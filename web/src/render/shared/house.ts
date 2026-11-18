@@ -1050,10 +1050,13 @@ export class HousePlanner {
     /**
      * One wall face (a rectangle on the plane of a wall side) from `a0` to `a1` along the
      * wall, `y0` to `y1` high. `n` is the outward normal; `r` the room that face looks into;
-     * `key` names it in `surfaces`.
+     * `key` names it in `surfaces`. `butt`: its ends (`a0`, `a1`) where the face goes on in its plane past them (a
+     * wall's at its posts, a post's at a wall it joins): its frieze's and its baseboard's ends there aren't drawn.
      */
-    const face = (axis: 'h' | 'v', plane: number, a0: number, a1: number, y0: number, y1: number, n: V3, r: number, cover = 0, key?: string) => {
+    const face = (axis: 'h' | 'v', plane: number, a0: number, a1: number, y0: number, y1: number, n: V3, r: number, cover = 0, key?: string, butt = '') => {
       const P = (a: number, y: number): V3 => (axis === 'h' ? [a, y, plane] : [plane, y, a]);
+      // (A board's end that butts nothing shows: its arris is eased as its top's is.)
+      const free = `${butt.includes('a0') ? '' : 'a0'} ${butt.includes('a1') ? '' : 'a1'}`;
       // The room's corners along this face: the nodes either end of its tile where a wall meets it on the room's side.
       const k0 = Math.floor((a0 + a1) / 2 + 1e-6);
       const meets = (k: number) => (axis === 'h' ? edges.get('v', k, Math.round(n[2] < 0 ? plane + T - 1 : plane - T)) : edges.get('h', Math.round(n[0] < 0 ? plane + T - 1 : plane - T), k)) !== undefined;
@@ -1069,14 +1072,11 @@ export class HousePlanner {
         // Exterior: stone plinth below, siding/brick above, frieze board under the eaves.
         const Q = (a: number, y: number, d: number): V3 => (axis === 'h' ? [a, y, plane + n[2] * d] : [plane + n[0] * d, y, a]);
         if (y0 < plinth) {
-          const out = 0.03;
-          stone.poly([P(a0, y0), P(a1, y0), P(a1, Math.min(plinth, y1)), P(a0, Math.min(plinth, y1))], n);
           // Its ledge only where wall goes on above it: faced all the way up (a basement's), it
-          // would lie on the wall's top, and inside the walls a post joins.
-          if (plinth < y1) {
-            stone.poly([Q(a0, plinth, 0), Q(a1, plinth, 0), Q(a1, plinth, out), Q(a0, plinth, out)], [0, 1, 0]);
-            stone.poly([Q(a0, y0, out), Q(a1, y0, out), Q(a1, plinth, out), Q(a0, plinth, out)], n);
-          }
+          // would lie on the wall's top, and inside the walls a post joins. The ledge is a board of stone on the wall's
+          // face, its upper arris eased (and a free end's); the wall's own face behind it isn't drawn.
+          if (plinth < y1) board(stone, layOn(axis, plane, n), a0, a1, y0, plinth, 0.03, `y1 ${free}`, `y0 ${butt}`);
+          else stone.poly([P(a0, y0), P(a1, y0), P(a1, Math.min(plinth, y1)), P(a0, Math.min(plinth, y1))], n);
         }
         const yb = Math.max(y0, plinth);
         if (y1 > yb) (own ?? ext).poly([P(a0, yb), P(a1, yb), P(a1, y1), P(a0, y1)], n);
@@ -1086,7 +1086,7 @@ export class HousePlanner {
           trim.kind = Cut.Hide;
           // (No higher than the face: a post's face towards a wall it joins stops a hair under that wall's top, and
           // its frieze, at the wall's full height, lay in the top's own plane and showed through it as light ticks.)
-          trim.box(...span(axis, plane, n, a0, a1, H - 0.2, Math.min(H, y1), 0.025));
+          board(trim, layOn(axis, plane, n), a0, a1, H - 0.2, Math.min(H, y1), 0.025, `y1 ${free}`, `y0 ${butt}`);
           trim.kind = k;
         }
         if (y0 < 0.01) ao.poly([Q(a0, 0.012, 0), Q(a1, 0.012, 0), Q(a1, 0.012, 0.45), Q(a0, 0.012, 0.45)], [0, 1, 0], undefined, [0.32, 0.32, 0, 0]);
@@ -1103,7 +1103,8 @@ export class HousePlanner {
         if (y1 > split) wall(int.color(tint), split, y1);
       }
       if (y0 < 0.01) {
-        trim.box(...span(axis, plane, n, a0, a1, 0, 0.1, 0.014));
+        // (The baseboard: its top's arris eased, the face on the floor not drawn.)
+        board(trim, layOn(axis, plane, n), a0, a1, 0, 0.1, 0.014, `y1 ${free}`, `y0 ${butt}`);
         const Q = (a: number, d: number): V3 => (axis === 'h' ? [a, 0.013, plane + n[2] * d] : [plane + n[0] * d, 0.013, a]);
         ao.poly([Q(a0, 0.014), Q(a1, 0.014), Q(a1, 0.34), Q(a0, 0.34)], [0, 1, 0], undefined, [0.3, 0.3, 0, 0]);
       }
@@ -1130,12 +1131,12 @@ export class HousePlanner {
       const a1 = s1 ?? (axis === 'h' ? x : z) + 1 - T;
       const [c0, c1] = lookOf(axis, x, z).faces ?? [0, 0];
       if (axis === 'h') {
-        face('h', z - T, a0, a1, y0, y1, [0, 0, -1], roomP(x + 0.5, z - 0.25), c0, `h:${x}:${z}:0`);
-        face('h', z + T, a0, a1, y0, y1, [0, 0, 1], roomP(x + 0.5, z + 0.25), c1, `h:${x}:${z}:1`);
+        face('h', z - T, a0, a1, y0, y1, [0, 0, -1], roomP(x + 0.5, z - 0.25), c0, `h:${x}:${z}:0`, 'a0 a1');
+        face('h', z + T, a0, a1, y0, y1, [0, 0, 1], roomP(x + 0.5, z + 0.25), c1, `h:${x}:${z}:1`, 'a0 a1');
         if (cap) capped(y1, () => trim.box(a0, y1 - 0.001, z - T, a1, y1, z + T, 'ny nx px nz pz'));
       } else {
-        face('v', x - T, a0, a1, y0, y1, [-1, 0, 0], roomP(x - 0.25, z + 0.5), c0, `v:${x}:${z}:0`);
-        face('v', x + T, a0, a1, y0, y1, [1, 0, 0], roomP(x + 0.25, z + 0.5), c1, `v:${x}:${z}:1`);
+        face('v', x - T, a0, a1, y0, y1, [-1, 0, 0], roomP(x - 0.25, z + 0.5), c0, `v:${x}:${z}:0`, 'a0 a1');
+        face('v', x + T, a0, a1, y0, y1, [1, 0, 0], roomP(x + 0.25, z + 0.5), c1, `v:${x}:${z}:1`, 'a0 a1');
         if (cap) capped(y1, () => trim.box(x - T, y1 - 0.001, a0, x + T, y1, a1, 'ny nx px nz pz'));
       }
     };
@@ -1342,7 +1343,9 @@ export class HousePlanner {
           // Against a wall it sits a hair inside it (its edges off the wall's faces and top): only
           // a cut wall shows it, and then a hair's crack round it doesn't.
           const e0 = e ? INSIDE : 0;
-          face(axis, plane, a0 + e0, a1 - e0, 0, top - e0, n, ra === 0 || rb === 0 ? 0 : ra, cover, from && from.join(':'));
+          // (Its frieze and baseboard butt those of the walls in its plane: a wall along x by its faces towards z, and so on.)
+          const [before, after] = axis === 'h' ? [hl, hr] : [vd, vu];
+          face(axis, plane, a0 + e0, a1 - e0, 0, top - e0, n, ra === 0 || rb === 0 ? 0 : ra, cover, from && from.join(':'), `${before ? 'a0' : ''} ${after ? 'a1' : ''}`);
         };
         const q = (dx: number, dz: number) => roomP(x + dx * 0.25, z + dz * 0.25);
         side('px', hr, [1, 0, 0], q(1, -1), q(1, 1));
@@ -1372,7 +1375,6 @@ export class HousePlanner {
      * `key` names it in `surfaces`.
      */
     const faceG = (f: WallFrame, a0: number, a1: number, y0: number, y1: number, dOff: number, sign: number, r: number, cover = 0, key?: string) => {
-      const out = (o: number): [number, number] => (sign > 0 ? [dOff, dOff + o] : [dOff - o, dOff]);
       const own = coverGeo(cover);
       const mark = (y0: number, y1: number) => {
         if (key && y1 > y0) f.face(surface(surfaces.faces, key), a0, a1, y0, y1, dOff + sign * PROUD, sign);
@@ -1394,7 +1396,7 @@ export class HousePlanner {
         if (y1 >= H - 0.01) {
           const k = trim.kind;
           trim.kind = Cut.Hide;
-          f.box(trim, a0, a1, H - 0.2, H, ...out(0.025), sign > 0 ? 'nd' : 'pd');
+          board(trim, (a, y, o) => f.at(a, y, dOff + sign * o), a0, a1, H - 0.2, H, 0.025, 'y1', 'y0');
           trim.kind = k;
         }
         if (y0 < 0.01) ground(0.012, 0, 0.45, [0.32, 0.32, 0, 0]);
@@ -1413,7 +1415,7 @@ export class HousePlanner {
         if (y1 > split) wall(int.color(tint), split, y1);
       }
       if (y0 < 0.01) {
-        f.box(trim, a0, a1, 0, 0.1, ...out(0.014), sign > 0 ? 'nd' : 'pd');
+        board(trim, (a, y, o) => f.at(a, y, dOff + sign * o), a0, a1, 0, 0.1, 0.014, 'y1', 'y0');
         ground(0.013, 0.014, 0.34, [0.3, 0.3, 0, 0]);
       }
     };
@@ -1458,24 +1460,24 @@ export class HousePlanner {
         // Glazing bars between the panes, then per face: a pane, frame, sill and (outside) shutters.
         const recess = 0.03;
         trim.cutting(Cut.Hide, mask).color(TRIM);
-        muntins(win, g0, g1, (a0, a1, y0, y1) => f.box(trim, a0, a1, y0, y1, -T + recess, T - recess));
+        muntins(win, g0, g1, (b0, b1, y0, y1) => glazingBar(trim, (a, y, o) => f.at(a, y, o), b0, b1, y0, y1, T - recess));
         for (const sign of [-1, 1]) {
           const plane = sign * T;
           const outside = d.rooms[sign > 0 ? 1 : 0] === 0;
-          const out = (o: number): [number, number] => (sign > 0 ? [plane, plane + o] : [plane - o, plane]);
           // (Lit by the room behind it; with the garden behind it, not at all: `GLASS_OUT`.)
           const pane = glass(d.rooms[sign > 0 ? 0 : 1] || (outside ? 0 : GLASS_OUT)).cutting(Cut.Hide, mask);
           f.face(pane, g0, g1, sill, head, plane - sign * recess, sign);
           trim.cutting(Cut.Hide, mask).color(TRIM);
           const fr = 0.07;
-          f.box(trim, g0 - fr, g0, sill, head, ...out(0.035));
-          f.box(trim, g1, g1 + fr, sill, head, ...out(0.035));
-          f.box(trim, g0 - fr, g1 + fr, head, head + fr, ...out(0.035));
-          f.box(trim, g0 - fr - 0.04, g1 + fr + 0.04, sill - 0.05, sill, ...out(outside ? 0.07 : 0.05));
+          const L: Lay = (a, y, o) => f.at(a, y, plane + sign * o);
+          board(trim, L, g0 - fr, g0, sill, head, 0.035, 'a0 a1', 'y0 y1', undefined, true);
+          board(trim, L, g1, g1 + fr, sill, head, 0.035, 'a0 a1', 'y0 y1', undefined, true);
+          board(trim, L, g0 - fr, g1 + fr, head, head + fr, 0.035, 'a0 a1 y1', '', undefined, true);
+          board(trim, L, g0 - fr - 0.04, g1 + fr + 0.04, sill - 0.05, sill, outside ? 0.07 : 0.05, 'a0 a1 y1', '', undefined, true);
           if (outside && (win.shutters === 'house' ? scheme.shutters : win.shutters)) {
             trim.color(scheme.accent);
-            if (g0 - fr - 0.36 >= a0 || plainDiagEnd(d, 0)) f.box(trim, g0 - fr - 0.36, g0 - fr - 0.02, sill - 0.02, head + 0.04, ...out(0.03));
-            if (g1 + fr + 0.36 <= a1 || plainDiagEnd(d, 1)) f.box(trim, g1 + fr + 0.02, g1 + fr + 0.36, sill - 0.02, head + 0.04, ...out(0.03));
+            if (g0 - fr - 0.36 >= a0 || plainDiagEnd(d, 0)) board(trim, L, g0 - fr - 0.36, g0 - fr - 0.02, sill - 0.02, head + 0.04, 0.03, 'a0 a1 y1');
+            if (g1 + fr + 0.36 <= a1 || plainDiagEnd(d, 1)) board(trim, L, g1 + fr + 0.02, g1 + fr + 0.36, sill - 0.02, head + 0.04, 0.03, 'a0 a1 y1');
             trim.color(TRIM);
           }
         }
@@ -1492,18 +1494,12 @@ export class HousePlanner {
         trim.poly([f.at(o0, DOOR_HEIGHT, -T), f.at(o0, DOOR_HEIGHT, T), f.at(o1, DOOR_HEIGHT, T), f.at(o1, DOOR_HEIGHT, -T)], [0, -1, 0]);
         for (const sign of [-1, 1]) {
           const plane = sign * T;
-          const out = (o: number): [number, number] => (sign > 0 ? [plane, plane + o] : [plane - o, plane]);
           trim.cutting(Cut.Clamp, mask);
           // (Their tops, which only a cut shows, in the cut wall's tone: `cutBoard`.)
-          for (const [b0, b1] of [[o0 - 0.1, o0 + 0.01], [o1 - 0.01, o1 + 0.1]]) {
-            const [d0, d1] = out(0.022);
-            const y1 = DOOR_HEIGHT + 0.1;
-            f.box(trim, b0, b1, 0, y1, d0, d1, 'py');
-            trim.color(HOUSE_LOOK.cap).poly([f.at(b0, y1, d0), f.at(b1, y1, d0), f.at(b1, y1, d1), f.at(b0, y1, d1)], [0, 1, 0]);
-            trim.color(TRIM);
-          }
+          const L: Lay = (a, y, o) => f.at(a, y, plane + sign * o);
+          for (const [b0, b1] of [[o0 - 0.1, o0 + 0.01], [o1 - 0.01, o1 + 0.1]]) cutBoard(trim, L, b0, b1, 0, DOOR_HEIGHT + 0.1, 0.022, 'a0 a1');
           trim.cutting(Cut.Hide, mask);
-          f.box(trim, o0 - 0.1, o1 + 0.1, DOOR_HEIGHT, DOOR_HEIGHT + 0.12, ...out(0.024));
+          board(trim, L, o0 - 0.1, o1 + 0.1, DOOR_HEIGHT, DOOR_HEIGHT + 0.12, 0.024, 'y1 a0 a1', '', undefined, true);
         }
         // The leaf, drawn open 90° (see `diagLeaf`; accent colour on a painted front door), its glass
         // the room it stands in (standing outdoors, the one it shuts). Shut, it lies in the doorway
@@ -1527,6 +1523,7 @@ export class HousePlanner {
         const fr = new WallFrame(ox, oz, ox + ux, oz + uz);
         this.leaf(d.style, front, scheme, mask, DOOR_HEIGHT, own ? { trim: own.trim, wood: own.wood, glass: leafGlass } : { trim, wood: doorWood, glass: leafGlass }, {
           box: (g, s0, s1, y0, y1, l0, l1) => fr.box(g, hinge + s0, hinge + s1, y0, y1, Math.min(at(l0), at(l1)), Math.max(at(l0), at(l1))),
+          at: (s, y, l) => fr.at(hinge + s, y, at(l)),
           pane: (y0, y1, l0, l1) => {
             const a = hinge + LEAF_T / 2;
             const pts: V3[] = [fr.at(a, y0, at(l0)), fr.at(a, y0, at(l1)), fr.at(a, y1, at(l1)), fr.at(a, y1, at(l0))];
@@ -2118,9 +2115,11 @@ export class HousePlanner {
       // A single garage's door, 2.4–2.5 m (wider garages keep their walls either side).
       const half = Math.min(g1 - g0 - 0.7, 2.5) / 2;
       const [d0, d1] = [(g0 + g1) / 2 - half, (g0 + g1) / 2 + half];
-      trim.color(TRIM).box(...span(axis, plane, n, d0 - 0.1, d1 + 0.1, 0, 2.25, 0.03));
+      // (Its frame and its door boards with their arrises eased: the viewed lot's garage is seen from the play camera.)
+      const G = layOn(axis, plane, n);
+      board(trim.color(TRIM), G, d0 - 0.1, d1 + 0.1, 0, 2.25, 0.03, 'a0 a1 y1', 'y0');
       const door = hash(b.x0, b.z0, 9) < 0.5 ? '#F2F0EA' : s.accent;
-      trim.color(door).box(...span(axis, plane, n, d0, d1, 0, 2.12, 0.045));
+      board(trim.color(door), (a, y, o) => G(a, y, 0.03 + o), d0, d1, 0, 2.12, 0.015, 'a0 a1 y1', 'y0');
       trim.color(shade(door, 0.82));
       for (const y of [0.53, 1.06, 1.59]) trim.box(...span(axis, plane, n, d0 + 0.04, d1 - 0.04, y - 0.015, y + 0.015, 0.05));
       trim.color(TRIM);
@@ -2280,14 +2279,18 @@ export class HousePlanner {
     const z1 = plane + out * depth;
     // Kept low: Sims walk up to the door at ground level.
     trim.color('#C9C4BA');
-    box(mid - half, 0, z0, mid + half, 0.05, z1, 'ny');
-    box(mid - half + 0.15, 0, z1, mid + half - 0.15, 0.025, z1 + out * 0.3, 'ny');
+    // (The landing and its step: slabs on the ground, their upper arrises eased.)
+    const slab = (u0: number, u1: number, v0: number, v1: number, high: number) =>
+      board(trim, axis === 'h' ? (a, v, d) => [a, d, v] : (a, v, d) => [v, d, a], u0, u1, Math.min(v0, v1), Math.max(v0, v1), high, 'a0 a1 y0 y1');
+    slab(mid - half, mid + half, z0, z1, 0.05);
+    slab(mid - half + 0.15, mid + half - 0.15, z1, z1 + out * 0.3, 0.025);
     const top = PORCH_TOP;
     trim.color(TRIM);
     cut(Cut.Clamp);
     for (const x of [mid - half + 0.08, mid + half - 0.08]) {
       const zc = z1 - out * 0.08;
-      box(x - 0.055, 0.05, zc - 0.055, x + 0.055, top, zc + 0.055);
+      // (The post as two boards back to back, its four arrises eased; its ends stand in its base and under the canopy.)
+      for (const side of [1, -1]) board(trim, axis === 'h' ? (a, y, d) => [a, y, zc + side * d] : (a, y, d) => [zc + side * d, y, a], x - 0.055, x + 0.055, 0.05, top, 0.055, 'a0 a1', 'y0 y1');
       box(x - 0.08, 0.05, zc - 0.08, x + 0.08, 0.22, zc + 0.08);
     }
     // The canopy from the posts back to the wall, its ridge out from it (the gable end a centimetre in).
@@ -2323,7 +2326,7 @@ export class HousePlanner {
     if (p.kind === 'post') {
       const [cx, cz] = [p.x + 0.5, p.z + 0.5];
       trim.color(TRIM);
-      trim.box(cx - 0.055, 0, cz - 0.055, cx + 0.055, PORCH_TOP, cz + 0.055, 'ny');
+      for (const side of [1, -1]) board(trim, (a, y, d) => [a, y, cz + side * d], cx - 0.055, cx + 0.055, 0, PORCH_TOP, 0.055, 'a0 a1', 'y0');
       trim.box(cx - 0.08, 0, cz - 0.08, cx + 0.08, 0.22, cz + 0.08, 'ny');
     } else if (p.kind === 'canopy') {
       walls.color(s.wall);
@@ -2401,10 +2404,11 @@ export class HousePlanner {
       const a1 = base + 1 - T;
       const side = (axis === 'h' ? n[2] : n[0]) < 0 ? -1 : 1;
       trim.cutting(Cut.Clamp, mask);
-      if (first) cutBoard(trim, span(axis, plane, n, a0 - (geos.meets?.(0, side) ? 0 : 0.1), a0 + 0.01, 0, head + 0.1, 0.022));
-      if (last) cutBoard(trim, span(axis, plane, n, a1 - 0.01, a1 + (geos.meets?.(1, side) ? 0 : 0.1), 0, head + 0.1, 0.022));
+      const L = layOn(axis, plane, n);
+      if (first) cutBoard(trim, L, a0 - (geos.meets?.(0, side) ? 0 : 0.1), a0 + 0.01, 0, head + 0.1, 0.022, 'a0 a1');
+      if (last) cutBoard(trim, L, a1 - 0.01, a1 + (geos.meets?.(1, side) ? 0 : 0.1), 0, head + 0.1, 0.022, 'a0 a1');
       trim.cutting(Cut.Hide, mask);
-      trim.box(...span(axis, plane, n, first ? a0 - 0.1 : base, last ? a1 + 0.1 : base + 1, head, head + 0.12, 0.024));
+      board(trim, L, first ? a0 - 0.1 : base, last ? a1 + 0.1 : base + 1, head, head + 0.12, 0.024, `y1${first ? ' a0' : ''}${last ? ' a1' : ''}`, '', undefined, true);
     }
     // A door leaf hinged on one jamb, shut in the doorway; open, swung 90 degrees into the room (or
     // the outdoor side's opposite for front doors), standing against the opening's edge.
@@ -2502,6 +2506,7 @@ export class HousePlanner {
         if (axis === 'h') g.box(hinge + s0, y0, p0, hinge + s1, y1, p1);
         else g.box(p0, y0, hinge + s0, p1, y1, hinge + s1);
       },
+      at: (s, y, l) => (turn !== 0 ? f.at(s, y, out(l)) : axis === 'h' ? [hinge + s, y, at(l)] : [at(l), y, hinge + s]),
       pane: (y0, y1, l0, l1) => {
         const a = LEAF_T / 2;
         const pts: V3[] = [f.at(a, y0, out(l0)), f.at(a, y0, out(l1)), f.at(a, y1, out(l1)), f.at(a, y1, out(l0))];
@@ -2524,7 +2529,7 @@ export class HousePlanner {
     mask: number,
     head: number,
     geos: { trim: Geo; wood: Geo; glass: Geo },
-    put: { box: (g: Geo, s0: number, s1: number, y0: number, y1: number, l0: number, l1: number) => void; pane: (y0: number, y1: number, l0: number, l1: number) => void },
+    put: { box: (g: Geo, s0: number, s1: number, y0: number, y1: number, l0: number, l1: number) => void; at: (s: number, y: number, l: number) => V3; pane: (y0: number, y1: number, l0: number, l1: number) => void },
     width: number,
   ): void {
     const def = this.looks.doors[style ?? 0] ?? PANEL_DOOR;
@@ -2532,17 +2537,19 @@ export class HousePlanner {
     for (const g of [trim, wood, glass]) g.cutting(Cut.Hide, mask);
     const paint = def.color ?? (front ? scheme.accent : '#EDEAE2');
     const top = head - 0.03;
-    const box = (g: Geo, y0: number, y1: number, l0: number, l1: number) => put.box(g, 0, LEAF_T, y0, y1, l0, l1);
     if (def.leaf === 'oak' || def.leaf === 'panel') {
       // Four raised panels on both faces, as the neighbours' doors have, a shade lighter.
       const [g, colour] = def.leaf === 'oak' ? [wood, def.color ?? OAK] : [trim, paint];
-      box(g.color(colour), 0.01, top, 0, width);
+      // The slab as two boards back to back from its middle, its upright arrises and its top's eased (`board`); the
+      // panels 10 mm proud of it, their backs on it not drawn.
+      const faces: Lay[] = [(l, y, d) => put.at(LEAF_T / 2 - d, y, l), (l, y, d) => put.at(LEAF_T / 2 + d, y, l)];
+      g.color(colour);
+      for (const face of faces) board(g, face, 0, width, 0.01, top, LEAF_T / 2, 'a0 a1 y1', 'y0');
       g.color(shade(colour, 1.08));
       const mid = width / 2;
       for (const [y0, y1] of [[0.15, 0.95], [1.15, 1.95]]) {
         for (const [l0, l1] of [[0.1, mid - 0.04], [mid + 0.04, width - 0.1]]) {
-          put.box(g, -0.012, 0, y0, y1, l0, l1);
-          put.box(g, LEAF_T, LEAF_T + 0.012, y0, y1, l0, l1);
+          for (const face of faces) board(g, (l, y, d) => face(l, y, LEAF_T / 2 + d), l0, l1, y0, y1, 0.01);
         }
       }
     } else {
@@ -2550,16 +2557,19 @@ export class HousePlanner {
       const glassFrom = def.leaf === 'halfGlass' ? 1.05 : 0.22;
       const stile = def.leaf === 'halfGlass' ? 0.1 : 0.08;
       trim.color(paint);
-      box(trim, 0.01, glassFrom, 0, width);
-      box(trim, glassFrom, top, 0, stile);
-      box(trim, glassFrom, top, width - stile, width);
-      box(trim, top - 0.1, top, stile, width - stile);
-      if (def.leaf === 'glass') box(trim, 1.08, 1.12, stile, width - stile);
+      // Its panel, stiles and rails each two boards back to back, the arrises that show eased (`board`).
+      for (const face of [(l: number, y: number, d: number) => put.at(LEAF_T / 2 - d, y, l), (l: number, y: number, d: number) => put.at(LEAF_T / 2 + d, y, l)]) {
+        board(trim, face, 0, width, 0.01, glassFrom, LEAF_T / 2, 'a0 a1 y1', 'y0');
+        board(trim, face, 0, stile, glassFrom, top, LEAF_T / 2, 'a0 a1 y1', 'y0');
+        board(trim, face, width - stile, width, glassFrom, top, LEAF_T / 2, 'a0 a1 y1', 'y0');
+        board(trim, face, stile, width - stile, top - 0.1, top, LEAF_T / 2, 'y1', 'a0 a1');
+        if (def.leaf === 'glass') board(trim, face, stile, width - stile, 1.08, 1.12, LEAF_T / 2, 'y1', 'a0 a1');
+      }
       put.pane(glassFrom, top - 0.1, stile, width - stile);
     }
-    // A brass handle on both faces.
+    // A brass handle on both faces (a knob: under a tenth of a metre through the leaf, too small for an eased arris to show).
     trim.color('#B39A62');
-    put.box(trim, -0.035, LEAF_T + 0.035, 1.0, 1.05, width - 0.12, width - 0.07);
+    put.box(trim, -0.027, LEAF_T + 0.027, 1.0, 1.05, width - 0.12, width - 0.07);
     trim.color(TRIM);
   }
 
@@ -2584,10 +2594,9 @@ export class HousePlanner {
     const a0 = base + win.inset;
     const a1 = base + len - win.inset;
     const recess = 0.03;
-    const n0: V3 = axis === 'h' ? [0, 0, 1] : [1, 0, 0];
-    const back = (axis === 'h' ? z : x) - T + recess;
     trim.cutting(Cut.Hide, mask).color(TRIM);
-    const bar = (b0: number, b1: number, y0: number, y1: number) => trim.box(...span(axis, back, n0, b0, b1, y0, y1, 2 * (T - recess)));
+    const mid: Lay = axis === 'h' ? (a, y, d) => [a, y, z + d] : (a, y, d) => [x + d, y, a];
+    const bar = (b0: number, b1: number, y0: number, y1: number) => glazingBar(trim, mid, b0, b1, y0, y1, T - recess);
     for (let k = 0; k < len; k++) {
       muntins(win, k === 0 ? a0 : base + k, k === len - 1 ? a1 : base + k + 1, bar);
       if (k > 0) bar(base + k - 0.03, base + k + 0.03, sill, head);
@@ -2606,14 +2615,16 @@ export class HousePlanner {
       trim.cutting(Cut.Hide, mask).color(TRIM);
       const f = 0.07;
       const out = 0.035;
-      trim.box(...span(axis, plane, n, a0 - f, a0, sill, head, out));
-      trim.box(...span(axis, plane, n, a1, a1 + f, sill, head, out));
-      trim.box(...span(axis, plane, n, a0 - f, a1 + f, head, head + f, out));
-      trim.box(...span(axis, plane, n, a0 - f - 0.04, a1 + f + 0.04, sill - 0.05, sill, outside ? 0.07 : 0.05));
+      // The frame's boards with their arrises eased (`board`): the jambs stand on the sill and under the head.
+      const L = layOn(axis, plane, n);
+      board(trim, L, a0 - f, a0, sill, head, out, 'a0 a1', 'y0 y1', undefined, true);
+      board(trim, L, a1, a1 + f, sill, head, out, 'a0 a1', 'y0 y1', undefined, true);
+      board(trim, L, a0 - f, a1 + f, head, head + f, out, 'a0 a1 y1', '', undefined, true);
+      board(trim, L, a0 - f - 0.04, a1 + f + 0.04, sill - 0.05, sill, outside ? 0.07 : 0.05, 'a0 a1 y1', '', undefined, true);
       if (outside && (win.shutters === 'house' ? scheme.shutters : win.shutters)) {
         trim.color(scheme.accent);
-        if (shutters[0]) trim.box(...span(axis, plane, n, a0 - f - 0.36, a0 - f - 0.02, sill - 0.02, head + 0.04, 0.03));
-        if (shutters[1]) trim.box(...span(axis, plane, n, a1 + f + 0.02, a1 + f + 0.36, sill - 0.02, head + 0.04, 0.03));
+        if (shutters[0]) board(trim, L, a0 - f - 0.36, a0 - f - 0.02, sill - 0.02, head + 0.04, 0.03, 'a0 a1 y1');
+        if (shutters[1]) board(trim, L, a1 + f + 0.02, a1 + f + 0.36, sill - 0.02, head + 0.04, 0.03, 'a0 a1 y1');
         trim.color(TRIM);
       }
     }
@@ -2640,9 +2651,10 @@ export class HousePlanner {
     const za = z + sz * T;
     trim.cutting(Cut.Clamp, LOOK.All, LOOK.All);
     trim.color(TRIM);
-    // Board on the face whose normal is along x, and one on the face along z.
-    cutBoard(trim, [Math.min(xa, xa + sx * d), PLINTH, Math.min(za + sz * 0.001, za - sz * w), Math.max(xa, xa + sx * d), WALL_HEIGHT - 0.2, Math.max(za + sz * 0.001, za - sz * w)]);
-    cutBoard(trim, [Math.min(xa + sx * d, xa - sx * w), PLINTH, Math.min(za, za + sz * d), Math.max(xa + sx * d, xa - sx * w), WALL_HEIGHT - 0.2, Math.max(za, za + sz * d)]);
+    // Board on the face whose normal is along x, and one on the face along z, which runs on past the corner over the
+    // first's edge: the corner's arris is its, eased as its other one and the first's far one are.
+    cutBoard(trim, layOn('v', xa, [sx, 0, 0]), Math.min(za + sz * 0.001, za - sz * w), Math.max(za + sz * 0.001, za - sz * w), PLINTH, WALL_HEIGHT - 0.2, d, sz > 0 ? 'a0' : 'a1');
+    cutBoard(trim, layOn('h', za, [0, 0, sz]), Math.min(xa + sx * d, xa - sx * w), Math.max(xa + sx * d, xa - sx * w), PLINTH, WALL_HEIGHT - 0.2, d, 'a0 a1');
   }
 }
 
@@ -2651,12 +2663,20 @@ export class HousePlanner {
  * shows only then (standing, the casing's head or the frieze lies on it), so it is in the cut wall's tone
  * (`HOUSE_LOOK.cap`), as the wall's own top is, not a white dash beside it.
  */
-function cutBoard(trim: Geo, box: [number, number, number, number, number, number]): void {
-  const [x0, , z0, x1, y1, z1] = box;
-  const { r, g, b, a } = trim;
-  trim.box(...box, 'py');
-  trim.color(HOUSE_LOOK.cap).poly([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], [0, 1, 0]);
-  [trim.r, trim.g, trim.b, trim.a] = [r, g, b, a];
+function cutBoard(trim: Geo, L: Lay, a0: number, a1: number, y0: number, y1: number, out: number, chamfer: string, skip = ''): void {
+  // (A board too narrow to ease is square: a casing's sliver beside a wall it meets. Its back is drawn: it lies over
+  // the arris of its wall's corner or of its doorway.)
+  board(trim, L, a0, a1, y0, y1, out, a1 - a0 < 0.03 ? '' : chamfer, `y0 ${skip}`, HOUSE_LOOK.cap, true);
+}
+
+/**
+ * A glazing bar (or a mullion) through a window's opening, between its two panes: `b0`..`b1` along the wall, `y0`..`y1`
+ * up, `half` its depth either way from the wall's middle (`at`: a point `d` off it). Two boards back to back, the
+ * long arrises that show eased: an upright bar's four, a level one's two upper ones (`board`); its ends stand in the frame.
+ */
+function glazingBar(trim: Geo, at: Lay, b0: number, b1: number, y0: number, y1: number, half: number): void {
+  const upright = y1 - y0 > b1 - b0;
+  for (const side of [1, -1]) board(trim, (a, y, d) => at(a, y, side * d), b0, b1, y0, y1, half, upright ? 'a0 a1' : 'y1', upright ? 'y0 y1' : 'a0 a1');
 }
 
 /**
@@ -2708,6 +2728,65 @@ function span(axis: 'h' | 'v', plane: number, n: V3, a0: number, a1: number, y0:
   const lo = Math.min(d0, d1);
   const hi = Math.max(d0, d1);
   return axis === 'h' ? [a0, y0, lo, a1, y1, hi] : [lo, y0, a0, hi, y1, a1];
+}
+
+/** A chamfer on a board's arris (m): a pixel at the play camera's nearest, where it catches the light as a line. */
+const CHAMFER = 0.004;
+
+/** Where a point of a board is: `a` along its wall, `y` up, `d` out from the wall's face (the three at right angles, a metre each). */
+type Lay = (a: number, y: number, d: number) => V3;
+
+/** A straight wall's `Lay`: its face at `plane`, looking along `n`. */
+function layOn(axis: 'h' | 'v', plane: number, n: V3): Lay {
+  const s = axis === 'h' ? n[2] : n[0];
+  return axis === 'h' ? (a, y, d) => [a, y, plane + s * d] : (a, y, d) => [plane + s * d, y, a];
+}
+
+/**
+ * A board on a wall's face, built with its arrises eased: `a0`..`a1` along the wall, `y0`..`y1` up, `out` m proud of
+ * the face. `chamfer` names the edges of its front that are chamfered (`a0`, `a1`, `y0`, `y1`: the edge on that side),
+ * each a flat face `CHAMFER` wide at 45° with normals of its own, as a model's bevel has: the long edges that show,
+ * not one against another board or looking down. `skip` names the sides not drawn (one butted against another
+ * board, or on the floor). Its back, against the wall, is drawn only where it lies over an arris of the wall's own
+ * (`backed`: a frame's boards round their opening, which closes them as the solids the edge rule reads). `cap`: its
+ * top side in that colour (a board that drops with its wall shows its top only then: `HOUSE_LOOK.cap`).
+ */
+function board(geo: Geo, P: Lay, a0: number, a1: number, y0: number, y1: number, out: number, chamfer = '', skip = '', cap?: string, backed = false): void {
+  const c = Math.min(CHAMFER, out * 0.45);
+  const [ca0, ca1, cy0, cy1] = ['a0', 'a1', 'y0', 'y1'].map((k) => (chamfer.includes(k) ? c : 0));
+  const o = P(0, 0, 0);
+  const dir = (p: V3, k = 1): V3 => [(p[0] - o[0]) * k, (p[1] - o[1]) * k, (p[2] - o[2]) * k];
+  const [ua, uy, n] = [dir(P(1, 0, 0)), dir(P(0, 1, 0)), dir(P(0, 0, 1))];
+  const eased = (side: V3, k: number): V3 => [(n[0] + side[0] * k) * Math.SQRT1_2, (n[1] + side[1] * k) * Math.SQRT1_2, (n[2] + side[2] * k) * Math.SQRT1_2];
+  const r = out - c;
+  geo.poly([P(a0 + ca0, y0 + cy0, out), P(a1 - ca1, y0 + cy0, out), P(a1 - ca1, y1 - cy1, out), P(a0 + ca0, y1 - cy1, out)], n);
+  if (backed) geo.poly([P(a0, y0, 0), P(a1, y0, 0), P(a1, y1, 0), P(a0, y1, 0)], [-n[0], -n[1], -n[2]]);
+  if (ca0) geo.poly([P(a0 + c, y0 + cy0, out), P(a0 + c, y1 - cy1, out), P(a0, y1, r), P(a0, y0, r)], eased(ua, -1));
+  if (ca1) geo.poly([P(a1 - c, y0 + cy0, out), P(a1 - c, y1 - cy1, out), P(a1, y1, r), P(a1, y0, r)], eased(ua, 1));
+  if (cy0) geo.poly([P(a0 + ca0, y0 + c, out), P(a1 - ca1, y0 + c, out), P(a1, y0, r), P(a0, y0, r)], eased(uy, -1));
+  if (cy1) geo.poly([P(a0 + ca0, y1 - c, out), P(a1 - ca1, y1 - c, out), P(a1, y1, r), P(a0, y1, r)], eased(uy, 1));
+  // A side: from the wall out to the front, or to the foot of its own chamfer; cut at its ends by the chamfers beside it.
+  const side = (own: number, lo: number, hi: number, at: (v: number, d: number) => V3, normal: V3) => {
+    const pts = [at(0, 0), at(1, 0)];
+    if (own) pts.push(at(1, r), at(0, r));
+    else {
+      if (hi) pts.push(at(1, r), at(1 - hi, out));
+      else pts.push(at(1, out));
+      if (lo) pts.push(at(lo, out), at(0, r));
+      else pts.push(at(0, out));
+    }
+    geo.poly(pts, normal);
+  };
+  const [la, ly] = [a1 - a0, y1 - y0];
+  if (!skip.includes('a0')) side(ca0, cy0 / ly, cy1 / ly, (v, d) => P(a0, y0 + v * ly, d), dir(P(-1, 0, 0)));
+  if (!skip.includes('a1')) side(ca1, cy0 / ly, cy1 / ly, (v, d) => P(a1, y0 + v * ly, d), ua);
+  if (!skip.includes('y0')) side(cy0, ca0 / la, ca1 / la, (v, d) => P(a0 + v * la, y0, d), dir(P(0, -1, 0)));
+  if (!skip.includes('y1')) {
+    const { r: red, g, b } = geo;
+    if (cap) geo.color(cap);
+    side(cy1, ca0 / la, ca1 / la, (v, d) => P(a0 + v * la, y1, d), uy);
+    [geo.r, geo.g, geo.b] = [red, g, b];
+  }
 }
 
 /** How much of a leaf by its hinge `slantClear` leaves out (metres): it stays in the jamb and the corner post. */
