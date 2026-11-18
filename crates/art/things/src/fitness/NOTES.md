@@ -1,11 +1,11 @@
 # Fitness — notes
 
-`fitness.py` builds the five F1 home gym models into `web/public/assets/models/fitness/` and their entries in
+This module builds the five F1 home gym models into `web/public/assets/models/fitness/` and their entries in
 `packs/fitness/manifest.json`: the treadmill (`model.treadmill`), the weight bench (`model.weightBench`), the
 exercise bike (`model.exerciseBike`), the yoga mat (`model.yogaMat`) and the dumbbell rack (`model.dumbbells`).
 Built 2026-10-14; they sat in Validate › Fitness until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`,
+Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `centre` on its `Model`,
 except the bike, which is centred).
 
 ## The treadmill
@@ -15,7 +15,7 @@ belt facing the console: `characters.ts` moves them forward from the tile in fro
 top (content `stand.height`, 0.156 m), as it does for the trampoline.
 
 - **The slats** (`slats`): 6 strips across the belt, 30 cm apart (`SLAT`). `belt_run` moves them one slat back
-  (towards the rear) in 0.13 s at an even speed (`G.scroll`, 2.25 m/s, a run; a clip of 4 frames: 3 failed the
+  (towards the rear) in 0.13 s at an even speed (`scroll`, 2.25 m/s, a run; a clip of 4 frames: 3 failed the
   gate's even-speed test), a loop for the whole run
   (`loops: {run: belt_run}`). It was 0.4 m/s with 10 cm slats, a slow walk under a running stride (review
   A-fitness-02, 2026-10-21): the long pitch is what lets the belt run that fast and still be seen going back, as
@@ -32,7 +32,7 @@ their old parts reached 2 cm into the wall.)
 
 An upright bike: stabiliser feet, a flywheel with covers at the front, the saddle 0.76 m up (content `seat`), the
 handlebars and a console. **The cranks and pedals** (`pedals`) are joined round the axle; `pedals_turn` turns them
-once in 1.2 s (`G.spin`), a loop while cycled (`loops: {cycle: pedals_turn}`). The pedals are round, so they look
+once in 1.2 s (`spin`), a loop while cycled (`loops: {cycle: pedals_turn}`). The pedals are round, so they look
 the same at any angle. The rider pedals: content `"seat": {"height": 0.76, "forward": -0.12, "pedals": {"height":
 0.3, "forward": 0.04, "crank": 0.16}}` puts each foot on its pedal, in time with `pedals_turn` (the right one at
 the bottom at rest; `characters.ts` `pedal`).
@@ -44,10 +44,10 @@ rest it lies rolled up at the back, on the wall's face, with a foam block and a 
 use: `uses: {yoga: unroll}`, back when the yoga ends) moves two parts together:
 
 - **The flat mat** (`mat`), its origin under the roll's axis, built full and squeezed to 0.001 deep: it grows to the
-  front (`G.grow`, axis Y). Flattened there, it is mostly inside the roll (`check-glb` still warns of 42 % showing:
+  front (`grow`, axis Y). Flattened there, it is mostly inside the roll (`check-glb` still warns of 42 % showing:
   a 1.6 cm strip under the roll's curve, at the back on the floor).
-- **The roll** (`roll`), its origin on the floor under its axis: it rolls forward with the mat's edge (`G.slide`)
-  and shrinks onto the floor (`G.squash` to 0.12), leaving a curled front edge.
+- **The roll** (`roll`), its origin on the floor under its axis: it rolls forward with the mat's edge (`slide`)
+  and shrinks onto the floor (`squash` to 0.12), leaving a curled front edge.
 
 The mat is 1.6 cm thick: the house's floor is drawn 1 cm up, so a thinner one disappears. Rolled at rest, it
 stands off the middle of its footprint (its `Model`'s `centre`, which the gate checks it is centred on) and is
@@ -111,8 +111,15 @@ its hood and cap covers as they were), motions, paint and draws; the held bar an
 ```
 cargo art fitness            # the five .glb, the pack, check-glb
 cargo art fitness --preview  # previews/fitness/<id>.png, <id>@<clip>.png
+cargo art fitness --check    # rebuilds and fails on any byte that differs
 ```
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `treadmill`, `weightBench`, `yogaMat`; 11,348 to 11,300 triangles.
+No change to the models' code: their soft boxes take the shared form's new shape (the soft box: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `treadmill`, `weightBench`, `yogaMat`; 11,348 to 11,300 triangles.
+
+## Built in Rust (2026-11-18)
+
+Ported line for line from the Blender script (`crates/art/things/src/fitness`): against the last Blender build
+(`ref/blender`) all five are near (every point Blender's, 0.000 mm; baked shading within 1.7 of 32 greys), the pack
+the same. The yoga mat's nodes come out `roll` before `mat` (the order they are made), Blender's by name.

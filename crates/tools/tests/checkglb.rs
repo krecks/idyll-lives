@@ -272,7 +272,7 @@ fn every_object_is_measured() {
     );
 }
 
-/// The birds the renderer flies (`packs/birds`, families/birds.py) carry their sizes, and the trees, shrubs and hedges
+/// The birds the renderer flies (`packs/birds`, crates/art/things/src/birds) carry their sizes, and the trees, shrubs and hedges
 /// where they sit carry their perches (crates/art/nature/src/trees, families/plants.py): 12-30 a tree, 3-8 a shrub or hedge segment, each
 /// three numbers, and their `habitat`. The gate checks both against the files.
 #[test]
