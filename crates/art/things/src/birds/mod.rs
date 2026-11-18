@@ -123,50 +123,47 @@ fn facts(s: &Species) -> json::Json {
 /// box's middle (the feet are on the origin, the tail reaches back further than the bill forward); `sink` how far
 /// the tail hangs below the perch.
 pub fn family() -> Option<Family> {
-    Some(
-        Family::new(
-            "birds",
-            M.palette(),
-            vec![
-                Model::new("blueTit", blue_tit, (0.185, 0.072, 0.106))
-                    .centre(0.0, -0.0021)
-                    .key("model.bird.blueTit")
-                    .code()
-                    .on_wall()
-                    .sink(0.01)
-                    .bird(facts(&BLUE_TIT)),
-                Model::new("chaffinch", chaffinch, (0.26, 0.072, 0.135))
-                    .centre(0.0, -0.0059)
-                    .key("model.bird.chaffinch")
-                    .code()
-                    .on_wall()
-                    .sink(0.01)
-                    .bird(facts(&CHAFFINCH)),
-                Model::new("warbler", willow_warbler, (0.19, 0.054, 0.103))
-                    .centre(0.0, -0.0019)
-                    .key("model.bird.warbler")
-                    .code()
-                    .on_wall()
-                    .bird(facts(&WARBLER)),
-                Model::new("blackbird", blackbird, (0.36, 0.11, 0.241))
-                    .centre(0.0, -0.0077)
-                    .key("model.bird.blackbird")
-                    .code()
-                    .on_wall()
-                    .bird(facts(&BLACKBIRD)),
-                Model::new("collaredDove", collared_dove, (0.51, 0.11, 0.312))
-                    .centre(0.0, -0.0313)
-                    .key("model.bird.collaredDove")
-                    .code()
-                    .on_wall()
-                    .bird(facts(&COLLARED_DOVE)),
-            ],
-            "The garden birds (crates/art/things/src/birds, built by cargo art): the blue tit, chaffinch, willow \
+    Some(Family::new(
+        "birds",
+        M.palette(),
+        vec![
+            Model::new("blueTit", blue_tit, (0.185, 0.072, 0.106))
+                .centre(0.0, -0.0021)
+                .key("model.bird.blueTit")
+                .code()
+                .on_wall()
+                .sink(0.01)
+                .bird(facts(&BLUE_TIT)),
+            Model::new("chaffinch", chaffinch, (0.26, 0.072, 0.135))
+                .centre(0.0, -0.0059)
+                .key("model.bird.chaffinch")
+                .code()
+                .on_wall()
+                .sink(0.01)
+                .bird(facts(&CHAFFINCH)),
+            Model::new("warbler", willow_warbler, (0.19, 0.054, 0.103))
+                .centre(0.0, -0.0019)
+                .key("model.bird.warbler")
+                .code()
+                .on_wall()
+                .bird(facts(&WARBLER)),
+            Model::new("blackbird", blackbird, (0.36, 0.11, 0.241))
+                .centre(0.0, -0.0077)
+                .key("model.bird.blackbird")
+                .code()
+                .on_wall()
+                .bird(facts(&BLACKBIRD)),
+            Model::new("collaredDove", collared_dove, (0.51, 0.11, 0.312))
+                .centre(0.0, -0.0313)
+                .key("model.bird.collaredDove")
+                .code()
+                .on_wall()
+                .bird(facts(&COLLARED_DOVE)),
+        ],
+        "The garden birds (crates/art/things/src/birds, built by cargo art): the blue tit, chaffinch, willow \
              warbler, blackbird and collared dove the game flies about by code, perched, in five rigid parts the \
              renderer moves (`body`, `head`, `tail`, `wing.L`, `wing.R`: the wings spread, which it flaps, and hides \
              while perched). `bird`: length (bill to tail tip) and wingspan, the body's middle over the feet \
              (`perchHeight`) and the perched torso's rise from level (`pitch`, degrees), in metres.",
-        )
-        .switched(),
-    )
+    ))
 }

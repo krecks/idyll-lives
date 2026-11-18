@@ -290,5 +290,5 @@ pub fn family() -> Option<Family> {
          high chair, the toys, and the kids' study and art things. Listed in the base manifest's \
          packs. The materials map onto the game's finishes so a model costs one draw call per finish \
          group.",
-    ).switched())
+    ))
 }

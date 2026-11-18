@@ -83,5 +83,5 @@ pub fn family() -> Option<Family> {
          costs one draw call per finish group. Each moves while it is used: a lettuce is picked from \
          the veggie bed (whose crop follows its growth stage), a seedling comes up, a bird lands, the \
          hammock sways, the shower runs, the cloche lifts and the glasshouse's door and vent open.",
-    ).switched())
+    ))
 }

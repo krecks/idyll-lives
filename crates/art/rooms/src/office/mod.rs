@@ -222,5 +222,5 @@ pub fn family() -> Option<Family> {
          costs one draw call per finish group. The keyboard shelves slide out (`tray_out`), the writing desk's \
          drawer opens (`drawer_open`), the laptop opens (`lid_open`), the gaming PC's fans spin (`fans`), the \
          chairs swivel (`swivel`) and the whiteboard fills with a plan (`scribble`) while residents use them.",
-    ).switched())
+    ))
 }

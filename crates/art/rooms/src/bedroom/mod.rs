@@ -99,5 +99,5 @@ pub fn family() -> Option<Family> {
          packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The \
          beds turn their duvet down (`turn_down`) while a resident sleeps or naps; the futon unfolds into a bed \
          (`unfold`) and stays open.",
-    ).switched())
+    ))
 }

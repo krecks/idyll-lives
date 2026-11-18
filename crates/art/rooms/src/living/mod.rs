@@ -424,5 +424,5 @@ pub fn family() -> Option<Family> {
         ],
         "The living room (crates/art/rooms/src/living, built by cargo art). The materials map onto the game's \
          finishes so a model costs one draw call per finish group.",
-    ).switched())
+    ))
 }

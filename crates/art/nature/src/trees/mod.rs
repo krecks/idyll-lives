@@ -102,5 +102,5 @@ pub fn family() -> Option<Family> {
          follows the tree's ripeness (picked bare, the lemons all go), the Japanese maple's stray sprigs while it is \
          shaped.",
     );
-    Some(trees.switched())
+    Some(trees)
 }

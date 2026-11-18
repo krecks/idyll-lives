@@ -64,5 +64,5 @@ pub fn family() -> Option<Family> {
          The materials map onto the game's finishes so a model costs one draw call per finish group. Each moves a part \
          while it is used: the pod's hood, the radio's dial and antenna, a patch of the puzzle, a twig of the bonsai, \
          the sauna's door and the delivery hatch.",
-    ).switched())
+    ))
 }

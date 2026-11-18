@@ -83,5 +83,5 @@ pub fn family() -> Option<Family> {
          draw call per finish group. The seesaw's plank, the spring rider's horse and the merry-go-round's \
          platform go round while played on, carrying their riders (`ride`); the hoop's net swishes after a shot \
          and a pawn moves on the chess table. Each has a far version for the town overview.",
-    ).switched())
+    ))
 }

@@ -33,12 +33,10 @@ pub fn family() -> Option<Family> {
             .key("model.dressingTable")
             .centre(0.0, -0.003)
             // getReady (the `wash` tag) slides the right drawer out to the seat, and back after a while
-            .motions(
-                motions(&format!(
-                    r#"{{"uses": {{"getReady": "drawer_open"}}, "hold": {}}}"#,
-                    artkit::json::float_repr(mirrors::DRAWER_HOLD)
-                )),
-            )
+            .motions(motions(&format!(
+                r#"{{"uses": {{"getReady": "drawer_open"}}, "hold": {}}}"#,
+                artkit::json::float_repr(mirrors::DRAWER_HOLD)
+            )))
             .paint(&[("table", "Table"), ("table_frame", "Frame")]),
             Model::new("mirrorWall", mirrors::mirror_wall, (0.62, 0.97, 0.09))
                 .key("model.mirrorWall")
@@ -54,5 +52,5 @@ pub fn family() -> Option<Family> {
          mirror, the dressing table, the wall mirror and the standing mirror. Listed in the base manifest's packs. \
          Each mirror's glass maps to a `mirror` material, so the game reflects the room in it live. The dressing \
          table slides its drawer out (`drawer_open`) while a resident gets ready.",
-    ).switched())
+    ))
 }

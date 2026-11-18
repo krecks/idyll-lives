@@ -96,5 +96,5 @@ pub fn family() -> Option<Family> {
         ],
         "The lawn's wildflowers, the woods' rocks and the selection marker (crates/art/nature/src/ground, \
          built by cargo art).",
-    ).switched())
+    ))
 }

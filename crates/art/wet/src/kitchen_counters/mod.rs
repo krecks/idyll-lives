@@ -278,5 +278,5 @@ pub fn family() -> Option<Family> {
          and bars (K6) add freestanding islands with their cupboards at the front and a worktop \
          overhanging the back for stools, and slatted bars with a top at 1.06, the kitchen island \
          sliding a drawer out between its stools for a sandwich.",
-    ).switched())
+    ))
 }

@@ -104,5 +104,5 @@ pub fn family() -> Option<Family> {
          overview. The press's plate and blanket cylinders turn while a resident watches it run (`rollers`); the \
          server rack's LEDs blink (`blink`) and the flag sways at the top of its pole (`flutter`), both ambient; \
          the server rack's LEDs and its UPS's screen glow at night.",
-    ).switched())
+    ))
 }

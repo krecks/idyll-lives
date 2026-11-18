@@ -66,5 +66,5 @@ pub fn family() -> Option<Family> {
          moves while it is used: the candles light, the tub fills with petals, the vanity's drawer opens, the \
          gramophone's arm drops onto the turning record, the bureau's flap drops and the arbour swing sways while a \
          bloom is cut.",
-    ).switched())
+    ))
 }

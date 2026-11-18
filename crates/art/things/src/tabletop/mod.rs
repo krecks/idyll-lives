@@ -260,5 +260,5 @@ pub fn family() -> Option<Family> {
         "The tabletop things (crates/art/things/src/tabletop, built by cargo art). Listed in the base manifest's \
          packs. The materials map onto the game's finishes, so each costs one draw call (the see-through ones and \
          the parts kept for a use to come one more, the alarm clock's two hands two more).",
-    ).switched())
+    ))
 }
