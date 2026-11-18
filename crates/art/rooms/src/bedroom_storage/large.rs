@@ -1,29 +1,19 @@
 //! BR3: the dressers, chests and wardrobes; each opens while a resident picks an outfit.
 
 use super::common::{
-    BOX, DOOR_SECONDS, DRAWER_SECONDS, F, M, PULL, Style, WALL, drawer, folded, fr, front, gap,
-    hanging, knob, pull, shell, top,
+    DOOR_SECONDS, DRAWER_SECONDS, F, M, PULL, Style, WALL, drawer, folded, front, gap, hanging,
+    knob, pull, shell, top,
 };
 use artkit::forms::rounded_rect;
-use artkit::kit;
+use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, pow, sin};
 use artkit::motion::Ease;
-use artkit::parts::{Settle, aside, hinged, join, new_parts, settle_with};
-use artkit::place::{Coord, Facing};
-use artkit::scene::{Obj, meshes};
+use artkit::parts::{aside, hinged, join, new_parts};
+use artkit::place::{Facing, N};
+use artkit::scene::Obj;
 use artkit::{fbox, fcyl, fextrude, fsweep, loft, revolve, slide, soft, swing};
-
-/// Settled on the floor where it was built.
-fn settle_in_place() -> Vec<Obj> {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    )
-}
+use artkit::{kit, settle};
 
 // --- BR3: the dresser: oak, two small drawers over two wide ones; the middle (wide) one slides out -------
 /// Folded clothes in a drawer: stacks across its width, bottom at `y`.
@@ -316,7 +306,7 @@ pub fn dresser() -> Vec<Obj> {
         Some(&|x, y, z| drawer_clothes(x, y, z, 1.2, 0.36)),
         Style::Plain,
     );
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     slide!(d, "drawer_open", (0, -PULL, 0), seconds = DRAWER_SECONDS);
     objs
 }
@@ -329,32 +319,26 @@ fn wardrobe_inside(w: f64, y0: f64, y1: f64, back: f64, front_z: f64, rail_y: f6
     let (d, zc) = (front_z - back, (back + front_z) / 2.0);
     let hang_x1 = if split { -0.02 } else { w / 2.0 - 0.08 };
     let width = if split { w / 2.0 } else { w };
-    fn at_x<X: Coord>(x: X, name: &str, width: f64, rail_y: f64, d: f64, zc: f64) {
-        fbox!(
-            F,
-            "hat_shelf",
-            width - 0.04,
-            0.02,
-            d - 0.04,
-            (x, rail_y + 0.12, zc - 0.01),
-            M.white
-        );
-        fcyl!(
-            F,
-            name,
-            0.012,
-            width - 0.06,
-            (x, rail_y, zc),
-            M.chrome,
-            verts = 10,
-            rot = (0, 90, 0)
-        );
-    }
-    if split {
-        at_x(-w / 4.0, "rail", width, rail_y, d, zc);
-    } else {
-        at_x(0, "rail", width, rail_y, d, zc);
-    }
+    let x = if split { N::F(-w / 4.0) } else { N::I(0) };
+    fbox!(
+        F,
+        "hat_shelf",
+        width - 0.04,
+        0.02,
+        d - 0.04,
+        (x, rail_y + 0.12, zc - 0.01),
+        M.white
+    );
+    fcyl!(
+        F,
+        "rail",
+        0.012,
+        width - 0.06,
+        (x, rail_y, zc),
+        M.chrome,
+        verts = 10,
+        rot = (0, 90, 0)
+    );
     let n = if split { 5 } else { 3.max((w / 0.16) as usize) };
     hanging(
         "shirt",
@@ -374,7 +358,7 @@ fn wardrobe_inside(w: f64, y0: f64, y1: f64, back: f64, front_z: f64, rail_y: f6
         0.13,
         0.3,
         (-w / 4.0, rail_y + 0.13, zc),
-        BOX,
+        M.box_,
     );
     if split {
         fbox!(
@@ -461,7 +445,7 @@ fn hinges(name: &str, x: f64, ys: &[f64], z: f64) {
     for &y in ys {
         fcyl!(
             F,
-            format!("{name}{}", fr(y)),
+            format!("{name}{}", float_repr(y)),
             0.006,
             0.06,
             (x, y, z),
@@ -488,7 +472,7 @@ pub fn wardrobe() -> Vec<Obj> {
         );
         shell(1.84, 0.06, 2.11, back, front_z, M.white, 0.025, "case");
         wardrobe_inside(1.84, 0.06, 2.11, back, front_z, 1.8, true);
-        storage_box("box_big", 0.4, 0.3, 0.32, (-0.5, 2.11, -0.18), BOX);
+        storage_box("box_big", 0.4, 0.3, 0.32, (-0.5, 2.11, -0.18), M.box_);
         storage_box("box_small", 0.32, 0.22, 0.3, (-0.08, 2.11, -0.18), M.box2);
         for s in [-1, 1] {
             hinges(
@@ -533,7 +517,7 @@ pub fn wardrobe() -> Vec<Obj> {
             F.at(sf * 0.91, 1.085, front_z + 0.01),
         ));
     }
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(
         doors[0],
         "doors_open",
@@ -643,7 +627,7 @@ pub fn chest_of_drawers() -> Vec<Obj> {
         Some(&|x, y, z| drawer_clothes(x, y, z, 0.72, 0.34)),
         Style::Shaker,
     );
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     slide!(d, "drawer_open", (0, -PULL, 0), seconds = DRAWER_SECONDS);
     objs
 }
@@ -659,7 +643,7 @@ pub fn dresser_low() -> Vec<Obj> {
             for z in [-0.39, 0.12] {
                 kit::tube!(
                     F,
-                    format!("leg{sx}{}", fr(z)),
+                    format!("leg{sx}{}", float_repr(z)),
                     &[
                         (sf * 0.84, 0.1, z),
                         (sf * 0.852, 0.002, z + 0.012_f64.copysign(z + 0.1))
@@ -708,7 +692,7 @@ pub fn dresser_low() -> Vec<Obj> {
                     continue;
                 }
                 front(
-                    &format!("drawer{}{}", fr(x), fr(y)),
+                    &format!("drawer{}{}", float_repr(x), float_repr(y)),
                     0.575,
                     0.1993,
                     x,
@@ -719,7 +703,7 @@ pub fn dresser_low() -> Vec<Obj> {
                     None,
                 );
                 pull(
-                    &format!("pull{}{}", fr(x), fr(y)),
+                    &format!("pull{}{}", float_repr(x), float_repr(y)),
                     x,
                     y + 0.032,
                     front_z + 0.02,
@@ -759,7 +743,7 @@ pub fn dresser_low() -> Vec<Obj> {
         Some(&|x, y, z| drawer_clothes(x, y, z, 0.5, 0.4)),
         Style::Plain,
     );
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     slide!(d, "drawer_open", (0, -PULL, 0), seconds = DRAWER_SECONDS);
     objs
 }
@@ -786,7 +770,7 @@ pub fn wardrobe_single() -> Vec<Obj> {
         );
         shell(w, 0.05, 2.04, back, front_z, M.white, 0.022, "case");
         wardrobe_inside(w, 0.05, 2.04, back, front_z, 1.74, false);
-        storage_box("box_top", 0.3, 0.24, 0.3, (-0.1, 2.04, -0.2), BOX);
+        storage_box("box_top", 0.3, 0.24, 0.3, (-0.1, 2.04, -0.2), M.box_);
         hinges(
             "hinge",
             -(w - 0.02) / 2.0,
@@ -823,7 +807,7 @@ pub fn wardrobe_single() -> Vec<Obj> {
         join(&parts, "door", None),
         F.at(-(w - 0.02) / 2.0, 1.045, front_z + 0.01),
     );
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(
         door,
         "door_open",
@@ -882,7 +866,7 @@ pub fn armoire() -> Vec<Obj> {
         for sx in [-1, 1] {
             for z in [-0.38, 0.08] {
                 revolve!(
-                    format!("foot{sx}{}", fr(z)),
+                    format!("foot{sx}{}", float_repr(z)),
                     &[
                         (0.0, 0.0),
                         (0.028, 0.0),
@@ -1039,7 +1023,7 @@ pub fn armoire() -> Vec<Obj> {
                 })
                 .collect();
                 loft!(
-                    format!("panel{s}{}", fr(dy)),
+                    format!("panel{s}{}", float_repr(dy)),
                     &secs,
                     material = M.walnut,
                     smooth = false
@@ -1080,7 +1064,7 @@ pub fn armoire() -> Vec<Obj> {
             F.at(sf * 0.82, 1.08, front_z + 0.0125),
         ));
     }
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(
         doors[0],
         "doors_open",

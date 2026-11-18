@@ -1,18 +1,15 @@
 //! O1 continued: the catalog2 desks: the simple, corner, standing and executive desks.
 
 use super::chairs::desk_chair;
-use super::common::{
-    Run, bar_pull, drawer_box, fillet, front, moulding, pull, shaker, top, turned,
-};
+use super::common::{bar_pull, drawer_box, front, top, turned};
 use super::desk_things::{cactus, keyboard, laptop_open, monitor, mouse, mug, notebook, pen};
-use super::desks::{origin, settle};
 use super::{DT, F, M};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr;
 use artkit::parts::{join, join_all, new_parts};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, slide, soft};
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, join, kit, settle, slide, soft};
 
 // --- the catalog2 desks --------------------------------------------------------------------------------------
 pub fn desk_simple() -> Vec<Obj> {
@@ -94,7 +91,7 @@ pub fn desk_simple() -> Vec<Obj> {
                 fsweep!(
                     F,
                     format!("pin{xs}{zs}"),
-                    &fillet(&pin, 0.006, 3),
+                    &kit::fillet!(&pin, 0.006, 3),
                     0.0065,
                     M.frame,
                     verts = 8
@@ -112,7 +109,7 @@ pub fn desk_simple() -> Vec<Obj> {
         }
     });
     join_all("deskSimple");
-    settle();
+    settle!(centre = false);
     meshes()
 }
 
@@ -269,7 +266,7 @@ pub fn desk_corner() -> Vec<Obj> {
                     fsweep!(
                         F,
                         format!("pedestal{k}_pull{j}"),
-                        &fillet(&pts, 0.009, 3),
+                        &kit::fillet!(&pts, 0.009),
                         0.005,
                         M.frame,
                         verts = 8
@@ -336,7 +333,7 @@ pub fn desk_corner() -> Vec<Obj> {
         o.loc.y = (f64::from(o.loc.y) - CORNER_SEAT.1) as f32;
     });
     join_all("deskCorner");
-    settle();
+    settle!(centre = false);
     meshes()
 }
 
@@ -524,7 +521,7 @@ pub fn desk_standing() -> Vec<Obj> {
         mug(0.32, -0.3, 1.05);
         cactus(-0.36, -0.36, 1.05, 0.04, 0.07);
     });
-    join(&still, "deskStanding", origin());
+    join!(&still, "deskStanding", origin = (0, 0, 0));
     // the keyboard shelf under the front, sliding 20 cm out to the resident
     let parts = new_parts(|| {
         fbox!(
@@ -564,7 +561,7 @@ pub fn desk_standing() -> Vec<Obj> {
         mouse("mouse", 0.22, 0.983, 0.08, M.keys, 1.0);
     });
     let shelf = join(&parts, "shelf", None);
-    settle();
+    settle!(centre = false);
     slide!(shelf, "tray_out", (0, -0.2, 0), seconds = 0.6);
     meshes()
 }
@@ -572,31 +569,27 @@ pub fn desk_standing() -> Vec<Obj> {
 /// One of the executive desk's drawer fronts: raised-panel, a brass bar pull between two roses.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn drawer_front(name: &str, w: f64, h: f64, x: f64, y: f64, z: f64, pull_y: f64) {
-    shaker(
-        &F,
+    kit::shaker!(
+        F,
         name,
         w,
         h,
         (x, y, z),
         0.02,
         M.walnut2,
-        0.045_f64.min(h * 0.25),
-        None,
-        0.005,
-        true,
+        rail = 0.045_f64.min(h * 0.25),
+        raised = true
     );
-    pull(
-        &F,
-        &format!("{name}_pull"),
+    kit::pull!(
+        F,
+        format!("{name}_pull"),
         x,
         y + pull_y,
         z + 0.01,
         0.12_f64.min(w * 0.3),
         M.brass,
-        0.005,
-        0.016,
-        false,
-        8,
+        r = 0.005,
+        out = 0.016
     );
     for p in [-1, 1] {
         fcyl!(
@@ -679,9 +672,9 @@ pub fn desk_executive() -> Vec<Obj> {
                 bevel_segments = 2
             );
             // a moulding round the pedestal's foot
-            moulding(
-                &F,
-                &format!("base_moulding{s}"),
+            kit::moulding!(
+                F,
+                format!("base_moulding{s}"),
                 &[
                     (x + 0.22, -0.418),
                     (x + 0.22, 0.3),
@@ -696,9 +689,8 @@ pub fn desk_executive() -> Vec<Obj> {
                     (0.0, 0.04),
                 ],
                 M.walnut_case,
-                0.06,
-                Run::Top,
-                artkit::shapes::SHARP,
+                at = 0.06,
+                plane = Facing::Top
             );
             for (i, (y, h)) in [(0.585, 0.18), (0.385, 0.18), (0.175, 0.2)]
                 .into_iter()
@@ -716,18 +708,16 @@ pub fn desk_executive() -> Vec<Obj> {
             }
         }
         // the modesty panel at the back of the kneehole, framed and panelled
-        shaker(
-            &F,
+        kit::shaker!(
+            F,
             "modesty",
             0.88,
             0.45,
-            (0.0, 0.44, -0.38),
+            (0, 0.44, -0.38),
             0.025,
             M.walnut_case,
-            0.07,
-            None,
-            0.005,
-            true,
+            rail = 0.07,
+            raised = true
         );
         fbox!(
             F,
@@ -776,34 +766,29 @@ pub fn desk_executive() -> Vec<Obj> {
             rot = (0, 0, 20)
         );
     });
-    join(&still, "deskExecutive", origin());
+    join!(&still, "deskExecutive", origin = (0, 0, 0));
     // the middle drawer, still: no use opens it yet
     let parts = new_parts(|| {
-        shaker(
-            &F,
+        kit::shaker!(
+            F,
             "drawer",
             0.84,
             0.075,
-            (0.0, DT - 0.09, 0.31),
+            (0, DT - 0.09, 0.31),
             0.02,
             M.walnut2,
-            0.025,
-            None,
-            0.005,
-            false,
+            rail = 0.025
         );
-        pull(
-            &F,
+        kit::pull!(
+            F,
             "drawer_pull",
-            0.0,
+            0,
             DT - 0.09,
             0.32,
             0.16,
             M.brass,
-            0.006,
-            0.015,
-            false,
-            8,
+            r = 0.006,
+            out = 0.015
         );
         drawer_box(
             "drawer_box",
@@ -817,6 +802,6 @@ pub fn desk_executive() -> Vec<Obj> {
         );
     });
     join(&parts, "drawer", None);
-    settle();
+    settle!(centre = false);
     meshes()
 }

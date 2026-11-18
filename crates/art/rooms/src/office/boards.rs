@@ -1,13 +1,12 @@
 //! O3: the boards on the wall: the whiteboard and the corkboard.
 
-use super::common::{Run, moulding};
 use super::{F, M, WALL};
 use artkit::materials::Mat;
 use artkit::math::{Axis, TAU, cos, cosd, sin, sind};
 use artkit::motion::{Grow, grow};
-use artkit::parts::{Settle, hinged, join, join_all, new_parts, settle_with};
+use artkit::parts::{hinged, join, join_all, new_parts};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fsweep, revolve, soft};
+use artkit::{fbox, fcyl, fsweep, kit, py, revolve, settle, soft};
 
 /// A whiteboard marker lying across at (x, y, z): a barrel, its coloured cap with a clip and an end plug.
 pub(super) fn marker(name: &str, x: f64, y: f64, z: f64, ink: Mat) {
@@ -65,8 +64,8 @@ pub fn whiteboard() -> Vec<Obj> {
             (-0.4625, y + 0.3125),
             (-0.4625, y - 0.3125),
         ];
-        moulding(
-            &F,
+        kit::moulding!(
+            F,
             "frame",
             &frame,
             &[
@@ -78,9 +77,8 @@ pub fn whiteboard() -> Vec<Obj> {
                 (0.026, 0.0),
             ],
             M.aluminium,
-            z,
-            Run::Front,
-            50.0,
+            at = z,
+            angle = 50
         );
         for s in [-1, 1] {
             for t in [-1, 1] {
@@ -330,13 +328,7 @@ pub fn whiteboard() -> Vec<Obj> {
         o.scale.z = 0.001;
         o.scale.x = 0.001;
     });
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: false,
-        },
-    );
+    settle!(centre = false, floor = false);
     grow(
         scribble,
         "scribble",
@@ -416,7 +408,7 @@ pub(super) fn note(
     for i in 0..5 {
         let t = f64::from(i) / 4.0;
         let dy = h / 2.0 - h * t;
-        let out = curl * artkit::math::pow(super::common::pmax(0.0, (t - 0.55) / 0.45), 2.0);
+        let out = curl * artkit::math::pow(py::max(0.0, (t - 0.55) / 0.45), 2.0);
         pts.push((x - s * dy, y + c * dy, face + 0.0012 + out));
     }
     fsweep!(
@@ -447,8 +439,8 @@ pub fn corkboard() -> Vec<Obj> {
             (-0.37, y + 0.26),
             (-0.37, y - 0.26),
         ];
-        moulding(
-            &F,
+        kit::moulding!(
+            F,
             "frame",
             &frame,
             &[
@@ -460,9 +452,8 @@ pub fn corkboard() -> Vec<Obj> {
                 (0.035, 0.0),
             ],
             M.cork_frame,
-            z,
-            Run::Front,
-            50.0,
+            at = z,
+            angle = 50
         );
         for (k, (x, yy, m, r, pin)) in [
             (-0.2, 1.55, M.note, 6, M.pin),
@@ -549,12 +540,6 @@ pub fn corkboard() -> Vec<Obj> {
         }
     });
     join_all("corkboard");
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: false,
-        },
-    );
+    settle!(centre = false, floor = false);
     meshes()
 }

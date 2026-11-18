@@ -16,17 +16,12 @@
 //!
 //! Built in game coordinates (`F`: x, height, depth; front +depth).
 
-use artkit::family::{Family, Model};
-use artkit::json::{Json, loads};
+use artkit::family::{Family, Model, motions};
 
 mod beds;
 mod common;
 
 use common::M;
-
-fn motions(text: &str) -> Json {
-    loads(text).expect("the motions are JSON")
-}
 
 const PAINT: [&str; 3] = ["Frame", "Headboard", "Bedding"];
 

@@ -1,10 +1,11 @@
 //! LT4: the table lamps.
 
 use super::common::{
-    Drum, F, Lathe, M, bulb, check_at, drum, fr, lathe, loft_at, near_light, ring_at, socket,
-    trough, turn,
+    Drum, F, Lathe, M, bulb, check_at, drum, lathe, loft_at, near_light, ring_at, socket, trough,
+    turn,
 };
 use artkit::forms::rounded_rect;
+use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::{cos, radians, sin, sqrt};
 use artkit::parts::{join_all, new_parts};
@@ -89,7 +90,7 @@ pub fn table_lamp() -> Vec<Obj> {
         for x in [-0.28, 0.28] {
             for z in [-0.16, 0.16] {
                 loft_at(
-                    &format!("leg{}{}", fr(x), fr(z)),
+                    &format!("leg{}{}", float_repr(x), float_repr(z)),
                     x,
                     z,
                     &[(0.0, 0.013, 0.013, 8.0), (0.47, 0.021, 0.021, 8.0)],
@@ -612,7 +613,7 @@ pub fn lamp_lantern() -> Vec<Obj> {
             for z in [-0.07, 0.07] {
                 fbox!(
                     F,
-                    format!("post{}{}", fr(x), fr(z)),
+                    format!("post{}{}", float_repr(x), float_repr(z)),
                     0.016,
                     0.22,
                     0.016,

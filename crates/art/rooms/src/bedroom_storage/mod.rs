@@ -11,16 +11,11 @@
 //! slides out for a midnight snack, the chest's lid lifts for a blanket and the hamper's while the washing is
 //! sorted; the rest are static.
 
-use artkit::family::{Family, Model};
-use artkit::json::{Json, loads};
+use artkit::family::{Family, Model, motions};
 
 mod common;
 mod large;
 mod small;
-
-fn motions(text: &str) -> Json {
-    loads(text).expect("the motions are JSON")
-}
 
 // Open while the resident changes into another outfit (content `changesOutfit`), shut as they leave.
 const CHANGE_DRAWER: &str = r#"{"uses": {"outfit": "drawer_open"}}"#;
@@ -35,7 +30,7 @@ pub fn family() -> Option<Family> {
     );
     Some(Family::new(
         "bedroom_storage",
-        common::palette(),
+        common::M.palette(),
         vec![
             // BR2: the three-drawer nightstand's top drawer slides out for a snack, the chest's lid lifts for a
             // blanket and the hamper's while the washing is sorted

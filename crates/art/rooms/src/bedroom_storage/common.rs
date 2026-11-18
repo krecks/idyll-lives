@@ -45,7 +45,7 @@ palette! { M:
     coffee = ("#4A2E1E", gloss),     // the coffee in it
     tin = ("#4E7A7F", gloss),        // a biscuit tin in the nightstand's drawer
     wrapper = ("#C65D52", satin),    // chocolate bars
-    box_ = ("#C9B79C", matte),       // (`BOX`: the name is Rust's)
+    box_ = ("#C9B79C", matte, named("box")), // storage boxes on a wardrobe (`box` is Rust's own word)
     box2 = ("#E6DFD3", matte),
     chrome = ("#C9CCCF", chrome),    // a hanging rail, the hangers and the wardrobes' hinges
     cloth1 = ("#5B7DB1", satin),     // clothes: hanging and folded
@@ -55,20 +55,6 @@ palette! { M:
     frame = ("#B08E66", wood),       // a picture frame on the dresser
     print1 = ("#4E7A7F", wood),      // its picture (a stained board: wood, so it draws with the dresser)
     vase = ("#8A5A38", wood),        // a turned wooden vase
-}
-
-/// Storage boxes on a wardrobe: the palette's `box`.
-pub const BOX: Mat = Mat::new("box", "#C9B79C", "matte");
-
-/// The family's palette, in the script's order: `box` where `box_` stands.
-pub fn palette() -> artkit::materials::Palette {
-    let mut p = M.palette();
-    for m in &mut p.colours {
-        if m.name == "box_" {
-            *m = BOX;
-        }
-    }
-    p
 }
 
 /// Game numbers as they are: the models stand where the game places them.
@@ -525,9 +511,4 @@ pub fn mug(name: &str, x: f64, y: f64, z: f64) {
         verts = 6,
         resolution = 2
     );
-}
-
-/// A float as Python writes it in a name.
-pub fn fr(x: f64) -> String {
-    artkit::json::float_repr(x)
 }

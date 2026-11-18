@@ -3,7 +3,7 @@
 
 use super::common::disc;
 use super::shelves::{
-    WALL, book_row, bookcase, floor, frame_photo, plant, prism, quarter, tips_out, vase,
+    WALL, book_row, bookcase, frame_photo, plant, prism, quarter, tips_out, vase,
 };
 use super::{F, M};
 use artkit::forms::rounded_rect;
@@ -12,7 +12,7 @@ use artkit::motion::Ease;
 use artkit::parts::{hinged, join, join_all, new_parts};
 use artkit::place::Facing;
 use artkit::scene::Obj;
-use artkit::{fbox, fcone, fcyl, fextrude, fsphere, rod, soft, sweep, swing};
+use artkit::{fbox, fcone, fcyl, fextrude, fsphere, rod, settle, soft, sweep, swing};
 
 /// The industrial shelving (the old part): five oak boards on black steel posts and angles, its top at 1.83 (content
 /// `surface`); a cross brace behind, books, boxes and a plant.
@@ -122,7 +122,7 @@ pub fn shelving_industrial() -> Vec<Obj> {
     vase(-0.6, 1.015, zm, 0.07, 0.14, M.vase);
     frame_photo(0.4, 1.455, zm - 0.1, M.black_metal, 0.2, 0.26);
     join_all("shelvingIndustrial");
-    floor();
+    settle!(centre = false);
     Vec::new()
 }
 
@@ -370,7 +370,7 @@ pub fn cube_shelf() -> Vec<Obj> {
         None,
     );
     join_all("cubeShelf");
-    floor();
+    settle!(centre = false);
     Vec::new()
 }
 
@@ -433,7 +433,7 @@ pub fn ladder_shelf() -> Vec<Obj> {
     book_row(-0.22, -0.02, y, zf - 0.02, 0.11, 0.1, 72, 0.0, true, None);
     plant(0.14, y, (zb + zf) / 2.0, 0.04, 0.06, M.clay, 0.05);
     join_all("ladderShelf");
-    floor();
+    settle!(centre = false);
     Vec::new()
 }
 
@@ -681,7 +681,7 @@ pub fn display_cabinet() -> Vec<Obj> {
         );
     });
     let door = hinged(join(&parts, "door", None), F.at(hx, 1.015, hz));
-    floor();
+    settle!(centre = false);
     swing!(
         door,
         "door_open",

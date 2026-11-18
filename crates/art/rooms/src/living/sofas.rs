@@ -2,22 +2,17 @@
 //! in place. Two nodes: the sofa (upholstery, frame, back cushions, pillows, legs) and its seat cushions (`seat`,
 //! origin on their underside), which `sink_in` squashes 2 cm while it's sat or dozed on.
 
-use super::common::{
-    Cushion, cabriole, cushion, leg, panel, pillow, plain, seat, settled, taper_leg, throw,
-};
+use super::common::{Cushion, cushion, leg, panel, pillow, plain, seat, settled, taper_leg, throw};
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, TAU, cos, exp, pow, radians, sin};
 use artkit::parts::{join, new_parts};
 use artkit::py;
 use artkit::scene::Obj;
 use artkit::{fbox, fcyl, fextrude, fsweep, soft};
-
-pub(super) fn turned_back(degrees: i32) -> P3 {
-    P3::from((degrees, 0, 0))
-}
 
 /// A sofa or a sectional's module `w` wide (the old `sofa_run`): a base, arms on the `arms` sides (-1 at -x), back
 /// rests along the back and/or a side ('left' at -x, 'right' at +x), seat and back cushions, pillows (x, depth,
@@ -145,7 +140,7 @@ pub(super) fn run(
                     (sx0 + cw * (i as f64 + 0.5), 0.62, sz0 + 0.07),
                     cush,
                     Cushion {
-                        rot: turned_back(-9),
+                        rot: P3::from((-9, 0, 0)),
                         puff: 0.03,
                         piping: if lean < 3 { Some(0.006) } else { None },
                         flat: Some(if lean < 3 { 3 } else { 2 }),
@@ -379,17 +374,15 @@ pub fn sofa_classic() -> Vec<Obj> {
         for x in [-0.82, 0.82] {
             for (z, dz) in [(0.33, 1.0), (-0.38, -1.0)] {
                 let sx = if x > 0.0 { 1.0 } else { -1.0 };
-                cabriole(
-                    &F,
-                    &format!("leg{}{}", float_repr(x), float_repr(z)),
+                kit::cabriole!(
+                    F,
+                    format!("leg{}{}", float_repr(x), float_repr(z)),
                     x,
                     z,
                     0.18,
                     M.walnut_legs,
                     0.025 * sx,
-                    0.02 * dz,
-                    0.024,
-                    12,
+                    0.02 * dz
                 );
             }
         }
@@ -488,7 +481,7 @@ pub fn box_sofa(
                 ),
                 cush,
                 Cushion {
-                    rot: turned_back(-9),
+                    rot: P3::from((-9, 0, 0)),
                     puff: 0.03,
                     ..Cushion::default()
                 },
@@ -603,7 +596,7 @@ pub fn sofa_three() -> Vec<Obj> {
                 (x, 0.62, -0.2),
                 M.stone_cushion,
                 Cushion {
-                    rot: turned_back(-10),
+                    rot: P3::from((-10, 0, 0)),
                     puff: 0.03,
                     ..Cushion::default()
                 },

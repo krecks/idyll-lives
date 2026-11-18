@@ -1,7 +1,7 @@
 //! K7: the dining sets: the dining table with its two chairs (base manifest), the bistro set, the glass and the
 //! farmhouse dining sets.
 
-use super::common::{apron, finish, rail, ring_loop, round_slab, slab, sq_leg, tube, turned};
+use super::common::{apron, finish, rail, ring_loop, round_slab, slab, sq_leg, turned};
 use super::settings::{SET_X, SET_Z, end_chair, flowers, place, runner};
 use super::tables::turned_leg;
 use super::{F, M};
@@ -10,7 +10,7 @@ use artkit::materials::Mat;
 use artkit::math::{TAU, cos, radians, sin};
 use artkit::place::Facing;
 use artkit::scene::Obj;
-use artkit::{fbox, fcyl, fsweep};
+use artkit::{fbox, fcyl, fsweep, kit};
 
 // --- the dining table (base manifest): an oak top to 0.76 on turned legs, a chair at each end facing in -----------
 pub fn dining_table() -> Vec<Obj> {
@@ -140,15 +140,14 @@ fn cafe_chair(prefix: &str, x: f64, z: f64, frame: Mat, pad: Mat) {
             (top.2 + foot.2) / 2.0,
         );
         let mid = (mid.0 + sx * 0.012, mid.1, mid.2 + sz * 0.012);
-        tube(
-            &F,
-            &format!("{prefix}leg{k}"),
+        kit::tube!(
+            F,
+            format!("{prefix}leg{k}"),
             &[foot, mid, top],
             0.011,
             frame,
-            Some(6),
-            2,
-            1.0,
+            verts = 6,
+            round = 2
         );
         turned(
             &format!("{prefix}foot{k}"),
@@ -195,9 +194,9 @@ fn cafe_chair(prefix: &str, x: f64, z: f64, frame: Mat, pad: Mat) {
     hoop(format!("{prefix}back_in"), 0.1, 0.09, 0.008, 16);
     for s in [-1, 1] {
         let sf = f64::from(s);
-        tube(
-            &F,
-            &format!("{prefix}post{s}"),
+        kit::tube!(
+            F,
+            format!("{prefix}post{s}"),
             &[
                 (x + sf * 0.13, seat_h - 0.045, z - 0.13),
                 (x + sf * 0.15, 0.62, z - 0.175),
@@ -205,23 +204,20 @@ fn cafe_chair(prefix: &str, x: f64, z: f64, frame: Mat, pad: Mat) {
             ],
             0.011,
             frame,
-            Some(8),
-            3,
-            1.0,
+            verts = 8,
+            round = 3
         );
         // the loops tied together at the sides
-        tube(
-            &F,
-            &format!("{prefix}tie{s}"),
+        kit::tube!(
+            F,
+            format!("{prefix}tie{s}"),
             &[
                 (x + sf * 0.1, 0.75, z - 0.21),
                 (x + sf * 0.16, 0.75, z - 0.21),
             ],
             0.006,
             frame,
-            Some(5),
-            3,
-            1.0,
+            verts = 5
         );
     }
 }
@@ -407,15 +403,13 @@ pub fn dining_glass() -> Vec<Obj> {
             );
         }
     }
-    tube(
-        &F,
+    kit::tube!(
+        F,
         "rail",
         &[(0, y - 0.05, z - 0.3), (0, y - 0.05, z + 0.3)],
         0.012,
         M.legs_chrome,
-        Some(10),
-        3,
-        1.0,
+        verts = 10
     );
     flowers("", 0, z - 0.22, y, 0.18, 5, true, 12);
     for s in [-1, 1] {

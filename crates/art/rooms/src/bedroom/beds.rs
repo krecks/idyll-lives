@@ -2,13 +2,14 @@
 
 use super::common::{
     Bedding, Board, Cap, DUVET, F, M, Mattress, SECONDS, WALL, bedding, board, channel, finish,
-    flap, fr, legs_round, legs_square, mattress, pillow, pillow_at, post, runner, settle_bed,
-    tufts, turn_down,
+    flap, legs_round, legs_square, mattress, pillow, pillow_at, post, runner, settle_bed, tufts,
+    turn_down,
 };
 use artkit::forms::rounded_rect;
+use artkit::json::float_repr;
 use artkit::math::{Axis, P3, PI, TAU, cos, radians, sin};
 use artkit::parts::{hinged, join, join_all, new_parts, turn};
-use artkit::place::Coord;
+use artkit::place::N;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fextrude, fsweep, jitter, loft, revolve, rod, soft, swing};
 
@@ -381,7 +382,7 @@ pub fn bed_bunk() -> Vec<Obj> {
     for z in [0.42, 0.86] {
         fbox!(
             F,
-            format!("ladder{}", fr(z)),
+            format!("ladder{}", float_repr(z)),
             0.03,
             1.62,
             0.045,
@@ -391,7 +392,7 @@ pub fn bed_bunk() -> Vec<Obj> {
         );
         fsweep!(
             F,
-            format!("ladder_hook{}", fr(z)),
+            format!("ladder_hook{}", float_repr(z)),
             &[
                 (0.465, 1.6, z),
                 (0.465, 1.66, z),
@@ -490,7 +491,7 @@ pub fn bed_futon() -> Vec<Obj> {
         for z in [0.95, WALL + 0.03] {
             fbox!(
                 F,
-                format!("tenon{s}{}", fr(z)),
+                format!("tenon{s}{}", float_repr(z)),
                 0.012,
                 0.09,
                 0.035,
@@ -1053,21 +1054,6 @@ fn scallops(w: f64, h: f64, n: usize) -> Vec<(f64, f64)> {
     out
 }
 
-/// A headboard's raised panel, `x` across.
-fn canopy_panel(i: usize, x: impl Coord) {
-    fbox!(
-        F,
-        format!("panel{i}"),
-        0.418,
-        0.398,
-        0.024,
-        (x, 0.7, WALL + 0.02),
-        M.headboard_walnut,
-        bevel = 0.009,
-        bevel_segments = 1
-    );
-}
-
 /// The four-poster.
 pub fn bed_canopy() -> Vec<Obj> {
     let top = DOUBLE_TOP;
@@ -1149,9 +1135,19 @@ pub fn bed_canopy() -> Vec<Obj> {
         bevel = 0.006,
         bevel_segments = 1
     );
-    canopy_panel(0, -0.52);
-    canopy_panel(1, 0);
-    canopy_panel(2, 0.52);
+    for (i, x) in [N::F(-0.52), N::I(0), N::F(0.52)].into_iter().enumerate() {
+        fbox!(
+            F,
+            format!("panel{i}"),
+            0.418,
+            0.398,
+            0.024,
+            (x, 0.7, WALL + 0.02),
+            M.headboard_walnut,
+            bevel = 0.009,
+            bevel_segments = 1
+        );
+    }
     board(
         "crest",
         1.64,

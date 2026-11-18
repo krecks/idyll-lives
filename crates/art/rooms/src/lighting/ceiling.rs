@@ -3,10 +3,11 @@
 //! chandelier and the industrial pendant hang lower, over a table or a sofa only (content `headHeight`, Q-12).
 
 use super::common::{
-    CEILING, DOME, F, Lathe, M, bulb, canopy, check_at, fr, hang, lathe, loft_at, near_light, pear,
+    CEILING, DOME, F, Lathe, M, bulb, canopy, check_at, hang, lathe, loft_at, near_light, pear,
     ring_at, socket, turn,
 };
 use artkit::forms::{Plane, rounded_rect, smooth_outline};
+use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::{Axis, P3, PI, V3, asin, cos, cosd, pow, sin, sind, sqrt};
 use artkit::parts::{hinged, join, join_all, new_parts};
@@ -339,7 +340,7 @@ pub fn chandelier() -> Vec<Obj> {
                 let a = (360 * k) as f64 / n as f64 + if n == 6 { 15.0 } else { 0.0 };
                 let (x, z) = (ring * cosd(a), ring * sind(a));
                 turn(
-                    &format!("cup{}_{k}", fr(y)),
+                    &format!("cup{}_{k}", float_repr(y)),
                     &[
                         (0.0, 0.0),
                         (size, size * 0.6),
@@ -352,7 +353,7 @@ pub fn chandelier() -> Vec<Obj> {
                 );
                 fsphere!(
                     F,
-                    format!("globe{}_{k}", fr(y)),
+                    format!("globe{}_{k}", float_repr(y)),
                     r,
                     (x, y, z),
                     M.bulb,

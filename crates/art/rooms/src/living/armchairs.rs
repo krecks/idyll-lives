@@ -1,11 +1,12 @@
 //! L2, the armchairs: built as the sofas are, their seats sinking in (`sink_in`), but for the designer chair
 //! (still).
 
-use super::common::{Cushion, cabriole, cushion, panel, plain, round_rings, seat, settled};
+use super::common::{Cushion, cushion, panel, plain, round_rings, seat, settled};
 use super::sofas::{box_sofa, rolled_arm};
 use super::{F, M};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, TAU, cos, exp, pow, radians, sin, sqrt};
 use artkit::parts::{join, join_all, new_parts, settle};
@@ -170,17 +171,15 @@ pub fn armchair_bergere() -> Vec<Obj> {
         for x in [-0.31, 0.31] {
             for (z, dz) in [(0.3, 1.0), (-0.385, -1.0)] {
                 let sx = if x > 0.0 { 1.0 } else { -1.0 };
-                cabriole(
-                    &F,
-                    &format!("leg{}{}", float_repr(x), float_repr(z)),
+                kit::cabriole!(
+                    F,
+                    format!("leg{}{}", float_repr(x), float_repr(z)),
                     x,
                     z,
                     0.18,
                     M.walnut_legs,
                     0.02 * sx,
-                    0.02 * dz,
-                    0.024,
-                    12,
+                    0.02 * dz
                 );
             }
         }
@@ -653,17 +652,16 @@ pub fn armchair_wingback() -> Vec<Obj> {
         for x in [-0.36, 0.36] {
             let xs = float_repr(x);
             // cabrioles in front, plain swept legs raked back behind
-            cabriole(
-                &F,
-                &format!("leg_front{xs}"),
+            kit::cabriole!(
+                F,
+                format!("leg_front{xs}"),
                 x,
                 z1 - 0.06,
                 0.17,
                 M.walnut_warm,
                 0.015_f64.copysign(x),
                 0.02,
-                0.02,
-                12,
+                r = 0.02
             );
             fsweep!(
                 F,

@@ -5,12 +5,12 @@ use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{M4, P3, PI, TAU, V3, cos, pow, sin, tan};
 use artkit::mesh::Mesh;
-use artkit::parts::{Settle, join_all, settle_with};
-use artkit::place::{Facing, GameFrame, Spot};
-use artkit::scene;
+use artkit::parts::join_all;
+use artkit::place::{Facing, Spot};
 use artkit::scene::{Obj, meshes};
 use artkit::shapes::recalc_normals;
 use artkit::{cube, fextrude, fsweep, loft, revolve, solidify};
+use artkit::{kit, scene, settle};
 
 /// A game position or direction as a Blender vector.
 pub fn v(p: impl Spot) -> V3 {
@@ -109,7 +109,7 @@ pub fn rail(
     if closed {
         return fsweep!(F, name, &path, r, material, verts = verts, closed = true);
     }
-    tube(&F, name, &path, r, material, Some(verts), 1, 1.0)
+    kit::tube!(F, name, &path, r, material, verts = verts, round = 1)
 }
 
 /// A flat ring of tube in the floor's plane, `rx` by `rz` about (x, z) at height `y`: a foot ring, a rim.
@@ -320,15 +320,15 @@ pub fn stretcher(
     verts: usize,
 ) -> Obj {
     let m = ((a.0 + b.0) / 2.0, (a.1 + b.1) / 2.0, (a.2 + b.2) / 2.0);
-    tube(
-        &F,
+    kit::tube!(
+        F,
         name,
         &[a, m, b],
         r,
         material,
-        Some(verts),
-        3,
-        [0.8, swell, 0.8],
+        verts = verts,
+        round = 3,
+        scale = [0.8, swell, 0.8]
     )
 }
 
@@ -371,42 +371,8 @@ pub fn finish(name: &str) -> Vec<Obj> {
             v.z = v.z.max(0.0);
         }
     });
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     meshes()
-}
-
-/// Gamekit's `kit.tube`: a round tube of radius `r` through game points, its bends rounded (`round` steps between
-/// each pair of points; 1 keeps them sharp), its ends capped. `verts` round: by default 8, and more for one over
-/// 13 mm in radius, as many as keep its outline within a millimetre of the circle.
-// KIT: kit.tube
-#[allow(clippy::too_many_arguments)]
-pub fn tube<P: Spot>(
-    frame: &GameFrame,
-    name: &str,
-    points: &[P],
-    r: f64,
-    material: Mat,
-    verts: Option<usize>,
-    round: usize,
-    scale: impl artkit::Arg<artkit::forms::Scale>,
-) -> Obj {
-    fsweep!(
-        frame,
-        name,
-        points,
-        r,
-        material,
-        verts = verts,
-        resolution = round,
-        scale = scale,
-        least = 8
-    )
 }
 
 /// A curved panel `t` thick through a grid of game points (rows of the same length): a moulded shell, a bent back, a

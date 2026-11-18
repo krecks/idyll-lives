@@ -260,6 +260,6 @@ The leather armchair's cushions (`leather`), the designer chair's (`hide`) and t
 ## Built in Rust (2026-11-18)
 
 Ported from `living.py` line for line (crates/art/rooms/src/living). Against the last Blender build (`ref/blender`)
-every model's points are Blender's (0.000 mm): 14 same, 30 near, none changed. `cabriole` in common.rs is gamekit's
-kit, marked `// KIT`. Kept as the script had it: `fillet` leaves a right-angled corner sharp (the bed's handle, the
+every model's points are Blender's (0.000 mm): 14 same, 30 near, none changed. The cabriole legs are the kit's
+(`kit::cabriole!`). Kept as the script had it: `fillet` leaves a right-angled corner sharp (the bed's handle, the
 sofa bed's leg, the nesting and console tables' frames); `living.py`'s `_legs4` was never called and is not ported.

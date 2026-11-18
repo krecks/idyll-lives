@@ -8,7 +8,7 @@ use artkit::math::{P3, PI, V3, exp, pow, radians, tan};
 use artkit::mesh::Mesh;
 use artkit::motion::{Squash, squash};
 use artkit::parts::{join, new_parts, settle};
-use artkit::place::{Coord, Facing, GameFrame};
+use artkit::place::{Coord, Facing};
 use artkit::scene::{self, Obj, meshes};
 use artkit::soft::{Puff, Sag, SoftBox};
 use artkit::{fbox, fextrude, fsweep, jitter, loft, ring, soft};
@@ -430,38 +430,4 @@ pub fn book(x: f64, y: f64, front: f64, t: f64, h: f64, d: f64, cover: Mat, band
             M.gilt
         );
     }
-}
-
-// KIT: kit.cabriole
-/// A cabriole leg from the frame at height `h` over (x, z) down to the floor: out by (sx, sz) at the knee, slim at
-/// the ankle, flaring into a pad foot that stands on the floor (its lowest point at height 0).
-#[allow(clippy::too_many_arguments)]
-pub fn cabriole(
-    frame: &GameFrame,
-    name: &str,
-    x: f64,
-    z: f64,
-    h: f64,
-    material: Mat,
-    sx: f64,
-    sz: f64,
-    r: f64,
-    verts: usize,
-) -> Obj {
-    fsweep!(
-        frame,
-        name,
-        &[
-            (x, h, z),
-            (x + sx, h * 0.62, z + sz),
-            (x + sx * 0.4, 0.06, z + sz * 0.4),
-            (x + sx * 0.55, 0.02, z + sz * 0.55),
-            (x + sx * 0.55, 0.0, z + sz * 0.55)
-        ],
-        r,
-        material,
-        verts = verts,
-        resolution = 2,
-        scale = [1.0, 1.05, 0.7, 1.1, 1.15]
-    )
 }

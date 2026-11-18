@@ -9,10 +9,10 @@ use super::{F, M};
 use artkit::forms::{Holes, rounded_rect};
 use artkit::materials::Mat;
 use artkit::math::{Axis, PI, TAU, cos, sin};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts};
 use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fextrude, fsphere, fsweep, jitter, swing};
+use artkit::{fbox, fextrude, fsphere, fsweep, jitter, settle, swing};
 
 pub(super) const WALL: f64 = -0.43;
 pub(super) const BOOK_TIP: f64 = 25.0;
@@ -22,16 +22,6 @@ pub(super) fn books() -> [Mat; 7] {
     [
         M.book_a, M.book_b, M.book_c, M.book_d, M.book_e, M.book_f, M.book_g,
     ]
-}
-
-pub(super) fn floor() {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
 }
 
 /// A book built apart: its parts and its hinge, the foot of its spine.
@@ -400,7 +390,7 @@ pub(super) fn tips_out(name: &str, out: Option<Out>) -> Vec<Obj> {
         .collect();
     join(&rest, name, Some((0, 0, 0).into()));
     let book = hinged(join(&parts, "book", None), F.at(hinge.0, hinge.1, hinge.2));
-    floor();
+    settle!(centre = false);
     swing!(book, "book_out", BOOK_TIP, seconds = 0.6, axis = Axis::X);
     Vec::new()
 }

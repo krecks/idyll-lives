@@ -1,7 +1,7 @@
 //! What the desks are made of and what lies on them: frames, lamps, mugs, plants, notebooks, pens, monitors,
 //! keyboards, mice and laptops.
 
-use super::common::{axle, fillet, turned};
+use super::common::{axle, turned};
 use super::{F, FT, M};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
@@ -10,7 +10,7 @@ use artkit::math::{TAU, cos, radians, sin};
 use artkit::parts::new_parts;
 use artkit::place::Coord;
 use artkit::scene::Obj;
-use artkit::{fbox, fcyl, fsphere, fsweep, loft, revolve};
+use artkit::{fbox, fcyl, fsphere, fsweep, kit, loft, revolve};
 
 /// A welded frame of square tube: each side one piece (a leg up, a rail along, a leg down) on glides, a back
 /// apron, and a front (resident's side) apron with a drawer gap (x0, x1) left open.
@@ -22,7 +22,7 @@ pub fn desk_frame(w: f64, legs: Option<Mat>, gap: Option<(f64, f64)>, apron: Opt
         fsweep!(
             F,
             format!("side{s}"),
-            &fillet(
+            &kit::fillet!(
                 &[
                     (x, 0.012, 0.06),
                     (x, 0.70, 0.06),

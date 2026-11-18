@@ -1,15 +1,13 @@
 //! What the dressing things are built from: the palette, the frame, mouldings swept round an outline, mirror glass
 //! gridded for its shading.
 
-use artkit::forms;
 use artkit::materials::{Mat, Mirror};
-use artkit::math::{P3, PI, V3, cos, radians, sin};
-use artkit::mesh::Mesh;
+use artkit::math::{PI, V3, cos, radians, sin};
 use artkit::palette;
 use artkit::place::{Coord, GameFrame};
 use artkit::py;
 use artkit::scene::Obj;
-use artkit::shapes::Revolve;
+use artkit::{edit, forms, subdivide_edges};
 use artkit::{fbox, revolve};
 
 palette! { M:
@@ -149,7 +147,12 @@ pub fn pane_with(
     let obj = fbox!(F, name, w, h, t, at, material);
     // the box's long edges (longer than twice its thickness: across and up) cut `cuts` times, its faces' cuts
     // joined: a grid on its front and back, strips round its sides
-    let mesh = subdivided_pane(w, h, t, cuts);
+    let pts = obj.read(|o| o.mesh.verts.clone());
+    let long: Vec<(u32, u32)> = edit::edges(obj)
+        .into_iter()
+        .filter(|&(a, b)| (pts[b as usize] - pts[a as usize]).length() > t * 2.0)
+        .collect();
+    subdivide_edges!(obj, &long, cuts = cuts, use_grid_fill = true);
     let remap = |c: f64, half: f64| {
         // the first grid line in from each edge moves out to `inset`, the lines between spread evenly
         let mut k = c.abs() / half;
@@ -162,72 +165,13 @@ pub fn pane_with(
         }
         (k * half).copysign(c)
     };
-    let mut mesh = mesh;
-    for v in &mut mesh.verts {
-        v.x = remap(v.x as f64, w / 2.0) as f32;
-        v.z = remap(v.z as f64, h / 2.0) as f32;
-    }
-    mesh.set_material(Some(material));
-    mesh.recalc_normals();
-    mesh.shade_flat();
-    obj.edit(|o| o.mesh = mesh);
+    obj.edit(|o| {
+        for v in &mut o.mesh.verts {
+            v.x = remap(v.x as f64, w / 2.0) as f32;
+            v.z = remap(v.z as f64, h / 2.0) as f32;
+        }
+    });
     obj
-}
-
-// KIT: bmesh.ops.subdivide_edges (cuts, use_grid_fill) on a box's edges longer than twice its thickness
-/// A box `w` (x) by `t` (y) by `h` (z) about its middle, its edges along x and z each cut `cuts` times evenly: its
-/// faces at ±y gridded (grid fill), the four round its sides cut into strips.
-fn subdivided_pane(w: f64, h: f64, t: f64, cuts: usize) -> Mesh {
-    let n = cuts + 1;
-    let along = |i: usize, size: f64| -size / 2.0 + size * i as f64 / n as f64;
-    let mut verts: Vec<V3> = Vec::new();
-    let mut index = std::collections::BTreeMap::new();
-    let mut at = |i: usize, j: usize, k: usize, verts: &mut Vec<V3>| -> u32 {
-        *index.entry((i, j, k)).or_insert_with(|| {
-            verts.push(V3::from(P3 {
-                x: along(i, w),
-                y: if j == 0 { -t / 2.0 } else { t / 2.0 },
-                z: along(k, h),
-            }));
-            (verts.len() - 1) as u32
-        })
-    };
-    let mut faces: Vec<Vec<u32>> = Vec::new();
-    // the front (-y) and back (+y): a grid
-    for j in [0, 1] {
-        for i in 0..n {
-            for k in 0..n {
-                faces.push(vec![
-                    at(i, j, k, &mut verts),
-                    at(i + 1, j, k, &mut verts),
-                    at(i + 1, j, k + 1, &mut verts),
-                    at(i, j, k + 1, &mut verts),
-                ]);
-            }
-        }
-    }
-    // the sides at ±x: strips up z; the top and bottom at ±z: strips across x
-    for i in [0, n] {
-        for k in 0..n {
-            faces.push(vec![
-                at(i, 0, k, &mut verts),
-                at(i, 1, k, &mut verts),
-                at(i, 1, k + 1, &mut verts),
-                at(i, 0, k + 1, &mut verts),
-            ]);
-        }
-    }
-    for k in [0, n] {
-        for i in 0..n {
-            faces.push(vec![
-                at(i, 0, k, &mut verts),
-                at(i + 1, 0, k, &mut verts),
-                at(i + 1, 1, k, &mut verts),
-                at(i, 1, k, &mut verts),
-            ]);
-        }
-    }
-    Mesh::from_pydata(verts, &faces)
 }
 
 /// A flat oval `w` x `h`, `t` thick along game z, upright at game `at` (mirror glass, a back plate), its faces in
@@ -265,25 +209,12 @@ pub fn turned(
     material: Mat,
     segments: usize,
 ) -> Obj {
-    forms_revolve(name, profile, F.at(x, 0, z), material, segments)
-}
-
-fn forms_revolve(
-    name: &str,
-    profile: &[(f64, f64)],
-    at: P3,
-    material: Mat,
-    segments: usize,
-) -> Obj {
-    artkit::shapes::revolve(
+    revolve!(
         name,
         profile,
-        Revolve {
-            at,
-            material: Some(material),
-            segments: Some(segments),
-            ..Revolve::default()
-        },
+        at = F.at(x, 0, z),
+        material = material,
+        segments = segments
     )
 }
 

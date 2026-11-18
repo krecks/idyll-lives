@@ -1,9 +1,8 @@
 //! D2: the grandfather clock.
 
-use super::common::{
-    F, M, WALL, box_outline, clock_clips, clock_hands, disc, fan, fr, rect, turned_g,
-};
+use super::common::{F, M, WALL, box_outline, clock_clips, clock_hands, disc, fan, rect, turned_g};
 use artkit::forms::rounded_rect;
+use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::{Axis, P3, TAU, atan2, cos, degrees, pow, radians, sin};
 use artkit::motion::Ease;
@@ -204,7 +203,7 @@ pub fn grandfather_clock() -> Vec<Obj> {
             );
             for (y, k) in [(0.52, 1), (1.48, -1)] {
                 turned_g(
-                    &format!("quarter_cap{s}{}", fr(y)),
+                    &format!("quarter_cap{s}{}", float_repr(y)),
                     &[
                         (0.0, 0.0),
                         (0.022, 0.0),
@@ -320,7 +319,7 @@ pub fn grandfather_clock() -> Vec<Obj> {
             (0.0, 2.098, 0.018),
         ] {
             turned_g(
-                &format!("finial{}", fr(x)),
+                &format!("finial{}", float_repr(x)),
                 &[
                     (0.0, 0.0),
                     (0.012, 0.0),

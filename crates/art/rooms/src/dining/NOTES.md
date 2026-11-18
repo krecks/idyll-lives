@@ -155,4 +155,4 @@ The high bar stool's seat and back (`leather`) are leather. It goes from 2 draws
 
 Ported from `dining.py` line for line (crates/art/rooms/src/dining). Against the last Blender build (`ref/blender`)
 every model's points are Blender's (0.000 mm): 4 same, 25 near (bevel UVs, baked shading and corner normals within
-the parity limits), the pack the same. The local `kit.tube` is gamekit's, marked `// KIT` for the kit.
+the parity limits), the pack the same. Its tubes are the kit's (`kit::tube!`).

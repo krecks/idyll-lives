@@ -1,12 +1,12 @@
 //! K7 continued: the tables on a pedestal: the round bistro table, the high café table and the round table for four.
 
-use super::common::{finish, ring_loop, round_slab, tube, turned};
+use super::common::{finish, ring_loop, round_slab, turned};
 use super::{BT, F, M, TT};
 use artkit::forms::rounded_rect;
-use artkit::fsweep;
 use artkit::materials::Mat;
 use artkit::math::{cosd, sind};
 use artkit::scene::Obj;
+use artkit::{fsweep, kit};
 
 /// A round top on a column: a hub under the top, the column with a ring near its top, a domed cast foot (5 cm
 /// high), the top 4 cm thick and 40-sided.
@@ -121,15 +121,13 @@ pub fn table_bar_high() -> Vec<Obj> {
     for k in 0..4 {
         let a = f64::from(45 + 90 * k);
         let (c, s) = (cosd(a), sind(a));
-        tube(
-            &F,
-            &format!("spoke{k}"),
+        kit::tube!(
+            F,
+            format!("spoke{k}"),
             &[(c * 0.05, 0.3, s * 0.05), (c * 0.18, 0.3, s * 0.18)],
             0.009,
             M.legs_black,
-            Some(8),
-            3,
-            1.0,
+            verts = 8
         );
     }
     finish("tableBarHigh")

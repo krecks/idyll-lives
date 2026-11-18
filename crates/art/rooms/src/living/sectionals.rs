@@ -1,11 +1,12 @@
 //! L1 continued: the designer sofa, the three-seater, the sectional's modules and its chaise.
 
 use super::common::{Cushion, cushion, panel, plain, seat, settled, taper_leg, throw};
-use super::sofas::{run, turned_back};
+use super::sofas::run;
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::materials::Mat;
+use artkit::math::P3;
 use artkit::parts::{join, new_parts};
 use artkit::scene::Obj;
 use artkit::soft::SoftBox;
@@ -42,7 +43,7 @@ pub fn sofa_design() -> Vec<Obj> {
             0.014,
             Some(0.006),
             SoftBox {
-                rot: turned_back(-8),
+                rot: P3::from((-8, 0, 0)),
                 tufts: Some((8, 2)),
                 tuft: 0.014,
                 diamond: true,
@@ -261,7 +262,7 @@ pub fn chaise() -> Vec<Obj> {
             (-0.08, 0.62, -0.68),
             M.greige_cushion,
             Cushion {
-                rot: turned_back(-9),
+                rot: P3::from((-9, 0, 0)),
                 puff: 0.03,
                 ..Cushion::default()
             },

@@ -1,14 +1,14 @@
 //! O2: the desk chairs, and the chairs the desks with their own chair are drawn with: a padded seat and back on
 //! a gas lift and five castors.
 
-use super::common::{fillet, pmax, turned};
+use super::common::turned;
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, TAU, cos, degrees, exp, pow, radians, sin};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fsweep, loft, revolve, soft, sphere, swing};
+use artkit::{fbox, fcyl, fsweep, kit, loft, py, revolve, settle, soft, sphere, swing};
 
 const LEG_R: f64 = 0.27; // how far a chair's legs reach out from the lift
 
@@ -45,7 +45,7 @@ fn contour_rings(
             0.0
         };
         let rx = w / 2.0 * e * (1.0 - taper * (1.0 - v) / 2.0);
-        let rz = t / 2.0 * pow(pmax(0.0, 1.0 - pow(v.abs(), 8.0)), 0.125);
+        let rz = t / 2.0 * pow(py::max(0.0, 1.0 - pow(v.abs(), 8.0)), 0.125);
         let fwd = lumbar * exp(-pow((v + 0.35) / 0.35, 2.0));
         let mut ring = Vec::new();
         for k in 0..verts {
@@ -78,11 +78,11 @@ fn contour_front(
 ) -> (f64, f64, f64) {
     let (lumbar, square) = (0.012, 4.0);
     let (x0, y0, z0) = at;
-    let e = pow(pmax(0.0, 1.0 - pow(v.abs(), 4.0)), 0.25);
+    let e = pow(py::max(0.0, 1.0 - pow(v.abs(), 4.0)), 0.25);
     let rx = w / 2.0 * e * (1.0 - taper * (1.0 - v) / 2.0);
-    let rz = t / 2.0 * pow(pmax(0.0, 1.0 - pow(v.abs(), 8.0)), 0.125);
+    let rz = t / 2.0 * pow(py::max(0.0, 1.0 - pow(v.abs(), 8.0)), 0.125);
     let px = u * rx;
-    let pz = rz * pow(pmax(0.0, 1.0 - pow(u.abs(), square)), 1.0 / square);
+    let pz = rz * pow(py::max(0.0, 1.0 - pow(u.abs(), square)), 1.0 / square);
     let fwd = lumbar * exp(-pow((v + 0.35) / 0.35, 2.0));
     (
         x0 + px,
@@ -171,7 +171,7 @@ fn chair_base(z: f64, seat_y: f64, frame: Mat, lite: bool) {
         let path = if lite {
             pts.to_vec()
         } else {
-            fillet(&pts, 0.04, 2)
+            kit::fillet!(&pts, 0.04, 2)
         };
         fsweep!(
             F,
@@ -240,7 +240,7 @@ fn t_arm(name: &str, s: i32, z: f64, seat_y: f64, frame: Mat, pad: Mat, lite: bo
     fsweep!(
         F,
         format!("{name}_post"),
-        &fillet(&pts, 0.035, if lite { 2 } else { 3 }),
+        &kit::fillet!(&pts, 0.035, if lite { 2 } else { 3 }),
         0.0,
         frame,
         profile = rounded_rect(0.03, 0.05, 0.01, 1),
@@ -277,7 +277,7 @@ fn loop_arm(name: &str, s: i32, z: f64, seat_y: f64, frame: Mat, pad: Mat, _lite
     fsweep!(
         F,
         format!("{name}_loop"),
-        &fillet(&pts, 0.045, 3),
+        &kit::fillet!(&pts, 0.045, 3),
         0.0,
         frame,
         profile = rounded_rect(0.012, 0.04, 0.005, 1),
@@ -356,7 +356,7 @@ fn chair_seat(z: f64, seat_y: f64, back_h: f64, seat: Mat, o: Seat) {
     fsweep!(
         F,
         "lever",
-        &fillet(
+        &kit::fillet!(
             &[
                 (0.06, seat_y - 0.12, z + 0.04),
                 (0.22, seat_y - 0.12, z + 0.05),
@@ -431,7 +431,7 @@ fn chair_seat(z: f64, seat_y: f64, back_h: f64, seat: Mat, o: Seat) {
     fsweep!(
         F,
         "spine",
-        &fillet(
+        &kit::fillet!(
             &[
                 (0.0, seat_y - 0.115, z - 0.06),
                 (0.0, seat_y - 0.115, sz),
@@ -520,8 +520,8 @@ fn chair_seat(z: f64, seat_y: f64, back_h: f64, seat: Mat, o: Seat) {
             let span = back_h * 0.86;
             for k in 0..n {
                 let v = -0.86 + (k as f64 + 0.5) * 1.72 / n as f64;
-                let e =
-                    pow(pmax(0.0, 1.0 - pow(v.abs(), 4.0)), 0.25) * (1.0 - 0.08 * (1.0 - v) / 2.0);
+                let e = pow(py::max(0.0, 1.0 - pow(v.abs(), 4.0)), 0.25)
+                    * (1.0 - 0.08 * (1.0 - v) / 2.0);
                 let fwd = 0.012 * exp(-pow((v + 0.35) / 0.35, 2.0));
                 soft!(
                     F,
@@ -670,13 +670,7 @@ fn chair(seat_y: f64, back_h: f64, z: f64, seat: Mat, o: Seat) -> Vec<Obj> {
         )
     });
     let swivel = hinged(join(&parts, "seat", None), F.at(0, seat_y - 0.15, z));
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     swing!(swivel, "swivel", 15.0, seconds = 0.5);
     meshes()
 }

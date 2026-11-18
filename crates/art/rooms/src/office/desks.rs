@@ -2,33 +2,20 @@
 //! tile, a frame, the chair behind; the catalog2 desks (simple, corner, standing, executive) stand alone.
 
 use super::chairs::desk_chair;
-use super::common::{bar_pull, drawer_box, fillet, front, top, turned};
+use super::common::{bar_pull, drawer_box, front, top, turned};
 use super::desk_things::{
     cactus, desk_frame, desk_lamp, keyboard, laptop_keys, monitor, mouse, mug, notebook, pen,
 };
 use super::{CHAIR_Z, F, FT, M};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
-use artkit::math::{Axis, P3};
+use artkit::math::Axis;
 use artkit::motion::{Spin, spin};
-use artkit::parts::{Settle, aside, hinged, join, new_parts, settle_with};
+use artkit::parts::{aside, hinged, join, new_parts};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcone, fcyl, fextrude, fsphere, fsweep, revolve, slide, swing, torus};
-
-pub(super) fn origin() -> Option<P3> {
-    Some((0, 0, 0).into())
-}
-
-/// Stands the model on the floor where it was built (`G.settle(centre=False)`).
-pub(super) fn settle() {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
-}
+use artkit::{
+    fbox, fcone, fcyl, fextrude, fsphere, fsweep, join, kit, revolve, settle, slide, swing, torus,
+};
 
 // --- the desks with their own chair: a top at the front of the tile, a frame, the chair behind -----------------
 pub fn computer_desk() -> Vec<Obj> {
@@ -38,7 +25,7 @@ pub fn computer_desk() -> Vec<Obj> {
         let sq = rounded_rect(0.04, 0.04, 0.007, 1);
         for s in [-1, 1] {
             let x = f64::from(s) * 0.72;
-            let lp = fillet(
+            let lp = kit::fillet!(
                 &[
                     (x, 0.02, 0.275),
                     (x, 0.02, 0.43),
@@ -48,7 +35,7 @@ pub fn computer_desk() -> Vec<Obj> {
                     (x, 0.02, 0.275),
                 ],
                 0.03,
-                3,
+                3
             );
             fsweep!(
                 F,
@@ -144,7 +131,7 @@ pub fn computer_desk() -> Vec<Obj> {
             );
         }
     });
-    join(&still, "computerDesk", origin());
+    join!(&still, "computerDesk", origin = (0, 0, 0));
     // the monitor on it, facing the resident, the mug, lamp, cactus, notebook and pen, and the chair drawn at
     // it: not part of the desk's size (the monitor stands 1.21 m up, the desk's own top 0.75)
     let carried = new_parts(|| {
@@ -241,7 +228,7 @@ pub fn computer_desk() -> Vec<Obj> {
         );
     });
     let tray = join(&parts, "tray", None);
-    settle();
+    settle!(centre = false);
     slide!(tray, "tray_out", (0, 0.15, 0), seconds = 0.6);
     meshes()
 }
@@ -260,7 +247,7 @@ pub fn desk_writing() -> Vec<Obj> {
             M.frame
         );
     });
-    join(&still, "deskWriting", origin());
+    join!(&still, "deskWriting", origin = (0, 0, 0));
     // what lies on it and the chair drawn at it: part of the picture, not of the desk's size (a desk is
     // 1.54 x 0.75 x 0.87 m with its chair's back and the lamp standing over it)
     let carried = new_parts(|| {
@@ -394,7 +381,7 @@ pub fn desk_writing() -> Vec<Obj> {
         }
     });
     let drawer = join(&parts, "drawer", None);
-    settle();
+    settle!(centre = false);
     slide!(drawer, "drawer_open", (0, 0.22, 0), seconds = 0.6);
     meshes()
 }
@@ -464,7 +451,7 @@ pub fn desk_laptop() -> Vec<Obj> {
             verts = 8
         );
     });
-    join(&still, "deskLaptop", origin());
+    join!(&still, "deskLaptop", origin = (0, 0, 0));
     // the mug, notebook, pen and charger on it, and the chair drawn at it: not part of the desk's size
     let carried = new_parts(|| {
         mug(0.32, 0.36, FT);
@@ -531,7 +518,7 @@ pub fn desk_laptop() -> Vec<Obj> {
         );
     });
     let lid = hinged(join(&parts, "lid", None), F.at(0.02, FT + 0.013, 0.31));
-    settle();
+    settle!(centre = false);
     swing!(lid, "lid_open", 110.0, seconds = 0.8, axis = Axis::X);
     meshes()
 }
@@ -794,7 +781,7 @@ pub fn computer_gaming() -> Vec<Obj> {
         }
         desk_chair(M.chair_gamer, CHAIR_Z, 0.62, true, Some(accent));
     });
-    join(&still, "computerGaming", origin());
+    join!(&still, "computerGaming", origin = (0, 0, 0));
     let mut fans = Vec::new();
     let blade = [
         (0.0, -0.006),
@@ -845,7 +832,7 @@ pub fn computer_gaming() -> Vec<Obj> {
             F.at(0.62, y, 0.446),
         ));
     }
-    settle();
+    settle!(centre = false);
     for fan in fans {
         spin(
             fan,

@@ -88,14 +88,6 @@ fn lights() -> &'static BTreeMap<String, Json> {
     })
 }
 
-fn number(j: &Json) -> f64 {
-    match j {
-        Json::Int(i) => *i as f64,
-        Json::Num(x) => *x,
-        _ => panic!("a light's number is a number"),
-    }
-}
-
 const AT_TOLERANCE: f64 = 0.05; // how far across (m) a bulb may stand from the content's `light.at`
 
 thread_local! {
@@ -106,12 +98,12 @@ thread_local! {
 /// Asserts a bulb at height `y` is within 25 cm of where the content puts the lamp's light; notes its material, so
 /// that once the model is built and settled `check_at` finds it across.
 pub fn near_light(id: &str, y: f64, material: Option<Mat>) {
-    let want = number(
-        lights()
-            .get(id)
-            .and_then(|l| l.get("height"))
-            .unwrap_or_else(|| panic!("{id}: the content gives no light height")),
-    );
+    let want = lights()
+        .get(id)
+        .and_then(|l| l.get("height"))
+        .unwrap_or_else(|| panic!("{id}: the content gives no light height"))
+        .num()
+        .expect("a light's number is a number");
     assert!(
         (y - want).abs() <= 0.25,
         "{id}: bulb at {y:.2} m, the content's light at {want:.2} m"
@@ -159,7 +151,10 @@ pub fn check_at(id: &str) -> Vec<Obj> {
     let n = pts.len() as f64;
     let x = -py::sum(pts.iter().map(|p| p.x as f64)) / n; // game x
     let z = -py::sum(pts.iter().map(|p| p.y as f64)) / n; // game depth
-    let (ax, az) = (number(&at[0]), number(&at[1]));
+    let (ax, az) = (
+        at[0].num().expect("a light's number is a number"),
+        at[1].num().expect("a light's number is a number"),
+    );
     let off = py::hypot(x - ax, z - az);
     assert!(
         off <= AT_TOLERANCE,
@@ -602,8 +597,3 @@ pub const DOME: [(f64, f64); 10] = [
     (0.44, -0.06),
     (0.47, -0.5),
 ];
-
-/// A float as Python writes it in a name.
-pub fn fr(x: f64) -> String {
-    artkit::json::float_repr(x)
-}

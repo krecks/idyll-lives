@@ -1,21 +1,16 @@
 //! D2: vases, statues, the coat rack and the hanging plant.
 
-use super::common::{F, M, fr, heart, leaf_outline, pedestal, v};
+use super::common::{F, M, heart, leaf_outline, pedestal};
 use artkit::forms::{Plane, rounded_rect};
+use artkit::json::float_repr;
 use artkit::kit;
-use artkit::math::{Axis, P3, PI, TAU, V3, atan2, cos, degrees, radians, sin};
-use artkit::parts::{hinged, join, join_all, new_parts};
+use artkit::math::{Axis, P3, PI, TAU, V3, atan2, cos, degrees, radians, sin, v3};
+use artkit::parts::{hinged, join, join_all, new_parts, settle_all};
 use artkit::scene::{Obj, RotationMode, meshes};
 use artkit::{
     boulder, cone, cube, extrude, fsphere, fsweep, jitter, loft, revolve, ring, settle, sphere,
     sweep, swing, torus,
 };
-
-/// Settled on the floor, centred.
-fn settled() -> Vec<Obj> {
-    settle!();
-    meshes()
-}
 
 /// A tall floor vase of pale ceramic, thrown with a foot, two grooves and a rolled lip, holding three dried twigs
 /// curving out, each with a side shoot, under their pampas plumes.
@@ -57,9 +52,9 @@ pub fn vase_tall() -> Vec<Obj> {
             .into_iter()
             .enumerate()
         {
-            let tip = v((-x, y, top + 0.035)); // Blender: the game's x mirrored
-            let foot = v((0.0, 0.0, 0.5));
-            let bend = v((-x * 0.35, y * 0.2, 0.0));
+            let tip = v3(-x, y, top + 0.035); // Blender: the game's x mirrored
+            let foot = v3(0.0, 0.0, 0.5);
+            let bend = v3(-x * 0.35, y * 0.2, 0.0);
             let pts: Vec<V3> = [0.0, 0.33, 0.66, 1.0]
                 .iter()
                 .map(|&t| foot + (tip - foot) * t + bend * sin(PI * t))
@@ -74,10 +69,10 @@ pub fn vase_tall() -> Vec<Obj> {
                 scale = [1.0, 0.85, 0.7, 0.55]
             );
             let mid = pts[2];
-            let shoot = mid + v((-x * 0.15, y * 0.3, 0.12));
+            let shoot = mid + v3(-x * 0.15, y * 0.3, 0.12);
             sweep!(
                 format!("shoot{k}"),
-                &[mid, mid + (shoot - mid) * 0.5 + v((0.0, 0.0, 0.02)), shoot],
+                &[mid, mid + (shoot - mid) * 0.5 + v3(0.0, 0.0, 0.02), shoot],
                 0.0035,
                 material = M.twig,
                 verts = 5,
@@ -104,7 +99,7 @@ pub fn vase_tall() -> Vec<Obj> {
         }
     });
     join_all("vaseTall");
-    settled()
+    settle_all()
 }
 
 /// The ginger jar's radius at heights (its profile).
@@ -255,7 +250,7 @@ pub fn urn_porcelain() -> Vec<Obj> {
         }
     });
     join_all("urnPorcelain");
-    settled()
+    settle_all()
 }
 
 /// A blue glazed vase with a foot and a rolled lip, of five white hydrangea heads on curving stems with pointed
@@ -298,11 +293,11 @@ pub fn vase_pedestal() -> Vec<Obj> {
         .into_iter()
         .enumerate()
         {
-            let tip = v((-x, -d, top));
-            let foot = v((0.0, 0.0, y + 0.28));
+            let tip = v3(-x, -d, top);
+            let foot = v3(0.0, 0.0, y + 0.28);
             let pts: Vec<V3> = [0.0, 0.4, 0.75, 1.0]
                 .iter()
-                .map(|&t| foot + (tip - foot) * t + v((-x * 0.25, -d * 0.25, 0.0)) * sin(PI * t))
+                .map(|&t| foot + (tip - foot) * t + v3(-x * 0.25, -d * 0.25, 0.0) * sin(PI * t))
                 .collect();
             sweep!(
                 format!("stem{k}"),
@@ -340,7 +335,7 @@ pub fn vase_pedestal() -> Vec<Obj> {
         }
     });
     join_all("vasePedestal");
-    settled()
+    settle_all()
 }
 
 /// A marble bust on a stone pedestal: a turned socle, a chest cut off at the shoulders, a neck, a head lofted from
@@ -508,7 +503,7 @@ pub fn bust_marble() -> Vec<Obj> {
         jitter!(hair, 0.005, size = 0.012, seed = 1.0);
     });
     join_all("bustMarble");
-    settled()
+    settle_all()
 }
 
 /// A concrete cat sitting up: its rump with a thigh bulging at either side, the hind feet tucked forward by the front
@@ -710,7 +705,7 @@ pub fn statue_cat() -> Vec<Obj> {
         );
     });
     join_all("statueCat");
-    settled()
+    settle_all()
 }
 
 fn ellipse_profile(a: f64, b: f64) -> Vec<(f64, f64)> {
@@ -889,7 +884,7 @@ pub fn statue_horse() -> Vec<Obj> {
                 let pts: Vec<(f64, f64, f64)> =
                     joints.iter().map(|&(jx, jy)| (jx, d, y + jy)).collect();
                 sweep!(
-                    format!("leg{}{}", fr(x), fr(d)),
+                    format!("leg{}{}", float_repr(x), float_repr(d)),
                     &pts,
                     0.0135,
                     material = M.bronze,
@@ -898,7 +893,7 @@ pub fn statue_horse() -> Vec<Obj> {
                     scale = [if x > 0.0 { 2.0 } else { 1.6 }, 1.05, 0.95, 0.85]
                 );
                 cone!(
-                    format!("hoof{}{}", fr(x), fr(d)),
+                    format!("hoof{}{}", float_repr(x), float_repr(d)),
                     0.017,
                     0.013,
                     0.022,
@@ -910,7 +905,7 @@ pub fn statue_horse() -> Vec<Obj> {
         }
     });
     join_all("statueHorse");
-    settled()
+    settle_all()
 }
 
 const COAT_AT: (f64, f64) = (0.1, 0.07); // where the coat hangs (game x, depth)
@@ -1191,7 +1186,7 @@ pub fn coat_rack() -> Vec<Obj> {
         );
     });
     join_all("coatRack");
-    settled()
+    settle_all()
 }
 
 // --- D2: the hanging plant --------------------------------------------------------------------------------
