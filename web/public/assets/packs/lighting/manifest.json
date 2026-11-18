@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built lamps (tools/art/blender/families/lighting.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Shades, diffusers and bulbs glow at night (`glow`); the ceiling fan's blades turn while it is on, near the camera (`idle`).",
+  "$comment": "The lamps (crates/art/rooms/src/lighting, built by cargo art). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Shades, diffusers and bulbs glow at night (`glow`); the ceiling fan's blades turn while it is on, near the camera (`idle`).",
   "version": 1,
   "entries": {
     "model.ceilingPendant": {

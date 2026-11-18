@@ -82,8 +82,8 @@ gate below, so the review does.
 - **Heights the content names** come from the model: `seat.height`, `surface.height` and its
   rectangle (`size`, `at`), `light.height`, and `slots` spread across the width (or each slot's `places`). Mark them in
   Blender with empties named `top`, `seat`, `seat.1` …, `light` (not exported), and have the
-  family script assert them against the content JSON (`families/lighting.py` reads each lamp's
-  `light.height` from the content and `_near_light` checks its bulb against it). The content stays the
+  family script assert them against the content JSON (crates/art/rooms/src/lighting reads each lamp's
+  `light.height` from the content and `near_light` checks its bulb against it). The content stays the
   truth for the simulation; the script keeps the two in line.
 
 ## Budgets

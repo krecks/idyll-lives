@@ -1,22 +1,22 @@
-# Lighting — notes
+# Lighting (`crates/art/rooms/src/lighting`)
 
-`lighting.py` builds the 21 lamps into `web/public/assets/models/lighting/` and their
+The module builds the 21 lamps into `web/public/assets/models/lighting/` and their
 entries in `packs/lighting/manifest.json`. Built 2026-10-14; they sat in Validate ›
 Ceiling Lights, Wall Lights, Floor Lamps and Table Lamps until signed off.
 
 - **LT1, ceiling:** `ceilingPendant`, `ceilingLight`, `chandelier`, `pendantIndustrial`, `ceilingFan`,
-  `trackLights`, `paperLantern`. They hang from 2.8 m at their real height (`G.settle(floor=False)`,
+  `trackLights`, `paperLantern`. They hang from 2.8 m at their real height (settled with `floor = false`,
   `floor=False` on the `Model`), centred. The pendant lamp and the paper lantern, which residents walk under, hang
   clear of heads: their lowest point 2.11 and 2.12 m up (a 0.69 m drop; 2026-10-21, review M-lighting-05 and Q-12,
   was 1.85 and 1.80); the chandelier and the industrial pendant hang lower, over furniture only (content
   `headHeight`).
 - **LT2, wall:** `wallSconce`, `wallLampArm`, `wallLightOutdoor`. Their back is on the wall face (−0.43), at
-  their real height (`G.settle(centre=False, floor=False)`, `centre=` on the `Model`).
+  their real height (settled with `centre = false, floor = false`, a `centre` on the `Model`).
 - **LT3, floor:** `lamp`, `floorLampSimple`, `lampFloorArc`, `lampFloorTripod`, `lampTorchiere`. The arc lamp
   reaches over the next tile (2026-10-26, review M-lighting-06): its base in the back left corner of its tile, its
   back on the wall face, the arc rising to 2.05 m and coming down over the middle of the tile in front, 1.33 m from
   the base across the floor (`ARC_BASE`, `ARC_SHADE_AT`), the shade from 1.6 to 1.8 m, over a sofa's seat. It is
-  built where it stands (`G.settle(centre=False)`, `centre` the box's middle, -0.1245, 0.3755). Content: `overhang`
+  built where it stands (settled with `centre = false`, `centre` the box's middle, -0.1245, 0.3755). Content: `overhang`
   [[0, 1]] (furniture under the shade, nobody walking there, nothing tall or hanging low), `light.at` (0, 1) and
   `light.height` 1.65 at the bulb, and `freeRotation` false (the sim refuses an `overhang` that turns freely: the
   shade's tile turns in quarter turns). Build mode checks the shade's tile as the sim does; the house generator hangs
@@ -30,7 +30,7 @@ Ceiling Lights, Wall Lights, Floor Lamps and Table Lamps until signed off.
 
 ## The light
 
-The light is the content's `light`; the model only shows where it comes from. `_bulb` (and `_near_light`)
+The light is the content's `light`; the model only shows where it comes from. `bulb` (and `near_light`)
 asserts each bulb within 25 cm of the content's `light.height`, read from `base.json`, `furniture.json` and
 `catalog2/lighting.json`, so a remodel can't drift away from it. Most are within 8 cm. The pendant's light was
 at the top of its dome (2.1 m, as the old part had it), 20 cm above the bulb; it is at the bulb now (1.9 m,
@@ -38,7 +38,7 @@ at the top of its dome (2.1 m, as the old part had it), 20 cm above the bulb; it
 footprint's middle unless the content's `light.at` moves it (in the game's frame, the old part's: the GLB's x
 mirrored, as the glTF loader turns it): the arc lamp's (0, 1), over the tile in front, and the table lamp's (−0.12, 0)
 put it at their bulbs, the nightstand lamp's (0, −0.26, bedroom) at its bulb near the wall (2026-10-17). Since
-2026-10-26 the build checks `at` too: once a lamp of this family with a `light.at` is built and settled, `_check_at`
+2026-10-26 the build checks `at` too: once a lamp of this family with a `light.at` is built and settled, `check_at`
 finds its bulb (the middle of the faces in the bulb's material, which `_bulb` notes) and asserts it within 5 cm across
 of `at`. The wall lights keep theirs at the middle, 13–38 cm out from the bulb: tried at the bulb, the sconce and
 bulkhead lit only a small hot ring round themselves and lost the warm pool on the wall and floor.
@@ -54,17 +54,17 @@ lamp's coral cap `#FFAA78`.
 ## Clips (ambient, `idle`)
 
 - **Ceiling fan** (`blades`): the five blades and their irons, origin on the axis; `blades_turn` turns them
-  once in 2.5 s (`G.spin`). The axis is on the tile's middle, so the blades sweep a circle 0.974 m across
+  once in 2.5 s (`spin`). The axis is on the tile's middle, so the blades sweep a circle 0.974 m across
   inside the tile (the fan's box, reaching farther one way, is centred 3.7 cm off: its `centre`, -0.0374 since the
   blades' tips were rounded, 2026-10-22).
 - **Paper lantern**: still since 2026-10-21 (review A-lighting-01: a paper globe indoors hangs still without a
-  draught; it swayed 2.5° in 2 s, `G.rock`). One node, joined.
+  draught; it swayed 2.5° in 2 s, `rock`). One node, joined.
 
 Not on Low (E2); at rest they look as the old part.
 
 ## Shapes
 
-- `_lathe` turns an old part's `lathe` (profile in fractions of its size) into a `G.revolve`, closing the
+- `lathe` turns an old part's `lathe` (profile in fractions of its size) into a `revolve`, closing the
   profile and optionally adding the liner. `top=True` puts the origin at the top, to tilt the swing-arm
   shade about where it hangs.
 - `_drum` is an open drum or cone shade with a wall thickness (4 segments turned 45° for the square ones).
@@ -75,8 +75,8 @@ Not on Low (E2); at rest they look as the old part.
 Rebuilt with the forms and the kit: same keys, sizes (within 2 %), centres (the fan's re-measured), bulb heights,
 paint and draws; every lamp under its size class's target. Shared turned parts: `_turned` (a profile from a foot),
 `_canopy` (a ceiling cup with a cord grip), `_socket` (ribbed), `_pear` (a pear bulb), `_ring` (rolled rims, wires),
-`_loft` (rounded-square bodies, `G.loft`/`G.ring`); `_drum` takes `rims` (rolled bindings in the shade's own fabric)
-and `spider` (the wire fitter seen from above); cords, stems, arms and harps are `G.kit.tube` sweeps. Shades keep
+`loft_at` (rounded-square bodies, `loft`/`ring`); `drum` takes `rims` (rolled bindings in the shade's own fabric)
+and `spider` (the wire fitter seen from above); cords, stems, arms and harps are `kit::tube` sweeps. Shades keep
 their materials and glows.
 - **Ceiling**: the pendant's and the industrial dome's rolled lips, collars and fitters, pear bulbs; the lantern's
   glazing bars, head rails and hipped lid; the chandelier's turned column, S-scrolled arms and curved spokes (one
@@ -133,3 +133,10 @@ shade, and the tiles it reaches over count as its own. Khronos validator: 0 erro
 | lampBanker | 0.30 × 0.39 × 0.16 | 2,536 | 1 | Base, Shade |
 | lampMushroom | 0.30 × 0.36 × 0.30 | 1,668 | 1 | Base, Shade |
 | lampLantern | 0.16 × 0.37 × 0.16 | 1,070 | 2 | Base, Glass |
+
+## Ported to Rust (2026-11-18)
+
+Built by `cargo art lighting` from this module (its Python script's numbers and order, one function each). The
+content's lights the bulbs are checked against are read from web/public/content (base.json, furniture.json,
+catalog2/lighting.json), built into the crate. Against the last Blender build (`ref/blender`): 7 same, 14 near,
+every surface within 0.2 mm (the square table lamp's shade), most to 0.000 mm.

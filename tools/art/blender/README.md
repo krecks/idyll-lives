@@ -455,7 +455,7 @@ never one that's already running) and drive Playwright headless with full Chrome
 - **Lopsided turning parts.** `G.settle()` centres the model's box, which moves a part that goes round
   off the middle when it reaches farther one way (five fan blades: 3.3 cm), and it then sweeps past its
   tile. Build it with its axis on the middle, `G.settle(centre=False)`, and give the `Model` the box's
-  middle as its `centre` (`families/lighting.py` `ceilingFan`). The gate fails a part a loop or ambient
+  middle as its `centre` (crates/art/rooms/src/lighting `ceiling_fan`). The gate fails a part a loop or ambient
   clip spins (G.spin) whose circle reaches over 1 cm past the footprint, indoors.
 - **Clicking.** An object is clicked by its drawn outline at rest, never past its tiles. An object held open
   is clicked by its whole tiles. The contact shadow is the model's own shape at rest, seen from above: darkest
