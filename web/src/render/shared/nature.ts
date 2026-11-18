@@ -1125,7 +1125,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   /** The field's water round its edge (`edgeWater`): past the edge only its sea runs on. */
   private edgeWet: Uint8Array | null = null;
   /** Where the sea's far shore meets the field's edge behind a rim of land (`seaRims`): past it the sea runs on. */
-  private edgeRims: Uint8Array | null = null;
+  private edgeRims: Uint16Array | null = null;
   private fieldWater = { any: false, sea: false };
   private fieldTop = 0;
   /** The field's cover as its zones were last made from it (`landChanged`: only the kinds that changed again). */

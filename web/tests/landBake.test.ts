@@ -467,6 +467,41 @@ describe("the sea's far shore meeting the edge behind a rim of land", () => {
     expect(drawn.waterEdge(-30, 190)).toBeLessThan(0);
   });
 
+  test('where its far shore bends into the edge, the shore past the edge comes on to where it leaves the blend', () => {
+    // (The rim to z 140 m; from there the far shore bends into the edge, the sea a sample further in every 4 m (27°), and
+    // runs on along z 160 m from 14 m in.)
+    const land = bakeLand(layout(plainWorld()), SIDE, SIDE);
+    for (let j = 0; j < land.rows; j++) {
+      for (let i = 0; i < 100; i++) {
+        const z = j * LAND_CELL;
+        const from = z <= 100 ? 0 : z <= 140 ? 2 : 3 + Math.floor((z - 142) / 4);
+        if (i < from || z > 160) continue;
+        const k = j * land.cols + i;
+        [land.h[k], land.wl[k]] = [Math.min(land.h[k], SEA_CM - 200), SEA_CM];
+      }
+    }
+    const sd = wetDistance(land);
+    const edge = edgeWater(land, 20);
+    const rims = seaRims(land, sd)!;
+    // On along the bend while the sea is no more than 6 samples in (to z 156 m), as far along the edge from its end as
+    // each is.
+    for (const z of [130, 150, 156]) expect(carriedWetEdgeAt(land, sd, -20, z, edge, rims)).toBeCloseTo(20 + (156 - z) + LAND_CELL, 6);
+    expect(carriedWetEdgeAt(land, sd, -20, 160, edge, rims)).toBe(wetEdgeAt(land, sd, -20, 160, edge));
+    const drawn = layout(plainWorld());
+    drawn.setLand(land);
+    const shore = (x: number) => {
+      let last = 0;
+      for (let z = 90; z <= 200; z += 0.5) if (drawn.waterEdge(x, z) > 0) last = z;
+      return last;
+    };
+    // (Before: past the edge it ended at 137 to 139 m, the far shore at 148 m 8 m in and 156 m 12 m in, a jog of 10 to
+    // 17 m at the edge.)
+    for (const x of [-60, -30, -10, -4]) {
+      expect(shore(x)).toBeGreaterThan(Math.min(shore(8), shore(12)) + 1);
+      expect(shore(x)).toBeLessThan(shore(24));
+    }
+  });
+
   test('not where the rim is wider, nor where the sea behind it runs on along the edge', () => {
     for (const land of [field(3, true), field(2, false)]) {
       const sd = wetDistance(land);
