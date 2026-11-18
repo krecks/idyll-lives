@@ -7,10 +7,12 @@
 #[macro_export]
 macro_rules! kit_tube {
     ($frame:expr, $name:expr, $points:expr, $r:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $points, $r, $material);
         #[allow(unused_mut)]
         let mut o = $crate::kit::Tube::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::kit::tube(&$frame, $name, $points, $crate::forms::num($r), $material, o)
+        $crate::kit::tube(args.0, args.1, args.2, $crate::forms::num(args.3), args.4, o)
     }};
 }
 
@@ -18,10 +20,12 @@ macro_rules! kit_tube {
 #[macro_export]
 macro_rules! kit_cabriole {
     ($frame:expr, $name:expr, $x:expr, $z:expr, $h:expr, $material:expr, $sx:expr, $sz:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $x, $z, $h, $material, $sx, $sz);
         #[allow(unused_mut)]
         let mut o = $crate::kit::Cabriole::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::kit::cabriole(&$frame, $name, $x, $z, $crate::forms::num($h), $material, $crate::forms::num($sx), $crate::forms::num($sz), o)
+        $crate::kit::cabriole(args.0, args.1, args.2, args.3, $crate::forms::num(args.4), args.5, $crate::forms::num(args.6), $crate::forms::num(args.7), o)
     }};
 }
 
@@ -44,10 +48,12 @@ macro_rules! kit_fillet {
 #[macro_export]
 macro_rules! kit_pull {
     ($frame:expr, $name:expr, $x:expr, $y:expr, $face:expr, $length:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $x, $y, $face, $length, $material);
         #[allow(unused_mut)]
         let mut o = $crate::kit::Pull::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::kit::pull(&$frame, $name, $crate::forms::num($x), $crate::forms::num($y), $crate::forms::num($face), $crate::forms::num($length), $material, o)
+        $crate::kit::pull(args.0, args.1, $crate::forms::num(args.2), $crate::forms::num(args.3), $crate::forms::num(args.4), $crate::forms::num(args.5), args.6, o)
     }};
 }
 
@@ -55,10 +61,12 @@ macro_rules! kit_pull {
 #[macro_export]
 macro_rules! kit_knob {
     ($frame:expr, $name:expr, $x:expr, $y:expr, $face:expr, $r:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $x, $y, $face, $r, $material);
         #[allow(unused_mut)]
         let mut o = $crate::kit::Knob::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::kit::knob(&$frame, $name, $x, $y, $face, $crate::forms::num($r), $material, o)
+        $crate::kit::knob(args.0, args.1, args.2, args.3, args.4, $crate::forms::num(args.5), args.6, o)
     }};
 }
 
@@ -66,10 +74,12 @@ macro_rules! kit_knob {
 #[macro_export]
 macro_rules! kit_shaker {
     ($frame:expr, $name:expr, $w:expr, $h:expr, $at:expr, $t:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $w, $h, $at, $t, $material);
         #[allow(unused_mut)]
         let mut o = $crate::kit::Shaker::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::kit::shaker(&$frame, $name, $crate::forms::num($w), $crate::forms::num($h), $at, $crate::forms::num($t), $material, o)
+        $crate::kit::shaker(args.0, args.1, $crate::forms::num(args.2), $crate::forms::num(args.3), args.4, $crate::forms::num(args.5), args.6, o)
     }};
 }
 
@@ -78,10 +88,12 @@ macro_rules! kit_shaker {
 #[macro_export]
 macro_rules! kit_moulding {
     ($frame:expr, $name:expr, $outline:expr, $profile:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $outline, $profile, $material);
         #[allow(unused_mut)]
         let mut o = $crate::kit::Moulding::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::kit::moulding(&$frame, $name, $outline, $profile, $material, o)
+        $crate::kit::moulding(args.0, args.1, args.2, args.3, args.4, o)
     }};
 }
 
@@ -91,16 +103,19 @@ macro_rules! kit_moulding {
 #[macro_export]
 macro_rules! kit_songbird {
     ($frame:expr, $name:expr, $x:expr, $y:expr, $z:expr, $body:expr, $breast:expr, $beak:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $x, $y, $z, $body, $breast, $beak);
         #[allow(unused_mut)]
         let mut o = $crate::kit::Songbird::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::kit::songbird(&$frame, $name, $crate::forms::num($x), $crate::forms::num($y), $crate::forms::num($z), $body, $breast, $beak, None, o)
+        $crate::kit::songbird(args.0, args.1, $crate::forms::num(args.2), $crate::forms::num(args.3), $crate::forms::num(args.4), args.5, args.6, args.7, None, o)
     }};
     ($frame:expr, $name:expr, $x:expr, $y:expr, $z:expr, $body:expr, $breast:expr, $beak:expr, $eye:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        let args = (&$frame, $name, $x, $y, $z, $body, $breast, $beak, $eye);
         #[allow(unused_mut)]
         let mut o = $crate::kit::Songbird::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::kit::songbird(&$frame, $name, $crate::forms::num($x), $crate::forms::num($y), $crate::forms::num($z), $body, $breast, $beak, $crate::Arg::arg($eye), o)
+        $crate::kit::songbird(args.0, args.1, $crate::forms::num(args.2), $crate::forms::num(args.3), $crate::forms::num(args.4), args.5, args.6, args.7, $crate::Arg::arg(args.8), o)
     }};
 }
 
@@ -108,10 +123,12 @@ macro_rules! kit_songbird {
 #[macro_export]
 macro_rules! kit_scroll {
     ($frame:expr, $name:expr, $start:expr, $centre:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $start, $centre, $material);
         #[allow(unused_mut)]
         let mut o = $crate::kit::Scroll::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::kit::scroll(&$frame, $name, $start, $centre, $material, o)
+        $crate::kit::scroll(args.0, args.1, args.2, args.3, args.4, o)
     }};
 }
 
@@ -119,10 +136,12 @@ macro_rules! kit_scroll {
 #[macro_export]
 macro_rules! kit_bench_end {
     ($frame:expr, $name:expr, $x:expr, $seat:expr, $front:expr, $back:expr, $top:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $x, $seat, $front, $back, $top, $material);
         #[allow(unused_mut)]
         let mut o = $crate::kit::BenchEnd::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::kit::bench_end(&$frame, $name, $x, $crate::forms::num($seat), $crate::forms::num($front), $crate::forms::num($back), $top, $material, o)
+        $crate::kit::bench_end(args.0, args.1, args.2, $crate::forms::num(args.3), $crate::forms::num(args.4), $crate::forms::num(args.5), args.6, args.7, o)
     }};
 }
 
@@ -130,10 +149,12 @@ macro_rules! kit_bench_end {
 #[macro_export]
 macro_rules! kit_taxi_word {
     ($frame:expr, $name:expr, $centre:expr, $h:expr, $z:expr, $facing:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $centre, $h, $z, $facing, $material);
         #[allow(unused_mut)]
         let mut o = $crate::kit::TaxiWord::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::kit::taxi_word(&$frame, $name, $centre, $crate::forms::num($h), $crate::forms::num($z), $facing, $material, o)
+        $crate::kit::taxi_word(args.0, args.1, args.2, $crate::forms::num(args.3), $crate::forms::num(args.4), args.5, args.6, o)
     }};
 }
 
@@ -141,9 +162,11 @@ macro_rules! kit_taxi_word {
 #[macro_export]
 macro_rules! kit_chequer {
     ($frame:expr, $name:expr, $x0:expr, $x1:expr, $y:expr, $z:expr, $size:expr, $facing:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $x0, $x1, $y, $z, $size, $facing, $material);
         #[allow(unused_mut)]
         let mut o = $crate::kit::Chequer::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::kit::chequer(&$frame, $name, $crate::forms::num($x0), $crate::forms::num($x1), $crate::forms::num($y), $crate::forms::num($z), $crate::forms::num($size), $facing, $material, o)
+        $crate::kit::chequer(args.0, args.1, $crate::forms::num(args.2), $crate::forms::num(args.3), $crate::forms::num(args.4), $crate::forms::num(args.5), $crate::forms::num(args.6), args.7, args.8, o)
     }};
 }

@@ -1272,6 +1272,37 @@ fn the_macros_call_the_kit_as_the_scripts_did() {
     assert_eq!(kit::fillet!(&corner, 0.05, steps = 2).len(), 5);
     let flat = [(0.0, 0.0), (0.5, 0.0), (0.5, 0.2)];
     assert_eq!(kit::fillet!(&flat, 0.05, steps = 1).len(), 4);
+    // what is given by place is worked out before the options, as Python does: a script's random draws keep
+    // their order
+    let mut rng = artkit::rand::Random::new(7);
+    let mut again = artkit::rand::Random::new(7);
+    let (first, second) = (again.random(), again.random());
+    let knob = kit::knob!(
+        F,
+        "drawn",
+        0,
+        0.45,
+        0.02,
+        0.01 + 0.01 * rng.random(),
+        M.brass,
+        segments = 6 + (4.0 * rng.random()) as usize
+    );
+    let plain = kit::knob(
+        &F,
+        "plain",
+        0,
+        0.45,
+        0.02,
+        0.01 + 0.01 * first,
+        M.brass,
+        kit::Knob {
+            segments: 6 + (4.0 * second) as usize,
+        },
+    );
+    assert_eq!(
+        knob.read(|o| o.mesh.verts.clone()),
+        plain.read(|o| o.mesh.verts.clone())
+    );
 }
 
 /// The slabs three of the families' models are cut from (tests/golden/kit_slab_walls.txt: the fridge's sides, kick
