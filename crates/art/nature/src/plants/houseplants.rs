@@ -1,10 +1,10 @@
 //! G1, the houseplants: the potted plant, the monstera, the fiddle-leaf fig, the snake plant, the cacti, the
 //! succulents, the fern on its stand, the parlour palm, the orchid and the bonsai.
 
-use crate::garden_decor::common::fillet;
 use artkit::botany::{_flower, fiddle, fit_to, palette, polar, sword};
 use artkit::far::{is_low, low};
 use artkit::forms::by;
+use artkit::kit::fillet;
 use artkit::math::{M4, P3, TAU, V3, atan2, cos, degrees, radians, sin, v3};
 use artkit::parts::{join, join_all, new_parts, settle};
 use artkit::rand::Random;

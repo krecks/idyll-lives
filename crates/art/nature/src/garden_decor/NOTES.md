@@ -47,5 +47,5 @@ the wheelbarrow come down by half while showing more.
 Built here, not in Blender, since 2026-11-18 (`cargo check-glb --against ref/blender`): the bird bath and the
 fountain the same in every bit, the gnome, the lantern and the wheelbarrow the same points and triangles (the baked
 shading within 0.05 of a grey level), the boulders within 0.001 mm with the same triangles a material. The boulders'
-cuts are the ground's (`ground::rock::_cut`): a point is in front of the plane or behind it, the face that closes
-a cut is triangulated without slivers, and a stone's fractures are cut where it was made, at the origin.
+cuts are the ground's (`ground::rock::_cut`, on artkit's `edit::bisect_plane`, `holes_fill` and `triangulate`): a
+stone's fractures are cut where it was made, at the origin.

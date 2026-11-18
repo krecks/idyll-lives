@@ -92,6 +92,6 @@ the game, its content, the crates or the tools drew them.
 
 Built here, not in Blender, since 2026-11-18 (`cargo check-glb --against ref/blender`): the thirteen files' points
 and triangles Blender's (0.000 mm), nine of them the same in every bit; the rock's lichen and soil on the same
-faces. A stone's cut is `rock::_cut`: a point is in front of the plane or behind it, the face that closes a cut is
-triangulated without slivers (`beautify`), and a stone's fractures are cut where it was made, at the origin. The
+faces. A stone's cut is `rock::_cut` (artkit's `edit::bisect_plane`, `holes_fill` and `triangulate`, bmesh's own), and a
+stone's fractures are cut where it was made, at the origin. The
 blades' and heads' sky normals are kept a corner at a time as Blender keeps them (`common::sky_normals`).

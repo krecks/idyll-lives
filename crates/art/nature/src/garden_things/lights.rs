@@ -1,8 +1,8 @@
 //! The garden lamp post and the string lights.
 
 use super::common::{_name, _near_light, _own, F};
-use crate::garden_decor::common::fillet;
 use artkit::far::low;
+use artkit::kit::fillet;
 use artkit::math::{P3, PI, TAU, cos, cosd, p3, pow, sin, sind};
 use artkit::motion::{Rock, rock};
 use artkit::parts::{Settle, hinged, join, join_all, new_parts, settle_all, settle_with};

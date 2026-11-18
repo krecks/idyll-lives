@@ -1,14 +1,14 @@
 //! The planter box, the birdhouse and the bird feeders.
 
-use super::common::{_name, _own, _prism, F, M, Run, moulding};
-use crate::garden_decor::common::fillet;
-use crate::songbird;
+use super::common::{_name, _own, _prism, F, M};
 use artkit::far::{is_low, low};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
+use artkit::kit::{self, Moulding, fillet, moulding};
 use artkit::math::{P3, TAU, V3, cos, cosd, degrees, p3, sin, sind, v3};
 use artkit::motion::{Squash, squash};
 use artkit::parts::{Settle, join, join_all, measure, new_parts, settle_all, settle_with};
+use artkit::place::Facing;
 use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
 use artkit::{dome, fbox, fcyl, fextrude, fsweep, leaf, lump, revolve, star, sweep, torus};
@@ -118,9 +118,11 @@ pub fn planterBox() -> Vec<Obj> {
             (0.07, 0.0),
         ],
         m.box_trim,
-        h,
-        Run::Top,
-        None,
+        Moulding {
+            at: h,
+            plane: Facing::Top,
+            ..Moulding::default()
+        },
     );
     // steel corner brackets on the front, bolted through
     if full {
@@ -406,8 +408,8 @@ pub fn birdhouse() -> Vec<Obj> {
         m.post,
         verts = 8
     );
-    songbird!(
-        &F,
+    kit::songbird!(
+        F,
         "robin",
         0.0,
         1.607,
@@ -415,7 +417,7 @@ pub fn birdhouse() -> Vec<Obj> {
         m.robin,
         m.robin_breast,
         m.beak,
-        eye = m.dark,
+        m.dark,
         turn = 90,
         size = 0.85
     );
@@ -728,8 +730,8 @@ pub fn birdFeederPole() -> Vec<Obj> {
             _feeder(s * 0.32);
         }
         // the robin, always there
-        songbird!(
-            &F,
+        kit::songbird!(
+            F,
             "robin",
             0.32,
             1.475,
@@ -737,7 +739,7 @@ pub fn birdFeederPole() -> Vec<Obj> {
             m.robin,
             m.robin_breast,
             m.beak,
-            eye = m.dark,
+            m.dark,
             turn = -20,
             size = 0.8
         );
@@ -745,8 +747,8 @@ pub fn birdFeederPole() -> Vec<Obj> {
     join(&still, "feeders", Some(p3(0, 0, 0)));
     // the blue tit that comes to the other feeder's perch, built full size and scaled to nothing
     let bird = new_parts(|| {
-        songbird!(
-            &F,
+        kit::songbird!(
+            F,
             "tit",
             -0.32,
             1.475,
@@ -754,7 +756,7 @@ pub fn birdFeederPole() -> Vec<Obj> {
             m.tit,
             m.tit_breast,
             m.beak,
-            eye = m.dark,
+            m.dark,
             turn = 25,
             size = 0.75
         );
