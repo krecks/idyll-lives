@@ -1,5 +1,6 @@
-//! Triangles of a polygon of five corners or more (a cylinder's cap, a swept profile's end): ears clipped in the
-//! order Blender clips them, every other corner round the polygon, so a round cap comes out as Blender's does.
+//! Triangles of a polygon of five corners or more (a cylinder's cap, a swept profile's end, the underside of a
+//! cushion that rests on it): the ones Blender's mesh is drawn, exported and hit by, its ears clipped as Blender
+//! clips them (`polyfill`), every other corner round a polygon with no hollow.
 //! And the triangles that fill outlines with holes (`fill`: a slab's two faces), as Blender's `triangle_fill`
 //! cuts them: its sweep (BLI_scanfill) and its beauty pass (BLI_polyfill_beautify, bmesh_beautify), GPL-2.0-or-later,
 //! worked through again here.
@@ -7,86 +8,10 @@
 use crate::math::V3;
 use std::collections::{BTreeMap, BTreeSet};
 
-/// The triangles of the polygon `p` (its `normal` given), as places among its corners.
+/// The triangles of the polygon `p` (five corners or more; `normal`: its unit normal by Newell's sum,
+/// `mesh::normal_newell`), as places among its corners: the ones Blender's mesh has for it (`polyfill::ngon`).
 pub fn polygon(p: &[V3], normal: V3) -> Vec<[u32; 3]> {
-    let n = p.len();
-    // the polygon flat, seen from the side its normal points to: anticlockwise
-    let nrm = [normal.x as f64, normal.y as f64, normal.z as f64];
-    let a = if nrm[0].abs() < 0.9 {
-        [1.0, 0.0, 0.0]
-    } else {
-        [0.0, 1.0, 0.0]
-    };
-    let cross = |u: [f64; 3], v: [f64; 3]| {
-        [
-            u[1] * v[2] - u[2] * v[1],
-            u[2] * v[0] - u[0] * v[2],
-            u[0] * v[1] - u[1] * v[0],
-        ]
-    };
-    let dot = |u: [f64; 3], v: [f64; 3]| u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
-    let x = cross(a, nrm);
-    let y = cross(nrm, x);
-    let flat: Vec<[f64; 2]> = p
-        .iter()
-        .map(|v| {
-            let q = [v.x as f64, v.y as f64, v.z as f64];
-            [dot(q, x), dot(q, y)]
-        })
-        .collect();
-    let turn = |i: usize, j: usize, k: usize| {
-        (flat[j][0] - flat[i][0]) * (flat[k][1] - flat[i][1])
-            - (flat[j][1] - flat[i][1]) * (flat[k][0] - flat[i][0])
-    };
-    let mut next: Vec<usize> = (0..n).map(|i| (i + 1) % n).collect();
-    let mut prev: Vec<usize> = (0..n).map(|i| (i + n - 1) % n).collect();
-    let mut left = n;
-    let mut out = Vec::with_capacity(n - 2);
-    let mut head = 0usize;
-    let mut init = 0usize;
-    let mut reverse = false;
-    while left > 3 {
-        // the first corner from `init` that is an ear: it turns the polygon's way and holds no other corner
-        let is_ear = |i: usize, next: &[usize], prev: &[usize]| {
-            let (a, b) = (prev[i], next[i]);
-            if turn(a, i, b) <= 0.0 {
-                return false;
-            }
-            let mut k = next[b];
-            while k != a {
-                if turn(a, i, k) >= 0.0
-                    && turn(i, b, k) >= 0.0
-                    && turn(b, a, k) >= 0.0
-                    && turn(prev[k], k, next[k]) <= 0.0
-                {
-                    return false;
-                }
-                k = next[k];
-            }
-            true
-        };
-        let mut ear = init;
-        let mut tried = 0;
-        while !is_ear(ear, &next, &prev) && tried < left {
-            ear = if reverse { prev[ear] } else { next[ear] };
-            tried += 1;
-        }
-        let (a, b) = (prev[ear], next[ear]);
-        out.push([a as u32, ear as u32, b as u32]);
-        next[a] = b;
-        prev[b] = a;
-        left -= 1;
-        if head == ear {
-            head = b;
-        }
-        init = if reverse { prev[a] } else { next[b] };
-        if turn(prev[init], init, next[init]) <= 0.0 {
-            init = if reverse { prev[init] } else { next[init] };
-            reverse = !reverse;
-        }
-    }
-    out.push([head as u32, next[head] as u32, next[next[head]] as u32]);
-    out
+    crate::polyfill::ngon(p, normal)
 }
 
 // ---- outlines filled as Blender fills them --------------------------------------------------------------

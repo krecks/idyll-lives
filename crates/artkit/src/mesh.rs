@@ -302,7 +302,8 @@ impl Mesh {
 
     /// The mesh's triangles as Blender draws and casts rays at them: (face, its three corners' places among the
     /// face's corners). A quad is cut from its first corner to its third, unless that folds it; a polygon of
-    /// more by clipping ears.
+    /// more by clipping ears as Blender clips them (`tri::polygon`), from its normal by Newell's sum: the same
+    /// triangles in the same order, each from the same corner.
     pub fn triangles(&self) -> Vec<(u32, [u32; 3])> {
         let mut out = Vec::with_capacity(self.loops.len());
         for f in 0..self.faces.len() {
