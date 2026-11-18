@@ -392,7 +392,9 @@ pub fn check_size(
 /// own, so it is only for third-party files; a model built here is made to its real size and checked with
 /// `check_size` (docs/design/objects.md, "Real size, uniform scale").
 pub fn fit(obj: Obj, w: f64, h: f64, d: f64) -> Obj {
-    let ws = obj.world_points();
+    // (where its points are by the matrix Blender has for it: the identity for a part just made)
+    let seen = obj.matrix_world_seen();
+    let ws: Vec<V3> = obj.read(|o| o.mesh.verts.iter().map(|&v| seen * v).collect());
     let (mut mn, mut mx) = ([f64::INFINITY; 3], [f64::NEG_INFINITY; 3]);
     for p in &ws {
         for i in 0..3 {
