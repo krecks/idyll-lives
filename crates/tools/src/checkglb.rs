@@ -242,7 +242,7 @@ fn strictly(
 const SWEEP: f64 = 0.01;
 /// How far (m) a model's middle at rest may be off its `centre` (centres.json).
 const OFF_CENTRE: f64 = 0.02;
-/// A bird's `bird` (tools/art/blender/families/birds.py; the renderer flies it by code): its length bill to tail
+/// A bird's `bird` (crates/art/things/src/birds; the renderer flies it by code): its length bill to tail
 /// tip and wingspan (m, both needed), its body's middle over its feet (`perchHeight`, m) and how far its perched
 /// torso is raised from level (`pitch`, degrees).
 const BIRD_KEYS: [&str; 4] = ["length", "wingspan", "perchHeight", "pitch"];
@@ -5288,7 +5288,7 @@ mod tests {
         );
     }
 
-    /// The blue tit as built (families/birds.py) against its `bird`, and against wrong ones.
+    /// The blue tit as built (crates/art/things/src/birds) against its `bird`, and against wrong ones.
     #[test]
     fn a_bird_is_checked_against_its_file() {
         let path = join(&repo_root(), "web/public/assets/models/birds/blueTit.glb");

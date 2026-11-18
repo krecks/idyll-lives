@@ -1,12 +1,12 @@
 # Media — notes
 
-`media.py` builds the eight L4 living-room media models into `web/public/assets/models/media/` and
+This module builds the eight L4 living-room media models into `web/public/assets/models/media/` and
 their entries in `packs/media/manifest.json`, a pack listed in the base manifest's `packs` and the only manifest
 that defines these keys (`tv`, the old `tv_set`; `tvWall`, `tvRetro`, `homeCinema`, `stereo`, `boombox`,
 `tvStandLow`, `fireplaceElectric`). Built 2026-10-16; they sat
 in Validate › Media until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`), its
+Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `centre` on its `Model`), its
 back on the wall face (-0.43). The old parts of the portable TV, the bench, the home cinema, the stereo and the
 fireplace reached 1.5–6 cm into the wall; they are moved forward onto its face (`shift(…, dz=…)`). Residents watch standing on the tile in front (the `watch` pose), so every screen faces the front (+Z), as
 the old parts did and as housegen expects (`"opposite": "sofa"`).
@@ -14,7 +14,7 @@ the old parts did and as housegen expects (`"opposite": "sofa"`).
 | Model | Moving parts and clip | Played by |
 |---|---|---|
 | `tv` | none: a slim set on its stand on an oak media unit, a soundbar in front | — |
-| `tvWall` | none: a thin panel on a wall bracket, a soundbar on two brackets under it (wall layer, `floor=False`) | — |
+| `tvWall` | none: a thin panel on a wall bracket, a soundbar on two brackets under it (wall layer, `on_wall`) | — |
 | `tvRetro` | the telescopic aerial, origin at its foot on the case's top right: `antenna` lifts it 35° (0.9 s) | `watch` (until it ends) |
 | `tvStandLow` | the TV with the lift's lid on its top edge, down in the bench at rest: `tv_up` lifts it 60 cm (1.6 s) | `watch` (sinks back at the end) |
 | `homeCinema` | the projector screen, its origin in the case on the wall, flattened into it at rest: `screen_down` unrolls it (1.4 s) | `watch`, `film` |
@@ -52,8 +52,8 @@ Other warnings left, by design: the wall TV floating above its origin (it hangs 
 
 Rebuilt with the forms and the kit, same sizes, centres, parts, clips, glow, paint and draws:
 
-- **TV:** the unit's doors framed round panels (`kit.shaker`) with slim upright bar pulls, a reveal round them, turned
-  feet; the set a rounded panel with a vented back (`_flat_screen`), a swept neck, an oval foot; a soundbar swept round
+- **TV:** the unit's doors framed round panels (`kit::shaker`) with slim upright bar pulls, a reveal round them, turned
+  feet; the set a rounded panel with a vented back (`flat_screen`), a swept neck, an oval foot; a soundbar swept round
   with a ribbed grille and a light; the pebbles (jittered) in their bowl on two books; a remote with its keys.
 - **Wall TV:** a bracket with two arms, the rounded panel, a standby light, a cable cover, a swept soundbar, ribbed.
 - **Portable TV:** one moulded plastic case with well-rounded corners on an inset base band, two pads at the front and a
@@ -71,8 +71,8 @@ Rebuilt with the forms and the kit, same sizes, centres, parts, clips, glow, pai
   turned woofer cones, drivers for tweeters, bass ports.
 - **Boombox:** a rounded case, swept trim and speaker rings, ribbed grilles, tweeters, the handle bent in one piece with
   a grip, a tapering aerial on a hinge, piano keys, a tuning needle, side dials, the cassette's label and the door's tab.
-- **Electric fireplace:** beads panelling the piers and the frieze (`kit.moulding`), a moulded firebox frame, a fluted
-  back, a switch; jittered logs and stones on the embers; the hearth cushion plump and piped (`F.soft`); the mantel on
+- **Electric fireplace:** beads panelling the piers and the frieze (`kit::moulding`), a moulded firebox frame, a fluted
+  back, a switch; jittered logs and stones on the embers; the hearth cushion plump and piped (`soft!`); the mantel on
   two corbels, a lofted vase with a candle, a moulded picture frame with a landscape.
 
 | Model | Size at rest (w × h × d) | Triangles (before → now) | Draws | Colour parts |
@@ -98,8 +98,15 @@ colours on the painted parts.
 ```
 cargo art media            # the eight .glb, the pack, check-glb
 cargo art media --preview  # previews/media/<id>.png, <id>@<clip>.png
+cargo art media --check    # rebuilds and fails on any byte that differs
 ```
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 7 models changed shape: `boombox`, `fireplaceElectric`, `homeCinema`, `tv`, `tvRetro`, `tvStandLow`, `tvWall`; 26,486 to 26,566 triangles.
+No change to the models' code: their soft boxes take the shared form's new shape (the soft box: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 7 models changed shape: `boombox`, `fireplaceElectric`, `homeCinema`, `tv`, `tvRetro`, `tvStandLow`, `tvWall`; 26,486 to 26,566 triangles.
+
+## Built in Rust (2026-11-18)
+
+Ported line for line from the Blender script (`crates/art/things/src/media`): against the last Blender build
+(`ref/blender`) all eight are near (every point Blender's, 0.000 mm; baked shading within 1.1 of 32 greys), the pack
+the same. The palette's `crate` is a constant of its own (`CRATE`): Rust keeps the word.
