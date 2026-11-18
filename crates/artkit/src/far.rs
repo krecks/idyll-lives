@@ -44,44 +44,116 @@ pub const EDGE: f64 = 0.003;
 /// - its feet (within `feet` of its bottom) and its outermost faces (within `edge` of its box) kept whole, so it
 ///   stands and measures as the model does;
 /// - each face the collapse turned round turned back to face the way the model's surface there does, so it isn't
-///   lit from behind.
+///   lit from behind;
+/// - shaded as the model is: its normals are the model's, carried to the corners left, and its baked shading the
+///   model's, laid on its faces (a fluted shaft brought down to a few sides is neither smooth nor round any
+///   more: shaded by its own faces it is crumpled, and dark in its folds).
 ///
-/// Returns `obj`.
+/// The model stands on the floor (`decimated_on` for one that does not). Returns `obj`.
 pub fn decimated(obj: Obj, ratio: f64, feet: f64, edge: f64) -> Obj {
+    decimated_on(obj, ratio, feet, edge, true)
+}
+
+/// `decimated` for a model the floor shades the foot of (`ground`) or not.
+pub fn decimated_on(obj: Obj, ratio: f64, feet: f64, edge: f64, ground: bool) -> Obj {
+    // the model's shading, baked on it whole: what its far version keeps
+    crate::shade::bake_ao(&[obj], None, ground);
     let (name, faces, turned) = obj.edit(|o| {
         let turned = decimate(&mut o.mesh, ratio, feet, edge);
         (o.name.clone(), o.mesh.faces.len(), turned)
     });
-    scene::log(format!(
-        "[gamekit] {name}: {faces} faces, {turned} turned back"
-    ));
+    scene::log(format!("[art] {name}: {faces} faces, {turned} turned back"));
     obj
 }
 
-/// `decimated` on a mesh; how many faces were turned back.
+/// `decimated` on a mesh; how many faces were turned back. Its baked shading (`Mesh::ao`), if it has any, is laid
+/// on what is left (`shading`) as each vertex's own (`Mesh::card_shade`, as a leaf card's is), so it is written as
+/// it is and not baked again on the far version's faces.
 pub fn decimate(mesh: &mut Mesh, ratio: f64, feet: f64, edge: f64) -> usize {
     // the normals it is shaded with, as they are read on the mesh as it is (a bevel's are kept as angles in its
-    // corners' frames): what the collapses keep smooth and what they keep apart
+    // corners' frames): what the collapses carry
     mesh.normals = Some(crate::normals::corner_normals(mesh));
     mesh.stored = None;
     merge_doubles(mesh, 1e-5);
+    let faces = mesh.triangle_verts();
     let reference = Surface::new(
-        mesh.triangle_verts()
-            .into_iter()
+        faces
+            .iter()
             .map(|t| t.map(|v| mesh.verts[v as usize]))
             .collect(),
     );
     let locked = locks(mesh, feet, edge);
     let (mut done, was) = decimate::collapse_traced(mesh, ratio, &locked);
     let turned = turn_back(&mut done, &was, &reference);
-    if turned > 0 {
-        // (the normals the collapses left were its faces' as they lay: the mesh's smooth faces and sharp edges
-        // give them again)
-        done.normals = None;
+    if let Some(shade) = mesh.ao.as_ref().filter(|s| s.len() == mesh.verts.len()) {
+        done.card_shade = Some(shading(&done, &reference, &faces, shade));
     }
     *mesh = done;
     turned
 }
+
+/// Where on a far version's triangle the model's shading is read: its middle, and three points towards each
+/// corner (the corners' weights).
+const READ_AT: [[f64; 3]; 7] = [
+    [1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0],
+    [0.6, 0.2, 0.2],
+    [0.2, 0.6, 0.2],
+    [0.2, 0.2, 0.6],
+    [0.8, 0.1, 0.1],
+    [0.1, 0.8, 0.1],
+    [0.1, 0.1, 0.8],
+];
+
+/// The model's baked shading (`shade`, a vertex of its triangles `faces`, which `reference` was made of) laid on
+/// its far version `done`: a value a vertex. Each of the far version's triangles reads the model's shading at the
+/// points of the model's surface nearest its own (`READ_AT`; of a thin part's two sides, the one that faces its
+/// way), and a vertex takes the mean of what its triangles read near it, each reading counting for as much as is
+/// seen of the surface there (its shading again: how much of the sky it sees, and so the sky of it). So a
+/// triangle laid over the grooves of a ribbed lid or a fluted shaft is as light as the ribs look from afar, and
+/// not as dark as the bottom of the groove its corner stands in.
+fn shading(done: &Mesh, reference: &Surface, faces: &[[u32; 3]], shade: &[f32]) -> Vec<f32> {
+    let (mut lit, mut seen) = (
+        vec![0.0_f64; done.verts.len()],
+        vec![0.0_f64; done.verts.len()],
+    );
+    for f in 0..done.faces.len() {
+        let c = done.corners(f);
+        if c.len() != 3 {
+            continue;
+        }
+        let p: Vec<[f64; 3]> = c
+            .iter()
+            .map(|&v| done.verts[v as usize].array().map(f64::from))
+            .collect();
+        let normal = cross(sub(p[1], p[0]), sub(p[2], p[0]));
+        let area = dot(normal, normal).sqrt() / 2.0;
+        for at in READ_AT {
+            let point: [f64; 3] =
+                std::array::from_fn(|k| at[0] * p[0][k] + at[1] * p[1][k] + at[2] * p[2][k]);
+            let Some((t, weights)) = reference.nearest_facing(point, normal) else {
+                continue;
+            };
+            let read: f64 = (0..3)
+                .map(|k| weights[k] * shade[faces[t as usize][k] as usize] as f64)
+                .sum();
+            for k in 0..3 {
+                let counts = area * at[k] * read;
+                lit[c[k] as usize] += counts * read;
+                seen[c[k] as usize] += counts;
+            }
+        }
+    }
+    // (a vertex with no shading of its own is one the bake shades: none is left at nought)
+    (0..done.verts.len())
+        .map(|x| {
+            let own = if seen[x] > 0.0 { lit[x] / seen[x] } else { 0.0 };
+            (own as f32).clamp(OWN_SHADE, 1.0)
+        })
+        .collect()
+}
+
+/// The darkest a far version's vertex is written (a step of the baked shading's 32).
+const OWN_SHADE: f32 = 1.0 / 32.0;
 
 /// For each of `mesh`'s vertices, whether a far version keeps it as it is: within `feet` of the mesh's bottom, or
 /// within `edge` of its box.
@@ -222,6 +294,9 @@ fn turn_back(mesh: &mut Mesh, was: &[[f64; 3]], reference: &Surface) -> usize {
             mesh.loops.swap(at + 1, at + 2);
             if let Some(uvs) = &mut mesh.uvs {
                 uvs.swap(at + 1, at + 2);
+            }
+            if let Some(normals) = &mut mesh.normals {
+                normals.swap(at + 1, at + 2);
             }
             turned += 1;
         }
@@ -430,6 +505,40 @@ impl Surface {
             }
         }
         out
+    }
+
+    /// The point of the surface nearest `p` on a triangle that faces along `facing`, if one does within
+    /// `decimate::REACH` of the nearest of all (a thin part's other side), else the nearest of all: the triangle
+    /// and its corners' weights at the point. None for a surface without triangles.
+    pub fn nearest_facing(&self, p: [f64; 3], facing: [f64; 3]) -> Option<(u32, [f64; 3])> {
+        let nearest = self.distance(p)?;
+        let mut best: Option<(bool, f64, u32)> = None;
+        for (t, d) in self.reached(p, nearest + decimate::REACH[1], false) {
+            let faces = dot(self.normal(t), facing) > 0.0;
+            // (one that faces its way before one that does not, then the nearer, then the lower)
+            let better = match best {
+                None => true,
+                Some((f, far, other)) => {
+                    (faces, -d, std::cmp::Reverse(t)) > (f, -far, std::cmp::Reverse(other))
+                }
+            };
+            if better {
+                best = Some((faces, d, t));
+            }
+        }
+        let (_, _, t) = best?;
+        let [a, b, c] = self.tris[t as usize];
+        let q = nearest_on(p, &self.tris[t as usize]);
+        let (e0, e1, e2) = (sub(b, a), sub(c, a), sub(q, a));
+        let (d00, d01, d11) = (dot(e0, e0), dot(e0, e1), dot(e1, e1));
+        let (d20, d21) = (dot(e2, e0), dot(e2, e1));
+        let den = d00 * d11 - d01 * d01;
+        if den <= 0.0 {
+            return Some((t, [1.0, 0.0, 0.0]));
+        }
+        let v = ((d11 * d20 - d01 * d21) / den).clamp(0.0, 1.0);
+        let w = ((d00 * d21 - d01 * d20) / den).clamp(0.0, 1.0 - v);
+        Some((t, [1.0 - v - w, v, w]))
     }
 
     /// How far `p` is from the surface; None for a surface without triangles.

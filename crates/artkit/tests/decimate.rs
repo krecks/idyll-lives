@@ -631,6 +631,93 @@ fn a_far_version_keeps_its_feet_and_its_box() {
     }
 }
 
+/// A fluted shaft standing on the floor: `flutes` shallow flutes round it, three points a flute, smooth.
+fn shaft(flutes: u32, rings: u32, radius: f64, height: f64) -> Mesh {
+    let around = flutes * 3;
+    let mut verts = Vec::new();
+    for i in 0..=rings {
+        for j in 0..around {
+            let turn = std::f64::consts::TAU * j as f64 / around as f64;
+            let r = radius * (1.0 - 0.06 * (0.5 + 0.5 * (flutes as f64 * turn).cos()));
+            verts.push(V3::new(
+                (r * turn.cos()) as f32,
+                (r * turn.sin()) as f32,
+                (height * i as f64 / rings as f64) as f32,
+            ));
+        }
+    }
+    let at = |i: u32, j: u32| i * around + j % around;
+    let mut faces = Vec::new();
+    for i in 0..rings {
+        for j in 0..around {
+            faces.push(vec![at(i, j), at(i, j + 1), at(i + 1, j + 1), at(i + 1, j)]);
+        }
+    }
+    let mut mesh = Mesh::from_pydata(verts, &faces);
+    mesh.shade_smooth(180.0);
+    mesh
+}
+
+#[test]
+fn a_round_part_stays_smooth_and_as_light_as_it_was() {
+    // a fluted shaft, its flutes' middles darker than their edges in the model's baked shading
+    let (flutes, radius) = (16, 0.14);
+    let mut model = shaft(flutes, 4, radius, 0.7);
+    let dark = |v: &V3| {
+        let r = (v.x as f64).hypot(v.y as f64);
+        r < radius * 0.955
+    };
+    model.ao = Some(
+        model
+            .verts
+            .iter()
+            .map(|v| if dark(v) { 0.5 } else { 1.0 })
+            .collect(),
+    );
+    let sunk = model.verts.iter().filter(|v| dark(v)).count();
+    assert_eq!(sunk, model.verts.len() / 3);
+    let mut done = model.clone();
+    far::decimate(&mut done, 0.25, far::FEET, far::EDGE);
+    // (its two rims are its far version's foot and its top: they stay, and what is between them goes)
+    assert!(
+        done.faces.len() * 2 <= model.triangles().len(),
+        "{}",
+        done.faces.len()
+    );
+    // it is as smooth as it was: a normal a vertex, and each within a flute's turn of straight out from the axis,
+    // though its faces lie as its flutes were (up to 30 degrees off)
+    assert!(done.sharp.is_empty());
+    assert_eq!(written(&done), done.verts.len());
+    let normals = artkit::normals::corner_normals(&done);
+    for (l, &v) in done.loops.iter().enumerate() {
+        let (p, n) = (done.verts[v as usize], normals[l]);
+        let out = (p.x as f64).hypot(p.y as f64);
+        let cosine = (n.x as f64 * p.x as f64 + n.y as f64 * p.y as f64) / out;
+        assert!(cosine > 0.9 && n.z.abs() < 0.2, "{n:?} at {p:?}");
+    }
+    // and as light: no vertex left is as dark as a flute's middle was, most are near the light of its edges
+    let shade = done.card_shade.as_ref().unwrap();
+    assert_eq!(shade.len(), done.verts.len());
+    let mean = shade.iter().sum::<f32>() / shade.len() as f32;
+    assert!(shade.iter().all(|&s| s > 0.6 && s <= 1.0), "{shade:?}");
+    assert!(mean > 0.8, "{mean}");
+    // a mesh shaded alike all over is shaded so still
+    let mut even = shaft(flutes, 4, radius, 0.7);
+    even.ao = Some(vec![0.75; even.verts.len()]);
+    far::decimate(&mut even, 0.25, far::FEET, far::EDGE);
+    assert!(
+        even.card_shade
+            .as_ref()
+            .unwrap()
+            .iter()
+            .all(|&s| (s - 0.75).abs() < 1e-6)
+    );
+    // and one with no shading is given none
+    let mut bare = shaft(flutes, 4, radius, 0.7);
+    far::decimate(&mut bare, 0.25, far::FEET, far::EDGE);
+    assert!(bare.card_shade.is_none() && bare.ao.is_none());
+}
+
 // A model that asks for a decimated far version.
 
 artkit::palette! { LAMP: glass = ("#DCE6EA", plain), iron = ("#30343A", plain) }
@@ -649,6 +736,11 @@ fn lamp() -> Vec<artkit::scene::Obj> {
     water.set_material(Some(LAMP.glass));
     scene::add("water", water).set_scale((0.001, 0.001, 0.001));
     Vec::new()
+}
+
+/// A line of the build's log without the kernel's mark before it.
+fn said_of(line: &str) -> &str {
+    line.split_once("] ").map_or(line, |(_, said)| said)
 }
 
 fn plain() -> Finishes {
@@ -701,16 +793,31 @@ fn a_model_that_asks_for_a_share_of_its_triangles_gets_its_far_version() {
         .map(|p| p.indices.len() / 3)
         .sum();
     assert_eq!(post, 12);
-    let said = |line: &str| assert!(log.iter().any(|l| l == line), "no {line:?} in {log:#?}");
-    said(&format!(
-        "[gamekit] lamp_far: {} faces, 0 turned back",
-        left.len()
-    ));
-    said(&format!(
-        "[gamekit] lamp.far: {} triangles (25% kept)",
-        left.len()
-    ));
-    said("[gamekit] built its far version -> models/lamps/lamp.far.glb");
+    let said = |line: &str| {
+        assert!(
+            log.iter().any(|l| said_of(l) == line),
+            "no {line:?} in {log:#?}"
+        )
+    };
+    said(&format!("lamp_far: {} faces, 0 turned back", left.len()));
+    said(&format!("lamp.far: {} triangles (25% kept)", left.len()));
+    said("built its far version -> models/lamps/lamp.far.glb");
+    // its shading is the model's, kept by its vertices: none of it darker than the model's darkest
+    let greys = |m: &glb::Model| -> Vec<f32> {
+        m.meshes
+            .iter()
+            .flat_map(|me| me.primitives.iter())
+            .flat_map(|p| p.colours.as_ref().unwrap().iter().map(|c| c[0]))
+            .collect()
+    };
+    let darkest = |m: &glb::Model| greys(m).into_iter().fold(1.0, f32::min);
+    assert!(
+        darkest(&far) >= darkest(&model) - 1e-4,
+        "{} against {}",
+        darkest(&far),
+        darkest(&model)
+    );
+    assert!(greys(&far).iter().any(|&g| g < 0.99), "it is shaded");
     // and the same file a second time
     assert!(build_model(&family, &family.models[0]).unwrap().far == out.far);
 }
@@ -766,11 +873,11 @@ fn what_a_model_carries_aside_is_in_its_far_version() {
     assert!(top.len() >= 4, "{} triangles of the flag", top.len());
     assert!(
         log.iter()
-            .any(|l| l == &format!("[gamekit] flagged.far: {} triangles (25% kept)", left.len())),
+            .any(|l| said_of(l) == format!("flagged.far: {} triangles (25% kept)", left.len())),
         "{log:#?}"
     );
     assert!(
-        !log.iter().any(|l| l.starts_with("[gamekit] flagged.far ")),
+        !log.iter().any(|l| said_of(l).starts_with("flagged.far ")),
         "its size is not said again: {log:#?}"
     );
 }
