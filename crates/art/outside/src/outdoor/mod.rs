@@ -17,7 +17,7 @@
 use artkit::family::{Family, Model};
 use artkit::json::{Json, loads};
 
-mod common;
+pub(crate) mod common;
 mod fire;
 mod leisure;
 mod seats;
