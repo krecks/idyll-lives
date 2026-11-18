@@ -13,8 +13,7 @@
 //! - the server rack's LEDs blink near the camera all the time (`blink`, ambient);
 //! - the flag sways at the top of its pole near the camera (`flutter`, ambient).
 
-use artkit::family::{Family, Model};
-use artkit::json::{Json, loads};
+use artkit::family::{Family, Model, motions};
 
 pub(crate) mod common;
 mod engine;
@@ -26,10 +25,6 @@ mod station;
 mod yard;
 
 use common::S;
-
-fn motions(text: &str) -> Json {
-    loads(text).expect("the motions are JSON")
-}
 
 /// The family.
 pub fn family() -> Option<Family> {

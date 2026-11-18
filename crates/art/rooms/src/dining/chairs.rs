@@ -1,15 +1,15 @@
 //! K8: chairs and stools. The stools' seats are a part of their own, swivelling on a hub; the chairs are still.
 
-use super::common::{apron, crest, finish, rail, ring_loop, slab, sq_leg, stretcher, tube, turned};
+use super::common::{apron, crest, finish, rail, ring_loop, slab, sq_leg, stretcher, turned};
 use super::{F, M, SZ};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::{cos, cosd, pow, radians, sin, sind};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fsweep, soft, swing};
+use artkit::{fbox, fsweep, kit, settle, soft, swing};
 
 pub(super) const UP: (f64, f64, f64) = (0.0, 0.0, 1.0); // `crest`'s up: Blender +Z
 
@@ -40,16 +40,7 @@ pub(super) fn stool(
                 (c * 0.12, seat_h - 0.06, z + s * 0.12),
             );
             if metal {
-                tube(
-                    &F,
-                    &format!("leg{k}"),
-                    &[foot, top],
-                    0.016,
-                    frame,
-                    Some(10),
-                    3,
-                    1.0,
-                );
+                kit::tube!(F, format!("leg{k}"), &[foot, top], 0.016, frame, verts = 10);
             } else {
                 // turned: a long taper with a ring at the foot rest and a neck
                 let pts: Vec<(f64, f64, f64)> = [0.0, 0.25, 0.33, 0.38, 0.43, 0.9, 1.0]
@@ -62,15 +53,15 @@ pub(super) fn stool(
                         )
                     })
                     .collect();
-                tube(
-                    &F,
-                    &format!("leg{k}"),
+                kit::tube!(
+                    F,
+                    format!("leg{k}"),
                     &pts,
                     0.017,
                     frame,
-                    Some(10),
-                    2,
-                    [0.78, 0.86, 0.92, 1.18, 0.92, 1.05, 0.95],
+                    verts = 10,
+                    round = 2,
+                    scale = [0.78, 0.86, 0.92, 1.18, 0.92, 1.05, 0.95]
                 );
             }
             turned(
@@ -239,13 +230,7 @@ pub(super) fn stool(
         }
     });
     let seat_part = hinged(join(&top, "seat", None), F.at(0, seat_h - 0.056, z));
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     swing!(seat_part, "swivel", 20.0, seconds = 0.5);
     meshes()
 }
@@ -353,9 +338,9 @@ pub fn dining_chair() -> Vec<Obj> {
             10,
             35.0,
         );
-        tube(
-            &F,
-            &format!("back{xs}"),
+        kit::tube!(
+            F,
+            format!("back{xs}"),
             &[
                 (x, 0.0, -0.17),
                 (x, 0.42, -0.178),
@@ -364,9 +349,9 @@ pub fn dining_chair() -> Vec<Obj> {
             ],
             0.017,
             M.frame_cream,
-            Some(10),
-            3,
-            [0.9, 1.0, 0.95, 0.88],
+            verts = 10,
+            round = 3,
+            scale = [0.9, 1.0, 0.95, 0.88]
         );
         turned(
             &format!("finial{xs}"),

@@ -1,6 +1,7 @@
 //! The bird feeder post (1x1): a cedar post, a feeder house on a tray, a seed tube, flowers round its foot.
 
-use super::common::{_flower, _m, _rosette, _sq, M};
+use super::common::{_flower, _m, _rosette, M};
+use artkit::forms::rect;
 use artkit::kit;
 use artkit::math::{P3, TAU, cos, cosd, sin, sind};
 use artkit::parts::{join, new_parts};
@@ -49,7 +50,7 @@ fn _feeder_house(f: &GameFrame) {
             ],
             0.0,
             M.cedar_dark,
-            profile = _sq(0.03, None),
+            profile = rect(0.03, 0.03),
             up = (1, 0, 0)
         );
     }
@@ -170,7 +171,7 @@ fn _seed_tube(f: &GameFrame, x: f64) {
         &[(0.04, 1.3, PZ), (x - 0.04, 1.31, PZ), (x, 1.33, PZ)],
         0.0,
         M.cedar_dark,
-        profile = _sq(0.03, Some(0.035)),
+        profile = rect(0.03, 0.035),
         up = (0, 0, 1),
         resolution = 2
     );

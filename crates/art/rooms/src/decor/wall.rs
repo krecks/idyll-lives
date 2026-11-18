@@ -1,22 +1,17 @@
 //! D1: wall art, the wall clock and the wall shelf.
 
 use super::common::{
-    F, M, WALL, books, clock_clips, clock_hands, disc, fan, flat, fr, frame, leaf, mounted, oval,
-    rect, shape, vine,
+    F, M, WALL, books, clock_clips, clock_hands, disc, fan, flat, frame, leaf, mounted, oval, rect,
+    shape, vine,
 };
 use artkit::forms::{rounded_rect, smooth_outline};
+use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::{P3, TAU, atan2, cos, degrees, pow, radians, sin, sqrt};
 use artkit::parts::{join, join_all, new_parts, set_origin};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fextrude, fsweep, jitter, loft, revolve, ring, settle, soft, sphere};
-
-/// The wall things settle where they were built, on the wall.
-fn settle_on_wall() -> Vec<Obj> {
-    settle!(centre = false, floor = false);
-    meshes()
-}
 
 /// A botanical print: a white moulded frame and a bevel-cut mount, a curving stem on cream paper with paired
 /// pointed leaves in two greens, a bud at its tip.
@@ -106,7 +101,7 @@ pub fn print_framed() -> Vec<Obj> {
         );
     });
     join_all("printFramed");
-    settle_on_wall()
+    settle!(centre = false, floor = false)
 }
 
 /// A photo print: a thin black frame and a bevel-cut white mount round a mountain lake: two ranges of peaks with
@@ -275,7 +270,7 @@ pub fn photo_print() -> Vec<Obj> {
         );
     });
     join_all("photoPrint");
-    settle_on_wall()
+    settle!(centre = false, floor = false)
 }
 
 const GILT: [(f64, f64); 15] = [
@@ -510,7 +505,7 @@ pub fn painting_classic() -> Vec<Obj> {
         );
     });
     join_all("paintingClassic");
-    settle_on_wall()
+    settle!(centre = false, floor = false)
 }
 
 /// A big abstract canvas in an oak float frame (an L-section standing off the canvas): the canvas wrapped round its
@@ -647,7 +642,7 @@ pub fn canvas_abstract() -> Vec<Obj> {
         );
     });
     join_all("canvasAbstract");
-    settle_on_wall()
+    settle!(centre = false, floor = false)
 }
 
 // --- D1: the wall clock -----------------------------------------------------------------------------------
@@ -745,7 +740,7 @@ pub fn wall_shelf() -> Vec<Obj> {
         for y in [1.4, 1.78] {
             fextrude!(
                 F,
-                format!("shelf{}", fr(y)),
+                format!("shelf{}", float_repr(y)),
                 &board,
                 0.9,
                 (0, y, zc),
@@ -900,5 +895,5 @@ pub fn wall_shelf() -> Vec<Obj> {
         );
     });
     join_all("wallShelf");
-    settle_on_wall()
+    settle!(centre = false, floor = false)
 }

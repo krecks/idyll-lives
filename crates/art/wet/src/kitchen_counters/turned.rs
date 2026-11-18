@@ -1,10 +1,10 @@
 //! What is turned: a round thing lofted about the upright, and the plates, bowls, mugs, jugs, canisters and tins
 //! turned with it.
 
-use super::common::py_max;
 use artkit::materials::Mat;
 use artkit::math::{P3, cos, radians, sin};
 use artkit::place::{Coord, GameFrame};
+use artkit::py;
 use artkit::scene::Obj;
 use artkit::{fsweep, loft, ring};
 
@@ -30,8 +30,8 @@ pub fn lathe(
         .iter()
         .map(|&(r, h)| {
             ring!(
-                py_max(r, 1e-5),
-                py_max(r, 1e-5),
+                py::max(r, 1e-5),
+                py::max(r, 1e-5),
                 z = bz + h,
                 verts = verts,
                 at = (bx, by)

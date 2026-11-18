@@ -126,5 +126,5 @@ The executive chair's upholstery (`leather`, `leather2`) and the executive desk'
 
 Ported from `office.py` line for line (crates/art/rooms/src/office). Against the last Blender build (`ref/blender`)
 every model's points are Blender's (0.000 mm): 2 same, 13 near, none changed. `fillet`, `pull`, `shaker` and
-`moulding` in common.rs are gamekit's kit, marked `// KIT`; `office.py`'s `_slab`, `_box`, `_rod` and `_pull`
+`moulding` are the kit's (`kit::fillet!` and the rest); `office.py`'s `_slab`, `_box`, `_rod` and `_pull`
 were never called and are not ported.

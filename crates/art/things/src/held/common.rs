@@ -230,11 +230,6 @@ pub fn t3(v: V3) -> (f64, f64, f64) {
     (v.x as f64, v.y as f64, v.z as f64)
 }
 
-/// Whether two materials are the one material (the script's `is`).
-pub fn same(a: Mat, b: Mat) -> bool {
-    a.name == b.name
-}
-
 /// One material for every band, or one a band.
 pub trait Bands {
     fn bands(self, n: usize) -> Vec<Mat>;
@@ -274,7 +269,7 @@ impl Pair for (Mat, Mat) {
 fn ordered(mats: &[Mat]) -> Vec<Mat> {
     let mut order: Vec<Mat> = Vec::new();
     for &m in mats {
-        if !order.iter().any(|&o| same(o, m)) {
+        if !order.contains(&m) {
             order.push(m);
         }
     }
@@ -284,7 +279,7 @@ fn ordered(mats: &[Mat]) -> Vec<Mat> {
 fn index_of(order: &[Mat], m: Mat) -> u16 {
     order
         .iter()
-        .position(|&o| same(o, m))
+        .position(|&o| o == m)
         .expect("a material of the part") as u16
 }
 
@@ -1294,37 +1289,4 @@ pub fn _spoon(at: (f64, f64, f64), yaw: f64, tilt: f64, name: &str, reach: f64) 
         segments = 8,
         rings = 5
     );
-}
-
-/// A face's centre as Blender gives it (`MeshPolygon.center`): a triangle's and a quad's corners summed and divided,
-/// a larger face's each weighted by one over their number, in single precision.
-pub fn face_centre(verts: &[V3], corners: &[u32]) -> V3 {
-    let p = |i: usize| verts[corners[i] as usize];
-    match corners.len() {
-        3 => {
-            let (a, b, c) = (p(0), p(1), p(2));
-            V3::new(
-                (a.x + b.x + c.x) / 3.0,
-                (a.y + b.y + c.y) / 3.0,
-                (a.z + b.z + c.z) / 3.0,
-            )
-        }
-        4 => {
-            let (a, b, c, d) = (p(0), p(1), p(2), p(3));
-            V3::new(
-                (a.x + b.x + c.x + d.x) / 4.0,
-                (a.y + b.y + c.y + d.y) / 4.0,
-                (a.z + b.z + c.z + d.z) / 4.0,
-            )
-        }
-        n => {
-            let w = 1.0_f32 / n as f32;
-            let mut c = V3::new(0.0, 0.0, 0.0);
-            for i in 0..n {
-                let q = p(i);
-                c = V3::new(c.x + q.x * w, c.y + q.y * w, c.z + q.z * w);
-            }
-            c
-        }
-    }
 }

@@ -1,6 +1,6 @@
 //! K9 continued: the china cabinet and the bar cart.
 
-use super::common::{fillet, rail, slab, tube, turned};
+use super::common::{fillet, rail, slab, turned};
 use super::storage::{DOOR_SECONDS, WALL, door, knob, plate};
 use super::{F, M};
 use artkit::forms::rounded_rect;
@@ -8,9 +8,11 @@ use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::{PI, sin};
 use artkit::motion::{Ease, Squash, squash};
-use artkit::parts::{Settle, hinged, join, new_parts, settle, settle_with};
+use artkit::parts::{hinged, join, new_parts, settle};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, loft, revolve, ring, soft, swing};
+use artkit::{
+    fbox, fcyl, fextrude, fsphere, fsweep, kit, loft, revolve, ring, settle, soft, swing,
+};
 
 /// A cove moulding along a cabinet's front and sides at height `y` (its foot), `w` across, its front `d` in
 /// front of `z_back`, `depth` high: a bead and a cove flaring out under the cornice's cap, swept round the corners.
@@ -420,15 +422,13 @@ pub fn bar_cart() -> Vec<Obj> {
         for x in [-0.35, 0.35] {
             for z in [-0.2, 0.2] {
                 let at = format!("{}{}", float_repr(x), float_repr(z));
-                tube(
-                    &F,
-                    &format!("post{at}"),
+                kit::tube!(
+                    F,
+                    format!("post{at}"),
                     &[(x, 0.06, z), (x, 0.8, z)],
                     0.011,
                     M.frame_brass,
-                    Some(10),
-                    3,
-                    1.0,
+                    verts = 10
                 );
                 turned(
                     &format!("finial{at}"),
@@ -508,15 +508,13 @@ pub fn bar_cart() -> Vec<Obj> {
         );
         for x in [-0.12, 0.12] {
             for z in [-0.2, 0.2] {
-                tube(
-                    &F,
-                    &format!("baluster{}{}", float_repr(x), float_repr(z)),
+                kit::tube!(
+                    F,
+                    format!("baluster{}{}", float_repr(x), float_repr(z)),
                     &[(x, 0.312, z), (x, 0.345, z)],
                     0.005,
                     M.frame_brass,
-                    Some(6),
-                    3,
-                    1.0,
+                    verts = 6
                 );
             }
         }
@@ -728,13 +726,7 @@ pub fn bar_cart() -> Vec<Obj> {
         );
     });
     let shaker = hinged(join(&shake, "shaker", None), F.at(sx, 0.766, sz));
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     squash(
         shaker,
         "shake",

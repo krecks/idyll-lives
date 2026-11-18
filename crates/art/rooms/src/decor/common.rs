@@ -4,7 +4,7 @@
 use artkit::forms::{Plane, smooth_outline};
 use artkit::kit;
 use artkit::materials::Mat;
-use artkit::math::{Axis, P3, PI, V3, cos, pow, radians, sin};
+use artkit::math::{Axis, PI, V3, cos, pow, radians, sin};
 use artkit::mesh::Mesh;
 use artkit::palette;
 use artkit::parts::{hinged, join, new_parts, set_origin};
@@ -110,11 +110,6 @@ palette! { M:
 
 pub const F: GameFrame = GameFrame::new(0.0);
 pub const WALL: f64 = -0.43; // the wall's face, game depth
-
-/// A float as Python writes it in a name.
-pub fn fr(x: f64) -> String {
-    artkit::json::float_repr(x)
-}
 
 // --- flat shapes ------------------------------------------------------------------------------------------
 /// A mesh object from Blender points and faces, its normals made outward; the first `smooth` faces shaded smooth,
@@ -742,13 +737,4 @@ pub fn pedestal(h: f64, w: f64, material: Mat) {
             plane = Facing::Side
         );
     }
-}
-
-/// A Blender point as a `mathutils.Vector` (single precision).
-pub fn v(p: (f64, f64, f64)) -> V3 {
-    V3::from(P3 {
-        x: p.0,
-        y: p.1,
-        z: p.2,
-    })
 }

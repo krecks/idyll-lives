@@ -1,20 +1,18 @@
 //! What the kids' things are built from: the helpers kids.py shared between its models.
 
 use super::{F, M};
-use artkit::forms::{Extrude, rounded_rect};
+pub use crate::common::P;
+use artkit::forms::{self, Extrude, rounded_rect};
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, TAU, V3, cos, pow, radians, sin, v3};
-use artkit::mesh::Mesh;
 use artkit::motion::{Squash, squash};
 use artkit::noise::noise;
 use artkit::parts::{Settle, hinged, join, measure, new_parts, settle_with};
 use artkit::place::Coord;
 use artkit::py::sum;
 use artkit::scene::{self, Obj, meshes};
-use artkit::{jitter, revolve, soft, swing};
-
-/// A game point (x, height, depth).
-pub type P = (f64, f64, f64);
+use artkit::{jitter, soft, swing};
 
 /// `_add`: the points summed, a coordinate at a time.
 pub fn add(vs: &[P]) -> P {
@@ -35,10 +33,7 @@ pub fn mesh(name: &str, verts: &[P], faces: &[Vec<u32>], material: Mat) -> Obj {
         .iter()
         .map(|&(x, y, z)| F.at(x, y, z).into())
         .collect();
-    let mut m = Mesh::from_pydata(vs, faces);
-    m.set_material(Some(material));
-    m.recalc_normals();
-    scene::add(name, m)
+    forms::object(name, vs, faces, Some(material), false, 0.0, false)
 }
 
 /// A frame on a flat face: its point `o`, the across `s` and up `u` directions (game, unit), and its outward
@@ -174,13 +169,7 @@ pub fn turned(
     segments: usize,
     y: f64,
 ) -> Obj {
-    revolve!(
-        name,
-        profile,
-        at = F.at(x, y, z),
-        material = material,
-        segments = segments
-    )
+    kit::turned!(F, name, x, y, z, profile, material, segments = segments)
 }
 
 /// Rumples a cover's top: its vertices above height `above` moved up or down by smooth noise, up to `amount`,
@@ -536,115 +525,4 @@ pub fn block(
         bevel_segments = 1
     );
     (cube, face_obj)
-}
-
-// --- the cut through the toy box's ends ------------------------------------------------------------------
-
-/// What `G.cut` made of the toy box's walls and a grip through an end, built without a boolean: `cutter`, a slab drawn
-/// on the side (its outline in Blender's y and z, thick along x), runs square through the faces of `obj` that lie
-/// across it and hold its outline whole; each of those gets the outline as a hole, the hole's sides run between
-/// them, and the cutter goes. For a part placed without a turn or a scale.
-pub fn cut_through(obj: Obj, cutter: Obj) -> Obj {
-    let points = cutter.world_points();
-    let n = points.len() / 2;
-    let (x0, x1) = points
-        .iter()
-        .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), p| {
-            (lo.min(p.x), hi.max(p.x))
-        });
-    let loc = obj.location();
-    let ring: Vec<[f32; 2]> = points[..n]
-        .iter()
-        .map(|p| [p.y - loc.y, p.z - loc.z])
-        .collect();
-    let centre = ring.iter().fold([0.0f32; 2], |a, p| {
-        [a[0] + p[0] / n as f32, a[1] + p[1] / n as f32]
-    });
-    obj.edit(|o| {
-        let old = &o.mesh;
-        let mut verts = old.verts.clone();
-        let mut faces: Vec<Vec<u32>> = Vec::new();
-        let mut pierced: Vec<(f32, Vec<u32>)> = Vec::new();
-        for f in 0..old.faces.len() {
-            let c = old.corners(f).to_vec();
-            let nrm = old.face_normal(f);
-            let xs: Vec<f32> = c.iter().map(|&v| old.verts[v as usize].x + loc.x).collect();
-            let face2d: Vec<[f32; 2]> = c
-                .iter()
-                .map(|&v| [old.verts[v as usize].y, old.verts[v as usize].z])
-                .collect();
-            let across = nrm.x.abs() > 0.9999 && xs.iter().all(|&x| x > x0 && x < x1);
-            if !(across && ring.iter().all(|&p| inside(p, &face2d))) {
-                faces.push(c);
-                continue;
-            }
-            // the face with the hole in it, its triangles as the slabs' faces are cut (tri::fill), turned its way
-            let x = old.verts[c[0] as usize].x;
-            let start = verts.len() as u32;
-            verts.extend(ring.iter().map(|p| V3::new(x, p[0], p[1])));
-            let at = |i: u32| {
-                if (i as usize) < c.len() {
-                    c[i as usize]
-                } else {
-                    start + i - c.len() as u32
-                }
-            };
-            let all: Vec<[f32; 2]> = face2d.iter().chain(&ring).copied().collect();
-            for t in artkit::tri::fill(&[face2d.clone(), ring.clone()]) {
-                let (a, b, d) = (all[t[0] as usize], all[t[1] as usize], all[t[2] as usize]);
-                let mid = [(a[0] + b[0] + d[0]) / 3.0, (a[1] + b[1] + d[1]) / 3.0];
-                if inside(mid, &ring) {
-                    continue;
-                }
-                let way = (b[0] - a[0]) * (d[1] - a[1]) - (b[1] - a[1]) * (d[0] - a[0]);
-                if (way > 0.0) == (nrm.x > 0.0) {
-                    faces.push(vec![at(t[0]), at(t[1]), at(t[2])]);
-                } else {
-                    faces.push(vec![at(t[0]), at(t[2]), at(t[1])]);
-                }
-            }
-            pierced.push((x, (start..start + n as u32).collect()));
-        }
-        // the hole's sides, between each face it enters by and the one it leaves by, looking into the hole
-        pierced.sort_by(|a, b| a.0.total_cmp(&b.0));
-        for pair in pierced.chunks(2) {
-            let [(_, a), (_, b)] = pair else { continue };
-            for i in 0..n {
-                let j = (i + 1) % n;
-                let quad = vec![a[i], a[j], b[j], b[i]];
-                let p: Vec<V3> = quad.iter().map(|&v| verts[v as usize]).collect();
-                let normal = artkit::mesh::normal_newell(&p);
-                let mid = [(p[0].y + p[1].y) / 2.0, (p[0].z + p[1].z) / 2.0];
-                let to_axis = (centre[0] - mid[0]) * normal.y + (centre[1] - mid[1]) * normal.z;
-                faces.push(if to_axis > 0.0 {
-                    quad
-                } else {
-                    vec![a[i], b[i], b[j], a[j]]
-                });
-            }
-        }
-        let mats = old.mats.clone();
-        let mut new = Mesh::from_pydata(verts, &faces);
-        for m in mats {
-            new.slot(m);
-        }
-        o.mesh = new;
-    });
-    cutter.remove();
-    obj
-}
-
-/// Whether the point is inside the closed outline (crossings of a ray along +u).
-fn inside(p: [f32; 2], outline: &[[f32; 2]]) -> bool {
-    let mut odd = false;
-    let n = outline.len();
-    for i in 0..n {
-        let (a, b) = (outline[i], outline[(i + n - 1) % n]);
-        if (a[1] > p[1]) != (b[1] > p[1])
-            && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0]
-        {
-            odd = !odd;
-        }
-    }
-    odd
 }

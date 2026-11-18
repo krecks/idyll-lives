@@ -122,5 +122,5 @@ No change to the build: its soft boxes take the shared form's new shape (the sof
 
 Built by `cargo art bedroom_storage` from this module (its Python script's numbers and order, one function each;
 the pulls, knobs, frame-and-panel fronts and bent paths are artkit's kit). Against the last Blender build
-(`ref/blender`): 1 same, 13 near, every surface to 0.000 mm. The palette's `box` is `BOX` in the code (`box` is
-Rust's word).
+(`ref/blender`): 1 same, 13 near, every surface to 0.000 mm. The palette's `box` is `M.box_` in the code (`box` is
+Rust's word), named `box` in the file and the pack.

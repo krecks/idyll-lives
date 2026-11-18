@@ -1,14 +1,13 @@
-//! What the cheerful pack is built from: its palette, meshes from points, arch outlines, bands, bulbs, pleated
-//! curtains, tumblers, and the kit's parts it uses.
+//! What the cheerful pack is built from: its palette, flat shapes from outlines, arch outlines, bands, bulbs,
+//! pleated curtains and tumblers.
 
-use artkit::forms::{Scale, rounded_rect};
+use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, V3, cos, sin};
-use artkit::mesh::Mesh;
-use artkit::place::{GameFrame, Spot};
-use artkit::scene::{self, Obj};
-use artkit::{fcyl, fsphere, fsweep, palette, revolve, torus};
-use std::cell::Cell;
+use artkit::parts::numbered;
+use artkit::place::GameFrame;
+use artkit::scene::Obj;
+use artkit::{fcyl, fsphere, fsweep, kit, object_of, palette, revolve, torus};
 
 palette! { M:
     // the jukebox
@@ -110,48 +109,7 @@ pub const WALL2: f64 = -0.93;
 /// The mocktail cart's top shelf's top.
 pub const TOP: f64 = 0.815;
 
-thread_local! {
-    static N: Cell<u32> = const { Cell::new(0) };
-}
-
-/// `stem` numbered: each part its own name.
-pub fn name(stem: &str) -> String {
-    N.with(|n| {
-        n.set(n.get() + 1);
-        format!("{stem}{}", n.get())
-    })
-}
-
 // --- meshes from points ------------------------------------------------------------------------------------------
-
-/// A mesh object from Blender-space `verts` and `faces`, normals made outward, smooth below `sharp` degrees.
-#[allow(clippy::too_many_arguments)]
-pub fn obj(
-    name: &str,
-    verts: &[P3],
-    faces: &[Vec<u32>],
-    mats: &[Mat],
-    face_mats: Option<&[u16]>,
-    sharp: f64,
-    bevel: f64,
-) -> Obj {
-    let mut mesh = Mesh::from_pydata(verts.iter().map(|&p| V3::from(p)).collect(), faces);
-    for &m in mats {
-        mesh.slot(m);
-    }
-    if let Some(face_mats) = face_mats {
-        for (face, &i) in mesh.faces.iter_mut().zip(face_mats) {
-            face.mat = i;
-        }
-    }
-    mesh.recalc_normals();
-    let o = scene::add(name, mesh);
-    o.edit(|p| p.mesh.shade_smooth(sharp));
-    if bevel != 0.0 {
-        artkit::bevel::bevel_edges(o, bevel, 2, 40.0, &artkit::bevel::EdgeOrder::Corners); // (a mesh made of points and faces)
-    }
-    o
-}
 
 /// A flat shape: the outline `pts` [(x, y)] (game, in order round it) between depths `z0` and `z1`.
 pub fn slab(
@@ -168,7 +126,7 @@ pub fn slab(
     verts.extend(pts.iter().map(|&(x, y)| f.at(x, y, z0)));
     let mut faces = vec![(0..n).collect::<Vec<u32>>(), (n..2 * n).rev().collect()];
     faces.extend((0..n).map(|i| vec![i, (i + 1) % n, n + (i + 1) % n, n + i]));
-    obj(name, &verts, &faces, &[mat], None, 35.0, bevel)
+    object_of!(name, &verts, &faces, &[mat], bevel = bevel)
 }
 
 /// An arch-topped outline: straight sides `hw` either side of x = 0 from `yb` up to `yc`, a half circle over.
@@ -181,35 +139,6 @@ pub fn tomb(hw: f64, yb: f64, yc: f64, n: usize) -> Vec<(f64, f64)> {
         )
     }));
     pts
-}
-
-/// A polygon's middle, as Blender gives it: the mean of its corners.
-fn centre(mesh: &Mesh, f: usize) -> V3 {
-    let c = mesh.corners(f);
-    let mut s = V3::ZERO;
-    for &v in c {
-        s += mesh.verts[v as usize];
-    }
-    let n = c.len() as f32;
-    V3 {
-        x: s.x / n,
-        y: s.y / n,
-        z: s.z / n,
-    }
-}
-
-/// Gives the faces of `obj` whose middle (its own axes, Blender) passes `test` another material: a band, a
-/// surround, a label, with no more triangles.
-pub fn paint(obj: Obj, material: Mat, test: impl Fn(V3) -> bool) -> Obj {
-    obj.edit(|p| {
-        let k = p.mesh.slot(material);
-        for f in 0..p.mesh.faces.len() {
-            if test(centre(&p.mesh, f)) {
-                p.mesh.faces[f].mat = k;
-            }
-        }
-    });
-    obj
 }
 
 /// Turns a part built along Blender +Z (a revolve) to point along `direction` (Blender).
@@ -260,7 +189,7 @@ pub fn around(
 pub fn bulb(f: &GameFrame, x: f64, y: f64, z: f64, k: usize, r: f64) {
     fsphere!(
         f,
-        name("bulb"),
+        numbered("bulb"),
         r,
         (x, y, z),
         BULBS[k % BULBS.len()],
@@ -333,7 +262,7 @@ pub fn pleats(
             (0..n).map(|k| vec![base + k, base + k + 1, base + m - 2 - k, base + m - 1 - k]),
         );
     }
-    obj(name, &verts, &faces, &[mat], None, 70.0, 0.0)
+    object_of!(name, &verts, &faces, &[mat], sharp = 70)
 }
 
 /// A tumbler full of `drink` (opaque: no glass draw): a thick clear foot, the drink, a clear rim, a bendy straw
@@ -353,7 +282,7 @@ pub fn tumbler(
     let y = y.unwrap_or(TOP);
     fcyl!(
         f,
-        name("tumbler_foot"),
+        numbered("tumbler_foot"),
         r * 0.85,
         0.012,
         (x, y + 0.006, z),
@@ -361,7 +290,7 @@ pub fn tumbler(
         verts = 12
     );
     revolve!(
-        name("tumbler"),
+        numbered("tumbler"),
         &[
             (0.0, 0.0),
             (r * 0.86, 0.0),
@@ -373,7 +302,7 @@ pub fn tumbler(
         segments = 12
     );
     torus!(
-        name("rim"),
+        numbered("rim"),
         r * 0.98,
         0.004,
         at = f.at(x, y + h, z),
@@ -381,28 +310,27 @@ pub fn tumbler(
         major_segments = 12,
         minor_segments = 3
     );
-    tube(
+    kit::tube!(
         f,
-        &name("straw"),
-        &fillet(
+        numbered("straw"),
+        &kit::fillet!(
             &[
                 (x + 0.008, y + 0.03, z),
                 (x + 0.018, y + h + 0.04, z - 0.006),
                 (x + 0.045, y + h + 0.06, z - 0.01),
             ],
             0.01,
-            2,
+            steps = 2
         ),
         0.0035,
         straw.unwrap_or(M.coral),
-        Some(5),
-        1,
-        Scale::One(1.0),
+        verts = 5,
+        round = 1
     );
     if let Some(s) = slice_ {
         fcyl!(
             f,
-            name("slice"),
+            numbered("slice"),
             0.024,
             0.006,
             (x - r * 0.9, y + h - 0.004, z),
@@ -411,97 +339,4 @@ pub fn tumbler(
             verts = 12
         );
     }
-}
-
-// --- the kit's parts ------------------------------------------------------------------------------------------
-
-/// The kit's tube (`artkit::kit::tube`), as the script called it.
-#[allow(clippy::too_many_arguments)]
-pub fn tube<P: Spot>(
-    f: &GameFrame,
-    name: &str,
-    points: &[P],
-    r: f64,
-    material: Mat,
-    verts: Option<usize>,
-    round: usize,
-    scale: Scale,
-) -> Obj {
-    artkit::kit::tube(
-        f,
-        name,
-        points,
-        r,
-        material,
-        artkit::kit::Tube {
-            verts,
-            round,
-            scale,
-        },
-    )
-}
-
-/// The kit's fillet (`artkit::kit::fillet`): the path through `points` with each inner corner rounded.
-pub fn fillet(points: &[(f64, f64, f64)], radius: f64, steps: usize) -> Vec<(f64, f64, f64)> {
-    artkit::kit::fillet(points, radius, steps)
-}
-
-/// The kit's bar pull (`artkit::kit::pull`), as the script called it.
-#[allow(clippy::too_many_arguments)]
-pub fn pull(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    face: f64,
-    length: f64,
-    material: Mat,
-    r: f64,
-    out: f64,
-    upright: bool,
-    verts: usize,
-) -> Obj {
-    artkit::kit::pull(
-        f,
-        name,
-        x,
-        y,
-        face,
-        length,
-        material,
-        artkit::kit::Pull {
-            r,
-            out,
-            upright,
-            verts,
-        },
-    )
-}
-
-/// The kit's moulding (`artkit::kit::moulding`), as the script called it: on the front at depth `at`, or on top
-/// at height `at` (`front` false).
-#[allow(clippy::too_many_arguments)]
-pub fn moulding(
-    f: &GameFrame,
-    name: &str,
-    outline: &[(f64, f64)],
-    profile: &[(f64, f64)],
-    material: Mat,
-    at: f64,
-    front: bool,
-    angle: f64,
-) -> Obj {
-    let plane = if front {
-        artkit::place::Facing::Front
-    } else {
-        artkit::place::Facing::Top
-    };
-    artkit::kit::moulding(
-        f,
-        name,
-        outline,
-        profile,
-        material,
-        artkit::kit::Moulding { at, plane, angle },
-    )
 }

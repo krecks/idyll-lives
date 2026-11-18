@@ -1,13 +1,10 @@
-//! What the lazy pack is built from: its palette, turned and lofted pieces, a mug, a band of a sphere (the pod's
-//! hood).
+//! What the lazy pack is built from: its palette, a mug, a band of a sphere (the pod's hood).
 
 use artkit::materials::Mat;
-use artkit::math::{P3, V3, cos, cosd, radians, sin, sind};
-use artkit::mesh::Mesh;
-use artkit::place::{Coord, GameFrame};
-use artkit::scene::{self, Obj};
-use artkit::{fsweep, loft, palette, revolve, ring};
-use std::cell::Cell;
+use artkit::math::{V3, cos, cosd, radians, sin, sind};
+use artkit::place::GameFrame;
+use artkit::scene::Obj;
+use artkit::{fsweep, kit, palette};
 
 palette! { M:
     body = ("#E9E4F4", satin),        // the bed's puffy base and cloud headboard; the main part
@@ -63,72 +60,6 @@ palette! { M:
 /// The wall's face in a 1-deep footprint, game depth.
 pub const WALL: f64 = -0.43;
 
-thread_local! {
-    static N: Cell<u32> = const { Cell::new(0) };
-}
-
-/// `stem` numbered: each part its own name.
-pub fn _name(stem: &str) -> String {
-    N.with(|n| {
-        n.set(n.get() + 1);
-        format!("{stem}{}", n.get())
-    })
-}
-
-/// A turned piece standing at game (x, y, z): `profile` [(radius, height up), ...] from its foot, revolved.
-#[allow(clippy::too_many_arguments)]
-pub fn _turned(
-    f: &GameFrame,
-    name: &str,
-    x: impl Coord,
-    y: f64,
-    z: impl Coord,
-    profile: &[(f64, f64)],
-    material: Mat,
-    segments: usize,
-    rot: (f64, f64, f64),
-) -> Obj {
-    revolve!(
-        name,
-        profile,
-        at = f.at(x, y, z),
-        material = material,
-        segments = segments,
-        rot = rot
-    )
-}
-
-/// A body lofted through rings [(radius, height up), ...] standing at game (x, y, z); `sy` squashes them in depth.
-#[allow(clippy::too_many_arguments)]
-pub fn _lathe(
-    f: &GameFrame,
-    name: &str,
-    x: impl Coord,
-    y: f64,
-    z: impl Coord,
-    rings: &[(f64, f64)],
-    material: Mat,
-    verts: usize,
-    square: f64,
-    sy: f64,
-) -> Obj {
-    let P3 { x: bx, y: by, .. } = f.at(x, 0, z);
-    let sections: Vec<Vec<P3>> = rings
-        .iter()
-        .map(|&(r, h)| {
-            ring!(
-                r,
-                r * sy,
-                z = y + h,
-                verts = verts,
-                square = square,
-                at = (bx, by)
-            )
-        })
-        .collect();
-    loft!(name, &sections, material = material)
-}
-
 /// A mug standing on `y`: hollow, its handle out at `turn` degrees (0: +x, 90: to the front).
 #[allow(clippy::too_many_arguments)]
 pub fn _mug(
@@ -142,7 +73,7 @@ pub fn _mug(
     material: Mat,
     turn: f64,
 ) {
-    _turned(
+    kit::turned!(
         f,
         name,
         x,
@@ -158,8 +89,7 @@ pub fn _mug(
             (0.0, 0.15 * h),
         ],
         material,
-        14,
-        (0.0, 0.0, 0.0),
+        segments = 14
     );
     let (c, s) = (cosd(turn), sind(turn));
     let pts: Vec<(f64, f64, f64)> = [
@@ -259,10 +189,6 @@ pub fn _sphere_band(
             ]);
         }
     }
-    let mut mesh = Mesh::from_pydata(verts, &faces);
-    mesh.set_material(Some(material));
-    mesh.recalc_normals();
     // (every face smooth, no edge kept sharp)
-    mesh.shade_smooth(180.0);
-    scene::add(name, mesh)
+    artkit::forms::object(name, verts, &faces, Some(material), true, 180.0, false)
 }

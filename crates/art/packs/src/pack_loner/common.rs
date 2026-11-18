@@ -1,14 +1,12 @@
-//! What the loner pack is built from: its palette, turned and lofted pieces, a spindle chair, a desk, a mug and a
-//! book.
+//! What the loner pack is built from: its palette, a spindle chair, a desk, a mug and a book.
 
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit;
 use artkit::materials::Mat;
-use artkit::math::{P3, cosd, pow, sind};
-use artkit::place::{Coord, Facing, GameFrame};
-use artkit::scene::Obj;
-use artkit::{fbox, fextrude, fsweep, loft, palette, revolve, ring, soft};
-use std::cell::Cell;
+use artkit::math::{cosd, pow, sind};
+use artkit::parts::numbered;
+use artkit::place::{Facing, GameFrame};
+use artkit::{fbox, fextrude, fsweep, palette, soft};
 
 palette! { M:
     body = ("#8FA58A", satin),       // sage paint: the radio's case, the puzzle table's frame, the bonsai bench's frame
@@ -70,74 +68,8 @@ pub const WALL: f64 = -0.43;
 /// In a 2-deep one.
 pub const WALL2: f64 = -0.93;
 
-thread_local! {
-    static N: Cell<u32> = const { Cell::new(0) };
-}
-
-/// `stem` numbered: each part its own name.
-pub fn _name(stem: &str) -> String {
-    N.with(|n| {
-        n.set(n.get() + 1);
-        format!("{stem}{}", n.get())
-    })
-}
-
 pub fn _m(name: &str) -> Mat {
     M.palette().get(name)
-}
-
-/// A turned piece standing at game (x, y, z): `profile` [(radius, height up), ...] from its foot, revolved.
-#[allow(clippy::too_many_arguments)]
-pub fn _turned(
-    f: &GameFrame,
-    name: &str,
-    x: impl Coord,
-    y: f64,
-    z: impl Coord,
-    profile: &[(f64, f64)],
-    material: Mat,
-    segments: usize,
-    rot: (f64, f64, f64),
-) -> Obj {
-    revolve!(
-        name,
-        profile,
-        at = f.at(x, y, z),
-        material = material,
-        segments = segments,
-        rot = rot
-    )
-}
-
-/// A body lofted through rings [(radius, height up), ...] standing at game (x, y, z); `square` > 2 squares them.
-#[allow(clippy::too_many_arguments)]
-pub fn _lathe(
-    f: &GameFrame,
-    name: &str,
-    x: impl Coord,
-    y: f64,
-    z: impl Coord,
-    rings: &[(f64, f64)],
-    material: Mat,
-    verts: usize,
-    square: f64,
-    sy: f64,
-) -> Obj {
-    let P3 { x: bx, y: by, .. } = f.at(x, 0, z);
-    let sections: Vec<Vec<P3>> = rings
-        .iter()
-        .map(|&(r, h)| {
-            ring!(
-                r,
-                r * sy,
-                z = y + h,
-                verts = verts,
-                square = square,
-                at = (bx, by)
-            )
-        })
-        .collect();
-    loft!(name, &sections, material = material)
 }
 
 /// A spindle chair facing the front, its seat (top 0.45) centred on (0, z): the resident's seat. A shaped seat with
@@ -146,7 +78,7 @@ pub fn _lathe(
 pub fn _chair(f: &GameFrame, z: f64, wood: Mat, pad: Mat, verts: usize) {
     fextrude!(
         f,
-        _name("chair_seat"),
+        numbered("chair_seat"),
         &smooth_outline(
             &[
                 (-0.21, -0.2),
@@ -167,7 +99,7 @@ pub fn _chair(f: &GameFrame, z: f64, wood: Mat, pad: Mat, verts: usize) {
     );
     soft!(
         f,
-        _name("chair_pad"),
+        numbered("chair_pad"),
         0.36,
         0.024,
         0.34,
@@ -181,7 +113,7 @@ pub fn _chair(f: &GameFrame, z: f64, wood: Mat, pad: Mat, verts: usize) {
     for x in [-0.18, 0.18] {
         fsweep!(
             f,
-            _name("chair_leg"),
+            numbered("chair_leg"),
             &[(x, 0.39, z + 0.15), (x * 1.04, 0.0, z + 0.17)],
             0.018,
             wood,
@@ -190,7 +122,7 @@ pub fn _chair(f: &GameFrame, z: f64, wood: Mat, pad: Mat, verts: usize) {
         );
         fsweep!(
             f,
-            _name("chair_post"),
+            numbered("chair_post"),
             &[
                 (x, 0.0, z - 0.165),
                 (x, 0.42, z - 0.172),
@@ -204,7 +136,7 @@ pub fn _chair(f: &GameFrame, z: f64, wood: Mat, pad: Mat, verts: usize) {
         );
         kit::tube!(
             f,
-            _name("stretcher"),
+            numbered("stretcher"),
             &[(x, 0.14, z + 0.15), (x, 0.14, z - 0.17)],
             0.009,
             wood,
@@ -224,7 +156,7 @@ pub fn _chair(f: &GameFrame, z: f64, wood: Mat, pad: Mat, verts: usize) {
         .collect();
     fsweep!(
         f,
-        _name("chair_crest"),
+        numbered("chair_crest"),
         &crest,
         0.0,
         wood,
@@ -235,7 +167,7 @@ pub fn _chair(f: &GameFrame, z: f64, wood: Mat, pad: Mat, verts: usize) {
     for x in [-0.09, 0.0, 0.09] {
         kit::tube!(
             f,
-            _name("spindle"),
+            numbered("spindle"),
             &[
                 (x, 0.43, z - 0.175),
                 (x, 0.83, z - 0.186 - 0.006 * (1.0 - pow(x / 0.2, 2.0)))
@@ -254,7 +186,7 @@ pub fn _desk(f: &GameFrame, z0: f64, z1: f64, w: f64, h: f64, top: Mat, legs: Ma
     let (zc, d) = ((z0 + z1) / 2.0, z1 - z0);
     fbox!(
         f,
-        _name("desk_top"),
+        numbered("desk_top"),
         w,
         0.03,
         d,
@@ -265,7 +197,7 @@ pub fn _desk(f: &GameFrame, z0: f64, z1: f64, w: f64, h: f64, top: Mat, legs: Ma
     );
     fbox!(
         f,
-        _name("desk_apron"),
+        numbered("desk_apron"),
         w - 0.08,
         0.07,
         0.02,
@@ -277,7 +209,7 @@ pub fn _desk(f: &GameFrame, z0: f64, z1: f64, w: f64, h: f64, top: Mat, legs: Ma
     for x in [-w / 2.0 + 0.035, w / 2.0 - 0.035] {
         fbox!(
             f,
-            _name("desk_apron_side"),
+            numbered("desk_apron_side"),
             0.02,
             0.07,
             d - 0.08,
@@ -289,7 +221,7 @@ pub fn _desk(f: &GameFrame, z0: f64, z1: f64, w: f64, h: f64, top: Mat, legs: Ma
         for z in [z0 + 0.035, z1 - 0.035] {
             fsweep!(
                 f,
-                _name("desk_leg"),
+                numbered("desk_leg"),
                 &[
                     (x, h - 0.03, z),
                     (
@@ -310,9 +242,9 @@ pub fn _desk(f: &GameFrame, z0: f64, z1: f64, w: f64, h: f64, top: Mat, legs: Ma
 /// A mug standing on `y`: hollow, its handle out at `turn` degrees (0: +x).
 pub fn _mug(f: &GameFrame, x: f64, y: f64, z: f64, material: Mat, turn: f64) {
     let (r, h) = (0.038, 0.09);
-    _turned(
+    kit::turned!(
         f,
-        &_name("mug"),
+        numbered("mug"),
         x,
         y,
         z,
@@ -326,8 +258,7 @@ pub fn _mug(f: &GameFrame, x: f64, y: f64, z: f64, material: Mat, turn: f64) {
             (0.0, 0.012),
         ],
         material,
-        14,
-        (0.0, 0.0, 0.0),
+        segments = 14
     );
     let (c, s) = (cosd(turn), sind(turn));
     let pts: Vec<(f64, f64, f64)> = [
@@ -342,7 +273,7 @@ pub fn _mug(f: &GameFrame, x: f64, y: f64, z: f64, material: Mat, turn: f64) {
     .collect();
     fsweep!(
         f,
-        _name("mug_handle"),
+        numbered("mug_handle"),
         &pts,
         0.0045,
         material,

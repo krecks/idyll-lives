@@ -1,20 +1,19 @@
 //! The songbird feeding station (1x1): a feeder house on a post, a bird bath, songbirds.
 
-use super::common::{M, WALL, bush, name, songbird, tube, turned};
+use super::common::{M, WALL, bush};
 use artkit::forms::rounded_rect;
 use artkit::math::{Axis, P3, cosd, sind};
 use artkit::motion::{Grow, grow};
-use artkit::parts::{hinged, join, new_parts, settle_all};
+use artkit::parts::{hinged, join, new_parts, numbered, settle_all};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, soft, swing, torus};
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, kit, soft, swing, torus};
 
 const POST: (f64, f64) = (-0.2, -0.22); // x, depth
 const HOUSE_Y: f64 = 1.48; // the feeder house's middle
 
 pub fn songbird_feeder() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
-    let none = (0.0, 0.0, 0.0);
     let (px, pz) = POST;
     let still = new_parts(|| {
         fbox!(
@@ -61,7 +60,7 @@ pub fn songbird_feeder() -> Vec<Obj> {
             ];
             fextrude!(
                 f,
-                name("tray_bracket"),
+                numbered("tray_bracket"),
                 &arm,
                 0.016,
                 (px + s * 0.035, 1.298, pz),
@@ -70,7 +69,7 @@ pub fn songbird_feeder() -> Vec<Obj> {
             );
             fextrude!(
                 f,
-                name("tray_bracket"),
+                numbered("tray_bracket"),
                 &arm,
                 0.016,
                 (px, 1.298, pz + s * 0.035),
@@ -112,7 +111,7 @@ pub fn songbird_feeder() -> Vec<Obj> {
         ] {
             fsphere!(
                 f,
-                name("seeds"),
+                numbered("seeds"),
                 0.025,
                 (x, 1.383, z),
                 M.seed,
@@ -137,7 +136,7 @@ pub fn songbird_feeder() -> Vec<Obj> {
             for sz in [-1.0, 1.0] {
                 fbox!(
                     f,
-                    name("house_trim"),
+                    numbered("house_trim"),
                     0.018,
                     0.2,
                     0.018,
@@ -188,16 +187,16 @@ pub fn songbird_feeder() -> Vec<Obj> {
             major_segments = 16,
             minor_segments = 3
         );
-        tube(
+        kit::tube!(
             f,
             "perch",
             &[(px, 1.465, pz + 0.09), (px, 1.465, pz + 0.16)],
             0.006,
             M.tray,
-            Some(6),
-            1,
+            verts = 6,
+            round = 1
         );
-        songbird(
+        kit::songbird!(
             f,
             "robin",
             px,
@@ -206,14 +205,12 @@ pub fn songbird_feeder() -> Vec<Obj> {
             M.bird_brown,
             M.bird_orange,
             M.mustard,
-            Some(M.dark),
-            0.0,
-            0.9,
-            0.0,
-            false,
+            M.dark,
+            turn = 0,
+            size = 0.9
         );
         // the bird bath: a fluted stem, a dished bowl with a rolled rim, its water
-        turned(
+        kit::turned!(
             f,
             "bath_stand",
             0.2,
@@ -233,10 +230,9 @@ pub fn songbird_feeder() -> Vec<Obj> {
                 (0.0, 0.6),
             ],
             M.stone,
-            20,
-            none,
+            segments = 20
         );
-        turned(
+        kit::turned!(
             f,
             "bath_bowl",
             0.2,
@@ -254,8 +250,7 @@ pub fn songbird_feeder() -> Vec<Obj> {
                 (0.0, 0.665),
             ],
             M.stone,
-            32,
-            none,
+            segments = 32
         );
         fcyl!(
             f,
@@ -311,7 +306,7 @@ pub fn songbird_feeder() -> Vec<Obj> {
             segments = 10,
             rings = 5
         );
-        turned(
+        kit::turned!(
             f,
             "scoop_tin",
             -0.02,
@@ -328,8 +323,7 @@ pub fn songbird_feeder() -> Vec<Obj> {
                 (0.0, 0.006),
             ],
             M.tin,
-            16,
-            none,
+            segments = 16
         );
         fsphere!(
             f,
@@ -341,14 +335,14 @@ pub fn songbird_feeder() -> Vec<Obj> {
             segments = 10,
             rings = 5
         );
-        tube(
+        kit::tube!(
             f,
             "scoop",
             &[(-0.02, 0.085, 0.38), (0.0, 0.11, 0.37), (0.02, 0.15, 0.36)],
             0.006,
             M.tin,
-            Some(6),
-            1,
+            verts = 6,
+            round = 1
         );
     });
     join(&still, "body", Some(P3::ZERO));
@@ -359,7 +353,7 @@ pub fn songbird_feeder() -> Vec<Obj> {
         for s in [-1.0, 1.0] {
             fbox!(
                 f,
-                name("roof_slab"),
+                numbered("roof_slab"),
                 0.28,
                 0.02,
                 0.15,
@@ -376,7 +370,7 @@ pub fn songbird_feeder() -> Vec<Obj> {
                 let zz = pz + s * ((0.13 - t) * cosd(36.0) - 0.01);
                 fbox!(
                     f,
-                    name("shingle"),
+                    numbered("shingle"),
                     0.284,
                     0.012,
                     0.05,
@@ -403,7 +397,7 @@ pub fn songbird_feeder() -> Vec<Obj> {
     // The songbirds that come while residents watch: built where they perch, joined with their origin in the
     // feeder house and shrunk into it; `bird` grows them out to the tray and the bath.
     let birds = new_parts(|| {
-        songbird(
+        kit::songbird!(
             f,
             "tit",
             -0.34,
@@ -412,13 +406,12 @@ pub fn songbird_feeder() -> Vec<Obj> {
             M.bird_blue,
             M.bird_cream,
             M.mustard,
-            Some(M.dark),
-            -60.0,
-            0.85,
-            20.0,
-            false,
+            M.dark,
+            turn = -60,
+            size = 0.85,
+            head = 20
         );
-        songbird(
+        kit::songbird!(
             f,
             "finch",
             0.36,
@@ -427,13 +420,11 @@ pub fn songbird_feeder() -> Vec<Obj> {
             M.bird_gold,
             M.bird_yellow,
             M.mustard,
-            Some(M.dark),
-            70.0,
-            0.9,
-            0.0,
-            false,
+            M.dark,
+            turn = 70,
+            size = 0.9
         );
-        songbird(
+        kit::songbird!(
             f,
             "sparrow",
             0.02,
@@ -442,11 +433,10 @@ pub fn songbird_feeder() -> Vec<Obj> {
             M.bird_grey,
             M.bird_pink,
             M.mustard,
-            Some(M.dark),
-            -80.0,
-            0.9,
-            35.0,
-            false,
+            M.dark,
+            turn = -80,
+            size = 0.9,
+            head = 35
         );
     });
     let birds = join(&birds, "birds", Some(f.at(px, HOUSE_Y, pz)));

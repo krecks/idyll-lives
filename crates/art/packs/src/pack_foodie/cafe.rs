@@ -1,16 +1,17 @@
 //! The espresso bar and the cookbook lectern.
 
-use super::common::{_lofted, _name, _paint, M, WALL};
-use super::garden::settle_in_place;
+use super::common::{_lofted, M, WALL};
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, TAU, cos, cosd, radians, sin, sind};
 use artkit::motion::{Path, keys};
-use artkit::parts::{hinged, join, new_parts};
+use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, RotationMode};
-use artkit::{fbox, fcone, fcyl, fextrude, fsphere, fsweep, grow, jitter, revolve, soft, swing};
+use artkit::{
+    fbox, fcone, fcyl, fextrude, fsphere, fsweep, grow, jitter, revolve, settle, soft, swing,
+};
 
 // --- the espresso bar (1x1): a lever espresso machine on a teal-and-oak cart ----------------------------------
 const GROUPS: [f64; 2] = [-0.16, 0.04]; // the group heads' x
@@ -19,7 +20,7 @@ const GROUPS: [f64; 2] = [-0.16, 0.04]; // the group heads' x
 fn _cup(f: &GameFrame, x: f64, y: f64, z: f64, m: Option<Mat>) {
     let m = m.unwrap_or(M.cup);
     revolve!(
-        _name("saucer"),
+        numbered("saucer"),
         &[
             (0.0, 0.0),
             (0.026, 0.0),
@@ -32,7 +33,7 @@ fn _cup(f: &GameFrame, x: f64, y: f64, z: f64, m: Option<Mat>) {
         segments = 12
     );
     revolve!(
-        _name("cup"),
+        numbered("cup"),
         &[
             (0.0, 0.0),
             (0.02, 0.0),
@@ -48,7 +49,7 @@ fn _cup(f: &GameFrame, x: f64, y: f64, z: f64, m: Option<Mat>) {
     );
     fcyl!(
         f,
-        _name("crema"),
+        numbered("crema"),
         0.026,
         0.002,
         (x, y + 0.045, z),
@@ -57,7 +58,7 @@ fn _cup(f: &GameFrame, x: f64, y: f64, z: f64, m: Option<Mat>) {
     );
     fsweep!(
         f,
-        _name("cup_handle"),
+        numbered("cup_handle"),
         &[
             (x + 0.028, y + 0.04, z),
             (x + 0.044, y + 0.036, z),
@@ -89,7 +90,7 @@ pub fn espresso_bar() -> Vec<Obj> {
         for y in [0.42, 0.13] {
             fbox!(
                 f,
-                _name("shelf"),
+                numbered("shelf"),
                 0.7,
                 0.03,
                 0.44,
@@ -100,7 +101,7 @@ pub fn espresso_bar() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                _name("shelf_lip"),
+                numbered("shelf_lip"),
                 0.7,
                 0.03,
                 0.012,
@@ -113,7 +114,7 @@ pub fn espresso_bar() -> Vec<Obj> {
             for z in [WALL + 0.03, zc + 0.22] {
                 fsweep!(
                     f,
-                    _name("post"),
+                    numbered("post"),
                     &[(x, 0.07, z), (x, 0.87, z)],
                     0.0,
                     M.teal,
@@ -122,7 +123,7 @@ pub fn espresso_bar() -> Vec<Obj> {
                 );
                 fcyl!(
                     f,
-                    _name("fork"),
+                    numbered("fork"),
                     0.012,
                     0.03,
                     (x, 0.07, z),
@@ -131,7 +132,7 @@ pub fn espresso_bar() -> Vec<Obj> {
                 );
                 fcyl!(
                     f,
-                    _name("castor"),
+                    numbered("castor"),
                     0.037,
                     0.022,
                     (x, 0.037, z),
@@ -209,7 +210,7 @@ pub fn espresso_bar() -> Vec<Obj> {
             material = M.copper,
             segments = 20
         );
-        _paint(boiler, M.brass, |c| c.z < 0.025);
+        kit::paint(boiler, M.brass, |c| c.z < 0.025);
         revolve!(
             "eagle_post",
             &[
@@ -236,7 +237,7 @@ pub fn espresso_bar() -> Vec<Obj> {
         for s in [-1, 1] {
             fextrude!(
                 f,
-                _name("eagle_wing"),
+                numbered("eagle_wing"),
                 &[(0.0, 0.0), (0.06, 0.02), (0.05, 0.04), (0.0, 0.015)],
                 0.004,
                 (-0.06 + s as f64 * 0.012, 1.482, -0.27),
@@ -298,7 +299,7 @@ pub fn espresso_bar() -> Vec<Obj> {
         for x in GROUPS {
             fbox!(
                 f,
-                _name("group_neck"),
+                numbered("group_neck"),
                 0.05,
                 0.04,
                 0.05,
@@ -308,7 +309,7 @@ pub fn espresso_bar() -> Vec<Obj> {
                 bevel_segments = 1
             );
             revolve!(
-                _name("group"),
+                numbered("group"),
                 &[
                     (0.0, 0.0),
                     (0.03, 0.0),
@@ -322,7 +323,7 @@ pub fn espresso_bar() -> Vec<Obj> {
                 segments = 12
             );
             revolve!(
-                _name("portafilter"),
+                numbered("portafilter"),
                 &[
                     (0.0, 0.0),
                     (0.02, 0.0),
@@ -336,7 +337,7 @@ pub fn espresso_bar() -> Vec<Obj> {
             );
             fcone!(
                 f,
-                _name("spout"),
+                numbered("spout"),
                 0.012,
                 0.006,
                 0.02,
@@ -346,7 +347,7 @@ pub fn espresso_bar() -> Vec<Obj> {
             );
             fsweep!(
                 f,
-                _name("pf_handle"),
+                numbered("pf_handle"),
                 &[(x, 1.06, -0.04), (x, 1.058, 0.0), (x, 1.054, 0.07)],
                 0.011,
                 M.black,
@@ -355,7 +356,7 @@ pub fn espresso_bar() -> Vec<Obj> {
             );
             kit::tube!(
                 f,
-                _name("lever"),
+                numbered("lever"),
                 &[(x, 1.16, -0.1), (x, 1.25, -0.06), (x, 1.34, 0.0)],
                 0.011,
                 M.chrome,
@@ -364,7 +365,7 @@ pub fn espresso_bar() -> Vec<Obj> {
             );
             fsphere!(
                 f,
-                _name("lever_knob"),
+                numbered("lever_knob"),
                 0.025,
                 (x, 1.35, 0.005),
                 M.black,
@@ -528,7 +529,7 @@ pub fn espresso_bar() -> Vec<Obj> {
         for dx in [-0.006, 0.006] {
             fcyl!(
                 f,
-                _name("stream"),
+                numbered("stream"),
                 0.004,
                 0.08,
                 (gx + dx, 0.992, -0.07),
@@ -578,7 +579,7 @@ pub fn espresso_bar() -> Vec<Obj> {
         );
     });
     let wand = hinged(join(&wand, "wand", None), f.at(0.165, 1.12, -0.16));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     grow!(stream, "brew", seconds = 0.4);
     swing!(wand, "brew", 40.0, seconds = 0.6, axis = Axis::Y);
     objs
@@ -618,7 +619,7 @@ pub fn cookbook_lectern() -> Vec<Obj> {
             let (c, s) = (cosd(a), sind(a));
             fsweep!(
                 f,
-                _name("foot"),
+                numbered("foot"),
                 &[
                     (0.03 * c, 0.12, -0.05 + 0.03 * s),
                     (0.11 * c, 0.06, -0.05 + 0.11 * s),
@@ -633,7 +634,7 @@ pub fn cookbook_lectern() -> Vec<Obj> {
             );
             fsphere!(
                 f,
-                _name("foot_pad"),
+                numbered("foot_pad"),
                 0.018,
                 (0.2 * c, 0.016, -0.05 + 0.2 * s),
                 M.walnut,
@@ -724,7 +725,7 @@ pub fn cookbook_lectern() -> Vec<Obj> {
             let sf = s as f64;
             kit::tube!(
                 f,
-                _name("clip"),
+                numbered("clip"),
                 &[
                     _on_desk(sf * 0.245, 0.0, 0.17),
                     _on_desk(sf * 0.245, 0.07, 0.17),
@@ -737,7 +738,7 @@ pub fn cookbook_lectern() -> Vec<Obj> {
             );
             fsphere!(
                 f,
-                _name("clip_end"),
+                numbered("clip_end"),
                 0.007,
                 _on_desk(sf * 0.2, 0.07, 0.12),
                 M.brass,
@@ -772,7 +773,7 @@ pub fn cookbook_lectern() -> Vec<Obj> {
             let swapped: Vec<(f64, f64)> = prof.iter().map(|&(u, v)| (v, u)).collect();
             fsweep!(
                 f,
-                _name("pages"),
+                numbered("pages"),
                 &pts,
                 0.0,
                 M.page,
@@ -793,7 +794,7 @@ pub fn cookbook_lectern() -> Vec<Obj> {
         for k in 0..4 {
             fbox!(
                 f,
-                _name("text"),
+                numbered("text"),
                 0.15,
                 0.002,
                 0.008,
@@ -845,7 +846,7 @@ pub fn cookbook_lectern() -> Vec<Obj> {
         ] {
             _pages(fbox!(
                 f,
-                _name("cookbook"),
+                numbered("cookbook"),
                 w,
                 hh,
                 w * 0.75,
@@ -883,7 +884,7 @@ pub fn cookbook_lectern() -> Vec<Obj> {
         for k in 0..4 {
             fbox!(
                 f,
-                _name("card"),
+                numbered("card"),
                 0.14,
                 0.06,
                 0.002,
@@ -910,7 +911,7 @@ pub fn cookbook_lectern() -> Vec<Obj> {
             let tip = (-0.31 + dx * 3.0 + lean as f64 * 0.002, 0.3, -0.3 + dz * 2.0);
             fsweep!(
                 f,
-                _name("spoon"),
+                numbered("spoon"),
                 &[(-0.31 + dx, 0.03, -0.3 + dz), tip],
                 0.007,
                 M.honey_wood,
@@ -919,7 +920,7 @@ pub fn cookbook_lectern() -> Vec<Obj> {
             );
             fsphere!(
                 f,
-                _name("spoon_bowl"),
+                numbered("spoon_bowl"),
                 0.022,
                 (tip.0, 0.31, tip.2),
                 M.honey_wood,
@@ -956,7 +957,7 @@ pub fn cookbook_lectern() -> Vec<Obj> {
         for k in 0..5 {
             fbox!(
                 f,
-                _name("page_text"),
+                numbered("page_text"),
                 0.15,
                 0.002,
                 0.008,
@@ -968,7 +969,7 @@ pub fn cookbook_lectern() -> Vec<Obj> {
     let page = join(&page, "page", Some(f.at(hx, hy, hz)));
     page.set_rotation_mode(RotationMode::YXZ); // the tilt (X) after the turn about the spine (Y)
     page.set_rotation_euler((radians(TILT), 0.0, 0.0));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     keys(
         page,
         "page",

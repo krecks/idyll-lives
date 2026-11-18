@@ -12,8 +12,8 @@
 //!   - the fireplace's flames grow on the logs while a resident warms up (`flames`);
 //!   - the curtains are drawn closed at night (`close`), on cloth tabs over the rail.
 
-use artkit::family::{Family, Model};
-use artkit::json::{Json, loads};
+use artkit::family::{Family, Model, motions};
+use artkit::json::Json;
 
 mod clock;
 mod common;
@@ -23,10 +23,6 @@ mod textiles;
 mod wall;
 
 use common::M;
-
-fn motions(text: &str) -> Json {
-    loads(text).expect("the motions are JSON")
-}
 
 /// The clocks' motions: the hands tell the game's time.
 fn clock() -> Json {

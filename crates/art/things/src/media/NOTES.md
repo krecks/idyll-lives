@@ -109,4 +109,4 @@ No change to the models' code: their soft boxes take the shared form's new shape
 
 Ported line for line from the Blender script (`crates/art/things/src/media`): against the last Blender build
 (`ref/blender`) all eight are near (every point Blender's, 0.000 mm; baked shading within 1.1 of 32 greys), the pack
-the same. The palette's `crate` is a constant of its own (`CRATE`): Rust keeps the word.
+the same. The palette's `crate` is the field `M.crate_`, named `crate` (`named("crate")`): Rust keeps the word.

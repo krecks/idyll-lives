@@ -1,10 +1,11 @@
 //! KD2: the toy box and the toy chest.
 
 use super::beds::bun;
-use super::common::{P, block, cut_through, place, star, still, teddy, walls};
+use super::common::{P, block, place, star, still, teddy, walls};
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
+use artkit::kit;
 use artkit::math::{Axis, PI, TAU, cos, sin};
 use artkit::parts::{aside, hinged, join, new_parts};
 use artkit::place::Facing;
@@ -79,19 +80,20 @@ pub fn toy_box() -> Vec<Obj> {
         0.03,
         0.0,
     );
-    // hand holds cut through the ends (the script cut them with a boolean: here the ends get the grip's outline
-    // as a hole, and its sides between)
+    // hand holds cut through the ends
     for s in [-1, 1] {
-        let grip = fextrude!(
-            F,
-            format!("grip{s}"),
-            &rounded_rect(0.13, 0.035, 0.0175, 3),
-            0.1,
-            (s as f64 * 0.4, 0.37, z),
-            M.toybox,
-            plane = Facing::Side
+        kit::cut!(
+            box_walls,
+            fextrude!(
+                F,
+                format!("grip{s}"),
+                &rounded_rect(0.13, 0.035, 0.0175, 3),
+                0.1,
+                (s as f64 * 0.4, 0.37, z),
+                M.toybox,
+                plane = Facing::Side
+            )
         );
-        cut_through(box_walls, grip);
     }
     // a rounded rim along the walls' top edge, under the lid
     let rim = rounded_rect(0.775, 0.475, 0.018, 3);

@@ -82,17 +82,6 @@ pub fn _m(name: &str) -> Mat {
     M.palette().get(name)
 }
 
-/// A square bar's profile, `w` across (`h` the other way).
-pub fn _sq(w: f64, h: Option<f64>) -> Vec<(f64, f64)> {
-    let h = h.unwrap_or(w);
-    vec![
-        (-w / 2.0, -h / 2.0),
-        (w / 2.0, -h / 2.0),
-        (w / 2.0, h / 2.0),
-        (-w / 2.0, h / 2.0),
-    ]
-}
-
 /// A spirit bottle standing on `y`: a body (round, or square as a whisky's), its label, a shoulder, neck and cap.
 #[allow(clippy::too_many_arguments)]
 pub fn _bottle(

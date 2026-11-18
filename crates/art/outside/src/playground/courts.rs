@@ -1,16 +1,18 @@
 //! The games: the basketball hoop, the ping-pong table and the park chess table.
 
-use super::common::{F, M, N, fillet, fr, moulding};
+use super::common::{F, M};
 use artkit::forms::rounded_rect;
+use artkit::json::float_repr;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, TAU, cos, sin};
 use artkit::motion::{Rock, Slide, Squash, rock, slide, squash};
-use artkit::parts::{Settle, hinged, join, join_all, new_parts, settle_with};
+use artkit::parts::{hinged, join, join_all, new_parts};
 use artkit::place::Facing;
+use artkit::place::N;
 use artkit::scene::{Obj, meshes};
-use artkit::shapes::SHARP;
 use artkit::{
-    cube, fbox, fcyl, fextrude, fsphere, fsweep, loft, revolve, ring, soft, sphere, torus,
+    cube, fbox, fcyl, fextrude, fsphere, fsweep, loft, revolve, ring, settle, soft, sphere, torus,
 };
 
 // A hoop on a post with a ballast base at the back of its tile; the rim at 3.05 m (regulation, park and driveway
@@ -151,8 +153,8 @@ pub fn basketball_hoop() -> Vec<Obj> {
         for (y, to) in [(3.3, 3.45), (3.0, 3.08)] {
             fsweep!(
                 F,
-                format!("arm{}", fr(y)),
-                &fillet(&[(0.0, y, -0.3), (0.0, y, -0.2), (0.0, to, 0.0)], 0.04, 3),
+                format!("arm{}", float_repr(y)),
+                &kit::fillet!(&[(0.0, y, -0.3), (0.0, y, -0.2), (0.0, to, 0.0)], 0.04),
                 0.025,
                 M.post,
                 verts = 8
@@ -179,8 +181,8 @@ pub fn basketball_hoop() -> Vec<Obj> {
             bevel = 0.004,
             bevel_segments = 1
         );
-        moulding(
-            &F,
+        kit::moulding!(
+            F,
             "board_frame",
             &[
                 (bw / 2.0, by - bh / 2.0),
@@ -190,14 +192,12 @@ pub fn basketball_hoop() -> Vec<Obj> {
             ],
             &[(0.0, -0.02), (0.0, 0.016), (0.022, 0.016), (0.022, -0.02)],
             M.post,
-            0.04,
-            Facing::Front,
-            SHARP,
+            at = 0.04
         );
         for y in [by + bh / 2.0 - 0.045, by - bh / 2.0 + 0.045] {
             fbox!(
                 F,
-                format!("border{}", fr(y)),
+                format!("border{}", float_repr(y)),
                 bw - 0.07,
                 0.03,
                 0.028,
@@ -208,7 +208,7 @@ pub fn basketball_hoop() -> Vec<Obj> {
         for x in [-bw / 2.0 + 0.045, bw / 2.0 - 0.045] {
             fbox!(
                 F,
-                format!("border{}", fr(x)),
+                format!("border{}", float_repr(x)),
                 0.03,
                 bh - 0.06,
                 0.028,
@@ -326,13 +326,7 @@ pub fn basketball_hoop() -> Vec<Obj> {
     });
     let ball = hinged(join(&ball_parts, "ball", None), F.at(0.3, 0.12, 0.32));
     let net = hinged(net("net"), F.at(0, RIM.0, RIM.1));
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     rock(
         net,
         "swish",
@@ -385,8 +379,8 @@ pub fn ping_pong_table() -> Vec<Obj> {
         bevel = 0.006,
         bevel_segments = 1
     );
-    moulding(
-        &F,
+    kit::moulding!(
+        F,
         "top_band",
         &[(hl, -hw), (hl, hw), (-hl, hw), (-hl, -hw)],
         &[
@@ -396,14 +390,13 @@ pub fn ping_pong_table() -> Vec<Obj> {
             (0.006, -0.035),
         ],
         M.steel,
-        top,
-        Facing::Top,
-        SHARP,
+        at = top,
+        plane = Facing::Top
     );
     for z in [-hw + 0.1, hw - 0.1] {
         fbox!(
             F,
-            format!("apron{}", fr(z)),
+            format!("apron{}", float_repr(z)),
             length - 0.3,
             0.06,
             0.04,
@@ -438,7 +431,7 @@ pub fn ping_pong_table() -> Vec<Obj> {
         hole.push((-0.18, 0.12));
         fextrude!(
             F,
-            format!("leg{}", fr(x)),
+            format!("leg{}", float_repr(x)),
             &leg,
             0.12,
             (x, 0, 0),
@@ -450,7 +443,7 @@ pub fn ping_pong_table() -> Vec<Obj> {
         );
         fbox!(
             F,
-            format!("foot{}", fr(x)),
+            format!("foot{}", float_repr(x)),
             0.22,
             0.04,
             1.12,
@@ -461,7 +454,7 @@ pub fn ping_pong_table() -> Vec<Obj> {
         );
         fbox!(
             F,
-            format!("cap{}", fr(x)),
+            format!("cap{}", float_repr(x)),
             0.16,
             0.02,
             0.88,
@@ -517,7 +510,7 @@ pub fn ping_pong_table() -> Vec<Obj> {
     for z in [-net / 2.0 + 0.015, net / 2.0 - 0.015] {
         fbox!(
             F,
-            format!("net_post{}", fr(z)),
+            format!("net_post{}", float_repr(z)),
             0.04,
             0.17,
             0.03,
@@ -528,7 +521,7 @@ pub fn ping_pong_table() -> Vec<Obj> {
         );
         fbox!(
             F,
-            format!("net_clamp{}", fr(z)),
+            format!("net_clamp{}", float_repr(z)),
             0.06,
             0.05,
             0.05,
@@ -539,7 +532,7 @@ pub fn ping_pong_table() -> Vec<Obj> {
         );
         fbox!(
             F,
-            format!("net_arm{}", fr(z)),
+            format!("net_arm{}", float_repr(z)),
             0.03,
             0.02,
             z.abs() - hw + 0.03,
@@ -558,13 +551,7 @@ pub fn ping_pong_table() -> Vec<Obj> {
         rings = 6
     );
     join_all("pingPongTable");
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     meshes()
 }
 
@@ -890,13 +877,7 @@ pub fn park_chess_table() -> Vec<Obj> {
     let parts = new_parts(|| piece("pawn", "pawn", 4, 1, M.piece_white, false));
     let (x, z) = square(4, 1);
     let pawn = hinged(join(&parts, "pawn", None), F.at(x, BOARD.0, z));
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     slide(
         pawn,
         "move",
@@ -918,12 +899,6 @@ pub fn park_chess_table_far() -> Vec<Obj> {
     piece("white_king", "king", 4, 0, M.piece_white, true);
     piece("black_king", "king", 4, 7, M.piece_black, true);
     join_all("parkChessTable_far");
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     meshes()
 }

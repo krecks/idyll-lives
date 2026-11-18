@@ -5,70 +5,11 @@ use super::M;
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{P3, cos, radians, sin};
-use artkit::parts::{Settle, join, new_parts, settle_with};
+use artkit::parts::{join, new_parts};
 use artkit::place::{Coord, Facing, GameFrame};
-use artkit::scene::{Obj, meshes};
+use artkit::py;
+use artkit::scene::Obj;
 use artkit::{fbox, fextrude, sweep};
-
-/// Python's `min` of two: the first unless the second is strictly below it.
-pub fn py_min(a: f64, b: f64) -> f64 {
-    if b < a { b } else { a }
-}
-
-/// Python's `max` of two: the first unless the second is strictly above it.
-pub fn py_max(a: f64, b: f64) -> f64 {
-    if b > a { b } else { a }
-}
-
-/// Python's `max` of a list.
-fn py_max_of(xs: &[f64]) -> f64 {
-    xs[1..].iter().fold(xs[0], |m, &x| py_max(m, x))
-}
-
-/// Python's `min` of a list.
-fn py_min_of(xs: &[f64]) -> f64 {
-    xs[1..].iter().fold(xs[0], |m, &x| py_min(m, x))
-}
-
-/// A round tube of radius `r` through game points, its bends rounded (`round` steps between each pair of points; 1
-/// keeps them sharp), its ends capped: a towel rail, a bent-tube frame, a tap's riser, a hose. `verts` round: by
-/// default 8, and more for one over 13 mm in radius, as many as keep its outline within a millimetre of the circle.
-#[allow(clippy::too_many_arguments)] // (as the kit took it)
-pub fn tube(
-    frame: &GameFrame,
-    name: impl AsRef<str>,
-    points: &[(f64, f64, f64)],
-    r: f64,
-    material: Mat,
-    verts: Option<usize>,
-    round: usize,
-    scale: f64,
-) -> Obj {
-    // (the kit's tube, called as the script called it)
-    artkit::kit::tube(
-        frame,
-        name,
-        points,
-        r,
-        material,
-        artkit::kit::Tube {
-            verts,
-            round,
-            scale: artkit::forms::Scale::One(scale),
-        },
-    )
-}
-
-/// `G.settle` with `centre` and `floor` both false: a wall thing, built in place at its real height.
-pub fn settle_in_place() {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: false,
-        },
-    );
-}
 
 /// The frame `f` draws in, without its `depths`: for parts placed at drawn depths (`GameFrame::depth`), so a pull or a
 /// door keeps its real thickness on a counter drawn shallower (COUNTER66).
@@ -105,7 +46,7 @@ pub fn pull(
     r: f64,
     base: f64,
 ) -> Obj {
-    let (out, h, k) = (reach - r, length / 2.0, py_min(0.012, reach * 0.5));
+    let (out, h, k) = (reach - r, length / 2.0, py::min(0.012, reach * 0.5));
     let pt = |a: f64, d: f64| -> P3 {
         if vertical {
             p.at(x, y + a, z + d)
@@ -183,9 +124,9 @@ pub fn shaker(
         let us: Vec<f64> = hole.iter().map(|&(u, _)| u).collect();
         let vs: Vec<f64> = hole.iter().map(|&(_, v)| v).collect();
         let (pw, ph, pv) = (
-            py_max_of(&us) - py_min_of(&us),
-            py_max_of(&vs) - py_min_of(&vs),
-            (py_max_of(&vs) + py_min_of(&vs)) / 2.0,
+            py::max_of(&us) - py::min_of(&us),
+            py::max_of(&vs) - py::min_of(&vs),
+            (py::max_of(&vs) + py::min_of(&vs)) / 2.0,
         );
         let inner = rounded_rect(pw - 0.02, ph - 0.02, 0.002, 1);
         fextrude!(

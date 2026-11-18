@@ -1,8 +1,8 @@
 //! The garden hammock (3x1): a canvas sling 2 m long hung from a curved cedar stand, rocking for the resident
 //! (2026-10-21: 2x1, its sling 1.44 m, grown-ups lying in it with the knees up: M-packs-06, Q-07).
 
-use super::common::{_m, _sq, M};
-use artkit::forms::rounded_rect;
+use super::common::{_m, M};
+use artkit::forms::{rect, rounded_rect};
 use artkit::json::float_repr;
 use artkit::math::{Axis, P3, atan, degrees, pow};
 use artkit::parts::{hinged, join, new_parts};
@@ -114,7 +114,7 @@ pub fn garden_hammock() -> Vec<Obj> {
                 &pts,
                 0.0,
                 _m(m),
-                profile = _sq(0.012, Some(zw + 0.002)),
+                profile = rect(0.012, zw + 0.002),
                 up = (0, 0, 1)
             );
         }

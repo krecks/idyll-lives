@@ -1,17 +1,17 @@
 //! The power blender station and the contrast rain shower.
 
-use super::common::{M, WALL, fillet, lofted, name, pull, shaker, tube};
-use super::play::settle_in_place;
+use super::common::{M, WALL, lofted};
 use artkit::forms::{by, rounded_rect};
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, cosd, sin, sind};
 use artkit::motion::{Ease, Grow, Spin, grow, spin};
-use artkit::parts::{hinged, join, new_parts, settle_all};
+use artkit::parts::{hinged, join, new_parts, numbered, settle_all};
 use artkit::place::{Facing, GameFrame};
 use artkit::py::round;
 use artkit::scene::Obj;
 use artkit::{
-    fbox, fcone, fcyl, fextrude, fsphere, fsweep, jitter, loft, revolve, ring, slide, swing,
+    fbox, fcone, fcyl, fextrude, fsphere, fsweep, jitter, kit, loft, revolve, ring, settle, slide,
+    swing,
 };
 
 // --- the power blender station (1x1): a kitchen base unit, the blender, fruit and two smoothies ----------------
@@ -22,7 +22,7 @@ const JAR: (f64, f64) = (-0.18, -0.12); // the blender's middle (x, depth)
 #[allow(clippy::too_many_arguments)]
 fn glass(f: &GameFrame, x: f64, z: f64, drink: Mat, y: f64, h: f64, r: f64, straw: Option<Mat>) {
     revolve!(
-        name("drink"),
+        numbered("drink"),
         &[
             (0.0, 0.0),
             (r * 0.8, 0.0),
@@ -34,7 +34,7 @@ fn glass(f: &GameFrame, x: f64, z: f64, drink: Mat, y: f64, h: f64, r: f64, stra
         segments = 12
     );
     revolve!(
-        name("glass"),
+        numbered("glass"),
         &[
             (0.0, 0.0),
             (r * 0.88, 0.0),
@@ -48,17 +48,17 @@ fn glass(f: &GameFrame, x: f64, z: f64, drink: Mat, y: f64, h: f64, r: f64, stra
         segments = 14
     );
     if let Some(straw) = straw {
-        tube(
+        kit::tube!(
             f,
-            &name("straw"),
+            numbered("straw"),
             &[
                 (x + 0.008, y + 0.02, z),
                 (x + 0.02, y + h + 0.05, z - 0.008),
             ],
             0.004,
             straw,
-            Some(5),
-            1,
+            verts = 5,
+            round = 1
         );
     }
 }
@@ -152,7 +152,7 @@ pub fn power_blender() -> Vec<Obj> {
             ],
             up = (0, 0, 1)
         );
-        shaker(
+        kit::shaker!(
             f,
             "drawer",
             w - 0.03,
@@ -160,12 +160,9 @@ pub fn power_blender() -> Vec<Obj> {
             (0.0, h - t - 0.095, zc + 0.01),
             0.02,
             M.blend_door,
-            0.04,
-            None,
-            0.005,
-            false,
+            rail = 0.04
         );
-        pull(
+        kit::pull!(
             f,
             "drawer_pull",
             0.0,
@@ -173,41 +170,35 @@ pub fn power_blender() -> Vec<Obj> {
             zc + 0.02,
             0.16,
             M.chrome,
-            0.006,
-            0.026,
-            false,
-            8,
+            r = 0.006,
+            out = 0.026
         );
         let dw = (w - 0.03) / 2.0;
         for s in [-1.0, 1.0] {
             let cx = s * (dw / 2.0 + 0.005);
             let dh = h - t - 0.29;
-            shaker(
+            kit::shaker!(
                 f,
-                &name("door"),
+                numbered("door"),
                 dw,
                 dh,
                 (cx, 0.1 + dh / 2.0, zc + 0.01),
                 0.02,
                 M.blend_door,
-                0.055,
-                None,
-                0.005,
-                false,
+                rail = 0.055
             );
             let hx = cx - s * (dw / 2.0 - 0.045);
-            pull(
+            kit::pull!(
                 f,
-                &name("handle"),
+                numbered("handle"),
                 hx,
                 h - t - 0.29,
                 zc + 0.02,
                 0.12,
                 M.chrome,
-                0.006,
-                0.026,
-                true,
-                8,
+                r = 0.006,
+                out = 0.026,
+                upright = true
             );
         }
         // the blender: a motor base with its control strip and dials, the glass jug with its handle and spout
@@ -241,7 +232,7 @@ pub fn power_blender() -> Vec<Obj> {
         );
         for dx in [-0.04, 0.0, 0.04] {
             revolve!(
-                name("dial"),
+                numbered("dial"),
                 &[
                     (0.0, 0.0),
                     (0.011, 0.0),
@@ -288,7 +279,7 @@ pub fn power_blender() -> Vec<Obj> {
         fsweep!(
             f,
             "jug_handle",
-            &fillet(
+            &kit::fillet!(
                 &[
                     (jx + 0.072, TOP + 0.33, jz),
                     (jx + 0.12, TOP + 0.31, jz),
@@ -296,7 +287,7 @@ pub fn power_blender() -> Vec<Obj> {
                     (jx + 0.075, TOP + 0.16, jz)
                 ],
                 0.03,
-                2
+                steps = 2
             ),
             0,
             M.dark,
@@ -320,7 +311,7 @@ pub fn power_blender() -> Vec<Obj> {
         ] {
             fsphere!(
                 f,
-                name("fruit"),
+                numbered("fruit"),
                 r,
                 (x, TOP + y, z),
                 m,
@@ -329,7 +320,7 @@ pub fn power_blender() -> Vec<Obj> {
             );
             fcyl!(
                 f,
-                name("fruit_stalk"),
+                numbered("fruit_stalk"),
                 0.003,
                 0.012,
                 (x, TOP + y + r, z),
@@ -370,7 +361,7 @@ pub fn power_blender() -> Vec<Obj> {
         for x in [0.08, 0.16] {
             fcyl!(
                 f,
-                name("lemon_rind"),
+                numbered("lemon_rind"),
                 0.032,
                 0.012,
                 (x, TOP + 0.021, 0.12 + (x - 0.12) * 0.25),
@@ -379,7 +370,7 @@ pub fn power_blender() -> Vec<Obj> {
             );
             fcyl!(
                 f,
-                name("lemon_face"),
+                numbered("lemon_face"),
                 0.027,
                 0.002,
                 (x, TOP + 0.0275, 0.12 + (x - 0.12) * 0.25),
@@ -471,7 +462,7 @@ pub fn power_blender() -> Vec<Obj> {
             let r = 0.062;
             fbox!(
                 f,
-                name("streak"),
+                numbered("streak"),
                 0.016,
                 0.12,
                 0.006,
@@ -481,7 +472,7 @@ pub fn power_blender() -> Vec<Obj> {
             );
             fsphere!(
                 f,
-                name("bit"),
+                numbered("bit"),
                 0.014,
                 (
                     jx + 0.035 * cosd(a + 60.0),
@@ -495,7 +486,7 @@ pub fn power_blender() -> Vec<Obj> {
         }
     });
     let swirl = join(&swirl, "smoothie", Some(f.at(jx, TOP + 0.13, jz)));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     slide!(lid, "lid", (0, 0, 0.09), seconds = 0.5);
     spin(
         swirl,
@@ -555,7 +546,7 @@ fn tiled_walls(
         for i in 0..cols {
             fbox!(
                 f,
-                name("tile"),
+                numbered("tile"),
                 tw - gap,
                 th - gap,
                 0.008,
@@ -568,7 +559,7 @@ fn tiled_walls(
         for i in 0..deep {
             fbox!(
                 f,
-                name("tile"),
+                numbered("tile"),
                 0.008,
                 th - gap,
                 td - gap,
@@ -616,7 +607,7 @@ pub fn contrast_shower() -> Vec<Obj> {
         for k in -2..3 {
             fbox!(
                 f,
-                name("drain_slot"),
+                numbered("drain_slot"),
                 0.05,
                 0.002,
                 0.004,
@@ -638,7 +629,7 @@ pub fn contrast_shower() -> Vec<Obj> {
         for k in 0..5 {
             fbox!(
                 f,
-                name("mat_rib"),
+                numbered("mat_rib"),
                 0.54,
                 0.004,
                 0.02,
@@ -660,7 +651,7 @@ pub fn contrast_shower() -> Vec<Obj> {
         for (x0, x1) in [(-0.414, -DOOR_HALF - 0.004), (DOOR_HALF + 0.004, 0.4225)] {
             fbox!(
                 f,
-                name("glass_fixed"),
+                numbered("glass_fixed"),
                 x1 - x0,
                 2.0,
                 0.01,
@@ -672,7 +663,7 @@ pub fn contrast_shower() -> Vec<Obj> {
         for (x, z) in [(0.435, 0.435), (0.435, -0.42)] {
             fsweep!(
                 f,
-                name("post"),
+                numbered("post"),
                 &[(x, 0.058, z), (x, top, z)],
                 0,
                 M.shower_frame,
@@ -708,7 +699,7 @@ pub fn contrast_shower() -> Vec<Obj> {
             // the door's hinges on the right pane
             fextrude!(
                 f,
-                name("hinge"),
+                numbered("hinge"),
                 &rounded_rect(0.05, 0.05, 0.01, 2),
                 0.026,
                 (DOOR_HALF + 0.01, y, 0.437),
@@ -718,23 +709,22 @@ pub fn contrast_shower() -> Vec<Obj> {
             );
         }
         // the square rain head on its arm from the wall, the hot and cold dials on their plate, a shelf of bottles
-        tube(
+        kit::tube!(
             f,
             "arm",
-            &fillet(
+            &kit::fillet!(
                 &[
                     (0.0, 2.1, -0.415),
                     (0.0, 2.1, -0.3),
                     (0.0, 2.04, -0.25),
                     (0.0, 2.04, hz),
                 ],
-                0.04,
-                3,
+                0.04
             ),
             0.014,
             M.fittings,
-            Some(8),
-            1,
+            verts = 8,
+            round = 1
         );
         revolve!(
             "arm_rose",
@@ -774,7 +764,7 @@ pub fn contrast_shower() -> Vec<Obj> {
             for k in 0..5 {
                 fbox!(
                     f,
-                    name("nozzle"),
+                    numbered("nozzle"),
                     0.01,
                     0.003,
                     0.01,
@@ -799,7 +789,7 @@ pub fn contrast_shower() -> Vec<Obj> {
         );
         for (x, m) in [(-0.1, M.hot), (0.1, M.cold)] {
             revolve!(
-                name("dial"),
+                numbered("dial"),
                 &[
                     (0.0, 0.0),
                     (0.042, 0.0),
@@ -815,7 +805,7 @@ pub fn contrast_shower() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                name("dial_mark"),
+                numbered("dial_mark"),
                 0.008,
                 0.05,
                 0.006,
@@ -841,7 +831,7 @@ pub fn contrast_shower() -> Vec<Obj> {
         ] {
             lofted(
                 f,
-                &name("bottle"),
+                &numbered("bottle"),
                 x,
                 1.4075,
                 -0.37,
@@ -857,7 +847,7 @@ pub fn contrast_shower() -> Vec<Obj> {
             );
             fcyl!(
                 f,
-                name("bottle_cap"),
+                numbered("bottle_cap"),
                 0.012,
                 0.02,
                 (x, 1.4075 + hh + 0.01, -0.37),
@@ -879,7 +869,7 @@ pub fn contrast_shower() -> Vec<Obj> {
         let towel = fsweep!(
             f,
             "towel",
-            &fillet(
+            &kit::fillet!(
                 &[
                     (0.36, 1.06, -0.4),
                     (0.36, 1.42, -0.402),
@@ -887,7 +877,7 @@ pub fn contrast_shower() -> Vec<Obj> {
                     (0.36, 1.12, -0.36)
                 ],
                 0.012,
-                2
+                steps = 2
             ),
             0,
             M.towel,
@@ -903,7 +893,7 @@ pub fn contrast_shower() -> Vec<Obj> {
             for k in 0..5 {
                 fcyl!(
                     f,
-                    name("rain"),
+                    numbered("rain"),
                     0.004,
                     hy - 0.07,
                     (

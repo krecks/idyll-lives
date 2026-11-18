@@ -8,8 +8,7 @@
 //! the wall layer: built at its real height, its back on the wall face. Built to the old parts' sizes, in their
 //! numbers: the parts are placed in game axes (`F`).
 
-use artkit::family::{Family, Model};
-use artkit::json::loads;
+use artkit::family::{Family, Model, motions};
 
 mod common;
 mod mirrors;
@@ -35,11 +34,10 @@ pub fn family() -> Option<Family> {
             .centre(0.0, -0.003)
             // getReady (the `wash` tag) slides the right drawer out to the seat, and back after a while
             .motions(
-                loads(&format!(
+                motions(&format!(
                     r#"{{"uses": {{"getReady": "drawer_open"}}, "hold": {}}}"#,
                     artkit::json::float_repr(mirrors::DRAWER_HOLD)
-                ))
-                .expect("the motions are JSON"),
+                )),
             )
             .paint(&[("table", "Table"), ("table_frame", "Frame")]),
             Model::new("mirrorWall", mirrors::mirror_wall, (0.62, 0.97, 0.09))

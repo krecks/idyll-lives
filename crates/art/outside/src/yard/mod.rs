@@ -15,8 +15,7 @@
 //! Each is built in place where the game places it (`F`, game axes), and each has a far version for the town
 //! overview: its own build at low detail.
 
-use artkit::family::{Family, Model};
-use artkit::json::{Json, loads};
+use artkit::family::{Family, Model, motions};
 
 mod common;
 mod garden;
@@ -26,10 +25,6 @@ mod play;
 mod rides;
 
 use common::M;
-
-fn motions(text: &str) -> Json {
-    loads(text).expect("the motions are JSON")
-}
 
 /// The family.
 pub fn family() -> Option<Family> {

@@ -1,24 +1,17 @@
 //! The sandpit, and the bike rack with its bike: the bikes' frames, wheels and parts, shared with the rides.
 
-use super::common::{F, M, N, arc_points, bent_bar, blob, ground, name, prism, rod};
+use super::common::{F, M, arc_points, bent, blob, ground, prism, rod};
 use artkit::far::{is_low, low};
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, cosd, sind};
 use artkit::motion::{Grow, Spin, Swing, attach, grow, spin, swing};
-use artkit::parts::{Settle, hinged, join, join_all, new_parts, settle_with};
+use artkit::parts::numbered;
+use artkit::parts::{hinged, join, join_all, new_parts};
 use artkit::place::Facing;
+use artkit::place::N;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcone, fcyl, fextrude, fsweep, loft, revolve, ring, torus};
-
-pub fn settle_in_place(objs: &[Obj]) -> Vec<Obj> {
-    settle_with(
-        objs,
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    )
-}
+use artkit::{fbox, fcone, fcyl, fextrude, fsweep, loft, revolve, ring, settle, torus};
 
 // --- the sandpit (2x2): a box of boards round the sand, two corner seats, a bucket and spade; a castle grows ---
 const SAND: f64 = 0.18; // the sand's top
@@ -41,7 +34,7 @@ pub fn sandbox() -> Vec<Obj> {
         for z in [-0.92, 0.92] {
             fbox!(
                 F,
-                name("board"),
+                numbered("board"),
                 1.92,
                 0.125,
                 0.08,
@@ -54,7 +47,7 @@ pub fn sandbox() -> Vec<Obj> {
         for x in [-0.92, 0.92] {
             fbox!(
                 F,
-                name("board"),
+                numbered("board"),
                 0.08,
                 0.125,
                 1.76,
@@ -65,8 +58,8 @@ pub fn sandbox() -> Vec<Obj> {
             );
         }
     }
-    crate::playground::common::moulding(
-        &F,
+    kit::moulding!(
+        F,
         "cap",
         &[(0.99, 0.99), (-0.99, 0.99), (-0.99, -0.99), (0.99, -0.99)],
         &[
@@ -78,9 +71,8 @@ pub fn sandbox() -> Vec<Obj> {
             (0.13, 0.0),
         ],
         M.frame,
-        0.26,
-        Facing::Top,
-        artkit::shapes::SHARP,
+        at = 0.26,
+        plane = Facing::Top
     );
     for sx in [-1.0, 1.0] {
         // corner seats at the back: triangles across the corners
@@ -91,7 +83,7 @@ pub fn sandbox() -> Vec<Obj> {
         ];
         fextrude!(
             F,
-            name("seat"),
+            numbered("seat"),
             &tri,
             0.03,
             (0, 0.3, 0),
@@ -251,7 +243,7 @@ pub fn sandbox() -> Vec<Obj> {
         bevel_segments = 1
     );
     if is_low() {
-        return settle_in_place(&[join_all("sandbox")]);
+        return settle!(&[join_all("sandbox")], centre = false);
     }
     join(&meshes(), "sandbox", Some(P3::from((0, 0, 0))));
     // The castle: a keep and four turrets turned out of the bucket, walls between them, a flag. Its origin is 2 cm
@@ -272,7 +264,7 @@ pub fn sandbox() -> Vec<Obj> {
             let a = 45 * k;
             fbox!(
                 F,
-                name("merlon"),
+                numbered("merlon"),
                 0.03,
                 0.03,
                 0.025,
@@ -298,7 +290,7 @@ pub fn sandbox() -> Vec<Obj> {
             // the bucket's ridges, pressed into the keep
             fcyl!(
                 F,
-                name("keep_ring"),
+                numbered("keep_ring"),
                 0.1 - 0.025 * (k as f64 + 0.5) / 3.0 * 1.0 + 0.003,
                 0.008,
                 (cx, SAND + 0.03 + 0.05 * k as f64, cz),
@@ -322,7 +314,7 @@ pub fn sandbox() -> Vec<Obj> {
                 let (x, z) = (cx + sx * 0.15, cz + sz * 0.15);
                 fcone!(
                     F,
-                    name("turret"),
+                    numbered("turret"),
                     0.055,
                     0.042,
                     0.11,
@@ -332,7 +324,7 @@ pub fn sandbox() -> Vec<Obj> {
                 );
                 fcone!(
                     F,
-                    name("turret_top"),
+                    numbered("turret_top"),
                     0.046,
                     0.0,
                     0.06,
@@ -345,7 +337,7 @@ pub fn sandbox() -> Vec<Obj> {
         for s in [-1.0, 1.0] {
             fbox!(
                 F,
-                name("wall"),
+                numbered("wall"),
                 0.24,
                 0.06,
                 0.03,
@@ -355,7 +347,7 @@ pub fn sandbox() -> Vec<Obj> {
             );
             fbox!(
                 F,
-                name("wall"),
+                numbered("wall"),
                 0.03,
                 0.06,
                 0.24,
@@ -396,7 +388,7 @@ pub fn sandbox() -> Vec<Obj> {
     });
     let castle = join(&castle, "castle", Some(F.at(cx, SAND - 0.02, cz)));
     castle.edit(|o| o.scale.z = 0.001);
-    let objs = settle_in_place(&meshes());
+    let objs = settle!(centre = false);
     grow(
         castle,
         "castle",
@@ -564,7 +556,7 @@ pub fn wheel(x: f64, z: f64, s: &Bike) {
     let t = s.tyre.unwrap_or(0.02 * k);
     let y = r;
     torus!(
-        name("tyre"),
+        numbered("tyre"),
         r - t,
         t,
         at = F.at(x, y, z),
@@ -581,7 +573,7 @@ pub fn wheel(x: f64, z: f64, s: &Bike) {
             for side in [-1.0, 1.0] {
                 let dz = side * 0.012 * k;
                 rod(
-                    &name("knob"),
+                    &numbered("knob"),
                     (x + (r - 0.008 * k) * c, y + (r - 0.008 * k) * sn, z + dz),
                     (x + (r + 0.014 * k) * c, y + (r + 0.014 * k) * sn, z + dz),
                     0.008 * k,
@@ -594,7 +586,7 @@ pub fn wheel(x: f64, z: f64, s: &Bike) {
     if !is_low() {
         let rim = r - 2.0 * t - 0.003 * k;
         torus!(
-            name("rim"),
+            numbered("rim"),
             rim,
             0.009 * k,
             at = F.at(x, y, z),
@@ -621,7 +613,7 @@ pub fn wheel(x: f64, z: f64, s: &Bike) {
         .map(|&(u, v)| (u * k, v * k))
         .collect();
         revolve!(
-            name("hub"),
+            numbered("hub"),
             &hub,
             at = F.at(x, y, z),
             material = M.rim,
@@ -635,7 +627,7 @@ pub fn wheel(x: f64, z: f64, s: &Bike) {
             let side = if i % 2 == 1 { 0.03 * k } else { -0.03 * k };
             let lead = if i % 2 == 1 { 12.0 } else { -12.0 };
             rod(
-                &name("spoke"),
+                &numbered("spoke"),
                 (
                     x + 0.022 * k * cosd(a + lead),
                     y + 0.022 * k * sind(a + lead),
@@ -654,7 +646,7 @@ pub fn wheel(x: f64, z: f64, s: &Bike) {
     } else {
         fcyl!(
             F,
-            name("hub"),
+            numbered("hub"),
             0.022 * k,
             0.1 * k,
             (x, y, z),
@@ -681,7 +673,7 @@ pub fn bike(s: &Bike) -> (Vec<Obj>, Vec<Obj>, Vec<Obj>) {
         // down tubes curve down from the head tube, the top one into the seat tube low down.
         fsweep!(
             F,
-            name("tube"),
+            numbered("tube"),
             &[at(bb, 0.0), at(sc, 0.0)],
             s.tubes.0,
             body,
@@ -693,7 +685,7 @@ pub fn bike(s: &Bike) -> (Vec<Obj>, Vec<Obj>, Vec<Obj>) {
                 let pts: Vec<(f64, f64, f64)> = path.iter().map(|&p| at(p, 0.0)).collect();
                 fsweep!(
                     F,
-                    name("tube"),
+                    numbered("tube"),
                     &pts,
                     r,
                     body,
@@ -706,7 +698,7 @@ pub fn bike(s: &Bike) -> (Vec<Obj>, Vec<Obj>, Vec<Obj>) {
             for (a, b, r) in [(sc, ht, s.tubes.1), (bb, hb, s.tubes.2)] {
                 fsweep!(
                     F,
-                    name("tube"),
+                    numbered("tube"),
                     &[at(a, 0.0), at(b, 0.0)],
                     r,
                     body,
@@ -726,7 +718,7 @@ pub fn bike(s: &Bike) -> (Vec<Obj>, Vec<Obj>, Vec<Obj>) {
         for dz in [-s.stay_dz, s.stay_dz] {
             fsweep!(
                 F,
-                name("chainstay"),
+                numbered("chainstay"),
                 &[at(ra, dz), at(bb, dz * 0.4)],
                 0.011 * k,
                 body,
@@ -735,7 +727,7 @@ pub fn bike(s: &Bike) -> (Vec<Obj>, Vec<Obj>, Vec<Obj>) {
             );
             fsweep!(
                 F,
-                name("seatstay"),
+                numbered("seatstay"),
                 &[
                     at(ra, dz),
                     at(
@@ -752,7 +744,7 @@ pub fn bike(s: &Bike) -> (Vec<Obj>, Vec<Obj>, Vec<Obj>) {
             // the fork's blades, raked forward to the axle
             fsweep!(
                 F,
-                name("fork"),
+                numbered("fork"),
                 &[at(crown, dz * 0.5), at(s.fork_mid, dz * 0.9), at(fa, dz)],
                 0.011 * k,
                 body,
@@ -781,7 +773,7 @@ pub fn bike(s: &Bike) -> (Vec<Obj>, Vec<Obj>, Vec<Obj>) {
             .collect();
             fsweep!(
                 F,
-                name("guard"),
+                numbered("guard"),
                 &pts,
                 0,
                 s.guard_colour.unwrap_or(body),
@@ -825,10 +817,10 @@ pub fn bike(s: &Bike) -> (Vec<Obj>, Vec<Obj>, Vec<Obj>) {
             8,
         );
         let bars: Vec<(f64, f64, f64)> = s.bars.iter().map(|&(x, h, dz)| (x, h, bz + dz)).collect();
-        bent_bar("bars", &bars, 0.011 * k, M.rim, s.bend, low(8, 5), 3);
+        bent("bars", &bars, 0.011 * k, M.rim, s.bend, low(8, 5), 3);
         for &(a, b) in &s.grips {
             rod(
-                &name("grip"),
+                &numbered("grip"),
                 (a.0, a.1, bz + a.2),
                 (b.0, b.1, bz + b.2),
                 s.grip_r,
@@ -874,7 +866,7 @@ pub fn bike(s: &Bike) -> (Vec<Obj>, Vec<Obj>, Vec<Obj>) {
             let a = (s.crank.0 * sg, s.crank.1 * sg);
             let dz = s.crank_dz * sg;
             rod(
-                &name("crank"),
+                &numbered("crank"),
                 at(bb, dz),
                 (bb.0 + a.0, bb.1 + a.1, bz + dz),
                 0.009 * k,
@@ -883,7 +875,7 @@ pub fn bike(s: &Bike) -> (Vec<Obj>, Vec<Obj>, Vec<Obj>) {
             );
             fbox!(
                 F,
-                name("pedal"),
+                numbered("pedal"),
                 s.pedal.0,
                 s.pedal.1,
                 s.pedal.2,
@@ -897,7 +889,7 @@ pub fn bike(s: &Bike) -> (Vec<Obj>, Vec<Obj>, Vec<Obj>) {
     let chain = new_parts(|| {
         for dy in [s.ring, -s.ring].into_iter().take(low(2, 0)) {
             rod(
-                &name("chain"),
+                &numbered("chain"),
                 (bb.0, bb.1 + dy, bz + rdz),
                 (s.rear, r + dy * s.chain_drop, bz + rdz),
                 0.004 * k,
@@ -945,8 +937,8 @@ pub fn bike_rack() -> Vec<Obj> {
         );
         for x in [-0.6, -0.2, 0.2, 0.6] {
             // inverted-U hoops on the rail, each one bent tube, on its feet
-            bent_bar(
-                &name("hoop"),
+            bent(
+                &numbered("hoop"),
                 &[
                     (x - 0.15, 0.04, RACK_Z),
                     (x - 0.15, 0.57, RACK_Z),
@@ -962,7 +954,7 @@ pub fn bike_rack() -> Vec<Obj> {
             for e in [-1.0, 1.0] {
                 fbox!(
                     F,
-                    name("hoop_foot"),
+                    numbered("hoop_foot"),
                     0.07,
                     0.008,
                     0.1,
@@ -979,7 +971,7 @@ pub fn bike_rack() -> Vec<Obj> {
             let z = BZ + dz;
             for e in [-1.0, 1.0] {
                 rod(
-                    &name("stand_leg"),
+                    &numbered("stand_leg"),
                     (ax + e * 0.16, 0.0, z + dz * 0.8),
                     (ax, ay - 0.03, z),
                     0.012,
@@ -989,7 +981,7 @@ pub fn bike_rack() -> Vec<Obj> {
             }
             fsweep!(
                 F,
-                name("cradle"),
+                numbered("cradle"),
                 &arc_points((ax, ay, z), 0.022, 180.0, 360.0, 4, true),
                 0.008,
                 M.rack,
@@ -998,7 +990,7 @@ pub fn bike_rack() -> Vec<Obj> {
             for e in [-1.0, 1.0] {
                 fcyl!(
                     F,
-                    name("stand_foot"),
+                    numbered("stand_foot"),
                     0.018,
                     0.012,
                     (ax + e * 0.16, 0.006, z + dz * 0.8),
@@ -1017,14 +1009,14 @@ pub fn bike_rack() -> Vec<Obj> {
     });
     let wheel_parts = new_parts(|| wheel(REAR, BZ, &rack_bike));
     if is_low() {
-        return settle_in_place(&[join_all("bikeRack")]);
+        return settle!(&[join_all("bikeRack")], centre = false);
     }
     let b = hinged(join(&bike_parts, "bike", None), F.at(FRONT, 0, BZ));
     let w = hinged(
         join(&wheel_parts, "wheel_rear", None),
         F.at(REAR, WHEEL_R, BZ),
     );
-    let objs = settle_in_place(&meshes());
+    let objs = settle!(centre = false);
     attach(w, b);
     swing(
         b,

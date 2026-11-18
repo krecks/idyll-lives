@@ -1,18 +1,18 @@
 //! The rainbow hammock, the sunrise stretch lamp and the confetti party booth.
 
-use super::common::{
-    M, STRIPES, WALL2, bulb, fillet, name, obj, paint, pleats, slab, tube, tumbler,
-};
-use super::music::{settle_in_place, tilt};
-use artkit::forms::{Scale, rounded_rect, smooth_outline};
+use super::common::{M, STRIPES, WALL2, bulb, pleats, slab, tumbler};
+use super::music::tilt;
+use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, TAU, atan2, cosd, degrees, pow, sin, sind, sqrt};
 use artkit::motion::{Rock, Squash, rock, squash};
-use artkit::parts::{hinged, join, new_parts};
+use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::py::fmod;
 use artkit::scene::Obj;
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, revolve, slide, soft, torus};
+use artkit::{
+    fbox, fcyl, fextrude, fsphere, fsweep, kit, object_of, revolve, settle, slide, soft, torus,
+};
 
 // --- the rainbow hammock (3x1): a striped sling 2 m long between spreader bars, on a wooden stand (2026-10-21: 2x1,
 // its sling 1.5 m, grown-ups lying in it with the knees up: M-packs-06, Q-07) ---------------------------------------
@@ -32,7 +32,6 @@ fn sling_y(u: f64, v: f64) -> f64 {
 
 pub fn rainbow_hammock() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
-    let one = || Scale::One(1.0);
     let beam = rounded_rect(0.07, 0.09, 0.02, 1);
     let still = new_parts(|| {
         // the base beam, its ends rounded, and the two posts curving up and out from it to the hooks
@@ -48,7 +47,7 @@ pub fn rainbow_hammock() -> Vec<Obj> {
         for s in [-1.0, 1.0] {
             fsweep!(
                 f,
-                name("post"),
+                numbered("post"),
                 &[
                     (s * (POST_X - 0.16), 0.04, 0.0),
                     (s * (POST_X - 0.1), 0.3, 0.0),
@@ -62,7 +61,7 @@ pub fn rainbow_hammock() -> Vec<Obj> {
                 resolution = 3
             );
             revolve!(
-                name("post_top"),
+                numbered("post_top"),
                 &[
                     (0.0, 0.0),
                     (0.04, 0.0),
@@ -77,7 +76,7 @@ pub fn rainbow_hammock() -> Vec<Obj> {
             );
             fextrude!(
                 f,
-                name("foot"),
+                numbered("foot"),
                 &rounded_rect(0.62, 0.045, 0.02, 2),
                 0.09,
                 (s * (POST_X - 0.1), 0.0225, 0.0),
@@ -90,7 +89,7 @@ pub fn rainbow_hammock() -> Vec<Obj> {
                 // braces from the foot to the post
                 fsweep!(
                     f,
-                    name("brace"),
+                    numbered("brace"),
                     &[
                         (s * (POST_X - 0.1), 0.04, z * 1.5),
                         (s * (POST_X - 0.11), 0.34, 0.0)
@@ -164,7 +163,14 @@ pub fn rainbow_hammock() -> Vec<Obj> {
                 mats.push(stripe(j));
             }
         }
-        obj("sling", &verts, &faces, &STRIPES, Some(&mats), 50.0, 0.0);
+        object_of!(
+            "sling",
+            &verts,
+            &faces,
+            &STRIPES,
+            face_mats = &mats,
+            sharp = 50
+        );
         // a corded edge along each long side, and a fringe of tassels hanging from it
         for (j, side) in [(0, -1.0), (nv, 1.0)] {
             let edge: Vec<(f64, f64, f64)> = (0..=nu)
@@ -176,18 +182,18 @@ pub fn rainbow_hammock() -> Vec<Obj> {
                     )
                 })
                 .collect();
-            fsweep!(f, name("edge_cord"), &edge, 0.008, M.rope, verts = 5);
+            fsweep!(f, numbered("edge_cord"), &edge, 0.008, M.rope, verts = 5);
             for i in (2..nu - 1).step_by(2) {
                 let (x, y, z) = edge[i as usize];
-                tube(
+                kit::tube!(
                     f,
-                    &name("tassel"),
+                    numbered("tassel"),
                     &[(x, y, z + side * 0.004), (x, y - 0.09, z + side * 0.012)],
                     0.005,
                     STRIPES[((i / 2) % 6) as usize],
-                    Some(4),
-                    1,
-                    Scale::List(vec![0.7, 1.2]),
+                    verts = 4,
+                    round = 1,
+                    scale = [0.7, 1.2]
                 );
             }
         }
@@ -195,7 +201,7 @@ pub fn rainbow_hammock() -> Vec<Obj> {
             let bx = s * (SLING_X + 0.015);
             fsweep!(
                 f,
-                name("spreader"),
+                numbered("spreader"),
                 &[
                     (bx, SLING_END - 0.01, -(SLING_W / 2.0 + 0.014)),
                     (bx, SLING_END - 0.01, SLING_W / 2.0 + 0.014)
@@ -207,7 +213,7 @@ pub fn rainbow_hammock() -> Vec<Obj> {
             for z in [-1.0, 1.0] {
                 fsphere!(
                     f,
-                    name("spreader_end"),
+                    numbered("spreader_end"),
                     0.026,
                     (bx, SLING_END - 0.01, z * (SLING_W / 2.0 + 0.014)),
                     M.spreader,
@@ -217,7 +223,7 @@ pub fn rainbow_hammock() -> Vec<Obj> {
             }
             let hook = (s * (POST_X - 0.02), HOOK, 0.0);
             torus!(
-                name("ring"),
+                numbered("ring"),
                 0.03,
                 0.007,
                 at = f.at(hook.0, hook.1, hook.2),
@@ -226,38 +232,35 @@ pub fn rainbow_hammock() -> Vec<Obj> {
                 major_segments = 12,
                 minor_segments = 4
             );
-            tube(
+            kit::tube!(
                 f,
-                &name("hook"),
-                &fillet(
+                numbered("hook"),
+                &kit::fillet!(
                     &[
                         (s * (POST_X - 0.02), HOOK + 0.05, 0.0),
                         (s * (POST_X - 0.02), HOOK + 0.032, 0.0),
                         (s * (POST_X - 0.045), HOOK + 0.03, 0.0),
                         (s * (POST_X - 0.048), HOOK + 0.05, 0.0),
                     ],
-                    0.01,
-                    3,
+                    0.01
                 ),
                 0.005,
                 M.lamp_metal,
-                Some(5),
-                1,
-                one(),
+                verts = 5,
+                round = 1
             );
             for z in [-0.33, -0.22, -0.11, 0.0, 0.11, 0.22, 0.33] {
-                tube(
+                kit::tube!(
                     f,
-                    &name("rope"),
+                    numbered("rope"),
                     &[
                         (s * (POST_X - 0.04), HOOK - 0.03, 0.0),
                         (bx, SLING_END + 0.012, z),
                     ],
                     0.005,
                     M.rope,
-                    Some(4),
-                    1,
-                    one(),
+                    verts = 4,
+                    round = 1
                 );
             }
         }
@@ -283,7 +286,7 @@ pub fn rainbow_hammock() -> Vec<Obj> {
         );
     });
     let sling = hinged(join(&sling, "sling", None), f.at(0, HOOK, 0));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     rock(
         sling,
         "sway",
@@ -373,15 +376,14 @@ pub fn sunrise_lamp() -> Vec<Obj> {
             material = M.housing,
             segments = 24
         );
-        tube(
+        kit::tube!(
             f,
             "stem",
             &[(cx, 0.04, cz - 0.03), (cx, cy - 0.37, cz - 0.03)],
             0.016,
             M.lamp_metal,
-            Some(10),
-            1,
-            Scale::One(1.0),
+            verts = 10,
+            round = 1
         );
         revolve!(
             "stem_collar",
@@ -463,7 +465,7 @@ pub fn sunrise_lamp() -> Vec<Obj> {
                 .collect();
             fextrude!(
                 f,
-                name("cloud"),
+                numbered("cloud"),
                 &cloud,
                 0.004,
                 (0.0, 0.0, cz + 0.024),
@@ -513,7 +515,7 @@ pub fn sunrise_lamp() -> Vec<Obj> {
         for s in [-1.0, 1.0] {
             spiral(
                 f,
-                &name("roll_layers"),
+                &numbered("roll_layers"),
                 s * 0.3,
                 0.06,
                 0.38,
@@ -563,7 +565,7 @@ pub fn sunrise_lamp() -> Vec<Obj> {
         .set_scale((1, 1, 0.4));
     });
     let sun = hinged(join(&sun, "sun", None), f.at(cx, cy - 0.19, cz + 0.011));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     slide!(sun, "sunrise", (0.0, 0.0, SUN_RISE), seconds = 1.5);
     objs
 }
@@ -592,7 +594,7 @@ fn channels(
         let x = x0 + cw * (i as f64 + 0.5);
         fsweep!(
             f,
-            name(name_),
+            numbered(name_),
             &[
                 (x, y0, z0),
                 (x, (y0 + top) / 2.0, (z0 + z1) / 2.0 - 0.01),
@@ -665,7 +667,7 @@ pub fn party_booth() -> Vec<Obj> {
         for s in [-1.0, 1.0] {
             soft!(
                 f,
-                name("wing"),
+                numbered("wing"),
                 0.3,
                 0.7,
                 1.0,
@@ -679,7 +681,7 @@ pub fn party_booth() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                name("wing_base"),
+                numbered("wing_base"),
                 0.28,
                 0.04,
                 0.96,
@@ -691,26 +693,24 @@ pub fn party_booth() -> Vec<Obj> {
         }
         // the bulb-lit frame over it: each side one bent brass tube, from the wing's front up and back to the panel
         for s in [-1.0, 1.0] {
-            tube(
+            kit::tube!(
                 f,
-                &name("frame"),
-                &fillet(
+                numbered("frame"),
+                &kit::fillet!(
                     &[
                         (s * xr, 0.72, zr),
                         (s * xr, yr, zr),
                         (s * xr, yr, WALL2 + 0.06),
                     ],
-                    0.06,
-                    3,
+                    0.06
                 ),
                 0.016,
                 M.brass,
-                Some(8),
-                1,
-                Scale::One(1.0),
+                verts = 8,
+                round = 1
             );
             revolve!(
-                name("frame_foot"),
+                numbered("frame_foot"),
                 &[
                     (0.0, 0.0),
                     (0.03, 0.0),
@@ -758,25 +758,15 @@ pub fn party_booth() -> Vec<Obj> {
                 )
             })
             .collect();
-        tube(
-            f,
-            "bulb_wire",
-            &wire,
-            0.0025,
-            M.stand,
-            Some(4),
-            2,
-            Scale::One(1.0),
-        );
-        tube(
+        kit::tube!(f, "bulb_wire", &wire, 0.0025, M.stand, verts = 4, round = 2);
+        kit::tube!(
             f,
             "bulb_wire_top",
             &[(-0.86, 1.555, WALL2 + 0.062), (0.86, 1.555, WALL2 + 0.062)],
             0.0025,
             M.stand,
-            Some(4),
-            1,
-            Scale::One(1.0),
+            verts = 4,
+            round = 1
         );
         for (i, (x, y)) in [
             (-0.6, 1.08),
@@ -797,7 +787,7 @@ pub fn party_booth() -> Vec<Obj> {
             if i % 2 != 0 {
                 fbox!(
                     f,
-                    name("confetti"),
+                    numbered("confetti"),
                     0.05,
                     0.05,
                     0.008,
@@ -808,7 +798,7 @@ pub fn party_booth() -> Vec<Obj> {
             } else {
                 fcyl!(
                     f,
-                    name("confetti"),
+                    numbered("confetti"),
                     0.026,
                     0.008,
                     (x, y, WALL2 + 0.064),
@@ -916,7 +906,7 @@ pub fn party_booth() -> Vec<Obj> {
             material = M.white,
             segments = 16
         );
-        paint(bowl, M.bulb_c, |c| {
+        kit::paint(bowl, M.bulb_c, |c| {
             fmod(atan2(c.y as f64, c.x as f64), PI / 4.0) < PI / 8.0
         });
         for k in 0..7 {
@@ -924,7 +914,7 @@ pub fn party_booth() -> Vec<Obj> {
             let r = if k % 3 != 0 { 0.04 } else { 0.015 };
             fsphere!(
                 f,
-                name("popcorn"),
+                numbered("popcorn"),
                 0.022,
                 (
                     0.14 + r * cosd(a),
@@ -971,7 +961,7 @@ pub fn party_booth() -> Vec<Obj> {
         );
     });
     let cur = hinged(join(&cur, "curtain", None), f.at(xr, yr, WALL2 + 0.07));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     squash(
         cur,
         "curtain",

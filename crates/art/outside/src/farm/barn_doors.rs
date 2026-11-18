@@ -2,8 +2,10 @@
 //! at the back, and the four-pane windows down each side.
 
 use super::barn::BW;
-use super::common::{F, M, N, fr, frame, prism, pts, strut};
+use super::common::{F, M, frame, prism, pts, strut};
+use artkit::json::float_repr;
 use artkit::place::Coord;
+use artkit::place::N;
 use artkit::{cube, cylinder, fbox, kit_knob, kit_pull, torus};
 
 /// The big doors (front, s=1) or the small one (back, s=-1) on the gable face at depth `z`.
@@ -98,7 +100,7 @@ pub(super) fn barn_doors(z: f64, s: i32, detail: bool) {
         if detail {
             for x in [-1.0, -0.3, 0.3, 1.0] {
                 cylinder!(
-                    format!("hanger{}", fr(x)),
+                    format!("hanger{}", float_repr(x)),
                     0.05,
                     0.05,
                     at = F.at(x, top + 0.12, z + 0.13),
@@ -155,7 +157,7 @@ pub(super) fn barn_doors(z: f64, s: i32, detail: bool) {
                 // its strap hinges, on the left
                 fbox!(
                     F,
-                    format!("loft_hinge{}", fr(y)),
+                    format!("loft_hinge{}", float_repr(y)),
                     0.36,
                     0.045,
                     0.015,
@@ -165,7 +167,7 @@ pub(super) fn barn_doors(z: f64, s: i32, detail: bool) {
                     bevel_segments = 1
                 );
                 cylinder!(
-                    format!("loft_pin{}", fr(y)),
+                    format!("loft_pin{}", float_repr(y)),
                     0.018,
                     0.07,
                     at = F.at(-hx - 0.02, y, z + 0.1),

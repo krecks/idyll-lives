@@ -4,10 +4,12 @@ use super::common::{M, WALL, cut_mouth};
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{Axis, P3, TAU, cos, cosd, radians, sin, sind};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
-use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcone, fcyl, fextrude, fsweep, grow, loft, revolve, ring, soft, swing, torus};
+use artkit::scene::Obj;
+use artkit::{
+    fbox, fcone, fcyl, fextrude, fsweep, grow, loft, revolve, ring, settle, soft, swing, torus,
+};
 
 const HOB: f64 = 0.92; // the hob's top
 const FRONT: f64 = 0.15; // the carcass's front face
@@ -820,13 +822,7 @@ pub fn chef_stove() -> Vec<Obj> {
     });
     let flame = join(&fl, "flame", Some(f.at(fx, HOB + 0.026, fz)));
     flame.set_scale((0.001, 0.001, 0.001));
-    let objs = settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    let objs = settle!(centre = false);
     swing!(door, "oven_open", 85.0, seconds = 1.2, axis = Axis::X);
     swing!(knob, "burner_on", 90.0, seconds = 0.5, axis = Axis::Y);
     for axis in [Axis::X, Axis::Y, Axis::Z] {

@@ -1,14 +1,14 @@
-//! What the foodie pack is built from: its palette, a counter for parts' names, faces painted another material,
-//! lofted bodies, and the herbs and pots more than one of its models holds.
+//! What the foodie pack is built from: its palette, lofted bodies, and the herbs and pots more than one of its
+//! models holds.
 
 use artkit::forms::smooth_outline;
 use artkit::kit;
 use artkit::materials::Mat;
-use artkit::math::{P3, V3, cosd, sind};
+use artkit::math::{P3, cosd, sind};
+use artkit::parts::numbered;
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{boulder, fcyl, fextrude, fsweep, jitter, loft, palette, revolve, ring};
-use std::cell::Cell;
 
 palette! { M:
     // the herb garden
@@ -98,52 +98,6 @@ palette! { M:
 /// The wall's face in a 1-deep footprint, game depth.
 pub const WALL: f64 = -0.43;
 
-thread_local! {
-    static N: Cell<u32> = const { Cell::new(0) };
-}
-
-/// `stem` numbered: each part its own name. (The script's count runs on from model to model, and the pantry's
-/// doors are named by it: `_names_from` sets where a model's count starts.)
-pub fn _name(stem: &str) -> String {
-    N.with(|n| {
-        n.set(n.get() + 1);
-        format!("{stem}{}", n.get())
-    })
-}
-
-/// Starts the count of `_name` after `n` names.
-pub fn _names_from(n: u32) {
-    N.with(|c| c.set(n));
-}
-
-/// A polygon's middle, as Blender's `MeshPolygon.center`: the mean of its corners.
-fn center(obj: Obj, f: usize) -> V3 {
-    obj.read(|o| {
-        let c = o.mesh.corners(f);
-        let mut s = V3::ZERO;
-        for &v in c {
-            s += o.mesh.verts[v as usize];
-        }
-        s / c.len() as f32
-    })
-}
-
-/// Gives the faces of `obj` whose middle (its own axes, Blender) passes `test` another material: a band, a label, a
-/// rind, with no more triangles.
-pub fn _paint(obj: Obj, material: Mat, test: impl Fn(V3) -> bool) -> Obj {
-    let count = obj.read(|o| o.mesh.faces.len());
-    let hit: Vec<bool> = (0..count).map(|f| test(center(obj, f))).collect();
-    obj.edit(|o| {
-        let k = o.mesh.slot(material);
-        for (face, &h) in o.mesh.faces.iter_mut().zip(&hit) {
-            if h {
-                face.mat = k;
-            }
-        }
-    });
-    obj
-}
-
 /// A body standing on `y` at (x, z), lofted through rings (height, radius) from its foot up.
 #[allow(clippy::too_many_arguments)]
 pub fn _lofted(
@@ -225,7 +179,7 @@ pub fn _leaf(
 pub fn _basil(f: &GameFrame, x: f64, z: f64, y: f64, s: f64) {
     kit::tube!(
         f,
-        _name("basil_stem"),
+        numbered("basil_stem"),
         &[(x, y, z), (x + 0.004 * s, y + 0.12 * s, z)],
         0.005 * s,
         M.basil,
@@ -245,7 +199,7 @@ pub fn _basil(f: &GameFrame, x: f64, z: f64, y: f64, s: f64) {
             let a = k * 55 + j * if k < 3 { 180 } else { 120 };
             _leaf(
                 f,
-                &_name("basil"),
+                &numbered("basil"),
                 x,
                 y + h * s,
                 z,
@@ -266,7 +220,7 @@ pub fn _rosemary(f: &GameFrame, x: f64, z: f64, y: f64, s: f64) {
         let h = (0.213 + 0.05 * (i % 3) as f64) * s;
         fsweep!(
             f,
-            _name("rosemary"),
+            numbered("rosemary"),
             &[
                 (x + 0.02 * s * c, y, z + 0.02 * s * sn),
                 (x + 0.05 * s * c, y + h * 0.5, z + 0.05 * s * sn),
@@ -284,7 +238,7 @@ pub fn _rosemary(f: &GameFrame, x: f64, z: f64, y: f64, s: f64) {
 /// A low thyme mound on the soil at `y`: lumpy and fine-leaved.
 pub fn _thyme(f: &GameFrame, x: f64, z: f64, y: f64, s: f64, seed: f64) {
     let mound = boulder!(
-        _name("thyme"),
+        numbered("thyme"),
         0.07 * s,
         at = f.at(x, y - 0.01, z),
         material = M.thyme,
@@ -299,7 +253,7 @@ pub fn _thyme(f: &GameFrame, x: f64, z: f64, y: f64, s: f64, seed: f64) {
 /// A terracotta pot standing on `y` with soil in it, its rim rolled; returns the soil's top.
 pub fn _pot(f: &GameFrame, x: f64, z: f64, y: f64, r: f64, h: f64) -> f64 {
     revolve!(
-        _name("pot"),
+        numbered("pot"),
         &[
             (0.0, 0.0),
             (r * 0.72, 0.0),
@@ -317,7 +271,7 @@ pub fn _pot(f: &GameFrame, x: f64, z: f64, y: f64, r: f64, h: f64) -> f64 {
     );
     let soil = fcyl!(
         f,
-        _name("pot_soil"),
+        numbered("pot_soil"),
         r * 0.84,
         0.008,
         (x, y + h * 0.9 + 0.003, z),

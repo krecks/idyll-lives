@@ -1,43 +1,38 @@
 //! O3: the storage: the filing cabinet (the boards are boards.rs).
 
-use super::common::{pull, shaker};
 use super::{F, M, WALL};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{TAU, cos, sin};
-use artkit::parts::{Settle, join, new_parts, settle_with};
+use artkit::parts::{join, new_parts};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsweep, revolve, slide};
+use artkit::{fbox, fcyl, fextrude, fsweep, kit, revolve, settle, slide};
 
 // --- storage and boards ----------------------------------------------------------------------------------------
 /// A steel drawer front, pressed with a panel line, a bar handle and a label card in its chrome holder.
 pub(super) fn cabinet_front(name: &str, y: f64, front: f64, label: bool) {
-    shaker(
-        &F,
+    kit::shaker!(
+        F,
         name,
         0.42,
         0.3,
-        (0.0, y, front + 0.01),
+        (0, y, front + 0.01),
         0.02,
         M.steel,
-        0.028,
-        None,
-        0.003,
-        false,
+        rail = 0.028,
+        recess = 0.003
     );
-    pull(
-        &F,
-        &format!("{name}_handle"),
-        0.0,
+    kit::pull!(
+        F,
+        format!("{name}_handle"),
+        0,
         y + 0.06,
         front + 0.02,
         0.15,
         M.chrome,
-        0.006,
-        0.012,
-        false,
-        8,
+        r = 0.006,
+        out = 0.012
     );
     if label {
         let holder: Vec<(f64, f64, f64)> = rounded_rect(0.1, 0.04, 0.004, 1)
@@ -351,13 +346,7 @@ pub fn filing_cabinet() -> Vec<Obj> {
         }
     });
     let drawer = join(&parts, "drawer", Some(F.at(0, 0.825, front)));
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     slide!(drawer, "drawer_open", (0, -0.3, 0), seconds = 1.2);
     meshes()
 }

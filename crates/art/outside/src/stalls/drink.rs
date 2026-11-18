@@ -1,16 +1,17 @@
 //! The drinks machine: a cabinet against the back of its tile, a lit front with three cans, a can dropping to the
 //! tray.
 
-use super::common::{M, settle_in_place};
-use super::machines::{BAY_Y, FRONT, WIN_X, WIN_Y, cabinet, sum};
+use super::common::M;
+use super::machines::{BAY_Y, FRONT, WIN_X, WIN_Y, cabinet};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{P3, radians};
 use artkit::motion::{Slide, slide};
 use artkit::parts::{join, new_parts};
 use artkit::place::GameFrame;
+use artkit::py;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, revolve};
+use artkit::{fbox, fcyl, fextrude, revolve, settle};
 
 /// A drinks can about Blender point `at` (its middle), upright unless turned: a body necked in at the top and the
 /// bottom, its lid's rim and a ring pull.
@@ -67,7 +68,7 @@ pub fn vending_drink() -> Vec<Obj> {
             WIN_X.1 - WIN_X.0,
             WIN_Y.1 - WIN_Y.0,
             0.012,
-            (cx, sum(WIN_Y) / 2.0, FRONT - 0.006),
+            (cx, py::sum([WIN_Y.0, WIN_Y.1]) / 2.0, FRONT - 0.006),
             M.lit_panel
         );
         fbox!(
@@ -177,7 +178,7 @@ pub fn vending_drink() -> Vec<Obj> {
         );
     });
     let can = join(&parts, "can", Some(f.at(x, y, z)));
-    settle_in_place();
+    settle!(centre = false);
     slide(
         can,
         "drop",

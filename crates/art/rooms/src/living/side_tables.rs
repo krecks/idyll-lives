@@ -1,7 +1,6 @@
 //! L3 continued: the round and long coffee tables, the nesting tables, the round side table and the console table.
 
 use super::common::{disc, fillet, top};
-use super::tables::floor;
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
@@ -9,7 +8,7 @@ use artkit::materials::Mat;
 use artkit::math::{P3, PI, TAU, cos, pow, sin};
 use artkit::parts::{join, join_all, new_parts, settle};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fsweep, loft, ring, slide, sweep};
+use artkit::{fbox, fsweep, loft, ring, settle, slide, sweep};
 
 /// The round coffee table (the old part): a cream top at 0.42 with a rounded edge on an oak drum, its sides reeded
 /// all round, standing on a plinth.
@@ -69,7 +68,7 @@ pub fn coffee_table_round() -> Vec<Obj> {
         48,
     );
     join_all("coffeeTableRound");
-    floor();
+    settle!(centre = false);
     Vec::new()
 }
 
@@ -172,7 +171,7 @@ pub fn coffee_table_long() -> Vec<Obj> {
         rot = (0, 0, -5)
     );
     join_all("coffeeTableLong");
-    floor();
+    settle!(centre = false);
     Vec::new()
 }
 
@@ -252,7 +251,7 @@ pub fn nesting_tables() -> Vec<Obj> {
         }
     });
     let small = join(&small, "small_table", None);
-    floor();
+    settle!(centre = false);
     slide!(small, "small_out", (0, -0.42, 0), seconds = 0.9);
     Vec::new()
 }
@@ -309,7 +308,7 @@ pub fn side_table_round() -> Vec<Obj> {
         40,
     );
     join_all("sideTableRound");
-    floor();
+    settle!(centre = false);
     Vec::new()
 }
 

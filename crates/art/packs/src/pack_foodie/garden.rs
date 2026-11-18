@@ -1,23 +1,13 @@
 //! The windowsill herb garden (1x1): a slatted cedar trough on a stand, pots on the shelf below.
 
-use super::common::{_basil, _leaf, _name, _pot, _rosemary, _thyme, M, WALL};
+use super::common::{_basil, _leaf, _pot, _rosemary, _thyme, M, WALL};
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{Axis, P3};
-use artkit::parts::{Settle, join, new_parts, settle_with};
+use artkit::parts::{join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
-use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsweep, grow, jitter, revolve, torus};
-
-pub fn settle_in_place() -> Vec<Obj> {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    )
-}
+use artkit::scene::Obj;
+use artkit::{fbox, fcyl, fextrude, fsweep, grow, jitter, revolve, settle, torus};
 
 pub fn herb_garden() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
@@ -27,7 +17,7 @@ pub fn herb_garden() -> Vec<Obj> {
             for z in [-0.40, -0.06] {
                 fsweep!(
                     f,
-                    _name("leg"),
+                    numbered("leg"),
                     &[(x, 0.0, z), (x, 0.615, z)],
                     0.0,
                     M.cedar_dark,
@@ -37,7 +27,7 @@ pub fn herb_garden() -> Vec<Obj> {
             }
             fbox!(
                 f,
-                _name("side_rail"),
+                numbered("side_rail"),
                 0.04,
                 0.03,
                 0.36,
@@ -48,7 +38,7 @@ pub fn herb_garden() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                _name("shelf_rail"),
+                numbered("shelf_rail"),
                 0.03,
                 0.025,
                 0.36,
@@ -59,7 +49,7 @@ pub fn herb_garden() -> Vec<Obj> {
         for z in [-0.36, -0.23, -0.10] {
             fbox!(
                 f,
-                _name("shelf_slat"),
+                numbered("shelf_slat"),
                 0.78,
                 0.02,
                 0.09,
@@ -72,7 +62,7 @@ pub fn herb_garden() -> Vec<Obj> {
         for z in [-0.40, -0.06] {
             fbox!(
                 f,
-                _name("top_rail"),
+                numbered("top_rail"),
                 0.8,
                 0.03,
                 0.05,
@@ -99,7 +89,7 @@ pub fn herb_garden() -> Vec<Obj> {
             for pz in [z0 + 0.025, z1 - 0.025] {
                 fbox!(
                     f,
-                    _name("trough_post"),
+                    numbered("trough_post"),
                     0.05,
                     h,
                     0.05,
@@ -116,7 +106,7 @@ pub fn herb_garden() -> Vec<Obj> {
             for z in [z0 + 0.01, z1 - 0.01] {
                 fbox!(
                     f,
-                    _name("trough_slat"),
+                    numbered("trough_slat"),
                     w - 0.02,
                     sh - 0.014,
                     0.02,
@@ -129,7 +119,7 @@ pub fn herb_garden() -> Vec<Obj> {
             for x in [-w / 2.0 + 0.01, w / 2.0 - 0.01] {
                 fbox!(
                     f,
-                    _name("trough_slat"),
+                    numbered("trough_slat"),
                     0.02,
                     sh - 0.014,
                     d - 0.02,
@@ -180,7 +170,7 @@ pub fn herb_garden() -> Vec<Obj> {
             // chalk tags on the trough's front
             fbox!(
                 f,
-                _name("tag"),
+                numbered("tag"),
                 0.09,
                 0.05,
                 0.006,
@@ -191,7 +181,7 @@ pub fn herb_garden() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                _name("tag_line"),
+                numbered("tag_line"),
                 0.05,
                 0.006,
                 0.002,
@@ -260,7 +250,7 @@ pub fn herb_garden() -> Vec<Obj> {
         for y in [0.03, 0.06] {
             let r = 0.09 + y / 3.0 + 0.003;
             torus!(
-                _name("weave"),
+                numbered("weave"),
                 1.0,
                 0.004,
                 at = f.at(-0.2, y, bz),
@@ -316,7 +306,7 @@ pub fn herb_garden() -> Vec<Obj> {
         {
             _leaf(
                 f,
-                &_name("sprig_leaf"),
+                &numbered("sprig_leaf"),
                 sx + 0.005,
                 sy + dy,
                 sz,
@@ -329,7 +319,7 @@ pub fn herb_garden() -> Vec<Obj> {
     });
     let sprig = join(&sprig, "sprig", Some(f.at(sx, sy, sz)));
     sprig.set_scale((0.001, 0.001, 0.001));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     for axis in [Axis::X, Axis::Y, Axis::Z] {
         grow!(sprig, "sprig", seconds = 0.9, axis = axis);
     }

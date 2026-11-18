@@ -4,10 +4,10 @@ use super::common::{Cushion, book, cushion, fillet, leg, panel, pillow, plain};
 use super::{F, M};
 use artkit::math::{Axis, P3, PI, cos, sin};
 use artkit::motion::{Grow, grow};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with, turn};
+use artkit::parts::{hinged, join, new_parts, turn};
 use artkit::place::Facing;
-use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsweep, jitter, soft, swing};
+use artkit::scene::Obj;
+use artkit::{fbox, fcyl, fextrude, fsweep, jitter, settle, soft, swing};
 
 // The footprint is 2 wide and 3 deep: depth -1.5 to +1.5; the wall's face is 7 cm in (objects.md).
 const BACK: f64 = -1.43;
@@ -353,13 +353,7 @@ pub fn wall_bed() -> Vec<Obj> {
     let bed = bed();
     // Built down; folded up is the rest pose (the clip's first key): its foot up, its mattress to the wall.
     turn(bed, -90.0, Axis::X);
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    ); // it stands at the back of its tiles, where it was built
+    settle!(centre = false); // it stands at the back of its tiles, where it was built
     swing!(bed, "bed_down", 90.0, seconds = SECONDS, axis = Axis::X);
     Vec::new()
 }
@@ -562,13 +556,7 @@ pub fn sofa_bed() -> Vec<Obj> {
     let mattress = join(&bed, "bed", Some(F.at(0, SB_MATTRESS - 0.13, SB_HEAD)));
     // Folded away at rest: its length shortened into the base, under the seat (Blender y is the depth).
     mattress.set_scale((1, SB_TUCKED, 1));
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    ); // against the wall, as built
+    settle!(centre = false); // against the wall, as built
     grow(
         mattress,
         "bed_out",

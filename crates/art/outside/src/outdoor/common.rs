@@ -1,17 +1,17 @@
 //! What the outdoor things are built from: the palette, the frame, boards and bars at any angle, and the cups,
 //! bottles and tops more than one of them carries.
 
-pub use crate::playground::common::fillet;
-use artkit::forms::{Plane, Scale, Sweep, rounded_rect};
+use artkit::forms::{Plane, rounded_rect};
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{M3, M4, P3, PI, V3, cos, radians, sin};
 use artkit::mesh::Mesh;
 use artkit::noise::noise;
 use artkit::palette;
-use artkit::parts::{Settle, join_all, settle_with};
+use artkit::parts::join_all;
 use artkit::place::{Coord, Facing, GameFrame, Spot};
 use artkit::scene::{Obj, meshes};
-use artkit::{cube, cylinder, extrude, fbox, fcyl, fextrude, fsweep, loft, revolve, ring};
+use artkit::{cube, cylinder, extrude, fcyl, fextrude, fsweep, loft, revolve, ring, settle};
 
 palette! { M:
     iron = ("#2A2C30", metal),           // cast and wrought iron frames
@@ -92,8 +92,6 @@ palette! { M:
 
 pub const F: GameFrame = GameFrame::new(0.0);
 
-pub use crate::playground::common::{N, fr};
-
 /// A game position or direction as a Blender vector.
 pub fn v(p: impl Spot) -> V3 {
     V3::from(p.through(&F))
@@ -150,13 +148,7 @@ pub fn finish(name: &str, centred: bool) -> Vec<Obj> {
             }
         }
     });
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: centred,
-            floor: true,
-        },
-    );
+    settle!(centre = centred);
     meshes()
 }
 
@@ -193,15 +185,15 @@ pub fn bent(
     steps: usize,
     scale: f64,
 ) -> Obj {
-    tube(
-        &F,
+    kit::tube!(
+        F,
         name,
-        &fillet(pts, bend, steps),
+        &kit::fillet!(pts, bend, steps),
         r,
         material,
-        Some(verts),
-        1,
-        Scale::One(scale),
+        verts = verts,
+        round = 1,
+        scale = scale
     )
 }
 
@@ -233,7 +225,7 @@ impl Default for Bar {
 
 pub fn bar(name: &str, pts: &[(f64, f64, f64)], w: f64, h: f64, material: Mat, o: Bar) -> Obj {
     let path = if o.bend != 0.0 && !o.closed {
-        fillet(pts, o.bend, o.steps)
+        kit::fillet!(pts, o.bend, o.steps)
     } else {
         pts.to_vec()
     };
@@ -589,185 +581,4 @@ pub fn mesh_of(
     }
     mesh.recalc_normals();
     artkit::scene::add(name, mesh)
-}
-
-// KIT: kit.tube
-/// A round tube of radius `r` through game points, its bends rounded (`round` steps between each pair of
-/// points; 1 keeps them sharp), its ends capped: a towel rail, a bent-tube frame, a tap's riser, a hose. `verts`
-/// round: by default 8, and more for one over 13 mm in radius, as many as keep its outline within a millimetre of
-/// the circle (`forms::sweep`).
-#[allow(clippy::too_many_arguments)] // (as the scripts called it)
-pub fn tube(
-    frame: &GameFrame,
-    name: &str,
-    points: &[(f64, f64, f64)],
-    r: f64,
-    material: Mat,
-    verts: Option<usize>,
-    round: usize,
-    scale: Scale,
-) -> Obj {
-    frame.sweep(
-        name,
-        points,
-        r,
-        material,
-        Sweep {
-            verts,
-            resolution: round,
-            scale,
-            least: 8,
-            ..Sweep::default()
-        },
-    )
-}
-
-// KIT: kit.pull
-/// A bar pull in one piece: out from a front at game depth `face` on two round stand-offs `length` apart
-/// (across it, or `upright`), its bends rounded: a drawer's or a door's handle.
-#[allow(clippy::too_many_arguments)] // (as the scripts called it)
-pub fn pull(
-    frame: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    face: f64,
-    length: f64,
-    material: Mat,
-    r: f64,
-    out: f64,
-    upright: bool,
-    verts: usize,
-) -> Obj {
-    let (h, b) = (length / 2.0, 0.012_f64.min(out * 0.45));
-    let ends = [
-        (-h, face - 0.003),
-        (-h, face + out),
-        (h, face + out),
-        (h, face - 0.003),
-    ];
-    let pts: Vec<(f64, f64, f64)> = ends
-        .iter()
-        .map(|&(u, z)| {
-            if upright {
-                (x, y + u, z)
-            } else {
-                (x + u, y, z)
-            }
-        })
-        .collect();
-    frame.sweep(
-        name,
-        &fillet(&pts, b, 3),
-        r,
-        material,
-        Sweep {
-            verts: Some(verts),
-            ..Sweep::default()
-        },
-    )
-}
-
-// KIT: kit.knob
-/// A turned knob on a front at game depth `face`: a rose against it, a waisted neck and a domed head `r` round.
-#[allow(clippy::too_many_arguments)] // (as the scripts called it)
-pub fn knob(
-    frame: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    face: f64,
-    r: f64,
-    material: Mat,
-    segments: usize,
-) -> Obj {
-    let prof = [
-        (0.0, 0.0),
-        (r * 0.75, 0.0),
-        (r * 0.7, r * 0.15),
-        (r * 0.36, r * 0.35),
-        (r * 0.42, r * 0.75),
-        (r * 0.95, r * 1.05),
-        (r, r * 1.35),
-        (r * 0.8, r * 1.7),
-        (r * 0.4, r * 1.88),
-        (0.0, r * 1.92),
-    ];
-    revolve!(
-        name,
-        &prof,
-        at = frame.at(x, y, face),
-        material = material,
-        segments = segments,
-        rot = (90, 0, 0)
-    )
-}
-
-// KIT: kit.shaker
-/// A frame-and-panel front `w` x `h`, `t` thick, centred at game `at`, facing the front (a cabinet's door, a
-/// drawer's front): a frame `rail` wide round a panel set back `recess`, flat, or `raised` (its edges chamfered
-/// up to a field); `panel`: the panel's own material. Returns (frame, panel).
-#[allow(clippy::too_many_arguments)] // (as the scripts called it)
-pub fn shaker(
-    frame: &GameFrame,
-    name: &str,
-    w: f64,
-    h: f64,
-    at: (f64, f64, f64),
-    t: f64,
-    material: Mat,
-    rail: f64,
-    panel: Option<Mat>,
-    recess: f64,
-    raised: bool,
-) -> (Obj, Obj) {
-    let hole = rounded_rect(w - 2.0 * rail, h - 2.0 * rail, 0.003, 1);
-    let fr = fextrude!(
-        frame,
-        name,
-        &rounded_rect(w, h, 0.003, 1),
-        t,
-        at,
-        material,
-        holes = [hole],
-        bevel = 0.004_f64.min(t * 0.2),
-        bevel_segments = 1
-    );
-    // (a hair inside the opening, not into the frame: a vertex buried in it would bake black)
-    let (pw, ph) = (w - 2.0 * rail - 0.002, h - 2.0 * rail - 0.002);
-    if !raised {
-        let p = fbox!(
-            frame,
-            format!("{name}_panel"),
-            pw,
-            ph,
-            t - 2.0 * recess,
-            at,
-            panel.unwrap_or(material),
-            bevel = 0.002,
-            bevel_segments = 1
-        );
-        return (fr, p);
-    }
-    // a raised panel: a thin edge inside the frame, rising over a wide shallow chamfer to a flat field
-    let (x, y, z) = at;
-    let b = (rail * 0.7).min(pw * 0.25).min(ph * 0.25);
-    let lp = |hw: f64, hh: f64, d: f64| -> Vec<P3> {
-        [(hw, hh), (-hw, hh), (-hw, -hh), (hw, -hh)]
-            .iter()
-            .map(|&(u, v)| frame.at(x + u, y + v, d))
-            .collect()
-    };
-    let front = z + t / 2.0;
-    let pn = loft!(
-        format!("{name}_panel"),
-        &[
-            lp(pw / 2.0, ph / 2.0, z - t / 2.0 + 0.002),
-            lp(pw / 2.0, ph / 2.0, front - recess - 0.004),
-            lp(pw / 2.0 - b, ph / 2.0 - b, front - recess * 0.2)
-        ],
-        material = panel.unwrap_or(material),
-        smooth = false
-    );
-    (fr, pn)
 }

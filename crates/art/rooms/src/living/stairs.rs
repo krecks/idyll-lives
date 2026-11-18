@@ -7,10 +7,10 @@ use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::{cos, radians, sin};
-use artkit::parts::{Settle, join_all, settle_with};
+use artkit::parts::join_all;
 use artkit::place::Facing;
-use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsweep};
+use artkit::scene::Obj;
+use artkit::{fbox, fcyl, fextrude, fsweep, settle};
 
 // A flight of 14 steps up one storey (house.ts WALL_HEIGHT 2.8) over its 1 × 4 footprint, climbed from the front
 // (+depth) to the back, every step where the old part has it: 0.2 m up and 4/14 m deep, the first starting at the
@@ -28,16 +28,6 @@ const STRING_T: f64 = 0.035;
 const STRING_UP: f64 = 0.12; // how far the strings stand above the nosings' line
 const STRING_DOWN: f64 = 0.15; // and below the steps'
 const RAIL: f64 = 0.58; // the handrail's middle above the strings' top (the old part's rail height)
-
-fn floor() {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
-}
 
 /// A closed string's top edge at depth `z`.
 fn string_top(z: f64) -> f64 {
@@ -238,7 +228,7 @@ pub fn stairs() -> Vec<Obj> {
         }
     }
     join_all("stairs");
-    floor();
+    settle!(centre = false);
     Vec::new()
 }
 
@@ -362,7 +352,7 @@ pub fn stairs_spiral() -> Vec<Obj> {
         );
     }
     join_all("stairsSpiral");
-    floor();
+    settle!(centre = false);
     Vec::new()
 }
 
@@ -442,6 +432,6 @@ pub fn stairs_open() -> Vec<Obj> {
         }
     }
     join_all("stairsOpen");
-    floor();
+    settle!(centre = false);
     Vec::new()
 }

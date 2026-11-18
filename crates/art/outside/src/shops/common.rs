@@ -3,10 +3,9 @@
 
 use artkit::forms;
 use artkit::materials::Mat;
-use artkit::math::{P3, PI, TAU, V3, cos, radians, sin, v3};
-use artkit::parts::{Settle, settle_with};
+use artkit::math::{Axis, P3, PI, TAU, V3, cos, radians, sin, v3};
 use artkit::place::GameFrame;
-use artkit::scene::{Obj, meshes};
+use artkit::scene::Obj;
 use artkit::shapes::SHARP;
 use artkit::{fcyl, loft, palette, revolve, ring};
 
@@ -54,15 +53,8 @@ palette! { M:
     cane = ("#D9C7A7", fabric),      // its woven seat
 }
 
-/// The axis a `prism` runs along.
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Along {
-    X,
-    Z,
-}
-
 /// A slab from a0 to a1 along game x (its side the convex polygon `profile` [(depth, height)], in order: the
-/// bakery case's end panels) or along the depth (`Along::Z`, its face [(x, height)]: a sandwich pack). `shift`
+/// bakery case's end panels) or along the depth (`Axis::Z`, its face [(x, height)]: a sandwich pack). `shift`
 /// moves it back as a GameFrame's does.
 pub fn prism(
     name: &str,
@@ -70,10 +62,10 @@ pub fn prism(
     a0: f64,
     a1: f64,
     material: Mat,
-    axis: Along,
+    axis: Axis,
     shift: f64,
 ) -> Obj {
-    let (a, b): (Vec<V3>, Vec<V3>) = if axis == Along::X {
+    let (a, b): (Vec<V3>, Vec<V3>) = if axis == Axis::X {
         (
             profile
                 .iter()
@@ -228,15 +220,4 @@ pub fn bottle(
         cap,
         verts = 8
     )
-}
-
-/// Stands the model on the floor, back on its tiles, where the game places it.
-pub fn settle_back() {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
 }

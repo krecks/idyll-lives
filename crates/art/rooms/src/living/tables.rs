@@ -7,20 +7,10 @@ use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::{TAU, cos, sin};
-use artkit::parts::{Settle, join, join_all, new_parts, settle_with};
+use artkit::parts::{join, join_all, new_parts};
 use artkit::rand::Random;
-use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fsweep, loft, slide};
-
-pub(super) fn floor() {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
-}
+use artkit::scene::Obj;
+use artkit::{fbox, fcyl, fsweep, loft, settle, slide};
 
 /// A leg turned below a square block where the aprons meet it: a collar, a long taper to a small foot.
 pub(super) fn turned_leg(name: &str, x: f64, z: f64, h: f64, mat: Mat) {
@@ -223,7 +213,7 @@ pub fn coffee_table() -> Vec<Obj> {
         );
     });
     let drawer = join(&parts, "drawer", None);
-    floor();
+    settle!(centre = false);
     slide!(drawer, "drawer_open", (0, -0.3, 0), seconds = 0.8);
     Vec::new()
 }
@@ -381,7 +371,7 @@ pub fn coffee_table_glass() -> Vec<Obj> {
         );
     }
     join_all("coffeeTableGlass");
-    floor();
+    settle!(centre = false);
     Vec::new()
 }
 
@@ -486,7 +476,7 @@ pub fn coffee_table_marble() -> Vec<Obj> {
         bevel = 0.002
     );
     join_all("coffeeTableMarble");
-    floor();
+    settle!(centre = false);
     Vec::new()
 }
 
@@ -557,6 +547,6 @@ pub fn side_table() -> Vec<Obj> {
         }
     }
     join_all("sideTable");
-    floor();
+    settle!(centre = false);
     Vec::new()
 }

@@ -2,17 +2,17 @@
 //! at its real height.
 
 use super::M;
-use super::common::{settle_in_place, tube};
 use super::storage::{WALL, jar, lathe_at};
 use super::turned::{canister, lathe, mug, plates};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, TAU, cos, radians, sin};
 use artkit::parts::{join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, loft, torus};
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, loft, settle, torus};
 
 /// A rectangle in plan at height `y`, game corners (x0, z0) to (x1, z1), as Blender points (for a loft).
 fn rect_ring(f: &GameFrame, x0: f64, x1: f64, z0: f64, z1: f64, y: f64) -> Vec<P3> {
@@ -151,7 +151,7 @@ pub fn range_hood() -> Vec<Obj> {
         }
     });
     join(&still, "body", Some((0, 0, 0).into()));
-    settle_in_place();
+    settle!(centre = false, floor = false);
     meshes()
 }
 
@@ -200,7 +200,7 @@ pub fn spice_rack() -> Vec<Obj> {
                 bevel = 0.003
             );
             // a brass rail on two posts along the shelf's front, in one piece
-            tube(
+            kit::tube!(
                 f,
                 format!("rail{i}"),
                 &[
@@ -213,9 +213,8 @@ pub fn spice_rack() -> Vec<Obj> {
                 ],
                 0.005,
                 M.brass,
-                Some(6),
-                1,
-                1.0,
+                verts = 6,
+                round = 1
             );
             for j in 0..6 {
                 jar(
@@ -235,7 +234,7 @@ pub fn spice_rack() -> Vec<Obj> {
         }
     });
     join(&still, "body", Some((0, 0, 0).into()));
-    settle_in_place();
+    settle!(centre = false, floor = false);
     meshes()
 }
 
@@ -262,15 +261,14 @@ pub fn pot_rail() -> Vec<Obj> {
     let (z, y) = (WALL + 0.08, 1.6);
     let still = new_parts(|| {
         // the rail with ball ends, on two arms from round wall plates
-        tube(
+        kit::tube!(
             f,
             "rail",
             &[(-0.435, y, z), (0.435, y, z)],
             0.014,
             M.metal,
-            Some(12),
-            1,
-            1.0,
+            verts = 12,
+            round = 1
         );
         for s in [-1, 1] {
             fsphere!(
@@ -450,7 +448,7 @@ pub fn pot_rail() -> Vec<Obj> {
         }
     });
     join(&still, "body", Some((0, 0, 0).into()));
-    settle_in_place();
+    settle!(centre = false, floor = false);
     meshes()
 }
 
@@ -695,6 +693,6 @@ pub fn kitchen_shelf_wall() -> Vec<Obj> {
         }
     });
     join(&still, "body", Some((0, 0, 0).into()));
-    settle_in_place();
+    settle!(centre = false, floor = false);
     meshes()
 }

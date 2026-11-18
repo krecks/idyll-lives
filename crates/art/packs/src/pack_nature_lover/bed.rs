@@ -1,6 +1,7 @@
 //! The raised veggie bed (2x1): a cedar box of lettuces, carrots, a courgette and staked tomatoes.
 
-use super::common::{_flower, _rosette, _sq, M};
+use super::common::{_flower, _rosette, M};
+use artkit::forms::rect;
 use artkit::json::float_repr;
 use artkit::kit;
 use artkit::materials::Mat;
@@ -125,7 +126,7 @@ fn _bed_box(f: &GameFrame) {
             &[(x, SOIL - 0.02, -0.22), (x, H + 0.85, -0.22)],
             0.0,
             M.cedar_dark,
-            profile = _sq(0.022, None),
+            profile = rect(0.022, 0.022),
             up = (0, 1, 0),
             scale = [1.0, 0.7]
         );
@@ -136,7 +137,7 @@ fn _bed_box(f: &GameFrame) {
         &[(-0.85, SOIL - 0.02, 0.36), (-0.85, H + 0.02, 0.36)],
         0.0,
         M.label,
-        profile = _sq(0.012, Some(0.006)),
+        profile = rect(0.012, 0.006),
         up = (0, 1, 0)
     );
     fbox!(

@@ -3,11 +3,10 @@
 
 use artkit::far::decimated;
 use artkit::forms::Scale;
-use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, TAU, cos, sin};
 use artkit::parts::join;
-use artkit::place::{Coord, GameFrame, Spot};
+use artkit::place::{GameFrame, Spot};
 use artkit::scene::{Obj, meshes};
 use artkit::{fsweep, palette};
 
@@ -78,43 +77,6 @@ pub fn own(id: &str) -> SF {
     let mut m = SF;
     m.body = Mat::new("body", hex, finish);
     m
-}
-
-/// A float in a part's name, as Python writes it.
-pub fn fr(x: f64) -> String {
-    float_repr(x)
-}
-
-/// A number as a script wrote it, whole or not: a part's place keeps the sign of a negated zero as Python's does.
-#[derive(Clone, Copy, Debug)]
-pub enum N {
-    I(i32),
-    F(f64),
-}
-
-impl N {
-    /// `self * k`, as Python multiplies: whole by whole stays whole.
-    pub fn times(self, k: i32) -> N {
-        match self {
-            N::I(i) => N::I(i * k),
-            N::F(x) => N::F(x * k as f64),
-        }
-    }
-}
-
-impl Coord for N {
-    fn f(self) -> f64 {
-        match self {
-            N::I(i) => i as f64,
-            N::F(x) => x,
-        }
-    }
-    fn negated(self) -> f64 {
-        match self {
-            N::I(i) => i.negated(),
-            N::F(x) => -x,
-        }
-    }
 }
 
 /// A bent tube in one piece through game points `pts`, curved through them (a stream of water, the bubbler's arc):

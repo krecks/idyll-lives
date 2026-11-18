@@ -1,11 +1,11 @@
 //! The grand cinema wall and the Pixel Arcade console: a screen on the wall, the seats in front of it. Each is
 //! built with the seats at the back and the screen at the front edge facing them, then turned round.
 
-use super::common::{M, cup, driver, name, pleats, popcorn, screen, turn_round};
+use super::common::{M, cup, driver, pleats, popcorn, screen, turn_round};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::math::{P3, cos, radians, sin};
 use artkit::motion::{Squash, squash};
-use artkit::parts::{hinged, join, new_parts, settle_all};
+use artkit::parts::{hinged, join, new_parts, numbered, settle_all};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcone, fcyl, fextrude, fsweep, slide, soft, torus};
@@ -19,7 +19,7 @@ pub const SCREEN_Z: f64 = 0.42;
 fn cinema_seat(f: &GameFrame, x: f64, w: f64, outer: f64) {
     soft!(
         f,
-        name("seat_base"),
+        numbered("seat_base"),
         w,
         0.28,
         0.62,
@@ -31,7 +31,7 @@ fn cinema_seat(f: &GameFrame, x: f64, w: f64, outer: f64) {
     );
     soft!(
         f,
-        name("seat"),
+        numbered("seat"),
         w - 0.18,
         0.09,
         0.54,
@@ -45,7 +45,7 @@ fn cinema_seat(f: &GameFrame, x: f64, w: f64, outer: f64) {
     let (up, back) = ((cos(a), sin(a)), (0.32, -0.23));
     soft!(
         f,
-        name("seat_shell"),
+        numbered("seat_shell"),
         w,
         0.68,
         0.12,
@@ -59,7 +59,7 @@ fn cinema_seat(f: &GameFrame, x: f64, w: f64, outer: f64) {
     for (t, hh) in [(0.12, 0.22), (0.33, 0.2), (0.53, 0.18)] {
         soft!(
             f,
-            name("seat_roll"),
+            numbered("seat_roll"),
             w - 0.16,
             hh,
             0.13,
@@ -74,7 +74,7 @@ fn cinema_seat(f: &GameFrame, x: f64, w: f64, outer: f64) {
     }
     soft!(
         f,
-        name("arm"),
+        numbered("arm"),
         0.11,
         0.3,
         0.62,
@@ -86,7 +86,7 @@ fn cinema_seat(f: &GameFrame, x: f64, w: f64, outer: f64) {
     );
     soft!(
         f,
-        name("arm_pad"),
+        numbered("arm_pad"),
         0.13,
         0.05,
         0.5,
@@ -98,7 +98,7 @@ fn cinema_seat(f: &GameFrame, x: f64, w: f64, outer: f64) {
     );
     fextrude!(
         f,
-        name("seat_foot"),
+        numbered("seat_foot"),
         &rounded_rect(w - 0.1, 0.56, 0.04, 2),
         0.05,
         (x, 0.025, -0.06),
@@ -139,7 +139,7 @@ pub fn cinema_wall() -> Vec<Obj> {
         );
         for z in [0.08, 0.17] {
             torus!(
-                name("cup_ring"),
+                numbered("cup_ring"),
                 0.045,
                 0.006,
                 at = f.at(0, 0.503, z),
@@ -149,7 +149,7 @@ pub fn cinema_wall() -> Vec<Obj> {
             );
             fcyl!(
                 f,
-                name("cup_well"),
+                numbered("cup_well"),
                 0.042,
                 0.004,
                 (0, 0.5, z),
@@ -198,7 +198,7 @@ pub fn cinema_wall() -> Vec<Obj> {
         for x in [-0.86, 0.86] {
             fextrude!(
                 f,
-                name("speaker"),
+                numbered("speaker"),
                 &rounded_rect(0.16, 0.16, 0.03, 2),
                 0.8,
                 (x, 0.44, 0.33),
@@ -207,11 +207,11 @@ pub fn cinema_wall() -> Vec<Obj> {
                 bevel = 0.012,
                 bevel_segments = 1
             );
-            driver(f, &name("woofer"), x, 0.6, 0.25, 0.05, -1, 12);
-            driver(f, &name("tweeter"), x, 0.76, 0.25, 0.028, -1, 12);
+            driver(f, &numbered("woofer"), x, 0.6, 0.25, 0.05, -1, 12);
+            driver(f, &numbered("tweeter"), x, 0.76, 0.25, 0.028, -1, 12);
             fcyl!(
                 f,
-                name("port"),
+                numbered("port"),
                 0.014,
                 0.01,
                 (x, 0.3, 0.248),
@@ -223,7 +223,7 @@ pub fn cinema_wall() -> Vec<Obj> {
                 for dz in [0.28, 0.38] {
                     fcone!(
                         f,
-                        name("spike"),
+                        numbered("spike"),
                         0.012,
                         0.004,
                         0.04,
@@ -300,7 +300,7 @@ fn pad(f: &GameFrame, x: f64, y: f64, z: f64, turn: f64) {
     );
     fextrude!(
         f,
-        name("pad"),
+        numbered("pad"),
         &body,
         0.026,
         (x, y + 0.013, z),
@@ -313,7 +313,7 @@ fn pad(f: &GameFrame, x: f64, y: f64, z: f64, turn: f64) {
     for dx in [-0.025, 0.025] {
         fcyl!(
             f,
-            name("stick"),
+            numbered("stick"),
             0.009,
             0.012,
             (x + dx, y + 0.032, z - 0.005),
@@ -323,7 +323,7 @@ fn pad(f: &GameFrame, x: f64, y: f64, z: f64, turn: f64) {
     }
     fbox!(
         f,
-        name("cross"),
+        numbered("cross"),
         0.024,
         0.004,
         0.008,
@@ -332,7 +332,7 @@ fn pad(f: &GameFrame, x: f64, y: f64, z: f64, turn: f64) {
     );
     fbox!(
         f,
-        name("cross"),
+        numbered("cross"),
         0.008,
         0.004,
         0.024,
@@ -345,7 +345,7 @@ fn pad(f: &GameFrame, x: f64, y: f64, z: f64, turn: f64) {
     {
         fcyl!(
             f,
-            name("button"),
+            numbered("button"),
             0.004,
             0.005,
             (x + dx, y + 0.0285, z + dz),
@@ -374,7 +374,7 @@ pub fn game_console() -> Vec<Obj> {
         for x in [-0.21, 0.21] {
             soft!(
                 f,
-                name("seat"),
+                numbered("seat"),
                 0.4,
                 0.1,
                 0.5,
@@ -387,7 +387,7 @@ pub fn game_console() -> Vec<Obj> {
             );
             soft!(
                 f,
-                name("back_cushion"),
+                numbered("back_cushion"),
                 0.38,
                 0.36,
                 0.13,
@@ -431,7 +431,7 @@ pub fn game_console() -> Vec<Obj> {
             .concat();
             fsweep!(
                 f,
-                name("arm"),
+                numbered("arm"),
                 &[(s * 0.4, 0, -0.39), (s * 0.4, 0, 0.15)],
                 0,
                 M.gamer,
@@ -449,7 +449,7 @@ pub fn game_console() -> Vec<Obj> {
                 ];
                 fsweep!(
                     f,
-                    name("foot"),
+                    numbered("foot"),
                     &pts,
                     0.016,
                     M.dark,
@@ -539,7 +539,7 @@ pub fn game_console() -> Vec<Obj> {
             let k = k as i32;
             fbox!(
                 f,
-                name("game_art"),
+                numbered("game_art"),
                 0.1,
                 0.1,
                 0.002,

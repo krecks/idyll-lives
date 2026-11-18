@@ -2,9 +2,11 @@
 //! the three-seat garden bench.
 
 use super::common::{
-    Bar, F, M, bar, board, bolts, cup, end_round, fillet, finish, fr, jug, plank, rod, side_slab, v,
+    Bar, F, M, bar, board, bolts, cup, end_round, finish, jug, plank, rod, side_slab, v,
 };
 use artkit::forms::rounded_rect;
+use artkit::json::float_repr;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, V3, cos, cosd, radians, sin, sind};
 use artkit::scene::Obj;
@@ -113,7 +115,7 @@ fn cast_end(
     for (_fy, fz) in [back[0], front[0]] {
         fbox!(
             F,
-            format!("{p}foot{}", fr(fz)),
+            format!("{p}foot{}", float_repr(fz)),
             0.05,
             0.016,
             0.075,
@@ -233,7 +235,7 @@ fn bistro_chair(c: f64, facing: i32) {
     let at = |x: f64, y: f64, lz: f64| (x * fc, y, c + lz * fc);
     for (k, lz) in [-0.14, -0.045, 0.05, 0.145].into_iter().enumerate() {
         plank(
-            &format!("chair{}_seat{k}", fr(c)),
+            &format!("chair{}_seat{k}", float_repr(c)),
             at(-0.205, 0.43, lz),
             at(0.205, 0.43, lz),
             0.02,
@@ -253,7 +255,7 @@ fn bistro_chair(c: f64, facing: i32) {
         let up = v(lean);
         fsweep!(
             F,
-            format!("chair{}_back{k}", fr(c)),
+            format!("chair{}_back{k}", float_repr(c)),
             &bow,
             0,
             M.bistro,
@@ -264,7 +266,7 @@ fn bistro_chair(c: f64, facing: i32) {
     }
     let x = 0.21;
     super::common::bent(
-        &format!("chair{}_frame", fr(c)),
+        &format!("chair{}_frame", float_repr(c)),
         &[
             at(-x, 0.0, 0.2),
             at(-x, 0.93, -0.25),
@@ -279,7 +281,7 @@ fn bistro_chair(c: f64, facing: i32) {
         1.0,
     );
     super::common::bent(
-        &format!("chair{}_legs", fr(c)),
+        &format!("chair{}_legs", float_repr(c)),
         &[
             at(-x + 0.012, 0.0, -0.2),
             at(-x + 0.012, 0.405, 0.16),
@@ -299,7 +301,7 @@ fn bistro_chair(c: f64, facing: i32) {
         .collect();
     fsweep!(
         F,
-        format!("chair{}_seat_ring", fr(c)),
+        format!("chair{}_seat_ring", float_repr(c)),
         &ring,
         0.009,
         M.iron,
@@ -307,7 +309,7 @@ fn bistro_chair(c: f64, facing: i32) {
         closed = true
     );
     rod(
-        &format!("chair{}_stretcher", fr(c)),
+        &format!("chair{}_stretcher", float_repr(c)),
         at(-x, 0.12, 0.13),
         at(x, 0.12, 0.13),
         0.008,
@@ -318,7 +320,7 @@ fn bistro_chair(c: f64, facing: i32) {
         // the pivots where the legs cross the frame, glides under
         let p = at(s as f64 * (x + 0.006), 0.2, 0.06);
         cylinder!(
-            format!("chair{}_pivot{s}", fr(c)),
+            format!("chair{}_pivot{s}", float_repr(c)),
             0.014,
             0.012,
             at = F.at(p.0, p.1, p.2),
@@ -519,7 +521,7 @@ pub fn picnic_table() -> Vec<Obj> {
     for x in [-0.95, 0.0, 0.95] {
         let yc = top - 0.065;
         side_slab(
-            &format!("cleat{}", fr(x)),
+            &format!("cleat{}", float_repr(x)),
             x,
             &[
                 (-0.36, yc + 0.025),
@@ -570,7 +572,7 @@ pub fn picnic_table() -> Vec<Obj> {
             for y in [yb, top - 0.065] {
                 let zl = zf + (zt - zf) * y / (top - 0.04);
                 cylinder!(
-                    format!("bolt{s}{e}{}", fr(y)),
+                    format!("bolt{s}{e}{}", float_repr(y)),
                     0.011,
                     0.006,
                     at = F.at(x + sf * 0.087, y, zl),
@@ -593,7 +595,7 @@ pub fn picnic_table() -> Vec<Obj> {
     }
     // the cloth: red gingham laid across the table where the two sit, hanging over both long edges
     let (e, hang, ct) = (0.362, 0.07, 0.004);
-    let drape = fillet(
+    let drape = kit::fillet!(
         &[
             (-0.3, top - hang, -e),
             (-0.3, top + ct / 2.0, -e),
@@ -601,7 +603,7 @@ pub fn picnic_table() -> Vec<Obj> {
             (-0.3, top - hang, e),
         ],
         0.012,
-        2,
+        steps = 2
     );
     fsweep!(
         F,
@@ -1028,7 +1030,7 @@ pub fn bench_garden3() -> Vec<Obj> {
             &[(0.0, 0.19), (0.435, 0.2)]
         };
         cast_end(
-            &format!("frame{}", fr(x)),
+            &format!("frame{}", float_repr(x)),
             x,
             &back,
             front,
@@ -1043,9 +1045,9 @@ pub fn bench_garden3() -> Vec<Obj> {
         );
         let seat: Vec<(f64, f64, f64)> =
             [-0.08, 0.04, 0.16].iter().map(|&z| (x, 0.467, z)).collect();
-        bolts(&format!("bolt_seat{}", fr(x)), &seat, M.iron, true);
+        bolts(&format!("bolt_seat{}", float_repr(x)), &seat, M.iron, true);
         let bb: Vec<(f64, f64, f64)> = backs.iter().map(|&(y, z)| (x, y, z + 0.014)).collect();
-        bolts(&format!("bolt_back{}", fr(x)), &bb, M.iron, false);
+        bolts(&format!("bolt_back{}", float_repr(x)), &bb, M.iron, false);
     }
     finish("benchGarden3", false)
 }

@@ -4,7 +4,7 @@
 
 use artkit::far::{is_low, low};
 use artkit::materials::Mat;
-use artkit::math::{PI, asin, cos, sin};
+use artkit::math::{Axis, PI, asin, cos, sin};
 use artkit::place::{Coord, Facing, GameFrame};
 use artkit::py;
 use artkit::scene::Obj;
@@ -145,15 +145,7 @@ pub fn slats_back(
     )
 }
 
-/// The axle a tyre turns on: game x, z, or y (lying flat).
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Axle {
-    X,
-    Z,
-    Y,
-}
-
-/// A tyre round an axle along game x (or `Axle::Z`; or `Axle::Y`, lying flat) through (x, y, z): rounded
+/// A tyre round an axle along game x (or `Axis::Z`; or `Axis::Y`, lying flat) through (x, y, z): rounded
 /// shoulders, its tread's grooves round its crown, its bead's hole open (r * 0.64 round), where a rim goes.
 /// `grooves` None: plain, one rounded shoulder a side.
 #[allow(clippy::too_many_arguments)] // (as the script called it)
@@ -167,14 +159,14 @@ pub fn tyre(
     material: Mat,
     grooves: Option<usize>,
     segments: Option<usize>,
-    axis: Axle,
+    axis: Axis,
 ) -> Obj {
     let hw = w / 2.0;
     let sh = f64::min(0.06, r * 0.12);
     let rot = match axis {
-        Axle::X => (0, 90, 0),
-        Axle::Z => (90, 0, 0),
-        Axle::Y => (0, 0, 0),
+        Axis::X => (0, 90, 0),
+        Axis::Z => (90, 0, 0),
+        Axis::Y => (0, 0, 0),
     };
     let Some(grooves) = grooves else {
         // plain: one rounded shoulder a side

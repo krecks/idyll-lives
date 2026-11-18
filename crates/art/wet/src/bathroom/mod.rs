@@ -18,7 +18,7 @@
 use artkit::family::{Family, Model};
 use artkit::json::Json;
 use artkit::materials::Mirror;
-use artkit::palette;
+use artkit::{json, palette};
 
 mod bath_parts;
 mod baths;
@@ -93,72 +93,31 @@ palette! { M:
 // vanity: the one the quick colour row paints). Drains, water, soap and the basins' metal insides keep their own
 // material.
 
-/// `{'uses': {<tag>: <clip>}}`.
-fn uses(tag: &str, clip: Json) -> Json {
-    Json::Obj(vec![("uses".into(), Json::Obj(vec![(tag.into(), clip)]))])
-}
-
-/// A clip in a use's list, with its timings: `{'clip': .., 'hold': .., ...}`.
-fn clip(name: &str, timings: &[(&str, f64)]) -> Json {
-    let mut fields = vec![("clip".to_string(), Json::from(name))];
-    fields.extend(timings.iter().map(|&(k, v)| (k.to_string(), Json::Num(v))));
-    Json::Obj(fields)
-}
-
 fn wash() -> Json {
-    uses("wash", Json::from("water_on"))
+    json!({"uses": {"wash": "water_on"}})
 }
 
 fn toilet() -> Json {
-    uses("toilet", Json::from("lid_up"))
+    json!({"uses": {"toilet": "lid_up"}})
 }
 
 fn bath() -> Json {
-    uses(
-        "bath",
-        Json::Arr(vec![
-            clip(
-                "tap_on",
-                &[("hold", bath_parts::BATH_TAP + bath_parts::BATH_FILL)],
-            ),
-            Json::from("fill"),
-        ]),
-    )
+    json!({"uses": {"bath": [{"clip": "tap_on", "hold": (bath_parts::BATH_TAP + bath_parts::BATH_FILL)}, "fill"]}})
 }
 
 fn shower() -> Json {
-    uses("shower", Json::from("water_on"))
+    json!({"uses": {"shower": "water_on"}})
 }
 
 /// The base shower's door slides open as the resident steps in, shuts behind them, and opens again to let them
 /// out; the water comes on once it's shut. The stall's curtain is drawn across once they're in, back at the end.
 fn shower_door() -> Json {
-    uses(
-        "shower",
-        Json::Arr(vec![
-            clip("door_open", &[("hold", 1.5), ("out", 1.5)]),
-            clip("water_on", &[("delay", 2.0)]),
-        ]),
-    )
+    json!({"uses": {"shower": [{"clip": "door_open", "hold": 1.5, "out": 1.5},
+                               {"clip": "water_on", "delay": 2.0}]}})
 }
 
 fn shower_curtain() -> Json {
-    uses(
-        "shower",
-        Json::Arr(vec![
-            clip("curtain_draw", &[("delay", 1.0)]),
-            clip("water_on", &[("delay", 1.8)]),
-        ]),
-    )
-}
-
-/// `{'uses': {<tag>: 'door_open'}, 'hold': 1.5}`.
-fn door_held(tag: &str) -> Json {
-    let Json::Obj(mut fields) = uses(tag, Json::from("door_open")) else {
-        unreachable!()
-    };
-    fields.push(("hold".into(), Json::Num(1.5)));
-    Json::Obj(fields)
+    json!({"uses": {"shower": [{"clip": "curtain_draw", "delay": 1.0}, {"clip": "water_on", "delay": 1.8}]}})
 }
 
 /// The family.
@@ -359,7 +318,7 @@ pub fn family() -> Option<Family> {
                 .key("model.mirrorCabinet")
                 .centre(0.0, -0.33)
                 .on_wall()
-                .motions(door_held("brushTeeth"))
+                .motions(json!({"uses": {"brushTeeth": "door_open"}, "hold": 1.5}))
                 .paint(&[("cab", "Cabinet"), ("cab_door", "Frame")]),
             Model::new("mirrorRound", storage::mirror_round, (0.64, 0.772, 0.046))
                 .key("model.mirrorRound")
@@ -373,7 +332,7 @@ pub fn family() -> Option<Family> {
             )
             .key("model.bathCabinetTall")
             .centre(0.0, -0.24)
-            .motions(door_held("takeTowel"))
+            .motions(json!({"uses": {"takeTowel": "door_open"}, "hold": 1.5}))
             .paint(&[
                 ("cab", "Cabinet"),
                 ("cab_door", "Doors"),

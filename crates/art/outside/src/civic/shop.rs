@@ -5,10 +5,10 @@ use artkit::forms::smooth_outline;
 use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::{cos, sin};
-use artkit::parts::{Settle, join, new_parts, settle_all, settle_with};
+use artkit::parts::{join, new_parts, settle_all};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsphere, jitter, revolve};
+use artkit::{fbox, fcyl, fextrude, fsphere, jitter, revolve, settle};
 
 // --- the clothes rail: 2x1, a chrome rail on castored feet, garments on hangers ----------------------------------
 /// A garment on its hanger, seen edge on: a shirt, a dress, a coat or trousers over the bar.
@@ -592,12 +592,6 @@ pub fn atm() -> Vec<Obj> {
         );
     });
     join(&parts, "atm", Some((0, 0, 0).into()));
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     meshes()
 }

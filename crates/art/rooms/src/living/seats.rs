@@ -7,10 +7,10 @@ use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr;
 use artkit::math::{Axis, P3, V3, cos, exp, pow, radians, sin, sqrt};
 use artkit::motion::{Rock, Squash, path, rock, squash};
-use artkit::parts::{Settle, hinged, join, measure, new_parts, settle_with, turn};
+use artkit::parts::{hinged, join, measure, new_parts, turn};
 use artkit::place::Facing;
-use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fextrude, fsweep, jitter, loft, ring, soft, sphere, sweep, swing};
+use artkit::scene::Obj;
+use artkit::{fbox, fextrude, fsweep, jitter, loft, ring, settle, soft, sphere, sweep, swing};
 
 // The recliner: its seat and back tip back 25° about the sitter's hips and glide 8 cm forward as they do
 // (`recline`, a wall-hugger's), carrying them (`ride`), and its footrest swings up 80° from the front of the
@@ -21,16 +21,6 @@ const RC_Z0: f64 = -0.32; // the base, back to front
 const RC_Z1: f64 = 0.48;
 const RC_HIPS: (f64, f64) = (0.44, 0.12); // (height, depth): content seat 0.44, forward 0.12
 const RC_GLIDE: f64 = 0.08; // how far the seat and back come forward reclined
-
-fn floor() {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
-}
 
 pub fn recliner() -> Vec<Obj> {
     let (w, aw) = (0.92, 0.17);
@@ -174,7 +164,7 @@ pub fn recliner() -> Vec<Obj> {
     });
     let footrest = hinged(join(&foot, "footrest", None), F.at(0, hinge.0, hinge.1));
     turn(footrest, 90.0, Axis::X); // folded down flat against the front of the base at rest
-    floor();
+    settle!(centre = false);
     path(
         seat,
         "recline",
@@ -398,7 +388,7 @@ pub fn rocking_chair() -> Vec<Obj> {
         );
     });
     let chair = join(&chair, "chair", Some(F.at(0, RK_R + 0.025, RK_Z)));
-    floor();
+    settle!(centre = false);
     rock(
         chair,
         "rock",
@@ -709,7 +699,7 @@ pub fn bean_bag() -> Vec<Obj> {
         });
     }
     let bag = join(&parts, "bag", Some(F.at(0, 0, 0.02)));
-    floor();
+    settle!(centre = false);
     squash(
         bag,
         "squash",

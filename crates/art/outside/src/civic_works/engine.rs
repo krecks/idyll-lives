@@ -2,12 +2,12 @@
 //! ladder, 5.84 m long: a crew cab over the front axle, a body of roller-shuttered lockers, a triple ladder and two
 //! hard suction hoses on the roof, blue lights on the cab.
 
-use super::common::{Axle, F, arc, own_palette, slats, slats_back, tyre};
+use super::common::{F, arc, own_palette, slats, slats_back, tyre};
 use artkit::far::{is_low, low};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::materials::Mat;
-use artkit::math::{TAU, atan2, cos, degrees, sin};
+use artkit::math::{Axis, TAU, atan2, cos, degrees, sin};
 use artkit::parts::{join_all, settle_all};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
@@ -46,7 +46,7 @@ pub fn fe_wheel(name: &str, x: f64, z: f64, m: &ENGINE, inner: bool) {
         m.rubber,
         None,
         Some(if inner { low(20, 12) } else { low(40, 16) }),
-        Axle::X,
+        Axis::X,
     );
     if inner {
         return;

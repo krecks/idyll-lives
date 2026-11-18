@@ -9,17 +9,7 @@
 
 use artkit::family::{Family, Model};
 use artkit::json::Json;
-use artkit::palette;
-
-/// `pull` as the script called it: `pull!(F, name, a, b, face, out = .., r = None, ...)`.
-macro_rules! pull {
-    ($f:expr, $name:expr, $a:expr, $b:expr, $face:expr $(, $k:ident = $v:expr)* $(,)?) => {{
-        #[allow(unused_mut)]
-        let mut o = $crate::kitchen_cooking::common::Pull::default();
-        $(o.$k = $v;)*
-        $crate::kitchen_cooking::common::pull($f, $name, $a, $b, $face, o.material, o.out, o.w, o.t, o.r, o.verts)
-    }};
-}
+use artkit::{json, palette};
 
 mod appliances;
 pub(crate) mod common;
@@ -62,32 +52,19 @@ const SECONDS: f64 = 1.4; // a door drops, a drawer slides or a knob turns in th
 const COUNTER66: [(f64, f64); 4] = [(-0.48, -0.43), (-0.46, -0.41), (0.24, 0.19), (0.31, 0.23)];
 const HOLD: f64 = 3.0; // seconds a door stays open once a use starts
 
-/// A JSON object from its keys and values, in order.
-fn obj(pairs: Vec<(&str, Json)>) -> Json {
-    Json::Obj(pairs.into_iter().map(|(k, v)| (k.to_string(), v)).collect())
-}
-
 /// The microwave's plate turns once its door has shut (`door_open` opens in 1.0 s and plays back from its hold,
 /// 1.2 s), a hair under its 2 s turn each time round: no pause between turns.
 fn turntable() -> Json {
-    obj(vec![
-        ("clip", Json::from("turntable")),
-        ("delay", Json::Num(2.2)),
-        ("every", Json::Num(1.9)),
-    ])
+    json!({"clip": "turntable", "delay": 2.2, "every": 1.9})
 }
 
 /// `bake` drops the oven door for HOLD s.
 fn bake() -> Json {
-    obj(vec![
-        ("clip", Json::from("oven_open")),
-        ("hold", Json::Num(HOLD)),
-    ])
+    json!({"clip": "oven_open", "hold": (HOLD)})
 }
 
 /// The family.
 pub fn family() -> Option<Family> {
-    let s = Json::from;
     // A floor thing against a wall is centred where the game places it (`centre`): its back on the wall,
     // its top under its content `surface`.
     Some(Family::new(
@@ -104,54 +81,25 @@ pub fn family() -> Option<Family> {
             // cook turns the front-left knob and its ring glows for the whole use; bake drops the oven door
             // for HOLD s. By the cooking step's tag too (`stir` on the hob, `bake` in the oven), for a meal
             // started at the fridge (snapshot.rs: no interaction at a station that isn't the recipe's origin).
-            .motions(obj(vec![(
-                "uses",
-                obj(vec![
-                    ("cook", s("burner_on")),
-                    ("stir", s("burner_on")),
-                    ("bake", bake()),
-                ]),
-            )]))
+            .motions(json!({"uses": {"cook": "burner_on", "stir": "burner_on", "bake": (bake())}}))
             .paint(&[("enamel", "Body"), ("chrome", "Knobs"), ("hob", "Hob")]),
             Model::new("stoveGas", cookers::stove_gas, (0.92, 1.111, 0.694))
                 .key("model.stoveGas")
                 .centre(0.0, -0.089)
                 // cook and gourmet (and any `stir` step) light the front left burner; bake drops the oven door
-                .motions(obj(vec![(
-                    "uses",
-                    obj(vec![
-                        ("cook", s("burner_on")),
-                        ("gourmet", s("burner_on")),
-                        ("stir", s("burner_on")),
-                        ("bake", bake()),
-                    ]),
-                )]))
+                .motions(json!({"uses": {"cook": "burner_on", "gourmet": "burner_on", "stir": "burner_on", "bake": (bake())}}))
                 .paint(&[("enamel", "Body"), ("chrome", "Knobs"), ("grate", "Hob")]),
             Model::new("wallOven", cookers::wall_oven, (0.70, 2.11, 0.696))
                 .key("model.wallOven")
                 .centre(0.0, -0.077)
                 // roast and bake (the interactions, and any `bake` step) drop the upper oven door and pull its tray out
-                .motions(obj(vec![
-                    (
-                        "uses",
-                        obj(vec![("roast", s("oven_open")), ("bake", s("oven_open"))]),
-                    ),
-                    ("hold", Json::Num(HOLD)),
-                ]))
+                .motions(json!({"uses": {"roast": "oven_open", "bake": "oven_open"}, "hold": (HOLD)}))
                 .paint(&[("cab", "Tower"), ("chrome", "Handles")]),
             Model::new("rangeCooker", cookers::range_cooker, (1.58, 1.13, 0.755))
                 .key("model.rangeCooker")
                 .centre(0.0, -0.0525)
                 // cook and gourmet (and any `stir` step) light a burner; bake drops the left oven door
-                .motions(obj(vec![(
-                    "uses",
-                    obj(vec![
-                        ("cook", s("burner_on")),
-                        ("gourmet", s("burner_on")),
-                        ("stir", s("burner_on")),
-                        ("bake", bake()),
-                    ]),
-                )]))
+                .motions(json!({"uses": {"cook": "burner_on", "gourmet": "burner_on", "stir": "burner_on", "bake": (bake())}}))
                 .paint(&[
                     ("enamel2", "Body"),
                     ("chrome", "Knobs & rail"),
@@ -165,26 +113,14 @@ pub fn family() -> Option<Family> {
             .key("model.cooktopCounter")
             .centre(0.0, -0.10)
             // cook (and any `stir` step) turns the outer knob on its side and the front ring at +x glows red
-            .motions(obj(vec![(
-                "uses",
-                obj(vec![("cook", s("burner_on")), ("stir", s("burner_on"))]),
-            )]))
+            .motions(json!({"uses": {"cook": "burner_on", "stir": "burner_on"}}))
             .paint(&[("cab", "Cabinet"), ("worktop", "Worktop"), ("hob", "Hob")]),
             Model::new("microwave", appliances::microwave, (1.0, 1.25, 0.66))
                 .key("model.microwave")
                 .centre(0.0, -0.095)
                 // reheat (and a meal's `bake` step) opens the door to put the dish in, shuts it, then turns the
                 // plate while it heats: from the door shut (turntable), round and round (`every`, a turn each 2 s)
-                .motions(obj(vec![
-                    (
-                        "uses",
-                        obj(["reheat", "bake"]
-                            .into_iter()
-                            .map(|u| (u, Json::Arr(vec![s("door_open"), turntable()])))
-                            .collect()),
-                    ),
-                    ("hold", Json::Num(1.2)),
-                ]))
+                .motions(json!({"uses": {"reheat": ["door_open", (turntable())], "bake": ["door_open", (turntable())]}, "hold": 1.2}))
                 .paint(&[
                     ("cab", "Cabinet"),
                     ("worktop", "Worktop"),
@@ -199,19 +135,7 @@ pub fn family() -> Option<Family> {
             .centre(0.0, -0.097)
             // espresso slides a cup under the spout and grows a stream of coffee; pour too, a second in (at a café
             // as the barista turns to the machine: the game's `sell` clip)
-            .motions(obj(vec![
-                (
-                    "uses",
-                    obj(vec![
-                        ("espresso", s("brew")),
-                        (
-                            "pour",
-                            obj(vec![("clip", s("brew")), ("delay", Json::Num(1.0))]),
-                        ),
-                    ]),
-                ),
-                ("hold", Json::Num(2.0)),
-            ]))
+            .motions(json!({"uses": {"espresso": "brew", "pour": {"clip": "brew", "delay": 1.0}}, "hold": 2.0}))
             .paint(&[
                 ("cab", "Cabinet"),
                 ("worktop", "Worktop"),
@@ -226,14 +150,7 @@ pub fn family() -> Option<Family> {
             .centre(0.0, -0.097)
             // toast presses the lever and the toast down (back up, popping, after `hold`); smoothie lifts the
             // lid and swirls the smoothie for as long as it blends
-            .motions(obj(vec![
-                (
-                    "uses",
-                    obj(vec![("toast", s("toast_down")), ("smoothie", s("blend"))]),
-                ),
-                ("loops", obj(vec![("smoothie", s("blades"))])),
-                ("hold", Json::Num(2.0)),
-            ]))
+            .motions(json!({"uses": {"toast": "toast_down", "smoothie": "blend"}, "loops": {"smoothie": "blades"}, "hold": 2.0}))
             .paint(&[
                 ("cab", "Counter"),
                 ("toaster", "Toaster"),
@@ -244,14 +161,7 @@ pub fn family() -> Option<Family> {
                 .centre(0.0, -0.088)
                 // dishes (loading it), clearing away at it (the `wash` tag) and emptying it (unload) drop the door
                 // and slide the lower rack out, held open while it is loaded or emptied
-                .motions(obj(vec![(
-                    "uses",
-                    obj(vec![
-                        ("dishes", s("door_open")),
-                        ("wash", s("door_open")),
-                        ("unload", s("door_open")),
-                    ]),
-                )]))
+                .motions(json!({"uses": {"dishes": "door_open", "wash": "door_open", "unload": "door_open"}}))
                 .paint(&[("cab", "Body"), ("chrome", "Handle"), ("steel", "Panel")]),
             Model::new(
                 "dishwasherCompact",
@@ -261,14 +171,7 @@ pub fn family() -> Option<Family> {
             .key("model.dishwasherCompact")
             .centre(0.0, -0.10)
             // dishes, clearing away and emptying it, as the dishwasher
-            .motions(obj(vec![(
-                "uses",
-                obj(vec![
-                    ("dishes", s("door_open")),
-                    ("wash", s("door_open")),
-                    ("unload", s("door_open")),
-                ]),
-            )]))
+            .motions(json!({"uses": {"dishes": "door_open", "wash": "door_open", "unload": "door_open"}}))
             .paint(&[("cab", "Body"), ("chrome", "Handle"), ("steel", "Panel")]),
         ],
         "The kitchen's cookers (crates/art/wet/src/kitchen_cooking, built by cargo art). Listed in the \

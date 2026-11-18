@@ -8,100 +8,9 @@ use artkit::mesh::Mesh;
 use artkit::motion::{Grow, grow};
 use artkit::parts::{join, new_parts};
 use artkit::place::{Coord, GameFrame};
+use artkit::py;
 use artkit::scene::Obj;
-use artkit::{fbox, fcone, fcyl, fextrude, fsweep, revolve, soft, torus};
-
-/// Python's `min` of two: the first unless the second is strictly below it.
-pub fn py_min(a: f64, b: f64) -> f64 {
-    if b < a { b } else { a }
-}
-
-/// Python's `max` of two: the first unless the second is strictly above it.
-pub fn py_max(a: f64, b: f64) -> f64 {
-    if b > a { b } else { a }
-}
-
-/// A bar handle in one piece from face point `a` (x, height) to `b`: out from the face at game depth `face` on
-/// rounded stand-offs, along, and back in, its front `out` proud; a rounded `w` × `t` section (`r` None: a round bar
-/// of radius w / 2).
-#[allow(clippy::too_many_arguments)] // (as the script called it)
-pub fn pull(
-    f: &GameFrame,
-    name: impl AsRef<str>,
-    a: (f64, f64),
-    b: (f64, f64),
-    face: f64,
-    material: Option<Mat>,
-    out: f64,
-    w: f64,
-    t: f64,
-    r: Option<f64>,
-    verts: usize,
-) -> Obj {
-    let ((x0, y0), (x1, y1)) = (a, b);
-    let n = artkit::py::hypot(x1 - x0, y1 - y0);
-    let (ux, uy) = ((x1 - x0) / n, (y1 - y0) / n);
-    let (e, o) = (
-        py_min(0.012, n / 4.0),
-        face + out - (if r.is_none() { w } else { t }) / 2.0,
-    );
-    let pts = [
-        (x0, y0, face - 0.004),
-        (x0, y0, o - e),
-        (x0 + ux * e, y0 + uy * e, o),
-        (x1 - ux * e, y1 - uy * e, o),
-        (x1, y1, o - e),
-        (x1, y1, face - 0.004),
-    ];
-    let material = material.unwrap_or(M.chrome);
-    match r {
-        None => fsweep!(
-            f,
-            name,
-            &pts,
-            w / 2.0,
-            material,
-            up = (uy, 0, ux),
-            resolution = 2,
-            angle = 60.0,
-            verts = verts
-        ),
-        Some(r) => fsweep!(
-            f,
-            name,
-            &pts,
-            0.0,
-            material,
-            up = (uy, 0, ux),
-            resolution = 2,
-            angle = 60.0,
-            profile = rounded_rect(w, t, r, 1)
-        ),
-    }
-}
-
-/// `pull` with the script's defaults but for the ones named.
-pub struct Pull {
-    pub material: Option<Mat>,
-    pub out: f64,
-    pub w: f64,
-    pub t: f64,
-    pub r: Option<f64>,
-    pub verts: usize,
-}
-
-impl Default for Pull {
-    fn default() -> Pull {
-        Pull {
-            material: None,
-            out: 0.034,
-            w: 0.016,
-            t: 0.02,
-            r: Some(0.007),
-            verts: 8,
-        }
-    }
-}
+use artkit::{fbox, fcone, fcyl, fsweep, revolve, torus};
 
 /// A polyline's corners rounded by arcs about `r` long each way (a quadratic curve through `steps` - 1 more
 /// points), for `kit.tube(..., round=1)`: bent tube whose long straights don't make the curve overshoot its corners,
@@ -114,10 +23,10 @@ pub fn fillet(points: &[(f64, f64, f64)], r: f64, steps: usize) -> Vec<(f64, f64
         let da: Vec<f64> = (0..3).map(|i| p[i] - a[i]).collect();
         let db: Vec<f64> = (0..3).map(|i| b[i] - p[i]).collect();
         let (la, lb) = (
-            sqrt(artkit::py::sum(da.iter().map(|c| c * c))),
-            sqrt(artkit::py::sum(db.iter().map(|c| c * c))),
+            sqrt(py::sum(da.iter().map(|c| c * c))),
+            sqrt(py::sum(db.iter().map(|c| c * c))),
         );
-        let k = py_min(py_min(r, la / 2.0), lb / 2.0);
+        let k = py::min(py::min(r, la / 2.0), lb / 2.0);
         let s: Vec<f64> = (0..3).map(|i| p[i] - da[i] / la * k).collect();
         let e: Vec<f64> = (0..3).map(|i| p[i] + db[i] / lb * k).collect();
         for j in 0..=steps {
@@ -130,77 +39,6 @@ pub fn fillet(points: &[(f64, f64, f64)], r: f64, steps: usize) -> Vec<(f64, f64
     }
     out.push(points[points.len() - 1]);
     out
-}
-
-#[allow(clippy::too_many_arguments)] // (as the kit has it)
-/// A round tube of radius `r` through game points, its bends rounded (`round` steps between each pair of points; 1
-/// keeps them sharp), its ends capped. `verts` round: by default 8, and more for one over 13 mm in radius, as many
-/// as keep its outline within a millimetre of the circle (`forms.sweep`).
-pub fn tube(
-    frame: &GameFrame,
-    name: &str,
-    points: &[(f64, f64, f64)],
-    r: f64,
-    material: Mat,
-    verts: Option<usize>,
-    round: usize,
-    scale: f64,
-) -> Obj {
-    // (the kit's tube, called as the script called it)
-    artkit::kit::tube(
-        frame,
-        name,
-        points,
-        r,
-        material,
-        artkit::kit::Tube {
-            verts,
-            round,
-            scale: artkit::forms::Scale::One(scale),
-        },
-    )
-}
-
-/// A cabinet door or drawer front: a frame (stiles and rails, one slab with a hole) round a panel set 6 mm back,
-/// lightly puffed so the baked shading darkens only its border. `at` is the middle of the slab.
-#[allow(clippy::too_many_arguments)] // (as the script called it)
-pub fn shaker<X: Coord, Y: Coord>(
-    f: &GameFrame,
-    name: &str,
-    w: f64,
-    h: f64,
-    at: (X, Y, f64),
-    material: Mat,
-    t: f64,
-    rail: f64,
-    r: f64,
-) {
-    let (x, y, z) = at;
-    let hole = rounded_rect(w - 2.0 * rail, h - 2.0 * rail, 0.003, 1);
-    fextrude!(
-        f,
-        format!("{name}_frame"),
-        &rounded_rect(w, h, r, 1),
-        t,
-        at,
-        material,
-        holes = [hole],
-        bevel = 0.003,
-        bevel_segments = 1
-    );
-    soft!(
-        f,
-        format!("{name}_panel"),
-        w - 2.0 * rail - 0.002,
-        h - 2.0 * rail - 0.002,
-        t * 0.6,
-        (x, y, z + t * 0.2 - 0.006),
-        material,
-        puff = 0.002,
-        round = 0.003,
-        round_segments = 1,
-        flat = 2
-    );
 }
 
 /// A control knob facing the front, `d` deep about game depth `z`: a skirt on the panel, a grip and a dished
@@ -394,6 +232,10 @@ pub fn hob_ring(f: &GameFrame, name: &str, x: f64, z: f64, y: f64, r: f64, inner
 /// split round the opening (an eight-sided face and a quad beside it, or, where the opening's lower edge lies on the
 /// face's own, one face with a notch and the face below given the opening's two corners), and five flat walls line
 /// the cavity, its points numbered among the carcass's as Blender numbered them.
+///
+/// Not `artkit::kit::cut`, on purpose: that one numbers the points a cut makes and starts its faces in its own
+/// order, and the baked shading, which hangs on both, then lies farther off Blender's on the microwave and the
+/// gas range.
 #[allow(clippy::too_many_arguments)] // (as the script called it)
 pub fn hollow(
     obj: Obj,

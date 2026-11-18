@@ -6,8 +6,7 @@ use super::common::{LATHE, Lathe, bends, lathe, tube, wall_rose};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::materials::Mat;
-use artkit::math::{Axis, P3, TAU, V3, cos, cosd, sin, sind, v3};
-use artkit::motion::{Grow, grow};
+use artkit::math::{P3, TAU, V3, cos, cosd, sin, sind, v3};
 use artkit::parts::{join, new_parts};
 use artkit::place::{Coord, Facing, GameFrame};
 use artkit::scene::Obj;
@@ -608,9 +607,4 @@ pub fn curtain_rings(
             minor_segments = 3
         );
     }
-}
-
-/// `G.grow(obj, clip, seconds=..., axis=...)`.
-pub fn grow_on(obj: Obj, clip: &str, seconds: f64, axis: Axis) {
-    grow(obj, clip, Grow { seconds, axis });
 }

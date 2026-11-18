@@ -2,15 +2,16 @@
 //! flap that turns down), headboard channels, posts, boards and legs.
 
 use artkit::forms::rounded_rect;
+use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, cos, radians, sin, sqrt};
-use artkit::palette;
-use artkit::parts::{Settle, hinged, join, measure, new_parts, settle_with};
+use artkit::parts::{hinged, join, measure, new_parts};
 use artkit::place::{Coord, GameFrame};
 use artkit::scene::{self, Obj, meshes};
 use artkit::{
     fbox, fcone, fcyl, fextrude, fsphere, fsweep, jitter, loft, ring, soft, squash, swing,
 };
+use artkit::{palette, settle};
 
 palette! { M:
     // shared
@@ -78,13 +79,7 @@ pub fn settle_bed() {
         -(lo[0] + hi[0]) / 2.0,
         -(lo[1] + hi[1]) / 2.0
     ));
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
 }
 
 /// A pillow on a mattress top `top`, `h` thick in the middle: plump, thinning to its seams, its corners pinched
@@ -387,7 +382,7 @@ pub fn legs_round(xs: &[f64], zs: &[f64], h: f64, material: Mat, r: f64) {
         for &z in zs {
             fcone!(
                 F,
-                format!("leg{}{}", fr(x), fr(z)),
+                format!("leg{}{}", float_repr(x), float_repr(z)),
                 r * 0.75,
                 r,
                 h,
@@ -406,7 +401,7 @@ pub fn legs_square(xs: &[f64], zs: &[f64], h: f64, material: Mat, w: f64) {
         for &z in zs {
             fcone!(
                 F,
-                format!("leg{}{}", fr(x), fr(z)),
+                format!("leg{}{}", float_repr(x), float_repr(z)),
                 r * 0.72,
                 r,
                 h,
@@ -418,11 +413,6 @@ pub fn legs_square(xs: &[f64], zs: &[f64], h: f64, material: Mat, w: f64) {
             );
         }
     }
-}
-
-/// A float as Python writes it in a name.
-pub fn fr(x: f64) -> String {
-    artkit::json::float_repr(x)
 }
 
 /// What a post's top is.

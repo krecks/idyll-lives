@@ -2,28 +2,13 @@
 //! water (`water_on`).
 
 use super::M;
-use super::common::{
-    LATHE, Lathe, Ring, bottle, drain, gooseneck, lathe, pull, shaker, tube, water,
-};
+use super::common::{LATHE, Lathe, Ring, bottle, drain, gooseneck, lathe, pull, shaker, tube};
+use crate::common::water;
 use artkit::forms::rounded_rect;
-use artkit::math::Axis;
-use artkit::motion::{Grow, grow};
 use artkit::parts::{join, new_parts, settle_all};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fextrude, soft};
-
-/// `G.grow(water, 'water_on', seconds=0.4)`.
-pub fn water_on(water: Obj) {
-    grow(
-        water,
-        "water_on",
-        Grow {
-            seconds: 0.4,
-            axis: Axis::Z,
-        },
-    );
-}
+use artkit::{fbox, fextrude, grow, soft};
 
 // --- the base sink: a shaker cabinet, a worktop with an undermount basin and a gooseneck tap -------------
 pub fn sink() -> Vec<Obj> {
@@ -233,9 +218,9 @@ pub fn sink() -> Vec<Obj> {
         );
     });
     join(&still, "body", Some((0, 0, 0).into()));
-    let water = water(&f, spout, by);
+    let water = water(&f, spout, by, M.water);
     settle_all();
-    water_on(water);
+    grow!(water, "water_on", seconds = 0.4);
     meshes()
 }
 
@@ -396,8 +381,8 @@ pub fn sink_pedestal() -> Vec<Obj> {
         );
     });
     join(&still, "body", Some((0, 0, 0).into()));
-    let water = water(&f, spout, floor_y + 0.01);
+    let water = water(&f, spout, floor_y + 0.01, M.water);
     settle_all();
-    water_on(water);
+    grow!(water, "water_on", seconds = 0.4);
     meshes()
 }

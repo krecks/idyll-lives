@@ -2,9 +2,9 @@
 //! recycling sorted.
 
 use super::M;
-use super::common::tube;
 use super::turned::lathe;
 use artkit::forms::smooth_outline;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, cos, radians, sin};
 use artkit::parts::{hinged, join, new_parts, settle_all};
@@ -227,7 +227,7 @@ pub fn recycling_bins() -> Vec<Obj> {
                 holes = vec![smooth_outline(&inner, 1, true)]
             );
             // the hand grip under the lid's front
-            tube(
+            kit::tube!(
                 f,
                 format!("handle{i}"),
                 &[
@@ -240,9 +240,8 @@ pub fn recycling_bins() -> Vec<Obj> {
                 ],
                 0.009,
                 M.lid,
-                Some(8),
-                1,
-                1.0,
+                verts = 8,
+                round = 1
             );
         }
     });

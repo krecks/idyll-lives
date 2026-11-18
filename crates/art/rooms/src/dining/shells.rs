@@ -1,16 +1,12 @@
 //! K8 continued: the chairs whose seat is a solidified surface: the moulded chair's shell and the Windsor chair's
 //! saddle seat.
 
-use super::common::{finish, rail, stretcher, surface, tube};
+use super::common::{finish, rail, stretcher, surface};
 use super::{F, M, SZ};
 use artkit::forms::catmull;
 use artkit::math::{PI, V3, exp, pow, sin, sqrt};
 use artkit::scene::Obj;
-
-/// Python's `max(0.0, x)`.
-fn pos(x: f64) -> f64 {
-    if x > 0.0 { x } else { 0.0 }
-}
+use artkit::{kit, py};
 
 /// Moulded chair (catalog2): a gloss shell in one piece, its seat rolling over at the front and curving up into a
 /// back that wraps round the sitter, on a black sled frame of two bent tubes.
@@ -64,15 +60,13 @@ pub fn chair_modern() -> Vec<Obj> {
             true,
         );
     }
-    tube(
-        &F,
+    kit::tube!(
+        F,
         "cross",
         &[(-0.19, 0.444, SZ), (0.19, 0.444, SZ)],
         0.009,
         M.legs_black,
-        Some(8),
-        3,
-        1.0,
+        verts = 8
     );
     finish("chairModern")
 }
@@ -89,16 +83,19 @@ pub fn chair_windsor() -> Vec<Obj> {
         for j in 0..=n {
             let u = f64::from(j) / f64::from(n) * 2.0 - 1.0;
             let (px, pz) = (
-                u * sqrt(pos(1.0 - v * v / 2.0)),
-                v * sqrt(pos(1.0 - u * u / 2.0)),
+                u * sqrt(py::max(0.0, 1.0 - v * v / 2.0)),
+                v * sqrt(py::max(0.0, 1.0 - u * u / 2.0)),
             );
             let r2 = px * px + pz * pz;
-            let pommel = 0.004 * exp(-pow(px / 0.15, 2.0)) * pos(pz); // never above the rim
-            let dish = pos(0.012 * (1.0 - r2) * (1.0 - 0.6 * pow(pos(pz), 2.0)) - pommel);
+            let pommel = 0.004 * exp(-pow(px / 0.15, 2.0)) * py::max(0.0, pz); // never above the rim
+            let dish = py::max(
+                0.0,
+                0.012 * (1.0 - r2) * (1.0 - 0.6 * pow(py::max(0.0, pz), 2.0)) - pommel,
+            );
             row.push((
                 px * 0.235,
                 0.4475 - dish,
-                SZ + 0.002 + pz * 0.225 - 0.02 * (1.0 - px * px) * pos(-pz),
+                SZ + 0.002 + pz * 0.225 - 0.02 * (1.0 - px * px) * py::max(0.0, -pz),
             ));
         }
         grid.push(row);
@@ -122,15 +119,15 @@ pub fn chair_windsor() -> Vec<Obj> {
                 })
                 .collect();
             pts[0] = (foot.0, 0.0, foot.2);
-            tube(
-                &F,
-                &format!("leg{sx}{sz}"),
+            kit::tube!(
+                F,
+                format!("leg{sx}{sz}"),
                 &pts,
                 0.018,
                 M.frame_windsor,
-                Some(10),
-                2,
-                turn,
+                verts = 10,
+                round = 2,
+                scale = turn
             );
         }
     }
@@ -173,24 +170,32 @@ pub fn chair_windsor() -> Vec<Obj> {
     let mut scale = vec![1.05];
     scale.extend((0..17).map(|i| 1.0 - 0.18 * sin(PI * f64::from(i) / 16.0)));
     scale.push(1.05);
-    tube(&F, "bow", &pts, 0.016, M.frame_windsor, Some(8), 2, scale);
+    kit::tube!(
+        F,
+        "bow",
+        &pts,
+        0.016,
+        M.frame_windsor,
+        verts = 8,
+        round = 2,
+        scale = scale
+    );
     for (k, sx) in [-0.12, -0.08, -0.04, 0.0, 0.04, 0.08, 0.12]
         .into_iter()
         .enumerate()
     {
-        let yy = y0 + ry * sqrt(pos(1.0 - pow(sx / rx, 2.0)));
-        tube(
-            &F,
-            &format!("spindle{k}"),
+        let yy = y0 + ry * sqrt(py::max(0.0, 1.0 - pow(sx / rx, 2.0)));
+        kit::tube!(
+            F,
+            format!("spindle{k}"),
             &[
                 (sx * 0.9, 0.455, SZ - 0.115),
                 (sx, yy - 0.005, z0 - back * (yy - y0) / ry),
             ],
             0.008,
             M.frame_windsor,
-            Some(6),
-            3,
-            [1.15, 0.75],
+            verts = 6,
+            scale = [1.15, 0.75]
         );
     }
     finish("chairWindsor")

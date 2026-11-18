@@ -1,14 +1,14 @@
 //! The bakery case: 2 x 1, a cream cabinet under a glass display, sitting back on its tiles as the game places it;
 //! its back door slides aside.
 
-use super::common::{M, arc, fluted, settle_back};
+use super::common::{M, arc, fluted};
 use artkit::forms::by;
 use artkit::math::{P3, PI, cos, radians, sin};
 use artkit::motion::{Slide, slide};
 use artkit::parts::{join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, kit_shaker, loft, revolve, soft};
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, kit_shaker, loft, revolve, settle, soft};
 
 const DOOR_SECONDS: f64 = 1.0; // the bakery case's back door slides aside this long
 
@@ -451,7 +451,7 @@ pub fn bakery_case() -> Vec<Obj> {
     });
     let door = join(&door, "back_door", Some(f.at(0.455, 1.02, back + 0.008)));
 
-    settle_back();
+    settle!(centre = false);
     slide(
         door,
         "door",

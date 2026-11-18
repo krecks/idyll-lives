@@ -1,8 +1,9 @@
 //! The stereo and the boombox: the music the residents play.
 
 use super::common::call::rbox;
-use super::common::{axle, capsule, driver, py, records};
-use super::{CRATE, F, M};
+use super::common::{axle, capsule, driver, records};
+use super::{F, M};
+use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::{Axis, P3, cosd, pow, sind};
 use artkit::parts::{hinged, join, new_parts};
@@ -120,7 +121,7 @@ pub fn stereo() -> Vec<Obj> {
         );
         for x in [-0.15, -0.08] {
             revolve!(
-                format!("amp_knob{}", py(x)),
+                format!("amp_knob{}", float_repr(x)),
                 &[
                     (0.0, 0.0),
                     (0.019, 0.0),
@@ -441,25 +442,25 @@ pub fn boombox() -> Vec<Obj> {
             0.02,
             0.44,
             (0, 0.01, 0),
-            CRATE,
+            M.crate_,
             r = 0.003
         );
         for s in [-1, 1] {
             let sf = s as f64;
             for y in [0.1, 0.3] {
                 rbox!(
-                    format!("crate_side{s}{}", py(y)),
+                    format!("crate_side{s}{}", float_repr(y)),
                     0.018,
                     0.13,
                     0.44,
                     (sf * 0.291, y, 0),
-                    CRATE,
+                    M.crate_,
                     r = 0.003
                 );
             }
             for zz in [-0.205, 0.205] {
                 rbox!(
-                    format!("crate_post{s}{}", py(zz)),
+                    format!("crate_post{s}{}", float_repr(zz)),
                     0.03,
                     0.42,
                     0.03,
@@ -471,23 +472,23 @@ pub fn boombox() -> Vec<Obj> {
         }
         for x in [-0.15, 0.15] {
             rbox!(
-                format!("crate_top{}", py(x)),
+                format!("crate_top{}", float_repr(x)),
                 0.27,
                 0.018,
                 0.44,
                 (x, 0.411, 0),
-                CRATE,
+                M.crate_,
                 r = 0.003
             );
         }
         for y in [0.1, 0.3] {
             rbox!(
-                format!("crate_back{}", py(y)),
+                format!("crate_back{}", float_repr(y)),
                 0.6,
                 0.13,
                 0.018,
                 (0, y, -0.211),
-                CRATE,
+                M.crate_,
                 r = 0.003
             );
         }
@@ -692,7 +693,7 @@ pub fn boombox() -> Vec<Obj> {
         for x in [-0.025, 0.025] {
             fcyl!(
                 F,
-                format!("reel{}", py(x)),
+                format!("reel{}", float_repr(x)),
                 0.011,
                 0.004,
                 (x, y0 + 0.125, zf + 0.003),
@@ -733,7 +734,7 @@ pub fn boombox() -> Vec<Obj> {
         for x in [-0.22, 0.22] {
             fcyl!(
                 F,
-                format!("dial{}", py(x)),
+                format!("dial{}", float_repr(x)),
                 0.014,
                 0.012,
                 (x, y0 + 0.23, zf + 0.003),

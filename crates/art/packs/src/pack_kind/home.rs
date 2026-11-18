@@ -1,16 +1,16 @@
 //! The gift-knitting rocker, the welcome tea table and the hearthside quilted settee.
 
-use super::bake::settle_in_place;
-use super::common::{M, cup, fluted, name, teapot, tube, turned};
+use super::common::{M, cup, fluted, teapot};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, TAU, cos, cosd, pow, radians, sin, sind};
 use artkit::motion::{Rock, Squash, rock, squash};
-use artkit::parts::{hinged, join, new_parts};
+use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{
-    fbox, fcone, fcyl, fextrude, fsphere, fsweep, jitter, loft, ring, soft, swing, torus,
+    fbox, fcone, fcyl, fextrude, fsphere, fsweep, jitter, kit, loft, ring, settle, soft, swing,
+    torus,
 };
 
 // --- the gift-knitting rocker (1x1): a spindle-back rocking chair, its knitter rocking on it ----------------
@@ -46,7 +46,7 @@ pub fn knitting_rocker() -> Vec<Obj> {
             major_segments = 24,
             minor_segments = 4
         );
-        tube(
+        kit::tube!(
             f,
             "basket_handle",
             &[
@@ -58,8 +58,8 @@ pub fn knitting_rocker() -> Vec<Obj> {
             ],
             0.007,
             M.honey,
-            Some(6),
-            2,
+            verts = 6,
+            round = 2
         );
         for (k, (x, y, z, r, m)) in [
             (0.32, 0.18, 0.32, 0.045, M.rose_flower),
@@ -69,10 +69,18 @@ pub fn knitting_rocker() -> Vec<Obj> {
         .into_iter()
         .enumerate()
         {
-            fsphere!(f, name("yarn"), r, (x, y, z), m, segments = 12, rings = 8);
+            fsphere!(
+                f,
+                numbered("yarn"),
+                r,
+                (x, y, z),
+                m,
+                segments = 12,
+                rings = 8
+            );
             for j in 0..2 {
                 torus!(
-                    name("yarn_wrap"),
+                    numbered("yarn_wrap"),
                     r * 0.98,
                     0.0035,
                     at = f.at(x, y, z),
@@ -83,7 +91,7 @@ pub fn knitting_rocker() -> Vec<Obj> {
                 );
             }
         }
-        tube(
+        kit::tube!(
             f,
             "yarn_strand",
             &[
@@ -94,8 +102,8 @@ pub fn knitting_rocker() -> Vec<Obj> {
             ],
             0.003,
             M.rose_flower,
-            Some(4),
-            2,
+            verts = 4,
+            round = 2
         );
         for (a, b) in [
             ((0.31, 0.15, 0.37), (0.41, 0.32, 0.29)),
@@ -103,7 +111,7 @@ pub fn knitting_rocker() -> Vec<Obj> {
         ] {
             fsweep!(
                 f,
-                name("needle"),
+                numbered("needle"),
                 &[a, b],
                 0.004,
                 M.needle,
@@ -112,7 +120,7 @@ pub fn knitting_rocker() -> Vec<Obj> {
             );
             fsphere!(
                 f,
-                name("needle_end"),
+                numbered("needle_end"),
                 0.007,
                 b,
                 M.mustard,
@@ -175,7 +183,7 @@ pub fn knitting_rocker() -> Vec<Obj> {
                 .collect();
             fsweep!(
                 f,
-                name("rocker"),
+                numbered("rocker"),
                 &pts,
                 0,
                 M.rocker,
@@ -185,7 +193,7 @@ pub fn knitting_rocker() -> Vec<Obj> {
             );
             fsweep!(
                 f,
-                name("front_leg"),
+                numbered("front_leg"),
                 &[
                     (x, 0.04, CZ + 0.2),
                     (x, 0.25, CZ + 0.19),
@@ -199,7 +207,7 @@ pub fn knitting_rocker() -> Vec<Obj> {
             );
             fsweep!(
                 f,
-                name("stile"),
+                numbered("stile"),
                 &[
                     (x, 0.035, CZ - 0.2),
                     (x, 0.42, CZ - 0.19),
@@ -212,9 +220,9 @@ pub fn knitting_rocker() -> Vec<Obj> {
                 resolution = 2,
                 scale = [0.85, 1.0, 0.95, 0.85]
             );
-            turned(
+            kit::turned!(
                 f,
-                &name("finial"),
+                numbered("finial"),
                 x * 1.02,
                 0.998,
                 CZ - 0.322,
@@ -228,13 +236,12 @@ pub fn knitting_rocker() -> Vec<Obj> {
                     (0.0, 0.048),
                 ],
                 M.rocker,
-                10,
-                (0.0, 0.0, 0.0),
+                segments = 10
             );
             // the arm: rising from its post and rolling over at the front into a hand-rest
             fsweep!(
                 f,
-                name("arm"),
+                numbered("arm"),
                 &[
                     (x * 1.06, 0.655, CZ - 0.24),
                     (x * 1.08, 0.665, CZ - 0.02),
@@ -250,7 +257,7 @@ pub fn knitting_rocker() -> Vec<Obj> {
             );
             fsweep!(
                 f,
-                name("arm_post"),
+                numbered("arm_post"),
                 &[
                     (x * 1.06, 0.42, CZ + 0.17),
                     (x * 1.07, 0.55, CZ + 0.175),
@@ -262,21 +269,21 @@ pub fn knitting_rocker() -> Vec<Obj> {
                 resolution = 2,
                 scale = [1.0, 0.8, 1.0]
             );
-            tube(
+            kit::tube!(
                 f,
-                &name("side_stretcher"),
+                numbered("side_stretcher"),
                 &[(x, 0.15, CZ - 0.19), (x, 0.15, CZ + 0.19)],
                 0.011,
                 M.rocker,
-                Some(6),
-                1,
+                verts = 6,
+                round = 1
             );
         }
         for i in 0..6 {
             let xx = -0.15 + i as f64 * 0.06;
             fsweep!(
                 f,
-                name("spindle"),
+                numbered("spindle"),
                 &[
                     (xx, 0.44, CZ - 0.185),
                     (xx, 0.68, CZ - 0.235),
@@ -308,14 +315,14 @@ pub fn knitting_rocker() -> Vec<Obj> {
             profile = rounded_rect(0.08, 0.035, 0.014, 2),
             up = (0, 0, 1)
         );
-        tube(
+        kit::tube!(
             f,
             "stretcher",
             &[(-w / 2.0 + 0.07, 0.15, CZ), (w / 2.0 - 0.07, 0.15, CZ)],
             0.011,
             M.rocker,
-            Some(6),
-            1,
+            verts = 6,
+            round = 1
         );
         soft!(
             f,
@@ -331,9 +338,9 @@ pub fn knitting_rocker() -> Vec<Obj> {
             flat = 2
         );
         for s in [-1.0, 1.0] {
-            tube(
+            kit::tube!(
                 f,
-                &name("cushion_tie"),
+                numbered("cushion_tie"),
                 &[
                     (s * 0.17, 0.46, CZ - 0.17),
                     (s * 0.2, 0.45, CZ - 0.19),
@@ -341,8 +348,8 @@ pub fn knitting_rocker() -> Vec<Obj> {
                 ],
                 0.004,
                 M.cushion,
-                Some(4),
-                2,
+                verts = 4,
+                round = 2
             );
         }
         // the throw folded over the crest, hanging down the back
@@ -367,7 +374,7 @@ pub fn knitting_rocker() -> Vec<Obj> {
         jitter!(throw, 0.004, size = 0.1, seed = 3.0, up = 0.5);
     });
     let chair = hinged(join(&chair, "chair", None), f.at(0, py, CZ));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     rock(
         chair,
         "rock",
@@ -385,7 +392,6 @@ const POUF_X: f64 = 0.75; // content `places` [±0.75, 0], facing ±90
 
 pub fn welcome_tea_table() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
-    let none = (0.0, 0.0, 0.0);
     let still = new_parts(|| {
         // a braided oval rug: rings of plait in two colours to a border
         fcyl!(
@@ -418,7 +424,7 @@ pub fn welcome_tea_table() -> Vec<Obj> {
             };
             fsweep!(
                 f,
-                name("rug_braid"),
+                numbered("rug_braid"),
                 &ring,
                 0,
                 m,
@@ -431,7 +437,7 @@ pub fn welcome_tea_table() -> Vec<Obj> {
             let P3 { x: bx, y: by, .. } = f.at(x, 0, 0);
             // a cable-knit pouf: its side ribbed, its top a cushion with piping and a button
             loft!(
-                name("pouf"),
+                numbered("pouf"),
                 &[
                     ring!(0.18, 0.18, z = 0.0, verts = 40, at = (bx, by)),
                     fluted(0.198, 0.02, 40, (bx, by), 10, 0.035, 1.0),
@@ -442,9 +448,9 @@ pub fn welcome_tea_table() -> Vec<Obj> {
                 ],
                 material = m
             );
-            turned(
+            kit::turned!(
                 f,
-                &name("pouf_top"),
+                numbered("pouf_top"),
                 x,
                 0.0,
                 0.0,
@@ -458,11 +464,10 @@ pub fn welcome_tea_table() -> Vec<Obj> {
                     (0.0, 0.448),
                 ],
                 M.cushion,
-                28,
-                none,
+                segments = 28
             );
             torus!(
-                name("piping"),
+                numbered("piping"),
                 0.202,
                 0.009,
                 at = f.at(x, 0.372, 0.0),
@@ -472,7 +477,7 @@ pub fn welcome_tea_table() -> Vec<Obj> {
             );
             fsphere!(
                 f,
-                name("pouf_button"),
+                numbered("pouf_button"),
                 0.014,
                 (x, 0.448, 0.0),
                 M.rug,
@@ -498,7 +503,7 @@ pub fn welcome_tea_table() -> Vec<Obj> {
             for z in [-0.25, 0.21] {
                 fsweep!(
                     f,
-                    name("table_leg"),
+                    numbered("table_leg"),
                     &[
                         (x, 0.32, z),
                         (
@@ -533,7 +538,7 @@ pub fn welcome_tea_table() -> Vec<Obj> {
             let k = k as f64;
             fbox!(
                 f,
-                name("book"),
+                numbered("book"),
                 0.16 - 0.01 * k,
                 h,
                 0.12 - 0.01 * k,
@@ -545,7 +550,7 @@ pub fn welcome_tea_table() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                name("book_pages"),
+                numbered("book_pages"),
                 0.15 - 0.01 * k,
                 h - 0.008,
                 0.124 - 0.01 * k,
@@ -554,7 +559,7 @@ pub fn welcome_tea_table() -> Vec<Obj> {
                 rot = (0, 0, r)
             );
         }
-        turned(
+        kit::turned!(
             f,
             "tea_light_cup",
             0.1,
@@ -569,8 +574,7 @@ pub fn welcome_tea_table() -> Vec<Obj> {
                 (0.0, 0.006),
             ],
             M.rose,
-            14,
-            none,
+            segments = 14
         );
         fcyl!(
             f,
@@ -593,7 +597,7 @@ pub fn welcome_tea_table() -> Vec<Obj> {
         );
         cup(f, -0.1, 0.36, 0.14, 200.0); // a cup before each of them
         cup(f, 0.1, 0.36, 0.1, -20.0);
-        turned(
+        kit::turned!(
             f,
             "milk_jug",
             0.11,
@@ -611,8 +615,7 @@ pub fn welcome_tea_table() -> Vec<Obj> {
                 (0.0, 0.06),
             ],
             M.porcelain,
-            14,
-            none,
+            segments = 14
         );
         fsweep!(
             f,
@@ -640,9 +643,9 @@ pub fn welcome_tea_table() -> Vec<Obj> {
         );
         // potted ferns at the back, between the poufs and the table: arching fronds in two greens
         for x in [-0.44, 0.44] {
-            turned(
+            kit::turned!(
                 f,
-                &name("fern_pot"),
+                numbered("fern_pot"),
                 x,
                 0.0,
                 -0.33,
@@ -657,8 +660,7 @@ pub fn welcome_tea_table() -> Vec<Obj> {
                     (0.0, 0.19),
                 ],
                 M.pot,
-                16,
-                none,
+                segments = 16
             );
             for k in 0..6 {
                 let a = (k * 60 - 30) as f64;
@@ -667,7 +669,7 @@ pub fn welcome_tea_table() -> Vec<Obj> {
                 let s = s * if s < 0.0 { 0.8 } else { 1.0 }; // (less towards the wall)
                 fsweep!(
                     f,
-                    name("frond"),
+                    numbered("frond"),
                     &[
                         (x, 0.185, -0.33),
                         (
@@ -692,7 +694,7 @@ pub fn welcome_tea_table() -> Vec<Obj> {
     let pot = new_parts(|| teapot(f, -0.07, 0.36, -0.06, 1.0));
     // `pour` tips it towards its spout about the foot's edge under the spout, over the cups.
     let pot = hinged(join(&pot, "teapot", None), f.at(-0.02, 0.36, -0.06));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(pot, "pour", -30.0, seconds = 0.8, axis = Axis::Y);
     objs
 }
@@ -786,7 +788,7 @@ pub fn hearth_settee() -> Vec<Obj> {
         for x in [-0.4, 0.4] {
             soft!(
                 f,
-                name("back_cushion"),
+                numbered("back_cushion"),
                 0.74,
                 0.36,
                 0.14,
@@ -803,7 +805,7 @@ pub fn hearth_settee() -> Vec<Obj> {
         for s in [-1.0, 1.0] {
             rolled_arm(
                 f,
-                &name("arm"),
+                &numbered("arm"),
                 s * 0.82,
                 s,
                 -0.42,
@@ -815,9 +817,9 @@ pub fn hearth_settee() -> Vec<Obj> {
                 0.02,
             );
             for z in [-0.36, 0.3] {
-                turned(
+                kit::turned!(
                     f,
-                    &name("leg"),
+                    numbered("leg"),
                     s * 0.82,
                     0.0,
                     z,
@@ -832,8 +834,7 @@ pub fn hearth_settee() -> Vec<Obj> {
                         (0.0, 0.1),
                     ],
                     M.honey,
-                    12,
-                    (0.0, 0.0, 0.0),
+                    segments = 12
                 );
             }
         }
@@ -873,7 +874,7 @@ pub fn hearth_settee() -> Vec<Obj> {
         {
             fsphere!(
                 f,
-                name("pillow_button"),
+                numbered("pillow_button"),
                 0.012,
                 (x + 0.01 * (1 - 2 * k as i32) as f64, y, z - 0.004),
                 M.brass,
@@ -884,7 +885,7 @@ pub fn hearth_settee() -> Vec<Obj> {
         }
         // a brass lantern on the left arm: a base, four posts round its light, a peaked cap, a ring
         let (lx, ly, lz) = (-0.84, 0.68, 0.12);
-        turned(
+        kit::turned!(
             f,
             "lantern_base",
             lx,
@@ -898,8 +899,8 @@ pub fn hearth_settee() -> Vec<Obj> {
                 (0.0, 0.02),
             ],
             M.brass,
-            4,
-            (0.0, 0.0, 45.0),
+            segments = 4,
+            rot = (0.0, 0.0, 45.0)
         );
         fbox!(
             f,
@@ -916,7 +917,7 @@ pub fn hearth_settee() -> Vec<Obj> {
             for dz in [-0.052, 0.052] {
                 fbox!(
                     f,
-                    name("lantern_post"),
+                    numbered("lantern_post"),
                     0.012,
                     0.16,
                     0.012,
@@ -928,7 +929,7 @@ pub fn hearth_settee() -> Vec<Obj> {
         for y in [ly + 0.03, ly + 0.165] {
             fbox!(
                 f,
-                name("lantern_band"),
+                numbered("lantern_band"),
                 0.116,
                 0.01,
                 0.116,
@@ -966,7 +967,7 @@ pub fn hearth_settee() -> Vec<Obj> {
         for x in [-0.41, 0.41] {
             soft!(
                 f,
-                name("seat_cushion"),
+                numbered("seat_cushion"),
                 0.8,
                 0.12 - puff,
                 0.62,
@@ -994,7 +995,7 @@ pub fn hearth_settee() -> Vec<Obj> {
             ];
             let strip = fsweep!(
                 f,
-                name("quilt_strip"),
+                numbered("quilt_strip"),
                 &pts,
                 0,
                 m,
@@ -1008,7 +1009,7 @@ pub fn hearth_settee() -> Vec<Obj> {
             let t = (k as f64 + 0.5) / 4.0;
             fbox!(
                 f,
-                name("quilt_stitch"),
+                numbered("quilt_stitch"),
                 0.762,
                 0.003,
                 0.006,
@@ -1018,7 +1019,7 @@ pub fn hearth_settee() -> Vec<Obj> {
         }
     });
     let seats = hinged(join(&seats, "seats", None), f.at(0, 0.33, 0.06));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     squash(
         seats,
         "sink_in",

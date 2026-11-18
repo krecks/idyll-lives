@@ -1,26 +1,14 @@
 //! The midnight record cabinet and the nocturne cello.
 
-use super::common::{
-    M, WALL, candle, fillet, lathe, leg, name, open_book, pull, scroll, tube, turned, vase,
-};
+use super::common::{M, WALL, candle, leg, open_book, vase};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::math::{Axis, P3, PI, TAU, cos, cosd, degrees, pow, sin, sind, sqrt};
 use artkit::motion::{Spin, spin};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
-use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, loft, slide, swing, torus};
-
-pub fn settle_in_place() -> Vec<Obj> {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    )
-}
+use artkit::scene::Obj;
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, kit, loft, settle, slide, swing, torus};
 
 // --- the midnight record cabinet (1x1): a walnut console, a turntable under a hinged lid -------------------
 const TOP: f64 = 0.62;
@@ -37,7 +25,7 @@ pub fn record_cabinet() -> Vec<Obj> {
             for z in [WALL + 0.05, zf - 0.05] {
                 leg(
                     f,
-                    &name("leg"),
+                    &numbered("leg"),
                     x,
                     z,
                     0.145,
@@ -82,7 +70,7 @@ pub fn record_cabinet() -> Vec<Obj> {
         for x in [-0.435, 0.435] {
             fbox!(
                 f,
-                name("side"),
+                numbered("side"),
                 0.03,
                 TOP - 0.14,
                 d,
@@ -120,7 +108,7 @@ pub fn record_cabinet() -> Vec<Obj> {
             let t = rnd.uniform(0.008, 0.016);
             let m = rnd.choice(&[M.sleeve_a, M.sleeve_b, M.sleeve_c, M.sleeve_d]);
             let h = if rnd.random() < 0.8 { 0.31 } else { 0.26 };
-            let n = name("lp");
+            let n = numbered("lp");
             let r = rnd.uniform(-4.0, 4.0);
             fbox!(
                 f,
@@ -181,7 +169,7 @@ pub fn record_cabinet() -> Vec<Obj> {
         for k in 0..8 {
             fbox!(
                 f,
-                name("door_slat"),
+                numbered("door_slat"),
                 0.03,
                 0.32,
                 0.014,
@@ -189,7 +177,7 @@ pub fn record_cabinet() -> Vec<Obj> {
                 M.slat
             );
         }
-        pull(
+        kit::pull!(
             f,
             "door_pull",
             0.055,
@@ -197,10 +185,10 @@ pub fn record_cabinet() -> Vec<Obj> {
             zf + 0.014,
             0.09,
             M.brass,
-            0.005,
-            0.022,
-            true,
-            6,
+            r = 0.005,
+            out = 0.022,
+            upright = true,
+            verts = 6
         );
         // the top: the turntable's well on the left, a board on the right with sleeves and a candle
         fbox!(
@@ -271,7 +259,7 @@ pub fn record_cabinet() -> Vec<Obj> {
         for k in 0..2 {
             fcyl!(
                 f,
-                name("speed"),
+                numbered("speed"),
                 0.008,
                 0.006,
                 (-0.39 + 0.022 * k as f64, 0.601, zf - 0.075),
@@ -279,7 +267,7 @@ pub fn record_cabinet() -> Vec<Obj> {
                 verts = 8
             );
         }
-        turned(
+        kit::turned!(
             f,
             "tonearm_base",
             -0.08,
@@ -294,9 +282,9 @@ pub fn record_cabinet() -> Vec<Obj> {
                 (0.0, 0.027),
             ],
             M.chrome,
-            10,
+            segments = 10
         );
-        tube(
+        kit::tube!(
             f,
             "tonearm",
             &[
@@ -308,8 +296,8 @@ pub fn record_cabinet() -> Vec<Obj> {
             ],
             0.0035,
             M.chrome,
-            Some(6),
-            2,
+            verts = 6,
+            round = 2
         );
         fcyl!(
             f,
@@ -358,7 +346,7 @@ pub fn record_cabinet() -> Vec<Obj> {
         {
             fbox!(
                 f,
-                name("sleeve"),
+                numbered("sleeve"),
                 0.31,
                 0.31,
                 0.01,
@@ -379,7 +367,7 @@ pub fn record_cabinet() -> Vec<Obj> {
             let mid = (0.33 + dx * 0.45, top + h * 0.45, 0.3 + dz * 0.45 + 0.01);
             fsweep!(
                 f,
-                name("twig"),
+                numbered("twig"),
                 &[p0, mid, p1],
                 0.005,
                 M.twig,
@@ -397,7 +385,7 @@ pub fn record_cabinet() -> Vec<Obj> {
                 let end = (at.0 + bx * (1 - 2 * (a % 2)) as f64, at.1 + by, at.2 + bz);
                 fsweep!(
                     f,
-                    name("sprig"),
+                    numbered("sprig"),
                     &[at, end],
                     0.0028,
                     M.twig,
@@ -406,7 +394,7 @@ pub fn record_cabinet() -> Vec<Obj> {
                 );
                 fcyl!(
                     f,
-                    name("pod"),
+                    numbered("pod"),
                     0.016,
                     0.003,
                     end,
@@ -419,7 +407,7 @@ pub fn record_cabinet() -> Vec<Obj> {
             for k in 0..2 {
                 fcyl!(
                     f,
-                    name("pod"),
+                    numbered("pod"),
                     0.018 - 0.002 * k as f64,
                     0.003,
                     (
@@ -438,7 +426,7 @@ pub fn record_cabinet() -> Vec<Obj> {
     join(&still, "body", Some(P3::ZERO));
     // The platter and its record, origin on the spindle: `platter_spin` turns it (33 rpm) while the record plays.
     let plat = new_parts(|| {
-        turned(
+        kit::turned!(
             f,
             "platter",
             -0.225,
@@ -446,9 +434,9 @@ pub fn record_cabinet() -> Vec<Obj> {
             zc,
             &[(0.0, 0.0), (0.131, 0.0), (0.131, 0.012), (0.0, 0.012)],
             M.platter,
-            28,
+            segments = 28
         );
-        turned(
+        kit::turned!(
             f,
             "record",
             -0.225,
@@ -462,7 +450,7 @@ pub fn record_cabinet() -> Vec<Obj> {
                 (0.0, 0.016),
             ],
             M.vinyl,
-            28,
+            segments = 28
         );
         fcyl!(
             f,
@@ -532,7 +520,7 @@ pub fn record_cabinet() -> Vec<Obj> {
         );
     });
     let lid = hinged(join(&lid, "lid", None), f.at(-0.225, TOP + 0.0125, WALL));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(lid, "lid_open", -80.0, seconds = 0.9, axis = Axis::X);
     spin(
         plat,
@@ -623,7 +611,7 @@ fn cello_body(f: &GameFrame) {
     for s in [-1.0, 1.0] {
         fsweep!(
             f,
-            name("f_hole"),
+            numbered("f_hole"),
             &[
                 (x + s * 0.074, 0.49, z + 0.063),
                 (x + s * 0.062, 0.535, z + 0.064),
@@ -681,7 +669,7 @@ fn cello_body(f: &GameFrame) {
     for k in 0..4 {
         fcyl!(
             f,
-            name("tuner"),
+            numbered("tuner"),
             0.0035,
             0.008,
             (x - 0.018 + 0.012 * k as f64, 0.455, z + 0.076),
@@ -768,7 +756,7 @@ fn cello_body(f: &GameFrame) {
     for s in [-1.0, 1.0] {
         fbox!(
             f,
-            name("pegbox_cheek"),
+            numbered("pegbox_cheek"),
             0.008,
             0.13,
             0.034,
@@ -798,22 +786,22 @@ fn cello_body(f: &GameFrame) {
         (x, 1.27, z + 0.045),
         M.ebony
     );
-    scroll(
+    kit::scroll!(
         f,
         "scroll",
         (x, 1.335, z + 0.045),
         (1.385, z + 0.04),
         M.varnish,
-        -1.2,
-        0.22,
-        0.042,
-        0.02,
-        14,
+        turns = -1.2,
+        end = 0.22,
+        t = 0.042,
+        w = 0.02,
+        steps = 14
     );
     for (s, yk) in [(-1.0, 1.245), (1.0, 1.265), (-1.0, 1.29), (1.0, 1.31)] {
         fcyl!(
             f,
-            name("peg"),
+            numbered("peg"),
             0.005,
             0.07,
             (x + s * 0.032, yk, z + 0.045),
@@ -823,7 +811,7 @@ fn cello_body(f: &GameFrame) {
         );
         fsphere!(
             f,
-            name("peg_head"),
+            numbered("peg_head"),
             0.017,
             (x + s * 0.07, yk, z + 0.045),
             M.ebony,
@@ -836,7 +824,7 @@ fn cello_body(f: &GameFrame) {
         let dx = -0.015 + 0.01 * k as f64;
         fsweep!(
             f,
-            name("string"),
+            numbered("string"),
             &[
                 (x + dx * 0.9, 0.465, z + 0.078),
                 (x + dx, 0.532, z + 0.101),
@@ -855,7 +843,7 @@ pub fn cello() -> Vec<Obj> {
         // the stool: a padded round seat (top 0.45, hips on the footprint's middle) on a turned column and three
         // splayed legs with a foot ring
         let sz = -0.08;
-        turned(
+        kit::turned!(
             f,
             "stool_top",
             0.0,
@@ -870,9 +858,9 @@ pub fn cello() -> Vec<Obj> {
                 (0.0, 0.04),
             ],
             M.rosewood,
-            28,
+            segments = 28
         );
-        lathe(
+        kit::lathe!(
             f,
             "stool_cushion",
             0.0,
@@ -887,8 +875,7 @@ pub fn cello() -> Vec<Obj> {
                 (0.0, 0.031),
             ],
             M.plum,
-            28,
-            2.0,
+            verts = 28
         );
         torus!(
             "stool_piping",
@@ -909,7 +896,7 @@ pub fn cello() -> Vec<Obj> {
             segments = 8,
             rings = 4
         );
-        turned(
+        kit::turned!(
             f,
             "stool_column",
             0.0,
@@ -927,14 +914,14 @@ pub fn cello() -> Vec<Obj> {
                 (0.0, 0.26),
             ],
             M.rosewood,
-            14,
+            segments = 14
         );
         for k in 0..3 {
             let a = (90 + 120 * k) as f64;
             let (c, s) = (cosd(a), sind(a));
             fsweep!(
                 f,
-                name("stool_leg"),
+                numbered("stool_leg"),
                 &[
                     (0.03 * c, 0.2, sz + 0.03 * s),
                     (0.11 * c, 0.09, sz + 0.11 * s),
@@ -960,7 +947,7 @@ pub fn cello() -> Vec<Obj> {
         // back and a yoke round the neck
         let (x, _, z) = REST;
         let hz = z - 0.08;
-        turned(
+        kit::turned!(
             f,
             "stand_hub",
             x,
@@ -974,14 +961,14 @@ pub fn cello() -> Vec<Obj> {
                 (0.0, 0.06),
             ],
             M.rosewood,
-            12,
+            segments = 12
         );
         for k in 0..3 {
             let a = (90 + 120 * k) as f64;
             let (c, s) = (cosd(a), sind(a));
             fsweep!(
                 f,
-                name("stand_foot"),
+                numbered("stand_foot"),
                 &[
                     (x + 0.015 * c, 0.035, hz + 0.015 * s),
                     (x + 0.07 * c, 0.02, hz + 0.07 * s),
@@ -996,7 +983,7 @@ pub fn cello() -> Vec<Obj> {
             );
             fsphere!(
                 f,
-                name("stand_pad"),
+                numbered("stand_pad"),
                 0.012,
                 (x + 0.125 * c, 0.008, hz + 0.125 * s),
                 M.rosewood,
@@ -1005,7 +992,7 @@ pub fn cello() -> Vec<Obj> {
                 rings = 4
             );
         }
-        turned(
+        kit::turned!(
             f,
             "stand_cup",
             x,
@@ -1020,16 +1007,16 @@ pub fn cello() -> Vec<Obj> {
                 (0.0, 0.022),
             ],
             M.rosewood,
-            14,
+            segments = 14
         );
-        tube(
+        kit::tube!(
             f,
             "stand_heel",
             &[(x, 0.015, z - 0.02), (x, 0.03, hz)],
             0.011,
             M.rosewood,
-            Some(8),
-            1,
+            verts = 8,
+            round = 1
         );
         fsweep!(
             f,
@@ -1051,41 +1038,40 @@ pub fn cello() -> Vec<Obj> {
             bevel = 0.004,
             bevel_segments = 1
         );
-        tube(
+        kit::tube!(
             f,
             "stand_arm",
             &[(x, 0.985, z - 0.12), (x, 0.985, z - 0.005)],
             0.008,
             M.rosewood,
-            Some(8),
-            1,
+            verts = 8,
+            round = 1
         );
-        tube(
+        kit::tube!(
             f,
             "stand_yoke",
-            &fillet(
+            &kit::fillet!(
                 &[
                     (x - 0.03, 0.985, z + 0.045),
                     (x - 0.03, 0.985, z - 0.005),
                     (x + 0.03, 0.985, z - 0.005),
                     (x + 0.03, 0.985, z + 0.045),
                 ],
-                0.012,
-                3,
+                0.012
             ),
             0.006,
             M.rosewood,
-            Some(6),
-            1,
+            verts = 6,
+            round = 1
         );
-        tube(
+        kit::tube!(
             f,
             "stand_cradle",
             &[(x, 0.3, z - 0.12), (x, 0.3, z - 0.075)],
             0.009,
             M.rosewood,
-            Some(8),
-            1,
+            verts = 8,
+            round = 1
         );
         fbox!(
             f,
@@ -1100,7 +1086,7 @@ pub fn cello() -> Vec<Obj> {
         );
         // the bow hung on the stand's post: a cambered stick, its frog and tip, the hair
         let (bx, bz) = (x + 0.035, z - 0.135);
-        tube(
+        kit::tube!(
             f,
             "bow_hook",
             &[
@@ -1110,8 +1096,8 @@ pub fn cello() -> Vec<Obj> {
             ],
             0.003,
             M.chrome,
-            Some(5),
-            1,
+            verts = 5,
+            round = 1
         );
         fsweep!(
             f,
@@ -1175,7 +1161,7 @@ pub fn cello() -> Vec<Obj> {
     // to between the player's knees and leans it back 14 degrees.
     let body = new_parts(|| cello_body(f));
     let body = join(&body, "cello", Some(f.at(REST.0, REST.1, REST.2)));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     slide!(
         body,
         "off_stand",

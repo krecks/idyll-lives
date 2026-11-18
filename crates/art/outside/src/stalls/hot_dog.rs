@@ -1,25 +1,19 @@
 //! The hot dog stand: a red cart with a hot plate across its 2 x 1 tiles, under a striped awning on four posts; its
 //! hot plate's lid lifts as the vendor reaches in.
 
-use super::common::{M, fr, settle_in_place, valance, wheel};
+use super::common::{M, valance, wheel};
 use artkit::forms::{by, rounded_rect};
+use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, pow, sin};
 use artkit::motion::{Swing, swing};
 use artkit::parts::{hinged, join, new_parts};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcone, fcyl, fextrude, fsweep, kit_pull, loft, ring, soft};
+use artkit::{fbox, fcone, fcyl, fextrude, fsweep, kit_pull, loft, ring, settle, soft};
 
 // --- the hot dog stand: a red cart with a hot plate, under a striped awning on four posts -----------------
-/// Which way a sausage or a bun lies.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Along {
-    X,
-    Z,
-}
-
-/// A sausage lying along the depth (or across, `Along::X`): a tube bowed a little, rounded off at its ends.
+/// A sausage lying along the depth (or across, `Axis::X`): a tube bowed a little, rounded off at its ends.
 #[allow(clippy::too_many_arguments)] // (as the script called it)
 fn sausage(
     f: &GameFrame,
@@ -30,14 +24,14 @@ fn sausage(
     length: f64,
     r: f64,
     material: Mat,
-    along: Along,
+    along: Axis,
     bend: f64,
 ) -> Obj {
     let mut pts = Vec::new();
     for i in 0..7 {
         let fi = i as f64 / 6.0 - 0.5;
         let off = bend * (1.0 - pow(2.0 * fi, 2.0));
-        pts.push(if along == Along::Z {
+        pts.push(if along == Axis::Z {
             (x + off, y, z + fi * length)
         } else {
             (x + fi * length, y + off, z)
@@ -57,19 +51,10 @@ fn sausage(
 
 /// A split bun lying along the depth or across: two soft halves, a little apart.
 #[allow(clippy::too_many_arguments)] // (as the script called it)
-fn bun(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    z: f64,
-    length: f64,
-    material: Mat,
-    along: Along,
-) {
+fn bun(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, length: f64, material: Mat, along: Axis) {
     for s in [-1, 1] {
         let sf = s as f64;
-        if along == Along::Z {
+        if along == Axis::Z {
             soft!(
                 f,
                 format!("{name}{s}"),
@@ -191,7 +176,14 @@ pub fn hot_dog_stand() -> Vec<Obj> {
         );
         for x in [-0.68, 0.5] {
             for z in [0.24, -0.34] {
-                wheel(&f, &format!("wheel{}{}", fr(x), fr(z)), x, z, 0.2, 6);
+                wheel(
+                    &f,
+                    &format!("wheel{}{}", float_repr(x), float_repr(z)),
+                    x,
+                    z,
+                    0.2,
+                    6,
+                );
             }
         }
         // the sign on the front: a framed plate, a hot dog in its bun with a mustard zigzag
@@ -236,7 +228,7 @@ pub fn hot_dog_stand() -> Vec<Obj> {
             0.5,
             0.024,
             M.sausage,
-            Along::X,
+            Axis::X,
             0.0,
         );
         let zigzag: Vec<(f64, f64, f64)> = (0..13)
@@ -283,16 +275,16 @@ pub fn hot_dog_stand() -> Vec<Obj> {
                 0.22,
                 0.018,
                 M.sausage,
-                Along::Z,
+                Axis::Z,
                 0.006,
             );
         }
         for (k, x) in [-0.6, -0.13].into_iter().enumerate() {
-            bun(&f, &format!("bun{k}"), x, 1.07, -0.12, 0.2, M.bun, Along::Z);
+            bun(&f, &format!("bun{k}"), x, 1.07, -0.12, 0.2, M.bun, Axis::Z);
         }
         // sauces, a napkin box with a napkin pulled up, a stack of paper trays at the right
         for (x, m) in [(0.3, M.mustard), (0.42, M.ketchup)] {
-            squeezy(&f, &format!("bottle{}", fr(x)), x, 1.0, 0.1, m, m);
+            squeezy(&f, &format!("bottle{}", float_repr(x)), x, 1.0, 0.1, m, m);
         }
         fbox!(
             f,
@@ -337,7 +329,7 @@ pub fn hot_dog_stand() -> Vec<Obj> {
             for (z, top) in [(-0.4, 2.35), (0.38, 2.23)] {
                 fsweep!(
                     f,
-                    format!("post{}{}", fr(x), fr(z)),
+                    format!("post{}{}", float_repr(x), float_repr(z)),
                     &[(x, 1.0, z), (x, top, z)],
                     0.02,
                     M.steel,
@@ -345,7 +337,7 @@ pub fn hot_dog_stand() -> Vec<Obj> {
                 );
                 fcyl!(
                     f,
-                    format!("post_foot{}{}", fr(x), fr(z)),
+                    format!("post_foot{}{}", float_repr(x), float_repr(z)),
                     0.03,
                     0.02,
                     (x, 1.01, z),
@@ -402,7 +394,7 @@ pub fn hot_dog_stand() -> Vec<Obj> {
         );
     });
     let lid = hinged(join(&parts, "lid", None), f.at(-0.35, 1.04, -0.3));
-    settle_in_place();
+    settle!(centre = false);
     swing(
         lid,
         "lid_open",

@@ -1,9 +1,10 @@
 //! The tall fridge-freezer (K1) behind shaker cabinet fronts: a fridge door over a freezer door, each hinged on its
 //! left edge with a clip of its own.
 
-use super::common::{apple, carton, gasket, jar, kick, shaker};
+use super::common::{apple, carton, gasket, jar, kick};
 use super::fridge::{bottle, door_bin};
 use super::{DOOR_SECONDS, M};
+use crate::common::shaker;
 use artkit::forms::rounded_rect;
 use artkit::math::{cos, radians, sin};
 use artkit::motion::Ease;

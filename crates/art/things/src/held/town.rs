@@ -1,7 +1,7 @@
 //! The food from town (review M-held-03), each in what it is sold in, and a parcel to carry in.
 
 use super::M;
-use super::common::{F, done, face_centre, loft, rrect, same};
+use super::common::{F, done, loft, rrect};
 use super::dishes::_bag_ring;
 use artkit::math::{TAU, atan2};
 use artkit::scene::Obj;
@@ -39,11 +39,11 @@ pub fn ice_cream_cup() -> Vec<Obj> {
         let paper = mesh
             .mats
             .iter()
-            .position(|&m| same(m, M.cup_paper))
+            .position(|&m| m == M.cup_paper)
             .expect("the cup's paper") as u16;
         let normals = mesh.face_normals();
         for f in 0..mesh.faces.len() {
-            let c = face_centre(&mesh.verts, mesh.corners(f));
+            let c = mesh.face_centre(f);
             let cz = c.z as f64;
             if mesh.faces[f].mat != paper && normals[f].z < 0.9 && 0.004 < cz && cz < 0.057 {
                 let turn = artkit::py::fmod(atan2(c.y as f64, c.x as f64), TAU);

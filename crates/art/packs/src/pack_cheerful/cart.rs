@@ -1,15 +1,17 @@
 //! The fizz & sunshine mocktail cart (1x1): a brass bar cart under a striped canopy.
 
-use super::common::{M, TOP, fillet, name, obj, paint, pull, slab, tube, tumbler};
-use super::music::settle_in_place;
-use artkit::forms::{Scale, rounded_rect, smooth_outline};
+use super::common::{M, TOP, slab, tumbler};
+use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, cos, cosd, pow, sin, sind};
 use artkit::motion::{Squash, squash};
-use artkit::parts::{hinged, join, new_parts};
+use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
-use artkit::{fbox, fcone, fcyl, fextrude, fsphere, fsweep, jitter, loft, revolve, ring, torus};
+use artkit::{
+    fbox, fcone, fcyl, fextrude, fsphere, fsweep, jitter, kit, loft, object_of, revolve, ring,
+    settle, torus,
+};
 
 const SHAKER: (f64, f64) = (0.06, 0.08); // the shaker's foot (x, depth), tipping over to the left
 
@@ -44,7 +46,7 @@ fn bottle(
         .map(|&(t, k)| ring!(r * k, r * k, z = bz + h * t, verts = 10, at = (bx, by)))
         .collect();
     let b = loft!(name, &secs, material = material);
-    paint(b, M.porcelain, |c| {
+    kit::paint(b, M.porcelain, |c| {
         let up = c.z as f64 - bz;
         0.2 * h < up && up < 0.5 * h
     });
@@ -66,12 +68,11 @@ fn bottle(
 pub fn mocktail_cart() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
     let (zb, zf) = (-0.29, 0.17);
-    let one = || Scale::One(1.0);
     let still = new_parts(|| {
         for y in [0.3, 0.8] {
             fextrude!(
                 f,
-                name("shelf"),
+                numbered("shelf"),
                 &rounded_rect(0.78, 0.46, 0.03, 2),
                 0.03,
                 (0.0, y, -0.06),
@@ -86,7 +87,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
                 .collect();
             fsweep!(
                 f,
-                name("gallery"),
+                numbered("gallery"),
                 &gal,
                 0.006,
                 M.brass,
@@ -95,15 +96,14 @@ pub fn mocktail_cart() -> Vec<Obj> {
             );
             for x in [-0.2, 0.0, 0.2] {
                 for z in [zb, zf] {
-                    tube(
+                    kit::tube!(
                         f,
-                        &name("spindle"),
+                        numbered("spindle"),
                         &[(x, y + 0.015, z), (x, y + 0.06, z)],
                         0.0035,
                         M.brass,
-                        Some(4),
-                        1,
-                        one(),
+                        verts = 4,
+                        round = 1
                     );
                 }
             }
@@ -111,18 +111,17 @@ pub fn mocktail_cart() -> Vec<Obj> {
         for x in [-0.39, 0.39] {
             for z in [zb, zf] {
                 let y0 = if z == zf { 0.07 } else { 0.0 };
-                tube(
+                kit::tube!(
                     f,
-                    &name("post"),
+                    numbered("post"),
                     &[(x, y0, z), (x, 1.6, z)],
                     0.012,
                     M.brass,
-                    Some(8),
-                    1,
-                    one(),
+                    verts = 8,
+                    round = 1
                 );
                 revolve!(
-                    name("finial"),
+                    numbered("finial"),
                     &[
                         (0.0, 0.0),
                         (0.014, 0.0),
@@ -136,7 +135,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
                 );
             }
             torus!(
-                name("wheel"),
+                numbered("wheel"),
                 0.055,
                 0.016,
                 at = f.at(x, 0.071, zf),
@@ -147,7 +146,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
             );
             fcyl!(
                 f,
-                name("hub"),
+                numbered("hub"),
                 0.03,
                 0.04,
                 (x, 0.071, zf),
@@ -156,7 +155,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
                 verts = 10
             );
             revolve!(
-                name("cap"),
+                numbered("cap"),
                 &[
                     (0.0, 0.0),
                     (0.018, 0.0),
@@ -169,15 +168,14 @@ pub fn mocktail_cart() -> Vec<Obj> {
                 segments = 8
             );
         }
-        tube(
+        kit::tube!(
             f,
             "handle",
             &[(-0.39, 0.95, zb), (-0.39, 0.95, zf)],
             0.012,
             M.brass,
-            Some(8),
-            1,
-            one(),
+            verts = 8,
+            round = 1
         );
         fsweep!(
             f,
@@ -203,7 +201,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
                 .collect();
             fsweep!(
                 f,
-                name("canopy"),
+                numbered("canopy"),
                 &pts,
                 0,
                 m,
@@ -218,7 +216,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
                 )
             }));
             let pts: Vec<(f64, f64)> = pts.iter().map(|&(px, py)| (x + px, py)).collect();
-            slab(f, &name("scallop"), &pts, 0.218, 0.23, m, 0.0);
+            slab(f, &numbered("scallop"), &pts, 0.218, 0.23, m, 0.0);
         }
         for s in [-1.0, 1.0] {
             for i in 0..4 {
@@ -241,7 +239,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
                 let nn = pts.len() as u32;
                 let mut faces = vec![(0..nn).collect::<Vec<u32>>(), (nn..2 * nn).rev().collect()];
                 faces.extend((0..nn).map(|k| vec![k, (k + 1) % nn, nn + (k + 1) % nn, nn + k]));
-                obj(&name("scallop_side"), &verts, &faces, &[m], None, 35.0, 0.0);
+                object_of!(&numbered("scallop_side"), &verts, &faces, &[m]);
             }
         }
         // the top: a jug of juice, an ice bucket, a pineapple, citrus and three drinks
@@ -286,7 +284,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
         fsweep!(
             f,
             "jug_handle",
-            &fillet(
+            &kit::fillet!(
                 &[
                     (jx - 0.055, TOP + 0.17, jz),
                     (jx - 0.095, TOP + 0.16, jz),
@@ -294,7 +292,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
                     (jx - 0.058, TOP + 0.04, jz)
                 ],
                 0.02,
-                2
+                steps = 2
             ),
             0,
             M.porcelain,
@@ -317,7 +315,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
         );
         for s in [-1.0, 1.0] {
             torus!(
-                name("bucket_ring"),
+                numbered("bucket_ring"),
                 0.016,
                 0.003,
                 at = f.at(0.2 + s * 0.08, TOP + 0.095, -0.17),
@@ -334,7 +332,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
             let k = k as i32;
             fbox!(
                 f,
-                name("ice"),
+                numbered("ice"),
                 0.03,
                 0.03,
                 0.03,
@@ -374,7 +372,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
             let lean = (18 + 10 * (k % 2)) as f64;
             fextrude!(
                 f,
-                name("crown"),
+                numbered("crown"),
                 &leaf,
                 0.004,
                 (0.3 + 0.008 * cosd(a), TOP + 0.155, 0.06 + 0.008 * sind(a)),
@@ -389,7 +387,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
         ] {
             fsphere!(
                 f,
-                name("citrus"),
+                numbered("citrus"),
                 r,
                 (x, TOP + r, z),
                 m,
@@ -469,7 +467,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
             (-0.15, 0.49, 0.011),
             M.chrome
         );
-        pull(
+        kit::pull!(
             f,
             "fridge_handle",
             -0.15,
@@ -477,10 +475,8 @@ pub fn mocktail_cart() -> Vec<Obj> {
             0.01,
             0.12,
             M.chrome,
-            0.005,
-            0.02,
-            false,
-            8,
+            r = 0.005,
+            out = 0.02
         );
         for (i, m) in [M.drink_pink, M.drink_teal, M.drink_sun]
             .into_iter()
@@ -488,7 +484,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
         {
             bottle(
                 f,
-                &name("syrup"),
+                &numbered("syrup"),
                 0.12 + i as f64 * 0.09,
                 0.315,
                 -0.12,
@@ -535,7 +531,7 @@ pub fn mocktail_cart() -> Vec<Obj> {
         );
     });
     let shaker = hinged(join(&shaker, "shaker", None), f.at(sx - 0.036, TOP, sz));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     squash(
         shaker,
         "shake",

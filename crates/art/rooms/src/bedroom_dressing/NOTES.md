@@ -88,5 +88,6 @@ No change to the build: its soft boxes take the shared form's new shape (the sof
 ## Ported to Rust (2026-11-18)
 
 Built by `cargo art bedroom_dressing` from this module (its Python script's numbers and order, one function each).
-Against the last Blender build (`ref/blender`): all four near, their surfaces to 0.000 mm, shading within 0.3 of
-a grey. The glass's grid is `bmesh.ops.subdivide_edges` (5 cuts, grid fill) rebuilt in `common::subdivided_pane`.
+Against the last Blender build (`ref/blender`): the wall and floor mirrors the same, the cheval mirror and the
+dressing table near, their surfaces to 0.000 mm and their shading to 0.00 greys. The glass's grid is the kernel's
+`subdivide_edges!` (5 cuts, grid fill), Blender's points and faces in Blender's order.

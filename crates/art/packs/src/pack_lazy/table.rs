@@ -1,14 +1,13 @@
 //! The heated quilt table and the smart-home command hub.
 
-use super::common::{_lathe, _mug, _name, _turned, M, WALL};
-use super::sleep::settle_in_place;
+use super::common::{_mug, M, WALL};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, TAU, cos, cosd, sind};
-use artkit::parts::{hinged, join, new_parts, turn};
+use artkit::parts::{hinged, join, new_parts, numbered, turn};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
-use artkit::{fbox, fcyl, fsphere, fsweep, soft, swing, torus};
+use artkit::{fbox, fcyl, fsphere, fsweep, kit, settle, soft, swing, torus};
 
 // --- the heated quilt table (2x1): a kotatsu in front, two poufs (tops 0.45) at x = ±0.5 behind it ---------
 const TOP_Y: f64 = 0.6; // the underside of the table top
@@ -75,7 +74,7 @@ pub fn quilt_table() -> Vec<Obj> {
             for z in [TZ0 + 0.05, TZ1 - 0.05] {
                 fbox!(
                     f,
-                    _name("leg"),
+                    numbered("leg"),
                     0.05,
                     TOP_Y,
                     0.05,
@@ -113,7 +112,7 @@ pub fn quilt_table() -> Vec<Obj> {
             // its quilting, stitched in rows
             fbox!(
                 f,
-                _name("quilt_seam"),
+                numbered("quilt_seam"),
                 0.004,
                 0.004,
                 td + 0.02,
@@ -142,7 +141,7 @@ pub fn quilt_table() -> Vec<Obj> {
             };
             _drape(
                 f,
-                &_name("quilt_end"),
+                &numbered("quilt_end"),
                 a,
                 b,
                 0.01,
@@ -169,7 +168,7 @@ pub fn quilt_table() -> Vec<Obj> {
         );
         // a bowl of mandarins, two mugs, a plate of biscuits on the quilt's top
         let ty = TOP_Y + 0.067;
-        _turned(
+        kit::turned!(
             f,
             "bowl",
             0,
@@ -186,8 +185,7 @@ pub fn quilt_table() -> Vec<Obj> {
                 (0.0, 0.016),
             ],
             M.porcelain,
-            22,
-            (0.0, 0.0, 0.0),
+            segments = 22
         );
         for (dx, dz, dy) in [
             (-0.05, 0.22, 0.0),
@@ -198,7 +196,7 @@ pub fn quilt_table() -> Vec<Obj> {
         ] {
             fsphere!(
                 f,
-                _name("mandarin"),
+                numbered("mandarin"),
                 0.035,
                 (dx, ty + 0.035 + dy, dz),
                 M.mandarin,
@@ -222,7 +220,7 @@ pub fn quilt_table() -> Vec<Obj> {
             let x = s as f64 * 0.5;
             _mug(
                 f,
-                &_name("mug"),
+                &numbered("mug"),
                 x + s as f64 * 0.12,
                 ty,
                 0.12,
@@ -234,7 +232,7 @@ pub fn quilt_table() -> Vec<Obj> {
             // the pouf, its seat cushion (top 0.45) and a back cushion against the wall
             soft!(
                 f,
-                _name("pouf"),
+                numbered("pouf"),
                 0.5,
                 0.38,
                 0.44,
@@ -246,7 +244,7 @@ pub fn quilt_table() -> Vec<Obj> {
             );
             soft!(
                 f,
-                _name("pouf_top"),
+                numbered("pouf_top"),
                 0.46,
                 0.05,
                 0.42,
@@ -259,7 +257,7 @@ pub fn quilt_table() -> Vec<Obj> {
             );
             soft!(
                 f,
-                _name("back_cushion"),
+                numbered("back_cushion"),
                 0.44,
                 0.3,
                 0.064,
@@ -271,7 +269,7 @@ pub fn quilt_table() -> Vec<Obj> {
                 flat = 2
             );
         }
-        _turned(
+        kit::turned!(
             f,
             "snack_plate",
             0.6,
@@ -286,20 +284,18 @@ pub fn quilt_table() -> Vec<Obj> {
                 (0.0, 0.006),
             ],
             M.porcelain,
-            18,
-            (0.0, 0.0, 0.0),
+            segments = 18
         );
         for (dx, dz) in [(-0.02, -0.01), (0.03, 0.02), (0.0, 0.035)] {
-            _turned(
+            kit::turned!(
                 f,
-                &_name("biscuit"),
+                numbered("biscuit"),
                 0.6 + dx,
                 ty + 0.006,
                 0.32 + dz,
                 &[(0.0, 0.0), (0.026, 0.002), (0.022, 0.012), (0.0, 0.012)],
                 M.biscuit,
-                10,
-                (0.0, 0.0, 0.0),
+                segments = 10
             );
         }
     });
@@ -344,7 +340,7 @@ pub fn quilt_table() -> Vec<Obj> {
         join(&flap, "quilt_flap", None),
         f.at(0, TOP_Y + 0.05, FLAP_Z),
     );
-    let objs = settle_in_place(); // built in place: the poufs under the sitters (`furniture.json`), the back on the wall
+    let objs = settle!(centre = false); // built in place: the poufs under the sitters (`furniture.json`), the back on the wall
     swing!(flap, "quilt", 70.0, seconds = 0.8, axis = Axis::X);
     objs
 }
@@ -394,7 +390,7 @@ pub fn smart_hub() -> Vec<Obj> {
             for lz in [z - d / 2.0 + 0.05, z + d / 2.0 - 0.05] {
                 fsweep!(
                     f,
-                    _name("leg"),
+                    numbered("leg"),
                     &[
                         (lx, h - 0.03, lz),
                         (
@@ -412,7 +408,7 @@ pub fn smart_hub() -> Vec<Obj> {
             }
         }
         // the smart speaker: a rounded fabric-covered cylinder, its light ring and buttons on top
-        _lathe(
+        kit::lathe!(
             f,
             "speaker",
             -0.14,
@@ -428,9 +424,7 @@ pub fn smart_hub() -> Vec<Obj> {
                 (0.0, 0.2),
             ],
             M.speaker,
-            24,
-            2.0,
-            1.0,
+            verts = 24
         );
         torus!(
             "speaker_ring",
@@ -445,7 +439,7 @@ pub fn smart_hub() -> Vec<Obj> {
             let a = (45 + 90 * k) as f64;
             fcyl!(
                 f,
-                _name("speaker_button"),
+                numbered("speaker_button"),
                 0.007,
                 0.003,
                 (
@@ -486,7 +480,7 @@ pub fn smart_hub() -> Vec<Obj> {
             let y = 0.15 + 0.04 * kf + bh / 2.0;
             fbox!(
                 f,
-                _name("book"),
+                numbered("book"),
                 0.22 - 0.02 * kf,
                 bh,
                 0.16 - 0.01 * kf,
@@ -498,7 +492,7 @@ pub fn smart_hub() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                _name("book_pages"),
+                numbered("book_pages"),
                 0.21 - 0.02 * kf,
                 bh - 0.008,
                 0.164 - 0.01 * kf,
@@ -507,7 +501,7 @@ pub fn smart_hub() -> Vec<Obj> {
                 rot = (0, 0, r)
             );
         }
-        _turned(
+        kit::turned!(
             f,
             "robot",
             0,
@@ -522,8 +516,7 @@ pub fn smart_hub() -> Vec<Obj> {
                 (0.0, 0.065),
             ],
             M.white,
-            32,
-            (0.0, 0.0, 0.0),
+            segments = 32
         );
         fcyl!(
             f,
@@ -555,7 +548,7 @@ pub fn smart_hub() -> Vec<Obj> {
         for s in [-1, 1] {
             fcyl!(
                 f,
-                _name("robot_wheel"),
+                numbered("robot_wheel"),
                 0.018,
                 0.012,
                 (s as f64 * 0.1, 0.018, 0.26),
@@ -568,7 +561,7 @@ pub fn smart_hub() -> Vec<Obj> {
             let a = 30 + 120 * k;
             fbox!(
                 f,
-                _name("brush"),
+                numbered("brush"),
                 0.05,
                 0.003,
                 0.006,
@@ -617,7 +610,7 @@ pub fn smart_hub() -> Vec<Obj> {
         ] {
             fbox!(
                 f,
-                _name("app"),
+                numbered("app"),
                 0.032,
                 0.032,
                 0.002,
@@ -650,7 +643,7 @@ pub fn smart_hub() -> Vec<Obj> {
     });
     let tab = hinged(join(&tab, "tablet", None), f.at(0.12, hy, hz));
     turn(tab, -72.0, Axis::X);
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(tab, "screen_up", 57.0, seconds = 0.8, axis = Axis::X);
     objs
 }

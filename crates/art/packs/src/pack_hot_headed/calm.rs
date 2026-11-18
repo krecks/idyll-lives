@@ -1,16 +1,16 @@
 //! The cool-down meditation cushion, the grudge-to-gratitude writing desk and the glacier cold-plunge tub.
 
-use super::bag::settle_in_place;
-use super::common::{M, fillet, fluted, lathe, name, tube, turned};
+use super::common::{M, fluted};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::math::{P3, PI, cosd, pow, sin, sind};
 use artkit::motion::{Squash, squash};
-use artkit::parts::{hinged, join, new_parts, settle_all};
+use artkit::parts::{hinged, join, new_parts, numbered, settle_all};
 use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
 use artkit::scene::Obj;
 use artkit::{
-    boulder, fbox, fcyl, fextrude, fsphere, fsweep, jitter, loft, ring, slide, soft, torus,
+    boulder, fbox, fcyl, fextrude, fsphere, fsweep, jitter, kit, loft, ring, settle, slide, soft,
+    torus,
 };
 
 // --- the cool-down meditation cushion (1x1): a round mat, a zabuton and a tall zafu, a singing bowl ---------
@@ -52,7 +52,7 @@ pub fn cool_down_cushion() -> Vec<Obj> {
             for sz in [-1.0, 1.0] {
                 fsphere!(
                     f,
-                    name("tuft"),
+                    numbered("tuft"),
                     0.012,
                     (sx * 0.2, 0.082, -0.02 + sz * 0.19),
                     M.oat,
@@ -63,8 +63,7 @@ pub fn cool_down_cushion() -> Vec<Obj> {
             }
         }
         // the singing bowl on its ring cushion and stand, the mallet beside it
-        let none = (0.0, 0.0, 0.0);
-        turned(
+        kit::turned!(
             f,
             "bowl_stand",
             0.32,
@@ -79,8 +78,7 @@ pub fn cool_down_cushion() -> Vec<Obj> {
                 (0.0, 0.026),
             ],
             M.oak,
-            16,
-            none,
+            segments = 16
         );
         torus!(
             "bowl_ring",
@@ -91,7 +89,7 @@ pub fn cool_down_cushion() -> Vec<Obj> {
             major_segments = 14,
             minor_segments = 6
         );
-        turned(
+        kit::turned!(
             f,
             "singing_bowl",
             0.32,
@@ -110,8 +108,7 @@ pub fn cool_down_cushion() -> Vec<Obj> {
                 (0.0, 0.012),
             ],
             M.brass,
-            20,
-            none,
+            segments = 20
         );
         fsweep!(
             f,
@@ -135,7 +132,7 @@ pub fn cool_down_cushion() -> Vec<Obj> {
             bevel_segments = 1
         );
         // a candle on its dish, a potted plant and an incense stick on a leaf-shaped holder
-        turned(
+        kit::turned!(
             f,
             "candle_dish",
             -0.32,
@@ -150,10 +147,9 @@ pub fn cool_down_cushion() -> Vec<Obj> {
                 (0.0, 0.006),
             ],
             M.brass,
-            16,
-            none,
+            segments = 16
         );
-        turned(
+        kit::turned!(
             f,
             "candle",
             -0.32,
@@ -168,8 +164,7 @@ pub fn cool_down_cushion() -> Vec<Obj> {
                 (0.0, 0.062),
             ],
             M.candle,
-            14,
-            none,
+            segments = 14
         );
         fsweep!(
             f,
@@ -189,7 +184,7 @@ pub fn cool_down_cushion() -> Vec<Obj> {
             segments = 8,
             rings = 5
         );
-        turned(
+        kit::turned!(
             f,
             "plant_pot",
             -0.3,
@@ -206,8 +201,7 @@ pub fn cool_down_cushion() -> Vec<Obj> {
                 (0.0, 0.092),
             ],
             M.pot,
-            16,
-            none,
+            segments = 16
         );
         for k in 0..7 {
             let a = (k * 51 + 10) as f64;
@@ -215,7 +209,7 @@ pub fn cool_down_cushion() -> Vec<Obj> {
             let l = 0.07 + 0.039 * ((k * 5) % 3) as f64 / 2.0;
             fsweep!(
                 f,
-                name("leaf"),
+                numbered("leaf"),
                 &[
                     (-0.3 + 0.01 * c, 0.09, -0.32 + 0.01 * s),
                     (-0.3 + 0.35 * l * c, 0.09 + l * 1.1, -0.32 + 0.35 * l * s),
@@ -301,7 +295,7 @@ pub fn cool_down_cushion() -> Vec<Obj> {
             segments = 10,
             rings = 5
         );
-        tube(
+        kit::tube!(
             f,
             "zafu_loop",
             &[
@@ -311,8 +305,8 @@ pub fn cool_down_cushion() -> Vec<Obj> {
             ],
             0.006,
             M.calm_deep,
-            Some(5),
-            2,
+            verts = 5,
+            round = 2
         );
     });
     let zafu = hinged(join(&zafu, "zafu", None), f.at(0, 0.08, 0));
@@ -356,7 +350,7 @@ fn hairpin(
     fsweep!(
         f,
         name,
-        &fillet(&pts, 0.012, 2),
+        &kit::fillet!(&pts, 0.012, steps = 2),
         0.0065,
         material,
         verts = 6
@@ -365,7 +359,6 @@ fn hairpin(
 
 pub fn grudge_journal() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
-    let none = (0.0, 0.0, 0.0);
     let still = new_parts(|| {
         fbox!(
             f,
@@ -379,10 +372,19 @@ pub fn grudge_journal() -> Vec<Obj> {
             bevel_segments = 2
         );
         for x in [-0.37, 0.37] {
-            hairpin(f, &name("leg"), x, 0.18, 0.42, 0.715, M.steel_dark, 0.03);
+            hairpin(
+                f,
+                &numbered("leg"),
+                x,
+                0.18,
+                0.42,
+                0.715,
+                M.steel_dark,
+                0.03,
+            );
             fbox!(
                 f,
-                name("leg_plate"),
+                numbered("leg_plate"),
                 0.05,
                 0.006,
                 0.27,
@@ -414,7 +416,7 @@ pub fn grudge_journal() -> Vec<Obj> {
         for x in [0.045, 0.395] {
             fbox!(
                 f,
-                name("case_side"),
+                numbered("case_side"),
                 0.012,
                 0.16,
                 0.28,
@@ -459,7 +461,7 @@ pub fn grudge_journal() -> Vec<Obj> {
             let prof = rounded_rect(0.008, 0.214, 0.003, 1);
             fsweep!(
                 f,
-                name("page"),
+                numbered("page"),
                 &pts,
                 0,
                 M.paper,
@@ -506,7 +508,7 @@ pub fn grudge_journal() -> Vec<Obj> {
         .enumerate()
         {
             let c = boulder!(
-                name("crumple"),
+                numbered("crumple"),
                 r,
                 at = f.at(x, y - r, z),
                 material = M.paper,
@@ -516,7 +518,7 @@ pub fn grudge_journal() -> Vec<Obj> {
             );
             jitter!(c, r * 0.18, size = r * 0.6, seed = k as f64);
         }
-        turned(
+        kit::turned!(
             f,
             "bin",
             -0.3,
@@ -532,8 +534,7 @@ pub fn grudge_journal() -> Vec<Obj> {
                 (0.0, 0.008),
             ],
             M.steel,
-            20,
-            none,
+            segments = 20
         );
         boulder!(
             "bin_paper",
@@ -544,7 +545,7 @@ pub fn grudge_journal() -> Vec<Obj> {
             noise = 0.35,
             subdivisions = 1
         );
-        turned(
+        kit::turned!(
             f,
             "cactus_pot",
             0.3,
@@ -560,8 +561,7 @@ pub fn grudge_journal() -> Vec<Obj> {
                 (0.0, 0.08),
             ],
             M.ember,
-            14,
-            none,
+            segments = 14
         );
         let P3 { x: cbx, y: cby, .. } = f.at(0.3, 0, 0.38);
         loft!(
@@ -587,7 +587,7 @@ pub fn grudge_journal() -> Vec<Obj> {
         );
         // the lamp: a weighted foot, two arms jointed with knobs, a deep conical shade
         let (lx, lz) = (0.33, 0.18);
-        turned(
+        kit::turned!(
             f,
             "lamp_foot",
             lx,
@@ -602,31 +602,30 @@ pub fn grudge_journal() -> Vec<Obj> {
                 (0.0, 0.02),
             ],
             M.dark,
-            16,
-            none,
+            segments = 16
         );
-        tube(
+        kit::tube!(
             f,
             "lamp_arm",
             &[(lx, 0.76, lz), (0.3, 0.975, 0.24)],
             0.007,
             M.dark,
-            Some(6),
-            1,
+            verts = 6,
+            round = 1
         );
-        tube(
+        kit::tube!(
             f,
             "lamp_arm2",
             &[(0.3, 0.975, 0.24), (0.225, 0.96, 0.2)],
             0.007,
             M.dark,
-            Some(6),
-            1,
+            verts = 6,
+            round = 1
         );
         for (jx, jy, jz) in [(lx, 0.765, lz), (0.3, 0.975, 0.24), (0.225, 0.96, 0.2)] {
             fcyl!(
                 f,
-                name("lamp_joint"),
+                numbered("lamp_joint"),
                 0.012,
                 0.024,
                 (jx, jy, jz),
@@ -635,16 +634,16 @@ pub fn grudge_journal() -> Vec<Obj> {
                 verts = 8
             );
         }
-        tube(
+        kit::tube!(
             f,
             "lamp_spring",
             &[(lx + 0.012, 0.8, lz + 0.01), (0.312, 0.94, 0.232)],
             0.003,
             M.steel,
-            Some(4),
-            1,
+            verts = 4,
+            round = 1
         );
-        turned(
+        kit::turned!(
             f,
             "lamp_shade",
             0.2,
@@ -659,8 +658,8 @@ pub fn grudge_journal() -> Vec<Obj> {
                 (0.0, 0.09),
             ],
             M.fire,
-            18,
-            (25.0, 0.0, -20.0),
+            segments = 18,
+            rot = (25.0, 0.0, -20.0)
         );
         // the chair, the writer's seat at 0.45: a padded seat, a curved back rail, tapered legs and stretchers
         fbox!(
@@ -689,7 +688,7 @@ pub fn grudge_journal() -> Vec<Obj> {
         for dx in [-0.18, 0.18] {
             fsweep!(
                 f,
-                name("front_leg"),
+                numbered("front_leg"),
                 &[(dx, 0.39, 0.16), (dx, 0.0, 0.165)],
                 0,
                 M.body,
@@ -699,7 +698,7 @@ pub fn grudge_journal() -> Vec<Obj> {
             );
             fsweep!(
                 f,
-                name("back_leg"),
+                numbered("back_leg"),
                 &[(dx, 0.0, -0.165), (dx, 0.4, -0.18), (dx, 0.9, -0.2)],
                 0,
                 M.body,
@@ -708,14 +707,14 @@ pub fn grudge_journal() -> Vec<Obj> {
                 resolution = 2,
                 scale = [0.75, 1.0, 0.9]
             );
-            tube(
+            kit::tube!(
                 f,
-                &name("stretcher"),
+                numbered("stretcher"),
                 &[(dx, 0.14, 0.16), (dx, 0.14, -0.168)],
                 0.008,
                 M.body,
-                Some(6),
-                1,
+                verts = 6,
+                round = 1
             );
         }
         let rail: Vec<(f64, f64, f64)> = [-0.2, -0.13, -0.065, 0.0, 0.065, 0.13, 0.2]
@@ -783,7 +782,7 @@ pub fn grudge_journal() -> Vec<Obj> {
         fsweep!(
             f,
             "drawer_pull",
-            &fillet(&pts, 0.009, 3),
+            &kit::fillet!(&pts, 0.009),
             0.005,
             M.steel,
             verts = 6
@@ -800,7 +799,7 @@ pub fn grudge_journal() -> Vec<Obj> {
         for x in [0.07, 0.37] {
             fbox!(
                 f,
-                name("drawer_side"),
+                numbered("drawer_side"),
                 0.008,
                 0.08,
                 0.25,
@@ -824,7 +823,7 @@ pub fn grudge_journal() -> Vec<Obj> {
             let k = k as f64;
             fbox!(
                 f,
-                name("letter"),
+                numbered("letter"),
                 0.16,
                 0.012,
                 0.11,
@@ -834,7 +833,7 @@ pub fn grudge_journal() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                name("letter_flap"),
+                numbered("letter_flap"),
                 0.15,
                 0.002,
                 0.04,
@@ -845,7 +844,7 @@ pub fn grudge_journal() -> Vec<Obj> {
         }
     });
     let drawer = join(&drawer, "drawer", None);
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     slide!(drawer, "drawer_open", (0, 0.17, 0), seconds = 0.6); // game -z: out towards the writer
     objs
 }
@@ -883,7 +882,7 @@ pub fn cold_plunge() -> Vec<Obj> {
         for x in [-0.395, 0.395] {
             fbox!(
                 f,
-                name("wall"),
+                numbered("wall"),
                 0.05,
                 h - 0.06,
                 d - 0.02,
@@ -894,7 +893,7 @@ pub fn cold_plunge() -> Vec<Obj> {
         for z in [zb + 0.025, zf - 0.025] {
             fbox!(
                 f,
-                name("wall"),
+                numbered("wall"),
                 0.74,
                 h - 0.06,
                 0.05,
@@ -908,7 +907,7 @@ pub fn cold_plunge() -> Vec<Obj> {
             let j = rnd.uniform(-0.0015, 0.0015);
             fbox!(
                 f,
-                name("board_side"),
+                numbered("board_side"),
                 0.022,
                 0.058,
                 d - 0.03,
@@ -919,7 +918,7 @@ pub fn cold_plunge() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                name("board_side"),
+                numbered("board_side"),
                 0.022,
                 0.058,
                 d - 0.03,
@@ -930,7 +929,7 @@ pub fn cold_plunge() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                name("board_front"),
+                numbered("board_front"),
                 0.81,
                 0.058,
                 0.022,
@@ -941,7 +940,7 @@ pub fn cold_plunge() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                name("board_back"),
+                numbered("board_back"),
                 0.81,
                 0.058,
                 0.022,
@@ -955,7 +954,7 @@ pub fn cold_plunge() -> Vec<Obj> {
             for z in [zb + 0.009, zf - 0.009] {
                 fbox!(
                     f,
-                    name("corner"),
+                    numbered("corner"),
                     0.042,
                     0.53,
                     0.042,
@@ -974,7 +973,7 @@ pub fn cold_plunge() -> Vec<Obj> {
                 .collect();
             fsweep!(
                 f,
-                name("band"),
+                numbered("band"),
                 &lp,
                 0,
                 M.steel,
@@ -1010,7 +1009,7 @@ pub fn cold_plunge() -> Vec<Obj> {
         ] {
             fbox!(
                 f,
-                name("ice"),
+                numbered("ice"),
                 0.06,
                 0.045,
                 0.06,
@@ -1036,7 +1035,7 @@ pub fn cold_plunge() -> Vec<Obj> {
         for x in [-0.424, 0.424] {
             fcyl!(
                 f,
-                name("housing_cap"),
+                numbered("housing_cap"),
                 0.048,
                 0.012,
                 (x, h + 0.05, zb + 0.05),
@@ -1115,7 +1114,7 @@ pub fn cold_plunge() -> Vec<Obj> {
         for k in 0..3 {
             fcyl!(
                 f,
-                name("button"),
+                numbered("button"),
                 0.009,
                 0.006,
                 (-0.04 + 0.03 * k as f64, 0.52, -0.634),
@@ -1125,27 +1124,26 @@ pub fn cold_plunge() -> Vec<Obj> {
             );
         }
         for x in [-0.22, 0.0] {
-            tube(
+            kit::tube!(
                 f,
-                &name("hose"),
-                &fillet(
+                numbered("hose"),
+                &kit::fillet!(
                     &[
                         (x, 0.5, -0.64),
                         (x, 0.66, -0.62),
                         (x, 0.66, zb - 0.03),
                         (x, 0.56, zb - 0.01),
                     ],
-                    0.04,
-                    3,
+                    0.04
                 ),
                 0.022,
                 M.hose,
-                Some(10),
-                1,
+                verts = 10,
+                round = 1
             );
             fcyl!(
                 f,
-                name("hose_clamp"),
+                numbered("hose_clamp"),
                 0.027,
                 0.014,
                 (x, 0.5, -0.648),
@@ -1157,7 +1155,7 @@ pub fn cold_plunge() -> Vec<Obj> {
         for sx in [-1.0, 1.0] {
             fbox!(
                 f,
-                name("chiller_foot"),
+                numbered("chiller_foot"),
                 0.06,
                 0.012,
                 0.25,
@@ -1186,7 +1184,7 @@ pub fn cold_plunge() -> Vec<Obj> {
             (0.17, 0.62, -0.72),
             M.cover
         );
-        lathe(
+        kit::lathe!(
             f,
             "bottle",
             -0.22,
@@ -1202,8 +1200,7 @@ pub fn cold_plunge() -> Vec<Obj> {
                 (0.0, 0.24),
             ],
             M.calm,
-            14,
-            2.0,
+            verts = 14
         );
         fcyl!(
             f,
@@ -1227,7 +1224,7 @@ pub fn cold_plunge() -> Vec<Obj> {
         for k in 0..n {
             fbox!(
                 f,
-                name("slat"),
+                numbered("slat"),
                 0.8,
                 0.024,
                 sl - 0.004,
@@ -1250,7 +1247,7 @@ pub fn cold_plunge() -> Vec<Obj> {
         );
     });
     let cover = join(&cover, "cover", Some(f.at(0, h + 0.03, cz0)));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     squash(
         cover,
         "cover_off",

@@ -9,8 +9,7 @@
 //! machine's tray and a can drops to it (`drop`). The machines' lit signs (and the drinks machine's front) glow at
 //! night. They are placed on town lots and seen from far, so each has a far version (a quarter of the triangles).
 
-use artkit::family::{Family, Model};
-use artkit::json::{Json, loads};
+use artkit::family::{Family, Model, motions};
 
 pub(crate) mod common;
 mod drink;
@@ -22,10 +21,6 @@ mod market;
 use common::M;
 
 const FAR: f64 = 0.25;
-
-fn motions(text: &str) -> Json {
-    loads(text).expect("the motions are JSON")
-}
 
 /// The family.
 pub fn family() -> Option<Family> {

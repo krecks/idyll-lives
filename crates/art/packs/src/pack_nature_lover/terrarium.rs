@@ -1,6 +1,7 @@
 //! The moss terrarium (1x1): a little forest under a glass cloche, on a walnut pedestal.
 
-use super::common::{_sq, M};
+use super::common::M;
+use artkit::forms::rect;
 use artkit::materials::Mat;
 use artkit::math::P3;
 use artkit::parts::{join, new_parts};
@@ -188,7 +189,7 @@ pub fn moss_terrarium() -> Vec<Obj> {
             &[(0.24, 0.19, 0.18), (0.24, 0.15, 0.19)],
             0.0,
             M.white,
-            profile = _sq(0.012, Some(0.008)),
+            profile = rect(0.012, 0.008),
             up = (1, 0, 0)
         );
         let mut braid = vec![(0.0, 0.0), (0.21, 0.0), (0.21, 0.006)]; // rings of braid, from the edge in

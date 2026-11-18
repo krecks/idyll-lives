@@ -6,23 +6,13 @@ use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, M4, P3, PI, TAU, V3, cos, pow, radians, sin};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts};
 use artkit::place::GameFrame;
-use artkit::scene::{Obj, meshes};
+use artkit::scene::Obj;
 use artkit::{
-    cylinder, fbox, fcyl, fsphere, fsweep, jitter, loft, revolve, slide, soft, sphere, squash,
-    swing,
+    cylinder, fbox, fcyl, fsphere, fsweep, jitter, loft, revolve, settle, slide, soft, sphere,
+    squash, swing,
 };
-
-fn settle_in_place() -> Vec<Obj> {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    )
-}
 
 // --- the crumb-proof beanbag (1x1): sat on and napped on in the middle, a snack bag and a controller by it -----
 
@@ -189,7 +179,7 @@ pub fn beanbag() -> Vec<Obj> {
         );
     });
     let bag = join(&bag, "bag", Some(P3::from((0, 0, 0))));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     squash!(bag, "squash", (1.04, 1.04, 0.86), seconds = 0.5);
     objs
 }
@@ -443,7 +433,7 @@ pub fn snack_nightstand() -> Vec<Obj> {
         );
     });
     let drawer = hinged(join(&drawer, "drawer", None), f.at(0.286, 0.27, -0.02));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     slide!(drawer, "drawer_open", (-0.16, 0, 0), seconds = 0.6);
     objs
 }
@@ -780,7 +770,7 @@ pub fn gaming_recliner() -> Vec<Obj> {
         );
     });
     let cup = hinged(join(&cup, "cup_holder", None), f.at(cx, cy, cz));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(back, "recline", -20.0, seconds = 1.0, axis = Axis::X);
     swing!(cup, "cup_out", 110.0, seconds = 0.6);
     objs

@@ -1,31 +1,19 @@
 //! The neighbourly baking counter and the community giving jar.
 
-use super::common::{M, WALL, bush, fillet, lathe, moulding, name, pull, shaker, tube, turned};
+use super::common::{M, WALL, bush};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::math::{Axis, P3, PI, TAU, cos, cosd, pow, sin, sind, sqrt};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
-use artkit::scene::{Obj, meshes};
-use artkit::shapes::SHARP;
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, jitter, slide, swing, torus};
-
-pub fn settle_in_place() -> Vec<Obj> {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    )
-}
+use artkit::scene::Obj;
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, jitter, kit, settle, slide, swing, torus};
 
 // --- the neighbourly baking counter (2x1): a cream retro range beside a sage counter laid with bakes --------
 const RANGE: (f64, f64, f64, f64) = (0.6, 0.62, 0.92, 0.6); // x, width, hob height, depth
 
 pub fn neighbourly_oven() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
-    let none = (0.0, 0.0, 0.0);
     let (rx, rw, rh, rd) = RANGE;
     let zf = WALL + rd; // the range's front
     let (cx0, cx1) = (-0.91, rx - rw / 2.0 - 0.01);
@@ -54,22 +42,21 @@ pub fn neighbourly_oven() -> Vec<Obj> {
         );
         for i in 0..3 {
             let x = cx0 + cw / 6.0 * (2 * i + 1) as f64;
-            shaker(
+            kit::shaker!(
                 f,
-                &name("door"),
+                numbered("door"),
                 cw / 3.0 - 0.03,
                 0.66,
                 (x, 0.45, WALL + cd + 0.008),
                 0.016,
                 M.cabinet,
-                0.055,
-                Some(M.cabinet_panel),
-                0.005,
-                true,
+                rail = 0.055,
+                panel = M.cabinet_panel,
+                raised = true
             );
-            turned(
+            kit::turned!(
                 f,
-                &name("knob"),
+                numbered("knob"),
                 x + if i % 2 != 0 { 0.13 } else { -0.13 },
                 0.68,
                 WALL + cd + 0.016,
@@ -82,8 +69,8 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                     (0.0, 0.029),
                 ],
                 M.brass,
-                10,
-                (-90.0, 0.0, 0.0),
+                segments = 10,
+                rot = (-90.0, 0.0, 0.0)
             );
         }
         fbox!(
@@ -101,7 +88,7 @@ pub fn neighbourly_oven() -> Vec<Obj> {
             // the butcher block's strips
             fbox!(
                 f,
-                name("strip"),
+                numbered("strip"),
                 0.003,
                 0.0015,
                 cd + 0.022,
@@ -114,7 +101,7 @@ pub fn neighbourly_oven() -> Vec<Obj> {
         // worktop's right end, by the range, is left free (a patch of flour on it) for the cook's mixing bowl or board and
         // what they set down behind it (`STATION_SPOTS`, `SET_DOWN_SPOTS`: the pin lay where the bowl goes)
         let (px, pz) = (cxm - 0.28, -0.06);
-        turned(
+        kit::turned!(
             f,
             "pie_dish",
             px,
@@ -130,10 +117,9 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                 (0.0, 0.008),
             ],
             M.terracotta,
-            20,
-            none,
+            segments = 20
         );
-        turned(
+        kit::turned!(
             f,
             "pie_crust",
             px,
@@ -147,8 +133,7 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                 (0.0, 0.03),
             ],
             M.crust,
-            20,
-            none,
+            segments = 20
         );
         torus!(
             "pie_rim",
@@ -184,7 +169,7 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                     .collect();
                 fsweep!(
                     f,
-                    name("lattice"),
+                    numbered("lattice"),
                     &pts,
                     0,
                     M.crust_dark,
@@ -201,34 +186,33 @@ pub fn neighbourly_oven() -> Vec<Obj> {
         let (rx0, rz0) = (cxm + 0.1, -0.1);
         for k in 0..5 {
             let z = rz0 - 0.1 + 0.05 * k as f64;
-            tube(
+            kit::tube!(
                 f,
-                &name("rack_bar"),
+                numbered("rack_bar"),
                 &[(rx0 - 0.15, top + 0.016, z), (rx0 + 0.15, top + 0.016, z)],
                 0.0025,
                 M.chrome,
-                Some(4),
-                1,
+                verts = 4,
+                round = 1
             );
         }
         for x in [rx0 - 0.15, rx0 + 0.15] {
-            tube(
+            kit::tube!(
                 f,
-                &name("rack_end"),
-                &fillet(
+                numbered("rack_end"),
+                &kit::fillet!(
                     &[
                         (x, top, rz0 - 0.11),
                         (x, top + 0.016, rz0 - 0.11),
                         (x, top + 0.016, rz0 + 0.11),
                         (x, top, rz0 + 0.11),
                     ],
-                    0.01,
-                    3,
+                    0.01
                 ),
                 0.003,
                 M.chrome,
-                Some(4),
-                1,
+                verts = 4,
+                round = 1
             );
         }
         for (x, z) in [
@@ -239,19 +223,18 @@ pub fn neighbourly_oven() -> Vec<Obj> {
             (0.22, -0.04),
             (0.05, -0.09),
         ] {
-            turned(
+            kit::turned!(
                 f,
-                &name("biscuit"),
+                numbered("biscuit"),
                 rx0 - 0.15 + x,
                 top + 0.019,
                 z,
                 &[(0.0, 0.0), (0.03, 0.004), (0.026, 0.012), (0.0, 0.012)],
                 M.crust_dark,
-                10,
-                none,
+                segments = 10
             );
         }
-        turned(
+        kit::turned!(
             f,
             "rolling_pin",
             rx0 - 0.15,
@@ -270,8 +253,8 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                 (0.0, 0.3),
             ],
             M.honey,
-            14,
-            (0.0, -90.0, 0.0),
+            segments = 14,
+            rot = (0.0, -90.0, 0.0)
         );
         fextrude!(
             f,
@@ -293,7 +276,7 @@ pub fn neighbourly_oven() -> Vec<Obj> {
             M.flour,
             plane = Facing::Top
         );
-        turned(
+        kit::turned!(
             f,
             "cake_stand",
             cxm - 0.42,
@@ -312,10 +295,9 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                 (0.0, 0.085),
             ],
             M.porcelain,
-            16,
-            none,
+            segments = 16
         );
-        turned(
+        kit::turned!(
             f,
             "cake",
             cxm - 0.42,
@@ -330,15 +312,14 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                 (0.0, 0.095),
             ],
             M.icing,
-            20,
-            none,
+            segments = 20
         );
         for k in 0..8 {
             // icing run down the cake's side
             let a = (k * 45 + 10) as f64;
             fsweep!(
                 f,
-                name("drip"),
+                numbered("drip"),
                 &[
                     (
                         cxm - 0.42 + 0.088 * cosd(a),
@@ -382,7 +363,7 @@ pub fn neighbourly_oven() -> Vec<Obj> {
         for i in 1..8 {
             fbox!(
                 f,
-                name("bead"),
+                numbered("bead"),
                 0.006,
                 1.62 - top - 0.04,
                 0.004,
@@ -416,7 +397,7 @@ pub fn neighbourly_oven() -> Vec<Obj> {
         for x in [cx0 + 0.06, cx1 - 0.06] {
             fextrude!(
                 f,
-                name("bracket"),
+                numbered("bracket"),
                 &[
                     (0.0, 0.0),
                     (0.0, 0.12),
@@ -438,9 +419,9 @@ pub fn neighbourly_oven() -> Vec<Obj> {
             (-0.15, 0.2, M.jar_red),
             (0.1, 0.14, M.jar_gold),
         ] {
-            lathe(
+            kit::lathe!(
                 f,
-                &name("jar"),
+                numbered("jar"),
                 cxm + dx,
                 1.515,
                 WALL + 0.1,
@@ -454,12 +435,11 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                     (0.0, h - 0.02),
                 ],
                 m,
-                12,
-                2.0,
+                verts = 12
             );
-            turned(
+            kit::turned!(
                 f,
-                &name("jar_lid"),
+                numbered("jar_lid"),
                 cxm + dx,
                 1.515 + h - 0.0225,
                 WALL + 0.1,
@@ -471,13 +451,12 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                     (0.0, 0.025),
                 ],
                 M.cork,
-                12,
-                none,
+                segments = 12
             );
             // (plain, not the towel's check: the door with the towel takes the fabric draw)
             fbox!(
                 f,
-                name("jar_label"),
+                numbered("jar_label"),
                 0.05,
                 0.04,
                 0.004,
@@ -552,7 +531,7 @@ pub fn neighbourly_oven() -> Vec<Obj> {
         for (a, l) in [(60.0, 0.025), (-60.0, 0.035)] {
             fbox!(
                 f,
-                name("clock_hand"),
+                numbered("clock_hand"),
                 0.004,
                 l,
                 0.002,
@@ -568,20 +547,19 @@ pub fn neighbourly_oven() -> Vec<Obj> {
         for dx in [-0.15, 0.15] {
             for dz in [-0.12, 0.12] {
                 let (bx, bz) = (rx + dx, WALL + rd / 2.0 + dz);
-                turned(
+                kit::turned!(
                     f,
-                    &name("burner"),
+                    numbered("burner"),
                     bx,
                     rh,
                     bz,
                     &[(0.0, 0.0), (0.065, 0.0), (0.05, 0.01), (0.0, 0.016)],
                     M.grate,
-                    12,
-                    none,
+                    segments = 12
                 );
                 fcyl!(
                     f,
-                    name("burner_cap"),
+                    numbered("burner_cap"),
                     0.03,
                     0.006,
                     (bx, rh + 0.019, bz),
@@ -590,23 +568,22 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                 );
                 for a in [0.0, 90.0] {
                     let (c, s) = (cosd(a), sind(a));
-                    tube(
+                    kit::tube!(
                         f,
-                        &name("grate"),
-                        &fillet(
+                        numbered("grate"),
+                        &kit::fillet!(
                             &[
                                 (bx - 0.1 * c, rh + 0.004, bz - 0.1 * s),
                                 (bx - 0.1 * c, rh + 0.026, bz - 0.1 * s),
                                 (bx + 0.1 * c, rh + 0.026, bz + 0.1 * s),
                                 (bx + 0.1 * c, rh + 0.004, bz + 0.1 * s),
                             ],
-                            0.01,
-                            3,
+                            0.01
                         ),
                         0.0055,
                         M.grate,
-                        Some(4),
-                        1,
+                        verts = 4,
+                        round = 1
                     );
                 }
             }
@@ -623,9 +600,9 @@ pub fn neighbourly_oven() -> Vec<Obj> {
             bevel_segments = 1
         );
         for i in 0..5 {
-            turned(
+            kit::turned!(
                 f,
-                &name("range_knob"),
+                numbered("range_knob"),
                 rx - 0.22 + i as f64 * 0.11,
                 rh - 0.1,
                 zf - 0.015,
@@ -637,8 +614,8 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                     (0.0, 0.027),
                 ],
                 M.chrome,
-                10,
-                (-90.0, 0.0, 0.0),
+                segments = 10,
+                rot = (-90.0, 0.0, 0.0)
             );
         }
         fbox!(
@@ -659,26 +636,25 @@ pub fn neighbourly_oven() -> Vec<Obj> {
             (rx, 0.3, zf - 0.03 + 0.007),
             M.chrome
         );
-        tube(
+        kit::tube!(
             f,
             "rail",
-            &fillet(
+            &kit::fillet!(
                 &[
                     (rx - rw / 2.0 + 0.06, 0.7, zf - 0.016),
                     (rx - rw / 2.0 + 0.06, 0.7, zf + 0.012),
                     (rx + rw / 2.0 - 0.06, 0.7, zf + 0.012),
                     (rx + rw / 2.0 - 0.06, 0.7, zf - 0.016),
                 ],
-                0.012,
-                3,
+                0.012
             ),
             0.009,
             M.chrome,
-            Some(8),
-            1,
+            verts = 8,
+            round = 1
         );
         let (sx, sz) = (rx + 0.15, WALL + rd / 2.0 - 0.12);
-        turned(
+        kit::turned!(
             f,
             "stock_pot",
             sx,
@@ -695,10 +671,9 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                 (0.0, 0.135),
             ],
             M.sage_pot,
-            18,
-            none,
+            segments = 18
         );
-        turned(
+        kit::turned!(
             f,
             "stock_lid",
             sx,
@@ -712,8 +687,7 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                 (0.0, 0.02),
             ],
             M.sage_dark,
-            18,
-            none,
+            segments = 18
         );
         fsphere!(
             f,
@@ -725,23 +699,22 @@ pub fn neighbourly_oven() -> Vec<Obj> {
             rings = 5
         );
         for s in [-1.0, 1.0] {
-            tube(
+            kit::tube!(
                 f,
-                &name("stock_handle"),
-                &fillet(
+                numbered("stock_handle"),
+                &kit::fillet!(
                     &[
                         (sx + s * 0.108, rh + 0.13, sz),
                         (sx + s * 0.135, rh + 0.13, sz),
                         (sx + s * 0.135, rh + 0.11, sz),
                         (sx + s * 0.108, rh + 0.11, sz),
                     ],
-                    0.006,
-                    3,
+                    0.006
                 ),
                 0.005,
                 M.sage_dark,
-                Some(4),
-                1,
+                verts = 4,
+                round = 1
             );
         }
     });
@@ -760,7 +733,7 @@ pub fn neighbourly_oven() -> Vec<Obj> {
             bevel = 0.01,
             bevel_segments = 2
         );
-        moulding(
+        kit::moulding!(
             f,
             "oven_frame",
             &[
@@ -777,9 +750,7 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                 (0.012, 0.0),
             ],
             M.enamel,
-            zf - 0.01,
-            true,
-            SHARP,
+            at = zf - 0.01
         );
         fbox!(
             f,
@@ -790,7 +761,7 @@ pub fn neighbourly_oven() -> Vec<Obj> {
             (rx, 0.36, zf - 0.009),
             M.oven_glass
         );
-        pull(
+        kit::pull!(
             f,
             "door_handle",
             rx,
@@ -798,10 +769,9 @@ pub fn neighbourly_oven() -> Vec<Obj> {
             zf - 0.01,
             rw - 0.16,
             M.chrome,
-            0.009,
-            0.032,
-            false,
-            8,
+            r = 0.009,
+            out = 0.032,
+            verts = 8
         );
         // the gingham tea towel folded over the handle, so it drops with the door (hung on the rail above, the door
         // swung up through it as it opened)
@@ -829,7 +799,7 @@ pub fn neighbourly_oven() -> Vec<Obj> {
         for k in 0..4 {
             fbox!(
                 f,
-                name("towel_check"),
+                numbered("towel_check"),
                 0.16,
                 0.02,
                 0.003,
@@ -840,7 +810,7 @@ pub fn neighbourly_oven() -> Vec<Obj> {
         for k in 0..3 {
             fbox!(
                 f,
-                name("towel_check_v"),
+                numbered("towel_check_v"),
                 0.026,
                 0.15,
                 0.0028,
@@ -850,7 +820,7 @@ pub fn neighbourly_oven() -> Vec<Obj> {
         }
     });
     let door = hinged(join(&door, "oven_door", None), f.at(rx, 0.13, zf - 0.02));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(door, "oven_open", 85.0, seconds = 0.8, axis = Axis::X);
     objs
 }
@@ -875,11 +845,10 @@ fn heart(s: f64) -> Vec<(f64, f64)> {
 
 pub fn giving_jar() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
-    let none = (0.0, 0.0, 0.0);
     let (jx, jz) = JAR;
     let _rnd = Random::new(5); // (the script makes it and draws nothing from it)
     let still = new_parts(|| {
-        turned(
+        kit::turned!(
             f,
             "pedestal",
             jx,
@@ -907,8 +876,7 @@ pub fn giving_jar() -> Vec<Obj> {
                 (0.0, 0.86),
             ],
             M.pedestal,
-            28,
-            none,
+            segments = 28
         );
         torus!(
             "pedestal_bead",
@@ -925,7 +893,7 @@ pub fn giving_jar() -> Vec<Obj> {
             let rr = 0.02 + 0.1 * ((i * 7) % 6) as f64 / 6.0;
             fcyl!(
                 f,
-                name("coin"),
+                numbered("coin"),
                 0.022,
                 0.006,
                 (
@@ -941,7 +909,7 @@ pub fn giving_jar() -> Vec<Obj> {
         for (k, (dx, dz)) in [(-0.02, 0.02), (0.05, -0.04)].into_iter().enumerate() {
             fsweep!(
                 f,
-                name("note"),
+                numbered("note"),
                 &[
                     (jx + dx - 0.05, 0.91, jz + dz),
                     (jx + dx, 0.915 + 0.01 * k as f64, jz + dz + 0.01),
@@ -955,7 +923,7 @@ pub fn giving_jar() -> Vec<Obj> {
             );
         }
         // the cork lid and its slot, a ribbon round the neck tied in a bow, a heart tag on a string
-        turned(
+        kit::turned!(
             f,
             "cork",
             jx,
@@ -969,8 +937,7 @@ pub fn giving_jar() -> Vec<Obj> {
                 (0.0, 0.05),
             ],
             M.cork,
-            22,
-            none,
+            segments = 22
         );
         fbox!(
             f,
@@ -992,9 +959,9 @@ pub fn giving_jar() -> Vec<Obj> {
         );
         let bz = jz + 0.115;
         for s in [-1.0, 1.0] {
-            tube(
+            kit::tube!(
                 f,
-                &name("bow_loop"),
+                numbered("bow_loop"),
                 &[
                     (jx, 1.2, bz),
                     (jx + s * 0.03, 1.225, bz + 0.012),
@@ -1004,12 +971,12 @@ pub fn giving_jar() -> Vec<Obj> {
                 ],
                 0.007,
                 M.ribbon,
-                Some(5),
-                2,
+                verts = 5,
+                round = 2
             );
             fsweep!(
                 f,
-                name("bow_tail"),
+                numbered("bow_tail"),
                 &[
                     (jx, 1.195, bz + 0.004),
                     (jx + s * 0.02, 1.16, bz + 0.012),
@@ -1031,7 +998,7 @@ pub fn giving_jar() -> Vec<Obj> {
             segments = 8,
             rings = 5
         );
-        tube(
+        kit::tube!(
             f,
             "tag_string",
             &[
@@ -1041,8 +1008,8 @@ pub fn giving_jar() -> Vec<Obj> {
             ],
             0.0025,
             M.ribbon,
-            Some(4),
-            2,
+            verts = 4,
+            round = 2
         );
         fextrude!(
             f,
@@ -1070,7 +1037,7 @@ pub fn giving_jar() -> Vec<Obj> {
         for (y, w) in [(0.6, 0.14), (0.575, 0.1)] {
             fbox!(
                 f,
-                name("chalk_line"),
+                numbered("chalk_line"),
                 w,
                 0.008,
                 0.003,
@@ -1091,7 +1058,7 @@ pub fn giving_jar() -> Vec<Obj> {
             verts = 4,
             closed = true
         );
-        turned(
+        kit::turned!(
             f,
             "plant_pot",
             0.31,
@@ -1108,12 +1075,11 @@ pub fn giving_jar() -> Vec<Obj> {
                 (0.0, 0.148),
             ],
             M.terracotta,
-            18,
-            none,
+            segments = 18
         );
         bush(f, 0.31, 0.15, 0.291, 0.1, M.mustard, 3);
         // the glass jar over the coins (the glass draw): a thick rim and a lip under the cork
-        turned(
+        kit::turned!(
             f,
             "jar",
             jx,
@@ -1133,8 +1099,7 @@ pub fn giving_jar() -> Vec<Obj> {
                 (0.0, 0.36),
             ],
             M.glass,
-            28,
-            none,
+            segments = 28
         );
     });
     join(&still, "body", Some(P3::ZERO));
@@ -1162,7 +1127,7 @@ pub fn giving_jar() -> Vec<Obj> {
         );
     });
     let coin = join(&coin, "coin", None);
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     slide!(coin, "coin", (0, 0, -0.1), seconds = 0.6);
     objs
 }

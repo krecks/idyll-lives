@@ -1,11 +1,11 @@
 //! The cookers: the electric cooker, the gas range, the oven tower, the range cooker and the hob counter.
 
-use super::common::{
-    burner, fillet, flame, hob_ring, hot_ring, knob, knob_obj, light, shaker, tube,
-};
+use super::common::{burner, fillet, flame, hob_ring, hot_ring, knob, knob_obj, light};
 use super::ovens::{drawer_front, oven, oven_door, oven_face, stock_pot, strip, tray};
 use super::{COUNTER66, M, SECONDS};
+use crate::common::shaker;
 use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::math::{Axis, cos, radians, sin};
 use artkit::parts::{join, new_parts, set_origin, settle_all};
 use artkit::place::{Facing, GameFrame};
@@ -421,7 +421,7 @@ pub fn range_cooker() -> Vec<Obj> {
         }
         stock_pot(f, "pot", -0.55, 0.911, -0.30, 0.14, 0.19, M.pot);
         // the chrome rail across the front in one piece, posts and all, and a tea towel hung over it
-        tube(
+        kit::tube!(
             f,
             "rail",
             &fillet(
@@ -436,9 +436,8 @@ pub fn range_cooker() -> Vec<Obj> {
             ),
             0.012,
             M.chrome,
-            Some(10),
-            1,
-            1.0,
+            verts = 10,
+            round = 1
         );
         fsweep!(
             f,

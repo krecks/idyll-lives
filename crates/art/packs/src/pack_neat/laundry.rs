@@ -1,7 +1,6 @@
 //! The stacked laundry centre and the rainfall steam shower.
 
 use super::common::{_bottle, _box, _m, _towels, M, TOWELS, WALL};
-use super::dock::settle_in_place;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit;
 use artkit::materials::Mat;
@@ -11,7 +10,7 @@ use artkit::parts::{hinged, join, new_parts, settle};
 use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsweep, grow, loft, revolve, ring, rod, soft, swing};
+use artkit::{fbox, fcyl, fextrude, fsweep, grow, loft, revolve, ring, rod, settle, soft, swing};
 
 // --- the stacked laundry centre (2x1): washer and dryer at the left, a folding counter with cubbies, a rail ---
 const WX: f64 = -0.56; // the stack's middle
@@ -580,7 +579,7 @@ pub fn laundry_center() -> Vec<Obj> {
     // The washer's porthole door, hinged on its left: `door_open` swings it open.
     let door = new_parts(|| _porthole(f, "door", cy, zf));
     let door = hinged(join(&door, "door", None), f.at(WX - 0.235, cy, zf + 0.005));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(
         door,
         "door_open",

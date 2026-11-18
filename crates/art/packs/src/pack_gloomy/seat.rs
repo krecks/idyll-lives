@@ -1,16 +1,15 @@
 //! The brooding window seat and the moonstone soaking tub.
 
-use super::common::{M, WALL, WALL2, book, candle, moulding, name, pull, shaker, turned, vase};
-use super::music::settle_in_place;
+use super::common::{M, WALL, WALL2, book, candle, vase};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{P3, cosd, sind};
 use artkit::motion::{Grow, Squash, grow, squash};
-use artkit::parts::{hinged, join, new_parts};
+use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::GameFrame;
 use artkit::rand::Random;
 use artkit::scene::Obj;
-use artkit::{boulder, fbox, fextrude, fsphere, fsweep, jitter, soft, torus};
+use artkit::{boulder, fbox, fextrude, fsphere, fsweep, jitter, kit, settle, soft, torus};
 
 // --- the brooding window seat (2x1): a cushioned bench under a rain-streaked window ------------------------
 const FRAME_Z: f64 = WALL + 0.08; // the window wall's front
@@ -66,7 +65,7 @@ fn mug(
     material: Mat,
     turn: f64,
 ) {
-    turned(
+    kit::turned!(
         f,
         name,
         x,
@@ -82,7 +81,7 @@ fn mug(
             (0.0, 0.15 * h),
         ],
         material,
-        16,
+        segments = 16
     );
     let (c, s) = (cosd(turn), sind(turn));
     let pts: Vec<(f64, f64, f64)> = [
@@ -135,31 +134,26 @@ pub fn window_seat() -> Vec<Obj> {
             verts = 10
         );
         for x in [-0.45, 0.45] {
-            shaker(
+            kit::shaker!(
                 f,
-                &name("drawer"),
+                numbered("drawer"),
                 0.86,
                 0.24,
                 (x, 0.215, FRAME_Z + 0.587),
                 0.014,
                 M.bench_front,
-                0.05,
-                None,
-                0.005,
-                false,
+                rail = 0.05
             );
-            pull(
+            kit::pull!(
                 f,
-                &name("pull"),
+                numbered("pull"),
                 x,
                 0.28,
                 FRAME_Z + 0.594,
                 0.14,
                 M.brass,
-                0.006,
-                0.03,
-                false,
-                8,
+                r = 0.006,
+                out = 0.03
             );
         }
         // the window wall: a panel, the rainy pane behind a sash of four lights, a moulded casing, a nosed sill
@@ -208,7 +202,7 @@ pub fn window_seat() -> Vec<Obj> {
             bevel = 0.003,
             bevel_segments = 1
         );
-        moulding(
+        kit::moulding!(
             f,
             "casing",
             &[(0.81, 0.69), (0.81, 1.79), (-0.81, 1.79), (-0.81, 0.69)],
@@ -220,9 +214,7 @@ pub fn window_seat() -> Vec<Obj> {
                 (0.012, 0.0),
             ],
             M.frame,
-            FRAME_Z,
-            true,
-            artkit::shapes::SHARP,
+            at = FRAME_Z
         );
         fsweep!(
             f,
@@ -254,7 +246,7 @@ pub fn window_seat() -> Vec<Obj> {
                 let l = rnd.uniform(0.06, 0.16);
                 fsweep!(
                     f,
-                    name("run"),
+                    numbered("run"),
                     &[
                         (x, y, FRAME_Z + 0.011),
                         (x + 0.004, y - l * 0.5, FRAME_Z + 0.011),
@@ -269,7 +261,7 @@ pub fn window_seat() -> Vec<Obj> {
             }
             fsphere!(
                 f,
-                name("drop"),
+                numbered("drop"),
                 0.012,
                 (x, y, FRAME_Z + 0.011),
                 M.drop,
@@ -392,7 +384,7 @@ pub fn window_seat() -> Vec<Obj> {
         );
     });
     let seat = hinged(join(&seat, "seat", None), f.at(0, 0.385, zc));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     squash(
         seat,
         "sink_in",
@@ -412,7 +404,7 @@ pub fn soaking_tub() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
     let still = new_parts(|| {
         // the tub: up the outside from a rounded foot, over a rolled rim and down the inside to its floor
-        turned(
+        kit::turned!(
             f,
             "tub",
             0.0,
@@ -435,7 +427,7 @@ pub fn soaking_tub() -> Vec<Obj> {
                 (0.0, 0.095),
             ],
             M.stone,
-            56,
+            segments = 56
         );
         torus!(
             "moon_band",
@@ -467,18 +459,16 @@ pub fn soaking_tub() -> Vec<Obj> {
             bevel = 0.01
         );
         for x in [-0.69, 0.69] {
-            shaker(
+            kit::shaker!(
                 f,
-                &name("ledge_panel"),
+                numbered("ledge_panel"),
                 0.38,
                 0.36,
                 (x, 0.26, WALL2 + 0.307),
                 0.016,
                 M.ledge,
-                0.05,
-                None,
-                0.005,
-                true,
+                rail = 0.05,
+                raised = true
             );
         }
         fsweep!(
@@ -534,7 +524,7 @@ pub fn soaking_tub() -> Vec<Obj> {
         {
             fbox!(
                 f,
-                name("towel_band"),
+                numbered("towel_band"),
                 w + 0.004,
                 0.012,
                 0.03,
@@ -561,7 +551,7 @@ pub fn soaking_tub() -> Vec<Obj> {
             ];
             fsweep!(
                 f,
-                name("frond"),
+                numbered("frond"),
                 &pts,
                 0,
                 M.leaf,
@@ -588,7 +578,7 @@ pub fn soaking_tub() -> Vec<Obj> {
             for k in 0..9 {
                 fbox!(
                     f,
-                    name("tassel"),
+                    numbered("tassel"),
                     0.02,
                     0.012,
                     0.012,
@@ -602,7 +592,7 @@ pub fn soaking_tub() -> Vec<Obj> {
     // The water: the tub's inside up to 0.52, a little foam on it, its origin under the tub's floor and flat
     // there at rest; `fill` raises it while a resident soaks.
     let water = new_parts(|| {
-        turned(
+        kit::turned!(
             f,
             "water",
             0.0,
@@ -610,7 +600,7 @@ pub fn soaking_tub() -> Vec<Obj> {
             TZ,
             &[(0.0, 0.0), (0.565, 0.0), (0.615, 0.425), (0.0, 0.425)],
             M.water,
-            48,
+            segments = 48
         );
         for (k, (x, z, r)) in [
             (0.25, 0.25, 0.1),
@@ -622,7 +612,7 @@ pub fn soaking_tub() -> Vec<Obj> {
         .enumerate()
         {
             boulder!(
-                name("foam"),
+                numbered("foam"),
                 r,
                 at = f.at(x, 0.515, TZ + z),
                 material = M.foam,
@@ -635,7 +625,7 @@ pub fn soaking_tub() -> Vec<Obj> {
     });
     let water = join(&water, "water", Some(f.at(0, 0.09, TZ)));
     water.edit(|o| o.scale.z = 0.001);
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     grow(
         water,
         "fill",

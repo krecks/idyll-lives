@@ -1,12 +1,13 @@
 //! The treadmill: belt along the depth, the console at the back; the runner faces the back.
 
 use super::M;
-use super::common::{Num, on, py, rr};
+use super::common::{on, rr};
+use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::P3;
 use artkit::motion::scroll;
 use artkit::parts::{join, new_parts};
-use artkit::place::GameFrame;
+use artkit::place::{GameFrame, N};
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcyl, fsphere, fsweep, loft, revolve, ring, settle, soft};
 
@@ -19,11 +20,11 @@ const HOOD: f64 = -0.63;
 /// The rear roller cap's front edge (the belt goes under it).
 const CAP: f64 = 0.80;
 /// The console's middle, tilted back to face the runner.
-const CON: (Num, f64, f64) = (Num::Int(0), 1.3, -0.58);
+const CON: (N, f64, f64) = (N::I(0), 1.3, -0.58);
 const TILT: i32 = -35;
 
 /// A point on the console's face (`_on(CON, TILT, d)`).
-fn con(x: impl Into<Num>, y: f64, z: f64) -> (Num, f64, f64) {
+fn con(x: impl Into<N>, y: f64, z: f64) -> (N, f64, f64) {
     on(CON, TILT, (x.into(), y, z))
 }
 
@@ -162,7 +163,7 @@ pub fn treadmill() -> Vec<Obj> {
             for z in [-0.86, 0.84] {
                 fcyl!(
                     f,
-                    format!("foot{}{}", py(x), py(z)),
+                    format!("foot{}{}", float_repr(x), float_repr(z)),
                     0.03,
                     0.04,
                     (x, 0.02, z),

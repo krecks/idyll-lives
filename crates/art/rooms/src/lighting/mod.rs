@@ -11,8 +11,7 @@
 //! turn while it's on. The rest are still (the paper lantern's sway went, 2026-10-21: a paper globe indoors hangs
 //! still).
 
-use artkit::family::{Family, Model};
-use artkit::json::loads;
+use artkit::family::{Family, Model, motions};
 
 mod ceiling;
 mod common;
@@ -45,7 +44,7 @@ pub fn family() -> Option<Family> {
             model!("ceilingFan", ceiling::ceiling_fan, (0.905, 0.385, 0.951), &[("white", "Body"), ("blade", "Blades")])
                 .on_wall()
                 .centre(-0.0374, 0.0)
-                .motions(loads(r#"{"idle": "blades_turn"}"#).expect("the motions are JSON")),
+                .motions(motions(r#"{"idle": "blades_turn"}"#)),
             model!("trackLights", ceiling::track_lights, (0.94, 0.296, 0.19), &[("white", "Body"), ("iron", "Shade")]).on_wall(),
             model!("paperLantern", ceiling::paper_lantern, (0.543, 0.681, 0.543), &[("paper", "Paper"), ("rib", "Ribs")]).on_wall(),
             model!("wallSconce", standing::wall_sconce, (0.2, 0.25, 0.27), &[("brass", "Body"), ("shade", "Shade")])

@@ -4,10 +4,10 @@ use super::common::{F, M, WALL, open_book, rod, tube};
 use artkit::forms::smooth_outline;
 use artkit::json::float_repr;
 use artkit::math::{P3, TAU, cos, radians, sin};
-use artkit::parts::{Settle, join, new_parts, settle_all, settle_with};
+use artkit::parts::{join, new_parts, settle_all};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, loft, revolve, ring, soft, torus};
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, loft, revolve, ring, settle, soft, torus};
 
 // --- the wall bars: 1x1 on a wall, beech rungs between two uprights, the top ones standing out -------------------
 /// The rungs' depth at height `y`: against the wall low down, standing out over the top.
@@ -72,13 +72,7 @@ pub fn wall_bars() -> Vec<Obj> {
         }
     });
     join(&parts, "bars", Some((0, 0, 0).into()));
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: false,
-        },
-    );
+    settle!(centre = false, floor = false);
     meshes()
 }
 
@@ -358,13 +352,7 @@ pub fn locker_row() -> Vec<Obj> {
         }
     });
     join(&parts, "lockers", Some((0, 0, 0).into()));
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     meshes()
 }
 
@@ -828,12 +816,6 @@ pub fn vault_door() -> Vec<Obj> {
         }
     });
     join(&parts, "vault", Some((0, 0, 0).into()));
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: false,
-        },
-    );
+    settle!(centre = false, floor = false);
     meshes()
 }

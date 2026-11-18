@@ -13,21 +13,10 @@ use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{TAU, cos, sin};
 use artkit::motion::Ease;
-use artkit::parts::{Settle, hinged, join, join_all, new_parts, settle_with};
+use artkit::parts::{hinged, join, join_all, new_parts};
 use artkit::place::{Coord, GameFrame};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fsphere, fsweep, soft, swing};
-
-/// `G.settle(centre=False, floor=...)`.
-fn settle(floor: bool) {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor,
-        },
-    );
-}
+use artkit::{fbox, fcyl, fsphere, fsweep, settle, soft, swing};
 
 /// An open-fronted box: back, sides, top and bottom, `w` x `h` x `d`, its back at game depth `z0`.
 #[allow(clippy::too_many_arguments)] // (as the script called it)
@@ -357,7 +346,7 @@ pub fn mirror_cabinet() -> Vec<Obj> {
         join(&parts, "door", None),
         f.at(-(w - 0.02) / 2.0, y0 + h / 2.0, front),
     );
-    settle(false);
+    settle!(centre = false, floor = false);
     swing!(door, "door_open", 100, seconds = 0.8, ease = Ease::BackOut);
     meshes()
 }
@@ -484,7 +473,7 @@ pub fn mirror_round() -> Vec<Obj> {
     });
     join(&glass, "mirror", None);
     join_all("mirrorRound");
-    settle(false);
+    settle!(centre = false, floor = false);
     meshes()
 }
 
@@ -683,7 +672,7 @@ pub fn bath_cabinet_tall() -> Vec<Obj> {
         join(&parts, "door", None),
         f.at(-0.2, (niche.1 + top) / 2.0, front),
     );
-    settle(true);
+    settle!(centre = false);
     swing!(door, "door_open", 100, seconds = 0.8, ease = Ease::BackOut);
     meshes()
 }

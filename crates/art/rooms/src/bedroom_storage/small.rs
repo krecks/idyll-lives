@@ -1,30 +1,20 @@
 //! BR2: the nightstands, the blanket chest, the laundry hamper and the bed-end bench.
 
 use super::common::{
-    BOX, DRAWER_SECONDS, F, M, PULL, Style, WALL, book, books, drawer, fr, front, gap, knob, mug,
-    pull, shell, top,
+    DRAWER_SECONDS, F, M, PULL, Style, WALL, book, books, drawer, front, gap, knob, mug, pull,
+    shell, top,
 };
 use artkit::forms::rounded_rect;
-use artkit::kit;
+use artkit::json::float_repr;
 use artkit::math::{Axis, P3, PI, TAU, cos, cosd, sin, sind};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts};
 use artkit::place::Facing;
-use artkit::scene::{Obj, meshes};
+use artkit::scene::Obj;
 use artkit::{
     fbox, fcone, fcyl, fextrude, fsphere, fsweep, jitter, loft, revolve, ring, rod, slide, soft,
     swing, torus,
 };
-
-/// Settled on the floor where it was built.
-fn settle_in_place() -> Vec<Obj> {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    )
-}
+use artkit::{kit, settle};
 
 // --- BR2: the nightstand: oak, a drawer over an open niche, on four short tapered legs -----------------
 fn classic_nightstand(decor: bool) {
@@ -34,7 +24,7 @@ fn classic_nightstand(decor: bool) {
         for z in [WALL + 0.035, front_z - 0.035] {
             fcone!(
                 F,
-                format!("leg{sx}{}", fr(z)),
+                format!("leg{sx}{}", float_repr(z)),
                 0.022,
                 0.015,
                 0.145,
@@ -111,7 +101,7 @@ fn classic_nightstand(decor: bool) {
 pub fn nightstand() -> Vec<Obj> {
     let still = new_parts(|| classic_nightstand(true));
     join(&still, "nightstand", Some(P3::ZERO));
-    settle_in_place()
+    settle!(centre = false)
 }
 
 // --- the nightstand with a lamp: the same nightstand, a gourd lamp with a drum shade on it --------------
@@ -274,7 +264,7 @@ pub fn nightstand_lamp() -> Vec<Obj> {
         );
     });
     join(&still, "nightstandLamp", Some(P3::ZERO));
-    settle_in_place()
+    settle!(centre = false)
 }
 
 // --- the modern nightstand: white, an oak top and legs, a drawer over an open niche of books -----------
@@ -305,7 +295,7 @@ pub fn nightstand_modern() -> Vec<Obj> {
         for sx in [-1, 1] {
             for z in [-0.37, front_z - 0.05] {
                 splayed(
-                    &format!("leg{sx}{}", fr(z)),
+                    &format!("leg{sx}{}", float_repr(z)),
                     sx as f64 * 0.23,
                     z,
                     0.13,
@@ -364,7 +354,7 @@ pub fn nightstand_modern() -> Vec<Obj> {
             0.08,
             0.16,
             (0.15, 0.18, -0.18),
-            BOX,
+            M.box_,
             round = 0.01,
             round_segments = 1
         );
@@ -375,13 +365,13 @@ pub fn nightstand_modern() -> Vec<Obj> {
             0.02,
             0.166,
             (0.15, 0.225, -0.18),
-            BOX,
+            M.box_,
             round = 0.008,
             round_segments = 1
         );
     });
     join(&still, "nightstandModern", Some(P3::ZERO));
-    settle_in_place()
+    settle!(centre = false)
 }
 
 // --- the drum nightstand: a terracotta drum with a drawer band, an oak top and a round foot ------------
@@ -434,7 +424,7 @@ pub fn nightstand_round() -> Vec<Obj> {
         );
         for y in [0.358, 0.482] {
             torus!(
-                format!("groove{}", fr(y)),
+                format!("groove{}", float_repr(y)),
                 0.256,
                 0.004,
                 at = F.at(0, y, z),
@@ -475,7 +465,7 @@ pub fn nightstand_round() -> Vec<Obj> {
         );
     });
     join(&still, "nightstandRound", Some(P3::ZERO));
-    settle_in_place()
+    settle!(centre = false)
 }
 
 // --- the three-drawer nightstand: walnut, three drawers with brass bars; the top one a part of its own ---
@@ -560,7 +550,7 @@ pub fn nightstand_drawers() -> Vec<Obj> {
         Some(&drawer_snacks),
         Style::Plain,
     );
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     slide!(d, "drawer_open", (0, -PULL, 0), seconds = DRAWER_SECONDS);
     objs
 }
@@ -735,7 +725,7 @@ pub fn cedar_chest() -> Vec<Obj> {
             for y in [0.09, 0.425] {
                 fbox!(
                     F,
-                    format!("corner_front{s}{}", fr(y)),
+                    format!("corner_front{s}{}", float_repr(y)),
                     0.05,
                     0.05,
                     0.004,
@@ -746,7 +736,7 @@ pub fn cedar_chest() -> Vec<Obj> {
                 );
                 fbox!(
                     F,
-                    format!("corner_side{s}{}", fr(y)),
+                    format!("corner_side{s}{}", float_repr(y)),
                     0.004,
                     0.05,
                     0.05,
@@ -757,7 +747,7 @@ pub fn cedar_chest() -> Vec<Obj> {
                 );
                 fsphere!(
                     F,
-                    format!("rivet{s}{}", fr(y)),
+                    format!("rivet{s}{}", float_repr(y)),
                     0.005,
                     (sf * (w / 2.0 - 0.02), y, d / 2.0 + 0.004),
                     M.iron,
@@ -897,7 +887,7 @@ pub fn cedar_chest() -> Vec<Obj> {
         loft!("lid_panel", &secs, material = M.cedar, smooth = false);
     });
     let lid = hinged(join(&parts, "lid", None), F.at(0, 0.455, -0.25));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(lid, "lid_open", -95.0, seconds = 0.9, axis = Axis::X);
     objs
 }
@@ -963,7 +953,7 @@ pub fn laundry_hamper() -> Vec<Obj> {
         loft!("basket", &secs, material = M.wicker);
         for y in [0.04, 0.2, 0.4] {
             braid(
-                &format!("band{}", fr(y)),
+                &format!("band{}", float_repr(y)),
                 0.2 + 0.031 * y / 0.56 + 0.004,
                 y,
                 z,
@@ -1046,7 +1036,7 @@ pub fn laundry_hamper() -> Vec<Obj> {
         );
     });
     let lid = hinged(join(&parts, "lid", None), F.at(0, 0.56, z - 0.236));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(lid, "lid_open", -70.0, seconds = 0.7, axis = Axis::X); // not past upright: it stands at the wall
     objs
 }
@@ -1145,5 +1135,5 @@ pub fn bench_bed_end() -> Vec<Obj> {
         }
     });
     join(&still, "benchBedEnd", Some(P3::ZERO));
-    settle_in_place()
+    settle!(centre = false)
 }

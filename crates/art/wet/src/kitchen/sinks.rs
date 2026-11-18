@@ -3,8 +3,9 @@
 //! GameFrame.
 
 use super::M;
-use super::common::{py_max, shaker, tube};
+use crate::common::{shaker, water};
 use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, cos, sin};
 use artkit::motion::{Grow, grow};
@@ -42,7 +43,7 @@ fn gooseneck<X: Coord>(
         (x, tip_y + 0.04, spout_z),
         (x, tip_y, spout_z),
     ];
-    tube(f, name, &pts, r, material, Some(10), 3, 1.0);
+    kit::tube!(f, name, &pts, r, material, verts = 10, round = 3);
     fcyl!(
         f,
         format!("{name}_head"),
@@ -279,29 +280,6 @@ fn soap_dish(fx: &GameFrame, name: &str, x: f64, y: f64, z: f64, w: f64, d: f64)
     );
 }
 
-/// The stream: a thin cylinder from the spout tip down to the basin, joined with its origin at the
-/// tip and scaled to nothing along its length, so it is hidden until `grow` runs the clip.
-fn water<X: Coord>(f: &GameFrame, spout: (X, f64, f64), floor_y: f64) -> Obj {
-    let (x, top_y, z) = spout;
-    let length = py_max(0.06, top_y - floor_y);
-    let parts = new_parts(|| {
-        fcyl!(
-            f,
-            "water",
-            0.012,
-            length,
-            (x, (top_y + floor_y) / 2.0, z),
-            M.water,
-            verts = 10
-        );
-    });
-    let obj = join(&parts, "water", Some(f.at(x, top_y, z)));
-    obj.edit(|o| o.scale.z = 0.001);
-    obj
-}
-
-// --- farmhouse sink: a white apron basin in a painted cabinet under a wood worktop ---------------------
-
 /// A fireclay apron-front basin standing proud of a painted cabinet with a face frame and two shaker doors,
 /// under a wooden worktop cut round it; a gooseneck tap with a lever, a soap dish and a potted herb.
 pub fn farmhouse_sink() -> Vec<Obj> {
@@ -446,7 +424,7 @@ pub fn farmhouse_sink() -> Vec<Obj> {
         herb(&fk, "herb", -0.36, 0.95, -0.38, 0.06);
     });
     join(&still, "body", Some((0, 0, 0).into()));
-    let water = water(&fk, spout.expect("the tap is built"), 0.785);
+    let water = water(&fk, spout.expect("the tap is built"), 0.785, M.water);
     settle_all();
     grow(
         water,
@@ -595,7 +573,7 @@ pub fn counter_sink_double() -> Vec<Obj> {
     // sim-core spreads the two slots along the width (objectMotion.ts `slotOf`).
     let waters: Vec<Obj> = [-0.42, 0.42]
         .into_iter()
-        .map(|x| water(&fk, (x, 1.17, -0.17), 0.79))
+        .map(|x| water(&fk, (x, 1.17, -0.17), 0.79, M.water))
         .collect();
     settle_all();
     for (slot, water) in waters.into_iter().enumerate() {

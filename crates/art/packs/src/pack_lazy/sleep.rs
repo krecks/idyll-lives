@@ -1,22 +1,14 @@
 //! The snoozecloud adjustable bed and the daydream nap pod.
 
-use super::common::{_lathe, _name, _sphere_band, _turned, M};
+use super::common::{_sphere_band, M};
 use artkit::forms::smooth_outline;
 use artkit::math::{Axis, P3, cos, pow, radians, sin, sqrt};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::GameFrame;
-use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, jitter, revolve, soft, swing, torus};
-
-pub fn settle_in_place() -> Vec<Obj> {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    )
-}
+use artkit::scene::Obj;
+use artkit::{
+    fbox, fcyl, fextrude, fsphere, fsweep, jitter, kit, revolve, settle, soft, swing, torus,
+};
 
 // --- the snoozecloud adjustable bed (2x2): two sleepers side by side, mattress top 0.49, head at the back ----
 const HINGE_Z: f64 = -0.42; // the head section's front edge (depth), where it rises from
@@ -68,9 +60,9 @@ pub fn snoozecloud_bed() -> Vec<Obj> {
         );
         for sx in [-1, 1] {
             for sz in [-1, 1] {
-                _turned(
+                kit::turned!(
                     f,
-                    &_name("foot"),
+                    numbered("foot"),
                     sx as f64 * 0.8,
                     0.0,
                     sz as f64 * 0.8,
@@ -83,8 +75,7 @@ pub fn snoozecloud_bed() -> Vec<Obj> {
                         (0.0, 0.05),
                     ],
                     M.birch,
-                    12,
-                    (0.0, 0.0, 0.0),
+                    segments = 12
                 );
             }
         }
@@ -182,7 +173,7 @@ pub fn snoozecloud_bed() -> Vec<Obj> {
         for k in 0..3 {
             fcyl!(
                 f,
-                _name("remote_button"),
+                numbered("remote_button"),
                 0.008,
                 0.004,
                 (0.78, MAT_TOP + 0.027, 0.26 + 0.025 * k as f64),
@@ -213,7 +204,7 @@ pub fn snoozecloud_bed() -> Vec<Obj> {
             let sf = s as f64;
             soft!(
                 f,
-                _name("pillow"),
+                numbered("pillow"),
                 0.68,
                 0.14,
                 0.36,
@@ -226,7 +217,7 @@ pub fn snoozecloud_bed() -> Vec<Obj> {
             );
             soft!(
                 f,
-                _name("cushion"),
+                numbered("cushion"),
                 0.22,
                 0.26,
                 0.1,
@@ -243,7 +234,7 @@ pub fn snoozecloud_bed() -> Vec<Obj> {
         join(&head, "head_section", None),
         f.at(0, MAT_TOP - 0.2, HINGE_Z),
     );
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(head, "head_up", 30.0, seconds = 1.2, axis = Axis::X);
     objs
 }
@@ -284,7 +275,7 @@ pub fn nap_pod() -> Vec<Obj> {
             scale = (1.0, POD_H / POD_R, 1.0)
         );
         // its stem and swivel base
-        _turned(
+        kit::turned!(
             f,
             "stem",
             0,
@@ -299,10 +290,9 @@ pub fn nap_pod() -> Vec<Obj> {
                 (0.0, 0.24),
             ],
             M.chrome,
-            20,
-            (0.0, 0.0, 0.0),
+            segments = 20
         );
-        _turned(
+        kit::turned!(
             f,
             "base_disc",
             0,
@@ -317,11 +307,10 @@ pub fn nap_pod() -> Vec<Obj> {
                 (0.0, 0.04),
             ],
             M.chrome,
-            36,
-            (0.0, 0.0, 0.0),
+            segments = 36
         );
         // the cushions: a round seat (top 0.45), a tufted back cushion in the egg's curve, a little pillow
-        _lathe(
+        kit::lathe!(
             f,
             "seat",
             0,
@@ -337,9 +326,7 @@ pub fn nap_pod() -> Vec<Obj> {
                 (0.0, 0.1),
             ],
             M.seat,
-            32,
-            2.0,
-            1.0,
+            verts = 32
         );
         torus!(
             "seat_piping",
@@ -373,7 +360,7 @@ pub fn nap_pod() -> Vec<Obj> {
             let depth = 0.09 * sqrt(if left > 0.0 { left } else { 0.0 });
             fsphere!(
                 f,
-                _name("button"),
+                numbered("button"),
                 0.012,
                 (u, 0.84 + v, -0.21 + depth - 0.004),
                 M.hood,
@@ -455,11 +442,11 @@ pub fn nap_pod() -> Vec<Obj> {
                     )
                 })
                 .collect();
-            fsweep!(f, _name("hood_seam"), &seam, 0.004, M.seat, verts = 4);
+            fsweep!(f, numbered("hood_seam"), &seam, 0.004, M.seat, verts = 4);
         }
     });
     let hood = hinged(join(&hood, "hood", None), f.at(HOOD.0, HOOD.1, HOOD.2));
-    let objs = settle_in_place(); // built in place: the seat under the sitter, the hood over their head
+    let objs = settle!(centre = false); // built in place: the seat under the sitter, the hood over their head
     swing!(hood, "hood", 60.0, seconds = 1.0, axis = Axis::X);
     objs
 }

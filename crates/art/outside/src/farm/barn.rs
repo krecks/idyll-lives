@@ -2,12 +2,13 @@
 //! each side and a louvred cupola, and its far version.
 
 use super::barn_doors::{barn_doors, barn_window};
-use super::common::{F, M, N, P2, offset, prism, pts, shell, strut};
+use super::common::{F, M, P2, offset, prism, pts, shell, strut};
 use artkit::parts::{join_all, settle};
 use artkit::place::Coord;
+use artkit::place::N;
 use artkit::py;
 use artkit::scene::Obj;
-use artkit::{cube, fbox, fcone, fsphere, fsweep, rod, sweep};
+use artkit::{cube, fbox, fcone, fsphere, fsweep, points, rod, sweep};
 
 // --- the barn --------------------------------------------------------------------------------------------
 pub(super) const BW: f64 = 2.8; // half the walls' width and depth
@@ -21,16 +22,16 @@ const ROOF_D: f64 = 2.92;
 
 #[allow(non_snake_case)]
 fn BARN_WALL() -> Vec<P2> {
-    use N::{F as f, I as i};
-    vec![
-        (f(-BW), i(0)),
-        (f(BW), i(0)),
-        (f(BW), f(EAVE)),
-        (f(KNEE_X), f(KNEE)),
-        (i(0), f(RIDGE)),
-        (f(-KNEE_X), f(KNEE)),
-        (f(-BW), f(EAVE)),
+    points![
+        (-BW, 0),
+        (BW, 0),
+        (BW, EAVE),
+        (KNEE_X, KNEE),
+        (0, RIDGE),
+        (-KNEE_X, KNEE),
+        (-BW, EAVE),
     ]
+    .to_vec()
 }
 
 /// The roof's underside: the walls' gambrel, carried 0.2 m past the eaves.
@@ -38,14 +39,14 @@ fn barn_roof_line() -> Vec<P2> {
     let (dx, dy) = (KNEE_X - BW, KNEE - EAVE);
     let k = py::hypot(dx, dy);
     let (ex, ey) = (BW - 0.2 * dx / k, EAVE - 0.2 * dy / k);
-    use N::{F as f, I as i};
-    vec![
-        (f(-ex), f(ey)),
-        (f(-KNEE_X), f(KNEE)),
-        (i(0), f(RIDGE)),
-        (f(KNEE_X), f(KNEE)),
-        (f(ex), f(ey)),
+    points![
+        (-ex, ey),
+        (-KNEE_X, KNEE),
+        (0, RIDGE),
+        (KNEE_X, KNEE),
+        (ex, ey),
     ]
+    .to_vec()
 }
 
 /// The walls' top at `x`.

@@ -1,14 +1,14 @@
 //! The writer's bureau and the book-club tea trolley.
 
-use super::common::{M, books, fillet, knob, lamp, mug, name, pile, pull, shaker, tube};
+use super::common::{M, books, knob, lamp, mug, pile};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, cosd, pow, sin, sind};
-use artkit::parts::{hinged, join, new_parts, settle_all};
+use artkit::parts::{hinged, join, new_parts, numbered, settle_all};
 use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
 use artkit::scene::Obj;
-use artkit::{fbox, fcyl, fextrude, fsweep, loft, revolve, ring, soft, swing};
+use artkit::{fbox, fcyl, fextrude, fsweep, kit, loft, revolve, ring, soft, swing};
 
 // --- the writer's bureau (1x1): its back on the wall, the chair in front; the writer faces the bureau ------
 // (content `seat.facing: "back"`). Built facing the front as it stands (2026-10-22: it was built the other way
@@ -22,7 +22,7 @@ fn bureau_chair(f: &GameFrame, z: f64) {
         let x = s * 0.18;
         fsweep!(
             f,
-            name("back_leg"),
+            numbered("back_leg"),
             &[
                 (x, 0.0, zb),
                 (x, 0.42, zb - 0.01),
@@ -36,7 +36,7 @@ fn bureau_chair(f: &GameFrame, z: f64) {
             resolution = 2
         );
         revolve!(
-            name("front_leg"),
+            numbered("front_leg"),
             &[
                 (0.0, 0.0),
                 (0.013, 0.0),
@@ -52,24 +52,24 @@ fn bureau_chair(f: &GameFrame, z: f64) {
             material = M.honey,
             segments = 10
         );
-        tube(
+        kit::tube!(
             f,
-            &name("side_stretcher"),
+            numbered("side_stretcher"),
             &[(x, 0.14, z - 0.16), (x, 0.14, zb)],
             0.009,
             M.honey,
-            Some(6),
-            1,
+            verts = 6,
+            round = 1
         );
     }
-    tube(
+    kit::tube!(
         f,
         "front_stretcher",
         &[(-0.18, 0.18, z - 0.16), (0.18, 0.18, z - 0.16)],
         0.009,
         M.honey,
-        Some(6),
-        1,
+        verts = 6,
+        round = 1
     );
     // the seat: a board with a rounded front, the pad on it
     let mut seat = vec![(0.21, 0.19), (-0.21, 0.19)];
@@ -165,7 +165,7 @@ pub fn writing_bureau() -> Vec<Obj> {
             let x = s * 0.31;
             fbox!(
                 f,
-                name("pedestal"),
+                numbered("pedestal"),
                 0.2,
                 0.69,
                 0.28,
@@ -176,7 +176,7 @@ pub fn writing_bureau() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                name("pedestal_plinth"),
+                numbered("pedestal_plinth"),
                 0.21,
                 0.04,
                 0.29,
@@ -186,20 +186,17 @@ pub fn writing_bureau() -> Vec<Obj> {
                 bevel_segments = 1
             );
             for (y, hh) in [(0.17, 0.2), (0.4, 0.2), (0.6, 0.16)] {
-                shaker(
+                kit::shaker!(
                     f,
-                    &name("drawer"),
+                    numbered("drawer"),
                     0.172,
                     hh,
                     (x, y, -0.152),
                     0.016,
                     M.panel,
-                    0.032,
-                    None,
-                    0.005,
-                    false,
+                    rail = 0.032
                 );
-                knob(f, &name("knob"), x, y, -0.144, 0.011, None, 8);
+                knob(f, &numbered("knob"), x, y, -0.144, 0.011, None, 8);
             }
         }
         fbox!(
@@ -242,7 +239,7 @@ pub fn writing_bureau() -> Vec<Obj> {
             // panels on its back (on the wall; out in a room, it shows)
             fbox!(
                 f,
-                name("hutch_panel"),
+                numbered("hutch_panel"),
                 0.32,
                 0.4,
                 0.008,
@@ -255,7 +252,7 @@ pub fn writing_bureau() -> Vec<Obj> {
         for x in [-0.4, 0.4] {
             fbox!(
                 f,
-                name("hutch_side"),
+                numbered("hutch_side"),
                 0.022,
                 0.52,
                 0.17,
@@ -304,7 +301,7 @@ pub fn writing_bureau() -> Vec<Obj> {
         for x in [-0.125, 0.0, 0.125] {
             fbox!(
                 f,
-                name("divider"),
+                numbered("divider"),
                 0.012,
                 0.2,
                 0.15,
@@ -319,7 +316,7 @@ pub fn writing_bureau() -> Vec<Obj> {
         ] {
             fbox!(
                 f,
-                name("letters"),
+                numbered("letters"),
                 0.1,
                 0.09,
                 0.08,
@@ -329,7 +326,7 @@ pub fn writing_bureau() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                name("envelope"),
+                numbered("envelope"),
                 0.1,
                 0.004,
                 0.06,
@@ -342,7 +339,7 @@ pub fn writing_bureau() -> Vec<Obj> {
             // small drawers either side of the flap
             fbox!(
                 f,
-                name("little_case"),
+                numbered("little_case"),
                 0.13,
                 0.2,
                 0.15,
@@ -352,7 +349,7 @@ pub fn writing_bureau() -> Vec<Obj> {
             for y in [0.83, 0.93] {
                 fbox!(
                     f,
-                    name("little_drawer"),
+                    numbered("little_drawer"),
                     0.124,
                     0.08,
                     0.012,
@@ -361,7 +358,7 @@ pub fn writing_bureau() -> Vec<Obj> {
                     bevel = 0.003,
                     bevel_segments = 1
                 );
-                knob(f, &name("knob"), x, y, -0.264, 0.007, None, 6);
+                knob(f, &numbered("knob"), x, y, -0.264, 0.007, None, 6);
             }
         }
         books(
@@ -413,7 +410,7 @@ pub fn writing_bureau() -> Vec<Obj> {
     join(&still, "body", Some(P3::ZERO));
     // The writing flap, closed up over the pigeonholes, hinged on its foot: `fall_front` drops it onto the desk.
     let flap = new_parts(|| {
-        shaker(
+        kit::shaker!(
             f,
             "flap",
             0.5,
@@ -421,10 +418,8 @@ pub fn writing_bureau() -> Vec<Obj> {
             (0.0, 0.875, -0.265),
             0.02,
             M.panel,
-            0.035,
-            None,
-            0.005,
-            true,
+            rail = 0.035,
+            raised = true
         );
         fbox!(
             f,
@@ -435,7 +430,7 @@ pub fn writing_bureau() -> Vec<Obj> {
             (0, 0.875, -0.277),
             M.seatpad
         );
-        pull(
+        kit::pull!(
             f,
             "flap_pull",
             0.0,
@@ -443,10 +438,8 @@ pub fn writing_bureau() -> Vec<Obj> {
             -0.255,
             0.06,
             M.brass,
-            0.004,
-            0.016,
-            false,
-            8,
+            r = 0.004,
+            out = 0.016
         );
         fcyl!(
             f,
@@ -508,10 +501,10 @@ fn teapot(f: &GameFrame, x: f64, y: f64, z: f64) {
         .iter()
         .map(|&(h, r)| ring!(r, r, z = bz + h, verts = 18, at = (bx, by)))
         .collect();
-    let pot = loft!(name("pot"), &secs, material = M.porcelain);
+    let pot = loft!(numbered("pot"), &secs, material = M.porcelain);
     band(pot, M.glaze, 0.045, 0.072);
     revolve!(
-        name("pot_lid"),
+        numbered("pot_lid"),
         &[
             (0.0, 0.0),
             (0.045, 0.0),
@@ -528,7 +521,7 @@ fn teapot(f: &GameFrame, x: f64, y: f64, z: f64) {
     );
     fsweep!(
         f,
-        name("spout"),
+        numbered("spout"),
         &[
             (x + 0.07, y + 0.035, z),
             (x + 0.1, y + 0.06, z),
@@ -543,7 +536,7 @@ fn teapot(f: &GameFrame, x: f64, y: f64, z: f64) {
     );
     fsweep!(
         f,
-        name("pot_handle"),
+        numbered("pot_handle"),
         &[
             (x - 0.072, y + 0.09, z),
             (x - 0.11, y + 0.088, z),
@@ -562,7 +555,7 @@ fn teapot(f: &GameFrame, x: f64, y: f64, z: f64) {
 /// A teacup on its saucer, tea in it, a glazed band round its rim and an ear handle.
 fn cup(f: &GameFrame, x: f64, y: f64, z: f64) {
     revolve!(
-        name("saucer"),
+        numbered("saucer"),
         &[
             (0.0, 0.0),
             (0.032, 0.0),
@@ -576,7 +569,7 @@ fn cup(f: &GameFrame, x: f64, y: f64, z: f64) {
         segments = 12
     );
     let c = revolve!(
-        name("cup"),
+        numbered("cup"),
         &[
             (0.0, 0.0),
             (0.022, 0.0),
@@ -595,7 +588,7 @@ fn cup(f: &GameFrame, x: f64, y: f64, z: f64) {
     band(c, M.glaze, 0.036, 0.051);
     fcyl!(
         f,
-        name("cup_tea"),
+        numbered("cup_tea"),
         0.036,
         0.002,
         (x, y + 0.046, z),
@@ -604,8 +597,8 @@ fn cup(f: &GameFrame, x: f64, y: f64, z: f64) {
     );
     fsweep!(
         f,
-        name("cup_handle"),
-        &fillet(
+        numbered("cup_handle"),
+        &kit::fillet!(
             &[
                 (x + 0.04, y + 0.044, z),
                 (x + 0.058, y + 0.042, z),
@@ -613,7 +606,7 @@ fn cup(f: &GameFrame, x: f64, y: f64, z: f64) {
                 (x + 0.034, y + 0.02, z)
             ],
             0.008,
-            2
+            steps = 2
         ),
         0.004,
         M.porcelain,
@@ -629,7 +622,7 @@ pub fn tea_trolley() -> Vec<Obj> {
         for y in [0.32, 0.78] {
             fextrude!(
                 f,
-                name("shelf"),
+                numbered("shelf"),
                 &rounded_rect(0.72, 0.42, 0.025, 2),
                 0.03,
                 (0, y, -0.2),
@@ -640,24 +633,24 @@ pub fn tea_trolley() -> Vec<Obj> {
             );
             for z in [zb, zf] {
                 // brass gallery rails along the long sides, on little spindles
-                tube(
+                kit::tube!(
                     f,
-                    &name("gallery"),
+                    numbered("gallery"),
                     &[(-0.36, y + 0.05, z), (0.36, y + 0.05, z)],
                     0.0055,
                     M.brass,
-                    Some(6),
-                    1,
+                    verts = 6,
+                    round = 1
                 );
                 for x in [-0.18, 0.0, 0.18] {
-                    tube(
+                    kit::tube!(
                         f,
-                        &name("spindle"),
+                        numbered("spindle"),
                         &[(x, y + 0.015, z), (x, y + 0.05, z)],
                         0.003,
                         M.brass,
-                        Some(4),
-                        1,
+                        verts = 4,
+                        round = 1
                     );
                 }
             }
@@ -676,20 +669,28 @@ pub fn tea_trolley() -> Vec<Obj> {
                     (x, 0.06, zf),
                 ];
             }
-            tube(
+            kit::tube!(
                 f,
-                &name("frame"),
-                &fillet(&path, 0.04, 3),
+                numbered("frame"),
+                &kit::fillet!(&path, 0.04),
                 0.012,
                 M.brass,
-                Some(8),
-                1,
+                verts = 8,
+                round = 1
             );
             for z in [zb, zf] {
-                fbox!(f, name("fork"), 0.02, 0.03, 0.03, (x, 0.055, z), M.brass);
+                fbox!(
+                    f,
+                    numbered("fork"),
+                    0.02,
+                    0.03,
+                    0.03,
+                    (x, 0.055, z),
+                    M.brass
+                );
                 fcyl!(
                     f,
-                    name("castor"),
+                    numbered("castor"),
                     0.034,
                     0.018,
                     (x, 0.034, z),
@@ -699,14 +700,14 @@ pub fn tea_trolley() -> Vec<Obj> {
                 );
             }
         }
-        tube(
+        kit::tube!(
             f,
             "grip",
             &[(0.36, 0.92, zb + 0.08), (0.36, 0.92, zf - 0.08)],
             0.016,
             M.dark,
-            Some(8),
-            1,
+            verts = 8,
+            round = 1
         );
         // the cloth on the top shelf, hanging over its front edge
         fbox!(f, "cloth", 0.6, 0.004, 0.42, (0, 0.797, -0.2), M.linen);
@@ -750,15 +751,14 @@ pub fn tea_trolley() -> Vec<Obj> {
         fsweep!(
             f,
             "jug_handle",
-            &fillet(
+            &kit::fillet!(
                 &[
                     (0.08, 0.86, -0.29),
                     (0.1, 0.855, -0.29),
                     (0.096, 0.82, -0.29),
                     (0.078, 0.815, -0.29)
                 ],
-                0.01,
-                3
+                0.01
             ),
             0.004,
             M.porcelain,

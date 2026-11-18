@@ -1,13 +1,11 @@
-//! What the kind pack is built from: its palette, turned and lofted pieces, fluted rings, the tea set, little
-//! shrubs, and the kit's parts it uses.
+//! What the kind pack is built from: its palette, fluted rings, the tea set and little shrubs.
 
 use artkit::materials::Mat;
 use artkit::math::{P3, TAU, cos, cosd, sin, sind};
-use artkit::place::{GameFrame, Spot};
+use artkit::parts::numbered;
+use artkit::place::GameFrame;
 use artkit::rand::Random;
-use artkit::scene::Obj;
-use artkit::{boulder, fsphere, fsweep, jitter, loft, palette, revolve, ring, torus};
-use std::cell::Cell;
+use artkit::{boulder, fsphere, fsweep, jitter, kit, palette, torus};
 
 palette! { M:
     body = ("#6F8F6A", fabric), // the settee's sage velvet; its main part
@@ -96,71 +94,6 @@ palette! { M:
 /// The wall's face in a 1-deep footprint, game depth.
 pub const WALL: f64 = -0.43;
 
-thread_local! {
-    static N: Cell<u32> = const { Cell::new(0) };
-}
-
-/// `stem` numbered: each part its own name.
-pub fn name(stem: &str) -> String {
-    N.with(|n| {
-        n.set(n.get() + 1);
-        format!("{stem}{}", n.get())
-    })
-}
-
-/// A turned piece standing at game (x, y, z): `profile` [(radius, height up), ...] from its foot, revolved.
-#[allow(clippy::too_many_arguments)]
-pub fn turned(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    z: f64,
-    profile: &[(f64, f64)],
-    material: Mat,
-    segments: usize,
-    rot: (f64, f64, f64),
-) -> Obj {
-    revolve!(
-        name,
-        profile,
-        at = f.at(x, y, z),
-        material = material,
-        segments = segments,
-        rot = rot
-    )
-}
-
-/// A body lofted through round rings [(radius, height up), ...] standing at game (x, y, z).
-#[allow(clippy::too_many_arguments)]
-pub fn lathe(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    z: f64,
-    rings: &[(f64, f64)],
-    material: Mat,
-    verts: usize,
-    square: f64,
-) -> Obj {
-    let P3 { x: bx, y: by, .. } = f.at(x, 0, z);
-    let sections: Vec<Vec<P3>> = rings
-        .iter()
-        .map(|&(r, h)| {
-            ring!(
-                r,
-                r,
-                z = y + h,
-                verts = verts,
-                square = square,
-                at = (bx, by)
-            )
-        })
-        .collect();
-    loft!(name, &sections, material = material)
-}
-
 /// A ring of Blender points of radius `r` at height `y`, in and out `depth` (a fraction) `flutes` times round.
 pub fn fluted(
     r: f64,
@@ -187,9 +120,9 @@ pub fn fluted(
 /// A teapot standing on `y`, spout to the right (+x game), `s` its scale: a round body with a band, a lid with a
 /// knob, a curving spout and a looped handle.
 pub fn teapot(f: &GameFrame, x: f64, y: f64, z: f64, s: f64) {
-    lathe(
+    kit::lathe!(
         f,
-        &name("pot"),
+        numbered("pot"),
         x,
         y,
         z,
@@ -203,12 +136,11 @@ pub fn teapot(f: &GameFrame, x: f64, y: f64, z: f64, s: f64) {
             (0.04 * s, 0.11 * s),
         ],
         M.porcelain,
-        18,
-        2.0,
+        verts = 18
     );
-    turned(
+    kit::turned!(
         f,
-        &name("pot_lid"),
+        numbered("pot_lid"),
         x,
         y + 0.108 * s,
         z,
@@ -221,12 +153,11 @@ pub fn teapot(f: &GameFrame, x: f64, y: f64, z: f64, s: f64) {
             (0.0, 0.014 * s),
         ],
         M.porcelain,
-        18,
-        (0.0, 0.0, 0.0),
+        segments = 18
     );
     fsphere!(
         f,
-        name("pot_knob"),
+        numbered("pot_knob"),
         0.012 * s,
         (x, y + 0.13 * s, z),
         M.rose,
@@ -235,7 +166,7 @@ pub fn teapot(f: &GameFrame, x: f64, y: f64, z: f64, s: f64) {
         rings = 5
     );
     torus!(
-        name("pot_band"),
+        numbered("pot_band"),
         0.079 * s,
         0.005 * s,
         at = f.at(x, y + 0.055 * s, z),
@@ -245,7 +176,7 @@ pub fn teapot(f: &GameFrame, x: f64, y: f64, z: f64, s: f64) {
     );
     fsweep!(
         f,
-        name("spout"),
+        numbered("spout"),
         &[
             (x + 0.06 * s, y + 0.035 * s, z),
             (x + 0.1 * s, y + 0.06 * s, z),
@@ -260,7 +191,7 @@ pub fn teapot(f: &GameFrame, x: f64, y: f64, z: f64, s: f64) {
     );
     fsweep!(
         f,
-        name("pot_handle"),
+        numbered("pot_handle"),
         &[
             (x - 0.065 * s, y + 0.095 * s, z),
             (x - 0.11 * s, y + 0.1 * s, z),
@@ -277,10 +208,9 @@ pub fn teapot(f: &GameFrame, x: f64, y: f64, z: f64, s: f64) {
 
 /// A cup on its saucer, a rose band round its rim, its handle out at `turn` degrees (0: +x).
 pub fn cup(f: &GameFrame, x: f64, y: f64, z: f64, turn: f64) {
-    let none = (0.0, 0.0, 0.0);
-    turned(
+    kit::turned!(
         f,
-        &name("saucer"),
+        numbered("saucer"),
         x,
         y,
         z,
@@ -293,12 +223,11 @@ pub fn cup(f: &GameFrame, x: f64, y: f64, z: f64, turn: f64) {
             (0.0, 0.005),
         ],
         M.porcelain,
-        16,
-        none,
+        segments = 16
     );
-    turned(
+    kit::turned!(
         f,
-        &name("cup"),
+        numbered("cup"),
         x,
         y + 0.006,
         z,
@@ -311,11 +240,10 @@ pub fn cup(f: &GameFrame, x: f64, y: f64, z: f64, turn: f64) {
             (0.0, 0.006),
         ],
         M.porcelain,
-        14,
-        none,
+        segments = 14
     );
     torus!(
-        name("cup_band"),
+        numbered("cup_band"),
         0.0365,
         0.003,
         at = f.at(x, y + 0.049, z),
@@ -330,7 +258,7 @@ pub fn cup(f: &GameFrame, x: f64, y: f64, z: f64, turn: f64) {
         .collect();
     fsweep!(
         f,
-        name("cup_handle"),
+        numbered("cup_handle"),
         &pts,
         0.0035,
         M.porcelain,
@@ -348,7 +276,7 @@ pub fn bush(f: &GameFrame, x: f64, y: f64, z: f64, r: f64, flower: Mat, seed: i3
         .enumerate()
     {
         let o = boulder!(
-            name("clump"),
+            numbered("clump"),
             r * fr * 0.9,
             at = f.at(x + dx, y, z + dz),
             material = if k != 0 { M.leaf } else { M.leaf_light },
@@ -363,7 +291,7 @@ pub fn bush(f: &GameFrame, x: f64, y: f64, z: f64, r: f64, flower: Mat, seed: i3
         let a = rnd.uniform(0.0, 360.0);
         fsphere!(
             f,
-            name("flower"),
+            numbered("flower"),
             0.018,
             (
                 x + 0.06 * cosd(a),
@@ -376,162 +304,4 @@ pub fn bush(f: &GameFrame, x: f64, y: f64, z: f64, r: f64, flower: Mat, seed: i3
             rings = 4
         );
     }
-}
-
-/// The kit's tube (`artkit::kit::tube`), as the script called it.
-pub fn tube<P: Spot>(
-    f: &GameFrame,
-    name: &str,
-    points: &[P],
-    r: f64,
-    material: Mat,
-    verts: Option<usize>,
-    round: usize,
-) -> Obj {
-    artkit::kit::tube(
-        f,
-        name,
-        points,
-        r,
-        material,
-        artkit::kit::Tube {
-            verts,
-            round,
-            ..artkit::kit::Tube::default()
-        },
-    )
-}
-
-/// The kit's fillet (`artkit::kit::fillet`): the path through `points` with each inner corner rounded.
-pub fn fillet(points: &[(f64, f64, f64)], radius: f64, steps: usize) -> Vec<(f64, f64, f64)> {
-    artkit::kit::fillet(points, radius, steps)
-}
-
-/// The kit's bar pull (`artkit::kit::pull`), as the script called it.
-#[allow(clippy::too_many_arguments)]
-pub fn pull(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    face: f64,
-    length: f64,
-    material: Mat,
-    r: f64,
-    out: f64,
-    upright: bool,
-    verts: usize,
-) -> Obj {
-    artkit::kit::pull(
-        f,
-        name,
-        x,
-        y,
-        face,
-        length,
-        material,
-        artkit::kit::Pull {
-            r,
-            out,
-            upright,
-            verts,
-        },
-    )
-}
-
-/// The kit's frame-and-panel front (`artkit::kit::shaker`), as the script called it: (frame, panel).
-#[allow(clippy::too_many_arguments)]
-pub fn shaker(
-    f: &GameFrame,
-    name: &str,
-    w: f64,
-    h: f64,
-    at: (f64, f64, f64),
-    t: f64,
-    material: Mat,
-    rail: f64,
-    panel: Option<Mat>,
-    recess: f64,
-    raised: bool,
-) -> (Obj, Obj) {
-    artkit::kit::shaker(
-        f,
-        name,
-        w,
-        h,
-        at,
-        t,
-        material,
-        artkit::kit::Shaker {
-            rail,
-            panel,
-            recess,
-            raised,
-        },
-    )
-}
-
-/// The kit's moulding (`artkit::kit::moulding`), as the script called it: on the front at depth `at`, or on top
-/// at height `at` (`front` false).
-#[allow(clippy::too_many_arguments)]
-pub fn moulding(
-    f: &GameFrame,
-    name: &str,
-    outline: &[(f64, f64)],
-    profile: &[(f64, f64)],
-    material: Mat,
-    at: f64,
-    front: bool,
-    angle: f64,
-) -> Obj {
-    let plane = if front {
-        artkit::place::Facing::Front
-    } else {
-        artkit::place::Facing::Top
-    };
-    artkit::kit::moulding(
-        f,
-        name,
-        outline,
-        profile,
-        material,
-        artkit::kit::Moulding { at, plane, angle },
-    )
-}
-
-/// The kit's songbird (`artkit::kit::songbird`), as the script called it (its turn a whole number of degrees).
-#[allow(clippy::too_many_arguments)]
-pub fn songbird(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    z: f64,
-    body: Mat,
-    breast: Mat,
-    beak: Mat,
-    eye: Option<Mat>,
-    turn: f64,
-    size: f64,
-    head: f64,
-    low: bool,
-) -> Vec<Obj> {
-    let turn = artkit::Arg::arg(turn as i32);
-    artkit::kit::songbird(
-        f,
-        name,
-        x,
-        y,
-        z,
-        body,
-        breast,
-        beak,
-        eye,
-        artkit::kit::Songbird {
-            turn,
-            size,
-            head,
-            low,
-        },
-    )
 }

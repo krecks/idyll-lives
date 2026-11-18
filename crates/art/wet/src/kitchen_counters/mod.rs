@@ -20,7 +20,7 @@
 
 use artkit::family::{Family, Model};
 use artkit::json::Json;
-use artkit::palette;
+use artkit::{json, palette};
 
 mod bins;
 mod block;
@@ -82,38 +82,12 @@ pub const WALL_DOOR_SECONDS: f64 = 0.8; // a wall cabinet's door swings open in 
 // worktop -0.43..0.23 and the carcass -0.41..0.19 (the old `COUNTER66`; GameFrame `depths`)
 pub const COUNTER66: [(f64, f64); 4] = [(-0.48, -0.43), (-0.46, -0.41), (0.24, 0.19), (0.31, 0.23)];
 
-/// `{'uses': {use: clip}, 'hold': hold}`.
-fn uses(name: &str, clip: &str, hold: f64) -> Json {
-    Json::Obj(vec![
-        (
-            "uses".into(),
-            Json::Obj(vec![(name.into(), Json::from(clip))]),
-        ),
-        ("hold".into(), Json::Num(hold)),
-    ])
-}
-
 /// Sorting the recycling lifts the three lids one after another.
 fn sort_recycling() -> Json {
-    Json::Obj(vec![
-        (
-            "uses".into(),
-            Json::Obj(vec![(
-                "sortRecycling".into(),
-                Json::Arr(
-                    (0..3)
-                        .map(|i| {
-                            Json::Obj(vec![
-                                ("clip".into(), Json::from(format!("lid{i}_open").as_str())),
-                                ("delay".into(), Json::Num(0.6 * i as f64)),
-                            ])
-                        })
-                        .collect(),
-                ),
-            )]),
-        ),
-        ("hold".into(), Json::Num(0.9)),
-    ])
+    let lids: Vec<Json> = (0..3)
+        .map(|i| json!({"clip": (format!("lid{i}_open")), "delay": (0.6 * i as f64)}))
+        .collect();
+    json!({"uses": {"sortRecycling": (Json::Arr(lids))}, "hold": 0.9})
 }
 
 const BASE_PAINT: [(&str, &str); 3] = [
@@ -134,13 +108,13 @@ pub fn family() -> Option<Family> {
                 .key("model.counter")
                 .centre(0.0, -0.10)
                 // sandwich slides the top drawer out
-                .motions(uses("sandwich", "drawer_open", HOLD))
+                .motions(json!({"uses": {"sandwich": "drawer_open"}, "hold": (HOLD)}))
                 .paint(&BASE_PAINT),
             Model::new("counterCorner", counters::counter_corner, (1.0, 1.26, 0.93))
                 .key("model.counterCorner")
                 .centre(0.0, 0.035)
                 // sandwich, as the counter
-                .motions(uses("sandwich", "drawer_open", HOLD))
+                .motions(json!({"uses": {"sandwich": "drawer_open"}, "hold": (HOLD)}))
                 .paint(&BASE_PAINT),
             Model::new("counterEnd", counters::counter_end, (1.0, 0.95, 0.66))
                 .key("model.counterEnd")
@@ -162,7 +136,7 @@ pub fn family() -> Option<Family> {
             .key("model.counterDrawers")
             .centre(0.0, -0.10)
             // putting clean dishes away here (cooking putAwayAt prep, anim fetch) slides the top drawer out
-            .motions(uses("fetch", "drawer_open", HOLD))
+            .motions(json!({"uses": {"fetch": "drawer_open"}, "hold": (HOLD)}))
             .paint(&BASE_PAINT),
             Model::new(
                 "counterOpenShelf",
@@ -175,13 +149,13 @@ pub fn family() -> Option<Family> {
             Model::new("butcherBlock", block::butcher_block, (0.9, 0.95, 0.813))
                 .key("model.butcherBlock")
                 // sandwich slides the knife drawer out
-                .motions(uses("sandwich", "drawer_open", HOLD))
+                .motions(json!({"uses": {"sandwich": "drawer_open"}, "hold": (HOLD)}))
                 .paint(&[("leg", "Base"), ("block", "Block"), ("block2", "Top")]),
             Model::new("counterMarble", block::counter_marble, (1.0, 0.953, 0.66))
                 .key("model.counterMarble")
                 .centre(0.0, -0.10)
                 // sandwich slides the top drawer out
-                .motions(uses("sandwich", "drawer_open", HOLD))
+                .motions(json!({"uses": {"sandwich": "drawer_open"}, "hold": (HOLD)}))
                 .paint(&[
                     ("navy", "Cabinet"),
                     ("marble", "Marble top"),
@@ -192,20 +166,20 @@ pub fn family() -> Option<Family> {
                 .key("model.pantry")
                 .centre(0.0, -0.115)
                 // snack fetches from the larder: both doors swing open
-                .motions(uses("snack", "doors_open", DOOR_HOLD))
+                .motions(json!({"uses": {"snack": "doors_open"}, "hold": (DOOR_HOLD)}))
                 .paint(&[("cab", "Cabinet"), ("chrome", "Handles")]),
             Model::new("pantryTall", storage::pantry_tall, (0.96, 2.38, 0.71))
                 .key("model.pantryTall")
                 .centre(0.0, -0.08)
                 // snack, as the larder
-                .motions(uses("snack", "doors_open", DOOR_HOLD))
+                .motions(json!({"uses": {"snack": "doors_open"}, "hold": (DOOR_HOLD)}))
                 .paint(&[("cab", "Cabinet"), ("brass", "Handles")]),
             // putting clean dishes away (a `cupboard` station, cooking putAwayAt, anim fetch) opens the doors
             Model::new("wallCabinet", cabinets::wall_cabinet, (0.98, 0.732, 0.379))
                 .key("model.wallCabinet")
                 .centre(0.0, -0.2405)
                 .on_wall()
-                .motions(uses("fetch", "doors_open", HOLD))
+                .motions(json!({"uses": {"fetch": "doors_open"}, "hold": (HOLD)}))
                 .paint(&[("cab", "Cabinet"), ("chrome", "Handles")]),
             Model::new(
                 "wallCabinetGlass",
@@ -215,7 +189,7 @@ pub fn family() -> Option<Family> {
             .key("model.wallCabinetGlass")
             .centre(0.0, -0.227)
             .on_wall()
-            .motions(uses("fetch", "door_open", HOLD))
+            .motions(json!({"uses": {"fetch": "door_open"}, "hold": (HOLD)}))
             .paint(&[("cab", "Cabinet"), ("chrome", "Handles")]),
             Model::new(
                 "wallCabinetCorner",
@@ -225,7 +199,7 @@ pub fn family() -> Option<Family> {
             .key("model.wallCabinetCorner")
             .centre(0.0, -0.227)
             .on_wall()
-            .motions(uses("fetch", "door_open", HOLD))
+            .motions(json!({"uses": {"fetch": "door_open"}, "hold": (HOLD)}))
             .paint(&[("cab", "Cabinet"), ("chrome", "Handles")]),
             Model::new("rangeHood", wall::range_hood, (0.9, 0.712, 0.515))
                 .key("model.rangeHood")
@@ -255,7 +229,7 @@ pub fn family() -> Option<Family> {
                 .key("model.trashCan")
                 .centre(0.0, -0.247)
                 // scraping a plate into the bin (the cooking `bin` station, anim clean) lifts the lid
-                .motions(uses("clean", "lid_open", 1.0))
+                .motions(json!({"uses": {"clean": "lid_open"}, "hold": 1.0}))
                 .paint(&[("steel", "Bin"), ("lid", "Lid")]),
             Model::new("recyclingBins", bins::recycling_bins, (0.92, 0.66, 0.455))
                 .key("model.recyclingBins")
@@ -277,7 +251,7 @@ pub fn family() -> Option<Family> {
             .key("model.kitchenIsland")
             .centre(0.0, 0.0495)
             // sandwich slides the drawer out (breakfast is eaten standing, or on a stool at the island)
-            .motions(uses("sandwich", "drawer_open", HOLD))
+            .motions(json!({"uses": {"sandwich": "drawer_open"}, "hold": (HOLD)}))
             .paint(&[("cab", "Cabinet"), ("worktop", "Worktop")]),
             Model::new("islandSmall", islands::island_small, (0.96, 0.95, 0.911))
                 .key("model.islandSmall")

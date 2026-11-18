@@ -1,9 +1,9 @@
 //! D2: the fireplace.
 
-use super::common::{F, M, WALL, disc, rect, shape, v};
+use super::common::{F, M, WALL, disc, rect, shape};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit;
-use artkit::math::{P3, PI, V3, sin};
+use artkit::math::{P3, PI, V3, sin, v3};
 use artkit::parts::{join, new_parts, set_origin};
 use artkit::place::Facing;
 use artkit::scene::{Obj, RotationMode, meshes};
@@ -18,7 +18,7 @@ const HEARTH_FRONT: f64 = 0.45;
 /// A split log from game point `a` to `b`: a barked, slightly crooked round, its cut ends pale.
 fn log(name: &str, a: (f64, f64, f64), b: (f64, f64, f64), r: f64, seed: f64) {
     let (va, vb) = (V3::from(F.at(a.0, a.1, a.2)), V3::from(F.at(b.0, b.1, b.2)));
-    let mid = (va + vb) / 2 + v((0.0, 0.0, r * 0.15));
+    let mid = (va + vb) / 2 + v3(0.0, 0.0, r * 0.15);
     let l = sweep!(
         name,
         &[va, mid, vb],

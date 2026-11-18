@@ -1,27 +1,18 @@
 //! OU2: the sun lounger, the hammock, the porch swing, the swing set and the cedar hot tub; each moves while it
 //! is used.
 
-use super::common::{
-    F, M, N, board, end_round, fillet, fr, mesh_of, plank, side_slab, tapered_leg,
-};
+use super::common::{F, M, board, end_round, mesh_of, plank, side_slab, tapered_leg};
 use super::seats::arm_board;
 use artkit::forms::{bisect, rounded_rect};
+use artkit::json::float_repr;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, TAU, V3, cos, cosd, pow, radians, sin, sind};
 use artkit::motion::{PathKey, Rock, Spin, Swing, attach, last_frame, path, rock, spin, swing};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts};
+use artkit::place::N;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, loft, revolve, ring, soft, torus};
-
-fn settle_in_place() {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
-}
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, loft, revolve, ring, settle, soft, torus};
 
 // --- OU2: the sun lounger: a slatted platform and cushion; the back reclines flat for sunbathing ---------------
 const BACK_HINGE: (f64, f64) = (0.29, -0.36); // the back's hinge, (height, depth)
@@ -53,7 +44,7 @@ pub fn sun_lounger() -> Vec<Obj> {
             );
             for z in [-0.3, 0.86] {
                 tapered_leg(
-                    &format!("leg{s}{}", fr(z)),
+                    &format!("leg{s}{}", float_repr(z)),
                     sf * 0.275,
                     z,
                     0.0,
@@ -68,7 +59,7 @@ pub fn sun_lounger() -> Vec<Obj> {
         for z in [-0.3, 0.86] {
             fbox!(
                 F,
-                format!("leg_rail{}", fr(z)),
+                format!("leg_rail{}", float_repr(z)),
                 0.5,
                 0.04,
                 0.03,
@@ -121,10 +112,10 @@ pub fn sun_lounger() -> Vec<Obj> {
             round_segments = 1
         );
         // a beach towel laid along the cushion and over its foot, and one rolled up
-        let drape = fillet(
+        let drape = kit::fillet!(
             &[(0.0, 0.355, 0.55), (0.0, 0.356, 0.915), (0.0, 0.24, 0.93)],
             0.02,
-            2,
+            steps = 2
         );
         fsweep!(
             F,
@@ -202,7 +193,7 @@ pub fn sun_lounger() -> Vec<Obj> {
         );
     });
     let back = hinged(join(&back, "back", None), F.at(0, y0, z0));
-    settle_in_place();
+    settle!(centre = false);
     swing(
         back,
         "recline",
@@ -399,7 +390,7 @@ pub fn hammock() -> Vec<Obj> {
             for x in [-0.36, -0.18, 0.0, 0.18, 0.36] {
                 fsweep!(
                     F,
-                    format!("cord{s}{}", fr(x)),
+                    format!("cord{s}{}", float_repr(x)),
                     &[(N::F(x), SLING_END + 0.01, sf * bar), knot],
                     0.0035,
                     M.sling_stripe,
@@ -449,7 +440,7 @@ pub fn hammock() -> Vec<Obj> {
         );
     });
     let bed = hinged(join(&bed, "sling", None), F.at(0, HOOK_Y, 0));
-    settle_in_place();
+    settle!(centre = false);
     rock(
         bed,
         "sway",
@@ -695,7 +686,7 @@ pub fn porch_swing() -> Vec<Obj> {
             for z in [-0.18, 0.24] {
                 fsweep!(
                     F,
-                    format!("chain{s}{}", fr(z)),
+                    format!("chain{s}{}", float_repr(z)),
                     &[(sf * 0.66, 0.5 - d, z), ring],
                     0.006,
                     M.chain,
@@ -703,7 +694,7 @@ pub fn porch_swing() -> Vec<Obj> {
                 );
                 fcyl!(
                     F,
-                    format!("eye{s}{}", fr(z)),
+                    format!("eye{s}{}", float_repr(z)),
                     0.012,
                     0.03,
                     (sf * 0.66, 0.5 - d, z),
@@ -756,7 +747,7 @@ pub fn porch_swing() -> Vec<Obj> {
         );
     });
     let seat = hinged(join(&seat, "seat", None), F.at(0, 1.98, 0));
-    settle_in_place();
+    settle!(centre = false);
     rock(
         seat,
         "swing",
@@ -782,7 +773,7 @@ pub fn swing_set() -> Vec<Obj> {
                 .collect();
             fsweep!(
                 F,
-                format!("seat{}", fr(x)),
+                format!("seat{}", float_repr(x)),
                 &belt,
                 0,
                 M.swing_seat,
@@ -793,7 +784,7 @@ pub fn swing_set() -> Vec<Obj> {
             for dx in [-0.2, 0.2] {
                 fsweep!(
                     F,
-                    format!("chain{}{}", fr(x), fr(dx)),
+                    format!("chain{}{}", float_repr(x), float_repr(dx)),
                     &[(x + dx, 0.53, 0), (x + dx, 1.86, 0)],
                     0.006,
                     M.chain,
@@ -801,7 +792,7 @@ pub fn swing_set() -> Vec<Obj> {
                 );
                 fbox!(
                     F,
-                    format!("clip{}{}", fr(x), fr(dx)),
+                    format!("clip{}{}", float_repr(x), float_repr(dx)),
                     0.03,
                     0.04,
                     0.03,
@@ -812,7 +803,7 @@ pub fn swing_set() -> Vec<Obj> {
                 );
                 // the hanger round the beam: a ring the chain hangs from (it turns on its own axis as it swings)
                 torus!(
-                    format!("hanger{}{}", fr(x), fr(dx)),
+                    format!("hanger{}{}", float_repr(x), float_repr(dx)),
                     0.052,
                     0.008,
                     at = F.at(x + dx, 1.92, 0),
@@ -825,7 +816,7 @@ pub fn swing_set() -> Vec<Obj> {
         }
     });
     let seats = hinged(join(&seats, "seats", None), F.at(0, 1.92, 0));
-    settle_in_place();
+    settle!(centre = false);
     rock(
         seats,
         "swing",
@@ -912,7 +903,7 @@ pub fn hot_tub_cedar() -> Vec<Obj> {
                 .collect();
             fsweep!(
                 F,
-                format!("band{}", fr(y)),
+                format!("band{}", float_repr(y)),
                 &band,
                 0,
                 M.cedar_band,
@@ -922,7 +913,7 @@ pub fn hot_tub_cedar() -> Vec<Obj> {
             );
             fbox!(
                 F,
-                format!("lug{}", fr(y)),
+                format!("lug{}", float_repr(y)),
                 0.05,
                 0.05,
                 0.03,
@@ -1079,7 +1070,7 @@ pub fn hot_tub_cedar() -> Vec<Obj> {
             // the straps down to their clips, and the handles
             fbox!(
                 F,
-                format!("strap{}", fr(x)),
+                format!("strap{}", float_repr(x)),
                 0.05,
                 0.06,
                 0.008,
@@ -1090,7 +1081,7 @@ pub fn hot_tub_cedar() -> Vec<Obj> {
             );
             fbox!(
                 F,
-                format!("clip{}", fr(x)),
+                format!("clip{}", float_repr(x)),
                 0.04,
                 0.025,
                 0.012,
@@ -1101,7 +1092,7 @@ pub fn hot_tub_cedar() -> Vec<Obj> {
             );
             fsweep!(
                 F,
-                format!("handle{}", fr(x)),
+                format!("handle{}", float_repr(x)),
                 &[
                     (x - 0.05, 0.91, 0.6),
                     (x - 0.03, 0.919, 0.6),
@@ -1119,7 +1110,7 @@ pub fn hot_tub_cedar() -> Vec<Obj> {
     // it folds over onto the back half
     let cover = hinged(join(&back, "cover", None), F.at(0, 0.84, -TUB_R - 0.02));
     let flap = hinged(join(&front, "cover_front", None), F.at(0, 0.912, 0));
-    settle_in_place();
+    settle!(centre = false);
     attach(flap, cover);
     // Off for a soak: the front half folds back over the back half on the seam, then the two together are lifted,
     // turned down behind the tub and lowered to hang there on their folded edge, as on a cover lifter, the round

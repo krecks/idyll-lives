@@ -1,7 +1,6 @@
 //! The rose-gold vanity and the moonlight gramophone.
 
 use super::common::{_rose, _rose_leaves, M, WALL};
-use super::dining::settle_in_place;
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{Axis, M4, P3, PI, TAU, V3, cos, cosd, radians, sin, sind};
@@ -9,8 +8,8 @@ use artkit::parts::{hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{
-    fbox, fcyl, fextrude, fsphere, fsweep, loft, revolve, ring, rod, slide, soft, spin, sweep,
-    swing, torus,
+    fbox, fcyl, fextrude, fsphere, fsweep, loft, revolve, ring, rod, settle, slide, soft, spin,
+    sweep, swing, torus,
 };
 
 // --- the rose-gold vanity (1x1): a dressing table with an oval mirror, a pouf before it ---------------------
@@ -383,7 +382,7 @@ pub fn vanity() -> Vec<Obj> {
         );
     });
     let drawer = hinged(join(&drawer, "drawer", None), f.at(0, 0.635, -0.084));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     slide!(drawer, "drawer_open", (0, -0.2, 0), seconds = 0.7);
     objs
 }
@@ -794,7 +793,7 @@ pub fn gramophone() -> Vec<Obj> {
         );
     });
     let arm = hinged(join(&arm, "tone_arm", None), f.at(ax, ay, az));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(arm, "needle", 30.0, seconds = 0.8);
     spin!(platter, "platter", turns = 1.0, seconds = 1.8);
     objs

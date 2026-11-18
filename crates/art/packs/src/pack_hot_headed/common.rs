@@ -1,17 +1,16 @@
-//! What the hot-headed pack is built from: its palette, turned and lofted pieces, fluted rings, chains, and the
-//! kit's parts it uses.
+//! What the hot-headed pack is built from: its palette, fluted rings and chains.
 
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, Quat, TAU, V3, cos, sin};
-use artkit::place::{GameFrame, Spot};
+use artkit::parts::numbered;
+use artkit::place::GameFrame;
 use artkit::scene::Obj;
-use artkit::{loft, palette, revolve, ring, torus};
-use std::cell::Cell;
+use artkit::{palette, torus};
 
 palette! { M:
     body = ("#C49A6C", wood),        // the grudge desk's oak top and its chair; the desk's main part
     bag = ("#C8402F", leather),      // the heavy bag's leather
-    crate_ = ("#A87547", wood),      // the smash crate and its lid (`CRATE_MAT`: `crate` is Rust's)
+    crate_ = ("#A87547", wood, named("crate")), // the smash crate and its lid (`crate` is Rust's)
     shell = ("#C8402F", gloss),      // the drum shells
     zafu = ("#5F7FA0", fabric),      // the meditation cushion
     cedar = ("#C98B58", wood),       // the plunge tub's cladding
@@ -60,88 +59,6 @@ palette! { M:
     ash = ("#8E8A84", matte),        // the incense's ash
 }
 
-/// The smash crate's material, named as the pack names it.
-pub const CRATE_MAT: Mat = Mat {
-    name: "crate",
-    ..M.crate_
-};
-
-/// The family's palette, the crate's material under its own name.
-pub fn palette() -> artkit::materials::Palette {
-    let colours: Vec<Mat> = M
-        .palette()
-        .colours
-        .iter()
-        .map(|&c| if c.name == "crate_" { CRATE_MAT } else { c })
-        .collect();
-    artkit::materials::Palette::new(&colours)
-}
-
-thread_local! {
-    static N: Cell<u32> = const { Cell::new(0) };
-}
-
-/// `stem` numbered: each part its own name.
-pub fn name(stem: &str) -> String {
-    N.with(|n| {
-        n.set(n.get() + 1);
-        format!("{stem}{}", n.get())
-    })
-}
-
-/// A turned piece standing at game (x, y, z): `profile` [(radius, height up), ...] from its foot, revolved.
-#[allow(clippy::too_many_arguments)]
-pub fn turned(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    z: f64,
-    profile: &[(f64, f64)],
-    material: Mat,
-    segments: usize,
-    rot: (f64, f64, f64),
-) -> Obj {
-    revolve!(
-        name,
-        profile,
-        at = f.at(x, y, z),
-        material = material,
-        segments = segments,
-        rot = rot
-    )
-}
-
-/// A body lofted through round rings [(radius, height up), ...] standing at game (x, y, z).
-#[allow(clippy::too_many_arguments)]
-pub fn lathe(
-    f: &GameFrame,
-    name: &str,
-    x: f64,
-    y: f64,
-    z: f64,
-    rings: &[(f64, f64)],
-    material: Mat,
-    verts: usize,
-    square: f64,
-) -> Obj {
-    let P3 { x: bx, y: by, .. } = f.at(x, 0, z);
-    let sections: Vec<Vec<P3>> = rings
-        .iter()
-        .map(|&(r, h)| {
-            ring!(
-                r,
-                r,
-                z = y + h,
-                verts = verts,
-                square = square,
-                at = (bx, by)
-            )
-        })
-        .collect();
-    loft!(name, &sections, material = material)
-}
-
 /// A ring of Blender points of radius `r` at height `y`, in and out `depth` (a fraction) `flutes` times round: the
 /// pleats of a zafu, the ribs of a cactus.
 pub fn fluted(r: f64, y: f64, verts: usize, at: (f64, f64), flutes: i32, depth: f64) -> Vec<P3> {
@@ -179,7 +96,7 @@ pub fn chain(
     for k in 0..n {
         let c = a + d * ((k as f64 + 0.5) / n as f64);
         let link = torus!(
-            name(name_),
+            numbered(name_),
             r,
             t,
             at = c,
@@ -194,35 +111,4 @@ pub fn chain(
         made.push(link);
     }
     made
-}
-
-// --- the kit's parts ------------------------------------------------------------------------------------------
-
-/// The kit's tube (`artkit::kit::tube`), as the script called it.
-pub fn tube<P: Spot>(
-    f: &GameFrame,
-    name: &str,
-    points: &[P],
-    r: f64,
-    material: Mat,
-    verts: Option<usize>,
-    round: usize,
-) -> Obj {
-    artkit::kit::tube(
-        f,
-        name,
-        points,
-        r,
-        material,
-        artkit::kit::Tube {
-            verts,
-            round,
-            ..artkit::kit::Tube::default()
-        },
-    )
-}
-
-/// The kit's fillet (`artkit::kit::fillet`): the path through `points` with each inner corner rounded.
-pub fn fillet(points: &[(f64, f64, f64)], radius: f64, steps: usize) -> Vec<(f64, f64, f64)> {
-    artkit::kit::fillet(points, radius, steps)
 }

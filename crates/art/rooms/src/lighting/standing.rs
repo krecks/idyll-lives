@@ -1,9 +1,10 @@
 //! LT2, the wall lights, and LT3, the floor lamps.
 
 use super::common::{
-    Drum, F, Lathe, M, WALL, bulb, check_at, drum, fr, lathe, ring_at, socket, turn, turned,
+    Drum, F, Lathe, M, WALL, bulb, check_at, drum, lathe, ring_at, socket, turn, turned,
 };
 use artkit::forms::{rounded_rect, smooth_outline};
+use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::{TAU, cos, cosd, pow, sin, sind, sqrt};
 use artkit::parts::{join_all, new_parts};
@@ -249,7 +250,7 @@ pub fn wall_light_outdoor() -> Vec<Obj> {
         for y in [1.885, 2.135] {
             fcyl!(
                 F,
-                format!("screw{}", fr(y)),
+                format!("screw{}", float_repr(y)),
                 0.006,
                 0.004,
                 (0, y, WALL + 0.031),
@@ -324,7 +325,7 @@ pub fn wall_light_outdoor() -> Vec<Obj> {
         for y in [1.94, 2.01, 2.08] {
             kit::tube!(
                 F,
-                format!("bar{}", fr(y)),
+                format!("bar{}", float_repr(y)),
                 &[(-0.085, y, -0.36), (0.0, y, -0.327), (0.085, y, -0.36)],
                 0.006,
                 M.iron,
@@ -395,7 +396,7 @@ pub fn lamp() -> Vec<Obj> {
         );
         for y in [0.5, 1.0] {
             turn(
-                &format!("collar{}", fr(y)),
+                &format!("collar{}", float_repr(y)),
                 &[
                     (0.0, 0.0),
                     (0.016, 0.0),
@@ -919,7 +920,7 @@ pub fn lamp_torchiere() -> Vec<Obj> {
         );
         for y in [0.6, 1.15] {
             turn(
-                &format!("collar{}", fr(y)),
+                &format!("collar{}", float_repr(y)),
                 &[
                     (0.0, 0.0),
                     (0.017, 0.0),

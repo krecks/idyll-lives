@@ -1,14 +1,16 @@
 //! The rides: the seesaw, the spring rider and the merry-go-round. Each has a part that goes round while it is
 //! played on, carrying its riders (`ride`).
 
-use super::common::{F, M, fillet, fr};
+use super::common::{F, M};
 use artkit::forms::rounded_rect;
+use artkit::json::float_repr;
+use artkit::kit;
 use artkit::math::{Axis, M4, P3, TAU, V3, cos, radians, sin, v3};
 use artkit::motion::{Rock, Spin, rock, spin};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, loft, revolve, rod, soft, torus};
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, loft, revolve, rod, settle, soft, torus};
 
 // A 3 m plank on an A-frame stand. The content's two slots sit at x = ±0.75 m (3 m wide, 2 slots), at the
 // seat height 0.56 m: the seats are there, level at rest. The plank, its seats and handles are one part
@@ -21,19 +23,15 @@ pub fn seesaw() -> Vec<Obj> {
             // each side of the stand an A of bent tube, its feet on a base plate, a boss for the axle at its apex
             fsweep!(
                 F,
-                format!("leg{}", fr(z)),
-                &fillet(
-                    &[(-0.22, 0.02, z), (0.0, AXLE, z), (0.22, 0.02, z)],
-                    0.05,
-                    3
-                ),
+                format!("leg{}", float_repr(z)),
+                &kit::fillet!(&[(-0.22, 0.02, z), (0.0, AXLE, z), (0.22, 0.02, z)], 0.05),
                 0.028,
                 M.body,
                 verts = 10
             );
             fbox!(
                 F,
-                format!("foot{}", fr(z)),
+                format!("foot{}", float_repr(z)),
                 0.56,
                 0.04,
                 0.08,
@@ -45,7 +43,7 @@ pub fn seesaw() -> Vec<Obj> {
             for x in [-0.24, 0.24] {
                 fcyl!(
                     F,
-                    format!("bolt{}{}", fr(z), fr(x)),
+                    format!("bolt{}{}", float_repr(z), float_repr(x)),
                     0.012,
                     0.012,
                     (x, 0.044, z),
@@ -55,7 +53,7 @@ pub fn seesaw() -> Vec<Obj> {
             }
             fcyl!(
                 F,
-                format!("boss{}", fr(z)),
+                format!("boss{}", float_repr(z)),
                 0.05,
                 0.05,
                 (0, AXLE, z),
@@ -67,7 +65,7 @@ pub fn seesaw() -> Vec<Obj> {
             );
             fsweep!(
                 F,
-                format!("crossbar{}", fr(z)),
+                format!("crossbar{}", float_repr(z)),
                 &[(-0.12, 0.2, z), (0.12, 0.2, z)],
                 0.016,
                 M.body,
@@ -85,7 +83,7 @@ pub fn seesaw() -> Vec<Obj> {
         for z in [-0.202, 0.202] {
             fcyl!(
                 F,
-                format!("axle_nut{}", fr(z)),
+                format!("axle_nut{}", float_repr(z)),
                 0.03,
                 0.012,
                 (0, AXLE, z),
@@ -97,7 +95,7 @@ pub fn seesaw() -> Vec<Obj> {
         for x in [-1.1, 1.1] {
             // half-buried tyres the low end comes down onto
             revolve!(
-                format!("bumper{}", fr(x)),
+                format!("bumper{}", float_repr(x)),
                 &[
                     (0.0, 0.0),
                     (0.12, 0.0),
@@ -204,15 +202,14 @@ pub fn seesaw() -> Vec<Obj> {
             fsweep!(
                 F,
                 format!("handle{s}"),
-                &fillet(
+                &kit::fillet!(
                     &[
                         (sf * 0.47, 0.49, -0.135),
                         (sf * 0.47, 0.82, -0.135),
                         (sf * 0.47, 0.82, 0.135),
                         (sf * 0.47, 0.49, 0.135)
                     ],
-                    0.035,
-                    3
+                    0.035
                 ),
                 0.02,
                 M.rail,
@@ -243,13 +240,7 @@ pub fn seesaw() -> Vec<Obj> {
         }
     });
     let plank = hinged(join(&parts, "plank", None), F.at(0, AXLE, 0));
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     rock(
         plank,
         "seesaw",
@@ -439,7 +430,7 @@ pub fn spring_rider() -> Vec<Obj> {
             for (z, dz) in [(0.18, 1.0), (-0.2, -1.0)] {
                 fsweep!(
                     F,
-                    format!("leg{s}{}", fr(z)),
+                    format!("leg{s}{}", float_repr(z)),
                     &[
                         (sf * 0.08, 0.6, z),
                         (sf * 0.095, 0.5, z + dz * 0.04),
@@ -453,7 +444,7 @@ pub fn spring_rider() -> Vec<Obj> {
                 );
                 fcyl!(
                     F,
-                    format!("hoof{s}{}", fr(z)),
+                    format!("hoof{s}{}", float_repr(z)),
                     0.032,
                     0.035,
                     (sf * 0.1, 0.43, z + dz * 0.115),
@@ -612,13 +603,7 @@ pub fn spring_rider() -> Vec<Obj> {
             .transform(&M4::translation(v3(0, 0, SPRING_TOP - HORSE_DRAWN)))
     });
     let horse = hinged(horse, F.at(0, SPRING_TOP, 0));
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     rock(
         horse,
         "rock",
@@ -839,13 +824,7 @@ pub fn merry_go_round() -> Vec<Obj> {
         }
     });
     let platform = hinged(join(&parts, "platform", None), (0, 0, 0));
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     spin(
         platform,
         "spin",

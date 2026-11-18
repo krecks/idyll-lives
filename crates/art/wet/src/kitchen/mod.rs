@@ -9,18 +9,8 @@
 
 use artkit::family::{Family, Model};
 use artkit::json::Json;
-use artkit::palette;
 use artkit::place::GameFrame;
-
-/// `pull` as the script called it: `pull!(F, name, a, b, face, out = .., r = None, ...)`.
-macro_rules! pull {
-    ($f:expr, $name:expr, $a:expr, $b:expr, $face:expr $(, $k:ident = $v:expr)* $(,)?) => {{
-        #[allow(unused_mut)]
-        let mut o = $crate::kitchen::common::Pull::default();
-        $(o.$k = $v;)*
-        $crate::kitchen::common::pull($f, $name, $a, $b, $face, o.material, o.out, o.w, o.t, o.r, o.verts)
-    }};
-}
+use artkit::{json, palette};
 
 mod built_in;
 pub(crate) mod common;
@@ -97,43 +87,16 @@ const HOLD: f64 = 3.5;
 const LEVER_SECONDS: f64 = 0.3;
 
 fn retro_open() -> Json {
-    Json::Arr(vec![
-        obj(vec![
-            ("clip", Json::from("lever")),
-            ("hold", Json::Num(0.4)),
-        ]),
-        obj(vec![
-            ("clip", Json::from("fridge_open")),
-            ("delay", Json::Num(LEVER_SECONDS)),
-        ]),
-    ])
+    json!([{"clip": "lever", "hold": 0.4}, {"clip": "fridge_open", "delay": (LEVER_SECONDS)}])
 }
 
 // The fridges with a freezer: food, a meal's ingredients and a drink from the fridge door, ice cream from the freezer.
-const FRIDGE_USES: [(&str, &str); 4] = [
-    ("frozenTreat", "freezer_open"),
-    ("fetch", "fridge_open"),
-    ("cook", "fridge_open"),
-    ("drink", "fridge_open"),
-];
-
-/// A JSON object from its keys and values, in order.
-fn obj(pairs: Vec<(&str, Json)>) -> Json {
-    Json::Obj(pairs.into_iter().map(|(k, v)| (k.to_string(), v)).collect())
-}
-
-fn uses(pairs: &[(&str, &str)]) -> Json {
-    Json::Obj(
-        pairs
-            .iter()
-            .map(|(k, v)| (k.to_string(), Json::from(*v)))
-            .collect(),
-    )
+fn fridge_uses() -> Json {
+    json!({"frozenTreat": "freezer_open", "fetch": "fridge_open", "cook": "fridge_open", "drink": "fridge_open"})
 }
 
 /// The family.
 pub fn family() -> Option<Family> {
-    let s = Json::from;
     // A floor thing against a wall is centred where the game places it (`centre`): its back on the wall,
     // its top under its content `surface`.
     Some(Family::new(
@@ -145,10 +108,7 @@ pub fn family() -> Option<Family> {
                 .centre(0.0, -0.069)
                 // Taking food or a drink out opens the fridge door (snacks, a meal's ingredients (cook), a cold
                 // drink, putting dishes away); ice cream (`frozenTreat`) opens the freezer door.
-                .motions(obj(vec![
-                    ("uses", uses(&FRIDGE_USES)),
-                    ("hold", Json::Num(HOLD)),
-                ]))
+                .motions(json!({"uses": (fridge_uses()), "hold": (HOLD)}))
                 // The player colours the cabinet and doors, the handles, the plinth and the inside; the
                 // food keeps its own colours.
                 .paint(&[
@@ -160,13 +120,7 @@ pub fn family() -> Option<Family> {
             Model::new("fridgeMini", fridges::fridge_mini, (0.60, 1.00, 0.60))
                 .key("model.fridgeMini")
                 .centre(0.0, -0.128)
-                .motions(obj(vec![
-                    (
-                        "uses",
-                        uses(&[("fetch", "fridge_open"), ("cook", "fridge_open")]),
-                    ),
-                    ("hold", Json::Num(3.0)),
-                ]))
+                .motions(json!({"uses": {"fetch": "fridge_open", "cook": "fridge_open"}, "hold": 3.0}))
                 .paint(&[("body", "Body"), ("chrome", "Handles"), ("trim", "Plinth")]),
             Model::new(
                 "fridgeBuiltIn",
@@ -176,10 +130,7 @@ pub fn family() -> Option<Family> {
             .key("model.fridgeBuiltIn")
             .centre(0.0, -0.099)
             // the tall door serves every use but ice cream, which opens the freezer door
-            .motions(obj(vec![
-                ("uses", uses(&FRIDGE_USES)),
-                ("hold", Json::Num(HOLD)),
-            ]))
+            .motions(json!({"uses": (fridge_uses()), "hold": (HOLD)}))
             .paint(&[("panel", "Panels"), ("chrome", "Handles")]),
             Model::new(
                 "fridgeFrenchDoor",
@@ -189,32 +140,14 @@ pub fn family() -> Option<Family> {
             .key("model.fridgeFrenchDoor")
             .centre(0.0, -0.052)
             // both doors for a snack or a meal; the right door alone for a cold drink
-            .motions(obj(vec![
-                (
-                    "uses",
-                    uses(&[
-                        ("frozenTreat", "freezer_open"),
-                        ("fetch", "fridge_open"),
-                        ("cook", "fridge_open"),
-                        ("drink", "door_right"),
-                    ]),
-                ),
-                ("hold", Json::Num(HOLD)),
-            ]))
+            .motions(json!({"uses": {"frozenTreat": "freezer_open", "fetch": "fridge_open", "cook": "fridge_open",
+                             "drink": "door_right"},
+                    "hold": (HOLD)}))
             .paint(&[("steel", "Body"), ("chrome", "Handles"), ("trim", "Plinth")]),
             Model::new("fridgeRetro", retro::fridge_retro, (0.72, 1.64, 0.715))
                 .key("model.fridgeRetro")
                 .centre(0.0, -0.067)
-                .motions(obj(vec![
-                    (
-                        "uses",
-                        obj(["fetch", "cook", "drink"]
-                            .into_iter()
-                            .map(|u| (u, retro_open()))
-                            .collect()),
-                    ),
-                    ("hold", Json::Num(HOLD)),
-                ]))
+                .motions(json!({"uses": {"fetch": (retro_open()), "cook": (retro_open()), "drink": (retro_open())}, "hold": (HOLD)}))
                 .paint(&[("mint", "Body"), ("chrome", "Handle"), ("mint2", "Trim")]),
             Model::new(
                 "fridgeMiniRetro",
@@ -223,16 +156,7 @@ pub fn family() -> Option<Family> {
             )
             .key("model.fridgeMiniRetro")
             .centre(0.0, -0.14)
-            .motions(obj(vec![
-                (
-                    "uses",
-                    obj(["fetch", "cook", "drink"]
-                        .into_iter()
-                        .map(|u| (u, s("fridge_open")))
-                        .collect()),
-                ),
-                ("hold", Json::Num(3.0)),
-            ]))
+            .motions(json!({"uses": {"fetch": "fridge_open", "cook": "fridge_open", "drink": "fridge_open"}, "hold": 3.0}))
             .paint(&[
                 ("pink", "Body"),
                 ("gold", "Handle & feet"),
@@ -242,28 +166,12 @@ pub fn family() -> Option<Family> {
                 .key("model.wineFridge")
                 .centre(0.0, -0.10)
                 // pouring a glass opens the door, then slides the top shelf of bottles out (back in before it shuts)
-                .motions(obj(vec![
-                    (
-                        "uses",
-                        obj(vec![(
-                            "drink",
-                            Json::Arr(vec![
-                                s("door_open"),
-                                obj(vec![
-                                    ("clip", s("rack_out")),
-                                    ("delay", Json::Num(0.9)),
-                                    ("hold", Json::Num(0.9)),
-                                ]),
-                            ]),
-                        )]),
-                    ),
-                    ("hold", Json::Num(2.5)),
-                ]))
+                .motions(json!({"uses": {"drink": ["door_open", {"clip": "rack_out", "delay": 0.9, "hold": 0.9}]}, "hold": 2.5}))
                 .paint(&[("panel", "Body"), ("doorframe", "Door frame")]),
             Model::new("farmhouseSink", sinks::farmhouse_sink, (1.0, 1.253, 0.67))
                 .key("model.farmhouseSink")
                 .centre(0.0, -0.095)
-                .motions(obj(vec![("uses", obj(vec![("wash", s("water_on"))]))]))
+                .motions(json!({"uses": {"wash": "water_on"}}))
                 .paint(&[
                     ("body", "Cabinet"),
                     ("wood", "Worktop"),
@@ -278,23 +186,7 @@ pub fn family() -> Option<Family> {
             )
             .key("model.counterSinkDouble")
             .centre(0.0, -0.10)
-            .motions(obj(vec![(
-                "uses",
-                obj(vec![(
-                    "wash",
-                    Json::Arr(
-                        [0, 1]
-                            .into_iter()
-                            .map(|slot| {
-                                obj(vec![
-                                    ("clip", Json::from(format!("water_on_{slot}").as_str())),
-                                    ("slot", Json::Int(slot)),
-                                ])
-                            })
-                            .collect(),
-                    ),
-                )]),
-            )]))
+            .motions(json!({"uses": {"wash": [{"clip": "water_on_0", "slot": 0}, {"clip": "water_on_1", "slot": 1}]}}))
             .paint(&[
                 ("body", "Cabinets"),
                 ("stone", "Worktop"),

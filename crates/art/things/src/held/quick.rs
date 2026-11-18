@@ -65,7 +65,7 @@ pub fn ice_cream() -> Vec<Obj> {
             rot = (0.0, 0.0, (25 * i) as f64)
         );
         jitter!(sc, 0.0012, size = 0.01, seed = 1.3 + i as f64);
-        if !super::common::same(m, M.choc_ice) {
+        if m != M.choc_ice {
             _sauce(&format!("sauce{i}"), (x, 0.026, z), s, i as f64);
         }
     }

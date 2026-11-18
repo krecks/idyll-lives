@@ -1,16 +1,18 @@
 //! What the play and yard things are built from: the palette, the frame, and the shapes more than one of them
 //! makes (ground, clumps, pots, slabs from outlines).
 
-pub use crate::outdoor::common::{F, N, bent, board, fillet, mesh_of, rod, tube};
+pub use crate::outdoor::common::{F, board, rod};
 use artkit::far::low;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::V3;
 use artkit::noise::noise;
 use artkit::palette;
+use artkit::parts::numbered;
+use artkit::place::N;
 use artkit::scene::Obj;
-use artkit::shapes::SHARP;
+use artkit::shapes::{CLOSED, SHARP};
 use artkit::{boulder, revolve};
-use std::cell::Cell;
 
 palette! { M:
     // the sandpit
@@ -119,18 +121,6 @@ palette! { M:
     haft = ("#B08E66", satin),
 }
 
-thread_local! {
-    static COUNT: Cell<u32> = const { Cell::new(0) };
-}
-
-/// A part's name: `stem` and a number counting on.
-pub fn name(stem: &str) -> String {
-    COUNT.with(|n| {
-        n.set(n.get() + 1);
-        format!("{stem}{}", n.get())
-    })
-}
-
 /// Game points round an arc of radius `r` about game point `centre`, from `a0` to `a1` degrees, in the game's
 /// x-height plane (`xy`, 0° along +x, 90° up) or its x-depth plane.
 pub fn arc_points(
@@ -178,7 +168,7 @@ pub fn blob(
     noise: f64,
 ) -> Obj {
     boulder!(
-        name("blob"),
+        numbered("blob"),
         r,
         at = F.at(x, y, z),
         material = material,
@@ -192,7 +182,7 @@ pub fn blob(
 /// A flower pot standing on height `y`, `r` across the rim, with soil in it.
 pub fn pot(x: f64, y: f64, z: f64, r: f64, h: f64, material: Option<Mat>) {
     revolve!(
-        name("pot"),
+        numbered("pot"),
         &[
             (r * 0.72, 0.0),
             (r, h * 0.86),
@@ -210,7 +200,7 @@ pub fn pot(x: f64, y: f64, z: f64, r: f64, h: f64, material: Option<Mat>) {
 
 /// One length of round bar or tube through game points, its corners bent round about `bend` (no overshoot):
 /// hoops, handles, frames.
-pub fn bent_bar(
+pub fn bent(
     name: &str,
     pts: &[(f64, f64, f64)],
     r: f64,
@@ -219,7 +209,15 @@ pub fn bent_bar(
     verts: usize,
     steps: usize,
 ) -> Obj {
-    bent(name, pts, r, material, bend, verts, steps, 1.0)
+    kit::tube!(
+        F,
+        name,
+        &kit::fillet!(pts, bend, steps),
+        r,
+        material,
+        verts = verts,
+        round = 1
+    )
 }
 
 /// A ground surface `w` by `d` at height `y` (sand, soil): a grid raised in soft lumps up to `bump` (noise, the
@@ -282,6 +280,5 @@ pub fn ground(
         let b = rim[(i + 1) % rim.len()];
         faces.push(vec![a, b, off + b, off + a]);
     }
-    let mats = vec![0; faces.len()];
-    mesh_of(name, vs, &faces, &[material], &mats, true)
+    artkit::forms::object(name, vs, &faces, Some(material), true, CLOSED, false)
 }

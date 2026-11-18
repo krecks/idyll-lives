@@ -1,8 +1,9 @@
 //! The low TV bench (2x1): a white bench on oak legs, a TV lift in a hood at its back.
 
+use super::common::WALL;
 use super::common::call::rbox;
-use super::common::{WALL, py};
 use super::{F, M};
+use artkit::json::float_repr;
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, TAU, cos, pow, sin};
@@ -179,7 +180,7 @@ pub fn tv_stand_low() -> Vec<Obj> {
         for x in [-0.6, 0.0, 0.6] {
             kit::shaker!(
                 F,
-                &format!("door{}", py(x)),
+                &format!("door{}", float_repr(x)),
                 0.58,
                 0.34,
                 (x, 0.26, 0.01),
@@ -190,7 +191,7 @@ pub fn tv_stand_low() -> Vec<Obj> {
             );
             kit::pull!(
                 F,
-                format!("pull{}", py(x)),
+                format!("pull{}", float_repr(x)),
                 x,
                 0.4,
                 0.02,

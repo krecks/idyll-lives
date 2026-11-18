@@ -1,6 +1,7 @@
 //! What the media are built from: the helpers media.py shared between its models.
 
 use super::{F, M};
+pub use crate::common::P;
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{P3, atan2, cosd, degrees, sind};
@@ -9,16 +10,8 @@ use artkit::scene::Obj;
 use artkit::shapes::Cube;
 use artkit::{fbox, fsweep, revolve, soft};
 
-/// A game point (x, height, depth).
-pub type P = (f64, f64, f64);
-
 /// The wall's face (game depth).
 pub const WALL: f64 = -0.43;
-
-/// A float as Python's `str` writes it in a part's name (a whole one with its `.0`).
-pub fn py(x: f64) -> String {
-    artkit::json::float_repr(x)
-}
 
 /// `_axle`: the rot for a cylinder whose axis runs along the game direction (gx, 0, gz).
 pub fn axle(gx: f64, gz: f64) -> P3 {

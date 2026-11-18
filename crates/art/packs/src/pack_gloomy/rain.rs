@@ -1,13 +1,12 @@
 //! The rainfall lamp (1x1): rain running down lines over a pool, a little figure under an umbrella.
 
-use super::common::{M, fillet, lathe, name, tube, turned};
-use super::music::settle_in_place;
+use super::common::M;
 use artkit::math::{P3, TAU, cos, cosd, sin, sind};
 use artkit::motion::{Grow, Squash, grow, squash};
-use artkit::parts::{join, new_parts};
+use artkit::parts::{join, new_parts, numbered};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
-use artkit::{boulder, fcyl, fsphere, fsweep, loft, ring, torus};
+use artkit::{boulder, fcyl, fsphere, fsweep, kit, loft, ring, settle, torus};
 
 const LZ: f64 = -0.05; // the lamp's middle (depth)
 const POOL: f64 = 0.165;
@@ -43,7 +42,7 @@ pub fn rain_lamp() -> Vec<Obj> {
     let P3 { x: bx, y: by, .. } = f.at(0, 0, LZ);
     let still = new_parts(|| {
         // the base: a moulded slate bowl round the pool, its lip stepped in
-        turned(
+        kit::turned!(
             f,
             "base",
             0.0,
@@ -65,7 +64,7 @@ pub fn rain_lamp() -> Vec<Obj> {
                 (0.0, 0.15),
             ],
             M.slate,
-            40,
+            segments = 40
         );
         fcyl!(
             f,
@@ -81,7 +80,7 @@ pub fn rain_lamp() -> Vec<Obj> {
             let (px, pz) = (0.195 * cosd(a), LZ + 0.195 * sind(a));
             fsweep!(
                 f,
-                name("post"),
+                numbered("post"),
                 &[(px, 0.13, pz), (px, CANOPY + 0.01, pz)],
                 0.0075,
                 M.slate,
@@ -90,7 +89,7 @@ pub fn rain_lamp() -> Vec<Obj> {
             );
             fcyl!(
                 f,
-                name("post_foot"),
+                numbered("post_foot"),
                 0.014,
                 0.02,
                 (px, 0.14, pz),
@@ -102,7 +101,7 @@ pub fn rain_lamp() -> Vec<Obj> {
             for y in [0.55, 0.95] {
                 fcyl!(
                     f,
-                    name("post_collar"),
+                    numbered("post_collar"),
                     0.011,
                     0.014,
                     (px, y, pz),
@@ -123,7 +122,7 @@ pub fn rain_lamp() -> Vec<Obj> {
             ring!(0.02, 0.02, z = CANOPY + 0.1, verts = 48, at = (bx, by)),
         ];
         loft!("canopy", &rings, material = M.slate);
-        turned(
+        kit::turned!(
             f,
             "finial",
             0.0,
@@ -140,7 +139,7 @@ pub fn rain_lamp() -> Vec<Obj> {
                 (0.0, 0.038),
             ],
             M.brass,
-            14,
+            segments = 14
         );
         fcyl!(
             f,
@@ -173,7 +172,7 @@ pub fn rain_lamp() -> Vec<Obj> {
             subdivisions = 1
         );
         let (fx, fz) = (0.0, LZ);
-        lathe(
+        kit::lathe!(
             f,
             "figure",
             fx,
@@ -189,8 +188,7 @@ pub fn rain_lamp() -> Vec<Obj> {
                 (0.008, 0.112),
             ],
             M.figure,
-            12,
-            2.0,
+            verts = 12
         );
         fsphere!(
             f,
@@ -220,23 +218,22 @@ pub fn rain_lamp() -> Vec<Obj> {
             verts = 10
         );
         let (ux, uz) = (0.02, LZ + 0.01);
-        tube(
+        kit::tube!(
             f,
             "umbrella_handle",
-            &fillet(
+            &kit::fillet!(
                 &[
                     (ux, POOL + 0.26, uz),
                     (ux, POOL + 0.1, uz),
                     (ux + 0.014, POOL + 0.09, uz),
                     (ux + 0.024, POOL + 0.1, uz),
                 ],
-                0.007,
-                3,
+                0.007
             ),
             0.003,
             M.wick,
-            Some(5),
-            1,
+            verts = 5,
+            round = 1
         );
         let P3 { x: ubx, y: uby, .. } = f.at(ux, 0, uz);
         let uy = POOL + 0.218;
@@ -272,7 +269,7 @@ pub fn rain_lamp() -> Vec<Obj> {
         .enumerate()
         {
             boulder!(
-                name("pebble"),
+                numbered("pebble"),
                 0.04 * s,
                 at = f.at(x, 0, z),
                 material = [M.pebble, M.pebble_dark][i % 2],
@@ -294,7 +291,7 @@ pub fn rain_lamp() -> Vec<Obj> {
             let (x, z) = (r * cosd(a), LZ + r * sind(a));
             fcyl!(
                 f,
-                name("strand"),
+                numbered("strand"),
                 0.0035,
                 CANOPY - POOL,
                 (x, (CANOPY + POOL) / 2.0, z),
@@ -304,7 +301,7 @@ pub fn rain_lamp() -> Vec<Obj> {
             for k in 0..3 {
                 fsphere!(
                     f,
-                    name("drop"),
+                    numbered("drop"),
                     0.007,
                     (x, POOL + 0.15 + ((i * 3 + k * 5) % 11) as f64 * 0.09, z),
                     M.rain,
@@ -321,7 +318,7 @@ pub fn rain_lamp() -> Vec<Obj> {
     let rip = new_parts(|| {
         for i in 0..4 {
             torus!(
-                name("ripple"),
+                numbered("ripple"),
                 0.06 + i as f64 * 0.03,
                 0.0025,
                 at = f.at(0, POOL + 0.002, LZ),
@@ -332,7 +329,7 @@ pub fn rain_lamp() -> Vec<Obj> {
         }
     });
     let rip = join(&rip, "ripples", Some(f.at(0, POOL, LZ)));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     grow(
         rain,
         "rain",

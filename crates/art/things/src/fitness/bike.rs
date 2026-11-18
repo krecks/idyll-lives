@@ -1,13 +1,14 @@
 //! The exercise bike: an upright bike, the flywheel at the front, the cranks under the saddle.
 
 use super::M;
-use super::common::{Num, on, py, rr};
+use super::common::{on, rr};
+use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::{Axis, P3, TAU, cos, cosd, pow, sin, sind};
 use artkit::parts::{hinged, join, new_parts};
-use artkit::place::GameFrame;
+use artkit::place::{GameFrame, N};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fsphere, fsweep, loft, revolve, settle, soft, spin};
+use artkit::{fbox, fcyl, fsphere, fsweep, loft, points, revolve, settle, soft, spin};
 
 /// The crank axle.
 const CRANK: (i32, f64, f64) = (0, 0.3, 0.04);
@@ -15,8 +16,8 @@ const CRANK: (i32, f64, f64) = (0, 0.3, 0.04);
 const ARM: f64 = 0.16;
 
 /// A point on the console's face (`_on((0, 1.05, 0.36), -30, d)`).
-fn console(x: impl Into<Num>, y: f64, z: f64) -> (Num, f64, f64) {
-    on((Num::Int(0), 1.05, 0.36), -30, (x.into(), y, z))
+fn console(x: impl Into<N>, y: f64, z: f64) -> (N, f64, f64) {
+    on((N::I(0), 1.05, 0.36), -30, (x.into(), y, z))
 }
 
 pub fn exercise_bike() -> Vec<Obj> {
@@ -35,7 +36,7 @@ pub fn exercise_bike() -> Vec<Obj> {
         for z in [-0.38, 0.38] {
             fsweep!(
                 f,
-                format!("stabiliser{}", py(z)),
+                format!("stabiliser{}", float_repr(z)),
                 &[(-0.22, 0.03, z), (0.22, 0.03, z)],
                 0,
                 M.body,
@@ -44,7 +45,7 @@ pub fn exercise_bike() -> Vec<Obj> {
             for s in [-1, 1] {
                 soft!(
                     f,
-                    format!("cap{}{s}", py(z)),
+                    format!("cap{}{s}", float_repr(z)),
                     0.05,
                     0.035,
                     0.085,
@@ -177,11 +178,11 @@ pub fn exercise_bike() -> Vec<Obj> {
         kit::tube!(
             f,
             "resistance_cable",
-            &[
-                (Num::Int(0), 0.95, 0.31),
-                (Num::Float(0.04), 0.8, 0.35),
-                (Num::Float(0.03), 0.55, 0.36),
-                (Num::Int(0), 0.5, 0.33)
+            &points![
+                (0, 0.95, 0.31),
+                (0.04, 0.8, 0.35),
+                (0.03, 0.55, 0.36),
+                (0, 0.5, 0.33)
             ],
             0.004,
             M.dark,

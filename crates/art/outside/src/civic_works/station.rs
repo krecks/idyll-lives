@@ -5,10 +5,10 @@ use artkit::far::{is_low, low};
 use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::{TAU, cos, radians, sin};
-use artkit::parts::{Settle, join_all, new_parts, settle_all, settle_with};
+use artkit::parts::{join_all, new_parts, settle_all};
 use artkit::scene::{Obj, meshes};
 use artkit::shapes::sides;
-use artkit::{fbox, fcyl, fsweep, revolve};
+use artkit::{fbox, fcyl, fsweep, revolve, settle};
 
 own_palette! { POLE:
     body = ("#C9A04A", metal, roughness(0.16)),   // the polished brass pole
@@ -303,12 +303,6 @@ pub fn hose_rack() -> Vec<Obj> {
         }
     });
     join_all(if is_low() { "hoseRack_far" } else { "hoseRack" });
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: false,
-        },
-    );
+    settle!(centre = false, floor = false);
     meshes()
 }

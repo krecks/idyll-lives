@@ -2,10 +2,11 @@
 //! the kitchen island; the worktop overhangs the back (-Z) 30 cm for stools, its edge on the wall face. A bar: a
 //! slatted body, a top to 1.06 overhanging the front (+Z) and a foot rail.
 
-use super::common::{arc, drawer, pull, shaker, tube};
+use super::common::{arc, drawer, pull, shaker};
 use super::wall::corbel;
 use super::{M, SECONDS};
 use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::parts::{join, new_parts, settle_all};
 use artkit::place::{Facing, GameFrame};
@@ -404,15 +405,14 @@ fn bar(
         bevel_segments = 1
     );
     let x1 = -0.5 + bw + if end { 0.02 } else { 0.0 };
-    tube(
+    kit::tube!(
         f,
         "rail",
         &[(-0.5, 0.2, 0.26), (x1, 0.2, 0.26)],
         0.02,
         rail,
-        Some(12),
-        1,
-        1.0,
+        verts = 12,
+        round = 1
     );
     for x in [-0.38, -0.5 + bw - 0.12] {
         let xs = artkit::json::float_repr(x);

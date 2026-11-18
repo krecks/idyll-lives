@@ -1,16 +1,15 @@
 //! The doorstep delivery locker and the effortless vibration plate.
 
-use super::common::{_lathe, _name, _turned, M, WALL};
-use super::sleep::settle_in_place;
+use super::common::{M, WALL};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, cosd, sind};
 use artkit::motion::Ease;
-use artkit::parts::{hinged, join, new_parts};
+use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, rock, soft, swing};
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, rock, settle, soft, swing};
 
 // --- the doorstep delivery locker (1x1): a bank of parcel lockers with a touch screen, an order waiting -----
 const COLS: [f64; 3] = [-0.28, 0.0, 0.28];
@@ -167,7 +166,7 @@ pub fn delivery_locker() -> Vec<Obj> {
                 }
                 _locker_door(
                     f,
-                    &_name("door"),
+                    &numbered("door"),
                     x,
                     y,
                     h,
@@ -238,7 +237,7 @@ pub fn delivery_locker() -> Vec<Obj> {
             for j in 0..2 {
                 fbox!(
                     f,
-                    _name("key"),
+                    numbered("key"),
                     0.03,
                     0.022,
                     0.004,
@@ -379,7 +378,7 @@ pub fn delivery_locker() -> Vec<Obj> {
         for dx in [-0.05, 0.05] {
             kit::tube!(
                 f,
-                _name("bag_handle"),
+                numbered("bag_handle"),
                 &[
                     (-0.22 + dx, 0.268, 0.2),
                     (-0.22 + dx * 0.9, 0.32, 0.215),
@@ -400,7 +399,7 @@ pub fn delivery_locker() -> Vec<Obj> {
         join(&door, "locker_door", None),
         f.at(x - 0.13, y, FRONT + 0.01),
     );
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(
         door,
         "door_open",
@@ -449,7 +448,7 @@ pub fn vibe_plate() -> Vec<Obj> {
             for sz in [-1, 1] {
                 fcyl!(
                     f,
-                    _name("foot"),
+                    numbered("foot"),
                     0.03,
                     0.012,
                     (sx as f64 * 0.25, 0.006, dz - 0.02 + sz as f64 * 0.24),
@@ -500,7 +499,7 @@ pub fn vibe_plate() -> Vec<Obj> {
             let sf = s as f64;
             fsweep!(
                 f,
-                _name("grip"),
+                numbered("grip"),
                 &[
                     (sf * 0.26, BAR_Y - 0.0185, -0.2),
                     (sf * 0.26, BAR_Y - 0.02, -0.06)
@@ -512,7 +511,7 @@ pub fn vibe_plate() -> Vec<Obj> {
             );
             fsphere!(
                 f,
-                _name("grip_end"),
+                numbered("grip_end"),
                 0.029,
                 (sf * 0.26, BAR_Y - 0.02, -0.06),
                 M.lime,
@@ -549,7 +548,7 @@ pub fn vibe_plate() -> Vec<Obj> {
         for k in 0..3 {
             fcyl!(
                 f,
-                _name("console_button"),
+                numbered("console_button"),
                 0.009,
                 0.006,
                 (-0.05 + 0.05 * k as f64, BAR_Y + 0.045, -0.29),
@@ -558,7 +557,7 @@ pub fn vibe_plate() -> Vec<Obj> {
                 verts = 8
             );
         }
-        _lathe(
+        kit::lathe!(
             f,
             "bottle",
             0.32,
@@ -576,11 +575,9 @@ pub fn vibe_plate() -> Vec<Obj> {
                 (0.0, 0.2),
             ],
             M.bottle,
-            14,
-            2.0,
-            1.0,
+            verts = 14
         );
-        _turned(
+        kit::turned!(
             f,
             "bottle_cap",
             0.32,
@@ -594,8 +591,7 @@ pub fn vibe_plate() -> Vec<Obj> {
                 (0.0, 0.022),
             ],
             M.white,
-            12,
-            (0.0, 0.0, 0.0),
+            segments = 12
         );
     });
     join(&still, "body", Some(P3::from((0, 0, 0))));
@@ -627,7 +623,7 @@ pub fn vibe_plate() -> Vec<Obj> {
         for k in 0..9 {
             fbox!(
                 f,
-                _name("rib"),
+                numbered("rib"),
                 0.47,
                 0.003,
                 0.012,
@@ -657,7 +653,7 @@ pub fn vibe_plate() -> Vec<Obj> {
             let mark: Vec<(f64, f64)> = foot.iter().map(|&(u, v)| (sf * u, v)).collect();
             fextrude!(
                 f,
-                _name("foot_mark"),
+                numbered("foot_mark"),
                 &mark,
                 0.004,
                 (dx + sf * 0.13, dy + 0.0215, dz),
@@ -667,7 +663,7 @@ pub fn vibe_plate() -> Vec<Obj> {
         }
     });
     let deck = hinged(join(&deck, "deck", None), f.at(dx, dy, dz));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     rock!(deck, "shake", 3.0, seconds = 0.25, axis = Axis::Y);
     objs
 }

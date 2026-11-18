@@ -14,7 +14,7 @@
 
 use artkit::family::{Family, Model};
 use artkit::json::Json;
-use artkit::palette;
+use artkit::{json, palette};
 
 mod common;
 mod machines;
@@ -55,17 +55,7 @@ palette! { M:
 /// each way); once loaded it runs on its own (content `runs`), the drum going round, a turn each 1.2 s on the
 /// washer and 1.8 s on the dryer, till it's done (`running`, from rest to rest).
 fn machine() -> Json {
-    Json::Obj(vec![
-        (
-            "uses".into(),
-            Json::Obj(vec![
-                ("laundry".into(), Json::from("door_open")),
-                ("unload".into(), Json::from("door_open")),
-            ]),
-        ),
-        ("hold".into(), Json::Num(2.5)),
-        ("running".into(), Json::from("drum_spin")),
-    ])
+    json!({"uses": {"laundry": "door_open", "unload": "door_open"}, "hold": 2.5, "running": "drum_spin"})
 }
 
 /// The family.

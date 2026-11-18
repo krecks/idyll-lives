@@ -2,7 +2,8 @@
 //! (content `held`), so the bench's bar (`bar_off`) and a pair of the rack's dumbbells (`pair_off`) leave them.
 
 use super::M;
-use super::common::{Along, dumbbell, plate, py, rr};
+use super::common::{Along, dumbbell, plate, rr};
+use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::{P3, cos, radians, sin};
 use artkit::parts::{hinged, join, new_parts};
@@ -64,7 +65,7 @@ pub fn weight_bench() -> Vec<Obj> {
         for z in [0.4, -0.62] {
             fsweep!(
                 f,
-                format!("post{}", py(z)),
+                format!("post{}", float_repr(z)),
                 &[(0, top - 0.11, z), (0, 0.05, z)],
                 0,
                 M.frame,
@@ -73,7 +74,7 @@ pub fn weight_bench() -> Vec<Obj> {
             );
             fsweep!(
                 f,
-                format!("feet{}", py(z)),
+                format!("feet{}", float_repr(z)),
                 &[(-0.23, 0.025, z), (0.23, 0.025, z)],
                 0,
                 M.frame,
@@ -82,7 +83,7 @@ pub fn weight_bench() -> Vec<Obj> {
             for s in [-1, 1] {
                 soft!(
                     f,
-                    format!("cap{}{s}", py(z)),
+                    format!("cap{}{s}", float_repr(z)),
                     0.04,
                     0.052,
                     0.085,
@@ -94,7 +95,7 @@ pub fn weight_bench() -> Vec<Obj> {
             }
             fbox!(
                 f,
-                format!("gusset{}", py(z)),
+                format!("gusset{}", float_repr(z)),
                 0.01,
                 0.06,
                 0.08,
@@ -147,7 +148,7 @@ pub fn weight_bench() -> Vec<Obj> {
             for z in [-0.94, -0.56] {
                 soft!(
                     f,
-                    format!("base_cap{s}{}", py(z)),
+                    format!("base_cap{s}{}", float_repr(z)),
                     0.064,
                     0.054,
                     0.02,
@@ -232,7 +233,7 @@ pub fn weight_bench() -> Vec<Obj> {
         for x in [-0.3, 0.3] {
             dumbbell(
                 &f,
-                &format!("dumbbell{}", py(x)),
+                &format!("dumbbell{}", float_repr(x)),
                 x,
                 0.05,
                 0.842,
@@ -383,7 +384,7 @@ pub fn dumbbells() -> Vec<Obj> {
             for z in [-0.32, 0.1] {
                 soft!(
                     f,
-                    format!("base_cap{s}{}", py(z)),
+                    format!("base_cap{s}{}", float_repr(z)),
                     0.054,
                     0.034,
                     0.02,

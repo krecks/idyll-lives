@@ -1,14 +1,14 @@
 //! K8 continued: the upholstered, bentwood, folding and carver chairs and the dining bench.
 
 use super::chairs::UP;
-use super::common::{apron, crest, finish, rail, ring_loop, slab, sq_leg, stretcher, tube, turned};
+use super::common::{apron, crest, finish, rail, ring_loop, slab, sq_leg, stretcher, turned};
 use super::{F, M, SZ};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::math::{PI, TAU, V3, cos, radians, sin};
 use artkit::place::Facing;
 use artkit::scene::Obj;
-use artkit::{fbox, fcyl, fextrude, fsweep, soft, sphere};
+use artkit::{fbox, fcyl, fextrude, fsweep, kit, soft, sphere};
 
 /// Upholstered chair (catalog2): a stuffed, piped seat and back in oatmeal fabric on walnut legs, seat at 0.48:
 /// tapered front legs, sabre back legs, the back buttoned.
@@ -53,19 +53,18 @@ pub fn chair_upholstered() -> Vec<Obj> {
     }
     for x in [-0.19, 0.19] {
         let xs = float_repr(x);
-        tube(
-            &F,
-            &format!("front{xs}"),
+        kit::tube!(
+            F,
+            format!("front{xs}"),
             &[(x, 0.0, SZ + 0.17), (x, 0.4, SZ + 0.165)],
             0.02,
             M.legs_walnut,
-            Some(10),
-            3,
-            [0.6, 1.0],
+            verts = 10,
+            scale = [0.6, 1.0]
         );
-        tube(
-            &F,
-            &format!("back_leg{xs}"),
+        kit::tube!(
+            F,
+            format!("back_leg{xs}"),
             &[
                 (x, 0.0, SZ - 0.252),
                 (x, 0.2, SZ - 0.212),
@@ -73,9 +72,9 @@ pub fn chair_upholstered() -> Vec<Obj> {
             ],
             0.017,
             M.legs_walnut,
-            Some(10),
-            3,
-            [0.72, 0.92, 1.05],
+            verts = 10,
+            round = 3,
+            scale = [0.72, 0.92, 1.05]
         );
     }
     finish("chairUpholstered")
@@ -144,9 +143,9 @@ pub fn chair_bentwood() -> Vec<Obj> {
     );
     for sx in [-1, 1] {
         let s = f64::from(sx);
-        tube(
-            &F,
-            &format!("front{sx}"),
+        kit::tube!(
+            F,
+            format!("front{sx}"),
             &[
                 (s * 0.18, 0.0, SZ + 0.2),
                 (s * 0.155, 0.22, SZ + 0.162),
@@ -154,14 +153,14 @@ pub fn chair_bentwood() -> Vec<Obj> {
             ],
             0.016,
             M.frame_bent,
-            Some(8),
-            2,
-            [0.78, 0.95, 1.05],
+            verts = 8,
+            round = 2,
+            scale = [0.78, 0.95, 1.05]
         );
         // a knee brace from the leg up under the seat rim
-        tube(
-            &F,
-            &format!("brace{sx}"),
+        kit::tube!(
+            F,
+            format!("brace{sx}"),
             &[
                 (s * 0.15, 0.33, SZ + 0.145),
                 (s * 0.12, 0.4, SZ + 0.1),
@@ -169,9 +168,8 @@ pub fn chair_bentwood() -> Vec<Obj> {
             ],
             0.007,
             M.frame_bent,
-            Some(6),
-            3,
-            1.0,
+            verts = 6,
+            round = 3
         );
     }
     // the back legs and the loop of the back in one length: up from the floor past the seat, round the top, down
@@ -196,7 +194,16 @@ pub fn chair_bentwood() -> Vec<Obj> {
     let mut taper = vec![0.8, 0.95, 1.05];
     taper.extend((1..18).map(|i| 1.0 - 0.12 * sin(PI * f64::from(i) / 18.0)));
     taper.extend([1.05, 0.95, 0.8]);
-    tube(&F, "back", &pts, 0.015, M.frame_bent, Some(8), 2, taper);
+    kit::tube!(
+        F,
+        "back",
+        &pts,
+        0.015,
+        M.frame_bent,
+        verts = 8,
+        round = 2,
+        scale = taper
+    );
     // the inner loop, leaning with the back, tied to it each side
     let lean = radians(6.0);
     let inner: Vec<(f64, f64, f64)> = (0..20)
@@ -220,18 +227,16 @@ pub fn chair_bentwood() -> Vec<Obj> {
     );
     for s in [-1, 1] {
         let sf = f64::from(s);
-        tube(
-            &F,
-            &format!("tie{s}"),
+        kit::tube!(
+            F,
+            format!("tie{s}"),
             &[
                 (sf * 0.084, 0.71, SZ - 0.195),
                 (sf * 0.154, 0.7, SZ - 0.196),
             ],
             0.007,
             M.frame_bent,
-            Some(6),
-            3,
-            1.0,
+            verts = 6
         );
     }
     finish("chairBentwood")
@@ -273,25 +278,21 @@ pub fn chair_folding() -> Vec<Obj> {
         3,
         false,
     );
-    tube(
-        &F,
+    kit::tube!(
+        F,
         "stretcher",
         &[(-xf, 0.1, SZ + 0.15), (xf, 0.1, SZ + 0.15)],
         0.009,
         M.frame_steel,
-        Some(8),
-        3,
-        1.0,
+        verts = 8
     );
-    tube(
-        &F,
+    kit::tube!(
+        F,
         "stretcher_rear",
         &[(-xr, 0.1, SZ - 0.15), (xr, 0.1, SZ - 0.15)],
         0.009,
         M.frame_steel,
-        Some(8),
-        3,
-        1.0,
+        verts = 8
     );
     for s in [-1, 1] {
         let sf = f64::from(s);
@@ -601,18 +602,16 @@ pub fn bench_dining() -> Vec<Obj> {
                 Some((x, SZ + dz)),
             );
         }
-        tube(
-            &F,
-            &format!("stretcher{xs}"),
+        kit::tube!(
+            F,
+            format!("stretcher{xs}"),
             &[
                 (x + s * 0.025, 0.15, SZ - 0.142),
                 (x + s * 0.025, 0.15, SZ + 0.142),
             ],
             0.014,
             M.legs_oakd,
-            Some(8),
-            3,
-            1.0,
+            verts = 8
         );
         for dz in [-0.1, 0.1] {
             fcyl!(

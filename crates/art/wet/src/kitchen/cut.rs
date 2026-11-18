@@ -3,6 +3,9 @@
 //! (`cut_cabinet`). Each leaves the pieces of the body's faces outside the cutter, in the body's own face order,
 //! and adds the cutter's faces inside the body, taking the cutter's material (the modifier's `TRANSFER`), its points
 //! numbered among the body's as Blender numbered them.
+//!
+//! Not `artkit::kit::cut`, on purpose: that one numbers the points a cut makes and starts its faces in its own
+//! order, and the baked shading, which hangs on both, then lies a grey off Blender's round these two cuts.
 
 use artkit::materials::Mat;
 use artkit::math::V3;

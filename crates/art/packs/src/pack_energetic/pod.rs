@@ -1,13 +1,12 @@
 //! The recovery pod (1x2): a padded lounger (top 0.5) in a shell, a tinted canopy over the head end.
 
-use super::common::{M, lofted, name};
-use super::play::settle_in_place;
+use super::common::{M, lofted};
 use artkit::forms::rounded_rect;
 use artkit::math::{Axis, P3, TAU, cos, sin};
-use artkit::parts::{hinged, join, new_parts, turn};
+use artkit::parts::{hinged, join, new_parts, numbered, turn};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
-use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, loft, soft, swing, torus};
+use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, loft, settle, soft, swing, torus};
 
 const CANOPY: (f64, f64, f64, f64, f64) = (0.42, -0.35, 0.4, 0.4, 0.5); // the canopy's rim height, middle depth, half-width, height, half-length
 const CANOPY_UP: f64 = 40.0; // how far it stands open at rest (degrees)
@@ -40,10 +39,10 @@ fn boot(f: &GameFrame, x: f64, y: f64, z: f64) {
                 .collect()
         })
         .collect();
-    loft!(name("boot"), &secs, material = M.pod_boots);
+    loft!(numbered("boot"), &secs, material = M.pod_boots);
     for u in [-0.2, -0.06, 0.08] {
         torus!(
-            name("boot_quilt"),
+            numbered("boot_quilt"),
             1.0,
             0.006,
             at = (bx, by - u, bz),
@@ -150,7 +149,7 @@ pub fn recovery_pod() -> Vec<Obj> {
         for k in 0..3 {
             fcyl!(
                 f,
-                name("control_key"),
+                numbered("control_key"),
                 0.012,
                 0.004,
                 (0.412, 0.44, 0.49 + 0.06 * k as f64),
@@ -162,7 +161,7 @@ pub fn recovery_pod() -> Vec<Obj> {
         for x in [-0.33, 0.33] {
             fextrude!(
                 f,
-                name("hinge_block"),
+                numbered("hinge_block"),
                 &rounded_rect(0.06, 0.07, 0.02, 2),
                 0.06,
                 (x, 0.42, -0.86),
@@ -203,7 +202,7 @@ pub fn recovery_pod() -> Vec<Obj> {
         for x in [-0.33, 0.33] {
             fbox!(
                 f,
-                name("canopy_arm"),
+                numbered("canopy_arm"),
                 0.02,
                 0.03,
                 0.12,
@@ -216,7 +215,7 @@ pub fn recovery_pod() -> Vec<Obj> {
     });
     let can = hinged(join(&can, "canopy", None), f.at(0, ry, cz - hl));
     turn(can, -CANOPY_UP, Axis::X);
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(can, "canopy", CANOPY_UP, seconds = 1.2, axis = Axis::X);
     objs
 }

@@ -5,20 +5,10 @@ use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{P3, PI, TAU, cos, cosd, degrees, pow, radians, sin, sind};
 use artkit::motion::{PathKey, path};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
-use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fextrude, fsphere, fsweep, leaf, loft, revolve, ring, soft, squash};
-
-pub fn settle_in_place() -> Vec<Obj> {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    )
-}
+use artkit::scene::Obj;
+use artkit::{fbox, fextrude, fsphere, fsweep, leaf, loft, revolve, ring, settle, soft, squash};
 
 // --- the steam mop dock (1x1): a slim white tower against the wall, the mop docked before it ----------------
 const MOP: (f64, f64, f64) = (0.0, 0.04, -0.07); // the mop head's foot (x, height, depth): it pivots there
@@ -302,7 +292,7 @@ pub fn steam_mop_dock() -> Vec<Obj> {
         loft!("mop_tank", &sections, material = M.teal, rot = (0, 0, 0));
     });
     let mop = hinged(join(&mop, "mop", None), f.at(x, 0.0, z));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     squash!(mop, "mop_off", 0.001, seconds = 0.2);
     objs
 }
@@ -538,7 +528,7 @@ pub fn robot_vacuum_dock() -> Vec<Obj> {
         }
     });
     let robot = hinged(join(&robot, "robot", None), f.at(x, y, z));
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     path(robot, "vacuum_round", &_round(), true);
     objs
 }

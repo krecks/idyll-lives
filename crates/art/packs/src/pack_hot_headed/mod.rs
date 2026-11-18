@@ -30,7 +30,7 @@ const WALL: f64 = -0.43;
 pub fn family() -> Option<Family> {
     Some(Family::new(
         "pack_hotHeaded",
-        common::palette(),
+        M.palette(),
         vec![
             Model::new("heavyBag", bag::heavy_bag, (0.86, 2.01, 0.86))
                 .key("model.hotHeaded.heavyBag")

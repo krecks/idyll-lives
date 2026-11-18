@@ -1,13 +1,15 @@
 //! The long park bench and the taxi rank's shelter: seats for three.
 
-use super::common::{fr, own};
+use super::common::own;
 use artkit::forms::rounded_rect;
+use artkit::json::float_repr;
 use artkit::math::{P3, PI, TAU, cos, sin};
-use artkit::parts::{Settle, join_all, settle_with};
+use artkit::parts::join_all;
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
 use artkit::{
     fbox, fcyl, fextrude, fsphere, fsweep, kit_bench_end, kit_chequer, kit_fillet, kit_taxi_word,
+    settle,
 };
 
 // --- the long park bench: wooden slats on three cast-iron supports --------------------------------------------
@@ -26,7 +28,7 @@ pub fn park_bench() -> Vec<Obj> {
         for x in BENCH_LEGS {
             kit_bench_end!(
                 f,
-                format!("end{}", fr(x)),
+                format!("end{}", float_repr(x)),
                 x,
                 rail,
                 0.2,
@@ -54,7 +56,7 @@ pub fn park_bench() -> Vec<Obj> {
                 // domed bolts over the end supports
                 fsphere!(
                     f,
-                    format!("bolt{k}{}", fr(x)),
+                    format!("bolt{k}{}", float_repr(x)),
                     0.009,
                     (x, SEAT, z),
                     frame,
@@ -80,7 +82,7 @@ pub fn park_bench() -> Vec<Obj> {
             for x in [BENCH_LEGS[0], BENCH_LEGS[2]] {
                 fsphere!(
                     f,
-                    format!("back_bolt{k}{}", fr(x)),
+                    format!("back_bolt{k}{}", float_repr(x)),
                     0.009,
                     (x, y, z + 0.017),
                     frame,
@@ -92,13 +94,7 @@ pub fn park_bench() -> Vec<Obj> {
         }
     }
     join_all("parkBench");
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     meshes()
 }
 
@@ -123,7 +119,7 @@ pub fn bus_stop() -> Vec<Obj> {
             for z in [back, front] {
                 fbox!(
                     f,
-                    format!("post{}{}", fr(x), fr(z)),
+                    format!("post{}{}", float_repr(x), float_repr(z)),
                     0.07,
                     2.32,
                     0.07,
@@ -133,7 +129,7 @@ pub fn bus_stop() -> Vec<Obj> {
                 );
                 fbox!(
                     f,
-                    format!("plate{}{}", fr(x), fr(z)),
+                    format!("plate{}{}", float_repr(x), float_repr(z)),
                     0.1,
                     0.012,
                     0.1,
@@ -146,7 +142,7 @@ pub fn bus_stop() -> Vec<Obj> {
                     let a = TAU * (k as f64 + 0.5) / 4.0;
                     fcyl!(
                         f,
-                        format!("bolt{}{}{k}", fr(x), fr(z)),
+                        format!("bolt{}{}{k}", float_repr(x), float_repr(z)),
                         0.007,
                         0.012,
                         (x + 0.05 * cos(a), 0.016, z + 0.05 * sin(a)),
@@ -181,7 +177,7 @@ pub fn bus_stop() -> Vec<Obj> {
         for z in [back, front] {
             fbox!(
                 f,
-                format!("beam{}", fr(z)),
+                format!("beam{}", float_repr(z)),
                 2.9,
                 0.09,
                 0.06,
@@ -252,7 +248,7 @@ pub fn bus_stop() -> Vec<Obj> {
         for y in [0.3, 2.24] {
             fbox!(
                 f,
-                format!("rail_back{}", fr(y)),
+                format!("rail_back{}", float_repr(y)),
                 2.8,
                 0.05,
                 0.05,
@@ -262,7 +258,7 @@ pub fn bus_stop() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                format!("rail_side{}", fr(y)),
+                format!("rail_side{}", float_repr(y)),
                 0.05,
                 0.05,
                 deep - 0.06,
@@ -315,7 +311,7 @@ pub fn bus_stop() -> Vec<Obj> {
             ];
             fsweep!(
                 f,
-                format!("bracket{}", fr(x)),
+                format!("bracket{}", float_repr(x)),
                 &kit_fillet!(&path, 0.03, steps = 2),
                 0,
                 frame,
@@ -324,7 +320,7 @@ pub fn bus_stop() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                format!("bracket_leg{}", fr(x)),
+                format!("bracket_leg{}", float_repr(x)),
                 0.04,
                 0.42,
                 0.04,
@@ -486,12 +482,6 @@ pub fn bus_stop() -> Vec<Obj> {
         }
     }
     join_all("busStop");
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     meshes()
 }

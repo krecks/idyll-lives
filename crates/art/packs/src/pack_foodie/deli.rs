@@ -1,17 +1,18 @@
 //! The deli pantry (1x1): a cream cupboard under a marble ledge, open shelves of deli things above.
 
-use super::common::{_lofted, _name, _names_from, _paint, M, WALL};
-use super::garden::settle_in_place;
+use super::common::{_lofted, M, WALL};
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, cosd, sind};
 use artkit::motion::Ease;
-use artkit::parts::{hinged, join, new_parts};
+use artkit::parts::{hinged, join, new_parts, numbered, numbered_from};
 use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
 use artkit::scene::Obj;
-use artkit::{fbox, fcone, fcyl, fextrude, fsphere, fsweep, jitter, loft, revolve, ring, swing};
+use artkit::{
+    fbox, fcone, fcyl, fextrude, fsphere, fsweep, jitter, loft, revolve, ring, settle, swing,
+};
 
 /// Where the pantry's count of names starts: the script names its parts from one count that runs on through a whole
 /// run of the family, and the herb garden, built before it, names 95. The doors' own names come from it.
@@ -22,7 +23,7 @@ const AFTER_HERB_GARDEN: u32 = 95;
 fn _jar(f: &GameFrame, x: f64, y: f64, z: f64, m: Mat, r: f64, h: f64) {
     let jar = _lofted(
         f,
-        &_name("jar"),
+        &numbered("jar"),
         x,
         y,
         z,
@@ -37,11 +38,11 @@ fn _jar(f: &GameFrame, x: f64, y: f64, z: f64, m: Mat, r: f64, h: f64) {
         12,
     );
     let base = f.at(x, y, z).z;
-    _paint(jar, M.chalk, |c| {
+    kit::paint(jar, M.chalk, |c| {
         0.3 * h < c.z as f64 - base && c.z as f64 - base < 0.6 * h
     });
     revolve!(
-        _name("jar_lid"),
+        numbered("jar_lid"),
         &[
             (0.0, 0.0),
             (r * 0.9, 0.0),
@@ -60,7 +61,7 @@ fn _jar(f: &GameFrame, x: f64, y: f64, z: f64, m: Mat, r: f64, h: f64) {
 pub fn _loaf(f: &GameFrame, x: f64, y: f64, z: f64, length: f64, r: f64, turn: f64, seed: f64) {
     let loaf = fsphere!(
         f,
-        _name("loaf"),
+        numbered("loaf"),
         r,
         (x, y + r * 0.8, z),
         M.bread,
@@ -75,7 +76,7 @@ pub fn _loaf(f: &GameFrame, x: f64, y: f64, z: f64, length: f64, r: f64, turn: f
         let u = k as f64 * length * 0.25;
         fsweep!(
             f,
-            _name("loaf_slash"),
+            numbered("loaf_slash"),
             &[
                 (
                     x + u * c - 0.6 * r * s,
@@ -127,7 +128,7 @@ fn _wheel(
         bevel_segments = 1
     );
     if m.name != M.cheese.name {
-        return _paint(w, M.cheese, |c| {
+        return kit::paint(w, M.cheese, |c| {
             artkit::py::hypot(c.x as f64, c.y as f64) > r * 0.92 || (c.z as f64).abs() > h * 0.45
         });
     }
@@ -149,10 +150,10 @@ fn _salami(f: &GameFrame, x: f64, y: f64, z: f64, length: f64) {
         .iter()
         .map(|&(hh, r)| ring!(r, r, z = b.z - hh, verts = 10, at = (b.x, b.y)))
         .collect();
-    loft!(_name("salami"), &sections, material = M.salami);
+    loft!(numbered("salami"), &sections, material = M.salami);
     kit::tube!(
         f,
-        _name("string"),
+        numbered("string"),
         &[(x, y, z), (x, y + 0.05, z)],
         0.0025,
         M.chalk,
@@ -166,7 +167,7 @@ fn _pantry_door(f: &GameFrame, x: f64, hinge_x: f64, zf: f64) -> Obj {
     let parts = new_parts(|| {
         kit::shaker!(
             f,
-            _name("door"),
+            numbered("door"),
             0.395,
             0.78,
             (x, 0.5, zf + 0.01),
@@ -179,7 +180,7 @@ fn _pantry_door(f: &GameFrame, x: f64, hinge_x: f64, zf: f64) -> Obj {
         let px = x + if hinge_x < x { 0.15 } else { -0.15 };
         kit::pull!(
             f,
-            _name("door_pull"),
+            numbered("door_pull"),
             px,
             0.62,
             zf + 0.02,
@@ -192,7 +193,7 @@ fn _pantry_door(f: &GameFrame, x: f64, hinge_x: f64, zf: f64) -> Obj {
         for y in [0.2, 0.8] {
             fcyl!(
                 f,
-                _name("hinge"),
+                numbered("hinge"),
                 0.008,
                 0.06,
                 (
@@ -206,13 +207,13 @@ fn _pantry_door(f: &GameFrame, x: f64, hinge_x: f64, zf: f64) -> Obj {
         }
     });
     hinged(
-        join(&parts, &_name("door"), None),
+        join(&parts, &numbered("door"), None),
         f.at(hinge_x, 0.5, zf + 0.01),
     )
 }
 
 pub fn deli_pantry() -> Vec<Obj> {
-    _names_from(AFTER_HERB_GARDEN);
+    numbered_from(AFTER_HERB_GARDEN);
     let f = &GameFrame::new(0.0);
     let mut rnd = Random::new(2);
     let zf = 0.06; // the carcass's front
@@ -231,7 +232,7 @@ pub fn deli_pantry() -> Vec<Obj> {
         for x in [-0.41, 0.41] {
             fbox!(
                 f,
-                _name("side"),
+                numbered("side"),
                 0.02,
                 0.84,
                 zf - WALL,
@@ -292,7 +293,7 @@ pub fn deli_pantry() -> Vec<Obj> {
         for x in [-0.28, -0.18] {
             fcyl!(
                 f,
-                _name("tin"),
+                numbered("tin"),
                 0.045,
                 0.12,
                 (x, 0.57, -0.2),
@@ -333,7 +334,7 @@ pub fn deli_pantry() -> Vec<Obj> {
         for x in [-0.405, 0.405] {
             fbox!(
                 f,
-                _name("upper_side"),
+                numbered("upper_side"),
                 0.03,
                 0.92,
                 0.4,
@@ -355,7 +356,7 @@ pub fn deli_pantry() -> Vec<Obj> {
         for y in [1.2, 1.5] {
             fbox!(
                 f,
-                _name("shelf"),
+                numbered("shelf"),
                 0.78,
                 0.02,
                 0.36,
@@ -366,7 +367,7 @@ pub fn deli_pantry() -> Vec<Obj> {
             );
             fbox!(
                 f,
-                _name("shelf_lip"),
+                numbered("shelf_lip"),
                 0.78,
                 0.03,
                 0.012,
@@ -437,7 +438,7 @@ pub fn deli_pantry() -> Vec<Obj> {
         for (x, m) in [(-0.33, M.wine), (-0.26, M.bottle)] {
             _lofted(
                 f,
-                &_name("bottle"),
+                &numbered("bottle"),
                 x,
                 1.51,
                 -0.28,
@@ -495,7 +496,7 @@ pub fn deli_pantry() -> Vec<Obj> {
         for (x, z) in [(-0.3, 0.02), (-0.24, 0.06)] {
             fsphere!(
                 f,
-                _name("tomato"),
+                numbered("tomato"),
                 0.028,
                 (x, 0.988, z),
                 M.tomato,
@@ -505,7 +506,7 @@ pub fn deli_pantry() -> Vec<Obj> {
             );
             fcone!(
                 f,
-                _name("tomato_calyx"),
+                numbered("tomato_calyx"),
                 0.012,
                 0.0,
                 0.008,
@@ -519,7 +520,7 @@ pub fn deli_pantry() -> Vec<Obj> {
     // The two doors, hinged on their outer edges: `doors_open` swings them out.
     let left = _pantry_door(f, -0.2025, -0.40, zf);
     let right = _pantry_door(f, 0.2025, 0.40, zf);
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     swing!(
         left,
         "doors_open",

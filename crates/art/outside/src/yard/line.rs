@@ -1,16 +1,16 @@
 //! The washing line, whose washing is pegged out line by line, and the log store.
 
-use super::common::{F, M, bent_bar, board, name};
-use super::play::settle_in_place;
+use super::common::{F, M, bent, board};
 use artkit::far::{is_low, low};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, TAU, cos, cosd, sin, sind};
 use artkit::motion::grow_in_turn;
+use artkit::parts::numbered;
 use artkit::parts::{join, join_all, new_parts};
 use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsweep, loft, revolve, ring, soft, torus};
+use artkit::{fbox, fcyl, fextrude, fsweep, loft, revolve, ring, settle, soft, torus};
 
 // --- the washing line (3x1): two T-posts, three lines; the washing is pegged out and stays out --------------
 const LINE_Y: f64 = 1.76;
@@ -47,7 +47,7 @@ fn garment(kind: &str, x: f64, z: f64, w: f64, h: f64, m: Mat) {
                 (-hw + 0.02, h * 0.42),
                 (-hw, h * 0.12),
             ];
-            hang(&name("shirt"), &out, x, z, m, 0.006);
+            hang(&numbered("shirt"), &out, x, z, m, 0.006);
             vec![x - body * 0.8, x + body * 0.8]
         }
         "trousers" => {
@@ -62,7 +62,7 @@ fn garment(kind: &str, x: f64, z: f64, w: f64, h: f64, m: Mat) {
                 (-hw * 0.96, h),
                 (-hw, h * 0.2),
             ];
-            hang(&name("trousers"), &out, x, z, m, 0.006);
+            hang(&numbered("trousers"), &out, x, z, m, 0.006);
             vec![x - w * 0.4, x + w * 0.4]
         }
         "socks" => {
@@ -83,10 +83,10 @@ fn garment(kind: &str, x: f64, z: f64, w: f64, h: f64, m: Mat) {
                 } else {
                     sock.iter().map(|&(u, v)| (-u, v)).collect()
                 };
-                hang(&name("sock"), &sock, cx, z, m, 0.006);
+                hang(&numbered("sock"), &sock, cx, z, m, 0.006);
                 fbox!(
                     F,
-                    name("sock_cuff"),
+                    numbered("sock_cuff"),
                     0.08,
                     0.04,
                     0.008,
@@ -104,10 +104,10 @@ fn garment(kind: &str, x: f64, z: f64, w: f64, h: f64, m: Mat) {
                     h + 0.012 * sin(PI * i as f64 / 3.0),
                 )
             }));
-            hang(&name("sheet"), &out, x, z, m, 0.006);
+            hang(&numbered("sheet"), &out, x, z, m, 0.006);
             fbox!(
                 F,
-                name("sheet_hem"),
+                numbered("sheet_hem"),
                 w,
                 0.025,
                 0.008,
@@ -119,7 +119,7 @@ fn garment(kind: &str, x: f64, z: f64, w: f64, h: f64, m: Mat) {
         _ => {
             // a towel, a pillowcase
             hang(
-                &name(kind),
+                &numbered(kind),
                 &[(-hw, 0.0), (hw, 0.0), (hw, h), (-hw, h)],
                 x,
                 z,
@@ -135,7 +135,7 @@ fn garment(kind: &str, x: f64, z: f64, w: f64, h: f64, m: Mat) {
             let y = if towel { h * 0.82 } else { h * 0.15 };
             fbox!(
                 F,
-                name("band"),
+                numbered("band"),
                 w,
                 if towel { 0.045 } else { 0.02 },
                 0.008,
@@ -148,7 +148,7 @@ fn garment(kind: &str, x: f64, z: f64, w: f64, h: f64, m: Mat) {
     for px in pegs {
         // a wooden peg: two legs split at the foot, astride the line
         hang(
-            &name("peg"),
+            &numbered("peg"),
             &[
                 (-0.008, -0.014),
                 (0.008, -0.014),
@@ -171,7 +171,7 @@ pub fn clothesline() -> Vec<Obj> {
         // the post, a cap on its top; the arm across, capped; two braces bent up into it; a flange at its foot
         fsweep!(
             F,
-            name("post"),
+            numbered("post"),
             &[(x, 0.0, 0), (x, LINE_Y + 0.045, 0)],
             0.03,
             M.posts,
@@ -179,7 +179,7 @@ pub fn clothesline() -> Vec<Obj> {
         );
         fcyl!(
             F,
-            name("post_cap"),
+            numbered("post_cap"),
             0.034,
             0.012,
             (x, LINE_Y + 0.051, 0),
@@ -190,7 +190,7 @@ pub fn clothesline() -> Vec<Obj> {
         );
         fsweep!(
             F,
-            name("arm"),
+            numbered("arm"),
             &[(x, LINE_Y + 0.02, -0.343), (x, LINE_Y + 0.02, 0.343)],
             0.022,
             M.posts,
@@ -199,7 +199,7 @@ pub fn clothesline() -> Vec<Obj> {
         for s in [-1.0, 1.0] {
             fcyl!(
                 F,
-                name("arm_cap"),
+                numbered("arm_cap"),
                 0.025,
                 0.012,
                 (x, LINE_Y + 0.02, s * 0.345),
@@ -207,8 +207,8 @@ pub fn clothesline() -> Vec<Obj> {
                 rot = (90, 0, 0),
                 verts = low(10, 5)
             );
-            bent_bar(
-                &name("brace"),
+            bent(
+                &numbered("brace"),
                 &[
                     (x, LINE_Y - 0.28, 0.02 * s),
                     (x, LINE_Y - 0.1, 0.12 * s),
@@ -222,7 +222,7 @@ pub fn clothesline() -> Vec<Obj> {
             );
         }
         revolve!(
-            name("foot"),
+            numbered("foot"),
             &[
                 (0.0, 0.0),
                 (0.06, 0.0),
@@ -239,7 +239,7 @@ pub fn clothesline() -> Vec<Obj> {
     for z in LINES {
         fsweep!(
             F,
-            name("line"),
+            numbered("line"),
             &[(-1.34, LINE_Y, z), (1.34, LINE_Y, z)],
             0.008,
             M.line,
@@ -249,7 +249,7 @@ pub fn clothesline() -> Vec<Obj> {
             // a tensioner on each line by the right post
             fbox!(
                 F,
-                name("tensioner"),
+                numbered("tensioner"),
                 0.06,
                 0.02,
                 0.022,
@@ -286,7 +286,7 @@ pub fn clothesline() -> Vec<Obj> {
     for s in [-1.0, 1.0] {
         if !is_low() {
             torus!(
-                name("basket_handle"),
+                numbered("basket_handle"),
                 0.035,
                 0.009,
                 at = F.at(bx + s * 0.262, 0.23, bz),
@@ -308,7 +308,7 @@ pub fn clothesline() -> Vec<Obj> {
         let k = k as f64;
         soft!(
             F,
-            name("folded"),
+            numbered("folded"),
             0.34 - 0.04 * k,
             0.026,
             0.22 - 0.02 * k,
@@ -322,7 +322,7 @@ pub fn clothesline() -> Vec<Obj> {
     }
     if is_low() {
         // from afar: at rest, the washing in
-        return settle_in_place(&[join_all("clothesline")]);
+        return settle!(&[join_all("clothesline")], centre = false);
     }
     join(&meshes(), "posts", Some(P3::from((0, 0, 0))));
     // The washing, pegged on the lines, a part a line: each line's origin is on it, so at rest its washing is
@@ -358,7 +358,7 @@ pub fn clothesline() -> Vec<Obj> {
         line.edit(|o| o.scale.z = 0.001);
         lines.push(line);
     }
-    let objs = settle_in_place(&meshes());
+    let objs = settle!(centre = false);
     grow_in_turn(&lines, "washing", Some(1.5), Axis::Z);
     objs
 }
@@ -417,8 +417,8 @@ pub fn firewood_stack() -> Vec<Obj> {
         bevel_segments = 1
     );
     for x in [-0.44, 0.44] {
-        bent_bar(
-            &name("rack_end"),
+        bent(
+            &numbered("rack_end"),
             &[
                 (x, 0.0, LS_Z - 0.16),
                 (x, 1.0, LS_Z - 0.16),
@@ -433,7 +433,7 @@ pub fn firewood_stack() -> Vec<Obj> {
         );
         fbox!(
             F,
-            name("rack_side"),
+            numbered("rack_side"),
             0.035,
             0.035,
             0.36,
@@ -443,7 +443,7 @@ pub fn firewood_stack() -> Vec<Obj> {
         for z in [LS_Z - 0.16, LS_Z + 0.16] {
             fbox!(
                 F,
-                name("rack_foot"),
+                numbered("rack_foot"),
                 0.06,
                 0.008,
                 0.05,
@@ -457,7 +457,7 @@ pub fn firewood_stack() -> Vec<Obj> {
     for z in [LS_Z - 0.16, LS_Z + 0.16] {
         fsweep!(
             F,
-            name("rack_top"),
+            numbered("rack_top"),
             &[(-0.46, 1.0, z), (0.46, 1.0, z)],
             0.0175,
             M.iron,
@@ -467,7 +467,7 @@ pub fn firewood_stack() -> Vec<Obj> {
     // the shelter: a pent roof of corrugated iron, sloping to the back, on two bearers
     for x in [-0.44, 0.44] {
         board(
-            &name("bearer"),
+            &numbered("bearer"),
             (x, 1.06, LS_Z + 0.17),
             (x, 1.0, LS_Z - 0.17),
             0.035,
@@ -543,7 +543,7 @@ pub fn firewood_stack() -> Vec<Obj> {
             let prof: Vec<(f64, f64)> = sec.iter().map(|&(u, v)| (-u, v)).collect();
             fsweep!(
                 F,
-                name("log"),
+                numbered("log"),
                 &[(x, y, LS_Z - 0.17), (x, y, LS_Z + 0.169)],
                 0,
                 barks[(row + col) % 3],
@@ -557,7 +557,7 @@ pub fn firewood_stack() -> Vec<Obj> {
                 .collect();
             fextrude!(
                 F,
-                name("log_end"),
+                numbered("log_end"),
                 &face,
                 0.004,
                 (0, 0, LS_Z + 0.171),
@@ -566,7 +566,7 @@ pub fn firewood_stack() -> Vec<Obj> {
             if kind == "round" && !is_low() {
                 fcyl!(
                     F,
-                    name("log_heart"),
+                    numbered("log_heart"),
                     r * 0.45,
                     0.002,
                     (x, y, LS_Z + 0.1735),
@@ -577,5 +577,5 @@ pub fn firewood_stack() -> Vec<Obj> {
             }
         }
     }
-    settle_in_place(&[join_all("firewoodStack")])
+    settle!(&[join_all("firewoodStack")], centre = false)
 }

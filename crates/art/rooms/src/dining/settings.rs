@@ -1,7 +1,7 @@
 //! What the dining sets are laid with and the chairs they're drawn with: place settings, flowers, a runner, the
 //! sets' ladder-back chairs.
 
-use super::common::{apron, crest, fillet, rail, slab, sq_leg, stretcher, tube, turned, v};
+use super::common::{apron, crest, fillet, rail, slab, sq_leg, stretcher, turned, v};
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
@@ -9,7 +9,7 @@ use artkit::math::{Axis, M4, radians};
 use artkit::parts::new_parts;
 use artkit::place::{Coord, Facing};
 use artkit::scene::Obj;
-use artkit::{fextrude, fsweep, soft};
+use artkit::{fextrude, fsweep, kit, soft};
 
 // --- table settings, vases, a runner ---------------------------------------------------------------------------------
 const KNIFE: [(f64, f64); 9] = [
@@ -197,15 +197,14 @@ pub fn flowers<X: Coord>(
     for (k, &(dx, dh, dz, m)) in blooms[..n].iter().enumerate() {
         let (base, tip) = ((xf, y + h - 0.04, z), (xf + dx, y + h + dh - 0.02, z + dz));
         let mid = (xf + dx * 0.35, y + h + dh * 0.45, z + dz * 0.35);
-        tube(
-            &F,
-            &format!("{prefix}stem{k}"),
+        kit::tube!(
+            F,
+            format!("{prefix}stem{k}"),
             &[base, mid, tip],
             0.0035,
             M.stem,
-            Some(5),
-            2,
-            1.0,
+            verts = 5,
+            round = 2
         );
         // a tulip: a cup of six petals, closed inside
         turned(
@@ -342,15 +341,13 @@ fn ladder_chair(prefix: &str, frame: Mat, seat: Mat, pad: Mat, metal: bool) {
                 false,
             );
         }
-        tube(
-            &F,
-            &format!("{prefix}stretcher"),
+        kit::tube!(
+            F,
+            format!("{prefix}stretcher"),
             &[(-0.18, 0.16, 0.17), (0.18, 0.16, 0.17)],
             0.009,
             frame,
-            Some(8),
-            3,
-            1.0,
+            verts = 8
         );
         for (k, (y, h)) in [(back_h - 0.25, 0.04), (back_h - 0.38, 0.04)]
             .into_iter()

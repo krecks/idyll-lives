@@ -1,7 +1,7 @@
 //! The light-up dance floor and the party photo wall.
 
-use super::bar::settle_in_place;
-use super::common::{_m, _speaker, _sq, M, PHOTOS, TILES, WALL};
+use super::common::{_m, _speaker, M, PHOTOS, TILES, WALL};
+use artkit::forms::rect;
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, cos, radians, sin, sqrt};
@@ -10,7 +10,7 @@ use artkit::parts::{hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::py;
 use artkit::scene::Obj;
-use artkit::{fbox, fcone, fcyl, fsphere, fsweep, grow, loft, revolve, ring, soft};
+use artkit::{fbox, fcone, fcyl, fsphere, fsweep, grow, loft, revolve, ring, settle, soft};
 
 // --- the light-up dance floor (2x2): sixteen glowing tiles, a mirror ball on a truss gantry, two speaker towers ---
 const TILE: f64 = 0.43;
@@ -252,7 +252,7 @@ pub fn dance_floor() -> Vec<Obj> {
         let name = if parity == 0 { "tiles_a" } else { "tiles_b" };
         groups.push(hinged(join(&tiles, name, None), f.at(0, TILE_Y, 0)));
     }
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     turns(&groups, "tiles", (0.0, 0.0, LIFT), Some(1.2));
     objs
 }
@@ -524,7 +524,7 @@ pub fn photo_wall() -> Vec<Obj> {
                 ],
                 0.0,
                 M.magenta,
-                profile = _sq(0.004, Some(0.035)),
+                profile = rect(0.004, 0.035),
                 up = (0, 0, 1),
                 resolution = 2
             );
@@ -538,7 +538,7 @@ pub fn photo_wall() -> Vec<Obj> {
                 ],
                 0.0,
                 M.magenta,
-                profile = _sq(0.003, Some(0.03)),
+                profile = rect(0.003, 0.03),
                 up = (0, 1, 0)
             );
         }
@@ -551,7 +551,7 @@ pub fn photo_wall() -> Vec<Obj> {
     let photo = hinged(join(&photo, "photo", None), f.at(px, py, zb + 0.017));
     photo.set_scale_axis(0, 0.001);
     photo.set_scale_axis(2, 0.001);
-    let objs = settle_in_place();
+    let objs = settle!(centre = false);
     grow!(photo, "photo", seconds = 0.8, axis = Axis::X);
     grow!(photo, "photo", seconds = 0.8, axis = Axis::Z);
     objs
