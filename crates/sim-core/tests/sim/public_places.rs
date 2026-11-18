@@ -155,7 +155,13 @@ fn front_porch(place: &Value, (w, d): (i64, i64), rotated: bool) -> Option<Value
     let walls: Vec<Vec<i64>> = place["walls"]
         .as_array()?
         .iter()
-        .map(|c| c.as_array().unwrap().iter().map(|v| v.as_i64().unwrap()).collect())
+        .map(|c| {
+            c.as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_i64().unwrap())
+                .collect()
+        })
         .collect();
     let (x, z) = (door["x"].as_i64()?, door["z"].as_i64()?);
     let xs = || walls.iter().flat_map(|c| [c[0], c[2]]);
