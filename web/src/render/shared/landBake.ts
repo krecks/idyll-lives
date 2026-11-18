@@ -324,6 +324,86 @@ export function wetEdgeAt(land: Land, sd: Float32Array | null, x: number, z: num
   return e > 0 ? e + out : e - out;
 }
 
+/** A rim of land along the edge between it and the sea is this many samples wide at most (`seaRims`). */
+export const RIM_SAMPLES = 2;
+/** Where the sea behind a rim turns away from the edge (`seaRims`): no sea `RIM_TURN` samples in within `RIM_ON` samples on (at about 20° or more). */
+const RIM_TURN = 4;
+const RIM_ON = 8;
+
+/**
+ * Where the sea's far shore meets the land's edge behind a rim of land (`carriedWetEdgeAt`): for each edge sample, in
+ * order round the edge (`ringAt`), 1 where it stands on a rim of land no more than `RIM_SAMPLES` wide between the edge
+ * and the sea, that runs along the edge from where the sea reaches the edge to where the sea behind it turns away from
+ * the edge (no sea `RIM_TURN` samples in within `RIM_ON` samples on). A generated coast leaves one where it meets the
+ * edge at a slant and then turns away: the sea runs on along the edge behind it for tens of metres. Not where the
+ * strip goes on widening along the edge (a coast meeting the edge at a slant and staying along it, `shoreIn`'s), nor in
+ * a corner. Null without the sea at the edge.
+ */
+export function seaRims(land: Land, sd: Float32Array | null): Uint8Array | null {
+  const { cols, rows, h, wl } = land;
+  if (!sd || cols < 2 * RIM_TURN || rows < 2 * RIM_TURN) return null;
+  const n = 2 * (cols - 1) + 2 * (rows - 1);
+  // How many samples in from each edge sample the sea is (0: at the edge; 99: none within `RIM_TURN`; the corners none).
+  const depth = new Uint8Array(n).fill(99);
+  const sea = (i: number, j: number) => {
+    const k = j * cols + i;
+    return wl[k] === SEA_CM && wl[k] > h[k] && sd[k] > 0;
+  };
+  const side = (i: number, j: number, di: number, dj: number) => {
+    for (let m = 0; m <= RIM_TURN; m++) {
+      if (sea(i + di * m, j + dj * m)) return (depth[ringAt(cols, rows, i, j)] = m);
+    }
+  };
+  for (let i = 1; i < cols - 1; i++) [side(i, 0, 0, 1), side(i, rows - 1, 0, -1)];
+  for (let j = 1; j < rows - 1; j++) [side(0, j, 1, 0), side(cols - 1, j, -1, 0)];
+  const rims = new Uint8Array(n);
+  let any = false;
+  const at = (p: number) => depth[((p % n) + n) % n];
+  const turns = (from: number, step: number) => {
+    for (let m = 0; m < RIM_ON; m++) if (at(from + step * m) > RIM_TURN) return true;
+    return false;
+  };
+  for (let p = 0; p < n; p++) {
+    // (Each run of rim from its first sample.)
+    if (at(p) < 1 || at(p) > RIM_SAMPLES || (at(p - 1) >= 1 && at(p - 1) <= RIM_SAMPLES)) continue;
+    let q = p;
+    while (q - p < n && at(q + 1) >= 1 && at(q + 1) <= RIM_SAMPLES) q++;
+    if ((at(p - 1) === 0 && turns(q + 1, 1)) || (at(q + 1) === 0 && turns(p - 1, -1))) {
+      for (let r = p; r <= q; r++) rims[r % n] = 1;
+      any = true;
+    }
+  }
+  return any ? rims : null;
+}
+
+/**
+ * `wetEdgeAt` as the water rounded past the land's edge takes it in (`roundedWater`): the same, but past one side of
+ * the edge where it stands on a rim of land with the sea's far shore behind it (`seaRims`), carried out as the sea
+ * there is (deeper further out). Carried out dry, that rim ended the sea past the edge where the edge itself was wet,
+ * and the sea inside ran on along the edge behind the rim to its far shore: a square step. Past it now the sea runs
+ * on to where its far shore meets the edge, rounded with the rest, and the rim goes under it
+ * (`LandscapeLayout.shoreIn`).
+ */
+export function carriedWetEdgeAt(land: Land, sd: Float32Array | null, x: number, z: number, edge: Uint8Array | null, rims: Uint8Array | null): number {
+  const e = wetEdgeAt(land, sd, x, z, edge);
+  if (!sd || !rims || e >= 0) return e;
+  const { cols, rows } = land;
+  const [fx, fz] = [x / LAND_CELL, z / LAND_CELL];
+  const pastX = fx < 0 || fx > cols - 1;
+  const pastZ = fz < 0 || fz > rows - 1;
+  if (pastX === pastZ) return e;
+  const [i, j] = [Math.min(cols - 1, Math.max(0, Math.round(fx))), Math.min(rows - 1, Math.max(0, Math.round(fz)))];
+  if (!rims[ringAt(cols, rows, i, j)]) return e;
+  // (The sea in from the edge's sample: its depth there, deeper as far out as the point is.)
+  const [di, dj] = pastX ? [fx < 0 ? 1 : -1, 0] : [0, fz < 0 ? 1 : -1];
+  const out = pastX ? (fx < 0 ? -fx : fx - (cols - 1)) * LAND_CELL : (fz < 0 ? -fz : fz - (rows - 1)) * LAND_CELL;
+  for (let m = 1; m <= RIM_SAMPLES; m++) {
+    const v = sd[(j + dj * m) * cols + (i + di * m)];
+    if (v > 0) return v + out;
+  }
+  return e;
+}
+
 /**
  * A water edge's values (m past the shore: above 0 in the water) on a grid (`roundedWater`): cell (i, j)'s at
  * (`x0` + i · `cell`, `z0` + j · `cell`).

@@ -9,7 +9,7 @@ import type { WorldStructure } from '../src/core/protocol';
 import { COVER, coverSpan, encodeLand, LAND_CELL, NONE, SEA_CM, type Land } from '../src/game/land';
 import { CountryRoads } from '../src/render/shared/countryRoads';
 import { landZones } from '../src/game/landEdit';
-import { bakeLand, copyLand, EDGE_DRY, EDGE_POND, EDGE_SEA, edgeWater, edgeWaterAt, EXIT_MOST, landExits, marchToGround, pondQuads, ROUND_REACH, roundedWater, waterGridAt, wetDistance, wetEdgeAt } from '../src/render/shared/landBake';
+import { bakeLand, carriedWetEdgeAt, copyLand, EDGE_DRY, EDGE_POND, EDGE_SEA, edgeWater, edgeWaterAt, EXIT_MOST, landExits, marchToGround, pondQuads, ROUND_REACH, roundedWater, seaRims, waterGridAt, wetDistance, wetEdgeAt } from '../src/render/shared/landBake';
 import { LAND_BLOCK, LandscapeLayout, WATER_Y, type Woods } from '../src/render/shared/nature';
 import { islandWorld, plainWorld, SIDE } from './support/landFixtures';
 
@@ -420,6 +420,61 @@ describe('a coast meeting the edge at a slant', () => {
     for (const [x, z] of [[200, 2], [200, 0], [200, -10], [240, 0]]) expect(drawn.ground(x, z)).toBeGreaterThan(WATER_Y);
     // Further in than the edge's blend, as the field has it.
     for (const x of [200, 290, 320]) expect(drawn.waterEdge(x, 10)).toBe(wetEdgeAt(field, sd, x, 10, edge));
+  });
+});
+
+describe("the sea's far shore meeting the edge behind a rim of land", () => {
+  /**
+   * The plain world's land surveyed, the sea over its west side (x < 200 m) up to z 140 m, reaching the west edge up to
+   * z 100 m, and from there to 140 m behind a rim of land `rim` samples wide along the edge; past 140 m its far shore,
+   * turning away from the edge at 45° (`turn`) or running on along it, the rim widening a sample in 28 m (a coast
+   * meeting the edge at a slant).
+   */
+  const field = (rim: number, turn: boolean) => {
+    const land = bakeLand(layout(plainWorld()), SIDE, SIDE);
+    for (let j = 0; j < land.rows; j++) {
+      for (let i = 0; i < 100; i++) {
+        const z = j * LAND_CELL;
+        const from = z <= 100 ? 0 : z <= 140 ? rim : turn ? rim + (z - 140) / LAND_CELL : rim + Math.floor((z - 140) / 28);
+        if (i < from || z > (turn ? 220 : 400)) continue;
+        const k = j * land.cols + i;
+        [land.h[k], land.wl[k]] = [Math.min(land.h[k], SEA_CM - 200), SEA_CM];
+      }
+    }
+    return land;
+  };
+
+  test('past the edge the sea runs on to where its far shore meets the edge, rounded, and the rim goes under it', () => {
+    const land = field(2, true);
+    const sd = wetDistance(land);
+    const edge = edgeWater(land, 20);
+    const rims = seaRims(land, sd)!;
+    expect(rims).not.toBeNull();
+    // (Carried dry from the rim before: the sea past the edge ended where the edge itself was wet.)
+    for (const z of [110, 130]) {
+      expect(wetEdgeAt(land, sd, -20, z, edge)).toBeLessThan(0);
+      expect(carriedWetEdgeAt(land, sd, -20, z, edge, rims)).toBeGreaterThan(0);
+    }
+    // Beyond the far shore, and by the edge's wet run, as before.
+    for (const z of [60, 160, 300]) expect(carriedWetEdgeAt(land, sd, -20, z, edge, rims)).toBe(wetEdgeAt(land, sd, -20, z, edge));
+    const drawn = layout(plainWorld());
+    drawn.setLand(land);
+    for (const z of [110, 130]) {
+      expect(drawn.waterEdge(-30, z)).toBeGreaterThan(0);
+      // (The rim under the sea, as the sea both sides of it.)
+      expect(drawn.ground(1, z)).toBeLessThan(WATER_Y);
+    }
+    expect(drawn.waterEdge(-30, 190)).toBeLessThan(0);
+  });
+
+  test('not where the rim is wider, nor where the sea behind it runs on along the edge', () => {
+    for (const land of [field(3, true), field(2, false)]) {
+      const sd = wetDistance(land);
+      expect(seaRims(land, sd)).toBeNull();
+      const drawn = layout(plainWorld());
+      drawn.setLand(land);
+      expect(drawn.waterEdge(-30, 130)).toBeLessThan(0);
+    }
   });
 });
 
