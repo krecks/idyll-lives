@@ -148,7 +148,8 @@ pub fn cube(name: impl AsRef<str>, size: impl Into<Size>, o: Cube) -> Obj {
 pub fn sphere(name: impl AsRef<str>, radius: f64, o: Sphere) -> Obj {
     let obj = scene::add(
         name.as_ref(),
-        uv_sphere_mesh(o.segments, o.rings, radius as f32),
+        // (Blender's operator takes no fewer than three segments or rings: two rings come out as three)
+        uv_sphere_mesh(o.segments.max(3), o.rings.max(3), radius as f32),
     );
     scale_mesh(obj, o.scale);
     let bevel = (o.bevel, o.bevel_segments, EdgeOrder::Faces);
