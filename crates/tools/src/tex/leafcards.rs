@@ -667,6 +667,8 @@ fn willow_leaf(
     length: f64,
     depth: f64,
 ) {
+    // (a little broader than a willow's, a fifth of its length for a real one's eighth: narrower, a leaf is under a
+    // pixel wide at the play camera)
     let width = length * rng.uniform(0.2, 0.25);
     let edge = outline(
         "lance",
@@ -763,7 +765,7 @@ fn cherry_leaf(
 fn flower(sketch: &mut Sketch, rng: &mut Random, at: (f64, f64, f64), size: f64, depth: f64) {
     let turn = rng.uniform(0.0, TAU);
     // (one flower paler, the next deeper: a mass of them is not one pattern)
-    let k = (1.0 - 0.3 * depth) as f32 * rng.uniform(0.82, 1.0) as f32;
+    let k = (1.0 - 0.2 * depth) as f32 * rng.uniform(0.86, 1.0) as f32;
     for (ring, (petals, long, tilt, pink)) in [
         (9, 0.5, (8.0, 26.0), 0.0),
         (7, 0.4, (34.0, 54.0), 0.5),
@@ -787,8 +789,8 @@ fn flower(sketch: &mut Sketch, rng: &mut Random, at: (f64, f64, f64), size: f64,
                     teeth: 0.0,
                 },
             );
-            let pale = rng.uniform(0.86, 0.98) as f32 * k;
-            let tone = [pale, pale * (1.0 - 0.2 * pink), pale * (1.0 - 0.12 * pink)];
+            let pale = rng.uniform(0.9, 0.98) as f32 * k;
+            let tone = [pale, pale * (1.0 - 0.14 * pink), pale * (1.0 - 0.08 * pink)];
             let hold = Hold {
                 tilt,
                 droop: (0.0, 0.2),
