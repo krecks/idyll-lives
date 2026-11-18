@@ -33,7 +33,7 @@
 //! five segments or more.
 
 use crate::math::{PI, V3, cosf, dot_v3, len_v3, mul_v3_fl, normalize_v3, sinf};
-use crate::mesh::{Mesh, edge};
+use crate::mesh::{Mesh, edge, normal_newell, normal_tri};
 use crate::scene::Obj;
 use crate::shapes::{SHARP, shade};
 use std::collections::{BTreeMap, BTreeSet};
@@ -108,6 +108,25 @@ pub struct Bevelled {
     pub segments: usize,
     /// The offset the edges were cut back by: the width, or less where the mesh has no room for it.
     pub offset: f32,
+}
+
+/// The faces' normals as the mesh the bevel works on keeps them (Blender's BMesh): a triangle or a quad of no
+/// area has none, where a mesh's own is straight up.
+fn face_normals(mesh: &Mesh) -> Vec<V3> {
+    (0..mesh.faces.len())
+        .map(|f| {
+            let p: Vec<V3> = mesh
+                .corners(f)
+                .iter()
+                .map(|&v| mesh.verts[v as usize])
+                .collect();
+            match p.len() {
+                3 => normal_tri(p[0], p[1], p[2]),
+                4 => normalize_v3((p[0] - p[2]).cross(p[1] - p[3])).0,
+                _ => normal_newell(&p),
+            }
+        })
+        .collect()
 }
 
 fn mid(a: V3, b: V3) -> V3 {
@@ -760,7 +779,7 @@ pub fn bevelled(
     order: &EdgeOrder,
 ) -> Result<Bevelled, String> {
     let ns = segments.max(1);
-    let normals = mesh.face_normals();
+    let normals = face_normals(mesh);
     let nf = mesh.faces.len();
     let mut leaving = BTreeMap::new();
     for f in 0..nf {
@@ -1625,7 +1644,7 @@ fn harden(out: &mut Mesh, kinds: &[Kind], long: &BTreeSet<(u32, u32)>, old: &Mes
         }
     }
     out.normals = None;
-    let face_normals = out.face_normals();
+    let face_normals = face_normals(out);
     // a vertex's normal: its faces' weighed by their angles at it
     let mut vertex_normals = vec![V3::ZERO; out.verts.len()];
     for (f, &normal) in face_normals.iter().enumerate() {
@@ -1736,6 +1755,7 @@ fn harden(out: &mut Mesh, kinds: &[Kind], long: &BTreeSet<(u32, u32)>, old: &Mes
         }
     }
     out.normals = Some(crate::normals::from_stored(out, &stored));
+    out.stored = Some(stored.into_iter().map(Some).collect());
 }
 
 fn acos_clamped(x: f32) -> f32 {
@@ -2064,9 +2084,15 @@ pub fn apply(obj: Obj) -> Obj {
         }
         let Some(made) = rounded(o) else { return };
         let mut made = made;
-        if textured && let Some(uvs) = &o.mesh.uvs {
-            let sides_from = o.bevel.as_ref().and_then(|b| b.sides_from);
-            made.mesh.uvs = Some(carried(&o.mesh, uvs, &made.mesh, &made, sides_from));
+        if let Some(uvs) = &o.mesh.uvs {
+            made.mesh.uvs = Some(if textured {
+                let sides_from = o.bevel.as_ref().and_then(|b| b.sides_from);
+                carried(&o.mesh, uvs, &made.mesh, &made, sides_from)
+            } else {
+                // (a part on plain finishes: its UVs are zero, or will be before they are read)
+                vec![[0.0, 0.0]; made.mesh.loops.len()]
+            });
+            // the mesh is still the one whose UVs were made: joined first, it says so for the whole
             made.mesh.uv_metres = o.mesh.uv_metres;
         } else if o.mesh.uvs.is_some() {
             // (a part on plain finishes keeps its zeros and that they are final: joined first, its mesh is the

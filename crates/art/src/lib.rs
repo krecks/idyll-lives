@@ -196,6 +196,12 @@ pub fn run_family(repo: &Paths, family: &Family, options: &Options) -> Result<Ve
         .palette
         .check(&finishes)
         .map_err(|e| format!("{}: {e}", family.name))?;
+    for model in &family.models {
+        if let Some(own) = &model.palette {
+            own.check(&finishes)
+                .map_err(|e| format!("{} {}: {e}", family.name, model.id))?;
+        }
+    }
     let mut ids: Vec<usize> = (0..family.models.len()).collect();
     if let Some(only) = &options.only {
         let unknown: Vec<&str> = only
