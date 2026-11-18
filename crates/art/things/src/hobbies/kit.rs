@@ -4,11 +4,10 @@ use super::common::P;
 use artkit::forms::{Extrude, Loft, Scale, Sweep, rounded_rect};
 use artkit::materials::Mat;
 use artkit::math::{P3, V3, pow, tan};
-use artkit::mesh::Mesh;
 use artkit::place::{Coord, GameFrame, Spot};
 use artkit::py::sum;
-use artkit::scene::{self, Obj};
-use artkit::shapes::{Cube, Revolve, revolve, shade};
+use artkit::scene::Obj;
+use artkit::shapes::{Cube, Revolve, revolve};
 
 /// `tube`'s options.
 pub struct Tube {
@@ -278,11 +277,7 @@ pub fn moulding(
             faces.push(vec![a + j, a + j2, b + j2, b + j]);
         }
     }
-    let mut mesh = Mesh::from_pydata(vs, &faces);
-    mesh.set_material(Some(material));
-    mesh.recalc_normals();
-    let obj = scene::add(name, mesh);
-    shade(obj, true, angle)
+    artkit::forms::object(name, vs, &faces, Some(material), true, angle, false)
 }
 
 /// The kit's parts called as the scripts called them, their options by name.
