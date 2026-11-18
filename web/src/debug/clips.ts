@@ -11,7 +11,8 @@
  * `?clip=water_on` (only that clip), `?t=0.2` (hold every clip at that time, for screenshots),
  * `?cols=4` (models a row), `?colors=body:%23c46b4a,stone:%232f3236` (the parts' colours),
  * `?renderer=webgl` (WebGL2; default WebGPU), `?alpha=…&beta=…&radius=…` (the camera), `?target=1.6`
- * (the height it looks at; `?target=x,y,z` a point), `?labels=0`.
+ * (the height it looks at; `?target=x,y,z` a point), `?labels=0`. `?still`: the wind dropped and the stage's own
+ * clock held, so a plant, a flame or a fan stands as it is made (pictures that compare pixel for pixel).
  * From the console: `__clips.set(t)` holds every clip at `t`, `__clips.play()` lets them run again,
  * `__clips.solo('name')` plays only that clip (`solo(null)`: all).
  */
@@ -21,6 +22,7 @@ import { createStage } from './pcStage';
 import type { PartColors } from '../core/protocol';
 import { Instances } from '../render/pc/instancing';
 import { buildModel, type ModelTemplate } from '../render/pc/models';
+import { setWind } from '../render/pc/nature';
 import { multiply, transformPoint, translation } from '../render/shared/math';
 import { partPose } from '../render/shared/modelClips';
 import { painted } from '../render/shared/modelEntry';
@@ -38,6 +40,9 @@ const stage = await createStage({
   near: 0.02,
 });
 const { app, assets, root, orbit } = stage;
+// `?still`: no wind, and time stands still but for the clips' own (held at `t`).
+const still = params.has('still');
+if (still) setWind(app, 0);
 
 /** `?colors=body:#hex,stone:#hex` as the parts' colours. */
 function colorsParam(): PartColors | undefined {
@@ -217,7 +222,7 @@ stage.run(() => {
     if (!stage.project(b.x + (o ? (o.minX + o.maxX) / 2 : 0), 0, b.z + (o ? o.maxZ : 0.5) + 0.12, projected)) continue;
     b.label.style.transform = `translate(${projected.x}px, ${projected.y}px) translate(-50%, 0)`;
   }
-});
+}, still);
 poseAll(0);
 // (Two frames drawn before saying so: the shadow's and the picture's.)
 requestAnimationFrame(() => requestAnimationFrame(() => Object.assign(window, { __app: app, __scene: app.scene, __clips: { set, play, solo: setSolo, benches }, __ready: true })));
