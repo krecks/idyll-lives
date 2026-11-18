@@ -1,6 +1,6 @@
 /**
  * Shooting hoops (`basketballHoop`, characters.ts `STEP_IN`: out on the court, a lane each for two): from
- * `SHOT.to` m out from the hoop's middle, its rim 2.94 m up and 0.27 m out (`playground.py` `RIM`); and at the
+ * `SHOT.to` m out from the hoop's middle, its rim 2.94 m up and 0.27 m out (crates/art/outside/src/playground/courts.rs `RIM`); and at the
  * streetball hoop (`energetic.streetballHoop`, `STREET_SHOT`), its rim 2.4 m up and 0.22 m out
  * (`pack_energetic.py` `RIM`), from 2.2 m out, where its two players stand (content `places`). A round of
  * a few dribbles, the ball gathered to the chest, the dip and a jump shot, the right hand under the ball and the
@@ -8,7 +8,7 @@
  * held while the ball drops in, a look up at it. A child heaves it up two-handed from the chest instead, with
  * a little hop. In sizes like the street's (`street.ts`): the rim's height and distance divided by the size give
  * the clip's, which set where the arms point and where the head looks. The ball goes with the round (`ballAt`): bounced
- * on the dribbles, in both hands from the gather, in an arc to the rim and back; its net swishes 1.4 s into the use and every 3.2 s after (`HOOP` in `playground.py`), the
+ * on the dribbles, in both hands from the gather, in an arc to the rim and back; its net swishes 1.4 s into the use and every 3.2 s after (the hoop's `motions` in crates/art/outside/src/playground/mod.rs), the
  * round's length.
  */
 
