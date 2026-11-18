@@ -187,16 +187,9 @@ fn round(kind: &str, name: &str, r1: f64, r2: f64, depth: f64, o: Round) -> Obj 
     );
     scale_mesh(obj, o.scale);
     obj.edit(|p| p.uv = UvWay::Round);
-    // (Blender numbers a cylinder's rims before its sides, the bottom's and the top's in turn: a rim's bevel
-    // starts from the rim)
     let n = o.verts as u32;
     let rims = if obj.read(|p| p.mesh.verts.len()) == 2 * o.verts {
-        // (the bottom's run on round, the top's back)
-        let rims = (0..n).flat_map(|i| {
-            let j = (i + 1) % n;
-            [(2 * i, 2 * j), (2 * j + 1, 2 * i + 1)]
-        });
-        EdgeOrder::Listed(rims.collect())
+        EdgeOrder::Listed(cone_edges(n))
     } else {
         EdgeOrder::Faces
     };
@@ -209,6 +202,23 @@ fn round(kind: &str, name: &str, r1: f64, r2: f64, depth: f64, o: Round) -> Obj 
         (o.bevel, o.bevel_segments, rims),
         round_angle(o.verts),
     )
+}
+
+/// A cylinder's edges as Blender's operator leaves them numbered, each from its first point to its second: it is
+/// made a side at a time, and each side brings the bottom rim's edge to it (run on round), the top's (run back)
+/// and its own far edge (from the top down), the first side its near edge too (from the bottom up) before its far
+/// one; the two rim edges that close the rings come last. A bevel starts each corner by this numbering.
+pub(crate) fn cone_edges(n: u32) -> Vec<(u32, u32)> {
+    let mut edges = Vec::with_capacity(3 * n as usize);
+    for i in 1..n {
+        edges.extend([(2 * i - 2, 2 * i), (2 * i + 1, 2 * i - 1)]);
+        if i == 1 {
+            edges.push((0, 1));
+        }
+        edges.push((2 * i + 1, 2 * i));
+    }
+    edges.extend([(2 * n - 2, 0), (1, 2 * n - 1)]);
+    edges
 }
 
 /// A cylinder of `radius` from point `a` to point `b` (both in metres).
@@ -378,6 +388,11 @@ pub mod primitive {
     pub fn cone(vertices: usize, r1: f32, r2: f32, depth: f32) -> Mesh {
         super::cone_mesh(vertices, r1, r2, depth)
     }
+    /// The edges of `cone` (neither end drawn to a point) in Blender's order, each from its first point to its
+    /// second: what a bevel of it is told (`bevel::EdgeOrder::Listed`).
+    pub fn cone_edges(vertices: usize) -> Vec<(u32, u32)> {
+        super::cone_edges(vertices as u32)
+    }
     /// `primitive_cube_add(size=1)`.
     pub fn cube() -> Mesh {
         super::cube_mesh()
@@ -455,13 +470,22 @@ pub(crate) fn cone_mesh(segs: usize, r1: f32, r2: f32, depth: f32) -> Mesh {
         verts.push(placed(r2 * s, r2 * c, half));
     }
     let n = segs as u32;
+    let side = |i: u32| {
+        vec![
+            2 * i - 2,
+            2 * i - 1,
+            (2 * i + 1) % (2 * n),
+            (2 * i) % (2 * n),
+        ]
+    };
+    // the faces in the order Blender leaves them: the sides, the top among them before the last two (three
+    // sides: before the last), then the bottom; the top from its second point back round, the bottom from its
+    // first on. (A ray that meets two faces at once is given the one that comes first.)
+    let before = (n - 2).max(2);
     let mut faces: Vec<Vec<u32>> = Vec::with_capacity(segs + 2);
-    for i in 1..n {
-        faces.push(vec![2 * i - 2, 2 * i - 1, 2 * i + 1, 2 * i]);
-    }
-    faces.push(vec![2 * n - 2, 2 * n - 1, 1, 0]);
-    // the ends: the top from its second point back round, the bottom from its first on
+    faces.extend((1..=before).map(side));
     faces.push((0..n).map(|k| 2 * ((n + 1 - k) % n) + 1).collect());
+    faces.extend((before + 1..=n).map(side));
     faces.push((0..n).map(|k| 2 * k).collect());
     let mut mesh = Mesh::from_pydata(verts, &faces);
     // an end drawn to a point is one point: the first of its ring at the bottom, the last of it at the top
@@ -474,6 +498,16 @@ pub(crate) fn cone_mesh(segs: usize, r1: f32, r2: f32, depth: f32) -> Mesh {
             })
             .collect();
         mesh.weld(&target);
+        // (drawn to a point at the top, its bottom is where the top was among the sides)
+        if r2 == 0.0 && r1 != 0.0 {
+            let mut faces: Vec<Vec<u32>> = (0..mesh.faces.len())
+                .map(|f| mesh.corners(f).to_vec())
+                .collect();
+            if let Some(bottom) = faces.pop() {
+                faces.insert((n as usize - 2).min(faces.len()), bottom);
+            }
+            mesh = Mesh::from_pydata(std::mem::take(&mut mesh.verts), &faces);
+        }
     }
     mesh
 }

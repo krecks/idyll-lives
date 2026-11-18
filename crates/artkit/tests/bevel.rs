@@ -81,12 +81,8 @@ impl Rec {
         match self.kv["kind"].as_str() {
             "cube" => EdgeOrder::Faces,
             "cylinder" => {
-                let n: u32 = self.kv["verts"].parse().unwrap();
-                let rims = (0..n).flat_map(|i| {
-                    let j = (i + 1) % n;
-                    [(2 * i, 2 * j), (2 * j + 1, 2 * i + 1)]
-                });
-                EdgeOrder::Listed(rims.collect())
+                let n: usize = self.kv["verts"].parse().unwrap();
+                EdgeOrder::Listed(artkit::shapes::primitive::cone_edges(n))
             }
             _ => EdgeOrder::Corners,
         }
@@ -228,10 +224,9 @@ fn a_bevel_cuts_blenders_mesh_as_blender_does() {
         .unwrap();
         let want = r.points("ov");
         let kind = r.kv["kind"].as_str();
-        // a box's and a cylinder's points come in Blender's order; a slab's (whose far face Blender numbers by its
-        // own triangles) are the same points, and so are an 8-sided cylinder's given Blender's own order of its
-        // faces, where the last top corner's three come a point round
-        let (map, far) = if kind == "extrude" || r.kv.get("verts").is_some_and(|v| v == "8") {
+        // a box's and a cylinder's points come in Blender's order; a slab's (given here without the way Blender
+        // numbers its edges) are the same points
+        let (map, far) = if kind == "extrude" {
             paired(&made.mesh.verts, &want)
         } else {
             (

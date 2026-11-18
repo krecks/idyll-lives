@@ -483,6 +483,70 @@ fn a_slabs_far_face_is_numbered_as_blenders_extrusion_numbers_it() {
 }
 
 #[test]
+fn a_bevelled_slabs_points_come_in_blenders_order() {
+    // The baked shading turns each point's rays by the point's number, and the faces name their points by it: a
+    // slab whose bevel has Blender's points in another order bakes other levels all over. Blender starts each
+    // corner's new points from an edge its own numbering of the mesh's edges picks (`bevel::bevelled`); the slabs
+    // of tests/golden/bevel_order.txt and the bevelled ones of bevel.txt, built by `extrude` as asked for: every
+    // point where Blender has the point of its number.
+    let mut report = Vec::new();
+    let (mut seen, mut bad) = (0, 0);
+    for file in ["bevel_order.txt", "bevel.txt"] {
+        for r in records(file) {
+            if r.kv["kind"] != "extrude" || r.kv["changed"] != "0" || r.f64("width") == 0.0 {
+                continue;
+            }
+            scene::reset();
+            let loops = r.loops();
+            let slab = extrude(
+                "slab",
+                &loops[0],
+                r.f64("depth"),
+                Extrude {
+                    holes: Holes(loops[1..].to_vec()),
+                    plane: match r.kv["plane"].as_str() {
+                        "XZ" => Plane::XZ,
+                        "XY" => Plane::XY,
+                        _ => Plane::YZ,
+                    },
+                    bevel: r.f64("width"),
+                    bevel_segments: r.kv["seg"].parse().unwrap(),
+                    smooth: r.kv["smooth"] == "1",
+                    angle: r.f64("sharp"),
+                    ..Extrude::default()
+                },
+            );
+            let got = artkit::bevel::apply(slab).read(|o| o.mesh.verts.clone());
+            let want = r.points("ov");
+            assert_eq!(got.len(), want.len(), "{}", r.name);
+            let apart = |g: &V3, w: &V3| (0..3).map(|k| (g[k] - w[k]).abs()).fold(0.0, f32::max);
+            let exact = got
+                .iter()
+                .zip(&want)
+                .filter(|(g, w)| apart(g, w) == 0.0)
+                .count();
+            let out_of_place = got
+                .iter()
+                .zip(&want)
+                .filter(|(g, w)| apart(g, w) > 1e-6)
+                .count();
+            report.push(format!(
+                "{} ({} outlines, {} segments): {out_of_place} of {} points out of place, {exact} Blender's to the bit",
+                r.name,
+                loops.len(),
+                r.kv["seg"],
+                got.len()
+            ));
+            seen += 1;
+            bad += (out_of_place > 0) as usize;
+        }
+    }
+    println!("{}", report.join("\n"));
+    assert!(seen >= 20, "{seen} slabs");
+    assert_eq!(bad, 0, "\n{}", report.join("\n"));
+}
+
+#[test]
 fn a_bevel_of_a_width_below_zero_is_none() {
     // Blender's modifier clamps a width below zero to none: the part is only shaded as a bevelled one is
     for r in records("bevel_none.txt") {
