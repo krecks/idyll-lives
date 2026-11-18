@@ -1,6 +1,6 @@
-# Bedroom dressing — notes
+# Bedroom dressing (`crates/art/rooms/src/bedroom_dressing`)
 
-`bedroom_dressing.py` builds the bedroom's mirrors and dressing table (BR4) into
+The module builds the bedroom's mirrors and dressing table (BR4) into
 `web/public/assets/models/bedroom_dressing/` and their entries in `packs/bedroom_dressing/manifest.json`:
 `model.mirror` (`mirror.glb`, the cheval mirror), `model.dressingTable` (`dressingTable.glb`), `model.mirrorWall`
 (`mirrorWall.glb`) and `model.mirrorFloor` (`mirrorFloor.glb`). Built 2026-10-14. They sat in Validate › Dressing
@@ -16,7 +16,7 @@ until checked in play.
 - **Gloss, not see-through.** The mirror materials map to `gloss`, as the old parts' mirrors: only the
   High preset reflects live, so elsewhere (the gallery, Low and Medium, a mirror beyond the nearest two) the
   pane shows as pale gloss, never what is behind it.
-- **Frames** are swept loops (`_loop`): a moulded cross-section (`_moulding`) round a rounded rectangle or an
+- **Frames** are swept loops (`frame_loop`): a moulded cross-section (`moulding`) round a rounded rectangle or an
   ellipse, so a frame is one closed mesh. The glass is set into the frame from the front: its face is behind
   the moulding's inner lip, so the reflection (2 mm in front of the face) stays under the lip.
 
@@ -39,13 +39,13 @@ until checked in play.
   on the wall face. On the top: two perfume bottles and a jewellery box. The script builds it as it first stood
   and turns it round at the end (`TURN_BACK`), as the old part was.
   - **The drawer.** The case on the seated resident's right (game +x: the game is left-handed) slides its drawer
-    out 18 cm towards the seat in 0.8 s (`drawer_open`, `G.slide`), its tray hidden in the case at rest, a dark
+    out 18 cm towards the seat in 0.8 s (`drawer_open`, `slide`), its tray hidden in the case at rest, a dark
     `inside` panel behind it. `motions` plays it for `getReady` and holds it 3 s, then shuts it.
   - **Draw calls: 3.** The still body's wood, its plain finishes (the mirror glass is `gloss`), and the drawer
     (wood, with a wooden knob so it stays one). The pouf is a plain `satin`, not `fabric`.
 - **`mirrorWall`** — on the wall layer: built in place at the old part's height (frame 1.0–1.9 m, ledge at
-  0.97 m), its back on the wall face (depth −0.43); `G.settle(centre=False, floor=False)` and
-  `G.Model(..., floor=False, centre=(0, -0.385))`. A black metal frame, the glass, and a ledge with a cup and a
+  0.97 m), its back on the wall face (depth −0.43); settled with `centre = false, floor = false` and
+  its Model `on_wall()`, `centre(0.0, -0.385)`. A black metal frame, the glass, and a ledge with a cup and a
   toothbrush (as the old part: house generation hangs it over basins too).
 - **`mirrorFloor`** — a full-length mirror in a slim brass frame, upright on a brass stand: two sled feet, a
   clamp up from each to the frame's bottom, a rear bar and a strut to a plate on the frame's back. Where its
@@ -54,9 +54,9 @@ until checked in play.
 ### Detail (2026-10-22)
 
 Rebuilt with the forms and the kit, same sizes, centres, glass boxes, parts, clip and draws. The frames are swept
-with a moulding (`_moulding`: a rounded outer edge, a cove, a bead and a lip standing in front of the glass). The glass
-stays one flat piece, but gridded (`_pane`; the dressing table's oval in rings, `_oval`): its edges are set into the
-frame, and with only its corner vertices buried there the baked shading (`shade.py`) greyed the whole pane; now only
+with a moulding (`moulding`: a rounded outer edge, a cove, a bead and a lip standing in front of the glass). The glass
+stays one flat piece, but gridded (`pane`; the dressing table's oval in rings, `oval`): its edges are set into the
+frame, and with only its corner vertices buried there the baked shading (`artkit::shade`) greyed the whole pane; now only
 its rim darkens. The cheval mirror has shaped sled feet, more turnings, an arched crest and turned brass knobs; the
 dressing table turned shoes, an arched kneehole rail, faceted bottles, a piped and buttoned pouf, a tube stand with
 turned finials; the wall mirror a rolled-lip tray on bent brackets with a hollow cup, a toothbrush and a tube of
@@ -78,8 +78,15 @@ shows the seated resident.
 ```
 cargo art bedroom_dressing            # every .glb, the pack, check-glb
 cargo art bedroom_dressing --preview  # previews/bedroom_dressing/mirror.png, dressingTable@drawer_open.png, …
+cargo art bedroom_dressing --check    # rebuilt and held to the committed files, byte for byte
 ```
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `dressingTable`; the same triangles.
+No change to the build: its soft boxes take the shared form's new shape (the soft form: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `dressingTable`; the same triangles.
+
+## Ported to Rust (2026-11-18)
+
+Built by `cargo art bedroom_dressing` from this module (its Python script's numbers and order, one function each).
+Against the last Blender build (`ref/blender`): all four near, their surfaces to 0.000 mm, shading within 0.3 of
+a grey. The glass's grid is `bmesh.ops.subdivide_edges` (5 cuts, grid fill) rebuilt in `common::subdivided_pane`.
