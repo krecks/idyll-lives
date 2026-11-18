@@ -138,3 +138,245 @@ macro_rules! clad {
         $crate::botany::clad($palette, $still, $seed, o)
     }};
 }
+
+/// `botany::cut_leaf` with its options by name, as the family scripts wrote them: `cut_leaf!(name, base, yaw, tilt, length, edge, material, key = value, ...)`.
+#[macro_export]
+macro_rules! cut_leaf {
+    ($name:expr, $base:expr, $yaw:expr, $tilt:expr, $length:expr, $edge:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::CutLeaf::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::cut_leaf($name, $base, $yaw, $tilt, $length, $edge, $material, o)
+    }};
+}
+
+/// `botany::outline` with its options by name, as the family scripts wrote them: `outline!(shape, width, key = value, ...)`.
+#[macro_export]
+macro_rules! outline {
+    ($shape:expr, $width:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::OutlineOf::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::outline($shape, $width, o)
+    }};
+}
+
+/// `botany::pinnate` with its options by name, as the family scripts wrote them: `pinnate!(pairs, width, shape, key = value, ...)`
+/// (`shape` left out: "lance").
+#[macro_export]
+macro_rules! pinnate {
+    ($pairs:expr, $width:expr $(, $k:ident = $v:expr)* $(,)?) => {
+        $crate::pinnate!($pairs, $width, "lance" $(, $k = $v)*)
+    };
+    ($pairs:expr, $width:expr, $shape:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::Pinnate::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::pinnate($pairs, $width, $shape, o)
+    }};
+}
+
+/// `botany::slits` with its options by name, as the family scripts wrote them: `slits!(shape, width, n, key = value, ...)`.
+#[macro_export]
+macro_rules! slits {
+    ($shape:expr, $width:expr, $n:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::Slits::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::slits($shape, $width, $n, o)
+    }};
+}
+
+/// `botany::lobed` with its options by name, as the family scripts wrote them: `lobed!(lobes, key = value, ...)`.
+#[macro_export]
+macro_rules! lobed {
+    ($lobes:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::Lobed::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::lobed($lobes, o)
+    }};
+}
+
+/// `botany::rose_leaf` with its options by name, as the family scripts wrote them: `rose_leaf!(name, base, yaw, tilt, size, material, key = value, ...)`.
+#[macro_export]
+macro_rules! rose_leaf {
+    ($name:expr, $base:expr, $yaw:expr, $tilt:expr, $size:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::RoseLeaf::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::rose_leaf($name, $base, $yaw, $tilt, $size, $material, o)
+    }};
+}
+
+/// `botany::arc` with its options by name, as the family scripts wrote them: `arc!(a, b, lift, key = value, ...)`.
+#[macro_export]
+macro_rules! arc {
+    ($a:expr, $b:expr, $lift:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::ArcOf::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::arc($a, $b, $lift, o)
+    }};
+}
+
+/// `botany::twig` with its options by name, as the family scripts wrote them: `twig!(name, points, r0, r1, material, key = value, ...)`.
+#[macro_export]
+macro_rules! twig {
+    ($name:expr, $points:expr, $r0:expr, $r1:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::Twig::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::twig($name, $points, $r0, $r1, $material, o)
+    }};
+}
+
+/// `botany::stem` with its options by name, as the family scripts wrote them: `stem!(name, a, b, material, key = value, ...)`.
+#[macro_export]
+macro_rules! stem {
+    ($name:expr, $a:expr, $b:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::Stem::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::stem($name, $a, $b, $material, o)
+    }};
+}
+
+/// `botany::blade` with its options by name, as the family scripts wrote them: `blade!(name, base, yaw, tilt, length, width, material, key = value, ...)`.
+#[macro_export]
+macro_rules! blade {
+    ($name:expr, $base:expr, $yaw:expr, $tilt:expr, $length:expr, $width:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::Blade::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::blade($name, $base, $yaw, $tilt, $length, $width, $material, o)
+    }};
+}
+
+/// `botany::stalk` with its options by name, as the family scripts wrote them: `stalk!(name, a, b, material, key = value, ...)`.
+#[macro_export]
+macro_rules! stalk {
+    ($name:expr, $a:expr, $b:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::Stalk::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::stalk($name, $a, $b, $material, o)
+    }};
+}
+
+/// `botany::ribbed` with its options by name, as the family scripts wrote them: `ribbed!(r, ribs, key = value, ...)`.
+#[macro_export]
+macro_rules! ribbed {
+    ($r:expr, $ribs:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::Ribbed::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::ribbed($r, $ribs, o)
+    }};
+}
+
+/// `botany::rays` with its options by name, as the family scripts wrote them: `rays!(name, at, r, n, material, key = value, ...)`.
+#[macro_export]
+macro_rules! rays {
+    ($name:expr, $at:expr, $r:expr, $n:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::Rays::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::rays($name, $at, $r, $n, $material, o)
+    }};
+}
+
+/// `botany::dome` with its options by name, as the family scripts wrote them: `dome!(name, at, r, h, material, key = value, ...)`.
+#[macro_export]
+macro_rules! dome {
+    ($name:expr, $at:expr, $r:expr, $h:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::Dome::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::dome($name, $at, $r, $h, $material, o)
+    }};
+}
+
+/// `botany::star` with its options by name, as the family scripts wrote them: `star!(name, at, r, n, material, key = value, ...)`.
+#[macro_export]
+macro_rules! star {
+    ($name:expr, $at:expr, $r:expr, $n:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::Star::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::star($name, $at, $r, $n, $material, o)
+    }};
+}
+
+/// `botany::tulip_head` with its options by name, as the family scripts wrote them: `tulip_head!(name, at, r, h, material, key = value, ...)`.
+#[macro_export]
+macro_rules! tulip_head {
+    ($name:expr, $at:expr, $r:expr, $h:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::TulipHead::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::tulip_head($name, $at, $r, $h, $material, o)
+    }};
+}
+
+/// `botany::lupin_spike` with its options by name, as the family scripts wrote them: `lupin_spike!(name, at, h, r, material, key = value, ...)`.
+#[macro_export]
+macro_rules! lupin_spike {
+    ($name:expr, $at:expr, $h:expr, $r:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::LupinSpike::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::lupin_spike($name, $at, $h, $r, $material, o)
+    }};
+}
+
+/// `botany::florets` with its options by name, as the family scripts wrote them: `florets!(name, r, at, material, key = value, ...)`.
+#[macro_export]
+macro_rules! florets {
+    ($name:expr, $r:expr, $at:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::Florets::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::florets($name, $r, $at, $material, o)
+    }};
+}
+
+/// `botany::rose_head` with its options by name, as the family scripts wrote them: `rose_head!(name, at, r, material, key = value, ...)`.
+#[macro_export]
+macro_rules! rose_head {
+    ($name:expr, $at:expr, $r:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::RoseHead::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::rose_head($name, $at, $r, $material, o)
+    }};
+}
+
+/// `botany::vessel` with its options by name, as the family scripts wrote them: `vessel!(palette, r_top, h, key = value, ...)`.
+#[macro_export]
+macro_rules! vessel {
+    ($palette:expr, $r_top:expr, $h:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::Vessel::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::vessel($palette, $r_top, $h, o)
+    }};
+}
+
+/// `botany::soil_top` with its options by name, as the family scripts wrote them: `soil_top!(palette, r, z, key = value, ...)`,
+/// the palette `None` where the script gave none (and a `material`).
+#[macro_export]
+macro_rules! soil_top {
+    (None, $r:expr, $z:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::SoilTop::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::soil_top(None, $r, $z, o)
+    }};
+    ($palette:expr, $r:expr, $z:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::botany::SoilTop::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::botany::soil_top(Some($palette), $r, $z, o)
+    }};
+}
