@@ -1,16 +1,16 @@
-# Garden decor (`families/garden_decor.py`)
+# Garden decor: notes
 
 The garden decor of `garden.json`: the gnome, the bird bath, the two-tier fountain, the stone lantern, the
 wheelbarrow planter and the boulders. Family `garden`: the models go to `web/public/assets/models/garden/`, the
-entries to `packs/gardenDecor/manifest.json`. Built in Blender axes at the old parts' sizes (within 10 %), each stood
-on the floor and centred by `G.settle`. The fountain's water moves all the time near the camera (`flow`, ambient);
+entries to `packs/gardenDecor/manifest.json` (`cargo art garden_decor`). Built in Blender axes at the old parts' sizes (within
+10 %), each stood on the floor and centred by `settle`. The fountain's water moves all the time near the camera (`flow`, ambient);
 the rest are still.
 
 - **Gnome**: boots with turned-up toes, a bell tunic with a hem, a belt with a brass buckle and buttons, sleeves swept
   round to his hands resting on his belly; a round face with ears, rosy cheeks, eyes under bushy brows and a big nose,
   a long lofted beard and a moustache; a hat with a rolled brim flopping back to its tip. Paint: Hat, Tunic, Belt.
 - **Bird bath**: a moulded plinth, a fluted column on a foot under a turned capital, a bowl lofted out to a rim
-  waving in twelve scallops, water with a ring on it, a robin on the far rim dipping its beak (`kit.songbird`, head
+  waving in twelve scallops, water with a ring on it, a robin on the far rim dipping its beak (`songbird`, head
   tipped down). Paint: Bowl & column, Plinth.
 - **Fountain**: an octagonal step, a round basin with a moulded rim, a turned stem with four spouts each pouring an
   arc of water into it, an upper bowl with a scalloped lip spilling over in four streams, a finial in tiers and a
@@ -43,3 +43,9 @@ the wheelbarrow come down by half while showing more.
 
 `check-glb`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings on each file. In the game
 (2026-10-22, headless, WebGPU and WebGL2): the gallery and the fountain's `flow` on the clips bench, no errors.
+
+Built here, not in Blender, since 2026-11-18 (`cargo check-glb --against ref/blender`): the bird bath and the
+fountain the same in every bit, the gnome, the lantern and the wheelbarrow the same points and triangles (the baked
+shading within 0.05 of a grey level), the boulders within 0.001 mm with the same triangles a material. The boulders'
+cuts are the ground's (`ground::rock::_cut`): a point is in front of the plane or behind it, the face that closes
+a cut is triangulated without slivers, and a stone's fractures are cut where it was made, at the origin.
