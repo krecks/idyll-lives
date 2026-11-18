@@ -1599,6 +1599,9 @@ function release(built: Instanced, keep?: ReadonlySet<ModelTemplate | undefined>
   if (built.template && !keep?.has(built.template)) disposeTemplate(built.template);
 }
 
+/** The woods' rocks (`LandscapeLayout`'s woods): not plants, but they stand in the veil past the land's edge as the trees do. */
+const ROCK = 'model.rock';
+
 /** One model's plants, as the landscape keeps them. */
 interface Batch {
   /** Its model, and the level drawn (`instanced`'s). */
@@ -1680,8 +1683,12 @@ async function instanced(
   const groups = cell ? groupInstances(matrices, (m) => cell(m[12], m[14])) : new Map<string, number[]>();
   const split = groups.size > 1 ? template.meshes.filter((m) => splitsByGroup(m, matrices.length)) : [];
   const span = perfStart(`nature: instances ${key}`);
+  // (The rocks sink into the land in the haze's veil past its edge as the plants do, `shaders/fog.ts`: their finish is
+  // everyone's, so a copy of it, `MaterialLibrary.veilSinking`.)
+  const sinks = key === ROCK;
   const draw = (m: ModelMesh, indices: readonly number[], name: string): Instances => {
-    const d = new Instances(app.graphicsDevice, parent, m.mesh, m.material, { name, castShadows: false, receiveShadows: true, capacity: indices.length });
+    const material = sinks && m.material instanceof pc.StandardMaterial ? MaterialLibrary.for(app).veilSinking(m.material) : m.material;
+    const d = new Instances(app.graphicsDevice, parent, m.mesh, material, { name, castShadows: false, receiveShadows: true, capacity: indices.length });
     d.setCount(indices.length);
     for (let i = 0; i < indices.length; i++) d.setMatrix(i, matrices[indices[i]]);
     d.update();
@@ -2179,7 +2186,7 @@ export class FarCrowns {
     // Gathered by square.
     const cells = new Map<string, { n: number; x: number; y: number; z: number; s: number; x0: number; x1: number; z0: number; z1: number; cone: number; birch: number; fruit: number }>();
     for (const { kind, m } of trees) {
-      if (kind === 'model.rock' || kind.startsWith('model.bush')) continue;
+      if (kind === ROCK || kind.startsWith('model.bush')) continue;
       const [x, y, z] = [m[12], m[13], m[14]];
       const s = Math.hypot(m[0], m[1], m[2]);
       const key = `${Math.floor(x / CROWN_CELL)},${Math.floor(z / CROWN_CELL)}`;
