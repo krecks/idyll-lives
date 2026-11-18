@@ -4,13 +4,30 @@ mod common;
 
 use artkit::math::{Axis, M3, M4, Quat, V3};
 use artkit::noise::noise;
-use artkit::rand::Random;
+use artkit::rand::{Random, float_hash};
 use common::*;
 
 #[test]
 fn random_draws_what_cpython_draws() {
+    let mut floats = 0;
     for line in golden("random.txt").lines() {
         let w: Vec<&str> = line.split(' ').collect();
+        if w[0] == "float" {
+            // a float seed (as Python writes it, and its bits), its hash, the first 8 random()
+            let seed = f64w(w[2]);
+            assert_eq!(w[1].parse::<f64>().unwrap().to_bits(), seed.to_bits());
+            assert_eq!(
+                float_hash(seed),
+                w[3].parse::<i64>().unwrap(),
+                "hash({seed})"
+            );
+            let mut r = Random::from_float(seed);
+            for x in f64s(&w[4..12]) {
+                assert_eq!(r.random().to_bits(), x.to_bits(), "seed {seed}");
+            }
+            floats += 1;
+            continue;
+        }
         if w[0] == "long" {
             let mut r = Random::new(w[1].parse().unwrap());
             for _ in 0..1000 {
@@ -74,6 +91,13 @@ fn random_draws_what_cpython_draws() {
             assert_eq!(r.random().to_bits(), x.to_bits());
         }
     }
+    assert_eq!(floats, 69, "the float seeds checked");
+}
+
+#[test]
+#[should_panic(expected = "hash(nan)")]
+fn a_nan_seeds_nothing() {
+    Random::from_float(f64::NAN);
 }
 
 #[test]
