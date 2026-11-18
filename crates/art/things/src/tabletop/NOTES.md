@@ -26,7 +26,7 @@ Bath Bits) until checked in play, then went back to `tabletop` and their old gro
 
 Rebuilt with the forms and the kit (README "The toolkit"): turned things are lofted rings (`turned`: a profile of
 (r, z) rows, few sides, rims kept sharp and few-sided bodies shaded round), handles, spouts and stems swept
-(`G.kit.fillet` round their bends), slabs extruded with their holes (`slab`), flat faces a single polygon (`disc`: a
+(`kit::fillet!` round their bends), slabs extruded with their holes (`slab`), flat faces a single polygon (`disc`: a
 drink's surface), the plants' leaves and flowers the botany's. Sixteen were over half the target before (up to
 1,496); every one is under it now, with more on it. Sizes, centres, parts, clips and draws as before.
 
@@ -40,7 +40,7 @@ drink's surface), the plants' leaves and flowers the botany's. Sixteen were over
 | `knifeBlock` | 0.12 × 0.30 × 0.23 m | 584 (352) | 1 | leaning block with eased edges on its foot, six knives (a steel bolster under each riveted handle, sized to its blade) |
 | `utensilCrock` | 0.13 × 0.32 × 0.12 m | 708 (668) | 1 | glazed crock with a rolled lip and a blue band; wooden spoon (one swept piece), slotted spatula, balloon whisk (two wire loops), ladle with its bowl |
 | `cuttingBoard` | 0.34 × 0.10 × 0.23 m | 724 (792) | 1 | board with a hand hole, a lofted bloomer with three scores, two tomatoes with calyxes, two slices with their cut faces, a cook's knife (blade, bolster, handle) |
-| `breadBin` | 0.34 × 0.21 × 0.20 m | 644 (380) | 2 | body between D-shaped wooden ends (eased), a toe rail, a loaf inside; the roll-top's wooden bar pull (`kit.pull`), rolling back (`roll_open`) |
+| `breadBin` | 0.34 × 0.21 × 0.20 m | 644 (380) | 2 | body between D-shaped wooden ends (eased), a toe rail, a loaf inside; the roll-top's wooden bar pull (`kit::pull!`), rolling back (`roll_open`) |
 | `spiceJars` | 0.30 × 0.11 × 0.12 m | 700 (792) | 1 | rack with shaped ends, back board and round front rail; five shouldered jars with paper labels and screw lids |
 | `cookieJar` | 0.16 × 0.25 × 0.16 m | 604 (696) | 2 | glass jar with shoulder and neck, four cookies, glazed lid with a turned knob |
 | `fruitBowl` | 0.28 × 0.19 × 0.28 m | 726 (1,088) | 1 | bowl on a foot ring; red and green apples (shaped, stalks), two oranges with navels, two bananas (five-sided, dark tips) |
@@ -58,7 +58,7 @@ drink's surface), the plants' leaves and flowers the botany's. Sixteen were over
 | `potSucculent` | 0.16 × 0.14 × 0.16 m | 732 (524) | 1 | pot with a rim on grit; an echeveria: three tiers of fat upturned leaves round a heart |
 | `potCactus` | 0.18 × 0.32 × 0.13 m | 686 (896) | 1 | terracotta pot with a rolled rim on sand; a ribbed column with two ribbed arms bent up (fillet), a pink flower with its eye |
 | `potSmall` | 0.16 × 0.26 × 0.16 m | 728 (1,008) | 1 | glossy pot with a rim, soil; a peace lily: arching pointed leaves on stalks, two white spathes with spadices on tall stems |
-| `photoFrame` | 0.18 × 0.23 × 0.11 m | 288 (260) | 1 | moulded frame (`kit.moulding`, mitred), back board, white mount, a photo of a hillside with sun and a figure, strut |
+| `photoFrame` | 0.18 × 0.23 × 0.11 m | 288 (260) | 1 | moulded frame (`kit::moulding!`, mitred), back board, white mount, a photo of a hillside with sun and a figure, strut |
 | `tableClock` | 0.11 × 0.16 × 0.05 m | 722 (976) | 3 | drum case rolled at the back with a raised bezel, face with flat hour marks, domed bells, hammer, carrying loop, splayed legs on bun feet |
 | `globe` | 0.21 × 0.31 × 0.24 m | 728 (940) | 1 | the continents as the sphere's own faces in land colour, tilted in a brass meridian ring with pole pins, turned column and foot |
 | `snowGlobe` | 0.13 × 0.18 × 0.13 m | 800 (804) | 2 | turned base with a brass band and a collar round the dome's foot; inside a snowy mound, a three-tier fir, a cabin with a snowy roof, a snowman, flakes |
@@ -82,7 +82,7 @@ part of its own (two draws):
   moved to its free side; `lid_open` flips it up 80° in 0.4 s while the kettle is filled for *Make a cup of tea*
   (`tea`, held 1.6 s, then shut).
 - `breadBin`: the `roll_top`, a half-tube shell round the bin's axis, rolls back 100° in 0.6 s (`roll_open`, about
-  Blender X) for *Make a sandwich* (`sandwich`, held 2.4 s): over the top and down behind, inside the base, showing
+  the build axes' x) for *Make a sandwich* (`sandwich`, held 2.4 s): over the top and down behind, inside the base, showing
   a loaf on the bin's floor (a soft box, 108 triangles, hidden at rest).
 - `laptopClosed`: the `lid`, hinged at its back edge, opens 105° in 0.8 s (`lid_open`) and stays open while the
   laptop is used (by its uses' animation, `type`: browse, code, write, homework). Under it, hidden at rest, the
@@ -97,16 +97,16 @@ about the way its host faces) the screen faces them.
 ## The alarm clock
 
 `tableClock` tells the game's time: its hour and minute hands are parts of their own, each turning about the face's
-middle once round, `G.spin(hand, '<name>_hand', 1, seconds=12, axis='Y')`, and the game holds each where the time has
+middle once round, `spin!(hand, &hand.name(), turns = 1, seconds = 12, axis = Axis::Y)`, and the game holds each where the time has
 it (`motions.clock`, `at` 610: ten past ten at rest, the catalogue picture), on every preset. A positive turn about
-Blender +Y is clockwise seen from the front. The red second hand is gone (a game minute is a real second at normal
+the build axes' +y is clockwise seen from the front. The red second hand is gone (a game minute is a real second at normal
 speed); its red hub stays on the face. Three draws: the body and the two hands.
 
 ## The candles (2026-10-21)
 
 `candlesticks` was drawn with its flames lit all day and dark at night (review M-tabletop-01). Its two flames are now
 one part of their own (`flames`, one more draw: two), built lit and sunk 3.4 cm into the candles' tops at rest, hidden
-in the wax (1.3 cm across to their 2.2). `lit` slides them up over the wicks (`G.slide`, 0.6 s) and is the model's
+in the wax (1.3 cm across to their 2.2). `lit` slides them up over the wicks (`slide!`, 0.6 s) and is the model's
 `night` clip, held open dusk to dawn: by day the wicks are dark, at night the flames stand on them. The flame's
 material glows (`#FFC46A`, as the lantern's): bright while the room's lights are on, out with them (a dark room's
 candles show their flames unlit). Its height is the candles' at rest: 0.33 m.

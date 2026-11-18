@@ -5,20 +5,20 @@
 shelves (`model.groceryShelf`), the café table (`model.cafeTable`) and the café chair (`model.cafeChair`). Built 2026-10-14; they sat in
 Validate › Shops until checked in play (back to community / shops).
 
-They stand on town lots, seen from far and by the dozen, so each has a far version (`<id>.far.glb`): `_far(build)`,
+They stand on town lots, seen from far and by the dozen, so each has a far version (`<id>.far.glb`): `.far_ratio(FAR)`,
 the model at rest, joined, the vertices that sit on one another merged, decimated to a quarter with its feet and
-outermost faces kept; the café table's by hand (`G.far_of`: coarser, no veins or curls), as decimating its thin iron
+outermost faces kept; the café table's by hand (`.far_low()`: coarser, no veins or curls), as decimating its thin iron
 took its column and legs away. Each is built where the game places it (`F`, game axes): the
-counter, the case and the shelves back on their 2 × 1 tiles (`G.settle(centre=False)` and `centre=` on the `Model`),
+counter, the case and the shelves back on their 2 × 1 tiles (`settle!(centre = false)` and `.centre(..)` on the `Model`),
 the counter's worktop and the case's deck at the back on the wall face (−0.43: their parts are placed 4 cm forward,
-`GameFrame(shift=0.04)`, as are the old parts, which reached 4 cm into the wall before),
+`GameFrame::new(0.04)`, as are the old parts, which reached 4 cm into the wall before),
 the table centred, the chair's seat 2 cm forward. The family checks the café table's top (0.745 m) and the chair's
 seat (0.47 m, 2 cm forward) against `content/community.json` before it builds.
 
 ## The shop counter
 
 An oak counter (`wood`) on a walnut plinth: a walnut worktop with a rounded nose and a cove under it, three
-frame-and-panel bays in front (`kit.shaker`, walnut frames round raised oak panels), two shaker cupboard doors with
+frame-and-panel bays in front (`kit::shaker!`, walnut frames round raised oak panels), two shaker cupboard doors with
 turned knobs at the back. On the worktop a till (the keypad sloping to the shopkeeper, the customer's display on a post), a receipt printer with its
 paper curling out, a chrome service bell, a sweet jar with a shoulder and a domed lid, and a magazine rack with shaped
 ends, a lip and four magazines. The till is the shopkeeper's (0.5.0, I-community-09): its keypad slopes up to the
@@ -29,14 +29,14 @@ One moving part:
   in the till's case at rest. `till` slides it 10 cm out to the back (to the shopkeeper; at home against a wall it
   stops at the wall's face) in 0.8 s.
 
-`motions`: `{'uses': {'treat': {'clip': 'till', 'delay': 3.9, 'hold': 1.1}}}`: as the game's shopkeeper takes the
+`motions`: `{"uses": {"treat": {"clip": "till", "delay": 3.9, "hold": 1.1}}}`: as the game's shopkeeper takes the
 money (`characters/clips/serve.ts`, paid at 4.2 s). The sweet jar is
 opaque gloss with the sweets pressed into its sides, as if seen through it: real glass would have been a fourth draw
 call.
 
 ## The bakery case
 
-A cream cabinet (three raised panels, `kit.shaker`, under a band) with a walnut deck and sill, a glass display on walnut
+A cream cabinet (three raised panels, `kit::shaker!`, under a band) with a walnut deck and sill, a glass display on walnut
 ends (the front glass curving up and back into the glass top, a glass shelf on brackets) and bakes on doilies and
 trays with price cards: glazed buns, tarts in fluted cases, scored loaves, banded cakes with cherries, biscuits,
 crescent croissants (one swept piece each, plump in the middle) and cupcakes in fluted cups under piped frosting. The back, the server's side, is two glass panes in two tracks. One moving part:
@@ -44,7 +44,7 @@ crescent croissants (one swept piece each, plump in the middle) and cupcakes in 
 - **The back door** (`back_door`): the right-hand pane (as seen from the front), in the front track. `door` slides
   it 84 cm left, in front of the fixed pane, in 1 s.
 
-`motions`: `pastry` and `takeCake` each `{'clip': 'door', 'delay': 1.0, 'hold': 1.4}`: the baker reaches in through
+`motions`: `pastry` and `takeCake` each `{"clip": "door", "delay": 1.0, "hold": 1.4}`: the baker reaches in through
 it a second into the sale (`characters/clips/serve.ts`), and it shuts as they hand the pastry over. The door is plain glass with no handle, so the model stays at 3 draws.
 
 ## The rest
@@ -59,8 +59,7 @@ it a second into the sale (`characters/clips/serve.ts`), and it shuts as they ha
   round feet. Its top is at 0.745 m, the content's `surface.height`.
 - **Café chair**: a bentwood chair (`wood`) with a cane seat (`fabric`, dished a little in its ring): one bent piece,
   tapering to the feet, runs from the back feet up into the bow of the back, an inner loop inside it, two tapering
-  splayed front legs with little bent brackets up to the seat, and a ring bracing all four. All swept (`F.sweep`; they
-  were Blender curve objects converted to meshes). The seat's rim is
+  splayed front legs with little bent brackets up to the seat, and a ring bracing all four. All swept (`fsweep!`). The seat's rim is
   at 0.47 m, the content's `seat.height`. Residents sit on it at the right height (checked in play, sitting and with a
   coffee at the table).
 
@@ -93,4 +92,4 @@ The Workbench previews draw glass opaque: the case's bakes and its back door onl
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `bakeryCase`; the same triangles.
+No change to the build: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `bakeryCase`; the same triangles.

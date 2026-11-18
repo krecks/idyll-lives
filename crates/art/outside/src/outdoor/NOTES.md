@@ -2,17 +2,17 @@
 
 The outdoor things. One pack, `packs/outdoor/manifest.json`. Each model is built in place where the
 old part stood (`F`, game axes), so seat heights (content `seat`) and table tops (content `surface`)
-stay where the game has them; models that stand off the middle of their footprint say so with `centre=`.
+stay where the game has them; models that stand off the middle of their footprint say so with `.centre(..)`.
 
-2026-10-22 (detail pass, with gamekit's forms and kit; the same sizes, heights, parts, clips, draws and paint): cast
+2026-10-22 (detail pass, with the kit and the forms, now artkit's; the same sizes, heights, parts, clips, draws and paint): cast
 ends and bent tubes in one piece, shaped and rounded boards, soft piped cushions, lofted cups, jugs, bottles and a
 basket, a parasol canopy sagging between its ribs, a mosaic of proud tiles, extruded stones and wedges. The common
 pieces (chairs, benches, tables, the parasol) keep to about half their size class's target: the town overview draws
-every lot's outdoor objects whole, and these have no far version. Helpers: `_bent` (kit.fillet + kit.tube), `_bar` (a
-rounded-rect section swept), `_plank` (an outline placed like a board), `_side_slab`, `_slab`, `_cup`, `_jug`,
-`_bottle`, `_mosaic`, `_cast_end`, `_flame`, `_log`, and `_jitter`: G.jitter's `noise_vector` gives other numbers in
-each Blender process, so a jittered model came out a little different on each run (the fire pit's centre moved 2 mm
-and failed the size check); `_jitter` uses `noise()`, which doesn't.
+every lot's outdoor objects whole, and these have no far version. Helpers (`common.rs`): `bent` (`kit::fillet!` + `kit::tube!`), `bar` (a
+rounded-rect section swept), `plank` (an outline placed like a board), `side_slab`, `slab`, `cup`, `jug`,
+`bottle`, and `jitter`, which wobbles with `noise()` so a jittered model is the same on every run (in Blender the
+shared jitter was not: the fire pit's centre moved 2 mm and failed the size check); `mosaic` (`tables.rs`),
+`cast_end` (`seats.rs`), `flame` and `log` (`fire.rs`).
 
 2026-10-21 (authenticity review, Phase 4): the park bench's and the picnic table's heights, the bistro set's
 chairs, the garden bench, the hammock, the porch swing's seat, the swing set's frame, the hot tub's cover and bench
@@ -26,7 +26,7 @@ What each has since the detail pass (2026-10-22):
 | patioSet | each chair's frame two bent tubes (over the top; under the seat's front), a tube round the seat, bowed back slats, seat slats with rounded ends, pivots; the table's framed top on two crossing U legs; a turned cup with a handle, a jug with a spout |
 | picnicTable | legs, bearers and cleats cut level and chamfered (side outlines), carriage bolts, the gingham laid across and hanging over both edges, a lofted wicker basket with a rim, lid flaps, a bent handle and a strap |
 | gardenChair, adirondackChair | arms tapering to round fronts, curved corbels, stringers rounded at the front, slats with rounded tops (11 cm seat slats), the garden chair's arched top rail, the Adirondack's bowed upper rail; a turned cup |
-| patioTableRound | a mosaic of proud tiles in rings (`_mosaic`: the grout a baked V between them), an iron band, a turned column with collars, a moulded foot |
+| patioTableRound | a mosaic of proud tiles in rings (`mosaic`: the grout a baked V between them), an iron band, a turned column with collars, a moulded foot |
 | patioTable4 | breadboard ends with pegs, arched aprons, tapered legs with eased corners, an H stretcher |
 | patioChair | a bent-tube back over the top, front legs running into the arms, a piped soft cushion, a seat frame, bowed slats, glides |
 | benchGarden3 | the park bench's cast ends on three frames (the middle one armless), bolts |
@@ -102,7 +102,7 @@ Built 2026-10-14; they sat in Validate › Loungers until signed off (back to Ou
 - **Hammock** (`hammock`): a 2.8 m wooden stand on its 1 × 3 tiles (Q-07; it was 1.86 m on 1 × 2, lain in
   folded); the sling (a sagging striped mesh 0.74 m wide, spreader bars, ropes, a pillow) is hinged on the line
   through the hooks (1.1 m). `sway` rocks it ±8° in 2 s, a loop for swing and doze, and the resident rides it
-  (`ride`). They lie in the sling's dip (`furniture.json` `beds.hammock.sling`, its heights from `_sling` and
+  (`ride`). They lie in the sling's dip (`furniture.json` `beds.hammock.sling`, its heights from `leisure.rs`'s `sling` and
   `SLING_*`: 0.52 m in the middle, 0.84 at the spreader bars ±0.98, the pillow 0.78 towards the head), the head
   on the pillow and the feet inside the spreader bar. A changed sling needs those numbers changed too; the two pack
   hammocks have theirs.
@@ -145,7 +145,7 @@ Built 2026-10-16; they sat in Validate › Grills until signed off (back to Outd
   catcher; inside, a bed of red coals and a grate with burgers and sausages. The rim is at 0.79 m and the grate at
   0.77 (a 57 cm kettle's; they were 0.99 and 0.97, at the cook's elbow), 1.04 m with the lid. The lid (with a vent
   and a front handle) is hinged at the back of the rim: `lid_open` swings it up 95° for the whole of cook. The coals
-  glow at night (`coal_hot`): the glow's copy no longer shows through the shut lid (`models.ts` `glowMesh`).
+  glow at night (`coal_hot`): the glow's copy no longer shows through the shut lid (`models.ts`, the glows).
 - **Gas grill station** (`grillStation`): a stainless cart on a plinth, two doors with bar handles and a control
   panel's chrome knobs, under a dark counter at 0.9 m (the content's `surface`); a chopping board with a tray of
   patties on the left, a bottle and a pepper mill at the back right, off the surface. The grill in the middle (a dark

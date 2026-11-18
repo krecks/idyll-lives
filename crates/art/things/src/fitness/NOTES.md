@@ -120,6 +120,5 @@ No change to the models' code: their soft boxes take the shared form's new shape
 
 ## Built in Rust (2026-11-18)
 
-Ported line for line from the Blender script (`crates/art/things/src/fitness`): against the last Blender build
-(`ref/blender`) all five are near (every point Blender's, 0.000 mm; baked shading within 1.7 of 32 greys), the pack
-the same. The yoga mat's nodes come out `roll` before `mat` (the order they are made), Blender's by name.
+Built in Rust since 2026-11-18 (`cargo art fitness`), proved against the last Blender build (`ref/blender`). The yoga mat's
+nodes come out `roll` before `mat` (the order they are made).

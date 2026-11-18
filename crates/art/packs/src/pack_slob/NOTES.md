@@ -4,7 +4,7 @@
 `packs/pack_slob/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sat in
 Validate › Slob until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `.centre(..)` on its `Model`),
 backs on the wall's face where they stand against one. Seats keep the old part's: the beanbag's dimple and the
 nightstand's padded top at about 0.45, the recliner's seat top at 0.45 in the middle.
 
@@ -52,14 +52,14 @@ coloured; the same at night (`office-night`, WebGL).
 
 Same keys, sizes, parts, clips and paint; draws the same or fewer.
 - **Microwave cart:** lofted trays with a raised lip, round posts on castors (plate, fork, tyred wheel), the handle bent
-  in one piece with a grip; the microwave's cavity cut into its case (`G.cut`) with a turntable and a bowl of noodles, its
-  door a `G.kit.shaker` round the window with a swept handle, soft keys, a turned dial; stuffed dinners and pizza box, a
+  in one piece with a grip; the microwave's cavity cut into its case (`kit::cut!`) with a turntable and a bowl of noodles, its
+  door a `kit::shaker!` round the window with a swept handle, soft keys, a turned dial; stuffed dinners and pizza box, a
   cool box with a handle; cans turned with ring pulls.
-- **Beanbag:** one lofted, wrinkled body (`G.jitter`) rising into a back, with a hollow where the sitter sinks: the
+- **Beanbag:** one lofted, wrinkled body (`jitter!`) rising into a back, with a hollow where the sitter sinks: the
   content's seat is 0.30 m, 5 cm forward, and the old bag was 0.41 there (the gate warned 11 cm); 0.31 now. The dimple's
   own part (`bag_light`) is gone: 2 draws (3 before), fewer triangles. Piped seam and a carry loop; a lofted controller,
   a puffed chip bag.
-- **Snack nightstand:** a rounded cabinet, the pad piped and buttoned, a `G.kit.shaker` front panel, swept pulls, feet;
+- **Snack nightstand:** a rounded cabinet, the pad piped and buttoned, a `kit::shaker!` front panel, swept pulls, feet;
   chip bags puffed and crimped in the drawer, a cookie, a candy bar; a turned alarm clock with its bells lying over, a
   sock, a magazine.
 - **Spritz station:** rounded shelves, the mirror's frame turned, spray cans necked with caps, lofted bottles, the hung

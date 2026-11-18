@@ -4,7 +4,7 @@ The family builds the kitchen models into `web/public/assets/models/kitchen/` an
 `packs/kitchen/manifest.json`: the **fridge** (`model.fridge`, `fridge.glb`), the six **K1 fridges**
 (`fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `fridgeMiniRetro`, `wineFridge`) and the two **sinks**
 (`model.farmhouseSink`, `farmhouseSink.glb`; `model.counterSinkDouble`, `counterSinkDouble.glb`). The fridge was
-first made as an evaluation on 2026-10-13; on 2026-10-14 the flat build and the doors build (`kitchen_doors.py`,
+first made as an evaluation on 2026-10-13; on 2026-10-14 the flat build and the doors build (then a Blender script of its own,
 `fridge.doors.glb`) became this one build, and the two sinks and the five K1 fridges were added.
 
 ## The fridge
@@ -13,7 +13,7 @@ A top-freezer fridge: the **top compartment is the freezer** (frozen food), the 
 the fridge** (normal food), separated by a real divider.
 
 - 0.740 × 1.800 × 0.722 m (w × h × d): exactly the old part's bounds, built in its numbers (`F`, a
-  `GameFrame`) and standing where the game places it (`centre=(0, -0.094)`), its back on the wall
+  `GameFrame`) and standing where the game places it (`.centre(0.0, -0.094)`), its back on the wall
 - 4,286 triangles, 3 nodes (`cabinet`, `door_freezer`, `door_fridge`), 3 draw calls (one per node), 14
   materials, no UVs
 - `check-glb`: ok, with one warning (below). Khronos glTF validator: 0 errors, 0 warnings.
@@ -65,11 +65,11 @@ tag covers both the `wash` and `washUp` interactions). The double sink has a str
 (`water_on_0`, `water_on_1`) played for the resident in that slot (`slot`; 2026-10-21, review A-kitchen-03: one
 washer ran both taps).
 
-Detail pass (2026-10-22): each bowl is one lofted piece (`_bowl`: a flat rim round a rounded opening, the walls running
+Detail pass (2026-10-22): each bowl is one lofted piece (`bowl`: a flat rim round a rounded opening, the walls running
 down to a floor that dips to the drain; the farmhouse one square outside, an apron proud of the cabinet), with a
 chrome-ringed drain and strainer. The tap is one bent tube (the kit's tube) on a turned escutcheon, with a spray head and
-a lever on a valve beside it. The cabinets have shaker doors (`_shaker`: a frame with a hole round a recessed panel)
-and bar pulls in one piece (`_pull`); the farmhouse worktop is one U-shaped slab round the basin, the double sink's
+a lever on a valve beside it. The cabinets have shaker doors (`shaker`: a frame with a hole round a recessed panel)
+and bar pulls in one piece (`pull!`); the farmhouse worktop is one U-shaped slab round the basin, the double sink's
 stone worktop one slab with the two openings cut in it. A lofted soap dish with a bar of soap and a terracotta pot
 (`pot`) with a mound of herb leaves stand on the worktop.
 
@@ -100,7 +100,7 @@ rack slide instead. The clip each use plays is in the pack's `motions`:
 What each has since the detail pass (2026-10-22), on the fridge's pattern (doors with seals, liners, bins and stock):
 - **fridgeMini**: sides rounded on their edges, a vented kick plate, an ice box with a flap and grip, a trimmed shelf, a
   crisper with a grip cut in its front; a gable-top carton, a bottle and apples (with stalks) inside; a chopping board
-  with a hanging hole, a jar and an apple on top; the door rounded (`F.soft`), a badge, a one-piece bar handle, its
+  with a hanging hole, a jar and an apple on top; the door rounded (`soft!`), a badge, a one-piece bar handle, its
   seal, liner and two bins with bottles, a can and a jar.
 - **fridgeBuiltIn**: shaker cabinet fronts (frame round a recessed, lightly puffed panel), a cornice with a cove
   moulding swept round it, a vented kick plate; a water dispenser set into the fridge door (trim, recess, paddle,
@@ -122,8 +122,8 @@ What each has since the detail pass (2026-10-22), on the fridge's pattern (doors
   display and a round bar handle, its seal; three drawers flush with the door with long pulls; a vented kick plate.
 
 The built-in's freezer door and the French-door freezer drawer play `freezer_open` for "Get some ice
-cream"; `model.fridge`'s freezer door does the same (`FRIDGE_USES`, by the interaction `frozenTreat`; the G-17
-rebuild of 2026-10-21 had lost it, as the family script never named it: back the same day).
+cream"; `model.fridge`'s freezer door does the same (`fridge_uses`, by the interaction `frozenTreat`; the G-17
+rebuild of 2026-10-21 had lost it, as the family's build never named it: back the same day).
 
 Fixed 2026-10-21 (G-41, M-kitchen-06): the wine fridge's door is a dark frame round a pane of smoked `glass` (it was
 a solid slab with the glass in front of it, so it drew black), and what slides out is its top shelf of bottles

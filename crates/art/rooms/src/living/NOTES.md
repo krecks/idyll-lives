@@ -8,13 +8,13 @@ staircase (`model.stairs`). Built 2026-10-14; they sat in Validate › Sofas, Ar
 ## The sofas and sectionals (L1)
 
 Each is built where the old part stood (`F`, game axes), its back on the wall's face, and is settled in place
-(`settle` on the floor, `centre=` on its `Model`). Two nodes each:
+(`settle` on the floor, `.centre(..)` on its `Model`). Two nodes each:
 
 - **`sofa`**: the upholstery (base, arms, back), any show-wood or metal frame, the back cushions, the pillows and
   the legs. Fabric plus wood (or metal): 2 draws.
 - **`seat`**: the seat cushions (and a throw lying on them), their origin on their underside. `sink_in` squashes
-  them 2 cm in 0.6 s (`squash`), held while the use lasts: `motions: {'uses': {'relax': 'sink_in', 'doze':
-  'sink_in'}}` (the classic sofa has no `doze`). 1 draw.
+  them 2 cm in 0.6 s (`squash`), held while the use lasts: `motions: {"uses": {"relax": "sink_in", "doze":
+  "sink_in"}}` (the classic sofa has no `doze`). 1 draw.
 
 The seat cushions' tops are the seat heights (`characters.ts` `SEATS`, content `seat`): 0.44–0.45 m, the designer
 sofa's 0.425 m.
@@ -86,8 +86,8 @@ for the side, nesting and console tables). Still, but for two:
   drawer now).
 - **Nesting tables** (`small_out` for `pullOut`, and back for `pushIn`): the small oak table is a part of its own
   (`small_table`) and slides 42 cm out from under the white one in 0.9 s (`slide`, after `settle`), leaving it
-  beside the big table; `motions: {'uses': {'pullOut': 'small_out', 'pushIn': {'clip': 'small_out', 'over': -1}},
-  'open': 'small_out'}`. It was left decorative in 0.3.0 and got its use on 2026-10-31 (I-living-01).
+  beside the big table; `motions: {"uses": {"pullOut": "small_out", "pushIn": {"clip": "small_out", "over": -1}},
+  "open": "small_out"}`. It was left decorative in 0.3.0 and got its use on 2026-10-31 (I-living-01).
 - **Side table**: the model copies the catalog pack's `side_table` (oak with a drawer and a brass knob), which stood
   in front of the base manifest's version; the two differed before the model, as `check-glb` warned.
 - What stands on the tops (a plant, vases, magazines, a box) is plain finish, so it costs no draw call.
@@ -128,7 +128,7 @@ models' tops now start at the wall's face, 1–4 cm in front of the rectangles' 
   (it has no back).
 - **Display cabinet**: walnut, solid sides, a pale back, glass-look shelves (plain `gloss`, so the door is its only
   glass), ornaments; a brass-framed glass door with a brass knob, a node of its own (`door`, its origin on the hinge
-  at its left, `DOOR_HINGE`) with no clip yet: the (+use) swing needs only `G.swing(door, 'door_open', …)` and a use.
+  at its left, `DOOR_HINGE`) with no clip yet: the (+use) swing needs only `swing!(door, "door_open", ..)` and a use.
   Still, it counts 3 draws; with a clip the door's brass and glass draw on their own (4).
 - Plants on the shelves are plain satin spheres, not `foliage`, so they cost no draw; the cube shelf's bins are
   `fabric` (its second draw), the ladder shelf's basket too.
@@ -182,9 +182,9 @@ Every model but the two worked examples (`model.armchair`, `model.sofa`, rebuilt
 forms (artkit's `forms`), same keys, sizes, centres, nodes, clips, motions, paint and draws; the triangles in the
 tables above. The helpers (common.rs):
 
-- **`cushion`** is a `F.soft` box: rounded, puffed on its two largest faces, its corners pinched in (the shared
+- **`cushion`** is a `soft!` box: rounded, puffed on its two largest faces, its corners pinched in (the shared
   form's default: two seat cushions part in a V at their front corners), piped round both seams (`piping` None:
-  none), `resting` (it lies on the deck or leans on the back: that face is plain and has no cord). `keep_top=True`
+  none), `resting` (it lies on the deck or leans on the back: that face is plain and has no cord). `keep_top: true`
   for a seat cushion: its puffed middle where the old box's top was, its edges lower, so the seat stays at the
   content height (the gate checks within 2 cm; a puff on top of the old top was 2.5 cm high), its top sinking
   1.4 cm over its front third (`SEAT_SAG`: where the hips rest, and the 5 cm round it the gate probes, it keeps
@@ -259,7 +259,6 @@ The leather armchair's cushions (`leather`), the designer chair's (`hide`) and t
 
 ## Built in Rust (2026-11-18)
 
-Ported from `living.py` line for line (crates/art/rooms/src/living). Against the last Blender build (`ref/blender`)
-every model's points are Blender's (0.000 mm): 14 same, 30 near, none changed. The cabriole legs are the kit's
-(`kit::cabriole!`). Kept as the script had it: `fillet` leaves a right-angled corner sharp (the bed's handle, the
-sofa bed's leg, the nesting and console tables' frames); `living.py`'s `_legs4` was never called and is not ported.
+Built in Rust since 2026-11-18 (`cargo art living`), proved against the last Blender build (`ref/blender`). The cabriole legs are the
+kit's (`kit::cabriole!`). Kept as the Blender script had it: `fillet` leaves a right-angled corner sharp (the bed's handle, the
+sofa bed's leg, the nesting and console tables' frames); its `_legs4` was never called and is not ported.

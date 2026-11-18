@@ -4,11 +4,11 @@
 `packs/pack_loner/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sat in
 Validate › Loner until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `.centre(..)` on its `Model`),
 keeping its footprint, its wall side (the pod, the bench and the hatch against the wall face at depth −0.43, the
 sauna at −0.93 in its 1 × 2) and the seats at 0.45 m (the pod's cushion, the radio and puzzle chairs at the tile's
 middle, the sauna's bench). The pod stood 3 cm into the wall; it is centred on its `Model` `centre` now
-(`G.settle()`), its back on the face, as the wall-standing ones' old parts stood, so the model and the wall
+(`settle_all()`), its back on the face, as the wall-standing ones' old parts stood, so the model and the wall
 agree within a centimetre.
 
 | Model | Moving part and clip | Played by |
@@ -83,7 +83,7 @@ the bonsai's pads are jittered boulders, cheaper than its spheres were.
   and tier's skirts in upright boards; the heater's vents and a cedar guard, more stones; a banded bucket and a cupped
   ladle; a louvred lamp, a thermometer with its face and needle; a towel over the bench's edge. The door: a bent cedar
   pull on roses.
-- `deliveryHatch`: a moulded frame round the hatch (`kit.moulding`), a nosed cap, scroll brackets under the ledge, a
+- `deliveryHatch`: a moulded frame round the hatch (`kit::moulding!`), a nosed cap, scroll brackets under the ledge, a
   soft bag, a lidded cup with a band, a bezelled screen, plaque screws, a drawer pull and letter flap, a bordered mat.
   The door: its window framed, a bar pull.
 

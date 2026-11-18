@@ -8,7 +8,7 @@ chicken coop (`model.farm.coop`). Built 2026-10-14; they sat in Validate › Far
 
 They stand on the farm lots of farm worlds, placed by id in `web/src/game/town.ts` `farmstead` (the farmyard behind
 the house, hay on the fallow field, a scarecrow in a crop row), not by category or group. Each is built in the game's
-axes (`F`) and centred on its footprint by `G.settle`; the sizes are the old parts', within 3 % (but the bale's and the tractor's, below).
+axes (`F`) and centred on its footprint by `settle_all()`; the sizes are the old parts', within 3 % (but the bale's and the tractor's, below).
 
 ## Far versions (E7)
 
@@ -27,7 +27,7 @@ Every model has a `<id>.far.glb` for the town overview (the menus' town, the new
   - the trough: plain sides and rim, no corrugations (208). Decimated, the corrugations made spikes;
   - the coop: house, roof, legs, one-piece ramp, trims, the hatch up over the dark pop hole, the windows as dark
     panels in frames, the nest box (264). Decimated, its legs and ramp went to spikes.
-- **Decimated** (`far=0.25`): the scarecrow.
+- **Decimated** (`.far_ratio(0.25)`): the scarecrow.
 
 ## The models
 
@@ -74,8 +74,8 @@ draws as they were.
 
 ## Clips and parts
 
-- **Scarecrow**: `sway`, ambient (`motions: {'idle': 'sway'}`). The whole scarecrow is one node, its origin at the
-  foot of the post. `G.rock` tips it 2.5° to each side about Blender Y over 3 s (a slow sway is longer than 1 s;
+- **Scarecrow**: `sway`, ambient (`motions: {"idle": "sway"}`). The whole scarecrow is one node, its origin at the
+  foot of the post. `rock!` tips it 2.5° to each side about the build axes' y over 3 s (a slow sway is longer than 1 s;
   `check-glb` doesn't mind) and ends where it starts.
 - **Coop** (`close`, `night`): the pop-hole hatch is its own node (`hatch`, in `coop_trim`), its origin the middle
   of its top edge. By day it stands 32 cm up its runners, the dark pop hole open for the hens; from dusk to dawn
@@ -131,12 +131,7 @@ No change to the build: its soft boxes take the shared form's new shape (the sha
 
 ## Built in Rust (2026-11-18)
 
-The script's functions one for one (`barn.rs` and `barn_doors.rs`, `silo.rs`, `tractor.rs`, `hay.rs`, `scarecrow.rs`, `trough.rs`,
-`coop.rs`; the slabs, shells and bars of `_prism`, `_shell`, `_strut`, `_frame` in `common.rs`). Against the last
-Blender build (`ref/blender`): 11 same, 6 near, 0 CHANGED of the 8 models, their far versions and the pack; every
-surface 0.000 mm from Blender's, the baked shading 0.00 greys off. The nears: the barn's and the tractor's normals in
-their last digits (`shape`), the bale's far version's and the scarecrow's texture coordinates (`uv`, within the
-limit), the sway's keys in their last bit, the tractor's far version's origin 3e-8 m off Blender's (`nodes`: its surface
-the same, its x bounds a unit in the last place apart when centred), and the scarecrow's far version, decimated
-by the kernel, held to the decimated far versions' rule: 1,001 triangles where Blender's file has 941 (+6.4 %), and
-2,509 vertices where it has 1,268 (117 KB where it was 67 KB).
+A file a model (`barn.rs` and `barn_doors.rs`, `silo.rs`, `tractor.rs`, `hay.rs`, `scarecrow.rs`, `trough.rs`,
+`coop.rs`; the slabs, shells and bars of `prism`, `shell`, `strut`, `_frame` in `common.rs`), proved against the
+last Blender build (`ref/blender`); the scarecrow's far version is the kernel's decimation, held to the decimated far
+versions' rule.

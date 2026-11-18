@@ -66,20 +66,20 @@ rest pose where it is.
 
 Rebuilt with the forms and the kit (sweeps, lofts of rings, extrusions with holes, soft boxes, the kit's tube),
 keeping every key, size, centre, footprint, worktop height, node, hinge, clip, `motions`, `paint` and draw count. The
-shared parts, in the script:
+shared parts, in `common.rs`:
 
-- `_worktop`: a worktop as a side-plane extrude, its front edge rolled over (postformed) and its underside eased, its
+- `worktop`: a worktop as a side-plane extrude, its front edge rolled over (postformed) and its underside eased, its
   ends cut square so the tops of a run meet without a seam; drawn through `COUNTER66` like the old box, the same
   depth (-0.43..0.23 as drawn) and height (0.90 or 0.91 to 0.95).
-- `_shaker`: a shaker door or drawer front: a frame (an outline with a hole, its edges eased) round a flat panel, a
+- `shaker`: a shaker door or drawer front: a frame (an outline with a hole, its edges eased) round a flat panel, a
   middle rail on the larders' tall doors. The panel is a margin ring under the frame and a field whose corners are
   clear of it: the baked shading is per vertex, and a panel whose four corners hide under the frame went dark all over.
 - `_pull`: a bar pull swept in one piece (legs bending into the bar); its `reach` is set so it never stands past the
   old front-most point (the worktop's nose on a counter), so no bounding box, centre or wall gap moved.
-- `_drawer`: the shaker drawer front, its box, and a cutlery tray (spoons, forks, knives, a serving spoon as flat
+- `drawer`: the shaker drawer front, its box, and a cutlery tray (spoons, forks, knives, a serving spoon as flat
   outlines) in the front of the box, which shows when it slides out; the butcher block's drawer holds a knife insert.
 - `_lathe` and what is turned with it: stacked plates, bowls, mugs with handles, jugs, canisters with lids, cans, a
-  crock, pans, a saucepan, ladles, jars (glass with what is in them); `_basket`, a ribbed, hollow woven basket.
+  crock, pans, a saucepan, ladles, jars (glass with what is in them); `basket`, a ribbed, hollow woven basket.
 
 Doors on the 1 m counters are now 4 mm apart and line up with the drawer above (they were 3 cm apart). A counter's
 fronts (2 cm behind the worktop's nose) and plinth line up with its neighbours' in a run: checked by importing the
@@ -137,8 +137,8 @@ What each model has now:
 
 ## K5 — tall and wall storage
 
-A wall thing sits on the wall face (`WALL = -0.43`) at its real height: it is built at that height and
-`settle(floor=False)` / `check_size(floor=False)` leave it alone, so `check-glb` reports it as floating,
+A wall thing sits on the wall face (`WALL = -0.43`) at its real height: it is built at that height and,
+`.on_wall()` on its `Model`, settling and the size check leave it alone, so `check-glb` reports it as floating,
 which is fine on a wall. A floor thing stands where the game places it, its back on the wall (below).
 
 The wall cabinets are `cupboard` stations (content `stations`): clean things are put away in the nearest cupboard or

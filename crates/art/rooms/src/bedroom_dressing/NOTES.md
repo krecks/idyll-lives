@@ -31,12 +31,12 @@ until checked in play.
 
 - **`mirror`** — a cheval mirror: two turned posts on feet and a low stretcher, the swing frame between them on
   brass pivots at 0.95 m, a crest with a finial. Centred on its tile (its old part was 5 cm back).
-- **`dressingTable`** — its mirror against the wall, the pouf at the front (`centre=(0, -0.003)`; turned round
+- **`dressingTable`** — its mirror against the wall, the pouf at the front (`.centre(0.0, -0.003)`; turned round
   on 2026-10-14: it stood the other way, as its old part, the stool against the wall and the player looking at
   the mirror's back). The pouf at depth +0.22, its top 0.45 m (characters.ts `SEATS` h 0.45, fwd 0.22, `back`:
   the sitter faces the object's back, to the mirror); the table (top 0.76 m) behind it on four tapered brass legs,
   two drawer cases either side of the kneehole, the oval mirror on a brass stand at the back edge, its wooden back
-  on the wall face. On the top: two perfume bottles and a jewellery box. The script builds it as it first stood
+  on the wall face. On the top: two perfume bottles and a jewellery box. The build makes it as it first stood
   and turns it round at the end (`TURN_BACK`), as the old part was.
   - **The drawer.** The case on the seated resident's right (game +x: the game is left-handed) slides its drawer
     out 18 cm towards the seat in 0.8 s (`drawer_open`, `slide`), its tray hidden in the case at rest, a dark
@@ -49,7 +49,7 @@ until checked in play.
   toothbrush (as the old part: house generation hangs it over basins too).
 - **`mirrorFloor`** — a full-length mirror in a slim brass frame, upright on a brass stand: two sled feet, a
   clamp up from each to the frame's bottom, a rear bar and a strut to a plate on the frame's back. Where its
-  the game places it (`centre=(0, -0.155)`: the frame 5 cm behind the middle, the strut behind it).
+  the game places it (`.centre(0.0, -0.155)`: the frame 5 cm behind the middle, the strut behind it).
 
 ### Detail (2026-10-22)
 
@@ -87,7 +87,5 @@ No change to the build: its soft boxes take the shared form's new shape (the sof
 
 ## Ported to Rust (2026-11-18)
 
-Built by `cargo art bedroom_dressing` from this module (its Python script's numbers and order, one function each).
-Against the last Blender build (`ref/blender`): the wall and floor mirrors the same, the cheval mirror and the
-dressing table near, their surfaces to 0.000 mm and their shading to 0.00 greys. The glass's grid is the kernel's
-`subdivide_edges!` (5 cuts, grid fill), Blender's points and faces in Blender's order.
+Built in Rust since 2026-11-18 (`cargo art bedroom_dressing`), proved against the last Blender build (`ref/blender`). The glass's grid is the kernel's
+`subdivide_edges!` (5 cuts, grid fill), so the baked shading darkens its rim only.

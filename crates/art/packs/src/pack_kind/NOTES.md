@@ -4,7 +4,7 @@
 `packs/pack_kind/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sat in
 Validate › Kind until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
+Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `.centre(..)` on its `Model`).
 Seats stay where the renderer puts residents: the rocker's cushion and the poufs at 0.45–0.49 (default seat), the
 settee's seat cushions at 0.45 at x = ±0.5, its sleepers on the default 0.5 bed height. The tea table's poufs
 (40 cm across) stand at x = ±0.75 either side of its low table (top 0.36, 0.4 × 0.56 m), and its two face each
@@ -69,10 +69,10 @@ Rebuilt with the forms and the kit, keeping every key, size, centre, part, hinge
 (triangles before → after: counter 5,592 → 7,914, jar 3,068 → 4,912, rocker 2,840 → 4,820, tea table 4,616 → 7,380,
 feeder 5,004 → 6,724, settee 3,188 → 7,360; draws unchanged).
 
-- `neighbourlyOven`: raised shaker doors (`kit.shaker`) with turned brass knobs, a butcher block with strips; a
+- `neighbourlyOven`: raised shaker doors (`kit::shaker!`) with turned brass knobs, a butcher block with strips; a
   lattice pie of woven strips, a wire cooling rack, turned biscuits, a turned rolling pin in a patch of flour, a cake
   with icing drips and a cherry on a turned stand; a capped beadboard back, shaped shelf brackets, lofted jars with
-  cork lids and labels; the range's backguard clock, burners under cast-iron grates (`kit.fillet` tubes), turned
+  cork lids and labels; the range's backguard clock, burners under cast-iron grates (`kit::fillet!` tubes), turned
   knobs, a rail on returns with a gingham towel draped over it (swept, jittered, checked), a stock pot with handles.
   The oven door: a moulded window frame and a bar pull.
 - `givingJar`: a richer turned pedestal with a bead; more coins and curled notes; a turned cork, a ribbon tied in a
@@ -86,10 +86,10 @@ feeder 5,004 → 6,724, settee 3,188 → 7,360; draws unchanged).
   with pages, a tea light in a cup; cups with handles on saucers, a milk jug; ferns of arching fronds. The teapot:
   lofted, with a band, lid, knob, a curving spout and a looped handle.
 - `songbirdFeeder`: a bracketed tray with a swept lip, a house with corner trims, a hopper of seed, a ringed door with
-  its perch; the kit's songbirds (`kit.songbird`: a robin at the door, a tit on the tray, a finch and a sparrow in the
+  its perch; the kit's songbirds (`kit::songbird!`: a robin at the door, a tit on the tray, a finch and a sparrow in the
   bath); a bath with a rolled rim; jittered flowering shrubs; a soft seed sack with its top rolled, a tin of seed and
   a scoop. The roof: shingle rows and a ridge.
-- `hearthSettee`: a piped soft base and back, puffed back cushions, rolled arms with welts (living.py's), turned
+- `hearthSettee`: a piped soft base and back, puffed back cushions, rolled arms with welts (the living room's, `crates/art/rooms/src/living`), turned
   legs, buttoned pillows, a lantern with bands, a cap and a ring. The seats: piped cushions with their tops at 0.45, a
   strip quilt of five fabrics draped over the right cushion and down its front, stitched across.
 

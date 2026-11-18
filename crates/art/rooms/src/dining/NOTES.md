@@ -33,7 +33,7 @@ K9 (2026-10-14): catalog2's `sideboard`, `buffet`, `chinaCabinet` and `barCart`.
   setting before each. A chair is built facing the front and turned a quarter (`end_chair`). The glass set's sleds
   run along its sides, leaving the ends open for the knees. The chairs are part of the table (as the old parts drew
   them): residents sit on them.
-- **Storage** stands where the game places it against the wall (`centre=` the old part's middle, then
+- **Storage** stands where the game places it against the wall (`.centre(..)` the old part's middle, then
   `settle`), so the sideboard's and buffet's tops (0.8, 0.9) are where the content's `surface` is.
 
 ## Materials
@@ -52,7 +52,7 @@ it costs no draw call. The bar cart's trays, bottles and wine glasses are `glass
   stool draws in 3 groups (base wood; seat wood and fabric).
 - **Bar cart**: the cocktail shaker is a part of its own, its origin at its foot, in the middle of the top tray's
   front edge, before the resident who mixes from the front tile. `shake` squashes it away in 0.2 s for `mix`, for as
-  long as the drink is mixed, while the resident shakes the same shaker in both hands (held.py `tool.shaker`,
+  long as the drink is mixed, while the resident shakes the same shaker in both hands (`crates/art/things/src/held`'s `tool.shaker`,
   `clips/props.ts` `shake`; 2026-10-26, review I-kitchen-13: it lifted 10 cm and tipped 30° on its own).
 - **Storage doors:** the sideboard's four fluted doors, the buffet's five panelled doors and the china cabinet's two
   glazed doors are parts of their own, hinged on their outer edges. All three are `cupboard` stations (content
@@ -153,6 +153,5 @@ The high bar stool's seat and back (`leather`) are leather. It goes from 2 draws
 
 ## Built in Rust (2026-11-18)
 
-Ported from `dining.py` line for line (crates/art/rooms/src/dining). Against the last Blender build (`ref/blender`)
-every model's points are Blender's (0.000 mm): 4 same, 25 near (bevel UVs, baked shading and corner normals within
-the parity limits), the pack the same. Its tubes are the kit's (`kit::tube!`).
+Built in Rust since 2026-11-18 (`cargo art dining`), proved against the last Blender build (`ref/blender`). Its tubes are the kit's
+(`kit::tube!`).

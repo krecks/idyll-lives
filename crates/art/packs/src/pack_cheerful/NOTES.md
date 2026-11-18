@@ -4,15 +4,15 @@
 entries in `packs/pack_cheerful/manifest.json`, an override pack listed in the base manifest. Built
 2026-10-14; they sat in Validate › Cheerful until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `.centre(..)` on its `Model`),
 with one moving part. Flat shapes (the jukebox's arch, the lamp's hills, the booth's pleated curtains, the hammock's
-sling) are meshes made from points in the family (`_slab`, `_ring`, `_pleats`, `_obj`).
+sling) are meshes made from points in the family (`slab`, `ring!`, `pleats`, `_obj`).
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
-| `jukebox` | the top record of the stack in the window, hinged on its front edge: `record` swings it up 90° to stand in the window (0.8 s); its label (with a coral stripe) is a part inside it (`G.attach`): `spin` turns it at 33⅓ a minute, a loop. The arch bands and the bubble tubes glow at night (`amber`, `sunny`: M-packs-07) | `dance` |
+| `jukebox` | the top record of the stack in the window, hinged on its front edge: `record` swings it up 90° to stand in the window (0.8 s); its label (with a coral stripe) is a part inside it (`motion::attach`): `spin` turns it at 33⅓ a minute, a loop. The arch bands and the bubble tubes glow at night (`amber`, `sunny`: M-packs-07) | `dance` |
 | `karaokeMachine` | the stand's upper tube, boom and microphone: `mic_up` raises them 25 cm out of the lower tube (0.8 s). The lyrics screen glows while it is sung to (`lyrics`, `screen`: M-packs-07) | `sing` |
-| `mocktailCart` | the cocktail shaker, hinged on its foot's edge: `shake` squashes it away (0.2 s) while the resident shakes held.py's `tool.shaker` in both hands (2026-10-26, review I-kitchen-13: it tipped 35° over the pink drink on its own) | `mix` |
+| `mocktailCart` | the cocktail shaker, hinged on its foot's edge: `shake` squashes it away (0.2 s) while the resident shakes the held `tool.shaker` (`crates/art/things/src/held`) in both hands (2026-10-26, review I-kitchen-13: it tipped 35° over the pink drink on its own) | `mix` |
 | `rainbowHammock` | the sling with its spreader bars, ropes, hooks and pillow, pivoting on the hooks: `sway` rocks it 5° each way (2.4 s), a loop; `ride: sway`. A 3 × 1 stand, the sling 2 m between the spreader bars at ±1.015 (`furniture.json` `sling`: low 0.5, end 0.9, half 1.015, head 0.75), so a grown-up lies in it near flat (2026-10-21: 2 × 1, a 1.5 m sling, the knees up: M-packs-06, Q-07) | `swing`, `doze` (loops) |
 | `sunriseLamp` | the sun, set behind the hills: `sunrise` slides it 22 cm up into the sky (1.5 s). The lamp has a content `light` (2.5 m, at 1.25 m), switched as a lamp, its sky glowing with it (M-packs-07) | `stretch` |
 | `partyBooth` | the right side curtain, hanging closed along its rail: `curtain` gathers it to the back (scaled to a quarter along its rail, 0.8 s), `hold` 1.5 s | `party` |
@@ -44,7 +44,7 @@ Rebuilt with the forms and the kit (README "The toolkit"); keys, sizes, centres,
 draws as before. Triangles in the table below (was: before the pass).
 - `jukebox`: the cabinet and plinth extruded from rounded outlines; the arch one extruded piece with the window cut
   through it, its bands stepping out; sunburst rays behind the record; the song cards in a chrome frame with rows
-  of titles; six turned push buttons in chrome rings; a moulded brass grille frame (`kit.moulding`) with chrome
+  of titles; six turned push buttons in chrome rings; a moulded brass grille frame (`kit::moulding!`) with chrome
   bars bursting from a hub; turned feet, caps and collars on the bubble tubes; two grooves on the record.
 - `karaokeMachine`: a rounded cabinet with a band round its sides and front; each driver one turned piece (flange,
   rolled surround painted in the trim colour, dished cone, dust cap); a rounded port; top knobs; bent carrying

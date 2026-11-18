@@ -6,7 +6,7 @@ the snack machine (`model.vendingSnack`), the drinks machine (`model.vendingDrin
 (`model.marketStall`). Built 2026-10-14; they sat in Validate › Stalls until checked in play
 (back to community / food).
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`):
+Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `.centre(..)` on its `Model`):
 the carts and the stall across their 2 × 1 tiles, the machines with their backs on the wall face (depth −0.43) of
 their 1 × 1 tile. They are placed on town lots and seen from far, so each has a far version (`_far(build)`: the
 model at rest, joined, the vertices that sit on one another merged, decimated to a quarter with its feet and outermost
@@ -35,7 +35,7 @@ floor).
 
 ## The machines
 
-One shell for both (`_cabinet`): a back block on levelling feet, side walls, a header with a lit sign (six letters on
+One shell for both (`cabinet`): a back block on levelling feet, side walls, a header with a lit sign (six letters on
 it), a keypad column on the right (display, twelve keys, a card reader with its slot, a coin slot, a coin return with
 its cup), a rounded bezel round the window, and a kick panel round an open pick-up tray with its PUSH label. The inside is
 lined dark; the tray's well is open at the front, so what drops into it shows.
@@ -87,4 +87,4 @@ cargo art stalls --preview  # previews/stalls/<id>.png, <id>@<clip>.png, <id>.fa
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `hotDogStand`, `iceCreamCart`, `vendingSnack`; the same triangles.
+No change to the build: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `hotDogStand`, `iceCreamCart`, `vendingSnack`; the same triangles.

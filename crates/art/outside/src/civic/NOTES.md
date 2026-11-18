@@ -1,7 +1,7 @@
 # Civic — notes
 
 This module builds the fittings of the town's named places (`content/civic.json`) into `web/public/assets/models/civic/`
-and their entries in `packs/civic/manifest.json`. Built 2026-11-17 (in Blender, by `civic.py`) in place of the
+and their entries in `packs/civic/manifest.json`. Built 2026-11-17 (in Blender) in place of the
 stand-ins the content pointed at until then; ported to Rust 2026-11-18. None of them has a moving part: no use of
 theirs opens anything.
 
@@ -105,8 +105,6 @@ cargo art civic --check    # the committed bytes, nothing written
 
 ## The port (2026-11-18)
 
-Against the last Blender build (`cargo check-glb --against ref/blender-civic --family civic`): 4 same (examCouch,
-lockerRow, waitingBench, the pack), 16 near, every one at 0.000 mm of surface, at most 0.30 % of texture and 0.00
-greys of shading off (a bevel's band of UVs, a normal's last digits). The plant table's far version is the kernel's
-decimation, not Blender's (which a second Blender build does not repeat): 1,934 triangles to Blender's 1,891, 1.2 mm
-from it on average and 22 mm at most, held to the decimated far versions' rule (`tools/art/port-accepted.json`).
+Built in Rust since 2026-11-18, proved against the last Blender build (`cargo check-glb --against ref/blender-civic
+--family civic`). The plant table's far version is the kernel's decimation, held to the decimated far versions' rule
+(`tools/art/port-accepted.json`).

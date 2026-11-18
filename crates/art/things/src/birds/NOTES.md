@@ -14,10 +14,10 @@ Each file is five rigid parts, the scene's top-level nodes, no clips:
 | `body` | the torso with the wings folded on it, and the legs | between the feet, on the perch: the model's origin |
 | `head` | head, bill, eyes (a blackbird's eye ring) | the neck joint |
 | `tail` | the tail | its base, under the rump |
-| `wing.L` | the bird's left wing, spread for flight: level, flat in the game's XZ plane, out along game −X (glTF/Blender +X) | the shoulder |
+| `wing.L` | the bird's left wing, spread for flight: level, flat in the game's XZ plane, out along game −X (glTF and the build axes' +X) | the shoulder |
 | `wing.R` | its right wing, out along game +X | the shoulder |
 
-The bird faces the game's +Z (glTF +Z, Blender −Y), in a perched pose: the torso raised `pitch` degrees from level, the
+The bird faces the game's +Z (glTF +Z, the build axes' −Y), in a perched pose: the torso raised `pitch` degrees from level, the
 tail hanging back and down. The spread wings are saved at scale 1. The renderer hides them (scale 0) while the bird is
 perched and flaps them about the body's forward axis in flight. Part names are exact. A species' extra part would go
 inside one of these five.
@@ -61,7 +61,7 @@ across from the game's camera, and the gate doesn't ask for one.
   the shoulder (its outer face and its lower edge), the tail by how far along and which face (top, outer edges, under),
   the spread wing by how far out and which band front to back. So the markings are one mesh per part, with no textures.
 - **The detail pass (2026-10-22).** Same parts, origins, pivots and `bird` facts as before (the node translations are
-  the old files' to the digit: the joints are placed by the old straight-line body, `body_point(smooth=False)`); more
+  the old files' to the digit: the joints are placed by the old straight-line body, `body_point(.., false)`); more
   rings and shape:
   - the torso 10 points round (12: blackbird, dove) through nine stations, its fullness eased between them (a monotone
     curve: a plain Hermite bulged 2 mm over the stations and failed the height);
@@ -98,9 +98,9 @@ across from the game's camera, and the gate doesn't ask for one.
 ## Looking at them
 
 `cargo art birds --preview` renders each bird into `previews/birds/<id>.png`: the front three-quarter with its wings
-spread. (The Blender script's extra views, perched from the side, the front and above and on a lawn beside a 1.77 m
-figure at 6 and 20 m, were Blender renders and are not made here: the game's gallery
-`/gallery.html?keys=model.bird.blackbird&scale=adult`, or `--camera game`, draws them as built. At real size, a tit
+spread. (To see one perched, from the side, the front and above, or on a lawn beside a 1.77 m figure at 6 and 20 m,
+use the game's gallery: `/gallery.html?keys=model.bird.blackbird&scale=adult`, or `--camera game`, draws them as
+built. At real size, a tit
 is a few pixels across at 20 m and a blackbird or a dove about ten.)
 
 ## Rebuild
@@ -113,5 +113,4 @@ cargo art birds --check    # rebuilds and fails on any byte that differs
 
 ## Built in Rust (2026-11-18)
 
-Ported line for line from the Blender script (`crates/art/things/src/birds`): against the last Blender build
-(`ref/blender`) all five files are byte for byte Blender's, and the pack the same.
+Built in Rust since 2026-11-18 (`cargo art birds`), proved against the last Blender build (`ref/blender`).

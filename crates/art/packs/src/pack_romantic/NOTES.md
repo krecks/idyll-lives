@@ -4,7 +4,7 @@
 entries in `packs/pack_romantic/manifest.json`, an override pack listed in the base manifest. Built
 2026-10-14; they sat in Validate › Romantic until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
+Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `.centre(..)` on its `Model`).
 Seats: the diners at 0.45 on a slipper chair at each end of the candlelit table, facing each other across its
 0.8 × 0.72 top (content `places` `[±0.62, 0.1]` facing ±90; G-39, 2026-10-21: they sat side by side behind a
 0.3 m top before, their legs through its front skirt), the writer at 0.45 in front of the bureau at depth 0.2, facing it (`furniture.json` `back`, the hips at 0.25; M-packs-05), the
@@ -31,10 +31,10 @@ the moving parts the rest:
 - the vanity: 2 (the mirror is plain gloss now), its pouf plain satin velvet;
 - the gramophone: all plain (the cabinet is satin wood colours), for the two moving parts;
 - the bureau: the chair's velvet is `fabric`;
-- the arbour: all plain, for the swing and the bloom: its leaves are satin, lumpy `G.boulder`s, and the swing's
+- the arbour: all plain, for the swing and the bloom: its leaves are satin, lumpy `boulder!`s, and the swing's
   cushion is satin.
 
-The heart tub is two prisms over a heart curve (`_prism`): the shell, hollow inside a smaller heart, on a plinth,
+The heart tub is two prisms over a heart curve (`loft!` through `_heart_ring`s): the shell, hollow inside a smaller heart, on a plinth,
 its floor at 0.2 m. Seated bathers (the renderer's chair pose at 0.35 m) put their shins down through the front of
 the shell at x = ±0.5 where the heart narrows, as they do in the old part: the pose, not the model.
 
@@ -62,7 +62,7 @@ bureau turned; the table, tub and arbour bought coloured; the same at night (`of
 ## Detail pass (2026-10-22)
 
 Roses are three thick turned cups (outer petals flaring, inner, bud: thick, so their insides show from above) with
-`plants.leaf` leaves. Same keys, sizes, parts, clips, paint and draws.
+`leaf!` leaves. Same keys, sizes, parts, clips, paint and draws.
 - **Candlelit table:** the cloth lofted in one piece, rolling over the edge and falling in soft folds; the runner draped
   over both ends; chairs with a stuffed seat and a rounded back (extruded, bevelled) on tapered legs; plates turned with
   a gold rim, a dessert with cream and a berry, forks and knives, wine in turned glasses; dripped candles and teardrop
@@ -70,13 +70,13 @@ Roses are three thick turned cups (outer petals flaring, inner, bud: thick, so t
 - **Heart tub:** the shell lofted through heart-shaped rings (up the outside, over a rolled rim, down to the floor) on an
   eased plinth; the ice bucket with ring handles, a lofted bottle with foil; rolled towels; petals on the water as petal
   blades, heaps of foam.
-- **Vanity:** a rounded top, the apron scalloped either side of the drawer, `G.kit.cabriole` legs, the oval mirror in a
+- **Vanity:** a rounded top, the apron scalloped either side of the drawer, `kit::cabriole!` legs, the oval mirror in a
   swept moulded frame on a stand, lofted perfume bottles with turned stoppers, a necklace, a buttoned pouf on a ring with
-  feet, a `G.kit.knob` and a lipstick and compact in the drawer.
+  feet, a `kit::knob!` and a lipstick and compact in the drawer.
 - **Gramophone:** a moulded cabinet top, raised-panel doors, brass corners, a bent crank, the horn's neck swept and its
   petals' seams, a grooved record, a turned sound box with its face.
 - **Letter bureau:** the apron's lower edge shaped, tapered square legs, an arched crest, envelopes standing tied with
-  ribbon, the flap a `G.kit.shaker` with a knob, a quill with a vane (`plants.leaf`), a turned wax seal.
+  ribbon, the flap a `kit::shaker!` with a knob, a quill with a vane (`leaf!`), a turned wax seal.
 - **Rose arbour:** the arches swept, the lattice laths each one sweep, climbing canes up the posts with leaves in threes
   and blooms, a leafy arch; the swing slatted with spindles between rails, swept arms, a stuffed cushion and pillows.
   11,734 triangles (its class, over 2.5 m, is 12,000).

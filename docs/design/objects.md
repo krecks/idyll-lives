@@ -468,6 +468,9 @@ are the examples; `hinged`, `turn`, `swing!` and `slide!` do the work.
   rest (a yoga mat, rolled up, has nothing under its seat). No content fact says a thing
   stands against a wall, so one standing off it isn't caught. CI runs it (in `cargo test -p ll-tools`);
   `--preview` also draws each file as read. A content file or manifest it can't read is a FAIL naming the file.
+- **`cargo review sizes --check`** (in CI) holds every buyable object's sizes and heights to its kind in
+  `docs/review/reference.json` (a tree or plant to its species), what is outside today held by
+  `tools/art/gate-baseline.json`'s `reference`; **`cargo review uses --check`** every use the renderer plays.
 - **`cargo test -p sim-core --test sim shipped_content::`** (in CI) fails when an object or item has no
   model file, or no `far` file where its entry names one, once the manifests are stacked as the game
   stacks them, and on an empty `model`.
@@ -542,7 +545,7 @@ licence in CREDITS.md, and go through the same gate.
 - [ ] Inside its footprint; heights and tops agree with the content (`seat`, `surface`, `light`, `slots`).
 - [ ] Every material mapped to a finish; 1–3 draw calls; triangles within the target for its size (half for things placed many times).
 - [ ] No emissive, no see-through except `glass`, no textures of its own unless needed (then ≤ 512 px).
-- [ ] `cargo check-glb --validate` passes.
+- [ ] `cargo check-glb --validate` passes; `cargo review sizes --check` and `cargo review uses --check` too.
 - [ ] Gallery; a lot by day and at night; WebGPU and WebGL2; the catalog picture; turned four ways.
 - [ ] Parts the player may colour named in `paint` (`body`), the rest in materials of their own.
 - [ ] Pack entry with `url` and `materials` (written by the build); base manifest lists the pack.

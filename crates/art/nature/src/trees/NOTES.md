@@ -201,7 +201,7 @@ As leaf cards (2026-11-10), by the same measure: Japanese maple 2.29 m, magnolia
 ## Perches (2026-10-22)
 
 Every tree's entry has `perches`: the places the game's birds sit on it. Each is `[x, y, z]` in the
-model's game axes (x, height, depth: Blender (−x, z, −y)), in metres, at rest, before the entry's `scale` and the
+model's game axes (x, height, depth: the build axes' (−x, z, −y)), in metres, at rest, before the entry's `scale` and the
 instance's turn. They are found on the tree as built (`artkit::perch` `find`, `clump_aims`, `tier_aims`):
 
 - A broadleaf's crown: lines come in from outside towards each clump of its crown (out from the trunk ±50°,
@@ -288,9 +288,5 @@ cargo art trees --only oak    # one of them
 cargo art trees --check       # nothing written: fails on any byte that differs from what is committed
 ```
 
-A build gives the same bytes every time. Against Blender 5.2's build of the script this folder replaced
-(2026-11-17, `cargo check-glb --against`): the perches and the pack entries to the letter, every triangle's points
-and UVs to the bit, and 19 of the 24 files the same in every bit of every corner. The other five: one normal of the
-cypress a ten-thousandth off; the apple's, the Japanese maple's and the lemon tree's clips' keys a unit in the last
-place; and the baked shading of the lemon tree's pot band, on the side of it buried in the pot, a grey or more off
-at 19 vertices (7 on its far version).
+A build gives the same bytes every time. Built in Rust since 2026-11-17, proved against the last Blender build
+(`cargo check-glb --against ref/blender`).

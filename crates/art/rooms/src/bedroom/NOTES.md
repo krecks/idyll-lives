@@ -45,7 +45,7 @@ The module builds the nine beds of BR1 into `web/public/assets/models/bedroom/` 
 |---|---|---|---|---|---|
 | `model.bed` | 1.90 × 1.13 × 1.88 m | 6,722 | 3 | `turn_down` | upholstered linen base piped round top and bottom, piped headboard with four lofted padded channels, teak legs, a sage runner swept over the foot |
 | `model.bedSingle` | 0.96 × 0.95 × 1.91 m | 6,520 | 3 | `turn_down` | oak posts with collars and ball finials, an arched top rail over five rounded slats, a framed and panelled footboard |
-| `model.bedBunk` | 0.97 × 1.90 × 1.90 m | 7,896 | 4 | `turn_down` (lower bunk, slot 0), `turn_down_upper` (slot 1, 5 s in) | oak; posts with capped tops, arched end boards (the upper bunk's with a hand hold), the ladder hooked over the upper rail; the ladder (right, at the foot) is still; each bunk's duvet turns down for its own sleeper (`slot` in `motions.uses`), at a fourth draw; the upper one once its sleeper has climbed the ladder and crawled in (`delay` 5 s, `BUNK_CLIMB_IN`: the climb is 7 s), not at the ladder's foot (A-bedroom-06) |
+| `model.bedBunk` | 0.97 × 1.90 × 1.90 m | 7,896 | 4 | `turn_down` (lower bunk, slot 0), `turn_down_upper` (slot 1, 5 s in) | oak; posts with capped tops, arched end boards (the upper bunk's with a hand hold), the ladder hooked over the upper rail; the ladder (right, at the foot) is still; each bunk's duvet turns down for its own sleeper (`slot` in `motions.uses`), at a fourth draw; the upper one once its sleeper has climbed the ladder and crawled in (`delay` 5 s, `BUNK_LADDER` in actions.ts: the climb is 7 s), not at the ladder's foot (A-bedroom-06) |
 | `model.bedFuton` | 1.96 × 0.99 × 1.91 m | 7,496 | 3 | `unfold` (held open) | ash slatted platform with rounded rails and tenons showing, a low headboard with four slots under a rounded cap; tufted seat and back, a folded quilt |
 | `model.bedKing` | 1.98 × 1.40 × 1.90 m | 8,378 | 3 | `turn_down` | piped base and headboard, five lofted padded channels, piped wings, tapered square legs, sage runner |
 | `model.bedDouble` | 1.62 × 0.95 × 1.90 m | 6,840 | 3 | `turn_down` | oak frame with a bead, posts with pyramid caps, an arched top rail over eight rounded teak slats, tapered square legs, blue duvet |
@@ -112,8 +112,4 @@ cargo art bedroom --check    # rebuilt and held to the committed files, byte for
 
 ## Ported to Rust (2026-11-18)
 
-Built by `cargo art bedroom` from this module (its Python script's numbers and order, one function each).
-Against the last Blender build (`ref/blender`): all nine near; the futon and the daybed to 0.000 mm, the beds with
-a duvet within 0.2 mm on average: the duvet's flat underside, hidden in the mattress, is cut into triangles a
-little otherwise than Blender's (its points are Blender's), up to 2.2 mm apart on the queen (accepted in
-tools/art/port-accepted.json).
+Built in Rust since 2026-11-18 (`cargo art bedroom`), proved against the last Blender build (`ref/blender`).

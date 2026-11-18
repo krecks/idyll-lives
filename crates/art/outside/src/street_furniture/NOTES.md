@@ -17,20 +17,19 @@ built in the game's axes (`F`) where the game places it, at the content's height
 - the lamp's lantern from 3.46 to 3.88 m round the content's `light.height` 3.5.
 
 The bench, the litter bin and the notice board stand a few centimetres back of their tile's middle, as their
-old parts do (`G.settle(centre=False)` and `centre=` on the `Model`); the rest are centred by `G.settle`.
+old parts do (`settle!(centre = false)` and `.centre(..)` on the `Model`); the rest are centred by `settle_all()`.
 
 ## One palette per model
 
 Every model's main part is `body` (the part the player colours), but its colour and finish differ: a cast-iron lamp
 post (metal), a red gloss post box and phone box, a stone fountain (matte), a walnut notice board (wood), a bronze
-statue (metal). A `G.Palette` has one colour and finish per name, so each build function makes its own palette
-(`_palette(body=…)`, the shared colours plus its own body) and the family's palette (`PALETTES`) answers the pack's
-`materials` with the model just built.
+statue (metal). A palette has one colour and finish per name, so each model has a palette of its own (`common::own(id)`, the
+shared colours plus its own body), which names its materials in the pack's `materials`.
 
 ## The clips
 
 - **Drinking fountain** (`water_on`, use `drink`): the arc of water from the bubbler's mouth into the bowl, a swept
-  tube with its origin at the mouth and scaled to 0.001 on all three axes at rest; `G.grow` on X, Y and Z
+  tube with its origin at the mouth and scaled to 0.001 on all three axes at rest; `grow!` on X, Y and Z
   grows it out of the mouth in 0.35 s. It is `spray`, gloss, never emissive. Played back when the drink ends.
 - **Post box** (`flap`, use `post`, `hold` 1 s): the slot's flap, hinged on its top edge in a housing proud of the
   pillar, swings 65° in (its bottom edge to the back) over a dark opening, in 0.5 s.
@@ -40,7 +39,7 @@ statue (metal). A `G.Palette` has one colour and finish per name, so each build 
   (It swung in until 2026-10-17, to clear a caller who stayed on the tile in front; with them inside it would sweep
   through them.) Seen in play.
 - **Town fountain** (`water_run`, `idle`): the water runs all the time near the camera (not on Low). Two parts move
-  in one clip of 1.2 s, each a `G.squash(..., back=True)` pulse that ends where it starts: the jet on the top knob
+  in one clip of 1.2 s, each a `squash!(.., back = true)` pulse that ends where it starts: the jet on the top knob
   rises to 1.3 times its height and falls back, and the splashes where the eight streams land in the basin bob up
   to 1.8 times theirs. The streams spilling from both bowls are still, on the body. `check-glb` gives no loop
   warning: a pulse comes back to rest exactly.
@@ -57,7 +56,7 @@ statue (metal). A `G.Palette` has one colour and finish per name, so each build 
 ## Far versions (E7)
 
 Every model has a `<id>.far.glb` for the town overview (the menus' town). The lamp, the bench, the bin, the shelter,
-the post box, the notice board and the phone box use `far=0.25`: the model at rest, joined and decimated to a quarter.
+the post box, the notice board and the phone box use `.far_ratio(0.25)`: the model at rest, joined and decimated to a quarter.
 The drinking fountain, the town fountain and the statue use `_far(build)`: the same, but the vertices that sit on one
 another are merged first (turned parts meet on their axis in many vertices, and the fountains' pillars and copings
 decimated unmerged tore into spikes), the vertices below 0.1 m (the feet) and on the model's outermost faces are left
@@ -69,11 +68,11 @@ Rebuilt in detail on 2026-10-22 with the forms and the kit, each at most half it
 (they stand by the dozen on the town's lots and the town overview draws them all).
 
 - **Street lamp**: a square chamfered plinth, a fluted bell rising to a moulded collar, a fluted post with a collar part
-  way, a neck with the lamplighter's ladder bar (ball ends), four iron scrolls (`kit.scroll`) from a turned capital out
+  way, a neck with the lamplighter's ladder bar (ball ends), four iron scrolls (`kit::scroll!`) from a turned capital out
   under the lantern; the lantern's frosted panes widening upwards in an iron frame between a moulded floor and top, a
   hipped roof curving in, a vented crown and a turned finial. One draw call.
 - **Park bench**: five rounded slats and three back slats, 2.5 m long, with domed bolts, on three cast-iron supports in
-  one piece each (`kit.bench_end`: back leg into the upright, seat rail, stretcher, a curl under the seat; armrests
+  one piece each (`kit::bench_end!`: back leg into the upright, seat rail, stretcher, a curl under the seat; armrests
   curling down in scrolls on the end two); its three sitters a metre apart on its three tiles.
 - **Drinking fountain**: a granite slab, a turned stone pillar (moulded base, fluted shaft, moulded capital), a bowl with
   a rolled lip falling to a grated drain, a chrome bubbler bent forward in one piece on a turned foot, its mouth and an
@@ -83,9 +82,9 @@ Rebuilt in detail on 2026-10-22 with the forms and the kit, each at most half it
   straps round its back.
 - **Taxi rank shelter** (`busStop`; the bus shelter until 2026-11-05, when the bus went and a shared work taxi took
   its place): four posts on bolted foot plates, a curved roof on beams, a fascia with the taxi's yellow stripe and
-  two rows of its chequers (`kit.chequer`), a gutter; glass at the back (two panes on a mullion) and the right-hand
+  two rows of its chequers (`kit::chequer!`), a gutter; glass at the back (two panes on a mullion) and the right-hand
   end in rails, white safety bands; a two-slat bench on cantilevered brackets with slim legs; the fares (a yellow
-  head lettered TAXI, `kit.taxi_word`, over lines of fares) and a town map on the back glass; on the roof the rank's
+  head lettered TAXI, `kit::taxi_word!`, over lines of fares) and a town map on the back glass; on the roof the rank's
   sign: a yellow case, a light box lettered TAXI on both faces (lit at night), the chequers under it, in the language
   of the taxi's roof sign (`render/shared/cars.ts` `paintTaxi`). Its shapes are the bus shelter's; its id stays
   `busStop`, so towns and saves keep it.
@@ -97,12 +96,12 @@ Rebuilt in detail on 2026-10-22 with the forms and the kit, each at most half it
   one a leaflet with tear-off strips.
 - **Phone box**: a red kiosk on a stepped plinth, glazed on all four sides (three columns, eight rows of panes), panelled
   kick panels, a band with four TELEPHONE signs, a cornice, an arched pediment with a crown on each side and the shallow
-  dome between them; the door with a bar pull (`kit.pull`). Inside, the phone (case, dial, a
+  dome between them; the door with a bar pull (`kit::pull!`). Inside, the phone (case, dial, a
   coiled cord, the coin box) on a panel, and a shelf of directories. Its handset isn't in the model: a part of its own
   would be a fifth draw call, so the game draws it on its hook by code (the held things' `receiver`, actions.ts `REST_PROPS`),
   and in the caller's hand while they call.
 - **Town fountain**: a square basin on a granite slab: walls on a plinth band, three raised panels a face, a moulded
-  coping with a rounded nose all round (`kit.moulding`, its top the seat), water; in the middle a moulded foot, a fluted
+  coping with a rounded nose all round (`kit::moulding!`, its top the seat), water; in the middle a moulded foot, a fluted
   column, a capital, the wide lower bowl gadrooned underneath with a rolled lip, a waisted stem, the small top bowl
   gadrooned too, a turned knob. Six streams from the top bowl and eight from the lower one, each one swept piece
   thinning as it falls, splash into crowns of spray.
@@ -140,9 +139,9 @@ Khronos validator: 0 errors, 0 warnings on all twenty files (each model and its 
 
 ## The traffic light (`model.trafficLight`)
 
-Built 2026-11-05. Not buyable and in no content (`code=True`): `render/pc/signals.ts` stands one at each signal head
+Built 2026-11-05. Not buyable and in no content (`.code()`): `render/pc/signals.ts` stands one at each signal head
 the sim has (the snapshot's `light` rows, sim-core `traffic.rs`: one per arm of each lit junction). Its origin is the
-pole's axis, where the snapshot stands it, so it isn't centred (`G.settle(centre=False)`, `centre=(0, 0.15)`: the
+pole's axis, where the snapshot stands it, so it isn't centred (`settle!(centre = false)`, `.centre(0.0, 0.15)`: the
 head reaches forward); its head faces +z, towards the traffic coming in.
 
 - A square chamfered plinth and a short fluted bell to a moulded collar (the street lamp's, smaller), a fluted pole
@@ -153,7 +152,7 @@ head reaches forward); its head faces +z, towards the traffic coming in.
   colour it glows (`glow`). All plain, so the model is one draw. The renderer builds the glows a mesh per material
   (`BuildOptions.glowApart`) and draws each colour's as one instanced draw of the heads showing it: only the lamp
   the snapshot shows is lit, by day as at night (brighter as the lamps come up). The rest stay dark glass.
-- Far version: its own build at low detail (`G.far_of`): fewer segments, no flutes, flat hoods.
+- Far version: its own build at low detail (`.far_low()`): fewer segments, no flutes, flat hoods.
 
 ## Rebuild
 

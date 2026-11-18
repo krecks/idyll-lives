@@ -6,7 +6,7 @@ entries in `packs/office/manifest.json`: the desks (`model.deskSimple`, `deskCor
 `officeChair`) and the storage and boards (`model.filingCabinet`, `whiteboard`, `corkboard`). Built
 2026-10-14; they sat in Validate › Desks, Office Chairs and Office Storage until checked in play.
 
-Each is built where the game places it (`F`, game axes; `settle` on the floor and `centre=` on its `Model`). Backs against the wall stop at its face (game depth −0.43, −0.93 two tiles
+Each is built where the game places it (`F`, game axes; `settle` on the floor and `.centre(..)` on its `Model`). Backs against the wall stop at its face (game depth −0.43, −0.93 two tiles
 deep), so the simple, standing and executive desks' tops are 3 cm shallower than their content `surface` rectangle
 at the back. Desk tops are at the content's `surface` height: 0.74 (catalog2), 0.75 (the old part), 1.05 standing.
 
@@ -38,7 +38,7 @@ and its back the room. The chair is part of the still desk (no swivel) and its b
   `surface` is the back wing (1.86 × 0.7 m). 2026-10-21, review M-office-01: it was a 1.86 m square slab with one
   corner cut, read as an island, a chair facing it from the front tiles at its edge or its front panel; generated
   studies now take it on its own (`housegen.json`), not as a desk set with a chair. `turned` sets the joined part
-  to Euler mode: a part whose first piece is a rod (`G.rod`) is in quaternion mode, which ignored the chair's turn.
+  to Euler mode: a part whose first piece is a rod (`rod!`) is in quaternion mode, which ignored the chair's turn.
 - **Executive desk:** walnut on two pedestals of three drawers with brass handles, a green leather pad. Its middle
   drawer is a part of its own but still: left decorative in 0.3.0, because its clip would need a seated use on the
   desk.
@@ -124,7 +124,6 @@ The executive chair's upholstery (`leather`, `leather2`) and the executive desk'
 
 ## Built in Rust (2026-11-18)
 
-Ported from `office.py` line for line (crates/art/rooms/src/office). Against the last Blender build (`ref/blender`)
-every model's points are Blender's (0.000 mm): 2 same, 13 near, none changed. `fillet`, `pull`, `shaker` and
-`moulding` are the kit's (`kit::fillet!` and the rest); `office.py`'s `_slab`, `_box`, `_rod` and `_pull`
-were never called and are not ported.
+Built in Rust since 2026-11-18 (`cargo art office`), proved against the last Blender build (`ref/blender`). `fillet`, `pull`, `shaker` and
+`moulding` are the kit's (`kit::fillet!` and the rest); the Blender script's `_slab`, `_box`, `_rod` and
+`_pull` were never called and are not ported.

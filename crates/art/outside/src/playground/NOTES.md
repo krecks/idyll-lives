@@ -8,34 +8,34 @@ hoop (`model.basketballHoop`), the ping-pong table (`model.pingPongTable`) and t
 
 Each is built where the game places it (`F`, game axes) and stood on the floor without moving it across
 (`settle!(centre = false)`, `centre` on its `Model`), so the seats stay where `community.json` seats the riders. Town
-things, seen from far: every model has a far version (`far=0.25`; the chess table's by hand, below).
+things, seen from far: every model has a far version (`.far_ratio(0.25)`; the chess table's by hand, below).
 
 ## The moving ones
 
 - **Seesaw** (3 × 1 tiles): a 2.5 m plank on a blue A-frame stand, rubber bumpers under its ends. The content's two
   slots fall at x = ±0.75 m (3 m wide, 2 slots) at 0.56 m: the seats are there, level at rest. The plank, its seats
   and handles are one part (`plank`) turning about the axle (0.46 m up). `seesaw` rocks it ±12° in 1.4 s (`rock`
-  about Blender Y), so the low end just meets its bumper. `motions`: `{'loops': {'seesaw': 'seesaw'}, 'ride':
-  'seesaw'}`.
+  about the build axes' y), so the low end just meets its bumper. `motions`: `{"loops": {"seesaw": "seesaw"}, "ride":
+  "seesaw"}`.
 - **Spring rider**: a red horse on a green coil spring (a swept helix). The saddle's top is the content's seat (0.62 m,
   4 cm back: a rider's seat for a toddler to a six-year-old; it was 0.78, the horse 16 cm higher on a longer coil). The horse and everything above the spring (`horse`) rocks ±10° in 1 s about the spring's top (`rock`).
-  `motions`: `{'loops': {'ride': 'rock'}, 'ride': 'rock'}` (the interaction id is `ride`).
+  `motions`: `{"loops": {"ride": "rock"}, "ride": "rock"}` (the interaction id is `ride`).
 - **Merry-go-round** (2 × 2): a 1.9 m red platform, its top 0.26 m up (the content's seat; it was 0.24), four bent rails and a centre
   column; the hub stays still. `spin` turns the platform (`platform`) once in 3.5 s: a whole turn, so riders carried
-  round never snap back at the loop's end, and well under a turn a second. `motions`: `{'loops': {'spin': 'spin'},
-  'ride': 'spin'}`. `check-glb` has no clip-length check; 3.5 s is longer than the usual "about 1 s", needed for a
+  round never snap back at the loop's end, and well under a turn a second. `motions`: `{"loops": {"spin": "spin"},
+  "ride": "spin"}`. `check-glb` has no clip-length check; 3.5 s is longer than the usual "about 1 s", needed for a
   whole turn at a believable speed.
 - **Basketball hoop**: a post on a ballast base at the back of its tile, a 1.2 × 0.8 m backboard with the shooter's
   square, and the rim at 3.05 m (regulation, as park hoops are; it was 2.94 m on a 0.95 × 0.62 board). The net
   (`net`, a diamond mesh of thin strands, `fabric`) is its own part hung from the rim: `swish` sways it 9° and
   stretches it 18 % down and back in 0.6 s, from rest to rest, after each shot: 1.4 s into `shoot`, then every
-  3.2 s while it lasts. `motions`: `{'uses': {'shoot': {'clip': 'swish', 'delay': 1.4, 'every': 3.2}}}`.
+  3.2 s while it lasts. `motions`: `{"uses": {"shoot": {"clip": "swish", "delay": 1.4, "every": 3.2}}}`.
 - **Park chess table** (2 × 1): a stone table (0.7 m square) with the board inlaid (5 cm squares), and a stone
   stool either side, left and right, where the content's `places` seat the two players facing each other across the
   board (x = ±0.6 m, 0.47 m up, their knees clear of each other under the top; until 2026-10-21 both stools stood
   behind it, the players side by side, then ±0.42 m on one tile, the knees meeting). White plays
   from the left. A game is under way; one white pawn (`pawn`) slides one square on, towards black (`move`, 0.6 s), for
-  the whole game (no `hold`: it goes back when they get up). `motions`: `{'uses': {'chess': 'move'}}`.
+  the whole game (no `hold`: it goes back when they get up). `motions`: `{"uses": {"chess": "move"}}`.
 
 How riding works: `objectMotion.ts` `ride(id)` gives the seat's move from rest (the first part the `ride` clip moves),
 and `characters.ts` moves a sitting or lying resident by it. All three rides use `"pose": "sit"`, so their riders go
@@ -54,14 +54,14 @@ rider's rocks on the saddle, the merry-go-round's goes round sitting on the plat
   net up the front and a fireman's pole beside it (the content's description).
 - **Ping-pong table** (3 × 2): a green top at the ITTF's 2.74 × 1.525 m, 0.76 m up, with white lines, on two concrete
   legs, a steel net 15.25 cm high reaching 15.25 cm past each side, and a ball; the players stand at its
-  ends (`places` ±1.8 m; it was 1.9 × 0.94 m on 2 × 1, its top 0.78). The bats are in the players' hands (held.py
+  ends (`places` ±1.8 m; it was 1.9 × 0.94 m on 2 × 1, its top 0.78). The bats are in the players' hands (`crates/art/things/src/held`'s
   `tool.bat`; 2026-10-26, review I-community-06: two lay on the top while it was played).
   All plain finishes: one draw call.
 
 ## Far versions
 
-`far=0.25` decimates the model at rest. On the chess table that folded the inlaid board into spikes, so it has a far
-build of its own (`parkChessTableFar`): the table, the squares and the stools at fewer sides and only the two kings
+`.far_ratio(0.25)` decimates the model at rest. On the chess table that folded the inlaid board into spikes, so it has a far
+build of its own (`park_chess_table_far`): the table, the squares and the stools at fewer sides and only the two kings
 (1,784 triangles, under half the full model's). Its revolves take 12 sides so its bounds stay those of the full model.
 
 | Model | Size (w × h × d) | Triangles (far), before → after | Draws | Colour parts |
@@ -77,8 +77,8 @@ build of its own (`parkChessTableFar`): the table, the squares and the stools at
 
 ## Detail pass (2026-10-22)
 
-Rebuilt with the forms and the kit (one-piece bent tube through `kit.fillet`, sweeps, lofts, extrudes with holes,
-soft boxes, `kit.moulding`), keeping every size, centre, part, clip, `motions`, paint slot, draw count and the
+Rebuilt with the forms and the kit (one-piece bent tube through `kit::fillet!`, sweeps, lofts, extrudes with holes,
+soft boxes, `kit::moulding!`), keeping every size, centre, part, clip, `motions`, paint slot, draw count and the
 heights and places the game seats and animates residents by (`clips/rides.ts`, `street.ts`): the deck, ladder,
 chute and arch of the slide, the net's ropes and the pole of the climbing frame, the seats and grips of the seesaw,
 the saddle, handles and pegs of the spring rider, the merry-go-round's rail curve and platform, the rim.
@@ -103,7 +103,7 @@ the saddle, handles and pegs of the spring rider, the merry-go-round's rail curv
   collar, bent arms with a strut, the board in a moulded steel frame with a pad along its foot, the shooter's square
   one outline, a flanged rim bracket and spring housing, net hooks; the net's strands each one cord (`swish` as before).
 - **Ping-pong table**: a steel band round the top's edge and an apron under it, tapered concrete piers with an arch
-  through them and steel caps, the net as a plate with slots, a band, posts and clamps (the bats are held.py's).
+  through them and steel caps, the net as a plate with slots, a band, posts and clamps (the bats are the held things', `crates/art/things/src/held`).
 - **Park chess table**: a moulded pedestal, a top with a chamfered edge and a band under it, the board in a border,
   turned stools; knights and bishops join the game (a knight's head swept), a cross-barred king, a taken pawn beside
   the board. The far version builds from the same pedestal, top and stools at 12 sides.
@@ -121,4 +121,4 @@ cargo art playground --preview  # previews/playground/<id>.png, <id>@<clip>.png,
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `basketballHoop`, `seesaw`, `springRider`; the same triangles.
+No change to the build: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `basketballHoop`, `seesaw`, `springRider`; the same triangles.

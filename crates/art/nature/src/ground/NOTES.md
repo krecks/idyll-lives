@@ -14,7 +14,7 @@ group. The keys are unchanged.
   triangles but drew all of them, where the old part's thin cones are mostly degenerate tips and hidden caps:
   it measured 0.9 ms more GPU time on WebGL (0.4 on WebGPU) over the village from afar (`render.mjs`, `wide`,
   Medium); the ribbons measure the same as the old part. The blades are flat-shaded with their normals bent
-  towards the sky (`_mesh(sky=…)`, custom normals): near upright, they drew dark against the lawn from above,
+  towards the sky (`_mesh`'s `sky`, custom normals): near upright, they drew dark against the lawn from above,
   where the old part's cones read light.
 - **Wildflowers** (`model.flowers`): on about one tile in seventeen and a tenth of the scatter round the town, one mesh
   over the whole landscape. Five low leaves (ribbons as above), three kinked stems and three five-petalled heads (a
@@ -45,7 +45,7 @@ group. The keys are unchanged.
   triangles a petal), 4 to 9 cm up, at the tips of the blades (the gate's `float`, accepted), with no stem (the
   blades would hide one; a sliver of a stem drew as a dark mark beside each head from the street) and no leaves.
   Every face's normal is bent to the sky, as the blades' are: a head is 4 to 7 px from the play camera, and shaded
-  by its own slope half of it drew dark. No shading from the ground (`ground=False`), which had every head, all
+  by its own slope half of it drew dark. No shading from the ground (`.ground(false)`), which had every head, all
   within 10 cm of it, dark. A first version with `flower`'s closed heads and tube stems (228 triangles a patch of
   daisies) cost 0.23 ms of GPU a frame on Medium over the village; lighter heads, on the plots only, 0.07 ms and
   0.09 M triangles (M3 Pro, the orbit by day, medians of 3). Low draws none (`lawnDensity`): every other one, in its
@@ -68,9 +68,9 @@ group. The keys are unchanged.
 **Detail pass (2026-10-22).** Same keys, sizes, centres, finishes and draw calls:
 
 - **Grass tuft**: the four blades stand where they did; three short, narrow straight blades between them (the new
-  growth, `blade(joint=False)`, 2 triangles each) fill its foot. 30 triangles, 15 of them drawn (the old 12): kept
+  growth, `blade(joint = false)`, 2 triangles each) fill its foot. 30 triangles, 15 of them drawn (the old 12): kept
   small, as the lawn draws it by the ten thousand (more blades measured as GPU time before; not re-measured).
-- **Wildflowers**: each leaf folded along its midrib (`blade(fold=…)`, 12 triangles; flat in the far version); the
+- **Wildflowers**: each leaf folded along its midrib (`blade`'s `fold`, 12 triangles; flat in the far version); the
   three heads given their own kinds where they stood: an ox-eye daisy (thirteen narrow white rays round a broad
   yellow disc), a buttercup (five yellow petals cupped up round an orange eye) and a cranesbill (five broad violet
   petals, flat, round a pale eye, `eye_pale`); a daisy's bud nodding on a fourth stem, its green sepals cupping the
@@ -90,8 +90,7 @@ anything that draws them far off. `check-glb`: 4 models, 0 failed, no warnings. 
 The spare `model.stove`, `model.plantSmall` and `model.ceilingLamp` went at the same time: nothing in
 the game, its content, the crates or the tools drew them.
 
-Built here, not in Blender, since 2026-11-18 (`cargo check-glb --against ref/blender`): the thirteen files' points
-and triangles Blender's (0.000 mm), nine of them the same in every bit; the rock's lichen and soil on the same
-faces. A stone's cut is `rock::_cut` (artkit's `edit::bisect_plane`, `holes_fill` and `triangulate`, bmesh's own), and a
-stone's fractures are cut where it was made, at the origin. The
-blades' and heads' sky normals are kept a corner at a time as Blender keeps them (`common::sky_normals`).
+Built in Rust since 2026-11-18, proved against the last Blender build (`cargo check-glb --against ref/blender`). A
+stone's cut is `rock::_cut` (artkit's `edit::bisect_plane`, `holes_fill` and `triangulate`), and a stone's fractures
+are cut where it was made, at the origin. The blades' and heads' sky normals are kept a corner at a time
+(`common::sky_normals`).

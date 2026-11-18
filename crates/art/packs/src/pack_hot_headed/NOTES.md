@@ -4,7 +4,7 @@
 entries in `packs/pack_hotHeaded/manifest.json`, an override pack listed in the base manifest. Built
 2026-10-14; they sat in Validate › Hot Headed until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`).
+Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `.centre(..)` on its `Model`).
 Seats stay where the renderer puts residents: the drum throne's top at 0.47 (default seat), the zafu pressed to 0.17, sat on cross-legged
 (`furniture.json` `hotHeaded.coolDownCushion`, a seat under 0.2 m: the floor clips), the plunge's bather at 0.35 in the middle of its tub (`SEATS`), the desk chair
 at 0.45 in the middle of its tile.
@@ -62,7 +62,7 @@ Rebuilt with the forms and the kit, keeping every key, size, centre, part, hinge
 desk 2,844 → 3,540, plunge 7,140 → 5,182; draws unchanged). The crate and the plunge came down: their boxes' bevels
 were the default two segments (108 triangles a board); one segment is enough at this size.
 
-- `heavyBag`: the upright and boom bent from one square tube (`kit.fillet`), gussets, a round brace with flanges, a
+- `heavyBag`: the upright and boom bent from one square tube (`kit::fillet!`), gussets, a round brace with flanges, a
   T foot with rubber caps; weight plates turned with a raised rim on L-shaped pegs; gloves with swept thumbs, turned
   cuffs and straps, hung by their laces. The bag: a rounded leather body, raised straps and seams, a flame logo (an
   outline), a turned swivel, four D-rings and four chains of oval links.
@@ -83,7 +83,7 @@ were the default two segments (108 triangles a board); one segment is enough at 
   inset front and a bar pull towards the writer, letters with flaps.
 - `coldPlunge`: cedar boards a hair proud or shy, corner posts, two steel bands swept round, a moulded rim in one
   piece; bevelled ice; the housing with end caps; the chiller with a slotted grille (an outline with holes), buttons,
-  feet and hoses arching into the tub (`kit.fillet`), a soft towel with a band, a lofted bottle.
+  feet and hoses arching into the tub (`kit::fillet!`), a soft towel with a band, a lofted bottle.
 
 `check-glb`: 6 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings each.
 
@@ -96,7 +96,7 @@ cargo art pack_hotHeaded --preview  # previews/pack_hotHeaded/<id>.png, <id>@<cl
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `coldPlunge`, `coolDownCushion`, `grudgeJournal`; the same triangles.
+No change to the build: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `coldPlunge`, `coolDownCushion`, `grudgeJournal`; the same triangles.
 
 ## Leather (2026-11-13)
 
