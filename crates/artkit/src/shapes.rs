@@ -60,6 +60,14 @@ pub fn shade(obj: Obj, smooth: bool, angle: f64) -> Obj {
     obj
 }
 
+/// `bpy.ops.object.shade_smooth_by_angle(angle)` with `obj` selected: smooth, its edges turning more than `angle`
+/// degrees sharp as well as those that were (`Mesh::shade_smooth_by_angle`). On its mesh as it is: a bevel still to
+/// be given is given first by the script that applies its modifiers (`bevel::apply`).
+pub fn shade_smooth_by_angle(obj: Obj, angle: f64) -> Obj {
+    obj.edit(|o| o.mesh.shade_smooth_by_angle(angle));
+    obj
+}
+
 /// gamekit's `shapes._recalc_normals`, which a script may call itself (and `bmesh.ops.recalc_face_normals` over
 /// all a mesh's faces): each connected piece of `obj`'s mesh wound one way, looking outwards.
 pub fn recalc_normals(obj: Obj) -> Obj {

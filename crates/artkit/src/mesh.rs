@@ -128,11 +128,20 @@ impl Mesh {
         if crate::math::skips_transform(m) {
             return;
         }
+        // (a mirror turns the frames a mesh's own normals are kept in inside out, and Blender reads them in the
+        // frames as they then are: they are not the normals turned with the points)
+        let a = m.0;
+        let mirrors = a[0][0] * (a[1][1] * a[2][2] - a[2][1] * a[1][2])
+            - a[1][0] * (a[0][1] * a[2][2] - a[2][1] * a[0][2])
+            + a[2][0] * (a[0][1] * a[1][2] - a[1][1] * a[0][2])
+            < 0.0;
+        if mirrors {
+            self.store_normals();
+        }
         for v in &mut self.verts {
             *v = mul_m4_v3(m, *v);
         }
         if let Some(normals) = &mut self.normals {
-            let a = m.0;
             // (a normal goes through the matrix's cofactors: its inverse transposed, but for the length)
             let cof = |r: usize, c: usize| {
                 let (r1, r2, c1, c2) = ((r + 1) % 3, (r + 2) % 3, (c + 1) % 3, (c + 2) % 3);
@@ -157,11 +166,37 @@ impl Mesh {
         self.transform(&M4::translation(by));
     }
 
-    /// `mesh.flip_normals()`: every face wound the other way, from the corner it started at.
+    /// `mesh.flip_normals()`: every face wound the other way, from the corner it started at. A mesh's own normals
+    /// are not turned with the faces as vectors: Blender keeps each as two angles in the frame of its corner's fan,
+    /// which go round with the corners and read in the frames of the faces as they then are
+    /// (`normals::corner_normals`): a normal that was its fan's own looks the other way with it, as a joined
+    /// part's without a bevel does; one a bevel hardened reads from the fan's other end.
     pub fn flip_normals(&mut self) {
+        self.store_normals();
         for f in 0..self.faces.len() {
             self.flip_face(f);
         }
+    }
+
+    /// Gives each corner that has only a normal of its own (`normals`) the two angles Blender keeps for it
+    /// (`stored`), in the frames of the mesh as it is.
+    fn store_normals(&mut self) {
+        if self.normals.is_none() {
+            return;
+        }
+        let corners = self.loops.len();
+        let mut stored = match self.stored.take() {
+            Some(stored) if stored.len() == corners => stored,
+            _ => vec![None; corners],
+        };
+        if stored.iter().any(Option::is_none) {
+            self.stored = Some(stored.clone());
+            let now = crate::normals::corner_normals(self);
+            for (kept, angles) in stored.iter_mut().zip(crate::normals::to_stored(self, &now)) {
+                kept.get_or_insert(angles);
+            }
+        }
+        self.stored = Some(stored);
     }
 
     fn flip_face(&mut self, f: usize) {
@@ -187,12 +222,48 @@ impl Mesh {
     }
 
     /// `mesh.shade_smooth()` then `mesh.set_sharp_from_angle(angle)`: smooth, but for the edges between two faces
-    /// that turn more than `degrees` as the mesh is now (a half turn or more: none).
+    /// that turn more than `degrees` as the mesh is now (a half turn or more: none). On a mesh with normals of its
+    /// own the turn is told by them (`own_face_normals`), as they read once its sharp edges are gone.
     pub fn shade_smooth(&mut self, degrees: f64) {
+        self.smooth_by_angle(degrees, false);
+    }
+
+    /// `bpy.ops.object.shade_smooth_by_angle(angle)`: as `shade_smooth`, but the edges that are sharp stay sharp,
+    /// and a mesh with normals of its own tells the turn by them as they read with those edges.
+    pub fn shade_smooth_by_angle(&mut self, degrees: f64) {
+        self.smooth_by_angle(degrees, true);
+    }
+
+    /// The faces' normals as a mesh with normals of its own gives them (Blender's `mesh.polygon_normals`, and what
+    /// its smooth by angle reads): each face's corners' normals as they read now, summed and made a unit vector,
+    /// which is not where the face looks once a cut or a clamped bevel has left its corners' normals elsewhere.
+    /// None on a mesh without.
+    pub fn own_face_normals(&self) -> Option<Vec<V3>> {
+        self.normals.as_ref()?;
+        let corners = crate::normals::corner_normals(self);
+        let unit = |f: &Face| {
+            let mut sum = V3::ZERO;
+            for &n in &corners[f.start as usize..(f.start + f.len) as usize] {
+                sum += n;
+            }
+            let d = dot_v3(sum, sum);
+            if d > 1.0e-35 {
+                let length = d.sqrt();
+                V3::new(sum.x / length, sum.y / length, sum.z / length)
+            } else {
+                V3::ZERO
+            }
+        };
+        Some(self.faces.iter().map(unit).collect())
+    }
+
+    fn smooth_by_angle(&mut self, degrees: f64, keep: bool) {
         for f in &mut self.faces {
             f.smooth = true;
         }
-        self.sharp.clear();
+        if !keep {
+            self.sharp.clear();
+        }
         let angle = crate::math::radians(degrees) as f32;
         if angle as f64 >= crate::math::PI {
             return;
@@ -205,6 +276,8 @@ impl Mesh {
             .collect();
         // each edge's first face, then whether a second or third came
         let mut first: BTreeMap<(u32, u32), (usize, u32, bool)> = BTreeMap::new();
+        // (a mesh with normals of its own tells the turn by them, not by where its faces' points are)
+        let normals = self.own_face_normals().unwrap_or(normals);
         for f in 0..self.faces.len() {
             let c = self.corners(f).to_vec();
             for (i, &v) in c.iter().enumerate() {
