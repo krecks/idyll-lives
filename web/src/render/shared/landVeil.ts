@@ -20,12 +20,33 @@ export const VEIL_FADE = 240;
 export const VEIL_NEAR = 200;
 
 /**
- * While the curtain closing the landscape's cut edge is drawn (`curtain`), the veil is whole over the landscape's last
- * this many metres whatever its strength (m; `shaders/fog.ts`): from a camera out over the band at its edge, the veil
- * at a quarter of its strength there, the curtain stood as a straight wall of the sky's colour across land and water
- * barely hazed.
+ * While the curtain closing the landscape's cut edge is drawn (`curtain`), the veil rises to whole over the landscape's
+ * last this many metres whatever its strength (m; `shaders/fog.ts`): from a camera out over the band at its edge, the
+ * veil at a quarter of its strength there, the curtain stood as a straight wall of the sky's colour across land and water
+ * barely hazed. Near the eye over more of it (`VEIL_EDGE_SOFT`).
  */
 export const VEIL_EDGE = 60;
+
+/**
+ * Within the first of these from the eye (m), the veil rises to whole over the whole band (`VEIL_FADE`) while the curtain
+ * is drawn, past the second over its last `VEIL_EDGE` m, between them over as much between as it is (`veilShown`): from
+ * a camera low in the band looking along it, the veil rose from 0.44 to whole over its last 60 m, a few hundred pixels
+ * across, and what it took stood as a pale wall (the plane 60 m in from the edge, seen edge on) over the land and the
+ * water. Further off, the ring's far hills and the mountains round a mountain place are in no more of the haze than they
+ * were, the band a sliver of the picture there.
+ */
+export const VEIL_EDGE_SOFT = [500, 1000] as const;
+
+/**
+ * How thick the veil is `out` m past its clear rectangle (its `fade` m to whole), at `strength` and, while the curtain
+ * is drawn, rising to whole over its last `edge` m (0: not) or more of it near the eye (`VEIL_EDGE_SOFT`; `eye` m from
+ * it): as the shaders work it out (`shaders/fog.ts` `veilStrength`), but for the veil's clearing at the eye.
+ */
+export function veilShown(fade: number, strength: number, edge: number, out: number, eye = Infinity): number {
+  const over = fade + (Math.max(edge, 1e-3) - fade) * smoothstep(VEIL_EDGE_SOFT[0], VEIL_EDGE_SOFT[1], eye);
+  const most = edge > 1e-6 ? smoothstep(fade - over, fade, out) : 0;
+  return Math.max(strength, most) * smoothstep(0, fade, out);
+}
 
 /** A box of the world (m). */
 export interface VeilBox {

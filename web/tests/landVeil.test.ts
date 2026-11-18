@@ -6,7 +6,7 @@
  * sheet; and both shader languages' haze taking the veil in.
  */
 import { describe, expect, test } from 'bun:test';
-import { curtain, cutInView, VEIL_FADE, VEIL_NEAR, veilAt, veilRect } from '../src/render/shared/landVeil';
+import { curtain, cutInView, VEIL_EDGE, VEIL_EDGE_SOFT, VEIL_FADE, VEIL_NEAR, veilAt, veilRect, veilShown } from '../src/render/shared/landVeil';
 import { gameFog } from '../src/render/pc/shaders/fog';
 
 /** A medium land's landscape: 832 m and its 260 m ring each way. */
@@ -40,6 +40,34 @@ describe('the veil', () => {
     expect(Math.abs(at(0.75) - 0.8)).toBeLessThan(0.06);
     // (Thicker all the way out.)
     for (let s = 0.05; s <= 1; s += 0.05) expect(at(s)).toBeGreaterThan(at(s - 0.05));
+  });
+
+  test('with the curtain drawn, whole at the edge at any strength: near the eye rising gently, far off over its last 60 m', () => {
+    const steepest = (strength: number, edge: number, eye: number) => {
+      let most = 0;
+      for (let out = 0; out < VEIL_FADE; out += 0.5) most = Math.max(most, (veilShown(VEIL_FADE, strength, edge, out + 0.5, eye) - veilShown(VEIL_FADE, strength, edge, out, eye)) / 0.5);
+      return most;
+    };
+    // (The plain fade: a smoothstep over the band, at most 1.5 / 240 a metre.)
+    const plain = steepest(1, 0, Infinity);
+    expect(plain).toBeCloseTo(1.5 / VEIL_FADE, 4);
+    const [near, far] = VEIL_EDGE_SOFT;
+    for (const strength of [0, 0.25, 0.52, 0.8, 1]) {
+      for (const eye of [0, near, (near + far) / 2, far, 5000]) {
+        expect(veilShown(VEIL_FADE, strength, VEIL_EDGE, VEIL_FADE, eye)).toBe(1);
+        expect(veilShown(VEIL_FADE, strength, VEIL_EDGE, 0, eye)).toBe(0);
+        // Never thinner than its strength would have it, and thicker nearer the eye.
+        for (let out = 0; out <= VEIL_FADE; out += 10) {
+          expect(veilShown(VEIL_FADE, strength, VEIL_EDGE, out, eye)).toBeGreaterThanOrEqual(veilShown(VEIL_FADE, strength, 0, out, eye));
+          expect(veilShown(VEIL_FADE, strength, VEIL_EDGE, out, eye)).toBeGreaterThanOrEqual(veilShown(VEIL_FADE, strength, VEIL_EDGE, out, eye + 100) - 1e-9);
+        }
+      }
+      // Near the eye no steeper than half again the plain fade (from a camera low in the band, the veil at half there,
+      // before: 2.5 % a metre over the last 60 m, the plane 60 m in seen edge on as a pale wall); far off as before.
+      expect(steepest(strength, VEIL_EDGE, near)).toBeLessThan(plain * 1.5);
+      if (strength <= 0.52) expect(steepest(strength, VEIL_EDGE, far)).toBeGreaterThan(plain * 3);
+      for (let out = 0; out <= VEIL_FADE; out += 10) expect(veilShown(VEIL_FADE, strength, VEIL_EDGE, out, far)).toBeCloseTo(Math.max(strength, out >= VEIL_FADE - VEIL_EDGE ? ((t) => t * t * (3 - 2 * t))((out - VEIL_FADE + VEIL_EDGE) / VEIL_EDGE) : 0) * ((t) => t * t * (3 - 2 * t))(out / VEIL_FADE), 6);
+    }
   });
 
   test('round at the corners: as thick as along a side at the same distance from where it begins', () => {
@@ -160,10 +188,13 @@ describe("the haze's shaders", () => {
     const glsl = gameFog(engine.glsl, 'glsl', once);
     expect(glsl).toContain('uniform vec4 game_landVeil;');
     expect(glsl).toContain('uniform vec4 game_veilFade;');
-    expect(glsl).toContain('smoothstep(0.0, game_veilFade.z, distance(vPositionW, view_position))');
-    expect(glsl).toMatch(/#ifndef VERTEXSHADER\s+float veilOut = length\(max\(abs\(vPositionW\.xz - game_landVeil\.xy\)/);
-    // (Its strength, but whole over the landscape's last `game_veilFade.w` m while the curtain is drawn; 0 in the game.)
-    expect(glsl).toContain('gameVeil = max(game_veilFade.y, step(1e-6, game_veilFade.w) * smoothstep(game_veilFade.x - max(game_veilFade.w, 1e-3), game_veilFade.x, veilOut)) * smoothstep(0.0, game_veilFade.x, veilOut)');
+    // (Nothing worked out without a veil, as in the game.)
+    expect(glsl).toMatch(/#ifndef VERTEXSHADER\s+\/\/[^\n]*\s+if \(game_veilFade\.y > 0\.0 \|\| game_veilFade\.w > 0\.0\) \{\s+float veilOut = length\(max\(abs\(vPositionW\.xz - game_landVeil\.xy\)/);
+    expect(glsl).toContain('float veilEye = distance(vPositionW, view_position);');
+    expect(glsl).toContain('smoothstep(0.0, game_veilFade.z, veilEye)');
+    // (Its strength, but whole over the landscape's last `game_veilFade.w` m while the curtain is drawn, all the band's
+    // near the eye; 0 in the game.)
+    expect(glsl).toContain('gameVeil = max(game_veilFade.y, step(1e-6, game_veilFade.w) * smoothstep(game_veilFade.x - mix(game_veilFade.x, max(game_veilFade.w, 1e-3), smoothstep(500.0, 1000.0, veilEye)), game_veilFade.x, veilOut)) * smoothstep(0.0, game_veilFade.x, veilOut)');
     // (Without a veil the haze's colour as ever, nothing of the sky read; with it, the sky's dome behind.)
     expect(glsl).toContain('if (gameVeil > 0.0) gameHazed = mix(gameHazed, gameSkyAt(normalize(vPositionW - view_position)) * dBlendModeFogFactor, gameVeil);');
     expect(glsl).toMatch(/#ifndef VERTEXSHADER\s+float gameVeil = 0\.0;\s+uniform vec3 game_skyLow;/);
@@ -172,11 +203,11 @@ describe("the haze's shaders", () => {
     const wgsl = gameFog(engine.wgsl, 'wgsl', once);
     expect(wgsl).toContain('uniform game_landVeil: vec4f;');
     expect(wgsl).toContain('uniform game_veilFade: vec4f;');
-    expect(wgsl).toContain('smoothstep(0.0, uniform.game_veilFade.z, distance(vPositionW, uniform.view_position))');
-    expect(wgsl).toMatch(/#ifndef VERTEXSHADER\s+let veilOut = length\(max\(abs\(vPositionW\.xz - uniform\.game_landVeil\.xy\)/);
+    expect(wgsl).toMatch(/#ifndef VERTEXSHADER\s+\/\/[^\n]*\s+if \(uniform\.game_veilFade\.y > 0\.0 \|\| uniform\.game_veilFade\.w > 0\.0\) \{\s+let veilOut = length\(max\(abs\(vPositionW\.xz - uniform\.game_landVeil\.xy\)/);
+    expect(wgsl).toContain('smoothstep(0.0, uniform.game_veilFade.z, veilEye)');
     expect(wgsl).toContain('if (gameVeil > 0.0) { gameHazed = mix(gameHazed, gameSkyAt(normalize(vPositionW - uniform.view_position)) * dBlendModeFogFactor, gameVeil); }');
     expect(wgsl).toContain('uniform game_skySun: vec3f;');
     expect(wgsl).not.toContain('texture');
-    expect(wgsl).toContain('gameVeil = max(uniform.game_veilFade.y, step(1e-6, uniform.game_veilFade.w) * smoothstep(uniform.game_veilFade.x - max(uniform.game_veilFade.w, 1e-3), uniform.game_veilFade.x, veilOut))');
+    expect(wgsl).toContain('gameVeil = max(uniform.game_veilFade.y, step(1e-6, uniform.game_veilFade.w) * smoothstep(uniform.game_veilFade.x - mix(uniform.game_veilFade.x, max(uniform.game_veilFade.w, 1e-3), smoothstep(500.0, 1000.0, veilEye)), uniform.game_veilFade.x, veilOut))');
   });
 });

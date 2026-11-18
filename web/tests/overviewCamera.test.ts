@@ -249,7 +249,7 @@ describe("the player's free camera", () => {
     };
     for (const alpha of [-Math.PI / 2, 0, 0.8]) {
       const { rig, pose } = camera();
-      rig.setBounds({ x0: 0, z0: 0, x1: size, z1: size }, true);
+      rig.setBounds({ x0: 0, z0: 0, x1: size, z1: size }, { x0: -260, z0: -260, x1: size + 260, z1: size + 260 });
       rig.setShot({ ...whole(size), alpha }, true);
       settle(rig);
       // (The whole land's shot as framed: as it was.)
@@ -282,12 +282,77 @@ describe("the player's free camera", () => {
     expect(pose.beta).toBeCloseTo(TILT_MAX, 6);
   });
 
+  test("from past the landscape's cut edge, the land's edge is seen over the ring's mountains; from within it, as it will", () => {
+    const size = 832;
+    const reach = { x0: -260, z0: -260, x1: size + 260, z1: size + 260 };
+    // A mountain place: the land 100 m up at its edge, the ring rising from it to 280 m at the landscape's cut edge.
+    const ground = (x: number, z: number) => {
+      const out = Math.hypot(Math.max(0, -x, x - size), Math.max(0, -z, z - size));
+      return 100 + 180 * Math.min(1, out / 260);
+    };
+    /** Whether the way from the eye as drawn to (x, z) on the land clears the ring's ground (from the cut edge in). */
+    const seen = (pose: ReturnType<typeof camera>['pose'], x: number, z: number) => {
+      const [sx, sy, sz] = viewShift(pose.alpha, pose.beta, pose.targetScreenOffset.x, pose.targetScreenOffset.y, [0, 0, 0]);
+      const flat = Math.sin(pose.beta) * pose.radius;
+      const e = [pose.target.x + Math.cos(pose.alpha) * flat + sx, pose.target.y + Math.cos(pose.beta) * pose.radius + sy, pose.target.z + Math.sin(pose.alpha) * flat + sz];
+      for (let s = 0.01; s < 1; s += 0.01) {
+        const [px, pz] = [e[0] + (x - e[0]) * s, e[2] + (z - e[2]) * s];
+        const inLand = px >= 0 && px <= size && pz >= 0 && pz <= size;
+        const inReach = px >= reach.x0 && px <= reach.x1 && pz >= reach.z0 && pz <= reach.z1;
+        if (!inLand && inReach && ground(px, pz) > e[1] + (ground(x, z) - e[1]) * s) return false;
+      }
+      return true;
+    };
+    for (const alpha of [Math.PI / 2, -Math.PI / 2, 0.8]) {
+      for (const far of [800, 1300, 2400]) {
+        const { rig, pose } = camera();
+        rig.setBounds({ x0: 0, z0: 0, x1: size, z1: size }, reach);
+        rig.ground = ground;
+        rig.setShot({ ...whole(size), alpha }, true);
+        settle(rig);
+        rig.nudge(0, pose.radius / far, TILT_MAX);
+        settle(rig);
+        // (Before: 800 m out, tilted as low as it goes, the eye 100 m past the cut edge and under the ring's crest: the
+        // curtain closing the cut and the ring wholly in the veil hid the land's near half below a hard pale line.)
+        for (const [x, z] of [
+          [0, size],
+          [size / 2, size],
+          [size, size],
+          [size / 2, 0],
+          [size, size / 2],
+        ]) {
+          const flat = Math.sin(pose.beta) * pose.radius;
+          const [ex, ez] = [pose.target.x + Math.cos(pose.alpha) * flat, pose.target.z + Math.sin(pose.alpha) * flat];
+          // (Only the sides it is past.)
+          const facing = (x === size && ex > size) || (x === 0 && ex < 0) || (z === size && ez > size) || (z === 0 && ez < 0);
+          if (facing && !(ex >= reach.x0 && ex <= reach.x1 && ez >= reach.z0 && ez <= reach.z1)) expect(seen(pose, x, z)).toBe(true);
+        }
+        expect(pose.beta).toBeGreaterThan(0.5);
+      }
+    }
+    // From within the landscape (500 m out, the eye over the ring), its mountains before the land as they stand: as
+    // tilted as with no ring looked over (only kept out of the mountains).
+    const near = (withReach: boolean) => {
+      const { rig, pose } = camera();
+      rig.setBounds({ x0: 0, z0: 0, x1: size, z1: size }, withReach ? reach : null);
+      rig.ground = ground;
+      rig.setShot({ ...whole(size), alpha: Math.PI / 2 }, true);
+      settle(rig);
+      rig.nudge(0, pose.radius / 500, TILT_MAX);
+      settle(rig);
+      const flat = Math.sin(pose.beta) * pose.radius;
+      expect(pose.target.z + Math.sin(pose.alpha) * flat).toBeLessThan(reach.z1);
+      return pose.beta;
+    };
+    expect(near(true)).toBeCloseTo(near(false), 6);
+  });
+
   test('in a narrow window, fitted by its width from 2 km and more out, the shot is as framed and tilts lower', () => {
     const [w, h] = [800, 1000];
     const pose = { alpha: 0, beta: 0.9, radius: 60, target: { x: 0, y: 0, z: 0 }, targetScreenOffset: { x: 0, y: 0 }, fov: LENS.fov };
     const rig = new OverviewCamera(pose);
     rig.setViewport(w, h);
-    rig.setBounds({ x0: 0, z0: 0, x1: 832, z1: 832 }, true);
+    rig.setBounds({ x0: 0, z0: 0, x1: 832, z1: 832 }, { x0: -260, z0: -260, x1: 1092, z1: 1092 });
     rig.setShot({ ...whole(832), frame: { left: 352, top: 20, right: 772, bottom: 976 } }, true);
     for (let i = 0; i < 400; i++) rig.frame(0.05, w / h);
     // (Kept within 600 m of the land, before: from 2,400 m out, tilted to 0.42, and no lower whatever the player did.)

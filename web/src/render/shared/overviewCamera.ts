@@ -86,6 +86,25 @@ const PAN_REACH = 1500;
 export const LAND_TALL = 0.4;
 /** Or this share of the picture's height the land has at the shot's own tilt, if that is less (`reachTilt`). */
 export const LAND_KEEP = 0.8;
+/**
+ * The land's sides the eye stands past are seen over the landscape's ring (`overRing`) at this many points each, its
+ * ground read this many times along the way to each, from where the way comes into the landscape to the land's edge.
+ */
+const RING_POINTS = 5;
+const RING_STEPS = 20;
+/** How far (m) the way to the land's edge passes over the ring's ground at least (`overRing`; the curtain's top is 0.3 m over it). */
+const RING_CLEAR = 2;
+
+/**
+ * The part of the way from `e` on along `d` (0 at `e`, 1 at its end) at which it comes into `a`..`b` (0 from inside; past
+ * 1, or infinite, if it never does). One axis of a box.
+ */
+function enter(e: number, d: number, a: number, b: number): number {
+  if (e >= a && e <= b) return 0;
+  if (d === 0) return Infinity;
+  const s = ((e < a ? a : b) - e) / d;
+  return s >= 0 ? s : Infinity;
+}
 
 /** A rectangle of the world (m) the camera's target is kept over. */
 export interface OverviewBounds {
@@ -143,8 +162,14 @@ export class OverviewCamera {
   ground: ((x: number, z: number) => number) | null = null;
   /** The land the player's pan keeps the camera's target over (null: within `PAN_REACH` of the shot's focus). */
   private bounds: OverviewBounds | null = null;
-  /** Whether the land has a landscape round it, the camera's tilt kept to what keeps the land more than a strip (`reachTilt`). */
-  private reach = false;
+  /**
+   * The landscape round the land (null: none): the camera's tilt is kept to what keeps the land more than a strip, and
+   * its edge in sight over the landscape's ring (`reachTilt`).
+   */
+  private reach: OverviewBounds | null = null;
+  /** `reachTilt`'s last pose and what it gave (the camera at rest asks the same again every frame). */
+  private readonly tiltAsked = [NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN];
+  private tiltGiven = 0;
   /** `hidden`'s view offset, worked out in place. */
   private readonly shift: [number, number, number] = [0, 0, 0];
 
@@ -175,11 +200,13 @@ export class OverviewCamera {
 
   /**
    * The land the camera's target is kept over while the player pans (null: none); the pan already made is pulled in.
-   * `reach`: a landscape is drawn round it, and the camera tilts no lower than keeps the land more than a strip (`reachTilt`).
+   * `reach`: the landscape drawn round it (its box, the land's within it), and the camera tilts no lower than keeps the
+   * land more than a strip, and its edge in sight over the landscape's ring (`reachTilt`).
    */
-  setBounds(bounds: OverviewBounds | null, reach = false): void {
+  setBounds(bounds: OverviewBounds | null, reach: OverviewBounds | null = null): void {
     this.bounds = bounds;
     this.reach = reach;
+    this.tiltAsked[0] = NaN;
     this.clampPan();
   }
 
@@ -375,9 +402,9 @@ export class OverviewCamera {
     // (Near, the target on the land under it: on a hill the camera would be in it otherwise.)
     const lift = Math.min(1, Math.max(0, (LIFT_FAR - c.radius) / (LIFT_FAR - LIFT_NEAR)));
     const ty = lift > 0 && this.ground ? this.ground(c.tx, c.tz) * lift : 0;
-    // Looking from higher up while the camera would be far out past the landscape, or the land (a mountain) would stand
-    // in the way.
-    let beta = this.reachTilt(c.alpha, c.beta, c.radius, c.tx, c.tz, c.ox, c.oy);
+    // Looking from higher up while the camera would be far out past the landscape, or the ring's hills or the land (a
+    // mountain) would stand in the way.
+    let beta = this.reachTilt(c.alpha, c.beta, c.radius, c.tx, ty, c.tz, c.ox, c.oy);
     for (let k = 0; k < 30 && beta > 0.2 && this.hidden(c.alpha, beta, c.radius, c.tx, ty, c.tz, c.ox, c.oy); k++) beta -= 0.04;
     cam.beta = beta;
     cam.radius = c.radius;
@@ -391,22 +418,77 @@ export class OverviewCamera {
   /**
    * The tilt (rad from straight down) at most `beta` from which the land (`bounds`, with a landscape round it: `reach`)
    * keeps `LAND_TALL` of the picture's height, or `LAND_KEEP` of what it has at the shot's own tilt if that is less (a
-   * narrow window's, fitted by its width), for the camera as drawn (moved by the view offset `ox`, `oy`), its target at
-   * (`tx`, `tz`) `radius` m off along `alpha`: from far out, a low camera saw the land as a strip behind the ring's
-   * hills. Eased as the camera zooms or pans (the most that keeps it so, not steps).
+   * narrow window's, fitted by its width), and its edge is seen over the landscape's ring (`overRing`), for the camera
+   * as drawn (moved by the view offset `ox`, `oy`), its target at (`tx`, `ty`, `tz`) `radius` m off along `alpha`: from
+   * far out, a low camera saw the land as a strip behind the ring's hills, and on a mountain place the ring's near
+   * mountains, wholly in the veil, hid half of it below a hard pale line. Eased as the camera zooms or pans (the most
+   * that keeps it so, not steps). The same pose as last asked is answered as it was.
    */
-  private reachTilt(alpha: number, beta: number, radius: number, tx: number, tz: number, ox: number, oy: number): number {
+  private reachTilt(alpha: number, beta: number, radius: number, tx: number, ty: number, tz: number, ox: number, oy: number): number {
     if (!this.bounds || !this.reach) return beta;
-    const least = Math.min(LAND_TALL, LAND_KEEP * this.landTall(alpha, Math.min(beta, this.goal.beta), radius, tx, tz, ox, oy));
-    if (this.landTall(alpha, beta, radius, tx, tz, ox, oy) >= least) return beta;
-    // (Further out the lower it looks: the most that keeps it so, to a ten-thousandth of a radian.)
-    let [lo, hi] = [0, beta];
-    for (let k = 0; k < 14; k++) {
-      const mid = (lo + hi) / 2;
-      if (this.landTall(alpha, mid, radius, tx, tz, ox, oy) >= least) lo = mid;
-      else hi = mid;
+    const asked = this.tiltAsked;
+    const goal = this.goal.beta;
+    if (asked[0] === alpha && asked[1] === beta && asked[2] === radius && asked[3] === tx && asked[4] === ty && asked[5] === tz && asked[6] === ox && asked[7] === oy && asked[8] === goal) return this.tiltGiven;
+    const least = Math.min(LAND_TALL, LAND_KEEP * this.landTall(alpha, Math.min(beta, goal), radius, tx, tz, ox, oy));
+    const keeps = (b: number) => this.landTall(alpha, b, radius, tx, tz, ox, oy) >= least && this.overRing(alpha, b, radius, tx, ty, tz, ox, oy);
+    let given = beta;
+    if (!keeps(beta)) {
+      // (Further out the lower it looks: the most that keeps it so, to a ten-thousandth of a radian.)
+      let [lo, hi] = [0, beta];
+      for (let k = 0; k < 14; k++) {
+        const mid = (lo + hi) / 2;
+        if (keeps(mid)) lo = mid;
+        else hi = mid;
+      }
+      given = lo;
     }
-    return lo;
+    [asked[0], asked[1], asked[2], asked[3], asked[4], asked[5], asked[6], asked[7], asked[8]] = [alpha, beta, radius, tx, ty, tz, ox, oy, goal];
+    this.tiltGiven = given;
+    return given;
+  }
+
+  /**
+   * Whether, from the camera as drawn out past the landscape (`reach`), the land's edge on each side it stands past is
+   * seen over the landscape's ring (outside the land's `bounds`), by `RING_CLEAR` at least: at `RING_POINTS` along each
+   * such side, at the land's height there, against the ring's ground on the way to it from where the way comes into the
+   * landscape (its cut edge, the curtain closing it as high as the ground there) to the land's edge. From there what
+   * stands in the way is the curtain and the ring by it, wholly in the veil: a hard pale line across the land. From
+   * within the landscape it is (the ring's mountains near the eye are as clear as the veil leaves what is near it, and
+   * stand before the land as they are), and without the land's height (`ground`). Allocation-free.
+   */
+  private overRing(alpha: number, beta: number, radius: number, tx: number, ty: number, tz: number, ox: number, oy: number): boolean {
+    const ground = this.ground;
+    const r = this.bounds!;
+    const out = this.reach!;
+    if (!ground) return true;
+    const [sx, sy, sz] = viewShift(alpha, beta, ox, oy, this.shift);
+    const flat = Math.sin(beta) * radius;
+    const [ex, ey, ez] = [tx + Math.cos(alpha) * flat + sx, ty + Math.cos(beta) * radius + sy, tz + Math.sin(alpha) * flat + sz];
+    if (ex >= out.x0 && ex <= out.x1 && ez >= out.z0 && ez <= out.z1) return true;
+    for (let side = 0; side < 4; side++) {
+      // (The sides the eye is past: x0, x1, z0, z1.)
+      const alongX = side >= 2;
+      const at = side === 0 ? r.x0 : side === 1 ? r.x1 : side === 2 ? r.z0 : r.z1;
+      const past = side === 0 ? ex < r.x0 : side === 1 ? ex > r.x1 : side === 2 ? ez < r.z0 : ez > r.z1;
+      if (!past) continue;
+      for (let k = 0; k < RING_POINTS; k++) {
+        const f = k / (RING_POINTS - 1);
+        const [px, pz] = alongX ? [r.x0 + (r.x1 - r.x0) * f, at] : [at, r.z0 + (r.z1 - r.z0) * f];
+        const [dx, dz] = [px - ex, pz - ez];
+        const far = Math.hypot(dx, dz);
+        if (far < 1) continue;
+        // (Where the way to it comes into the landscape, and where it reaches the land: parts of the way.)
+        const s0 = Math.max(0, enter(ex, dx, out.x0, out.x1), enter(ez, dz, out.z0, out.z1));
+        const s1 = Math.max(enter(ex, dx, r.x0, r.x1), enter(ez, dz, r.z0, r.z1));
+        if (!(s1 > s0)) continue;
+        const down = (ground(px, pz) - ey) / far;
+        for (let n = 0; n < RING_STEPS; n++) {
+          const s = s0 + ((s1 - s0) * n) / RING_STEPS;
+          if (s > 0 && (ground(ex + dx * s, ez + dz * s) + RING_CLEAR - ey) / (far * s) > down) return false;
+        }
+      }
+    }
+    return true;
   }
 
   /**
