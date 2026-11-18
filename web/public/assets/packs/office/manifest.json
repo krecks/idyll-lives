@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built office models (tools/art/blender/families/office.py): the desks, the desk chairs, the filing cabinet and the boards. Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The keyboard shelves slide out (`tray_out`), the writing desk's drawer opens (`drawer_open`), the laptop opens (`lid_open`), the gaming PC's fans spin (`fans`), the chairs swivel (`swivel`) and the whiteboard fills with a plan (`scribble`) while residents use them.",
+  "$comment": "The office (crates/art/rooms/src/office, built by cargo art): the desks, the desk chairs, the filing cabinet and the boards. Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The keyboard shelves slide out (`tray_out`), the writing desk's drawer opens (`drawer_open`), the laptop opens (`lid_open`), the gaming PC's fans spin (`fans`), the chairs swivel (`swivel`) and the whiteboard fills with a plan (`scribble`) while residents use them.",
   "version": 1,
   "entries": {
     "model.deskSimple": {
