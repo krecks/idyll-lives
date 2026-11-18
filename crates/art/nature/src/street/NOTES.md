@@ -53,8 +53,8 @@ Draws are unchanged by the detail pass. Before it (2026-10-16 to 10-22) the benc
 `check-glb`: 8 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings on all sixteen files.
 
 Built here, not in Blender, since 2026-11-18 (`cargo check-glb --against ref/blender`): the sixteen files' points
-and triangles Blender's (0.000 mm), six of them the same in every bit, the baked shading within a quarter of a grey
-level but on the taxi sign's fares (the backs of the lines' boxes, sunk in the plate: port-accepted.json). The
+and triangles Blender's (0.000 mm), seven of them the same in every bit, the baked shading within a quarter of a grey
+level. The
 clump's flowers are found on what stands when each is made, as Blender's scene had it: the clump and the flowers
 before it.
 

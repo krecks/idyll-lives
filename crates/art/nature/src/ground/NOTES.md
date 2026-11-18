@@ -91,9 +91,7 @@ The spare `model.stove`, `model.plantSmall` and `model.ceilingLamp` went at the 
 the game, its content, the crates or the tools drew them.
 
 Built here, not in Blender, since 2026-11-18 (`cargo check-glb --against ref/blender`): the thirteen files' points
-and triangles Blender's (0.000 mm), seven of them the same in every bit; the rock's lichen and soil on the same
+and triangles Blender's (0.000 mm), nine of them the same in every bit; the rock's lichen and soil on the same
 faces. A stone's cut is `rock::_cut`: a point is in front of the plane or behind it, the face that closes a cut is
 triangulated without slivers (`beautify`), and a stone's fractures are cut where it was made, at the origin. The
-blades' and heads' sky normals are kept a corner at a time as Blender keeps them (`common::sky_normals`). The far
-flowers' leaves are shaded up to 6 of 32 lighter than Blender's (their two faces lie in one another, and a ray takes
-the front one here: port-accepted.json, until artkit takes the face turned to the ray).
+blades' and heads' sky normals are kept a corner at a time as Blender keeps them (`common::sky_normals`).
