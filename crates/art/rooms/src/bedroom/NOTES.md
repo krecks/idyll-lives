@@ -1,6 +1,6 @@
-# Bedroom — notes
+# Bedroom (`crates/art/rooms/src/bedroom`)
 
-`bedroom.py` builds the nine beds of BR1 into `web/public/assets/models/bedroom/` and their entries in
+The module builds the nine beds of BR1 into `web/public/assets/models/bedroom/` and their entries in
 `packs/bedroom/manifest.json`: `model.bed`, `model.bedSingle`, `model.bedBunk`, `model.bedFuton`, `model.bedKing`,
 `model.bedDouble`, `model.bedQueenUpholstered`, `model.bedCanopy` and `model.bedDaybed`. Built 2026-10-14; they sat in Validate › Beds until checked in play (back to Bedroom › Beds).
 
@@ -13,21 +13,21 @@
   got `BEDS` entries with those tops. Headboard faces stay behind depth -0.87, so heads don't go into them.
 - **The head end stands on the wall's face** (depth -0.93): headboards, posts, rails and the canopy's head end
   stop there, not the mattress, so the sleepers keep their places. Each bed's bounds therefore stand 1–2.5 cm
-  forward of the middle (the Model's `centre`, printed by `_settle`); the old parts were cut back the same way
+  forward of the middle (the Model's `centre`, said by `settle_bed`); the old parts were cut back the same way
   (`to_wall`, the posted beds' head ends moved forward).
 - **The duvet turns down (`turn_down`).** The game lays its own quilt over each sleeper on `BLANKET_BEDS` (now
   also `bedDouble`, `bedQueenUpholstered`, `bedCanopy`), so the bed's duvet isn't a second cover over them. It is
-  two parts: the lower two thirds (`_duvet`, one soft, puffed box draped down the sides and the foot, still) and
+  two parts: the lower two thirds (`duvet`, one soft, puffed box draped down the sides and the foot, still) and
   the top third (`duvet_flap`, flat on the mattress with the sheet turned down over its head edge), hinged
   across the fold on the duvet's top 3 mm up. `turn_down` turns the flap 180° about X in 1 s, laying it over the
-  rest toward the foot, and flattens it as it goes (`_turn_down`); half way over it is gathered to a fifth of its
+  rest toward the foot, and flattens it as it goes (`turn_down`); half way over it is gathered to a fifth of its
   length (`ROLL`, a scale along the bed there and back, 2026-10-21), so it rolls over its fold as cloth, a low
   bulge, not a 0.45 m board standing up across the bed's head. The game's quilt lies 10 cm above the mattress
   off the body times the sleeper's size (8.5 cm for the smallest), rounding down to 6 cm over its outer 8 cm. A
   flap folded at full thickness topped out at 10.1 cm (its sheet at 10.5) and showed through it, along the
   sides of the single, the bunk and the king and between two sleepers in a wide bed. Folded, it is now 40 % of
   its thickness (`FOLDED`), its sheet's top 7.5 cm above the mattress, and on the one-tile beds and the king it
-  narrows to 8 cm inside the quilt's edge (`QUILT_EDGE`: 0.46 m from a one-tile bed's middle, 1.0 m on a two-tile
+  narrows to 8 cm inside the quilt's edge (`quilt_edge`: 0.46 m from a one-tile bed's middle, 1.0 m on a two-tile
   bed's outer side); the king's runner is 1.93 m across, just round its duvet, for the same reason. Without a
   quilt (as the resident lies down, before it comes up) the bed still shows turned down. `motions` plays it for
   `sleep` and `nap` with no `hold`: it turns down as they get in and back up after. One sleeper in a wide bed
@@ -55,27 +55,27 @@
 
 ### Detail (2026-10-22)
 
-Rebuilt with the forms (gamekit/forms.py) and the kit, same sizes, centres, parts, clips, draws and mattress tops:
-- **Bedding.** `_mattress`: a soft box with a piped seam round its top, its middle exactly at the mattress
+Rebuilt with the forms and the kit, same sizes, centres, parts, clips, draws and mattress tops:
+- **Bedding.** `mattress`: a soft box with a piped seam round its top, its middle exactly at the mattress
   top (`BEDS`), puffed a few mm, in the three steps it always had (the sleeper's height is probed on it).
-  `_pillow`: plump in the middle (a third of its thickness is the box, a third each face's puff), thin at the
-  seams, its corners pinched in, a little crumpled (`G.jitter`). The duvet (`_duvet`) is a soft box rumpled by
+  `pillow`: plump in the middle (a third of its thickness is the box, a third each face's puff), thin at the
+  seams, its corners pinched in, a little crumpled (`jitter`). The duvet (`duvet`) is a soft box rumpled by
   the form (`rumple` 3 cm in folds 26 cm apart, lying askew; its sides hang in flutes to a square hem and it
   rolls over the mattress's edge on a 6 cm round): the folds only go down and in, so its top is still at `DUVET`
-  at most and the quilts over sleepers still hide it and the turned-down flap (`_flap`, flat as before, the
-  sheet too). Under a runner (`bed`, `bedKing`) the duvet is smooth (`runner=`, the form's `calm`), or the
+  at most and the quilts over sleepers still hide it and the turned-down flap (`flap`, flat as before, the
+  sheet too). Under a runner (`bed`, `bedKing`) the duvet is smooth (`runner`, the form's `calm`), or the
   runner would bridge its folds. Mattress, duvet and pillows are `resting` (their undersides plain). Since the
   soft forms pass (2026-11-13): up to 1,000 triangles more a bed, the four-poster (8,572) and the king (8,378)
   over their aim of 8,000. Mattresses are not pinched (firm, their edges taped), and the futon's pillows, which
-  stand on its back at rest, have their sides drawn in instead of their corners (`_pillow(pinch=False)`): their
+  stand on its back at rest, have their sides drawn in instead of their corners (`pillow`, `pinch` false): their
   corners are the bed's highest points (it was 5 mm lower for a day). Every bed within 1.2 mm of its size before. The runners are one cloth
-  swept over the foot (`_runner`, its path's corners rounded by hand: Catmull-Rom overshot 9 cm off the long
+  swept over the foot (`runner`, its path's corners rounded by hand: Catmull-Rom overshot 9 cm off the long
   top span).
-- **Headboards.** `_channel` lofts a padded column (domed for the queen), `_board` an arched board with slots,
-  `_post` a post with a collar and a ball, pyramid or flat cap. The canopy's posts are turned (`G.revolve`),
+- **Headboards.** `channel` lofts a padded column (domed for the queen), `board` an arched board with slots,
+  `post` a post with a collar and a ball, pyramid or flat cap. The canopy's posts are turned (`revolve`),
   its curtains lofted through pleated sections, its valances extruded with scalloped edges.
 - **Baked shading.** A panel set into a frame stops a hair inside the opening: a vertex buried in another part
-  bakes black (`shade.py`), and a face with only corner vertices goes dark all over (the single bed's
+  bakes black (`artkit::shade`), and a face with only corner vertices goes dark all over (the single bed's
   footboard and the canopy's panels did).
 
 `check-glb`: 0 failed; its one warning is the bunk's 4 draw calls. The old `futon` was the futon lying flat
@@ -107,4 +107,13 @@ residents asleep in it stay in view from above.
 ```
 cargo art bedroom            # every .glb, the pack, check-glb
 cargo art bedroom --preview  # previews/bedroom/bed.png, bed@turn_down.png, …
+cargo art bedroom --check    # rebuilt and held to the committed files, byte for byte
 ```
+
+## Ported to Rust (2026-11-18)
+
+Built by `cargo art bedroom` from this module (its Python script's numbers and order, one function each).
+Against the last Blender build (`ref/blender`): all nine near; the futon and the daybed to 0.000 mm, the beds with
+a duvet within 0.2 mm on average: the duvet's flat underside, hidden in the mattress, is cut into triangles a
+little otherwise than Blender's (its points are Blender's), up to 2.2 mm apart on the queen (accepted in
+tools/art/port-accepted.json).

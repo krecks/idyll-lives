@@ -178,7 +178,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      has no cord. A third fewer triangles: give it to every cushion, mattress and cover that lies on something.
    Its steps (`flat`, `round_segments`) are chosen to keep its rounded edges within 1.5 mm of their curve and its
    crowned faces within 2 mm; give them only to save triangles on something small. A seat cushion a clip sinks (`G.squash`) is its own part, as before
-   (`families/living.py` `_cushion`, `_seat`; `bedroom.py` `_pillow`, `_duvet`).
+   (`families/living.py` `_cushion`, `_seat`; crates/art/rooms/src/bedroom `pillow`, `duvet`).
 
    Round things take as many sides as keep their outline within a millimetre of the circle when the family gives
    no count (`G.sides(radius)`: a polygon's sides stand `r × (1 − cos(π / n))` in): a lathe (`G.revolve`) 24 up to
