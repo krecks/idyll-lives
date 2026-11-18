@@ -2,7 +2,7 @@
  * Shooting hoops (`basketballHoop`, characters.ts `STEP_IN`: out on the court, a lane each for two): from
  * `SHOT.to` m out from the hoop's middle, its rim 2.94 m up and 0.27 m out (`playground.py` `RIM`); and at the
  * streetball hoop (`energetic.streetballHoop`, `STREET_SHOT`), its rim 2.4 m up and 0.22 m out
- * (`pack_energetic.py` `RIM`), from 2.2 m out, where its two players stand (content `places`). A round of
+ * (`crates/art/packs/src/pack_energetic` `RIM`), from 2.2 m out, where its two players stand (content `places`). A round of
  * a few dribbles, the ball gathered to the chest, the dip and a jump shot, the right hand under the ball and the
  * left at its side, let go at the top with the wrist flicked through, a landing on bent knees and the follow-through
  * held while the ball drops in, a look up at it. A child heaves it up two-handed from the chest instead, with

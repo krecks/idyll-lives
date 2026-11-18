@@ -65,5 +65,5 @@ pub fn family() -> Option<Family> {
          manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish \
          group. The bike's cranks turn and the trampoline's mat dips while used (loops), the net sways, the \
          blender's lid lifts, the rain grows and the pod's canopy lowers; the bouldering wall is still.",
-    ))
+    ).switched())
 }
