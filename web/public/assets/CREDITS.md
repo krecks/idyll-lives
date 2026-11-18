@@ -225,7 +225,7 @@ lowers; the bouldering wall is still.
 
 The hot-headed pack models (`models/pack_hotHeaded/heavyBag.glb`, `smashBin.glb`, `thunderDrums.glb`,
 `coolDownCushion.glb`, `grudgeJournal.glb`, `coldPlunge.glb`, override pack `packs/pack_hotHeaded/manifest.json`) are
-built in Blender by `tools/art/blender/families/pack_hotHeaded.py` on `gamekit` and exported as `.glb` (glTF,
+built by `crates/art/packs/src/pack_hot_headed` on `artkit` and exported as `.glb` (glTF,
 original, CC0). Each moves while it is used: the bag swings, the crate's lid flips up, the cymbals rock, the zafu
 sinks, the desk drawer slides out and the plunge cover rolls back.
 
