@@ -746,7 +746,7 @@ export class Street {
     const key = `${this.layoutKey}|${this.focus}|${town.surfaceMoves}|${town.dressKey}`;
     if (this.townHousesOf?.key !== key) {
       const planner = this.house.planner;
-      const list = town.townHouses(this.focus).map(({ chunk, plot, pad, dress }): TownLotHouse => ({ id: plot.id, chunk, storeys: plot.storeys ?? 1, pad, ...planner.farLook({ x: plot.x, z: plot.z, house: plot.house!, roof: plot.roof, storeys: plot.storeys }), ...(dress ? { look: dress.look, ...(dress.hours ? { hours: dress.hours } : {}) } : {}) }));
+      const list = town.townHouses(this.focus).map(({ chunk, plot, pad, cover, dress }): TownLotHouse => ({ id: plot.id, chunk, storeys: plot.storeys ?? 1, pad, ...planner.farLook({ x: plot.x, z: plot.z, house: plot.house!, roof: plot.roof, storeys: plot.storeys, cover }), ...(dress ? { look: dress.look, ...(dress.hours ? { hours: dress.hours } : {}) } : {}) }));
       this.townHousesOf = { key, list };
     }
     return this.townHousesOf.list;
