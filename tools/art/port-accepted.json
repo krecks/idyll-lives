@@ -21,6 +21,7 @@
   "model.parkBench far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.phoneBooth far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.pingPongTable far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)", "size": "the reference's far version has a decimation spike 29 mm above the model; the kernel's is the model's height", "surface": "the same spike in the reference; the kernel's has none"},
+  "model.plantTable far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.postBox far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.seesaw far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.shopCounter far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},

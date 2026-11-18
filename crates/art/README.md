@@ -22,7 +22,7 @@ family, and later for writing a new one. The standard a model meets is
 | `art-wet` (`wet`) | kitchen, kitchen_cooking, kitchen_counters, bathroom, laundry |
 | `art-rooms` (`rooms`) | living, dining, office, decor, lighting, bedroom, bedroom_storage, bedroom_dressing |
 | `art-packs` (`packs`) | pack_bookworm, pack_cheerful, pack_couchPotato, pack_energetic, pack_example, pack_foodie, pack_gloomy, pack_hotHeaded, pack_kind, pack_lazy, pack_loner, pack_natureLover, pack_neat, pack_outgoing, pack_romantic, pack_slob |
-| `art-outside` (`outside`) | yard, outdoor, playground, farm, street_furniture, stalls, shops |
+| `art-outside` (`outside`) | yard, outdoor, playground, farm, street_furniture, stalls, shops, civic |
 | `art-things` (`things`) | hobbies, kids, held, tabletop, media, fitness, birds |
 
 A family is a folder, `crates/art/<group>/src/<family>/` (snake case: `pack_couch_potato` for `pack_couchPotato`):
@@ -34,7 +34,7 @@ A family is a folder, `crates/art/<group>/src/<family>/` (snake case: `pack_couc
 | `<group>.rs` | The models, a file a group of them as the script had its sections (`chairs.rs`, `tables.rs`), a `pub fn <model>() -> Vec<Obj>` each |
 | `NOTES.md` | The script's `<family>.md`, moved here: what the models are, the facts they keep, the faults found |
 
-The group's `src/lib.rs` lists its families by name (`families()`); all 49 names are there already.
+The group's `src/lib.rs` lists its families by name (`families()`); all 50 names are there already.
 `crates/art/rooms/src/dining` and `crates/art/nature/src/trees` are finished ports to read first.
 
 ## The loop

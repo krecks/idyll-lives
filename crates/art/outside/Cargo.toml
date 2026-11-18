@@ -1,6 +1,6 @@
 [package]
 name = "art-outside"
-description = "The game's item models, generated: yards, playgrounds, farms, street furniture, stalls and shops. One folder a family."
+description = "The game's item models, generated: yards, playgrounds, farms, street furniture, stalls, shops and the named places' fittings. One folder a family."
 edition.workspace = true
 version.workspace = true
 license.workspace = true
