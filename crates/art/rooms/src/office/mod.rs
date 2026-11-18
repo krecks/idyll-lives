@@ -1,6 +1,6 @@
 //! The office: the desks (O1: the simple, corner, standing and executive desks, the computer, writing and laptop
 //! desks and the gaming PC), the desk chairs (O2: the executive, desk and office chairs) and the storage and boards
-//! (O3: the filing cabinet, the whiteboard and the corkboard). Notes: tools/art/blender/families/office.md.
+//! (O3: the filing cabinet, the whiteboard and the corkboard). Notes: NOTES.md.
 //!
 //! The parts are placed in game axes (`F`, no shift), where the game places it; a desk's top is the content's
 //! `surface` height (`DT`, 0.75 for the plain desks, 1.05 standing). Backs against the wall stop at its face (game
@@ -16,9 +16,6 @@
 //!
 //! The executive desk's middle drawer and the filing cabinet's top drawer are parts of their own, still: no use
 //! opens them yet, so a clip can be added once content gives them one.
-//!
-//! Being ported: every model is built here, but tools/art/blender/families/office.py still builds the family
-//! (`cargo art office` runs it in Blender until that script goes; `--out` and `--check` build what is here).
 
 use artkit::family::{Family, Model};
 use artkit::json;
@@ -225,5 +222,5 @@ pub fn family() -> Option<Family> {
          costs one draw call per finish group. The keyboard shelves slide out (`tray_out`), the writing desk's \
          drawer opens (`drawer_open`), the laptop opens (`lid_open`), the gaming PC's fans spin (`fans`), the \
          chairs swivel (`swivel`) and the whiteboard fills with a plan (`scribble`) while residents use them.",
-    ))
+    ).switched())
 }

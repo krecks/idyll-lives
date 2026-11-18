@@ -1,7 +1,7 @@
 //! The living room: a fold-down wall bed (`model.wallBed`, content `wallBed` in catalog2/living.json), a sofa bed
 //! (`model.sofaBed`, content `sofaBed`), the L1 sofas and sectionals, the L2 armchairs and small seats, the L3
 //! coffee and side tables, the L5 shelves and the L6 staircases (`model.stairs`, content `stairs` in base.json).
-//! Notes: tools/art/blender/families/living.md.
+//! Notes: NOTES.md.
 //!
 //! The wall bed: a cabinet at the back of a 2 × 3 footprint, with open shelves on both sides. The bed stands
 //! folded up in it at rest, its underside dressed as two door panels with a handle. It turns down on a hinge at
@@ -18,9 +18,6 @@
 //! The sofas and sectionals copy the old primitive parts, where they stand. Their seat cushions are a part of
 //! their own that sinks 2 cm while sat or dozed on (`sink_in`). The armchairs too, but for the recliner (it
 //! reclines), the rocking chair (it rocks) and the bean bag.
-//!
-//! Being ported: every model is built here, but tools/art/blender/families/living.py still builds the family
-//! (`cargo art living` runs it in Blender until that script goes; `--out` and `--check` build what is here).
 
 use artkit::family::{Family, Model};
 use artkit::json;
@@ -427,5 +424,5 @@ pub fn family() -> Option<Family> {
         ],
         "The living room (crates/art/rooms/src/living, built by cargo art). The materials map onto the game's \
          finishes so a model costs one draw call per finish group.",
-    ))
+    ).switched())
 }
