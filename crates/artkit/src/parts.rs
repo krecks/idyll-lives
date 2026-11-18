@@ -402,7 +402,7 @@ pub fn check_size(
     Ok((
         got,
         format!(
-            "[gamekit] {name} {:.3} x {:.3} x {:.3} m (w x h x d), {wher}, on the floor{carried}",
+            "[art] {name} {:.3} x {:.3} x {:.3} m (w x h x d), {wher}, on the floor{carried}",
             got[0], got[1], got[2]
         ),
     ))

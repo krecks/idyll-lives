@@ -31,9 +31,13 @@ pub fn family() -> Option<Family> {
             Model::new("receptionDesk", desks::reception_desk, (1.92, 1.374, 0.85))
                 .key("model.receptionDesk")
                 .paint(&[("desk", "Desk"), ("oak", "Ledge")]),
-            Model::new("hotelReception", desks::hotel_reception, (1.94, 1.481, 0.858))
-                .key("model.hotelReception")
-                .paint(&[("walnut", "Desk"), ("marble", "Top")]),
+            Model::new(
+                "hotelReception",
+                desks::hotel_reception,
+                (1.94, 1.481, 0.858),
+            )
+            .key("model.hotelReception")
+            .paint(&[("walnut", "Desk"), ("marble", "Top")]),
             Model::new("dutyDesk", desks::duty_desk, (1.92, 1.93, 0.85))
                 .key("model.dutyDesk")
                 .paint(&[("counter", "Counter"), ("laminate", "Top")]),
@@ -86,7 +90,11 @@ pub fn family() -> Option<Family> {
                 .paint(&[("locker", "Doors"), ("frame", "Frame")]),
             Model::new("mannequin", rest::mannequin, (0.547, 1.755, 0.4))
                 .key("model.mannequin")
-                .paint(&[("cloth1", "Jacket"), ("cloth2", "Trousers"), ("dummy", "Dummy")]),
+                .paint(&[
+                    ("cloth1", "Jacket"),
+                    ("cloth2", "Trousers"),
+                    ("dummy", "Dummy"),
+                ]),
             Model::new("luggageTrolley", rest::luggage_trolley, (0.9, 1.874, 0.54))
                 .key("model.luggageTrolley")
                 .paint(&[("brass", "Frame"), ("carpet", "Carpet")]),
@@ -100,8 +108,7 @@ pub fn family() -> Option<Family> {
          content/civic.json): front desks and counters, the church's pews, lectern and altar, the pub's bar, \
          school desks, the waiting room's bench, the couch, shop rails and the rest. Listed in the base \
          manifest's packs. Nothing moves.",
-    )
-    .switched())
+    ))
 }
 
 #[cfg(test)]

@@ -114,5 +114,5 @@ pub fn family() -> Option<Family> {
          packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The \
          parasol's canopy stirs in the wind (`stir`, ambient); the lounger reclines, the hammock and the swings \
          sway with whoever is on them, and the hot tub's cover folds back for a soak.",
-    ).switched())
+    ))
 }

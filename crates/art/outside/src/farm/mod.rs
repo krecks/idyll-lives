@@ -27,15 +27,18 @@ const TOLERANCE: f64 = 0.03;
 
 /// The family.
 pub fn family() -> Option<Family> {
-    Some(
-        Family::new(
+    Some(Family::new(
         "farm",
         M.palette(),
         vec![
             Model::new("barn", barn::barn, (6.04, 6.0, 5.94))
                 .tolerance(TOLERANCE)
                 .far(barn::barn_far)
-                .paint(&[("barn", "Paint"), ("barn_roof", "Roof"), ("barn_trim", "Trim")]),
+                .paint(&[
+                    ("barn", "Paint"),
+                    ("barn_roof", "Roof"),
+                    ("barn_trim", "Trim"),
+                ]),
             Model::new("silo", silo::silo, (2.77, 6.9, 2.72))
                 .tolerance(TOLERANCE)
                 .far(silo::silo_far)
@@ -65,13 +68,15 @@ pub fn family() -> Option<Family> {
                 .tolerance(TOLERANCE)
                 .far(coop::coop_far)
                 .motions(motions(r#"{"night": "close"}"#))
-                .paint(&[("coop", "Paint"), ("coop_roof", "Roof"), ("coop_trim", "Trim")]),
+                .paint(&[
+                    ("coop", "Paint"),
+                    ("coop_roof", "Roof"),
+                    ("coop_trim", "Trim"),
+                ]),
         ],
         "The farm (crates/art/outside/src/farm, built by cargo art): the red barn, the grain silo, the little tractor, \
          the round hay bale, the stack of hay bales, the scarecrow (an ambient sway), the water trough and the chicken \
          coop (its pop-hole hatch shut at night, `close`). Each has a far version (`far`, E7) for the town overview. \
          Listed in the base manifest's packs.",
-        )
-        .switched(),
-    )
+    ))
 }

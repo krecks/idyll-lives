@@ -38,32 +38,54 @@ pub fn family() -> Option<Family> {
                 .key("model.nightstand")
                 .centre(0.0, -0.1958)
                 .paint(&[("oak", "Body"), ("brass", "Handles")]),
-            Model::new("nightstandModern", small::nightstand_modern, (0.58, 0.56, 0.468))
-                .key("model.nightstandModern")
-                .centre(0.0, -0.196)
-                .paint(&[("white", "Body"), ("iron", "Handles")]),
-            Model::new("nightstandRound", small::nightstand_round, (0.54, 0.57, 0.56))
-                .key("model.nightstandRound")
-                .centre(0.0, -0.0498)
-                .paint(&[("clay", "Body"), ("brass", "Handles")]),
-            Model::new("nightstandDrawers", small::nightstand_drawers, (0.58, 0.6, 0.468))
-                .key("model.nightstandDrawers")
-                .centre(0.0, -0.196)
-                .motions(motions(&snack_drawer))
-                .paint(&[("walnut", "Body"), ("brass", "Handles")]),
-            Model::new("nightstandLamp", small::nightstand_lamp, (0.54, 1.08, 0.468))
-                .key("model.nightstandLamp")
-                .centre(0.0, -0.1958)
-                .paint(&[("oak", "Body"), ("shade", "Shade")]),
+            Model::new(
+                "nightstandModern",
+                small::nightstand_modern,
+                (0.58, 0.56, 0.468),
+            )
+            .key("model.nightstandModern")
+            .centre(0.0, -0.196)
+            .paint(&[("white", "Body"), ("iron", "Handles")]),
+            Model::new(
+                "nightstandRound",
+                small::nightstand_round,
+                (0.54, 0.57, 0.56),
+            )
+            .key("model.nightstandRound")
+            .centre(0.0, -0.0498)
+            .paint(&[("clay", "Body"), ("brass", "Handles")]),
+            Model::new(
+                "nightstandDrawers",
+                small::nightstand_drawers,
+                (0.58, 0.6, 0.468),
+            )
+            .key("model.nightstandDrawers")
+            .centre(0.0, -0.196)
+            .motions(motions(&snack_drawer))
+            .paint(&[("walnut", "Body"), ("brass", "Handles")]),
+            Model::new(
+                "nightstandLamp",
+                small::nightstand_lamp,
+                (0.54, 1.08, 0.468),
+            )
+            .key("model.nightstandLamp")
+            .centre(0.0, -0.1958)
+            .paint(&[("oak", "Body"), ("shade", "Shade")]),
             Model::new("cedarChest", small::cedar_chest, (0.974, 0.505, 0.52))
                 .key("model.cedarChest")
-                .motions(motions(r#"{"uses": {"takeBlanket": "lid_open"}, "hold": 2.0}"#))
+                .motions(motions(
+                    r#"{"uses": {"takeBlanket": "lid_open"}, "hold": 2.0}"#,
+                ))
                 .paint(&[("cedar", "Body"), ("iron", "Handles")]),
-            Model::new("laundryHamper", small::laundry_hamper, (0.476, 0.631, 0.476))
-                .key("model.laundryHamper")
-                .centre(0.0, -0.2)
-                .motions(motions(r#"{"uses": {"sortWashing": "lid_open"}}"#))
-                .paint(&[("wicker", "Hamper")]),
+            Model::new(
+                "laundryHamper",
+                small::laundry_hamper,
+                (0.476, 0.631, 0.476),
+            )
+            .key("model.laundryHamper")
+            .centre(0.0, -0.2)
+            .motions(motions(r#"{"uses": {"sortWashing": "lid_open"}}"#))
+            .paint(&[("wicker", "Hamper")]),
             Model::new("benchBedEnd", small::bench_bed_end, (1.6, 0.471, 0.42))
                 .key("model.benchBedEnd")
                 .paint(&[("brass", "Frame"), ("olive", "Cushion")]),
@@ -80,11 +102,15 @@ pub fn family() -> Option<Family> {
                 .motions(motions(CHANGE_DOORS))
                 // (the white carcass is its body; the birch doors are their own part)
                 .paint(&[("white", "Body"), ("birch", "Doors"), ("brass", "Handles")]),
-            Model::new("chestOfDrawers", large::chest_of_drawers, (0.88, 1.16, 0.51))
-                .key("model.chestOfDrawers")
-                .centre(0.0, -0.175)
-                .motions(motions(CHANGE_DRAWER))
-                .paint(&[("linen", "Body"), ("brass", "Handles")]),
+            Model::new(
+                "chestOfDrawers",
+                large::chest_of_drawers,
+                (0.88, 1.16, 0.51),
+            )
+            .key("model.chestOfDrawers")
+            .centre(0.0, -0.175)
+            .motions(motions(CHANGE_DRAWER))
+            .paint(&[("linen", "Body"), ("brass", "Handles")]),
             Model::new("dresserLow", large::dresser_low, (1.82, 0.8, 0.635))
                 .key("model.dresserLow")
                 .centre(0.0, -0.1125)
@@ -105,5 +131,5 @@ pub fn family() -> Option<Family> {
          blanket chest, the laundry hamper and the bed-end bench (BR2), and the dressers, chests and wardrobes (BR3). \
          Listed in the base manifest's packs. A dresser or chest slides its middle drawer out 30 cm (`drawer_open`), \
          a wardrobe swings its doors open (`doors_open`, `door_open`) while a resident picks an outfit.",
-    ).switched())
+    ))
 }

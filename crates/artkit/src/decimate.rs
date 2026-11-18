@@ -14,9 +14,11 @@
 //! - leave the mesh's box, or take a vertex out of reach (`REACH`) of the faces it stood for: a post is not
 //!   squashed, a rod not shortened, a panel's corner not cut off, whatever the count asks.
 //!
-//! What is left is shaded as the mesh was, and written with as few vertices: its faces smooth, a normal a corner
-//! (`Work::normals`) that the corners round a vertex share wherever the mesh's own normals ran on from face to
-//! face, and where a face is too small to be seen from afar; a texture torn only where it was (`Work::carry`).
+//! What is left is shaded as the mesh was, and written with as few vertices: its corners carry the mesh's own
+//! normals and its UVs through the collapses (`Work::carry`), mixed where two vertices become one and torn only
+//! where they were, so a round part is as smooth as it was however its faces have come to lie; and the corners
+//! round a vertex share a normal wherever the mesh's did, and where a face is too small to be seen from afar
+//! (`Work::normals`).
 
 use crate::math::V3;
 use crate::mesh::{Mesh, edge, normal_of};
@@ -42,18 +44,14 @@ const AREA: f64 = 1e-12;
 /// Two normals at a vertex are one where their cosine is at least this (under a degree apart: a file's are
 /// rounded to four places).
 const SAME_NORMAL: f64 = 0.9999;
-/// A face was shaded flat if its corners' normals were within 3 degrees of its own (their cosine).
-const FLAT_LOOK: f64 = 0.9986;
-/// Two faces of which one was shaded flat are in one plane still while they are within 15 degrees (their
-/// normals' cosine): beyond it the edge between them is sharp.
-const FLAT_TURN: f64 = 0.9659;
-/// The faces round a vertex that are shaded as one (a fan) have their own normal there if they are this large
-/// together (m²: 8 cm by 8, some two pixels of a far version as it is drawn), and
+/// A corner keeps the normal it carries while its face lies within 60 degrees of it (their cosine).
+const LEANS: f64 = 0.5;
+/// The faces round a vertex that share a normal there keep it if they are this large together (m²: 8 cm by 8,
+/// some two pixels of a far version as it is drawn), and
 const SMALL: f64 = 0.0064;
-/// this share of the largest fan's area at the vertex: a smaller fan bends the larger one's normal by 6 degrees
-/// at most as it takes it.
+/// this share of the largest such lot's area at the vertex.
 const SLIGHT: f64 = 0.1;
-/// A small fan does not take the normal of one that looks the other way (their normals' cosine under this, over
+/// Smaller ones do not take the normal of faces that look the other way (their normals' cosine under this, over
 /// 100 degrees apart: the two sides of a sheet).
 const OPPOSED: f64 = -0.17;
 /// The faces at a vertex are a sheet's two sides, a vertex each, where their normals' cosine is under this
@@ -179,11 +177,6 @@ struct Tri {
     v: [u32; 3],
     mat: u16,
     alive: bool,
-    /// The faces it is shaded as one surface with: those it reached at first across edges its normals run on
-    /// over (the mesh's own where it has them, a bevel's or a shell's weighted ones).
-    group: u32,
-    /// Whether it was shaded flat at first: its corners' normals its own.
-    flat: bool,
 }
 
 impl Tri {
@@ -199,6 +192,15 @@ enum Lie {
     Inside,
     Along,
     Corner,
+}
+
+/// The corners round a vertex that share a normal: the normal, the area of their faces, and the corners (each a
+/// triangle and which of its three).
+#[derive(Clone)]
+struct Lot {
+    normal: P,
+    area: f64,
+    corners: Vec<(u32, usize)>,
 }
 
 /// A collapse: the vertex `gone` merged into `kept`, which is then at `to`.
@@ -247,6 +249,12 @@ struct Work {
     tris: Vec<Tri>,
     /// A UV a corner, where the mesh has them.
     uvs: Option<Vec<[[f32; 2]; 3]>>,
+    /// A normal a corner: the mesh's own at first, carried as its corners go.
+    looks: Vec<[P; 3]>,
+    /// How much of the surface each vertex stands for, as far as it is seen: a third of each of its faces' area
+    /// at first (m²) times its baked shading (how much of the sky it sees, and the sky of it: a groove's walls
+    /// count for little beside the face they are cut into), and what the vertices merged into it stood for.
+    seen: Vec<f64>,
     /// Each vertex's live triangles, in the order they came to it.
     around: Vec<Vec<u32>>,
     stamp: Vec<u32>,
@@ -321,113 +329,90 @@ impl Work {
         }
     }
 
-    /// A triangle's normal as it lies now (not of unit length: twice its area long).
-    fn across(&self, tri: &Tri) -> P {
-        let p = tri.v.map(|x| self.at[x as usize]);
-        cross(sub(p[1], p[0]), sub(p[2], p[0]))
-    }
-
-    /// Whether the edge between two triangles is a crease: they were not shaded as one surface at first, or one
-    /// of them was shaded flat and they are no longer in one plane.
-    fn creased(&self, s: &Tri, t: &Tri) -> bool {
-        s.group != t.group
-            || ((s.flat || t.flat)
-                && match (unit(self.across(s)), unit(self.across(t))) {
-                    (Some(a), Some(b)) => dot(a, b) < FLAT_TURN,
-                    _ => false,
-                })
-    }
-
-    /// A normal for each corner of each triangle left: what the far version is shaded and written with. Round a
-    /// vertex, the triangles that reach one another without crossing a crease are a fan, and a fan has one
-    /// normal, its triangles' by their areas (a large face keeps its own beside a small one, as with the weighted
-    /// normals the models' shells have). A fan too small to be seen from afar (`SMALL`), or next to nothing
-    /// beside the vertex's largest (`SLIGHT`), takes the normal of the fan it looks most like, unless that looks
-    /// the other way: so a vertex is written once for each face of some size that meets at it, and not once for
-    /// every chamfer, pin and moulding.
+    /// A normal for each corner of each triangle left: what the far version is shaded and written with. They are
+    /// the mesh's own, carried through the collapses (`carry`), so a round part stays as smooth as it was however
+    /// its faces have come to lie, and a flat face flat (a face that lies over 60 degrees off what it carries has
+    /// its own instead). Round a vertex, the corners that share a normal are
+    /// written as one vertex; those of faces too small together to be seen from afar (`SMALL`), or next to
+    /// nothing beside the vertex's largest lot (`SLIGHT`), take the normal of the lot they look most like, unless
+    /// that looks the other way: so a vertex is written once for each face of some size that meets at it, and not
+    /// once for every chamfer, pin and moulding.
     fn normals(&self) -> Vec<[P; 3]> {
-        let mut out = vec![[[0.0, 0.0, 1.0]; 3]; self.tris.len()];
+        let mut out = self.looks.clone();
         for x in 0..self.at.len() as u32 {
-            let tris = &self.around[x as usize];
-            if tris.is_empty() {
-                continue;
-            }
-            // the fans: each triangle's, by its place among the vertex's
-            let mut fan: Vec<usize> = (0..tris.len()).collect();
-            for y in self.ring(x) {
-                let on: Vec<u32> = self.on_edge(x, y).collect();
-                if let [s, t] = on[..]
-                    && !self.creased(&self.tris[s as usize], &self.tris[t as usize])
+            // the lots: each a normal, the area of the faces that have it here, and their corners
+            let mut lots: Vec<Lot> = Vec::new();
+            for &t in &self.around[x as usize] {
+                let tri = &self.tris[t as usize];
+                let corner = tri.v.iter().position(|&y| y == x).unwrap_or(0);
+                let p = self.corners(t);
+                let c = cross(sub(p[1], p[0]), sub(p[2], p[0]));
+                let area = dot(c, c).sqrt() / 2.0;
+                // (a face that has come to lie another way than the normal it carries has its own: a rib's side
+                // stretched into a slope is not shaded as the wall it was)
+                let n = match unit(c) {
+                    Some(own) if dot(self.looks[t as usize][corner], own) < LEANS => own,
+                    _ => self.looks[t as usize][corner],
+                };
+                match lots
+                    .iter_mut()
+                    .find(|lot| dot(lot.normal, n) >= SAME_NORMAL)
                 {
-                    let place = |t: u32| tris.iter().position(|&o| o == t).unwrap_or(0);
-                    let (a, b) = (fan[place(s)], fan[place(t)]);
-                    let (low, high) = (a.min(b), a.max(b));
-                    for f in &mut fan {
-                        if *f == high {
-                            *f = low;
-                        }
+                    Some(lot) => {
+                        lot.area += area;
+                        lot.corners.push((t, corner));
                     }
+                    None => lots.push(Lot {
+                        normal: n,
+                        area,
+                        corners: vec![(t, corner)],
+                    }),
                 }
             }
-            // each fan's normal, its triangles' summed by area, and its area
-            let mut sums: BTreeMap<usize, (P, f64)> = BTreeMap::new();
-            for (i, &t) in tris.iter().enumerate() {
-                let n = self.across(&self.tris[t as usize]);
-                let sum = sums.entry(fan[i]).or_insert(([0.0; 3], 0.0));
-                for k in 0..3 {
-                    sum.0[k] += n[k] / 2.0;
-                }
-                sum.1 += dot(n, n).sqrt() / 2.0;
-            }
-            // the small ones folded into the fans they look most like, the smallest first
+            // the small ones folded into those they look most like, the smallest first
             loop {
-                let largest = sums.values().map(|s| s.1).fold(0.0, f64::max);
-                let mut small: Vec<(usize, f64)> = sums
-                    .iter()
-                    .filter(|(_, s)| s.1 < SMALL || s.1 < SLIGHT * largest)
-                    .map(|(&f, s)| (f, s.1))
+                let largest = lots.iter().map(|lot| lot.area).fold(0.0, f64::max);
+                let mut small: Vec<usize> = (0..lots.len())
+                    .filter(|&i| lots[i].area < SMALL || lots[i].area < SLIGHT * largest)
                     .collect();
-                small.sort_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)));
-                let mut folded = false;
-                for (f, _) in small {
-                    let own = unit(sums[&f].0);
+                small.sort_by(|&a, &b| lots[a].area.total_cmp(&lots[b].area).then(a.cmp(&b)));
+                let mut fold: Option<(usize, usize)> = None;
+                for i in small {
                     let mut best: Option<(usize, f64)> = None;
-                    for (&g, s) in sums.iter().filter(|(g, _)| **g != f) {
-                        let like = match (own, unit(s.0)) {
-                            (Some(a), Some(b)) => dot(a, b),
-                            _ => 1.0,
-                        };
+                    for j in (0..lots.len()).filter(|&j| j != i) {
+                        let like = dot(lots[i].normal, lots[j].normal);
                         if like >= OPPOSED && best.is_none_or(|(_, most)| like > most) {
-                            best = Some((g, like));
+                            best = Some((j, like));
                         }
                     }
-                    if let Some((g, _)) = best {
-                        let (n, area) = sums.remove(&f).unwrap_or(([0.0; 3], 0.0));
-                        let into = sums.entry(g).or_insert(([0.0; 3], 0.0));
-                        for k in 0..3 {
-                            into.0[k] += n[k];
-                        }
-                        into.1 += area;
-                        for h in &mut fan {
-                            if *h == f {
-                                *h = g;
-                            }
-                        }
-                        folded = true;
+                    if let Some((j, _)) = best {
+                        fold = Some((i, j));
                         break;
                     }
                 }
-                if !folded {
+                let Some((i, j)) = fold else {
                     break;
+                };
+                // (the larger's normal is the two's)
+                let Lot {
+                    normal,
+                    area,
+                    corners,
+                } = lots[i].clone();
+                if area > lots[j].area {
+                    lots[j].normal = normal;
                 }
+                lots[j].area += area;
+                lots[j].corners.extend(corners);
+                lots.remove(i);
             }
-            for (i, &t) in tris.iter().enumerate() {
-                let tri = &self.tris[t as usize];
-                let normal = unit(sums[&fan[i]].0)
-                    .or_else(|| unit(self.across(tri)))
-                    .unwrap_or([0.0, 0.0, 1.0]);
-                let corner = tri.v.iter().position(|&y| y == x).unwrap_or(0);
-                out[t as usize][corner] = normal;
+            for Lot {
+                normal, corners, ..
+            } in lots
+            {
+                for (t, corner) in corners {
+                    out[t as usize][corner] = normal;
+                }
             }
         }
         out
@@ -645,22 +630,33 @@ impl Work {
         })
     }
 
-    /// The UVs of the corners at the two vertices of a collapse, as they are once it is made. The corners that
-    /// shared a UV at a vertex share one still, and those the collapsed edge's own faces join from one vertex to
-    /// the other become one, so the texture is torn only where it was: along the edge it is the two ends' mixed by
-    /// where the point falls between them, elsewhere (a seam's other side) where the point lies on a face's own
-    /// texture.
-    fn carry(&self, uvs: &mut [[[f32; 2]; 3]], c: &Collapse) {
-        let (u, v) = (c.gone, c.kept);
-        let (pu, pv) = (self.at[u as usize], self.at[v as usize]);
+    /// Where a collapse's point falls between its two vertices: 0 at the one that goes, 1 at the one kept.
+    fn share(&self, c: &Collapse) -> f64 {
+        let (pu, pv) = (self.at[c.gone as usize], self.at[c.kept as usize]);
         let along = sub(pv, pu);
         let length = dot(along, along);
-        let share = if c.to == pv || length <= 0.0 {
+        if c.to == pv || length <= 0.0 {
             1.0
         } else {
             (dot(sub(c.to, pu), along) / length).clamp(0.0, 1.0)
-        };
-        let bits = |uv: [f32; 2]| uv.map(f32::to_bits);
+        }
+    }
+
+    /// What the corners at the two vertices of a collapse carry (a UV, a normal: `values`, three a triangle) as
+    /// it is once the collapse is made. The corners that shared a value at a vertex share one still, and those
+    /// the collapsed edge's own faces join from one vertex to the other become one, so a texture is torn and a
+    /// surface creased only where it was: along the edge the value is the two ends' mixed (`mix`) by where the
+    /// point falls between them; a corner the edge's faces do not reach (a seam's other side) has what `alone`
+    /// gives it at the point.
+    fn carry<T: Copy + PartialEq>(
+        &self,
+        values: &mut [[T; 3]],
+        c: &Collapse,
+        mix: impl Fn(T, T, f64) -> T,
+        alone: impl Fn(u32, usize, &[T; 3]) -> T,
+    ) {
+        let (u, v) = (c.gone, c.kept);
+        let share = self.share(c);
         let corner = |t: u32, x: u32| {
             self.tris[t as usize]
                 .v
@@ -668,16 +664,17 @@ impl Work {
                 .position(|&y| y == x)
                 .unwrap_or(0)
         };
-        // each UV at either vertex that a face on the edge has, with what it becomes
-        let mut joined: [Vec<([u32; 2], [f32; 2])>; 2] = [Vec::new(), Vec::new()];
+        // each value at either vertex that a face on the edge has, with what it becomes
+        let mut joined: [Vec<(T, T)>; 2] = [Vec::new(), Vec::new()];
         for t in self.on_edge(u, v) {
-            let (at_u, at_v) = (uvs[t as usize][corner(t, u)], uvs[t as usize][corner(t, v)]);
-            let mixed: [f32; 2] = std::array::from_fn(|k| {
-                (at_u[k] as f64 * (1.0 - share) + at_v[k] as f64 * share) as f32
-            });
+            let (at_u, at_v) = (
+                values[t as usize][corner(t, u)],
+                values[t as usize][corner(t, v)],
+            );
+            let mixed = mix(at_u, at_v, share);
             for (side, was) in [(0, at_u), (1, at_v)] {
-                if !joined[side].iter().any(|(b, _)| *b == bits(was)) {
-                    joined[side].push((bits(was), mixed));
+                if !joined[side].iter().any(|(b, _)| *b == was) {
+                    joined[side].push((was, mixed));
                 }
             }
         }
@@ -691,20 +688,20 @@ impl Work {
                     continue;
                 }
                 let k = corner(t, moved);
-                let was = bits(uvs[t as usize][k]);
+                let was = values[t as usize][k];
                 let now = match joined[side].iter().find(|(b, _)| *b == was) {
                     Some(&(_, now)) => now,
                     None => {
                         let now = if stays {
-                            uvs[t as usize][k]
+                            was
                         } else {
-                            Work::carried(&self.corners(t), &uvs[t as usize], k, c.to)
+                            alone(t, k, &values[t as usize])
                         };
                         joined[side].push((was, now));
                         now
                     }
                 };
-                uvs[t as usize][k] = now;
+                values[t as usize][k] = now;
             }
         }
     }
@@ -713,9 +710,33 @@ impl Work {
     fn collapse(&mut self, c: &Collapse) -> Vec<u32> {
         let (u, v) = (c.gone, c.kept);
         if let Some(mut uvs) = self.uvs.take() {
-            self.carry(&mut uvs, c);
+            // (a texture runs straight across a face: a corner alone is where the point lies on its own)
+            self.carry(
+                &mut uvs,
+                c,
+                |a, b, share| {
+                    std::array::from_fn(|k| {
+                        (a[k] as f64 * (1.0 - share) + b[k] as f64 * share) as f32
+                    })
+                },
+                |t, k, uv| Work::carried(&self.corners(t), uv, k, c.to),
+            );
             self.uvs = Some(uvs);
         }
+        // a normal is the two vertices' by how much of the surface each stood for, as far as it is seen
+        let (of_u, of_v) = (self.seen[u as usize], self.seen[v as usize]);
+        let mut looks = std::mem::take(&mut self.looks);
+        self.carry(
+            &mut looks,
+            c,
+            |a, b, _| {
+                let mixed: P = std::array::from_fn(|k| a[k] * of_u + b[k] * of_v);
+                unit(mixed).unwrap_or(b)
+            },
+            |_, k, normals| normals[k],
+        );
+        self.looks = looks;
+        self.seen[v as usize] += of_u;
         self.at[v as usize] = c.to;
         let qu = self.quadric[u as usize];
         self.quadric[v as usize].add(&qu);
@@ -786,11 +807,11 @@ fn cut(p: &[V3]) -> Vec<[u32; 3]> {
 
 /// `mesh` cut into triangles and brought down to `ratio` of them (rounded down, as Blender's modifier counts
 /// what it is to leave: it stops at that or a triangle under), or as near it as the module's rules allow. `locked`: for each vertex, whether it must stay as it is. The vertices and triangles left keep
-/// their order and each triangle its face's material. Every face is smooth, and an edge sharp where its two
-/// faces were not shaded as one surface before (by the normals the mesh had: its own, a bevel's hardened ones,
-/// or those its smooth faces and sharp edges gave), or where a face shaded flat has come to turn from its
-/// neighbour: so a vertex is written once wherever the model's was. The UVs follow their corners, torn only
-/// where they were; the corners' own normals and the baked shading are not kept (they were the old surface's).
+/// their order and each triangle its face's material. Every face is smooth and each corner has a normal, the
+/// mesh's own carried to it (its faces' and sharp edges', a bevel's hardened ones, a shell's weighted ones), so a
+/// vertex is written once wherever the model's was; the UVs follow their corners, torn only where they were. The
+/// baked shading (`Mesh::ao`) is not kept (`far::decimate` lays the mesh's on what is left); where the mesh
+/// has it, a vertex in the dark counts for less beside one in the open when the two become one.
 pub fn collapse(mesh: &Mesh, ratio: f64, locked: &[bool]) -> Mesh {
     collapse_traced(mesh, ratio, locked).0
 }
@@ -826,8 +847,6 @@ pub fn collapse_traced(mesh: &Mesh, ratio: f64, locked: &[bool]) -> (Mesh, Vec<[
                 v,
                 mat: face.mat,
                 alive: true,
-                group: f as u32,
-                flat: false,
             });
             looks.push(t.map(|k| shown[(face.start + k) as usize].array().map(f64::from)));
             if let (Some(out), Some(have)) = (&mut uvs, &mesh.uvs) {
@@ -856,6 +875,8 @@ pub fn collapse_traced(mesh: &Mesh, ratio: f64, locked: &[bool]) -> (Mesh, Vec<[
         live: tris.len(),
         tris,
         uvs,
+        looks,
+        seen: vec![0.0; n],
         around,
         stamp: vec![0; n],
         was: Vec::new(),
@@ -871,6 +892,14 @@ pub fn collapse_traced(mesh: &Mesh, ratio: f64, locked: &[bool]) -> (Mesh, Vec<[
         let tri = work.tris[t];
         let p = work.corners(t as u32);
         work.was.push(cross(sub(p[1], p[0]), sub(p[2], p[0])));
+        for x in tri.v {
+            let c = work.was[t];
+            let shade = match &mesh.ao {
+                Some(ao) if ao.len() == n => ao[x as usize] as f64,
+                _ => 1.0,
+            };
+            work.seen[x as usize] += shade * dot(c, c).sqrt() / 6.0;
+        }
         for k in 0..3 {
             edges.insert(edge(tri.v[k], tri.v[(k + 1) % 3]));
         }
@@ -902,37 +931,6 @@ pub fn collapse_traced(mesh: &Mesh, ratio: f64, locked: &[bool]) -> (Mesh, Vec<[
                 }
             }
         }
-    }
-    // the faces shaded as one surface: joined across each edge of two faces whose normals are the same at both
-    // its ends; and those shaded flat
-    let mut group: Vec<u32> = (0..mesh.faces.len() as u32).collect();
-    fn root(group: &mut [u32], mut x: u32) -> u32 {
-        while group[x as usize] != x {
-            group[x as usize] = group[group[x as usize] as usize];
-            x = group[x as usize];
-        }
-        x
-    }
-    let same = |a: P, b: P| dot(a, b) >= SAME_NORMAL && dot(a, a) > 0.5 && dot(b, b) > 0.5;
-    for &(a, b) in &edges {
-        let on: Vec<u32> = work.on_edge(a, b).collect();
-        if let [s, t] = on[..] {
-            let look = |t: u32, x: u32| {
-                let tri = &work.tris[t as usize];
-                looks[t as usize][tri.v.iter().position(|&y| y == x).unwrap_or(0)]
-            };
-            if same(look(s, a), look(t, a)) && same(look(s, b), look(t, b)) {
-                let (s, t) = (work.tris[s as usize], work.tris[t as usize]);
-                let (x, y) = (root(&mut group, s.group), root(&mut group, t.group));
-                group[x.max(y) as usize] = x.min(y);
-            }
-        }
-    }
-    for t in 0..work.tris.len() {
-        let own = unit(work.was[t]);
-        let tri = &mut work.tris[t];
-        tri.group = root(&mut group, tri.group);
-        tri.flat = own.is_some_and(|own| looks[t].iter().all(|&n| dot(n, own) >= FLAT_LOOK));
     }
     let target = if ratio.is_finite() {
         (work.live as f64 * ratio.clamp(0.0, 1.0)).floor() as usize
@@ -1003,14 +1001,17 @@ fn rebuilt(mesh: &Mesh, work: &Work) -> Mesh {
     out.card_shade = card;
     let mut uvs = work.uvs.as_ref().map(|_| Vec::new());
     let mut shown = Vec::new();
-    let mut left: BTreeMap<(u32, u32), Vec<&Tri>> = BTreeMap::new();
+    // (each edge's faces, with the normals each has at its two ends)
+    let mut left: BTreeMap<(u32, u32), Vec<[P; 2]>> = BTreeMap::new();
     for (t, tri) in work.tris.iter().enumerate().filter(|(_, t)| t.alive) {
         let v = corners[t];
         out.push_face(&v, tri.mat, true);
         for k in 0..3 {
-            left.entry(edge(v[k], v[(k + 1) % 3]))
+            let (a, b) = (k, (k + 1) % 3);
+            let (a, b) = if v[a] < v[b] { (a, b) } else { (b, a) };
+            left.entry((v[a], v[b]))
                 .or_default()
-                .push(tri);
+                .push([normals[t][a], normals[t][b]]);
         }
         if let (Some(out), Some(have)) = (&mut uvs, &work.uvs) {
             out.extend(have[t]);
@@ -1018,11 +1019,10 @@ fn rebuilt(mesh: &Mesh, work: &Work) -> Mesh {
         shown.extend(normals[t].map(|n| V3::new(n[0] as f32, n[1] as f32, n[2] as f32)));
     }
     out.uvs = uvs;
-    // every face is smooth, an edge sharp where the two faces the collapses brought to it are creased
-    // (`Work::creased`), and each corner has its normal (`Work::normals`)
+    // every face is smooth and each corner has its normal; an edge is sharp where its two faces' normals part
     for (e, faces) in &left {
         if let [s, t] = faces[..]
-            && work.creased(s, t)
+            && (0..2).any(|k| dot(s[k], t[k]) < SAME_NORMAL)
         {
             out.sharp.insert(*e);
         }

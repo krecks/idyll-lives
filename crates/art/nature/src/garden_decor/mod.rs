@@ -97,6 +97,6 @@ pub fn family() -> Option<Family> {
              and lights like the rest of the garden.",
         )
         .pack("gardenDecor")
-        .switched(),
+        ,
     )
 }

@@ -62,5 +62,5 @@ pub fn family() -> Option<Family> {
          manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish \
          group. Each has one moving part its use plays: the nook's cushion sinks, the ladder rolls, the bureau's \
          flap drops, the teapot pours, the fire grows and the top book opens.",
-    ).switched())
+    ))
 }

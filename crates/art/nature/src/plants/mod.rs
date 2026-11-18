@@ -266,5 +266,5 @@ pub fn family() -> Option<Family> {
          they are trimmed, a rose and lavender stems while they are cut, a meadow flower and basil \
          while they are picked; the crops grow from seedlings to ripe and lose their crop when \
          harvested (`motions.growth`).",
-    ).switched())
+    ))
 }

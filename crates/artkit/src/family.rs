@@ -198,8 +198,6 @@ pub struct Family {
     pub comment: &'static str,
     /// The pack's folder (packs/<pack>/manifest.json).
     pub pack: &'static str,
-    /// Its files in the repo are the ones built here: cargo art builds it in Rust (`switched`).
-    pub switched: bool,
 }
 
 impl Family {
@@ -226,15 +224,7 @@ impl Family {
             models,
             comment,
             pack: name,
-            switched: false,
         }
-    }
-
-    /// Its files in the repo are the ones built here: cargo art builds it in Rust, whatever is asked (a family
-    /// ported and not yet switched only with --out or --check, and its script in Blender otherwise).
-    pub fn switched(mut self) -> Family {
-        self.switched = true;
-        self
     }
 
     pub fn pack(mut self, pack: &'static str) -> Family {
@@ -263,7 +253,7 @@ pub struct Output {
 
 fn stats(name: &str) {
     scene::log(format!(
-        "[gamekit] {name}: {} triangles in {} meshes",
+        "[art] {name}: {} triangles in {} meshes",
         glb::triangles(),
         meshes().len()
     ));
@@ -353,7 +343,7 @@ fn make_decimated(model: &Model, ratio: f64) -> Result<Vec<Obj>, String> {
     // flag on a roof), which is no part of that size, is joined into its far version with the rest.)
     far::decimated(far, ratio, far::FEET, far::EDGE);
     scene::log(format!(
-        "[gamekit] {}.far: {} triangles ({:.0}% kept)",
+        "[art] {}.far: {} triangles ({:.0}% kept)",
         model.id,
         far.read(|p| p.mesh.triangles().len()),
         ratio * 100.0
@@ -431,7 +421,7 @@ pub fn build_model(family: &Family, model: &Model) -> Result<Output, String> {
                     .collect(),
             ),
         );
-        scene::log(format!("[gamekit] {}: {} perches", model.id, perches.len()));
+        scene::log(format!("[art] {}: {} perches", model.id, perches.len()));
     }
     if let Some(habitat) = model.habitat {
         if perches.is_empty() {
@@ -468,12 +458,12 @@ pub fn build_model(family: &Family, model: &Model) -> Result<Output, String> {
         all.extend(glb::materials_used(&far_objs));
         entry.set("materials", family.palette_of(model).finishes(&all)?);
         scene::log(format!(
-            "[gamekit] built its far version -> models/{}/{}.far.glb",
+            "[art] built its far version -> models/{}/{}.far.glb",
             family.name, model.id
         ));
     }
     scene::log(format!(
-        "[gamekit] built {key} -> models/{}/{}.glb",
+        "[art] built {key} -> models/{}/{}.glb",
         family.name, model.id
     ));
     Ok(Output {

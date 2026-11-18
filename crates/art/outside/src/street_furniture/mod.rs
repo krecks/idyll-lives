@@ -102,6 +102,6 @@ pub fn family() -> Option<Family> {
              runs near the camera (`water_run`, ambient).",
         )
         .pack("street_furniture")
-        .switched(),
+        ,
     )
 }

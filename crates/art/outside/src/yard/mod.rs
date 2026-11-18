@@ -127,5 +127,5 @@ pub fn family() -> Option<Family> {
          castle grows in the sandpit, the bike lifts its back wheel and turns it, the raised bed's crop grows and is \
          picked, the shed's and the greenhouse's doors open (and the vent), the compost bin's lid lifts and the \
          washing goes out on the line a line at a time and stays out.",
-    ).switched())
+    ))
 }

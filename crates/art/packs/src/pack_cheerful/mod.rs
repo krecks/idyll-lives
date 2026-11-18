@@ -71,5 +71,5 @@ pub fn family() -> Option<Family> {
          group. Each has one moving part: the record swings up, the microphone rises, the shaker is taken off the \
          cart, the hammock sways (a loop its sleeper rides), the sun rises (its sky glowing at night) and the \
          curtain is drawn.",
-    ).switched())
+    ))
 }

@@ -67,7 +67,7 @@ pub fn family() -> Option<Family> {
          Listed in the base manifest's packs. Each has a far version for the town overview. The till's cash drawer \
          slides out (`till`) while a resident buys a treat; the bakery case's back glass door slides aside (`door`) \
          for a pastry.",
-    ).switched())
+    ))
 }
 
 #[cfg(test)]

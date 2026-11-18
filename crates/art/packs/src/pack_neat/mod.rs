@@ -69,5 +69,5 @@ pub fn family() -> Option<Family> {
          The materials map onto the game's finishes so a model costs one draw call per finish group. Each moves one \
          part while it is used: the mop leaves its dock for the resident's hands, the washer's door opens, the rain \
          falls, a bin slides out, the robot rolls out and the key tray drawer opens.",
-    ).switched())
+    ))
 }

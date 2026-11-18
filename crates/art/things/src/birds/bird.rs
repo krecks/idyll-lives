@@ -423,7 +423,7 @@ impl<'a> Bird<'a> {
             ));
         }
         scene::log(format!(
-            "[gamekit] {}: tail {:.1} cm, body middle {:.1} cm up, head {:.1} cm up",
+            "[art] {}: tail {:.1} cm, body middle {:.1} cm up, head {:.1} cm up",
             s.name,
             self.tail_len * 100.0,
             self.c.z as f64 * 100.0,

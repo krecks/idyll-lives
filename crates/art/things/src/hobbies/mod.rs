@@ -339,5 +339,5 @@ pub fn family() -> Option<Family> {
          a model costs one draw call per finish group. The piano lifts its fallboard, the drums' \
          cymbals and the foosball rods move while played, the darts, the painting, the jigsaw patch, \
          the pot and the liquid grow, and the other hobbies move a part while a resident uses them.",
-    ).switched())
+    ))
 }
