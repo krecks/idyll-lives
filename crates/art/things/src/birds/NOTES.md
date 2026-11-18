@@ -1,9 +1,9 @@
 # Birds — notes
 
-`birds.py` builds the garden birds into `web/public/assets/models/birds/` and their entries in `packs/birds/manifest.json`:
+This module builds the garden birds into `web/public/assets/models/birds/` and their entries in `packs/birds/manifest.json`:
 the blue tit, chaffinch (a male), willow warbler, blackbird (a male) and collared dove (`model.bird.*`). Nothing in the content
 names them: the renderer flies them about by code and perches them on the trees and shrubs (`perches`, below), so their
-`Model`s take `code=True`. Built 2026-10-22.
+`Model`s are `code`. Built 2026-10-22.
 
 ## What the renderer gets
 
@@ -98,15 +98,20 @@ across from the game's camera, and the gate doesn't ask for one.
 ## Looking at them
 
 `cargo art birds --preview` renders each bird into `previews/birds/<id>.png`: the front three-quarter with its wings
-spread. `views` adds `<id>.side.png`, `.front.png` and `.three_quarter.png` perched (the wings scaled away, as the game
-draws a perched bird), `.top.png` spread, and `.at6m.png` and `.at20m.png`: the bird on a lawn beside a 1.77 m figure,
-seen as the game's camera sees it (a 0.8 rad field of view, 38 degrees down). At real size, a tit is a few pixels
-across at 20 m and a blackbird or a dove about ten. In the game's gallery (`/gallery.html?keys=model.bird.blackbird&scale=adult`,
-or `--camera game`) they draw as built.
+spread. (The Blender script's extra views, perched from the side, the front and above and on a lawn beside a 1.77 m
+figure at 6 and 20 m, were Blender renders and are not made here: the game's gallery
+`/gallery.html?keys=model.bird.blackbird&scale=adult`, or `--camera game`, draws them as built. At real size, a tit
+is a few pixels across at 20 m and a blackbird or a dove about ten.)
 
 ## Rebuild
 
 ```
 cargo art birds            # the .glb files, the pack, check-glb
-cargo art birds --preview  # previews/birds/<id>.png and the views above
+cargo art birds --preview  # previews/birds/<id>.png
+cargo art birds --check    # rebuilds and fails on any byte that differs
 ```
+
+## Built in Rust (2026-11-18)
+
+Ported line for line from the Blender script (`crates/art/things/src/birds`): against the last Blender build
+(`ref/blender`) all five files are byte for byte Blender's, and the pack the same.

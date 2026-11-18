@@ -222,7 +222,7 @@ exits 1 if a build or the gate fails. Run Blender only through it (or with `--ba
      model (`families/plants.py` `perches`). Its `Model` says what they are on, the entry's `habitat`
      beside them: `habitat='tree'` (broadleaved and fruit trees), `'conifer'`, `'bush'` (shrubs) or `'hedge'`.
      `--preview` renders `<id>@perches.png` (and `.top`) with a red ball on each. A bird the game flies by code takes
-     `bird={'length', 'wingspan', 'perchHeight', 'pitch'}` (`families/birds.py`, birds.md). The gate checks them all
+     `bird={'length', 'wingspan', 'perchHeight', 'pitch'}` (crates/art/things/src/birds and its NOTES.md). The gate checks them all
      against the file.
 5. **Look**: `cargo art <family> --preview`, then open `previews/<family>/<id>.png`. The preview looks at the front
    three-quarter, so sides facing away (the inside of side shelves) may not show; the game will. Once exported, the
