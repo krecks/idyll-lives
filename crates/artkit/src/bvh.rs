@@ -1,8 +1,10 @@
-//! Rays against triangles: a tree of boxes over a mesh's triangles, and the ray-triangle test Blender casts with
-//! (watertight, single precision), so a ray meets a built mesh where it met the one Blender built: the perches
-//! found on a tree, and the baked shading, come from where rays land.
+//! Rays against triangles: the ray-triangle test Blender casts with (watertight, single precision), and two trees
+//! of boxes over triangles: the kernel's own over a part's mesh for the scene's rays (`Rays`: the perches found on a
+//! tree), and Blender's over polygons for a script's `BVHTree` (`Polygons`: the baked shading), built and walked
+//! as Blender builds and walks it. A ray meets a built mesh where it met the one Blender built, and where it meets
+//! two faces at once it is given Blender's.
 
-use crate::math::{V3, normalize_v3};
+use crate::math::{V3, dot_v3, normalize_v3};
 use crate::mesh::normal_tri;
 use crate::scene::{self, Obj};
 
@@ -203,6 +205,458 @@ impl Bvh {
             }
         }
         best
+    }
+}
+
+// ---- a script's own tree: mathutils' BVHTree.FromPolygons ---------------------------------------------------
+
+/// A node of Blender's tree (BLI_kdopbvh, GPL-2.0-or-later, worked through again here): a leaf is one triangle,
+/// a branch up to four nodes.
+#[derive(Clone)]
+struct Knot {
+    /// Its box: the least and the most along x, then y, then z.
+    bv: [f32; 6],
+    children: [u32; 4],
+    /// How many children it has (none: a leaf).
+    count: u8,
+    /// The axis its children were sorted along.
+    axis: u8,
+}
+
+/// What Blender's tree is built by: how many leaves hang under a branch at each depth of a tree filled from
+/// the left, four to a branch.
+struct Levels {
+    leaves: i64,
+    per_child: [i64; 32],
+    on_level: [i64; 32],
+    remain: i64,
+}
+
+const FOUR: i64 = 4;
+
+impl Levels {
+    fn new(leaves: i64) -> Levels {
+        let (mut per_child, mut on_level) = ([0_i64; 32], [0_i64; 32]);
+        per_child[0] = 1;
+        while per_child[0] < leaves {
+            per_child[0] *= FOUR;
+        }
+        on_level[0] = 1;
+        let mut depth = 1;
+        while depth < 32 && per_child[depth - 1] != 0 {
+            on_level[depth] = on_level[depth - 1] * FOUR;
+            per_child[depth] = per_child[depth - 1] / FOUR;
+            depth += 1;
+        }
+        let remain = leaves - per_child[1];
+        let nodes = (remain + FOUR - 2) / (FOUR - 1);
+        Levels {
+            leaves,
+            per_child,
+            on_level,
+            remain: remain + nodes,
+        }
+    }
+
+    /// The first leaf under the branch that is `child` along its level at `depth`.
+    fn first_leaf(&self, depth: usize, child: i64) -> usize {
+        let least = child * self.per_child[depth - 1];
+        let at = if least <= self.remain {
+            least
+        } else if self.per_child[depth] != 0 {
+            self.leaves - (self.on_level[depth - 1] - child) * self.per_child[depth]
+        } else {
+            self.remain
+        };
+        at as usize
+    }
+}
+
+/// Blender's partial sort of the leaves `a[begin..end]` by `key`: those before `n` no greater than those after
+/// it, left in the order its quicksort leaves them (which decides the order equal leaves are met in).
+fn nth_element(
+    a: &mut [u32],
+    key: &impl Fn(u32) -> f32,
+    mut begin: usize,
+    mut end: usize,
+    n: usize,
+) {
+    while end - begin > 3 {
+        // the median of the first, the middle and the last
+        let (lo, mid, hi) = (key(a[begin]), key(a[(begin + end) / 2]), key(a[end - 1]));
+        let x = if mid < lo {
+            if hi < mid {
+                mid
+            } else if hi < lo {
+                hi
+            } else {
+                lo
+            }
+        } else if hi < mid {
+            if hi < lo { lo } else { hi }
+        } else {
+            mid
+        };
+        let (mut i, mut j) = (begin, end);
+        let cut = loop {
+            while key(a[i]) < x {
+                i += 1;
+            }
+            j -= 1;
+            while x < key(a[j]) {
+                j -= 1;
+            }
+            if i >= j {
+                break i;
+            }
+            a.swap(i, j);
+            i += 1;
+        };
+        if cut <= n {
+            begin = cut;
+        } else {
+            end = cut;
+        }
+    }
+    for i in begin..end {
+        let t = a[i];
+        let mut j = i;
+        while j != begin && key(t) < key(a[j - 1]) {
+            a[j] = a[j - 1];
+            j -= 1;
+        }
+        a[j] = t;
+    }
+}
+
+/// Blender's tree over triangles, as `BLI_bvhtree_new(n, 0, 4, 6)`, an insert a triangle and
+/// `BLI_bvhtree_balance` leave it: the leaves first (a triangle each, in the order given), then the branches,
+/// the root the first of them.
+struct Kdop {
+    knots: Vec<Knot>,
+    leaves: usize,
+}
+
+const NO_BOX: [f32; 6] = [
+    f32::MAX,
+    -f32::MAX,
+    f32::MAX,
+    -f32::MAX,
+    f32::MAX,
+    -f32::MAX,
+];
+
+impl Kdop {
+    fn new(tris: &[[V3; 3]]) -> Kdop {
+        let leaves = tris.len();
+        let mut knots: Vec<Knot> = tris
+            .iter()
+            .map(|t| {
+                let mut bv = NO_BOX;
+                for p in t {
+                    for i in 0..3 {
+                        bv[2 * i] = bv[2 * i].min(p[i]);
+                        bv[2 * i + 1] = bv[2 * i + 1].max(p[i]);
+                    }
+                }
+                // (a tree asked for with no margin is given the least one)
+                for i in 0..3 {
+                    bv[2 * i] -= f32::EPSILON;
+                    bv[2 * i + 1] += f32::EPSILON;
+                }
+                Knot {
+                    bv,
+                    children: [0; 4],
+                    count: 0,
+                    axis: 0,
+                }
+            })
+            .collect();
+        if leaves == 0 {
+            return Kdop { knots, leaves };
+        }
+        let branches = ((leaves as i64 + FOUR - 3) / (FOUR - 1)).max(1) as usize;
+        knots.resize(
+            leaves + branches,
+            Knot {
+                bv: [0.0; 6],
+                children: [0; 4],
+                count: 0,
+                axis: 0,
+            },
+        );
+        // (the leaves as the build sorts them; branch j, counted from one, is knot `leaves - 1 + j`)
+        let mut order: Vec<u32> = (0..leaves as u32).collect();
+        let around = |knots: &[Knot], order: &[u32]| {
+            let mut bv = NO_BOX;
+            for &l in order {
+                let leaf = &knots[l as usize].bv;
+                for i in 0..3 {
+                    bv[2 * i] = bv[2 * i].min(leaf[2 * i]);
+                    bv[2 * i + 1] = bv[2 * i + 1].max(leaf[2 * i + 1]);
+                }
+            }
+            let (x, y, z) = (bv[1] - bv[0], bv[3] - bv[2], bv[5] - bv[4]);
+            let axis = if x > y {
+                if x > z { 0 } else { 2 }
+            } else if y > z {
+                1
+            } else {
+                2
+            };
+            (bv, axis)
+        };
+        if leaves == 1 {
+            let (bv, axis) = around(&knots, &order);
+            knots[1] = Knot {
+                bv,
+                children: [0; 4],
+                count: 1,
+                axis,
+            };
+            return Kdop { knots, leaves };
+        }
+        let levels = Levels::new(leaves as i64);
+        let (mut i, mut depth) = (1_i64, 1_usize);
+        while i <= branches as i64 {
+            let next_level = i * FOUR - 2;
+            for j in i..next_level.min(branches as i64 + 1) {
+                let (begin, end) = (
+                    levels.first_leaf(depth, j - i),
+                    levels.first_leaf(depth, j - i + 1),
+                );
+                let (bv, axis) = around(&knots, &order[begin..end]);
+                // the leaves dealt to the children, sorted along the box's longest side by where they end
+                let child = |k: i64| j * FOUR - 2 + k;
+                let mut nth = [begin; 5];
+                nth[4] = end;
+                for (k, first) in nth.iter_mut().enumerate().take(4).skip(1) {
+                    *first = levels.first_leaf(depth + 1, child(k as i64) - next_level);
+                }
+                let key = |l: u32| knots[l as usize].bv[2 * axis as usize + 1];
+                for k in 0..3 {
+                    if nth[k] >= nth[4] {
+                        break;
+                    }
+                    nth_element(&mut order, &key, nth[k], nth[4], nth[k + 1]);
+                }
+                let mut parent = Knot {
+                    bv,
+                    children: [0; 4],
+                    count: 0,
+                    axis,
+                };
+                for k in 0..4 {
+                    let at = child(k) - next_level;
+                    let (first, last) = (
+                        levels.first_leaf(depth + 1, at),
+                        levels.first_leaf(depth + 1, at + 1),
+                    );
+                    if last > first + 1 {
+                        parent.children[k as usize] = (leaves as i64 - 1 + child(k)) as u32;
+                    } else if last == first + 1 {
+                        parent.children[k as usize] = order[first];
+                    } else {
+                        break;
+                    }
+                    parent.count += 1;
+                }
+                knots[leaves - 1 + j as usize] = parent;
+            }
+            i = next_level;
+            depth += 1;
+        }
+        Kdop { knots, leaves }
+    }
+}
+
+/// A ray on its way down Blender's tree.
+struct Dive<'a> {
+    tris: &'a [[V3; 3]],
+    origin: V3,
+    shear: Shear,
+    /// The ray's direction along each axis (zero where it hardly moves), and one over it.
+    along: [f32; 3],
+    over: [f32; 3],
+    /// Which of a box's six bounds the ray meets first and last along each axis.
+    bound: [usize; 6],
+    hit: Option<u32>,
+    dist: f32,
+}
+
+impl Dive<'_> {
+    /// How far along the ray it enters the box (single precision, as Blender tests it: a box the ray only touches
+    /// may be passed by), or f32::MAX if it doesn't within the nearest hit so far.
+    fn enters(&self, bv: &[f32; 6]) -> f32 {
+        let o = self.origin;
+        let t1x = (bv[self.bound[0]] - o.x) * self.over[0];
+        let t2x = (bv[self.bound[1]] - o.x) * self.over[0];
+        let t1y = (bv[self.bound[2]] - o.y) * self.over[1];
+        let t2y = (bv[self.bound[3]] - o.y) * self.over[1];
+        let t1z = (bv[self.bound[4]] - o.z) * self.over[2];
+        let t2z = (bv[self.bound[5]] - o.z) * self.over[2];
+        if (t1x > t2y || t2x < t1y || t1x > t2z || t2x < t1z || t1y > t2z || t2y < t1z)
+            || (t2x < 0.0 || t2y < 0.0 || t2z < 0.0)
+            || (t1x > self.dist || t1y > self.dist || t1z > self.dist)
+        {
+            return f32::MAX;
+        }
+        // (the greatest of the three, as std::max folds them)
+        let m = if t1x < t1y { t1y } else { t1x };
+        if m < t1z { t1z } else { m }
+    }
+
+    fn down(&mut self, tree: &Kdop, at: u32) {
+        let knot = &tree.knots[at as usize];
+        if self.enters(&knot.bv) >= self.dist {
+            return;
+        }
+        if knot.count == 0 {
+            // a nearer triangle only: of two as far as each other, the one met first on the way down stays
+            if let Some(dist) = self.shear.hit(self.origin, &self.tris[at as usize])
+                && dist >= 0.0
+                && dist < self.dist
+            {
+                (self.hit, self.dist) = (Some(at), dist);
+            }
+        } else if self.along[knot.axis as usize] > 0.0 {
+            for &child in &knot.children[..knot.count as usize] {
+                self.down(tree, child);
+            }
+        } else {
+            for &child in knot.children[..knot.count as usize].iter().rev() {
+                self.down(tree, child);
+            }
+        }
+    }
+}
+
+/// Where a ray met a script's tree.
+#[derive(Clone, Copy, Debug)]
+pub struct PolyHit {
+    pub at: V3,
+    /// The normal of the polygon it met.
+    pub normal: V3,
+    /// Which polygon, among those the tree was built of.
+    pub index: u32,
+    pub dist: f32,
+}
+
+/// `mathutils.bvhtree.BVHTree.FromPolygons(verts, polys, all_triangles=False, epsilon=0.0)`: polygons to cast rays
+/// at, cut into triangles and kept in a tree as Blender does both, so that a ray which meets two faces in one
+/// plane, an edge or a corner is given the face Blender gives it. That depends on the order the triangles are
+/// come to (the tree's boxes, sorted as its build sorts them, the nearer child first by the ray's direction alone),
+/// on boxes tested in single precision, and on a hit only replacing a farther one.
+pub struct Polygons {
+    tris: Vec<[V3; 3]>,
+    /// Each triangle's polygon.
+    poly: Vec<u32>,
+    /// A normal a polygon: a triangle's own, any other's by Newell's sum (none for one of no area).
+    normals: Vec<V3>,
+    tree: Kdop,
+}
+
+impl Polygons {
+    pub fn new(verts: &[V3], polys: &[Vec<u32>]) -> Polygons {
+        let (mut tris, mut poly) = (Vec::new(), Vec::new());
+        let mut normals = Vec::with_capacity(polys.len());
+        for (index, corners) in polys.iter().enumerate() {
+            let p: Vec<V3> = corners.iter().map(|&v| verts[v as usize]).collect();
+            if p.len() < 3 {
+                normals.push(V3::ZERO);
+                continue;
+            }
+            if p.len() == 3 {
+                normals.push(normal_tri(p[0], p[1], p[2]));
+                tris.push([p[0], p[1], p[2]]);
+                poly.push(index as u32);
+                continue;
+            }
+            let mut sum = V3::ZERO;
+            let mut prev = p[p.len() - 1];
+            for &cur in &p {
+                sum.x += (prev.y - cur.y) * (prev.z + cur.z);
+                sum.y += (prev.z - cur.z) * (prev.x + cur.x);
+                sum.z += (prev.x - cur.x) * (prev.y + cur.y);
+                prev = cur;
+            }
+            let normal = normalize_v3(sum).0;
+            normals.push(normal);
+            // flattened seen from behind (clockwise), its ears clipped
+            let (n1, n2) = ortho_basis(V3::new(-normal.x, -normal.y, -normal.z));
+            let flat: Vec<[f32; 2]> = p.iter().map(|&c| [dot_v3(n1, c), dot_v3(n2, c)]).collect();
+            for t in crate::botany::polyfill::fill(&flat) {
+                tris.push(t.map(|i| p[i as usize]));
+                poly.push(index as u32);
+            }
+        }
+        let tree = Kdop::new(&tris);
+        Polygons {
+            tris,
+            poly,
+            normals,
+            tree,
+        }
+    }
+
+    /// `tree.ray_cast(origin, direction, distance)`: the nearest polygon the ray meets within `distance`.
+    pub fn ray_cast(&self, origin: V3, direction: V3, distance: f64) -> Option<PolyHit> {
+        if self.tris.is_empty() {
+            return None;
+        }
+        let dir = normalize_v3(direction).0;
+        let (mut along, mut over, mut bound) = ([0.0_f32; 3], [0.0_f32; 3], [0_usize; 6]);
+        for i in 0..3 {
+            along[i] = dir[i];
+            if along[i].abs() < f32::EPSILON {
+                along[i] = 0.0;
+                over[i] = f32::MAX;
+            } else {
+                over[i] = 1.0 / along[i];
+            }
+            let first = (over[i] < 0.0) as usize;
+            bound[2 * i] = 2 * i + first;
+            bound[2 * i + 1] = 2 * i + 1 - first;
+        }
+        let mut dive = Dive {
+            tris: &self.tris,
+            origin,
+            shear: Shear::new(dir),
+            along,
+            over,
+            bound,
+            hit: None,
+            dist: distance as f32,
+        };
+        dive.down(&self.tree, self.tree.leaves as u32);
+        let t = dive.hit?;
+        let index = self.poly[t as usize];
+        Some(PolyHit {
+            at: V3::new(
+                origin.x + dir.x * dive.dist,
+                origin.y + dir.y * dive.dist,
+                origin.z + dir.z * dive.dist,
+            ),
+            normal: self.normals[index as usize],
+            index,
+            dist: dive.dist,
+        })
+    }
+}
+
+/// Two vectors square to the unit vector `n` and to each other (Blender's `ortho_basis_v3v3_v3`).
+fn ortho_basis(n: V3) -> (V3, V3) {
+    let f = n.x * n.x + n.y * n.y;
+    if f > f32::EPSILON {
+        let d = 1.0 / f.sqrt();
+        let n1 = V3::new(n.y * d, -n.x * d, 0.0);
+        let n2 = V3::new(-n.z * n1.y, n.z * n1.x, n.x * n1.y - n.y * n1.x);
+        (n1, n2)
+    } else {
+        (
+            V3::new(if n.z < 0.0 { -1.0 } else { 1.0 }, 0.0, 0.0),
+            V3::new(0.0, 1.0, 0.0),
+        )
     }
 }
 

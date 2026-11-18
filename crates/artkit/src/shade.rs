@@ -12,9 +12,8 @@
 //! A tree's leaf cards carry their own shading on their corners (`Mesh::card_shade`, written as they are laid: open
 //! on the crown's outside, darker inside it) and shade nothing: they are leaves, not walls.
 
-use crate::bvh::Bvh;
+use crate::bvh::Polygons;
 use crate::math::{self, Axis, M3, PI, V3, v3};
-use crate::mesh::normal_newell;
 use crate::motion;
 use crate::parts::measure;
 use crate::py;
@@ -47,21 +46,18 @@ pub fn directions(n: usize) -> Vec<V3> {
         .collect()
 }
 
-/// The triangles rays are cast at, in the world at rest or (`local`) in the one part's own space, with each
-/// one's face's normal. Leaf cards shade nothing.
-struct Tree {
-    bvh: Bvh,
-    normals: Vec<V3>,
-}
-
-fn tree(objs: &[Obj], local: bool) -> Tree {
-    let (mut tris, mut normals) = (Vec::new(), Vec::new());
+/// The faces rays are cast at, in the world at rest or (`local`) in the one part's own space, in the tree a
+/// script's `BVHTree.FromPolygons` makes of them. Leaf cards shade nothing.
+fn tree(objs: &[Obj], local: bool) -> Polygons {
+    let (mut verts, mut polys) = (Vec::new(), Vec::new());
     for &o in objs {
         let points = if local {
             o.read(|p| p.mesh.verts.clone())
         } else {
             o.world_points()
         };
+        let base = verts.len() as u32;
+        verts.extend(points);
         o.read(|p| {
             let mesh = &p.mesh;
             for f in 0..mesh.faces.len() {
@@ -73,34 +69,17 @@ fn tree(objs: &[Obj], local: bool) -> Tree {
                 {
                     continue;
                 }
-                let poly: Vec<V3> = c.iter().map(|&v| points[v as usize]).collect();
-                let normal = normal_newell(&poly);
-                let fan: Vec<[u32; 3]> = if poly.len() == 3 {
-                    vec![[0, 1, 2]]
-                } else {
-                    crate::tri::polygon(&poly, normal)
-                };
-                for t in fan {
-                    tris.push([
-                        poly[t[0] as usize],
-                        poly[t[1] as usize],
-                        poly[t[2] as usize],
-                    ]);
-                    normals.push(normal);
-                }
+                polys.push(c.iter().map(|&v| base + v).collect());
             }
         });
     }
-    Tree {
-        bvh: Bvh::new(tris),
-        normals,
-    }
+    Polygons::new(&verts, &polys)
 }
 
 /// The share of the sky a point `p` with normal `n` sees, 0 (enclosed) to 1 (open), from rays out over the
 /// hemisphere about `n`, a hit counting less the farther away it is (up to `reach`); with `ground`, a ray that
 /// reaches down to the floor (z = 0) within `GROUND_REACH` is blocked by it too.
-fn seen(tree: &Tree, dirs: &[V3], p: V3, n: V3, twist: usize, reach: f64, ground: bool) -> f64 {
+fn seen(tree: &Polygons, dirs: &[V3], p: V3, n: V3, twist: usize, reach: f64, ground: bool) -> f64 {
     // a turn taking +Z onto the normal, twisted (by the vertex's index) so neighbours don't band
     let turn =
         V3::Z.rotation_difference(n).to_matrix() * M3::rotation(twist as f64 * 2.399963, Axis::Z);
@@ -108,14 +87,13 @@ fn seen(tree: &Tree, dirs: &[V3], p: V3, n: V3, twist: usize, reach: f64, ground
     let (mut blocked, mut inside) = (0.0_f64, 0usize);
     for &d in dirs {
         let ray = turn * d;
-        let dir = crate::math::normalize_v3(ray).0;
-        match tree.bvh.ray_cast(start, dir, reach as f32) {
-            Some((t, dist)) => {
-                if tree.normals[t as usize].dot(ray) > 0.0 {
+        match tree.ray_cast(start, ray, reach) {
+            Some(hit) => {
+                if hit.normal.dot(ray) > 0.0 {
                     // the back of a face: this point is inside another part, not under it
                     inside += 1;
                 } else {
-                    blocked += 1.0 - math::pow(dist as f64 / reach, 2.0);
+                    blocked += 1.0 - math::pow(hit.dist as f64 / reach, 2.0);
                 }
             }
             None => {

@@ -1,7 +1,7 @@
 //! Assembling a model from its parts: joining them into one mesh (or one per moving part), putting a moving
 //! part's origin on its hinge, standing the model on the floor and checking its size.
 
-use crate::math::{Axis, M4, P3, V3, mul_m4_m4m4, radians, v3};
+use crate::math::{Axis, M4, P3, Quat, V3, mul_m4_m4m4, radians, v3};
 use crate::mesh::Mesh;
 use crate::perch;
 use crate::scene::{self, Obj, meshes};
@@ -44,12 +44,14 @@ pub fn join(parts: &[Obj], name: &str, origin: Option<P3>) -> Obj {
     join_into(first, &others);
     // rotation and scale into the mesh
     first.edit(|o| {
-        if o.rot != V3::ZERO || o.scale != v3(1, 1, 1) || o.quat.is_some() {
+        if !o.unturned() {
             let mut m = o.matrix_basis();
             m.0[3] = [0.0, 0.0, 0.0, 1.0];
             o.mesh.transform(&m);
-            (o.rot, o.scale, o.quat) = (V3::ZERO, v3(1, 1, 1), None);
         }
+        // (it keeps its mode, as in Blender: a part joined onto a rod is still turned by a quaternion, by none)
+        (o.rot, o.scale) = (V3::ZERO, v3(1, 1, 1));
+        o.quat = o.quat.map(|_| Quat::IDENTITY);
         o.name = name.to_string();
     });
     if let Some(origin) = origin {
@@ -63,15 +65,7 @@ pub fn join(parts: &[Obj], name: &str, origin: Option<P3>) -> Obj {
 pub(crate) fn join_into(first: Obj, others: &[Obj]) {
     if !others.is_empty() {
         let world = first.matrix_world();
-        let (loc, plain) = first.read(|o| {
-            (
-                o.loc,
-                o.rot == V3::ZERO
-                    && o.scale == v3(1, 1, 1)
-                    && o.quat.is_none()
-                    && o.parent.is_none(),
-            )
-        });
+        let (loc, plain) = first.read(|o| (o.loc, o.unturned() && o.parent.is_none()));
         let inverse = if plain {
             M4::translation(-loc)
         } else {
@@ -123,6 +117,7 @@ fn append(a: &mut Mesh, b: &Mesh) {
         *a = Some(out);
     }
     merge(&mut a.uvs, &b.uvs, l0, b.loops.len(), [0.0, 0.0]);
+    merge(&mut a.stored, &b.stored, l0, b.loops.len(), None);
     merge(
         &mut a.card_shade,
         &b.card_shade,
@@ -154,10 +149,13 @@ pub fn set_origin(obj: Obj, point: impl Into<P3>) -> Obj {
     let world = obj.matrix_world();
     let local = world.inverted().unwrap_or(M4::IDENTITY) * V3::from(point);
     let moved = world * M4::translation(local);
-    obj.edit(|o| {
-        o.mesh.transform(&M4::translation(-local));
-        o.loc = moved.location();
-    });
+    obj.edit(|o| o.mesh.transform(&M4::translation(-local)));
+    if obj.read(|o| o.unturned() && o.parent.is_none()) {
+        obj.edit(|o| o.loc = moved.location());
+    } else {
+        // (a turned or scaled part's matrix is taken apart again, as Blender takes `obj.matrix_world = ...`)
+        obj.set_matrix_world(moved);
+    }
     obj
 }
 
@@ -375,6 +373,66 @@ pub fn check_size(
             got[0], got[1], got[2]
         ),
     ))
+}
+
+/// Scales `obj` into an exact w × h × d box (game metres), bottom on z = 0, centred. It stretches each axis on its
+/// own, so it is only for third-party files; a model built here is made to its real size and checked with
+/// `check_size` (docs/design/objects.md, "Real size, uniform scale").
+pub fn fit(obj: Obj, w: f64, h: f64, d: f64) -> Obj {
+    let ws = obj.world_points();
+    let (mut mn, mut mx) = ([f64::INFINITY; 3], [f64::NEG_INFINITY; 3]);
+    for p in &ws {
+        for i in 0..3 {
+            mn[i] = mn[i].min(p[i] as f64);
+            mx[i] = mx[i].max(p[i] as f64);
+        }
+    }
+    let ext = [mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]];
+    let s = [w / ext[0], d / ext[1], h / ext[2]];
+    obj.edit(|o| {
+        for v in &mut o.mesh.verts {
+            v.x = ((v.x as f64 - (mn[0] + mx[0]) / 2.0) * s[0]) as f32;
+            v.y = ((v.y as f64 - (mn[1] + mx[1]) / 2.0) * s[1]) as f32;
+            v.z = ((v.z as f64 - mn[2]) * s[2]) as f32;
+        }
+        (o.loc, o.scale) = (V3::ZERO, v3(1, 1, 1));
+    });
+    obj
+}
+
+/// `parts::join` as the family scripts wrote it: `join!(parts, name)` or `join!(parts, name, origin = point)`.
+#[macro_export]
+macro_rules! join {
+    ($parts:expr, $name:expr) => {
+        $crate::parts::join($parts, $name, None)
+    };
+    ($parts:expr, $name:expr, origin = $origin:expr) => {
+        $crate::parts::join(
+            $parts,
+            $name,
+            Some($crate::Arg::<$crate::math::P3>::arg($origin)),
+        )
+    };
+}
+
+/// `parts::settle` with its options by name, as the family scripts wrote them: `settle!()` (every mesh),
+/// `settle!(centre = false)`, `settle!(objs, centre = false, floor = false)`.
+#[macro_export]
+macro_rules! settle {
+    ($($k:ident = $v:expr),* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut how = $crate::parts::Settle::default();
+        $(how.$k = $v;)*
+        $crate::parts::settle_with(&$crate::scene::meshes(), how)
+    }};
+    ($objs:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($objs,);
+        #[allow(unused_mut)]
+        let mut how = $crate::parts::Settle::default();
+        $(how.$k = $v;)*
+        $crate::parts::settle_with(args.0, how)
+    }};
 }
 
 /// A number as Python's `{:g}` writes the centres it is given (whole numbers without a point).
