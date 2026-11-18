@@ -1,5 +1,5 @@
 //! Joined scenes the kernel builds itself against the same scenes as gamekit builds them in Blender 5.2
-//! (tests/golden/shade_built.txt: each joined mesh as Blender held it: its points, its polygons in order from the
+//! (tests/golden/shade_built.txt, six scenes: each joined mesh as Blender held it: its points, its polygons in order from the
 //! corner each starts at, the two angles stored for each corner's normal, the vertices' normals, and the levels
 //! gamekit's own `shade.bake_ao` baked). Where a part lies exactly on another, a ray meets two faces at once and the
 //! last bit of the direction it is cast in decides which: the shading is Blender's only if the mesh the kernel
@@ -204,10 +204,37 @@ fn build(name: &str) -> Obj {
             });
             turned(&f, &parts, "laptop", (x, y, z), 0.0, -20.0);
         }
+        "sun" => {
+            fbox!(
+                f,
+                "board",
+                0.58,
+                0.006,
+                0.4,
+                (0, 0.7555, 0.2),
+                WOOD,
+                bevel = 0.002,
+                bevel_segments = 1
+            );
+            fcyl!(
+                f,
+                "sun",
+                0.035,
+                0.0015,
+                (-0.17, 0.7585 + 0.0012, 0.08),
+                KEY,
+                verts = 16,
+                smooth = false
+            );
+        }
         other => panic!("no scene {other}"),
     }
     join_all(name)
 }
+
+/// The scenes with a cylinder: its caps aren't where Blender has them among its sides (the same faces, in another
+/// order), and a vertex normal is summed in the faces' order.
+const CYLINDERS: [&str; 2] = ["cyl", "sun"];
 
 /// The scene `g` built by the kernel: its joined mesh, and for each of its faces the place of the same face
 /// (from the same corner) among Blender's.
@@ -284,7 +311,7 @@ fn a_bevels_hardened_normals_are_stored_as_blender_stores_them() {
         );
         scenes += 1;
     }
-    assert_eq!(scenes, 3);
+    assert_eq!(scenes, 4);
 }
 
 #[test]
@@ -293,8 +320,7 @@ fn the_built_scenes_are_blenders_and_bake_to_its_levels() {
         let (obj, mesh, place) = built(&g);
         // the polygons in Blender's order: the tree rays are cast at is built of them in that order, and of two
         // faces a ray meets at once it is given the one the tree comes to first
-        // (a cylinder's caps aren't where Blender has them among its sides: its faces as a set)
-        if g.name != "cyl" {
+        if !CYLINDERS.contains(&g.name.as_str()) {
             let moved: Vec<usize> = (0..place.len()).filter(|&f| place[f] != f).collect();
             assert!(
                 moved.is_empty(),
@@ -308,7 +334,7 @@ fn the_built_scenes_are_blenders_and_bake_to_its_levels() {
         let off: Vec<usize> = (0..normals.len())
             .filter(|&i| bits(&normals[i].array()) != bits(&want[3 * i..3 * i + 3]))
             .collect();
-        if g.name != "cyl" {
+        if !CYLINDERS.contains(&g.name.as_str()) {
             assert!(
                 off.is_empty(),
                 "{}: {} of {} vertex normals aren't Blender's bits: {:?}",

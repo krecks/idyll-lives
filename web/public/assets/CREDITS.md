@@ -149,20 +149,19 @@ Each moves while it is used: the bar's tap lever pulls, the sectional's cushions
 swings up, the dance floor's tiles pulse and a new photo grows.
 
 The romantic pack models (`models/pack_romantic/candlelitTable.glb`, `heartTub.glb`, `vanity.glb`, `gramophone.glb`,
-`letterBureau.glb`, `roseArbourSwing.glb`, override pack `packs/pack_romantic/manifest.json`) are built in Blender by
-`tools/art/blender/families/pack_romantic.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each moves
+`letterBureau.glb`, `roseArbourSwing.glb`, override pack `packs/pack_romantic/manifest.json`) are built by
+`crates/art/packs/src/pack_romantic` on `artkit` and exported as `.glb` (glTF, original, CC0). Each moves
 while it is used: the candles light, the tub fills with petals, the vanity's drawer opens, the gramophone's arm drops
 onto the turning record, the bureau's flap drops and the arbour swing sways while a bloom is cut. The candlelit table
 was rebuilt with a chair at each end, its two diners facing each other (2026-10-21).
 
 The slob pack models (`models/pack_slob/microwaveCart.glb`, `beanbag.glb`, `snackNightstand.glb`, `spritzStation.glb`,
-`arcadeCabinet.glb`, `gamingRecliner.glb`, override pack `packs/pack_slob/manifest.json`) are built in Blender by
-`tools/art/blender/families/pack_slob.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each moves while
+`arcadeCabinet.glb`, `gamingRecliner.glb`, override pack `packs/pack_slob/manifest.json`) are built by `crates/art/packs/src/pack_slob` on `artkit` and exported as `.glb` (glTF, original, CC0). Each moves while
 it is used: the microwave's door opens, the beanbag squashes, the snack drawer slides out, the spray tips, the joystick
 waggles, and the recliner reclines and swings its cup holder out.
 
 The example pack models (`models/pack_example/chefStove.glb`, `whirlpoolTub.glb`, override pack
-`packs/pack_example/manifest.json`) are built in Blender by `tools/art/blender/families/pack_example.py` on `gamekit`
+`packs/pack_example/manifest.json`) are built by `crates/art/packs/src/pack_example` on `artkit`
 and exported as `.glb` (glTF, original, CC0). The stove's oven door drops and its front burner lights while a resident
 cooks; the tub fills and bubbles while residents soak.
 
@@ -180,7 +179,7 @@ rippling pool, the window seat's cushion sinks and the tub fills.
 
 The loner pack models (`models/pack_loner/quietPod.glb`, `shortwaveRadio.glb`, `puzzleTable.glb`,
 `bonsaiBench.glb`, `soloSauna.glb`, `deliveryHatch.glb`, override pack `packs/pack_loner/manifest.json`) are built
-in Blender by `tools/art/blender/families/pack_loner.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+by `crates/art/packs/src/pack_loner` on `artkit` and exported as `.glb` (glTF, original, CC0).
 Each moves a part while it is used: the pod's hood swings over, the radio's dial turns and its antenna rises, a
 patch of the puzzle is laid, a twig of the bonsai is trimmed, the sauna's door opens and the delivery hatch opens.
 
@@ -200,7 +199,7 @@ nightstand-sized bedside stack; the lava lamp turned to its watcher; and glowing
 
 The neat pack models (`models/pack_neat/steamMopDock.glb`, `laundryCenter.glb`, `rainShowerTower.glb`,
 `organizerDesk.glb`, `robotVacuumDock.glb`, `entryConsole.glb`, override pack `packs/pack_neat/manifest.json`) are
-built in Blender by `tools/art/blender/families/pack_neat.py` on `gamekit` and exported as `.glb` (glTF, original,
+built by `crates/art/packs/src/pack_neat` on `artkit` and exported as `.glb` (glTF, original,
 CC0). Each moves one part while it is used: the mop leaves its dock, the washer's door opens, the rain falls, a bin
 slides out of the desk's hutch, the robot rolls out and back, and the key tray drawer opens.
 
@@ -237,8 +236,7 @@ the feeder's roof lifts and songbirds fly out, and the settee's cushions sink. T
 narrower, its poufs either side of it facing each other (2026-10-21).
 
 The lazy pack models (`models/pack_lazy/snoozecloudBed.glb`, `napPod.glb`, `quiltTable.glb`, `deliveryLocker.glb`,
-`vibePlate.glb`, `smartHub.glb`, override pack `packs/pack_lazy/manifest.json`) are built in Blender by
-`tools/art/blender/families/pack_lazy.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each moves while
+`vibePlate.glb`, `smartHub.glb`, override pack `packs/pack_lazy/manifest.json`) are built by `crates/art/packs/src/pack_lazy` on `artkit` and exported as `.glb` (glTF, original, CC0). Each moves while
 it is used: the bed's head section rises, the pod's hood swings over, the quilt's edge lifts, a locker door opens, the
 plate's deck shakes and the tablet tilts up.
 
@@ -252,8 +250,8 @@ ladder, basket and mat are still.
 The hobby models (`models/hobbies/piano.glb`, `ukulele.glb`, `guitarElectric.glb`, `keyboardDigital.glb`,
 `drumKit.glb`, `guitarAcoustic.glb`, `chessTable.glb`, `poolTable.glb`, `foosball.glb`, `dartboard.glb`,
 `arcadeCabinet.glb`, `puzzleTable.glb`, `easel.glb`, `workbench.glb`, `telescope.glb`, `sewingTable.glb`,
-`chemistrySet.glb`, `potteryWheel.glb`, `craftTable.glb`, override pack `packs/hobbies/manifest.json`) are built in
-Blender by `tools/art/blender/families/hobbies.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The
+`chemistrySet.glb`, `potteryWheel.glb`, `craftTable.glb`, override pack `packs/hobbies/manifest.json`) are generated by
+`crates/art/things/src/hobbies` on `artkit` (`cargo art hobbies`) as `.glb` (glTF, original, CC0). The
 piano lifts its fallboard, the drums' cymbals, the foosball rods and the arcade joystick move while played, darts,
 a painting, a jigsaw patch, a pot and a flask's liquid grow, and the chess pawn, the pool rack, the vice, the
 telescope, the sewing machine's presser and handwheel, the pottery wheel and the scrapbook's cover move while a
@@ -303,13 +301,13 @@ runs its belt and the bike turns its pedals while used, and the yoga mat unrolls
 dumbbell rack are still.
 
 The lamps (`models/lighting/*.glb`: the seven ceiling lights, three wall lights, five floor lamps and six table
-lamps, override pack `packs/lighting/manifest.json`) are built in Blender by `tools/art/blender/families/lighting.py`
-on `gamekit` and exported as `.glb` (glTF, original, CC0). Their shades glow at night (coloured glass in its own colour); the ceiling fan's blades
+lamps, override pack `packs/lighting/manifest.json`) are generated by `crates/art/rooms/src/lighting` on `artkit`
+(`cargo art lighting`) as `.glb` (glTF, original, CC0). Their shades glow at night (coloured glass in its own colour); the ceiling fan's blades
 turn while it is on.
 
 The decor models (`models/decor/*.glb`: the D1 wall art and clocks, D2 ornaments and D3 curtains and rugs, override
-pack `packs/decor/manifest.json`) are built in Blender by `tools/art/blender/families/decor.py` on `gamekit` and
-exported as `.glb` (glTF, original, CC0). The wall clock's second hand and the grandfather clock's pendulum go
+pack `packs/decor/manifest.json`) are generated by `crates/art/rooms/src/decor` on `artkit` (`cargo art decor`) as
+`.glb` (glTF, original, CC0). The wall clock's second hand and the grandfather clock's pendulum go
 round near the camera, the hanging plant sways when watered, the fire burns while a resident warms up by it, and the
 curtains (a window-length pair, a wide pair and a floor-length pair) are drawn at night.
 
@@ -387,28 +385,28 @@ pack) is generated by `crates/art/rooms/src/dining` on `artkit` (`cargo art dini
 sideboard, buffet and china cabinet are static (their doors are parts of their own, for a later use).
 
 The bedroom mirrors and dressing table (`models/bedroom_dressing/mirror.glb`, `dressingTable.glb`, `mirrorWall.glb`,
-`mirrorFloor.glb`, override pack `packs/bedroom_dressing/manifest.json`) are built in Blender by
-`tools/art/blender/families/bedroom_dressing.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Their
+`mirrorFloor.glb`, override pack `packs/bedroom_dressing/manifest.json`) are generated by
+`crates/art/rooms/src/bedroom_dressing` on `artkit` (`cargo art bedroom_dressing`) as `.glb` (glTF, original, CC0). Their
 glass is mirror glass the game reflects the room in; the dressing table slides its drawer out while a resident
 gets ready.
 
 The bedroom nightstands and small storage (`models/bedroom_storage/nightstand.glb`, `nightstandModern.glb`,
 `nightstandRound.glb`, `nightstandDrawers.glb`, `nightstandLamp.glb`, `cedarChest.glb`, `laundryHamper.glb`,
-`benchBedEnd.glb`, override pack `packs/bedroom_storage/manifest.json`) are built in Blender by
-`tools/art/blender/families/bedroom_storage.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The
+`benchBedEnd.glb`, override pack `packs/bedroom_storage/manifest.json`) are generated by
+`crates/art/rooms/src/bedroom_storage` on `artkit` (`cargo art bedroom_storage`) as `.glb` (glTF, original, CC0). The
 three-drawer nightstand's top drawer slides out with a midnight snack in it, the chest's and the hamper's lids lift;
 the rest are static, and the nightstand lamp's shade glows at night.
 
 The bedroom wardrobes and drawers (`models/bedroom_storage/dresser.glb`, `wardrobe.glb`, `chestOfDrawers.glb`,
-`dresserLow.glb`, `wardrobeSingle.glb`, `armoire.glb`, same pack) are built in Blender by
-`tools/art/blender/families/bedroom_storage.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each
+`dresserLow.glb`, `wardrobeSingle.glb`, `armoire.glb`, same pack) are generated by
+`crates/art/rooms/src/bedroom_storage` on `artkit` (`cargo art bedroom_storage`) as `.glb` (glTF, original, CC0). Each
 slides its middle drawer out (`drawer_open`) or swings its doors open onto a rail of clothes (`doors_open`,
 `door_open`) while a resident picks an outfit.
 
 The bedroom beds (`models/bedroom/bed.glb`, `bedSingle.glb`, `bedBunk.glb`, `bedFuton.glb`, `bedKing.glb`,
 `bedDouble.glb`, `bedQueenUpholstered.glb`, `bedCanopy.glb`, `bedDaybed.glb`, override pack
-`packs/bedroom/manifest.json`) are built in Blender by `tools/art/blender/families/bedroom.py` on `gamekit` and
-exported as `.glb` (glTF, original, CC0). Each turns the top of its duvet down (`turn_down`) while a resident sleeps
+`packs/bedroom/manifest.json`) are generated by `crates/art/rooms/src/bedroom` on `artkit` (`cargo art bedroom`)
+as `.glb` (glTF, original, CC0). Each turns the top of its duvet down (`turn_down`) while a resident sleeps
 or naps; the futon's back folds down flat into a bed (`unfold`) and stays down until it is folded away; the daybed is
 static.
 
@@ -425,8 +423,8 @@ tableware `fruitBowl`, `plateSet`, `cakeStand`, `teapotSet`, `mugs`, `wineGlasse
 `bookStack`, `booksUpright`, `vaseFlowers`, `vaseSmall`, `potSucculent`, `potCactus`, `potSmall`; the ornaments
 `photoFrame`, `tableClock`, `globe`, `snowGlobe`, `trophy`, `sculptureSmall`; and `soapSet`, `towelStack`,
 `perfumeTray`, `deskOrganiser`, `laptopClosed`, `monitor`, `stuffedToy`, `toyBlocks`; override pack
-`packs/tabletop/manifest.json`) are built in Blender by `tools/art/blender/families/tabletop.py` on `gamekit` and
-exported as `.glb` (glTF, original, CC0). The alarm clock's hands tell the game's time and the
+`packs/tabletop/manifest.json`) are generated by `crates/art/things/src/tabletop` on `artkit` (`cargo art tabletop`)
+as `.glb` (glTF, original, CC0). The alarm clock's hands tell the game's time and the
 candles' flames rise at night; the kettle's lid, the bread bin's roll-top and the laptop's lid open while they're used,
 and the toaster's toast goes down, the blender's jug shakes, the stand mixer's beater turns and the espresso machine
 runs coffee into its cup (2026-11-03); the rest are static.

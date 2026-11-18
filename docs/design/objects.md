@@ -82,8 +82,8 @@ gate below, so the review does.
 - **Heights the content names** come from the model: `seat.height`, `surface.height` and its
   rectangle (`size`, `at`), `light.height`, and `slots` spread across the width (or each slot's `places`). Mark them in
   Blender with empties named `top`, `seat`, `seat.1` …, `light` (not exported), and have the
-  family script assert them against the content JSON (`families/lighting.py` reads each lamp's
-  `light.height` from the content and `_near_light` checks its bulb against it). The content stays the
+  family script assert them against the content JSON (crates/art/rooms/src/lighting reads each lamp's
+  `light.height` from the content and `near_light` checks its bulb against it). The content stays the
   truth for the simulation; the script keeps the two in line.
 
 ## Budgets
@@ -106,7 +106,7 @@ instances, so these costs are per kind of object in view, plus the triangles of 
   (on Low a still part shares the lot's one merged shadow draw). Map every material to a finish: six garden models took 30 draws unmapped, 9 mapped.
   A model whose moving parts can't fit in four says so in its pack entry, `"draws": 5`
   (`G.Model(draws=5)`), and the gate allows it there: the grandfather clock, whose trunk door swings
-  open while it is wound (families/decor.md). It is the one such model; nothing else should need it.
+  open while it is wound (crates/art/rooms/src/decor/NOTES.md). It is the one such model; nothing else should need it.
 - **Textures:** none by default; the finishes bring their own tiling textures. A texture of its
   own (a painting, a label) is one per object, at most 512 px a side (1024 for something over
   2.5 m), PNG or JPEG in the file; `cargo assets` then leaves the whole file as it is (no KTX2, no
