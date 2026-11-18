@@ -27,9 +27,11 @@ const SUPERSAMPLE = 4;
  * - `margin`: room round the model's outline (m), where the blur spills;
  * - `blur`: radius of each of the two box blurs (m; a texel at least);
  * - `half`: height above the model's bottom (m) at which something over the floor shades it half as dark as touching it;
- * - `peak`: the shadow's opacity where the model touches the floor.
+ * - `peak`: the shadow's opacity where the model touches the floor (0.6 until 2026-11-18: from the play camera a
+ *   sofa and a table sat lightly on the floor, most of all on Low, which has no contact shading; at 1 the slot
+ *   under a low shelf is black).
  */
-const { margin: MARGIN, blur: BLUR, half: HALF, peak: PEAK } = tuned('contactShadow', { margin: 0.3, blur: 0.12, half: 0.5, peak: 0.6 });
+const { margin: MARGIN, blur: BLUR, half: HALF, peak: PEAK } = tuned('contactShadow', { margin: 0.3, blur: 0.12, half: 0.5, peak: 0.8 });
 
 /** A model's contact shadow: its tile, and the rectangle of model space (m, x and z) it covers. */
 export interface ContactShape {

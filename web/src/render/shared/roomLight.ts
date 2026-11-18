@@ -23,13 +23,14 @@ import { tuned } from '../tune';
  *   comes in over `night` of the time of day's lamp level (dusk to night): while the sky outside is still light, a
  *   room with its lamps on is as light as the day leaves it.
  * - `dayAmbient`, `dayFill`: by day, the share a room has of the sky's ambient (which comes from every side alike) and
- *   of its hemispheric fill (which comes from above: a table's top takes more of it than its side). Both 1: a room is
- *   lit as the garden is. Less ambient and more fill, and what faces up in a room stands off from what faces
- *   sideways. `dayTint`: the colour both take in a room (white: the sky's own, a blue under which cream walls are
- *   grey; the light in a room has come off its floor and walls). All three go back to the garden's over `night`, as
- *   the lamps come on (`roomDay`).
+ *   of its hemispheric fill (which comes from above: a table's top takes more of it than its side). `dayTint`: the
+ *   colour both take in a room: the light in a room has come off its floor and walls, and is warmer than the sky's.
+ *   Under the sky's own blue (white here, and shares of 1: a room lit as the garden is, until 2026-11-18) cream walls
+ *   were grey and a room read as the outdoors under cloud. The shares make up for what the tint takes: a room is as
+ *   bright as it was. (Less ambient and more fill only made a room bluer and dimmer: the fill casts no shadow.) All
+ *   three go back to the garden's over `night`, as the lamps come on (`roomDay`).
  */
-export const ROOM = tuned('room', { sky: 0.15, bounce: 0.08, full: 1, fill: 0.3, area: 16, night: [0.4, 0.85], dayAmbient: 1, dayFill: 1, dayTint: '#FFFFFF' });
+export const ROOM = tuned('room', { sky: 0.15, bounce: 0.08, full: 1, fill: 0.3, area: 16, night: [0.4, 0.85], dayAmbient: 1.14, dayFill: 1.14, dayTint: '#FFEEDA' });
 
 /**
  * A room's shares of the sky's ambient and of its fill at the time of day's lamp level `lamps` (0 by day, 1 at night),

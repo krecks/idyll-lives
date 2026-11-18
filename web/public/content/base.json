@@ -3925,7 +3925,7 @@
     {"id": "tile.green", "label": "Green tiles", "finish": "tile", "color": "#C3DCC8", "price": 10}
   ],
   "floorCoverings": [
-    {"id": "wood.oak", "label": "Oak boards", "finish": "wood", "color": "#FFFFFF", "price": 6},
+    {"id": "wood.oak", "label": "Oak boards", "finish": "wood", "color": "#C5D2EA", "price": 6},
     {"id": "wood.honey", "label": "Honey pine", "finish": "wood", "color": "#F2D6A8", "price": 6},
     {"id": "wood.walnut", "label": "Walnut boards", "finish": "wood", "color": "#9C7458", "price": 8},
     {"id": "wood.whitewashed", "label": "Whitewashed wood", "finish": "whitewash", "color": "#F4EFE6", "price": 8},
