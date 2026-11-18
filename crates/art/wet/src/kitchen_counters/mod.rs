@@ -1,6 +1,6 @@
 //! The kitchen's base counters (K4): the plain counter and its corner, the counter end with open shelves, the outer
 //! corner counter, the drawer counter, the open-shelf counter, the butcher block and the marble counter; the tall and
-//! wall storage (K5); the islands and bars (K6). Notes: tools/art/blender/families/kitchen_counters.md.
+//! wall storage (K5); the islands and bars (K6). Notes: NOTES.md.
 //!
 //! A base counter is a plinth, a carcass and a worktop; the front carries a drawer over two doors (the plain, corner
 //! and marble counters), four drawers, one door, or nothing (the open shelves). The four with a `sandwich` use slide
@@ -304,5 +304,5 @@ pub fn family() -> Option<Family> {
          and bars (K6) add freestanding islands with their cupboards at the front and a worktop \
          overhanging the back for stools, and slatted bars with a top at 1.06, the kitchen island \
          sliding a drawer out between its stools for a sandwich.",
-    ))
+    ).switched())
 }
