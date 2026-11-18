@@ -564,3 +564,19 @@ fn quat_to_eul(q: [f32; 4]) -> V3 {
     let e = if d(e1) > d(e2) { e2 } else { e1 };
     V3::new(e[0], e[1], e[2])
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use artkit::math::{object_matrix, v3};
+
+    #[test]
+    fn a_matrix_set_as_a_parts_world_comes_back_as_its_place_turn_and_scale() {
+        let (loc, rot, scale) = (v3(0.3, -1.2, 0.5), v3(0.2, -0.7, 1.9), v3(1.0, 1.0, 1.0));
+        let (l, r, s) = decompose(&object_matrix(loc, rot, scale));
+        assert_eq!(l, loc);
+        for i in 0..3 {
+            assert!((r[i] - rot[i]).abs() < 1e-6 && (s[i] - scale[i]).abs() < 1e-6);
+        }
+    }
+}
