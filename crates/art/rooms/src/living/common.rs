@@ -4,7 +4,7 @@
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
-use artkit::math::{P3, PI, V3, exp, pow, radians, tan};
+use artkit::math::{P3, PI, V3, cos, exp, pow, radians, sin, tan};
 use artkit::mesh::Mesh;
 use artkit::motion::{Squash, squash};
 use artkit::parts::{join, new_parts, settle};
@@ -403,6 +403,91 @@ pub fn prism_faces(k: usize) -> Vec<Vec<u32>> {
         faces.push(vec![i, (i + 1) % k32, k32 + (i + 1) % k32, k32 + i]);
     }
     faces
+}
+
+/// A hardback seen end on, as an outline (across, out) about the crown of its spine (0, 0), counter-clockwise: two
+/// boards `b` thick running `depth` back from the crown, and the spine between them, rounded `bulge` proud of where
+/// the boards' edges end and `sp` thick (the page block stands behind it), in `n` steps round.
+pub fn hardback_end(t: f64, depth: f64, bulge: f64, b: f64, sp: f64, n: usize) -> Vec<(f64, f64)> {
+    let h = t / 2.0;
+    let mut pts = vec![
+        (-h, -depth),
+        (-h + b, -depth),
+        (-h + b, -bulge - sp),
+        (h - b, -bulge - sp),
+        (h - b, -depth),
+        (h, -depth),
+        (h, -bulge),
+    ];
+    for k in 1..n {
+        let a = PI * k as f64 / n as f64;
+        pts.push((h * cos(a), -bulge + bulge * sin(a)));
+    }
+    pts.push((-h, -bulge));
+    pts
+}
+
+/// The band round a hardback's spine (`hardback_end`'s crown), standing `e` proud of it and `w` deep into it.
+pub fn spine_band(t: f64, bulge: f64, e: f64, w: f64, n: usize) -> Vec<(f64, f64)> {
+    let h = t / 2.0;
+    let arc = |r: f64, rb: f64, k: usize| {
+        let a = PI * k as f64 / n as f64;
+        (r * cos(a), -bulge + rb * sin(a))
+    };
+    let mut pts: Vec<(f64, f64)> = (0..=n).map(|k| arc(h + e, bulge + e, k)).collect();
+    pts.extend((0..=n).rev().map(|k| arc(h - w, bulge - w, k)));
+    pts
+}
+
+/// How a hardback is made: its boards' thickness, its spine's bulge for a book `t` thick, the spine's thickness
+/// behind the bulge, how far the page block stands in from the boards' edges, and the steps round the spine.
+pub const BOARD: f64 = 0.0022;
+pub const SPINE: f64 = 0.002;
+pub const PAGES_IN: f64 = 0.0025;
+pub const SPINE_STEPS: usize = 4;
+pub fn bulge(t: f64) -> f64 {
+    (t * 0.2).clamp(0.003, 0.0075)
+}
+
+/// A hardback standing on `y`, `t` thick and `h` high, its spine's crown at `front` and `d` deep: boards and a
+/// rounded spine in the cover's colour, the page block in pale paper set in from the boards' edges (its top a little
+/// under theirs), and a gilt band round some spines.
+#[allow(clippy::too_many_arguments)]
+pub fn hardback(x: f64, y: f64, front: f64, t: f64, h: f64, d: f64, cover: Mat, band: bool) {
+    let bu = bulge(t);
+    let end = hardback_end(t, d, bu, BOARD, SPINE, SPINE_STEPS);
+    fextrude!(
+        F,
+        "book",
+        &end,
+        h,
+        (x, y + h / 2.0, front),
+        cover,
+        plane = Facing::Top,
+        smooth = true
+    );
+    let pd = d - bu - SPINE - PAGES_IN;
+    fbox!(
+        F,
+        "pages",
+        t - 2.0 * BOARD - 0.0006,
+        h - 2.0 * PAGES_IN,
+        pd,
+        (x, y + h / 2.0, front - bu - SPINE - pd / 2.0),
+        M.pages
+    );
+    if band {
+        fextrude!(
+            F,
+            "band",
+            &spine_band(t, bu, 0.0006, 0.0012, SPINE_STEPS),
+            0.012,
+            (x, y + h * 0.82, front),
+            M.gilt,
+            plane = Facing::Top,
+            smooth = true
+        );
+    }
 }
 
 /// One book standing on `y`, `t` thick, its spine at `front`: the cover, the page block just showing on top, and
