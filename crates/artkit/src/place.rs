@@ -275,10 +275,12 @@ impl GameFrame {
 #[macro_export]
 macro_rules! soft {
     ($frame:expr, $name:expr, $w:expr, $h:expr, $d:expr, $at:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $w, $h, $d, $at, $material);
         #[allow(unused_mut)]
         let mut o = $crate::soft::SoftBox::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $frame.soft($name, $w, $h, $d, $at, $material, o)
+        args.0.soft(args.1, args.2, args.3, args.4, args.5, args.6, o)
     }};
 }
 
@@ -286,10 +288,12 @@ macro_rules! soft {
 #[macro_export]
 macro_rules! fbox {
     ($frame:expr, $name:expr, $w:expr, $h:expr, $d:expr, $at:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $w, $h, $d, $at, $material);
         #[allow(unused_mut)]
         let mut o = $crate::shapes::Cube::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $frame.box_($name, $crate::forms::num($w), $crate::forms::num($h), $crate::forms::num($d), $at, $material, o)
+        args.0.box_(args.1, $crate::forms::num(args.2), $crate::forms::num(args.3), $crate::forms::num(args.4), args.5, args.6, o)
     }};
 }
 
@@ -297,10 +301,12 @@ macro_rules! fbox {
 #[macro_export]
 macro_rules! fcyl {
     ($frame:expr, $name:expr, $r:expr, $h:expr, $at:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $r, $h, $at, $material);
         #[allow(unused_mut)]
         let mut o = $crate::shapes::Round::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $frame.cyl($name, $crate::forms::num($r), $crate::forms::num($h), $at, $material, o)
+        args.0.cyl(args.1, $crate::forms::num(args.2), $crate::forms::num(args.3), args.4, args.5, o)
     }};
 }
 
@@ -308,10 +314,12 @@ macro_rules! fcyl {
 #[macro_export]
 macro_rules! fcone {
     ($frame:expr, $name:expr, $r1:expr, $r2:expr, $h:expr, $at:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $r1, $r2, $h, $at, $material);
         #[allow(unused_mut)]
         let mut o = $crate::shapes::Round::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $frame.cone($name, $crate::forms::num($r1), $crate::forms::num($r2), $crate::forms::num($h), $at, $material, o)
+        args.0.cone(args.1, $crate::forms::num(args.2), $crate::forms::num(args.3), $crate::forms::num(args.4), args.5, args.6, o)
     }};
 }
 
@@ -319,10 +327,12 @@ macro_rules! fcone {
 #[macro_export]
 macro_rules! fsphere {
     ($frame:expr, $name:expr, $r:expr, $at:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $r, $at, $material);
         #[allow(unused_mut)]
         let mut o = $crate::shapes::Sphere::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $frame.sphere($name, $crate::forms::num($r), $at, $material, o)
+        args.0.sphere(args.1, $crate::forms::num(args.2), args.3, args.4, o)
     }};
 }
 
@@ -331,10 +341,12 @@ macro_rules! fsphere {
 #[macro_export]
 macro_rules! fsweep {
     ($frame:expr, $name:expr, $points:expr, $radius:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $points, $radius, $material);
         #[allow(unused_mut)]
         let mut o = $crate::forms::Sweep::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $frame.sweep($name, $points, $crate::forms::num($radius), $material, o)
+        args.0.sweep(args.1, args.2, $crate::forms::num(args.3), args.4, o)
     }};
 }
 
@@ -343,10 +355,12 @@ macro_rules! fsweep {
 #[macro_export]
 macro_rules! fextrude {
     ($frame:expr, $name:expr, $outline:expr, $depth:expr, $at:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $outline, $depth, $at, $material);
         #[allow(unused_mut)]
         let mut o = $crate::forms::Extrude::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $frame.extrude($name, $outline, $crate::forms::num($depth), $at, $material, o)
+        args.0.extrude(args.1, args.2, $crate::forms::num(args.3), args.4, args.5, o)
     }};
 }
 
