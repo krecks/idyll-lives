@@ -26,6 +26,8 @@ use artkit::palette;
 use artkit::place::GameFrame;
 
 mod boards;
+mod cabinet;
+mod catalog_desks;
 mod chairs;
 mod common;
 mod desk_things;
@@ -119,11 +121,11 @@ pub fn family() -> Option<Family> {
         "office",
         M.palette(),
         vec![
-            Model::new("deskSimple", desks::desk_simple, (1.5, 0.74, 0.69))
+            Model::new("deskSimple", catalog_desks::desk_simple, (1.5, 0.74, 0.69))
                 .key("model.deskSimple")
                 .centre(0.0, -0.085)
                 .paint(&[("oak", "Top"), DESK[0], DESK[1]]),
-            Model::new("deskCorner", desks::desk_corner, (1.86, 1.009, 1.86))
+            Model::new("deskCorner", catalog_desks::desk_corner, (1.86, 1.009, 1.86))
                 .key("model.deskCorner")
                 .paint(&[
                     ("laminate", "Top"),
@@ -131,12 +133,12 @@ pub fn family() -> Option<Family> {
                     ("drawers", "Drawers"),
                     ("chair", "Chair"),
                 ]),
-            Model::new("deskStanding", desks::desk_standing, (0.96, 1.54, 0.63))
+            Model::new("deskStanding", catalog_desks::desk_standing, (0.96, 1.54, 0.63))
                 .key("model.deskStanding")
                 .centre(0.0, -0.115)
                 .motions(json!({"uses": {"browse": "tray_out", "code": "tray_out"}}))
                 .paint(&[("birch", "Top"), ("frame", "Frame"), ("shelf", "Shelf")]),
-            Model::new("deskExecutive", desks::desk_executive, (1.8, 0.754, 0.771))
+            Model::new("deskExecutive", catalog_desks::desk_executive, (1.8, 0.754, 0.771))
                 .key("model.deskExecutive")
                 .centre(0.0, -0.0445)
                 .paint(&[
@@ -201,7 +203,7 @@ pub fn family() -> Option<Family> {
                 .centre(0.0, -0.0162)
                 .motions(json!({"uses": {"sit": "swivel"}, "hold": 0.6, "ride": "swivel"}))
                 .paint(&[("frame", "Frame"), ("upholstery", "Seat")]),
-            Model::new("filingCabinet", boards::filing_cabinet, (0.46, 1.21, 0.64))
+            Model::new("filingCabinet", cabinet::filing_cabinet, (0.46, 1.21, 0.64))
                 .key("model.filingCabinet")
                 .centre(0.0, -0.11)
                 .motions(json!({"uses": {"file": "drawer_open"}, "hold": 2.0}))
