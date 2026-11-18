@@ -6,7 +6,7 @@
  */
 import { expect, test } from 'bun:test';
 import type { WallEdge, WorldStructure } from '../src/core/protocol';
-import { HousePlanner, type HousePlan } from '../src/render/shared/house';
+import { HousePlanner, houseScheme, type HousePlan } from '../src/render/shared/house';
 
 /** Rows a storey. */
 const DEPTH = 12;
@@ -46,16 +46,21 @@ function ring(): HousePlan {
   return plan;
 }
 
-/** The heights of the roof's faces looking up, over (x, z): one over a roof that is one surface. */
+/**
+ * The heights of the roof's slopes over (x, z): one over a roof that is one surface. Its slopes are its faces looking
+ * up in the roof's own colour (the lot's look's); the cap shingles along its ridges and hips and the flashings down
+ * its valleys lie a hair over them in tones of their own (`HOUSE_LOOK.roofCap`, `roofValley`), and are not the surface.
+ */
 function tops(plan: HousePlan, x: number, z: number): number[] {
   const roof = plan.parts.find((p) => p.name === 'roof');
   if (!roof) throw new Error('no roof');
-  const { pos, nor, idx } = roof.geo;
+  const { pos, nor, idx, col } = roof.geo;
   const at = (v: number) => [pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]];
+  const own = parseInt(houseScheme(0, 0).roof.slice(1), 16);
   const out: number[] = [];
   for (let t = 0; t < idx.length; t += 3) {
     const [a, b, c] = [idx[t], idx[t + 1], idx[t + 2]];
-    if (nor[a * 3 + 1] <= 0.5) continue;
+    if (nor[a * 3 + 1] <= 0.5 || ((col[a * 4] << 16) | (col[a * 4 + 1] << 8) | col[a * 4 + 2]) !== own) continue;
     const [p, q, r] = [at(a), at(b), at(c)];
     // Barycentric, in plan: is (x, z) inside this triangle's footprint?
     const d = (q[0] - p[0]) * (r[2] - p[2]) - (r[0] - p[0]) * (q[2] - p[2]);

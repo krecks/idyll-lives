@@ -36,7 +36,7 @@
 import type { DoorStyleDef, FloorCoveringDef, LightAim, RoofColorDef, RoofStyleDef, WallCoveringDef, WindowStyleDef } from '../../content/content';
 import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalWall, type Opening, type PorchInfo, type PorchPieceInfo, type WallEdge, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
-import { Cut, facing, Geo, LOOK, type V3 } from './geometry';
+import { Cut, facing, Geo, LOOK, planarUV, type V3 } from './geometry';
 import { roadIndex, townRoads } from './roads';
 import { tuned } from '../tune';
 import { smoothstep, valueNoise } from '../../game/noise';
@@ -273,6 +273,8 @@ export const HOUSE_LOOK = tuned('house', {
    * at dusk, when the slopes either side are one tone, a hip's cap was a hard dark stripe across the roof.
    */
   roofCap: 0.95,
+  /** A valley's flashing against the slopes it lies between (the colour's multiplier): the valley's own shade, and metal under the shingles' edges. */
+  roofValley: 0.8,
 });
 
 /**
@@ -2917,6 +2919,9 @@ export function addRoof(
         [[0, 1 / len, (cb < bc ? -pitch : pitch) / len], [ca < ra ? 1 : -1, 0, 0]],
         [[(ca < ra ? -pitch : pitch) / len, 1 / len, 0], [0, 0, cb < bc ? 1 : -1]],
       ];
+      // (Bent over the hip, not folded: its two courses share their normal along the crest.)
+      const cl = Math.hypot(slopes[0][0][0] + slopes[1][0][0], slopes[0][0][1] + slopes[1][0][1], slopes[0][0][2] + slopes[1][0][2]);
+      const crest = P((slopes[0][0][0] + slopes[1][0][0]) / cl, (slopes[0][0][1] + slopes[1][0][1]) / cl, (slopes[0][0][2] + slopes[1][0][2]) / cl);
       for (const [n, into] of slopes) {
         let p = cross(n, d);
         const pl = Math.hypot(...p) || 1;
@@ -2924,8 +2929,7 @@ export function addRoof(
         p = [(p[0] / pl) * sign * HIP_CAP, (p[1] / pl) * sign * HIP_CAP, (p[2] / pl) * sign * HIP_CAP];
         const top = (q: L3): V3 => P(q[0], q[1] + 0.045, q[2]);
         const foot = (q: L3): V3 => P(q[0] + p[0] + n[0] * 0.006, q[1] + p[1] + n[1] * 0.006, q[2] + p[2] + n[2] * 0.006);
-        const pts = [top(E), top(R), foot(R), foot(E)];
-        roof.poly(pts, facing(pts[0], pts[1], pts[2], [0, 1, 0]));
+        capCourse(roof, top(E), top(R), foot(R), foot(E), crest);
       }
     }
     roof.r = r;
@@ -3046,6 +3050,7 @@ function addRoofArea(
   // of one slope. Those of the same slope are one facet: the whole tile, or a part between a hip, a
   // valley or a ridge through its middle.
   const ring: P2[] = [[0, 0], [1, 0], [2, 0], [2, 1], [2, 2], [1, 2], [0, 2], [0, 1]];
+  const creases = new Creases();
   for (let z = z0; z < z1; z++) {
     for (let x = x0; x < x1; x++) {
       if (!roofed(x, z)) continue;
@@ -3062,7 +3067,12 @@ function addRoofArea(
         const [ci, cj] = ring[c & 7];
         const [mi, mj] = ring[m & 7];
         const [gx, gz] = [(mi - ci) * (h(m) - h(c)) + (1 - mi) * (mid - h(m)), (mj - cj) * (h(m) - h(c)) + (1 - mj) * (mid - h(m))];
-        return { gx, key: `${gx},${gz},${mid - gx * (i0 + 1) - gz * (j0 + 1)}` };
+        return { gx, gz, key: `${gx},${gz},${mid - gx * (i0 + 1) - gz * (j0 + 1)}` };
+      });
+      // Each triangle's sides, for the caps: the two on the tile's own lines and the one on its rim.
+      slopes.forEach((sl, k) => {
+        const [m, a, b]: P2[] = [[i0 + 1, j0 + 1], at(k), at(k + 1)];
+        for (const [p, q, r] of [[m, a, b], [a, b, m], [b, m, a]]) creases.side(p, q, r, sl.key, sl.gx, sl.gz);
       });
       // The middle of a side is a corner of the roof only where a ridge crosses the side.
       const kept = (k: number) => k % 2 === 0 || h(k - 1) + h(k + 1) !== 2 * h(k);
@@ -3111,5 +3121,152 @@ function addRoofArea(
     roof.poly(top, n);
     trim.poly(down(top), [-n[0], -n[1], -n[2]]);
     trim.poly([oa, ob, [ob[0], ob[1] + th, ob[2]], [oa[0], oa[1] + th, oa[2]]], [e.nx, 0, e.nz]);
+  }
+  // Cap shingles along the ridges and the hips, and a flashing down the valleys (not on a flat roof, which has
+  // none of them to speak of): each from the area's edge inwards, and on out over the eaves' boards to the mitre.
+  if (s.shape === 'flat') return;
+  // The roof's top over any point: the pitch times how far in from the eave line it is, square to the walls (past the
+  // area's edge, over the eaves' boards, how far out). A course is cut to the slope it lies on by it (`capShingles`).
+  const [tiles, open]: [P2[], P2[]] = [[], []];
+  for (let z = z0 - 1; z <= z1; z++) for (let x = x0 - 1; x <= x1; x++) (roofed(x, z) ? tiles : open).push([x, z]);
+  const square = (of: readonly P2[], x: number, z: number) => of.reduce((least, [tx, tz]) => Math.min(least, Math.max(tx - x, x - tx - 1, tz - z, z - tz - 1, 0)), Infinity);
+  const surface = (x: number, z: number) => ye + th + pitch * (d + (roofed(Math.floor(x), Math.floor(z)) ? square(open, x, z) : -square(tiles, x, z)));
+  /** A slope's normal from how it rises a step along x and along z (in the grid's half tiles a half tile: nought or one). */
+  const normal = (gx: number, gz: number): V3 => [(-pitch * gx) / slope, 1 / slope, (-pitch * gz) / slope];
+  for (const c of creases.runs((i, j) => far[j * gw + i])) {
+    capShingles(roof, on(...c.a), on(...c.b), c.sides.map(({ gx, gz, into }) => ({ n: normal(gx, gz), into })), c.valley, slope, surface);
+  }
+  for (const [key, normals] of out) {
+    if (normals.length !== 2) continue;
+    const [px, pz] = key.split(',').map(Number);
+    const [[ex, ez], [fx, fz]] = normals;
+    // An outer corner has one roofed tile about it (a hip runs out over it), an inner one three (a valley).
+    const about = [[-1, -1], [0, -1], [-1, 0], [0, 0]].filter(([dx, dz]) => roofed(px + dx, pz + dz)).length;
+    if (about !== 1 && about !== 3) continue;
+    const k = about === 1 ? 1 : -1;
+    const sides = [
+      { n: normal(-ex, -ez), into: [k * (ex - fx), k * (ez - fz)] as P2 },
+      { n: normal(-fx, -fz), into: [k * (fx - ex), k * (fz - ez)] as P2 },
+    ];
+    const eave = corner([px, pz]);
+    capShingles(roof, [eave[0], eave[1] + th, eave[2]], [px, yw, pz], sides, about === 3, slope, surface, true);
+  }
+}
+
+/**
+ * One course of a cap: a quad from the cap's crest (`a`, `b`) down to its feet on a slope (`fb`, `fa`). It is flat, but
+ * along the crest its normal is `crest`, which the cap's other course has there too: the cap is lit as shingles
+ * bent over the line, and its crest is no hard edge (two flat courses met in one, a bright or a dark line by the sun).
+ */
+function capCourse(roof: Geo, a: V3, b: V3, fb: V3, fa: V3, crest: V3): void {
+  const n = facing(a, b, fb, [0, 1, 0]);
+  const ids = ([[a, crest], [b, crest], [fb, n], [fa, n]] as const).map(([p, m]) => roof.point(p, m, ...planarUV(p, n)));
+  // (Wound as `Geo.poly` winds: (a − b) × (c − b) along the normal.)
+  const front = ((a[1] - b[1]) * (fb[2] - b[2]) - (a[2] - b[2]) * (fb[1] - b[1])) * n[0] + ((a[2] - b[2]) * (fb[0] - b[0]) - (a[0] - b[0]) * (fb[2] - b[2])) * n[1] + ((a[0] - b[0]) * (fb[1] - b[1]) - (a[1] - b[1]) * (fb[0] - b[0])) * n[2] >= 0;
+  if (front) roof.face(ids[0], ids[1], ids[2]).face(ids[0], ids[2], ids[3]);
+  else roof.face(ids[0], ids[2], ids[1]).face(ids[0], ids[3], ids[2]);
+}
+
+/** How far a valley's flashing reaches up each slope from the valley (m). */
+const VALLEY = 0.11;
+
+/**
+ * Cap shingles along a ridge or a hip from `a` to `b` (points on the roof's top): a course on each of the two slopes
+ * that meet there (`sides`: a slope's normal, and the way into it from the line, x and z), standing a little proud of
+ * them and a little darker, as a plain hip roof's (`HOUSE_LOOK.roofCap`). `valley`: a flashing instead, lying in the
+ * valley a hair over the slopes, in the valley's shade (`HOUSE_LOOK.roofValley`). `slope`: a slope's length a metre of run. `surface`: the roof's top over a point. `fromEave`: `a` is on the eave line.
+ */
+function capShingles(roof: Geo, a: V3, b: V3, sides: readonly { n: V3; into: P2 }[], valley: boolean, slope: number, surface: (x: number, z: number) => number, fromEave = false): void {
+  const { r, g, b: blue } = roof;
+  const tone = valley ? HOUSE_LOOK.roofValley : HOUSE_LOOK.roofCap;
+  roof.r *= tone;
+  roof.g *= tone;
+  roof.b *= tone;
+  const d: V3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const [reach, lift] = valley ? [VALLEY, 0.006 * slope] : [HIP_CAP, 0.045];
+  const cl = Math.hypot(sides[0].n[0] + sides[1].n[0], sides[0].n[1] + sides[1].n[1], sides[0].n[2] + sides[1].n[2]) || 1;
+  const crest: V3 = [(sides[0].n[0] + sides[1].n[0]) / cl, (sides[0].n[1] + sides[1].n[1]) / cl, (sides[0].n[2] + sides[1].n[2]) / cl];
+  for (const { n, into } of sides) {
+    const p = [n[1] * d[2] - n[2] * d[1], n[2] * d[0] - n[0] * d[2], n[0] * d[1] - n[1] * d[0]];
+    const k = ((p[0] * into[0] + p[2] * into[1] < 0 ? -1 : 1) * reach) / (Math.hypot(p[0], p[1], p[2]) || 1);
+    const top = (q: V3): V3 => [q[0], q[1] + lift, q[2]];
+    /**
+     * The course's lower corner by the line's end `q`: square to the line where that is on this slope still, else in
+     * along the line (`way`: towards its other end) to where it comes onto it. So at a hip's top the course ends
+     * along the ridge or the hip it meets there, mitred to the course on that, and not out in the air past it.
+     */
+    const foot = (q: V3, way: number): V3 => {
+      const at = (t: number): V3 => [q[0] + p[0] * k + d[0] * t, q[1] + p[1] * k + d[1] * t, q[2] + p[2] * k + d[2] * t];
+      const off = (t: number) => Math.abs(surface(at(t)[0], at(t)[2]) - at(t)[1]) > 1e-4;
+      let [lo, hi] = [0, way * 0.5];
+      if (off(0) && !off(hi)) {
+        for (let i = 0; i < 24; i++) {
+          const mid = (lo + hi) / 2;
+          if (off(mid)) lo = mid;
+          else hi = mid;
+        }
+      } else hi = 0;
+      const f = at(hi);
+      return [f[0] + n[0] * 0.006, f[1] + n[1] * 0.006, f[2] + n[2] * 0.006];
+    };
+    // (A hip's from the eave line: the course ends on it, cut along it, not square to the hip and out past the roof's corner.)
+    let f0 = foot(a, 1);
+    if (fromEave && !valley && Math.abs(d[1]) > 1e-9) {
+      const t = -(p[1] * k) / d[1];
+      f0 = [a[0] + p[0] * k + d[0] * t, a[1] + 0.006 * slope, a[2] + p[2] * k + d[2] * t];
+    }
+    if (valley) roof.poly([top(a), top(b), foot(b, -1), f0], facing(top(a), top(b), foot(b, -1), [0, 1, 0]));
+    else capCourse(roof, top(a), top(b), foot(b, -1), f0, crest);
+  }
+  [roof.r, roof.g, roof.b] = [r, g, blue];
+}
+
+/**
+ * The lines an area roof's slopes meet on (`addRoofArea`): every side of its triangles (on the half-tile grid) with
+ * the slope on each side of it; where the two differ the roof turns, and such sides on one line between the same
+ * two slopes are one run: a ridge or a hip where it turns down both ways, a valley where it turns up.
+ */
+class Creases {
+  private readonly sides = new Map<string, { a: P2; b: P2; of: { key: string; gx: number; gz: number; third: P2 }[] }>();
+
+  /** A triangle's side `a`-`b` (`third` its other corner), on the slope `key` that rises `gx` a step along x and `gz` along z. */
+  side(a: P2, b: P2, third: P2, key: string, gx: number, gz: number): void {
+    const [p, q] = a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]) ? [a, b] : [b, a];
+    const id = `${p[0]},${p[1]},${q[0]},${q[1]}`;
+    let s = this.sides.get(id);
+    if (!s) this.sides.set(id, (s = { a: p, b: q, of: [] }));
+    s.of.push({ key, gx, gz, third });
+  }
+
+  /** The runs, each from `a` to `b` with its two slopes (and the way into each from the line); `far(i, j)`: how high a grid point stands (in half tiles in from the edge). */
+  runs(far: (i: number, j: number) => number): { a: P2; b: P2; valley: boolean; sides: { gx: number; gz: number; into: P2 }[] }[] {
+    // By line (its direction and where it lies) and its two slopes: the stretches along it, each a grid step.
+    const lines = new Map<string, { at: number; a: P2; b: P2; valley: boolean; sides: { gx: number; gz: number; into: P2 }[] }[]>();
+    for (const { a, b, of } of this.sides.values()) {
+      if (of.length !== 2 || of[0].key === of[1].key) continue;
+      const [di, dj] = [b[0] - a[0], b[1] - a[1]];
+      const line = di === 0 ? `v${a[0]}` : dj === 0 ? `h${a[1]}` : dj > 0 ? `p${a[0] - a[1]}` : `n${a[0] + a[1]}`;
+      // (The two triangles mirror each other in their side: between their far corners the roof is on the side if it is
+      // flat there, under it over a ridge or a hip, over it in a valley.)
+      const [t0, t1] = [of[0].third, of[1].third];
+      const along = ((((t0[0] + t1[0]) / 2 - a[0]) * di + ((t0[1] + t1[1]) / 2 - a[1]) * dj) / (di * di + dj * dj)) as number;
+      const onLine = far(a[0], a[1]) + along * (far(b[0], b[1]) - far(a[0], a[1]));
+      const valley = (far(t0[0], t0[1]) + far(t1[0], t1[1])) / 2 > onLine;
+      const [first, second] = of[0].key < of[1].key ? [of[0], of[1]] : [of[1], of[0]];
+      const mid: P2 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      const sides = [first, second].map((o) => ({ gx: o.gx, gz: o.gz, into: [o.third[0] - mid[0], o.third[1] - mid[1]] as P2 }));
+      const id = `${line}|${first.key}|${second.key}`;
+      lines.set(id, [...(lines.get(id) ?? []), { at: di === 0 ? a[1] : a[0], a, b, valley, sides }]);
+    }
+    const out: { a: P2; b: P2; valley: boolean; sides: { gx: number; gz: number; into: P2 }[] }[] = [];
+    for (const list of lines.values()) {
+      list.sort((p, q) => p.at - q.at);
+      for (const s of list) {
+        const last = out[out.length - 1];
+        if (last && s !== list[0] && last.b[0] === s.a[0] && last.b[1] === s.a[1]) last.b = s.b;
+        else out.push({ a: s.a, b: s.b, valley: s.valley, sides: s.sides });
+      }
+    }
+    return out;
   }
 }
