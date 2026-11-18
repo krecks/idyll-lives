@@ -1,6 +1,7 @@
 //! Magnolia: a smooth grey trunk parting low into upswept stems, a rounded pale pink crown of masses with big
 //! upright white and pink goblets on them.
 
+use artkit::botany::Tiles;
 use artkit::botany::skeleton::{Branches, Buttress, ClumpAims, Heart, Mass, Stem};
 use artkit::botany::species::{
     Aims, Crown, Hearts, Perches, Roots, Seeds, Species, Stage, Tree, Trunk, grow,
@@ -35,6 +36,7 @@ pub fn species() -> Species {
             cards: Some(217),
         },
         leaves: &["#EAAACA", "#F2BED6", "#F8D2E2", "#FCE2EE", "#FFF2F8"],
+        tiles: Tiles::of("magnolia"),
         colours: &[
             ("bark", "#D2CBC0"),
             ("fruit", "#FFFFFF"),

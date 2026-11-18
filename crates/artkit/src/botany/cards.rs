@@ -1,5 +1,6 @@
 //! Leaf cards (the `leafcards` finish). A broadleaved tree's leaf masses are drawn as cut-out cards over a dark
-//! core, not as lumpy balls: each card a quad carrying a cluster of leaves from the one atlas every tree shares,
+//! core, not as lumpy balls: each card a quad carrying a cluster of its species' leaves from the one atlas the trees
+//! share (`ATLAS`: a few tiles a species),
 //! lying as a spray of leaves does, its normals the mass's hull's (not its own flat one), so the crown still shades
 //! as a volume. The game draws the finish cut out by the atlas's alpha, from both sides; the file's materials stay
 //! one-sided. A build makes its masses as ever (`leaves`: the lumps, kept out of the model, for what is found on
@@ -20,10 +21,91 @@ use crate::scene::{self, Obj, meshes};
 use crate::shapes::options;
 use std::cell::RefCell;
 
-/// Each cluster's corner in the atlas (u, v from the bottom), 0.5 across.
+/// An atlas in quarters, as the first was (three clusters of one leaf and a dense tile): each cluster's corner (u, v
+/// from the bottom), 0.5 across. `Tiles::default`: what a crown wears that says nothing.
 pub const CARD_TILES: [(f64, f64); 3] = [(0.0, 0.5), (0.5, 0.5), (0.0, 0.0)];
 /// The dense, opaque wall of leaves, in the middle 0.8 of its tile: the cores'.
 pub const CORE_TILE: (f64, f64) = (0.5, 0.0);
+/// A card draws one of this many pictures: its species' clusters in turn, should it have fewer or more. (Each card
+/// draws its tile from the cards' random numbers: drawn from another count, every card after it would lie
+/// otherwise.)
+pub const CARD_DRAWS: i64 = 3;
+
+/// The trees' atlas (web/public/assets/textures/leafcards/albedo.png, which `cargo tex leafcards` draws from this
+/// table): `ATLAS_PX` pixels a side, `ATLAS_GRID` tiles of `TILE_PX` a row and a column, `ATLAS_EDGE` pixels in
+/// from the picture's top left.
+pub const ATLAS_PX: usize = 1024;
+pub const ATLAS_GRID: usize = 6;
+pub const TILE_PX: usize = 170;
+pub const ATLAS_EDGE: usize = 2;
+
+/// What a tile of the atlas pictures.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Picture {
+    /// A cluster of leaves on their twigs, cut out.
+    Cluster,
+    /// A cluster of blossom with a few young leaves, cut out.
+    Blossom,
+    /// Leaves down hanging shoots, cut out, as tall as a hanging card (`Cards::hang`) and drawn as wide as it is
+    /// tall: the card draws it narrow again.
+    Strand,
+    /// A dense wall of leaves, opaque, in the middle 0.8 of its tile: the cores'.
+    Core,
+}
+
+/// The atlas's tiles, a row at a time from the top left: whose it is, its leaf's shape (a class of
+/// docs/review/reference.json's species) and what it pictures.
+pub const ATLAS: [(&str, &str, Picture); ATLAS_GRID * ATLAS_GRID] = {
+    use Picture::{Blossom, Cluster, Core, Strand};
+    [
+        ("oak", "lobed", Cluster),
+        ("oak", "lobed", Cluster),
+        ("oak", "lobed", Cluster),
+        ("oak", "lobed", Core),
+        ("maple", "palmate", Cluster),
+        ("maple", "palmate", Cluster),
+        ("maple", "palmate", Cluster),
+        ("maple", "palmate", Core),
+        ("birch", "serrate-small", Cluster),
+        ("birch", "serrate-small", Cluster),
+        ("birch", "serrate-small", Cluster),
+        ("birch", "serrate-small", Core),
+        ("cherry", "oval", Blossom),
+        ("cherry", "oval", Blossom),
+        ("cherry", "oval", Blossom),
+        ("cherry", "oval", Core),
+        ("apple", "oval", Cluster),
+        ("apple", "oval", Cluster),
+        ("apple", "oval", Cluster),
+        ("apple", "oval", Core),
+        ("japaneseMaple", "palmate", Cluster),
+        ("japaneseMaple", "palmate", Cluster),
+        ("japaneseMaple", "palmate", Cluster),
+        ("japaneseMaple", "palmate", Core),
+        ("magnolia", "obovate-large", Cluster),
+        ("magnolia", "obovate-large", Cluster),
+        ("magnolia", "obovate-large", Cluster),
+        ("magnolia", "obovate-large", Core),
+        ("willow", "lance", Cluster),
+        ("willow", "lance", Cluster),
+        ("willow", "lance", Strand),
+        ("willow", "lance", Strand),
+        ("willow", "lance", Core),
+        ("lemon", "oval", Cluster),
+        ("lemon", "oval", Cluster),
+        ("lemon", "oval", Cluster),
+    ]
+};
+
+/// Tile `i` of the atlas (`ATLAS`'s order): its left, top, width and height in pixels.
+pub fn tile_px(i: usize) -> [usize; 4] {
+    [
+        ATLAS_EDGE + i % ATLAS_GRID * TILE_PX,
+        ATLAS_EDGE + i / ATLAS_GRID * TILE_PX,
+        TILE_PX,
+        TILE_PX,
+    ]
+}
 /// A card's UVs stop this far inside its tile: no mipmap of its edge reaches the next.
 pub const CARD_INSET: f64 = 0.03;
 /// How much of its own facing a card's normals keep: sprays differ a little.
@@ -57,21 +139,72 @@ pub fn card_of(leaf: &str) -> &'static str {
     }
 }
 
-/// Where the cards' and the cores' pictures are in the atlas: each cluster's corner (u, v from the bottom, 0.5
-/// across) and the dense tile's. The shared atlas's by default; a species may carry its own. (A card draws its
-/// tile: with as many clusters as the shared atlas has, a tree's cards lie as they lay; with more or fewer they
-/// fall otherwise.)
+/// Where a species' pictures are in the atlas: each cluster's corner (u, v from the bottom, `across` wide and
+/// tall), the dense tile's, and, where it has them, the clusters its green among blossom wears (the `green` leaf
+/// colours' cards) and the ones its hanging cards do (`Cards::hang`); none: its clusters. A quartered atlas's by
+/// default; a species takes its own from the trees' atlas (`Tiles::of`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Tiles {
     pub cards: Vec<(f64, f64)>,
+    pub green: Vec<(f64, f64)>,
+    pub strands: Vec<(f64, f64)>,
     pub core: (f64, f64),
+    pub across: f64,
 }
 
 impl Default for Tiles {
     fn default() -> Tiles {
         Tiles {
             cards: CARD_TILES.to_vec(),
+            green: Vec::new(),
+            strands: Vec::new(),
             core: CORE_TILE,
+            across: 0.5,
+        }
+    }
+}
+
+impl Tiles {
+    /// `species`' tiles of the trees' atlas (`ATLAS`).
+    pub fn of(species: &str) -> Tiles {
+        let corner = |i: usize| {
+            let [x, y, _, tall] = tile_px(i);
+            (
+                x as f64 / ATLAS_PX as f64,
+                1.0 - (y + tall) as f64 / ATLAS_PX as f64,
+            )
+        };
+        let all = |picture: &[Picture]| -> Vec<(f64, f64)> {
+            (0..ATLAS.len())
+                .filter(|&i| ATLAS[i].0 == species && picture.contains(&ATLAS[i].2))
+                .map(corner)
+                .collect()
+        };
+        let cards = all(&[Picture::Cluster, Picture::Blossom]);
+        assert!(!cards.is_empty(), "the atlas has no {species:?}");
+        Tiles {
+            cards,
+            green: Vec::new(),
+            strands: all(&[Picture::Strand]),
+            // (a species with no dense tile of its own says whose it wears: `core_of`)
+            core: all(&[Picture::Core]).first().copied().unwrap_or(CORE_TILE),
+            across: TILE_PX as f64 / ATLAS_PX as f64,
+        }
+    }
+
+    /// With `species`' dense tile under the cards.
+    pub fn core_of(self, species: &str) -> Tiles {
+        Tiles {
+            core: Tiles::of(species).core,
+            ..self
+        }
+    }
+
+    /// With `species`' clusters on its green among blossom.
+    pub fn green_of(self, species: &str) -> Tiles {
+        Tiles {
+            green: Tiles::of(species).cards,
+            ..self
         }
     }
 }
@@ -213,8 +346,8 @@ pub struct Cards {
     pub hi: [f64; 3],
     /// The cards so far, by material, in the order each was first used.
     pub by: Vec<(Mat, Vec<Quad>)>,
-    /// Each cluster's corner in the atlas (`CARD_TILES`, or a species' own).
-    pub tiles: Vec<(f64, f64)>,
+    /// Where the cards' pictures are in the atlas (a quartered one's, or a species' own).
+    pub tiles: Tiles,
 }
 
 impl Cards {
@@ -227,7 +360,7 @@ impl Cards {
             lo,
             hi,
             by: Vec::new(),
-            tiles: CARD_TILES.to_vec(),
+            tiles: Tiles::default(),
         }
     }
 
@@ -253,7 +386,7 @@ impl Cards {
         let h = size / 2.0;
         let offsets = [-u * h - v * h, u * h - v * h, u * h + v * h, -u * h + v * h];
         let at = fit(at.into(), &offsets);
-        self._quad(offsets.map(|o| at + o), m, material, &hull, shade);
+        self._quad(offsets.map(|o| at + o), m, material, &hull, shade, false);
     }
 
     /// An upright card `width` across and `height` tall at `at`, its plane facing `facing` (a hanging strand's:
@@ -280,11 +413,13 @@ impl Cards {
             material,
             &hull,
             shade,
+            true,
         );
     }
 
     /// A card of `corners` (round `m`, its plane's facing), moved into the box, its normals `hull`'s at each, a
-    /// tile of the atlas on it.
+    /// tile of the atlas on it: one of its species' clusters (of the ones for its green among blossom on a
+    /// `green` colour's card, of the ones for `hanging` cards on one that hangs, where the species has them).
     pub fn _quad(
         &mut self,
         mut corners: [V3; 4],
@@ -292,6 +427,7 @@ impl Cards {
         material: Mat,
         hull: &dyn Fn(V3) -> V3,
         shade: f64,
+        hanging: bool,
     ) {
         for i in 0..3 {
             let reach = corners.map(|c| c[i]);
@@ -312,13 +448,21 @@ impl Cards {
             m = -m;
         }
         let normals = normals.map(|n| n.lerp(m, CARD_OWN).normalized());
-        let (u0, v0) = self.tiles[self.rng.randrange(self.tiles.len() as i64) as usize];
+        let green = material.name.starts_with("cardg");
+        let tiles = if hanging && !self.tiles.strands.is_empty() {
+            &self.tiles.strands
+        } else if green && !self.tiles.green.is_empty() {
+            &self.tiles.green
+        } else {
+            &self.tiles.cards
+        };
+        let (u0, v0) = tiles[self.rng.randrange(CARD_DRAWS) as usize % tiles.len()];
         let flip = self.rng.random() < 0.5;
-        let k = CARD_INSET;
+        let (k, across) = (CARD_INSET, self.tiles.across);
         let uvs = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)].map(|(x, y): (f64, f64)| {
             (
-                u0 + 0.5 * (k + (1.0 - 2.0 * k) * if flip { 1.0 - x } else { x }),
-                v0 + 0.5 * (k + (1.0 - 2.0 * k) * y),
+                u0 + across * (k + (1.0 - 2.0 * k) * if flip { 1.0 - x } else { x }),
+                v0 + across * (k + (1.0 - 2.0 * k) * y),
             )
         });
         let quad = Quad {
@@ -514,10 +658,10 @@ impl Cards {
     }
 }
 
-/// Puts a core's UVs in the atlas's dense tile (`tile`, its corner): a box projection about its own middle, the
-/// tile `across` metres, turning back at the tile's edges (mirrored), so the leaves keep their size on a big core
-/// and nothing wraps into the cut-out tiles.
-pub fn core_uvs(obj: Obj, across: f64, tile: (f64, f64)) -> Obj {
+/// Puts a core's UVs in the atlas's dense tile (`tile`, its corner, `size` wide and tall): a box projection about
+/// its own middle, the tile `across` metres, turning back at the tile's edges (mirrored), so the leaves keep their
+/// size on a big core and nothing wraps into the cut-out tiles.
+pub fn core_uvs(obj: Obj, across: f64, tile: (f64, f64), size: f64) -> Obj {
     obj.edit(|part| {
         let mesh = &mut part.mesh;
         let co = &mesh.verts;
@@ -549,8 +693,8 @@ pub fn core_uvs(obj: Obj, across: f64, tile: (f64, f64)) -> Obj {
             for l in face.start as usize..(face.start + face.len) as usize {
                 let c = mesh.verts[mesh.loops[l] as usize];
                 uvs[l] = [
-                    (tile.0 + 0.5 * fold(c[ua] as f64 - mid[ua])) as f32,
-                    (tile.1 + 0.5 * fold(c[va] as f64 - mid[va])) as f32,
+                    (tile.0 + size * fold(c[ua] as f64 - mid[ua])) as f32,
+                    (tile.1 + size * fold(c[va] as f64 - mid[va])) as f32,
                 ];
             }
         }
@@ -587,7 +731,8 @@ pub fn clad(p: &Palette, still: Obj, seed: i128, o: Clad) -> Obj {
     let (lo, hi) = measure(&stood_in);
     let crown = (V3::from(lo) + V3::from(hi)) / 2;
     let mut cards = Cards::new("cards", seed, lo, hi);
-    cards.tiles = o.tiles.cards;
+    let (core, size) = (o.tiles.core, o.tiles.across);
+    cards.tiles = o.tiles;
     let shade = |rng: &mut Random, d: V3, at: V3| {
         0.7 + 0.18 * d.dot((at - crown).normalized()) + 0.16 * d.z as f64 + rng.uniform(-0.1, 0.1)
     };
@@ -643,7 +788,8 @@ pub fn clad(p: &Palette, still: Obj, seed: i128, o: Clad) -> Obj {
                 },
             ),
             1.5 * r,
-            o.tiles.core,
+            core,
+            size,
         ));
     }
     for obj in stood_in {

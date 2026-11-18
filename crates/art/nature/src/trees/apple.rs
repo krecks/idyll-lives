@@ -4,6 +4,7 @@
 //! low enough for a child on tiptoe, and those the harvest's reaches close on. Picked bare, no apples until it
 //! fruits again (`ripen`).
 
+use artkit::botany::Tiles;
 use artkit::botany::skeleton::{Branches, Buttress, ClumpAims, Heart, Mass, Stem, base};
 use artkit::botany::species::{
     Aims, Crown, Hearts, Perches, Roots, Seeds, Species, Stage, Tree, Trunk, grow,
@@ -90,6 +91,7 @@ pub fn species() -> Species {
             cards: Some(215),
         },
         leaves: &["#52803A", "#629040", "#74A048", "#86AE52", "#98BC5E"],
+        tiles: Tiles::of("apple"),
         // a short, crooked trunk opening low into gnarled limbs that spread wide, a round crown on them
         trunk: Stage::Spec(Trunk {
             pts: vec![

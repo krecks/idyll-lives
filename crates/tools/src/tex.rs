@@ -23,7 +23,7 @@ pub const USAGE: &str = "usage: cargo tex <command> ...
   clouds <out.png>                          the sky's tileable cloud layer
   synth [set...]                            procedural albedo/normal/arm maps (no downloads)
   materials                                 writes materials.json (PBR material + environment entries)
-  leafcards [out.png]                       the trees' leaf-card atlas";
+  leafcards [dir]                           the trees' leaf-card atlas and its tiles.json";
 pub fn main_with(args: &[String]) -> i32 {
     let a: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
     let res = match a.as_slice() {

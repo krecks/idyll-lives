@@ -6,7 +6,8 @@ use crate::botany::polyfill;
 use crate::far::is_low;
 use crate::materials::Mat;
 use crate::math::{
-    Axis, M4, PI, V3, cos, dot_v3, exp, len_v3, mul_v3_fl, normalize_v3, pow, radians, sin, v3,
+    Axis, M4, PI, TAU, V3, cos, dot_v3, exp, len_v3, mul_v3_fl, normalize_v3, pow, radians, sin,
+    sqrt, v3,
 };
 use crate::mesh::{Mesh, edge, normal_of};
 use crate::scene::{self, Obj};
@@ -456,6 +457,103 @@ pub fn lobed(lobes: impl crate::math::Num, o: Lobed) -> impl Fn(f64) -> f64 + Co
         pow(sin(PI * 1.0_f64.min(0.15 + t * 0.85)), 0.6)
             * (1.0 - depth * pow(sin(PI * lobes / 2.0 * t).abs(), 3.0))
     }
+}
+
+options! {
+    /// `sinuate`'s options.
+    Sinuate { depth: f64 = 0.45 }
+}
+
+/// An oak leaf's right half, as a width profile: `pairs` rounded lobes a side with narrow bays between them, cut in
+/// by `depth`, on a blade widest above its middle that narrows to two small ears at the stalk.
+pub fn sinuate(pairs: impl crate::math::Num, o: Sinuate) -> impl Fn(f64) -> f64 + Copy {
+    let (pairs, depth) = (pairs.f(), o.depth);
+    move |t: f64| {
+        let blade = pow(sin(PI * pow(t, 1.35)), 0.75) + 0.2 * exp(-pow((t - 0.05) / 0.045, 2.0));
+        let lobe = 0.5 - 0.5 * cos(TAU * pairs * t - 0.9);
+        blade * (1.0 - depth * (1.0 - pow(lobe, 0.6)))
+    }
+}
+
+options! {
+    /// `palmate`'s options.
+    Palmate { cut: f64 = 0.4, bulge: f64 = 0.07, teeth: usize = 1, spread: f64 = 105.0, fall: f64 = 0.84 }
+}
+
+/// A palmately lobed leaf's right half for `cut_leaf` (a maple's), `length` metres from the stalk's end to the
+/// middle lobe's tip: `lobes` pointed lobes in all (an odd number: one down the middle) fanning from the stalk's
+/// end, the outermost `spread` degrees round from the tip, each `fall` as long as the one before it, the bays
+/// between them `cut` of the way in to the stalk's end; each side of a lobe stands out by `bulge` of its length:
+/// as a point with a notch behind it (`teeth`: a Norway maple's) or as a shoulder (none: a Japanese maple's
+/// narrow lobes). The lowest lobes reach back past the stalk's end (t under 0).
+pub fn palmate(lobes: usize, length: f64, o: Palmate) -> Vec<(f64, f64)> {
+    let side = (lobes.max(3) - 1) / 2;
+    let at = |r: f64, a: f64| (r * cos(a), r * sin(a));
+    let turn = radians(o.spread) / side as f64;
+    let long = |k: usize| pow(o.fall, k as f64);
+    // the bay between lobe k and the one before it (nearer the tip), and the leaf's foot past the last
+    let bay = |k: usize| {
+        at(
+            (1.0 - o.cut) * (long(k) + long(k - 1)) / 2.0,
+            turn * (k as f64 - 0.5),
+        )
+    };
+    let foot = at(
+        (1.0 - o.cut) * long(side) * 0.55,
+        (turn * side as f64 + radians(38.0)).min(radians(172.0)),
+    );
+    // a lobe's side from `from` (a bay) out to its `tip`, standing out to the side away from `axis` (the lobe's)
+    let flank = |from: (f64, f64), tip: (f64, f64), axis: f64, long: f64| -> Vec<(f64, f64)> {
+        let (dx, dy) = (tip.0 - from.0, tip.1 - from.1);
+        let d = sqrt(dx * dx + dy * dy).max(1e-9);
+        let mut out = (-dy / d, dx / d);
+        let mid = ((from.0 + tip.0) / 2.0, (from.1 + tip.1) / 2.0);
+        // (away from the lobe's own line)
+        let (ax, ay) = (cos(axis), sin(axis));
+        let off = (
+            mid.0 - ax * (mid.0 * ax + mid.1 * ay),
+            mid.1 - ay * (mid.0 * ax + mid.1 * ay),
+        );
+        if out.0 * off.0 + out.1 * off.1 < 0.0 {
+            out = (-out.0, -out.1);
+        }
+        let on = |f: f64, by: f64| {
+            (
+                from.0 + dx * f + out.0 * by * long,
+                from.1 + dy * f + out.1 * by * long,
+            )
+        };
+        if o.teeth > 0 {
+            vec![
+                on(0.3, o.bulge * 0.45),
+                on(0.5, o.bulge),
+                on(0.58, o.bulge * 0.2),
+                on(0.8, o.bulge * 0.3),
+            ]
+        } else {
+            vec![
+                on(0.25, o.bulge * 0.7),
+                on(0.5, o.bulge),
+                on(0.78, o.bulge * 0.6),
+            ]
+        }
+    };
+    let mut points = vec![foot];
+    for k in (1..=side).rev() {
+        let (axis, tip) = (turn * k as f64, at(long(k), turn * k as f64));
+        let below = if k == side { foot } else { bay(k + 1) };
+        points.extend(flank(below, tip, axis, long(k)));
+        points.push(tip);
+        let mut above = flank(bay(k), tip, axis, long(k));
+        above.reverse();
+        points.extend(above);
+        points.push(bay(k));
+    }
+    points.extend(flank(bay(1), (1.0, 0.0), 0.0, 1.0));
+    points
+        .into_iter()
+        .map(|(t, w)| (t, (w * length).max(0.0005)))
+        .collect()
 }
 
 options! {

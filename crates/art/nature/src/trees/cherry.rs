@@ -1,6 +1,7 @@
 //! Cherry blossom: a short, leaning trunk opening into wide, low limbs, and a broad, flat crown of pink blossom
 //! clouds at their boughs' tips.
 
+use artkit::botany::Tiles;
 use artkit::botany::skeleton::{Branches, Buttress, ClumpAims, Heart, Mass, Stem};
 use artkit::botany::species::{
     Aims, Crown, Hearts, Perches, Roots, Seeds, Species, Stage, Tree, Trunk, grow,
@@ -21,6 +22,7 @@ pub fn species() -> Species {
             cards: Some(214),
         },
         leaves: &["#E07AAE", "#EA90BE", "#F2A8CE", "#F8BEDC", "#FCD4E8"],
+        tiles: Tiles::of("cherry").green_of("apple"),
         colours: &[("bark", "#B09A8A")],
         // a short trunk, leaning a little, that opens at 1.6-2 m into wide, low limbs reaching out nearly level
         // and turning up at their ends: a broad vase under a flat crown of blossom clouds
