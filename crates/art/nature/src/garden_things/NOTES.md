@@ -1,4 +1,4 @@
-# Garden things (`families/garden_things.py`)
+# Garden things: notes
 
 Outdoor (OU5): the pond, the small garden things and the garden lights. One pack,
 `packs/garden_things/manifest.json`. Built 2026-10-16; they sat in Validate › Garden Things until signed off (back to Outdoor ›
@@ -86,3 +86,10 @@ dog house at all four facings, the planter box and the string lights recoloured,
 watching the fish (`surface` repeating, ripples ambient) and watching the birds (the blue tit on its perch), by day
 and at 22:00 (the lamp's panes and the bulbs lit). After the detail pass (2026-10-22): the gallery (WebGPU and WebGL2)
 and the clips bench at 0, 0.5 s and open, no errors; not played in a house again.
+
+Built here, not in Blender, since 2026-11-18 (`cargo check-glb --against ref/blender`): the eleven files' points
+Blender's (0.000 mm), two the same in every bit, the pack the same but for its comment. Each model names its
+materials in a palette of its own (the family's colours and its own `body`: `common::palette_of`); the lamp post's
+far version is artkit's decimation of it (`far_ratio`), held to the decimated far versions' rule. The bulbs are held
+to the content's `light.height` as the build runs (`_near_light`, the content read when the tool is compiled). The
+stones' own random numbers are seeded from a float as CPython seeds from one (`random_of`).

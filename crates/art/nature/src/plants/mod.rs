@@ -1,5 +1,12 @@
-//! The plants: the G1 houseplants, the G2 flowers, the G3 shrubs and the G4 edibles. Notes:
-//! tools/art/blender/families/plants.md.
+//! The plants: the G1 houseplants, the G2 flowers, the G3 shrubs and the G4 edibles. Notes: NOTES.md.
+//!
+//! Each model takes the family's colours with some of its own (`botany::palette`; the finishes stay the
+//! family's) and is built from artkit's botany: leaves cut from outlines, stems, pots, flower faces, the shrubs'
+//! masses and their perches, the beds and the crops' growth clips. The outdoor ones have a far version, the same
+//! build at low detail (`far_low`), every random number drawn. tools/art/blender/families/plants.py stays as the
+//! library the scripts not yet ported import; the plants are built here.
+//!
+//! Run:  cargo art plants [--only hosta] [--preview]
 
 use artkit::botany::BASE;
 use artkit::family::{Family, Model};
@@ -17,7 +24,7 @@ mod shrubs;
 /// beyond).
 const TOLERANCE: f64 = 0.03;
 
-/// The family, as far as it is built here.
+/// The family.
 pub fn family() -> Option<Family> {
     let pot = |model: Model| model.tolerance(TOLERANCE).paint(&[("body", "Pot")]);
     let bed = |model: Model, more: &[(&'static str, &'static str)]| {
@@ -253,12 +260,12 @@ pub fn family() -> Option<Family> {
             .paint(&[("bed", "Bed")])
             .motions(json!({"growth": "grow"})),
         ],
-        "Blender-built plants (tools/art/blender/families/plants.py): the G1 houseplants, G2 flowers, \
+        "The plants (crates/art/nature/src/plants, built by cargo art): the G1 houseplants, G2 flowers, \
          G3 shrubs and G4 edibles. Listed in the base manifest's packs. Leaves and stems are on the \
          `foliage` finish, so the nature shader sways and tints them. The outdoor ones have a far \
          version (`far`). Clips: the bonsai's sprig and the clipped shrubs' sprigs shrink away while \
          they are trimmed, a rose and lavender stems while they are cut, a meadow flower and basil \
          while they are picked; the crops grow from seedlings to ripe and lose their crop when \
          harvested (`motions.growth`).",
-    ))
+    ).switched())
 }
