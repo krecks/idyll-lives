@@ -1,7 +1,7 @@
 //! The big working things of the town's named places (content/civicWorks.json, the 'community' buy category): the
 //! fire station's fire engine, fire pole and hose rack, the garage's two-post car lift, tyre rack and tool chest,
 //! the newspaper's printing press, the server rack, and the builders' yard's timber stack, cement mixer and the
-//! town's flagpole (`model.<id>`). Notes: tools/art/blender/families/civic_works.md, until the family switches.
+//! town's flagpole (`model.<id>`). Notes: NOTES.md.
 //!
 //! Built in game axes (`F`: x, height, depth; the front +depth) where the game places them, then stood on the
 //! floor (`settle`). The things against a wall (the hose rack on it; the server rack, the tyre rack and the tool
@@ -101,7 +101,7 @@ pub fn family() -> Option<Family> {
                 .paint(&[("body", "Pole"), ("flag", "Flag")])
                 .palette(yard::FLAG.palette()),
         ],
-        "Blender-built big working things for the town's named places (tools/art/blender/families/civic_works.py; \
+        "The big working things of the town's named places (crates/art/outside/src/civic_works, built by cargo art; \
          content/civicWorks.json): the fire engine, fire pole and hose rack, the two-post car lift, tyre rack and \
          tool chest, the printing press, the server rack, the timber stack, cement mixer and flagpole. Listed in the \
          base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per \
@@ -109,5 +109,5 @@ pub fn family() -> Option<Family> {
          overview. The press's plate and blanket cylinders turn while a resident watches it run (`rollers`); the \
          server rack's LEDs blink (`blink`) and the flag sways at the top of its pole (`flutter`), both ambient; \
          the server rack's LEDs and its UPS's screen glow at night.",
-    ))
+    ).switched())
 }

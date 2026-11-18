@@ -1,6 +1,6 @@
 # Civic works — notes
 
-`civic_works.py` builds the eleven big working things of the town's named places (`content/civicWorks.json`, the
+`crates/art/outside/src/civic_works` (`cargo art civic_works`) builds the eleven big working things of the town's named places (`content/civicWorks.json`, the
 `community` buy category) into `web/public/assets/models/civic_works/` and their entries in
 `packs/civic_works/manifest.json`: the fire station's fire engine, fire pole and hose rack, the garage's car lift, tyre
 rack and tool chest, the newspaper's printing press, the server rack, and the builders' yard's timber stack, cement

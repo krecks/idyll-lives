@@ -7,6 +7,7 @@
   "model.climbingFrame far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.drinkingFountain far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.farm.scarecrow far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
+  "model.fireEngine": {"area": "Blender's fill of the right-hand shutters' sawtooth outline (27 slats) leaves overlapping faces, some facing inwards; the kernel cuts it cleanly, and the two look the same from every side", "surface": "the same overlapping faces in the reference's shutters", "normals": "the same faces in the reference's shutters face inwards"},
   "model.foodie.pizzaOven": {"shading": "Blender's UV sphere has its faces in another order on every run: three of its own builds differ by 2.76 to 3.15 greys on the dough ball; the kernel's is within that"},
   "model.fountainTown far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.fridgeMiniRetro": {"normals": "the name plate's letters: Blender's text has the walls of the holes in its A and R facing into the metal; the kernel's look outwards"},
