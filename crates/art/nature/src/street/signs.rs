@@ -106,7 +106,7 @@ pub fn taxi_sign() -> Vec<Obj> {
             let side = face as f64;
             taxi_word(
                 &F,
-                &format!("word{face}"),
+                format!("word{face}"),
                 (0, 2.475),
                 0.095,
                 side * 0.038,
@@ -116,7 +116,7 @@ pub fn taxi_sign() -> Vec<Obj> {
             );
             chequer(
                 &F,
-                &format!("check{face}"),
+                format!("check{face}"),
                 -0.21,
                 0.21,
                 2.385,

@@ -20,7 +20,7 @@ pub fn bench() -> Vec<Obj> {
     for x in [-0.8, 0.8] {
         bench_end(
             &F,
-            &format!("end{}", float_repr(x)),
+            format!("end{}", float_repr(x)),
             x,
             0.415,
             0.19,
