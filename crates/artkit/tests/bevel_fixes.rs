@@ -305,6 +305,7 @@ fn a_bevels_normals_are_read_on_the_part_where_it_is_joined() {
     // otherwise than where the bevel was made: the parts are joined after another, off the origin, as a family
     // joins them.
     let mut report = Vec::new();
+    let material = Some(Mat::new("body", "#C0683F", "satin"));
     for r in records("bevel_placed.txt") {
         scene::reset();
         let first = cube(
@@ -312,6 +313,7 @@ fn a_bevels_normals_are_read_on_the_part_where_it_is_joined() {
             (0.1, 0.06, 0.04),
             Cube {
                 at: (0.05, -0.3, 0.31).into(),
+                material,
                 ..Cube::default()
             },
         );
@@ -327,6 +329,7 @@ fn a_bevels_normals_are_read_on_the_part_where_it_is_joined() {
                 (s[0], s[1], s[2]),
                 Cube {
                     at,
+                    material,
                     bevel,
                     bevel_segments,
                     ..Cube::default()
@@ -340,6 +343,7 @@ fn a_bevels_normals_are_read_on_the_part_where_it_is_joined() {
                 r.f64("depth"),
                 Extrude {
                     at,
+                    material,
                     holes: Holes(loops[1..].to_vec()),
                     plane: if r.kv["plane"] == "XY" {
                         Plane::XY
@@ -389,6 +393,40 @@ fn a_bevels_normals_are_read_on_the_part_where_it_is_joined() {
             "{}",
             report.last().unwrap()
         );
+        // the file's normals: unit vectors all, straight up where Blender reads none (as its exporter writes them)
+        let none = r.points("n").iter().filter(|n| **n == V3::ZERO).count();
+        let file = artkit::glb::read(&artkit::glb::write(&[joined], false, &finishes())).unwrap();
+        let written: Vec<[f32; 3]> = file
+            .meshes
+            .iter()
+            .flat_map(|m| &m.primitives)
+            .flat_map(|p| p.normals.iter().copied())
+            .collect();
+        for n in &written {
+            let len = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
+            assert!(
+                (len - 1.0).abs() < 1e-4,
+                "{}: a normal {n:?} in its file",
+                r.name
+            );
+        }
+        let up = written
+            .iter()
+            .filter(|n| n[0] == 0.0 && n[1].abs() == 1.0 && n[2] == 0.0)
+            .count();
+        let mine = artkit::normals::corner_normals(&mesh);
+        let zero = mine.iter().filter(|n| **n == V3::ZERO).count();
+        report.push(format!(
+            "{}: Blender reads no normal at {none} corners, the kernel at {zero}; {up} written straight up",
+            r.name
+        ));
+        if r.name == "plate/strip" || r.name == "plate/light" {
+            assert!(
+                none == 8 && zero == 8 && up > 0,
+                "{}",
+                report.last().unwrap()
+            );
+        }
         // (a plate thinner than two bevels never reads as where it was made)
         assert!(
             before.0 > 1.0 || !r.name.starts_with("plate/"),
