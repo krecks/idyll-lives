@@ -116,6 +116,11 @@ impl Mesh {
         normal_of(&self.points(f))
     }
 
+    /// A face's centre as Blender gives it (`MeshPolygon.center`).
+    pub fn face_centre(&self, f: usize) -> V3 {
+        centre_of(&self.points(f))
+    }
+
     pub fn face_normals(&self) -> Vec<V3> {
         (0..self.faces.len()).map(|f| self.face_normal(f)).collect()
     }
@@ -570,6 +575,32 @@ pub fn normal_of(p: &[V3]) -> V3 {
         _ => normalize_v3(newell(p)).0,
     };
     if n == V3::ZERO { V3::Z } else { n }
+}
+
+/// A polygon's centre as Blender works it out (`MeshPolygon.center`, bke's face_center_calc), in single
+/// precision: a triangle's and a quad's corners summed in order and divided by their number, any other's each
+/// times one over their number, summed in order.
+pub fn centre_of(p: &[V3]) -> V3 {
+    match p.len() {
+        3 => V3::new(
+            (p[0].x + p[1].x + p[2].x) / 3.0,
+            (p[0].y + p[1].y + p[2].y) / 3.0,
+            (p[0].z + p[1].z + p[2].z) / 3.0,
+        ),
+        4 => V3::new(
+            (p[0].x + p[1].x + p[2].x + p[3].x) / 4.0,
+            (p[0].y + p[1].y + p[2].y + p[3].y) / 4.0,
+            (p[0].z + p[1].z + p[2].z + p[3].z) / 4.0,
+        ),
+        n => {
+            let w = 1.0 / n as f32;
+            let mut c = V3::ZERO;
+            for &q in p {
+                c = V3::new(c.x + q.x * w, c.y + q.y * w, c.z + q.z * w);
+            }
+            c
+        }
+    }
 }
 
 /// A triangle's normal.
