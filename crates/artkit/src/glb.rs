@@ -155,7 +155,10 @@ fn natural_key(name: &str) -> Vec<(String, u128)> {
                 chars.next();
             }
             // (one more than the number, so that text with no number after it sorts first)
-            out.push((std::mem::take(&mut text), digits.parse::<u128>().unwrap_or(u128::MAX - 1) + 1));
+            out.push((
+                std::mem::take(&mut text),
+                digits.parse::<u128>().unwrap_or(u128::MAX - 1) + 1,
+            ));
         } else {
             text.extend(c.to_lowercase());
         }
