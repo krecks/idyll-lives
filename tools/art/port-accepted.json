@@ -7,6 +7,7 @@
   "model.climbingFrame far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.drinkingFountain far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.farm.scarecrow far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
+  "model.flowers far": {"shading": "the leaves' blades, each two faces back to back on the same three points: a ray meets both at once, Blender's tree takes one or the other and artkit's always the front one, so a blade seen from behind shades nothing here (10 of the leaves' 15 points 1 to 6 of 32 lighter); until artkit takes the face turned to the ray"},
   "model.fountainTown far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.groceryShelf far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.hotDogStand far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
