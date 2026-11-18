@@ -12,6 +12,7 @@ import { townMap } from '../ui/townMap.svelte';
 import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { BENCH } from '../debug/benchFlags';
 import { GAMEPLAY_STATS, installGameplayStats } from '../debug/gameplayStats';
+import { installPlaceHooks } from '../debug/places';
 import { tileWorld } from '../debug/tileWorld';
 import { benchBigWorld } from '../debug/bigTown';
 import { recentLog } from '../debug/log';
@@ -1067,6 +1068,8 @@ async function openSession(
     const withLamps = (w: WorldStructure | null) =>
       w && { ...w, objects: w.objects.map((o) => (content.object(o.def)?.light ? { ...o, off: bridge.lampOff(o.id) } : o)) };
     Object.assign(window, { __controls: controls, __showPlot: showPlot, __world: () => withLamps(world), __send: (cmd: Command) => bridge.send(cmd), __items: () => itemsSeen });
+    // `__places()` and `__lookInside(name, storey?)`: the named places' lots, looked inside by name (dev only).
+    installPlaceHooks(controls, () => world);
     // `__sims()`: every resident as the newest snapshot shows them (where, pose, the object and use,
     // needs; `debug/sims.ts`), to wait on; `__content` the game's content (`__content.object(id)`).
     // `__addFunds(amount)`: money for the player's household. `__customise(id)`: the colour studio
