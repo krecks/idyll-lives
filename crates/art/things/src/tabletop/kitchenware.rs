@@ -277,6 +277,7 @@ fn _blender_base() {
     );
 }
 
+#[allow(clippy::approx_constant)] // (the jug's 0.318 m, not 1 / pi)
 fn _blender_jar() {
     turned!(
         "smoothie",

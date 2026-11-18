@@ -453,6 +453,7 @@ pub fn desk_organiser() -> Vec<Obj> {
 /// A closed laptop: an aluminium base with eased edges, a thumb notch at the front, ports on its side and a hinge
 /// barrel at the back, a keyboard and a touchpad on its top; the lid a part of its own, hinged at its back edge, the
 /// logo on it and the screen under it: it opens while the laptop is used (`lid_open`).
+#[allow(clippy::approx_constant)] // (the lid's 0.318 m, not 1 / pi)
 pub fn laptop_closed() -> Vec<Obj> {
     let body = new_parts(|| {
         slab!(
@@ -791,7 +792,10 @@ pub fn stuffed_toy() -> Vec<Obj> {
 }
 
 /// A raised letter on a toy block: its outline and the holes in it.
-fn letter(c: char) -> (Vec<(f64, f64)>, Vec<Vec<(f64, f64)>>) {
+/// An outline and the holes in it.
+type Outline = (Vec<(f64, f64)>, Vec<Vec<(f64, f64)>>);
+
+fn letter(c: char) -> Outline {
     match c {
         'A' => (
             vec![
