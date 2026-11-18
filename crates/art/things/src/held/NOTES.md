@@ -1,4 +1,4 @@
-# Held (`families/held.py`)
+# Held: notes
 
 The 82 things residents carry, cook with and hold while they use a thing. One pack, `packs/held/manifest.json`, models
 in `models/held/`. Built 2026-10-16. They aren't buyable: no content entry, no Validate group, no paint.
@@ -81,7 +81,7 @@ sideways; the pan and the grill food, which stand off their middle, take their m
 | `item.crisps` | a packet of crisps lying on its back, puffed, blue with a yellow band, crimped seals, its top torn open on the silvered inside, five crisps spilt | 616 | 616 |
 | `item.apple` | an apple 7.5 cm across, lobed a little, red with a yellow blush at the stalk and the eye, a stalk and a leaf | 250 | 250 |
 | `item.pastryBag` | a white paper bag 12 cm wide, its top folded open, a croissant of five lobes standing out of it | 176 | 176 |
-| `item.cutFlowers` | a bunch of cut flowers 37 cm tall standing out of the hand, the stems gathered at the grip and curving up to six heads (three daisies with an amber eye, two tulip buds, a small daisy) and four leaves, the same heads as the vase of flowers (`tabletop.py`) | 624 | 624 |
+| `item.cutFlowers` | a bunch of cut flowers 37 cm tall standing out of the hand, the stems gathered at the grip and curving up to six heads (three daisies with an amber eye, two tulip buds, a small daisy) and four leaves, the same heads as the vase of flowers (the tabletop things') | 624 | 624 |
 | `item.daisyChain` | a daisy chain 16 cm across, coiled flat in the hand: a ring of plaited green stems with eleven white daisies round it (an amber eye on each), heads up, and the two stem ends tucked back under where the chain was closed | 1,034 | 1034 |
 | `item.parcel` | a parcel from the shop 42 x 30 x 34 cm (2026-11-03, sim-core `setup.rs`): a corrugated card box, its edges rounded a little, brown tape over the top seam and a hand's width down the front and back, a white address label with three red lines; at the front door, in both hands, and on the floor while what's in it is put together | 140 | 140 |
 | `tool.book` | an open cloth-bound book, 30 x 22 cm: the boards, two page blocks rising from the spine and curving down to the fore-edges, a sheet over each with seven grey bands of type | 496 | 496 |
@@ -165,7 +165,7 @@ sideways; the pan and the grill food, which stand off their middle, take their m
   the plate, bowls, pots, pan, pizza, rolls, scoops, cookies, corn and the sausages (laid down, their grill marks as
   bands). Wedges and the sandwich halves are `prism`s over their outline. Crusts and pastry edges are `crust` sweeps
   (crimped by a wave in their thickness), icing and cream `swirl`s, smears `blob`s, leaves `leaf` outlines. Small
-  lumpy food takes `lump(rough=)`: `G.boulder`'s own noise is too broad to show on a thing a few centimetres across.
+  lumpy food takes `lump(rough=)`: the boulder's own noise is too broad to show on a thing a few centimetres across.
 - **Sizes** within 10 % of the old part on every axis (as the gate checked while the old parts were there). The
   pan's handle runs to the back as the old part's (whose crossbar was across, likely by mistake), 2 cm longer.
 - **The old `item.pizzaSlice`** was a three-sided cone stood on its edge, through the plate; it is now a flat wedge
@@ -173,4 +173,4 @@ sideways; the pan and the grill food, which stand off their middle, take their m
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `crisps`; the same triangles.
+No change to the models' code: their soft boxes take the shared form's new shape (rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `crisps`; the same triangles.
