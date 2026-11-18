@@ -272,5 +272,5 @@ pub fn family() -> Option<Family> {
          group. Table tops stand at the content's surface heights and seats where the game seats residents; the \
          stools' seats swivel 20 degrees as a resident sits (`swivel`, carrying them), and the bar cart's cocktail \
          shaker is taken off it while a drink is mixed (`shake`).",
-    ))
+    ).switched())
 }
