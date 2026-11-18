@@ -1,7 +1,7 @@
 /**
  * Things residents ride (content `vehicle`, sim-core `ride.rs`: a bike, an e-scooter) as the renderer draws
  * them under their riders (`residents.ts`): where on it the rider is, its grips, its wheels and its cranks, by
- * object id, measured from its model (tools/art/blender/families/yard.md). The model's own frame: x along it
+ * object id, measured from its model (crates/art/outside/src/yard/NOTES.md). The model's own frame: x along it
  * (+x towards its front wheel), y up, z across; its parts are the file's named nodes (`frame`, `wheel_front`,
  * `wheel_rear`, `cranks`, `stand`), each with its origin at its pivot, turned here by code (no clips).
  */
@@ -52,7 +52,7 @@ export const MOUNTS: Record<string, Mount> = {
     wheels: WHEELS([0.28, 0.18, 0.18], [-0.28, 0.18, 0.18]),
     cranks: { node: 'cranks', x: -0.05, h: 0.19, len: 0.105, out: 0.09, gear: 1.8, rest: -Math.PI / 2 },
   },
-  // The other bicycles (`tools/art/blender/families/yard.py`: `MTB`, `ROAD`, `CARGO`, `EBIKE`): each sat on and
+  // The other bicycles (`crates/art/outside/src/yard/rides.rs`: `mtb`, `road`, `cargo`, `ebike`): each sat on and
   // pedalled as the city bike is, by its own numbers (the cargo bike's model is centred on its long box).
   mountainBike: {
     kind: 'bike',

@@ -1,4 +1,4 @@
-//! The play and yard things. Notes: tools/art/blender/families/yard.md.
+//! The play and yard things. Notes: NOTES.md.
 //!
 //! The sandpit (`model.sandbox`), whose sand castle grows while one is built (`castle`); the bike rack
 //! (`model.bikeRack`), whose bike lifts its back wheel onto the stand (`wheel_up`) and turns it (`wheel_turn`, a loop)

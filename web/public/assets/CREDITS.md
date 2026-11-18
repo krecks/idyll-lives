@@ -285,8 +285,8 @@ The play and yard things (`models/yard/sandbox.glb`, `bikeRack.glb`, `raisedBed.
 ride to work or school, `bicycle.glb` (a step-through city bike with a basket), `bicycleChild.glb` (a kids' bike on
 stabilisers), `eScooter.glb` (an electric scooter), `mountainBike.glb` (knobbly tyres and a suspension fork),
 `roadBike.glb` (drop bars and thin tyres), `cargoBike.glb` (a long box up front) and `eBike.glb` (a battery in the
-frame and a motor at the pedals), each with its `.far.glb`, override pack `packs/yard/manifest.json`) are built in
-Blender by `tools/art/blender/families/yard.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). A sand
+frame and a motor at the pedals), each with its `.far.glb`, override pack `packs/yard/manifest.json`) are generated
+by `crates/art/outside/src/yard` on `artkit` (`cargo art yard`) as `.glb` (glTF, original, CC0). A sand
 castle grows in the sandpit, the bike lifts and turns its back wheel, the raised bed's crop grows and is picked, the
 shed's and the greenhouse's doors open, the compost bin's lid lifts and the washing goes out on the line a line at a
 time; the rides' wheels, cranks and stands are parts the game moves.
