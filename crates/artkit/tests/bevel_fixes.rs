@@ -6,7 +6,7 @@ use artkit::materials::{Finish, Finishes, Mat};
 use artkit::math::{P3, V3};
 use artkit::mesh::Mesh;
 use artkit::scene;
-use artkit::shapes::{Cube, cube};
+use artkit::shapes::{Cube, Round, cube, cylinder};
 use common::*;
 use std::collections::BTreeMap;
 
@@ -430,4 +430,73 @@ fn a_slabs_far_face_is_numbered_as_blenders_extrusion_numbers_it() {
         seen += 1;
     }
     assert!(seen >= 8, "{seen} slabs");
+}
+
+#[test]
+fn a_bevel_of_a_width_below_zero_is_none() {
+    // Blender's modifier clamps a width below zero to none: the part is only shaded as a bevelled one is
+    for r in records("bevel_none.txt") {
+        scene::reset();
+        let part = match r.name.as_str() {
+            "cube" => cube(
+                "p",
+                (0.2, 0.3, 0.4),
+                Cube {
+                    bevel: -0.01,
+                    bevel_segments: 1,
+                    ..Cube::default()
+                },
+            ),
+            "cylinder" => cylinder(
+                "c",
+                0.1,
+                0.3,
+                Round {
+                    verts: 8,
+                    bevel: -0.004,
+                    ..Round::default()
+                },
+            ),
+            _ => {
+                let (w, h, c) = (0.2, 0.1, 0.01);
+                let outline = [
+                    (w, h - c),
+                    (w - c, h),
+                    (-w + c, h),
+                    (-w, h - c),
+                    (-w, -h + c),
+                    (-w + c, -h),
+                    (w - c, -h),
+                    (w, -h + c),
+                ];
+                extrude(
+                    "s",
+                    &outline,
+                    0.02,
+                    Extrude {
+                        bevel: -0.004,
+                        bevel_segments: 1,
+                        ..Extrude::default()
+                    },
+                )
+            }
+        };
+        assert_eq!(artkit::parts::game_size(&[part]).len(), 3);
+        let joined = artkit::parts::join(&[part], "j", None);
+        let mesh = joined.read(|o| o.mesh.clone());
+        let (want_points, want_faces) = (r.points("v"), r.faces("f"));
+        assert_eq!(mesh.verts.len(), want_points.len(), "{}: points", r.name);
+        assert!(
+            mesh.normals.is_none() && mesh.stored.is_none(),
+            "{}: no normals of its own",
+            r.name
+        );
+        assert!(mesh.faces.iter().all(|f| f.smooth), "{}: smooth", r.name);
+        let (turned, _, missing) = normals_off(&mesh, &want_points, &want_faces, &r.points("n"));
+        assert!(
+            turned < 0.01 && missing == 0,
+            "{}: {turned} {missing}",
+            r.name
+        );
+    }
 }
