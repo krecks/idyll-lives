@@ -1,6 +1,6 @@
 //! The garden pond (2x2): a stone-edged pool with lilies and reeds, ripples, and a koi that comes up.
 
-use super::common::{_mesh, _own, F, M, random_of};
+use super::common::{_mesh, _own, F, M};
 use artkit::forms::smooth_outline;
 use artkit::json::float_repr;
 use artkit::materials::Mat;
@@ -36,7 +36,7 @@ fn _flag(
     sz: f64,
     n: usize,
 ) -> Obj {
-    let mut rng = random_of(seed);
+    let mut rng = Random::from_float(seed);
     let mut pts = Vec::new();
     for k in 0..n {
         let a = TAU * (k as f64 + rng.uniform(-0.18, 0.18)) / n as f64;

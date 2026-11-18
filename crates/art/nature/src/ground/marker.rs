@@ -2,8 +2,8 @@
 
 use super::M;
 use super::common::_mesh;
+use artkit::edit::{NgonMethod, QuadMethod, triangulate};
 use artkit::math::{PI, TAU, V3, cos, pow, sin, sqrt, v3};
-use artkit::mesh::Mesh;
 use artkit::normals::custom_from_verts;
 use artkit::py;
 use artkit::scene::Obj;
@@ -200,45 +200,13 @@ pub fn marker() -> Vec<Obj> {
         true,
     );
     let given: Vec<V3> = used.iter().map(|&v| normals[v]).collect();
+    // Quads to triangles along their shorter diagonal, so the outline and the rays' flanks stay smooth.
+    triangulate(obj, QuadMethod::ShortEdge, NgonMethod::Beauty);
     obj.edit(|o| {
-        // Quads to triangles along their shorter diagonal, so the outline and the rays' flanks stay smooth.
-        short_edge(&mut o.mesh);
         for f in &mut o.mesh.faces {
             f.smooth = true;
         }
         o.mesh.normals = Some(custom_from_verts(&o.mesh, &given));
     });
     vec![obj]
-}
-
-/// Every quad cut in two along its shorter diagonal (`bmesh.ops.triangulate`, `SHORT_EDGE`): between its first
-/// and third corners where that one is the shorter, else between the other two.
-fn short_edge(mesh: &mut Mesh) {
-    let mut new = Mesh {
-        verts: mesh.verts.clone(),
-        mats: mesh.mats.clone(),
-        sharp: mesh.sharp.clone(),
-        ..Mesh::default()
-    };
-    let apart = |a: V3, b: V3| {
-        let (x, y, z) = (a.x - b.x, a.y - b.y, a.z - b.z);
-        x * x + y * y + z * z
-    };
-    for f in 0..mesh.faces.len() {
-        let c = mesh.corners(f);
-        let face = mesh.faces[f];
-        if let [c0, c1, c2, c3] = *c {
-            let at = |v: u32| mesh.verts[v as usize];
-            if apart(at(c1), at(c3)) - apart(at(c0), at(c2)) > 0.0 {
-                new.push_face(&[c0, c1, c2], face.mat, face.smooth);
-                new.push_face(&[c0, c2, c3], face.mat, face.smooth);
-            } else {
-                new.push_face(&[c0, c1, c3], face.mat, face.smooth);
-                new.push_face(&[c1, c2, c3], face.mat, face.smooth);
-            }
-        } else {
-            new.push_face(c, face.mat, face.smooth);
-        }
-    }
-    *mesh = new;
 }

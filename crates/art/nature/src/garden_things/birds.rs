@@ -1,13 +1,15 @@
 //! The planter box, the birdhouse and the bird feeders.
 
-use super::common::{_name, _own, _prism, F, M};
+use super::common::{_own, _prism, F, M};
 use artkit::far::{is_low, low};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::kit::{self, Moulding, fillet, moulding};
 use artkit::math::{P3, TAU, V3, cos, cosd, degrees, p3, sin, sind, v3};
 use artkit::motion::{Squash, squash};
-use artkit::parts::{Settle, join, join_all, measure, new_parts, settle_all, settle_with};
+use artkit::parts::{
+    Settle, join, join_all, measure, new_parts, numbered, settle_all, settle_with,
+};
 use artkit::place::Facing;
 use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
@@ -517,7 +519,7 @@ fn _feeder(x: f64) {
     // the bail: a loop over the hook's tip, down to the lid's knob
     fsweep!(
         F,
-        _name("hanger"),
+        numbered("hanger"),
         &[
             (x - 0.012, 1.705, z),
             (x - 0.012, 1.765, z),
@@ -531,7 +533,7 @@ fn _feeder(x: f64) {
         resolution = 2
     );
     revolve!(
-        _name("cap"),
+        numbered("cap"),
         &[
             (0.0, 1.645),
             (0.074, 1.645),
@@ -548,7 +550,7 @@ fn _feeder(x: f64) {
     );
     fcyl!(
         F,
-        _name("tube"),
+        numbered("tube"),
         0.055,
         0.2,
         (x, 1.545, z),
@@ -557,7 +559,7 @@ fn _feeder(x: f64) {
     );
     fcyl!(
         F,
-        _name("tube_seed"),
+        numbered("tube_seed"),
         0.048,
         0.17,
         (x, 1.53, z),
@@ -570,7 +572,7 @@ fn _feeder(x: f64) {
         for k in [-1.0, 1.0] {
             fsweep!(
                 F,
-                _name("port"),
+                numbered("port"),
                 &[
                     (x + k * 0.05 * c, y, z + k * 0.05 * s),
                     (x + k * 0.062 * c, y, z + k * 0.062 * s)
@@ -581,7 +583,7 @@ fn _feeder(x: f64) {
             );
             fsweep!(
                 F,
-                _name("peg"),
+                numbered("peg"),
                 &[
                     (x + k * 0.05 * c, y - 0.022, z + k * 0.05 * s),
                     (x + k * 0.1 * c, y - 0.022, z + k * 0.1 * s)
@@ -593,7 +595,7 @@ fn _feeder(x: f64) {
         }
     }
     revolve!(
-        _name("tray"),
+        numbered("tray"),
         &[
             (0.0, 1.433),
             (0.09, 1.433),
@@ -609,7 +611,7 @@ fn _feeder(x: f64) {
         segments = 16
     );
     torus!(
-        _name("perch"),
+        numbered("perch"),
         0.1,
         0.005,
         at = F.at(x, 1.47, z),
@@ -620,7 +622,7 @@ fn _feeder(x: f64) {
     for a in [0.0, 90.0, 180.0, 270.0] {
         fsweep!(
             F,
-            _name("spoke"),
+            numbered("spoke"),
             &[
                 (x + 0.06 * cosd(a), 1.452, z + 0.06 * sind(a)),
                 (x + 0.1 * cosd(a), 1.47, z + 0.1 * sind(a))
