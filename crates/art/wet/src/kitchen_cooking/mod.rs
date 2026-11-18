@@ -276,5 +276,5 @@ pub fn family() -> Option<Family> {
          below: its door drops on a bottom hinge (`oven_open`) while a resident bakes, and a knob \
          turns with a ring of flame on the gas ones (`burner_on`) while they cook. The microwave \
          swings its door (`door_open`) and turns its turntable (`turntable`).",
-    ))
+    ).switched())
 }
