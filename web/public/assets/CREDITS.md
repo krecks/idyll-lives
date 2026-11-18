@@ -46,17 +46,17 @@ shrinks away while a resident prunes it.
 
 The flower beds (`models/plants/flowerbed.glb`, `tulips.glb`, `daffodils.glb`, `daisies.glb`, `sunflowers.glb`,
 `poppies.glb`, `marigolds.glb`, `pansies.glb`, `lilies.glb`, `lupins.glb`, `forgetMeNots.glb`, `cosmos.glb`,
-`meadow.glb`, `geraniums.glb`, `flowerBox.glb`, in the same pack) are built by the same script, also original and
+`meadow.glb`, `geraniums.glb`, `flowerBox.glb`, in the same pack) are built by the same module, also original and
 CC0. A flower in the wildflower meadow shrinks away while a resident picks it.
 
 The shrubs (`models/plants/bush.glb`, `boxwood.glb`, `topiaryCone.glb`, `hedge.glb`, `hydrangea.glb`, `rosebush.glb`,
 `azalea.glb`, `lavender.glb`, `fern.glb`, `grass.glb`, `hosta.glb`, the lot dressing's `bushSmall.glb` and
-`bushFlowering.glb` and the streets' `streetHedge.glb`, in the same pack) are built by the same script,
+`bushFlowering.glb` and the streets' `streetHedge.glb`, in the same pack) are built by the same module,
 also original and CC0, each with a far version (`<id>.far.glb`), as are the flower beds. A trim takes the clipped
 shrubs' stray sprigs off, a prune cuts a rose and a cut a few lavender stems.
 
 The edibles (`models/plants/vegPatch.glb`, `tomatoes.glb`, `strawberries.glb`, `herbs.glb`, `pumpkins.glb`, each
-with its far version, in the same pack) are built by the same script, also original and CC0. The four crops grow
+with its far version, in the same pack) are built by the same module, also original and CC0. The four crops grow
 from seedlings to ripe and lose their crop when harvested (`grow`); the herb planter's basil shrinks while herbs are
 picked; a harvested vegetable patch is bare.
 

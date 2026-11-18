@@ -134,6 +134,7 @@ Main thread                                   Sim worker
 |---|---|---|
 | `crates/sim-core` | All game rules: needs, AI, pathfinding, town, social life, saves, geometry generation | Know about browsers, rendering or asset files |
 | `crates/sim-wasm` | JS bindings | Contain game logic |
+| `crates/artkit`, `crates/art` | The item models: the kernel and the families that build them into `.glb` files and packs (`cargo art`) | Ship with the game (it reads only the files they write) |
 | `web/src/core` | Worker, bridge, protocol, snapshot channel | Render or touch the DOM |
 | `web/src/render` | Everything drawn; `types.ts` is the contract (below) | Contain game rules; allocate per frame |
 | `web/src/assets` | Key → file resolution | Hard-code art anywhere else |
@@ -185,7 +186,7 @@ To ship a whole art set without editing the base manifest, create a pack and lis
 { "version": 1, "entries": { "icon.need.hunger": { "type": "icon", "url": "icons/hunger.png", "mode": "image" } } }
 ```
 
-Model conventions: 1 unit = 1 metre, origin at the footprint centre on the floor, front facing +Z. How to build a new object (scale, budgets, finishes, export, checks): [docs/design/objects.md](docs/design/objects.md). Monochrome SVG icons are recoloured by CSS (`mode: "mask"`); use `mode: "image"` for full-colour art.
+Model conventions: 1 unit = 1 metre, origin at the footprint centre on the floor, front facing +Z. How to build a new object (scale, budgets, finishes, export, checks): [docs/design/objects.md](docs/design/objects.md); the code and the commands: [crates/art/README.md](crates/art/README.md). Monochrome SVG icons are recoloured by CSS (`mode: "mask"`); use `mode: "image"` for full-colour art.
 
 ## Adding gameplay content
 

@@ -21,7 +21,7 @@ Every tool's `src/<name>.rs` opens with what it does and its arguments; this pag
 | `cargo fetch-voice` | The voice model and the pronunciation dictionary into `web/public/voice/` (was `tools/voice/fetch.mjs`, `fp16.mjs`). |
 | `cargo fetch-llm` | The language model into `web/public/llm/`, repacked smaller without changing what it computes (`llmslim.rs`; was `tools/llm/fetch.mjs`). |
 | `cargo review` | The authenticity review's first pass over every buyable object: `sizes`, `uses`; and `colours`, every model's colours against what real surfaces reflect (2 % to 80 % of the light, a metal at least 45 %; glass left out): a report of those outside; `facets`, `edges`, `texels`, reports over every model. |
-| `cargo tex` | The texture scripts: `clouds`, `synth` (every surface map, generated in code), `materials` (was `tools/art/*.py`). |
+| `cargo tex` | The texture scripts: `clouds`, `synth` (every surface map, generated in code), `materials` (was `tools/art/*.py`), `leafcards` (the trees' leaf-card atlas, drawn on `artkit`; was a Blender script). |
 | `cargo pins` | Accepted parts of the game held by their SHA-256 (`tools/pins/pins.json`: a file, a marked region or an `export const`), so work on something else can't change them by the way (was `tools/pins/check.ts`). `--list`, `--update`, `--add`. |
 | `cargo shots` | Numbers from the bench's pictures: `stats` (brightness, clipping, saturation, how much is one tone, contrast at four sizes), `steady` (how much a picture changes when the camera moves a quarter of a pixel), `compare` (how many pixels differ between two shot folders, with pictures of where; `render.mjs --compare` runs it) and `sheet` (pictures of the same name from several folders tiled side by side under their names; `looks.mjs` and `play.mjs` run it). Was `tools/bench/stats.mjs`, part of `render.mjs` and `sheet.mjs` on sharp. |
 | `cargo world-map` | Draws the sample worlds (`tools/worlds/sample.ts`'s output) from above, an SVG each and an index page (was `tools/worlds/map.ts`). |
@@ -103,6 +103,7 @@ numbers match a crash stack from the site.
 | `tools/voice/check.mjs`, `samples.mjs`, `tools/llm/check.mjs`, `devices.mjs` (and the `engine.mjs` they share) | They run the models the way the browser does: ONNX Runtime Web, plus the worker's own `web/src/voice/supertonic.ts` and `voices.ts`. Porting them means an ONNX runtime in Rust (`ort` or `tract`) and `supertonic.ts` in Rust. |
 | `tools/characters/check_clips.ts` | Reads the clip data that is generated into `web/src/render/shared/characters/clips/`. |
 | `tools/bench/*.mjs` | Playwright: they drive a real browser and time the render. What they do with the pictures afterwards is `cargo shots`. |
+| `tools/art/validate.ts` | It runs the Khronos glTF validator (`cargo check-glb --validate`), which is a JavaScript package. |
 | `tools/housegen/sample.ts`, `tools/worlds/sample.ts`, `tools/built/dump.ts` | They run the game's own generators, which are TypeScript (`web/src/game`, `web/src/render/shared`). |
 | `tools/audio/listen.ts` | It renders the sounds as the game plays them: made in Rust (`crates/sound`, through its wasm), but at the player's levels, in its rooms and from its camera distances, which are TypeScript (`web/src/audio/`). |
 | `tools/characters/blend_analysis.ts` | It runs the game's own clips, which are TypeScript. |
