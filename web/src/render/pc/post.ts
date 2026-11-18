@@ -37,6 +37,7 @@ import { deviceDriverInfo } from './internals';
 import { NIGHT_TINT, nightAmount } from './nightGrade';
 import { composeChunks, FXAA, PAGE_TONE_MAPPING, pageToneMapping } from './shaders/post';
 import { curveUniforms, NEUTRAL_CURVES, vignetteUniforms, type ColorCurveSettings, type VignetteSettings } from '../shared/imageProcessing';
+import { tuned } from '../tune';
 
 export interface PostOptions {
   /** Multisampling of the scene (1: none). */
@@ -57,11 +58,14 @@ export interface PostOptions {
  * Contact shading: PlayCanvas's screen-space ambient occlusion, applied in the lighting (the lit shaders
  * read it; `shaders/softLook.ts` gives it to the sky's fill and a share of the lights). `radius` (m): how
  * far a thing shades what is beside it (short: at 0.8 m a room's corners darkened in bands and a bookcase
- * had a halo on the wall behind it, darkest in an unlit room); `intensity` and `power`: its strength, kept at
- * the pass's own (at four times that, a door's casing and a window's frame, a few centimetres off the wall,
- * had a dark smudge a hand wide round them); `scale`: its size, of the picture's.
+ * had a halo on the wall behind it, darkest in an unlit room; at 0.5 m a sofa's creases, a shelf's inside and
+ * where the skirting meets the floor are shaded, and the wall behind a bookcase is not); `intensity` and
+ * `power`: its strength, half again the pass's own (from the play camera the pass's own hardly showed; at four
+ * times that, a door's casing and a window's frame, a few centimetres off the wall, had a dark smudge a hand
+ * wide round them); `scale`: its size, of the picture's. (`?tune=contact.…` on the dev server. Radius 0.3 and
+ * intensity 1 until 2026-11-18.)
  */
-const CONTACT = { radius: 0.3, intensity: 1, power: 1, samples: 16, minAngle: 25, scale: 0.5 };
+const CONTACT = tuned('contact', { radius: 0.5, intensity: 1.5, power: 1, samples: 16, minAngle: 25, scale: 0.5 });
 
 /** What the image processing does (`shared/imageProcessing.ts`, ACES always). */
 export interface PostLook {

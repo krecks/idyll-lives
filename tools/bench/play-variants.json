@@ -208,5 +208,111 @@
       "sky 0.25, bounce 0.06": "room.sky:0.25;room.bounce:0.06",
       "sky 0.15, bounce 0.08 (as it is)": ""
     }
+  },
+  "room-shading": {
+    "poses": [
+      "day-home-13",
+      "day-east-16",
+      "day-north-13",
+      "street-day"
+    ],
+    "variants": {
+      "radius 0.3, strength 1 (before 2026-11-18)": "contact.radius:0.3;contact.intensity:1",
+      "S1 radius 0.5, strength 1": "contact.intensity:1",
+      "S2 radius 0.5, strength 1.5 (as it is)": "",
+      "S3 radius 0.8, strength 1": "contact.radius:0.8;contact.intensity:1",
+      "S4 radius 0.5, strength 1, power 2": "contact.intensity:1;contact.power:2",
+      "S5 radius 0.5, strength 1, more of it on lamps and sun (0.6)": "contact.intensity:1;contactLight.direct:0.6"
+    }
+  },
+  "room-shadows": {
+    "poses": [
+      "day-home-13",
+      "day-east-16",
+      "day-north-13",
+      "street-day"
+    ],
+    "variants": {
+      "peak 0.6, blur 0.12, half 0.5 (before 2026-11-18)": "contactShadow.peak:0.6",
+      "C1 darker: peak 0.8 (as it is)": "",
+      "C2 darker and tighter (peak 0.85, blur 0.07)": "contactShadow.peak:0.85;contactShadow.blur:0.07",
+      "C3 C2, only what is low (half 0.25)": "contactShadow.peak:0.85;contactShadow.blur:0.07;contactShadow.half:0.25",
+      "C4 darker and wider (peak 0.8, blur 0.2, margin 0.45)": "contactShadow.blur:0.2;contactShadow.margin:0.45",
+      "C5 darkest (peak 1, blur 0.1)": "contactShadow.peak:1;contactShadow.blur:0.1"
+    }
+  },
+  "room-light": {
+    "poses": [
+      "day-home-13",
+      "day-east-16",
+      "day-north-13",
+      "street-day"
+    ],
+    "variants": {
+      "the garden's sky: ambient 1, from above 1, untinted (before 2026-11-18)": "room.dayAmbient:1;room.dayFill:1;room.dayTint:FFFFFF",
+      "R1 ambient 0.8, from above 1.5, untinted": "room.dayAmbient:0.8;room.dayFill:1.5;room.dayTint:FFFFFF",
+      "R2 ambient 0.65, from above 2, untinted": "room.dayAmbient:0.65;room.dayFill:2;room.dayTint:FFFFFF",
+      "R3 dimmer, untinted (ambient 0.7, from above 0.7)": "room.dayAmbient:0.7;room.dayFill:0.7;room.dayTint:FFFFFF",
+      "R4 a little warm, as bright: tint FFEEDA, 1.14, 1.14 (as it is)": "",
+      "R5 warm and dimmer (tint FFEEDA, 0.85, 0.85)": "room.dayAmbient:0.85;room.dayFill:0.85",
+      "R6 as it is, the walls' feet and the corners darker (the house's own tones, half again)": "house.floorWall:0.5;house.wallFoot:0.36;house.wallCorner:0.42"
+    }
+  },
+  "room-colour": {
+    "poses": [
+      "day-home-13",
+      "day-east-16",
+      "day-north-13",
+      "street-day"
+    ],
+    "variants": {
+      "pine boards untinted, the garden's sky (before 2026-11-18)": "room.dayAmbient:1;room.dayFill:1;room.dayTint:FFFFFF;floor.boards:FFFFFF;material.floor.wood.texture:../floor_wood.pine/albedo.jpg",
+      "K1 before, the floor a tone darker and cooler (D8D4CC)": "room.dayAmbient:1;room.dayFill:1;room.dayTint:FFFFFF;floor.boards:FFFFFF;material.floor.wood.texture:../floor_wood.pine/albedo.jpg;material.floor.wood.color:D8D4CC",
+      "K2 before, the floor darker, less orange (C2C2C0)": "room.dayAmbient:1;room.dayFill:1;room.dayTint:FFFFFF;floor.boards:FFFFFF;material.floor.wood.texture:../floor_wood.pine/albedo.jpg;material.floor.wood.color:C2C2C0",
+      "K3 before, the walls a tone darker (D0CCC4)": "room.dayAmbient:1;room.dayFill:1;room.dayTint:FFFFFF;floor.boards:FFFFFF;material.floor.wood.texture:../floor_wood.pine/albedo.jpg;material.wall.interior.color:D0CCC4",
+      "K4 before, the walls sage (C5D3BC)": "room.dayAmbient:1;room.dayFill:1;room.dayTint:FFFFFF;floor.boards:FFFFFF;material.floor.wood.texture:../floor_wood.pine/albedo.jpg;material.wall.interior.color:C5D3BC",
+      "K5 before, the walls clay (DDBFA4)": "room.dayAmbient:1;room.dayFill:1;room.dayTint:FFFFFF;floor.boards:FFFFFF;material.floor.wood.texture:../floor_wood.pine/albedo.jpg;material.wall.interior.color:DDBFA4",
+      "K6 before, the grade: contrast 1.18, saturation 6": "room.dayAmbient:1;room.dayFill:1;room.dayTint:FFFFFF;floor.boards:FFFFFF;material.floor.wood.texture:../floor_wood.pine/albedo.jpg;look.contrast:1.18;look.saturation:6",
+      "K7 as it is, the oak at its own tone": "floor.boards:FFFFFF;material.floor.wood.texture:../floor_wood.oak/albedo.jpg",
+      "K8 as it is, sage walls": "material.wall.interior.color:C5D3BC",
+      "K9 the room's light a little warm, oak boards a tone darker (as it is)": ""
+    }
+  },
+  "room-floor": {
+    "poses": [
+      "day-home-13",
+      "day-east-16",
+      "day-north-13",
+      "street-day"
+    ],
+    "variants": {
+      "pine, 13.5 cm boards, untinted (before 2026-11-18)": "floor.boards:FFFFFF;material.floor.wood.texture:../floor_wood.pine/albedo.jpg",
+      "T1 calm (knots and figure down), untinted": "floor.boards:FFFFFF;material.floor.wood.texture:../floor_wood.calm/albedo.jpg",
+      "T2 wide (21 cm boards), untinted": "floor.boards:FFFFFF;material.floor.wood.texture:../floor_wood.wide/albedo.jpg",
+      "T3 wide and calm: the set, untinted": "floor.boards:FFFFFF",
+      "T4 wide, calm, oak at its own tone": "floor.boards:FFFFFF;material.floor.wood.texture:../floor_wood.oak/albedo.jpg",
+      "T5 the old boards stretched to 20 cm": "floor.boards:FFFFFF;material.floor.wood.texture:../floor_wood.pine/albedo.jpg;material.floor.wood.uvScale:0.36",
+      "T6 wide and calm, a tone darker (D8D4CC)": "floor.boards:D8D4CC",
+      "T7 wide, calm, oak a tone darker (as it is)": ""
+    }
+  },
+  "room-pick": {
+    "poses": [
+      "day-home-9",
+      "day-home-13",
+      "day-home-16",
+      "day-back-13",
+      "day-east-9",
+      "day-east-13",
+      "day-east-16",
+      "day-north-13",
+      "day-north-16",
+      "up-day",
+      "street-day"
+    ],
+    "variants": {
+      "before 2026-11-18": "contact.radius:0.3;contact.intensity:1;contactShadow.peak:0.6;room.dayAmbient:1;room.dayFill:1;room.dayTint:FFFFFF;floor.boards:FFFFFF;material.floor.wood.texture:../floor_wood.pine/albedo.jpg",
+      "as it is (S2, C1, R4, T7)": ""
+    }
   }
 }

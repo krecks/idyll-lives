@@ -392,7 +392,8 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 		// In a room with its lamps on by night the eye is set to them: the sky's light, which comes in through the
 		// windows only, is a share of its fill and of its ambient there (and of the moon's, the \`sun\` patch), and the
 		// lamps' light comes off the walls and the floor from every side (\`RoomLightState.light\`, a texel per room:
-		// r the bounce, a the sky's share). The room is the one whose light the fragment has (\`gameRoomLitAt\`,
+		// r the bounce, a the sky's share). By day a room's shares of the ambient and of the fill are \`game_roomDayAmbient\`'s
+		// and \`game_roomDayFill\`'s (\`shared/roomLight.ts\` \`roomDay\`: 1 unless tuned). The room is the one whose light the fragment has (\`gameRoomLitAt\`,
 		// \`roomLights.ts\`: what is inside an outside wall has the wall's room's).
 		// (Not out of doors, \`GAME_OUTDOORS\`: the ground is in no room, and reads neither texture.)
 		#ifndef GAME_OUTDOORS
@@ -400,8 +401,8 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 		if (gameLit > 1.5 && gameLit < ${ROOM_LIGHT_ROOMS}.0) {
 			vec4 gameRoom = texelFetch(game_roomLight, ivec2(int(gameLit + 0.5), 0), 0);
 			gameRoomSky = gameRoom.a;
-			gameAmbient *= gameRoomSky;
-			dDiffuseLight = dDiffuseLight * gameRoomSky + game_roomBounce * gameRoom.r;
+			gameAmbient *= gameRoomSky * game_roomDayAmbient;
+			dDiffuseLight = dDiffuseLight * (gameRoomSky * game_roomDayFill) + game_roomBounce * gameRoom.r;
 		}
 		#endif
 		#ifdef LIT_SSAO
@@ -432,8 +433,8 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 		if (gameLit > 1.5 && gameLit < ${ROOM_LIGHT_ROOMS}.0) {
 			let gameRoom = textureLoad(game_roomLight, vec2<i32>(i32(gameLit + 0.5), 0), 0);
 			gameRoomSky = gameRoom.a;
-			gameAmbient = gameAmbient * gameRoomSky;
-			dDiffuseLight = dDiffuseLight * gameRoomSky + uniform.game_roomBounce * gameRoom.r;
+			gameAmbient = gameAmbient * (gameRoomSky * uniform.game_roomDayAmbient);
+			dDiffuseLight = dDiffuseLight * (gameRoomSky * uniform.game_roomDayFill) + uniform.game_roomBounce * gameRoom.r;
 		}
 		#endif
 		#ifdef LIT_SSAO
