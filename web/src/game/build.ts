@@ -672,12 +672,7 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
   const wanted = (a: number) => byArea[a].length > 0 && (full || touched.has(a));
 
   // ---- the lots, area by area as the generator lays them: the public places, the terraces, the houses ----
-  // (Each square's own tiles taken, not its box's, as the generator keeps them: the shops stand round it.)
-  const ground = townGround({ ...draft, open: { ...draft.open!, squares: [] } }, t);
-  for (const sq of draft.open!.squares ?? []) {
-    const box = boundsOf(sq);
-    for (let z = Math.floor(box.z); z < Math.ceil(box.z + box.d); z++) for (let x = Math.floor(box.x); x < Math.ceil(box.x + box.w); x++) if (inside(sq, x + 0.5, z + 0.5)) ground.take({ x, z, w: 1, d: 1 });
-  }
+  const ground = townGround(draft, t);
   const placers: LotPlacer[] = [];
   const newSlots = () => placers.flatMap((p) => p.slots);
   // A park on each green the roads go round that is painted green, changed and has none, as the generator puts one there.
@@ -878,7 +873,7 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
   }
 
   // ---- the backdrop, as the generator lays it: rows along the roads, a row behind, the blocks filled in; each building on land painted its use ----
-  const pass = new BackdropPass({ draft, t, content, squares: 'outline' });
+  const pass = new BackdropPass({ draft, t, content });
   pass.allow = (poly, use) => {
     const kind = USE_OF[use];
     return !!kind && paintedPoly(poly, kind);
