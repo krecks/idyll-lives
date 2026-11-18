@@ -1,6 +1,6 @@
 # Loner pack — notes
 
-`pack_loner.py` builds the six P11 loner models into `web/public/assets/models/pack_loner/` and their entries in
+`crates/art/packs/src/pack_loner` builds the six P11 loner models into `web/public/assets/models/pack_loner/` and their entries in
 `packs/pack_loner/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sat in
 Validate › Loner until checked in play.
 

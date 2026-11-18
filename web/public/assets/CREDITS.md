@@ -179,7 +179,7 @@ rippling pool, the window seat's cushion sinks and the tub fills.
 
 The loner pack models (`models/pack_loner/quietPod.glb`, `shortwaveRadio.glb`, `puzzleTable.glb`,
 `bonsaiBench.glb`, `soloSauna.glb`, `deliveryHatch.glb`, override pack `packs/pack_loner/manifest.json`) are built
-in Blender by `tools/art/blender/families/pack_loner.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+by `crates/art/packs/src/pack_loner` on `artkit` and exported as `.glb` (glTF, original, CC0).
 Each moves a part while it is used: the pod's hood swings over, the radio's dial turns and its antenna rises, a
 patch of the puzzle is laid, a twig of the bonsai is trimmed, the sauna's door opens and the delivery hatch opens.
 
