@@ -1,6 +1,6 @@
 # Energetic pack — notes
 
-`pack_energetic.py` builds the seven P4 energetic models into `web/public/assets/models/pack_energetic/` and their
+`crates/art/packs/src/pack_energetic` builds the seven P4 energetic models into `web/public/assets/models/pack_energetic/` and their
 entries in `packs/pack_energetic/manifest.json`, an override pack listed in the base manifest. Built
 2026-10-14; they sat in Validate › Energetic until checked in play.
 
