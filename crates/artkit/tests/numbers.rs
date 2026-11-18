@@ -237,15 +237,11 @@ fn vectors_and_matrices_are_mathutils_to_the_bit() {
         .map(|(k, (n, bad, far))| format!("{k}: {bad}/{n} off, by up to {far}"))
         .collect();
     println!("{}", report.join("\n"));
-    // A turn between two directions and a tracking turn go through the C library's single-precision arcsine and
-    // arctangent, which are Apple's in the goldens and the rounded double's or musl's here: now and then a unit
-    // or two apart (an arcsine of over a half, the angle of these wide turns, is Apple's for 24 singles in 25).
-    let (rot, track) = (seen["rotdiff"], seen["trackzy"]);
-    assert!(rot.1 * 25 <= rot.0 && rot.2 <= 2, "rotdiff: {rot:?}");
-    assert!(track.1 * 8 <= track.0, "trackzy: {track:?}");
+    // (A turn between two directions and a tracking turn go through the C library's single-precision arc sine,
+    // arc cosine and arc tangent, which are Apple's in the goldens and transcribed from it here.)
     let bad: Vec<&String> = seen
         .iter()
-        .filter(|(k, e)| e.1 > 0 && !["rotdiff", "trackzy"].contains(&k.as_str()))
+        .filter(|(_, e)| e.1 > 0)
         .map(|(k, _)| k)
         .collect();
     assert!(
