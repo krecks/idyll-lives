@@ -2,7 +2,7 @@
 
 use super::common::{_hex, _petals, _scalloped};
 use super::{F, M};
-use crate::songbird;
+use artkit::kit;
 use artkit::math::{PI, TAU, cos, cosd, p3, radians, sin, sind};
 use artkit::motion::{Squash, squash};
 use artkit::parts::{join, join_all, new_parts, settle};
@@ -110,8 +110,8 @@ pub fn birdbath() -> Vec<Obj> {
         minor_segments = 3
     );
     // a robin on the rim at the back, turned in to drink
-    songbird!(
-        &F,
+    kit::songbird!(
+        F,
         "robin",
         0.24,
         0.832,
@@ -119,7 +119,7 @@ pub fn birdbath() -> Vec<Obj> {
         M.bird_brown,
         M.bird_breast,
         M.beak,
-        eye = M.eye,
+        M.eye,
         turn = -47,
         head = 35
     );

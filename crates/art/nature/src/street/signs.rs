@@ -1,10 +1,11 @@
 //! The street-name sign and the taxi rank's sign.
 
-use super::common::{_band, _box, _lettering, _post, chequer, taxi_word};
+use super::common::{_band, _box, _lettering, _post};
 use super::{F, M};
 use artkit::far::{is_low, low};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
+use artkit::kit::{Chequer, TaxiWord, chequer, taxi_word};
 use artkit::parts::{Settle, join_all, settle_all, settle_with};
 use artkit::place::Facing;
 use artkit::rand::Random;
@@ -105,17 +106,17 @@ pub fn taxi_sign() -> Vec<Obj> {
             let side = face as f64;
             taxi_word(
                 &F,
-                &format!("word{face}"),
-                (0.0, 2.475),
+                format!("word{face}"),
+                (0, 2.475),
                 0.095,
                 side * 0.038,
                 face,
                 M.black,
-                0.004,
+                TaxiWord::default(),
             );
             chequer(
                 &F,
-                &format!("check{face}"),
+                format!("check{face}"),
                 -0.21,
                 0.21,
                 2.385,
@@ -123,8 +124,7 @@ pub fn taxi_sign() -> Vec<Obj> {
                 0.03,
                 face,
                 M.black,
-                2,
-                0.003,
+                Chequer::default(),
             );
         }
     } else {
@@ -196,12 +196,12 @@ pub fn taxi_sign() -> Vec<Obj> {
         taxi_word(
             &F,
             "header_word",
-            (0.0, 1.66),
+            (0, 1.66),
             0.035,
             0.062,
             1,
             M.black,
-            0.004,
+            TaxiWord::default(),
         );
         for k in 0..9 {
             let w = if k % 4 != 3 {

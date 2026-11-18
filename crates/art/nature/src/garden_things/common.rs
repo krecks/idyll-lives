@@ -2,14 +2,12 @@
 
 use artkit::json::{self, Json};
 use artkit::materials::Mat;
-use artkit::math::{V3, cosd, pow, sind};
+use artkit::math::{V3, cosd, sind};
 use artkit::mesh::Mesh;
 use artkit::palette;
 use artkit::place::GameFrame;
-use artkit::py;
 use artkit::rand::Random;
 use artkit::scene::{self, Obj};
-use artkit::shapes::{SHARP, shade};
 use artkit::{fsphere, rod};
 use std::cell::Cell;
 use std::sync::OnceLock;
@@ -312,89 +310,9 @@ pub fn _bird(x: f64, y: f64, z: f64, body: Mat, breast: Mat, turn: f64) {
     );
 }
 
-/// Where a moulding's outline is drawn (`moulding`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Run {
-    /// Game (x, height) points at depth `at`.
-    Front,
-    /// Game (x, depth) points at height `at`.
-    Top,
-}
-
-// KIT: kit.moulding
-/// A moulding run round a closed `outline` with mitred corners: a picture or mirror frame, a panel's bead, a
-/// plinth's or a cornice's band. `outline` is game (x, height) points drawn at depth `at` (`Run::Front`), or
-/// (x, depth) points at height `at` (`Run::Top`); `profile` is the moulding's closed cross-section
-/// [(inset, out), ...]: `inset` metres in from the outline, `out` metres forward of `at` (front) or up from it
-/// (top). The corners stay square however wide the profile (a sweep pinches them).
-#[allow(clippy::too_many_arguments)]
-pub fn moulding(
-    frame: &GameFrame,
-    name: &str,
-    outline: &[(f64, f64)],
-    profile: &[(f64, f64)],
-    material: Mat,
-    at: f64,
-    plane: Run,
-    angle: Option<f64>,
-) -> Obj {
-    let n = outline.len();
-    let area =
-        py::sum((0..n).map(|i| {
-            outline[i].0 * outline[(i + 1) % n].1 - outline[(i + 1) % n].0 * outline[i].1
-        }));
-    let turn = if area > 0.0 { 1.0 } else { -1.0 }; // inward is to the left of an anticlockwise outline
-    let inward = |a: (f64, f64), b: (f64, f64)| {
-        let (dx, dy) = (b.0 - a.0, b.1 - a.1);
-        let mut length = pow(dx * dx + dy * dy, 0.5);
-        if length == 0.0 {
-            length = 1.0;
-        }
-        (-dy / length * turn, dx / length * turn)
-    };
-    let (mut vs, mut faces): (Vec<V3>, Vec<Vec<u32>>) = (Vec::new(), Vec::new());
-    let m = profile.len();
-    for i in 0..n {
-        let p = outline[i];
-        let (n0, n1) = (
-            inward(outline[(i + n - 1) % n], p),
-            inward(p, outline[(i + 1) % n]),
-        );
-        let k = 1.0 + n0.0 * n1.0 + n0.1 * n1.1;
-        let (mx, my) = ((n0.0 + n1.0) / k, (n0.1 + n1.1) / k);
-        for &(inset, out) in profile {
-            let (u, v) = (p.0 + inset * mx, p.1 + inset * my);
-            vs.push(
-                match plane {
-                    Run::Front => frame.at(u, v, at + out),
-                    Run::Top => frame.at(u, at + out, v),
-                }
-                .into(),
-            );
-        }
-    }
-    for i in 0..n {
-        let (a, b) = (i * m, ((i + 1) % n) * m);
-        for j in 0..m {
-            let j2 = (j + 1) % m;
-            faces.push(vec![
-                (a + j) as u32,
-                (a + j2) as u32,
-                (b + j2) as u32,
-                (b + j) as u32,
-            ]);
-        }
-    }
-    let mut mesh = Mesh::from_pydata(vs, &faces);
-    mesh.set_material(Some(material));
-    mesh.recalc_normals();
-    shade(scene::add(name, mesh), true, angle.unwrap_or(SHARP))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use artkit::parts::measure;
 
     #[test]
     fn a_float_seeds_as_cpython_seeds_from_it() {
@@ -422,37 +340,5 @@ mod tests {
         }
         _near_light("lampPost", 2.3);
         _near_light("stringLights", 2.0);
-    }
-
-    #[test]
-    fn a_moulding_keeps_its_width_round_a_mitred_corner() {
-        scene::reset();
-        let rail = [(0.5, -0.3), (0.5, 0.3), (-0.5, 0.3), (-0.5, -0.3)];
-        let section = [(0.0, 0.0), (0.0, 0.03), (0.07, 0.03), (0.07, 0.0)];
-        let rim = moulding(
-            &F,
-            "rim",
-            &rail,
-            &section,
-            SPEC.box_trim,
-            0.44,
-            Run::Top,
-            None,
-        );
-        let (lo, hi) = measure(&[rim]);
-        // the outline's own size outside, 3 cm up from its height
-        assert!((hi[0] - lo[0] - 1.0).abs() < 1e-6 && (hi[1] - lo[1] - 0.6).abs() < 1e-6);
-        assert!((lo[2] - 0.44).abs() < 1e-6 && (hi[2] - 0.47).abs() < 1e-6);
-        rim.read(|o| {
-            assert_eq!((o.mesh.verts.len(), o.mesh.faces.len()), (16, 16));
-            // the inner corners are 7 cm in along both sides
-            let inner = o
-                .mesh
-                .verts
-                .iter()
-                .map(|v| v.x.abs())
-                .fold(f32::MAX, f32::min);
-            assert!((inner - 0.43).abs() < 1e-6);
-        });
     }
 }
