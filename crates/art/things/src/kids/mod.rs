@@ -1,4 +1,4 @@
-//! The kids' things. Notes: tools/art/blender/families/kids.md.
+//! The kids' things. Notes: NOTES.md.
 //!
 //! KD1 baby and kids' beds: the crib with its changing table (`model.crib`), the kids' bed (`model.kidsBed`), the race
 //!   car bed (`model.kidsBedCar`) and the high chair (`model.highChair`).
@@ -16,9 +16,6 @@
 //! shaped boards (the car's sides, arched headboards and ends, the doll house's windows, the toy box's lid) extruded
 //! outlines with their cut-outs, turned parts revolved, round bodies (the horse, the teddy, the bean bag, the tent's
 //! canvas) lofted.
-//!
-//! Being ported: `--out` and `--check` build what is here; `cargo art kids` builds the family in Blender until
-//! tools/art/blender/families/kids.py goes.
 
 use artkit::family::{Family, Model};
 use artkit::json;
@@ -34,7 +31,6 @@ mod desk;
 mod doll;
 mod easels;
 mod horse;
-mod kit;
 mod mat;
 mod pit;
 mod plush;
@@ -176,7 +172,7 @@ palette! { M:
 
 const F: GameFrame = GameFrame::new(0.0);
 
-/// The family, as far as it is built here.
+/// The family.
 pub fn family() -> Option<Family> {
     let turn_down = || json!({"uses": {"sleep": "turn_down", "nap": "turn_down"}});
     // open while the child plays (the toys are out), shut when they're done
@@ -290,9 +286,9 @@ pub fn family() -> Option<Family> {
                 .motions(json!({"uses": {"paint": "painting"}}))
                 .paint(&[("easel", "Easel")]),
         ],
-        "Blender-built kids' things (tools/art/blender/families/kids.py): the crib, the beds and the \
+        "The kids' things (crates/art/things/src/kids, built by cargo art): the crib, the beds and the \
          high chair, the toys, and the kids' study and art things. Listed in the base manifest's \
          packs. The materials map onto the game's finishes so a model costs one draw call per finish \
          group.",
-    ))
+    ).switched())
 }

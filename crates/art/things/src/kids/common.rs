@@ -1,5 +1,4 @@
-//! What the kids' things are built from: the helpers kids.py shared between its models, and the kit's parts it
-//! used (marked `KIT:` until the kernel has them).
+//! What the kids' things are built from: the helpers kids.py shared between its models.
 
 use super::{F, M};
 use artkit::forms::{Extrude, rounded_rect};

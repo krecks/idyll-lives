@@ -375,7 +375,7 @@ pub fn toy_chest() -> Vec<Obj> {
             bevel = 0.003,
             bevel_segments = 1
         );
-        let pts = super::kit::fillet(
+        let pts = artkit::kit::fillet(
             &[
                 (sf * 0.41, 0.4, z - 0.045),
                 (sf * 0.416, 0.355, z - 0.045),

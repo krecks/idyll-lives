@@ -1,10 +1,10 @@
 //! KD1: the kids' bed and the race car bed.
 
 use super::common::{P, mattress, moon, soft_pillow, star, teddy, turn_down, turned};
-use super::kit::fillet;
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
+use artkit::kit::fillet;
 use artkit::materials::Mat;
 use artkit::math::{PI, TAU, cos, radians, sin};
 use artkit::place::Facing;

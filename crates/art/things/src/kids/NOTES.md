@@ -1,23 +1,23 @@
 # Kids — notes
 
-`kids.py` builds the twenty kids' things into `web/public/assets/models/kids/` and their entries
+This module builds the twenty kids' things into `web/public/assets/models/kids/` and their entries
 in `packs/kids/manifest.json`. Built 2026-10-14; they sat in Validate › Baby And Beds, Toys and Kids
 Study until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its `Model`),
+Each is built where the game places it (`F`, game axes; `common::place`, which settles it without centring, and `centre` on its `Model`),
 so the baby, the sleepers and the sitters land where the game puts them: the crib's mattress at 0.56 m
 (`BEDS.crib`), the kids' bed's at 0.44 (`BEDS.kidsBed`), the car bed's at the default 0.5, the rocking horse's
 saddle at 0.56 (`SEATS.rockingHorse`), the desk chair's seat at 0.365 (`SEATS.kidsDesk`), the kids' chair's at 0.31
 and the bean bag's at 0.24 (content `seat`), the kids' table's top at 0.5 (`TOPS`).
 
 Flat things on a slope (the tent's door and flap, the flags, the chalk drawing, the painting, the picture books)
-are `_slab`s: an outline on a face's frame (`_plane`, `_board`), a few millimetres thick.
+are `slab`s: an outline on a face's frame (`plane`, `board`), a few millimetres thick.
 
 **Detail pass (2026-10-22)**, with the forms and the kit, every model's size, centre, parts, clips, draws and heights
 kept: mattresses, pillows, duvets and cushions are soft boxes (piped, puffed, the covers rumpled), frames and rails
 swept in one piece (`kit.fillet` for bent tube), shaped boards extruded with their cut-outs, turned parts revolved,
 round bodies lofted. Small soft boxes take `round_segments=1` (a default one is about 300 triangles). The bean bag's
-creases move its vertices up and down only (`_rumple`): `G.jitter` sideways moved its bounds by 3 mm between a
+creases move its vertices up and down only (`rumple`): `jitter` sideways moved its bounds by 3 mm between a
 `--only` build and a family build, and the centre check allows 2 mm.
 
 ## KD1: the crib, the beds and the high chair
@@ -70,9 +70,9 @@ town at its left. Its track is a circle (the old part's is an oval), so the trai
 - **Picture-book shelf** (against the wall): three sloped tiers of face-out books; the middle one tips out 20°
   (`book_out`) for read.
 - **Chalkboard easel**: a sun drawn already; a house in the grass draws itself from left to right (`drawing`,
-  `_draw_on`) for draw.
+  `draw_on`) for draw.
 - **Kids' easel**: a painting (sky, sun, a flower, grass) paints itself on from the left (`painting`) for paint.
-- Both pictures grow along x from their left edge (`_draw_on`); at rest they're a speck at that edge, their
+- Both pictures grow along x from their left edge (`draw_on`); at rest they're a speck at that edge, their
   height and depth coming back in the clip's first frames. Squeezed along x only (until 2026-10-16) they
   showed as a hairline of colours down the board.
 
@@ -105,7 +105,7 @@ chair's (a seat at x -0.25, where the chair has none). The toy box and the chest
 now (2026-10-14), as the models at rest. The doll house stood 5 cm off the wall and the picture-book shelf 3 cm
 into it; all stand on the wall face now. The crib, the two beds, the ball pit and the play mat reached 3–7 cm into
 the wall; their backs are on the face now (2026-10-15). The pit
-and the mat stand 3–3.5 cm forward of the middle (`_place(forward=)`; the pit's rim 1 cm smaller, so its front
+and the mat stand 3–3.5 cm forward of the middle (`place(forward)`; the pit's rim 1 cm smaller, so its front
 stays on the tile); the crib is built in place, its back on the wall's face. The beds' mattresses stay where the game lays children: the kids'
 bed's headboard is 4 cm thick (was 6), the car's tail and spoiler are shorter from the back. The play tent stands free, centred. Khronos validator: 0 errors, 0 warnings each.
 
@@ -121,4 +121,4 @@ cargo art kids --preview  # previews/kids/<id>.png, <id>@<clip>.png
 
 ## The soft forms pass (2026-11-13)
 
-The beds' duvets are rumpled by the form as the bedroom's are (2.5 cm folds 24 cm apart, a 5 cm roll over the mattress's edge, a square hem; the family's own `_rumple` is the bean bag's only now), their pillows a third box and two thirds puff with pinched corners, their mattresses unpinched and `resting`. Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 6 models changed shape: `crib`, `highChair`, `kidsBed`, `kidsBedCar`, `playTent`, `rockingHorse`; 29,104 to 29,770 triangles.
+The beds' duvets are rumpled by the form as the bedroom's are (2.5 cm folds 24 cm apart, a 5 cm roll over the mattress's edge, a square hem; the family's own `rumple` is the bean bag's only now), their pillows a third box and two thirds puff with pinched corners, their mattresses unpinched and `resting`. Besides, its soft boxes take the shared form's new shape (the soft form: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 6 models changed shape: `crib`, `highChair`, `kidsBed`, `kidsBedCar`, `playTent`, `rockingHorse`; 29,104 to 29,770 triangles.
