@@ -64,6 +64,151 @@ impl Coord for i32 {
     }
 }
 
+/// A number as a script wrote it, held as Python held it: whole (`N::I`) or not (`N::F`). Where the numbers of one
+/// place in a list are whole in some rows and floats in others (the points of a tube, the rows of a table of
+/// parts), a tuple of `i32` or of `f64` cannot say which: this can, and a whole zero still negates to a plain zero
+/// (`Coord`). It goes wherever a number of either kind does: a game position (`F.at`, `fbox!`'s `at`, a point of
+/// `fsweep!` or `kit::tube!`), a point in Blender's axes (`at = ..`, a corner of `kit::fillet!`), a size or a
+/// radius, a key. Its sums are Python's (whole with whole stays whole, `/` is always a float), and it is written as
+/// Python writes it (`0`, `0.0`, `-1.6`), so a part's name made from it is the script's.
+///
+///   let rows = [(N::I(0), N::F(0.47)), (N::F(0.47), N::I(0))];   // or points![(0, 0.47), (0.47, 0)]
+///   fbox!(F, format!("bar{x}"), 0.6, 0.012, 0.012, (x, 1.0, z), M.steel);
+#[derive(Clone, Copy, Debug)]
+pub enum N {
+    I(i32),
+    F(f64),
+}
+
+impl N {
+    /// Whether the script wrote a whole number.
+    pub fn is_whole(self) -> bool {
+        matches!(self, N::I(_))
+    }
+}
+
+impl Coord for N {
+    fn f(self) -> f64 {
+        match self {
+            N::I(i) => i as f64,
+            N::F(x) => x,
+        }
+    }
+    fn negated(self) -> f64 {
+        match self {
+            N::I(i) => i.negated(),
+            N::F(x) => -x,
+        }
+    }
+}
+
+impl crate::math::Num for N {
+    fn f(self) -> f64 {
+        Coord::f(self)
+    }
+}
+
+impl From<i32> for N {
+    fn from(i: i32) -> N {
+        N::I(i)
+    }
+}
+impl From<f64> for N {
+    fn from(x: f64) -> N {
+        N::F(x)
+    }
+}
+
+impl crate::Arg<f64> for N {
+    fn arg(self) -> f64 {
+        Coord::f(self)
+    }
+}
+impl crate::Arg<Option<f64>> for N {
+    fn arg(self) -> Option<f64> {
+        Some(Coord::f(self))
+    }
+}
+
+/// As Python's `str` and an f-string write it: `0` whole, `0.0` and `-1.6` not.
+impl std::fmt::Display for N {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            N::I(i) => write!(f, "{i}"),
+            N::F(x) => write!(f, "{}", crate::json::float_repr(*x)),
+        }
+    }
+}
+
+/// Python's `==`: by value, so a whole 2 is a float 2.0 (`is_whole` tells them apart).
+impl PartialEq for N {
+    fn eq(&self, o: &N) -> bool {
+        match (*self, *o) {
+            (N::I(a), N::I(b)) => a == b,
+            (a, b) => Coord::f(a) == Coord::f(b),
+        }
+    }
+}
+impl PartialOrd for N {
+    fn partial_cmp(&self, o: &N) -> Option<std::cmp::Ordering> {
+        match (*self, *o) {
+            (N::I(a), N::I(b)) => a.partial_cmp(&b),
+            (a, b) => Coord::f(a).partial_cmp(&Coord::f(b)),
+        }
+    }
+}
+
+/// `-n`: a whole zero stays a plain zero, a float zero turns negative.
+impl std::ops::Neg for N {
+    type Output = N;
+    fn neg(self) -> N {
+        match self {
+            N::I(i) => N::I(-i),
+            N::F(x) => N::F(-x),
+        }
+    }
+}
+
+// (Python's `+`, `-` and `*`: whole with whole stays whole, anything else is a float; with a bare `i32` or `f64`
+// on the right as with an `N`)
+macro_rules! n_op {
+    ($op:ident, $method:ident) => {
+        impl<R: Into<N>> std::ops::$op<R> for N {
+            type Output = N;
+            fn $method(self, o: R) -> N {
+                match (self, o.into()) {
+                    (N::I(a), N::I(b)) => N::I(std::ops::$op::$method(a, b)),
+                    (a, b) => N::F(std::ops::$op::$method(Coord::f(a), Coord::f(b))),
+                }
+            }
+        }
+    };
+}
+n_op!(Add, add);
+n_op!(Sub, sub);
+n_op!(Mul, mul);
+
+/// Python's `/`: a float, whatever it divides.
+impl<R: Into<N>> std::ops::Div<R> for N {
+    type Output = N;
+    fn div(self, o: R) -> N {
+        N::F(Coord::f(self) / Coord::f(o.into()))
+    }
+}
+
+/// A list of points as a script wrote them, each number whole or not as it stands: `points![(0, 0.2, 0.0), (0.3,
+/// 0.9, 0)]` is `[(N, N, N); 2]`, a whole number an `N::I` and a float an `N::F` (two numbers a point, or three:
+/// one kind a list).
+#[macro_export]
+macro_rules! points {
+    ($(($a:expr, $b:expr)),* $(,)?) => {
+        [$(($crate::place::N::from($a), $crate::place::N::from($b))),*]
+    };
+    ($(($a:expr, $b:expr, $c:expr)),* $(,)?) => {
+        [$(($crate::place::N::from($a), $crate::place::N::from($b), $crate::place::N::from($c))),*]
+    };
+}
+
 /// A game position as a script wrote one: (x, height, depth), each whole or not.
 pub trait Spot: Copy {
     fn through(self, frame: &GameFrame) -> P3;

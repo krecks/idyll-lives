@@ -92,6 +92,14 @@ impl Mat {
         }
     }
 
+    /// Under another name than its field in `palette!`: a name the language keeps for itself (`crate`, `box`,
+    /// `type`, `move`) is written `crate_ = ("#A87547", wood, named("crate"))`. The material is `M.crate_`; in the
+    /// file, the pack and the palette it is `crate`.
+    pub const fn named(mut self, name: &'static str) -> Mat {
+        self.name = name;
+        self
+    }
+
     /// Mirror glass, reflecting to `side`.
     pub const fn mirror(mut self, side: Mirror) -> Mat {
         self.extra.mirror = Some(side);
@@ -282,6 +290,7 @@ impl Palette {
 
 /// A family's palette as a value with a field a colour: `palette! { M: body = ("#F3F3F1", gloss) }` makes `M`,
 /// and `M.body` is that material. `M.palette()` is the list the family is given.
+/// A material is named as its field, or as its `named(..)` says where the field cannot be the name.
 #[macro_export]
 macro_rules! palette {
     ($name:ident : $($field:ident = ($hex:expr, $finish:ident $(, $more:ident ( $($arg:expr),* ))* )),+ $(,)?) => {
@@ -324,6 +333,44 @@ mod tests {
         assert_eq!(
             (q.get("body").colour, q.get("body").finish),
             ([0x10, 0x20, 0x30], "gloss")
+        );
+    }
+
+    palette! { K:
+        body = ("#C49A6C", wood),
+        crate_ = ("#A87547", wood, named("crate")), // (`crate`, `box`, `type` and `move` are Rust's)
+        box_ = ("#C9B79C", matte, named("box")),
+        type_ = ("#2B2C2E", metal, named("type"), roughness(0.4)),
+        move_ = ("#F2E6CC", fabric, glow("#FFD9A0"), named("move")),
+        crate_dark = ("#7C5432", wood),
+    }
+
+    #[test]
+    fn a_material_whose_name_the_language_keeps_is_named_after_its_finish() {
+        assert_eq!(
+            (K.crate_.name, K.box_.name, K.type_.name, K.move_.name),
+            ("crate", "box", "type", "move")
+        );
+        // as the others in every other way
+        assert_eq!(K.crate_, Mat::new("crate", "#A87547", "wood"));
+        assert_eq!(K.type_.extra.roughness, Some(0.4));
+        assert_eq!(K.move_.extra.glow, Some([0xFF, 0xD9, 0xA0]));
+        // in the palette under its name, in its place
+        let p = K.palette();
+        let names: Vec<&str> = p.colours.iter().map(|m| m.name).collect();
+        assert_eq!(
+            names,
+            ["body", "crate", "box", "type", "move", "crate_dark"]
+        );
+        assert!(p.has("crate") && !p.has("crate_") && p.get("box") == K.box_);
+        assert_eq!(
+            p.finishes(&["crate", "move", "body"]).unwrap().dumps(),
+            r##"{"body": {"finish": "material.finish.wood"}, "crate": {"finish": "material.finish.wood"}, "move": {"finish": "material.finish.fabric", "glow": "#FFD9A0"}}"##
+        );
+        assert!(p.finishes(&["crate_"]).is_err());
+        assert_eq!(
+            p.recoloured(&[("crate", "#102030")]).get("crate").colour,
+            [0x10, 0x20, 0x30]
         );
     }
 
