@@ -148,10 +148,10 @@ describe("the cut edge in the game's picture", () => {
 });
 
 describe("the haze's shaders", () => {
-  test('both languages take the veil in, in the fragment shader alone', () => {
+  test('both languages take the veil in, in the fragment shader alone, to the sky behind', () => {
     const engine = {
-      glsl: '#ifdef VERTEXSHADER\n#else\nfloat depth = gl_FragCoord.z / gl_FragCoord.w;\n#endif\nfogFactor = exp(-depth * depth * fog_density * fog_density);\n',
-      wgsl: '#ifdef VERTEXSHADER\n#else\nlet depth = pcPosition.z / pcPosition.w;\n#endif\nreturn evaluateFogFactorExp2(depth, uniform.fog_density);\n',
+      glsl: '#ifdef VERTEXSHADER\n#else\nfloat depth = gl_FragCoord.z / gl_FragCoord.w;\n#endif\nfogFactor = exp(-depth * depth * fog_density * fog_density);\nreturn mix(fog_color * dBlendModeFogFactor, color, getFogFactor());\n',
+      wgsl: '#ifdef VERTEXSHADER\n#else\nlet depth = pcPosition.z / pcPosition.w;\n#endif\nreturn evaluateFogFactorExp2(depth, uniform.fog_density);\nreturn mix(uniform.fog_color * dBlendModeFogFactor, color, getFogFactor());\n',
     };
     const once = (code: string, _name: string, anchor: string, replacement: string) => {
       expect(code.split(anchor).length).toBe(2);
@@ -161,11 +161,19 @@ describe("the haze's shaders", () => {
     expect(glsl).toContain('uniform vec4 game_landVeil;');
     expect(glsl).toContain('uniform vec4 game_veilFade;');
     expect(glsl).toContain('smoothstep(0.0, game_veilFade.z, distance(vPositionW, view_position))');
-    expect(glsl).toMatch(/#ifndef VERTEXSHADER\s+fogFactor \*= 1\.0 - game_veilFade\.y \* smoothstep\(0\.0, game_veilFade\.x/);
+    expect(glsl).toMatch(/#ifndef VERTEXSHADER\s+gameVeil = game_veilFade\.y \* smoothstep\(0\.0, game_veilFade\.x/);
+    // (Without a veil the haze's colour as ever, nothing of the sky read; with it, the sky's dome behind.)
+    expect(glsl).toContain('if (gameVeil > 0.0) gameHazed = mix(gameHazed, gameSkyAt(normalize(vPositionW - view_position)) * dBlendModeFogFactor, gameVeil);');
+    expect(glsl).toMatch(/#ifndef VERTEXSHADER\s+float gameVeil = 0\.0;\s+uniform vec3 game_skyLow;/);
+    // (No texture: a ground's program on WebGL2 reads its 16 already.)
+    expect(glsl).not.toContain('sampler');
     const wgsl = gameFog(engine.wgsl, 'wgsl', once);
     expect(wgsl).toContain('uniform game_landVeil: vec4f;');
     expect(wgsl).toContain('uniform game_veilFade: vec4f;');
     expect(wgsl).toContain('smoothstep(0.0, uniform.game_veilFade.z, distance(vPositionW, uniform.view_position))');
-    expect(wgsl).toMatch(/#ifdef VERTEXSHADER[\s\S]*#else\s+let veilOut = length\(max\(abs\(vPositionW\.xz - uniform\.game_landVeil\.xy\)/);
+    expect(wgsl).toMatch(/#ifndef VERTEXSHADER\s+let veilOut = length\(max\(abs\(vPositionW\.xz - uniform\.game_landVeil\.xy\)/);
+    expect(wgsl).toContain('if (gameVeil > 0.0) { gameHazed = mix(gameHazed, gameSkyAt(normalize(vPositionW - uniform.view_position)) * dBlendModeFogFactor, gameVeil); }');
+    expect(wgsl).toContain('uniform game_skySun: vec3f;');
+    expect(wgsl).not.toContain('texture');
   });
 });
