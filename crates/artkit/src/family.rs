@@ -61,6 +61,9 @@ pub struct Model {
     pub ground: Option<bool>,
     /// The gate's strict checks this model is right to fail: (check, why).
     pub accept: Vec<(&'static str, &'static str)>,
+    /// Its own palette, for a family whose models' colours differ in finish (each garden thing's `body`: a stone
+    /// pond, a wooden planter, an iron post): its pack entry's `materials` come from it, not from the family's.
+    pub palette: Option<Palette>,
 }
 
 impl Model {
@@ -84,6 +87,7 @@ impl Model {
             draws: None,
             ground: None,
             accept: Vec::new(),
+            palette: None,
         }
     }
 
@@ -164,6 +168,13 @@ impl Model {
         self
     }
 
+    /// With a palette of its own (the scripts' `_own(id)` / `_palette(body=...)`): the pack's `materials` for
+    /// this model are read from it.
+    pub fn palette(mut self, palette: Palette) -> Model {
+        self.palette = Some(palette);
+        self
+    }
+
     /// Whether the floor shades the foot of it.
     pub fn on_ground(&self) -> bool {
         self.ground.unwrap_or(self.floor && self.bird.is_none())
@@ -184,6 +195,11 @@ pub struct Family {
 }
 
 impl Family {
+    /// The palette `model`'s materials are named in: its own, or the family's.
+    pub fn palette_of<'a>(&'a self, model: &'a Model) -> &'a Palette {
+        model.palette.as_ref().unwrap_or(&self.palette)
+    }
+
     pub fn new(
         name: &'static str,
         palette: Palette,
@@ -318,7 +334,10 @@ pub fn build_model(family: &Family, model: &Model) -> Result<Output, String> {
     let url = format!("../../models/{}/{}.glb", family.name, model.id);
     let mut entry = Json::Obj(vec![
         ("url".into(), Json::Str(url)),
-        ("materials".into(), family.palette.finishes(&used)?),
+        (
+            "materials".into(),
+            family.palette_of(model).finishes(&used)?,
+        ),
     ]);
     if let Some(motions) = &model.motions {
         entry.set("motions", motions.clone());
@@ -392,7 +411,7 @@ pub fn build_model(family: &Family, model: &Model) -> Result<Output, String> {
         // The far version's own materials too (a tree's lumps on `foliage`, its cards on `leafcards`).
         let mut all = used.clone();
         all.extend(glb::materials_used(&far_objs));
-        entry.set("materials", family.palette.finishes(&all)?);
+        entry.set("materials", family.palette_of(model).finishes(&all)?);
         scene::log(format!(
             "[gamekit] built its far version -> models/{}/{}.far.glb",
             family.name, model.id
