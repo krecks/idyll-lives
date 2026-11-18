@@ -138,7 +138,7 @@ bathes, and drains after.
 
 The bookworm pack models (`models/pack_bookworm/readingNook.glb`, `libraryWall.glb`, `writingBureau.glb`,
 `teaTrolley.glb`, `firesideLounge.glb`, `bedsideStack.glb`, override pack `packs/pack_bookworm/manifest.json`) are
-built in Blender by `tools/art/blender/families/pack_bookworm.py` on `gamekit` and exported as `.glb` (glTF,
+built by `crates/art/packs/src/pack_bookworm` on `artkit` and exported as `.glb` (glTF,
 original, CC0). Each moves one part while it is used: the nook's cushion sinks, the ladder rolls, the bureau's flap
 drops, the teapot pours, the fire grows and the top book opens.
 
