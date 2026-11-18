@@ -429,6 +429,12 @@ impl V3 {
         vec_to_quat(-self, 2, 1)
     }
 
+    /// `v.to_track_quat(track, up)`: the turn that points the `track` axis along `v`, the `up` axis kept up
+    /// (`'X', 'Z'`: a chain's links along the chain).
+    pub fn to_track_quat(self, track: Axis, up: Axis) -> Quat {
+        vec_to_quat(-self, track.index(), up.index())
+    }
+
     /// `a.angle(b)`, radians.
     pub fn angle(self, o: V3) -> f64 {
         let f = |a: f32, b: f32| a as f64 * b as f64;
@@ -704,6 +710,40 @@ impl Quat {
         [self.w, self.x, self.y, self.z]
     }
 
+    /// `Quaternion(axis, angle)`: a turn of `angle` radians about `axis` (of any length; none for no axis).
+    pub fn from_axis_angle(axis: impl Into<V3>, angle: f64) -> Quat {
+        let (unit, len) = normalize_v3(axis.into());
+        if len == 0.0 {
+            return Quat::IDENTITY;
+        }
+        axis_angle_normalized_to_quat(unit, angle_wrap(angle as f32))
+    }
+
+    /// The quaternion at unit length, as Blender takes an object's before it turns it (`normalize_qt`).
+    pub fn normalized(self) -> Quat {
+        let len = (self.w * self.w + self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
+        if len == 0.0 {
+            return Quat {
+                w: 0.0,
+                x: 1.0,
+                y: 0.0,
+                z: 0.0,
+            };
+        }
+        let k = 1.0 / len;
+        Quat {
+            w: self.w * k,
+            x: self.x * k,
+            y: self.y * k,
+            z: self.z * k,
+        }
+    }
+
+    /// The turn as Euler angles in `order`, radians (`quat_to_eulO`).
+    pub fn to_euler(self, order: EulerOrder) -> V3 {
+        mat3_normalized_to_eul(&self.to_matrix(), order)
+    }
+
     /// `q.to_matrix()`.
     pub fn to_matrix(self) -> M3 {
         let s = std::f64::consts::SQRT_2;
@@ -751,6 +791,123 @@ impl Mul<V3> for Quat {
         let z = t0 * -q.z + r2 * q.w - r0 * q.y + r1 * q.x;
         V3::new(t1, t2, z)
     }
+}
+
+/// `a @ b`: the turn `b`, then `a`.
+impl Mul<Quat> for Quat {
+    type Output = Quat;
+    fn mul(self, o: Quat) -> Quat {
+        mul_qt_qtqt(self, o)
+    }
+}
+
+/// The order an object's Euler angles turn it in (its `rotation_mode`): 'XYZ' unless a script says otherwise.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum EulerOrder {
+    #[default]
+    XYZ,
+    XZY,
+    YXZ,
+    YZX,
+    ZXY,
+    ZYX,
+}
+
+impl EulerOrder {
+    /// The order's three axes and whether it is an odd one (Blender's `rotOrders`).
+    fn axes(self) -> ([usize; 3], bool) {
+        match self {
+            EulerOrder::XYZ => ([0, 1, 2], false),
+            EulerOrder::XZY => ([0, 2, 1], true),
+            EulerOrder::YXZ => ([1, 0, 2], true),
+            EulerOrder::YZX => ([1, 2, 0], false),
+            EulerOrder::ZXY => ([2, 0, 1], false),
+            EulerOrder::ZYX => ([2, 1, 0], true),
+        }
+    }
+}
+
+/// Euler angles in `order` (radians, as stored) as a turn's matrix (`eulO_to_mat3`).
+pub fn eul_to_mat3(e: V3, order: EulerOrder) -> M3 {
+    let ([i, j, k], odd) = order.axes();
+    let (ti, tj, th) = if odd {
+        (-e[i] as f64, -e[j] as f64, -e[k] as f64)
+    } else {
+        (e[i] as f64, e[j] as f64, e[k] as f64)
+    };
+    let (ci, cj, ch) = (cos(ti), cos(tj), cos(th));
+    let (si, sj, sh) = (sin(ti), sin(tj), sin(th));
+    let (cc, cs, sc, ss) = (ci * ch, ci * sh, si * ch, si * sh);
+    let mut m = [[0.0_f32; 3]; 3];
+    m[i][i] = (cj * ch) as f32;
+    m[j][i] = (sj * sc - cs) as f32;
+    m[k][i] = (sj * cc + ss) as f32;
+    m[i][j] = (cj * sh) as f32;
+    m[j][j] = (sj * ss + cc) as f32;
+    m[k][j] = (sj * cs - sc) as f32;
+    m[i][k] = (-sj) as f32;
+    m[j][k] = (cj * si) as f32;
+    m[k][k] = (cj * ci) as f32;
+    M3(m)
+}
+
+/// Euler angles in `order` as a quaternion (`eulO_to_quat`).
+pub fn eul_to_quat(e: V3, order: EulerOrder) -> Quat {
+    let ([i, j, k], odd) = order.axes();
+    let ti = e[i] as f64 * 0.5;
+    let tj = e[j] as f64 * if odd { -0.5 } else { 0.5 };
+    let th = e[k] as f64 * 0.5;
+    let (ci, cj, ch) = (cos(ti), cos(tj), cos(th));
+    let (si, sj, sh) = (sin(ti), sin(tj), sin(th));
+    let (cc, cs, sc, ss) = (ci * ch, ci * sh, si * ch, si * sh);
+    let mut a = [0.0_f64; 3];
+    a[i] = cj * sc - sj * cs;
+    a[j] = cj * ss + sj * cc;
+    a[k] = cj * cs - sj * sc;
+    let mut q = [
+        (cj * cc + sj * ss) as f32,
+        a[0] as f32,
+        a[1] as f32,
+        a[2] as f32,
+    ];
+    if odd {
+        q[j + 1] = -q[j + 1];
+    }
+    Quat {
+        w: q[0],
+        x: q[1],
+        y: q[2],
+        z: q[3],
+    }
+}
+
+/// A turn's matrix (its columns unit vectors) as Euler angles in `order`: the smaller of its two readings
+/// (`mat3_normalized_to_eulO`).
+pub fn mat3_normalized_to_eul(m: &M3, order: EulerOrder) -> V3 {
+    let ([i, j, k], odd) = order.axes();
+    let m = &m.0;
+    let cy = crate::py::hypot(m[i][i] as f64, m[i][j] as f64) as f32;
+    let (mut e1, mut e2) = ([0.0_f32; 3], [0.0_f32; 3]);
+    if cy > 0.0000375_f64 as f32 {
+        e1[i] = atan2f(m[j][k], m[k][k]);
+        e1[j] = atan2f(-m[i][k], cy);
+        e1[k] = atan2f(m[i][j], m[i][i]);
+        e2[i] = atan2f(-m[j][k], -m[k][k]);
+        e2[j] = atan2f(-m[i][k], -cy);
+        e2[k] = atan2f(-m[i][j], -m[i][i]);
+    } else {
+        e1[i] = atan2f(-m[k][j], m[j][j]);
+        e1[j] = atan2f(-m[i][k], cy);
+        e1[k] = 0.0;
+        e2 = e1;
+    }
+    if odd {
+        e1 = e1.map(|x| -x);
+        e2 = e2.map(|x| -x);
+    }
+    let d = |e: [f32; 3]| e[0].abs() + e[1].abs() + e[2].abs();
+    let e = if d(e1) > d(e2) { e2 } else { e1 };
+    V3::new(e[0], e[1], e[2])
 }
 
 /// `mathutils.Matrix` of 3 x 3, kept as Blender keeps it: `m.0[column][row]`.
@@ -1038,6 +1195,31 @@ pub fn object_matrix_of(loc: V3, rot: [f64; 3], scale: [f64; 3]) -> M4 {
         v3(radians(rot[0]), radians(rot[1]), radians(rot[2])),
         v3(scale[0], scale[1], scale[2]),
     )
+}
+
+/// An object's matrix from where it is, how it is turned (Euler angles in `order`, radians as stored) and its scale.
+pub fn object_matrix_in(loc: V3, rot: V3, order: EulerOrder, scale: V3) -> M4 {
+    if order == EulerOrder::XYZ {
+        return object_matrix(loc, rot, scale);
+    }
+    turned_matrix(loc, &eul_to_mat3(rot, order), scale)
+}
+
+/// An object's matrix from where it is, its turn as a quaternion (brought to unit length first, as Blender
+/// brings an object's) and its scale.
+pub fn object_matrix_quat(loc: V3, quat: Quat, scale: V3) -> M4 {
+    turned_matrix(loc, &quat.normalized().to_matrix(), scale)
+}
+
+fn turned_matrix(loc: V3, rmat: &M3, scale: V3) -> M4 {
+    let smat = M3([
+        [scale.x, 0.0, 0.0],
+        [0.0, scale.y, 0.0],
+        [0.0, 0.0, scale.z],
+    ]);
+    let mut m = mul_m3_m3m3(rmat, &smat).to_4x4();
+    m.0[3] = [loc.x, loc.y, loc.z, 1.0];
+    m
 }
 
 /// An object's matrix from where it is, how it is turned (Euler XYZ, radians as stored) and its scale.

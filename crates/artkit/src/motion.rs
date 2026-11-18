@@ -13,12 +13,12 @@
 //! acceleration (Blender's defaults), or one of its easings from a key to the next (`Ease`), all in single
 //! precision as Blender evaluates them.
 
-use crate::math::{self, Axis, M4, P3, PI, V3};
+use crate::math::{self, Axis, EulerOrder, M4, P3, PI, Quat, V3};
 use crate::py;
-use crate::scene::{self, FPS, Obj};
+use crate::scene::{self, FPS, Obj, RotationMode};
 use crate::shapes::options;
 
-/// What a channel keys: the part's place, its turn (Euler XYZ, radians) or its scale.
+/// What a channel keys: the part's place, its turn (Euler angles in the part's order, radians) or its scale.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Path {
     Location,
@@ -755,6 +755,12 @@ fn mark_peak(obj: Obj, clip: &str, frame: i32) -> Obj {
     obj
 }
 
+/// gamekit's `motion._peak`, which a script may call itself: marks where clip `clip` is most open, for its preview
+/// (default: its last key).
+pub fn peak(obj: Obj, clip: &str, frame: impl crate::math::Num) -> Obj {
+    mark_peak(obj, clip, py::round(frame.f()) as i32)
+}
+
 /// A scale: one number for every axis, or (x, y, z) Blender.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Factors(pub [f64; 3]);
@@ -786,6 +792,7 @@ options! {
 /// wall, a bed onto the floor).
 pub fn swing(obj: Obj, clip: &str, degrees: f64, o: Swing) -> Obj {
     let i = o.axis.index();
+    obj.set_rotation_mode(RotationMode::XYZ);
     let r = rest(obj, Path::Rotation, i);
     let keys = [
         (1, r),
@@ -867,6 +874,17 @@ pub fn squash(obj: Obj, clip: &str, scale: impl Into<Factors>, o: Squash) -> Obj
     mark_peak(obj, clip, if o.back { mid } else { end })
 }
 
+/// `motion::squash` with its options by name, as the family scripts wrote them: `squash!(obj, clip, scale, key = value, ...)`.
+#[macro_export]
+macro_rules! squash {
+    ($obj:expr, $clip:expr, $scale:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::motion::Squash::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::motion::squash($obj, $clip, $scale, o)
+    }};
+}
+
 options! {
     /// `stages`' options: `sink` is (picked, growing, planted), metres the part goes down into the soil at each.
     Stages { seconds: f64 = 1.5, sink: Option<(f64, f64, f64)> = None }
@@ -926,6 +944,17 @@ pub fn stages(
     obj
 }
 
+/// `motion::stages` with its options by name, as the family scripts wrote them: `stages!(obj, clip, picked = .., growing = .., planted = .., key = value, ...)`.
+#[macro_export]
+macro_rules! stages {
+    ($obj:expr, $clip:expr, picked = $picked:expr, growing = $growing:expr, planted = $planted:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::motion::Stages::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::motion::stages($obj, $clip, $picked, $growing, $planted, o)
+    }};
+}
+
 /// A part hidden at rest: a thousandth of its size, out of sight.
 pub const FLAT: f64 = 0.001;
 
@@ -956,6 +985,17 @@ pub fn grow(obj: Obj, clip: &str, o: Grow) -> Obj {
         Ease::Smooth,
         OVERSHOOT,
     )
+}
+
+/// `motion::grow` with its options by name, as the family scripts wrote them: `grow!(obj, clip, key = value, ...)`.
+#[macro_export]
+macro_rules! grow {
+    ($obj:expr, $clip:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::motion::Grow::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::motion::grow($obj, $clip, o)
+    }};
 }
 
 /// The frames that share `end` out among `n` parts, each its turn: from frame 1 to `end`.
@@ -1003,6 +1043,7 @@ options! {
 /// quarter turn with four blades, and loop.
 pub fn spin(obj: Obj, clip: &str, o: Spin) -> Obj {
     let i = o.axis.index();
+    obj.set_rotation_mode(RotationMode::XYZ);
     let r = rest(obj, Path::Rotation, i);
     let end = last_frame(o.seconds);
     key_channel(
@@ -1015,6 +1056,17 @@ pub fn spin(obj: Obj, clip: &str, o: Spin) -> Obj {
         OVERSHOOT,
     );
     mark_peak(obj, clip, py::round((1 + end) as f64 / 2.0) as i32)
+}
+
+/// `motion::spin` with its options by name, as the family scripts wrote them: `spin!(obj, clip, key = value, ...)`.
+#[macro_export]
+macro_rules! spin {
+    ($obj:expr, $clip:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::motion::Spin::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::motion::spin($obj, $clip, o)
+    }};
 }
 
 /// A clip `clip` moving `obj` by `offset` (Blender x, y, z, metres) at an even speed, as a loop, in `seconds`
@@ -1050,6 +1102,7 @@ options! {
 /// with, so it loops smoothly.
 pub fn rock(obj: Obj, clip: &str, degrees: f64, o: Rock) -> Obj {
     let i = o.axis.index();
+    obj.set_rotation_mode(RotationMode::XYZ);
     let r = rest(obj, Path::Rotation, i);
     let end = last_frame(o.seconds);
     let a = math::radians(degrees);
@@ -1063,6 +1116,17 @@ pub fn rock(obj: Obj, clip: &str, degrees: f64, o: Rock) -> Obj {
         .collect();
     key_channel(obj, clip, Path::Rotation, i, &keys, Ease::Linear, OVERSHOOT);
     mark_peak(obj, clip, py::round(1.0 + (end - 1) as f64 / 4.0) as i32)
+}
+
+/// `motion::rock` with its options by name, as the family scripts wrote them: `rock!(obj, clip, degrees, key = value, ...)`.
+#[macro_export]
+macro_rules! rock {
+    ($obj:expr, $clip:expr, $degrees:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::motion::Rock::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::motion::rock($obj, $clip, $crate::forms::num($degrees), o)
+    }};
 }
 
 /// A clip `clip` in which `objs` take turns: each in its share of `seconds` (1 by default) rises by `offset`
@@ -1113,6 +1177,7 @@ pub fn path(obj: Obj, clip: &str, keys: &[PathKey], linear: bool) -> Obj {
         frames.windows(2).all(|w| w[1] > w[0]),
         "path {clip:?}: keys a frame or more apart, in order"
     );
+    obj.set_rotation_mode(RotationMode::XYZ);
     let ease = if linear { Ease::Linear } else { Ease::Smooth };
     let at = |p: (f64, f64, f64), i: usize| [p.0, p.1, p.2][i];
     let mut moved = false;
@@ -1149,6 +1214,7 @@ options! {
 /// that moves and give both clips the same name.
 pub fn wobble(obj: Obj, clip: &str, degrees: f64, o: Wobble) -> Obj {
     let i = o.axis.index();
+    obj.set_rotation_mode(RotationMode::XYZ);
     let r = rest(obj, Path::Rotation, i);
     let (start, end) = (frame(o.delay), last_frame(o.delay + o.seconds));
     let a = math::radians(degrees);
@@ -1170,10 +1236,38 @@ pub fn wobble(obj: Obj, clip: &str, degrees: f64, o: Wobble) -> Obj {
     mark_peak(obj, clip, start + swing)
 }
 
+/// `motion::wobble` with its options by name, as the family scripts wrote them: `wobble!(obj, clip, degrees, key = value, ...)`.
+#[macro_export]
+macro_rules! wobble {
+    ($obj:expr, $clip:expr, $degrees:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::motion::Wobble::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::motion::wobble($obj, $clip, $crate::forms::num($degrees), o)
+    }};
+}
+
+/// A point of `keys`: (seconds, value), eased as Blender eases by default, or (seconds, value, the ease from that
+/// key to the next).
+pub trait KeyPoint: Copy {
+    fn key(self) -> (f64, f64, Ease);
+}
+impl<A: crate::math::Num, B: crate::math::Num> KeyPoint for (A, B) {
+    fn key(self) -> (f64, f64, Ease) {
+        (self.0.f(), self.1.f(), Ease::Smooth)
+    }
+}
+impl<A: crate::math::Num, B: crate::math::Num> KeyPoint for (A, B, Ease) {
+    fn key(self) -> (f64, f64, Ease) {
+        (self.0.f(), self.1.f(), self.2)
+    }
+}
+
 /// A clip `clip` keying `obj`'s `path`[`index`] (Blender axes) at `points`, (seconds, value, the ease from that key
 /// to the next) each; the first at 0 s is rest. Values as Blender has them (metres, radians, scale). For a clip none
 /// of the others make: water filling a bath from 0.5 s, a koi surfacing and diving.
-pub fn keys(obj: Obj, clip: &str, path: Path, index: usize, points: &[(f64, f64, Ease)]) -> Obj {
+pub fn keys(obj: Obj, clip: &str, path: Path, index: usize, points: &[impl KeyPoint]) -> Obj {
+    let points: Vec<(f64, f64, Ease)> = points.iter().map(|p| p.key()).collect();
     assert!(
         !points.is_empty() && points[0].0 == 0.0,
         "keys {clip:?}: the first key is at 0 s (rest)"
@@ -1192,25 +1286,44 @@ pub fn keys(obj: Obj, clip: &str, path: Path, index: usize, points: &[(f64, f64,
 /// Its own clips turn it about its own origin, in `parent`'s frame.
 pub fn attach(obj: Obj, parent: Obj) -> Obj {
     let world = obj.matrix_world();
-    let parent_world = parent.matrix_world();
-    // (its place, turn and scale taken apart from where it is in the parent's frame, as Blender's
-    // `BKE_object_apply_mat4` does when its world matrix is set)
-    let inverse = parent_world.inverted().unwrap_or(M4::IDENTITY);
-    let m = crate::math::mul_m4_m4m4(&inverse, &world);
-    let (loc, rot, scale) = decompose(&m);
-    obj.edit(|o| {
-        o.parent = Some(parent);
-        o.loc = loc;
-        o.rot = rot;
-        o.scale = scale;
-        o.quat = None;
-    });
-    obj
+    obj.edit(|o| o.parent = Some(parent));
+    // (its place, turn and scale taken apart from where it is in the parent's frame)
+    obj.set_matrix_world(world)
 }
 
 /// A matrix's place, Euler XYZ turn and scale (`mat4_to_loc_rot_size` and the turn through a quaternion, as an
 /// object's are).
-pub(crate) fn decompose(m: &M4) -> (V3, V3, V3) {
+pub fn decompose(m: &M4) -> (V3, V3, V3) {
+    let (loc, q, scale) = loc_quat_size(m);
+    (loc, quat_to_eul(q), scale)
+}
+
+/// A matrix's place, turn and scale as an object set to it takes them (`BKE_object_apply_mat4`): the turn a
+/// quaternion, with the object's delta turn (none) taken off it as its mode has it: `euler` the order of an
+/// object turned by Euler angles, None for one turned by a quaternion.
+pub fn decompose_quat(m: &M4, euler: Option<EulerOrder>) -> (V3, Quat, V3) {
+    let (loc, q, scale) = loc_quat_size(m);
+    let delta = match euler {
+        Some(order) => crate::math::eul_to_quat(V3::ZERO, order),
+        None => Quat::IDENTITY.normalized(),
+    };
+    let inverse = Quat {
+        w: delta.w,
+        x: -delta.x,
+        y: -delta.y,
+        z: -delta.z,
+    };
+    let q = Quat {
+        w: q[0],
+        x: q[1],
+        y: q[2],
+        z: q[3],
+    };
+    (loc, inverse * q, scale)
+}
+
+/// `mat4_to_loc_rot_size`, the turn through `mat3_normalized_to_quat`.
+fn loc_quat_size(m: &M4) -> (V3, [f32; 4], V3) {
     let col = |c: usize| V3::new(m.0[c][0], m.0[c][1], m.0[c][2]);
     let (mut rot, mut size) = ([V3::ZERO; 3], [0.0_f32; 3]);
     for c in 0..3 {
@@ -1225,10 +1338,9 @@ pub(crate) fn decompose(m: &M4) -> (V3, V3, V3) {
         }
     }
     let q = mat3_normalized_to_quat([rot[0].array(), rot[1].array(), rot[2].array()]);
-    let e = quat_to_eul(q);
     (
         V3::new(m.0[3][0], m.0[3][1], m.0[3][2]),
-        e,
+        q,
         V3::new(size[0], size[1], size[2]),
     )
 }
