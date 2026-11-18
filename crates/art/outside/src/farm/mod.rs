@@ -12,6 +12,7 @@ use artkit::family::{Family, Model};
 use artkit::json::{Json, loads};
 
 mod barn;
+mod barn_doors;
 mod common;
 mod coop;
 mod hay;
