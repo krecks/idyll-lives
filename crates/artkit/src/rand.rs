@@ -4,7 +4,31 @@
 const N: usize = 624;
 const M: usize = 397;
 
-/// `random.Random(seed)` for an integer seed.
+/// CPython's `hash()` of a float, on a 64-bit machine: the number modulo 2^61 - 1 under its own sign (a whole
+/// number under that is its own hash), -1 made -2, and 314159 for an infinity. A float is a whole number under
+/// 2^53 times a power of two, and 2^61 is 1 modulo 2^61 - 1, so the power only turns the number's 61 bits round.
+/// Not a NaN's: CPython hashes that by where the object lies, another number for each.
+pub fn float_hash(v: f64) -> i64 {
+    const BITS: u32 = 61;
+    assert!(!v.is_nan(), "hash(nan): no two of CPython's are the same");
+    if v.is_infinite() {
+        return if v > 0.0 { 314159 } else { -314159 };
+    }
+    let bits = v.to_bits();
+    let (exponent, fraction) = (((bits >> 52) & 0x7ff) as i32, bits & ((1 << 52) - 1));
+    // |v| = m * 2^e
+    let (m, e) = if exponent == 0 {
+        (fraction, -1074)
+    } else {
+        (fraction | 1 << 52, exponent - 1075)
+    };
+    let wide = (m as u128) << e.rem_euclid(BITS as i32);
+    let x = ((wide & ((1 << BITS) - 1)) | (wide >> BITS)) as i64;
+    let hash = if v.is_sign_negative() { -x } else { x };
+    if hash == -1 { -2 } else { hash }
+}
+
+/// `random.Random(seed)`: `new` for an integer seed, `from_float` for a float.
 #[derive(Clone)]
 pub struct Random {
     mt: [u32; N],
@@ -57,6 +81,14 @@ impl Random {
         }
         mt[0] = 0x8000_0000;
         Random { mt, index: N }
+    }
+
+    /// Seeded as CPython seeds from a float: from its hash (`float_hash`) read as an unsigned 64-bit number, so
+    /// a negative hash has 2^64 added, it is not made positive. A whole number from 0 to under 2^61 - 1 seeds as
+    /// the integer does; no other float does (`Random(-7.0)` is `Random(2**64 - 7)`, `Random(2.0**61)` is
+    /// `Random(1)`).
+    pub fn from_float(seed: f64) -> Random {
+        Random::new(float_hash(seed) as u64 as i128)
     }
 
     fn word(&mut self) -> u32 {

@@ -170,3 +170,44 @@ macro_rules! kit_chequer {
         $crate::kit::chequer(args.0, args.1, $crate::forms::num(args.2), $crate::forms::num(args.3), $crate::forms::num(args.4), $crate::forms::num(args.5), $crate::forms::num(args.6), args.7, args.8, o)
     }};
 }
+
+/// `kit::cut` with its options by name: `kit::cut!(obj, cutter)` for the script's `G.cut(obj, cutter)`, and
+/// `kit::cut!(obj, cutter, lined = true)` where the cut's faces take the cutter's material (a boolean modifier's
+/// TRANSFER).
+#[macro_export]
+macro_rules! kit_cut {
+    ($obj:expr, $cutter:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($obj, $cutter);
+        #[allow(unused_mut)]
+        let mut o = $crate::kit::Cut::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::kit::cut(args.0, args.1, o)
+    }};
+}
+
+/// `kit::recessed_box` with its options by name: `kit::recessed_box!(frame, name, w, h, d, at, material, cavity, cavity_at, key = value, ...)`.
+#[macro_export]
+macro_rules! kit_recessed_box {
+    ($frame:expr, $name:expr, $w:expr, $h:expr, $d:expr, $at:expr, $material:expr, $cavity:expr, $cavity_at:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $w, $h, $d, $at, $material, $cavity, $cavity_at);
+        #[allow(unused_mut)]
+        let mut o = $crate::kit::RecessedBox::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::kit::recessed_box(args.0, args.1, $crate::forms::num(args.2), $crate::forms::num(args.3), $crate::forms::num(args.4), args.5, args.6, args.7, args.8, o)
+    }};
+}
+
+/// `kit::letters` with its options by name: `kit::letters!(frame, name, text, size, depth, at, material, space = 1.25)`.
+#[macro_export]
+macro_rules! kit_letters {
+    ($frame:expr, $name:expr, $text:expr, $size:expr, $depth:expr, $at:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $text, $size, $depth, $at, $material);
+        #[allow(unused_mut)]
+        let mut o = $crate::kit::Letters::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::kit::letters(args.0, args.1, args.2, $crate::forms::num(args.3), $crate::forms::num(args.4), args.5, args.6, o)
+    }};
+}

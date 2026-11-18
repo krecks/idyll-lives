@@ -24,6 +24,7 @@ pub mod normals;
 pub mod parts;
 pub mod perch;
 pub mod place;
+pub(crate) mod polyfill;
 pub mod preview;
 pub mod py;
 pub mod rand;

@@ -10,10 +10,13 @@
 //!   kit::moulding!(F, "frame", &[(0.25, 1.0), (0.25, 1.7), (-0.25, 1.7), (-0.25, 1.0)], &[(0.0, 0.0), (0.0, 0.03), (0.03, 0.03), (0.03, 0.0)], M.gilt, at = -0.43);
 //!   kit::scroll!(F, "curl", (0, 0.66, 0.2), (0.62, 0.2), M.iron, turns = -1.1);  // a scroll in the depth-height plane
 //!   kit::bench_end!(F, "end", 0.8, 0.415, 0.19, -0.21, (0.885, -0.27), M.iron, arm = 0.68);  // a cast-iron bench end
+//!   kit::cut!(carcass, fbox!(F, "oven_cut", 0.62, 0.42, 0.36, (-0.4, 0.42, 0.06), M.body));   // a recess cut in through a side
+//!   kit::recessed_box!(F, "carcass", 0.6, 0.82, 0.6, (0, 0.46, 0), M.enamel, (0.48, 0.38, 0.46), (0, 0.43, 0.08), lining = M.dark);
+//!   kit::letters!(F, "letters", "MARIE", 0.064, 0.003, (-0.04, 0.705, 0.115), M.gold, space = 1.25);   // a name in raised letters
 //!
 //! By kind: `hardware` (pulls, knobs), `turned` (legs), `joinery` (bent paths, frame-and-panel fronts, mouldings,
-//! a bench's ends), `metalwork` (tube, scrolls), `creatures` (a songbird), `signs` (the taxi's word and chequers),
-//! `tableware`.
+//! a bench's ends, a recess or a hole cut into a body), `metalwork` (tube, scrolls), `creatures` (a songbird),
+//! `signs` (the taxi's word and chequers, raised block letters), `tableware`.
 
 pub mod creatures;
 pub mod hardware;
@@ -33,10 +36,10 @@ pub use turned::*;
 
 // (the macros, exported at the crate's root under `kit_` names, by the names the scripts called: `kit::pull!`)
 pub use crate::{
-    kit_bench_end as bench_end, kit_cabriole as cabriole, kit_chequer as chequer,
-    kit_fillet as fillet, kit_knob as knob, kit_moulding as moulding, kit_pull as pull,
-    kit_scroll as scroll, kit_shaker as shaker, kit_songbird as songbird,
-    kit_taxi_word as taxi_word, kit_tube as tube,
+    kit_bench_end as bench_end, kit_cabriole as cabriole, kit_chequer as chequer, kit_cut as cut,
+    kit_fillet as fillet, kit_knob as knob, kit_letters as letters, kit_moulding as moulding,
+    kit_pull as pull, kit_recessed_box as recessed_box, kit_scroll as scroll, kit_shaker as shaker,
+    kit_songbird as songbird, kit_taxi_word as taxi_word, kit_tube as tube,
 };
 
 /// Python's `min` of floats: the first of the least.
