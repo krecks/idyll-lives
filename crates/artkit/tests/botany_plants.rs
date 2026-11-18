@@ -4,17 +4,24 @@
 //! fitted, joined and settled, their perches found and their clips keyed).
 mod common;
 
-use artkit::botany::{self, _flower, fiddle, sword};
-use artkit::far::{far_of, low};
+use artkit::botany::{
+    self, _fit_with_part, _flower, MEADOW_FLOWERS, SHRUB, ShrubMass, fiddle, fit_to, hedge_top,
+    raised_bed, sword,
+};
+use artkit::far::{far_of, is_low, low};
 use artkit::materials::{Finish, Finishes, Palette};
-use artkit::math::{PI, V3, cos, degrees, pow, radians, sin, v3};
+use artkit::math::{PI, V3, asin, atan2, cos, degrees, pow, radians, sin, v3};
+use artkit::parts::{join_all, new_parts, settle};
+use artkit::rand::Random;
 use artkit::scene::{self, Obj};
 use artkit::{
-    arc, blade, cut_leaf, dome, florets, lobed, lupin_spike, normals, outline, perch, pinnate,
-    rays, ribbed, rose_head, rose_leaf, slits, soil_top, stalk, star, stem, tulip_head, twig,
-    vessel,
+    _crop, _put, _with_part, arc, blade, cone, cube, cut_leaf, dome, dots, florets, hedge_block,
+    leaf, leafy_shrub, lobed, lump, lupin_spike, mound, normals, on_masses, outline, perch,
+    perches, pinnate, rays, ribbed, rose_head, rose_leaf, rosettes, slits, soil_top, sphere,
+    spiral, stalk, star, stem, tulip_head, twig, vessel,
 };
 use common::*;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 /// The finishes of the base manifest the plants' palette wears.
@@ -35,6 +42,22 @@ fn finishes() -> Finishes {
     .map(|(k, v)| (k.to_string(), v))
     .collect()
 }
+
+thread_local! {
+    /// The perches as a model's build found them, before it was settled.
+    static FOUND: RefCell<Vec<V3>> = const { RefCell::new(Vec::new()) };
+}
+
+fn keep_found() {
+    FOUND.with(|f| *f.borrow_mut() = scene::with(|s| s.perches.clone()));
+}
+
+/// Metres: how far a model that was fitted to its size and then joined may be from Blender's (half a thousandth of
+/// a millimetre). The functions are Blender's to the bit, and so is a model that is joined as it was built (the
+/// rose bush); `fit_to` scales the parts, and the kernel's join then takes each part's points through the first
+/// part's frame and back, where Blender leaves them be (it skips a move that is within a millionth of none): a
+/// unit or two in the last place at most of the points.
+const JOINED: f32 = 5e-7;
 
 /// What a case returned: nothing, or its numbers in order.
 type Ret = Vec<f64>;
@@ -129,17 +152,27 @@ fn its_order(mesh: &artkit::mesh::Mesh, faces: &[Vec<u32>]) -> (Vec<usize>, Vec<
 #[derive(Clone, Copy, Default)]
 struct Hold {
     ordered: bool,
-    ulps: u64,
     /// How far the numbers it returns may be from Blender's, in units in a double's last place.
     ret_ulps: u64,
+    /// How far a model's size may be from Blender's, metres.
+    size: f64,
+    /// How far a part's turn may be from Blender's, in units in the last place.
+    turn_ulps: u64,
+    /// How far a joined model's points, place and perches may be from Blender's, metres (0: to the bit).
+    metres: f32,
 }
 
 /// How far the built parts were from the goldens where they may be at all: the farthest point, in units in the last
 /// place, and the normals' farthest.
 #[derive(Default, Debug)]
 struct Off {
+    turn: u64,
+    size: f64,
     returned: u64,
-    points: u64,
+    /// The farthest a point or a perch was from Blender's, metres, and how many points of how many weren't its bits.
+    metres: f32,
+    moved: usize,
+    points: usize,
     normals: f32,
     corners: usize,
     inexact: usize,
@@ -153,14 +186,40 @@ fn same(case: &str, obj: Obj, g: &GoldenMesh, hold: Hold, off: &mut Off) {
     let (mesh, loc, rot, scale) = obj.read(|o| (o.mesh.clone(), o.loc, o.rot, o.scale));
     let place = [loc.array(), rot.array(), scale.array()].concat();
     // (a zero's sign isn't a difference: Blender leaves -0 in a turn it has applied)
-    assert_eq!(place, g.f32s("loc"), "{what}: its place");
+    let want = g.f32s("loc");
+    let turned = (0..9)
+        .filter(|&i| place[i] != want[i] && (place[i] - want[i]).abs() > hold.metres)
+        .map(|i| {
+            if (3..6).contains(&i) {
+                ulps(place[i], want[i])
+            } else {
+                u64::MAX
+            }
+        })
+        .max()
+        .unwrap_or(0);
+    assert!(
+        turned <= hold.turn_ulps,
+        "{what}: its place {place:?}, Blender's {want:?}"
+    );
+    off.turn = off.turn.max(turned);
     assert_eq!(mesh.verts.len(), g.verts.len(), "{what}: points");
     let (n, far) = points_off(&mesh.verts, &g.verts);
+    let apart = mesh
+        .verts
+        .iter()
+        .zip(&g.verts)
+        .map(|(p, w)| (0..3).map(|i| (p[i] - w[i]).abs()).fold(0.0, f32::max))
+        .fold(0.0, f32::max);
     assert!(
-        far <= hold.ulps,
-        "{what}: {n} points differ, by up to {far} ulps"
+        far == 0 || apart <= hold.metres,
+        "{what}: {n} points differ, by up to {far} ulps, {apart:e} m"
     );
-    off.points = off.points.max(far);
+    if far > 0 {
+        off.metres = off.metres.max(apart);
+        off.moved += n;
+    }
+    off.points += mesh.verts.len();
     let faces: Vec<Vec<u32>> = (0..mesh.faces.len())
         .map(|f| mesh.corners(f).to_vec())
         .collect();
@@ -252,7 +311,7 @@ fn same(case: &str, obj: Obj, g: &GoldenMesh, hold: Hold, off: &mut Off) {
             let d = (0..3)
                 .map(|i| (mine[c][i] - want[i]).abs())
                 .fold(0.0, f32::max);
-            if hold.ulps == 0 {
+            if hold.metres == 0.0 {
                 assert_eq!(
                     bits(&its[l].array()),
                     bits(want),
@@ -311,6 +370,7 @@ fn check(
         scene::reset();
         perch::clear();
         botany::clear();
+        FOUND.with(|f| f.borrow_mut().clear());
         let p = botany::palette(&[]);
         let ret = if far {
             far_of(|| build(name, &p))
@@ -343,6 +403,57 @@ fn check(
                 "{}: returns nothing",
                 case.name
             ),
+        }
+        if let Some(size) = case.lines.get("size") {
+            // a model built whole: its size, its perches as found and as settled
+            let made = scene::meshes();
+            let got = artkit::parts::game_size(&made);
+            let want = f64s(&words(size));
+            let apart = (0..3).map(|i| (got[i] - want[i]).abs()).fold(0.0, f64::max);
+            assert!(
+                apart <= hold(name).size,
+                "{}: its size {got:?}, {apart:e} off Blender's",
+                case.name
+            );
+            off.size = off.size.max(apart);
+            let flat = |ps: &[V3]| ps.iter().flat_map(|p| p.array()).collect::<Vec<f32>>();
+            let reach = |got: &[f32], want: &[f32], what: &str| {
+                assert_eq!(got.len(), want.len(), "{}: the perches {what}", case.name);
+                let far = got
+                    .iter()
+                    .zip(want)
+                    .map(|(&a, &b)| (a - b).abs())
+                    .fold(0.0, f32::max);
+                assert!(
+                    far <= hold(name).metres,
+                    "{}: the perches {what} are up to {far:e} m off",
+                    case.name
+                );
+                far
+            };
+            let found = FOUND.with(|f| f.borrow().clone());
+            let a = reach(
+                &flat(&found),
+                &f32s(&words(&case.lines["found"])),
+                "as found",
+            );
+            let settled = scene::with(|s| s.perches.clone());
+            let b = reach(
+                &flat(&settled),
+                &f32s(&words(&case.lines["settled"])),
+                "as settled",
+            );
+            off.metres = off.metres.max(a).max(b);
+            let game: Vec<String> = perch::game()
+                .iter()
+                .map(|p| format!("[{}, {}, {}]", p[0], p[1], p[2]))
+                .collect();
+            assert_eq!(
+                format!("[{}]", game.join(", ")),
+                case.lines["game"],
+                "{}",
+                case.name
+            );
         }
         let made = scene::meshes();
         assert_eq!(
@@ -1878,10 +1989,882 @@ fn leaves_cut_from_an_outline_are_blenders_triangle_for_triangle() {
     // cut from them are single precision, and Blender's to the bit)
     let hold = |name: &str| Hold {
         ordered: name.starts_with("cut_leaf") || name.starts_with("rose_leaf"),
-        ulps: 0,
         ret_ulps: 4,
+        ..Hold::default()
     };
     let n = check("botany_leaves.txt", leaves, hold, &mut off);
     assert!(n >= 80, "{n} cases");
     assert!(off.normals < 2.5e-7, "{off:?}");
+}
+
+// ---- shrubs and hedges ----
+
+fn masses3() -> Vec<ShrubMass> {
+    vec![
+        (v3(0.3, 0.1, 0.5), 0.2, 0.7),
+        (v3(-0.2, 0.25, 0.6), 0.17, 0.75),
+        (v3(0.05, -0.3, 0.45), 0.22, 0.68),
+    ]
+}
+
+fn flat_spots(spots: &[(V3, V3, f64)]) -> Vec<f64> {
+    spots
+        .iter()
+        .flat_map(|&(at, d, s)| [flat3(&[at, d]), vec![s]].concat())
+        .collect()
+}
+
+fn flat_triples(points: &[(f64, f64, f64)]) -> Vec<f64> {
+    points.iter().flat_map(|&(a, b, c)| [a, b, c]).collect()
+}
+
+fn greens(p: &Palette, names: [&str; 5]) -> [artkit::materials::Mat; 5] {
+    names.map(|k| p.get(k))
+}
+
+/// families/plants.py's flowering shrub: the round shrub hung with sprays of five-petalled flowers.
+fn bush_flowering() {
+    let p = botany::palette(&[
+        ("blossom", "#F08CBC"),
+        ("blossom2", "#F8B4D4"),
+        ("blossom3", "#FFF0F6"),
+        ("blossom4", "#E870A8"),
+    ]);
+    let cols = ["blossom", "blossom2", "blossom3", "blossom4"].map(|k| p.get(k));
+    let blooms = |masses: &[ShrubMass], rng: &mut Random| {
+        for (i, (at, d, _)) in on_masses!(masses, rng, 26, up = (-0.3, 1.2))
+            .into_iter()
+            .enumerate()
+        {
+            let (yaw, tilt) = (
+                90.0 - degrees(atan2(d.y as f64, d.x as f64)),
+                90.0 - degrees(asin((-1.0_f64).max(1.0_f64.min(d.z as f64)))),
+            );
+            for j in 0..3 {
+                let off = v3(
+                    rng.uniform(-1.0, 1.0),
+                    rng.uniform(-1.0, 1.0),
+                    rng.uniform(-0.5, 0.5),
+                ) * 0.05;
+                if is_low() && j != 0 {
+                    continue; // a far version: one flower a spray
+                }
+                rays!(
+                    format!("blossom{i}_{j}"),
+                    at + off,
+                    0.045,
+                    5,
+                    cols[(i + j) % 4],
+                    yaw = yaw,
+                    tilt = tilt * 0.8,
+                    inner = 0.35,
+                    cup = 0.25,
+                    width = 0.95,
+                    centre = 0.006
+                );
+            }
+        }
+    };
+    let leafy = greens(&p, ["leaf_dark", "leaf_dark", "leaf", "stem", "leaf_light"]);
+    leafy_shrub!(
+        &p,
+        33,
+        1.208,
+        1.016,
+        &leafy,
+        p.get("twig"),
+        name = "bush_flowering",
+        depth = 1.268,
+        masses = 10,
+        sats = 1,
+        leaves = 8,
+        blooms = blooms
+    );
+    let still = join_all("bushFlowering");
+    perches!(6, 133, &[(0.0, 0.0, 0.5)]);
+    keep_found();
+    settle(&[still]);
+}
+
+/// families/plants.py's clipped hedge segment of the streets.
+fn street_hedge() {
+    let p = botany::palette(&[
+        ("leaf", SHRUB[1]),
+        ("leaf_light", SHRUB[2]),
+        ("stem", SHRUB[3]),
+    ]);
+    hedge_block!(&p, 1.547, 1.019, 0.85, seed = 134);
+    let still = join_all("hedge");
+    perches!(6, 134, &hedge_top(0.915), per = 6, up = (0.6, 1.4));
+    keep_found();
+    settle(&[still]);
+}
+
+/// families/plants.py's rose bush: canes from a leafy base, compound leaves along them, a rose on each, the one at
+/// the front cut by a prune.
+fn rosebush() {
+    let p = botany::palette(&[
+        ("leaf", "#2C4C26"),
+        ("leaf_dark", "#365A2C"),
+        ("leaf_light", "#3F6632"),
+        ("stem", "#4A7038"),
+        ("bloom", "#C8203A"),
+    ]);
+    let mut rng = Random::new(73);
+    let leafy = [p.get("leaf"), p.get("leaf_dark"), p.get("leaf_light")];
+    for (i, (x, y, _)) in spiral!(3, 0.16, &mut rng).into_iter().enumerate() {
+        lump!(
+            format!("base{i}"),
+            0.18,
+            (x, y, 0),
+            leafy[i % 3],
+            scale = (1, 1, 0.7),
+            seed = i as f64 * 1.3 + rng.random(),
+            noise = 0.32,
+            segments = 8,
+            rings = 5
+        );
+    }
+    let mut canes = Vec::new();
+    for (x, y, a) in spiral!(9, 0.3, &mut rng) {
+        let h = rng.uniform(0.6, 0.84);
+        let (foot, tip) = (v3(x * 0.3, y * 0.3, 0.05), v3(x * 1.3, y * 1.3, h));
+        let bend = v3(x * 1.05, y * 1.05, h * 0.6);
+        canes.push((foot, bend, tip, a, rng.uniform(8.0, 28.0)));
+    }
+    // the cane nearest the front (-y)
+    let front = (0..canes.len())
+        .min_by(|&i, &j| canes[i].2.y.total_cmp(&canes[j].2.y))
+        .unwrap();
+    for (i, &(foot, bend, tip, a, tilt)) in canes.iter().enumerate() {
+        twig!(
+            format!("cane{i}"),
+            &[foot, bend, tip - v3(0, 0, 0.02)],
+            0.01,
+            0.005,
+            p.get("stem"),
+            verts = 4
+        );
+        // leaves along the cane, turning round it
+        for (k, f) in [0.35, 0.62, 0.86].into_iter().enumerate() {
+            let at = if f < 0.6 {
+                foot.lerp(bend, f / 0.6)
+            } else {
+                bend.lerp(tip, (f - 0.6) / 0.4)
+            };
+            let heading = degrees(a) + (k as f64 * 2.0 - 1.0) * 70.0 + rng.uniform(-20.0, 20.0);
+            let tilt_k = rng.uniform(5.0, 30.0);
+            if is_low() && k == 1 {
+                continue; // a far version: the outer two
+            }
+            rose_leaf!(
+                format!("leaves{i}_{k}"),
+                at,
+                heading,
+                tilt_k,
+                0.13,
+                leafy[(i + k) % 3]
+            );
+        }
+        if i != front {
+            rose_head!(
+                &format!("rose{i}"),
+                tip,
+                0.05,
+                p.get("bloom"),
+                yaw = degrees(a),
+                tilt = tilt
+            );
+        }
+    }
+    // perches: on the canes (half way up their arch) and the leafy base
+    let bare: Vec<V3> = canes
+        .iter()
+        .map(|&(_, bend, tip, _, _)| bend.lerp(tip, 0.45) + v3(0, 0, 0.012))
+        .collect();
+    perches!(5, 140, &[(0.0, 0.0, 0.3)], per = 8, bare = bare);
+    keep_found();
+    let (_, _, tip, a, tilt) = canes[front];
+    _with_part!(
+        "rose",
+        join_all("rosebush"),
+        || rose_head!(
+            "cut_rose",
+            tip,
+            0.05,
+            p.get("bloom"),
+            yaw = degrees(a),
+            tilt = tilt
+        ),
+        tip,
+        "cut"
+    );
+}
+
+/// The models built whole, fitted and joined.
+const MODELS: [&str; 6] = [
+    "bush_flowering",
+    "street_hedge",
+    "rosebush",
+    "tulips",
+    "veg_patch",
+    "meadow",
+];
+
+fn shrubs(name: &str, p: &Palette) -> Option<Ret> {
+    let m = |k: &str| p.get(k);
+    match name {
+        "hedge_top" => {
+            return Some(
+                [
+                    flat_triples(&hedge_top(0.915)),
+                    flat_triples(&hedge_top(1.12)),
+                ]
+                .concat(),
+            );
+        }
+        "on_masses" => {
+            return Some(
+                [
+                    flat_spots(&on_masses!(
+                        &masses3(),
+                        &mut Random::new(5),
+                        7,
+                        up = (-0.3, 1.2)
+                    )),
+                    flat_spots(&on_masses!(&masses3(), &mut Random::new(6), 2)),
+                ]
+                .concat(),
+            );
+        }
+        "spiral" => {
+            return Some(
+                [
+                    flat_triples(&spiral!(7, 0.32, &mut Random::new(51))),
+                    flat_triples(&spiral!(48, 0.36, &mut Random::new(62))),
+                    flat_triples(&spiral!(5, 0.2, &mut Random::new(1), jitter = 0.6)),
+                ]
+                .concat(),
+            );
+        }
+        "fit_to" => {
+            cube!(
+                "box",
+                (0.3, 0.2, 0.1),
+                at = (0.1, -0.2, 0.05),
+                material = m("body")
+            );
+            sphere!(
+                "pad",
+                0.5,
+                at = (0.2, 0.1, 0.36),
+                material = m("flesh_light"),
+                segments = 8,
+                rings = 5,
+                scale = (0.11, 0.032, 0.14),
+                rot = (0, 8, 0)
+            );
+            sphere!(
+                "pad2",
+                0.5,
+                at = (-0.1, 0.1, 0.4),
+                material = m("flesh_light"),
+                segments = 6,
+                rings = 4,
+                scale = (0.08, 0.032, 0.1),
+                rot = (0, -28, 0)
+            );
+            twig!(
+                "stem",
+                &[(0.0, 0.0, 0.0), (0.05, 0.02, 0.3), (0.1, 0.0, 0.5)],
+                0.02,
+                0.01,
+                m("stem")
+            );
+            leaf!("leaf", (0.1, 0, 0.5), 30.0, 40.0, 0.3, 0.1, m("leaf"));
+            cone!(
+                "young",
+                0.012,
+                0.002,
+                0.14,
+                at = (0, 0.1, 0.2),
+                material = m("leaf_light"),
+                verts = 5,
+                rot = (20, 0, 35)
+            );
+            return Some(fit_to(&scene::meshes(), 0.568, 0.521, 0.465).to_vec());
+        }
+        "fit_to_some" => {
+            cube!(
+                "box",
+                (0.3, 0.2, 0.1),
+                at = (0.1, -0.2, 0.05),
+                material = m("body")
+            );
+            let crown = new_parts(|| {
+                lump!(
+                    "crown",
+                    0.3,
+                    (0.02, 0.01, 0.4),
+                    m("leaf"),
+                    scale = (1, 1.1, 1.6),
+                    seed = 2.0,
+                    segments = 6,
+                    rings = 5
+                );
+                twig!(
+                    "twig",
+                    &[(0.0, 0.0, 0.3), (0.3, 0.02, 0.5)],
+                    0.02,
+                    0.01,
+                    m("stem"),
+                    verts = 3,
+                    res = 1
+                );
+            });
+            let k = fit_to(&crown, 0.62, None, 0.65);
+            return Some([k, fit_to(&scene::meshes(), None, 0.9, None)].concat());
+        }
+        "dots" => dots!(
+            &mut Random::new(3),
+            6,
+            (0.1, 0.0, 0.5),
+            (0.5, 0.45, 0.4),
+            0.09,
+            &[m("bloom"), m("bloom2")],
+            "dot",
+            far_every = 3
+        ),
+        "dots_plain" => dots!(
+            &mut Random::new(4),
+            4,
+            (0.0, 0.0, 0.4),
+            (0.3, 0.3, 0.3),
+            0.06,
+            &[m("blossom")],
+            "bloom"
+        ),
+        "leafy_shrub_plain" => {
+            let mut seen = Vec::new();
+            let out = leafy_shrub!(
+                p,
+                7,
+                0.9,
+                0.8,
+                &[m("leaf_dark"), m("leaf"), m("leaf_light")],
+                m("twig"),
+                leaf_cols = vec![m("stem"), m("leaf_light")],
+                masses = 5,
+                stems = 3,
+                sats = 2,
+                leaves = 12,
+                blooms = |masses: &[ShrubMass], rng: &mut Random| {
+                    seen.extend([rng.random(), masses.len() as f64]);
+                }
+            );
+            let mut ret: Vec<f64> = out
+                .iter()
+                .flat_map(|&(at, r)| [flat3(&[at]), vec![r]].concat())
+                .collect();
+            ret.extend(seen);
+            return Some(ret);
+        }
+        "hedge_block" => {
+            let q = botany::palette(&[
+                ("leaf", SHRUB[1]),
+                ("leaf_light", SHRUB[2]),
+                ("stem", SHRUB[3]),
+            ]);
+            hedge_block!(&q, 1.546, 1.12, 0.92, seed = 137);
+        }
+        "bush_flowering" => bush_flowering(),
+        "street_hedge" => street_hedge(),
+        "rosebush" => rosebush(),
+        other => panic!("no case {other:?}"),
+    }
+    None
+}
+
+#[test]
+fn shrubs_and_hedges_are_blenders_fitted_joined_and_settled_with_their_perches() {
+    let mut off = Off::default();
+    let hold = |name: &str| Hold {
+        ret_ulps: if ["on_masses", "spiral", "hedge_top"].contains(&name) {
+            4
+        } else {
+            0
+        },
+        turn_ulps: if name.starts_with("fit_to") { 1 } else { 0 },
+        metres: if MODELS.contains(&name) { JOINED } else { 0.0 },
+        size: JOINED as f64,
+        ..Hold::default()
+    };
+    let n = check("botany_shrubs.txt", shrubs, hold, &mut off);
+    assert!(n >= 24, "{n} cases");
+    assert!(off.moved * 4 < off.points, "{off:?}");
+}
+
+// ---- beds and crops ----
+
+/// families/plants.py's tulips: a soil mound of tulips on bowed stems, broad leaves at their feet.
+fn tulips() {
+    let p = botany::palette(&[("leaf", "#5E8A5A"), ("leaf_light", "#6E9A66")]);
+    let mut rng = Random::new(51);
+    let top = mound!(&p);
+    let cols = ["bloom", "bloom2", "bloom3", "bloom4", "bloom", "bloom5"].map(|k| p.get(k));
+    for (i, (x, y, a)) in spiral!(17, 0.34, &mut rng).into_iter().enumerate() {
+        let h = rng.uniform(0.42, 0.55);
+        let tip = (
+            x + rng.uniform(-0.03, 0.03),
+            y + rng.uniform(-0.03, 0.03),
+            h,
+        );
+        stalk!(
+            format!("stem{i}"),
+            (x, y, top - 0.01),
+            tip,
+            p.get("stem"),
+            r = 0.005
+        );
+        tulip_head!(
+            format!("tulip{i}"),
+            V3::from(tip) - v3(0, 0, 0.01),
+            0.032,
+            0.075,
+            cols[i % cols.len()],
+            yaw = rng.uniform(0.0, 360.0),
+            tilt = rng.uniform(0.0, 10.0)
+        );
+        for k in 0..2 {
+            let (yaw, t, length) = (
+                a + 40.0 + k as f64 * 160.0,
+                rng.uniform(55.0, 70.0),
+                rng.uniform(0.2, 0.26),
+            );
+            if k != 0 && i % 2 != 0 {
+                continue;
+            }
+            cut_leaf!(
+                format!("leaf{i}_{k}"),
+                (x, y, top - 0.005),
+                yaw,
+                t,
+                length,
+                &outline!("lance", 0.075, n = 4),
+                [p.get("leaf"), p.get("leaf_light")][k],
+                droop = 0.32,
+                fold = 0.35,
+                ribs = 3,
+                thick = 0.005
+            );
+        }
+    }
+    fit_to(&scene::meshes(), 0.84, 0.622, 0.843);
+    settle(&[join_all("tulips")]);
+}
+
+/// families/plants.py's vegetable patch: a raised bed of lettuces, cabbages and carrot tops, grown from seedlings.
+fn veg_patch() {
+    let p = botany::palette(&[
+        ("body", "#8A6446"),
+        ("leaf", "#9CC45A"),
+        ("leaf_light", "#8AB44E"),
+        ("leaf_dark", "#7EA48A"),
+        ("stem", "#5E9A3A"),
+        ("bloom", "#A8C8A0"),
+        ("bloom4", "#E8782A"),
+    ]);
+    let mut rng = Random::new(81);
+    let top = raised_bed(&p, 0.92, 0.92, 0.18);
+    let still = join_all("vegPatch");
+    let mut spots: Vec<Vec<(f64, f64)>> = Vec::new();
+    for x in [-0.28, 0.0, 0.28] {
+        let mut row = Vec::new();
+        for y in [0.27, 0.0, -0.27] {
+            row.push((x + rng.uniform(-0.03, 0.03), y + rng.uniform(-0.03, 0.03)));
+        }
+        spots.push(row);
+    }
+    let mut tops: Vec<Vec<(f64, f64)>> = Vec::new();
+    for _ in 0..3 {
+        let mut row = Vec::new();
+        for j in 0..3 {
+            row.push((
+                rng.uniform(0.22, 0.28),
+                j as f64 * 120.0 + rng.uniform(0.0, 40.0),
+            ));
+        }
+        tops.push(row);
+    }
+    let ruffled = outline!("oval", 0.12, n = 4, wave = 0.18, waves = 5);
+    let leaves = || {
+        // lettuces: rosettes of ruffled leaves, cupped up
+        for (k, &(x, y)) in spots[0].iter().enumerate() {
+            lump!(
+                format!("lettuce_heart{k}"),
+                0.045,
+                (x, y, top - 0.01),
+                p.get("leaf_light"),
+                scale = (1, 1, 1.1),
+                noise = 0.3,
+                seed = k as f64,
+                segments = 6,
+                rings = 4
+            );
+            for j in 0..6 {
+                let inner = j >= 4;
+                cut_leaf!(
+                    format!("lettuce{k}_{j}"),
+                    (x, y, top + if inner { 0.03 } else { 0.01 }),
+                    (j * 360) as f64 / if inner { 2.0 } else { 4.0 }
+                        + (k * 25) as f64
+                        + if inner { 40.0 } else { 0.0 },
+                    if inner { 60.0 } else { 30.0 },
+                    if inner { 0.11 } else { 0.13 },
+                    &ruffled,
+                    [p.get("leaf"), p.get("leaf_light")][(j + k) % 2],
+                    droop = 0.35,
+                    fold = 0.4,
+                    ribs = 2
+                );
+            }
+        }
+        // cabbages' outer leaves
+        for (k, &(x, y)) in spots[1].iter().enumerate() {
+            for j in 0..5 {
+                cut_leaf!(
+                    format!("cabbage{k}_{j}"),
+                    (x, y, top + 0.01),
+                    (j * 72 + k * 20) as f64,
+                    38.0,
+                    0.15,
+                    &outline!("oval", 0.14, n = 4, wave = 0.08, waves = 3),
+                    p.get("leaf_dark"),
+                    droop = 0.4,
+                    fold = 0.45,
+                    ribs = 2,
+                    thick = 0.005
+                );
+            }
+        }
+        // carrot tops: feathery fronds
+        for (k, &(x, y)) in spots[2].iter().enumerate() {
+            for (j, &(length, yaw)) in tops[k].iter().enumerate() {
+                cut_leaf!(
+                    format!("carrot_top{k}_{j}"),
+                    (x, y, top),
+                    yaw,
+                    70.0 - j as f64 * 8.0,
+                    length,
+                    &pinnate!(3, 0.08, "lance", lean = 0.7, fill = 0.35),
+                    p.get("stem"),
+                    droop = 0.3,
+                    fold = 0.1,
+                    ribs = 2
+                );
+            }
+        }
+    };
+    let crop = || {
+        // cabbage hearts
+        for (k, &(x, y)) in spots[1].iter().enumerate() {
+            lump!(
+                format!("heart{k}"),
+                0.07,
+                (x, y, top + 0.04),
+                p.get("bloom"),
+                scale = (1, 1, 0.85),
+                noise = 0.1,
+                seed = (k + 6) as f64,
+                segments = low(9, 6),
+                rings = low(6, 4)
+            );
+        }
+        // carrot shoulders
+        for (k, &(x, y)) in spots[2].iter().enumerate() {
+            cone!(
+                format!("carrot{k}"),
+                0.022,
+                0.016,
+                0.03,
+                at = (x, y, top + 0.01),
+                material = p.get("bloom4"),
+                verts = low(8, 5)
+            );
+        }
+    };
+    // picked, the bed is bare
+    _crop!(
+        still,
+        (0, 0, top),
+        leaves,
+        crop,
+        harvested = true,
+        size = (0.92, 0.398, 0.92)
+    );
+}
+
+/// families/plants.py's wildflower meadow: tussocks, long grass and flowers, one of them picked.
+fn meadow() {
+    let p = botany::palette(&[
+        ("leaf", "#7FA04A"),
+        ("leaf_dark", "#6E9240"),
+        ("leaf_light", "#A2B45E"),
+        ("stem", "#8EAE52"),
+        ("bloom", "#EC3A2E"),
+        ("bloom2", "#F6C21E"),
+        ("bloom3", "#A880E0"),
+        ("bloom4", "#8CB4F8"),
+        ("bloom5", "#FFFFFF"),
+        ("centre", "#E8B436"),
+    ]);
+    let mut rng = Random::new(62);
+    let grass = ["leaf", "stem", "leaf_dark", "leaf_light"].map(|k| p.get(k));
+    // low tussocks at the grass's foot
+    for (i, (x, y, _)) in spiral!(3, 0.3, &mut rng).into_iter().enumerate() {
+        lump!(
+            format!("tussock{i}"),
+            0.12,
+            (x, y, 0),
+            grass[i % 4],
+            scale = (1, 1, 0.4),
+            seed = i as f64 * 1.1,
+            segments = 8,
+            rings = 5
+        );
+    }
+    // long grass, and stalks gone to seed; a far version builds every third blade (drawing every random number)
+    for (i, (x, y, a)) in spiral!(48, 0.36, &mut rng).into_iter().enumerate() {
+        let length = rng.uniform(0.28, 0.48);
+        let tilt = rng.uniform(70.0, 87.0);
+        let yaw = a + rng.uniform(-50.0, 50.0);
+        let lean = rng.uniform(-0.06, 0.06);
+        if is_low() && i % 3 != 0 {
+            continue;
+        }
+        leaf!(
+            format!("grass{i}"),
+            (x * 0.85, y * 0.85, 0),
+            yaw,
+            tilt,
+            length,
+            0.022,
+            grass[i % 4],
+            shape = "strap",
+            droop = 0.24,
+            thick = 0.004,
+            fold = 0.35,
+            rows = 2,
+            ring = 3
+        );
+        if i % 6 == 0 {
+            let head = (x * 0.8 + lean, y * 0.8 - lean, length * 1.02);
+            stem!(
+                format!("seed_stalk{i}"),
+                (x * 0.85, y * 0.85, 0),
+                head,
+                p.get("leaf_light"),
+                r = 0.003
+            );
+            florets!(
+                format!("seed{i}"),
+                0.01,
+                head,
+                p.get("leaf_light"),
+                bumps = 2.0,
+                amount = 0.25,
+                flat = 4.5,
+                segments = low(5, 3),
+                rings = low(5, 3),
+                seed = i as f64
+            );
+        }
+    }
+    for (i, (x, y, _)) in spiral!(14, 0.4, &mut rng).into_iter().enumerate() {
+        let h = rng.uniform(0.26, 0.48);
+        let (yaw, tilt) = (rng.uniform(0.0, 360.0), rng.uniform(0.0, 30.0));
+        stalk!(
+            format!("stem{i}"),
+            (x, y, 0),
+            (x, y, h),
+            p.get("stem"),
+            r = 0.0035
+        );
+        rays!(
+            format!("flower{i}"),
+            (x, y, h),
+            0.04,
+            5 + i % 3,
+            p.get(MEADOW_FLOWERS[i % 5]),
+            yaw = yaw,
+            tilt = tilt,
+            inner = 0.3,
+            cup = 0.12,
+            width = 0.85,
+            centre = 0.005
+        );
+    }
+    let (x, y, h) = (0.06, -0.22, 0.48);
+    // the one picked: at the front, standing tall
+    let picked = || {
+        stem!(
+            "picked_stem",
+            (x, y, 0),
+            (x, y, h),
+            p.get("stalk"),
+            r = 0.005
+        );
+        rays!(
+            "picked_flower",
+            (x, y, h),
+            0.06,
+            12,
+            p.get("bloom5"),
+            yaw = 180,
+            tilt = 30,
+            inner = 0.3,
+            cup = 0.08,
+            width = 0.75
+        );
+        let eye = sphere!(
+            "picked_eye",
+            1.0,
+            material = p.get("centre"),
+            segments = low(6, 4),
+            rings = 3,
+            scale = (0.018, 0.018, 0.011)
+        );
+        _put!(eye, (x, y, h), yaw = 180, tilt = 30, lift = 0.005);
+    };
+    _fit_with_part(
+        "picked",
+        "meadow",
+        picked,
+        (x, y, 0),
+        "pick",
+        (0.872, 0.575, 0.91),
+    );
+}
+
+fn beds(name: &str, p: &Palette) -> Option<Ret> {
+    let m = |k: &str| p.get(k);
+    let greens = [m("leaf"), m("leaf_dark"), m("leaf_light")];
+    match name {
+        "mound" => return Some(vec![mound!(p)]),
+        "mound_small" => return Some(vec![mound!(p, r = 0.4)]),
+        "mound_low" => return Some(vec![mound!(p, r = 0.3, h = 0.05)]),
+        "clumps" => botany::clumps(
+            p,
+            &mut Random::new(9),
+            7,
+            0.33,
+            0.27,
+            0.17,
+            0.07 + 0.07,
+            &greens,
+        ),
+        "rosettes" => rosettes!(
+            p,
+            &mut Random::new(11),
+            3,
+            0.3,
+            0.07 - 0.01,
+            &greens,
+            leaves = 4,
+            length = 0.17,
+            width = 0.065,
+            tilt = (15.0, 35.0)
+        ),
+        "rosettes_pinnae" => rosettes!(
+            p,
+            &mut Random::new(12),
+            3,
+            0.3,
+            0.07 - 0.01,
+            &[m("leaf"), m("leaf_light")],
+            leaves = 3,
+            length = 0.22,
+            width = 0.1,
+            tilt = (20.0, 40.0),
+            pinnae = 3
+        ),
+        "rosettes_oval" => rosettes!(
+            p,
+            &mut Random::new(13),
+            3,
+            0.34,
+            0.07 - 0.01,
+            &greens,
+            leaves = 5,
+            length = 0.13,
+            width = 0.08,
+            shape = "oval",
+            tilt = (10.0, 30.0)
+        ),
+        "rosettes_plain" => rosettes!(
+            p,
+            &mut Random::new(14),
+            3,
+            0.2,
+            0.05,
+            &[m("leaf")],
+            name = "tuft",
+            droop = 0.1
+        ),
+        "raised_bed" => return Some(vec![raised_bed(p, 0.92, 0.92, 0.18)]),
+        "tulips" => tulips(),
+        "veg_patch" => veg_patch(),
+        "meadow" => meadow(),
+        "_crop" => {
+            let top = mound!(p, r = 0.3);
+            let still = join_all("patch");
+            let leaves = || {
+                for (i, a) in [20.0, 140.0, 260.0].into_iter().enumerate() {
+                    cut_leaf!(
+                        format!("leaf{i}"),
+                        botany::polar(0.1, a, top),
+                        a,
+                        40.0,
+                        0.2,
+                        &outline!("oval", 0.1, n = 4),
+                        m("leaf"),
+                        droop = 0.3,
+                        ribs = 2
+                    );
+                }
+            };
+            let crop = || {
+                lump!(
+                    "berry",
+                    0.03,
+                    (0.05, 0.02, top + 0.02),
+                    m("bloom3"),
+                    seed = 1.0,
+                    segments = 6,
+                    rings = 4
+                );
+            };
+            _crop!(still, (0, 0, 0.05), leaves, crop, sink = (0.0, 0.04, 0.12));
+        }
+        other => panic!("no case {other:?}"),
+    }
+    None
+}
+
+#[test]
+fn beds_and_crops_are_blenders_with_their_growth_clips() {
+    let mut off = Off::default();
+    let hold = |name: &str| Hold {
+        ordered: name.starts_with("rosettes"),
+        metres: if MODELS.contains(&name) || name == "_crop" {
+            JOINED
+        } else {
+            0.0
+        },
+        size: JOINED as f64,
+        ..Hold::default()
+    };
+    let n = check("botany_beds.txt", beds, hold, &mut off);
+    assert!(n >= 26, "{n} cases");
+    assert!(off.moved * 2 < off.points, "{off:?}");
 }
