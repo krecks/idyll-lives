@@ -2,46 +2,18 @@
 
 use super::M;
 use artkit::forms::{Scale, rounded_rect};
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, TAU, V3, cos, pow, sin};
-use artkit::parts::{join, new_parts};
 use artkit::place::{Coord, GameFrame, Spot};
+use artkit::py;
 use artkit::scene::Obj;
 use artkit::{Arg, fbox, fcyl, fextrude, loft};
 
 /// The wall's face, game depth: the toilets' cisterns and the storage stand on it.
 pub const WALL: f64 = -0.43;
 
-/// A round tube of radius `r` through game points, its bends rounded (`round` steps between each pair of points; 1
-/// keeps them sharp), its ends capped: a towel rail, a bent-tube frame, a tap's riser, a hose. `verts` round: by
-/// default 8, and more for one over 13 mm in radius, as many as keep its outline within a millimetre of the circle.
-#[allow(clippy::too_many_arguments)] // (as the kit called it)
-pub fn kit_tube<P: Spot>(
-    f: &GameFrame,
-    name: impl AsRef<str>,
-    points: &[P],
-    r: f64,
-    material: Mat,
-    verts: Option<usize>,
-    round: usize,
-    scale: impl Arg<Scale>,
-) -> Obj {
-    // (the kit's tube, called as the script called it)
-    artkit::kit::tube(
-        f,
-        name,
-        points,
-        r,
-        material,
-        artkit::kit::Tube {
-            verts,
-            round,
-            scale: artkit::Arg::arg(scale),
-        },
-    )
-}
-
-/// A tube in one piece through game points, its bends rounded (`kit_tube`).
+/// A tube in one piece through game points, its bends rounded (the kit's tube).
 #[allow(clippy::too_many_arguments)] // (as the script called it)
 pub fn tube<P: Spot>(
     f: &GameFrame,
@@ -53,7 +25,16 @@ pub fn tube<P: Spot>(
     round: usize,
     scale: impl Arg<Scale>,
 ) -> Obj {
-    kit_tube(f, name, pts, r, material, Some(verts), round, scale)
+    kit::tube!(
+        f,
+        name,
+        pts,
+        r,
+        material,
+        verts = verts,
+        round = round,
+        scale = scale
+    )
 }
 
 /// A closed loop of Blender points round game (cx, cz) at height `y`: `rx` across, `rz` to the front (`back`
@@ -235,7 +216,7 @@ pub fn gooseneck<X: Coord>(
     let tip_y = tip_y.unwrap_or(base_y + 0.16);
     let big_r = (spout_z - z) / 2.0;
     let (cz, cy) = (z + big_r, top - big_r);
-    let end = py_min(tip_y, cy);
+    let end = py::min(tip_y, cy);
     let arc = (0..9).map(|k| {
         (
             x,
@@ -360,7 +341,7 @@ pub fn shaker(
         z,
         t - 0.006,
         material,
-        py_min(py_min(0.025, pw / 5.0), ph / 5.0),
+        py::min(py::min(0.025, pw / 5.0), ph / 5.0),
     );
 }
 
@@ -454,27 +435,6 @@ pub fn bottle(
             verts = verts
         );
     }
-}
-
-/// The stream: a thin cylinder from the spout tip down to the basin, joined with its origin at the tip and scaled
-/// to nothing along its length, so it is hidden until `grow` runs the clip.
-pub fn water<X: Coord>(f: &GameFrame, spout: (X, f64, f64), floor_y: f64) -> Obj {
-    let (x, top_y, z) = spout;
-    let length = py_max(0.06, top_y - floor_y);
-    let parts = new_parts(|| {
-        fcyl!(
-            f,
-            "water",
-            0.012,
-            length,
-            (x, (top_y + floor_y) / 2.0, z),
-            M.water,
-            verts = 10
-        );
-    });
-    let obj = join(&parts, "water", Some(f.at(x, top_y, z)));
-    obj.edit(|o| o.scale.z = 0.001);
-    obj
 }
 
 /// A plug's flange (chrome, or the tap's metal) and its dark hole, on a basin's floor at height `y`.
@@ -584,8 +544,8 @@ pub fn bends(pts: &[(f64, f64, f64)], r: f64, steps: usize) -> Vec<(f64, f64, f6
     let mut out = vec![pts[0]];
     for w in pts.windows(3) {
         let (a_, b_, c_) = (V3::from(w[0]), V3::from(w[1]), V3::from(w[2]));
-        let p0 = b_ + (a_ - b_).normalized() * py_min(r, (a_ - b_).length() / 2.0);
-        let p2 = b_ + (c_ - b_).normalized() * py_min(r, (c_ - b_).length() / 2.0);
+        let p0 = b_ + (a_ - b_).normalized() * py::min(r, (a_ - b_).length() / 2.0);
+        let p2 = b_ + (c_ - b_).normalized() * py::min(r, (c_ - b_).length() / 2.0);
         for k in 0..=steps {
             let t = k as f64 / steps as f64;
             let p = p0 * pow(1.0 - t, 2.0) + b_ * 2 * (1.0 - t) * t + p2 * t * t;
@@ -594,14 +554,4 @@ pub fn bends(pts: &[(f64, f64, f64)], r: f64, steps: usize) -> Vec<(f64, f64, f6
     }
     out.push(pts[pts.len() - 1]);
     out
-}
-
-/// Python's `min` of two: the first unless the second is strictly below it.
-pub fn py_min(a: f64, b: f64) -> f64 {
-    if b < a { b } else { a }
-}
-
-/// Python's `max` of two: the first unless the second is strictly above it.
-pub fn py_max(a: f64, b: f64) -> f64 {
-    if b > a { b } else { a }
 }

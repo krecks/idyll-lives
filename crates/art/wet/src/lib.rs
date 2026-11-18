@@ -3,6 +3,19 @@
 
 use artkit::family::Family;
 
+/// The kitchen's and the cookers' `pull` as their scripts called it: `pull!(F, name, a, b, face, out = .., r = None,
+/// ...)`. Without a material it is the chrome of the family that calls it (its own `M`).
+macro_rules! pull {
+    ($f:expr, $name:expr, $a:expr, $b:expr, $face:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        #[allow(unused_mut)]
+        let mut o = $crate::common::Pull::default();
+        $(o.$k = $v;)*
+        $crate::common::pull($f, $name, $a, $b, $face, o.material.unwrap_or(M.chrome), o.out, o.w, o.t, o.r, o.verts)
+    }};
+}
+
+mod common;
+
 pub mod bathroom;
 pub mod kitchen;
 pub mod kitchen_cooking;

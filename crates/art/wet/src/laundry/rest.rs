@@ -7,15 +7,10 @@ use artkit::json::float_repr;
 use artkit::kit::fillet;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, TAU, cos, cosd, radians, sin, sind};
-use artkit::parts::{Settle, join_all, new_parts, settle_all, settle_with};
+use artkit::parts::{join_all, new_parts, settle_all};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
-use artkit::{cube, fbox, fextrude, fsweep, loft, revolve, soft, soft_box, sphere, sweep};
-
-/// `G.settle` with its `centre` and `floor`.
-fn settle(centre: bool, floor: bool) {
-    settle_with(&meshes(), Settle { centre, floor });
-}
+use artkit::{cube, fbox, fextrude, fsweep, loft, revolve, settle, soft, soft_box, sphere, sweep};
 
 // --- the towel rail: two chrome bars on the wall, towels over them ----------------------------------------
 
@@ -159,7 +154,7 @@ pub fn towel_rail() -> Vec<Obj> {
         );
     });
     join_all("towelRail");
-    settle(false, false); // on the wall, at its real height
+    settle!(centre = false, floor = false); // on the wall, at its real height
     meshes()
 }
 
@@ -239,7 +234,7 @@ pub fn towel_ladder() -> Vec<Obj> {
         }
     });
     join_all("towelLadder");
-    settle(false, true);
+    settle!(centre = false);
     meshes()
 }
 
@@ -387,7 +382,7 @@ pub fn laundry_basket() -> Vec<Obj> {
         );
     });
     join_all("laundryBasket");
-    settle(false, true);
+    settle!(centre = false);
     meshes()
 }
 
@@ -501,7 +496,7 @@ pub fn washing_basket() -> Vec<Obj> {
         }
     });
     join_all("washingBasket");
-    settle(false, true);
+    settle!(centre = false);
     meshes()
 }
 
@@ -558,7 +553,7 @@ pub fn washing_armful() -> Vec<Obj> {
         );
     });
     join_all("washingArmful");
-    settle(false, true);
+    settle!(centre = false);
     meshes()
 }
 
@@ -599,7 +594,7 @@ pub fn washing_piece() -> Vec<Obj> {
         );
     });
     join_all("washingPiece");
-    settle(false, true);
+    settle!(centre = false);
     meshes()
 }
 

@@ -2,14 +2,13 @@
 
 use super::M;
 use super::common::{bends, bottle, tube, wall_rose};
-use super::shower_parts::{frame, grate, grow_on, head, post, rain};
+use super::shower_parts::{frame, grate, head, post, rain};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
-use artkit::math::Axis;
 use artkit::parts::{join, new_parts, settle_all};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fsweep, soft};
+use artkit::{fbox, fcyl, fsweep, grow, soft};
 
 pub fn shower_walk_in() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
@@ -210,7 +209,7 @@ pub fn shower_walk_in() -> Vec<Obj> {
     join(&still, "body", Some((0, 0, 0).into()));
     let rain = rain(&f, (0.0, 2.207, -0.08), 0.14, 0.04, 3, None, None);
     settle_all();
-    grow_on(rain, "water_on", 0.5, Axis::Z);
+    grow!(rain, "water_on", seconds = 0.5);
     meshes()
 }
 
@@ -426,6 +425,6 @@ pub fn shower_rain() -> Vec<Obj> {
     join(&still, "body", Some((0, 0, 0).into()));
     let rain = rain(&f, (0.0, 2.158, 0.0), 0.0, 0.08, 2, Some((5, 0.055)), None);
     settle_all();
-    grow_on(rain, "water_on", 0.5, Axis::Z);
+    grow!(rain, "water_on", seconds = 0.5);
     meshes()
 }

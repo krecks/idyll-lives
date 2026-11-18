@@ -1,7 +1,7 @@
 //! The wall cabinets (K5): two shaker doors, glazed doors, a corner cabinet with open shelves; their doors swing open
 //! while clean things are put away in them. A wall thing sits on the wall face (z = WALL) at its real height.
 
-use super::common::{pull, settle_in_place, shaker};
+use super::common::{pull, shaker};
 use super::storage::{WALL, case, shelf};
 use super::turned::{bowl, jug, lathe, mug, plates};
 use super::{M, WALL_DOOR_SECONDS};
@@ -10,7 +10,7 @@ use artkit::motion::Ease;
 use artkit::parts::{join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fextrude, fsphere, swing};
+use artkit::{fbox, fextrude, fsphere, settle, swing};
 
 /// A strip light under a wall cabinet, its top at `y`: a slim housing and its diffuser.
 fn strip_light(f: &GameFrame, w: f64, y: f64, z: f64) {
@@ -126,7 +126,7 @@ pub fn wall_cabinet() -> Vec<Obj> {
             Some(f.at(s as f64 * 0.487, 1.81, WALL + 0.34)),
         ));
     }
-    settle_in_place();
+    settle!(centre = false, floor = false);
     swing!(
         doors[0],
         "doors_open",
@@ -334,7 +334,7 @@ pub fn wall_cabinet_glass() -> Vec<Obj> {
             Some(f.at(s as f64 * 0.48, 1.81, WALL + 0.36)),
         ));
     }
-    settle_in_place();
+    settle!(centre = false, floor = false);
     // only the right door, in front of the plates, swings open: each glazed door is two draws (frame, glass)
     swing!(
         doors[1],
@@ -511,7 +511,7 @@ pub fn wall_cabinet_corner() -> Vec<Obj> {
         );
     });
     let door = join(&parts, "door", Some(f.at(-0.47, 1.81, WALL + 0.36)));
-    settle_in_place();
+    settle!(centre = false, floor = false);
     swing!(
         door,
         "door_open",

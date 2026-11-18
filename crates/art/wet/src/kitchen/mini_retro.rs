@@ -1,11 +1,11 @@
 //! The pastel-pink retro mini fridge, as in the reference photo.
 
 use super::M;
-use super::common::{apple, carton, gasket, jar, soft, tube};
+use super::common::{apple, carton, gasket, jar, soft};
 use super::cut::cut_cabinet;
 use super::fridge::{bottle, door_bin};
 use super::sticker::unicorn;
-use artkit::kit::Letters;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::motion::Ease;
 use artkit::parts::{hinged, join, new_parts, settle_all};
@@ -16,16 +16,7 @@ use artkit::{fbox, fcone, fcyl, swing};
 /// Raised metal letters on a face at game depth `at[2]`, centred on (x, height), facing the front: block letters
 /// of a text `size` high, 3 mm proud, spaced as Blender's text with a character spacing of 1.25 (the kit's).
 fn letters(f: &GameFrame, text: &str, at: (f64, f64, f64), size: f64, material: Mat) -> Obj {
-    artkit::kit::letters(
-        f,
-        "letters",
-        text,
-        size,
-        0.003,
-        at,
-        material,
-        Letters { space: 1.25 },
-    )
+    kit::letters!(f, "letters", text, size, 0.003, at, material, space = 1.25)
 }
 
 /// A pastel-pink retro mini fridge, as in the reference photo: a soft rounded cabinet on tapered brass
@@ -200,7 +191,7 @@ pub fn fridge_mini_retro() -> Vec<Obj> {
             (hx, y1, out - 0.006),
             (hx, y1 + 0.02, front),
         ];
-        tube(&fp, "handle", &pts, 0.0095, M.gold, Some(8), 3, 1.0);
+        kit::tube!(fp, "handle", &pts, 0.0095, M.gold, verts = 8, round = 3);
         for (i, y) in [y0 - 0.02, y1 + 0.02].into_iter().enumerate() {
             fcyl!(
                 fp,

@@ -11,10 +11,10 @@ use super::common::{LATHE, Lathe, WALL, lathe, rose, tube, wall_rose};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{Axis, TAU, cos, sin};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fsphere, fsweep, soft, swing};
+use artkit::{fbox, fcyl, fsphere, fsweep, settle, soft, swing};
 
 pub const EGG: f64 = 0.1;
 
@@ -417,18 +417,6 @@ fn close_coupled(
     cistern(f, cw, ch, rim, cz, M.cistern);
 }
 
-/// `G.settle(centre=False)`, then the lid's clip.
-fn lift(lid: Obj, seconds: f64) {
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
-    swing!(lid, "lid_up", -100, seconds = seconds, axis = Axis::X);
-}
-
 pub fn toilet() -> Vec<Obj> {
     let f = GameFrame::new(0.0);
     let (r, ratio, rim) = (0.18, 1.2, 0.405); // the seat's top at 0.43 m (SEATS)
@@ -440,7 +428,8 @@ pub fn toilet() -> Vec<Obj> {
     });
     join(&still, "body", Some((0, 0, 0).into()));
     let lid = lid(&f, zb, rim + 0.024, r, ratio, M.seat, 0.02, false);
-    lift(lid, 0.6);
+    settle!(centre = false);
+    swing!(lid, "lid_up", -100, seconds = 0.6, axis = Axis::X);
     meshes()
 }
 
@@ -480,7 +469,8 @@ pub fn toilet_compact() -> Vec<Obj> {
     });
     join(&still, "body", Some((0, 0, 0).into()));
     let lid = lid(&f, zb, rim + 0.024, r, ratio, M.seat, 0.02, false);
-    lift(lid, 0.6);
+    settle!(centre = false);
+    swing!(lid, "lid_up", -100, seconds = 0.6, axis = Axis::X);
     meshes()
 }
 
@@ -506,7 +496,8 @@ pub fn toilet_classic() -> Vec<Obj> {
     });
     join(&still, "body", Some((0, 0, 0).into()));
     let lid = lid(&f, zb, rim + 0.024, r, ratio, M.seat_wood, 0.02, false);
-    lift(lid, 0.6);
+    settle!(centre = false);
+    swing!(lid, "lid_up", -100, seconds = 0.6, axis = Axis::X);
     meshes()
 }
 
@@ -635,7 +626,8 @@ pub fn toilet_smart() -> Vec<Obj> {
     join(&still, "body", Some((0, 0, 0).into()));
     // the lid is level with the housing's top and hinged on its front edge, so it lifts over it
     let lid = lid(&f, zb, rim + 0.03, r, ratio, M.seat, 0.025, true);
-    lift(lid, 0.8);
+    settle!(centre = false);
+    swing!(lid, "lid_up", -100, seconds = 0.8, axis = Axis::X);
     meshes()
 }
 
@@ -708,6 +700,7 @@ pub fn toilet_wall_hung() -> Vec<Obj> {
     });
     join(&still, "body", Some((0, 0, 0).into()));
     let lid = lid(&f, zb, rim + 0.024, r, ratio, M.seat, 0.02, false);
-    lift(lid, 0.6);
+    settle!(centre = false);
+    swing!(lid, "lid_up", -100, seconds = 0.6, axis = Axis::X);
     meshes()
 }

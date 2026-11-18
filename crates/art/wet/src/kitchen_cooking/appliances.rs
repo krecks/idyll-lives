@@ -1,9 +1,11 @@
 //! The microwave counter and the small appliances: the coffee machine, the breakfast counter and two dishwashers,
 //! each on a base unit under a worktop.
 
-use super::common::{fillet, hollow, knob, py_max, shaker, tube};
+use super::common::{fillet, hollow, knob};
 use super::{M, SECONDS};
+use crate::common::shaker;
 use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::Axis;
 use artkit::motion::{Ease, Grow, Spin, grow, spin};
@@ -349,7 +351,7 @@ fn stream(
     material: Mat,
     r: f64,
 ) -> Obj {
-    let length = py_max(0.05, top_y - bottom_y);
+    let length = artkit::py::max(0.05, top_y - bottom_y);
     let parts = new_parts(|| {
         fcyl!(
             f,
@@ -402,7 +404,7 @@ pub fn coffee_machine() -> Vec<Obj> {
             bevel = 0.004,
             bevel_segments = 1
         );
-        tube(
+        kit::tube!(
             f,
             "warming_rail",
             &fillet(
@@ -417,9 +419,8 @@ pub fn coffee_machine() -> Vec<Obj> {
             ),
             0.004,
             M.chrome,
-            Some(6),
-            1,
-            1.0,
+            verts = 6,
+            round = 1
         );
         // the group head and the portafilter locked in under it, its handle out to the side
         let h = f.at(-0.14, 1.15, -0.11);
@@ -546,7 +547,7 @@ pub fn coffee_machine() -> Vec<Obj> {
                 rot = (90, 0, 0)
             );
         }
-        tube(
+        kit::tube!(
             f,
             "steam_wand",
             &[
@@ -557,9 +558,8 @@ pub fn coffee_machine() -> Vec<Obj> {
             ],
             0.0055,
             M.chrome,
-            Some(6),
-            3,
-            1.0,
+            verts = 6,
+            round = 3
         );
         let h = f.at(-0.06, 1.262, -0.30);
         let (hx, hy, hz) = (h.x, h.y, h.z);

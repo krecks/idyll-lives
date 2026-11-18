@@ -3,15 +3,15 @@
 
 use super::M;
 use super::common::{
-    LATHE, Lathe, Ring, bends, bowl_shell, drain, gooseneck, lathe, pull, shaker, tube, water,
+    LATHE, Lathe, Ring, bends, bowl_shell, drain, gooseneck, lathe, pull, shaker, tube,
 };
-use super::sinks::water_on;
+use crate::common::water;
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::parts::{join, new_parts, settle_all};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fsweep, soft};
+use artkit::{fbox, fcyl, fsweep, grow, soft};
 
 // --- double vanity: a two-basin cabinet ----------------------------------------------------------------
 // No mirrors: the player hangs the ones they like above it (the wall mirror, the mirror cabinet).
@@ -151,10 +151,13 @@ pub fn vanity_double() -> Vec<Obj> {
         }
     });
     join(&still, "body", Some((0, 0, 0).into()));
-    let waters: Vec<Obj> = tips.iter().map(|&tip| water(&f, tip, 0.785)).collect();
+    let waters: Vec<Obj> = tips
+        .iter()
+        .map(|&tip| water(&f, tip, 0.785, M.water))
+        .collect();
     settle_all();
     for water in waters {
-        water_on(water);
+        grow!(water, "water_on", seconds = 0.4);
     }
     meshes()
 }
@@ -299,9 +302,9 @@ pub fn sink_vessel() -> Vec<Obj> {
         }
     });
     join(&still, "body", Some((0, 0, 0).into()));
-    let water = water(&f, spout, 0.785);
+    let water = water(&f, spout, 0.785, M.water);
     settle_all();
-    water_on(water);
+    grow!(water, "water_on", seconds = 0.4);
     meshes()
 }
 
@@ -432,8 +435,8 @@ pub fn sink_console() -> Vec<Obj> {
         );
     });
     join(&still, "body", Some((0, 0, 0).into()));
-    let water = water(&f, spout, 0.81);
+    let water = water(&f, spout, 0.81, M.water);
     settle_all();
-    water_on(water);
+    grow!(water, "water_on", seconds = 0.4);
     meshes()
 }

@@ -8,10 +8,10 @@ use artkit::kit::fillet;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, TAU, cos, cosd, degrees, radians, sin, sind};
 use artkit::motion::{Ease, Spin, spin};
-use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
+use artkit::parts::{hinged, join, new_parts};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fextrude, fsweep, revolve, sphere, swing};
+use artkit::{fbox, fextrude, fsweep, revolve, settle, sphere, swing};
 
 const ZERO: P3 = P3 {
     x: 0.0,
@@ -501,13 +501,7 @@ fn machine(dryer: bool) -> Vec<Obj> {
     };
     let drum = drum(f, &washing, if dryer { 1 } else { 0 });
     let door = door(f, ring);
-    settle_with(
-        &meshes(),
-        Settle {
-            centre: false,
-            floor: true,
-        },
-    );
+    settle!(centre = false);
     swing!(door, "door_open", 110, seconds = 1.0, ease = Ease::BackOut);
     // (The dryer tumbles slower than the washer turns.)
     spin(

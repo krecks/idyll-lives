@@ -2,7 +2,7 @@
 //! swing open (`doors_open`) for a snack. A wall thing sits on the wall face (z = WALL) at its real height:
 //! `on_wall`, centred in x and depth.
 
-use super::common::{pull, py_max, shaker};
+use super::common::{pull, shaker};
 use super::turned::{bowl, can, canister, lathe, plates};
 use super::{DOOR_SECONDS, M};
 use artkit::materials::Mat;
@@ -10,6 +10,7 @@ use artkit::math::P3;
 use artkit::motion::Ease;
 use artkit::parts::{join, new_parts, settle_all};
 use artkit::place::{Coord, GameFrame};
+use artkit::py;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcyl, loft, ring, sweep, swing};
 
@@ -124,7 +125,7 @@ pub fn lathe_at(
 ) -> Obj {
     let sections: Vec<Vec<P3>> = profile
         .iter()
-        .map(|&(r, h)| ring!(py_max(r, 1e-5), py_max(r, 1e-5), z = h, verts = verts))
+        .map(|&(r, h)| ring!(py::max(r, 1e-5), py::max(r, 1e-5), z = h, verts = verts))
         .collect();
     loft!(name, &sections, material = material, at = at, rot = rot)
 }

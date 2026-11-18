@@ -8,15 +8,15 @@
 use super::M;
 use super::common::{bends, bottle, tube, wall_rose};
 use super::shower_parts::{
-    bar_mixer, caddy, curtain, curtain_rings, frame, grate, grow_on, hand_shower, head, rain,
-    tiled_walls, tray,
+    bar_mixer, caddy, curtain, curtain_rings, frame, grate, hand_shower, head, rain, tiled_walls,
+    tray,
 };
 use artkit::forms::rounded_rect;
 use artkit::math::{Axis, cos, radians, sin};
 use artkit::parts::{join, new_parts, settle_all};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsweep, slide};
+use artkit::{fbox, fcyl, fextrude, fsweep, grow, slide};
 
 // The base shower's sliding door goes this far left (Blender +x is the game's -x), behind the fixed panel; the
 // stall's front curtain is gathered to this part of its length at rest.
@@ -202,7 +202,7 @@ pub fn shower() -> Vec<Obj> {
     let rain = rain(&f, (0.0, 1.988, -0.15), 0.095, 0.06, 2, None, None);
     settle_all();
     slide!(door, "door_open", (SHOWER_SLIDE, 0, 0), seconds = 0.7);
-    grow_on(rain, "water_on", 0.5, Axis::Z);
+    grow!(rain, "water_on", seconds = 0.5);
     meshes()
 }
 
@@ -382,7 +382,7 @@ pub fn shower_stall() -> Vec<Obj> {
         Some((-0.05, 0.085, -0.02)),
     );
     settle_all();
-    grow_on(curtain, "curtain_draw", 0.9, Axis::X);
-    grow_on(rain, "water_on", 0.5, Axis::Z);
+    grow!(curtain, "curtain_draw", seconds = 0.9, axis = Axis::X);
+    grow!(rain, "water_on", seconds = 0.5);
     meshes()
 }

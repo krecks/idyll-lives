@@ -110,7 +110,7 @@ pub fn folded(
         d,
         (x, y + h / 2.0, z),
         mat,
-        py_min(0.02, h * 0.45),
+        artkit::py::min(0.02, h * 0.45),
         2,
         P3 {
             x: 0.0,
@@ -118,9 +118,4 @@ pub fn folded(
             z: turn,
         },
     )
-}
-
-/// Python's `min` of two: the first unless the second is strictly below it.
-pub fn py_min(a: f64, b: f64) -> f64 {
-    if b < a { b } else { a }
 }

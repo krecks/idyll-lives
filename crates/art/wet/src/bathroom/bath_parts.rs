@@ -10,6 +10,7 @@ use artkit::mesh::Mesh;
 use artkit::motion::{Ease, Grow, Path, grow, keys};
 use artkit::parts::{join, new_parts, set_origin};
 use artkit::place::{Coord, GameFrame};
+use artkit::py;
 use artkit::scene::{self, Obj};
 use artkit::shapes::shade;
 use artkit::{fcone, fcyl, fsphere, fsweep, soft, sphere};
@@ -125,10 +126,8 @@ pub fn bath_water(f: &GameFrame, floor: Section, top: Section, inset: f64) -> Ob
 /// The inside ring (a, b, y, n) at height `y`, between the two inside sections around it (the ones after the rim,
 /// going down).
 pub fn inside_at(sections: &[Section], y: f64) -> Section {
-    let top = sections
-        .iter()
-        .map(|s| s.2)
-        .fold(f64::NEG_INFINITY, |m, h| if h > m { h } else { m });
+    let heights: Vec<f64> = sections.iter().map(|s| s.2).collect();
+    let top = py::max_of(&heights);
     let at = sections.iter().position(|s| s.2 == top).unwrap();
     let inner = &sections[at..];
     for w in inner.windows(2) {
