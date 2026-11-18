@@ -13,16 +13,15 @@
 //! - a corner of three edges at right angles, all cut back alike, takes an eighth of a sphere; any other takes
 //!   a patch subdivided from its sides' profiles;
 //! - the new points come in the order the modifier leaves them (the baked shading twists its rays by a point's
-//!   number): to the point on a box and a cylinder, not on a slab's far face (Blender numbers that by its own
-//!   triangles' order).
+//!   number), on a box, a cylinder and a slab: each corner's from the edge Blender starts it at, which hangs on
+//!   how the mesh's edges are numbered (`EdgeOrder`).
 //!
 //! The normals are hardened: the faces the bevel joins stay flat, and each strip's corners take the normal of
 //! the face they touch (or of the strips either side, between two), so the bevel shades as a rounded edge.
 //! Blender stores each of those normals in the frame of its corner's fan on the mesh the bevel was working on (two
 //! angles, 16 bits each) and the mesh it leaves reads them back in its own fans' frames, the mean of them where
 //! a fan's corners were given unlike ones: so are they here, which is why a normal is now and then not the one
-//! given (round a profile's middle point it leans to one side). On a slab's far face the fans are not always
-//! Blender's (its faces there are in an order of its own).
+//! given (round a profile's middle point it leans to one side).
 //!
 //! A bevel is asked for (`bevel_edges`, a builder's `bevel`) and given later, as Blender's modifier is: the part
 //! keeps its mesh, which a build can still push about, scale or cut, and is rounded as it is when it is joined
@@ -58,7 +57,8 @@ pub enum EdgeOrder {
     /// Each face's closing side first, then its others, each the way that face runs it (a primitive of Blender's
     /// own).
     Faces,
-    /// These first, in this order, each from its first vertex to its second (an outline's rims, a cylinder's).
+    /// These first, in this order, each from its first vertex to its second; the others after them, as `Corners`
+    /// has them (an outline's rims, every edge of a cylinder).
     Listed(Vec<(u32, u32)>),
 }
 
@@ -925,14 +925,16 @@ pub fn bevelled(
                 "a bevel that ends at a vertex no other bevelled edge reaches isn't built".into(),
             );
         }
-        // Blender walks round from that edge through its newer face; where that is clockwise it turns the
-        // list round all but its last, which leaves it starting two edges on: the new points start from the
-        // first bevelled edge from there
-        if edges[edges.len() - 1].fnext > edges[0].fnext {
-            let n = edges.len();
-            edges.rotate_left(2 % n);
-            let first = edges.iter().position(|h| h.bev).expect("a bevelled edge");
-            edges.rotate_left(first);
+        // Blender lists the vertex's edges from that one on through whichever of its two neighbours the mesh
+        // numbers first, and turns the list over if that went clockwise, which leaves that edge last; the new
+        // points start from the list's last edge if it is bevelled, from its first if not. So they start from
+        // that edge where the list was turned over, and from the edge before it, if bevelled, where it was not
+        let n = edges.len();
+        if n > 2 {
+            let number = |h: &Half| rank[&edge(v, h.to)];
+            if number(&edges[1]) < number(&edges[n - 1]) && edges[n - 1].bev {
+                edges.rotate_right(1);
+            }
         }
         work.corners.insert(
             v,
