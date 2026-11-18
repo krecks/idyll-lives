@@ -404,7 +404,7 @@ const HEX_ACROSS: i64 = 7;
 const HEX_ROWS: i64 = 8;
 const HEX_HALF_JOINT: f64 = 0.0045;
 /// Rows of boards across a tile: floorboards, laminate planks, siding boards, roof courses.
-const FLOOR_WOOD_ROWS: i64 = 14;
+const FLOOR_WOOD_ROWS: i64 = 9;
 const LAMINATE_ROWS: i64 = 8;
 const SIDING_ROWS: i64 = 12;
 const ROOF_COURSES: i64 = 11;
@@ -1014,7 +1014,7 @@ fn board_at(
 /// Not in git and not in a build: the set itself is the variant `""`.
 pub fn variants(name: &str) -> &'static [&'static str] {
     match name {
-        "floor_wood" => &["", "calm", "wide", "widecalm", "oak"],
+        "floor_wood" => &["", "pine", "calm", "wide", "oak"],
         _ => &[""],
     }
 }
@@ -1034,38 +1034,46 @@ struct Boards {
 }
 
 fn boards(variant: &str) -> Boards {
-    let pine = Boards {
+    // The set: nine boards across, 21 cm each, the knots a quarter as dark as a pine board's are and the figure
+    // half, the boards near each other in tone, so that from the play camera (a pixel 4 to 16 mm) a floor is
+    // planks and not dots and streaks (2026-11-18). Its brightness is set so the tile's mean is the narrow
+    // knotty boards' it replaced: a covering's tint (honey, walnut, whitewash) gives the tone it gave.
+    let set = Boards {
         rows: FLOOR_WOOD_ROWS,
-        bright: (0.95, 0.10),
-        figure: 1.0,
-        knots: 1.0,
+        bright: (0.946, 0.058),
+        figure: 0.5,
+        knots: 0.25,
         early: (rgb(212, 164, 106), rgb(194, 144, 88)),
         late: (rgb(178, 122, 70), rgb(160, 106, 58)),
     };
-    // Calm: the knots a quarter as dark, the figure half, the boards nearer each other in tone.
-    let calm = |b: Boards| Boards {
-        bright: (0.97, 0.06),
-        figure: 0.5,
-        knots: 0.25,
+    // The boards before 2026-11-18: 13.5 cm, every knot and all the figure.
+    let pine = |b: Boards| Boards {
+        rows: 14,
+        bright: (0.95, 0.10),
+        figure: 1.0,
+        knots: 1.0,
         ..b
     };
-    // Wide: nine boards across, 21 cm each.
-    let wide = |b: Boards| Boards { rows: 9, ..b };
     match variant {
-        "calm" => calm(pine),
-        "wide" => wide(pine),
-        "widecalm" => wide(calm(pine)),
-        // Oak's tone: less orange and a little darker, wide and calm.
+        "pine" => pine(set),
+        // Calm at the old width; wide with the old knots and figure.
+        "calm" => Boards { rows: 14, ..set },
+        "wide" => Boards {
+            rows: FLOOR_WOOD_ROWS,
+            ..pine(set)
+        },
+        // Oak's own tone: less orange.
         "oak" => Boards {
+            bright: (0.97, 0.06),
             early: (rgb(196, 162, 120), rgb(180, 147, 107)),
             late: (rgb(164, 128, 90), rgb(148, 114, 79)),
-            ..wide(calm(pine))
+            ..set
         },
-        _ => pine,
+        _ => set,
     }
 }
 
-/// Pine floorboards, 13.5 cm wide, running along v.
+/// Pine floorboards, 21 cm wide and calm (`boards`), running along v.
 fn floor_wood(n: &Noise, size: usize, look: &Boards) -> Surface {
     let t = TILE_FLOOR_WOOD;
     let rows = look.rows;
