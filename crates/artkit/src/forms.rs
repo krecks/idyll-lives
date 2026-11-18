@@ -10,7 +10,7 @@
 
 use crate::bevel::{EdgeOrder, bevel_edges};
 use crate::materials::Mat;
-use crate::math::{self, Axis, M4, Num, P3, TAU, V3, dot_v3, v3};
+use crate::math::{self, Axis, M4, Num, P3, TAU, V3, v3};
 use crate::mesh::{Mesh, UvWay};
 use crate::noise::noise;
 use crate::scene::{self, Obj};
@@ -476,33 +476,61 @@ pub fn extrude(name: impl AsRef<str>, outline: &[(f64, f64)], depth: f64, o: Ext
     let (iu, iv, iw) = o.plane.axes();
     let half = -(depth / 2.0) as f32;
     let (lo, hi) = (0.0_f32 + half, depth as f32 + half);
-    let mut verts = Vec::with_capacity(2 * xy.len());
-    for w in [lo, hi] {
-        for p in &xy {
-            let mut co = [0.0_f32; 3];
-            (co[iu], co[iv], co[iw]) = (p[0], p[1], w);
-            verts.push(V3::new(co[0], co[1], co[2]));
+    // (Blender's extrusion copies the face triangle by triangle: the copy's points are numbered as the triangles
+    // first name them, and its sides as they first run them)
+    let mut far = vec![u32::MAX; xy.len()];
+    let mut named = n;
+    for &v in tris.iter().flatten() {
+        if far[v as usize] == u32::MAX {
+            far[v as usize] = named;
+            named += 1;
         }
     }
+    for f in &mut far {
+        if *f == u32::MAX {
+            (*f, named) = (named, named + 1);
+        }
+    }
+    let mut verts = vec![V3::ZERO; 2 * xy.len()];
+    for (i, p) in xy.iter().enumerate() {
+        for (at, w) in [(i, lo), (far[i] as usize, hi)] {
+            let mut co = [0.0_f32; 3];
+            (co[iu], co[iv], co[iw]) = (p[0], p[1], w);
+            verts[at] = V3::new(co[0], co[1], co[2]);
+        }
+    }
+    let far = |v: u32| far[v as usize];
     let mut faces: Vec<Vec<u32>> = tris.iter().map(|t| t.to_vec()).collect();
-    faces.extend(tris.iter().map(|t| vec![t[0] + n, t[1] + n, t[2] + n]));
+    faces.extend(tris.iter().map(|t| t.iter().map(|&v| far(v)).collect()));
     let mut rims = Vec::new();
     let mut at = 0u32;
     for l in &loops {
         let m = l.len() as u32;
         for i in 0..m {
             let (a, b) = (at + i, at + (i + 1) % m);
-            faces.push(vec![a, b, b + n, a + n]);
+            faces.push(vec![a, b, far(b), far(a)]);
             rims.push((a, b));
         }
         at += m;
     }
     // (Blender numbers the outlines' sides first, a face's before its copy's: a rim's bevel starts from them)
-    let order: Vec<(u32, u32)> = rims
-        .iter()
-        .copied()
-        .chain(rims.iter().map(|&(a, b)| (a + n, b + n)))
-        .collect();
+    let mut order = rims.clone();
+    for t in &tris {
+        for i in 0..3 {
+            let (a, b) = (t[i], t[(i + 1) % 3]);
+            for side in [(a, b), (b, a)] {
+                let copy = (far(side.0), far(side.1));
+                if rims.contains(&side) && !order.contains(&copy) {
+                    order.push(copy);
+                }
+            }
+        }
+    }
+    for &(a, b) in &rims {
+        if !order.contains(&(far(a), far(b))) {
+            order.push((far(a), far(b)));
+        }
+    }
     let sides_from = faces.len() - rims.len();
     let mut mesh = Mesh::from_pydata(verts, &faces);
     mesh.set_material(o.material);
@@ -556,134 +584,39 @@ macro_rules! extrude {
 // ---- after making -------------------------------------------------------------------------------------
 
 /// Cuts `obj` (in place) by the plane through `co` facing `no` (Blender world), dropping what lies in front
-/// of it; `cap` closes the cut with a flat face of its own: half of a lofted disc, a fracture across a stone,
-/// a lump cut off at the ground. For a closed mesh; a point within a tenth of a millimetre of the plane is on it.
+/// of it; `cap` closes the cut with a flat face of its own: half of a lofted disc, a lump cut off at the ground.
+/// Blender's `bisect_plane` with `clear_outer` and `holes_fill` (`edit::bisect_plane`, `edit::holes_fill`,
+/// which a build calls itself for another `dist`, or to cut its triangles after): only the points the cut makes
+/// are on the plane (`dist` 0).
 pub fn bisect(obj: Obj, co: impl Into<P3>, no: impl Into<P3>, cap: bool) -> Obj {
     let world = obj.matrix_world();
-    let back = world.inverted().unwrap_or(M4::IDENTITY);
-    let (co, no): (V3, V3) = (co.into().into(), no.into().into());
-    let no = no.normalized();
     obj.edit(|part| {
         // (a bevel still to be given rounds the cut mesh, whose points are numbered anew)
         if let Some(bevel) = &mut part.bevel {
             (bevel.order, bevel.sides_from) = (EdgeOrder::Corners, None);
         }
-        let old = &part.mesh;
-        let dist = 0.0001_f32;
-        // which side of the plane each point is on: -1 behind (kept), 0 on it, 1 in front
-        let at: Vec<V3> = old
-            .verts
-            .iter()
-            .map(|&v| if world.is_identity() { v } else { world * v })
-            .collect();
-        let d: Vec<f32> = at.iter().map(|&p| dot_v3(no, p - co)).collect();
-        let side: Vec<i8> = d
-            .iter()
-            .map(|&x| {
-                if x > dist {
-                    1
-                } else if x < -dist {
-                    -1
-                } else {
-                    0
-                }
-            })
-            .collect();
-        let mut new = Mesh {
-            mats: old.mats.clone(),
-            ..Mesh::default()
-        };
-        let mut kept = vec![u32::MAX; old.verts.len()];
-        for (i, &p) in at.iter().enumerate() {
-            if side[i] <= 0 {
-                kept[i] = new.verts.len() as u32;
-                new.verts.push(p);
-            }
-        }
-        // the point where an edge crosses the plane, made once
-        let mut crossings: std::collections::BTreeMap<(u32, u32), u32> =
-            std::collections::BTreeMap::new();
-        let mut cross = |new: &mut Mesh, a: u32, b: u32| -> u32 {
-            let key = crate::mesh::edge(a, b);
-            *crossings.entry(key).or_insert_with(|| {
-                let (da, db) = (d[key.0 as usize].abs(), d[key.1 as usize].abs());
-                let t = da / (da + db);
-                let (p, q) = (at[key.0 as usize], at[key.1 as usize]);
-                let s = 1.0 - t;
-                new.verts.push(V3::new(
-                    s * p.x + t * q.x,
-                    s * p.y + t * q.y,
-                    s * p.z + t * q.z,
-                ));
-                new.verts.len() as u32 - 1
-            })
-        };
-        // each face: its corners behind the plane, with the crossings where it goes through
-        let mut cut_edges: Vec<(u32, u32)> = Vec::new();
-        for f in 0..old.faces.len() {
-            let c = old.corners(f);
-            let n = c.len();
-            let mut out: Vec<u32> = Vec::new();
-            let mut on_plane: Vec<u32> = Vec::new();
-            for i in 0..n {
-                let (a, b) = (c[i], c[(i + 1) % n]);
-                let (sa, sb) = (side[a as usize], side[b as usize]);
-                if sa <= 0 {
-                    out.push(kept[a as usize]);
-                    if sa == 0 {
-                        on_plane.push(kept[a as usize]);
-                    }
-                }
-                if sa * sb < 0 {
-                    let x = cross(&mut new, a, b);
-                    out.push(x);
-                    on_plane.push(x);
-                }
-            }
-            let behind = c.iter().any(|&v| side[v as usize] < 0);
-            if out.len() >= 3 && behind {
-                // the side of it that lies along the plane, as the face runs it
-                for i in 0..out.len() {
-                    let (a, b) = (out[i], out[(i + 1) % out.len()]);
-                    if on_plane.contains(&a) && on_plane.contains(&b) && a != b {
-                        cut_edges.push((a, b));
-                    }
-                }
-                new.push_face(&out, old.faces[f].mat, old.faces[f].smooth);
-            }
-        }
-        if cap {
-            // the cut's edges chained into loops, each run against the faces' way so the cap looks out
-            let mut next: std::collections::BTreeMap<u32, u32> = std::collections::BTreeMap::new();
-            for &(a, b) in &cut_edges {
-                next.insert(b, a);
-            }
-            while let Some((&start, _)) = next.iter().next() {
-                let mut ring = vec![start];
-                let mut v = start;
-                while let Some(w) = next.remove(&v) {
-                    if w == start {
-                        break;
-                    }
-                    ring.push(w);
-                    v = w;
-                }
-                if ring.len() >= 3 {
-                    new.push_face(&ring, 0, false);
-                }
-            }
-        }
-        if !world.is_identity() {
-            new.verts.iter_mut().for_each(|v| *v = back * *v);
-        }
-        new.sharp = old
-            .sharp
-            .iter()
-            .filter(|e| kept[e.0 as usize] != u32::MAX && kept[e.1 as usize] != u32::MAX)
-            .map(|e| crate::mesh::edge(kept[e.0 as usize], kept[e.1 as usize]))
-            .collect();
-        part.mesh = new;
+        part.mesh.transform(&world);
     });
+    let cut = crate::edit::bisect_plane(
+        obj,
+        co,
+        no,
+        crate::edit::Bisect {
+            clear_outer: true,
+            ..Default::default()
+        },
+    );
+    if cap {
+        let made = crate::edit::holes_fill(obj, &cut);
+        obj.edit(|part| {
+            for f in made {
+                part.mesh.faces[f].smooth = false;
+            }
+        });
+    }
+    if let Some(back) = world.inverted() {
+        obj.edit(|part| part.mesh.transform(&back));
+    }
     obj
 }
 

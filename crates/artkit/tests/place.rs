@@ -179,7 +179,19 @@ fn a_part_is_cut_across_and_closed() {
             ..Cube::default()
         },
     );
-    bisect(placed, (3.0, 0.0, 0.0), (1.0, 0.0, 0.0), true);
+    // (the plane goes through four of its corners: they count as on it within a tenth of a millimetre, which
+    // Blender's `dist` says; with none, as `bisect` cuts, each would be a sliver's corner)
+    let world = placed.matrix_world();
+    placed.edit(|o| o.mesh.transform(&world));
+    let cut = artkit::bisect_plane!(
+        placed,
+        (3.0, 0.0, 0.0),
+        (1.0, 0.0, 0.0),
+        dist = 0.0001,
+        clear_outer = true
+    );
+    artkit::edit::holes_fill(placed, &cut);
+    placed.edit(|o| o.mesh.transform(&world.inverted().unwrap()));
     let world: Vec<V3> = placed.world_points();
     assert_eq!(world.len(), 6);
     assert!(world.iter().all(|p| p.x <= 3.0 + 1e-6));
