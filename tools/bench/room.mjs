@@ -19,6 +19,7 @@
  *   --gpu <secs>      instead of pictures: the GPU's time per frame (`?gpustats`), the 9.5 m pose held for <secs>,
  *                     one page at a time, each variant in turn and the round repeated `--runs` times (default 3);
  *                     medians to `<out>/gpu.json` and the console
+ *   --floor <id>      the room's floor laid in a floor covering first (`wood.honey`, `tile.white`: content's `floorCoverings`)
  *   --nudge <m>       the camera's target moved this far along x and z (0.004: a quarter of a pixel at 9.5 m; the same
  *                     pictures taken so and `cargo shots steady <dirA> <dirB>` say what shimmers as the camera moves)
  *   --url <base>      a dev server already running (else its own Vite on --port, --strictPort)
@@ -61,7 +62,7 @@ const ROOM = [
 ];
 /** The play camera over the room: from the front right, looking at the sofa's corner. */
 const CAMERA = { alpha: -0.95, beta: 0.86, target: [8, 0, 15] };
-const HOURS = { 11: 'day', 16: 'afternoon', 19.5: 'dusk' };
+const HOURS = { 11: 'day', 16: 'afternoon', 19.5: 'dusk', 22: 'night' };
 
 const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '-');
 const group = flag('sheet', null);
@@ -74,6 +75,13 @@ const clip = flag('clip', '280,40,1480,940').split(',').map(Number);
 const gpuSecs = Number(flag('gpu', '0'));
 const atOnce = gpuSecs ? 1 : Number(flag('at', '3'));
 const nudge = Number(flag('nudge', '0'));
+/** The floor covering to lay (`--floor`): its number in content's list, from 1. */
+const floor = flag('floor', null);
+const covering = floor ? JSON.parse(readFileSync(join(WEB, 'public/content/base.json'), 'utf8')).floorCoverings.findIndex((c) => c.id === floor) + 1 : 0;
+if (floor && !covering) {
+  console.error(`no floor covering ${floor}`);
+  process.exit(2);
+}
 
 const dirOf = (name) => join(out, name.replace(/[^\w.-]+/g, '-').replace(/^-|-$/g, ''));
 let variants;
@@ -144,6 +152,12 @@ async function open(tune, preset, backend, hour, more = '') {
       .then((h) => h.jsonValue())
       .catch(() => null);
     if (id === null) errors.push(`not bought: ${def} at ${at} (${await page.evaluate(() => [...document.querySelectorAll('.toast')].map((e) => e.textContent.trim()).join(' | '))})`);
+  }
+  if (covering) {
+    // (The state's room: (4, 6) to (16, 18).)
+    const tiles = [];
+    for (let z = 6; z < 18; z++) for (let x = 4; x < 16; x++) tiles.push({ x, z, covering });
+    await page.evaluate((tiles) => window.__send({ type: 'paintFloor', household: 0, tiles }), tiles);
   }
   // A moment of play (the lamps come on, the things settle), then the picture held still.
   await page.evaluate(() => window.__send({ type: 'setSpeed', speed: 1 }));
