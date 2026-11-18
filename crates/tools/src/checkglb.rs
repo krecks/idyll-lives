@@ -5733,8 +5733,11 @@ mod tests {
         // Over every model, a key that is no model is stale, and taken out.
         set("{\"edges\": {\"model.gone\": 2}}\n");
         let none: &[(&'static str, FileCheck)] = &[("edges", nothing)];
+        // (A stub check finds nothing, so a model that accepts `edges` fails for its accept being unused: counted
+        // apart, each with that one error.)
+        let unused = |t: &str| t.matches("error: `accept.edges` is unused").count();
         let r = run_gate(&paths, &[], none, &[]);
-        assert_eq!(r.failed, 1, "{}", r.text);
+        assert_eq!(r.failed, 1 + unused(&r.text), "{}", r.text);
         assert!(r.text.contains("FAIL gate-baseline.json\n       error: edges: model.gone is no model the gate checked"), "{}", r.text);
         assert_eq!(
             update_with(&paths, &[], none, &[]).unwrap(),
@@ -5747,7 +5750,7 @@ mod tests {
         // The built world's sections are its own gate's to judge (`built::CHECKS`): left as they are.
         set("{\"built.edges\": {\"house.cottage\": 3}}\n");
         let r = run_gate(&paths, &[], none, &[]);
-        assert_eq!(r.failed, 0, "{}", r.text);
+        assert_eq!(r.failed, unused(&r.text), "{}", r.text);
         assert!(update_with(&paths, &[], none, &[]).unwrap().is_empty());
         assert_eq!(read(), "{\"built.edges\": {\"house.cottage\": 3}}\n");
         // A baseline that can't be read fails the gate.
