@@ -90,10 +90,12 @@ options! {
 #[macro_export]
 macro_rules! soft_box {
     ($name:expr, $size:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($name, $size);
         #[allow(unused_mut)]
         let mut o = $crate::soft::SoftBox::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::soft::soft_box($name, $size, o)
+        $crate::soft::soft_box(args.0, args.1, o)
     }};
 }
 

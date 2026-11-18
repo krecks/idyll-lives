@@ -60,6 +60,13 @@ pub fn shade(obj: Obj, smooth: bool, angle: f64) -> Obj {
     obj
 }
 
+/// gamekit's `shapes._recalc_normals`, which a script may call itself (and `bmesh.ops.recalc_face_normals` over
+/// all a mesh's faces): each connected piece of `obj`'s mesh wound one way, looking outwards.
+pub fn recalc_normals(obj: Obj) -> Obj {
+    obj.edit(|o| o.mesh.recalc_normals());
+    obj
+}
+
 /// A size: one number for all three sides, or (x, y, z).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Size(pub P3);
@@ -268,10 +275,12 @@ pub fn torus(name: impl AsRef<str>, major_radius: f64, minor_radius: f64, o: Tor
 #[macro_export]
 macro_rules! torus {
     ($name:expr, $major:expr, $minor:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = ($name, $major, $minor);
         #[allow(unused_mut)]
         let mut o = $crate::shapes::Torus::default();
         $(o.$k = $crate::Arg::arg($v);)*
-        $crate::shapes::torus($name, $major, $minor, o)
+        $crate::shapes::torus(args.0, args.1, args.2, o)
     }};
 }
 
