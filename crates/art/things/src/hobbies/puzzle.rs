@@ -4,9 +4,8 @@
 
 use super::M;
 use super::common::{rr, stool, turned};
-use super::kit::Run;
-use super::kit::call::moulding;
 use artkit::json::float_repr as r;
+use artkit::kit;
 use artkit::math::{Axis, P3, PI, cosd, sin, sind};
 use artkit::motion::{Grow, grow};
 use artkit::parts::{Settle, join, new_parts, settle_with};
@@ -164,7 +163,7 @@ pub fn puzzle_table() -> Vec<Obj> {
             bevel = 0.002,
             bevel_segments = 1
         );
-        moulding!(
+        kit::moulding!(
             f,
             "board_rim",
             &[(0.29, 0.4), (-0.29, 0.4), (-0.29, 0.0), (0.29, 0.0)],
@@ -177,7 +176,7 @@ pub fn puzzle_table() -> Vec<Obj> {
             ],
             M.puzzle_board,
             at = 0.7525,
-            plane = Run::Top
+            plane = Facing::Top
         );
         picture(&f, "done", -0.27, PUZZLE_EDGE);
         fcyl!(

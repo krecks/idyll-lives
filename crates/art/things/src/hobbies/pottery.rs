@@ -6,9 +6,9 @@
 
 use super::M;
 use super::common::stool;
-use super::kit::call::tube;
 use artkit::forms::smooth_outline;
 use artkit::json::float_repr as r;
+use artkit::kit;
 use artkit::math::{Axis, P3};
 use artkit::motion::{Grow, Spin, grow, spin};
 use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
@@ -173,7 +173,7 @@ pub fn pottery_wheel() -> Vec<Obj> {
             M.wheel_body,
             rot = (-6, 0, 0)
         );
-        tube!(
+        kit::tube!(
             f,
             "pedal_cable",
             &[
@@ -218,7 +218,7 @@ pub fn pottery_wheel() -> Vec<Obj> {
             bevel = 0.008,
             bevel_segments = 1
         );
-        tube!(
+        kit::tube!(
             f,
             "wire_tool",
             &[(0.12, 0.39, WHEEL_Z + 0.16), (0.18, 0.39, WHEEL_Z + 0.1)],

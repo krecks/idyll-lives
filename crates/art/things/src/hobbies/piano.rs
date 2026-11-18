@@ -5,9 +5,9 @@
 
 use super::M;
 use super::common::{flat_quads, rr, sheet_music, turn_round, turned};
-use super::kit::shaker;
 use artkit::forms::smooth_outline;
 use artkit::json::float_repr as r;
+use artkit::kit::{self};
 use artkit::math::{Axis, P3, PI, TAU, cos, sin};
 use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
 use artkit::place::{Facing, GameFrame};
@@ -69,18 +69,17 @@ pub fn piano() -> Vec<Obj> {
         );
         // the upper front: a raised panel either side of the music desk, a moulded rail under them
         for s in [-1, 1] {
-            shaker(
-                &f,
-                &format!("upper_panel{s}"),
+            kit::shaker!(
+                f,
+                format!("upper_panel{s}"),
                 0.36,
                 0.3,
                 (s as f64 * 0.52, 1.05, 0.296),
                 0.012,
                 M.piano,
-                0.045,
-                Some(M.piano_trim),
-                0.005,
-                true,
+                rail = 0.045,
+                panel = M.piano_trim,
+                raised = true
             );
         }
         fsweep!(
@@ -280,18 +279,17 @@ pub fn piano() -> Vec<Obj> {
         }
         // the lower case: a framed kneeboard in two raised panels, the back, plinth, the lyre and three pedals
         for s in [-1, 1] {
-            shaker(
-                &f,
-                &format!("kneeboard{s}"),
+            kit::shaker!(
+                f,
+                format!("kneeboard{s}"),
                 0.71,
                 0.6,
                 (s as f64 * 0.355, 0.35, 0.36),
                 0.025,
                 M.piano,
-                0.06,
-                Some(M.piano),
-                0.005,
-                true,
+                rail = 0.06,
+                panel = M.piano,
+                raised = true
             );
         }
         fbox!(f, "back_lower", 1.42, 0.65, 0.02, (0, 0.325, 0.44), M.piano);

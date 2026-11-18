@@ -7,13 +7,12 @@
 
 use super::M;
 use super::common::{P, rr, turned};
-use super::kit::call::moulding;
-use super::kit::{Run, fillet};
 use artkit::json::float_repr as r;
+use artkit::kit::{self, fillet};
 use artkit::math::{P3, TAU, cos, exp, pow, sqrt};
 use artkit::motion::{Grow, Squash, grow, path, squash};
 use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
-use artkit::place::GameFrame;
+use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fextrude, fsweep, sphere};
 
@@ -82,7 +81,7 @@ pub fn pool_table() -> Vec<Obj> {
         );
         // beads round the apron's foot and under the rails, mitred at the corners
         let box_ = [(1.2, 0.65), (-1.2, 0.65), (-1.2, -0.65), (1.2, -0.65)];
-        moulding!(
+        kit::moulding!(
             f,
             "apron_bead",
             &box_,
@@ -95,7 +94,7 @@ pub fn pool_table() -> Vec<Obj> {
             ],
             M.pool_frame,
             at = BED - 0.275,
-            plane = Run::Top
+            plane = Facing::Top
         );
         // a shaped skirt under the long sides' aprons, dropping to a lobe in the middle
         let edge: Vec<(f64, f64)> = (0..25)
@@ -123,7 +122,7 @@ pub fn pool_table() -> Vec<Obj> {
         }
         // the rails: one moulded frame round the bed, rounded over at the top outside edge
         let rails = [(1.25, 0.7), (-1.25, 0.7), (-1.25, -0.7), (1.25, -0.7)];
-        moulding!(
+        kit::moulding!(
             f,
             "rails",
             &rails,
@@ -137,7 +136,7 @@ pub fn pool_table() -> Vec<Obj> {
             ],
             M.pool_frame,
             at = RAIL_TOP - 0.15,
-            plane = Run::Top
+            plane = Facing::Top
         );
         // the cushions: cloth noses along the rails' inside, between the pockets
         let nose = [

@@ -4,9 +4,8 @@
 
 use super::M;
 use super::common::{P, rr};
-use super::kit::Run;
-use super::kit::call::{moulding, tube};
 use artkit::json::float_repr as r;
+use artkit::kit;
 use artkit::math::{Axis, P3, cos, radians, sin, tan};
 use artkit::motion::{Rock, rock};
 use artkit::parts::{hinged, join, new_parts, settle};
@@ -145,7 +144,7 @@ pub fn arcade_cabinet() -> Vec<Obj> {
             bevel = 0.004,
             bevel_segments = 1
         );
-        moulding!(
+        kit::moulding!(
             f,
             "coin_frame",
             &[
@@ -157,7 +156,7 @@ pub fn arcade_cabinet() -> Vec<Obj> {
             &[(0.0, 0.0), (0.0, 0.006), (0.012, 0.006), (0.012, 0.0)],
             M.chrome,
             at = 0.197,
-            plane = Run::Front
+            plane = Facing::Front
         );
         for x in [-0.06, 0.06] {
             fbox!(
@@ -410,7 +409,7 @@ pub fn arcade_cabinet() -> Vec<Obj> {
     join(&still, "body", Some(P3::ZERO));
     let base = on_panel(-0.15, 0.28, 0.0);
     let j = new_parts(|| {
-        tube!(
+        kit::tube!(
             f,
             "stick",
             &[base, (base.0, base.1 + 0.075, base.2)],
