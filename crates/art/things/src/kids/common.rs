@@ -10,6 +10,7 @@ use artkit::motion::{Squash, squash};
 use artkit::noise::noise;
 use artkit::parts::{Settle, hinged, join, measure, new_parts, settle_with};
 use artkit::place::Coord;
+use artkit::py::sum;
 use artkit::scene::{self, Obj, meshes};
 use artkit::{jitter, revolve, soft, swing};
 
@@ -18,9 +19,11 @@ pub type P = (f64, f64, f64);
 
 /// `_add`: the points summed, a coordinate at a time.
 pub fn add(vs: &[P]) -> P {
-    // (Python's sum starts from a whole 0)
-    vs.iter()
-        .fold((0.0, 0.0, 0.0), |a, v| (a.0 + v.0, a.1 + v.1, a.2 + v.2))
+    (
+        sum(vs.iter().map(|v| v.0)),
+        sum(vs.iter().map(|v| v.1)),
+        sum(vs.iter().map(|v| v.2)),
+    )
 }
 
 pub fn mul(v: P, k: f64) -> P {

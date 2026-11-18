@@ -7,6 +7,7 @@ use artkit::math::{P3, PI, cos, radians, sin, sqrt};
 use artkit::motion::{Squash, squash};
 use artkit::parts::{hinged, join};
 use artkit::py::imod;
+use artkit::py::sum;
 use artkit::scene::{Obj, meshes};
 use artkit::{fcyl, fsweep, loft, soft, torus};
 
@@ -23,7 +24,7 @@ fn tent_face(k: i32) -> (Frame, f64) {
     let a = TENT_R * cos(radians(30.0));
     let base = (a * cos(th), 0.0, a * sin(th));
     let up = (-base.0, TENT_H, -base.2);
-    let length = sqrt(0.0 + up.0 * up.0 + up.1 * up.1 + up.2 * up.2);
+    let length = sqrt(sum([up.0 * up.0, up.1 * up.1, up.2 * up.2]));
     (
         plane(base, (sin(th), 0.0, -cos(th)), mul(up, 1.0 / length)),
         length,
@@ -89,7 +90,7 @@ pub fn play_tent() -> Vec<Obj> {
         .collect();
     for (i, &c) in corners.iter().enumerate() {
         let d = add(&[apex, mul(c, -1.0)]);
-        let length = sqrt(0.0 + d.0 * d.0 + d.1 * d.1 + d.2 * d.2);
+        let length = sqrt(sum([d.0 * d.0, d.1 * d.1, d.2 * d.2]));
         let foot = add(&[c, mul(d, -0.012 / length)]);
         let top = add(&[apex, mul(d, 0.28 / length)]);
         fsweep!(
