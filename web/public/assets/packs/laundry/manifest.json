@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built laundry models (tools/art/blender/families/laundry.py). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The washer and the dryer open their door (`door_open`) while a resident loads or empties them, and turn their drum (`drum_spin`) while they run on their own (`running`). The basket of washing and the piece held up to fold are carried (content `items`).",
+  "$comment": "The laundry (crates/art/wet/src/laundry, built by cargo art). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The washer and the dryer open their door (`door_open`) while a resident loads or empties them, and turn their drum (`drum_spin`) while they run on their own (`running`). The basket of washing and the piece held up to fold are carried (content `items`).",
   "version": 1,
   "entries": {
     "model.laundryWasher": {

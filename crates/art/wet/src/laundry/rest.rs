@@ -1,9 +1,10 @@
 //! The towel rail, the towel ladder, the laundry basket, the bath mat, and what is carried doing the laundry.
 
 use super::M;
-use super::common::{WALL, fillet, folded, lump};
+use super::common::{WALL, folded, lump};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
+use artkit::kit::fillet;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, TAU, cos, cosd, radians, sin, sind};
 use artkit::parts::{Settle, join_all, new_parts, settle_all, settle_with};
