@@ -339,7 +339,7 @@ How the parts work:
   - `{'night': 'close'}`: a clip held open from dusk to dawn (curtains drawn).
   - `{'clock': {'hour': 'hour_hand', 'minute': 'minute_hand', 'at': 610}}`: a clock's hands, each a
     whole turn (`G.spin`), held where the game's time has them, on every preset; `at` is what they show
-    at rest, in minutes past twelve (`families/decor.py` `_clock_hands`).
+    at rest, in minutes past twelve (crates/art/rooms/src/decor `clock_hands`).
   - `{'growth': 'grow'}`: a crop's clip, held where its growth stage is (content `grows`). Make it with
     `G.stages(part, 'grow', picked=…, growing=…, planted=…)`, a scale per stage (ripe is the rest
     pose): the fruit `0.001, 0.001, 0.001`, the plants `1, 0.6, 0.25`. Plants spread over a bed in one

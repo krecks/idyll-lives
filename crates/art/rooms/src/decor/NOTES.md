@@ -1,12 +1,12 @@
-# Decor — notes
+# Decor (`crates/art/rooms/src/decor`)
 
-`decor.py` builds the 23 decor models into `web/public/assets/models/decor/` and their entries in
+The module builds the 23 decor models into `web/public/assets/models/decor/` and their entries in
 `packs/decor/manifest.json`: wall art and clocks (D1), ornaments (D2) and textiles (D3). Built 2026-10-14; they sat in Validate ›
 Wall Decor, Ornaments and Textiles until checked in play.
 
 Each is built where the game places it (`F`, game axes):
 - **Wall things** (the pictures, the clocks, the shelf, the curtains) hang at their real height with their back on the
-  wall face: `G.settle(centre=False, floor=False)`, `floor=False` and `centre=` on the `Model`. `check-glb` warns
+  wall face: settled with `centre = false, floor = false`, the `Model` `on_wall()` with a `centre`. `check-glb` warns
   that they float (right on a wall).
 - **The hanging plant** hangs from the ceiling (2.8 m), centred, `floor=False`.
 - **The fireplace** has a raised hearth bench (0.42 m, `HEARTH`) with the firebox above it: residents warming up
@@ -37,9 +37,9 @@ Each is built where the game places it (`F`, game axes):
 
 ## Detail pass (2026-10-22)
 
-Rebuilt with the forms and the kit (`G.kit.moulding`, `F.sweep`, `G.loft`, `F.extrude`, `F.soft`, `G.jitter`): same keys,
+Rebuilt with the forms and the kit (`kit::moulding`, `sweep`, `loft`, `extrude`, `soft`, `jitter`): same keys,
 sizes (within 2 %), centres, parts, clips, motions, paint and draws; every model under its size class's target.
-- **Pictures**: each frame one mitred moulding (`G.kit.moulding`, new in the kit): the print's flat face with a sight
+- **Pictures**: each frame one mitred moulding (`kit::moulding`, new in the kit): the print's flat face with a sight
   lip, the photo's thin black section, the painting's gilt bead-cove-and-lip with carved shells at its corners and
   crest and a dark bead round the canvas, the canvas's oak L-section float frame. Mounts have bevel-cut windows. The
   art is extruded shapes: the print's curving stem and paired pointed leaves with veins; the photo's two ranges with
@@ -80,17 +80,17 @@ small from the game camera, on a wall thing most houses have several of. Revisit
 
 | Model | Clip | Kind | What |
 |---|---|---|---|
-| `wallClock`, `grandfatherClock` | `hour_hand`, `minute_hand` | `clock` (`at` 610) | the hands tell the game's time: each clip turns its hand once round clockwise (`G.spin`, 12 s), and the game holds it where the time has it (ten past ten at rest, the catalogue picture). No second hand: at normal speed a game minute is a real second |
-| `grandfatherClock` | `pendulum` | `idle` | the pendulum swings ±4° about its top, a beat each 0.8 s (`G.rock`, 1.6 s a round), all the time near the camera (2026-10-21) |
-| `grandfatherClock` | `door_open` | use `wind` | the trunk door swings open 100° on its left edge (seen from the front) as the clock is wound, and back when the use ends (`G.swing`, 0.8 s) |
-| `hangingPlant` | `sway` | use `water`, `hold` 0.8 s | the plant, pot and hanger swing 5° out about the ceiling hook (`G.swing`, eased) and, played back after the hold, home: one sway (it was a `G.rock`, which played back swung twice) |
-| `fireplace` | `flames` | use `relax` | an ember bed and tongues of flame (gloss) grow from nothing on the logs (`G.grow`) for the whole use; the light is the content's |
-| `curtains`, `curtainsWide`, `curtainsLong` | `close` | night | the two pleated panels, gathered open at the sides, widen from their outer ends until they meet (`G.squash` in x, about the rail end) |
+| `wallClock`, `grandfatherClock` | `hour_hand`, `minute_hand` | `clock` (`at` 610) | the hands tell the game's time: each clip turns its hand once round clockwise (`spin`, 12 s), and the game holds it where the time has it (ten past ten at rest, the catalogue picture). No second hand: at normal speed a game minute is a real second |
+| `grandfatherClock` | `pendulum` | `idle` | the pendulum swings ±4° about its top, a beat each 0.8 s (`rock`, 1.6 s a round), all the time near the camera (2026-10-21) |
+| `grandfatherClock` | `door_open` | use `wind` | the trunk door swings open 100° on its left edge (seen from the front) as the clock is wound, and back when the use ends (`swing`, 0.8 s) |
+| `hangingPlant` | `sway` | use `water`, `hold` 0.8 s | the plant, pot and hanger swing 5° out about the ceiling hook (`swing`, eased) and, played back after the hold, home: one sway (it was a `rock`, which played back swung twice) |
+| `fireplace` | `flames` | use `relax` | an ember bed and tongues of flame (gloss) grow from nothing on the logs (`grow`) for the whole use; the light is the content's |
+| `curtains`, `curtainsWide`, `curtainsLong` | `close` | night | the two pleated panels, gathered open at the sides, widen from their outer ends until they meet (`squash` in x, about the rail end) |
 
 The grandfather clock takes **5 draw calls**, the one model whose entry says so (`draws=5`): its body, all plain (1),
 the two hands, the pendulum and the trunk door. Since 2026-10-21 (review A-decor-01) its walnut is a polished satin,
 not the textured wood, which gave the draw back for the pendulum: a brass rod and bob, its origin on its top under the
-hood, that swings ±4° a beat each 0.8 s, all the time near the camera (`pendulum`, `idle`, `G.rock`; at rest on Low),
+hood, that swings ±4° a beat each 0.8 s, all the time near the camera (`pendulum`, `idle`, `rock`; at rest on Low),
 seen through the trunk door's window. The trunk door was left shut on 2026-10-26 (review §9.2, A-decor-01) for the
 fifth draw, with no use to open it; on 2026-10-31 it opens while the clock is wound (`wind`, `door_open`), the weights
 behind it, and the pack entry's `draws` allows this one model the fifth (`cargo check-glb`; every other model keeps
@@ -132,8 +132,15 @@ tabs are their own fabric, so the moving panels cost one draw call each.
 ```
 cargo art decor            # the 23 .glb, the pack, check-glb
 cargo art decor --preview  # previews/decor/<id>.png, <id>@<clip>.png
+cargo art decor --check    # rebuilt and held to the committed files, byte for byte
 ```
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `canvasAbstract`; the same triangles.
+No change to the build: its soft boxes take the shared form's new shape (the soft form: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `canvasAbstract`; the same triangles.
+
+## Ported to Rust (2026-11-18)
+
+Built by `cargo art decor` from this module (its Python script's numbers and order, one function each). Against
+the last Blender build (`ref/blender`): 10 same, 13 near, every surface to 0.000 mm. The curtains' `accept` still
+names this file by its old name (decor.md): the words are the pack's, which must not change in the port.
