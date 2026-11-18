@@ -1865,6 +1865,8 @@ export function installNature(app: pc.AppBase): void {
     const kind = WIND_KIND[key];
     if (!kind) return;
     material.setDefine('GAME_WIND', '');
+    // (Sinking into the land in the haze's veil past its edge, `shaders/fog.ts`.)
+    material.setDefine('GAME_VEIL_SINK', '');
     if (key !== 'material.finish.bark') material.setDefine('GAME_WIND_TINT', '');
     // No contact shading among leaves and twigs, and none of them in the depth it is made from (`post.ts`).
     withoutContact(material);
@@ -2239,7 +2241,7 @@ export class FarCrowns {
     if (this.draws) return this.draws;
     const { app, parent } = this;
     const lib = MaterialLibrary.for(app);
-    const material = lib.instanceColored(lib.plainFinish());
+    const material = lib.veilSinking(lib.instanceColored(lib.plainFinish()));
     return (this.draws = [false, true].map((cone) => {
       const mesh = meshFrom(app.graphicsDevice, crownMesh(cone).meshData({ colors: true }))!;
       mesh.incRefCount();

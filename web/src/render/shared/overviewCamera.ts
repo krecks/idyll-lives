@@ -79,11 +79,13 @@ const AROUND = [
 /** How far (m) the player may pan the camera off the shot's focus when no land is given to keep it over (`bounds`). */
 const PAN_REACH = 1500;
 /**
- * How far (m) from the land (`setBounds`'s `bounds`) the camera as drawn may go, with a landscape round it: from further
- * out, low, it looked across the haze past the landscape, the ring's hills before the land standing in it, at the land
- * as a strip (`reachTilt`).
+ * With a landscape round the land (`setBounds`'s `reach`), the least share of the picture's height the land keeps as the
+ * camera tilts low (`reachTilt`): from far out, low, the camera looked across the haze past the landscape, the ring's
+ * hills before the land standing in it, at the land as a strip a fifth of the picture high.
  */
-export const EYE_OUT = 600;
+export const LAND_TALL = 0.4;
+/** Or this share of the picture's height the land has at the shot's own tilt, if that is less (`reachTilt`). */
+export const LAND_KEEP = 0.8;
 
 /** A rectangle of the world (m) the camera's target is kept over. */
 export interface OverviewBounds {
@@ -141,7 +143,7 @@ export class OverviewCamera {
   ground: ((x: number, z: number) => number) | null = null;
   /** The land the player's pan keeps the camera's target over (null: within `PAN_REACH` of the shot's focus). */
   private bounds: OverviewBounds | null = null;
-  /** Whether the land has a landscape round it, the camera kept within `EYE_OUT` of the land (`reachTilt`). */
+  /** Whether the land has a landscape round it, the camera's tilt kept to what keeps the land more than a strip (`reachTilt`). */
   private reach = false;
   /** `hidden`'s view offset, worked out in place. */
   private readonly shift: [number, number, number] = [0, 0, 0];
@@ -173,7 +175,7 @@ export class OverviewCamera {
 
   /**
    * The land the camera's target is kept over while the player pans (null: none); the pan already made is pulled in.
-   * `reach`: a landscape is drawn round it, and the camera is kept within `EYE_OUT` of it (`reachTilt`).
+   * `reach`: a landscape is drawn round it, and the camera tilts no lower than keeps the land more than a strip (`reachTilt`).
    */
   setBounds(bounds: OverviewBounds | null, reach = false): void {
     this.bounds = bounds;
@@ -387,30 +389,54 @@ export class OverviewCamera {
   }
 
   /**
-   * The tilt (rad from straight down) at most `beta` that keeps the camera as drawn (moved by the view offset `ox`,
-   * `oy`) within `EYE_OUT` m of the land (`bounds`, with a landscape round it: `reach`), for its target at (`tx`, `tz`)
-   * `radius` m off along `alpha`: from far out, a low camera looked from well past the landscape across the haze, and
-   * the land showed as a strip behind the ring's hills. Eased as the camera zooms or pans (the most that keeps it
-   * there, not steps).
+   * The tilt (rad from straight down) at most `beta` from which the land (`bounds`, with a landscape round it: `reach`)
+   * keeps `LAND_TALL` of the picture's height, or `LAND_KEEP` of what it has at the shot's own tilt if that is less (a
+   * narrow window's, fitted by its width), for the camera as drawn (moved by the view offset `ox`, `oy`), its target at
+   * (`tx`, `tz`) `radius` m off along `alpha`: from far out, a low camera saw the land as a strip behind the ring's
+   * hills. Eased as the camera zooms or pans (the most that keeps it so, not steps).
    */
   private reachTilt(alpha: number, beta: number, radius: number, tx: number, tz: number, ox: number, oy: number): number {
-    const r = this.bounds;
-    if (!r || !this.reach) return beta;
-    const out = (b: number) => {
-      const [sx, , sz] = viewShift(alpha, b, ox, oy, this.shift);
-      const flat = Math.sin(b) * radius;
-      const [x, z] = [tx + Math.cos(alpha) * flat + sx, tz + Math.sin(alpha) * flat + sz];
-      return Math.hypot(Math.max(r.x0 - x, 0, x - r.x1), Math.max(r.z0 - z, 0, z - r.z1));
-    };
-    if (out(beta) <= EYE_OUT) return beta;
-    // (Further out the lower it looks: the most that keeps it within, to a ten-thousandth of a radian.)
+    if (!this.bounds || !this.reach) return beta;
+    const least = Math.min(LAND_TALL, LAND_KEEP * this.landTall(alpha, Math.min(beta, this.goal.beta), radius, tx, tz, ox, oy));
+    if (this.landTall(alpha, beta, radius, tx, tz, ox, oy) >= least) return beta;
+    // (Further out the lower it looks: the most that keeps it so, to a ten-thousandth of a radian.)
     let [lo, hi] = [0, beta];
     for (let k = 0; k < 14; k++) {
       const mid = (lo + hi) / 2;
-      if (out(mid) <= EYE_OUT) lo = mid;
+      if (this.landTall(alpha, mid, radius, tx, tz, ox, oy) >= least) lo = mid;
       else hi = mid;
     }
     return lo;
+  }
+
+  /**
+   * The share (0..1) of the picture's height the land (`bounds`, at its datum: its corners, the middles of its sides
+   * and its middle) takes from the camera as drawn (moved by the view offset `ox`, `oy`) at `alpha`, `beta`, `radius`
+   * m from (`tx`, `tz`), through its vertical field of view. Allocation-free.
+   */
+  private landTall(alpha: number, beta: number, radius: number, tx: number, tz: number, ox: number, oy: number): number {
+    const r = this.bounds!;
+    const [sx, sy, sz] = viewShift(alpha, beta, ox, oy, this.shift);
+    const [sa, ca, sb, cb] = [Math.sin(alpha), Math.cos(alpha), Math.sin(beta), Math.cos(beta)];
+    const [ex, ey, ez] = [tx + ca * sb * radius + sx, cb * radius + sy, tz + sa * sb * radius + sz];
+    // (The view's way in and up, as `viewShift`'s.)
+    const [fx, fy, fz] = [-ca * sb, -cb, -sa * sb];
+    const rl = Math.hypot(fz, fx) || 1;
+    const [rx, rz] = [fz / rl, -fx / rl];
+    const [ux, uy, uz] = [fy * rz, fz * rx - fx * rz, -fy * rx];
+    const tanY = Math.tan(this.camera.fov / 2);
+    let [bottom, top] = [1, -1];
+    for (let i = 0; i <= 2; i++) {
+      for (let j = 0; j <= 2; j++) {
+        const [dx, dy, dz] = [r.x0 + ((r.x1 - r.x0) * i) / 2 - ex, -ey, r.z0 + ((r.z1 - r.z0) * j) / 2 - ez];
+        const depth = dx * fx + dy * fy + dz * fz;
+        // (Behind the camera: below the picture, as it looks down.)
+        const y = depth > 0 ? (dx * ux + dy * uy + dz * uz) / (depth * tanY) : -1;
+        bottom = Math.min(bottom, Math.max(-1, y));
+        top = Math.max(top, Math.min(1, y));
+      }
+    }
+    return Math.max(0, (top - bottom) / 2);
   }
 
   /**

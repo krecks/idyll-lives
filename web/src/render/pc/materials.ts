@@ -575,6 +575,27 @@ export class MaterialLibrary {
   }
 
   /**
+   * `material` sinking into the land where the haze's veil takes it (`GAME_VEIL_SINK`, `shaders/fog.ts`): a copy, kept
+   * per material, as `instanceColored`'s (for the far crowns: the plain finish's copy is everyone's).
+   */
+  veilSinking(material: pc.StandardMaterial): pc.StandardMaterial {
+    let copy = this.sinking.get(material);
+    if (!copy) {
+      copy = material.clone();
+      copy.name = `${material.name}|veilSink`;
+      copy.setDefine('GAME_VEIL_SINK', '');
+      copy.update();
+      this.sinking.set(material, copy);
+      if (this.lit.has(material)) this.lit.add(copy);
+      const cutout = this.cutouts.get(material);
+      if (cutout !== undefined) this.cutouts.set(copy, cutout);
+      this.reuseTextures(material, copy);
+    }
+    return copy;
+  }
+  private readonly sinking = new WeakMap<pc.StandardMaterial, pc.StandardMaterial>();
+
+  /**
    * Lets go of a material made or adopted here that is going (the landscape's own: its grass, its
    * water): the library stops keeping and updating it. Its owner destroys it.
    */

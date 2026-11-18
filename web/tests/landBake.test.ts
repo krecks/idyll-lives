@@ -368,11 +368,17 @@ describe('the water past the edge rounded', () => {
     drawn.setLand(field);
     const sd = wetDistance(field);
     const edge = edgeWater(field, 20);
-    // Inside the land, as the field has it; at the edge, met.
+    // Inside the land, as the field has it but by the edge, where its shore may be drawn into the sea past it, never
+    // drier; at the edge, met. The strip along the edge is the field's with land past it, and goes under by the way out,
+    // where the sea is past it too (no spit of sand along the edge into the sea).
     for (const x of [100, 250, 300, 420]) {
-      expect(drawn.waterEdge(x, 3)).toBe(wetEdgeAt(field, sd, x, 3, edge));
+      expect(drawn.waterEdge(x, 10)).toBe(wetEdgeAt(field, sd, x, 10, edge));
+      expect(drawn.waterEdge(x, 3)).toBeGreaterThanOrEqual(wetEdgeAt(field, sd, x, 3, edge));
       expect(Math.abs(drawn.waterEdge(x, -0.5) - drawn.waterEdge(x, 0))).toBeLessThan(1);
     }
+    expect(drawn.waterEdge(100, 3)).toBe(wetEdgeAt(field, sd, 100, 3, edge));
+    expect(drawn.ground(100, 3)).toBeGreaterThan(WATER_Y);
+    expect(drawn.ground(250, 3)).toBeLessThan(WATER_Y);
     // Past the edge by each end of the way out: the water reaches round into what was a square corner of land, and
     // the shore further out goes on as it did.
     for (const [x, side] of [[250, -1], [406, 1]]) {
@@ -384,6 +390,36 @@ describe('the water past the edge rounded', () => {
     // And the ground follows it, under the sea's sheet there.
     expect(drawn.ground(250, -14)).toBeLessThan(WATER_Y);
     expect(drawn.ground(250 - 70, -40)).toBeGreaterThan(WATER_Y);
+  });
+});
+
+describe('a coast meeting the edge at a slant', () => {
+  test('leaves no spit of sand along the edge out into the sea past it, and the land backed by land past it is kept', () => {
+    // The plain world's land surveyed, the sea along its south edge north of a coast that meets the edge at x = 300, 4°
+    // off it: between the two a strip of land along the edge, 3 m wide 40 m along (a generated seaside land's, its
+    // outermost points dry beside the sea for tens of metres).
+    const field = bakeLand(layout(plainWorld()), SIDE, SIDE);
+    const coast = (x: number) => (300 - x) * 0.07;
+    for (let j = 0; j <= 60; j++) {
+      for (let i = 0; i < field.cols; i++) {
+        if (j * LAND_CELL <= coast(i * LAND_CELL)) continue;
+        const k = j * field.cols + i;
+        [field.h[k], field.wl[k]] = [Math.min(field.h[k], SEA_CM - 200), SEA_CM];
+      }
+    }
+    const drawn = layout(plainWorld());
+    drawn.setLand(field);
+    const sd = wetDistance(field);
+    const edge = edgeWater(field, 20);
+    // Where the strip is a few metres wide, under the sea's sheet at the edge and past it, as the sea past it is.
+    for (let x = 282; x <= 300; x += 3) {
+      for (const z of [-4, -2, 0, 1]) expect(drawn.ground(x, z)).toBeLessThan(WATER_Y);
+      expect(wetEdgeAt(field, sd, x, 0, edge)).toBeLessThan(0);
+    }
+    // Wider, and with land past the edge beside it, the land's.
+    for (const [x, z] of [[200, 2], [200, 0], [200, -10], [240, 0]]) expect(drawn.ground(x, z)).toBeGreaterThan(WATER_Y);
+    // Further in than the edge's blend, as the field has it.
+    for (const x of [200, 290, 320]) expect(drawn.waterEdge(x, 10)).toBe(wetEdgeAt(field, sd, x, 10, edge));
   });
 });
 
