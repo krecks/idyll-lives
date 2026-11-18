@@ -442,31 +442,64 @@ options! {
     Extrude { at: P3 = P3::ZERO, material: Option<Mat> = None, holes: Holes = Holes(Vec::new()), plane: Plane = Plane::XZ, rot: P3 = P3::ZERO, bevel: f64 = 0.0, bevel_segments: usize = 2, smooth: bool = false, angle: f64 = SHARP }
 }
 
+/// Whether one of `tris` (corners among the outlines' points, numbered on through them) has no area: its three
+/// points in one line.
+fn has_flat_face(loops: &[Vec<[f32; 2]>], tris: &[[u32; 3]]) -> bool {
+    let xy: Vec<[f64; 2]> = loops
+        .iter()
+        .flatten()
+        .map(|p| [p[0] as f64, p[1] as f64])
+        .collect();
+    tris.iter().any(|t| {
+        let [a, b, c] = t.map(|v| xy[v as usize]);
+        (b[0] - a[0]) * (c[1] - a[1]) == (b[1] - a[1]) * (c[0] - a[0])
+    })
+}
+
 /// A slab `depth` thick from a closed 2D `outline` [(u, v), ...] and any `holes` (outlines inside it): the
 /// outline's (0, 0) goes on `at`, and the slab is centred on it through its thickness. `plane` is where the
 /// outline is drawn (`Plane`). `bevel` rounds its edges, as the primitives' do.
 ///
 /// Its two faces are cut into triangles as Blender cut them (`tri::fill`): a bevel follows the cuts.
+///
+/// But where Blender's fill leaves faces of no area (among points in one line down a long outline: the feet of a
+/// roller shutter's slats) and fills the outline's mirror image without any, the slab is that one's, mirrored:
+/// Blender's extrusion walls the slab off inside under such faces, which shades it in blotches, and the two sides
+/// of a model, drawn as each other's mirror image, are then built as each other's.
 pub fn extrude(name: impl AsRef<str>, outline: &[(f64, f64)], depth: f64, o: Extrude) -> Obj {
     let name = name.as_ref();
     let loops: Vec<Vec<(f64, f64)>> = std::iter::once(outline)
         .chain(o.holes.0.iter().map(Vec::as_slice))
         .map(|l| dedupe(l, 1e-7))
         .collect();
-    let flat: Vec<Vec<[f32; 2]>> = loops
+    let mut flat: Vec<Vec<[f32; 2]>> = loops
         .iter()
         .map(|l| l.iter().map(|p| [p.0 as f32, p.1 as f32]).collect())
         .collect();
+    let mut filled = crate::tri::fill(&flat);
+    // (built as its mirror image's, u the other way, and turned back once its mesh is made)
+    let mut mirrored = false;
+    if has_flat_face(&flat, &filled) {
+        let other: Vec<Vec<[f32; 2]>> = flat
+            .iter()
+            .map(|l| l.iter().map(|p| [-p[0], p[1]]).collect())
+            .collect();
+        let its = crate::tri::fill(&other);
+        if !has_flat_face(&other, &its) {
+            (flat, filled, mirrored) = (other, its, true);
+        }
+    }
     let xy: Vec<[f32; 2]> = flat.iter().flatten().copied().collect();
     let n = xy.len() as u32;
     // the fill covers the holes too: take out what lies inside one
-    let tris: Vec<[u32; 3]> = crate::tri::fill(&flat)
+    let tris: Vec<[u32; 3]> = filled
         .into_iter()
         .filter(|t| {
             let (a, b, c) = (xy[t[0] as usize], xy[t[1] as usize], xy[t[2] as usize]);
             let third = 1.0_f32 / 3.0;
+            let u = ((a[0] + b[0] + c[0]) * third) as f64;
             let centre = (
-                ((a[0] + b[0] + c[0]) * third) as f64,
+                if mirrored { -u } else { u },
                 ((a[1] + b[1] + c[1]) * third) as f64,
             );
             !o.holes.0.iter().any(|h| inside(centre, h))
@@ -548,6 +581,12 @@ pub fn extrude(name: impl AsRef<str>, outline: &[(f64, f64)], depth: f64, o: Ext
             (false, false) => corners.rotate_right(1),
             _ => {}
         }
+    }
+    if mirrored {
+        for v in &mut mesh.verts {
+            v[iu] = -v[iu];
+        }
+        mesh.flip_normals();
     }
     scene::update(); // (its normals are set right by operators: Blender works the scene out)
     let obj = scene::add(name, mesh);

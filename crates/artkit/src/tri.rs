@@ -22,6 +22,8 @@ pub fn polygon(p: &[V3], normal: V3) -> Vec<[u32; 3]> {
 /// perimeter), the best turn first. An outline inside another is filled across, as Blender does: `forms::extrude`
 /// takes out what lies in a hole. The triangles come as the sweep wound them, in the order Blender's mesh keeps them
 /// and each from the corner Blender's starts at: its extrusion numbers the copy's points and edges by them.
+/// Among points in one line the sweep leaves triangles of no area, as Blender's does: `forms::extrude` says what
+/// becomes of a slab with any.
 ///
 /// The cuts decide how a bevel rounds the slab's rim (a point slides along the one cut at its corner, and the cut
 /// faces say how far a bevel has room to go), so they are Blender's, cut for cut.
@@ -39,6 +41,14 @@ pub fn fill(loops: &[Vec<[f32; 2]>]) -> Vec<[u32; 3]> {
     for (verts, own) in polys(&mirrored, &edges) {
         sweep(&mirrored, &verts, &own, &mut tris);
     }
+    // (where points lie in a line the sweep can close the same three twice, a triangle of no area: Blender's mesh
+    // takes a face on three points once)
+    let mut made = BTreeSet::new();
+    tris.retain(|t| {
+        let mut points = *t;
+        points.sort_unstable();
+        made.insert(points)
+    });
     let outline: BTreeSet<(u32, u32)> = edges
         .iter()
         .map(|&(a, b)| key(a as u32, b as u32))
@@ -366,13 +376,16 @@ fn sweep(xy: &[[f32; 2]], verts: &[usize], own: &[(usize, usize)], tris: &mut Ve
     }
 }
 
-/// The cosine of the angle at `b` between `a` and `c`.
+/// The cosine of the angle at `b` between `a` and `c`, rounded as Blender's is (each arm times one over its
+/// length): of points in a line down a long outline the sweep joins the one whose cosine is greatest, and theirs
+/// are a rounding apart.
 fn cos_at(a: [f32; 2], b: [f32; 2], c: [f32; 2]) -> f32 {
     let unit = |p: [f32; 2]| {
-        let d = [p[0] - b[0], p[1] - b[1]];
-        let len = (d[0] * d[0] + d[1] * d[1]).sqrt();
-        if len > 1.0e-35 {
-            [d[0] / len, d[1] / len]
+        let d = [b[0] - p[0], b[1] - p[1]];
+        let len2 = d[0] * d[0] + d[1] * d[1];
+        if len2 > 1.0e-35 {
+            let by = 1.0 / len2.sqrt();
+            [d[0] * by, d[1] * by]
         } else {
             [0.0, 0.0]
         }
