@@ -24,6 +24,7 @@
   "model.shopCounter far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.slide far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.springRider far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
+  "model.street.taxiSign": {"shading": "the backs of the fares' lines, boxes 3 mm deep sunk 0.5 mm into the fares' plate, whose own back lies in the case's front: from inside the plate a ray meets both faces at once, Blender's tree takes one or the other (a point buried, left open, or under the case, shaded: 32 or 19 of 32 at these 29 points) and artkit's always the case's (17 to 19); none of them shows"},
   "model.streetLamp far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.townStatue far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.vendingDrink far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
