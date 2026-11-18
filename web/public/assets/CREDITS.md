@@ -143,8 +143,8 @@ original, CC0). Each moves one part while it is used: the nook's cushion sinks, 
 drops, the teapot pours, the fire grows and the top book opens.
 
 The outgoing pack models (`models/pack_outgoing/partyBar.glb`, `conversationSectional.glb`, `karaokeStage.glb`,
-`videoCallNook.glb`, `danceFloor.glb`, `photoWall.glb`, override pack `packs/pack_outgoing/manifest.json`) are built in
-Blender by `tools/art/blender/families/pack_outgoing.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+`videoCallNook.glb`, `danceFloor.glb`, `photoWall.glb`, override pack `packs/pack_outgoing/manifest.json`) are built by
+`crates/art/packs/src/pack_outgoing` on `artkit` and exported as `.glb` (glTF, original, CC0).
 Each moves while it is used: the bar's tap lever pulls, the sectional's cushions sink, the mics rise, the ring light
 swings up, the dance floor's tiles pulse and a new photo grows.
 
