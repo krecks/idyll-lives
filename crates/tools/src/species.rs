@@ -13,10 +13,13 @@
 //! - **Blossom and fruit hue**: each saturated colour that isn't a leaf's green, on the leaves or on a part named
 //!   for its bloom or fruit (`bloom`, `blossom`, `flower`, `petal`, `fruit`), must be its blossom's or its fruit's.
 //! - **Leaf class**: each leaf card (the `leafcards` finish) lies on a tile of the atlas of its species' leaf
-//!   shape (`LEAF_SHAPES`). The atlas's tiles are listed in web/public/assets/textures/leafcards/tiles.json:
-//!   `{"tiles": [{"name": "oak", "class": "lobed", "rect": [u0, v0, u1, v1]}, …]}`, each rect in a model's UVs
-//!   (u right, v down from the image's top), `core` the class of the dense tile under the cards. With no such file
-//!   the atlas is today's (`Atlas::today`): three clusters of one oval leaf and the dense tile.
+//!   shape (`LEAF_SHAPES`). The atlas's tiles are listed in web/public/assets/textures/leafcards/tiles.json, which
+//!   `cargo tex leafcards` writes beside the atlas:
+//!   `{"tiles": [{"name": "oak 1", "class": "lobed", "kind": "cluster", "rect": [u0, v0, u1, v1]}, …]}`, each rect
+//!   in a model's UVs (u right, v down from the image's top), `core` the class of a dense tile under the cards
+//!   (its `leaf` says whose leaves it is of); `kind` says what the tile pictures (`cluster`, `blossom`, `strand`,
+//!   `core`). With no such file the atlas is the first one's (`Atlas::today`): three clusters of one oval leaf
+//!   and the dense tile, a quarter each.
 //!
 //! Leaf size on screen, the bark's pattern and the habit's likeness stay a reviewer's judgement against the kind's
 //! sources (crates/art/nature/src/trees/NOTES.md, "Species review").
@@ -448,7 +451,7 @@ pub struct Atlas {
 }
 
 impl Atlas {
-    /// Today's atlas (artkit's `botany::cards` `CARD_TILES`, `CORE_TILE`; v turned round as the file
+    /// The first atlas (artkit's `botany::cards` `CARD_TILES`, `CORE_TILE`; v turned round as the file
     /// has it): three clusters of one generic oval leaf, a quarter each, and the dense tile.
     pub fn today() -> Atlas {
         let tile = |class: &str, u: f64, v: f64| Tile {
