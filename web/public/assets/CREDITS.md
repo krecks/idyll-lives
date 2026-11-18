@@ -166,8 +166,8 @@ and exported as `.glb` (glTF, original, CC0). The stove's oven door drops and it
 cooks; the tub fills and bubbles while residents soak.
 
 The foodie pack models (`models/pack_foodie/herbGarden.glb`, `deliPantry.glb`, `espressoBar.glb`,
-`cookbookLectern.glb`, `pizzaOven.glb`, `chefsIsland.glb`, override pack `packs/pack_foodie/manifest.json`) are built
-in Blender by `tools/art/blender/families/pack_foodie.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+`cookbookLectern.glb`, `pizzaOven.glb`, `chefsIsland.glb`, override pack `packs/pack_foodie/manifest.json`) are built by
+`crates/art/packs/src/pack_foodie` on `artkit` and exported as `.glb` (glTF, original, CC0).
 A sprig grows, the pantry doors swing, the coffee runs, a page turns, the oven door comes off for the peel as the
 fire grows, and the island's drawer pulls out.
 
