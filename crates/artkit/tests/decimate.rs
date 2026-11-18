@@ -604,6 +604,66 @@ fn a_model_that_asks_for_a_share_of_its_triangles_gets_its_far_version() {
     assert!(build_model(&family, &family.models[0]).unwrap().far == out.far);
 }
 
+/// The lamp with a flag on its globe: drawn with it, no part of its size.
+fn lamp_with_a_flag() -> Vec<artkit::scene::Obj> {
+    lamp();
+    let mut flag = slab([0.3, 0.02, 0.4]);
+    flag.translate(V3::new(0.0, 0.0, 1.5));
+    flag.set_material(Some(LAMP.iron));
+    let flag = scene::add("flag", flag);
+    artkit::parts::aside(&[flag], "flag");
+    Vec::new()
+}
+
+#[test]
+fn what_a_model_carries_aside_is_in_its_far_version() {
+    scene::set_finishes(plain());
+    let family = Family::new(
+        "lamps",
+        LAMP.palette(),
+        vec![Model::new("flagged", lamp_with_a_flag, (0.5, 1.5, 0.5)).far_ratio(0.25)],
+        "a lamp with a flag",
+    );
+    scene::take_log();
+    // (the model is 1.5 m tall, 1.9 m with its flag: its far version is not held to the 1.5 m again)
+    let out = build_model(&family, &family.models[0]).unwrap();
+    let log = scene::take_log();
+    let (model, far) = (
+        glb::read(&out.glb).unwrap(),
+        glb::read(out.far.as_ref().unwrap()).unwrap(),
+    );
+    assert!(model.nodes.iter().any(|n| n.name == "flag_aside"));
+    // one part, the flag joined into it with the rest, without the water
+    assert_eq!(far.nodes.len(), 1);
+    assert_eq!(far.nodes[0].name, "flagged_far");
+    let left = triangles(&far);
+    let before = 960 + 12 + 12;
+    assert!(
+        left.len() <= before / 4 && left.len() + 2 >= before / 4,
+        "{}",
+        left.len()
+    );
+    let (lo, hi) = bounds(&left);
+    assert_eq!((lo[2], hi[2]), (0.0, f64::from(1.9_f32)));
+    assert_eq!((lo, hi), bounds(&triangles(&model)));
+    // the flag whole (its corners are the far version's highest and so locked, and it is thinner than a
+    // collapse may squash only across), the post whole
+    let top: Vec<&[V3; 3]> = left
+        .iter()
+        .filter(|t| t.iter().all(|p| p.z >= 1.5))
+        .collect();
+    assert!(top.len() >= 4, "{} triangles of the flag", top.len());
+    assert!(
+        log.iter()
+            .any(|l| l == &format!("[gamekit] flagged.far: {} triangles (25% kept)", left.len())),
+        "{log:#?}"
+    );
+    assert!(
+        !log.iter().any(|l| l.starts_with("[gamekit] flagged.far ")),
+        "its size is not said again: {log:#?}"
+    );
+}
+
 // The committed models.
 
 /// Linear 0..1 as the sRGB byte.
