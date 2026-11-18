@@ -6,9 +6,8 @@
 //! The detail is built from the forms: tops and seat boards lofted with a moulded edge (`slab`), turned legs
 //! (`turned`), arched aprons extruded (`apron`).
 //!
-//! Being ported: every model but the moulded and the Windsor chair (their shells are solidified grids, which the
-//! kernel can't make yet) is built here; tools/art/blender/families/dining.py still builds the family (`cargo art
-//! dining` runs it in Blender until that script goes; `--out` and `--check` build what is here).
+//! Being ported: every model is built here, but tools/art/blender/families/dining.py still builds the family
+//! (`cargo art dining` runs it in Blender until that script goes; `--out` and `--check` build what is here).
 
 use artkit::family::{Family, Model};
 use artkit::json;
@@ -22,6 +21,7 @@ mod common;
 mod pedestals;
 mod sets;
 mod settings;
+mod shells;
 mod storage;
 mod tables;
 
@@ -204,6 +204,14 @@ pub fn family() -> Option<Family> {
             .centre(0.0, 0.032)
             .key("model.chairUpholstered")
             .paint(&[("legs_walnut", "Frame"), ("upholstery", "Upholstery")]),
+            Model::new("chairModern", shells::chair_modern, (0.44, 0.789, 0.496))
+                .centre(0.0, 0.032)
+                .key("model.chairModern")
+                .paint(&[("legs_black", "Frame"), ("shell", "Seat")]),
+            Model::new("chairWindsor", shells::chair_windsor, (0.475, 0.975, 0.474))
+                .centre(0.0, 0.041)
+                .key("model.chairWindsor")
+                .paint(&[("frame_windsor", "Frame"), ("seat_windsor", "Seat")]),
             Model::new(
                 "chairBentwood",
                 chairs_more::chair_bentwood,

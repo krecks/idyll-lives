@@ -493,6 +493,6 @@ pub fn end_chair(prefix: &str, x: f64, z: f64, frame: Mat, seat: Mat, pad: Mat, 
     let turn = M4::translation(v((x, 0, z)))
         * M4::rotation(radians(if x < 0.0 { -90.0 } else { 90.0 }), Axis::Z);
     for o in parts {
-        super::common::set_matrix_world(o, &(turn * o.matrix_world()));
+        o.set_matrix_world(turn * o.matrix_world());
     }
 }

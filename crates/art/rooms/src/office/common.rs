@@ -1,15 +1,13 @@
 //! What the office things are built from: the frame's helpers and the kit's parts the office uses.
 
 use super::F;
-use artkit::forms::{Holes, rounded_rect};
+use artkit::forms::{Holes, object, rounded_rect};
 use artkit::loft;
 use artkit::materials::Mat;
 use artkit::math::{P3, V3, atan2, degrees, p3, pow, tan};
-use artkit::mesh::Mesh;
 use artkit::parts::{join, set_origin};
 use artkit::place::{GameFrame, Spot};
-use artkit::scene::{self, Obj};
-use artkit::shapes::shade;
+use artkit::scene::Obj;
 use artkit::{fbox, fextrude, fsweep, soft};
 
 /// Python's `max(a, b)`: the first unless the second is strictly beyond it.
@@ -332,9 +330,5 @@ pub fn moulding(
             ]);
         }
     }
-    // (forms' own part of points and faces: its material, its faces turned outwards, shaded)
-    let mut mesh = Mesh::from_pydata(vs, &faces);
-    mesh.set_material(Some(material));
-    mesh.recalc_normals();
-    shade(scene::add(name, mesh), true, angle)
+    object(name, vs, &faces, Some(material), true, angle, false)
 }

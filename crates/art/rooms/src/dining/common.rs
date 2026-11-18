@@ -3,12 +3,14 @@
 use super::F;
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
-use artkit::math::{M4, P3, PI, TAU, V3, atan2, cos, pow, sin, tan};
+use artkit::math::{M4, P3, PI, TAU, V3, cos, pow, sin, tan};
+use artkit::mesh::Mesh;
 use artkit::parts::{Settle, join_all, settle_with};
 use artkit::place::{Facing, GameFrame, Spot};
-use artkit::py;
+use artkit::scene;
 use artkit::scene::{Obj, meshes};
-use artkit::{cube, fextrude, fsweep, loft, revolve};
+use artkit::shapes::recalc_normals;
+use artkit::{cube, fextrude, fsweep, loft, revolve, solidify};
 
 /// A game position or direction as a Blender vector.
 pub fn v(p: impl Spot) -> V3 {
@@ -46,7 +48,7 @@ pub fn board(
         [z.x, z.y, z.z, 0.0],
         [mid.x, mid.y, mid.z, 1.0],
     ]);
-    set_matrix_world(obj, &m)
+    obj.set_matrix_world(m)
 }
 
 /// Game points of a polyline whose corners are bent round, about `bend` in radius (a curve through each corner,
@@ -407,176 +409,41 @@ pub fn tube<P: Spot>(
     )
 }
 
-/// `obj.matrix_world = m` for a part with no parent: Blender takes the matrix apart into a place, an Euler turn and
-/// a scale (`BKE_object_apply_mat4`).
-pub fn set_matrix_world(obj: Obj, m: &M4) -> Obj {
-    let (loc, rot, scale) = decompose(m);
-    obj.edit(|o| {
-        o.loc = loc;
-        o.rot = rot;
-        o.scale = scale;
-        o.quat = None;
-    });
+/// A curved panel `t` thick through a grid of game points (rows of the same length): a moulded shell, a bent back, a
+/// slatted seat. Its faces are shaded smooth.
+pub fn surface(
+    name: &str,
+    grid: &[Vec<(f64, f64, f64)>],
+    t: f64,
+    material: Mat,
+    angle: f64,
+) -> Obj {
+    let (rows, cols) = (grid.len(), grid[0].len());
+    let vs: Vec<V3> = grid
+        .iter()
+        .flatten()
+        .map(|&(x, y, z)| F.at(x, y, z).into())
+        .collect();
+    let mut faces = Vec::new();
+    for i in 0..rows - 1 {
+        for j in 0..cols - 1 {
+            faces.push(
+                [
+                    i * cols + j,
+                    i * cols + j + 1,
+                    (i + 1) * cols + j + 1,
+                    (i + 1) * cols + j,
+                ]
+                .map(|v| v as u32)
+                .to_vec(),
+            );
+        }
+    }
+    let mut mesh = Mesh::from_pydata(vs, &faces);
+    mesh.set_material(Some(material));
+    let obj = scene::add(name, mesh);
+    solidify!(obj, t, offset = 0.0, use_even_offset = true);
+    recalc_normals(obj); // the grid's winding may face either way: outwards
+    obj.edit(|o| o.mesh.shade_smooth(angle));
     obj
-}
-
-// KIT: motion::decompose (with its mat3_normalized_to_quat and quat_to_eul), private to artkit
-/// A matrix's place, Euler XYZ turn and scale (`mat4_to_loc_rot_size` and the turn through a quaternion, as an
-/// object's are).
-fn decompose(m: &M4) -> (V3, V3, V3) {
-    let col = |c: usize| V3::new(m.0[c][0], m.0[c][1], m.0[c][2]);
-    let dot = |a: V3, b: V3| a.x * b.x + a.y * b.y + a.z * b.z;
-    let (mut rot, mut size) = ([V3::ZERO; 3], [0.0_f32; 3]);
-    for c in 0..3 {
-        let a = col(c);
-        let d = dot(a, a);
-        (rot[c], size[c]) = if d > 1.0e-35 {
-            let d = d.sqrt();
-            let k = 1.0 / d;
-            (V3::new(a.x * k, a.y * k, a.z * k), d)
-        } else {
-            (V3::ZERO, 0.0)
-        };
-    }
-    if dot(rot[0].cross(rot[1]), rot[2]) < 0.0 {
-        for c in 0..3 {
-            rot[c] = -rot[c];
-            size[c] = -size[c];
-        }
-    }
-    let q = mat3_normalized_to_quat([rot[0].array(), rot[1].array(), rot[2].array()]);
-    let e = quat_to_eul(q);
-    (
-        V3::new(m.0[3][0], m.0[3][1], m.0[3][2]),
-        e,
-        V3::new(size[0], size[1], size[2]),
-    )
-}
-
-/// Blender's `mat3_normalized_to_quat`: `m[column][row]`, a turned and mirrored one taken as turned.
-fn mat3_normalized_to_quat(mut m: [[f32; 3]; 3]) -> [f32; 4] {
-    let det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
-        - m[1][0] * (m[0][1] * m[2][2] - m[0][2] * m[2][1])
-        + m[2][0] * (m[0][1] * m[1][2] - m[0][2] * m[1][1]);
-    if !det.is_finite() {
-        m = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
-    } else if det < 0.0 {
-        for c in &mut m {
-            for x in c.iter_mut() {
-                *x = -*x;
-            }
-        }
-    }
-    let mut q = [0.0_f32; 4];
-    // (Mike Day's method, the larger diagonal first, w kept non-negative)
-    let (big, s_index, sign_neg, rest): (f32, usize, bool, [(usize, f32); 3]);
-    if m[2][2] < 0.0 {
-        if m[0][0] > m[1][1] {
-            big = 1.0 + m[0][0] - m[1][1] - m[2][2];
-            s_index = 1;
-            sign_neg = m[1][2] < m[2][1];
-            rest = [
-                (0, m[1][2] - m[2][1]),
-                (2, m[0][1] + m[1][0]),
-                (3, m[2][0] + m[0][2]),
-            ];
-        } else {
-            big = 1.0 - m[0][0] + m[1][1] - m[2][2];
-            s_index = 2;
-            sign_neg = m[2][0] < m[0][2];
-            rest = [
-                (0, m[2][0] - m[0][2]),
-                (1, m[0][1] + m[1][0]),
-                (3, m[1][2] + m[2][1]),
-            ];
-        }
-    } else if m[0][0] < -m[1][1] {
-        big = 1.0 - m[0][0] - m[1][1] + m[2][2];
-        s_index = 3;
-        sign_neg = m[0][1] < m[1][0];
-        rest = [
-            (0, m[0][1] - m[1][0]),
-            (1, m[2][0] + m[0][2]),
-            (2, m[1][2] + m[2][1]),
-        ];
-    } else {
-        big = 1.0 + m[0][0] + m[1][1] + m[2][2];
-        s_index = 0;
-        sign_neg = false;
-        rest = [
-            (1, m[1][2] - m[2][1]),
-            (2, m[2][0] - m[0][2]),
-            (3, m[0][1] - m[1][0]),
-        ];
-    }
-    let mut s = 2.0 * big.sqrt();
-    if sign_neg {
-        s = -s;
-    }
-    q[s_index] = 0.25 * s;
-    let s = 1.0 / s;
-    for (i, v) in rest {
-        q[i] = v * s;
-    }
-    if big == 1.0 && rest.iter().all(|&(i, _)| q[i] == 0.0) {
-        q[s_index] = 1.0;
-    }
-    let len_squared = q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3];
-    if (len_squared - 1.0).abs() >= 0.0002 * 3.0 {
-        let k = 1.0 / len_squared.sqrt();
-        for x in &mut q {
-            *x *= k;
-        }
-    }
-    q
-}
-
-/// Blender's `quat_to_eulO` for the XYZ order: through the turn's matrix, the smaller of its two Euler readings.
-fn quat_to_eul(q: [f32; 4]) -> V3 {
-    let m = artkit::math::Quat {
-        w: q[0],
-        x: q[1],
-        y: q[2],
-        z: q[3],
-    }
-    .to_matrix()
-    .0;
-    let atan2f = |y: f32, x: f32| atan2(y as f64, x as f64) as f32;
-    let cy = py::hypot(m[0][0] as f64, m[0][1] as f64) as f32;
-    let (e1, e2) = if cy > 0.0000375_f64 as f32 {
-        (
-            [
-                atan2f(m[1][2], m[2][2]),
-                atan2f(-m[0][2], cy),
-                atan2f(m[0][1], m[0][0]),
-            ],
-            [
-                atan2f(-m[1][2], -m[2][2]),
-                atan2f(-m[0][2], -cy),
-                atan2f(-m[0][1], -m[0][0]),
-            ],
-        )
-    } else {
-        let e = [atan2f(-m[2][1], m[1][1]), atan2f(-m[0][2], cy), 0.0];
-        (e, e)
-    };
-    let d = |e: [f32; 3]| e[0].abs() + e[1].abs() + e[2].abs();
-    let e = if d(e1) > d(e2) { e2 } else { e1 };
-    V3::new(e[0], e[1], e[2])
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use artkit::math::{object_matrix, v3};
-
-    #[test]
-    fn a_matrix_set_as_a_parts_world_comes_back_as_its_place_turn_and_scale() {
-        let (loc, rot, scale) = (v3(0.3, -1.2, 0.5), v3(0.2, -0.7, 1.9), v3(1.0, 1.0, 1.0));
-        let (l, r, s) = decompose(&object_matrix(loc, rot, scale));
-        assert_eq!(l, loc);
-        for i in 0..3 {
-            assert!((r[i] - rot[i]).abs() < 1e-6 && (s[i] - scale[i]).abs() < 1e-6);
-        }
-    }
 }
