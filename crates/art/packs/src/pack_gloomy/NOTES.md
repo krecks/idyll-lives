@@ -1,6 +1,6 @@
 # Gloomy pack — notes
 
-`pack_gloomy.py` builds the six P7 gloomy models into `web/public/assets/models/pack_gloomy/` and their entries in
+`crates/art/packs/src/pack_gloomy` builds the six P7 gloomy models into `web/public/assets/models/pack_gloomy/` and their entries in
 `packs/pack_gloomy/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sat in
 Validate › Gloomy until checked in play.
 

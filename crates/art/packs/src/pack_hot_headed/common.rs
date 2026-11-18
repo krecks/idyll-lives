@@ -1,9 +1,8 @@
 //! What the hot-headed pack is built from: its palette, turned and lofted pieces, fluted rings, chains, and the
 //! kit's parts it uses.
 
-use artkit::forms::Sweep;
 use artkit::materials::Mat;
-use artkit::math::{P3, Quat, TAU, V3, cos, pow, sin, tan};
+use artkit::math::{P3, Quat, TAU, V3, cos, sin};
 use artkit::place::{GameFrame, Spot};
 use artkit::scene::Obj;
 use artkit::{loft, palette, revolve, ring, torus};
@@ -199,6 +198,37 @@ pub fn chain(
     made
 }
 
+// --- the kit's parts ------------------------------------------------------------------------------------------
+
+/// The kit's tube (`artkit::kit::tube`), as the script called it.
+pub fn tube<P: Spot>(
+    f: &GameFrame,
+    name: &str,
+    points: &[P],
+    r: f64,
+    material: Mat,
+    verts: Option<usize>,
+    round: usize,
+) -> Obj {
+    artkit::kit::tube(
+        f,
+        name,
+        points,
+        r,
+        material,
+        artkit::kit::Tube {
+            verts,
+            round,
+            ..artkit::kit::Tube::default()
+        },
+    )
+}
+
+/// The kit's fillet (`artkit::kit::fillet`): the path through `points` with each inner corner rounded.
+pub fn fillet(points: &[(f64, f64, f64)], radius: f64, steps: usize) -> Vec<(f64, f64, f64)> {
+    artkit::kit::fillet(points, radius, steps)
+}
+
 // KIT: mathutils Vector.to_track_quat('X', 'Z')
 /// The turn that points +X along `vec`, +Z kept up (Blender's `vec_to_quat`).
 fn to_track_quat_xz(vec: V3) -> Quat {
@@ -287,64 +317,4 @@ fn mul_qt_qtqt(a: Quat, b: Quat) -> Quat {
         y: t2,
         z,
     }
-}
-
-// --- the kit's parts ------------------------------------------------------------------------------------------
-
-// KIT: kit.tube
-/// A round tube of radius `r` through game points, its bends rounded (`round` steps between each pair of
-/// points; 1 keeps them sharp), its ends capped. `verts` round: by default 8, and more for one over 13 mm in
-/// radius, as many as keep its outline within a millimetre of the circle (`forms::sweep`).
-pub fn tube<P: Spot>(
-    f: &GameFrame,
-    name: &str,
-    points: &[P],
-    r: f64,
-    material: Mat,
-    verts: Option<usize>,
-    round: usize,
-) -> Obj {
-    f.sweep(
-        name,
-        points,
-        r,
-        material,
-        Sweep {
-            verts,
-            resolution: round,
-            least: 8,
-            ..Sweep::default()
-        },
-    )
-}
-
-// KIT: kit.fillet
-/// The path through `points` (any axes) with each inner corner rounded to about `radius` (`steps` points round
-/// it, on a curve that never overshoots, however uneven the spacing: Catmull-Rom loops on a short leg beside a long
-/// one). For handles, bent rails and draped cloth swept with `resolution` 1.
-// (3.1415 is the script's own limit for a straight corner, not pi.)
-#[allow(clippy::approx_constant)]
-pub fn fillet(points: &[(f64, f64, f64)], radius: f64, steps: usize) -> Vec<(f64, f64, f64)> {
-    let pts: Vec<V3> = points.iter().map(|&p| V3::from(p)).collect();
-    let mut out = vec![pts[0]];
-    for w in pts.windows(3) {
-        let (a, p, c) = (w[0], w[1], w[2]);
-        let (d1, d2) = (a - p, c - p);
-        if d1.length() < 1e-9 || d2.length() < 1e-9 || d1.angle(d2) > 3.1415 {
-            out.push(p);
-            continue;
-        }
-        let t = (radius / 1e-6_f64.max(tan(d1.angle(d2) / 2.0)))
-            .min(d1.length() * 0.5)
-            .min(d2.length() * 0.5);
-        let (p1, p2) = (p + d1.normalized() * t, p + d2.normalized() * t);
-        for i in 0..=steps {
-            let k = i as f64 / steps as f64;
-            out.push(p1 * pow(1.0 - k, 2.0) + p * 2 * k * (1.0 - k) + p2 * k * k);
-        }
-    }
-    out.push(pts[pts.len() - 1]);
-    out.iter()
-        .map(|p| (p.x as f64, p.y as f64, p.z as f64))
-        .collect()
 }

@@ -1,13 +1,12 @@
 //! What the cheerful pack is built from: its palette, meshes from points, arch outlines, bands, bulbs, pleated
 //! curtains, tumblers, and the kit's parts it uses.
 
-use artkit::forms::{Scale, Sweep, rounded_rect};
+use artkit::forms::{Scale, rounded_rect};
 use artkit::materials::Mat;
-use artkit::math::{P3, PI, V3, cos, pow, sin, tan};
+use artkit::math::{P3, PI, V3, cos, sin};
 use artkit::mesh::Mesh;
 use artkit::place::{GameFrame, Spot};
 use artkit::scene::{self, Obj};
-use artkit::shapes::shade;
 use artkit::{fcyl, fsphere, fsweep, palette, revolve, torus};
 use std::cell::Cell;
 
@@ -416,10 +415,7 @@ pub fn tumbler(
 
 // --- the kit's parts ------------------------------------------------------------------------------------------
 
-// KIT: kit.tube
-/// A round tube of radius `r` through game points, its bends rounded (`round` steps between each pair of
-/// points; 1 keeps them sharp), its ends capped. `verts` round: by default 8, and more for one over 13 mm in
-/// radius, as many as keep its outline within a millimetre of the circle (`forms::sweep`).
+/// The kit's tube (`artkit::kit::tube`), as the script called it.
 #[allow(clippy::too_many_arguments)]
 pub fn tube<P: Spot>(
     f: &GameFrame,
@@ -431,55 +427,26 @@ pub fn tube<P: Spot>(
     round: usize,
     scale: Scale,
 ) -> Obj {
-    f.sweep(
+    artkit::kit::tube(
+        f,
         name,
         points,
         r,
         material,
-        Sweep {
+        artkit::kit::Tube {
             verts,
-            resolution: round,
+            round,
             scale,
-            least: 8,
-            ..Sweep::default()
         },
     )
 }
 
-// KIT: kit.fillet
-/// The path through `points` (any axes) with each inner corner rounded to about `radius` (`steps` points round
-/// it, on a curve that never overshoots, however uneven the spacing: Catmull-Rom loops on a short leg beside a long
-/// one). For handles, bent rails and draped cloth swept with `resolution` 1.
-// (3.1415 is the script's own limit for a straight corner, not pi.)
-#[allow(clippy::approx_constant)]
+/// The kit's fillet (`artkit::kit::fillet`): the path through `points` with each inner corner rounded.
 pub fn fillet(points: &[(f64, f64, f64)], radius: f64, steps: usize) -> Vec<(f64, f64, f64)> {
-    let pts: Vec<V3> = points.iter().map(|&p| V3::from(p)).collect();
-    let mut out = vec![pts[0]];
-    for w in pts.windows(3) {
-        let (a, p, c) = (w[0], w[1], w[2]);
-        let (d1, d2) = (a - p, c - p);
-        if d1.length() < 1e-9 || d2.length() < 1e-9 || d1.angle(d2) > 3.1415 {
-            out.push(p);
-            continue;
-        }
-        let t = (radius / 1e-6_f64.max(tan(d1.angle(d2) / 2.0)))
-            .min(d1.length() * 0.5)
-            .min(d2.length() * 0.5);
-        let (p1, p2) = (p + d1.normalized() * t, p + d2.normalized() * t);
-        for i in 0..=steps {
-            let k = i as f64 / steps as f64;
-            out.push(p1 * pow(1.0 - k, 2.0) + p * 2 * k * (1.0 - k) + p2 * k * k);
-        }
-    }
-    out.push(pts[pts.len() - 1]);
-    out.iter()
-        .map(|p| (p.x as f64, p.y as f64, p.z as f64))
-        .collect()
+    artkit::kit::fillet(points, radius, steps)
 }
 
-// KIT: kit.pull
-/// A bar pull in one piece: out from a front at game depth `face` on two round stand-offs `length` apart
-/// (across it, or `upright`), its bends rounded: a drawer's or a door's handle.
+/// The kit's bar pull (`artkit::kit::pull`), as the script called it.
 #[allow(clippy::too_many_arguments)]
 pub fn pull(
     f: &GameFrame,
@@ -494,41 +461,25 @@ pub fn pull(
     upright: bool,
     verts: usize,
 ) -> Obj {
-    let (h, b) = (length / 2.0, 0.012_f64.min(out * 0.45));
-    let ends = [
-        (-h, face - 0.003),
-        (-h, face + out),
-        (h, face + out),
-        (h, face - 0.003),
-    ];
-    let pts: Vec<(f64, f64, f64)> = ends
-        .iter()
-        .map(|&(u, z)| {
-            if upright {
-                (x, y + u, z)
-            } else {
-                (x + u, y, z)
-            }
-        })
-        .collect();
-    f.sweep(
+    artkit::kit::pull(
+        f,
         name,
-        &fillet(&pts, b, 3),
-        r,
+        x,
+        y,
+        face,
+        length,
         material,
-        Sweep {
-            verts: Some(verts),
-            ..Sweep::default()
+        artkit::kit::Pull {
+            r,
+            out,
+            upright,
+            verts,
         },
     )
 }
 
-// KIT: kit.moulding
-/// A moulding run round a closed `outline` with mitred corners: a picture or mirror frame, a panel's bead, a
-/// plinth's or a cornice's band. `outline` is game (x, height) points drawn at depth `at` (`front`), or (x, depth)
-/// points at height `at`; `profile` is the moulding's closed cross-section [(inset, out), ...]: `inset` metres in
-/// from the outline, `out` metres forward of `at` (front) or up from it (top). The corners stay square however
-/// wide the profile (a sweep pinches them).
+/// The kit's moulding (`artkit::kit::moulding`), as the script called it: on the front at depth `at`, or on top
+/// at height `at` (`front` false).
 #[allow(clippy::too_many_arguments)]
 pub fn moulding(
     f: &GameFrame,
@@ -540,53 +491,17 @@ pub fn moulding(
     front: bool,
     angle: f64,
 ) -> Obj {
-    let n = outline.len();
-    let area =
-        artkit::py::sum((0..n).map(|i| {
-            outline[i].0 * outline[(i + 1) % n].1 - outline[(i + 1) % n].0 * outline[i].1
-        }));
-    let turn = if area > 0.0 { 1.0 } else { -1.0 }; // inward is to the left of an anticlockwise outline
-    let inward = |a: (f64, f64), b: (f64, f64)| -> (f64, f64) {
-        let (dx, dy) = (b.0 - a.0, b.1 - a.1);
-        let mut length = pow(dx * dx + dy * dy, 0.5);
-        if length == 0.0 {
-            length = 1.0;
-        }
-        (-dy / length * turn, dx / length * turn)
+    let plane = if front {
+        artkit::place::Facing::Front
+    } else {
+        artkit::place::Facing::Top
     };
-    let (mut vs, mut faces) = (Vec::new(), Vec::new());
-    let m = profile.len();
-    for i in 0..n {
-        let p = outline[i];
-        let (n0, n1) = (
-            inward(outline[(i + n - 1) % n], p),
-            inward(p, outline[(i + 1) % n]),
-        );
-        let k = 1.0 + n0.0 * n1.0 + n0.1 * n1.1;
-        let (mx, my) = ((n0.0 + n1.0) / k, (n0.1 + n1.1) / k);
-        for &(inset, out) in profile {
-            let (u, v) = (p.0 + inset * mx, p.1 + inset * my);
-            vs.push(V3::from(if front {
-                f.at(u, v, at + out)
-            } else {
-                f.at(u, at + out, v)
-            }));
-        }
-    }
-    for i in 0..n {
-        let (a, b) = (i * m, ((i + 1) % n) * m);
-        for j in 0..m {
-            let j2 = (j + 1) % m;
-            faces.push(vec![
-                (a + j) as u32,
-                (a + j2) as u32,
-                (b + j2) as u32,
-                (b + j) as u32,
-            ]);
-        }
-    }
-    let mut mesh = Mesh::from_pydata(vs, &faces);
-    mesh.set_material(Some(material));
-    mesh.recalc_normals();
-    shade(scene::add(name, mesh), true, angle)
+    artkit::kit::moulding(
+        f,
+        name,
+        outline,
+        profile,
+        material,
+        artkit::kit::Moulding { at, plane, angle },
+    )
 }

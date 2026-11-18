@@ -172,8 +172,8 @@ A sprig grows, the pantry doors swing, the coffee runs, a page turns, the oven d
 fire grows, and the island's drawer pulls out.
 
 The gloomy pack models (`models/pack_gloomy/recordCabinet.glb`, `cello.glb`, `journalDesk.glb`, `rainLamp.glb`,
-`windowSeat.glb`, `soakingTub.glb`, override pack `packs/pack_gloomy/manifest.json`) are built in Blender by
-`tools/art/blender/families/pack_gloomy.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The cabinet's
+`windowSeat.glb`, `soakingTub.glb`, override pack `packs/pack_gloomy/manifest.json`) are built by
+`crates/art/packs/src/pack_gloomy` on `artkit` and exported as `.glb` (glTF, original, CC0). The cabinet's
 lid lifts and its record turns, the cello comes off its stand, a candle is lit, the rain runs down the lamp over a
 rippling pool, the window seat's cushion sinks and the tub fills.
 

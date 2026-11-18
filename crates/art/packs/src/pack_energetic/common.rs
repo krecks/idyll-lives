@@ -1,13 +1,12 @@
 //! What the energetic pack is built from: its palette, meshes from points, lofted bodies, and the kit's parts it
 //! uses.
 
-use artkit::forms::{Sweep, loft as loft_, rounded_rect};
 use artkit::materials::Mat;
-use artkit::math::{P3, V3, pow, tan};
+use artkit::math::{P3, V3};
 use artkit::mesh::Mesh;
 use artkit::place::{GameFrame, Spot};
 use artkit::scene::{self, Obj};
-use artkit::{fbox, fextrude, loft, palette, ring};
+use artkit::{loft, palette, ring};
 use std::cell::Cell;
 
 palette! { M:
@@ -190,10 +189,7 @@ pub fn lofted(
     loft!(name, &sections, material = material)
 }
 
-// KIT: kit.tube
-/// A round tube of radius `r` through game points, its bends rounded (`round` steps between each pair of
-/// points; 1 keeps them sharp), its ends capped. `verts` round: by default 8, and more for one over 13 mm in
-/// radius, as many as keep its outline within a millimetre of the circle (`forms::sweep`).
+/// The kit's tube (`artkit::kit::tube`), as the script called it.
 pub fn tube<P: Spot>(
     f: &GameFrame,
     name: &str,
@@ -203,54 +199,26 @@ pub fn tube<P: Spot>(
     verts: Option<usize>,
     round: usize,
 ) -> Obj {
-    f.sweep(
+    artkit::kit::tube(
+        f,
         name,
         points,
         r,
         material,
-        Sweep {
+        artkit::kit::Tube {
             verts,
-            resolution: round,
-            least: 8,
-            ..Sweep::default()
+            round,
+            ..artkit::kit::Tube::default()
         },
     )
 }
 
-// KIT: kit.fillet
-/// The path through `points` (any axes) with each inner corner rounded to about `radius` (`steps` points round
-/// it, on a curve that never overshoots, however uneven the spacing: Catmull-Rom loops on a short leg beside a long
-/// one). For handles, bent rails and draped cloth swept with `resolution` 1.
-// (3.1415 is the script's own limit for a straight corner, not pi.)
-#[allow(clippy::approx_constant)]
+/// The kit's fillet (`artkit::kit::fillet`): the path through `points` with each inner corner rounded.
 pub fn fillet(points: &[(f64, f64, f64)], radius: f64, steps: usize) -> Vec<(f64, f64, f64)> {
-    let pts: Vec<V3> = points.iter().map(|&p| V3::from(p)).collect();
-    let mut out = vec![pts[0]];
-    for w in pts.windows(3) {
-        let (a, p, c) = (w[0], w[1], w[2]);
-        let (d1, d2) = (a - p, c - p);
-        if d1.length() < 1e-9 || d2.length() < 1e-9 || d1.angle(d2) > 3.1415 {
-            out.push(p);
-            continue;
-        }
-        let t = (radius / 1e-6_f64.max(tan(d1.angle(d2) / 2.0)))
-            .min(d1.length() * 0.5)
-            .min(d2.length() * 0.5);
-        let (p1, p2) = (p + d1.normalized() * t, p + d2.normalized() * t);
-        for i in 0..=steps {
-            let k = i as f64 / steps as f64;
-            out.push(p1 * pow(1.0 - k, 2.0) + p * 2 * k * (1.0 - k) + p2 * k * k);
-        }
-    }
-    out.push(pts[pts.len() - 1]);
-    out.iter()
-        .map(|p| (p.x as f64, p.y as f64, p.z as f64))
-        .collect()
+    artkit::kit::fillet(points, radius, steps)
 }
 
-// KIT: kit.pull
-/// A bar pull in one piece: out from a front at game depth `face` on two round stand-offs `length` apart
-/// (across it, or `upright`), its bends rounded: a drawer's or a door's handle.
+/// The kit's bar pull (`artkit::kit::pull`), as the script called it.
 #[allow(clippy::too_many_arguments)]
 pub fn pull(
     f: &GameFrame,
@@ -265,39 +233,24 @@ pub fn pull(
     upright: bool,
     verts: usize,
 ) -> Obj {
-    let (h, b) = (length / 2.0, 0.012_f64.min(out * 0.45));
-    let ends = [
-        (-h, face - 0.003),
-        (-h, face + out),
-        (h, face + out),
-        (h, face - 0.003),
-    ];
-    let pts: Vec<(f64, f64, f64)> = ends
-        .iter()
-        .map(|&(u, z)| {
-            if upright {
-                (x, y + u, z)
-            } else {
-                (x + u, y, z)
-            }
-        })
-        .collect();
-    f.sweep(
+    artkit::kit::pull(
+        f,
         name,
-        &fillet(&pts, b, 3),
-        r,
+        x,
+        y,
+        face,
+        length,
         material,
-        Sweep {
-            verts: Some(verts),
-            ..Sweep::default()
+        artkit::kit::Pull {
+            r,
+            out,
+            upright,
+            verts,
         },
     )
 }
 
-// KIT: kit.shaker
-/// A frame-and-panel front `w` x `h`, `t` thick, centred at game `at`, facing the front (a cabinet's door, a
-/// drawer's front): a frame `rail` wide round a panel set back `recess`, flat, or `raised` (its edges chamfered
-/// up to a field); `panel`: the panel's own material. Returns (frame, panel).
+/// The kit's frame-and-panel front (`artkit::kit::shaker`), as the script called it: (frame, panel).
 #[allow(clippy::too_many_arguments)]
 pub fn shaker(
     f: &GameFrame,
@@ -312,61 +265,19 @@ pub fn shaker(
     recess: f64,
     raised: bool,
 ) -> (Obj, Obj) {
-    let hole = rounded_rect(w - 2.0 * rail, h - 2.0 * rail, 0.003, 1);
-    let fr = fextrude!(
+    artkit::kit::shaker(
         f,
         name,
-        &rounded_rect(w, h, 0.003, 1),
-        t,
+        w,
+        h,
         at,
+        t,
         material,
-        holes = vec![hole],
-        bevel = if t * 0.2 < 0.004 { t * 0.2 } else { 0.004 },
-        bevel_segments = 1
-    );
-    // (a hair inside the opening, not into the frame: a vertex buried in it would bake black)
-    let (pw, ph) = (w - 2.0 * rail - 0.002, h - 2.0 * rail - 0.002);
-    if !raised {
-        let pn = fbox!(
-            f,
-            format!("{name}_panel"),
-            pw,
-            ph,
-            t - 2.0 * recess,
-            at,
-            panel.unwrap_or(material),
-            bevel = 0.002,
-            bevel_segments = 1
-        );
-        return (fr, pn);
-    }
-    // a raised panel: a thin edge inside the frame, rising over a wide shallow chamfer to a flat field
-    let (x, y, z) = at;
-    let mut b = rail * 0.7;
-    for c in [pw * 0.25, ph * 0.25] {
-        if c < b {
-            b = c;
-        }
-    }
-    let lp = |hw: f64, hh: f64, d: f64| -> Vec<P3> {
-        [(hw, hh), (-hw, hh), (-hw, -hh), (hw, -hh)]
-            .iter()
-            .map(|&(u, v)| f.at(x + u, y + v, d))
-            .collect()
-    };
-    let front = z + t / 2.0;
-    let pn = loft_(
-        format!("{name}_panel"),
-        &[
-            lp(pw / 2.0, ph / 2.0, z - t / 2.0 + 0.002),
-            lp(pw / 2.0, ph / 2.0, front - recess - 0.004),
-            lp(pw / 2.0 - b, ph / 2.0 - b, front - recess * 0.2),
-        ],
-        artkit::forms::Loft {
-            material: Some(panel.unwrap_or(material)),
-            smooth: false,
-            ..Default::default()
+        artkit::kit::Shaker {
+            rail,
+            panel,
+            recess,
+            raised,
         },
-    );
-    (fr, pn)
+    )
 }
