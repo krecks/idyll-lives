@@ -45,6 +45,7 @@ name = "art-packs"
 version = "0.8.3"
 dependencies = [
  "artkit",
+ "libm",
 ]
 
 [[package]]

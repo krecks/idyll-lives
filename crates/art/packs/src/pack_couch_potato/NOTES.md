@@ -1,6 +1,6 @@
 # Couch potato pack — notes
 
-`pack_couchPotato.py` builds the six P3 couch potato models into `web/public/assets/models/pack_couchPotato/` and
+`crates/art/packs/src/pack_couch_potato` builds the six P3 couch potato models into `web/public/assets/models/pack_couchPotato/` and
 their entries in `packs/pack_couchPotato/manifest.json`, a pack listed in the base manifest's `packs` (the
 trait's only model manifest). Built 2026-10-14; they sat in Validate › Couch Potato until checked in play.
 
