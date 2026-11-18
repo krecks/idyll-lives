@@ -547,6 +547,94 @@ fn a_bevelled_slabs_points_come_in_blenders_order() {
 }
 
 #[test]
+fn a_bevels_hardened_normals_are_stored_as_blenders_two_angles() {
+    // Blender keeps each hardened normal as two angles of sixteen bits in the frame of its corner's fan. The
+    // frame's own vectors are made unit vectors by division (the fan's sides and normal, handed to it by the
+    // bevel, by the reciprocal): made by the reciprocal too, a normal half way round a fan (a corner patch's
+    // on a profile's middle point) was stored a unit or two off. tests/golden/bevel_angles.txt: boxes in one to
+    // four segments, one cut back for want of room, and cylinders: every pair Blender's, but on the eight-sided
+    // cylinder in two segments, whose corner patches' points are a unit in the last place off Blender's and
+    // eight of its angles a unit or two with them.
+    let mut report = Vec::new();
+    let mut bad = 0;
+    for r in records("bevel_angles.txt") {
+        scene::reset();
+        let (bevel, bevel_segments) =
+            (r.kv["bevel"].parse().unwrap(), r.kv["seg"].parse().unwrap());
+        let part = if r.kv["kind"] == "cube" {
+            let s: Vec<f64> = r.kv["size"]
+                .split(',')
+                .map(|x| x.parse().unwrap())
+                .collect();
+            cube(
+                "part",
+                (s[0], s[1], s[2]),
+                Cube {
+                    bevel,
+                    bevel_segments,
+                    ..Cube::default()
+                },
+            )
+        } else {
+            artkit::shapes::cylinder(
+                "part",
+                r.kv["radius"].parse().unwrap(),
+                r.kv["depth"].parse().unwrap(),
+                artkit::shapes::Round {
+                    verts: r.kv["verts"].parse().unwrap(),
+                    bevel,
+                    bevel_segments,
+                    ..Default::default()
+                },
+            )
+        };
+        let mesh = artkit::bevel::apply(part).read(|o| o.mesh.clone());
+        let faces: Vec<Vec<u32>> = (0..mesh.faces.len())
+            .map(|f| mesh.corners(f).to_vec())
+            .collect();
+        assert_eq!(faces, r.faces("f"), "{}: faces", r.name);
+        let want: Vec<[i16; 2]> = r.lines["c"]
+            .split(' ')
+            .map(|p| {
+                let (a, b) = p.split_once(',').unwrap();
+                [a.parse().unwrap(), b.parse().unwrap()]
+            })
+            .collect();
+        let stored = mesh.stored.as_ref().expect("a bevel's stored normals");
+        let off = stored
+            .iter()
+            .zip(&want)
+            .filter(|(s, w)| **s != Some(**w))
+            .count();
+        let far = stored
+            .iter()
+            .zip(&want)
+            .map(|(s, w)| {
+                let s = s.unwrap_or([0, 0]);
+                (s[0] as i32 - w[0] as i32)
+                    .abs()
+                    .max((s[1] as i32 - w[1] as i32).abs())
+            })
+            .max()
+            .unwrap_or(0);
+        report.push(format!(
+            "{} ({} in {}): {off} of {} corners' angles not Blender's (the farthest {far} of 32,767)",
+            r.name,
+            r.kv["kind"],
+            r.kv["seg"],
+            want.len()
+        ));
+        bad += if r.name == "cyl8" {
+            far > 2 || off > 8
+        } else {
+            off > 0
+        } as usize;
+    }
+    println!("{}", report.join("\n"));
+    assert_eq!(bad, 0, "\n{}", report.join("\n"));
+}
+
+#[test]
 fn a_bevel_of_a_width_below_zero_is_none() {
     // Blender's modifier clamps a width below zero to none: the part is only shaded as a bevelled one is
     for r in records("bevel_none.txt") {

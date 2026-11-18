@@ -2037,9 +2037,12 @@ impl Space {
             });
             sum / counted.len() as f32
         };
-        let (vec_ref, _) = normalize_v3(vec_ref - mul_v3_fl(lnor, dtp_ref));
-        let (vec_ortho, _) = normalize_v3(lnor.cross(vec_ref));
-        let (other, _) = normalize_v3(vec_other - mul_v3_fl(lnor, dtp_other));
+        // (unit vectors by division here, as the frame's own code makes them; the fan's sides and normal, which
+        // Blender's bevel hands it, are made by the reciprocal)
+        let unit = crate::normals::unit;
+        let vec_ref = unit(vec_ref - mul_v3_fl(lnor, dtp_ref));
+        let vec_ortho = unit(lnor.cross(vec_ref));
+        let other = unit(vec_other - mul_v3_fl(lnor, dtp_other));
         let dtp = dot_v3(vec_ref, other);
         let ref_beta = if dtp < Space::TRIGO {
             let beta = crate::normals::acos_approx(dtp);
@@ -2083,7 +2086,7 @@ impl Space {
         } else {
             Space::short(alpha / self.ref_alpha)
         };
-        let (vec, _) = normalize_v3(mul_v3_fl(self.lnor, -cos_alpha) + custom);
+        let vec = crate::normals::unit(mul_v3_fl(self.lnor, -cos_alpha) + custom);
         let cos_beta = dot_v3(self.vec_ref, vec);
         let b = if cos_beta < Space::TRIGO {
             let mut beta = crate::normals::acos_approx(cos_beta);

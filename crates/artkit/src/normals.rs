@@ -13,7 +13,7 @@ use crate::mesh::{Mesh, edge, normal_newell};
 
 /// A unit vector by division, as the code that works the normals out makes one (Blender's older code multiplies by
 /// the reciprocal, now and then a unit in the last place off it); zero for none.
-fn unit(a: V3) -> V3 {
+pub(crate) fn unit(a: V3) -> V3 {
     let d = dot_v3(a, a);
     if d > 1.0e-35 {
         let length = d.sqrt();
