@@ -22,6 +22,7 @@ pub fn species() -> Species {
         },
         leaves: &["#3E6E34", "#4A7C3A", "#588A42", "#68984A", "#7AA654"],
         tiles: Tiles::of("maple"),
+        colours: &[("bark", "#FFFFFF")],
         // a straight trunk, a little flared, carrying on as the leader into the crown
         trunk: Stage::Spec(Trunk {
             pts: vec![

@@ -23,6 +23,7 @@ pub fn species() -> Species {
         },
         leaves: &["#6A8A36", "#7A9A3E", "#8AAA48", "#9CBA54", "#AEC862"],
         tiles: Tiles::of("willow"),
+        colours: &[("bark", "#F8F4EC")],
         trunk: Stage::Spec(Trunk {
             pts: vec![
                 (0.0, 0.0, 0.0),

@@ -34,7 +34,8 @@ pub fn species() -> Species {
         },
         leaves: &["#76963E", "#86A646", "#98B650", "#AAC45C", "#BCD26A"],
         tiles: Tiles::of("birch"),
-        colours: &[("bark", "#8E867C")],
+        // (its white bark as light as a birch's is, the black marks and the fissured foot in it)
+        colours: &[("bark", "#8E867C"), ("birch_bark", "#A29F98")],
         trunk: Stage::Own(trunk),
         // slender limbs up the stem from 3 m, rising, then their twigs hanging in long, light masses: an airy,
         // upright crown

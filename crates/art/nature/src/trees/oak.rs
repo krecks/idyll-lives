@@ -23,6 +23,8 @@ pub fn species() -> Species {
         },
         leaves: &["#558238", "#64923E", "#76A246", "#8AB250", "#9EC25C"],
         tiles: Tiles::of("oak"),
+        // (the bark texture is dark: under white it is as light as it gets, a little under an oak's bark)
+        colours: &[("bark", "#FFFFFF")],
         // the trunk: a slight lean and wave, flared at the foot, its base flat on the ground
         trunk: Stage::Spec(Trunk {
             pts: vec![

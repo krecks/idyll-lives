@@ -24,7 +24,7 @@ pub fn species() -> Species {
         },
         leaves: &["#6E1C1C", "#8A2424", "#A2302A", "#B83F2F", "#CC5636"],
         tiles: Tiles::of("japaneseMaple"),
-        colours: &[("bark", "#B09A8A"), ("leaf_light", "#B83F2F")],
+        colours: &[("bark", "#FFFFFF"), ("leaf_light", "#B83F2F")],
         // a short trunk splitting at knee height into six slender stems, each rising in a long S out to the
         // vase's rim
         trunk: Stage::Spec(Trunk {

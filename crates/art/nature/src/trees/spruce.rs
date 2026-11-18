@@ -18,7 +18,7 @@ pub fn species() -> Species {
             cards: None,
         },
         leaves: &["#3A5E52", "#446A5C", "#4E7666", "#5A8270"],
-        colours: &[("bark", "#8E7A6A")],
+        colours: &[("bark", "#FFF2E8")],
         trunk: Stage::Spec(Trunk {
             pts: vec![
                 (0.0, 0.0, 0.0),
