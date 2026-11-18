@@ -42,9 +42,9 @@
     {
       "name": "HOUSE_LOOK",
       "file": "web/src/render/shared/house.ts",
-      "sha256": "bbf04ae2140d550a3c8f7eafddd4cd75ed5a1c004055b687c19f79b8c6a9ff48",
-      "by": "setup",
-      "reason": "setup: accepted before the living-town run (look jump)",
+      "sha256": "a6b0a5b18ebaaf1cc352ec4d87116842afd759cfdca93a12128101f3673cc466",
+      "by": "art-rust",
+      "reason": "house detail (W3): roofValley 0.8 added for the valley flashing of L/U roofs; no accepted value changed",
       "const": "HOUSE_LOOK"
     },
     {
