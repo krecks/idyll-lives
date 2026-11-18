@@ -25,12 +25,16 @@ pub fn tier_aims(rng: &mut Random, feet: &[(f64, f64, f64)], o: TierAims) -> Vec
 /// `tier_aims` with its options by name: `tier_aims!(rng, feet, key = value, ...)`.
 #[macro_export]
 macro_rules! tier_aims {
-    ($rng:expr, $feet:expr $(, $k:ident = $v:expr)* $(,)?) => {{
-        #[allow(unused_mut)]
-        let mut o = $crate::botany::conifer::TierAims::default();
-        $(o.$k = $crate::Arg::arg($v);)*
-        $crate::botany::conifer::tier_aims($rng, $feet, o)
-    }};
+    ($rng:expr, $feet:expr $(, $k:ident = $v:expr)* $(,)?) => {
+        match ($feet,) {
+            (feet,) => {
+                #[allow(unused_mut)]
+                let mut o = $crate::botany::conifer::TierAims::default();
+                $(o.$k = $crate::Arg::arg($v);)*
+                $crate::botany::conifer::tier_aims($rng, feet, o)
+            }
+        }
+    };
 }
 
 /// A conifer bough's spray across (u up, v across): a ridge along the bough, the needles falling away to each
@@ -158,12 +162,16 @@ pub fn conifer(
 /// `conifer!(p, rng, tiers, base_d, z0, step, h, cols, boughs, key = value, ...)`.
 #[macro_export]
 macro_rules! conifer {
-    ($p:expr, $rng:expr, $tiers:expr, $base_d:expr, $z0:expr, $step:expr, $h:expr, $cols:expr, $boughs:expr $(, $k:ident = $v:expr)* $(,)?) => {{
-        #[allow(unused_mut)]
-        let mut o = $crate::botany::conifer::Conifer::default();
-        $(o.$k = $crate::Arg::arg($v);)*
-        $crate::botany::conifer::conifer($p, $rng, $tiers, $base_d, $z0, $step, $h, $cols, $boughs, o)
-    }};
+    ($p:expr, $rng:expr, $tiers:expr, $base_d:expr, $z0:expr, $step:expr, $h:expr, $cols:expr, $boughs:expr $(, $k:ident = $v:expr)* $(,)?) => {
+        match ($p, $tiers, $base_d, $z0, $step, $h, $cols, $boughs) {
+            (p, tiers, base_d, z0, step, h, cols, boughs) => {
+                #[allow(unused_mut)]
+                let mut o = $crate::botany::conifer::Conifer::default();
+                $(o.$k = $crate::Arg::arg($v);)*
+                $crate::botany::conifer::conifer(p, $rng, tiers, base_d, z0, step, h, cols, boughs, o)
+            }
+        }
+    };
 }
 
 /// A conifer's or the cypress's top, from straight above (a blackbird's song post).

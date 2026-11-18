@@ -10,6 +10,7 @@ pub mod far;
 pub mod forms;
 pub mod glb;
 pub mod json;
+pub mod kit;
 mod macros;
 pub use macros::Arg;
 pub mod materials;

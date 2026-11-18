@@ -95,7 +95,8 @@ pub fn polygon(p: &[V3], normal: V3) -> Vec<[u32; 3]> {
 /// Blender's `triangle_fill` with `use_beauty` leaves them: a sweep from the top that clips at each point in turn,
 /// then its edges turned wherever that makes the two triangles either side rounder (their area over their
 /// perimeter), the best turn first. An outline inside another is filled across, as Blender does: `forms::extrude`
-/// takes out what lies in a hole. The triangles come as the sweep wound them.
+/// takes out what lies in a hole. The triangles come as the sweep wound them, in the order Blender's mesh keeps them
+/// and each from the corner Blender's starts at: its extrusion numbers the copy's points and edges by them.
 ///
 /// The cuts decide how a bevel rounds the slab's rim (a point slides along the one cut at its corner, and the cut
 /// faces say how far a bevel has room to go), so they are Blender's, cut for cut.
@@ -573,8 +574,12 @@ impl Heap {
 }
 
 /// Turns the inner edges of `tris` (all but the `outline`'s) for rounder triangles, the best turn first, as
-/// Blender's `beautify_fill` does.
-fn beautify(xy: &[[f32; 2]], tris: &mut [[u32; 3]], outline: &BTreeSet<(u32, u32)>) {
+/// Blender's `beautify_fill` does. The triangles stay in the order Blender's mesh has them in after it, each from
+/// the corner Blender's starts at: a turn joins the two triangles into a face that takes the place left free by
+/// the turn before (a new one at the end, the first time) and splits the other off it into the older one's place,
+/// and the newer one's is left free.
+fn beautify(xy: &[[f32; 2]], tris: &mut Vec<[u32; 3]>, outline: &BTreeSet<(u32, u32)>) {
+    let mut free: Option<usize> = None;
     // each edge's triangles, the newer last (the one Blender measures the quad from)
     let mut on: BTreeMap<(u32, u32), Vec<usize>> = BTreeMap::new();
     let mut inner: Vec<(u32, u32)> = Vec::new();
@@ -657,13 +662,17 @@ fn beautify(xy: &[[f32; 2]], tris: &mut [[u32; 3]], outline: &BTreeSet<(u32, u32
         }
         // the two triangles become (1, 2, 3) and (1, 3, 4); the second is the one the new edge is measured from
         let faces = on.remove(&e).expect("the edge");
-        let (ta, tb) = (faces[1], faces[0]);
+        let (newer, tb) = (faces[1], faces[0]);
+        let ta = free.replace(newer).unwrap_or_else(|| {
+            tris.push([0; 3]);
+            tris.len() - 1
+        });
         tris[ta] = [v1, v2, v3];
-        tris[tb] = [v1, v3, v4];
+        tris[tb] = [v4, v1, v3];
         on.insert(new, vec![ta, tb]);
         for (a, b, t) in [(v1, v2, ta), (v2, v3, ta), (v3, v4, tb), (v4, v1, tb)] {
             let list = on.get_mut(&key(a, b)).expect("a side of the quad");
-            list.retain(|&f| f != ta && f != tb);
+            list.retain(|&f| f != newer && f != tb);
             list.push(t);
         }
         index.remove(&e);
@@ -686,6 +695,9 @@ fn beautify(xy: &[[f32; 2]], tris: &mut [[u32; 3]], outline: &BTreeSet<(u32, u32
                 heap.insert(cost, j);
             }
         }
+    }
+    if let Some(free) = free {
+        tris.remove(free);
     }
 }
 

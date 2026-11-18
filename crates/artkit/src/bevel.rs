@@ -292,25 +292,24 @@ impl Work<'_> {
         angle(self.co(a) - self.co(b), self.co(c) - self.co(b))
     }
 
-    /// The corner after `b` in the face that runs `a` to `b`.
-    fn after(&self, a: u32, b: u32) -> Option<u32> {
-        let &(f, i) = self.leaving.get(&(a, b))?;
-        let c = self.mesh.corners(f as usize);
-        Some(c[(i as usize + 2) % c.len()])
-    }
-
-    /// The largest offset the edge `i` of `corner` has room for before the cut faces collide.
+    /// The largest offset the edge `i` of `corner` has room for before the cut faces collide (Blender's
+    /// `geometry_collide_offset`, in its arithmetic: a slab's clamped corners close to the last bit or don't).
     fn collide_offset(&self, corner: &Corner, i: usize, offset: f32) -> f32 {
         let no_collide = offset + 1e6;
         let mut limit = no_collide;
         let eb = &corner.edges[i];
         let ea = &corner.edges[(i + 1) % corner.edges.len()];
-        let k = |bev: bool| if bev { 1.0_f32 } else { 0.0 };
+        let k = |bev: bool| if bev { offset } else { 0.0 };
         let (ka, kb) = (k(ea.bev), k(eb.bev));
         let (va, vb, vc) = (ea.to, corner.v, eb.to);
-        let Some(vd) = self.after(vb, vc) else {
+        let Some(&(f, at)) = self.leaving.get(&(vb, vc)) else {
             return limit;
         };
+        // the face between the two edges, round from the corner before this vertex
+        let c = self.mesh.corners(f as usize);
+        let n = c.len();
+        let round = |j: usize| c[(at as usize + n - 1 + j) % n];
+        let vd = round(3);
         let ec = self.corners.get(&vc).map(|c| {
             let other = c.half_to(vb);
             &c.edges[(other + c.edges.len() - 1) % c.edges.len()]
@@ -325,27 +324,42 @@ impl Work<'_> {
         // where the edge closes up: its two ends' cuts meeting on it
         let on_b = safe(ka + cos1 * kb, sin1) + safe(kc + cos2 * kb, sin2);
         if on_b > EPSILON {
-            let room = len_v3(self.co(vb) - self.co(vc)) / on_b;
+            let room = offset * (len_v3(self.co(vb) - self.co(vc)) / on_b);
             if room > EPSILON {
-                limit = limit.min(room);
+                limit = room;
             }
         }
-        // where a point sliding along an edge left as it is reaches that edge's end
-        if kb > 0.0 && ka == 0.0 {
-            let t = len_v3(self.co(va) - self.co(vb)) * sin1 / kb;
-            if t >= 0.0 && t < limit {
-                limit = t;
+        // where a point sliding along an edge left as it is reaches that edge's end (on along the edges that
+        // run straight on from it)
+        if kb > f32::EPSILON && (ka == 0.0 || kc == 0.0) {
+            let kb = offset / kb;
+            let pi = std::f32::consts::PI;
+            let side = |j: usize| len_v3(self.co(round(j)) - self.co(round(j + 1)));
+            if ka == 0.0 && round(0) == va {
+                // (back from the edge before the vertex: corner n - k is k corners before it)
+                let (mut back, mut exterior) = (0, pi - th1);
+                let mut slide = side(0) * sinf(exterior);
+                while exterior < 0.0001 && back < n {
+                    back += 1;
+                    let j = n - back;
+                    exterior += pi - self.angle3(round(j), round(j + 1), round(j + 2));
+                    slide += side(j) * sinf(exterior);
+                }
+                limit = (slide * kb).min(limit);
             }
-        }
-        if kb > 0.0 && kc == 0.0 && ec.is_some() {
-            let t = len_v3(self.co(vc) - self.co(vd)) * sin2 / kb;
-            if t >= 0.0 && t < limit {
-                limit = t;
+            if kc == 0.0 {
+                let (mut j, mut exterior) = (2, pi - th2);
+                let mut slide = side(j) * sinf(exterior);
+                while exterior < 0.0001 && j < n + 2 {
+                    j += 1;
+                    exterior += pi - self.angle3(round(j - 1), round(j), round(j + 1));
+                    slide += side(j) * sinf(exterior);
+                }
+                limit = (slide * kb).min(limit);
             }
         }
         limit
     }
-
     /// Where the offset lines of two bevelled edges of a vertex meet, on the face (or faces) between them.
     fn offset_meet(
         &self,
@@ -2093,11 +2107,6 @@ pub fn apply(obj: Obj) -> Obj {
                 vec![[0.0, 0.0]; made.mesh.loops.len()]
             });
             // the mesh is still the one whose UVs were made: joined first, it says so for the whole
-            made.mesh.uv_metres = o.mesh.uv_metres;
-        } else if o.mesh.uvs.is_some() {
-            // (a part on plain finishes keeps its zeros and that they are final: joined first, its mesh is the
-            // joined one, and the others' UVs are not to be made again over the whole of it)
-            made.mesh.uvs = Some(vec![[0.0, 0.0]; made.mesh.loops.len()]);
             made.mesh.uv_metres = o.mesh.uv_metres;
         }
         o.mesh = made.mesh;
