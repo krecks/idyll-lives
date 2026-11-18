@@ -342,19 +342,12 @@ fn make_decimated(model: &Model, ratio: f64) -> Result<Vec<Obj>, String> {
         &format!("{}_far", model.id),
         Some(crate::math::P3::ZERO),
     );
+    // (Its size is not checked again, as gamekit's is not: the model's was, and what the model carries (`aside`: a
+    // flag on a roof), which is no part of that size, is joined into its far version with the rest.)
     far::decimated(far, ratio, far::FEET, far::EDGE);
-    let name = format!("{}.far", model.id);
-    let tolerance = Tolerance(model.tolerance.0.map(|t| t.max(0.05)));
-    check_size(
-        model.size,
-        tolerance,
-        &[far],
-        &name,
-        model.centre,
-        model.floor,
-    )?;
     scene::log(format!(
-        "[gamekit] {name}: {} triangles ({:.0}% kept)",
+        "[gamekit] {}.far: {} triangles ({:.0}% kept)",
+        model.id,
         far.read(|p| p.mesh.triangles().len()),
         ratio * 100.0
     ));

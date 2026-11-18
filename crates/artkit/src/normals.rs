@@ -24,7 +24,7 @@ fn unit(a: V3) -> V3 {
 }
 
 /// The arc cosine as Blender approximates it for a face's weight (to a few hundred-thousandths of a radian).
-fn acos_approx(x: f32) -> f32 {
+pub(crate) fn acos_approx(x: f32) -> f32 {
     let f = x.abs();
     let m = if f < 1.0 { 1.0 - (1.0 - f) } else { 1.0 };
     let a = (1.0 - m).sqrt()

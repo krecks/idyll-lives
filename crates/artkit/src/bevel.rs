@@ -1703,7 +1703,8 @@ fn harden(out: &mut Mesh, kinds: &[Kind], long: &BTreeSet<(u32, u32)>, old: &Mes
     }
     out.normals = None;
     let face_normals = face_normals(out);
-    // a vertex's normal: its faces' weighed by their angles at it
+    // a vertex's normal: its faces' weighed by their angles at it (by Blender's approximate arc cosine, as
+    // every angle here is: the fans' weights, their frames and the angles stored in them)
     let mut vertex_normals = vec![V3::ZERO; out.verts.len()];
     for (f, &normal) in face_normals.iter().enumerate() {
         let c = out.corners(f);
@@ -1712,7 +1713,7 @@ fn harden(out: &mut Mesh, kinds: &[Kind], long: &BTreeSet<(u32, u32)>, old: &Mes
             let p = out.verts[c[i] as usize];
             let (e1, _) = normalize_v3(out.verts[c[(i + n - 1) % n] as usize] - p);
             let (e2, _) = normalize_v3(out.verts[c[(i + 1) % n] as usize] - p);
-            let k = libm::acos((dot_v3(e1, e2) as f64).clamp(-1.0, 1.0)) as f32;
+            let k = crate::normals::acos_approx(dot_v3(e1, e2));
             let s = &mut vertex_normals[c[i] as usize];
             *s = madd(*s, normal, k);
         }
@@ -1814,17 +1815,6 @@ fn harden(out: &mut Mesh, kinds: &[Kind], long: &BTreeSet<(u32, u32)>, old: &Mes
     }
     out.normals = Some(crate::normals::from_stored(out, &stored));
     out.stored = Some(stored.into_iter().map(Some).collect());
-}
-
-fn acos_clamped(x: f32) -> f32 {
-    if x <= -1.0 {
-        // (the single just under pi, as Blender's C library has it)
-        f32::from_bits(0x4049_0fda)
-    } else if x >= 1.0 {
-        0.0
-    } else {
-        libm::acos(x as f64) as f32
-    }
 }
 
 /// The corners of one vertex that shade as one, in the order Blender walks them round the vertex.
@@ -1938,7 +1928,7 @@ fn fans(mesh: &Mesh, face_normals: &[V3]) -> Vec<Fan> {
         loop {
             let e = edge_of(curr);
             let vec_curr = dir(pivot, e);
-            let k = acos_clamped(dot_v3(vec_curr, vec_prev));
+            let k = crate::normals::acos_approx(dot_v3(vec_curr, vec_prev));
             fan.normal = madd(fan.normal, face_normals[face_of[curr]], k);
             fan.corners.push(vert);
             if e != e_curr {
@@ -1996,7 +1986,7 @@ impl Space {
             };
         }
         let ref_alpha = if fan.single {
-            (acos_clamped(dtp_ref) + acos_clamped(dtp_other)) / 2.0
+            (crate::normals::acos_approx(dtp_ref) + crate::normals::acos_approx(dtp_other)) / 2.0
         } else {
             // (the first edge again at the end of a fan all the way round is not counted twice)
             let whole = fan.edges.len() > 2 && fan.edges[0] == fan.edges[fan.edges.len() - 1];
@@ -2005,9 +1995,9 @@ impl Space {
             } else {
                 &fan.edges[..]
             };
-            let sum: f32 = counted
-                .iter()
-                .fold(0.0, |s, &v| s + acos_clamped(dot_v3(v, lnor)));
+            let sum: f32 = counted.iter().fold(0.0, |s, &v| {
+                s + crate::normals::acos_approx(dot_v3(v, lnor))
+            });
             sum / counted.len() as f32
         };
         let (vec_ref, _) = normalize_v3(vec_ref - mul_v3_fl(lnor, dtp_ref));
@@ -2015,7 +2005,7 @@ impl Space {
         let (other, _) = normalize_v3(vec_other - mul_v3_fl(lnor, dtp_other));
         let dtp = dot_v3(vec_ref, other);
         let ref_beta = if dtp < Space::TRIGO {
-            let beta = acos_clamped(dtp);
+            let beta = crate::normals::acos_approx(dtp);
             if dot_v3(vec_ortho, other) < 0.0 {
                 Space::TWO_PI - beta
             } else {
@@ -2039,7 +2029,7 @@ impl Space {
         } else if val <= -1.0 {
             -32768
         } else {
-            (val * 32767.0).round() as i32
+            (val * 32767.0 + 0.5).floor() as i32
         }
     }
 
@@ -2050,7 +2040,7 @@ impl Space {
             return [0, 0];
         }
         let cos_alpha = dot_v3(self.lnor, custom);
-        let alpha = acos_clamped(cos_alpha);
+        let alpha = crate::normals::acos_approx(cos_alpha);
         let a = if alpha > self.ref_alpha {
             Space::short(-(Space::TWO_PI - alpha) / (Space::TWO_PI - self.ref_alpha))
         } else {
@@ -2059,7 +2049,7 @@ impl Space {
         let (vec, _) = normalize_v3(mul_v3_fl(self.lnor, -cos_alpha) + custom);
         let cos_beta = dot_v3(self.vec_ref, vec);
         let b = if cos_beta < Space::TRIGO {
-            let mut beta = acos_clamped(cos_beta);
+            let mut beta = crate::normals::acos_approx(cos_beta);
             if dot_v3(self.vec_ortho, vec) < 0.0 {
                 beta = Space::TWO_PI - beta;
             }
