@@ -1060,8 +1060,9 @@ fn face_area(mesh: &Mesh, f: usize) -> f32 {
 /// more than two, and at a flat face); without, all the corners at a point do. A run whose sum is nothing keeps
 /// the normal it had.
 ///
-/// With keep_sharp the normals are the sums themselves: Blender keeps them as two angles of sixteen bits in each
-/// run's own frame and reads them back a ten-thousandth of a turn or so off.
+/// The mesh is left as Blender leaves it: the normals are kept as two angles of sixteen bits in each run's own
+/// frame (`Mesh::stored`), in place of whatever was kept before (a bevel's hardened normals), and are what those
+/// angles read as, a ten-thousandth of a turn or so off the sums.
 pub fn weighted_normal(obj: Obj, o: WeightedNormal) -> Obj {
     obj.edit(|part| {
         let mesh = &part.mesh;
@@ -1092,7 +1093,7 @@ pub fn weighted_normal(obj: Obj, o: WeightedNormal) -> Obj {
             let (unit, len) = normalize_v3(*s);
             *s = if len < 1e-6 { V3::ZERO } else { unit };
         }
-        let own = if o.keep_sharp {
+        let own: Vec<V3> = if o.keep_sharp {
             let had = normals::corner_normals(mesh);
             (0..mesh.loops.len())
                 .map(|corner| {
@@ -1101,11 +1102,17 @@ pub fn weighted_normal(obj: Obj, o: WeightedNormal) -> Obj {
                 })
                 .collect()
         } else {
-            // (one normal a vertex, kept and read back as Blender keeps the normals a script gives a mesh's points)
-            sums.resize(mesh.verts.len(), V3::ZERO);
-            normals::custom_from_verts(mesh, &sums)
+            // (one normal a vertex, as Blender keeps the normals a script gives a mesh's points)
+            mesh.loops
+                .iter()
+                .map(|&v| normals::unit(sums[v as usize]))
+                .collect()
         };
-        part.mesh.normals = Some(own);
+        // Blender writes the two angles it keeps for each corner over the ones the mesh had (a bevel's), and the
+        // normals are what they read as from then on
+        let kept = normals::to_stored(mesh, &own);
+        part.mesh.normals = Some(normals::from_stored(mesh, &kept));
+        part.mesh.stored = Some(kept.into_iter().map(Some).collect());
     });
     obj
 }
