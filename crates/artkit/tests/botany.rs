@@ -941,6 +941,7 @@ fn a_species_own_tiles_move_only_the_cards_and_cores_pictures() {
     let tiles = Tiles {
         cards: vec![(0.5, 0.0), (0.0, 0.0), (0.5, 0.5)],
         core: (0.0, 0.5),
+        ..Tiles::default()
     };
     crown("crown1.tiles", crown1, Some(tiles), &mut Off::default());
 }

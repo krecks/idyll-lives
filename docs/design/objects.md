@@ -266,9 +266,9 @@ room has.
   woods too: a file's `far` (`crates/art/nature/src/plants`). Its parts on `foliage`, `leafcards` and `bark` take the nature
   shader's wind and tint.
 - **Leaf cards.** A broadleaved tree's crown is cut-out cards over dark cores, not lumpy balls (`artkit::botany`
-  `leaves`, `clad`; `crates/art/nature/src/trees/NOTES.md`): each card a quad with a cluster of leaves from the one atlas they all share
-  (`textures/leafcards/albedo.png`, a committed file; three clusters and a
-  dense wall of leaves for the cores), lying as a spray does, turned up and out, so the camera that looks down on the
+  `leaves`, `clad`; `crates/art/nature/src/trees/NOTES.md`): each card a quad with a cluster of its species' leaves from the one atlas they all share
+  (`textures/leafcards/albedo.png`, drawn by `cargo tex leafcards`: a species' clusters, the cherry's of blossom, and a
+  dense wall of its leaves for the cores), lying as a spray does, turned up and out, so the camera that looks down on the
   tree never sees it edge-on, with the normals of the leaf mass it stands for, so the crown shades as a volume. The
   cards stay inside the box of the lumps they replace: the tree keeps its size, its clearances and its perches. The
   finish is alpha-tested, never blended (`MaterialEntry.cutout`; alpha to coverage on the multisampled presets, a

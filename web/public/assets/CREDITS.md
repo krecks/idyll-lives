@@ -532,7 +532,7 @@ rollers turn while a resident watches it, the server cabinet's lights blink and 
 |---|---|---|
 | `textures/sky/clouds.png` | Cloud band of the sky | `cargo tex clouds` (procedural noise, `crates/tools/src/tex.rs`) |
 | `textures/<set>/albedo.jpg`, `normal.jpg`, `arm.jpg`; `street/sidewalk/*.jpg` | All 21 surface sets (`bark` … `leather` … `wood_oak`, `sidewalk`) | `cargo tex synth` (procedural height fields, `crates/tools/src/tex/synth.rs`) |
-| `textures/leafcards/albedo.png` | The trees' leaf cards: three cut-out clusters of leaves and a dense wall of them | Rendered from leaves generated in code; a committed file (original, CC0) |
+| `textures/leafcards/albedo.png` | The trees' leaf cards: each species' cut-out clusters of leaves (the cherry's of blossom, the willow's hanging strands too) and a dense wall of them | `cargo tex leafcards` (leaves generated in code, `crates/tools/src/tex/leafcards.rs`; original, CC0) |
 | `icons/rotate.svg`, `wall.svg`, `door.svg`, `eraser.svg`, `eyedropper.svg`, `environment.svg`, `fence.svg`, `gate.svg`, `garage.svg`, `porch.svg`, `roof.svg`, `upgrade.svg`, `focused.svg`, `inspired.svg`, `energized.svg`, `relaxed.svg` | UI and emotion icons | Hand-written SVG in the style of the existing set |
 
 ## Characters (`characters/`)

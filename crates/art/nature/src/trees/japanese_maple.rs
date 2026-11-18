@@ -3,6 +3,7 @@
 //! tiers over head height (from 2.1 m), so residents walk past and work at it from the next tile; a few stray sprigs
 //! on top, which shaping takes off.
 
+use artkit::botany::Tiles;
 use artkit::botany::skeleton::{Buttress, ClumpAims, Stem};
 use artkit::botany::species::{Aims, Perches, Roots, Seeds, Species, Stage, Tree, Trunk, grow};
 use artkit::botany::{_with_part, WithPart};
@@ -22,7 +23,8 @@ pub fn species() -> Species {
             cards: Some(216),
         },
         leaves: &["#6E1C1C", "#8A2424", "#A2302A", "#B83F2F", "#CC5636"],
-        colours: &[("bark", "#B09A8A"), ("leaf_light", "#B83F2F")],
+        tiles: Tiles::of("japaneseMaple"),
+        colours: &[("bark", "#FFFFFF"), ("leaf_light", "#B83F2F")],
         // a short trunk splitting at knee height into six slender stems, each rising in a long S out to the
         // vase's rim
         trunk: Stage::Spec(Trunk {

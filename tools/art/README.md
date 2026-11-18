@@ -24,9 +24,7 @@ counted checks' findings each model may keep), `validate.ts` (the Khronos valida
 | `cargo tex synth [set…]` | Generates every `albedo/normal/arm` texture set (21 sets: bark, brick, floors, foliage, grass, paving, roof, sidewalk, walls and wood) from tileable height fields; no downloads |
 | `cargo tex materials` | Writes `materials.json` in the current directory: PBR material + environment entries (the finishes in glTF's terms; refused when one is outside the ranges of `crates/tools/src/pbr.rs`) |
 | `cargo tex clouds <out.png>` | Generates the procedural, tileable cloud layer (`textures/sky/clouds.png`) |
-
-The trees' leaf-card atlas (`textures/leafcards/albedo.png`) is a committed file, not generated, until a Rust
-generator for it lands.
+| `cargo tex leafcards [dir]` | Draws the trees' leaf-card atlas, `textures/leafcards/albedo.png` (1024 px, a tile a picture of `artkit`'s `botany::ATLAS`: each species' clusters of leaves, its blossom, its hanging strands and its dense tile), and `tiles.json` beside it for the species check (`crates/tools/src/tex/leafcards.rs`; about half a minute) |
 
 ## The gate
 
@@ -105,8 +103,8 @@ section is taken out and seeded again with the reason in the commit.
 
 Texture flow: `cargo tex synth` writes the 20 texture sets into `web/public/assets/textures/` and the sidewalk into
 `web/public/assets/street/sidewalk/` (fixed filenames and resolutions, so the manifest's material bindings stay the
-same). The one texture it doesn't make is the trees' leaf-card atlas, a committed file. `cargo tex materials` writes the PBR material entries; `cargo tex clouds` regenerates the sky's cloud layer.
-All three are deterministic: the same source makes the same output. The tools' tests hold the committed sets, under the
+same). `cargo tex leafcards` draws the trees' leaf-card atlas; `cargo tex materials` writes the PBR material entries; `cargo tex clouds` regenerates the sky's cloud layer.
+All four are deterministic: the same source makes the same output. The tools' tests hold the committed sets, under the
 manifest's materials, to a physically based standard (`crates/tools/src/tex/synth/standard.rs`: albedo, roughness,
 metalness, normals, ambient occlusion and texels a metre, with the breaks known today listed there), and
 `cargo review sizes` their patterns (a brick, a board, a tile) and the kerb to real sizes (`surfaces` in

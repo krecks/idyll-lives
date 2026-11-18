@@ -84,8 +84,19 @@ masses and small shapes the plants use too (`leaves`, `clad`, `lump`, `tube`, `p
 A review found the crowns the least real thing on screen: lumpy balls with a leaf pattern tiled over them. A
 broadleaf's leaf masses are now cut-out cards over dark cores (`artkit::botany` `leaves`, `clad`, `Cards`):
 
-- **The atlas.** One texture for every tree, `textures/leafcards/albedo.png` (512², a committed file): three clusters of leaves on twigs, rendered from generated leaves and cut out by their alpha,
-  and a dense, opaque wall of leaves for the cores. Pale, as the tiling foliage is: a card's colour tints it.
+- **The atlas.** One texture for every tree, `textures/leafcards/albedo.png` (1024², `cargo tex leafcards`, drawn from
+  `artkit`'s `botany::ATLAS`): a 6 by 6 grid of 170 px tiles, each species' own (2026-11-18; one generic leaf for all
+  until then): three clusters of leaves on twigs, cut out by their alpha, and a dense, opaque wall of leaves for the
+  cores, for the oak (lobed), the Norway maple (five-pointed), the birch (small toothed triangles on sprays hanging to
+  one side), the cherry (double blossom with bronze young leaves), the apple (rosettes of toothed ovals), the Japanese
+  maple (seven-fingered) and the magnolia (large, obovate); two clusters, two strands and a dense tile for the willow;
+  three clusters for the lemon tree, which wears the magnolia's dense tile (leaves of the size its own would be).
+  Leaves are a little over life size where a pixel of the play camera would lose their shape (the oak's 14 to 17 cm).
+  Pale, as the tiling foliage is: a card's colour tints it, and every cluster's covered texels have one mean
+  luminance, so `CARD_TONE` holds for every species (measured in the gallery from 110 m with no lawn, cards against
+  the far version's lumps: each tree's ratio within 6 % of what it was on the first atlas). A species says which
+  tiles are its own (`Tiles::of`); a card still draws one of three from the same random number, so cards lie where
+  they lay.
 - **A build** makes its masses as ever (`leaves`: the same lumps from the same random numbers) and keeps them out of
   the model (`join_still`) for what is found on them by casting rays: the perches, the apples and lemons (`_hang`),
   the magnolia's goblets. `clad` then draws each mass as 15 cards, 1 to 1.4 of its radius across, in its own shade
@@ -110,8 +121,10 @@ broadleaf's leaf masses are now cut-out cards over dark cores (`artkit::botany` 
   line (`strand`, `Cards::hang`: one every half metre, overlapping, turned a little off the next, the clusters drawn
   long as hanging leaves), cut out, so whoever sits by the trunk shows through the leaves as well as between the
   strands. The ribbons are built as ever and stand in until then (`stand_in`): the curtain keeps their box.
-- **Blossom and fruit.** The cherry's and the magnolia's cards are their pinks (the same clusters, tinted), their
-  green clumps green cards; the apples, lemons and goblets sit where they sat, on the lumps' surface, just outside
+- **Blossom and fruit.** The cherry's cards are clusters of blossom: the petals pale in the tile, so the card's pink is
+  theirs, and the young leaves a yellow-green that the pink turns bronze (one tint for the whole card). Its two green
+  clumps wear the apple's leaves. The magnolia's cards are its own large leaves in its pinks, as broad as its
+  tepals, its green clumps the same leaves green; the apples, lemons and goblets sit where they sat, on the lumps' surface, just outside
   the cards.
 - **Cost.** The same triangles as the lumps within 2 % (the willow fewer) and the same draw calls (bark, leaves;
   the cores are on the cards' finish). The nine files are 24 % larger, 2.31 MB from 1.86 (four corners a card,
@@ -238,7 +251,10 @@ The plants family's shrubs and hedges have 4–6 each, found the same way.
 
 `cargo review sizes` measures each tree against its species in `docs/review/reference.json` (`crates/tools/src/species.rs`:
 height, crown width and ratio, clear trunk, bark luminance, blossom and fruit hue, leaf-card tile class); what is off
-is held in `tools/art/gate-baseline.json` (`reference`) until a rebuild fixes it. Leaf size on screen, the bark's
+is held in `tools/art/gate-baseline.json` (`reference`) until a rebuild fixes it. (Bark, 2026-11-18: each species'
+colour takes the one bark texture, whose mean luminance is 0.10, into its range where white or less does: the maples
+0.100, the willow 0.091, the spruce 0.092, the birch's stem 0.325 with its marks; the oak and the pine are at 0.100
+under white, below an oak's 0.13 and a pine's 0.11, until the texture is lighter.) Leaf size on screen, the bark's
 pattern and the habit's likeness are judged by eye against the kind's sources, one dated line per species:
 
 - `model.tree` (Quercus robur), 2026-11-17, from the 2026-11-02 previews (before the leaf cards): an upright oval

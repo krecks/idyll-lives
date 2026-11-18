@@ -53,7 +53,7 @@ pub fn _mesh<F: AsRef<[I]>, I: Copy + TryInto<u32>>(
 pub type Outline = fn(f64) -> f64;
 
 /// The leaves' outlines, by name.
-pub const PROFILES: [(&str, Outline); 5] = [
+pub const PROFILES: [(&str, Outline); 9] = [
     ("oval", |t| pow(sin(PI * t), 0.7) * (1.0 - 0.2 * t)),
     ("lance", |t| pow(sin(PI * t), 0.9) * (1.0 - 0.45 * t)),
     ("heart", |t| pow(sin(PI * (0.22 + 0.78 * t)), 0.6)),
@@ -61,6 +61,16 @@ pub const PROFILES: [(&str, Outline); 5] = [
         1.0_f64.min(t * 6.0) * pow(1.0_f64.min((1.0 - t) * 3.0), 0.8)
     }),
     ("petal", |t| pow(sin(PI * pow(t, 0.8)), 0.6)),
+    // an apple's, a cherry's: widest below its middle, rounded to the stalk, drawn to a point
+    ("ovate", |t| pow(sin(PI * pow(t, 0.72)), 0.75)),
+    // a birch's: widest near the stalk, its sides nearly straight from there to a long point
+    ("deltoid", |t| {
+        pow(1.0_f64.min(t / 0.16), 0.7) * pow((1.0 - t) / 0.84, 1.1)
+    }),
+    // a magnolia's: widest above its middle, a wedge to the stalk
+    ("obovate", |t| pow(sin(PI * pow(t, 1.5)), 0.7)),
+    // a lemon's: widest at its middle, pointed at both ends
+    ("elliptic", |t| pow(sin(PI * t), 1.15)),
 ];
 
 /// The outline named `shape` (`PROFILES`).

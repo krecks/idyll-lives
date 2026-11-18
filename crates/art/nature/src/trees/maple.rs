@@ -1,6 +1,7 @@
 //! Maple (a Norway maple): a straight trunk with a leader and six steep limbs forking into boughs under one dense,
 //! even dome of eighteen leaf masses round a dark heart, in a cool, deep green; not the oak's few big billows.
 
+use artkit::botany::Tiles;
 use artkit::botany::skeleton::{Branches, Buttress, ClumpAims, Heart, Mass, Stem};
 use artkit::botany::species::{
     Aims, Crown, Hearts, Perches, Roots, Seeds, Species, Stage, Trunk, grow,
@@ -20,6 +21,8 @@ pub fn species() -> Species {
             cards: Some(212),
         },
         leaves: &["#3E6E34", "#4A7C3A", "#588A42", "#68984A", "#7AA654"],
+        tiles: Tiles::of("maple"),
+        colours: &[("bark", "#FFFFFF")],
         // a straight trunk, a little flared, carrying on as the leader into the crown
         trunk: Stage::Spec(Trunk {
             pts: vec![

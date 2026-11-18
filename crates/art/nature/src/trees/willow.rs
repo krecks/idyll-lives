@@ -1,6 +1,7 @@
 //! Weeping willow: a thick, rough trunk on root buttresses, five limbs rising out of it and arching over, a domed
 //! crown of leaf masses along their arches, and curtains of leaves hanging from them nearly to the ground.
 
+use artkit::botany::Tiles;
 use artkit::botany::skeleton::{Buttress, ClumpAims, Limb, LimbPoints, Stem};
 use artkit::botany::species::{Aims, Perches, Roots, Seeds, Species, Stage, Tree, Trunk, grow};
 use artkit::botany::{Cards, card_of, stand_in};
@@ -21,6 +22,8 @@ pub fn species() -> Species {
             cards: Some(218),
         },
         leaves: &["#6A8A36", "#7A9A3E", "#8AAA48", "#9CBA54", "#AEC862"],
+        tiles: Tiles::of("willow"),
+        colours: &[("bark", "#F8F4EC")],
         trunk: Stage::Spec(Trunk {
             pts: vec![
                 (0.0, 0.0, 0.0),

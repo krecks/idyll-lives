@@ -1,6 +1,7 @@
 //! Silver birch: a slim white stem with dark lenticels, black and fissured at its foot, slender white limbs up it
 //! from 3 m and an airy, upright crown of small masses hanging from their twigs.
 
+use artkit::botany::Tiles;
 use artkit::botany::skeleton::{_along, Branches, ClumpAims, Heart, LimbPoints, Mass};
 use artkit::botany::species::{Aims, Crown, Hearts, Perches, Seeds, Species, Stage, Tree, grow};
 use artkit::far::{is_low, low};
@@ -32,7 +33,9 @@ pub fn species() -> Species {
             cards: Some(213),
         },
         leaves: &["#76963E", "#86A646", "#98B650", "#AAC45C", "#BCD26A"],
-        colours: &[("bark", "#8E867C")],
+        tiles: Tiles::of("birch"),
+        // (its white bark as light as a birch's is, the black marks and the fissured foot in it)
+        colours: &[("bark", "#8E867C"), ("birch_bark", "#A29F98")],
         trunk: Stage::Own(trunk),
         // slender limbs up the stem from 3 m, rising, then their twigs hanging in long, light masses: an airy,
         // upright crown
