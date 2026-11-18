@@ -99,14 +99,14 @@ pub fn plant() -> Vec<Obj> {
 /// Monstera: a white pot, a moss pole, and big glossy leaves split from their edges almost to the midrib, on long
 /// arching stems, with a couple of aerial roots reaching down.
 pub fn monstera() -> Vec<Obj> {
-    let p = palette(&[
+    let p = super::plain_leaves(palette(&[
         ("body", "#EDEBE6"),
         ("leaf", "#2F6B35"),
         ("leaf_dark", "#28602E"),
         ("leaf_light", "#3B7A3C"),
         ("stem", "#4E7A3A"),
         ("moss", "#6E6A3E"),
-    ]);
+    ]));
     let ys = vessel!(
         &p,
         0.18,
@@ -186,13 +186,13 @@ pub fn monstera() -> Vec<Obj> {
 /// Fiddle-leaf fig: a cream pot with a rolled rim, a slim, slightly crooked trunk in bark, and big leathery,
 /// wavy-edged fiddle-shaped leaves spiralling up it on short stalks.
 pub fn fiddle_fig() -> Vec<Obj> {
-    let p = palette(&[
+    let p = super::plain_leaves(palette(&[
         ("body", "#D9CDB4"),
         ("leaf", "#2E5A2A"),
         ("leaf_dark", "#2A5226"),
         ("leaf_light", "#386832"),
         ("bark", "#8A7058"),
-    ]);
+    ]));
     let ys = vessel!(
         &p,
         0.2,
@@ -789,7 +789,7 @@ pub fn palm() -> Vec<Obj> {
 /// Orchid: a small white pot of bark on a turned wooden pedestal, three broad, fleshy leaves, silvery aerial
 /// roots, and a staked, arching spike of moth-orchid flowers and buds.
 pub fn orchid() -> Vec<Obj> {
-    let p = palette(&[
+    let p = super::plain_leaves(palette(&[
         ("body", "#F2F0EC"),
         ("leaf", "#2E5A30"),
         ("stem", "#4E6A3A"),
@@ -798,7 +798,7 @@ pub fn orchid() -> Vec<Obj> {
         ("bloom_accent", "#C2367A"),
         ("soil", "#6A4A30"),
         ("flesh", "#AAB8A0"),
-    ]);
+    ]));
     revolve!(
         "pedestal",
         &[

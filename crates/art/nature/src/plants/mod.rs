@@ -65,11 +65,17 @@ pub fn family() -> Option<Family> {
             ),
             pot(
                 Model::new("monstera", houseplants::monstera, (0.784, 0.911, 0.791))
-                    .key("model.garden.monstera"),
+                    .key("model.garden.monstera")
+                    .palette(plain_leaves(BASE.palette())),
             ),
             pot(
                 Model::new("fiddleFig", houseplants::fiddle_fig, (0.528, 1.626, 0.527))
-                    .key("model.garden.fiddleFig"),
+                    .key("model.garden.fiddleFig")
+                    .palette(plain_leaves(BASE.palette()))
+                    .accept(
+                        "edges",
+                        "the rims of its leaf blades, drawn plain (satin): the gate leaves a leaf's rim unjudged on foliage",
+                    ),
             ),
             pot(
                 Model::new("snakePlant", houseplants::snake_plant, (0.341, 0.905, 0.32))
@@ -93,7 +99,8 @@ pub fn family() -> Option<Family> {
                 .key("model.garden.palm")),
             pot(
                 Model::new("orchid", houseplants::orchid, (0.431, 1.198, 0.381))
-                    .key("model.garden.orchid"),
+                    .key("model.garden.orchid")
+                    .palette(plain_leaves(BASE.palette())),
             ),
             pot(
                 Model::new("bonsai", houseplants::bonsai, (0.62, 1.354, 0.407))
