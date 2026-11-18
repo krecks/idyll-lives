@@ -1,6 +1,6 @@
-# Farm — notes
+# Farm (`crates/art/outside/src/farm`)
 
-`farm.py` builds the eight CM5 farm models into `web/public/assets/models/farm/` and their
+The module builds the eight CM5 farm models into `web/public/assets/models/farm/` and their
 entries in `packs/farm/manifest.json`: the red barn (`model.farm.barn`), the grain silo (`model.farm.silo`), the
 little tractor (`model.farm.tractor`), the round hay bale (`model.farm.hayBale`), the stack of hay bales
 (`model.farm.hayStack`), the scarecrow (`model.farm.scarecrow`), the water trough (`model.farm.trough`) and the
@@ -121,9 +121,22 @@ models and their far versions; 2026-10-22, the 12 the detail pass changed).
 
 ```
 cargo art farm            # the 8 .glb and 8 .far.glb, the pack, check-glb
-cargo art farm --preview  # previews/farm/<id>.png, <id>.far.png, scarecrow@sway.png (--lit: <id>.lit.png)
+cargo art farm --check    # the committed bytes, nothing written
+cargo art farm --preview  # previews/farm/<id>.png, <id>.far.png, scarecrow@sway.png
 ```
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 2 models changed shape: `scarecrow`, `tractor`; the same triangles.
+No change to the build: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 2 models changed shape: `scarecrow`, `tractor`; the same triangles.
+
+## Built in Rust (2026-11-18)
+
+The script's functions one for one (`barn.rs` and `barn_doors.rs`, `silo.rs`, `tractor.rs`, `hay.rs`, `scarecrow.rs`, `trough.rs`,
+`coop.rs`; the slabs, shells and bars of `_prism`, `_shell`, `_strut`, `_frame` in `common.rs`). Against the last
+Blender build (`ref/blender`): 11 same, 6 near, 0 CHANGED of the 8 models, their far versions and the pack; every
+surface 0.000 mm from Blender's, the baked shading 0.00 greys off. The nears: the barn's and the tractor's normals in
+their last digits (`shape`), the bale's far version's and the scarecrow's texture coordinates (`uv`, within the
+limit), the sway's keys in their last bit, the tractor's far version's origin 3e-8 m off Blender's (`nodes`: its surface
+the same, its x bounds a unit in the last place apart when centred), and the scarecrow's far version, decimated
+by the kernel, held to the decimated far versions' rule: 1,001 triangles where Blender's file has 941 (+6.4 %), and
+2,509 vertices where it has 1,268 (117 KB where it was 67 KB).
