@@ -61,14 +61,26 @@ fn kept<K: PartialEq, T>(cached: Option<(K, T)>, key: K) -> Option<T> {
     cached.filter(|c| c.0 == key).map(|c| c.1)
 }
 
-/// The lights that follow a use (content `light.while`; object ids, in id order) and the
-/// animations any of them watches (sorted): a big town has thousands of objects and a handful
-/// of these, looked at every tick.
+/// The lights that follow a use (content `light.while`; object ids, in id order), the
+/// animations any of them watches (sorted), and where on the lot someone could light one: a big
+/// town has thousands of objects and residents and a handful of these (a kitchen's hood), looked
+/// at every tick, so only the residents standing near one are looked at.
 #[derive(Debug, Clone)]
 struct WhileLights {
     lights: Vec<u32>,
     watched: Vec<usize>,
+    /// Per `CELL`-tile square of the lot, row by row (`cols` across): whether someone standing in
+    /// it could light one. Each light's tiles, grown by the largest thing that could stand over
+    /// or under it (content `footprint`) and by `REACH` past that (where its user stands).
+    near: Vec<bool>,
+    cols: usize,
 }
+
+/// The side of `WhileLights::near`'s squares (tiles).
+const CELL: i32 = 8;
+/// How far from what they use someone using it stands, at most (tiles): a use's places are
+/// beside it, a step or two off.
+const REACH: i32 = 8;
 
 impl WhileLights {
     fn new(world: &World) -> Self {
@@ -91,7 +103,50 @@ impl WhileLights {
             .collect();
         watched.sort_unstable();
         watched.dedup();
-        Self { lights, watched }
+        let (width, depth) = (world.lot.width as i32, world.lot.depth as i32);
+        let cols = (width + CELL - 1) / CELL;
+        let rows = (depth + CELL - 1) / CELL;
+        let mut near = vec![false; (cols * rows).max(0) as usize];
+        // (What is used under a light overlaps its tiles, so it reaches no further than the
+        // largest thing in the content from them; its user stands within `REACH` of it.)
+        let grow = content
+            .objects
+            .iter()
+            .map(|d| i32::from(d.footprint[0].max(d.footprint[1])))
+            .max()
+            .unwrap_or(1)
+            + REACH;
+        for &id in &lights {
+            let [x0, z0, x1, z1] = footprint(&world.objects[id as usize], content);
+            let (c0, c1) = (
+                ((x0 - grow).max(0)) / CELL,
+                ((x1 + grow).min(width - 1)) / CELL,
+            );
+            let (r0, r1) = (
+                ((z0 - grow).max(0)) / CELL,
+                ((z1 + grow).min(depth - 1)) / CELL,
+            );
+            for r in r0..=r1 {
+                for c in c0..=c1 {
+                    near[(r * cols + c) as usize] = true;
+                }
+            }
+        }
+        Self {
+            lights,
+            watched,
+            near,
+            cols: cols as usize,
+        }
+    }
+
+    /// Whether someone standing on tile (x, z) could light one (`near`).
+    fn near(&self, (x, z): (i32, i32)) -> bool {
+        if x < 0 || z < 0 {
+            return false;
+        }
+        let (c, r) = ((x / CELL) as usize, (z / CELL) as usize);
+        c < self.cols && self.near.get(r * self.cols + c).copied().unwrap_or(false)
     }
 }
 
@@ -121,6 +176,7 @@ fn while_lit(world: &World, cached: &WhileLights) -> Vec<u32> {
     let doing: Vec<_> = world
         .sims
         .iter()
+        .filter(|s| cached.near((s.pos[0].floor() as i32, s.pos[1].floor() as i32)))
         .filter_map(|s| {
             let d = crate::snapshot::doing(world, s);
             (d.action >= 0.0 && watched.binary_search(&(d.action as usize)).is_ok()).then(|| {
