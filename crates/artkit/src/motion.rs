@@ -1301,10 +1301,13 @@ pub fn keys(obj: Obj, clip: &str, path: Path, index: usize, points: &[impl KeyPo
 /// moves every part on its own) and before the clips; both stay their own parts, so `obj` still costs its own draw.
 /// Its own clips turn it about its own origin, in `parent`'s frame.
 pub fn attach(obj: Obj, parent: Obj) -> Obj {
+    scene::update();
     let world = obj.matrix_world();
     obj.edit(|o| o.parent = Some(parent));
     // (its place, turn and scale taken apart from where it is in the parent's frame)
-    obj.set_matrix_world(world)
+    obj.set_matrix_world(world);
+    scene::update();
+    obj
 }
 
 /// A matrix's place, Euler XYZ turn and scale (`mat4_to_loc_rot_size` and the turn through a quaternion, as an
@@ -1449,7 +1452,7 @@ fn quat_to_eul(q: [f32; 4]) -> V3 {
     }
     .to_matrix()
     .0;
-    let atan2f = |y: f32, x: f32| math::atan2(y as f64, x as f64) as f32;
+    let atan2f = math::atan2f;
     let cy = py::hypot(m[0][0] as f64, m[0][1] as f64) as f32;
     let (e1, e2) = if cy > 0.0000375_f64 as f32 {
         (

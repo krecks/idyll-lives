@@ -4,9 +4,8 @@
 
 use super::M;
 use super::common::{P, chair, rr};
-use super::kit::call::tube;
-use super::kit::{fillet, knob};
 use artkit::json::float_repr as r;
+use artkit::kit::{self, fillet};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, cos, cosd, radians, sin, sind};
 use artkit::motion::{Spin, spin};
@@ -33,7 +32,7 @@ fn knob_back(
     r: f64,
     material: Mat,
 ) -> Obj {
-    let obj = knob(fr, name, x, y, face, r, material, 10);
+    let obj = kit::knob!(fr, name, x, y, face, r, material, segments = 10);
     obj.edit(|o| o.rot.x = radians(-90.0) as f32);
     obj
 }
@@ -224,7 +223,7 @@ pub fn sewing_table() -> Vec<Obj> {
                 M.foot
             );
         }
-        tube!(
+        kit::tube!(
             f,
             "presser_bar_top",
             &[
@@ -236,7 +235,7 @@ pub fn sewing_table() -> Vec<Obj> {
             verts = 6,
             round = 1
         );
-        tube!(
+        kit::tube!(
             f,
             "presser_lever",
             &fillet(
@@ -290,7 +289,7 @@ pub fn sewing_table() -> Vec<Obj> {
             material = M.thread_red,
             segments = 12
         );
-        tube!(
+        kit::tube!(
             f,
             "thread",
             &[
@@ -423,7 +422,7 @@ pub fn sewing_table() -> Vec<Obj> {
                 )
             })
             .collect();
-        tube!(
+        kit::tube!(
             f,
             "basket_handle",
             &handle,
@@ -450,7 +449,7 @@ pub fn sewing_table() -> Vec<Obj> {
                 rings = 8
             );
         }
-        tube!(
+        kit::tube!(
             f,
             "knitting_needle",
             &[(-0.36, 0.82, 0.36), (-0.24, 0.92, 0.33)],
@@ -463,7 +462,7 @@ pub fn sewing_table() -> Vec<Obj> {
     });
     join(&still, "body", Some(P3::ZERO));
     let p = new_parts(|| {
-        tube!(
+        kit::tube!(
             f,
             "presser_bar",
             &[
@@ -485,7 +484,7 @@ pub fn sewing_table() -> Vec<Obj> {
             M.chrome,
             bevel = 0.002
         );
-        tube!(
+        kit::tube!(
             f,
             "needle_bar",
             &[
@@ -506,7 +505,7 @@ pub fn sewing_table() -> Vec<Obj> {
             M.chrome,
             verts = 6
         );
-        tube!(
+        kit::tube!(
             f,
             "needle",
             &[

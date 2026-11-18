@@ -141,6 +141,66 @@ fn quat_y_up(rot: V3) -> [f32; 4] {
     [x as f32, z as f32, -y as f32, w as f32]
 }
 
+/// A name as Blender's exporter sorts nodes by it: its runs of digits as numbers, the text between without case
+/// (`door1` before `door-1`, `water` before `water.001`, `leg2` before `leg10`).
+fn natural_key(name: &str) -> Vec<(String, u128)> {
+    // (text, the number after it) pairs: as Python compares the split list, text and numbers in turn
+    let mut out = Vec::new();
+    let mut text = String::new();
+    let mut chars = name.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c.is_ascii_digit() {
+            let mut digits = String::from(c);
+            while let Some(d) = chars.peek().copied().filter(char::is_ascii_digit) {
+                digits.push(d);
+                chars.next();
+            }
+            // (one more than the number, so that text with no number after it sorts first)
+            out.push((
+                std::mem::take(&mut text),
+                digits.parse::<u128>().unwrap_or(u128::MAX - 1) + 1,
+            ));
+        } else {
+            text.extend(c.to_lowercase());
+        }
+    }
+    out.push((text, 0));
+    out
+}
+
+/// The parts as the file has its nodes: the ones with no parent among them by name (as `natural_key` sorts),
+/// each after its children, they by name too; and the order the clips are met in: each parent before its
+/// children. Blender's exporter walks the scene so, whatever order the parts were made or given in.
+fn file_order(objs: &[Obj]) -> (Vec<Obj>, Vec<usize>) {
+    let by_name = |list: &mut Vec<Obj>| list.sort_by_cached_key(|o| natural_key(&o.name()));
+    let mut roots: Vec<Obj> = Vec::new();
+    let mut children: BTreeMap<Obj, Vec<Obj>> = BTreeMap::new();
+    for &o in objs {
+        match o.read(|p| p.parent).filter(|p| objs.contains(p)) {
+            Some(parent) => children.entry(parent).or_default().push(o),
+            None => roots.push(o),
+        }
+    }
+    by_name(&mut roots);
+    children.values_mut().for_each(by_name);
+    fn walk(o: Obj, children: &BTreeMap<Obj, Vec<Obj>>, post: &mut Vec<Obj>, pre: &mut Vec<Obj>) {
+        pre.push(o);
+        for &child in children.get(&o).map(Vec::as_slice).unwrap_or(&[]) {
+            walk(child, children, post, pre);
+        }
+        post.push(o);
+    }
+    let (mut post, mut pre) = (Vec::new(), Vec::new());
+    for o in roots {
+        walk(o, &children, &mut post, &mut pre);
+    }
+    let met = pre
+        .iter()
+        .map(|o| post.iter().position(|p| p == o).unwrap())
+        .collect();
+    (post, met)
+}
+
 /// An order for floats that sorts them as numbers.
 fn key(x: f32) -> i64 {
     let b = x.to_bits() as i64;
@@ -155,6 +215,9 @@ fn key(x: f32) -> i64 {
 /// `texcoords`: whether the UVs are written (a model with a part on a textured finish). `finishes`: the game's,
 /// for each material's roughness and metalness.
 pub fn write(objs: &[Obj], texcoords: bool, finishes: &Finishes) -> Vec<u8> {
+    // the nodes in the order Blender's exporter writes them, whatever order they were given in
+    let (objs, clip_order) = file_order(objs);
+    let objs = &objs[..];
     let mut file = File::default();
     let mut materials: Vec<(String, String)> = Vec::new();
     let mut meshes = Vec::new();
@@ -169,9 +232,10 @@ pub fn write(objs: &[Obj], texcoords: bool, finishes: &Finishes) -> Vec<u8> {
         }
     }
     for (i, &o) in objs.iter().enumerate() {
-        let (name, mesh, loc, rot, scale, quat, order) = o.read(|p| {
+        let (name, data_name, mesh, loc, rot, scale, quat, order) = o.read(|p| {
             (
                 p.name.clone(),
+                p.data_name.clone(),
                 p.mesh.clone(),
                 p.loc,
                 p.rot,
@@ -313,7 +377,7 @@ pub fn write(objs: &[Obj], texcoords: bool, finishes: &Finishes) -> Vec<u8> {
         }
         meshes.push(format!(
             "{{\"name\":{},\"primitives\":[{}]}}",
-            quoted(&name),
+            quoted(&data_name),
             primitives.join(",")
         ));
         let mut node = Vec::new();
@@ -337,7 +401,8 @@ pub fn write(objs: &[Obj], texcoords: bool, finishes: &Finishes) -> Vec<u8> {
     }
     // the clips: one animation a name, in the order they are first met
     let mut animations: Vec<(String, Vec<String>, Vec<String>)> = Vec::new();
-    for (i, &o) in objs.iter().enumerate() {
+    for i in clip_order {
+        let o = objs[i];
         let tracks = o.read(|p| p.tracks.clone());
         for track in tracks {
             let at = match animations.iter().position(|(n, _, _)| *n == track.name) {
@@ -1383,7 +1448,24 @@ pub fn encode(model: &Model) -> Vec<u8> {
         .iter()
         .map(|a| vec![(0, 0); a.channels.len()])
         .collect();
-    for (i, n) in model.nodes.iter().enumerate() {
+    // (the nodes as the clips are met: each root, then its children, as the writer and Blender's exporter go)
+    let mut met: Vec<usize> = Vec::new();
+    fn walk(i: usize, nodes: &[Node], met: &mut Vec<usize>) {
+        if i < nodes.len() && !met.contains(&i) {
+            met.push(i);
+            for &child in &nodes[i].children {
+                walk(child, nodes, met);
+            }
+        }
+    }
+    for &root in &model.roots {
+        walk(root, &model.nodes, &mut met);
+    }
+    for i in 0..model.nodes.len() {
+        walk(i, &model.nodes, &mut met);
+    }
+    for i in met {
+        let n = &model.nodes[i];
         let mut order: Vec<usize> = n.clips.clone();
         for (a, anim) in model.animations.iter().enumerate() {
             if !order.contains(&a) && anim.channels.iter().any(|c| c.node == i) {

@@ -4,10 +4,9 @@
 
 use super::M;
 use super::common::{P, ends, flat_quads, rr, stool};
-use super::kit::call::tube;
-use super::kit::fillet;
 use artkit::forms::circle;
 use artkit::json::float_repr as r;
+use artkit::kit::{self, fillet};
 use artkit::math::{Axis, P3};
 use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
 use artkit::place::{Facing, GameFrame};
@@ -57,7 +56,7 @@ pub fn craft_table() -> Vec<Obj> {
                     (x, 0.006, z + 0.004),
                     (x, 0.712, z + 0.03),
                 ];
-                tube!(
+                kit::tube!(
                     f,
                     format!("pin{sx}{}", r(z)),
                     &fillet(&pin, 0.006, 3),

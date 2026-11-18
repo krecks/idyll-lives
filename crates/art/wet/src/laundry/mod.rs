@@ -122,5 +122,5 @@ pub fn family() -> Option<Family> {
          washer and the dryer open their door (`door_open`) while a resident loads or empties them, and \
          turn their drum (`drum_spin`) while they run on their own (`running`). The basket of washing \
          and the piece held up to fold are carried (content `items`).",
-    ))
+    ).switched())
 }

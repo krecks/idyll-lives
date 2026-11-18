@@ -94,6 +94,17 @@ pub enum Pick {
         vert: u32,
         on: Vec<u32>,
         edges: Vec<(u32, u32, u32)>,
+        /// (Of an odd number of segments over one, the polygon in the middle of a patch: as a patch quad's.)
+        across: Vec<(u32, u32, u32)>,
+    },
+    /// A quad of a corner's patch of an odd number of segments at the old vertex `vert`: the one at `place` (new
+    /// point, ring, step). `across`: for each new point round the vertex, the bevelled edge its profile to the next
+    /// crosses (its other end) and the faces before and after that edge.
+    Patch {
+        at: usize,
+        vert: u32,
+        place: (usize, usize, usize),
+        across: Vec<(u32, u32, u32)>,
     },
 }
 
@@ -233,8 +244,15 @@ struct Corner {
     bounds: Vec<Bound>,
 }
 
-/// A face a corner makes: its corners, each one's source face, its material and, for the corner's polygon, the vertex.
-type CornerFace = (Vec<u32>, Vec<u32>, u16, Option<u32>);
+/// A face a corner makes: its corners, each one's source face, its material, for the corner's polygon the vertex,
+/// and for a patch's quad the vertex and its place in the patch (new point, ring, step).
+type CornerFace = (
+    Vec<u32>,
+    Vec<u32>,
+    u16,
+    Option<u32>,
+    Option<(u32, usize, usize, usize)>,
+);
 
 /// Each edge's faces, with the places of its two ends among the mesh's corners.
 type Sides = BTreeMap<(u32, u32), Vec<(u32, usize, usize)>>;
@@ -1050,19 +1068,19 @@ pub fn bevelled(
                             at(i, j + 1, k),
                         ];
                         let f = if 2 * k + 1 < ns { f1 } else { f2 };
-                        corner_faces.push((quad, vec![f; 4], mat, None));
+                        corner_faces.push((quad, vec![f; 4], mat, None, Some((v, i, j, k))));
                     }
                 }
             }
             if odd == 1 {
                 let ring: Vec<u32> = (0..n).map(|i| at(i, ns2, ns2)).collect();
                 let from: Vec<u32> = (0..n).map(|i| corner.bounds[i].face).collect();
-                corner_faces.push((ring, from, mat, Some(v)));
+                corner_faces.push((ring, from, mat, Some(v), None));
             }
         } else if n >= 3 {
             let ring: Vec<u32> = (0..n).map(|i| grid[&(i, 0, 0)]).collect();
             let from: Vec<u32> = (0..n).map(|i| corner.bounds[i].face).collect();
-            corner_faces.push((ring, from, mat, Some(v)));
+            corner_faces.push((ring, from, mat, Some(v), None));
         }
         grids.insert(v, grid);
     }
@@ -1075,7 +1093,20 @@ pub fn bevelled(
             source.extend(std::iter::repeat_n(f as u32, c.len()));
         }
     }
-    for (c, from, mat, vert) in corner_faces {
+    // each new point's bevelled edge across, with the faces either side of it
+    let across = |vert: u32| -> Vec<(u32, u32, u32)> {
+        let corner = &work.corners[&vert];
+        let (halves, n) = (&corner.edges, corner.edges.len());
+        corner
+            .bounds
+            .iter()
+            .map(|b| {
+                let h = b.ebev;
+                (halves[h].to, halves[(h + n - 1) % n].fnext, halves[h].fnext)
+            })
+            .collect()
+    };
+    for (c, from, mat, vert, patch) in corner_faces {
         if let Some(vert) = vert {
             let halves = &work.corners[&vert].edges;
             let n = halves.len();
@@ -1087,6 +1118,15 @@ pub fn bevelled(
                     .filter(|&i| halves[i].bev)
                     .map(|i| (halves[i].to, halves[(i + n - 1) % n].fnext, halves[i].fnext))
                     .collect(),
+                across: if ns > 1 { across(vert) } else { Vec::new() },
+            });
+        }
+        if let Some((vert, i, j, k)) = patch {
+            picks.push(Pick::Patch {
+                at: out.loops.len(),
+                vert,
+                place: (i, j, k),
+                across: across(vert),
             });
         }
         out.push_face(&c, mat, true);
@@ -1128,9 +1168,13 @@ pub fn bevelled(
     }
     // the mesh's faces round the bevelled vertices, each corner now the new point on it
     let mut done = vec![false; nf];
+    // (in the order Blender rebuilds them: vertex by vertex, each vertex's faces as its edges are numbered, a
+    // face from the edge it leaves the vertex along; the shading's rays meet the faces in this order)
     for &v in &keys {
         let corner = &work.corners[&v];
-        for h in &corner.edges {
+        let mut round: Vec<&Half> = corner.edges.iter().collect();
+        round.sort_by_key(|h| rank[&edge(v, h.to)]);
+        for h in round {
             let f = h.fnext as usize;
             if std::mem::replace(&mut done[f], true) {
                 continue;
@@ -2334,6 +2378,100 @@ impl<'a> Charts<'a> {
     }
 }
 
+/// A corner's patch of an odd number of segments, for its texture (Blender's bevel_build_rings): which old face
+/// each corner of its quads reads, and the old edge a corner on the patch's middle lines is read on.
+struct Patch<'a> {
+    vert: u32,
+    across: &'a [(u32, u32, u32)],
+    /// For each new point, whether its face is taken before the next point's where the two meet.
+    beats: Vec<bool>,
+    /// Whether the UVs break across each new point's bevelled edge.
+    seam: Vec<bool>,
+    /// The face the patch's middle takes its texture from.
+    centre: u32,
+}
+
+impl<'a> Patch<'a> {
+    fn new(charts: &Charts, vert: u32, across: &'a [(u32, u32, u32)]) -> Patch<'a> {
+        let n = across.len();
+        let beats = (0..n)
+            .map(|i| charts.pick(&[across[i].1, across[(i + 1) % n].1]) == across[i].1)
+            .collect();
+        let seam = across
+            .iter()
+            .map(|&(to, before, after)| !charts.runs_on((vert, to), before, after))
+            .collect();
+        let mut choices: Vec<u32> = Vec::new();
+        for &(_, before, after) in across {
+            let f = charts.pick(&[before, after]);
+            if !choices.contains(&f) {
+                choices.push(f);
+            }
+        }
+        Patch {
+            vert,
+            across,
+            beats,
+            seam,
+            centre: charts.pick(&choices),
+        }
+    }
+
+    fn any_seam(&self) -> bool {
+        self.seam.iter().any(|&s| s)
+    }
+
+    /// The face of the new point `i`.
+    fn rep(&self, i: usize) -> u32 {
+        self.across[i % self.across.len()].1
+    }
+
+    /// The bevelled edge across from the new point `i`.
+    fn old_edge(&self, i: usize) -> (u32, u32) {
+        (self.vert, self.across[i % self.across.len()].0)
+    }
+
+    /// That edge, if the UVs break across it.
+    fn edge(&self, i: usize) -> Option<(u32, u32)> {
+        self.seam[i % self.across.len()].then(|| self.old_edge(i))
+    }
+
+    /// The face corner `corner` of the quad at step `k` from the new point `i` reads.
+    fn face(&self, i: usize, k: usize, corner: usize, half: usize) -> u32 {
+        if k < half {
+            self.rep(i)
+        } else if self.seam[i] {
+            self.rep(if self.beats[i] { i } else { i + 1 })
+        } else {
+            self.rep(if corner == 0 || corner == 3 { i } else { i + 1 })
+        }
+    }
+
+    /// The edge a point on the patch's middle lines is read on: the point at ring `jj`, step `kk` from `i`.
+    fn snap(&self, i: usize, jj: usize, kk: usize, half: usize) -> Option<(u32, u32)> {
+        let n = self.across.len();
+        let prev = (i + n - 1) % n;
+        let centre = |i: usize| {
+            let (prev, next) = ((i + n - 1) % n, (i + 1) % n);
+            if self.beats[prev] && self.rep(prev) == self.centre {
+                self.edge(prev)
+            } else if !self.beats[i] && self.rep(next) == self.centre {
+                self.edge(i)
+            } else {
+                None
+            }
+        };
+        match (jj < half, kk) {
+            (true, kk) if kk < half => None,
+            (true, kk) if kk == half => (!self.beats[i]).then(|| self.edge(i)).flatten(),
+            (true, _) => self.beats[i].then(|| self.edge(i)).flatten(),
+            (false, kk) if kk < half => self.beats[prev].then(|| self.edge(prev)).flatten(),
+            (false, kk) if kk == half => centre(i),
+            (false, _) => centre((i + 1) % n),
+        }
+    }
+}
+
 /// The point of the segment a-b nearest to `p`.
 fn on_segment(p: V3, a: V3, b: V3) -> V3 {
     let d = b - a;
@@ -2417,6 +2555,19 @@ pub fn carried(
                     (f1, &[2, 3])
                 } else if !odd && *k == half + 1 {
                     (f2, &[0, 1])
+                } else if odd
+                    && ns > 1
+                    && (*k == half || *k == half + 2)
+                    && !charts.runs_on(*edge, f1, f2)
+                    && (charts.pick(&[f1, f2]) == f1) == (*k == half + 2)
+                {
+                    // the strip beside the middle one, on the face the middle one doesn't read: its points on
+                    // the middle strip's side are read on the old edge too, so its face's texture runs up to it
+                    if *k == half {
+                        (f1, &[2, 3])
+                    } else {
+                        (f2, &[0, 1])
+                    }
                 } else {
                     (if *k <= half { f1 } else { f2 }, &[])
                 };
@@ -2425,12 +2576,53 @@ pub fn carried(
                     read_at[*at + i] = Some(*edge);
                 }
             }
+            Pick::Patch {
+                at,
+                vert,
+                place,
+                across,
+            } => {
+                let patch = Patch::new(&charts, *vert, across);
+                let (i, j, k) = *place;
+                if !odd {
+                    // an even number: the quads that touch the patch's middle lines read their points there on
+                    // the old edges
+                    let n = across.len();
+                    let on_next = (k + 1 == half).then(|| patch.old_edge(i));
+                    let on_prev = (j + 1 == half).then(|| patch.old_edge(i + n - 1));
+                    source[*at..*at + 4].fill(patch.rep(i));
+                    read_at[*at + 1] = on_next;
+                    read_at[*at + 2] = on_next.or(on_prev);
+                    read_at[*at + 3] = on_prev;
+                    continue;
+                }
+                for corner in 0..4 {
+                    let jj = j + (corner >= 2) as usize;
+                    let kk = k + (corner == 1 || corner == 2) as usize;
+                    source[*at + corner] = patch.face(i, k, corner, half);
+                    read_at[*at + corner] = patch.snap(i, jj, kk, half);
+                }
+            }
             Pick::Corner {
                 at,
                 vert,
                 on,
                 edges,
+                across,
             } => {
+                if !across.is_empty() && odd {
+                    // the polygon in the middle of a patch: its corners as the quads round it have them
+                    let patch = Patch::new(&charts, *vert, across);
+                    for i in 0..on.len() {
+                        source[*at + i] = if patch.any_seam() {
+                            patch.centre
+                        } else {
+                            patch.rep(i)
+                        };
+                        read_at[*at + i] = patch.snap(i, half, half, half);
+                    }
+                    continue;
+                }
                 if edges
                     .iter()
                     .all(|&(to, before, after)| charts.runs_on((*vert, to), before, after))

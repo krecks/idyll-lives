@@ -96,6 +96,7 @@ pub fn family() -> Option<Family> {
              (`materials`, see render/pc/models.ts), so a model costs one draw call per finish group \
              and lights like the rest of the garden.",
         )
-        .pack("gardenDecor"),
+        .pack("gardenDecor")
+        .switched(),
     )
 }

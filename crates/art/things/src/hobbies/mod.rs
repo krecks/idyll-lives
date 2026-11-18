@@ -48,7 +48,6 @@ mod electric;
 mod foosball;
 mod guitars;
 mod keyboard;
-mod kit;
 mod piano;
 mod pool;
 mod pottery;

@@ -8,8 +8,7 @@
 use super::M;
 use super::common::P;
 use super::drums::{cymbal, drum, drum_stand, pedal};
-use super::kit::call::tube;
-use super::kit::fillet;
+use artkit::kit::{self, fillet};
 use artkit::math::{Axis, P3, cosd, sind};
 use artkit::motion::{Rock, rock};
 use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
@@ -109,7 +108,7 @@ pub fn drum_kit() -> Vec<Obj> {
             );
             for e in [-1, 1] {
                 let ef = e as f64;
-                tube!(
+                kit::tube!(
                     f,
                     format!("kick_rod{k}{e}"),
                     &[
@@ -125,7 +124,7 @@ pub fn drum_kit() -> Vec<Obj> {
         }
         for s in [-1, 1] {
             let sf = s as f64;
-            tube!(
+            kit::tube!(
                 f,
                 format!("spur{s}"),
                 &fillet(
@@ -154,7 +153,7 @@ pub fn drum_kit() -> Vec<Obj> {
         }
         // the pedal and its beater, on the batter head
         pedal(&f, "pedal", 0.0, kz - 0.33, 0.22);
-        tube!(
+        kit::tube!(
             f,
             "beater",
             &[(0, 0.12, kz - 0.22), (0, 0.27, kz - 0.215)],
@@ -187,7 +186,7 @@ pub fn drum_kit() -> Vec<Obj> {
             bevel = 0.006,
             bevel_segments = 1
         );
-        tube!(
+        kit::tube!(
             f,
             "tom_mount",
             &[(0.0, ky + kr - 0.01, kz - 0.02), (0.0, 0.72, kz - 0.08)],
@@ -211,7 +210,7 @@ pub fn drum_kit() -> Vec<Obj> {
                 6,
                 false,
             );
-            tube!(
+            kit::tube!(
                 f,
                 format!("tom_arm{k}"),
                 &fillet(
@@ -297,7 +296,7 @@ pub fn drum_kit() -> Vec<Obj> {
         );
         for k in 0..3 {
             let a = (30 + 120 * k) as f64;
-            tube!(
+            kit::tube!(
                 f,
                 format!("floor_leg{k}"),
                 &fillet(
@@ -364,7 +363,7 @@ pub fn drum_kit() -> Vec<Obj> {
                 bevel_segments = 1
             );
             let back = (x - (bx - x) * 0.25, top - 0.02, z - (bz - z) * 0.25);
-            tube!(
+            kit::tube!(
                 f,
                 format!("{name}_boom"),
                 &[back, (bx, top + 0.08, bz)],
@@ -373,7 +372,7 @@ pub fn drum_kit() -> Vec<Obj> {
                 verts = 6,
                 round = 1
             );
-            tube!(
+            kit::tube!(
                 f,
                 format!("{name}_weight"),
                 &[

@@ -306,7 +306,7 @@ function clockPose(fit: ClockFit): (p: number) => PoseSpec {
 // --- the bird feeder ------------------------------------------------------------------------------
 
 /**
- * The songbird feeder (`pack_kind.py`), used from its post (`STEP_IN`'s lane): its house 1.38 to 1.58 m up,
+ * The songbird feeder (`crates/art/packs/src/pack_kind`), used from its post (`STEP_IN`'s lane): its house 1.38 to 1.58 m up,
  * its front 0.13 m behind the middle and its middle 0.22 m, the roof lifted for a refill (`lid_open`); the
  * seed tray round the post at 1.38 m, its front 0.06 m behind the middle.
  */

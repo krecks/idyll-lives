@@ -1,6 +1,6 @@
 # Hot-headed pack — notes
 
-`pack_hotHeaded.py` builds the six P8 hot-headed models into `web/public/assets/models/pack_hotHeaded/` and their
+`crates/art/packs/src/pack_hot_headed` builds the six P8 hot-headed models into `web/public/assets/models/pack_hotHeaded/` and their
 entries in `packs/pack_hotHeaded/manifest.json`, an override pack listed in the base manifest. Built
 2026-10-14; they sat in Validate › Hot Headed until checked in play.
 

@@ -2,8 +2,9 @@
 //! glass, each its own node with its clip.
 
 use super::M;
-use super::common::{DOOR_R, DOOR_Y, DOOR_Z, fillet, folded, front_disc, lump, rbox};
+use super::common::{DOOR_R, DOOR_Y, DOOR_Z, folded, front_disc, lump, rbox};
 use artkit::forms::{rounded_rect, smooth_outline};
+use artkit::kit::fillet;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, TAU, cos, cosd, degrees, radians, sin, sind};
 use artkit::motion::{Ease, Spin, spin};

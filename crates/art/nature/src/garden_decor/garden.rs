@@ -1,8 +1,9 @@
 //! The gnome, the wheelbarrow planter and the boulders.
 
 use super::M;
-use super::common::{_on_top, _stone, fillet};
+use super::common::{_on_top, _stone};
 use artkit::forms::rounded_rect;
+use artkit::kit::fillet;
 use artkit::math::{P3, TAU, cos, degrees, sin};
 use artkit::parts::{join_all, settle};
 use artkit::rand::Random;

@@ -1,10 +1,11 @@
 //! The bench, the planter, the flower tub, the door pot, the path light and the flower clump.
 
-use super::common::{_bloom, _tub, BenchEnd, bench_end};
+use super::common::{_bloom, _tub};
 use super::{F, M};
 use artkit::bvh::Rays;
 use artkit::far::{is_low, low};
 use artkit::json::float_repr;
+use artkit::kit::{BenchEnd, bench_end};
 use artkit::math::{TAU, cos, pow, sin, sqrt, v3};
 use artkit::parts::{Settle, join_all, settle_all, settle_with};
 use artkit::rand::Random;
@@ -19,7 +20,7 @@ pub fn bench() -> Vec<Obj> {
     for x in [-0.8, 0.8] {
         bench_end(
             &F,
-            &format!("end{}", float_repr(x)),
+            format!("end{}", float_repr(x)),
             x,
             0.415,
             0.19,

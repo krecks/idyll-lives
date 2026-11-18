@@ -1,8 +1,8 @@
 //! KD2: the doll house.
 
 use super::common::{place, plane, rect, slab, still};
-use super::kit::shaker;
 use super::{F, M};
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{atan2, cos, degrees, radians, sin, tan};
 use artkit::parts::{hinged, join, new_parts};
@@ -514,18 +514,16 @@ pub fn doll_house() -> Vec<Obj> {
             bevel = 0.002,
             bevel_segments = 1
         );
-        shaker(
-            &F,
+        kit::shaker!(
+            F,
             "door",
             0.11,
             0.19,
             (-0.2, 0.135, 0.054),
             0.008,
             M.house_door,
-            0.02,
-            None,
-            0.002,
-            false,
+            rail = 0.02,
+            recess = 0.002
         );
         fextrude!(
             F,

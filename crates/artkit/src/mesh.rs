@@ -292,7 +292,8 @@ impl Mesh {
                         }
                         *done = true;
                     }
-                    // (a third face on the edge takes no mark off it)
+                    // a third face on the edge: it splits the shading anyway, and the edge stays as its first
+                    // two faces left it (marked, where they turn more than the angle), as in Blender
                     Some(_) => {}
                 }
             }

@@ -6,10 +6,9 @@
 
 use super::M;
 use super::common::{P, flat_quads, rr};
-use super::kit::call::tube;
-use super::kit::fillet;
 use super::workbench_board::tool_board;
 use artkit::json::float_repr as r;
+use artkit::kit::{self, fillet};
 use artkit::math::{P3, PI, cos, sin};
 use artkit::parts::{Settle, join, new_parts, settle_with};
 use artkit::place::{Facing, GameFrame};
@@ -275,7 +274,7 @@ pub fn workbench() -> Vec<Obj> {
                 )
             })
             .collect();
-        tube!(
+        kit::tube!(
             f,
             "paint_bail",
             &bail,
@@ -324,7 +323,7 @@ pub fn workbench() -> Vec<Obj> {
                 bevel_segments = 1
             );
         }
-        tube!(
+        kit::tube!(
             f,
             "toolbox_handle",
             &fillet(
@@ -393,7 +392,7 @@ pub fn workbench() -> Vec<Obj> {
             segments = 10,
             rot = (0, -90, 0)
         );
-        tube!(
+        kit::tube!(
             f,
             "drill_bit",
             &[(0.32, 0.91 + u, -0.16), (0.26, 0.91 + u, -0.16)],
@@ -546,7 +545,7 @@ pub fn workbench() -> Vec<Obj> {
             M.bench_steel
         );
         for dx in [-0.05, 0.05] {
-            tube!(
+            kit::tube!(
                 f,
                 format!("vice_guide{}", r(dx)),
                 &[
@@ -559,7 +558,7 @@ pub fn workbench() -> Vec<Obj> {
                 round = 1
             );
         }
-        tube!(
+        kit::tube!(
             f,
             "vice_screw",
             &[
@@ -581,7 +580,7 @@ pub fn workbench() -> Vec<Obj> {
             rot = (90, 0, 0),
             verts = 10
         );
-        tube!(
+        kit::tube!(
             f,
             "vice_handle",
             &[

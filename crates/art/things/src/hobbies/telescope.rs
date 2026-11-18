@@ -3,8 +3,8 @@
 
 use super::M;
 use super::common::{P, axis, rr};
-use super::kit::call::tube;
 use artkit::forms::smooth_outline;
+use artkit::kit;
 use artkit::math::{Axis, P3, TAU, cos, cosd, sin, sind};
 use artkit::parts::{hinged, join, new_parts, settle};
 use artkit::place::{Facing, GameFrame};
@@ -58,7 +58,7 @@ pub fn telescope() -> Vec<Obj> {
                 profile = rr(0.034, 0.024, 0.008, 1),
                 up = (1, 0, 0)
             );
-            tube!(
+            kit::tube!(
                 f,
                 format!("leg_inner{k}"),
                 &[mid, foot],
@@ -86,7 +86,7 @@ pub fn telescope() -> Vec<Obj> {
                 rings = 5,
                 scale = (1, 1, 0.8)
             );
-            tube!(
+            kit::tube!(
                 f,
                 format!("spreader{k}"),
                 &[(0.0, 0.45, 0.0), (0.17 * d.0, 0.5, 0.17 * d.1)],
@@ -214,7 +214,7 @@ pub fn telescope() -> Vec<Obj> {
             rot = (0, -90, 0)
         );
         // the slow-motion cable and its knob
-        tube!(
+        kit::tube!(
             f,
             "slow_motion",
             &[(0.03, 1.02, 0.05), (0.05, 0.94, 0.11), (0.06, 0.85, 0.16)],

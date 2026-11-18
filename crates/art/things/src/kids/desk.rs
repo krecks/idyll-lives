@@ -1,10 +1,10 @@
 //! KD3: the kids' desk (and its chair), table and chair.
 
 use super::common::{P, heart, place, still, turned, walls};
-use super::kit::fillet;
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
+use artkit::kit::fillet;
 use artkit::materials::Mat;
 use artkit::math::{PI, TAU, cos, sin};
 use artkit::parts::{join, join_all, new_parts};

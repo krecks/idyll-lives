@@ -1,6 +1,6 @@
 # Cheerful pack — notes
 
-`pack_cheerful.py` builds the six P2 cheerful models into `web/public/assets/models/pack_cheerful/` and their
+`crates/art/packs/src/pack_cheerful` builds the six P2 cheerful models into `web/public/assets/models/pack_cheerful/` and their
 entries in `packs/pack_cheerful/manifest.json`, an override pack listed in the base manifest. Built
 2026-10-14; they sat in Validate › Cheerful until checked in play.
 

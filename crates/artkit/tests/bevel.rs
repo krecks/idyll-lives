@@ -671,19 +671,8 @@ fn a_bevels_corners_take_their_texture_from_the_face_blender_takes_it_from() {
             "{name}: faces whose texture isn't from Blender's face: {} of {} cut, {} of {} strips, {} of {} of the corners'",
             off[1], all[1], off[2], all[2], off[3], all[3]
         ));
-        // the faces themselves and the strips, always; a corner's polygon and its patch of two segments too (of
-        // three, the patch's faces across its middle are not Blender's: 12 of a box's 56)
-        assert_eq!(
-            (off[0], off[1], off[2]),
-            (0, 0, 0),
-            "{}",
-            report.last().unwrap()
-        );
-        assert!(
-            off[3] <= if segments > 2 { 12 } else { 0 },
-            "{}",
-            report.last().unwrap()
-        );
+        // the faces themselves, the strips, a corner's polygon and its patch of two or three segments
+        assert_eq!(off, [0; 4], "{}", report.last().unwrap());
     }
     println!("{}", report.join("\n"));
 }

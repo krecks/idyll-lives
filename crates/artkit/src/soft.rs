@@ -707,7 +707,9 @@ fn buttons(name: &str, shape: &Soft, material: Mat) -> Vec<Obj> {
             mesh.transform(&M4::diagonal(V3::from(scale)));
             mesh.transform(&M4::translation(q));
             mesh.set_material(Some(material));
-            let ball = crate::scene::add(&format!("{name}_button{side}{i}"), mesh);
+            crate::scene::update(); // (an operator makes it)
+            let ball =
+                crate::scene::add_primitive("Sphere", &format!("{name}_button{side}{i}"), mesh);
             shade(ball, true, 180.0);
             made.push(ball);
         }
