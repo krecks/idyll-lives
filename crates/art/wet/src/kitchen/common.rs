@@ -349,9 +349,7 @@ pub fn jar(
 pub fn soft(obj: Obj) -> Obj {
     artkit::bevel::apply(obj);
     obj.edit(|o| {
-        let kept = o.mesh.sharp.clone();
-        o.mesh.shade_smooth(40.0);
-        o.mesh.sharp.extend(kept);
+        o.mesh.shade_smooth_by_angle(40.0);
         let normals = weighted_normals(&o.mesh);
         o.mesh.normals = Some(normals);
     });
