@@ -129,18 +129,22 @@ fn clips_on_two_parts_in_two_orders_read_back_and_are_written_again_to_their_byt
     let model = round_trip(&bytes, "two parts");
     let names: Vec<&str> = model.animations.iter().map(|a| a.name.as_str()).collect();
     assert_eq!(names, ["close", "open"]);
+    // the nodes as Blender's exporter numbers them: a child before its parent
+    let at = |name: &str| model.nodes.iter().position(|n| n.name == name).unwrap();
+    let (body, door) = (at("body"), at("door"));
+    assert_eq!((door, body), (0, 1));
     assert_eq!(
-        model.nodes[1].clips,
+        model.nodes[door].clips,
         [1, 0],
         "the door's clips in the order its keys lie"
     );
-    assert_eq!(model.nodes[0].children, [1]);
-    assert_eq!(model.roots, [0]);
+    assert_eq!(model.nodes[body].children, [door]);
+    assert_eq!(model.roots, [body]);
     let open = &model.animations[1];
     assert_eq!(
         open.channels
             .iter()
-            .filter(|c| c.node == 1)
+            .filter(|c| c.node == door)
             .map(|c| c.target)
             .collect::<Vec<_>>(),
         [Target::Translation, Target::Rotation]
@@ -153,18 +157,18 @@ fn clips_on_two_parts_in_two_orders_read_back_and_are_written_again_to_their_byt
     assert!(
         open.channels
             .iter()
-            .filter(|c| c.node == 1)
+            .filter(|c| c.node == door)
             .all(|c| c.times.len() == 8)
     );
     // the textured part has its UVs, and the door's material its colour, linear
-    let door_mesh = &model.meshes[model.nodes[1].mesh.unwrap()];
+    let door_mesh = &model.meshes[model.nodes[door].mesh.unwrap()];
     assert!(door_mesh.primitives[0].uvs.is_some());
     let m = &model.materials[door_mesh.primitives[0].material.unwrap()];
     assert_eq!(m.name, "door");
     assert!((m.base[2] - artkit::materials::linear(0x99 as f64 / 255.0) as f32).abs() < 1e-6);
     // posed: the door half way through "open" stands where its keys put it
-    let (t, _, _) = model.local(1, Some((1, 3.5 / 30.0)));
-    let (rest, _, _) = model.local(1, None);
+    let (t, _, _) = model.local(door, Some((1, 3.5 / 30.0)));
+    let (rest, _, _) = model.local(door, None);
     assert!(t[1] > rest[1] - 1e-6 && t != rest, "{t:?} {rest:?}");
 }
 

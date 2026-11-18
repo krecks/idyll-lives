@@ -4,6 +4,7 @@
 pub mod bevel;
 pub mod botany;
 pub mod bvh;
+pub mod decimate;
 pub mod edit;
 pub mod family;
 pub mod far;
@@ -33,4 +34,5 @@ pub mod shapes;
 pub mod soft;
 pub mod tri;
 pub mod uv;
+pub mod validate;
 pub mod weld;

@@ -1,0 +1,25 @@
+case water
+names part-0.25 water=Cylinder
+names part0.25 water.001=Cylinder
+names joined body=body water=water water.001=water.001
+file written body=body water=water water.001=water.001
+case hub
+names parts post=Cylinder hub=hub
+names joined hub=hub.001 platform=platform
+file written hub=hub.001 platform=platform
+case flaps
+names joined duvet_flap=duvet_flap duvet_flap.001=duvet_flap.001
+names renamed duvet_flap=duvet_flap duvet_flap_upper=duvet_flap.001
+file written duvet_flap=duvet_flap duvet_flap_upper=duvet_flap.001
+case parts
+names made leg=Cube leg.001=Cube.001 leg.002=Cube.002 knob=knob knob.001=knob.001 knob.002=knob.002
+names again leg=Cube leg.002=Cube.002 knob=knob knob.002=knob.002 leg.001=Cube.003 knob.001=knob.003
+names numbered leg=Cube leg.002=Cube.002 knob=knob knob.002=knob.002 leg.001=Cube.003 knob.001=knob.003 leg.003=Cube.004 leg.007=Cube.005 leg.004=Cube.006
+names kinds leg=Cube leg.002=Cube.002 knob=knob knob.002=knob.002 leg.001=Cube.003 knob.001=knob.003 leg.003=Cube.004 leg.007=Cube.005 leg.004=Cube.006 ball=Sphere ball.001=Sphere.001 ball.002=Cone ball.003=Torus ball.004=Icosphere ball.005=ball ball.006=ball.001 ball.007=ball.002 ball.008=Cylinder
+case mirror
+names made arm=Cube arm_mirror=Cube.001 arm_mirror.001=Cube.002 arm.001=Cube.003
+case order
+names made zed=zed alpha=alpha mid=mid
+file as_made alpha=alpha mid=mid zed=zed
+file given_otherwise alpha=alpha mid=mid zed=zed
+file renamed aaa=mid alpha=alpha zed=zed

@@ -21,6 +21,9 @@ pub struct Obj(pub(crate) u32);
 #[derive(Clone, Debug)]
 pub struct Object {
     pub name: String,
+    /// Its mesh's own name, which the file's mesh carries: the part's name where its mesh was made under it, a
+    /// primitive's kind (`Cube`, `Cylinder.003`) otherwise, until a join names it.
+    pub data_name: String,
     pub mesh: Mesh,
     pub loc: V3,
     /// Its Euler angles in `order`, radians (not read while it is turned by a quaternion).
@@ -38,6 +41,8 @@ pub struct Object {
     pub bevel: Option<crate::bevel::Pending>,
     /// Its clips, one track a name.
     pub tracks: Vec<Track>,
+    /// Its matrix in the world as Blender last worked it out (`Obj::matrix_world_seen`).
+    pub(crate) seen: M4,
     pub(crate) alive: bool,
 }
 
@@ -46,9 +51,10 @@ impl Object {
         self.alive && !self.tracks.is_empty()
     }
 
-    pub(crate) fn new(name: &str, mesh: Mesh) -> Object {
+    pub(crate) fn new(name: String, data_name: String, mesh: Mesh) -> Object {
         Object {
-            name: name.to_string(),
+            name,
+            data_name,
             mesh,
             loc: V3::ZERO,
             rot: V3::ZERO,
@@ -59,6 +65,7 @@ impl Object {
             uv: UvWay::Box,
             bevel: None,
             tracks: Vec::new(),
+            seen: M4::IDENTITY,
             alive: true,
         }
     }
@@ -119,6 +126,29 @@ pub struct Scene {
     pub finishes: Finishes,
     /// What the build said, a line each, for the runner to print.
     pub log: Vec<String>,
+    /// Every mesh name in use: the parts', and those of parts that are gone (joined into another), whose meshes
+    /// Blender keeps until the scene is emptied.
+    pub(crate) mesh_names: std::collections::BTreeSet<String>,
+}
+
+/// `name`, or the name Blender gives where `taken` says it is in use: its stem (`name` without a `.123` at its
+/// end) with the lowest number free, three digits at least: `water.001`.
+pub(crate) fn unique_name(name: &str, taken: impl Fn(&str) -> bool) -> String {
+    if !taken(name) {
+        return name.to_string();
+    }
+    let stem = match name.rsplit_once('.') {
+        Some((stem, digits))
+            if !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()) =>
+        {
+            stem
+        }
+        _ => name,
+    };
+    (1..)
+        .map(|n| format!("{stem}.{n:03}"))
+        .find(|candidate| !taken(candidate))
+        .unwrap()
 }
 
 thread_local! {
@@ -139,9 +169,25 @@ pub fn set_finishes(finishes: Finishes) {
 pub fn reset() {
     with(|s| {
         s.objects.clear();
+        s.mesh_names.clear();
         s.perches.clear();
         s.low = false;
         s.centre = [0.0, 0.0];
+    });
+}
+
+/// `bpy.context.view_layer.update()`: every part's matrix in the world worked out from where it stands now, for
+/// `Obj::matrix_world_seen`. Blender does it whenever an operator runs, so the kernel's builders, `join`,
+/// `measure` (and `settle`, before it moves the parts), `jitter`, `attach` and the perches' rays do it where
+/// gamekit's did; a build calls it where its script called `view_layer.update()` or an operator of its own.
+pub fn update() {
+    with(|s| {
+        for i in 0..s.objects.len() {
+            if s.objects[i].alive {
+                let world = s.matrix_world(Obj(i as u32));
+                s.objects[i].seen = world;
+            }
+        }
     });
 }
 
@@ -165,10 +211,25 @@ pub fn take_log() -> Vec<String> {
     with(|s| std::mem::take(&mut s.log))
 }
 
-/// A new part of `mesh` in the scene.
+/// A new part of `mesh` in the scene, the mesh made under the part's name (`bpy.data.meshes.new(name)`, then
+/// `bpy.data.objects.new(name, mesh)`). A name in use gets Blender's number: a second part `leg` is `leg.001`.
 pub fn add(name: &str, mesh: Mesh) -> Obj {
+    add_as(name, name, mesh)
+}
+
+/// A new part of `mesh` made by one of Blender's primitive operators: its mesh is named for the primitive's
+/// `kind` (`Cube`, `Sphere`, `Cylinder`, `Cone`, `Torus`, `Icosphere`), the part as the script names it after.
+pub fn add_primitive(kind: &str, name: &str, mesh: Mesh) -> Obj {
+    add_as(name, kind, mesh)
+}
+
+/// A new part named `name` with its mesh named `data_name`, each made one of a kind as Blender does.
+pub(crate) fn add_as(name: &str, data_name: &str, mesh: Mesh) -> Obj {
     with(|s| {
-        s.objects.push(Object::new(name, mesh));
+        let name = unique_name(name, |n| s.objects.iter().any(|o| o.alive && o.name == n));
+        let data_name = unique_name(data_name, |n| s.mesh_names.contains(n));
+        s.mesh_names.insert(data_name.clone());
+        s.objects.push(Object::new(name, data_name, mesh));
         Obj(s.objects.len() as u32 - 1)
     })
 }
@@ -258,9 +319,37 @@ impl Obj {
         self.read(|o| o.scale)
     }
 
-    /// `obj.name = name`.
+    /// `obj.name = name`: under a name another part has, Blender's number after it (`water.001`).
     pub fn set_name(self, name: &str) -> Obj {
-        self.edit(|o| o.name = name.to_string());
+        with(|s| {
+            let taken = |n: &str| {
+                s.objects
+                    .iter()
+                    .enumerate()
+                    .any(|(i, o)| o.alive && i as u32 != self.0 && o.name == n)
+            };
+            let name = unique_name(name, taken);
+            s.get_mut(self).name = name;
+        });
+        self
+    }
+
+    /// `obj.data.name`: the name the file's mesh carries.
+    pub fn data_name(self) -> String {
+        self.read(|o| o.data_name.clone())
+    }
+
+    /// `obj.data.name = name`: one of a kind among the meshes, those of parts joined away too.
+    pub fn set_data_name(self, name: &str) -> Obj {
+        with(|s| {
+            let own = s.get(self).data_name.clone();
+            if own != name {
+                s.mesh_names.remove(&own);
+                let name = unique_name(name, |n| s.mesh_names.contains(n));
+                s.mesh_names.insert(name.clone());
+                s.get_mut(self).data_name = name;
+            }
+        });
         self
     }
 
@@ -360,6 +449,8 @@ impl Obj {
             None => m,
         };
         self.edit(|o| {
+            // (read back before the scene is worked out again, Blender's matrix is the one given)
+            o.seen = m;
             let (loc, quat, scale) =
                 crate::motion::decompose_quat(&local, o.quat.is_none().then_some(o.order));
             (o.loc, o.scale) = (loc, scale);
@@ -371,9 +462,20 @@ impl Obj {
         self
     }
 
-    /// `obj.matrix_world`.
+    /// The part's matrix in the world, from where it stands now. Blender's `obj.matrix_world` is this only once
+    /// the scene has been worked out again (`matrix_world_seen`); nearly every script reads it then.
     pub fn matrix_world(self) -> M4 {
         with(|s| s.matrix_world(self))
+    }
+
+    /// `obj.matrix_world` as Blender answers a script at this point: the part's matrix as of the last time the
+    /// scene was worked out (`scene::update`), not as its place, turn and scale are now. A part a builder has
+    /// just made and placed still has the identity (Blender places it after the operator that made it), one
+    /// moved since (`settle`, a place set by hand) the matrix from before, one given a matrix
+    /// (`set_matrix_world`) that matrix. ground.py reads it so: a stone's fractures are cut in the stone's own
+    /// frame, the plane too, before Blender knows where the stone stands.
+    pub fn matrix_world_seen(self) -> M4 {
+        self.read(|o| o.seen)
     }
 
     /// The part's points in the world, at rest (`obj.matrix_world @ v.co`).

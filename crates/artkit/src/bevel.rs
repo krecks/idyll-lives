@@ -1128,9 +1128,13 @@ pub fn bevelled(
     }
     // the mesh's faces round the bevelled vertices, each corner now the new point on it
     let mut done = vec![false; nf];
+    // (in the order Blender rebuilds them: vertex by vertex, each vertex's faces as its edges are numbered, a
+    // face from the edge it leaves the vertex along; the shading's rays meet the faces in this order)
     for &v in &keys {
         let corner = &work.corners[&v];
-        for h in &corner.edges {
+        let mut round: Vec<&Half> = corner.edges.iter().collect();
+        round.sort_by_key(|h| rank[&edge(v, h.to)]);
+        for h in round {
             let f = h.fnext as usize;
             if std::mem::replace(&mut done[f], true) {
                 continue;
