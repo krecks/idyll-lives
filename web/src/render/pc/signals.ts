@@ -1,6 +1,6 @@
 /**
  * The traffic lights in the game on PlayCanvas (sim-core `traffic.rs`): a pole with its three-lamp
- * head (`model.trafficLight`, tools/art/blender/families/street_furniture.py) at each signal head
+ * head (`model.trafficLight`, crates/art/outside/src/street_furniture) at each signal head
  * the snapshot has (`SnapshotLayout.light`, read by `shared/signals.ts`), standing where its row
  * says, its head turned to the traffic coming in; hidden outside the chunks streamed in and far off
  * (`setView`), as the cars are.

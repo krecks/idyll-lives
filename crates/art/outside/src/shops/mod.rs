@@ -1,5 +1,5 @@
 //! The town's shop fittings and café furniture (CM4): the shop counter with its till, the bakery case, the
-//! grocery shelves, the café table and the bentwood café chair. Notes: tools/art/blender/families/shops.md.
+//! grocery shelves, the café table and the bentwood café chair. Notes: NOTES.md.
 //!
 //! They stand on town lots, seen from far and by the dozen, so each has a far version (a quarter of the triangles,
 //! E7). The parts are placed in game axes (`GameFrame`), where the game places them: the counter, the case and the
@@ -7,9 +7,6 @@
 //! the café chair's seat 2 cm forward. Two clips: the till's cash drawer slides out to the back, to the shopkeeper,
 //! for `treat` (`till`), and the bakery case's back glass door, on the baker's side, slides aside for `pastry`
 //! and `takeCake` (`door`), each as the game's vendor reaches for it.
-//!
-//! Being ported: `cargo art shops` builds the family in Blender until tools/art/blender/families/shops.py goes
-//! (`--out` and `--check` build what is here).
 
 use artkit::family::{Family, Model};
 use artkit::json::{Json, loads};
@@ -75,7 +72,7 @@ pub fn family() -> Option<Family> {
          Listed in the base manifest's packs. Each has a far version for the town overview. The till's cash drawer \
          slides out (`till`) while a resident buys a treat; the bakery case's back glass door slides aside (`door`) \
          for a pastry.",
-    ))
+    ).switched())
 }
 
 #[cfg(test)]

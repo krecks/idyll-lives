@@ -1,6 +1,6 @@
 # Street furniture — notes
 
-`street_furniture.py` builds the ten CM2 street furniture models into
+`crates/art/outside/src/street_furniture` builds the ten CM2 street furniture models into
 `web/public/assets/models/street_furniture/` and their entries in `packs/street_furniture/manifest.json`: the street
 lamp (`model.streetLamp`), the long park bench (`model.parkBench`), the drinking fountain (`model.drinkingFountain`),
 the litter bin (`model.litterBin`), the taxi rank's shelter (`model.busStop`, the bus shelter it was), the post box (`model.postBox`), the notice board
@@ -99,7 +99,7 @@ Rebuilt in detail on 2026-10-22 with the forms and the kit, each at most half it
   kick panels, a band with four TELEPHONE signs, a cornice, an arched pediment with a crown on each side and the shallow
   dome between them; the door with a bar pull (`kit.pull`). Inside, the phone (case, dial, a
   coiled cord, the coin box) on a panel, and a shelf of directories. Its handset isn't in the model: a part of its own
-  would be a fifth draw call, so the game draws it on its hook by code (held.py `receiver`, actions.ts `REST_PROPS`),
+  would be a fifth draw call, so the game draws it on its hook by code (the held things' `receiver`, actions.ts `REST_PROPS`),
   and in the caller's hand while they call.
 - **Town fountain**: a square basin on a granite slab: walls on a plinth band, three raised panels a face, a moulded
   coping with a rounded nose all round (`kit.moulding`, its top the seat), water; in the middle a moulded foot, a fluted
