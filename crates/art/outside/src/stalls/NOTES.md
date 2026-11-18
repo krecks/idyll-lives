@@ -1,6 +1,6 @@
 # Food stalls and vending — notes
 
-`stalls.py` builds the five CM3 models into `web/public/assets/models/stalls/` and their entries in
+`crates/art/outside/src/stalls` builds the five CM3 models into `web/public/assets/models/stalls/` and their entries in
 `packs/stalls/manifest.json`: the ice cream cart (`model.iceCreamCart`), the hot dog stand (`model.hotDogStand`),
 the snack machine (`model.vendingSnack`), the drinks machine (`model.vendingDrink`) and the market stall
 (`model.marketStall`). Built 2026-10-14; they sat in Validate › Stalls until checked in play

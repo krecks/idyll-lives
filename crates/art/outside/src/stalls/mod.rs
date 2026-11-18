@@ -1,6 +1,6 @@
 //! The town's food stalls and vending machines (CM3): the ice cream cart (`model.iceCreamCart`), the hot dog
 //! stand (`model.hotDogStand`), the snack machine (`model.vendingSnack`), the drinks machine (`model.vendingDrink`)
-//! and the market stall (`model.marketStall`). Notes: tools/art/blender/families/stalls.md.
+//! and the market stall (`model.marketStall`). Notes: NOTES.md.
 //!
 //! Each is built where the game places it (`GameFrame`, game axes; settled on the floor, not centred, and `centre`
 //! on its `Model`): the carts and the stall across their 2 x 1 tiles, the machines against the back of their tile.
@@ -8,9 +8,6 @@
 //! (`lid_open`), each a second into the sale as the vendor behind reaches in, for 1.4 s; a snack slides down to the
 //! machine's tray and a can drops to it (`drop`). The machines' lit signs (and the drinks machine's front) glow at
 //! night. They are placed on town lots and seen from far, so each has a far version (a quarter of the triangles).
-//!
-//! Being ported: `cargo art stalls` builds the family in Blender until tools/art/blender/families/stalls.py goes
-//! (`--out` and `--check` build what is here).
 
 use artkit::family::{Family, Model};
 use artkit::json::{Json, loads};
@@ -85,5 +82,5 @@ pub fn family() -> Option<Family> {
          group. The ice cream cart slides its freezer lid open and the hot dog stand lifts its hot-plate lid \
          (`lid_open`); a snack and a can drop to the machines' trays (`drop`). Each has a far version for the town \
          overview.",
-    ))
+    ).switched())
 }

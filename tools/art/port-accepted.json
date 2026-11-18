@@ -13,7 +13,7 @@
   "model.iceCreamCart far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.lampPost far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.litterBin far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
-  "model.marketStall far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
+  "model.marketStall far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)", "triangles": "the kernel's decimation keeps the quarter the script asks for; Blender's export had taken out faces its decimation left back to back (21.8 % left)"},
   "model.merryGoRound far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.noticeBoard far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.parkBench far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
@@ -27,5 +27,5 @@
   "model.streetLamp far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.townStatue far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.vendingDrink far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
-  "model.vendingSnack far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"}
+  "model.vendingSnack far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)", "triangles": "the kernel's decimation keeps the quarter the script asks for; Blender's export had taken out faces its decimation left back to back (21.8 % left)"}
 }
