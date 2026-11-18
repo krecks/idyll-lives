@@ -215,6 +215,29 @@ fn free(mesh: &Mesh) -> Vec<bool> {
 }
 
 /// No triangle of `mesh` (all of them triangles) is without area or all but flat.
+/// The gate's test of a file's faces (crates/tools/src/checkglb.rs, `flipped_faces`), on a mesh: how many faces of
+/// 1 cm² and over have every corner's normal over 120 degrees off the way the face is wound (lit as if from
+/// behind), and how many corners of such faces have theirs over 100 degrees off it, which is what the kernel holds
+/// a far version to (`decimate::OPPOSED`).
+fn shaded_from_behind(mesh: &Mesh) -> (usize, usize) {
+    let normals = artkit::normals::corner_normals(mesh);
+    let (mut faces, mut corners) = (0, 0);
+    for f in 0..mesh.faces.len() {
+        let own = normal(mesh, f);
+        let len = dot(own, own).sqrt();
+        if len / 2.0 < 1e-4 {
+            continue;
+        }
+        let start = mesh.faces[f].start as usize;
+        let cosines: Vec<f64> = (0..mesh.faces[f].len as usize)
+            .map(|k| dot(normals[start + k].array().map(f64::from), own) / len)
+            .collect();
+        faces += cosines.iter().all(|&c| c < -0.5) as usize;
+        corners += cosines.iter().filter(|&&c| c < -0.17 - 1e-6).count();
+    }
+    (faces, corners)
+}
+
 fn assert_no_slivers(mesh: &Mesh, what: &str) {
     for f in 0..mesh.faces.len() {
         assert_eq!(mesh.faces[f].len, 3, "{what}: face {f} is no triangle");
@@ -1212,6 +1235,7 @@ fn committed_models_decimated_pass_the_comparisons_rule() {
         );
         assert_no_slivers(&mesh, name);
         assert_eq!(measured.turned, 0, "{name}");
+        assert_eq!(shaded_from_behind(&mesh), (0, 0), "{name}");
     }
 }
 
@@ -1280,6 +1304,17 @@ const UNLIKE_BLENDERS: [(&str, &str); 6] = [
     ),
 ];
 
+/// The gate's strict check of a far file (`cargo check-glb`: `flipped`), and the kernel's stricter one, on each
+/// of the 29 models with a decimated far version as its family's file has it now: the 28, and civic's plant table.
+#[test]
+fn no_decimated_far_version_is_shaded_from_behind() {
+    for name in DECIMATED.into_iter().chain(["civic/plantTable"]) {
+        let mut mesh = joined(&read(name, false));
+        far::decimate(&mut mesh, 0.25, far::FEET, far::EDGE);
+        assert_eq!(shaded_from_behind(&mesh), (0, 0), "{name}");
+    }
+}
+
 #[test]
 #[ignore = "all 28 decimated far versions against Blender's (git's ref/blender): a table to read, and files to look at"]
 fn every_decimated_far_version() {
@@ -1305,6 +1340,7 @@ fn every_decimated_far_version() {
         assert!(measured.model_most <= 0.06, "{name}");
         assert_eq!(measured.turned, 0, "{name}");
         assert_no_slivers(&mesh, name);
+        assert_eq!(shaded_from_behind(&mesh), (0, 0), "{name}");
         if let Some(out) = &out {
             // as the runner writes a far version: one part, shaded by itself and the floor
             scene::reset();
