@@ -198,3 +198,16 @@ macro_rules! kit_recessed_box {
         $crate::kit::recessed_box(args.0, args.1, $crate::forms::num(args.2), $crate::forms::num(args.3), $crate::forms::num(args.4), args.5, args.6, args.7, args.8, o)
     }};
 }
+
+/// `kit::letters` with its options by name: `kit::letters!(frame, name, text, size, depth, at, material, space = 1.25)`.
+#[macro_export]
+macro_rules! kit_letters {
+    ($frame:expr, $name:expr, $text:expr, $size:expr, $depth:expr, $at:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $text, $size, $depth, $at, $material);
+        #[allow(unused_mut)]
+        let mut o = $crate::kit::Letters::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::kit::letters(args.0, args.1, args.2, $crate::forms::num(args.3), $crate::forms::num(args.4), args.5, args.6, o)
+    }};
+}
