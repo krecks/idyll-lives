@@ -8,6 +8,7 @@
   "model.drinkingFountain far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.farm.scarecrow far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.fountainTown far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
+  "model.fridgeMiniRetro": {"normals": "the name plate's letters: Blender's text has the walls of the holes in its A and R facing into the metal; the kernel's look outwards"},
   "model.groceryShelf far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.hotDogStand far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.iceCreamCart far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},

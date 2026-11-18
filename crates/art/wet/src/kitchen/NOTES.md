@@ -1,6 +1,6 @@
 # Kitchen — notes
 
-`kitchen.py` builds the kitchen models into `web/public/assets/models/kitchen/` and their entries in
+The family builds the kitchen models into `web/public/assets/models/kitchen/` and their entries in
 `packs/kitchen/manifest.json`: the **fridge** (`model.fridge`, `fridge.glb`), the six **K1 fridges**
 (`fridgeMini`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeRetro`, `fridgeMiniRetro`, `wineFridge`) and the two **sinks**
 (`model.farmhouseSink`, `farmhouseSink.glb`; `model.counterSinkDouble`, `counterSinkDouble.glb`). The fridge was
@@ -67,7 +67,7 @@ washer ran both taps).
 
 Detail pass (2026-10-22): each bowl is one lofted piece (`_bowl`: a flat rim round a rounded opening, the walls running
 down to a floor that dips to the drain; the farmhouse one square outside, an apron proud of the cabinet), with a
-chrome-ringed drain and strainer. The tap is one bent tube (`G.kit.tube`) on a turned escutcheon, with a spray head and
+chrome-ringed drain and strainer. The tap is one bent tube (the kit's tube) on a turned escutcheon, with a spray head and
 a lever on a valve beside it. The cabinets have shaker doors (`_shaker`: a frame with a hole round a recessed panel)
 and bar pulls in one piece (`_pull`); the farmhouse worktop is one U-shaped slab round the basin, the double sink's
 stone worktop one slab with the two openings cut in it. A lofted soap dish with a bar of soap and a terracotta pot
@@ -93,7 +93,7 @@ rack slide instead. The clip each use plays is in the pack's `motions`:
 | `model.fridgeMini` | 0.600 × 1.000 × 0.605 m | 3,868 | 2 | door | `fridge_open` 1.6 s (snack `fetch`, meal `cook`); `hold` 3 s |
 | `model.fridgeBuiltIn` | 0.840 × 2.025 × 0.664 m | 5,960 | 3 | fridge door, freezer door | `fridge_open` 1.75 s (fetch, cook, cold drink); `freezer_open` 1.75 s (frozen treat) |
 | `model.fridgeFrenchDoor` | 0.900 × 1.820 × 0.756 m | 6,884 | 4 | left door, right door, drawer | `fridge_open` 1.75 s (fetch, cook); `door_right` 1.75 s (cold drink); `freezer_open` 1.75 s (frozen treat) |
-| `model.fridgeRetro` | 0.720 × 1.640 × 0.722 m | 4,662 | 3 | door; the chrome lever inside it (`G.attach`) | `lever` turns 30° out (0.3 s, `hold` 0.4), then `fridge_open` 1.75 s (`delay` 0.3; fetch, cook, cold drink) |
+| `model.fridgeRetro` | 0.720 × 1.640 × 0.722 m | 4,662 | 3 | door; the chrome lever inside it (`attach`) | `lever` turns 30° out (0.3 s, `hold` 0.4), then `fridge_open` 1.75 s (`delay` 0.3; fetch, cook, cold drink) |
 | `model.fridgeMiniRetro` | 0.574 × 0.860 × 0.580 m | 3,729 | 2 | door (its handle, "MARIE" letters and unicorn sticker on it) | `fridge_open` 1.6 s (fetch, cook, cold drink); `hold` 3 s |
 | `model.wineFridge` | 1.000 × 0.950 × 0.660 m | 3,720 | 4 | glass door, top shelf of bottles | `door_open` 1.5 s (wine `drink`), `hold` 2.5 s; `rack_out` 0.8 s, the shelf out 15 cm (`delay` 0.9, `hold` 0.9: out once the door is open, in before it shuts) |
 
@@ -142,14 +142,14 @@ cargo art kitchen --preview  # previews/kitchen/fridge.png, fridge@<clip>.png
 
 ## Where it stands (review, 2026-10-14)
 
-Each floor model is centred where the game places it (its `Model`'s `centre`, which `G.settle()` uses),
+Each floor model is centred where the game places it (its `Model`'s `centre`, which settling uses),
 not on its tile: its back is on the wall face (-0.43), as the old part's, a run of counters and
 appliances lines up, and its top is under its content `surface`. Since the
 2026-10-14 fix-ups the old parts no longer reach into the wall: both moved forward onto the face.
 There is one counter depth, the catalogue's 0.66 m (worktop -0.43..0.23): the catalog2 counters keep
-the old 0.79-deep numbers and are drawn through `COUNTER66` (gamekit `GameFrame(depths=)`,
+the old 0.79-deep numbers and are drawn through `COUNTER66` (`GameFrame::with_depths`,
 the old `shallow`). Islands stand free, centred.
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 7 models changed shape: `counterSinkDouble`, `farmhouseSink`, `fridge`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeMini`, `fridgeRetro`; the same triangles.
+No change to the build: its soft boxes take the shared form's new shape (the kit's soft forms: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 7 models changed shape: `counterSinkDouble`, `farmhouseSink`, `fridge`, `fridgeBuiltIn`, `fridgeFrenchDoor`, `fridgeMini`, `fridgeRetro`; the same triangles.
