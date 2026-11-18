@@ -214,8 +214,17 @@ fn asinf(x: f32) -> f32 {
     // (under 2^-27 it is the number itself)
     libm::fmaf(x, f32::from_bits(0x4d00_0000), x) * f32::from_bits(0x3200_0000)
 }
-fn atan2f(y: f32, x: f32) -> f32 {
-    libm::atan2(y as f64, x as f64) as f32
+/// The C library's single-precision arc tangent of y over x, as far as it is known: the double's rounded, but
+/// never past the single just under pi, which is what it gives for a half turn (the single nearest pi is over
+/// it). About one in thirty-five of its other results is a unit in the last place off the rounded double.
+pub(crate) fn atan2f(y: f32, x: f32) -> f32 {
+    let a = libm::atan2(y as f64, x as f64) as f32;
+    let under_pi = f32::from_bits(0x4049_0fda);
+    if a.abs() > under_pi {
+        under_pi.copysign(a)
+    } else {
+        a
+    }
 }
 
 /// A number a script wrote, whole or not: `v3(0, 0.5, 1)`.

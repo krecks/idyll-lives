@@ -582,3 +582,69 @@ fn a_bevelled_boxs_faces_come_in_blenders_order() {
     }
     assert!(seen >= 5, "{seen} boxes");
 }
+
+#[test]
+fn a_corner_patchs_texture_is_carried_as_blender_carries_it() {
+    // a patch of three segments: each quad's corners read the face Blender reads them from, and those on the
+    // patch's middle lines are read on the old edge Blender snaps them to
+    let mut report = Vec::new();
+    for r in records("bevel_patch_uv.txt") {
+        scene::reset();
+        scene::set_finishes(finishes());
+        let s: Vec<f64> = r.kv["size"]
+            .split(',')
+            .map(|x| x.parse().unwrap())
+            .collect();
+        let deck = cube(
+            "deck",
+            (s[0], s[1], s[2]),
+            Cube {
+                at: (0.1, -0.2, 0.3).into(),
+                material: Some(Mat::new("wood", "#8A5A2B", "wood")),
+                bevel: r.kv["width"].parse().unwrap(),
+                bevel_segments: r.kv["seg"].parse().unwrap(),
+                ..Cube::default()
+            },
+        );
+        let joined = artkit::parts::join(&[deck], "j", None);
+        assert!(artkit::uv::ensure(&[joined]));
+        let mesh = joined.read(|o| o.mesh.clone());
+        let faces: Vec<Vec<u32>> = (0..mesh.faces.len())
+            .map(|f| mesh.corners(f).to_vec())
+            .collect();
+        assert_eq!(faces, r.faces("f"), "{}: faces", r.name);
+        let (uvs, want) = (mesh.uvs.as_ref().unwrap(), r.floats("uv"));
+        let (mut far, mut off, mut area_off, mut area_all) = (0.0_f32, 0, 0.0_f64, 0.0_f64);
+        for f in 0..mesh.faces.len() {
+            let face = mesh.faces[f];
+            let p: Vec<V3> = mesh
+                .corners(f)
+                .iter()
+                .map(|&v| mesh.verts[v as usize])
+                .collect();
+            let area: f64 = (1..p.len() - 1)
+                .map(|i| (p[i] - p[0]).cross(p[i + 1] - p[0]).length() / 2.0)
+                .sum();
+            let mut worst = 0.0_f32;
+            for l in face.start as usize..(face.start + face.len) as usize {
+                for k in 0..2 {
+                    worst = worst.max((uvs[l][k] - want[2 * l + k]).abs());
+                }
+            }
+            far = far.max(worst);
+            area_all += area;
+            if worst > 1e-5 {
+                off += 1;
+                area_off += area;
+            }
+        }
+        report.push(format!(
+            "{}: {off} of {} faces with a corner's UV over a hundredth of a millimetre off ({:.2} % of its surface), the farthest {far:e} m",
+            r.name,
+            mesh.faces.len(),
+            100.0 * area_off / area_all
+        ));
+        assert!(off == 0, "{}", report.last().unwrap());
+    }
+    println!("{}", report.join("\n"));
+}
