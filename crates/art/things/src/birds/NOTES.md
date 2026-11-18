@@ -98,9 +98,9 @@ across from the game's camera, and the gate doesn't ask for one.
 ## Looking at them
 
 `cargo art birds --preview` renders each bird into `previews/birds/<id>.png`: the front three-quarter with its wings
-spread. (For it perched, from the side, the front and above, or on a lawn beside a 1.77 m figure at 6 and 20 m, the
-game's gallery
-`/gallery.html?keys=model.bird.blackbird&scale=adult`, or `--camera game`, draws them as built. At real size, a tit
+spread. (To see one perched, from the side, the front and above, or on a lawn beside a 1.77 m figure at 6 and 20 m,
+use the game's gallery: `/gallery.html?keys=model.bird.blackbird&scale=adult`, or `--camera game`, draws them as
+built. At real size, a tit
 is a few pixels across at 20 m and a blackbird or a dove about ten.)
 
 ## Rebuild
