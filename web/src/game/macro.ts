@@ -332,7 +332,7 @@ export function placeReaches(t: Templates, road: RoadPlan, u: Unplaced, at: { x:
   return nearest(road.points, mx, mz).dist - road.width / 2 <= PLACE_REACH;
 }
 /** A farm shop goes along its farmstead's road within about this of the farm's middle (m). */
-const FARM_SHOP_REACH = 90;
+export const FARM_SHOP_REACH = 90;
 /** A river's width (m), how far its meanders swing (m), how far its mountains stand back from it (m). */
 const RIVER_WIDTH: [number, number] = [14, 22];
 const MEANDER: [number, number] = [70, 110];

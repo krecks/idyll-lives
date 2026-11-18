@@ -11,6 +11,8 @@
  * The land is filled as the generator lays a town, area by area (the main town first), each lot and
  * building on land painted its use (`painted`: `SHARE` of the cells under it, none green, little public
  * land but a civic place's), and each step from a stream of its own (the seed and the area, the road):
+ * - a farm shop by every farm that has none, along its road on land painted shops (as `macro.ts` `farmShops`
+ *   puts one), before the areas' lots;
  * - the civic places the area lacks (`civicChoices`, its size as its homes standing make it; a village a
  *   hamlet's, as the generator gives every other area), in the generator's order, each a lot of its own built
  *   from its layout (`placeLots.ts` `placeUnit`), along the public frontage nearest the area's heart, before
@@ -42,13 +44,13 @@ import type { Content } from '../content/content';
 import type { BackdropUse, RoadPlan, TownArea } from '../core/protocol';
 import { BackdropPass, CIVIC, civicChoices, civicTooBig, draftAreaSize, facesRoad, ZONE, type Row, type ZoneKind } from './backdrop';
 import { roadKey } from './edit/buildup';
-import { frontOf, inCentre, townGround } from './edit/ground';
+import { entryOf, frontOf, inCentre, townGround } from './edit/ground';
 import { removeLots, renumber, withLotPlace, withPlaceName } from './edit/lots';
 import { roadReach, usesOfDraft } from './edit/uses';
 import { encodeLand, heightAt } from './land';
 import { openUnderBuilt, settleLand } from './landFollow';
 import { unrle } from './landMasks';
-import { AREA_APART, BEND, BEND_MOST, cells8, cornersOf, grown, hamletOf, parkingFor, placeReaches, rowHouse, trailTo, type AreaPlan } from './macro';
+import { AREA_APART, BEND, BEND_MOST, cells8, cornersOf, FARM_SHOP_REACH, grown, hamletOf, parkingFor, placeReaches, rowHouse, trailTo, type AreaPlan } from './macro';
 import { mulberry32 } from './noise';
 import { placeOfTemplate, placeUnit } from './placeLots';
 import { fronted, greenSpots, hatched, SPOT_NEAR, SPOT_REACH, stretchesOf, type Stretch } from './proposal';
@@ -672,12 +674,7 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
   const wanted = (a: number) => byArea[a].length > 0 && (full || touched.has(a));
 
   // ---- the lots, area by area as the generator lays them: the public places, the terraces, the houses ----
-  // (Each square's own tiles taken, not its box's, as the generator keeps them: the shops stand round it.)
-  const ground = townGround({ ...draft, open: { ...draft.open!, squares: [] } }, t);
-  for (const sq of draft.open!.squares ?? []) {
-    const box = boundsOf(sq);
-    for (let z = Math.floor(box.z); z < Math.ceil(box.z + box.d); z++) for (let x = Math.floor(box.x); x < Math.ceil(box.x + box.w); x++) if (inside(sq, x + 0.5, z + 0.5)) ground.take({ x, z, w: 1, d: 1 });
-  }
+  const ground = townGround(draft, t);
   const placers: LotPlacer[] = [];
   const newSlots = () => placers.flatMap((p) => p.slots);
   // A park on each green the roads go round that is painted green, changed and has none, as the generator puts one there.
@@ -704,6 +701,32 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
   {
     const was = base ? unpackUses(usesOfDraft(base.plan)) : null;
     for (let k = 0; k < mask.length; k++) if (mask[k] === USE_CODE.rows && (!was || was[k] !== USE_CODE.rows)) freshRows[nearestArea(cellMid(k, cols))]++;
+  }
+  // A farm shop by every farm of an area built again that has none within `FARM_SHOP_REACH` m, along the farm's road
+  // that near its middle, on land painted shops, as the generator puts one (`farmShops`); before the areas' lots, whose
+  // named shops could take the only land by the farm painted for it.
+  {
+    const farmRand = mulberry32(mix(seed, 'farm shops'));
+    const placer = new LotPlacer(content, t, ground, roads, [0, 0], farmRand, true);
+    placers.push(placer);
+    const midOf = (s: PlotSlot): Pt => {
+      const r = plotRect(t, s);
+      return [r.x + r.w / 2, r.z + r.d / 2];
+    };
+    const farmShop = (s: PlotSlot) => {
+      const what = s.kind === 'shop' ? placeOfTemplate(s.template) : null;
+      return !!what && 'zone' in what && what.zone === 'farm';
+    };
+    for (const s of draft.slots) {
+      const a = s.area ?? 0;
+      if (s.lot !== 'farm' || !(full || touched.has(a))) continue;
+      const at = midOf(s);
+      if ([...draft.slots, ...newSlots()].some((q) => farmShop(q) && dist(midOf(q), at) <= FARM_SHOP_REACH)) continue;
+      const road = entryOf(draft, t, s).road;
+      if (road < 0) continue;
+      const near = frontageOf(roads, [road], at, farmRand).filter((f) => f.far < FARM_SHOP_REACH);
+      placeNamed(placer, t, roads, [{ ...placeUnit(t, 'farm', draftAreaSize(draft, a), farmRand), area: a, name: `${s.name} Shop` }], near, mask, cols, rows, 'shops');
+    }
   }
   for (const [a, fronts] of byArea.entries()) {
     if (!wanted(a)) continue;
@@ -878,7 +901,7 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
   }
 
   // ---- the backdrop, as the generator lays it: rows along the roads, a row behind, the blocks filled in; each building on land painted its use ----
-  const pass = new BackdropPass({ draft, t, content, squares: 'outline' });
+  const pass = new BackdropPass({ draft, t, content });
   pass.allow = (poly, use) => {
     const kind = USE_OF[use];
     return !!kind && paintedPoly(poly, kind);

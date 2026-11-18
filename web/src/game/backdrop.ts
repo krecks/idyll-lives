@@ -698,8 +698,6 @@ export interface BackdropDraft {
   draft: NeighbourhoodDraft;
   t: Templates;
   content: Content;
-  /** How a square is kept clear: its box (as the editor's ground has it), or its own outline (`'outline'`, as the generator lays the backdrop round it). */
-  squares?: 'box' | 'outline';
 }
 
 /**
@@ -799,11 +797,7 @@ export class BackdropPass {
       // (The ground without the buildings standing: they are in the overlap test, where two may
       // touch, as a row of shops does; the ground keeps lots a metre off their boxes, which would
       // keep a new building off its neighbours.)
-      this.ground = townGround(open ? { ...draft, open: { ...open, backdrop: [], ...(input.squares === 'outline' ? { squares: [] } : {}) } } : draft, t);
-      // (`squares: 'outline'`: each square's own tiles taken, not its box's, as the generator keeps them.)
-      if (input.squares === 'outline') {
-        for (const sq of open?.squares ?? []) tilesOf(sq, 0, (x, z) => void (inside(sq, x + 0.5, z + 0.5) && this.ground.take({ x, z, w: 1, d: 1 })));
-      }
+      this.ground = townGround(open ? { ...draft, open: { ...open, backdrop: [] } } : draft, t);
       this.centres = [];
       this.outlines = (open?.centre ?? []).map((c) => c.poly);
       // (Only `thin` reads the greens and the water, and a draft's pass has no centres to thin.)
