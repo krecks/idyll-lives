@@ -4,6 +4,7 @@ use super::common::call::rbox;
 use super::common::{P, WALL, capsule, flat_screen, grille};
 use super::{F, M};
 use artkit::forms::rounded_rect;
+use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::{Axis, P3, cosd, sind};
 use artkit::parts::{join, join_all, new_parts};
@@ -65,7 +66,7 @@ pub fn tv() -> Vec<Obj> {
         );
         for z in [-0.4, -0.04] {
             revolve!(
-                format!("foot{s}{}", super::common::py(z)),
+                format!("foot{s}{}", float_repr(z)),
                 &[
                     (0.0, 0.0),
                     (0.011, 0.0),

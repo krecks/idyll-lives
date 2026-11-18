@@ -8,15 +8,6 @@ use artkit::parts::{join_all, settle};
 use artkit::scene::Obj;
 use artkit::{cube, cylinder, extrude, loft, ring, sphere, sweep};
 
-/// A number as Python writes it in a name (a whole one with its point: `1.0`).
-pub fn repr(x: f64) -> String {
-    if x.fract() == 0.0 && x.abs() < 1e16 {
-        format!("{x:.1}")
-    } else {
-        format!("{x}")
-    }
-}
-
 /// `ball`'s options.
 #[derive(Clone, Debug)]
 pub struct Ball {

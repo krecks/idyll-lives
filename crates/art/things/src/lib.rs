@@ -4,6 +4,7 @@
 use artkit::family::Family;
 
 pub mod birds;
+mod common;
 pub mod fitness;
 pub mod held;
 pub mod hobbies;

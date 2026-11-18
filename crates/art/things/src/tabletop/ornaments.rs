@@ -11,6 +11,7 @@ use artkit::math::{
 };
 use artkit::parts::{hinged, join, new_parts};
 use artkit::place::GameFrame;
+use artkit::py;
 use artkit::scene::{Obj, meshes};
 use artkit::{cone, join, rod, settle, spin, sweep};
 
@@ -297,45 +298,6 @@ const CONTINENTS: [(f64, f64, f64); 13] = [
     (-42.0, 72.0, 9.0),
 ];
 
-/// A face's centre as Blender gives it (`MeshPolygon.center`): a triangle's and a quad's corners summed and divided,
-/// a larger face's each weighted by one over their number, in single precision.
-fn face_centre(verts: &[V3], corners: &[u32]) -> V3 {
-    let p = |i: usize| verts[corners[i] as usize];
-    match corners.len() {
-        3 => {
-            let (a, b, c) = (p(0), p(1), p(2));
-            V3::new(
-                (a.x + b.x + c.x) / 3.0,
-                (a.y + b.y + c.y) / 3.0,
-                (a.z + b.z + c.z) / 3.0,
-            )
-        }
-        4 => {
-            let (a, b, c, d) = (p(0), p(1), p(2), p(3));
-            V3::new(
-                (a.x + b.x + c.x + d.x) / 4.0,
-                (a.y + b.y + c.y + d.y) / 4.0,
-                (a.z + b.z + c.z + d.z) / 4.0,
-            )
-        }
-        n => {
-            let w = 1.0_f32 / n as f32;
-            let mut c = V3::new(0.0, 0.0, 0.0);
-            for i in 0..n {
-                let q = p(i);
-                c = V3::new(c.x + q.x * w, c.y + q.y * w, c.z + q.z * w);
-            }
-            c
-        }
-    }
-}
-
-/// `min(hi, max(lo, x))` as Python takes it.
-fn clamp(x: f64) -> f64 {
-    let lo = if x > -1.0 { x } else { -1.0 };
-    if lo < 1.0 { lo } else { 1.0 }
-}
-
 /// A desk globe: the blue sea with its continents (faces of the sphere coloured land), tilted on its axis in a brass
 /// meridian ring with pins at the poles, on a turned wooden column and foot.
 pub fn globe() -> Vec<Obj> {
@@ -377,17 +339,20 @@ pub fn globe() -> Vec<Obj> {
     sea.edit(|o| {
         let land = o.mesh.slot(M.land);
         for f in 0..o.mesh.faces.len() {
-            let corners = o.mesh.corners(f).to_vec();
-            let centre = face_centre(&o.mesh.verts, &corners);
+            let centre = o.mesh.face_centre(f);
             let c = centre.normalized();
             let (lat, lon) = (
-                degrees(asin(clamp(c.z as f64))),
+                degrees(asin(py::max(-1.0, py::min(1.0, c.z as f64)))),
                 degrees(atan2(c.y as f64, c.x as f64)),
             );
             for (clon, clat, reach) in CONTINENTS {
-                let d = degrees(acos(clamp(
-                    sin(radians(lat)) * sin(radians(clat))
-                        + cos(radians(lat)) * cos(radians(clat)) * cos(radians(lon - clon)),
+                let d = degrees(acos(py::max(
+                    -1.0,
+                    py::min(
+                        1.0,
+                        sin(radians(lat)) * sin(radians(clat))
+                            + cos(radians(lat)) * cos(radians(clat)) * cos(radians(lon - clon)),
+                    ),
                 )));
                 if d < reach {
                     o.mesh.faces[f].mat = land;

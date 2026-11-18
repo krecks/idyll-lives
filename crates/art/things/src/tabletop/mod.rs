@@ -23,8 +23,7 @@
 //! rims kept sharp), handles and spouts swept, slabs extruded with their holes, the plants' leaves and flowers
 //! the botany's (`leaf`, `rays`, `tulip_head`).
 
-use artkit::family::{Family, Model};
-use artkit::json::{Json, loads};
+use artkit::family::{Family, Model, motions};
 use artkit::palette;
 
 #[macro_use]
@@ -163,10 +162,6 @@ palette! { M:
     block_c = ("#F2C14E", satin),
     block_d = ("#5BAE6A", satin),
     block_e = ("#E07BC3", satin),
-}
-
-fn motions(text: &str) -> Json {
-    loads(text).expect("the motions are JSON")
 }
 
 const BODY: &str = "Body";

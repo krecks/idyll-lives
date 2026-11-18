@@ -489,7 +489,7 @@ pub fn _sandwich_half(
         ("tomato", 0.007, M.tomato, -0.04),
         ("bread_hi", 0.019, M.bread, 0.0),
     ] {
-        if super::common::same(m, M.bread) {
+        if m == M.bread {
             let sides: Vec<Mat> = (0..pts.len())
                 .map(|k| if k == cut { M.bread } else { M.crust })
                 .collect();
@@ -503,7 +503,7 @@ pub fn _sandwich_half(
                 sides = sides,
                 at = off
             );
-        } else if super::common::same(m, M.lettuce) {
+        } else if m == M.lettuce {
             let outline: Vec<(f64, f64)> = _frill(pts, 0.07, 0.004, 4)
                 .iter()
                 .map(|&(x, z)| (x + off.0, z + off.1))

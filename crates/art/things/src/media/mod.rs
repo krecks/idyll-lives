@@ -18,7 +18,6 @@
 
 use artkit::family::{Family, Model};
 use artkit::json;
-use artkit::materials::{Mat, Palette};
 use artkit::palette;
 use artkit::place::GameFrame;
 
@@ -83,6 +82,7 @@ palette! { M:
     // the boombox on its crate
     boombox_body = ("#3A3D41", satin), // Body
     boombox_trim = ("#C9CBCC", metal), // Trim: the top, rings, handle and aerial
+    crate_ = ("#A8754A", wood, named("crate")), // the record crate's wood (`crate` is Rust's word)
     crate_dark = ("#9E6E43", wood),
     cassette = ("#1D2228", gloss),
     window = ("#3A4450", gloss),
@@ -109,28 +109,13 @@ palette! { M:
     glass_lens = ("#2E4A66", gloss),
 }
 
-/// The record crate's wood (a name the palette's fields can't take: `crate` is Rust's).
-pub const CRATE: Mat = Mat::new("crate", "#A8754A", "wood");
-
 const F: GameFrame = GameFrame::new(0.0);
-
-/// The family's palette, `crate` in its place after the boombox's trim.
-fn colours() -> Palette {
-    let mut p = M.palette();
-    let at = p
-        .colours
-        .iter()
-        .position(|m| m.name == "boombox_trim")
-        .map_or(p.colours.len(), |i| i + 1);
-    p.colours.insert(at, CRATE);
-    p
-}
 
 /// The family.
 pub fn family() -> Option<Family> {
     Some(Family::new(
         "media",
-        colours(),
+        M.palette(),
         vec![
             Model::new("tv", tv::tv, (0.91, 1.07, 0.445))
                 .key("model.tv")

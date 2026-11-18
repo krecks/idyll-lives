@@ -9,7 +9,6 @@ use super::dishes::_bag_ring;
 use super::tools::_along;
 use artkit::forms::rounded_rect;
 use artkit::kit::fillet;
-use artkit::materials::Mat;
 use artkit::math::{PI, TAU, cos, degrees, radians, sin};
 use artkit::place::Facing;
 use artkit::scene::Obj;
@@ -771,17 +770,6 @@ const BUNCH: [Head; 6] = [
 ];
 const GRIP: (f64, f64, f64) = (0.0, 0.0, 0.02); // where the stems are gathered, the middle of the bunch's base
 
-/// A petal colour by its name.
-fn petal_of(name: &str) -> Mat {
-    match name {
-        "petal_white" => M.petal_white,
-        "petal_rose" => M.petal_rose,
-        "petal_yellow" => M.petal_yellow,
-        "petal_blush" => M.petal_blush,
-        other => panic!("no petal colour {other}"),
-    }
-}
-
 /// A flower's petals as a flat outline: `n` petals `r` out, `inner` of that between them (0.42: a daisy).
 pub fn _star(r: f64, inner: f64, n: usize) -> Vec<(f64, f64)> {
     (0..2 * n)
@@ -829,7 +817,7 @@ pub fn cut_flowers() -> Vec<Obj> {
                     (0.008, 0.036),
                     (0.0, 0.038)
                 ],
-                petal_of(petal),
+                M.palette().get(petal),
                 at = (x, y - 0.002, z),
                 segments = 6,
                 rot = (tip, 0.0, yaw)
@@ -842,7 +830,7 @@ pub fn cut_flowers() -> Vec<Obj> {
             &_star(r, 0.42, 6),
             0.004,
             (x, y, z),
-            petal_of(petal),
+            M.palette().get(petal),
             plane = Facing::Front,
             rot = (tip, 0.0, yaw)
         );

@@ -3,6 +3,7 @@
 use super::M;
 use super::common::{_place, disc, done, oval};
 use artkit::forms::{Plane, rounded_rect, smooth_outline};
+use artkit::json::float_repr;
 use artkit::kit::fillet;
 use artkit::kit::{Moulding, moulding};
 use artkit::materials::Mat;
@@ -621,7 +622,7 @@ pub fn monitor() -> Vec<Obj> {
         (0.153, 0.021),
     ] {
         box_!(
-            format!("key4_{}", super::common::repr(x)),
+            format!("key4_{}", float_repr(x)),
             (w, 0.018, 0.006),
             (x, -0.176, 0.015),
             M.keys

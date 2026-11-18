@@ -220,21 +220,10 @@ const VASE_BODY: [(f64, f64); 9] = [
     (0.027, 0.225),
 ];
 
-/// A petal colour by its name.
-fn petal_of(colour: &str) -> Mat {
-    match colour {
-        "white" => M.white,
-        "blush" => M.blush,
-        "yellow" => M.yellow,
-        "rose" => M.rose,
-        other => panic!("no petal colour {other}"),
-    }
-}
-
 /// The vase's bunch: `VASE_HEADS` on curving stems from the water at `water`, leaves at the neck.
 fn _bunch(water: f64, neck: f64) {
     for (i, &(x, y, z, colour, kind)) in VASE_HEADS.iter().enumerate() {
-        let petal = petal_of(colour);
+        let petal = M.palette().get(colour);
         let (yaw, tilt) = (_facing(x, y), if x != 0.0 || y != 0.0 { 25.0 } else { 0.0 });
         twig!(
             format!("stem{i}"),

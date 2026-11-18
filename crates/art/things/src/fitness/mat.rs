@@ -1,7 +1,8 @@
 //! The yoga mat: rolled up at the back with a block and a bottle; it unrolls to the front.
 
 use super::M;
-use super::common::{py, rr};
+use super::common::rr;
+use artkit::json::float_repr;
 use artkit::math::{Axis, TAU, cos, sin};
 use artkit::parts::{aside, hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
@@ -163,7 +164,7 @@ pub fn yoga_mat() -> Vec<Obj> {
         for x in [-0.2, 0.2] {
             fbox!(
                 f,
-                format!("mat_line{}", py(x)),
+                format!("mat_line{}", float_repr(x)),
                 0.006,
                 0.001,
                 MAT_L - 0.2,

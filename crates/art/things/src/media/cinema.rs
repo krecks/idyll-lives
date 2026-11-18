@@ -2,9 +2,10 @@
 //! projector screen rolled up in its case on the wall above.
 
 use super::common::call::rbox;
-use super::common::{WALL, capsule, driver, grille, py};
+use super::common::{WALL, capsule, driver, grille};
 use super::{F, M};
 use artkit::forms::rounded_rect;
+use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::{Axis, P3};
 use artkit::motion::flat;
@@ -67,7 +68,7 @@ pub fn home_cinema() -> Vec<Obj> {
             // a slab front with a finger grip routed along its top
             soft!(
                 F,
-                format!("front{}", py(x)),
+                format!("front{}", float_repr(x)),
                 0.58,
                 0.3,
                 0.012,
@@ -77,7 +78,7 @@ pub fn home_cinema() -> Vec<Obj> {
                 round_segments = 2
             );
             capsule(
-                format!("grip{}", py(x)),
+                format!("grip{}", float_repr(x)),
                 x - 0.08,
                 x + 0.08,
                 0.385,
@@ -203,7 +204,7 @@ pub fn home_cinema() -> Vec<Obj> {
             );
             for y in [0.78, 1.0] {
                 driver(
-                    &format!("woofer{s}{}", py(y)),
+                    &format!("woofer{s}{}", float_repr(y)),
                     x,
                     y,
                     -0.2,

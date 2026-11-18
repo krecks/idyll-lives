@@ -1,7 +1,7 @@
 //! What the hobbies are built from: the helpers hobbies.py shared between its models.
 
 use super::M;
-use artkit::forms::rounded_rect;
+pub use crate::common::{P, rr};
 use artkit::kit::{self, fillet};
 use artkit::materials::Mat;
 use artkit::math::{Axis, M4, P3, V3, cos, cosd, degrees, pow, radians, sin, sind};
@@ -11,9 +11,6 @@ use artkit::parts::{join, turn};
 use artkit::place::{Coord, GameFrame};
 use artkit::scene::{self, Obj};
 use artkit::{fbox, fcyl, fsweep, revolve, rod, soft, torus};
-
-/// A game point (x, height, depth).
-pub type P = (f64, f64, f64);
 
 /// The game direction of an old part's long axis (its local y) under its `rotate`: Euler degrees (yaw y, pitch x,
 /// roll z), read as the game reads them (`quatFromEuler` in render/shared/math.ts).
@@ -126,11 +123,6 @@ pub fn up_quad(verts: &[V3], start: u32, over: impl Fn(V3) -> bool) -> Vec<u32> 
     } else {
         c
     }
-}
-
-/// A rounded rectangle outline (`rounded_rect`), for profiles and slabs.
-pub fn rr(w: f64, h: f64, r: f64, corner: usize) -> Vec<(f64, f64)> {
-    rounded_rect(w, h, r, corner)
 }
 
 /// A sheet of music facing the front: paper and four staves.
@@ -563,6 +555,8 @@ pub fn frets(fr: &GameFrame, n: usize, scale: f64, nut: f64, w: f64, z: f64) {
 
 /// `matrix.to_euler('XYZ')` in degrees, as mathutils gives it: the turn (single precision) of the two that reach it
 /// with the least sum of angles, after each column is made a unit long.
+/// (Not `math::mat3_normalized_to_eul` on the matrix as it stands: that leaves out the columns made a unit long, and
+/// twelve more of the drum kit's points come off Blender's with it.)
 pub fn to_euler_degrees(m: M4) -> P {
     let mut c = [[0.0_f32; 3]; 3];
     for (i, col) in c.iter_mut().enumerate() {

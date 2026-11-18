@@ -1,72 +1,14 @@
 //! What the home gym is built from: the helpers fitness.py shared between its models.
 
 use super::M;
-use artkit::forms::rounded_rect;
+pub use crate::common::{P, rr};
 use artkit::materials::Mat;
 use artkit::math::{Axis, M4, P3, cos, radians, sin};
-use artkit::place::{Coord, GameFrame};
+use artkit::place::{GameFrame, N};
 use artkit::{fcyl, revolve};
 
-/// A game point (x, height, depth).
-pub type P = (f64, f64, f64);
-
-/// A number as the script held it, whole or not: a whole zero negates to a plain zero, a float zero to a negative
-/// one, and a part's place keeps that sign (`Coord`).
-#[derive(Clone, Copy, Debug)]
-pub enum Num {
-    Int(i32),
-    Float(f64),
-}
-
-impl Coord for Num {
-    fn f(self) -> f64 {
-        match self {
-            Num::Int(i) => i as f64,
-            Num::Float(x) => x,
-        }
-    }
-    fn negated(self) -> f64 {
-        match self {
-            Num::Int(i) => -i as f64,
-            Num::Float(x) => -x,
-        }
-    }
-}
-
-impl std::ops::Add for Num {
-    type Output = Num;
-    fn add(self, o: Num) -> Num {
-        match (self, o) {
-            (Num::Int(a), Num::Int(b)) => Num::Int(a + b),
-            _ => Num::Float(self.f() + o.f()),
-        }
-    }
-}
-
-impl From<i32> for Num {
-    fn from(i: i32) -> Num {
-        Num::Int(i)
-    }
-}
-
-impl From<f64> for Num {
-    fn from(x: f64) -> Num {
-        Num::Float(x)
-    }
-}
-
-/// A float as Python's `str` writes it in a part's name (a whole one with its `.0`).
-pub fn py(x: f64) -> String {
-    artkit::json::float_repr(x)
-}
-
-/// `_rr`: a rounded rectangle outline (`rounded_rect`), for profiles and slabs.
-pub fn rr(w: f64, h: f64, r: f64, corner: usize) -> Vec<(f64, f64)> {
-    rounded_rect(w, h, r, corner)
-}
-
 /// `_on`: a game point `d` (x, y, z) from `c` on a face tilted `tilt` degrees about the game's x axis.
-pub fn on(c: (Num, f64, f64), tilt: i32, d: (Num, f64, f64)) -> (Num, f64, f64) {
+pub fn on(c: (N, f64, f64), tilt: i32, d: (N, f64, f64)) -> (N, f64, f64) {
     let a = radians(tilt as f64);
     (
         c.0 + d.0,

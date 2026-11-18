@@ -1,8 +1,9 @@
 //! TT1 kitchenware.
 
 use super::M;
-use super::common::{arc_shell, done, oval, repr, tilt_x};
+use super::common::{arc_shell, done, oval, tilt_x};
 use artkit::forms::{Plane, by, rounded_rect, smooth_outline};
+use artkit::json::float_repr;
 use artkit::kit::{Pull, fillet, pull};
 use artkit::materials::Mat;
 use artkit::math::{Axis, PI, TAU, cos, cosd, radians, sin, sind};
@@ -262,7 +263,7 @@ fn _blender_base() {
     );
     for x in [-0.038, 0.038] {
         box_!(
-            format!("button{}", repr(x)),
+            format!("button{}", float_repr(x)),
             (0.016, 0.008, 0.01),
             (x, -0.065, 0.05),
             M.chrome,
@@ -494,7 +495,7 @@ pub fn espresso_machine_small() -> Vec<Obj> {
     let parts = new_parts(|| {
         for x in [-0.009, 0.009] {
             cylinder!(
-                format!("stream{}", repr(x)),
+                format!("stream{}", float_repr(x)),
                 0.0022,
                 0.071,
                 at = (x, -0.105, 0.1015),
@@ -626,7 +627,7 @@ fn _espresso_body() {
     );
     for x in [-0.009, 0.009] {
         cone!(
-            format!("spout{}", repr(x)),
+            format!("spout{}", float_repr(x)),
             0.005,
             0.003,
             0.014,
