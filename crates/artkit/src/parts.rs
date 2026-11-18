@@ -117,6 +117,7 @@ fn append(a: &mut Mesh, b: &Mesh) {
         *a = Some(out);
     }
     merge(&mut a.uvs, &b.uvs, l0, b.loops.len(), [0.0, 0.0]);
+    merge(&mut a.stored, &b.stored, l0, b.loops.len(), None);
     merge(
         &mut a.card_shade,
         &b.card_shade,

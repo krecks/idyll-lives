@@ -1,8 +1,10 @@
 //! Faults found in the bevel by the families built with it, each held to what Blender 5.2 makes (tests/golden).
 mod common;
 
+use artkit::forms::{Extrude, Holes, Plane, extrude};
 use artkit::materials::{Finish, Finishes, Mat};
-use artkit::math::V3;
+use artkit::math::{P3, V3};
+use artkit::mesh::Mesh;
 use artkit::scene;
 use artkit::shapes::{Cube, cube};
 use common::*;
@@ -26,6 +28,23 @@ impl Rec {
         self.floats(key)
             .chunks(3)
             .map(|c| V3::new(c[0], c[1], c[2]))
+            .collect()
+    }
+    fn f64(&self, key: &str) -> f64 {
+        f64w(&self.kv[key])
+    }
+    fn loops(&self) -> Vec<Vec<(f64, f64)>> {
+        self.lines["loops"]
+            .split(" | ")
+            .map(|l| {
+                l.split(' ')
+                    .filter(|w| !w.is_empty())
+                    .map(|p| {
+                        let (a, b) = p.split_once(',').unwrap();
+                        (f64w(a), f64w(b))
+                    })
+                    .collect()
+            })
             .collect()
     }
     fn faces(&self, key: &str) -> Vec<Vec<u32>> {
@@ -189,6 +208,176 @@ fn a_joined_parts_texture_stays_in_its_own_frame_whichever_part_is_bevelled() {
             "{}",
             report.last().unwrap()
         );
+    }
+    println!("{}", report.join("\n"));
+}
+
+/// Where a point is, to half a thousandth of a millimetre.
+type Place = [i64; 3];
+
+fn place(p: V3) -> Place {
+    [p.x, p.y, p.z].map(|c| (c as f64 * 2e6).round() as i64)
+}
+
+/// How a mesh's corner normals are off Blender's, each face found by where its corners are (a slab's points come
+/// in another order than Blender's): (the most any is turned, in degrees, over the faces that have an area; the
+/// share of the mesh's area on faces with a corner over 15 degrees off; the faces that aren't Blender's).
+fn normals_off(
+    mesh: &Mesh,
+    points: &[V3],
+    faces: &[Vec<u32>],
+    normals: &[V3],
+) -> (f64, f64, usize) {
+    let mut golden: BTreeMap<Vec<Place>, Vec<Vec<(Place, V3)>>> = BTreeMap::new();
+    let mut at = 0;
+    for f in faces {
+        let corners: Vec<(Place, V3)> = f
+            .iter()
+            .enumerate()
+            .map(|(i, &v)| (place(points[v as usize]), normals[at + i]))
+            .collect();
+        let mut key: Vec<Place> = corners.iter().map(|c| c.0).collect();
+        key.sort_unstable();
+        golden.entry(key).or_default().push(corners);
+        at += f.len();
+    }
+    let mine = artkit::normals::corner_normals(mesh);
+    let (mut worst, mut off, mut all, mut missing) = (0.0_f64, 0.0_f64, 0.0_f64, 0);
+    for f in 0..mesh.faces.len() {
+        let p: Vec<V3> = mesh
+            .corners(f)
+            .iter()
+            .map(|&v| mesh.verts[v as usize])
+            .collect();
+        let area: f64 = (1..p.len() - 1)
+            .map(|i| (p[i] - p[0]).cross(p[i + 1] - p[0]).length() / 2.0)
+            .sum();
+        all += area;
+        if area < 1e-10 {
+            continue;
+        }
+        let places: Vec<Place> = p.iter().map(|&q| place(q)).collect();
+        let mut key = places.clone();
+        key.sort_unstable();
+        let Some(want) = golden.get(&key) else {
+            missing += 1;
+            continue;
+        };
+        // (two faces on the same points, a clamped bevel's: the one it is nearer)
+        let mut turned = f64::INFINITY;
+        for want in want {
+            let mut most = 0.0_f64;
+            for (i, q) in places.iter().enumerate() {
+                // (a face that comes by a place twice: which corner is which isn't told)
+                if places.iter().filter(|x| *x == q).count() > 1 {
+                    continue;
+                }
+                let (n, w) = (
+                    mine[mesh.faces[f].start as usize + i],
+                    want.iter().find(|c| c.0 == *q).unwrap().1,
+                );
+                // (as the file is written: a normal's length isn't kept)
+                let cos = n.dot(w) / (n.length() * w.length()).max(1e-30);
+                if (0..3).any(|k| n[k] != w[k]) {
+                    most = most.max(cos.clamp(-1.0, 1.0).acos().to_degrees());
+                }
+            }
+            turned = turned.min(most);
+        }
+        worst = worst.max(turned);
+        if turned > 15.0 {
+            off += area;
+        }
+    }
+    (worst, off / all, missing)
+}
+
+#[test]
+fn a_bevels_normals_are_read_on_the_part_where_it_is_joined() {
+    // Blender keeps a bevel's hardened normals as two angles in the frame of each corner's fan, through a join
+    // and a move, and reads them on the mesh as it is when it is written. A plate thinner than two bevels (its
+    // sides slivers thinner than its points' rounding once it is moved) and a slab's clamped corners then read
+    // otherwise than where the bevel was made: the parts are joined after another, off the origin, as a family
+    // joins them.
+    let mut report = Vec::new();
+    for r in records("bevel_placed.txt") {
+        scene::reset();
+        let first = cube(
+            "first",
+            (0.1, 0.06, 0.04),
+            Cube {
+                at: (0.05, -0.3, 0.31).into(),
+                ..Cube::default()
+            },
+        );
+        let (at, bevel, bevel_segments) = (
+            P3::from((-0.2, 0.632, 0.52)),
+            r.f64("width"),
+            r.kv["seg"].parse().unwrap(),
+        );
+        let part = if r.kv["kind"] == "cube" {
+            let s: Vec<f64> = r.kv["size"].split(',').map(f64w).collect();
+            cube(
+                "part",
+                (s[0], s[1], s[2]),
+                Cube {
+                    at,
+                    bevel,
+                    bevel_segments,
+                    ..Cube::default()
+                },
+            )
+        } else {
+            let loops = r.loops();
+            extrude(
+                "part",
+                &loops[0],
+                r.f64("depth"),
+                Extrude {
+                    at,
+                    holes: Holes(loops[1..].to_vec()),
+                    plane: if r.kv["plane"] == "XY" {
+                        Plane::XY
+                    } else {
+                        Plane::XZ
+                    },
+                    bevel,
+                    bevel_segments,
+                    ..Extrude::default()
+                },
+            )
+        };
+        let joined = artkit::parts::join(&[first, part], "joined", Some(P3::ZERO));
+        let mesh = joined.read(|o| o.mesh.clone());
+        // the same points, to the bit
+        let (want_points, want_faces) = (r.points("v"), r.faces("f"));
+        let bits = |points: &[V3]| {
+            let mut b: Vec<[u32; 3]> = points
+                .iter()
+                .map(|p| [p.x, p.y, p.z].map(|c| (c + 0.0).to_bits()))
+                .collect();
+            b.sort_unstable();
+            b
+        };
+        assert_eq!(bits(&mesh.verts), bits(&want_points), "{}: points", r.name);
+        let (turned, share, missing) =
+            normals_off(&mesh, &want_points, &want_faces, &r.points("n"));
+        // (what keeping the normals as they were given through the move comes to)
+        let mut kept = mesh.clone();
+        kept.stored = None;
+        let before = normals_off(&kept, &want_points, &want_faces, &r.points("n"));
+        report.push(format!(
+            "{}: normals within {turned:.3} degrees of Blender's, {missing} faces not Blender's (kept as given: within {:.1} degrees, {:.2} % of its surface over 15 off)",
+            r.name,
+            before.0,
+            before.1 * 100.0
+        ));
+        assert!(
+            turned < 0.05 && share == 0.0 && missing == 0,
+            "{}",
+            report.last().unwrap()
+        );
+        assert!(before.0 > 1.0, "{}", report.last().unwrap());
     }
     println!("{}", report.join("\n"));
 }

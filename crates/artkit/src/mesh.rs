@@ -35,6 +35,11 @@ pub struct Mesh {
     pub sharp: BTreeSet<(u32, u32)>,
     /// A normal a corner where they are given and not worked out (leaf cards, bevels).
     pub normals: Option<Vec<V3>>,
+    /// The corners whose normal a tool gave as Blender keeps it (a bevel's hardened normals): two angles of
+    /// sixteen bits in the frame of the corner's fan, which read as a normal on the mesh as it is when it is asked
+    /// (`normals::corner_normals`), not as it was when they were stored. A corner's None: its normal is the one
+    /// `normals` has.
+    pub stored: Option<Vec<Option<[i16; 2]>>>,
     /// A UV a corner, in metres, once made.
     pub uvs: Option<Vec<[f32; 2]>>,
     /// Whether the UVs are final (made in the part's own frame before it was joined).
@@ -167,6 +172,9 @@ impl Mesh {
         }
         if let Some(n) = &mut self.normals {
             n[a..b].reverse();
+        }
+        if let Some(s) = &mut self.stored {
+            s[a..b].reverse();
         }
     }
 

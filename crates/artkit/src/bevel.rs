@@ -1755,6 +1755,7 @@ fn harden(out: &mut Mesh, kinds: &[Kind], long: &BTreeSet<(u32, u32)>, old: &Mes
         }
     }
     out.normals = Some(crate::normals::from_stored(out, &stored));
+    out.stored = Some(stored.into_iter().map(Some).collect());
 }
 
 fn acos_clamped(x: f32) -> f32 {
