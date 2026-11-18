@@ -1,6 +1,6 @@
 # Outgoing pack — notes
 
-`pack_outgoing.py` builds the six P14 outgoing models into `web/public/assets/models/pack_outgoing/` and their
+`crates/art/packs/src/pack_outgoing` builds the six P14 outgoing models into `web/public/assets/models/pack_outgoing/` and their
 entries in `packs/pack_outgoing/manifest.json`, an override pack listed in the base manifest. Built
 2026-10-14; they sat in Validate › Outgoing until checked in play.
 
