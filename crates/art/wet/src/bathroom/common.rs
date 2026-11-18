@@ -7,12 +7,11 @@ use artkit::math::{P3, PI, TAU, V3, cos, pow, sin};
 use artkit::parts::{join, new_parts};
 use artkit::place::{Coord, GameFrame, Spot};
 use artkit::scene::Obj;
-use artkit::{Arg, fbox, fcyl, fextrude, fsweep, loft};
+use artkit::{Arg, fbox, fcyl, fextrude, loft};
 
 /// The wall's face, game depth: the toilets' cisterns and the storage stand on it.
 pub const WALL: f64 = -0.43;
 
-// KIT: kit.tube
 /// A round tube of radius `r` through game points, its bends rounded (`round` steps between each pair of points; 1
 /// keeps them sharp), its ends capped: a towel rail, a bent-tube frame, a tap's riser, a hose. `verts` round: by
 /// default 8, and more for one over 13 mm in radius, as many as keep its outline within a millimetre of the circle.
@@ -27,16 +26,18 @@ pub fn kit_tube<P: Spot>(
     round: usize,
     scale: impl Arg<Scale>,
 ) -> Obj {
-    fsweep!(
+    // (the kit's tube, called as the script called it)
+    artkit::kit::tube(
         f,
         name,
         points,
         r,
         material,
-        verts = verts,
-        resolution = round,
-        scale = scale,
-        least = 8
+        artkit::kit::Tube {
+            verts,
+            round,
+            scale: artkit::Arg::arg(scale),
+        },
     )
 }
 
