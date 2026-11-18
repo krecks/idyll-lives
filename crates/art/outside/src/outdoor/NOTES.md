@@ -1,4 +1,4 @@
-# Outdoor (`families/outdoor.py`)
+# Outdoor (`crates/art/outside/src/outdoor`)
 
 The outdoor things. One pack, `packs/outdoor/manifest.json`. Each model is built in place where the
 old part stood (`F`, game axes), so seat heights (content `seat`) and table tops (content `surface`)

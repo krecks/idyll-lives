@@ -1,4 +1,4 @@
-# Yard (`families/yard.py`)
+# Yard (`crates/art/outside/src/yard`)
 
 The OU4 play and yard things, and the rides (a city bike, a kids' bike, an e-scooter,
 below). One pack, `packs/yard/manifest.json`,
@@ -9,9 +9,9 @@ The plan names `outdoor.py` as the family; these nine are a family of their own 
 building at once don't all edit one script, palette and pack. Moving them into `outdoor.py` later changes only the
 files' folder (`models/yard/` to `models/outdoor/`): the keys stay `model.<id>`.
 
-Each is built in place where the game places it (`F`, game axes), with `G.settle(centre=False)` and its
+Each is built in place where the game places it (`F`, game axes), with `settle_with` with `centre: false` and its
 `Model`'s `centre` where it stands off the footprint's middle. Outdoor things are drawn in the town overview, so
-each has a far version (`far=`): the model's own build at low detail (`G.far_of`), at rest, all one part, without
+each has a far version (`far=`): the model's own build at low detail (`far_low`), at rest, all one part, without
 the castle and the washing; the log store's too since 2026-10-22 (it was decimated, `far=0.25`, which
 turned its logs to spikes).
 
@@ -30,12 +30,12 @@ draws, paint and far versions, each far version at most half its model):
 | clothesline | swept posts with caps, arms with end caps, bent braces, turned feet, tensioners; a lofted basket with a rim and handles, soft folded washing; the washing cut to shape (T-shirts, trousers with their legs, socks with their feet, a sheet with a soft hem, towels with woven bands) and pegs astride the line, all within the line's 16 mm when flattened |
 | firewoodStack | round, half and quarter logs (swept rough sections), pale sawn ends with darker hearts, the rack's ends bent tube on feet, a corrugated roof |
 
-Yard keeps G.jitter out (it gives other numbers in each Blender process: outdoor.md); its noise is `noise()` only.
+Yard keeps the kit's jitter out; its noise is `noise()` only.
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
 | `sandbox` | the sand castle (a keep, four turrets, walls, a flag), origin 2 cm down in the sand: `castle` raises it (2.5 s) and holds it while the castle is built | `sandcastle` |
-| `bikeRack` | the bike, hinged on its front tyre's foot: `wheel_up` tips it up 8.5° (0.8 s), so the back axle rests in the stand's cradle; the back wheel, inside the bike (`G.attach`): `wheel_turn` turns it once in 1.2 s, a loop | `tuneUp` (both) |
+| `bikeRack` | the bike, hinged on its front tyre's foot: `wheel_up` tips it up 8.5° (0.8 s), so the back axle rests in the stand's cradle; the back wheel, inside the bike (`attach`): `wheel_turn` turns it once in 1.2 s, a loop | `tuneUp` (both) |
 | `raisedBed` | the plants (foliage: lettuces, carrot tops, tomato bushes) and the crop (plain: carrots, tomatoes), origins on the soil: `grow` holds each at its stage (ripe at rest; picked, the bed bare; growing, lower and no crop; planted, seedlings); `harvest` picks the crop away (1 s); `rustle` sways both 3° about the soil line (0.8 s, every 2.4 s), on top of the stage | `growth`; `harvest`; `tend` |
 | `shedSmall` | the ledged and braced door with black T-hinges and a latch, hinged on the left: `door_open` swings it 100° out (1 s) for the whole of pottering | `potter` |
 | `greenhouse` | the glass door, hinged on its left post, and the roof vent on the left slope, hinged at the ridge: `door_open` swings the door 70° out and lifts the vent 25° (0.9 s), one clip on both | `tend`, `harvest` |
@@ -117,7 +117,7 @@ with the bed ripe: the crop went with the harvest, the bed bare after); the colo
 
 What residents ride to work or school (content `vehicle`; `bicycle` 2 × 1, `bicycleChild` and `eScooter` 1 × 1,
 outdoors). All three original, CC0. Each is built along game x, its **front wheel to +x**, its middle line at depth 0,
-standing upright on the floor (`G.settle(centre=False)`; the `centre` is the box's middle, a few mm behind the
+standing upright on the floor (`settle_with` with `centre: false`; the `centre` is the box's middle, a few mm behind the
 footprint's because the back mudguard reaches farther than the front). Plain finishes only, so each is **one draw**.
 
 The two bikes are the bike rack's bike made with other numbers: `Bike` holds a bike's numbers (the rack's are its
@@ -171,7 +171,7 @@ The geometry the renderer rides them by (game metres, the model's own frame, as 
 
 Triangles: the city bike 6312 (frame 3384, each wheel 1056, cranks 476, stand 340), the kids' bike 3920 (frame 2228,
 each wheel 672, cranks 348), the scooter 4200 (frame 2216, wheels 972 and 848, stand 164). Far versions
-(`G.far_of`: no spokes or rims, fewer points round, all one still part, parked): 1892, 1548, 1172. `check-glb`: no
+(`far_low`: no spokes or rims, fewer points round, all one still part, parked): 1892, 1548, 1172. `check-glb`: no
 warnings; Khronos validator: 0 errors, 0 warnings on all six files. `cargo review sizes` (kinds `cityBike`,
 `kidsBike`, `eScooter`): within range.
 
