@@ -1,7 +1,7 @@
 //! The playground (CM1): the slide (`model.slide`), the climbing frame (`model.climbingFrame`), the seesaw
 //! (`model.seesaw`), the spring rider (`model.springRider`), the merry-go-round (`model.merryGoRound`), the
 //! basketball hoop (`model.basketballHoop`), the ping-pong table (`model.pingPongTable`) and the park chess
-//! table (`model.parkChessTable`). Notes: tools/art/blender/families/playground.md.
+//! table (`model.parkChessTable`). Notes: NOTES.md.
 //!
 //! Each is built where the game places it (`F`, game axes) and stood on the floor without moving it across
 //! (`settle_with` `centre: false`, `centre` on its `Model`), so the seats stay where the content puts its riders:
@@ -88,5 +88,5 @@ pub fn family() -> Option<Family> {
          draw call per finish group. The seesaw's plank, the spring rider's horse and the merry-go-round's \
          platform go round while played on, carrying their riders (`ride`); the hoop's net swishes after a shot \
          and a pawn moves on the chess table. Each has a far version for the town overview.",
-    ))
+    ).switched())
 }

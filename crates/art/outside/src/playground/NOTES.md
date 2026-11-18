@@ -1,20 +1,20 @@
 # Playground — notes
 
-`playground.py` builds the eight CM1 playground models into `web/public/assets/models/playground/` and their entries
+The playground module (`crates/art/outside/src/playground`) builds the eight CM1 playground models into `web/public/assets/models/playground/` and their entries
 in `packs/playground/manifest.json`: the slide (`model.slide`), the climbing frame (`model.climbingFrame`), the seesaw
 (`model.seesaw`), the spring rider (`model.springRider`), the merry-go-round (`model.merryGoRound`), the basketball
 hoop (`model.basketballHoop`), the ping-pong table (`model.pingPongTable`) and the park chess table
 (`model.parkChessTable`). Built 2026-10-14; they sat in Validate › Playground until checked in play.
 
 Each is built where the game places it (`F`, game axes) and stood on the floor without moving it across
-(`G.settle(centre=False)`, `centre=` on its `Model`), so the seats stay where `community.json` seats the riders. Town
+(`settle_with` with `centre: false`, `centre` on its `Model`), so the seats stay where `community.json` seats the riders. Town
 things, seen from far: every model has a far version (`far=0.25`; the chess table's by hand, below).
 
 ## The moving ones
 
 - **Seesaw** (3 × 1 tiles): a 2.5 m plank on a blue A-frame stand, rubber bumpers under its ends. The content's two
   slots fall at x = ±0.75 m (3 m wide, 2 slots) at 0.56 m: the seats are there, level at rest. The plank, its seats
-  and handles are one part (`plank`) turning about the axle (0.46 m up). `seesaw` rocks it ±12° in 1.4 s (`G.rock`
+  and handles are one part (`plank`) turning about the axle (0.46 m up). `seesaw` rocks it ±12° in 1.4 s (`rock`
   about Blender Y), so the low end just meets its bumper. `motions`: `{'loops': {'seesaw': 'seesaw'}, 'ride':
   'seesaw'}`.
 - **Spring rider**: a red horse on a green coil spring (a swept helix). The saddle's top is the content's seat (0.62 m,
