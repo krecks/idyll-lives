@@ -5,7 +5,7 @@
 
 use crate::json::{Json, float_repr};
 use crate::materials::Finishes;
-use crate::math::{V3, cos, sin};
+use crate::math::{EulerOrder, V3, cos, sin};
 use crate::motion::{self, Path};
 use crate::normals::corner_normals;
 use crate::scene::{self, FPS, Obj};
@@ -111,6 +111,18 @@ fn rounded_normal(n: V3) -> [f32; 3] {
     y_up(V3::new(unit[0], unit[1], unit[2])).map(|x| x + 0.0)
 }
 
+/// A part's turn as the file's quaternion (x, y, z, w), +Y up: its quaternion's, or its Euler angles' in its order.
+fn turn_y_up(rot: V3, order: EulerOrder, quat: Option<crate::math::Quat>) -> [f32; 4] {
+    match (quat, order) {
+        (Some(q), _) => [q.x, q.z, -q.y, q.w],
+        (None, EulerOrder::XYZ) => quat_y_up(rot),
+        (None, order) => {
+            let q = crate::math::eul_to_quat(rot, order);
+            [q.x, q.z, -q.y, q.w]
+        }
+    }
+}
+
 /// A turn (Euler XYZ, radians) as the file's quaternion (x, y, z, w), +Y up.
 fn quat_y_up(rot: V3) -> [f32; 4] {
     let (hx, hy, hz) = (rot.x as f64 / 2.0, rot.y as f64 / 2.0, rot.z as f64 / 2.0);
@@ -150,7 +162,7 @@ pub fn write(objs: &[Obj], texcoords: bool, finishes: &Finishes) -> Vec<u8> {
         }
     }
     for (i, &o) in objs.iter().enumerate() {
-        let (name, mesh, loc, rot, scale, quat) = o.read(|p| {
+        let (name, mesh, loc, rot, scale, quat, order) = o.read(|p| {
             (
                 p.name.clone(),
                 p.mesh.clone(),
@@ -158,6 +170,7 @@ pub fn write(objs: &[Obj], texcoords: bool, finishes: &Finishes) -> Vec<u8> {
                 p.rot,
                 p.scale,
                 p.quat,
+                p.order,
             )
         });
         let normals = corner_normals(&mesh);
@@ -303,10 +316,7 @@ pub fn write(objs: &[Obj], texcoords: bool, finishes: &Finishes) -> Vec<u8> {
         }
         node.push(format!("\"mesh\":{i}"));
         node.push(format!("\"name\":{}", quoted(&name)));
-        let turn = match quat {
-            Some(q) => [q.x, q.z, -q.y, q.w],
-            None => quat_y_up(rot),
-        };
+        let turn = turn_y_up(rot, order, quat);
         if turn != [0.0, 0.0, 0.0, 1.0] {
             node.push(format!("\"rotation\":{}", nums(&turn)));
         }
@@ -335,6 +345,7 @@ pub fn write(objs: &[Obj], texcoords: bool, finishes: &Finishes) -> Vec<u8> {
                 .iter()
                 .map(|&f| ((f - 1) as f64 / FPS) as f32)
                 .collect();
+            let (order, quat) = o.read(|p| (p.order, p.quat));
             let mut paths: Vec<Path> = track.channels.iter().map(|c| c.path).collect();
             paths.sort();
             paths.dedup();
@@ -344,7 +355,7 @@ pub fn write(objs: &[Obj], texcoords: bool, finishes: &Finishes) -> Vec<u8> {
                     let (loc, rot, scale) = motion::pose(o, Some(&track.name), f as f64);
                     match path {
                         Path::Location => values.extend(y_up(loc)),
-                        Path::Rotation => values.extend(quat_y_up(rot)),
+                        Path::Rotation => values.extend(turn_y_up(rot, order, quat)),
                         Path::Scale => values.extend([scale.x, scale.z, scale.y]),
                     }
                 }
