@@ -122,7 +122,8 @@ describe('moving in', async () => {
     // (The player's home is not among the town's households: the game moves them in.)
     expect(vacantSlots(filled).filter((s) => s.index !== home).length).toBe(keepForSale(homes(hamlet)));
     expect(filled.households.slice(0, town.households.length)).toEqual(town.households);
-    expect(filled.households.every((h) => h.household.name !== request.household.name)).toBe(true);
+    // The newcomers take no household's family name as the player's (the first wave was drawn before the player was made).
+    expect(filled.households.slice(town.households.length).every((h) => h.household.name !== request.household.name)).toBe(true);
     expect(JSON.stringify(townOnMoveIn(content, assets, t, request).households)).toBe(JSON.stringify(filled.households));
     // Another people seed: other newcomers.
     const other = townOnMoveIn(content, assets, t, { ...request, peopleSeed: SEED + 1 });
