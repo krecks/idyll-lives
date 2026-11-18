@@ -353,7 +353,8 @@ impl Obj {
     pub fn set_matrix_world(self, m: M4) -> Obj {
         let local = match self.read(|o| o.parent) {
             Some(parent) => {
-                let inverse = parent.matrix_world().inverted().unwrap_or(M4::IDENTITY);
+                let inverse =
+                    crate::math::invert_m4(&parent.matrix_world()).unwrap_or(M4::IDENTITY);
                 mul_m4_m4m4(&inverse, &m)
             }
             None => m,

@@ -121,10 +121,11 @@ impl Mesh {
     }
 
     /// `mesh.transform(matrix)`: every point through it, single precision; the corners' own normals (a bevel's)
-    /// turn with it. (A matrix that moves nothing is not gone through, as in Blender: a zero keeps its sign, which
-    /// a sum with zero would take.)
+    /// turn with it. A matrix within a millionth of the identity at every entry is not gone through, as in Blender
+    /// (`math::transform_points`): the points stay to the bit, which is what a part joined onto one placed, turned
+    /// and scaled as it is itself gets, or a mesh scaled by one and a rounding.
     pub fn transform(&mut self, m: &M4) {
-        if m.is_identity() {
+        if crate::math::skips_transform(m) {
             return;
         }
         for v in &mut self.verts {
