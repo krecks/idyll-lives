@@ -138,7 +138,7 @@ bathes, and drains after.
 
 The bookworm pack models (`models/pack_bookworm/readingNook.glb`, `libraryWall.glb`, `writingBureau.glb`,
 `teaTrolley.glb`, `firesideLounge.glb`, `bedsideStack.glb`, override pack `packs/pack_bookworm/manifest.json`) are
-built in Blender by `tools/art/blender/families/pack_bookworm.py` on `gamekit` and exported as `.glb` (glTF,
+built by `crates/art/packs/src/pack_bookworm` on `artkit` and exported as `.glb` (glTF,
 original, CC0). Each moves one part while it is used: the nook's cushion sinks, the ladder rolls, the bureau's flap
 drops, the teapot pours, the fire grows and the top book opens.
 
@@ -206,7 +206,7 @@ slides out of the desk's hutch, the robot rolls out and back, and the key tray d
 
 The cheerful pack models (`models/pack_cheerful/jukebox.glb`, `karaokeMachine.glb`, `mocktailCart.glb`,
 `rainbowHammock.glb`, `sunriseLamp.glb`, `partyBooth.glb`, override pack `packs/pack_cheerful/manifest.json`) are built
-in Blender by `tools/art/blender/families/pack_cheerful.py` on `gamekit` and exported as `.glb` (glTF, original,
+by `crates/art/packs/src/pack_cheerful` on `artkit` and exported as `.glb` (glTF, original,
 CC0). Each moves one part while it is used: the record swings up, the microphone rises, the shaker tips, the hammock
 sways with its sleeper, the sun rises and the booth's curtain is drawn.
 
@@ -225,13 +225,13 @@ lowers; the bouldering wall is still.
 
 The hot-headed pack models (`models/pack_hotHeaded/heavyBag.glb`, `smashBin.glb`, `thunderDrums.glb`,
 `coolDownCushion.glb`, `grudgeJournal.glb`, `coldPlunge.glb`, override pack `packs/pack_hotHeaded/manifest.json`) are
-built in Blender by `tools/art/blender/families/pack_hotHeaded.py` on `gamekit` and exported as `.glb` (glTF,
+built by `crates/art/packs/src/pack_hot_headed` on `artkit` and exported as `.glb` (glTF,
 original, CC0). Each moves while it is used: the bag swings, the crate's lid flips up, the cymbals rock, the zafu
 sinks, the desk drawer slides out and the plunge cover rolls back.
 
 The kind pack models (`models/pack_kind/neighbourlyOven.glb`, `givingJar.glb`, `knittingRocker.glb`,
 `welcomeTeaTable.glb`, `songbirdFeeder.glb`, `hearthSettee.glb`, override pack `packs/pack_kind/manifest.json`) are
-built in Blender by `tools/art/blender/families/pack_kind.py` on `gamekit` and exported as `.glb` (glTF, original,
+built by `crates/art/packs/src/pack_kind` on `artkit` and exported as `.glb` (glTF, original,
 CC0). Each moves while it is used: the oven door drops with the tea towel over its handle, a coin drops into the jar, the rocker rocks, the teapot pours,
 the feeder's roof lifts and songbirds fly out, and the settee's cushions sink. The tea table was rebuilt lower and
 narrower, its poufs either side of it facing each other (2026-10-21).

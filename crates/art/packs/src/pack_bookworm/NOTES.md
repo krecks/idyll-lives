@@ -1,6 +1,6 @@
 # Bookworm pack — notes
 
-`pack_bookworm.py` builds the six P1 bookworm models into `web/public/assets/models/pack_bookworm/` and their
+`crates/art/packs/src/pack_bookworm` builds the six P1 bookworm models into `web/public/assets/models/pack_bookworm/` and their
 entries in `packs/pack_bookworm/manifest.json`, an override pack listed in the base manifest. Built
 2026-10-14; they sat in Validate › Bookworm until checked in play.
 

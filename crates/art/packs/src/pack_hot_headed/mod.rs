@@ -73,5 +73,5 @@ pub fn family() -> Option<Family> {
          group. Each has its moving part: the bag swings while pounded, the crate's lid flips up, the cymbals rock \
          while the kit is played, the zafu sinks, the desk drawer slides out and the plunge tub's slatted cover \
          rolls back.",
-    ))
+    ).switched())
 }
