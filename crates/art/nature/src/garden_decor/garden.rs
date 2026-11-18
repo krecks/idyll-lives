@@ -2,14 +2,14 @@
 
 use super::M;
 use super::common::{_on_top, _stone, fillet};
-use crate::{dome, star};
 use artkit::forms::rounded_rect;
 use artkit::math::{P3, TAU, cos, degrees, sin};
 use artkit::parts::{join_all, settle};
 use artkit::rand::Random;
 use artkit::scene::Obj;
 use artkit::{
-    boulder, cube, cylinder, jitter, leaf, loft, lump, revolve, ring, sphere, sweep, torus,
+    boulder, cube, cylinder, dome, jitter, leaf, loft, lump, revolve, ring, sphere, star, sweep,
+    torus,
 };
 
 /// A garden gnome: boots with turned-up toes, a belted tunic with a brass buckle and two buttons, hands on his

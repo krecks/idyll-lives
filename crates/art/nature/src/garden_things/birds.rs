@@ -2,7 +2,7 @@
 
 use super::common::{_name, _own, _prism, F, M, Run, moulding};
 use crate::garden_decor::common::fillet;
-use crate::{dome, songbird, star};
+use crate::songbird;
 use artkit::far::{is_low, low};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
@@ -11,7 +11,7 @@ use artkit::motion::{Squash, squash};
 use artkit::parts::{Settle, join, join_all, measure, new_parts, settle_all, settle_with};
 use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsweep, leaf, lump, revolve, sweep, torus};
+use artkit::{dome, fbox, fcyl, fextrude, fsweep, leaf, lump, revolve, star, sweep, torus};
 
 // --- the planter box (1x1): a plank trough on feet, full of leaves and flowers ---------------------------------
 /// The depth it is centred on: the trough 10 cm back (as the old part's), leaves over its front.

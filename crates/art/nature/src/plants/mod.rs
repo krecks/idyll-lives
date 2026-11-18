@@ -7,8 +7,11 @@ use artkit::json;
 
 mod boxes;
 pub mod common;
+mod edibles;
 mod flowers;
+mod grasses;
 mod houseplants;
+mod shrubs;
 
 /// (width, height, depth) as measured; each within 10 % of the old part's bounds (`cargo check-glb` warns
 /// beyond).
@@ -21,6 +24,7 @@ pub fn family() -> Option<Family> {
         let paint = [&[("bed", "Bed")][..], more].concat();
         model.tolerance(TOLERANCE).far_low().paint(&paint)
     };
+    let shrub = |model: Model| model.tolerance(TOLERANCE).far_low();
     Some(Family::new(
         "plants",
         BASE.palette(),
@@ -139,6 +143,115 @@ pub fn family() -> Option<Family> {
                 .tolerance(TOLERANCE)
                 .far_low()
                 .paint(&[("body", "Box")]),
+            // G3: shrubs (they dress every lot)
+            shrub(Model::new("bush", shrubs::bush, (1.043, 0.91, 1.095)).key("model.bush"))
+                .habitat("bush"),
+            shrub(
+                Model::new("bushSmall", shrubs::bush_small, (0.832, 0.707, 0.782))
+                    .key("model.bush.small"),
+            )
+            .habitat("bush"),
+            shrub(
+                Model::new(
+                    "bushFlowering",
+                    shrubs::bush_flowering,
+                    (1.208, 1.016, 1.268),
+                )
+                .key("model.bush.flowering"),
+            )
+            .habitat("bush"),
+            shrub(
+                Model::new("streetHedge", shrubs::street_hedge, (1.547, 1.019, 0.85))
+                    .key("model.hedge"),
+            )
+            .habitat("hedge"),
+            shrub(
+                Model::new("boxwood", shrubs::boxwood, (0.696, 0.752, 0.722))
+                    .key("model.garden.boxwood"),
+            )
+            .habitat("bush")
+            .motions(json!({"uses": {"trim": "trim"}})),
+            shrub(
+                Model::new("topiaryCone", shrubs::topiary_cone, (0.643, 1.805, 0.66))
+                    .key("model.garden.topiaryCone"),
+            )
+            .habitat("bush")
+            .paint(&[("body", "Pot")])
+            .motions(json!({"uses": {"trim": "trim"}})),
+            shrub(
+                Model::new("hedge", shrubs::garden_hedge, (1.546, 1.167, 0.92))
+                    .key("model.garden.hedge"),
+            )
+            .habitat("hedge")
+            .motions(json!({"uses": {"trim": "trim"}})),
+            shrub(
+                Model::new("hydrangea", shrubs::hydrangea, (1.196, 0.957, 1.182))
+                    .key("model.garden.hydrangea"),
+            )
+            .habitat("bush")
+            .paint(&[("blossom", "Flowers")]),
+            shrub(
+                Model::new("rosebush", shrubs::rosebush, (0.771, 0.903, 0.722))
+                    .key("model.garden.rosebush"),
+            )
+            .habitat("bush")
+            .paint(&[("bloom", "Roses")])
+            .motions(json!({"uses": {"prune": "cut"}})),
+            shrub(
+                Model::new("azalea", shrubs::azalea, (1.158, 1.013, 1.152))
+                    .key("model.garden.azalea"),
+            )
+            .habitat("bush")
+            .paint(&[("blossom", "Flowers")])
+            .motions(json!({"uses": {"trim": "trim"}})),
+            shrub(
+                Model::new("lavender", grasses::lavender, (0.607, 0.865, 0.63))
+                    .key("model.garden.lavender"),
+            )
+            .paint(&[("bloom", "Flowers")])
+            .motions(json!({"uses": {"cut": "cut"}})),
+            shrub(
+                Model::new("fern", grasses::garden_fern, (0.793, 0.478, 0.932))
+                    .key("model.garden.fern"),
+            ),
+            shrub(
+                Model::new("grass", grasses::ornamental_grass, (1.218, 1.21, 1.28))
+                    .key("model.garden.grass"),
+            ),
+            shrub(
+                Model::new("hosta", grasses::hosta, (0.621, 0.842, 0.675))
+                    .key("model.garden.hosta"),
+            ),
+            // G4: edibles
+            shrub(
+                Model::new("vegPatch", edibles::veg_patch, (0.92, 0.398, 0.92))
+                    .key("model.garden.vegPatch"),
+            )
+            .paint(&[("body", "Bed")])
+            .motions(json!({"growth": "grow"})),
+            shrub(
+                Model::new("tomatoes", edibles::tomatoes, (0.8, 1.19, 0.8))
+                    .key("model.garden.tomatoes"),
+            )
+            .paint(&[("bed", "Bed")])
+            .motions(json!({"growth": "grow"})),
+            shrub(
+                Model::new("strawberries", edibles::strawberries, (0.88, 0.21, 0.88))
+                    .key("model.garden.strawberries"),
+            )
+            .paint(&[("bed", "Bed")])
+            .motions(json!({"growth": "grow"})),
+            shrub(
+                Model::new("herbs", edibles::herbs, (0.84, 1.01, 0.46)).key("model.garden.herbs"),
+            )
+            .paint(&[("body", "Bed")])
+            .motions(json!({"uses": {"pickHerbs": "harvest"}})),
+            shrub(
+                Model::new("pumpkins", edibles::pumpkins, (1.112, 0.269, 0.947))
+                    .key("model.garden.pumpkins"),
+            )
+            .paint(&[("bed", "Bed")])
+            .motions(json!({"growth": "grow"})),
         ],
         "Blender-built plants (tools/art/blender/families/plants.py): the G1 houseplants, G2 flowers, \
          G3 shrubs and G4 edibles. Listed in the base manifest's packs. Leaves and stems are on the \

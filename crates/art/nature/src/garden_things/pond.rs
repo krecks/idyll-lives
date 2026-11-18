@@ -1,7 +1,6 @@
 //! The garden pond (2x2): a stone-edged pool with lilies and reeds, ripples, and a koi that comes up.
 
 use super::common::{_mesh, _own, F, M, random_of};
-use crate::star;
 use artkit::forms::smooth_outline;
 use artkit::json::float_repr;
 use artkit::materials::Mat;
@@ -11,8 +10,8 @@ use artkit::parts::{hinged, join, new_parts, settle_all};
 use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
 use artkit::{
-    boulder, fcyl, fextrude, fsphere, fsweep, jitter, leaf, loft, revolve, ring, slide, swing,
-    torus,
+    boulder, fcyl, fextrude, fsphere, fsweep, jitter, leaf, loft, revolve, ring, slide, star,
+    swing, torus,
 };
 
 /// The rim stones' ring (game x, depth radii).
