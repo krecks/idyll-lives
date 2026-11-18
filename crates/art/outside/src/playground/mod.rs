@@ -15,9 +15,6 @@
 //!   basketballHoop the net sways and stretches after each shot (`swish`, 1.4 s into the use, then every 3.2 s)
 //!   parkChessTable a white pawn slides one square on (`move`)
 //!
-//! Being ported: the far versions decimated in Blender (all but the chess table's) wait for the kernel's decimator;
-//! `cargo art playground` builds the family in Blender until tools/art/blender/families/playground.py goes (`--out`
-//! and `--check` build what is here).
 
 use artkit::family::{Family, Model};
 use artkit::json::{Json, loads};
@@ -41,28 +38,34 @@ pub fn family() -> Option<Family> {
         vec![
             Model::new("slide", frames::slide, (0.75, 2.805, 1.934))
                 .key("model.slide")
+                .far_ratio(0.25)
                 .centre(0.0, 0.0024)
                 .paint(&[("body", "Frame"), ("chute", "Slide"), ("roof", "Roof")]),
             // its own size: the flag on the ridge is drawn with it, not measured (the frame is 2.81 m tall)
             Model::new("climbingFrame", frames::climbing_frame, (1.814, 2.808, 1.99))
                 .key("model.climbingFrame")
+                .far_ratio(0.25)
                 .centre(0.0, 0.015)
                 .paint(&[("timber", "Frame"), ("shingle", "Roof"), ("rope", "Net")]),
             Model::new("seesaw", rides::seesaw, (2.5, 0.846, 0.42))
                 .key("model.seesaw")
+                .far_ratio(0.25)
                 .motions(motions(r#"{"loops": {"seesaw": "seesaw"}, "ride": "seesaw"}"#))
                 .paint(&[("body", "Frame"), ("seat", "Seats"), ("plank", "Plank")]),
             Model::new("springRider", rides::spring_rider, (0.4, 0.949, 0.957))
                 .key("model.springRider")
+                .far_ratio(0.25)
                 .centre(0.0, 0.0387)
                 .motions(motions(r#"{"loops": {"ride": "rock"}, "ride": "rock"}"#))
                 .paint(&[("horse", "Horse"), ("saddle", "Saddle"), ("spring", "Spring")]),
             Model::new("merryGoRound", rides::merry_go_round, (1.96, 1.04, 1.96))
                 .key("model.merryGoRound")
+                .far_ratio(0.25)
                 .motions(motions(r#"{"loops": {"spin": "spin"}, "ride": "spin"}"#))
                 .paint(&[("platform", "Platform"), ("rail", "Rails"), ("deck", "Stripes")]),
             Model::new("basketballHoop", courts::basketball_hoop, (1.2, 3.7, 0.972))
                 .key("model.basketballHoop")
+                .far_ratio(0.25)
                 .centre(0.0, 0.016)
                 // The net swishes after each shot: the first 1.4 s into the use, then every 3.2 s while it lasts.
                 .motions(motions(
@@ -71,6 +74,7 @@ pub fn family() -> Option<Family> {
                 .paint(&[("post", "Frame"), ("board", "Backboard"), ("rim", "Hoop")]),
             Model::new("pingPongTable", courts::ping_pong_table, (2.74, 0.925, 1.86))
                 .key("model.pingPongTable")
+                .far_ratio(0.25)
                 .paint(&[("table_top", "Table"), ("concrete", "Legs")]),
             Model::new("parkChessTable", courts::park_chess_table, (1.44, 0.855, 0.7))
                 .key("model.parkChessTable")
