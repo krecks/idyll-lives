@@ -1,14 +1,15 @@
 # Civic — notes
 
-`civic.py` builds the fittings of the town's named places (`content/civic.json`) into `web/public/assets/models/civic/`
-and their entries in `packs/civic/manifest.json`. Built 2026-11-17 in place of the stand-ins the content pointed at
-until then. None of them has a moving part: no use of theirs opens anything.
+This module builds the fittings of the town's named places (`content/civic.json`) into `web/public/assets/models/civic/`
+and their entries in `packs/civic/manifest.json`. Built 2026-11-17 (in Blender, by `civic.py`) in place of the
+stand-ins the content pointed at until then; ported to Rust 2026-11-18. None of them has a moving part: no use of
+theirs opens anything.
 
 Each is built where the game places it (`F`, game axes). The desks and counters with `staff` face the customer at the
 front (+z); whoever serves stands 0.85 m behind their middle (content `staff.at`), so the monitors, drawers, tills and
 the bar's shelves face the back. The lockers, the cash machine, the wall bars and the vault door stand with their backs
-on the wall face (-0.43). The family checks the pew's and the waiting bench's seat (0.45 m, forward 0, three slots)
-against `content/civic.json` before it builds.
+on the wall face (-0.43). A test (`content_facts`) holds the pew's and the waiting bench's seat (0.45 m, forward 0,
+three slots) to `content/civic.json`.
 
 ## The desks and counters (2 × 1)
 
@@ -97,7 +98,15 @@ no warnings.
 ```
 cargo art civic            # the .glb (and the plant table's .far.glb), the pack, check-glb
 cargo art civic --preview  # previews/civic/<id>.png
+cargo art civic --check    # the committed bytes, nothing written
 ```
 
-The Workbench previews draw glass opaque; `bun tools/bench/check.mjs gallery --keys model.<id> --each --scale adult`
-shows them as the game does.
+`bun tools/bench/check.mjs gallery --keys model.<id> --each --scale adult` shows the glass as the game does.
+
+## The port (2026-11-18)
+
+Against the last Blender build (`cargo check-glb --against ref/blender-civic --family civic`): 4 same (examCouch,
+lockerRow, waitingBench, the pack), 16 near, every one at 0.000 mm of surface, at most 0.30 % of texture and 0.00
+greys of shading off (a bevel's band of UVs, a normal's last digits). The plant table's far version is the kernel's
+decimation, not Blender's (which a second Blender build does not repeat): 1,934 triangles to Blender's 1,891, 1.2 mm
+from it on average and 22 mm at most, held to the decimated far versions' rule (`tools/art/port-accepted.json`).
