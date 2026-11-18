@@ -94,7 +94,7 @@ broadleaf's leaf masses are now cut-out cards over dark cores (`artkit::botany` 
   Leaves are a little over life size where a pixel of the play camera would lose their shape (the oak's 14 to 17 cm).
   Pale, as the tiling foliage is: a card's colour tints it, and every cluster's covered texels have one mean
   luminance, so `CARD_TONE` holds for every species (measured in the gallery from 110 m with no lawn, cards against
-  the far version's lumps: each tree's ratio within 4 % of what it was on the first atlas). A species says which
+  the far version's lumps: each tree's ratio within 6 % of what it was on the first atlas). A species says which
   tiles are its own (`Tiles::of`); a card still draws one of three from the same random number, so cards lie where
   they lay.
 - **A build** makes its masses as ever (`leaves`: the same lumps from the same random numbers) and keeps them out of
