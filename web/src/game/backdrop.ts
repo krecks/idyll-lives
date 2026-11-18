@@ -447,6 +447,8 @@ export type Zone = keyof typeof KINDS;
 export interface Civic {
   label: string;
   kind: Kind;
+  /** How it looks from outside in a place of a size where it differs from `kind` (a hamlet's or a village's hall is a low hall, not a town hall). */
+  kinds?: Partial<Record<TownSize, Kind>>;
   place: TownPlace['kind'];
   name: (n: Namer) => string;
   work: string[];
@@ -466,7 +468,7 @@ const every = (id: string): Record<TownSize, string> => ({ hamlet: id, village: 
 /** The civic places, in the order a main town lays them (an index into this is a civic place's in step 2's choices: `civicChoices`). */
 export const CIVIC: readonly Civic[] = [
   // (A hamlet's hall is its parish's, a village's its own: the careers no other place takes work there.)
-  { label: 'Town hall', kind: K('office', [16, 20], [12, 14], [3, 3], ['hip', 'mansard']), place: 'office', name: (n) => `${n.town} ${{ hamlet: 'Parish Hall', village: 'Village Hall', town: 'Town Hall', city: 'Town Hall' }[n.size]}`, work: ['politics'], least: 'hamlet', templates: { hamlet: 'parishHall', village: 'parishHall', town: 'townHall', city: 'townHall' }, labels: { hamlet: 'Parish hall', village: 'Village hall' }, known: / (Parish|Village|Town) Hall$/ },
+  { label: 'Town hall', kind: K('office', [16, 20], [12, 14], [3, 3], ['hip', 'mansard']), place: 'office', name: (n) => `${n.town} ${{ hamlet: 'Parish Hall', village: 'Village Hall', town: 'Town Hall', city: 'Town Hall' }[n.size]}`, work: ['politics'], least: 'hamlet', templates: { hamlet: 'parishHall', village: 'parishHall', town: 'townHall', city: 'townHall' }, kinds: { hamlet: K('hall', [12, 12], [10, 10], [1, 1], ['gable']), village: K('hall', [12, 12], [10, 10], [1, 1], ['gable']) }, labels: { hamlet: 'Parish hall', village: 'Village hall' }, known: / (Parish|Village|Town) Hall$/ },
   { label: 'Church', kind: K('church', [11, 13], [22, 28], [3, 3], ['gable']), place: 'church', name: (n) => `St ${pick(n.rand, SAINTS)}'s Church`, work: [], least: 'hamlet', templates: every('church'), endOn: true, known: /^St .+'s Church$/ },
   { label: 'School', kind: K('school', [28, 36], [14, 18], [2, 2], ['hip', 'flat']), place: 'school', name: (n) => `${n.town} School`, work: ['education'], least: 'village', templates: every('school'), known: / School$/ },
   { label: 'Police station', kind: K('office', [12, 16], [11, 13], [2, 3], ['flat', 'hip']), place: 'office', name: (n) => `${n.town} Police Station`, work: ['detective'], least: 'town', templates: every('police'), known: / Police Station$/ },

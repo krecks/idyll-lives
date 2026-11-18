@@ -75,7 +75,7 @@ export function placeUnit(t: Templates, what: Civic | ZoneKind, size: TownSize, 
   const p = t.parks.find((q) => q.id === template);
   if (!p || p.kind !== 'place') throw new Error(`no place layout "${template}"`);
   const frame = p.lot ?? t.plot;
-  const kind = typeof what === 'string' ? ZONE[what].kind : what.kind;
+  const kind = typeof what === 'string' ? ZONE[what].kind : (what.kinds?.[size] ?? what.kind);
   return { kind: 'shop', template, name: p.name, lot: 'medium', w: frame.width, d: frame.depth, dress: dressOf(kind, rand) };
 }
 
