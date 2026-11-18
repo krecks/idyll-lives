@@ -83,7 +83,7 @@ function sitLowPose(fit: LowFit): (p: number) => PoseSpec {
 // --- kneeling at the train table ----------------------------------------------------------------
 
 /**
- * The train table (`kids.py`): its top 0.44 m up (the track 0.012 m on it), its front edge 0.42 m out from the
+ * The train table (crates/art/things/src/kids): its top 0.44 m up (the track 0.012 m on it), its front edge 0.42 m out from the
  * middle. Kneeling, the knees `KNEE` m short of the edge; the knee joint is 0.123 m ahead of the feet's place
  * (the kneel's, reference skeleton), so `to` puts them there for each size. The track's ring runs round its
  * right half, 0.3 m out at its front (a lane there), the little town on the left half (the other lane).

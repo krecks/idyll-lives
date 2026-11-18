@@ -3,10 +3,9 @@
 use super::M;
 use super::common::{frets, guitar_stand, lean, off_stand, strings, upright};
 use super::guitars::{dots, neck};
-use super::kit::call::{moulding, tube};
-use super::kit::{fillet, knob};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr as r;
+use artkit::kit::{self, fillet};
 use artkit::math::P3;
 use artkit::parts::{Settle, join, new_parts, settle_with};
 use artkit::place::GameFrame;
@@ -121,7 +120,7 @@ fn electric(fr: &GameFrame) -> Obj {
                 M.chrome
             );
         }
-        tube!(
+        kit::tube!(
             fr,
             "trem_arm",
             &fillet(
@@ -142,7 +141,16 @@ fn electric(fr: &GameFrame) -> Obj {
             .into_iter()
             .enumerate()
         {
-            knob(fr, &format!("knob{k}"), x, y, 0.0235, 0.009, M.black, 8);
+            kit::knob!(
+                fr,
+                format!("knob{k}"),
+                x,
+                y,
+                0.0235,
+                0.009,
+                M.black,
+                segments = 8
+            );
         }
         fbox!(
             fr,
@@ -153,7 +161,7 @@ fn electric(fr: &GameFrame) -> Obj {
             (0.11, 0.19, 0.0252),
             M.black
         );
-        tube!(
+        kit::tube!(
             fr,
             "switch",
             &[(0.11, 0.19, 0.025), (0.11, 0.19, 0.036)],
@@ -334,7 +342,7 @@ pub fn guitar_electric() -> Vec<Obj> {
             .iter()
             .map(|&(x, y)| (x, y + 0.165))
             .collect();
-        moulding!(
+        kit::moulding!(
             f,
             "amp_piping",
             &piping,
@@ -388,7 +396,7 @@ pub fn guitar_electric() -> Vec<Obj> {
             bevel = 0.002,
             bevel_segments = 1
         );
-        tube!(
+        kit::tube!(
             f,
             "amp_handle",
             &fillet(

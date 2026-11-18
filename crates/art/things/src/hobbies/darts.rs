@@ -3,8 +3,8 @@
 
 use super::M;
 use super::common::link;
+use artkit::kit;
 
-use super::kit::call::{moulding, tube};
 use artkit::math::{Axis, P3, V3, cosd, sind};
 use artkit::motion::{Grow, grow};
 use artkit::parts::{Settle, join, new_parts, settle_with};
@@ -77,7 +77,7 @@ pub fn dartboard() -> Vec<Obj> {
             (-0.31, BOARD_C - 0.31),
             (0.31, BOARD_C - 0.31),
         ];
-        moulding!(
+        kit::moulding!(
             f,
             "frame",
             &frame,
@@ -187,7 +187,7 @@ pub fn dartboard() -> Vec<Obj> {
         .into_iter()
         .enumerate()
         {
-            tube!(
+            kit::tube!(
                 f,
                 format!("point{k}"),
                 &[(x, by, FACE_Z), (x, by, FACE_Z + 0.02)],
@@ -212,7 +212,7 @@ pub fn dartboard() -> Vec<Obj> {
                 segments = 8,
                 rot = (90, 0, 0)
             );
-            tube!(
+            kit::tube!(
                 f,
                 format!("shaft{k}"),
                 &[(x, by, FACE_Z + 0.065), (x, by, FACE_Z + 0.1)],

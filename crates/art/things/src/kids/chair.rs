@@ -1,10 +1,10 @@
 //! KD1: the high chair.
 
 use super::common::{P, place, still, turned};
-use super::kit::fillet;
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
+use artkit::kit::fillet;
 use artkit::parts::{join, new_parts};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};

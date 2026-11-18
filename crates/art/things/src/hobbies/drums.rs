@@ -2,7 +2,7 @@
 
 use super::M;
 use super::common::{P, rr, to_euler_degrees};
-use super::kit::call::tube;
+use artkit::kit;
 use artkit::math::{Axis, M4, TAU, V3, cos, cosd, radians, sin, sind};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
@@ -106,7 +106,7 @@ pub fn drum(
 /// rubber feet.
 pub fn drum_stand(fr: &GameFrame, name: &str, x: f64, z: f64, top: f64, spread: f64) {
     let mid = 0.26 + (top - 0.26) * 0.55;
-    tube!(
+    kit::tube!(
         fr,
         format!("{name}_pole"),
         &[(x, 0.14, z), (x, mid, z)],
@@ -115,7 +115,7 @@ pub fn drum_stand(fr: &GameFrame, name: &str, x: f64, z: f64, top: f64, spread: 
         verts = 8,
         round = 1
     );
-    tube!(
+    kit::tube!(
         fr,
         format!("{name}_upper"),
         &[(x, mid, z), (x, top, z)],
@@ -155,7 +155,7 @@ pub fn drum_stand(fr: &GameFrame, name: &str, x: f64, z: f64, top: f64, spread: 
         let a = (90 + 120 * k) as f64;
         let (c, s) = (cosd(a), sind(a));
         let (fx, fz) = (x + spread * c, z + spread * s);
-        tube!(
+        kit::tube!(
             fr,
             format!("{name}_leg{k}"),
             &[(x, 0.26, z), (fx, 0.01, fz)],
@@ -164,7 +164,7 @@ pub fn drum_stand(fr: &GameFrame, name: &str, x: f64, z: f64, top: f64, spread: 
             verts = 6,
             round = 1
         );
-        tube!(
+        kit::tube!(
             fr,
             format!("{name}_brace{k}"),
             &[
@@ -225,7 +225,7 @@ pub fn pedal(fr: &GameFrame, name: &str, x: f64, z: f64, length: f64) {
     );
     for s in [-1, 1] {
         let sf = s as f64;
-        tube!(
+        kit::tube!(
             fr,
             format!("{name}_post{s}"),
             &[(x + sf * 0.05, 0.01, z1), (x + sf * 0.05, 0.13, z1)],
@@ -235,7 +235,7 @@ pub fn pedal(fr: &GameFrame, name: &str, x: f64, z: f64, length: f64) {
             round = 1
         );
     }
-    tube!(
+    kit::tube!(
         fr,
         format!("{name}_axle"),
         &[(x - 0.05, 0.12, z1), (x + 0.05, 0.12, z1)],
@@ -254,7 +254,7 @@ pub fn pedal(fr: &GameFrame, name: &str, x: f64, z: f64, length: f64) {
         rot = (0, 90, 0),
         verts = 10
     );
-    tube!(
+    kit::tube!(
         fr,
         format!("{name}_chain"),
         &[(x, 0.05, z1 - 0.03), (x, 0.11, z1 - 0.012)],

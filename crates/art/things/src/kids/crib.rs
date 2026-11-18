@@ -1,10 +1,10 @@
 //! KD1: the crib with its changing table.
 
 use super::common::{heart, mattress, moon, place, star, still, turned};
-use super::kit::{fillet, knob, shaker};
 use super::{F, M};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
+use artkit::kit::{self, fillet};
 use artkit::materials::Mat;
 use artkit::math::{Axis, PI, cos, radians, sin};
 use artkit::motion::{Spin, spin};
@@ -170,20 +170,27 @@ fn changing_table() {
         bevel_segments = 2
     );
     for (i, y) in [0.165, 0.4, 0.635].into_iter().enumerate() {
-        shaker(
-            &F,
-            &format!("drawer{i}"),
+        kit::shaker!(
+            F,
+            format!("drawer{i}"),
             w - 0.08,
             0.215,
             (x, y, z + 0.259),
             0.018,
             M.crib_wood,
-            0.035,
-            None,
-            0.004,
-            false,
+            rail = 0.035,
+            recess = 0.004
         );
-        knob(&F, &format!("knob{i}"), x, y, z + 0.268, 0.014, M.crib, 8);
+        kit::knob!(
+            F,
+            format!("knob{i}"),
+            x,
+            y,
+            z + 0.268,
+            0.014,
+            M.crib,
+            segments = 8
+        );
     }
     fbox!(
         F,

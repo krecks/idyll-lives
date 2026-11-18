@@ -1,9 +1,8 @@
 //! What the hobbies are built from: the helpers hobbies.py shared between its models.
 
 use super::M;
-use super::kit::call::tube;
-use super::kit::fillet;
 use artkit::forms::rounded_rect;
+use artkit::kit::{self, fillet};
 use artkit::materials::Mat;
 use artkit::math::{Axis, M4, P3, V3, cos, cosd, degrees, pow, radians, sin, sind};
 use artkit::mesh::{Mesh, normal_newell};
@@ -290,7 +289,7 @@ pub fn stool(fr: &GameFrame, z: f64, top: f64, r: f64, legs: Mat, seat: Mat, x: 
     );
     for k in 0..4 {
         let a = (45 + 90 * k) as f64;
-        tube!(
+        kit::tube!(
             fr,
             format!("stool_leg{k}"),
             &[
@@ -369,7 +368,7 @@ pub fn guitar_stand(
 ) {
     let t = (cradle_y - 0.03) / (top_y - 0.03);
     let cz = base_z + t * (top_z - base_z);
-    tube!(
+    kit::tube!(
         fr,
         "post",
         &[(0, 0.03, base_z), (0, top_y, top_z)],
@@ -392,7 +391,7 @@ pub fn guitar_stand(
         bevel = 0.004,
         bevel_segments = 1
     );
-    tube!(
+    kit::tube!(
         fr,
         "collar_knob",
         &[(0.0, cy, cz2), (0.035, cy, cz2)],
@@ -424,7 +423,7 @@ pub fn guitar_stand(
     );
     for s in [-1, 1] {
         let sf = s as f64;
-        tube!(
+        kit::tube!(
             fr,
             format!("leg{s}"),
             &fillet(
@@ -453,7 +452,7 @@ pub fn guitar_stand(
             bevel_segments = 1
         );
     }
-    tube!(
+    kit::tube!(
         fr,
         "foot_front",
         &[(0, 0.022, base_z), (0, 0.012, base_z + front)],
@@ -480,7 +479,7 @@ pub fn guitar_stand(
         (0.1, cradle_y, cz),
         (0.1, cradle_y + 0.03, cz + reach),
     ];
-    tube!(
+    kit::tube!(
         fr,
         "cradle",
         &fillet(&arm, 0.025, 3),
@@ -491,7 +490,7 @@ pub fn guitar_stand(
     );
     for s in [-1, 1] {
         let sf = s as f64;
-        tube!(
+        kit::tube!(
             fr,
             format!("arm{s}"),
             &[
@@ -511,7 +510,7 @@ pub fn guitar_stand(
         (0.03, top_y, top_z),
         (0.03, top_y + 0.045, top_z + 0.01),
     ];
-    tube!(
+    kit::tube!(
         fr,
         "yoke",
         &fillet(&yoke, 0.014, 3),

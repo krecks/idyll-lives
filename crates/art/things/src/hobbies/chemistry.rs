@@ -3,10 +3,9 @@
 
 use super::M;
 use super::common::rr;
-use super::kit::Run;
-use super::kit::call::{moulding, tube};
 use artkit::forms::smooth_outline;
 use artkit::json::float_repr as r;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, TAU, cos, cosd, sin, sind};
 use artkit::motion::{Grow, grow};
@@ -68,7 +67,7 @@ pub fn chemistry_set() -> Vec<Obj> {
             M.chem_bench,
             bevel = 0.008
         );
-        moulding!(
+        kit::moulding!(
             f,
             "lip",
             &[(0.46, 0.1), (-0.46, 0.1), (-0.46, -0.4), (0.46, -0.4)],
@@ -81,7 +80,7 @@ pub fn chemistry_set() -> Vec<Obj> {
             ],
             M.chem_bench,
             at = BENCH_TOP,
-            plane = Run::Top
+            plane = Facing::Top
         );
         let frame = rr(0.04, 0.04, 0.006, 1);
         for sx in [-1, 1] {
@@ -331,7 +330,7 @@ pub fn chemistry_set() -> Vec<Obj> {
             bevel = 0.003,
             bevel_segments = 1
         );
-        tube!(
+        kit::tube!(
             f,
             "stand_rod",
             &[(-0.4, BENCH_TOP, -0.31), (-0.4, BENCH_TOP + 0.32, -0.31)],
@@ -351,7 +350,7 @@ pub fn chemistry_set() -> Vec<Obj> {
             bevel = 0.003,
             bevel_segments = 1
         );
-        tube!(
+        kit::tube!(
             f,
             "stand_arm",
             &[

@@ -8,9 +8,8 @@
 
 use super::M;
 use super::common::rr;
-use super::kit::call::tube;
-use super::kit::shaker;
 use artkit::json::float_repr as r;
+use artkit::kit::{self};
 use artkit::math::{Axis, P3, cos, radians, sin};
 use artkit::motion::{Rock, rock};
 use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
@@ -77,7 +76,7 @@ fn rod_men(fr: &GameFrame, name: &str, x: f64, front: bool, men: &[f64]) {
     ];
     if front {
         // the handle to the front, the bar's back end on the back wall's outside
-        tube!(
+        kit::tube!(
             fr,
             format!("{name}_bar"),
             &[(x, ROD_Y, -0.375), (x, ROD_Y, 0.415)],
@@ -96,7 +95,7 @@ fn rod_men(fr: &GameFrame, name: &str, x: f64, front: bool, men: &[f64]) {
         );
     } else {
         // the handle to the back, short, inside the wall's face
-        tube!(
+        kit::tube!(
             fr,
             format!("{name}_bar"),
             &[(x, ROD_Y, -0.378), (x, ROD_Y, 0.375)],
@@ -182,18 +181,16 @@ pub fn foosball() -> Vec<Obj> {
                 bevel = 0.01
             );
             // a framed panel on each long side, bearings where the rods come through
-            shaker(
-                &f,
-                &format!("side_panel{s}"),
+            kit::shaker!(
+                f,
+                format!("side_panel{s}"),
                 1.24,
                 0.19,
                 (0, 0.795, sf * 0.365),
                 0.012,
                 M.foos,
-                0.035,
-                Some(M.foos_trim),
-                0.005,
-                false,
+                rail = 0.035,
+                panel = M.foos_trim
             );
             for &x in &rods_x {
                 fcyl!(
@@ -299,7 +296,7 @@ pub fn foosball() -> Vec<Obj> {
                 M.foos_trim
             );
             // a score rail of sliding beads at each end
-            tube!(
+            kit::tube!(
                 f,
                 format!("score{s}"),
                 &[(sf * 0.62, 0.935, -0.12), (sf * 0.62, 0.935, 0.12)],

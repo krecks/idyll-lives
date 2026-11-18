@@ -6,10 +6,9 @@
 
 use super::M;
 use super::common::{P, flat_quads, sheet_music, turn_round};
-use super::kit::call::tube;
-use super::kit::fillet;
 use artkit::forms::smooth_outline;
 use artkit::json::float_repr as r;
+use artkit::kit::{self, fillet};
 use artkit::math::{PI, cos, sin};
 use artkit::parts::{Settle, join_all, settle_with};
 use artkit::place::{Facing, GameFrame};
@@ -345,7 +344,7 @@ pub fn keyboard_digital() -> Vec<Obj> {
         bevel = 0.02,
         bevel_segments = 2
     );
-    tube!(
+    kit::tube!(
         f,
         "pedal_rod",
         &[(0, 0.11, 0.38), (0, KB_TOP - 0.07, 0.38)],
@@ -372,7 +371,7 @@ pub fn keyboard_digital() -> Vec<Obj> {
         );
     }
     // headphones hung on a hook under the keybed, at the player's left
-    tube!(
+    kit::tube!(
         f,
         "hook",
         &fillet(
@@ -398,7 +397,7 @@ pub fn keyboard_digital() -> Vec<Obj> {
             )
         })
         .collect();
-    tube!(f, "headband", &band, 0.008, M.ebony, verts = 6, round = 1);
+    kit::tube!(f, "headband", &band, 0.008, M.ebony, verts = 6, round = 1);
     for s in [-1, 1] {
         fcyl!(
             f,
@@ -441,7 +440,7 @@ pub fn keyboard_digital() -> Vec<Obj> {
     );
     for x in [-0.28, 0.28] {
         for (z0, z1) in [(-0.32, -0.08), (-0.08, -0.32)] {
-            tube!(
+            kit::tube!(
                 f,
                 format!("bench_leg{}{}", r(x), r(z0)),
                 &[(x, 0.016, z0), (x, 0.41, z1)],
@@ -474,7 +473,7 @@ pub fn keyboard_digital() -> Vec<Obj> {
             );
         }
     }
-    tube!(
+    kit::tube!(
         f,
         "bench_bar",
         &[(-0.28, 0.213, -0.2), (0.28, 0.213, -0.2)],

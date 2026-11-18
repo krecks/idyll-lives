@@ -2,10 +2,10 @@
 
 use super::M;
 use super::common::{link, rr, up_quad};
-use super::kit::call::tube;
 use super::workbench::BOARD_Z;
 use artkit::forms::smooth_outline;
 use artkit::json::float_repr as r;
+use artkit::kit;
 use artkit::math::{V3, cos, radians, sin};
 use artkit::place::{Facing, GameFrame};
 use artkit::{fbox, fcyl, fextrude, fsweep, revolve, torus};
@@ -198,7 +198,7 @@ pub fn tool_board(fr: &GameFrame) {
             segments = 8,
             rot = (180, 0, 0)
         );
-        tube!(
+        kit::tube!(
             fr,
             format!("driver_shaft{k}"),
             &[(x, 1.32, z + 0.016), (x, 1.2, z + 0.016)],
@@ -260,7 +260,7 @@ pub fn tool_board(fr: &GameFrame) {
     // pliers: two crossed handles, red-sleeved, from the jaws
     for s in [-1, 1] {
         let sf = s as f64;
-        tube!(
+        kit::tube!(
             fr,
             format!("plier{s}"),
             &[
@@ -273,7 +273,7 @@ pub fn tool_board(fr: &GameFrame) {
             verts = 6,
             round = 2
         );
-        tube!(
+        kit::tube!(
             fr,
             format!("plier_grip{s}"),
             &[
