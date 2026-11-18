@@ -1,6 +1,6 @@
 # Dining — notes
 
-`dining.py` builds the kitchen's **K7 dining tables**, **K8 chairs and stools** and **K9 dining storage** into
+This module builds the kitchen's **K7 dining tables**, **K8 chairs and stools** and **K9 dining storage** into
 `web/public/assets/models/dining/` and their entries in `packs/dining/manifest.json` (listed in the base
 manifest's `packs`, and the only manifest that defines these keys).
 
@@ -30,11 +30,11 @@ K9 (2026-10-14): catalog2's `sideboard`, `buffet`, `chinaCabinet` and `barCart`.
 - **The sets for two** (`diningTable`, `diningGlass`, `diningOak`; G-39, 2026-10-21) seat their two across the top,
   facing each other: a chair at each end (`SET_X` ±0.62, `SET_Z` 0.1, the content's `places` `[±0.62, 0.1]` facing
   ±90), the top 0.84 × 0.75 (the dining table) or 0.9 × 0.8 m (glass, farmhouse) centred at depth 0.1, a place
-  setting before each. A chair is built facing the front and turned a quarter (`_end_chair`). The glass set's sleds
+  setting before each. A chair is built facing the front and turned a quarter (`end_chair`). The glass set's sleds
   run along its sides, leaving the ends open for the knees. The chairs are part of the table (as the old parts drew
   them): residents sit on them.
 - **Storage** stands where the game places it against the wall (`centre=` the old part's middle, then
-  `G.settle()`), so the sideboard's and buffet's tops (0.8, 0.9) are where the content's `surface` is.
+  `settle`), so the sideboard's and buffet's tops (0.8, 0.9) are where the content's `surface` is.
 
 ## Materials
 
@@ -60,29 +60,28 @@ it costs no draw call. The bar cart's trays, bottles and wine glasses are `glass
   swings open 100° in 0.9 s while they are (`door_open`, `fetch`, `hold` 1.5 s): the sideboard's second, the
   buffet's wide middle one, the china cabinet's left glazed one. One door each, as each opening door costs draws of
   its own (the sideboard's walnut and fluting two). Behind the sideboard's and buffet's is a real cupboard
-  (`_cabinet(hollow=…)`) with a shelf and stacks of plates and bowls (`_crockery`); the china cabinet's opens onto
+  (`cabinet` with a `hollow`) with a shelf and stacks of plates and bowls (`crockery`); the china cabinet's opens onto
   its plates. The other doors are still (no draw call of their own). The china cabinet's base doors and the
   buffet's drawers are in the body.
 
 ## Detail pass (2026-10-22)
 
-Every model rebuilt with the forms (`gamekit/forms.py`) for more detail, keeping its key, size, centre, parts,
-clips, `motions`, `paint` and draw calls, its tops and seats at their heights. The family's own `_tube` (and the
-rods joined by spheres, the tori bent into loops) is gone: bent rails and bentwood are `G.kit.tube` through
-`_fillet`'s corners (`_rail`), closed loops (foot rings, sleds, hoops, galleries) a closed `F.sweep` (`_loop`).
-The family's helpers:
+Every model rebuilt with the forms for more detail, keeping its key, size, centre, parts, clips, `motions`, `paint` and
+draw calls, its tops and seats at their heights. Bent rails and bentwood are `tube` through `fillet`'s corners
+(`rail`), closed loops (foot rings, sleds, hoops, galleries) a closed sweep (`ring_loop`). The family's helpers
+(common.rs):
 
-- `_slab`, `_round_slab`: a top or seat board lofted round with a moulded edge (a rounded nose over a chamfer);
+- `slab`, `round_slab`: a top or seat board lofted round with a moulded edge (a rounded nose over a chamfer);
   planked tops are several, meeting in rounded joints (5 on the banquet table and the farmhouse set, 3 on the
   farmhouse table and the bench), never one on the middle line the gate probes for the surface or seat.
-- `_turned`: a revolve with crisp edges (legs, finials, columns, feet, plates, cups, vases, bottles, knobs).
-- `_sq_leg`: a square leg tapering, its corners rounded, a small chamfer at the floor, splayed (`at_top`).
-- `_apron`: an apron rail arched between the legs (`F.extrude`). `_crest`: a back rail bowed round the sitter.
-  `_stretcher`: a turned stretcher swelling in the middle.
-- `_surface`: a curved panel through a grid of points, thickened (Solidify, applied): the moulded chair's shell in
+- `turned`: a revolve with crisp edges (legs, finials, columns, feet, plates, cups, vases, bottles, knobs).
+- `sq_leg`: a square leg tapering, its corners rounded, a small chamfer at the floor, splayed (`at_top`).
+- `apron`: an apron rail arched between the legs (an extrude). `crest`: a back rail bowed round the sitter.
+  `stretcher`: a turned stretcher swelling in the middle.
+- `surface`: a curved panel through a grid of points, thickened (`solidify!`): the moulded chair's shell in
   one piece, the Windsor's carved saddle seat.
-- `_finish` cuts the feet flat on the floor: a leg swept up from the floor at a slant dips a few mm below it,
-  and `G.settle` would otherwise lift the whole model (the shipped stools, Windsor, bentwood and folding chairs were
+- `finish` cuts the feet flat on the floor: a leg swept up from the floor at a slant dips a few mm below it,
+  and settling would otherwise lift the whole model (the shipped stools, Windsor, bentwood and folding chairs were
   2-4 mm high from their slanted rods; now every seat top is where the code puts it).
 
 ## K7 — dining tables
@@ -140,13 +139,20 @@ and WebGL2: the stools' swivel, the doors, the shaker) on 2026-10-22.
 
 ```
 cargo art dining            # the .glbs, the pack, check-glb
-cargo art dining --preview --lit  # previews/dining/<id>.png, <id>.lit.png, <id>@<clip>.png
+cargo art dining --check    # rebuilt in memory, compared byte for byte with what is committed
+cargo art dining --preview  # previews/dining/<id>.png, <id>@<clip>.png
 ```
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 8 models changed shape: `barCart`, `chairArm`, `chairFolding`, `chairUpholstered`, `diningChair`, `diningGlass`, `diningOak`, `diningTable`; 38,334 to 37,838 triangles.
+No change to the models' code: their soft boxes take the shared form's new shape ( rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 8 models changed shape: `barCart`, `chairArm`, `chairFolding`, `chairUpholstered`, `diningChair`, `diningGlass`, `diningOak`, `diningTable`; 38,334 to 37,838 triangles.
 
 ## Leather (2026-11-13)
 
-The high bar stool's seat and back (`leather`) are leather. It goes from 2 draws to 3. The finish is `leather` (`material.finish.leather`: the generated set `textures/leather`, `cargo tex synth leather`: soft creases a hand's width apart, the hide's waviness, patches polished where it is sat on, roughness 0.35 to 0.5; its colour all but even, 97 % of the part's), where it was plain `satin`: a textured finish, so the part has UVs (`gamekit/uv.py` makes them) and a draw call of its own.
+The high bar stool's seat and back (`leather`) are leather. It goes from 2 draws to 3. The finish is `leather` (`material.finish.leather`: the generated set `textures/leather`, `cargo tex synth leather`: soft creases a hand's width apart, the hide's waviness, patches polished where it is sat on, roughness 0.35 to 0.5; its colour all but even, 97 % of the part's), where it was plain `satin`: a textured finish, so the part has UVs (`artkit::uv` makes them) and a draw call of its own.
+
+## Built in Rust (2026-11-18)
+
+Ported from `dining.py` line for line (crates/art/rooms/src/dining). Against the last Blender build (`ref/blender`)
+every model's points are Blender's (0.000 mm): 4 same, 25 near (bevel UVs, baked shading and corner normals within
+the parity limits), the pack the same. The local `kit.tube` is gamekit's, marked `// KIT` for the kit.

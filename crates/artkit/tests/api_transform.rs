@@ -39,11 +39,10 @@ fn cases() -> BTreeMap<String, Lines> {
     out
 }
 
-/// How far from Blender's a number may be where a matrix was inverted on the way: the points of parts joined onto
-/// a first part that is turned or scaled, and the place, turn and scale of a part put inside a turned one. Blender
-/// inverts the first part's (the parent's) matrix with Eigen, the kernel as mathutils does, and the two differ in
-/// the last places. Everything else is Blender's to the bit.
-const INVERTED: f32 = 5e-7;
+/// How far from Blender's a number may be for a part put inside a parent that is turned and scaled unevenly: its
+/// own matrix in the parent's frame is then sheared, and one of the Euler angles read back from it comes out a unit
+/// in the last place from Blender's (its world matrix with it). Everything else is Blender's to the bit.
+const SHEARED: f32 = 1e-7;
 
 /// What a case's checks found: how many numbers were compared, and those not Blender's (to the bit, or within
 /// `reach` where it is set).
@@ -308,7 +307,6 @@ fn build(c: &mut Case) {
             }
             let j = join(&made, "chain", None);
             c.state(j, "chain");
-            c.found.reach = INVERTED;
             c.verts(j, "chain");
         }
         "quat_plume" => {
@@ -383,7 +381,6 @@ fn build(c: &mut Case) {
             for &o in &parts {
                 c.state(o, &o.name());
             }
-            c.found.reach = INVERTED;
             c.verts(join(&parts, "j", None), "j");
         }
         "mw_modes" => {
@@ -416,7 +413,6 @@ fn build(c: &mut Case) {
             );
             let j = join(&[r, b], "j", None);
             c.state(j, "joined");
-            c.found.reach = INVERTED;
             c.verts(j, "joined");
             set_origin(j, (0.1, 0.2, 0.3));
             j.set_rotation_euler((0.2, 0.0, 0.4));
@@ -488,8 +484,9 @@ fn build(c: &mut Case) {
             );
             motion::attach(lever, door);
             c.state(door, "door");
-            c.found.reach = INVERTED;
+            c.found.reach = SHEARED;
             c.state(lever, "lever");
+            c.found.reach = 0.0;
             let r = a_rod("rod");
             motion::attach(r, door);
             c.state(r, "rod");

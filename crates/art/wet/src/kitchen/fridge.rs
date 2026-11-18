@@ -286,7 +286,7 @@ fn fridge_food() {
         M.bottle,
         M.carton,
         10,
-        F,
+        &F,
     );
     for (i, x) in [-0.20, -0.11, -0.02].into_iter().enumerate() {
         fsphere!(
@@ -378,7 +378,7 @@ fn freezer_food() {
 
 /// A bottle standing at game point `foot`: a round body, a shoulder, a neck and its cap.
 #[allow(clippy::too_many_arguments)]
-fn bottle(
+pub(super) fn bottle(
     name: &str,
     foot: (f64, f64, f64),
     r: f64,
@@ -386,7 +386,7 @@ fn bottle(
     material: Mat,
     cap: Mat,
     verts: usize,
-    frame: GameFrame,
+    frame: &GameFrame,
 ) {
     let at = frame.at(foot.0, foot.1, foot.2);
     let (bx, by, bz) = (at.x, at.y, at.z);
@@ -415,7 +415,7 @@ fn bottle(
 }
 
 /// A bin on a door's inside: a tray with a lip along its inner edge, from game x0 to x1, z0 (inner) to z1.
-fn door_bin(name: &str, y: f64, x0: f64, x1: f64, z0: f64, z1: f64, frame: GameFrame) {
+pub(super) fn door_bin(name: &str, y: f64, x0: f64, x1: f64, z0: f64, z1: f64, frame: &GameFrame) {
     let (w, d) = (x1 - x0, z1 - z0);
     fbox!(
         frame,
@@ -530,7 +530,7 @@ fn door(
             M.liner
         );
         for (i, &by) in bins.iter().enumerate() {
-            door_bin(&format!("{name}_bin{i}"), by, -0.3, 0.3, 0.1, 0.168, F);
+            door_bin(&format!("{name}_bin{i}"), by, -0.3, 0.3, 0.1, 0.168, &F);
         }
     });
     hinged(join(&parts, name, None), F.at(0.364, y, 0.195))
@@ -600,7 +600,7 @@ pub fn fridge() -> Vec<Obj> {
                 mat,
                 M.carton,
                 10,
-                F,
+                &F,
             );
         }
         for (i, x) in [0.1, 0.19].into_iter().enumerate() {
