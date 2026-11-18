@@ -2,7 +2,7 @@
 //!
 //! - **Quantised geometry** (`KHR_mesh_quantization`): positions to 14 bits of the mesh's box (within a
 //!   tenth of a millimetre on a 2 m sofa), normals to 10, texture coordinates within 0..1 to 12, each a 16-bit
-//!   integer, not a 32-bit float; the baked shading (COLOR_0, a grey of 32 levels: `gamekit/shade.py`)
+//!   integer, not a 32-bit float; the baked shading (COLOR_0, a grey of 32 levels: `artkit`'s `shade`)
 //!   to 8 bits, which keep every level. A model with foliage keeps its floats but for the colours (its
 //!   leaf cards sit close: quantised, their edges moved).
 //! - **A node under each node with a mesh**, named as it is, holds the mesh with the quantisation's

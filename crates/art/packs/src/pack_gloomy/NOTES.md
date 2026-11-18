@@ -102,4 +102,4 @@ cargo art pack_gloomy --preview  # previews/pack_gloomy/<id>.png, <id>@<clip>.pn
 
 ## The soft forms pass (2026-11-13)
 
-The window seat's two pillows are sewn flat and stuffed (`waist`), `resting`. Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `journalDesk`, `soakingTub`, `windowSeat`; 20,098 to 20,610 triangles.
+The window seat's two pillows are sewn flat and stuffed (`waist`), `resting`. Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `journalDesk`, `soakingTub`, `windowSeat`; 20,098 to 20,610 triangles.

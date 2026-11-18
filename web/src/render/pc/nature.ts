@@ -10,7 +10,7 @@
  * carries the lawn, its gusts too (`grassGround`), and on past the town into the landscape.
  *
  * Trees, bushes, hedges, the lawn's flowers and the garden catalog's plants are built files
- * (tools/art/blender/families/plants.py, crates/art/nature/src/trees): crowns on the leafy `foliage` finish over `bark`
+ * (crates/art/nature/src/plants and trees): crowns on the leafy `foliage` finish over `bark`
  * limbs, each tree and shrub with a far version for the distant woods. `installNature` gives those
  * two finishes the wind (`NATURE_WIND`, the port of `NatureWindPlugin`) and the foliage its
  * per-instance tint.

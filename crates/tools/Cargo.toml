@@ -1,6 +1,6 @@
 [package]
 name = "ll-tools"
-description = "The repo's command-line tools: the resident generator, the object gate and Blender runner, the content editor, the texture scripts, the authenticity review, and the release work (version, licences, wasm-opt, the model fetches). Never shipped."
+description = "The repo's command-line tools: the resident generator, the object gate and the models' pack writer, the content editor, the texture scripts, the authenticity review, and the release work (version, licences, wasm-opt, the model fetches). Never shipped."
 edition.workspace = true
 version.workspace = true
 license.workspace = true

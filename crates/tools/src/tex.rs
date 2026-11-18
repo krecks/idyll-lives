@@ -404,7 +404,7 @@ fn surf(color: &'static str, tex: &str, uv: f64, kw: &[(&'static str, J)]) -> J 
 }
 
 /// A cut-out finish: one albedo on the mesh's own UVs, its alpha cutting the surface out where it is under
-/// `cutout` (the trees' leaf cards; the atlas is rendered by `cargo art --leafcards`, not synthesised here).
+/// `cutout` (the trees' leaf cards; the atlas is a committed file, not synthesised here).
 fn cut(color: &'static str, tex: &str, cutout: f64, kw: &[(&'static str, J)]) -> J {
     let mut e = vec![
         ("type", J::Str("material")),

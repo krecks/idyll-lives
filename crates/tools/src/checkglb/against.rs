@@ -24,8 +24,8 @@
 //! A row that is right as it is takes a line in tools/art/port-accepted.json, `{"<key>": {"<metric>": "<why>"}}`
 //! (a far version's key is `<key> far`, a manifest's its path under the assets), and is then printed as
 //! `accepted`. As with the gate's `accept`, one that names no row, gives no reason or is not needed is an error.
-//! But `decimated`, which says what a far version is (Blender's decimate made it, and makes another on every
-//! run): where the rows fail it, it is held to that rule in their place (`METRICS`); where they pass, it passes.
+//! But `decimated`, which says what a far version is (a decimation made it, which another build need not
+//! repeat): where the rows fail it, it is held to that rule in their place (`METRICS`); where they pass, it passes.
 
 use super::digest;
 use super::glb::{Glb, R, parse_glb};
@@ -100,7 +100,7 @@ pub const UV_OFF: f64 = 0.002;
 /// Two Blender builds of one script differ on up to 3.9 % of a part (measured 2026-11-17, the porch swing's frame:
 /// a face at 45° between two sides takes its texture from either), so 5 % may be off.
 pub const UV_SHARE: f64 = 0.95;
-/// The baked shading is rounded to this many greys (gamekit/shade.py `LEVELS`).
+/// The baked shading is rounded to this many greys (artkit's shade.rs `LEVELS`).
 pub const SHADE_LEVELS: f64 = 32.0;
 /// A part's shading may differ by this many greys on average. Two Blender builds of one script differ by up to
 /// 1.36 (measured 2026-11-17, the pizza oven's cup: a vertex's rays hit or miss by a hair), so 2.
@@ -167,7 +167,7 @@ pub const METRICS: &[(&str, &str)] = &[
     ("shading", "the baked shading at the nearest points"),
     (
         "decimated",
-        "a far version Blender's decimate made, which not even Blender repeats: where the rows above fail it is \
+        "a far version a decimation made, which another build need not repeat: where the rows above fail it is \
          held to its own rule in their place (the old size within 2 %, its lowest point within 0.5 cm of the \
          model's, at most a tenth more triangles, its surface within 6 cm of the old one's)",
     ),
@@ -1266,7 +1266,10 @@ struct Side {
 }
 
 const ASSETS: &str = "web/public/assets";
-const CENTRES: &str = "tools/art/blender/centres.json";
+const CENTRES: &str = "tools/art/centres.json";
+/// Where a revision from before the models' tools moved has its centres (the tags ref/blender and
+/// ref/blender-civic).
+const CENTRES_BEFORE: &str = "tools/art/blender/centres.json";
 
 fn copy(from: &Path, to: &Path) -> Result<(), String> {
     if let Some(dir) = to.parent() {
@@ -1296,7 +1299,7 @@ impl Side {
         let tree = Paths::at(root);
         let at = scratch.0.join(what).to_string_lossy().into_owned();
         let under = |base: &str, assets: String, centres: String| Paths {
-            here: normpath(&join(base, "tools/art/blender")),
+            art: normpath(&join(base, "tools/art")),
             assets,
             content: tree.content.clone(),
             furniture: tree.furniture.clone(),
@@ -1304,10 +1307,16 @@ impl Side {
             baseline: tree.baseline.clone(),
         };
         let laid_out = |base: &str| {
+            let before = Path::new(base).join(CENTRES_BEFORE);
+            let centres = if !Path::new(base).join(CENTRES).exists() && before.exists() {
+                CENTRES_BEFORE
+            } else {
+                CENTRES
+            };
             under(
                 base,
                 normpath(&join(base, ASSETS)),
-                normpath(&join(base, CENTRES)),
+                normpath(&join(base, centres)),
             )
         };
         let (paths, origin) = match source {
@@ -1325,6 +1334,7 @@ impl Side {
                         &format!("{ASSETS}/manifest.json"),
                         &format!("{ASSETS}/packs"),
                         CENTRES,
+                        CENTRES_BEFORE,
                     ],
                 )?;
                 let files: Vec<String> = String::from_utf8_lossy(&listed)

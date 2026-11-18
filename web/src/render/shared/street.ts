@@ -39,7 +39,7 @@
  *   lot (build-mode edits don't rebuild it), merged into a handful of meshes (one per material)
  *   plus thin-instanced foliage and props (manifest models: `model.street.*` and the town's
  *   things, see `assets/packs/street/manifest.json`), a few dozen draw calls for the whole street.
- * - Models built in Blender (`.glb` files, downloaded like the rest), plus a CC0 concrete texture for the sidewalks.
+ * - Generated models (`.glb` files, downloaded like the rest), plus a CC0 concrete texture for the sidewalks.
  *
  * Engine-neutral: `planStreet` lays the street out and writes its geometry and its models'
  * instances (`StreetPlan`); the renderer's `Street` (`pc/street.ts`) draws it.

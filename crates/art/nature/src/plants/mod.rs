@@ -3,8 +3,7 @@
 //! Each model takes the family's colours with some of its own (`botany::palette`; the finishes stay the
 //! family's) and is built from artkit's botany: leaves cut from outlines, stems, pots, flower faces, the shrubs'
 //! masses and their perches, the beds and the crops' growth clips. The outdoor ones have a far version, the same
-//! build at low detail (`far_low`), every random number drawn. tools/art/blender/families/plants.py stays as the
-//! library the scripts not yet ported import; the plants are built here.
+//! build at low detail (`far_low`), every random number drawn.
 //!
 //! Run:  cargo art plants [--only hosta] [--preview]
 

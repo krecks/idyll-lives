@@ -947,7 +947,7 @@ export function restyledData(data: VData, base: readonly [number, number, number
   for (let i = 0; i + 2 < indices.length; i += 3) pushTri(positions, normals, wound, indices[i], indices[i + 1], indices[i + 2]);
   const out: VData = { positions: Float32Array.from(positions), normals: Float32Array.from(normals), indices: Uint32Array.from(wound) };
   // A textured finish takes the file's UVs where it has them (metres, made for each part in its own frame by
-  // gamekit/uv.py: the grain along a leg, bark round a trunk); else, or for a plain finish, they're projected here.
+  // artkit's uv: the grain along a leg, bark round a trunk); else, or for a plain finish, they're projected here.
   if (fileUVs && hasUVs(data, positions.length / 3)) out.uvs = Float32Array.from(data.uvs!);
   else boxProjectUVs(out);
   if (full) {
@@ -958,7 +958,7 @@ export function restyledData(data: VData, base: readonly [number, number, number
   const [r, g, b] = ov.color ? hexColor(ov.color) : base;
   const count = positions.length / 3;
   const colors = new Float32Array(count * 4);
-  // The file's grey vertex colour is the shading baked into its creases (gamekit/shade.py), linear: the
+  // The file's grey vertex colour is the shading baked into its creases (artkit's shade), linear: the
   // colour here is sRGB (the finish shader raises it to 2.2), so it takes the shading's 1/2.2 power.
   const baked = data.colors && data.colors.length >= count * 4 ? data.colors : null;
   for (let i = 0; i < count; i++) {

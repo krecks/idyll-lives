@@ -1,5 +1,5 @@
-//! `cargo art <family> --preview --sheet` on a family built here: the Italian cypress (the port of
-//! families/trees.py's, kept with the kernel's tests), drawn into a scratch folder.
+//! `cargo art <family> --preview --sheet`: the Italian cypress (the trees family's, kept with the kernel's tests),
+//! drawn into a scratch folder.
 #[path = "../../artkit/tests/common/cypress.rs"]
 mod cypress;
 

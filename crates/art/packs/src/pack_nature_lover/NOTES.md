@@ -117,7 +117,7 @@ cargo art pack_natureLover --preview  # previews/pack_natureLover/<id>.png, <id>
 
 ## The soft forms pass (2026-11-13)
 
-The hammock's pillow is sewn flat and stuffed (`waist`), `resting`. Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 5 models changed shape: `birdFeeder`, `gardenHammock`, `glasshouse`, `pottingBench`, `veggieBed`; 29,410 to 29,584 triangles.
+The hammock's pillow is sewn flat and stuffed (`waist`), `resting`. Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 5 models changed shape: `birdFeeder`, `gardenHammock`, `glasshouse`, `pottingBench`, `veggieBed`; 29,410 to 29,584 triangles.
 
 ## The Rust port (2026-11-18)
 

@@ -1,29 +1,22 @@
 //! `cargo art`: builds the families of item models and checks what they wrote.
 //!
-//!   cargo art kitchen                  build, write and register a family
+//!   cargo art kitchen                  build, write and register a family, then run the gate on what it wrote
 //!   cargo art kitchen --only fridge    one model of it (--only a,b: several)
-//!   cargo art --all                    every family (--all --check: every switched one)
+//!   cargo art --all                    every family
 //!   cargo art kitchen --no-pack        write the files without writing the pack
 //!   cargo art trees --out /tmp/trees   write the files, the pack and centres.json under another root, laid out
-//!                                      as the repo is (web/public/assets/…, tools/art/blender/centres.json), for
-//!                                      comparing with what is committed
+//!                                      as the repo is (web/public/assets/…, tools/art/centres.json)
 //!   cargo art trees --check            build in memory and fail on any byte that differs from the committed
-//!                                      files, pack entries or centres
-//!   cargo art --centres                write centres.json from every family (no build)
+//!                                      files, pack entries or centres (--all --check: every family)
+//!   cargo art --centres                write centres.json from every family's models (no build)
 //!   cargo art trees --preview [--sheet]  build in memory and draw each model (`preview`) into
-//!                                      tools/art/blender/previews/trees/, writing nothing else
+//!                                      tools/art/previews/trees/, writing nothing else
+//!   cargo art template --preview       draw the template family (`template`), which nothing else builds
 //!
-//! The registry says where a family is built (`route`; the group crates here: nature, wet, rooms, packs, outside,
-//! things), not whether a script of its name is left. A switched family (`Family::switched`: its files in the repo
-//! are the ones built here) is built in this process by the kernel (`artkit`), a thread a model, whatever is asked,
-//! and though its script stays as the other scripts' library (plants.py). One ported and not switched is still its
-//! script run in Blender (`ll_tools::art`, which also keeps its `--preview`, `--lit` and `--leafcards`), but for
-//! `--out` and `--check`, which build the models it has here: how a port is proved before the switch. Any other is
-//! its script. `--all` builds every switched family here and every other that has a script in Blender;
-//! `--all --check` holds the switched ones to the committed files and leaves the rest out. Either way the content
-//! and the manifests are read here, the pack and centres.json written by the same code
-//! (`ll_tools::art::take_build`), and the gate (`cargo check-glb`) run on the keys built; the exit code is 1 if a
-//! build or the gate fails.
+//! The registry (`registry`: the group crates nature, wet, rooms, packs, outside and things) names every family,
+//! and each is built here by the kernel (`artkit`), a thread a model. The content and the manifests are read here,
+//! the pack and centres.json written (`ll_tools::art::take_build`), and the gate (`cargo check-glb`) run on the
+//! keys built; the exit code is 1 if a build or the gate fails.
 
 use artkit::family::{Family, Output, build_model};
 use artkit::json::Json;
@@ -35,8 +28,9 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 pub mod preview;
+pub mod template;
 
-/// Every family by its name on the command line, each once it is ported to Rust.
+/// Every family by its name on the command line (`cargo art <name>`).
 pub fn registry() -> Vec<(&'static str, Option<Family>)> {
     let mut all = art_nature::families();
     all.extend(art_wet::families());
@@ -47,151 +41,38 @@ pub fn registry() -> Vec<(&'static str, Option<Family>)> {
     all
 }
 
-/// How far a family's port has come: what the registry says of it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Port {
-    /// Its module builds nothing yet.
-    Unported,
-    /// Its module builds it, and the files in the repo are still Blender's.
-    Ported,
-    /// The files in the repo are the ones built here (`Family::switched`).
-    Switched,
-}
-
-impl Port {
-    pub fn of(family: Option<&Family>) -> Port {
-        match family {
-            None => Port::Unported,
-            Some(f) if f.switched => Port::Switched,
-            Some(_) => Port::Ported,
-        }
-    }
-}
-
-/// What of the command line says where a family is built (`--only`, `--no-pack` and `--preview` say nothing of it).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Asked {
-    pub all: bool,
-    pub out: bool,
-    pub check: bool,
-}
-
-/// What a run builds where.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Route {
-    /// The families built in this process, in the order asked.
-    pub here: Vec<String>,
-    /// The families whose scripts are run in Blender.
-    pub blender: Vec<String>,
-    /// What to say of it, a line each.
-    pub notes: Vec<String>,
-}
-
-/// Where each of `names` (with `--all`: each of the registry's) is built. The registry decides, not whether a
-/// script of that name is left:
-///
-///   switched               here, whatever is asked (its script may stay as the other scripts' library)
-///   ported, not switched   here with --out or --check (how a port is proved before the switch); else its script
-///                          in Blender, with a line saying so
-///   not ported             its script in Blender; none with --out or --check
-///   --all                  every switched family here, every other that has a script in Blender
-///   --all --check          every switched family; the others left out, with a line saying how many (a port's
-///                          files aren't expected to be the Blender-built ones)
-///   --all --out            every ported family, switched or not; the others left out
-///
-/// An error for a name that is neither ported nor a script, and for one nothing can build as asked.
-pub fn route(
+/// The families `names` asks for, in the order asked (`all`: every family of the registry). An error for a name the
+/// registry doesn't have, and for a family whose module builds nothing (`family()` gives `None`).
+pub fn pick<'a>(
     names: &[String],
-    registry: &[(&str, Port)],
-    scripts: &[String],
-    asked: Asked,
-) -> Result<Route, String> {
-    let port = |name: &str| {
-        registry
-            .iter()
-            .find(|(n, _)| *n == name)
-            .map_or(Port::Unported, |(_, p)| *p)
-    };
-    let script = |name: &str| scripts.iter().any(|s| s == name);
+    registry: &'a [(&'static str, Option<Family>)],
+    all: bool,
+) -> Result<Vec<&'a Family>, String> {
     let listed = || {
         let all: Vec<&str> = registry.iter().map(|(n, _)| *n).collect();
         all.join(", ")
     };
-    let in_blender = |name: &str| {
-        format!(
-            "[gamekit] {name}: ported, not switched: built in Blender (--out or --check build it here)"
-        )
-    };
-    const GONE: &str = "ported, not switched, and no script of that name is left";
-    const SWITCH: &str = "--out or --check build it here; `.switched()` in its module once its files are the committed ones";
-    let proving = asked.out || asked.check;
-    let mut route = Route::default();
-    if asked.all {
-        let mut left = 0;
-        for &(name, port) in registry {
-            if port == Port::Switched || (port == Port::Ported && asked.out && !asked.check) {
-                route.here.push(name.to_string());
-            } else if proving {
-                left += usize::from(port == Port::Ported || script(name));
-            } else if script(name) {
-                if port == Port::Ported {
-                    route.notes.push(in_blender(name));
-                }
-                route.blender.push(name.to_string());
-            } else if port == Port::Ported {
-                route
-                    .notes
-                    .push(format!("[gamekit] {name}: {GONE}: not built ({SWITCH})"));
-            }
-        }
-        if left > 0 {
-            route.notes.push(if asked.check {
-                format!(
-                    "[gamekit] not switched, left out: {left} (--check holds a switched family to the committed files)"
-                )
-            } else {
-                format!("[gamekit] still built in Blender, left out: {left}")
-            });
-        }
-        return Ok(route);
-    }
-    if names.is_empty() {
+    let asked: Vec<&str> = if all {
+        registry.iter().map(|(n, _)| *n).collect()
+    } else if names.is_empty() {
         return Err(format!("name a family ({}) or --all", listed()));
-    }
-    if let Some(odd) = names
-        .iter()
-        .find(|n| port(n) == Port::Unported && !script(n))
-    {
-        return Err(format!("no family {odd:?} ({})", listed()));
-    }
-    let (mut theirs, mut gone) = (Vec::new(), Vec::new());
-    for name in names {
-        match port(name) {
-            Port::Switched => route.here.push(name.clone()),
-            // (only some of its models may be built here yet)
-            Port::Ported if proving => route.here.push(name.clone()),
-            Port::Ported if script(name) => {
-                route.notes.push(in_blender(name));
-                route.blender.push(name.clone());
-            }
-            Port::Ported => gone.push(name.as_str()),
-            Port::Unported if proving => theirs.push(name.as_str()),
-            Port::Unported => route.blender.push(name.clone()),
-        }
-    }
-    if !theirs.is_empty() {
-        return Err(format!(
-            "{}: still built in Blender (--out and --check are for the families built here)",
-            theirs.join(", ")
-        ));
-    }
-    if !gone.is_empty() {
-        return Err(format!("{}: {GONE} ({SWITCH})", gone.join(", ")));
-    }
-    Ok(route)
+    } else {
+        names.iter().map(String::as_str).collect()
+    };
+    asked
+        .into_iter()
+        .map(|name| match registry.iter().find(|(n, _)| *n == name) {
+            Some((_, Some(family))) => Ok(family),
+            Some((_, None)) => Err(format!("{name}: its module builds nothing (its family() gives None)")),
+            None if name == template::NAME => Err(format!(
+                "{name}: the template only previews (cargo art {name} --preview); copy it to make a family (crates/art/README.md)"
+            )),
+            None => Err(format!("no family {name:?} ({})", listed())),
+        })
+        .collect()
 }
 
-/// The centres of every model of `families`, by key: what `--centres` writes over the scripts' own.
+/// The centres of every model of `families`, by key: what `--centres` writes.
 pub fn centres_of(families: &[&Family]) -> J {
     J::Obj(
         families
@@ -354,7 +235,7 @@ fn seeded(root: &str, repo: &Paths) -> Result<Paths, String> {
     Ok(paths)
 }
 
-/// Builds a ported `family` as `options` say. The keys it built (for the gate), or what failed.
+/// Builds `family` as `options` say. The keys it built (for the gate), or what failed.
 pub fn run_family(repo: &Paths, family: &Family, options: &Options) -> Result<Vec<String>, String> {
     let finishes = finishes(repo)?;
     family
@@ -402,7 +283,7 @@ pub fn run_family(repo: &Paths, family: &Family, options: &Options) -> Result<Ve
     for b in &built {
         b.log.iter().for_each(|l| println!("{l}"));
         if let Err(why) = &b.output {
-            println!("[gamekit] {}: {why}", b.id);
+            println!("[art] {}: {why}", b.id);
             failed.push(b.id);
         }
     }
@@ -413,7 +294,7 @@ pub fn run_family(repo: &Paths, family: &Family, options: &Options) -> Result<Ve
             failed.join(", ")
         ));
     }
-    // What the build hands the pack's writer, as the Blender builds hand it.
+    // What the build hands the pack's writer.
     let entry = |f: &dyn Fn(&Built, &Output) -> J| -> J {
         J::Obj(
             built
@@ -539,7 +420,7 @@ fn check(
     taken?;
     if differ.is_empty() {
         println!(
-            "[gamekit] {}: {} files, its pack and its centres as committed",
+            "[art] {}: {} files, its pack and its centres as committed",
             family.name,
             files.len()
         );
@@ -558,6 +439,18 @@ fn exit(msg: String) -> i32 {
     1
 }
 
+/// The options `cargo art` takes (`--only` and `--out` with a value).
+const FLAGS: [&str; 8] = [
+    "--all",
+    "--only",
+    "--no-pack",
+    "--out",
+    "--check",
+    "--centres",
+    "--preview",
+    "--sheet",
+];
+
 /// `cargo art …`: the exit code.
 pub fn main(argv: &[String]) -> i32 {
     let has = |flag: &str| argv.iter().any(|a| a == flag);
@@ -566,28 +459,29 @@ pub fn main(argv: &[String]) -> i32 {
             .position(|a| a == flag)
             .map(|i| argv.get(i + 1).cloned())
     };
+    if let Some(odd) = argv
+        .iter()
+        .find(|a| a.starts_with('-') && !FLAGS.contains(&a.as_str()))
+    {
+        return exit(format!("no option {odd} ({})", FLAGS.join(", ")));
+    }
     let registry = registry();
-    let ported: Vec<&Family> = registry.iter().filter_map(|(_, f)| f.as_ref()).collect();
     let repo = Paths::repo();
     if has("--centres") {
-        // Blender's scripts first (it writes the file anew; none left, and it isn't run), then every ported
-        // family's over them, written last: a switched family whose script stays as a library (plants.py) has
-        // the centres its module gives, not those its script reports.
-        let code = if ll_tools::art::families(&repo.here).is_empty() {
-            0
-        } else {
-            ll_tools::art::main(argv)
+        // Every family's models and no others: a key the families don't build isn't centred here.
+        let families = match pick(&[], &registry, true) {
+            Ok(f) => f,
+            Err(err) => return exit(err),
         };
-        if code == 0
-            && !ported.is_empty()
-            && let Err(err) = write_centres(&repo, &centres_of(&ported), false)
-        {
+        if let Err(err) = write_centres(&repo, &centres_of(&families), true) {
             return exit(err);
         }
-        return code;
-    }
-    if has("--leafcards") {
-        return ll_tools::art::main(argv);
+        let models: usize = families.iter().map(|f| f.models.len()).sum();
+        println!(
+            "[art] wrote tools/art/centres.json: {models} models of {} families",
+            families.len()
+        );
+        return 0;
     }
     let (only, out) = match (value("--only"), value("--out")) {
         (Some(None), _) => return exit("--only names a model: --only <id>[,<id>…]".into()),
@@ -604,34 +498,6 @@ pub fn main(argv: &[String]) -> i32 {
             names.remove(i);
         }
     }
-    let ports: Vec<(&str, Port)> = registry
-        .iter()
-        .map(|(n, f)| (*n, Port::of(f.as_ref())))
-        .collect();
-    let asked = Asked {
-        all: has("--all"),
-        out: out.is_some(),
-        check: has("--check"),
-    };
-    let Route {
-        here,
-        blender,
-        notes,
-    } = match route(&names, &ports, &ll_tools::art::families(&repo.here), asked) {
-        Ok(route) => route,
-        Err(err) => return exit(err),
-    };
-    notes.iter().for_each(|l| println!("{l}"));
-    let mut here: Vec<&Family> = here
-        .iter()
-        .filter_map(|name| {
-            registry
-                .iter()
-                .find(|(n, _)| *n == name.as_str())?
-                .1
-                .as_ref()
-        })
-        .collect();
     let options = Options {
         only: only
             .as_ref()
@@ -640,14 +506,28 @@ pub fn main(argv: &[String]) -> i32 {
         out,
         check: has("--check"),
     };
+    let into = std::path::PathBuf::from(ll_tools::checkglb::preview::folder(&repo));
+    if has("--preview") && names == [template::NAME] {
+        let family = template::family();
+        return match preview::run(
+            &repo,
+            &family,
+            options.only.as_deref(),
+            has("--sheet"),
+            &into,
+        ) {
+            Ok(()) => 0,
+            Err(err) => exit(err),
+        };
+    }
+    let families = match pick(&names, &registry, has("--all")) {
+        Ok(f) => f,
+        Err(err) => return exit(err),
+    };
     let (mut keys, mut failed) = (Vec::new(), Vec::new());
     if has("--preview") {
-        // Pictures only: the families built here are drawn (no file, pack or gate), Blender's render their own.
-        if has("--lit") && !here.is_empty() {
-            println!("{}", preview::LIT);
-        }
-        let into = std::path::PathBuf::from(ll_tools::checkglb::preview::folder(&repo));
-        for family in here.drain(..) {
+        // Pictures only: no file, pack or gate.
+        for family in families {
             if let Err(err) = preview::run(
                 &repo,
                 family,
@@ -659,13 +539,14 @@ pub fn main(argv: &[String]) -> i32 {
                 failed.push(family.name.to_string());
             }
         }
-    }
-    for family in here {
-        match run_family(&repo, family, &options) {
-            Ok(built) => keys.extend(built),
-            Err(err) => {
-                println!("{err}");
-                failed.push(family.name.to_string());
+    } else {
+        for family in families {
+            match run_family(&repo, family, &options) {
+                Ok(built) => keys.extend(built),
+                Err(err) => {
+                    println!("{err}");
+                    failed.push(family.name.to_string());
+                }
             }
         }
     }
@@ -678,20 +559,6 @@ pub fn main(argv: &[String]) -> i32 {
         print!("{}", report.text);
         if report.failed > 0 {
             failed.push("check-glb".into());
-        }
-    }
-    if !blender.is_empty() {
-        let mut args = blender;
-        args.extend(
-            argv.iter()
-                .filter(|a| ["--preview", "--lit", "--sheet", "--no-pack"].contains(&a.as_str()))
-                .cloned(),
-        );
-        if let Some(only) = &only {
-            args.extend(["--only".to_string(), only.clone()]);
-        }
-        if ll_tools::art::main(&args) != 0 {
-            failed.push("the Blender builds".into());
         }
     }
     if !failed.is_empty() {

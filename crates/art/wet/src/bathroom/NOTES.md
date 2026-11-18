@@ -229,7 +229,7 @@ their teeth there, and the tall cabinet's upper door while one takes a fresh tow
 
 ```
 cargo art bathroom            # every .glb, the pack, check-glb
-cargo art bathroom --preview --lit  # previews/bathroom/sink.png, sink.lit.png, sink@water_on.png, …
+cargo art bathroom --preview        # tools/art/previews/bathroom/sink.png, sink@water_on.png, …
 ```
 
 ## The soft forms pass (2026-11-13)

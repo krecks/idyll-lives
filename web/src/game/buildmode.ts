@@ -83,7 +83,7 @@ const DIAGONAL_SLOPE = Math.tan(Math.PI / 8);
 /** Resize arrows sit this far (m) outside the edge they move, and the height arrow this far above the top. */
 const HANDLE_OUT = 0.3;
 /**
- * Whether things can be resized in Buy mode (the arrows). Off for now: a Blender model's moving parts
+ * Whether things can be resized in Buy mode (the arrows). Off for now: a model's moving parts
  * (a fridge's doors, a wall bed) don't follow a resize well. It comes back for the objects it suits.
  * Things resized before keep their size, and "Reset size" still takes them back to their own.
  */

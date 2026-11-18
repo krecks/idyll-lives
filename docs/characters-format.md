@@ -365,7 +365,7 @@ an ear runs into the head (its foot, its front edge) it takes the tone of the sk
 the join shows no line. Every stage uses the base stage's tone.
 
 w is how much of the sky a vertex does not see at rest, 0 (open) to 1 (enclosed), in 32 steps
-(`ao.rs`, after the furniture's `gamekit/shade.py`): 96 rays per vertex (48 on the hair, whose shade is
+(`ao.rs`, after the furniture's, `artkit`'s `shade`): 96 rays per vertex (48 on the hair, whose shade is
 the depth into a broad volume) over the hemisphere about its
 normal (cosine-weighted, a Fibonacci spiral twisted by the vertex's index), started 1.5 mm off the
 surface; a hit counts `1 - (d / reach)^2`, the reach being 0.12 m on the skin (a fold, a seam, the

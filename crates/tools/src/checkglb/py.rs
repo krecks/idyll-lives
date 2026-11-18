@@ -1,4 +1,4 @@
-//! Python's ways, where the gate prints what check_glb.py printed: JSON values as Python's `json` reads
+//! Python's ways, where the gate prints as Python would: JSON values as Python's `json` reads
 //! them, objects in file order and integers apart from floats (`J`; `json.rs` reads them), Python's numbers
 //! (`Num`: an int stays an int, so a zero negated stays 0, not -0.0), `repr`, `format` and
 //! `math.hypot`/`math.dist`, and `os.path`'s `join`/`normpath`/`dirname`.

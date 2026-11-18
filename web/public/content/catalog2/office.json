@@ -1,5 +1,5 @@
 {
-  "$comment": "Catalogue 2: Desks (tops), desk chairs that work at them (`needsTable`) and office bits. Separate pieces only. Models: assets/manifest.json and the packs it lists (tools/art/blender/families/).",
+  "$comment": "Catalogue 2: Desks (tops), desk chairs that work at them (`needsTable`) and office bits. Separate pieces only. Models: assets/manifest.json and the packs it lists (crates/art).",
   "objects": [
     {
       "id": "deskSimple",

@@ -84,8 +84,7 @@ masses and small shapes the plants use too (`leaves`, `clad`, `lump`, `tube`, `p
 A review found the crowns the least real thing on screen: lumpy balls with a leaf pattern tiled over them. A
 broadleaf's leaf masses are now cut-out cards over dark cores (`artkit::botany` `leaves`, `clad`, `Cards`):
 
-- **The atlas.** One texture for every tree, `textures/leafcards/albedo.png` (512², `cargo art --leafcards`,
-  `tools/art/blender/leafcards.py`): three clusters of leaves on twigs, rendered from generated leaves and cut out by their alpha,
+- **The atlas.** One texture for every tree, `textures/leafcards/albedo.png` (512², a committed file): three clusters of leaves on twigs, rendered from generated leaves and cut out by their alpha,
   and a dense, opaque wall of leaves for the cores. Pale, as the tiling foliage is: a card's colour tints it.
 - **A build** makes its masses as ever (`leaves`: the same lumps from the same random numbers) and keeps them out of
   the model (`join_still`) for what is found on them by casting rays: the perches, the apples and lemons (`_hang`),

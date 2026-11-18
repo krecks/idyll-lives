@@ -1,5 +1,5 @@
-//! The game's item models, generated: kitchens, bathrooms and the laundry. One folder a family; a family not yet ported has
-//! none to give, and `cargo art` builds it in Blender from tools/art/blender/families/ as before.
+//! The game's item models, generated: kitchens, bathrooms and the laundry. One folder a family, each
+//! listed in `families()`.
 
 use artkit::family::Family;
 
@@ -22,7 +22,7 @@ pub mod kitchen_cooking;
 pub mod kitchen_counters;
 pub mod laundry;
 
-/// The group's families by their names on the command line (`cargo art <name>`), each once it is ported.
+/// The group's families by their names on the command line (`cargo art <name>`).
 pub fn families() -> Vec<(&'static str, Option<Family>)> {
     vec![
         ("kitchen", kitchen::family()),

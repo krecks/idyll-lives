@@ -1,6 +1,6 @@
 [package]
 name = "ll-art"
-description = "cargo art: builds the game's item models (the families ported to Rust here, the rest in Blender through ll-tools), writes their packs and runs the gate on them. Never shipped."
+description = "cargo art: builds the game's item models, writes their packs and centres and runs the gate on them. Never shipped."
 edition.workspace = true
 version.workspace = true
 license.workspace = true
