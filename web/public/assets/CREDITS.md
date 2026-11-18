@@ -185,8 +185,8 @@ patch of the puzzle is laid, a twig of the bonsai is trimmed, the sauna's door o
 
 The nature lover pack models (`models/pack_natureLover/veggieBed.glb`, `pottingBench.glb`, `birdFeeder.glb`,
 `gardenHammock.glb`, `cedarShower.glb`, `mossTerrarium.glb`, `glasshouse.glb`, override pack
-`packs/pack_natureLover/manifest.json`) are built in Blender by `tools/art/blender/families/pack_natureLover.py` on
-`gamekit` and exported as `.glb` (glTF, original, CC0). Each moves while it is used: a lettuce is picked from the
+`packs/pack_natureLover/manifest.json`) are built by `crates/art/packs/src/pack_nature_lover` on `artkit` and
+exported as `.glb` (glTF, original, CC0). Each moves while it is used: a lettuce is picked from the
 veggie bed (whose crop follows its growth stage), a seedling comes up, a bird lands, the hammock sways, the shower
 runs, the cloche lifts and the glasshouse's door and roof vent open.
 

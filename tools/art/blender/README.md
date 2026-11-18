@@ -346,7 +346,7 @@ How the parts work:
     part shrink towards its middle; scale them in height only and sink them instead
     (`planted=(1, 1, 0.5), sink=(0, …, …)`), so each seedling comes up where its plant stands
     (`families/plants.py` `_crop`). A use's clip on a growing part plays on top of its stage (the veggie
-    bed's plants rustle while tended, `families/pack_natureLover.py`).
+    bed's plants rustle while tended, `crates/art/packs/src/pack_nature_lover`).
   - `'open': 'bed_down'`: the clip is held open while the object is open (the sim's `open`, set by
     interactions with `leaves`; content `when` offers them).
   - Also list the uses that open it in `uses`, so the clip starts with the use.

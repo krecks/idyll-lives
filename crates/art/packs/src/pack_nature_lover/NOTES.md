@@ -1,6 +1,6 @@
 # Nature lover pack — notes
 
-`pack_natureLover.py` builds the seven P12 nature lover models into `web/public/assets/models/pack_natureLover/`
+`crates/art/packs/src/pack_nature_lover` builds the seven P12 nature lover models into `web/public/assets/models/pack_natureLover/`
 and their entries in `packs/pack_natureLover/manifest.json`, a pack listed in the base manifest's `packs`
 (the trait's only model manifest). Built 2026-10-14; they sat in Validate › Nature Lover until checked in
 play.
@@ -118,3 +118,17 @@ cargo art pack_natureLover --preview  # previews/pack_natureLover/<id>.png, <id>
 ## The soft forms pass (2026-11-13)
 
 The hammock's pillow is sewn flat and stuffed (`waist`), `resting`. Besides, its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 5 models changed shape: `birdFeeder`, `gardenHammock`, `glasshouse`, `pottingBench`, `veggieBed`; 29,410 to 29,584 triangles.
+
+## The Rust port (2026-11-18)
+
+Ported function for function from the Blender script (`common.rs`: the palette, `_sq`, `_pot`, `_rosette`,
+`_flower`; a file a model, the glasshouse's plants in `ferns.rs`). Against `ref/blender`: 7 near, 0 CHANGED, the pack
+the same; every part's surface 0.000 mm from Blender's. What is left:
+- clips (veggie bed, hammock, glasshouse): the turns' quaternions differ in their last bits (at most 1.8e-7);
+- the hammock's shading, 0.86 greys of 32 on average (limit 2): vertices where the eye bolts meet the hooks and the
+  ropes and cords meet the rope rings, rays tied on the tori;
+- the glasshouse's body stands 3.7 nm (2^-28 m) higher: its posts' feet lie one single-precision step under the floor
+  in both files; the kernel's `settle` lifts it by that step, Blender's did not.
+
+Found in the script, left as it was: `TOPY` (the terrarium's soil top) is set and never read (not ported); the
+potting bench's line above names a `_pot(trim=True)` the script does not have.
