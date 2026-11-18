@@ -157,6 +157,16 @@ pub(crate) fn from_stored(mesh: &Mesh, stored: &[[i16; 2]]) -> Vec<V3> {
     fans(mesh, Keeps::Stored(stored))
 }
 
+/// The two angles Blender keeps for each corner of a mesh that has `normals`, one a corner, for its own: in the
+/// frame of the corner's fan on the mesh as it is, a fan's corners sharing those of the mean of theirs. Read back on
+/// that mesh (`from_stored`) they are the normals again, to the sixteen bits; read once its faces are turned over or
+/// its points moved, they are what Blender then shows.
+pub(crate) fn to_stored(mesh: &Mesh, normals: &[V3]) -> Vec<[i16; 2]> {
+    let kept = std::cell::RefCell::new(vec![[0_i16; 2]; mesh.loops.len()]);
+    fans(mesh, Keeps::Corners(normals, &kept));
+    kept.into_inner()
+}
+
 /// What a fan's normal is kept as.
 enum Keeps<'a> {
     /// As it is worked out.
@@ -165,6 +175,9 @@ enum Keeps<'a> {
     Frames,
     /// As these normals, one a vertex, come back out of the fan's frame.
     Given(&'a [V3]),
+    /// As these normals, one a corner, come back out of the fan's frame: the mean of the fan's, whose two angles
+    /// are put down for each of its corners.
+    Corners(&'a [V3], &'a std::cell::RefCell<Vec<[i16; 2]>>),
     /// As what is stored for its corners (two angles of sixteen bits each, whatever frame they were stored in)
     /// reads in the fan's frame: the mean of them.
     Stored(&'a [[i16; 2]]),
@@ -285,6 +298,20 @@ fn fans(mesh: &Mesh, keeps: Keeps) -> Vec<V3> {
                             mean += given[v];
                         }
                         frame.kept(crate::math::mul_v3_fl(mean, 1.0 / fan.len() as f32))
+                    }
+                    Keeps::Corners(given, kept) => {
+                        let mut mean = V3::ZERO;
+                        for &i in &fan {
+                            mean += given[faces[i].corner as usize];
+                        }
+                        if fan.len() > 1 {
+                            mean = crate::math::mul_v3_fl(mean, 1.0 / fan.len() as f32);
+                        }
+                        let (a, b) = frame.angles(mean);
+                        for &i in &fan {
+                            kept.borrow_mut()[faces[i].corner as usize] = [a, b];
+                        }
+                        frame.read(a, b)
                     }
                     Keeps::Stored(stored) => {
                         let (mut a, mut b) = (0_i32, 0_i32);
