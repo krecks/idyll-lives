@@ -1,9 +1,9 @@
 //! The four dressing things.
 
 use super::common::{F, M, ellipse, frame_loop, moulding, oval, pane, rounded, side_knob, turned};
-use super::kit;
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
+use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, M4, P3, PI, TAU, cos, radians, sin, v3};
 use artkit::parts::{aside, join, join_all, new_parts, settle_all};

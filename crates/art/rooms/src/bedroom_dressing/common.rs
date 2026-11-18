@@ -289,6 +289,6 @@ fn forms_revolve(
 
 /// A turned knob on the side facing game x's sign `s`, its rose at game (x, y, z).
 pub fn side_knob(name: &str, x: f64, y: f64, z: impl Coord, r: f64, s: i32, material: Mat) -> Obj {
-    let k = super::kit::knob!(F, name, x, y, z, r, material);
+    let k = artkit::kit::knob!(F, name, x, y, z, r, material);
     k.set_rotation_euler((0.0, radians((-90 * s) as f64), 0.0))
 }
