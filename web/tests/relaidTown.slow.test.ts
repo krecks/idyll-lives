@@ -77,8 +77,9 @@ describe('the town laid again on a shaped land', async () => {
         expect(relaid.name).toBe(draft.name);
         expect(relaid.width).toBe(land.cols * LAND_CELL);
         expect(relaid.roads.filter((r) => r.area === 0 && r.kind !== 'trail' && r.kind !== 'country').length, tag).toBe(draft.roads.filter((r) => r.area === 0 && r.kind !== 'trail' && r.kind !== 'country').length);
-        // (Most of its lots: those of villages over the river, now off the town's piece of land, are not.)
-        expect(relaid.slots.length).toBeGreaterThan(draft.slots.length * 0.6);
+        // (Most of its homes: those of villages over the river, now off the town's piece of land, are not.)
+        const homes = (d: typeof draft) => d.slots.filter((s) => s.kind === 'house').length;
+        expect(homes(relaid)).toBeGreaterThan(homes(draft) * 0.6);
         // One road network.
         expect(networks(relaid.roads), `${tag}: networks`).toBe(1);
         // No bridge (the river is the land's now, and no bridge is laid over it).
