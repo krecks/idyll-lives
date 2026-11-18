@@ -83,5 +83,5 @@ pub fn family() -> Option<Family> {
          in the base manifest's packs. Each has a far version for the town overview. Leaves and \
          flowers are on the foliage finish, so they sway in the wind; the path light's lens glows at \
          night.",
-    ))
+    ).switched())
 }
