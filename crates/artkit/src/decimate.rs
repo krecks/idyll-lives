@@ -52,8 +52,9 @@ const SMALL: f64 = 0.0064;
 /// this share of the largest such lot's area at the vertex.
 const SLIGHT: f64 = 0.1;
 /// Smaller ones do not take the normal of faces that look the other way (their normals' cosine under this, over
-/// 100 degrees apart: the two sides of a sheet).
-const OPPOSED: f64 = -0.17;
+/// 100 degrees apart: the two sides of a sheet), and no face takes a normal that looks the other way from the
+/// face itself, the way it is wound: it would be lit as if from behind.
+pub const OPPOSED: f64 = -0.17;
 /// The faces at a vertex are a sheet's two sides, a vertex each, where their normals' cosine is under this
 /// (over 154 degrees apart: flat on one another, not the two faces of a blade's edge).
 const SIDES: f64 = -0.9;
@@ -335,10 +336,21 @@ impl Work {
     /// its own instead). Round a vertex, the corners that share a normal are
     /// written as one vertex; those of faces too small together to be seen from afar (`SMALL`), or next to
     /// nothing beside the vertex's largest lot (`SLIGHT`), take the normal of the lot they look most like, unless
-    /// that looks the other way: so a vertex is written once for each face of some size that meets at it, and not
-    /// once for every chamfer, pin and moulding.
+    /// that looks the other way, from them or from any face that would take it (the normal a lot carries may lie
+    /// up to 60 degrees off its faces, and the lot it looks most like as far again: a rim's face stretched into
+    /// a slope took the normal of the deck's other side): so a vertex is written once for each face of some size
+    /// that meets at it, and not once for every chamfer, pin and moulding, and no face is shaded with a normal
+    /// over 100 degrees off the way it is wound.
     fn normals(&self) -> Vec<[P; 3]> {
         let mut out = self.looks.clone();
+        // whether every one of these corners' faces can be shaded with this normal
+        let suits = |normal: P, corners: &[(u32, usize)]| {
+            corners.iter().all(|&(t, _)| {
+                let p = self.corners(t);
+                unit(cross(sub(p[1], p[0]), sub(p[2], p[0])))
+                    .is_none_or(|own| dot(normal, own) >= OPPOSED)
+            })
+        };
         for x in 0..self.at.len() as u32 {
             // the lots: each a normal, the area of the faces that have it here, and their corners
             let mut lots: Vec<Lot> = Vec::new();
@@ -381,7 +393,16 @@ impl Work {
                     let mut best: Option<(usize, f64)> = None;
                     for j in (0..lots.len()).filter(|&j| j != i) {
                         let like = dot(lots[i].normal, lots[j].normal);
-                        if like >= OPPOSED && best.is_none_or(|(_, most)| like > most) {
+                        // (the larger's normal is the two's: the smaller's faces take it)
+                        let (takes, normal) = if lots[i].area > lots[j].area {
+                            (j, lots[i].normal)
+                        } else {
+                            (i, lots[j].normal)
+                        };
+                        if like >= OPPOSED
+                            && best.is_none_or(|(_, most)| like > most)
+                            && suits(normal, &lots[takes].corners)
+                        {
                             best = Some((j, like));
                         }
                     }

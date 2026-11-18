@@ -267,7 +267,8 @@ fn merge_doubles(mesh: &mut Mesh, dist: f32) {
 /// Turns each of `mesh`'s triangles that the collapses turned round: one that faces against the `reference`
 /// surface nearest its middle, and against the way it faced itself before (`was`: a triangle on a slat or a pane
 /// thinner than its vertices moved is nearer the other side's faces, and is as it should be). How many. One of
-/// no area is left, as is one as near a reference face that looks its way as any that looks the other.
+/// no area is left, as is one as near a reference face that looks its way as any that looks the other. A corner of
+/// a face turned whose normal then looks the other way from it (`decimate::OPPOSED`) takes the face's own.
 fn turn_back(mesh: &mut Mesh, was: &[[f64; 3]], reference: &Surface) -> usize {
     let mut turned = 0;
     for f in 0..mesh.faces.len() {
@@ -297,6 +298,14 @@ fn turn_back(mesh: &mut Mesh, was: &[[f64; 3]], reference: &Surface) -> usize {
             }
             if let Some(normals) = &mut mesh.normals {
                 normals.swap(at + 1, at + 2);
+                // (a corner shaded by the face itself, as it lay, or from its other side: by it as it lies now)
+                let len = dot(normal, normal).sqrt();
+                let own = normal.map(|x| -x / len);
+                for n in &mut normals[at..at + 3] {
+                    if dot(n.array().map(f64::from), own) < decimate::OPPOSED {
+                        *n = V3::new(own[0] as f32, own[1] as f32, own[2] as f32);
+                    }
+                }
             }
             turned += 1;
         }
@@ -589,8 +598,12 @@ mod tests {
         let up = [0.0, 0.0, 1.0];
         let mut mesh = square();
         mesh.loops.swap(4, 5);
+        // (shaded by itself as it lay, looking down, and at one corner as the surface is)
+        let (above, below) = (V3::from((0, 0, 1)), V3::from((0, 0, -1)));
+        mesh.normals = Some(vec![above, above, above, below, above, below]);
         assert_eq!(turn_back(&mut mesh, &[up, up], &reference), 1);
         assert_eq!(mesh.loops, square().loops);
+        assert_eq!(mesh.normals, Some(vec![above; 6]));
         assert_eq!(turn_back(&mut mesh, &[up, up], &reference), 0);
     }
 
