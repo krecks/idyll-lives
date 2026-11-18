@@ -131,11 +131,12 @@ No change to the build: its soft boxes take the shared form's new shape (gamekit
 
 ## Built in Rust (2026-11-18)
 
-The script's functions one for one (`barn.rs`, `silo.rs`, `tractor.rs`, `hay.rs`, `scarecrow.rs`, `trough.rs`,
+The script's functions one for one (`barn.rs` and `barn_doors.rs`, `silo.rs`, `tractor.rs`, `hay.rs`, `scarecrow.rs`, `trough.rs`,
 `coop.rs`; the slabs, shells and bars of `_prism`, `_shell`, `_strut`, `_frame` in `common.rs`). Against the last
 Blender build (`ref/blender`): 11 same, 6 near, 0 CHANGED of the 8 models, their far versions and the pack; every
 surface 0.000 mm from Blender's, the baked shading 0.00 greys off. The nears: the barn's and the tractor's normals in
 their last digits (`shape`), the bale's far version's and the scarecrow's texture coordinates (`uv`, within the
 limit), the sway's keys in their last bit, the tractor's far version's origin 3e-8 m off Blender's (`nodes`: its surface
 the same, its x bounds a unit in the last place apart when centred), and the scarecrow's far version, decimated
-by the kernel (1,001 triangles where Blender's had 999), held to the decimated far versions' rule.
+by the kernel, held to the decimated far versions' rule: 1,001 triangles where Blender's file has 941 (+6.4 %), and
+2,509 vertices where it has 1,268 (117 KB where it was 67 KB).
