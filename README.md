@@ -11,7 +11,7 @@ A home-building game with a living town, in the browser: you build and furnish a
 <table>
 <tr>
 <td width="50%"><img src="docs/screenshots/night.jpg" alt="The same home in the evening, its lamps lit"><br><em>Evening: residents switch the lamps on as they come in.</em></td>
-<td width="50%"><img src="docs/screenshots/build.jpg" alt="Build mode with the catalog open"><br><em>Build › Furnish: over 500 objects, every one built in Blender.</em></td>
+<td width="50%"><img src="docs/screenshots/build.jpg" alt="Build mode with the catalog open"><br><em>Build › Furnish: over 500 objects, every one generated in code.</em></td>
 </tr>
 <tr>
 <td><img src="docs/screenshots/neighbourhood.jpg" alt="Choosing a household in a generated town"><br><em>A new game: a generated town and the households who live there.</em></td>
@@ -164,7 +164,7 @@ All art is referenced by **key**, never by path:
 - `web/public/content/base.json`: gameplay data. Objects name their model key (`"model": "model.fridge"`); needs name their icon key.
 - `web/public/assets/manifest.json`: maps keys to files.
 
-A model entry is its file, with what the game needs to know about it. Every object's model is a glTF built in Blender (`tools/art/blender`, `cargo art`), listed in a pack per family (`assets/packs/<family>/manifest.json`, all under the base manifest's `"packs"`): `materials` maps each material to one of the game's finishes, `paint` names the parts the player can colour, and `motions` the clips a use plays (here, shortened):
+A model entry is its file, with what the game needs to know about it. Every object's model is a glTF generated in Rust (`crates/art`, `cargo art`), listed in a pack per family (`assets/packs/<family>/manifest.json`, all under the base manifest's `"packs"`): `materials` maps each material to one of the game's finishes, `paint` names the parts the player can colour, and `motions` the clips a use plays (here, shortened):
 
 ```json
 "model.fridge": {
@@ -185,7 +185,7 @@ To ship a whole art set without editing the base manifest, create a pack and lis
 { "version": 1, "entries": { "icon.need.hunger": { "type": "icon", "url": "icons/hunger.png", "mode": "image" } } }
 ```
 
-Model conventions: 1 unit = 1 metre, origin at the footprint centre on the floor, front facing +Z. How to build a new object in Blender (scale, budgets, finishes, export, checks): [docs/design/objects.md](docs/design/objects.md). Monochrome SVG icons are recoloured by CSS (`mode: "mask"`); use `mode: "image"` for full-colour art.
+Model conventions: 1 unit = 1 metre, origin at the footprint centre on the floor, front facing +Z. How to build a new object (scale, budgets, finishes, export, checks): [docs/design/objects.md](docs/design/objects.md). Monochrome SVG icons are recoloured by CSS (`mode: "mask"`); use `mode: "image"` for full-colour art.
 
 ## Adding gameplay content
 
