@@ -20,6 +20,9 @@ pub enum Far {
     Low,
     /// A build of its own.
     Own(Build),
+    /// The model at rest, joined and decimated to this share of its triangles (`far=0.25`). The kernel has no
+    /// decimator yet: a model that asks for one fails to build, and says so.
+    Ratio(f64),
 }
 
 /// One model: models/<family>/<id>.glb.
@@ -120,6 +123,11 @@ impl Model {
     /// With a far version built by `build`.
     pub fn far(mut self, build: Build) -> Model {
         self.far = Some(Far::Own(build));
+        self
+    }
+    /// With a far version decimated to `ratio` of the model's triangles (`far=0.25`).
+    pub fn far_ratio(mut self, ratio: f64) -> Model {
+        self.far = Some(Far::Ratio(ratio));
         self
     }
     pub fn sink(mut self, sink: f64) -> Model {
@@ -258,6 +266,14 @@ pub fn make_far(model: &Model, far_build: Far) -> Result<Vec<Obj>, String> {
     let built = match far_build {
         Far::Low => far::far_of(model.build),
         Far::Own(build) => build(),
+        Far::Ratio(ratio) => {
+            return Err(format!(
+                "{}: its far version is the model decimated to {ratio} of its triangles (far={ratio}), and the \
+                 kernel has no decimator yet (gamekit/far.py `decimated`: Blender's DECIMATE modifier): give it a \
+                 build of its own (`far`, `far_low`) or wait for the decimator",
+                model.id
+            ));
+        }
     };
     let objs = if built.is_empty() { meshes() } else { built };
     crate::bevel::apply_all(&objs);
