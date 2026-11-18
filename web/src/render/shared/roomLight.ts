@@ -22,8 +22,23 @@ import { tuned } from '../tune';
  *   a bedroom with everyone asleep is still seen; with the lamps on the eye is set to them, and the blue goes. It
  *   comes in over `night` of the time of day's lamp level (dusk to night): while the sky outside is still light, a
  *   room with its lamps on is as light as the day leaves it.
+ * - `dayAmbient`, `dayFill`: by day, the share a room has of the sky's ambient (which comes from every side alike) and
+ *   of its hemispheric fill (which comes from above: a table's top takes more of it than its side). Both 1: a room is
+ *   lit as the garden is. Less ambient and more fill, and what faces up in a room stands off from what faces
+ *   sideways. `dayTint`: the colour both take in a room (white: the sky's own, a blue under which cream walls are
+ *   grey; the light in a room has come off its floor and walls). All three go back to the garden's over `night`, as
+ *   the lamps come on (`roomDay`).
  */
-export const ROOM = tuned('room', { sky: 0.15, bounce: 0.08, full: 1, fill: 0.3, area: 16, night: [0.4, 0.85] });
+export const ROOM = tuned('room', { sky: 0.15, bounce: 0.08, full: 1, fill: 0.3, area: 16, night: [0.4, 0.85], dayAmbient: 1, dayFill: 1, dayTint: '#FFFFFF' });
+
+/**
+ * A room's shares of the sky's ambient and of its fill at the time of day's lamp level `lamps` (0 by day, 1 at night),
+ * and how much of `dayTint` they take (1 by day, 0 at night).
+ */
+export function roomDay(lamps: number, room: typeof ROOM = ROOM): { ambient: number; fill: number; tint: number } {
+  const night = Math.min(1, Math.max(0, (lamps - room.night[0]) / (room.night[1] - room.night[0])));
+  return { ambient: room.dayAmbient + (1 - room.dayAmbient) * night, fill: room.dayFill + (1 - room.dayFill) * night, tint: 1 - night };
+}
 
 /**
  * The light of a room of `area` tiles whose lamps' brightness sums to `flux` (a lamp of power 1 full on is 1), at the

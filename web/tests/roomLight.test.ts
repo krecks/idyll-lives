@@ -1,6 +1,6 @@
 // `render/shared/roomLight.ts`: a room's own light by night, from its lamplight (`bun test`).
 import { describe, expect, test } from 'bun:test';
-import { ROOM, roomLight } from '../src/render/shared/roomLight';
+import { ROOM, roomDay, roomLight } from '../src/render/shared/roomLight';
 
 describe('a room\'s light', () => {
   test('by day a room is lit as it was: the whole sky, whatever lamps are on', () => {
@@ -8,6 +8,17 @@ describe('a room\'s light', () => {
     // (A windowless room's lamps are on by day: they bounce, the sky's share stays.)
     expect(roomLight(3, 12, 0).sky).toBe(1);
     expect(roomLight(3, 12, 0).bounce).toBe(1);
+  });
+
+  test('by day a room has the garden\'s sky unless tuned, and a tuned share is back at 1 by night', () => {
+    expect(roomDay(0)).toEqual({ ambient: 1, fill: 1, tint: 1 });
+    expect(roomDay(1)).toEqual({ ambient: 1, fill: 1, tint: 0 });
+    expect(ROOM.dayTint).toBe('#FFFFFF');
+    const tuned = { ...ROOM, dayAmbient: 0.6, dayFill: 1.5 };
+    expect(roomDay(0, tuned)).toEqual({ ambient: 0.6, fill: 1.5, tint: 1 });
+    expect(roomDay(ROOM.night[0], tuned)).toEqual({ ambient: 0.6, fill: 1.5, tint: 1 });
+    expect(roomDay((ROOM.night[0] + ROOM.night[1]) / 2, tuned).ambient).toBeCloseTo(0.8, 9);
+    expect(roomDay(1, tuned)).toEqual({ ambient: 1, fill: 1, tint: 0 });
   });
 
   test('at night a dark room keeps the moon, a lamplit one loses it', () => {

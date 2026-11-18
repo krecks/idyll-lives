@@ -41,6 +41,7 @@ import { settings } from '../../settings/settings.svelte';
 import { isGraphicsPreset, QUALITY } from '../quality';
 import type { RGB } from '../shared/environment';
 import { WALL_HEIGHT } from '../shared/walls';
+import { tunedEntry } from '../tune';
 import type { Shading } from '../types';
 
 export { INSTANCE_COLOR_SEMANTIC, WALL_CUT_SEMANTIC } from './shaders/chunks';
@@ -401,6 +402,9 @@ export class MaterialLibrary {
   private readonly skySky = new Float32Array(3);
   /** The lamps' light off a room's walls and floor at the room's full level (`setRoomBounce`). */
   private readonly roomBounce = new Float32Array(3);
+  /** A room's shares of the sky's ambient and of its fill by day, each in the room's tint (`setRoomDay`). */
+  private readonly roomDayAmbient = new Float32Array([1, 1, 1]);
+  private readonly roomDayFill = new Float32Array([1, 1, 1]);
   private readonly skyGround = new Float32Array(3);
   /** Where it comes from (PlayCanvas space, unit length). */
   private readonly skyDir = new Float32Array(3);
@@ -429,6 +433,8 @@ export class MaterialLibrary {
       ['game_hemiGround', 3, (o) => o.set(this.skyGround)],
       ['game_hemiDir', 3, (o) => o.set(this.skyDir)],
       ['game_roomBounce', 3, (o) => o.set(this.roomBounce)],
+      ['game_roomDayAmbient', 3, (o) => o.set(this.roomDayAmbient)],
+      ['game_roomDayFill', 3, (o) => o.set(this.roomDayFill)],
       ['game_wallCutLook', 4, vec4(cut.look)],
       ['game_wallCutParams', 4, vec4(cut.params)],
       ['game_wallHole', 4, vec4(cut.hole)],
@@ -758,6 +764,15 @@ export class MaterialLibrary {
     r[2] = bounce.b;
   }
 
+  /**
+   * A room's shares of the sky's ambient and of its hemispheric fill, in the `tint` (linear) the sky's light takes in a
+   * room (`shared/roomLight.ts` `roomDay`; 1, 1 and white: the garden's).
+   */
+  setRoomDay(ambient: number, fill: number, tint: RGB): void {
+    this.roomDayAmbient.set([ambient * tint.r, ambient * tint.g, ambient * tint.b]);
+    this.roomDayFill.set([fill * tint.r, fill * tint.g, fill * tint.b]);
+  }
+
   /** Where the sky's fill comes from (game space; the game's is `SKY_FILL_DIRECTION`, the dev pages' straight up). */
   setSkyDirection(d: { x: number; y: number; z: number }): void {
     const len = Math.hypot(d.x, d.y, d.z);
@@ -806,6 +821,10 @@ export class MaterialLibrary {
   }
 
   private create(key: string, entry: MaterialEntry, options: SurfaceOptions): pc.StandardMaterial {
+    const asked = tunedEntry(key, entry);
+    // (A tuned texture is named from the entry's own file: `../floor_wood.calm/albedo.jpg`.)
+    if (asked !== entry && asked.texture && entry.texture && asked.texture !== entry.texture) asked.texture = new URL(asked.texture, entry.texture).href;
+    entry = asked;
     if (new URLSearchParams(location.search).has('profile')) console.log(`[material] create ${key} ${options.variant ?? ''}`);
     const mat = new pc.StandardMaterial();
     mat.name = options.variant ? `${key}|${options.variant}` : key;

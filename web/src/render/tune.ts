@@ -10,8 +10,14 @@
  * `shared/groundShade.ts`; `clouds` (the clouds' shadows) in `pc/cloudShadows.ts`; `house` (the walls' tops, the tone of
  * walls and floors over a room) in `shared/house.ts`; `street` (worn asphalt, the pavement and its kerb, paving's sides) in
  * `shared/paving.ts`; `leaves` (the plants' leaves from above and from plant to plant) in `pc/nature.ts`; `room` (a lamplit
- * room's own light) in `shared/roomLight.ts`; `lampShadows` (the lamps' shadows) in `pc/lampShadows.ts`; `water` (the water's ripples, flow and foam) in
- * `pc/shaders/water.ts`.
+ * room's own light, and a room's shares of the sky's by day) in `shared/roomLight.ts`; `lampShadows` (the lamps' shadows) in `pc/lampShadows.ts`; `water` (the water's ripples, flow and foam) in
+ * `pc/shaders/water.ts`; `contact` (the contact shading's pass) in `pc/post.ts` and `contactLight` (its share of the lamps' and the
+ * sun's light) in `pc/shaders/softLook.ts`; `contactShadow` (the shadows shaped like what casts them) in
+ * `shared/contactShadow.ts`.
+ *
+ * A surface of the asset manifest is tuned by its key and one of its own fields (`tunedEntry`, where `pc/materials.ts`
+ * makes its material): `material.floor.wood.color:D9C8B4`, `material.floor.wood.uvScale:0.36`,
+ * `material.floor.wood.texture:../floor_wood.calm/albedo.jpg` (a file named from the entry's own).
  */
 
 /** `a.b:1;c.d:x` as path → value, both as written. */
@@ -55,4 +61,24 @@ export function tuned<T extends object>(group: string, base: T): T {
   if (!import.meta.env.DEV || typeof location === 'undefined') return base;
   asked ??= parseTune(new URLSearchParams(location.search).get('tune') ?? '');
   return asked.size ? applyTune(group, base, asked) : base;
+}
+
+/**
+ * `entry` (the asset manifest's, under `key`) with `tune`'s entries that name `key` and then one of the entry's own
+ * fields: a copy, or `entry` itself when none do. (`material.floor.wood.color` is `material.floor.wood`'s colour, and
+ * nothing of `material.floor`'s, which has no `wood`: said of neither.)
+ */
+export function applyEntryTune<T extends object>(key: string, entry: T, tune: ReadonlyMap<string, string>): T {
+  const own = new Map<string, string>();
+  for (const [path, raw] of tune) {
+    if (path.startsWith(`${key}.`) && (entry as Record<string, unknown>)[path.slice(key.length + 1)] !== undefined) own.set(path, raw);
+  }
+  return own.size ? applyTune(key, entry, own) : entry;
+}
+
+/** A manifest entry as `?tune=` asks for it on the dev server; `entry` itself otherwise. */
+export function tunedEntry<T extends object>(key: string, entry: T): T {
+  if (!import.meta.env.DEV || typeof location === 'undefined') return entry;
+  asked ??= parseTune(new URLSearchParams(location.search).get('tune') ?? '');
+  return asked.size ? applyEntryTune(key, entry, asked) : entry;
 }
