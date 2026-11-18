@@ -53,7 +53,11 @@ function baseOf(draft: NeighbourhoodDraft): Uint8Array {
   if (open?.water) mask.set(grown(unrle(open.water, W * D), W, D, SHORE_GAP));
   // A parking space as the generator laid it: 6 m along the verge, 3 m deep, and a metre round it.
   for (const p of open?.parking ?? []) take(p.rot % 2 ? { x: Math.round(p.x - 3), z: Math.round(p.z - 1.5), w: 6, d: 3 } : { x: Math.round(p.x - 1.5), z: Math.round(p.z - 3), w: 3, d: 6 }, 1);
-  for (const q of open?.squares ?? []) take(boundsOf(q));
+  // A square's own tiles (those whose middle is in it), as the generator keeps them clear (`chooseCentre`).
+  for (const q of open?.squares ?? []) {
+    const b = boundsOf(q);
+    for (let z = Math.max(0, Math.floor(b.z)); z < Math.min(D, Math.ceil(b.z + b.d)); z++) for (let x = Math.max(0, Math.floor(b.x)); x < Math.min(W, Math.ceil(b.x + b.w)); x++) if (inside(q, x + 0.5, z + 0.5)) mask[z * W + x] = 1;
+  }
   // Nothing goes down on a trail (a tile round each of its points), nor in an orchard (and 2 m round it).
   for (const r of roads) if (r.kind === 'trail') for (const [x, z] of r.points) take({ x: Math.floor(x) - 1, z: Math.floor(z) - 1, w: 3, d: 3 });
   for (const zone of open?.zones ?? []) if (zone.kind === 'orchard' && zone.poly.length) take(boundsOf(zone.poly), 2);
