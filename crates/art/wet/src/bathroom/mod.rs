@@ -383,5 +383,5 @@ pub fn family() -> Option<Family> {
         "The bathroom (crates/art/wet/src/bathroom, built by cargo art). Listed in the base manifest's packs. \
          The materials map onto the game's finishes so a model costs one draw call per finish group. Each \
          sink has a `water_on` clip (the stream from the tap) played while a resident washes.",
-    ))
+    ).switched())
 }

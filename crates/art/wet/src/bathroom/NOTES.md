@@ -1,6 +1,6 @@
 # Bathroom — notes
 
-`bathroom.py` builds the five bathroom sinks, the five toilets, the four showers, the three baths and the three storage and mirror models (below) into `web/public/assets/models/bathroom/` and their entries
+the family builds the five bathroom sinks, the five toilets, the four showers, the three baths and the three storage and mirror models (below) into `web/public/assets/models/bathroom/` and their entries
 in `packs/bathroom/manifest.json`: `model.sink` (`sink.glb`), `model.sinkPedestal` (`sinkPedestal.glb`),
 `model.vanityDouble` (`vanityDouble.glb`), `model.sinkVessel` (`sinkVessel.glb`) and `model.sinkConsole`
 (`sinkConsole.glb`). First made 2026-10-14. The pack is listed in the base manifest's `packs` and is the
@@ -12,13 +12,13 @@ only manifest that defines these keys.
   `stone`, `wood`, `trim`, `metal`, `chrome`, `brass`, `blackmetal`, `fabric`, `dark`, `teal`, `water`, and
   `towel` (a plain satin, so a towel does not cost an extra draw call). `PAINT = ['body']`.
 - **Water on use.** Each sink has one `water` moving part. The stream is built full length from the spout
-  tip into the basin, its origin on the spout tip; before `G.settle()` it is scaled to 0.001 along its
-  length, so it is hidden at rest and does not affect the bounds. `G.grow(water, 'water_on', seconds=0.4)`
+  tip into the basin, its origin on the spout tip; before settling it is scaled to 0.001 along its
+  length, so it is hidden at rest and does not affect the bounds. `grow(water, "water_on", 0.4 s)`
   keys it from there to scale 1. `motions` plays `water_on` for the `wash` animation tag, with no `hold`,
   so the water runs for the whole use and retracts afterwards (the `wash` tag covers both the `wash` and
   `washUp` interactions).
 - **Against the wall.** The sinks stand with their backs on the wall face (game depth -0.43): `centre=` on each
-  `Model`, where `G.settle()` centres it (they stood centred on the tile, 15–22 cm off the wall, until
+  `Model`, where settling centres it (they stood centred on the tile, 15–22 cm off the wall, until
   2026-10-14). Their old parts (the base sink and the rest) reached 1–4 cm into
   the wall and were moved forward onto it.
 - **Basins.** Each basin is one shell lofted through rings (`_lathe`, `_bowl_shell`): up the outside, over a
@@ -26,8 +26,8 @@ only manifest that defines these keys.
   undermount steel basin under a worktop slab cut with a rounded opening. Its cabinet's hidden top stays 3 cm under
   the basin's floor, with painted "shoulders" round the basin up to the worktop: a face within 1 cm of the basin's
   floor made `cargo review` take the worktop for something standing on it (ll-tools `checkglb` test).
-- **The detail pass (2026-10-22).** Every model was rebuilt with the forms (`G.sweep`, `G.loft`, `F.extrude`,
-  `F.soft`, `G.kit.tube`): same keys, sizes, centres, heights, parts, pivots, clips, `motions`, paint and draws.
+- **The detail pass (2026-10-22).** Every model was rebuilt with the forms (sweeps, lofts, extrusions,
+  soft boxes, the kit's tube): same keys, sizes, centres, heights, parts, pivots, clips, `motions`, paint and draws.
   The family's helpers: `_lathe` (a loft through game rings: squareness, an egg's narrowing, a deeper back, a ring
   moved forward), `_gooseneck` (a tap in one sweep: riser, half-circle arc, aerator, domed rose, side lever),
   `_pull` (a one-piece bar pull), `_shaker` + `_panel` (a frame with a hole round a panel set 6 mm back; the
@@ -70,7 +70,7 @@ old part (`catalog.double_vanity`) has none either.
 - **Against the wall, not centred.** The game sits a resident at the footprint's middle plus the seat's
   `fwd` (characters.ts `SEATS`, else the content's `seat`), so each toilet is built where the game places it:
    the cistern (or the boxed-in cistern) on the wall face at game depth -0.43,
-  `G.settle(centre=False)`, and `centre=` on its `Model`. The bowl's middle is 8–16 cm in front of the hips.
+  settled with `centre: false`, and `centre` on its `Model`. The bowl's middle is 8–16 cm in front of the hips.
 - **Seat heights.** The seat's top is the seat height: 0.43 m (`toilet`, `toiletCompact`), 0.44 m
   (`toiletSmart`), 0.445 m (`toiletWallHung`) and 0.45 m (`toiletClassic`). The wall-hung old part had its
   seat at 0.6 m; the model follows the content (0.45 m).
@@ -198,7 +198,7 @@ Validate › Bathroom Storage until checked in play. The mirror cabinet's door o
 their teeth there, and the tall cabinet's upper door while one takes a fresh towel; the round mirror is still.
 
 - **Wall things.** The mirror cabinet and the round mirror hang at their real height, their backs on the wall
-  face: `G.settle(centre=False, floor=False)` and `floor=False` on their `Model`. `check-glb` warns that they
+  face: settled with `centre: false, floor: false` and `on_wall()` on their `Model`. `check-glb` warns that they
   float, which is right for a wall thing.
 - **Mirror glass from the file** (E6): a flat piece of the `mirror` material (`gloss`, `'front'`). Every preset
   reflects live: the nearest mirror on screen on Low and Medium, two on High (`mirrors: 2`). It was see-through
@@ -234,4 +234,4 @@ cargo art bathroom --preview --lit  # previews/bathroom/sink.png, sink.lit.png, 
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 9 models changed shape: `bathCabinetTall`, `bathtub`, `mirrorCabinet`, `showerRain`, `sinkPedestal`, `sinkVessel`, `toiletSmart`, `toiletWallHung`, `vanityDouble`; the same triangles.
+No change to the build: its soft boxes take the shared form's new shape (the kit's soft forms: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 9 models changed shape: `bathCabinetTall`, `bathtub`, `mirrorCabinet`, `showerRain`, `sinkPedestal`, `sinkVessel`, `toiletSmart`, `toiletWallHung`, `vanityDouble`; the same triangles.
