@@ -78,6 +78,12 @@ const AROUND = [
 ] as const;
 /** How far (m) the player may pan the camera off the shot's focus when no land is given to keep it over (`bounds`). */
 const PAN_REACH = 1500;
+/**
+ * How far (m) from the land (`setBounds`'s `bounds`) the camera as drawn may go, with a landscape round it: from further
+ * out, low, it looked across the haze past the landscape, the ring's hills before the land standing in it, at the land
+ * as a strip (`reachTilt`).
+ */
+export const EYE_OUT = 600;
 
 /** A rectangle of the world (m) the camera's target is kept over. */
 export interface OverviewBounds {
@@ -135,6 +141,8 @@ export class OverviewCamera {
   ground: ((x: number, z: number) => number) | null = null;
   /** The land the player's pan keeps the camera's target over (null: within `PAN_REACH` of the shot's focus). */
   private bounds: OverviewBounds | null = null;
+  /** Whether the land has a landscape round it, the camera kept within `EYE_OUT` of the land (`reachTilt`). */
+  private reach = false;
   /** `hidden`'s view offset, worked out in place. */
   private readonly shift: [number, number, number] = [0, 0, 0];
 
@@ -163,9 +171,13 @@ export class OverviewCamera {
     this.swayBase = base;
   }
 
-  /** The land the camera's target is kept over while the player pans (null: none); the pan already made is pulled in. */
-  setBounds(bounds: OverviewBounds | null): void {
+  /**
+   * The land the camera's target is kept over while the player pans (null: none); the pan already made is pulled in.
+   * `reach`: a landscape is drawn round it, and the camera is kept within `EYE_OUT` of it (`reachTilt`).
+   */
+  setBounds(bounds: OverviewBounds | null, reach = false): void {
     this.bounds = bounds;
+    this.reach = reach;
     this.clampPan();
   }
 
@@ -361,8 +373,9 @@ export class OverviewCamera {
     // (Near, the target on the land under it: on a hill the camera would be in it otherwise.)
     const lift = Math.min(1, Math.max(0, (LIFT_FAR - c.radius) / (LIFT_FAR - LIFT_NEAR)));
     const ty = lift > 0 && this.ground ? this.ground(c.tx, c.tz) * lift : 0;
-    // Looking from higher up while the land (a mountain) would stand in the way.
-    let beta = c.beta;
+    // Looking from higher up while the camera would be far out past the landscape, or the land (a mountain) would stand
+    // in the way.
+    let beta = this.reachTilt(c.alpha, c.beta, c.radius, c.tx, c.tz, c.ox, c.oy);
     for (let k = 0; k < 30 && beta > 0.2 && this.hidden(c.alpha, beta, c.radius, c.tx, ty, c.tz, c.ox, c.oy); k++) beta -= 0.04;
     cam.beta = beta;
     cam.radius = c.radius;
@@ -371,6 +384,33 @@ export class OverviewCamera {
     cam.target.z = c.tz;
     cam.targetScreenOffset.x = c.ox;
     cam.targetScreenOffset.y = c.oy;
+  }
+
+  /**
+   * The tilt (rad from straight down) at most `beta` that keeps the camera as drawn (moved by the view offset `ox`,
+   * `oy`) within `EYE_OUT` m of the land (`bounds`, with a landscape round it: `reach`), for its target at (`tx`, `tz`)
+   * `radius` m off along `alpha`: from far out, a low camera looked from well past the landscape across the haze, and
+   * the land showed as a strip behind the ring's hills. Eased as the camera zooms or pans (the most that keeps it
+   * there, not steps).
+   */
+  private reachTilt(alpha: number, beta: number, radius: number, tx: number, tz: number, ox: number, oy: number): number {
+    const r = this.bounds;
+    if (!r || !this.reach) return beta;
+    const out = (b: number) => {
+      const [sx, , sz] = viewShift(alpha, b, ox, oy, this.shift);
+      const flat = Math.sin(b) * radius;
+      const [x, z] = [tx + Math.cos(alpha) * flat + sx, tz + Math.sin(alpha) * flat + sz];
+      return Math.hypot(Math.max(r.x0 - x, 0, x - r.x1), Math.max(r.z0 - z, 0, z - r.z1));
+    };
+    if (out(beta) <= EYE_OUT) return beta;
+    // (Further out the lower it looks: the most that keeps it within, to a ten-thousandth of a radian.)
+    let [lo, hi] = [0, beta];
+    for (let k = 0; k < 14; k++) {
+      const mid = (lo + hi) / 2;
+      if (out(mid) <= EYE_OUT) lo = mid;
+      else hi = mid;
+    }
+    return lo;
   }
 
   /**

@@ -324,6 +324,77 @@ export function wetEdgeAt(land: Land, sd: Float32Array | null, x: number, z: num
   return e > 0 ? e + out : e - out;
 }
 
+/**
+ * A water edge's values (m past the shore: above 0 in the water) on a grid (`roundedWater`): cell (i, j)'s at
+ * (`x0` + i · `cell`, `z0` + j · `cell`).
+ */
+export interface WaterGrid {
+  x0: number;
+  z0: number;
+  cell: number;
+  cols: number;
+  rows: number;
+  e: Float32Array;
+}
+
+/** `roundedWater`'s cells (m), and how many either way each of its three box blurs takes in. */
+export const ROUND_CELL = 4;
+export const ROUND_CELLS = 8;
+/** How far (m) a change in the water reaches in `roundedWater`'s grid, each way. */
+export const ROUND_REACH = 3 * ROUND_CELLS * ROUND_CELL;
+
+/**
+ * The water edge `edge` (m past the shore, above 0 in the water) over the box `x0`..`x1` × `z0`..`z1` (m), rounded: its
+ * values on a `ROUND_CELL` m grid, blurred three times by a box `ROUND_CELLS` cells either way (about a Gaussian
+ * 36 m wide), so its shore keeps its straight runs and its corners come out round, and a strip of land or water much
+ * narrower than that between two of the other goes. The cells whose middles `held` keeps (the land's own, inside its
+ * edge) stay as they are, the rest rounded against them: where those end the rounded water meets theirs. Read with
+ * `waterGridAt`.
+ */
+export function roundedWater(x0: number, z0: number, x1: number, z1: number, edge: (x: number, z: number) => number, held?: (x: number, z: number) => boolean): WaterGrid {
+  const cell = ROUND_CELL;
+  const cols = Math.max(1, Math.ceil((x1 - x0) / cell) + 1);
+  const rows = Math.max(1, Math.ceil((z1 - z0) / cell) + 1);
+  const e = new Float32Array(cols * rows);
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) e[j * cols + i] = edge(x0 + i * cell, z0 + j * cell);
+  // (The cells `held` keeps as they are between the blurs: the rest round off against them, and meet them where they end.)
+  const keep: number[] = [];
+  if (held) for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) if (held(x0 + i * cell, z0 + j * cell)) keep.push(j * cols + i);
+  const kept = Float32Array.from(keep, (k) => e[k]);
+  const line = new Float32Array(Math.max(cols, rows));
+  for (let pass = 0; pass < 3; pass++) {
+    for (let j = 0; j < rows; j++) boxBlur(e, j * cols, 1, cols, line);
+    for (let i = 0; i < cols; i++) boxBlur(e, i, cols, rows, line);
+    keep.forEach((k, n) => (e[k] = kept[n]));
+  }
+  return { x0, z0, cell, cols, rows, e };
+}
+
+/** The `n` values of `v` from `at`, `step` apart, each the mean of those `ROUND_CELLS` either way of it (the ends' carried on past them). */
+function boxBlur(v: Float32Array, at: number, step: number, n: number, line: Float32Array): void {
+  const r = ROUND_CELLS;
+  for (let k = 0; k < n; k++) line[k] = v[at + k * step];
+  const get = (k: number) => line[Math.min(n - 1, Math.max(0, k))];
+  let sum = 0;
+  for (let k = -r; k <= r; k++) sum += get(k);
+  for (let k = 0; k < n; k++) {
+    v[at + k * step] = sum / (2 * r + 1);
+    sum += get(k + r + 1) - get(k - r);
+  }
+}
+
+/** `grid`'s value at (x, z), read between its cells (its edge's past them). */
+export function waterGridAt(grid: WaterGrid, x: number, z: number): number {
+  const { cols, rows, e } = grid;
+  const gx = Math.min(cols - 1, Math.max(0, (x - grid.x0) / grid.cell));
+  const gz = Math.min(rows - 1, Math.max(0, (z - grid.z0) / grid.cell));
+  const i = Math.min(Math.floor(gx), Math.max(0, cols - 2));
+  const j = Math.min(Math.floor(gz), Math.max(0, rows - 2));
+  const [u, v] = [gx - i, gz - j];
+  const [i1, j1] = [Math.min(i + 1, cols - 1), Math.min(j + 1, rows - 1)];
+  return (e[j * cols + i] * (1 - u) + e[j * cols + i1] * u) * (1 - v) + (e[j1 * cols + i] * (1 - u) + e[j1 * cols + i1] * u) * v;
+}
+
 /** The cover cell's value at (x, z) (`COVER`; open off the land). */
 export function coverAt(land: Land, x: number, z: number): number {
   const cw = Math.ceil((land.cols * LAND_CELL) / COVER_CELL);

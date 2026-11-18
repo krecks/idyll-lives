@@ -52,6 +52,48 @@ export function veilAt(rect: VeilRect, x: number, z: number, eye = Infinity): nu
   return smoothstep(0, rect.fade, Math.hypot(dx, dz)) * smoothstep(0, VEIL_NEAR, eye);
 }
 
+/** `cutInView` is whole once the cut edge is this share of the half picture in from the picture's edge. */
+export const CUT_EASE = 0.15;
+
+/**
+ * How far the cut edge of the landscape `box`, closed by its curtain (`curtain`'s `positions`: each sample's top, then
+ * each one's foot), is in the picture of a camera whose eye is at (`ex`, `ey`, `ez`), looking as an orbit at `alpha`,
+ * `beta` does (towards -(cos α sin β, cos β, sin α sin β)), its vertical field of view `fov` (rad) and its `aspect`: 0
+ * while none of it on a side the eye stands past shows (over the landscape, or past it but looking down on it steeply
+ * enough that the side under it is below the picture: a side's face shows only from past it), over 0 once some does
+ * (the curtain drawn then closes it), whole once it is `CUT_EASE` of the half picture in. The game's town view from far
+ * out over a small land's corner. Allocation-free; nothing to work out from over the landscape.
+ */
+export function cutInView(box: VeilBox, positions: Float32Array, ex: number, ey: number, ez: number, alpha: number, beta: number, fov: number, aspect: number): number {
+  const past0 = ex < box.x0;
+  const past1 = ex > box.x1;
+  const past2 = ez < box.z0;
+  const past3 = ez > box.z1;
+  if (!past0 && !past1 && !past2 && !past3) return 0;
+  // (The view's way in, right and up: a left-handed look-at, up y, as `overviewCamera.ts` `viewShift`'s.)
+  const [sa, ca, sb, cb] = [Math.sin(alpha), Math.cos(alpha), Math.sin(beta), Math.cos(beta)];
+  const [fx, fy, fz] = [-ca * sb, -cb, -sa * sb];
+  const rl = Math.hypot(fz, fx) || 1;
+  const [rx, rz] = [fz / rl, -fx / rl];
+  const [ux, uy, uz] = [fy * rz, fz * rx - fx * rz, -fy * rx];
+  const tanY = Math.tan(fov / 2);
+  const tanX = tanY * aspect;
+  let most = -Infinity;
+  const n = positions.length / 6;
+  for (let i = 0; i < n * 2; i++) {
+    const [x, y, z] = [positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]];
+    // (Only the sides the eye is past: the curtain's on the others is turned away from it.)
+    if (!((past0 && x < box.x0) || (past1 && x > box.x1) || (past2 && z < box.z0) || (past3 && z > box.z1))) continue;
+    const [dx, dy, dz] = [x - ex, y - ey, z - ez];
+    const depth = dx * fx + dy * fy + dz * fz;
+    if (depth <= 0) continue;
+    const across = Math.abs(dx * rx + dz * rz) / (depth * tanX);
+    const up = Math.abs(dx * ux + dy * uy + dz * uz) / (depth * tanY);
+    most = Math.max(most, 1 - Math.max(across, up));
+  }
+  return most <= 0 ? 0 : smoothstep(0, CUT_EASE, most);
+}
+
 /** The curtain's samples along the landscape's edge (m). */
 const CURTAIN_STEP = 4;
 /** How far past the landscape's edge the curtain hangs (m): in front of the ground's own skirt there, not in it. */

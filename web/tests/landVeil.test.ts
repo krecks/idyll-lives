@@ -6,7 +6,7 @@
  * sheet; and both shader languages' haze taking the veil in.
  */
 import { describe, expect, test } from 'bun:test';
-import { curtain, VEIL_FADE, VEIL_NEAR, veilAt, veilRect } from '../src/render/shared/landVeil';
+import { curtain, cutInView, VEIL_FADE, VEIL_NEAR, veilAt, veilRect } from '../src/render/shared/landVeil';
 import { gameFog } from '../src/render/pc/shaders/fog';
 
 /** A medium land's landscape: 832 m and its 260 m ring each way. */
@@ -105,6 +105,45 @@ describe('the curtain', () => {
     }
     // Its foot well under the lowest ground at the edge and under the sea's sheet.
     for (let i = n; i < 2 * n; i++) expect(positions[i * 3 + 1]).toBeLessThan(Math.min(lowest, -0.35) - 10);
+  });
+});
+
+describe("the cut edge in the game's picture", () => {
+  // A small land (640 m) and its landscape, 260 m round it, its curtain over hills 60 m up all along its edge; the
+  // lens's 0.7 rad, a 16:10 window.
+  const box = { x0: -260, z0: -260, x1: 900, z1: 900 };
+  const { positions } = curtain(box, () => 60, -0.35);
+  const at = (ex: number, ey: number, ez: number, alpha: number, beta: number) => cutInView(box, positions, ex, ey, ez, alpha, beta, 0.7, 1.6);
+
+  test('none from over the landscape, whichever way it looks', () => {
+    for (const alpha of [0, 1, 2, 3, 4, 5]) expect(at(320, 486, 320, alpha, 1.35)).toBe(0);
+    expect(at(-250, 40, -250, Math.PI * 1.25, 1.35)).toBe(0);
+  });
+
+  test('none past a side, looking down on the landscape from the town view as far out as it goes (the side under it, below the picture)', () => {
+    // 900 m out over a side, the tilt at its town view's lowest (1 rad), the target as near the side as it may come: the
+    // eye 273 m past the landscape.
+    expect(at(-533, 486, 320, Math.PI, 1)).toBe(0);
+    expect(at(320, 486, 1173, Math.PI / 2, 1)).toBe(0);
+  });
+
+  test('there across a corner from as far out, and whole from past a side looking low', () => {
+    // (Over the corner the eye is past two sides, nearer each than over a side, and they reach into the picture's lower
+    // corners.)
+    expect(at(-312, 486, 952, Math.PI * 0.75, 1)).toBeGreaterThan(0.5);
+    expect(at(-854, 286, 320, Math.PI, 1.35)).toBe(1);
+  });
+
+  test('eased in as the side comes into the picture, from none to whole', () => {
+    // (900 m out from a target 224 m in from the land's edge, tilted lower and lower.)
+    const seen: number[] = [];
+    for (let beta = 0.9; beta <= 1.3; beta += 0.005) seen.push(at(224 - 900 * Math.sin(beta), 900 * Math.cos(beta), 320, Math.PI, beta));
+    expect(seen[0]).toBe(0);
+    expect(seen.at(-1)).toBe(1);
+    const first = seen.findIndex((k) => k > 0);
+    const whole = seen.indexOf(1);
+    expect(whole - first).toBeGreaterThan(2);
+    for (let i = first; i < whole; i++) expect(seen[i + 1]).toBeGreaterThanOrEqual(seen[i]);
   });
 });
 
