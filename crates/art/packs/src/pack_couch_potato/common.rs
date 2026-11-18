@@ -1,9 +1,8 @@
 //! What the couch potato pack is built from: its palette, meshes from points, pleated curtains, speaker drivers,
 //! screens, snacks, and the kit's parts it uses.
 
-use artkit::forms::Sweep;
 use artkit::materials::Mat;
-use artkit::math::{P3, PI, V3, atan2, cosd, pow, sind, tan};
+use artkit::math::{P3, PI, V3, atan2, cosd, sind};
 use artkit::mesh::Mesh;
 use artkit::parts::turn;
 use artkit::place::{Facing, GameFrame, Spot};
@@ -420,10 +419,7 @@ pub fn cup(f: &GameFrame, x: f64, y: f64, z: f64, r: f64, h: f64, material: Mat)
 
 // --- the kit's parts ------------------------------------------------------------------------------------------
 
-// KIT: kit.tube
-/// A round tube of radius `r` through game points, its bends rounded (`round` steps between each pair of
-/// points; 1 keeps them sharp), its ends capped. `verts` round: by default 8, and more for one over 13 mm in
-/// radius, as many as keep its outline within a millimetre of the circle (`forms::sweep`).
+/// The kit's tube (`artkit::kit::tube`), as the script called it.
 pub fn tube<P: Spot>(
     f: &GameFrame,
     name: &str,
@@ -433,54 +429,26 @@ pub fn tube<P: Spot>(
     verts: Option<usize>,
     round: usize,
 ) -> Obj {
-    f.sweep(
+    artkit::kit::tube(
+        f,
         name,
         points,
         r,
         material,
-        Sweep {
+        artkit::kit::Tube {
             verts,
-            resolution: round,
-            least: 8,
-            ..Sweep::default()
+            round,
+            ..artkit::kit::Tube::default()
         },
     )
 }
 
-// KIT: kit.fillet
-/// The path through `points` (any axes) with each inner corner rounded to about `radius` (`steps` points round
-/// it, on a curve that never overshoots, however uneven the spacing: Catmull-Rom loops on a short leg beside a long
-/// one). For handles, bent rails and draped cloth swept with `resolution` 1.
-// (3.1415 is the script's own limit for a straight corner, not pi.)
-#[allow(clippy::approx_constant)]
+/// The kit's fillet (`artkit::kit::fillet`): the path through `points` with each inner corner rounded.
 pub fn fillet(points: &[(f64, f64, f64)], radius: f64, steps: usize) -> Vec<(f64, f64, f64)> {
-    let pts: Vec<V3> = points.iter().map(|&p| V3::from(p)).collect();
-    let mut out = vec![pts[0]];
-    for w in pts.windows(3) {
-        let (a, p, c) = (w[0], w[1], w[2]);
-        let (d1, d2) = (a - p, c - p);
-        if d1.length() < 1e-9 || d2.length() < 1e-9 || d1.angle(d2) > 3.1415 {
-            out.push(p);
-            continue;
-        }
-        let t = (radius / 1e-6_f64.max(tan(d1.angle(d2) / 2.0)))
-            .min(d1.length() * 0.5)
-            .min(d2.length() * 0.5);
-        let (p1, p2) = (p + d1.normalized() * t, p + d2.normalized() * t);
-        for i in 0..=steps {
-            let k = i as f64 / steps as f64;
-            out.push(p1 * pow(1.0 - k, 2.0) + p * 2 * k * (1.0 - k) + p2 * k * k);
-        }
-    }
-    out.push(pts[pts.len() - 1]);
-    out.iter()
-        .map(|p| (p.x as f64, p.y as f64, p.z as f64))
-        .collect()
+    artkit::kit::fillet(points, radius, steps)
 }
 
-// KIT: kit.pull
-/// A bar pull in one piece: out from a front at game depth `face` on two round stand-offs `length` apart
-/// (across it, or `upright`), its bends rounded: a drawer's or a door's handle.
+/// The kit's bar pull (`artkit::kit::pull`), as the script called it.
 #[allow(clippy::too_many_arguments)]
 pub fn pull(
     f: &GameFrame,
@@ -495,31 +463,19 @@ pub fn pull(
     upright: bool,
     verts: usize,
 ) -> Obj {
-    let (h, b) = (length / 2.0, 0.012_f64.min(out * 0.45));
-    let ends = [
-        (-h, face - 0.003),
-        (-h, face + out),
-        (h, face + out),
-        (h, face - 0.003),
-    ];
-    let pts: Vec<(f64, f64, f64)> = ends
-        .iter()
-        .map(|&(u, z)| {
-            if upright {
-                (x, y + u, z)
-            } else {
-                (x + u, y, z)
-            }
-        })
-        .collect();
-    f.sweep(
+    artkit::kit::pull(
+        f,
         name,
-        &fillet(&pts, b, 3),
-        r,
+        x,
+        y,
+        face,
+        length,
         material,
-        Sweep {
-            verts: Some(verts),
-            ..Sweep::default()
+        artkit::kit::Pull {
+            r,
+            out,
+            upright,
+            verts,
         },
     )
 }

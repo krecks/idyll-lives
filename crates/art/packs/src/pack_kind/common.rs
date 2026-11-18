@@ -1,17 +1,12 @@
 //! What the kind pack is built from: its palette, turned and lofted pieces, fluted rings, the tea set, little
 //! shrubs, and the kit's parts it uses.
 
-use artkit::forms::{Loft, Sweep, loft as loft_, rounded_rect};
 use artkit::materials::Mat;
-use artkit::math::{P3, TAU, V3, cos, cosd, pow, radians, sin, sind, tan};
-use artkit::mesh::Mesh;
+use artkit::math::{P3, TAU, cos, cosd, sin, sind};
 use artkit::place::{GameFrame, Spot};
 use artkit::rand::Random;
-use artkit::scene::{self, Obj};
-use artkit::shapes::{Sphere, shade, sphere};
-use artkit::{
-    boulder, fbox, fextrude, fsphere, fsweep, jitter, loft, palette, revolve, ring, torus,
-};
+use artkit::scene::Obj;
+use artkit::{boulder, fsphere, fsweep, jitter, loft, palette, revolve, ring, torus};
 use std::cell::Cell;
 
 palette! { M:
@@ -383,10 +378,7 @@ pub fn bush(f: &GameFrame, x: f64, y: f64, z: f64, r: f64, flower: Mat, seed: i3
     }
 }
 
-// KIT: kit.tube
-/// A round tube of radius `r` through game points, its bends rounded (`round` steps between each pair of
-/// points; 1 keeps them sharp), its ends capped. `verts` round: by default 8, and more for one over 13 mm in
-/// radius, as many as keep its outline within a millimetre of the circle (`forms::sweep`).
+/// The kit's tube (`artkit::kit::tube`), as the script called it.
 pub fn tube<P: Spot>(
     f: &GameFrame,
     name: &str,
@@ -396,54 +388,26 @@ pub fn tube<P: Spot>(
     verts: Option<usize>,
     round: usize,
 ) -> Obj {
-    f.sweep(
+    artkit::kit::tube(
+        f,
         name,
         points,
         r,
         material,
-        Sweep {
+        artkit::kit::Tube {
             verts,
-            resolution: round,
-            least: 8,
-            ..Sweep::default()
+            round,
+            ..artkit::kit::Tube::default()
         },
     )
 }
 
-// KIT: kit.fillet
-/// The path through `points` (any axes) with each inner corner rounded to about `radius` (`steps` points round
-/// it, on a curve that never overshoots, however uneven the spacing: Catmull-Rom loops on a short leg beside a long
-/// one). For handles, bent rails and draped cloth swept with `resolution` 1.
-// (3.1415 is the script's own limit for a straight corner, not pi.)
-#[allow(clippy::approx_constant)]
+/// The kit's fillet (`artkit::kit::fillet`): the path through `points` with each inner corner rounded.
 pub fn fillet(points: &[(f64, f64, f64)], radius: f64, steps: usize) -> Vec<(f64, f64, f64)> {
-    let pts: Vec<V3> = points.iter().map(|&p| V3::from(p)).collect();
-    let mut out = vec![pts[0]];
-    for w in pts.windows(3) {
-        let (a, p, c) = (w[0], w[1], w[2]);
-        let (d1, d2) = (a - p, c - p);
-        if d1.length() < 1e-9 || d2.length() < 1e-9 || d1.angle(d2) > 3.1415 {
-            out.push(p);
-            continue;
-        }
-        let t = (radius / 1e-6_f64.max(tan(d1.angle(d2) / 2.0)))
-            .min(d1.length() * 0.5)
-            .min(d2.length() * 0.5);
-        let (p1, p2) = (p + d1.normalized() * t, p + d2.normalized() * t);
-        for i in 0..=steps {
-            let k = i as f64 / steps as f64;
-            out.push(p1 * pow(1.0 - k, 2.0) + p * 2 * k * (1.0 - k) + p2 * k * k);
-        }
-    }
-    out.push(pts[pts.len() - 1]);
-    out.iter()
-        .map(|p| (p.x as f64, p.y as f64, p.z as f64))
-        .collect()
+    artkit::kit::fillet(points, radius, steps)
 }
 
-// KIT: kit.pull
-/// A bar pull in one piece: out from a front at game depth `face` on two round stand-offs `length` apart
-/// (across it, or `upright`), its bends rounded: a drawer's or a door's handle.
+/// The kit's bar pull (`artkit::kit::pull`), as the script called it.
 #[allow(clippy::too_many_arguments)]
 pub fn pull(
     f: &GameFrame,
@@ -458,39 +422,24 @@ pub fn pull(
     upright: bool,
     verts: usize,
 ) -> Obj {
-    let (h, b) = (length / 2.0, 0.012_f64.min(out * 0.45));
-    let ends = [
-        (-h, face - 0.003),
-        (-h, face + out),
-        (h, face + out),
-        (h, face - 0.003),
-    ];
-    let pts: Vec<(f64, f64, f64)> = ends
-        .iter()
-        .map(|&(u, z)| {
-            if upright {
-                (x, y + u, z)
-            } else {
-                (x + u, y, z)
-            }
-        })
-        .collect();
-    f.sweep(
+    artkit::kit::pull(
+        f,
         name,
-        &fillet(&pts, b, 3),
-        r,
+        x,
+        y,
+        face,
+        length,
         material,
-        Sweep {
-            verts: Some(verts),
-            ..Sweep::default()
+        artkit::kit::Pull {
+            r,
+            out,
+            upright,
+            verts,
         },
     )
 }
 
-// KIT: kit.shaker
-/// A frame-and-panel front `w` x `h`, `t` thick, centred at game `at`, facing the front (a cabinet's door, a
-/// drawer's front): a frame `rail` wide round a panel set back `recess`, flat, or `raised` (its edges chamfered
-/// up to a field); `panel`: the panel's own material. Returns (frame, panel).
+/// The kit's frame-and-panel front (`artkit::kit::shaker`), as the script called it: (frame, panel).
 #[allow(clippy::too_many_arguments)]
 pub fn shaker(
     f: &GameFrame,
@@ -505,71 +454,25 @@ pub fn shaker(
     recess: f64,
     raised: bool,
 ) -> (Obj, Obj) {
-    let hole = rounded_rect(w - 2.0 * rail, h - 2.0 * rail, 0.003, 1);
-    let fr = fextrude!(
+    artkit::kit::shaker(
         f,
         name,
-        &rounded_rect(w, h, 0.003, 1),
-        t,
+        w,
+        h,
         at,
+        t,
         material,
-        holes = vec![hole],
-        bevel = if t * 0.2 < 0.004 { t * 0.2 } else { 0.004 },
-        bevel_segments = 1
-    );
-    // (a hair inside the opening, not into the frame: a vertex buried in it would bake black)
-    let (pw, ph) = (w - 2.0 * rail - 0.002, h - 2.0 * rail - 0.002);
-    if !raised {
-        let pn = fbox!(
-            f,
-            format!("{name}_panel"),
-            pw,
-            ph,
-            t - 2.0 * recess,
-            at,
-            panel.unwrap_or(material),
-            bevel = 0.002,
-            bevel_segments = 1
-        );
-        return (fr, pn);
-    }
-    // a raised panel: a thin edge inside the frame, rising over a wide shallow chamfer to a flat field
-    let (x, y, z) = at;
-    let mut b = rail * 0.7;
-    for c in [pw * 0.25, ph * 0.25] {
-        if c < b {
-            b = c;
-        }
-    }
-    let lp = |hw: f64, hh: f64, d: f64| -> Vec<P3> {
-        [(hw, hh), (-hw, hh), (-hw, -hh), (hw, -hh)]
-            .iter()
-            .map(|&(u, v)| f.at(x + u, y + v, d))
-            .collect()
-    };
-    let front = z + t / 2.0;
-    let pn = loft_(
-        format!("{name}_panel"),
-        &[
-            lp(pw / 2.0, ph / 2.0, z - t / 2.0 + 0.002),
-            lp(pw / 2.0, ph / 2.0, front - recess - 0.004),
-            lp(pw / 2.0 - b, ph / 2.0 - b, front - recess * 0.2),
-        ],
-        artkit::forms::Loft {
-            material: Some(panel.unwrap_or(material)),
-            smooth: false,
-            ..Default::default()
+        artkit::kit::Shaker {
+            rail,
+            panel,
+            recess,
+            raised,
         },
-    );
-    (fr, pn)
+    )
 }
 
-// KIT: kit.moulding
-/// A moulding run round a closed `outline` with mitred corners: a picture or mirror frame, a panel's bead, a
-/// plinth's or a cornice's band. `outline` is game (x, height) points drawn at depth `at` (`front`), or (x, depth)
-/// points at height `at`; `profile` is the moulding's closed cross-section [(inset, out), ...]: `inset` metres in
-/// from the outline, `out` metres forward of `at` (front) or up from it (top). The corners stay square however
-/// wide the profile (a sweep pinches them).
+/// The kit's moulding (`artkit::kit::moulding`), as the script called it: on the front at depth `at`, or on top
+/// at height `at` (`front` false).
 #[allow(clippy::too_many_arguments)]
 pub fn moulding(
     f: &GameFrame,
@@ -581,62 +484,22 @@ pub fn moulding(
     front: bool,
     angle: f64,
 ) -> Obj {
-    let n = outline.len();
-    let area =
-        artkit::py::sum((0..n).map(|i| {
-            outline[i].0 * outline[(i + 1) % n].1 - outline[(i + 1) % n].0 * outline[i].1
-        }));
-    let turn = if area > 0.0 { 1.0 } else { -1.0 }; // inward is to the left of an anticlockwise outline
-    let inward = |a: (f64, f64), b: (f64, f64)| -> (f64, f64) {
-        let (dx, dy) = (b.0 - a.0, b.1 - a.1);
-        let mut length = pow(dx * dx + dy * dy, 0.5);
-        if length == 0.0 {
-            length = 1.0;
-        }
-        (-dy / length * turn, dx / length * turn)
+    let plane = if front {
+        artkit::place::Facing::Front
+    } else {
+        artkit::place::Facing::Top
     };
-    let (mut vs, mut faces) = (Vec::new(), Vec::new());
-    let m = profile.len();
-    for i in 0..n {
-        let p = outline[i];
-        let (n0, n1) = (
-            inward(outline[(i + n - 1) % n], p),
-            inward(p, outline[(i + 1) % n]),
-        );
-        let k = 1.0 + n0.0 * n1.0 + n0.1 * n1.1;
-        let (mx, my) = ((n0.0 + n1.0) / k, (n0.1 + n1.1) / k);
-        for &(inset, out) in profile {
-            let (u, v) = (p.0 + inset * mx, p.1 + inset * my);
-            vs.push(V3::from(if front {
-                f.at(u, v, at + out)
-            } else {
-                f.at(u, at + out, v)
-            }));
-        }
-    }
-    for i in 0..n {
-        let (a, b) = (i * m, ((i + 1) % n) * m);
-        for j in 0..m {
-            let j2 = (j + 1) % m;
-            faces.push(vec![
-                (a + j) as u32,
-                (a + j2) as u32,
-                (b + j2) as u32,
-                (b + j) as u32,
-            ]);
-        }
-    }
-    let mut mesh = Mesh::from_pydata(vs, &faces);
-    mesh.set_material(Some(material));
-    mesh.recalc_normals();
-    shade(scene::add(name, mesh), true, angle)
+    artkit::kit::moulding(
+        f,
+        name,
+        outline,
+        profile,
+        material,
+        artkit::kit::Moulding { at, plane, angle },
+    )
 }
 
-// KIT: kit.songbird
-/// A small songbird (a robin, a tit, a sparrow) perched with its feet at game (x, y, z), facing the front turned
-/// `turn` degrees towards +x: a lofted body tapering into a fanned tail, a `breast` patch, a pointed `beak`, `eye`s,
-/// thin legs down to the perch. `size` 1 is a robin (14 cm long); `head` tips the head down (degrees: drinking,
-/// pecking); `low` takes fewer sides and no eyes (a far version). About 350 triangles. Returns its pieces.
+/// The kit's songbird (`artkit::kit::songbird`), as the script called it (its turn a whole number of degrees).
 #[allow(clippy::too_many_arguments)]
 pub fn songbird(
     f: &GameFrame,
@@ -653,144 +516,22 @@ pub fn songbird(
     head: f64,
     low: bool,
 ) -> Vec<Obj> {
-    let (c, s) = (cos(radians(turn)), sin(radians(turn)));
-    let dip = radians(head);
-    // The game point `u` across (to the bird's right), `v` forward and `w` up from its feet (at size 1).
-    let at = |u: f64, v: f64, w: f64| -> P3 {
-        let (mut v, mut w) = (v, w);
-        if v > 0.03 {
-            // the head and beak tip down about the neck
-            let (dv, dw) = (v - 0.03, w - 0.048);
-            (v, w) = (
-                0.03 + dv * cos(dip) + dw * sin(dip),
-                0.048 - dv * sin(dip) + dw * cos(dip),
-            );
-        }
-        let (u, v, w) = (u * size, v * size, w * size);
-        f.at(x + v * s + u * c, y + w, z + v * c - u * s)
-    };
-    // (forward, half width, half height, centre height): from the tail's root to the face
-    let rows = [
-        (-0.05, 0.010, 0.010, 0.040),
-        (-0.035, 0.022, 0.024, 0.036),
-        (-0.012, 0.029, 0.031, 0.034),
-        (0.012, 0.027, 0.030, 0.038),
-        (0.03, 0.02, 0.022, 0.048),
-        (0.045, 0.02, 0.02, 0.058),
-        (0.06, 0.016, 0.015, 0.06),
-        (0.07, 0.007, 0.007, 0.059),
-    ];
-    let n = if low { 6 } else { 10 };
-    let sections: Vec<Vec<P3>> = rows
-        .iter()
-        .map(|&(v, hw, hh, wc)| {
-            (0..n)
-                .map(|k| {
-                    at(
-                        hw * cos(TAU * k as f64 / n as f64),
-                        v,
-                        wc + hh * sin(TAU * k as f64 / n as f64),
-                    )
-                })
-                .collect()
-        })
-        .collect();
-    let mut made = vec![loft_(
+    let turn = artkit::Arg::arg(turn as i32);
+    artkit::kit::songbird(
+        f,
         name,
-        &sections,
-        Loft {
-            material: Some(body),
-            ..Loft::default()
+        x,
+        y,
+        z,
+        body,
+        breast,
+        beak,
+        eye,
+        artkit::kit::Songbird {
+            turn,
+            size,
+            head,
+            low,
         },
-    )];
-    made.push(artkit::forms::sweep(
-        format!("{name}_beak"),
-        &[at(0.0, 0.066, 0.058), at(0.0, 0.088, 0.057)],
-        0.0055 * size,
-        Sweep {
-            material: Some(beak),
-            verts: Some(if low { 5 } else { 6 }),
-            scale: artkit::forms::Scale::List(vec![1.0, 0.15]),
-            ..Sweep::default()
-        },
-    ));
-    let breast_at = V3::from(at(0.0, 0.01, 0.034));
-    made.push(sphere(
-        format!("{name}_breast"),
-        1.0,
-        Sphere {
-            at: breast_at.into(),
-            material: Some(breast),
-            rot: P3 {
-                x: 0.0,
-                y: 0.0,
-                z: -turn,
-            },
-            scale: P3 {
-                x: 0.026 * size,
-                y: 0.027 * size,
-                z: 0.025 * size,
-            },
-            segments: if low { 8 } else { 10 },
-            rings: if low { 5 } else { 6 },
-            ..Sphere::default()
-        },
-    ));
-    // the tail: a thin fan, cocked a little up
-    made.push(artkit::forms::sweep(
-        format!("{name}_tail"),
-        &[at(0.0, -0.04, 0.041), at(0.0, -0.088, 0.054)],
-        0.0,
-        Sweep {
-            material: Some(body),
-            profile: artkit::forms::Profile(Some(vec![
-                (-0.0018, -0.008),
-                (0.0018, -0.008),
-                (0.0018, 0.008),
-                (-0.0018, 0.008),
-            ])),
-            up: P3 {
-                x: 0.0,
-                y: 0.0,
-                z: 1.0,
-            },
-            scale: artkit::forms::Scale::List(vec![0.9 * size, 1.8 * size]),
-            ..Sweep::default()
-        },
-    ));
-    if let Some(eye) = eye
-        && !low
-    {
-        for k in [-1, 1] {
-            made.push(sphere(
-                format!("{name}_eye{k}"),
-                0.0042 * size,
-                Sphere {
-                    at: at(k as f64 * 0.0148, 0.055, 0.062),
-                    material: Some(eye),
-                    segments: 6,
-                    rings: 4,
-                    ..Sphere::default()
-                },
-            ));
-        }
-    }
-    for k in [-1, 1] {
-        let kf = k as f64;
-        made.push(artkit::forms::sweep(
-            format!("{name}_leg{k}"),
-            &[
-                at(kf * 0.008, 0.0, 0.026),
-                at(kf * 0.009, 0.004, 0.0),
-                at(kf * 0.009, 0.016, 0.0),
-            ],
-            0.0016 * size,
-            Sweep {
-                material: Some(beak),
-                verts: Some(4),
-                ..Sweep::default()
-            },
-        ));
-    }
-    made
+    )
 }
