@@ -362,10 +362,12 @@ fn make_decimated(model: &Model, ratio: f64) -> Result<Vec<Obj>, String> {
 }
 
 /// The parts shaded and written: the .glb's bytes.
-fn export(objs: &[Obj], ground: bool) -> Vec<u8> {
+pub fn export(objs: &[Obj], ground: bool) -> Vec<u8> {
     // The textured finishes' UVs, made when the parts were joined; a part never joined gets its own.
     let texcoords = uv::ensure(objs);
     shade::bake_ao(objs, None, ground);
+    // Blender's exporter validates each mesh before it writes it: a face on another's points goes, shaded as it is.
+    crate::validate::meshes(objs);
     let finishes = scene::with(|s| s.finishes.clone());
     glb::write(objs, texcoords, &finishes)
 }

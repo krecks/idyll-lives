@@ -34,4 +34,5 @@ pub mod shapes;
 pub mod soft;
 pub mod tri;
 pub mod uv;
+pub mod validate;
 pub mod weld;
