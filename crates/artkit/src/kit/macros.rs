@@ -211,3 +211,29 @@ macro_rules! kit_letters {
         $crate::kit::letters(args.0, args.1, args.2, $crate::forms::num(args.3), $crate::forms::num(args.4), args.5, args.6, o)
     }};
 }
+
+/// `kit::turned` with its options by name, as the packs' scripts called their `_turned`: `kit::turned!(frame, name, x, y, z, profile, material, segments = 14, rot = (90, 0, 0))`.
+#[macro_export]
+macro_rules! kit_turned {
+    ($frame:expr, $name:expr, $x:expr, $y:expr, $z:expr, $profile:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $x, $y, $z, $profile, $material);
+        #[allow(unused_mut)]
+        let mut o = $crate::kit::Turned::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::kit::turned(args.0, args.1, args.2, args.3, args.4, args.5, args.6, o)
+    }};
+}
+
+/// `kit::lathe` with its options by name, as the packs' scripts called their `_lathe`: `kit::lathe!(frame, name, x, y, z, rings, material, verts = 24, square = 7, sy = 0.68)`.
+#[macro_export]
+macro_rules! kit_lathe {
+    ($frame:expr, $name:expr, $x:expr, $y:expr, $z:expr, $rings:expr, $material:expr $(, $k:ident = $v:expr)* $(,)?) => {{
+        // (as Python: what is given by place first, then the options in the order written)
+        let args = (&$frame, $name, $x, $y, $z, $rings, $material);
+        #[allow(unused_mut)]
+        let mut o = $crate::kit::Lathe::default();
+        $(o.$k = $crate::Arg::arg($v);)*
+        $crate::kit::lathe(args.0, args.1, args.2, $crate::forms::num(args.3), args.4, args.5, args.6, o)
+    }};
+}

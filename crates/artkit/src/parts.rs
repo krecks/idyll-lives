@@ -12,6 +12,26 @@ use crate::scene::{self, Obj, meshes};
 /// "Scale, axes, origin and footprint").
 pub const ASIDE: &str = "_aside";
 
+thread_local! {
+    static NUMBERED: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+/// `stem` numbered, each part its own name: `pot1`, `leaf2`, `pot3` (the scripts' `_name`: one count for every
+/// stem). The count runs on over everything a thread builds, a model and its far version: it is not the scene's,
+/// and `scene::reset` leaves it.
+pub fn numbered(stem: &str) -> String {
+    NUMBERED.with(|n| {
+        n.set(n.get() + 1);
+        format!("{stem}{}", n.get())
+    })
+}
+
+/// Starts `numbered`'s count after `n` names: where a script's count ran on from the models before, and a part
+/// kept the number it was given.
+pub fn numbered_from(n: u32) {
+    NUMBERED.with(|c| c.set(n));
+}
+
 /// The parts made inside `build`, in order: `let lid = new_parts(|| { cube!("lid", ...); cube!("lid_handle", ...); });`
 /// then `join(&lid, "lid", None)`.
 pub fn new_parts(build: impl FnOnce()) -> Vec<Obj> {

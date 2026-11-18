@@ -13,8 +13,11 @@
 //!   kit::cut!(carcass, fbox!(F, "oven_cut", 0.62, 0.42, 0.36, (-0.4, 0.42, 0.06), M.body));   // a recess cut in through a side
 //!   kit::recessed_box!(F, "carcass", 0.6, 0.82, 0.6, (0, 0.46, 0), M.enamel, (0.48, 0.38, 0.46), (0, 0.43, 0.08), lining = M.dark);
 //!   kit::letters!(F, "letters", "MARIE", 0.064, 0.003, (-0.04, 0.705, 0.115), M.gold, space = 1.25);   // a name in raised letters
+//!   kit::turned!(F, "saucer", x, y, z, &[(0.0, 0.0), (0.03, 0.0), (0.05, 0.006), (0.0, 0.005)], M.porcelain, segments = 16);   // a profile revolved on a game point
+//!   kit::lathe!(F, "bowl", x, y, z, &[(0.05, 0.0), (0.09, 0.05), (0.085, 0.06)], M.glaze, verts = 24, square = 7, sy = 0.68);   // rings lofted on one
+//!   kit::paint(jar, M.label, |c| 0.03 < c.z && c.z < 0.06);   // a band on a part's own faces
 //!
-//! By kind: `hardware` (pulls, knobs), `turned` (legs), `joinery` (bent paths, frame-and-panel fronts, mouldings,
+//! By kind: `hardware` (pulls, knobs), `turned` (legs, turned and lofted round pieces), `joinery` (bent paths, frame-and-panel fronts, mouldings,
 //! a bench's ends, a recess or a hole cut into a body), `metalwork` (tube, scrolls), `creatures` (a songbird),
 //! `signs` (the taxi's word and chequers, raised block letters), `tableware`.
 
@@ -37,23 +40,18 @@ pub use turned::*;
 // (the macros, exported at the crate's root under `kit_` names, by the names the scripts called: `kit::pull!`)
 pub use crate::{
     kit_bench_end as bench_end, kit_cabriole as cabriole, kit_chequer as chequer, kit_cut as cut,
-    kit_fillet as fillet, kit_knob as knob, kit_letters as letters, kit_moulding as moulding,
-    kit_pull as pull, kit_recessed_box as recessed_box, kit_scroll as scroll, kit_shaker as shaker,
-    kit_songbird as songbird, kit_taxi_word as taxi_word, kit_tube as tube,
+    kit_fillet as fillet, kit_knob as knob, kit_lathe as lathe, kit_letters as letters,
+    kit_moulding as moulding, kit_pull as pull, kit_recessed_box as recessed_box,
+    kit_scroll as scroll, kit_shaker as shaker, kit_songbird as songbird,
+    kit_taxi_word as taxi_word, kit_tube as tube, kit_turned as turned,
 };
 
 /// Python's `min` of floats: the first of the least.
 pub(crate) fn least(xs: &[f64]) -> f64 {
-    let mut m = xs[0];
-    for &x in &xs[1..] {
-        if x < m {
-            m = x;
-        }
-    }
-    m
+    crate::py::min_of(xs)
 }
 
 /// Python's `max` of two floats: the first unless the second is greater.
 pub(crate) fn most(a: f64, b: f64) -> f64 {
-    if b > a { b } else { a }
+    crate::py::max(a, b)
 }

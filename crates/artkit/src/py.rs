@@ -1,6 +1,27 @@
 //! Python's arithmetic where Rust's differs: the family code was written in Python, and a model's numbers
 //! (a perch to the millimetre, a count of sides) come out of its rounding and its `math` module.
 
+/// `min(a, b)`: the first unless the second is below it, so of two equal ones the first (`min(0.0, -0.0)` is
+/// `0.0`, where `f64::min` may give either), and the first if it is not a number.
+pub fn min(a: f64, b: f64) -> f64 {
+    if b < a { b } else { a }
+}
+
+/// `max(a, b)`: the first unless the second is above it.
+pub fn max(a: f64, b: f64) -> f64 {
+    if b > a { b } else { a }
+}
+
+/// `min(xs)`, of one number or more: the first of the least.
+pub fn min_of(xs: &[f64]) -> f64 {
+    xs[1..].iter().fold(xs[0], |m, &x| min(m, x))
+}
+
+/// `max(xs)`, of one number or more: the first of the greatest.
+pub fn max_of(xs: &[f64]) -> f64 {
+    xs[1..].iter().fold(xs[0], |m, &x| max(m, x))
+}
+
 /// `round(x)`: to the nearest whole number, a half to the even one.
 pub fn round(x: f64) -> i64 {
     x.round_ties_even() as i64
@@ -143,6 +164,25 @@ mod tests {
         assert_eq!(round_to(0.0625, 3), 0.062);
         assert_eq!(round_to(-0.0004, 3) + 0.0, 0.0);
         assert!((round_to(-0.0004, 3) + 0.0).is_sign_positive());
+    }
+
+    #[test]
+    fn the_least_and_the_greatest_are_the_first_of_their_equals() {
+        // CPython 3.13: min(0.0, -0.0), min(-0.0, 0.0), max(-0.0, 0.0), max(0.0, -0.0)
+        assert!(min(0.0, -0.0).is_sign_positive() && min(-0.0, 0.0).is_sign_negative());
+        assert!(max(-0.0, 0.0).is_sign_negative() && max(0.0, -0.0).is_sign_positive());
+        assert_eq!(
+            (min(2.0, 1.5), min(1.5, 2.0), max(2.0, 1.5), max(1.5, 2.0)),
+            (1.5, 1.5, 2.0, 2.0)
+        );
+        // min(nan, 1.0) is nan and min(1.0, nan) is 1.0: nothing is below or above what is not a number
+        assert!(min(f64::NAN, 1.0).is_nan() && max(f64::NAN, 1.0).is_nan());
+        assert_eq!((min(1.0, f64::NAN), max(1.0, f64::NAN)), (1.0, 1.0));
+        assert_eq!(min_of(&[0.012, 0.0135, 0.012]), 0.012);
+        assert!(
+            min_of(&[0.0, -0.0, 0.0]).is_sign_positive() && max_of(&[-0.0, 0.0]).is_sign_negative()
+        );
+        assert_eq!((min_of(&[3.0]), max_of(&[1.0, 3.0, 2.0])), (3.0, 3.0));
     }
 
     #[test]

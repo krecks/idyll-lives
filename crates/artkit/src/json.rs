@@ -30,6 +30,15 @@ impl Json {
         }
     }
 
+    /// A number's value, whole or not (a script read `d['height']` as it came).
+    pub fn num(&self) -> Option<f64> {
+        match self {
+            Json::Int(i) => Some(*i as f64),
+            Json::Num(x) => Some(*x),
+            _ => None,
+        }
+    }
+
     pub fn str(&self) -> Option<&str> {
         match self {
             Json::Str(s) => Some(s),
@@ -375,6 +384,14 @@ macro_rules! json {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_number_reads_whole_or_not() {
+        let j = loads(r#"{"height": 2, "reach": 0.25, "name": "lamp"}"#).unwrap();
+        assert_eq!(j.get("height").and_then(Json::num), Some(2.0));
+        assert_eq!(j.get("reach").and_then(Json::num), Some(0.25));
+        assert_eq!(j.get("name").and_then(Json::num), None);
+    }
 
     #[test]
     fn floats_read_as_pythons_repr() {
