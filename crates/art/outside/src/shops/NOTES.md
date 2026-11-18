@@ -1,6 +1,6 @@
 # Shops — notes
 
-`shops.py` builds the five CM4 shop and café models into `web/public/assets/models/shops/` and their entries in
+`crates/art/outside/src/shops` builds the five CM4 shop and café models into `web/public/assets/models/shops/` and their entries in
 `packs/shops/manifest.json`: the shop counter (`model.shopCounter`), the bakery case (`model.bakeryCase`), the grocery
 shelves (`model.groceryShelf`), the café table (`model.cafeTable`) and the café chair (`model.cafeChair`). Built 2026-10-14; they sat in
 Validate › Shops until checked in play (back to community / shops).

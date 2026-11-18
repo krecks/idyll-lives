@@ -8,7 +8,7 @@
   "model.drinkingFountain far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.farm.scarecrow far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.fountainTown far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
-  "model.groceryShelf far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
+  "model.groceryShelf far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)", "triangles": "the kernel's decimation keeps the quarter the script asks for; Blender's export had taken out faces its decimation left back to back (21.8 % left)"},
   "model.hotDogStand far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.iceCreamCart far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
   "model.lampPost far": {"decimated": "far version decimated by Blender: not repeatable between two Blender builds (measured up to 55 mm)"},
