@@ -1,6 +1,6 @@
 # Living — notes
 
-`living.py` builds the living room's models into `web/public/assets/models/living/` and their entries in
+This module builds the living room's models into `web/public/assets/models/living/` and their entries in
 `packs/living/manifest.json`: the fold-down wall bed (`model.wallBed`), the sofa bed (`model.sofaBed`), the ten
 L1 sofas and sectionals, the eleven L2 armchairs and small seats, the nine L3 coffee and side tables and the L6
 staircase (`model.stairs`). Built 2026-10-14; they sat in Validate › Sofas, Armchairs and Coffee Tables until checked in play.
@@ -8,12 +8,12 @@ staircase (`model.stairs`). Built 2026-10-14; they sat in Validate › Sofas, Ar
 ## The sofas and sectionals (L1)
 
 Each is built where the old part stood (`F`, game axes), its back on the wall's face, and is settled in place
-(`G.settle(centre=False)`, `centre=` on its `Model`). Two nodes each:
+(`settle` on the floor, `centre=` on its `Model`). Two nodes each:
 
 - **`sofa`**: the upholstery (base, arms, back), any show-wood or metal frame, the back cushions, the pillows and
   the legs. Fabric plus wood (or metal): 2 draws.
 - **`seat`**: the seat cushions (and a throw lying on them), their origin on their underside. `sink_in` squashes
-  them 2 cm in 0.6 s (`G.squash`), held while the use lasts: `motions: {'uses': {'relax': 'sink_in', 'doze':
+  them 2 cm in 0.6 s (`squash`), held while the use lasts: `motions: {'uses': {'relax': 'sink_in', 'doze':
   'sink_in'}}` (the classic sofa has no `doze`). 1 draw.
 
 The seat cushions' tops are the seat heights (`characters.ts` `SEATS`, content `seat`): 0.44–0.45 m, the designer
@@ -47,7 +47,7 @@ Built as the sofas are, from the old primitive parts (`armchair_bergere` and the
 
 - **Recliner** (`recline`, `footrest_up`, for relax and doze): a skirted base and arms (still); the seat cushion,
   the back and its head cushion as one part (`seat`) turning back 25° about the sitter's hips (content seat 0.44 m,
-  forward 0.12) and gliding 8 cm forward as it does (`G.path`, a wall-hugger's), with `ride` on it, so the resident
+  forward 0.12) and gliding 8 cm forward as it does (`path`, a wall-hugger's), with `ride` on it, so the resident
   reclines with it and rests the head on the head cushion; the padded footrest, folded flat against the front of the
   base at rest, swings up 80°. Since 2026-10-21 (M-living-04) the back stands 1.0 m high with a head cushion, over a
   0.80 m deep base (it was 0.84 × 0.70, the back stopping at the sitter's shoulder blades). It stands 11 cm off the
@@ -85,7 +85,7 @@ for the side, nesting and console tables). Still, but for two:
   slides out 30 cm. It is 6 cm lower than the old part (that one had magazines on the top; they're in the
   drawer now).
 - **Nesting tables** (`small_out` for `pullOut`, and back for `pushIn`): the small oak table is a part of its own
-  (`small_table`) and slides 42 cm out from under the white one in 0.9 s (`G.slide`, after `G.settle`), leaving it
+  (`small_table`) and slides 42 cm out from under the white one in 0.9 s (`slide`, after `settle`), leaving it
   beside the big table; `motions: {'uses': {'pullOut': 'small_out', 'pushIn': {'clip': 'small_out', 'over': -1}},
   'open': 'small_out'}`. It was left decorative in 0.3.0 and got its use on 2026-10-31 (I-living-01).
 - **Side table**: the model copies the catalog pack's `side_table` (oak with a drawer and a brass knob), which stood
@@ -115,7 +115,7 @@ the corner bookcase's and the ladder shelf's redrawn as the models are. Tops at 
 low bookcase 0.90 m, the cube shelf 0.80 m, the industrial shelving 1.83 m (the content rectangles are unchanged; the
 models' tops now start at the wall's face, 1–4 cm in front of the rectangles' backs).
 
-- **Books** are rows of plain satin boxes (`_book_row`, seeded, so they rebuild the same): a cover, the page block
+- **Books** are rows of plain satin boxes (`book_row`, seeded, so they rebuild the same): a cover, the page block
   showing 2 mm above it, a gilt band on a third of the spines, the odd gap and a few lying flat at the end of some
   rows. Joined into the still body, they cost no draw call of their own.
 - **`book_out`** (the five bookcases): one red book at reading height is a part of its own, hinged on the foot of
@@ -180,16 +180,16 @@ colour studio.
 
 Every model but the two worked examples (`model.armchair`, `model.sofa`, rebuilt the day before) rebuilt with the
 forms (gamekit/forms.py), same keys, sizes, centres, nodes, clips, motions, paint and draws; the triangles in the
-tables above. The helpers in living.py:
+tables above. The helpers (common.rs):
 
-- **`_cushion`** is a `F.soft` box: rounded, puffed on its two largest faces, its corners pinched in (the shared
+- **`cushion`** is a `F.soft` box: rounded, puffed on its two largest faces, its corners pinched in (the shared
   form's default: two seat cushions part in a V at their front corners), piped round both seams (`piping` None:
   none), `resting` (it lies on the deck or leans on the back: that face is plain and has no cord). `keep_top=True`
   for a seat cushion: its puffed middle where the old box's top was, its edges lower, so the seat stays at the
   content height (the gate checks within 2 cm; a puff on top of the old top was 2.5 cm high), its top sinking
   1.4 cm over its front third (`SEAT_SAG`: where the hips rest, and the 5 cm round it the gate probes, it keeps
-  its height) and standing 5 mm over its boxing (`SEAT_OVERHANG`). **`_pillow`**: a throw pillow sewn flat and
-  stuffed: thin at its seams, its sides drawn in between corners that stand out as ears (`waist`). **`_panel`**:
+  its height) and standing 5 mm over its boxing (`SEAT_OVERHANG`). **`pillow`**: a throw pillow sewn flat and
+  stuffed: thin at its seams, its sides drawn in between corners that stand out as ears (`waist`). **`panel`**:
   firm upholstery (a base, an arm, a back), rounded, welted; the designer sofa's back and the pouf's top are
   tufted by the form (`tufts`, `button`: the dents are in the mesh, a covered button in each). Never puff a part
   across its width or depth at the model's edge: `soft_box` puffs both faces, and the model grows (the sofas did,
@@ -201,13 +201,13 @@ tables above. The helpers in living.py:
   more triangles (the table above), the armchair (4,556) and the lounge chair (4,028) a little over their aim of
   4,000. The designer chair's arm pads, crossed in one step, are not pinched (they were, for a day, and the chair
   7 mm narrower).
-- **`_leg`** (a turned leg: collar, taper, splay), **`_throw`** (a throw swept over a seat's front edge,
-  wobbled), **`_rolled_arm`** (an English arm: its section swept, a welt round its scroll), **`_press`** (tufts
-  pressed into a top), **`_round_rings`**/**`_disc`** (turned things lofted from (height, radius) rows: table
-  tops with moulded edges, feet, vases, finials), **`_shell`** (a dished plywood shell), **`_top`** (a table top
-  with rounded corners and eased edges), **`_turned_leg`**, **`_knob`** (a turned knob), **`_fillet`** (a polyline
+- **`leg`** (a turned leg: collar, taper, splay), **`throw`** (a throw swept over a seat's front edge,
+  wobbled), **`rolled_arm`** (an English arm: its section swept, a welt round its scroll), **`press`** (tufts
+  pressed into a top), **`round_rings`**/**`disc`** (turned things lofted from (height, radius) rows: table
+  tops with moulded edges, feet, vases, finials), **`shell`** (a dished plywood shell), **`top`** (a table top
+  with rounded corners and eased edges), **`turned_leg`**, **`knob`** (a turned knob), **`fillet`** (a polyline
   with its corners rounded, for bent tube: a Catmull-Rom sweep through close corner points bulges past them, which
-  stood the console table 1.3 cm taller), **`_basket`**, **`_plant_bowl`**.
+  stood the console table 1.3 cm taller), **`basket`**, **`plant_bowl`**.
 
 What each has now:
 
@@ -249,9 +249,17 @@ What each has now:
 
 ```
 cargo art living            # the .glb files, the pack, check-glb
+cargo art living --check    # rebuilt in memory, compared byte for byte with what is committed
 cargo art living --preview  # previews/living/<id>.png, <id>@<clip>.png
 ```
 
 ## Leather (2026-11-13)
 
-The leather armchair's cushions (`leather`), the designer chair's (`hide`) and the pouf (`pouf_leather`, and its buttons, covered in the same hide so the top stays one draw) are leather. The leather armchair and the pouf stay at 3 draws, the designer chair goes from 2 to 3 (leather, walnut, the plain aluminium). The finish is `leather` (`material.finish.leather`: the generated set `textures/leather`, `cargo tex synth leather`: soft creases a hand's width apart, the hide's waviness, patches polished where it is sat on, roughness 0.35 to 0.5; its colour all but even, 97 % of the part's), where it was plain `satin`: a textured finish, so the part has UVs (`gamekit/uv.py` makes them) and a draw call of its own.
+The leather armchair's cushions (`leather`), the designer chair's (`hide`) and the pouf (`pouf_leather`, and its buttons, covered in the same hide so the top stays one draw) are leather. The leather armchair and the pouf stay at 3 draws, the designer chair goes from 2 to 3 (leather, walnut, the plain aluminium). The finish is `leather` (`material.finish.leather`: the generated set `textures/leather`, `cargo tex synth leather`: soft creases a hand's width apart, the hide's waviness, patches polished where it is sat on, roughness 0.35 to 0.5; its colour all but even, 97 % of the part's), where it was plain `satin`: a textured finish, so the part has UVs (`artkit::uv` makes them) and a draw call of its own.
+
+## Built in Rust (2026-11-18)
+
+Ported from `living.py` line for line (crates/art/rooms/src/living). Against the last Blender build (`ref/blender`)
+every model's points are Blender's (0.000 mm): 14 same, 30 near, none changed. `cabriole` in common.rs is gamekit's
+kit, marked `// KIT`. Kept as the script had it: `fillet` leaves a right-angled corner sharp (the bed's handle, the
+sofa bed's leg, the nesting and console tables' frames); `living.py`'s `_legs4` was never called and is not ported.
