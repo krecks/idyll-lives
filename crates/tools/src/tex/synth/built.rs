@@ -9,14 +9,16 @@
 
 use super::{HeightMap, Img, Noise, Surface, lerp, mix, mul, par_map, rgb, smoothstep, to_u8};
 
-/// The sets made here.
+/// The sets made here. `floor_wood.calm`: a set's variant ([`variants`]), drawn only when named.
 pub fn generate(name: &str, n: &Noise, size: usize) -> Option<Surface> {
+    let (name, variant) = name.split_once('.').unwrap_or((name, ""));
     Some(match name {
+        _ if !variants(name).contains(&variant) => return None,
         "brick" => brick(n, size),
         "stone_foundation" => stone(n, size),
         "floor_tile" => floor_tile(n, size),
         "path_hexpaving" => hexpaving(n, size),
-        "floor_wood" => floor_wood(n, size),
+        "floor_wood" => floor_wood(n, size, &boards(variant)),
         "floor_laminate" => laminate(n, size),
         "siding_wood" => siding(n, size),
         "roof_shingles" => roof(n, size),
@@ -402,7 +404,7 @@ const HEX_ACROSS: i64 = 7;
 const HEX_ROWS: i64 = 8;
 const HEX_HALF_JOINT: f64 = 0.0045;
 /// Rows of boards across a tile: floorboards, laminate planks, siding boards, roof courses.
-const FLOOR_WOOD_ROWS: i64 = 14;
+const FLOOR_WOOD_ROWS: i64 = 9;
 const LAMINATE_ROWS: i64 = 8;
 const SIDING_ROWS: i64 = 12;
 const ROOF_COURSES: i64 = 11;
@@ -1007,10 +1009,74 @@ fn board_at(
     }
 }
 
-/// Pine floorboards, 13.5 cm wide, running along v.
-fn floor_wood(n: &Noise, size: usize) -> Surface {
+/// A set's variants (`cargo tex synth floor_wood.calm`, into `textures/floor_wood.calm`): candidates for a look
+/// sheet (tools/bench/play-variants.json), on the set's own tile and seed, so the boards lie where the set's do.
+/// Not in git and not in a build: the set itself is the variant `""`.
+pub fn variants(name: &str) -> &'static [&'static str] {
+    match name {
+        "floor_wood" => &["", "pine", "calm", "wide", "oak"],
+        _ => &[""],
+    }
+}
+
+/// What the floorboards' variants vary.
+struct Boards {
+    /// Rows of boards across the tile.
+    rows: i64,
+    /// A board's own brightness: the darkest, and the range above it.
+    bright: (f64, f64),
+    /// The share drawn of the grain's figure (late wood, fibre, streaks) and of the knots.
+    figure: f64,
+    knots: f64,
+    /// Early and late wood, each from a light board's to a dark one's.
+    early: ([f64; 3], [f64; 3]),
+    late: ([f64; 3], [f64; 3]),
+}
+
+fn boards(variant: &str) -> Boards {
+    // The set: nine boards across, 21 cm each, the knots a quarter as dark as a pine board's are and the figure
+    // half, the boards near each other in tone, so that from the play camera (a pixel 4 to 16 mm) a floor is
+    // planks and not dots and streaks (2026-11-18). Its brightness is set so the tile's mean is the narrow
+    // knotty boards' it replaced: a covering's tint (honey, walnut, whitewash) gives the tone it gave.
+    let set = Boards {
+        rows: FLOOR_WOOD_ROWS,
+        bright: (0.946, 0.058),
+        figure: 0.5,
+        knots: 0.25,
+        early: (rgb(212, 164, 106), rgb(194, 144, 88)),
+        late: (rgb(178, 122, 70), rgb(160, 106, 58)),
+    };
+    // The boards before 2026-11-18: 13.5 cm, every knot and all the figure.
+    let pine = |b: Boards| Boards {
+        rows: 14,
+        bright: (0.95, 0.10),
+        figure: 1.0,
+        knots: 1.0,
+        ..b
+    };
+    match variant {
+        "pine" => pine(set),
+        // Calm at the old width; wide with the old knots and figure.
+        "calm" => Boards { rows: 14, ..set },
+        "wide" => Boards {
+            rows: FLOOR_WOOD_ROWS,
+            ..pine(set)
+        },
+        // Oak's own tone: less orange.
+        "oak" => Boards {
+            bright: (0.97, 0.06),
+            early: (rgb(196, 162, 120), rgb(180, 147, 107)),
+            late: (rgb(164, 128, 90), rgb(148, 114, 79)),
+            ..set
+        },
+        _ => set,
+    }
+}
+
+/// Pine floorboards, 21 cm wide and calm (`boards`), running along v.
+fn floor_wood(n: &Noise, size: usize, look: &Boards) -> Surface {
     let t = TILE_FLOOR_WOOD;
-    let rows = FLOOR_WOOD_ROWS;
+    let rows = look.rows;
     let bw = t / rows as f64;
     let px_m = t / size as f64;
     let ng = n.layer(1);
@@ -1035,20 +1101,22 @@ fn floor_wood(n: &Noise, size: usize) -> Surface {
                 joint,
             );
             let tone = lg.tone;
-            let early = mix(rgb(212, 164, 106), rgb(194, 144, 88), tone);
-            let latec = mix(rgb(178, 122, 70), rgb(160, 106, 58), tone);
-            let mut c = mix(early, latec, late * 0.75);
-            let bright = 0.95 + 0.10 * n.rand(b.row, b.seg, 88);
+            let early = mix(look.early.0, look.early.1, tone);
+            let latec = mix(look.late.0, look.late.1, tone);
+            let mut c = mix(early, latec, late * 0.75 * look.figure);
+            let bright = look.bright.0 + look.bright.1 * n.rand(b.row, b.seg, 88);
             c = mul(
                 c,
                 bright
                     * (1.0
-                        + 0.16 * fibre
-                        + 0.16 * fbm_free(&ng.layer(2), b.x * 2.0 + lg.salt, b.y * 20.0, 3)),
+                        + 0.16 * look.figure * fibre
+                        + 0.16
+                            * look.figure
+                            * fbm_free(&ng.layer(2), b.x * 2.0 + lg.salt, b.y * 20.0, 3)),
             );
-            c = mix(c, rgb(156, 94, 46), knot * 0.85);
+            c = mix(c, rgb(156, 94, 46), knot * 0.85 * look.knots);
             let kring = knot * (1.0 - knot) * 4.0;
-            c = mix(c, rgb(84, 48, 26), kring * 0.8);
+            c = mix(c, rgb(84, 48, 26), kring * 0.8 * look.knots);
             let col = mix(rgb(70, 48, 30), c, joint);
             let rough = lerp(0.8, 0.58 + 0.06 * late + 0.06 * fibre, joint);
             Px {

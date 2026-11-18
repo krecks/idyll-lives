@@ -25,6 +25,7 @@ import type { ShaderFeature } from './chunks';
 import { RESIDENT_LIGHT } from './character';
 import { ROOM } from './envBrdf';
 import { SPECULAR_UNITS } from '../lightUnits';
+import { tuned } from '../../tune';
 
 const LUM = { glsl: 'vec3(0.2126, 0.7152, 0.0722)', wgsl: 'vec3f(0.2126, 0.7152, 0.0722)' };
 
@@ -56,9 +57,15 @@ export const BASE = {
  * Contact shading (`post.ts` `CONTACT`, the lit shaders' `LIT_SSAO`): the sky's light is shaded by it in
  * full (PlayCanvas's ambient by the engine, the hemispheric fill in `chunks.ts`'s patch), the lamps' and
  * the sun's by this share of it: a lamp casts no shadow here, so without it a lamplit room has none
- * where a thing stands on the floor or against the wall.
+ * where a thing stands on the floor or against the wall. (`?tune=contactLight.direct:…` on the dev server.)
  */
-export const CONTACT_DIRECT = '0.35';
+export const CONTACT_DIRECT = shaderNumber(tuned('contactLight', { direct: 0.35 }).direct);
+
+/** `x` as a shader's number (with its point: `1` is `1.0`). */
+function shaderNumber(x: number): string {
+  const text = String(x);
+  return /[.e]/.test(text) ? text : `${text}.0`;
+}
 
 /**
  * A finish's layers (`GAME_FINISH_LAYERS`, `surface.ts`: cloth's sheen, a lacquer's clear coat) in the
@@ -131,6 +138,9 @@ export const SOFT_LOOK: ShaderFeature = {
 	uniform vec3 game_hemiDir;
 	// The lamps' light off a room's walls and floor, at the room's full level (\`MaterialLibrary.setRoomBounce\`).
 	uniform vec3 game_roomBounce;
+	// A room's shares of the sky's ambient and of its fill by day, in the room's tint (\`MaterialLibrary.setRoomDay\`; 1: the garden's).
+	uniform vec3 game_roomDayAmbient;
+	uniform vec3 game_roomDayFill;
 	// The share of the sky's and the moon's light in the fragment's room (1 outdoors and by day; \`chunks.ts\`'s patches).
 	float gameRoomSky = 1.0;
 	vec3 gameAmbient = vec3(0.0);
@@ -230,6 +240,8 @@ export const SOFT_LOOK: ShaderFeature = {
 	uniform game_hemiGround: vec3f;
 	uniform game_hemiDir: vec3f;
 	uniform game_roomBounce: vec3f;
+	uniform game_roomDayAmbient: vec3f;
+	uniform game_roomDayFill: vec3f;
 	var<private> gameRoomSky: f32 = 1.0;
 	var<private> gameAmbient: vec3f = vec3f(0.0);
 	var<private> gameContact: f32 = 1.0;
