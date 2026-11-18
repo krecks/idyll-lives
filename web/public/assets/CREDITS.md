@@ -206,7 +206,7 @@ slides out of the desk's hutch, the robot rolls out and back, and the key tray d
 
 The cheerful pack models (`models/pack_cheerful/jukebox.glb`, `karaokeMachine.glb`, `mocktailCart.glb`,
 `rainbowHammock.glb`, `sunriseLamp.glb`, `partyBooth.glb`, override pack `packs/pack_cheerful/manifest.json`) are built
-in Blender by `tools/art/blender/families/pack_cheerful.py` on `gamekit` and exported as `.glb` (glTF, original,
+by `crates/art/packs/src/pack_cheerful` on `artkit` and exported as `.glb` (glTF, original,
 CC0). Each moves one part while it is used: the record swings up, the microphone rises, the shaker tips, the hammock
 sways with its sleeper, the sun rises and the booth's curtain is drawn.
 
