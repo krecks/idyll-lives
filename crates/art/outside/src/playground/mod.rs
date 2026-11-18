@@ -22,7 +22,7 @@
 use artkit::family::{Family, Model};
 use artkit::json::{Json, loads};
 
-mod common;
+pub(crate) mod common;
 mod courts;
 mod frames;
 mod rides;
