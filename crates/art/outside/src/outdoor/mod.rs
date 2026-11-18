@@ -1,4 +1,4 @@
-//! The outdoor things. Notes: tools/art/blender/families/outdoor.md.
+//! The outdoor things. Notes: NOTES.md.
 //!
 //! OU1, patio seating and tables: the park bench (`model.bench`), the folding bistro set (`model.patioSet`), the
 //! picnic table (`model.picnicTable`), the garden chair (`model.gardenChair`), the round mosaic table
