@@ -1,8 +1,9 @@
 //! KD3: the kids' study and art things.
 
-use super::common::{fillet, heart, place};
+use super::common::{heart, place};
 use super::{F, M};
 use artkit::forms::rounded_rect;
+use artkit::kit;
 use artkit::parts::join_all;
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
@@ -35,7 +36,7 @@ pub fn kids_chair() -> Vec<Obj> {
         fsweep!(
             F,
             format!("post{sx}"),
-            &fillet(
+            &kit::fillet!(
                 &[
                     (sx * 0.135, 0.0, -0.075),
                     (sx * 0.13, 0.28, -0.07),
