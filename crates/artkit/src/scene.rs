@@ -3,7 +3,10 @@
 //! shapes' builders keep the signatures the family scripts called: they add to the scene and hand back the part.
 
 use crate::materials::Finishes;
-use crate::math::{M4, P3, Quat, V3, mul_m4_m4m4, object_matrix, radians, v3};
+use crate::math::{
+    EulerOrder, M4, P3, Quat, V3, eul_to_quat, mul_m4_m4m4, object_matrix_in, object_matrix_quat,
+    radians, v3,
+};
 use crate::mesh::{Mesh, UvWay};
 use crate::motion::Track;
 use std::cell::RefCell;
@@ -20,9 +23,12 @@ pub struct Object {
     pub name: String,
     pub mesh: Mesh,
     pub loc: V3,
-    /// Euler XYZ, radians.
+    /// Its Euler angles in `order`, radians (not read while it is turned by a quaternion).
     pub rot: V3,
-    /// Set for a part turned by a quaternion instead (`rod`).
+    /// The order its Euler angles turn it in: XYZ unless a script set its `rotation_mode`.
+    pub order: EulerOrder,
+    /// Set for a part turned by a quaternion instead (`rod`, or its `rotation_mode` set to it): a part joined
+    /// onto such a one stays so, as in Blender, and an Euler turn does nothing to it.
     pub quat: Option<Quat>,
     pub scale: V3,
     /// The moving part this one goes with (`attach`): its place, turn and scale are then in that part's frame.
@@ -46,6 +52,7 @@ impl Object {
             mesh,
             loc: V3::ZERO,
             rot: V3::ZERO,
+            order: EulerOrder::XYZ,
             quat: None,
             scale: v3(1, 1, 1),
             parent: None,
@@ -59,19 +66,43 @@ impl Object {
     /// Its own matrix (in its parent's frame, if it has one).
     pub fn matrix_basis(&self) -> M4 {
         match self.quat {
-            None => object_matrix(self.loc, self.rot, self.scale),
-            Some(q) => {
-                let r = q.to_matrix().0;
-                let s = self.scale;
-                let mut m = M4::IDENTITY;
-                for c in 0..3 {
-                    for (row, cell) in r[c].iter().enumerate() {
-                        m.0[c][row] = cell * s[c];
-                    }
-                }
-                m.0[3] = [self.loc.x, self.loc.y, self.loc.z, 1.0];
-                m
-            }
+            None => object_matrix_in(self.loc, self.rot, self.order, self.scale),
+            Some(q) => object_matrix_quat(self.loc, q, self.scale),
+        }
+    }
+
+    /// Whether it is neither turned nor scaled (only placed).
+    pub(crate) fn unturned(&self) -> bool {
+        let turned = match self.quat {
+            Some(q) => q != Quat::IDENTITY,
+            None => self.rot != V3::ZERO,
+        };
+        !turned && self.scale == v3(1, 1, 1)
+    }
+}
+
+/// How a part is turned (its `rotation_mode`): by a quaternion, or by Euler angles in one of six orders.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RotationMode {
+    Quaternion,
+    XYZ,
+    XZY,
+    YXZ,
+    YZX,
+    ZXY,
+    ZYX,
+}
+
+impl RotationMode {
+    fn order(self) -> Option<EulerOrder> {
+        match self {
+            RotationMode::Quaternion => None,
+            RotationMode::XYZ => Some(EulerOrder::XYZ),
+            RotationMode::XZY => Some(EulerOrder::XZY),
+            RotationMode::YXZ => Some(EulerOrder::YXZ),
+            RotationMode::YZX => Some(EulerOrder::YZX),
+            RotationMode::ZXY => Some(EulerOrder::ZXY),
+            RotationMode::ZYX => Some(EulerOrder::ZYX),
         }
     }
 }
@@ -220,6 +251,122 @@ impl Obj {
     pub fn set_scale(self, scale: impl Into<P3>) -> Obj {
         let k: P3 = scale.into();
         self.edit(|o| o.scale = k.into());
+        self
+    }
+
+    pub fn scale(self) -> V3 {
+        self.read(|o| o.scale)
+    }
+
+    /// `obj.name = name`.
+    pub fn set_name(self, name: &str) -> Obj {
+        self.edit(|o| o.name = name.to_string());
+        self
+    }
+
+    /// `obj.location[i] = x` (`obj.location.y -= d` is `o.set_location_axis(1, o.location().y as f64 - d)`: Python
+    /// adds in double precision, the part keeps a single).
+    pub fn set_location_axis(self, i: usize, x: f64) -> Obj {
+        self.edit(|o| o.loc[i] = x as f32);
+        self
+    }
+
+    /// `obj.scale[i] = k`.
+    pub fn set_scale_axis(self, i: usize, k: f64) -> Obj {
+        self.edit(|o| o.scale[i] = k as f32);
+        self
+    }
+
+    /// `obj.rotation_euler`: its Euler angles, radians.
+    pub fn rotation_euler(self) -> V3 {
+        self.read(|o| o.rot)
+    }
+
+    /// `obj.rotation_euler = rot`: radians about X, Y and Z, turned in the part's order (`set_rotation` takes
+    /// degrees, as the builders' `rot` does). Kept, but not read, while the part is turned by a quaternion.
+    pub fn set_rotation_euler(self, rot: impl Into<P3>) -> Obj {
+        let r: P3 = rot.into();
+        self.edit(|o| o.rot = r.into());
+        self
+    }
+
+    /// `obj.rotation_euler[i] = radians`.
+    pub fn set_rotation_euler_axis(self, i: usize, radians: f64) -> Obj {
+        self.edit(|o| o.rot[i] = radians as f32);
+        self
+    }
+
+    /// `obj.rotation_mode`.
+    pub fn rotation_mode(self) -> RotationMode {
+        self.read(|o| match (o.quat, o.order) {
+            (Some(_), _) => RotationMode::Quaternion,
+            (None, EulerOrder::XYZ) => RotationMode::XYZ,
+            (None, EulerOrder::XZY) => RotationMode::XZY,
+            (None, EulerOrder::YXZ) => RotationMode::YXZ,
+            (None, EulerOrder::YZX) => RotationMode::YZX,
+            (None, EulerOrder::ZXY) => RotationMode::ZXY,
+            (None, EulerOrder::ZYX) => RotationMode::ZYX,
+        })
+    }
+
+    /// `obj.rotation_mode = mode`, as Blender changes it: a part turned by a quaternion takes that turn's Euler
+    /// angles in the new order (whatever angles it was given meanwhile are gone), one turned by Euler angles takes
+    /// their quaternion, and between two Euler orders the angles stay as they are (the part turns).
+    pub fn set_rotation_mode(self, mode: RotationMode) -> Obj {
+        self.edit(|o| match (mode.order(), o.quat) {
+            (Some(order), Some(q)) => {
+                o.rot = q.normalized().to_euler(order);
+                (o.order, o.quat) = (order, None);
+            }
+            (Some(order), None) => o.order = order,
+            (None, None) => o.quat = Some(eul_to_quat(o.rot, o.order)),
+            (None, Some(_)) => {}
+        });
+        self
+    }
+
+    /// `obj.rotation_quaternion` of a part turned by one.
+    pub fn rotation_quaternion(self) -> Quat {
+        self.read(|o| match o.quat {
+            Some(q) => q,
+            None => panic!("{}: not turned by a quaternion", o.name),
+        })
+    }
+
+    /// `obj.rotation_quaternion = q`, for a part whose mode is `RotationMode::Quaternion` (set it first, as the
+    /// scripts do: Blender keeps a quaternion given in another mode without reading it).
+    pub fn set_rotation_quaternion(self, q: Quat) -> Obj {
+        self.edit(|o| {
+            assert!(
+                o.quat.is_some(),
+                "{}: set_rotation_mode(RotationMode::Quaternion) before its quaternion",
+                o.name
+            );
+            o.quat = Some(q);
+        });
+        self
+    }
+
+    /// `obj.matrix_world = m`: the part's place, turn (in its own mode) and scale taken apart from `m` (in its
+    /// parent's frame, if it has one), as Blender's `BKE_object_apply_mat4` does: what the part's matrix is
+    /// afterwards is those put together again, a unit in the last place off `m` here and there.
+    pub fn set_matrix_world(self, m: M4) -> Obj {
+        let local = match self.read(|o| o.parent) {
+            Some(parent) => {
+                let inverse = parent.matrix_world().inverted().unwrap_or(M4::IDENTITY);
+                mul_m4_m4m4(&inverse, &m)
+            }
+            None => m,
+        };
+        self.edit(|o| {
+            let (loc, quat, scale) =
+                crate::motion::decompose_quat(&local, o.quat.is_none().then_some(o.order));
+            (o.loc, o.scale) = (loc, scale);
+            match o.quat {
+                Some(_) => o.quat = Some(quat),
+                None => o.rot = quat.to_euler(o.order),
+            }
+        });
         self
     }
 

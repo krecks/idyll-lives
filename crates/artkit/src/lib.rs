@@ -4,6 +4,7 @@
 pub mod bevel;
 pub mod botany;
 pub mod bvh;
+pub mod edit;
 pub mod family;
 pub mod far;
 pub mod forms;
