@@ -3026,3 +3026,177 @@ fn beds_and_crops_are_blenders_with_their_growth_clips() {
     assert!(n >= 26, "{n} cases");
     assert!(off.moved * 2 < off.points, "{off:?}");
 }
+
+// ---- the macros' order ----
+
+#[test]
+fn a_macro_works_out_what_was_given_by_place_before_what_was_given_by_name() {
+    scene::set_finishes(finishes());
+    scene::reset();
+    let p = botany::palette(&[]);
+    let order = RefCell::new(Vec::new());
+    // a number that says when it was worked out
+    let at = |what: &'static str, x: f64| {
+        order.borrow_mut().push(what);
+        x
+    };
+    let took = |what: &str| {
+        let got = order.borrow().join(" ");
+        order.borrow_mut().clear();
+        assert_eq!(got, "place name", "{what}!");
+    };
+    lump!(
+        "a",
+        at("place", 0.1),
+        (0, 0, 0),
+        p.get("leaf"),
+        seed = at("name", 1.0)
+    );
+    took("lump");
+    artkit::leaves!(
+        "b",
+        at("place", 0.1),
+        (0, 0, 0),
+        p.get("leaf"),
+        seed = at("name", 1.0)
+    );
+    took("leaves");
+    leaf!(
+        "c",
+        (0, 0, 0),
+        0.0,
+        at("place", 10.0),
+        0.2,
+        0.1,
+        p.get("leaf"),
+        droop = at("name", 0.1)
+    );
+    took("leaf");
+    artkit::tube!(
+        "d",
+        &[(0.0, 0.0, 0.0), (0.0, 0.0, 0.1)],
+        at("place", 0.01),
+        0.01,
+        p.get("stem"),
+        verts = at("name", 3.0) as usize
+    );
+    took("tube");
+    artkit::sprigs!(
+        "e",
+        &p,
+        (0, 0, 0),
+        at("place", 0.1),
+        length = at("name", 0.1)
+    );
+    took("sprigs");
+    artkit::pot!(&p, at("place", 0.1), 0.2, rim = at("name", 0.01));
+    took("pot");
+    let eye = sphere!("f", 0.1);
+    _put!(eye, (0.0, 0.0, at("place", 0.1)), yaw = at("name", 10.0));
+    took("_put");
+    artkit::cupped!(
+        "g",
+        &[(0.0, 0.0), (0.02, 0.01), (0.03, 0.05)],
+        (0.0, 0.0, at("place", 0.1)),
+        p.get("bloom"),
+        yaw = at("name", 10.0)
+    );
+    took("cupped");
+    artkit::_mesh!(
+        "h",
+        [v3(0, 0, 0), v3(at("place", 1.0), 0, 0), v3(0, 1, 0)],
+        [[0, 1, 2]],
+        p.get("leaf"),
+        smooth = at("name", 1.0) > 0.0
+    );
+    took("_mesh");
+    rays!(
+        "i",
+        (0, 0, 0),
+        at("place", 0.05),
+        5,
+        p.get("bloom"),
+        yaw = at("name", 10.0)
+    );
+    took("rays");
+    twig!(
+        "j",
+        &[(0.0, 0.0, 0.0), (0.0, 0.0, 0.1)],
+        at("place", 0.01),
+        0.005,
+        p.get("stem"),
+        verts = at("name", 3.0) as usize
+    );
+    took("twig");
+    cut_leaf!(
+        "k",
+        (0, 0, 0),
+        0.0,
+        0.0,
+        at("place", 0.2),
+        &outline!("oval", 0.1),
+        p.get("leaf"),
+        droop = at("name", 0.1)
+    );
+    took("cut_leaf");
+    outline!("oval", at("place", 0.1), wave = at("name", 0.1));
+    took("outline");
+    pinnate!(3, at("place", 0.1), "lance", lean = at("name", 0.5));
+    took("pinnate");
+    vessel!(&p, at("place", 0.1), 0.2, lip = at("name", 0.01));
+    took("vessel");
+    soil_top!(&p, at("place", 0.1), 0.2, mound = at("name", 0.01));
+    took("soil_top");
+    florets!(
+        "l",
+        at("place", 0.1),
+        (0, 0, 0),
+        p.get("bloom"),
+        seed = at("name", 1.0)
+    );
+    took("florets");
+    star!(
+        "m",
+        (0, 0, 0),
+        at("place", 0.05),
+        5,
+        p.get("bloom"),
+        yaw = at("name", 10.0)
+    );
+    took("star");
+    tulip_head!(
+        "n",
+        (0, 0, 0),
+        at("place", 0.03),
+        0.07,
+        p.get("bloom"),
+        yaw = at("name", 10.0)
+    );
+    took("tulip_head");
+    spiral!(
+        3,
+        at("place", 0.3),
+        &mut Random::new(1),
+        jitter = at("name", 0.2)
+    );
+    took("spiral");
+    mound!(&p, r = at("place", 0.3), h = at("name", 0.05));
+    took("mound");
+    perches!(
+        at("place", 2.0) as usize,
+        1,
+        &[(0.0, 0.0, 0.1)],
+        gap = at("name", 0.2)
+    );
+    took("perches");
+    leafy_shrub!(
+        &p,
+        1,
+        at("place", 0.5),
+        0.4,
+        &[p.get("leaf_dark"), p.get("leaf")],
+        p.get("twig"),
+        leaf_size = at("name", 0.1)
+    );
+    took("leafy_shrub");
+}
