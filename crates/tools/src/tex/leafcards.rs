@@ -762,7 +762,8 @@ fn cherry_leaf(
 /// inner standing, paler outside and a deeper pink at its heart.
 fn flower(sketch: &mut Sketch, rng: &mut Random, at: (f64, f64, f64), size: f64, depth: f64) {
     let turn = rng.uniform(0.0, TAU);
-    let k = (1.0 - 0.3 * depth) as f32;
+    // (one flower paler, the next deeper: a mass of them is not one pattern)
+    let k = (1.0 - 0.3 * depth) as f32 * rng.uniform(0.82, 1.0) as f32;
     for (ring, (petals, long, tilt, pink)) in [
         (9, 0.5, (8.0, 26.0), 0.0),
         (7, 0.4, (34.0, 54.0), 0.5),
@@ -1026,7 +1027,7 @@ fn wall(
 /// a couple of bronze young leaves beside each bunch.
 fn blossom(sketch: &mut Sketch, rng: &mut Random, across: f64, twigs: usize, turn: f64) {
     let reach = across / 2.0 * REACH;
-    let size = (0.07, 0.085);
+    let size = (0.06, 0.092);
     let wood = tone(0.32, 1.4);
     let mut bunches: Vec<(f64, f64, f64)> = vec![(0.0, 0.0, rng.uniform(0.0, TAU))];
     for t in 0..twigs {
@@ -1073,8 +1074,8 @@ fn blossom(sketch: &mut Sketch, rng: &mut Random, across: f64, twigs: usize, tur
     let total = bunches.len();
     // the leaves first, under the flowers: two to a bunch, pointing out past it
     for (i, &(x, y, a)) in bunches.iter().enumerate() {
-        for side in [-1.0, 1.0] {
-            let heading = a + side * rng.uniform(0.5, 1.3);
+        for side in [-1.0, 0.0, 1.0] {
+            let heading = a + side * rng.uniform(0.5, 1.3) + rng.uniform(-0.2, 0.2);
             let length = fits((x, y), heading, rng.uniform(0.1, 0.13), 0.5, (reach, reach));
             if length > 0.06 {
                 let depth = 0.6 * rng.random();
@@ -1094,7 +1095,7 @@ fn blossom(sketch: &mut Sketch, rng: &mut Random, across: f64, twigs: usize, tur
         let off = rng.uniform(0.0, TAU);
         for j in 0..flowers {
             let a = off + TAU * (j as f64 + rng.uniform(-0.2, 0.2)) / flowers as f64;
-            let r = rng.uniform(0.45, 0.75) * size.1;
+            let r = rng.uniform(0.3, 0.8) * size.1;
             let across = rng.uniform(size.0, size.1);
             let (fx, fy) = (x + r * cos(a), y + r * sin(a));
             if fx.abs() + across / 2.0 < reach && fy.abs() + across / 2.0 < reach {
@@ -1409,7 +1410,7 @@ fn tile(i: usize) -> Picture {
                     from: 0.35,
                     opposite: true,
                     tip: 1,
-                    fill: 7,
+                    fill: 10,
                     top: 2,
                     lean: (1.0, 0.7),
                     long: (0.5, 0.75),
