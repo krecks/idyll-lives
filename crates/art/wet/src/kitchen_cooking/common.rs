@@ -132,7 +132,6 @@ pub fn fillet(points: &[(f64, f64, f64)], r: f64, steps: usize) -> Vec<(f64, f64
     out
 }
 
-// KIT: kit.tube
 #[allow(clippy::too_many_arguments)] // (as the kit has it)
 /// A round tube of radius `r` through game points, its bends rounded (`round` steps between each pair of points; 1
 /// keeps them sharp), its ends capped. `verts` round: by default 8, and more for one over 13 mm in radius, as many
@@ -147,14 +146,19 @@ pub fn tube(
     round: usize,
     scale: f64,
 ) -> Obj {
-    let o = artkit::forms::Sweep {
-        verts,
-        resolution: round,
-        scale: artkit::forms::Scale::One(scale),
-        least: 8,
-        ..artkit::forms::Sweep::default()
-    };
-    frame.sweep(name, points, r, material, o)
+    // (the kit's tube, called as the script called it)
+    artkit::kit::tube(
+        frame,
+        name,
+        points,
+        r,
+        material,
+        artkit::kit::Tube {
+            verts,
+            round,
+            scale: artkit::forms::Scale::One(scale),
+        },
+    )
 }
 
 /// A cabinet door or drawer front: a frame (stiles and rails, one slab with a hole) round a panel set 6 mm back,

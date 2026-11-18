@@ -1,6 +1,6 @@
 # Kitchen cooking — notes
 
-`kitchen_cooking.py` builds the kitchen's cookers and small appliances into
+The family builds the kitchen's cookers and small appliances into
 `web/public/assets/models/kitchen_cooking/` and their entries in `packs/kitchen_cooking/manifest.json`:
 the six **K2 cookers** — the electric cooker (`model.stoveElectric`), the gas range (`model.stoveGas`), the
 own tower (`model.wallOven`), the range cooker (`model.rangeCooker`), the hob counter (`model.cooktopCounter`)
@@ -106,10 +106,10 @@ Validate › Appliances until checked in play.
 Same sizes (within 2 %), centres, parts, pivots, clips, `motions`, paint and draw calls; more of what a real one has.
 Shared parts: `_knob` (a turned skirt, grip and dished cap with a pointer line), `_burner` (a spreader, a cap and a
 cast-iron pan support: a square of bar with four fingers), `_flame` (a ring with twelve blue tongues), `_hob_ring` (a
-printed double ring), `_oven` (the cavity cut out of the carcass with a boolean, `_hollow`, its walls dark enamel, a wire
+printed double ring), `oven` (the cavity cut out of the carcass (`hollow`: the front split round the opening and five walls, as Blender's boolean cut them), its walls dark enamel, a wire
 rack on runners and a lamp: an open door shows an oven, not a dark face), `_oven_door`/`_oven_face` (a dark frame
 round a black window, an inner pane, a round bar handle on stand-offs in one piece), `_strip` (a rounded fascia with a
-clock display), `_shaker` and `_pull` (shaker fronts and one-piece bar pulls on every cabinet), `_stock_pot`,
+clock display), `shaker` and `pull` (shaker fronts and one-piece bar pulls on every cabinet), `stock_pot`,
 `_frying_pan`, `_tray`, `_cup`, `_canister`, `_basket` (a dishwasher's wire basket), `_fillet` (round a bent tube's
 corners without the Catmull-Rom overshoot `kit.tube` makes between a long span and a short one).
 
@@ -176,12 +176,12 @@ cargo art kitchen_cooking --preview  # previews/kitchen_cooking/<id>.png, <id>@<
 
 ## Where it stands (review, 2026-10-14)
 
-Each floor model is centred where the game places it (its `Model`'s `centre`, which `G.settle()` uses),
+Each floor model is centred where the game places it (its `Model`'s `centre`, which settling uses),
 not on its tile: its back is on the wall face (-0.43), as the old part's, a run of counters and
 appliances lines up, and its top is under its content `surface`. Since the
 2026-10-14 fix-ups the old parts no longer reach into the wall: both moved forward onto the face.
 There is one counter depth, the catalogue's 0.66 m (worktop -0.43..0.23): the catalog2 counters keep
-the old 0.79-deep numbers and are drawn through `COUNTER66` (gamekit `GameFrame(depths=)`,
+the old 0.79-deep numbers and are drawn through `COUNTER66` (`GameFrame::with_depths`,
 the old `shallow`). Islands stand free, centred.
 
 Also from the review: the hob clip (`burner_on`) lasts the whole use, and only `oven_open`
@@ -192,4 +192,4 @@ column), so its turntable shows through the window and the open door.
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 7 models changed shape: `breakfastCounter`, `coffeeMachine`, `cooktopCounter`, `dishwasher`, `dishwasherCompact`, `microwave`, `wallOven`; the same triangles.
+No change to the build: its soft boxes take the shared form's new shape (the kit's soft forms: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 7 models changed shape: `breakfastCounter`, `coffeeMachine`, `cooktopCounter`, `dishwasher`, `dishwasherCompact`, `microwave`, `wallOven`; the same triangles.

@@ -8,7 +8,7 @@ use artkit::math::{P3, cos, radians, sin};
 use artkit::parts::{Settle, join, new_parts, settle_with};
 use artkit::place::{Coord, Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fextrude, fsweep, sweep};
+use artkit::{fbox, fextrude, sweep};
 
 /// Python's `min` of two: the first unless the second is strictly below it.
 pub fn py_min(a: f64, b: f64) -> f64 {
@@ -30,7 +30,6 @@ fn py_min_of(xs: &[f64]) -> f64 {
     xs[1..].iter().fold(xs[0], |m, &x| py_min(m, x))
 }
 
-// KIT: kit.tube
 /// A round tube of radius `r` through game points, its bends rounded (`round` steps between each pair of points; 1
 /// keeps them sharp), its ends capped: a towel rail, a bent-tube frame, a tap's riser, a hose. `verts` round: by
 /// default 8, and more for one over 13 mm in radius, as many as keep its outline within a millimetre of the circle.
@@ -45,16 +44,18 @@ pub fn tube(
     round: usize,
     scale: f64,
 ) -> Obj {
-    fsweep!(
+    // (the kit's tube, called as the script called it)
+    artkit::kit::tube(
         frame,
         name,
         points,
         r,
         material,
-        verts = verts,
-        resolution = round,
-        scale = scale,
-        least = 8
+        artkit::kit::Tube {
+            verts,
+            round,
+            scale: artkit::forms::Scale::One(scale),
+        },
     )
 }
 

@@ -82,5 +82,5 @@ pub fn family() -> Option<Family> {
          packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each \
          moves while it is used: the bar's tap lever pulls, the sectional's cushions sink, the mics rise, the ring \
          light swings up, the dance floor's tiles pulse and a new photo grows.",
-    ))
+    ).switched())
 }
