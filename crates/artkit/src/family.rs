@@ -192,6 +192,8 @@ pub struct Family {
     pub comment: &'static str,
     /// The pack's folder (packs/<pack>/manifest.json).
     pub pack: &'static str,
+    /// Its files in the repo are the ones built here: cargo art builds it in Rust (`switched`).
+    pub switched: bool,
 }
 
 impl Family {
@@ -218,7 +220,15 @@ impl Family {
             models,
             comment,
             pack: name,
+            switched: false,
         }
+    }
+
+    /// Its files in the repo are the ones built here: cargo art builds it in Rust, whatever is asked (a family
+    /// ported and not yet switched only with --out or --check, and its script in Blender otherwise).
+    pub fn switched(mut self) -> Family {
+        self.switched = true;
+        self
     }
 
     pub fn pack(mut self, pack: &'static str) -> Family {

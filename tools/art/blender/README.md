@@ -10,7 +10,7 @@ The content fields are in [docs/content-packs.md](../../../docs/content-packs.md
 centres.json      where each model built here is centred at rest, for the gate only (the build writes it)
 leafcards.py      renders the trees' leaf-card atlas (`cargo art --leafcards`)
 gamekit/          the toolkit every family imports as G
-families/         one script per family: garden_decor, kitchen (the fridge's doors), living (the wall
+families/         one script per family not yet ported: kitchen (the fridge's doors), living (the wall
                   bed that folds down); _template.py (a chest with a lid and a drawer) is the one to copy
 previews/         renders from --preview, a folder per family (ignored by git)
 ```

@@ -1267,9 +1267,46 @@ fn flowers(name: &str, p: &Palette) -> Option<Ret> {
                 segments = 12
             )]);
         }
+        "palette" => {}
         other => panic!("no case {other:?}"),
     }
     None
+}
+
+#[test]
+fn the_plants_palette_is_the_scripts() {
+    let all = cases("botany_flowers.txt");
+    let case = all
+        .iter()
+        .find(|c| c.name == "palette")
+        .expect("the palette");
+    let written = |p: &Palette| -> Vec<String> {
+        p.colours
+            .iter()
+            .map(|m| {
+                format!(
+                    "{}={}:{}",
+                    m.name,
+                    artkit::materials::hex_of(m.colour),
+                    m.finish
+                )
+            })
+            .collect()
+    };
+    assert_eq!(
+        written(&botany::BASE.palette()),
+        words(&case.lines["colours"])
+    );
+    assert_eq!(
+        written(&botany::palette(&[])),
+        words(&case.lines["colours"])
+    );
+    let own = botany::palette(&[
+        ("body", "#C46A43"),
+        ("leaf_light", "#7DB85C"),
+        ("twig", "#102030"),
+    ]);
+    assert_eq!(written(&own), words(&case.lines["recoloured"]));
 }
 
 #[test]
@@ -1975,9 +2012,130 @@ fn leaves(name: &str, p: &Palette) -> Option<Ret> {
                 droop = 0.35
             );
         }
+        "random" => {}
         other => panic!("no case {other:?}"),
     }
     None
+}
+
+/// 400 leaves of random outlines, every other one a far version: each as one number of its points, its faces in
+/// their order and its sharp edges, and how many it has of each.
+fn random_leaves() -> (Vec<String>, Vec<String>) {
+    let p = botany::palette(&[]);
+    let mut rng = Random::new(2026);
+    let (mut hashes, mut sizes) = (Vec::new(), Vec::new());
+    for i in 0..400 {
+        scene::reset();
+        let kind = rng.randrange(4);
+        let shape = ["oval", "lance", "heart", "strap", "petal"][rng.randrange(5) as usize];
+        let width = rng.uniform(0.02, 0.3);
+        let mut make = || {
+            let edge = match kind {
+                0 => {
+                    let n = rng.randrange_step(1, 12, 1) as usize;
+                    let wave = rng.uniform(0.0, 0.3);
+                    let waves = rng.randrange(8) as f64;
+                    let teeth = rng.choice(&[0.0, 0.05, 0.1]);
+                    outline!(
+                        shape,
+                        width,
+                        n = n,
+                        wave = wave,
+                        waves = waves,
+                        teeth = teeth
+                    )
+                }
+                1 => {
+                    let pairs = rng.randrange_step(1, 14, 1) as usize;
+                    let lean = rng.uniform(0.3, 1.0);
+                    let fill = rng.uniform(0.2, 0.9);
+                    let round_tip = rng.random() < 0.5;
+                    pinnate!(
+                        pairs,
+                        width,
+                        shape,
+                        lean = lean,
+                        fill = fill,
+                        round_tip = round_tip
+                    )
+                }
+                2 => {
+                    let n = rng.randrange_step(1, 8, 1) as usize;
+                    let depth = rng.uniform(0.2, 0.9);
+                    let gap = rng.uniform(0.1, 0.5);
+                    slits!(shape, width, n, depth = depth, gap = gap)
+                }
+                _ => outline!(fiddle, width, n = rng.randrange_step(2, 10, 1) as usize),
+            };
+            let base = (
+                rng.uniform(-1.0, 1.0),
+                rng.uniform(-1.0, 1.0),
+                rng.uniform(0.0, 2.0),
+            );
+            let (yaw, tilt, length) = (
+                rng.uniform(0.0, 360.0),
+                rng.uniform(-20.0, 90.0),
+                rng.uniform(0.03, 0.8),
+            );
+            cut_leaf!(
+                "leaf",
+                base,
+                yaw,
+                tilt,
+                length,
+                &edge,
+                p.get("leaf"),
+                droop = rng.uniform(0.0, 0.6),
+                fold = rng.uniform(0.0, 0.5),
+                thick = rng.uniform(0.002, 0.014),
+                ribs = rng.randrange(9) as usize,
+                twist = rng.uniform(-40.0, 40.0)
+            )
+        };
+        let obj = if i % 2 != 0 { far_of(make) } else { make() };
+        let mesh = obj.read(|o| o.mesh.clone());
+        let mut words: Vec<u32> = mesh
+            .verts
+            .iter()
+            .flat_map(|v| v.array().map(f32::to_bits))
+            .collect();
+        words.extend(&mesh.loops);
+        words.extend(mesh.sharp.iter().flat_map(|&(a, b)| [a, b]));
+        let mut h = 0xcbf2_9ce4_8422_2325_u64;
+        for b in words.iter().flat_map(|w| w.to_le_bytes()) {
+            h = (h ^ b as u64).wrapping_mul(0x0100_0000_01b3);
+        }
+        hashes.push(format!("{h:016x}"));
+        sizes.push(format!(
+            "{},{},{}",
+            mesh.verts.len(),
+            mesh.faces.len(),
+            mesh.sharp.len()
+        ));
+    }
+    (hashes, sizes)
+}
+
+#[test]
+fn four_hundred_random_leaves_are_blenders_too() {
+    scene::set_finishes(finishes());
+    let all = cases("botany_leaves.txt");
+    let case = all
+        .iter()
+        .find(|c| c.name == "random")
+        .expect("the random leaves");
+    let (hashes, sizes) = random_leaves();
+    let (want, want_sizes) = (words(&case.lines["hashes"]), words(&case.lines["sizes"]));
+    let wrong: Vec<usize> = (0..hashes.len())
+        .filter(|&i| hashes[i] != want[i] || sizes[i] != want_sizes[i])
+        .collect();
+    assert!(
+        wrong.is_empty() && hashes.len() == want.len(),
+        "{} of {} leaves aren't Blender's: {:?}",
+        wrong.len(),
+        want.len(),
+        &wrong[..wrong.len().min(12)]
+    );
 }
 
 #[test]
@@ -2867,4 +3025,178 @@ fn beds_and_crops_are_blenders_with_their_growth_clips() {
     let n = check("botany_beds.txt", beds, hold, &mut off);
     assert!(n >= 26, "{n} cases");
     assert!(off.moved * 2 < off.points, "{off:?}");
+}
+
+// ---- the macros' order ----
+
+#[test]
+fn a_macro_works_out_what_was_given_by_place_before_what_was_given_by_name() {
+    scene::set_finishes(finishes());
+    scene::reset();
+    let p = botany::palette(&[]);
+    let order = RefCell::new(Vec::new());
+    // a number that says when it was worked out
+    let at = |what: &'static str, x: f64| {
+        order.borrow_mut().push(what);
+        x
+    };
+    let took = |what: &str| {
+        let got = order.borrow().join(" ");
+        order.borrow_mut().clear();
+        assert_eq!(got, "place name", "{what}!");
+    };
+    lump!(
+        "a",
+        at("place", 0.1),
+        (0, 0, 0),
+        p.get("leaf"),
+        seed = at("name", 1.0)
+    );
+    took("lump");
+    artkit::leaves!(
+        "b",
+        at("place", 0.1),
+        (0, 0, 0),
+        p.get("leaf"),
+        seed = at("name", 1.0)
+    );
+    took("leaves");
+    leaf!(
+        "c",
+        (0, 0, 0),
+        0.0,
+        at("place", 10.0),
+        0.2,
+        0.1,
+        p.get("leaf"),
+        droop = at("name", 0.1)
+    );
+    took("leaf");
+    artkit::tube!(
+        "d",
+        &[(0.0, 0.0, 0.0), (0.0, 0.0, 0.1)],
+        at("place", 0.01),
+        0.01,
+        p.get("stem"),
+        verts = at("name", 3.0) as usize
+    );
+    took("tube");
+    artkit::sprigs!(
+        "e",
+        &p,
+        (0, 0, 0),
+        at("place", 0.1),
+        length = at("name", 0.1)
+    );
+    took("sprigs");
+    artkit::pot!(&p, at("place", 0.1), 0.2, rim = at("name", 0.01));
+    took("pot");
+    let eye = sphere!("f", 0.1);
+    _put!(eye, (0.0, 0.0, at("place", 0.1)), yaw = at("name", 10.0));
+    took("_put");
+    artkit::cupped!(
+        "g",
+        &[(0.0, 0.0), (0.02, 0.01), (0.03, 0.05)],
+        (0.0, 0.0, at("place", 0.1)),
+        p.get("bloom"),
+        yaw = at("name", 10.0)
+    );
+    took("cupped");
+    artkit::_mesh!(
+        "h",
+        [v3(0, 0, 0), v3(at("place", 1.0), 0, 0), v3(0, 1, 0)],
+        [[0, 1, 2]],
+        p.get("leaf"),
+        smooth = at("name", 1.0) > 0.0
+    );
+    took("_mesh");
+    rays!(
+        "i",
+        (0, 0, 0),
+        at("place", 0.05),
+        5,
+        p.get("bloom"),
+        yaw = at("name", 10.0)
+    );
+    took("rays");
+    twig!(
+        "j",
+        &[(0.0, 0.0, 0.0), (0.0, 0.0, 0.1)],
+        at("place", 0.01),
+        0.005,
+        p.get("stem"),
+        verts = at("name", 3.0) as usize
+    );
+    took("twig");
+    cut_leaf!(
+        "k",
+        (0, 0, 0),
+        0.0,
+        0.0,
+        at("place", 0.2),
+        &outline!("oval", 0.1),
+        p.get("leaf"),
+        droop = at("name", 0.1)
+    );
+    took("cut_leaf");
+    outline!("oval", at("place", 0.1), wave = at("name", 0.1));
+    took("outline");
+    pinnate!(3, at("place", 0.1), "lance", lean = at("name", 0.5));
+    took("pinnate");
+    vessel!(&p, at("place", 0.1), 0.2, lip = at("name", 0.01));
+    took("vessel");
+    soil_top!(&p, at("place", 0.1), 0.2, mound = at("name", 0.01));
+    took("soil_top");
+    florets!(
+        "l",
+        at("place", 0.1),
+        (0, 0, 0),
+        p.get("bloom"),
+        seed = at("name", 1.0)
+    );
+    took("florets");
+    star!(
+        "m",
+        (0, 0, 0),
+        at("place", 0.05),
+        5,
+        p.get("bloom"),
+        yaw = at("name", 10.0)
+    );
+    took("star");
+    tulip_head!(
+        "n",
+        (0, 0, 0),
+        at("place", 0.03),
+        0.07,
+        p.get("bloom"),
+        yaw = at("name", 10.0)
+    );
+    took("tulip_head");
+    spiral!(
+        3,
+        at("place", 0.3),
+        &mut Random::new(1),
+        jitter = at("name", 0.2)
+    );
+    took("spiral");
+    mound!(&p, r = at("place", 0.3), h = at("name", 0.05));
+    took("mound");
+    perches!(
+        at("place", 2.0) as usize,
+        1,
+        &[(0.0, 0.0, 0.1)],
+        gap = at("name", 0.2)
+    );
+    took("perches");
+    leafy_shrub!(
+        &p,
+        1,
+        at("place", 0.5),
+        0.4,
+        &[p.get("leaf_dark"), p.get("leaf")],
+        p.get("twig"),
+        leaf_size = at("name", 0.1)
+    );
+    took("leafy_shrub");
 }

@@ -129,12 +129,16 @@ pub fn clump_aims(clumps: &[Clump], rng: &mut Random, o: ClumpAims) -> Vec<Aim> 
 /// `clump_aims` with its options by name: `clump_aims!(clumps, rng, key = value, ...)`.
 #[macro_export]
 macro_rules! clump_aims {
-    ($clumps:expr, $rng:expr $(, $k:ident = $v:expr)* $(,)?) => {{
-        #[allow(unused_mut)]
-        let mut o = $crate::botany::skeleton::ClumpAims::default();
-        $(o.$k = $crate::Arg::arg($v);)*
-        $crate::botany::skeleton::clump_aims($clumps, $rng, o)
-    }};
+    ($clumps:expr, $rng:expr $(, $k:ident = $v:expr)* $(,)?) => {
+        match ($clumps,) {
+            (clumps,) => {
+                #[allow(unused_mut)]
+                let mut o = $crate::botany::skeleton::ClumpAims::default();
+                $(o.$k = $crate::Arg::arg($v);)*
+                $crate::botany::skeleton::clump_aims(clumps, $rng, o)
+            }
+        }
+    };
 }
 
 // ---- broadleaves ----------------------------------------------------------------------------------------------
@@ -168,12 +172,16 @@ pub fn _bough<Q: Into<V3> + Copy>(
 /// `_bough` with its options by name: `bough!(name, pts, r0, r1, p, key = value, ...)`.
 #[macro_export]
 macro_rules! bough {
-    ($name:expr, $pts:expr, $r0:expr, $r1:expr, $p:expr $(, $k:ident = $v:expr)* $(,)?) => {{
-        #[allow(unused_mut)]
-        let mut o = $crate::botany::skeleton::Bough::default();
-        $(o.$k = $crate::Arg::arg($v);)*
-        $crate::botany::skeleton::_bough($name, $pts, $r0, $r1, $p, o)
-    }};
+    ($name:expr, $pts:expr, $r0:expr, $r1:expr, $p:expr $(, $k:ident = $v:expr)* $(,)?) => {
+        match ($name, $pts, $r0, $r1, $p) {
+            (name, pts, r0, r1, p) => {
+                #[allow(unused_mut)]
+                let mut o = $crate::botany::skeleton::Bough::default();
+                $(o.$k = $crate::Arg::arg($v);)*
+                $crate::botany::skeleton::_bough(name, pts, r0, r1, p, o)
+            }
+        }
+    };
 }
 
 options! {
@@ -205,12 +213,16 @@ pub fn _bend(a: impl Into<V3>, b: impl Into<V3>, rng: &mut Random, o: Bend) -> V
 /// `_bend` with its options by name: `bend!(a, b, rng, key = value, ...)`.
 #[macro_export]
 macro_rules! bend {
-    ($a:expr, $b:expr, $rng:expr $(, $k:ident = $v:expr)* $(,)?) => {{
-        #[allow(unused_mut)]
-        let mut o = $crate::botany::skeleton::Bend::default();
-        $(o.$k = $crate::Arg::arg($v);)*
-        $crate::botany::skeleton::_bend($a, $b, $rng, o)
-    }};
+    ($a:expr, $b:expr, $rng:expr $(, $k:ident = $v:expr)* $(,)?) => {
+        match ($a, $b) {
+            (a, b) => {
+                #[allow(unused_mut)]
+                let mut o = $crate::botany::skeleton::Bend::default();
+                $(o.$k = $crate::Arg::arg($v);)*
+                $crate::botany::skeleton::_bend(a, b, $rng, o)
+            }
+        }
+    };
 }
 
 options! {
@@ -246,12 +258,16 @@ pub fn _trunk(
 /// `_trunk` with its options by name: `trunk!(p, pts, r, scale, seed, key = value, ...)`.
 #[macro_export]
 macro_rules! trunk {
-    ($p:expr, $pts:expr, $r:expr, $scale:expr, $seed:expr $(, $k:ident = $v:expr)* $(,)?) => {{
-        #[allow(unused_mut)]
-        let mut o = $crate::botany::skeleton::Stem::default();
-        $(o.$k = $crate::Arg::arg($v);)*
-        $crate::botany::skeleton::_trunk($p, $pts, $r, $scale, $seed, o)
-    }};
+    ($p:expr, $pts:expr, $r:expr, $scale:expr, $seed:expr $(, $k:ident = $v:expr)* $(,)?) => {
+        match ($p, $pts, $r, $scale, $seed) {
+            (p, pts, r, scale, seed) => {
+                #[allow(unused_mut)]
+                let mut o = $crate::botany::skeleton::Stem::default();
+                $(o.$k = $crate::Arg::arg($v);)*
+                $crate::botany::skeleton::_trunk(p, pts, r, scale, seed, o)
+            }
+        }
+    };
 }
 
 options! {
@@ -288,12 +304,16 @@ pub fn _roots(p: &Palette, rng: &mut Random, n: usize, r: f64, h: f64, reach: f6
 /// `_roots` with its options by name: `roots!(p, rng, n, r, h, reach, key = value, ...)`.
 #[macro_export]
 macro_rules! roots {
-    ($p:expr, $rng:expr, $n:expr, $r:expr, $h:expr, $reach:expr $(, $k:ident = $v:expr)* $(,)?) => {{
-        #[allow(unused_mut)]
-        let mut o = $crate::botany::skeleton::Buttress::default();
-        $(o.$k = $crate::Arg::arg($v);)*
-        $crate::botany::skeleton::_roots($p, $rng, $n, $r, $h, $reach, o)
-    }};
+    ($p:expr, $rng:expr, $n:expr, $r:expr, $h:expr, $reach:expr $(, $k:ident = $v:expr)* $(,)?) => {
+        match ($p, $n, $r, $h, $reach) {
+            (p, n, r, h, reach) => {
+                #[allow(unused_mut)]
+                let mut o = $crate::botany::skeleton::Buttress::default();
+                $(o.$k = $crate::Arg::arg($v);)*
+                $crate::botany::skeleton::_roots(p, $rng, n, r, h, reach, o)
+            }
+        }
+    };
 }
 
 options! {
@@ -399,12 +419,16 @@ pub fn _mass(
 /// `_mass` with its options by name: `mass!(name, rng, tip, heading, cols, light, out, key = value, ...)`.
 #[macro_export]
 macro_rules! mass {
-    ($name:expr, $rng:expr, $tip:expr, $heading:expr, $cols:expr, $light:expr, $out:expr $(, $k:ident = $v:expr)* $(,)?) => {{
-        #[allow(unused_mut)]
-        let mut o = $crate::botany::skeleton::Mass::default();
-        $(o.$k = $crate::Arg::arg($v);)*
-        $crate::botany::skeleton::_mass($name, $rng, $tip, $heading, $cols, $light, $out, o)
-    }};
+    ($name:expr, $rng:expr, $tip:expr, $heading:expr, $cols:expr, $light:expr, $out:expr $(, $k:ident = $v:expr)* $(,)?) => {
+        match ($name, $tip, $heading, $cols, $light) {
+            (name, tip, heading, cols, light) => {
+                #[allow(unused_mut)]
+                let mut o = $crate::botany::skeleton::Mass::default();
+                $(o.$k = $crate::Arg::arg($v);)*
+                $crate::botany::skeleton::_mass(name, $rng, tip, heading, cols, light, $out, o)
+            }
+        }
+    };
 }
 
 options! {
@@ -550,12 +574,16 @@ pub fn _branches(
 /// `branches!(p, rng, cols, centre, radii, tips, limbs, base_z, key = value, ...)`.
 #[macro_export]
 macro_rules! branches {
-    ($p:expr, $rng:expr, $cols:expr, $centre:expr, $radii:expr, $tips:expr, $limbs:expr, $base_z:expr $(, $k:ident = $v:expr)* $(,)?) => {{
-        #[allow(unused_mut)]
-        let mut o = $crate::botany::skeleton::Branches::default();
-        $(o.$k = $crate::Arg::arg($v);)*
-        $crate::botany::skeleton::_branches($p, $rng, $cols, $centre, $radii, $tips, $limbs, $base_z, o)
-    }};
+    ($p:expr, $rng:expr, $cols:expr, $centre:expr, $radii:expr, $tips:expr, $limbs:expr, $base_z:expr $(, $k:ident = $v:expr)* $(,)?) => {
+        match ($p, $cols, $centre, $radii, $tips, $limbs, $base_z) {
+            (p, cols, centre, radii, tips, limbs, base_z) => {
+                #[allow(unused_mut)]
+                let mut o = $crate::botany::skeleton::Branches::default();
+                $(o.$k = $crate::Arg::arg($v);)*
+                $crate::botany::skeleton::_branches(p, $rng, cols, centre, radii, tips, limbs, base_z, o)
+            }
+        }
+    };
 }
 
 /// A value given at each point of an upright `line` (Blender points), at height `z`, linear between.
@@ -613,12 +641,16 @@ pub fn _hearts(
 /// `_hearts` with its options by name: `hearts!(rng, cols, n, centre, radii, size, key = value, ...)`.
 #[macro_export]
 macro_rules! hearts {
-    ($rng:expr, $cols:expr, $n:expr, $centre:expr, $radii:expr, $size:expr $(, $k:ident = $v:expr)* $(,)?) => {{
-        #[allow(unused_mut)]
-        let mut o = $crate::botany::skeleton::Heart::default();
-        $(o.$k = $crate::Arg::arg($v);)*
-        $crate::botany::skeleton::_hearts($rng, $cols, $n, $centre, $radii, $size, o)
-    }};
+    ($rng:expr, $cols:expr, $n:expr, $centre:expr, $radii:expr, $size:expr $(, $k:ident = $v:expr)* $(,)?) => {
+        match ($cols, $n, $centre, $radii, $size) {
+            (cols, n, centre, radii, size) => {
+                #[allow(unused_mut)]
+                let mut o = $crate::botany::skeleton::Heart::default();
+                $(o.$k = $crate::Arg::arg($v);)*
+                $crate::botany::skeleton::_hearts($rng, cols, n, centre, radii, size, o)
+            }
+        }
+    };
 }
 
 options! {
@@ -645,12 +677,16 @@ pub fn limb_points(limbs: &[Limb], o: LimbPoints) -> Vec<V3> {
 /// `limb_points` with its options by name: `limb_points!(limbs, key = value, ...)`.
 #[macro_export]
 macro_rules! limb_points {
-    ($limbs:expr $(, $k:ident = $v:expr)* $(,)?) => {{
-        #[allow(unused_mut)]
-        let mut o = $crate::botany::skeleton::LimbPoints::default();
-        $(o.$k = $crate::Arg::arg($v);)*
-        $crate::botany::skeleton::limb_points($limbs, o)
-    }};
+    ($limbs:expr $(, $k:ident = $v:expr)* $(,)?) => {
+        match ($limbs,) {
+            (limbs,) => {
+                #[allow(unused_mut)]
+                let mut o = $crate::botany::skeleton::LimbPoints::default();
+                $(o.$k = $crate::Arg::arg($v);)*
+                $crate::botany::skeleton::limb_points(limbs, o)
+            }
+        }
+    };
 }
 
 // ---- fruit ----------------------------------------------------------------------------------------------------
@@ -730,12 +766,16 @@ macro_rules! fruiting {
     (@set $o:ident, $k:ident, $v:expr) => {
         $o.$k = $crate::Arg::arg($v);
     };
-    ($p:expr, $name:expr, $still:expr, $seed:expr, $crown_mid:expr, $fruit:expr $(, $k:ident = $v:expr)* $(,)?) => {{
-        #[allow(unused_mut)]
-        let mut o = $crate::botany::skeleton::Fruiting::default();
-        $($crate::fruiting!(@set o, $k, $v);)*
-        $crate::botany::skeleton::_fruiting($p, $name, $still, $seed, $crown_mid, $fruit, o)
-    }};
+    ($p:expr, $name:expr, $still:expr, $seed:expr, $crown_mid:expr, $fruit:expr $(, $k:ident = $v:expr)* $(,)?) => {
+        match ($p, $name, $still, $seed, $crown_mid, $fruit) {
+            (p, name, still, seed, crown_mid, fruit) => {
+                #[allow(unused_mut)]
+                let mut o = $crate::botany::skeleton::Fruiting::default();
+                $($crate::fruiting!(@set o, $k, $v);)*
+                $crate::botany::skeleton::_fruiting(p, name, still, seed, crown_mid, fruit, o)
+            }
+        }
+    };
 }
 
 options! {
@@ -793,12 +833,16 @@ pub fn _hang(
 /// `_hang` with its options by name: `hang!(rng, n, centre, radii, size, materials, name, key = value, ...)`.
 #[macro_export]
 macro_rules! hang {
-    ($rng:expr, $n:expr, $centre:expr, $radii:expr, $size:expr, $materials:expr, $name:expr $(, $k:ident = $v:expr)* $(,)?) => {{
-        #[allow(unused_mut)]
-        let mut o = $crate::botany::skeleton::Hang::default();
-        $(o.$k = $crate::Arg::arg($v);)*
-        $crate::botany::skeleton::_hang($rng, $n, $centre, $radii, $size, $materials, $name, o)
-    }};
+    ($rng:expr, $n:expr, $centre:expr, $radii:expr, $size:expr, $materials:expr, $name:expr $(, $k:ident = $v:expr)* $(,)?) => {
+        match ($n, $centre, $radii, $size, $materials, $name) {
+            (n, centre, radii, size, materials, name) => {
+                #[allow(unused_mut)]
+                let mut o = $crate::botany::skeleton::Hang::default();
+                $(o.$k = $crate::Arg::arg($v);)*
+                $crate::botany::skeleton::_hang($rng, n, centre, radii, size, materials, name, o)
+            }
+        }
+    };
 }
 
 #[cfg(test)]
