@@ -1,6 +1,6 @@
 # Slob pack — notes
 
-`pack_slob.py` builds the six P16 slob models into `web/public/assets/models/pack_slob/` and their entries in
+`crates/art/packs/src/pack_slob` builds the six P16 slob models into `web/public/assets/models/pack_slob/` and their entries in
 `packs/pack_slob/manifest.json`, an override pack listed in the base manifest. Built 2026-10-14; they sat in
 Validate › Slob until checked in play.
 

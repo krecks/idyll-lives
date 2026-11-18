@@ -149,20 +149,19 @@ Each moves while it is used: the bar's tap lever pulls, the sectional's cushions
 swings up, the dance floor's tiles pulse and a new photo grows.
 
 The romantic pack models (`models/pack_romantic/candlelitTable.glb`, `heartTub.glb`, `vanity.glb`, `gramophone.glb`,
-`letterBureau.glb`, `roseArbourSwing.glb`, override pack `packs/pack_romantic/manifest.json`) are built in Blender by
-`tools/art/blender/families/pack_romantic.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each moves
+`letterBureau.glb`, `roseArbourSwing.glb`, override pack `packs/pack_romantic/manifest.json`) are built by
+`crates/art/packs/src/pack_romantic` on `artkit` and exported as `.glb` (glTF, original, CC0). Each moves
 while it is used: the candles light, the tub fills with petals, the vanity's drawer opens, the gramophone's arm drops
 onto the turning record, the bureau's flap drops and the arbour swing sways while a bloom is cut. The candlelit table
 was rebuilt with a chair at each end, its two diners facing each other (2026-10-21).
 
 The slob pack models (`models/pack_slob/microwaveCart.glb`, `beanbag.glb`, `snackNightstand.glb`, `spritzStation.glb`,
-`arcadeCabinet.glb`, `gamingRecliner.glb`, override pack `packs/pack_slob/manifest.json`) are built in Blender by
-`tools/art/blender/families/pack_slob.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each moves while
+`arcadeCabinet.glb`, `gamingRecliner.glb`, override pack `packs/pack_slob/manifest.json`) are built by `crates/art/packs/src/pack_slob` on `artkit` and exported as `.glb` (glTF, original, CC0). Each moves while
 it is used: the microwave's door opens, the beanbag squashes, the snack drawer slides out, the spray tips, the joystick
 waggles, and the recliner reclines and swings its cup holder out.
 
 The example pack models (`models/pack_example/chefStove.glb`, `whirlpoolTub.glb`, override pack
-`packs/pack_example/manifest.json`) are built in Blender by `tools/art/blender/families/pack_example.py` on `gamekit`
+`packs/pack_example/manifest.json`) are built by `crates/art/packs/src/pack_example` on `artkit`
 and exported as `.glb` (glTF, original, CC0). The stove's oven door drops and its front burner lights while a resident
 cooks; the tub fills and bubbles while residents soak.
 
@@ -180,7 +179,7 @@ rippling pool, the window seat's cushion sinks and the tub fills.
 
 The loner pack models (`models/pack_loner/quietPod.glb`, `shortwaveRadio.glb`, `puzzleTable.glb`,
 `bonsaiBench.glb`, `soloSauna.glb`, `deliveryHatch.glb`, override pack `packs/pack_loner/manifest.json`) are built
-in Blender by `tools/art/blender/families/pack_loner.py` on `gamekit` and exported as `.glb` (glTF, original, CC0).
+by `crates/art/packs/src/pack_loner` on `artkit` and exported as `.glb` (glTF, original, CC0).
 Each moves a part while it is used: the pod's hood swings over, the radio's dial turns and its antenna rises, a
 patch of the puzzle is laid, a twig of the bonsai is trimmed, the sauna's door opens and the delivery hatch opens.
 
@@ -200,7 +199,7 @@ nightstand-sized bedside stack; the lava lamp turned to its watcher; and glowing
 
 The neat pack models (`models/pack_neat/steamMopDock.glb`, `laundryCenter.glb`, `rainShowerTower.glb`,
 `organizerDesk.glb`, `robotVacuumDock.glb`, `entryConsole.glb`, override pack `packs/pack_neat/manifest.json`) are
-built in Blender by `tools/art/blender/families/pack_neat.py` on `gamekit` and exported as `.glb` (glTF, original,
+built by `crates/art/packs/src/pack_neat` on `artkit` and exported as `.glb` (glTF, original,
 CC0). Each moves one part while it is used: the mop leaves its dock, the washer's door opens, the rain falls, a bin
 slides out of the desk's hutch, the robot rolls out and back, and the key tray drawer opens.
 
@@ -237,8 +236,7 @@ the feeder's roof lifts and songbirds fly out, and the settee's cushions sink. T
 narrower, its poufs either side of it facing each other (2026-10-21).
 
 The lazy pack models (`models/pack_lazy/snoozecloudBed.glb`, `napPod.glb`, `quiltTable.glb`, `deliveryLocker.glb`,
-`vibePlate.glb`, `smartHub.glb`, override pack `packs/pack_lazy/manifest.json`) are built in Blender by
-`tools/art/blender/families/pack_lazy.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each moves while
+`vibePlate.glb`, `smartHub.glb`, override pack `packs/pack_lazy/manifest.json`) are built by `crates/art/packs/src/pack_lazy` on `artkit` and exported as `.glb` (glTF, original, CC0). Each moves while
 it is used: the bed's head section rises, the pod's hood swings over, the quilt's edge lifts, a locker door opens, the
 plate's deck shakes and the tablet tilts up.
 
