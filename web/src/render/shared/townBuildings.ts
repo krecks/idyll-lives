@@ -5,7 +5,7 @@
  * under its ground to its storeys, its roof's rise), and the unit meshes themselves.
  */
 
-import type { BackdropBuilding, BackdropUse, RoadPlan, TownPlace } from '../../core/protocol';
+import type { BackdropBuilding, BackdropUse, LotLook, RoadPlan, TownPlace } from '../../core/protocol';
 import { chunkAt } from './chunks';
 import { Geo, facing, type V3 } from './geometry';
 
@@ -167,6 +167,9 @@ export interface TownLotHouse {
   rise: number;
   /** Its lot's pad (m): the level its floor stands at (`TownStreet.padOf`; 0 on flat land). */
   pad: number;
+  /** A named place's lot: how it looks from outside (`WorldMeta.lotLooks`), and its place's hours (`lotLookBuilding`). */
+  look?: LotLook;
+  hours?: TownPlace['hours'];
 }
 
 const hex = (h: string): [number, number, number] => {
@@ -304,6 +307,68 @@ export function townBackdrop(
   return [...buildings, ...hedges];
 }
 
+// ---- the named places' lots, closed ------------------------------------------------------------
+
+/**
+ * A named place's lot (`WorldMeta.lotLooks`) closed, as the backdrop building its look says: on its walls' box (`box`,
+ * their outer faces), its floor its lot's pad, as many storeys as the look has, or as its own walls if more (a real upper
+ * floor). Its roof's ridge along its longer side (a hip's always is).
+ */
+export function lotLookBackdrop(box: readonly [number, number, number, number], look: LotLook, storeys: number, pad: number): BackdropBuilding {
+  const [x0, z0, x1, z1] = box;
+  return { poly: [[x0, z0], [x0, z1], [x1, z1], [x1, z0]], y: pad, storeys: Math.max(1, Math.min(6, Math.round(Math.max(look.storeys, storeys)))), roof: look.roof, use: look.use, look: look.look, area: 0 };
+}
+
+/**
+ * A named place's lot closed as drawn, near (`backdropDress.ts`) and far alike: `lotLookBackdrop` as a backdrop building
+ * is (`backdropBuilding`, its variation its footprint's), its walls down to the lowest of `ground` round it, its windows
+ * lit by its place's `hours` (`litAt`).
+ */
+export function lotLookBuilding(box: readonly [number, number, number, number], look: LotLook, storeys: number, pad: number, ground: (x: number, z: number) => number, hours?: TownPlace['hours']): TownBuilding {
+  const b = lotLookBackdrop(box, look, storeys, pad);
+  const t = backdropBuilding(b, footprintSeed(b), ground);
+  return hours ? { ...t, hours } : t;
+}
+
+/** sRGB 0..1 as a hex colour. */
+const hexOf = (c: readonly number[]) => `#${c.map((v) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0')).join('')}`;
+
+/**
+ * Building `t` as a plain box and its roof into `geo`, in its colours (the street's far LOD of a named place's lot,
+ * `TownStreet.farChunk`, as the town view's unit meshes have it: `unitMeshes`).
+ */
+export function farBuilding(geo: Geo, t: TownBuilding): void {
+  const g = new Geo();
+  const [W, D] = [t.w / 2, t.d / 2];
+  const wall = hexOf(t.wall);
+  const roof = hexOf(t.roofColor);
+  const { top, rise } = t;
+  g.color(wall, FINISH).box(-W, t.base, -D, W, top, D, 'ny py');
+  if (t.roof === 'flat') {
+    g.color(wall, FINISH).box(-W, top, -D, W, top + rise, D, 'ny py');
+    g.color(roof, FINISH).poly([[-W, top + rise, -D], [W, top + rise, -D], [W, top + rise, D], [-W, top + rise, D]], [0, 1, 0]);
+  } else {
+    const [ex, ez] = [W + EAVE * t.w, D + EAVE * t.d];
+    // (A gable's ridge the whole length, its ends walls; a hip's and a mansard's short, four slopes to it.)
+    const r = t.roof === 'gable' ? ex : t.roof === 'hip' ? HIP_RIDGE * t.w : HIP_RIDGE * 0.6 * t.w;
+    const y = top + rise;
+    g.color(roof, FINISH);
+    for (const s of [-1, 1]) {
+      const q: V3[] = [[-ex, top, s * ez], [ex, top, s * ez], [r, y, 0], [-r, y, 0]];
+      g.poly(q, facing(q[0], q[1], q[2], [0, 1, s]));
+    }
+    for (const s of [-1, 1]) {
+      if (t.roof === 'gable') {
+        g.color(wall, FINISH).poly([[s * W, top, -D], [s * W, top, D], [s * W, y, 0]], [s, 0, 0]);
+        continue;
+      }
+      const q: V3[] = [[s * ex, top, -ez], [s * ex, top, ez], [s * r, y, 0]];
+      g.color(roof, FINISH).poly(q, facing(q[0], q[1], q[2], [s, 1, 0]));
+    }
+  }
+  geo.merge(g.place(t.ux, t.uz, t.cx, 0, t.cz));
+}
+
 /** The share of a lot's house's windows lit at night while someone is up in it. */
 const LOT_LIT = 0.5;
 
@@ -313,6 +378,8 @@ const LOT_LIT = 0.5;
  * camera do).
  */
 export function lotBuilding(h: TownLotHouse, ground: (x: number, z: number) => number, up = true): TownBuilding {
+  // (A named place's lot as its look has it, lit by its hours: `lotLookBuilding`.)
+  if (h.look) return { ...lotLookBuilding(h.box, h.look, h.storeys, h.pad, ground, h.hours), chunk: h.chunk };
   const [x0, z0, x1, z1] = h.box;
   const along = x1 - x0 >= z1 - z0;
   const [w, d] = along ? [x1 - x0, z1 - z0] : [z1 - z0, x1 - x0];

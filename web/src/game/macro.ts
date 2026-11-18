@@ -29,9 +29,9 @@
  */
 
 import type { Content } from '../content/content';
-import type { BackdropBuilding, LandSize, Rle, TownArea, TownPlace, WorldMeta, WorldOptions, WorldZone } from '../core/protocol';
+import type { BackdropBuilding, LandSize, Rle, TownArea, TownPlace, TownSize, WorldMeta, WorldOptions, WorldZone } from '../core/protocol';
 import { distanceToRect } from '../render/shared/chunks';
-import { chooseCentre, layBackdrop, reserveCentre } from './backdrop';
+import { areaSize, chooseCentre, civicTooBig, CIVIC, layBackdrop, namerFor, reserveCentre, ZONE, type ZoneKind } from './backdrop';
 import { random } from './housegen';
 import { COVER, COVER_CELL, coverSpan, LAND_CELL, NONE, type Land as LandField } from './land';
 import { APRON, landZones, Protection, wetTiles, type BuiltLand } from './landEdit';
@@ -42,7 +42,8 @@ import { fbm } from './noise';
 import type { UseLayer } from './uses';
 import { along, astar, CELL, Cells, clearOfBoxes, COUNTRY_GRADE, COUNTRY_TURN, COUNTRY_WIDTH, CountryRouter, CTRL_APART, FACING, ROAD_WIDTH, ROUTE_GRADE, SIDE_COST, TRIES, type Port, type Way } from './countryRouter';
 import { centroid, cropRoads, curve, evenly, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, straightAround, type Box, type Pt, type RoadPlan } from './roads';
-import { BIG_COURTS, boundsOf, COURTS, frontageOf, Ground, houseFor, joinUp, LotPlacer, plotRect, settleRoads, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
+import { lotName, placeOfTemplate, placeUnit } from './placeLots';
+import { BIG_COURTS, boundsOf, COURTS, frontageOf, Ground, houseFor, joinUp, lotAt, LotPlacer, plotRect, settleRoads, shuffled, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
 import { LAND_SIZE, LEGACY_KINDS, placeOf, specOf, streetNames, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind, type WorldSpec, type WorldStep } from './world';
 
 /** The mask helpers moved to `landMasks.ts`; still here for those that import them from the generator. */
@@ -319,6 +320,20 @@ const SPOT_REACH = 130;
 export const SHORE_GAP = 3;
 /** Streams of their own for a river's course and its bridges (a place's). */
 const RIVER = 0x72697672;
+/** Streams of their own for the named places' lots and for their names (so the rest of the town draws as it did). */
+const PLACES = 0x706c6163;
+const PLACE_NAMES = 0x6e616d65;
+/** A named place's lot stands with the middle of its front no further than this from its road's edge (m): as far as a lot's path reaches across the verge to its road (`layoutTown`). */
+const PLACE_REACH = 12;
+
+/** Whether named place lot `u` at `at` (`lotAt`, facing `road`) has the middle of its front within `PLACE_REACH` m of the road's edge (it has no driveway: its path crosses the verge). */
+export function placeReaches(t: Templates, road: RoadPlan, u: Unplaced, at: { x: number; z: number; facing: Facing }): boolean {
+  const r = plotRect(t, { ...u, ...at });
+  const [mx, mz] = ([[r.x + r.w / 2, r.z], [r.x, r.z + r.d / 2], [r.x + r.w / 2, r.z + r.d], [r.x + r.w, r.z + r.d / 2]] as const)[at.facing];
+  return nearest(road.points, mx, mz).dist - road.width / 2 <= PLACE_REACH;
+}
+/** A farm shop goes along its farmstead's road within about this of the farm's middle (m). */
+export const FARM_SHOP_REACH = 90;
 /** A river's width (m), how far its meanders swing (m), how far its mountains stand back from it (m). */
 const RIVER_WIDTH: [number, number] = [14, 22];
 const MEANDER: [number, number] = [70, 110];
@@ -1488,6 +1503,22 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   // No lot's middle by a junction or on a tight bend (`cornersOf`).
   const offCorners = cornersOf(worldRoads, plans.flatMap((plan) => plan.roads));
   let reserved: Uint8Array | undefined;
+  // The named places' lots, from a stream of their own (`namedLots`): with no room in their area, along the
+  // country roads leaving it, where they run straight over gentle land.
+  const placeRand = random(((lay?.townSeed ?? seed) ^ PLACES) >>> 0);
+  const ways = worldRoads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : []));
+  const wayLengths = new Map<number, number[]>();
+  const lengthsOf = (r: number) => wayLengths.get(r) ?? wayLengths.set(r, lengths(worldRoads[r].points)).get(r)!;
+  /**
+   * Each area's named places to go down on what its homes leave once every home has found room: the main
+   * town's that went in no parade nor its centre (`units`), every other area's (`namedLots`); along its
+   * frontage nearest its heart (`near`).
+   */
+  const later: { units?: Unplaced[]; near: readonly Frontage[]; a: number }[] = [];
+  const spillOf = (a: number) => {
+    let list: Frontage[] | undefined;
+    return () => (list ??= frontageOf(worldRoads, ways, plans[a].centre, placeRand).filter((f) => offRect(plans[a].rect, f.p) < TERRACE_SPILL && straight(worldRoads[f.road].points, f.s, lengthsOf(f.road)) && gentleBy(f.p)));
+  };
   for (const [a, plan] of plans.entries()) {
     if (a === 0) {
       const wanted = wantedLots(content, t, spec, plan.spec, rand, { park: true, avoid: [] });
@@ -1498,6 +1529,15 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       const homes = all.filter((f) => !inCentre(f));
       const [places, houses] = [wanted.filter((u) => u.kind !== 'house'), wanted.filter((u) => u.kind === 'house')];
       for (const u of lots.place(places, fronts.get(a)!, plan.greens, plan.centre, a, true)) left.push({ u, from: a });
+      // Its named places' lots (`namedLots`) round its heart (its square, else its high street's middle; else its
+      // middle), its shops and cafés in parades along its high street; then its centre kept for the backdrop.
+      const heart = centre ? (centre.square ? centroid(centre.square) : pointAt(worldRoads[centre.road].points, (centre.s0 + centre.s1) / 2).p) : plan.centre;
+      const near = frontageOf(worldRoads, plan.roads, heart, placeRand);
+      const street = centre ? near.filter((f) => f.road === centre.road && f.s >= centre.s0 && f.s <= centre.s1) : near;
+      // (Its civic places before its homes, nearest its heart; its other places before them only in its centre,
+      // which no home fronts: the rest once every home has found room.)
+      const inTheCentre = near.filter(inCentre);
+      const others = namedLots(t, lots, worldRoads, a, spec.civic, true, near, street, placeRand).filter((u) => !putPlace(lots, t, worldRoads, u, inTheCentre));
       reserved = centre ? reserveCentre(centre, ground) : undefined;
       // (Out of room in the town: on along the country roads leaving it, where they run straight.)
       const countryWays = worldRoads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : []));
@@ -1506,9 +1546,12 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       terraceRows(t, lots, [homes, out], spec, dense);
       fronts.set(a, homes.filter(offCorners));
       for (const u of lots.place(houses, fronts.get(a)!, [], plan.centre, a, true)) left.push({ u, from: a });
+      later.push({ units: others, near, a });
     } else {
       // A hamlet: its lots along its own roads (`hamletLots`).
       const laid = hamletLots(content, t, spec, plan, a, lots, worldRoads, offCorners, rand);
+      // (Its named places' lots once every home has found room.)
+      later.push({ near: frontageOf(worldRoads, plan.roads, plan.centre, placeRand), a });
       fronts.set(a, laid.fronts);
       for (const u of laid.left) left.push({ u, from: a });
     }
@@ -1532,6 +1575,26 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     lots.dropped.push({ name: u.name, kind: u.kind, lot: u.lot });
   }
   const farmsteads = alongCountryRoads(content, t, lots, plans, worldRoads, land, spec.farmEvery, rand, spec.classic ? STEEP : PLACE_STEEP);
+  // The named places that did not go down before the homes, on what the homes leave (the main town's in no
+  // parade nor its centre; every other area's, its civic places first, its shops and cafés in parades where
+  // they fit). A shop, a café and the like with no room in its own area goes to the nearest other with room,
+  // a place of that one's then, as a home does. Then a farm shop by every farm.
+  const homeless: Unplaced[] = [];
+  for (const { units, near, a } of later) {
+    const rest = units ?? namedLots(t, lots, worldRoads, a, areaSize(spec.civic, a), false, near, near, placeRand);
+    for (const u of rest) {
+      if (putPlace(lots, t, worldRoads, u, near) || putPlace(lots, t, worldRoads, u, spillOf(a)())) continue;
+      // (A civic place is its own area's.)
+      if ('civic' in (placeOfTemplate(u.template) ?? {})) lots.dropped.push({ name: u.name, kind: u.kind, lot: u.lot, place: true });
+      else homeless.push(u);
+    }
+  }
+  for (const u of homeless) {
+    const from = plans[u.area ?? 0].centre;
+    const others = later.filter((l) => l.a !== (u.area ?? 0)).sort((x, y) => dist(plans[x.a].centre, from) - dist(plans[y.a].centre, from));
+    if (!others.some((o) => putPlace(lots, t, worldRoads, { ...u, area: o.a }, o.near))) lots.dropped.push({ name: u.name, kind: u.kind, lot: u.lot, place: true });
+  }
+  farmShops(t, lots, worldRoads, (a) => (a === 0 ? spec.civic : areaSize(spec.civic, a)), placeRand);
   lots.number(names);
   const slots = lots.slots;
   const rectOf = (s: PlotSlot) => plotRect(t, s);
@@ -1601,9 +1664,13 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     orchards.push(at);
   }
 
+  // ---- the named places' names: each lot as its place is called, none twice -------------------
+  nameLots(content, slots, plans, worldRoads, spec.civic, random(((lay?.townSeed ?? seed) ^ PLACE_NAMES) >>> 0));
+
   // ---- the living town: the backdrop, and the places the tags name --------------------------
   const { backdrop, places } = layBackdrop({
     content,
+    t,
     W,
     D,
     roads: worldRoads,
@@ -1901,6 +1968,95 @@ export function hamletLots(content: Content, t: Templates, spec: WorldSpec, plan
   const wanted = wantedLots(content, t, spec, plan.spec, rand, { park: false, avoid: ['market'] });
   const fronts = frontageOf(roads, plan.roads, plan.centre, rand).filter(offCorners);
   return { fronts, left: lots.place(wanted, fronts, plan.greens, plan.centre, a, true) };
+}
+
+/**
+ * Named place lot `u` (`placeLots.ts` `placeUnit`) put down along the first of `frontage` it fits, as
+ * `lotAt` lays a lot but not snug (it has no driveway whose end must meet the road): the middle of its
+ * front within `PLACE_REACH` m of its road's edge, the land a metre round it taken. Its slot, or null.
+ */
+export function putPlace(lots: LotPlacer, t: Templates, roads: readonly RoadPlan[], u: Unplaced, frontage: readonly Frontage[]): PlotSlot | null {
+  const { width, depth } = slotDims(t, u);
+  for (const f of frontage) {
+    const road = roads[f.road];
+    const at = lotAt(lots.ground, road, f, width, depth);
+    if (!at || !placeReaches(t, road, u, at)) continue;
+    const r = plotRect(t, { ...u, ...at });
+    const slot: PlotSlot = { ...u, index: lots.slots.length, ...at };
+    lots.slots.push(slot);
+    lots.placed.set(slot, f);
+    lots.ground.take(r, 1);
+    return slot;
+  }
+  return null;
+}
+
+/**
+ * Area `a`'s named places as lots (`placeLots.ts`), each a place of `size`'s (its layout and name), drawn
+ * from `rand`: its civic places (`CIVIC`: a main town's, `main`, those of its size, `Civic.least`;
+ * any other area's a hamlet's) put down along `near` (its frontage nearest its heart first: `putPlace`),
+ * and its other places (`ZONE`: of each kind as many as `ZONE.lots` has for a main town of its size,
+ * `ZONE.around` for any other area), its shops and cafés in parades along `street` where they fit
+ * (`paraded`). Those not put down yet, to go one by one: the civic places first, then a restaurant, the
+ * shops and cafés, the offices, the workshops.
+ */
+export function namedLots(t: Templates, lots: LotPlacer, roads: readonly RoadPlan[], a: number, size: TownSize, main: boolean, near: readonly Frontage[], street: readonly Frontage[], rand: Rand): Unplaced[] {
+  const civic = CIVIC.flatMap((c) => (civicTooBig(c, main ? size : 'hamlet') ? [] : [{ ...placeUnit(t, c, size, rand), area: a }])).filter((u) => !putPlace(lots, t, roads, u, near));
+  const of = (k: ZoneKind) => Array.from({ length: between(rand, main ? ZONE[k].lots[size] : ZONE[k].around) }, (): Unplaced => ({ ...placeUnit(t, k, size, rand), area: a }));
+  const [shops, cafes, restaurants, offices, workshops] = (['shop', 'cafe', 'restaurant', 'office', 'workshop'] as const).map(of);
+  return [...civic, ...restaurants, ...paraded(lots, shuffled([...shops, ...cafes], rand), street, a, rand), ...offices, ...workshops];
+}
+
+/**
+ * Of `units` (named places' lots of area `a`, all of one depth: shops and cafés), as many as fit put down
+ * in parades of two to four along `street` (`LotPlacer.placeRow`: nearest its start first), each as long
+ * as `rand` draws else shorter, down to a pair. Those left (the first a parade found no room for on).
+ */
+export function paraded(lots: LotPlacer, units: readonly Unplaced[], street: readonly Frontage[], a: number, rand: Rand): Unplaced[] {
+  const left = units.slice();
+  while (left.length >= 2 && street.length) {
+    let row: PlotSlot[] = [];
+    for (let n = Math.min(left.length, between(rand, [2, 4])); n >= 2 && !row.length; n--) row = lots.placeRow(left.slice(0, n), street, a);
+    if (!row.length) break;
+    left.splice(0, row.length);
+  }
+  return left;
+}
+
+/**
+ * A farm shop (`ZONE.farm`, a place of `sizeOf` its area's size) by every farm lot (a farmstead out in the
+ * country, a farm in an area), along its road within about `FARM_SHOP_REACH` m of its middle, called after
+ * the farm (`Meadow Farm Shop`), drawn from `rand`. One with no room by its farm is listed in `lots.dropped`.
+ */
+export function farmShops(t: Templates, lots: LotPlacer, roads: readonly RoadPlan[], sizeOf: (area: number) => TownSize, rand: Rand): void {
+  for (const s of lots.slots.filter((q) => q.lot === 'farm')) {
+    const f = lots.placed.get(s);
+    if (!f) continue;
+    const r = plotRect(t, s);
+    const near = frontageOf(roads, [f.road], [r.x + r.w / 2, r.z + r.d / 2], rand).filter((g) => g.far < FARM_SHOP_REACH);
+    const a = s.area ?? 0;
+    const u: Unplaced = { ...placeUnit(t, 'farm', sizeOf(a), rand), area: a, name: `${s.name} Shop` };
+    if (!putPlace(lots, t, roads, u, near)) lots.dropped.push({ name: u.name, kind: u.kind, lot: u.lot, place: true });
+  }
+}
+
+/**
+ * Every named place's lot of `slots` called as its place is (`placeLots.ts` `lotName`; a farm shop after its
+ * farm), none as another lot is nor twice (`namerFor`: the names from its area's, `plans`, its streets
+ * among `roads`, of a place of the main town's size `main`, else of its area's, `areaSize`), drawn from
+ * `rand`. Its place is called the same (`backdrop.ts` `places`).
+ */
+export function nameLots(content: Content, slots: readonly PlotSlot[], plans: readonly AreaPlan[], roads: readonly RoadPlan[], main: TownSize, rand: Rand): void {
+  const taken = new Set(slots.flatMap((s) => (s.dress ? [] : [s.name])));
+  const lastNames = content.names.last.length ? content.names.last : ['Smith'];
+  for (const s of slots) {
+    if (!s.dress) continue;
+    const a = s.area ?? 0;
+    const streets = plans[a].roads.map((r) => roads[r].name).filter((n): n is string => !!n && !/Trail|Path/.test(n));
+    const namer = namerFor(rand, plans[a].name, a === 0 ? main : areaSize(main, a), lastNames, streets, taken);
+    const what = placeOfTemplate(s.template);
+    s.name = what && 'zone' in what && what.zone === 'farm' ? namer.unique(() => s.name) : (lotName(s, namer) ?? s.name);
+  }
 }
 
 /** A shaped land's 8 m cells, as the generator and the country roads' router read it (`fillFrom`). */

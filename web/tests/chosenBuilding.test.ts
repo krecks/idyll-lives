@@ -4,7 +4,7 @@
  */
 import { describe, expect, test } from 'bun:test';
 import type { BackdropBuilding, PlotInfo, SimView, TownPlace } from '../src/core/protocol';
-import { chosenAnchor, chosenIcon, chosenOf, insideText, whoIsIn, type ChosenTown } from '../src/ui/town/chosen';
+import { chosenAnchor, chosenIcon, chosenOf, insideText, placeDetail, placeLabel, whoIsIn, type ChosenTown } from '../src/ui/town/chosen';
 import type { TagWorld } from '../src/ui/town/tags';
 
 const plot = (id: number, name: string, pub: boolean, extra: Partial<PlotInfo> = {}): PlotInfo => ({ id, name, x: id * 20, z: 0, w: 16, d: 20, public: pub, entry: null, house: null, ...extra });
@@ -50,6 +50,40 @@ describe('what a click on a building chooses', () => {
     const flats = chosenOf({ kind: 'building', index: 1 }, town)!;
     expect(flats).toEqual({ kind: 'building', building: 1, plot: null, title: 'Flats', detail: '' });
     expect(chosenAnchor(flats, town)).toEqual({ x: 205, z: 5, lift: 12 });
+  });
+});
+
+describe("a place's card line", () => {
+  const t = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const fire: TownPlace = { name: 'Ashby Fire Station', kind: 'workshop', x: 0, z: 0, work: ['firefighter'], area: 0, plot: 4 };
+  const hall: TownPlace = { name: 'Millbrook Village Hall', kind: 'office', x: 0, z: 0, work: ['politics'], area: 1, plot: 5 };
+  const school: TownPlace = { name: 'Ashby School', kind: 'school', x: 0, z: 0, work: ['education'], area: 0, plot: 6 };
+
+  test("a civic place says what it is (a village's hall its village hall); a shop or an office its name alone", () => {
+    expect(placeLabel(fire)).toBe('Fire station');
+    expect(placeLabel(hall)).toBe('Village hall');
+    expect(placeLabel({ ...hall, name: 'Ashby Town Hall', area: 0 })).toBe('Town hall');
+    expect(placeLabel(places[0])).toBe('');
+    expect(placeLabel(places[1])).toBe('');
+    expect(placeLabel(undefined)).toBe('');
+  });
+
+  test('then whether it is open, and till when or when it opens', () => {
+    const shift = { open: 7 * 60, close: 17 * 60, days: 0b1111111 };
+    expect(placeDetail(fire, shift, 10 * 60, 0, t, days)).toBe('Fire station · open till 17:00');
+    const term = { open: 8 * 60, close: 16 * 60, days: 0b0011111 };
+    expect(placeDetail(school, term, 12 * 60, 5, t, days)).toBe('School · closed · opens Mon 08:00');
+    expect(placeDetail(places[0], { open: 9 * 60, close: 18 * 60, days: 0b1111111 }, 10 * 60, 0, t, days)).toBe('open till 18:00');
+    expect(placeDetail(places[0], undefined, 10 * 60, 0, t, days)).toBe('');
+  });
+
+  test('a place lot is a place: Visit and Look inside go to its lot', () => {
+    const t2: ChosenTown = { ...town, places: [...places, school], plots: [...town.plots, plot(3, 'x', false), plot(4, 'x', false), plot(5, 'x', false), plot(6, 'Ashby School', true)] };
+    expect(chosenOf({ kind: 'lot', plot: 6 }, t2)).toEqual({ kind: 'place', place: 2, plot: 6, title: 'Ashby School', detail: '' });
+    // (Drawn by the backdrop dresser while closed, its building still names the place and its lot.)
+    const b: BackdropBuilding = { poly: box(120, 0), y: 0, storeys: 2, roof: 'hip', use: 'school', look: 0, place: 2, area: 0 };
+    expect(chosenOf({ kind: 'building', index: 0 }, { ...t2, backdrop: [b] })).toEqual({ kind: 'place', place: 2, plot: 6, title: 'Ashby School', detail: '' });
   });
 });
 

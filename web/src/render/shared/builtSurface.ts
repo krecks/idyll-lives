@@ -1012,8 +1012,8 @@ export class BuiltSurface {
     // what it stands on (`GROUND_ROUND`) and a cell's diagonal past that (every corner of a cell its edge crosses,
     // as beside a road: the land drawn between the samples meets its forecourt under its edge), but not under a road,
     // and past its footprint not in a box nor beside one whose pad is more than a retaining edge from its own (a lot's
-    // pad is its own and the land beside it within `RETAIN_MAX` of it: its ground gives way to it as to a road); one
-    // standing in water none (`afloat`: its pad the water's bed, it would dig the banks round it out to that).
+    // pad is its own and the land beside it within `RETAIN_MAX` of it: its ground gives way to it as to a road, and
+    // a lot's own samples are its pad's); one standing in water none (`afloat`: its pad the water's bed, it would dig the banks round it out to that).
     const boxed = new Uint8Array(cols * rows);
     /** Whether sample (i, j) is in a box (a lot's, or a backdrop building's along x and z), or beside one whose pad is more than a retaining edge from `y`. */
     const byBox = (i: number, j: number, y: number) => {
@@ -1030,7 +1030,7 @@ export class BuiltSurface {
         for (let i = Math.max(0, Math.ceil((p.x - out) / c)); i <= Math.min(cols - 1, Math.floor((p.x + p.w + out) / c)); i++) {
           const at = j * cols + i;
           // (Beside a road, only where its pad is no higher: the land meets the sidewalk's edge under it, and its ground's.)
-          if (p.poly && (kind[at] === 1 || (kind[at] === BESIDE && pads[n] > builtY[at]) || !onPad(p, i * c, j * c, out) || (!onPad(p, i * c, j * c) && byBox(i, j, pads[n])))) continue;
+          if (p.poly && (boxed[at] || kind[at] === 1 || (kind[at] === BESIDE && pads[n] > builtY[at]) || !onPad(p, i * c, j * c, out) || (!onPad(p, i * c, j * c) && byBox(i, j, pads[n])))) continue;
           builtY[at] = kind[at] === 2 ? Math.max(builtY[at], pads[n]) : pads[n];
           kind[at] = 2;
           if (!p.poly) boxed[at] = 1;

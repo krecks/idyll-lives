@@ -274,3 +274,43 @@ fn cars_on_their_way_in_a_v36_save_load_where_they_were() {
     common::check(&w);
     common::reload(&w, &content);
 }
+
+/// A save from before places had hours (`plots[].hours`; version 36, its hamlets' parks public)
+/// loads with none: every place open at any hour, as before, and saved again with none.
+#[test]
+fn a_save_from_before_places_had_hours_loads_with_them_always_open() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves/v036_hamlets.json");
+    let json = std::fs::read_to_string(path).unwrap();
+    let content = common::content();
+    let w = World::from_save_json(&content, &json).unwrap();
+    let public: Vec<_> = w.plots.iter().filter(|p| p.public).collect();
+    assert!(!public.is_empty(), "its parks");
+    for p in &w.plots {
+        assert_eq!(p.hours, None, "{}: no hours", p.name);
+        for day in 1..=7 {
+            for minute in [0.0, 6.0 * 60.0, 13.5 * 60.0, 23.9 * 60.0] {
+                assert!(
+                    p.open_at(day, minute),
+                    "{}: open on day {day} at {minute}",
+                    p.name
+                );
+            }
+        }
+        assert_eq!(
+            p.open_for(1, 0.0),
+            f32::INFINITY,
+            "{}: open for good",
+            p.name
+        );
+    }
+    let saved: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
+    assert!(
+        saved["plots"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|p| p.get("hours").is_none()),
+        "saved again with no hours"
+    );
+}

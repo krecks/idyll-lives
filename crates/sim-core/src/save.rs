@@ -139,6 +139,11 @@
 //! the speed super speed drops back to (`resumeSpeed`). A file before it had 4 and 5 for 30×
 //! and 60×: it loads at super speed with 3 to drop back to, which the first step leaves if
 //! someone at home is up.
+//! Still 40: a public place's plot may say when it is open (`plots[].hours`: minutes of the day it
+//! opens and closes and the days it opens, bit 0 Monday, as the town file gave them; `Plot::open_at`).
+//! Left out where it has none, so a file without them (every file before it) has its places open
+//! at any hour, as before. A town holds up to 128 servers (`staff::MAX_STAFF`, 48 before); nothing
+//! of them is saved.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -818,6 +823,9 @@ pub struct PlotSave {
     /// The roof the player chose: roof style and colour ids (absent before v11: the town's look).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub roof: Option<[String; 2]>,
+    /// When the place on it is open (`world::PlotHours`; absent: always).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hours: Option<crate::world::PlotHours>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1081,6 +1089,7 @@ impl World {
                         };
                         [id(&b.roofs, r.style), id(&b.roof_colors, r.color)]
                     }),
+                    hours: p.hours,
                 })
                 .collect(),
             relationships,
@@ -1275,6 +1284,7 @@ impl World {
                     let color = index(&b.roof_colors, color).unwrap_or(0);
                     (!b.roofs.is_empty()).then_some(crate::world::RoofLook { style, color })
                 }),
+                hours: p.hours,
             })
             .collect();
         let starting_funds = world.content.starting_funds;

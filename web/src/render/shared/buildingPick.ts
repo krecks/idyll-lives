@@ -18,6 +18,15 @@ function insidePoly(poly: Footprint, x: number, z: number): boolean {
   return inside;
 }
 
+/**
+ * How tall a lot's house stands to its walls' top (m): its own storeys (`wall` m each), or a named place's lot closed
+ * (`WorldMeta.lotLooks`) as the street draws it, its look's storeys (`storey` m each, the backdrop's) or its own if
+ * more (`townBuildings.ts` `lotLookBuilding`).
+ */
+export function lotWallsHeight(storeys: number | undefined, look: { storeys: number } | undefined, wall: number, storey: number): number {
+  return look ? Math.max(look.storeys, storeys ?? 1) * storey : (storeys ?? 1) * wall;
+}
+
 /** A rectangle `[x0, z0, x1, z1]` as a footprint. */
 export function rectFootprint(x0: number, z0: number, x1: number, z1: number): Footprint {
   return [

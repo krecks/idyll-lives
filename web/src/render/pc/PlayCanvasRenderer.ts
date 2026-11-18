@@ -80,11 +80,11 @@ import { edgeFog, landEdge, menuFog, menuFogFrom, TOWN_RADIUS_LIMITS, townArriva
 import { townView } from '../shared/townView';
 import { landscapeRing, WATER_Y } from '../shared/nature';
 import { setFogFrom } from './shaders/fog';
-import { LT_FIXTURE } from '../../debug/livingTown';
+import { LOT_LOOKS_FIXTURE, LT_FIXTURE } from '../../debug/livingTown';
 import { applyLandFixture, LAND_FIXTURE } from '../landFixture';
 import { lotBuilding, MOVER_GROW, TownBuildings, TownMovers, townBackdrop, type Mover, type TownLotHouse } from './townView';
 import { STOREY as BACKDROP_STOREY, type TownBuilding } from '../shared/townBuildings';
-import { rayPrism, rectFootprint } from '../shared/buildingPick';
+import { lotWallsHeight, rayPrism, rectFootprint } from '../shared/buildingPick';
 import { surfaceOf } from '../shared/landSurface';
 import { TownGroundMap } from './groundTiles';
 import { LandHaze } from './landHaze';
@@ -1803,9 +1803,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (LAND_FIXTURE.size) applyLandFixture(world);
     // (`?ltFixture`: a Big world without a backdrop gets the debug fixture's, until worldgen writes
     // one; its code is a chunk of its own.)
-    if (LT_FIXTURE) {
-      return import('../../debug/ltFixture').then(({ applyLtFixture }) => {
-        applyLtFixture(world);
+    // (`?lotLooks`: the public lots with walls get named places' looks, until worldgen writes them.)
+    if (LT_FIXTURE || LOT_LOOKS_FIXTURE) {
+      return import('../../debug/ltFixture').then(({ applyLtFixture, applyLotLooksFixture }) => {
+        if (LT_FIXTURE) applyLtFixture(world);
+        if (LOT_LOOKS_FIXTURE) applyLotLooksFixture(world);
         return this.placeWorld(world, view);
       });
     }
@@ -3732,11 +3734,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const view = this.view;
     let best = Infinity;
     let hit: BuildingHit | null = null;
-    for (const p of world.plots) {
+    const looks = world.meta?.lotLooks;
+    for (let i = 0; i < world.plots.length; i++) {
+      const p = world.plots[i];
       if (!p.house || (view && view.x === p.x && view.z === p.z)) continue;
       const [x0, z0, x1, z1] = p.house;
       const g = [this.groundY(x0, z0), this.groundY(x1, z0), this.groundY(x1, z1), this.groundY(x0, z1)];
-      const t = rayPrism(origin, dir, rectFootprint(x0, z0, x1, z1), Math.min(...g) - 0.5, Math.max(...g) + (p.storeys ?? 1) * WALL_HEIGHT + PICK_ROOF);
+      // (A named place's lot as tall as the street draws it closed: its look's storeys, or its own if more, `lotLookBuilding`.)
+      const tall = lotWallsHeight(p.storeys, p.public ? looks?.[i] : undefined, WALL_HEIGHT, BACKDROP_STOREY);
+      const t = rayPrism(origin, dir, rectFootprint(x0, z0, x1, z1), Math.min(...g) - 0.5, Math.max(...g) + tall + PICK_ROOF);
       if (t < best) [best, hit] = [t, { kind: 'lot', plot: p.id }];
     }
     const backdrop = world.meta?.backdrop ?? [];

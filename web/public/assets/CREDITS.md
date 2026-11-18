@@ -501,6 +501,19 @@ override pack
 `packs/held/manifest.json`, over the `item.*` and `tool.*` keys) are built in Blender by
 `tools/art/blender/families/held.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). They are still.
 
+The named places' fittings (`models/civic/receptionDesk.glb`, `hotelReception.glb`, `dutyDesk.glb`,
+`tellerCounter.glb`, `teacherDesk.glb`, `lectern.glb`, `barCounter.glb`, `schoolDesk.glb`, `pew.glb`,
+`waitingBench.glb`, `examCouch.glb`, `clothesRack.glb`, `plantTable.glb`, `atm.glb`, `wallBars.glb`, `altar.glb`,
+`lockerRow.glb`, `mannequin.glb`, `luggageTrolley.glb`, `vaultDoor.glb`, pack `packs/civic/manifest.json`) are built
+in Blender by `tools/art/blender/families/civic.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). They
+are still.
+
+The named places' working things (`models/civic_works/fireEngine.glb`, `carLift.glb`, `printingPress.glb`,
+`firePole.glb`, `hoseRack.glb`, `serverRack.glb`, `tyreRack.glb`, `toolChest.glb`, `timberStack.glb`,
+`cementMixer.glb`, `flagPole.glb`, pack `packs/civic_works/manifest.json`) are built in Blender by
+`tools/art/blender/families/civic_works.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). The press's
+rollers turn while a resident watches it, the server cabinet's lights blink and the flag sways.
+
 ## Generated art (original, CC0)
 
 | File | What | How |

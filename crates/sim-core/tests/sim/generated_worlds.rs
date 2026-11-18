@@ -441,8 +441,14 @@ impl HalfDay {
                                 })
                             })
                     });
+                    // (Sent home as the place shut: `decide` ends a visit at closing.)
+                    let shut = w
+                        .plots
+                        .get(plot as usize)
+                        .is_some_and(|p| !p.open_at_tick(w.tick));
                     if w.tick < t0 + self.least
                         && !critical
+                        && !shut
                         && !work
                         && !passenger
                         && !party

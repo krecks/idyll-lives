@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { rayPrism, rectFootprint } from '../src/render/shared/buildingPick';
+import { lotWallsHeight, rayPrism, rectFootprint } from '../src/render/shared/buildingPick';
 
 const norm = (x: number, y: number, z: number) => {
   const l = Math.hypot(x, y, z);
@@ -48,5 +48,14 @@ describe('rayPrism', () => {
     expect(rayPrism({ x: 2, y: 20, z: 8 }, { x: 0, y: -1, z: 0 }, l, 0, 6)).toBeCloseTo(14, 6);
     // Level through the notch from the far side: in through the notch's inner wall at x = 5.
     expect(rayPrism({ x: 20, y: 3, z: 8 }, { x: -1, y: 0, z: 0 }, l, 0, 6)).toBeCloseTo(15, 6);
+  });
+});
+
+describe('lotWallsHeight', () => {
+  test('a lot’s house its own storeys; a named place’s lot closed its look’s, or its own if more', () => {
+    expect(lotWallsHeight(undefined, undefined, 2.8, 3)).toBeCloseTo(2.8, 6);
+    expect(lotWallsHeight(2, undefined, 2.8, 3)).toBeCloseTo(5.6, 6);
+    expect(lotWallsHeight(1, { storeys: 3 }, 2.8, 3)).toBeCloseTo(9, 6);
+    expect(lotWallsHeight(2, { storeys: 1 }, 2.8, 3)).toBeCloseTo(6, 6);
   });
 });

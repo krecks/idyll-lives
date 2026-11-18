@@ -576,6 +576,8 @@ export interface WorldMeta {
   places?: TownPlace[];
   /** Living town: each main town's centre, the square and the high street. */
   centre?: { area: number; poly: [number, number][] }[];
+  /** Living town: how the lots of the town's named places look from outside, by plot index (`PlotSlot.dress`). */
+  lotLooks?: Record<number, LotLook>;
   // pin:living-town-meta end
   /**
    * Big worlds: how high the land stands over the level the towns are built at, a grid of `cell` m
@@ -672,6 +674,18 @@ export interface TownPlace {
   work?: string[];
   area: number;
 }
+
+/**
+ * How a named place's lot (a town hall, a school, a shop on the high street: `game/placeLots.ts`) looks
+ * from outside, as a backdrop building of its kind would: its use, storeys (3 m each, the ground floor
+ * the only real one inside unless its layout has a storey above), roof and colours (`BackdropBuilding`'s).
+ */
+export interface LotLook {
+  use: BackdropUse;
+  storeys: number;
+  roof: BackdropBuilding['roof'];
+  look: number;
+}
 // pin:living-town-types end
 
 /** The world a town stands in (`game/world.ts`): its kind, its land, and farm fields in town. */
@@ -767,6 +781,11 @@ export interface PlotInfo {
   roof?: [number, number];
   /** Storeys the house on it has (absent: one). */
   storeys?: number;
+  /**
+   * The hours the place on it keeps (sim-core `world::PlotHours`, `Plot::open_at`): minutes of the day [open, close)
+   * and the days (bit 0 = Monday), a `close` at or before `open` running past midnight. Absent: always open.
+   */
+  hours?: { open: number; close: number; days: number };
 }
 
 /** Sent when walls or objects change (rare). */
