@@ -34,8 +34,8 @@ still body takes its plain finishes and one textured finish, the moving part one
   chairs, its fire hidden from the camera); no glass.
 
 Book spines are plain satin, unbevelled boxes: a wall of books costs no draw call and few triangles. Their page
-edges are a second (plain) material on the same box (`_pages`: the tops of standing books, three sides of lying
-ones), so they show cream with no more triangles; china takes its glazed bands the same way (`_band`).
+edges are a second (plain) material on the same box (`pages`: the tops of standing books, three sides of lying
+ones), so they show cream with no more triangles; china takes its glazed bands the same way (`band`).
 
 ## Detail pass (2026-10-22)
 

@@ -67,14 +67,14 @@ Not on Low (E2); at rest they look as the old part.
 - `lathe` turns an old part's `lathe` (profile in fractions of its size) into a `revolve`, closing the
   profile and optionally adding the liner. `top: true` puts the origin at the top, to tilt the swing-arm
   shade about where it hangs.
-- `_drum` is an open drum or cone shade with a wall thickness (4 segments turned 45° for the square ones).
+- `drum` is an open drum or cone shade with a wall thickness (4 segments turned 45° for the square ones).
 - `trough` is the banker's half-round shade, open below, coming 20° past the axis so the tube bulb hides.
 
 ## Detail pass (2026-10-22)
 
 Rebuilt with the forms and the kit: same keys, sizes (within 2 %), centres (the fan's re-measured), bulb heights,
 paint and draws; every lamp under its size class's target. Shared turned parts: `_turned` (a profile from a foot),
-`_canopy` (a ceiling cup with a cord grip), `_socket` (ribbed), `pear` (a pear bulb), `_ring` (rolled rims, wires),
+`_canopy` (a ceiling cup with a cord grip), `socket` (ribbed), `pear` (a pear bulb), `ring_at` (rolled rims, wires),
 `loft_at` (rounded-square bodies, `loft`/`ring`); `drum` takes `rims` (rolled bindings in the shade's own fabric)
 and `spider` (the wire fitter seen from above); cords, stems, arms and harps are `kit::tube` sweeps. Shades keep
 their materials and glows.

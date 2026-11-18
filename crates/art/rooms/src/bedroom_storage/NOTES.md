@@ -25,9 +25,9 @@ by the existing `model.<id>` keys. Built
   dresser's black handles are `wood` too (`ebony`). The three-drawer nightstand and the armoire are `satin`
   (walnut, mahogany: a little lighter than the old parts' `wood` colours, which the wood texture brightens), so
   their drawer and doors carry brass and the armoire's clothes without more calls.
-- **Drawers** (`_drawer`) are a front, its pulls and a box behind it (inside the solid carcass at rest), with folded
+- **Drawers** (`drawer`) are a front, its pulls and a box behind it (inside the solid carcass at rest), with folded
   clothes in it, joined with the origin on the carcass face; `_gap` puts a dark panel on the carcass behind the
-  front, so the opening reads dark when it slides out. **Wardrobes** are open shells (`_shell`) with a rail of
+  front, so the opening reads dark when it slides out. **Wardrobes** are open shells (`shell`) with a rail of
   shirts hung side-on, a hat shelf and, in the double wardrobe, shelves of folded clothes; their doors are hinged
   on their outer edges.
 

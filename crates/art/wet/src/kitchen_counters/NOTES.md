@@ -76,10 +76,10 @@ shared parts, in `common.rs`:
   clear of it: the baked shading is per vertex, and a panel whose four corners hide under the frame went dark all over.
 - `_pull`: a bar pull swept in one piece (legs bending into the bar); its `reach` is set so it never stands past the
   old front-most point (the worktop's nose on a counter), so no bounding box, centre or wall gap moved.
-- `_drawer`: the shaker drawer front, its box, and a cutlery tray (spoons, forks, knives, a serving spoon as flat
+- `drawer`: the shaker drawer front, its box, and a cutlery tray (spoons, forks, knives, a serving spoon as flat
   outlines) in the front of the box, which shows when it slides out; the butcher block's drawer holds a knife insert.
 - `_lathe` and what is turned with it: stacked plates, bowls, mugs with handles, jugs, canisters with lids, cans, a
-  crock, pans, a saucepan, ladles, jars (glass with what is in them); `_basket`, a ribbed, hollow woven basket.
+  crock, pans, a saucepan, ladles, jars (glass with what is in them); `basket`, a ribbed, hollow woven basket.
 
 Doors on the 1 m counters are now 4 mm apart and line up with the drawer above (they were 3 cm apart). A counter's
 fronts (2 cm behind the worktop's nose) and plinth line up with its neighbours' in a run: checked by importing the

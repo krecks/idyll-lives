@@ -30,11 +30,11 @@ only manifest that defines these keys.
   soft boxes, the kit's tube): same keys, sizes, centres, heights, parts, pivots, clips, `motions`, paint and draws.
   The family's helpers: `_lathe` (a loft through game rings: squareness, an egg's narrowing, a deeper back, a ring
   moved forward), `gooseneck` (a tap in one sweep: riser, half-circle arc, aerator, domed rose, side lever),
-  `_pull` (a one-piece bar pull), `shaker` + `_panel` (a frame with a hole round a panel set 6 mm back; the
+  `pull` (a one-piece bar pull), `shaker` + `_panel` (a frame with a hole round a panel set 6 mm back; the
   panel is a band and its middle, so the shading baked per vertex darkens only the band in the crease, not the
   whole face), `bends` (a path's corners turned in round bends as points, swept as they are: Catmull-Rom through
-  long runs beside short corner spans overshot by 12 cm), `_frame`, `_tray`, `_grate`, `_head`, `hand_shower`,
-  `bar_mixer`, `caddy`, `_curtain` (one wavy sheet), `_bottle`, `_cup`, `drain`, `_rose`/`wall_rose`.
+  long runs beside short corner spans overshot by 12 cm), `frame`, `_tray`, `grate`, `_head`, `hand_shower`,
+  `bar_mixer`, `caddy`, `curtain` (one wavy sheet), `bottle`, `cup`, `drain`, `_rose`/`wall_rose`.
 
 ## The models
 
@@ -75,9 +75,9 @@ old part (`catalog.double_vanity`) has none either.
   (`toiletSmart`), 0.445 m (`toiletWallHung`) and 0.45 m (`toiletClassic`). The wall-hung old part had its
   seat at 0.6 m; the model follows the content (0.45 m).
 - **Shapes.** Egg-shaped from above (`EGG`, narrower to the front), as an elongated bowl is. The bowl is one
-  shell (`_bowl`): up the outside to a rounded rim and down the inside to a water disc. A waisted foot rising into
+  shell (`bowl`): up the outside to a rounded rim and down the inside to a water disc. A waisted foot rising into
   the bowl's underside (`_foot`) with a bolt cap each side, or a wall-hung bowl on a rounded porcelain block
-  (`column`) into the panel. The seat is a rounded section swept round the egg (`_seat`) on two buffers, the lid
+  (`column`) into the panel. The seat is a rounded section swept round the egg (`seat`) on two buffers, the lid
   a domed loft, the hinges a knuckle on a post each. The cisterns are rounded lofts (`cistern`) under a soft lid a
   little proud of them (`cistern_lid`; the classic's stepped, with a band round it), the flush levers a boss and
   a swept arm (`_lever`). The roll (`roll`) hangs on a one-piece holder with its loose end down the front.
@@ -130,7 +130,7 @@ Validate › Showers until checked in play.
   the use ends (`out`); the water comes on 2 s in, once it's shut. The resident is moved in by the sim at once
   (`inside`), so they are already in when it opens and step out while it opens again (A-bathroom-05).
 - **The stall's curtain** hangs along the whole open side (still) and across the front as its own part
-  (`curtain`): built drawn across, one wavy sheet in 7 folds (`_curtain`) on 14 rings from the right corner, and
+  (`curtain`): built drawn across, one wavy sheet in 7 folds (`curtain`) on 14 rings from the right corner, and
   gathered into that corner at rest
   (scaled to 0.32 along the rail about its origin there); `curtain_draw` grows it across in 0.9 s, 1 s into the
   use, held till the use ends (A-bathroom-02). The water comes on at 1.8 s.
@@ -138,7 +138,7 @@ Validate › Showers until checked in play.
   the stall 25 cm. The walk-in shower's stone wall has grooved joints; the rain shower's walls are plain stone.
   The rain shower's front glass covers only the left half: the right half is the way in.
 - **Details (2026-10-22).** Trays are one loft with a raised lip round a floor falling to the drain (`_tray`), the
-  drains slotted grates (`_grate`). Frames are square-section sweeps bent round their corners (`_frame`). The base
+  drains slotted grates (`grate`). Frames are square-section sweeps bent round their corners (`frame`). The base
   shower has a bar mixer, a hand shower on a slide rail with its hose looping down, a corner shelf with bottles and
   a domed head on a bent arm; the stall a bent L rail with wall roses, the side curtain a wavy sheet on 12 rings, a
   riser bent up into its head, a lever mixer on a round plate and a wire caddy; the walk-in a linear grate, a floor
@@ -166,7 +166,7 @@ Validate › Baths until checked in play.
 - **The tub** is one closed shell (`loft`): superellipse rings up the outside, over the rim and down the inside
   to the floor, so the inside faces up into the tub; flat-shaded above 40°. The built-in bath is squarer
   (higher exponent) behind a gloss front and end panels over a dark plinth set back under them.
-- **Two moving parts.** The tap's stream (`stream`, the sinks' `_water` way) grows in 0.4 s (`tap_on`, held
+- **Two moving parts.** The tap's stream (`stream`, the sinks' `water` way) grows in 0.4 s (`tap_on`, held
   2.4 s, so it runs while the tub fills). The water (`bathwater`) is the tub's inside from the floor up to two
   thirds of the depth, its origin just under the floor, scaled to nothing upright and in to the floor's size
   across: at rest it's hidden under the floor; `fill` waits for the tap, then rises (and widens with the walls)

@@ -83,7 +83,7 @@ and a lower rack that slides out 30 cm as the door opens, at the left of its 1 m
 front was the door before): the `dishwasher` is a 60 cm machine beside a 40 cm cupboard (a drawer over a door),
 the `dishwasherCompact` a slimline 45 cm one beside a 55 cm stack of three drawers, both with stainless doors under
 one worktop. The cupboard and drawers are in the still body. The coffee machine slides its cup back under the
-spout and runs a thin coffee stream (the sinks' `_water` way: built full size, origin at the spout tip,
+spout and runs a thin coffee stream (the sinks' `water` way: built full size, origin at the spout tip,
 scaled to nothing along its length, `grow` runs it out). The breakfast counter's toast stands up in the
 toaster at rest; `toast_down` presses it down with the lever, and playing back after the `hold` pops it up.
 Its blender lid lifts for `blend` (the jug blades need E1).

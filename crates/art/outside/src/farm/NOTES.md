@@ -132,6 +132,6 @@ No change to the build: its soft boxes take the shared form's new shape (the sha
 ## Built in Rust (2026-11-18)
 
 A file a model (`barn.rs` and `barn_doors.rs`, `silo.rs`, `tractor.rs`, `hay.rs`, `scarecrow.rs`, `trough.rs`,
-`coop.rs`; the slabs, shells and bars of `_prism`, `_shell`, `_strut`, `_frame` in `common.rs`), proved against the
+`coop.rs`; the slabs, shells and bars of `prism`, `shell`, `strut`, `_frame` in `common.rs`), proved against the
 last Blender build (`ref/blender`); the scarecrow's far version is the kernel's decimation, held to the decimated far
 versions' rule.

@@ -65,11 +65,11 @@ tag covers both the `wash` and `washUp` interactions). The double sink has a str
 (`water_on_0`, `water_on_1`) played for the resident in that slot (`slot`; 2026-10-21, review A-kitchen-03: one
 washer ran both taps).
 
-Detail pass (2026-10-22): each bowl is one lofted piece (`_bowl`: a flat rim round a rounded opening, the walls running
+Detail pass (2026-10-22): each bowl is one lofted piece (`bowl`: a flat rim round a rounded opening, the walls running
 down to a floor that dips to the drain; the farmhouse one square outside, an apron proud of the cabinet), with a
 chrome-ringed drain and strainer. The tap is one bent tube (the kit's tube) on a turned escutcheon, with a spray head and
 a lever on a valve beside it. The cabinets have shaker doors (`shaker`: a frame with a hole round a recessed panel)
-and bar pulls in one piece (`_pull`); the farmhouse worktop is one U-shaped slab round the basin, the double sink's
+and bar pulls in one piece (`pull!`); the farmhouse worktop is one U-shaped slab round the basin, the double sink's
 stone worktop one slab with the two openings cut in it. A lofted soap dish with a bar of soap and a terracotta pot
 (`pot`) with a mound of herb leaves stand on the worktop.
 

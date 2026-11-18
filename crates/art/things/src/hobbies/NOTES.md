@@ -19,7 +19,7 @@ Each is built where the game places it (`F`, game axes; `settle` without centrin
   back.
 - **Ukulele, electric and acoustic guitars**: each instrument leans on a black A-frame stand (the electric
   with a practice amp behind). The instrument is a part of its own (`ukulele`, `guitar`), built upright with
-  its foot at its origin; its lean on the stand is the node's turn (`_lean`), not baked into the mesh. While
+  its foot at its origin; its lean on the stand is the node's turn (`lean`), not baked into the mesh. While
   it's played, `off_stand` hides it (squashed to 0.001 in 0.2 s; `uses: {music: off_stand}`) and the game
   draws the same part in the player's hands (content `"held": {"part": "guitar", "grip": "guitar"}`,
   `characters.ts` `writeHeld`): the neck in the left hand, the body against the belly, strummed. Each costs
@@ -69,7 +69,7 @@ Each is built where the game places it (`F`, game axes; `settle` without centrin
   the old part (darts in) was 19 cm.
   Their origin is 2 cm inside the board, so at rest they flatten out of sight (on the face, the flights showed
   as crosses).
-- **Arcade cabinet**: the sides are prisms cut to the classic profile (`_prism`). The screen and the marquee
+- **Arcade cabinet**: the sides are prisms cut to the classic profile (`fextrude!`). The screen and the marquee
   glow at night. The joystick waggles in a loop, `joystick`.
 - **Jigsaw table**: half the picture is done; a patch beside it spreads across (`pieces`, grown along X).
 
@@ -149,7 +149,7 @@ axes. What each now has:
   (heel, footboard, posts, cam, chain), two-stage stands with clamps, braces and rubber feet, boom counterweights, the
   snare's strainer, basket and sticks, a lofted throne.
 - **Chess table**: a turned pedestal on three swept feet, a rounded top; knights carved in profile; the chair
-  (`_chair`, shared with the sewing table) has back posts in one piece from the floor, tapered legs, curved rails.
+  (`chair`, shared with the sewing table) has back posts in one piece from the floor, tapered legs, curved rails.
 - **Pool table**: mitred rails rounded over (`kit::moulding!`), cushion noses between the pockets, leather pocket
   mouths, diamond sights, turned legs, serpentine skirts, a rack with rounded corners (the cue is a held thing's, `crates/art/things/src/held`).
 - **Foosball**: men cut in profile (head, body, legs, feet), turned handles, framed side panels, rod bearings,

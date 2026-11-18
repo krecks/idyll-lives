@@ -35,7 +35,7 @@ floor).
 
 ## The machines
 
-One shell for both (`_cabinet`): a back block on levelling feet, side walls, a header with a lit sign (six letters on
+One shell for both (`cabinet`): a back block on levelling feet, side walls, a header with a lit sign (six letters on
 it), a keypad column on the right (display, twelve keys, a card reader with its slot, a coin slot, a coin return with
 its cup), a rounded bezel round the window, and a kick panel round an open pick-up tray with its PUSH label. The inside is
 lined dark; the tray's well is open at the front, so what drops into it shows.

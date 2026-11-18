@@ -34,7 +34,7 @@ the moving parts the rest:
 - the arbour: all plain, for the swing and the bloom: its leaves are satin, lumpy `boulder!`s, and the swing's
   cushion is satin.
 
-The heart tub is two prisms over a heart curve (`_prism`): the shell, hollow inside a smaller heart, on a plinth,
+The heart tub is two prisms over a heart curve (`loft!` through `_heart_ring`s): the shell, hollow inside a smaller heart, on a plinth,
 its floor at 0.2 m. Seated bathers (the renderer's chair pose at 0.35 m) put their shins down through the front of
 the shell at x = ±0.5 where the heart narrows, as they do in the old part: the pose, not the model.
 
