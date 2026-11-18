@@ -114,7 +114,10 @@ pub fn dedupe(pts: &[(f64, f64)], eps: f64) -> Vec<(f64, f64)> {
 
 /// The points, with `resolution` - 1 more on a Catmull-Rom curve between each pair (1: as they are). Returns
 /// (points, the fraction of the way along the given points at each, 0..1).
-fn catmull(pts: &[V3], resolution: usize, closed: bool) -> (Vec<V3>, Vec<f64>) {
+/// gamekit's `forms._catmull`, which a script may call itself (a chair's shell through its key rows): the points,
+/// with `resolution` - 1 more on a Catmull-Rom curve between each pair (1: as they are), and the fraction of the
+/// way along the given points at each, 0..1.
+pub fn catmull(pts: &[V3], resolution: usize, closed: bool) -> (Vec<V3>, Vec<f64>) {
     let n = pts.len();
     let spans = if closed { n } else { n - 1 };
     if resolution <= 1 || n < 3 {
@@ -722,8 +725,10 @@ pub fn mirrored(obj: Obj, axis: Axis, name: Option<&str>) -> Obj {
 
 // ---- objects ------------------------------------------------------------------------------------------
 
-/// A part of the points `vs` and `faces`, its faces turned to look outwards, shaded.
-pub(crate) fn object(
+/// gamekit's `forms._object`, which a script may call itself: a part of the points `vs` and `faces` (each its
+/// corners' points), its faces turned to look outwards, shaded smooth with its edges over `angle` degrees kept
+/// sharp, or flat; `merge`: the points on one another made one first.
+pub fn object(
     name: &str,
     vs: Vec<V3>,
     faces: &[Vec<u32>],

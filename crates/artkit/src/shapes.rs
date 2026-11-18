@@ -60,6 +60,13 @@ pub fn shade(obj: Obj, smooth: bool, angle: f64) -> Obj {
     obj
 }
 
+/// gamekit's `shapes._recalc_normals`, which a script may call itself (and `bmesh.ops.recalc_face_normals` over
+/// all a mesh's faces): each connected piece of `obj`'s mesh wound one way, looking outwards.
+pub fn recalc_normals(obj: Obj) -> Obj {
+    obj.edit(|o| o.mesh.recalc_normals());
+    obj
+}
+
 /// A size: one number for all three sides, or (x, y, z).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Size(pub P3);

@@ -2064,9 +2064,15 @@ pub fn apply(obj: Obj) -> Obj {
         }
         let Some(made) = rounded(o) else { return };
         let mut made = made;
-        if textured && let Some(uvs) = &o.mesh.uvs {
-            let sides_from = o.bevel.as_ref().and_then(|b| b.sides_from);
-            made.mesh.uvs = Some(carried(&o.mesh, uvs, &made.mesh, &made, sides_from));
+        if let Some(uvs) = &o.mesh.uvs {
+            made.mesh.uvs = Some(if textured {
+                let sides_from = o.bevel.as_ref().and_then(|b| b.sides_from);
+                carried(&o.mesh, uvs, &made.mesh, &made, sides_from)
+            } else {
+                // (a part on plain finishes: its UVs are zero, or will be before they are read)
+                vec![[0.0, 0.0]; made.mesh.loops.len()]
+            });
+            // the mesh is still the one whose UVs were made: joined first, it says so for the whole
             made.mesh.uv_metres = o.mesh.uv_metres;
         }
         o.mesh = made.mesh;
