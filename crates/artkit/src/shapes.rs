@@ -470,13 +470,22 @@ pub(crate) fn cone_mesh(segs: usize, r1: f32, r2: f32, depth: f32) -> Mesh {
         verts.push(placed(r2 * s, r2 * c, half));
     }
     let n = segs as u32;
+    let side = |i: u32| {
+        vec![
+            2 * i - 2,
+            2 * i - 1,
+            (2 * i + 1) % (2 * n),
+            (2 * i) % (2 * n),
+        ]
+    };
+    // the faces in the order Blender leaves them: the sides, the top among them before the last two (three
+    // sides: before the last), then the bottom; the top from its second point back round, the bottom from its
+    // first on. (A ray that meets two faces at once is given the one that comes first.)
+    let before = (n - 2).max(2);
     let mut faces: Vec<Vec<u32>> = Vec::with_capacity(segs + 2);
-    for i in 1..n {
-        faces.push(vec![2 * i - 2, 2 * i - 1, 2 * i + 1, 2 * i]);
-    }
-    faces.push(vec![2 * n - 2, 2 * n - 1, 1, 0]);
-    // the ends: the top from its second point back round, the bottom from its first on
+    faces.extend((1..=before).map(side));
     faces.push((0..n).map(|k| 2 * ((n + 1 - k) % n) + 1).collect());
+    faces.extend((before + 1..=n).map(side));
     faces.push((0..n).map(|k| 2 * k).collect());
     let mut mesh = Mesh::from_pydata(verts, &faces);
     // an end drawn to a point is one point: the first of its ring at the bottom, the last of it at the top
@@ -489,6 +498,16 @@ pub(crate) fn cone_mesh(segs: usize, r1: f32, r2: f32, depth: f32) -> Mesh {
             })
             .collect();
         mesh.weld(&target);
+        // (drawn to a point at the top, its bottom is where the top was among the sides)
+        if r2 == 0.0 && r1 != 0.0 {
+            let mut faces: Vec<Vec<u32>> = (0..mesh.faces.len())
+                .map(|f| mesh.corners(f).to_vec())
+                .collect();
+            if let Some(bottom) = faces.pop() {
+                faces.insert((n as usize - 2).min(faces.len()), bottom);
+            }
+            mesh = Mesh::from_pydata(std::mem::take(&mut mesh.verts), &faces);
+        }
     }
     mesh
 }
