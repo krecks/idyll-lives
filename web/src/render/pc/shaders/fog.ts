@@ -33,6 +33,7 @@
 
 import * as pc from '../engine';
 import { GLOW_FROM, SKY_BAND, SKY_COLUMNS, SKY_GLOW, SKY_ROWS, type DomeSky } from '../../shared/skyMap';
+import { VEIL_EDGE_SOFT } from '../../shared/landVeil';
 import type { Language, ShaderFeature } from './chunks';
 
 /** A number as a shader's float literal (`chunks.ts`'s, which imports this file). */
@@ -123,13 +124,15 @@ const FOG_FROM_DECL: Record<Language, string> = {
 };
 
 /**
- * The veil's strength at a point `out` m past its clear rectangle (`setLandVeil`): its strength (`game_veilFade.y`), but
- * whole over the landscape's last `game_veilFade.w` m (`VEIL_EDGE`, 0: not) while the curtain closing its cut edge is
- * drawn (`landHaze.ts`), so the land meets that curtain in the sky's colour at any strength.
+ * The veil's strength at a point `out` m past its clear rectangle (`setLandVeil`) and `eye` m from the eye: its strength
+ * (`game_veilFade.y`), but rising to whole over the landscape's last `game_veilFade.w` m (`VEIL_EDGE`, 0: not), over the
+ * whole band near the eye (`VEIL_EDGE_SOFT`), while the curtain closing its cut edge is drawn (`landHaze.ts`), so the
+ * land meets that curtain in the sky's colour at any strength (`shared/landVeil.ts` `veilShown`).
  */
-function veilStrength(lang: Language, out: string): string {
+function veilStrength(lang: Language, out: string, eye: string): string {
   const v = lang === 'glsl' ? 'game_veilFade' : 'uniform.game_veilFade';
-  return `max(${v}.y, step(1e-6, ${v}.w) * smoothstep(${v}.x - max(${v}.w, 1e-3), ${v}.x, ${out}))`;
+  const over = `mix(${v}.x, max(${v}.w, 1e-3), smoothstep(${float(VEIL_EDGE_SOFT[0])}, ${float(VEIL_EDGE_SOFT[1])}, ${eye}))`;
+  return `max(${v}.y, step(1e-6, ${v}.w) * smoothstep(${v}.x - ${over}, ${v}.x, ${out}))`;
 }
 
 const FOG_CODE: Record<Language, { depth: string; exp2: string; mix: string }> = {
@@ -145,8 +148,12 @@ const FOG_CODE: Record<Language, { depth: string; exp2: string; mix: string }> =
 		#ifdef GAME_LOOK
 			fogFactor = pow(fogFactor, 2.2);
 			#ifndef VERTEXSHADER
-				float veilOut = length(max(abs(vPositionW.xz - game_landVeil.xy) - game_landVeil.zw, vec2(0.0)));
-				gameVeil = ${veilStrength('glsl', 'veilOut')} * smoothstep(0.0, game_veilFade.x, veilOut) * smoothstep(0.0, game_veilFade.z, distance(vPositionW, view_position));
+				// (Nothing to work out without a veil, as the game nearly always is.)
+				if (game_veilFade.y > 0.0 || game_veilFade.w > 0.0) {
+					float veilOut = length(max(abs(vPositionW.xz - game_landVeil.xy) - game_landVeil.zw, vec2(0.0)));
+					float veilEye = distance(vPositionW, view_position);
+					gameVeil = ${veilStrength('glsl', 'veilOut', 'veilEye')} * smoothstep(0.0, game_veilFade.x, veilOut) * smoothstep(0.0, game_veilFade.z, veilEye);
+				}
 			#endif
 		#endif`,
     mix: `
@@ -168,9 +175,12 @@ const FOG_CODE: Record<Language, { depth: string; exp2: string; mix: string }> =
     exp2: `
 		#ifdef GAME_LOOK
 			#ifndef VERTEXSHADER
-				let veilOut = length(max(abs(vPositionW.xz - uniform.game_landVeil.xy) - uniform.game_landVeil.zw, vec2f(0.0)));
-				let veilNear = smoothstep(0.0, uniform.game_veilFade.z, distance(vPositionW, uniform.view_position));
-				gameVeil = ${veilStrength('wgsl', 'veilOut')} * smoothstep(0.0, uniform.game_veilFade.x, veilOut) * veilNear;
+				// (Nothing to work out without a veil, as the game nearly always is.)
+				if (uniform.game_veilFade.y > 0.0 || uniform.game_veilFade.w > 0.0) {
+					let veilOut = length(max(abs(vPositionW.xz - uniform.game_landVeil.xy) - uniform.game_landVeil.zw, vec2f(0.0)));
+					let veilEye = distance(vPositionW, uniform.view_position);
+					gameVeil = ${veilStrength('wgsl', 'veilOut', 'veilEye')} * smoothstep(0.0, uniform.game_veilFade.x, veilOut) * smoothstep(0.0, uniform.game_veilFade.z, veilEye);
+				}
 			#endif
 			return pow(evaluateFogFactorExp2(depth, uniform.fog_density), 2.2);
 		#else
@@ -313,7 +323,8 @@ function veilSinkCode(lang: Language): ShaderFeature['glsl'] {
 	if (${u('game_veilFade')}.y > 0.0 || ${u('game_veilFade')}.w > 0.0) {
 		${glsl ? 'vec3' : 'let'} sinkAt = (${u('matrix_model')} * ${v4}(instance_line4.xyz, 1.0)).xyz;
 		${decl} sinkOut = length(max(abs(sinkAt.xz - ${u('game_landVeil')}.xy) - ${u('game_landVeil')}.zw, ${v2}(0.0)));
-		${decl} sinkLeft = 1.0 - ${veilStrength(lang, 'sinkOut')} * smoothstep(0.0, ${u('game_veilFade')}.x, sinkOut) * smoothstep(0.0, ${u('game_veilFade')}.z, distance(sinkAt, ${u('view_position')}));
+		${decl} sinkEye = distance(sinkAt, ${u('view_position')});
+		${decl} sinkLeft = 1.0 - ${veilStrength(lang, 'sinkOut', 'sinkEye')} * smoothstep(0.0, ${u('game_veilFade')}.x, sinkOut) * smoothstep(0.0, ${u('game_veilFade')}.z, sinkEye);
 		localPos = localPos * (sinkLeft * sinkLeft);
 	}
 #endif`,
