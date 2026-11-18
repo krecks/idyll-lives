@@ -1,9 +1,7 @@
 //! What the play and yard things are built from: the palette, the frame, and the shapes more than one of them
 //! makes (ground, clumps, pots, slabs from outlines).
 
-pub use crate::outdoor::common::{
-    F, N, bent, board, fillet, mesh_of, object, rod, set_matrix_world, tube,
-};
+pub use crate::outdoor::common::{F, N, bent, board, fillet, mesh_of, rod, tube};
 use artkit::far::low;
 use artkit::materials::Mat;
 use artkit::math::V3;
@@ -164,7 +162,7 @@ pub fn prism(name: &str, pts: &[(N, f64)], z0: f64, z1: f64, material: Mat) -> O
     verts.extend(pts.iter().map(|&(x, y)| V3::from(F.at(x, y, z0))));
     let mut faces = vec![(0..n).collect::<Vec<u32>>(), (n..2 * n).collect()];
     faces.extend((0..n).map(|i| vec![i, (i + 1) % n, n + (i + 1) % n, n + i]));
-    object(name, verts, &faces, material, false, SHARP)
+    artkit::forms::object(name, verts, &faces, Some(material), false, SHARP, false)
 }
 
 /// A lumpy clump standing on height `y` (a lettuce, a bush, a heap).

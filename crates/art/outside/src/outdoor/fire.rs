@@ -1,6 +1,6 @@
 //! OU3: the charcoal grill, the gas grill station and the fire pit.
 
-use super::common::{F, M, bent, bottle, jitter, knob, object, pull, rod, shaker, slab, v};
+use super::common::{F, M, bent, bottle, jitter, knob, pull, rod, shaker, slab, v};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, TAU, V3, cos, cosd, pow, radians, sin, sind};
 use artkit::motion::{Grow, Swing, grow, swing};
@@ -31,7 +31,7 @@ fn across(name: &str, outline: &[(f64, f64)], x0: f64, x1: f64, material: Mat) -
     let mut faces = vec![(0..n).collect::<Vec<u32>>(), (n..2 * n).rev().collect()];
     faces.extend((0..n).map(|i| vec![i, (i + 1) % n, n + (i + 1) % n, n + i]));
     // (flat, as a mesh made from points is)
-    object(name, verts, &faces, material, false, SHARP)
+    artkit::forms::object(name, verts, &faces, Some(material), false, SHARP, false)
 }
 
 /// `n` glowing lumps of coal scattered over a disc of radius `r` at height `y`.

@@ -1,13 +1,13 @@
 //! What the playground is built from: its palette, its frame, and the few shapes it makes itself.
 
+use artkit::forms;
 use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::{V3, pow, tan};
-use artkit::mesh::Mesh;
 use artkit::palette;
 use artkit::place::{Coord, Facing, GameFrame};
-use artkit::scene::{self, Obj};
-use artkit::shapes::{self, CLOSED};
+use artkit::scene::Obj;
+use artkit::shapes::CLOSED;
 
 palette! { M:
     body = ("#2E6FA8", metal),         // painted steel frames: the slide's tower, the seesaw's stand
@@ -88,25 +88,9 @@ impl std::fmt::Display for N {
     }
 }
 
-// KIT: forms._object (artkit's forms::object is the crate's own)
-/// A part of the points `vs` and `faces`, its faces turned to look outwards, shaded.
-pub fn object(
-    name: &str,
-    vs: Vec<V3>,
-    faces: &[Vec<u32>],
-    material: Mat,
-    smooth: bool,
-    angle: f64,
-) -> Obj {
-    let mut mesh = Mesh::from_pydata(vs, faces);
-    mesh.set_material(Some(material));
-    mesh.recalc_normals();
-    shapes::shade(scene::add(name, mesh), smooth, angle)
-}
-
 /// A mesh object from points and faces (Blender world), its normals pointing out.
 pub fn mesh(name: &str, verts: Vec<V3>, faces: &[Vec<u32>], material: Mat, smooth: bool) -> Obj {
-    object(name, verts, faces, material, smooth, CLOSED)
+    forms::object(name, verts, faces, Some(material), smooth, CLOSED, false)
 }
 
 // KIT: kit.fillet
@@ -201,5 +185,5 @@ pub fn moulding(
             ]);
         }
     }
-    object(name, vs, &faces, material, true, angle)
+    forms::object(name, vs, &faces, Some(material), true, angle, false)
 }

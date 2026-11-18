@@ -1,8 +1,6 @@
 //! The raised vegetable bed, the garden shed, the compost bin and the rain barrel.
 
-use super::common::{
-    F, M, N, blob, board, fillet, ground, mesh_of, name, pot, prism, rod, set_matrix_world, tube,
-};
+use super::common::{F, M, N, blob, board, fillet, ground, mesh_of, name, pot, prism, rod, tube};
 use super::play::settle_in_place;
 use artkit::far::{is_low, low};
 use artkit::forms::{Scale, rounded_rect};
@@ -73,7 +71,7 @@ fn frond(name: &str, x: f64, y: f64, z: f64, a: f64, h: f64, material: Mat, lean
     let m = M4::translation(V3::from(F.at(x, y, z)))
         * M4::rotation(radians(a - 90.0), Axis::Z)
         * M4::rotation(lean, Axis::X);
-    set_matrix_world(leaf, m)
+    leaf.set_matrix_world(m)
 }
 
 pub fn raised_bed() -> Vec<Obj> {
