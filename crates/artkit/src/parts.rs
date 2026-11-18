@@ -128,7 +128,11 @@ fn append(a: &mut Mesh, b: &Mesh) {
     );
     merge(&mut a.ao, &b.ao, v0 as usize, b.verts.len(), 0.0);
     if a.normals.is_some() || b.normals.is_some() {
-        // (a part without its own normals keeps the ones worked out for it as it was)
+        // a part without normals of its own is stored two zeros a corner, as Blender's join stores it: its normals
+        // are the ones worked out for it on the mesh as it is whenever they are asked for
+        // (`normals::corner_normals`), not the ones it had here (a face of no area, as a tube's are inside a bend
+        // tighter than the tube, has a normal that turns over when the mesh is moved a hair)
+        let (a_own, b_own) = (a.normals.is_some(), b.normals.is_some());
         let mut out = a.normals.take().unwrap_or_else(|| {
             let mut own = a.clone();
             own.loops.truncate(l0);
@@ -140,6 +144,13 @@ fn append(a: &mut Mesh, b: &Mesh) {
                 .clone()
                 .unwrap_or_else(|| crate::normals::joined_normals(b)),
         );
+        let stored = a.stored.get_or_insert_with(|| vec![None; out.len()]);
+        if !a_own {
+            stored[..l0].fill(Some([0, 0]));
+        }
+        if !b_own {
+            stored[l0..].fill(Some([0, 0]));
+        }
         a.normals = Some(out);
     }
 }

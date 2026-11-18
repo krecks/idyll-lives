@@ -100,11 +100,14 @@ fn mixed(mesh: &Mesh, at: &[Vec<At>], of: impl Fn(&At) -> V3) -> Vec<V3> {
 }
 
 /// A normal a vertex: its faces' normals weighed by their angles at it; on a mesh with normals of its own
-/// (`Mesh::normals`), its corners' there.
+/// (`Mesh::normals`), its corners' there, as they read on the mesh as it is (`corner_normals`).
 pub fn vertex_normals(mesh: &Mesh) -> Vec<V3> {
     let at = faces_at(mesh);
     match &mesh.normals {
-        Some(own) => mixed(mesh, &at, |face| own[face.corner as usize]),
+        Some(_) => {
+            let own = corner_normals(mesh);
+            mixed(mesh, &at, |face| own[face.corner as usize])
+        }
         None => {
             let normals = weighed_face_normals(mesh);
             mixed(mesh, &at, |face| normals[face.face as usize])

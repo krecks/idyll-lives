@@ -1452,7 +1452,7 @@ fn quat_to_eul(q: [f32; 4]) -> V3 {
     }
     .to_matrix()
     .0;
-    let atan2f = |y: f32, x: f32| math::atan2(y as f64, x as f64) as f32;
+    let atan2f = math::atan2f;
     let cy = py::hypot(m[0][0] as f64, m[0][1] as f64) as f32;
     let (e1, e2) = if cy > 0.0000375_f64 as f32 {
         (
