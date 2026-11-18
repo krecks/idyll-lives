@@ -1,192 +1,19 @@
-//! `cargo art` for the families Blender builds (the binary is crates/art, which builds the families ported to
-//! Rust itself and calls this for the rest): builds them and checks what they wrote (was
-//! tools/art/blender/build.py).
-//!
-//!   cargo art kitchen                  build, export and register a family
-//!   cargo art kitchen --only fridge    one model of it (--only a,b: several)
-//!   cargo art --all                    every family
-//!   cargo art garden_decor --preview   render previews/ instead of exporting
-//!   cargo art garden_decor --preview --lit   and <id>.lit.png, lit and textured as the game draws it
-//!   cargo art garden_decor --preview --sheet   and <id>.sheet.png: four sides, the baked shading, the clips along
-//!   cargo art kitchen --no-pack        export without writing the pack
-//!   cargo art --centres                write centres.json from every family (gamekit/centres.py, no build)
-//!   cargo art --leafcards              render the trees' leaf-card atlas (leafcards.py: textures/leafcards/albedo.png)
-//!
-//! A family is a script in tools/art/blender/families/ (those starting with `_` are templates). Blender
-//! comes from $BLENDER, the macOS app, or PATH; the models are made with Blender 5.2 LTS. After exporting
-//! it runs the gate (`cargo check-glb`) on the keys it built and exits 1 if a build or the gate fails.
-//!
-//! The Python in Blender builds and exports; this side reads the content and the manifests and writes the
-//! pack and centres.json (gamekit/runner.py). Before a build it hands Blender the keys a build may write
-//! (`$GAMEKIT_KNOWN`, a JSON list: a misspelt `key=` is refused before anything is built); after it, it
-//! reads what the build made (`$GAMEKIT_RESULT`: the pack, its entries, each model's clips and centre),
-//! checks every clip `motions` plays is one the model has, and writes centres.json and the pack.
-//!
-//! `--centres` writes centres.json (where each model is centred at rest, for the gate) for every model
-//! of every family, as a build writes it for the models it builds: Blender imports the family scripts
-//! without building anything. Run it after changing a Model's `centre` without a rebuild (the gate then
-//! says which files are off it), or after adding or removing models.
-//!
-//! `--leafcards` renders the one atlas every tree's leaf cards are cut from (the `leafcards` finish), from
-//! leaves the script generates: run it after changing the script; the trees needn't be rebuilt for it.
+//! What `cargo art` (crates/art) writes beside the models it builds: the keys a build may write (`build_keys`),
+//! a family's pack (`write_pack`) and centres.json (`write_centres`), from what the build hands back
+//! (`take_build`), which also checks that every clip a model's `motions` plays is one it has.
 
-use crate::checkglb::py::{dumps_indent, join, json_str, normpath, relpath};
+use crate::checkglb::py::{dumps_indent, join, normpath, relpath};
 use crate::checkglb::{self, Paths};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
-use std::process::Command;
 
-/// The JSON value a pack and a build's result are held in, and its reader: for the builds done in Rust
-/// (crates/art), which hand `take_build` what Blender's hand it.
+/// The JSON value a pack and a build's result are held in, and its reader.
 pub use crate::checkglb::json::loads_text as loads;
 pub use crate::checkglb::py::J;
 
-/// Blender: `$BLENDER`, the macOS app, or `blender` on PATH.
-pub fn blender() -> Result<String, String> {
-    let on_path = || -> Option<String> {
-        std::env::split_paths(&std::env::var_os("PATH")?)
-            .map(|d| d.join("blender"))
-            .find(|p| is_executable(p))
-            .map(|p| p.to_string_lossy().into_owned())
-    };
-    let env = std::env::var("BLENDER").ok().filter(|p| !p.is_empty());
-    for path in [
-        env,
-        Some("/Applications/Blender.app/Contents/MacOS/Blender".into()),
-        on_path(),
-    ]
-    .into_iter()
-    .flatten()
-    {
-        if Path::new(&path).exists() {
-            return Ok(path);
-        }
-    }
-    Err("Blender not found: install Blender 5.2 LTS or set $BLENDER".into())
-}
-
-fn is_executable(p: &Path) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-    p.metadata()
-        .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
-}
-
-/// The family scripts (not the `_` templates), sorted.
-pub fn families(here: &str) -> Vec<String> {
-    let mut out: Vec<String> = std::fs::read_dir(Path::new(here).join("families"))
-        .into_iter()
-        .flatten()
-        .flatten()
-        .filter_map(|e| e.file_name().into_string().ok())
-        .filter(|n| n.ends_with(".py") && !n.starts_with('_') && !n.starts_with('.'))
-        .map(|n| n.trim_end_matches(".py").to_string())
-        .collect();
-    out.sort();
-    out
-}
-
-/// What a Blender run printed (newlines as Python's text mode reads them) and whether it succeeded.
-pub struct Run {
-    pub ok: bool,
-    pub stdout: String,
-    pub stderr: String,
-}
-
-/// Runs a script in Blender, in the background, with the factory settings (so the export settings stay
-/// fixed) and an exit code on a Python error (else Blender exits 0 on one): `exe --background
-/// --factory-startup --python-exit-code 1 --python <script> [-- <args>]`, with `env` set.
-pub fn run(exe: &str, script: &str, args: &[String], env: &[(&str, &str)]) -> Run {
-    let mut cmd = Command::new(exe);
-    cmd.envs(env.iter().copied());
-    cmd.args([
-        "--background",
-        "--factory-startup",
-        "--python-exit-code",
-        "1",
-        "--python",
-        script,
-    ]);
-    if !args.is_empty() {
-        cmd.arg("--").args(args);
-    }
-    let text = |b: &[u8]| {
-        String::from_utf8_lossy(b)
-            .replace("\r\n", "\n")
-            .replace('\r', "\n")
-    };
-    match cmd.output() {
-        Ok(out) => Run {
-            ok: out.status.success(),
-            stdout: text(&out.stdout),
-            stderr: text(&out.stderr),
-        },
-        Err(err) => Run {
-            ok: false,
-            stdout: String::new(),
-            stderr: format!("{exe}: {err}"),
-        },
-    }
-}
-
-/// Python's `str.splitlines()`.
-fn splitlines(s: &str) -> Vec<&str> {
-    let mut out = Vec::new();
-    let mut rest = s;
-    while !rest.is_empty() {
-        match rest.char_indices().find(|(_, c)| {
-            matches!(
-                c,
-                '\n' | '\r'
-                    | '\u{b}'
-                    | '\u{c}'
-                    | '\u{1c}'
-                    | '\u{1d}'
-                    | '\u{1e}'
-                    | '\u{85}'
-                    | '\u{2028}'
-                    | '\u{2029}'
-            )
-        }) {
-            Some((i, c)) => {
-                out.push(&rest[..i]);
-                let skip = if rest[i..].starts_with("\r\n") {
-                    2
-                } else {
-                    c.len_utf8()
-                };
-                rest = &rest[i + skip..];
-            }
-            None => {
-                out.push(rest);
-                break;
-            }
-        }
-    }
-    out
-}
-
-/// Prints a run's `[gamekit]` lines and, when it failed, the Python traceback (Blender prints it to stdout;
-/// else the last 20 lines) and the end of stderr. Whether it succeeded.
-pub fn echo(run: &Run) -> bool {
-    let out = splitlines(&run.stdout);
-    for line in out.iter().filter(|l| l.starts_with("[gamekit]")) {
-        println!("{line}");
-    }
-    if !run.ok {
-        let start = out
-            .iter()
-            .position(|l| l.starts_with("Traceback"))
-            .unwrap_or(out.len().saturating_sub(20));
-        let chars: Vec<char> = run.stderr.chars().collect();
-        let tail: String = chars[chars.len().saturating_sub(2000)..].iter().collect();
-        println!("{}\n{tail}", out[start..].join("\n"));
-    }
-    run.ok
-}
-
 /// The model keys a build may write: `known_keys` (the content's and the manifests'), and every pack's own
 /// model entries, its pack listed in the base manifest's `packs` or not yet. Any other key is a misspelt
-/// `key=`, unless its `Model` says the game draws it by code (`code=True`).
+/// `key`, unless its `Model` says the game draws it by code (`.code()`).
 pub fn build_keys(paths: &Paths) -> Result<BTreeSet<String>, String> {
     let mut known = checkglb::known_keys(paths)?;
     let listed: Vec<String> = checkglb::asset_manifests(paths)?
@@ -274,7 +101,7 @@ pub fn write_pack(
     for (key, _) in entries {
         if !known.contains(key) && !code.contains(key) {
             return Err(format!(
-                "{key}: no content object names this model and no manifest has it: a misspelt key=? (a model the game draws by code: Model(code=True))"
+                "{key}: no content object names this model and no manifest has it: a misspelt key? (a model the game draws by code takes .code())"
             ));
         }
     }
@@ -360,7 +187,7 @@ pub fn write_centres(paths: &Paths, centres: &J, replace: bool) -> Result<(), St
         .map_err(|e| format!("centres.json: {e}"))
 }
 
-/// What a family's build handed back (`$GAMEKIT_RESULT`): checks each model's `motions` against its clips,
+/// What a family's build hands back (its pack, comment, entries, centres, clips and the keys drawn by code): checks each model's `motions` against its clips,
 /// then writes centres.json and (unless `no_pack`) the pack. The lines to print, or what failed.
 pub fn take_build(
     paths: &Paths,
@@ -416,226 +243,9 @@ pub fn take_build(
             .collect();
         let comment = result.get("comment").cloned().unwrap_or(J::Null);
         let path = write_pack(paths, pack, given, &comment, &code, known)?;
-        lines.push(format!("[gamekit] wrote {}", relpath(&path, &paths.assets)));
+        lines.push(format!("[art] wrote {}", relpath(&path, &paths.assets)));
     }
     Ok(lines)
-}
-
-/// A file for this run's hand-overs, in a folder of its own, gone when the run is.
-struct Scratch(std::path::PathBuf);
-
-impl Scratch {
-    fn new() -> Result<Scratch, String> {
-        let dir = std::env::temp_dir().join(format!("ll-art-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-        Ok(Scratch(dir))
-    }
-
-    fn file(&self, name: &str) -> String {
-        self.0.join(name).to_string_lossy().into_owned()
-    }
-}
-
-impl Drop for Scratch {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
-    }
-}
-
-/// What Blender wrote to `path` (`$GAMEKIT_RESULT`), if it wrote anything; removed once read.
-fn read_result(path: &str) -> Result<Option<J>, String> {
-    if !Path::new(path).exists() {
-        return Ok(None);
-    }
-    let r = checkglb::read_json(path).map_err(|e| format!("the build's result: {e}"));
-    let _ = std::fs::remove_file(path);
-    r.map(Some)
-}
-
-fn exit(msg: String) -> i32 {
-    eprintln!("{msg}");
-    1
-}
-
-/// `cargo art …`: the exit code.
-pub fn main(argv: &[String]) -> i32 {
-    let paths = Paths::repo();
-    let here = paths.here.clone();
-    let has = |flag: &str| argv.iter().any(|a| a == flag);
-    let only = argv
-        .iter()
-        .position(|a| a == "--only")
-        .map(|i| argv.get(i + 1).cloned());
-    let scratch = match Scratch::new() {
-        Ok(s) => s,
-        Err(err) => return exit(err),
-    };
-    let result = scratch.file("result.json");
-    if has("--centres") {
-        // Every family imported in Blender, its models' centres collected (no build), centres.json written.
-        let exe = match blender() {
-            Ok(exe) => exe,
-            Err(err) => return exit(err),
-        };
-        let script = format!("{here}/gamekit/centres.py");
-        if !echo(&run(&exe, &script, &[], &[("GAMEKIT_RESULT", &result)])) {
-            return 1;
-        }
-        let found = match read_result(&result) {
-            Ok(Some(r)) => r,
-            Ok(None) => return exit("centres.py handed back no centres".into()),
-            Err(err) => return exit(err),
-        };
-        let none = J::Obj(Vec::new());
-        let centres = found.get("centres").unwrap_or(&none);
-        if let Err(err) = write_centres(&paths, centres, true) {
-            return exit(err);
-        }
-        let all = centres.entries().unwrap_or(&[]);
-        let off = all
-            .iter()
-            .filter(|(_, c)| {
-                c.list()
-                    .is_some_and(|l| l.iter().any(|v| v.num().is_some_and(|n| n.f() != 0.0)))
-            })
-            .count();
-        let cwd = std::env::current_dir()
-            .map(|d| d.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        println!(
-            "[gamekit] wrote {}: {} models of {} families ({off} off the middle)",
-            relpath(&paths.centres, &cwd),
-            all.len(),
-            found
-                .get("families")
-                .map(checkglb::py::repr)
-                .unwrap_or_default()
-        );
-        return 0;
-    }
-    if has("--leafcards") {
-        // The trees' leaf-card atlas, rendered from generated leaves (no family, no gate).
-        let exe = match blender() {
-            Ok(exe) => exe,
-            Err(err) => return exit(err),
-        };
-        return if echo(&run(&exe, &format!("{here}/leafcards.py"), &[], &[])) {
-            0
-        } else {
-            1
-        };
-    }
-    let mut names: Vec<String> = argv
-        .iter()
-        .filter(|a| !a.starts_with('-'))
-        .cloned()
-        .collect();
-    let only = match only {
-        Some(Some(id)) => {
-            if let Some(i) = names.iter().position(|n| *n == id) {
-                names.remove(i);
-            }
-            Some(id)
-        }
-        Some(None) => return exit("--only names a model: --only <id>[,<id>…]".into()),
-        None => None,
-    };
-    if has("--all") {
-        names = families(&here);
-    }
-    if names.is_empty() {
-        return exit(format!(
-            "name a family ({}) or --all",
-            families(&here).join(", ")
-        ));
-    }
-    let mut passthrough: Vec<String> = ["--preview", "--lit", "--sheet", "--no-pack"]
-        .iter()
-        .filter(|f| has(f))
-        .map(|f| f.to_string())
-        .collect();
-    if let Some(id) = only {
-        passthrough.extend(["--only".to_string(), id]);
-    }
-    let exe = match blender() {
-        Ok(exe) => exe,
-        Err(err) => return exit(err),
-    };
-    // The keys a build may write, read once and handed to every family (not needed for previews).
-    let preview = has("--preview");
-    let known = if preview {
-        BTreeSet::new()
-    } else {
-        match build_keys(&paths) {
-            Ok(k) => k,
-            Err(err) => return exit(format!("cannot read the content or the manifests: {err}")),
-        }
-    };
-    let known_file = scratch.file("known.json");
-    let list: Vec<String> = known.iter().map(|k| json_str(k)).collect();
-    if let Err(err) = std::fs::write(&known_file, format!("[{}]", list.join(", "))) {
-        return exit(format!("{known_file}: {err}"));
-    }
-    let env = [
-        ("GAMEKIT_KNOWN", known_file.as_str()),
-        ("GAMEKIT_RESULT", result.as_str()),
-    ];
-    let (mut built, mut failed) = (Vec::new(), Vec::new());
-    let made = regex::Regex::new(r"(?m)^\[gamekit\] built (\S+)").unwrap();
-    for name in &names {
-        let script = format!("{here}/families/{name}.py");
-        if !Path::new(&script).exists() {
-            return exit(format!(
-                "no family {} ({})",
-                checkglb::py_repr_str(name),
-                families(&here).join(", ")
-            ));
-        }
-        let run = run(&exe, &script, &passthrough, &env);
-        let ok = echo(&run);
-        // (A failed build hands back nothing: it stopped before it got there.)
-        let taken = match read_result(&result) {
-            Ok(Some(r)) if ok && !preview => take_build(&paths, &r, has("--no-pack"), &known),
-            Ok(_) => Ok(Vec::new()),
-            Err(err) => Err(err),
-        };
-        match &taken {
-            Ok(lines) => lines.iter().for_each(|l| println!("{l}")),
-            Err(err) => println!("{name}: {err}"),
-        }
-        if !ok || taken.is_err() {
-            failed.push(name.clone());
-        }
-        built.extend(made.captures_iter(&run.stdout).map(|c| c[1].to_string()));
-    }
-    if !built.is_empty() {
-        // (The gate takes the keys among its arguments: model., item., tool.; none, and it checks every model.)
-        let keys: Vec<String> = built
-            .into_iter()
-            .filter(|k| k.starts_with("model.") || k.starts_with("item.") || k.starts_with("tool."))
-            .collect();
-        // With the Khronos validator over the files it wrote, where it can run (else CI's `models` step finds it).
-        let validated: Vec<(&'static str, checkglb::BatchCheck)> =
-            match checkglb::validate::ready(&checkglb::repo_root()) {
-                Ok(()) => vec![("validator", checkglb::validate::check)],
-                Err(err) => {
-                    println!("The Khronos glTF validator didn't run: {err}");
-                    Vec::new()
-                }
-            };
-        let report = checkglb::gate_with(&paths, &keys, &validated);
-        print!("{}", report.text);
-        if report.failed > 0 {
-            failed.push("check-glb".into());
-        }
-        println!(
-            "Exports are not byte-for-byte repeatable: commit only the models you meant to change (git checkout the others)."
-        );
-    }
-    if !failed.is_empty() {
-        return exit(format!("failed: {}", failed.join(", ")));
-    }
-    0
 }
 
 #[cfg(test)]
@@ -645,8 +255,8 @@ mod tests {
 
     #[test]
     fn every_committed_pack_reads_back_to_its_own_text() {
-        // The packs were written by gamekit's write_pack (Python's json.dumps(indent=2) and the perches on a
-        // line each): read and written again here they must come out byte for byte.
+        // The packs as written (two-space indents, the perches a point a line): read and written again they must
+        // come out byte for byte.
         let paths = Paths::repo();
         let dir = join(&paths.assets, "packs");
         let mut n = 0;
@@ -691,7 +301,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         let paths = Paths::at(&root);
         std::fs::create_dir_all(join(&paths.assets, "packs/listed")).unwrap();
-        std::fs::create_dir_all(&paths.here).unwrap();
+        std::fs::create_dir_all(&paths.art).unwrap();
         std::fs::write(
             join(&paths.assets, "manifest.json"),
             "{\n  \"version\": 1,\n  \"packs\": [\n    \"packs/listed/manifest.json\"\n  ],\n  \"entries\": {\n    \"model.a\": {\n      \"type\": \"model\",\n      \"url\": \"models/a.glb\",\n      \"vary\": {\"x\": 1},\n      \"scale\": 2,\n      \"centre\": [0, 1]\n    }\n  }\n}\n",
@@ -714,11 +324,11 @@ mod tests {
             loads_text(br#"{"url": "../../models/f/a.glb", "materials": {"body": "gloss"}}"#)
                 .unwrap(),
         )];
-        let comment = J::Str("Blender-built \u{d7} models".into());
+        let comment = J::Str("Generated \u{d7} models".into());
         let path = write_pack(&paths, "fam", &entries, &comment, &BTreeSet::new(), &known).unwrap();
         assert_eq!(
             std::fs::read_to_string(&path).unwrap(),
-            "{\n  \"$comment\": \"Blender-built \\u00d7 models\",\n  \"version\": 1,\n  \"entries\": {\n    \"model.a\": {\n      \"type\": \"model\",\n      \"url\": \"../../models/f/a.glb\",\n      \"materials\": {\n        \"body\": \"gloss\"\n      },\n      \"scale\": 2\n    }\n  }\n}\n"
+            "{\n  \"$comment\": \"Generated \\u00d7 models\",\n  \"version\": 1,\n  \"entries\": {\n    \"model.a\": {\n      \"type\": \"model\",\n      \"url\": \"../../models/f/a.glb\",\n      \"materials\": {\n        \"body\": \"gloss\"\n      },\n      \"scale\": 2\n    }\n  }\n}\n"
         );
         let base = std::fs::read_to_string(join(&paths.assets, "manifest.json")).unwrap();
         assert!(
@@ -771,7 +381,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             take_build(&paths, &result, false, &known).unwrap(),
-            ["[gamekit] wrote packs/fam/manifest.json"]
+            ["[art] wrote packs/fam/manifest.json"]
         );
         assert_eq!(
             std::fs::read_to_string(&paths.centres).unwrap(),

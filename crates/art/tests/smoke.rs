@@ -1,6 +1,6 @@
 //! `cargo art` from end to end on a model that needs no leaf cards: the Italian cypress (the kernel's own, kept
 //! with its tests), built by the runner under another root and compared with the committed files and pack entry,
-//! which the trees family built and which are Blender's triangle for triangle.
+//! which the trees family built, triangle for triangle.
 #[path = "../../artkit/tests/common/cypress.rs"]
 mod cypress;
 
@@ -152,7 +152,7 @@ fn the_cypress_built_here_is_the_committed_one() {
                 .unwrap_or_else(|| panic!("{file}: no {material}"));
             assert_eq!(now.len(), was.len(), "{file}: {material}'s triangles");
             triangles += now.len() / 3;
-            // each corner of Blender's file has one here at its place, shaded alike
+            // each corner of the committed file has one here at its place, shaded alike
             for (p, level) in was {
                 let (near, shade) = now
                     .iter()
@@ -175,12 +175,12 @@ fn the_cypress_built_here_is_the_committed_one() {
             }
         }
         println!(
-            "{file}: {triangles} triangles as Blender's; its corners within {worst} m of Blender's, their shading {:.4} levels off a corner",
+            "{file}: {triangles} triangles as committed; its corners within {worst} m of the committed ones, their shading {:.4} levels off a corner",
             levels / corners as f64
         );
         assert!(
             worst <= most_off,
-            "{file}: a corner {worst} m from any of Blender's"
+            "{file}: a corner {worst} m from any committed one"
         );
         assert!(
             levels / corners as f64 <= 0.01,

@@ -1,6 +1,5 @@
 //! `cargo check-glb [keys…] [--keys] [--preview] [--against <rev|dir>] [--built <dir>]`: the gate for the game's
-//! glTF models (docs/design/objects.md, "Validation"), was tools/art/blender/check_glb.py, and prints what it
-//! printed.
+//! glTF models (docs/design/objects.md, "Validation").
 //!
 //! It reads every `.glb` a model entry of the manifests uses (the base manifest and its packs, later ones
 //! overriding) with that entry, checks what the game needs of it, and that every model the content draws
@@ -10,9 +9,8 @@
 //!   cargo check-glb model.garden.gnome …   only these keys (model., item., tool.)
 //!   cargo check-glb --keys                 the keys a build may write (`known_keys`)
 //!   cargo check-glb --preview [--sheet]    also draws each file as read (`preview`) to
-//!                                          tools/art/blender/previews/<family>/rt_<name>.png, its clips, perches
-//!                                          and far version beside it (and its sheet); with --blender, Blender
-//!                                          re-imports and renders it instead (gamekit/review.py)
+//!                                          tools/art/previews/<family>/rt_<name>.png, its clips, perches and far
+//!                                          version beside it (and its sheet)
 //!   cargo check-glb --validate             also runs the Khronos glTF validator over each file and its far
 //!                                          version (`validate`: Bun and web/'s `gltf-validator`)
 //!   cargo check-glb --update-baseline      first lowers tools/art/gate-baseline.json to what the counted checks
@@ -21,7 +19,7 @@
 //!   cargo check-glb --built <dir>          the same rules over what the game builds as it runs, dumped there by
 //!                                          tools/built/dump.ts (`built`)
 //!
-//! What it prints is check_glb.py's to the byte: JSON objects are read in file order, numbers as Python
+//! What it prints keeps one form: JSON objects are read in file order, numbers as Python
 //! has them (an int stays an int), and formatted, `repr`'d and `math.hypot`'d as Python does (`py`); and
 //! since, the functional heights' warnings (`heights`: seats, tops, mattresses and lamps against the model).
 //! `measures` gives `cargo review` the same numbers.
@@ -252,14 +250,14 @@ const BIRD_PARTS: [&str; 5] = ["body", "head", "tail", "wing.L", "wing.R"];
 const BIRD_FIT: f64 = 0.05;
 /// How far (m) a perch (`perches`: where the game's birds sit on a tree or a hedge) may be outside the model's box.
 const PERCH_OUT: f64 = 0.01;
-/// What a model with `perches` is, its entry's `habitat` (crates/art/nature/src/trees, families/plants.py): a broadleaved or fruit tree,
+/// What a model with `perches` is, its entry's `habitat` (crates/art/nature/src/trees and plants): a broadleaved or fruit tree,
 /// a conifer, a bush or shrub, or a hedge.
 const HABITATS: [&str; 4] = ["tree", "conifer", "bush", "hedge"];
 
-/// Where the gate reads: the repo's assets, content and tools/art/blender/centres.json.
+/// Where the gate reads: the repo's assets, content and tools/art/centres.json.
 pub struct Paths {
-    /// tools/art/blender
-    pub here: String,
+    /// tools/art: the models' tools (centres.json, the gate's baseline, previews/)
+    pub art: String,
     /// web/public/assets
     pub assets: String,
     /// web/public/content
@@ -267,10 +265,10 @@ pub struct Paths {
     /// web/src/render/shared/characters/furniture.json: where residents sit and lie on each object (`SEATS`,
     /// `BEDS`, `BUNKS` in characters.ts), for the height checks.
     pub furniture: String,
-    /// tools/art/blender/centres.json: where each Blender-built model is centred at rest (its Model's
-    /// `centre`, (0, 0) for most): {key: [x, depth]}, for this gate only (the game doesn't read it). A build
-    /// writes its models' (gamekit/family.py), `cargo art --centres` every family's. A key that isn't in it
-    /// isn't built here (a third-party file): its centre isn't checked.
+    /// tools/art/centres.json: where each model `cargo art` builds is centred at rest (its Model's `centre`,
+    /// (0, 0) for most): {key: [x, depth]}, for this gate only (the game doesn't read it). A build writes its
+    /// models', `cargo art --centres` every family's. A key that isn't in it isn't built here (a third-party
+    /// file): its centre isn't checked.
     pub centres: String,
     /// tools/art/gate-baseline.json: the counted checks' findings each model may keep (`baseline`).
     pub baseline: String,
@@ -281,14 +279,14 @@ impl Paths {
     pub fn at(root: &str) -> Paths {
         let root = normpath(root);
         Paths {
-            here: normpath(&join(&root, "tools/art/blender")),
+            art: normpath(&join(&root, "tools/art")),
             assets: normpath(&join(&root, "web/public/assets")),
             content: normpath(&join(&root, "web/public/content")),
             furniture: normpath(&join(
                 &root,
                 "web/src/render/shared/characters/furniture.json",
             )),
-            centres: normpath(&join(&root, "tools/art/blender/centres.json")),
+            centres: normpath(&join(&root, "tools/art/centres.json")),
             baseline: normpath(&join(&root, baseline::FILE)),
         }
     }
@@ -1103,7 +1101,7 @@ fn positions(g: &Glb, prim: &J) -> R<Vec<Vec<Num>>> {
 }
 
 /// Whether a primitive's vertex colour (COLOR_0) is anything but grey. The game reads it as the shading baked into
-/// the model's creases (gamekit/shade.py) and multiplies it into the part's colour, so a colour in it would tint
+/// the model's creases (artkit's shade.rs) and multiplies it into the part's colour, so a colour in it would tint
 /// the part. One it can't read here (compressed) passes.
 fn coloured(g: &Glb, prim: &J) -> R<bool> {
     let Some(index) = key(prim, "attributes")?.get("COLOR_0") else {
@@ -1118,7 +1116,7 @@ fn coloured(g: &Glb, prim: &J) -> R<bool> {
 }
 
 /// Whether an accessor's values are all the same (or can't be read here: compressed): a plain part's UVs, zero
-/// in Blender, (0, 1) once the exporter has turned v round.
+/// as built, (0, 1) once the writer has turned v round.
 fn constant(g: &Glb, index: &J) -> R<bool> {
     Ok(accessor(g, index)?.is_none_or(|rows| {
         rows.first().is_none_or(|first| {
@@ -1575,13 +1573,13 @@ fn check_clips(g: &Glb, entry: &J) -> R<(Vec<String>, Vec<String>)> {
         }
         if late > CLIP_START {
             errors.push(format!(
-                "clip {name} starts {} s in: the game holds it at rest until then, a pause each round of a loop (its first key at 0 s: gamekit/export.py)",
+                "clip {name} starts {} s in: the game holds it at rest until then, a pause each round of a loop (its first key at 0 s, as artkit writes a clip)",
                 fixed(late, 3)
             ));
         }
         if cubic {
             warnings.push(strict("cubic", format!(
-                "clip {name} has cubic-spline keys: the game plays them as straight lines between the keys (export it sampled, as gamekit does)"
+                "clip {name} has cubic-spline keys: the game plays them as straight lines between the keys (export it sampled, as artkit does)"
             )));
         }
         for c in key(a, "channels")?.list().unwrap_or(&[]) {
@@ -1900,7 +1898,7 @@ type Bounds = ([Num; 3], [Num; 3]);
 /// Each moving part's bounds (None: the still body), in the order they're met.
 type PartBounds = Vec<(Option<usize>, Bounds)>;
 
-/// A model's nodes drawn but not part of its own size (`gamekit.parts.ASIDE`): a desk's chair, a chest of
+/// A model's nodes drawn but not part of its own size (`artkit::parts::aside`): a desk's chair, a chest of
 /// drawers' picture, the blocks left out in front of a toy box, the flag on a climbing frame, the block and
 /// bottle beside a rolled mat. The game draws them; `model()` leaves them out of the size it measures.
 pub const ASIDE: &str = "_aside";
@@ -3675,7 +3673,7 @@ fn check_file(
             } else {
                 None
             };
-            // UVs a textured finish draws with (gamekit/uv.py) or the file's own textures read; a plain part joined
+            // UVs a textured finish draws with (artkit's uv.rs) or the file's own textures read; a plain part joined
             // with textured ones carries one UV throughout, which costs next to nothing compressed.
             if let Some(uvs) = key(prim, "attributes")?.get("TEXCOORD_0") {
                 let used = finish.map_or(textured, |f| fin.textured(f));
@@ -3769,7 +3767,7 @@ fn check_file(
     }
     if let Some(names) = flags.get("coloured").filter(|n| !n.is_empty()) {
         let names = names.iter().cloned().collect::<Vec<_>>().join(", ");
-        errors.push(format!("materials with a coloured COLOR_0: {names} (the game multiplies it in as baked shading, grey: gamekit/shade.py)"));
+        errors.push(format!("materials with a coloured COLOR_0: {names} (the game multiplies it in as baked shading, grey: artkit's shade.rs)"));
     }
 
     // Units and origin: on the floor, centred on the footprint (models.ts lines files up by neither).
@@ -4063,7 +4061,7 @@ pub struct Report {
     pub counts: Counts,
 }
 
-/// Runs the gate over `keys` (every model if none), as check_glb.py's `main` did, into a report.
+/// Runs the gate over `keys` (every model if none) into a report.
 pub fn gate(paths: &Paths, keys: &[String]) -> Report {
     gate_with(paths, keys, &[])
 }
@@ -4590,7 +4588,7 @@ pub fn measures(paths: &Paths, tops: &BTreeMap<String, [f64; 2]>) -> Result<Meas
     Ok(Measures { models, objects })
 }
 
-/// `cargo check-glb [keys…] [--keys] [--preview [--sheet] [--blender]] [--validate] [--update-baseline]`, or
+/// `cargo check-glb [keys…] [--keys] [--preview [--sheet]] [--validate] [--update-baseline]`, or
 /// `--against` (`against::main`), or `--built` (`built::main`): the exit code.
 pub fn main(args: &[String]) -> i32 {
     if args.iter().any(|a| a == "--against") {
@@ -4645,31 +4643,10 @@ pub fn main(args: &[String]) -> i32 {
     print!("{}", report.text);
     let mut code = if report.failed > 0 { 1 } else { 0 };
     let has = |flag: &str| args.iter().any(|a| a == flag);
-    if has("--preview") && !has("--blender") && !report.checked.is_empty() {
+    if has("--preview") && !report.checked.is_empty() {
         // Draws each file as read to previews/<family>/rt_<name>.png, so export problems show.
         if preview::review(&paths, &report.checked, &report.files, has("--sheet")) != 0 {
             code = 1;
-        }
-    } else if has("--preview") && !report.checked.is_empty() {
-        // `--blender`: re-imports each file in Blender and renders it there instead: review.py takes `key=file`
-        // for each checked model whose file is there.
-        let review = join(&paths.here, "gamekit/review.py");
-        let pairs: Vec<String> = report
-            .checked
-            .iter()
-            .zip(&report.files)
-            .filter(|(_, f)| std::path::Path::new(f).exists())
-            .map(|(k, f)| format!("{k}={f}"))
-            .collect();
-        let ok = crate::art::blender()
-            .map(|exe| crate::art::echo(&crate::art::run(&exe, &review, &pairs, &[])));
-        match ok {
-            Ok(true) => {}
-            Ok(false) => code = 1,
-            Err(err) => {
-                eprintln!("{err}");
-                code = 1;
-            }
         }
     }
     code
@@ -4864,7 +4841,7 @@ mod tests {
         assert_eq!(finish("stone"), None);
     }
 
-    /// One triangle whose vertex colour is `colour` at each corner (normalised u16 RGBA, as Blender writes it).
+    /// One triangle whose vertex colour is `colour` at each corner (normalised u16 RGBA, as the models' writer writes it).
     fn shaded(colour: [u16; 4]) -> Glb {
         let mut bin: Vec<u8> = [[0f32, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]
             .iter()

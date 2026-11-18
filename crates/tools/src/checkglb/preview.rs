@@ -1,5 +1,5 @@
 //! The pictures' files. `cargo check-glb --preview` draws each model the gate checked from its file as read
-//! (`artkit::glb::read`, `artkit::preview`) into tools/art/blender/previews/<family>/rt_<name>.png (its clips,
+//! (`artkit::glb::read`, `artkit::preview`) into tools/art/previews/<family>/rt_<name>.png (its clips,
 //! perches and far version beside it, as `cargo art --preview` names them, and its sheet with `--sheet`), so a
 //! fault in a file shows; `cargo art --preview` writes its pictures with `save`. A cut-out finish (the leaf
 //! cards) is drawn on its texture and cut by its alpha (`Textures`).
@@ -27,9 +27,9 @@ pub fn save(path: &Path, picture: &Picture) -> Result<(), String> {
         .map_err(|e| format!("{}: {e}", path.display()))
 }
 
-/// tools/art/blender/previews: the pictures' folder (ignored by git).
+/// tools/art/previews: the pictures' folder (ignored by git).
 pub fn folder(paths: &Paths) -> String {
-    join(&paths.here, "previews")
+    join(&paths.art, "previews")
 }
 
 /// An entry's materials: (material, finish key), its `materials` in order.
@@ -229,15 +229,11 @@ pub fn draw_all(paths: &Paths, subjects: &[Subject], sheet: bool, shown: &Path) 
             }
             pictures += drawn.len();
             let stem = subject.stem.strip_prefix(shown).unwrap_or(&subject.stem);
-            println!(
-                "[gamekit] previewed {} -> {}.png",
-                subject.key,
-                stem.display()
-            );
+            println!("[art] previewed {} -> {}.png", subject.key, stem.display());
         }
     }
     println!(
-        "[gamekit] {pictures} pictures of {} models in {:.1} s",
+        "[art] {pictures} pictures of {} models in {:.1} s",
         jobs.len(),
         started.elapsed().as_secs_f64()
     );
@@ -297,7 +293,7 @@ pub fn review(paths: &Paths, checked: &[String], files: &[String], sheet: bool) 
             entry,
         });
     }
-    failed.extend(draw_all(paths, &subjects, sheet, Path::new(&paths.here)));
+    failed.extend(draw_all(paths, &subjects, sheet, Path::new(&paths.art)));
     for f in &failed {
         eprintln!("{f}");
     }

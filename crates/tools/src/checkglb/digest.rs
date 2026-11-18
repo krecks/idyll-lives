@@ -2,8 +2,8 @@
 //! same nodes, materials, triangles and clips (`cargo check-glb --against`'s class `same`), and the raw accessors it
 //! is made from.
 //!
-//! Blender's exporter writes the same triangles in a different order on every run (docs/design/objects.md,
-//! "Export settings"), so two builds of one model differ in their bytes. Here a triangle is the raw bytes of its
+//! Two builds of one model may differ in their bytes and not in what they draw: an exporter may write the same
+//! triangles in another order, or lay its buffer out otherwise. Here a triangle is the raw bytes of its
 //! three corners' attributes, turned to start at its smallest corner, and a primitive is the sorted list of its
 //! triangles: neither the order of the triangles, nor of the vertices, nor of the nodes, materials and clips in
 //! the file counts, and neither does how the buffer is laid out. Every bit of a number does.

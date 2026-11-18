@@ -636,7 +636,7 @@ impl Checkout {
         );
         c.entry(ENTRY);
         c.write(
-            "tools/art/blender/centres.json",
+            "tools/art/centres.json",
             br#"{"model.cupboard": [0.0, 0.0]}"#,
         );
         c.write(
@@ -841,14 +841,27 @@ fn the_pack_entry_the_centre_and_the_rest_of_a_manifest_are_compared() {
 
     new.entry(ENTRY);
     new.write(
-        "tools/art/blender/centres.json",
+        "tools/art/centres.json",
         br#"{"model.cupboard": [0.0, 0.01]}"#,
     );
     let outcome = new.against(&old, "{}");
     assert_eq!(found(&outcome, "model.cupboard"), ["centre"]);
+    // a checkout from before the models' tools moved keeps its centres where they were: read there
+    let before = Checkout::new("centres-before");
+    std::fs::remove_file(before.path("tools/art/centres.json")).unwrap();
+    before.write(
+        "tools/art/blender/centres.json",
+        br#"{"model.cupboard": [0.0, 0.01]}"#,
+    );
+    let outcome = new.against(&before, "{}");
+    assert!(
+        found(&outcome, "model.cupboard").is_empty(),
+        "{}",
+        outcome.text
+    );
 
     new.write(
-        "tools/art/blender/centres.json",
+        "tools/art/centres.json",
         br#"{"model.cupboard": [0.0, 0.0]}"#,
     );
     // (its `$comment` says what builds the pack: the game does not read it, and it is no finding)

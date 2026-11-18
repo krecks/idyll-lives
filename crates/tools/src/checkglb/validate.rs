@@ -33,7 +33,7 @@ pub const VALIDATOR_IGNORED: &[(&str, &str, &str)] = &[
         "UNUSED_OBJECT",
         "/attributes/TEXCOORD_",
         "UVs of a material with no texture in the file: the finish it maps to in the game is textured (wood, \
-         fabric: gamekit/uv.py), which the validator can't know; UVs that no finish reads are the gate's own \
+         fabric: artkit's uv.rs), which the validator can't know; UVs that no finish reads are the gate's own \
          `materials` finding",
     ),
     (
