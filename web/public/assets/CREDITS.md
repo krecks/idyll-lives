@@ -162,7 +162,7 @@ it is used: the microwave's door opens, the beanbag squashes, the snack drawer s
 waggles, and the recliner reclines and swings its cup holder out.
 
 The example pack models (`models/pack_example/chefStove.glb`, `whirlpoolTub.glb`, override pack
-`packs/pack_example/manifest.json`) are built in Blender by `tools/art/blender/families/pack_example.py` on `gamekit`
+`packs/pack_example/manifest.json`) are built by `crates/art/packs/src/pack_example` on `artkit`
 and exported as `.glb` (glTF, original, CC0). The stove's oven door drops and its front burner lights while a resident
 cooks; the tub fills and bubbles while residents soak.
 

@@ -1,6 +1,6 @@
 # Example pack — notes
 
-`pack_example.py` builds the two P5 example-pack models (`content/packs/example.json`) into
+`crates/art/packs/src/pack_example` builds the two P5 example-pack models (`content/packs/example.json`) into
 `web/public/assets/models/pack_example/` and their entries in `packs/pack_example/manifest.json`, an override pack
 listed after the base manifest's own. Their keys are the existing `model.chefStove` and `model.whirlpoolTub`.
 Built 2026-10-14; they sat in Validate › Example until checked in play (back to Kitchen and Wellness).
@@ -63,7 +63,7 @@ parts, clips, paint and draws):
 
 ```
 cargo art pack_example            # the two .glb, the pack, check-glb
-cargo art pack_example --preview  # previews/pack_example/<id>.png, <id>@<clip>.png
+cargo art pack_example --preview  # tools/art/blender/previews/pack_example/<id>.png, <id>@<clip>.png
 ```
 
 ## Cooking at it (2026-11-03)
