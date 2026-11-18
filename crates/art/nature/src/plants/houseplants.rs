@@ -18,13 +18,14 @@ use artkit::{
 /// Potted plant: a terracotta pot with a rolled rim on its saucer, and a lush arrowhead plant, three rings of
 /// heart-shaped leaves on arching stalks round a few young ones still rolled up in the middle.
 pub fn plant() -> Vec<Obj> {
-    let p = palette(&[
+    let p = super::plain_leaves(palette(&[
         ("body", "#C46A43"),
-        ("leaf", "#4F8A3E"),
-        ("leaf_dark", "#5E9A48"),
-        ("leaf_light", "#7DB85C"),
-        ("stem", "#7FA35A"),
-    ]);
+        // (plain, so as dark as the foliage texture drew them)
+        ("leaf", "#37632B"),
+        ("leaf_dark", "#2E5626"),
+        ("leaf_light", "#4C7A3A"),
+        ("stem", "#5E8044"),
+    ]));
     let ys = vessel!(
         &p,
         0.19,

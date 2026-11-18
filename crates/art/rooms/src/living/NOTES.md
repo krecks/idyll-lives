@@ -135,7 +135,7 @@ models' tops now start at the wall's face, 1–4 cm in front of the rectangles' 
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts | Clip |
 |---|---|---|---|---|---|
-| `model.bookshelf` | 0.90 × 1.92 × 0.38 m | 4,136 | 3 | Frame, Back | `book_out` (read, study, homework) |
+| `model.bookshelf` | 0.90 × 1.92 × 0.38 m | 6,836 | 3 | Frame, Back | `book_out` (read, study, homework) |
 | `model.bookcaseLow` | 0.92 × 1.17 × 0.38 m | 2,820 | 3 | Frame, Back | `book_out` (read) |
 | `model.bookcaseWide` (2 × 1) | 1.86 × 2.00 × 0.47 m | 7,244 | 3 | Frame, Back | `book_out` (read, study, homework) |
 | `model.shelvingIndustrial` (2 × 1) | 1.86 × 1.83 × 0.53 m | 6,776 | 2 | Frame, Shelves | — |
@@ -263,3 +263,11 @@ Ported from `living.py` line for line (crates/art/rooms/src/living). Against the
 every model's points are Blender's (0.000 mm): 14 same, 30 near, none changed. The cabriole legs are the kit's
 (`kit::cabriole!`). Kept as the script had it: `fillet` leaves a right-angled corner sharp (the bed's handle, the
 sofa bed's leg, the nesting and console tables' frames); `living.py`'s `_legs4` was never called and is not ported.
+
+## The bookshelf's hardbacks (2026-11-18)
+
+Taken from the showcase room (`feat/art-rust-showcase`). **The bookshelf's books are hardbacks** (`hardback`,
+`hardback_row` in shelves.rs): boards round a spine rounded `bulge` proud, the page block in paper set in 2.5 mm from
+the boards, a gilt band round some spines; the same books as before (the plain row's random numbers, in order), some
+pushed up to 12 mm back (a generator of their own), one leaning on the last where a row ends short of its shelf, the
+lying ones rounded too. 4,136 → 6,836 triangles, the edges the gate counted 33 → 0.

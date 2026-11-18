@@ -7,22 +7,22 @@
       "url": "../../models/plants/plant.glb",
       "materials": {
         "body": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.ceramic"
         },
         "leaf": {
-          "finish": "material.finish.foliage"
+          "finish": "material.finish.satin"
         },
         "leaf_dark": {
-          "finish": "material.finish.foliage"
+          "finish": "material.finish.satin"
         },
         "leaf_light": {
-          "finish": "material.finish.foliage"
+          "finish": "material.finish.satin"
         },
         "soil": {
           "finish": "material.finish.matte"
         },
         "stem": {
-          "finish": "material.finish.foliage"
+          "finish": "material.finish.satin"
         }
       },
       "paint": [
@@ -30,7 +30,10 @@
           "material": "body",
           "label": "Pot"
         }
-      ]
+      ],
+      "accept": {
+        "edges": "the rims of its leaf blades, drawn plain (satin): the gate leaves a leaf's rim unjudged on foliage"
+      }
     },
     "model.garden.monstera": {
       "type": "model",

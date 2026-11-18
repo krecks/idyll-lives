@@ -33,7 +33,7 @@ whole prune (the game brings it back after). It is the model's fourth draw call 
 
 | Model | Size (w × h × d) | Triangles | Draws |
 |---|---|---|---|
-| `model.plant` | 0.77 × 0.83 × 0.79 m | 1,884 | 2 |
+| `model.plant` | 0.77 × 0.83 × 0.79 m | 1,884 | 1 |
 | `model.garden.monstera` | 0.78 × 0.91 × 0.79 m | 1,576 | 2 |
 | `model.garden.fiddleFig` | 0.53 × 1.63 × 0.53 m | 2,080 | 3 |
 | `model.garden.snakePlant` | 0.34 × 0.91 × 0.32 m | 1,452 | 2 |
@@ -280,3 +280,12 @@ has a top and an underside triangle on the same three points wherever a triangle
 point; Blender's exporter validates a mesh and takes the second of each such pair out, and so does artkit's: those
 leaflets are drawn from one side only, as they were. The rose bush turns the spiral's heading, already degrees,
 into degrees again, as the script did.
+
+## The potted plant's plain leaves (2026-11-18)
+
+Taken from the showcase room (`feat/art-rust-showcase`): the potted plant's leaves and stalks are plain `satin` in
+darker greens (`plain_leaves`). The foliage texture drew them as a dark-and-light dapple at the play camera; now they
+read as folded glossy blades. They no longer sway (the nature shader moves only foliage and bark), as the cacti
+don't. Its pot is glazed (`ceramic`). One draw call (was two). The gate judges a plain leaf's rims as edges, so the
+entry accepts `edges` (the leaves' rims, 36, and the pot's rim and saucer, the 2 it had); `cargo review sizes`
+finds the plant's height by its foliage, so it reads 0 now (its reference baseline 2 → 1).
