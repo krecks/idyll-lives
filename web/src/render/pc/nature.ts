@@ -38,7 +38,7 @@ import { CountryRoads, ROAD_VERGE } from '../shared/countryRoads';
 import type { Lighting } from '../shared/environment';
 import { GRASS, grassField, gustAt, gustNoise, markGrassPatches, recolourGrass, regroundGrass, type GrassQuality } from '../shared/grass';
 import { OffThreadLand, withTownGrass } from '../shared/renderData';
-import { pondQuads, rectBox } from '../shared/landBake';
+import { pondQuads, rectBox, ROUND_REACH } from '../shared/landBake';
 import { flowingWater, WaterFlowMap } from './water';
 import { padGeometry, padMask, padsOf } from '../shared/pads';
 import { LAND_CELL, type Land, type LandRect } from '../../game/land';
@@ -551,11 +551,16 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     return out;
   }
 
-  /** The box (m) round the samples in `rect` the land's drawing leans on, `pad` m out, and on past the world's edge where it reaches it. */
-  landBox(rect: LandRect, pad = 0): [number, number, number, number] {
+  /**
+   * The box (m) round the samples in `rect` the land's drawing leans on, `pad` m out, and on past the world's edge where
+   * it reaches it (and `along` m more each way there: the water past the edge as rounded again once a stroke is done,
+   * `roundedWater`).
+   */
+  landBox(rect: LandRect, pad = 0, along = 0): [number, number, number, number] {
     const field = this.heightField!;
     const box = rectBox(rect, pad);
     const fade = LAND_EDGE_FADE_M + pad;
+    if (rect.i0 <= 0 || rect.j0 <= 0 || rect.i1 >= field.cols || rect.j1 >= field.rows) [box[0], box[1], box[2], box[3]] = [box[0] - along, box[1] - along, box[2] + along, box[3] + along];
     if (rect.i0 <= 0) box[0] = Math.min(box[0], -fade);
     if (rect.j0 <= 0) box[1] = Math.min(box[1], -fade);
     if (rect.i1 >= field.cols) box[2] = Math.max(box[2], Math.max(this.w, field.cols * LAND_CELL) + fade);
@@ -737,7 +742,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     // (On a land its town follows, what the surface solved again moved too.)
     const exits = this.landExits;
     const changed = this.landChanged(rect);
-    const box = this.landBox(changed, LAND_DONE_PAD);
+    const box = this.landBox(changed, LAND_DONE_PAD, ROUND_REACH);
     // (A river drawn out to the edge, or away from it: the valley past the edge came, went or moved with it.)
     const valleys = this.valleysMoved(exits);
     if (valleys) [box[0], box[1], box[2], box[3]] = [Math.min(box[0], valleys[0]), Math.min(box[1], valleys[1]), Math.max(box[2], valleys[2]), Math.max(box[3], valleys[3])];

@@ -9,7 +9,7 @@ import type { WorldStructure } from '../src/core/protocol';
 import { COVER, coverSpan, encodeLand, LAND_CELL, NONE, SEA_CM, type Land } from '../src/game/land';
 import { CountryRoads } from '../src/render/shared/countryRoads';
 import { landZones } from '../src/game/landEdit';
-import { bakeLand, copyLand, EDGE_DRY, EDGE_POND, EDGE_SEA, edgeWater, edgeWaterAt, EXIT_MOST, landExits, marchToGround, pondQuads, wetDistance, wetEdgeAt } from '../src/render/shared/landBake';
+import { bakeLand, copyLand, EDGE_DRY, EDGE_POND, EDGE_SEA, edgeWater, edgeWaterAt, EXIT_MOST, landExits, marchToGround, pondQuads, ROUND_REACH, roundedWater, waterGridAt, wetDistance, wetEdgeAt } from '../src/render/shared/landBake';
 import { LAND_BLOCK, LandscapeLayout, WATER_Y, type Woods } from '../src/render/shared/nature';
 import { islandWorld, plainWorld, SIDE } from './support/landFixtures';
 
@@ -294,7 +294,7 @@ describe('past the edge only the sea runs on', () => {
     for (let x = SIDE - 1; x < SIDE + 80; x += 3) expect(low.ground(x, 119)).toBeGreaterThan(WATER_Y);
   });
 
-  test('a generated land reaches the edge only with the sea: drawn past it as before', () => {
+  test('a generated land reaches the edge only with the sea: drawn past it as before, its shore rounded', () => {
     for (const world of [plainWorld(), islandWorld()]) {
       const baked = bakeLand(layout(world), SIDE, SIDE);
       const edge = edgeWater(baked, 20)!;
@@ -304,6 +304,15 @@ describe('past the edge only the sea runs on', () => {
       const sd = wetDistance(baked);
       for (let a = 0; a < 360; a += 5) {
         const [x, z] = [SIDE / 2 + Math.cos((a * Math.PI) / 180) * 400, SIDE / 2 + Math.sin((a * Math.PI) / 180) * 400];
+        // (Water where it was and land where it was, but within a rounding's reach of a shore: a corner, or a strip
+        // much narrower than that, as a causeway's ground carried out from the edge.)
+        const was = wetEdgeAt(baked, sd, x, z);
+        const near = [-1, 1].flatMap((k) => [wetEdgeAt(baked, sd, x + k * ROUND_REACH, z), wetEdgeAt(baked, sd, x, z + k * ROUND_REACH)]);
+        if (near.every((v) => Math.sign(v) === Math.sign(was))) expect(Math.sign(drawn.waterEdge(x, z))).toBe(Math.sign(was));
+      }
+      // Inside the land, as the field has it.
+      for (let a = 0; a < 360; a += 5) {
+        const [x, z] = [SIDE / 2 + Math.cos((a * Math.PI) / 180) * 200, SIDE / 2 + Math.sin((a * Math.PI) / 180) * 200];
         expect(drawn.waterEdge(x, z)).toBe(wetEdgeAt(baked, sd, x, z));
       }
     }
@@ -311,6 +320,70 @@ describe('past the edge only the sea runs on', () => {
     const island = layout(islandWorld());
     island.setLand(bakeLand(layout(islandWorld()), SIDE, SIDE));
     for (const [x, z] of [[-30, 256], [SIDE + 30, 100], [256, -60], [256, SIDE + 60]]) expect(island.waterEdge(x, z)).toBeGreaterThan(0);
+  });
+});
+
+describe('the water past the edge rounded', () => {
+  /** A grid of `edge` over a 400 m square round (0, 0), rounded. */
+  const grid = (edge: (x: number, z: number) => number, held?: (x: number, z: number) => boolean) => roundedWater(-200, -200, 200, 200, edge, held);
+
+  test('a straight shore stays where it was; a square corner comes out round, the land kept where it is held', () => {
+    // The sea east of x = 10.
+    const straight = grid((x) => x - 10);
+    for (const z of [-60, 0, 60]) {
+      expect(waterGridAt(straight, 10, z)).toBeCloseTo(0, 3);
+      expect(waterGridAt(straight, 30, z)).toBeCloseTo(20, 3);
+    }
+    // The sea north-east of a square corner of the land at (0, 0): from the corner along the diagonal, the shore moved
+    // out into the water (the land's corner rounded off), and far along either side as it was.
+    const corner = (x: number, z: number) => (x > 0 && z > 0 ? Math.min(x, z) : -Math.hypot(Math.min(0, x), Math.min(0, z)));
+    const round = grid(corner);
+    expect(waterGridAt(round, 0, 0)).toBeLessThan(-4);
+    expect(waterGridAt(round, 6, 6)).toBeLessThan(0);
+    expect(waterGridAt(round, 20, 20)).toBeGreaterThan(0);
+    for (const at of [120, 140]) {
+      expect(Math.abs(waterGridAt(round, at, 0))).toBeLessThan(1);
+      expect(Math.abs(waterGridAt(round, 0, at))).toBeLessThan(1);
+    }
+    // Held west of x = 0: there as it was, and the rest met there.
+    const held = grid(corner, (x) => x <= 0);
+    for (const [x, z] of [[0, 0], [-20, 40], [-4, -60]]) expect(waterGridAt(held, x, z)).toBeCloseTo(corner(x, z), 5);
+    // (Read between the cells: halfway, the mean.)
+    expect(waterGridAt(straight, 12, 0)).toBeCloseTo((waterGridAt(straight, 8, 0) + waterGridAt(straight, 16, 0)) / 2, 5);
+  });
+
+  test("where the sea leaves the land, its shore past the edge curves into the land's own, no square corner", () => {
+    // The plain world's land surveyed, a sea along it 6 to 120 m in from its south edge, out through the edge between x
+    // 256 and 400 (a strip of land 6 m wide along the edge either side): carried straight out, the shore past the edge
+    // turned square at each end of that.
+    const field = bakeLand(layout(plainWorld()), SIDE, SIDE);
+    for (let j = 0; j <= 60; j++) {
+      for (let i = 0; i < field.cols; i++) {
+        if (j < 3 && (i < 128 || i > 200)) continue;
+        const k = j * field.cols + i;
+        [field.h[k], field.wl[k]] = [Math.min(field.h[k], SEA_CM - 200), SEA_CM];
+      }
+    }
+    const drawn = layout(plainWorld());
+    drawn.setLand(field);
+    const sd = wetDistance(field);
+    const edge = edgeWater(field, 20);
+    // Inside the land, as the field has it; at the edge, met.
+    for (const x of [100, 250, 300, 420]) {
+      expect(drawn.waterEdge(x, 3)).toBe(wetEdgeAt(field, sd, x, 3, edge));
+      expect(Math.abs(drawn.waterEdge(x, -0.5) - drawn.waterEdge(x, 0))).toBeLessThan(1);
+    }
+    // Past the edge by each end of the way out: the water reaches round into what was a square corner of land, and
+    // the shore further out goes on as it did.
+    for (const [x, side] of [[250, -1], [406, 1]]) {
+      expect(wetEdgeAt(field, sd, x, -14, edge)).toBeLessThan(0);
+      expect(drawn.waterEdge(x, -14)).toBeGreaterThan(0);
+      expect(drawn.waterEdge(x + side * 70, -40)).toBeLessThan(0);
+      expect(drawn.waterEdge(x - side * 70, -120)).toBeGreaterThan(0);
+    }
+    // And the ground follows it, under the sea's sheet there.
+    expect(drawn.ground(250, -14)).toBeLessThan(WATER_Y);
+    expect(drawn.ground(250 - 70, -40)).toBeGreaterThan(WATER_Y);
   });
 });
 

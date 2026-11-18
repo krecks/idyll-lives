@@ -11,7 +11,7 @@
 
 import { DEFAULT_LANDSCAPE, groundDepth, type LandFile, type LandscapeParams, type WorldStructure, type WorldZone } from '../../core/protocol';
 import { COVER, COVER_CELL, decodeLand, heightAt as landHeight, LAND_CELL, NONE, SEA_CM, type Land, type LandRect } from '../../game/land';
-import { coverAt, EDGE_POND, edgeWater, edgeWaterAt, EXIT_MOST, landExits, landTop, landWater, VALLEY_BANK, VALLEY_IN, valleyCap, wetDistance, wetEdgeAt, type LandExit } from './landBake';
+import { coverAt, EDGE_POND, edgeWater, edgeWaterAt, EXIT_MOST, landExits, landTop, landWater, ROUND_CELL, roundedWater, VALLEY_BANK, VALLEY_IN, valleyCap, waterGridAt, wetDistance, wetEdgeAt, type LandExit, type WaterGrid } from './landBake';
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
 import { onPad, type BuiltSurface, type SurfaceChange } from './builtSurface';
 import { surfaceOf } from './landSurface';
@@ -189,6 +189,15 @@ const TUFT_DRAWS = 4;
 const LAWN_CLEAR = 0.6;
 /** Height of the sea or a lake (m); the shore is where the land meets it. */
 export const WATER_Y = -0.35;
+/**
+ * Past the world's edge a height field's water is rounded (`roundedWater`): from the edge's own carried straight out at
+ * the edge to wholly rounded this far (m) past it.
+ */
+const ROUND_IN = 8;
+/** Past the world's edge, behind the sandy bank of a height field's water the land rises no steeper than this (19°). */
+const SHORE_RISE = 0.35;
+/** Past the world's edge a height field's edge's stand off the landscape is carried out over this (m), not its banks and beds. */
+const BANK_TOP = WATER_Y + 1;
 /** How far (m) round a road, lot or building that came or went the land's plants and lawn are grown again (`relayout`): past what clears them. */
 const RELAY_REACH = 12;
 /** Sand from the shoreline up the bank (m). */
@@ -882,6 +891,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     this.wetSd = wetDistance(land);
     this.edgeWet = edgeWater(land, END_REACH);
     this.exits = landExits(land, EXIT_MOST);
+    this.roundGrid = undefined;
     this.fieldWater = landWater(land);
     this.fieldTop = landTop(land);
     if (!this.built) return;
@@ -963,13 +973,35 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     // (A height field's: the edge of its water.)
     if (!this.field) return this.drawnWaterEdge(x, z);
     let e = wetEdgeAt(this.field, this.wetSd, x, z, this.edgeWet);
-    // (Past the edge, a sea river's channel widening down its valley: `valley`.)
-    if (x < 0 || z < 0 || x > this.w || z > this.d) {
-      for (const exit of this.exits) {
-        if (!exit.sea) continue;
-        const [d, a] = this.exitFrame(exit, x, z);
-        if (d > 0) e = Math.max(e, valleyCap(exit, d, a, WATER_Y, this.capped).wet);
-      }
+    if (x >= 0 && z >= 0 && x <= this.w && z <= this.d) return e;
+    // Past the edge, rounded (`pastWater`): eased in from the edge's own, carried straight out, over `ROUND_IN` m. Not by
+    // a pond's or a river's end: it ends at the edge.
+    const k = smoothstep(0, ROUND_IN, Math.hypot(x - Math.min(this.w, Math.max(0, x)), z - Math.min(this.d, Math.max(0, z))));
+    const grid = k > 0 && edgeWaterAt(this.field, this.edgeWet, x, z) !== EDGE_POND ? this.pastWater() : null;
+    if (grid) e += (waterGridAt(grid, x, z) - e) * k;
+    return this.downValleys(x, z, e);
+  }
+
+  /**
+   * The field's water rounded past its edge (`roundedWater`), over the landscape (and as far again as it reaches,
+   * `ROUND_REACH`): made when first asked after the field's water was measured (`measureLand`). Null without water.
+   */
+  private pastWater(): WaterGrid | null {
+    if (this.roundGrid !== undefined) return this.roundGrid;
+    const pad = Math.ceil((this.ring + 16) / ROUND_CELL) * ROUND_CELL;
+    const [w, d] = [this.w, this.d];
+    this.roundGrid = this.wetSd ? roundedWater(-pad, -pad, w + pad, d + pad, (x, z) => wetEdgeAt(this.field!, this.wetSd, x, z, this.edgeWet), (x, z) => x >= 0 && z >= 0 && x <= w && z <= d) : null;
+    return this.roundGrid;
+  }
+  /** `pastWater`'s grid (undefined: to be made). */
+  private roundGrid: WaterGrid | null | undefined = undefined;
+
+  /** The water's edge `e` at (x, z) past the field's edge, with a sea river's channel widening down its valley (`valley`). */
+  private downValleys(x: number, z: number, e: number): number {
+    for (const exit of this.exits) {
+      if (!exit.sea) continue;
+      const [d, a] = this.exitFrame(exit, x, z);
+      if (d > 0) e = Math.max(e, valleyCap(exit, d, a, WATER_Y, this.capped).wet);
     }
     return e;
   }
@@ -1218,11 +1250,16 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const cx = Math.min(this.w, Math.max(0, x));
     const cz = Math.min(this.d, Math.max(0, z));
     const pond = edgeWaterAt(field, this.edgeWet, x, z) === EDGE_POND;
-    const today = this.drawnGround(x, z, !pond);
+    const e = pond ? null : this.waterEdge(x, z);
+    const today = this.pastGround(x, z, e);
     const fade = 1 - smoothstep(0, LAND_EDGE_FADE, Math.hypot(x - cx, z - cz));
     if (fade <= 0) return this.valley(x, z, today);
     const edge = pond ? this.endBank(field, cx, cz, this.fieldAt(cx, cz)) : this.fieldAt(cx, cz);
-    const h = today + (edge - this.drawnGround(cx, cz, !pond)) * fade;
+    // (Its stand off the landscape there carried out as land only, over `BANK_TOP`, and not into the water past the
+    // edge, rounded: its banks and its beds, and its land by them, carried straight out squared the water's corners.)
+    const base = this.pastGround(cx, cz, pond ? null : this.waterEdge(cx, cz));
+    const carry = e === null ? edge - base : (Math.max(edge, BANK_TOP) - Math.max(base, BANK_TOP)) * (1 - smoothstep(-this.beach * 1.5, 0, e));
+    const h = today + carry * fade;
     // (By a pond's end, land over the sea's sheet: the landscape's own may lie lower there than at the edge.)
     return this.valley(x, z, pond ? Math.max(h, WATER_Y + END_BANK * fade) : h);
   }
@@ -1331,6 +1368,21 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     if (e > 0) return WATER_Y - Math.min(4, e * 0.22 + e * e * 0.004);
     const bank = WATER_Y - e * 0.09;
     return h + (Math.min(h, bank) - h) * smoothstep(-beach * 1.5, -beach * 0.3, e);
+  }
+
+  /**
+   * The landscape's own land at (x, z) past a height field's edge, by the field's water there (`waterEdge`: carried on
+   * past the edge, rounded), not the zones' (whose shore past the edge went its own way, square at the edge): under
+   * the water its bed, and by it a sandy bank, behind which the land rises no steeper than `SHORE_RISE` (the zones'
+   * came up from the beach in a cliff as high as the hills behind it), `e` m off (`waterEdge`'s). None by a pond's or a
+   * river's end (`e` null: it ends at the edge, `endBank`).
+   */
+  private pastGround(x: number, z: number, e: number | null): number {
+    const h = this.drawnGround(x, z, false);
+    if (e === null) return h;
+    const beach = this.beach * 1.5;
+    if (e > 0) return Math.min(h, WATER_Y - Math.min(4, e * 0.22 + e * e * 0.004));
+    return Math.min(h, WATER_Y + Math.min(-e, beach) * 0.09 + Math.max(0, -e - beach) * SHORE_RISE);
   }
 
   /** The relief grid's height (m) at (x, z), read between the cells' middles, the edge's past the world's edge. */
