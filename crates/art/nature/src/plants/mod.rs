@@ -2,6 +2,8 @@
 
 use artkit::family::Family;
 
+pub mod common;
+
 /// The family, once it is built here.
 pub fn family() -> Option<Family> {
     None
