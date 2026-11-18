@@ -1371,7 +1371,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const haze = (this.worldHaze ??= new LandHaze(this.app, this.root));
     const made = this.worldHazeFor;
     if (made.scape !== scape || made.version !== scape.landVersion) {
-      if (!made.scape) haze.setColour(this.app.scene.fog.color);
       [made.scape, made.version] = [scape, scape.landVersion];
       haze.set(r, (x, z) => scape.heightAt(x, z), pc.LAYERID_WORLD, `${landscapeId(scape)}|${scape.landVersion}`);
     }
@@ -3181,8 +3180,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // given: linear.
     const c = l.clearColor;
     this.app.scene.fog.color.set(toLinear(c.r), toLinear(c.g), toLinear(c.b), 1);
-    this.landHaze?.setColour(this.app.scene.fog.color);
-    this.worldHaze?.setColour(this.app.scene.fog.color);
     this.camera.camera.clearColor = this.colorTmp.set(toLinear(c.r), toLinear(c.g), toLinear(c.b), 1);
     // The look's exposure for the hour and the moonlight grade (`post.ts`: uniforms).
     if (this.post) this.post.exposure = l.exposure * LOOK.exposure;
@@ -3251,7 +3248,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         // The camera keeps a clear view over the hills (and out of the mountains).
         this.townRig.ground = (x, z) => nature.landscape.heightAt(x, z);
         // (The land faded into the haze past its landscape's edge, from far out.)
-        (this.landHaze ??= new LandHaze(this.app, this.root)).setColour(this.app.scene.fog.color);
+        this.landHaze ??= new LandHaze(this.app, this.root);
         this.hazeLand(nature.landscape);
       } finally {
         this.townBuilds--;

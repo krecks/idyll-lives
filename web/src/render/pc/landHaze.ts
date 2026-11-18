@@ -12,8 +12,8 @@
  * (A sheet hung over the land and moved along the eye's lines to the land it was for came apart from a low camera:
  * pale slabs across the picture, over the hills and the sky.)
  *
- * The curtain (`curtain`): the landscape's cut edge closed in the haze's colour, from over the ground there to under
- * it and the sea's sheet. A camera past the edge (the step camera keeps its target over the land, not its eye) saw
+ * The curtain (`curtain`): the landscape's cut edge closed in the sky's colour behind it (as the veil, whole there,
+ * takes the land beside it to), from over the ground there to under it and the sea's sheet. A camera past the edge (the step camera keeps its target over the land, not its eye) saw
  * the cut: the ground tiles' skirts standing as a green wall, and under the hills the sea's sheet the whole square has.
  * One draw of a few thousand triangles (about 2,700 round a medium land), whatever the camera's distance.
  *
@@ -23,9 +23,9 @@
  */
 
 import * as pc from './engine';
-import { curtain, VEIL_NEAR, veilAt, veilRect, type VeilRect } from '../shared/landVeil';
+import { curtain, VEIL_EDGE, VEIL_NEAR, veilAt, veilRect, type VeilRect } from '../shared/landVeil';
 import { WATER_Y } from '../shared/nature';
-import { landVeilTold, setLandVeil } from './shaders/fog';
+import { landVeilTold, setLandVeil, skyFog } from './shaders/fog';
 
 /** The camera's distance (m) the veil fades in over. */
 const SHOW_FROM = 650;
@@ -53,8 +53,12 @@ export class LandHaze {
     mat.useSkybox = false;
     mat.useFog = false;
     mat.diffuse.set(0, 0, 0);
-    mat.emissive.set(1, 1, 1);
+    mat.emissive.set(0, 0, 0);
     mat.cull = pc.CULLFACE_NONE;
+    // (Its colour the sky's dome behind it, as the veil takes the land beside it to: `shaders/fog.ts` `skyFog`.)
+    mat.shaderChunksVersion = '2.8';
+    mat.getShaderChunks(pc.SHADERLANGUAGE_GLSL).set('fogPS', skyFog('glsl'));
+    mat.getShaderChunks(pc.SHADERLANGUAGE_WGSL).set('fogPS', skyFog('wgsl'));
     mat.update();
     this.entity = new pc.Entity('landHaze', app);
     this.entity.enabled = false;
@@ -81,12 +85,6 @@ export class LandHaze {
     const mi = new pc.MeshInstance(mesh, this.material);
     this.entity.addComponent('render', { meshInstances: [mi], castShadows: false, receiveShadows: false, layers: [layer] });
     this.entity.enabled = this.shown > 0 || (this.shown === 0 && this.always);
-  }
-
-  /** Its colour: the haze's (`scene.fog.color`, as PlayCanvas takes a colour: the sky's dome comes out the same). */
-  setColour(c: pc.Color): void {
-    this.material.emissive.set(c.r, c.g, c.b);
-    this.material.update();
   }
 
   /**
@@ -119,8 +117,10 @@ export class LandHaze {
     const told = landVeilTold(this.app.graphicsDevice);
     // (As the shaders keep them, in single precision; its ends exactly: clear is none, whole is whole.)
     const k32 = Math.fround(strength);
-    if (told && Math.fround(p.x) === told.cx && Math.fround(p.z) === told.cz && Math.fround(r?.hx ?? 0) === told.hx && Math.fround(r?.hz ?? 0) === told.hz && (k32 === told.strength || (Math.abs(strength - told.strength) < 0.002 && strength > 0 && strength < 1))) return;
-    setLandVeil(this.app.graphicsDevice, p.x, p.z, r?.hx ?? 0, r?.hz ?? 0, r?.fade ?? 1, strength, VEIL_NEAR);
+    // (While the curtain is drawn, the land's last metres before it whole in the veil at any strength: `VEIL_EDGE`.)
+    const edge = this.entity.enabled ? Math.min(VEIL_EDGE, r?.fade ?? 0) : 0;
+    if (told && Math.fround(p.x) === told.cx && Math.fround(p.z) === told.cz && Math.fround(r?.hx ?? 0) === told.hx && Math.fround(r?.hz ?? 0) === told.hz && edge === told.edge && (k32 === told.strength || (Math.abs(strength - told.strength) < 0.002 && strength > 0 && strength < 1))) return;
+    setLandVeil(this.app.graphicsDevice, p.x, p.z, r?.hx ?? 0, r?.hz ?? 0, r?.fade ?? 1, strength, VEIL_NEAR, edge);
   }
 
   destroy(): void {

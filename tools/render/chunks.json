@@ -718,7 +718,7 @@
       ]
     },
     {
-      "for": "render/pc/shaders/fog.ts: the game's haze (the eye's distance, the factor linearised, the menus' land's veil by where a thing stands).",
+      "for": "render/pc/shaders/fog.ts: the game's haze (the eye's distance, the factor linearised, the menus' land's veil by where a thing stands, to the sky behind it).",
       "anchors": [
         {
           "chunk": "common/frag/fog.js",
@@ -731,6 +731,12 @@
           "glsl": "fogFactor = exp(-depth * depth * fog_density * fog_density);",
           "wgsl": "return evaluateFogFactorExp2(depth, uniform.fog_density);",
           "who": "shaders/fog.ts: the exponential-squared factor"
+        },
+        {
+          "chunk": "common/frag/fog.js",
+          "glsl": "return mix(fog_color * dBlendModeFogFactor, color, getFogFactor());",
+          "wgsl": "return mix(uniform.fog_color * dBlendModeFogFactor, color, getFogFactor());",
+          "who": "shaders/fog.ts: the haze's colour mixed in (the veil's goes to the sky behind)"
         },
         {
           "chunk": "lit/frag/base.js",

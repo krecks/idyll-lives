@@ -11,7 +11,7 @@
 
 import { DEFAULT_LANDSCAPE, groundDepth, type LandFile, type LandscapeParams, type WorldStructure, type WorldZone } from '../../core/protocol';
 import { COVER, COVER_CELL, decodeLand, heightAt as landHeight, LAND_CELL, NONE, SEA_CM, type Land, type LandRect } from '../../game/land';
-import { coverAt, EDGE_POND, edgeWater, edgeWaterAt, EXIT_MOST, landExits, landTop, landWater, ROUND_CELL, roundedWater, VALLEY_BANK, VALLEY_IN, valleyCap, waterGridAt, wetDistance, wetEdgeAt, type LandExit, type WaterGrid } from './landBake';
+import { carriedWetEdgeAt, coverAt, EDGE_POND, seaRims, edgeWater, edgeWaterAt, EXIT_MOST, landExits, landTop, landWater, ROUND_CELL, roundedWater, seaWays, VALLEY_BANK, VALLEY_IN, valleyCap, waterGridAt, waterMetres, wetDistance, wetEdgeAt, type LandExit, type WaterGrid } from './landBake';
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
 import { onPad, type BuiltSurface, type SurfaceChange } from './builtSurface';
 import { surfaceOf } from './landSurface';
@@ -770,6 +770,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     this.stale = null;
     this.wetSd = null;
     this.edgeWet = null;
+    this.edgeRims = null;
     this.coverSeen = null;
     this.zones = this.zonesToday;
     if (land || this.metaLand) this.adoptLand(land);
@@ -895,7 +896,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const land = this.field!;
     this.wetSd = wetDistance(land);
     this.edgeWet = edgeWater(land, END_REACH);
-    this.exits = landExits(land, EXIT_MOST);
+    this.edgeRims = seaRims(land, this.wetSd);
+    this.exits = [...landExits(land, EXIT_MOST), ...seaWays(land)];
     this.roundGrid = undefined;
     this.fieldWater = landWater(land);
     this.fieldTop = landTop(land);
@@ -989,7 +991,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     if (grid) {
       const g = waterGridAt(grid, x, z);
       const own = g > e ? e + (g - e) * this.seaPast(grid, cx + ((x - cx) / out) * ROUND_IN, cz + ((z - cz) / out) * ROUND_IN) : e;
-      e = own + (g - own) * k;
+      // (Its shore, as metres from it: `waterMetres`.)
+      e = own + (waterGridAt(this.roundMetres!, x, z) - own) * k;
     }
     return this.downValleys(x, z, e);
   }
@@ -1046,11 +1049,13 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const [w, d] = [this.w, this.d];
     // (The land's own cells held but by its edge, whose shore is drawn into this water: `shoreIn`.)
     const [x0, z0, x1, z1] = [BLEND_IN, BLEND_IN, w - BLEND_IN, d - BLEND_IN];
-    this.roundGrid = this.wetSd ? roundedWater(-pad, -pad, w + pad, d + pad, (x, z) => wetEdgeAt(this.field!, this.wetSd, x, z, this.edgeWet), (x, z) => x >= x0 && z >= z0 && x <= x1 && z <= z1) : null;
+    this.roundGrid = this.wetSd ? roundedWater(-pad, -pad, w + pad, d + pad, (x, z) => carriedWetEdgeAt(this.field!, this.wetSd, x, z, this.edgeWet, this.edgeRims), (x, z) => x >= x0 && z >= z0 && x <= x1 && z <= z1) : null;
+    this.roundMetres = this.roundGrid && waterMetres(this.roundGrid);
     return this.roundGrid;
   }
-  /** `pastWater`'s grid (undefined: to be made). */
+  /** `pastWater`'s grid (undefined: to be made), and its shore as metres from it (`waterMetres`): what lies past the edge is laid by. */
   private roundGrid: WaterGrid | null | undefined = undefined;
+  private roundMetres: WaterGrid | null = null;
 
   /** The water's edge `e` at (x, z) past the field's edge, with a sea river's channel widening down its valley (`valley`). */
   private downValleys(x: number, z: number, e: number): number {
@@ -1119,6 +1124,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   private wetSd: Float32Array | null = null;
   /** The field's water round its edge (`edgeWater`): past the edge only its sea runs on. */
   private edgeWet: Uint8Array | null = null;
+  /** Where the sea's far shore meets the field's edge behind a rim of land (`seaRims`): past it the sea runs on. */
+  private edgeRims: Uint8Array | null = null;
   private fieldWater = { any: false, sea: false };
   private fieldTop = 0;
   /** The field's cover as its zones were last made from it (`landChanged`: only the kinds that changed again). */
@@ -1328,6 +1335,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    */
   private valley(x: number, z: number, h: number): number {
     for (const e of this.exits) {
+      if (e.wide) continue;
       const [d, a] = this.exitFrame(e, x, z);
       if (d <= 0) continue;
       const { cap, wet } = valleyCap(e, d, a, WATER_Y, this.capped);
@@ -1354,7 +1362,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   /** `exitFrame`'s and `valleyCap`'s outs. */
   private readonly frame: [number, number] = [0, 0];
   private readonly capped = { cap: 0, wet: 0 };
-  /** Where water leaves the land in a run short enough to be a river's way out (`landExits`), measured with its water. */
+  /** Where water leaves the land in a run short enough to be a river's way out (`landExits`), and the sea's wider ways out (`seaWays`), measured with its water. */
   private exits: LandExit[] = [];
 
   /** The ways out as measured now (`landExits`): kept by a stroke's end to see whether its valleys moved (`valleysMoved`). */

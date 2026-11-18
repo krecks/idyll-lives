@@ -55,7 +55,7 @@ import { CUTOUT } from './cutout';
 import { DIAG_VIEW } from './diagView';
 import { gameNormalMap } from './bump';
 import { gameFresnel, gameReflection } from './envBrdf';
-import { gameFog, setFogFrom, setLandVeil, VEIL_SINK } from './fog';
+import { gameFog, setFogFrom, setLandVeil, setSky, VEIL_SINK } from './fog';
 import { CONTACT_DIRECT, SOFT_LOOK } from './softLook';
 import { ROOM_LIGHT_CODE, ROOM_LIGHT_ROOMS, ROOM_LIGHTS } from './roomLights';
 import { PATTERN, PLAIN_FINISH, VERTEX_TWEAKS } from './surface';
@@ -242,6 +242,8 @@ export function gameChunks(device: pc.GraphicsDevice): Record<Language, Record<s
     // (The haze from the eye, and no land's veil, until the renderer says otherwise: the gallery and the previews never do.)
     setFogFrom(device, 0);
     setLandVeil(device, 0, 0, 0, 0, 1, 0, 1);
+    // (And a sky for it to read, until a sky's own: `nature.ts` `Sky`.)
+    if (!device.scope.resolve('game_skyLow').value) setSky(device, null);
   }
   return chunks;
 }
