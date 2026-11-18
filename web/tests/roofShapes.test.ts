@@ -65,13 +65,28 @@ function roofOf(plan: Plan, style?: number): HousePart['geo'] {
 }
 
 type V3 = [number, number, number];
-/** The roof's faces looking up, each a triangle. */
-function faces(roof: HousePart['geo']): [V3, V3, V3][] {
-  const { pos, nor, idx } = roof;
+/**
+ * The roof's faces looking up, each a triangle: its slopes, or (`caps`) what lies on them, the cap shingles along
+ * its ridges and hips and the flashings down its valleys. Those are told apart by their tone: a slope is in the
+ * roof's own colour (the colour most of the roof's area has), a cap or a flashing in its own (`HOUSE_LOOK.roofCap`,
+ * `roofValley`). They sit a hair over the slopes, so the rules for the roof's surface are held for its slopes alone,
+ * and the caps have their own below.
+ */
+function faces(roof: HousePart['geo'], caps = false): [V3, V3, V3][] {
+  const { pos, nor, idx, col } = roof;
   const at = (v: number): V3 => [pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]];
-  const out: [V3, V3, V3][] = [];
-  for (let t = 0; t < idx.length; t += 3) if (nor[idx[t] * 3 + 1] > 0.5) out.push([at(idx[t]), at(idx[t + 1]), at(idx[t + 2])]);
-  return out;
+  const tone = (v: number) => (col[v * 4] << 16) | (col[v * 4 + 1] << 8) | col[v * 4 + 2];
+  const areas = new Map<number, number>();
+  const up: [V3, V3, V3, number][] = [];
+  for (let t = 0; t < idx.length; t += 3) {
+    if (nor[idx[t] * 3 + 1] <= 0.5) continue;
+    const [p, q, r] = [at(idx[t]), at(idx[t + 1]), at(idx[t + 2])];
+    up.push([p, q, r, tone(idx[t])]);
+    // (Its area in plan.)
+    areas.set(tone(idx[t]), (areas.get(tone(idx[t])) ?? 0) + Math.abs((q[0] - p[0]) * (r[2] - p[2]) - (r[0] - p[0]) * (q[2] - p[2])) / 2);
+  }
+  const own = [...areas].sort((a, b) => b[1] - a[1])[0]?.[0];
+  return up.filter((f) => (f[3] === own) !== caps).map(([p, q, r]) => [p, q, r]);
 }
 
 /** The heights of the faces over (x, z): one over a roof that is one surface. */
@@ -193,6 +208,83 @@ for (const [name, style, pitch, overhang] of CASES) {
     expect(rim).toBeGreaterThan(0);
   });
 }
+
+// ---- the caps: along every ridge and hip, and a flashing down every valley -----------------------------------
+
+/** Where two of the roof's slopes meet: the middle of each side two slope faces share with normals apart, whether the roof turns up there (a valley), and the way along it. */
+function turns(slopes: [V3, V3, V3][]): { at: V3; valley: boolean; along: V3 }[] {
+  const key = (p: V3) => p.map((c) => Math.round(c * 1e4)).join(',');
+  const normalOf = ([p, q, r]: [V3, V3, V3]): V3 => {
+    const [u, v] = [q.map((c, k) => c - p[k]), r.map((c, k) => c - p[k])];
+    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    const l = Math.hypot(n[0], n[1], n[2]) * Math.sign(n[1] || 1);
+    return [n[0] / l, n[1] / l, n[2] / l];
+  };
+  const sides = new Map<string, { a: V3; b: V3; of: { n: V3; third: V3 }[] }>();
+  for (const tri of slopes) {
+    for (let k = 0; k < 3; k++) {
+      const [a, b] = [tri[k], tri[(k + 1) % 3]];
+      const id = [key(a), key(b)].sort().join(' ');
+      const s = sides.get(id) ?? { a, b, of: [] };
+      s.of.push({ n: normalOf(tri), third: tri[(k + 2) % 3] });
+      sides.set(id, s);
+    }
+  }
+  const out: { at: V3; valley: boolean; along: V3 }[] = [];
+  for (const { a, b, of } of sides.values()) {
+    if (of.length !== 2 || of[0].n[0] * of[1].n[0] + of[0].n[1] * of[1].n[1] + of[0].n[2] * of[1].n[2] > 0.999) continue;
+    // A valley: one face's far corner stands over the other face's plane.
+    const over = of[0].n[0] * (of[1].third[0] - a[0]) + of[0].n[1] * (of[1].third[1] - a[1]) + of[0].n[2] * (of[1].third[2] - a[2]);
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    out.push({ at: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], valley: over > 1e-6, along: [(b[0] - a[0]) / l, (b[1] - a[1]) / l, (b[2] - a[2]) / l] });
+  }
+  return out;
+}
+
+for (const name of Object.keys(PLANS)) {
+  test(`${name}: cap shingles lie along every ridge and hip and a flashing down every valley, a hair over the slopes`, () => {
+    const roof = roofOf(planOf(name));
+    const [slopes, caps] = [faces(roof), faces(roof, true)];
+    expect(caps.length).toBeGreaterThan(0);
+    const bare: string[] = [];
+    let [ridges, valleys] = [0, 0];
+    for (const { at, valley, along } of turns(slopes)) {
+      if (valley) valleys++;
+      else ridges++;
+      // 5 cm to either side of the line, square to it in plan: a cap over the slope there, by at most 5 cm.
+      const [sx, sz] = [-along[2], along[0]];
+      const sl = Math.hypot(sx, sz);
+      for (const side of [-1, 1]) {
+        const [x, z] = [at[0] + (side * 0.05 * sx) / sl, at[2] + (side * 0.05 * sz) / sl];
+        const [under] = tops(slopes, x, z);
+        const over = tops(caps, x, z);
+        if (!over.some((h) => h > under + 0.001 && h < under + 0.05)) bare.push(`${valley ? 'valley' : 'ridge or hip'} at ${at.map((c) => c.toFixed(2)).join(', ')}: ${over.map((h) => (h - under).toFixed(3)).join(' ') || 'nothing'} over it`);
+      }
+    }
+    expect(bare).toEqual([]);
+    expect(ridges).toBeGreaterThan(0);
+    expect(valleys).toBeGreaterThan(0);
+    // No cap hangs in the air or sinks into the roof: each corner of one is over a slope by under 6 cm, or on the eave line.
+    const off: string[] = [];
+    for (const tri of caps) {
+      for (const p of tri) {
+        const [under] = tops(slopes, p[0], p[2]);
+        if (under !== undefined && (p[1] < under + 0.001 || p[1] > under + 0.06)) off.push(`${p.map((c) => c.toFixed(3)).join(', ')}: ${(p[1] - under).toFixed(4)} over the slope`);
+      }
+    }
+    expect(off).toEqual([]);
+  });
+}
+
+test('a valley\'s flashing is darker than the cap shingles, and neither is on a flat roof', () => {
+  const roof = roofOf(planOf('L'));
+  const { col, idx, nor } = roof;
+  const tones = new Set<number>();
+  for (let t = 0; t < idx.length; t += 3) if (nor[idx[t] * 3 + 1] > 0.5) tones.add(col[idx[t] * 4] + col[idx[t] * 4 + 1] + col[idx[t] * 4 + 2]);
+  // The slopes', the caps' and the flashings'.
+  expect(tones.size).toBe(3);
+  expect(faces(roofOf(planOf('L'), 2), true)).toHaveLength(0);
+});
 
 test('at an inner corner the slopes meet in a valley that runs up from it, at an outer one in a hip', () => {
   const plan = planOf('L');

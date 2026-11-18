@@ -204,7 +204,7 @@ interface Plan extends Floor {
   /** Diagonal walls across tiles (a wall, a door or a window), each with the half of its tile that is indoors. */
   diagonals?: { axis: 'dp' | 'dn'; x: number; z: number; kind: DiagonalWall['kind'] }[];
   /** The look its lot's place gives it (`houseScheme`): the lot is put where it is this. */
-  look: (s: HouseScheme, chimney: boolean) => boolean;
+  look: (s: HouseScheme) => boolean;
   /** The roof the player chose: a roof style's and a roof colour's id. */
   roof?: [string, string];
   /** Every wall covering on its inside faces in turn, a floor covering a room (every third: each finish comes up), every door and window style in turn. */
@@ -245,7 +245,7 @@ function plans(): Plan[] {
       doors: maple.doors as Gap[],
       windows: maple.windows as Gap[],
       objects: maple.objects,
-      look: (s, chimney) => !s.brick && !s.hip && s.shutters && chimney,
+      look: (s) => !s.brick && !s.hip && s.shutters,
       porch: true,
     },
     {
@@ -256,7 +256,7 @@ function plans(): Plan[] {
       doors: [...along('x', 4, 5), ...along('z', 8, 5, 9), ...along('x', 8, 6)],
       windows: [...along('x', 4, 3, 9, 10), ...along('x', 11, 4, 6, 9, 10), ...along('z', 3, 5, 9), ...along('z', 12, 5, 6, 9)],
       objects: [thing('sofa', 4, 9), thing('fridge', 9, 5), thing('bed', 4, 5), thing('toilet', 10, 9)],
-      look: (s, chimney) => s.brick && s.hip && !chimney,
+      look: (s) => s.brick && s.hip && s.shutters,
       garage: true,
     },
     {
@@ -347,7 +347,7 @@ function plans(): Plan[] {
       roof: ['gable', 'charcoal'],
     },
     generated('generated-small', 'housegen.json\'s house of one storey for a small lot, of its own look', 'small', 1, (s) => !s.brick),
-    generated('generated-tall', 'housegen.json\'s house of two storeys for a medium lot, of its own look', 'medium', 2, (_, chimney) => chimney),
+    generated('generated-tall', 'housegen.json\'s house of two storeys for a medium lot, of its own look', 'medium', 2, () => true),
   ];
 }
 
@@ -365,14 +365,6 @@ const indexOf = (list: readonly { id: string }[], id: string): number => {
   if (i < 0) throw new Error(`no ${id} in the content`);
   return i;
 };
-
-/** Whether a neighbour's silhouette at wall box corner (x0, z0) gets a chimney on a pitched roof of its own look (`HousePlanner.silhouettes`' rule; the planner's own hash, read back from what it builds). */
-function chimneyAt(planner: InstanceType<typeof HousePlanner>, lot: { x: number; z: number }, x0: number, z0: number): boolean {
-  const plain = planner.silhouettes([{ x0, z0, x1: x0 + 8, z1: z0 + 6, lot, front: [0, -1], door: null, garage: null }], []);
-  const none = planner.silhouettes([{ x0, z0, x1: x0 + 8, z1: z0 + 6, lot, front: [0, -1], door: null, garage: null, home: true }], []);
-  const brick = (p: typeof plain) => p.parts.find((q) => q.name === 'silhouetteBrick')!.geo.vertexCount;
-  return brick(plain) > brick(none);
-}
 
 /** A plan as the world the renderer is given: its lot at (`ox`, `STREET`) with the street along its -z side and an empty lot beside it, every storey on its rows. */
 function worldOf(plan: Plan, ox: number): WorldStructure {
@@ -544,9 +536,7 @@ async function houseSamples(plan: Plan): Promise<Sample[]> {
   let ox = 2;
   for (; ; ox += 1) {
     if (ox > 4000) throw new Error(`${plan.name}: no lot has its look`);
-    let [x0, z0] = [Infinity, Infinity];
-    for (const [ax, az, bx, bz] of plan.walls) [x0, z0] = [Math.min(x0, ax, bx), Math.min(z0, az, bz)];
-    if (plan.look(houseScheme(ox, STREET), chimneyAt(planner, { x: ox, z: STREET }, ox + x0, STREET + z0))) break;
+    if (plan.look(houseScheme(ox, STREET))) break;
   }
   const world = worldOf(plan, ox);
   const [home, next] = world.plots;
@@ -578,7 +568,7 @@ async function houseSamples(plan: Plan): Promise<Sample[]> {
   const neighbour = seen.silhouettes.parts.map((part) => partMesh(part));
 
   // Far off: the street's far house, and the town view's box (`pc/street.ts`: `farLook` on the lot's pad, here 0).
-  const plot = { x: home.x, z: home.z, house: home.house!, roof: home.roof, storeys: home.storeys };
+  const plot = { x: home.x, z: home.z, house: home.house!, roof: home.roof, storeys: home.storeys, cover: planner.exteriorCover(world, home.house!, home.storeys ?? 1) };
   const far = new GeoClass();
   planner.farHouse(far, plot);
   const town = lotBuilding({ id: home.id, chunk: 0, storeys: home.storeys ?? 1, pad: 0, ...planner.farLook(plot) }, () => 0);

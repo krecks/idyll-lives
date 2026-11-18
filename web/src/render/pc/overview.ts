@@ -1,8 +1,8 @@
 /**
  * The town overview behind the menus (main menu, new-game steps) on PlayCanvas: the whole
  * neighbourhood at once, drawn with the game's own builders so it looks like the game. Every house
- * is a dressed shell (`HouseBuilder.silhouetteMeshes` through `Street`: porches, chimneys, garages,
- * cars, fences, flower beds; the player's house, `WorldMeta.home`, dressed as the game draws it: its porch and garage, no chimney),
+ * is a dressed shell (`HouseBuilder.silhouetteMeshes` through `Street`: porches, garages,
+ * cars, fences, flower beds; the player's house, `WorldMeta.home`, dressed as the game draws it: its porch and garage),
  * with its models' far versions, plus the road, garden paths and fields and every outdoor object
  * (garden and park trees, benches, flower beds). No interiors, no residents.
  *
@@ -46,7 +46,7 @@ import { fieldLayers } from '../shared/street';
 import type { TownBuilding } from '../shared/townBuildings';
 import { perfEnd, perfStart } from '../../debug/perf';
 
-/** Height that labels and fits allow for (roofs, chimneys, crowns). */
+/** Height that labels and fits allow for (roofs, crowns). */
 const HIGHLIGHT_INSET = 0.55;
 const HIGHLIGHT_CORNER = 1.6;
 /** Per-plot highlight intensities ease towards their targets with this time constant (s). */
