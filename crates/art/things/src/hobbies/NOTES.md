@@ -1,10 +1,10 @@
 # Hobbies — notes
 
-`hobbies.py` builds the nineteen hobby models into `web/public/assets/models/hobbies/`
+This module builds the nineteen hobby models into `web/public/assets/models/hobbies/`
 and their entries in `packs/hobbies/manifest.json`. Built 2026-10-14;
 they sat in Validate › Music, Games and Crafts until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+Each is built where the game places it (`F`, game axes; `settle` without centring, and `centre` on its
 `Model`), so seats and stools stay where the game seats residents. The dartboard hangs at its real height
 (`floor=False`).
 
@@ -51,7 +51,7 @@ Each is built where the game places it (`F`, game axes; `G.settle(centre=False)`
   its own ("Chair"); the board's rim is the table's wood.
 - **Pool table**: the cloth at 0.75 m, the rails' top at 0.785 (a table is 0.74–0.79 to the rail; 2026-10-21, review
   M-hobbies-06: the rails were at 0.82; `clips/games.ts` `BED` follows). The triangle is lifted off the fifteen racked balls, carried over the foot rail and hung up by its
-  apex on the foot end (`rack_off`, `G.path`, 1.4 s; 2026-10-21: it hung 25 cm over the balls) for `pool` and
+  apex on the foot end (`rack_off`, a path, 1.4 s; 2026-10-21: it hung 25 cm over the balls) for `pool` and
   `trickShots`. At the first shot, 4.6 s in (the rack hung up, the player's stroke through: `clips/games.ts`
   `STROKE`), the racked balls go (`racked_off`, a part squashed away to the rack's middle in 0.15 s) and the fifteen
   come up spread over the cloth as the break leaves them (`spread`, a part grown up out of the slate in 0.3 s, flat
@@ -71,7 +71,7 @@ Each is built where the game places it (`F`, game axes; `G.settle(centre=False)`
   as crosses).
 - **Arcade cabinet**: the sides are prisms cut to the classic profile (`_prism`). The screen and the marquee
   glow at night. The joystick waggles in a loop, `joystick`.
-- **Jigsaw table**: half the picture is done; a patch beside it spreads across (`pieces`, `G.grow` along X).
+- **Jigsaw table**: half the picture is done; a patch beside it spreads across (`pieces`, grown along X).
 
 ## Crafts and science (H3)
 
@@ -130,7 +130,7 @@ warnings each.
 
 ## Detail pass (2026-10-22)
 
-Every model rebuilt with the forms and the kit (`G.sweep`, `G.loft`, `G.extrude`, `F.soft`, `G.kit.*`), the same keys,
+Every model rebuilt with the forms and the kit (sweeps, lofts, extrusions, soft boxes, the kit), the same keys,
 sizes, centres, parts, pivots, clips, motions, paint and draws; the held instruments keep their origin (the foot) and
 axes. What each now has:
 
@@ -172,7 +172,7 @@ axes. What each now has:
 - **Chemistry bench**: a steel frame, a lipped top, storage boxes, a periodic table, a rack with holes, flasks with
   feet, a beaker's marks, a retort stand, a microscope with a cast base, three objectives and focus knobs.
 - **Pottery wheel**: a rounded housing with louvres, a rolled pan rim and seam, a profiled pedal, tools; the pot
-  thrown with rings and a hand's wobble (`G.jitter`).
+  thrown with rings and a hand's wobble (jittered).
 - **Craft table**: hairpin legs each one bent rod, a gridded cutting mat, binder rings, sharpened pencils, a ruler, a
   craft knife, rolls of tape, glue.
 
@@ -188,4 +188,4 @@ cargo art hobbies --preview  # previews/hobbies/<id>.png, <id>@<clip>.png
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 7 models changed shape: `arcadeCabinet`, `chessTable`, `keyboardDigital`, `piano`, `potteryWheel`, `sewingTable`, `workbench`; 34,454 to 34,486 triangles.
+Its soft boxes take the shared form's new shape (the soft form: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 7 models changed shape: `arcadeCabinet`, `chessTable`, `keyboardDigital`, `piano`, `potteryWheel`, `sewingTable`, `workbench`; 34,454 to 34,486 triangles.

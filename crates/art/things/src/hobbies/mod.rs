@@ -2,7 +2,7 @@
 //! `model.drumKit`, `model.guitarAcoustic`), games (H2: `model.chessTable`, `model.poolTable`, `model.foosball`,
 //! `model.dartboard`, `model.arcadeCabinet`, `model.puzzleTable`) and crafts and science (H3: `model.easel`,
 //! `model.workbench`, `model.telescope`, `model.sewingTable`, `model.chemistrySet`, `model.potteryWheel`,
-//! `model.craftTable`). Notes: tools/art/blender/families/hobbies.md.
+//! `model.craftTable`). Notes: NOTES.md.
 //!
 //! Each is built where the game places it, in the game's axes (`F`), and stood on the floor (`settle`, not
 //! centred), so a seat stays where the game seats residents. The moving parts and their clips:
@@ -25,9 +25,6 @@
 //!                  the instrument is hidden while played (`off_stand`): the game draws it in the player's hands
 //!                  (content `held`), from this part, upright as built (its lean on the stand is the node's turn)
 //! The digital piano is still.
-//!
-//! Being ported: `--out` and `--check` build what is here; `cargo art hobbies` builds the family in Blender until
-//! tools/art/blender/families/hobbies.py goes.
 
 use artkit::family::{Family, Model};
 use artkit::json;
@@ -222,7 +219,7 @@ fn after_sitting(clip: &str, every: Option<f64>) -> Json {
     out
 }
 
-/// The family, as far as it is built here.
+/// The family.
 pub fn family() -> Option<Family> {
     let off_stand = || json!({"uses": {"music": "off_stand"}});
     let pool = || {
@@ -337,10 +334,10 @@ pub fn family() -> Option<Family> {
                 .motions(json!({"uses": {"scrapbook": (after_sitting("book_open", None))}}))
                 .paint(&[("craft_top", "Wood"), ("craft_metal", "Metal")]),
         ],
-        "Blender-built hobby models (tools/art/blender/families/hobbies.py): music, games, crafts and \
+        "The hobby models (crates/art/things/src/hobbies, built by cargo art): music, games, crafts and \
          science. Listed in the base manifest's packs. The materials map onto the game's finishes so \
          a model costs one draw call per finish group. The piano lifts its fallboard, the drums' \
          cymbals and the foosball rods move while played, the darts, the painting, the jigsaw patch, \
          the pot and the liquid grow, and the other hobbies move a part while a resident uses them.",
-    ))
+    ).switched())
 }
