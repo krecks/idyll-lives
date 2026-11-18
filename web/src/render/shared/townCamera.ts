@@ -171,6 +171,27 @@ export function menuFogFrom(radius: number): number {
   return FOG_FROM * radius;
 }
 
+/** The ways round the eye `townClearance` looks at the land. */
+const AROUND = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+] as const;
+
+/**
+ * How far (m) an eye at (`ex`, `ey`, `ez`) `radius` m out is over the land (`ground`): under it, and as far round it
+ * as the town view's near plane reaches (`TOWN_NEAR_SHARE` of the radius) each way, the highest. `townNear`'s
+ * clearance: from the land under the eye alone, the near plane of an eye out over a gorge (a river's way out between
+ * the hills past the land's edge) cut through its sides beside it, and the picture showed what is behind and under them.
+ */
+export function townClearance(ex: number, ey: number, ez: number, radius: number, ground: (x: number, z: number) => number): number {
+  const r = radius * TOWN_NEAR_SHARE;
+  let top = ground(ex, ez);
+  for (const [ox, oz] of AROUND) top = Math.max(top, ground(ex + ox * r, ez + oz * r));
+  return ey - top;
+}
+
 /**
  * The near plane (m) for a camera `radius` m out whose eye is `clearance` m over the land under it: the play
  * camera's (`LENS.nearShare` of the radius, never under `LENS.near`) eased out to `TOWN_NEAR_SHARE` of the radius,

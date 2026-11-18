@@ -735,8 +735,12 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   async landDone(rect: LandRect, pace?: () => Promise<void>): Promise<[number, number, number, number] | null> {
     if (!this.heightField || !this.host) return null;
     // (On a land its town follows, what the surface solved again moved too.)
+    const exits = this.landExits;
     const changed = this.landChanged(rect);
     const box = this.landBox(changed, LAND_DONE_PAD);
+    // (A river drawn out to the edge, or away from it: the valley past the edge came, went or moved with it.)
+    const valleys = this.valleysMoved(exits);
+    if (valleys) [box[0], box[1], box[2], box[3]] = [Math.min(box[0], valleys[0]), Math.min(box[1], valleys[1]), Math.max(box[2], valleys[2]), Math.max(box[3], valleys[3])];
     perfTime('land: flow', () => this.flowMap?.changed(changed, true));
     for (const k of this.tilesIn(box)) {
       await pace?.();
