@@ -1,6 +1,6 @@
 # Laundry — notes
 
-`laundry.py` builds the six B4 laundry models into `web/public/assets/models/laundry/` and their entries in
+The family builds the six B4 laundry models into `web/public/assets/models/laundry/` and their entries in
 `packs/laundry/manifest.json`: the washing machine (`model.laundryWasher`), the tumble dryer
 (`model.laundryDryer`), the towel rail (`model.towelRail`), the towel ladder (`model.towelLadder`), the laundry
 basket (`model.laundryBasket`) and the bath mat (`model.bathMat`); and since 0.5.0 three things carried doing the
@@ -9,10 +9,10 @@ laundry (content `items`, shown in the hands by `brings` and `holds`): the baske
 (`item.washingPiece`). Built 2026-10-14; they sat in Validate › Laundry
 until checked in play.
 
-Each is built where the game places it (`F`, game axes; `G.settle(centre=False)` and `centre=` on its
+Each is built where the game places it (game axes; settled with `centre: false` and `centre` on its
 `Model`): the machines, the ladder and the basket against the wall, the mat flat and centred. The washer, the
 dryer and the towel ladder were built 3 cm into the wall, as the old parts; they and the old parts stand
-on the wall face now (`G.GameFrame(shift=0.03)`, 2026-10-14). The machines keep 4 draw calls (cabinet, door ring,
+on the wall face now (`GameFrame::new(0.03)`, 2026-10-14). The machines keep 4 draw calls (cabinet, door ring,
 door glass, drum): an opaque window would save one, but then the drum can't be seen turning.
 
 ## The washer and the dryer
@@ -23,7 +23,7 @@ round the porthole. Two moving parts:
 - **The door** (`door`): a ring with a window (`glass`) and a handle on the right, hinged on its left edge.
   `door_open` swings it 110° in 1 s; `hold` 2.5 s, so it shuts while the resident is still loading.
 - **The drum's face** (`drum`): a dark disc with three paddles and the washing, just behind the window, its
-  origin on the axis. `drum_spin` turns it once in 1.2 s (`G.spin`); on the washer only.
+  origin on the axis. `drum_spin` turns it once in 1.2 s (`spin`); on the washer only.
 
 `motions` (2026-10-21, review A-bathroom-03): the washer `{'uses': {'laundry': ['door_open', {'clip': 'drum_spin',
 'delay': 3.5, 'every': 1.1}]}, 'hold': 2.5}`: the drum turns once the door has shut (3.5 s in), round after round
@@ -59,7 +59,7 @@ The carried things, each one draw, base where it rests on the palms (`hold: both
 
 - **Towel rail** (wall): two chrome bars on posts and wall plates, a bath towel over the top bar and a hand
   towel over the lower one. It hangs at its real height (bars at 0.95 and 1.2 m), its back on the wall face:
-  `G.settle(centre=False, floor=False)` and `floor=False` on its `Model`. `check-glb` warns that it floats
+  settled with `centre: false, floor: false` and `on_wall()` on its `Model`. `check-glb` warns that it floats
   (right for a wall thing) and that it's 2 cm shallower than its old part.
 - **Towel ladder**: two birch rails leaning 10.66° back to the wall, five rungs, a towel over three of them.
 - **Laundry basket**: a wicker tub (`fabric`) with a rim, woven bands and side handles, clean washing on top.
@@ -75,7 +75,7 @@ Rebuilt with the forms, same sizes, centres, parts, clips (the washer's drum loo
   settings; rubber bellows turned round the opening. The door ring turned in one profile, its window domed, a grip bent
   from flat bar. The drum's face: a ring of holes, three shaped lifters, lumpy washing (jittered). On top: folded
   towels (washer), a basket bound with bands and a heap of washing with a sock (dryer).
-- **Towel rail:** each bar bent from one tube into the wall (`kit.fillet`), roses at the wall, rounded wall plates;
+- **Towel rail:** each bar bent from one tube into the wall (`fillet`), roses at the wall, rounded wall plates;
   the towels draped over the bars in one piece, each with a woven hem.
 - **Towel ladder:** squared rails rounded at the top, round rungs, the towels draped over in one piece, two hemmed.
 - **Laundry basket:** a lofted wicker tub woven in checked rows, a rolled rim, a plaited foot band, two loop handles;
@@ -104,4 +104,4 @@ cargo art laundry --preview  # previews/laundry/<id>.png, <id>@<clip>.png
 
 ## The soft forms pass (2026-11-13)
 
-No change to the script: its soft boxes take the shared form's new shape (gamekit/forms.py: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 4 models changed shape: `bathMat`, `laundryDryer`, `laundryWasher`, `washingArmful`; the same triangles.
+No change to the build: its soft boxes take the shared form's new shape (the kit's soft forms: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 4 models changed shape: `bathMat`, `laundryDryer`, `laundryWasher`, `washingArmful`; the same triangles.
