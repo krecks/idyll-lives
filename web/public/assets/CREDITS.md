@@ -236,8 +236,7 @@ the feeder's roof lifts and songbirds fly out, and the settee's cushions sink. T
 narrower, its poufs either side of it facing each other (2026-10-21).
 
 The lazy pack models (`models/pack_lazy/snoozecloudBed.glb`, `napPod.glb`, `quiltTable.glb`, `deliveryLocker.glb`,
-`vibePlate.glb`, `smartHub.glb`, override pack `packs/pack_lazy/manifest.json`) are built in Blender by
-`tools/art/blender/families/pack_lazy.py` on `gamekit` and exported as `.glb` (glTF, original, CC0). Each moves while
+`vibePlate.glb`, `smartHub.glb`, override pack `packs/pack_lazy/manifest.json`) are built by `crates/art/packs/src/pack_lazy` on `artkit` and exported as `.glb` (glTF, original, CC0). Each moves while
 it is used: the bed's head section rises, the pod's hood swings over, the quilt's edge lifts, a locker door opens, the
 plate's deck shakes and the tablet tilts up.
 
