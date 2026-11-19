@@ -41,7 +41,7 @@ export type MonoKind = (typeof MONO)[number];
 export const ONCE_MONO = ['knock'] as const satisfies readonly MonoKind[];
 
 /** The interface's blips (`blips.rs`). */
-export const BLIPS = ['pick', 'place', 'sell', 'rotate', 'error', 'build', 'remove', 'paint', 'upgrade', 'tab', 'open', 'close'] as const;
+export const BLIPS = ['pick', 'place', 'sell', 'rotate', 'error', 'build', 'remove', 'paint', 'upgrade', 'tab', 'open', 'close', 'menu', 'choose', 'speed', 'pause', 'resume', 'moneyIn', 'moneyOut', 'notify', 'notifyLow'] as const;
 export type Blip = (typeof BLIPS)[number];
 
 /** Footsteps (`steps.rs`): what is walked on, in what, and the versions of each step. */

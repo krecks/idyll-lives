@@ -126,12 +126,13 @@
   // funds only change through buying, selling and building). With Reduce motion it stays put.
   const floats = new MoneyFloats<{ x: number; y: number }>(1400);
   const still = $derived(settings.reducedMotion || systemMotion.reduced);
-  $effect(() =>
+  // (Its sound is the edit's own: `place`, `sell`.)
+  $effect(() => {
     floats.note(game.funds, game.mode === 'build', () => {
       const k = settings.uiScale || 1;
       return onCanvas ? { x, y } : { x: window.innerWidth / k / 2, y: window.innerHeight / k / 2 };
-    }),
-  );
+    });
+  });
 </script>
 
 <svelte:window onpointermove={move} />

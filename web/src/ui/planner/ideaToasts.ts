@@ -10,6 +10,7 @@ import type { GoalView, SimView } from '../../core/protocol';
 import { services } from '../services';
 import { askToast, dropToast, game } from '../state.svelte';
 import { money } from '../format';
+import { play } from '../sfx';
 import { goalText } from '../story';
 import { actOnWish, brokenAtHome, describeHomeWish } from './homeWishes';
 import { activityLabel } from './planner';
@@ -27,7 +28,8 @@ interface Idea {
 
 const goalKey = (g: GoalView) => `${g.def}:${g.skill ?? ''}:${g.category ?? ''}:${g.target}`;
 
-export function ideaToasts() {
+/** `mayChime`: a new toast may play its chime now (not behind the loading screen, not out of Live). */
+export function ideaToasts(mayChime: () => boolean) {
   /** Residents whose ideas are known; what they had when they turned up isn't new. */
   const known = new Set<number>();
   /** Idea key → toast id, and the keys seen in the last snapshot. */
@@ -136,6 +138,8 @@ export function ideaToasts() {
           { label: 'Decline', run: () => (done(), idea.decline?.()) },
         ]);
         open.set(key, id);
+        // (A chime: someone asks for an answer.)
+        if (mayChime()) play('notify');
       }
       for (const s of sims) if (s.plan) known.add(s.id);
       last = new Set(now.keys());
