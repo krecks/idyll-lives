@@ -1,10 +1,12 @@
 // The sounds of things happening (`audio/events.ts`; made in Rust, `crates/sound/src/things/events.rs`, and tested
 // there): a busy street's doors and gates never sound more than a few at a time; a car's row tells a door shut and
 // a parked car setting off, and a car only coming into sight says nothing; curtains drawn or opened are the ids that
-// changed, none on the first sight of them.
+// changed, none on the first sight of them; a till rings only where someone is paid.
 import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import { EVENTS, ONCE_KINDS, ONCE_LEVEL } from '../src/audio/catalog';
-import { carEvents, changed, doorMay } from '../src/audio/events';
+import { carEvents, changed, doorMay, useSounds } from '../src/audio/events';
+import type { ObjectDef } from '../src/content/content';
 import { EVENT_THINGS, MADE, ONCE_EVENTS } from '../src/audio/kinds';
 
 describe('doors and gates', () => {
@@ -62,6 +64,12 @@ describe("a car's row", () => {
     expect(carEvents({ shown: 1, doors: 0b1 }, 2, 0)).toEqual({ door: true, start: true });
   });
 
+  test("a work taxi moving off from a stop is no start, but its door is heard", () => {
+    expect(carEvents({ shown: 1, doors: 0 }, 2, 0, true)).toEqual({ door: false, start: false });
+    expect(carEvents({ shown: 1, doors: 0b10 }, 2, 0, true)).toEqual({ door: true, start: false });
+    expect(carEvents({ shown: 1, doors: 0b10 }, 1, 0, true).door).toBe(true);
+  });
+
   test('a first sight, or a car coming into town, says nothing', () => {
     expect(carEvents(undefined, 2, 0)).toEqual({ door: false, start: false });
     expect(carEvents(undefined, 1, 0b1)).toEqual({ door: false, start: false });
@@ -88,5 +96,32 @@ describe('the sounds', () => {
       expect(ONCE_LEVEL[kind]).toBeGreaterThan(0);
     }
     expect(ONCE_KINDS).not.toContain('clockTick');
+  });
+});
+
+describe('helping oneself', () => {
+  const objects = (file: string) => (JSON.parse(readFileSync(new URL(`../public/content/${file}`, import.meta.url), 'utf8')) as { objects: ObjectDef[] }).objects;
+  const use = (file: string, object: string, id: string) => objects(file).find((o) => o.id === object)!.interactions.find((i) => i.id === id)!;
+
+  test("served, the till rings; at a household's own cart nobody is paid", () => {
+    const iceCream = use('community.json', 'iceCreamCart', 'iceCream');
+    expect(useSounds(iceCream, iceCream.anim).endSound).toBe('till');
+    expect(useSounds(iceCream, iceCream.selfServe!.anim)).toEqual({ endSound: undefined });
+  });
+
+  test('a drink poured at the bar by the customer is not rung up; the shop counter is paid at the till on the way out', () => {
+    const drink = use('civic.json', 'barCounter', 'drink');
+    expect(useSounds(drink, drink.anim).sound).toBe('till');
+    expect(useSounds(drink, drink.selfServe!.anim).sound).toBeUndefined();
+    const treat = use('community.json', 'shopCounter', 'treat');
+    expect(useSounds(treat, treat.anim).endSound).toBe('till');
+    expect(useSounds(treat, treat.selfServe!.anim).endSound).toBe('till');
+  });
+
+  test('a use without a self-serve sounds as it says, whatever it is done as', () => {
+    const fetch = use('catalog2/outdoor.json', 'letterbox', 'fetchPost');
+    expect(useSounds(fetch, fetch.anim).sound).toBe('letterbox');
+    expect(useSounds(fetch, 'idle').sound).toBe('letterbox');
+    expect(useSounds(undefined, 'idle')).toEqual({});
   });
 });

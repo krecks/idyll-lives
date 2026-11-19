@@ -150,7 +150,9 @@ export class Outside {
       const shown = curr[at + c.shown];
       const doors = c.doors === undefined ? 0 : curr[at + c.doors];
       const last = this.rows.get(i);
-      const happened = carEvents(last, shown, doors);
+      // (A work taxi stands at each stop with its engine running: it never starts.)
+      const taxi = c.kind !== undefined && curr[at + c.kind] === c.kinds?.taxi;
+      const happened = carEvents(last, shown, doors, taxi);
       if (last) {
         last.shown = shown;
         last.doors = doors;
@@ -236,8 +238,14 @@ export class Outside {
     return { pan: Number.isFinite(pan) ? pan : 0, muffle: acoustics.muffleAt(x, z) };
   }
 
+  /** Forgets the cars' rows as last looked at (nothing is heard for a while): the next look starts afresh, so nothing that happened meanwhile sounds late. */
+  forget(): void {
+    this.rows.clear();
+  }
+
   /** Fades everything out (no looks for a while: the picture stopped). */
   hush(t: number): void {
+    this.forget();
     for (const b of [this.town, this.leaves]) b?.gain.gain.setTargetAtTime(0, t, FADE / 3);
     for (const v of this.voices.values()) {
       v.engineGain.gain.setTargetAtTime(0, t, FADE / 3);

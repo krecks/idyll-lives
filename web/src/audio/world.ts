@@ -19,8 +19,8 @@
  * - sounds as something happens: a fridge door as its use starts (a `sound` played once), a toilet's
  *   flush as its use ends (content `endSound`), a visitor's knock at the front door; and what no use says
  *   (`events.ts` has the rules): a door or a gate opening and falling shut as a resident goes through
- *   (`Renderer.doorSounds`, a few at a time, none from far out or at a fast speed), curtains drawn or opened
- *   (`curtains`, the nearest two a change), the morning's post dropping into a letterbox (its `open` going true),
+ *   (`Renderer.doorSounds`, a few at a time, none from far out, at a fast speed or on a storey not shown), curtains
+ *   drawn or opened on the lot in view (`curtains`, the nearest two a change), the morning's post dropping into a letterbox (its `open` going true),
  *   a car's door shut and a parked car setting off (`outside.ts`);
  * - the footsteps of the residents in view (`footsteps.ts`).
  *
@@ -34,7 +34,7 @@
 
 import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
-import { storeyOfRow, storeyRow, type StoreyLayout, type WorldStructure } from '../core/protocol';
+import { storeyOfRow, storeyRow, storeyShown, type StoreyLayout, type WorldStructure } from '../core/protocol';
 import { townView } from '../render/shared/townView';
 import { birdActivity, STOREY_HEIGHT, type DoorSound, type Renderer, type ViewRect } from '../render/types';
 import { game } from '../ui/state.svelte';
@@ -42,7 +42,7 @@ import { acoustics, distanceGain } from './acoustics';
 import { MONO, SPECIES, VERSIONS, WATER, type MadeKind, type MonoKind, type MusicKind, type RoomSize, type Species, type Voice, type WorkerKind } from './kinds';
 import { Footsteps } from './footsteps';
 import { AMBIENCE, EVENTS, LOOPS, ONCE_KINDS, ONCE_LEVEL, pieceAt, type LoopKind, type OnceKind, type SoundKind } from './catalog';
-import { changed, doorMay } from './events';
+import { changed, doorMay, useSounds } from './events';
 import { audioContext, bus, space, updateVolumes } from './mixer';
 import { Outside } from './outside';
 import { Placed, playOnce, type Place, type Space } from './space';
@@ -81,7 +81,7 @@ const SILENT = 'none';
 
 /**
  * What a resident's action sounds like, by what they use: the use's own `sound` (not a recipe's,
- * whose steps sound by where they're done), else the cooking step's (`recipe`: the snapshot's,
+ * whose steps sound by where they're done, nor one helped to at a self-serve: `useSounds`), else the cooking step's (`recipe`: the snapshot's,
  * index + 1; a bake), else the object's for that animation (`sounds`: an oven's `stir` is silent),
  * else by the animation (`ACTION_SOUNDS`), with washing by what's washed. A sound played once (a
  * fridge door) is played as the action starts. `def` and `interaction` are the snapshot's (-1: none).
@@ -90,22 +90,22 @@ export function soundOf(content: Content, tag: string, def: number, interaction:
   const object = def >= 0 ? content.objectList[def] : undefined;
   const use = interaction >= 0 ? object?.interactions[interaction] : undefined;
   const step = recipe > 0 ? content.recipes[recipe - 1]?.steps.find((s) => s.anim === tag && s.sound !== undefined) : undefined;
-  const own = (use?.recipe ? undefined : use?.sound) ?? step?.sound ?? object?.sounds?.[tag];
+  const own = (use?.recipe ? undefined : useSounds(use, tag).sound) ?? step?.sound ?? object?.sounds?.[tag];
   if (own !== undefined) return soundKind(own);
   if (tag === 'wash') {
     // Clearing away after a meal washes up at the sink without an interaction of its own; at a
     // dishwasher (no washing interaction) it's loaded without a sound.
     if (use?.id === 'washUp' || !object) return 'washUp';
-    if (!use) return object.interactions.some((i) => i.anim === 'wash') ? 'washUp' : undefined;
+    if (!use) return (object.interactions ?? []).some((i) => i.anim === 'wash') ? 'washUp' : undefined;
     // Getting ready at a dressing table washes without a tap.
     return use.tags?.includes('handwash') ? 'tap' : undefined;
   }
   return ACTION_SOUNDS[tag];
 }
 
-/** The sound played once as the use ends (content `endSound`: a toilet's flush), if any. */
-export function endSoundOf(content: Content, def: number, interaction: number): OnceKind | undefined {
-  const key = def >= 0 && interaction >= 0 ? content.objectList[def]?.interactions[interaction]?.endSound : undefined;
+/** The sound played once as the use ends, done as animation `tag` (content `endSound`: a toilet's flush; a self-serve's own: `useSounds`), if any. */
+export function endSoundOf(content: Content, tag: string, def: number, interaction: number): OnceKind | undefined {
+  const key = def >= 0 && interaction >= 0 ? useSounds(content.objectList[def]?.interactions?.[interaction], tag).endSound : undefined;
   return key === undefined ? undefined : isOnce(key) ? key : unknownSound(key);
 }
 
@@ -188,6 +188,8 @@ function join(users: Map<LoopKind, Users>, kind: LoopKind, pan: number, x: numbe
 
 /** The sounds of things happening made before they're wanted (doors and curtains: any moment). */
 const AHEAD: readonly OnceKind[] = ['doorOpen', 'doorClose', 'curtain'];
+/** Seconds into `doorClose` it is started: its leaf meets the frame 0.2 s in (after the swing's air), as the drawn leaf comes shut. */
+const DOOR_SHUT_AT = 0.18;
 
 /** Something that happened, to be heard on the next update: curtains drawn or opened, the post in a letterbox (by object id). */
 interface Happened {
@@ -208,6 +210,8 @@ export class WorldSound {
   private piece: MusicKind | null = null;
   /** The world's storeys (to find the rows of the one in view). */
   private storeys: StoreyLayout | null = null;
+  /** The lot in view (`setWorld`; null: none): curtains are heard only in it. */
+  private view: ViewRect | null = null;
   private bed: Loop | null = null;
   private crickets: Loop | null = null;
   private readonly made = new WorkerSounds();
@@ -264,6 +268,7 @@ export class WorldSound {
     this.defOf.clear();
     this.tilesOf.clear();
     this.storeys = world;
+    this.view = view;
     acoustics.setWorld(world);
     this.steps.setWorld(world);
     const index = new Map(this.content.objectList.map((o, i) => [o.id, i]));
@@ -288,7 +293,7 @@ export class WorldSound {
       const x = o.x + o.w / 2;
       const z = o.z - storeyRow(world, storey) + o.d / 2;
       if (!def || x < view.x || x > view.x + view.w || z < view.z || z > view.z + view.d) continue;
-      for (const key of [...Object.values(def.sounds ?? {}), ...def.interactions.flatMap((i) => [i.sound, i.endSound])]) if (key !== undefined && isOnce(key)) this.onceHere.add(key);
+      for (const key of [...Object.values(def.sounds ?? {}), ...(def.interactions ?? []).flatMap((i) => [i.sound, i.endSound, i.selfServe?.endSound])]) if (key !== undefined && isOnce(key)) this.onceHere.add(key);
       const key = def.ambient ?? (o.running ? def.runs?.sound : undefined);
       const kind = key === undefined ? undefined : soundKind(key);
       // Broken (worn out), it's still.
@@ -325,7 +330,11 @@ export class WorldSound {
     const ac = audioContext();
     const out = bus('world');
     const around = space('world');
-    if (!ac || !out || !around || out.gain.value === 0) return;
+    if (!ac || !out || !around || out.gain.value === 0) {
+      // (Nothing heard meanwhile: the cars are looked at afresh on the way back, so no door shut long ago sounds then.)
+      this.outside.forget();
+      return;
+    }
     const quiet = document.hidden;
     const t = ac.currentTime;
     around.distance(acoustics.radius, t);
@@ -384,7 +393,7 @@ export class WorldSound {
         this.ending.delete(id);
         if (!quiet && this.renderer.simHead(i, this.head) && this.once(ac, around, was.kind, placeAt(this.panAt(), sx, sz))) once.push({ kind: was.kind, at: now });
       }
-      const end = use >= 0 ? endSoundOf(this.content, def, interaction) : undefined;
+      const end = tag !== undefined && use >= 0 ? endSoundOf(this.content, tag, def, interaction) : undefined;
       if (end) {
         this.ending.set(id, { use, kind: end });
         // Made while the use lasts, so it's there as it ends.
@@ -499,16 +508,17 @@ export class WorldSound {
   /**
    * The doors and gates that opened or fell shut (a few at a time: `doorMay`), and the curtains drawn and the post
    * come (the nearest the middle of the picture: `EVENTS.curtain.most` curtains, one letterbox), each at its place if
-   * it's in the picture and its sound is made; `heard` is told of each played. At audio time `t`.
+   * it's in the picture and its sound is made; `heard` is told of each played. A door or curtains on a storey not
+   * shown are not heard, nor curtains off the lot in view (a closed neighbour's house). At audio time `t`.
    */
   private happen(ac: AudioContext, around: Space, t: number, doors: readonly DoorSound[], happened: readonly Happened[], heard: (kind: OnceKind) => void): void {
     for (const d of doors) {
       const kind = d.shut ? 'doorClose' : 'doorOpen';
       const made = this.made.sound(kind, ac.sampleRate);
-      const pan = made ? this.inPicture(d.x, d.row, 1) : null;
+      const pan = made && (d.gate || this.shown(d.row)) ? this.inPicture(d.x, d.row, 1) : null;
       if (!made || pan === null || !doorMay(this.doorTimes, t)) continue;
       const level = ONCE_LEVEL[kind] * (d.gate ? EVENTS.door.gate : 1) * (0.85 + 0.15 * Math.random());
-      playOnce(ac, around, made, level, placeAt(pan, d.x, d.row), 0.94 + 0.12 * Math.random());
+      playOnce(ac, around, made, level, placeAt(pan, d.x, d.row), 0.94 + 0.12 * Math.random(), d.shut ? DOOR_SHUT_AT : 0);
       heard(kind);
     }
     if (!happened.length) return;
@@ -520,6 +530,7 @@ export class WorldSound {
       if (!tiles) continue;
       const x = tiles.x + tiles.w / 2;
       const row = tiles.z + tiles.d / 2;
+      if (h.kind === 'curtain' && !this.inView(x, row)) continue;
       const pan = this.inPicture(x, row, 1.6);
       if (pan === null) continue;
       near.push({ kind: h.kind, x, row, pan, off: Math.hypot(this.screen.x / width - 0.5, this.screen.y / height - 0.5) });
@@ -536,6 +547,20 @@ export class WorldSound {
       playOnce(ac, around, made, ONCE_LEVEL[n.kind], placeAt(n.pan, n.x, n.row));
       heard(n.kind);
     }
+  }
+
+  /** Whether the storey of a row (the world's) is shown. */
+  private shown(row: number): boolean {
+    return !!this.storeys && storeyShown(storeyOfRow(this.storeys, row), game.storey);
+  }
+
+  /** Whether tile point (`x`, `row`: the world's rows) is on a shown storey of the lot in view (as the things sounding by themselves: `setWorld`). */
+  private inView(x: number, row: number): boolean {
+    const view = this.view;
+    const storeys = this.storeys;
+    if (!view || !storeys || !this.shown(row)) return false;
+    const z = row - storeyRow(storeys, storeyOfRow(storeys, row));
+    return x >= view.x && x <= view.x + view.w && z >= view.z && z <= view.z + view.d;
   }
 
   /** Where tile point (`x`, `row`: the world's rows), `up` m over its floor, is left to right if it's in the picture (`this.screen` its pixel); null if not. */

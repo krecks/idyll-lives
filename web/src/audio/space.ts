@@ -156,8 +156,11 @@ export class Placed {
   }
 }
 
-/** Plays a sound once at `level` at its place in `space` (`rate`: how fast, and with it how high), then takes it out of the graph. */
-export function playOnce(ac: BaseAudioContext, space: Space, buffer: AudioBuffer, level: number, place: Place, rate = 1): void {
+/**
+ * Plays a sound once at `level` at its place in `space` (`rate`: how fast, and with it how high; `offset`: from that
+ * many seconds into it), then takes it out of the graph.
+ */
+export function playOnce(ac: BaseAudioContext, space: Space, buffer: AudioBuffer, level: number, place: Place, rate = 1, offset = 0): void {
   const source = ac.createBufferSource();
   source.buffer = buffer;
   source.playbackRate.value = rate;
@@ -167,5 +170,5 @@ export function playOnce(ac: BaseAudioContext, space: Space, buffer: AudioBuffer
   source.connect(gain).connect(placed.input);
   // (Its room goes on a moment after it: the longest response is under a second.)
   source.onended = () => setTimeout(() => placed.disconnect(), 1000);
-  source.start();
+  source.start(0, offset);
 }
