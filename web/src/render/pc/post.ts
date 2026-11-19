@@ -15,7 +15,8 @@
  *   the contrast pushed past white is clamped a pass sooner). Half the bytes of two half-float
  *   targets, read and written every frame.
  * - Contact shading on Medium and High (`QualitySettings.contactShading`, `CONTACT`): the scene's depth
- *   drawn once before the scene, an occlusion pass at half size from it, read by the lit shaders.
+ *   drawn once before the scene, an occlusion pass at half size from it, read by the lit shaders. The
+ *   town view fades it out (`setContact`); fully out, the depth isn't drawn.
  * - `?diag=albedo|normals` and `?diag=linear` leave the image processing and the grade out (the
  *   colour itself, encoded for the screen); without them only Low's FXAA is left, so Medium and High
  *   draw straight onto the canvas there. `?diag=noaa`: no multisampling, no FXAA; `?diag=nonight`:
@@ -78,6 +79,9 @@ export interface PostLook {
 /** Whether the scene's depth is being drawn for the contact shading (`withoutContact`'s materials are left out of it). */
 const depthPass = { drawing: false };
 
+/** The cameras whose contact shading is off for now (`PostProcessing.setContact`): their depth pass draws nothing. */
+const depthIdle = new WeakSet<pc.CameraComponent>();
+
 let contactPassesDone = false;
 
 /**
@@ -94,7 +98,9 @@ function contactPasses(): void {
   // makes its two targets (the occlusion and the blur's). `check:chunks` checks both are there.
   const depth = pc.RenderPassPrepass.prototype as unknown as { execute(): void };
   const execute = depth.execute;
-  depth.execute = function (this: unknown) {
+  depth.execute = function (this: { camera: pc.CameraComponent }) {
+    // (Off: the depth as cleared, all far, which the occlusion at no strength doesn't read.)
+    if (depthIdle.has(this.camera)) return;
     depthPass.drawing = true;
     try {
       execute.call(this);
@@ -264,6 +270,7 @@ export class PostProcessing {
   private look: PostLook = PLAIN_LOOK;
   private exposureNow = 1;
   private nightNow = 0;
+  private contactNow = 1;
   private readonly onResize = (width: number, height: number) => this.resized(width, height);
 
   constructor(
@@ -389,6 +396,23 @@ export class PostProcessing {
 
   get night(): number {
     return this.nightNow;
+  }
+
+  /**
+   * The contact shading's strength, of its own (0..1: the town view fades it out, where it is far too small to see). At
+   * 0 the scene's depth isn't drawn for it (about a third of a whole town's draws) and the occlusion is plain white. Its
+   * shaders stay as they are: nothing is compiled as the camera goes out or comes back.
+   */
+  setContact(share: number): void {
+    const frame = this.frame;
+    if (!frame || !this.options.contact) return;
+    const s = Math.min(1, Math.max(0, share));
+    if (s === this.contactNow) return;
+    this.contactNow = s;
+    frame.ssao.intensity = CONTACT.intensity * s;
+    frame.update();
+    if (s > 0) depthIdle.delete(this.camera);
+    else depthIdle.add(this.camera);
   }
 
   /** Contrast, vignette and colour curves (live: uniforms only). */

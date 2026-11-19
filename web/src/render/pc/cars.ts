@@ -75,6 +75,8 @@ interface Own {
   whole: pc.Entity;
   apart: pc.Entity;
   doors: pc.Entity[];
+  /** Its draws, which cast the sun's shadow while drawn (`movingCasters`). */
+  casters: pc.MeshInstance[];
 }
 
 interface Drawn {
@@ -127,6 +129,11 @@ export class Cars extends Vehicles {
   /** The snapshot's car rows looked at for a taxi so far (the households' and the taxis' come before). */
   private scanned = 0;
   private lastNow = 0;
+  /**
+   * Whether a parked draw changed where it casts into the sun's map (a car came, went, parked or drove off): the still
+   * casters' picture is drawn again. A car that only drove is `moved` alone (its own entity is a mover: `movingCasters`).
+   */
+  stillMoved = false;
   /** The parked cars by look (their body meshes, by body, paint and age, shared by the cars of a build that look alike). */
   private readonly parked = new Map<string, Parked>();
   /** The wheels and contact shadows are written again: every car's (one came or went), or only those of the cars drawn that moved (`stirred`). */
@@ -171,6 +178,7 @@ export class Cars extends Vehicles {
     const drive = rate * layout.driveScale;
     this.lastNow = frame.now;
     this.moved = false;
+    this.stillMoved = false;
     if (layout.carBase === undefined || layout.carStride === undefined || !f) return;
     this.pose(frame);
     const step = dt / DOOR_SWING;
@@ -210,6 +218,13 @@ export class Cars extends Vehicles {
       if (changed || shown) this.restate(car);
     }
     this.flush();
+  }
+
+  /** As `Vehicles.movingCasters`, and the cars drawn by their own entities (driving, or a door open). */
+  override movingCasters(out: pc.MeshInstance[]): void {
+    super.movingCasters(out);
+    if (!this.shadows) return;
+    for (const car of this.cars) if (car.owned && car.own) for (const mi of car.own.casters) if (mi.node.enabled) out.push(mi);
   }
 
   /** As `Vehicles.hideOn`: a car driving off the lot shows as it leaves. */
@@ -352,7 +367,7 @@ export class Cars extends Vehicles {
       const parked = (car.drawn && !car.owned) || (drawn && !owned) ? this.parkedFor(car) : null;
       if (parked) parked.dirty = true;
       if (drawn !== car.drawn) this.around = true;
-      if (this.castsMoved(car)) this.moved = true;
+      if (this.castsMoved(car)) this.moved = this.stillMoved = true;
       car.drawn = drawn;
       car.owned = owned;
     }
@@ -481,8 +496,12 @@ export class Cars extends Vehicles {
       doors.push(door);
     }
     // Out of the house's lamps, as the street is.
-    for (const r of entity.findComponents('render') as pc.RenderComponent[]) this.lib.excludeFromLights([], r.meshInstances);
-    return { entity, tilt, whole, apart, doors };
+    const casters: pc.MeshInstance[] = [];
+    for (const r of entity.findComponents('render') as pc.RenderComponent[]) {
+      this.lib.excludeFromLights([], r.meshInstances);
+      casters.push(...r.meshInstances);
+    }
+    return { entity, tilt, whole, apart, doors, casters };
   }
 
   /** A car's body in one piece, its doors shut, without its wheels (shut, as most are most of the time, one draw instead of five). */
