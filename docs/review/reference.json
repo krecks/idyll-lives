@@ -842,6 +842,10 @@
       "title": "Czar Floors, Wide Plank Wood Flooring: solid boards up to 8 in, wider engineered only",
       "url": "https://www.czarfloors.com/plank-wood-floor.asp"
     },
+    "urbaneLivingOak": {
+      "title": "Urbane Living, engineered prime grade oak flooring: standard widths 140, 160, 180, 200, 220, 240, 260, 280, 300, 320 mm",
+      "url": "https://urbaneliving.co.uk/product/2-layer-prime-oak/"
+    },
     "quickStepImpressive": {
       "title": "Travis Perkins, Quick-Step Impressive laminate: 1380 x 190 x 8 mm planks",
       "url": "https://www.travisperkins.co.uk/laminate-flooring/quick-step-impressive-classic-oak-natural-laminate-flooring-1380-x-190-x-8mm-pack-size-1-835m2/p/936910"
@@ -15285,17 +15289,18 @@
       ]
     },
     "floorboards": {
-      "label": "Solid wood floorboards, face width: strip from 1 1/2 in to wide plank 8 in",
+      "label": "Wood floorboards, face width: strip from 1 1/2 in; solid boards to 8 in, engineered wide plank to 320 mm",
       "of": [
         "floor_wood"
       ],
       "width": [
         0.038,
-        0.203
+        0.32
       ],
       "sources": [
         "nwfa",
-        "czarWidePlank"
+        "czarWidePlank",
+        "urbaneLivingOak"
       ]
     },
     "laminatePlanks": {

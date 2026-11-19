@@ -16,19 +16,22 @@
  */
 
 import { dataBox } from './modelParts';
+import { tuned } from '../tune';
 
 /** Texels a side of a tile. */
 export const CONTACT_TILE = 32;
 /** Cells a side of the grid the triangles are laid on, per texel (thin legs fall between cells less). */
 const SUPERSAMPLE = 4;
-/** Room round the model's outline (m): where the blur spills. */
-const MARGIN = 0.3;
-/** Radius of each of the two box blurs (m; a texel at least). */
-const BLUR = 0.12;
-/** Height above the model's bottom (m) at which something over the floor shades it half as dark as touching it. */
-const HALF = 0.5;
-/** The shadow's opacity where the model touches the floor. */
-const PEAK = 0.6;
+/**
+ * The shadow's shape (`?tune=contactShadow.…` on the dev server):
+ * - `margin`: room round the model's outline (m), where the blur spills;
+ * - `blur`: radius of each of the two box blurs (m; a texel at least);
+ * - `half`: height above the model's bottom (m) at which something over the floor shades it half as dark as touching it;
+ * - `peak`: the shadow's opacity where the model touches the floor (0.6 until 2026-11-18: from the play camera a
+ *   sofa and a table sat lightly on the floor, most of all on Low, which has no contact shading; at 1 the slot
+ *   under a low shelf is black).
+ */
+const { margin: MARGIN, blur: BLUR, half: HALF, peak: PEAK } = tuned('contactShadow', { margin: 0.3, blur: 0.12, half: 0.5, peak: 0.8 });
 
 /** A model's contact shadow: its tile, and the rectangle of model space (m, x and z) it covers. */
 export interface ContactShape {

@@ -300,6 +300,13 @@ const ROOM_WALLS: Record<RoomKind, string[]> = {
   kitchen: ['#F2E6CF', '#EFE8D6', '#E8EDDE'],
 };
 const CARPET = ['#B8AE9C', '#9FAAB8', '#B49C8C', '#A8B29A', '#C4B4A8'];
+/**
+ * `boards`: the boards of a room nobody has laid a floor in, and content's `wood.oak` (base.json `floorCoverings`,
+ * the same colour): oak a tone darker than the furniture that stands on it, as a tint over the floorboards' texture
+ * (`textures/floor_wood`, pine's own colours, which honey, walnut and whitewashed boards tint their way). Untinted
+ * until 2026-11-18: an orange floor was the strongest thing in a room. (`?tune=floor.boards:FFFFFF` on the dev server.)
+ */
+const FLOOR = tuned('floor', { boards: '#C5D2EA' });
 /** Curtain colours seen through neighbours' windows. */
 const CURTAINS = ['#F2EDE0', '#E8D9B8', '#C9D6E2', '#E2C4BE', '#F4F1EA', '#E6E0C8'];
 /** Wall height of a garage (lower than the house). */
@@ -1659,7 +1666,7 @@ export class HousePlanner {
         const floorOf = (r: number) => {
           if (def) return FINISH[def.finish].color(def.color);
           const kind = kinds.get(r) ?? 'living';
-          return kind === 'bath' || kind === 'kitchen' ? tile.color(kind === 'bath' ? '#F4F4F2' : '#E6DCCB') : kind === 'bedroom' ? carpet.color(carpetTint) : wood.color('#FFFFFF');
+          return kind === 'bath' || kind === 'kitchen' ? tile.color(kind === 'bath' ? '#F4F4F2' : '#E6DCCB') : kind === 'bedroom' ? carpet.color(carpetTint) : wood.color(FLOOR.boards);
         };
         const d = diagonal(x, z);
         if (d) {
