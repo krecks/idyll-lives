@@ -303,7 +303,7 @@ const veilFades = new WeakMap<pc.GraphicsDevice, Float32Array>();
 
 /**
  * What stands in the veil sinks into the land as it fades (`GAME_VEIL_SINK`, instanced draws: the woods' trees and
- * bushes, the far crowns): each copy scaled down about its foot by the veil where it stands (`setLandVeil`: its x and
+ * bushes): each copy scaled down about its foot by the veil where it stands (`setLandVeil`: its x and
  * z, and how far it is from the eye, as `fogPS` has it), gone where the veil is whole. The haze takes a thing and the
  * ground under it alike, so a dark crown on a pale field kept its share of their difference whatever the haze:
  * halfway into the veil the woods stood as dark domes on a ground gone to haze. Not in the shadow pass (the sun's map

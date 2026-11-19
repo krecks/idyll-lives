@@ -25,7 +25,7 @@ import * as pc from './engine';
 import { withoutContact } from './post';
 import { Grass, grassGround, type GrassPusher } from './grass';
 import { disposeTiles, type GroundTile } from './groundTiles';
-import { Instances, INSTANCE_COLOR } from './instancing';
+import { Instances } from './instancing';
 import { gpuOnly, meshFrom } from './meshes';
 import { GAME_FRONT_FACE, MaterialLibrary, textureWithFallback } from './materials';
 import { buildModel, disposeTemplate, type ModelMesh, type ModelTemplate } from './models';
@@ -35,7 +35,6 @@ import { domeColour, SKY_SEGMENTS, type DomeSky } from '../shared/skyMap';
 import type { AssetRegistry } from '../../assets/registry';
 import type { WorldStructure } from '../../core/protocol';
 import { LookedFrom } from '../shared/chunks';
-import { Geo } from '../shared/geometry';
 import { CountryRoads, ROAD_VERGE } from '../shared/countryRoads';
 import type { Lighting } from '../shared/environment';
 import { GRASS, grassField, gustAt, gustNoise, markGrassPatches, recolourGrass, regroundGrass, type GrassQuality } from '../shared/grass';
@@ -115,10 +114,6 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   private batches: Batch[] = [];
   /** Its other draws (the terrain, the water, the roads). */
   private others: pc.Entity[] = [];
-  /** A big world's far woods as crown clusters, shown in the town view past the woods drawn in full (`FarCrowns`). */
-  private crowns: FarCrowns | null = null;
-  /** How the woods' squares are named (`Woods.sector`), as they were last laid out. */
-  private woodsSector: ((x: number, z: number) => string) | null = null;
   /** The water's material and the library that adopted it (its own: it goes with the landscape). */
   private waterMaterial: { material: pc.StandardMaterial; lib: MaterialLibrary } | null = null;
   /** The water's flow map (`pc/water.ts`), made with its material (none: `?diag=noflow`). */
@@ -331,8 +326,6 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   /** Takes down everything it draws (the plants' templates with their draws). */
   dispose(): void {
     for (const b of this.batches) release(b.built);
-    this.crowns?.destroy();
-    this.crowns = null;
     // A ground tile's levels not drawn now are no draw's: they go here (the one drawn goes with its entity).
     disposeTiles(this.tiles);
     this.tiles = [];
@@ -908,13 +901,6 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       freshLawns.push({ at: fresh.length, matrices, tiles, clear });
       fresh.push(batch({ key, matrices, lod, cell, tiles, clear }, false, 'flowers', built));
     }
-    // A big world's crown clusters, gathered again from every tree.
-    let crowns: FarCrowns | null = null;
-    if (this.built && (!woodsChanged || woodsChanged.size)) {
-      const trees: { kind: string; m: Float32Array }[] = [];
-      for (const map of [woods.near, woods.far]) for (const [kind, list] of map) for (const m of list) trees.push({ kind, m });
-      crowns = new FarCrowns(app, parent, trees, woods.sector);
-    }
     const kept = new Set(templates.values());
     const replaced = gather(stale).draws;
     const commit = () => {
@@ -929,32 +915,25 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
         this.lawn.push(...layers);
         if (this.lawnMask) hideLawn(layers, this.lawnMask, uploadLawn);
       }
-      if (crowns) {
-        this.crowns?.destroy();
-        this.crowns = crowns;
-      }
-      this.woodsSector = woods.sector;
       this.findSquares();
     };
     const discard = () => {
       for (const b of fresh) release(b.built, kept);
-      crowns?.destroy();
     };
     return { ...gather(fresh), replaced, commit, discard };
   }
 
   /** A big world's woods and flower squares, by where they are: those far from the camera are left out (`frameTiles`). */
   private findSquares(): void {
-    const sector = this.woodsSector;
     const of = (parts: readonly NaturePart[]) =>
-      this.built ? this.batches.filter((b) => parts.includes(b.part)).flatMap((b) => b.built.cells.flatMap((c) => c.draws.map((d) => d.meshInstance))).map((mi) => ({ mi, x: mi.aabb.center.x, z: -mi.aabb.center.z, key: sector?.(mi.aabb.center.x, -mi.aabb.center.z) ?? '' })) : [];
+      this.built ? this.batches.filter((b) => parts.includes(b.part)).flatMap((b) => b.built.cells.flatMap((c) => c.draws.map((d) => d.meshInstance))).map((mi) => ({ mi, x: mi.aabb.center.x, z: -mi.aabb.center.z })) : [];
     this.woodsSquares = of(['woods', 'farWoods']);
     this.flowerSquares = of(['flowers']);
     this.framedAt.forget();
   }
 
   /** A big world's woods squares: each one's draw and where its middle is (game space). */
-  private woodsSquares: { mi: pc.MeshInstance; x: number; z: number; key: string }[] = [];
+  private woodsSquares: { mi: pc.MeshInstance; x: number; z: number }[] = [];
   /** A big world's lawn flowers' squares, as the woods'. */
   private flowerSquares: { mi: pc.MeshInstance; x: number; z: number }[] = [];
   /** A big world's ground tiles: each one's draw, its meshes by level, where its middle is and the level drawn. */
@@ -965,10 +944,9 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
 
   /**
    * Each frame (the game's): each ground tile draws the level for its distance from (`x`, `z`), the camera's target.
-   * In the town view (`town`, its blend, over 0; `radius`, the orbit's) the woods draw their own trees only in the
-   * squares near the target (nearer the further out it is: `TOWN_WOODS_NEAR` at the full view), crown clusters in the
-   * rest (`FarCrowns`), and a ground tile's level goes by the eye's distance too (its altitude): culling by altitude
-   * and the frustum, not the preset's distances. Out of it, as ever.
+   * In the town view (`town`, its blend, over 0; `radius`, the orbit's) every woods square draws its own trees (the
+   * frustum leaves out those out of sight), and a ground tile's level goes by the eye's distance too (its altitude):
+   * culling by altitude and the frustum, not the preset's distances. Out of it, as ever.
    */
   frameTiles(x: number, z: number, town = 0, radius = 0): void {
     // (The camera's target still, as far out: nothing changes.)
@@ -976,19 +954,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     if (!this.framedAt.moved(x, z, 0.5) && level === this.framedTown) return;
     this.framedTown = level;
     const { woodsFar, flowersFar, tiles: [near, mid] } = this.open;
-    if (town > 0) {
-      const reach = woodsFar + (TOWN_WOODS_NEAR - woodsFar) * town;
-      const cell = this.bigWoodsCell;
-      const near = (key: string) => {
-        const at = key.indexOf(':');
-        return Math.hypot((Number(key.slice(0, at)) + 0.5) * cell - x, (Number(key.slice(at + 1)) + 0.5) * cell - z) < reach;
-      };
-      for (const w of this.woodsSquares) w.mi.visible = near(w.key);
-      this.crowns?.show((key) => !near(key));
-    } else {
-      for (const w of this.woodsSquares) w.mi.visible = Math.hypot(w.x - x, w.z - z) < woodsFar;
-      this.crowns?.show(null);
-    }
+    for (const w of this.woodsSquares) w.mi.visible = town > 0 || Math.hypot(w.x - x, w.z - z) < woodsFar;
     for (const f of this.flowerSquares) f.mi.visible = Math.hypot(f.x - x, f.z - z) < flowersFar;
     const lift = town * radius;
     this.tiles.forEach((t, k) => {
@@ -1240,23 +1206,9 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   private padTexture: pc.Texture | null = null;
   private groundMats: pc.StandardMaterial[] | null = null;
 
-  /** Crown clusters gathered from the woods (for the report), 0 without them. */
-  get crownCount(): number {
-    return this.crowns?.count ?? 0;
-  }
-
   /** The woods (`woods`), each model instanced, in groups by sector round the town. */
   private async forests(app: pc.AppBase, parent: pc.Entity, assets: AssetRegistry, pace?: () => Promise<void>): Promise<void> {
     const { near, far, sector } = await this.woods(pace);
-    this.woodsSector = sector;
-    // A big world's woods at altitude: crown clusters over every tree (`FarCrowns`), shown only in the town view.
-    this.crowns?.destroy();
-    this.crowns = null;
-    if (this.built) {
-      const trees: { kind: string; m: Float32Array }[] = [];
-      for (const bucket of [near, far]) for (const [kind, list] of bucket) for (const m of list) trees.push({ kind, m });
-      this.crowns = perfTime('nature: far crowns', () => new FarCrowns(app, parent, trees, sector));
-    }
     for (const [bucket, casts] of [
       [near, true],
       [far, false],
@@ -2109,186 +2061,5 @@ export class Sky {
   destroy(): void {
     setSky(this.device, null);
     this.dome.destroy();
-  }
-}
-
-
-// ---- the far woods at altitude (crown clusters past the near woods) ----
-
-/** The trees gathered into one crown cluster per square this wide (m). */
-const CROWN_CELL = 9;
-/** In the full town view the woods draw their own trees only in squares within this of the camera's target (m); crown clusters elsewhere. */
-const TOWN_WOODS_NEAR = 260;
-/** The crowns' colours (sRGB): broadleaves, birches, conifers and fruit trees, as the woods' leaves read from afar. */
-const CROWN = { leaf: '#4F6E33', birch: '#6E8A42', needle: '#36503C', fruit: '#5C7A36' } as const;
-
-/** A crown cluster's mesh: a low dome over a trunk's gap (unit: radius 1, from 0.3 to 1 up), smooth-shaded; a conifer's a cone. */
-function crownMesh(cone: boolean): Geo {
-  // (White at 0.45 alpha, the cutaway's keep-everything: what its vertices were given one by one.)
-  const g = new Geo().color('#FFFFFF', 0.45);
-  const n = 10;
-  // Rings up the crown (height, radius), and the dome's middle its normals point out from.
-  const rings: [number, number][] = cone ? [[0.22, 0.6], [0.5, 0.42], [0.78, 0.2], [1, 0]] : [[0.3, 0.7], [0.48, 0.97], [0.7, 0.88], [0.88, 0.55], [1, 0]];
-  const mid = cone ? 0.35 : 0.5;
-  const squash = cone ? 0.5 : 1.4;
-  const vertex = (x: number, y: number, z: number, nx: number, ny: number, nz: number) => {
-    const l = Math.hypot(nx, ny, nz) || 1;
-    return g.point([x, y, z], [nx / l, ny / l, nz / l], 0, 0);
-  };
-  const ids = rings.map(([y, r]) =>
-    Array.from({ length: n }, (_, k) => {
-      const a = (k / n) * Math.PI * 2;
-      const [x, z] = [Math.cos(a) * r, Math.sin(a) * r];
-      return vertex(x, y, z, Math.cos(a) * Math.max(r, 0.3), (y - mid) * squash + (r === 0 ? 1 : 0), Math.sin(a) * Math.max(r, 0.3));
-    }),
-  );
-  // (Wound as `Geo` winds a face towards its normal, `(a - b) × (c - b)`: out.)
-  for (let i = 0; i + 1 < ids.length; i++) {
-    for (let k = 0; k < n; k++) {
-      const [a, b, c, d] = [ids[i][k], ids[i][(k + 1) % n], ids[i + 1][(k + 1) % n], ids[i + 1][k]];
-      g.face(a, b, c).face(a, c, d);
-    }
-  }
-  // Its underside, flat.
-  const [yb] = rings[0];
-  const centre = vertex(0, yb, 0, 0, -1, 0);
-  for (let k = 0; k < n; k++) g.face(centre, ids[0][(k + 1) % n], ids[0][k]);
-  return g;
-}
-
-/** A crown cluster as gathered: where it stands, how wide and tall, its colour; by woods square. */
-interface Crown {
-  key: string;
-  cone: boolean;
-  m: Float32Array;
-  color: [number, number, number, number];
-}
-
-/**
- * The far woods at altitude: every woods tree gathered into crown clusters (`CROWN_CELL` m squares, one
- * cluster each: its trees' middle, as wide as they spread, as tall as they are on average, broadleaf or
- * conifer by most of them), one instanced draw each of a dome and a cone. Shown only in the town view, in
- * the woods' squares that don't draw their own trees then (`show`).
- */
-export class FarCrowns {
-  /** Its draws, made the first time it shows any (nothing of it before the town view: `TownBuildings.made`). */
-  private draws: [Instances, Instances] | null = null;
-  private readonly meshes: pc.Mesh[] = [];
-  private readonly byKey = new Map<string, Crown[]>();
-  private shownKeys = '';
-
-  constructor(
-    private readonly app: pc.AppBase,
-    private readonly parent: pc.Entity,
-    trees: Iterable<{ kind: string; m: Float32Array }>,
-    sector: (x: number, z: number) => string,
-  ) {
-    // Gathered by square.
-    const cells = new Map<string, { n: number; x: number; y: number; z: number; s: number; x0: number; x1: number; z0: number; z1: number; cone: number; birch: number; fruit: number }>();
-    for (const { kind, m } of trees) {
-      if (kind === ROCK || kind.startsWith('model.bush')) continue;
-      const [x, y, z] = [m[12], m[13], m[14]];
-      const s = Math.hypot(m[0], m[1], m[2]);
-      const key = `${Math.floor(x / CROWN_CELL)},${Math.floor(z / CROWN_CELL)}`;
-      let c = cells.get(key);
-      if (!c) cells.set(key, (c = { n: 0, x: 0, y: 0, z: 0, s: 0, x0: x, x1: x, z0: z, z1: z, cone: 0, birch: 0, fruit: 0 }));
-      c.n++;
-      c.x += x;
-      c.y += y;
-      c.z += z;
-      c.s += s;
-      [c.x0, c.x1, c.z0, c.z1] = [Math.min(c.x0, x), Math.max(c.x1, x), Math.min(c.z0, z), Math.max(c.z1, z)];
-      if (kind === 'model.pine' || kind === 'model.spruce') c.cone++;
-      else if (kind === 'model.tree.birch') c.birch++;
-      else if (kind === 'model.tree.fruit') c.fruit++;
-    }
-    let i = 0;
-    for (const c of cells.values()) {
-      const [x, y, z, s] = [c.x / c.n, c.y / c.n, c.z / c.n, c.s / c.n];
-      const cone = c.cone * 2 > c.n;
-      // As wide as its trees spread and a crown more; as tall as a tree of their size (a conifer taller, slimmer).
-      const h = (cone ? 10.5 : 8.5) * s;
-      const rx = Math.min(CROWN_CELL * 0.75, (c.x1 - c.x0) / 2 + (cone ? 1.8 : 2.6) * s);
-      const rz = Math.min(CROWN_CELL * 0.75, (c.z1 - c.z0) / 2 + (cone ? 1.8 : 2.6) * s);
-      const yaw = ((i++ * 2.399) % (Math.PI * 2));
-      const [cs, sn] = [Math.cos(yaw), Math.sin(yaw)];
-      const m = new Float32Array(16);
-      m[0] = cs * rx;
-      m[2] = -sn * rx;
-      m[5] = h;
-      m[8] = sn * rz;
-      m[10] = cs * rz;
-      m[12] = x;
-      m[13] = y;
-      m[14] = z;
-      m[15] = 1;
-      const base = cone ? CROWN.needle : c.birch * 2 > c.n ? CROWN.birch : c.fruit * 2 > c.n ? CROWN.fruit : CROWN.leaf;
-      const v = parseInt(base.slice(1), 16);
-      const k = 0.9 + ((i * 0.6180339) % 1) * 0.2;
-      const color: Crown['color'] = [Math.min(1, (((v >> 16) & 255) / 255) * k), Math.min(1, (((v >> 8) & 255) / 255) * k), Math.min(1, ((v & 255) / 255) * k), 1];
-      const key = sector(x, z);
-      let list = this.byKey.get(key);
-      if (!list) this.byKey.set(key, (list = []));
-      list.push({ key, cone, m, color });
-    }
-  }
-
-  /** Crowns in total (for the report). */
-  get count(): number {
-    let n = 0;
-    for (const l of this.byKey.values()) n += l.length;
-    return n;
-  }
-
-  private made(): [Instances, Instances] {
-    if (this.draws) return this.draws;
-    const { app, parent } = this;
-    const lib = MaterialLibrary.for(app);
-    const material = lib.veilSinking(lib.instanceColored(lib.plainFinish()));
-    return (this.draws = [false, true].map((cone) => {
-      const mesh = meshFrom(app.graphicsDevice, crownMesh(cone).meshData({ colors: true }))!;
-      mesh.incRefCount();
-      this.meshes.push(mesh);
-      const d = new Instances(app.graphicsDevice, parent, mesh, material, { name: cone ? 'farCrowns.cone' : 'farCrowns.dome', streams: [INSTANCE_COLOR], castShadows: false, receiveShadows: true, capacity: 1024 });
-      lib.excludeFromLights([], [d.meshInstance]);
-      d.enabled = false;
-      return d;
-    }) as [Instances, Instances]);
-  }
-
-  /** Shows the crowns of the squares `far` says (none: hidden), written again only when that set changes. */
-  show(far: ((key: string) => boolean) | null): void {
-    const keys = far ? [...this.byKey.keys()].filter(far).sort() : [];
-    const sig = keys.join('|');
-    if (sig === this.shownKeys) return;
-    this.shownKeys = sig;
-    const [dome, cone] = this.made();
-    const lists = keys.map((k) => this.byKey.get(k)!);
-    let nd = 0;
-    let nc = 0;
-    for (const l of lists) for (const c of l) c.cone ? nc++ : nd++;
-    dome.setCount(nd);
-    cone.setCount(nc);
-    let [id, ic] = [0, 0];
-    for (const l of lists) {
-      for (const c of l) {
-        const d = c.cone ? cone : dome;
-        const i = c.cone ? ic++ : id++;
-        d.setMatrix(i, c.m);
-        d.set(INSTANCE_COLOR, i, c.color);
-      }
-    }
-    for (const d of [dome, cone]) {
-      d.update();
-      d.enabled = d.count > 0;
-    }
-  }
-
-  destroy(): void {
-    for (const d of this.draws ?? []) d.destroy();
-    for (const mesh of this.meshes) {
-      mesh.decRefCount();
-      if (mesh.refCount === 0) mesh.destroy();
-    }
   }
 }
