@@ -949,6 +949,8 @@ pub enum EventKind {
     /// `a` brought their guest `b` something to eat or drink (`n`: the item, an index into
     /// `Content::items`; `hosting.rs`).
     Served,
+    /// `a` fetched the post and had a letter from their friend `b` (`post.rs`).
+    GotLetter,
 }
 
 impl EventKind {
@@ -964,7 +966,7 @@ impl EventKind {
             | Bought | DeniedAgain | StayedHome | NoBed | NotClosed | PlayedAlone | NoPartner
             | SetUp | SetUpForThem | SentBack => 1,
             Met | MissedWork | SkillUp | PaidRent | Upgraded | Visited | GoalSuggested
-            | Repaired | NobodyHome | Invited | Declined | Babysitter | Served => 0,
+            | Repaired | NobodyHome | Invited | Declined | Babysitter | Served | GotLetter => 0,
         }
     }
 }

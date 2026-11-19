@@ -440,6 +440,7 @@ fn household_for(w: &mut World, plot: u32, name: &str) -> usize {
         expecting: None,
         sitter_day: None,
         laundry: crate::world::LAUNDRY_START,
+        letters: Vec::new(),
     });
     id as usize
 }

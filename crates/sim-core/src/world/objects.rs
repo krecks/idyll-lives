@@ -512,12 +512,17 @@ pub(crate) fn arrive(
                 sim.pose = Pose::Stand;
             } else {
                 // Onto the seat or bed, or into the shower, facing the way it faces (or its
-                // slot's place does); they step back off where they came from (see `end_activity`).
+                // slot's place does, as the place says: standing beside a massage table); they
+                // step back off where they came from (see `end_activity`).
                 let slot = obj.slot_of(sim.id).unwrap_or(0);
                 sim.seated_from = Some((sim.pos[0].floor() as i32, sim.pos[1].floor() as i32));
                 sim.pos = obj.slot_position(content, slot);
                 sim.yaw = obj.slot_yaw(content, slot);
-                sim.pose = inter.pose;
+                sim.pose = content.objects[obj.def]
+                    .places
+                    .get(slot)
+                    .and_then(|p| p.pose)
+                    .unwrap_or(inter.pose);
             }
             act.phase = Phase::Using { elapsed: 0.0 };
             // Opened or closed as the use starts (a wall bed folds down as they lie down); what

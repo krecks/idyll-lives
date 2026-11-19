@@ -205,6 +205,19 @@ pub struct Interaction {
     /// end grows it this share of its way from planted to ripe at once (less for one cut
     /// short), while it grows.
     pub tends: f32,
+    /// Waters the garden (content `waters`, on an object outdoors: a hose reel): a use done to
+    /// the end brings every growing crop on its plot this share of its way to ripe at once (less
+    /// for one cut short), as `tends` brings on the one it's done at (`post::water_garden`).
+    pub waters: f32,
+    /// Fetching the post (content `post`, at a letterbox, with `"when": "open"` and
+    /// `"leaves": "closed"`): the post came this morning (`post::deliver`), and as the use ends
+    /// it's read: a letter from a friend gives a little social and the story names them
+    /// (`post::read`).
+    pub post: bool,
+    /// Writing a letter (content `letter`: at a writing desk): a use done to the end sends it to
+    /// the writer's closest friend outside the household, whose letterbox has it next morning
+    /// (`post::send`; nobody's, without one).
+    pub letter: bool,
     /// A harvest's produce (content `yields`): food carried in to the home's fridge and put away
     /// (with no fridge, eaten sitting down as `eats`); see `Yield`.
     pub yields: Option<Yield>,
@@ -665,6 +678,9 @@ pub(crate) fn stage_mask(
 pub struct SlotPlace {
     pub at: [f32; 2],
     pub facing: f32,
+    /// How the one there is, whatever the use's `pose` (content `pose`): the one giving a
+    /// massage stands beside the table the other lies on. None: as the use says.
+    pub pose: Option<Pose>,
 }
 
 /// Which seats a `seatNear` use takes (content `seatFacing`): one that looks at the thing from
@@ -2845,6 +2861,8 @@ struct PlaceRaw {
     at: [f32; 2],
     #[serde(default)]
     facing: f32,
+    #[serde(default)]
+    pose: Option<Pose>,
 }
 
 /// An object's `grows`: `{"days": 2, "fallow": 0.5}` (game days to ripen, and fallow after picking).
@@ -2988,6 +3006,15 @@ struct InteractionRaw {
     /// Brings the crop on (see `Interaction::tends`).
     #[serde(default)]
     tends: f32,
+    /// Waters every crop on the plot (see `Interaction::waters`).
+    #[serde(default)]
+    waters: f32,
+    /// Fetching the post (see `Interaction::post`).
+    #[serde(default)]
+    post: bool,
+    /// Writing a letter to a friend (see `Interaction::letter`).
+    #[serde(default)]
+    letter: bool,
     /// A harvest's produce, put in the fridge (see `Interaction::yields`).
     #[serde(default)]
     yields: Option<YieldRaw>,
@@ -3605,6 +3632,18 @@ impl Content {
                         "{ctx}: `tends` brings a crop on: the object needs `grows`"
                     )));
                 }
+                if !(0.0..=1.0).contains(&it.waters) || (it.waters > 0.0 && !obj.outdoors) {
+                    return Err(Error::new(format!(
+                        "{ctx}: `waters` (0..=1) waters the garden: the object stands `outdoors`"
+                    )));
+                }
+                if it.post
+                    && (it.when != Some(OpenState::Open) || it.leaves != Some(OpenState::Closed))
+                {
+                    return Err(Error::new(format!(
+                        "{ctx}: `post` is fetched while the post is in: \"when\": \"open\", \"leaves\": \"closed\""
+                    )));
+                }
                 if it.carried
                     && (it.care.values().all(|&g| g <= 0.0)
                         || !obj.interactions.iter().any(|i| i.baby))
@@ -3744,6 +3783,9 @@ impl Content {
                     lasts: it.lasts,
                     spare: it.spare,
                     tends: it.tends,
+                    waters: it.waters,
+                    post: it.post,
+                    letter: it.letter,
                     yields,
                     carried: it.carried,
                     at_slot: it.at_slot,
@@ -4199,7 +4241,7 @@ impl Content {
                 interactions,
                 price: obj.price,
                 slots: obj.slots,
-                places: obj.places.iter().map(|p| SlotPlace { at: p.at, facing: p.facing.to_radians() }).collect(),
+                places: obj.places.iter().map(|p| SlotPlace { at: p.at, facing: p.facing.to_radians(), pose: p.pose }).collect(),
                 outdoors: obj.outdoors,
                 crown: obj.crown.max(0.0),
                 private: obj.private,

@@ -144,6 +144,8 @@
 //! Left out where it has none, so a file without them (every file before it) has its places open
 //! at any hour, as before. A town holds up to 128 servers (`staff::MAX_STAFF`, 48 before); nothing
 //! of them is saved.
+//! Still 40: a household may have letters on their way to its letterbox (`households[].letters`, by
+//! who wrote them, `post.rs`). Left out where there are none, so a file without them has none.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -808,6 +810,10 @@ pub struct HouseholdSave {
     /// the dried).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub laundry: Option<Vec<f32>>,
+    /// Letters on their way to the household's letterbox, by who wrote them (see
+    /// `Household::letters`; absent: none).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub letters: Vec<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1069,6 +1075,7 @@ impl World {
                         )
                         .to_vec(),
                     ),
+                    letters: h.letters.clone(),
                 })
                 .collect(),
             plots: self
@@ -1300,6 +1307,7 @@ impl World {
                 expecting: None,
                 sitter_day: None,
                 laundry: crate::world::LAUNDRY_START,
+                letters: Vec::new(),
             }]
         } else {
             save.households
@@ -1326,6 +1334,7 @@ impl World {
                             finite(l.get(k).copied().unwrap_or(0.0), 0.0).max(0.0)
                         })
                     }),
+                    letters: h.letters.clone(),
                 })
                 .collect()
         };

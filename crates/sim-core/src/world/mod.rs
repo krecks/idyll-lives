@@ -1214,6 +1214,8 @@ pub struct Sim {
     /// An object they broke or repaired, or an accident they had, this tick (applied after
     /// the step).
     pub(crate) news: Option<News>,
+    /// The post read or a letter written this tick (`post::after_step`). Not saved.
+    pub(crate) mail: Option<crate::post::Mail>,
     /// Finished putting together something new this tick (an object type; `setup.rs` places it
     /// after the step). Not saved.
     pub(crate) set_up: Option<u32>,
@@ -1816,6 +1818,9 @@ pub struct Household {
     /// Loads of washing waiting: dirty (piling up as content `laundry` says), washed, to dry,
     /// and dried, to fold (`content::WorkOn::load`).
     pub laundry: [f32; 3],
+    /// Letters on their way to the household's letterbox, by who wrote them, the oldest first
+    /// (`post::send`): read as the post is fetched (`post::read`).
+    pub letters: Vec<u32>,
 }
 
 /// Loads of washing a new household has waiting, dirty and washed (one of each: there's always
@@ -2409,6 +2414,7 @@ impl World {
                 expecting: None,
                 sitter_day: None,
                 laundry: LAUNDRY_START,
+                letters: Vec::new(),
             }]
         } else {
             lot_file
@@ -2426,6 +2432,7 @@ impl World {
                     expecting: None,
                     sitter_day: None,
                     laundry: LAUNDRY_START,
+                    letters: Vec::new(),
                 })
                 .collect()
         };
@@ -3530,6 +3537,7 @@ impl World {
             to_bed: None,
             kept_out: 0,
             news: None,
+            mail: None,
             set_up: None,
             accident_at: [0; crate::content::MAX_ACCIDENTS],
             empty_since: [0; crate::content::MAX_ACCIDENTS],
@@ -3580,6 +3588,10 @@ impl World {
             household,
         });
         let k = (self.former.len() - 1) as u32;
+        // (Letters of theirs still on the way are lost in the post.)
+        for h in &mut self.households {
+            h.letters.retain(|&w| w != slot as u32);
+        }
         self.events.rewrite_refs(|r| {
             if *r == slot as u32 {
                 *r = FORMER | k;
@@ -5094,6 +5106,7 @@ impl World {
         crate::profile::phase("apply_messes", || self.apply_messes());
         crate::profile::phase("carry::after_step", || crate::carry::after_step(self));
         crate::profile::phase("setup::update", || crate::setup::update(self));
+        crate::profile::phase("post::after_step", || crate::post::after_step(self));
         crate::profile::phase("wake_for_crying_babies", || self.wake_for_crying_babies());
         crate::profile::phase("conversation::update", || conversation::update(self));
         crate::profile::phase("privacy::after_step", || crate::privacy::after_step(self));
