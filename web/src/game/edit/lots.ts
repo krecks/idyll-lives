@@ -15,13 +15,14 @@
  *
  * The generator's own pieces are used as it uses them: the corner and bend limits (`macro.ts`), the
  * driveway test (`town.ts` `drivesOut`), the named places' lots and every public lot's place
- * (`placeLots.ts`: `placeUnit`, `lotName`, `slotPlace`), the civic places (`backdrop.ts` `CIVIC` and
+ * (`placeLots.ts`: `placeUnit`, `lotName`, `slotPlace`), the civic places (`places.ts` `CIVIC` and
  * the names it draws: `namerFor`).
  */
 
 import type { Content } from '../../content/content';
 import type { RoadPlan, TownPlace } from '../../core/protocol';
 import { byNeed, CIVIC, civicLabel, civicOf, civicTooBig, draftAreaSize, hoursFor, namerFor } from '../places';
+import { flatsTemplate } from '../flats';
 import { weighted, type GardenSize } from '../housegen';
 import { heightAt } from '../land';
 import { BEND, BEND_MOST, CORNER, placeReaches, TIGHT_BEND, TRAIL_WIDTH } from '../macro';
@@ -72,7 +73,7 @@ export interface LotFit extends Rect {
 }
 
 /** An edit that cleared nothing out of its way. */
-const NOTHING: { lots: number[]; backdrop: number[] } = { lots: [], backdrop: [] };
+const NOTHING: { lots: number[] } = { lots: [] };
 
 // ---- identity -----------------------------------------------------------------------------------
 
@@ -573,12 +574,12 @@ export function swapPlace(draft: NeighbourhoodDraft, t: Templates, content: Cont
   return { draft: withLotPlace(next, t, content, slot), cleared: NOTHING };
 }
 
-// ---- civic places (`backdrop.ts` `CIVIC`) ---------------------------------------------------------
+// ---- civic places (`places.ts` `CIVIC`) -----------------------------------------------------------
 
 /**
- * The civic places (`backdrop.ts` `CIVIC`), as step 2's cards know them: their indices are `CIVIC`'s.
- * (Passed on as it is, not read here as this module loads: `backdrop.ts` reaches this module again
- * through `ground.ts`, `macro.ts` and `landFollow.ts`, and may not have made `CIVIC` yet.)
+ * The civic places (`places.ts` `CIVIC`), as step 2's cards know them: their indices are `CIVIC`'s.
+ * (Passed on as it is, not read here as this module loads: `places.ts` reaches this module again
+ * through `placeLots.ts` and `macro.ts`, and may not have made `CIVIC` yet.)
  */
 export { CIVIC as CIVIC_PLACES } from '../places';
 
@@ -661,7 +662,7 @@ export function swapCivic(draft: NeighbourhoodDraft, t: Templates, content: Cont
     const s: PlotSlot = { ...placer.put(u, { x: fit.x, z: fit.z, facing: fit.facing, anchor: fit.anchor }, fit.f), index: without.slots.length };
     next = { ...without, slots: [...without.slots, s] };
     at = s.index;
-    cleared = { lots: [slot], backdrop: [] };
+    cleared = { lots: [slot] };
   }
   next = withLotPlace(withPlaceName(next, content, at, rand), t, content, at);
   if (extra.length && next.open?.places) {
@@ -695,48 +696,54 @@ export function renumber(draft: NeighbourhoodDraft, t: Templates, roads: readonl
   return { ...draft, slots: draft.slots.map((s, i) => (named.has(i) && named.get(i) !== s.name ? { ...s, name: named.get(i)! } : s)) };
 }
 
-/** Why the lots on `lots` (slot indices) may not all go from `draft`, or null: the town keeps its last home and its last park. */
+/** How many homes lot `s` holds: a house's one (a farm's among them), a flats building's flats, the flats over a named place; none on another lot. */
+export function homesOn(t: Templates, s: Pick<PlotSlot, 'kind' | 'template' | 'upper'>): number {
+  if (s.kind === 'house') return 1;
+  const id = s.kind === 'flats' ? s.template : s.kind === 'shop' && s.upper?.startsWith('over:') ? s.upper : undefined;
+  return id ? (flatsTemplate(t, id)?.units.length ?? 0) : 0;
+}
+
+/** Whether lot `s` is somebody's home, or holds homes: a house's, a flats building's, a named place's with flats over it. */
+const holdsHomes = (s: Pick<PlotSlot, 'kind' | 'upper'>) => s.kind === 'house' || s.kind === 'flats' || (s.kind === 'shop' && !!s.upper?.startsWith('over:'));
+
+/** Why the lots on `lots` (slot indices) may not all go from `draft`, or null: the town keeps its last home (a house or a building of flats) and its last park. */
 export function removalRefused(draft: NeighbourhoodDraft, lots: ReadonlySet<number>): string | null {
   const left = draft.slots.filter((s) => !lots.has(s.index));
-  if (!left.some((s) => s.kind === 'house') && draft.slots.some((s) => s.kind === 'house')) return 'The town keeps its last home.';
+  if (!left.some(holdsHomes) && draft.slots.some(holdsHomes)) return 'The town keeps its last home.';
   if (!left.some(isPark) && draft.slots.some(isPark)) return 'The town keeps its last park.';
   return null;
 }
 
 /** `removeLots` as an edit: refused if it would take the town's last home or last park (`removalRefused`). */
-export function removeLotsEdit(draft: NeighbourhoodDraft, lots: ReadonlySet<number>, backdrop: ReadonlySet<number> = new Set()): Edited {
+export function removeLotsEdit(draft: NeighbourhoodDraft, lots: ReadonlySet<number>): Edited {
   const why = removalRefused(draft, lots);
   if (why) return { refused: why };
-  return { draft: removeLots(draft, lots, backdrop), cleared: { lots: [...lots].sort((a, b) => a - b), backdrop: [...backdrop].sort((a, b) => a - b) } };
+  return { draft: removeLots(draft, lots), cleared: { lots: [...lots].sort((a, b) => a - b) } };
 }
 
 /**
- * `draft` without the lots on `lots` (slot indices) and the backdrop buildings `backdrop` (their
- * indices in `open.backdrop`): the slots left numbered again from 0, and the households, pads,
- * places and backdrop buildings that name them with them; a household goes with its lot, a place
- * with its lot or its building. No refusal here (the slope limits' last resort uses it too:
- * `landFollow.ts` `settleLand`); the town edits use `removeLotsEdit`.
+ * `draft` without the lots on `lots` (slot indices): the slots left numbered again from 0, and the
+ * households, the shells, the pads, the places and the car parks that name them with them. A household
+ * goes with its lot (one in a flat with its building, or with the place its flat is over), and so does a
+ * shell and a place; a car park by a big place that goes stays, serving none. No refusal here (the slope limits' last resort uses it too: `landFollow.ts` `settleLand`); the
+ * town edits use `removeLotsEdit`.
  */
-export function removeLots(draft: NeighbourhoodDraft, lots: ReadonlySet<number>, backdrop: ReadonlySet<number> = new Set()): NeighbourhoodDraft {
+export function removeLots(draft: NeighbourhoodDraft, lots: ReadonlySet<number>): NeighbourhoodDraft {
   const open = draft.open;
   const kept = draft.slots.filter((s) => !lots.has(s.index));
   const renumber = new Map(kept.map((s, i) => [s.index, i]));
   const slots = kept.map((s, i) => ({ ...s, index: i }));
   const households = draft.households.filter((h) => renumber.has(h.slot)).map((h) => (h.slot === renumber.get(h.slot) ? h : { ...h, slot: renumber.get(h.slot)! }));
-  if (!open) return { ...draft, slots, households };
+  const shells = draft.shells?.filter((h) => renumber.has(h.slot)).map((h) => (h.slot === renumber.get(h.slot) ? h : { ...h, slot: renumber.get(h.slot)! }));
+  const homes = { ...draft, slots, households, ...(shells ? { shells } : {}) };
+  if (!open) return homes;
   const pads: Record<number, number> = {};
   for (const [k, v] of Object.entries(open.pads)) if (renumber.has(Number(k))) pads[renumber.get(Number(k))!] = v;
-  const places = open.places ?? [];
-  const placeGone = new Set<number>();
-  places.forEach((q, i) => {
-    if (q.plot !== undefined && !renumber.has(q.plot)) placeGone.add(i);
+  const places = open.places?.filter((q) => q.plot === undefined || renumber.has(q.plot)).map((q) => (q.plot === undefined ? q : { ...q, plot: renumber.get(q.plot)! }));
+  const carParks = open.carParks?.map((p) => {
+    if (p.serves === undefined || p.serves === renumber.get(p.serves)) return p;
+    const { serves, ...rest } = p;
+    return renumber.has(serves) ? { ...rest, serves: renumber.get(serves)! } : rest;
   });
-  (open.backdrop ?? []).forEach((b, i) => {
-    if (backdrop.has(i) && b.place !== undefined) placeGone.add(b.place);
-  });
-  const placeNumber = new Map<number, number>();
-  places.forEach((_, i) => !placeGone.has(i) && placeNumber.set(i, placeNumber.size));
-  const keptPlaces = places.filter((_, i) => !placeGone.has(i)).map((q) => (q.plot === undefined ? q : { ...q, plot: renumber.get(q.plot)! }));
-  const keptBackdrop = (open.backdrop ?? []).filter((_, i) => !backdrop.has(i)).map((b) => (b.place === undefined ? b : { ...b, place: placeNumber.get(b.place)! }));
-  return { ...draft, slots, households, open: { ...open, pads, ...(open.places ? { places: keptPlaces } : {}), ...(open.backdrop ? { backdrop: keptBackdrop } : {}) } };
+  return { ...homes, open: { ...open, pads, ...(places ? { places } : {}), ...(carParks ? { carParks } : {}) } };
 }

@@ -82,7 +82,6 @@ function town(river = 30): NeighbourhoodDraft {
       pads: {},
       parking: [{ x: LANE_X + 7, z: 120, yaw: 0, area: 0 }],
       places: [],
-      backdrop: [],
     },
   };
 }
@@ -534,7 +533,7 @@ describe('removing a road', () => {
     if ('refused' in goes) throw new Error(goes.refused);
     expect(goes.roads).toEqual([bridge, far].sort((a, b) => a - b));
     expect(goes.bridges).toEqual([bridge]);
-    expect(whatGoesLine(drawn, goes, far)).toEqual([`1 bridge left leading nowhere (${drawn.roads[bridge].name})`]);
+    expect(whatGoesLine(drawn, t, goes, far)).toEqual([`1 bridge left leading nowhere (${drawn.roads[bridge].name})`]);
     const after = made(removeRoad(drawn, t, far)).draft;
     expect(after.roads.some((r) => r.bridge)).toBe(false);
     expect(after.roads).toHaveLength(5);
@@ -579,7 +578,7 @@ describe('removing a road', () => {
 
   test('its parking goes; a road joined to it ends there in a dead end; the water under a bridge is water again', () => {
     const goes = whatGoes(town(), t, 1);
-    expect(goes).toEqual({ roads: [1], bridges: [], streets: [], lots: [], backdrop: [], parking: [0] });
+    expect(goes).toEqual({ roads: [1], bridges: [], streets: [], lots: [], parking: [0] });
     const { draft } = made(removeRoad(town(), t, 1));
     expect(draft.roads.length).toBe(3);
     expect(draft.open!.parking).toEqual([]);

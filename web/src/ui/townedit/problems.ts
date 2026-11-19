@@ -6,16 +6,17 @@
  * Those checks read a town file (`CheckedTown`, what `assembleTown` writes), and assembling one
  * means furnishing every house: far too slow after every edit. `checkedTown` writes the part of a
  * town file the checks read straight from the draft, as `assembleTown` would write it (the lots'
- * rectangles, kinds and facings, the roads, the ways out, the water, the parking, the zones, the
- * backdrop, the places and the centre), with nobody living there yet.
+ * rectangles, kinds and facings, the roads, the ways out, the water, the parking and its car parks,
+ * the zones, the places and the centre), with nobody living there yet.
  *
  * `townIssues` sorts what the checks find into what blocks the way on to step 3 and what only warns,
  * in the player's words. Blocking: what would leave the sim a town it can't run well, as the plan
- * has it: the roads not one network or no way out, a lot off its road or on a road or the water, a
- * road over water with no deck, a country road's dead end past a court's length, a village with no
- * road (said "No road to Ashby"), fewer than two homes. The rest only warns (a career with nowhere to work, a village of few lots, a road with a
- * hairpin, a country road that comes to a dead end out in the country, as one that led to a village moved away may). The checks of how the generator fills a town (how many backdrop buildings an area
- * keeps, the centre the densest) are left out: they hold for generated towns, not edited ones.
+ * has it: the roads not one network or no way out, a lot off its road, with no way to one, or on a
+ * road or the water, a car park on a lot, a road or the water, a road over water with no deck, a country road's dead end past a court's length, a village with no
+ * road (said "No road to Ashby"), fewer than two homes (houses and flats). The rest only warns (a career with nowhere to work, a village of few lots, a road with a
+ * hairpin, a country road that comes to a dead end out in the country, as one that led to a village moved away may, a parking bay
+ * off its car park). The checks of how the generator fills a town (the centre the densest) are left out: they hold for generated
+ * towns, not edited ones.
  */
 
 import type { Content } from '../../content/content';
@@ -23,6 +24,7 @@ import type { RoadPlan } from '../../core/protocol';
 import { pointAt, lengths } from '../../game/roads';
 import { areasFor } from '../../game/build';
 import { checkedTown } from '../../game/edit/checked';
+import { homesOn } from '../../game/edit/lots';
 import { townProblems } from '../../game/townCheck';
 import { plotRect, type NeighbourhoodDraft, type Templates } from '../../game/town';
 
@@ -64,6 +66,8 @@ const BLOCKING: readonly RegExp[] = [
   /^plots \d+ and \d+ overlap$/,
   /^plot \d+ on a road$/,
   /^plot \d+ [\d.]+ m from its road$/,
+  /^plot \d+ \(\w+\) has no way to a road$/,
+  /^car park \d+ is on (plot \d+|a road|the water)$/,
   /^trail .* runs through plot \d+$/,
   /^two roads called /,
   /^road \d+ .* has no name$/,
@@ -87,7 +91,7 @@ function longCountryCourt(line: string, draft: NeighbourhoodDraft): boolean {
 const LAYOUT_LATER: readonly RegExp[] = [/^hamlet .* has \d+ lots$/];
 
 /** The checks of how the generator fills a town, which an edited town needn't keep (see the top of this file). */
-const GENERATED_ONLY: readonly RegExp[] = [/ has \d+ backdrop buildings \(\d+ or more\)$/, /^the centre's open land is /, /^the main town has no centre$/];
+const GENERATED_ONLY: readonly RegExp[] = [/^the centre's open land is /, /^the main town has no centre$/];
 
 /** The middle of a road (m). */
 function middleOf(r: RoadPlan): { x: number; z: number } {
@@ -102,7 +106,18 @@ export function issueOf(line: string, draft: NeighbourhoodDraft, t: Templates): 
   const lotName = (i: number) => slots[i]?.name ?? `a lot`;
   let lot: number | undefined;
   let at: { x: number; z: number } | undefined;
+  let parkAt: { x: number; z: number } | undefined;
+  const open = draft.open;
   let text = line
+    // (A car park or a bay by where it is: the town file numbers them, the player sees them.)
+    .replace(/\b(car park|parking bay) (\d+)\b/, (_, what: string, i: string) => {
+      const p = what === 'car park' ? open?.carParks?.[Number(i)] : undefined;
+      const b = what === 'parking bay' ? open?.parking[Number(i)] : undefined;
+      if (p?.poly.length) parkAt = { x: p.poly.reduce((s, q) => s + q[0], 0) / p.poly.length, z: p.poly.reduce((s, q) => s + q[1], 0) / p.poly.length };
+      else if (b) parkAt = { x: b.x, z: b.z };
+      return `a ${what}`;
+    })
+    .replace(/ \(\w+\) has no way to a road$/, ' has no way to a road')
     .replace(/\bplots (\d+) and (\d+)\b/, (_, a: string, b: string) => {
       lot = Number(a);
       return `${lotName(Number(a))} and ${lotName(Number(b))}`;
@@ -119,6 +134,7 @@ export function issueOf(line: string, draft: NeighbourhoodDraft, t: Templates): 
     const r = plotRect(t, slots[lot]);
     at = { x: r.x + r.w / 2, z: r.z + r.d / 2 };
   }
+  if (parkAt) at = parkAt;
   // (Else a road or an area it names.)
   if (!at) {
     const road = draft.roads.find((r) => r.name && text.includes(r.name));
@@ -148,7 +164,7 @@ export function townIssues(plan: NeighbourhoodDraft, t: Templates, content: Cont
   // (Only the main town's careers are expected, in a town or a city; nothing about how filled it is.)
   const expect = { built: 0, empty: null, meadow: false, quarters: 0, homes: 0, careers: !layout && (size === 'town' || size === 'city'), exits: null };
   const found = townProblems(checkedTown(draft, t), expect, { river: false, careers, generated: false });
-  const homes = draft.slots.filter((s) => s.kind === 'house').length;
+  const homes = draft.slots.reduce((n, s) => n + homesOn(t, s), 0);
   const lines = [...found.hard];
   if (homes < 2 && !layout) lines.push(`fewer than two homes (${homes})`);
   const had = new Set(base?.blocking.map((i) => i.text) ?? []);

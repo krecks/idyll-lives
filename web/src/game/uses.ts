@@ -1,7 +1,7 @@
 /**
  * What the land is to be used for, as the player paints it in step 2 (the UI calls these "zones";
- * in code they are uses, since `WorldZone`, the backdrop's zones and `render/shared/zones.ts` have
- * the word already). A grid of `USE_CELL` m cells over the world from its corner, row-major, each
+ * in code they are uses, since `WorldZone`, the places' zones (`places.ts` `ZONE`) and
+ * `render/shared/zones.ts` have the word already). A grid of `USE_CELL` m cells over the world from its corner, row-major, each
  * holding one use's code (0: none), kept run-length as `[count, code, count, code, …]`.
  *
  * The layer rides on the draft as `OpenWorldDraft.uses` while the new game is set up. It never goes
@@ -151,7 +151,7 @@ export function usesHash(layer: UseLayer | null | undefined): string {
 /**
  * A fingerprint of a town's layout (the plan step 2 edits): its size, its roads, its areas and the main
  * town's centre, and its uses. What Build makes the town from, so a layout whose hash is the proposal's
- * builds the proposal's town as it is. Lots, backdrop, places and parking don't count.
+ * builds the proposal's town as it is. Lots, places and parking don't count.
  */
 export function layoutHash(plan: NeighbourhoodDraft): string {
   const open = plan.open;

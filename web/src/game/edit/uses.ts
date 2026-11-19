@@ -193,7 +193,7 @@ export function paintUses(draft: NeighbourhoodDraft, stamps: readonly UseStamp[]
     if (ci >= 0 && cj >= 0 && ci < cols && cj < rows) paint(cj * cols + ci);
   });
   if (!changed) return { refused: kind ? 'There is nothing there to zone: zones go on the land beside the streets.' : 'There is no zone there to erase.' };
-  return { draft: { ...draft, open: { ...open, uses: packUses(cells, cols, rows) } }, cleared: { lots: [], backdrop: [] }, needsSettle: false };
+  return { draft: { ...draft, open: { ...open, uses: packUses(cells, cols, rows) } }, cleared: { lots: [] }, needsSettle: false };
 }
 
 /** Whether an edit's town must be settled on its land again: every edit's but a stroke of the zone brush (`paintUses`). */

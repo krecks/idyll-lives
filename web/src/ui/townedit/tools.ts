@@ -48,7 +48,7 @@ export interface TownEditor {
   seed(): number;
   /** The point on the ground under a screen point (CSS pixels, as the stage gives them), if the town is there. */
   ground(x: number, y: number): { x: number; z: number } | null;
-  /** What is under a screen point on the plan, of what `what` allows (all: a lot, a building, a road, a village or the main town). */
+  /** What is under a screen point on the plan, of what `what` allows (all: a lot, a road, a village or the main town). */
   pick(x: number, y: number, what?: PickWhat): Picked | null;
   /** What is picked (its card shows), and picking something (null: nothing). */
   readonly selected: Picked | null;

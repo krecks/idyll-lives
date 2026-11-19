@@ -1,6 +1,7 @@
 /**
- * The Remove tool: a click on a lot, a backdrop building or a street removes it; a street takes
- * with it what stands on it and the roads it leaves joined to nothing (`streets.ts` `whatGoes`).
+ * The Remove tool: a click on a lot or a street removes it (a building of flats with its flats, a
+ * place with the flats over it); a street takes with it what stands on it and the roads it leaves
+ * joined to nothing (`streets.ts` `whatGoes`).
  * As the pointer goes over one, what would go is greyed on the town and said under the tools; what
  * may not go (the town's last home, its last park, a street the roads need) is red, with why.
  */
@@ -9,10 +10,10 @@ import { removalRefused, removeLotsEdit } from '../../game/edit/lots';
 import { removeRoad, whatGoes } from '../../game/edit/streets';
 import type { NeighbourhoodDraft } from '../../game/town';
 import type { TownGhosts } from '../../render/types';
-import { buildingBox, lotBox, roadGhost } from './ghosts';
+import { lotBox, roadGhost } from './ghosts';
 import type { Picked } from './pick';
 import type { TownEditor, TownTool } from './tools';
-import { listed, madeStreetsLine, sentence, whatGoesLine } from './words';
+import { flatsLine, listed, madeStreetsLine, sentence, whatGoesLine } from './words';
 
 /** What removing `p` would do: its ghosts, and a line saying it (or why it may not go: `refused`). */
 function removal(editor: TownEditor, p: Picked): { ghosts: Partial<TownGhosts>; line: string; refused: boolean } | null {
@@ -22,25 +23,20 @@ function removal(editor: TownEditor, p: Picked): { ghosts: Partial<TownGhosts>; 
     const s = draft.slots[p.slot];
     if (!s) return null;
     const why = removalRefused(draft, new Set([p.slot]));
-    return { ghosts: { lots: [{ ...lotBox(t, s), tone: why ? 'bad' : 'gone' }] }, line: why ?? `Removes ${s.name}.`, refused: !!why };
-  }
-  if (p.kind === 'building') {
-    const b = draft.open?.backdrop?.[p.building];
-    if (!b) return null;
-    const place = b.place === undefined ? undefined : draft.open?.places?.[b.place];
-    return { ghosts: { lots: [{ ...buildingBox(b), tone: 'gone' }] }, line: `Removes ${place ? place.name : 'this building'}.`, refused: false };
+    const flats = flatsLine(t, s);
+    return { ghosts: { lots: [{ ...lotBox(t, s), tone: why ? 'bad' : 'gone' }] }, line: why ?? `Removes ${s.name}${flats ? `, and with it ${flats}` : ''}.`, refused: !!why };
   }
   if (p.kind === 'road') {
     const r = draft.roads[p.road];
     if (!r) return null;
     const goes = goesOf(editor, p.road);
     if ('refused' in goes) return { ghosts: { roads: [roadGhost(r, 'bad')] }, line: sentence(goes.refused), refused: true };
-    const also = whatGoesLine(draft, goes, p.road);
+    const also = whatGoesLine(draft, t, goes, p.road);
     const streets = madeStreetsLine(draft, goes);
     return {
       ghosts: {
         roads: goes.roads.map((i) => roadGhost(draft.roads[i], 'bad')),
-        lots: [...goes.lots.map((i) => ({ ...lotBox(t, draft.slots[i]), tone: 'gone' as const })), ...goes.backdrop.map((i) => ({ ...buildingBox(draft.open!.backdrop![i]), tone: 'gone' as const }))],
+        lots: goes.lots.map((i) => ({ ...lotBox(t, draft.slots[i]), tone: 'gone' as const })),
       },
       line: `Removes ${r.name ?? 'this road'}${also.length ? `, and with it ${listed(also)}` : ''}.${streets ? ` ${streets}` : ''}`,
       refused: false,
@@ -59,13 +55,13 @@ function goesOf(editor: TownEditor, road: number): ReturnType<typeof whatGoes> {
   return goes;
 }
 
-const WHAT = { lots: true, buildings: true, roads: true };
+const WHAT = { lots: true, roads: true };
 
 export const removeTool: TownTool = {
   id: 'remove',
   label: 'Remove',
   icon: 'icon.ui.trash',
-  does: 'Click a lot, a building or a street to remove it (a street with what stands on it).',
+  does: 'Click a lot or a street to remove it (a street with what stands on it).',
   stage(editor: TownEditor) {
     /** What the pointer was last over, and where (looked at again after an edit). */
     let last: { x: number; y: number } | null = null;
@@ -82,7 +78,6 @@ export const removeTool: TownTool = {
         if (!p) return false;
         const draft = editor.draft;
         if (p.kind === 'lot') editor.apply(removeLotsEdit(draft, new Set([p.slot])));
-        else if (p.kind === 'building') editor.apply(removeLotsEdit(draft, new Set(), new Set([p.building])));
         else if (p.kind === 'road') editor.apply(removeRoad(draft, editor.t, p.road));
         look(x, y);
         return true;

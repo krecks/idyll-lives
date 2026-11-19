@@ -6,6 +6,7 @@
  */
 
 import type { Edited } from '../../game/edit/edited';
+import { withoutBays } from '../../game/edit/ground';
 import { removeLots } from '../../game/edit/lots';
 import { noUseCells, usesOfDraft } from '../../game/edit/uses';
 import { plotRect, type NeighbourhoodDraft, type PlotSlot, type Templates } from '../../game/town';
@@ -19,7 +20,7 @@ export { BUILD_REACH, hatched, usesSummary, type UsesSummary } from '../../game/
 export const BESIDE_STREETS = 40;
 
 /** Nothing cleared: a zones edit takes nothing out of the way. */
-const NOTHING = { lots: [] as number[], backdrop: [] as number[] };
+const NOTHING = { lots: [] as number[] };
 
 /** The layer a draft paints on: its own, else an empty one for its world. */
 export const layerOf = usesOfDraft;
@@ -69,13 +70,14 @@ export function summaryLine(s: UsesSummary): string {
 /** The use a lot of the generator's stands for (`proposal.ts` maps them the same way); null: none (a farm). */
 function useOfLot(s: PlotSlot): UseKind | null {
   if (s.kind === 'house') return s.lot === 'farm' ? null : s.lot === 'terrace' ? 'rows' : 'homes';
+  if (s.kind === 'flats') return 'rows';
   if (s.kind === 'shop') return 'shops';
   return 'green';
 }
 
 /**
  * The Village tool's village in step 2 (`placed`, a `placeVillage` on `before`): its streets kept, its
- * lots and buildings taken off and painted as the zones they stood for. A refusal as it was.
+ * lots and car parks taken off and the lots painted as the zones they stood for. A refusal as it was.
  */
 export function villageAsLayout(before: NeighbourhoodDraft, placed: Edited, t: Templates): Edited {
   if (!('draft' in placed) || !placed.draft.open) return placed;
@@ -83,7 +85,6 @@ export function villageAsLayout(before: NeighbourhoodDraft, placed: Edited, t: T
   const area = draft.open!.areas.length - 1;
   if (area <= 0 || area < (before.open?.areas.length ?? 0)) return placed;
   const lots = new Set(draft.slots.filter((s) => (s.area ?? 0) === area).map((s) => s.index));
-  const backdrop = new Set((draft.open!.backdrop ?? []).flatMap((b, i) => (b.area === area ? [i] : [])));
   const layer = layerOf(draft);
   const codes = unpackUses(layer).slice();
   const none = noUseCells(draft);
@@ -97,9 +98,9 @@ export function villageAsLayout(before: NeighbourhoodDraft, placed: Edited, t: T
       }
     }
   }
-  const bare = removeLots(draft, lots, backdrop);
+  const bare = removeLots(draft, lots);
   const open = bare.open!;
-  const zoned = { ...open, parking: open.parking.filter((p) => p.area !== area), uses: packUses(codes, layer.cols, layer.rows) };
+  const zoned = { ...open, ...withoutBays(open, open.parking.flatMap((p, i) => (p.area === area ? [i] : []))), uses: packUses(codes, layer.cols, layer.rows) };
   return { ...placed, draft: { ...bare, open: zoned } };
 }
 
@@ -114,22 +115,22 @@ export function clearZones(draft: NeighbourhoodDraft): Edited {
 
 /**
  * Clear all: bare land to lay out from scratch. The main town's area is kept (where its centre is to
- * be); every road goes, every village, lot, building, place, parking space and zone. The first street
+ * be); every road goes, every village, lot, place, car park and zone. The first street
  * is then drawn in from the edge of the world (the Street tool says so while the land is bare).
  */
 export function clearAll(draft: NeighbourhoodDraft): Edited {
   const open = draft.open;
   if (!open) return { refused: 'this town has no land to clear' };
   const lots = new Set(draft.slots.map((s) => s.index));
-  const bare = removeLots(draft, lots, new Set((open.backdrop ?? []).map((_, i) => i)));
+  const bare = removeLots(draft, lots);
   const areas = open.areas.slice(0, 1);
   const cleared: NeighbourhoodDraft = {
     ...bare,
     roads: [],
     greens: [],
-    open: { ...bare.open!, areas, parking: [], pads: {}, backdrop: [], places: [], centre: [], squares: [], uses: usesFor(draft) },
+    open: { ...bare.open!, areas, parking: [], carParks: [], pads: {}, places: [], centre: [], squares: [], uses: usesFor(draft) },
   };
-  return { draft: cleared, cleared: { lots: [...lots], backdrop: (open.backdrop ?? []).map((_, i) => i) } };
+  return { draft: cleared, cleared: { lots: [...lots] } };
 }
 
 /**

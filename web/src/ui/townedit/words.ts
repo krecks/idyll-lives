@@ -1,14 +1,16 @@
 /**
- * The town editor's words for what it shows: what a lot or building is, what a removal takes with
- * it (the street card lists it first; the Remove tool says it as the pointer goes over a street).
+ * The town editor's words for what it shows: what a lot is (a home, a building of flats, a place with
+ * flats over it...), what a removal takes with it (the street card lists it first; the Remove tool
+ * says it as the pointer goes over a street).
  */
 
 import { CIVIC, civicLabel, draftAreaSize } from '../../game/places';
 import { placeOfTemplate } from '../../game/placeLots';
+import { homesOn } from '../../game/edit/lots';
 import type { Goes } from '../../game/edit/streets';
-import type { NeighbourhoodDraft } from '../../game/town';
+import type { NeighbourhoodDraft, PlotSlot, Templates } from '../../game/town';
 
-/** What a named place's lot of another kind than a civic place is (`backdrop.ts` `ZONE`). */
+/** What a named place's lot of another kind than a civic place is (`places.ts` `ZONE`). */
 const ZONE_KIND: Record<string, string> = { shop: 'Shop', cafe: 'Café', restaurant: 'Restaurant', office: 'Offices', workshop: 'Workshop', farm: 'Farm shop' };
 
 /** A sentence from an edit's reason (they are written as clauses: "it bends tighter than 9 m"). */
@@ -25,29 +27,47 @@ export function listed(items: readonly string[]): string {
   return items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
-/** What a lot is, in a word or two: a home, a farm, a public place's or an outdoor spot's kind, a named place's (a civic place's called as one of its area's size in `draft`: a village's hall its village hall). */
+/**
+ * What a lot is, in a word or two: a home, a farm, a building of flats, a public place's or an outdoor spot's kind, a named
+ * place's (a civic place's called as one of its area's size in `draft`: a village's hall its village hall; with flats over
+ * it, said so).
+ */
 export function lotKind(s: NeighbourhoodDraft['slots'][number], draft?: NeighbourhoodDraft): string {
   const what = s.kind === 'shop' ? placeOfTemplate(s.template) : null;
-  if (what) return 'civic' in what ? civicLabel(CIVIC[what.civic], draft ? draftAreaSize(draft, s.area ?? 0) : 'town') : (ZONE_KIND[what.zone] ?? 'Shop');
-  if (s.kind === 'house') return s.lot === 'farm' ? 'Farm' : s.lot === 'terrace' ? 'Terraced home' : `${s.lot ? s.lot.charAt(0).toUpperCase() + s.lot.slice(1) : 'A'} home`;
+  if (what) {
+    const kind = 'civic' in what ? civicLabel(CIVIC[what.civic], draft ? draftAreaSize(draft, s.area ?? 0) : 'town') : (ZONE_KIND[what.zone] ?? 'Shop');
+    return s.upper?.startsWith('over:') ? `${kind}, flats over it` : kind;
+  }
+  if (s.kind === 'flats') return 'Flats';
+  if (s.kind === 'house') return s.lot === 'farm' ? 'Farm' : s.lot === 'terrace' ? 'Terraced home' : s.garden === 'tight' ? 'Town house' : `${s.lot ? s.lot.charAt(0).toUpperCase() + s.lot.slice(1) : 'A'} home`;
   if (s.kind === 'outdoor') return 'Outdoor spot';
   return s.kind === 'shop' ? 'Shop' : 'Public place';
 }
 
-/** What a removal takes besides the thing itself: other roads, bridges left leading nowhere, homes, other lots, buildings, parking (`streets.ts` `whatGoes`). */
-export function whatGoesLine(draft: NeighbourhoodDraft, goes: Pick<Goes, 'roads' | 'lots' | 'backdrop' | 'parking'> & Partial<Pick<Goes, 'bridges'>>, road: number): string[] {
+/** The flats lot `s` holds, in words ("its 6 flats", "the 2 flats over it"); null: none (a house, a place with nothing over it). */
+export function flatsLine(t: Templates, s: Pick<PlotSlot, 'kind' | 'template' | 'upper'>): string | null {
+  if (s.kind === 'house') return null;
+  const n = homesOn(t, s);
+  if (!n) return null;
+  return s.kind === 'flats' ? `its ${count(n, 'flat')}` : `the ${count(n, 'flat')} over it`;
+}
+
+/**
+ * What a removal takes besides the thing itself (`streets.ts` `whatGoes`): other roads, bridges left leading nowhere,
+ * homes (a house, each flat of a building of flats or over a place), other lots, parking spaces (their car parks whole).
+ */
+export function whatGoesLine(draft: NeighbourhoodDraft, t: Templates, goes: Pick<Goes, 'roads' | 'lots' | 'parking'> & Partial<Pick<Goes, 'bridges'>>, road: number): string[] {
   const bridged = new Set(goes.bridges ?? []);
   const name = (r: number) => draft.roads[r]?.name ?? 'a road';
   const roads = goes.roads.filter((r) => r !== road && !bridged.has(r)).map(name);
   const bridges = [...bridged].filter((r) => r !== road).map(name);
-  const homes = goes.lots.filter((i) => draft.slots[i]?.kind === 'house').length;
-  const others = goes.lots.length - homes;
+  const homes = goes.lots.reduce((n, i) => n + (draft.slots[i] ? homesOn(t, draft.slots[i]) : 0), 0);
+  const others = goes.lots.filter((i) => draft.slots[i] && draft.slots[i].kind !== 'house' && draft.slots[i].kind !== 'flats').length;
   return [
     ...(roads.length ? [`${count(roads.length, 'road')} left joined to nothing (${listed(roads)})`] : []),
     ...(bridges.length ? [`${count(bridges.length, 'bridge')} left leading nowhere (${listed(bridges)})`] : []),
     ...(homes ? [count(homes, 'home')] : []),
     ...(others ? [count(others, 'other lot')] : []),
-    ...(goes.backdrop.length ? [count(goes.backdrop.length, 'building')] : []),
     ...(goes.parking.length ? [count(goes.parking.length, 'parking space')] : []),
   ];
 }
