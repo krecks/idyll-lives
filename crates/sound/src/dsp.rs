@@ -8,7 +8,9 @@
 //! The arithmetic is JavaScript's as the sounds were written in it: f64 throughout, every buffer of samples
 //! f32 (a `Float32Array`: what is read back from one is the value rounded to f32), `Math.round` rounding
 //! halves up (`js_round`), and `sin`, `exp`, `pow`… from `libm` (fdlibm, as V8's `Math`), so a sound is the
-//! same here, in the browser's wasm and as the TypeScript made it.
+//! same here and in the browser's wasm, and what the TypeScript made: to rounding where a tone is now turned
+//! by rotation (a clink, something struck, a motor). The music, the knock and the knife's chop have moved on
+//! from it.
 
 /// `Math`'s functions, as fdlibm computes them (the same in a native build and in wasm).
 pub mod m {
