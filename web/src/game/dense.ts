@@ -95,6 +95,8 @@ const KINDS: Record<Zone, readonly (readonly [BuildingUse, number])[]> = {
 const PLACE_OF: Partial<Record<BuildingUse, ZoneKind>> = { shop: 'shop', cafe: 'cafe', restaurant: 'restaurant', office: 'office', hall: 'office', workshop: 'workshop' };
 /** A lot with no driveway (a home on a tight garden, a place, a row) stands with its middle this far from a junction at least (m; one with a driveway, `macro.ts` `CORNER`). */
 export const NEAR_CORNER = 9;
+/** A lot along a country road into town keeps this far from a junction (m): cars take the country junctions wide. */
+const COUNTRY_CORNER = 40;
 /** How far into a stretch a lot's middle stands from a junction where a lot with a driveway may (m, `macro.ts` `CORNER`). */
 const CORNER = 18;
 /** Of a centre's shops, cafés and restaurants, the share with flats over them; elsewhere (`raisePlaces`). */
@@ -114,6 +116,8 @@ const between = (rand: Rand, lo: number, hi: number) => lo + Math.floor(rand() *
 export class DensePass {
   /** What else a lot must be to go down (by hand only: Build keeps each to the land painted its use); anything if unset. */
   allow?: (rect: Rect, use: BuildingUse) => boolean;
+  /** How far from a junction a lot's middle stands at least, besides its own rule (`approaches`: `COUNTRY_CORNER`). */
+  private corner = 0;
   /** Where rows go (the land 6 m back from a road's edge, in area `a`): anywhere if unset (`lay`'s `only`). */
   private within?: (a: number, p: Pt) => boolean;
   private readonly content: Content;
@@ -253,7 +257,7 @@ export class DensePass {
     const { t, lots, roads } = this;
     const f = this.frontage(r, s, side, ls);
     const drives = us.length === 1 && us[0].kind === 'house' && us[0].garden !== 'tight';
-    if (!this.offJunctions(r, s, drives ? CORNER : NEAR_CORNER)) return [];
+    if (!this.offJunctions(r, s, Math.max(drives ? CORNER : NEAR_CORNER, this.corner))) return [];
     if (us.length > 1) {
       const allow = this.allow;
       if (allow) {
@@ -398,10 +402,12 @@ export class DensePass {
       const ends = [near(this.roads[r].points[0]), near(this.roads[r].points[this.roads[r].points.length - 1])];
       for (const k of new Set([a, ...ends])) {
         this.within = (_, p) => near(p) === k && only(k, p);
+        this.corner = COUNTRY_CORNER;
         this.rowsAlong(k, r, [1, -1], rand, k === 0 ? 'town' : 'hamlet');
       }
     }
     this.within = undefined;
+    this.corner = 0;
   }
 
   /** Every lot (a draft's first, then the new) and the places of the public ones (a draft's as they were, then the new lots'). */
