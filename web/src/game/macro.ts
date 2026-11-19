@@ -252,14 +252,14 @@ const PARKING_VILLAGE = 2;
 const HOMES_PER_SPACE_MAIN = 25;
 const HOMES_PER_SPACE_VILLAGE = 15;
 /** A main town's car park by its square (bays, fewest and most), and one by each big place's lot (`BIG_PLACES`). */
-const SQUARE_BAYS: [number, number] = [6, 10];
-const PLACE_BAYS: [number, number] = [4, 6];
+export const SQUARE_BAYS: [number, number] = [6, 10];
+export const PLACE_BAYS: [number, number] = [4, 6];
 /** The places a car park is laid beside (their layouts): the school, the leisure and medical centres, the hotel, the town hall, the garden centre, the church. */
 /** How far out from its heart a main town is built up before its houses go down (`DensePass.lay`), of the way to its box's corners. */
 const INNER = 0.5;
 /** How far past an area's box the country roads into it are built along (m: `DensePass.approaches`). */
 const APPROACH = 120;
-const BIG_PLACES = new Set(['school', 'leisure', 'medical', 'hotel', 'townHall', 'gardenCentre', 'church']);
+export const BIG_PLACES = new Set(['school', 'leisure', 'medical', 'hotel', 'townHall', 'gardenCentre', 'church']);
 
 /** The public parking spaces an area with `homes` homes gets (`main`: the main town). */
 export function parkingFor(homes: number, main: boolean): number {

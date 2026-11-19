@@ -24,7 +24,7 @@ import { flatsFor, flatsOverFor, floorsFor, storeysOfId } from './flats';
 import { placeOfTemplate, placeUnit, slotPlace } from './placeLots';
 import { draftAreaSize, HOURS, hoursFor, namerFor, type Namer, type ZoneKind } from './places';
 import { inside, leftOf, lengths, pointAt, RoadIndex, type Pt, type RoadPlan } from './roads';
-import { houseFor, lotAt, LotPlacer, plotRect, slotDims, type Frontage, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates, type Unplaced } from './town';
+import { houseFor, lotAt, LotPlacer, plotRect, slotDims, type Frontage, type Ground, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates, type Unplaced } from './town';
 
 type Rand = () => number;
 
@@ -47,11 +47,16 @@ export interface DenseInput {
   civic: TownSize;
 }
 
-/** What a pass over a town laid already is made from (Build, the build-up tool): its draft, the house templates its lots are measured by, the content its places come from. */
+/**
+ * What a pass over a town laid already is made from (Build, the build-up tool): its draft, the house templates its lots
+ * are measured by, the content its places come from, and the ground its lots go down on (`ground`: one shared with lots
+ * being laid beside it, Build's; else the draft's own, `edit/ground.ts` `townGround`).
+ */
 export interface DenseDraft {
   draft: NeighbourhoodDraft;
   t: Templates;
   content: Content;
+  ground?: Ground;
 }
 
 /**
@@ -144,7 +149,7 @@ export class DensePass {
         roads: draft.roads.flatMap((r, k) => (r.area === i && r.kind !== 'trail' ? [k] : [])),
       }));
       // (Its lots standing taken, the new ones put down after them with no gap: Build lays them as the land is painted.)
-      this.lots = new LotPlacer(content, t, townGround(draft, t), draft.roads, [0, 0], () => 0.5, true);
+      this.lots = new LotPlacer(content, t, input.ground ?? townGround(draft, t), draft.roads, [0, 0], () => 0.5, true);
       this.lots.slots.push(...draft.slots.map((s) => ({ ...s })));
       this.outlines = (open?.centre ?? []).map((c) => c.poly);
       this.density = 0.6;
