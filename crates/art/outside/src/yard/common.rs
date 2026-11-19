@@ -119,6 +119,24 @@ palette! { M:
     end_grain_dark = ("#C9AE86", matte),
     axe = ("#9A9EA2", metal),
     haft = ("#B08E66", satin),
+    // the letterbox: all plain, a draw a part (the box, its door, its flag)
+    mailbox = ("#2F3438", satin),        // the box and its door; the main part
+    mail_post = ("#7E6248", satin),      // its post, board and brace (stained timber)
+    mail_flag = ("#D23A2E", satin),      // the red flag
+    steel = ("#B4BABF", metal),          // the flag's pivot, the door's latch, the reel's axles
+    letter = ("#F4F1E8", matte),         // the post inside
+    letter_kraft = ("#D6BE95", matte),
+    // the hose reel: all plain, one draw
+    reel = ("#3B4046", satin),           // the cart's tube frame; the main part
+    drum = ("#A3ABB0", plastic),         // the drum's flanges, the wheels' hubs
+    hose = ("#3F8F3A", satin),           // the green hose
+    nozzle = ("#F2B531", plastic),       // the spray gun, the crank's knob, the mower's fuel cap
+    // the lawnmower: all plain, one draw
+    mower = ("#C23B2C", gloss),          // the deck; the main part
+    engine = ("#2C2E31", plastic),       // the engine's shroud, the grass box's frame, knobs
+    grass_box = ("#3E4549", matte),      // the grass box's bag
+    mower_handle = ("#2A2C2F", satin),   // the handle's powder-coated tube, the bail
+    mower_hub = ("#D3D5D2", plastic),    // the wheels' hubs
 }
 
 /// Game points round an arc of radius `r` about game point `centre`, from `a0` to `a1` degrees, in the game's
