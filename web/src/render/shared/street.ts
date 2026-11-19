@@ -59,7 +59,7 @@ import { wallCorners, writeFences } from './fences';
 import { shownFences } from './shownFences';
 import { centroid, lengths, pointAt } from '../../game/roads';
 import { pavedRects } from './paving';
-import { streetGround, streetGroundKey } from './streetGround';
+import { streetGround, streetGroundChunks, streetGroundKey } from './streetGround';
 import { bridgeSpans, Kerb, KERB, levelStops, ROAD_Y, roadIndex, roadMeshes, SIDEWALK, stretchOf, townRoads, WALK_Y, walkStops, type RoadIndex } from './roads';
 import { JunctionCuts, junctionsOf, type JunctionPlan } from './junctions';
 import { Levels, levelsOf } from './landSurface';
@@ -1323,6 +1323,7 @@ export class TownStreet {
     for (const id of this.fencesByChunk.keys()) ids.add(id);
     for (const id of this.backdropByChunk.keys()) ids.add(id);
     if (this.options.ground) for (const [, rects] of this.groundRects()) for (const r of rects) ids.add(chunkAt(r.x + r.w / 2, r.z + r.d / 2));
+    for (const id of streetGroundChunks(this.world)) ids.add(id);
     return [...ids].sort((a, b) => a - b);
   }
 
@@ -2172,7 +2173,7 @@ export class TownStreet {
     const own = this.staticSig(id);
     if (own !== null) keys.push(`s${own}`);
     // The town's paved ground in it (`streetGround.ts`).
-    const paved = streetGroundKey(this.world, id);
+    const paved = streetGroundKey(this.world, id, focus, !!this.options.ground);
     if (paved) keys.push(`g${paved}`);
     // Ground layers: garden paths and fields off the focus lot (the lot draws its own, on its ground). Their key now,
     // their geometry only when the chunk is planned (`chunk`): most keys are asked for to find the chunk unchanged.
@@ -2258,7 +2259,7 @@ export class TownStreet {
     for (const p of g.kerbs) mergeParts(plan, p);
     if (g.fence) mergeParts(plan, this.fenceOut(g.fence));
     // The town's paved ground: the centre, the courts and yards, the car parks and their bays (`streetGround.ts`).
-    streetGround(plan, this.world, id, this.groundAt);
+    streetGround(plan, this.world, id, this.levels?.surface, focus, !!this.options.ground);
     // The backdrop's buildings, their hedges, and what they stand on.
     const items = this.backdropByChunk.get(id);
     if (items?.length) {

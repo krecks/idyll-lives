@@ -36,11 +36,12 @@ import { Geo, type V3 } from '../shared/geometry';
 import { compose, quatYawPitchRoll, type Quat } from '../shared/math';
 import { placementVariation, standInOf } from '../shared/modelEntry';
 import { pavedRects } from '../shared/paving';
+import { pavingLayers } from '../shared/streetGround';
 import { townRoadMesh, type RoadMeshData } from '../shared/roads';
 import { backdropKey, roadKey, townKey } from '../shared/overviewKeys';
 import { surfaceOf } from '../shared/landSurface';
 import type { BuiltSurface } from '../shared/builtSurface';
-import { hashNumbers } from '../shared/chunks';
+import { hashNumbers, hashString } from '../shared/chunks';
 import { townRoadMeshOffThread } from '../shared/renderData';
 import { fieldLayers } from '../shared/street';
 import type { TownBuilding } from '../shared/townBuildings';
@@ -500,6 +501,20 @@ export class TownOverview {
       const entity = drawMesh(this.root, name, mesh, this.lib.surface(material, { doubleSided: true, vertexColors: toned }), { receiveShadows: true, layers: this.layers });
       entity.enabled = false;
       out.set(name, { key, entity });
+    }
+    // The town's paving (`townPaving`: the centre, courts and yards, car parks and their bays' lines), as the game's street lays it.
+    const meta = world.meta;
+    const paved = `${roadsKey}|${hashString(JSON.stringify([meta?.centre, meta?.paving, meta?.greens, world.parking, world.carParks, world.plots.map((p) => [p.x, p.z, p.w, p.d])]))}`;
+    // (Kept as they are for the same paving: every layer drawn of it was drawn with its key.)
+    if (!['townPaving', 'townYards', 'carParks', 'bayLines'].filter((name) => keep(name, paved)).length) {
+      await pace?.();
+      for (const { name, material, geo, paint } of pavingLayers(world, null)) {
+        const mesh = meshFrom(this.device, geo.meshData({ colors: true }));
+        if (!mesh) continue;
+        const entity = drawMesh(this.root, name, mesh, paint ? this.lib.roadPaint() : this.lib.surface(material, { doubleSided: true, vertexColors: true }), { receiveShadows: true, layers: this.layers });
+        entity.enabled = false;
+        out.set(name, { key: paved, entity });
+      }
     }
     return out;
   }
