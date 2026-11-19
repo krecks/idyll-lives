@@ -833,6 +833,7 @@
           "id": "fetchPost",
           "label": "Fetch the post",
           "anim": "read",
+          "sound": "letterbox",
           "minutes": 8,
           "when": "open",
           "leaves": "closed",
