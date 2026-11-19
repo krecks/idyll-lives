@@ -526,6 +526,9 @@ pub struct ObjectDef {
     /// file), picked by interactions that leave it "picked", then fallow, planted again and
     /// growing (see `ObjectInstance::growth`).
     pub grows: Option<Growth>,
+    /// What the player is told when ordered to do a use that wants it ripe while it isn't
+    /// (content `grows.notRipe`: "the grass hasn't grown back yet"); none: "the … isn't ripe yet".
+    pub not_ripe: Option<String>,
     /// A machine that runs on its own (content `runs`: `{"minutes": 60}`): loaded by a use that
     /// `loads`, it runs this many game minutes with nobody at it, then waits, done, for a use
     /// that `unloads` it (see `machines.rs`, `ObjectInstance::run`).
@@ -2880,6 +2883,9 @@ struct GrowsRaw {
     /// Ripe when bought (see `Growth::bought_ripe`).
     #[serde(default, rename = "boughtRipe")]
     bought_ripe: bool,
+    /// What an order says while it isn't ripe (see `ObjectDef::not_ripe`).
+    #[serde(default, rename = "notRipe")]
+    not_ripe: Option<String>,
 }
 
 /// An object's `runs`: `{"minutes": 60}` (and, for the renderer, the `sound` it makes running).
@@ -4306,6 +4312,7 @@ impl Content {
                     }
                     n => n,
                 },
+                not_ripe: obj.grows.as_ref().and_then(|g| g.not_ripe.clone()),
                 grows: match &obj.grows {
                     Some(g) if g.days > 0.0 && g.fallow >= 0.0 => Some(Growth { days: g.days, fallow_days: g.fallow, bought_ripe: g.bought_ripe }),
                     Some(_) => {

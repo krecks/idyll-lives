@@ -5690,7 +5690,10 @@ impl World {
                             format!("the {name} is already open")
                         }
                         Some(w) if w != obj.open => format!("the {name} is closed"),
-                        _ if inter.ripe && !obj.ripe() => format!("the {name} isn't ripe yet"),
+                        _ if inter.ripe && !obj.ripe() => self.content.objects[obj.def]
+                            .not_ripe
+                            .clone()
+                            .unwrap_or_else(|| format!("the {name} isn't ripe yet")),
                         _ if (inter.loads
                             || inter.unloads
                             || inter.work_on == Some(crate::content::WorkOn::Dishes))

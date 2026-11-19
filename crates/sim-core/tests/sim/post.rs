@@ -255,5 +255,5 @@ fn a_new_lawnmower_mows_at_once_then_waits_for_the_grass() {
     assert!(until(&mut w, 60, |w| idle(w, 0)), "mowed");
     assert!(!w.objects[mower as usize].ripe(), "just mown");
     let err = order(&mut w, 0, mower, 0).unwrap_err();
-    assert!(err.contains("isn't ripe yet"), "{err}");
+    assert!(err.contains("the grass hasn't grown back yet"), "{err}");
 }
