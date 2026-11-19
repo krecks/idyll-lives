@@ -17,7 +17,7 @@ import type { GameKind, LandscapeParams, Lifespan, LotLook, ParkingBay, PlotKind
 import { fetchText } from '../content/content';
 import { householdBonds, householdSpawns, residentsOf, type HouseholdDraft, type SimSpawn } from './household';
 import { homePrice } from './price';
-import { crownClear, generateHouse, objectInfos, residentsKey, weighted, type GardenSize, type HouseGenConfig, type ObjectInfos, type Residents } from './housegen';
+import { crownClear, generateHouse, objectInfos, residentsKey, weighted, type Furnishing, type GardenSize, type HouseGenConfig, type ObjectInfos } from './housegen';
 import { connect, inside, leftOf, lengths, nearest, pointAt, roadExits, roadIndex, roadMask, tangent, trimJoins, type Box, type Pt, type RoadPlan } from './roads';
 import { householdFunds, savingsOf } from './wealth';
 import { extend, fill, LEGACY_KINDS, placeOf, specOf, type LotMix, type RoadLayout, type SizeSpec, type WorldStep } from './world';
@@ -316,8 +316,8 @@ export function shuffled<T>(list: readonly T[], rand: Rand = Math.random): T[] {
   return out;
 }
 
-/** A house layout by id; a generated one furnished for `residents` (the layout is the same for anyone; undefined: nobody lives there). */
-export function houseTemplate(t: Templates, id: string, residents?: Residents): HouseTemplate | undefined {
+/** A house layout by id; a generated one furnished for `residents` (the layout is the same for anyone; undefined: nobody lives there; `'shell'`: a shell, see `housegen.ts` `Furnishing`). */
+export function houseTemplate(t: Templates, id: string, residents?: Furnishing): HouseTemplate | undefined {
   if (id.startsWith('gen:')) {
     const at = `${id}#${residentsKey(residents)}`;
     if (!generated.has(at)) {
