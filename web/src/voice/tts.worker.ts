@@ -56,6 +56,9 @@ const SMALL: File[] = [
 ];
 const VOICE_WASM_BYTES = 162_000;
 
+/** `GPUBufferUsage` STORAGE | COPY_SRC | COPY_DST: an input ONNX Runtime can read (and download). */
+const INPUT_USAGE = 0x80 | 0x04 | 0x08;
+
 let engine: Engine | null = null;
 let loading: Promise<void> | null = null;
 /** Lines are made one after another: a run must finish before the next starts. */
@@ -158,12 +161,16 @@ async function load(base: string, device: VoiceDevice): Promise<void> {
   const ort = await importOrt();
   configureOrt(ort, ortWasm, device);
   const sessions = {} as Record<keyof typeof MODELS, Session>;
-  // The runtime creates one session at a time. On the GPU the vector estimator's latent stays there
-  // between its passes and goes straight into the vocoder, and the other graphs hand back the few
-  // numbers we need on the CPU; on the processor everything comes back as CPU tensors.
+  // The runtime creates one session at a time. On the GPU the text encoder's output and the vector
+  // estimator's latent stay there: the text into every pass, the latent from pass to pass and
+  // straight into the vocoder, with no download and upload between the graphs. The duration
+  // predictor and the vocoder hand back what we need on the CPU; on the processor everything
+  // comes back as CPU tensors.
   for (const [i, k] of names.entries()) {
-    sessions[k] = await ort.InferenceSession.create(new Uint8Array(models[i]), sessionOptions(device, k === 'vector' ? 'gpu-buffer' : undefined));
+    sessions[k] = await ort.InferenceSession.create(new Uint8Array(models[i]), sessionOptions(device, k === 'vector' || k === 'text' ? 'gpu-buffer' : undefined));
   }
+  // What every pass reads goes up to the GPU once a line (`Engine.upload`).
+  const gpu = device === 'gpu' ? await ort.env.webgpu.device : null;
   engine = {
     ort,
     sessions,
@@ -171,6 +178,14 @@ async function load(base: string, device: VoiceDevice): Promise<void> {
     indexer: json<number[]>(indexer),
     styles: new Map(STYLE_IDS.map((id, i) => [id, parseStyle(json<StyleFile>(styles[i]))])),
     phonemizer: new Voice(await gunzipText(lexicon)),
+    upload: gpu
+      ? (data, dims) => {
+          // Sized up to 16 bytes: the runtime's kernels read four floats at a time.
+          const buffer = gpu.createBuffer({ size: Math.ceil(data.byteLength / 16) * 16, usage: INPUT_USAGE });
+          gpu.queue.writeBuffer(buffer, 0, data);
+          return ort.Tensor.fromGpuBuffer(buffer, { dataType: 'float32', dims, dispose: () => buffer.destroy() });
+        }
+      : undefined,
   };
   // The sessions and the engine have their own copies.
   for (const f of files) forget(f.url);
