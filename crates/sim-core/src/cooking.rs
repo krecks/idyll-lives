@@ -3024,7 +3024,7 @@ fn invite(w: &mut World) {
         let r = &content.recipes[recipe];
         for (j, s) in sims.iter_mut().enumerate() {
             let at_home = s.tile();
-            let at_home = plots[home as usize].contains(at_home.0, stairs.ground_z(at_home.1));
+            let at_home = plots[home as usize].holds(stairs, at_home.0, at_home.1);
             if j == i
                 || s.household != household
                 || !s.here()
@@ -3132,7 +3132,7 @@ fn update(w: &mut World) {
             .sims
             .iter()
             .any(|s| s.here() && s.household == it.household);
-        let on_home = home.is_some_and(|p| w.plots[p as usize].contains(x, w.stairs.ground_z(z)));
+        let on_home = home.is_some_and(|p| w.on_plot(p, x, z));
         if !placed || !lives_here || (!on_home && !eaten.contains(&it.id)) {
             changed = true;
             continue;

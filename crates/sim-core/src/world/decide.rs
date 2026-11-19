@@ -560,7 +560,13 @@ pub(crate) fn pick_autonomous(
         // (Not where they couldn't get to a moment ago, nor where someone else is tidying up:
         // the next dirtiest spot instead.)
         let out_of_reach = cleaning_skip(sim, ctx);
-        for z in p.z..p.z + p.d {
+        // (A flat's on its own storey; a house's on the ground.)
+        let up = if p.is_flat() {
+            ctx.nav.stairs.storey_row(i32::from(p.storey))
+        } else {
+            0
+        };
+        for z in p.z + up..p.z + p.d + up {
             for x in p.x..p.x + p.w {
                 if !lot.in_bounds(x, z) || out_of_reach.contains(&(x, z)) {
                     continue;
@@ -1564,7 +1570,8 @@ pub(crate) fn start_task(
             let knock = (content.visits.door.is_some() && !p.public)
                 .then(|| crate::life::knock_spot(nav, p))
                 .flatten();
-            let mut door = p.arrival_point();
+            // (At a flat, its own door off the landing: `Plot::doorstep`.)
+            let mut door = p.doorstep();
             // A public place without an entry: the open ground nearest its middle, not whatever
             // stands there.
             if p.public && p.entry.is_none() {
@@ -1604,8 +1611,9 @@ pub(crate) fn start_task(
             } else if let (Some(_), Some(at)) = (sim.bound_for_bike, sim.bike_parked) {
                 goal_at(at)
             } else {
+                // (Into a flat, behind its own door: `Plot::home_point`.)
                 let home = ctx.households[sim.household as usize].plot;
-                let Some(door) = home.map(|p| ctx.plots[p as usize].arrival_point()) else {
+                let Some(door) = home.map(|p| ctx.plots[p as usize].home_point()) else {
                     sim.transition = Some(crate::life::Transition::Home);
                     return;
                 };

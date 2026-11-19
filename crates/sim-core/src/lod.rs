@@ -2,8 +2,8 @@
 //!
 //! Only one lot is drawn at a time, but the whole town lives on. Residents on a watched lot
 //! (the one being looked at, the player's home, wherever someone of the player's household
-//! is) or near the view, and the player's household wherever they are, are updated every
-//! tick. Everyone else takes a turn every `LOD_TICKS` ticks and catches up on the time since
+//! is; a building watched, every flat in it) or near the view, and the player's household
+//! wherever they are, are updated every tick. Everyone else takes a turn every `LOD_TICKS` ticks and catches up on the time since
 //! in one go (`Sim::steps`): needs, skills, walking and whatever they're doing move on by that
 //! much at once, so what the player sees of them (needs, skills, careers, money,
 //! relationships, the story) stays about the same. Something they start or reach partway
@@ -111,6 +111,24 @@ pub(crate) fn plan(w: &mut World) {
             .filter_map(|b| b.plot);
         for p in homes.chain(with_them) {
             w.watched[p as usize] = true;
+        }
+        // A building watched watches its flats (and the player's flat its building: the hall
+        // and the stairs they come and go by).
+        let homes: Vec<u32> = w
+            .households
+            .iter()
+            .filter(|h| h.player)
+            .filter_map(|h| h.plot)
+            .collect();
+        for h in homes {
+            if let Some(lot) = w.plots.get(h as usize).and_then(|p| p.of) {
+                w.watched[lot as usize] = true;
+            }
+        }
+        for f in w.plots.iter().filter(|p| p.is_flat()) {
+            if f.of.is_some_and(|lot| w.watched[lot as usize]) {
+                w.watched[f.id as usize] = true;
+            }
         }
     }
     let tick = w.tick;

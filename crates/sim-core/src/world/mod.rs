@@ -1807,9 +1807,36 @@ impl Plot {
         self.inside.unwrap_or_else(|| self.arrival_point())
     }
 
+    /// Whether tile (`x`, `z`: stacked rows, as `stairs` has them) is on it: inside its rectangle
+    /// on any storey, and a flat's on its own storey.
+    pub fn holds(&self, stairs: &crate::path::StairMap, x: i32, z: i32) -> bool {
+        self.contains(x, stairs.ground_z(z))
+            && (!self.is_flat() || stairs.storey(z) == i32::from(self.storey))
+    }
+
+    /// Where one coming to it stands at its door: a flat's landing before its own door (on its
+    /// storey's rows), else where it is arrived at (`arrival_point`).
+    pub fn doorstep(&self) -> [f32; 2] {
+        match self.door {
+            Some((x, z)) => [x as f32 + 0.5, z as f32 + 0.5],
+            None => self.arrival_point(),
+        }
+    }
+
     /// Whether it is a flat (a plot inside its building's lot, `of`).
     pub fn is_flat(&self) -> bool {
         self.of.is_some()
+    }
+
+    /// The lot on the ground it stands on: a flat's building, else itself.
+    pub fn lot(&self) -> u32 {
+        self.of.unwrap_or(self.id)
+    }
+
+    /// Whether someone may live on it: not a public place, nor a building of flats (its hall,
+    /// stairs and yard are its flats'; each flat is a home of its own).
+    pub fn is_home(&self) -> bool {
+        !self.public && self.kind != Some(crate::travel::PlotKind::Flats)
     }
 
     /// Whether the place on it is open at `minute` of day `day` (`clock::day`, `clock::minute_of_day`):
@@ -2141,6 +2168,9 @@ pub struct World {
     /// ground lot which of them is its (index + 1; 0: none). Made with `tile_plot`.
     pub(crate) flat_tiles: Vec<FlatTiles>,
     pub(crate) flats_in: Vec<u16>,
+    /// The flats' stair halls over public places (`path::Halls`), found with the rooms
+    /// (`map_halls`).
+    pub(crate) halls: crate::path::Halls,
     pub relationships: Relationships,
     pub events: EventLog,
     pub(crate) blocked: Vec<bool>,
@@ -2359,6 +2389,8 @@ pub(crate) struct Ctx<'a> {
     pub plots: &'a [Plot],
     /// Plot per ground tile (`World::tile_plot`).
     pub tile_plot: &'a [u16],
+    /// The flats' stair halls over public places (`World::halls`).
+    pub halls: &'a crate::path::Halls,
     pub object_plot: &'a [Option<u32>],
     /// Objects by plot (`World::object_index`).
     pub index: &'a ObjectIndex,
@@ -2618,8 +2650,7 @@ impl World {
                 None,
             )?;
             world.objects[id as usize].turn = turn;
-            world.objects[id as usize].keeper =
-                p.plot.filter(|&k| (k as usize) < world.plots.len());
+            world.keep(id, p.plot);
         }
         if lot_file.sims.len() > MAX_SIMS {
             return Err(Error::new(format!("at most {MAX_SIMS} residents per town")));
@@ -2685,6 +2716,7 @@ impl World {
             tile_plot: Vec::new(),
             flat_tiles: Vec::new(),
             flats_in: Vec::new(),
+            halls: Default::default(),
             relationships: Relationships::default(),
             events: EventLog::default(),
             blocked: vec![false; tiles],
@@ -2909,6 +2941,7 @@ impl World {
             households: &self.households,
             plots: &self.plots,
             tile_plot: &self.tile_plot,
+            halls: &self.halls,
             object_plot: &self.object_plot,
             index: &self.object_index,
             exits: &self.exits,
@@ -3083,6 +3116,60 @@ impl World {
             ),
             _ => Some(lot),
         }
+    }
+
+    /// Finds the flats' stair hall in each public place with flats over it (`path::Halls`): the
+    /// room on the ground in at the flats' street door (their `entry`), when it is not the place's
+    /// own (its `entry` is elsewhere). Rooms change with walls, so with them (`refresh_rooms`).
+    fn map_halls(&mut self) {
+        let mut halls = crate::path::Halls::default();
+        if !self.flats_in.iter().any(|&k| k > 0) {
+            self.halls = halls;
+            return;
+        }
+        halls.of_lot = vec![0; self.plots.len()];
+        let nav = self.nav();
+        for lot in self.plots.iter().filter(|p| !p.is_flat() && p.public) {
+            if self.flats_in.get(lot.id as usize).is_none_or(|&k| k == 0) {
+                continue;
+            }
+            let Some(entry) = self
+                .plots
+                .iter()
+                .find(|f| f.of == Some(lot.id))
+                .and_then(|f| f.entry)
+                .filter(|&e| Some(e) != lot.entry)
+            else {
+                continue;
+            };
+            let Some(((x, z), (dx, dz))) =
+                crate::life::front_door(&nav, entry, |x, z| lot.contains(x, z))
+            else {
+                continue;
+            };
+            let room = self.lot.room_at(x + dx, z + dz);
+            let tiles = (lot.z..lot.z + lot.d)
+                .flat_map(|tz| (lot.x..lot.x + lot.w).map(move |tx| (tx, tz)))
+                .map(|(tx, tz)| self.lot.in_bounds(tx, tz) && self.lot.room_at(tx, tz) == room)
+                .collect();
+            halls.list.push(crate::path::Hall {
+                lot: lot.id,
+                x: lot.x,
+                z: lot.z,
+                w: lot.w,
+                tiles,
+            });
+            halls.of_lot[lot.id as usize] = halls.list.len() as u16;
+        }
+        self.halls = halls;
+    }
+
+    /// Whether tile (`x`, `z`, stacked rows) is on `plot`: inside its rectangle on any storey, and
+    /// for a flat, on its own storey.
+    pub fn on_plot(&self, plot: u32, x: i32, z: i32) -> bool {
+        self.plots
+            .get(plot as usize)
+            .is_some_and(|p| p.holds(&self.stairs, x, z))
     }
 
     /// Notes the plot of every ground tile (plots never move; upper storeys are the same
@@ -3558,6 +3645,23 @@ impl World {
         }
         self.rooms_things_changed(at);
         Ok(self.objects.len() as u32 - 1)
+    }
+
+    /// Says which plot object `id` belongs to though it stands elsewhere (`ObjectInstance::keeper`:
+    /// a flat's letterbox in the hall), or that it belongs where it stands (None). What it is
+    /// counted on (`object_plot`) follows.
+    pub(crate) fn keep(&mut self, id: u32, keeper: Option<u32>) {
+        let keeper = keeper.filter(|&k| (k as usize) < self.plots.len());
+        let Some(o) = self.objects.get_mut(id as usize) else {
+            return;
+        };
+        o.keeper = keeper;
+        let (x, z) = (o.x, o.z);
+        let plot = keeper.or_else(|| self.plot_at(x, z));
+        if self.object_plot[id as usize] != plot {
+            self.object_plot[id as usize] = plot;
+            self.objects_version = self.objects_version.wrapping_add(1);
+        }
     }
 
     /// Adds a Sim with random starting needs. Identity, traits and perks are validated.
@@ -4670,6 +4774,7 @@ impl World {
         self.lot.take_room_changes();
         let (rooms, cells) = crate::rooms::compute(self);
         self.rooms = rooms;
+        self.map_halls();
         self.rooms_out = crate::privacy::doors_out(&self.content, &self.rooms, &self.lot);
         self.refresh_privacy();
         self.rooms_version = self.room_layout_version;
@@ -4682,7 +4787,8 @@ impl World {
         // indoor tiles anywhere their room; off the plots, none (`roomRules.away`).
         let rooms = &self.rooms;
         let mut source = vec![crate::rooms::NO_ROOM; self.lot.tile_slots()];
-        for (pi, p) in self.plots.iter().enumerate() {
+        // (A flat has no garden: its rectangle's ground is its building's.)
+        for (pi, p) in self.plots.iter().enumerate().filter(|(_, p)| !p.is_flat()) {
             let garden = rooms
                 .iter()
                 .position(|r| r.garden && r.plot == Some(pi as u32))
@@ -4767,6 +4873,7 @@ impl World {
         use crate::rooms::room_order;
         self.sync_tile_arrays();
         self.map_plots();
+        self.map_halls();
         let away = self.content.room_rules.away;
         let Some([x0, z0, x1, z1]) = changes.rect else {
             return;
@@ -4820,11 +4927,9 @@ impl World {
         let lot = &self.lot;
         // The last plot over each tile sets its garden's score there (as `refresh_rooms`).
         let last_plot = |x: i32, z: i32| {
-            plots
-                .iter()
-                .rev()
-                .copied()
-                .find(|&p| self.plots[p as usize].contains(x, z))
+            plots.iter().rev().copied().find(|&p| {
+                !self.plots[p as usize].is_flat() && self.plots[p as usize].contains(x, z)
+            })
         };
         let gardens: Vec<u32> = found
             .iter()
@@ -4840,7 +4945,11 @@ impl World {
                 let later: Vec<&Plot> = self.plots[pi as usize + 1..]
                     .iter()
                     .filter(|q| {
-                        q.x < p.x + p.w && p.x < q.x + q.w && q.z < p.z + p.d && p.z < q.z + q.d
+                        !q.is_flat()
+                            && q.x < p.x + p.w
+                            && p.x < q.x + q.w
+                            && q.z < p.z + p.d
+                            && p.z < q.z + q.d
                     })
                     .collect();
                 for z in p.z..p.z + p.d {
@@ -5221,6 +5330,7 @@ impl World {
                 households,
                 plots,
                 tile_plot,
+                halls,
                 object_plot,
                 object_index,
                 exits,
@@ -5260,6 +5370,7 @@ impl World {
                 households,
                 plots,
                 tile_plot,
+                halls,
                 object_plot,
                 index: object_index,
                 exits,
