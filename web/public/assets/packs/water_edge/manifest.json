@@ -63,8 +63,14 @@
         "blade": {
           "finish": "material.finish.foliage"
         },
+        "blade_dark": {
+          "finish": "material.finish.foliage"
+        },
+        "blade_light": {
+          "finish": "material.finish.foliage"
+        },
         "head": {
-          "finish": "material.finish.bark"
+          "finish": "material.finish.foliage"
         },
         "stem": {
           "finish": "material.finish.foliage"

@@ -9,7 +9,7 @@ is `packs/water_edge/manifest.json`. Sizes are held to `docs/review/reference.js
 |---|---|---|---|---|---|
 | jetty | 2 × 4 | 1.92 × 0.98 × 3.82 | 2832 | 1 | twelve planks across two bearers on eight posts, the deck at 0.585 m, a mooring bollard at each corner of the far (+z) end |
 | rowingBoat | 2 × 3 | 1.28 × 0.70 × 2.97 | 4636 | 2 | a lofted hull through nine stations, two more on a Catmull-Rom curve between each pair (`forms::catmull`) so the sheer runs fair; a cream liner, a wood transom and stem, cap rails, floorboards, two thwarts and two oars stowed along them |
-| reeds | 1 × 1 | 0.80 × 1.54 × 1.09 | 1542 | 2 | 24 strap blades (`leaf!`), mostly upright, and seven bulrushes with brown seed heads; blades and stems on `foliage`, heads on `bark`, so they sway in the wind |
+| reeds | 1 × 1 | 0.80 × 1.54 × 1.09 | 1542 | 1 | 24 strap blades (`leaf!`) in three grey-greens, mostly upright, and seven bulrushes with warm brown seed heads; all on `foliage` (one draw: blades, stems and heads sway together), its colours lighter than they read as the ornamental grass's are, since the foliage texture darkens what it is on (2026-11-19: the heads were on `bark`, a second draw and nearly black, the blades one dark green) |
 | beachHut | 2 × 2 | 1.94 × 2.51 × 1.95 | 4768 | 2 | a cabin on two skids under a 27° gable to the front, the door (0.76 × 1.72 m) in the middle between two small windows, white bargeboards; stripes down the sides and the back. Eaves at 2 m and the ridge at 2.5 m, as Hove's huts |
 | bench | 2 × 1 | 1.75 × 0.93 × 0.52 | 3184 | 2 | the kit's `bench_end` ends, four seat slats (seat 0.475 m, the content's `seat.height`), three back slats and a brass plaque on the top one; two sitters, as the garden bench |
 
