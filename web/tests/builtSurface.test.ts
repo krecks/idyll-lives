@@ -4,14 +4,15 @@
 // trail, a footpath, on the land as it lies);
 // each junction one height over its arms; each pad within a short drive of its road where its way in
 // meets it, at the middle of the land under it where it may be, and near the pads beside it; the
-// bridge clear of its water; the land graded within the cones and the retaining edge, and under a road's edges; `update` after an
+// bridge clear of its water; the land graded within the cones and the retaining edge, and under a road's edges; round a lot
+// whose edges are off the land's grain, the land drawn outside its edges at its pad where it lies near it; `update` after an
 // edit the same as a surface made afresh, its chunks' versions moved; `at` without a jump along the
 // roads. `bun test tests/builtSurface.test.ts`.
 import { describe, expect, test } from 'bun:test';
 import type { RoadPlan } from '../src/core/protocol';
 import { blankLand, heightAt, LAND_CELL, NONE, type Land } from '../src/game/land';
 import { bridgeSpans, lengths, pointAt, type Pt } from '../src/game/roads';
-import { BRIDGE_CLEAR, BuiltSurface, builtSurfaceOf, CUT_MAX, ENTRY_MAX, GRADE, RETAIN_MAX, ROAD_SINK, surfacePlots, type SurfaceWorld } from '../src/render/shared/builtSurface';
+import { BRIDGE_CLEAR, BuiltSurface, builtSurfaceOf, CUT_MAX, ENTRY_MAX, GRADE, RETAIN_MAX, ROAD_SINK, SKIRT_MOST, surfacePlots, type SurfaceWorld } from '../src/render/shared/builtSurface';
 import { chunkAt } from '../src/render/shared/chunks';
 
 const [W, D] = [160, 120];
@@ -397,5 +398,44 @@ describe("a turned backdrop building's ground", () => {
   test('one standing in water levels nothing round it, its bank as it was', () => {
     expect(surface.at(98, 47)).toBeGreaterThan(3);
     expect(surface.conformed).toEqual(without.conformed);
+  });
+});
+
+describe('round a lot whose edges are off the land\'s grain', () => {
+  // A gentle slope (2 % along z, 1 % along x) and a lot off any road, its edges on odd metres: the cells its edges
+  // cross have a corner outside it.
+  const gentle = blankLand(60, 60, 'follow');
+  for (let j = 0; j < gentle.rows; j++) for (let i = 0; i < gentle.cols; i++) gentle.h[j * gentle.cols + i] = Math.round((0.01 * i + 0.02 * j) * LAND_CELL * 100);
+  const lot = { x: 11, z: 17, w: 9, d: 19, entry: null };
+  const surface = new BuiltSurface(gentle, [], [lot], [], 0.75);
+  const pad = surface.padY(0);
+
+  test('the land drawn just outside its edges meets its pad (no step, no crease at the edge)', () => {
+    const out = 0.01;
+    for (let t = 0; t <= 1; t += 0.125) {
+      const [x, z] = [lot.x + lot.w * t, lot.z + lot.d * t];
+      expect(Math.abs(surface.landAt(x, lot.z - out) - pad)).toBeLessThan(0.01);
+      expect(Math.abs(surface.landAt(x, lot.z + lot.d + out) - pad)).toBeLessThan(0.01);
+      expect(Math.abs(surface.landAt(lot.x - out, z) - pad)).toBeLessThan(0.01);
+      expect(Math.abs(surface.landAt(lot.x + lot.w + out, z) - pad)).toBeLessThan(0.01);
+    }
+    // (The land itself is off the pad there: about 0.2 m from its middle along z.)
+    expect(Math.abs(heightAt(gentle, 15, lot.z - out) - pad)).toBeGreaterThan(0.15);
+  });
+
+  test('a cell further out, the land as it lies; stored and solved again, the same', () => {
+    expect(surface.conformed[(12 / LAND_CELL) * gentle.cols + 14 / LAND_CELL]).toBeCloseTo(gentle.h[(12 / LAND_CELL) * gentle.cols + 14 / LAND_CELL] / 100, 4);
+    const again = new BuiltSurface({ ...gentle, h: surface.graded() }, [], [lot], [], 0.75);
+    expect(again.padY(0)).toBeCloseTo(pad, 2);
+    for (let k = 0; k < again.conformed.length; k++) expect(Math.abs(again.conformed[k] - surface.conformed[k])).toBeLessThan(0.006);
+  });
+
+  test('on a steep slope, further from its pad than SKIRT_MOST, the land is left to a retaining edge', () => {
+    const steep = blankLand(60, 60, 'follow');
+    for (let j = 0; j < steep.rows; j++) for (let i = 0; i < steep.cols; i++) steep.h[j * steep.cols + i] = Math.round(0.1 * j * LAND_CELL * 100);
+    const s = new BuiltSurface(steep, [], [lot], [], 0.75);
+    const k = (16 / LAND_CELL) * steep.cols + 14 / LAND_CELL;
+    expect(Math.abs(s.conformed[k] - s.padY(0))).toBeGreaterThan(SKIRT_MOST);
+    expect(s.conformed[k]).toBeCloseTo(steep.h[k] / 100, 4);
   });
 });

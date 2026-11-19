@@ -27,7 +27,10 @@
  *   from it, no lower than it less as much. Under a road it is the road's height less `ROAD_SINK`
  *   out to its sidewalk's edge, and the road's height round the cells its edge crosses (the land
  *   drawn between the samples meets the road under its edge, never over it); inside a lot the
- *   pad's; beside a lot within `RETAIN_MAX` of the pad (the tallest a retaining edge stands).
+ *   pad's, and the pad's round the cells its edge crosses where the land there is within
+ *   `SKIRT_MOST` of it (the land drawn between the samples meets the pad at its edge: a lawn runs
+ *   on from it, not over its edge or under it); beside a lot within `RETAIN_MAX` of the pad (the
+ *   tallest a retaining edge stands).
  *   Under a deck carried on over dry land well past its water, it is drawn `DECK_UNDER` under the
  *   deck's road at least (stored as graded: `graded`). Water is left as it is.
  *
@@ -46,6 +49,14 @@ export const GRADE: Record<RoadKind, number> = { street: 0.08, lane: 0.08, count
 /** The tallest a lot's edge stands over the land beside it (m), the deepest a road or a lot is cut into the land or stands on it (m). */
 export const RETAIN_MAX = 1.5;
 export const CUT_MAX = 4;
+/**
+ * Round a lot, the land at the samples a cell or less outside it (the corners of the cells its edge crosses) is
+ * graded to its pad where it lies within this (m) of it (`solveLand`). Lots don't keep to the land's 2 m grain, so
+ * without it the land drawn across such a cell stood over the pad's edge or under it: on a gentle slope a lawn with a
+ * crease and a small step at the lot's front, burying its path's first metre and its fence's foot. Further off, a
+ * retaining edge stands as ever.
+ */
+export const SKIRT_MOST = 0.5;
 /** Among mountains (a world whose Hills are `mountains`), a country road (a pass, a way out of the world) may be cut into the rock or stand over the land by this much (m). */
 export const CUT_MAX_MOUNTAIN_ROAD = 10;
 /** The graded land under a road lies this far below it (m), so it never shows through on a bend. */
@@ -207,7 +218,7 @@ export class BuiltSurface {
   /** Each lot's neighbours: the pads within the land's grain of it. */
   private readonly touching: number[][];
   private nodes: Node[] = [];
-  /** Per sample: the built height there (NaN: nothing built), and what is built (0 nothing, 1 a road, 2 a lot, `BESIDE` the land beside a road, at its height). */
+  /** Per sample: the built height there (NaN: nothing built), and what is built (0 nothing, 1 a road, 2 a lot, `BESIDE` the land beside a road, at its height, `SKIRT` the land round a lot, at its pad's). */
   private builtY: Float32Array;
   private kind: Uint8Array;
   private readonly index: RoadIndex;
@@ -1037,6 +1048,32 @@ export class BuiltSurface {
         }
       }
     });
+    // Round a lot (not a turned backdrop building's: its ground reaches out already), the samples a cell or less
+    // outside its box at its pad: the nearest lot's (the higher of two as near), on bare dry land within `SKIRT_MOST`
+    // of that pad, not a road's nor beside one.
+    const skirt = new Float32Array(cols * rows).fill(Infinity);
+    const skirtY = new Float32Array(cols * rows);
+    plots.forEach((p, n) => {
+      if (p.poly || this.afloat[n]) return;
+      const [i0, i1] = [Math.max(0, Math.floor((p.x - c) / c) + 1), Math.min(cols - 1, Math.ceil((p.x + p.w + c) / c) - 1)];
+      const [j0, j1] = [Math.max(0, Math.floor((p.z - c) / c) + 1), Math.min(rows - 1, Math.ceil((p.z + p.d + c) / c) - 1)];
+      for (let j = j0; j <= j1; j++) {
+        for (let i = i0; i <= i1; i++) {
+          const at = j * cols + i;
+          if (boxed[at] || kind[at] || wet(land, at)) continue;
+          const d = Math.hypot(Math.max(p.x - i * c, 0, i * c - p.x - p.w), Math.max(p.z - j * c, 0, j * c - p.z - p.d));
+          if (d < skirt[at] - 1e-6 || (d <= skirt[at] + 1e-6 && pads[n] > skirtY[at])) {
+            skirt[at] = d;
+            skirtY[at] = pads[n];
+          }
+        }
+      }
+    });
+    for (let k = 0; k < skirt.length; k++) {
+      if (skirt[k] === Infinity || Math.abs(land.h[k] / 100 - skirtY[k]) > SKIRT_MOST) continue;
+      builtY[k] = skirtY[k];
+      kind[k] = SKIRT;
+    }
     // The two cones from what is built, `bank` steep (two chamfer passes each way).
     const hi = new Float32Array(cols * rows);
     const lo = new Float32Array(cols * rows);
@@ -1123,6 +1160,8 @@ function cones(hi: Float32Array, lo: Float32Array, cols: number, rows: number, s
 
 /** A sample beside a road (a corner of a cell its edge crosses): graded to the road's height, not sunk (`solveLand`). */
 const BESIDE = 3;
+/** A sample round a lot (a corner of a cell its edge crosses): graded to its pad (`solveLand`, `SKIRT_MOST`). */
+const SKIRT = 4;
 
 /** [`from`, `to`] narrowed to [`lo`, `hi`] where they overlap (else as it was). */
 function narrowed(from: number, to: number, lo: number, hi: number): [number, number] {
