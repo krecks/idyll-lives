@@ -723,7 +723,7 @@
       "group": "waterside",
       "outdoors": true,
       "decor": 0.3,
-      "description": "A plank jetty on weathered posts, with a bollard at each corner.",
+      "description": "A plank jetty on timber posts, with a mooring bollard at each corner of its far end.",
       "interactions": []
     },
     {
@@ -740,7 +740,7 @@
       "group": "waterside",
       "outdoors": true,
       "decor": 0.4,
-      "description": "A painted rowing boat with two thwarts and a pair of oars.",
+      "description": "A painted rowing boat with two seats and a pair of oars.",
       "interactions": []
     },
     {
@@ -758,26 +758,7 @@
       "outdoors": true,
       "decor": 0.4,
       "description": "A clump of reeds and bulrushes for the water's edge.",
-      "interactions": [
-        {
-          "id": "water",
-          "label": "Water the reeds",
-          "anim": "water",
-          "minutes": 5,
-          "effects": {
-            "fun": 0.03
-          },
-          "tags": [
-            "chores",
-            "nature",
-            "garden",
-            "outdoors"
-          ],
-          "skills": {
-            "gardening": 0.1
-          }
-        }
-      ]
+      "interactions": []
     },
     {
       "id": "beachHut",
@@ -793,7 +774,7 @@
       "group": "waterside",
       "outdoors": true,
       "decor": 0.4,
-      "description": "A striped beach hut on timber skids, its door and window to the front.",
+      "description": "A striped beach hut on timber skids, its door under the gable between two little windows.",
       "interactions": []
     },
     {
@@ -807,7 +788,7 @@
       "price": 260,
       "category": "outdoor",
       "group": "waterside",
-      "slots": 3,
+      "slots": 2,
       "outdoors": true,
       "seat": {
         "height": 0.475,
