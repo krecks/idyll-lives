@@ -1,6 +1,6 @@
 /**
  * The town view's buildings (`townView.ts`): every
- * backdrop building and every far lot's house as copies of a few unit meshes (a box of walls, and a
+ * far lot's house and building as copies of a few unit meshes (a box of walls, and a
  * gable, hip, flat or mansard roof), one instanced draw each, in one material (`GAME_TOWN_BUILDING`).
  *
  * Each copy carries its look beside its matrix (`TOWN_WALL`, `TOWN_ROOF`, `TOWN_INFO`):

@@ -489,7 +489,8 @@ pub(crate) fn no_bike_out(sim: &Sim) -> bool {
 
 /// The way out of town `sim` takes on foot: the quickest (`travel::Travel::eta`).
 pub(crate) fn exit_on_foot(ctx: &Ctx, sim: &Sim) -> Option<[f32; 2]> {
-    // From home, the way their commute was timed by (on foot).
+    // From home (a flat's building too: its hall, its yard), the way their commute was timed by
+    // (on foot).
     let home = ctx
         .households
         .get(sim.household as usize)
@@ -500,7 +501,7 @@ pub(crate) fn exit_on_foot(ctx: &Ctx, sim: &Sim) -> Option<[f32; 2]> {
         && ctx
             .briefs
             .get(sim.id as usize)
-            .is_some_and(|b| b.plot.is_none() || b.plot == home)
+            .is_some_and(|b| b.plot.is_none_or(|p| at_home(ctx.plots, home, p)))
     {
         return Some(exit);
     }

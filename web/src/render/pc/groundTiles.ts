@@ -7,7 +7,6 @@
 import * as pc from './engine';
 import { groundDepth, type RoadPlan, type WorldStructure, type WorldZone } from '../../core/protocol';
 import { carriageway, hasSidewalks } from '../shared/junctions';
-import { backdropGround } from '../shared/townBuildings';
 import { bridgeSpans, stretchOf } from '../shared/roads';
 import { BRIDGE } from '../shared/street';
 
@@ -47,7 +46,7 @@ export function disposeTiles(tiles: readonly GroundTile[]): void {
 /** Texels a metre at most, and the map's side at most (2048: half a metre a texel over a Big world). */
 const MAP_PER_M = 2;
 const MAP_MAX = 2048;
-/** The map's colours (sRGB): the asphalt and pavements as the street's textures and tones come out, the centre's paving, soil, paths, and what the backdrop's buildings stand on. */
+/** The map's colours (sRGB): the asphalt and pavements as the street's textures and tones come out, the centre's paving, soil and paths. */
 const MAP = {
   asphalt: '#55544F',
   pavement: '#C4C0B6',
@@ -55,8 +54,6 @@ const MAP = {
   soil: '#6B4E37',
   furrow: '#5A412E',
   path: '#A99C86',
-  forecourt: '#B9B3A6',
-  yard: '#9A8C74',
   joint: '#A4967F',
 } as const;
 
@@ -68,7 +65,7 @@ export interface TownGroundLand {
 }
 
 /**
- * What a town's ground map is drawn from, as a hash: its roads, lots, centres, backdrop, greens, fields and zones (not
+ * What a town's ground map is drawn from, as a hash: its roads, lots, centres, greens, fields and zones (not
  * how many of each: another town with a street moved, or a lot moved, has the same counts). Kept per world's meta.
  */
 function groundVersion(world: WorldStructure): number {
@@ -76,7 +73,7 @@ function groundVersion(world: WorldStructure): number {
   if (!meta) return 0;
   const known = groundVersions.get(meta);
   if (known?.plots === world.plots) return known.version;
-  const text = JSON.stringify([meta.roads, world.plots.map((p) => [p.x, p.z, p.w, p.d]), meta.centre, meta.backdrop?.map((b) => [b.poly, b.use]), meta.greens, meta.world?.fields, meta.zones, meta.paths]);
+  const text = JSON.stringify([meta.roads, world.plots.map((p) => [p.x, p.z, p.w, p.d]), meta.centre, meta.greens, meta.world?.fields, meta.zones, meta.paths]);
   let h = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
   const version = h >>> 0;
@@ -87,17 +84,14 @@ const groundVersions = new WeakMap<object, { plots: WorldStructure['plots']; ver
 
 /** The centre's paving's courses (m apart). */
 const COURSE = 5;
-/** How wide a building's way to the road is drawn (m): a forecourt's or a yard's carried on to it, a garden's path. */
-const WAY = { forecourt: 3, yard: 3, garden: 1.4 } as const;
 /** How far apart (m) the farmland's strength is asked (drawn smoothed between), and how far round the field zones (their soft edge). */
 const FIELD_MASK = 4;
 const FIELD_SOFT = 8;
 
 /**
  * The ground's colour map at altitude: what the town lays on its land (streets and pavements, the junctions'
- * pads, the centre's paving, its farm fields and paths, a big world's farmland as its ground has it,
- * and what the backdrop's buildings stand on: forecourts, yards, a way to the road) over the whole
- * world in one texture, baked
+ * pads, the centre's paving, its farm fields and paths, a big world's farmland as its ground has it)
+ * over the whole world in one texture, baked
  * once per town (`bake`; again only for another town), and laid over the ground tiles' colour by the town
  * view's blend (`shaders/townGround.ts`). The tiles' material takes its define only while the blend is over 0
  * (`apply`): up to `TOWN_FROM` the ground draws with the shader it always had.
@@ -157,27 +151,6 @@ export class TownGroundMap {
       for (let x = Math.ceil(x0 / COURSE) * COURSE; x < x1; x += COURSE) g.fillRect(x - 0.25, z0, 0.5, z1 - z0);
       for (let z = Math.ceil(z0 / COURSE) * COURSE; z < z1; z += COURSE) g.fillRect(x0, z - 0.25, x1 - x0, 0.5);
       g.restore();
-    }
-    // What the backdrop's buildings stand on (`backdropGround`: a forecourt, a yard; a garden's hedge is drawn with
-    // the buildings, `gardenHedges`), and their ways to the road.
-    const driven = roads.filter((r) => r.kind !== 'trail');
-    const grounds = (meta.backdrop ?? []).filter((b) => b.poly.length >= 3).map((b) => backdropGround(b, driven));
-    for (const way of [true, false]) {
-      for (const b of grounds) {
-        const colour = b.kind === 'garden' ? MAP.path : MAP[b.kind];
-        if (way && b.to) {
-          g.strokeStyle = colour;
-          g.lineWidth = WAY[b.kind];
-          g.beginPath();
-          g.moveTo(b.from[0], b.from[1]);
-          g.lineTo(b.to[0], b.to[1]);
-          g.stroke();
-        } else if (!way && b.kind !== 'garden') {
-          g.fillStyle = colour;
-          poly(b.round);
-          g.fill();
-        }
-      }
     }
     // None of that on the lots (their gardens stay theirs) or the greens.
     g.globalCompositeOperation = 'destination-out';

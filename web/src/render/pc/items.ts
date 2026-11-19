@@ -33,8 +33,8 @@ export interface ItemView {
   /** The same row on the ground's rows. */
   groundZ(z: number): number;
   storeyHeight: number;
-  /** Whether a ground point (tiles) is in the lot being viewed. */
-  inView(x: number, z: number): boolean;
+  /** Whether a ground point (tiles) on storey `k` is in the lot being viewed (and in no flat that may not be shown open). */
+  inView(x: number, z: number, k: number): boolean;
 }
 
 /** A drawn item's pick box (metres; ground rows). */
@@ -139,7 +139,7 @@ export class ItemLayer {
       this.disposeStale();
       return;
     }
-    const shown = this.items.filter((it) => it.state !== 'stored' && view.shown(view.storeyOf(it.z)) && view.inView(it.x, view.groundZ(it.z)));
+    const shown = this.items.filter((it) => it.state !== 'stored' && view.shown(view.storeyOf(it.z)) && view.inView(it.x, view.groundZ(it.z), view.storeyOf(it.z)));
     const byModel = Map.groupBy(shown, (it) => this.modelOf(it.def));
     this.buildElsewhere(generation);
     const keys = [...byModel.keys()];

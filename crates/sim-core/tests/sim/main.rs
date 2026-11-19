@@ -41,6 +41,7 @@ mod dishwasher;
 mod family;
 mod fast_lookups;
 mod fences;
+mod flats;
 mod floor_coverings;
 mod flowers;
 mod footstools;

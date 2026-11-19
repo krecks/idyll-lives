@@ -407,12 +407,12 @@ fn may_move(w: &World, i: usize) -> bool {
         && (w.player_moves || !w.households[s.household as usize].player)
 }
 
-/// A house nobody lives in (not a park, not the player's home), with beds for `n`: one, or two
-/// partners.
+/// A home nobody lives in (a house or a flat; not a park, not the player's home), with beds for
+/// `n`: one, or two partners.
 fn vacant_plot(w: &World, n: usize) -> Option<u32> {
     w.plots
         .iter()
-        .filter(|p| !p.public)
+        .filter(|p| p.is_home())
         .filter(|p| {
             !w.households
                 .iter()
@@ -466,7 +466,7 @@ fn move_to(w: &mut World, i: usize, to: usize) {
     crate::cars::job_lost(&mut w.cars, id);
     let arrive = w.households[to]
         .plot
-        .map(|p| w.plots[p as usize].arrival_point());
+        .map(|p| w.plots[p as usize].home_point());
     // (The household index no longer matches the residents: `World::household_sims`.)
     w.members.moved = true;
     let sim = &mut w.sims[i];
@@ -579,11 +579,11 @@ fn moving(w: &mut World, rules: &crate::content::MovingRules) {
 
 // ---- Newcomers -----------------------------------------------------------------------------
 
-/// Vacant houses (furnished, nobody living there, not the player's) get a new household now
-/// and then.
+/// Vacant homes (houses and flats: furnished, nobody living there, not the player's) get a new
+/// household now and then. They come in at the street door (a flat's building's).
 fn newcomers(w: &mut World, rules: &crate::content::NewcomerRules) {
     for p in 0..w.plots.len() as u32 {
-        if w.plots[p as usize].public
+        if !w.plots[p as usize].is_home()
             || beds(w, p).most(grown_stage(w)) == 0
             || w.households
                 .iter()
@@ -1076,7 +1076,7 @@ fn add_child(w: &mut World, h: usize, age: f32, parents: &[usize], born: bool) -
         .or_else(|| {
             w.households[h]
                 .plot
-                .map(|p| w.plots[p as usize].arrival_point())
+                .map(|p| w.plots[p as usize].home_point())
         })?;
     let (traits, perks) = random_character(w);
     let seed = w.rng.next_u32();

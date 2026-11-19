@@ -6,7 +6,7 @@
 //! home dirtier than `roomRules.clean.threshold` that the tool cleans (a mop and a broom leave a
 //! carpet; only a broom goes out into the garden), the keener the dirtier and the more of the room
 //! is dirty. The resident takes the tool (the renderer draws it in their hands, content `held`, and
-//! hides it where it's kept) to the dirtiest such spot (`spot`, every storey of the home; for a
+//! hides it where it's kept) to the dirtiest such spot (`spot`, every storey of the home, a flat's own storey; for a
 //! whole room, `reach` 0, the free tile nearest the middle of that room), and uses it there, facing
 //! the room (`facing`); done, the dirt comes off every tile of that room the tool cleans within its
 //! `reach` (`clean`, after the step). Two residents never clean the same spot at once: the spot is
@@ -47,7 +47,7 @@ pub(crate) fn keen(content: &Content, spot: &Spot) -> f32 {
 }
 
 /// Rows of plot `p` on every storey (each storey's block of rows, `storeys.rs`), the ground's
-/// first: `(z, ground)`.
+/// first; a flat's on its own storey only: `(z, ground)`.
 fn plot_rows(lot: &Lot, stairs: &StairMap, p: &Plot) -> impl Iterator<Item = (i32, bool)> {
     let depth = stairs.depth;
     let blocks = if depth > 0 {
@@ -55,7 +55,10 @@ fn plot_rows(lot: &Lot, stairs: &StairMap, p: &Plot) -> impl Iterator<Item = (i3
     } else {
         1
     };
-    (0..blocks).flat_map(move |b| (p.z..p.z + p.d).map(move |z| (z + b * depth, b == 0)))
+    let flat = p.is_flat().then_some(i32::from(p.storey));
+    (0..blocks)
+        .filter(move |&b| flat.is_none_or(|s| stairs.storey(b * depth) == s))
+        .flat_map(move |b| (p.z..p.z + p.d).map(move |z| (z + b * depth, b == 0)))
 }
 
 /// Whether the floor of room `room` is soft where no covering was laid: its kind's `carpet` (a
@@ -114,7 +117,7 @@ fn within(sweep: &Sweep, sx: i32, sz: i32, x: i32, z: i32) -> bool {
     sweep.reach == 0 || ((x - sx).abs().max((z - sz).abs()) <= i32::from(sweep.reach))
 }
 
-/// The dirtiest tile at home (plot `p`, every storey) that `sweep` cleans, dirtier than
+/// The dirtiest tile at home (plot `p`, every storey; a flat, its own) that `sweep` cleans, dirtier than
 /// `threshold`, that a resident can stand on and isn't one of `skip` (someone else's, or out of
 /// reach a moment ago); with how many more tiles over `threshold` it would clean there.
 #[allow(clippy::too_many_arguments)]
@@ -254,7 +257,8 @@ pub(crate) fn clean(w: &mut World, x: i32, z: i32, sweep: &Sweep) {
     if !w.lot.in_bounds(x, z) {
         return;
     }
-    let Some(plot) = w.plot_at(x, w.ground_z(z)) else {
+    // (In a building of flats, the flat on this storey.)
+    let Some(plot) = w.plot_at(x, z) else {
         return;
     };
     let p = w.plots[plot as usize].clone();

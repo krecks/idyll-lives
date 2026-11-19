@@ -946,7 +946,8 @@ impl World {
                     // down to do isn't saved.)
                     pos = [fx as f32 + 0.5, fz as f32 + 0.5];
                 }
-                // (Lost somewhere: back at home's front door, or the middle of town.)
+                // (Lost somewhere: back at home (a flat's: behind its own door), or the middle of
+                // town.)
                 if !pos.iter().all(|p| p.is_finite()) {
                     let home = self
                         .households
@@ -954,7 +955,7 @@ impl World {
                         .and_then(|h| h.plot);
                     pos = home.map_or(
                         [self.lot.width as f32 / 2.0, self.lot.depth as f32 / 2.0],
-                        |p| self.plots[p as usize].arrival_point(),
+                        |p| self.plots[p as usize].home_point(),
                     );
                 }
                 let tasks = s
@@ -1448,8 +1449,6 @@ impl World {
             .chain((0..tops.len()).filter(|&i| grown[i]))
             .chain((0..tops.len()).filter(|&i| tops[i]))
             .collect();
-        // (A thing's keeper, `ObjectInstance::keeper`, must be one of the plots.)
-        let plots = world.plots.len();
         for i in order {
             let o = &save.objects[i];
             // (A corrupt save's second use of an id gets a fresh one.)
@@ -1501,8 +1500,9 @@ impl World {
                     None => None,
                 };
                 obj.rack = o.rack.min(world.content.objects[obj.def].rack);
-                obj.keeper = o.plot.filter(|&k| (k as usize) < plots);
                 let id = if posts[i] { world.nudge_post(id) } else { id };
+                // (A thing kept by a plot it doesn't stand on: one of the plots, `World::keep`.)
+                world.keep(id, o.plot);
                 used.extend(keep);
                 object_ids.insert(i as u32, id);
             }

@@ -77,6 +77,18 @@ impl ObjectIndex {
                 }
             }
         }
+        // A flat's people may use its building's own things too (the hall's, the yard's: a
+        // building of flats is nobody's home, `world::at_home`), kept in id order.
+        for (f, p) in plots.iter().enumerate() {
+            if let Some(lot) = p.of.map(|l| l as usize).filter(|&l| !plots[l].public)
+                && !index.on[lot].is_empty()
+            {
+                let shared = index.on[lot].clone();
+                let own = &mut index.usable[f];
+                own.extend(shared);
+                own.sort_unstable();
+            }
+        }
         index
     }
 
