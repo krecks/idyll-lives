@@ -31,9 +31,9 @@ import { IMPOSTOR_COLUMNS, IMPOSTOR_ROWS } from './shaders/impostorLayout';
 
 /**
  * The pictures: `columns` sides round the tree at each of `elevations` (rad above the horizon), `tile` texels
- * square each; a woods square further than `from` m from the eye (its nearest tree) draws them.
+ * square each; a woods square further than `switchDistance` m from the eye (its nearest tree) draws them.
  */
-export const IMPOSTOR = { columns: IMPOSTOR_COLUMNS, elevations: [0.6, 0.95], tile: 128, from: 250 } as const;
+export const IMPOSTOR = { columns: IMPOSTOR_COLUMNS, elevations: [0.6, 0.95], tile: 128, switchDistance: 250 } as const;
 
 /** Where the bake's cameras stand from the tree (m: far enough that the leaves' cut-out near the eye is off, `shaders/cutout.ts`). */
 const BAKE_DISTANCE = 120;
@@ -217,14 +217,16 @@ export const IMPOSTOR_SHADER: ShaderFeature = { name: 'impostor', priority: 225,
 registerShaderFeature(IMPOSTOR_SHADER);
 
 /** The eye (game space) the cards face: every card's, set each frame the town view draws them (`setImpostorEye`). */
+const eyeValues = new WeakMap<pc.GraphicsDevice, Float32Array>();
+
 export function setImpostorEye(device: pc.GraphicsDevice, eye: { x: number; y: number; z: number }): void {
-  const v = (eyeValues.get(device) ?? eyeValues.set(device, new Float32Array(3)).get(device))!;
+  let v = eyeValues.get(device);
+  if (!v) eyeValues.set(device, (v = new Float32Array(3)));
   v[0] = eye.x;
   v[1] = eye.y;
   v[2] = eye.z;
   device.scope.resolve('game_eye').setValue(v);
 }
-const eyeValues = new WeakMap<pc.GraphicsDevice, Float32Array>();
 
 /** A model's impostor: its picture, the card's mesh (its box the card's reach) and material. */
 export interface Impostor {
@@ -258,22 +260,25 @@ export class TreeImpostors {
     private readonly onBaked: () => void,
   ) {}
 
-  /** `key`'s impostor if it is baked; else it is baked (from `template`, its bake's draws under `parent`) and null for now. */
-  get(key: string, template: ModelTemplate, parent: pc.Entity): Impostor | null {
-    const have = this.made.get(key);
-    if (have && typeof have === 'object') return have;
-    if (!have) {
-      this.made.set(key, 'baking');
-      this.queue.push({ key, template, parent });
-      void this.next();
-    }
-    return null;
+  /** `key`'s state: its impostor once baked, `'baking'` while its bake runs, `'failed'` if that gave up, `'missing'` until it is asked for. */
+  state(key: string): Impostor | 'baking' | 'failed' | 'missing' {
+    return this.made.get(key) ?? 'missing';
   }
 
-  /** Whether `key`'s impostor is baked or its bake failed (nothing more will come of asking). */
-  settled(key: string): boolean {
-    const m = this.made.get(key);
-    return m !== undefined && m !== 'baking';
+  /** Asks for `key`'s impostor (baked from `template`, its draws under `parent`) and says what came of asking. */
+  want(key: string, template: ModelTemplate, parent: pc.Entity): Impostor | 'baking' | 'failed' {
+    const have = this.state(key);
+    if (have !== 'missing') return have;
+    this.made.set(key, 'baking');
+    this.queue.push({ key, template, parent });
+    void this.next();
+    return 'baking';
+  }
+
+  /** `key`'s impostor if it is baked; else it is baked (from `template`, its bake's draws under `parent`) and null for now. */
+  get(key: string, template: ModelTemplate, parent: pc.Entity): Impostor | null {
+    const have = this.want(key, template, parent);
+    return typeof have === 'object' ? have : null;
   }
 
   private async next(): Promise<void> {
@@ -317,9 +322,13 @@ function disposeImpostor(m: Impostor): void {
 
 /** A card for `count` copies of `impostor`, their matrices `matrices` (16 floats each), under `parent` (drawn while it is). */
 export function impostorCards(impostor: Impostor, parent: pc.Entity, matrices: Float32Array, count: number, name: string): Instances {
+  // SAFETY: an entity keeps its app in `_app` (the constructor's `app`; tools/render/chunks.json).
   const device = (parent as unknown as { _app: pc.AppBase })._app.graphicsDevice;
-  const d = new Instances(device, parent, impostor.mesh, impostor.material, { name, castShadows: false, receiveShadows: true, capacity: count });
-  d.setMatrices(matrices, count);
+  // (A matrix each, 16 floats: never read past what was given.)
+  const cards = Math.min(count, Math.floor(matrices.length / 16));
+  if (cards < count) console.warn(`[render] ${name}: ${count} cards asked for, ${cards} matrices given`);
+  const d = new Instances(device, parent, impostor.mesh, impostor.material, { name, castShadows: false, receiveShadows: true, capacity: cards });
+  d.setMatrices(matrices, cards);
   d.update();
   return d;
 }
@@ -332,29 +341,29 @@ async function bake(app: pc.AppBase, key: string, template: ModelTemplate, paren
   const device = app.graphicsDevice;
   const { columns, elevations, tile } = IMPOSTOR;
   // The model's box (its meshes', model space): how high its middle is, how far it reaches round its trunk and up and down.
-  const lo = [Infinity, Infinity, Infinity];
-  const hi = [-Infinity, -Infinity, -Infinity];
+  const min = new pc.Vec3(Infinity, Infinity, Infinity);
+  const max = new pc.Vec3(-Infinity, -Infinity, -Infinity);
+  let any = false;
   for (const m of template.meshes) {
     const b = m.mesh.aabb;
-    const [mn, mx] = [b.getMin(), b.getMax()];
-    lo[0] = Math.min(lo[0], mn.x);
-    lo[1] = Math.min(lo[1], mn.y);
-    lo[2] = Math.min(lo[2], mn.z);
-    hi[0] = Math.max(hi[0], mx.x);
-    hi[1] = Math.max(hi[1], mx.y);
-    hi[2] = Math.max(hi[2], mx.z);
+    min.min(b.getMin());
+    max.max(b.getMax());
+    any = true;
   }
-  if (!Number.isFinite(lo[0])) return null;
-  const centre = (lo[1] + hi[1]) / 2;
-  const tallHalf = Math.max(0.25, (hi[1] - lo[1]) / 2);
-  const radius = Math.max(0.25, Math.hypot(Math.max(-lo[0], hi[0]), Math.max(-lo[2], hi[2])));
+  if (!any) {
+    console.warn(`[render] impostor of ${key} failed: its model has no mesh with a box`);
+    return null;
+  }
+  const centre = (min.y + max.y) / 2;
+  const tallHalf = Math.max(0.25, (max.y - min.y) / 2);
+  const radius = Math.max(0.25, Math.hypot(Math.max(-min.x, max.x), Math.max(-min.z, max.z)));
   // Half the card at first: the tree's box seen from any side at either height.
   const loose = Math.max(radius, ...elevations.map((e) => tallHalf * Math.cos(e) + radius * Math.sin(e))) * MARGIN;
 
   // One target: the colour by day's rows, the colour by night's, the normals'.
   const width = tile * columns;
-  const bands = PASSES.length;
-  const tall = tile * ROWS * bands;
+  const passes = PASSES.length;
+  const tall = tile * ROWS * passes;
   const color = new pc.Texture(device, { name: `impostorBake:${key}`, width, height: tall, format: pc.PIXELFORMAT_RGBA8, mipmaps: false, minFilter: pc.FILTER_NEAREST, magFilter: pc.FILTER_NEAREST });
   const target = new pc.RenderTarget({ name: `impostorBake:${key}`, colorBuffer: color, depth: true });
   const layers = PASSES.map((pass) => {
@@ -393,12 +402,12 @@ async function bake(app: pc.AppBase, key: string, template: ModelTemplate, paren
     const root = parent.getWorldTransform();
     const at = new pc.Vec3();
     const aim = root.transformPoint(new pc.Vec3(0, middle, 0));
-    layers.forEach(({ layer }, pass) => {
+    layers.forEach(({ layer }, band) => {
       elevations.forEach((e, row) => {
         for (let col = 0; col < columns; col++) {
           const a = (col / columns) * Math.PI * 2;
-          const top = pass * ROWS + row;
-          const rect = new pc.Vec4(col / columns, 1 - (top + 1) / (ROWS * bands), 1 / columns, 1 / (ROWS * bands));
+          const top = band * ROWS + row;
+          const rect = new pc.Vec4(col / columns, 1 - (top + 1) / (ROWS * passes), 1 / columns, 1 / (ROWS * passes));
           const cam = new pc.Entity('impostorBake');
           cam.addComponent('camera', {
             projection: pc.PROJECTION_ORTHOGRAPHIC,
@@ -426,9 +435,9 @@ async function bake(app: pc.AppBase, key: string, template: ModelTemplate, paren
       });
     });
     // Drawn in the next frame drawn, read after it (as the save's picture, `thumbnail.ts`).
-    const read = await new Promise<Uint8Array | null>((resolve) => {
+    const pixels = await new Promise<Uint8Array | null>((resolve) => {
       let armed = false;
-      const timer = setTimeout(() => finish(null), 5000);
+      const timer = setTimeout(() => finish(null, 'no frame was drawn within 5 s'), 5000);
       const prerender = () => {
         if (armed) return;
         armed = true;
@@ -437,11 +446,12 @@ async function bake(app: pc.AppBase, key: string, template: ModelTemplate, paren
       const postrender = () => {
         if (!armed) return;
         for (const c of cameras) c.enabled = false;
-        const read = color.read(0, 0, width, tall, { renderTarget: target }) as Promise<Uint8Array> | undefined;
-        if (!read) finish(null);
-        else read.then(finish, () => finish(null));
+        const pending = color.read(0, 0, width, tall, { renderTarget: target }) as Promise<Uint8Array> | undefined;
+        if (!pending) finish(null, 'the device cannot read the target back');
+        else pending.then(finish, (err: unknown) => finish(null, `its read-back failed (${String(err)})`));
       };
-      function finish(p: Uint8Array | null) {
+      function finish(p: Uint8Array | null, why?: string) {
+        if (why) console.warn(`[render] impostor of ${key}: ${why}`);
         clearTimeout(timer);
         app.off('prerender', prerender);
         app.off('postrender', postrender);
@@ -451,7 +461,7 @@ async function bake(app: pc.AppBase, key: string, template: ModelTemplate, paren
       app.on('postrender', postrender);
     });
     for (const c of cameras) c.destroy();
-    return read;
+    return pixels;
   };
   const cleanup = () => {
     for (const d of draws) d.destroy();
@@ -572,8 +582,14 @@ function fit(pixels: Uint8Array, width: number, tall: number, tile: number, bott
  * across its tile's view, up it and towards the eye that drew it (`compose`'s cameras: game space, the world root's
  * mirror turning right round, as the cards' `vsLocal`), as `n * 0.5 + 0.5`, for the cards' lighting.
  */
+/** A band's rows: the target's height over the passes. */
+const rowsPerPass = (tall: number) => tall / PASSES.length;
+
+/** `v` · (`x`, `y`, `z`): a texel's normal across the picture against one of its view's axes. */
+const dot = (v: readonly number[], x: number, y: number, z: number) => v[0] * x + v[1] * y + v[2] * z;
+
 function compose(pixels: Uint8Array, width: number, tall: number, bottomUp: boolean, band: number, normals = false): Uint8Array {
-  const rows = tile0(tall);
+  const rows = rowsPerPass(tall);
   const { columns, elevations, tile } = IMPOSTOR;
   const out = new Uint8Array(width * rows * 4);
   const row = (y: number) => (bottomUp ? tall - 1 - y : y) * width * 4;
@@ -599,11 +615,12 @@ function compose(pixels: Uint8Array, width: number, tall: number, bottomUp: bool
       if (pixels[i + 3] === 0) continue;
       if (normals) {
         const { f, r, u } = view[Math.floor(x / tile)];
-        const g = [0, 1, 2].map((c) => (pixels[n + x * 4 + c] / 255) * 2 - 1);
-        const dot = (v: number[]) => v[0] * g[0] + v[1] * g[1] + v[2] * g[2];
-        out[o] = Math.round((dot(r) * 0.5 + 0.5) * 255);
-        out[o + 1] = Math.round((dot(u) * 0.5 + 0.5) * 255);
-        out[o + 2] = Math.round((dot(f) * 0.5 + 0.5) * 255);
+        const gx = (pixels[n + x * 4] / 255) * 2 - 1;
+        const gy = (pixels[n + x * 4 + 1] / 255) * 2 - 1;
+        const gz = (pixels[n + x * 4 + 2] / 255) * 2 - 1;
+        out[o] = Math.round((dot(r, gx, gy, gz) * 0.5 + 0.5) * 255);
+        out[o + 1] = Math.round((dot(u, gx, gy, gz) * 0.5 + 0.5) * 255);
+        out[o + 2] = Math.round((dot(f, gx, gy, gz) * 0.5 + 0.5) * 255);
       } else {
         out[o] = pixels[i];
         out[o + 1] = pixels[i + 1];
@@ -615,9 +632,6 @@ function compose(pixels: Uint8Array, width: number, tall: number, bottomUp: bool
   bleed(out, width, rows, tile);
   return out;
 }
-
-/** A band's rows: the target's height over the passes. */
-const tile0 = (tall: number) => tall / PASSES.length;
 
 /** The clear texels next to the picture take its colour (still clear), `BLEED` texels out, within each tile. */
 function bleed(px: Uint8Array, width: number, height: number, tile: number): void {
