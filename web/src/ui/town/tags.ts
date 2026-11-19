@@ -5,9 +5,9 @@
  * there (`tagRank`). `TownTags.svelte` places them on screen each frame (`game/tagLayout.ts`, as the menus do).
  */
 
-import type { HouseholdInfo, PlotInfo, RelationshipView, SimInfo, SimView, TownArea, TownPlace } from '../../core/protocol';
+import type { FlatInfo, HouseholdInfo, PlotInfo, RelationshipView, SimInfo, SimView, TownArea, TownPlace } from '../../core/protocol';
 import { kinLabel, friendLabel, romanceLabel } from '../relationship';
-import { lotInSentence, wayText } from '../place';
+import { lotInSentence, plotInfo, wayText, type Lots } from '../place';
 import type { TagKind } from './kinds';
 import { openState, openText, type HomeForSale, type NameLabel } from './places';
 import { schoolOf, workplaceOf } from './workplace';
@@ -57,6 +57,8 @@ export interface TagWorld {
   roster: readonly Pick<SimInfo, 'id' | 'gender' | 'gone'>[];
   households: readonly HouseholdInfo[];
   plots: readonly PlotInfo[];
+  /** The flats: a household's home, or where a resident is, may be one (`plotInfo`). */
+  flats?: readonly FlatInfo[];
   relationships: readonly RelationshipView[];
   places: readonly TownPlace[];
   /** Places' index by their public lot. */
@@ -75,7 +77,7 @@ export interface TagWorld {
 /** Where `s` is, in words, and the place they count at. */
 export function whereabouts(s: SimView, w: TagWorld): Whereabouts {
   const home = w.households[s.household]?.plot ?? null;
-  const way = wayText(s, home, w.plots, w.households, w.time);
+  const way = wayText(s, home, w, w.households, w.time);
   if (way) return { place: null, text: way.charAt(0).toLowerCase() + way.slice(1), unplaced: false };
   if (s.awayUntil !== null) {
     const school = !s.job && w.pupil(s.stage);
@@ -88,12 +90,12 @@ export function whereabouts(s: SimView, w: TagWorld): Whereabouts {
   const at = s.visiting ?? s.plot;
   const place = at === null ? null : (w.placeOfPlot.get(at) ?? null);
   if (s.visiting !== null) {
-    const p = w.plots[s.visiting];
+    const p = plotInfo(w, s.visiting);
     return { place, text: `visiting ${p ? lotInSentence(p, w.households) : 'friends'}`, unplaced: false };
   }
   if (s.plot === null) return { place: null, text: 'out', unplaced: false };
   if (s.plot === home) return { place: null, text: 'at home', unplaced: false };
-  const p = w.plots[s.plot];
+  const p = plotInfo(w, s.plot);
   return { place, text: p ? `at ${lotInSentence(p, w.households)}` : 'out', unplaced: false };
 }
 
@@ -162,7 +164,8 @@ export function householdTags(members: readonly SimView[], w: TagWorld): { tags:
 
 /**
  * The household's home's own tag, while none of the household's tags stands there (nobody is in): the home is marked
- * from anywhere in the town view. Over its house (its lot, without one). A click glides down to it.
+ * from anywhere in the town view. Over its house (its lot, without one; a flat's building, `home` then the building's
+ * lot and `homeId` the flat). A click glides down to it.
  */
 export function homeTag(home: PlotInfo | null | undefined, members: readonly SimView[], homeId: number | null): TownTag | null {
   if (!home || members.some((s) => s.plot === homeId && s.awayUntil === null)) return null;
@@ -309,22 +312,25 @@ export function nearestFew(tags: readonly { key: string; far: number }[], most: 
   return new Set(order.slice(0, Math.max(0, most)).map((t) => t.key));
 }
 
-/** The homes for sale: their price and size. */
-export function saleTags(homes: readonly HomeForSale[], plots: readonly PlotInfo[], money: (n: number) => string): TownTag[] {
-  return homes.map((h) => {
-    const p = plots[h.plot];
-    const size = h.floor ? `${h.storeys > 1 ? `${h.storeys} floors · ` : ''}${Math.round(h.floor)} m²` : `empty lot · ${h.w} × ${h.d} m`;
-    return {
-      key: `s:${h.plot}`,
-      kind: 'sale' as const,
-      title: h.price ? `${money(h.price)}+` : 'For sale',
-      detail: size,
-      anchor: { x: p.x + p.w / 2, z: p.z + p.d / 2 },
-      lift: 6,
-      tone: 'sale' as const,
-      action: { kind: 'sale' as const, plot: h.plot },
-      radius: [0, SALE_REACH] as [number, number],
-    };
+/** The homes for sale: their price and size (a flat's over its own rectangle, `lots` the town's lots and flats). */
+export function saleTags(homes: readonly HomeForSale[], lots: Lots, money: (n: number) => string): TownTag[] {
+  return homes.flatMap((h) => {
+    const p = plotInfo(lots, h.plot);
+    if (!p) return [];
+    const size = h.flat ? `flat · ${Math.round(h.floor)} m²` : h.floor ? `${h.storeys > 1 ? `${h.storeys} floors · ` : ''}${Math.round(h.floor)} m²` : `empty lot · ${h.w} × ${h.d} m`;
+    return [
+      {
+        key: `s:${h.plot}`,
+        kind: 'sale' as const,
+        title: h.price ? `${money(h.price)}+` : 'For sale',
+        detail: size,
+        anchor: { x: p.x + p.w / 2, z: p.z + p.d / 2 },
+        lift: 6,
+        tone: 'sale' as const,
+        action: { kind: 'sale' as const, plot: h.plot },
+        radius: [0, SALE_REACH] as [number, number],
+      },
+    ];
   });
 }
 

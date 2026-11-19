@@ -471,11 +471,8 @@ export interface LandCursor {
   tone: 'up' | 'down' | 'water' | 'cover' | 'bad' | UseKind | 'erase';
 }
 
-/**
- * What `Renderer.buildingAt` found: a lot's building. (`building`, a building on no lot, is found no more: every
- * building is a lot's. It goes once the town's cards no longer ask for it, `ui/town/chosen.ts`.)
- */
-export type BuildingHit = { kind: 'lot'; plot: number } | { kind: 'building'; index: number };
+/** What `Renderer.buildingAt` found: a lot's building (every building is a lot's). */
+export type BuildingHit = { kind: 'lot'; plot: number };
 
 export interface Renderer {
   init(canvas: HTMLCanvasElement): Promise<void>;

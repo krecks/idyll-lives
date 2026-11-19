@@ -42,6 +42,7 @@ import { settings, unsavedSettings } from '../settings/settings.svelte';
 import { app } from '../ui/app.svelte';
 import { services } from '../ui/services';
 import { game } from '../ui/state.svelte';
+import { plotInfo } from '../ui/place';
 import { BENCH, type BenchFlags } from './benchFlags';
 import { gpuInfo, loadState } from './report';
 
@@ -266,7 +267,7 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
   renderer.followSim(null);
 
   const home = game.households.find((h) => h.player)?.plot;
-  const plot = home == null ? null : game.plots[home];
+  const plot = plotInfo(game, home) ?? null;
   const town = renderer.benchInfo().world as { width: number; depth: number; areas?: [number, number][] } | undefined;
   // (`townCentre=1`: round the drawn world's main town, the town view's.)
   const main = b.orbit.town ? town?.areas?.[0] : undefined;
