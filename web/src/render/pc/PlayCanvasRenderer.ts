@@ -84,6 +84,7 @@ import { applyLandFixture, LAND_FIXTURE } from '../landFixture';
 import { lotBuilding, MOVER_GROW, TownBuildings, TownMovers, type Mover, type TownLotHouse } from './townView';
 import { STOREY as TOWN_STOREY } from '../shared/townBuildings';
 import { lotWallsHeight, rayPrism, rectFootprint } from '../shared/buildingPick';
+import { closedFlats, flatLids, inFlats, viewedFlats } from '../shared/flatLids';
 import { TownGroundMap } from './groundTiles';
 import { LandHaze } from './landHaze';
 import { cutInView } from '../shared/landVeil';
@@ -95,7 +96,7 @@ import { Geo } from '../shared/geometry';
 import { pavedRects } from '../shared/paving';
 import { GrassPush } from '../shared/grass';
 import { idleMoment } from '../shared/idle';
-import { coveringSurface, houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from '../shared/house';
+import { coveringSurface, HOUSE_MATERIALS, houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from '../shared/house';
 import { compose, quatYawPitchRoll, toLinear, type Quat } from '../shared/math';
 import { OrbitControls } from '../shared/orbit';
 import { Flight, panBounds, Roam, WARM_LOTS, warmLots, type FocusPlot } from '../shared/focus';
@@ -109,7 +110,7 @@ import { fieldLayers } from '../shared/street';
 import { darkTiles, windowlessRooms, type DarkTiles, type Windowless } from '../shared/windowless';
 import type { FrameState } from '../../core/bridge';
 import { Pose } from '../../core/snapshot';
-import { groundDepth, lowestStorey, storeyOfRow, storeyRow, storeyShown, type FenceEdge, type GarageInfo, type ItemPlacement, type ObjectPlacement, type RoadPlan, type StoreyLayout, type WorldStructure } from '../../core/protocol';
+import { groundDepth, lowestStorey, storeyOfRow, storeyRow, storeyShown, type FenceEdge, type FlatInfo, type GarageInfo, type ItemPlacement, type ObjectPlacement, type RoadPlan, type StoreyLayout, type WorldStructure } from '../../core/protocol';
 import type { VisemeTrack } from '../../voice/visemes';
 import type {
   BuildEffect,
@@ -175,6 +176,9 @@ declare global {
 const TOWN_FADE = 0.03;
 /** A far bike's frame (sRGB). */
 const BIKE: readonly [number, number, number] = [0.22, 0.22, 0.24];
+
+/** How often (ms) the flats of the building in view are asked again whether they may be shown open (`setFlatsOpen`). */
+const FLATS_ASK_MS = 250;
 
 /** Longest wait (ms) for the birds of a game's first build (their models built): they'd pop in in play otherwise. */
 const BIRDS_WAIT_MS = 3000;
@@ -625,6 +629,17 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private lotRooms: RoomTiles | null = null;
   /** Openings in the ground floor over stairs down to the basement (ground rows), seen from the ground up. */
   private stairwells: ViewRect[] = [];
+  /**
+   * The flats of the building in view (`WorldStructure.flats` of the viewed lot), whether each may be shown open
+   * (`setFlatsOpen`), those that may not now (and their ids as a key), when that was last asked, and their lids (one
+   * draw a storey, `placeLids`).
+   */
+  private viewFlats: readonly FlatInfo[] = [];
+  private flatsOpen: ((plot: number) => boolean) | null = null;
+  private closedFlats: readonly FlatInfo[] = [];
+  private closedKey = '';
+  private flatsAskedAt = 0;
+  private lids: { entity: pc.Entity; storey: number }[] = [];
   /** The house's garden trees and shrubs (`placeDecor`): a draw per model mesh, hidden while its basement is in view. */
   private decorTemplates!: TemplateCache<ModelTemplate>;
   /** The viewed lot's hedges (its fences in the hedge style), planted with its garden's shrubs ([x, z, scale, yaw]). */
@@ -738,13 +753,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly followHead = { x: 0, y: 0, z: 0 };
   private framedView = '';
   /**
-   * Whether a resident at ground point (x, z) is drawn: on the viewed lot (and just round it) as
-   * ever; elsewhere outdoors within the preset's `residentRadius` of the camera's target and in the
-   * view (life on every lot), not indoors on a lot not in view (its house is a silhouette there).
-   * `?residents=lot`: only the viewed lot's, as before.
+   * Whether a resident at ground point (x, z) on storey `k` is drawn: on the viewed lot (and just round
+   * it) as ever, but not in a flat of it that may not be shown open (`closedFlats`); elsewhere outdoors
+   * within the preset's `residentRadius` of the camera's target and in the view (life on every lot),
+   * not indoors on a lot not in view (its house is a silhouette there). `?residents=lot`: only the
+   * viewed lot's, as before.
    */
-  private readonly simInView = (x: number, z: number): boolean => {
-    if (this.diag.has('nosims')) return false;
+  private readonly simInView = (x: number, z: number, k = 0): boolean => {
+    if (this.diag.has('nosims') || inFlats(this.closedFlats, x, z, k)) return false;
     if (this.inView(x, z, SIM_VIEW_MARGIN)) return true;
     const vp = this.simViewProj;
     const world = this.lastWorld;
@@ -918,7 +934,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // The map's size, filtering and bias are the preset's (`sunShadows.ts`).
     this.sunShadows = new SunShadows(this.app, this.sun, { size: this.quality.shadowMapSize, rate: this.quality.shadowRate, still: !this.diag.has('wholeshadows') });
     // (lotContents.ts: the landscape, sky, objects and items.)
-    this.lot = new LotContents(this.app, this.root, this.sun, this.camera.entity, this.deps, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), inView: (x, z, m) => this.inView(x, z, m) }, { pace: () => this.pace(), shadowsMoved: (urgent) => this.castersMoved(urgent), partsMoved: () => this.partsMoved(), landscapeChanged: () => this.lamps.exclude(this.lot.landscapeDraws()) /* (lamps.ts) */ });
+    this.lot = new LotContents(this.app, this.root, this.sun, this.camera.entity, this.deps, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), inView: (x, z, m) => this.inView(x, z, m), closed: (x, z, k) => inFlats(this.closedFlats, x, z, k) }, { pace: () => this.pace(), shadowsMoved: (urgent) => this.castersMoved(urgent), partsMoved: () => this.partsMoved(), landscapeChanged: () => this.lamps.exclude(this.lot.landscapeDraws()) /* (lamps.ts) */ });
     // (the menus' town on a layer of its own, `overview.ts`, the landscape's draws for it too; the sky on both.)
     this.lot.objectsRoot = this.lotRoot;
     const town = townLayer(this.app).id;
@@ -2032,6 +2048,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.roam.setBounds({ x0: pb.x0 - 300, z0: pb.z0 - 300, x1: pb.x1 + 300, z1: pb.z1 + 300 });
     const viewIndex = view ? world.plots.findIndex((p) => p.x === view.x && p.z === view.z && p.w === view.w && p.d === view.d) : -1;
     this.roam.setFocus(viewIndex >= 0 ? viewIndex : null);
+    // The flats of the building in view, and which of them may not be shown open (`setFlatsOpen`).
+    this.viewFlats = viewedFlats(world, view);
+    this.closedFlats = closedFlats(this.viewFlats, this.flatsOpen);
+    this.closedKey = this.closedFlats.map((f) => f.id).join(',');
     if (this.streamOn) {
       const o = this.orbit;
       const aspect = this.cssSize.width / Math.max(1, this.cssSize.height);
@@ -2113,6 +2133,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.placing.objectsBuilt(); // (the thing in hand hidden in them.)
     this.loadStep('Bringing everyone home', 0.55);
     await this.buildSims(world);
+    this.placeLids();
     this.applyWallMode();
     this.applyStoreys();
     const birds = this.birdLife.settle(world, view, this.fixedHour !== null ? this.fixedHour * 60 : this.lastMinute, { landscape: this.lot.landscape, street: this.street.plants, roofs: this.roofs, houseTop: (plot) => this.house.roofTop(plot) }); // (where the birds live.)
@@ -2226,6 +2247,30 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       else for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
       const mesh = meshFrom(this.device, geo.meshData({ colors: toned }));
       if (mesh) this.lotEntities.push({ entity: drawMesh(this.lotRoot, name, mesh, toned ? this.lib.surface(material, { doubleSided: true, vertexColors: true }) : this.lotMaterial(material)), storey: 0 });
+    }
+  }
+
+  setFlatsOpen(mayOpen: ((plot: number) => boolean) | null): void {
+    this.flatsOpen = mayOpen;
+    this.askFlats();
+  }
+
+  /** Which flats of the building in view may be shown open, asked again: its things, residents and lids drawn again if that changed. */
+  private askFlats(): void {
+    if (!this.viewFlats.length || !this.lastWorld || this.worldBuilding) return;
+    if (closedFlats(this.viewFlats, this.flatsOpen).map((f) => f.id).join(',') !== this.closedKey) void this.setWorld(this.lastWorld, this.view);
+  }
+
+  /**
+   * A lid over each flat of the building in view that may not be shown open (`closedFlats`, `flatLids`), so from above
+   * it is closed as a neighbour's house is; drawn only with its storey in view (`applyStoreys`).
+   */
+  private placeLids(): void {
+    for (const l of this.lids) l.entity.destroy();
+    this.lids = [];
+    for (const [k, geo] of flatLids(this.closedFlats, WALL_HEIGHT)) {
+      const mesh = meshFrom(this.device, geo.meshData({ colors: true }));
+      if (mesh) this.lids.push({ entity: drawMesh(this.lotRoot, `flatLids${k}`, mesh, this.lib.surface(HOUSE_MATERIALS.plaster, { vertexColors: true, doubleSided: true }), { castShadows: true }), storey: k });
     }
   }
 
@@ -2438,8 +2483,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const shown = (z: number) => storeyShown(this.storeyOf(z), this.storey);
     // The viewed lot on every storey at once: each room's lamps (or fill) are placed once.
     const inView = (x: number, z: number) => {
-      const row = z - this.rowOf(this.storeyOf(z));
-      return !view || (x >= view.x && row >= view.z && x < view.x + view.w && row < view.z + view.d);
+      const k = this.storeyOf(z);
+      const row = z - this.rowOf(k);
+      return (!view || (x >= view.x && row >= view.z && x < view.x + view.w && row < view.z + view.d)) && !inFlats(this.closedFlats, x + 0.5, row + 0.5, k);
     };
     this.markWindowless(world, view);
     const lights: RoomLight[] = this.lotRooms ? placeLights(world, inView, this.lotRooms, (def) => this.deps.content.object(def)?.light).filter((l) => shown(l.z)) : [];
@@ -2559,6 +2605,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private clearLot(): void {
     for (const { entity } of this.lotEntities) entity.destroy();
     this.lotEntities = [];
+    for (const l of this.lids) l.entity.destroy();
+    this.lids = [];
     this.lotKey = '';
     this.roofs = [];
     this.doors = [];
@@ -2633,6 +2681,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (From the town view the house stands whole, `townWhole`: every storey from the ground up, whichever is in view.)
     const upTo = this.townWhole && this.storey >= 0 ? this.storeys.count - 1 : this.storey;
     for (const { entity, storey } of this.lotEntities) if (storey !== undefined) entity.enabled = storeyShown(storey, upTo);
+    // (A closed flat's lid with its own storey in view: the storey over it has its floor there.)
+    for (const l of this.lids) l.entity.enabled = l.storey === upTo;
     for (const p of this.decor.values()) for (const d of p.draws) d.enabled = this.storey >= 0 && d.count > 0;
     const v = this.view;
     this.street.showLot(this.storey >= 0);
@@ -2850,6 +2900,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lastMinute = minute;
     this.lastWeekday = (Math.max(1, curr[layout.header.day] | 0) - 1) % 7;
     if (this.townMode) return;
+    // Which flats of the building in view may be shown open, asked again a few times a second.
+    if (this.viewFlats.length && this.flatsOpen && frame.now - this.flatsAskedAt >= FLATS_ASK_MS) {
+      this.flatsAskedAt = frame.now;
+      this.askFlats();
+    }
     const h = layout.header;
     this.gamePaused = (curr[h.speed] | 0) === 0;
     // At 10× and super speed, the preset's step (Low's ten minutes: each update re-colours the sun, sky and lamps).

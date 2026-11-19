@@ -628,6 +628,12 @@ export interface Renderer {
    * previews and ground picks work on this storey's rows of the lot (see `WorldStructure.storeys`).
    */
   setStorey(storey: number): void;
+  /**
+   * Which flats of the building in view may be shown open (`game/openLots.ts` `mayOpen`, asked of each flat's plot
+   * id); null: every one. A flat that may not keeps a lid over it on the storey in view, and its things, its food and
+   * the residents in it are not drawn. Asked again a few times a second (someone of yours going in opens it).
+   */
+  setFlatsOpen(mayOpen: ((plot: number) => boolean) | null): void;
   /** Build/buy mode: plays a placement, upgrade, sale or construction effect (after `setWorld` showed the change). */
   buildEffect(fx: BuildEffect): void;
   stats(): RenderStats;
