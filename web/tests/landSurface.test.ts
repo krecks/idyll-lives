@@ -2,15 +2,17 @@
 // levels, `nature.ts`'s land, `pc/space.ts` `setDatum`), on a small made-up world: a street climbing a slope with a
 // lane in a T off it and lots on both. The roads drawn on their heights (the sidewalks' outer edges a lip below),
 // the junction's pad at its one height; a part merged onto its pad; each lot masked out of the terrain and drawn as
-// a slab at its pad with a retaining edge where the land beside it is higher or lower; the land's heights the pads'
-// in a lot and the land's, not a slope to the pad, beside it; and the datum keeping the viewed lot at the engine's
+// a slab at its pad (a lip hanging under its edges) with a retaining edge where the land beside it is higher or
+// lower; the land's heights the pads' in a lot and the land's, not a slope to the pad, beside it (but beside land
+// within `SKIRT_MOST` of the pad, the pad at its edge, the land sloping from it); and the datum keeping the viewed lot at the engine's
 // 0. A world its town doesn't follow draws as ever. `bun test tests/landSurface.test.ts`.
 import { afterAll, describe, expect, test } from 'bun:test';
 import type { PlotInfo, RoadPlan, WorldStructure } from '../src/core/protocol';
 import { blankLand, encodeLand, LAND_CELL } from '../src/game/land';
 import { Geo } from '../src/render/shared/geometry';
 import { follows, Levels, levelsOf, surfaceOf } from '../src/render/shared/landSurface';
-import { EDGE_FOOT, padGeometry, padMask, padsOf, STEP_LEAST } from '../src/render/shared/pads';
+import { EDGE_FOOT, padGeometry, padMask, padsOf, SLAB_LIP, STEP_LEAST } from '../src/render/shared/pads';
+import { BuiltSurface, SKIRT_MOST } from '../src/render/shared/builtSurface';
 import { ROAD_Y, roadMeshes, WALK_LIP, WALK_Y } from '../src/render/shared/roads';
 import { junctionsOf } from '../src/render/shared/junctions';
 
@@ -133,11 +135,35 @@ describe('the renderer on a land the town follows', () => {
     const land = (x: number, z: number) => layout.terrainAt(x, z);
     const geos = padGeometry(land, pads, () => 0, (_x, _z, _y, out) => ((out.r = out.g = out.b = 0.5), 1), (x, z) => [x, z]);
     const g = geos.get(0)!;
-    // The slabs: every vertex at its lot's pad.
+    // The slabs: every vertex inside its lot at its pad; its lip down from its edges and out under the land beside, no
+    // further than `SLAB_LIP` either way.
+    const within = (q: (typeof pads)[number], x: number, z: number, by: number) => x >= q.x - by && x <= q.x + q.w + by && z >= q.z - by && z <= q.z + q.d + by;
+    let lips = 0;
     for (let k = 0; k < g.slabs.pos.length; k += 3) {
       const [x, y, z] = [g.slabs.pos[k], g.slabs.pos[k + 1], g.slabs.pos[k + 2]];
-      const p = pads.find((q) => x >= q.x - 1e-6 && x <= q.x + q.w + 1e-6 && z >= q.z - 1e-6 && z <= q.z + q.d + 1e-6)!;
-      expect(y).toBeCloseTo(p.y, 5);
+      const p = pads.find((q) => within(q, x, z, SLAB_LIP + 1e-6))!;
+      if (within(p, x, z, -1e-6)) expect(y).toBeCloseTo(p.y, 5);
+      else {
+        expect(y).toBeLessThanOrEqual(p.y + 1e-5);
+        expect(y).toBeGreaterThanOrEqual(p.y - SLAB_LIP - 1e-5);
+        if (y < p.y - 1e-5) lips++;
+      }
+    }
+    expect(lips).toBeGreaterThan(0);
+    // No lip where a retaining edge stands: in its plane, the two would fight.
+    for (let k = 0; k < g.edges.pos.length; k += 12) {
+      const [ax, az, bx, bz] = [g.edges.pos[k], g.edges.pos[k + 2], g.edges.pos[k + 3], g.edges.pos[k + 5]];
+      const p = pads.find((q) => within(q, (ax + bx) / 2, (az + bz) / 2, 1e-6))!;
+      // (A quad of the slab's, four points: all of them on this piece, some below the pad, is a lip in its plane.)
+      const onPiece = (v: number) => {
+        const [x, z] = [g.slabs.pos[v], g.slabs.pos[v + 2]];
+        const t = ((x - ax) * (bx - ax) + (z - az) * (bz - az)) / ((bx - ax) ** 2 + (bz - az) ** 2);
+        return t > -1e-6 && t < 1 + 1e-6 && Math.hypot(ax + (bx - ax) * t - x, az + (bz - az) * t - z) < 1e-6;
+      };
+      for (let v = 0; v < g.slabs.pos.length; v += 12) {
+        const quad = [v, v + 3, v + 6, v + 9];
+        expect(quad.every(onPiece) && quad.some((q) => g.slabs.pos[q + 1] < p.y - 1e-5)).toBe(false);
+      }
     }
     // The edges: from the lower of the two (less `EDGE_FOOT`) to the higher; none where the step is less than `STEP_LEAST`.
     expect(g.edges.pos.length).toBeGreaterThan(0);
@@ -241,3 +267,30 @@ describe('the renderer on a land the town follows', () => {
   });
 });
 
+describe('the land drawn round a lot whose edge is on the land\'s grain', () => {
+  // A lot off any road, x 10..20 (both edges on samples), on land rising along x.
+  const lot = { x: 10, z: 10, w: 10, d: 10, entry: null };
+  const sloped = (rise: number) => {
+    const land = blankLand(40, 40, 'follow');
+    for (let j = 0; j < land.rows; j++) for (let i = 0; i < land.cols; i++) land.h[j * land.cols + i] = Math.round(rise * i * LAND_CELL * 100);
+    return new BuiltSurface(land, [], [lot], [], 0.75);
+  };
+  const at = (s: BuiltSurface, x: number, z: number) => (z / LAND_CELL) * s.cols + x / LAND_CELL;
+
+  test('beside land within SKIRT_MOST of its pad, its edge keeps its pad: the land slopes from it, no step', async () => {
+    const { lotsFilled } = await import('../src/render/shared/nature');
+    const s = sloped(0.03);
+    const filled = lotsFilled(s, 1);
+    expect(Math.abs(s.conformed[at(s, 22, 14)] - s.padY(0))).toBeLessThanOrEqual(SKIRT_MOST);
+    expect(filled[at(s, 20, 14)]).toBeCloseTo(s.padY(0), 5);
+    expect(filled[at(s, 10, 14)]).toBeCloseTo(s.padY(0), 5);
+  });
+
+  test('beside land further off, its edge is the land carried in, a retaining edge between', async () => {
+    const { lotsFilled } = await import('../src/render/shared/nature');
+    const s = sloped(0.2);
+    const filled = lotsFilled(s, 1);
+    expect(Math.abs(s.conformed[at(s, 22, 14)] - s.padY(0))).toBeGreaterThan(SKIRT_MOST);
+    expect(Math.abs(filled[at(s, 20, 14)] - s.padY(0))).toBeGreaterThan(SKIRT_MOST);
+  });
+});

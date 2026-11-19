@@ -13,7 +13,7 @@ import { DEFAULT_LANDSCAPE, groundDepth, type LandFile, type LandscapeParams, ty
 import { COVER, COVER_CELL, decodeLand, heightAt as landHeight, LAND_CELL, NONE, SEA_CM, type Land, type LandRect } from '../../game/land';
 import { carriedWetEdgeAt, coverAt, EDGE_POND, seaRims, edgeWater, edgeWaterAt, EXIT_MOST, landExits, landTop, landWater, ROUND_CELL, roundedWater, seaWays, VALLEY_BANK, VALLEY_IN, valleyCap, waterGridAt, waterMetres, wetDistance, wetEdgeAt, type LandExit, type WaterGrid } from './landBake';
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
-import { onPad, type BuiltSurface, type SurfaceChange } from './builtSurface';
+import { onPad, SKIRT_MOST, type BuiltSurface, type SurfaceChange } from './builtSurface';
 import { junctionKey, shareSurface, surfaceOf } from './landSurface';
 import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
 import { compose, quatAxisAngle } from './math';
@@ -91,7 +91,10 @@ function between(values: Float32Array, cols: number, rows: number, x: number, z:
  * ring from their edges, each the mean of its neighbours reached already (the terrain beside a lot is the land's, not
  * a slope to its pad: `LandscapeLayout.terrainField`). A sample of a lot beside another lot (a step or less apart:
  * the narrow strip between them, which has no sample of its own) keeps its pad, so the strip lies between the two
- * pads, not down at the land beyond them.
+ * pads, not down at the land beyond them. So does one beside land within `SKIRT_MOST` of its pad: there the land
+ * slopes to the pad and meets it at its edge (as the surface grades it round a lot whose edge is off the land's
+ * grain), not standing a few centimetres over it or under it behind a retaining edge, which went up the slope in
+ * metre-long steps.
  */
 export function lotsFilled(surface: BuiltSurface, count: number): Float32Array {
   const { cols, rows, conformed } = surface;
@@ -116,8 +119,9 @@ export function lotsFilled(surface: BuiltSurface, count: number): Float32Array {
   let ring: number[] = [];
   for (let k = 0; k < owner.length; k++) {
     if (owner[k] < 0) continue;
+    const pad = surface.padY(owner[k]);
     let beside = false;
-    around(k, (q) => (beside ||= owner[q] >= 0 && owner[q] !== owner[k]));
+    around(k, (q) => (beside ||= (owner[q] >= 0 && owner[q] !== owner[k]) || (owner[q] < 0 && Math.abs(conformed[q] - pad) <= SKIRT_MOST)));
     if (beside) continue;
     todo[k] = 1;
     ring.push(k);

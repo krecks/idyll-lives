@@ -14,6 +14,13 @@ import { Geo, type V3 } from './geometry';
 export const STEP_LEAST = 0.04;
 /** How far a retaining edge reaches below the lower of the two (m): no gap under it where the land dips. */
 export const EDGE_FOOT = 0.3;
+/**
+ * A slab's edges hang this far down (m), and reach a third as far out under the land beside, in the slab's own colours,
+ * where the land meets the pad at its edge (no retaining edge): the slab and the terrain beside it are two meshes, and
+ * the hairline between them showed the sky through it, dot by dot along the edge. Not where a retaining edge stands:
+ * in its plane, the two fought, in teeth along it.
+ */
+export const SLAB_LIP = 0.15;
 /** A slab's points are this far apart (m) on the land's grain (its colours follow the terrain's). */
 const SLAB_STEP = 2;
 /** A retaining edge's pieces are this long at most (m). */
@@ -131,7 +138,38 @@ export function padGeometry(
         const [[x0, z0], [x1, z1]] = [at(k), at(k + 1)];
         const [o0, o1] = [beside(x0, z0), beside(x1, z1)];
         if (Number.isNaN(o0) || Number.isNaN(o1)) continue;
-        if (Math.abs(o0 - p.y) < STEP_LEAST && Math.abs(o1 - p.y) < STEP_LEAST) continue;
+        if (Math.abs(o0 - p.y) < STEP_LEAST && Math.abs(o1 - p.y) < STEP_LEAST) {
+          // Where no retaining edge stands (the land beside within `STEP_LEAST` of the pad), the slab's lip (`SLAB_LIP`): down
+          // from its edge, both faces, and out under the land beside. (Not where an edge stands: in its plane, the two fought.)
+          const lip = (q: V3[], n: V3) => {
+            const lawn: number[] = [];
+            const tint: V3[] = [];
+            for (const v of q) {
+              lawn.push(colour(v[0], v[2], p.y, tmp));
+              tint.push([tmp.r, tmp.g, tmp.b]);
+            }
+            const l = Math.hypot(...n);
+            g.slabs.poly(
+              q,
+              [n[0] / l, n[1] / l, n[2] / l],
+              q.map((v) => uv(v[0], v[2])),
+              lawn,
+              tint,
+            );
+          };
+          const [t0, t1, d0, d1]: V3[] = [
+            [x0, p.y, z0],
+            [x1, p.y, z1],
+            [x0, p.y - SLAB_LIP, z0],
+            [x1, p.y - SLAB_LIP, z1],
+          ];
+          // (Each face lit nearly as the top, tipped its own way a little: enough to face it so.)
+          for (const s of [1, -1]) lip([t0, t1, d1, d0], [nx * s * 0.2, 1, nz * s * 0.2]);
+          // (Steeply: a land a little lower than the pad stays over it.)
+          const out = SLAB_LIP / 3;
+          lip([t0, t1, [x1 + nx * out, p.y - SLAB_LIP, z1 + nz * out], [x0 + nx * out, p.y - SLAB_LIP, z0 + nz * out]], up);
+          continue;
+        }
         const [top0, top1] = [Math.max(o0, p.y), Math.max(o1, p.y)];
         const [low0, low1] = [Math.min(o0, p.y) - EDGE_FOOT, Math.min(o1, p.y) - EDGE_FOOT];
         // (Facing the lower side: out from a pad over the land, in from the land over a pad.)
