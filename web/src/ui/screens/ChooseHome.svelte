@@ -395,10 +395,12 @@
     chosen = first ? refOf(first) : null;
   });
 
-  // The 3D town shows the chosen home as the game will (cleared when starting on an empty lot); a flat's, its building.
+  // The 3D town shows the chosen home as the game will (cleared when starting on an empty lot). A flat's building is
+  // no house: it is shown with no home, in its own look as the town has it (`lotLooks`), lit and tagged as the home.
   $effect(() => {
     const shown = !selected || staying ? town : app.homeTown(selected);
-    if (shown) void menuScene.show(shown, selected?.slot ?? from?.slot ?? null);
+    const home = selected ?? from;
+    if (shown) void menuScene.show(shown, home && home.flat === undefined ? home.slot : null);
   });
   $effect(() => {
     menuScene.highlight({ hover, selected: selected?.slot ?? null, marked: litLots, dear: dearLots, outlines: false });
@@ -471,7 +473,9 @@
           {#if flat && selected.storey !== undefined}
             <b class="house">A flat · {storeyName(selected.storey)}</b>
             <p>
-              {building?.place ? `Over ${selected.lot.name}` : selected.lot.name}, up the stairs from its own street door. No garden of its own: inside, the walls and the furniture are theirs to change.
+              {selected.storey === 0 ? 'On the ground floor of' : building?.place ? 'Over' : 'Upstairs in'}
+              {selected.lot.name}, in at the building's street door{selected.storey === 0 ? '' : ' and up its stairs'}. No garden of its own: inside, the walls and the furniture
+              are theirs to change.
             </p>
           {:else if emptyLot}
             <b class="house">An empty lot</b>
@@ -485,7 +489,7 @@
             <div class="flats" role="radiogroup" aria-label="Flats in {selected.lot.name}">
               {#each flatsHere as f (f.key)}
                 {@const on = f.key === selected.key}
-                <button class="flat" class:on class:dear={dear(f)} role="radio" aria-checked={on} onclick={() => pick(f)}>
+                <button class:on class:dear={dear(f)} role="radio" aria-checked={on} onclick={() => pick(f)}>
                   <b>Flat {(f.flat ?? 0) + 1}</b>
                   <small>{storeyName(f.storey ?? 0)} · {f.bedrooms} bed{f.bedrooms === 1 ? '' : 's'}{sameHome(f, from) ? ' · theirs' : creative ? '' : ` · ${money(f.price)}`}</small>
                 </button>
@@ -501,7 +505,7 @@
               <dt>Bedrooms</dt>
               <dd>{flat.bedrooms}</dd>
               <dt>Building</dt>
-              <dd>{building?.units.length} flats · {building?.storeys} storeys</dd>
+              <dd>{building?.units.length} flat{building?.units.length === 1 ? '' : 's'} · {building?.storeys} storeys</dd>
             {:else if house && !emptyLot}
               <dt>Bedrooms</dt>
               <dd>{house.bedrooms}</dd>
@@ -598,7 +602,7 @@
             class:active={i === active}
             class:dear={dear(r)}
             class:own={sameHome(r, from)}
-            class:flat={r.flat !== undefined}
+            class:unit={r.flat !== undefined}
             onclick={() => ((active = i), pick(r))}
             onmouseenter={() => setHover(r.slot)}
             onmouseleave={() => setHover(null)}
@@ -916,16 +920,17 @@
   .homes li.building:hover {
     background: none;
   }
-  .homes li.flat {
+  .homes li.unit {
     padding-left: 18px;
   }
   /* The chosen flat's building's flats, to choose another. */
   .flats {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 5px;
   }
-  .flat {
+  .flats button {
+    text-align: left;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -937,18 +942,18 @@
     color: var(--text-strong);
     line-height: 1.25;
   }
-  .flat small {
+  .flats button small {
     font-size: 11px;
     color: var(--text-muted);
   }
-  .flat.dear {
+  .flats button.dear {
     opacity: 0.6;
   }
-  .flat.on {
+  .flats button.on {
     background: var(--accent);
     color: #fff;
   }
-  .flat.on small {
+  .flats button.on small {
     color: rgba(255, 255, 255, 0.85);
   }
   .homes .dot {
