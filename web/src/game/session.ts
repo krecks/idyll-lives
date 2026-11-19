@@ -37,7 +37,7 @@ import { townPlaces } from '../ui/town/places';
 import { townHud } from '../ui/town/townHud.svelte';
 import { mayOpen } from './openLots';
 import { ideaToasts } from '../ui/planner/ideaToasts';
-import { aboutUs } from '../ui/story';
+import { aboutUs, storyTone } from '../ui/story';
 import { BubbleLayer } from './bubbles';
 import { RoomOverlay } from './roomOverlay';
 import { VoiceDirector } from '../voice';
@@ -545,14 +545,22 @@ async function openSession(
    */
   let autonomy: boolean | null = params.has('state') ? settings.autonomy : null;
 
+  /** A speed for the game: the player's (with a blip for pausing, going again or a speed changed) or the game's own (`onStory`, silent). */
+  function chooseSpeed(to: number, byPlayer: boolean) {
+    // Time stands still in Build and Create.
+    if (game.mode !== 'live') return;
+    slowedFrom = null;
+    to = Math.max(0, Math.min(SUPER_SPEED, to));
+    // (The player's speed, also under a hold.)
+    const was = speed.chosen;
+    // (Under a menu: the speed it gives back.)
+    speed.choose(to);
+    if (byPlayer && to !== was) play(to === 0 ? 'pause' : was === 0 ? 'resume' : 'speed');
+  }
+
   const controls: GameControls = {
     setSpeed(to) {
-      // Time stands still in Build and Create.
-      if (game.mode !== 'live') return;
-      slowedFrom = null;
-      to = Math.max(0, Math.min(SUPER_SPEED, to));
-      // (Under a menu: the speed it gives back.)
-      speed.choose(to);
+      chooseSpeed(to, true);
     },
     togglePause() {
       controls.setSpeed(game.speed === 0 ? speed.last : 0);
@@ -713,6 +721,7 @@ async function openSession(
       bridge.send({ type: 'social', sim: game.selected, target, social });
       voices.playerConversation(game.selected, target);
       game.socialMenu = null;
+      play('choose');
     },
     phone(action, contact) {
       if (game.mode !== 'live') return;
@@ -722,26 +731,31 @@ async function openSession(
       if (game.mode !== 'live') return;
       bridge.send({ type: 'use', sim: game.selected, object: objectId, interaction });
       game.menu = null;
+      play('choose');
     },
     useItem(itemId, action) {
       if (game.mode !== 'live') return;
       bridge.send({ type: 'useItem', sim: game.selected, item: itemId, action });
       game.menu = null;
+      play('choose');
     },
     walkTo(sim, x, z) {
       if (game.mode !== 'live') return;
       bridge.send({ type: 'moveTo', sim, x, z });
       game.menu = null;
+      play('choose');
     },
     switchLamp(objectId) {
       if (game.mode !== 'live') return;
       bridge.send({ type: 'switchLamp', object: objectId, on: bridge.lampOff(objectId) });
       game.menu = null;
+      play('choose');
     },
     drawCurtains(objectId) {
       if (game.mode !== 'live') return;
       bridge.send({ type: 'drawCurtains', object: objectId, shut: !bridge.curtainShut(objectId) });
       game.menu = null;
+      play('choose');
     },
     cancelAction(index) {
       bridge.send({ type: 'cancel', sim: game.selected, index });
@@ -1485,10 +1499,12 @@ async function openSession(
     if (news.length) game.feed = [...game.feed.filter((f) => now - f.at < FEED_MS), ...news.map((event) => ({ event, at: now }))].slice(-FEED_SIZE);
     // Big moments at home are worth seeing at normal speed.
     const big = fresh.find((e) => e.importance >= 2 && aboutUs(e));
+    // A chime for the household's milestones (a sad one for bad news).
+    if (big && revealed && game.mode === 'live') play(storyTone(big) === 'bad' ? 'notifyLow' : 'notify');
     if (big && liveSettings.autoSlow && game.mode === 'live' && game.speed >= 3) {
       // (Super speed wouldn't come back so soon after it: 10×.)
       const from = Math.min(game.speed, 3);
-      controls.setSpeed(1);
+      chooseSpeed(1, false);
       slowedFrom = from;
       slowUntil = performance.now() + SLOW_MS;
       toast('Slowed down for a moment');
@@ -1665,6 +1681,7 @@ async function openSession(
     // Upgrades are bought in the catalog, not from here.
     if (items.length === 0) return;
     game.menu = { objectId, title: placement.quality ? `${def.name} ${'★'.repeat(placement.quality)}` : def.name, x, y, items };
+    play('menu');
   };
 
   /** Food or a dish: eat a serving, or clear it away (to the sink). */
@@ -1679,6 +1696,7 @@ async function openSession(
       { label: 'Clear away', index: 1 },
     ];
     game.menu = { objectId: -1, itemId, title: `${def.label}${it.state === 'spoiled' ? ' (gone off)' : servings}`, x, y, items };
+    play('menu');
   };
 
   let pointer: PointerInput | null = null;
@@ -1709,6 +1727,7 @@ async function openSession(
       const sim = simAt(x, y);
       if (sim !== null && actor !== null && sim !== actor) {
         game.socialMenu = { target: sim, x, y, options: null };
+        play('menu');
         bridge.requestSocialOptions(actor, sim).then(
           (options) => {
             if (game.socialMenu?.target === sim) game.socialMenu = { ...game.socialMenu, options };
@@ -1737,6 +1756,7 @@ async function openSession(
       // The floor (or the ground): a menu with "Walk here", as an object's has its uses.
       if (actor !== null && hit.ground && inLot(hit.ground.x, hit.ground.z)) {
         game.menu = { objectId: -1, ground: { x: hit.ground.x, z: hit.ground.z, sim: actor }, title: 'Here', x, y, items: [{ label: 'Walk here', index: 0 }] };
+        play('menu');
       } else if (!direct) controls.inspect(null);
     },
     hover(x, y) {

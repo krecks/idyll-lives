@@ -4,6 +4,7 @@
   import { settings, systemMotion } from '../settings/settings.svelte';
   import { MoneyFloats, moneyChange } from './moneyFloats.svelte';
   import { services } from './services';
+  import { play } from './sfx';
   import { game, nextWallMode } from './state.svelte';
   import { SUPER_SPEED } from '../game/speed';
   import { dayBar } from './town/dayBar';
@@ -39,7 +40,11 @@
    */
   const floats = new MoneyFloats(1600, 3);
   const still = $derived(settings.reducedMotion || systemMotion.reduced);
-  $effect(() => floats.note(game.funds, game.mode === 'live' && !game.creative));
+  // (With a coin's sound for money in, a falling one for money out.)
+  $effect(() => {
+    const d = floats.note(game.funds, game.mode === 'live' && !game.creative);
+    if (d) play(d > 0 ? 'moneyIn' : 'moneyOut');
+  });
 
   /** The day from sunrise to sunset, under the clock and the speeds (`town/dayBar.ts`). */
   const day = $derived(dayBar(game.minute));

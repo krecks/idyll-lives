@@ -10,6 +10,7 @@ import type { GoalView, SimView } from '../../core/protocol';
 import { services } from '../services';
 import { askToast, dropToast, game } from '../state.svelte';
 import { money } from '../format';
+import { play } from '../sfx';
 import { goalText } from '../story';
 import { actOnWish, brokenAtHome, describeHomeWish } from './homeWishes';
 import { activityLabel } from './planner';
@@ -136,6 +137,8 @@ export function ideaToasts() {
           { label: 'Decline', run: () => (done(), idea.decline?.()) },
         ]);
         open.set(key, id);
+        // (A chime: someone asks for an answer.)
+        if (game.mode === 'live') play('notify');
       }
       for (const s of sims) if (s.plan) known.add(s.id);
       last = new Set(now.keys());
