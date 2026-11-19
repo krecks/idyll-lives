@@ -35,9 +35,9 @@
 #          docs/review/reference.json (`review sizes` and `uses`); tools/built (the built world's dump for
 #          `check-glb --built`: it runs web/src's generators, and takes its street's junctions from
 #          web/tests/fixtures/junctions.ts; web/tests/builtDump.test.ts holds it, so the web job reads it too).
-# ci.yml itself (the jobs, bun-version, SLOW_TESTS), tools/ci-local.sh and this script run every
-# job. Read by no step (checked by grep), so no job: README.md, CHANGELOG.md (pages.yml's version
-# check reads it, on a tag), PLAN.md, plan/, LICENSE, docs/ but review/reference.json, .gitignore,
+# ci.yml itself (the jobs, bun-version, SLOW_TESTS), tools/ci-local.sh, tools/ci-runner.sh (the
+# runner's Rust) and this script run every job. Read by no step (checked by grep), so no job:
+# README.md, CHANGELOG.md (pages.yml's version check reads it, on a tag), PLAN.md, plan/, LICENSE, docs/ but review/reference.json, .gitignore,
 # .git-blame-ignore-revs, pages.yml, crates/tools/README.md, the models' guides and notes (crates/art's
 # .md files), tools/characters/README.md, tools/art/README.md, and the tools no job runs: tools/bench,
 # llm, voice, audio, and tools/housegen (only `generated`'s, which runs on a tag or by hand, on
@@ -51,7 +51,7 @@ JOBS="rust web tools"
 # for every tracked file).
 jobs_for() {
   case "$1" in
-    .github/workflows/ci.yml | tools/ci-local.sh | tools/ci-changes.sh) J="rust web tools" ;;
+    .github/workflows/ci.yml | tools/ci-local.sh | tools/ci-changes.sh | tools/ci-runner.sh) J="rust web tools" ;;
     rust-toolchain.toml | Cargo.toml | Cargo.lock | .cargo/*) J="rust web tools" ;;
     crates/tools/README.md | crates/art/*.md) J="" ;;
     crates/sim-core/src/* | crates/sound/* | crates/sound-wasm/*) J="rust web tools" ;;

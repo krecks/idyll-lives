@@ -9,16 +9,25 @@
 # pages.yml, run by hand or on a tag; it runs none of these tests again, and publishes only once this
 # workflow has passed on the same commit (on a tag, the tag's own run).
 #
-# Four jobs side by side, each its own runner and its own Rust cache: the generated worlds alone
-# take 12 to 18 minutes (every one a Big one), so one after another the checks took 25 to 40.
-# `test` waits for the four and passes only when all four did (the generated worlds skipped counts
-# as passed where they don't run): the name the main branch's ruleset requires.
+# Four jobs, run on the self-hosted runner (`self-hosted, Linux, X64`; tools/ci-runner.sh readies it
+# for each: Rust, and target/ linked to a build kept on the machine and shared by every job). With
+# one runner they go one after another; a second runner registered with the same labels takes them
+# side by side again (the generated worlds alone take 12 to 18 minutes on GitHub's runners, every
+# one a Big one). `changes` and `test` only read the trees and the results, and stay on GitHub's
+# runners, so the decision and the verdict don't queue behind the work. `test` waits for the four
+# and passes only when all four did (the generated worlds skipped counts as passed where they don't
+# run): the name the main branch's ruleset requires.
+#
+# The repository is public, so a pull request from a fork runs its own code on that machine: the
+# repository's Actions setting has to ask for approval before outside contributors' runs (Settings,
+# Actions, General: "Require approval for all external contributors"), and a fork's pull request is
+# read before it is approved.
 #
 # A job runs only for what can change its answer. `changes` maps the files a pull request touches
 # (against its base) to the jobs that read them (tools/ci-changes.sh has the map, traced from what
 # each step opens): a docs-only change runs none, a renderer change the renderer's and the tools'.
 # A push to main, a tag and a run by hand run every job. A path the map doesn't know runs every
-# job; ci.yml, tools/ci-local.sh and tools/ci-changes.sh too. (Not `paths` on the workflow: `test`
+# job; ci.yml, tools/ci-local.sh, tools/ci-changes.sh and tools/ci-runner.sh too. (Not `paths` on the workflow: `test`
 # would then never report and the pull request could not merge.) And a job that passed on exactly
 # these files before is not run again: on a pull request and a push to main, `changes` hashes the
 # files each job reads (with ci.yml, so its tool versions and SLOW_TESTS too), the job looks the
@@ -28,10 +37,8 @@
 # look up nor save. When in doubt it runs: `changes` failing fails `test`, a failed or missing
 # lookup runs the job.
 #
-# The Actions cache holds 10 GB a repository, and over that GitHub evicts the least recently used.
-# So only main saves the big caches (Rust's target folders, Bun): a pull request, a branch run by hand
-# and a tag restore main's and save nothing, and `generated` restores the `rust` job's (the same
-# simulation tests' build). Only the pass markers above (a few bytes each) are saved everywhere.
+# The Rust build, Cargo's registry, the toolchain and Bun's packages stay on the runner between
+# jobs, so this workflow saves only the pass markers above (a few bytes each) in the Actions cache.
 name: CI
 
 on:
@@ -105,7 +112,7 @@ jobs:
     needs: changes
     # (Anything but a plain "false" runs it.)
     if: needs.changes.outputs.rust != 'false'
-    runs-on: ubuntu-26.04
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 30
     steps:
       # Passed on these very files before (see the top): the steps below are skipped.
@@ -122,16 +129,9 @@ jobs:
       - uses: actions/checkout@v7
         if: steps.passed.outputs.cache-hit != 'true'
 
-      - name: Rust toolchain
+      - name: Rust toolchain and the kept build
         if: steps.passed.outputs.cache-hit != 'true'
-        run: |
-          rustup toolchain install
-          rustc --version
-          cargo clippy --version
-      - uses: Swatinem/rust-cache@v2
-        if: steps.passed.outputs.cache-hit != 'true'
-        with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+        run: tools/ci-runner.sh
 
       - name: Formatting
         if: steps.passed.outputs.cache-hit != 'true'
@@ -161,26 +161,19 @@ jobs:
   generated:
     name: Generated houses and worlds
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-26.04
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
 
-      - name: Rust toolchain
-        run: |
-          rustup toolchain install
-          rustc --version
-      # The `rust` job's cache (its simulation tests are these tests' build), restored only.
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rust
-          save-if: false
+      - name: Rust toolchain and the kept build
+        run: tools/ci-runner.sh
 
       # Bun runs the sample makers.
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.4
-          no-cache: ${{ github.ref != 'refs/heads/main' }}
+          no-cache: true
 
       # The generated_* tests are ignored because they need sample files; made here so they run
       # instead of passing without checking anything.
@@ -194,7 +187,7 @@ jobs:
     name: Clips and renderer tests
     needs: changes
     if: needs.changes.outputs.web != 'false'
-    runs-on: ubuntu-26.04
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 20
     steps:
       # (As in `rust`.)
@@ -212,16 +205,10 @@ jobs:
         if: steps.passed.outputs.cache-hit != 'true'
 
       # Bun runs the clip check (no packages) and the renderer's checks; Rust builds the sounds' wasm
-      # for them (small: about 20 s from a warm cache).
-      - name: Rust toolchain
+      # for them (small: about 20 s from a warm build).
+      - name: Rust toolchain and the kept build
         if: steps.passed.outputs.cache-hit != 'true'
-        run: |
-          rustup toolchain install
-          rustc --version
-      - uses: Swatinem/rust-cache@v2
-        if: steps.passed.outputs.cache-hit != 'true'
-        with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+        run: tools/ci-runner.sh
       # Must match the wasm-bindgen crate version in Cargo.lock.
       - uses: taiki-e/install-action@v2
         if: steps.passed.outputs.cache-hit != 'true'
@@ -232,8 +219,7 @@ jobs:
         if: steps.passed.outputs.cache-hit != 'true'
         with:
           bun-version: 1.4.4
-          # (Bun's own cache: on main only, as the Rust caches; elsewhere it is fetched.)
-          no-cache: ${{ github.ref != 'refs/heads/main' }}
+          no-cache: true
 
       # The residents' clips on both bodies at every life stage; the known failures are in
       # tools/characters/clip-baseline.json, so only a new one fails.
@@ -264,7 +250,7 @@ jobs:
     name: Tools, object sizes, uses and models
     needs: changes
     if: needs.changes.outputs.tools != 'false'
-    runs-on: ubuntu-26.04
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 30
     steps:
       # (As in `rust`.)
@@ -281,15 +267,9 @@ jobs:
       - uses: actions/checkout@v7
         if: steps.passed.outputs.cache-hit != 'true'
 
-      - name: Rust toolchain
+      - name: Rust toolchain and the kept build
         if: steps.passed.outputs.cache-hit != 'true'
-        run: |
-          rustup toolchain install
-          rustc --version
-      - uses: Swatinem/rust-cache@v2
-        if: steps.passed.outputs.cache-hit != 'true'
-        with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+        run: tools/ci-runner.sh
 
       # The repo's tools (crates/tools): a fresh character build against the committed set and its
       # checks, the object gate over every shipped model, the models' kernel, runner and families
@@ -313,7 +293,7 @@ jobs:
         if: steps.passed.outputs.cache-hit != 'true'
         with:
           bun-version: 1.4.4
-          no-cache: ${{ github.ref != 'refs/heads/main' }}
+          no-cache: true
       - name: Shader chunks
         if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh chunks
