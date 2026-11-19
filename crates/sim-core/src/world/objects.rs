@@ -352,8 +352,15 @@ pub(crate) fn arrive(
                 sim.bound_for_bike = Some(bike);
                 sim.bike_parked = Some(sim.pos);
             }
+            // Let in there already (a walk across it set off again): nothing to knock for, the
+            // visit goes on as it was (`life::apply_transition`).
+            let there = sim
+                .visiting
+                .is_some_and(|v| v.plot == plot && v.arrived > 0);
             // At a house (not a park) with door rules: knock and wait (`life::doors`).
-            if content.visits.door.is_some() && !ctx.plots[plot as usize].public {
+            if there {
+                sim.current = None;
+            } else if content.visits.door.is_some() && !ctx.plots[plot as usize].public {
                 // Facing the door, at it (else towards the middle of the lot).
                 let p = &ctx.plots[plot as usize];
                 let centre = [p.x as f32 + p.w as f32 / 2.0, p.z as f32 + p.d as f32 / 2.0];
