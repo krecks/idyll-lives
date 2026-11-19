@@ -134,8 +134,8 @@ const PLANS_KEPT = 3;
 /**
  * Vertex arrays kept for the chunks not drawn (bytes): a chunk back in view costs only its group's
  * meshes, as before, while its arrays last. Beyond this the least recently drawn go, and a chunk
- * back in view after that is planned again (10–25 ms measured, between frames). Less is kept on a
- * machine low on memory (`LOW_MEMORY`).
+ * back in view after that is planned again, between frames (the bench tour's longest slice 24.5 ms).
+ * Less is kept on a machine low on memory (`LOW_MEMORY`).
  */
 const DATA_KEPT = (LOW_MEMORY ? 8 : 24) * 1024 * 1024;
 
@@ -426,7 +426,7 @@ export class Street {
       dirty.add(groupOf(id));
     }
     let planned = 0;
-    const planOf = (id: number, key: string, wantData: boolean): BuiltChunk => {
+    const planOf = (id: number, key: string): BuiltChunk => {
       // (The last few plans of each chunk kept: back on a lot the camera just left, its chunks are planned already.)
       const kept = this.planned.get(id) ?? [];
       const at = kept.findIndex((k) => k.key === key);
@@ -434,18 +434,16 @@ export class Street {
       if (!built) {
         const plan = town.chunk(id, focus);
         built = { key, shape: shapeOf(plan), data: null, bytes: 0, drawnAt: 0 };
-        if (wantData) this.takeData(built, plan);
-      } else if (wantData) {
+        this.takeData(built, plan);
+      } else {
         if (built.data) built.drawnAt = ++this.dataClock;
         // (Its vertex arrays went while it was not drawn: planned again.)
         else {
-          const plan = town.chunk(id, focus);
-          // (The same key almost always: refreshed with the arrays if the gather changed under the memo.)
-          if (plan.key !== built.key) {
-            built.key = plan.key;
-            built.shape = shapeOf(plan);
-          }
           const t0 = performance.now();
+          const plan = town.chunk(id, focus);
+          // (The same plan almost always: its shape refreshed with the arrays if the gather changed under the memo.
+          // Its key stays the one `chunkKey` gives, as a fresh plan's does, or the next build would plan it again.)
+          if (plan.key !== key) built.shape = shapeOf(plan);
           this.takeData(built, plan);
           // (Counted for the last build that made any: a build that made none leaves the numbers to read.)
           if (this.replanBuild !== build) {
@@ -468,7 +466,7 @@ export class Street {
       keyMs += t1 - t0;
       const drawn = this.chunks.get(id);
       if (drawn?.key !== key) {
-        this.chunks.set(id, planOf(id, key, true));
+        this.chunks.set(id, planOf(id, key));
         planMs += performance.now() - t1;
         dirty.add(groupOf(id));
         planned++;
@@ -476,12 +474,30 @@ export class Street {
       await pace?.();
       if (stale()) return;
     }
-    // Streaming: every other chunk's shape made now too (at load, between frames), so a chunk streamed in later
-    // needs only its vertex arrays and its group's meshes. Its arrays are not made: they would be let go at once.
+    // Streaming: every other chunk planned now too (at load, between frames), so the camera roaming later only
+    // merges and uploads them. The farthest from the chunks drawn first: the arrays past `DATA_KEPT` go least
+    // recently made first, so those kept are the nearest, the first the camera reaches; one whose arrays went is
+    // planned again when it comes back. (Let go of as they pile up, not at the end: the load never holds them all.)
     if (this.wanted && !this.prepared) {
-      for (const id of all) {
-        if (wantedSet.has(id)) continue;
-        planOf(id, town.chunkKey(id, focus), false);
+      let [cx, cz] = [0, 0];
+      for (const id of wanted) {
+        const [x, z] = chunkCoords(id);
+        cx += x / wanted.length;
+        cz += z / wanted.length;
+      }
+      const away = (id: number) => {
+        const [x, z] = chunkCoords(id);
+        return Math.hypot(x - cx, z - cz);
+      };
+      const rest = all.filter((id) => !wantedSet.has(id)).sort((a, b) => away(b) - away(a));
+      let made = 0;
+      for (const id of rest) {
+        const b = planOf(id, town.chunkKey(id, focus));
+        made += b.bytes;
+        if (made > DATA_KEPT) {
+          this.evictData();
+          made = 0;
+        }
         await pace?.();
         if (stale()) return;
       }
@@ -1028,7 +1044,7 @@ export class Street {
   /**
    * Lets go of the vertex arrays of the chunks not drawn, least recently drawn first, beyond
    * `DATA_KEPT`: the drawn chunks' are always kept. A chunk back in view after its arrays went is
-   * planned again (10–25 ms measured), between frames.
+   * planned again, between frames.
    */
   private evictData(): void {
     const spare = this.spareChunks();
