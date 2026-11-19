@@ -855,6 +855,16 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       (window as unknown as { __samplers?: () => unknown }).__samplers = () => check.report();
       // (The bridge decks the street draws now, and whether it stands on the game's landscape's surface: `land.mjs`.)
       (window as unknown as { __streetBridges?: () => unknown }).__streetBridges = () => ({ decks: this.street.layout?.bridgeCount() ?? 0, onLand: !!this.lot.landscape?.surface && this.street.layout?.standsOn(this.lot.landscape.surface) });
+      // (How far the street's heights stand off the game's landscape's surface at the points, m, the most: 0 when it stands
+      // on the land as drawn; null with no surface: `land.mjs`.)
+      (window as unknown as { __streetGap?: (points: [number, number][]) => number | null }).__streetGap = (points) => {
+        const surface = this.lot.landscape?.surface;
+        const street = this.street.layout;
+        if (!surface || !street) return null;
+        let most = 0;
+        for (const [x, z] of points) most = Math.max(most, Math.abs((street.levelAt(x, z) ?? 0) - surface.at(x, z)));
+        return most;
+      };
       // (The game's ground as drawn at each point: what is built there (a road's height on a road), the terrain and the grass: `land.mjs`.)
       (window as unknown as { __groundDrawn?: (points: [number, number][]) => unknown }).__groundDrawn = (points) => {
         const scape = this.lot.landscape;
@@ -2105,12 +2115,19 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.placeRoomLights(world, view);
     await this.pace();
     this.loadStep('Building the street', 0.35);
-    // (A road the land's water bridged: the game's landscape solves its surface again with the new roads, the land under
-    // them drawn again.)
+    // (The game's world on the landscape the menus built for its preview, or a road the land's water bridged: the game's
+    // landscape solves its surface again for this world, the one the street stands on too, and the land drawn again where
+    // it moved.)
     const shaped = this.lot.landscape;
-    const bridged = shaped?.heightField ? shaped.takeRoads(world) : null;
-    if (shaped && bridged) void this.queueLand('land: roads taken', async () => {
-      await shaped.landDone(bridged, this.landPace);
+    const taken = shaped?.heightField ? shaped.takeRoads(world) : [];
+    if (shaped && taken.length) void this.queueLand('land: roads taken', async () => {
+      // (Behind the world's build and the warm-up, not in their way: on the way into a game, the land moved by a few
+      // centimetres round its junctions.)
+      const behind = async () => {
+        await this.landPace();
+        while ((this.worldBuilding || this.warming) && !this.disposed) await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+      };
+      for (const rect of taken) await shaped.landDone(rect, behind, true);
     });
     await this.street.build(world, this.view, () => this.pace());
     // (On land the brushes shaped, the street stands on the landscape's surface, one surface for the land and what

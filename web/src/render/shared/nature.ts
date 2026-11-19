@@ -14,7 +14,7 @@ import { COVER, COVER_CELL, decodeLand, heightAt as landHeight, LAND_CELL, NONE,
 import { carriedWetEdgeAt, coverAt, EDGE_POND, seaRims, edgeWater, edgeWaterAt, EXIT_MOST, landExits, landTop, landWater, ROUND_CELL, roundedWater, seaWays, VALLEY_BANK, VALLEY_IN, valleyCap, waterGridAt, waterMetres, wetDistance, wetEdgeAt, type LandExit, type WaterGrid } from './landBake';
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
 import { onPad, type BuiltSurface, type SurfaceChange } from './builtSurface';
-import { surfaceOf } from './landSurface';
+import { junctionKey, shareSurface, surfaceOf } from './landSurface';
 import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
 import { compose, quatAxisAngle } from './math';
 import { fbm, hash, mulberry32, ridged, smoothstep, valueNoise } from '../../game/noise';
@@ -542,6 +542,9 @@ export function groupInstances<T, K>(items: readonly T[], group: (item: T) => K)
 
 // ---- Landscape ----------------------------------------------------------------------
 
+/** The most samples a side of each part `LandscapeLayout.takeRoads` says to draw again (128 m): where the land moved, not the box round it all. */
+const TAKEN_BLOCK = 64;
+
 /**
  * `v` as JSON with its objects' keys sorted: two worlds whose look or options are the same but were
  * made in another order (the menus' draft's, the sim's) keep the same landscape (`baseKey`).
@@ -557,10 +560,10 @@ function canonicalJson(v: unknown): string {
   return JSON.stringify(v) ?? 'null';
 }
 
-/** The same road laid out again (not just another object of it): its middle, width, kind and the decks the land's water made. */
+/** The same road laid out again (not just another object of it): its middle, width, kind, ends and the decks the land's water made. */
 function sameRoad(a: RoadPlan, b: RoadPlan): boolean {
   if (a === b) return true;
-  if (a.width !== b.width || a.kind !== b.kind || a.points.length !== b.points.length) return false;
+  if (a.width !== b.width || a.kind !== b.kind || a.ends[0] !== b.ends[0] || a.ends[1] !== b.ends[1] || a.points.length !== b.points.length) return false;
   if (a.points.some(([x, z], i) => x !== b.points[i][0] || z !== b.points[i][1])) return false;
   const decks = (r: RoadPlan) => `${r.bridge ?? ''}|${(r.bridges ?? []).map(([s, e]) => `${s}:${e}`).join(',')}`;
   return decks(a) === decks(b);
@@ -806,10 +809,11 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    * zones of the cover kinds that changed made again; on a land its town follows, the surface solved again
    * (`BuiltSurface.update`), the land it grades drawn from it again (the samples it changed join `rect`'s).
    */
-  landChanged(rect: LandRect): LandRect {
+  landChanged(rect: LandRect, solved = false): LandRect {
     if (!this.field) return rect;
     let out = rect;
-    if (this.surface) {
+    // (`solved`: the surface solved for the whole land already, `takeRoads`: only drawn again here.)
+    if (this.surface && !solved) {
       // (Solved already where the stroke settled the land under the town, `settleLand`.)
       const change = this.settled ?? this.surface.update(rect);
       this.settled = null;
@@ -825,27 +829,56 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   }
 
   /**
-   * The world's roads changed under a land the brushes shaped (a road the land's water bridged, `landBridges.ts`):
-   * the surface solved again with them, on the same land, so what stands on it follows them. Says the samples round
-   * the roads that changed (null: none did, or no surface).
+   * Takes on `world`'s roads and junctions on this land: another world than the one laid out (the game's world on the
+   * landscape the menus built for its preview, which has no junctions) or its roads changed (a road the land's water
+   * bridged, `landBridges.ts`). The surface is solved again for it, on the same land, and shared as its world's
+   * (`shareSurface`: the street and everything else on the land stand on this one). Says the samples to draw again
+   * on the surface as solved (`landDone`'s `solved`), in blocks of `TAKEN_BLOCK` samples at most: round each road
+   * that changed, and wherever the land as drawn moved (a junction's few metres, not the whole town between them);
+   * none: nothing to draw, nothing taken on, or no surface.
    */
-  takeRoads(world: WorldStructure): LandRect | null {
-    if (!this.field || !this.surface) return null;
-    const old = this.laidOut.meta?.roads ?? [];
+  takeRoads(world: WorldStructure): LandRect[] {
+    if (!this.field || !this.surface) return [];
+    const before = this.laidOut;
+    if (world === before) return [];
+    const old = before.meta?.roads ?? [];
     const now = world.meta?.roads ?? [];
-    // (By value: the same roads laid out again, by the menus' draft and by the game's world, are the same roads: only
-    // one the water bridged or a stroke moved is to be solved again, not every one of them for another array.)
-    const changed = now.filter((r, i) => i >= old.length || !sameRoad(r, old[i]));
-    if (!changed.length && old.length === now.length) return null;
+    // (The same road objects and junctions: the world as it comes again from the simulation, nothing to solve.)
+    if (now.length === old.length && now.every((r, i) => r === old[i]) && junctionKey(world.junctions) === junctionKey(before.junctions)) return [];
+    const drawn = this.terrainField?.slice() ?? null;
     this.laidOut = world;
     this.adoptLand(this.field);
+    shareSurface(world, this.surface);
+    // (Its roads and pads drawn again on it, once: `landDone`.)
+    this.builtMoved = true;
     this.landVersion++;
-    let [x0, z0, x1, z1] = [Infinity, Infinity, -Infinity, -Infinity];
-    for (const r of changed) for (const [x, z] of r.points) [x0, z0, x1, z1] = [Math.min(x0, x), Math.min(z0, z), Math.max(x1, x), Math.max(z1, z)];
-    if (!(x1 >= x0)) return null;
     const { cols, rows } = this.field;
+    // Each block's samples to draw again (bounds: i0, j0, i1, j1), by block.
+    const blocks = new Map<number, [number, number, number, number]>();
+    /** The samples (`i0`..`i1`, `j0`..`j1`, the ends not in) taken into the blocks they fall in. */
+    const take = (i0: number, j0: number, i1: number, j1: number) => {
+      [i0, j0, i1, j1] = [Math.max(0, i0), Math.max(0, j0), Math.min(cols, i1), Math.min(rows, j1)];
+      for (let bj = Math.floor(j0 / TAKEN_BLOCK); bj * TAKEN_BLOCK < j1; bj++) {
+        for (let bi = Math.floor(i0 / TAKEN_BLOCK); bi * TAKEN_BLOCK < i1; bi++) {
+          const [a0, b0, a1, b1] = [Math.max(i0, bi * TAKEN_BLOCK), Math.max(j0, bj * TAKEN_BLOCK), Math.min(i1, (bi + 1) * TAKEN_BLOCK), Math.min(j1, (bj + 1) * TAKEN_BLOCK)];
+          const b = blocks.get(bj * 65536 + bi);
+          if (b) [b[0], b[1], b[2], b[3]] = [Math.min(b[0], a0), Math.min(b[1], b0), Math.max(b[2], a1), Math.max(b[3], b1)];
+          else blocks.set(bj * 65536 + bi, [a0, b0, a1, b1]);
+        }
+      }
+    };
+    // Where the land as drawn moved (the junctions the preview had not, a road bridged)...
+    const terrain = this.terrainField;
+    if (!drawn || !terrain || drawn.length !== terrain.length) take(0, 0, cols, rows);
+    else for (let k = 0; k < terrain.length; k++) if (Math.abs(drawn[k] - terrain[k]) > 1e-3) take(k % cols, Math.floor(k / cols), (k % cols) + 1, Math.floor(k / cols) + 1);
+    // ...and round each road that changed (by value: the same roads in another world's objects are the same roads).
     const pad = 4;
-    return { i0: Math.max(0, Math.floor(x0 / LAND_CELL) - pad), j0: Math.max(0, Math.floor(z0 / LAND_CELL) - pad), i1: Math.min(cols, Math.ceil(x1 / LAND_CELL) + pad), j1: Math.min(rows, Math.ceil(z1 / LAND_CELL) + pad) };
+    for (const r of now.filter((r, i) => i >= old.length || !sameRoad(r, old[i]))) {
+      const xs = r.points.map(([x]) => x);
+      const zs = r.points.map(([, z]) => z);
+      take(Math.floor(Math.min(...xs) / LAND_CELL) - pad, Math.floor(Math.min(...zs) / LAND_CELL) - pad, Math.ceil(Math.max(...xs) / LAND_CELL) + pad, Math.ceil(Math.max(...zs) / LAND_CELL) + pad);
+    }
+    return [...blocks.values()].map(([i0, j0, i1, j1]) => ({ i0, j0, i1, j1 }));
   }
 
   /**

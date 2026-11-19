@@ -179,6 +179,31 @@ describe('the renderer on a land the town follows', () => {
     expect(Math.abs(inner - outer)).toBeLessThan(Math.abs(p.y - outer) + 0.01);
   });
 
+  test('the game’s world on the landscape its preview built: one surface, solved for its junctions, the street’s too', async () => {
+    const { LandscapeLayout } = await import('../src/render/shared/nature');
+    const { CountryRoads } = await import('../src/render/shared/countryRoads');
+    // The menus' preview (no junctions: the sim reports them) and the game's world: the same town in other objects.
+    const preview = world();
+    const layout = new LandscapeLayout(preview, (l, ww, n) => new CountryRoads(l, ww, n));
+    const game = structuredClone(preview);
+    expect(game.meta!.roads![0]).not.toBe(preview.meta!.roads![0]);
+    layout.takeRoads(game);
+    // Taken on: the landscape's surface is the game's (its roads' own objects), the one `surfaceOf` gives the street.
+    expect(layout.surface!.roads[0]).toBe(game.meta!.roads![0]);
+    expect(surfaceOf(game)).toBe(layout.surface);
+    expect(levelsOf(game)!.surface).toBe(layout.surface);
+    // The world as it comes again (the same objects): nothing solved again.
+    const same = layout.surface;
+    expect(layout.takeRoads(game)).toEqual([]);
+    expect(layout.surface).toBe(same);
+    // The sim's junctions: the surface solved with them, still the street's.
+    const arm = (road: number, dir: [number, number]) => ({ road, dir, width: 9, walkFrom: 6, walkTo: 9, stop: 9.5, light: null });
+    const joined = { ...game, junctions: [{ x: 100, z: 40, arms: [arm(0, [1, 0]), arm(0, [-1, 0]), arm(1, [0, 1])] }] } as WorldStructure;
+    layout.takeRoads(joined);
+    expect(layout.surface).not.toBe(same);
+    expect(surfaceOf(joined)).toBe(layout.surface);
+  });
+
   test('the datum keeps the viewed lot at the engine’s 0 and lowers the world by it', async () => {
     const pc = await import('../src/render/pc/engine');
     const { createWorldRoot, setDatum } = await import('../src/render/pc/space');
