@@ -95,6 +95,10 @@ class MenuScene {
   private uses: { layer: UseLayer; hatched: Uint8Array | null } | null = null;
   /** How near the player's zoom comes in (`setNearest`), kept for a renderer made again. */
   private nearest = OVERVIEW_NEAREST;
+  /** What the town on screen was built from (its draft's content and home), so the same town asked
+   *  for again — a new draft object with the same content, as the wizard's steps each make — is not
+   *  built again. Null: nothing shown, or a draft that would not stringify (compared by identity). */
+  private shownKey: string | null = null;
   /** Lots whose tags win when tags compete for space. */
   private focusPlots: [number | null, number | null] = [null, null];
   private readonly sizes = new ResizeObserver((entries) => {
@@ -118,6 +122,19 @@ class MenuScene {
    */
   async show(draft: NeighbourhoodDraft, home: number | null = null, onStep?: (done: TownBuildStep) => void, covered = false): Promise<void> {
     if (draft === this.draft && home === this.home && this.live?.townShown) return;
+    // (The wizard's steps each hand over a fresh draft of the same town: the renderer rebuilds it
+    // only when its content changed, not when its object did.)
+    let key: string | null = null;
+    try {
+      key = `${home ?? ''}|${JSON.stringify(draft)}`;
+    } catch {
+      key = null;
+    }
+    if (key !== null && key === this.shownKey && this.live?.townShown) {
+      this.draft = draft;
+      this.home = home;
+      return;
+    }
     this.draft = draft;
     this.home = home;
     perfPhase('menu: show town');
@@ -136,6 +153,7 @@ class MenuScene {
     if (covered) renderer.setCovered(true);
     try {
       await perfTimeAsync('menu: showTown (renderer)', () => host.showTown(world, MENU_MINUTE, { ...settings }, onStep));
+      if (this.draft === draft && this.home === home) this.shownKey = key;
     } finally {
       if (covered) renderer.setCovered(false);
     }
@@ -145,6 +163,7 @@ class MenuScene {
   hide(): Promise<void> {
     this.draft = null;
     this.home = null;
+    this.shownKey = null;
     return host.hideTown();
   }
 
