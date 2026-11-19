@@ -1,6 +1,9 @@
-//! The building blocks every sound is made from (were `web/src/audio/water.ts`'s and `mono.ts`'s): a seeded
-//! generator, pink noise, a two-pole filter as the browser's node computes it, slow wandering, bubbles,
-//! clicks, clinks, thuds and sloshes, a small room, and the loop's seam folded and its level set.
+//! The building blocks every sound is made from (most were `web/src/audio/water.ts`'s and `mono.ts`'s): a
+//! seeded generator, pink noise, a two-pole filter as the browser's node computes it, slow wandering, bubbles,
+//! clicks, clinks, thuds and sloshes, a small room, and the loop's seam folded and its level set; and, since,
+//! tones without a `sin` or an `exp` a sample: a sine by rotation (`Osc`), overtones from one `sin`
+//! (`harmonics`), a recursive decay (`Decay`), a bank of decaying modes (`Modal`), a plucked string (`Pluck`)
+//! and a saw without false tones (`saw`).
 //!
 //! The arithmetic is JavaScript's as the sounds were written in it: f64 throughout, every buffer of samples
 //! f32 (a `Float32Array`: what is read back from one is the value rounded to f32), `Math.round` rounding
@@ -684,6 +687,261 @@ impl Biquad {
     }
 }
 
+// --- Tones without a `sin` or an `exp` a sample -------------------------------------------------------
+//
+// Not the TypeScript's: a sine turned by rotation, an envelope by a ratio a sample, a bank of decaying modes
+// and a plucked string. A note pays one `sin`, `cos` or `exp` where the sum it replaces paid one a sample (the
+// software `libm` is most of a sound's time in wasm).
+
+/// A sine by rotation: a point on the unit circle turned by `w` a sample, `w = 2π·hz/rate` (one `sin` and one
+/// `cos` a note, or a glide's step).
+#[derive(Clone, Debug)]
+pub struct Osc {
+    re: f64,
+    im: f64,
+    c: f64,
+    s: f64,
+    count: u32,
+}
+
+impl Osc {
+    /// At `hz` from `phase` (radians): its first sample is `sin(phase)`.
+    pub fn new(hz: f64, rate: f64, phase: f64) -> Osc {
+        let mut o = Osc {
+            re: cos(phase),
+            im: sin(phase),
+            c: 1.0,
+            s: 0.0,
+            count: 0,
+        };
+        o.set(hz, rate);
+        o
+    }
+
+    /// A new pitch (a glide's step: every 8 to 32 samples, not every one).
+    pub fn set(&mut self, hz: f64, rate: f64) {
+        let w = (2.0 * PI * hz) / rate;
+        self.c = cos(w);
+        self.s = sin(w);
+    }
+
+    /// This sample, then a turn to the next.
+    #[inline]
+    #[allow(clippy::should_implement_trait)]
+    pub fn next(&mut self) -> f64 {
+        let v = self.im;
+        let re = self.re * self.c - self.im * self.s;
+        self.im = self.re * self.s + self.im * self.c;
+        self.re = re;
+        self.count += 1;
+        if self.count == 1024 {
+            // Back onto the circle (one Newton step to a length of 1; the drift it takes off is about 1e-13).
+            self.count = 0;
+            let g = 1.5 - 0.5 * (self.re * self.re + self.im * self.im);
+            self.re *= g;
+            self.im *= g;
+        }
+        v
+    }
+}
+
+/// A tone's overtones at `turns` (its phase, in turns) from one `sin` and one `cos`: `Σ weights[k]·sin((k+1)·θ)`,
+/// `θ = 2π·turns`, each overtone turned from the one under it. For a phase that wanders a sample at a time (a
+/// motor's speed, a bow's vibrato), where an `Osc` does not fit.
+#[inline]
+pub fn harmonics(turns: f64, weights: &[f64]) -> f64 {
+    let Some((&first, rest)) = weights.split_first() else {
+        return 0.0;
+    };
+    let theta = 2.0 * PI * turns;
+    let (c1, s1) = (cos(theta), sin(theta));
+    let (mut c, mut s) = (c1, s1);
+    let mut v = first * s;
+    for &w in rest {
+        let next = c * c1 - s * s1;
+        s = s * c1 + c * s1;
+        c = next;
+        v += w * s;
+    }
+    v
+}
+
+/// An exponential fall, by a ratio a sample (one `exp` a note): `level·e^(−n/(tau·rate))` at sample `n`.
+#[derive(Clone, Debug)]
+pub struct Decay {
+    v: f64,
+    k: f64,
+}
+
+impl Decay {
+    pub fn new(level: f64, tau: f64, rate: f64) -> Decay {
+        Decay {
+            v: level,
+            k: exp(-1.0 / (tau * rate)),
+        }
+    }
+
+    /// This sample's level, then the next's.
+    #[inline]
+    #[allow(clippy::should_implement_trait)]
+    pub fn next(&mut self) -> f64 {
+        let v = self.v;
+        self.v *= self.k;
+        v
+    }
+}
+
+/// A mode of something struck: its frequency (Hz), the time it takes to die to a third (s), its level and the
+/// phase it starts from (radians).
+#[derive(Clone, Copy, Debug)]
+pub struct Mode {
+    pub hz: f64,
+    pub tau: f64,
+    pub level: f64,
+    pub phase: f64,
+}
+
+/// A bank of decaying modes (something struck ringing out): each a point turned and drawn in a little every
+/// sample, so `Σ level·e^(−t/tau)·sin(w·n + phase)` with no `sin` or `exp` a sample. Nothing keeps it on its
+/// circle: it dies away by design.
+#[derive(Clone, Debug, Default)]
+pub struct Modal {
+    /// Each mode's point (`re`, `im`) and its step (`c`, `s`: the turn and the fall).
+    modes: Vec<[f64; 4]>,
+}
+
+impl Modal {
+    /// The modes at `rate` (a frequency over 0.45 of the rate is held there).
+    pub fn new(rate: f64, modes: &[Mode]) -> Modal {
+        Modal {
+            modes: modes
+                .iter()
+                .map(|m| {
+                    let rho = exp(-1.0 / (m.tau * rate));
+                    let w = (2.0 * PI * min(m.hz, 0.45 * rate)) / rate;
+                    [
+                        m.level * cos(m.phase),
+                        m.level * sin(m.phase),
+                        rho * cos(w),
+                        rho * sin(w),
+                    ]
+                })
+                .collect(),
+        }
+    }
+
+    /// This sample (every mode's), then every mode turned on.
+    #[inline]
+    #[allow(clippy::should_implement_trait)]
+    pub fn next(&mut self) -> f64 {
+        let mut v = 0.0;
+        for m in self.modes.iter_mut() {
+            let [re, im, c, s] = *m;
+            v += im;
+            m[0] = re * c - im * s;
+            m[1] = re * s + im * c;
+        }
+        v
+    }
+}
+
+/// A plucked string (Karplus-Strong, tuned between samples): a line of noise going round through a loss filter
+/// and a tuning all-pass, at `hz`, its own note falling to a third in `tau` s. `dull` (0.1 bright .. 0.5 dull)
+/// is how much the loss filter takes off the highs, `soft` (0..1) how soft the pluck (the noise smoothed), `place`
+/// where along the string it is plucked (a fraction of it: the overtones with a node there are missing).
+#[derive(Clone, Copy, Debug)]
+pub struct Pluck {
+    pub hz: f64,
+    pub tau: f64,
+    pub dull: f64,
+    pub soft: f64,
+    pub place: f64,
+}
+
+impl Pluck {
+    /// The note for `seconds` at `rate`, its pluck's noise drawn from `r`: in over 1 ms, out over its last 5 ms.
+    pub fn play(&self, rate: f64, seconds: f64, r: &mut Rng) -> Vec<f32> {
+        let len = round_usize(seconds * rate);
+        let mut out = vec![0.0f32; len];
+        let period = rate / self.hz;
+        let w = (2.0 * PI * self.hz) / rate;
+        let s = self.dull;
+        // The loss filter's delay and gain at the note.
+        let d_lp = atan2(s * sin(w), (1.0 - s) + s * cos(w)) / w;
+        let gain = sqrt((1.0 - s) * (1.0 - s) + s * s + 2.0 * s * (1.0 - s) * cos(w));
+        let whole = (period - d_lp - 0.1).floor();
+        if whole < 2.0 {
+            // Too high for the rate: a sine dying away.
+            let mut osc = Osc::new(self.hz, rate, 0.0);
+            let mut fall = Decay::new(1.0, self.tau, rate);
+            for o in out.iter_mut() {
+                *o = (osc.next() * fall.next()) as f32;
+            }
+        } else {
+            let n = whole as usize;
+            let rho = min(0.99995, exp(-period / (self.tau * rate)) / gain);
+            let d = period - d_lp - whole;
+            let ap = sin(((1.0 - d) * w) / 2.0) / sin(((1.0 + d) * w) / 2.0);
+            // The pluck: noise, softened, less itself `place` along the string, its mean off, its peak 1.
+            let mut e = vec![0.0f64; n];
+            let mut last = 0.0;
+            for v in e.iter_mut() {
+                last = (1.0 - self.soft) * (r.next() * 2.0 - 1.0) + self.soft * last;
+                *v = last;
+            }
+            let m = (js_round(self.place * n as f64) as usize).clamp(1, n);
+            let mut line: Vec<f64> = (0..n).map(|i| e[i] - e[(i + n - m) % n]).collect();
+            let mean = line.iter().sum::<f64>() / n as f64;
+            let peak = line.iter().fold(0.0f64, |p, &v| max(p, (v - mean).abs()));
+            let scale = if peak > 0.0 { 1.0 / peak } else { 0.0 };
+            for v in line.iter_mut() {
+                *v = (*v - mean) * scale;
+            }
+            let (mut u1, mut v1, mut w1) = (0.0, 0.0, 0.0);
+            let mut i = 0;
+            for o in out.iter_mut() {
+                let y = line[i];
+                *o = y as f32;
+                let v = rho * ((1.0 - s) * y + s * u1);
+                let x = ap * v + v1 - ap * w1;
+                u1 = y;
+                v1 = v;
+                w1 = x;
+                line[i] = x;
+                i += 1;
+                if i == n {
+                    i = 0;
+                }
+            }
+        }
+        let attack = 0.001 * rate;
+        let fade = 0.005 * rate;
+        for (j, o) in out.iter_mut().enumerate() {
+            let g = min(min(1.0, j as f64 / attack), (len - j) as f64 / fade);
+            if g < 1.0 {
+                *o = (*o as f64 * g) as f32;
+            }
+        }
+        out
+    }
+}
+
+/// A saw at `phase` (0..1) without false tones above the rate (PolyBLEP: the jump rounded off over a sample
+/// either side), `dt = hz/rate`.
+#[inline]
+pub fn saw(phase: f64, dt: f64) -> f64 {
+    let blep = if phase < dt {
+        let x = phase / dt;
+        2.0 * x - x * x - 1.0
+    } else if phase > 1.0 - dt {
+        let x = (phase - 1.0) / dt;
+        x * x + 2.0 * x + 1.0
+    } else {
+        0.0
+    };
+    2.0 * phase - 1.0 - blep
+}
+
 // --- mono.ts's parts ------------------------------------------------------------------------------
 
 /// The first sample at or after `seconds`.
@@ -810,5 +1068,170 @@ mod tests {
         assert_eq!(js_round(-2.5), -2.0);
         assert_eq!(js_round(0.49999999999999994), 0.0);
         assert_eq!(js_round(-0.6), -1.0);
+    }
+
+    #[test]
+    fn a_sine_by_rotation_stays_a_sine_for_ten_seconds() {
+        let rate = 48000.0;
+        for (hz, phase) in [(440.0, 0.0), (61.7, 1.3), (5123.4, 4.0)] {
+            let mut o = Osc::new(hz, rate, phase);
+            let w = (2.0 * PI * hz) / rate;
+            for n in 0..(10.0 * rate) as usize {
+                let want = sin(w * n as f64 + phase);
+                let got = o.next();
+                assert!(
+                    (got - want).abs() < 1e-9,
+                    "{hz} Hz, sample {n}: {got} {want}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_decay_is_an_exponential() {
+        let (rate, tau, level) = (48000.0, 0.13, 0.7);
+        let mut d = Decay::new(level, tau, rate);
+        for n in 0..round_usize(5.0 * tau * rate) {
+            let want = level * exp(-(n as f64) / (tau * rate));
+            assert!((d.next() - want).abs() < 1e-9 * level, "{n}");
+        }
+    }
+
+    #[test]
+    fn a_modal_bank_is_its_modes_dying_away() {
+        let rate = 48000.0;
+        let modes = [
+            Mode {
+                hz: 98.0,
+                tau: 0.04,
+                level: 1.0,
+                phase: 0.0,
+            },
+            Mode {
+                hz: 1234.5,
+                tau: 0.02,
+                level: 0.6,
+                phase: 2.1,
+            },
+            Mode {
+                hz: 7000.0,
+                tau: 0.008,
+                level: 0.3,
+                phase: 5.9,
+            },
+            // Over 0.45 of the rate: held there.
+            Mode {
+                hz: 30000.0,
+                tau: 0.01,
+                level: 0.2,
+                phase: 1.0,
+            },
+        ];
+        let mut bank = Modal::new(rate, &modes);
+        for n in 0..round_usize(7.0 * 0.04 * rate) {
+            let t = n as f64 / rate;
+            let want: f64 = modes
+                .iter()
+                .map(|m| {
+                    let w = (2.0 * PI * min(m.hz, 0.45 * rate)) / rate;
+                    m.level * exp(-t / m.tau) * sin(w * n as f64 + m.phase)
+                })
+                .sum();
+            let got = bank.next();
+            assert!((got - want).abs() < 1e-9, "{n}: {got} {want}");
+        }
+    }
+
+    #[test]
+    fn harmonics_are_the_sum_of_their_sines() {
+        let weights: Vec<f64> = (1..=40).map(|h| 1.0 / h as f64).collect();
+        for turns in [0.0, 0.013, 0.25, 0.4999, 0.77, 3.3, 1234.567] {
+            let want: f64 = weights
+                .iter()
+                .enumerate()
+                .map(|(k, w)| w * sin(2.0 * PI * (k + 1) as f64 * turns))
+                .sum();
+            let got = harmonics(turns, &weights);
+            assert!((got - want).abs() < 1e-9, "{turns}: {got} {want}");
+        }
+        assert_eq!(harmonics(0.3, &[]), 0.0);
+    }
+
+    #[test]
+    fn a_plucked_string_is_in_tune() {
+        let rate = 48000.0;
+        // The pitch where the note is strongest, of 61 a cent apart round where it should be.
+        let found = |x: &[f32], hz: f64| -> f64 {
+            let n = rate as usize;
+            let mut best = (0.0, f64::NEG_INFINITY);
+            for cents in -30..=30 {
+                let f = hz * pow(2.0, cents as f64 / 1200.0);
+                let w = (2.0 * PI * f) / rate;
+                let (mut re, mut im) = (0.0, 0.0);
+                for (i, &v) in x[..n].iter().enumerate() {
+                    let h = 0.5 - 0.5 * cos((2.0 * PI * i as f64) / (n - 1) as f64);
+                    re += v as f64 * h * cos(w * i as f64);
+                    im -= v as f64 * h * sin(w * i as f64);
+                }
+                let size = re * re + im * im;
+                if size > best.1 {
+                    best = (cents as f64, size);
+                }
+            }
+            best.0
+        };
+        for (hz, within) in [(110.0, 10.0), (440.0, 5.0), (1760.0, 5.0), (1975.0, 10.0)] {
+            for dull in [0.3, 0.5] {
+                let mut r = Rng::new(7.0);
+                let note = Pluck {
+                    hz,
+                    tau: 2.0,
+                    dull,
+                    soft: 0.4,
+                    place: 0.18,
+                }
+                .play(rate, 1.2, &mut r);
+                let off = found(&note, hz);
+                assert!(off.abs() <= within, "{hz} Hz, dull {dull}: {off} cents off");
+            }
+        }
+        // Too high for the rate: a sine, still a note.
+        let mut r = Rng::new(7.0);
+        let high = Pluck {
+            hz: 3000.0,
+            tau: 0.3,
+            dull: 0.3,
+            soft: 0.4,
+            place: 0.18,
+        }
+        .play(8000.0, 0.5, &mut r);
+        assert!(high.iter().any(|&v| v.abs() > 0.2));
+        assert!(high.iter().all(|v| v.is_finite() && v.abs() <= 1.0));
+    }
+
+    #[test]
+    fn a_saw_without_false_tones_averages_nothing_and_stays_in_bounds() {
+        let rate = 48000.0;
+        for hz in [55.0, 440.0, 1003.0] {
+            let dt = hz / rate;
+            let periods = 20.0;
+            let n = round_usize(periods * rate / hz);
+            let mut phase = 0.0;
+            let mut sum = 0.0;
+            for _ in 0..n {
+                let v = saw(phase, dt);
+                assert!(v.abs() <= 1.05, "{hz}: {v}");
+                sum += v;
+                phase += dt;
+                if phase >= 1.0 {
+                    phase -= 1.0;
+                }
+            }
+            assert!(
+                (sum / n as f64).abs() < 2e-3,
+                "{hz}: mean {}",
+                sum / n as f64
+            );
+        }
     }
 }
