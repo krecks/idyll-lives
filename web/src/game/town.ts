@@ -1292,10 +1292,8 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
         const car = reaches && (who?.has(unit) || mine) ? houseCar(plotRect(t, s), s.facing, turn.rect(bay), mine) : null;
         if (car) cars.push({ plot: s.index, flat: unit, ...car });
       }
-      // (The street door's path out across the verge, and a building's porch over it: a flats building's own; the
-      // flats' door beside a place's has its letterboxes by it, no porch.)
+      // (The street door's path out across the verge; no porch over it: its letterboxes stand by it.)
       pathTo(s, f.front);
-      if (s.kind === 'flats') porchOver(s, f.shell[0] ?? {}, f.front);
     }
     // A place with real floors above (`flats.ts` `placeFloors`): each on its storey's rows (its ground floor is the place's layout, stairs added).
     const up = floorsBy.get(s.index);
