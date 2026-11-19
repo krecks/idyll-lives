@@ -196,6 +196,9 @@ pub struct ObjectInstance {
     /// A lamp (or a fire) switched off (see `lights.rs`); bought off, on with a lot or a house's
     /// file. Meaningless for other things.
     pub off: bool,
+    /// Curtains (a thing over a window, content `overWindow`) drawn shut (see `curtains.rs`);
+    /// bought open. Meaningless for other things.
+    pub shut: bool,
     /// A machine's run (its kind `runs`; see `machines.rs`): None empty, the game minutes left
     /// while it runs on its own, 0 done with the load still in it.
     pub run: Option<f32>,
@@ -485,7 +488,8 @@ impl ObjectInstance {
     }
 
     /// Takes on the state `old`, this object before it was lifted out and placed again, had: its
-    /// stable id, turn, wear, open or closed, on or off, crop, and a machine's run.
+    /// stable id, turn, wear, open or closed, on or off, curtains drawn or not, crop, and a
+    /// machine's run.
     pub(crate) fn carry_state(&mut self, old: &ObjectInstance) {
         (
             self.stable,
@@ -493,11 +497,13 @@ impl ObjectInstance {
             self.wear,
             self.open,
             self.off,
+            self.shut,
             self.growth,
             self.run,
             self.rack,
         ) = (
-            old.stable, old.turn, old.wear, old.open, old.off, old.growth, old.run, old.rack,
+            old.stable, old.turn, old.wear, old.open, old.off, old.shut, old.growth, old.run,
+            old.rack,
         );
     }
 
@@ -2207,6 +2213,10 @@ pub struct World {
     pub(crate) lights_version: u32,
     /// What residents switching lights saw last (see `lights::update`).
     pub(crate) light_watch: crate::lights::Watch,
+    /// Bumped when curtains are drawn or opened (see `curtains.rs`); not a structure change.
+    pub(crate) curtains_version: u32,
+    /// What residents drawing curtains saw last (see `curtains::update`).
+    pub(crate) curtain_watch: crate::curtains::Watch,
     /// The lights that follow a use (content `light.while`) that are lit now (object ids): a cooker
     /// hood's light while the hob under it cooks (see `lights::update_while`). Not saved.
     pub(crate) while_lit: Vec<u32>,
@@ -2524,6 +2534,8 @@ impl World {
         world.refresh_rooms();
         // A new lot's lamps come on only where someone is (`lights::Watch::fresh`).
         world.light_watch.fresh = true;
+        // And its curtains are drawn as fits the hour (`curtains::Watch::fresh`).
+        world.curtain_watch.fresh = true;
         Ok(world)
     }
 
@@ -2622,6 +2634,8 @@ impl World {
             watched: Vec::new(),
             lights_version: 0,
             light_watch: Default::default(),
+            curtains_version: 0,
+            curtain_watch: Default::default(),
             while_lit: Vec::new(),
             staff: Default::default(),
             walk_memo: Vec::new(),
@@ -2653,6 +2667,11 @@ impl World {
     /// Bumped whenever a lamp is switched (see `lights::lamps_off`).
     pub fn lights_version(&self) -> u32 {
         self.lights_version
+    }
+
+    /// Bumped whenever curtains are drawn or opened (see `curtains::shut`).
+    pub fn curtains_version(&self) -> u32 {
+        self.curtains_version
     }
 
     /// Changes whenever the lot does (see `lot_version`); never while only objects move.
@@ -3015,6 +3034,7 @@ impl World {
             // A crop comes ripe with a lot (bought, it is just planted: `buy_at`).
             growth: 1.0,
             off: false,
+            shut: false,
             run: None,
             rack: 0,
         };
@@ -5108,6 +5128,7 @@ impl World {
         crate::profile::phase("cooking::after_step", || crate::cooking::after_step(self));
         crate::profile::phase("lights::update", || crate::lights::update(self));
         crate::profile::phase("lights::update_while", || crate::lights::update_while(self));
+        crate::profile::phase("curtains::update", || crate::curtains::update(self));
         if self.tick.is_multiple_of(TICKS_PER_HOUR) {
             crate::rooms::opinions(self);
         }
@@ -5629,6 +5650,16 @@ impl World {
                     )));
                 }
                 crate::lights::set(self, object, on);
+            }
+            Command::DrawCurtains { object, shut } => {
+                let obj = &self.objects[object as usize];
+                if !crate::curtains::is_curtain(self, obj.def) {
+                    return Err(Error::new(format!(
+                        "the {} has no curtains to draw",
+                        self.content.objects[obj.def].name.to_lowercase()
+                    )));
+                }
+                crate::curtains::set(self, object, shut);
             }
             Command::Use {
                 sim,

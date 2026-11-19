@@ -71,3 +71,52 @@ describe('a machine running on its own', () => {
     expect(motion.clipsOf(7)?.get('drum_spin')?.kind).toBe('loop');
   });
 });
+
+function curtains(id: number, curtain = true): MovingObject<number> {
+  return {
+    id,
+    target: { matrices: new Float32Array(16), index: 0, moving: { parts: [{ meshes: [1], matrices: new Float32Array(16) }], poses: restPoses(1) } },
+    motion: { parts: [0], clips: new Map([['close', clip(1)]]) },
+    motions: { uses: {}, loops: {}, night: 'close' },
+    interactions: [],
+    curtain,
+  };
+}
+
+describe('curtains drawn as the simulation has them (sim-core `curtains.rs`)', () => {
+  const eye = { x: 0, y: 0, z: 0 };
+  const shown = (motion: ObjectMotion<number>, id: number) => motion.clipsOf(id)?.get('close')?.time ?? 0;
+
+  test('drawn while shut, whatever the hour; a night clip of anything else keeps to the clock', () => {
+    const motion = new ObjectMotion<number>({ writeMoving: () => {}, upload: () => {} });
+    motion.setLamps(1); // (night)
+    motion.setCurtainsShut(new Set([2]));
+    motion.set([curtains(1), curtains(2), curtains(3, false)]);
+    for (let t = 1000; t <= 3000; t += 50) motion.update(frame(t), [], eye);
+    expect(shown(motion, 1)).toBe(0); // open at night: the player opened them
+    expect(shown(motion, 2)).toBe(1); // drawn
+    expect(shown(motion, 3)).toBe(1); // a coop's hatch: shut at night
+
+    // Day: the drawn ones stay drawn; opened, they play open.
+    motion.setLamps(0);
+    for (let t = 3050; t <= 5000; t += 50) motion.update(frame(t), [], eye);
+    expect(shown(motion, 2)).toBe(1);
+    expect(shown(motion, 3)).toBe(0);
+    motion.setCurtainsShut(new Set());
+    motion.update(frame(5050), [], eye);
+    const opening = shown(motion, 2);
+    expect(opening).toBeGreaterThan(0);
+    expect(opening).toBeLessThan(1);
+    for (let t = 5100; t <= 7000; t += 50) motion.update(frame(t), [], eye);
+    expect(shown(motion, 2)).toBe(0);
+  });
+
+  test('the first word of them shows them as they are, without playing', () => {
+    const motion = new ObjectMotion<number>({ writeMoving: () => {}, upload: () => {} });
+    motion.set([curtains(1)]);
+    motion.update(frame(1000), [], eye);
+    motion.setCurtainsShut(new Set([1]));
+    motion.update(frame(1050), [], eye);
+    expect(shown(motion, 1)).toBe(1);
+  });
+});

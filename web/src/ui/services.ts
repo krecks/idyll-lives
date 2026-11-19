@@ -65,6 +65,8 @@ export interface GameControls {
   walkTo(sim: number, x: number, z: number): void;
   /** Switches a lamp on if it's off, off if it's on (at once: nobody walks over). */
   switchLamp(objectId: number): void;
+  /** Draws curtains shut if they're open, opens them if they're drawn (at once: nobody walks over). */
+  drawCurtains(objectId: number): void;
   cancelAction(index: number): void;
   setWallMode(mode: WallMode): void;
   closeMenu(): void;

@@ -520,8 +520,9 @@ pub struct ObjectDef {
     /// none (a sink washes up there and then).
     pub rack: u8,
     /// Things on a wall: it belongs over a window (content `overWindow`: curtains, blinds), so
-    /// its back may be on a window as well as on a plain wall. Everything else on a wall needs
-    /// plain wall behind it.
+    /// its back may be on a window as well as on a plain wall, and it is drawn shut and opened
+    /// (`ObjectInstance::shut`, see `curtains.rs`). Everything else on a wall needs plain wall
+    /// behind it.
     pub over_window: bool,
     /// Furniture that fills the wall's height (content `fillsWall`: a wardrobe, a tall bookcase,
     /// a fireplace's chimney breast): nothing hangs on the wall or from the ceiling over its

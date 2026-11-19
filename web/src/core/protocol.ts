@@ -24,6 +24,8 @@ export type Command =
   | { type: 'useItem'; sim: number; item: number; action: 'eat' | 'clear' }
   /** A lamp switched on or off (sim-core `lights.rs`): at once, nobody walks over. */
   | { type: 'switchLamp'; object: number; on: boolean }
+  /** Curtains drawn shut or opened (sim-core `curtains.rs`): at once, nobody walks over. */
+  | { type: 'drawCurtains'; object: number; shut: boolean }
   | { type: 'moveTo'; sim: number; x: number; z: number }
   | { type: 'social'; sim: number; target: number; social: number }
   | { type: 'joinCareer'; sim: number; career: number; level: number }
@@ -1398,6 +1400,8 @@ export type FromWorker =
   | { type: 'items'; items: ItemPlacement[] }
   /** The lamps switched off (object ids), whenever a lamp is switched or the objects change. */
   | { type: 'lamps'; off: number[] }
+  /** The curtains drawn shut (object ids), whenever some are drawn or opened or the objects change. */
+  | { type: 'curtains'; shut: number[] }
   | { type: 'ui'; ui: UiUpdate }
   | { type: 'saved'; requestId: number; data: string }
   | { type: 'socialOptions'; requestId: number; options: SocialOption[] }

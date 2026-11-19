@@ -85,7 +85,7 @@ small from the game camera, on a wall thing most houses have several of. Revisit
 | `grandfatherClock` | `door_open` | use `wind` | the trunk door swings open 100° on its left edge (seen from the front) as the clock is wound, and back when the use ends (`swing`, 0.8 s) |
 | `hangingPlant` | `sway` | use `water`, `hold` 0.8 s | the plant, pot and hanger swing 5° out about the ceiling hook (`swing`, eased) and, played back after the hold, home: one sway (it was a `rock`, which played back swung twice) |
 | `fireplace` | `flames` | use `relax` | an ember bed and tongues of flame (gloss) grow from nothing on the logs (`grow`) for the whole use; the light is the content's |
-| `curtains`, `curtainsWide`, `curtainsLong` | `close` | night | the two pleated panels, gathered open at the sides, widen from their outer ends until they meet (`squash` in x, about the rail end) |
+| `curtains`, `curtainsWide`, `curtainsLong` | `close` | night (held while the sim has them drawn: sim-core `curtains.rs`) | the two pleated panels, gathered open at the sides, widen from their outer ends until they meet (`squash` in x, about the rail end) |
 
 The grandfather clock takes **5 draw calls**, the one model whose entry says so (`.draws(5)`): its body, all plain (1),
 the two hands, the pendulum and the trunk door. Since 2026-10-21 (review A-decor-01) its walnut is a polished satin,

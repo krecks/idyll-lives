@@ -31,7 +31,7 @@ import { createApp, createDevice, destroyApp } from './device';
 import { buildFences, swingGate, type Fences, type GateLeaf } from './fences';
 import { fenceHedges, wallCorners } from '../shared/fences';
 import { shownFences } from '../shared/shownFences';
-import { gardenPool, GardenPools, windowPools, type GardenPool } from './gardenPools';
+import { backEdges, curtainsLetThrough, gardenPool, GardenPools, windowPools, type GardenPool } from './gardenPools';
 import { HoverTile, ResizeHandles } from './handles';
 import { HeldFrames } from './heldFrames';
 import { HouseBuilder, type HouseDoor } from './house';
@@ -650,7 +650,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly doorHand = new Float32Array(MAX_CHARACTERS);
   /** Pools of lamplight on the lawn under the garden's lamps. */
   private gardenPools: GardenPools | null = null;
-  private readonly poolOn = (pool: GardenPool) => (pool.room !== undefined ? this.lamps.windowLight(pool.room) : this.lamps.lampOn(pool.lamp)); // (as its lamp fades, or its room's lights, `lamps.ts`.)
+  private readonly poolOn = (pool: GardenPool) => (pool.room !== undefined ? this.lamps.windowLight(pool.room) * curtainsLetThrough(pool, this.curtainsShut) : this.lamps.lampOn(pool.lamp)); // (as its lamp fades, or its room's lights, `lamps.ts`; less through curtains drawn.)
+  /** The curtains drawn shut (the sim's `curtainsShut`): their windows' pools dim. */
+  private curtainsShut: ReadonlySet<number> = new Set();
   /** Night level of the lamps at the last lighting update (`Lighting.lamps`), the lamps' colour and the windows' glow (linear). */
   private lampsLevel = 0;
   private readonly lampColor = linearHex(LOOK.lampColor);
@@ -2457,7 +2459,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (Under the garden's lamps, and outside the windows of the house's rooms: lit as the rooms are.)
     const ground = (z: number) => this.storeyOf(z) === 0;
     const underLamps = lights.filter((l) => l.kind === 'lamp' && l.room === 0 && ground(l.z)).map((l) => gardenPool(l, this.rowOf(0)));
-    this.gardenPools?.set(this.storey >= 0 ? [...underLamps, ...windowPools(world, ground, this.rowOf(0), inView)] : underLamps);
+    // (Curtains over the windows, by the edges they hang over: drawn, they keep the light in.)
+    const curtains = new Map<string, number>();
+    for (const o of world.objects) if (ground(o.z) && inView(o.x, o.z) && this.deps.content.object(o.def)?.overWindow) for (const e of backEdges(o)) curtains.set(e, o.id);
+    this.gardenPools?.set(this.storey >= 0 ? [...underLamps, ...windowPools(world, ground, this.rowOf(0), inView, (e) => curtains.get(e))] : underLamps);
     this.applyGardenPools();
     // (the interior lights and the rooms they keep to, `lamps.ts`.)
     this.lamps.markRooms(world, view);
@@ -3141,6 +3146,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lot.setLampsOff(off); // (fans and fires.)
     this.lamps.setLampsOff(off); // (their light and fades, `lamps.ts`.)
     this.applyGardenPools();
+  }
+  setCurtainsShut(shut: ReadonlySet<number>): void {
+    this.pictureChanged();
+    this.curtainsShut = shut;
+    this.lot.setCurtainsShut(shut); // (drawn, `objectMotion.ts`.)
+    this.applyGardenPools(); // (less light through them on the garden.)
   }
   holdModelRefresh(on: boolean): void {
     this.modelRefresh.hold(on);

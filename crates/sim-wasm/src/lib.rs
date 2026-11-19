@@ -372,6 +372,17 @@ impl Game {
         self.world.lights_version()
     }
 
+    /// The curtains drawn shut (JSON array of object ids; see `sim_core::curtains`).
+    pub fn curtains_shut(&self) -> String {
+        serde_json::to_string(&sim_core::curtains::shut(&self.world))
+            .unwrap_or_else(|_| "[]".into())
+    }
+
+    /// Bumped whenever curtains are drawn or opened (see `curtainsShut`).
+    pub fn curtains_version(&self) -> u32 {
+        self.world.curtains_version()
+    }
+
     /// Changes whenever the lot (walls, floors, fences...) does; see `World::lot_version`.
     pub fn lot_version(&self) -> u32 {
         self.world.lot_version()

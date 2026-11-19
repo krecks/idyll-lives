@@ -1,10 +1,11 @@
 /**
  * Where light lands on the lawn at night (engine-neutral; the renderers' `GardenPools` draw the pools): a garden
  * lamp's round its foot, as bright in its middle as its light there (`gardenPool`), and a lit room's through its
- * windows, a soft patch on the ground outside each (`windowPools`).
+ * windows, a soft patch on the ground outside each (`windowPools`), less of it through curtains drawn over them
+ * (`curtainsLetThrough`).
  */
 
-import type { WorldStructure } from '../../core/protocol';
+import type { ObjectPlacement, WorldStructure } from '../../core/protocol';
 import type { RoomLight } from './house';
 import { tuned } from '../tune';
 
@@ -24,6 +25,8 @@ export interface GardenPool {
   strength: number;
   lamp?: number;
   room?: number;
+  /** A window's: per edge of it, the curtains hung over that edge (object id), or -1. */
+  covers?: number[];
 }
 
 /** A garden lamp's pool of light on the lawn (`gardenPool`): its middle's brightness per `intensity / height²` (the street lamp's 0.3, the street's own up to 0.6), at most this, and at least this wide (m). */
@@ -62,12 +65,12 @@ export const WINDOW_POOL = tuned('windowPool', { near: 0.1, far: 3.4, spread: 0.
  * first lot row; `inView`: whether a tile (in lot rows) is the viewed lot's. Windows in diagonal walls, on upper
  * storeys and between two rooms throw none.
  */
-export function windowPools(world: Pick<WorldStructure, 'openings' | 'rooms' | 'width' | 'depth'>, ground: (z: number) => boolean, row: number, inView: (x: number, z: number) => boolean): GardenPool[] {
+export function windowPools(world: Pick<WorldStructure, 'openings' | 'rooms' | 'width' | 'depth'>, ground: (z: number) => boolean, row: number, inView: (x: number, z: number) => boolean, curtainAt?: (edge: string) => number | undefined): GardenPool[] {
   const W = world.width;
   // (Rows of another storey are not this storey's rooms: outdoors, as far as its windows go.)
   const roomAt = (x: number, z: number) => (x >= 0 && z >= 0 && x < W && z < world.depth && ground(z) ? (world.rooms[z * W + x] ?? 0) : 0);
   // Runs of window along one side of one wall line, by the room behind them: where each edge starts.
-  const runs = new Map<string, { axis: 'h' | 'v'; line: number; out: number; room: number; at: number[] }>();
+  const runs = new Map<string, { axis: 'h' | 'v'; line: number; out: number; room: number; at: number[]; covers: Map<number, number> }>();
   for (const o of world.openings) {
     if (o.kind !== 'window' || !ground(o.z) || !inView(o.x, o.z)) continue;
     // (An 'h' edge lies on the line z, between rows z - 1 and z, from x to x + 1; a 'v' edge on the line x.)
@@ -79,8 +82,10 @@ export function windowPools(world: Pick<WorldStructure, 'openings' | 'rooms' | '
     const line = o.axis === 'h' ? o.z : o.x;
     const key = `${o.axis}:${line}:${out}:${room}`;
     let run = runs.get(key);
-    if (!run) runs.set(key, (run = { axis: o.axis, line, out, room, at: [] }));
+    if (!run) runs.set(key, (run = { axis: o.axis, line, out, room, at: [], covers: new Map() }));
     run.at.push(o.axis === 'h' ? o.x : o.z);
+    const curtains = curtainAt?.(`${o.axis}:${o.x}:${o.z}`);
+    if (curtains !== undefined) run.covers.set(o.axis === 'h' ? o.x : o.z, curtains);
   }
   const { near, far, spread, strength } = WINDOW_POOL;
   const pools: GardenPool[] = [];
@@ -93,9 +98,35 @@ export function windowPools(world: Pick<WorldStructure, 'openings' | 'rooms' | '
       const wide = (run.at[j] + 1 - run.at[i]) / 2 + spread;
       const foot = run.line + run.out * near;
       const out = run.out > 0 ? '+' : '-';
-      pools.push(run.axis === 'h' ? { x: along, y: 0, z: foot - row, radius: wide, depth: far, half: `z${out}`, strength, room: run.room } : { x: foot, y: 0, z: along - row, radius: far, depth: wide, half: `x${out}`, strength, room: run.room });
+      const covers = run.covers.size ? run.at.slice(i, j + 1).map((a) => run.covers.get(a) ?? -1) : undefined;
+      const pool: GardenPool = run.axis === 'h' ? { x: along, y: 0, z: foot - row, radius: wide, depth: far, half: `z${out}`, strength, room: run.room } : { x: foot, y: 0, z: along - row, radius: far, depth: wide, half: `x${out}`, strength, room: run.room };
+      pools.push(covers ? { ...pool, covers } : pool);
       i = j + 1;
     }
   }
   return pools;
+}
+
+/** The share of a lit room's light that still comes through curtains drawn over its window (thin linen). */
+export const CURTAIN_LEAK = 0.15;
+
+/**
+ * The edges of wall a thing hung on a wall has its back on, as Build mode finds them (`'h:x:z'`: an edge on the
+ * line z from x to x + 1; `'v:x:z'` on the line x): a curtain's over its window.
+ */
+export function backEdges(o: Pick<ObjectPlacement, 'x' | 'z' | 'w' | 'd' | 'rot'>): string[] {
+  const r = o.rot % 4;
+  const edges: string[] = [];
+  if (r === 0 || r === 2) for (let x = o.x; x < o.x + o.w; x++) edges.push(`h:${x}:${r === 0 ? o.z : o.z + o.d}`);
+  else for (let z = o.z; z < o.z + o.d; z++) edges.push(`v:${r === 1 ? o.x : o.x + o.w}:${z}`);
+  return edges;
+}
+
+/** How much of a window pool's light comes through (0..1): all of it but on the edges with curtains drawn shut over them (`shut`). */
+export function curtainsLetThrough(pool: GardenPool, shut: ReadonlySet<number>): number {
+  const covers = pool.covers;
+  if (!covers || !shut.size) return 1;
+  let drawn = 0;
+  for (const id of covers) if (id >= 0 && shut.has(id)) drawn++;
+  return 1 - (drawn / covers.length) * (1 - CURTAIN_LEAK);
 }

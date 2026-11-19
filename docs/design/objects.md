@@ -389,11 +389,13 @@ are the examples; `hinged`, `turn`, `swing!` and `slide!` do the work.
   ```json
   "motions": { "clock": { "hour": "hour_hand", "minute": "minute_hand", "at": 610 } }
   ```
-- **Night:** `night` names a clip held open from dusk to dawn, while the lamps are lit (curtains
-  drawn): it closes as the lamps come up past half way and opens again as they go down. A room going
-  dark because everyone in it is asleep doesn't open it (the curtains stay drawn over the sleepers);
-  what follows a room's own lights is the shade glow. A game loaded at night shows it
-  closed without playing it.
+- **Night:** `night` names a clip held open from dusk to dawn, while the lamps are lit (a coop's
+  hatch shut): it closes as the lamps come up past half way and opens again as they go down. A room
+  going dark because everyone in it is asleep doesn't open it; what follows a room's own lights is the
+  shade glow. A game loaded at night shows it closed without playing it. Curtains (content
+  `overWindow`) are the simulation's instead (sim-core `curtains.rs`): their `night` clip is held
+  while they're drawn shut, by the player's click or the residents (at bedtime, at nightfall, open
+  again in the morning), whatever the hour, and shown as they are when a game loads.
   ```json
   "motions": { "night": "close" }
   ```
