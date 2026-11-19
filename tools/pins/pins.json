@@ -58,9 +58,9 @@
     {
       "name": "sim-ai",
       "file": "crates/sim-core/src/ai.rs",
-      "sha256": "671a8f1d1ffa8785214c88de8737cfedd1fe3e294352ada62518f10afe2f9c7d",
-      "by": "setup",
-      "reason": "household behaviour: not this run's to change"
+      "sha256": "67c7f176c6113999cd96bd85cb17525dc42b7f03fbd1bd6aa6bacd7542860e44",
+      "by": "integrator",
+      "reason": "0.8.3 missing-items run: cleaning tools (sweep), the post at home, household cars (boughtCar/gotLetter events), nobody moves house at the wheel; reviewed, sim 819 and generated seeds 0-2 pass"
     },
     {
       "name": "sim-cooking",
@@ -72,9 +72,9 @@
     {
       "name": "sim-social",
       "file": "crates/sim-core/src/social.rs",
-      "sha256": "b450892bebe9e1e337acd03cd550f702ab906b884321f7c9922971b78b3c4eca",
-      "by": "release/0.8.3",
-      "reason": "no behaviour change: the relationship matrix makes room 64 residents at a time (its rows a stride long) instead of being copied whole for each one moving in"
+      "sha256": "8d7e4254d6fa359ed451ac82086e49e3d1f3e07d9dc9f5349788adad02b64a00",
+      "by": "integrator",
+      "reason": "0.8.3 missing-items run: cleaning tools (sweep), the post at home, household cars (boughtCar/gotLetter events), nobody moves house at the wheel; reviewed, sim 819 and generated seeds 0-2 pass"
     },
     {
       "name": "sim-partners",
@@ -93,9 +93,9 @@
     {
       "name": "sim-lifecycle",
       "file": "crates/sim-core/src/lifecycle.rs",
-      "sha256": "7d7f95be344da33316ef1b86fbc5cfeb1167029c7e8037e99697e7971b99f01c",
-      "by": "release/0.8.3",
-      "reason": "the town holds World::residents_most (768, or fewer where a town file says residentsMost) instead of MAX_SIMS; a move between households marks the household index stale"
+      "sha256": "2debafb2b682748a52e94a247eb37c1a4aa7021248d133d0af23652ca7a2a8b5",
+      "by": "integrator",
+      "reason": "0.8.3 missing-items run: cleaning tools (sweep), the post at home, household cars (boughtCar/gotLetter events), nobody moves house at the wheel; reviewed, sim 819 and generated seeds 0-2 pass"
     },
     {
       "name": "sim-hosting",
