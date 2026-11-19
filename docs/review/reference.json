@@ -881,6 +881,34 @@
     "fhwaPddm9": {
       "title": "FHWA Federal Lands, Project Development and Design Manual, ch. 9 Highway Design: vertical curbs typically 6 in (150 mm), sloping curbs 3-4 in (75-100 mm)",
       "url": "https://highways.dot.gov/federal-lands/pddm/Chapter_09.pdf"
+    },
+    "dockCt": {
+      "title": "Connecticut DEEP, Residential Dock Guidelines: a fixed pier generally about 4 ft (1.2 m) wide",
+      "url": "https://portal.ct.gov/deep/coastal-resources/living-on-the-shore/residential-dock-guidelines"
+    },
+    "dockWa": {
+      "title": "Washington WAC 220-660-140: freshwater residential piers at most 6 ft (1.8 m) wide for their first 30 ft from shore",
+      "url": "https://app.leg.wa.gov/wac/default.aspx?cite=220-660-140"
+    },
+    "walkerBay10": {
+      "title": "Sailing World, Walker Bay 10: a 10 ft tender to row, sail or motor, 98 in (2.95 m) long, 57 in (1.45 m) beam",
+      "url": "https://www.sailingworld.com/sailboats/walker-bay-10-2/"
+    },
+    "rhsTypha": {
+      "title": "RHS: Typha latifolia, ultimate height 1.5-2.5 m",
+      "url": "https://www.rhs.org.uk/plants/18566/typha-latifolia/details"
+    },
+    "hoveHuts": {
+      "title": "Brighton & Hove City Council, Beach huts on Hove Esplanade: 1.83 m (6 ft) wide and deep, ridge 2.46 m (8 ft 1 in)",
+      "url": "https://www.brighton-hove.gov.uk/libraries-leisure-and-arts/seafront/beach-huts-hove-esplanade"
+    },
+    "tendringHuts": {
+      "title": "Tendring District Council, Beach Hut Specification (May 2026): 2440 mm wide, 3660 mm deep, eaves to 2060 mm, ridge 2460 mm",
+      "url": "https://tdcdemocracy.tendringdc.gov.uk/documents/s81673/Beach%20Hut%20Specification%20May%202026.pdf"
+    },
+    "tmTypha": {
+      "title": "Thompson & Morgan, Typha latifolia (marginal aquatic): 240 cm high, 150 cm spread",
+      "url": "https://www.thompson-morgan.com/p/typha-latifolia-marginal-aquatic/t78463TM"
     }
   },
   "kinds": {
@@ -9104,10 +9132,10 @@
         "neufert"
       ]
     },
-    "waterside.jetty": {
-      "label": "Timber jetty",
+    "jetty": {
+      "label": "Timber jetty (a fixed pier)",
       "w": [
-        1.6,
+        1.2,
         2.4
       ],
       "h": [
@@ -9117,10 +9145,41 @@
       "d": [
         2.5,
         6
+      ],
+      "uses": [
+        "walk out over the water",
+        "tie up a boat"
+      ],
+      "sources": [
+        "dockCt",
+        "dockWa"
       ]
     },
-    "waterside.rowingBoat": {
-      "label": "Rowing boat",
+    "beachHut": {
+      "label": "Beach hut (council standard)",
+      "w": [
+        1.8,
+        2.44
+      ],
+      "h": [
+        2.3,
+        2.6
+      ],
+      "d": [
+        1.8,
+        3.7
+      ],
+      "uses": [
+        "change for a swim",
+        "keep the deckchairs"
+      ],
+      "sources": [
+        "hoveHuts",
+        "tendringHuts"
+      ]
+    },
+    "rowingBoat": {
+      "label": "Small rowing boat (a dinghy or tender)",
       "w": [
         1.1,
         1.5
@@ -9132,21 +9191,35 @@
       "d": [
         2.8,
         4.5
+      ],
+      "uses": [
+        "row out",
+        "lie up on the bank"
+      ],
+      "sources": [
+        "walkerBay10"
       ]
     },
-    "waterside.reeds": {
-      "label": "Reed clump",
+    "reeds": {
+      "label": "Reed clump (bulrush, as planted at a pond margin)",
       "w": [
         0.5,
-        1.2
+        1.5
       ],
       "h": [
         1.2,
-        2
+        2.5
       ],
       "d": [
         0.5,
-        1.2
+        1.5
+      ],
+      "uses": [
+        "dress the water's edge"
+      ],
+      "sources": [
+        "rhsTypha",
+        "tmTypha"
       ]
     },
     "gardenFountain": {
@@ -15164,10 +15237,10 @@
     "roadBike": "roadBike",
     "cargoBike": "cargoBike",
     "eBike": "eBike",
-    "jetty": "waterside.jetty",
-    "rowingBoat": "waterside.rowingBoat",
-    "reeds": "waterside.reeds",
-    "beachHut": "shed",
+    "jetty": "jetty",
+    "rowingBoat": "rowingBoat",
+    "reeds": "reeds",
+    "beachHut": "beachHut",
     "waterBench": "parkBench"
   },
   "decor": [
@@ -15235,7 +15308,11 @@
     "toolChest",
     "timberStack",
     "cementMixer",
-    "flagPole"
+    "flagPole",
+    "jetty",
+    "rowingBoat",
+    "reeds",
+    "beachHut"
   ],
   "surfaces": {
     "brick": {
