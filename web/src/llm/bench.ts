@@ -67,6 +67,8 @@ export interface PerfOptions {
   decodeRuns?: number;
   /** Also run the game's five test lines (default true). */
   lines?: boolean;
+  /** Where the model runs (default the GPU). */
+  device?: 'gpu' | 'cpu';
 }
 
 declare global {
@@ -169,7 +171,7 @@ export async function perf(options: PerfOptions = {}): Promise<PerfReport> {
     }
   };
   const load = new Promise<number>((resolve, reject) => (ready = { resolve, reject }));
-  worker.postMessage({ type: 'load', base: import.meta.env.BASE_URL, model: MODEL } satisfies ToLlmWorker);
+  worker.postMessage({ type: 'load', base: import.meta.env.BASE_URL, model: MODEL, device: options.device ?? 'gpu' } satisfies ToLlmWorker);
   const loadMs = await load;
 
   /** One reply through the worker, timed end to end. */

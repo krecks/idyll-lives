@@ -27,7 +27,7 @@ import { acoustics } from '../audio/acoustics';
 import type { Place } from '../audio/space';
 import type { Renderer } from '../render/types';
 import { settings } from '../settings/settings.svelte';
-import { deviceTest, llmWrites, LlmWriter, loadTalk, WRITE_MS } from '../talk';
+import { deviceTest, llmDevice, llmWrites, LlmWriter, loadTalk, WRITE_MS } from '../talk';
 import { game, toast } from '../ui/state.svelte';
 import { BusyShare } from './busyShare';
 import { fill, loadLines, Lines, speechPieces, type Line } from './lines';
@@ -545,7 +545,7 @@ export class VoiceDirector {
     }
     // Nothing is written while the model loads: the moment passes (low on memory, the first starts it).
     if (!llmReady()) {
-      wantLlm();
+      wantLlm(llmDevice());
       return;
     }
     this.writing.get(id)?.abort();

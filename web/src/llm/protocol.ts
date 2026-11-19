@@ -2,11 +2,12 @@
 
 import type { ChatMessage } from './chat';
 import type { GenParams, GenResult } from './generate';
+import type { OrtDevice } from '../ml/ort';
 import type { ModelSpec } from './models';
 
 export type ToLlmWorker =
-  /** `base`: the app's base URL (the model's `url` is under it); `model`: what to load. */
-  | { type: 'load'; base: string; model: ModelSpec }
+  /** `base`: the app's base URL (the model's `url` is under it); `model`: what to load; `device`: where it runs. */
+  | { type: 'load'; base: string; model: ModelSpec; device: OrtDevice }
   /**
    * `reply`: the reply's first words, written for the model, and `lead` the last message's
    * start, kept as its own part (`formatChat`); `deadline`:
