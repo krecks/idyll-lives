@@ -60,17 +60,15 @@ fn courses(name: &str, length: f64, base: f64, top: f64, z: f64, heights: &[f64]
     }
 }
 
-/// The coping: stones set on edge along the top, each a little taller or shorter, so the wall's back is uneven.
+/// The coping: `count` stones set on edge along the top, standing at depth `z` on height `y0`, each between
+/// `hmin` and `hmax` tall, so the wall's back is uneven.
 fn coping(
     name: &str,
     length: f64,
     depth: f64,
-    z: f64,
-    y0: f64,
+    (z, y0): (f64, f64),
     seed: i128,
-    count: usize,
-    hmin: f64,
-    hmax: f64,
+    (count, hmin, hmax): (usize, f64, f64),
 ) {
     let mut rng = Random::new(seed);
     let unit = length / count as f64;
@@ -108,7 +106,7 @@ pub fn dry_stone_wall() -> Vec<Obj> {
     let heights = [0.20, 0.18, 0.17, 0.16, 0.14, 0.10];
     let (base, top) = (0.60, 0.36);
     courses("stone", 2.0, base, top, 0.0, &heights, 41);
-    coping("coping", 1.98, top, 0.0, 0.95, 43, 16, 0.14, 0.19);
+    coping("coping", 1.98, top, (0.0, 0.95), 43, (16, 0.14, 0.19));
     // lichen on the front face, in the shelter of the stones: a patch 2.2 cm deep from the face of a stone set
     // back the most (1.5 cm) to 1 mm past one set out the most, so it is on the stone wherever the stone is
     let mut rng = Random::new(45);
@@ -146,7 +144,7 @@ pub fn dry_stone_wall() -> Vec<Obj> {
 pub fn stile() -> Vec<Obj> {
     let heights = [0.20, 0.18, 0.17, 0.16, 0.10];
     courses("stileStone", 0.95, 0.52, 0.36, 0.0, &heights, 47);
-    coping("stileCoping", 0.95, 0.36, 0.0, 0.81, 49, 7, 0.12, 0.15);
+    coping("stileCoping", 0.95, 0.36, (0.0, 0.81), 49, (7, 0.12, 0.15));
     // a through-stone: a slab laid in the course at its height, reaching 0.22 m out of the battered face
     for (side, s) in [("front", 1.0), ("back", -1.0)] {
         for (i, (y, x)) in [(0.30, -0.16 * s), (0.60, 0.16 * s)].iter().enumerate() {
