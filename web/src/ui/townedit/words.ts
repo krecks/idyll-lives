@@ -3,7 +3,7 @@
  * it (the street card lists it first; the Remove tool says it as the pointer goes over a street).
  */
 
-import { CIVIC, civicLabel, draftAreaSize } from '../../game/backdrop';
+import { CIVIC, civicLabel, draftAreaSize } from '../../game/places';
 import { placeOfTemplate } from '../../game/placeLots';
 import type { Goes } from '../../game/edit/streets';
 import type { NeighbourhoodDraft } from '../../game/town';

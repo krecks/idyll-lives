@@ -46,10 +46,11 @@ import { bridgeSites, dryPieces } from '../landPieces';
 import { AREA_APART, BRIDGE_IN, cells8, cornersOf, DECK_PAST, deckTiles, hamletFits, hamletLots, hamletOf, parkingFor, putHamlet, ROAD_WIDTH, type AreaPlan } from '../macro';
 import { mulberry32 } from '../noise';
 import { COURT, endDir, evenly, leftOf, lengths, nearest, pointAt, RoadIndex, roadIndex, tangent, type Pt } from '../roads';
-import { boundsOf, frontageOf, LotPlacer, plotRect, type Facing, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates } from '../town';
+import { boundsOf, frontageOf, LotPlacer, plotRect, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates } from '../town';
 import { placeOf, specOf, streetNames, type WorldSpec } from '../world';
 import type { Edited } from './edited';
 import { entriesOf, townGround } from './ground';
+import { bayRect, vergeParking } from '../parking';
 import { removalRefused, removeLots, renumber, withLotPlace } from './lots';
 
 /** Where a village is placed (its box's middle, m), whether its shape is turned across, and the seed its streets, lots and names are drawn from. */
@@ -274,11 +275,10 @@ function standing(draft: NeighbourhoodDraft, t: Templates, rect: Rect, aside?: A
 
 /** The rectangles of what stands on `draft` (its lots, buildings and parking spaces) but a village's own (`parts`: one being moved, inside its box, which the router keeps out of but by its ways out). */
 function thingsOf(draft: NeighbourhoodDraft, t: Templates, parts?: Parts): Rect[] {
-  const space = (p: { x: number; z: number; rot: number }): Rect => (p.rot % 2 ? { x: p.x - 3, z: p.z - 1.5, w: 6, d: 3 } : { x: p.x - 1.5, z: p.z - 3, w: 3, d: 6 });
   return [
     ...draft.slots.flatMap((s) => (parts?.lots.has(s.index) ? [] : [plotRect(t, s)])),
     ...(draft.open?.backdrop ?? []).flatMap((b, i) => (parts?.backdrop.has(i) ? [] : [boundsOf(b.poly)])),
-    ...(draft.open?.parking ?? []).flatMap((p, i) => (parts?.parking.has(i) ? [] : [space(p)])),
+    ...(draft.open?.parking ?? []).flatMap((p, i) => (parts?.parking.has(i) ? [] : [bayRect(p)])),
   ];
 }
 
@@ -678,19 +678,12 @@ export function placeVillage(draft: NeighbourhoodDraft, t: Templates, content: C
   const slots = placer.slots.map((s, k): PlotSlot => ({ ...s, index: draft.slots.length + k, area: a }));
   // Its parking: a few spaces by the verge nearest its middle, more for more homes (as the generator lays a hamlet's).
   const spaces = parkingFor(slots.filter((s) => s.kind === 'house').length, false);
-  const parking: { x: number; z: number; rot: number; area: number }[] = [];
-  for (const f of frontageOf(roads, plan.roads, plan.centre, rand)) {
-    if (parking.length >= spaces) break;
-    const facing = (Math.abs(f.n[1]) >= Math.abs(f.n[0]) ? (f.n[1] > 0 ? 0 : 2) : f.n[0] > 0 ? 1 : 3) as Facing;
-    const reach = roads[f.road].width / 2 + 0.5;
-    const [qx, qz] = [f.p[0] + f.n[0] * (reach + 3), f.p[1] + f.n[1] * (reach + 3)];
-    const r = facing % 2 ? { x: Math.round(qx - 3), z: Math.round(qz - 1.5), w: 6, d: 3 } : { x: Math.round(qx - 1.5), z: Math.round(qz - 3), w: 3, d: 6 };
-    if (!ground.free(r, 8) || parking.some((p) => Math.hypot(p.x - r.x, p.z - r.z) < 12)) continue;
-    ground.take(r, 1);
-    parking.push({ x: r.x + r.w / 2, z: r.z + r.d / 2, rot: facing, area: a });
-  }
+  // (Pairs of bays by the verge, as the generator lays them: `parking.ts` `vergeParking`.)
+  const laidParks = vergeParking(roads, ground, frontageOf(roads, plan.roads, plan.centre, rand), spaces, a);
+  const parks0 = open.carParks?.length ?? 0;
+  const parking = laidParks.flatMap((p, k) => p.bays.map((b) => ({ ...b, park: parks0 + k })));
   const area: TownArea = { name: plan.name, kind: 'hamlet', x: plan.rect.x, z: plan.rect.z, w: plan.rect.w, d: plan.rect.d };
-  let next: NeighbourhoodDraft = { ...laid, slots: [...draft.slots, ...slots], open: { ...open, areas: [...open.areas, area], parking: [...open.parking, ...parking], ...(linked.walk ? { water: rle(linked.walk) } : {}) } };
+  let next: NeighbourhoodDraft = { ...laid, slots: [...draft.slots, ...slots], open: { ...open, areas: [...open.areas, area], parking: [...open.parking, ...parking], carParks: [...(open.carParks ?? []), ...laidParks.map((p) => p.park)], ...(linked.walk ? { water: rle(linked.walk) } : {}) } };
   for (const s of slots) if (s.kind !== 'house') next = withLotPlace(next, t, content, s.index);
   next = renumber(next, t, plan.roads);
   const notes = linked.laid && reaches(next.roads, plan.roads) ? [] : [`no road could be found to ${plan.name}: draw one to it`];

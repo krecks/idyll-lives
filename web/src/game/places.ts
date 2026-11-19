@@ -80,19 +80,20 @@ export const CIVIC: readonly Civic[] = [
 export type ZoneKind = 'shop' | 'cafe' | 'restaurant' | 'office' | 'workshop' | 'farm';
 /**
  * The named places besides the civic ones, by kind, as lots (`placeLots.ts`): the layouts a lot of
- * the kind is built from (`houses.json` `parks` of kind `place`, one drawn for each), the kind of
- * building it looks like from outside (its storeys and roof: `LotLook`), and how many a main town of
+ * the kind is built from (`houses.json` `parks` of kind `place`, one drawn for each), its compact
+ * layouts (`compact`: a narrow lot of a street built up shoulder to shoulder, `dense.ts`), the kind of
+ * building it looks like from outside (its roof: `LotLook`), and how many a main town of
  * each size has (`lots`, fewest and most) and every other area (`around`): as many as the backdrop
  * named of the kind when these were its buildings (measured over the places' sample worlds,
  * 2026-11-17). A farm shop is a farmstead's own, one by each (`macro.ts`), none of these.
  */
-export const ZONE: Record<ZoneKind, { templates: readonly string[]; kind: Kind; lots: Record<TownSize, [number, number]>; around: [number, number] }> = {
-  shop: { templates: ['shopSmall', 'shopGoods'], kind: K('shop', [10, 12], [10, 12], [2, 3], ['gable', 'flat', 'mansard']), lots: { hamlet: [8, 12], village: [10, 14], town: [8, 13], city: [10, 14] }, around: [0, 2] },
-  cafe: { templates: ['cafeSmall'], kind: K('cafe', [10, 12], [10, 12], [2, 3], ['gable', 'mansard']), lots: { hamlet: [3, 5], village: [4, 6], town: [4, 6], city: [5, 7] }, around: [0, 2] },
-  restaurant: { templates: ['restaurant'], kind: K('restaurant', [13, 15], [12, 14], [2, 3], ['gable', 'hip']), lots: { hamlet: [1, 2], village: [1, 2], town: [1, 2], city: [2, 3] }, around: [0, 0] },
-  office: { templates: ['officeSuite'], kind: K('office', [15, 17], [12, 14], [2, 4], ['flat', 'mansard', 'hip']), lots: { hamlet: [1, 3], village: [3, 5], town: [2, 4], city: [3, 5] }, around: [0, 0] },
-  workshop: { templates: ['workshopUnit'], kind: K('workshop', [15, 17], [12, 14], [1, 2], ['gable', 'flat']), lots: { hamlet: [0, 2], village: [2, 4], town: [2, 4], city: [3, 5] }, around: [0, 2] },
-  farm: { templates: ['farmShop'], kind: K('farm', [9, 11], [9, 11], [1, 2], ['gable']), lots: { hamlet: [0, 0], village: [0, 0], town: [0, 0], city: [0, 0] }, around: [0, 0] },
+export const ZONE: Record<ZoneKind, { templates: readonly string[]; compact: readonly string[]; kind: Kind; lots: Record<TownSize, [number, number]>; around: [number, number] }> = {
+  shop: { templates: ['shopSmall', 'shopGoods'], compact: ['shopTiny'], kind: K('shop', [10, 12], [10, 12], [2, 3], ['gable', 'flat', 'mansard']), lots: { hamlet: [8, 12], village: [10, 14], town: [8, 13], city: [10, 14] }, around: [0, 2] },
+  cafe: { templates: ['cafeSmall'], compact: ['cafeTiny'], kind: K('cafe', [10, 12], [10, 12], [2, 3], ['gable', 'mansard']), lots: { hamlet: [3, 5], village: [4, 6], town: [4, 6], city: [5, 7] }, around: [0, 2] },
+  restaurant: { templates: ['restaurant'], compact: ['restaurantSmall'], kind: K('restaurant', [13, 15], [12, 14], [2, 3], ['gable', 'hip']), lots: { hamlet: [1, 2], village: [1, 2], town: [1, 2], city: [2, 3] }, around: [0, 0] },
+  office: { templates: ['officeSuite'], compact: ['officeSmall'], kind: K('office', [15, 17], [12, 14], [2, 4], ['flat', 'mansard', 'hip']), lots: { hamlet: [1, 3], village: [3, 5], town: [2, 4], city: [3, 5] }, around: [0, 0] },
+  workshop: { templates: ['workshopUnit'], compact: ['workshopSmall'], kind: K('workshop', [15, 17], [12, 14], [1, 2], ['gable', 'flat']), lots: { hamlet: [0, 2], village: [2, 4], town: [2, 4], city: [3, 5] }, around: [0, 2] },
+  farm: { templates: ['farmShop'], compact: [], kind: K('farm', [9, 11], [9, 11], [1, 2], ['gable']), lots: { hamlet: [0, 0], village: [0, 0], town: [0, 0], city: [0, 0] }, around: [0, 0] },
 };
 const SAINTS = ['Mary', 'John', 'Peter', 'Michael', 'Andrew', 'James', 'Anne', 'Catherine', 'Luke', 'Margaret', 'Martin', 'Nicholas'];
 const SHOPS = ['Bakery', 'Butcher', 'Greengrocer', 'Bookshop', 'Hardware', 'Chemist', 'Florist', 'Newsagent', 'Toy Shop', 'Deli', 'Tailor', 'Cobbler', 'Fishmonger', 'Gift Shop', 'Bike Shop', 'Record Shop', 'Sweet Shop', 'Wool Shop', 'Antiques', 'Opticians'];

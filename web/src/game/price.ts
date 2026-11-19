@@ -49,17 +49,17 @@ export function priceOf(objectPrice: (def: string) => number, rates: Rates | und
  * A flat's floor costs this share of a house's a tile: no roof, garden or outside walls of its own
  * but the ones it shares, and its stairs and hall the building's.
  */
-export const FLAT_FLOOR = 0.6;
+export const FLAT_FLOOR = 0.25;
 
 /**
  * The price of flat `unit` of building `b` (as `flatsTemplate` gives it: for sale, furnished for
  * nobody in particular) from `rates`: its share of the building's land (the lot shared evenly by
- * its flats), its floor (`FLAT_FLOOR`) and what's in it.
+ * its flats, and the place under them over a place), its floor (`FLAT_FLOOR`) and what's in it.
  */
 export function flatPriceOf(objectPrice: (def: string) => number, rates: Rates | undefined, b: FlatsTemplate, unit: number): PriceParts {
   const flat = b.units[unit];
   if (!rates || !flat) return { land: 0, house: 0, furniture: 0, total: 0 };
-  return partsOf(objectPrice, rates, (b.lot.width * b.lot.depth) / b.units.length, [flat.layout], FLAT_FLOOR);
+  return partsOf(objectPrice, rates, (b.lot.width * b.lot.depth) / (b.units.length + (b.place ? 1 : 0)), [flat.layout], FLAT_FLOOR);
 }
 
 /** The land (`tiles` of it), the floor of `floors` (`share` of a house's a tile) and what's in them, priced at `rates`. */

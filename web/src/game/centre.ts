@@ -4,15 +4,17 @@
  * (`WorldMeta.centre`), and how built over it is against the rest of the town (`centreDensity`).
  */
 
-import { inside, leftOf, lengths, nearest, pointAt, type Pt, type RoadPlan } from './roads';
+import { inside, leftOf, lengths, nearest, pointAt, roadMask, type Pt, type RoadPlan } from './roads';
 import type { Ground, Rect } from './town';
-import { fillPoly, rectFrom, signedArea2, tilesOf } from './footprints';
+import { fillPoly, rectFrom, rectPoly, signedArea2, tilesOf } from './footprints';
 
 /** How long a main town's high street is (m, at most), and how far its centre reaches either side of its middle line. */
 const HIGH_STREET = 180;
 const BAND = 32;
 /** The bands a centre's outline is tried at, widest first (`outline`): a narrower one where the wider crosses itself, or isn't the densest. */
 export const BANDS = [BAND, 24, 18, 12];
+/** A centre's side narrowed to its kerb (`narrowCentre`): the road's half-width and its pavement, about (m). */
+const KERB_BAND = 6;
 /** A main town's square (m along its street, m deep), the larger first. */
 const SQUARES: readonly [number, number][] = [
   [26, 18],
@@ -59,11 +61,13 @@ export function selfCrossing(poly: readonly Pt[]): boolean {
  * A main town's centre (area `area`): its high street, the stretch of its street (else a lane)
  * nearest its middle, `HIGH_STREET` m long at most, and a square off it on the side towards the
  * middle if it has room there (else the other), the largest of `SQUARES` that fits on land
- * nothing takes yet (no road, green or water). The square's tiles are taken on `ground`, so no
+ * nothing takes yet (no road, green or water). Of the stretches, the one with the most land free to
+ * build on round it counts for more (nothing on it, and not `steep`: a hillside its lots would be
+ * given up on). The square's tiles are taken on `ground`, so no
  * lot goes there. The outline reaches `BAND` m either side of the street, further round the
  * square. Null: no street long enough.
  */
-export function chooseCentre(roads: readonly RoadPlan[], areaRoads: readonly number[], middle: Pt, ground: Ground, area = 0): Centre | null {
+export function chooseCentre(roads: readonly RoadPlan[], areaRoads: readonly number[], middle: Pt, ground: Ground, area = 0, steep: (x: number, z: number) => boolean = () => false): Centre | null {
   // Stretches of the area's streets and lanes round its middle: the one nearest it, straight
   // enough for its outline not to cross itself, with the most land nothing takes yet (no green,
   // no water, no other road) to build on.
@@ -87,7 +91,8 @@ export function chooseCentre(roads: readonly RoadPlan[], areaRoads: readonly num
       let [free, all] = [0, 0];
       fillPoly(poly, ground.w, ground.d, (i) => {
         all++;
-        if (!ground.takenAt((i % ground.w) + 0.5, Math.floor(i / ground.w) + 0.5)) free++;
+        const [x, z] = [(i % ground.w) + 0.5, Math.floor(i / ground.w) + 0.5];
+        if (!ground.takenAt(x, z) && !steep(x, z)) free++;
       });
       const score = dist(p, middle) + (road.kind === 'lane' ? 40 : 0) + (1 - free / Math.max(1, all)) * 200 + (BAND - band) * 3;
       if (!best || score < best.score) best = { road: r, s0: mid - half, s1: mid + half, side: near.side, score };
@@ -138,23 +143,70 @@ export function chooseCentre(roads: readonly RoadPlan[], areaRoads: readonly num
   return centre;
 }
 
-/** A centre's outline `band` m either side of its high street, out round its square: counter-clockwise seen from above. */
-export function outline(roads: readonly RoadPlan[], c: Centre, band: number): Pt[] {
+/**
+ * Centre `c` made the densest: its outline narrowed to its high street, either side on its own (the narrower
+ * `BANDS`, down to `KERB_BAND` just past the pavement, where the land on that side is the emptier: a shore, a
+ * hillside) until its open land is built over `DENSEST` times as densely as the rest of its area's box `box`
+ * (`centreDensity` over `taken`, `polys`), the widest outline that is; else the one that comes nearest. Its square
+ * stays inside it (`outline` goes round it).
+ */
+export function narrowCentre(roads: readonly RoadPlan[], c: Centre, W: number, D: number, taken: Uint8Array, box: Rect, polys: readonly (readonly Pt[])[]): void {
+  const ratio = (poly: readonly Pt[]) => {
+    const d = centreDensity(W, D, taken, box, poly, polys);
+    return d.centre / Math.max(1e-6, d.rest);
+  };
+  let best = { poly: c.poly, r: ratio(c.poly), width: 2 * c.band };
+  if (best.r >= DENSEST) return;
+  const bands = [...BANDS.filter((b) => b <= c.band), KERB_BAND];
+  for (const left of bands) {
+    for (const right of bands) {
+      if (left === c.band && right === c.band) continue;
+      const poly = outline(roads, c, left, right);
+      if (selfCrossing(poly)) continue;
+      const r = ratio(poly);
+      const better = r >= DENSEST ? best.r < DENSEST || left + right > best.width : r > best.r;
+      if (better) best = { poly, r, width: left + right };
+    }
+  }
+  c.poly = best.poly;
+}
+
+/**
+ * Centre `c` of a town of `W` × `D` made the densest (`narrowCentre`) over its land as laid: its open land is no road
+ * of `roads` (but a trail), water (`water`, one per tile, if any), green (`greens`) or lot but a named place's
+ * (`lots`: each lot's rectangle, and whether it is a named place's, built over), against the rest of its area's box `box`.
+ */
+export function densestCentre(c: Centre, roads: readonly RoadPlan[], W: number, D: number, water: Uint8Array | null, greens: readonly (readonly Pt[])[], lots: readonly { rect: Rect; place: boolean }[], box: Rect): void {
+  const taken = roadMask(roads.filter((r) => r.kind !== 'trail'), W, D, 0);
+  if (water) for (let i = 0; i < taken.length; i++) if (water[i]) taken[i] = 1;
+  for (const g of greens) fillPoly(g, W, D, (i) => (taken[i] = 1));
+  const built: Pt[][] = [];
+  for (const { rect: r, place } of lots) {
+    if (place) built.push(rectPoly(r));
+    else for (let z = Math.max(0, r.z); z < Math.min(D, r.z + r.d); z++) for (let x = Math.max(0, r.x); x < Math.min(W, r.x + r.w); x++) taken[z * W + x] = 1;
+  }
+  narrowCentre(roads, c, W, D, taken, box, built);
+}
+
+/** A centre's outline `band` m either side of its high street (`right` m on its right, if given), out round its square: counter-clockwise seen from above. */
+export function outline(roads: readonly RoadPlan[], c: Centre, band: number, right = band): Pt[] {
   const pts = roads[c.road].points;
   const ls = lengths(pts);
   const { s0, s1, at } = c;
-  const left: Pt[] = [];
-  const right: Pt[] = [];
+  const lefts: Pt[] = [];
+  const rights: Pt[] = [];
   const steps = Math.ceil((s1 - s0) / 4);
   for (let k = 0; k <= steps; k++) {
     const s = s0 + ((s1 - s0) * k) / steps;
     const { p, t } = pointAt(pts, s, ls);
     const n = leftOf(t);
-    const round = at && Math.abs(s - at.s) <= at.w / 2 + 2 ? Math.max(band, at.front + at.d + 4) : band;
-    left.push(add(p, n, at?.side === 1 ? round : band));
-    right.push(add(p, n, -(at?.side === -1 ? round : band)));
+    // (Out round the square, on its side.)
+    const near = !!at && Math.abs(s - at.s) <= at.w / 2 + 2;
+    const round = at ? at.front + at.d + 4 : 0;
+    lefts.push(add(p, n, near && at?.side === 1 ? Math.max(band, round) : band));
+    rights.push(add(p, n, -(near && at?.side === -1 ? Math.max(right, round) : right)));
   }
-  const poly = [...left, ...right.reverse()].map(([x, z]): Pt => [r2(x), r2(z)]);
+  const poly = [...lefts, ...rights.reverse()].map(([x, z]): Pt => [r2(x), r2(z)]);
   return signedArea2(poly) > 0 ? poly.reverse() : poly;
 }
 
@@ -162,8 +214,7 @@ export function outline(roads: readonly RoadPlan[], c: Centre, band: number): Pt
  * How built over a main town's centre is against the rest of its box: of each one's open land
  * (`taken`: the tiles that are a road, a lot, a green or water, one per tile over `W` × `D`), the
  * share under a backdrop building (`polys`) whose tiles' middles are in it. `per`: each
- * building's tiles counted towards the rest of the box (to take it away again: `layBackdrop`).
- * tools/worlds/sample.ts checks the centre is the denser.
+ * building's tiles counted towards the rest of the box. tools/worlds/sample.ts checks the centre is the denser.
  */
 export function centreDensity(W: number, D: number, taken: Uint8Array, box: Rect, centre: readonly Pt[], polys: readonly (readonly Pt[])[]): { centre: number; rest: number; open: [number, number]; built: [number, number]; per: number[] } {
   const inC = new Uint8Array(W * D);

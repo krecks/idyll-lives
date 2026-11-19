@@ -146,7 +146,7 @@ export function townIssues(plan: NeighbourhoodDraft, t: Templates, content: Cont
   const careers = content.careerCategories.map((c) => c.id);
   const size = draft.world?.options?.town;
   // (Only the main town's careers are expected, in a town or a city; nothing about how filled it is.)
-  const expect = { built: 0, empty: null, meadow: false, quarters: 0, homes: 0, mainLeast: 0, careers: !layout && (size === 'town' || size === 'city'), exits: null };
+  const expect = { built: 0, empty: null, meadow: false, quarters: 0, homes: 0, careers: !layout && (size === 'town' || size === 'city'), exits: null };
   const found = townProblems(checkedTown(draft, t), expect, { river: false, careers, generated: false });
   const homes = draft.slots.filter((s) => s.kind === 'house').length;
   const lines = [...found.hard];

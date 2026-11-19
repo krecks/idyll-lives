@@ -123,8 +123,8 @@ export interface FlatsSpec {
   names: string[];
 }
 
-/** How much garden a house's lot has round it (see `fitLot`). */
-export type GardenSize = 'snug' | 'roomy' | 'big';
+/** How much garden a house's lot has round it (see `fitLot`; `tight`: a dense street's, no driveway, never offered to choose). */
+export type GardenSize = 'tight' | 'snug' | 'roomy' | 'big';
 export const GARDEN_SIZES: readonly GardenSize[] = ['snug', 'roomy', 'big'];
 
 /**

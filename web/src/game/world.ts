@@ -125,14 +125,13 @@ export interface WorldSpec extends LotMix {
   /**
    * The main town's terraced houses: so many lots in rows of `rows` houses (two: a
    * semi-detached pair), each row on one lot's frontage (`LotPlacer.placeRow`), off the high
-   * street; and how much of the town the backdrop builds over, 0..1 (`backdrop.ts`).
+   * street; and how built up the town is, 0..1 (`dense.ts`: the fewer gaps along its streets the more).
    */
   terraces: [number, number];
   rows: [number, number];
   density: number;
-  /** The biggest town size whose civic places the main town has (`backdrop.ts` `CIVIC`), and the fewest backdrop buildings it has. */
+  /** The biggest town size whose civic places the main town has (`places.ts` `CIVIC`). */
   civic: TownSize;
-  mainLeast: number;
   /** Country roads out of the world. */
   exits: [number, number];
 
@@ -554,10 +553,9 @@ export type ClassicKind = 'small' | 'medium' | 'dense' | 'farm' | 'seaside' | 'm
 /** A classic world's hamlet: a high street with a back lane, or a crescent round a green, its streets reaching all of its box. */
 const HAMLET: HamletSpec = { shapes: [highStreet, crescentTown], box: { w: 220, d: 160 }, lots: [16, 24], places: [1, 1], scale: 1.1, fill: 2, extend: 1 };
 
-/** What every classic world has alike: every civic place, 60 backdrop buildings or more in its main town, two or three ways out, a farmstead every 150 to 200 m. */
-const CLASSIC_BUILT: Pick<WorldSpec, 'civic' | 'mainLeast' | 'exits' | 'farmEvery' | 'fieldsCut' | 'ponds' | 'classic'> = {
+/** What every classic world has alike: every civic place, two or three ways out, a farmstead every 150 to 200 m. */
+const CLASSIC_BUILT: Pick<WorldSpec, 'civic' | 'exits' | 'farmEvery' | 'fieldsCut' | 'ponds' | 'classic'> = {
   civic: 'town',
-  mainLeast: 60,
   exits: [2, 3],
   farmEvery: [150, 200],
   fieldsCut: 0.4,
@@ -839,7 +837,7 @@ export const CLASSIC: Record<ClassicKind, WorldSpec> = {
  * A main town of each size (`specOf`): the area of its box (m², the shape of the place's own; none:
  * the place's own box, lots and lanes), its lots (a place with a bigger town of its own takes the
  * more), how far its lanes reach, its cross streets and outer streets, its public places besides
- * the park; its terraced houses (lots, rows), how built over it is, and its fewest backdrop buildings.
+ * the park; its terraced houses (lots, rows), and how built up it is (`dense.ts`).
  */
 interface SizeTable {
   area?: number;
@@ -851,13 +849,12 @@ interface SizeTable {
   terraces: [number, number];
   rows: [number, number];
   density: number;
-  mainLeast: number;
 }
 const SIZES: Record<TownSize, SizeTable> = {
-  hamlet: { area: 42_000, lots: [20, 24], scale: 1.1, extend: 1, fill: 2, places: [1, 1], terraces: [0, 0], rows: [2, 2], density: 0.25, mainLeast: 10 },
-  village: { area: 70_000, lots: [46, 54], scale: 1.25, extend: 3, fill: 3, places: [2, 2], terraces: [18, 30], rows: [2, 3], density: 0.4, mainLeast: 28 },
-  town: { terraces: [90, 120], rows: [2, 5], density: 0.6, mainLeast: 60 },
-  city: { area: 152_000, lots: [104, 110], scale: 1.3, extend: 8, fill: 6, places: [6, 6], terraces: [125, 140], rows: [3, 6], density: 0.85, mainLeast: 60 },
+  hamlet: { area: 42_000, lots: [20, 24], scale: 1.1, extend: 1, fill: 2, places: [1, 1], terraces: [0, 0], rows: [2, 2], density: 0.25 },
+  village: { area: 70_000, lots: [46, 54], scale: 1.25, extend: 3, fill: 3, places: [2, 2], terraces: [18, 30], rows: [2, 3], density: 0.4 },
+  town: { terraces: [90, 120], rows: [2, 5], density: 0.6 },
+  city: { area: 152_000, lots: [104, 110], scale: 1.3, extend: 8, fill: 6, places: [6, 6], terraces: [125, 140], rows: [3, 6], density: 0.85 },
 };
 /** The town sizes, smallest first. */
 export const TOWN_SIZES: readonly TownSize[] = ['hamlet', 'village', 'town', 'city'];
@@ -1138,7 +1135,6 @@ export function specOf(kind: WorldKind, options: Partial<WorldOptions> = {}): Wo
     rows: s.rows,
     density: s.density,
     civic: size,
-    mainLeast: s.mainLeast,
     exits: island ? (small ? [1, 1] : [2, 2]) : [2, 3],
     water: p.land.water,
     ponds: p.land.ponds,
@@ -1161,7 +1157,7 @@ export function specOf(kind: WorldKind, options: Partial<WorldOptions> = {}): Wo
  * share of its land (less the water) built and farmed (the areas' boxes, the lots, the fields and
  * orchards), the most share of its 100 m squares with nothing in them (null: not checked; on a
  * heath its meadows, the heather, count) and how many of its quarters hold an area or homes; its
- * fewest homes; the main town's fewest backdrop buildings, and whether every career works there
+ * fewest homes; whether every career works in the main town
  * (a town's or a city's); an island's ways out of the world, its causeways (fewest, most; null:
  * not checked, a world with land at its edges has as many as its roads find).
  */
@@ -1171,7 +1167,6 @@ export interface Expected {
   meadow: boolean;
   quarters: number;
   homes: number;
-  mainLeast: number;
   careers: boolean;
   exits: [number, number] | null;
 }
@@ -1186,7 +1181,6 @@ export function expectations(kind: WorldKind, options: Partial<WorldOptions> = {
     // (Among mountains, along the valley: across a half of the world, it may be.)
     quarters: Math.min({ none: 0, few: 3, many: 4 }[v], o.hills === 'mountains' ? 2 : 4),
     homes: { hamlet: 14, village: 40, town: 110, city: 150 }[o.town] + { none: 0, few: 25, many: 70 }[v],
-    mainLeast: SIZES[o.town].mainLeast,
     careers: o.town === 'town' || o.town === 'city',
     exits: kind === 'island' ? specOf(kind, o).exits : null,
   };

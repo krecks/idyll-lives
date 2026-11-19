@@ -81,6 +81,7 @@
 
   "$gardens": "A lot cut to fit its house, by garden size (a town's world says which its houses get): the garden behind the house as a share of the house's depth (`back`, a range; at least `backMin` and at most `backMax` m), beside it (`side`, m, a range) and at least `drive` m on the driveway's side (away from the front door). The front yard is `margins.front`.",
   "gardens": {
+    "tight": { "back": [0.2, 0.35], "backMin": 3, "backMax": 5, "side": [1, 1], "drive": 0 },
     "snug": { "back": [0.35, 0.6], "backMin": 5, "backMax": 8, "side": [1, 2], "drive": 4 },
     "roomy": { "back": [0.6, 0.9], "backMin": 6, "backMax": 11, "side": [1, 3], "drive": 4 },
     "big": { "back": [0.9, 1.3], "backMin": 9, "backMax": 16, "side": [2, 5], "drive": 5 }

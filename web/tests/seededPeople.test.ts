@@ -33,8 +33,7 @@ describe('seeded people', async () => {
   const { objectInfos } = await import('../src/game/housegen');
   const { randomHousehold } = await import('../src/game/household');
   const { assembleTown, generateWorld, useTownContent, vacantSlots } = await import('../src/game/town');
-  const { defaultResidentsMost, FILL_CAP, fillPlan, fillTown, keepForSale, neighbourBonds, offered, peopleStreams, populate, residentsMost, SIM_RESIDENTS, tierFor } = await import('../src/game/people');
-  const { homePrice } = await import('../src/game/price');
+  const { defaultResidentsMost, FILL_CAP, fillPlan, fillTown, homesOf, keepForSale, neighbourBonds, offered, peopleStreams, populate, residentsMost, SIM_RESIDENTS, tierFor } = await import('../src/game/people');
   const { mulberry32 } = await import('../src/game/noise');
   const { runTownJob } = await import('../src/game/townJobs');
   type Templates = import('../src/game/town').Templates;
@@ -155,17 +154,20 @@ describe('seeded people', async () => {
   test('after Move in every home but the kept cheapest is lived in, up to the cap', () => {
     for (const town of [gridTown(), hamlet]) {
       const { first, filled, home } = people(town, 5);
-      const houses = town.slots.filter((s) => s.kind === 'house');
+      // (Every home: a house's lot, or a flat.)
+      const homes = homesOf(content, t, town);
+      const key = (h: { slot: number | PlotSlot; flat?: number }) => `${typeof h.slot === 'number' ? h.slot : h.slot.index}:${h.flat ?? ''}`;
+      const vacant = (d: NeighbourhoodDraft) => homes.filter((h) => !d.households.some((q) => key(q) === key(h)));
       // The first wave leaves a quarter of the homes, six at least, to choose from.
-      expect(vacantSlots(first).length).toBeGreaterThanOrEqual(Math.max(6, Math.ceil(houses.length / 4)));
+      expect(vacant(first).length).toBeGreaterThanOrEqual(Math.max(6, Math.ceil(homes.length / 4)));
       // After it, only the kept ones and the player's.
-      const left = vacantSlots(filled).filter((s) => s.index !== home);
-      expect(left.length).toBe(keepForSale(houses.length));
+      const left = vacant(filled).filter((h) => key(h) !== `${home}:`);
+      expect(left.length).toBe(keepForSale(homes.length));
       expect(residents(filled, home)).toBeLessThanOrEqual(FILL_CAP);
       // The cheapest of those for sale were kept.
-      const price = (s: PlotSlot) => homePrice(content, t, s);
-      const moved = filled.households.slice(first.households.length).map((h) => town.slots[h.slot]);
-      expect(Math.max(...left.map(price))).toBeLessThanOrEqual(Math.min(...moved.map(price)));
+      const priceOf = new Map(homes.map((h) => [key(h), h.price]));
+      const moved = filled.households.slice(first.households.length).map((h) => priceOf.get(key(h))!);
+      expect(Math.max(...left.map((h) => h.price))).toBeLessThanOrEqual(Math.min(...moved));
       // The village has its households.
       if (town === hamlet) continue;
       expect(filled.households.filter((h) => town.slots[h.slot].area === 1).length).toBe(12);

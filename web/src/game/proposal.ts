@@ -10,7 +10,7 @@
  * step 2 hatches (`hatched`); and how much a layout would build (`usesSummary`, step 2's live line).
  */
 
-import { CIVIC, civicChoices, civicOf, civicTooBig } from './backdrop';
+import { CIVIC, civicChoices, civicOf, civicTooBig } from './places';
 import { placeOfTemplate } from './placeLots';
 import { inCentre } from './edit/ground';
 import { noUseCells, roadReach, usesOfDraft } from './edit/uses';

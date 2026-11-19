@@ -22,13 +22,15 @@
  */
 
 import type { Content } from '../../content/content';
-import type { BackdropBuilding, RoadPlan } from '../../core/protocol';
+import type { RoadPlan } from '../../core/protocol';
 import { CUT_MAX, ENTRY_MAX, RETAIN_MAX, surfacePlots } from '../../render/shared/builtSurface';
-import { BackdropPass, CIVIC, civicChoices, civicLabel, civicTooBig, draftAreaSize, type Row } from '../backdrop';
+import { CIVIC, civicChoices, civicLabel, civicTooBig, draftAreaSize } from '../places';
+import { DensePass } from '../dense';
 import { heightAt, LAND_CELL, type Land } from '../land';
 import { mulberry32 } from '../noise';
 import { lengths, pointAt, RoadIndex, type Pt } from '../roads';
-import { plotRect, type NeighbourhoodDraft, type Rect, type Templates } from '../town';
+import { plotRect, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates } from '../town';
+import { rectPoly } from '../footprints';
 import { placeOf, specOf } from '../world';
 import type { Edited } from './edited';
 import { frontOf, inCentre } from './ground';
@@ -263,38 +265,32 @@ export function buildUp(draft: NeighbourhoodDraft, t: Templates, content: Conten
     if (op.mode === 'homes') return homes ? { draft: next, cleared: { lots: [], backdrop: [] } } : { refused: `nothing more fits along ${name}` };
   }
 
-  // ---- the buildings: rows along it in what the homes left, a second row behind ----
+  // ---- the buildings: rows of lots along it in what the homes left (`dense.ts`; the slope judge comes back with Build's) ----
   const rand = mulberry32(mix(op.seed, key, 'rows'));
-  const pass = new BackdropPass({ draft: next, t, content });
+  const pass = new DensePass({ draft: next, t, content });
   const from = pass.count;
   const sides: (1 | -1)[] = r.lots ? [r.lots] : [1, -1];
-  const rows: Row[] = pass.rowsAlong(area, op.road, sides, rand);
-  pass.secondRow(rows, rand);
-  const laid = pass.result().backdrop;
-  const fresh = laid.slice(from).map((b, k) => ({ b, at: from + k }));
-  // Only those fronting this road (the road nearest each, as the surface and "Clear its buildings" have it), near its area.
-  const entries = surfacePlots({ plots: [], meta: { roads: next.roads as RoadPlan[], backdrop: fresh.map((f) => f.b) } });
+  pass.rowsAlong(area, op.road, sides, rand);
+  const { slots, places } = pass.result();
+  // Only those near its area; and the ground judged: a lot that would break a slope limit is left out (decision 32).
   const box = next.open?.areas[area];
-  const near = (b: BackdropBuilding) => {
+  const near = (s: PlotSlot) => {
     if (r.area !== undefined || !box) return true;
-    const c = boxOf(b.poly);
+    const c = plotRect(t, s);
     const [x, z] = [c.x + c.w / 2, c.z + c.d / 2];
     return x >= box.x - NEAR_BOX && z >= box.z - NEAR_BOX && x <= box.x + box.w + NEAR_BOX && z <= box.z + box.d + NEAR_BOX;
   };
-  const fronting = fresh.filter((f, k) => entries[k].entry?.road === op.road && near(f.b));
-  // The ground judged: a building that would break a slope limit is left out (decision 32).
   const land = landOf(next);
-  const judge = land ? new SlopeJudge(land, next.roads, [...next.slots.map((s) => plotRect(t, s)), ...(next.open?.backdrop ?? []).map((b) => boxOf(b.poly))]) : null;
-  const kept = judge ? fronting.filter((f) => judge.keep(f.b.poly)) : fronting;
-  const leftOut = fronting.length - kept.length;
+  const judge = land ? new SlopeJudge(land, next.roads, next.slots.map((s) => plotRect(t, s))) : null;
+  const fresh = slots.slice(from).filter(near);
+  const kept = judge ? fresh.filter((s) => judge.keep(rectPoly(plotRect(t, s)))) : fresh;
+  const leftOut = fresh.length - kept.length;
   if (!homes && !kept.length) return { refused: leftOut ? `the ground along ${name} is too steep for anything more to be built there` : `nothing more fits along ${name}` };
-  const open = next.open!;
-  const backdrop = [...(open.backdrop ?? []), ...kept.map((f) => f.b)];
-  return {
-    draft: { ...next, open: { ...open, backdrop } },
-    cleared: { lots: [], backdrop: [] },
-    ...(leftOut ? { leftOut } : {}),
-  };
+  // (Numbered on from the lots standing; a new lot's place with it.)
+  const at = new Map(kept.map((s, k) => [s.index, from + k]));
+  const added = kept.map((s) => ({ ...s, index: at.get(s.index)! }));
+  const own = places.filter((p) => p.plot === undefined || p.plot < from || at.has(p.plot)).map((p) => (p.plot !== undefined && p.plot >= from ? { ...p, plot: at.get(p.plot)! } : p));
+  return { draft: renumber({ ...next, slots: [...slots.slice(0, from), ...added], open: { ...next.open!, places: own } }, t, [op.road]), cleared: { lots: [], backdrop: [] }, ...(leftOut ? { leftOut } : {}) };
 }
 
 /** The backdrop buildings fronting road `road` (the road nearest each, as the surface takes them: `surfacePlots`), by their index in `open.backdrop`. */

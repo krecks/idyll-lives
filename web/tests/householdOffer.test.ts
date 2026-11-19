@@ -26,7 +26,7 @@ describe("step 3's households from the world code", async () => {
   const { AssetRegistry } = await import('../src/assets/registry');
   const { objectInfos } = await import('../src/game/housegen');
   const { generateWorld, useTownContent } = await import('../src/game/town');
-  const { householdsAtMost, offered, peopleStreams, populate } = await import('../src/game/people');
+  const { homesOf, householdsAtMost, offered, peopleStreams, populate } = await import('../src/game/people');
   const { offerPage, peopleKey, peopleSeedOf, startCode, townKey, withSeed } = await import('../src/ui/newGame');
   type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
@@ -105,7 +105,8 @@ describe("step 3's households from the world code", async () => {
   });
 
   test('the Neighbours slider ends where the first wave stops', () => {
-    const homes = world.slots.filter((s) => s.kind === 'house').length;
+    // (Every home: a house's lot, or a flat.)
+    const homes = homesOf(content, t, world).length;
     const most = householdsAtMost(homes);
     expect(most).toBe(homes - Math.max(6, Math.ceil(homes / 4)));
     const code = startCode('country', 5150);

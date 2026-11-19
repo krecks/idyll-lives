@@ -93,7 +93,7 @@ describe('lot edits', async () => {
   test('the ground has every lot, the backdrop, the water with its shore and the roads on it', () => {
     const ground = townGround(hamlet, t);
     for (const s of hamlet.slots) expect(ground.free(plotRect(t, s), 0)).toBe(false);
-    for (const b of hamlet.open!.backdrop!) expect(ground.free(boundsOf(b.poly), 0)).toBe(false);
+    for (const b of hamlet.open!.backdrop ?? []) expect(ground.free(boundsOf(b.poly), 0)).toBe(false);
     const wet = unrle(hamlet.open!.water, hamlet.width * hamlet.depth).indexOf(1);
     expect(wet).toBeGreaterThanOrEqual(0);
     expect(ground.takenAt((wet % hamlet.width) + 0.5, Math.floor(wet / hamlet.width) + 0.5)).toBe(true);
@@ -281,7 +281,7 @@ describe('lot edits', async () => {
     expect(lots.swapPlace(hamlet, t, content, market.index, 'lookout')).toHaveProperty('refused');
     // A civic place is a lot of its own (no backdrop building is a place): the hamlet's hall, its parish hall.
     const places = hamlet.open!.places!;
-    expect(hamlet.open!.backdrop!.every((b) => b.place === undefined)).toBe(true);
+    expect(hamlet.open!.backdrop ?? []).toEqual([]);
     const hall = hamlet.slots.find((s) => lots.civicOfLot(s) === 0)!;
     expect(hall).toBeDefined();
     expect(hall.template).toBe('parishHall');

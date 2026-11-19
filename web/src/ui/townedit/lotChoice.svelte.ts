@@ -6,7 +6,7 @@
 
 import type { GardenSize } from '../../game/housegen';
 import { civicOffered } from '../../game/edit/buildup';
-import { draftAreaSize } from '../../game/backdrop';
+import { draftAreaSize } from '../../game/places';
 import { CIVIC_PLACES, publicChoices, type LotChoice } from '../../game/edit/lots';
 import { placeTemplate } from '../../game/placeLots';
 import type { NeighbourhoodDraft, Templates } from '../../game/town';

@@ -37,7 +37,8 @@
  */
 
 import type { Content } from '../../content/content';
-import type { RoadKind, RoadPlan } from '../../core/protocol';
+import type { ParkingBay, RoadKind, RoadPlan } from '../../core/protocol';
+import { bayRect } from '../parking';
 import { surfacePlots } from '../../render/shared/builtSurface';
 import { crossWater, DRAWN_SPAN, wetSpans, withBridge, withoutDeck } from '../bridges';
 import { CTRL_APART } from '../countryRouter';
@@ -172,8 +173,8 @@ function offPoly(poly: readonly Pt[], x: number, z: number): number {
   return best;
 }
 
-/** A parking space's ground (`macro.ts` lays them 3 × 6 m, turned with the verge). */
-const spaceOf = (p: { x: number; z: number; rot: number }): Rect => (p.rot % 2 ? { x: p.x - 3, z: p.z - 1.5, w: 6, d: 3 } : { x: p.x - 1.5, z: p.z - 3, w: 3, d: 6 });
+/** A parking bay's ground (`parking.ts` `bayRect`). */
+const spaceOf = (p: ParkingBay): Rect => bayRect(p);
 
 /** Every name in town: its roads', its places', its areas' and its own. */
 function namesIn(draft: NeighbourhoodDraft): Set<string> {
