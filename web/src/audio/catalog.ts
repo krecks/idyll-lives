@@ -10,12 +10,12 @@
  * out there, so one sound against another reads here as it does in the game.
  */
 
-import { BLIPS, FOOTWEAR, MONO, MUSIC, ONCE, ONCE_MONO, ONCE_THINGS, SPECIES, SURFACES, type Footwear, type MadeKind, type MusicKind, type Stereo, type Surface } from './kinds';
+import { BLIPS, FOOTWEAR, MONO, MUSIC, ONCE, ONCE_EVENTS, ONCE_HOME, ONCE_MONO, ONCE_THINGS, SPECIES, SURFACES, type Footwear, type MadeKind, type MusicKind, type Stereo, type Surface } from './kinds';
 import { blipSamples, makeSound, monoSamples, songSamples, stepSamples } from './synth';
 
-/** A sound played once (`ONCE`, `ONCE_THINGS`), not looped. */
-export type OnceKind = (typeof ONCE)[number] | (typeof ONCE_THINGS)[number];
-export const ONCE_KINDS: readonly string[] = [...ONCE, ...ONCE_THINGS];
+/** A sound played once (`ONCE`, `ONCE_THINGS`, `ONCE_HOME`, `ONCE_EVENTS`), not looped. */
+export type OnceKind = (typeof ONCE)[number] | (typeof ONCE_THINGS)[number] | (typeof ONCE_HOME)[number] | (typeof ONCE_EVENTS)[number];
+export const ONCE_KINDS: readonly string[] = [...ONCE, ...ONCE_THINGS, ...ONCE_HOME, ...ONCE_EVENTS];
 /** A sound that loops while something is in use (or runs by itself). */
 export type LoopKind = 'sizzle' | 'chop' | 'tv' | 'music' | 'drums' | MusicKind | Exclude<MadeKind, OnceKind>;
 /** A world sound: a loop, or one played once (as a use starts, when it's a use's sound). */
@@ -48,6 +48,7 @@ export const LOOPS: Record<LoopKind, LoopDef> = {
   dishwasher: { level: 0.16, drift: 0.02 },
   crockery: { level: 0.35 },
   fountain: { level: 0.2, drift: 0.03 },
+  clockTick: { level: 0.4 },
   tv: { level: 0.35 },
   music: { level: MUSIC_LEVEL },
   musicFolk: { level: MUSIC_LEVEL },
@@ -79,6 +80,19 @@ export const LOOPS: Record<LoopKind, LoopDef> = {
   cello: { level: 0.29 },
   punchBag: { level: 0.33 },
   smash: { level: 0.33 },
+  vacuum: { level: 0.22, drift: 0.02 },
+  mower: { level: 0.25, drift: 0.02 },
+  hose: { level: 0.17, drift: 0.03 },
+  wateringCan: { level: 0.115, drift: 0.03 },
+  kettle: { level: 0.28, drift: 0.03 },
+  saunaStove: { level: 0.29 },
+  sweep: { level: 0.24 },
+  mop: { level: 0.26 },
+  shears: { level: 0.235 },
+  iron: { level: 0.155 },
+  typing: { level: 0.22 },
+  cutlery: { level: 0.13 },
+  fireplaceElectric: { level: 0.115 },
 };
 
 /**
@@ -94,7 +108,7 @@ export function pieceAt(hour: number, dancing: boolean): MusicKind {
 }
 
 /** Levels of the sounds played once. */
-export const ONCE_LEVEL: Record<OnceKind, number> = { flush: 0.3, fridgeDoor: 0.27, binLid: 0.29, vendSnack: 0.25, vendCan: 0.25, phoneBox: 0.23, hangUp: 0.23, ping: 0.21, toastPop: 0.27, pour: 0.21 };
+export const ONCE_LEVEL: Record<OnceKind, number> = { flush: 0.3, fridgeDoor: 0.27, binLid: 0.29, vendSnack: 0.25, vendCan: 0.25, phoneBox: 0.23, hangUp: 0.23, ping: 0.21, toastPop: 0.27, pour: 0.21, kettleOff: 0.295, doorOpen: 0.22, doorClose: 0.135, curtain: 0.067, carDoor: 0.34, carStart: 0.105, letterbox: 0.17, till: 0.107, drawer: 0.22 };
 
 /**
  * The outdoors: the bed of wind (its level at night, and how much the day adds), the crickets at night, the
@@ -126,6 +140,17 @@ export const STEPS = {
   ahead: 0.18,
   apart: 0.15,
   farthest: 0.35,
+};
+
+/**
+ * Things that happen (`events.ts`): doors and gates (`gate`: a gate's share of a door's level; at most `voices`
+ * within `within` s and never two closer than `apart` s; none past `farthest` of the camera's distance gain, nor
+ * above game speed `fastest`), curtains (`most` a change) and cars (heard from nearness `near` up, `perLook` a look).
+ */
+export const EVENTS = {
+  door: { gate: 0.6, voices: 3, within: 0.6, apart: 0.15, farthest: 0.35, fastest: 2 },
+  curtain: { most: 2 },
+  car: { near: 0.25, perLook: 2 },
 };
 
 /**
@@ -193,6 +218,15 @@ function scaled(s: Stereo, level: number): Stereo {
 /** A typical unseen bird of a species (`world.ts` `FLOCK`): the middle of its pitch range, a garden away. */
 const FLOCK_NEAR = 0.575;
 
+/** Who sounds the things happening that no content names (the rest are named by content). */
+const HAPPENS: Partial<Record<string, string>> = {
+  doorOpen: 'a resident opening a door or a gate',
+  doorClose: 'the door or gate falling shut behind them',
+  curtain: 'curtains drawn or opened',
+  carDoor: 'a car door shut (right by the middle of the picture)',
+  carStart: 'a parked car setting off',
+};
+
 /** Every sound the game makes, in the order `bun run sounds` lists them. */
 export function everySound(): Listed[] {
   const list: Listed[] = [];
@@ -209,7 +243,7 @@ export function everySound(): Listed[] {
       continue;
     }
     const heard = of(MONO, name) ? (rate: number) => centred(monoSamples(name as (typeof MONO)[number], rate), level) : (rate: number) => scaled(makeSound(name as MadeKind, rate) as Stereo, level);
-    list.push({ name, group: 'things', plays: once.has(name) ? 'once' : 'loop', level, heard });
+    list.push({ name, group: 'things', plays: once.has(name) ? 'once' : 'loop', level, who: HAPPENS[name], heard });
   }
   list.push({ name: 'knock', group: 'things', plays: 'once', level: AMBIENCE.knock, who: 'a visitor at the door', heard: (rate) => centred(monoSamples('knock', rate), AMBIENCE.knock) });
   for (const surface of SURFACES) {

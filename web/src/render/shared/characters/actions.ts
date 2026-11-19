@@ -556,6 +556,10 @@ const EATEN_WITH: Record<string, HandProp> = {
   iceCreamCone: PROPS.paddle,
   noodles: PROPS.chopsticks,
 };
+/** Whether `plate` (content `items`) is eaten with a fork: then eating sounds of cutlery (`audio/world.ts`). */
+export function eatenWithFork(plate: string): boolean {
+  return EATEN_WITH[plate] === PROPS.fork;
+}
 /**
  * What is eaten by hand at the table (content `items`), a bite of it in the right hand (`biteOf`): the rest of it stays
  * on the plate, as what is eaten with a fork does.

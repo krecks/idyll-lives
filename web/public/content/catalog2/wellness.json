@@ -161,6 +161,7 @@
           "id": "sauna",
           "label": "Take a sauna",
           "anim": "relax",
+          "sound": "saunaStove",
           "minutes": 30,
           "pose": "sit",
           "effects": {

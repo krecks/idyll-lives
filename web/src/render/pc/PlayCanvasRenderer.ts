@@ -130,6 +130,7 @@ import type {
   PaintPreviewFace,
   PickResult,
   BuildingHit,
+  DoorSound,
   PlacementGhost,
   RenderFailure,
   RenderPassInfo,
@@ -208,6 +209,8 @@ const SHADOW_MARGIN = 10;
 const TARGET_EASE = 0.25;
 /** The basement's pit (and the ground dug away over it) reaches this far past the plot (m), clear of walls on its edge. */
 const PIT_MARGIN = 0.3;
+/** The doors and gates opening or falling shut kept for the world's sound between its looks (`doorSounds`). */
+const DOOR_SOUNDS = 16;
 /** Cells (m) the residents on the move are sorted into for the gates (`swingDoors`). */
 const GATE_CELL = 8;
 /** Camera distance below which the viewed lot's roof is hidden even with walls up. */
@@ -642,6 +645,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private doors: { leaf: HouseDoor; open: number }[] = [];
   /** Gates in the fences' meshes, each with how far open it stands (0 shut, as drawn) and the side it opens to. */
   private gates: { fences: Fences; leaf: GateLeaf; open: number; towards: number }[] = [];
+  /** The doors and gates that opened or fell shut since `doorSounds` was last called (at most `DOOR_SOUNDS`), and the list handed out then. */
+  private doorsHeard: DoorSound[] = [];
+  private doorsHanded: DoorSound[] = [];
   /**
    * How far out each resident's hand reaches for a door's handle this frame, 0..1 (indexed by their
    * row; `goingThrough`'s `hand`), 0 where they go through no leaf that moves. The arm goes out with
@@ -2830,6 +2836,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const target = way ? 1 : 0;
       const open = target > gate.open ? Math.min(target, gate.open + step) : Math.max(target, gate.open - step);
       if (open === gate.open) continue;
+      this.doorHeard(gate.open, open, gate.leaf.centre, true);
       gate.open = open;
       swingGate(gate.fences, gate.leaf, ease(open), gate.towards);
       moved = urgent = true;
@@ -2841,6 +2848,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const target = goingThrough(movers, leaf.axis, leaf.centre, door.open === 1, lead, hand) !== 0 ? 1 : 0;
       const open = door.open < 0 ? target : target > door.open ? Math.min(target, door.open + step) : Math.max(target, door.open - step);
       if (open === door.open) continue;
+      // (One first placed, `open` -1, is heard from its next move.)
+      this.doorHeard(door.open, open, leaf.centre, false);
       door.open = open;
       // Eased: quick off the frame, slowing as it meets the jamb or the wall. One that slides stays
       // turned shut and slides into the wall (from where it was built).
@@ -2855,6 +2864,13 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
     // (Doors and gates cast only the sun's shadow.)
     if (moved) this.sunShadows.moved(urgent, false);
+  }
+
+  /** A leaf moved from `was` to `open` (0 shut): one leaving its frame or coming back to it is kept for the world's sound (`doorSounds`). */
+  private doorHeard(was: number, open: number, centre: readonly [number, number], gate: boolean): void {
+    const opened = was === 0 && open > 0;
+    if ((!opened && !(was > 0 && open === 0)) || this.doorsHeard.length >= DOOR_SOUNDS) return;
+    this.doorsHeard.push({ x: centre[0], row: centre[1], shut: !opened, gate });
   }
 
   update(frame: FrameState): void {
@@ -4213,6 +4229,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   birdSings(id: number, seconds: number): void {
     this.birdLife?.sings(id, seconds);
+  }
+
+  doorSounds(): readonly DoorSound[] {
+    const heard = this.doorsHeard;
+    this.doorsHeard = this.doorsHanded;
+    this.doorsHeard.length = 0;
+    this.doorsHanded = heard;
+    return heard;
   }
   setSelectedSim(id: number | null): void {
     this.pictureChanged();
