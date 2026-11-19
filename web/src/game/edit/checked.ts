@@ -10,14 +10,12 @@
 import type { Content } from '../../content/content';
 import { wetTile } from '../landEdit';
 import { roadExits } from '../roads';
-import { plotRect, type NeighbourhoodDraft, type Templates } from '../town';
+import { plotKindOf, plotRect, type NeighbourhoodDraft, type Templates } from '../town';
 import { townProblems, type CheckedTown } from '../townCheck';
 
 /** The checks of how the generator fills a town (the backdrop each area keeps, the centre the densest), which an edited town needn't keep. */
 const GENERATED_ONLY: readonly RegExp[] = [/ has \d+ backdrop buildings \(\d+ or more\)$/, /^the centre's open land is /, /^the main town has no centre$/];
 
-/** The town file's kind of a lot (`assembleTown`'s `PlotKind`). */
-const plotKind = (s: NeighbourhoodDraft['slots'][number]): string => (s.kind === 'house' ? (s.lot === 'farm' ? 'farm' : 'home') : s.kind === 'shop' ? 'shop' : s.kind === 'outdoor' ? 'countryside' : 'public');
 
 /** The part of `draft`'s town file the checks read (`CheckedTown`), written as `assembleTown` writes it, with nobody living there yet. */
 export function checkedTown(draft: NeighbourhoodDraft, t: Templates): CheckedTown {
@@ -25,7 +23,9 @@ export function checkedTown(draft: NeighbourhoodDraft, t: Templates): CheckedTow
   const W = draft.width;
   const D = draft.depth;
   const land = open?.land;
-  const plots = draft.slots.map((s) => ({ ...plotRect(t, s), public: s.kind !== 'house', area: s.area ?? 0, kind: plotKind(s) }));
+  const plots = draft.slots.map((s) => ({ ...plotRect(t, s), public: s.kind !== 'house' && s.kind !== 'flats', area: s.area ?? 0, kind: plotKindOf(s) }));
+  // (The named places' and flats buildings' looks, by plot, as the town file has them: `assembleTown`.)
+  const lotLooks = Object.fromEntries(draft.slots.flatMap((s) => (s.dress ? [[s.index, s.dress]] : [])));
   // (A place's ways out are where its roads, not its footpaths, leave the world; a classic town's, any road's.)
   const exits = open ? roadExits(draft.roads.filter((r) => r.kind !== 'trail'), W, D).map(([x, z]) => ({ x, z, kind: 'road' as const })) : roadExits(draft.roads, W, D);
   return {
@@ -44,6 +44,7 @@ export function checkedTown(draft: NeighbourhoodDraft, t: Templates): CheckedTow
       roads: draft.roads,
       greens: draft.greens,
       facing: draft.slots.map((s) => s.facing),
+      ...(Object.keys(lotLooks).length ? { lotLooks } : {}),
       ...(open
         ? {
             zones: open.zones,
@@ -64,7 +65,7 @@ export function checkedTown(draft: NeighbourhoodDraft, t: Templates): CheckedTow
  */
 export function editedProblems(draft: NeighbourhoodDraft, t: Templates, content: Content): { hard: string[]; soft: string[] } {
   const size = draft.world?.options?.town;
-  const expect = { built: 0, empty: null, meadow: false, quarters: 0, homes: 0, mainLeast: 0, careers: size === 'town' || size === 'city', exits: null };
+  const expect = { built: 0, empty: null, meadow: false, quarters: 0, homes: 0, careers: size === 'town' || size === 'city', exits: null };
   const found = townProblems(checkedTown(draft, t), expect, { river: false, careers: content.careerCategories.map((c) => c.id), generated: false });
   const homes = draft.slots.filter((s) => s.kind === 'house').length;
   // (How the generator fills a town, which an edited one needn't keep: a village placed by hand has no backdrop, decision 15.)

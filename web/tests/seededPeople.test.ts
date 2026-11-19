@@ -34,7 +34,6 @@ describe('seeded people', async () => {
   const { randomHousehold } = await import('../src/game/household');
   const { assembleTown, generateWorld, useTownContent, vacantSlots } = await import('../src/game/town');
   const { defaultResidentsMost, FILL_CAP, fillPlan, fillTown, homesOf, keepForSale, neighbourBonds, offered, peopleStreams, populate, residentsMost, SIM_RESIDENTS, tierFor } = await import('../src/game/people');
-  const { homePrice } = await import('../src/game/price');
   const { mulberry32 } = await import('../src/game/noise');
   const { runTownJob } = await import('../src/game/townJobs');
   type Templates = import('../src/game/town').Templates;

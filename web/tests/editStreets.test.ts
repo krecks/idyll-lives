@@ -80,7 +80,7 @@ function town(river = 30): NeighbourhoodDraft {
       zones: [{ kind: 'water', poly: rect(0, 200, RIVER_END, 200 + river) }],
       water: rle(water),
       pads: {},
-      parking: [{ x: LANE_X + 7, z: 120, rot: 0, area: 0 }],
+      parking: [{ x: LANE_X + 7, z: 120, yaw: 0, area: 0 }],
       places: [],
       backdrop: [],
     },
