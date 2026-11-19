@@ -6,7 +6,10 @@
 //! - a workbench's tools and a bike's, a fire, a chemistry set bubbling, a punch bag, crockery smashed in a
 //!   bin, a cello played with a bow, someone singing to a karaoke track;
 //! - played once: a fridge door, a pedal bin, the vending machines, a phone box's call and its hanging up,
-//!   the microwave's ping, toast popping up, coffee poured into a cup.
+//!   the microwave's ping, toast popping up, coffee poured into a cup;
+//! - at home and in the garden (\`home\`, \`HOME\`): a vacuum cleaner, an iron, a broom, a mop, a mower, a hose,
+//!   a watering can, shears, a kettle boiling (and switching itself off, played once), typing, a sauna's
+//!   stove, an electric fire, a knife and fork on a plate.
 //!
 //! Most are made the same few ways:
 //! - a motor or a fan: a tone at its speed with its harmonics (a transformer's hum at twice the mains,
@@ -22,6 +25,9 @@
 
 use crate::dsp::m::*;
 use crate::dsp::*;
+
+mod home;
+pub use home::{HOME, ONCE_HOME};
 
 /// The sounds of things, by name (\`THINGS\`).
 pub const THINGS: [&str; 34] = [
@@ -111,7 +117,7 @@ pub fn make(kind: &str, rate: f64) -> Option<Stereo> {
         "ping" => ping(rate),
         "toastPop" => toast_pop(rate),
         "pour" => pour(rate),
-        _ => return None,
+        _ => return home::make(kind, rate),
     })
 }
 

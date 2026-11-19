@@ -20,8 +20,12 @@ export const THINGS = ['treadmill', 'bike', 'tools', 'bikeTools', 'pool', 'foosb
 export type ThingKind = (typeof THINGS)[number];
 export const ONCE_THINGS = ['fridgeDoor', 'binLid', 'vendSnack', 'vendCan', 'phoneBox', 'hangUp', 'ping', 'toastPop', 'pour'] as const satisfies readonly ThingKind[];
 
-/** Every sound made off the main thread: the water's and the things'. */
-export const MADE = [...WATER, ...THINGS] as const;
+/** The things' sounds at home and in the garden (`things/home.rs`); the one played once. */
+export const HOME_THINGS = ['vacuum', 'iron', 'sweep', 'mop', 'mower', 'hose', 'wateringCan', 'shears', 'kettle', 'typing', 'saunaStove', 'fireplaceElectric', 'cutlery', 'kettleOff'] as const;
+export const ONCE_HOME = ['kettleOff'] as const satisfies readonly (typeof HOME_THINGS)[number][];
+
+/** Every sound made off the main thread: the water's and the things' (at home and in the garden too). */
+export const MADE = [...WATER, ...THINGS, ...HOME_THINGS] as const;
 export type MadeKind = (typeof MADE)[number];
 
 /** The outdoors' loops (`outdoors.rs`): one channel for what has a place (a car), two for what is all round. */

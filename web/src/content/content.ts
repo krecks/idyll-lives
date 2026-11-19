@@ -134,7 +134,7 @@ export interface InteractionDef {
    * steps sound by the station they're done at.
    */
   sound?: string;
-  /** A sound played once as it ends (`audio/kinds.ts` `ONCE`, `ONCE_THINGS`: a toilet's `flush`, a microwave's `ping`). */
+  /** A sound played once as it ends (`audio/kinds.ts` `ONCE`, `ONCE_THINGS`, `ONCE_HOME`: a toilet's `flush`, a microwave's `ping`, a kettle's `kettleOff`). */
   endSound?: string;
 }
 
