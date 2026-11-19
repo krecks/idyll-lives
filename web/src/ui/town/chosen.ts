@@ -3,7 +3,7 @@
  * its icon, where its pin stands, and who is inside now. Pure: `chosenView.svelte.ts` gives it the game's views.
  */
 
-import type { BackdropBuilding, BackdropUse, HouseholdInfo, PlotInfo, TownPlace } from '../../core/protocol';
+import type { BackdropBuilding, BuildingUse, HouseholdInfo, PlotInfo, TownPlace } from '../../core/protocol';
 import { CIVIC, civicOf } from '../../game/backdrop';
 import type { BuildingHit } from '../../render/types';
 import { lotTitle } from '../place';
@@ -12,7 +12,7 @@ import { whereabouts, type TagWorld } from './tags';
 import type { Chosen } from './townHud.svelte';
 
 /** A backdrop building that is no place, in words. */
-const USE_TITLE: Record<BackdropUse, string> = {
+const USE_TITLE: Record<BuildingUse, string> = {
   flats: 'Flats',
   terrace: 'Terraced houses',
   house: 'House',
@@ -43,7 +43,7 @@ const KIND_ICON: Record<TownPlace['kind'], string> = {
 };
 
 /** A backdrop building's icon, by its use. */
-const USE_ICON: Record<BackdropUse, string> = {
+const USE_ICON: Record<BuildingUse, string> = {
   flats: 'icon.ui.home',
   terrace: 'icon.ui.home',
   house: 'icon.ui.home',

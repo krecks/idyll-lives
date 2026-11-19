@@ -3,17 +3,17 @@
     {
       "name": "living-town-meta",
       "file": "web/src/core/protocol.ts",
-      "sha256": "15041764db92b504f905094de42a8d89c7a211960f51305a77775e414d98da85",
-      "by": "integrator",
-      "reason": "owner's OK 2026-11-19: protocol.ts living-town parts as changed by 0.8.3 (land, speeds, visitable places, curtains and cars messages)",
+      "sha256": "a845a22616775e3dd3f544faca99860b9f55a8fb4d6d1da13db56c1884969da2",
+      "by": "real-town-contracts",
+      "reason": "owner's OK, real town: the contracts of stage 0 (BuildingUse for BackdropUse; parking bays, car parks, paved pieces, plot kinds and flats; the centre's square and the town's paving in the meta)",
       "region": "living-town-meta"
     },
     {
       "name": "living-town-types",
       "file": "web/src/core/protocol.ts",
-      "sha256": "3f1f692a2d3e707e440ab6539906ef6d68e8b1d8c06a2c6e017c2caa079014a8",
-      "by": "integrator",
-      "reason": "owner's OK 2026-11-19: protocol.ts living-town parts as changed by 0.8.3 (land, speeds, visitable places, curtains and cars messages)",
+      "sha256": "a49c31a5f2016a6be91961e13ceab5cf4bf6a10aeacb2dc730473cc4afcc1d71",
+      "by": "real-town-contracts",
+      "reason": "owner's OK, real town: the contracts of stage 0 (BuildingUse for BackdropUse; parking bays, car parks, paved pieces, plot kinds and flats; the centre's square and the town's paving in the meta)",
       "region": "living-town-types"
     },
     {

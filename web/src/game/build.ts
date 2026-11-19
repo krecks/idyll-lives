@@ -41,7 +41,7 @@
  */
 
 import type { Content } from '../content/content';
-import type { BackdropUse, RoadPlan, TownArea } from '../core/protocol';
+import type { BuildingUse, RoadPlan, TownArea } from '../core/protocol';
 import { BackdropPass, CIVIC, civicChoices, civicTooBig, draftAreaSize, facesRoad, ZONE, type Row, type ZoneKind } from './backdrop';
 import { roadKey } from './edit/buildup';
 import { entryOf, frontOf, inCentre, townGround } from './edit/ground';
@@ -83,9 +83,9 @@ const SPOT_LEAST = 9;
 /** How far behind the kerb (m) a road's frontage is read for what goes along it. */
 const PROBES = [4, 8, 12] as const;
 /** The backdrop's buildings each use is built with (by use code): homes, terraces and flats, shops and work, (none on a green), public places. */
-const BUILDINGS: readonly (readonly BackdropUse[] | null)[] = [null, ['house'], ['terrace', 'flats'], ['shop', 'cafe', 'restaurant', 'office', 'workshop'], null, ['hall']];
+const BUILDINGS: readonly (readonly BuildingUse[] | null)[] = [null, ['house'], ['terrace', 'flats'], ['shop', 'cafe', 'restaurant', 'office', 'workshop'], null, ['hall']];
 /** Which use each kind of backdrop building goes on (as `proposal.ts` paints it). */
-const USE_OF: Partial<Record<BackdropUse, UseKind>> = { house: 'homes', terrace: 'rows', flats: 'rows', shop: 'shops', cafe: 'shops', restaurant: 'shops', office: 'shops', workshop: 'shops', hall: 'public', church: 'public', school: 'public' };
+const USE_OF: Partial<Record<BuildingUse, UseKind>> = { house: 'homes', terrace: 'rows', flats: 'rows', shop: 'shops', cafe: 'shops', restaurant: 'shops', office: 'shops', workshop: 'shops', hall: 'public', church: 'public', school: 'public' };
 /** The shop lots an area with shops and none of its own is given one of, and a green stretch's lots. */
 const SHOP_LOTS = ['grocer', 'bakery', 'cafe'];
 const GREEN_LOTS = ['park', 'playground'];

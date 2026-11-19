@@ -6,7 +6,7 @@
  */
 
 import type { CareerCategory } from '../content/content';
-import type { BackdropBuilding, BackdropUse, TownPlace, TownSize } from '../core/protocol';
+import type { BackdropBuilding, BuildingUse, TownPlace, TownSize } from '../core/protocol';
 import type { NeighbourhoodDraft } from './town';
 import { placeOfTemplate } from './placeLots';
 import { placeOf, sizeByHomes, specOf } from './world';
@@ -17,14 +17,14 @@ const pick = <T>(rand: Rand, list: readonly T[]): T => list[Math.floor(rand() * 
 
 /** What a building is, and how big a kind of it is: along the road (m), deep (m), storeys, roofs. */
 export interface Kind {
-  use: BackdropUse;
+  use: BuildingUse;
   w: [number, number];
   d: [number, number];
   storeys: [number, number];
   roofs: readonly BackdropBuilding['roof'][];
 }
 /** A kind of building: its use, how long along the road and how deep (m), its storeys and roofs. */
-export const K = (use: BackdropUse, w: [number, number], d: [number, number], storeys: [number, number], roofs: readonly BackdropBuilding['roof'][]): Kind => ({ use, w, d, storeys, roofs });
+export const K = (use: BuildingUse, w: [number, number], d: [number, number], storeys: [number, number], roofs: readonly BackdropBuilding['roof'][]): Kind => ({ use, w, d, storeys, roofs });
 
 /**
  * A town's civic places, each a lot (`placeLots.ts`), a main town's laid first, nearest its square (its

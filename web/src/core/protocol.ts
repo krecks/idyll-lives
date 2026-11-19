@@ -538,8 +538,10 @@ export interface OpenWorldTownFields {
   areas?: TownArea[];
   exits?: TownExit[];
   terrain?: { water?: Rle; blocked?: Rle };
-  /** Public parking for car trips between areas. */
-  parking?: { x: number; z: number; rot: number; area: number }[];
+  /** Public parking: marked bays, each where a car parked in it stands (the simulation parks at exactly this pose). */
+  parking?: ParkingBay[];
+  /** The car parks the bays are grouped into (`ParkingBay.park`). */
+  carParks?: CarPark[];
 }
 
 export interface WorldMeta {
@@ -576,9 +578,11 @@ export interface WorldMeta {
   backdrop?: BackdropBuilding[];
   /** Living town: the places the town tags name (backdrop places and public lots). */
   places?: TownPlace[];
-  /** Living town: each main town's centre, the square and the high street. */
-  centre?: { area: number; poly: [number, number][] }[];
-  /** Living town: how the lots of the town's named places look from outside, by plot index (`PlotSlot.dress`). */
+  /** Living town: each main town's centre, the square and the high street (`poly`, paved but for its lots and greens), and the square itself. */
+  centre?: { area: number; poly: [number, number][]; square?: [number, number][] }[];
+  /** Real town: paved ground the town lays besides its roads, paths and car parks (courts, yards), the one source near and far draw. */
+  paving?: PavedPiece[];
+  /** Living town: how the lots of the town's named places and flats buildings look from outside, by plot index (`PlotSlot.dress`). */
   lotLooks?: Record<number, LotLook>;
   // pin:living-town-meta end
   /**
@@ -625,8 +629,8 @@ export interface LandFile {
 
 // pin:living-town-types begin
 
-/** What a backdrop building is. */
-export type BackdropUse =
+/** What a building is, for how it looks closed (a lot's `LotLook`, a backdrop building's). */
+export type BuildingUse =
   | 'flats'
   | 'terrace'
   | 'house'
@@ -652,7 +656,7 @@ export interface BackdropBuilding {
   roof: 'gable' | 'hip' | 'flat' | 'mansard';
   /** The ridge's direction for gable and mansard roofs (rad, 0 = along x): a turn around +y (y up), so it runs along (cos r, −sin r) in (x, z). */
   ridge?: number;
-  use: BackdropUse;
+  use: BuildingUse;
   /** A wall and roof colour pair: an index into the renderer's backdrop palette, taken modulo its length. */
   look: number;
   /** A place's building: its index into `WorldMeta.places`. */
@@ -661,7 +665,7 @@ export interface BackdropBuilding {
   area: number;
 }
 
-/** Somewhere the town tags name: a backdrop place or a public lot. */
+/** Somewhere the town tags name: a backdrop place or a public lot (every one a lot once the backdrop goes). */
 export interface TownPlace {
   name: string;
   kind: 'shop' | 'cafe' | 'restaurant' | 'office' | 'school' | 'church' | 'park' | 'outdoor' | 'workshop' | 'farm';
@@ -683,10 +687,68 @@ export interface TownPlace {
  * the only real one inside unless its layout has a storey above), roof and colours (`BackdropBuilding`'s).
  */
 export interface LotLook {
-  use: BackdropUse;
+  use: BuildingUse;
   storeys: number;
   roof: BackdropBuilding['roof'];
   look: number;
+}
+
+/**
+ * A marked parking bay (`OpenWorldTownFields.parking`, `WorldStructure.parking`): its middle (m),
+ * the way a car parked in it faces (rad, as the simulation's yaw: nose in, away from the road), its
+ * area (`TownArea` index) and its car park (`carParks` index; absent: a bay on its own by the verge).
+ */
+export interface ParkingBay {
+  x: number;
+  z: number;
+  yaw: number;
+  area: number;
+  park?: number;
+}
+
+/**
+ * A car park: a row of nose-in bays off a straight stretch of street on one apron. Its asphalt (4
+ * corners, counter-clockwise seen from above), where its P sign stands (x, z and the way it faces,
+ * rad), the plot of the place it is by (`serves`), or that it is the square's (`square`).
+ */
+export interface CarPark {
+  area: number;
+  poly: [number, number][];
+  sign: [number, number, number];
+  serves?: number;
+  square?: true;
+}
+
+/**
+ * Paved ground the town lays besides its roads and paths (`WorldMeta.paving`): a centre's, a
+ * square, the open ground of a place's or a flats building's lot (`court`), a workshop's yard. A
+ * polygon in town metres, counter-clockwise seen from above; `plot`: the lot it is part of.
+ */
+export interface PavedPiece {
+  kind: 'centre' | 'square' | 'court' | 'yard';
+  poly: [number, number][];
+  plot?: number;
+}
+
+/** What a lot is (`PlotInfo.kind`, the town file's `plots[].kind`; a flat in the file is `flat`). */
+export type PlotKind = 'home' | 'farm' | 'public' | 'shop' | 'countryside' | 'flats';
+
+/**
+ * A flat (`WorldStructure.flats`): a plot of its own inside a building's lot (`of`: a flats lot,
+ * or a shop's, café's or restaurant's with flats over it), on one storey (`storey`). Its id follows
+ * the last ground lot's (at or past `plots.length`); its rectangle (`x`, `z`, `w`, `d`) is on the
+ * ground's rows, as a lot's; `door` is the landing tile before its own door, on its storey's rows.
+ */
+export interface FlatInfo {
+  id: number;
+  of: number;
+  storey: number;
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+  name: string;
+  door: [number, number];
 }
 // pin:living-town-types end
 
@@ -764,6 +826,7 @@ export const DEFAULT_LANDSCAPE: LandscapeParams = {
 export interface HouseholdInfo {
   id: number;
   name: string;
+  /** Its home: a lot, or a flat (at or past `plots.length`: `flatOf`, `lotOf`). */
   plot: number | null;
   player: boolean;
 }
@@ -788,6 +851,24 @@ export interface PlotInfo {
    * and the days (bit 0 = Monday), a `close` at or before `open` running past midnight. Absent: always open.
    */
   hours?: { open: number; close: number; days: number };
+  /** What the lot is (the town file's `plots[].kind`). Absent: a town file without kinds. */
+  kind?: PlotKind;
+}
+
+/** What `lotOf` and `flatOf` read: the ground lots and the flats. */
+type LotsAndFlats = { plots: readonly PlotInfo[]; flats?: readonly FlatInfo[] };
+
+/** The flat plot id `plot` is (a household's or a resident's may be one), or undefined for a ground lot. */
+export function flatOf(world: LotsAndFlats, plot: number): FlatInfo | undefined {
+  if (plot < world.plots.length) return undefined;
+  const flats = world.flats ?? [];
+  const at = flats[plot - world.plots.length];
+  return at?.id === plot ? at : flats.find((f) => f.id === plot);
+}
+
+/** The ground lot plot id `plot` stands on: a flat's building, else the lot itself. */
+export function lotOf(world: LotsAndFlats, plot: number): number {
+  return flatOf(world, plot)?.of ?? plot;
 }
 
 /** Sent when walls or objects change (rare). */
@@ -836,6 +917,7 @@ export interface WorldStructure {
   sims: SimInfo[];
   former?: FormerResident[];
   households: HouseholdInfo[];
+  /** The ground lots, in slot order (ids index this list; `meta.facing`, `pads` and `lotLooks` too). Flats are in `flats`. */
   plots: PlotInfo[];
   exits: [number, number][];
   /** The room of each tile, row by row (`width × depth`; 0 outdoors): a `Uint16Array` from the simulation. */
@@ -888,6 +970,15 @@ export interface WorldStructure {
    * giving way (no heads). Absent: none.
    */
   junctions?: JunctionInfo[];
+  /**
+   * Public parking (sim-core `travel::Parking`): every marked bay, where a car parked in it stands
+   * and faces (the simulation parks at exactly this pose), in the town file's order. Absent: none.
+   */
+  parking?: ParkingBay[];
+  /** The car parks the bays are grouped into (`ParkingBay.park`), as the town file has them. Absent: none. */
+  carParks?: CarPark[];
+  /** The flats (each a plot of its own, ids after the last of `plots`), in id order. Absent: none. */
+  flats?: FlatInfo[];
 }
 
 /**
@@ -1033,7 +1124,7 @@ export interface SimView {
   stage?: string | null;
   /** Retired: the weekly pension. */
   pension?: number;
-  /** Plot the Sim is on (null on the street or at work). */
+  /** Plot the Sim is on (null on the street or at work): a lot, or a flat (`flatOf`, `lotOf`). */
   plot: number | null;
   /** Minute of day they come back from work, if away. */
   awayUntil: number | null;

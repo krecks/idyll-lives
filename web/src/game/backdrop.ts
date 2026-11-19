@@ -36,7 +36,7 @@
  */
 
 import type { Content } from '../content/content';
-import type { BackdropBuilding, BackdropUse, TownPlace, TownSize } from '../core/protocol';
+import type { BackdropBuilding, BuildingUse, TownPlace, TownSize } from '../core/protocol';
 import { townGround } from './edit/ground';
 import { inside, leftOf, lengths, pointAt, RoadIndex, type Pt, type RoadPlan } from './roads';
 import { plotRect, type Ground, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates } from './town';
@@ -171,7 +171,7 @@ export interface Row {
   side: 1 | -1;
   back: number;
   zone: Zone;
-  kinds?: readonly BackdropUse[];
+  kinds?: readonly BuildingUse[];
 }
 
 /**
@@ -182,8 +182,8 @@ export interface Row {
 export interface RowLimits {
   from?: number;
   to?: number;
-  kinds?: readonly BackdropUse[];
-  kindsAt?: (p: Pt) => readonly BackdropUse[] | null;
+  kinds?: readonly BuildingUse[];
+  kindsAt?: (p: Pt) => readonly BuildingUse[] | null;
 }
 
 /** The buildings in each 24 m cell (`BackdropPass`'s overlap test). */
@@ -233,7 +233,7 @@ export class BackdropPass {
   /** The places so far (a draft's, then those named since). */
   private readonly placeList: TownPlace[] = [];
   /** What else a building must be to go down (by hand only: Build keeps each to the land painted its use); anything if unset. */
-  allow?: (poly: readonly Pt[], use: BackdropUse) => boolean;
+  allow?: (poly: readonly Pt[], use: BuildingUse) => boolean;
 
   constructor(input: BackdropInput | BackdropDraft) {
     if ('draft' in input) {
@@ -427,8 +427,8 @@ export class BackdropPass {
 
   /** A kind of `zone`'s drawn by its weight (`kinds`: of those only; null if the zone has none of them). */
   private pickKind(zone: Zone, rand: Rand): Kind;
-  private pickKind(zone: Zone, rand: Rand, kinds: readonly BackdropUse[] | undefined): Kind | null;
-  private pickKind(zone: Zone, rand: Rand, kinds?: readonly BackdropUse[]): Kind | null {
+  private pickKind(zone: Zone, rand: Rand, kinds: readonly BuildingUse[] | undefined): Kind | null;
+  private pickKind(zone: Zone, rand: Rand, kinds?: readonly BuildingUse[]): Kind | null {
     const all = KINDS[zone] as readonly (readonly [Kind, number])[];
     const list = kinds ? all.filter(([k]) => kinds.includes(k.use)) : all;
     if (!list.length) return null;
@@ -461,7 +461,7 @@ export class BackdropPass {
       // (From 4 to 8 m along the road; from 0 to 1 m past `from`, if given, to make the most of a short stretch.)
       let s = from === undefined ? 4 + rand() * 4 : Math.max(4, from + rand());
       // (Where the land asks for kinds: how far on along the road it asks for the same, read every 2 m.)
-      let [runKinds, runEnd]: [readonly BackdropUse[] | null | undefined, number] = [undefined, 0];
+      let [runKinds, runEnd]: [readonly BuildingUse[] | null | undefined, number] = [undefined, 0];
       while (s < end) {
         const probe = this.frontAt(r, s, side, 6, ls).c;
         // (The kinds the land asks for here, if it is asked: on along the road where it asks for none.)
@@ -551,7 +551,7 @@ export class BackdropPass {
    * (`infillArea`), of the kinds the land there asks for (`kindsAt`: none if null), smaller where it doesn't fit.
    * The buildings laid, by index.
    */
-  infillPoints(a: number, points: readonly Pt[], rand: Rand, kindsAt: (p: Pt) => readonly BackdropUse[] | null): number[] {
+  infillPoints(a: number, points: readonly Pt[], rand: Rand, kindsAt: (p: Pt) => readonly BuildingUse[] | null): number[] {
     return points.flatMap((p) => {
       const at = this.infillAt(a, p, rand, 1, kindsAt);
       return at < 0 ? [] : [at];
@@ -559,7 +559,7 @@ export class BackdropPass {
   }
 
   /** A building at `p` of area `a` with `chance`, turned to the road nearest within its reach, as `infillArea` lays one (`kindsAt`: see `infillPoints`). Its index, else -1. */
-  private infillAt(a: number, p: Pt, rand: Rand, chance: number, kindsAt?: (p: Pt) => readonly BackdropUse[] | null): number {
+  private infillAt(a: number, p: Pt, rand: Rand, chance: number, kindsAt?: (p: Pt) => readonly BuildingUse[] | null): number {
     const { roads, W, D, blocked } = this;
     const reach = INFILL_REACH[a === 0 ? 0 : 1];
     if (p[0] < EDGE || p[1] < EDGE || p[0] >= W - EDGE || p[1] >= D - EDGE || blocked[Math.floor(p[1]) * W + Math.floor(p[0])]) return -1;
