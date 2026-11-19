@@ -6,7 +6,9 @@
 //! - a workbench's tools and a bike's, a fire, a chemistry set bubbling, a punch bag, crockery smashed in a
 //!   bin, a cello played with a bow, someone singing to a karaoke track;
 //! - played once: a fridge door, a pedal bin, the vending machines, a phone box's call and its hanging up,
-//!   the microwave's ping, toast popping up, coffee poured into a cup.
+//!   the microwave's ping, toast popping up, coffee poured into a cup;
+//! - things happening (\`events\`): a door or a gate opened and shut, curtains drawn, a car's door and its
+//!   start, the post through a letterbox, a till, a drawer, and a clock's tick (a loop).
 //!
 //! Most are made the same few ways:
 //! - a motor or a fan: a tone at its speed with its harmonics (a transformer's hum at twice the mains,
@@ -22,6 +24,8 @@
 
 use crate::dsp::m::*;
 use crate::dsp::*;
+
+pub mod events;
 
 /// The sounds of things, by name (\`THINGS\`).
 pub const THINGS: [&str; 34] = [
@@ -111,7 +115,7 @@ pub fn make(kind: &str, rate: f64) -> Option<Stereo> {
         "ping" => ping(rate),
         "toastPop" => toast_pop(rate),
         "pour" => pour(rate),
-        _ => return None,
+        _ => return events::make(kind, rate),
     })
 }
 
