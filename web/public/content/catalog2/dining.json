@@ -947,6 +947,7 @@
           "id": "mix",
           "label": "Mix a drink",
           "anim": "drink",
+          "sound": "pour",
           "minutes": 10,
           "effects": {
             "fun": 0.1,

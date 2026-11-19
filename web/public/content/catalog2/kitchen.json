@@ -373,6 +373,7 @@
           "id": "breakfast",
           "label": "Have breakfast at the island",
           "anim": "eat",
+          "sound": "cutlery",
           "seatNear": 3,
           "minutes": 20,
           "effects": {
@@ -428,6 +429,7 @@
           "id": "breakfast",
           "label": "Have breakfast at the island",
           "anim": "eat",
+          "sound": "cutlery",
           "seatNear": 3,
           "minutes": 20,
           "effects": {
@@ -1092,6 +1094,7 @@
           "label": "Sort the recycling",
           "workOn": "dishes",
           "anim": "clean",
+          "sound": "binLid",
           "minutes": 4,
           "effects": {
             "comfort": 0.03

@@ -177,6 +177,7 @@
           "id": "marathon",
           "label": "Gaming marathon",
           "anim": "play",
+          "sound": "arcade",
           "requires": ["screen"],
           "minutes": 90,
           "pose": "sit",

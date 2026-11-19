@@ -98,6 +98,7 @@
           "id": "shoot",
           "label": "Shoot hoops",
           "anim": "exercise",
+          "sound": "basketball",
           "minutes": 40,
           "pose": "stand",
           "autonomous": true,

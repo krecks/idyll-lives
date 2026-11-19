@@ -219,6 +219,7 @@
           "id": "barBite",
           "label": "Grab a bite at the bar",
           "anim": "eat",
+          "sound": "cutlery",
           "minutes": 20,
           "pose": "sit",
           "autonomous": true,

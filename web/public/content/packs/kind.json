@@ -253,6 +253,7 @@
           "id": "shareTea",
           "label": "Share a pot of tea",
           "anim": "drink",
+          "sound": "pour",
           "minutes": 30,
           "pose": "sit",
           "autonomous": true,
