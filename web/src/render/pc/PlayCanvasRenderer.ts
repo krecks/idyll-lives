@@ -94,6 +94,7 @@ import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/e
 import { playbackRate } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
 import { pavedRects } from '../shared/paving';
+import { pavingLayers } from '../shared/streetGround';
 import { GrassPush } from '../shared/grass';
 import { idleMoment } from '../shared/idle';
 import { coveringSurface, HOUSE_MATERIALS, houseObjectKey, placeLights, WALL_HEIGHT, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from '../shared/house';
@@ -2249,6 +2250,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       else for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
       const mesh = meshFrom(this.device, geo.meshData({ colors: toned }));
       if (mesh) this.lotEntities.push({ entity: drawMesh(this.lotRoot, name, mesh, toned ? this.lib.surface(material, { doubleSided: true, vertexColors: true }) : this.lotMaterial(material)), storey: 0 });
+    }
+    // The town's paving on it (a place's court, a yard: `townPaving`), which the street leaves to it.
+    for (const { name, material, geo } of pavingLayers(world, v, { tilesOnly: true })) {
+      const mesh = meshFrom(this.device, geo.meshData({ colors: true }));
+      if (mesh) this.lotEntities.push({ entity: drawMesh(this.lotRoot, name, mesh, this.lib.surface(material, { doubleSided: true, vertexColors: true })), storey: 0 });
     }
   }
 

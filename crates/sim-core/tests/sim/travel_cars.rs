@@ -283,7 +283,7 @@ fn come_home(w: &mut World, c: usize) {
 
 /// How far two of `w`'s cars' bodies overlap at most where they're drawn, one of them on the move
 /// (m; 0 or less: apart), and which.
-fn cars_overlap(w: &World) -> (f32, usize, usize) {
+pub(crate) fn cars_overlap(w: &World) -> (f32, usize, usize) {
     overlap_where(w, |_| true)
 }
 

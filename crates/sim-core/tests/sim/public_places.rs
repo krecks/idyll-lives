@@ -1743,7 +1743,7 @@ fn nobody_uses_a_closed_places_things() {
 #[test]
 fn past_the_most_servers_the_other_posts_are_self_serve() {
     let merged = common::content();
-    let (cols, rows) = (12, 12);
+    let (cols, rows) = (16, 17);
     let objects: Vec<Value> = (0..rows)
         .flat_map(|r| {
             (0..cols).map(
@@ -1753,9 +1753,9 @@ fn past_the_most_servers_the_other_posts_are_self_serve() {
         .collect();
     assert!(objects.len() > sim_core::staff::MAX_STAFF);
     let lot = json!({
-        "width": 90, "depth": 52, "objects": objects,
+        "width": 110, "depth": 72, "objects": objects,
         "plots": [{"name": "Home", "x": 0, "z": 0, "w": 26, "d": 22, "entry": [13.0, 1.5]},
-                  {"name": "Arcade", "x": 26, "z": 0, "w": 64, "d": 52, "public": true, "entry": [27.5, 1.5]}],
+                  {"name": "Arcade", "x": 26, "z": 0, "w": 84, "d": 72, "public": true, "entry": [27.5, 1.5]}],
         "households": [{"name": "Ada's", "plot": 0, "player": true, "funds": 500}],
         "sims": [{"name": "Ada", "traits": ["cheerful"], "x": 13.0, "z": 3.5}],
     });

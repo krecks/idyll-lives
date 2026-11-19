@@ -169,6 +169,7 @@
 //! (`openWorld.carParks`). The game opens no file older than this (sim-wasm's
 //! `OLDEST_SAVE_VERSION`: too old, removed); the simulation still reads them for its own tests
 //! until their migrations go, a bay without a yaw facing away from the road nearest it as before.
+//! A town holds up to 256 servers (`staff::MAX_STAFF`, 128 before); nothing of them is saved.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 

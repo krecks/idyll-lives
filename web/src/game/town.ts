@@ -29,6 +29,7 @@ import { fenceRuns, townFences, type TownFence } from './gardenFences';
 import { defaultResidentsMost, neighbourBonds } from './people';
 import { flatsTemplate, placeFloors, type FlatsTemplate, type PlaceFloors } from './flats';
 import { rectPoly } from './footprints';
+import { clearOf, type DriveLine } from './parking';
 
 /** The households moved to `people.ts`; still here for those that import them from the town. */
 export { NEIGHBOUR_CAP, populate, rehouse } from './people';
@@ -1878,10 +1879,17 @@ function openWorldFields(t: Templates, town: NeighbourhoodDraft, drives: TownLay
   const ways = town.roads.filter((r) => r.kind !== 'trail');
   const exits: TownExit[] = roadExits(ways, town.width, town.depth).map(([x, z]): TownExit => ({ x, z, kind: 'road' }));
   const paving = lotPaving(t, town, built);
+  // The bays as the draft lays them, but any by a driveway as laid now (a lot changed since, a house furnished
+  // otherwise): sim-core `by_a_mouth`, `parking.ts` `clearOf`.
+  const lines: DriveLine[] = drives.flatMap((d) => (d.meets ? [{ inner: d.inner, mouth: pointAt(town.roads[d.meets.road].points, d.meets.s).p }] : []));
+  const kept = (open.parking ?? []).filter((b) => clearOf([b], lines));
+  const used = [...new Set(kept.flatMap((b) => (b.park === undefined ? [] : [b.park])))].sort((a, b) => a - b);
+  const parking = kept.map((b) => (b.park === undefined ? b : { ...b, park: used.indexOf(b.park) }));
+  const carParks = used.map((k) => open.carParks![k]);
   return {
     areas,
     exits,
-    file: { terrain: { water: open.water }, ...(open.parking?.length ? { parking: open.parking } : {}), ...(open.carParks?.length ? { carParks: open.carParks } : {}), drives: filed, cars: parked },
+    file: { terrain: { water: open.water }, ...(parking.length ? { parking } : {}), ...(carParks.length ? { carParks } : {}), drives: filed, cars: parked },
     meta: { zones: open.zones, pads: open.pads, areas, ...(open.places ? { places: open.places } : {}), ...(open.centre ? { centre: open.centre } : {}), ...(paving.length ? { paving } : {}), ...(open.relief ? { relief: open.relief } : {}), ...(open.land && (open.land.edited || open.land.seeded === 'follow') ? { land: encodeLand(open.land) } : {}) },
   };
 }

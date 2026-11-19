@@ -36,7 +36,7 @@ import { chooseCentre, narrowCentre } from './centre';
 import { fillPoly, rectPoly } from './footprints';
 import { DensePass, raisePlaces, townPlaces } from './dense';
 import { flatsTemplate } from './flats';
-import { carParkFits, driveMouths, takeCarPark, vergeParking, type CarParkLaid } from './parking';
+import { carParkFits, clearOfDrives, driveLines, takeCarPark, vergeParking, type CarParkLaid } from './parking';
 import { random } from './housegen';
 import { COVER, COVER_CELL, coverSpan, LAND_CELL, NONE, type Land as LandField } from './land';
 import { APRON, landZones, Protection, wetTiles, type BuiltLand } from './landEdit';
@@ -1665,16 +1665,14 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
 
   // ---- parking in each area: pairs of bays by the verge nearest its middle till it has its share ----
   // (Its car parks' bays counted; clear of every driveway's mouth.)
-  const mouths = driveMouths(t, slots, (def) => content.object(def)?.footprint ?? [1, 1]);
+  const drives = driveLines(t, slots, worldRoads, (def) => content.object(def)?.footprint ?? [1, 1]);
   for (const [a, plan] of plans.entries()) {
     const homes = spec.classic ? 0 : slots.filter((s) => s.kind === 'house' && (s.area ?? 0) === a).length;
     const spaces = parkingFor(homes, a === 0);
     const frontage = frontageOf(worldRoads, plan.roads, plan.centre, rand);
     const bays = parks.reduce((n, p) => n + (p.park.area === a ? p.bays.length : 0), 0);
-    parks.push(...vergeParking(worldRoads, ground, frontage, spaces - bays, a, offAll, mouths));
+    parks.push(...vergeParking(worldRoads, ground, frontage, spaces - bays, a, offAll, drives));
   }
-  const parking: ParkingBay[] = parks.flatMap((p, k) => p.bays.map((b) => ({ ...b, park: k })));
-  const carParks: CarPark[] = parks.map((p) => p.park);
 
   // ---- outdoor places, a trail to each from its area's roads ----------------------------------
   const outdoor = new Map(t.parks.filter((p) => p.kind === 'outdoor').map((p) => [p.id, p]));
@@ -1729,6 +1727,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   // (Flats over the shops, cafés and restaurants, real floors over the offices and halls: `dense.ts` `raisePlaces`.)
   if (!spec.classic) raisePlaces(t, lots.slots, centre ? [centre.poly] : [], dense);
   lots.number(names);
+  // The bays, every one clear of every driveway (a lot laid after its car park may have one by it, across the street too).
+  const { bays: parking, carParks } = clearOfDrives(parks, driveLines(t, slots, worldRoads, (def) => content.object(def)?.footprint ?? [1, 1]));
   // (A flats building is called as its template names it: "Mill Court".)
   for (const s of lots.slots) if (s.kind === 'flats') s.name = flatsTemplate(t, s.template)?.name ?? s.name;
 

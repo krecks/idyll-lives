@@ -2,11 +2,13 @@ import { describe, expect, test } from 'bun:test';
 import { Geo } from '../src/render/shared/geometry';
 import { asDrawn, HOUSE_MATERIALS, HousePlanner, houseScheme, WALL_HEIGHT, type SilhouetteSpec } from '../src/render/shared/house';
 import type { WallEdge } from '../src/core/protocol';
+import { realTown, STOREY, W } from './fixtures/realTown';
 
 /**
  * A house's far versions (the street's silhouette of it, the far LOD's box, the town view's) stand for the house the
  * game draws on its lot: the same kind of roof, the colours its textured walls and roof show from far off, the
- * player's own paint, and nothing on its roof that the house has not.
+ * player's own paint, and nothing on its roof that the house has not. The town's paving far off (the town view's
+ * map, `groundTiles.ts` `paintPaving`) covers the tiles the street lays near (`streetGround.ts`).
  */
 
 const COVERINGS = [
@@ -137,5 +139,85 @@ describe("a neighbour's silhouette", () => {
       const top = p.roofTop(plot);
       for (const part of plan.parts) for (let i = 1; i < part.geo.pos.length; i += 3) expect(part.geo.pos[i]).toBeLessThanOrEqual(top + 1e-6);
     }
+  });
+});
+
+describe('the town’s paving far and near', () => {
+  /** What a 2D canvas is asked to fill, in town metres: rectangles and outlines (even-odd), each in its colour. */
+  class Recorder {
+    fillStyle: string | CanvasGradient | CanvasPattern = '#000';
+    strokeStyle: string | CanvasGradient | CanvasPattern = '#000';
+    lineWidth = 1;
+    lineCap: CanvasLineCap = 'butt';
+    readonly fills: { colour: string; polys: [number, number][][] }[] = [];
+    private path: [number, number][][] = [];
+    fillRect(x: number, z: number, w: number, d: number): void {
+      this.fills.push({ colour: String(this.fillStyle), polys: [[[x, z], [x + w, z], [x + w, z + d], [x, z + d]]] });
+    }
+    beginPath(): void {
+      this.path = [];
+    }
+    moveTo(x: number, z: number): void {
+      this.path.push([[x, z]]);
+    }
+    lineTo(x: number, z: number): void {
+      this.path[this.path.length - 1].push([x, z]);
+    }
+    closePath(): void {}
+    rect(x: number, z: number, w: number, d: number): void {
+      this.path.push([[x, z], [x + w, z], [x + w, z + d], [x, z + d]]);
+    }
+    fill(): void {
+      this.fills.push({ colour: String(this.fillStyle), polys: this.path.map((p) => [...p]) });
+    }
+    stroke(): void {}
+  }
+  /** Whether (`x`, `z`) is inside the outlines `polys`, even-odd. */
+  const inside = (polys: [number, number][][], x: number, z: number) => {
+    let n = 0;
+    for (const poly of polys) {
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const [[xi, zi], [xj, zj]] = [poly[i], poly[j]];
+        if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) n++;
+      }
+    }
+    return n % 2 === 1;
+  };
+
+  test('cover the same tiles: what the far map paints is what the street lays near', async () => {
+    Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' }, requestAnimationFrame: () => 0, window: { addEventListener: () => {}, removeEventListener: () => {} } });
+    const { paintPaving } = await import('../src/render/pc/groundTiles');
+    const { streetGround } = await import('../src/render/shared/streetGround');
+    const { townPaving, PAVING_LOOK } = await import('../src/render/shared/townPaving');
+    const { chunkAt } = await import('../src/render/shared/chunks');
+    const t = realTown();
+    // (A car park turned off the grid, so its edges cross the tiles anywhere, and a yard beside it.)
+    const turn = (x: number, z: number): [number, number] => [30 + (x - 30) * Math.cos(0.3) - (z - 27) * Math.sin(0.3), 27 + (x - 30) * Math.sin(0.3) + (z - 27) * Math.cos(0.3)];
+    t.carParks = [{ area: 0, poly: [turn(26.1, 24.6), turn(26.1, 30.4), turn(37.9, 30.4), turn(37.9, 24.6)], sign: [25.5, 30.5, 0] }];
+    t.meta!.paving!.push({ kind: 'yard', poly: [[0, 0], [0, 4], [3, 4], [3, 0]] });
+    const g = new Recorder();
+    paintPaving(g as unknown as Parameters<typeof paintPaving>[0], townPaving(t), W, STOREY);
+    const colours = new Set<string>([PAVING_LOOK.stone, PAVING_LOOK.joint, PAVING_LOOK.yard, PAVING_LOOK.asphalt]);
+    const far = new Uint8Array(W * STOREY);
+    for (let z = 0; z < STOREY; z++) for (let x = 0; x < W; x++) if (g.fills.some((f) => colours.has(f.colour) && inside(f.polys, x + 0.5, z + 0.5))) far[z * W + x] = 1;
+    // Near: every chunk's layers, as the street plans them.
+    const near = new Uint8Array(W * STOREY);
+    const plan = { ground: [] as { name: string; geo: Geo }[], batches: new Map() };
+    streetGround(plan as unknown as Parameters<typeof streetGround>[0], t, chunkAt(0, 0), undefined);
+    const layers = plan.ground.filter((l) => l.name !== 'bayLines');
+    expect(layers.map((l) => l.name).sort()).toEqual(['carParks', 'townPaving', 'townYards']);
+    for (const { geo } of layers) {
+      for (const tri of triangles(geo)) {
+        const poly = tri.p.map((q) => [q[0], q[2]] as [number, number]);
+        for (let z = 0; z < STOREY; z++) for (let x = 0; x < W; x++) if (inside([poly], x + 0.5, z + 0.5)) near[z * W + x] = 1;
+      }
+    }
+    expect(far.some((v) => v)).toBe(true);
+    const differ = [...far.keys()].filter((i) => far[i] !== near[i]).map((i) => [i % W, Math.floor(i / W)]);
+    expect(differ).toEqual([]);
+    // And both are the mask the lawn reads.
+    expect([...far]).toEqual([...townPaving(t).mask(W, STOREY)]);
+    // The P sign by the car park, standing where the town file says.
+    expect(plan.batches.get('model.street.parkingSign')).toEqual([[25.5, 30.5, 1, 1, 0]]);
   });
 });
