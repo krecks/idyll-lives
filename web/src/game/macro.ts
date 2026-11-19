@@ -1621,7 +1621,10 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     } else {
       // A hamlet: its parking kept by its middle before its lots go down (a pair: more by the verge after them), then
       // its lots along its own roads (`hamletLots`).
-      if (!spec.classic) parkAlong(frontageOf(worldRoads, plan.roads, plan.centre, dense), [1, 2], a);
+      if (!spec.classic) {
+        const by = frontageOf(worldRoads, plan.roads, plan.centre, dense);
+        if (!parkAlong(by, [1, 2], a)) parks.push(...vergeParking(worldRoads, ground, by, 1, a, nearCorners, [], LOOSE_BEND));
+      }
       const laid = hamletLots(content, t, spec, plan, a, lots, worldRoads, offCorners, rand);
       // (Its named places' lots once every home has found room.)
       later.push({ near: frontageOf(worldRoads, plan.roads, plan.centre, placeRand), a });
@@ -1767,7 +1770,16 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   }
   lots.number(names);
   // The bays, every one clear of every driveway (a lot laid after its car park may have one by it, across the street too).
-  const { bays: parking, carParks } = clearOfDrives(parks, driveLines(t, slots, worldRoads, (def) => content.object(def)?.footprint ?? [1, 1]));
+  const lines = driveLines(t, slots, worldRoads, (def) => content.object(def)?.footprint ?? [1, 1]);
+  const { bays: parking, carParks } = clearOfDrives(parks, lines);
+  // (An area whose bays all went: a pair, or one, by the verge where none is by a driveway now.)
+  for (const [a, plan] of plans.entries()) {
+    if (spec.classic || parking.some((b) => b.area === a)) continue;
+    for (const p of vergeParking(worldRoads, ground, frontageOf(worldRoads, plan.roads, plan.centre, rand), 2, a, nearCorners, lines, LOOSE_BEND)) {
+      parking.push(...p.bays.map((b) => ({ ...b, park: carParks.length })));
+      carParks.push(p.park);
+    }
+  }
   // (A flats building is called as its template names it: "Mill Court".)
   for (const s of lots.slots) if (s.kind === 'flats') s.name = flatsTemplate(t, s.template)?.name ?? s.name;
 
