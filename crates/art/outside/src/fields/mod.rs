@@ -13,9 +13,9 @@ mod walls;
 pub const F: GameFrame = GameFrame::new(0.0);
 
 palette! { M:
-    stone = ("#8B8983", matte),         // the wall's face stones
-    stone_dark = ("#6F6D68", matte),    // the shaded stones
-    stone_light = ("#A6A39A", matte),   // the sunned stones and coping
+    stone = ("#7A756C", matte),         // the wall's field stones: the boulders' weathered greys (garden_decor)
+    stone_dark = ("#605C55", matte),    // the darker stones
+    stone_light = ("#8A8174", matte),   // the warmer stones, coping and steps
     lichen = ("#7F855F", matte),        // the patches on the wall
     oak = ("#8A6642", wood),            // the gate's and fingerpost's timber
     oak_dark = ("#6E4F33", wood),       // its shaded rails and posts
@@ -29,7 +29,7 @@ pub fn family() -> Option<Family> {
         "fields",
         M.palette(),
         vec![
-            Model::new("dryStoneWall", walls::dry_stone_wall, (2.0, 1.15, 0.5))
+            Model::new("dryStoneWall", walls::dry_stone_wall, (1.98, 1.14, 0.57))
                 .tolerance(0.03)
                 .paint(&[("stone", "Stone")]),
             Model::new("hedgerow", hedges::hedgerow, (1.95, 1.45, 0.95))
@@ -40,7 +40,7 @@ pub fn family() -> Option<Family> {
             Model::new("gate", gates::gate, (1.9, 1.35, 0.21))
                 .tolerance(0.03)
                 .paint(&[("oak", "Wood")]),
-            Model::new("stile", walls::stile, (0.95, 1.05, 0.8))
+            Model::new("stile", walls::stile, (0.94, 0.96, 0.9))
                 .tolerance(0.03)
                 .paint(&[("stone", "Stone")]),
             Model::new("fingerpost", gates::fingerpost, (0.85, 2.38, 0.43))
