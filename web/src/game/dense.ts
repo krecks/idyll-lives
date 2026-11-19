@@ -87,7 +87,7 @@ export interface RowLimits {
  * densest: `centre.ts` `DENSEST`); a hamlet's (a hall is an office's lot).
  */
 const KINDS: Record<Zone, readonly (readonly [BuildingUse, number])[]> = {
-  centre: [['shop', 40], ['flats', 16], ['cafe', 12], ['restaurant', 8], ['office', 16], ['terrace', 8]],
+  centre: [['shop', 38], ['flats', 24], ['cafe', 12], ['restaurant', 8], ['office', 14], ['terrace', 4]],
   town: [['house', 34], ['terrace', 38], ['flats', 8], ['shop', 3], ['workshop', 6], ['cafe', 1]],
   hamlet: [['house', 58], ['terrace', 16], ['workshop', 8], ['shop', 4], ['cafe', 2]],
 };
@@ -100,8 +100,8 @@ const COUNTRY_CORNER = 40;
 /** How far into a stretch a lot's middle stands from a junction where a lot with a driveway may (m, `macro.ts` `CORNER`). */
 const CORNER = 18;
 /** Of a centre's shops, cafés and restaurants, the share with flats over them; elsewhere (`raisePlaces`). */
-const OVER_CENTRE = 0.8;
-const OVER_TOWN = 0.3;
+const OVER_CENTRE = 1;
+const OVER_TOWN = 0.6;
 /** The designs of the homes on tight gardens and of the terraced houses a pass lays (`DensePass.pooled`). */
 const DESIGNS = 16;
 /** How far a lot set by hand looks for a road to front (m from the road's edge). */
