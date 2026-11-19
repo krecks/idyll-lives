@@ -547,7 +547,15 @@ fn commute_metres(
     let nav = w.nav();
     let goal = (target[0].floor() as i32, target[1].floor() as i32);
     let start = (from[0].floor() as i32, from[1].floor() as i32);
-    let grounds = crate::world::grounds(&w.tile_plot, &w.plots, &w.households, &nav, sim, goal);
+    let grounds = crate::world::grounds(
+        &w.tile_plot,
+        &w.halls,
+        &w.plots,
+        &w.households,
+        &nav,
+        sim,
+        goal,
+    );
     let reach = (w.reach_version == w.nav_version).then_some(&w.reach);
     crate::world::trip(
         &nav,

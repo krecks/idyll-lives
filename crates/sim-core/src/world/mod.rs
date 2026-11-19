@@ -2168,6 +2168,9 @@ pub struct World {
     /// ground lot which of them is its (index + 1; 0: none). Made with `tile_plot`.
     pub(crate) flat_tiles: Vec<FlatTiles>,
     pub(crate) flats_in: Vec<u16>,
+    /// The flats' stair halls over public places (`path::Halls`), found with the rooms
+    /// (`map_halls`).
+    pub(crate) halls: crate::path::Halls,
     pub relationships: Relationships,
     pub events: EventLog,
     pub(crate) blocked: Vec<bool>,
@@ -2386,6 +2389,8 @@ pub(crate) struct Ctx<'a> {
     pub plots: &'a [Plot],
     /// Plot per ground tile (`World::tile_plot`).
     pub tile_plot: &'a [u16],
+    /// The flats' stair halls over public places (`World::halls`).
+    pub halls: &'a crate::path::Halls,
     pub object_plot: &'a [Option<u32>],
     /// Objects by plot (`World::object_index`).
     pub index: &'a ObjectIndex,
@@ -2711,6 +2716,7 @@ impl World {
             tile_plot: Vec::new(),
             flat_tiles: Vec::new(),
             flats_in: Vec::new(),
+            halls: Default::default(),
             relationships: Relationships::default(),
             events: EventLog::default(),
             blocked: vec![false; tiles],
@@ -2935,6 +2941,7 @@ impl World {
             households: &self.households,
             plots: &self.plots,
             tile_plot: &self.tile_plot,
+            halls: &self.halls,
             object_plot: &self.object_plot,
             index: &self.object_index,
             exits: &self.exits,
@@ -3109,6 +3116,52 @@ impl World {
             ),
             _ => Some(lot),
         }
+    }
+
+    /// Finds the flats' stair hall in each public place with flats over it (`path::Halls`): the
+    /// room on the ground in at the flats' street door (their `entry`), when it is not the place's
+    /// own (its `entry` is elsewhere). Rooms change with walls, so with them (`refresh_rooms`).
+    fn map_halls(&mut self) {
+        let mut halls = crate::path::Halls::default();
+        if !self.flats_in.iter().any(|&k| k > 0) {
+            self.halls = halls;
+            return;
+        }
+        halls.of_lot = vec![0; self.plots.len()];
+        let nav = self.nav();
+        for lot in self.plots.iter().filter(|p| !p.is_flat() && p.public) {
+            if self.flats_in.get(lot.id as usize).is_none_or(|&k| k == 0) {
+                continue;
+            }
+            let Some(entry) = self
+                .plots
+                .iter()
+                .find(|f| f.of == Some(lot.id))
+                .and_then(|f| f.entry)
+                .filter(|&e| Some(e) != lot.entry)
+            else {
+                continue;
+            };
+            let Some(((x, z), (dx, dz))) =
+                crate::life::front_door(&nav, entry, |x, z| lot.contains(x, z))
+            else {
+                continue;
+            };
+            let room = self.lot.room_at(x + dx, z + dz);
+            let tiles = (lot.z..lot.z + lot.d)
+                .flat_map(|tz| (lot.x..lot.x + lot.w).map(move |tx| (tx, tz)))
+                .map(|(tx, tz)| self.lot.in_bounds(tx, tz) && self.lot.room_at(tx, tz) == room)
+                .collect();
+            halls.list.push(crate::path::Hall {
+                lot: lot.id,
+                x: lot.x,
+                z: lot.z,
+                w: lot.w,
+                tiles,
+            });
+            halls.of_lot[lot.id as usize] = halls.list.len() as u16;
+        }
+        self.halls = halls;
     }
 
     /// Whether tile (`x`, `z`, stacked rows) is on `plot`: inside its rectangle on any storey, and
@@ -4721,6 +4774,7 @@ impl World {
         self.lot.take_room_changes();
         let (rooms, cells) = crate::rooms::compute(self);
         self.rooms = rooms;
+        self.map_halls();
         self.rooms_out = crate::privacy::doors_out(&self.content, &self.rooms, &self.lot);
         self.refresh_privacy();
         self.rooms_version = self.room_layout_version;
@@ -4819,6 +4873,7 @@ impl World {
         use crate::rooms::room_order;
         self.sync_tile_arrays();
         self.map_plots();
+        self.map_halls();
         let away = self.content.room_rules.away;
         let Some([x0, z0, x1, z1]) = changes.rect else {
             return;
@@ -5275,6 +5330,7 @@ impl World {
                 households,
                 plots,
                 tile_plot,
+                halls,
                 object_plot,
                 object_index,
                 exits,
@@ -5314,6 +5370,7 @@ impl World {
                 households,
                 plots,
                 tile_plot,
+                halls,
                 object_plot,
                 index: object_index,
                 exits,
