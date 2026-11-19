@@ -2262,7 +2262,7 @@ fn fridge_door(rate: f64) -> Stereo {
         let hz = 2000.0 + 600.0 * r.next();
         glass(&mut out, at, 0.12, 0.15, hz);
     }
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,
@@ -2311,7 +2311,7 @@ fn bin_lid(rate: f64) -> Stereo {
         burst(400.0, 0.6, 0.04, 1.0),
     );
     lid(&mut out, 1.75, 0.9);
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,
@@ -2397,7 +2397,7 @@ fn vend_snack(rate: f64) -> Stereo {
         strike(&mut out, at, 0.04, 0.0, &[], burst(hz, 1.0, 0.001, 1.0));
     }
     flap(&mut out, 3.7);
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,
@@ -2479,7 +2479,7 @@ fn vend_can(rate: f64) -> Stereo {
         let hz = 5000.0 + 4000.0 * r.next();
         strike(&mut out, at, 0.015, 0.0, &[], burst(hz, 1.0, 0.0008, 1.0));
     }
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,
@@ -2608,7 +2608,7 @@ fn phone_box(rate: f64) -> Stereo {
             0.7,
         );
     }
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,
@@ -2651,7 +2651,7 @@ fn hang_up(rate: f64) -> Stereo {
         &[[3200.0, 0.004, 1.0]],
         burst(3000.0, 1.0, 0.001, 0.6),
     );
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,
@@ -2703,7 +2703,7 @@ fn ping(rate: f64) -> Stereo {
         &[[420.0, 0.04, 1.0]],
         burst(600.0, 4.0, 0.08, 0.4),
     );
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,
@@ -2752,7 +2752,7 @@ fn toast_pop(rate: f64) -> Stereo {
         );
     }
     rustle(&mut out, &mut r, 0.75, 0.2, 0.06, 0.0, 2500.0, 0.8);
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,
@@ -2813,7 +2813,7 @@ fn pour(rate: f64) -> Stereo {
         }
         t += -log(1.0 - r.next()) / 60.0;
     }
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,
@@ -2931,15 +2931,8 @@ fn looped(rate: f64, seconds: f64) -> Ev {
     }
 }
 
-thread_local! {
-    /// Whether the sound being made is played once (\`once\` made its track): \`done\` then runs its filters and
-    /// room from silence rather than from the loop's end, and clears it.
-    static PLAYED_ONCE: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
-}
-
 /// A track for a sound played once: nothing wraps.
 fn once(rate: f64, seconds: f64) -> Ev {
-    PLAYED_ONCE.with(|o| o.set(true));
     let t = track(rate, seconds, 0.0);
     Ev {
         left: t.left,
@@ -3059,7 +3052,8 @@ fn noise(n: usize, rate: f64, r: &mut Rng, kind: Filter, hz: f64, q: f64) -> Vec
 /// Puts the parts together: the steady ones (already folded into their start: \`fold\`) and the events
 /// added; then a room (\`delays\` in ms, none for out of doors, mixed in at \`wet\`), the highs and lows taken
 /// off (\`low\`, \`high\`: a box or a small speaker; 0 for none), and the level set to an average of \`rms\`, or
-/// with 0 to a peak of \`peak\`.
+/// with 0 to a peak of \`peak\`. A loop's filters and room are already ringing at its start, as they were at
+/// its end (\`done_once\` for a sound played once, which starts from silence).
 #[allow(clippy::too_many_arguments)]
 fn done(
     rate: f64,
@@ -3070,6 +3064,37 @@ fn done(
     wet: f64,
     low: f64,
     high: f64,
+) -> Stereo {
+    put_together(rate, parts, rms, peak, delays, wet, low, high, true)
+}
+
+/// \`done\` for a sound played once: its filters and room start from silence.
+#[allow(clippy::too_many_arguments)]
+fn done_once(
+    rate: f64,
+    parts: Vec<Stereo>,
+    rms: f64,
+    peak: f64,
+    delays: &[f64],
+    wet: f64,
+    low: f64,
+    high: f64,
+) -> Stereo {
+    put_together(rate, parts, rms, peak, delays, wet, low, high, false)
+}
+
+/// \`done\`'s work; \`lead\`: a loop, its filters and room run over a second of its end before its start.
+#[allow(clippy::too_many_arguments)]
+fn put_together(
+    rate: f64,
+    parts: Vec<Stereo>,
+    rms: f64,
+    peak: f64,
+    delays: &[f64],
+    wet: f64,
+    low: f64,
+    high: f64,
+    lead: bool,
 ) -> Stereo {
     let n = parts.iter().map(|p| p.left.len()).min().unwrap_or(0);
     let mut result = Stereo {
@@ -3084,12 +3109,8 @@ fn done(
     }
     // A loop's start follows its end: the filters and the room run over a second of the loop (its end, round
     // and round if it is shorter) before its start, so they are already ringing as they were at its end. A sound
-    // played once (\`once\`) starts from silence.
-    let lead = if PLAYED_ONCE.with(|o| o.replace(false)) || n == 0 {
-        0
-    } else {
-        round_usize(rate)
-    };
+    // played once starts from silence.
+    let lead = if lead && n > 0 { round_usize(rate) } else { 0 };
     for c in 0..2 {
         let ch = result.ch(c);
         let mut x: Vec<f32> = (0..lead)
@@ -3176,12 +3197,21 @@ mod tests {
     }
 
     /// A loop's end runs on into its start at the browser's other rates too (the filters and the room in \`done\`
-    /// already ringing at its start).
+    /// already ringing at its start): the things', the home's and the events' loops.
     #[test]
     fn every_loop_is_seamless_at_44_1_and_96_khz() {
         let mut off = Vec::new();
         for rate in [44100.0, 96000.0] {
-            for kind in THINGS.iter().filter(|k| !ONCE_THINGS.contains(k)) {
+            let loops = THINGS
+                .iter()
+                .filter(|k| !ONCE_THINGS.contains(k))
+                .chain(HOME.iter().filter(|k| !ONCE_HOME.contains(k)))
+                .chain(
+                    events::EVENTS
+                        .iter()
+                        .filter(|k| !events::ONCE_EVENTS.contains(k)),
+                );
+            for kind in loops {
                 let s = make(kind, rate).unwrap();
                 for ch in [&s.left, &s.right] {
                     let (inside, seam) = steps(ch);

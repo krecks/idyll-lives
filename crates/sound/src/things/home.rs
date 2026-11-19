@@ -514,7 +514,7 @@ fn kettle_off(rate: f64) -> Stereo {
         bubble(&mut out.left, rate, at, f, 0.08, 0.2);
         bubble(&mut out.right, rate, at, f, 0.08, 0.2);
     }
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,

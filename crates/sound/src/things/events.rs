@@ -51,7 +51,7 @@ pub(super) fn make(kind: &str, rate: f64) -> Option<Stereo> {
 
 /// Played once, dry, to a peak (`low`: the highs taken off above it; 0 for none).
 fn dry(rate: f64, out: Ev, peak: f64, low: f64) -> Stereo {
-    done(rate, vec![out.into()], 0.0, peak, &[], 0.0, low, 0.0)
+    done_once(rate, vec![out.into()], 0.0, peak, &[], 0.0, low, 0.0)
 }
 
 /// A door opened: the handle pressed, the latch drawn back out of the keep, the leaf's air as it swings.
