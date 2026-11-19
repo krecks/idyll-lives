@@ -15,9 +15,11 @@
  * (`web/src/audio/catalog.ts`, the list `web/tests/sounds.test.ts` measures too), so one sound
  * against another sounds as it does in the game.
  *
- * `--against <folder>` (from the checkout, as `--out`): another render's `index.md` to hold this one to. Every
- * sound whose loudness moved by more than 0.2 LU or its centroid by more than 2 % is printed, old → new, and a
- * move of more than 1.0 LU exits 1 (after the WAVs are written); a sound the old index lacks is listed as new.
+ * `--against <folder>` (from the checkout, as `--out`; not the same folder): another render's `index.md` to hold
+ * this one to, read before anything is written. Every sound whose loudness moved by more than 0.25 LU (the old
+ * index has it to a tenth) or its centroid by more than 2 % is printed, old → new, and a move of more than 1.0 LU
+ * exits 1 (after the WAVs are written); a sound the old index lacks is listed as new, one it has that this render
+ * lacks as missing.
  *
  * What a machine can say is here; whether a microwave sounds like a microwave is the ear's part.
  */
@@ -44,7 +46,24 @@ const named = argument('--out');
 const OUT = named ? fromRoot(named) : join(ROOT, 'bench-results/sounds');
 /** Another render to hold this one to: `--against <folder>`. */
 const against = argument('--against');
-const AGAINST = against ? fromRoot(against) : undefined;
+const AGAINST = against ? resolve(fromRoot(against)) : undefined;
+if (AGAINST && AGAINST === resolve(OUT)) {
+  console.error(`--against ${against} is where this render is written (--out): it would be held to itself`);
+  process.exit(2);
+}
+/** The sounds' rows of an `index.md` this tool wrote: each sound's loudness (LUFS; NaN for a silent one) and centroid (Hz). */
+function indexed(file: string): Map<string, { loud: number; centroid: number }> {
+  const found = new Map<string, { loud: number; centroid: number }>();
+  const lines = readFileSync(file, 'utf8').split('\n');
+  // (The first table only: the sounds; the ones after it are the same sounds heard from somewhere.)
+  for (let i = lines.findIndex((l) => l.startsWith('| sound |')) + 2; i > 1 && i < lines.length && lines[i].startsWith('|'); i++) {
+    const cells = lines[i].split('|').map((c) => c.trim());
+    found.set(cells[1].replaceAll('`', ''), { loud: Number(cells[8]), centroid: Number(cells[9]) });
+  }
+  return found;
+}
+/** The other render's sounds, read before this one writes anything. */
+const OLD = AGAINST ? indexed(join(AGAINST, 'index.md')) : undefined;
 
 /** A 16-bit stereo WAV of two channels of samples. */
 function wav(left: Float32Array, right: Float32Array): Buffer {
@@ -377,46 +396,33 @@ writeFileSync(
 );
 console.log(`\nwrote ${sounds.length} WAVs and index.md to ${OUT}`);
 
-/** The sounds' rows of an `index.md` this tool wrote: each sound's loudness (LUFS; NaN for a silent one) and centroid (Hz). */
-function indexed(file: string): Map<string, { loud: number; centroid: number }> {
-  const found = new Map<string, { loud: number; centroid: number }>();
-  const lines = readFileSync(file, 'utf8').split('\n');
-  // (The first table only: the sounds; the ones after it are the same sounds heard from somewhere.)
-  for (let i = lines.findIndex((l) => l.startsWith('| sound |')) + 2; i > 1 && i < lines.length && lines[i].startsWith('|'); i++) {
-    const cells = lines[i].split('|').map((c) => c.trim());
-    found.set(cells[1].replaceAll('`', ''), { loud: Number(cells[8]), centroid: Number(cells[9]) });
-  }
-  return found;
-}
-
-if (AGAINST) {
-  const old = indexed(join(AGAINST, 'index.md'));
+if (OLD) {
   const moved: string[] = [];
   const added: string[] = [];
   let worst = 0;
   for (const h of heard) {
-    const was = old.get(h.name);
+    const was = OLD.get(h.name);
     if (!was) {
       added.push(h.name);
       continue;
     }
-    // (As the index shows them: a tenth of an LU, a whole Hz.)
-    const loud = Number(num(h.loud));
-    const c = Math.round(h.centroid);
-    const lu = Number.isFinite(loud) && Number.isFinite(was.loud) ? loud - was.loud : Number.isFinite(loud) === Number.isFinite(was.loud) ? 0 : Infinity;
-    const shift = was.centroid > 0 ? c / was.centroid - 1 : 0;
+    const silent = !Number.isFinite(h.loud);
+    const lu = !silent && Number.isFinite(was.loud) ? h.loud - was.loud : silent === !Number.isFinite(was.loud) ? 0 : Infinity;
+    const shift = was.centroid > 0 ? h.centroid / was.centroid - 1 : 0;
     worst = Math.max(worst, Math.abs(lu));
-    if (Math.abs(lu) > 0.2 + 1e-9 || Math.abs(shift) > 0.02) {
+    if (Math.abs(lu) > 0.25 || Math.abs(shift) > 0.02) {
       moved.push(
-        `${h.name.padEnd(15)} ${num(was.loud).padStart(6)} → ${num(loud).padStart(6)} LUFS (${lu >= 0 ? '+' : ''}${num(lu)})  centroid ${String(was.centroid).padStart(6)} → ${String(c).padStart(6)} Hz (${shift >= 0 ? '+' : ''}${(shift * 100).toFixed(1)} %)${Math.abs(lu) > 1 ? '  OVER 1 LU' : ''}`,
+        `${h.name.padEnd(15)} ${num(was.loud).padStart(6)} → ${num(h.loud, 2).padStart(6)} LUFS (${lu >= 0 ? '+' : ''}${num(lu, 2)})  centroid ${String(was.centroid).padStart(6)} → ${num(h.centroid, 0).padStart(6)} Hz (${shift >= 0 ? '+' : ''}${(shift * 100).toFixed(1)} %)${Math.abs(lu) > 1 ? '  OVER 1 LU' : ''}`,
       );
     }
   }
-  console.log(`\nagainst ${AGAINST}: ${moved.length} moved by more than 0.2 LU or 2 % of their centroid`);
+  const missing = [...OLD.keys()].filter((name) => !heard.some((h) => h.name === name));
+  console.log(`\nagainst ${AGAINST}: ${moved.length} moved by more than 0.25 LU or 2 % of their centroid`);
   for (const line of moved) console.log(line);
   if (added.length) console.log(`new (not in the old index): ${added.join(', ')}`);
-  if (worst > 1 + 1e-9) {
-    console.error(`a sound moved by ${num(worst)} LU, more than 1.0`);
+  if (missing.length) console.log(`missing (in the old index, not made here): ${missing.join(', ')}`);
+  if (worst > 1) {
+    console.error(`a sound moved by ${num(worst, 2)} LU, more than 1.0`);
     process.exit(1);
   }
 }
