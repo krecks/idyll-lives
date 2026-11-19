@@ -45,8 +45,7 @@ pub fn family() -> Option<Family> {
             Model::new("rowingBoat", boats::rowing_boat, (1.28, 0.695, 2.943))
                 .key("model.waterEdge.rowingBoat")
                 .paint(&[("hull", "Hull"), ("inside", "Interior"), ("seat", "Seats")]),
-            Model::new("reeds", plants::reeds, (0.801, 1.539, 1.086))
-                .key("model.waterEdge.reeds"),
+            Model::new("reeds", plants::reeds, (0.801, 1.539, 1.086)).key("model.waterEdge.reeds"),
             Model::new("beachHut", structures::beach_hut, (1.98, 2.185, 1.96))
                 .key("model.waterEdge.beachHut")
                 .paint(&[("wall", "Walls"), ("stripe", "Stripes"), ("door", "Door")]),

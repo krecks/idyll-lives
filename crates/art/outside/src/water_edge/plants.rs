@@ -43,7 +43,11 @@ pub fn reeds() -> Vec<Obj> {
         fsweep!(
             F,
             format!("stem{i}"),
-            &[(x, 0.0, z), (x + lx * 0.5, h * 0.55, z + lz * 0.5), (x + lx, h, z + lz)],
+            &[
+                (x, 0.0, z),
+                (x + lx * 0.5, h * 0.55, z + lz * 0.5),
+                (x + lx, h, z + lz)
+            ],
             0.008,
             M.stem,
             verts = 5,
