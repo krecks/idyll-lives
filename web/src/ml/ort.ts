@@ -1,6 +1,6 @@
 /**
- * ONNX Runtime Web for a worker: the language model runs on the GPU (WebGPU), the voices on
- * the GPU or, in Auto's fallback, on the processor (WASM). Its WASM binary comes from our own
+ * ONNX Runtime Web for a worker: the language model and the voices run on the GPU (WebGPU) or,
+ * chosen or in Auto's fallback, on the processor (WASM). Its WASM binary comes from our own
  * download (`ml/assets.ts`), and it runs in the worker itself (no proxy worker).
  */
 

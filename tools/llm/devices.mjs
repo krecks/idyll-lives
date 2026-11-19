@@ -2,7 +2,7 @@
 /**
  * The device test (`web/src/talk/devices.svelte.ts`) in a real browser: starts Vite, opens the
  * game with `?debug` in Chromium with WebGPU, runs `__llmBench()` and prints (the language model
- * and the voices, both on the GPU) load time, prompt and writing speed, time
+ * where Settings puts it, Auto: the GPU, and the voices) load time, prompt and writing speed, time
  * to write a line, to make its first piece of speech and from asking to hearing it, how fast
  * speech is made against its length, sentences per line, frame times and whether it ran right,
  * and which setup is used (none: the model's lines are switched off). Exits non-zero if a setup that ran

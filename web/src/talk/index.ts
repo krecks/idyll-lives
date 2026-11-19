@@ -8,12 +8,12 @@
 import { ensureLlm, generateText } from '../llm';
 import { settings } from '../settings/settings.svelte';
 import { cleanLine } from './clean';
-import { loadDeviceReports, runDeviceTest, testPrompts } from './devices.svelte';
+import { llmDevice, loadDeviceReports, runDeviceTest, testPrompts } from './devices.svelte';
 import { loadTalk } from './text';
 import { cutShort, LINE_STOPS, LINE_TOKENS } from './writer';
 
 export { LlmWriter, WRITE_MS } from './writer';
-export { browserHint, deviceTest, report, runDeviceTest, stopDeviceTest, type DeviceReport, type TestResult } from './devices.svelte';
+export { browserHint, deviceTest, llmDevice, report, runDeviceTest, stopDeviceTest, type DeviceReport, type TestResult } from './devices.svelte';
 export type { TalkText } from './prompt';
 export { llmChosen, llmWrites, testDevices } from './talk.svelte';
 export { loadTalk } from './text';
@@ -30,7 +30,7 @@ let samples = 0;
 export async function sampleLine(): Promise<string | null> {
   const text = await loadTalk(settings.voiceLanguage);
   if (!text) return null;
-  await ensureLlm();
+  await ensureLlm(llmDevice());
   const asks = testPrompts(text);
   const at = samples++ % asks.length;
   const ask = asks[at];

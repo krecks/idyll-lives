@@ -24,7 +24,7 @@
   import { voiceFor } from '../../voice/voices';
   import { downloadMb, llmStatus, MODEL } from '../../llm';
   import { hasWebGpu } from '../../ml/ort';
-  import { browserHint, deviceTest, report, sampleLine, stopDeviceTest, testDevices } from '../../talk';
+  import { browserHint, deviceTest, llmDevice, report, sampleLine, stopDeviceTest, testDevices } from '../../talk';
 
   // This game's lifespan (sent to the simulation when picked).
   let lifespan = $state<Lifespan>(game.lifespan);
@@ -64,7 +64,7 @@
     { id: 'camera', label: 'Camera & time', icon: 'icon.ui.watch', keys: ['directorDelay', 'directorPace', 'hideHudWhileWatching', 'autoSlow', 'skipQuietHours', 'pauseOnBlur'] },
     { id: 'interface', label: 'Interface', icon: 'icon.ui.display', keys: ['uiScale', 'clock24h', 'reducedMotion', 'showFps'] },
     { id: 'audio', label: 'Audio', icon: 'icon.ui.audio', keys: ['masterVolume', 'sound', 'worldSound', 'worldVolume', 'muteInBackground'] },
-    { id: 'voices', label: 'Voices', icon: 'icon.ui.voice', keys: ['voices', 'voiceDevice', 'voiceVolume', 'voiceWriter', 'subtitles'] },
+    { id: 'voices', label: 'Voices', icon: 'icon.ui.voice', keys: ['voices', 'voiceDevice', 'voiceVolume', 'voiceWriter', 'llmDevice', 'subtitles'] },
     { id: 'controls', label: 'Controls', icon: 'icon.ui.move', keys: ['directControl', 'cameraSensitivity'] },
   ] as const satisfies readonly { id: string; label: string; icon: string; keys: readonly (keyof Settings)[] }[];
   type Page = (typeof pages)[number]['id'];
@@ -141,21 +141,32 @@
   const downloading = $derived(llmStatus.state === 'loading');
   /** What loading shows: the download, then starting the model (the files are in). */
   const loadLabel = $derived(llmStatus.progress < 1 ? `Downloading ${MODEL.label}` : `Starting ${MODEL.label}`);
+  /** Where the model runs: where it is loaded, else where the setting and the device test put it. */
+  const llmOn = $derived(llmStatus.state === 'off' ? llmDevice() : llmStatus.device);
   const llmText = $derived.by(() => {
     if (llmStatus.state === 'error') return `Couldn't load it: ${llmStatus.error}`;
-    return `${MODEL.label}, on this computer's graphics card: about ${Math.round(downloadMb(MODEL))} MB, downloaded once.`;
+    if (llmOn === 'gpu' && !gpuAvailable) return 'No WebGPU here: choose Auto or Processor for the model.';
+    return `${MODEL.label}, on ${DEVICE_NAME[llmOn]}: about ${Math.round(downloadMb(MODEL))} MB, downloaded once.`;
   });
+  const LLM_DEVICE_HINT = {
+    auto: 'Auto uses the graphics card, and steps down to the processor if it is missing or too slow.',
+    gpu: 'The graphics card writes a line in under a second.',
+    cpu: 'The processor takes several seconds a line: on most computers too long for residents to say it.',
+  };
+  const ON_DEVICE = { gpu: 'On the graphics card', cpu: 'On the processor' };
   const deviceText = $derived.by(() => {
     if (deviceTest.running) return deviceTest.step || 'Testing…';
     const r = report();
     if (!r && deviceTest.stopped) return 'Test stopped. Until it has run, residents say hand-written lines.';
-    if (!r) return gpuAvailable ? 'Not tested here yet: it tests itself when chosen.' : 'No WebGPU here: the model needs it, so residents say hand-written lines.';
+    if (!r) return 'Not tested here yet: it tests itself when chosen.';
     const x = r.result;
     if (!r.usable) {
-      const why = x.ran ? `${(x.lineMs / 1000).toFixed(1)} s a line${x.ok ? '' : ' (wrong text)'}.` : "It couldn't load.";
-      return `Doesn't run well enough here, so residents say hand-written lines. ${why}${browserHint(x)}`;
+      // (Lines cut short at the writer's time limit don't pass as lines: too slow, not wrong.)
+      const fault = x.ok ? '' : x.cut * 2 >= x.written ? ', most cut short' : ' (wrong text)';
+      const why = x.ran ? `${(x.lineMs / 1000).toFixed(1)} s a line${fault}.` : x.error === 'no WebGPU here' ? 'No WebGPU here.' : "It couldn't load.";
+      return `${ON_DEVICE[r.device]} it doesn't run well enough here, so residents say hand-written lines. ${why}${browserHint(r)}`;
     }
-    return `Runs on the GPU: ${(x.lineMs / 1000).toFixed(2)} s from asking for a line to hearing it.`;
+    return `${ON_DEVICE[r.device]}: ${(x.lineMs / 1000).toFixed(2)} s from asking for a line to hearing it.`;
   });
   let writing = $state(false);
   let written = $state('');
@@ -577,6 +588,21 @@
         {#if settings.voiceWriter === 'llm'}
           <section>
             <h3>Language model</h3>
+            <SettingRow
+              title="Runs on"
+              hint={LLM_DEVICE_HINT[settings.llmDevice]}
+              details="The graphics card is many times faster; Auto only moves to the processor when the card is missing or the test finds it too slow."
+            >
+              <Segmented
+                label="Language model runs on"
+                bind:value={settings.llmDevice}
+                options={[
+                  { value: 'auto', label: 'Auto' },
+                  { value: 'gpu', label: 'Graphics card' },
+                  { value: 'cpu', label: 'Processor' },
+                ]}
+              />
+            </SettingRow>
             <SettingRow title="Model" hint={llmText} details="{MODEL.about} Licence: {MODEL.licence}.">
               {#if downloading && !deviceTest.running}
                 <Busy label={loadLabel} progress={llmStatus.progress < 1 ? llmStatus.progress : null} />

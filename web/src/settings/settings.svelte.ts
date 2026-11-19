@@ -65,6 +65,11 @@ export interface Settings {
    * in the browser, from who they are and what's going on (`talk/`; downloads the model).
    */
   voiceWriter: 'lines' | 'llm';
+  /**
+   * Where the language model runs: `auto` uses the graphics card and steps down to the processor
+   * when it is missing or the device test finds it too slow; `gpu` and `cpu` keep the player's choice.
+   */
+  llmDevice: 'auto' | 'cpu' | 'gpu';
   /** Spoken lines also show as text in the speech bubble. */
   subtitles: boolean;
   /** Birds, crickets, the wind, things in use at home, footsteps, cars passing and the town from above (audio/world.ts). */
@@ -110,6 +115,7 @@ export const DEFAULT_SETTINGS: Settings = {
   voiceDevice: 'auto',
   voiceVolume: 0.8,
   voiceWriter: 'lines',
+  llmDevice: 'auto',
   subtitles: true,
   worldSound: true,
   worldVolume: 0.6,
@@ -221,6 +227,7 @@ function sanitize(s: Record<string, unknown>): Settings {
   out.voiceLanguage = oneOf(s.voiceLanguage, ['en'] as const, DEFAULT_SETTINGS.voiceLanguage);
   out.voiceDevice = oneOf(s.voiceDevice, ['auto', 'cpu', 'gpu'] as const, DEFAULT_SETTINGS.voiceDevice);
   out.voiceWriter = oneOf(s.voiceWriter, ['lines', 'llm'] as const, DEFAULT_SETTINGS.voiceWriter);
+  out.llmDevice = oneOf(s.llmDevice, ['auto', 'cpu', 'gpu'] as const, DEFAULT_SETTINGS.llmDevice);
   const tips = s.tipsSeen;
   out.tipsSeen = Array.isArray(tips) && tips.every((id: unknown): id is string => typeof id === 'string') ? tips : [];
   return out;

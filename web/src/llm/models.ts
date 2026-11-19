@@ -3,8 +3,9 @@
  * its files are, its chat format, stop tokens and sampling defaults. Liquid AI's LFM2.5 350M,
  * self-hosted (fetched by `cargo fetch-llm`), its upstream 4-bit build repacked smaller without
  * changing what it computes (`crates/tools/src/llmslim.rs`): small to download, fast on the GPU
- * (WebGPU). It runs only there (on the CPU 4-bit was too slow for
- * lines); without WebGPU residents say hand-written lines. The generation loop (`generate.ts`)
+ * (WebGPU). It runs on the processor too (Settings, Runs on), one node of its graph rebuilt there
+ * (`cpuGraph.ts`), but slowly: 4-bit weights have no fast path in ONNX Runtime's WASM build
+ * (2026-11-19, an M3 Pro: 2.4 tokens a second, 8–16 s a line). The generation loop (`generate.ts`)
  * reads the model's cache inputs from the model itself.
  */
 

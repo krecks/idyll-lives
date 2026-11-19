@@ -17,6 +17,7 @@
  *     --runs 3           decode runs (median, min, max)
  *     --no-lines         skip the game's five test lines
  *     --cold / --warm    only the first load / only the cached reload (default: both)
+ *     --cpu              the model on the processor (WASM) instead of the GPU
  *     --headed / --headless  with a window (the default: a timing run, like `devices.mjs`) or
  *                        without (still the real GPU)
  *     --left 2600        how far right the window goes, out of the way
@@ -45,6 +46,7 @@ const LEFT = Number(flag('left', 2600));
 const COLD = !has('warm');
 const WARM = !has('cold');
 const LINES = !has('no-lines');
+const DEVICE = has('cpu') ? 'cpu' : 'gpu';
 const OUT = String(flag('out', `${ROOT}bench-results/llm-${new Date().toISOString().replace(/[:.]/g, '-')}/`));
 
 async function playwright() {
@@ -96,6 +98,7 @@ const table = (report) => {
   const cached = report.lines.length ? report.cached : report.decode.runs[0];
   return [
     {
+      device: DEVICE,
       adapter: [report.adapter.vendor, report.adapter.architecture, report.adapter.device].filter(Boolean).join(' ') || 'none',
       isolated: report.isolated ? 'yes' : 'no',
       'load s': fmt(report.loadMs / 1000, 1),
@@ -139,7 +142,7 @@ try {
   }
   page.on('console', (m) => m.type() === 'error' && console.error(`page: ${m.text()}`));
   page.on('pageerror', (e) => console.error(`page error: ${e.message}`));
-  const options = { decodeTokens: TOKENS, decodeRuns: RUNS, lines: LINES };
+  const options = { decodeTokens: TOKENS, decodeRuns: RUNS, lines: LINES, device: DEVICE };
   const reports = {};
   if (COLD) {
     console.log('llm bench: cold (nothing cached)');
