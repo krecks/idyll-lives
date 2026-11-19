@@ -471,7 +471,10 @@ export interface LandCursor {
   tone: 'up' | 'down' | 'water' | 'cover' | 'bad' | UseKind | 'erase';
 }
 
-/** What `Renderer.buildingAt` found. */
+/**
+ * What `Renderer.buildingAt` found: a lot's building. (`building`, a building on no lot, is found no more: every
+ * building is a lot's. It goes once the town's cards no longer ask for it, `ui/town/chosen.ts`.)
+ */
 export type BuildingHit = { kind: 'lot'; plot: number } | { kind: 'building'; index: number };
 
 export interface Renderer {
@@ -527,8 +530,8 @@ export interface Renderer {
   pick(x: number, y: number): PickResult;
   /**
    * The house or building the ray through canvas CSS pixel (`x`, `y`) meets first, other than the
-   * viewed lot's: a lot's house (`plot`) or a backdrop building (`WorldMeta.backdrop` index). Null
-   * when it meets none, or the viewed lot's ground first.
+   * viewed lot's: a lot's house or building (`plot`; a flats building's lot, not a flat). Null when it
+   * meets none, or the viewed lot's ground first.
    */
   buildingAt(x: number, y: number): BuildingHit | null;
   /**

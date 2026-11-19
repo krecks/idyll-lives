@@ -1,7 +1,7 @@
 /**
  * The built world as dumped for its gate (`cargo check-glb --built`): a fixed set of samples made by the game's own
  * generators (`web/src/render/shared`: `HousePlanner.build`, `silhouettes`, `farHouse` and `farLook`, the street,
- * `dressBackdrop`, the town view's unit meshes, `writeFences`, `paintCar`), each as the meshes one frame draws of it.
+ * `dressBuilding`, the town view's unit meshes, `writeFences`, `paintCar`), each as the meshes one frame draws of it.
  * No browser and no simulation: the worlds they are built from are made here, as the menus' preview makes its own
  * (`game/townPreview.ts`), from house plans written below and from the shipped `houses.json` and `housegen.json`.
  *
@@ -10,8 +10,8 @@
  *   and as the town view's box (`town.<name>`). The plans cover the roofs (gable, hip, flat; over a plain box, an L,
  *   a U and a ring), one and two storeys, a porch, a garage, diagonal walls, every wall covering, a floor covering
  *   of each finish, and every door and window style.
- * - **The backdrop**: a building of each use dressed (`backdrop.<use>`) and as the town view's box
- *   (`backdropFar.<use>`).
+ * - **The lots' buildings closed**: a building of each use dressed (`backdrop.<use>`, as a lot with that look) and as
+ *   the town view's box (`backdropFar.<use>`).
  * - **A street** (`street.block`): two streets crossing, a lane with a bend to a dead end, a country road over a
  *   bridge, lots with houses, each fence style round a garden, parked cars.
  * - **Fences** (`fence.<style>`) and **cars** (`car.<body>`) each on their own.
@@ -22,7 +22,7 @@
 
 import { readFileSync } from 'node:fs';
 import type { DoorStyleDef, FenceStyleDef, FloorCoveringDef, ObjectDef, RoofColorDef, RoofStyleDef, WallCoveringDef, WindowStyleDef } from '../../web/src/content/content';
-import type { BackdropBuilding, BuildingUse, DiagonalWall, FenceEdge, ObjectPlacement, Opening, PlotInfo, RoadPlan, WallEdge, WorldStructure } from '../../web/src/core/protocol';
+import type { BuildingUse, DiagonalWall, LotLook, FenceEdge, ObjectPlacement, Opening, PlotInfo, RoadPlan, WallEdge, WorldStructure } from '../../web/src/core/protocol';
 import type { HouseTemplate } from '../../web/src/game/town';
 import type { Geo } from '../../web/src/render/shared/geometry';
 import type { HousePart, HouseScheme } from '../../web/src/render/shared/house';
@@ -34,8 +34,8 @@ Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', o
 const { Geo: GeoClass } = await import('../../web/src/render/shared/geometry');
 const { HousePlanner, houseScheme, HOUSE_MATERIALS, WALL_HEIGHT, WALL_STUB } = await import('../../web/src/render/shared/house');
 const { planStreet, TownStreet, Painter, NO_FOCUS } = await import('../../web/src/render/shared/street');
-const { backdropBuilding, footprintSeed, lotBuilding, unitMeshes } = await import('../../web/src/render/shared/townBuildings');
-const { dressBackdrop } = await import('../../web/src/render/shared/backdropDress');
+const { lotBuilding, lotLookBuilding, unitMeshes } = await import('../../web/src/render/shared/townBuildings');
+const { dressBuilding } = await import('../../web/src/render/shared/buildingDress');
 const { writeFences } = await import('../../web/src/render/shared/fences');
 const { CARS, CAR_PAINT, paintCar } = await import('../../web/src/render/shared/cars');
 const { generateHouse, objectInfos } = await import('../../web/src/game/housegen');
@@ -609,13 +609,13 @@ function unitMeshesOf(b: TownBuilding): DumpMesh[] {
   return [copy('town.walls', units.walls, b.top - b.base, b.base), copy(`town.${b.roof}`, units[b.roof], b.rise, b.top)];
 }
 
-// ---- the backdrop -----------------------------------------------------------------------------------
+// ---- the lots' buildings closed ---------------------------------------------------------------------
 
-/** A building of each use: its size (m along its ridge and across), its roof and its storeys, as the town's generator makes them about. */
-const BACKDROP: [BuildingUse, number, number, BackdropBuilding['roof'], number][] = [
+/** A building of each use: its size (m along its ridge and across), its roof and its storeys (at most the world's three), as the town's generator makes them about. */
+const BACKDROP: [BuildingUse, number, number, LotLook['roof'], number][] = [
   ['house', 12, 8, 'gable', 2],
   ['terrace', 22, 9, 'gable', 2],
-  ['flats', 16, 11, 'flat', 4],
+  ['flats', 16, 11, 'flat', 3],
   ['shop', 10, 8, 'flat', 2],
   ['cafe', 12, 9, 'hip', 2],
   ['restaurant', 14, 10, 'mansard', 2],
@@ -628,16 +628,12 @@ const BACKDROP: [BuildingUse, number, number, BackdropBuilding['roof'], number][
   ['barn', 14, 9, 'gable', 2],
 ];
 
-/** A backdrop building dressed, as the street draws it near, and as the town view's box. */
+/** A lot's building of each use closed, dressed as the street draws it near, and as the town view's box. */
 function backdropSamples([use, w, d, roof, storeys]: (typeof BACKDROP)[number], i: number): Sample[] {
-  // (Turned a little, as few stand square to the grid; its road to the south.)
-  const a = 0.3;
+  // (Its road to the south.)
   const [cx, cz] = [100, 50];
-  const [ux, uz] = [Math.cos(a), Math.sin(a)];
-  const at = (u: number, v: number): [number, number] => [cx + u * ux - v * uz, cz + u * uz + v * ux];
-  const b: BackdropBuilding = { poly: [at(-w / 2, d / 2), at(w / 2, d / 2), at(w / 2, -d / 2), at(-w / 2, -d / 2)], y: 0, storeys, roof, ridge: -a, use, look: i, area: 0 };
-  const t = backdropBuilding(b, footprintSeed(b), () => 0);
-  const dress = dressBackdrop(t, use, [cx, cz + 30]);
+  const t = lotLookBuilding([cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2], { use, storeys, roof, look: i }, storeys, 0, () => 0);
+  const dress = dressBuilding(t, use, [cx, cz + 30]);
   const about = `a ${use}, ${w} m by ${d} m, ${storeys} storey${storeys === 1 ? '' : 's'} under a ${roof} roof, look ${i}`;
   const near = [...dress.parts.map((p) => partMesh(p)), ...dress.panes.map((g, k) => meshOf('backdropPanes', HOUSE_MATERIALS.glass, g, { set: k }))];
   const key = `backdrop.${use}`;

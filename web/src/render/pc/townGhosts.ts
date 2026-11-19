@@ -226,8 +226,8 @@ export class TownGhostDraw {
   }
 
   /**
-   * Draws `ghosts` (null: none) draped over `drape`, on `layer`. `world`: the town shown, whose buildings a lot or
-   * backdrop building to be removed has dimmed. Cheap: every pointer move.
+   * Draws `ghosts` (null: none) draped over `drape`, on `layer`. `world`: the town shown, whose building on a lot to be
+   * removed is dimmed. Cheap: every pointer move.
    */
   set(ghosts: TownGhosts | null, drape: Drape, layer: number, world: WorldStructure | null): void {
     const empty = !ghosts || (!ghosts.roads.length && !ghosts.lots.length && !ghosts.boxes.length);
@@ -394,26 +394,13 @@ export class TownGhostDraw {
     this.band(path, normals(path, true), -line / 2, line / 2, t.rgb, t.edge, drape, true, gap);
   }
 
-  /** The building on a lot (or a backdrop building) to be removed, under a dark veil: a box round it up to its roof. */
+  /** The building on a lot to be removed, under a dark veil: a box round it up to its roof. */
   private veil(r: { x: number; z: number; w: number; d: number }, drape: Drape, world: WorldStructure): void {
     const [cx, cz] = [r.x + r.w / 2, r.z + r.d / 2];
-    let shape: { x0: number; z0: number; x1: number; z1: number; top: number } | null = null;
     const plot = world.plots.find((p) => cx >= p.x && cx < p.x + p.w && cz >= p.z && cz < p.z + p.d);
-    if (plot?.house) {
-      const [x0, z0, x1, z1] = plot.house;
-      shape = { x0, z0, x1, z1, top: (plot.storeys ?? 1) * STOREY + ROOF };
-    } else if (!plot) {
-      for (const b of world.meta?.backdrop ?? []) {
-        const xs = b.poly.map((p) => p[0]);
-        const zs = b.poly.map((p) => p[1]);
-        const [x0, z0, x1, z1] = [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)];
-        if (cx < x0 || cx > x1 || cz < z0 || cz > z1) continue;
-        shape = { x0, z0, x1, z1, top: b.storeys * STOREY + ROOF };
-        break;
-      }
-    }
-    if (!shape) return;
-    const { x0, z0, x1, z1, top } = shape;
+    if (!plot?.house) return;
+    const [x0, z0, x1, z1] = plot.house;
+    const top = (plot.storeys ?? 1) * STOREY + ROOF;
     // (A little bigger than the building, so its walls are inside the veil, not through it.)
     const m = 0.3;
     const [a0, b0, a1, b1] = [x0 - m, z0 - m, x1 + m, z1 + m];

@@ -52,10 +52,11 @@ describe('rayPrism', () => {
 });
 
 describe('lotWallsHeight', () => {
-  test('a lot’s house its own storeys; a named place’s lot closed its look’s, or its own if more', () => {
+  test('a lot’s house its own storeys; a lot with a look closed its real storeys too (never its look’s), at most three', () => {
     expect(lotWallsHeight(undefined, undefined, 2.8, 3)).toBeCloseTo(2.8, 6);
     expect(lotWallsHeight(2, undefined, 2.8, 3)).toBeCloseTo(5.6, 6);
-    expect(lotWallsHeight(1, { storeys: 3 }, 2.8, 3)).toBeCloseTo(9, 6);
+    expect(lotWallsHeight(1, { storeys: 3 }, 2.8, 3)).toBeCloseTo(3, 6);
     expect(lotWallsHeight(2, { storeys: 1 }, 2.8, 3)).toBeCloseTo(6, 6);
+    expect(lotWallsHeight(5, { storeys: 4 }, 2.8, 3)).toBeCloseTo(9, 6);
   });
 });

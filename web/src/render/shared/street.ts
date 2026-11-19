@@ -6,8 +6,9 @@
  * the fences and hedges round gardens and fields, and flower beds along their house
  * fronts, with pots by the door and little lights along the garden path; the things standing in
  * their gardens. The town's public places seen from another lot: shops as silhouettes with an awning,
- * a named place's lot (`WorldMeta.lotLooks`: a school, a church, a shop on the high street) as the backdrop building
- * its look says (`backdropDress.ts`, its door where its own is; open, the game draws its real walls), and the park,
+ * a lot with a look (`WorldMeta.lotLooks`: a school, a church, a shop on the high street, a flats building) closed as
+ * the building its look says, as tall as its real storeys (`buildingDress.ts`, its door where its own is; open, the
+ * game draws its real walls), and the park,
  * playground and market things standing in the open. At the ends of the street a taxi
  * rank and street signs; benches, planters and bins along the kerb in front of the public places.
  *
@@ -47,7 +48,7 @@
 
 import type { ModelEntry } from '../../assets/types';
 import type { FenceStyleDef } from '../../content/content';
-import { groundDepth, objectCentre, storeyOfRow, storeyRow, type BackdropBuilding, type FenceEdge, type GarageInfo, type LotLook, type ObjectPlacement, type Opening, type PlotInfo, type RoadPlan, type TownPlace, type WorldStructure } from '../../core/protocol';
+import { groundDepth, objectCentre, storeyOfRow, storeyRow, type FenceEdge, type GarageInfo, type LotLook, type ObjectPlacement, type Opening, type PlotInfo, type RoadPlan, type TownPlace, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Geo, type V3 } from './geometry';
 import { CARS, CAR_PAINT, carAge, garageAt, garageFor, hash, paintCar, parkCar, pick, type CarAge, type CarBody } from './cars';
@@ -64,8 +65,8 @@ import { bridgeSpans, Kerb, KERB, levelStops, ROAD_Y, roadIndex, roadMeshes, SID
 import { JunctionCuts, junctionsOf, type JunctionPlan } from './junctions';
 import { Levels, levelsOf } from './landSurface';
 import type { BuiltSurface } from './builtSurface';
-import { dressBackdrop } from './backdropDress';
-import { backdropBuilding, drawnKey, farBuilding, footprintSeed, hedgeSides, layBackdropGrounds, lotLookBuilding, middleOf, wayCorners, type BackdropLaid, type HedgeSide, type TownBuilding } from './townBuildings';
+import { dressBuilding } from './buildingDress';
+import { farBuilding, lotLookBuilding, type TownBuilding } from './townBuildings';
 
 /** Vertex-colour alpha for the plain finish, as the material libraries' `encodeFinish`: [0, 0.5) dielectric, [0.5, 1] metal; roughness scaled within. */
 function encodeFinish(roughness: number, metallic: number): number {
@@ -380,17 +381,6 @@ export interface StreetSource {
   ground?: boolean;
   /** The content's fence styles, for the fences on other lots (`WorldStructure.fences`). */
   fenceStyles?: readonly FenceStyleDef[];
-  /**
-   * Also the backdrop's buildings (`WorldMeta.backdrop`), dressed (`backdropDress.ts`), with their hedges and what they
-   * stand on (its own ground layers, `ground` or not): the game's street (far off the town view draws them,
-   * `pc/townView.ts`) and the menus' (`pc/overview.ts`).
-   */
-  backdrop?: boolean;
-  /**
-   * The ground (m) as the landscape draws it (`Landscape.heightAt`): what the backdrop's forecourts, yards and ways lie
-   * on. None: the surface's (`groundAt`), else 0.
-   */
-  terrain?: (x: number, z: number) => number;
 }
 
 /** The street as laid out, to be drawn. */
@@ -444,8 +434,8 @@ export interface ChunkPlan extends Omit<StreetPlan, 'batches' | 'footprints' | '
   batches: Map<string, Inst[]>;
   /** Road surface, garden paths and fields off the focus lot (game only). */
   ground: GroundLayer[];
-  /** The backdrop's buildings in it (`StreetSource.backdrop`): each as the town view has it (its lights, `litAt`), and its window glass by set (`PANE_SETS`). */
-  backdrop: { t: TownBuilding; panes: Geo[] }[];
+  /** The lots' buildings drawn closed in it (`lotDressed`): each as the town view has it (its lights, `litAt`), and its window glass by set (`PANE_SETS`). */
+  buildings: { t: TownBuilding; panes: Geo[] }[];
 }
 
 /** Whether a model the street instances casts the sun's shadows (as `StreetPlan.batches`). */
@@ -501,50 +491,19 @@ interface PlotOut {
   silhouettes: SilhouettePlan | null;
   spec: SilhouetteSpec | null;
   lot: StreetPlan['lot'];
-  /** A named place's lot closed: the backdrop building its look says, dressed, on its pad (`TownStreet.lotDressed`). */
+  /** A lot with a look closed: the building its look says, dressed, on its pad (`TownStreet.lotDressed`). */
   dressed: { t: TownBuilding; parts: HousePart[]; panes: Geo[] } | null;
 }
 
-/** How a named place's lot looks from outside (`WorldMeta.lotLooks`), and its place's hours (its windows lit while it is open). */
+/**
+ * How a lot with a look (`WorldMeta.lotLooks`: a named place's, a flats building's) looks from outside, its place's
+ * hours (its windows lit while it is open), and whether a place has flats over it (`WorldStructure.flats` of its lot).
+ */
 export interface LotDress {
   look: LotLook;
   hours?: TownPlace['hours'];
+  flats?: true;
 }
-
-/** A backdrop building as the street takes it (`TownStreet.layBackdrop`): what it is drawn from, what it stands on, its hedges' sides and its way to the road. */
-interface BackdropItem {
-  b: BackdropBuilding;
-  /** What it is drawn from (`drawnKey`): its share of a chunk's key. */
-  draw: string;
-  /** What it stands on: its forecourt or yard, its way to the road (`layBackdropGrounds`). */
-  laid: BackdropLaid;
-  hedges: HedgeSide[];
-}
-
-/** A backdrop building's share of the street (`TownStreet.backdropOut`): dressed, its window glass by set, its hedges, what it stands on. */
-interface BackdropOut {
-  t: TownBuilding;
-  parts: HousePart[];
-  panes: Geo[];
-  hedges: Inst[];
-  /** A forecourt (and its way) paved, a yard (and its way) bare, a garden's path. */
-  court: Geo;
-  yard: Geo;
-  path: Geo;
-  chunk: number;
-}
-
-/**
- * A backdrop building's ground (m over the land as the landscape draws it), and the cells it is cut into to lie on a
- * land that slopes (m: the land's own samples, `LAND_CELL`). Over the land by a hand's width: the ground's tiles are
- * quads of 2 m and more (`pc/nature.ts` `TILE_LODS`), between whose corners the land (`heightAt`) dips and rises by
- * several centimetres; a few centimetres up, the land showed through in patches. Still under the pavement (`WALK_Y` and
- * its kerb).
- */
-const BACKDROP_GROUND_Y = 0.1;
-const BACKDROP_GROUND_CELL = 2;
-/** The hedge model's length along its run at scale 1 (`fences.ts`). */
-const HEDGE_RUN = 1.05;
 
 /** A road side's kerbside furniture, by chunk, with what each chunk's share looks like (`Parts.signature`). */
 interface KerbOut {
@@ -714,12 +673,7 @@ export class TownStreet {
   /** The edges walls (and the doors and windows in them) stand on, `axis:x:z`, made when first asked for after the walls or openings changed (`walled`). */
   private wallEdges: Set<string> | null = null;
   private readonly fenceUnits = new Map<number, { hash: number; out: Parts }>();
-  /** The backdrop's buildings and places as last taken (`setWorld`; `StreetSource.backdrop`), the buildings by the chunk their middle is in, and each one's share as planned (by what it is drawn from and the land under it). */
-  private backdropOf: BackdropBuilding[] | undefined = undefined;
-  private placesOf: TownPlace[] | undefined = undefined;
-  private backdropByChunk = new Map<number, BackdropItem[]>();
-  private readonly backdropUnits = new Map<string, BackdropOut>();
-  /** The named places' lots' looks by plot id (`lotDresses`), what they were taken from (`setWorld`), and as a key. */
+  /** The lots' looks by plot id (`lotDresses`), what they were taken from (`setWorld`), and as a key. */
   private dresses = new Map<number, LotDress>();
   private dressesOf: unknown[] = [];
   private dressesKey = '';
@@ -1024,17 +978,9 @@ export class TownStreet {
   /** Takes the world's things, houses and rooms as they are now (the layout stays: see `layoutKey`). */
   setWorld(world: WorldStructure): void {
     this.world = world;
-    // The backdrop's buildings (a street built up or cleared in step 2, a place's hours): found again by chunk; each
-    // chunk's key has what its own are drawn from (`gather`).
-    if (this.options.backdrop && (world.meta?.backdrop !== this.backdropOf || world.meta?.places !== this.placesOf)) {
-      this.backdropOf = world.meta?.backdrop;
-      this.placesOf = world.meta?.places;
-      this.backdropByChunk = this.layBackdrop(world);
-      this.version++;
-    }
-    // The named places' lots' looks and their places' hours (a place's lot added or given up): each plot's share notices
+    // The lots' looks, their places' hours and their flats (a place's lot added or given up): each plot's share notices
     // its own (`plotKey`).
-    const dressesOf = [world.meta?.lotLooks, world.meta?.places, world.plots];
+    const dressesOf = [world.meta?.lotLooks, world.meta?.places, world.plots, world.flats];
     if (dressesOf.some((v, i) => v !== this.dressesOf[i])) {
       this.dressesOf = dressesOf;
       this.dresses = lotDresses(world);
@@ -1321,7 +1267,6 @@ export class TownStreet {
     for (const r of this.rows.keys()) for (const id of this.kerbOf(r, NO_FOCUS).chunks.keys()) ids.add(id);
     for (const f of this.fields) ids.add(chunkAt(f.x + f.w / 2, f.z + f.d / 2));
     for (const id of this.fencesByChunk.keys()) ids.add(id);
-    for (const id of this.backdropByChunk.keys()) ids.add(id);
     if (this.options.ground) for (const [, rects] of this.groundRects()) for (const r of rects) ids.add(chunkAt(r.x + r.w / 2, r.z + r.d / 2));
     return [...ids].sort((a, b) => a - b);
   }
@@ -1407,7 +1352,6 @@ export class TownStreet {
   keepUnits(chunks: ReadonlySet<number> | null, focus: number): void {
     for (const [id, u] of this.plotUnits) if ((chunks && !chunks.has(u.chunk)) || (u.variant !== NO_FOCUS && u.variant !== focus)) this.plotUnits.delete(id);
     if (chunks) for (const id of this.fenceUnits.keys()) if (!chunks.has(id)) this.fenceUnits.delete(id);
-    if (chunks) for (const [key, u] of this.backdropUnits) if (!chunks.has(u.chunk)) this.backdropUnits.delete(key);
   }
 
   /** A plot's share of the street with lot `focus` in view (see the rules at the top). */
@@ -1421,8 +1365,9 @@ export class TownStreet {
     let spec: SilhouetteSpec | null = null;
     let lot: StreetPlan['lot'] = null;
     let dressed: PlotOut['dressed'] = null;
-    // (A named place's lot not in view: the backdrop building its look says, in place of a silhouette and an awning.)
-    const dress = kind === 'shop' && L.house ? this.dresses.get(L.info.id) : undefined;
+    // (A lot with a look not in view, a named place's or a flats building's: the building its look says, in place of a
+    // silhouette, an awning and a garden.)
+    const dress = (kind === 'shop' || kind === 'house') && L.house ? this.dresses.get(L.info.id) : undefined;
 
     // ---- its house (the player's in the menus' town a shell; the viewed lot's only its garage and porch) ----
     // (A garage or porch pieces the player built on their lot before any house: they stand there alone.)
@@ -1431,7 +1376,7 @@ export class TownStreet {
     const loneGarage = home && game && !L.house ? (this.garages.get(L.info.id) ?? null) : null;
     const lone = loneGarage ?? (home && game && !L.house && pieces?.length ? { x0: pieces[0].x, z0: pieces[0].z, x1: pieces[0].x + pieces[0].w, z1: pieces[0].z + pieces[0].d } : null);
     if ((kind === 'house' || kind === 'shop' || home) && (L.house || lone)) {
-      const g = kind === 'shop' ? null : world.garages ? (this.garages.get(L.info.id) ?? null) : home ? null : this.legacyGarage(L, focus);
+      const g = kind === 'shop' || dress ? null : world.garages ? (this.garages.get(L.info.id) ?? null) : home ? null : this.legacyGarage(L, focus);
       const [x0, z0, x1, z1] = L.info.house ?? [lone!.x0, lone!.z0, lone!.x1, lone!.z1];
       const front: [number, number] = L.turned ? [-L.front, 0] : [0, L.front];
       spec = { x0, z0, x1, z1, lot: L.info, home, dressingOnly: home && game, front, door: L.door, garage: g, porches, pieces, roof: L.plot.roof, cover: this.coverOf(L), storeys: L.plot.storeys, lived: kind === 'house' && this.options.lived };
@@ -1492,32 +1437,36 @@ export class TownStreet {
   }
 
   /**
-   * A named place's lot as drawn closed (`lotLookBuilding`): the backdrop building its look says on its walls' box (their
-   * outer faces), on its pad, as tall as the look or its own storeys (a real upper floor) if more. Open (the focus), the
-   * game draws its own walls, its real storeys alone: the look's storeys over them are a façade, gone with the roof.
+   * A lot with a look as drawn closed (`lotLookBuilding`): the building its look says on its walls' box (their outer
+   * faces), on its pad, as tall as its real storeys (the walls on each storey of its lot). Open (the focus), the game
+   * draws its own walls: the same storeys.
    */
   private lotBuilding(L: PlotLayout, dress: LotDress): TownBuilding {
     const [x0, z0, x1, z1] = L.info.house!;
     const pad = this.padOf(L);
-    return { ...lotLookBuilding([x0 - T, z0 - T, x1 + T, z1 + T], dress.look, L.info.storeys ?? 1, pad, () => pad, dress.hours), chunk: this.plotChunk(L) };
+    return { ...lotLookBuilding([x0 - T, z0 - T, x1 + T, z1 + T], dress.look, L.info.storeys ?? 1, pad, () => pad, dress.hours, dress.flats), chunk: this.plotChunk(L) };
   }
 
-  /** `lotBuilding` dressed (`dressBackdrop`): its door where the lot's own front door is, on the side its street is on. */
+  /**
+   * `lotBuilding` dressed (`dressBuilding`): its door where the lot's own front door is, on the side its street is on;
+   * a place with flats over it, its flats' street door where the next door on that wall is.
+   */
   private lotDressed(L: PlotLayout, dress: LotDress): NonNullable<PlotOut['dressed']> {
     const t = this.lotBuilding(L, dress);
     const [x0, z0, x1, z1] = L.info.house!;
     const [fx, fz] = L.turned ? [-L.front, 0] : [0, L.front];
-    const door = this.frontDoor(L, fx, fz);
+    const [door = null, flats = null] = this.frontDoors(L, fx, fz);
     const [mx, mz] = door ?? [(x0 + x1) / 2 + (fx * (x1 - x0)) / 2, (z0 + z1) / 2 + (fz * (z1 - z0)) / 2];
-    const { parts, panes } = dressBackdrop(t, dress.look.use, [mx + fx * 6, mz + fz * 6], door);
+    const { parts, panes } = dressBuilding(t, dress.look.use, [mx + fx * 6, mz + fz * 6], door, flats);
     return { t, parts, panes };
   }
 
   /**
-   * The middle of a lot's front door (town metres, on its house's wall towards the street, (`fx`, `fz`)): the door on
-   * the ground floor nearest the wall's middle, with those beside it (a double door). Null: none on that wall.
+   * The middles of a lot's front doors (town metres, on its house's wall towards the street, (`fx`, `fz`)): the doors on
+   * the ground floor, those side by side as one (a double door), the nearest the wall's middle first. None on that wall:
+   * empty.
    */
-  private frontDoor(L: PlotLayout, fx: number, fz: number): [number, number] | null {
+  private frontDoors(L: PlotLayout, fx: number, fz: number): [number, number][] {
     const [x0, z0, x1, z1] = L.info.house!;
     const alongX = fz !== 0;
     const line = fz > 0 ? z1 : fz < 0 ? z0 : fx > 0 ? x1 : x0;
@@ -1526,14 +1475,18 @@ export class TownStreet {
       if (o.kind !== 'door' || storeyOfRow(this.world, o.z) !== 0) continue;
       if (alongX ? o.axis === 'h' && o.z === line && o.x >= x0 && o.x < x1 : o.axis === 'v' && o.x === line && o.z >= z0 && o.z < z1) tiles.add(alongX ? o.x : o.z);
     }
-    if (!tiles.size) return null;
     const mid = alongX ? (x0 + x1) / 2 : (z0 + z1) / 2;
-    const best = [...tiles].reduce((b, a) => (Math.abs(a + 0.5 - mid) < Math.abs(b + 0.5 - mid) ? a : b));
-    let [lo, hi] = [best, best];
-    while (tiles.has(lo - 1)) lo--;
-    while (tiles.has(hi + 1)) hi++;
-    const a = (lo + hi + 1) / 2;
-    return alongX ? [a, line] : [line, a];
+    const out: [number, number][] = [];
+    for (const a of [...tiles].sort((p, q) => Math.abs(p + 0.5 - mid) - Math.abs(q + 0.5 - mid))) {
+      if (!tiles.has(a)) continue;
+      let [lo, hi] = [a, a];
+      while (tiles.has(lo - 1)) lo--;
+      while (tiles.has(hi + 1)) hi++;
+      for (let k = lo; k <= hi; k++) tiles.delete(k);
+      const c = (lo + hi + 1) / 2;
+      out.push(alongX ? [c, line] : [line, c]);
+    }
+    return out;
   }
 
   /** A neighbour's garden (see the rules at the top), with lot `focus` in view. */
@@ -1969,104 +1922,6 @@ export class TownStreet {
   private readonly staticSigs = new Map<number, number | null>();
 
   /**
-   * The backdrop's buildings by the chunk their middle is in: what each is drawn from, what it stands on
-   * (`backdropGround`), its garden's hedges (`hedgeSides`, as the town view's) and its way to the road, stopped at the
-   * road's edge (the pavement's, a street's) and left out where it would cross a lot (the lots' gardens are theirs).
-   */
-  private layBackdrop(world: WorldStructure): Map<number, BackdropItem[]> {
-    const list = world.meta?.backdrop ?? [];
-    const places = world.meta?.places ?? [];
-    const driven = (world.meta?.roads ?? []).filter((r) => r.kind !== 'trail');
-    const laid = layBackdropGrounds(list, driven, world.plots);
-    const sides = new Map<number, HedgeSide[]>();
-    for (const side of hedgeSides(list, laid.map((l) => l.ground), world.plots, driven)) {
-      let mine = sides.get(side.of);
-      if (!mine) sides.set(side.of, (mine = []));
-      mine.push(side);
-    }
-    const out = new Map<number, BackdropItem[]>();
-    list.forEach((b, i) => {
-      if (b.poly.length < 3) return;
-      const id = chunkAt(...middleOf(b.poly));
-      let mine = out.get(id);
-      if (!mine) out.set(id, (mine = []));
-      mine.push({ b, draw: drawnKey(b, places), laid: laid[i], hedges: sides.get(i) ?? [] });
-    });
-    return out;
-  }
-
-  /** Whether (`x`, `z`) is on a lot (inside its rectangle). */
-  private onLot(x: number, z: number): boolean {
-    return this.plotGrid.near({ x, z, w: 0, d: 0 }, 0).some(({ L }) => x > L.info.x && x < L.info.x + L.info.w && z > L.info.z && z < L.info.z + L.info.d);
-  }
-
-  /**
-   * A backdrop building's share of the street: dressed (`dressBackdrop`) on the box the town view draws it as
-   * (`backdropBuilding`; on a land the town follows, on its pad, its walls down to the land round it), its garden's
-   * hedges (the street's hedge model along each side), its forecourt or yard and its way to the road laid on the
-   * ground. Kept by what it is drawn from and the land under it.
-   */
-  private backdropOut(item: BackdropItem): BackdropOut {
-    const levels = this.levels;
-    const { b } = item;
-    const [mx, mz] = middleOf(b.poly);
-    const floor = levels ? levels.at(mx, mz) : b.y;
-    const land = levels ? (x: number, z: number) => levels.surface.landAt(x, z) : () => 0;
-    let lowest = Infinity;
-    for (const [x, z] of b.poly) lowest = Math.min(lowest, land(x, z));
-    const way = item.laid.way;
-    // (The land round it as drawn too: shaped, the chunk's heights move, `chunkSig`.)
-    const key = `${item.draw}|${Math.round(floor * 100)}|${Math.round(lowest * 100)}|${levels ? levels.surface.chunkSig(chunkAt(mx, mz)) : '-'}|${way ? [...way.from, ...way.to].map((v) => Math.round(v * 10)).join(',') : '-'}|${item.hedges.length}`;
-    const known = this.backdropUnits.get(key);
-    if (known) return known;
-    const chunk = chunkAt(mx, mz);
-    const t: TownBuilding = { ...backdropBuilding(levels ? { ...b, y: floor } : b, footprintSeed(b), land, this.world.meta?.places ?? []), chunk };
-    const dress = dressBackdrop(t, b.use, item.laid.ground.to);
-    // (What its ground lies on: the land as the landscape draws it, which beside a lot isn't the surface's slope to the
-    // lot's pad, `nature.ts` `lotsFilled`.)
-    const at = this.options.terrain ?? this.groundAt;
-    // Its hedges: the hedge model along each side, a little over a metre a plant.
-    const hedges: Inst[] = [];
-    for (const { a, c } of item.hedges) {
-      const l = Math.hypot(c[0] - a[0], c[1] - a[1]);
-      const n = Math.max(1, Math.round(l));
-      const s = (l / n / HEDGE_RUN) * 1.04;
-      const yaw = Math.atan2(-(c[1] - a[1]), c[0] - a[0]);
-      for (let k = 0; k < n; k++) {
-        const [x, z] = [a[0] + ((c[0] - a[0]) * (k + 0.5)) / n, a[1] + ((c[1] - a[1]) * (k + 0.5)) / n];
-        const y = at ? at(x, z) : 0;
-        hedges.push(y ? [x, z, s, 1, yaw, y] : [x, z, s, 1, yaw]);
-      }
-    }
-    // What it stands on: its forecourt or yard round it (its rectangle's, as wide as the town view's map has it), and its way.
-    const [court, yard, path] = [new Geo().color('#ECE8E0'), new Geo().color('#C4B7A0'), new Geo()];
-    const kind = item.laid.ground.kind;
-    const y = BACKDROP_GROUND_Y;
-    /**
-     * A rectangle (its corners in order), `dy` m up; on a land the town follows cut into cells
-     * (`BACKDROP_GROUND_CELL`), so draped it lies on the land between its corners too.
-     */
-    const lay = (g: Geo, q: readonly (readonly [number, number])[], dy: number) => {
-      // (Cut into cells everywhere: a cell on a lot is left out, as the town view's map leaves the lots theirs.)
-      const [nu, nv] = [Math.max(1, Math.ceil(Math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1]) / BACKDROP_GROUND_CELL)), Math.max(1, Math.ceil(Math.hypot(q[3][0] - q[0][0], q[3][1] - q[0][1]) / BACKDROP_GROUND_CELL))];
-      const P = (u: number, v: number): V3 => [q[0][0] + (q[1][0] - q[0][0]) * u + (q[3][0] - q[0][0]) * v, dy, q[0][1] + (q[1][1] - q[0][1]) * u + (q[3][1] - q[0][1]) * v];
-      for (let i = 0; i < nu; i++) {
-        for (let j = 0; j < nv; j++) {
-          const [x, , z] = P((i + 0.5) / nu, (j + 0.5) / nv);
-          if (this.onLot(x, z)) continue;
-          g.poly([P(i / nu, j / nv), P((i + 1) / nu, j / nv), P((i + 1) / nu, (j + 1) / nv), P(i / nu, (j + 1) / nv)], [0, 1, 0]);
-        }
-      }
-    };
-    if (item.laid.court) lay(kind === 'forecourt' ? court : yard, item.laid.court, y);
-    if (way) lay(kind === 'forecourt' ? court : kind === 'yard' ? yard : path, wayCorners(way), y + 0.002);
-    if (at) for (const g of [court, yard, path]) g.drape(at);
-    const out: BackdropOut = { t, parts: dress.parts, panes: dress.panes, hedges, court, yard, path, chunk };
-    this.backdropUnits.set(key, out);
-    return out;
-  }
-
-  /**
    * Chunk `id` far off (the far LOD, past the chunks streamed in): its houses as boxes with their
    * roofs (`HousePlanner.farHouse`), the focus lot's left out, in one plain-finish geometry, with
    * what it was made from. Null when it has none.
@@ -2166,8 +2021,6 @@ export class TownStreet {
     }
     const fence = this.fenceKey(id, focus);
     if (fence) keys.push(`e${id}:${fence.hash}`);
-    // The backdrop's buildings in it, by what each is drawn from (`drawnKey`; its land: `moved` below).
-    for (const item of this.backdropByChunk.get(id) ?? []) keys.push(`b${hashString(item.draw)}:${item.hedges.length}:${item.laid.way ? 'w' : '-'}`);
     // The street's own in it (sidewalks, the road, fountains, bridges, parked cars), by what they look like.
     const own = this.staticSig(id);
     if (own !== null) keys.push(`s${own}`);
@@ -2234,7 +2087,7 @@ export class TownStreet {
       lot: null,
       batches: new Map((Object.keys(FOLIAGE) as FoliageKind[]).map((k) => [FOLIAGE[k], []])),
       ground: g.ground(),
-      backdrop: [],
+      buildings: [],
     };
     const st = this.staticParts().get(id);
     if (st) mergeParts(plan, st.parts);
@@ -2247,10 +2100,10 @@ export class TownStreet {
       const dy = this.padOf(k.L);
       if (p.spec) plan.specs.push(p.spec);
       if (p.silhouettes) mergeSilhouettes(plan.silhouettes, p.silhouettes, dy);
-      // (A named place's lot closed: built on its pad already, its windows lit as the backdrop's are.)
+      // (A lot with a look closed: built on its pad already, its windows lit by the hour, `litAt`.)
       if (p.dressed) {
         mergeSilhouettes(plan.silhouettes, { parts: p.dressed.parts, homes: [], lamps: [] });
-        plan.backdrop.push({ t: p.dressed.t, panes: p.dressed.panes });
+        plan.buildings.push({ t: p.dressed.t, panes: p.dressed.panes });
       }
       if (p.lot) plan.lot = p.lot;
       mergeParts(plan, p.parts, dy);
@@ -2259,27 +2112,6 @@ export class TownStreet {
     if (g.fence) mergeParts(plan, this.fenceOut(g.fence));
     // The town's paved ground: the centre, the courts and yards, the car parks and their bays (`streetGround.ts`).
     streetGround(plan, this.world, id, this.groundAt);
-    // The backdrop's buildings, their hedges, and what they stand on.
-    const items = this.backdropByChunk.get(id);
-    if (items?.length) {
-      const [court, yard, path] = [new Geo(), new Geo(), new Geo()];
-      const hedges = plan.batches.get(FOLIAGE.hedge)!;
-      for (const item of items) {
-        const o = this.backdropOut(item);
-        mergeSilhouettes(plan.silhouettes, { parts: o.parts, homes: [], lamps: [] });
-        plan.backdrop.push({ t: o.t, panes: o.panes });
-        hedges.push(...o.hedges);
-        court.merge(o.court);
-        yard.merge(o.yard);
-        path.merge(o.path);
-      }
-      // (The menus' street too, which draws no ground of its own otherwise: the town's paths and fields are the overview's.)
-      {
-        if (!court.empty) plan.ground.push({ name: 'backdropCourts', material: 'material.sidewalk', geo: court, toned: true });
-        if (!yard.empty) plan.ground.push({ name: 'backdropYards', material: 'material.path', geo: yard, toned: true });
-        if (!path.empty) plan.ground.push({ name: 'backdropPaths', material: 'material.path', geo: path });
-      }
-    }
     return plan;
   }
 }
@@ -2575,22 +2407,24 @@ const scratchQ: Quat = [0, 0, 0, 1];
 const scratchM = new Float32Array(16);
 
 /**
- * The named places' lots' looks (`WorldMeta.lotLooks`, by plot index; public lots' only) by plot id, each with its
- * place's hours (the `WorldMeta.places` entry on that plot).
+ * The lots' looks (`WorldMeta.lotLooks`, by plot index: a named place's lot's, a flats building's) by plot id, each with
+ * its place's hours (the `WorldMeta.places` entry on that plot), and whether flats stand on it (`WorldStructure.flats`).
+ * A home's lot has none (it is drawn as the house it is).
  */
-export function lotDresses(world: Pick<WorldStructure, 'plots' | 'meta'>): Map<number, LotDress> {
+export function lotDresses(world: Pick<WorldStructure, 'plots' | 'meta' | 'flats'>): Map<number, LotDress> {
   const out = new Map<number, LotDress>();
   const looks = world.meta?.lotLooks;
   if (!looks) return out;
   const hours = new Map<number, NonNullable<TownPlace['hours']>>();
   for (const p of world.meta?.places ?? []) if (p.plot !== undefined && p.hours) hours.set(p.plot, p.hours);
+  const flats = new Set((world.flats ?? []).map((f) => f.of));
   for (const [k, look] of Object.entries(looks)) {
     const i = Number(k);
     const plot = world.plots[i];
-    // (A public lot's only: a place's lot is.)
-    if (!plot?.public || !look) continue;
+    // (A place's lot, or a flats building's.)
+    if (!plot || !look || !(plot.public || plot.kind === 'flats')) continue;
     const h = hours.get(i);
-    out.set(plot.id, h ? { look, hours: h } : { look });
+    out.set(plot.id, { look, ...(h ? { hours: h } : {}), ...(flats.has(plot.id) ? { flats: true as const } : {}) });
   }
   return out;
 }
