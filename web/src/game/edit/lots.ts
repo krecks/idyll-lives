@@ -21,7 +21,7 @@
 
 import type { Content } from '../../content/content';
 import type { RoadPlan, TownPlace } from '../../core/protocol';
-import { byNeed, CIVIC, civicLabel, civicOf, civicTooBig, draftAreaSize, hoursFor, namerFor } from '../backdrop';
+import { byNeed, CIVIC, civicLabel, civicOf, civicTooBig, draftAreaSize, hoursFor, namerFor } from '../places';
 import { weighted, type GardenSize } from '../housegen';
 import { heightAt } from '../land';
 import { BEND, BEND_MOST, CORNER, placeReaches, TIGHT_BEND, TRAIL_WIDTH } from '../macro';
@@ -580,7 +580,7 @@ export function swapPlace(draft: NeighbourhoodDraft, t: Templates, content: Cont
  * (Passed on as it is, not read here as this module loads: `backdrop.ts` reaches this module again
  * through `ground.ts`, `macro.ts` and `landFollow.ts`, and may not have made `CIVIC` yet.)
  */
-export { CIVIC as CIVIC_PLACES } from '../backdrop';
+export { CIVIC as CIVIC_PLACES } from '../places';
 
 /** A civic place's lot made one of another size is tried this far apart (m) along its road from where it met it. */
 const SWAP_STEP = 2;

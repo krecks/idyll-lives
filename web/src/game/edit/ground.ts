@@ -12,6 +12,7 @@ import { unrle } from '../landMasks';
 import { grown, SHORE_GAP } from '../macro';
 import { inside, nearest, pointAt, roadIndex, type Pt, type RoadPlan } from '../roads';
 import { boundsOf, Ground, plotRect, turner, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates } from '../town';
+import { bayRect } from '../parking';
 
 /** A place along a road: which road, how far along it (m), and which side (+1: its left, looking along it; -1: its right). */
 export interface RoadSpot {
@@ -51,8 +52,8 @@ function baseOf(draft: NeighbourhoodDraft): Uint8Array {
     for (let z = Math.max(0, r.z - grow); z < Math.min(D, r.z + r.d + grow); z++) for (let x = Math.max(0, r.x - grow); x < Math.min(W, r.x + r.w + grow); x++) mask[z * W + x] = 1;
   };
   if (open?.water) mask.set(grown(unrle(open.water, W * D), W, D, SHORE_GAP));
-  // A parking space as the generator laid it: 6 m along the verge, 3 m deep, and a metre round it.
-  for (const p of open?.parking ?? []) take(p.rot % 2 ? { x: Math.round(p.x - 3), z: Math.round(p.z - 1.5), w: 6, d: 3 } : { x: Math.round(p.x - 1.5), z: Math.round(p.z - 3), w: 3, d: 6 }, 1);
+  // A parking bay's ground (`parking.ts` `bayRect`), and a metre round it.
+  for (const p of open?.parking ?? []) take(bayRect(p), 1);
   // A square's own tiles (those whose middle is in it), as the generator keeps them clear (`chooseCentre`).
   for (const q of open?.squares ?? []) {
     const b = boundsOf(q);

@@ -4,7 +4,7 @@
  */
 
 import type { BackdropBuilding, BuildingUse, HouseholdInfo, PlotInfo, TownPlace } from '../../core/protocol';
-import { CIVIC, civicOf } from '../../game/backdrop';
+import { CIVIC, civicOf } from '../../game/places';
 import type { BuildingHit } from '../../render/types';
 import { lotTitle } from '../place';
 import { openState, openText } from './places';

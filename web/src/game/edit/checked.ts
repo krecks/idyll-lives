@@ -37,7 +37,7 @@ export function checkedTown(draft: NeighbourhoodDraft, t: Templates): CheckedTow
     sims: [],
     households: [],
     roads: draft.roads,
-    ...(open ? { areas: open.areas, terrain: { water: open.water }, parking: open.parking } : {}),
+    ...(open ? { areas: open.areas, terrain: { water: open.water }, parking: open.parking, carParks: open.carParks } : {}),
     // (The water as the land has it, which the Street tool bridges: `CheckedTown.landWet`.)
     ...(land ? { landWet: (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < D && wetTile(land, Math.floor(x), Math.floor(z)) } : {}),
     meta: {

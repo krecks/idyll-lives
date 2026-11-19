@@ -12,7 +12,7 @@ import type { CareerCategory } from '../content/content';
 import { DEFAULT_LANDSCAPE, type RoadPlan, type TownPlace, type WorldStructure, type WorldZone } from '../core/protocol';
 import { BRIDGE_CLEAR, builtSurfaceOf, CUT_MAX, CUT_MAX_MOUNTAIN_ROAD, GRADE, onPad, profileOf, RETAIN_MAX, surfacePlots, type BuiltSurface, type SurfaceWorld } from '../render/shared/builtSurface';
 import { blankLand, COVER, COVER_CELL, coverSpan, heightAt, LAND_CELL, NONE, SEA_CM, type Land } from './land';
-import { HOURS, hoursFor } from './backdrop';
+import { HOURS, hoursFor } from './places';
 import { APRON, builtOf, landZones, Protection, wetTiles } from './landEdit';
 import { lotKey, removeLots } from './edit/lots';
 import { rle, unrle } from './landMasks';
@@ -272,10 +272,10 @@ const SETTLE_MARGIN = 0.15;
 /**
  * `withLand`, and the last resort: a place's world whose built land still breaks a slope limit
  * (`measureLand`, a little within it) gives up what breaks it and is graded again, round after
- * round (`SETTLE_ROUNDS` at most): a lot or a backdrop building cut too deep or whose edge stands
- * too tall (of two pads, the backdrop building, else a home's lot before a public one's, else the later lot; a lot before a building that is a place) is left out (`diagnostics.dropped`);
- * a country road cut too deep (a way out, a loop between places) is left out, and the lots and
- * backdrop buildings on it (those by it, and those it was the nearest road to), where the roads left are still one network with a way out; a dead end reaching past `COURT` m beyond the last road it meets is
+ * round (`SETTLE_ROUNDS` at most): a lot cut too deep or whose edge stands too tall (of two lots, a
+ * home's before a public one's, else the later one; a building set by hand in step 2 before the lots) is left out (`diagnostics.dropped`);
+ * a country road cut too deep (a way out, a loop between places) is left out, and the lots on it
+ * (and the buildings by it, and those it was the nearest road to), where the roads left are still one network with a way out; a dead end reaching past `COURT` m beyond the last road it meets is
  * cut back to that, and the lots past it left out; a country road cut too deep that may not be
  * left out has the land along it eased to its own profile the next round (`easeAlong`: once).
  * What it gave up: `diagnostics.slopes`. A career
@@ -286,7 +286,7 @@ const SETTLE_MARGIN = 0.15;
  * (`marks`, as `settleEdit` keys them: what it couldn't give up).
  *
  * `keepRoads`: no road is given up nor cut back (a town built from the player's layout, whose streets
- * were judged as they were drawn: `build.ts`); only lots and backdrop buildings go, and a country road
+ * were judged as they were drawn: `build.ts`); only lots (and buildings) go, and a country road
  * cut too deep has the land along it eased to it instead, as one that may not be left out.
  */
 export function settleLand<W extends FollowWorld>(
@@ -297,7 +297,7 @@ export function settleLand<W extends FollowWorld>(
   { keepRoads = false }: { keepRoads?: boolean } = {},
 ): { draft: NeighbourhoodDraft; world: W; marks: string[] } {
   let draft = laid;
-  const given = { lots: 0, backdrop: 0, roads: 0, courts: 0, backdropIn: {} as Record<number, number> };
+  const given = { lots: 0, roads: 0, courts: 0 };
   /** The country roads whose land is eased along them (`roadKey`). */
   const ease = new Set<string>();
   for (let round = 0; ; round++) {
@@ -311,8 +311,7 @@ export function settleLand<W extends FollowWorld>(
     const next = found ? giveUp(draft, world, found, courts, given, careers, ease, keepRoads) : null;
     if (!next) {
       seeded?.(first);
-      const total = given.lots + given.backdrop + given.roads + given.courts;
-      if (!given.backdrop) delete (given as { backdropIn?: unknown }).backdropIn;
+      const total = given.lots + given.roads + given.courts;
       // (What is left over a limit itself: step 2's first settle's `before`. The margin changes what is given up, not that.)
       const marks = [...overOf(draft, world, found ?? measureLand(world, land, first, 0, false)).keys()];
       return { draft: total ? { ...graded, diagnostics: { ...(graded.diagnostics ?? { dropped: [] }), slopes: given } } : graded, world, marks };
@@ -577,7 +576,7 @@ function giveUp(
   world: FollowWorld,
   found: LandMeasure,
   courts: ReturnType<typeof longCourts>,
-  given: { lots: number; backdrop: number; roads: number; courts: number; backdropIn: Record<number, number> },
+  given: { lots: number; roads: number; courts: number },
   careers: readonly CareerCategory[],
   ease: Set<string>,
   keepRoads = false,
@@ -647,11 +646,6 @@ function giveUp(
   if (!eased && !gone.size && !lots.size && !backdrop.size && roads.every((r, i) => r === draft.roads[i] || r.points.length === draft.roads[i].points.length)) return null;
   roads = roads.filter((_, i) => !gone.has(i));
   given.lots += lots.size;
-  given.backdrop += backdrop.size;
-  for (const i of backdrop) {
-    const area = open.backdrop?.[i]?.area ?? 0;
-    given.backdropIn[area] = (given.backdropIn[area] ?? 0) + 1;
-  }
   // The slots left, numbered again; the pads, places and backdrop buildings that name them with them (`edit/lots.ts`).
   const dropped = [...(draft.diagnostics?.dropped ?? []), ...draft.slots.filter((s) => lots.has(s.index)).map((s) => ({ name: s.name, kind: s.kind, ...(s.lot ? { lot: s.lot } : {}) }))];
   const removed = removeLots({ ...draft, roads }, lots, backdrop);

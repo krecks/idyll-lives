@@ -7,9 +7,9 @@
  */
 
 import type { Content } from '../content/content';
-import type { FenceEdge, ObjectPlacement, Opening, PlotInfo, WallEdge, WorldStructure } from '../core/protocol';
+import type { FenceEdge, FlatInfo, LotLook, ObjectPlacement, Opening, PlotInfo, WallEdge, WorldStructure } from '../core/protocol';
 import { encodeLand } from './land';
-import { layoutTown, worldLook, type NeighbourhoodDraft, type Templates, type TownMeta } from './town';
+import { layoutTown, lotPaving, plotKindOf, worldLook, type NeighbourhoodDraft, type Templates, type TownMeta } from './town';
 
 /** A menu preview's walls and floors: none (the renderer still expects the three meshes). */
 export const EMPTY_MESH = { positions: new Float32Array(0), normals: new Float32Array(0), uvs: new Float32Array(0), indices: new Uint32Array(0) };
@@ -95,7 +95,7 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
     for (let z = p.z; z < Math.min(z1, D); z++) {
       for (let x = p.x; x <= Math.min(x1, W); x++) if (v[z * (W + 1) + x] && !(x === p.x && !indoors(x, z)) && !(x === x1 && !indoors(x - 1, z))) grow(x, z, x, z + 1);
     }
-    return { id, name: p.name, x: p.x, z: p.z, w: p.w, d: p.d, public: p.public, entry: p.entry, house: box, storeys: p.storeys };
+    return { id, name: p.name, x: p.x, z: p.z, w: p.w, d: p.d, public: p.public, entry: p.entry, house: box, storeys: p.storeys, kind: plotKindOf(town.slots[id]) };
   });
 
   const objects: ObjectPlacement[] = layout.objects.filter((o) => o.z < D).map((o, id) => {
@@ -111,12 +111,22 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
   const meta: TownMeta = { kind: 'town', name: town.name, roads: town.roads, greens: town.greens, paths: layout.paths, facing: layout.facing, seed: town.seed ?? 1, world: worldLook(town, layout.fields), home: playerSlot, gardenFences: true };
   // A big world's land and areas, as the town file carries them (`assembleTown`).
   if (town.open) {
-    const { zones, pads, areas, backdrop, places, centre, relief, land } = town.open;
-    // (And the living town's backdrop, places and centres: the land is cleared for them as in the game, and the
-    // town view over a preview, the bench's Big world, draws them; and the land's relief, its hills; and the land
-    // once it has been shaped or graded under its town, as the town file carries it.)
-    Object.assign(meta, { zones, pads, areas, ...(backdrop ? { backdrop } : {}), ...(places ? { places } : {}), ...(centre ? { centre } : {}), ...(relief ? { relief } : {}), ...(land && (land.edited || land.seeded === 'follow') ? { land: encodeLand(land) } : {}) });
+    const { zones, pads, areas, places, centre, relief, land } = town.open;
+    // (And the living town's places, centres and paved ground: the town view over a preview, the bench's Big world,
+    // draws them; and the land's relief, its hills; and the land once it has been shaped or graded under its town,
+    // as the town file carries it.)
+    const paving = lotPaving(t, town, layout.built);
+    Object.assign(meta, { zones, pads, areas, ...(places ? { places } : {}), ...(centre ? { centre } : {}), ...(paving.length ? { paving } : {}), ...(relief ? { relief } : {}), ...(land && (land.edited || land.seeded === 'follow') ? { land: encodeLand(land) } : {}) });
   }
+  // How the named places' lots and the flats buildings look from outside, by plot (`PlotSlot.dress`), as `assembleTown` files them.
+  const lotLooks: Record<number, LotLook> = {};
+  town.slots.forEach((s, i) => {
+    if (s.dress) lotLooks[i] = s.dress;
+  });
+  if (Object.keys(lotLooks).length) meta.lotLooks = lotLooks;
+  // Each flat a plot of its own after the lots on the ground (`assembleTown`'s ids), and the households in them.
+  const flats: FlatInfo[] = layout.flats.map((f, k) => ({ id: layout.plots.length + k, of: f.of, storey: f.storey, ...f.rect, name: `Flat ${f.unit + 1}, ${town.slots[f.of].name}`, door: f.door }));
+  const flatId = (slot: number, flat: number | undefined) => (flat === undefined ? slot : (flats.find((f, k) => f.of === slot && layout.flats[k].unit === flat)?.id ?? slot));
   return {
     version: 0,
     lotVersion: 0,
@@ -125,7 +135,7 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
     depth: D,
     objects,
     sims: [],
-    households: town.households.map((x, id) => ({ id, name: x.household.name, plot: x.slot, player: false })),
+    households: town.households.map((x, id) => ({ id, name: x.household.name, plot: flatId(x.slot, x.flat), player: false })),
     plots,
     exits: [],
     rooms,
@@ -136,6 +146,10 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
     meshes: { walls: EMPTY_MESH, wallsLow: EMPTY_MESH, floors: EMPTY_MESH },
     garages: layout.garages,
     porches: layout.porches,
+    // The public parking as the draft lays it (the game's: the poses the sim parks at), its car parks, and the flats.
+    ...(town.open?.parking.length ? { parking: town.open.parking } : {}),
+    ...(town.open?.carParks?.length ? { carParks: town.open.carParks } : {}),
+    ...(flats.length ? { flats } : {}),
     // The households' cars where the game parks them (the player's slot has one), as the street drew them.
     cars: layout.cars.map(({ plot, x, z, yaw, body, paint }) => ({ plot, x, z, yaw, body, paint })),
   };

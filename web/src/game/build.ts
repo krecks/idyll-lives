@@ -42,7 +42,10 @@
 
 import type { Content } from '../content/content';
 import type { BuildingUse, RoadPlan, TownArea } from '../core/protocol';
-import { BackdropPass, CIVIC, civicChoices, civicTooBig, draftAreaSize, facesRoad, ZONE, type Row, type ZoneKind } from './backdrop';
+import { CIVIC, civicChoices, civicTooBig, draftAreaSize, ZONE, type ZoneKind } from './places';
+import { facesRoad, rectPoly } from './footprints';
+import { bayRect, vergeParking } from './parking';
+import { DensePass } from './dense';
 import { roadKey } from './edit/buildup';
 import { entryOf, frontOf, inCentre, townGround } from './edit/ground';
 import { removeLots, renumber, withLotPlace, withPlaceName } from './edit/lots';
@@ -61,7 +64,6 @@ import type { LaidTown, Proposal } from './townJobs';
 import { layoutHash, unpackUses, USE_CELL, USE_CODE, type UseKind } from './uses';
 import { placeOf, specOf, type SizeSpec, type WorldSpec } from './world';
 
-type Rand = () => number;
 
 /** The build seed of the proposal's own town: an untouched layout built with it is the generator's town. "Build again" draws another. */
 export const PROPOSAL_SEED = 0;
@@ -583,9 +585,7 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
     const left = removeLots(town, gone.lots, gone.backdrop);
     const lo = left.open!;
     const ground = new Ground(W, D, plan.roads, plan.greens);
-    // (A space as the generator laid it: 6 m along the verge, 3 m deep.)
-    const space = (p: { x: number; z: number; rot: number }) => (p.rot % 2 ? { x: Math.round(p.x - 3), z: Math.round(p.z - 1.5), w: 6, d: 3 } : { x: Math.round(p.x - 1.5), z: Math.round(p.z - 3), w: 3, d: 6 });
-    const parking = lo.parking.filter((p) => areaMap[p.area] >= 0 && ground.free(space(p), 0)).map((p) => ({ ...p, area: areaMap[p.area] }));
+    const parking = lo.parking.filter((p) => areaMap[p.area] >= 0 && ground.free(bayRect(p), 0)).map((p) => ({ ...p, area: areaMap[p.area] }));
     roads = plan.roads.filter((_, i) => !gone.trails.has(i));
     draft = {
       ...draft,
@@ -900,31 +900,35 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
     if (s.kind !== 'house') draft = withLotPlace(draft, t, content, s.index);
   }
 
-  // ---- the backdrop, as the generator lays it: rows along the roads, a row behind, the blocks filled in; each building on land painted its use ----
-  const pass = new BackdropPass({ draft, t, content });
-  pass.allow = (poly, use) => {
+  // ---- the buildings, as the generator lays them (`dense.ts`): rows of lots along the roads, the blocks' frontage filled in; each lot on land painted its use ----
+  const pass = new DensePass({ draft, t, content });
+  pass.allow = (rect, use) => {
     const kind = USE_OF[use];
-    return !!kind && paintedPoly(poly, kind);
+    return !!kind && paintedPoly(rectPoly(rect), kind);
   };
-  const laidRows: { rows: Row[]; rand: Rand }[] = [];
+  const before = draft.slots.length;
   for (const r of frontedRoads) {
     if (!builtAlong.has(r)) continue;
     const road = roads[r];
     const rand = mulberry32(mix(seed, 'rows', roadKey(road)));
     const a = road.area ?? nearestArea(pointAt(road.points, lengths(road.points)[road.points.length - 1] / 2).p);
-    laidRows.push({ rows: pass.rowsAlong(a, r, [1, -1], rand, undefined, { kindsAt }), rand });
+    pass.rowsAlong(a, r, [1, -1], rand, undefined, { kindsAt });
   }
-  for (const { rows: row, rand } of laidRows) pass.secondRow(row, rand);
   // The blocks filled in: a building on each patch of land painted for one and not yet built on, every `INFILL_APART` m of it.
-  const spots = infillSpots(mask, cols, rows, [...draft.slots.map((s) => rectCells(plotRect(t, s), cols, rows)), ...pass.result().backdrop.map((b) => polyCells(b.poly, cols, rows))]);
+  const spots = infillSpots(mask, cols, rows, pass.result().slots.map((s) => rectCells(plotRect(t, s), cols, rows)));
   const areaAt = (p: Pt) => {
     const k = areas.findIndex((q) => offRect(q, p) === 0);
     return k >= 0 ? k : nearestArea(p);
   };
   const infillRand = mulberry32(mix(seed, 'infill'));
-  for (const p of spots) pass.infillPoints(areaAt(p), [p], infillRand, kindsAt);
+  for (const p of spots) pass.fillPoints(areaAt(p), [p], infillRand, kindsAt);
   pass.allow = undefined;
-  draft = { ...draft, open: { ...draft.open!, backdrop: pass.result().backdrop } };
+  draft = { ...draft, slots: pass.result().slots };
+  // (A new named place's lot called as its place is, then given its place.)
+  for (const s of draft.slots.slice(before)) {
+    draft = withPlaceName(draft, content, s.index, nameRand);
+    if (s.kind === 'shop') draft = withLotPlace(draft, t, content, s.index);
+  }
 
   // ---- parking in each area changed; a village with too few lots goes with the nearest area ----
   // (A village built again with too few lots, new or the layout's own, goes the same way.)
@@ -1020,7 +1024,10 @@ function foldSmallVillages(draft: NeighbourhoodDraft, villages: readonly number[
 function parkedAgain(draft: NeighbourhoodDraft, t: Templates, areas: ReadonlySet<number>, seed: number): NeighbourhoodDraft {
   const open = draft.open;
   if (!open || !areas.size) return draft;
-  const parking = open.parking.filter((p) => !areas.has(p.area));
+  // (The car parks of the areas laid again go, the others' bays kept with their car parks numbered again.)
+  const kept = (open.carParks ?? []).flatMap((p, i) => (areas.has(p.area) ? [] : [i]));
+  const carParks = kept.map((i) => open.carParks![i]);
+  const parking = open.parking.filter((p) => !areas.has(p.area)).map((p) => (p.park === undefined ? p : { ...p, park: kept.indexOf(p.park) }));
   const ground = townGround({ ...draft, open: { ...open, parking } }, t);
   const { roads } = draft;
   for (const a of [...areas].sort((x, y) => x - y)) {
@@ -1030,20 +1037,14 @@ function parkedAgain(draft: NeighbourhoodDraft, t: Templates, areas: ReadonlySet
     if (!own.length) continue;
     const homes = draft.slots.filter((s) => s.kind === 'house' && (s.area ?? 0) === a).length;
     const spaces = parkingFor(homes, a === 0);
-    let n = 0;
-    for (const f of frontageOf(roads, own, middle(area), mulberry32(mix(seed, 'parking', a)))) {
-      if (n >= spaces) break;
-      const facing = (Math.abs(f.n[1]) >= Math.abs(f.n[0]) ? (f.n[1] > 0 ? 0 : 2) : f.n[0] > 0 ? 1 : 3) as Facing;
-      const reach = roads[f.road].width / 2 + 0.5;
-      const [qx, qz] = [f.p[0] + f.n[0] * (reach + 3), f.p[1] + f.n[1] * (reach + 3)];
-      const r = facing % 2 ? { x: Math.round(qx - 3), z: Math.round(qz - 1.5), w: 6, d: 3 } : { x: Math.round(qx - 1.5), z: Math.round(qz - 3), w: 3, d: 6 };
-      if (!ground.free(r, 8) || parking.some((p) => Math.hypot(p.x - r.x, p.z - r.z) < 12)) continue;
-      ground.take(r, 1);
-      parking.push({ x: r.x + r.w / 2, z: r.z + r.d / 2, rot: facing, area: a });
-      n++;
+    // (Pairs of bays by the verge, as the generator lays them: `parking.ts` `vergeParking`.)
+    const front = frontageOf(roads, own, middle(area), mulberry32(mix(seed, 'parking', a)));
+    for (const p of vergeParking(roads, ground, front, spaces, a)) {
+      parking.push(...p.bays.map((b) => ({ ...b, park: carParks.length })));
+      carParks.push(p.park);
     }
   }
-  return { ...draft, open: { ...open, parking } };
+  return { ...draft, open: { ...open, parking, carParks } };
 }
 
 // ---- the job ----------------------------------------------------------------------------------------

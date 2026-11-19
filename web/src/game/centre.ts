@@ -138,6 +138,27 @@ export function chooseCentre(roads: readonly RoadPlan[], areaRoads: readonly num
   return centre;
 }
 
+/**
+ * Centre `c` made the densest: its outline narrowed to its high street (the narrower `BANDS`) until its open land is
+ * built over `DENSEST` times as densely as the rest of its area's box `box` (`centreDensity` over `taken`, `polys`),
+ * else to the band that comes nearest. Its square stays inside it (`outline` goes round it).
+ */
+export function narrowCentre(roads: readonly RoadPlan[], c: Centre, W: number, D: number, taken: Uint8Array, box: Rect, polys: readonly (readonly Pt[])[]): void {
+  const ratio = (poly: readonly Pt[]) => {
+    const d = centreDensity(W, D, taken, box, poly, polys);
+    return d.centre / Math.max(1e-6, d.rest);
+  };
+  let best = ratio(c.poly);
+  for (const band of BANDS.filter((b) => b < c.band)) {
+    if (best >= DENSEST) break;
+    const poly = outline(roads, c, band);
+    if (selfCrossing(poly)) continue;
+    const r = ratio(poly);
+    if (r <= best) continue;
+    [c.poly, c.band, best] = [poly, band, r];
+  }
+}
+
 /** A centre's outline `band` m either side of its high street, out round its square: counter-clockwise seen from above. */
 export function outline(roads: readonly RoadPlan[], c: Centre, band: number): Pt[] {
   const pts = roads[c.road].points;
@@ -162,8 +183,7 @@ export function outline(roads: readonly RoadPlan[], c: Centre, band: number): Pt
  * How built over a main town's centre is against the rest of its box: of each one's open land
  * (`taken`: the tiles that are a road, a lot, a green or water, one per tile over `W` × `D`), the
  * share under a backdrop building (`polys`) whose tiles' middles are in it. `per`: each
- * building's tiles counted towards the rest of the box (to take it away again: `layBackdrop`).
- * tools/worlds/sample.ts checks the centre is the denser.
+ * building's tiles counted towards the rest of the box. tools/worlds/sample.ts checks the centre is the denser.
  */
 export function centreDensity(W: number, D: number, taken: Uint8Array, box: Rect, centre: readonly Pt[], polys: readonly (readonly Pt[])[]): { centre: number; rest: number; open: [number, number]; built: [number, number]; per: number[] } {
   const inC = new Uint8Array(W * D);

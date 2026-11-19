@@ -158,7 +158,7 @@ describe("step 2's settle", async () => {
     keptAll(kept.draft, after);
     expect(kept.marks.length).toBeGreaterThan(0);
     const given = settleLand(after, (d) => previewWorld(content, t, d, null)).draft.diagnostics?.slopes;
-    expect(given && given.lots + given.roads + given.backdrop + given.courts).toBeGreaterThan(0);
+    expect(given && given.lots + given.roads + given.courts).toBeGreaterThan(0);
   }, 300_000);
 
   test('a street bridged over a river keeps its deck dry for walkers once settled', () => {

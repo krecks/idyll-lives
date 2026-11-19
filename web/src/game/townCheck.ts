@@ -14,17 +14,18 @@
  * every road named (no two alike); lots inside the world, apart from each other and off the roads,
  * each by its road (a park may stand on a green), the ways out on its edge. Over the water only
  * bridges and causeways, each over its deck (`bridge`) alone, straight and not too long; a river
- * world (`river`) has a bridge. And the living town's backdrop, centre and places (`livingProblems`).
+ * world (`river`) has a bridge. And the living town's lots, parking, centre and places (`livingProblems`).
  *
  * With `expect` (`world.ts` `expectations`), the world is filled and its homes as many as its place
  * and options want: so much of its land less the water built and farmed, at most so many of its
  * 100 m squares with nothing in them, so many of its quarters with an area or homes out in the
- * country, so many homes, so many ways out, the backdrop buildings each area wants, and (in a town
- * or a city) every career working somewhere in the main town.
+ * country, so many homes, so many ways out, and (in a town or a city) every career working somewhere
+ * in the main town.
  */
 
-import type { BackdropBuilding, LandFile, RoadPlan, TownPlace } from '../core/protocol';
-import { centreDensity, facesRoad, fillPoly, HAMLET_LEAST, LOT_CLEAR, overlaps, signedArea2 } from './backdrop';
+import type { BackdropBuilding, CarPark, LandFile, ParkingBay, RoadPlan, TownPlace } from '../core/protocol';
+import { centreDensity } from './centre';
+import { fillPoly, overlaps } from './footprints';
 import { AREA_APART, COUNTRY_TURN, unrle } from './macro';
 import { COURT, inside, lengths, nearest, pointAt, RoadIndex, roadMask, sharpestTurn, sideBySide, type Pt } from './roads';
 import { BIG_COURTS, COURTS, NEIGHBOUR_CAP, turner, type Facing } from './town';
@@ -38,6 +39,8 @@ export type CheckedTown = {
   width: number;
   depth: number;
   plots: (Rect & { public: boolean; area?: number; kind?: string })[];
+  /** Every wall, every storey's (`[x0, z0, x1, z1]`; storey `k`'s on rows `k * depth ..`). */
+  walls?: (readonly [number, number, number, number])[];
   exits: Exit[];
   sims: { household: number }[];
   households: { player: boolean }[];
@@ -58,13 +61,15 @@ export type CheckedTown = {
     facing?: number[];
     zones?: { kind: string; poly: Pt[] }[];
     greens?: Pt[][];
+    /** None now: every building is a lot (a town edited by hand before Build lays lots may still have some). */
     backdrop?: BackdropBuilding[];
     places?: TownPlace[];
-    centre?: { area: number; poly: Pt[] }[];
+    centre?: { area: number; poly: Pt[]; square?: Pt[] }[];
     /** The named places' lots' looks, by plot (`placeLots.ts`): which plots are a named place's. */
     lotLooks?: Record<number, unknown>;
   };
-  parking?: { x: number; z: number; rot: number; area: number }[];
+  parking?: ParkingBay[];
+  carParks?: CarPark[];
 };
 const exitAt = (e: Exit): Pt => (Array.isArray(e) ? e : [e.x, e.z]);
 /** How far a point is from a rectangle (0 inside it). */
@@ -330,10 +335,10 @@ const headingAt = (pts: readonly Pt[], s: number, ls: number[]) => {
   return Math.atan2(t[1], t[0]);
 };
 
-/** What a backdrop building may be, and its roofs; the places' kinds. */
-const USES = ['flats', 'terrace', 'house', 'shop', 'cafe', 'restaurant', 'office', 'school', 'church', 'hall', 'workshop', 'farm', 'barn'];
-const ROOFS = ['gable', 'hip', 'flat', 'mansard'];
+/** The places' kinds. */
 const PLACE_KINDS = ['shop', 'cafe', 'restaurant', 'office', 'school', 'church', 'park', 'outdoor', 'workshop', 'farm'];
+/** The lots that have a door to the street (`PlotKind`): a home, a farm, a named place, a flats building. */
+const DOORED = ['home', 'farm', 'shop', 'flats'];
 /** A rectangle's corners, grown by `by` m. */
 const corners = (r: Rect, by = 0): Pt[] => [
   [r.x - by, r.z - by],
@@ -342,125 +347,109 @@ const corners = (r: Rect, by = 0): Pt[] => [
   [r.x - by, r.z + r.d + by],
 ];
 /**
- * The living town's world data (`game/backdrop.ts`): every
- * backdrop building a rectangle (4 to 8 corners, counter-clockwise seen from above), 1 to 6 storeys,
- * a roof (a ridge for a gable or mansard), a use and its area; on no lot (and
- * `LOT_CLEAR` m off one), road or trail with its sidewalks (more than half its width off its
- * middle: a junction's pad too), parking, water or other backdrop building; a side along the road
- * nearest it (`facesRoad`); as many as its size wants in the main town (`expect.mainLeast`) and `HAMLET_LEAST` in every hamlet,
- * a named place's lot (`meta.lotLooks`) counted with them, the centre's open land built over (by
- * them too) more densely than the rest of the main town's box's. Every public lot a place, and every
- * place a lot's, in a town edited by hand too (no backdrop building is a place); each place named (none
- * twice), its hours within
- * the day, its work careers that are, and (in a town or a city: `expect.careers`) every career a
- * resident may hold working somewhere in the main town. The main town has its centre.
+ * The ground storey's walls' box inside each of `plots` (sim-core `house_bounds`): what is built on it, null for none.
+ * `depth`: the town's rows a storey (the walls of the storeys above and the basement are past it).
  */
-function livingProblems(town: CheckedTown, careers: readonly string[], expect: Expected | undefined, given: Record<number, number>, soft: string[], index: RoadIndex, generated: boolean): string[] {
-  const out: string[] = [];
-  const backdrop = town.meta.backdrop;
-  const places = town.meta.places;
-  if (!backdrop || !places) return ['no backdrop or places'];
-  const areas = town.areas ?? [];
-  const roads = index.roads;
-  // (The roads' points by the 16 m cell they are in: a building looks only at those round it.)
-  const points = new Map<number, Pt[]>();
-  for (const r of roads) {
-    for (const p of r.points) {
-      const k = Math.floor(p[0] / 16) * 65536 + Math.floor(p[1] / 16);
-      const list = points.get(k);
-      if (list) list.push(p);
-      else points.set(k, [p]);
-    }
+function builtOn(walls: readonly (readonly [number, number, number, number])[], plots: readonly Rect[], depth: number): (Rect | null)[] {
+  const cells = new Map<number, (readonly [number, number, number, number])[]>();
+  for (const w of walls) {
+    if (Math.max(w[1], w[3]) > depth) continue;
+    const k = Math.floor(Math.min(w[0], w[2]) / 16) * 65536 + Math.floor(Math.min(w[1], w[3]) / 16);
+    (cells.get(k) ?? cells.set(k, []).get(k)!).push(w);
   }
-  const pointsIn = (poly: readonly Pt[]) => {
-    const xs = poly.map((p) => p[0]);
-    const zs = poly.map((p) => p[1]);
-    for (let cz = Math.floor(Math.min(...zs) / 16); cz <= Math.floor(Math.max(...zs) / 16); cz++) {
-      for (let cx = Math.floor(Math.min(...xs) / 16); cx <= Math.floor(Math.max(...xs) / 16); cx++) if (points.get(cx * 65536 + cz)?.some(([x, z]) => inside(poly, x, z))) return true;
-    }
-    return false;
-  };
-  const water = town.terrain?.water ? unrle(town.terrain.water, town.width * town.depth) : null;
-  const lots = town.plots.map((p) => corners(p, LOT_CLEAR - 0.01));
-  const parking = (town.parking ?? []).map((p) => corners(p.rot % 2 ? { x: p.x - 3, z: p.z - 1.5, w: 6, d: 3 } : { x: p.x - 1.5, z: p.z - 3, w: 3, d: 6 }));
-  const say = (i: number, what: string) => out.push(`backdrop ${i} (${backdrop[i].use}) ${what}`);
-  backdrop.forEach((b, i) => {
-    const { poly } = b;
-    if (poly.length < 4 || poly.length > 8) say(i, `has ${poly.length} corners`);
-    if (signedArea2(poly) >= 0) say(i, 'goes clockwise seen from above');
-    if (!Number.isInteger(b.storeys) || b.storeys < 1 || b.storeys > 6) say(i, `has ${b.storeys} storeys`);
-    if (!ROOFS.includes(b.roof)) say(i, `has a ${b.roof} roof`);
-    if ((b.roof === 'gable' || b.roof === 'mansard') && b.ridge === undefined) say(i, 'has no ridge');
-    if (!USES.includes(b.use)) say(i, 'has no use');
-    if (!Number.isInteger(b.area) || b.area < 0 || b.area >= Math.max(1, areas.length)) say(i, `is in area ${b.area}`);
-    // (The named places are lots, in a town edited by hand too.)
-    if (b.place !== undefined) say(i, 'has a place');
-    for (const [k, lot] of lots.entries()) if (overlaps(poly, lot, 0)) say(i, `is within ${LOT_CLEAR} m of plot ${k}`);
-    for (const [k, spot] of parking.entries()) if (overlaps(poly, spot, 0)) say(i, `is on parking space ${k}`);
-    for (let k = 0; k < poly.length; k++) {
-      const [a, c] = [poly[k], poly[(k + 1) % poly.length]];
-      const n = Math.max(1, Math.ceil(Math.hypot(c[0] - a[0], c[1] - a[1]) * 2));
-      for (let j = 0; j <= n; j++) {
-        const [x, z] = [a[0] + ((c[0] - a[0]) * j) / n, a[1] + ((c[1] - a[1]) * j) / n];
-        if (index.onRoad(x, z)) {
-          say(i, `stands on a road at ${x.toFixed(1)}, ${z.toFixed(1)}`);
-          j = n;
-          k = poly.length;
+  return plots.map((r) => {
+    let box: [number, number, number, number] | null = null;
+    for (let cx = Math.floor(r.x / 16); cx <= Math.floor((r.x + r.w) / 16); cx++) {
+      for (let cz = Math.floor(r.z / 16); cz <= Math.floor((r.z + r.d) / 16); cz++) {
+        for (const [x0, z0, x1, z1] of cells.get(cx * 65536 + cz) ?? []) {
+          if (Math.min(x0, x1) < r.x || Math.max(x0, x1) > r.x + r.w || Math.min(z0, z1) < r.z || Math.max(z0, z1) > r.z + r.d) continue;
+          const b: [number, number, number, number] = [Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1)];
+          box = box ? [Math.min(box[0], b[0]), Math.min(box[1], b[1]), Math.max(box[2], b[2]), Math.max(box[3], b[3])] : b;
         }
       }
     }
-    if (pointsIn(poly)) say(i, 'has a road through it');
-    if (water) {
-      const xs = poly.map((p) => p[0]);
-      const zs = poly.map((p) => p[1]);
-      let wet = 0;
-      for (let z = Math.floor(Math.min(...zs)); z < Math.ceil(Math.max(...zs)); z++) for (let x = Math.floor(Math.min(...xs)); x < Math.ceil(Math.max(...xs)); x++) if (inside(poly, x + 0.5, z + 0.5) && water[z * town.width + x]) wet++;
-      if (wet) say(i, `stands on ${wet} tiles of water`);
-    }
-    // Along the road nearest it: one of its sides within `FACING` of the road's way (or square to it).
-    if (!facesRoad(poly, roads, index)) say(i, "doesn't face the road nearest it");
+    return box && { x: box[0], z: box[1], w: box[2] - box[0], d: box[3] - box[1] };
   });
-  // (Two touching is a row: overlapping is not.)
-  const cell = new Map<string, number[]>();
-  backdrop.forEach((b, i) => {
-    const xs = b.poly.map((p) => p[0]);
-    const zs = b.poly.map((p) => p[1]);
-    for (let cz = Math.floor(Math.min(...zs) / 32); cz <= Math.floor(Math.max(...zs) / 32); cz++) {
-      for (let cx = Math.floor(Math.min(...xs) / 32); cx <= Math.floor(Math.max(...xs) / 32); cx++) {
-        const list = cell.get(`${cx},${cz}`) ?? [];
-        for (const j of list) if (overlaps(b.poly, backdrop[j].poly)) say(i, `overlaps backdrop ${j}`);
-        list.push(i);
-        cell.set(`${cx},${cz}`, list);
-      }
-    }
+}
+
+/**
+ * How built over a main town's centre is against the rest of its box (`centre.ts` `centreDensity`): of its open
+ * land (not a road, a green, water or a lot of a home, a farm or a park), the share a named place's or a flats
+ * building's lot takes (`meta.lotLooks`). The generator makes the centre the densest (`DENSEST` times the rest's:
+ * tools/worlds/sample.ts checks it); null: no centre, or no main town.
+ */
+export function centreBuilt(town: CheckedTown): { centre: number; rest: number } | null {
+  const centre = town.meta.centre?.find((c) => c.area === 0);
+  const box = town.areas?.[0];
+  if (!centre || centre.poly.length < 3 || !box) return null;
+  const roads = (town.meta.roads ?? []).filter((r) => r.kind !== 'trail');
+  const taken = roadMask(roads, town.width, town.depth, 0);
+  const water = town.terrain?.water ? unrle(town.terrain.water, town.width * town.depth) : null;
+  if (water) for (let i = 0; i < taken.length; i++) if (water[i]) taken[i] = 1;
+  for (const g of town.meta.greens ?? []) fillPoly(g, town.width, town.depth, (i) => (taken[i] = 1));
+  // (A named place's or a flats building's lot built over, as a building; the other lots no open land.)
+  const placed = new Set(Object.keys(town.meta.lotLooks ?? {}).map(Number));
+  town.plots.forEach((p, i) => p.kind === 'flat' || placed.has(i) || fillPoly(corners(p), town.width, town.depth, (k) => (taken[k] = 1)));
+  const { centre: c, rest } = centreDensity(town.width, town.depth, taken, box, centre.poly, [...placed].map((i) => corners(town.plots[i])));
+  return { centre: c, rest };
+}
+
+/**
+ * The living town's world data: every building a lot (no backdrop: `dense.ts`), and every lot with a door to the
+ * street reached from a road (its path out of its front gets to one, as `town.ts` `layoutTown` lays it); every
+ * parking bay inside its car park, every car park on no lot, road or water; the centre's open land built over more
+ * densely than the rest of the main town's box's (`centreBuilt`). Every public lot a place, and every place a lot's;
+ * each place named (none twice), its hours within the day, its work careers that are, and (in a town or a city:
+ * `expect.careers`) every career a resident may hold working somewhere in the main town. The main town has its centre.
+ */
+function livingProblems(town: CheckedTown, careers: readonly string[], expect: Expected | undefined, soft: string[], index: RoadIndex, generated: boolean): string[] {
+  const out: string[] = [];
+  const places = town.meta.places;
+  if (!places) return ['no places'];
+  const areas = town.areas ?? [];
+  if (town.meta.backdrop?.length) out.push(`${town.meta.backdrop.length} backdrop buildings (every building a lot)`);
+  // Every lot with a door reached from a road: a path out of its front onto one.
+  const paths = town.meta.paths ?? [];
+  const pathCells = new Map<number, Rect[]>();
+  for (const r of paths) for (let cx = Math.floor(r.x / 16); cx <= Math.floor((r.x + r.w) / 16); cx++) for (let cz = Math.floor(r.z / 16); cz <= Math.floor((r.z + r.d) / 16); cz++) (pathCells.get(cx * 65536 + cz) ?? pathCells.set(cx * 65536 + cz, []).get(cx * 65536 + cz)!).push(r);
+  const built = builtOn(town.walls ?? [], town.plots, town.depth);
+  town.plots.forEach((p, i) => {
+    if (!DOORED.includes(p.kind ?? '') || !built[i]) return;
+    // (A path that leaves the lot, a tile of it on a road.)
+    const near = new Set<Rect>();
+    for (let cx = Math.floor((p.x - 2) / 16); cx <= Math.floor((p.x + p.w + 2) / 16); cx++) for (let cz = Math.floor((p.z - 2) / 16); cz <= Math.floor((p.z + p.d + 2) / 16); cz++) for (const r of pathCells.get(cx * 65536 + cz) ?? []) near.add(r);
+    const out_ = [...near].filter((r) => offRect(p, r.x + r.w / 2, r.z + r.d / 2) > 0 && r.x <= p.x + p.w && r.x + r.w >= p.x && r.z <= p.z + p.d && r.z + r.d >= p.z);
+    const reaches = out_.some((r) => {
+      for (let z = Math.floor(r.z); z < Math.ceil(r.z + r.d); z++) for (let x = Math.floor(r.x); x < Math.ceil(r.x + r.w); x++) if (index.onRoad(x + 0.5, z + 0.5)) return true;
+      return false;
+    });
+    if (!reaches) out.push(`plot ${i} (${p.kind}) has no way to a road`);
   });
-  const placeLots = Object.keys(town.meta.lotLooks ?? {}).map(Number);
-  areas.forEach((a, k) => {
-    // (A town checked with no expectations, one edited by hand: as many as it has.)
-    if (!expect) return;
-    // (A named place's lot is one of the town's buildings.)
-    const n = backdrop.filter((b) => b.area === k).length + placeLots.filter((p) => (town.plots[p]?.area ?? 0) === k).length;
-    // (Less those the slope limits gave up there: `landFollow.ts` `settleLand`.)
-    const least = (k === 0 ? expect.mainLeast : HAMLET_LEAST) - (given[k] ?? 0);
-    if (n < least) out.push(`${a.name} has ${n} backdrop buildings (${least} or more)`);
+  // Parking: each bay inside its car park, each car park on no lot, no road and no water.
+  const water = town.terrain?.water ? unrle(town.terrain.water, town.width * town.depth) : null;
+  const parks = town.carParks ?? [];
+  (town.parking ?? []).forEach((b, k) => {
+    // (A bay of a draft edited by hand may have lost its car park: only the generator's are checked.)
+    if (b.park === undefined && !generated) return;
+    const park = b.park === undefined ? undefined : parks[b.park];
+    if (!park) out.push(`parking bay ${k} is in no car park`);
+    else if (!inside(park.poly, b.x, b.z)) out.push(`parking bay ${k} is outside its car park`);
   });
-  // The centre: the main town's, its open land (not a road, a lot, a green or water) built over more
-  // densely than the rest of its box's (how the generator fills a town: not asked of an edited one).
+  parks.forEach((c, k) => {
+    for (const [j, p] of town.plots.entries()) if (p.kind !== 'flat' && overlaps(c.poly, corners(p), 0)) out.push(`car park ${k} is on plot ${j}`);
+    const mid = c.poly.reduce<Pt>((m, q) => [m[0] + q[0] / c.poly.length, m[1] + q[1] / c.poly.length], [0, 0]);
+    if (index.onRoad(mid[0], mid[1])) out.push(`car park ${k} is on a road`);
+    if (water?.[Math.floor(mid[1]) * town.width + Math.floor(mid[0])]) out.push(`car park ${k} is on the water`);
+  });
+  // The centre: the main town's, its open land built over more densely than the rest of its box's (how the
+  // generator fills a town: not asked of an edited one).
   const centre = town.meta.centre?.find((c) => c.area === 0);
   if (!generated) {
     // (Not checked.)
   } else if (!centre || centre.poly.length < 3) out.push('the main town has no centre');
-  else if (areas[0]) {
-    const box = areas[0];
-    const taken = roadMask(roads.filter((r) => r.kind !== 'trail'), town.width, town.depth, 0);
-    // (A named place's lot built over, as a building; the other lots no open land.)
-    const placed = new Set(placeLots);
-    town.plots.forEach((p, i) => placed.has(i) || fillPoly(corners(p), town.width, town.depth, (k) => (taken[k] = 1)));
-    // (Nor the water: a lakeside town's high street runs along its shore.)
-    if (water) for (let i = 0; i < taken.length; i++) if (water[i]) taken[i] = 1;
-    for (const g of town.meta.greens ?? []) fillPoly(g, town.width, town.depth, (i) => (taken[i] = 1));
-    const { centre: inC, rest: inRest } = centreDensity(town.width, town.depth, taken, box, centre.poly, [...backdrop.map((b) => b.poly), ...placeLots.map((p) => corners(town.plots[p]))]);
-    if (inC <= inRest) out.push(`the centre's open land is ${(inC * 100).toFixed(0)}% built over, the rest of the main town's ${(inRest * 100).toFixed(0)}% (the centre the densest)`);
+  else {
+    const d = centreBuilt(town);
+    if (d && d.centre <= d.rest) out.push(`the centre's open land is ${(d.centre * 100).toFixed(0)}% built over, the rest of the main town's ${(d.rest * 100).toFixed(0)}% (the centre the densest)`);
   }
   // Places: every public lot one, named once, open within the day, careers that are.
   town.plots.forEach((p, i) => {
@@ -529,14 +518,13 @@ function layoutProblems(town: CheckedTown, expect: Expected | undefined, river: 
 
 /**
  * What is wrong with `town` (see the top of this file): `river`, a river world's (it wants a bridge);
- * `careers`, the careers a resident may hold; `given`, per area, the backdrop buildings the slope
- * limits gave up there (`landFollow.ts` `settleLand`: fewer are wanted); `generated` false: not the
- * checks of how the generator fills a town (the centre the densest), which an edited town needn't keep.
+ * `careers`, the careers a resident may hold; `generated` false: not the checks of how the generator
+ * fills a town (the centre the densest), which an edited town needn't keep.
  */
-export function townProblems(town: CheckedTown, expect?: Expected, { river = false, careers = [], given = {}, generated = true }: { river?: boolean; careers?: readonly string[]; given?: Record<number, number>; generated?: boolean } = {}): { hard: string[]; soft: string[] } {
+export function townProblems(town: CheckedTown, expect?: Expected, { river = false, careers = [], generated = true }: { river?: boolean; careers?: readonly string[]; generated?: boolean } = {}): { hard: string[]; soft: string[] } {
   const soft: string[] = [];
   // (One index of the roads for every check that asks which are near a point.)
   const index = new RoadIndex(town.roads ?? town.meta.roads ?? []);
-  const hard = [...layoutProblems(town, expect, river, index, generated), ...livingProblems(town, careers, expect, given, soft, index, generated)];
+  const hard = [...layoutProblems(town, expect, river, index, generated), ...livingProblems(town, careers, expect, soft, index, generated)];
   return { hard, soft };
 }

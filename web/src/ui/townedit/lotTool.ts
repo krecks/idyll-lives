@@ -14,7 +14,7 @@ import type { RoadSpot } from '../../game/edit/ground';
 import { addCivic, areaOfRoad } from '../../game/edit/buildup';
 import type { Edited } from '../../game/edit/edited';
 import { addLot, canPlace, CIVIC_PLACES, moveLot, type LotChoice } from '../../game/edit/lots';
-import { civicLabel, draftAreaSize } from '../../game/backdrop';
+import { civicLabel, draftAreaSize } from '../../game/places';
 import type { TownGhosts } from '../../render/types';
 import { choiceOf, choiceSize, civicChosen, lotChoice } from './lotChoice.svelte';
 import LotCard from './LotCard.svelte';

@@ -8,6 +8,8 @@
 import type { Content } from '../content/content';
 import type { WorldOptions, WorldStructure } from '../core/protocol';
 import { residentsOf, type HouseholdDraft } from './household';
+import type { Residents } from './housegen';
+import { flatsTemplate } from './flats';
 import { encodeLand, type Land } from './land';
 import { settleEdit, settleLand } from './landFollow';
 import { editedProblems } from './edit/checked';
@@ -39,7 +41,7 @@ export type TownJob =
   /**
    * Step 2's proposed layout, from what the `town` job is given: the generator's town laid and settled as that job
    * lays it (`built`), and the layout step 2 starts from (`plan`: its roads, areas, centre and uses, with no lots,
-   * backdrop, places or parking). The result's town (`LaidTown`) is what step 2 shows: the plan's streets settled.
+   * places or parking). The result's town (`LaidTown`) is what step 2 shows: the plan's streets settled.
    */
   | { kind: 'layout'; land: NeighbourhoodDraft; seed: number; name?: string; options: Partial<WorldOptions>; site?: Pt; waterKept: boolean }
   /**
@@ -75,7 +77,7 @@ export type TownJob =
    * kept where the job ran (the worker's houses, or the page's where no worker runs), so the
    * `assemble` after it finds them made. Sent by `furnishAhead`.
    */
-  | { kind: 'furnish'; town: NeighbourhoodDraft; households: readonly { slot: number; household: HouseholdDraft }[] };
+  | { kind: 'furnish'; town: NeighbourhoodDraft; households: readonly { slot: number; flat?: number; household: HouseholdDraft }[] };
 
 /**
  * A town laid out: its draft, the menus' preview of it, and the houses made for its lots (by template
@@ -93,7 +95,7 @@ export interface LaidTown {
 
 /**
  * Step 2's proposed layout (the `layout` job's): the layout it starts from (`plan`: the generator's roads, areas,
- * centre and uses, with no lots, backdrop, places or parking), the town the generator built for it (`built`, with its
+ * centre and uses, with no lots, places or parking), the town the generator built for it (`built`, with its
  * uses: what Build gives for the layout untouched) and the plan's `layoutHash` (`hash`). `builtPlan` and `builtMarks`:
  * the built town's own `LaidTown.plan` and `marks`, which step 3's edits start from.
  */
@@ -165,12 +167,20 @@ export function runTownJob(content: Content, t: Templates, job: TownJob, step?: 
 }
 
 /** The houses of `town` furnished for `households` (as `layoutTown` furnishes them), kept with the houses made: how many, and in how long (ms). */
-function furnish(content: Content, t: Templates, town: NeighbourhoodDraft, households: readonly { slot: number; household: HouseholdDraft }[]): { houses: number; ms: number } {
+function furnish(content: Content, t: Templates, town: NeighbourhoodDraft, households: readonly { slot: number; flat?: number; household: HouseholdDraft }[]): { houses: number; ms: number } {
   const t0 = performance.now();
   let houses = 0;
-  for (const { slot, household } of households) {
+  // (A building's flats furnished together, for every household in them, as `layoutTown` asks for them.)
+  const flats = new Map<number, (Residents | undefined)[]>();
+  for (const { slot, flat, household } of households) {
     const s = town.slots[slot];
-    if (s?.kind === 'house' && houseTemplate(t, s.template, residentsOf(content, household))) houses++;
+    if (flat !== undefined) (flats.get(slot) ?? flats.set(slot, []).get(slot)!)[flat] = residentsOf(content, household);
+    else if (s?.kind === 'house' && houseTemplate(t, s.template, residentsOf(content, household))) houses++;
+  }
+  for (const [slot, residents] of flats) {
+    const s = town.slots[slot];
+    const id = s?.kind === 'flats' ? s.template : s?.upper;
+    if (id && flatsTemplate(t, id, Array.from(residents))) houses++;
   }
   return { houses, ms: performance.now() - t0 };
 }
