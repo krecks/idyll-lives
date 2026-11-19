@@ -1186,6 +1186,31 @@
           "who": "post.ts contactPasses: the frame's depth pass is a RenderPassPrepass (its execute is wrapped)"
         },
         {
+          "file": "extras/render-passes/render-pass-prepass.js",
+          "text": "this.camera = camera;",
+          "who": "post.ts contactPasses: the depth pass keeps the camera component it draws for (`setContact`: idle per camera)"
+        },
+        {
+          "file": "extras/render-passes/render-pass-prepass.js",
+          "text": "clearValue.r = farClip;",
+          "who": "post.ts setContact: an idle depth pass is cleared to all far, not left as the last frame drew it"
+        },
+        {
+          "file": "extras/render-passes/camera-frame.js",
+          "text": "ssaoPass.intensity = ssao.intensity;",
+          "who": "post.ts setContact: the frame's update hands its occlusion pass the strength, without making its passes again"
+        },
+        {
+          "file": "scene/shader-lib/wgsl/chunks/render-pass/frag/ssao.js",
+          "text": "if (uniform.uIntensity > 0.0) {",
+          "who": "post.ts setContact: at no strength the occlusion is plain white, the depth unread"
+        },
+        {
+          "file": "scene/shader-lib/glsl/chunks/render-pass/frag/ssao.js",
+          "text": "if (uIntensity > 0.0) {",
+          "who": "post.ts setContact: the same on WebGL2"
+        },
+        {
           "file": "extras/render-passes/render-pass-ssao.js",
           "text": "createRenderTarget(name) {",
           "who": "post.ts contactPasses: the occlusion pass makes its targets in createRenderTarget (wrapped: read between texels)"

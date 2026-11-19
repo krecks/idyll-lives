@@ -946,6 +946,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.sunShadows.movers = (out) => {
         this.characters.shadowCasters(out);
         this.lot.movingCasters(out);
+        this.cars.movingCasters(out);
       };
     this.birdLife = new GameBirds(this.app, this.root, this.deps.assets, this.deps.content, this.quality.birds, { eye: (out) => this.camera.eyeInGame(out), storey: () => this.storey, roofShown: () => this.roofShown, calm: () => !!this.options.reducedMotion }, this.debug); // (the garden birds.)
     const blob = contactBlob(this.app);
@@ -1551,6 +1552,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private frameTownView(): void {
     const blend = this.townBlend;
     this.street.setTownView(blend > 0);
+    // (From the full town view the small things in the gardens and streets are a pixel or two: not drawn. The contact
+    // shading, a hand's width of shade, fades out with the town view coming in.)
+    this.street.setSmallHidden(blend >= 1);
+    this.post?.setContact(1 - blend);
     this.townBuildings.show(this.diag.has('notownbuildings') ? 0 : Math.min(1, blend / TOWN_FADE));
     // (The ground tiles' materials asked for only while the map is, or is to be, on them. In with the buildings: what
     // they stand on is in it, and the farmland's edges, which step along the ground's grid without it.)
@@ -2816,6 +2821,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const step = Math.min(1, (this.frameDt / 1000 / DOOR_SWING) * Math.min(Math.max(rate, 1), 10));
     let moved = false;
     let urgent = false;
+    let swung = false;
+    // (Only a leaf where it casts into the sun's map draws the map again: one across town moves the picture alone.)
+    const casts = (c: readonly [number, number]) => this.sunShadows.reaches(c[0], c[1] - this.rowOf(this.storeyOf(Math.floor(c[1]))));
     // (A town has a gate in most gardens, a house a door or more a room: one standing shut with
     // nobody within a cell of it isn't asked.)
     const near = this.moverCells;
@@ -2839,7 +2847,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.doorHeard(gate.open, open, gate.leaf.centre, true);
       gate.open = open;
       swingGate(gate.fences, gate.leaf, ease(open), gate.towards);
-      moved = urgent = true;
+      swung = true;
+      if (casts(gate.leaf.centre)) moved = urgent = true;
     }
     for (const door of this.doors) {
       const { leaf } = door;
@@ -2857,6 +2866,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const { slide, base } = leaf;
       if (slide) leaf.pivot.setLocalPosition(base.x + slide[0] * k, base.y, base.z + slide[1] * k);
       leaf.pivot.setLocalEulerAngles(0, ((slide ? leaf.close : leaf.close * (1 - leaf.opens * k)) * 180) / Math.PI, 0);
+      swung = true;
+      if (!casts(leaf.centre)) continue;
       moved = true;
       // (A door indoors, where the sun reaches only through the windows, redraws the shadows as a
       // resident's pose does: held to the preset's `shadowRate`.)
@@ -2864,6 +2875,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
     // (Doors and gates cast only the sun's shadow.)
     if (moved) this.sunShadows.moved(urgent, false);
+    else if (swung) this.pictureChanged();
   }
 
   /** A leaf moved from `was` to `open` (0 shut): one leaving its frame or coming back to it is kept for the world's sound (`doorSounds`). */
@@ -2908,10 +2920,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.findTownUp(frame);
     this.signals.update(frame);
     // (A car's shadow goes with it: `moved` only for a car that moved where it casts into the map, `setShadowTest`; the lights' poles when they're placed.)
-    if (this.cars.moved || this.signals.moved) {
-      this.sunShadows.moved(false);
-      this.pictureChanged();
-    }
+    // (Cars that only drove draw over the still casters' picture, as the residents do: `Cars.movingCasters`.)
+    if (this.signals.moved || this.cars.stillMoved) this.sunShadows.moved(false);
+    else if (this.cars.moved) this.sunShadows.posed();
+    if (this.cars.moved || this.signals.moved) this.pictureChanged();
     // (After the residents, who scare them. Paused, the birds keep still but for the wind's sway on their perches, which
     // stands still with the wind's clock while the frame is held: no change of the picture's.)
     this.birdLife.update(frame, minute, this.frameDt, this.characters, this.simCount);

@@ -119,6 +119,13 @@ const FAR_CULL = 650;
  * tree is a few dozen pixels.
  */
 const FAR_MODELS = 100;
+/**
+ * A model no bigger than this (m: its height, width and depth) is a small thing (a garden chair, a grill, a bin): from the
+ * full town view (`setSmallHidden`) it is a pixel or two, and its draws (one per mesh and draw group, in the scene, the
+ * shadow map and the depth pass: about 1,100 of a whole town's 2,700) aren't drawn. Hedges, stretched along their run,
+ * stay, and the trees, the lamps and the buildings are bigger.
+ */
+const SMALL_PROP = 2.5;
 /** The cells' far versions and the far LOD's houses are chosen again once the camera's target has moved this far (m). */
 const REFRAME = 1;
 /** Plans kept per chunk (`planned`): the focus lot's chunks with it and without it, and one more. */
@@ -259,6 +266,8 @@ export class Street {
   private poolsLit = false;
   /** The town view draws the far LOD's houses (`setTownView`): the street's own far groups are hidden meanwhile. */
   private townView = false;
+  /** The small things' draws (`SMALL_PROP`), under one entity: hidden all at once (`setSmallHidden`). */
+  private readonly smallRoot: pc.Entity;
 
   constructor(
     private readonly app: pc.AppBase,
@@ -284,6 +293,8 @@ export class Street {
     parent.addChild(this.root);
     this.lotRoot = new pc.Entity('streetLot');
     this.root.addChild(this.lotRoot);
+    this.smallRoot = new pc.Entity('streetSmall');
+    this.root.addChild(this.smallRoot);
     // Streetlights' glass: unlit, its colour by the time of day (`setNight`). (Its colours, and the
     // pools' and the lenses' strengths, are sRGB as PlayCanvas takes them, as they were tuned;
     // clamped to 1.)
@@ -733,6 +744,12 @@ export class Street {
     this.framedAt.forget();
   }
 
+  /** The small things (`SMALL_PROP`) hidden (`hidden`: from the full town view) or drawn. */
+  setSmallHidden(hidden: boolean): void {
+    if (this.smallRoot.enabled === !hidden) return;
+    this.smallRoot.enabled = !hidden;
+  }
+
   /**
    * The lots' houses the far LOD draws, each with the chunk it is in and how it looks (the town view's,
    * `townView.ts` `lotBuilding`), each on its pad; the focus lot's left out. Made again only when the town, the focus
@@ -1019,6 +1036,8 @@ export class Street {
     if (this.destroyed) return;
     const far = farT && farT.meshes.length ? farT : null;
     if (far) split = split.map(() => true);
+    // (A small thing's draws under `smallRoot`, hidden from the full town view.)
+    const parent = !flat && propSize(t, footprint) <= SMALL_PROP ? this.smallRoot : this.root;
     let p = this.placed.get(key);
     if (p && p.template !== t) {
       // Built again (a file came): the old draws go now (the new ones take their place), the old template once the build is done (`disposeStale`).
@@ -1035,12 +1054,12 @@ export class Street {
     if (!p) {
       p = { template: t, far, draws: [], cells: new Map(), glows: [] };
       this.placed.set(key, p);
-      for (const m of t.meshes) p.draws.push(this.draw(m, m.material, cast));
+      for (const m of t.meshes) p.draws.push(this.draw(m, m.material, cast, parent));
       for (const { mesh } of t.glows ?? []) {
         // (Every lens glows alike: the street's copy of their material carries the strength.)
         const material = (mesh.material as pc.StandardMaterial).clone();
         material.update();
-        p.glows.push({ draw: this.draw(mesh, material, false), material });
+        p.glows.push({ draw: this.draw(mesh, material, false, parent), material });
       }
     }
     p.far = far;
@@ -1082,10 +1101,10 @@ export class Street {
         });
         t.meshes.forEach((m, i) => {
           if (!split[i]) return;
-          const d = (c.near[i] ??= this.draw(m, m.material, cast));
+          const d = (c.near[i] ??= this.draw(m, m.material, cast, parent));
           fill(d, indices);
         });
-        if (far && !c.far.length) c.far = far.meshes.map((m) => this.draw(m, m.material, cast));
+        if (far && !c.far.length) c.far = far.meshes.map((m) => this.draw(m, m.material, cast, parent));
         for (const d of c.far) fill(d, indices);
         showCell(c);
       }
@@ -1097,13 +1116,19 @@ export class Street {
     this.templates.hideStale(key);
   }
 
-  private draw(m: ModelMesh, material: pc.Material, cast: boolean): Instances {
-    const d = new Instances(this.device, this.root, m.mesh, material, { name: m.name, castShadows: cast && this.shadows, ...(this.layers ? { layers: this.layers } : {}) });
+  private draw(m: ModelMesh, material: pc.Material, cast: boolean, parent = this.root): Instances {
+    const d = new Instances(this.device, parent, m.mesh, material, { name: m.name, castShadows: cast && this.shadows, ...(this.layers ? { layers: this.layers } : {}) });
     // (Foliage sways in the wind, `nature.ts`: a part grown from nothing without fluttering.)
     windStill(d.meshInstance, m);
     this.lib.excludeFromLights([], [d.meshInstance]);
     return d;
   }
+}
+
+/** A model's size (m): the largest of its height, width and depth (its outline's, else its footprint's). */
+function propSize(t: ModelTemplate, footprint: readonly [number, number]): number {
+  const o = t.outline;
+  return Math.max(t.height, o ? o.maxX - o.minX : footprint[0], o ? o.maxZ - o.minZ : footprint[1]);
 }
 
 /** The template cache's key of a model's far version (the street's draw groups far off, `FAR_MODELS`). */

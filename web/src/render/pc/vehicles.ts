@@ -91,6 +91,16 @@ export abstract class Vehicles {
   protected shadowDraw: Instances | null = null;
   /** Whether one moved in the last frame where it casts a shadow into the sun's map (the map is to be drawn again). */
   moved = false;
+
+  /**
+   * Adds to `out` the draws of what drives (the wheels: every drawn vehicle's in one draw, whose box grows and shrinks
+   * as any of them goes), drawn again at every redraw of the sun's map over the still casters' picture
+   * (`SunShadows.movers`): one driving anywhere doesn't make that picture be drawn again.
+   */
+  movingCasters(out: pc.MeshInstance[]): void {
+    const wheels = this.wheels;
+    if (this.shadows && wheels?.enabled) out.push(wheels.meshInstance);
+  }
   /** Those standing in here (x0, z0, x1, z1) aren't drawn (`hideOn`). */
   protected hidden: readonly [number, number, number, number] | null = null;
   /** The chunks streamed in (null: all of them) and the camera's target: those outside them, or further than `FAR` from it, aren't drawn (`setView`). */
