@@ -199,8 +199,8 @@ pub(crate) fn parking_for(
 }
 
 /// Where a car parked at public parking spot `k` (`OpenWorld::parking`) stands, which way it
-/// faces and whether it's a bay off the road (nose in, facing away from it: `parking_bay`; else
-/// as the spot, on the road).
+/// faces (the bay's own `yaw`, nose in) and whether it's a bay off the road (`parking_bay`; else
+/// on the road, pulled into along it).
 pub(crate) fn parked_at(travel: &Travel, k: usize) -> Option<([f32; 2], f32, bool)> {
     match travel.parked.get(k) {
         Some(&spot) => spot,
@@ -208,14 +208,18 @@ pub(crate) fn parked_at(travel: &Travel, k: usize) -> Option<([f32; 2], f32, boo
     }
 }
 
-/// `parked_at` worked out (`Travel::parked` keeps it).
+/// `parked_at` worked out (`Travel::parked` keeps it): the bay's pose as the town file gives it,
+/// which is the one the renderer draws. A bay without a yaw (a save from before bays had one)
+/// faces away from the road nearest it, as then.
 pub(crate) fn park_spot(travel: &Travel, k: usize) -> Option<([f32; 2], f32, bool)> {
     let p = travel.file.parking.get(k)?;
     let at = [p.x, p.z];
     at.iter().all(|v| v.is_finite()).then_some(())?;
-    Some(match parking_bay(travel, at) {
-        Some((_, _, [x, z])) => (at, (0.0 - x).atan2(0.0 - z), true),
-        None => (at, p.rot, false),
+    let bay = parking_bay(travel, at);
+    Some(match (p.yaw.filter(|y| y.is_finite()), bay) {
+        (Some(yaw), bay) => (at, yaw, bay.is_some()),
+        (None, Some((_, _, [x, z]))) => (at, (0.0 - x).atan2(0.0 - z), true),
+        (None, None) => (at, 0.0, false),
     })
 }
 

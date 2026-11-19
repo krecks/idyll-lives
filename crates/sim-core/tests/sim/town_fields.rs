@@ -26,7 +26,7 @@ fn open_world_fields_are_read_kept_and_saved() {
     town["areas"] = json!([{"name": "Main", "kind": "hamlet", "x": 0, "z": 0, "w": w, "d": d}]);
     town["exits"] = json!([[0.5, 30.0], {"x": 20.0, "z": 31.0, "kind": "stop"}]);
     town["terrain"] = json!({"water": [w * 2, 0, 3, 1]});
-    town["parking"] = json!([{"x": 10.0, "z": 36.5, "rot": 0, "area": 0}]);
+    town["parking"] = json!([{"x": 10.0, "z": 36.5, "yaw": 3.0, "area": 0}]);
     town["plots"][0]["area"] = json!(0);
     town["plots"][0]["kind"] = json!("home");
     let mut world = World::from_json(&content, &town.to_string(), 5).unwrap();
@@ -41,6 +41,7 @@ fn open_world_fields_are_read_kept_and_saved() {
     // (A bus stop, in a town file from when the town had buses, is no way out: left out.)
     assert_eq!(world.exits, vec![[0.5, 30.0]]);
     assert_eq!(f.parking.len(), 1);
+    assert_eq!(f.parking[0].yaw, Some(3.0));
     assert_eq!(f.plot_areas[0], Some(0));
     assert_eq!(f.plot_kinds[0], Some(PlotKind::Home));
     assert_eq!(f.plot_kinds[1], None);

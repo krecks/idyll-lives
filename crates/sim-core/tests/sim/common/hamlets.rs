@@ -127,7 +127,8 @@ pub fn hamlets_with_parking(
             let off = 6.0 / 2.0 + 0.5 + 3.0;
             out["parking"] = json!([{
                 "x": (dx + cut) as f64 + BAY_GAP as f64 / 2.0, "z": z + side * off,
-                "rot": if side > 0.0 { 0 } else { 2 }, "area": k,
+                // (Nose in, away from the street.)
+                "yaw": if side > 0.0 { 0.0 } else { std::f64::consts::PI }, "area": k,
             }]);
         }
         let pts = line([x0 + 0.5, z], [x1 - 0.5, z]);
