@@ -17,7 +17,9 @@
  *   to the game up (its interface there, the loading screen gone), the rest of the homes for sale
  *   filled on the way. Step 5 is reached by "Play" on a household's card, or with `--create` through
  *   Creation (its household as it comes, "Choose a home"), and its home as it opens. Then the residents
- *   in the game, the homes they live in, and the homes the game shows for sale.
+ *   in the game, the homes they live in, and the homes the game shows for sale;
+ * - total: the page's first byte to the game up (`marks.entered`, the harness's waits between steps
+ *   included).
  *
  * With `--back`, then the way back and in again: the long tasks in the 5 s after the entry (`entryLong`),
  * "Save and quit" from the menu shown to its picture on screen (`back`), Continue (once the latest save has been prepared behind the
@@ -255,7 +257,9 @@ async function visit(page, cdp) {
   clearInterval(polling);
   await keep();
   const report = { entries: [...entries.values()].sort((a, b) => a.start - b.start), marks };
-  return { boot, world: made - newGame, layout: proposed - proposePressed, town: laid - layPressed, inView: inView - opened, portraits: shown - opened, faces, home, entry: entered - pressed, ...people, ...more, report };
+  // (The marks as page times too: the whole way from the page's first byte to the game up,
+  // `marks.entered`, is reported as the total.)
+  return { boot, world: made - newGame, layout: proposed - proposePressed, town: laid - layPressed, inView: inView - opened, portraits: shown - opened, faces, home, entry: entered - pressed, ...people, ...more, report, marks };
 }
 
 /** `--back`: from the game to the menu and in again (see the header), ms each. */
@@ -328,7 +332,7 @@ for (let r = 0; r < runs; r++) {
   }
   for (const [i, v] of visits.entries()) {
     const label = i === 0 ? 'first' : 'again';
-    console.log(`run ${r + 1} (${label}): boot ${v.boot.toFixed(0)} ms · land ${v.world.toFixed(0)} ms · layout ${v.layout.toFixed(0)} ms · town ${v.town.toFixed(0)} ms · step-4 portraits in view ${v.inView.toFixed(0)} ms, all ${v.portraits.toFixed(0)} ms (${v.faces}) · step 5 ${v.home.toFixed(0)} ms · entry ${v.entry.toFixed(0)} ms · ${v.residents} residents in ${v.homes} homes, ${v.forSale} for sale`);
+    console.log(`run ${r + 1} (${label}): total ${v.marks.entered.toFixed(0)} ms · boot ${v.boot.toFixed(0)} ms · land ${v.world.toFixed(0)} ms · layout ${v.layout.toFixed(0)} ms · town ${v.town.toFixed(0)} ms · step-4 portraits in view ${v.inView.toFixed(0)} ms, all ${v.portraits.toFixed(0)} ms (${v.faces}) · step 5 ${v.home.toFixed(0)} ms · entry ${v.entry.toFixed(0)} ms · ${v.residents} residents in ${v.homes} homes, ${v.forSale} for sale`);
     if (back) {
       const tasks = (xs) => (xs.length ? `${xs.length} long (max ${Math.max(...xs)} ms)` : 'no long tasks');
       console.log(`  after entry ${tasks(v.entryLong)} · back ${v.back.toFixed(0)} ms, ${tasks(v.backLong)} · continue ${v.continue.toFixed(0)} ms, then ${tasks(v.continueLong)} · heap ${v.heapMB.toFixed(0)} MB, buffers ${v.buffersMB.toFixed(0)} MB · again ${v.again.toFixed(0)} ms, ${tasks(v.againLong)}`);
@@ -356,6 +360,7 @@ for (const label of ['first', 'again']) {
   if (!list.length) continue;
   md.push(`## ${label === 'first' ? 'First visit' : 'Second visit'}`, '');
   md.push('| moment | median ms | runs |', '|---|---|---|');
+  md.push(`| total (page load → game up) | ${median(list.map((v) => v.marks.entered)).toFixed(0)} | ${list.map((v) => v.marks.entered.toFixed(0)).join(', ')} |`);
   for (const k of ['boot', 'world', 'layout', 'town', 'inView', 'portraits', 'home', 'entry', 'residents', 'homes', 'forSale', ...(back ? ['back', 'continue', 'heapMB', 'buffersMB', 'again'] : [])]) md.push(`| ${k} | ${median(list.map((v) => v[k])).toFixed(0)} | ${list.map((v) => v[k].toFixed(0)).join(', ')} |`);
   // (`--back`: the longest task in each stretch.)
   if (back) for (const k of ['entryLong', 'backLong', 'continueLong', 'againLong']) md.push(`| ${k} (longest) | ${median(list.map((v) => Math.max(0, ...v[k]))).toFixed(0)} | ${list.map((v) => Math.max(0, ...v[k])).join(', ')} |`);

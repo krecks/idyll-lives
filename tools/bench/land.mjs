@@ -9,7 +9,8 @@
  * camera looks at it; then Build mode's Land tab: a mound by the home (paid in Living, free in
  * Creative; undo pays back, redo pays again) and a pond, a raise across the road by the home and a lower under the
  * home (built land), water across a country road (a bridge, undone and redone) and a raise by it, the terrain not drawn
- * over the raised roads' edges (`roadCovered`); saved, continued from the menu, and the
+ * over the raised roads' edges (`roadCovered`), the street on the landscape's surface after Move in, the first stroke and
+ * the raise across the road (`streetOnLand`); saved, continued from the menu, and the
  * land and the water are still there. In step 1 too, the ends of the size range: 120 m raise, smooth
  * and lake strokes timed, a 1 m point stroke (one sample changed at each point it crosses), the
  * palette at 1 m and at 120 m, and the 1 m cursor close up.
@@ -216,6 +217,29 @@ async function roadCovered(page, at, span, kind) {
 }
 /** The most (m) the terrain may be drawn over a road's edge (`roadCovered`): under a road it lies `ROAD_SINK` (6 cm) below it. */
 const COVER_MOST = 0.03;
+/** The most (m) the street may stand off the landscape's surface it stands on (`streetOnLand`). */
+const GAP_MOST = 0.005;
+
+/**
+ * Whether the game's street stands on its landscape's surface (`__streetBridges`'s `onLand`: one surface for the land
+ * and what stands on it) and how far its heights stand off that surface (m, the most) over 400 m round the home
+ * (`__streetGap`). `roadCovered` measures the terrain against the surface; this, the street against it.
+ */
+async function streetOnLand(page) {
+  return page.evaluate(() => {
+    const h = window.__osw.home();
+    const [cx, cz] = h ? [h.x + h.w / 2, h.z + h.d / 2] : [0, 0];
+    const points = [];
+    for (let a = -20; a <= 20; a++) for (let b = -20; b <= 20; b++) points.push([cx + a * 10, cz + b * 10]);
+    const gap = window.__streetGap?.(points);
+    return { onLand: !!window.__streetBridges?.().onLand, gap: gap == null ? null : +gap.toFixed(3) };
+  });
+}
+
+/** A fault unless the street stands on the landscape's surface (`streetOnLand`), `when` saying when. */
+function streetFault(renderer, when, s) {
+  if (!s.onLand || s.gap === null || s.gap > GAP_MOST) fault(`${renderer} the street ${when} isn't on the landscape's surface: ${JSON.stringify(s)}`);
+}
 
 /**
  * In play: the pond made in step 1 is water the residents walk round (someone sent across it, the
@@ -297,6 +321,12 @@ async function landTabInPlay(page, renderer, stepOne, shot) {
   const again = await funds(page);
   r.money = { mode, before, paid, refunded, again, rose: +(h1 - h0).toFixed(2), refused: raised.refused, frames: spread(raised.frames.slice(1)) };
   console.log(`land: ${renderer} in play: ${JSON.stringify(r.money)}`);
+  // (The first stroke in play done: the street on the land as the landscape solved it.)
+  await settled(page);
+  await page.waitForTimeout(1500);
+  r.streetAfterStroke = await streetOnLand(page);
+  console.log(`land: ${renderer} the street after the first stroke in play: ${JSON.stringify(r.streetAfterStroke)}`);
+  streetFault(renderer, 'after the first stroke in play', r.streetAfterStroke);
   if (raised.refused) fault(`${renderer} the mound was refused: ${raised.refused}`);
   if (mode === 'creative' ? paid !== before : !(paid < before)) fault(`${renderer} funds ${before} → ${paid} after the mound (${mode})`);
   if (refunded !== before) fault(`${renderer} undo gave back ${refunded - paid}, not ${before - paid}`);
@@ -375,7 +405,9 @@ async function builtStrokes(page, renderer, home, shot) {
   // (`end`: the frame the stroke ended in, ms: its settling under the town and the surface solved again.)
   out.road = { at: [Math.round(rx), Math.round(rz)], rose: +(h1 - h0).toFixed(2), refused: raised.refused, stamps: spread(raised.stamps), end: Math.round(raised.frames.at(-1)) };
   out.road.covered = await roadCovered(page, [rx, rz], 20);
+  out.road.street = await streetOnLand(page);
   console.log(`land: ${renderer} a raise across the road: ${JSON.stringify(out.road)}`);
+  streetFault(renderer, 'after a raise across the road', out.road.street);
   if (raised.refused) fault(`${renderer} the raise across the road was refused: ${raised.refused}`);
   if ((out.road.covered?.terrain.over ?? 0) > COVER_MOST) fault(`${renderer} the terrain is drawn over the raised road's edge: ${JSON.stringify(out.road.covered)}`);
   await shot('17b-road-raised');
@@ -832,6 +864,10 @@ try {
       await inGame(page);
       await page.waitForTimeout(4000);
       await shot('11-play');
+      // (Moved in: the game's street on the landscape's surface, the one the menus' town was drawn on taken on.)
+      r.streetMovedIn = await streetOnLand(page);
+      console.log(`land: ${renderer} the street after Move in: ${JSON.stringify(r.streetMovedIn)}`);
+      streetFault(renderer, 'after Move in', r.streetMovedIn);
       r.play = await play(page, renderer, pond, shot);
     }
     await context.close();

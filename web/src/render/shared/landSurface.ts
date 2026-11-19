@@ -22,7 +22,7 @@ export function follows(world: { meta?: { land?: LandFile } | null } | null | un
 }
 
 /** The junctions' identity for the cache (a world message may bring the same ones as a new array). */
-const junctionKey = (junctions: readonly JunctionInfo[] | undefined) => (junctions?.length ? JSON.stringify(junctions.map((j) => [j.x, j.z, j.arms.map((a) => [a.road, a.walkTo])])) : '');
+export const junctionKey = (junctions: readonly JunctionInfo[] | undefined) => (junctions?.length ? JSON.stringify(junctions.map((j) => [j.x, j.z, j.arms.map((a) => [a.road, a.walkTo])])) : '');
 
 /**
  * The surface of `world`'s built land, made once per land (null: not a land its town follows).
@@ -40,6 +40,15 @@ export function surfaceOf(world: (SurfaceWorld & { meta?: { land?: LandFile } | 
   const surface = builtSurfaceOf(world, decodeLand(file));
   made.set(file, { junctions: key, surface });
   return surface;
+}
+
+/**
+ * `surface`, solved for `world` on its own land elsewhere (a landscape's, `LandscapeLayout.takeRoads`), is the one
+ * `surfaceOf(world)` gives from now on: one surface for the land and what stands on it, not a second one solved.
+ */
+export function shareSurface(world: { junctions?: JunctionInfo[]; meta?: { land?: LandFile } | null }, surface: BuiltSurface): void {
+  const file = world.meta?.land;
+  if (file?.seeded === 'follow') made.set(file, { junctions: junctionKey(world.junctions), surface });
 }
 
 /** A junction as far as its height goes: where it is. */

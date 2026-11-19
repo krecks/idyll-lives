@@ -19,6 +19,7 @@ import { previewWorld } from './townPreview';
 import { perfPhase, perfTime, perfTimeAsync } from '../debug/perf';
 import { layoutTags, type Box, type TagSpot } from './tagLayout';
 import { roadIndex } from './roads';
+import { sameContent } from '../core/sameContent';
 
 /** Golden hour on the title screen: low warm sun, long shadows, no lamps yet. */
 export const MENU_MINUTE = 18 * 60 + 20;
@@ -95,6 +96,9 @@ class MenuScene {
   private uses: { layer: UseLayer; hatched: Uint8Array | null } | null = null;
   /** How near the player's zoom comes in (`setNearest`), kept for a renderer made again. */
   private nearest = OVERVIEW_NEAREST;
+  /** The draft and home the town on screen was built from, so the same town asked for again (a new draft object with
+   *  the same content, `sameContent`) is not built again. Null: nothing shown, or its land changed in place since. */
+  private built: { draft: NeighbourhoodDraft; home: number | null } | null = null;
   /** Lots whose tags win when tags compete for space. */
   private focusPlots: [number | null, number | null] = [null, null];
   private readonly sizes = new ResizeObserver((entries) => {
@@ -118,6 +122,14 @@ class MenuScene {
    */
   async show(draft: NeighbourhoodDraft, home: number | null = null, onStep?: (done: TownBuildStep) => void, covered = false): Promise<void> {
     if (draft === this.draft && home === this.home && this.live?.townShown) return;
+    // (The wizard's steps each hand over a fresh draft of the same town: the renderer rebuilds it
+    // only when its content changed, not when its object did.)
+    const built = this.built;
+    if (built && built.home === home && this.live?.townShown && sameContent(draft, built.draft)) {
+      this.draft = draft;
+      this.home = home;
+      return;
+    }
     this.draft = draft;
     this.home = home;
     perfPhase('menu: show town');
@@ -136,6 +148,7 @@ class MenuScene {
     if (covered) renderer.setCovered(true);
     try {
       await perfTimeAsync('menu: showTown (renderer)', () => host.showTown(world, MENU_MINUTE, { ...settings }, onStep));
+      if (this.draft === draft && this.home === home) this.built = { draft, home };
     } finally {
       if (covered) renderer.setCovered(false);
     }
@@ -145,6 +158,7 @@ class MenuScene {
   hide(): Promise<void> {
     this.draft = null;
     this.home = null;
+    this.built = null;
     return host.hideTown();
   }
 
@@ -306,11 +320,14 @@ class MenuScene {
 
   /** The town drawn from `land` from now on (the brushes change it in place); null: from its landscape again. */
   setLand(land: Land | null): void {
+    // (The town on screen is no longer the one its draft makes: shown again for any draft, `built`.)
+    this.built = null;
     if (this.live?.townShown) this.live.setLand(land);
   }
 
   /** Samples of the land given to `setLand` changed: drawn again now, the rest once the stroke is `done`. */
   landChanged(rect: LandRect, done: boolean): void {
+    this.built = null;
     if (this.live?.townShown) this.live.landChanged(rect, done);
   }
 

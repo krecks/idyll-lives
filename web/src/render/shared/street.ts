@@ -1010,6 +1010,11 @@ export class TownStreet {
     return this.levels?.surface === surface;
   }
 
+  /** The height (m) the street stands at at (`x`, `z`), on its surface (null: a town on flat land). */
+  levelAt(x: number, z: number): number | null {
+    return this.levels ? this.levels.at(x, z) : null;
+  }
+
   /** How many bridge decks the street draws (every road's spans, `bridgeSpans`): for the benches. */
   bridgeCount(): number {
     return [...this.roads, ...this.ways.country].reduce((n, r) => n + bridgeSpans(r).length, 0);

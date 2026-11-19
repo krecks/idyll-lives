@@ -739,11 +739,11 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
    * sheet as the water now needs it, and the grass's colours and ground there, a tile or a strip of the grass at a time between
    * `pace`s. (The woods and flowers: `regrow`.) Says the box (m) it reached.
    */
-  async landDone(rect: LandRect, pace?: () => Promise<void>): Promise<[number, number, number, number] | null> {
+  async landDone(rect: LandRect, pace?: () => Promise<void>, solved = false): Promise<[number, number, number, number] | null> {
     if (!this.heightField || !this.host) return null;
-    // (On a land its town follows, what the surface solved again moved too.)
+    // (On a land its town follows, what the surface solved again moved too; `solved`: solved already, `takeRoads`.)
     const exits = this.landExits;
-    const changed = this.landChanged(rect);
+    const changed = this.landChanged(rect, solved);
     const box = this.landBox(changed, LAND_DONE_PAD, ROUND_REACH);
     // (A river drawn out to the edge, or away from it: the valley past the edge came, went or moved with it.)
     const valleys = this.valleysMoved(exits);
