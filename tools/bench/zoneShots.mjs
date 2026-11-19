@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /**
  * Step 2's painted uses (`menuScene.setUses`, `render/pc/useOverlay.ts`) and the free camera on the menus' town,
- * without going through the screens. A generated town is shown and painted as its own lots and buildings are (each
- * lot's and backdrop building's cells by what it is: houses homes, terraces and flats rows, shops and work shops,
- * parks green, the hall, church and school public; the cells under its roads left out), with the zoned cells more
+ * without going through the screens. A generated town is shown and painted as its own lots are (each lot's cells by
+ * what it is: houses homes, terraces and buildings of flats rows, shops and work shops, parks green; the cells under
+ * its roads left out), with the zoned cells more
  * than 36 m from a road hatched; then shot from the whole world's view, the main town's and close up. Then the time
  * a brush stamp's change takes (`setUses` with a few cells changed) against the whole layer drawn again.
  *
@@ -95,18 +95,10 @@ async function setUp({ kind, options, seed, side }) {
     for (let j = Math.max(0, Math.floor(z0 / USE_CELL)); j < Math.min(rows, Math.ceil(z1 / USE_CELL)); j++)
       for (let i = Math.max(0, Math.floor(x0 / USE_CELL)); i < Math.min(cols, Math.ceil(x1 / USE_CELL)); i++) codes[j * cols + i] = code;
   };
-  const BACKDROP = { flats: 'rows', terrace: 'rows', house: 'homes', shop: 'shops', cafe: 'shops', restaurant: 'shops', office: 'shops', workshop: 'shops', school: 'public', church: 'public', hall: 'public' };
-  for (const b of world.meta?.backdrop ?? []) {
-    const use = BACKDROP[b.use];
-    if (!use) continue;
-    const xs = b.poly.map((p) => p[0]);
-    const zs = b.poly.map((p) => p[1]);
-    paint(Math.min(...xs) - 2, Math.min(...zs) - 2, Math.max(...xs) + 2, Math.max(...zs) + 2, USE_CODE[use]);
-  }
   for (const s of town.slots) {
     const p = world.plots[s.index];
     if (!p) continue;
-    const use = s.kind === 'house' ? ((p.storeys ?? 1) > 1 ? 'rows' : 'homes') : s.kind === 'shop' ? 'shops' : 'green';
+    const use = s.kind === 'house' ? (s.lot === 'terrace' || (p.storeys ?? 1) > 1 ? 'rows' : 'homes') : s.kind === 'flats' ? 'rows' : s.kind === 'shop' ? 'shops' : 'green';
     paint(p.x, p.z, p.x + p.w, p.z + p.d, USE_CODE[use]);
   }
   // The cells under the roads left out, and those far from any road found (for the hatching).

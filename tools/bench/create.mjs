@@ -313,7 +313,7 @@ function benchHelpers() {
           const t0 = performance.now();
           const e = live.verdictOf(d, t, ed().content, pts, 'street', true, 1);
           const ms = performance.now() - t0;
-          return 'draft' in e && (what !== 'join' || e.cleared.lots.length + e.cleared.backdrop.length === 0) ? { ...v, ms } : null;
+          return 'draft' in e && (what !== 'join' || e.cleared.lots.length === 0) ? { ...v, ms } : null;
         };
         for (const i of order) {
           const r = d.roads[i];
@@ -388,11 +388,11 @@ function benchHelpers() {
             }
           }
           if (!at) continue;
-          const c = buildup.clearBuildings(d, i);
+          const c = buildup.clearBuildings(d, t, i);
           const bare = 'draft' in c ? c.draft : d;
           const e = buildup.buildUp(bare, t, ed().content, { road: i, mode, seed: 1 });
           if ('refused' in e) continue;
-          const adds = { buildings: e.draft.open.backdrop.length - bare.open.backdrop.length, homes: e.draft.slots.length - bare.slots.length };
+          const adds = { buildings: buildup.buildingsOn(e.draft, t, i).length - buildup.buildingsOn(bare, t, i).length, homes: e.draft.slots.length - bare.slots.length };
           if (!best || adds.buildings > best.buildings) best = { road: i, name: r.name, area: a, ...adds, ...at };
           if (++tried >= 14) break;
         }
@@ -528,10 +528,10 @@ function benchHelpers() {
         const hatched = layoutApi.hatched(d);
         return { zoned: count.slice(1).reduce((a, b) => a + b, 0), homes: count[1], hatched: hatched ? hatched.reduce((a, b) => a + b, 0) : 0, summary: layoutApi.summaryLine(layoutApi.usesSummary(d)), hash: uses.usesHash(d.open?.uses) };
       },
-      /** How many backdrop buildings and places the plan has. */
+      /** How many of the town's buildings (`buildup.ts` `isTownBuilding`: flats, terraces, compact places...), places and lots the plan has. */
       built() {
         const d = plan();
-        return { buildings: d.open?.backdrop?.length ?? 0, places: d.open?.places?.length ?? 0, lots: d.slots.length };
+        return { buildings: d.slots.filter(buildup.isTownBuilding).length, places: d.open?.places?.length ?? 0, lots: d.slots.length };
       },
       /** The page's frames from now (their gaps, ms) until `stop`: the 50th, 95th percentiles and the longest. */
       startFrames() {
