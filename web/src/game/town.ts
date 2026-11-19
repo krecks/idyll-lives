@@ -922,12 +922,12 @@ export class LotPlacer {
     return drivesOut(this.roads, this.t, u, at, (def) => this.content.object(def)?.footprint ?? [1, 1]);
   }
 
-  /** House numbers along each road (odd on its left, even on its right; a flats building's too), and the roads' names (`names`, by road; those without one are left as they are). */
+  /** House numbers along each road (odd on its left, even on its right), and the roads' names (`names`, by road; those without one are left as they are). */
   number(names: readonly (string | undefined)[]): void {
     for (const [r, road] of this.roads.entries()) {
       const name = names[r];
       if (name === undefined) continue;
-      const along = [...this.placed].filter(([s, f]) => f.road === r && (s.kind === 'house' || s.kind === 'flats') && s.lot !== 'farm').sort((a, b) => a[1].s - b[1].s);
+      const along = [...this.placed].filter(([s, f]) => f.road === r && s.kind === 'house' && s.lot !== 'farm').sort((a, b) => a[1].s - b[1].s);
       for (const side of [1, -1] as const) along.filter(([, f]) => f.side === side).forEach(([s], i) => (s.name = `${i * 2 + (side > 0 ? 1 : 2)} ${name}`));
       road.name = name;
     }

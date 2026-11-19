@@ -489,8 +489,10 @@ function layoutProblems(town: CheckedTown, expect: Expected | undefined, river: 
   const wayOf = ways && new Map(ways.map((i, k) => [i, k]));
   const widest = Math.max(0, ...roads.map((r) => r.width));
   town.plots.forEach((p, i) => {
+    // (A flat is inside its building's lot, on its storey: its building is checked.)
+    if (p.kind === 'flat') return;
     if (p.x < 0 || p.z < 0 || p.x + p.w > town.width || p.z + p.d > town.depth) out.push(`plot ${i} off the town`);
-    for (const [j, q] of town.plots.entries()) if (j > i && p.x < q.x + q.w && q.x < p.x + p.w && p.z < q.z + q.d && q.z < p.z + p.d) out.push(`plots ${i} and ${j} overlap`);
+    for (const [j, q] of town.plots.entries()) if (j > i && q.kind !== 'flat' && p.x < q.x + q.w && q.x < p.x + p.w && p.z < q.z + q.d && q.z < p.z + p.d) out.push(`plots ${i} and ${j} overlap`);
     let onRoad = false;
     for (let z = p.z; z < p.z + p.d; z++) for (let x = p.x; x < p.x + p.w; x++) onRoad ||= mask[z * town.width + x] === 1 && roads.some((r) => nearest(r.points, x + 0.5, z + 0.5).dist < r.width / 2);
     if (onRoad) out.push(`plot ${i} on a road`);

@@ -8,7 +8,7 @@
 
 import type { CarPark, ParkingBay } from '../core/protocol';
 import { rectFrom, tilesOf } from './footprints';
-import { inside, leftOf, lengths, nearest, pointAt, straightAround, type Pt, type RoadPlan } from './roads';
+import { leftOf, lengths, nearest, pointAt, straightAround, type Pt, type RoadPlan } from './roads';
 import { driveways, houseTemplate, onLot, slotDims, turner, type Frontage, type Ground, type PlotSlot, type Rect, type Templates } from './town';
 
 /** A bay keeps this far from a driveway's mouth (m, sim-core `cars::MOUTH_CLEAR`): a car turning out of one never meets a parked one. */
@@ -21,8 +21,6 @@ export const BAY_W = 3;
 export const BAY_D = 6;
 /** How far a car park's stretch of road may turn (radians over its length and a bay either side): each bay faces away from the road at its own nearest point. */
 const PARK_BEND = 0.3;
-/** The asphalt's front strip the road's tiles may take (m: `roads.ts` `roadMask` takes a tile any of whose corner reaches its verge). */
-const VERGE_TILES = 0.8;
 /** Off the world's edge (m), as the lots keep. */
 const EDGE = 8;
 
@@ -30,7 +28,7 @@ const add = (a: Pt, b: Pt, k = 1): Pt => [a[0] + b[0] * k, a[1] + b[1] * k];
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
 
-/** A car park laid out (`carParkAt`): the car park, its bays, and its asphalt with `MOUTH_CLEAR` m more along the road either end (what it keeps clear: its land past the verge's tiles). */
+/** A car park laid out (`carParkAt`): the car park, its bays, and its asphalt with `MOUTH_CLEAR` m more along the road either end (what it keeps clear). */
 export interface CarParkLaid {
   park: CarPark;
   bays: ParkingBay[];
@@ -58,8 +56,7 @@ export function carParkAt(roads: readonly RoadPlan[], f: Pick<Frontage, 'road' |
   const poly = rectFrom(front, t, out, BAY_W * n, BAY_D).map(([x, z]): [number, number] => [r2(x), r2(z)]);
   const sign = add(add(p, t, (BAY_W * n) / 2 + 1), out, reach + 0.4);
   const park: CarPark = { area, poly, sign: [r2(sign[0]), r2(sign[1]), r4(Math.atan2(-out[0], -out[1]))], ...also };
-  // (What it keeps clear starts a little past the asphalt's front: the tiles there are the road's verge, `roadMask`'s.)
-  return { park, bays, clear: rectFrom(add(front, out, VERGE_TILES), t, out, BAY_W * n + 2 * MOUTH_CLEAR, BAY_D - VERGE_TILES) };
+  return { park, bays, clear: rectFrom(front, t, out, BAY_W * n + 2 * MOUTH_CLEAR, BAY_D) };
 }
 
 /**
@@ -77,7 +74,9 @@ export function carParkFits(roads: readonly RoadPlan[], ground: Ground, f: Front
   if (!straightAround(road.points, f.s, half + BAY_W, PARK_BEND, ls)) return null;
   for (const s of [f.s - half, f.s + half]) if (!offCorners({ ...f, s, p: pointAt(road.points, s, ls).p })) return null;
   const laid = carParkAt(roads, f, n, 0);
-  const bad = tilesOf(laid.clear, 0, (x, z) => inside(laid.clear, x + 0.5, z + 0.5) && (x < EDGE || z < EDGE || x >= ground.w - EDGE || z >= ground.d - EDGE || ground.takenAt(x + 0.5, z + 0.5)));
+  // (Every tile it touches but the road's own, which reach a little past its verge: `roads.ts` `roadMask`.)
+  const roads0 = ground.roadTiles();
+  const bad = tilesOf(laid.clear, 0, (x, z) => x < EDGE || z < EDGE || x >= ground.w - EDGE || z >= ground.d - EDGE || (!roads0[z * ground.w + x] && ground.takenAt(x + 0.5, z + 0.5)));
   if (bad) return null;
   const { p, t } = pointAt(road.points, f.s, ls);
   const out = leftOf(t).map((v) => v * f.side) as Pt;

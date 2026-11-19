@@ -111,7 +111,8 @@ describe('named places as lots', async () => {
   });
 
   test("a public lot's place is the one the generator gives it, called as its lot is", () => {
-    const publicLots = hamlet.slots.filter((s) => s.kind !== 'house');
+    // (A flats building is homes, no place.)
+    const publicLots = hamlet.slots.filter((s) => s.kind !== 'house' && s.kind !== 'flats');
     expect(publicLots.length).toBeGreaterThan(0);
     // (But the main town's first office, which takes the careers no place there has, its hours widened to theirs.)
     const office = hamlet.open!.places!.find((p) => p.area === 0 && p.kind === 'office')!;
@@ -175,7 +176,8 @@ describe('named places as lots', async () => {
     for (const seed of [1, 2, 3]) {
       const world = generateWorld(content, t, 'country', seed, undefined, undefined, { town: 'town', villages: 'few' });
       // Every lot built from a named place's layout is dressed as one (`placeUnit`), and no other is.
-      expect(world.slots.filter((s) => !!placeOfTemplate(s.template) !== !!s.dress).map((s) => s.template)).toEqual([]);
+      // (A flats building is dressed as flats, no place.)
+      expect(world.slots.filter((s) => s.kind !== 'flats' && !!placeOfTemplate(s.template) !== !!s.dress).map((s) => s.template)).toEqual([]);
       const named = world.slots.filter((s) => s.dress);
       // Every civic place of a town in the main town; a hamlet's in every other area.
       const civicOfSlot = (s: PlotSlot) => {

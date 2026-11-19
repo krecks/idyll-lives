@@ -35,6 +35,7 @@ import { areaSize, civicTooBig, CIVIC, namerFor, ZONE, type ZoneKind } from './p
 import { chooseCentre, narrowCentre } from './centre';
 import { fillPoly, rectPoly } from './footprints';
 import { DensePass, raisePlaces, townPlaces } from './dense';
+import { flatsTemplate } from './flats';
 import { carParkFits, driveMouths, takeCarPark, vergeParking, type CarParkLaid } from './parking';
 import { random } from './housegen';
 import { COVER, COVER_CELL, coverSpan, LAND_CELL, NONE, type Land as LandField } from './land';
@@ -1587,7 +1588,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       // terraces off the high street, nearest the middle; then its houses, beyond them.
       const homes = all.filter((f) => !inCentre(f));
       const [places, houses] = [wanted.filter((u) => u.kind !== 'house'), wanted.filter((u) => u.kind === 'house')];
-      for (const u of lots.place(places, fronts.get(a)!, plan.greens, plan.centre, a, true)) left.push({ u, from: a });
+      // (Out of its centre, which is its named places' and the dense pass's: `inCentre`.)
+      for (const u of lots.place(places, fronts.get(a)!.filter((f) => !inCentre(f)), plan.greens, plan.centre, a, true)) left.push({ u, from: a });
       // Its named places' lots (`namedLots`) round its heart (its square, else its high street's middle; else its
       // middle), its shops and cafés in parades along its high street; then its centre kept for the backdrop.
       const heart = centre ? (centre.square ? centroid(centre.square) : pointAt(worldRoads[centre.road].points, (centre.s0 + centre.s1) / 2).p) : plan.centre;
@@ -1727,6 +1729,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   // (Flats over the shops, cafés and restaurants, real floors over the offices and halls: `dense.ts` `raisePlaces`.)
   if (!spec.classic) raisePlaces(t, lots.slots, centre ? [centre.poly] : [], dense);
   lots.number(names);
+  // (A flats building is called as its template names it: "Mill Court".)
+  for (const s of lots.slots) if (s.kind === 'flats') s.name = flatsTemplate(t, s.template)?.name ?? s.name;
 
   // ---- the named places' names: each lot as its place is called, none twice -------------------
   nameLots(content, slots, plans, worldRoads, spec.civic, random(((lay?.townSeed ?? seed) ^ PLACE_NAMES) >>> 0));
