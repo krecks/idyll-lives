@@ -4998,43 +4998,45 @@
    "name": "Corner Shop",
    "description": "A narrow shop on the high street: shelves down both walls, the counter at the back.",
    "kind": "place",
-   "lot": {"width": 8, "depth": 16},
+   "lot": {"width": 10, "depth": 16},
    "walls": [
-    [1, 3, 7, 3],
-    [1, 12, 7, 12],
+    [1, 3, 9, 3],
+    [1, 12, 9, 12],
     [1, 3, 1, 12],
-    [7, 3, 7, 12]
+    [9, 3, 9, 12]
    ],
    "doors": [
-    {"x": 4, "z": 3, "axis": "x"}
+    {"x": 5, "z": 3, "axis": "x"}
    ],
    "windows": [
     {"x": 2, "z": 3, "axis": "x"},
     {"x": 3, "z": 3, "axis": "x"},
-    {"x": 5, "z": 3, "axis": "x"},
-    {"x": 6, "z": 3, "axis": "x"},
+    {"x": 7, "z": 3, "axis": "x"},
+    {"x": 8, "z": 3, "axis": "x"},
     {"x": 1, "z": 6, "axis": "z"},
-    {"x": 7, "z": 6, "axis": "z"},
-    {"x": 3, "z": 12, "axis": "x"}
+    {"x": 9, "z": 6, "axis": "z"},
+    {"x": 4, "z": 12, "axis": "x"}
    ],
    "paths": [
-    {"x": 1, "z": 1, "w": 6, "d": 2}
+    {"x": 1, "z": 1, "w": 8, "d": 2}
    ],
-   "entry": [4.5, 1.5],
+   "entry": [5.5, 1.5],
    "objects": [
-    {"def": "shopCounter", "x": 2, "z": 10, "rot": 2},
+    {"def": "shopCounter", "x": 3, "z": 10, "rot": 2},
     {"def": "groceryShelf", "x": 1, "z": 4, "rot": 1},
     {"def": "groceryShelf", "x": 1, "z": 7, "rot": 1},
-    {"def": "groceryShelf", "x": 6, "z": 4, "rot": 3},
-    {"def": "groceryShelf", "x": 6, "z": 7, "rot": 3},
-    {"def": "vendingDrink", "x": 6, "z": 9, "rot": 3},
-    {"def": "pantry", "x": 6, "z": 11, "rot": 2},
-    {"def": "wallClock", "x": 4, "z": 11, "rot": 2},
+    {"def": "groceryShelf", "x": 8, "z": 4, "rot": 3},
+    {"def": "groceryShelf", "x": 8, "z": 7, "rot": 3},
+    {"def": "vendingDrink", "x": 8, "z": 9, "rot": 3},
+    {"def": "pantry", "x": 8, "z": 11, "rot": 2},
+    {"def": "wallClock", "x": 5, "z": 11, "rot": 2},
     {"def": "ceilingLight", "x": 3, "z": 5, "rot": 0},
+    {"def": "ceilingLight", "x": 6, "z": 5, "rot": 0},
     {"def": "ceilingLight", "x": 3, "z": 8, "rot": 0},
-    {"def": "ceilingLight", "x": 4, "z": 10, "rot": 0},
+    {"def": "ceilingLight", "x": 6, "z": 8, "rot": 0},
+    {"def": "ceilingLight", "x": 5, "z": 10, "rot": 0},
     {"def": "garden.flowerBox", "x": 2, "z": 2, "rot": 2},
-    {"def": "litterBin", "x": 6, "z": 1, "rot": 0},
+    {"def": "litterBin", "x": 8, "z": 1, "rot": 0},
     {"def": "bush", "x": 2, "z": 14, "rot": 0}
    ]
   },
@@ -5043,48 +5045,48 @@
    "name": "Café",
    "description": "A narrow café: a counter with cakes and a coffee machine at the back, two tables inside and one out.",
    "kind": "place",
-   "lot": {"width": 8, "depth": 16},
+   "lot": {"width": 10, "depth": 16},
    "walls": [
-    [1, 3, 7, 3],
-    [1, 12, 7, 12],
+    [1, 3, 9, 3],
+    [1, 12, 9, 12],
     [1, 3, 1, 12],
-    [7, 3, 7, 12]
+    [9, 3, 9, 12]
    ],
    "doors": [
-    {"x": 4, "z": 3, "axis": "x"}
+    {"x": 5, "z": 3, "axis": "x"}
    ],
    "windows": [
     {"x": 2, "z": 3, "axis": "x"},
     {"x": 3, "z": 3, "axis": "x"},
-    {"x": 5, "z": 3, "axis": "x"},
-    {"x": 6, "z": 3, "axis": "x"},
+    {"x": 7, "z": 3, "axis": "x"},
+    {"x": 8, "z": 3, "axis": "x"},
     {"x": 1, "z": 6, "axis": "z"},
-    {"x": 7, "z": 6, "axis": "z"},
-    {"x": 5, "z": 12, "axis": "x"}
+    {"x": 9, "z": 6, "axis": "z"},
+    {"x": 6, "z": 12, "axis": "x"}
    ],
    "paths": [
-    {"x": 1, "z": 1, "w": 6, "d": 2}
+    {"x": 1, "z": 1, "w": 8, "d": 2}
    ],
-   "entry": [4.5, 1.5],
+   "entry": [5.5, 1.5],
    "objects": [
-    {"def": "bakeryCase", "x": 1, "z": 10, "rot": 2},
-    {"def": "coffeeMachine", "x": 4, "z": 10, "rot": 2},
-    {"def": "pantry", "x": 6, "z": 11, "rot": 2},
+    {"def": "bakeryCase", "x": 2, "z": 10, "rot": 2},
+    {"def": "coffeeMachine", "x": 5, "z": 10, "rot": 2},
+    {"def": "pantry", "x": 8, "z": 11, "rot": 2},
     {"def": "cafeTable", "x": 2, "z": 5, "rot": 0},
     {"def": "cafeChair", "x": 1, "z": 5, "rot": 1},
     {"def": "cafeChair", "x": 3, "z": 5, "rot": 3},
-    {"def": "cafeTable", "x": 5, "z": 7, "rot": 0, "turn": 20},
-    {"def": "cafeChair", "x": 4, "z": 7, "rot": 1},
-    {"def": "cafeChair", "x": 6, "z": 7, "rot": 3},
+    {"def": "cafeTable", "x": 7, "z": 7, "rot": 0, "turn": 20},
+    {"def": "cafeChair", "x": 6, "z": 7, "rot": 1},
+    {"def": "cafeChair", "x": 8, "z": 7, "rot": 3},
     {"def": "paintingClassic", "x": 1, "z": 8, "rot": 1},
-    {"def": "wallClock", "x": 3, "z": 11, "rot": 2},
+    {"def": "wallClock", "x": 4, "z": 11, "rot": 2},
     {"def": "ceilingPendant", "x": 2, "z": 5, "rot": 0},
-    {"def": "ceilingPendant", "x": 5, "z": 7, "rot": 0},
-    {"def": "ceilingPendant", "x": 3, "z": 10, "rot": 0},
-    {"def": "cafeTable", "x": 6, "z": 1, "rot": 0},
-    {"def": "cafeChair", "x": 7, "z": 1, "rot": 3},
+    {"def": "ceilingPendant", "x": 7, "z": 7, "rot": 0},
+    {"def": "ceilingPendant", "x": 4, "z": 10, "rot": 0},
+    {"def": "cafeTable", "x": 8, "z": 1, "rot": 0},
+    {"def": "cafeChair", "x": 9, "z": 1, "rot": 3},
     {"def": "garden.geraniums", "x": 2, "z": 2, "rot": 2},
-    {"def": "bush", "x": 5, "z": 14, "rot": 0}
+    {"def": "bush", "x": 6, "z": 14, "rot": 0}
    ]
   },
   {

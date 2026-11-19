@@ -100,6 +100,8 @@ const CORNER = 18;
 /** Of a centre's shops, cafés and restaurants, the share with flats over them; elsewhere (`raisePlaces`). */
 const OVER_CENTRE = 0.8;
 const OVER_TOWN = 0.3;
+/** The designs of the homes on tight gardens and of the terraced houses a pass lays (`DensePass.pooled`). */
+const DESIGNS = 16;
 /** How far a lot set by hand looks for a road to front (m from the road's edge). */
 const FILL_REACH = 30;
 
@@ -172,6 +174,17 @@ export class DensePass {
     return this.lots.slots.length;
   }
 
+  /**
+   * `rand`, but each draw one of `DESIGNS` numbers fixed for the pass: the homes it lays are of a few designs a
+   * kind, as a street built at once is (and each design is generated once: `town.ts` `houseTemplate` keeps them).
+   */
+  private pooled(rand: Rand): Rand {
+    this.designs ??= Array.from({ length: DESIGNS }, () => rand());
+    const designs = this.designs;
+    return () => designs[Math.floor(rand() * designs.length)];
+  }
+  private designs?: number[];
+
   /** Whether a point is in a centre. */
   private centreAt(p: Pt): boolean {
     return this.outlines.some((poly) => inside(poly, p[0], p[1]));
@@ -198,10 +211,10 @@ export class DensePass {
   private unitsOf(use: BuildingUse, a: number, zone: Zone, rand: Rand): Unplaced[] {
     const { t } = this;
     const row = (n: number) =>
-      Array.from({ length: n }, () => rowHouse(t, rand))
+      Array.from({ length: n }, () => rowHouse(t, this.pooled(rand)))
         .filter((h) => !!h)
         .map((h): Unplaced => ({ kind: 'house', name: '', lot: 'terrace', area: a, ...h }));
-    if (use === 'house') return [{ kind: 'house', name: '', lot: 'small', area: a, ...houseFor(t, 'small', 'tight', rand) }];
+    if (use === 'house') return [{ kind: 'house', name: '', lot: 'small', area: a, ...houseFor(t, 'small', 'tight', this.pooled(rand)) }];
     if (use === 'terrace') return row(between(rand, 2, 4));
     if (use === 'flats') {
       const f = flatsFor(t, zone === 'centre' ? 'centre' : 'town', rand);

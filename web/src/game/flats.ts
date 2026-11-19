@@ -327,7 +327,8 @@ function flatsBuilding(t: Templates, seed: number, storeys: number, wide: boolea
     for (const x of starts.slice(0, most)) bayRects.push({ rect: { x, z: 0, w: 3, d: front }, unit: bayRects.length });
   }
   const inBay = (x: number, z: number) => bayRects.some(({ rect: r }) => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.d);
-  const outside: KeptPlacement[] = letterboxes(cfg, units.length, doorX, front, box.x, box.x + box.w, (x, z) => !inBay(x, z));
+  // (Off the bays, and off the posts of the porch over the street door, a tile either side of it: `town.ts` `frontPorchPosts`.)
+  const outside: KeptPlacement[] = letterboxes(cfg, units.length, doorX, front, box.x, box.x + box.w, (x, z) => !inBay(x, z) && Math.abs(x - doorX) > 1);
   if (outside.length < units.length) return null;
   outside.push(...yardThings(cfg, info, rng, { x: box.x, z: front + depth, w: box.w, d: yard }, doorX));
   const name = `${pick(rng, cfg.names.first)} ${pick(rng, spec.names)}`;
@@ -591,10 +592,11 @@ function flatsOver(t: Templates, place: string, seed: number, storeys: number, r
   const units = flatsBeside(t, hall, [side], storeys, 1, residents);
   if (!units) return null;
   const shell = stairHall(cfg, info, { rect: hall, storeys, up: [outer, inner], door: inner, back: true }, t.lampTiles);
-  // Letterboxes on the front strip's free tiles (not on the place's things, nor before its door).
+  // Letterboxes on the front strip's free tiles (not on the place's things, nor before its door or under the porch
+  // over it, whose posts stand a tile either side of it: `town.ts` `frontPorchPosts`).
   const taken = new Set(best.ground.objects.flatMap((o) => thingTiles(o, info)).map(([x, z]) => tileKey(x, z)));
   const placeDoor = p.doors![0];
-  const outside = letterboxes(cfg, units.length, inner, box.z, box.x, box.x + box.w, (x, z) => !taken.has(tileKey(x, z)) && x !== placeDoor.x);
+  const outside = letterboxes(cfg, units.length, inner, box.z, box.x, box.x + box.w, (x, z) => !taken.has(tileKey(x, z)) && Math.abs(x - placeDoor.x) > 1);
   if (outside.length < units.length) return null;
   const lot = p.lot ?? t.plot;
   const words = ['no', 'one', 'two', 'three'];

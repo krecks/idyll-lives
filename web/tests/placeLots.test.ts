@@ -178,7 +178,7 @@ describe('named places as lots', async () => {
       // Every lot built from a named place's layout is dressed as one (`placeUnit`), and no other is.
       // (A flats building is dressed as flats, no place.)
       expect(world.slots.filter((s) => s.kind !== 'flats' && !!placeOfTemplate(s.template) !== !!s.dress).map((s) => s.template)).toEqual([]);
-      const named = world.slots.filter((s) => s.dress);
+      const named = world.slots.filter((s) => s.dress && s.kind === 'shop');
       // Every civic place of a town in the main town; a hamlet's in every other area.
       const civicOfSlot = (s: PlotSlot) => {
         const what = placeOfTemplate(s.template);

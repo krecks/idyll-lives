@@ -32,8 +32,8 @@ import type { Content } from '../content/content';
 import type { BackdropBuilding, CarPark, LandSize, ParkingBay, Rle, TownArea, TownPlace, TownSize, WorldMeta, WorldOptions, WorldZone } from '../core/protocol';
 import { distanceToRect } from '../render/shared/chunks';
 import { areaSize, civicTooBig, CIVIC, namerFor, ZONE, type ZoneKind } from './places';
-import { chooseCentre, narrowCentre } from './centre';
-import { fillPoly, rectPoly } from './footprints';
+import { chooseCentre, densestCentre, type Centre } from './centre';
+import { tilesOf } from './footprints';
 import { DensePass, raisePlaces, townPlaces } from './dense';
 import { flatsTemplate } from './flats';
 import { carParkFits, clearOfDrives, driveLines, takeCarPark, vergeParking, type CarParkLaid } from './parking';
@@ -46,9 +46,9 @@ import { chaikin, outlines, rasterize, rle, simplify, simplifyRing, unrle } from
 import { fbm } from './noise';
 import type { UseLayer } from './uses';
 import { along, astar, CELL, Cells, clearOfBoxes, COUNTRY_GRADE, COUNTRY_TURN, COUNTRY_WIDTH, CountryRouter, CTRL_APART, FACING, ROAD_WIDTH, ROUTE_GRADE, SIDE_COST, TRIES, type Port, type Way } from './countryRouter';
-import { centroid, cropRoads, curve, evenly, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, roadMask, straightAround, type Box, type Pt, type RoadPlan } from './roads';
+import { centroid, cropRoads, curve, evenly, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, roadIndex, straightAround, type Box, type Pt, type RoadPlan } from './roads';
 import { lotName, placeOfTemplate, placeUnit } from './placeLots';
-import { BIG_COURTS, boundsOf, COURTS, frontageOf, Ground, houseFor, joinUp, lotAt, LotPlacer, plotRect, settleRoads, shuffled, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
+import { BIG_COURTS, boundsOf, COURTS, frontageOf, Ground, houseFor, joinUp, lotAt, LotPlacer, plotRect, reachesRoad, settleRoads, shuffled, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
 import { LAND_SIZE, LEGACY_KINDS, placeOf, specOf, streetNames, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind, type WorldSpec, type WorldStep } from './world';
 
 /** The mask helpers moved to `landMasks.ts`; still here for those that import them from the generator. */
@@ -77,6 +77,8 @@ export interface OpenWorldDraft {
   /** The places the tags name, and the main town's centre (its outline and its square). */
   places?: TownPlace[];
   centre?: { area: number; poly: Pt[]; square?: Pt[] }[];
+  /** Each centre's high street (`centre.ts` `Centre`), to narrow its outline again once lots are given up (`landFollow.ts`); not in the town file. */
+  highStreets?: Centre[];
   /** The centres' squares (kept clear of lots: `withGarden`); not in the town file. */
   squares?: Pt[][];
   /** How high the land stands over the level the towns are built at (`reliefOf`); none in a classic world. */
@@ -1512,7 +1514,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   // the rest of the world is laid out as it was.
   const dense = random(((lay?.townSeed ?? seed) ^ 0x2545f491) >>> 0);
   // The main town's centre: its high street and a square off it, kept clear of lots.
-  const centre = chooseCentre(worldRoads, plans[0].roads, plans[0].centre, ground);
+  const centre = chooseCentre(worldRoads, plans[0].roads, plans[0].centre, ground, 0, (x, z) => !spec.classic && land.slope(land.cell(x, z)) > PLACE_STEEP);
   const inCentre = (f: Frontage) => !!centre && inside(centre.poly, f.p[0] + f.n[0] * 10, f.p[1] + f.n[1] * 10);
   const lots = new LotPlacer(content, t, ground, worldRoads, spec.gaps, rand, true);
   const names: (string | undefined)[] = worldRoads.map((r) => r.name);
@@ -1674,6 +1676,11 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     parks.push(...vergeParking(worldRoads, ground, frontage, spaces - bays, a, offAll, drives));
   }
 
+  // (A trail keeps off the water and the car parks.)
+  const keepOff = waterMask.slice();
+  for (const p of parks) tilesOf(p.park.poly, 0.5, (x, z) => {
+    if (x >= 0 && z >= 0 && x < W && z < D) keepOff[z * W + x] = 1;
+  });
   // ---- outdoor places, a trail to each from its area's roads ----------------------------------
   const outdoor = new Map(t.parks.filter((p) => p.kind === 'outdoor').map((p) => [p.id, p]));
   const pads: Record<number, number> = {};
@@ -1689,7 +1696,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       const slot = lots.put({ kind: 'outdoor', template: place.id, name: `${plan.name} ${place.name}`, lot: 'medium', w: spot.w, d: spot.d, area: a }, spot, null);
       const r = rectOf(slot);
       pads[slot.index] = Math.round(land.at(r.x + r.w / 2, r.z + r.d / 2) * 10) / 10;
-      const trail = trailTo(slot, plan, worldRoads, slots, waterMask, land, t, W, D);
+      const trail = trailTo(slot, plan, worldRoads, slots, keepOff, land, t, W, D);
       // (No way to it: no place there, then. It is the last lot put down.)
       if (!trail) {
         slots.pop();
@@ -1726,6 +1733,26 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   densePass?.approaches(dense, ways, (a, p) => offRect(plans[a].rect, p) < APPROACH && gentleBy(p));
   // (Flats over the shops, cafés and restaurants, real floors over the offices and halls: `dense.ts` `raisePlaces`.)
   if (!spec.classic) raisePlaces(t, lots.slots, centre ? [centre.poly] : [], dense);
+  // No lot whose front door gets no path to a road (on a bend, its door looking past the road): left out
+  // (`diagnostics.dropped`), the lots after it numbered again with what names them (the pads, the car parks' `serves`).
+  const roadIdx = roadIndex(worldRoads);
+  const pathless = new Set(slots.filter((s) => !reachesRoad(content, t, roadIdx, slots, s)).map((s) => s.index));
+  if (pathless.size) {
+    for (const s of slots) if (pathless.has(s.index)) lots.dropped.push({ name: s.name, kind: s.kind, ...(s.lot ? { lot: s.lot } : {}) });
+    const kept = slots.filter((s) => !pathless.has(s.index));
+    const now = new Map(kept.map((s, k) => [s.index, k]));
+    const was = { ...pads };
+    for (const k of Object.keys(pads)) delete pads[Number(k)];
+    for (const [k, h] of Object.entries(was)) if (now.has(Number(k))) pads[now.get(Number(k))!] = h;
+    for (const p of parks) {
+      if (p.park.serves === undefined) continue;
+      const to = now.get(p.park.serves);
+      if (to === undefined) delete p.park.serves;
+      else p.park.serves = to;
+    }
+    slots.length = 0;
+    kept.forEach((s, k) => slots.push(Object.assign(s, { index: k })));
+  }
   lots.number(names);
   // The bays, every one clear of every driveway (a lot laid after its car park may have one by it, across the street too).
   const { bays: parking, carParks } = clearOfDrives(parks, driveLines(t, slots, worldRoads, (def) => content.object(def)?.footprint ?? [1, 1]));
@@ -1736,19 +1763,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   nameLots(content, slots, plans, worldRoads, spec.civic, random(((lay?.townSeed ?? seed) ^ PLACE_NAMES) >>> 0));
 
   // ---- the centre made the densest: narrowed to its high street where the land round it is the emptier ----
-  if (centre && !spec.classic) {
-    // (Its open land: not a road, the water, a green, nor a lot of a home or a park; a named place's or a flats building's lot built over.)
-    const taken = roadMask(worldRoads.filter((r) => r.kind !== 'trail'), W, D, 0);
-    for (let i = 0; i < taken.length; i++) if (waterMask[i]) taken[i] = 1;
-    for (const g of allGreens) fillPoly(g, W, D, (i) => (taken[i] = 1));
-    const built: Pt[][] = [];
-    for (const s of slots) {
-      const r = rectOf(s);
-      if (s.dress) built.push(rectPoly(r));
-      else for (let z = Math.max(0, r.z); z < Math.min(D, r.z + r.d); z++) for (let x = Math.max(0, r.x); x < Math.min(W, r.x + r.w); x++) taken[z * W + x] = 1;
-    }
-    narrowCentre(worldRoads, centre, W, D, taken, plans[0].rect, built);
-  }
+  if (centre && !spec.classic) densestCentre(centre, worldRoads, W, D, waterMask, allGreens, slots.map((s) => ({ rect: rectOf(s), place: !!s.dress && s.kind === 'shop' })), plans[0].rect);
 
   // ---- the places the tags name ---------------------------------------------------------------
   const places = townPlaces(content, t, worldRoads, areaList, slots, centre ? [centre.area] : [], (a) => (a === 0 ? spec.civic : areaSize(spec.civic, a)), dense);
@@ -1862,7 +1877,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       parking,
       ...(carParks.length ? { carParks } : {}),
       places,
-      ...(centre ? { centre: [{ area: centre.area, poly: centre.poly, ...(centre.square ? { square: centre.square } : {}) }], squares: centre.square ? [centre.square] : [] } : {}),
+      ...(centre ? { centre: [{ area: centre.area, poly: centre.poly, ...(centre.square ? { square: centre.square } : {}) }], squares: centre.square ? [centre.square] : [], highStreets: [centre] } : {}),
       ...(relief ? { relief } : {}),
       ...(signed ? { heights: signed } : {}),
       ...(laid ? { land: laid } : {}),

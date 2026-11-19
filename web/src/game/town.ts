@@ -1250,6 +1250,8 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
   /** Where a garage the player builds at the end of a driveway would stand, on a house the town gave none (`garageAt`): the fences start behind it too. */
   const roomFor = new Map<number, Rect>();
   const flats: TownLayout['flats'] = [];
+  /** The paths to the street door of the flats over a place, laid after the place's own (see the flats below). */
+  const flatsWays = new Map<number, () => void>();
   /** The farms' barns (town tiles): no garden fence runs round one as round a house. */
   const barns: Rect[] = [];
   for (const s of town.slots) {
@@ -1270,7 +1272,17 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
         placeAll(s, u.layout.objects, u.storey * town.depth);
       }
       for (const o of f.outside) objects.push({ ...turn.place(o, footprint), ...(o.unit === undefined ? {} : { plot: first + o.unit }) });
-      paths.push(...f.paths.map(turn.rect));
+      // (Its paths: a flats building's at once; over a place, after the place's own, so the first garden path on the
+      // lot is still the place's, to its own front door, as the porch over it is worked out: sim-core `guess_porches`.)
+      const ways = () => {
+        paths.push(...f.paths.map(turn.rect));
+        pathTo(s, f.front);
+      };
+      // (A flats building's porch over its street door, as over a house's: its letterboxes stand clear of its posts.)
+      if (s.kind === 'flats') {
+        ways();
+        porchOver(s, f.shell[0] ?? {}, f.front);
+      } else flatsWays.set(s.index, ways);
       const tile = ([x, z]: [number, number], lift: number): [number, number] => {
         const [tx, tz] = turn.point([x + 0.5, z + 0.5]);
         return [Math.floor(tx), Math.floor(tz) + lift];
@@ -1292,8 +1304,6 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
         const car = reaches && (who?.has(unit) || mine) ? houseCar(plotRect(t, s), s.facing, turn.rect(bay), mine) : null;
         if (car) cars.push({ plot: s.index, flat: unit, ...car });
       }
-      // (The street door's path out across the verge; no porch over it: its letterboxes stand by it.)
-      pathTo(s, f.front);
     }
     // A place with real floors above (`flats.ts` `placeFloors`): each on its storey's rows (its ground floor is the place's layout, stairs added).
     const up = floorsBy.get(s.index);
@@ -1320,6 +1330,7 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
         porchOver(s, place, door);
       }
       paths.push(...(place.paths ?? []).map(turnOnto(t, s).rect));
+      flatsWays.get(s.index)?.();
       continue;
     }
     // A farm's fields and farmyard, and its barn (an empty farm lot keeps them too).
@@ -1586,6 +1597,33 @@ function gardenFencesOf(
   });
   const roads = roadIndex(town.roads);
   return townFences({ plots, fields: layout.fields, walls, blockers, paths: layout.paths, onRoad: (x, z) => roads.onRoad(x, z) });
+}
+
+/**
+ * Whether lot `s` (of `slots`; `index`: the town's roads' `roadIndex`) gets a garden path from its front door to a road,
+ * as `layoutTown` lays it (`pathTo`: straight out from the door across the verge, `PATH_REACH` m at most, over no other
+ * lot past 12 m). A lot with no front door (a park, an outdoor spot, an empty lot) needs none.
+ */
+export function reachesRoad(content: Content, t: Templates, index: ReturnType<typeof roadIndex>, slots: readonly PlotSlot[], s: PlotSlot): boolean {
+  const footprint = (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
+  let door: Door | undefined;
+  if (s.kind === 'house') {
+    const h = houseTemplate(t, s.template);
+    door = h && onLot(t, h, s, footprint).doors[0];
+  } else if (s.kind === 'flats') door = flatsTemplate(t, s.template)?.front;
+  else if (s.kind === 'shop') {
+    const p = t.parks.find((q) => q.id === s.template);
+    door = p && placeOnLot(t, p, s).doors?.[0];
+  }
+  if (!door) return true;
+  const turn = turnOnto(t, s);
+  const rects = slots.map((q) => plotRect(t, q));
+  for (let k = 1; k <= PATH_REACH; k++) {
+    const [x, z] = turn.point([door.x + 0.5, -k + 0.5]);
+    if (k > 12 && rects.some((p, i) => i !== s.index && x > p.x && x < p.x + p.w && z > p.z && z < p.z + p.d)) return false;
+    if (index.onRoad(x, z)) return true;
+  }
+  return false;
 }
 
 /** The flats template id of a slot's flats: a flats building's own, or the flats over a named place (`PlotSlot.upper`); '' for none. */

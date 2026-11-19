@@ -374,8 +374,8 @@ function builtOn(walls: readonly (readonly [number, number, number, number])[], 
 
 /**
  * How built over a main town's centre is against the rest of its box (`centre.ts` `centreDensity`): of its open
- * land (not a road, a green, water or a lot of a home, a farm or a park), the share a named place's or a flats
- * building's lot takes (`meta.lotLooks`). The generator makes the centre the densest (`DENSEST` times the rest's:
+ * land (not a road, a green, water or a lot of a home, a flats building, a farm or a park), the share a named place's
+ * lot takes (`meta.lotLooks`). The generator makes the centre the densest (`DENSEST` times the rest's:
  * tools/worlds/sample.ts checks it); null: no centre, or no main town.
  */
 export function centreBuilt(town: CheckedTown): { centre: number; rest: number } | null {
@@ -387,8 +387,8 @@ export function centreBuilt(town: CheckedTown): { centre: number; rest: number }
   const water = town.terrain?.water ? unrle(town.terrain.water, town.width * town.depth) : null;
   if (water) for (let i = 0; i < taken.length; i++) if (water[i]) taken[i] = 1;
   for (const g of town.meta.greens ?? []) fillPoly(g, town.width, town.depth, (i) => (taken[i] = 1));
-  // (A named place's or a flats building's lot built over, as a building; the other lots no open land.)
-  const placed = new Set(Object.keys(town.meta.lotLooks ?? {}).map(Number));
+  // (A named place's lot built over, as a building; the other lots, homes and flats buildings among them, no open land.)
+  const placed = new Set(Object.keys(town.meta.lotLooks ?? {}).map(Number).filter((i) => town.plots[i]?.kind === 'shop'));
   town.plots.forEach((p, i) => p.kind === 'flat' || placed.has(i) || fillPoly(corners(p), town.width, town.depth, (k) => (taken[k] = 1)));
   const { centre: c, rest } = centreDensity(town.width, town.depth, taken, box, centre.poly, [...placed].map((i) => corners(town.plots[i])));
   return { centre: c, rest };

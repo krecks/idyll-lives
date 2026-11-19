@@ -13,6 +13,7 @@ import { DEFAULT_LANDSCAPE, type RoadPlan, type TownPlace, type WorldStructure, 
 import { BRIDGE_CLEAR, builtSurfaceOf, CUT_MAX, CUT_MAX_MOUNTAIN_ROAD, GRADE, onPad, profileOf, RETAIN_MAX, surfacePlots, type BuiltSurface, type SurfaceWorld } from '../render/shared/builtSurface';
 import { blankLand, COVER, COVER_CELL, coverSpan, heightAt, LAND_CELL, NONE, SEA_CM, type Land } from './land';
 import { HOURS, hoursFor } from './places';
+import { densestCentre, type Centre } from './centre';
 import { APRON, builtOf, landZones, Protection, wetTiles } from './landEdit';
 import { lotKey, removeLots } from './edit/lots';
 import { rle, unrle } from './landMasks';
@@ -268,6 +269,22 @@ const BY_ROAD = 40;
 const SETTLE_MARGIN = 0.15;
 
 /**
+ * `draft` with its main town's centre made the densest again over the lots it has now (`centre.ts` `densestCentre`,
+ * its high street as the generator chose it: `OpenWorldDraft.highStreets`), `world` its preview (the lots' rectangles).
+ * Unchanged where it has no centre.
+ */
+function recentred(draft: NeighbourhoodDraft, world: FollowWorld): NeighbourhoodDraft {
+  const open = draft.open;
+  const high = open?.highStreets?.[0];
+  const area = high && open?.areas[high.area];
+  if (!open || !high || !area || !open.centre?.length) return draft;
+  const c: Centre = { ...high, poly: open.centre[0].poly };
+  const lots = draft.slots.map((s, i) => ({ rect: world.plots[i], place: !!s.dress && s.kind === 'shop' }));
+  densestCentre(c, draft.roads, draft.width, draft.depth, unrle(open.water, draft.width * draft.depth), draft.greens, lots, { x: area.x, z: area.z, w: area.w, d: area.d });
+  return { ...draft, open: { ...open, centre: open.centre.map((q, k) => (k === 0 ? { ...q, poly: c.poly } : q)), highStreets: [c] } };
+}
+
+/**
  * `withLand`, and the last resort: a place's world whose built land still breaks a slope limit
  * (`measureLand`, a little within it) gives up what breaks it and is graded again, round after
  * round (`SETTLE_ROUNDS` at most): a lot cut too deep or whose edge stands too tall (of two lots, a
@@ -310,9 +327,11 @@ export function settleLand<W extends FollowWorld>(
     if (!next) {
       seeded?.(first);
       const total = given.lots + given.roads + given.courts;
+      // (Lots given up: the main town's centre narrowed again, to stay the densest without them.)
+      const settled = given.lots ? recentred(graded, world) : graded;
       // (What is left over a limit itself: step 2's first settle's `before`. The margin changes what is given up, not that.)
       const marks = [...overOf(draft, world, found ?? measureLand(world, land, first, 0, false)).keys()];
-      return { draft: total ? { ...graded, diagnostics: { ...(graded.diagnostics ?? { dropped: [] }), slopes: given } } : graded, world, marks };
+      return { draft: total ? { ...settled, diagnostics: { ...(settled.diagnostics ?? { dropped: [] }), slopes: given } } : settled, world, marks };
     }
     draft = next;
   }
