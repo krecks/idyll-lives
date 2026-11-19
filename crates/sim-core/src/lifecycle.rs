@@ -462,6 +462,8 @@ fn move_to(w: &mut World, i: usize, to: usize) {
     for o in &mut w.objects {
         o.release(id);
     }
+    // (A car their job called for that the old household hasn't bought yet isn't bought.)
+    crate::cars::job_lost(&mut w.cars, id);
     let arrive = w.households[to]
         .plot
         .map(|p| w.plots[p as usize].arrival_point());

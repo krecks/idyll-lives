@@ -1,8 +1,8 @@
 //! A household's car fits its best earner's job (`cars/looks.rs`): the body a field's grade calls
 //! for (`careerCategories[].car`) and how old it is (`grades[].carAge`), from the start, after a
 //! promotion or a new job (bought once it stands idle, the story told; not if the job is given up
-//! first), kept by a household with
-//! nobody at work, kept where a longer one wouldn't fit, and kept in the save.
+//! first), kept by a household with nobody at work, kept where a longer one wouldn't fit, and kept
+//! in the save.
 
 use crate::common;
 
