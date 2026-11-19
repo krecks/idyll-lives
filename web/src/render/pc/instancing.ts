@@ -172,6 +172,13 @@ export class Instances {
     for (let i = 0; i < count; i++) this.setMatrix(i, matrices, i * 16);
   }
 
+  /** The copies' matrices (game space), 16 floats each, as drawn (a tree's impostors take its woods square's: `impostors.ts`). */
+  matrices(): Float32Array {
+    const out = new Float32Array(this.count * 16);
+    for (let i = 0; i < this.count; i++) out.set(this.data.subarray(i * this.stride, i * this.stride + 16), i * 16);
+    return out;
+  }
+
   /** Copy `i`'s values of `stream` (its `components` floats from `values` at `offset`). */
   set(stream: InstanceStream, i: number, values: ArrayLike<number>, offset = 0): void {
     const at = this.offsets.get(stream);

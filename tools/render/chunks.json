@@ -1173,6 +1173,31 @@
       ]
     },
     {
+      "for": "render/pc/impostors.ts: tree impostors (the bake's diag passes, the cards lit by their pictures' normals, occlusion and glossiness).",
+      "anchors": [
+        {
+          "file": "scene/shader-lib/glsl/chunks/standard/frag/stdFrontEnd.js",
+          "text": "litArgs_worldNormal = dNormalW;",
+          "who": "impostors.ts metalness slot: the frontend's normal is set before getMetalness, which then sets it again from the card's picture"
+        },
+        {
+          "file": "scene/shader-lib/glsl/chunks/standard/frag/stdFrontEnd.js",
+          "text": "litArgs_ao = dAo;",
+          "who": "diagView.ts GAME_DIAG_SURFACE: the bake reads the leaves' occlusion"
+        },
+        {
+          "file": "scene/shader-lib/glsl/chunks/standard/frag/stdFrontEnd.js",
+          "text": "litArgs_gloss = dGlossiness;",
+          "who": "diagView.ts GAME_DIAG_SURFACE: the bake reads the leaves' glossiness (inverted already)"
+        },
+        {
+          "file": "scene/shader-lib/glsl/chunks/standard/frag/diffuse.js",
+          "text": "dAlbedo *= saturate(vVertexColor.{STD_DIFFUSE_VERTEX_CHANNEL});",
+          "who": "nature.ts windCode GAME_IMPOSTOR: a card's tint in its vertex colour, clamped (IMPOSTOR_TINT_SCALE)"
+        }
+      ]
+    },
+    {
       "for": "render/pc/post.ts: contact shading (PlayCanvas's occlusion in the lighting, its depth pass without the plants).",
       "anchors": [
         {
