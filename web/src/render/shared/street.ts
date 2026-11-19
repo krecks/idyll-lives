@@ -59,6 +59,7 @@ import { wallCorners, writeFences } from './fences';
 import { shownFences } from './shownFences';
 import { centroid, lengths, pointAt } from '../../game/roads';
 import { pavedRects } from './paving';
+import { streetGround, streetGroundKey } from './streetGround';
 import { bridgeSpans, Kerb, KERB, levelStops, ROAD_Y, roadIndex, roadMeshes, SIDEWALK, stretchOf, townRoads, WALK_Y, walkStops, type RoadIndex } from './roads';
 import { JunctionCuts, junctionsOf, type JunctionPlan } from './junctions';
 import { Levels, levelsOf } from './landSurface';
@@ -2170,6 +2171,9 @@ export class TownStreet {
     // The street's own in it (sidewalks, the road, fountains, bridges, parked cars), by what they look like.
     const own = this.staticSig(id);
     if (own !== null) keys.push(`s${own}`);
+    // The town's paved ground in it (`streetGround.ts`).
+    const paved = streetGroundKey(this.world, id);
+    if (paved) keys.push(`g${paved}`);
     // Ground layers: garden paths and fields off the focus lot (the lot draws its own, on its ground). Their key now,
     // their geometry only when the chunk is planned (`chunk`): most keys are asked for to find the chunk unchanged.
     const layers: [string, Rect[], string, number][] = [];
@@ -2253,6 +2257,8 @@ export class TownStreet {
     }
     for (const p of g.kerbs) mergeParts(plan, p);
     if (g.fence) mergeParts(plan, this.fenceOut(g.fence));
+    // The town's paved ground: the centre, the courts and yards, the car parks and their bays (`streetGround.ts`).
+    streetGround(plan, this.world, id, this.groundAt);
     // The backdrop's buildings, their hedges, and what they stand on.
     const items = this.backdropByChunk.get(id);
     if (items?.length) {
