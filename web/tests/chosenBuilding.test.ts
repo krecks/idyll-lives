@@ -1,30 +1,21 @@
 /**
- * A building clicked in the play view (`ui/town/chosen.ts`): what it is (a place, a lot's house, a backdrop building),
- * its icon and pin, and who is inside now, as the town card and its pin say it.
+ * A building clicked in the play view (`ui/town/chosen.ts`): what it is (a place, a building of flats, a lot's house),
+ * its icon and pin, a building's flats, and who is inside now, as the town card and its pin say it.
  */
 import { describe, expect, test } from 'bun:test';
-import type { BackdropBuilding, PlotInfo, SimView, TownPlace } from '../src/core/protocol';
-import { chosenAnchor, chosenIcon, chosenOf, insideText, placeDetail, placeLabel, whoIsIn, type ChosenTown } from '../src/ui/town/chosen';
+import type { PlotInfo, SimView, TownPlace } from '../src/core/protocol';
+import { chosenAnchor, chosenIcon, chosenOf, flatRows, flatsDetail, insideText, placeDetail, placeLabel, whoIsIn, type ChosenTown } from '../src/ui/town/chosen';
+import { homesForSale } from '../src/ui/town/places';
 import type { TagWorld } from '../src/ui/town/tags';
+import { BUILDING, FLATS, realTown } from './fixtures/realTown';
 
 const plot = (id: number, name: string, pub: boolean, extra: Partial<PlotInfo> = {}): PlotInfo => ({ id, name, x: id * 20, z: 0, w: 16, d: 20, public: pub, entry: null, house: null, ...extra });
 const places: TownPlace[] = [
   { name: 'Bakery', kind: 'shop', x: 45, z: 5, work: ['culinary'], area: 0, plot: 2 },
   { name: 'Town Offices', kind: 'office', x: 100, z: 100, work: ['business'], area: 0 },
 ];
-const box = (x: number, z: number): [number, number][] => [
-  [x, z],
-  [x, z + 10],
-  [x + 10, z + 10],
-  [x + 10, z],
-];
-const backdrop: BackdropBuilding[] = [
-  { poly: box(95, 95), y: 0, storeys: 4, roof: 'hip', use: 'office', look: 0, place: 1, area: 0 },
-  { poly: box(200, 0), y: 0, storeys: 3, roof: 'gable', use: 'flats', look: 0, area: 0 },
-];
 const town: ChosenTown = {
   places,
-  backdrop,
   plots: [plot(0, '1 Mill Lane', false, { house: [2, 2, 12, 14], storeys: 2 }), plot(1, '2 Mill Lane', false), plot(2, 'Bakery', true)],
   households: [
     { name: 'Hart', plot: 0 },
@@ -43,13 +34,49 @@ describe('what a click on a building chooses', () => {
   test("a public lot: its place's card, with its lot to look inside", () => {
     expect(chosenOf({ kind: 'lot', plot: 2 }, town)).toEqual({ kind: 'place', place: 0, plot: 2, title: 'Bakery', detail: '' });
   });
-  test("a backdrop place: the place's card, nothing to look inside; another building: what it is", () => {
-    const office = chosenOf({ kind: 'building', index: 0 }, town)!;
-    expect(office).toEqual({ kind: 'place', place: 1, plot: null, title: 'Town Offices', detail: '' });
-    expect(chosenIcon(office, town)).toBe('icon.career.business');
-    const flats = chosenOf({ kind: 'building', index: 1 }, town)!;
-    expect(flats).toEqual({ kind: 'building', building: 1, plot: null, title: 'Flats', detail: '' });
-    expect(chosenAnchor(flats, town)).toEqual({ x: 205, z: 5, lift: 12 });
+});
+
+describe("a building of flats' card (the real town: Mill Court, flats 1 to 4)", () => {
+  const world = realTown();
+  const t: ChosenTown = { places: [], plots: world.plots, flats: world.flats, households: world.households };
+
+  test('the building: its card, its icon a home, its pin over its walls', () => {
+    const c = chosenOf({ kind: 'lot', plot: BUILDING }, t)!;
+    expect(c).toEqual({ kind: 'flats', plot: BUILDING, title: 'Mill Court', detail: '' });
+    expect(chosenIcon(c, t)).toBe('icon.ui.home');
+    expect(chosenAnchor(c, t)).toEqual({ x: 13.5, z: 12.5, lift: 9 });
+  });
+
+  test('its flats by storey, each with who lives there, or for sale and its price', () => {
+    const households = world.households.filter((h) => h.plot !== FLATS[3]);
+    const sale = homesForSale(world.plots, households, { perTile: 10, perFloorTile: 100, round: 10 }, world.flats);
+    expect(sale.map((h) => h.plot)).toEqual([FLATS[3]]);
+    const rows = flatRows(BUILDING, { ...t, households }, sale);
+    expect(rows.map((r) => [r.plot, r.name, r.storey, r.who])).toEqual([
+      [1, 'Flat 1', 0, 'The Ashs'],
+      [2, 'Flat 2', 0, 'The Birchs'],
+      [3, 'Flat 3', 1, 'The Coles'],
+      [4, 'Flat 4', 1, null],
+    ]);
+    // (The lot of 520 m² shared by four flats, and its own 63 m² at a flat's rate.)
+    expect(rows[3].price).toBe(Math.round((10 * 130 + 0.6 * 100 * 63) / 10) * 10);
+    expect(rows.slice(0, 3).every((r) => r.price === null)).toBe(true);
+    expect(flatsDetail(rows)).toBe('4 flats · 1 for sale');
+    expect(flatsDetail(rows.slice(0, 3))).toBe('3 flats');
+  });
+
+  test("a place with flats over it is the place's card, its flats listed alike", () => {
+    const shop: TownPlace = { name: 'Corner Shop', kind: 'shop', x: 13, z: 30, work: ['retail'], area: 0, plot: BUILDING };
+    const mixed: ChosenTown = { ...t, places: [shop], plots: [{ ...world.plots[0], public: true, kind: 'shop' }] };
+    expect(chosenOf({ kind: 'lot', plot: BUILDING }, mixed)).toEqual({ kind: 'place', place: 0, plot: BUILDING, title: 'Corner Shop', detail: '' });
+    expect(flatRows(BUILDING, mixed, []).length).toBe(4);
+  });
+
+  test('inside: those in its flats, its hall and its yard', () => {
+    const sim = (id: number, plot: number | null) => ({ id, detail: false, name: `S${id}`, household: 9, plot, awayUntil: null, visiting: null }) as unknown as SimView;
+    const w = { sims: [sim(1, FLATS[0]), sim(2, BUILDING), sim(3, FLATS[2]), sim(4, null)], flats: world.flats, plots: world.plots } as unknown as TagWorld;
+    expect(whoIsIn({ kind: 'flats', plot: BUILDING, title: '', detail: '' }, w, new Map([[3, 'Cara']]))).toEqual({ names: ['Cara'], others: 2 });
+    expect(whoIsIn({ kind: 'home', plot: FLATS[0], title: '', detail: '' }, w, new Map())).toEqual({ names: [], others: 1 });
   });
 });
 
@@ -81,9 +108,7 @@ describe("a place's card line", () => {
   test('a place lot is a place: Visit and Look inside go to its lot', () => {
     const t2: ChosenTown = { ...town, places: [...places, school], plots: [...town.plots, plot(3, 'x', false), plot(4, 'x', false), plot(5, 'x', false), plot(6, 'Ashby School', true)] };
     expect(chosenOf({ kind: 'lot', plot: 6 }, t2)).toEqual({ kind: 'place', place: 2, plot: 6, title: 'Ashby School', detail: '' });
-    // (Drawn by the backdrop dresser while closed, its building still names the place and its lot.)
-    const b: BackdropBuilding = { poly: box(120, 0), y: 0, storeys: 2, roof: 'hip', use: 'school', look: 0, place: 2, area: 0 };
-    expect(chosenOf({ kind: 'building', index: 0 }, { ...t2, backdrop: [b] })).toEqual({ kind: 'place', place: 2, plot: 6, title: 'Ashby School', detail: '' });
+    expect(chosenIcon(chosenOf({ kind: 'lot', plot: 6 }, t2)!, t2)).toBe('icon.career.education');
   });
 });
 
@@ -121,8 +146,8 @@ describe('who is inside', () => {
     expect(inside).toEqual({ names: [], others: 1 });
     expect(insideText(inside)).toBe('1 person inside');
   });
-  test('a building nobody is simulated in says nothing; an empty one, nobody', () => {
-    expect(whoIsIn({ kind: 'building', building: 1, plot: null, title: '', detail: '' }, world([]), new Map())).toBeNull();
+  test('a person says nothing; an empty building, nobody', () => {
+    expect(whoIsIn({ kind: 'person', sim: 1, plot: null, title: '', detail: '' }, world([]), new Map())).toBeNull();
     expect(insideText({ names: [], others: 0 })).toBe('Nobody inside now');
     expect(insideText({ names: ['Mika', 'Ines'], others: 0 })).toBe('Mika and Ines inside');
   });

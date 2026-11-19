@@ -1779,7 +1779,7 @@ async function openSession(
       if (hit.objectId !== null) return openMenu(hit.objectId, x, y);
       // A house or a building past the lot in view: its card (what it is, who is inside) and its pin.
       const building = world ? renderer.buildingAt(x, y) : null;
-      const chosen = building && world ? chosenOf(building, { places: townPlaces(world.meta, game.plots), backdrop: world.meta?.backdrop ?? [], plots: game.plots, households: game.households }) : null;
+      const chosen = building && world ? chosenOf(building, { places: townPlaces(world.meta, game.plots), plots: game.plots, flats: game.flats, households: game.households }) : null;
       if (chosen) {
         townHud.chosen = chosen;
         return;
