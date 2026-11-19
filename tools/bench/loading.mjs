@@ -17,7 +17,9 @@
  *   to the game up (its interface there, the loading screen gone), the rest of the homes for sale
  *   filled on the way. Step 5 is reached by "Play" on a household's card, or with `--create` through
  *   Creation (its household as it comes, "Choose a home"), and its home as it opens. Then the residents
- *   in the game, the homes they live in, and the homes the game shows for sale.
+ *   in the game, the homes they live in, and the homes the game shows for sale;
+ * - total: the page's first byte to the game up (`marks.entered`, the harness's waits between steps
+ *   included).
  *
  * With `--back`, then the way back and in again: the long tasks in the 5 s after the entry (`entryLong`),
  * "Save and quit" from the menu shown to its picture on screen (`back`), Continue (once the latest save has been prepared behind the
@@ -255,8 +257,8 @@ async function visit(page, cdp) {
   clearInterval(polling);
   await keep();
   const report = { entries: [...entries.values()].sort((a, b) => a.start - b.start), marks };
-  // (perf/load-timing: the marks kept as absolute page times, so the whole way from the page's
-  // first byte to the game up — `marks.entered` — can be reported, not only the phases.)
+  // (The marks as page times too: the whole way from the page's first byte to the game up,
+  // `marks.entered`, is reported as the total.)
   return { boot, world: made - newGame, layout: proposed - proposePressed, town: laid - layPressed, inView: inView - opened, portraits: shown - opened, faces, home, entry: entered - pressed, ...people, ...more, report, marks };
 }
 

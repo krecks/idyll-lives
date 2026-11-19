@@ -151,17 +151,15 @@
       const snapshot = $state.snapshot(settings);
       step('Starting the renderer', 0.15);
       await perfTimeAsync('boot: renderer', () => inTime(host.rendererNow(snapshot)));
-      // The menu shows no portraits. One face warms the portrait studio up behind the loading screen
-      // (its device made, its shaders compiled; kept through the menus): step 2's first faces come
-      // quickly. Not longer than a moment (a slow first compile, or a missing environment texture).
-      // A face of its own (seeded: it takes none of the page's dice).
+      // The menu shows no portraits. One face warms the portrait studio up behind the menu, not in
+      // front of it (its device made, its shaders compiled; kept through the menus): New game's first
+      // faces come quickly, and one asked for before it is done queues behind it. Not longer than a
+      // moment (a slow first compile, or a missing environment texture). A face of its own (seeded:
+      // it takes none of the page's dice).
       if (services.previews) {
-        step('Preparing portraits', 0.3);
         // (Kept from now on, as the menus keep it.)
         services.previews.keep(true, 'page');
         const look = { gender: 'female', appearance: lookAtAge(services.content, services.assets, lookFromSeed(services.assets, 'female', WARM_FACE), WARM_AGE) };
-        // (Behind the menu, not in front of it: the studio warms up while the picture is painted, and
-        // a portrait asked for before it is done queues behind it.)
         void perfTimeAsync('boot: portraits', () => within(services.previews.portrait(look), PORTRAIT_LIMIT_MS, undefined)).catch((err: unknown) =>
           console.warn('[boot] the portrait warm-up failed', err),
         );
