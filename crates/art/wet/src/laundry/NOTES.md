@@ -95,10 +95,27 @@ The new hem colours (`towel_hem`, `towel_hem2`) are `fabric` like the towels the
 
 `check-glb`: 6 models, 0 failed. Khronos validator: 0 errors, 0 warnings each.
 
+## The cleaning things (2026-11-19)
+
+Four more in `cleaning.rs`, each with one part a resident takes, its origin where it's held from and hidden while used
+(`*_off`, a `squash!` to 0.001 in 0.2 s, by the use's id). The vacuum, the mop and the broom are held as a pole (content
+`held`, grip `pole`: the top in the hands, the foot on the floor ahead) and used where the floor is dirty, not where
+they stand (content `cleans`, sim-core `sweep.rs`): the part is gone from its place while it's out. The iron stays the
+board's and the hand holds the held family's `tool.iron` (actions.ts `PROPS.iron`).
+
+| Model | Size (w × h × d) | Triangles | Draws | What it is | Colour parts |
+|---|---|---|---|---|---|
+| `model.vacuumCleaner` | 0.44 × 1.09 × 0.31 m | 3,092 | 2 | a bagless upright against the wall: its head with bumper and brush window, two wheels, the motor ball, the body with its dust cup, a stem and hooked grip, the hose up its back, the cord wound; beside it on the wall, a clip with the crevice tool and a dusting brush (what stays). Moving part `vacuum`, origin at its head's middle on the floor | Body, Dust cup |
+| `model.mopBucket` | 0.33 × 1.32 × 0.32 m | 1,588 | 2 | a round bucket with a rolled rim, water in it, a slotted wringer on its right half and a bail handle; the cotton mop standing in it (moving part `mop`, origin at its strands' foot) | Bucket, Wringer |
+| `model.broomDustpan` | 0.64 × 1.40 × 0.27 m | 788 | 2 | a soft broom upright on its bristles by the wall (moving part `broom`, origin at its bristles' middle); a dustpan on the floor beside it, its brush lying in it | Dustpan, Broom |
+| `model.ironingBoard` | 1.43 × 1.03 × 0.39 m (2 × 1) | 1,788 | 3 | a board narrowing to a rounded nose, its cover (`fabric`), a wire rest at the square end, two U-legs crossed under it; the iron on the rest (moving part `iron`). The board stands to the front of its footprint, its top at 0.90 m, to be stood at | Cover, Iron |
+
+All plain but the board's cover. `check-glb`: 0 failed.
+
 ## Rebuild
 
 ```
-cargo art laundry            # the six .glb, the pack, check-glb
+cargo art laundry            # the .glb files, the pack, check-glb
 cargo art laundry --preview  # previews/laundry/<id>.png, <id>@<clip>.png
 ```
 

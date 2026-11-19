@@ -1,5 +1,5 @@
 {
-  "$comment": "The laundry (crates/art/wet/src/laundry, built by cargo art). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The washer and the dryer open their door (`door_open`) while a resident loads or empties them, and turn their drum (`drum_spin`) while they run on their own (`running`). The basket of washing and the piece held up to fold are carried (content `items`).",
+  "$comment": "The laundry (crates/art/wet/src/laundry, built by cargo art). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The washer and the dryer open their door (`door_open`) while a resident loads or empties them, and turn their drum (`drum_spin`) while they run on their own (`running`). The vacuum cleaner, the mop, the broom and the iron leave their place (`*_off`) while a resident has them in hand. The basket of washing and the piece held up to fold are carried (content `items`).",
   "version": 1,
   "entries": {
     "model.laundryWasher": {
@@ -310,6 +310,147 @@
           "finish": "material.finish.satin"
         }
       }
+    },
+    "model.vacuumCleaner": {
+      "type": "model",
+      "url": "../../models/laundry/vacuumCleaner.glb",
+      "materials": {
+        "alu": {
+          "finish": "material.finish.metal"
+        },
+        "rubber": {
+          "finish": "material.finish.rubber"
+        },
+        "vac_body": {
+          "finish": "material.finish.plastic"
+        },
+        "vac_cup": {
+          "finish": "material.finish.plastic"
+        }
+      },
+      "motions": {
+        "uses": {
+          "vacuum": "vacuum_off"
+        }
+      },
+      "paint": [
+        {
+          "material": "vac_body",
+          "label": "Body"
+        },
+        {
+          "material": "vac_cup",
+          "label": "Dust cup"
+        }
+      ]
+    },
+    "model.mopBucket": {
+      "type": "model",
+      "url": "../../models/laundry/mopBucket.glb",
+      "materials": {
+        "alu": {
+          "finish": "material.finish.metal"
+        },
+        "bucket": {
+          "finish": "material.finish.plastic"
+        },
+        "mop_cotton": {
+          "finish": "material.finish.satin"
+        },
+        "rubber": {
+          "finish": "material.finish.rubber"
+        },
+        "water": {
+          "finish": "material.finish.gloss"
+        },
+        "wringer": {
+          "finish": "material.finish.plastic"
+        }
+      },
+      "motions": {
+        "uses": {
+          "mop": "mop_off"
+        }
+      },
+      "paint": [
+        {
+          "material": "bucket",
+          "label": "Bucket"
+        },
+        {
+          "material": "wringer",
+          "label": "Wringer"
+        }
+      ]
+    },
+    "model.broomDustpan": {
+      "type": "model",
+      "url": "../../models/laundry/broomDustpan.glb",
+      "materials": {
+        "bristle": {
+          "finish": "material.finish.satin"
+        },
+        "broom_wood": {
+          "finish": "material.finish.satin"
+        },
+        "pan": {
+          "finish": "material.finish.plastic"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sweep": "broom_off"
+        }
+      },
+      "paint": [
+        {
+          "material": "pan",
+          "label": "Dustpan"
+        },
+        {
+          "material": "broom_wood",
+          "label": "Broom"
+        }
+      ]
+    },
+    "model.ironingBoard": {
+      "type": "model",
+      "url": "../../models/laundry/ironingBoard.glb",
+      "materials": {
+        "alu": {
+          "finish": "material.finish.metal"
+        },
+        "board_cover": {
+          "finish": "material.finish.fabric"
+        },
+        "iron_accent": {
+          "finish": "material.finish.plastic"
+        },
+        "iron_body": {
+          "finish": "material.finish.plastic"
+        },
+        "iron_plate": {
+          "finish": "material.finish.chrome"
+        },
+        "rubber": {
+          "finish": "material.finish.rubber"
+        }
+      },
+      "motions": {
+        "uses": {
+          "iron": "iron_off"
+        }
+      },
+      "paint": [
+        {
+          "material": "board_cover",
+          "label": "Cover"
+        },
+        {
+          "material": "iron_accent",
+          "label": "Iron"
+        }
+      ]
     }
   }
 }

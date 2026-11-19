@@ -1,6 +1,8 @@
 //! The laundry: the washing machine (`model.laundryWasher`), the tumble dryer (`model.laundryDryer`), the towel
 //! rail (`model.towelRail`), the towel ladder (`model.towelLadder`), the laundry basket (`model.laundryBasket`)
-//! and the bath mat (`model.bathMat`); and what residents carry doing the laundry (content `items`): the basket of
+//! and the bath mat (`model.bathMat`); the cleaning things (cleaning.rs): the vacuum cleaner (`model.vacuumCleaner`),
+//! the mop and bucket (`model.mopBucket`), the broom and dustpan (`model.broomDustpan`) and the ironing board
+//! (`model.ironingBoard`); and what residents carry doing the laundry (content `items`): the basket of
 //! washing (`item.washingBasket`), an armful of it dry (`item.washingArmful`) and a towel being folded
 //! (`item.washingPiece`). Notes: NOTES.md.
 //!
@@ -16,6 +18,7 @@ use artkit::family::{Family, Model};
 use artkit::json::Json;
 use artkit::{json, palette};
 
+mod cleaning;
 mod common;
 mod machines;
 mod rest;
@@ -49,6 +52,22 @@ palette! { M:
     towel_hem = ("#7FAEB9", fabric),  // the woven band across a towel's foot
     towel_hem2 = ("#D9D5CA", fabric),
     wicker_band = ("#B09A7C", satin), // the bands round the dryer's basket
+    // the cleaning things (cleaning.rs): all plain but the board's cover
+    vac_body = ("#5F86AD", plastic),  // the vacuum's shell, the dusting brush's head
+    vac_cup = ("#C7D0D6", plastic),   // its dust cup, the brush bar's window, the tools
+    rubber = ("#2F3236", rubber),     // wheels, grips, bumper, hose, cord, the wringer's slots, the board's feet
+    alu = ("#C3C8CD", metal),         // the stem, the mop's handle, the bail, the board's frame and legs
+    bucket = ("#3B8CC2", plastic),    // the mop bucket
+    wringer = ("#5A5F66", plastic),   // its wringer and the mop's socket
+    water = ("#A7BEC2", gloss),       // the water in it
+    mop_cotton = ("#ECE6D7", satin),  // the mop's strands
+    broom_wood = ("#C38D58", satin),  // the broom's stock and handle, the brush's back (plain)
+    bristle = ("#4A443D", satin),     // the broom's and the brush's bristles
+    pan = ("#5CA88A", plastic),       // the dustpan, the broom's cap
+    board_cover = ("#93B6C8", fabric), // the ironing board's cover
+    iron_body = ("#EEF1F3", plastic), // the iron's shell and handle
+    iron_accent = ("#3FA3B8", plastic), // its water window and dial
+    iron_plate = ("#C9CDD1", chrome), // its soleplate
 }
 
 /// Loading a machine and taking the washing out open its door, which shuts again (`hold`; `door_open` takes 1.0 s
@@ -99,6 +118,38 @@ pub fn family() -> Option<Family> {
             Model::new("bathMat", rest::bath_mat, (0.76, 0.025, 0.5))
                 .key("model.bathMat")
                 .paint(&[("mat", "Mat"), ("mat_pile", "Pile")]),
+            Model::new(
+                "vacuumCleaner",
+                cleaning::vacuum_cleaner,
+                (0.435, 1.087, 0.308),
+            )
+            .key("model.vacuumCleaner")
+            .centre(0.0275, -0.2837)
+            .motions(json!({"uses": {"vacuum": "vacuum_off"}}))
+            .paint(&[("vac_body", "Body"), ("vac_cup", "Dust cup")]),
+            Model::new("mopBucket", cleaning::mop_bucket, (0.327, 1.325, 0.32))
+                .key("model.mopBucket")
+                .centre(0.0, -0.23)
+                .motions(json!({"uses": {"mop": "mop_off"}}))
+                .paint(&[("bucket", "Bucket"), ("wringer", "Wringer")]),
+            Model::new(
+                "broomDustpan",
+                cleaning::broom_dustpan,
+                (0.64, 1.395, 0.266),
+            )
+            .key("model.broomDustpan")
+            .centre(0.0502, -0.2831)
+            .motions(json!({"uses": {"sweep": "broom_off"}}))
+            .paint(&[("pan", "Dustpan"), ("broom_wood", "Broom")]),
+            Model::new(
+                "ironingBoard",
+                cleaning::ironing_board,
+                (1.427, 1.028, 0.391),
+            )
+            .key("model.ironingBoard")
+            .centre(0.0908, 0.1)
+            .motions(json!({"uses": {"iron": "iron_off"}}))
+            .paint(&[("board_cover", "Cover"), ("iron_accent", "Iron")]),
             Model::new("washingBasket", rest::washing_basket, (0.42, 0.284, 0.3))
                 .key("item.washingBasket"),
             Model::new("washingArmful", rest::washing_armful, (0.34, 0.193, 0.24))
@@ -110,7 +161,8 @@ pub fn family() -> Option<Family> {
         "The laundry (crates/art/wet/src/laundry, built by cargo art). Listed in the base manifest's packs. \
          The materials map onto the game's finishes so a model costs one draw call per finish group. The \
          washer and the dryer open their door (`door_open`) while a resident loads or empties them, and \
-         turn their drum (`drum_spin`) while they run on their own (`running`). The basket of washing \
-         and the piece held up to fold are carried (content `items`).",
+         turn their drum (`drum_spin`) while they run on their own (`running`). The vacuum cleaner, the \
+         mop, the broom and the iron leave their place (`*_off`) while a resident has them in hand. The \
+         basket of washing and the piece held up to fold are carried (content `items`).",
     ))
 }

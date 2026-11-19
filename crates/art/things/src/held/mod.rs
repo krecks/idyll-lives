@@ -527,6 +527,15 @@ pub fn family() -> Option<Family> {
                 T,
             ),
             i(
+                "iron",
+                steam_iron,
+                (0.11, 0.153, 0.259),
+                "tool.iron",
+                (0.0, 0.0293),
+                true,
+                T,
+            ),
+            i(
                 "secateurs",
                 secateurs,
                 (0.048, 0.016, 0.175),

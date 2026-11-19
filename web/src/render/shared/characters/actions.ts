@@ -478,6 +478,8 @@ export const PROPS = {
   cue: { key: 'tool.cue', grip: 'cue', at: [0, 0, 0.32], clips: POOL.map(({ clip }) => clip) },
   // The rest of G-70: the tools, the post box's card, the basketball.
   wateringCan: { key: 'tool.wateringCan', grip: 'level', at: [0, -0.262, 0] },
+  // Held by its handle's middle, 13.8 cm over its soleplate, the point ahead.
+  iron: { key: 'tool.iron', grip: 'level', at: [0, -0.138, 0] },
   secateurs: { key: 'tool.secateurs', grip: 'hand', at: [0, 0, 0], turn: [0, 0, 0] },
   paintbrush: { key: 'tool.paintbrush', grip: 'hand', at: [0, 0, 0], turn: [90, 0, 0] },
   chalk: { key: 'tool.chalk', grip: 'hand', at: [0, 0, 0], turn: [90, 0, 0] },
@@ -510,6 +512,8 @@ export const PROPS = {
  * (`ACTIONS[tag].prop`, by the plate), not carried: the baby's bottle, fed with the baby in the arms.
  */
 export const PROP_ITEMS = new Set(['babyBottle']);
+/** The ironing board: ironed at with the iron in the hand (`ACTIONS.clean`). */
+const IRONING_BOARD = 'ironingBoard';
 /** Watered from a can (`ACTIONS.water`, the house plant's `garden`): not what is misted (the terrarium, the bonsai's leaves). */
 const MISTED = new Set(['natureLover.mossTerrarium', 'loner.bonsaiBench']);
 /** Painted with a brush (`ACTIONS.paint`); the chalkboard with chalk, the whiteboard with a marker. */
@@ -704,8 +708,18 @@ export const ACTIONS: Record<string, ActionAnim> = {
   sing: { stand: ['talk'], hands: HANDS.relaxed },
   clean: {
     stand: (def) =>
-      def.includes('Mop') || def.includes('Vacuum') ? ['push'] : def.includes('laundry') ? ['spell', 'interact', 'pickUp'] : DISHWASHERS.has(def) ? DISHWASHER_RACK : ['interact', 'spell'],
+      def.includes('Mop') || def.includes('Vacuum')
+        ? ['push']
+        : def === IRONING_BOARD
+          ? ['interact']
+          : def.includes('laundry')
+            ? ['spell', 'interact', 'pickUp']
+            : DISHWASHERS.has(def)
+              ? DISHWASHER_RACK
+              : ['interact', 'spell'],
     hands: HANDS.hold,
+    // (Ironing: the iron in the hand, the board's own hidden meanwhile, its `iron_off`.)
+    prop: (def) => (def === IRONING_BOARD ? PROPS.iron : null),
   },
   // Gardening, by task (older content and packs: `garden`).
   water: { stand: ['water'], hands: HANDS.hold, prop: (def) => (MISTED.has(def) ? null : PROPS.wateringCan) },
