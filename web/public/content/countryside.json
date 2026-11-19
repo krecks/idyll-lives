@@ -141,7 +141,7 @@
       "footprint": [2, 1],
       "price": 0,
       "decor": 0.1,
-      "description": "A course of local stone, stacked without mortar and capped with coping set on edge."
+      "description": "Field stones stacked without mortar, course on course, narrowing to a coping set on edge."
     },
     {
       "id": "countryside.hedgerow",
@@ -180,7 +180,7 @@
       "footprint": [1, 1],
       "price": 0,
       "decor": 0.1,
-      "description": "Two worn stone steps over a short wall, where a footpath crosses a field boundary."
+      "description": "Stones set through a field wall as steps on both sides, where a footpath crosses."
     },
     {
       "id": "countryside.fingerpost",
@@ -193,7 +193,7 @@
       "footprint": [1, 1],
       "price": 0,
       "decor": 0.1,
-      "description": "Three painted arms on an iron post, pointing the way down the lanes."
+      "description": "Three painted arms on an iron post where the lanes meet, pointing the way down each."
     }
   ]
 }

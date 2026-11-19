@@ -881,6 +881,30 @@
     "fhwaPddm9": {
       "title": "FHWA Federal Lands, Project Development and Design Manual, ch. 9 Highway Design: vertical curbs typically 6 in (150 mm), sloping curbs 3-4 in (75-100 mm)",
       "url": "https://highways.dot.gov/federal-lands/pddm/Chapter_09.pdf"
+    },
+    "wsdswaGuide": {
+      "title": "West of Scotland Dry Stone Walling Association, Beginners' Guide (2010): the training wall 1.4 m high, 70 cm wide at the base and 35 cm at the top, the batter",
+      "url": "https://wsdswa.org.uk/wp-content/uploads/2019/10/Beginners-Guide-V0.3.pdf"
+    },
+    "bs5709Guide": {
+      "title": "Understanding the British Standard for Gaps, Gates and Stiles (BS 5709): a stile's steps 200 mm deep at least, the first not over 300 mm from the ground",
+      "url": "https://shropshire.gov.uk/committee-services/documents/s16201/Existing%20BS5709.pdf"
+    },
+    "diyFenceGates": {
+      "title": "DIY Fence, 5 bar field gates: 5 ft to 14 ft wide, 4 ft high",
+      "url": "https://diy-fence.co.uk/product/quality-entrance-5-bar-field-gates/"
+    },
+    "walfordGates": {
+      "title": "Walford Timber, choosing a timber gate: farm and field gates typically 2,400 to 4,800 mm wide",
+      "url": "https://walfordtimber.co.uk/knowledge-base/choosing-the-right-timber-gate-sizes-styles-uses"
+    },
+    "roadsFingerposts": {
+      "title": "SABRE Roads, Clear and legible: the 1920s national fingerpost, its arms 8 to 9 ft above the ground and at least 3 ft 6 in long",
+      "url": "https://www.roads.org.uk/articles/clear-legible"
+    },
+    "aeEvansFingerpost": {
+      "title": "A E Evans, standard finger post: 2,400 mm high, 1,600 mm across its arms",
+      "url": "https://www.aeevans.co.uk/product/standard-finger-post/"
     }
   },
   "kinds": {
@@ -11161,7 +11185,7 @@
       ]
     },
     "dryStoneWall": {
-      "label": "Dry-stone field wall",
+      "label": "Dry-stone field wall (a length of it)",
       "w": [
         1.0,
         3.0
@@ -11178,7 +11202,7 @@
         "mark a field boundary"
       ],
       "sources": [
-        "neufert"
+        "wsdswaGuide"
       ]
     },
     "hedgerow": {
@@ -11204,14 +11228,14 @@
       ]
     },
     "fieldGate": {
-      "label": "Field gate between posts",
+      "label": "Five-bar field gate between its posts",
       "w": [
-        1.2,
-        3.0
+        1.5,
+        4.8
       ],
       "h": [
-        0.9,
-        1.7
+        1.1,
+        1.5
       ],
       "d": [
         0.1,
@@ -11222,11 +11246,12 @@
         "close it"
       ],
       "sources": [
-        "neufert"
+        "diyFenceGates",
+        "walfordGates"
       ]
     },
     "stoneStile": {
-      "label": "Stone stile over a wall",
+      "label": "Stone step stile in a field wall",
       "w": [
         0.6,
         1.4
@@ -11243,28 +11268,29 @@
         "climb over"
       ],
       "sources": [
-        "neufert"
+        "bs5709Guide"
       ]
     },
     "fingerpost": {
-      "label": "Fingerpost with direction arms",
+      "label": "Fingerpost with direction arms (across its arms)",
       "w": [
-        0.5,
-        1.3
+        0.9,
+        2.2
       ],
       "h": [
-        1.8,
-        3.0
+        2.2,
+        3.4
       ],
       "d": [
-        0.2,
-        1.0
+        0.1,
+        2.2
       ],
       "uses": [
         "read the directions"
       ],
       "sources": [
-        "neufert"
+        "aeEvansFingerpost",
+        "roadsFingerposts"
       ]
     },
     "floweringShrub": {
