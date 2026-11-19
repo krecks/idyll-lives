@@ -72,6 +72,8 @@ export interface LotView {
   rowOf(k: number): number;
   /** Whether a ground point (tiles) is in the lot being viewed, `margin` round it. */
   inView(x: number, z: number, margin: number): boolean;
+  /** Whether a ground point (tiles) on storey `k` is in a flat that may not be shown open: what is in it isn't drawn. */
+  closed(x: number, z: number, k: number): boolean;
 }
 
 /** What the renderer does for the lot's contents. */
@@ -732,7 +734,11 @@ export class LotContents {
     this.wallItemsHidden.clear();
     this.riddenHidden.clear();
     const down = (o: ObjectPlacement) => storey >= 0 && v.storeyOf(o.z) === -1 && !!this.deps.content.object(o.def)?.stairs;
-    const shown = world.objects.filter((o) => (storeyShown(v.storeyOf(o.z), storey) || down(o)) && v.inView(o.x + o.w / 2, o.z - v.rowOf(v.storeyOf(o.z)) + o.d / 2, 0));
+    const shown = world.objects.filter((o) => {
+      const k = v.storeyOf(o.z);
+      const [x, z] = [o.x + o.w / 2, o.z - v.rowOf(k) + o.d / 2];
+      return (storeyShown(k, storey) || down(o)) && v.inView(x, z, 0) && !v.closed(x, z, k);
+    });
     // One template per model and size (things the player resized get their own).
     const byModel = Map.groupBy(shown, (o) => `${o.def}|${this.objectModel(o)}${resizeKey(this.objectResize(o))}${colorsKey(this.objectColors(o))}`);
     const lists = [...byModel.values()];
@@ -1145,7 +1151,7 @@ export class LotContents {
   showItems(): void {
     const v = this.view;
     const storey = v.storey();
-    this.items.show({ storey, storeyOf: (z) => v.storeyOf(z), shown: (k) => storeyShown(k, storey), groundZ: (z) => z - v.rowOf(v.storeyOf(z)), storeyHeight: WALL_HEIGHT, inView: (x, z) => v.inView(x, z, 0) });
+    this.items.show({ storey, storeyOf: (z) => v.storeyOf(z), shown: (k) => storeyShown(k, storey), groundZ: (z) => z - v.rowOf(v.storeyOf(z)), storeyHeight: WALL_HEIGHT, inView: (x, z, k) => v.inView(x, z, 0) && !v.closed(x, z, k) });
   }
 
   /** New items from the simulation. */
