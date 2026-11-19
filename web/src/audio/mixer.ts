@@ -2,14 +2,17 @@
  * One audio context for the whole game, with a bus each for interface sounds (`ui/sfx.ts`),
  * resident voices (`voice/player.ts`) and the sounds of the world (`audio/world.ts`), each with
  * its own volume setting, all through a limiter and the master volume. The music (a stereo, a
- * radio, dancing) is one of the world's sounds with a volume of its own on top (`musicGain`: its
- * loops' level, so it stays in the world's space, under the voices and the limiter). The voices and
+ * radio, dancing, an instrument playing a tune) is one of the world's sounds with a volume of its
+ * own on top (`musicGain`: its loops' level, so it stays in the world's space, under the voices
+ * and the limiter). The voices and
  * the world's sounds are placed in a space on their way into their bus (`space`, `space.ts`: left
  * to right, rooms, walls, and for the world the camera's distance).
  *
  * The mix: while a resident speaks the world's sounds give way to the voice (`DUCK`), and what the
  * buses add up to goes through a limiter (`LIMIT`), so a shower, a blender and two voices at once
- * are held under full scale and not clipped. Below its threshold the limiter changes nothing.
+ * are held under full scale and not clipped. Below its threshold it changes next to nothing: the
+ * browser's compressor adds about +1.7 dB of make-up gain throughout, and a fresh one holds the first
+ * ~80 ms down while it settles.
  *
  * The context starts with the player's first click or key press (browsers allow sound only after
  * one); a context the browser stopped (Safari's `interrupted`) starts again with the next one.

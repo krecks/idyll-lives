@@ -78,7 +78,7 @@ export interface Settings {
   worldSound: boolean;
   /** 0..1. */
   worldVolume: number;
-  /** The stereo's, the radio's and the dance music's volume, 0..1 (in the world's); 0: no music. */
+  /** The music's volume (the stereo, the radio, dancing, instruments playing a tune), 0..1 (in the world's); 0: no music. */
   musicVolume: number;
   /** Every sound, 0..1. */
   masterVolume: number;

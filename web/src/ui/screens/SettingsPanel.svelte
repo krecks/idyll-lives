@@ -517,7 +517,7 @@
           <input class="slider" type="range" min="0" max="1" step="0.05" aria-label="World volume" bind:value={settings.worldVolume} disabled={!settings.worldSound} />
           <output>{percent(settings.worldVolume)}</output>
         </SettingRow>
-        <SettingRow title="Music volume" hint="The stereo, the radio and dancing. At 0 no music plays." disabled={!settings.worldSound}>
+        <SettingRow title="Music volume" hint="The stereo, the radio, dancing and instruments playing a tune. At 0 no music plays." disabled={!settings.worldSound}>
           <input class="slider" type="range" min="0" max="1" step="0.05" aria-label="Music volume" bind:value={settings.musicVolume} disabled={!settings.worldSound} />
           <output>{percent(settings.musicVolume)}</output>
         </SettingRow>
