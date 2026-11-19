@@ -1,14 +1,15 @@
 /**
- * A backdrop building (`WorldMeta.backdrop`: the terraces, flats, shops, civic places and houses nobody lives in)
- * dressed as the game draws it near (the street's chunks streamed in, `shared/street.ts`), engine-neutral. Far off the
- * town view draws the same building as a box and a roof (`townBuildings.ts`); this one has the box's measures and
- * colours (`backdropBuilding`: its rectangle, its walls from under its ground to its storeys, its roof's rise), dressed:
+ * A lot's building closed (`WorldMeta.lotLooks`: a named place's, a flats building's) dressed as the game draws it near
+ * (the street's chunks streamed in, `shared/street.ts`), engine-neutral. Far off the town view draws the same building
+ * as a box and a roof (`townBuildings.ts`); this one has the box's measures and colours (`lotLookBuilding`: its
+ * rectangle, its walls from under its ground to its real storeys, its roof's rise), dressed:
  *
  * - **Homes** (`house`, `terrace`, `farm`): siding (brick where the palette's wall is brick), corner boards, framed
  *   windows with curtains and shutters on every storey, a panelled front door under a little canopy on the side its
  *   way to the road leaves by, a chimney on some roofs. A terrace is a row of homes (one door each, a stack on each
  *   party wall).
- * - **Shops, cafés, restaurants**: a shopfront on the ground floor (glass, a door, a fascia, an awning on most).
+ * - **Shops, cafés, restaurants**: a shopfront on the ground floor (glass, a door, a fascia, an awning on most). With
+ *   flats over it (`TownBuilding.flats`), the flats' windows above and their own street door beside the shopfront.
  * - **Flats, offices, schools, halls**: render (or brick), bands between storeys, closer and wider windows, a door
  *   under a canopy.
  * - **A church**: stone, tall windows, a tower with a spire at one end. **A workshop, a barn**: boards, a wide door,
@@ -31,8 +32,8 @@ export const PANE_SETS = 4;
 /** Whether pane set `k` of a building is lit while `share` of its windows are (`litAt`). */
 export const paneSetLit = (k: number, share: number): boolean => share > (k + 0.5) / PANE_SETS;
 
-/** A backdrop building as dressed: its parts (by the silhouettes' names where they share a material) and its window glass by set. */
-export interface BackdropDress {
+/** A building as dressed: its parts (by the silhouettes' names where they share a material) and its window glass by set. */
+export interface BuildingDress {
   parts: HousePart[];
   panes: Geo[];
 }
@@ -48,6 +49,8 @@ const STRIPES = ['#B23A3A', '#2F6B5A', '#2F4E7A', '#C27B2A'];
 const OVERHANG = 0.35;
 /** A terrace's homes are about this wide (m). */
 const TERRACE_HOME = 5.5;
+/** Flats' windows (and a hall's): bays this far apart (m), this wide, their sill and head over the storey's floor. */
+const FLATS_WINDOWS = [2.4, 1.2, 0.9, 2.3] as const;
 
 const HOMES: ReadonlySet<BuildingUse> = new Set<BuildingUse>(['house', 'terrace', 'farm']);
 const SHOPS: ReadonlySet<BuildingUse> = new Set<BuildingUse>(['shop', 'cafe', 'restaurant']);
@@ -233,8 +236,8 @@ class Dresser {
       [
         [this.siding, 'silhouetteWalls', M.siding, true],
         [this.brick, 'silhouetteBrick', M.brick, true],
-        [this.render, 'backdropRender', M.plaster, true],
-        [this.stone, 'backdropStone', M.stone, true],
+        [this.render, 'buildingRender', M.plaster, true],
+        [this.stone, 'buildingStone', M.stone, true],
         [this.plinth, 'silhouettePlinth', M.stone, false],
         [this.roof, 'silhouetteRoofs', M.roof, true],
         [this.trim, 'silhouetteTrim', M.trim, true],
@@ -251,8 +254,8 @@ class Dresser {
 }
 
 /**
- * Which side of `t`'s box faces the road its way leaves for (`to`, as `backdropGround` finds it), in the box's own
- * frame (`Side`); none known: its long +z side.
+ * Which side of `t`'s box faces `to` (a point out in front of it, on its street), in the box's own frame (`Side`);
+ * none known: its long +z side.
  */
 export function frontSide(t: Pick<TownBuilding, 'cx' | 'cz' | 'ux' | 'uz' | 'w' | 'd'>, to: readonly [number, number] | null): Side {
   if (!to) return 0;
@@ -265,12 +268,13 @@ export function frontSide(t: Pick<TownBuilding, 'cx' | 'cz' | 'ux' | 'uz' | 'w' 
 }
 
 /**
- * Backdrop building `t` (as the town view draws it, `backdropBuilding`; its `use`) dressed, in place. `to`: where its
- * way meets the road (`backdropGround`), the side its door is on. `door`: a named place's lot closed
- * (`lotLookBuilding`), where its own front door is (town metres, on that side): the door drawn there, and a church's
- * tower over it where the door is on an end.
+ * Building `t` (a lot's closed, as the town view draws it, `lotLookBuilding`; its `use`) dressed, in place. `to`: a
+ * point out in front of it, on its street: the side its door is on. `door`: where its lot's own front door is (town
+ * metres, on that side): the door drawn there, and a church's tower over it where the door is on an end. `flatsDoor`:
+ * a place with flats over it (`TownBuilding.flats`), where the flats' own street door is (else at the front's other end
+ * from the place's).
  */
-export function dressBackdrop(t: TownBuilding, use: BuildingUse, to: readonly [number, number] | null, door: readonly [number, number] | null = null): BackdropDress {
+export function dressBuilding(t: TownBuilding, use: BuildingUse, to: readonly [number, number] | null, door: readonly [number, number] | null = null, flatsDoor: readonly [number, number] | null = null): BuildingDress {
   const W = t.w / 2;
   const D = t.d / 2;
   const seed = t.seed;
@@ -331,8 +335,11 @@ export function dressBackdrop(t: TownBuilding, use: BuildingUse, to: readonly [n
   const doors: { s: Side; a: number; wide: number }[] = [];
   const L = d.half(front);
   // (A lot's own door along the front side, in the building's frame, kept off its corners.)
-  const own = door && ((dx: number, dz: number) => (front < 2 ? dx * t.ux + dz * t.uz : -dx * t.uz + dz * t.ux))(door[0] - t.cx, door[1] - t.cz);
-  const at = (wide: number, fallback: number) => (own === null ? fallback : Math.max(-L + wide / 2 + 0.3, Math.min(L - wide / 2 - 0.3, own)));
+  const along = (p: readonly [number, number]) => ((dx: number, dz: number) => (front < 2 ? dx * t.ux + dz * t.uz : -dx * t.uz + dz * t.ux))(p[0] - t.cx, p[1] - t.cz);
+  const own = door && along(door);
+  const at = (wide: number, fallback: number, a: number | null = own) => (a === null ? fallback : Math.max(-L + wide / 2 + 0.3, Math.min(L - wide / 2 - 0.3, a)));
+  // (A place with flats over it: the flats' street door beside its own, apart from the shopfront.)
+  const flats = !!t.flats && shop;
   if (use === 'terrace') {
     for (let i = 0; i < homesIn; i++) {
       // (Each home's door at the same end of its frontage, its window beside it; along x on the long sides.)
@@ -340,7 +347,9 @@ export function dressBackdrop(t: TownBuilding, use: BuildingUse, to: readonly [n
       doors.push({ s: front < 2 ? front : 0, a: mid - unit * 0.22, wide: 1 });
     }
   } else if (shop) {
-    doors.push({ s: front, a: at(1.1, (h(seed, 13) - 0.5) * Math.max(0, L - 2.2)), wide: 1.1 });
+    const a = at(1.1, (h(seed, 13) - 0.5) * Math.max(0, L - 2.2));
+    doors.push({ s: front, a, wide: 1.1 });
+    if (flats) doors.push({ s: front, a: at(1.1, a > 0 ? -L + 1.2 : L - 1.2, flatsDoor && along(flatsDoor)), wide: 1.1 });
   } else if (boarded) {
     const wide = Math.min(3.2, L * 2 - 1.4);
     doors.push({ s: front, a: at(wide, (h(seed, 13) - 0.5) * Math.max(0, L - 3)), wide });
@@ -352,7 +361,7 @@ export function dressBackdrop(t: TownBuilding, use: BuildingUse, to: readonly [n
   const nearDoor = (s: Side, a: number, k: number, half: number) => k === 0 && doors.some((o) => o.s === s && Math.abs(o.a - a) < o.wide / 2 + half + 0.25);
 
   // ---- windows ----
-  const [apart, wide, sill, head] = home ? [2.6, 0.76, 0.9, 2.1] : use === 'office' ? [2.0, 1.5, 0.8, 2.4] : use === 'school' ? [2.4, 1.8, 0.9, 2.6] : use === 'flats' || use === 'hall' ? [2.4, 1.2, 0.9, 2.3] : [2.6, 0.9, 1.0, 2.2];
+  const windows: readonly [number, number, number, number] = home ? [2.6, 0.76, 0.9, 2.1] : use === 'office' ? [2.0, 1.5, 0.8, 2.4] : use === 'school' ? [2.4, 1.8, 0.9, 2.6] : use === 'flats' || use === 'hall' ? FLATS_WINDOWS : [2.6, 0.9, 1.0, 2.2];
   if (use === 'church') {
     const tall = Math.min(storeys * STOREY - 0.9, 5.2);
     for (const s of [0, 1] as const) for (const a of d.bays(s, 3, 2.2)) if (!nearDoor(s, a, 0, 0.5)) d.plainWindow(s, a, floor + 1.4, floor + Math.max(2.6, tall), 0.9);
@@ -366,6 +375,8 @@ export function dressBackdrop(t: TownBuilding, use: BuildingUse, to: readonly [n
         // (The shopfront is the front's ground floor.)
         if (shop && k === 0 && s === front) continue;
         const y = floor + k * STOREY;
+        // (Flats over a place have flats' windows.)
+        const [apart, wide, sill, head] = flats && k > 0 ? FLATS_WINDOWS : windows;
         for (const a of d.bays(s, apart, 0.9)) {
           if (nearDoor(s, a, k, wide / 2)) continue;
           // (A terrace's party walls keep clear.)
@@ -399,10 +410,9 @@ export function dressBackdrop(t: TownBuilding, use: BuildingUse, to: readonly [n
     const span = L - 0.45;
     const tr = d.trim;
     const sign = pick(FASCIA, t.accent);
-    const door = doors[0];
     const [g0, g1] = [floor + 0.5, floor + 2.55];
-    // Glass between mullions, but where the door stands.
-    const cuts = [-span, door.a - door.wide / 2 - 0.08, door.a + door.wide / 2 + 0.08, span];
+    // Glass between mullions, but where the doors stand (the shop's, and its flats' beside it).
+    const cuts = [-span, ...doors.filter((o) => o.s === s).sort((a, b) => a.a - b.a).flatMap((o) => [o.a - o.wide / 2 - 0.08, o.a + o.wide / 2 + 0.08]), span];
     for (let i = 0; i < cuts.length; i += 2) {
       const [a0, a1] = [cuts[i], cuts[i + 1]];
       if (a1 - a0 < 0.4) continue;

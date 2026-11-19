@@ -8,20 +8,17 @@
  * The rule: a centre's outline is paved, but for its lots, its greens and its water; a place's or a
  * flats building's lot in it is paved through its `court` pieces. Nothing here guesses what the
  * town did not say: a town whose generator wrote no `paving` has its centres and squares paved from
- * `meta.centre`, its bays drawn where the simulation parks, and its backdrop's forecourts, yards and
- * ways to the road (`layBackdropGrounds`) paved as the street lays them, while there is a backdrop.
+ * `meta.centre`, and its bays drawn where the simulation parks.
  *
  * Paving is laid by whole tiles (a tile is paved when its middle is in a piece, less its holes):
  * the lawn's grass is hidden tile by tile too, so the paving and the grass meet on the same line
- * near and far. A car park's apron and the backdrop's forecourts are turned to their roads and are
- * drawn by their own outlines.
+ * near and far. A car park's apron is turned to its road and is drawn by its own outline.
  */
 
 import type { PavedPiece, RoadPlan, WorldStructure } from '../../core/protocol';
 import { fillPoly } from '../../game/footprints';
 import { rasterRoads } from '../../game/roads';
 import { carriageway } from './junctions';
-import { layBackdropGrounds, wayCorners } from './townBuildings';
 
 /** A rectangle on the ground (town metres, x and z its corner). */
 export interface Rect {
@@ -34,24 +31,18 @@ export interface Rect {
 /** What `townPaving` reads: the lots (to leave homes out), the meta's centres and paving, the bays and car parks. */
 export type PavingWorld = Pick<WorldStructure, 'plots' | 'meta' | 'parking' | 'carParks'>;
 
-/**
- * What a piece is paved with: the centre's stone in courses (`stone`), a workshop's yard, a car
- * park's asphalt, and, while there is a backdrop, its forecourts (`forecourt`) and its gardens' ways
- * to the road (`path`).
- */
-export type PavingSurface = 'stone' | 'yard' | 'asphalt' | 'forecourt' | 'path';
+/** What a piece is paved with: the centre's stone in courses (`stone`), a workshop's yard, a car park's asphalt. */
+export type PavingSurface = 'stone' | 'yard' | 'asphalt';
 
 /**
- * A piece to pave: what it is (a car park's apron is `carpark`; a backdrop garden's way to the road
- * `path`), its outline (counter-clockwise seen from above), the lots cut out of it (`holes`) and
+ * A piece to pave: what it is (a car park's apron is `carpark`), its outline (counter-clockwise seen from above), the lots cut out of it (`holes`) and
  * the greens and water (`cuts`, outlines), how far apart its courses' joints are (m, 0: none), what
  * it is paved with, and how it is laid: by the tiles whose middles it covers (`tiles`), or by its
  * own outline (`exact`: a convex outline turned to its road). `plot`: the lot it is the court or
- * yard of (that lot draws it while it is in view). `backdrop`: what a backdrop building stands on,
- * which the street draws near with its building (`street.ts` `backdropOut`) until the backdrop goes.
+ * yard of (that lot draws it while it is in view).
  */
 export interface PavingDraw {
-  kind: PavedPiece['kind'] | 'carpark' | 'path';
+  kind: PavedPiece['kind'] | 'carpark';
   poly: [number, number][];
   holes: Rect[];
   course: number;
@@ -59,7 +50,6 @@ export interface PavingDraw {
   edge: 'tiles' | 'exact';
   cuts?: [number, number][][];
   plot?: number;
-  backdrop?: true;
 }
 
 /** A parking bay as drawn: its corners (the bay's own rectangle) and its painted lines (each a segment). */
@@ -91,7 +81,7 @@ export const TILE = { none: 0, stone: 1, yard: 2 } as const;
 /**
  * The paving's colours as they show (sRGB, the texture's mean through its material and tone): the
  * centre's stone and the joints between its courses, a yard, a car park's asphalt and the bays'
- * paint, and the backdrop's forecourts and garden ways. The far map paints them (`groundTiles.ts`
+ * paint. The far map paints them (`groundTiles.ts`
  * `MAP`) and the near ground tones its surfaces to them (`streetGround.ts`).
  */
 export const PAVING_LOOK = {
@@ -100,8 +90,6 @@ export const PAVING_LOOK = {
   yard: '#9A8C74',
   asphalt: '#55544F',
   line: '#D6D6D0',
-  forecourt: '#B9B3A6',
-  path: '#A99C86',
 } as const;
 
 /** The centre's courses (m apart), and how wide a joint between two is (m). */
@@ -164,17 +152,6 @@ function drawPaving(world: PavingWorld): TownPaving {
     if (p.poly.length < 3) continue;
     const open = p.kind === 'centre' || p.kind === 'square';
     pieces.push({ kind: p.kind, poly: p.poly, holes: open ? holesIn(p.poly) : [], cuts: open ? cutsIn(p.poly) : undefined, course: COURSES[p.kind], surface: p.kind === 'yard' ? 'yard' : 'stone', edge: 'tiles', plot: p.plot });
-  }
-  // The backdrop's forecourts, yards and ways to the road, as the street lays them, not on the lots.
-  const backdrop = meta.backdrop ?? [];
-  if (backdrop.length) {
-    const driven = (meta.roads ?? []).filter((r) => r.kind !== 'trail');
-    for (const { ground, court, way } of layBackdropGrounds(backdrop, driven, world.plots)) {
-      const [kind, surface]: [PavingDraw['kind'], PavingSurface] = ground.kind === 'forecourt' ? ['court', 'forecourt'] : ground.kind === 'yard' ? ['yard', 'yard'] : ['path', 'path'];
-      for (const poly of [court, way ? wayCorners(way) : null]) {
-        if (poly) pieces.push({ kind, poly, holes: holesIn(poly), course: 0, surface, edge: 'exact', backdrop: true });
-      }
-    }
   }
   // The car parks' aprons, and a lone bay's own (a bay of no car park the town file has).
   const parks = world.carParks ?? [];

@@ -200,7 +200,7 @@ export function pavingLayers(world: StreetGroundWorld, area: Rect | null, option
   const aprons = new Geo();
   const asphalt = toned(PAVING_LOOK.asphalt, SURFACE_TONE.road);
   for (const p of paving.pieces) {
-    if (p.edge !== 'exact' || p.backdrop || p.surface !== 'asphalt') continue;
+    if (p.edge !== 'exact' || p.surface !== 'asphalt') continue;
     if (within(...middle(p.poly))) lay(aprons, p.poly.map(([x, z]) => [x, z]), APRON_Y, () => asphalt, terrain);
   }
   if (!aprons.empty) out.push({ name: 'carParks', material: 'material.road', geo: aprons, toned: true });
@@ -272,7 +272,7 @@ export function streetGroundChunks(world: StreetGroundWorld): number[] {
       x = (Math.floor(x / CHUNK) + 1) * CHUNK - 1;
     }
   }
-  for (const p of paving.pieces) if (p.edge === 'exact' && !p.backdrop) ids.add(chunkAt(...middle(p.poly)));
+  for (const p of paving.pieces) if (p.edge === 'exact') ids.add(chunkAt(...middle(p.poly)));
   for (const b of paving.bays) ids.add(chunkAt(...middle(b.corners)));
   for (const [x, z] of paving.signs) ids.add(chunkAt(x, z));
   return [...ids];
@@ -303,7 +303,7 @@ export function streetGroundKey(world: StreetGroundWorld, id: number, focus = -1
       }
     }
     const mine = (p: readonly (readonly [number, number])[]) => chunkAt(...middle(p)) === id;
-    const aprons = paving.pieces.filter((p) => p.edge === 'exact' && !p.backdrop && mine(p.poly)).flatMap((p) => p.poly.flat());
+    const aprons = paving.pieces.filter((p) => p.edge === 'exact' && mine(p.poly)).flatMap((p) => p.poly.flat());
     const bays = paving.bays.filter((b) => mine(b.corners)).flatMap((b) => b.lines.flat(2));
     const signs = paving.signs.filter(([x, z]) => chunkAt(x, z) === id).flat();
     const tilesKey = any ? `t${hashNumbers(codes)}` : '';

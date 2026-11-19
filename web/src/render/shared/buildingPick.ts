@@ -1,8 +1,10 @@
 /**
- * What building a ray from the camera meets first (a click on a house or a backdrop building):
- * each one as a prism, its footprint raised from `y0` to `y1` (its roof included). The footprint
- * may be any simple polygon (a backdrop building's L).
+ * What building a ray from the camera meets first (a click on a lot's house or building): each one
+ * as a prism, its footprint raised from `y0` to `y1` (its roof included). The footprint may be any
+ * simple polygon.
  */
+
+import { MOST_STOREYS } from './townBuildings';
 
 type V3 = { readonly x: number; readonly y: number; readonly z: number };
 export type Footprint = readonly (readonly [number, number])[];
@@ -19,12 +21,12 @@ function insidePoly(poly: Footprint, x: number, z: number): boolean {
 }
 
 /**
- * How tall a lot's house stands to its walls' top (m): its own storeys (`wall` m each), or a named place's lot closed
- * (`WorldMeta.lotLooks`) as the street draws it, its look's storeys (`storey` m each, the backdrop's) or its own if
- * more (`townBuildings.ts` `lotLookBuilding`).
+ * How tall a lot's house stands to its walls' top (m): its own storeys (`wall` m each), or a lot with a look closed
+ * (`WorldMeta.lotLooks`: a named place's, a flats building's) as the street draws it, its real storeys (`storey` m each,
+ * the town's, at most `MOST_STOREYS`: `townBuildings.ts` `lotLookBuilding`).
  */
-export function lotWallsHeight(storeys: number | undefined, look: { storeys: number } | undefined, wall: number, storey: number): number {
-  return look ? Math.max(look.storeys, storeys ?? 1) * storey : (storeys ?? 1) * wall;
+export function lotWallsHeight(storeys: number | undefined, look: object | undefined, wall: number, storey: number): number {
+  return look ? Math.max(1, Math.min(MOST_STOREYS, Math.round(storeys ?? 1))) * storey : (storeys ?? 1) * wall;
 }
 
 /** A rectangle `[x0, z0, x1, z1]` as a footprint. */

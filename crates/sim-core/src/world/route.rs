@@ -131,11 +131,14 @@ pub(crate) const SEAT_LOOKS: f32 = std::f32::consts::FRAC_PI_3;
 /// ...and, for a screen, is within this of the way it faces.
 pub(crate) const SEAT_IN_FRONT: f32 = std::f32::consts::FRAC_PI_3;
 
-/// Where `sim` may walk on the way to tile `goal` (see `path::Grounds`): home, the place
-/// they're a guest at, public places, the plot they're on now (nobody is stuck in a garden)
-/// and the one they're heading for. Everyone else's garden only when there's no other way.
+/// Where `sim` may walk on the way to tile `goal` (see `path::Grounds`): home (a flat's
+/// building), the place they're a guest at, public places, the plot they're on now (nobody is
+/// stuck in a garden) and the one they're heading for. Everyone else's garden only when there's
+/// no other way; a flats' stair hall over a public place (`path::Halls`) only for those living
+/// in its flats and their guests.
 pub(crate) fn grounds<'a>(
     tile_plot: &'a [u16],
+    halls: &'a crate::path::Halls,
     plots: &[Plot],
     households: &[Household],
     nav: &NavGrid,
@@ -146,17 +149,38 @@ pub(crate) fn grounds<'a>(
         tile_plot,
         open: plots.iter().map(|p| p.public).collect(),
         fenced: plots.iter().map(|p| !p.public).collect(),
+        halls,
+        hall_open: vec![false; halls.list.len()],
     };
     let here = sim.tile();
     let ends = [here, goal].map(|(x, z)| grounds.plot(nav, x, z));
     let home = households.get(sim.household as usize).and_then(|h| h.plot);
-    for p in ends
-        .into_iter()
-        .chain([home, sim.visiting.map(|v| v.plot)])
-        .flatten()
-    {
-        if let Some(open) = grounds.open.get_mut(p as usize) {
+    let lot = |p: u32| plots.get(p as usize).map_or(p, Plot::lot);
+    for p in ends.into_iter().flatten().chain(
+        [home, sim.visiting.map(|v| v.plot)]
+            .into_iter()
+            .flatten()
+            .map(lot),
+    ) {
+        if p & crate::path::HALL != 0 {
+            if let Some(open) = grounds.hall_open.get_mut((p & !crate::path::HALL) as usize) {
+                *open = true;
+            }
+        } else if let Some(open) = grounds.open.get_mut(p as usize) {
             *open = true;
+        }
+    }
+    // (Home or a visit in a flat over a place: its hall.)
+    if !halls.list.is_empty() {
+        for p in [home, sim.visiting.map(|v| v.plot)].into_iter().flatten() {
+            if let Some(k) = plots
+                .get(p as usize)
+                .and_then(|f| f.of)
+                .and_then(|l| halls.of_lot.get(l as usize))
+                .and_then(|&k| usize::from(k).checked_sub(1))
+            {
+                grounds.hall_open[k] = true;
+            }
         }
     }
     grounds
@@ -171,6 +195,7 @@ pub(crate) fn walk_route(
 ) -> Option<Vec<[f32; 2]>> {
     let grounds = grounds(
         ctx.tile_plot,
+        ctx.halls,
         ctx.plots,
         ctx.households,
         &ctx.nav,

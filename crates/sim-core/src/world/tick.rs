@@ -587,8 +587,9 @@ pub(crate) fn off_the_road(sim: &Sim, ctx: &Ctx) -> Option<Task> {
 pub(crate) const OFF_ROAD_IN: f32 = 0.3;
 pub(crate) const OFF_ROAD_MOST: usize = 1024;
 
-/// What a Sim may use on a plot: everything at home or in public places; as a guest,
-/// anything that isn't private (bed, bathroom...); nothing on other people's lots.
+/// What a Sim may use on a plot: everything at home (and in a flat, its building's shared
+/// things: the hall's, the yard's) or in public places; as a guest, anything that isn't private
+/// (bed, bathroom...); nothing on other people's lots, nor in the neighbours' flats.
 #[derive(PartialEq)]
 pub(crate) enum Access {
     Full,
@@ -799,9 +800,14 @@ pub(crate) fn order_access(
     let home = households[sim.household as usize].plot;
     match plot {
         None => Access::Full,
-        Some(p) if plots[p as usize].public || home == Some(p) => Access::Full,
+        Some(p) if plots[p as usize].public || at_home(plots, home, p) => Access::Full,
         _ => access_in(households, plots, sim, plot),
     }
+}
+
+/// Whether plot `p` is home to those living on `home`: it, or the building their flat is in.
+pub(crate) fn at_home(plots: &[Plot], home: Option<u32>, p: u32) -> bool {
+    home.is_some_and(|h| h == p || plots.get(h as usize).and_then(|f| f.of) == Some(p))
 }
 
 /// `access` outside a step.
@@ -822,7 +828,7 @@ pub(crate) fn access_in(
     }
     match plot {
         None => Access::Full,
-        Some(p) if plots[p as usize].public || home == Some(p) => Access::Full,
+        Some(p) if plots[p as usize].public || at_home(plots, home, p) => Access::Full,
         Some(p) if sim.visiting.is_some_and(|v| v.plot == p) => Access::Guest,
         Some(_) => Access::None,
     }

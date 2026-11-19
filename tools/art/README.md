@@ -79,11 +79,11 @@ texture of its own, and the functional heights against the content (`docs/design
 
 ## The built world
 
-Houses, the neighbours' and the far houses, the backdrop's buildings, roads, sidewalks, junctions, bridges, fences and
+Houses, the neighbours' and the far houses, the lots' buildings drawn closed, roads, sidewalks, junctions, bridges, fences and
 cars are no model files: the game builds them as it runs (`web/src/render/shared`). They are held to the models' rules
 all the same. `bun tools/built/dump.ts target/built` writes a fixed set of samples (`tools/built/samples.ts`: house
 plans, each as the viewed house, as the neighbour's silhouette, as the street's far house and as the town view's box; a
-backdrop building of each use, dressed and as its box; a street's block; each fence style; each car), a `.glb` a sample,
+lot's building of each use closed, dressed and as its box; a street's block; each fence style; each car), a `.glb` a sample,
 made by those generators with no browser, and the same bytes on every machine. `cargo check-glb --built target/built`
 (`crates/tools/src/checkglb/built.rs`) reads them and counts, per sample, against the baseline's sections of these
 names:

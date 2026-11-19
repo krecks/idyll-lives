@@ -114,7 +114,7 @@ export interface SurfacePlot {
   poly?: readonly (readonly [number, number])[];
 }
 
-/** How far round a turned backdrop building's footprint its pad's land reaches (m): the widest of its forecourt, yard or garden (`townBuildings.ts` `AROUND`). */
+/** How far round a turned backdrop building's footprint its pad's land reaches (m): the widest of its forecourt, yard or garden. */
 const GROUND_ROUND = 3.5;
 
 /** Whether (x, z) is on `p`'s pad (or within `by` m of it): in its box, and in its ground if it is turned (`SurfacePlot.poly`). */

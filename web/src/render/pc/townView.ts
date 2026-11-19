@@ -3,19 +3,16 @@
  * camera shows of the town once it zooms out past `TOWN_FROM` (`townView.blend > 0`), and nothing
  * before (the play camera draws as it always has).
  *
- * - **Buildings** (`TownBuildings`): every backdrop building of the world (`WorldMeta.backdrop`) and
- *   every far lot's house (the street's far LOD, `Street.townHouses`: the lots outside the chunks
- *   streamed in) as copies of five unit meshes: a box of walls, and a gable, hip, flat or mansard
- *   roof. One instanced draw per mesh for the whole world, in one material
+ * - **Buildings** (`TownBuildings`): every far lot's house (the street's far LOD, `Street.townHouses`:
+ *   the lots outside the chunks streamed in) as copies of five unit meshes: a box of walls, and a
+ *   gable, hip, flat or mansard roof. One instanced draw per mesh for the whole world, in one material
  *   (`shaders/townBuilding.ts`: the walls' and the roof's colours per copy, the windows drawn by the
- *   fragment shader in bands a storey apart, a share of them lit at night: a shop's while it is open, a home's by
- *   the hour, a lot's house's while someone is up in it). A backdrop building's
- *   colours come from the backdrop palette (`BACKDROP_PALETTE`, by its `look`, varied a little per
- *   building), warm town tones: red and orange tile roofs over cream, sand and brick walls, grey
- *   slate here and there; its houses' gardens have hedges, low boxes in the same draws (`gardenHedges`);
- *   a lot's house keeps its own (`HousePlanner.farLook`, as the street's far
- *   LOD has it). A footprint that isn't a rectangle is drawn as the rectangle round it, along its
- *   longest side (or its ridge).
+ *   fragment shader in bands a storey apart, a share of them lit at night: a shop's while it is open,
+ *   a flats building's by the hour, a lot's house's while someone is up in it). A lot with a look (a
+ *   named place's, a flats building's: `lotLookBuilding`) takes its colours from the town's palette
+ *   (`PALETTE`, by its `look`, varied a little per building), warm town tones: red and orange tile
+ *   roofs over cream, sand and brick walls, grey slate here and there; a home's house keeps its own
+ *   (`HousePlanner.farLook`, as the street's far LOD has it).
  * - **Movers** (`TownMovers`): the cars, taxis, bikes and residents the near drawing leaves out (past
  *   the chunks streamed in, past the residents' radius), as tiny instanced shapes in their own
  *   colours, where the snapshot has them (`Cars.forEachFar`, `Residents.spot`); larger the further out
@@ -36,7 +33,7 @@ import './shaders/townGround';
 import { Geo } from '../shared/geometry';
 import { FINISH, litAt, ROOFS, unitMeshes, type RoofKind, type TownBuilding } from '../shared/townBuildings';
 
-export { backdropBuilding, backdropGround, gardenHedges, lotBuilding, townBackdrop, type TownLotHouse } from '../shared/townBuildings';
+export { lotBuilding, type TownLotHouse } from '../shared/townBuildings';
 
 /** How bright a lit window glows at night (times the street's window glow). */
 const GLOW = 1.4;
@@ -54,7 +51,6 @@ export class TownBuildings {
   private readonly lib: MaterialLibrary;
   private readonly draws = new Map<'walls' | RoofKind, Instances>();
   private readonly meshes: pc.Mesh[] = [];
-  private backdrop: TownBuilding[] = [];
   private lots: TownBuilding[] = [];
   /** The buildings given since the draws were last written. */
   private due = false;
@@ -112,28 +108,15 @@ export class TownBuildings {
     return mat;
   }
 
-  /** The backdrop's buildings (a new town's). */
-  setBackdrop(list: TownBuilding[]): void {
-    this.backdrop = list;
-    this.due = true;
-    if (this.shown) this.upload();
-  }
-
   /**
-   * The hour's lights: each backdrop building's share of lit windows at `minute` of the day on `weekday` (`litAt`: a
-   * place's while it is open, a home's by the hour), and a named place's lot's by its hours (`lotLookBuilding`). The
-   * copies are written again only when a share changed.
+   * The hour's lights: the share of lit windows at `minute` of the day on `weekday` of each lot with a look
+   * (`lotLookBuilding`, `litAt`): a place's while it is open, a flats building's by the hour. The copies are written
+   * again only when a share changed.
    */
   setTime(minute: number, weekday: number): void {
     let changed = false;
-    for (const b of this.backdrop) {
-      const now = litAt(b, minute, weekday);
-      if (now === b.now) continue;
-      b.now = now;
-      changed = true;
-    }
     for (const b of this.lots) {
-      if (!b.hours) continue;
+      if (!b.hours && !b.home) continue;
       const now = litAt(b, minute, weekday);
       if (now === b.now) continue;
       b.now = now;
@@ -144,7 +127,7 @@ export class TownBuildings {
     if (this.shown) this.upload();
   }
 
-  /** The far lots' houses (as the chunks streamed in change, and as their people get up and go to bed); a named place's lot's lit by its hours (`setTime`). */
+  /** The far lots' houses (as the chunks streamed in change, and as their people get up and go to bed); a lot with a look lit by the hour (`setTime`). */
   setLots(list: TownBuilding[]): void {
     this.lots = list;
     this.due = true;
@@ -152,7 +135,7 @@ export class TownBuildings {
   }
 
   get count(): number {
-    return this.backdrop.length + this.lots.length;
+    return this.lots.length;
   }
 
   /** Shown (`fade` > 0) or not, fading in by `fade` (0..1). */
@@ -179,7 +162,7 @@ export class TownBuildings {
   private upload(): void {
     this.made();
     this.due = false;
-    const all = this.backdrop.length ? (this.lots.length ? [...this.backdrop, ...this.lots] : this.backdrop) : this.lots;
+    const all = this.lots;
     const walls = this.draws.get('walls')!;
     walls.setCount(all.length);
     const counts = new Map<RoofKind, number>(ROOFS.map((r) => [r, 0]));

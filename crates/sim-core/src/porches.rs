@@ -379,6 +379,7 @@ impl World {
         z: i32,
     ) -> Result<(), Error> {
         let (h, plot) = self.home_of(household)?;
+        self.not_a_flat(plot, "porch")?;
         if !self.edge_on_plot(plot, axis, x, z) {
             return Err(Error::new("a porch goes on your own home"));
         }
@@ -459,6 +460,7 @@ impl World {
         rot: u8,
     ) -> Result<(), Error> {
         let (h, plot) = self.home_of(household)?;
+        self.not_a_flat(plot, "porch")?;
         if rot > 3 {
             return Err(Error::new(format!(
                 "a piece faces one of four ways, not {rot}"
@@ -707,7 +709,8 @@ impl World {
         /// Paths narrower than this are garden paths (wider ones driveways: the renderer's `DRIVEWAY_MIN_WIDTH`).
         const GARDEN_PATH: f32 = 1.8;
         let mut out = Vec::new();
-        for (i, p) in self.plots.iter().enumerate() {
+        // (A flat has no front door of its own outdoors: its building's hall has it.)
+        for (i, p) in self.plots.iter().enumerate().filter(|(_, p)| !p.is_flat()) {
             let Some([bx0, bz0, bx1, bz1]) =
                 crate::view::house_bounds(self, p.x, p.z, p.x + p.w, p.z + p.d)
             else {

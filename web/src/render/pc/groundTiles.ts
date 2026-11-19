@@ -50,7 +50,7 @@ const MAP_MAX = 2048;
 /**
  * The map's colours (sRGB): the asphalt and pavements as the street's textures and tones come out, soil, paths; and
  * the town's paving as the near ground shows it (`townPaving.ts` `PAVING_LOOK`): the centre's stone and its joints,
- * yards, a car park's asphalt and its bays' paint, what the backdrop's buildings stand on.
+ * yards, a car park's asphalt and its bays' paint.
  */
 const MAP = {
   asphalt: '#55544F',
@@ -63,7 +63,6 @@ const MAP = {
   yard: PAVING_LOOK.yard,
   carpark: PAVING_LOOK.asphalt,
   line: PAVING_LOOK.line,
-  forecourt: PAVING_LOOK.forecourt,
 } as const;
 
 /** What the map asks of the land: a big world's farmland as the terrain colours it (`LandscapeLayout.farmland`). */
@@ -74,8 +73,8 @@ export interface TownGroundLand {
 }
 
 /**
- * What a town's ground map is drawn from, as a hash: its roads, lots, centres, paving, bays and car parks, backdrop,
- * greens, fields and zones (not how many of each: another town with a street moved, or a lot moved, has the same
+ * What a town's ground map is drawn from, as a hash: its roads, lots, centres, paving, bays and car parks, greens,
+ * fields and zones (not how many of each: another town with a street moved, or a lot moved, has the same
  * counts). Kept per world's meta.
  */
 function groundVersion(world: WorldStructure): number {
@@ -83,7 +82,7 @@ function groundVersion(world: WorldStructure): number {
   if (!meta) return 0;
   const known = groundVersions.get(meta);
   if (known?.plots === world.plots && known.parking === world.parking && known.carParks === world.carParks) return known.version;
-  const text = JSON.stringify([meta.roads, world.plots.map((p) => [p.x, p.z, p.w, p.d]), meta.centre, meta.paving, world.parking, world.carParks, meta.backdrop?.map((b) => [b.poly, b.use]), meta.greens, meta.world?.fields, meta.zones, meta.paths]);
+  const text = JSON.stringify([meta.roads, world.plots.map((p) => [p.x, p.z, p.w, p.d]), meta.centre, meta.paving, world.parking, world.carParks, meta.greens, meta.world?.fields, meta.zones, meta.paths]);
   let h = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
   const version = h >>> 0;
@@ -98,8 +97,7 @@ export type PavingCanvas = Pick<OffscreenCanvasRenderingContext2D, 'fillStyle' |
 /**
  * The town's paving into the map (`g`, in town metres over a `W` × `D` ground): the tiles it lays (`TownPaving.tiles`)
  * a row's run of them at a time, the stone's joints over them (`COURSE` m apart, `JOINT` wide) as the near ground cuts
- * them, then the pieces laid by their own outlines (a car park's apron, a backdrop building's forecourt, yard or way)
- * less the lots in them, and the bays' lines.
+ * them, then the pieces laid by their own outlines (a car park's apron) less the lots in them, and the bays' lines.
  */
 export function paintPaving(g: PavingCanvas, paving: TownPaving, W: number, D: number): void {
   const tiles = paving.tiles(W, D);
@@ -133,7 +131,7 @@ export function paintPaving(g: PavingCanvas, paving: TownPaving, W: number, D: n
   }
   for (const p of paving.pieces) {
     if (p.edge !== 'exact') continue;
-    g.fillStyle = MAP[p.surface === 'asphalt' ? 'carpark' : p.surface === 'stone' ? 'paving' : p.surface];
+    g.fillStyle = MAP[p.surface === 'asphalt' ? 'carpark' : p.surface === 'stone' ? 'paving' : 'yard'];
     g.beginPath();
     p.poly.forEach(([x, z], i) => (i ? g.lineTo(x, z) : g.moveTo(x, z)));
     g.closePath();
@@ -162,7 +160,7 @@ const FIELD_SOFT = 8;
 /**
  * The ground's colour map at altitude: what the town lays on its land (streets and pavements, the junctions'
  * pads, its paving as the street lays it near (`townPaving`: the centre, courts and yards, car parks and their
- * bays, what the backdrop's buildings stand on), its farm fields and paths, a big world's farmland as its ground
+ * bays), its farm fields and paths, a big world's farmland as its ground
  * has it) over the whole world in one texture, baked once per town (`bake`; again only for another town), and laid over the ground tiles' colour by the town
  * view's blend (`shaders/townGround.ts`). The tiles' material takes its define only while the blend is over 0
  * (`apply`): up to `TOWN_FROM` the ground draws with the shader it always had.
@@ -218,7 +216,7 @@ export class TownGroundMap {
     }
     g.globalCompositeOperation = 'source-over';
     // The town's paving (`townPaving`: the centre's stone in courses, the courts and yards, the car parks and their
-    // bays, what the backdrop's buildings stand on), as the street lays it near.
+    // bays), as the street lays it near.
     paintPaving(g, townPaving(world), W, D);
     g.lineCap = 'round';
     // Farm fields on farm lots: soil in furrows.
