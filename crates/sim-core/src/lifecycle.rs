@@ -394,11 +394,14 @@ fn has_room_for_partner(w: &World, h: usize) -> bool {
 
 /// Whether a resident's household lets them move on their own (the player can say no). Being
 /// at work doesn't matter: they come back to the new home. Out on a visit or an outing, not
-/// that day (moved, they were taken from the host's home ten minutes in).
+/// that day (moved, they were taken from the host's home ten minutes in), nor out on a trip by
+/// car, there or back (`cars::on_trip`: moved at the wheel, they got out where the car stood, and
+/// it waited in the road for them for good).
 fn may_move(w: &World, i: usize) -> bool {
     let s = &w.sims[i];
     s.here()
         && s.visiting.is_none()
+        && !crate::cars::on_trip(&w.cars, s)
         && s.adult(&w.content)
         && (w.player_moves || !w.households[s.household as usize].player)
 }

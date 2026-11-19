@@ -337,3 +337,192 @@ fn a_walk_past_a_car_parked_out_on_a_trip_goes_round_it() {
         -closest
     );
 }
+
+/// The trips' two hamlets where a grown child at home moves into a house of their own when the
+/// day's moving comes round (`lifecycle::moving`, at 11), always, and nobody else moves (nor moves
+/// in): the town at the start of its day, a car of the first hamlet (parked at home: nobody works
+/// here), the child, one of its owners, and the park in the second hamlet.
+fn moving_out_town() -> (World, usize, usize, u32) {
+    let mut content: Value = serde_json::from_str(&common::content()).unwrap();
+    let life = &mut content["life"];
+    life["moving"]["leaveHome"] = 1.0.into();
+    life["moving"]["leaveTown"] = 0.0.into();
+    life["moving"]["partners"] = 0.0.into();
+    life.as_object_mut().unwrap().remove("newcomers");
+    let content = content.to_string();
+    let seed = 5;
+    let h = hamlets_with_parking(
+        &content,
+        seed,
+        3,
+        &[Place { x: 0, z: 0 }, Place { x: 330, z: 60 }],
+        (512, 160),
+        Some(1),
+    );
+    let mut town: Value = serde_json::from_str(&with_cars(&h)).unwrap();
+    let park = h.plots[1]
+        .clone()
+        .find(|&p| town["plots"][p]["public"].as_bool() == Some(true))
+        .expect("a park in the second hamlet") as u32;
+    for s in town["sims"].as_array_mut().unwrap() {
+        s.as_object_mut().unwrap().remove("job");
+    }
+    let load = |town: &Value| {
+        let mut w = World::from_json(&content, &town.to_string(), seed as u32).unwrap();
+        for hh in 0..w.households.len() as u32 {
+            w.apply(Command::SetAutonomy {
+                enabled: false,
+                household: Some(hh),
+            })
+            .unwrap();
+        }
+        w
+    };
+    let w = load(&town);
+    // (The child and the parent: two grown-ups of the household, not the player's.)
+    let (c, i, parent) = w
+        .cars
+        .iter()
+        .enumerate()
+        .find_map(|(c, car)| {
+            let hh = &w.households[car.household as usize];
+            (h.plots[0].contains(&(hh.plot? as usize)) && !hh.player).then_some(())?;
+            let i = *car.owners.first()? as usize;
+            let parent = (0..w.sims.len()).find(|&k| {
+                k != i && w.sims[k].household == car.household && w.sims[k].adult(&w.content)
+            })?;
+            Some((c, i, parent))
+        })
+        .expect("a car of two grown-ups in the first hamlet");
+    town["relationships"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!({"a": i, "b": parent, "preset": "parent"}));
+    let mut w = load(&town);
+    // (Moving out takes a living: a pension, as nobody works here.)
+    w.sims[i].retired = true;
+    assert!(sim_core::clock::hour(w.tick) < 9.0, "the town starts early");
+    assert_eq!(w.cars[c].state, CarState::Parked);
+    (w, c, i, park)
+}
+
+/// Car `c`'s state as it is just after 11 on `day` (the day's moving), whether `i` is in it, and
+/// whether they're got where `done` says, ticking up to `minutes`.
+fn through_eleven(
+    w: &mut World,
+    day: u32,
+    c: usize,
+    i: usize,
+    minutes: u64,
+    done: impl Fn(&World) -> bool,
+) -> (Option<(CarState, bool)>, bool) {
+    let eleven = sim_core::clock::tick_at(day, 11.0 * 60.0).unwrap();
+    let mut at_eleven = None;
+    let there = common::until(w, minutes, |w| {
+        if w.tick == eleven + 1 {
+            at_eleven = Some((w.cars[c].state, w.cars[c].aboard.contains(&(i as u32))));
+        }
+        w.tick > eleven && done(w)
+    });
+    (at_eleven, there)
+}
+
+/// Someone driving home from a trip as the day's moving comes round is out, as on a visit: they
+/// don't move house that day, but once home. Moved at the wheel, they were taken out of the car
+/// with the car still theirs to drive, and it stood in the road for good, waiting for them as for
+/// one on foot in its way, with everyone riding that way held up behind it (a generated mountain
+/// town, seed 10787095: there the driver was on the way out).
+#[test]
+fn a_driver_on_the_way_home_does_not_move_house_at_the_wheel() {
+    let (mut w, c, i, park) = moving_out_town();
+    let household = w.sims[i].household;
+    let home = w.households[household as usize].plot.unwrap();
+    let day = sim_core::clock::day(w.tick);
+    w.apply(Command::Visit {
+        sim: i as u32,
+        plot: park,
+    })
+    .unwrap();
+    let there = common::until(&mut w, 2 * 60, |w| {
+        let s = &w.sims[i];
+        w.cars[c].state == CarState::Out && s.visiting.is_some_and(|v| v.arrived > 0)
+    });
+    assert!(there, "never got to the park");
+    // Off home a quarter of an hour before the moving: at the wheel as it comes round.
+    common::run_to(&mut w, day, 10.75);
+    w.apply(Command::GoHome { sim: i as u32 }).unwrap();
+    let (at_eleven, home_again) = through_eleven(&mut w, day, c, i, 2 * 60, |w| {
+        let s = &w.sims[i];
+        w.cars[c].state == CarState::Parked && w.plot_at(s.tile().0, s.tile().1) == Some(home)
+    });
+    assert_eq!(
+        at_eleven,
+        Some((CarState::Arriving, true)),
+        "at the wheel on the way home at 11"
+    );
+    assert_eq!(w.sims[i].household, household, "not moved at the wheel");
+    assert!(
+        home_again,
+        "never got home: the car {:?} at {:?}",
+        w.cars[c].state,
+        w.cars[c].shown.map(|s| s.0)
+    );
+    // At home the next day's moving takes them.
+    common::run_to(&mut w, day + 1, 11.25);
+    assert_ne!(w.sims[i].household, household, "moved out the day after");
+}
+
+/// A visit by car set off on at the car's door (stood there already, the way to it no way at
+/// all) is a visit from then on, as one walked to the car is: the driver is out (`Sim::visiting`),
+/// and the day's moving doesn't take them at the wheel. (Setting off and getting to the door in
+/// one step, getting in lost the visit's start: a driver at home, as far as moving knew.)
+#[test]
+fn a_visit_by_car_set_off_on_at_its_door_is_a_visit_on_the_way() {
+    let (mut w, c, i, park) = moving_out_town();
+    let household = w.sims[i].household;
+    let day = sim_core::clock::day(w.tick);
+    // Off a few minutes before the moving: at the wheel as it comes round, at the driver's door
+    // already.
+    common::run_to(&mut w, day, 10.9);
+    let nav = sim_core::path::NavGrid {
+        lot: &w.lot,
+        blocked: w.blocked(),
+        stairs: w.stair_map(),
+        kept_off: &[],
+        steps: None,
+    };
+    let (_, stand) = w.cars[c].door(&nav, 0).expect("a door with room to open");
+    w.sims[i].pos = stand;
+    w.apply(Command::Visit {
+        sim: i as u32,
+        plot: park,
+    })
+    .unwrap();
+    assert!(
+        common::until(&mut w, 10, |w| w.cars[c].state == CarState::Leaving),
+        "drove off"
+    );
+    assert_eq!(
+        w.sims[i].visiting.map(|v| (v.plot, v.arrived)),
+        Some((park, 0)),
+        "on their way to a visit"
+    );
+    let (at_eleven, there) = through_eleven(&mut w, day, c, i, 2 * 60, |w| {
+        let s = &w.sims[i];
+        w.cars[c].state == CarState::Out
+            && w.plot_at(s.tile().0, s.tile().1) == Some(park)
+            && s.visiting.is_some_and(|v| v.plot == park)
+    });
+    assert_eq!(
+        at_eleven,
+        Some((CarState::Leaving, true)),
+        "at the wheel on the way at 11"
+    );
+    assert_eq!(w.sims[i].household, household, "not moved at the wheel");
+    assert!(
+        there,
+        "never got there: the car {:?} at {:?}",
+        w.cars[c].state,
+        w.cars[c].shown.map(|s| s.0)
+    );
+}
