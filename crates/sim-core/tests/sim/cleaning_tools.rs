@@ -113,7 +113,8 @@ fn the_mop_cleans_the_hard_floor_of_a_whole_room_and_leaves_the_carpet() {
     soil(&mut w, BEDROOM.0, BEDROOM.1, 0.6);
     let i = w.lot.tile_index(5, 5);
     w.dirt[i] = 0.8;
-    // The bedroom is dirtier, but carpeted: the mop goes to the hall's worst, and mops it there.
+    // The bedroom is dirtier, but carpeted: the mop goes to the hall, the hard floor with the worst
+    // of it, and mops it from the middle.
     order(&mut w, MOP, "mop").unwrap();
     let mut at = None;
     assert!(until(&mut w, 60, |w| {
@@ -123,10 +124,10 @@ fn the_mop_cleans_the_hard_floor_of_a_whole_room_and_leaves_the_carpet() {
         w.sims[0].current().is_none() && at.is_some()
     }));
     let at = at.unwrap();
-    assert_eq!(
-        (at[0].floor() as i32, at[1].floor() as i32),
-        (5, 5),
-        "used where the floor was dirtiest, not where it's kept"
+    let tile = (at[0].floor() as i32, at[1].floor() as i32);
+    assert!(
+        (2..7).contains(&tile.0) && (2..7).contains(&tile.1) && tile.1 >= 3,
+        "used in the hall it mops, out in the room, not where it's kept: {tile:?}"
     );
     assert!(
         worst(&w, HALL.0, HALL.1) < 0.01,

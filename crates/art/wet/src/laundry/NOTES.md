@@ -101,7 +101,9 @@ Four more in `cleaning.rs`, each with one part a resident takes, its origin wher
 (`*_off`, a `squash!` to 0.001 in 0.2 s, by the use's id). The vacuum, the mop and the broom are held as a pole (content
 `held`, grip `pole`: the top in the hands, the foot on the floor ahead) and used where the floor is dirty, not where
 they stand (content `cleans`, sim-core `sweep.rs`): the part is gone from its place while it's out. The iron stays the
-board's and the hand holds the held family's `tool.iron` (actions.ts `PROPS.iron`).
+board's and the hand holds the held family's `tool.iron` (actions.ts `PROPS.iron`): the resident steps up to the board
+(`STAND_BACK` -0.3) and irons with the stirring clip, the iron on the board's top. The vacuum cleaner and the mop are
+used from the middle of the room they clean, facing into it; the broom at the dirtiest spot.
 
 | Model | Size (w × h × d) | Triangles | Draws | What it is | Colour parts |
 |---|---|---|---|---|---|

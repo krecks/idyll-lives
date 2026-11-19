@@ -316,11 +316,11 @@ pub(crate) fn pick_autonomous(
             // A tool that cleans the floor: only with a floor at home it cleans dirty enough,
             // the keener the dirtier, as tidying up (`sweep.rs`), from as far as that floor is.
             if let Some(sweep) = &inter.cleans {
-                let at_home = ctx.object_plot[obj.id as usize].is_some_and(|p| Some(p) == own);
+                let at_home =
+                    here == own && ctx.object_plot[obj.id as usize].is_some_and(|p| Some(p) == own);
                 let Some(spot) = at_home
                     .then(|| sweep_spot(sim, ctx, sweep, content.room_rules.clean.threshold))
                     .flatten()
-                    .filter(|_| here == own)
                 else {
                     continue;
                 };

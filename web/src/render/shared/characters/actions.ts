@@ -69,7 +69,7 @@ export const DEFAULT_FADE = 0.25;
  * smaller than its tile (the herb planters, 0.4–0.46 m deep, are picked from as from a counter), or to
  * the part used: the toes at a basin or a sink's cabinet, the hands over the water; up to the toaster and
  * the blender on a counter, the chemistry bench pushed back on its tile, onto the dumbbell rack's mat, the
- * giving jar. (A thing stepped in to, `STEP_IN`, has its step instead.) Back from the statue, to look up at it. In beside the high chair, to feed the baby in it.
+ * giving jar, up to the ironing board. (A thing stepped in to, `STEP_IN`, has its step instead.) Back from the statue, to look up at it. In beside the high chair, to feed the baby in it.
  */
 export const STAND_BACK: Record<string, number> = {
   highChair: -0.5,
@@ -90,6 +90,7 @@ export const STAND_BACK: Record<string, number> = {
   dumbbells: -0.6,
   'kind.givingJar': -0.4,
   townStatue: 0.8,
+  ironingBoard: -0.3,
 };
 /**
  * Things hugged (the giant teddy, sitting on the floor): the hugger crouches down to it this far (m) from
@@ -711,7 +712,7 @@ export const ACTIONS: Record<string, ActionAnim> = {
       def.includes('Mop') || def.includes('Vacuum')
         ? ['push']
         : def === IRONING_BOARD
-          ? ['interact']
+          ? ['stir']
           : def.includes('laundry')
             ? ['spell', 'interact', 'pickUp']
             : DISHWASHERS.has(def)

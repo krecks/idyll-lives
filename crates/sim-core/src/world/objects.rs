@@ -512,7 +512,15 @@ pub(crate) fn arrive(
                 sim.pose = Pose::Sit;
             } else if inter.cleans.is_some() {
                 // At the floor they took the tool to (`sweep.rs`): cleaning it where they stand,
-                // the way they came.
+                // facing the room.
+                if let Some(yaw) = crate::sweep::facing(
+                    ctx.nav.lot,
+                    ctx.rooms,
+                    ctx.households[sim.household as usize].plot,
+                    sim.pos,
+                ) {
+                    sim.yaw = yaw;
+                }
                 sim.pose = Pose::Stand;
             } else if (inter.pose == Pose::Stand || on_top) && !inter.inside {
                 // At their own spot, come to it (the end of a ping-pong table, their basin at a
