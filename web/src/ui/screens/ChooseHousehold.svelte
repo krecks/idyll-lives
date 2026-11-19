@@ -14,8 +14,9 @@
   import { reducedMotion } from '../../game/host';
   import { menuScene } from '../../game/menuScene';
   import { householdsAtMost, peopleStreams, populate } from '../../game/people';
-  import { homePrice } from '../../game/price';
-  import { loadTemplates, vacantSlots, type NeighbourhoodDraft, type Templates } from '../../game/town';
+  import { flatPrice, homePrice } from '../../game/price';
+  import { flatsIdOf, loadTemplates, type NeighbourhoodDraft, type Templates } from '../../game/town';
+  import { flatName, homeKey, homeOffers, sameHome, type HomeRef } from '../homes';
   import { app } from '../app.svelte';
   import { lifespanHint, money } from '../format';
   import Icon from '../Icon.svelte';
@@ -32,21 +33,22 @@
 
   let templates = $state.raw<Templates | null>(null);
   let town = $state.raw<NeighbourhoodDraft | null>(app.town);
-  /** The lot under the pointer (3D, a tag or a card), and the card chosen (its home's lot): the camera goes to its area. */
+  /** The lot under the pointer (3D, a tag or a card), and the card chosen (its home: a house's lot or a flat): the camera goes to its area. */
   let hover = $state<number | null>(null);
-  let focus = $state<number | null>(app.playSlot !== null && app.offer.includes(app.playSlot) ? app.playSlot : null);
+  let focus = $state<HomeRef | null>(app.play !== null && app.offer.some((o) => sameHome(o, app.play)) ? app.play : null);
   let hoverOff = 0;
   let cards = $state<HTMLElement>();
 
   const code = $derived(app.code ?? startCode('country', 0));
   const streams = $derived(peopleStreams(peopleSeedOf(code)));
   const offer = $derived(app.offer);
-  const houseCount = $derived(town ? town.slots.filter((s) => s.kind === 'house').length : 0);
+  /** Every home (`homes.ts` `homeOffers`: houses and flats), once the templates are known. */
+  const homes = $derived(town && templates ? homeOffers(content, templates, town) : []);
   /** The homes as steps 2 and 3 count them, farms apart (a farm's house is lived in, so the slider above still counts it). */
-  const homeCount = $derived(town ? town.slots.filter((s) => s.kind === 'house' && s.lot !== 'farm').length : 0);
+  const homeCount = $derived(homes.filter((h) => h.lot.lot !== 'farm').length);
   /** The Neighbours slider's end: as many households as the first wave moves in at most (`populate` stops there too). */
-  const mostHouseholds = $derived(householdsAtMost(houseCount));
-  const forSale = $derived(town ? vacantSlots(town).length : 0);
+  const mostHouseholds = $derived(householdsAtMost(homes.length));
+  const forSale = $derived(town ? homes.length - new Set(town.households.map(homeKey)).size : 0);
   const population = $derived(town?.households.reduce((n, h) => n + h.household.members.length, 0) ?? 0);
   /** Every household is on the cards already: "Show others" has none to show. */
   const allShown = $derived(!town || town.households.length <= offer.length);
@@ -55,10 +57,12 @@
   const offeredHouseholds = $derived.by(() => {
     const t = town;
     if (!t) return [];
-    const bySlot = new Map(t.households.map((h) => [h.slot, h]));
-    return offer.flatMap((slot) => bySlot.get(slot) ?? []);
+    const byHome = new Map(t.households.map((h) => [homeKey(h), h]));
+    return offer.flatMap((home) => byHome.get(homeKey(home)) ?? []);
   });
-  const chosen = $derived(focus === null ? undefined : offeredHouseholds.find((h) => h.slot === focus));
+  const chosen = $derived(focus === null ? undefined : offeredHouseholds.find((h) => sameHome(h, focus)));
+  /** The lots of the homes offered (a building's once for all its flats offered). */
+  const offeredLots = $derived([...new Set(offer.map((o) => o.slot))]);
 
   /**
    * Each lived-in home's price band among the homes lived in: the cheapest third one coin, the
@@ -67,24 +71,25 @@
    */
   const bands = $derived.by(() => {
     const t = town;
-    const map = new Map<number, { band: number; price: number }>();
+    const map = new Map<string, { band: number; price: number }>();
     if (!t || !templates) return map;
-    const prices = t.households.flatMap((h) => (t.slots[h.slot] ? [{ slot: h.slot, price: homePrice(content, templates!, t.slots[h.slot]) }] : []));
+    const priceOf = (h: HomeRef) => (h.flat === undefined ? homePrice(content, templates!, t.slots[h.slot]) : flatPrice(content, templates!, { template: flatsIdOf(t.slots[h.slot]) }, h.flat));
+    const prices = t.households.flatMap((h) => (t.slots[h.slot] ? [{ key: homeKey(h), price: priceOf(h) }] : []));
     const sorted = prices.map((p) => p.price).sort((a, b) => a - b);
     const at = (q: number) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))] ?? 0;
     const [low, high] = [at(1 / 3), at(2 / 3)];
-    for (const p of prices) map.set(p.slot, { price: p.price, band: p.price < low ? 1 : p.price < high ? 2 : 3 });
+    for (const p of prices) map.set(p.key, { price: p.price, band: p.price < low ? 1 : p.price < high ? 2 : 3 });
     return map;
   });
   const BAND_LABEL = ['', 'Modest home', 'Family home', 'Fine home'];
   const currency = $derived(content.economy.currency ?? '$');
 
-  /** Where a home is: its street, and the town or the village it is in (a village says so). */
-  function whereOf(slot: number): { street: string; place: string; village: boolean } {
-    const s = town?.slots[slot];
+  /** Where a home is: its street (a flat: its name, "Flat 2, Mill Court"), and the town or the village it is in (a village says so). */
+  function whereOf(home: HomeRef): { street: string; place: string; village: boolean } {
+    const s = town?.slots[home.slot];
     const area = s?.area ?? 0;
     const name = area === 0 ? (town?.name ?? '') : (town?.open?.areas[area]?.name ?? '');
-    return { street: s?.name ?? '', place: name, village: area !== 0 };
+    return { street: s ? (home.flat === undefined ? s.name : flatName(s, home.flat)) : '', place: name, village: area !== 0 };
   }
 
   /** A resident in brief: "Ben, 34", and their first two traits. */
@@ -97,15 +102,20 @@
   const labels = $derived.by((): LotLabel[] => {
     const t = town;
     if (!t) return [];
-    const offered = new Map(offeredHouseholds.map((h) => [h.slot, h]));
+    // (One tag a lot: a building with several households offered names the one chosen, else the first, and how many more.)
+    const offered = new Map<number, typeof offeredHouseholds>();
+    for (const h of offeredHouseholds) offered.set(h.slot, [...(offered.get(h.slot) ?? []), h]);
     return t.slots.flatMap((s): LotLabel[] => {
-      if (s.kind !== 'house') {
-        const area = s.area ?? 0;
-        if (area === 0) return [{ plot: s.index, title: s.name, kind: 'park' }];
-        return s.index === hover || s.index === focus ? [{ plot: s.index, title: s.name, sub: t.open?.areas[area]?.name, kind: 'park' }] : [];
+      const here = offered.get(s.index);
+      if (here) {
+        const h = here.find((x) => sameHome(x, focus)) ?? here[0];
+        const more = here.length > 1 ? ` · and ${here.length - 1} more` : '';
+        return [{ plot: s.index, title: `The ${h.household.name}s`, sub: `${whereOf(h).street}${more}`, kind: 'home' }];
       }
-      const h = offered.get(s.index);
-      return h ? [{ plot: s.index, title: `The ${h.household.name}s`, sub: s.name, kind: 'home' }] : [];
+      if (s.kind === 'house') return [];
+      const area = s.area ?? 0;
+      if (area === 0) return [{ plot: s.index, title: s.name, kind: 'park' }];
+      return s.index === hover || s.index === focus?.slot ? [{ plot: s.index, title: s.name, sub: t.open?.areas[area]?.name, kind: 'park' }] : [];
     });
   });
 
@@ -159,14 +169,14 @@
     if (!town) return;
     app.town = town;
     if (app.world) app.townOf = peopleKey(app.world.key, peopleSeedOf(code));
-    if (app.playSlot !== null && !town.households.some((h) => h.slot === app.playSlot)) app.playSlot = null;
+    if (app.play !== null && !town.households.some((h) => sameHome(h, app.play))) app.play = null;
   }
 
-  /** Play `slot`'s household: on to step 5, which opens on their home. */
-  function choose(slot: number): void {
+  /** Play the household of `home`: on to step 5, which opens on their home. */
+  function choose(home: HomeRef): void {
     if (!town) return;
     keep();
-    app.playSlot = slot;
+    app.play = home;
     menuScene.highlight({});
     app.screen = 'home';
   }
@@ -174,7 +184,7 @@
   /** Make (or change) the player's own household in Creation. */
   function create(): void {
     keep();
-    app.playSlot = null;
+    app.play = null;
     app.screen = 'create';
   }
 
@@ -182,22 +192,32 @@
   function chooseOwn(): void {
     if (!app.household) return;
     keep();
-    app.playSlot = null;
+    app.play = null;
     menuScene.highlight({});
     app.screen = 'home';
   }
 
-  /** A card or its home picked (again: let go): the camera goes to its area, its card into view. */
-  function select(plot: number | null): void {
-    focus = plot !== null && plot !== focus && offer.includes(plot) ? plot : null;
+  /** A card picked (again: let go): the camera goes to its area, its card into view. */
+  function select(home: HomeRef | null): void {
+    focus = home !== null && !sameHome(home, focus) && offer.some((o) => sameHome(o, home)) ? home : null;
     if (focus === null) return;
-    const card = cards?.querySelector(`[data-slot="${focus}"]`);
+    const card = cards?.querySelector(`[data-home="${homeKey(focus)}"]`);
     card?.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
+  }
+
+  /**
+   * A home picked on the map: its lot's household offered (a building's: the next of those offered there, in the
+   * cards' order; past the last, or a house's picked again, let go).
+   */
+  function selectLot(plot: number | null): void {
+    const here = plot === null ? [] : offer.filter((o) => o.slot === plot);
+    const at = here.findIndex((o) => sameHome(o, focus));
+    select(here[at + 1] ?? focus);
   }
 
   /** What the camera frames: the area of the household chosen, else the whole world. */
   const shot = $derived.by((): 'world' | { area: number } => {
-    const s = focus === null ? undefined : town?.slots[focus];
+    const s = focus === null ? undefined : town?.slots[focus.slot];
     return s ? { area: s.area ?? 0 } : 'world';
   });
 
@@ -231,7 +251,7 @@
 
   // The offered households' homes lit; the one under the pointer and the one chosen more so.
   $effect(() => {
-    menuScene.highlight({ hover, selected: focus, marked: offer, outlines: true });
+    menuScene.highlight({ hover, selected: focus?.slot ?? null, marked: offeredLots, outlines: true });
   });
   $effect(() => () => menuScene.highlight({}));
 
@@ -303,7 +323,7 @@
 {#snippet stage()}
   <div class="split">
     {#if town}
-      <TownStage {labels} {hover} selected={focus} focus={null} {shot} selectable={(p) => offer.includes(p)} onhover={setHover} onselect={select} />
+      <TownStage {labels} {hover} selected={focus?.slot ?? null} focus={null} {shot} selectable={(p) => offeredLots.includes(p)} onhover={setHover} onselect={selectLot} />
     {:else}
       <div></div>
     {/if}
@@ -347,18 +367,18 @@
             {/if}
           </article>
 
-          {#each offeredHouseholds as h (h.slot)}
-            {@const where = whereOf(h.slot)}
-            {@const band = bands.get(h.slot)}
+          {#each offeredHouseholds as h (homeKey(h))}
+            {@const where = whereOf(h)}
+            {@const band = bands.get(homeKey(h))}
             <article
               class="card"
-              data-slot={h.slot}
+              data-home={homeKey(h)}
               class:hover={hover === h.slot}
-              class:focus={focus === h.slot}
+              class:focus={sameHome(focus, h)}
               onmouseenter={() => setHover(h.slot)}
               onmouseleave={() => setHover(null)}
             >
-              <button class="pick" aria-label="Look at the {h.household.name}s' home" aria-pressed={focus === h.slot} onclick={() => select(h.slot)}>
+              <button class="pick" aria-label="Look at the {h.household.name}s' home" aria-pressed={sameHome(focus, h)} onclick={() => select(h)}>
                 <span class="top">
                   <span class="faces">
                     {#each h.household.members as m (m.uid)}
@@ -383,7 +403,7 @@
                 </span>
               </button>
               <div class="card-actions">
-                <button class="btn small go" aria-label="Play the {h.household.name}s" onclick={() => choose(h.slot)}>Play →</button>
+                <button class="btn small go" aria-label="Play the {h.household.name}s" onclick={() => choose(h)}>Play →</button>
               </div>
             </article>
           {:else}
@@ -406,8 +426,8 @@
 
 {#snippet actions()}
   {#if chosen}
-    {#key chosen.slot}
-      <button class="btn primary" onclick={() => choose(chosen.slot)}>Play the {chosen.household.name}s →</button>
+    {#key homeKey(chosen)}
+      <button class="btn primary" onclick={() => choose(chosen)}>Play the {chosen.household.name}s →</button>
     {/key}
   {:else if app.household}
     <button class="btn primary" onclick={chooseOwn}>The {app.household.name}s: choose a home →</button>
