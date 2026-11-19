@@ -185,11 +185,13 @@ export function routeKey(e: KeyPress, c: KeyContext): 'escape' | 'undo' | 'redo'
 }
 
 /**
- * F8 off the game (the main menu, New game's steps; `App.svelte`): `report` saves a debug report,
- * `held` is a held key's repeat (taken from the browser, no second report), `none` isn't ours. In the
- * game the session's own keys (`routeKey`) have F8, so it is never handled twice.
+ * The debug keys off the game (the main menu, New game's steps; `App.svelte`): `report` saves a debug
+ * report (F8), `perf` opens or closes the performance overlay (F3), `held` is a held key's repeat
+ * (taken from the browser, done once), `none` isn't ours. In the game the session's own keys
+ * (`routeKey`) have them, so they are never handled twice.
  */
-export function menuKey(e: Pick<KeyPress, 'key'> & { repeat: boolean }, screen: string): 'report' | 'held' | 'none' {
-  if (e.key !== 'F8' || screen === 'game') return 'none';
-  return e.repeat ? 'held' : 'report';
+export function menuKey(e: Pick<KeyPress, 'key'> & { repeat: boolean }, screen: string): 'report' | 'perf' | 'held' | 'none' {
+  if ((e.key !== 'F8' && e.key !== 'F3') || screen === 'game') return 'none';
+  if (e.repeat) return 'held';
+  return e.key === 'F8' ? 'report' : 'perf';
 }

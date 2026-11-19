@@ -10,7 +10,9 @@
 
 import type { WorldStructure } from '../core/protocol';
 import { PlayCanvasRenderer } from '../render/pc/PlayCanvasRenderer';
-import type { Renderer, RenderFailure, TownBuildStep } from '../render/types';
+import type { Renderer, RenderFailure, RenderStats, TownBuildStep } from '../render/types';
+import { threadStats, type ThreadStats } from '../debug/threads';
+import type { VoiceDirectorStats } from '../voice';
 import { qualityFromSettings, RESTART_KEYS, settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app, type Progress } from '../ui/app.svelte';
 import { perfTime, perfTimeAsync } from '../debug/perf';
@@ -386,6 +388,23 @@ class GameHost {
       screenshot: picture ? await within(picture, 4000, null) : null,
       newGame,
     });
+  }
+
+  /**
+   * The performance overlay's numbers off the game (F3 on the main menu, New game's steps; a game
+   * has its own): the renderer's, if there is one yet, and the threads' with no simulation and no
+   * one speaking.
+   */
+  async perfSample(): Promise<{ stats: RenderStats | null; threads: ThreadStats }> {
+    const renderer = await this.renderer?.catch(() => null);
+    const stats = renderer?.stats() ?? null;
+    const idle: VoiceDirectorStats = { speaking: 0, inFlight: 0, writing: 0, ahead: 0, spoken: 0, dropped: 0, language: liveSettings.voices ? 'paused' : 'off', writer: 'lines' };
+    return { stats, threads: threadStats(stats, null, idle) };
+  }
+
+  /** GPU time measured for the overlay off the game (it costs a little: only while the overlay is open). */
+  measureGpu(on: boolean): void {
+    void this.renderer?.then((r) => r.measureGpu(on)).catch(() => {});
   }
 
   /**

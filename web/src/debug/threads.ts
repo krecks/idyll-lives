@@ -119,13 +119,13 @@ declare global {
 }
 
 export function threadStats(
-  render: RenderStats,
+  render: RenderStats | null,
   sim: SimThreadStats | null,
   director: VoiceDirectorStats,
 ): ThreadStats {
   forgetLongTasks(performance.now());
   const heapBytes = performance.memory?.usedJSHeapSize ?? null;
-  const frameWork = Math.min(1, (render.cpuMs * render.fps) / 1000);
+  const frameWork = render ? Math.min(1, (render.cpuMs * render.fps) / 1000) : 0;
   const mainBusy = Math.min(1, frameWork + (frameMeter.read() ?? 0));
   const voice = { ...voiceThreadStats(), ...director };
   const llm = llmStats();

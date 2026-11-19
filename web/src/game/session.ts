@@ -536,8 +536,6 @@ async function openSession(
   /** How soon each of the town's model files is wanted, by the lot in view and where the camera looks (`streamRanks`). */
   const fileRanks = (w: WorldStructure) => streamRanks(content, assets, w, viewPlot === null ? null : (w.plots[viewPlot] ?? null), watched);
   let autosaveMinutes = -1;
-  /** The performance overlay setting last applied (F3 opens and closes the overlay in between). */
-  let showFps: boolean | null = null;
   /**
    * The free will setting last sent: sent again only when it changes, not with every other setting (a debug `setAutonomy`
    * holds). A state the tests wrote (`?state=`) keeps its own free will as it opens (`check_states.rs`: off, so nobody
@@ -2152,7 +2150,6 @@ async function openSession(
       });
       if (s.autonomy !== autonomy) bridge.send({ type: 'setAutonomy', enabled: (autonomy = s.autonomy) });
       bridge.send({ type: 'setAutoFast', enabled: s.skipQuietHours });
-      if (s.showFps !== showFps) game.perfOpen = showFps = s.showFps;
       if (s.autosaveMinutes !== autosaveMinutes) {
         autosaveMinutes = s.autosaveMinutes;
         clearInterval(autosaveTimer);

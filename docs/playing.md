@@ -53,8 +53,8 @@ A new game goes in five steps. Make the land (step 1: one of nine places, the co
 | Page Up / Page Down | Storey up / down |
 | Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z (⌘Z, ⇧⌘Z) | Undo, redo (Build) |
 | Esc | Steps back: put down what's in hand, leave Build, close the journal, stop following, close a resident's panel — then the pause menu (save, load, settings, quit); with the pause menu open, closes it |
-| F3 | Performance overlay (with *Save debug report*) |
-| F8 | Save a debug report: screenshot, game state, settings, the build's version and commit, and recent errors. With `bun run dev` it goes to `debug-reports/<time>/` in the project; open `?debugReport=<time>` to load it with the same camera. Other builds download it as a file, which any build can play: paste it into Settings › Interface › Diagnostics › Game state. |
+| F3 | Performance overlay (with *Save debug report*), also on the main menu and in New game |
+| F8 | Save a debug report (also on the main menu and in New game): screenshot, game state, settings, the build's version and commit, and recent errors. With `bun run dev` it goes to `debug-reports/<time>/` in the project; open `?debugReport=<time>` to load it with the same camera. Other builds download it as a file, which any build can play: paste it into Settings › Interface › Diagnostics › Game state. |
 
 With `bun run dev`, every page load also keeps a **dev play log**, `dev-logs/<time>.jsonl` in the project (`dev-logs/latest.txt` names the newest; `?devlog=0` turns it off). One JSON object a line: the browser, the screen and the GPU; every console warning and error; the screen shown and every settings change; a game opened and closed; every 5 seconds what is drawn (frame rate, frame time, the resolution drawn, draw calls) and, in a game, the simulation's steps, memory and the game's time and speed; the size drawn whenever it changes; every stall of 100 ms or more between frames; and every step timed on the way (`perf`: start-up, the menus' town, each batch of portraits, a game's preparation and each lot its warm-up builds), so a slow load can be read step by step afterwards. Code: `web/src/debug/devlog.ts`.
 

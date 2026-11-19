@@ -1,6 +1,6 @@
 /**
  * The game's key routing (`game/input.ts` `routeKey`): what reaches the game's shortcuts with a
- * dialog or the pause menu open, with Ctrl, ⌘ or Alt held, and where Tab goes.
+ * dialog or the pause menu open, with Ctrl, ⌘ or Alt held, and where Tab goes; the debug keys off the game (`menuKey`).
  */
 import { describe, expect, test } from 'bun:test';
 import { menuKey, routeKey, type KeyContext, type KeyPress } from '../src/game/input';
@@ -55,21 +55,29 @@ describe('key routing', () => {
   });
 });
 
-describe('F8 off the game', () => {
+describe('F3 and F8 off the game', () => {
   const f8 = { key: 'F8', repeat: false };
+  const f3 = { key: 'F3', repeat: false };
+  const offGame = ['menu', 'land', 'streets', 'town', 'household', 'create', 'home'];
 
-  test('the main menu and every New game step save a report', () => {
-    for (const screen of ['menu', 'land', 'streets', 'town', 'household', 'create', 'home']) expect(menuKey(f8, screen)).toBe('report');
+  test('the main menu and every New game step save a report (F8) and show the performance overlay (F3)', () => {
+    for (const screen of offGame) {
+      expect(menuKey(f8, screen)).toBe('report');
+      expect(menuKey(f3, screen)).toBe('perf');
+    }
   });
 
-  test("in the game it is the session's (`routeKey`), never handled twice", () => {
-    expect(menuKey(f8, 'game')).toBe('none');
-    expect(menuKey({ ...f8, repeat: true }, 'game')).toBe('none');
-    expect(routeKey(key('F8'), scene)).toBe('game');
+  test("in the game they are the session's (`routeKey`), never handled twice", () => {
+    for (const k of [f8, f3]) {
+      expect(menuKey(k, 'game')).toBe('none');
+      expect(menuKey({ ...k, repeat: true }, 'game')).toBe('none');
+      expect(routeKey(key(k.key), scene)).toBe('game');
+    }
   });
 
-  test('a held key saves one report; other keys are not ours', () => {
+  test('a held key acts once; other keys are not ours', () => {
     expect(menuKey({ ...f8, repeat: true }, 'land')).toBe('held');
-    for (const k of ['F3', 'F7', 'Escape', 'z']) expect(menuKey({ key: k, repeat: false }, 'streets')).toBe('none');
+    expect(menuKey({ ...f3, repeat: true }, 'menu')).toBe('held');
+    for (const k of ['F2', 'F7', 'Escape', 'z']) expect(menuKey({ key: k, repeat: false }, 'streets')).toBe('none');
   });
 });

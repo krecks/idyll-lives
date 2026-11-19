@@ -40,6 +40,8 @@ type Profiler = pc.GraphicsDevice['gpuProfiler'];
 
 /** Frames in `GpuTiming.recentMs`'s average (about a second). */
 const RECENT = 60;
+/** A frame's GPU span longer than this is a stamp that never came (`reported`), not a frame (ms). */
+const MAX_FRAME_MS = 1000;
 
 export class GpuTiming {
   /** Whole frames measured so far, and the newest's time (ms). */
@@ -109,8 +111,14 @@ export class GpuTiming {
   }
 
   private reported(profiler: Profiler): void {
-    const ms = profiler.frameTime;
+    let ms = profiler.frameTime;
     if (ms === undefined) return;
+    // A pass whose end stamp never came stays at zero (on Metal, a sun shadow pass with nothing to draw, as on
+    // New game's Land step), and the span then starts at the clock's zero: days long. The passes' sum instead.
+    if (ms > MAX_FRAME_MS) {
+      ms = 0;
+      for (const t of profiler.passTimings.values()) ms += t;
+    }
     this.recent[this.frames % RECENT] = ms;
     this.frames++;
     this.ms = ms;

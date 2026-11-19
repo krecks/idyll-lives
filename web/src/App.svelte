@@ -36,6 +36,7 @@
   import SettingsPanel from './ui/screens/SettingsPanel.svelte';
   import StreamIndicator from './ui/StreamIndicator.svelte';
   import Toasts from './ui/Toasts.svelte';
+  import PerfOverlay from './ui/PerfOverlay.svelte';
 
   let gameLayer: HTMLDivElement;
 
@@ -85,6 +86,9 @@
   const WARM_AGE = 34;
   /** A start-up step, or nothing once it has taken `STEP_LIMIT_MS`. */
   const inTime = <T,>(p: Promise<T>) => within(p, STEP_LIMIT_MS, undefined);
+
+  /** How often the performance overlay's numbers are read off the game (ms; a game's own: `session.ts`). */
+  const PERF_SAMPLE_MS = 500;
 
   /** Longest wait for the menu's picture (read back, then decoded): the menu goes on without it. */
   const STILL_LIMIT_MS = 2_000;
@@ -337,13 +341,42 @@
     };
   });
 
-  /** F8 off the game (the main menu, New game's steps): a debug report, with New game's state on its steps (the game's own keys have it in play). */
+  /**
+   * The debug keys off the game (the main menu, New game's steps; the game's own keys have them in
+   * play): F8 a debug report, with New game's state on its steps; F3 the performance overlay.
+   */
   function onKey(e: KeyboardEvent) {
     const action = menuKey(e, app.screen);
     if (action === 'none') return;
     e.preventDefault();
     if (action === 'report') void saveDebugReport('', (note) => host.basicReport(note));
+    else if (action === 'perf') game.perfOpen = !game.perfOpen;
   }
+
+  // The performance overlay follows its setting (F3 opens and closes it between changes), in the game and out.
+  $effect(() => {
+    game.perfOpen = settings.showFps;
+  });
+
+  // Its numbers off the game (a game samples its own): the renderer's and the threads', twice a second.
+  $effect(() => {
+    if (!game.perfOpen || app.screen === 'game') return;
+    let stopped = false;
+    const sample = () =>
+      void host.perfSample().then(({ stats, threads }) => {
+        if (stopped || app.screen === 'game') return;
+        game.stats = stats;
+        game.threads = threads;
+      });
+    host.measureGpu(true);
+    sample();
+    const timer = setInterval(sample, PERF_SAMPLE_MS);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      host.measureGpu(false);
+    };
+  });
 </script>
 
 <svelte:window onkeydown={onKey} />
@@ -414,6 +447,9 @@
   </div>
 {/if}
 
+<!-- F3 off the game (the game shows it in its interface), over the menus but under their windows. -->
+{#if app.screen !== 'game' && !app.fatal}<div class="scaled perf-layer"><PerfOverlay /></div>{/if}
+
 <div class="scaled toast-layer"><Toasts /></div>
 
 <style>
@@ -472,6 +508,12 @@
   }
   .bar .btn {
     border-radius: var(--radius-pill);
+  }
+  .perf-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 45;
   }
   .toast-layer {
     position: fixed;
