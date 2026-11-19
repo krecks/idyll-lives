@@ -4,7 +4,8 @@
 # the release, and publishes only with `-f deploy=true`. Pushes to main alone don't publish. The
 # github-pages environment must allow `v*` tags (and any branch that is deployed by hand).
 # Run it by hand on main just before tagging: caches saved by a tag run can't be read by the next
-# tag, those saved on main can (and only main saves the Rust one, which is most of the size).
+# tag, those saved on main can (the compressed assets, wasm-opt's results, the voice and language
+# models; the Rust build stays on the runner, see `build`).
 #
 # The tests are CI's (ci.yml), not run again here: fmt, clippy, the simulation and the tools' tests,
 # the shader chunks and the renderer tests. A deploy waits for CI to pass on the same commit instead
@@ -37,8 +38,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # On the self-hosted runner, as CI's jobs (ci.yml has why, and what the repository's settings need):
+  # tools/ci-runner.sh readies it, the Rust build kept there and shared with CI's jobs.
   build:
-    runs-on: ubuntu-26.04
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 45
     # No RUSTFLAGS here: it would replace .cargo/config.toml's SIMD flag (the wasm crates then
     # stop with a compile error), so a flag added here must repeat `-C target-feature=+simd128`.
@@ -47,15 +50,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # The version pinned in rust-toolchain.toml, with the wasm32 target.
-      - name: Rust toolchain
-        run: |
-          rustup toolchain install
-          rustc --version
-      # (Saved on main only: see the top.)
-      - uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+      # The version pinned in rust-toolchain.toml, with the wasm32 target, and the kept build.
+      - name: Rust toolchain and the kept build
+        run: tools/ci-runner.sh
       # Must match the wasm-bindgen crate version in Cargo.lock.
       - uses: taiki-e/install-action@v2
         with:
@@ -64,6 +61,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.4
+          no-cache: true
 
       - name: Version check (web, Rust and Cargo.lock match; on a release tag, the tag and CHANGELOG.md too)
         env:
@@ -182,12 +180,15 @@ jobs:
   # CI passed on this commit (see the top). On a tag, the CI run the tag's push started; by hand,
   # the newest CI run on the commit that passed, or else one still running, waited for. A run that
   # fails, or none at all, fails this and the deploy waits on it; the build above runs anyway.
+  #
+  # On GitHub's runners: on the one self-hosted runner it would hold the machine while CI's jobs wait
+  # for it. It runs from the push, and CI's jobs and `build` take the runner one after another, so
+  # it waits up to three hours (the tag's CI alone took about 20 minutes on four GitHub runners).
   ci:
     name: CI passed on this commit
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy)
     runs-on: ubuntu-26.04
-    # (The tag's CI is about 20 minutes, the generated worlds the longest.)
-    timeout-minutes: 60
+    timeout-minutes: 180
     steps:
       - name: Wait for CI
         env:
@@ -230,6 +231,7 @@ jobs:
           echo "CI: ${state#completed } ($url)"
           if [ "$state" != "completed success" ]; then echo "::error::CI on $SHA: ${state#completed } ($url)"; exit 1; fi
 
+  # (Only GitHub's Pages calls: on GitHub's runners, not queued behind the self-hosted one.)
   deploy:
     needs: [build, ci]
     # Release tags publish; a run by hand only with deploy checked.
