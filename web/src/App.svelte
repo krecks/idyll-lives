@@ -162,7 +162,9 @@
         const look = { gender: 'female', appearance: lookAtAge(services.content, services.assets, lookFromSeed(services.assets, 'female', WARM_FACE), WARM_AGE) };
         // (Behind the menu, not in front of it: the studio warms up while the picture is painted, and
         // a portrait asked for before it is done queues behind it.)
-        void perfTimeAsync('boot: portraits', () => within(services.previews.portrait(look), PORTRAIT_LIMIT_MS, undefined));
+        void perfTimeAsync('boot: portraits', () => within(services.previews.portrait(look), PORTRAIT_LIMIT_MS, undefined)).catch((err: unknown) =>
+          console.warn('[boot] the portrait warm-up failed', err),
+        );
       }
       step('Painting the menu', 0.8);
       await perfTimeAsync('boot: menu picture', async () => showStill(await still));

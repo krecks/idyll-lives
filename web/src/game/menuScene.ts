@@ -60,6 +60,18 @@ const NO_HIGHLIGHT: LotHighlight = { hover: null, selected: null, marked: [], ou
 /** The menu's picture at most this wide (pixels); as the screen is, if smaller. */
 const STILL_WIDTH = 1920;
 
+/**
+ * What a town shown is made of, as a string: the renderer rebuilds it only when this changes (null: a
+ * draft that would not stringify, which is compared by identity instead).
+ */
+function shownKeyOf(draft: NeighbourhoodDraft, home: number | null): string | null {
+  try {
+    return `${home ?? ''}|${JSON.stringify(draft)}`;
+  } catch {
+    return null;
+  }
+}
+
 class MenuScene {
   private templates: Templates | null = null;
   private draft: NeighbourhoodDraft | null = null;
@@ -124,12 +136,7 @@ class MenuScene {
     if (draft === this.draft && home === this.home && this.live?.townShown) return;
     // (The wizard's steps each hand over a fresh draft of the same town: the renderer rebuilds it
     // only when its content changed, not when its object did.)
-    let key: string | null = null;
-    try {
-      key = `${home ?? ''}|${JSON.stringify(draft)}`;
-    } catch {
-      key = null;
-    }
+    const key = shownKeyOf(draft, home);
     if (key !== null && key === this.shownKey && this.live?.townShown) {
       this.draft = draft;
       this.home = home;

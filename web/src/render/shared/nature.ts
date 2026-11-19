@@ -9,7 +9,7 @@
  * Placements are matrices in game space (the layout of `math.ts`): 16 floats each.
  */
 
-import { DEFAULT_LANDSCAPE, groundDepth, type LandFile, type LandscapeParams, type WorldStructure, type WorldZone } from '../../core/protocol';
+import { DEFAULT_LANDSCAPE, groundDepth, type LandFile, type LandscapeParams, type RoadPlan, type WorldStructure, type WorldZone } from '../../core/protocol';
 import { COVER, COVER_CELL, decodeLand, heightAt as landHeight, LAND_CELL, NONE, SEA_CM, type Land, type LandRect } from '../../game/land';
 import { carriedWetEdgeAt, coverAt, EDGE_POND, seaRims, edgeWater, edgeWaterAt, EXIT_MOST, landExits, landTop, landWater, ROUND_CELL, roundedWater, seaWays, VALLEY_BANK, VALLEY_IN, valleyCap, waterGridAt, waterMetres, wetDistance, wetEdgeAt, type LandExit, type WaterGrid } from './landBake';
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
@@ -548,11 +548,22 @@ export function groupInstances<T, K>(items: readonly T[], group: (item: T) => K)
  */
 function canonicalJson(v: unknown): string {
   if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`;
-  if (v && typeof v === 'object') {
+  // (A typed array's keys are its indices, which must keep their order: only plain objects are sorted.)
+  if (v && typeof v === 'object' && !ArrayBuffer.isView(v)) {
     const o = v as Record<string, unknown>;
-    return `{${Object.keys(o).sort().filter((k) => o[k] !== undefined).map((k) => `${JSON.stringify(k)}:${canonicalJson(o[k])}`).join(',')}}`;
+    const keys = Object.keys(o).filter((k) => o[k] !== undefined).sort();
+    return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(o[k])}`).join(',')}}`;
   }
   return JSON.stringify(v) ?? 'null';
+}
+
+/** The same road laid out again (not just another object of it): its middle, width, kind and the decks the land's water made. */
+function sameRoad(a: RoadPlan, b: RoadPlan): boolean {
+  if (a === b) return true;
+  if (a.width !== b.width || a.kind !== b.kind || a.points.length !== b.points.length) return false;
+  if (a.points.some(([x, z], i) => x !== b.points[i][0] || z !== b.points[i][1])) return false;
+  const decks = (r: RoadPlan) => `${r.bridge ?? ''}|${(r.bridges ?? []).map(([s, e]) => `${s}:${e}`).join(',')}`;
+  return decks(a) === decks(b);
 }
 
 /**
@@ -824,9 +835,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const now = world.meta?.roads ?? [];
     // (By value: the same roads laid out again, by the menus' draft and by the game's world, are the same roads: only
     // one the water bridged or a stroke moved is to be solved again, not every one of them for another array.)
-    const same = (a: (typeof now)[number], b: (typeof now)[number]) =>
-      a === b || (a.width === b.width && a.kind === b.kind && a.points.length === b.points.length && a.points.every(([x, z], i) => x === b.points[i][0] && z === b.points[i][1]));
-    const changed = now.filter((r, i) => !(i < old.length && same(r, old[i])));
+    const changed = now.filter((r, i) => i >= old.length || !sameRoad(r, old[i]));
     if (!changed.length && old.length === now.length) return null;
     this.laidOut = world;
     this.adoptLand(this.field);
