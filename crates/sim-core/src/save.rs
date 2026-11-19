@@ -945,7 +945,8 @@ impl World {
                     // down to do isn't saved.)
                     pos = [fx as f32 + 0.5, fz as f32 + 0.5];
                 }
-                // (Lost somewhere: back at home's front door, or the middle of town.)
+                // (Lost somewhere: back at home (a flat's: behind its own door), or the middle of
+                // town.)
                 if !pos.iter().all(|p| p.is_finite()) {
                     let home = self
                         .households
@@ -953,7 +954,7 @@ impl World {
                         .and_then(|h| h.plot);
                     pos = home.map_or(
                         [self.lot.width as f32 / 2.0, self.lot.depth as f32 / 2.0],
-                        |p| self.plots[p as usize].arrival_point(),
+                        |p| self.plots[p as usize].home_point(),
                     );
                 }
                 let tasks = s

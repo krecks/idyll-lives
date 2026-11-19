@@ -297,7 +297,8 @@ When it goes well, those listening get its `targetFeeling`, and everyone there g
 their social's outcome with each other instead).
 
 **Visitors at the door** (`visits.door`: `waitMinutes`, `welcomeFriendship`, `greet`,
-`turnedAwayFeeling`, `knockAnim`): a visitor knocks and a grown-up of the household who is home and
+`turnedAwayFeeling`, `knockAnim`): a visitor knocks (at a flat, at its own door off the landing,
+in through the building's street door and up its stairs) and a grown-up of the household who is home and
 awake answers, before the next step of a routine; one busy (in a conversation, say) comes once
 free, and while someone awake is home the visitor waits three times `waitMinutes` for them, else
 `waitMinutes`, then goes home. Residents set off on a visit of their own choosing only to a home
@@ -653,7 +654,7 @@ Content `life` (an object, so a pack can change single keys):
 | `death` | `{"from", "perYear", "growth"}`: from age `from`, a yearly chance of `perYear`, ×e^`growth` per year older. |
 | `grief` | `{"feeling", "lightFeeling", "close", "friend"}`: family, partners and friends from `close` get `feeling` when someone dies; friends from `friend` get `lightFeeling`. |
 | `moving` | `{"hour", "partners", "romance", "leaveHomeAge", "leaveHome", "leaveTownAge", "leaveTown"}`: daily chances of partners moving in together (romance at least `romance`), grown children moving out, and leaving town when no house is free. Absent: nobody moves on their own. |
-| `newcomers` | `{"hour", "days"}`: a vacant house gets a household with a chance of 1 in `days` a day. Absent: nobody new comes. |
+| `newcomers` | `{"hour", "days"}`: a vacant home (a house or a flat) gets a household with a chance of 1 in `days` a day; they come in at its street door (a flat's building's). Absent: nobody new comes. |
 
 **Family** comes from bond presets with a `kin`, the family link of the bond's *second*
 resident to the first: `{"parent": {"friendship": 50, "kin": "parent"}}` in a bond `a, b` makes

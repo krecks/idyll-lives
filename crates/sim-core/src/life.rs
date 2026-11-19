@@ -1596,15 +1596,52 @@ const KNOCK_REACH: f32 = 0.45;
 
 /// Where a visitor knocks at `plot`: at the front door (the door from outdoors into the house
 /// nearest the plot's `entry`, within a few tiles of it), `KNOCK_REACH` out from it, facing it;
-/// and the tile they stand on. None without a door like that, or with something in front of it.
+/// and the tile they stand on. At a flat, its own door off the landing (`Plot::door`, the way in
+/// to `Plot::inside`). None without a door like that, or with something in front of it.
 pub(crate) fn knock_spot(nav: &crate::path::NavGrid, plot: &crate::world::Plot) -> Option<Knock> {
+    let ((x, z), (dx, dz)) = match (plot.door, plot.inside) {
+        (Some((x, z)), Some(inside)) => {
+            let (ix, iz) = (inside[0].floor() as i32, inside[1].floor() as i32);
+            let (dx, dz) = (ix - x, iz - z);
+            if dx.abs() + dz.abs() != 1
+                || !nav.tile_free(x, z)
+                || !nav.lot.in_bounds(ix, iz)
+                || nav.lot.edge_between(x, z, ix, iz) != crate::lot::Edge::Door
+            {
+                return None;
+            }
+            ((x, z), (dx, dz))
+        }
+        _ => front_door(nav, plot.arrival_point(), |x, z| plot.contains(x, z))?,
+    };
+    let door = [
+        x as f32 + 0.5 + dx as f32 * 0.5,
+        z as f32 + 0.5 + dz as f32 * 0.5,
+    ];
+    let at = [
+        door[0] - dx as f32 * KNOCK_REACH,
+        door[1] - dz as f32 * KNOCK_REACH,
+    ];
+    Some(((x, z), at, (dx as f32).atan2(dz as f32)))
+}
+
+/// A front door (`front_door`): the tile outdoors before it, and the step in through it.
+pub(crate) type FrontDoor = ((i32, i32), (i32, i32));
+
+/// The door from outdoors into a building nearest `entry` (within a few tiles of it, from a tile
+/// `on` the lot): the free tile outdoors before it, and the step in through it. None: no door
+/// like that, or something in front of it.
+pub(crate) fn front_door(
+    nav: &crate::path::NavGrid,
+    entry: [f32; 2],
+    on: impl Fn(i32, i32) -> bool,
+) -> Option<FrontDoor> {
     let lot = nav.lot;
-    let entry = plot.arrival_point();
     let (ex, ez) = (entry[0].floor() as i32, entry[1].floor() as i32);
-    let mut best: Option<(f32, Knock)> = None;
+    let mut best: Option<(f32, FrontDoor)> = None;
     for z in ez - 3..=ez + 3 {
         for x in ex - 3..=ex + 3 {
-            if !plot.contains(x, z)
+            if !on(x, z)
                 || !lot.in_bounds(x, z)
                 || lot.room_at(x, z) != crate::lot::OUTDOORS
                 || !nav.tile_free(x, z)
@@ -1623,13 +1660,9 @@ pub(crate) fn knock_spot(nav: &crate::path::NavGrid, plot: &crate::world::Plot) 
                     x as f32 + 0.5 + dx as f32 * 0.5,
                     z as f32 + 0.5 + dz as f32 * 0.5,
                 ];
-                let at = [
-                    door[0] - dx as f32 * KNOCK_REACH,
-                    door[1] - dz as f32 * KNOCK_REACH,
-                ];
                 let d = (door[0] - entry[0]).hypot(door[1] - entry[1]);
                 if best.is_none_or(|b| d < b.0) {
-                    best = Some((d, ((x, z), at, (dx as f32).atan2(dz as f32))));
+                    best = Some((d, ((x, z), (dx, dz))));
                 }
             }
         }
@@ -1643,7 +1676,7 @@ pub(crate) type Knock = ((i32, i32), [f32; 2], f32);
 /// Who answers the door of `plot`: the grown-up of the household living there who is nearest to
 /// the door, at home, awake, and not busy with something the player asked for or a conversation.
 fn door_host(w: &World, plot: u32, guest: usize) -> Option<usize> {
-    let door = w.plots[plot as usize].arrival_point();
+    let door = w.plots[plot as usize].doorstep();
     let free = |s: &crate::world::Sim| {
         s.current.as_ref().is_none_or(|a| {
             !a.task.directed
