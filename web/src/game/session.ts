@@ -92,8 +92,10 @@ export type StartRequest =
       kind: 'new';
       town: NeighbourhoodDraft;
       household: HouseholdDraft;
+      /** The home: a house's lot, or flat `flat` (its index in its building's flats) of the building on it. */
       slot: number;
-      /** `household` already lives in `town` at `slot`: the player takes it over instead of moving a new one in. */
+      flat?: number;
+      /** `household` already lives in `town` at `slot` (and `flat`): the player takes it over instead of moving a new one in. */
       existing?: boolean;
       /** Living (default) or Creative. */
       mode?: GameKind;
@@ -209,7 +211,7 @@ async function openSession(
   warm: boolean,
 ): Promise<GameSession> {
   const params = new URLSearchParams(location.search);
-  devlog('session', { event: 'opening', request: request.kind, ...(request.kind === 'load' ? { saveId: request.saveId } : { slot: request.slot, town: request.town.name, mode: request.mode ?? 'living' }) });
+  devlog('session', { event: 'opening', request: request.kind, ...(request.kind === 'load' ? { saveId: request.saveId } : { slot: request.slot, ...(request.flat === undefined ? {} : { flat: request.flat }), town: request.town.name, mode: request.mode ?? 'living' }) });
   // Every loading step names the work in the perf report (a long task or a dropped frame then says which).
   const report = progress;
   progress = (label, value) => {
@@ -242,7 +244,7 @@ async function openSession(
       progress('Laying out the neighbourhood', 0.09);
     }
     const made = await perfTimeAsync('session: assembleTown', () =>
-      townJob(content, { kind: 'assemble', town, player: request.household, slot: request.slot, options: { existing: request.existing, mode: request.mode, lifespan: request.lifespan }, random }),
+      townJob(content, { kind: 'assemble', town, player: request.household, slot: request.slot, options: { existing: request.existing, flat: request.flat, mode: request.mode, lifespan: request.lifespan }, random }),
     );
     source = { lot: made.lot, seed: Number(params.get('seed')) || (people?.sim ?? (Math.random() * 2 ** 31) >>> 0) };
     household = request.household.name.trim();

@@ -72,7 +72,7 @@ export function flatsDetail(rows: readonly FlatRow[]): string {
 }
 
 /**
- * What a card calls a civic place (`game/backdrop.ts` `CIVIC`: "Fire station", "School"; a village's hall its
+ * What a card calls a civic place (`game/places.ts` `CIVIC`: "Fire station", "School"; a village's hall its
  * "Village hall", as its name says), '' for any other: a shop's or a café's name says what it is.
  */
 export function placeLabel(place: TownPlace | undefined): string {
@@ -120,15 +120,18 @@ export interface Inside {
 
 /**
  * Who is inside the choice now: at the place (on its lot, or working there: `whereabouts`, as the place tags count
- * them), in the house (on its lot, not away), or in a building of flats (in its flats, its hall or its yard). Null
- * for a person.
+ * them, and in the flats over it), in the house (on its lot, not away), or in a building of flats (in its flats, its
+ * hall or its yard). Null for a person.
  */
 export function whoIsIn(c: Chosen, w: TagWorld, yours: ReadonlyMap<number, string>): Inside | null {
   if (c.kind === 'person') return null;
   const out: Inside = { names: [], others: 0 };
+  // (A place's lot, for the flats over it: who is home in one of them is in the building too.)
+  const lot = c.kind === 'place' ? (w.places[c.place]?.plot ?? c.plot) : c.plot;
   for (const s of w.sims) {
-    const at = c.kind === 'flats' && s.plot !== null ? lotOf(w, s.plot) : s.plot;
-    const there = c.kind === 'place' ? whereabouts(s, w).place === c.place : at === c.plot && s.awayUntil === null;
+    const at = (c.kind === 'flats' || c.kind === 'place') && s.plot !== null ? lotOf(w, s.plot) : s.plot;
+    const upstairs = c.kind === 'place' && lot != null && at === lot && s.plot !== lot && s.awayUntil === null;
+    const there = c.kind === 'place' ? whereabouts(s, w).place === c.place || upstairs : at === c.plot && s.awayUntil === null;
     if (!there) continue;
     const name = yours.get(s.id);
     if (name) out.names.push(name);

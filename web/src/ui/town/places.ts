@@ -5,6 +5,7 @@
  */
 
 import type { FlatInfo, PlotInfo, RoadPlan, TownArea, TownPlace, WorldMeta } from '../../core/protocol';
+import { FLAT_FLOOR } from '../../game/price';
 
 type Rates = { perTile: number; perFloorTile: number; round: number; sizeRef?: number; sizePremium?: number };
 
@@ -108,9 +109,6 @@ export interface HomeForSale {
   w: number;
   d: number;
 }
-
-/** A flat's floor costs this share of a house's a tile, as `game/price.ts` prices a flat: no roof, garden or outside walls of its own, its stairs and hall the building's. */
-const FLAT_FLOOR = 0.6;
 
 /**
  * The homes nobody lives in (private lots no household has, and flats), priced as `game/price.ts` prices a home from

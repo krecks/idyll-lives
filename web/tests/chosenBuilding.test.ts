@@ -146,6 +146,13 @@ describe('who is inside', () => {
     expect(inside).toEqual({ names: [], others: 1 });
     expect(insideText(inside)).toBe('1 person inside');
   });
+  test('at a shop with flats over it: those in the shop, and those at home in its flats', () => {
+    const flat = (id: number) => ({ id, of: 2, storey: 1, x: 40, z: 0, w: 8, d: 10, name: `Flat ${id - 2}, Bakery`, door: [44, 30] as [number, number] });
+    const w = { ...world([sim(1, { plot: 2 }), sim(2, { plot: 3, household: 2 }), sim(3, { plot: 4, household: 0, name: 'Mika' }), sim(4, { plot: 3, household: 2, awayUntil: 900, job }), sim(5, { plot: 1 })]), flats: [flat(3), flat(4)] };
+    w.households = [...w.households, { id: 2, name: 'Upton', plot: 3, player: false }];
+    const inside = whoIsIn({ kind: 'place', place: 0, plot: 2, title: '', detail: '' }, w, new Map([[3, 'Mika']]))!;
+    expect(inside).toEqual({ names: ['Mika'], others: 2 });
+  });
   test('a person says nothing; an empty building, nobody', () => {
     expect(whoIsIn({ kind: 'person', sim: 1, plot: null, title: '', detail: '' }, world([]), new Map())).toBeNull();
     expect(insideText({ names: [], others: 0 })).toBe('Nobody inside now');

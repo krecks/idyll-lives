@@ -36,10 +36,10 @@ function requestKey(r: StartRequest): string {
   // (A shaped land is another world: its fingerprint, `landHash`. The land's size and where the lots stand tell
   // one town laid on a land from another: another town seed, or the town moved.)
   const land = r.town.open?.land?.edited ? landHash(r.town.open.land) : '';
-  const town = `${r.town.name}:${r.town.world?.kind ?? ''}:${JSON.stringify(r.town.world?.options ?? null)}:${r.town.seed}:${r.town.width}x${r.town.depth}:${land}:${r.town.slots.map((s) => `${s.template}@${s.lot ?? 'medium'}@${s.x},${s.z}`).join(',')}:${r.town.households.map((h) => `${h.slot}=${members(h.household)}`).join(';')}`;
+  const town = `${r.town.name}:${r.town.world?.kind ?? ''}:${JSON.stringify(r.town.world?.options ?? null)}:${r.town.seed}:${r.town.width}x${r.town.depth}:${land}:${r.town.slots.map((s) => `${s.template}@${s.lot ?? 'medium'}@${s.x},${s.z}`).join(',')}:${r.town.households.map((h) => `${h.slot}${h.flat === undefined ? '' : `:${h.flat}`}=${members(h.household)}`).join(';')}`;
   // A household edited after its session was prepared (back to step 2) needs a new one too. (The neighbours filled
   // in on the way in come from the people seed: another seed, other neighbours.)
-  return `${r.existing ? 'play' : 'new'}:${r.mode ?? 'living'}:${r.lifespan ?? 'normal'}:${town}:${r.slot}:${r.fill ? `fill ${r.peopleSeed ?? '?'}` : ''}:${JSON.stringify(r.household)}`;
+  return `${r.existing ? 'play' : 'new'}:${r.mode ?? 'living'}:${r.lifespan ?? 'normal'}:${town}:${r.slot}${r.flat === undefined ? '' : `:${r.flat}`}:${r.fill ? `fill ${r.peopleSeed ?? '?'}` : ''}:${JSON.stringify(r.household)}`;
 }
 
 /** Seconds the camera takes to fly from the menu's view of a lot into the game. */
