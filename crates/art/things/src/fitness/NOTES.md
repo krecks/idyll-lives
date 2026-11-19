@@ -88,7 +88,7 @@ is never two of it.
 | `model.dumbbells` | 0.77 × 0.72 × 0.93 m | 3,240 | 3 | Rack, Weights |
 | `model.massageTable` | 0.70 × 0.79 × 1.85 m (the table) | 5,388 | 1 | Upholstery, Frame |
 | `model.meditationCushion` | 0.70 × 0.18 × 0.70 m | 1,834 | 1 | Cushion, Mat |
-| `model.sauna` | 1.94 × 2.05 × 1.93 m | 7,678 | 4 | Wood, Trim |
+| `model.sauna` | 1.94 × 2.05 × 1.93 m | 7,174 | 4 | Wood, Trim |
 
 `check-glb`: 5 models, 0 failed; warnings: the treadmill's belt loop (expected) and the yoga mat's flat strip (29 %,
 was 42 %). Khronos validator: 0 errors, 0 warnings each.
@@ -111,12 +111,13 @@ was 42 %). Khronos validator: 0 errors, 0 warnings each.
   lower bench's backrest. The stove with its stones behind a slatted guard in the front right corner, a banded bucket
   and ladle beside it, a thermometer, a towel folded on the upper bench. The front is glass: a fixed pane and the
   glass door (`door`, hinged on its left, a spruce handle): `door_open` swings it 60° out (0.8 s, `BackOut`), `hold`
-  1.5 s and `out` 1.5 s, as the soloSauna's. The roof is glazed whole, one pane in a slim spruce frame (a bar over
-  the door's post, one across over the bench's front), so every seat on the back bench shows from above at the play
-  camera: under a deck of boards only the bathers' legs showed, and under a deck over the back with a glazed band at
-  the front (2026-11-19, first build) a bather on the side away from the camera was hidden (the game seats them at
-  the place nearest the door: rotations 2 and 3). 4 draws (plain and glass on the cabin, glass and the plain handle
-  on the door), the soloSauna's count.
+  1.5 s and `out` 1.5 s, as the soloSauna's. Glass wherever the play camera looks in at the bench: the roof glazed
+  whole, one pane in a slim spruce frame (a bar over the door's post, one across over the bench's front), and each
+  side wall glazed above its boards (six boards, up to 0.83 m, under the bench line; a framed pane above with an
+  upright in the middle). The end seats are 0.4 m in from the side walls: behind a 2 m wall of boards the camera on
+  that side hid the bather (rotations 2 and 3 in play, 2026-11-19), and under a deck of boards over the back, the
+  one on the far side. The back wall stays boards (it stands on the house wall). 4 draws (plain and glass on the
+  cabin, glass and the plain handle on the door), the soloSauna's count.
 
 ## Detail pass (2026-10-22)
 

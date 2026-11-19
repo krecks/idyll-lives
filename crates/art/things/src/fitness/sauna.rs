@@ -39,6 +39,8 @@ const UPPER: f64 = 0.9;
 const GLASS_Z: f64 = 0.925;
 const DOOR_L: f64 = -0.89;
 const DOOR_R: f64 = -0.24;
+/// The side walls' boards under their glass: six, up to 0.83 m, under the bench line.
+const SIDE_BOARDS: usize = 6;
 /// The bar across the glazed roof (depth), over the lower bench's front edge.
 const ROOF_BAR: f64 = -0.12;
 
@@ -77,13 +79,14 @@ pub fn sauna() -> Vec<Obj> {
                 bevel_segments = 1
             );
         }
-        // The walls: horizontal boards, each a hair proud or shy of the next, so the seams show inside and out.
+        // The walls: horizontal boards, each a hair proud or shy of the next, so the seams show inside and out; the
+        // side walls' boards stop under the bench line (`SIDE_BOARDS`), glass above them.
         let (y0, n) = (0.05, 15);
         let bh = (TOP - y0) / n as f64;
         for k in 0..n {
             let y = y0 + bh * (k as f64 + 0.5);
             let t = WALL - 0.004 * (k % 2) as f64;
-            for s in [-1.0, 1.0] {
+            for s in [-1.0, 1.0].into_iter().filter(|_| k < SIDE_BOARDS) {
                 fbox!(
                     f,
                     numbered("side_board"),
@@ -105,6 +108,47 @@ pub fn sauna() -> Vec<Obj> {
                 (0, y, BACK + WALL / 2.0),
                 S.body,
                 bevel = 0.004,
+                bevel_segments = 1
+            );
+        }
+        // Each side wall glazed above its boards: a pane in a spruce frame (a sill rail on the boards, a head rail
+        // under the roof, an upright in the middle), so a bather on an end seat, 0.4 m in from the wall, shows from a
+        // camera on that side (behind 2 m of boards they were hidden).
+        let sill = y0 + bh * SIDE_BOARDS as f64;
+        let (gz0, gz1) = (BACK + 0.07, FRONT - 0.07);
+        for s in [-1.0, 1.0] {
+            let x = s * (HALF - WALL / 2.0);
+            fbox!(
+                f,
+                numbered("side_pane"),
+                0.008,
+                TOP - sill - 0.04,
+                gz1 - gz0 + 0.02,
+                (x, (sill + TOP) / 2.0, (gz0 + gz1) / 2.0),
+                S.glass
+            );
+            for (y, h) in [(sill + 0.025, 0.05), (TOP - 0.03, 0.06)] {
+                fbox!(
+                    f,
+                    numbered("side_rail"),
+                    WALL + 0.01,
+                    h,
+                    gz1 - gz0,
+                    (x, y, (gz0 + gz1) / 2.0),
+                    S.trim,
+                    bevel = 0.008,
+                    bevel_segments = 1
+                );
+            }
+            fbox!(
+                f,
+                numbered("side_mullion"),
+                WALL + 0.01,
+                TOP - sill - 0.11,
+                0.05,
+                (x, (sill + 0.05 + TOP - 0.06) / 2.0, (gz0 + gz1) / 2.0),
+                S.trim,
+                bevel = 0.008,
                 bevel_segments = 1
             );
         }
