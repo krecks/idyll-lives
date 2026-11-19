@@ -456,10 +456,7 @@ fn kettle(rate: f64) -> Stereo {
             t += -log(1.0 - r.next()) / 12.0;
         }
         // Inside its body: the highs muffled before the loop is folded, so its end runs on into its start.
-        let mut body = Biquad::with(rate, Filter::Lowpass, 2600.0, 0.7);
-        for v in bed.ch(c).iter_mut() {
-            *v = body.run(*v as f64) as f32;
-        }
+        muffle(bed.ch(c), rate, 2600.0, false);
     }
     done(
         rate,
@@ -693,6 +690,10 @@ fn fireplace_electric(rate: f64) -> Stereo {
         bed.left[i] = v as f32;
         bed.right[i] = v as f32;
     }
+    // Inside its casing: the highs muffled before the loop is folded.
+    for c in 0..2 {
+        muffle(bed.ch(c), rate, 2400.0, false);
+    }
     let mut ev = looped(rate, seconds);
     for k in 0..16 {
         strike(
@@ -714,6 +715,9 @@ fn fireplace_electric(rate: f64) -> Stereo {
             burst(3500.0, 1.0, 0.002, 1.0),
         );
     }
+    // The ticks muffled too, round the loop (they wrap).
+    muffle(&mut ev.left, rate, 2400.0, true);
+    muffle(&mut ev.right, rate, 2400.0, true);
     done(
         rate,
         vec![fold(bed), ev.into()],
@@ -721,7 +725,7 @@ fn fireplace_electric(rate: f64) -> Stereo {
         0.0,
         &[3.7, 6.1, 8.3, 10.9],
         0.12,
-        2400.0,
+        0.0,
         0.0,
     )
 }
@@ -776,11 +780,28 @@ fn cutlery(rate: f64) -> Stereo {
     )
 }
 
+/// The highs over `hz` muffled (inside a box: a kettle's body, an electric fire's casing). Done before a loop
+/// is put together, so its seam stays whole: on a track yet to be folded, or with `round` on a loop of events,
+/// the filter first run once round it so it starts where the loop ends.
+fn muffle(d: &mut [f32], rate: f64, hz: f64, round: bool) {
+    let mut lp = Biquad::with(rate, Filter::Lowpass, hz, 0.7);
+    if round {
+        for &v in d.iter() {
+            lp.run(v as f64);
+        }
+    }
+    for v in d.iter_mut() {
+        *v = lp.run(*v as f64) as f32;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     const RATE: f64 = 48000.0;
+    /// The rates a sound card runs at: a loop's seam is checked at each (a filter's state at the seam differs).
+    const RATES: [f64; 2] = [48000.0, 44100.0];
 
     /// The biggest step between neighbouring samples of a channel, and the step from its last sample round
     /// to its first.
@@ -793,33 +814,38 @@ mod tests {
     }
 
     /// Each as made (before the game's level), as the other things' (`things` `world_sounds`): long enough,
-    /// never past full scale, with sound in it, and a loop's end running on into its start.
+    /// never past full scale, with sound in it, and a loop's end running on into its start; at each rate.
     #[test]
     fn home_sounds() {
-        for kind in HOME {
-            let Stereo { left, right } =
-                make(kind, RATE).unwrap_or_else(|| panic!("{kind}: not made"));
-            assert_eq!(left.len(), right.len(), "{kind}");
-            assert!(
-                left.len() as f64 > RATE / 2.0,
-                "{kind}: {} samples",
-                left.len()
-            );
-            let (mut peak, mut sum) = (0.0f64, 0.0f64);
-            for ch in [&left, &right] {
-                for &v in ch.iter() {
-                    peak = peak.max((v as f64).abs());
-                    sum += v as f64 * v as f64;
-                }
-            }
-            assert!(sum.is_finite(), "{kind}: not finite");
-            assert!(peak <= 1.0 + 1e-6, "{kind}: peak {peak}");
-            let rms = (sum / (2.0 * left.len() as f64)).sqrt();
-            assert!(rms > 0.004, "{kind}: rms {rms}");
-            if !ONCE_HOME.contains(&kind) {
+        for rate in RATES {
+            for kind in HOME {
+                let Stereo { left, right } =
+                    make(kind, rate).unwrap_or_else(|| panic!("{kind}: not made"));
+                assert_eq!(left.len(), right.len(), "{kind} at {rate}");
+                assert!(
+                    left.len() as f64 > rate / 2.0,
+                    "{kind} at {rate}: {} samples",
+                    left.len()
+                );
+                let (mut peak, mut sum) = (0.0f64, 0.0f64);
                 for ch in [&left, &right] {
-                    let (inside, seam) = steps(ch);
-                    assert!(seam <= inside, "{kind}: seam {seam} over {inside}");
+                    for &v in ch.iter() {
+                        peak = peak.max((v as f64).abs());
+                        sum += v as f64 * v as f64;
+                    }
+                }
+                assert!(sum.is_finite(), "{kind} at {rate}: not finite");
+                assert!(peak <= 1.0 + 1e-6, "{kind} at {rate}: peak {peak}");
+                let rms = (sum / (2.0 * left.len() as f64)).sqrt();
+                assert!(rms > 0.004, "{kind} at {rate}: rms {rms}");
+                if !ONCE_HOME.contains(&kind) {
+                    for ch in [&left, &right] {
+                        let (inside, seam) = steps(ch);
+                        assert!(
+                            seam <= inside,
+                            "{kind} at {rate}: seam {seam} over {inside}"
+                        );
+                    }
                 }
             }
         }
