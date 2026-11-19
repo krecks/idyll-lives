@@ -31,7 +31,7 @@
 <BuildDock label="Land" tipId="land" style="--build: #3f8f5a; --build-soft: rgba(63, 143, 90, 0.14)">
   {#snippet tip()}
     <b>Shape the land.</b> Pick a brush and drag over the world to raise hills, dig ponds and rivers, plant woods or raise mountains. Lots and roads are left as they are.
-    {game.creative ? 'In Creative it is free.' : 'Each stroke is paid for; undo gives the money back.'} Right-drag turns the camera; <kbd>Esc</kbd> or right-click cancels a stroke.
+    {game.creative ? 'In Creative it is free.' : 'Each stroke is paid for; undo gives the money back.'} Middle-drag turns the camera and right-drag moves it; <kbd>Esc</kbd> or right-click cancels a stroke.
   {/snippet}
 
   {#snippet head()}

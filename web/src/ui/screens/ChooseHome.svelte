@@ -565,7 +565,7 @@
         {litChoice ? 'Within their savings' : 'For sale'}
         {#if litChoice && showAll}<span class="swatch dear"></span> More than they have{/if}
         <span class="sep"></span>
-        Click a home to look closer · drag to turn · scroll to zoom · middle-drag to pan
+        Click a home to look closer · drag to turn · right-drag to move · scroll to zoom
       </div>
     </div>
   </div>

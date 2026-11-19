@@ -36,15 +36,16 @@
    * camera into this box, turns pointer input into lot hover / clicks and the camera's moves, and
    * pins a tag above every lot. The camera itself is driven by `menuScene`.
    *
-   * The camera, in every step: the right button turns it (across) and tilts it (up and down); the
-   * middle button pans it, as does the left with Space held; the wheel zooms towards the pointer;
+   * The camera, in every step, as in the game (`render/shared/orbit.ts`): the left button turns it
+   * (across) and tilts it (up and down), as does the middle; the right button pans it, as does the
+   * left with Ctrl held (or, with a tool in hand, Space); the wheel zooms towards the pointer;
    * held W A S D or the arrows pan it, Q and E turn it, R and F tilt it, and Home frames the shot
    * again. Keys are let be while typing, with a modifier held, or when the tool in hand takes them
    * (the editor's own handler marks them done: they are looked at a frame later, `heldKeys`).
    *
    * With a `tool` in hand the left button is the tool's (a right press mid-stroke drops the stroke);
-   * lots aren't lit up or tagged meanwhile. With none, the left button picks a lot, and a drag with
-   * it pans. `ghost`: SVG path data drawn over the town (a mountain's ghost, screen pixels).
+   * lots aren't lit up or tagged meanwhile. With none, a left click picks a lot, and a drag with it
+   * turns. `ghost`: SVG path data drawn over the town (a mountain's ghost, screen pixels).
    *
    * `shot`: what the camera frames with no lot in focus: the main town (`overview`), the whole world
    * (`world`), or one of its areas (`{ area }`: the main town is 0, then the villages). `nearest`: how
@@ -262,7 +263,7 @@
       return;
     }
     if (held) return;
-    const kind = e.button === 0 && !space ? 'stroke' : e.button === 1 || e.button === 0 ? 'pan' : e.button === 2 ? 'orbit' : null;
+    const kind = e.button === 0 && !space ? 'stroke' : e.button === 0 || e.button === 2 ? 'pan' : e.button === 1 ? 'orbit' : null;
     if (!kind) return;
     if (e.button === 1) e.preventDefault();
     if (kind !== 'stroke') {
@@ -326,9 +327,9 @@
   function onpointerdown(e: PointerEvent) {
     if (tool) return toolDown(e);
     if (held || down) return;
-    if (e.button === 1 || e.button === 2) {
+    if (e.button === 1 || e.button === 2 || (e.button === 0 && e.ctrlKey)) {
       if (e.button === 1) e.preventDefault();
-      hold(e.button === 1 ? 'pan' : 'orbit', e);
+      hold(e.button === 1 ? 'orbit' : 'pan', e);
       return;
     }
     if (e.button !== 0) return;
@@ -342,8 +343,8 @@
     if (down) {
       if (!down.moved && Math.abs(e.clientX - down.x) + Math.abs(e.clientY - down.y) > 5) down.moved = dragging = true;
       if (down.moved) {
-        // (The land under the pointer follows it, from where the button went down.)
-        menuScene.drag(down.x, down.y, e.clientX, e.clientY);
+        // (Turned and tilted, from where the button went down.)
+        menuScene.nudge(-(e.clientX - down.x) * TURN_PX, 1, -(e.clientY - down.y) * TILT_PX);
         down.x = e.clientX;
         down.y = e.clientY;
         cursor = 'grabbing';
