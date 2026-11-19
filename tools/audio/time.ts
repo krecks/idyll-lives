@@ -11,6 +11,7 @@
  * - `--json <file>`: also writes the numbers there (from the checkout, as `listen.ts`'s `--out`).
  * - `--compare <file>`: a file `--json` wrote before; prints before → after and the ratio of each row.
  * - `--max-music <ms>`: exits 1 when the music's total is over it (the machine's own speed: by hand, not in CI).
+ * - `--wasm <file>`: times that build of `crates/sound-wasm` instead (its exports the same as the built one's).
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -19,7 +20,6 @@ import { BLIPS, FOOTWEAR, MADE, MONO, MUSIC, OUTDOORS, ROOM_SIZES, SPECIES, SURF
 import { blipSamples, loadSynth, makeSound, monoSamples, roomResponse, songSamples, stepSamples } from '../../web/src/audio/synth';
 
 const RATE = 48_000;
-await loadSynth(readFileSync(new URL('../../web/src/audio/wasm-pkg/sound_wasm_bg.wasm', import.meta.url)));
 /** The checkout. */
 const ROOT = resolve(import.meta.dir, '../..');
 
@@ -30,6 +30,11 @@ function arg(name: string): string | undefined {
 }
 /** A path from the checkout (or as it is, if absolute). */
 const path = (p: string) => (isAbsolute(p) ? p : join(ROOT, p));
+
+// The sounds' WebAssembly as `bun run sound` built it, or `--wasm <file>`: another build of the same crate (an
+// older one kept aside, timed against this one on the same machine at the same time).
+const wasm = arg('--wasm');
+await loadSynth(readFileSync(wasm ? path(wasm) : new URL('../../web/src/audio/wasm-pkg/sound_wasm_bg.wasm', import.meta.url)));
 
 const RUNS = Math.max(1, Number(arg('--runs') ?? 3) | 0);
 const FAMILIES = ['music', 'made', 'outdoors', 'mono', 'blips', 'steps', 'birds', 'rooms'] as const;
