@@ -61,6 +61,7 @@ import { CONTACT_DIRECT, SOFT_LOOK } from './softLook';
 import { ROOM_LIGHT_CODE, ROOM_LIGHT_ROOMS, ROOM_LIGHTS } from './roomLights';
 import { FINISH_LAYER_ANCHORS, finishLayerReflection, PATTERN, PLAIN_FINISH, VERTEX_TWEAKS } from './surface';
 import { UNDERGROUND } from './underground';
+import { IMPOSTOR_COLUMNS, IMPOSTOR_ROWS } from './impostorLayout';
 
 export type Language = 'glsl' | 'wgsl';
 
@@ -319,8 +320,9 @@ const INSTANCE_NORMAL: Record<Language, string> = {
 };
 
 /**
- * `uv0VS` for planar UVs (`GAME_PLANAR_UV`: the local XZ in metres) and atlas tiles (`GAME_ATLAS_TILE`:
- * the mesh's uv into its copy's tile, `game_atlasTile` at `ATLAS_TILE_SEMANTIC`); the engine's otherwise.
+ * `uv0VS` for planar UVs (`GAME_PLANAR_UV`: the local XZ in metres), atlas tiles (`GAME_ATLAS_TILE`:
+ * the mesh's uv into its copy's tile, `game_atlasTile` at `ATLAS_TILE_SEMANTIC`) and tree impostors' cards
+ * (`GAME_IMPOSTOR`, `impostors.ts`: the picture the eye sees, `IMPOSTOR_COLUMNS` × `IMPOSTOR_ROWS` of them); the engine's otherwise.
  */
 const UV0_GLSL = `
 #ifdef NINESLICED
@@ -342,6 +344,16 @@ const UV0_GLSL = `
 	attribute vec4 game_atlasTile;
 	vec2 getUv0() {
 		return game_atlasTile.xy + vertex_texCoord0 * game_atlasTile.zw;
+	}
+#elif defined(GAME_IMPOSTOR) && defined(INSTANCING)
+	// A tree's card (impostors.ts): the side before the eye's, at the lower height (the pixels blend in the next side and the higher height).
+	vec2 getUv0() {
+		vec3 impAx = normalize(instance_line1.xyz);
+		vec3 impAz = normalize(instance_line3.xyz);
+		vec3 impF = normalize(game_eye - (instance_line4.xyz + vec3(0.0, game_impostor.y * length(instance_line2.xyz), 0.0)));
+		float impK = floor(atan(dot(impF, impAz), dot(impF, impAx)) / 6.2831853 * ${float(IMPOSTOR_COLUMNS)}) + ${float(IMPOSTOR_COLUMNS)};
+		float impCol = impK - floor(impK / ${float(IMPOSTOR_COLUMNS)}) * ${float(IMPOSTOR_COLUMNS)};
+		return vec2((impCol + vertex_texCoord0.x) / ${float(IMPOSTOR_COLUMNS)}, vertex_texCoord0.y / ${float(IMPOSTOR_ROWS)});
 	}
 #else
 	vec2 getUv0() {
@@ -370,6 +382,16 @@ const UV0_WGSL = `
 	attribute game_atlasTile: vec4f;
 	fn getUv0() -> vec2f {
 		return game_atlasTile.xy + vertex_texCoord0 * game_atlasTile.zw;
+	}
+#elif defined(GAME_IMPOSTOR) && defined(INSTANCING)
+	// A tree's card (impostors.ts): the side before the eye's, at the lower height (the pixels blend in the next side and the higher height).
+	fn getUv0() -> vec2f {
+		let impAx = normalize(instance_line1.xyz);
+		let impAz = normalize(instance_line3.xyz);
+		let impF = normalize(uniform.game_eye - (instance_line4.xyz + vec3f(0.0, uniform.game_impostor.y * length(instance_line2.xyz), 0.0)));
+		let impK = floor(atan2(dot(impF, impAz), dot(impF, impAx)) / 6.2831853 * ${float(IMPOSTOR_COLUMNS)}) + ${float(IMPOSTOR_COLUMNS)};
+		let impCol = impK - floor(impK / ${float(IMPOSTOR_COLUMNS)}) * ${float(IMPOSTOR_COLUMNS)};
+		return vec2f((impCol + vertex_texCoord0.x) / ${float(IMPOSTOR_COLUMNS)}, vertex_texCoord0.y / ${float(IMPOSTOR_ROWS)});
 	}
 #else
 	fn getUv0() -> vec2f {
