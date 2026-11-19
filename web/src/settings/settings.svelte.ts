@@ -32,6 +32,8 @@ export interface Settings {
   reducedMotion: boolean;
   /** Interface sounds (buying, building, picking things up). */
   sound: boolean;
+  /** The interface sounds' volume, 0..1 (under `sound`). */
+  effectsVolume: number;
   /** Seconds without input before the camera starts watching on its own; 0: never. */
   directorDelay: number;
   /** How often the watching camera moves on: `calm` lingers, `lively` cuts sooner. */
@@ -76,6 +78,8 @@ export interface Settings {
   worldSound: boolean;
   /** 0..1. */
   worldVolume: number;
+  /** The stereo's, the radio's and the dance music's volume, 0..1 (in the world's); 0: no music. */
+  musicVolume: number;
   /** Every sound, 0..1. */
   masterVolume: number;
   /** Silent while another window has focus (sound always stops while the tab is hidden). */
@@ -103,6 +107,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showFps: false,
   reducedMotion: false,
   sound: true,
+  effectsVolume: 1,
   directorDelay: 20,
   directorPace: 'calm',
   hideHudWhileWatching: false,
@@ -119,6 +124,7 @@ export const DEFAULT_SETTINGS: Settings = {
   subtitles: true,
   worldSound: true,
   worldVolume: 0.6,
+  musicVolume: 0.6,
   masterVolume: 1,
   muteInBackground: true,
   tipsSeen: [],
@@ -216,6 +222,8 @@ function sanitize(s: Record<string, unknown>): Settings {
   out.directorDelay = clampNumber(s.directorDelay, 0, 600, DEFAULT_SETTINGS.directorDelay);
   out.voiceVolume = clampNumber(s.voiceVolume, 0, 1, DEFAULT_SETTINGS.voiceVolume);
   out.worldVolume = clampNumber(s.worldVolume, 0, 1, DEFAULT_SETTINGS.worldVolume);
+  out.musicVolume = clampNumber(s.musicVolume, 0, 1, DEFAULT_SETTINGS.musicVolume);
+  out.effectsVolume = clampNumber(s.effectsVolume, 0, 1, DEFAULT_SETTINGS.effectsVolume);
   out.masterVolume = clampNumber(s.masterVolume, 0, 1, DEFAULT_SETTINGS.masterVolume);
   out.graphics = isGraphicsPreset(s.graphics) ? s.graphics : DEFAULT_SETTINGS.graphics;
   out.shading = oneOf(s.shading, ['soft', 'classic'] as const, DEFAULT_SETTINGS.shading);

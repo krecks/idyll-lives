@@ -63,7 +63,7 @@
     { id: 'gameplay', label: 'Gameplay', icon: 'icon.ui.live', keys: ['autonomy', 'autosaveMinutes'] },
     { id: 'camera', label: 'Camera & time', icon: 'icon.ui.watch', keys: ['directorDelay', 'directorPace', 'hideHudWhileWatching', 'autoSlow', 'skipQuietHours', 'pauseOnBlur'] },
     { id: 'interface', label: 'Interface', icon: 'icon.ui.display', keys: ['uiScale', 'clock24h', 'reducedMotion', 'showFps'] },
-    { id: 'audio', label: 'Audio', icon: 'icon.ui.audio', keys: ['masterVolume', 'sound', 'worldSound', 'worldVolume', 'muteInBackground'] },
+    { id: 'audio', label: 'Audio', icon: 'icon.ui.audio', keys: ['masterVolume', 'sound', 'effectsVolume', 'worldSound', 'worldVolume', 'musicVolume', 'muteInBackground'] },
     { id: 'voices', label: 'Voices', icon: 'icon.ui.voice', keys: ['voices', 'voiceDevice', 'voiceVolume', 'voiceWriter', 'llmDevice', 'subtitles'] },
     { id: 'controls', label: 'Controls', icon: 'icon.ui.move', keys: ['directControl', 'cameraSensitivity'] },
   ] as const satisfies readonly { id: string; label: string; icon: string; keys: readonly (keyof Settings)[] }[];
@@ -503,8 +503,12 @@
           <input class="slider" type="range" min="0" max="1" step="0.05" aria-label="Master volume" bind:value={settings.masterVolume} />
           <output>{percent(settings.masterVolume)}</output>
         </SettingRow>
-        <SettingRow title="Sound effects" hint="Little sounds when you buy, build and place things.">
+        <SettingRow title="Sound effects" hint="Little sounds for menus, the clock, money, buying and building.">
           <Toggle label="Sound effects" bind:checked={settings.sound} />
+        </SettingRow>
+        <SettingRow title="Effects volume" disabled={!settings.sound}>
+          <input class="slider" type="range" min="0" max="1" step="0.05" aria-label="Effects volume" bind:value={settings.effectsVolume} disabled={!settings.sound} />
+          <output>{percent(settings.effectsVolume)}</output>
         </SettingRow>
         <SettingRow title="Sounds of the world" hint="Birds by day, crickets at night, a pan sizzling, the TV.">
           <Toggle label="Sounds of the world" bind:checked={settings.worldSound} />
@@ -512,6 +516,10 @@
         <SettingRow title="World volume" disabled={!settings.worldSound}>
           <input class="slider" type="range" min="0" max="1" step="0.05" aria-label="World volume" bind:value={settings.worldVolume} disabled={!settings.worldSound} />
           <output>{percent(settings.worldVolume)}</output>
+        </SettingRow>
+        <SettingRow title="Music volume" hint="The stereo, the radio and dancing. At 0 no music plays." disabled={!settings.worldSound}>
+          <input class="slider" type="range" min="0" max="1" step="0.05" aria-label="Music volume" bind:value={settings.musicVolume} disabled={!settings.worldSound} />
+          <output>{percent(settings.musicVolume)}</output>
         </SettingRow>
         <SettingRow title="Mute in background" hint="Silent while you're in another window." details="Sound always stops while the game's tab is hidden.">
           <Toggle label="Mute in background" bind:checked={settings.muteInBackground} />

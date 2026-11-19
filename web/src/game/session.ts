@@ -43,6 +43,7 @@ import { RoomOverlay } from './roomOverlay';
 import { VoiceDirector } from '../voice';
 import { holdInference, holdInferenceWhile } from '../ml/schedule.svelte';
 import { endSoundOf, soundOf, WorldSound } from '../audio/world';
+import { mixNow } from '../audio/mixer';
 import { addBlueprint, blueprints } from '../persistence/blueprints.svelte';
 import { Director } from './director';
 import { addedObjects, BuildBuyInput, editFeedback, liveAdded, placeEffect, type Picked } from './buildmode';
@@ -2217,6 +2218,8 @@ async function openSession(
       send: (command: Parameters<typeof bridge.send>[0]) => bridge.send(command),
       /** The world sounds heard on the last update (loops by residents and things, sounds played once). */
       sound: () => worldSound.playing(),
+      /** What the mix is doing (`mixNow`): the duck, the limiter, each bus's level and the music's share of its own. */
+      mix: () => mixNow(),
       /** What a use sounds like (`soundOf`), and what it plays as it ends: by object and use id; `anim` and `recipe` (an id) for a cooking step at it. */
       soundOf(object: string, use: string | null, anim?: string, recipe?: string) {
         const def = content.objectList.findIndex((o) => o.id === object);

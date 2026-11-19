@@ -1,9 +1,11 @@
 /**
  * One audio context for the whole game, with a bus each for interface sounds (`ui/sfx.ts`),
  * resident voices (`voice/player.ts`) and the sounds of the world (`audio/world.ts`), each with
- * its own volume setting, all through a limiter and the master volume. The voices and the world's
- * sounds are placed in a space on their way into their bus (`space`, `space.ts`: left to right,
- * rooms, walls, and for the world the camera's distance).
+ * its own volume setting, all through a limiter and the master volume. The music (a stereo, a
+ * radio, dancing) is one of the world's sounds with a volume of its own on top (`musicGain`: its
+ * loops' level, so it stays in the world's space, under the voices and the limiter). The voices and
+ * the world's sounds are placed in a space on their way into their bus (`space`, `space.ts`: left
+ * to right, rooms, walls, and for the world the camera's distance).
  *
  * The mix: while a resident speaks the world's sounds give way to the voice (`DUCK`), and what the
  * buses add up to goes through a limiter (`LIMIT`), so a shower, a blender and two voices at once
@@ -16,7 +18,7 @@
  * queued up to play all at once on return.
  */
 
-import { settings } from '../settings/settings.svelte';
+import { DEFAULT_SETTINGS, settings } from '../settings/settings.svelte';
 import { EFFECTS_LEVEL } from './catalog';
 import { Space } from './space';
 
@@ -102,10 +104,35 @@ export function voiceSpeaking(on: boolean): void {
 
 /**
  * What the mix is doing now, to check it by (null before sound can play): how many voices are speaking, the
- * world's level under them (1: not held down) and how many dB the limiter is taking off (0: nothing).
+ * world's level under them (1: not held down), how many dB the limiter is taking off (0: nothing), each bus's
+ * level and the music's share of its own (`musicGain`).
  */
-export function mixNow(): { speaking: number; duck: number; limiting: number } | null {
-  return duck && mix ? { speaking, duck: duck.gain.value, limiting: -mix.reduction } : null;
+export function mixNow(): {
+  speaking: number;
+  duck: number;
+  limiting: number;
+  effects: number;
+  world: number;
+  voices: number;
+  music: number;
+} | null {
+  return duck && mix
+    ? {
+        speaking,
+        duck: duck.gain.value,
+        limiting: -mix.reduction,
+        effects: level('effects'),
+        world: level('world'),
+        voices: level('voices'),
+        music: musicGain(),
+      }
+    : null;
+}
+
+/** The music's share of its catalogue level: 1 at the default setting, 0 off, 1.67 (+4.4 dB) at full. */
+export function musicGain(): number {
+  const v = settings.musicVolume;
+  return Number.isFinite(v) ? clamp01(v) / DEFAULT_SETTINGS.musicVolume : 1;
 }
 
 /** `stop` runs just before sound stops for a hidden tab (sounds that wait for their end, like voices, end there). Returns a function that removes it. */
@@ -117,7 +144,7 @@ export function onHide(stop: () => void): () => void {
 function level(name: Bus): number {
   switch (name) {
     case 'effects':
-      return EFFECTS_LEVEL;
+      return EFFECTS_LEVEL * clamp01(settings.effectsVolume);
     case 'voices':
       return settings.voiceVolume;
     case 'world':
@@ -133,7 +160,11 @@ export function updateVolumes(): void {
 
 /** The master volume: the setting, or nothing while another window has focus (with "Mute in background"). */
 function masterLevel(): number {
-  const v = away && settings.muteInBackground ? 0 : settings.masterVolume;
+  return clamp01(away && settings.muteInBackground ? 0 : settings.masterVolume);
+}
+
+/** `v` held within 0..1 (1 if it isn't a number). */
+function clamp01(v: number): number {
   return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1;
 }
 

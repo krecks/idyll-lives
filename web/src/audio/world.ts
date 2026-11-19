@@ -35,10 +35,10 @@ import { townView } from '../render/shared/townView';
 import { birdActivity, STOREY_HEIGHT, type Renderer, type ViewRect } from '../render/types';
 import { game } from '../ui/state.svelte';
 import { acoustics } from './acoustics';
-import { MONO, SPECIES, VERSIONS, WATER, type MadeKind, type MonoKind, type MusicKind, type RoomSize, type Species, type Voice, type WorkerKind } from './kinds';
+import { MONO, MUSIC, SPECIES, VERSIONS, WATER, type MadeKind, type MonoKind, type MusicKind, type RoomSize, type Species, type Voice, type WorkerKind } from './kinds';
 import { Footsteps } from './footsteps';
 import { AMBIENCE, LOOPS, ONCE_KINDS, ONCE_LEVEL, pieceAt, type LoopKind, type OnceKind, type SoundKind } from './catalog';
-import { audioContext, bus, space, updateVolumes } from './mixer';
+import { audioContext, bus, musicGain, space, updateVolumes } from './mixer';
 import { Outside } from './outside';
 import { Placed, type Place, type Space } from './space';
 import { random } from './random';
@@ -409,7 +409,9 @@ export class WorldSound {
     for (const kind of Object.keys(LOOPS) as LoopKind[]) {
       const u = users.get(kind);
       const def = LOOPS[kind];
-      const target = u && !quiet && !paused ? def.level * Math.min(1.6, Math.sqrt(u.n)) : 0;
+      // (The music at its own volume too: the residents playing drums, singing or a cello are the world's.)
+      const music = kind === 'music' || (MUSIC as readonly string[]).includes(kind);
+      const target = u && !quiet && !paused ? def.level * Math.min(1.6, Math.sqrt(u.n)) * (music ? musicGain() : 1) : 0;
       let loop = this.loops.get(kind);
       // The music is one of a few pieces: another one wanted (someone dances, the evening comes), this one fades out and the other starts.
       const piece = kind === 'music' ? pieceAt(hour, dancing) : null;
