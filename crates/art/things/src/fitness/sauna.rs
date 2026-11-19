@@ -1,13 +1,12 @@
 //! The sauna cabin for three: spruce boards, a glass front with a glass door, two benches, a stove with stones, a
 //! bucket and ladle.
 
-use artkit::forms::rounded_rect;
 use artkit::math::P3;
 use artkit::motion::Ease;
 use artkit::parts::{hinged, join, new_parts, numbered};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
-use artkit::{boulder, fbox, fcyl, fsweep, jitter, kit, palette, settle, swing, torus};
+use artkit::{boulder, fbox, fcyl, kit, palette, settle, soft, swing, torus};
 
 palette! { S:
     body = ("#E3C796", satin),   // the spruce: walls, roof, benches, floor; the main part the player colours
@@ -40,8 +39,8 @@ const UPPER: f64 = 0.9;
 const GLASS_Z: f64 = 0.925;
 const DOOR_L: f64 = -0.89;
 const DOOR_R: f64 = -0.24;
-/// Where the roof's deck of boards ends and its glazed band begins (depth).
-const ROOF_GLASS: f64 = 0.15;
+/// The bar across the glazed roof (depth), over the lower bench's front edge.
+const ROOF_BAR: f64 = -0.12;
 
 pub fn sauna() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
@@ -200,58 +199,44 @@ pub fn sauna() -> Vec<Obj> {
                 bevel_segments = 1
             );
         }
-        // The roof: a deck of boards over the back, and over the front a glazed band in a frame (the bathers on the
-        // bench are seen from above through it: under a deck to the front only their legs showed), a fascia round
-        // it all.
-        let deck_n = 8;
-        let deck_w = (ROOF_GLASS - BACK) / deck_n as f64;
-        for k in 0..deck_n {
-            fbox!(
-                f,
-                numbered("roof_board"),
-                2.0 * HALF + 0.02,
-                0.045 - 0.004 * (k % 2) as f64,
-                deck_w - 0.003,
-                (
-                    0,
-                    TOP + 0.0225 - 0.002 * (k % 2) as f64,
-                    BACK + deck_w * (k as f64 + 0.5)
-                ),
-                S.body,
-                bevel = 0.006,
-                bevel_segments = 1
-            );
-        }
-        let glass_z0 = ROOF_GLASS + 0.04;
-        let glass_z1 = FRONT - 0.07;
+        // The roof: glazed whole, one pane in a slim spruce frame (round its edge, a bar over the post between the
+        // door and the pane, one across over the bench's front), a fascia round it all. Every seat on the back bench
+        // is seen from above through it, whichever side a bather sits on (under a deck of boards over the back, those
+        // on the side away from the camera were hidden).
         fbox!(
             f,
             "roof_glass",
-            2.0 * HALF - 0.1,
+            2.0 * HALF - 0.06,
             0.008,
-            glass_z1 - glass_z0 + 0.02,
-            (0, TOP + 0.03, (glass_z0 + glass_z1) / 2.0),
+            FRONT - BACK - 0.06,
+            (0, TOP + 0.03, (BACK + FRONT) / 2.0),
             S.glass
         );
-        fbox!(
-            f,
-            "roof_rail",
-            2.0 * HALF + 0.02,
-            0.05,
-            0.08,
-            (0, TOP + 0.025, ROOF_GLASS + 0.04),
-            S.trim,
-            bevel = 0.008,
-            bevel_segments = 1
-        );
-        for x in [-HALF + 0.03, DOOR_R + 0.04, HALF - 0.03] {
+        for (name, z) in [
+            ("roof_rail", BACK + 0.025),
+            ("roof_rail", ROOF_BAR),
+            ("roof_rail", FRONT - 0.025),
+        ] {
+            fbox!(
+                f,
+                numbered(name),
+                2.0 * HALF + 0.02,
+                0.05,
+                0.05,
+                (0, TOP + 0.025, z),
+                S.trim,
+                bevel = 0.008,
+                bevel_segments = 1
+            );
+        }
+        for x in [-HALF + 0.025, DOOR_R + 0.04, HALF - 0.025] {
             fbox!(
                 f,
                 numbered("roof_bar"),
-                0.06,
                 0.05,
-                FRONT - ROOF_GLASS - 0.08,
-                (x, TOP + 0.025, (ROOF_GLASS + 0.08 + FRONT) / 2.0),
+                0.05,
+                FRONT - BACK - 0.1,
+                (x, TOP + 0.025, (BACK + FRONT) / 2.0),
                 S.trim,
                 bevel = 0.008,
                 bevel_segments = 1
@@ -528,26 +513,19 @@ pub fn sauna() -> Vec<Obj> {
             S.needle,
             rot = (0, -30, 0)
         );
-        // a towel over the upper bench's front edge at the left end
-        let tz = back_in + 0.33;
-        let pts = [
-            (-0.68, UPPER, back_in + 0.1),
-            (-0.68, UPPER + 0.006, tz - 0.08),
-            (-0.68, UPPER, tz - 0.01),
-            (-0.68, UPPER - 0.03, tz + 0.012),
-            (-0.68, UPPER - 0.16, tz + 0.02),
-        ];
-        let towel = fsweep!(
+        // a towel folded on the upper bench at the left end
+        soft!(
             f,
             "towel",
-            &pts,
-            0.0,
+            0.4,
+            0.04,
+            0.28,
+            (-0.66, UPPER + 0.02, back_in + 0.17),
             S.cream,
-            profile = rounded_rect(0.42, 0.012, 0.005, 1),
-            up = (1, 0, 0),
-            resolution = 2
+            round = 0.012,
+            puff = 0.004,
+            resting = true
         );
-        jitter!(towel, 0.003, size = 0.1, seed = 1.0, up = 0.5);
     });
     join(&still, "cabin", Some(P3::ZERO));
     // The glass door, hinged on its left, a spruce handle outside on two stand-offs: `door_open` swings it out.

@@ -1,5 +1,5 @@
 {
-  "$comment": "The play and yard things (crates/art/outside/src/yard, built by cargo art). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. A sand castle grows in the sandpit, the bike lifts its back wheel and turns it, the raised bed's crop grows and is picked, the shed's and the greenhouse's doors open (and the vent), the compost bin's lid lifts, the washing goes out on the line a line at a time and stays out, and the letterbox's flag goes up for the post and its door drops open to fetch it.",
+  "$comment": "The play and yard things (crates/art/outside/src/yard, built by cargo art). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. A sand castle grows in the sandpit, the bike lifts its back wheel and turns it, the raised bed's crop grows and is picked, the shed's and the greenhouse's doors open (and the vent), the compost bin's lid lifts, the washing goes out on the line a line at a time and stays out, the post waits half out of the letterbox's slot and its door swings open to fetch it.",
   "version": 1,
   "entries": {
     "model.sandbox": {
@@ -705,14 +705,14 @@
       "type": "model",
       "url": "../../models/yard/letterbox.glb",
       "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
         "letter": {
           "finish": "material.finish.matte"
         },
         "letter_kraft": {
           "finish": "material.finish.matte"
-        },
-        "mail_flag": {
-          "finish": "material.finish.satin"
         },
         "mail_post": {
           "finish": "material.finish.satin"
@@ -731,7 +731,7 @@
             "hold": 2.5
           }
         },
-        "open": "flag_up"
+        "open": "post_in"
       },
       "paint": [
         {

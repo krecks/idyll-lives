@@ -93,7 +93,7 @@ palette! { M:
     // the rain barrel
     barrel = ("#3F6E4A", satin),         // the main part
     barrel_dark = ("#35603F", satin),
-    brass = ("#B8925A", metal),
+    brass = ("#B8925A", metal),          // the rain barrel's tap; the letterbox's slot trim, lock, pull and plate
     can = ("#9EA7AD", metal),            // a galvanised watering can
     // the washing line: its still body all satin, one draw (the washing takes a draw a line)
     posts = ("#B9BCBE", satin),
@@ -119,11 +119,10 @@ palette! { M:
     end_grain_dark = ("#C9AE86", matte),
     axe = ("#9A9EA2", metal),
     haft = ("#B08E66", satin),
-    // the letterbox: all plain, a draw a part (the box, its door, its flag)
-    mailbox = ("#2F3438", satin),        // the box and its door; the main part
-    mail_post = ("#7E6248", satin),      // its post, board and brace (stained timber)
-    mail_flag = ("#D23A2E", satin),      // the red flag
-    steel = ("#B4BABF", metal),          // the flag's pivot, the door's latch, the reel's axles
+    // the letterbox: all plain, a draw a part (the box, its door, the post waiting)
+    mailbox = ("#2C4A3A", satin),        // the box and its door, dark green; the main part
+    mail_post = ("#7E6248", satin),      // its post (stained timber)
+    steel = ("#B4BABF", metal),          // the letterbox's mounting plate, the reel's axle, the mower's stubs
     letter = ("#F4F1E8", matte),         // the post inside
     letter_kraft = ("#D6BE95", matte),
     // the hose reel: all plain, one draw

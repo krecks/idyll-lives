@@ -7,8 +7,9 @@
 //! the greenhouse (`model.greenhouse`), whose door and roof vent open (`door_open`); the compost bin
 //! (`model.compostBin`) and its lid (`lid_open`); the rain barrel (`model.rainBarrel`); the washing line
 //! (`model.clothesline`), whose washing is pegged out line by line (`washing`) and stays out until taken in
-//! (`open`); the log store (`model.firewoodStack`); the letterbox on its post (`model.letterbox`), whose door drops
-//! open while the post is fetched (`door_open`) and whose flag is up while there is post (`flag_up`, `open`); the hose
+//! (`open`); the log store (`model.firewoodStack`); the garden letterbox on its post (`model.letterbox`), whose door
+//! swings open while the post is fetched (`door_open`) and whose post sticks out of its slot while it waits
+//! (`post_in`, `open`); the hose
 //! reel cart (`model.hoseReel`) and the push lawnmower (`model.lawnMower`). The rides, with no clips (the renderer turns their parts by code,
 //! each a top-level node on its pivot: `frame`, `wheel_front`, `wheel_rear`, `cranks`, `stand`): the step-through city
 //! bike with its basket, carrier and centre stand (`model.bicycle`), the kids' bike on stabilisers (`model.bicycleChild`)
@@ -124,10 +125,10 @@ pub fn family() -> Option<Family> {
                 .key("model.firewoodStack")
                 .far_low()
                 .paint(&[("iron", "Shelter")]),
-            Model::new("letterbox", chores::letterbox, (0.22, 1.304, 0.488))
+            Model::new("letterbox", chores::letterbox, (0.3, 1.35, 0.21))
                 .key("model.letterbox")
                 .far_low()
-                .motions(motions(r#"{"uses": {"fetchPost": {"clip": "door_open", "hold": 2.5}}, "open": "flag_up"}"#))
+                .motions(motions(r#"{"uses": {"fetchPost": {"clip": "door_open", "hold": 2.5}}, "open": "post_in"}"#))
                 .paint(&[("mailbox", "Box"), ("mail_post", "Post")]),
             Model::new("hoseReel", chores::hose_reel, (0.571, 0.848, 0.479))
                 .key("model.hoseReel")
@@ -143,7 +144,7 @@ pub fn family() -> Option<Family> {
          packs. The materials map onto the game's finishes so a model costs one draw call per finish group. A sand \
          castle grows in the sandpit, the bike lifts its back wheel and turns it, the raised bed's crop grows and is \
          picked, the shed's and the greenhouse's doors open (and the vent), the compost bin's lid lifts, the \
-         washing goes out on the line a line at a time and stays out, and the letterbox's flag goes up for the post \
-         and its door drops open to fetch it.",
+         washing goes out on the line a line at a time and stays out, the post waits half out of the letterbox's \
+         slot and its door swings open to fetch it.",
     ))
 }

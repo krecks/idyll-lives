@@ -1,25 +1,14 @@
-//! The letterbox on its post, the hose reel cart and the push lawnmower: the yard's chores.
+//! The garden letterbox on its post, the hose reel cart and the push lawnmower: the yard's chores.
 
 use super::common::{F, M, bent, board, rod};
 use artkit::far::{is_low, low};
-use artkit::forms::{Plane, smooth_outline};
+use artkit::forms::{Plane, rounded_rect, smooth_outline};
 use artkit::materials::Mat;
-use artkit::math::{Axis, P3, V3, cosd, sind};
-use artkit::motion::{Swing, swing};
+use artkit::math::{P3, V3};
+use artkit::motion::{Swing, path, swing};
 use artkit::parts::{hinged, join, join_all, new_parts, numbered};
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcyl, fextrude, fsweep, loft, revolve, ring, settle};
-
-/// An end of the letterbox: a flat bottom `2 * half` wide at `bottom`, straight sides up to `side`, a round top;
-/// (game x, height), the round in `n` steps.
-fn arch(half: f64, side: f64, bottom: f64, n: usize) -> Vec<(f64, f64)> {
-    let mut pts = vec![(-half, bottom), (half, bottom)];
-    pts.extend((0..=n).map(|k| {
-        let a = 180.0 * k as f64 / n as f64;
-        (half * cosd(a), side + half * sind(a))
-    }));
-    pts
-}
 
 /// A polygon's corners cut `r` back along each side, to be rounded by `smooth_outline`.
 fn cut_corners(pts: &[(f64, f64)], r: f64) -> Vec<(f64, f64)> {
@@ -78,198 +67,253 @@ fn wheel(x: f64, y: f64, z: f64, r: f64, w: f64, out: f64, hub: Mat) {
     );
 }
 
-// --- the letterbox (1x1): a rounded steel box on a post, its door drops open, its flag goes up -----------------
-const LB_Y: f64 = 1.07; // the box's floor
-const LB_HALF: f64 = 0.1; // half its width, the round top's radius
-const LB_SIDE: f64 = 0.13; // its straight sides; the top 0.23 up
-const LB_BACK: f64 = -0.24;
-const LB_FRONT: f64 = 0.225; // the box's front edge, where the door shuts
-const LB_DOOR: f64 = 0.012;
-const LB_FLAG: (f64, f64) = (LB_Y + 0.11, -0.16); // the flag's pivot on the right side (height, depth)
+// --- the letterbox (1x1): a garden post box on a post, its slot under a hood, a locked door below ---------------
+const LB_W: f64 = 0.28; // the box's width (its cap 0.30)
+const LB_D: f64 = 0.17; // its depth, front to back (its cap and hood reach 2 cm farther)
+const LB_Y0: f64 = 0.97; // its floor
+const LB_Y1: f64 = 1.325; // the top of its walls, under the cap (to 1.35)
+const LB_WALL: f64 = 0.012;
+const LB_SLOT: f64 = 1.265; // the slot's middle (height)
+const LB_DOOR: (f64, f64, f64) = (0.2, 0.18, 1.085); // the door: width, height, middle (height)
 
 pub fn letterbox() -> Vec<Obj> {
-    let n = low(16, 6);
+    let zf = LB_D / 2.0; // the front's face
+    let h = LB_Y1 - LB_Y0;
+    let ym = (LB_Y0 + LB_Y1) / 2.0;
     let bevel = low(0.004, 0.0);
-    // the post set in the ground, the board the box sits on, a brace under its front
+    // the post set in the ground, a plate on its top that the box is bolted to
     fbox!(
         F,
         "post",
-        0.09,
-        LB_Y - 0.025,
-        0.09,
-        (0, (LB_Y - 0.025) / 2.0, -0.07),
+        0.08,
+        LB_Y0 - 0.012,
+        0.08,
+        (0, (LB_Y0 - 0.012) / 2.0, 0),
         M.mail_post,
         bevel = low(0.006, 0.0),
         bevel_segments = 1
     );
     fbox!(
         F,
-        "board",
-        0.15,
-        0.025,
-        0.42,
-        (0, LB_Y - 0.0125, -0.02),
-        M.mail_post,
-        bevel = bevel,
+        "plate",
+        0.14,
+        0.012,
+        0.13,
+        (0, LB_Y0 - 0.006, 0),
+        M.steel,
+        bevel = low(0.003, 0.0),
         bevel_segments = 1
     );
-    board(
-        "brace",
-        (0, 0.84, -0.04),
-        (0, LB_Y - 0.03, 0.13),
-        0.04,
-        0.04,
-        M.mail_post,
-        (1, 0, 0),
-        bevel,
+    // the box: sheet steel, two sides, a back and a floor, the front with the slot and the door's opening cut out
+    for sx in [-1.0, 1.0] {
+        fbox!(
+            F,
+            numbered("box_side"),
+            LB_WALL,
+            h,
+            LB_D,
+            (sx * (LB_W - LB_WALL) / 2.0, ym, 0),
+            M.mailbox,
+            bevel = bevel,
+            bevel_segments = 1
+        );
+    }
+    let inner = LB_W - 2.0 * LB_WALL;
+    fbox!(
+        F,
+        "box_back",
+        inner,
+        h,
+        LB_WALL,
+        (0, ym, LB_WALL / 2.0 - zf),
+        M.mailbox
     );
-    // the box: a tunnel of sheet steel, its back set in
-    let inner = arch(LB_HALF - 0.006, LB_SIDE, 0.006, n);
+    fbox!(
+        F,
+        "box_floor",
+        inner,
+        LB_WALL,
+        LB_D - 2.0 * LB_WALL,
+        (0, LB_Y0 + LB_WALL / 2.0, 0),
+        M.mailbox
+    );
+    let (dw, dh, dy) = LB_DOOR;
+    let at = |pts: Vec<(f64, f64)>, y: f64| -> Vec<(f64, f64)> {
+        pts.into_iter().map(|(u, v)| (u, v + y)).collect()
+    };
     fextrude!(
         F,
-        "box",
-        &arch(LB_HALF, LB_SIDE, 0.0, n),
-        LB_FRONT - LB_BACK,
-        (0, LB_Y, (LB_BACK + LB_FRONT) / 2.0),
+        "box_front",
+        &rounded_rect(inner, h, 0.002, 1),
+        LB_WALL,
+        (0, ym, zf - LB_WALL / 2.0),
         M.mailbox,
-        holes = [inner.clone()],
+        holes = [
+            at(rounded_rect(dw + 0.006, dh + 0.006, 0.008, 2), dy - ym),
+            at(rounded_rect(0.205, 0.032, 0.004, 1), LB_SLOT - ym)
+        ],
+        bevel = low(0.003, 0.0),
+        bevel_segments = 1
+    );
+    // a pitched cap over it all, a hood over the slot, a brass surround round it
+    fextrude!(
+        F,
+        "cap",
+        &[
+            (-zf - 0.012, LB_Y1),
+            (zf + 0.02, LB_Y1),
+            (zf + 0.02, LB_Y1 + 0.01),
+            (0.0, 1.35),
+            (-zf - 0.012, LB_Y1 + 0.01)
+        ],
+        LB_W + 0.02,
+        (0, 0, 0),
+        M.mailbox,
+        plane = Plane::YZ,
         bevel = low(0.003, 0.0),
         bevel_segments = 1
     );
     fextrude!(
         F,
-        "box_back",
-        &inner,
-        0.008,
-        (0, LB_Y, LB_BACK + 0.004),
-        M.mailbox
+        "hood",
+        &[
+            (zf, LB_SLOT + 0.022),
+            (zf + 0.028, LB_SLOT + 0.018),
+            (zf + 0.028, LB_SLOT + 0.026),
+            (zf, LB_SLOT + 0.05)
+        ],
+        0.25,
+        (0, 0, 0),
+        M.mailbox,
+        plane = Plane::YZ,
+        bevel = low(0.002, 0.0),
+        bevel_segments = 1
+    );
+    fextrude!(
+        F,
+        "slot_trim",
+        &rounded_rect(0.235, 0.048, 0.008, low(2, 1)),
+        0.004,
+        (0, LB_SLOT, zf + 0.002),
+        M.brass,
+        holes = [rounded_rect(0.205, 0.032, 0.004, 1)]
     );
     if !is_low() {
-        // the post inside, seen when the door drops
+        // the slot's inner flap, hanging behind it, so no one sees in (nor the post waiting below it at rest)
         fbox!(
             F,
-            numbered("letter"),
-            0.15,
+            "slot_flap",
+            inner,
+            0.075,
             0.004,
-            0.22,
-            (0.005, LB_Y + 0.008, -0.03),
-            M.letter_kraft,
-            rot = (0, 0, 4)
+            (0, LB_SLOT - 0.012, zf - 0.03),
+            M.mailbox
         );
+        // what came yesterday, still inside, seen when the door opens
         fbox!(
             F,
             numbered("letter"),
             0.16,
             0.004,
             0.11,
-            (-0.006, LB_Y + 0.012, 0.13),
-            M.letter,
-            rot = (0, 0, -8)
+            (0.01, LB_Y0 + LB_WALL + 0.002, -0.005),
+            M.letter_kraft,
+            rot = (0, 0, 6)
         );
-    }
-    // the flag's pivot
-    fcyl!(
-        F,
-        "flag_pivot",
-        0.012,
-        0.008,
-        (LB_HALF + 0.004, LB_FLAG.0, LB_FLAG.1),
-        M.steel,
-        rot = (0, 90, 0),
-        verts = low(12, 6)
-    );
-    if !is_low() {
         join(&meshes(), "letterbox", Some(P3::from((0, 0, 0))));
     }
-    // The door: the box's end a little larger, a latch at its top to pull it down by, hinged along its foot.
+    // The door: a panel a little proud of the front, a brass lock and pull, a brass number plate; hinged on its left.
     let door = new_parts(|| {
         fextrude!(
             F,
             "door",
-            &arch(LB_HALF + 0.004, LB_SIDE, -0.004, n),
-            LB_DOOR,
-            (0, LB_Y, LB_FRONT + LB_DOOR / 2.0),
+            &rounded_rect(dw, dh, 0.006, low(2, 1)),
+            0.012,
+            (0, dy, zf + 0.002),
             M.mailbox,
             bevel = bevel,
             bevel_segments = 1
         );
+        let x = dw / 2.0 - 0.03;
+        fcyl!(
+            F,
+            "lock",
+            0.011,
+            0.01,
+            (x, dy + 0.035, zf + 0.012),
+            M.brass,
+            rot = (90, 0, 0),
+            verts = low(12, 6)
+        );
         fbox!(
             F,
-            "latch",
-            0.04,
-            0.026,
-            0.012,
-            (0, LB_Y + LB_SIDE + 0.08, LB_FRONT + LB_DOOR + 0.005),
-            M.steel,
+            "pull",
+            0.014,
+            0.045,
+            0.014,
+            (x, dy - 0.03, zf + 0.014),
+            M.brass,
             bevel = low(0.003, 0.0),
             bevel_segments = 1
         );
-    });
-    // The flag: an arm lying along the right side, pointing to the front, the flag at its end.
-    let flag = new_parts(|| {
-        let x = LB_HALF + 0.0105;
-        let (y, z) = LB_FLAG;
         fbox!(
             F,
-            "flag_arm",
-            0.005,
-            0.022,
-            0.2,
-            (x, y, z + 0.09),
-            M.mail_flag
-        );
-        fbox!(
-            F,
-            "flag",
-            0.005,
-            0.065,
+            "number_plate",
             0.075,
-            (x, y + 0.0215, z + 0.1525),
-            M.mail_flag
-        );
-        fcyl!(
-            F,
-            "flag_rivet",
-            0.006,
-            0.004,
-            (x + 0.004, y, z),
-            M.steel,
-            rot = (0, 90, 0),
-            verts = low(8, 5)
+            0.03,
+            0.003,
+            (-0.02, dy + 0.045, zf + 0.0095),
+            M.brass
         );
     });
-    if is_low() {
+    // The post waiting: two envelopes behind the front, under the slot at rest; `post_in` lifts them up to the slot
+    // and slides them half out of it.
+    let post = (!is_low()).then(|| {
+        new_parts(|| {
+            fbox!(
+                F,
+                "envelope",
+                0.19,
+                0.004,
+                0.12,
+                (0, LB_SLOT - 0.058, -0.005),
+                M.letter
+            );
+            fbox!(
+                F,
+                "envelope_kraft",
+                0.17,
+                0.004,
+                0.11,
+                (0.008, LB_SLOT - 0.064, -0.015),
+                M.letter_kraft
+            );
+        })
+    });
+    let Some(post) = post else {
         return settle!(&[join_all("letterbox")]);
-    }
-    let door = hinged(
-        join(&door, "door", None),
-        F.at(0, LB_Y - 0.004, LB_FRONT + LB_DOOR),
-    );
-    let flag = hinged(
-        join(&flag, "flag", None),
-        F.at(LB_HALF + 0.0105, LB_FLAG.0, LB_FLAG.1),
-    );
+    };
+    let door = hinged(join(&door, "door", None), F.at(-dw / 2.0, dy, zf + 0.008));
+    let post = join(&post, "post_waiting", None);
     let objs = settle!();
-    // the door's top drops to the front; the flag's arm turns up
     swing(
         door,
         "door_open",
-        95.0,
+        100.0,
         Swing {
             seconds: 1.0,
-            axis: Axis::X,
             ..Swing::default()
         },
     );
-    swing(
-        flag,
-        "flag_up",
-        -90.0,
-        Swing {
-            seconds: 0.6,
-            axis: Axis::X,
-            ..Swing::default()
-        },
+    path(
+        post,
+        "post_in",
+        &[
+            (0.0, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
+            (0.3, (0.0, 0.0, 0.06), (0.0, 0.0, 0.0)),
+            (0.9, (0.0, -0.13, 0.06), (0.0, 0.0, 0.0)),
+        ],
+        false,
     );
     objs
 }

@@ -40,7 +40,7 @@ Yard keeps the kit's jitter out; its noise is `noise()` only.
 | `shedSmall` | the ledged and braced door with black T-hinges and a latch, hinged on the left: `door_open` swings it 100° out (1 s) for the whole of pottering | `potter` |
 | `greenhouse` | the glass door, hinged on its left post, and the roof vent on the left slope, hinged at the ridge: `door_open` swings the door 70° out and lifts the vent 25° (0.9 s), one clip on both | `tend`, `harvest` |
 | `compostBin` | the slatted lid, hinged along the back: `lid_open` lifts it 75° (0.8 s), back down after `hold` 2 s | `compost` |
-| `letterbox` | the door, hinged along its foot: `door_open` drops it 95° to the front (1 s), back up after `hold` 2.5 s; the flag's arm, on its pivot on the right side: `flag_up` turns it up 90° (0.6 s), the `open` clip: up while there is post (the morning's post opens the box, `fetchPost` closes it as it starts) | `fetchPost`; `open` |
+| `letterbox` | the door, hinged on its side: `door_open` swings it 100° out (1 s), shut again after `hold` 2.5 s; the post waiting (two envelopes, hidden inside under the slot at rest): `post_in` lifts them to the slot and slides them 13 cm out (0.9 s), the `open` clip: out while there is post (the morning's post opens the box, `fetchPost` closes it as it starts) | `fetchPost`; `open` |
 | `clothesline` | the washing (towels, a sheet, shirts, jeans, socks, pegs), a part a line (`washing_a` front, `washing_b`, `washing_c` back), each with its origin on its line: `washing` lets them down one after another (1.5 s, half a second each, `motion::grow_in_turn`), so played along with the hang-out they come a line at a time. It is the `open` clip too: hanging the washing out leaves the line open (content `leaves`), so the washing stays out until it is taken in | `washing`; `open` |
 
 The rain barrel and the log store are still. The rides have no clips: the renderer turns their parts by code (below).
@@ -104,7 +104,7 @@ built, then dropped: the gate warned the models stood 7 cm off the old parts' ce
 | bicycle | 1.84 × 1.01 × 0.65 | 6312 | 1892 | 1 | Frame |
 | bicycleChild | 0.95 × 0.68 × 0.57 | 3920 | 1548 | 1 | Frame |
 | eScooter | 0.95 × 1.07 × 0.60 | 4200 | 1172 | 1 | Body |
-| letterbox | 0.22 × 1.30 × 0.49 | 908 | 244 | 3 | Box, Post |
+| letterbox | 0.30 × 1.35 × 0.21 | 940 | 352 | 3 | Box, Post |
 | hoseReel | 0.57 × 0.85 × 0.48 | 3944 | 1598 | 1 | Frame, Hose |
 | lawnMower | 0.55 × 0.99 × 1.42 | 5000 | 1820 | 1 | Body |
 
@@ -184,11 +184,14 @@ warnings; Khronos validator: 0 errors, 0 warnings on all six files. `cargo revie
 `chores.rs`; all original, CC0, plain finishes only, centred on their tiles but the mower (below), far versions their own builds at low
 detail (`far_low`).
 
-- **The letterbox** (`letterbox`, 1 × 1): a kerbside box on a post, its door to the front (+z, the path). A
-  stained 9 cm post with a brace up to the board the box sits on; the box a tunnel of sheet steel (an extruded arch,
-  0.20 wide, flat sides to 0.13 and a round top to 0.23, 0.47 deep, its floor at 1.07 m), its back set in; a red
-  flag on an arm along the right side (+x), pointing to the front when down; a steel latch on the door; two letters on
-  its floor, seen when the door drops. Three draws: the box, the door, the flag (each one plain draw).
+- **The letterbox** (`letterbox`, 1 × 1): a British garden letterbox on a post (rebuilt 2026-11-19: the first
+  was an American kerbside mailbox, which this town's pillar boxes, fingerposts and stiles don't go with). An upright
+  dark green steel box, 0.28 wide, 0.17 deep, its walls from 0.97 to 1.325 m under a pitched cap to 1.35 (0.30 wide);
+  a letter slot near the top under a hood, in a brass surround, an inner flap behind it so nothing shows through at
+  rest; a door below with a brass lock, pull and number plate; a stained 8 cm post and a steel mounting plate. Inside,
+  yesterday's letter on the floor (seen when the door opens). The post waiting is its own part: two envelopes behind
+  the front at rest, out of the slot (about 7 cm past the hood) while the box is open, white against the green so
+  the player sees there's post. Three draws: the box, the door, the post waiting (each one plain draw).
 - **The hose reel** (`hoseReel`, 1 × 1): a cart of 25 mm tube (charcoal, Frame): one tube up the front legs and over
   as the handle, struts from the wheels' axle to the drum, bars along the bottom, a foot bar with rubber feet; two
   22 cm wheels at the back; a grey drum with rolled flanges, the green hose wound on it coil by coil (a lathe whose
