@@ -1,9 +1,11 @@
 //! Households' cars: parked on their driveway, driven to work (or school) and back.
 //!
 //! A car belongs to a household and stands on its home's driveway (the town file's `cars`; every
-//! house's driveway is in its `drives`). Only its owners drive it, and only grown-ups (18 and up):
-//! the household's grown-ups when the town was made (a household left with no owner hands it down
-//! to its grown-ups). Whoever else in the household leaves at the same time rides along. When the
+//! house's driveway is in its `drives`); a flat's stands in its own bay in the building's front
+//! strip, and its household sets off in it from anywhere on the building's lot, the hall or the
+//! yard as much as the flat (`at_home_for_car`). Only its owners drive it, and only grown-ups (18
+//! and up): the household's grown-ups when the town was made (a household left with no owner hands
+//! it down to its grown-ups). Whoever else in the household leaves at the same time rides along. When the
 //! household moves house, the car goes with it, to the new home's driveway (`relocate`). Which car
 //! it is follows the job of whoever in the household earns the most: a van for a trade, an
 //! executive saloon high up in finance, newer up the ladder; a promotion or a new job buys another
@@ -31,7 +33,9 @@
 //! near the place (the town file's `parking`) walks to the driver's door instead (`trip_car`),
 //! gets in and drives off along the roads (`Phase::Driving`, sat at the wheel), parks at the spot
 //! (`CarState::Out`) and walks on. Going home they walk back to it and drive home, and get out
-//! as after work. The trip is saved with the car.
+//! as after work. The trip is saved with the car. A spot is a marked bay, often one of a car
+//! park's row 3 m apart: the car parks at the bay's own pose (the one drawn), and between two
+//! parked cars they squeeze in and out by a door opened only part way (`Car::door_in_bay`).
 //!
 //! Passengers (`Car::riders`): the household setting off at the same time for somewhere the car
 //! parks near (the same parking spot) comes along. The driver gets in and waits in the driveway
@@ -212,6 +216,13 @@ const DOOR_OUT: f32 = 0.45;
 const SEATS: usize = 5;
 /// How far from the car (m) someone already on the street turns back for a ride.
 const CALL_REACH: f32 = 15.0;
+
+/// Whether someone standing on plot `on` (`SimBrief::plot`) is at home on plot `home` as far as
+/// the household's car goes: on it, or (a flat's household) on its building's lot on the ground,
+/// its hall, stairs, yard and front strip, where the flat's car stands in its bay (its `Drive`).
+pub(crate) fn at_home_for_car(plots: &[Plot], on: Option<u32>, home: u32) -> bool {
+    on == Some(home) || on.is_some_and(|p| plots.get(home as usize).is_some_and(|h| h.lot() == p))
+}
 /// Clearance from the inner end of a driveway to the car (m), as the town parks them.
 const PARK_GAP: f32 = 0.45;
 /// On the town's roads (`Route::on_roads`): how far from the road a driveway or exit may be (m),
@@ -987,6 +998,30 @@ impl Car {
     /// their own, else the nearest other one with room outdoors to stand and for the door to
     /// swing open (`SWING`: not into the house, a fence or a thing).
     pub fn door(&self, nav: &crate::path::NavGrid, seat: usize) -> Option<(usize, [f32; 2])> {
+        self.door_swung(nav, seat, &[0.25, 0.6, SWING])
+    }
+
+    /// `door`, for a car parked out in a public bay (`CarState::Out`, posed there): with cars in
+    /// the bays either side (3 m apart, `BAY_WIDE`) none has room to swing a door wide open, so
+    /// one opened only as far as where they stand (`DOOR_OUT`) does: they squeeze in or out by
+    /// it, as anyone does in a full car park.
+    pub fn door_in_bay(
+        &self,
+        nav: &crate::path::NavGrid,
+        seat: usize,
+    ) -> Option<(usize, [f32; 2])> {
+        self.door(nav, seat)
+            .or_else(|| self.door_swung(nav, seat, &[0.25, DOOR_OUT]))
+    }
+
+    /// `door` with the door swung out as far as each of `swing` (m from the car's side, along
+    /// its length) clear of anything in the way.
+    fn door_swung(
+        &self,
+        nav: &crate::path::NavGrid,
+        seat: usize,
+        swing: &[f32],
+    ) -> Option<(usize, [f32; 2])> {
         const ORDER: [[usize; DOORS]; 4] = [[0, 1, 2, 3], [1, 3, 0, 2], [3, 1, 2, 0], [2, 0, 3, 1]];
         let own = self.tiles();
         let open = |x: i32, z: i32| {
@@ -1003,7 +1038,7 @@ impl Car {
                 // nor a fence or a wall between it and where they stand.
                 let swept_clear = || {
                     [-0.5f32, 0.0, 0.5].into_iter().all(|a| {
-                        [0.25f32, 0.6, SWING].into_iter().all(|o| {
+                        swing.iter().all(|&o| {
                             let q = self.local(along + a, (side + o) * k);
                             let (qx, qz) = (q[0].floor() as i32, q[1].floor() as i32);
                             let next = (qx - x).abs() + (qz - z).abs() == 1;
@@ -1708,9 +1743,10 @@ impl Route {
         // out of as a driveway is, and which way along the road it goes there (from the lane's
         // nearer end); a spot on the road itself is pulled into and out of straight.
         let bay = park.and_then(|(at, yaw)| {
-            let (rp, on, axis) = parking_bay(travel, at)?;
+            let (rp, on, to_road) = parking_bay(travel, at)?;
             let road = &g.roads[on.road as usize];
             let rt = road.tangent(on.s);
+            let axis = bay_axis(yaw, to_road);
             let (a, b) = if home {
                 (lane[0], lane[1])
             } else {
@@ -1987,9 +2023,10 @@ impl Route {
             Some((drive, if side[0] >= 0.0 { 1.0 } else { -1.0 }))
         } else {
             park.and_then(|(at, yaw)| {
-                let (rp, on, axis) = parking_bay(travel, at)?;
+                let (rp, on, to_road) = parking_bay(travel, at)?;
                 let road = &g.roads[on.road as usize];
                 let rt = road.tangent(on.s);
+                let axis = bay_axis(yaw, to_road);
                 let (a, b) = (lane[lane.len() - 2], lane[lane.len() - 1]);
                 let go = (b[0] - a[0]) * rt[0] + (b[1] - a[1]) * rt[1];
                 Some((
@@ -2271,11 +2308,30 @@ impl Bay {
     }
 }
 
+/// The way a car parked in a bay at `yaw` (nose in, as the town file lays it: `park_spot`) runs
+/// out of it to the road: straight back the way it faces, so it drives in along the bay's own
+/// line and stands at the bay's yaw, the one drawn, even where the bay isn't quite square to the
+/// road nearest it. Where that would take it away from the road, `to_road` (`parking_bay`).
+fn bay_axis(yaw: f32, to_road: [f32; 2]) -> [f32; 2] {
+    let back = [-yaw.sin(), -yaw.cos()];
+    // (Within a thousandth of a radian of the way to the road, that way, as it always was: a bay
+    // the town file gives the yaw the simulation would have worked out drives in as before.)
+    let cos = back[0] * to_road[0] + back[1] * to_road[1];
+    if cos > 0.0 && cos < (1e-3f32).cos() {
+        back
+    } else {
+        to_road
+    }
+}
+
 /// A public parking spot at `at` as a bay off the road (one of a big world's, `macro.ts`: square
 /// to the road, off its verge): the point of the road it's nearest, the road's tangent there and
 /// the way from the spot to it. None: no road near, or the spot is on the road itself (pulled into
 /// along it).
-fn parking_bay(travel: &Travel, at: [f32; 2]) -> Option<([f32; 2], RoadPoint, [f32; 2])> {
+pub(crate) fn parking_bay(
+    travel: &Travel,
+    at: [f32; 2],
+) -> Option<([f32; 2], RoadPoint, [f32; 2])> {
     let g = &travel.graph;
     let p = *g.near(at, ROAD_REACH, 1, Mode::Car).first()?;
     let road = &g.roads[p.road as usize];
@@ -2946,6 +3002,7 @@ pub(crate) use driving::*;
 pub(crate) use garages::*;
 pub use looks::*;
 pub(crate) use parking::*;
+pub use parking::{BAY_DEEP, BAY_LINES, BAY_WIDE, DRIVE_CLEAR, MOUTH_CLEAR};
 pub(crate) use seats::*;
 pub(crate) use trips::*;
 

@@ -3046,6 +3046,7 @@ impl World {
             drives: crate::cars::can_drive(
                 &self.travel,
                 &self.households,
+                &self.plots,
                 &self.briefs,
                 &self.cars,
                 sim,
