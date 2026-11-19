@@ -9100,6 +9100,51 @@
         "neufert"
       ]
     },
+    "waterside.jetty": {
+      "label": "Timber jetty",
+      "w": [
+        1.6,
+        2.4
+      ],
+      "h": [
+        0.5,
+        1.2
+      ],
+      "d": [
+        2.5,
+        6
+      ]
+    },
+    "waterside.rowingBoat": {
+      "label": "Rowing boat",
+      "w": [
+        1.1,
+        1.5
+      ],
+      "h": [
+        0.5,
+        0.8
+      ],
+      "d": [
+        2.8,
+        4.5
+      ]
+    },
+    "waterside.reeds": {
+      "label": "Reed clump",
+      "w": [
+        0.5,
+        1.2
+      ],
+      "h": [
+        1.2,
+        2
+      ],
+      "d": [
+        0.5,
+        1.2
+      ]
+    },
     "gardenFountain": {
       "label": "Two-tier garden fountain",
       "w": [
@@ -15114,7 +15159,12 @@
     "mountainBike": "mountainBike",
     "roadBike": "roadBike",
     "cargoBike": "cargoBike",
-    "eBike": "eBike"
+    "eBike": "eBike",
+    "jetty": "waterside.jetty",
+    "rowingBoat": "waterside.rowingBoat",
+    "reeds": "waterside.reeds",
+    "beachHut": "shed",
+    "waterBench": "parkBench"
   },
   "decor": [
     "wallArt",

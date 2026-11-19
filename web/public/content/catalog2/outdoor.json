@@ -709,6 +709,128 @@
       "decor": 0.4,
       "description": "Four flat stones across the lawn.",
       "interactions": []
+    },
+    {
+      "id": "jetty",
+      "name": "Jetty",
+      "model": "model.waterEdge.jetty",
+      "footprint": [
+        2,
+        4
+      ],
+      "price": 650,
+      "category": "outdoor",
+      "group": "waterside",
+      "outdoors": true,
+      "decor": 0.3,
+      "description": "A plank jetty on weathered posts, with a bollard at each corner.",
+      "interactions": []
+    },
+    {
+      "id": "rowingBoat",
+      "name": "Rowing boat",
+      "model": "model.waterEdge.rowingBoat",
+      "footprint": [
+        2,
+        3
+      ],
+      "price": 420,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "waterside",
+      "outdoors": true,
+      "decor": 0.4,
+      "description": "A painted rowing boat with two thwarts and a pair of oars.",
+      "interactions": []
+    },
+    {
+      "id": "reeds",
+      "name": "Reeds",
+      "model": "model.waterEdge.reeds",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 45,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "waterside",
+      "outdoors": true,
+      "decor": 0.4,
+      "description": "A clump of reeds and bulrushes for the water's edge.",
+      "interactions": [
+        {
+          "id": "water",
+          "label": "Water the reeds",
+          "anim": "water",
+          "minutes": 5,
+          "effects": {
+            "fun": 0.03
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skills": {
+            "gardening": 0.1
+          }
+        }
+      ]
+    },
+    {
+      "id": "beachHut",
+      "name": "Beach hut",
+      "model": "model.waterEdge.beachHut",
+      "footprint": [
+        2,
+        2
+      ],
+      "price": 780,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "waterside",
+      "outdoors": true,
+      "decor": 0.4,
+      "description": "A striped beach hut on timber skids, its door and window to the front.",
+      "interactions": []
+    },
+    {
+      "id": "waterBench",
+      "name": "Water's edge bench",
+      "model": "model.waterEdge.bench",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 260,
+      "category": "outdoor",
+      "group": "waterside",
+      "slots": 3,
+      "outdoors": true,
+      "seat": {
+        "height": 0.475,
+        "forward": 0.02
+      },
+      "description": "A slatted bench with a brass plaque, its back to the land so you look out over the water.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit and watch the water",
+          "anim": "sit",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.35,
+            "fun": 0.05
+          },
+          "tags": [
+            "lounge",
+            "outdoors"
+          ]
+        }
+      ]
     }
   ]
 }

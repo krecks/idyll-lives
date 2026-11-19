@@ -52,7 +52,8 @@
     "packs/ground/manifest.json",
     "packs/birds/manifest.json",
     "packs/civic/manifest.json",
-    "packs/civic_works/manifest.json"
+    "packs/civic_works/manifest.json",
+    "packs/water_edge/manifest.json"
   ],
   "entries": {
     "material.wall": {
