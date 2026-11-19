@@ -103,6 +103,7 @@ interface MotionsEntry {
   growth?: string;
   ride?: string;
   running?: string;
+  burn?: string;
   clock?: ClockClips;
 }
 
@@ -135,6 +136,11 @@ export interface Motions {
   ride?: string;
   /** The clip that goes round while the object runs on its own, nobody at it (a washer's drum; content `runs`, the sim's `running`). */
   running?: string;
+  /**
+   * The clip that goes round while a fire burns (content `light.fire`, at night while its lamp is on):
+   * the flames' lean and sway, from rest to rest (a fireplace's `burn`).
+   */
+  burn?: string;
   /** A clock's hands, set from the game's time (`ClockClips`). */
   clock?: ClockClips;
 }
@@ -199,8 +205,8 @@ export function motionsOf(entry: ModelEntry | undefined): Motions | undefined {
   );
   const loops = m.loops ?? {};
   const clock = m.clock?.hour || m.clock?.minute ? m.clock : undefined;
-  return Object.keys(uses).length || Object.keys(loops).length || m.open || m.idle || m.night || m.growth || m.running || clock
-    ? { uses, loops, open: m.open, idle: m.idle, night: m.night, growth: m.growth, ride: m.ride, running: m.running, clock }
+  return Object.keys(uses).length || Object.keys(loops).length || m.open || m.idle || m.night || m.growth || m.running || m.burn || clock
+    ? { uses, loops, open: m.open, idle: m.idle, night: m.night, growth: m.growth, ride: m.ride, running: m.running, burn: m.burn, clock }
     : undefined;
 }
 

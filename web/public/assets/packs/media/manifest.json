@@ -498,7 +498,8 @@
       "motions": {
         "uses": {
           "relax": "flames"
-        }
+        },
+        "burn": "burn"
       },
       "paint": [
         {

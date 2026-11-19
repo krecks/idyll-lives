@@ -14,7 +14,8 @@
 //!   homeCinema         the projector screen unrolls from its case on the wall (`screen_down`, watch and film);
 //!   stereo             the record turns on the turntable (`record`, a loop) and the woofers pulse (`pulse`, `every`);
 //!   boombox            the cassette door tips open and shuts (`cassette`, hold 1.2 s);
-//!   fireplaceElectric  the flames grow from the log bed (`flames`, for relax; gloss, glowing at night).
+//!   fireplaceElectric  the flames grow from the log bed (`flames`, for relax; gloss, glowing at night) and
+//!                      flicker while it burns (`burn`, a loop at night).
 
 use artkit::family::{Family, Model};
 use artkit::json;
@@ -160,7 +161,7 @@ pub fn family() -> Option<Family> {
             )
             .key("model.fireplaceElectric")
             .centre(0.0, 0.03)
-            .motions(json!({"uses": {"relax": "flames"}}))
+            .motions(json!({"uses": {"relax": "flames"}, "burn": "burn"}))
             .paint(&[("surround", "Surround"), ("firebox", "Firebox")]),
         ],
         "The living room's media (crates/art/things/src/media, built by cargo art): the TVs, the home cinema, the \

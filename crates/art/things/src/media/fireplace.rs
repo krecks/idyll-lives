@@ -6,7 +6,7 @@ use super::{F, M};
 use artkit::forms::smooth_outline;
 use artkit::kit;
 use artkit::math::{Axis, P3, cos, radians, sin};
-use artkit::motion::flat;
+use artkit::motion::{flat, keys, Path};
 use artkit::parts::{join, new_parts};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
@@ -425,5 +425,47 @@ pub fn fireplace_electric() -> Vec<Obj> {
     flat(flames, Axis::Z);
     settle!(centre = false);
     grow!(flames, "flames", seconds = 0.8);
+
+    // A lit fire never stands still: its tongues lean and sway on a loop that ends where it starts
+    // (`burn`, played round while the fire burns; `motions.burn`). A lean turns the whole bed about its
+    // foot, so the tongues at its ends sweep further than the middle's. (No scale: the part is flattened
+    // on its height axis, and a scale clip would carry that flatness into the grown flames it plays with.)
+    const PERIOD: f64 = 2.4;
+    // (24 samples round the loop, one every 0.1 s; the exporter resamples them at the frame rate.)
+    const STEPS: usize = 24;
+    const STEP: f64 = PERIOD / STEPS as f64;
+    // (A sum of whole cycles of sines, and of cosines taken from 1, so the loop starts and ends at rest;
+    // the cosine terms keep it from swinging back through rest at half time, which reads as a metronome.)
+    let wave = |terms: &[(f64, f64, bool)], amp: f64| -> Vec<(f64, f64)> {
+        (0..=STEPS)
+            .map(|k| {
+                let t = STEP * k as f64;
+                let turn = std::f64::consts::TAU * t / PERIOD;
+                let swing: f64 = terms
+                    .iter()
+                    .map(|&(cycles, share, cosine)| {
+                        let x = cycles * turn;
+                        share * if cosine { x.cos() - 1.0 } else { x.sin() }
+                    })
+                    .sum();
+                (t, amp * swing)
+            })
+            .collect()
+    };
+    let lean = wave(
+        &[(2.0, 0.6, false), (5.0, 0.2, false), (1.0, 0.2, true)],
+        radians(6.0),
+    );
+    let nod = wave(
+        &[(3.0, 0.6, false), (1.0, 0.2, false), (2.0, 0.2, true)],
+        radians(2.5),
+    );
+    let twist = wave(
+        &[(4.0, 0.7, false), (2.0, 0.15, false), (1.0, 0.15, true)],
+        radians(2.0),
+    );
+    keys(flames, "burn", Path::Rotation, 1, &lean);
+    keys(flames, "burn", Path::Rotation, 0, &nod);
+    keys(flames, "burn", Path::Rotation, 2, &twist);
     meshes()
 }

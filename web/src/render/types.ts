@@ -422,8 +422,11 @@ export type RenderFailure = 'frames' | 'device';
 
 /** A clip playing on a placed object's moving parts (`RendererDebugHooks.objectClips`). */
 export interface ObjectClipInfo {
-  /** How it plays: opened by a use, round while used, every so often, always, by growth stage, by the clock, along a use. */
-  kind: 'use' | 'loop' | 'repeat' | 'idle' | 'growth' | 'clock' | 'over';
+  /**
+   * How it plays: opened by a use, round while used, every so often, always, by growth stage, by the
+   * clock, along a use, or round while a fire burns.
+   */
+  kind: 'use' | 'loop' | 'repeat' | 'idle' | 'growth' | 'clock' | 'over' | 'burn';
   /** Seconds into it (0: at rest). */
   time: number;
   duration: number;
