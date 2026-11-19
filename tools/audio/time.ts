@@ -11,7 +11,8 @@
  * - `--json <file>`: also writes the numbers there (from the checkout, as `listen.ts`'s `--out`).
  * - `--compare <file>`: a file `--json` wrote before; prints before → after and the ratio of each row.
  * - `--max-music <ms>`: exits 1 when the music's total is over it (the machine's own speed: by hand, not in CI).
- * - `--wasm <file>`: times that build of `crates/sound-wasm` instead (its exports the same as the built one's).
+ * - `--wasm <file>`: times that build of `crates/sound-wasm` instead (its exports the same as the built one's); a
+ *   sound it cannot make (an older build's, from before the sound was added) is left out and named.
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -73,12 +74,19 @@ interface Timing {
 }
 
 const sounds: Timing['sounds'] = [];
+/** Sounds this build cannot make (an older one, `--wasm`, from before they were added): left out of the totals. */
+const unmade: string[] = [];
 for (const job of jobs) {
   let best = Infinity;
-  for (let run = 0; run < RUNS; run++) {
-    const t0 = performance.now();
-    job.make();
-    best = Math.min(best, performance.now() - t0);
+  try {
+    for (let run = 0; run < RUNS; run++) {
+      const t0 = performance.now();
+      job.make();
+      best = Math.min(best, performance.now() - t0);
+    }
+  } catch {
+    unmade.push(job.name);
+    continue;
   }
   sounds.push({ name: job.name, family: job.family, ms: best });
 }
@@ -92,6 +100,7 @@ const before: Timing | undefined = compared ? JSON.parse(readFileSync(path(compa
 const was = new Map(before?.sounds.map((s) => [s.name, s.ms]));
 
 console.log(`${sounds.length} sounds at ${RATE} Hz, the least of ${RUNS} run${RUNS > 1 ? 's' : ''} each${before ? ` (before: ${compared})` : ''}\n`);
+if (unmade.length) console.log(`not made by this build (left out): ${unmade.join(', ')}\n`);
 console.log(before ? `${'sound'.padEnd(18)} ${'family'.padEnd(9)} ${'before'.padStart(8)} ${'ms'.padStart(8)}  ratio` : `${'sound'.padEnd(18)} ${'family'.padEnd(9)} ${'ms'.padStart(8)}`);
 for (const s of sounds.toSorted((a, b) => b.ms - a.ms)) {
   console.log(before ? `${s.name.padEnd(18)} ${s.family.padEnd(9)} ${ms(was.get(s.name))} ${ms(s.ms)}  ${ratio(was.get(s.name), s.ms)}` : `${s.name.padEnd(18)} ${s.family.padEnd(9)} ${ms(s.ms)}`);
