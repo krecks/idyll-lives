@@ -7,7 +7,7 @@
 import { prefetch, prefetchNow, planStream, reprioritize, whenStreamSettled } from '../assets/stream';
 import { SaveRefused, SimBridge, type FrameState } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SimInfo, SocialEvent, WorldStructure } from '../core/protocol';
-import { groundDepth, lowestStorey } from '../core/protocol';
+import { flatOf, groundDepth, lowestStorey, storeyRow } from '../core/protocol';
 import { townMap } from '../ui/townMap.svelte';
 import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { BENCH } from '../debug/benchFlags';
@@ -31,7 +31,7 @@ import { app } from '../ui/app.svelte';
 import { prefetchCatalog, services, type GameControls } from '../ui/services';
 import { game, nextWallMode, toast } from '../ui/state.svelte';
 import { saveDebugReport } from '../ui/debugReport';
-import { lotInSentence } from '../ui/place';
+import { lotInSentence, plotInfo } from '../ui/place';
 import { chosenOf } from '../ui/town/chosen';
 import { townPlaces } from '../ui/town/places';
 import { townHud } from '../ui/town/townHud.svelte';
@@ -688,7 +688,7 @@ async function openSession(
       // The view goes along with them (Esc lets go).
       if (game.mode === 'live' && who) {
         controls.follow(who.id);
-        const p = game.plots[plot];
+        const p = plotInfo(game, plot);
         toast(`${who.name} is on the way to ${p ? lotInSentence(p, game.households) : 'visit'}.`);
       }
     },
@@ -1397,6 +1397,13 @@ async function openSession(
     game.former = w.former ?? [];
     game.households = w.households;
     game.plots = w.plots;
+    game.flats = w.flats ?? [];
+    // Where the home's things stand: a house's lot, a flat's rectangle on its storey's rows.
+    const homeFlat = mine?.plot == null ? undefined : flatOf(w, mine.plot);
+    const homeOn = homeFlat ? { x: homeFlat.x, z: homeFlat.z + storeyRow(w, homeFlat.storey), w: homeFlat.w, d: homeFlat.d } : mine?.plot == null ? undefined : w.plots[mine.plot];
+    const area = homeOn ? { x: homeOn.x, z: homeOn.z, w: homeOn.w, d: homeOn.d } : null;
+    const had = game.homeArea;
+    if (area?.x !== had?.x || area?.z !== had?.z || area?.w !== had?.w || area?.d !== had?.d) game.homeArea = area;
     // Portraits for the HUD, the household first (drawn once, cached by look); the game is
     // ready once the household's are.
     if (simsChanged || !portraits) {
@@ -1412,9 +1419,9 @@ async function openSession(
       // Nobody lives at home: nobody to give orders to.
       game.selected = first ?? -1;
       if (first !== undefined && liveSettings.directControl === 'always') controls.inspect(first);
-      // Start on the home lot; its geometry arrives in the next world message.
+      // Start on the home lot (a flat's building, on its storey); its geometry arrives in the next world message.
       const home = w.households.find((h) => h.player)?.plot;
-      if (home != null && w.plots[home]) return showPlot(home);
+      if (home != null && plotInfo(w, home)) return showPlot(home);
       // (No home: the whole town's walls and floors, which come once a view is asked for.)
       if (!w.meshes) return bridge.setView(null);
     } else if (!playerSims().includes(game.selected)) {
@@ -2096,9 +2103,9 @@ async function openSession(
       // Nobody lives here yet, or there's no house (an empty lot): the game starts with
       // building (time stands still until Live).
       const home = homePlot();
-      if (!game.occupied || (home !== null && !game.plots[home]?.house)) {
+      if (!game.occupied || (home !== null && !plotInfo(game, home)?.house)) {
         // No house yet: the Build tab; a house nobody lives in: the catalog to furnish it.
-        if (home !== null && !game.plots[home]?.house) controls.setBuildTool(game.buildTool);
+        if (home !== null && !plotInfo(game, home)?.house) controls.setBuildTool(game.buildTool);
         else controls.setBuildTab('furnish');
       }
       // Time runs from here (at the speed chosen), unless something else holds it (a menu, the

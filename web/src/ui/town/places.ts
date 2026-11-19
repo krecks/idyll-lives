@@ -4,7 +4,7 @@
  * the street and area names. Pure: the tag layer (`TownTags.svelte`) gives it the game's views.
  */
 
-import type { PlotInfo, RoadPlan, TownArea, TownPlace, WorldMeta } from '../../core/protocol';
+import type { FlatInfo, PlotInfo, RoadPlan, TownArea, TownPlace, WorldMeta } from '../../core/protocol';
 
 type Rates = { perTile: number; perFloorTile: number; round: number; sizeRef?: number; sizePremium?: number };
 
@@ -94,9 +94,11 @@ export function closedWhy(hours: TownPlace['hours'] | undefined, minute: number,
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-/** A home for sale: its lot, what it costs and how big it is. */
+/** A home for sale: its lot (or its flat), what it costs and how big it is. */
 export interface HomeForSale {
   plot: number;
+  /** A flat (`plot` its id): one storey of a building of flats, or over a place. */
+  flat?: true;
   /** The land and the house as built (the furniture comes on top): `game/price.ts` without the things in it. */
   price: number;
   /** Floor (m², every storey), 0 for an empty lot. */
@@ -107,26 +109,37 @@ export interface HomeForSale {
   d: number;
 }
 
+/** A flat's floor costs this share of a house's a tile, as `game/price.ts` prices a flat: no roof, garden or outside walls of its own, its stairs and hall the building's. */
+const FLAT_FLOOR = 0.6;
+
 /**
- * The homes nobody lives in (private lots no household has), priced as `game/price.ts` prices a home from what the
- * views carry: the land by its size and the house by its floor (the walls' box, every storey). The things in it
- * aren't in the views, so the price is a "from".
+ * The homes nobody lives in (private lots no household has, and flats), priced as `game/price.ts` prices a home from
+ * what the views carry: the land by its size and the house by its floor (the walls' box, every storey); a flat its
+ * share of its building's land (the lot shared evenly by its flats) and its own floor at a flat's rate. A building of
+ * flats is no home itself. The things in it aren't in the views, so the price is a "from".
  */
-export function homesForSale(plots: readonly PlotInfo[], households: readonly { plot: number | null }[], rates: Rates | undefined): HomeForSale[] {
+export function homesForSale(plots: readonly PlotInfo[], households: readonly { plot: number | null }[], rates: Rates | undefined, flats: readonly FlatInfo[] = []): HomeForSale[] {
   const taken = new Set(households.map((h) => h.plot));
+  const priced = (tiles: number, floor: number, share: number) => {
+    if (!rates) return 0;
+    const built = share * rates.perFloorTile * floor * (floor / (rates.sizeRef ?? 100)) ** (rates.sizePremium ?? 0);
+    const step = Math.max(1, rates.round);
+    return Math.round((rates.perTile * tiles + built) / step) * step;
+  };
+  const flatsOf = new Map<number, number>();
+  for (const f of flats) flatsOf.set(f.of, (flatsOf.get(f.of) ?? 0) + 1);
   const out: HomeForSale[] = [];
   for (const p of plots) {
-    if (p.public || taken.has(p.id)) continue;
+    if (p.public || p.kind === 'flats' || flatsOf.has(p.id) || taken.has(p.id)) continue;
     const storeys = p.house ? (p.storeys ?? 1) : 0;
     const floor = p.house ? (p.house[2] - p.house[0]) * (p.house[3] - p.house[1]) * storeys : 0;
-    let price = 0;
-    if (rates) {
-      const land = rates.perTile * p.w * p.d;
-      const built = rates.perFloorTile * floor * (floor / (rates.sizeRef ?? 100)) ** (rates.sizePremium ?? 0);
-      const step = Math.max(1, rates.round);
-      price = Math.round((land + built) / step) * step;
-    }
-    out.push({ plot: p.id, price, floor, storeys, w: p.w, d: p.d });
+    out.push({ plot: p.id, price: priced(p.w * p.d, floor, 1), floor, storeys, w: p.w, d: p.d });
+  }
+  for (const f of flats) {
+    const lot = plots[f.of];
+    if (taken.has(f.id) || !lot) continue;
+    const floor = f.w * f.d;
+    out.push({ plot: f.id, flat: true, price: priced((lot.w * lot.d) / (flatsOf.get(f.of) ?? 1), floor, FLAT_FLOOR), floor, storeys: 1, w: f.w, d: f.d });
   }
   return out;
 }

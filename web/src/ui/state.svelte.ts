@@ -1,6 +1,6 @@
 /** Reactive UI state. Written by the game layer at ~10 Hz, read by components. */
 
-import type { Catalog, FormerResident, HouseholdInfo, Lifespan, ObjectPlacement, PartColors, PlotInfo, RelationshipView, RoomView, Routine, SimInfo, SimView, SocialEvent, SocialOption } from '../core/protocol';
+import type { Catalog, FlatInfo, FormerResident, HouseholdInfo, Lifespan, ObjectPlacement, PartColors, PlotInfo, RelationshipView, RoomView, Routine, SimInfo, SimView, SocialEvent, SocialOption } from '../core/protocol';
 import type { ThreadStats } from '../debug/threads';
 import type { RenderStats, WallMode } from '../render/types';
 import { NO_LAND, startBrush, type BrushState, type LandState } from './land/landTools';
@@ -122,6 +122,13 @@ class GameState {
   former = $state.raw<FormerResident[]>([]);
   households = $state.raw<HouseholdInfo[]>([]);
   plots = $state.raw<PlotInfo[]>([]);
+  /** The flats (each a plot of its own inside a ground lot, `WorldStructure.flats`): a household's `plot` may be one. */
+  flats = $state.raw<FlatInfo[]>([]);
+  /**
+   * The player's home where its things stand, in lot tiles: a house's lot (on the ground's rows), a flat's rectangle on
+   * its storey's rows; null without a home.
+   */
+  homeArea = $state.raw<{ x: number; z: number; w: number; d: number } | null>(null);
   /** Pairs with a resident in `sims` that has details, both ways (as `sims`, unchanged pairs keep their objects). */
   relationships = $state.raw<RelationshipView[]>([]);
   socialMenu = $state.raw<SocialMenuState | null>(null);
@@ -285,6 +292,8 @@ class GameState {
     this.plots = [];
     this.relationships = [];
     this.socialMenu = null;
+    this.flats = [];
+    this.homeArea = null;
     this.feed = [];
     this.menu = null;
     this.pauseMenu = false;

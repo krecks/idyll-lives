@@ -5,7 +5,7 @@
  */
 import { describe, expect, test } from 'bun:test';
 import { labelWidth, layoutLabels, mapScale, screenToMap, type MapLabel } from '../src/ui/mapView';
-import { placeAt, rideText, tripText, wayText } from '../src/ui/place';
+import { flatsIn, lotTitle, placeAt, plotInfo, rideText, tripText, wayText } from '../src/ui/place';
 
 describe('town map view', () => {
   const view = { x: -6, z: -6, w: 412, d: 212 };
@@ -123,12 +123,12 @@ describe('place names', () => {
 
   test('a resident on the way: where to, and when', () => {
     const time = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
-    expect(tripText({ to: 1, at: 17 * 60 + 40 }, 1, plots, households, time)).toBe('On the way home · back about 17:40');
-    expect(tripText({ to: 0, at: 14 * 60 + 20 }, 1, plots, households, time)).toBe('On the way to the Smiths · there about 14:20');
-    expect(tripText({ to: 2, at: 9 * 60 }, 1, plots, households, time)).toBe('On the way to Village green · there about 9:00');
+    expect(tripText({ to: 1, at: 17 * 60 + 40 }, 1, { plots }, households, time)).toBe('On the way home · back about 17:40');
+    expect(tripText({ to: 0, at: 14 * 60 + 20 }, 1, { plots }, households, time)).toBe('On the way to the Smiths · there about 14:20');
+    expect(tripText({ to: 2, at: 9 * 60 }, 1, { plots }, households, time)).toBe('On the way to Village green · there about 9:00');
     // (The time only comes with a resident's details.)
-    expect(tripText({ to: 1 }, 1, plots, households, time)).toBe('On the way home');
-    expect(tripText({ to: 0 }, 1, plots, households, time)).toBe('On the way to the Smiths');
+    expect(tripText({ to: 1 }, 1, { plots }, households, time)).toBe('On the way home');
+    expect(tripText({ to: 0 }, 1, { plots }, households, time)).toBe('On the way to the Smiths');
   });
 
   test('a resident riding: cycling or on the e-scooter, to work, to school or home', () => {
@@ -136,15 +136,30 @@ describe('place names', () => {
     expect(rideText('bike', 'work')).toBe('Cycling to work');
     expect(rideText('bike', 'school')).toBe('Cycling to school');
     expect(rideText('scooter', 'work')).toBe('Riding the e-scooter to work');
-    expect(tripText({ to: 1, at: 17 * 60 + 40 }, 1, plots, households, time, { kind: 'bike', to: 'home' })).toBe('Cycling home · back about 17:40');
-    expect(tripText({ to: 1 }, 1, plots, households, time, { kind: 'scooter', to: 'home' })).toBe('Riding the e-scooter home');
+    expect(tripText({ to: 1, at: 17 * 60 + 40 }, 1, { plots }, households, time, { kind: 'bike', to: 'home' })).toBe('Cycling home · back about 17:40');
+    expect(tripText({ to: 1 }, 1, { plots }, households, time, { kind: 'scooter', to: 'home' })).toBe('Riding the e-scooter home');
     expect(rideText('bike', 'out')).toBe('Cycling out');
-    expect(tripText({ to: 0 }, 1, plots, households, time, { kind: 'bike', to: 'out' })).toBe('Cycling to the Smiths');
+    expect(tripText({ to: 0 }, 1, { plots }, households, time, { kind: 'bike', to: 'out' })).toBe('Cycling to the Smiths');
+  });
+
+  test('a flat is a home of its own: its household by name, its building by its own', () => {
+    const time = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+    const court = { id: 3, name: 'Mill Court', x: 120, z: 0, w: 20, d: 26, public: false, kind: 'flats' as const };
+    const flats = [{ id: 4, of: 3, storey: 1, x: 121, z: 4, w: 7, d: 9, name: 'Flat 3, Mill Court', door: [128, 45] as [number, number] }];
+    const lots = { plots: [...plots, court], flats };
+    const who = [...households, { name: 'Cole', plot: 4 }];
+    expect(plotInfo(lots, 4)).toMatchObject({ id: 4, name: 'Flat 3, Mill Court', x: 121, w: 7, public: false });
+    expect(plotInfo(lots, 3)).toBe(court);
+    expect(plotInfo(lots, 9)).toBeUndefined();
+    expect(flatsIn(lots, 3)).toEqual(flats);
+    expect(tripText({ to: 4 }, 1, lots, who, time)).toBe('On the way to the Coles');
+    expect(tripText({ to: 3 }, 1, lots, who, time)).toBe('On the way to Mill Court');
+    expect(lotTitle(court, who, 'Empty')).toBe('Mill Court');
   });
 
   test('a resident on their way: the trip, then the ride', () => {
     const time = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
-    const way = (s: Parameters<typeof wayText>[0]) => wayText(s, 1, plots, households, time);
+    const way = (s: Parameters<typeof wayText>[0]) => wayText(s, 1, { plots }, households, time);
     const bike = { kind: 'bike', to: 'work' } as const;
     expect(way({ trip: { to: 0 }, ride: bike })).toBe('On the way to the Smiths');
     expect(way({ trip: { to: 1, at: 17 * 60 + 40 } })).toBe('On the way home · back about 17:40');
@@ -154,7 +169,7 @@ describe('place names', () => {
 
   test('a resident and the work taxi: waiting at the kerb, in it to work or school, home in it', () => {
     const time = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
-    const way = (s: Parameters<typeof wayText>[0]) => wayText(s, 1, plots, households, time);
+    const way = (s: Parameters<typeof wayText>[0]) => wayText(s, 1, { plots }, households, time);
     expect(way({ taxi: { state: 'wait' }, job: {} })).toBe('Waiting for the taxi');
     expect(way({ taxi: { state: 'work', at: 8 * 60 + 40 }, job: {} })).toBe('Taxi to work · there about 8:40');
     expect(way({ taxi: { state: 'work' }, job: null })).toBe('Taxi to school');
