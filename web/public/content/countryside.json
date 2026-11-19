@@ -129,6 +129,71 @@
           "skills": { "endurance": 0.2 }
         }
       ]
+    },
+    {
+      "id": "countryside.dryStoneWall",
+      "name": "Dry-stone wall",
+      "model": "model.fields.dryStoneWall",
+      "category": "community",
+      "group": "countryside",
+      "freeRotation": true,
+      "outdoors": true,
+      "footprint": [2, 1],
+      "price": 0,
+      "decor": 0.1,
+      "description": "A course of local stone, stacked without mortar and capped with coping set on edge."
+    },
+    {
+      "id": "countryside.hedgerow",
+      "name": "Hedgerow",
+      "model": "model.fields.hedgerow",
+      "category": "community",
+      "group": "countryside",
+      "freeRotation": true,
+      "outdoors": true,
+      "footprint": [2, 1],
+      "price": 0,
+      "decor": 0.1,
+      "description": "A thick hedgerow of hawthorn and hazel, trimmed to hold the field and full of nesting cover."
+    },
+    {
+      "id": "countryside.gate",
+      "name": "Field gate",
+      "model": "model.fields.gate",
+      "category": "community",
+      "group": "countryside",
+      "freeRotation": true,
+      "outdoors": true,
+      "footprint": [2, 1],
+      "price": 0,
+      "decor": 0.1,
+      "description": "A five-bar oak gate between two posts, hung on iron hinges and closed with a latch."
+    },
+    {
+      "id": "countryside.stile",
+      "name": "Stone stile",
+      "model": "model.fields.stile",
+      "category": "community",
+      "group": "countryside",
+      "freeRotation": true,
+      "outdoors": true,
+      "footprint": [1, 1],
+      "price": 0,
+      "decor": 0.1,
+      "description": "Two worn stone steps over a short wall, where a footpath crosses a field boundary."
+    },
+    {
+      "id": "countryside.fingerpost",
+      "name": "Fingerpost",
+      "model": "model.fields.fingerpost",
+      "category": "community",
+      "group": "countryside",
+      "freeRotation": true,
+      "outdoors": true,
+      "footprint": [1, 1],
+      "price": 0,
+      "decor": 0.1,
+      "description": "Three painted arms on an iron post, pointing the way down the lanes."
     }
   ]
 }

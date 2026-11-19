@@ -6,6 +6,7 @@ use artkit::family::Family;
 pub mod civic;
 pub mod civic_works;
 pub mod farm;
+pub mod fields;
 pub mod outdoor;
 pub mod playground;
 pub mod shops;
@@ -20,6 +21,7 @@ pub fn families() -> Vec<(&'static str, Option<Family>)> {
         ("outdoor", outdoor::family()),
         ("playground", playground::family()),
         ("farm", farm::family()),
+        ("fields", fields::family()),
         ("street_furniture", street_furniture::family()),
         ("stalls", stalls::family()),
         ("shops", shops::family()),

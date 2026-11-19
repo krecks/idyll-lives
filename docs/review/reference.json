@@ -11156,6 +11156,113 @@
         "rhsPlants"
       ]
     },
+    "dryStoneWall": {
+      "label": "Dry-stone field wall",
+      "w": [
+        1.0,
+        3.0
+      ],
+      "h": [
+        0.8,
+        1.5
+      ],
+      "d": [
+        0.3,
+        0.8
+      ],
+      "uses": [
+        "mark a field boundary"
+      ],
+      "sources": [
+        "neufert"
+      ]
+    },
+    "hedgerow": {
+      "label": "Hedgerow, field boundary",
+      "w": [
+        1.0,
+        3.0
+      ],
+      "h": [
+        0.8,
+        2.0
+      ],
+      "d": [
+        0.5,
+        1.3
+      ],
+      "uses": [
+        "mark a field boundary",
+        "nest in"
+      ],
+      "sources": [
+        "rhsPlants"
+      ]
+    },
+    "fieldGate": {
+      "label": "Field gate between posts",
+      "w": [
+        1.2,
+        3.0
+      ],
+      "h": [
+        0.9,
+        1.7
+      ],
+      "d": [
+        0.1,
+        0.4
+      ],
+      "uses": [
+        "open it",
+        "close it"
+      ],
+      "sources": [
+        "neufert"
+      ]
+    },
+    "stoneStile": {
+      "label": "Stone stile over a wall",
+      "w": [
+        0.6,
+        1.4
+      ],
+      "h": [
+        0.8,
+        1.5
+      ],
+      "d": [
+        0.4,
+        1.1
+      ],
+      "uses": [
+        "climb over"
+      ],
+      "sources": [
+        "neufert"
+      ]
+    },
+    "fingerpost": {
+      "label": "Fingerpost with direction arms",
+      "w": [
+        0.5,
+        1.3
+      ],
+      "h": [
+        1.8,
+        3.0
+      ],
+      "d": [
+        0.2,
+        1.0
+      ],
+      "uses": [
+        "read the directions"
+      ],
+      "sources": [
+        "neufert"
+      ]
+    },
     "floweringShrub": {
       "label": "Flowering shrub (hydrangea, rose, azalea)",
       "w": [
@@ -14904,6 +15011,11 @@
     "countryside.picnicSpot": "picnicTable",
     "countryside.berryBush": "clippedShrub",
     "countryside.trailhead": "noticeBoard",
+    "countryside.dryStoneWall": "dryStoneWall",
+    "countryside.hedgerow": "hedgerow",
+    "countryside.gate": "fieldGate",
+    "countryside.stile": "stoneStile",
+    "countryside.fingerpost": "fingerpost",
     "garden.boulder": "boulders",
     "model.rock": "boulders",
     "tree": "treeOak",

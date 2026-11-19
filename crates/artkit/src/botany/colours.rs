@@ -7,6 +7,8 @@ crate::palette! { BASE:
     body = ("#C0683F", satin),          // the pot (the bonsai's tray); the main part the player colours
     soil = ("#5A4030", matte),
     leaf = ("#4F8A3E", foliage),
+    card = ("#FFFFFF", leafcards),       // a hedge's leaf cards, tinted from its leaf
+    core = ("#2A331E", leafcards),       // the dark mass under a hedge's cards
     leaf_dark = ("#3B7034", foliage),
     leaf_light = ("#6FAA52", foliage),
     stem = ("#6E9248", foliage),
