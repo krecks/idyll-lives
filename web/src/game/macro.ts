@@ -1552,7 +1552,9 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     const sq = centre.square ? centroid(centre.square) : pointAt(worldRoads[centre.road].points, (centre.s0 + centre.s1) / 2).p;
     const by = frontageOf(worldRoads, allRoads, sq, dense).filter((f) => dist(f.p, sq) < 120 && worldRoads[f.road].kind !== 'country');
     // (On a side street first: the high street's frontage is the centre's shops'.)
-    parkAlong([...by.filter((f) => f.road !== centre.road), ...by.filter((f) => f.road === centre.road)], SQUARE_BAYS, 0, { square: true });
+    // (A row where a street runs along the grid, else a pair: `parking.ts` `carParkFits`.)
+    const streets = [...by.filter((f) => f.road !== centre.road), ...by.filter((f) => f.road === centre.road)];
+    if (!parkAlong(streets, SQUARE_BAYS, 0, { square: true })) parkAlong(streets, [1, 2], 0, { square: true });
   }
   /** A car park by each big place (`BIG_PLACES`) laid since the last call, on its road beside its lot. */
   let parkedUpTo = 0;
@@ -1565,7 +1567,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       const r = plotRect(t, s);
       const mid: Pt = [r.x + r.w / 2, r.z + r.d / 2];
       const along = frontageOf(worldRoads, [f.road], mid, dense).filter((g) => g.side === f.side && g.far < Math.max(r.w, r.d) / 2 + 40);
-      parkAlong(along, PLACE_BAYS, s.area ?? 0, { serves: s.index });
+      if (!parkAlong(along, PLACE_BAYS, s.area ?? 0, { serves: s.index })) parkAlong(along, [1, 2], s.area ?? 0, { serves: s.index });
     }
   };
   // The named places' lots, from a stream of their own (`namedLots`): with no room in their area, along the

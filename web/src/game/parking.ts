@@ -34,6 +34,8 @@ export const BAY_LINES: readonly [number, number] = [2.8, 5.6];
 export const PARK_BEND = 0.3;
 /** How far a single bay's stretch may turn where an area has no straighter one for its share (`vergeParking`'s `bend`). */
 export const LOOSE_BEND = 0.6;
+/** How far off the grid's axes (radians) a row of more than two bays may run (`carParkFits`). */
+const ROW_SLANT = 0.35;
 /** Off the world's edge (m), as the lots keep. */
 const EDGE = 8;
 
@@ -85,6 +87,13 @@ export function carParkFits(roads: readonly RoadPlan[], ground: Ground, f: Front
   const half = (BAY_WIDE * n) / 2;
   if (f.s - half < 4 || f.s + half > L - 4) return null;
   if (!straightAround(road.points, f.s, half + BAY_WIDE, bend, ls)) return null;
+  // (A row of three or more only along a street running near enough along x or z: the cars' door stands between the
+  // bays are tiles, and a row across the grid leaves its middle cars' doors none a driver can get to.)
+  if (n > 2) {
+    const { t } = pointAt(road.points, f.s, ls);
+    const a = Math.atan2(Math.abs(t[1]), Math.abs(t[0]));
+    if (Math.min(a, Math.PI / 2 - a) > ROW_SLANT) return null;
+  }
   for (const s of [f.s - half, f.s + half]) if (!offCorners({ ...f, s, p: pointAt(road.points, s, ls).p })) return null;
   const laid = carParkAt(roads, f, n, 0);
   // (Every tile it touches but its own road's, which reach a little past its verge: `roads.ts` `roadMask`.)
