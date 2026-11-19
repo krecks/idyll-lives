@@ -112,3 +112,50 @@ So: the household entry (renderer build + warm-up) and the per-step town rebuild
   WebGL2 fallback, other hardware and other worlds (big/`--world`) were not measured.
 - `?profile` adds a `PerformanceObserver` and console logging; its cost is assumed small but was not
   measured.
+
+## Round 2: what was changed, and what it bought
+
+Three changes on `perf/load-timing` (game logic untouched):
+
+1. **A town is not rebuilt when its draft is unchanged** (`web/src/game/menuScene.ts`). The menus
+   hand `showTown` a fresh `NeighbourhoodDraft` object for the same draft on every call (the
+   ChooseHome hover, going back a step), so the identity check `draft === this.draft` never held and
+   the whole town was thrown away and built again. `show()` now keeps a `shownKey` (the home and the
+   draft's JSON) and returns early when it matches the town that is up.
+2. **Portraits no longer hold up the boot** (`web/src/App.svelte`, `boot()`). `boot: portraits`
+   (1 321 ms: `preview: studio` + 6 batches) was awaited before the menu was shown; it now runs
+   behind the menu picture (a portrait asked for meanwhile queues behind it). Boot phase 1 701 →
+   1 550 ms, with 1 266 ms of that work now off the critical path.
+3. **The game's world reuses the landscape the menus built** (`web/src/render/shared/nature.ts`).
+   Two things stopped it: `baseKey`/`relayKey` serialised the look and the options with
+   `JSON.stringify`, so the menus' draft's world and the sim's world (the same land, keys in another
+   order) had different keys — now serialised canonically (keys sorted); and `takeRoads` compared
+   `meta.roads` by identity, so the shared land re-solved its whole surface for roads that had not
+   moved — 6 673 ms of `land: roads taken` — now compared by value (width, kind, points).
+   With both, the entry builds no landscape at all: `render: nature` 2 766 → 299 ms, the rest of the
+   nature work gone, and `land: roads taken` 0.
+
+### After (3 runs, same machine, same protocol, seed 7)
+
+| moment | median ms | runs |
+|---|---|---|
+| total (page load → game up) | 30 170 | 31 320, 30 170, 28 913 |
+| boot | 1 550 | 2 415, 1 550, 1 452 |
+| town | 5 511 | 5 511, 5 593, 5 228 |
+| entry | 8 487 | 8 646, 8 487, 8 085 |
+
+Entry, span by span (median): `setWorld` 5 029 → 2 856, `render: nature` 2 766 → 299,
+`land: roads taken` 6 673 → 0, `warmGame` 3 371 → 3 391, `SimBridge.start` 1 283 → 1 310.
+
+Caveat: the machine drifted about 8 % slower between the two sessions (`menu: showTown`, which no
+change touched, went 9 603 → 10 323 ms), so totals are not directly comparable run to run; the span
+comparisons above are within one session's spread.
+
+### What is left
+
+- `warmGame` 3 391 ms (40 % of the entry), of which `warm: lots` ~2 800 ms over 5–6 lots
+  (`WARM_LOTS` in `web/src/render/shared/focus.ts`): a deliberate trade for smooth roaming.
+- `SimBridge.start` 1 310 ms.
+- The menus' five wizard rebuilds: `menu: showTown` 10 323 ms over 5 calls, 85 % of the town phase.
+  The land → layout → town steps are genuinely different towns; only the hover case was waste.
+- `street: plan` in the game, and `portraits: batch` 2 969 ms for the 70 cards at step 4.

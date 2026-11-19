@@ -543,6 +543,19 @@ export function groupInstances<T, K>(items: readonly T[], group: (item: T) => K)
 // ---- Landscape ----------------------------------------------------------------------
 
 /**
+ * `v` as JSON with its objects' keys sorted: two worlds whose look or options are the same but were
+ * made in another order (the menus' draft's, the sim's) keep the same landscape (`baseKey`).
+ */
+function canonicalJson(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`;
+  if (v && typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    return `{${Object.keys(o).sort().filter((k) => o[k] !== undefined).map((k) => `${JSON.stringify(k)}:${canonicalJson(o[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(v) ?? 'null';
+}
+
+/**
  * The land round a town and what grows on it, as the renderer builds it (`pc/nature.ts`'s `Landscape`
  * draws it). `R`: the engine's country roads (their layout is `CountryRoads`'s).
  */
@@ -649,9 +662,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   /** `baseKey` without the roads and the backdrop: what another town on the same land keeps (`canRelay`). */
   static relayKey(world: WorldStructure): string {
     const look = world.meta?.world;
-    const options = look?.options ? `:o${JSON.stringify(look.options)}` : '';
+    const options = look?.options ? `:o${canonicalJson(look.options)}` : '';
     const relief = world.meta?.relief ? `:r${reliefSum(world.meta.relief)}` : '';
-    return `${world.meta?.seed ?? 1}:${world.width}x${groundDepth(world)}:${world.meta?.name ?? ''}${look ? `:${look.kind}:${JSON.stringify(look.landscape)}` : ''}${options}${relief}`;
+    return `${world.meta?.seed ?? 1}:${world.width}x${groundDepth(world)}:${world.meta?.name ?? ''}${look ? `:${look.kind}:${canonicalJson(look.landscape)}` : ''}${options}${relief}`;
   }
 
   /**
@@ -809,7 +822,11 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     if (!this.field || !this.surface) return null;
     const old = this.laidOut.meta?.roads ?? [];
     const now = world.meta?.roads ?? [];
-    const changed = now.filter((r, i) => r !== old[i]);
+    // (By value: the same roads laid out again, by the menus' draft and by the game's world, are the same roads: only
+    // one the water bridged or a stroke moved is to be solved again, not every one of them for another array.)
+    const same = (a: (typeof now)[number], b: (typeof now)[number]) =>
+      a === b || (a.width === b.width && a.kind === b.kind && a.points.length === b.points.length && a.points.every(([x, z], i) => x === b.points[i][0] && z === b.points[i][1]));
+    const changed = now.filter((r, i) => !(i < old.length && same(r, old[i])));
     if (!changed.length && old.length === now.length) return null;
     this.laidOut = world;
     this.adoptLand(this.field);
@@ -967,9 +984,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const backdrop = world.meta?.backdrop?.length ? `:b${world.meta.backdrop.length}` : '';
     // (The options, the zones and the relief too: a world made again with only its woods or its hills changed
     // keeps its seed, name and roads, and must not keep the landscape it had.)
-    const options = look?.options ? `:o${JSON.stringify(look.options)}` : '';
+    const options = look?.options ? `:o${canonicalJson(look.options)}` : '';
     const relief = world.meta?.relief ? `:r${reliefSum(world.meta.relief)}` : '';
-    return `${world.meta?.seed ?? 1}:${world.width}x${groundDepth(world)}:${world.meta?.name ?? ''}:${streets}${look ? `:${look.kind}:${JSON.stringify(look.landscape)}` : ''}${backdrop}${options}${relief}`;
+    return `${world.meta?.seed ?? 1}:${world.width}x${groundDepth(world)}:${world.meta?.name ?? ''}:${streets}${look ? `:${look.kind}:${canonicalJson(look.landscape)}` : ''}${backdrop}${options}${relief}`;
   }
 
   /**

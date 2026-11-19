@@ -160,7 +160,9 @@
         // (Kept from now on, as the menus keep it.)
         services.previews.keep(true, 'page');
         const look = { gender: 'female', appearance: lookAtAge(services.content, services.assets, lookFromSeed(services.assets, 'female', WARM_FACE), WARM_AGE) };
-        await perfTimeAsync('boot: portraits', () => within(services.previews.portrait(look), PORTRAIT_LIMIT_MS, undefined));
+        // (Behind the menu, not in front of it: the studio warms up while the picture is painted, and
+        // a portrait asked for before it is done queues behind it.)
+        void perfTimeAsync('boot: portraits', () => within(services.previews.portrait(look), PORTRAIT_LIMIT_MS, undefined));
       }
       step('Painting the menu', 0.8);
       await perfTimeAsync('boot: menu picture', async () => showStill(await still));
