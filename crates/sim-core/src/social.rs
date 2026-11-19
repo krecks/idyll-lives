@@ -952,6 +952,8 @@ pub enum EventKind {
     /// `a`'s household bought the car `a`'s promotion or new job called for (`n`: its body, an
     /// index into `Content::car_bodies`; `cars/looks.rs`).
     BoughtCar,
+    /// `a` fetched the post and had a letter from their friend `b` (`post.rs`).
+    GotLetter,
 }
 
 impl EventKind {
@@ -967,7 +969,7 @@ impl EventKind {
             | Bought | DeniedAgain | StayedHome | NoBed | NotClosed | PlayedAlone | NoPartner
             | SetUp | SetUpForThem | SentBack | BoughtCar => 1,
             Met | MissedWork | SkillUp | PaidRent | Upgraded | Visited | GoalSuggested
-            | Repaired | NobodyHome | Invited | Declined | Babysitter | Served => 0,
+            | Repaired | NobodyHome | Invited | Declined | Babysitter | Served | GotLetter => 0,
         }
     }
 }

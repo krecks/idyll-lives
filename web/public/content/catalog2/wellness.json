@@ -1,0 +1,213 @@
+{
+  "$comment": "Catalogue 2: Wellness at home: a massage table (a use for two, one lying and one standing beside it), a meditation cushion and a sauna cabin for a few. The trait packs' saunas, plunges, pods and cushions are in it too. Models: assets/manifest.json and the packs it lists (crates/art).",
+  "feelings": [
+    {
+      "id": "wellness.clearHeaded",
+      "label": "Clear-headed",
+      "emotion": "focused",
+      "mood": 0.06,
+      "hours": 4,
+      "effects": {
+        "needDecay": {
+          "comfort": 0.9
+        },
+        "skillGain": {
+          "perception": 1.1
+        }
+      }
+    },
+    {
+      "id": "wellness.loosenedUp",
+      "label": "Loosened up",
+      "emotion": "relaxed",
+      "mood": 0.06,
+      "hours": 3,
+      "effects": {
+        "needDecay": {
+          "comfort": 0.85
+        }
+      }
+    }
+  ],
+  "objects": [
+    {
+      "id": "massageTable",
+      "name": "Massage table",
+      "model": "model.massageTable",
+      "footprint": [
+        2,
+        2
+      ],
+      "price": 650,
+      "category": "wellness",
+      "stages": [
+        "teen",
+        "youngAdult",
+        "adult",
+        "elder"
+      ],
+      "slots": 2,
+      "places": [
+        {
+          "at": [
+            -0.5,
+            0
+          ]
+        },
+        {
+          "at": [
+            0.15,
+            -0.25
+          ],
+          "facing": -90,
+          "pose": "stand"
+        }
+      ],
+      "description": "A padded table with a face rest, and a trolley of towels and oil. One resident lies down and another gives them a massage: both come away comfortable, a little closer and loosened up.",
+      "interactions": [
+        {
+          "id": "massage",
+          "label": "Give and get a massage",
+          "anim": "relax",
+          "minutes": 40,
+          "pose": "lie",
+          "partner": true,
+          "effects": {
+            "comfort": 0.4,
+            "social": 0.15,
+            "fun": 0.05
+          },
+          "tags": [
+            "spa"
+          ],
+          "feeling": "wellness.loosenedUp"
+        }
+      ]
+    },
+    {
+      "id": "meditationCushion",
+      "name": "Meditation cushion",
+      "model": "model.meditationCushion",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 60,
+      "category": "wellness",
+      "freeRotation": true,
+      "slots": 1,
+      "description": "A round buckwheat cushion on a cotton mat. Half an hour's quiet sitting brings comfort and leaves a resident clear-headed.",
+      "interactions": [
+        {
+          "id": "meditate",
+          "label": "Meditate",
+          "anim": "meditate",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.4,
+            "fun": 0.05
+          },
+          "tags": [
+            "rest",
+            "lounge"
+          ],
+          "feeling": "wellness.clearHeaded"
+        }
+      ]
+    },
+    {
+      "id": "sauna",
+      "name": "Sauna cabin",
+      "model": "model.sauna",
+      "footprint": [
+        2,
+        2
+      ],
+      "price": 5200,
+      "category": "wellness",
+      "stages": [
+        "teen",
+        "youngAdult",
+        "adult",
+        "elder"
+      ],
+      "fillsWall": true,
+      "approach": "door",
+      "slots": 3,
+      "places": [
+        {
+          "at": [
+            -0.55,
+            -0.35
+          ]
+        },
+        {
+          "at": [
+            0,
+            -0.35
+          ]
+        },
+        {
+          "at": [
+            0.55,
+            -0.35
+          ]
+        }
+      ],
+      "description": "A spruce cabin for three with a stove and a bucket of water, its roof and the tops of its sides glazed so you see who's in. A sauna leaves residents comfortable, a little cleaner and loosened up; come in together.",
+      "interactions": [
+        {
+          "id": "sauna",
+          "label": "Take a sauna",
+          "anim": "relax",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.4,
+            "hygiene": 0.1,
+            "social": 0.05
+          },
+          "tags": [
+            "spa"
+          ],
+          "feeling": "wellness.loosenedUp"
+        }
+      ]
+    }
+  ],
+  "voice": {
+    "en": {
+      "object": {
+        "massageTable": {
+          "interactions": {
+            "massage": [
+              "Ooh, right there.",
+              "Your shoulders are in knots!",
+              "Relax, I've got you.",
+              "Just breathe out."
+            ]
+          }
+        },
+        "meditationCushion": {
+          "interactions": {
+            "meditate": [
+              "In... and out.",
+              "Let it all go.",
+              "Quiet mind.",
+              "Just this breath."
+            ]
+          }
+        },
+        "sauna": {
+          "lines": [
+            "Another ladle on the stones?",
+            "Feel that heat!",
+            "Room for one more.",
+            "Sauna, then a cold drink."
+          ]
+        }
+      }
+    }
+  }
+}

@@ -36,6 +36,7 @@ pub mod path;
 pub mod phone;
 pub mod planner;
 pub mod porches;
+pub mod post;
 pub mod privacy;
 pub mod profile;
 pub(crate) mod ride;

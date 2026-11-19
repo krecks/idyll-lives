@@ -680,6 +680,24 @@ pub(crate) fn progress(
                         if !was && o.broken() {
                             sim.news = Some(News::Broke(object));
                         }
+                        // The post fetched and read, a letter written (`post.rs`, after the step).
+                        let it = def.interactions.get(interaction);
+                        if it.is_some_and(|it| it.post) {
+                            sim.mail = Some(crate::post::Mail::Read);
+                        } else if it.is_some_and(|it| it.letter) && share >= 0.5 {
+                            sim.mail = Some(crate::post::Mail::Wrote);
+                        }
+                        // A hose: every growing crop on its plot comes on at once.
+                        let waters = it.map_or(0.0, |it| it.waters);
+                        if waters > 0.0 {
+                            sim.reshaped |= crate::post::water_garden(
+                                content,
+                                objects,
+                                ctx.object_plot,
+                                object,
+                                waters * share,
+                            );
+                        }
                     }
                     done
                 }

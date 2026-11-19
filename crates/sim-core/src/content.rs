@@ -205,6 +205,19 @@ pub struct Interaction {
     /// end grows it this share of its way from planted to ripe at once (less for one cut
     /// short), while it grows.
     pub tends: f32,
+    /// Waters the garden (content `waters`, on an object outdoors: a hose reel): a use done to
+    /// the end brings every growing crop on its plot this share of its way to ripe at once (less
+    /// for one cut short), as `tends` brings on the one it's done at (`post::water_garden`).
+    pub waters: f32,
+    /// Fetching the post (content `post`, at a letterbox, with `"when": "open"` and
+    /// `"leaves": "closed"`): the post came this morning (`post::deliver`), and as the use ends
+    /// it's read: a letter from a friend gives a little social and the story names them
+    /// (`post::read`).
+    pub post: bool,
+    /// Writing a letter (content `letter`: at a writing desk): a use done to the end sends it to
+    /// the writer's closest friend outside the household, whose letterbox has it next morning
+    /// (`post::send`; nobody's, without one).
+    pub letter: bool,
     /// A harvest's produce (content `yields`): food carried in to the home's fridge and put away
     /// (with no fridge, eaten sitting down as `eats`); see `Yield`.
     pub yields: Option<Yield>,
@@ -459,6 +472,9 @@ impl Interaction {
 pub struct Growth {
     pub days: f32,
     pub fallow_days: f32,
+    /// Bought ripe rather than just planted (content `boughtRipe`: the lawnmower's lawn, there to
+    /// mow at once; its `days` only after a mow).
+    pub bought_ripe: bool,
 }
 
 #[derive(Debug)]
@@ -551,6 +567,9 @@ pub struct ObjectDef {
     /// file), picked by interactions that leave it "picked", then fallow, planted again and
     /// growing (see `ObjectInstance::growth`).
     pub grows: Option<Growth>,
+    /// What the player is told when ordered to do a use that wants it ripe while it isn't
+    /// (content `grows.notRipe`: "the grass hasn't grown back yet"); none: "the … isn't ripe yet".
+    pub not_ripe: Option<String>,
     /// A machine that runs on its own (content `runs`: `{"minutes": 60}`): loaded by a use that
     /// `loads`, it runs this many game minutes with nobody at it, then waits, done, for a use
     /// that `unloads` it (see `machines.rs`, `ObjectInstance::run`).
@@ -707,6 +726,9 @@ pub(crate) fn stage_mask(
 pub struct SlotPlace {
     pub at: [f32; 2],
     pub facing: f32,
+    /// How the one there is, whatever the use's `pose` (content `pose`): the one giving a
+    /// massage stands beside the table the other lies on. None: as the use says.
+    pub pose: Option<Pose>,
 }
 
 /// Which seats a `seatNear` use takes (content `seatFacing`): one that looks at the thing from
@@ -784,6 +806,9 @@ pub enum Approach {
     /// Its seat behind the work (a desk's chair, a drum kit's throne): from behind the slot, else
     /// beside it, else the front.
     Behind,
+    /// Got into through a door in its front (a sauna cabin): as `Front`, and its `places` too
+    /// are come to from the tile in front, never round the back through its walls.
+    Door,
 }
 
 /// Where an object goes (content `layer`). Things on a wall, the ceiling or the floor's surface
@@ -3006,6 +3031,8 @@ struct PlaceRaw {
     at: [f32; 2],
     #[serde(default)]
     facing: f32,
+    #[serde(default)]
+    pose: Option<Pose>,
 }
 
 /// An object's `grows`: `{"days": 2, "fallow": 0.5}` (game days to ripen, and fallow after picking).
@@ -3014,6 +3041,12 @@ struct GrowsRaw {
     days: f32,
     #[serde(default = "half_a_day")]
     fallow: f32,
+    /// Ripe when bought (see `Growth::bought_ripe`).
+    #[serde(default, rename = "boughtRipe")]
+    bought_ripe: bool,
+    /// What an order says while it isn't ripe (see `ObjectDef::not_ripe`).
+    #[serde(default, rename = "notRipe")]
+    not_ripe: Option<String>,
 }
 
 /// An object's `runs`: `{"minutes": 60}` (and, for the renderer, the `sound` it makes running).
@@ -3149,6 +3182,15 @@ struct InteractionRaw {
     /// Brings the crop on (see `Interaction::tends`).
     #[serde(default)]
     tends: f32,
+    /// Waters every crop on the plot (see `Interaction::waters`).
+    #[serde(default)]
+    waters: f32,
+    /// Fetching the post (see `Interaction::post`).
+    #[serde(default)]
+    post: bool,
+    /// Writing a letter to a friend (see `Interaction::letter`).
+    #[serde(default)]
+    letter: bool,
     /// A harvest's produce, put in the fridge (see `Interaction::yields`).
     #[serde(default)]
     yields: Option<YieldRaw>,
@@ -3792,6 +3834,18 @@ impl Content {
                         "{ctx}: `tends` brings a crop on: the object needs `grows`"
                     )));
                 }
+                if !(0.0..=1.0).contains(&it.waters) || (it.waters > 0.0 && !obj.outdoors) {
+                    return Err(Error::new(format!(
+                        "{ctx}: `waters` (0..=1) waters the garden: the object stands `outdoors`"
+                    )));
+                }
+                if it.post
+                    && (it.when != Some(OpenState::Open) || it.leaves != Some(OpenState::Closed))
+                {
+                    return Err(Error::new(format!(
+                        "{ctx}: `post` is fetched while the post is in: \"when\": \"open\", \"leaves\": \"closed\""
+                    )));
+                }
                 if it.carried
                     && (it.care.values().all(|&g| g <= 0.0)
                         || !obj.interactions.iter().any(|i| i.baby))
@@ -3931,6 +3985,9 @@ impl Content {
                     lasts: it.lasts,
                     spare: it.spare,
                     tends: it.tends,
+                    waters: it.waters,
+                    post: it.post,
+                    letter: it.letter,
                     yields,
                     carried: it.carried,
                     at_slot: it.at_slot,
@@ -4248,9 +4305,10 @@ impl Content {
                 Some("around") => Approach::Around,
                 Some("side") => Approach::Side,
                 Some("behind") => Approach::Behind,
+                Some("door") => Approach::Door,
                 Some(other) => {
                     return Err(Error::new(format!(
-                        "object '{}': unknown approach '{other}' (front, around, side or behind)",
+                        "object '{}': unknown approach '{other}' (front, around, side, behind or door)",
                         obj.id
                     )));
                 }
@@ -4428,7 +4486,7 @@ impl Content {
                 interactions,
                 price: obj.price,
                 slots: obj.slots,
-                places: obj.places.iter().map(|p| SlotPlace { at: p.at, facing: p.facing.to_radians() }).collect(),
+                places: obj.places.iter().map(|p| SlotPlace { at: p.at, facing: p.facing.to_radians(), pose: p.pose }).collect(),
                 outdoors: obj.outdoors,
                 crown: obj.crown.max(0.0),
                 private: obj.private,
@@ -4483,8 +4541,9 @@ impl Content {
                     }
                     n => n,
                 },
+                not_ripe: obj.grows.as_ref().and_then(|g| g.not_ripe.clone()),
                 grows: match &obj.grows {
-                    Some(g) if g.days > 0.0 && g.fallow >= 0.0 => Some(Growth { days: g.days, fallow_days: g.fallow }),
+                    Some(g) if g.days > 0.0 && g.fallow >= 0.0 => Some(Growth { days: g.days, fallow_days: g.fallow, bought_ripe: g.bought_ripe }),
                     Some(_) => {
                         return Err(Error::new(format!("object '{}': `grows` needs days > 0 and fallow >= 0", obj.id)));
                     }

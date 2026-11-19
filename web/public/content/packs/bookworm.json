@@ -89,6 +89,7 @@
           "anim": "write",
           "minutes": 30,
           "pose": "sit",
+          "letter": true,
           "effects": { "social": 0.18, "fun": 0.08 },
           "tags": ["creative", "cozy"],
           "skills": { "writing": 0.08, "charisma": 0.04 },

@@ -1,5 +1,5 @@
 {
-  "$comment": "The home gym (crates/art/things/src/fitness, built by cargo art). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The treadmill runs its belt (`belt_run`) and the bike turns its pedals (`pedals_turn`) while used; the yoga mat unrolls (`unroll`) for yoga.",
+  "$comment": "The home gym and wellness at home (crates/art/things/src/fitness, built by cargo art). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. The treadmill runs its belt (`belt_run`) and the bike turns its pedals (`pedals_turn`) while used; the yoga mat unrolls (`unroll`) for yoga; the sauna's glass door opens (`door_open`) to let the bathers in and out.",
   "version": 1,
   "entries": {
     "model.treadmill": {
@@ -208,6 +208,117 @@
         {
           "material": "plate",
           "label": "Weights"
+        }
+      ]
+    },
+    "model.massageTable": {
+      "type": "model",
+      "url": "../../models/fitness/massageTable.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.satin"
+        },
+        "oil": {
+          "finish": "material.finish.gloss"
+        },
+        "pump": {
+          "finish": "material.finish.satin"
+        },
+        "rubber": {
+          "finish": "material.finish.satin"
+        },
+        "sage": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "towel": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Upholstery"
+        },
+        {
+          "material": "oak",
+          "label": "Frame"
+        }
+      ]
+    },
+    "model.meditationCushion": {
+      "type": "model",
+      "url": "../../models/fitness/meditationCushion.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.fabric"
+        },
+        "zabuton": {
+          "finish": "material.finish.fabric"
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Cushion"
+        },
+        {
+          "material": "zabuton",
+          "label": "Mat"
+        }
+      ]
+    },
+    "model.sauna": {
+      "type": "model",
+      "url": "../../models/fitness/sauna.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.satin"
+        },
+        "copper": {
+          "finish": "material.finish.metal"
+        },
+        "cream": {
+          "finish": "material.finish.satin"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "heater": {
+          "finish": "material.finish.metal"
+        },
+        "needle": {
+          "finish": "material.finish.satin"
+        },
+        "stones": {
+          "finish": "material.finish.matte"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "motions": {
+        "uses": {
+          "sauna": {
+            "clip": "door_open",
+            "hold": 1.5,
+            "out": 1.5
+          }
+        }
+      },
+      "paint": [
+        {
+          "material": "body",
+          "label": "Wood"
+        },
+        {
+          "material": "trim",
+          "label": "Trim"
         }
       ]
     }

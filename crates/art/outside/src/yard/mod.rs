@@ -7,7 +7,10 @@
 //! the greenhouse (`model.greenhouse`), whose door and roof vent open (`door_open`); the compost bin
 //! (`model.compostBin`) and its lid (`lid_open`); the rain barrel (`model.rainBarrel`); the washing line
 //! (`model.clothesline`), whose washing is pegged out line by line (`washing`) and stays out until taken in
-//! (`open`); the log store (`model.firewoodStack`). The rides, with no clips (the renderer turns their parts by code,
+//! (`open`); the log store (`model.firewoodStack`); the garden letterbox on its post (`model.letterbox`), whose door
+//! swings open while the post is fetched (`door_open`) and whose post sticks out of its slot while it waits
+//! (`post_in`, `open`); the hose
+//! reel cart (`model.hoseReel`) and the push lawnmower (`model.lawnMower`). The rides, with no clips (the renderer turns their parts by code,
 //! each a top-level node on its pivot: `frame`, `wheel_front`, `wheel_rear`, `cranks`, `stand`): the step-through city
 //! bike with its basket, carrier and centre stand (`model.bicycle`), the kids' bike on stabilisers (`model.bicycleChild`)
 //! and the e-scooter on its side stand (`model.eScooter`), the two bikes the rack's bike with their own numbers (`Bike`).
@@ -17,6 +20,7 @@
 
 use artkit::family::{Family, Model, motions};
 
+mod chores;
 mod common;
 mod garden;
 mod greenhouse;
@@ -121,11 +125,26 @@ pub fn family() -> Option<Family> {
                 .key("model.firewoodStack")
                 .far_low()
                 .paint(&[("iron", "Shelter")]),
+            Model::new("letterbox", chores::letterbox, (0.3, 1.35, 0.21))
+                .key("model.letterbox")
+                .far_low()
+                .motions(motions(r#"{"uses": {"fetchPost": {"clip": "door_open", "hold": 2.5}}, "open": "post_in"}"#))
+                .paint(&[("mailbox", "Box"), ("mail_post", "Post")]),
+            Model::new("hoseReel", chores::hose_reel, (0.571, 0.848, 0.479))
+                .key("model.hoseReel")
+                .far_low()
+                .paint(&[("reel", "Frame"), ("hose", "Hose")]),
+            Model::new("lawnMower", chores::lawn_mower, (0.553, 0.992, 1.417))
+                .centre(0.0, 0.2626)
+                .key("model.lawnMower")
+                .far_low()
+                .paint(&[("mower", "Body")]),
         ],
         "The play and yard things (crates/art/outside/src/yard, built by cargo art). Listed in the base manifest's \
          packs. The materials map onto the game's finishes so a model costs one draw call per finish group. A sand \
          castle grows in the sandpit, the bike lifts its back wheel and turns it, the raised bed's crop grows and is \
-         picked, the shed's and the greenhouse's doors open (and the vent), the compost bin's lid lifts and the \
-         washing goes out on the line a line at a time and stays out.",
+         picked, the shed's and the greenhouse's doors open (and the vent), the compost bin's lid lifts, the \
+         washing goes out on the line a line at a time and stays out, the post waits half out of the letterbox's \
+         slot and its door swings open to fetch it.",
     ))
 }

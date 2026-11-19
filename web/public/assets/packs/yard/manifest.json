@@ -1,5 +1,5 @@
 {
-  "$comment": "The play and yard things (crates/art/outside/src/yard, built by cargo art). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. A sand castle grows in the sandpit, the bike lifts its back wheel and turns it, the raised bed's crop grows and is picked, the shed's and the greenhouse's doors open (and the vent), the compost bin's lid lifts and the washing goes out on the line a line at a time and stays out.",
+  "$comment": "The play and yard things (crates/art/outside/src/yard, built by cargo art). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. A sand castle grows in the sandpit, the bike lifts its back wheel and turns it, the raised bed's crop grows and is picked, the shed's and the greenhouse's doors open (and the vent), the compost bin's lid lifts, the washing goes out on the line a line at a time and stays out, the post waits half out of the letterbox's slot and its door swings open to fetch it.",
   "version": 1,
   "entries": {
     "model.sandbox": {
@@ -700,6 +700,131 @@
         }
       ],
       "far": "../../models/yard/eBike.far.glb"
+    },
+    "model.letterbox": {
+      "type": "model",
+      "url": "../../models/yard/letterbox.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "letter": {
+          "finish": "material.finish.matte"
+        },
+        "letter_kraft": {
+          "finish": "material.finish.matte"
+        },
+        "mail_post": {
+          "finish": "material.finish.satin"
+        },
+        "mailbox": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "motions": {
+        "uses": {
+          "fetchPost": {
+            "clip": "door_open",
+            "hold": 2.5
+          }
+        },
+        "open": "post_in"
+      },
+      "paint": [
+        {
+          "material": "mailbox",
+          "label": "Box"
+        },
+        {
+          "material": "mail_post",
+          "label": "Post"
+        }
+      ],
+      "far": "../../models/yard/letterbox.far.glb"
+    },
+    "model.hoseReel": {
+      "type": "model",
+      "url": "../../models/yard/hoseReel.glb",
+      "materials": {
+        "drum": {
+          "finish": "material.finish.plastic"
+        },
+        "engine": {
+          "finish": "material.finish.plastic"
+        },
+        "hose": {
+          "finish": "material.finish.satin"
+        },
+        "nozzle": {
+          "finish": "material.finish.plastic"
+        },
+        "reel": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "tyre": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "reel",
+          "label": "Frame"
+        },
+        {
+          "material": "hose",
+          "label": "Hose"
+        }
+      ],
+      "far": "../../models/yard/hoseReel.far.glb"
+    },
+    "model.lawnMower": {
+      "type": "model",
+      "url": "../../models/yard/lawnMower.glb",
+      "materials": {
+        "engine": {
+          "finish": "material.finish.plastic"
+        },
+        "grass_box": {
+          "finish": "material.finish.matte"
+        },
+        "grip_tape": {
+          "finish": "material.finish.matte"
+        },
+        "motor": {
+          "finish": "material.finish.metal"
+        },
+        "mower": {
+          "finish": "material.finish.gloss"
+        },
+        "mower_handle": {
+          "finish": "material.finish.satin"
+        },
+        "mower_hub": {
+          "finish": "material.finish.plastic"
+        },
+        "nozzle": {
+          "finish": "material.finish.plastic"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        },
+        "tyre": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "mower",
+          "label": "Body"
+        }
+      ],
+      "far": "../../models/yard/lawnMower.far.glb"
     }
   }
 }

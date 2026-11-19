@@ -1,11 +1,15 @@
 //! The home gym: the treadmill (`model.treadmill`), the weight bench (`model.weightBench`), the exercise bike
-//! (`model.exerciseBike`), the yoga mat (`model.yogaMat`) and the dumbbell rack (`model.dumbbells`). Notes: NOTES.md.
+//! (`model.exerciseBike`), the yoga mat (`model.yogaMat`) and the dumbbell rack (`model.dumbbells`); and wellness at
+//! home: the massage table (`model.massageTable`), the meditation cushion (`model.meditationCushion`) and the sauna
+//! cabin for three (`model.sauna`). Notes: NOTES.md.
 //!
 //! Each is built where the game places it (`F`, game axes). The treadmill's belt slats run back under the runner
 //! while it is used (`belt_run`, a loop: one slat on, home unseen under the hood and the rear cap). The bike's
 //! cranks and pedals turn while it is cycled (`pedals_turn`, a loop). The yoga mat lies rolled up and unrolls flat
 //! for yoga (`unroll`), rolling up again at the end. The lift draws the weight in the hands (content `held`), so
-//! the bench's bar (`bar_off`) and a pair of the rack's dumbbells (`pair_off`) leave them.
+//! the bench's bar (`bar_off`) and a pair of the rack's dumbbells (`pair_off`) leave them. The sauna's glass door
+//! (`door_open`) lets the bathers in, shuts behind them and opens to let them out. The three wellness models have
+//! palettes of their own.
 
 use artkit::family::{Family, Model};
 use artkit::json;
@@ -14,6 +18,8 @@ use artkit::palette;
 mod bike;
 mod common;
 mod mat;
+mod sauna;
+mod spa;
 mod treadmill;
 mod weights;
 
@@ -72,10 +78,32 @@ pub fn family() -> Option<Family> {
                 .centre(0.0, 0.035)
                 .motions(json!({"uses": {"lift": "pair_off"}}))
                 .paint(&[("frame", "Rack"), ("plate", "Weights")]),
+            // its own size, the table's: the trolley at the right back is drawn, not measured (the centre is of both)
+            Model::new("massageTable", spa::massage_table, (0.7, 0.785, 1.845))
+                .key("model.massageTable")
+                .centre(-0.045, -0.0025)
+                .palette(spa::table_palette())
+                .paint(&[("body", "Upholstery"), ("oak", "Frame")]),
+            Model::new(
+                "meditationCushion",
+                spa::meditation_cushion,
+                (0.7, 0.184, 0.7),
+            )
+            .key("model.meditationCushion")
+            .palette(spa::cushion_palette())
+            .paint(&[("body", "Cushion"), ("zabuton", "Mat")]),
+            Model::new("sauna", sauna::sauna, (1.94, 2.05, 1.925))
+                .key("model.sauna")
+                .centre(0.0, 0.0325)
+                // the door lets the bathers in, shuts behind them and opens to let them out
+                .motions(json!({"uses": {"sauna": {"clip": "door_open", "hold": 1.5, "out": 1.5}}}))
+                .palette(sauna::palette())
+                .paint(&[("body", "Wood"), ("trim", "Trim")]),
         ],
-        "The home gym (crates/art/things/src/fitness, built by cargo art). Listed in the base manifest's packs. The \
-         materials map onto the game's finishes so a model costs one draw call per finish group. The treadmill runs \
-         its belt (`belt_run`) and the bike turns its pedals (`pedals_turn`) while used; the yoga mat unrolls \
-         (`unroll`) for yoga.",
+        "The home gym and wellness at home (crates/art/things/src/fitness, built by cargo art). Listed in the base \
+         manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish \
+         group. The treadmill runs its belt (`belt_run`) and the bike turns its pedals (`pedals_turn`) while used; \
+         the yoga mat unrolls (`unroll`) for yoga; the sauna's glass door opens (`door_open`) to let the bathers in \
+         and out.",
     ))
 }

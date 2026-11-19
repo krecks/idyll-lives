@@ -2139,7 +2139,8 @@
     "setUpForThem": "{a}'s new {object} was set up for them",
     "sentBack": "There was no room at home for {a}'s {object}: it went back to the shop, the money too",
     "served": "{a} brought {b} {item}",
-    "boughtCar": "{a} bought a new {car}"
+    "boughtCar": "{a} bought a new {car}",
+    "gotLetter": "{a} had a letter from {b} in the post"
   },
   "activities": [
     {
@@ -4114,6 +4115,11 @@
       "icon": "icon.category.fitness"
     },
     {
+      "id": "wellness",
+      "label": "Wellness",
+      "icon": "icon.category.wellness"
+    },
+    {
       "id": "hobbies",
       "label": "Hobbies",
       "icon": "icon.category.hobbies",
@@ -5130,6 +5136,7 @@
     "catalog2/tabletop.json",
     "catalog2/lighting.json",
     "catalog2/outdoor.json",
+    "catalog2/wellness.json",
     "packs/example.json",
     "packs/foodie.json",
     "packs/bookworm.json",

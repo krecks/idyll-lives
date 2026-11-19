@@ -151,6 +151,8 @@
 //! pressed clothes to wear: `content::Pressed`); a file with three has none ironed, and an older
 //! build reads the first three. Where a tool is taken to clean the floor (`sweep.rs`) isn't saved:
 //! the use starts again after a load, as any.
+//! Still 40: a household may have letters on their way to its letterbox (`households[].letters`, by
+//! who wrote them, `post.rs`). Left out where there are none, so a file without them has none.
 //! 41 = a household's car fits its best earner's job (`cars/looks.rs`): its body (`cars[].body`,
 //! now any of `carBodies`, a van or an off-roader too) and how old it is (`cars[].age`: `old` or
 //! `new`, left out when used), and the car a promotion or a new job called for that it hasn't
@@ -824,6 +826,10 @@ pub struct HouseholdSave {
     /// the dried; without the ironed, none).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub laundry: Option<Vec<f32>>,
+    /// Letters on their way to the household's letterbox, by who wrote them (see
+    /// `Household::letters`; absent: none).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub letters: Vec<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1086,6 +1092,7 @@ impl World {
                         )
                         .to_vec(),
                     ),
+                    letters: h.letters.clone(),
                 })
                 .collect(),
             plots: self
@@ -1317,6 +1324,7 @@ impl World {
                 expecting: None,
                 sitter_day: None,
                 laundry: crate::world::LAUNDRY_START,
+                letters: Vec::new(),
             }]
         } else {
             save.households
@@ -1343,6 +1351,7 @@ impl World {
                             finite(l.get(k).copied().unwrap_or(0.0), 0.0).max(0.0)
                         })
                     }),
+                    letters: h.letters.clone(),
                 })
                 .collect()
         };

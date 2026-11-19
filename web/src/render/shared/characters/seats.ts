@@ -154,7 +154,7 @@ export const QUILT_COLOUR = '#E7E0D4';
  * What is worn in the water (`wearFor`) where it isn't a towel (every shower, bath and tub is): swimwear in
  * the hot tubs and the cold plunge; and a towel where the use isn't a bath or a shower (the sauna).
  */
-export const BATH_WEAR: Record<string, Wear> = { hotTubCedar: 'swim', whirlpoolTub: 'swim', 'hotHeaded.coldPlunge': 'swim', 'loner.soloSauna': 'towel' };
+export const BATH_WEAR: Record<string, Wear> = { hotTubCedar: 'swim', whirlpoolTub: 'swim', 'hotHeaded.coldPlunge': 'swim', 'loner.soloSauna': 'towel', sauna: 'towel' };
 /**
  * Two sleepers' quilts in a wide bed (`writeBlanket`): each this much (m) wider on each side than half the bed
  * and moved this much towards its middle, so they overlap by four times it over the middle.

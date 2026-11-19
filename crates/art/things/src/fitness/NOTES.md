@@ -3,7 +3,9 @@
 This module builds the five F1 home gym models into `web/public/assets/models/fitness/` and their entries in
 `packs/fitness/manifest.json`: the treadmill (`model.treadmill`), the weight bench (`model.weightBench`), the
 exercise bike (`model.exerciseBike`), the yoga mat (`model.yogaMat`) and the dumbbell rack (`model.dumbbells`).
-Built 2026-10-14; they sat in Validate › Fitness until checked in play.
+Built 2026-10-14; they sat in Validate › Fitness until checked in play. Wellness at home (2026-11-19): the massage
+table (`model.massageTable`), the meditation cushion (`model.meditationCushion`) and the sauna cabin for three
+(`model.sauna`), each with a palette of its own (`spa.rs`, `sauna.rs`).
 
 Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `centre` on its `Model`,
 except the bike, which is centred).
@@ -84,9 +86,38 @@ is never two of it.
 | `model.exerciseBike` | 0.53 × 1.11 × 0.90 m | 3,152 | 2 | Frame, Pads |
 | `model.yogaMat` | 0.92 × 0.23 × 0.27 m (rolled) | 1,952 | 3 | Mat |
 | `model.dumbbells` | 0.77 × 0.72 × 0.93 m | 3,240 | 3 | Rack, Weights |
+| `model.massageTable` | 0.70 × 0.79 × 1.85 m (the table) | 5,388 | 1 | Upholstery, Frame |
+| `model.meditationCushion` | 0.70 × 0.18 × 0.70 m | 1,834 | 1 | Cushion, Mat |
+| `model.sauna` | 1.94 × 2.05 × 1.93 m | 7,174 | 4 | Wood, Trim |
 
 `check-glb`: 5 models, 0 failed; warnings: the treadmill's belt loop (expected) and the yoga mat's flat strip (29 %,
 was 42 %). Khronos validator: 0 errors, 0 warnings each.
+
+## Wellness at home (2026-11-19)
+
+- **Massage table** (2 × 2): a padded vinyl table (pad top 0.785 m, `beds.massageTable`) on oak legs with height
+  knobs and stretchers, in the left tile column (x -0.5), its face cradle (a padded horseshoe on steel rods) at the
+  back on the wall's face, under the lying resident's head (0.84 m behind place 0). The masseur's spot (place 1,
+  [0.15, -0.25]) is clear; behind it, at the right back, an oak trolley with folded towels, oil bottles and a rolled
+  towel, `aside` (`trolley_aside`): the size is the table's, the `centre` the box of both. All plain: 1 draw.
+  `check-glb` warns of no mattress under place 1: the masseur stands there (the check takes every place).
+- **Meditation cushion** (1 × 1): a pleated zafu (0.35 m across, a piped top seam, a covered button, a carrying loop)
+  on an oat zabuton (0.7 × 0.045 m). Its top is the seat, 0.18 m (`seats.meditationCushion`): under 0.2 m, so it is
+  sat on cross-legged (seats.ts `floorSit`; at 0.2 the chair's clips would take it). All `fabric`: 1 draw. The
+  zabuton's tufts cost 580 triangles and did not show; it has none.
+- **Sauna cabin** (2 × 2, `fillsWall`): spruce boards (plain satin: a textured finish would be a fifth draw), the back
+  on the wall's face, darker posts, plinth and frames. The lower bench (top 0.45 m, `seats.sauna`) runs along the
+  back with the three places on it (x -0.55, 0, 0.55; depth -0.35), the upper bench (0.9 m) behind it, its skirt the
+  lower bench's backrest. The stove with its stones behind a slatted guard in the front right corner, a banded bucket
+  and ladle beside it, a thermometer, a towel folded on the upper bench. The front is glass: a fixed pane and the
+  glass door (`door`, hinged on its left, a spruce handle): `door_open` swings it 60° out (0.8 s, `BackOut`), `hold`
+  1.5 s and `out` 1.5 s, as the soloSauna's. Glass wherever the play camera looks in at the bench: the roof glazed
+  whole, one pane in a slim spruce frame (a bar over the door's post, one across over the bench's front), and each
+  side wall glazed above its boards (six boards, up to 0.83 m, under the bench line; a framed pane above with an
+  upright in the middle). The end seats are 0.4 m in from the side walls: behind a 2 m wall of boards the camera on
+  that side hid the bather (rotations 2 and 3 in play, 2026-11-19), and under a deck of boards over the back, the
+  one on the far side. The back wall stays boards (it stands on the house wall). 4 draws (plain and glass on the
+  cabin, glass and the plain handle on the door), the soloSauna's count.
 
 ## Detail pass (2026-10-22)
 
@@ -109,7 +140,7 @@ its hood and cap covers as they were), motions, paint and draws; the held bar an
 ## Rebuild
 
 ```
-cargo art fitness            # the five .glb, the pack, check-glb
+cargo art fitness            # the eight .glb, the pack, check-glb
 cargo art fitness --preview  # previews/fitness/<id>.png, <id>@<clip>.png
 cargo art fitness --check    # rebuilds and fails on any byte that differs
 ```
