@@ -1,17 +1,20 @@
 /**
- * Step 2's build-up: a street built up with the town's other buildings (shops, offices, terraces,
- * flats nobody lives in), its buildings cleared again, and a civic place put down by hand (a lot of
- * its own: `lots.ts` `addLot`). Each is a pure function from draft to draft, laid by the generator's
- * own backdrop pass (`backdrop.ts` `BackdropPass`, made from the draft: everything standing is kept
- * clear of, nothing standing moves) and its own lot fill (`lots.ts` `fillStreet`). The buildings are
- * the backdrop's, none of them a place: the town's named places are lots (`placeLots.ts`).
+ * Step 2's build-up: a street built up with the town's other buildings (real lots, as the generator
+ * lays them: shops, cafés, offices and workshops, buildings of flats, terraces and homes on tight
+ * gardens), those buildings cleared again, and a civic place put down by hand (a lot of its own:
+ * `lots.ts` `addLot`). Each is a pure function from draft to draft, laid by the generator's own dense
+ * pass (`dense.ts` `DensePass`, made from the draft: everything standing is kept clear of, nothing
+ * standing moves) and its own lot fill (`lots.ts` `fillStreet`). A new named place's lot is called as
+ * its place is and given its place, flats go over most shops, cafés and restaurants in a centre and
+ * real floors over offices (`dense.ts` `raisePlaces`), and a building of flats is called as its
+ * template names it.
  *
- * A street is built up as the generator builds one, its lots first and the backdrop in what they
+ * A street is built up as the generator builds one, its homes first and the buildings in what they
  * leave, the zone set stretch by stretch: inside the town centre's outline the centre's kinds
- * shoulder to shoulder with a second row behind and no homes; elsewhere in the main town homes on a
- * share of the frontage (the denser the town, the smaller the share), then rows in the gaps and a
- * second row at the generator's chance; in a village homes at the lot mix's gaps, then rows of the
- * hamlet's kinds with its gaps. A country road out of every town and village is not built up.
+ * shoulder to shoulder and no homes of the lot mix; elsewhere in the main town homes on a share of
+ * the frontage (the denser the town, the smaller the share), then rows of the town's kinds in the
+ * gaps; in a village homes at the lot mix's gaps, then rows of the hamlet's kinds with its gaps. A
+ * country road out of every town and village is not built up.
  *
  * The homes and the buildings draw from streams of their own, keyed by the op's seed and the road
  * (its ends and kind, so its index may change), so the homes stay the same whichever is asked for.
@@ -20,21 +23,22 @@
  * settle's surface would grade it (`builtSurface.ts`), with a margin, since the settle itself runs
  * later, in the worker.
  */
-
 import type { Content } from '../../content/content';
 import type { RoadPlan } from '../../core/protocol';
-import { CUT_MAX, ENTRY_MAX, RETAIN_MAX, surfacePlots } from '../../render/shared/builtSurface';
-import { CIVIC, civicChoices, civicLabel, civicTooBig, draftAreaSize } from '../places';
-import { DensePass } from '../dense';
+import { CUT_MAX, ENTRY_MAX, RETAIN_MAX } from '../../render/shared/builtSurface';
+import { CIVIC, civicChoices, civicLabel, civicTooBig, draftAreaSize, ZONE } from '../places';
+import { DensePass, raisePlaces } from '../dense';
+import { flatsTemplate } from '../flats';
 import { heightAt, LAND_CELL, type Land } from '../land';
 import { mulberry32 } from '../noise';
 import { lengths, pointAt, RoadIndex, type Pt } from '../roads';
 import { plotRect, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates } from '../town';
 import { rectPoly } from '../footprints';
+import { placeOfTemplate } from '../placeLots';
 import { placeOf, specOf } from '../world';
 import type { Edited } from './edited';
-import { frontOf, inCentre } from './ground';
-import { addLot, fillStreet, removeLotsEdit, renumber } from './lots';
+import { entriesOf, frontOf, inCentre } from './ground';
+import { addLot, fillStreet, removeLotsEdit, renumber, withLotPlace, withPlaceName } from './lots';
 
 /** What goes along a street built up: homes from the lot mix, the town's other buildings, or both. */
 export type BuildMode = 'homes' | 'buildings' | 'both';
@@ -142,7 +146,7 @@ function homeShare(draft: NeighbourhoodDraft): number {
 
 // ---- the slope limits, judged ------------------------------------------------------------------
 
-/** A footprint's box, as the surface takes a backdrop building's (`surfacePlots`). */
+/** A footprint's box. */
 function boxOf(poly: readonly Pt[]): Rect {
   const xs = poly.map((p) => p[0]);
   const zs = poly.map((p) => p[1]);
@@ -161,7 +165,7 @@ function boxOf(poly: readonly Pt[]): Rect {
 class SlopeJudge {
   private readonly index: RoadIndex;
   private readonly lens: number[][];
-  /** The pads standing (the lots', the buildings') and those kept so far: their boxes and their roads' heights. */
+  /** The pads standing (the lots') and those kept so far: their boxes and their roads' heights. */
   private readonly pads: { box: Rect; entry: number }[] = [];
 
   constructor(
@@ -198,7 +202,7 @@ class SlopeJudge {
     return n ? sum / n : null;
   }
 
-  /** Whether a building on `poly` keeps within the limits; kept as standing if it does. */
+  /** Whether a lot on `poly` keeps within the limits; kept as standing if it does. */
   keep(poly: readonly Pt[]): boolean {
     const box = boxOf(poly);
     const entry = this.entryOf(box);
@@ -225,7 +229,7 @@ class SlopeJudge {
   }
 }
 
-/** The land a draft's buildings are judged on: its plan's land as laid (step 2), else none to judge (a classic town: nothing is left out). */
+/** The land a draft's new lots are judged on: its plan's land as laid (step 2), else none to judge (a classic town: nothing is left out). */
 function landOf(draft: NeighbourhoodDraft): Land | null {
   return draft.open?.land ?? null;
 }
@@ -235,10 +239,9 @@ function landOf(draft: NeighbourhoodDraft): Land | null {
 /**
  * `draft` with road `op.road` built up (see the top of this file): homes from the lot mix
  * (`op.mode` `homes`, `both`: `fillStreet`, a share of the frontage in the main town outside its
- * centre for `both`), the town's other buildings in what they leave (`buildings`, `both`: rows
- * along it, a second row behind; none of them a place). `leftOut`: how many
- * buildings were left out where the ground would break a slope limit. Refused where nothing is
- * built along the road, or nothing more fits along it.
+ * centre for `both`), the town's other buildings in what they leave (`buildings`, `both`: rows of
+ * lots along it, `DensePass.rowsAlong`). `leftOut`: how many buildings were left out where the ground
+ * would break a slope limit. Refused where nothing is built along the road, or nothing more fits along it.
  */
 export function buildUp(draft: NeighbourhoodDraft, t: Templates, content: Content, op: BuildUpOp): Edited & { leftOut?: number } {
   const no = notBuilt(draft, op.road);
@@ -262,16 +265,16 @@ export function buildUp(draft: NeighbourhoodDraft, t: Templates, content: Conten
       next = renumber({ ...draft, slots: [...draft.slots, ...slots] }, t, [op.road]);
       homes = most;
     }
-    if (op.mode === 'homes') return homes ? { draft: next, cleared: { lots: [], backdrop: [] } } : { refused: `nothing more fits along ${name}` };
+    if (op.mode === 'homes') return homes ? { draft: next, cleared: { lots: [] } } : { refused: `nothing more fits along ${name}` };
   }
 
-  // ---- the buildings: rows of lots along it in what the homes left (`dense.ts`; the slope judge comes back with Build's) ----
+  // ---- the buildings: rows of lots along it in what the homes left (`dense.ts`) ----
   const rand = mulberry32(mix(op.seed, key, 'rows'));
   const pass = new DensePass({ draft: next, t, content });
   const from = pass.count;
   const sides: (1 | -1)[] = r.lots ? [r.lots] : [1, -1];
   pass.rowsAlong(area, op.road, sides, rand);
-  const { slots, places } = pass.result();
+  const { slots } = pass.result();
   // Only those near its area; and the ground judged: a lot that would break a slope limit is left out (decision 32).
   const box = next.open?.areas[area];
   const near = (s: PlotSlot) => {
@@ -286,28 +289,63 @@ export function buildUp(draft: NeighbourhoodDraft, t: Templates, content: Conten
   const kept = judge ? fresh.filter((s) => judge.keep(rectPoly(plotRect(t, s)))) : fresh;
   const leftOut = fresh.length - kept.length;
   if (!homes && !kept.length) return { refused: leftOut ? `the ground along ${name} is too steep for anything more to be built there` : `nothing more fits along ${name}` };
-  // (Numbered on from the lots standing; a new lot's place with it.)
-  const at = new Map(kept.map((s, k) => [s.index, from + k]));
-  const added = kept.map((s) => ({ ...s, index: at.get(s.index)! }));
-  const own = places.filter((p) => p.plot === undefined || p.plot < from || at.has(p.plot)).map((p) => (p.plot !== undefined && p.plot >= from ? { ...p, plot: at.get(p.plot)! } : p));
-  return { draft: renumber({ ...next, slots: [...slots.slice(0, from), ...added], open: { ...next.open!, places: own } }, t, [op.road]), cleared: { lots: [], backdrop: [] }, ...(leftOut ? { leftOut } : {}) };
+  // (Numbered on from the lots standing.)
+  const added = kept.map((s, k): PlotSlot => ({ ...s, index: from + k }));
+  const built = { ...next, slots: [...slots.slice(0, from), ...added] };
+  return { draft: renumber(withBuildings(built, t, content, from, mix(op.seed, key, 'places')), t, [op.road]), cleared: { lots: [] }, ...(leftOut ? { leftOut } : {}) };
 }
 
-/** The backdrop buildings fronting road `road` (the road nearest each, as the surface takes them: `surfacePlots`), by their index in `open.backdrop`. */
-export function buildingsOn(draft: NeighbourhoodDraft, road: number): number[] {
-  const backdrop = draft.open?.backdrop ?? [];
-  if (!backdrop.length || !draft.roads[road]) return [];
-  const entries = surfacePlots({ plots: [], meta: { roads: draft.roads as RoadPlan[], backdrop } });
-  return backdrop.flatMap((_, i) => (entries[i]?.entry?.road === road ? [i] : []));
+/**
+ * `draft` with its lots from slot `from` on (laid by the dense pass: `dense.ts`) made what the generator makes
+ * of them: flats over a shop, a café or a restaurant and real floors over an office (`raisePlaces`), a
+ * building of flats called as its template names it, a named place's lot called as its place is (none
+ * twice: `withPlaceName`), and every public lot (a park, an outdoor spot, a shop) given its place
+ * (`withLotPlace`). Drawn from `seed`.
+ */
+export function withBuildings(draft: NeighbourhoodDraft, t: Templates, content: Content, from: number, seed: number): NeighbourhoodDraft {
+  const rand = mulberry32(seed);
+  const fresh = draft.slots.slice(from).map((s) => ({ ...s }));
+  raisePlaces(t, fresh, (draft.open?.centre ?? []).map((c) => c.poly), rand);
+  for (const s of fresh) if (s.kind === 'flats') s.name = flatsTemplate(t, s.template)?.name ?? s.name;
+  let next: NeighbourhoodDraft = { ...draft, slots: [...draft.slots.slice(0, from), ...fresh] };
+  for (const s of fresh) {
+    if (s.kind === 'house' || s.kind === 'flats') continue;
+    next = withPlaceName(next, content, s.index, rand);
+    next = withLotPlace(next, t, content, s.index);
+  }
+  return next;
 }
 
-/** `draft` without the backdrop buildings fronting road `road` (`buildingsOn`); the lots along it stay (the named places' among them). Refused if none fronts it. */
-export function clearBuildings(draft: NeighbourhoodDraft, road: number): Edited {
+/**
+ * Whether lot `s` is one of the town's buildings the build-up lays (`dense.ts`) rather than a home of the
+ * lot mix, a farm or a place put down on its own: a building of flats, a terraced home, a home on a tight
+ * garden, a named place of a compact layout (`places.ts` `ZONE`'s `compact`).
+ */
+export function isTownBuilding(s: Pick<PlotSlot, 'kind' | 'lot' | 'garden' | 'template'>): boolean {
+  if (s.kind === 'flats') return true;
+  if (s.kind === 'house') return s.lot === 'terrace' || s.garden === 'tight';
+  const what = s.kind === 'shop' ? placeOfTemplate(s.template) : null;
+  return !!what && 'zone' in what && ZONE[what.zone].compact.includes(s.template);
+}
+
+/** The town's buildings (`isTownBuilding`) fronting road `road` (where each meets its road: `ground.ts` `entriesOf`), by slot index. */
+export function buildingsOn(draft: NeighbourhoodDraft, t: Templates, road: number): number[] {
+  if (!draft.roads[road]) return [];
+  const spots = entriesOf(draft, t);
+  return draft.slots.flatMap((s, i) => (spots[i].road === road && isTownBuilding(s) ? [s.index] : []));
+}
+
+/**
+ * `draft` without the town's buildings fronting road `road` (`buildingsOn`), the flats in them and the places
+ * of those that are places with them; the homes of the lot mix and the places put down on their own stay.
+ * Refused if none fronts it, or where the town would lose its last home (`lots.ts` `removeLotsEdit`).
+ */
+export function clearBuildings(draft: NeighbourhoodDraft, t: Templates, road: number): Edited {
   const r = draft.roads[road];
   if (!r) return { refused: 'there is no road there' };
-  const on = buildingsOn(draft, road);
+  const on = buildingsOn(draft, t, road);
   if (!on.length) return { refused: `nothing is built along ${r.name ?? 'it'}` };
-  return removeLotsEdit(draft, new Set(), new Set(on));
+  return removeLotsEdit(draft, new Set(on));
 }
 
 /** Civic places set by hand last: per draft, the edit each op made (the Lot tool asks for the same on every pointer move). */

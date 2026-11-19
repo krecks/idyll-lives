@@ -90,10 +90,10 @@ describe('lot edits', async () => {
     expect(lots.slotOf(hamlet, lots.lotKey(s))).toBe(5);
   });
 
-  test('the ground has every lot, the backdrop, the water with its shore and the roads on it', () => {
+  test('the ground has every lot, the car parks, the water with its shore and the roads on it', () => {
     const ground = townGround(hamlet, t);
     for (const s of hamlet.slots) expect(ground.free(plotRect(t, s), 0)).toBe(false);
-    for (const b of hamlet.open!.backdrop ?? []) expect(ground.free(boundsOf(b.poly), 0)).toBe(false);
+    for (const p of hamlet.open!.carParks ?? []) expect(ground.free(boundsOf(p.poly), 0)).toBe(false);
     const wet = unrle(hamlet.open!.water, hamlet.width * hamlet.depth).indexOf(1);
     expect(wet).toBeGreaterThanOrEqual(0);
     expect(ground.takenAt((wet % hamlet.width) + 0.5, Math.floor(wet / hamlet.width) + 0.5)).toBe(true);
@@ -231,11 +231,12 @@ describe('lot edits', async () => {
   });
 
   test("the town's last home and last park are kept", () => {
-    const homes = new Set(hamlet.slots.filter((s) => s.kind === 'house').map((s) => s.index));
+    // (Its homes: houses, buildings of flats and the places with flats over them.)
+    const homes = new Set(hamlet.slots.filter((s) => lots.homesOn(t, s) > 0).map((s) => s.index));
     expect(lots.removeLotsEdit(hamlet, homes)).toEqual({ refused: 'The town keeps its last home.' });
     const allButOne = new Set([...homes].slice(1));
     const one = made(lots.removeLotsEdit(hamlet, allButOne));
-    expect(one.slots.filter((s) => s.kind === 'house').length).toBe(1);
+    expect(one.slots.filter((s) => lots.homesOn(t, s) > 0).length).toBe(1);
     const parks = hamlet.slots.filter((s) => s.kind === 'park' && s.template !== 'market');
     expect(parks.length).toBe(1);
     expect(lots.removeLotsEdit(hamlet, new Set([parks[0].index]))).toEqual({ refused: 'The town keeps its last park.' });
@@ -244,7 +245,7 @@ describe('lot edits', async () => {
     const market = hamlet.slots.find((s) => s.template === 'market')!;
     const noMarket = lots.removeLotsEdit(hamlet, new Set([market.index]));
     expect(made(noMarket).open!.places!.some((p) => p.name === 'Market Square')).toBe(false);
-    expect(noMarket).toHaveProperty('cleared', { lots: [market.index], backdrop: [] });
+    expect(noMarket).toHaveProperty('cleared', { lots: [market.index] });
     expect(lots.removeLots(hamlet, homes).slots.some((s) => s.kind === 'house')).toBe(false);
   });
 
@@ -279,9 +280,8 @@ describe('lot edits', async () => {
     expect(bakery.slots[market.index]).toMatchObject({ kind: 'shop', template: 'bakery', name: 'The Bakery' });
     expect(bakery.open!.places!.find((p) => p.plot === market.index)).toMatchObject({ name: 'The Bakery', kind: 'shop', work: ['culinary', 'retail'] });
     expect(lots.swapPlace(hamlet, t, content, market.index, 'lookout')).toHaveProperty('refused');
-    // A civic place is a lot of its own (no backdrop building is a place): the hamlet's hall, its parish hall.
+    // A civic place is a lot of its own: the hamlet's hall, its parish hall.
     const places = hamlet.open!.places!;
-    expect(hamlet.open!.backdrop ?? []).toEqual([]);
     const hall = hamlet.slots.find((s) => lots.civicOfLot(s) === 0)!;
     expect(hall).toBeDefined();
     expect(hall.template).toBe('parishHall');
@@ -307,7 +307,7 @@ describe('lot edits', async () => {
     expect(lots.civicSwaps(grown, inn.index).some((c) => c.civic === garage)).toBe(true);
     const toGarage = lots.swapCivic(grown, t, content, inn.index, garage, 1);
     const town = made(toGarage);
-    expect(toGarage).toHaveProperty('cleared', { lots: [inn.index], backdrop: [] });
+    expect(toGarage).toHaveProperty('cleared', { lots: [inn.index] });
     expect(town.slots.length).toBe(grown.slots.length);
     expect(town.slots.some((s) => s.template === 'inn')).toBe(false);
     const lot = town.slots.at(-1)!;

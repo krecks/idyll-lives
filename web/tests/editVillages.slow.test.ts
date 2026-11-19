@@ -33,12 +33,12 @@ describe("step 2's villages", async () => {
   const { plotRect, useTownContent } = await import('../src/game/town');
   const { runTownJob } = await import('../src/game/townJobs');
   const { canMoveVillage, canPlaceVillage, moveVillage, placeVillage, removeVillage, villageGoes } = await import('../src/game/edit/villages');
-  const { addLot } = await import('../src/game/edit/lots');
+  const { addLot, removeLots } = await import('../src/game/edit/lots');
   const { removeRoad } = await import('../src/game/edit/streets');
   const { townIssues } = await import('../src/ui/townedit/problems');
   const { editedProblems } = await import('../src/game/edit/checked');
   const { COURT, evenly, leftOf, lengths, nearest, pointAt, RoadIndex } = await import('../src/game/roads');
-  const { entryOf } = await import('../src/game/edit/ground');
+  const { entriesOf, entryOf } = await import('../src/game/edit/ground');
   const { deckTiles } = await import('../src/game/macro');
   const { unrle } = await import('../src/game/landMasks');
   const { wetTile } = await import('../src/game/landEdit');
@@ -90,21 +90,21 @@ describe("step 2's villages", async () => {
     const ok = out.filter((s) => !s.why).sort((a, b) => Math.hypot(a.p[0] - mid[0], a.p[1] - mid[1]) - Math.hypot(b.p[0] - mid[0], b.p[1] - mid[1]));
     return { all: out, ok, each };
   };
-  /** Every area index on `d` (lots, roads, buildings, places, parking, centres) names an area it has; every place a lot or a building it has, and the other way round. */
+  /** Every area index on `d` (lots, roads, places, parking and car parks, centres) names an area it has; every place a lot it has; every bay a car park it has, which it is in. */
   const noDangling = (d: NeighbourhoodDraft) => {
     const open = d.open!;
     const n = open.areas.length;
     const inRange = (k: number | undefined) => k === undefined || (Number.isInteger(k) && k >= 0 && k < n);
     expect(d.slots.every((s) => inRange(s.area))).toBe(true);
     expect(d.roads.every((r) => inRange(r.area))).toBe(true);
-    expect((open.backdrop ?? []).every((b) => inRange(b.area))).toBe(true);
+    expect((open.carParks ?? []).every((p) => inRange(p.area))).toBe(true);
+    expect(open.parking.every((b) => b.park === undefined || (b.park >= 0 && b.park < (open.carParks ?? []).length && open.carParks![b.park].area === b.area))).toBe(true);
     expect((open.places ?? []).every((p) => inRange(p.area))).toBe(true);
     expect(open.parking.every((p) => inRange(p.area))).toBe(true);
     expect((open.centre ?? []).every((c) => inRange(c.area))).toBe(true);
     expect(d.slots.every((s, i) => s.index === i)).toBe(true);
     const places = open.places ?? [];
     expect(places.every((p) => p.plot === undefined || (p.plot >= 0 && p.plot < d.slots.length && d.slots[p.plot].kind !== 'house'))).toBe(true);
-    expect((open.backdrop ?? []).every((b) => b.place === undefined || (b.place >= 0 && b.place < places.length))).toBe(true);
     expect(Object.keys(open.pads).every((k) => Number(k) < d.slots.length)).toBe(true);
     // (Each area has a road of its own, or is the main town.)
     for (let k = 1; k < n; k++) expect(d.roads.some((r) => r.area === k)).toBe(true);
@@ -250,7 +250,7 @@ describe("step 2's villages", async () => {
     expect(e.draft.open!.areas).toEqual(big.open!.areas);
     expect(e.draft.open!.parking).toEqual(big.open!.parking);
     expect(e.draft.open!.places).toEqual(big.open!.places);
-    expect(e.draft.open!.backdrop).toEqual(big.open!.backdrop);
+    expect(e.draft.open!.carParks).toEqual(big.open!.carParks);
     // The main town is no village to remove or move.
     expect('refused' in removeVillage(big, t, 0)).toBe(true);
     expect('refused' in moveVillage(big, t, 0, 100, 0)).toBe(true);
@@ -287,7 +287,7 @@ describe("step 2's villages", async () => {
     const was = (i: number) => coast.roads.filter((r) => r.area === i).map((r) => r.name);
     for (let i = k + 1; i < areas.length; i++) expect(d.roads.filter((r) => r.area === i - 1).map((r) => r.name)).toEqual(was(i));
     for (let i = k + 1; i < areas.length; i++) {
-      expect((d.open!.backdrop ?? []).filter((b) => b.area === i - 1).length).toBe((coast.open!.backdrop ?? []).filter((b) => b.area === i).length);
+      expect((d.open!.carParks ?? []).filter((p) => p.area === i - 1).length).toBe((coast.open!.carParks ?? []).filter((p) => p.area === i).length);
       expect(d.open!.parking.filter((p) => p.area === i - 1).length).toBe(coast.open!.parking.filter((p) => p.area === i).length);
     }
     expect(d.roads.some((r) => r.name && was(k).includes(r.name))).toBe(false);
@@ -295,7 +295,7 @@ describe("step 2's villages", async () => {
     noDangling(d);
     expect(blocking(d, coast)).toEqual([]);
     expect(hardNew(d, coast)).toEqual([]);
-    console.log(`removed ${areas[k].name}: ${goes.roads} of its roads and ${goes.others} that led to it, ${goes.lots.length} lots, ${goes.backdrop.length} buildings`);
+    console.log(`removed ${areas[k].name}: ${goes.roads} of its roads and ${goes.others} that led to it, ${goes.lots.length} lots, ${goes.parking} parking bays`);
     // A site too near another area refused with why (and one in the water, on the large land's ponds).
     const near = sites(coast).all.find((s) => s.why?.includes(`of ${areas[0].name}`) || s.why?.includes(`${areas[0].name}'s`));
     const wet = found.all.find((s) => s.why?.includes('water'));
@@ -325,8 +325,8 @@ describe("step 2's villages", async () => {
       const rects = coast.slots.map((s) => plotRect(t, s));
       const index = new RoadIndex(coast.roads);
       const bounds = (poly: readonly Pt[]) => [Math.min(...poly.map((p) => p[0])), Math.min(...poly.map((p) => p[1])), Math.max(...poly.map((p) => p[0])), Math.max(...poly.map((p) => p[1]))];
-      const buildings = (coast.open!.backdrop ?? []).map((b) => bounds(b.poly));
-      // (Clear of the lots, the buildings and the other roads, the first 20 m but near its street.)
+      const buildings = (coast.open!.carParks ?? []).map((p) => bounds(p.poly));
+      // (Clear of the lots, the car parks and the other roads, the first 20 m but near its street.)
       const free = (a: Pt, b: Pt) =>
         evenly([a, b], 2).every(([x, z]) => {
           const d = Math.hypot(x - a[0], z - a[1]);
@@ -336,29 +336,35 @@ describe("step 2's villages", async () => {
           if (d > 10 && index.nearest(x, z, 10)) return false;
           return x > 30 && z > 30 && x < coast.width - 30 && z < coast.depth - 30;
         });
-      let site: { area: number; a: Pt; m: Pt } | null = null;
+      // (The lots whose way in would be the lane or the road taken off: a lot's way in elsewhere stays as it was.)
+      const before = entriesOf(coast, t);
+      let found: { site: { area: number; a: Pt; m: Pt }; lane: RoadPlan; d0: NeighbourhoodDraft } | null = null;
       for (const r of coast.roads) {
-        if (site || r.area === undefined || r.area === k || r.kind === 'trail' || r.kind === 'country') continue;
+        if (found || r.area === undefined || r.area === k || r.kind === 'trail' || r.kind === 'country') continue;
         const ls = lengths(r.points);
-        for (let s = 30; s < ls[ls.length - 1] - 30 && !site; s += 6) {
+        for (let s = 30; s < ls[ls.length - 1] - 30 && !found; s += 6) {
           const { p, t: tg } = pointAt(r.points, s, ls);
           const n = leftOf(tg);
           for (const side of [1, -1]) {
             const m: Pt = [p[0] + n[0] * side * 70, p[1] + n[1] * side * 70];
-            if (!site && free(p, m)) site = { area: r.area, a: p, m };
+            if (found || !free(p, m)) continue;
+            const site = { area: r.area, a: p, m };
+            let [to, best]: [Pt, number] = [[0, 0], Infinity];
+            for (const o of coast.roads.filter((q) => q.area === k && q.kind !== 'trail')) {
+              const at = nearest(o.points, m[0], m[1]);
+              if (at.dist < best) [to, best] = [pointAt(o.points, at.s).p, at.dist];
+            }
+            const lane: RoadPlan = { points: evenly([p, m], 4), width: 7, ends: ['join', 'join'], kind: 'lane', name: 'Test Lane', area: site.area };
+            const road: RoadPlan = { points: evenly([m, to], 4), width: 7, ends: ['join', 'join'], kind: 'country', name: 'Test Road' };
+            const laid: NeighbourhoodDraft = { ...coast, roads: [...coast.roads, lane, road] };
+            const moved = entriesOf(laid, t).flatMap((e, i) => (e.road !== before[i].road ? [i] : []));
+            found = { site, lane, d0: removeLots(laid, new Set(moved)) };
           }
         }
       }
-      if (!site) throw new Error('no open land beside a street of another area');
+      if (!found) throw new Error('no open land beside a street of another area');
+      const { site, d0 } = found;
       const { a, m } = site;
-      let [to, best]: [Pt, number] = [[0, 0], Infinity];
-      for (const r of coast.roads.filter((o) => o.area === k && o.kind !== 'trail')) {
-        const at = nearest(r.points, m[0], m[1]);
-        if (at.dist < best) [to, best] = [pointAt(r.points, at.s).p, at.dist];
-      }
-      const lane: RoadPlan = { points: evenly([a, m], 4), width: 7, ends: ['join', 'join'], kind: 'lane', name: 'Test Lane', area: site.area };
-      const road: RoadPlan = { points: evenly([m, to], 4), width: 7, ends: ['join', 'join'], kind: 'country', name: 'Test Road' };
-      const d0: NeighbourhoodDraft = { ...coast, roads: [...coast.roads, lane, road] };
       // (A home on the lane 62 m along it, its way in on the lane.)
       const u: Pt = [(m[0] - a[0]) / 70, (m[1] - a[1]) / 70];
       const n = leftOf(u);
@@ -416,7 +422,12 @@ describe("step 2's villages", async () => {
     // along a road only it leads to the town by may not move.)
     let found: { lane: ReturnType<typeof longLane>; shift: readonly [number, number]; e: Extract<Edited, { draft: unknown }> } | null = null;
     for (let k = 1; k < longLane().coast.open!.areas.length && !found; k++) {
-      const lane = longLane(k);
+      // (Without the homes built up along the country roads into it, its outskirts: they reach the town only through it,
+      // so it may not move with them standing.)
+      const raw = longLane(k);
+      const spots = entriesOf(raw.d0, t);
+      const d0 = removeLots(raw.d0, new Set(raw.d0.slots.filter((s, i) => (s.area ?? 0) === k && raw.d0.roads[spots[i].road]?.kind === 'country').map((s) => s.index)));
+      const lane = { ...raw, d0, home: { ...raw.home, index: d0.slots.length } };
       for (const step of [6, 8, 10, 12, 14]) {
         for (const [ux, uz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
           if (found) continue;

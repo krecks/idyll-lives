@@ -50,7 +50,7 @@ function town(): NeighbourhoodDraft {
     roads,
     greens: [],
     households: [],
-    open: { areas: [{ name: 'Ashby', kind: 'hamlet', x: 50, z: 50, w: 300, d: 140 }], zones: [], water: rle(water), pads: {}, parking: [], places: [], backdrop: [] },
+    open: { areas: [{ name: 'Ashby', kind: 'hamlet', x: 50, z: 50, w: 300, d: 140 }], zones: [], water: rle(water), pads: {}, parking: [], places: [] },
   } as unknown as NeighbourhoodDraft;
   return { ...draft, open: { ...draft.open!, uses: usesFor(draft) } };
 }
@@ -242,7 +242,7 @@ describe("the layout's edits", () => {
         slots: [lot(0, 250, 'house', 1), lot(1, 280, 'shop', 1)],
         open: { ...draft.open!, areas: [...draft.open!.areas, { name: 'Brook', kind: 'hamlet', x: 240, z: 280, w: 80, d: 60 }] },
       } as NeighbourhoodDraft,
-      cleared: { lots: [], backdrop: [] },
+      cleared: { lots: [] },
     };
     const zoned = villageAsLayout(draft, placed, t);
     if (!('draft' in zoned)) throw new Error('refused');

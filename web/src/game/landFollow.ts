@@ -663,9 +663,9 @@ function giveUp(
   if (!eased && !gone.size && !lots.size && !backdrop.size && roads.every((r, i) => r === draft.roads[i] || r.points.length === draft.roads[i].points.length)) return null;
   roads = roads.filter((_, i) => !gone.has(i));
   given.lots += lots.size;
-  // The slots left, numbered again; the pads, places and backdrop buildings that name them with them (`edit/lots.ts`).
+  // The slots left, numbered again; the households, pads, places and car parks that name them with them (`edit/lots.ts`).
   const dropped = [...(draft.diagnostics?.dropped ?? []), ...draft.slots.filter((s) => lots.has(s.index)).map((s) => ({ name: s.name, kind: s.kind, ...(s.lot ? { lot: s.lot } : {}) }))];
-  const removed = removeLots({ ...draft, roads }, lots, backdrop);
+  const removed = removeLots({ ...draft, roads }, lots);
   const places = removed.open?.places && rehome(open.places ?? [], removed.open.places, careers);
   return { ...removed, ...(removed.open && places !== removed.open.places ? { open: { ...removed.open, places } } : {}), diagnostics: { ...(draft.diagnostics ?? { dropped: [] }), dropped } };
 }

@@ -22,7 +22,7 @@ import type { LaidTown, Layout } from '../app.svelte';
 import { app } from '../app.svelte';
 import { toast } from '../state.svelte';
 import { checkTown } from './checkJob';
-import { buildingBox, editGhosts, joinGhosts, lotBox, roadGhost } from './ghosts';
+import { editGhosts, joinGhosts, lotBox, roadGhost } from './ghosts';
 import { hatched, shownUses } from './layoutApi';
 import { find, keyOf, pick, type Picked, type PickWhat } from './pick';
 import type { Issue, TownIssues } from './problems';
@@ -448,7 +448,7 @@ export class TownEditorState implements TownEditor {
 
   // ---- drawing ---------------------------------------------------------------------------------
 
-  /** What is picked or pointed at that the renderer's lot lights don't show (a road, a building, a village, a lot not built yet), as ghosts. */
+  /** What is picked or pointed at that the renderer's lot lights don't show (a road, a village, a lot not built yet), as ghosts. */
   private litGhosts(): Partial<TownGhosts> | null {
     const s = this.session;
     const t = this.templates;
@@ -458,7 +458,6 @@ export class TownEditorState implements TownEditor {
       if (!p) continue;
       // (A road picked or pointed at is outlined: the road shows through, never a band over it.)
       if (p.kind === 'road' && s.plan.roads[p.road]) out.roads.push(roadGhost(s.plan.roads[p.road], 'pick'));
-      else if (p.kind === 'building' && s.plan.open?.backdrop?.[p.building]) out.lots.push({ ...buildingBox(s.plan.open.backdrop[p.building]), tone: 'new' });
       else if (p.kind === 'village' && s.plan.open?.areas[p.area]) {
         const a = s.plan.open.areas[p.area];
         out.boxes.push({ x: a.x, z: a.z, w: a.w, d: a.d, tone: 'new' });

@@ -3,8 +3,8 @@
  * draft: the checks read a town file (`CheckedTown`, what `assembleTown` writes), and assembling one
  * means furnishing every house, far too slow after every edit. `checkedTown` writes the part of a
  * town file the checks read as `assembleTown` would write it (the lots' rectangles, kinds and
- * facings, the roads, the ways out, the water, the parking, the zones, the backdrop, the places and
- * the centre), with nobody living there. `editedProblems` is what step 2's `'edit'` job checks.
+ * facings, the roads, the ways out, the water, the parking and its car parks, the zones, the places
+ * and the centre), with nobody living there. `editedProblems` is what step 2's `'edit'` job checks.
  */
 
 import type { Content } from '../../content/content';
@@ -12,9 +12,10 @@ import { wetTile } from '../landEdit';
 import { roadExits } from '../roads';
 import { plotKindOf, plotRect, type NeighbourhoodDraft, type Templates } from '../town';
 import { townProblems, type CheckedTown } from '../townCheck';
+import { homesOn } from './lots';
 
-/** The checks of how the generator fills a town (the backdrop each area keeps, the centre the densest), which an edited town needn't keep. */
-const GENERATED_ONLY: readonly RegExp[] = [/ has \d+ backdrop buildings \(\d+ or more\)$/, /^the centre's open land is /, /^the main town has no centre$/];
+/** The checks of how the generator fills a town (the centre the densest), which an edited town needn't keep. */
+const GENERATED_ONLY: readonly RegExp[] = [/^the centre's open land is /, /^the main town has no centre$/];
 
 
 /** The part of `draft`'s town file the checks read (`CheckedTown`), written as `assembleTown` writes it, with nobody living there yet. */
@@ -48,7 +49,6 @@ export function checkedTown(draft: NeighbourhoodDraft, t: Templates): CheckedTow
       ...(open
         ? {
             zones: open.zones,
-            ...(open.backdrop ? { backdrop: open.backdrop } : {}),
             ...(open.places ? { places: open.places } : {}),
             ...(open.centre ? { centre: open.centre } : {}),
           }
@@ -60,15 +60,15 @@ export function checkedTown(draft: NeighbourhoodDraft, t: Templates): CheckedTow
 /**
  * What is wrong with an edited town (`townProblems`, `hard` and `soft`): its layout checked as every
  * generated world's is, but nothing asked of how filled it is (its homes, its built land, its
- * quarters, the backdrop each area keeps, its centre: the player's to choose), only that a town or a
- * city has somewhere for every career to work; and fewer than two homes is hard.
+ * quarters, its centre: the player's to choose), only that a town or a city has somewhere for every
+ * career to work; and fewer than two homes (houses and flats) is hard.
  */
 export function editedProblems(draft: NeighbourhoodDraft, t: Templates, content: Content): { hard: string[]; soft: string[] } {
   const size = draft.world?.options?.town;
   const expect = { built: 0, empty: null, meadow: false, quarters: 0, homes: 0, careers: size === 'town' || size === 'city', exits: null };
   const found = townProblems(checkedTown(draft, t), expect, { river: false, careers: content.careerCategories.map((c) => c.id), generated: false });
-  const homes = draft.slots.filter((s) => s.kind === 'house').length;
-  // (How the generator fills a town, which an edited one needn't keep: a village placed by hand has no backdrop, decision 15.)
+  const homes = draft.slots.reduce((n, s) => n + homesOn(t, s), 0);
+  // (How the generator fills a town, which an edited one needn't keep: its centre the densest.)
   const hard = found.hard.filter((line) => !GENERATED_ONLY.some((p) => p.test(line)));
   return { hard: homes < 2 ? [...hard, `fewer than two homes (${homes})`] : hard, soft: found.soft };
 }

@@ -5,7 +5,7 @@
  * (decision 14):
  * - its site is tested as the generator tests a hamlet's (`macro.ts` `hamletFits`: in the world, dry,
  *   clear of the other areas' boxes by 24 m, not too steep, clear of the bridges), its middle
- *   `AREA_APART` m from the other areas' (as the town checks want), with no road, lot or building
+ *   `AREA_APART` m from the other areas' (as the town checks want), with no road, lot or car park
  *   already standing there;
  * - its streets are the place's hamlet shapes (`hamletOf`: `joinUp`, `settleRoads`) put on the world
  *   as the generator puts one (`putHamlet`);
@@ -14,22 +14,23 @@
  *   generator's do (`CountryRouter.course`); its other ways out end inside its box, as the generator
  *   ends a port nobody took;
  * - its lots are the hamlet's own (`hamletLots`: the place's lot mix by `LotPlacer`), a public lot
- *   gets its place, the homes are numbered, and two parking spaces go by the verge nearest its middle;
+ *   gets its place, the homes are numbered, and a pair of bays or two goes by the verge nearest its
+ *   middle (`parking.ts` `vergeParking`), clear of every driveway;
  * - it and its streets are named, with names nobody in town has.
  * Where no road can be routed to it, it is placed all the same and the town's checks say it has no
- * way out ("No road to Ashby" in the Problems list), for the player to draw one. It gets no backdrop
- * (decision 15). Every random choice is drawn from the edit's seed: the same draft, place and seed
- * give the same village.
+ * way out ("No road to Ashby" in the Problems list), for the player to draw one. It gets none of the
+ * town's other buildings (decision 15). Every random choice is drawn from the edit's seed: the same
+ * draft, place and seed give the same village.
  *
  * A village moved is translated by whole metres: its streets, the lots fronting them (with their
- * places, pads and orchards), its backdrop buildings, its parking and its greens. Its site is tested
+ * places, pads and orchards), its car parks and its greens. Its site is tested
  * again (its own old things aside). The country roads that led to it are taken up where no lot
  * stands on them and the rest of the roads stay one network; those with homes on them are left
  * as dead ends, cut back past their last lot, and said in the edit's `notes`. A road is routed again
  * from where its streets were met (else from a dead end of theirs by the edge of its box).
  *
- * A village removed takes its streets, the lots fronting them, its backdrop buildings and their
- * places, its parking and greens, the country roads that led only to it (as a move takes them up),
+ * A village removed takes its streets, the lots fronting them (with the flats and the places in them),
+ * its car parks and greens, the country roads that led only to it (as a move takes them up),
  * and its area: the area indexes on everything else are numbered again (`removeArea`). It is refused
  * where the town would be left fewer than two homes, its last park, or no road out of the world, or
  * where another area reaches the roads only through it.
@@ -49,8 +50,8 @@ import { COURT, endDir, evenly, leftOf, lengths, nearest, pointAt, RoadIndex, ro
 import { boundsOf, frontageOf, LotPlacer, plotRect, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates } from '../town';
 import { placeOf, specOf, streetNames, type WorldSpec } from '../world';
 import type { Edited } from './edited';
-import { entriesOf, townGround } from './ground';
-import { bayRect, vergeParking } from '../parking';
+import { entriesOf, townGround, wholeParks, withoutBays } from './ground';
+import { bayRect, carParkRect, driveLines, vergeParking } from '../parking';
 import { removalRefused, removeLots, renumber, withLotPlace } from './lots';
 
 /** Where a village is placed (its box's middle, m), whether its shape is turned across, and the seed its streets, lots and names are drawn from. */
@@ -64,15 +65,15 @@ export interface VillageAt {
 /** A village's box on the town (m), where it would go. */
 export type VillageBox = Rect;
 
-/** What removing a village takes: how many of its own roads and of the country roads that led to it, the lots and backdrop buildings (indices in the draft it is asked of), how many parking spaces; or why it may not go. */
-export type VillageGoes = { roads: number; others: number; lots: number[]; backdrop: number[]; parking: number } | { refused: string };
+/** What removing a village takes: how many of its own roads and of the country roads that led to it, the lots (indices in the draft it is asked of), how many parking bays; or why it may not go. */
+export type VillageGoes = { roads: number; others: number; lots: number[]; parking: number } | { refused: string };
 
 // ---- the generator's measures ------------------------------------------------------------------
 
 /** A hamlet's box keeps this far inside the world's edge, and this far from another area's box (m): `macro.ts` `EDGE`, `BOX_GAP` (`hamletFits` tests both; these only say which it was). */
 const EDGE = 50;
 const BOX_GAP = 24;
-/** Nothing already standing (a road, a lot, a building) within this of a village's box (m): its streets reach its edges. */
+/** Nothing already standing (a road, a lot, a car park) within this of a village's box (m): its streets reach its edges. */
 const WAY = 8;
 /** A road on from a port meets what lies within this of straight on before what lies to the side, which costs it more (`countryRouter.ts` `AHEAD`, `ASIDE`). */
 const AHEAD = Math.PI / 3;
@@ -88,7 +89,7 @@ const BRIDGE_TRIES = 12;
 /** A crossing's line is carried on this far (m) past its ends, onto the dry land `bridgeSites` finds there, so its deck may reach on over a dip (`bridgeOver`). */
 const BRIDGE_REACH = 12;
 
-const NOTHING: { lots: number[]; backdrop: number[] } = { lots: [], backdrop: [] };
+const NOTHING: { lots: number[] } = { lots: [] };
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const middleOf = (r: Rect): Pt => [r.x + r.w / 2, r.z + r.d / 2];
@@ -183,12 +184,11 @@ function reaches(roads: readonly RoadPlan[], own: Iterable<number>): boolean {
 
 // ---- a village's things ---------------------------------------------------------------------------
 
-/** What belongs to a village (area `area`), by index in the draft: its roads (streets, lanes, trails), the lots fronting them, its backdrop buildings, parking, greens, the orchards by its farms; and the country roads that meet its roads (`links`). */
+/** What belongs to a village (area `area`), by index in the draft: its roads (streets, lanes, trails), the lots fronting them, its parking (its car parks' bays), greens, the orchards by its farms; and the country roads that meet its roads (`links`). */
 interface Parts {
   area: number;
   roads: Set<number>;
   lots: Set<number>;
-  backdrop: Set<number>;
   parking: Set<number>;
   greens: Set<number>;
   orchards: Set<number>;
@@ -213,19 +213,11 @@ function partsOf(draft: NeighbourhoodDraft, t: Templates, area: number): Parts {
     if (roads.has(i) || r.kind !== 'country' || r.area !== undefined) return;
     for (const v of roads) if (draft.roads[v].kind !== 'trail' && joined(draft.roads, i, v)) links.add(i);
   });
-  // (Its buildings: those whose nearest road is its own or one into it; a farm's barn out along a country road stays with that road.)
-  const index = roadIndex(draft.roads);
-  const fronts = (poly: readonly Pt[]) => {
-    const [x, z] = middleOfPoly(poly);
-    const near = index.nearest(x, z, 40);
-    return near ? roads.has(near.road) || links.has(near.road) : insideRect(box, [x, z]);
-  };
   parts = {
     area,
     roads,
     lots,
-    backdrop: new Set((open?.backdrop ?? []).flatMap((b, i) => (b.area === area && fronts(b.poly) ? [i] : []))),
-    parking: new Set((open?.parking ?? []).flatMap((p, i) => (p.area === area ? [i] : []))),
+    parking: new Set(open ? wholeParks(open, open.parking.flatMap((p, i) => (p.area === area ? [i] : []))) : []),
     greens: new Set(draft.greens.flatMap((g, i) => (g.length && insideRect(box, middleOfPoly(g)) ? [i] : []))),
     orchards: new Set((open?.zones ?? []).flatMap((z, i) => (z.kind === 'orchard' && z.poly.length && farms.some((f) => meets(f, boundsOf(z.poly))) ? [i] : []))),
     links,
@@ -241,7 +233,7 @@ interface Aside {
   area: number;
   roads: ReadonlySet<number>;
   lots: ReadonlySet<number>;
-  backdrop: ReadonlySet<number>;
+  parking: ReadonlySet<number>;
 }
 
 /** Each set of roads' bounds (their width round them), for the test of what stands where a village would go. */
@@ -268,17 +260,22 @@ function standing(draft: NeighbourhoodDraft, t: Templates, rect: Rect, aside?: A
   }
   const lots = draft.slots.filter((s) => !aside?.lots.has(s.index) && meets(plotRect(t, s), r)).length;
   if (lots) return `${lots === 1 ? 'a lot stands' : `${lots} lots stand`} there`;
-  const buildings = (draft.open?.backdrop ?? []).filter((b, i) => !aside?.backdrop.has(i) && meets(boundsOf(b.poly), r)).length;
-  if (buildings) return `${buildings === 1 ? 'a building stands' : `${buildings} buildings stand`} there`;
+  const open = draft.open;
+  // (A car park's asphalt, as the generator laid it: `parking.ts` `carParkRect`; the bays of one being moved aside.)
+  const asideParks = new Set([...(aside?.parking ?? [])].flatMap((i) => (open?.parking[i]?.park === undefined ? [] : [open.parking[i].park!])));
+  const parks = (open?.carParks ?? []).filter((p, k) => !asideParks.has(k) && meets(carParkRect(p), r)).length;
+  if (parks) return `${parks === 1 ? 'a car park is' : `${parks} car parks are`} there`;
   return null;
 }
 
-/** The rectangles of what stands on `draft` (its lots, buildings and parking spaces) but a village's own (`parts`: one being moved, inside its box, which the router keeps out of but by its ways out). */
+/** The rectangles of what stands on `draft` (its lots, car parks and parking bays) but a village's own (`parts`: one being moved, inside its box, which the router keeps out of but by its ways out). */
 function thingsOf(draft: NeighbourhoodDraft, t: Templates, parts?: Parts): Rect[] {
+  const open = draft.open;
+  const own = new Set([...(parts?.parking ?? [])].flatMap((i) => (open?.parking[i]?.park === undefined ? [] : [open.parking[i].park!])));
   return [
     ...draft.slots.flatMap((s) => (parts?.lots.has(s.index) ? [] : [plotRect(t, s)])),
-    ...(draft.open?.backdrop ?? []).flatMap((b, i) => (parts?.backdrop.has(i) ? [] : [boundsOf(b.poly)])),
-    ...(draft.open?.parking ?? []).flatMap((p, i) => (parts?.parking.has(i) ? [] : [bayRect(p)])),
+    ...(open?.carParks ?? []).flatMap((p, k) => (own.has(k) ? [] : [carParkRect(p)])),
+    ...(open?.parking ?? []).flatMap((p, i) => (parts?.parking.has(i) ? [] : [bayRect(p)])),
   ];
 }
 
@@ -328,8 +325,8 @@ export function canPlaceVillage(draft: NeighbourhoodDraft, t: Templates, at: Pic
   return 'refused' in site ? site : site.rect;
 }
 
-/** What a move of a village leaves aside when its new site is tested: its roads, lots and buildings, and the country roads that met it. */
-const asideOf = (parts: Parts): Aside => ({ area: parts.area, roads: new Set([...parts.roads, ...parts.links]), lots: parts.lots, backdrop: parts.backdrop });
+/** What a move of a village leaves aside when its new site is tested: its roads, lots and car parks, and the country roads that met it. */
+const asideOf = (parts: Parts): Aside => ({ area: parts.area, roads: new Set([...parts.roads, ...parts.links]), lots: parts.lots, parking: parts.parking });
 
 /** Why area `area` is no village that may be moved or removed, or null. */
 function notVillage(draft: NeighbourhoodDraft, area: number): string | null {
@@ -382,7 +379,7 @@ function toNetwork(router: CountryRouter, q: Port, blocked: Uint8Array, others: 
     if (!on || (h !== undefined && Math.abs(along(h, on.t)) >= 0.75)) return -1;
     return inFront(land.centre(i)) ? 0 : ASIDE;
   };
-  // (Not over a lot, a building or a parking space: the generator lays its roads before them; by the port, as it may. Into a village by its ports.)
+  // (Not over a lot or a car park: the generator lays its roads before them; by the port, as it may. Into a village by its ports.)
   const free = (cost: (i: number) => number) => (i: number) => (blocked[i] && dist(land.centre(i), q.p) > 12 ? Infinity : router.areaBlock[i] && others.some((x) => dist(land.centre(i), x.p) < 26) ? 1 : cost(i));
   const costs = [free(router.cost([q.p])), free(router.relaxed([q.p]))] as const;
   let made: Onward['made'] | null = null;
@@ -534,7 +531,7 @@ function capCourts(draft: NeighbourhoodDraft, roads: readonly RoadPlan[], from: 
 function linkUp(draft: NeighbourhoodDraft, roads: RoadPlan[], areas: readonly Rect[], ports: readonly Port[], rect: Rect, place: string, taken: Set<string>, things: readonly Rect[], walk: () => Uint8Array): { laid: boolean; walk?: Uint8Array } {
   const cells = cellsFor(draft.open!.land!);
   const router = new CountryRouter(cells, areas.map((r) => ({ rect: r })), roads, specFor(draft));
-  // The 8 m cells the lots, buildings and parking stand on, which a road keeps off.
+  // The 8 m cells the lots and the car parks stand on, which a road keeps off.
   const blocked = new Uint8Array(cells.gw * cells.gd);
   for (const r of things) {
     for (let cz = Math.max(0, Math.floor((r.z - 2) / 8)); cz <= Math.min(cells.gd - 1, Math.floor((r.z + r.d + 2) / 8)); cz++) {
@@ -678,8 +675,9 @@ export function placeVillage(draft: NeighbourhoodDraft, t: Templates, content: C
   const slots = placer.slots.map((s, k): PlotSlot => ({ ...s, index: draft.slots.length + k, area: a }));
   // Its parking: a few spaces by the verge nearest its middle, more for more homes (as the generator lays a hamlet's).
   const spaces = parkingFor(slots.filter((s) => s.kind === 'house').length, false);
-  // (Pairs of bays by the verge, as the generator lays them: `parking.ts` `vergeParking`.)
-  const laidParks = vergeParking(roads, ground, frontageOf(roads, plan.roads, plan.centre, rand), spaces, a);
+  // (Pairs of bays by the verge, as the generator lays them, clear of every driveway: `parking.ts` `vergeParking`.)
+  const drives = driveLines(t, [...draft.slots, ...slots], roads, (def) => content.object(def)?.footprint ?? [1, 1]);
+  const laidParks = vergeParking(roads, ground, frontageOf(roads, plan.roads, plan.centre, rand), spaces, a, undefined, drives);
   const parks0 = open.carParks?.length ?? 0;
   const parking = laidParks.flatMap((p, k) => p.bays.map((b) => ({ ...b, park: parks0 + k })));
   const area: TownArea = { name: plan.name, kind: 'hamlet', x: plan.rect.x, z: plan.rect.z, w: plan.rect.w, d: plan.rect.d };
@@ -694,25 +692,18 @@ export function placeVillage(draft: NeighbourhoodDraft, t: Templates, content: C
 
 /**
  * What goes with village `parts` besides its own roads: the country roads that led only to it and
- * carry no lot or building (`remove`; removing it, those with homes on them too, and their lots:
- * `lots`); and the roads a lot or building stands on (`carries`). Or why it may not go: another area,
+ * carry no lot (`remove`; removing it, those with homes on them too, and their lots: `lots`); and the
+ * roads a lot stands on (`carries`). Or why it may not go: another area,
  * or (moving it) homes on a road, would be left with no road to the town.
  */
 function detach(draft: NeighbourhoodDraft, t: Templates, parts: Parts, removing: boolean): { remove: Set<number>; lots: Set<number>; carries: Set<number> } | { refused: string } {
   const { roads } = draft;
   const areas = draft.open?.areas ?? [];
-  // The roads a lot or a building stands on (not the village's own).
+  // The roads a lot stands on (not the village's own).
   const carries = new Set<number>();
   const spots = entriesOf(draft, t);
   draft.slots.forEach((s, i) => {
     if (!parts.lots.has(s.index) && spots[i] && spots[i].road >= 0) carries.add(spots[i].road);
-  });
-  const index = roadIndex(roads);
-  (draft.open?.backdrop ?? []).forEach((b, i) => {
-    if (parts.backdrop.has(i)) return;
-    const [x, z] = middleOfPoly(b.poly);
-    const near = index.nearest(x, z, 30);
-    if (near) carries.add(near.road);
   });
   // The main town's network (its first road's), without what is `gone`.
   const mainOf = (gone: ReadonlySet<number>) => {
@@ -891,7 +882,7 @@ function portsOf(roads: readonly RoadPlan[], own: readonly number[], was: readon
 
 /**
  * `draft` with village `area` moved by (`dx`, `dz`), rounded to whole metres (see the top of this
- * file): its streets, lots, buildings, parking and greens with it; the country roads that led to it
+ * file): its streets, lots, car parks and greens with it; the country roads that led to it
  * taken up where nothing stands on them (else left, said in `notes`); a road routed to it again where
  * one can be. Refused for the main town (moved by "Move the town"), where its new site is not one
  * (with why), or where another area reaches the roads only through it.
@@ -913,21 +904,18 @@ export function moveVillage(draft: NeighbourhoodDraft, t: Templates, area: numbe
   const moved = ([x, z]: Pt): Pt => [r2(x + dx), r2(z + dz)];
   const land = open.land!;
 
-  // Its lots, buildings, places, parking, greens and orchards with it; the parking by a road taken up goes.
+  // Its lots, places, car parks, greens and orchards with it; a car park by a road taken up goes.
   const slots = draft.slots.map((s) => (parts.lots.has(s.index) ? { ...s, x: s.x + dx, z: s.z + dz, ...(s.anchor === undefined ? {} : { anchor: s.anchor + (s.facing % 2 ? dz : dx) }) } : s));
-  const backdrop = open.backdrop?.map((b, i) => {
-    if (!parts.backdrop.has(i)) return b;
-    const [x, z] = middleOfPoly(b.poly);
-    return { ...b, poly: b.poly.map(moved), y: r2(b.y + heightAt(land, x + dx, z + dz) - heightAt(land, x, z)) };
-  });
-  const placesMoved = new Set((open.backdrop ?? []).flatMap((b, i) => (parts.backdrop.has(i) && b.place !== undefined ? [b.place] : [])));
-  const places = open.places?.map((p, i) => (placesMoved.has(i) || (p.plot !== undefined && parts.lots.has(p.plot)) ? { ...p, x: r2(p.x + dx), z: r2(p.z + dz) } : p));
+  const places = open.places?.map((p) => (p.plot !== undefined && parts.lots.has(p.plot) ? { ...p, x: r2(p.x + dx), z: r2(p.z + dz) } : p));
   const index = roadIndex(draft.roads);
-  const parking = open.parking.flatMap((p, i) => {
-    if (parts.parking.has(i)) return [{ ...p, x: p.x + dx, z: p.z + dz }];
+  const ownParks = new Set([...parts.parking].flatMap((i) => (open.parking[i].park === undefined ? [] : [open.parking[i].park!])));
+  const carParks = open.carParks?.map((p, k) => (ownParks.has(k) ? { ...p, poly: p.poly.map(moved), sign: [r2(p.sign[0] + dx), r2(p.sign[1] + dz), p.sign[2]] as [number, number, number] } : p));
+  const shifted0 = { parking: open.parking.map((p, i) => (parts.parking.has(i) ? { ...p, x: r2(p.x + dx), z: r2(p.z + dz) } : p)), ...(carParks ? { carParks } : {}) };
+  const byRemoved = (p: { x: number; z: number }, i: number) => {
+    if (parts.parking.has(i)) return false;
     const near = index.nearest(p.x, p.z, 10);
-    return near && goes.remove.has(near.road) ? [] : [p];
-  });
+    return !!near && goes.remove.has(near.road);
+  };
   const greens = draft.greens.map((g, i) => (parts.greens.has(i) ? g.map(moved) : g));
   const zones = open.zones.map((z, i) => (parts.orchards.has(i) ? { ...z, poly: z.poly.map(moved) } : z));
   const pads = { ...open.pads };
@@ -961,7 +949,7 @@ export function moveVillage(draft: NeighbourhoodDraft, t: Templates, area: numbe
   const linked = link.laid;
   if (link.walk) walk = link.walk;
   // The other areas' streets and lanes it leaves ending where it was, held to a court's length (once
-  // its new road is down: that may meet one again); the buildings and parking by a stretch cut off go.
+  // its new road is down: that may meet one again); the car parks by a stretch cut off go.
   const capped = capCourts(draft, roads, left.from, lotsOnOf(draft, t, parts.lots), name, area, `with ${name} moved`);
   if ('refused' in capped) return capped;
   notes.push(...capped.notes);
@@ -970,18 +958,17 @@ export function moveVillage(draft: NeighbourhoodDraft, t: Templates, area: numbe
     const kept = near && capped.kept.get(near.road);
     return !!kept && (near.s < kept[0] - 0.5 || near.s > kept[1] + 0.5);
   };
-  const cut = new Set((open.backdrop ?? []).flatMap((b, i) => (!parts.backdrop.has(i) && byCut(...middleOfPoly(b.poly), 40) ? [i] : [])));
+  const parkingGone = open.parking.flatMap((p, i) => (byRemoved(p, i) || (!parts.parking.has(i) && byCut(p.x, p.z, 10)) ? [i] : []));
 
-  let next: NeighbourhoodDraft = {
+  const next: NeighbourhoodDraft = {
     ...draft,
     roads: deadEnds(capped.roads),
     slots,
     greens,
-    open: { ...open, areas: open.areas.map((a, k) => (k === area ? { ...a, x: rect.x, z: rect.z } : a)), zones, pads, parking: parking.filter((p) => !byCut(p.x, p.z, 10)), ...(backdrop ? { backdrop } : {}), ...(places ? { places } : {}), ...gentleWithout(open, open.areas[area]), ...(walk ? { water: rle(walk) } : {}) },
+    open: { ...open, areas: open.areas.map((a, k) => (k === area ? { ...a, x: rect.x, z: rect.z } : a)), zones, pads, ...withoutBays(shifted0, parkingGone), ...(places ? { places } : {}), ...gentleWithout(open, open.areas[area]), ...(walk ? { water: rle(walk) } : {}) },
   };
-  if (cut.size) next = removeLots(next, new Set(), cut);
   if (!linked || !reaches(next.roads, ownAt)) notes.push(`no road could be found to ${name}: draw one to it`);
-  return { draft: next, cleared: cut.size ? { lots: [], backdrop: [...cut].sort((a, b) => a - b) } : NOTHING, ...(notes.length ? { notes } : {}) };
+  return { draft: next, cleared: NOTHING, ...(notes.length ? { notes } : {}) };
 }
 
 // ---- removing -----------------------------------------------------------------------------------------
@@ -1036,7 +1023,7 @@ function removeOnce(draft: NeighbourhoodDraft, t: Templates, area: number): Edit
   const capped = capCourts(draft, left.roads, left.from, lotsOnOf(draft, t, lots), name, area, `without ${name}`);
   if ('refused' in capped) return capped;
   left.notes.push(...capped.notes);
-  // Its buildings (all of its area's: a farm's barn too), and those by a road that goes; the parking by its roads and theirs.
+  // Its car parks, and those by a road that goes.
   const index = roadIndex(draft.roads);
   const byGone = (x: number, z: number, within: number) => {
     const near = index.nearest(x, z, within);
@@ -1048,26 +1035,24 @@ function removeOnce(draft: NeighbourhoodDraft, t: Templates, area: number): Edit
     const kept = near && capped.kept.get(near.road);
     return !!kept && (near.s < kept[0] - 0.5 || near.s > kept[1] + 0.5);
   };
-  const backdrop = new Set(parts.backdrop);
-  (open.backdrop ?? []).forEach((b, i) => (b.area === area || byGone(...middleOfPoly(b.poly), 40) || byCut(...middleOfPoly(b.poly), 40)) && backdrop.add(i));
-  const parking = new Set(open.parking.flatMap((p, i) => (parts.parking.has(i) || byGone(p.x, p.z, 10) || byCut(p.x, p.z, 10) ? [i] : [])));
+  const parking = open.parking.flatMap((p, i) => (parts.parking.has(i) || byGone(p.x, p.z, 10) || byCut(p.x, p.z, 10) ? [i] : []));
   // (The water under a bridge that goes is water again.)
   const walk = withoutDecks(draft, [...gone]);
   let next: NeighbourhoodDraft = {
     ...draft,
     roads: capped.roads,
     greens: draft.greens.filter((_, i) => !parts.greens.has(i)),
-    open: { ...open, parking: open.parking.filter((_, i) => !parking.has(i)), zones: open.zones.filter((_, i) => !parts.orchards.has(i)), ...(walk ? { water: rle(walk) } : {}) },
+    open: { ...open, ...withoutBays(open, parking), zones: open.zones.filter((_, i) => !parts.orchards.has(i)), ...(walk ? { water: rle(walk) } : {}) },
   };
-  next = removeArea(removeLots(next, lots, backdrop), area);
-  const cleared = { lots: [...lots].sort((a, b) => a - b), backdrop: [...backdrop].sort((a, b) => a - b) };
+  next = removeArea(removeLots(next, lots), area);
+  const cleared = { lots: [...lots].sort((a, b) => a - b) };
   return { draft: next, cleared, ...(left.notes.length ? { notes: left.notes } : {}) };
 }
 
 /**
  * What removing village `area` from `draft` takes (see the top of this file): how many roads (its
- * own and the country roads that led only to it), the lots and buildings (by index in `draft`), how
- * many parking spaces; or why it may not go.
+ * own and the country roads that led only to it), the lots (by index in `draft`), how many parking
+ * bays; or why it may not go.
  */
 export function villageGoes(draft: NeighbourhoodDraft, t: Templates, area: number): VillageGoes {
   const made = removal(draft, t, area);
@@ -1075,12 +1060,12 @@ export function villageGoes(draft: NeighbourhoodDraft, t: Templates, area: numbe
   const open = draft.open!;
   const roads = draft.roads.length - made.draft.roads.length;
   const own = draft.roads.filter((r) => r.area === area).length;
-  return { roads: own, others: roads - own, lots: made.cleared.lots, backdrop: made.cleared.backdrop, parking: open.parking.length - (made.draft.open?.parking.length ?? 0) };
+  return { roads: own, others: roads - own, lots: made.cleared.lots, parking: open.parking.length - (made.draft.open?.parking.length ?? 0) };
 }
 
 /**
- * `draft` without village `area`: its roads, the lots fronting them, its buildings and their places,
- * its parking, greens and orchards; the country roads that led only to it (with the homes on them,
+ * `draft` without village `area`: its roads, the lots fronting them (with their flats and places),
+ * its car parks, greens and orchards; the country roads that led only to it (with the homes on them,
  * listed first by `villageGoes`); and its area, the area indexes on everything else numbered again
  * (`removeArea`). Refused for the main town, where the town would be left fewer than two homes, its
  * last park or no road out of the world, or where another area reaches the roads only through it.
@@ -1091,8 +1076,7 @@ export function removeVillage(draft: NeighbourhoodDraft, t: Templates, area: num
 
 /**
  * `draft` without area `area` (not the main town), the area indexes on everything else numbered
- * again: the lots', the roads', the backdrop buildings', the places', the parking's and the
- * centres'. Anything still in the area (a farm out on a country road, say) goes to the nearest area left.
+ * again: the lots', the roads', the places', the parking bays', the car parks' and the centres'. Anything still in the area (a farm out on a country road, say) goes to the nearest area left.
  */
 export function removeArea(draft: NeighbourhoodDraft, area: number): NeighbourhoodDraft {
   const open = draft.open;
@@ -1109,11 +1093,11 @@ export function removeArea(draft: NeighbourhoodDraft, area: number): Neighbourho
   const to = (k: number, at: () => Pt) => (k < area ? k : k > area ? k - 1 : nearestTo(at()));
   const slots = draft.slots.map((s) => (s.area === undefined || s.area < area ? s : { ...s, area: to(s.area, () => [s.x, s.z]) }));
   const roads = draft.roads.map((r) => (r.area === undefined || r.area < area ? r : { ...r, area: to(r.area, () => r.points[Math.floor(r.points.length / 2)]) }));
-  const backdrop = open.backdrop?.map((b) => (b.area < area ? b : { ...b, area: to(b.area, () => b.poly[0]) }));
   const places = open.places?.map((p) => (p.area < area ? p : { ...p, area: to(p.area, () => [p.x, p.z]) }));
   const parking = open.parking.map((p) => (p.area < area ? p : { ...p, area: to(p.area, () => [p.x, p.z]) }));
+  const carParks = open.carParks?.map((p) => (p.area < area ? p : { ...p, area: to(p.area, () => p.poly[0]) }));
   const centre = open.centre?.map((c) => (c.area < area ? c : { ...c, area: to(c.area, () => c.poly[0]) }));
-  return { ...draft, slots, roads, open: { ...open, areas, parking, ...(backdrop ? { backdrop } : {}), ...(places ? { places } : {}), ...(centre ? { centre } : {}), ...gentleWithout(open, open.areas[area]) } };
+  return { ...draft, slots, roads, open: { ...open, areas, parking, ...(carParks ? { carParks } : {}), ...(places ? { places } : {}), ...(centre ? { centre } : {}), ...gentleWithout(open, open.areas[area]) } };
 }
 
 /** The town's gentle ground (`OpenWorldDraft.gentle`) without area `a`'s plane: a village moved or removed has its ground fitted afresh where it goes. */

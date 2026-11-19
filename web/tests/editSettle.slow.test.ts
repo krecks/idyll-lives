@@ -71,11 +71,11 @@ describe("step 2's settle", async () => {
     if ('refused' in e) throw new Error(`refused: ${e.refused}`);
     return e.draft;
   };
-  /** Nothing of `plan` given up in `settled`: the same lots, roads, backdrop and places. */
+  /** Nothing of `plan` given up in `settled`: the same lots, roads, car parks and places. */
   const keptAll = (settled: NeighbourhoodDraft, plan: NeighbourhoodDraft) => {
     expect(settled.slots).toEqual(plan.slots);
     expect(settled.roads).toEqual(plan.roads);
-    expect(settled.open?.backdrop).toEqual(plan.open?.backdrop);
+    expect(settled.open?.carParks).toEqual(plan.open?.carParks);
     expect(settled.open?.places).toEqual(plan.open?.places);
     expect(settled.diagnostics?.slopes).toEqual(plan.diagnostics?.slopes);
   };
@@ -431,7 +431,7 @@ describe("step 2's settle", async () => {
       runTownJob(content, t, { kind: 'edit', plan: removed, ops: 1, steps: [plan, removed], check: false });
       const unmarked = performance.now() - t0;
       times.sort((a, b) => a - b);
-      console.log(`${kind} city, many villages (${plan.slots.length} lots, ${plan.roads.length} roads, ${plan.open?.backdrop?.length ?? 0} buildings): an edit settled in ${times[1].toFixed(0)} ms (M3), ${checked.toFixed(0)} ms with the checks, ${unmarked.toFixed(0)} ms with no marks yet`);
+      console.log(`${kind} city, many villages (${plan.slots.length} lots, ${plan.roads.length} roads, ${plan.open?.carParks?.length ?? 0} car parks): an edit settled in ${times[1].toFixed(0)} ms (M3), ${checked.toFixed(0)} ms with the checks, ${unmarked.toFixed(0)} ms with no marks yet`);
       // (Generous: the plan's estimate is about 2 s on the M1.)
       expect(times[1]).toBeLessThan(3000);
     }

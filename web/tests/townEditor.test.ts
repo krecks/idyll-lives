@@ -46,7 +46,7 @@ function clock() {
 
 /** A draft standing for a town (the session compares them by identity only). */
 const draft = (name: string) => ({ name, slots: [], roads: [] }) as unknown as NeighbourhoodDraft;
-const edit = (d: NeighbourhoodDraft): Edited => ({ draft: d, cleared: { lots: [], backdrop: [] } });
+const edit = (d: NeighbourhoodDraft): Edited => ({ draft: d, cleared: { lots: [] } });
 
 /** A session on town `base`, its settles recorded (each held until `release`d when `hold` is set). */
 function session(base = draft('base'), hold = false) {
@@ -452,7 +452,7 @@ describe('the Problems list and picking, on a generated town', async () => {
 
   test("step 2's layout (no lots, its homes zones) isn't blocked for want of homes; a town with none is", () => {
     const { cols, rows } = useGrid(hamlet.width, hamlet.depth);
-    const bare = { ...hamlet, slots: [], open: { ...hamlet.open!, pads: {}, places: [], backdrop: [] } };
+    const bare = { ...hamlet, slots: [], open: { ...hamlet.open!, pads: {}, places: [], parking: [], carParks: [] } };
     const layout = { ...bare, open: { ...bare.open, uses: packUses(new Uint8Array(cols * rows), cols, rows) } };
     expect(townIssues(layout, t, content).blocking.map((i) => i.text)).not.toContainEqual(expect.stringMatching(/fewer than two homes/i));
     expect(townIssues(bare, t, content).blocking.map((i) => i.text)).toContainEqual(expect.stringMatching(/fewer than two homes/i));
@@ -481,7 +481,8 @@ describe('the Problems list and picking, on a generated town', async () => {
 
   test('fewer than two homes blocks the way on', () => {
     const homes = hamlet.slots.filter((s) => s.kind === 'house').map((s) => s.index);
-    const few: NeighbourhoodDraft = { ...hamlet, slots: hamlet.slots.map((s) => (s.kind === 'house' && s.index !== homes[0] ? { ...s, kind: 'park' as const } : s)) };
+    // (Every other home a park: a building of flats too, and no flats over a place.)
+    const few: NeighbourhoodDraft = { ...hamlet, slots: hamlet.slots.map(({ upper: _upper, ...s }) => ((s.kind === 'house' || s.kind === 'flats') && s.index !== homes[0] ? { ...s, kind: 'park' as const } : s)) };
     expect(townIssues(few, t, content).blocking.some((i) => i.text.startsWith('Fewer than two homes'))).toBe(true);
   });
 
@@ -528,7 +529,7 @@ describe('the Problems list and picking, on a generated town', async () => {
     const city = generateWorld(content, t, 'country', 77, undefined, undefined, { town: 'city', villages: 'many' });
     const t0 = performance.now();
     const found = townIssues(city, t, content);
-    console.log(`townIssues on a city with many villages (${city.slots.length} lots, ${city.open?.backdrop?.length ?? 0} buildings): ${(performance.now() - t0).toFixed(0)} ms`);
+    console.log(`townIssues on a city with many villages (${city.slots.length} lots, ${city.open?.carParks?.length ?? 0} car parks): ${(performance.now() - t0).toFixed(0)} ms`);
     expect(found.blocking).toEqual([]);
   }, 60_000);
 });
