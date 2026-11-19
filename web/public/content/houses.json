@@ -5027,7 +5027,7 @@
     {"def": "groceryShelf", "x": 1, "z": 7, "rot": 1},
     {"def": "groceryShelf", "x": 6, "z": 4, "rot": 3},
     {"def": "groceryShelf", "x": 6, "z": 7, "rot": 3},
-    {"def": "vendingDrink", "x": 6, "z": 10, "rot": 3},
+    {"def": "vendingDrink", "x": 6, "z": 9, "rot": 3},
     {"def": "pantry", "x": 6, "z": 11, "rot": 2},
     {"def": "wallClock", "x": 4, "z": 11, "rot": 2},
     {"def": "ceilingLight", "x": 3, "z": 5, "rot": 0},
@@ -5081,10 +5081,9 @@
     {"def": "ceilingPendant", "x": 2, "z": 5, "rot": 0},
     {"def": "ceilingPendant", "x": 5, "z": 7, "rot": 0},
     {"def": "ceilingPendant", "x": 3, "z": 10, "rot": 0},
-    {"def": "cafeTable", "x": 2, "z": 1, "rot": 0},
-    {"def": "cafeChair", "x": 1, "z": 1, "rot": 1},
-    {"def": "cafeChair", "x": 3, "z": 1, "rot": 3},
-    {"def": "garden.geraniums", "x": 6, "z": 2, "rot": 2},
+    {"def": "cafeTable", "x": 6, "z": 1, "rot": 0},
+    {"def": "cafeChair", "x": 7, "z": 1, "rot": 3},
+    {"def": "garden.geraniums", "x": 2, "z": 2, "rot": 2},
     {"def": "bush", "x": 5, "z": 14, "rot": 0}
    ]
   },
@@ -5218,7 +5217,7 @@
     {"def": "ceilingLight", "x": 11, "z": 11, "rot": 0},
     {"def": "garden.boxwood", "x": 3, "z": 2, "rot": 2},
     {"def": "garden.boxwood", "x": 11, "z": 2, "rot": 2},
-    {"def": "bikeRack", "x": 10, "z": 1, "rot": 0},
+    {"def": "bikeRack", "x": 1, "z": 1, "rot": 0},
     {"def": "bush", "x": 3, "z": 16, "rot": 0}
    ]
   },

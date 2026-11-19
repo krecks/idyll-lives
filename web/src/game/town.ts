@@ -1286,13 +1286,16 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
         const [a, b] = [turn.point([bay.x + bay.w / 2, 0]), turn.point([bay.x + bay.w / 2, -1])];
         const meets = driveMeets(town.roads, roads, a, [b[0] - a[0], b[1] - a[1]], DRIVE_REACH);
         const reaches = !!meets?.square && verge(s, bay, DRIVE_REACH, meets.road);
+        paths.push(turn.rect(bay));
         drives.push({ plot: s.index, flat: unit, inner: turn.point([bay.x + bay.w / 2, bay.d]), street: turn.point([bay.x + bay.w / 2, 0]), facing: s.facing, meets });
         const mine = s.index === playerSlot && unit === playerFlat;
         const car = reaches && (who?.has(unit) || mine) ? houseCar(plotRect(t, s), s.facing, turn.rect(bay), mine) : null;
         if (car) cars.push({ plot: s.index, flat: unit, ...car });
       }
-      // (The street door's path out across the verge: a building's own, or the flats' beside the place's door.)
+      // (The street door's path out across the verge, and a building's porch over it: a flats building's own; the
+      // flats' door beside a place's has its letterboxes by it, no porch.)
       pathTo(s, f.front);
+      if (s.kind === 'flats') porchOver(s, f.shell[0] ?? {}, f.front);
     }
     // A place with real floors above (`flats.ts` `placeFloors`): each on its storey's rows (its ground floor is the place's layout, stairs added).
     const up = floorsBy.get(s.index);
@@ -1311,9 +1314,12 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
         shell(s, place.upper, town.depth);
         placeAll(s, place.upper.objects, town.depth);
       }
-      if (place.doors?.[0]) {
-        pathTo(s, place.doors[0]);
-        porchOver(s, place, place.doors[0]);
+      // (Its own front door: with flats over it, not theirs.)
+      const front = flatsBy.get(s.index)?.front;
+      const door = place.doors?.find((d) => !front || d.x !== front.x || d.z !== front.z || d.axis !== front.axis);
+      if (door) {
+        pathTo(s, door);
+        porchOver(s, place, door);
       }
       paths.push(...(place.paths ?? []).map(turnOnto(t, s).rect));
       continue;
