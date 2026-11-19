@@ -525,13 +525,14 @@ const CAR_HOURS: u64 = 4;
 /// The most of a size's cars that may have no way onto the road.
 const NO_WAY: f32 = 0.1;
 /// How far the middle of a car on the move may be off the paving (m): the roads, the driveways
-/// and their way across the verge (`meta.paths`), a dead end's turning circle, a parking spot.
+/// and their way across the verge (`meta.paths`), a dead end's turning circle, a parking spot, a
+/// car park's apron.
 /// (Its body is about a metre either side: out of a driveway at a bend it may cut the edge.)
 const OFF_PAVING: f32 = 1.5;
 
 /// How far `at` is off the paving (m): from the nearest road's edge, a path (a driveway and its
-/// way across the verge) or the parking spot of the car's trip, whichever is nearest. 0 off the
-/// map (past a way out of town).
+/// way across the verge), the parking spot of the car's trip or a car park's apron (the town file's
+/// `carParks`), whichever is nearest. 0 off the map (past a way out of town).
 fn off_paving(
     w: &World,
     car: &sim_core::cars::Car,
@@ -565,7 +566,79 @@ fn off_paving(
         .iter()
         .map(|&(c, r)| ((c[0] - at[0]).hypot(c[1] - at[1]) - r).max(0.0))
         .fold(f32::INFINITY, f32::min);
-    road.min(path).min(park).min(cap)
+    let apron = w
+        .travel
+        .file
+        .car_parks
+        .iter()
+        .map(|p| off_poly(at, &p.poly))
+        .fold(f32::INFINITY, f32::min);
+    road.min(path).min(park).min(cap).min(apron)
+}
+
+/// How far `at` is outside the polygon `poly` (m; 0 inside it or on its edge).
+fn off_poly(at: [f32; 2], poly: &[[f32; 2]]) -> f32 {
+    let n = poly.len();
+    if n < 3 {
+        return f32::INFINITY;
+    }
+    let mut inside = false;
+    let mut least = f32::INFINITY;
+    for k in 0..n {
+        let (a, b) = (poly[k], poly[(k + 1) % n]);
+        if (a[1] > at[1]) != (b[1] > at[1])
+            && at[0] < a[0] + (b[0] - a[0]) * (at[1] - a[1]) / (b[1] - a[1])
+        {
+            inside = !inside;
+        }
+        let ab = [b[0] - a[0], b[1] - a[1]];
+        let t = (((at[0] - a[0]) * ab[0] + (at[1] - a[1]) * ab[1])
+            / (ab[0] * ab[0] + ab[1] * ab[1]).max(1e-6))
+        .clamp(0.0, 1.0);
+        least = least.min((a[0] + ab[0] * t - at[0]).hypot(a[1] + ab[1] * t - at[1]));
+    }
+    if inside { 0.0 } else { least }
+}
+
+/// What is wrong with `car` parked out on a trip, if anything: it stands where no bay of the
+/// town file's is, or not at its pose (its middle and yaw: the pose drawn), or its body reaches
+/// past the bay's lines (`cars::BAY_LINES`).
+fn out_of_its_bay(w: &World, car: &sim_core::cars::Car) -> Option<String> {
+    let (at, yaw, ..) = car.shown?;
+    let Some(bay) = w
+        .travel
+        .file
+        .parking
+        .iter()
+        .find(|p| (p.x - at[0]).hypot(p.z - at[1]) < 0.01)
+    else {
+        return Some(format!(
+            "parked out at {:.2},{:.2}, in no bay",
+            at[0], at[1]
+        ));
+    };
+    let want = bay.yaw.unwrap_or(yaw);
+    if (want - yaw).sin().abs() > 1e-3 || (want - yaw).cos() < 0.0 {
+        return Some(format!(
+            "parked at {:.2},{:.2} facing {yaw:.3}, its bay {want:.3}",
+            at[0], at[1]
+        ));
+    }
+    let (fs, fc) = want.sin_cos();
+    let past = body(at, yaw, car.len, car.wid)
+        .iter()
+        .map(|p| {
+            let (dx, dz) = (p[0] - bay.x, p[1] - bay.z);
+            ((dx * fs + dz * fc).abs() - sim_core::cars::BAY_LINES[1] / 2.0)
+                .max((dx * fc - dz * fs).abs() - sim_core::cars::BAY_LINES[0] / 2.0)
+        })
+        .fold(f32::NEG_INFINITY, f32::max);
+    (past > 1e-3).then(|| {
+        format!(
+            "parked at {:.2},{:.2} {past:.2} m past its bay's lines",
+            at[0], at[1]
+        )
+    })
 }
 
 /// Whether a fence or gate stands where `car`'s doors would swing out (within 1.7 m of its sides,
@@ -1102,11 +1175,14 @@ impl Slips {
 /// which made and played every world a second time).
 ///
 /// The households' cars of generated worlds (`town.ts` writes them where the street drew them,
-/// with the road each driveway meets): every one loads parked on its driveway on its lot, nothing
-/// built over it, and few stay parked for want of a way onto the road (`NO_WAY`, a driveway that
-/// comes alongside its road: `Car::no_way`); driven for two days, the
-/// cars on the move keep to the paving (`OFF_PAVING`), some drive to work and some go on trips to
-/// another hamlet, and at three in the morning every car is parked at home, parked
+/// with the road each driveway meets): every one loads parked on its driveway on its lot (a flat's
+/// on its building's), nothing built over it, and few stay parked for want of a way onto the road
+/// (`NO_WAY`, a driveway that comes alongside its road: `Car::no_way`); no public bay is by a
+/// driveway's mouth or on one (`World::bays_by_a_mouth`, a guard the town never needs: `parking.ts`
+/// keeps its car parks clear of the driveways); driven for two days, the cars on the move keep to
+/// the paving (`OFF_PAVING`), every car parked out stands in its bay as the town file has it and
+/// inside its lines (`out_of_its_bay`), some drive to work and some go on trips to another
+/// hamlet, and at three in the morning every car is parked at home, parked
 /// out at a public spot, or away with someone at work in it; nobody waits for a car for hours
 /// (`CAR_HOURS`; a world's long stretches away or walking are about as many without cars). A
 /// preview in 0.7.0 (the owner's decision, 2026-11-07), a car held up in the seen area is counted,
@@ -1212,7 +1288,9 @@ fn generated_worlds_cars_keep_to_the_roads() {
                 ));
             }
             tally[2] += usize::from(car.no_way || shut);
-            if !w.plots[car.plot as usize]
+            // (A flat's car stands in its building's front strip.)
+            let lot = w.plots[car.plot as usize].of.unwrap_or(car.plot);
+            if !w.plots[lot as usize]
                 .contains(car.spot[0].floor() as i32, car.spot[1].floor() as i32)
             {
                 failures.push(format!(
@@ -1220,6 +1298,21 @@ fn generated_worlds_cars_keep_to_the_roads() {
                     at(car.spot)
                 ));
             }
+        }
+        let by_a_mouth = w.bays_by_a_mouth();
+        if !by_a_mouth.is_empty() {
+            let at: Vec<String> = by_a_mouth
+                .iter()
+                .map(|&k| {
+                    let p = &w.travel.file.parking[k];
+                    format!("{:.1},{:.1}", p.x, p.z)
+                })
+                .collect();
+            failures.push(format!(
+                "{label}: {} public bays by a driveway's mouth or on one: {}",
+                at.len(),
+                at.join(" ")
+            ));
         }
         let paths: Vec<[f32; 4]> = w.meta["paths"]
             .as_array()
@@ -1257,6 +1350,7 @@ fn generated_worlds_cars_keep_to_the_roads() {
         let mut half = HalfDay::new(&w);
         let start = w.tick;
         let mut taxi_faults = std::collections::BTreeSet::new();
+        let mut bay_faults = std::collections::BTreeSet::new();
         let slip = std::env::var("SLIP").ok();
         let mut slips = Slips::default();
         while w.tick < end {
@@ -1341,6 +1435,11 @@ fn generated_worlds_cars_keep_to_the_roads() {
                     }
                     was[c] = car.state;
                 }
+                if car.state == CarState::Out
+                    && let Some(fault) = out_of_its_bay(&w, car)
+                {
+                    bay_faults.insert(format!("the car of plot {} {fault}", car.plot));
+                }
                 let Some((at, _, true, _)) = car.shown else {
                     continue;
                 };
@@ -1373,6 +1472,7 @@ fn generated_worlds_cars_keep_to_the_roads() {
             }
         }
         failures.extend(taxi_faults.into_iter().map(|f| format!("{label}: {f}")));
+        failures.extend(bay_faults.into_iter().map(|f| format!("{label}: {f}")));
         if worst.0 > OFF_PAVING {
             failures.push(format!(
                 "{label}: {} is {:.2} m off the paving",
