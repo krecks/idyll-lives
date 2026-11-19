@@ -1313,7 +1313,7 @@ impl Subdivided {
         let s = n + 2;
         let mut lines = vec![0u32; s * s];
         for i in 0..s {
-            lines[i] = verts[n * 3 + 2 + (n - i + 1)];
+            lines[i] = verts[n * 3 + 2 + (n + 1 - i)];
             lines[(s - 1) * s + i] = verts[n + i];
         }
         for i in 0..n {
