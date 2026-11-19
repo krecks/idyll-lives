@@ -4,6 +4,7 @@
   import { services } from '../services';
   import { play } from '../sfx';
   import { game, type BuildTool } from '../state.svelte';
+  import { flatRefuses } from '../../game/flatBuild';
   import Blueprints from './Blueprints.svelte';
   import BuildDock from './BuildDock.svelte';
   import LookPicker from './LookPicker.svelte';
@@ -50,6 +51,9 @@
   const underground = (id: BuildTool) => game.storey < 0 && aboveGround.has(id);
   /** Tools for the ground only (a garage and a porch stand on it). */
   const upstairs = (id: BuildTool) => game.storey !== 0 && (id === 'garage' || id === 'porch');
+  /** Why a tool does nothing at home in a flat (its roof, outside, yard and stairs are the building's), in the simulation's words; null in a house. */
+  const homePlot = $derived(game.households.find((h) => h.player)?.plot);
+  const inFlat = (id: BuildTool) => flatRefuses(id, homePlot, game);
   /** The staircases the Stairs tool offers, and the one picked (as `LookPicker` shows them). */
   const stairDefs = $derived(content.staircases());
   const stairDef = $derived(stairDefs[game.buildLook.stair] ?? stairDefs[0]);
@@ -140,8 +144,8 @@
                 role="radio"
                 aria-checked={game.buildTool === t.id}
                 class:active={game.buildTool === t.id}
-                disabled={underground(t.id) || upstairs(t.id)}
-                title="{t.label}{costLabel(t)} — {underground(t.id) ? 'Not in the basement.' : upstairs(t.id) ? 'Only on the ground.' : t.note}{t.id === 'wall' ? diagonal : ''}"
+                disabled={underground(t.id) || upstairs(t.id) || !!inFlat(t.id)}
+                title="{t.label}{costLabel(t)} — {inFlat(t.id) ? `${inFlat(t.id)}.` : underground(t.id) ? 'Not in the basement.' : upstairs(t.id) ? 'Only on the ground.' : t.note}{t.id === 'wall' ? diagonal : ''}"
                 onclick={() => pick(t.id)}
               >
                 <span class="badge"><Icon name={t.icon} size={18} /></span>

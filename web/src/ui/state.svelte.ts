@@ -198,6 +198,8 @@ class GameState {
   /** Wall edges the build preview changes, and whether it can be built (for the cursor tag). */
   buildEdges = $state(0);
   buildValid = $state(true);
+  /** Why the build edit in hand can't go there, in the simulation's words, when it says more than "can't build here" (a flat's outer walls). */
+  buildWhy = $state<string | null>(null);
   /** The Room tool's rectangle in tiles while one is drawn. */
   buildRoom = $state.raw<[number, number] | null>(null);
   /** Whether the object in hand fits where the pointer is. */
@@ -290,10 +292,10 @@ class GameState {
     this.former = [];
     this.households = [];
     this.plots = [];
-    this.relationships = [];
-    this.socialMenu = null;
     this.flats = [];
     this.homeArea = null;
+    this.relationships = [];
+    this.socialMenu = null;
     this.feed = [];
     this.menu = null;
     this.pauseMenu = false;

@@ -47,6 +47,7 @@ import { mixNow } from '../audio/mixer';
 import { addBlueprint, blueprints } from '../persistence/blueprints.svelte';
 import { Director } from './director';
 import { addedObjects, BuildBuyInput, editFeedback, liveAdded, placeEffect, type Picked } from './buildmode';
+import { flatRefuses } from './flatBuild';
 import { ownSize } from './surfaces';
 import { colorValues } from '../ui/buy/catalog';
 import { play } from '../ui/sfx';
@@ -998,6 +999,12 @@ async function openSession(
       }
     },
     setBuildTool(tool) {
+      // (In a flat what the simulation refuses isn't taken up: its roof, outside, yard and stairs are the building's.)
+      const refused = flatRefuses(tool, homePlot(), game);
+      if (refused) {
+        if (game.buildTool === tool) tool = 'wall';
+        else return toast(refused);
+      }
       const wasBuilding = game.mode === 'build';
       controls.setMode('build');
       // Changing tab or tool, or (re)entering the Stairs tool, drops what's in hand.
