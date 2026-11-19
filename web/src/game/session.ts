@@ -1975,7 +1975,9 @@ async function openSession(
   const statsTimer = setInterval(() => {
     // GPU timing costs a little, so it runs only while the overlay is open (or the benchmark asks).
     renderer.measureGpu(game.perfOpen || GAMEPLAY_STATS);
-    if (!game.perfOpen) return;
+    // (A session prepared behind the menus leaves the overlay to their own numbers, `App.svelte`: both written, it
+    // flickered between theirs and this one's, its simulation thread there and gone twice a second.)
+    if (!game.perfOpen || app.screen !== 'game') return;
     game.stats = renderer.stats();
     game.threads = threadStats(game.stats, bridge.threadStats, voices.stats());
   }, STATS_INTERVAL_MS);
