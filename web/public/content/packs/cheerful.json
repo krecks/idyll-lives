@@ -116,6 +116,7 @@
           "id": "mix",
           "label": "Mix a fruity mocktail",
           "anim": "drink",
+          "sound": "pour",
           "minutes": 15,
           "pose": "stand",
           "autonomous": true,

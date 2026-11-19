@@ -947,6 +947,7 @@
           "id": "cut",
           "label": "Cut some tulips",
           "anim": "tend",
+          "sound": "shears",
           "minutes": 6,
           "autonomous": false,
           "effects": {
@@ -1014,6 +1015,7 @@
           "id": "cut",
           "label": "Cut some daffodils",
           "anim": "tend",
+          "sound": "shears",
           "minutes": 6,
           "autonomous": false,
           "effects": {
@@ -1081,6 +1083,7 @@
           "id": "cut",
           "label": "Cut some daisies",
           "anim": "tend",
+          "sound": "shears",
           "minutes": 6,
           "autonomous": false,
           "effects": {
@@ -1350,6 +1353,7 @@
           "id": "cut",
           "label": "Cut some lilies",
           "anim": "tend",
+          "sound": "shears",
           "minutes": 6,
           "autonomous": false,
           "effects": {
@@ -1508,6 +1512,7 @@
           "id": "cut",
           "label": "Cut some cosmos",
           "anim": "tend",
+          "sound": "shears",
           "minutes": 6,
           "autonomous": false,
           "effects": {

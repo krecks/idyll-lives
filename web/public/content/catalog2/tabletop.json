@@ -21,6 +21,8 @@
           "id": "tea",
           "label": "Make a cup of tea",
           "anim": "drink",
+          "sound": "kettle",
+          "endSound": "kettleOff",
           "minutes": 8,
           "effects": {
             "comfort": 0.12,
@@ -401,6 +403,7 @@
           "id": "tea",
           "label": "Pour a cup of tea",
           "anim": "drink",
+          "sound": "pour",
           "minutes": 20,
           "pose": "sit",
           "seatNear": 2,
@@ -476,6 +479,7 @@
             "elder"
           ],
           "anim": "drink",
+          "sound": "pour",
           "minutes": 10,
           "pose": "sit",
           "seatNear": 2,
@@ -808,6 +812,7 @@
       "decor": 0.2,
       "radius": 0.09,
       "description": "A red twin-bell alarm clock. It stands on a table, counter, desk or shelf.",
+      "ambient": "clockTick",
       "interactions": []
     },
     {

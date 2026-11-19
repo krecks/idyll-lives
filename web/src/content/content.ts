@@ -59,9 +59,11 @@ export interface InteractionDef {
   /**
    * Sold by someone at the object (sim-core `staff.rs`): on a public lot whose post has a server, under `label`
    * and `anim` (ordered, handed over, paid for; greyed out outside the post's `staff.hours`); where nobody serves
-   * (a household's own cart), helping themselves under this label and animation.
+   * (a household's own cart), helping themselves under this label and animation. Done so, the interaction's own
+   * `sound` and `endSound` aren't heard (nobody serves or takes money); `endSound`: one played once as it ends
+   * instead (a shop counter's `till`: paid on the way out).
    */
-  selfServe?: { label: string; anim?: string };
+  selfServe?: { label: string; anim?: string; endSound?: string };
   /** What it `requires` is fetched first, with this interaction (by id) of what provides it on the plot: a coffee poured at the machine. */
   fetch?: string;
   /** Takes every slot of the object: only started with nobody else on it, and nobody else gets on while it lasts. */
@@ -130,11 +132,11 @@ export interface InteractionDef {
   /**
    * What it sounds like while it lasts: a world sound by key (`audio/catalog.ts` `LOOPS`: `chop` for
    * a cheese board), or `none`; absent: by the object's `sounds`, else by `anim`. A sound played
-   * once (`audio/kinds.ts` `ONCE_THINGS`: `vendCan`) plays as it starts. Not for a `recipe`, whose
+   * once (`audio/kinds.ts` `ONCE_THINGS`, `ONCE_EVENTS`: `vendCan`, a drawer's `drawer`) plays as it starts. Not for a `recipe`, whose
    * steps sound by the station they're done at.
    */
   sound?: string;
-  /** A sound played once as it ends (`audio/kinds.ts` `ONCE`, `ONCE_THINGS`: a toilet's `flush`, a microwave's `ping`). */
+  /** A sound played once as it ends (`audio/kinds.ts` `ONCE`, `ONCE_THINGS`, `ONCE_HOME`, `ONCE_EVENTS`: a toilet's `flush`, a microwave's `ping`, a kettle's `kettleOff`, a shop's `till`). */
   endSound?: string;
 }
 

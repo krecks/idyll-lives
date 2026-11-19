@@ -976,6 +976,7 @@
           "id": "breakfast",
           "label": "Have breakfast at the island",
           "anim": "eat",
+          "sound": "cutlery",
           "seatNear": 3,
           "minutes": 20,
           "effects": {
@@ -1067,6 +1068,7 @@
           "id": "breakfast",
           "label": "Have breakfast",
           "anim": "eat",
+          "sound": "cutlery",
           "minutes": 20,
           "pose": "sit",
           "effects": {
@@ -1138,6 +1140,7 @@
           "id": "breakfast",
           "label": "Have breakfast",
           "anim": "eat",
+          "sound": "cutlery",
           "minutes": 20,
           "pose": "sit",
           "effects": {
@@ -1209,6 +1212,7 @@
           "id": "breakfast",
           "label": "Have breakfast",
           "anim": "eat",
+          "sound": "cutlery",
           "minutes": 20,
           "pose": "sit",
           "effects": {
@@ -1247,6 +1251,7 @@
           "id": "dinner",
           "label": "Linger over dinner",
           "anim": "eat",
+          "sound": "cutlery",
           "minutes": 40,
           "pose": "sit",
           "effects": {
@@ -2460,6 +2465,7 @@
           "label": "Pick an outfit",
           "changesOutfit": true,
           "anim": "clean",
+          "sound": "drawer",
           "minutes": 10,
           "effects": {
             "comfort": 0.05
@@ -2491,6 +2497,7 @@
           "label": "Pick an outfit",
           "changesOutfit": true,
           "anim": "clean",
+          "sound": "drawer",
           "minutes": 10,
           "effects": {
             "comfort": 0.05
@@ -3505,6 +3512,7 @@
           "id": "game",
           "label": "Play PC games",
           "anim": "play",
+          "sound": "arcade",
           "minutes": 60,
           "pose": "sit",
           "effects": {
@@ -4263,6 +4271,7 @@
       "layer": "wall",
       "decor": 0.4,
       "description": "A clean, round clock.",
+      "ambient": "clockTick",
       "interactions": []
     },
     {
@@ -4411,6 +4420,7 @@
       "group": "ornaments",
       "decor": 1.5,
       "description": "A tall clock with a pendulum. Someone has to wind it.",
+      "ambient": "clockTick",
       "interactions": [
         {
           "id": "wind",
@@ -5136,6 +5146,7 @@
           "id": "picnic",
           "label": "Have a picnic",
           "anim": "eat",
+          "sound": "cutlery",
           "minutes": 25,
           "pose": "sit",
           "effects": {

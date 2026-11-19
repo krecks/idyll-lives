@@ -1103,6 +1103,7 @@
           "id": "relax",
           "label": "Warm up by the fire",
           "anim": "relax",
+          "sound": "fireplaceElectric",
           "minutes": 30,
           "pose": "sit",
           "effects": {

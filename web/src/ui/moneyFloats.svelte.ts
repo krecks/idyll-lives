@@ -18,16 +18,21 @@ export class MoneyFloats<At extends object = object> {
     private readonly most = Infinity,
   ) {}
 
-  /** The funds now: the change since the last ones floats off, if `show` (`at` says where from). */
-  note(funds: number, show: boolean, at: () => At = () => ({}) as At): void {
+  /**
+   * The funds now: the change since the last ones floats off, if `show` (`at` says where from). Returns the
+   * change that floated off (0: none).
+   */
+  note(funds: number, show: boolean, at: () => At = () => ({}) as At): number {
     // (Untracked: an effect calling this reruns only when the funds, or `show`, change.)
-    untrack(() => {
+    return untrack(() => {
       const was = this.funds;
       this.funds = funds;
-      if (!show || was === null || Math.round(funds - was) === 0) return;
+      if (!show || was === null || Math.round(funds - was) === 0) return 0;
       const id = this.next++;
-      this.shown = [...this.shown, { ...at(), id, amount: funds - was }].slice(-this.most);
+      const amount = funds - was;
+      this.shown = [...this.shown, { ...at(), id, amount }].slice(-this.most);
       setTimeout(() => (this.shown = this.shown.filter((f) => f.id !== id)), this.ms);
+      return amount;
     });
   }
 }

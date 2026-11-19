@@ -262,6 +262,7 @@
             "anim": "drink"
           },
           "anim": "buy",
+          "sound": "till",
           "minutes": 30,
           "stages": [
             "youngAdult",
