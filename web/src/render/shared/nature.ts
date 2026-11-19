@@ -20,6 +20,7 @@ import { compose, quatAxisAngle } from './math';
 import { fbm, hash, mulberry32, ridged, smoothstep, valueNoise } from '../../game/noise';
 import { tuned } from '../tune';
 import { shareAt, ZONE_CELL, ZoneField, type ZoneKind } from './zones';
+import { townPaving } from './townPaving';
 
 /**
  * How far the landscape extends beyond the town (metres): towns of older code, and worlds (which
@@ -394,8 +395,9 @@ function bareTilesOf(world: WorldStructure, mask: LawnMask): Uint8Array {
 
 /**
  * Per tile of the town's ground (1), where no lawn grows at all: its roads (or streets), paths and
- * fields (the birds forage on the lawn). `any`: the tiles any of them reaches into; else only those whose middle they
- * cover.
+ * fields, and its paving as near and far draw it (`townPaving`: the centre, courts and yards, car parks) (the birds
+ * forage on the lawn). `any`: the tiles any of them reaches into; else only
+ * those whose middle they cover.
  */
 export function unlawned(world: WorldStructure, any = true): Uint8Array {
   const w = world.width;
@@ -407,6 +409,9 @@ export function unlawned(world: WorldStructure, any = true): Uint8Array {
     const [[x0, x1], [z0, z1]] = [span(r.x, r.w, w), span(r.z, r.d, d)];
     for (let z = z0; z < z1; z++) out.fill(1, z * w + x0, z * w + Math.max(x0, x1));
   }
+  // The town's paving (`townPaving`: the centre, courts and yards, car parks).
+  const paved = townPaving(world).mask(w, d, any);
+  for (let i = 0; i < out.length; i++) if (paved[i]) out[i] = 1;
   return out;
 }
 
@@ -2336,7 +2341,7 @@ export function lawnInputs(world: WorldStructure): LawnInputs {
     things,
     defs: world.objects.map((o) => o.def).join(),
     edges: JSON.stringify([world.walls.length, world.diagonals, world.floors, world.walls.map((e) => `${e.axis}${e.x},${e.z}`).join(), lawnEdges(world)]),
-    meta: [world.meta?.paths, world.meta?.streets, world.meta?.roads, world.meta?.world?.fields],
+    meta: [world.meta?.paths, world.meta?.streets, world.meta?.roads, world.meta?.world?.fields, world.meta?.centre, world.meta?.paving, world.meta?.greens, world.parking, world.carParks],
   };
 }
 

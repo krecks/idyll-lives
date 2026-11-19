@@ -1,5 +1,5 @@
 //! The street's dressing props (`model.street.*`): the kerbside bench, the planter with its little tree, the
-//! flower tub, the street-name sign, the taxi rank's sign, the pot by a front door, the garden path light, and the
+//! flower tub, the street-name sign, the taxi rank's sign, the car park's P sign, the pot by a front door, the garden path light, and the
 //! foliage of the street (`flowers`). Notes: NOTES.md.
 //!
 //! render/pc/street.ts draws them as thin instances along the kerbs and in the neighbours' front gardens, dozens
@@ -48,6 +48,7 @@ palette! { M:
     taxi = ("#F2B81C", gloss),
     black = ("#16181A", matte),
     sign_light = ("#FFF4C8", satin, glow("#FFE7A0")),
+    sign_blue = ("#1F4F9A", gloss), // the car park's P sign's panel
     terracotta = ("#B5653F", satin), // the door pot
     lamp = ("#2B2C2E", metal), // the path light's post and cap
     // the path light's frosted lens: glows at night (E8), where the old part's glass bulb was
@@ -72,12 +73,16 @@ pub fn family() -> Option<Family> {
                 .centre(0.0, 0.0141)
                 .code()
                 .far_low(),
+            Model::new("parkingSign", signs::parking_sign, (0.46, 2.417, 0.15))
+                .code()
+                .far_low(),
             Model::new("pot", props::pot, (0.432, 0.88, 0.421)).far_low(),
             Model::new("pathLight", props::path_light, (0.18, 0.56, 0.18)).far_low(),
             Model::new("flowers", props::flowers, (0.6, 0.343, 0.52)).far_low(),
         ],
         "The street's dressing (crates/art/nature/src/street, built by cargo art): the kerbside bench, \
          the planter with its little tree, the flower tub, the street-name sign, the taxi rank's sign, \
+         the car park's P sign, \
          the door pot, the garden path light and the flower clump that \
          render/pc/street.ts draws as thin instances along the kerbs and front gardens. Listed \
          in the base manifest's packs. Each has a far version for the town overview. Leaves and \
