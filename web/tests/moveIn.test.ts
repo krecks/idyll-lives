@@ -136,8 +136,8 @@ describe('moving in', async () => {
     // Their old home is filled with the rest (it isn't among the few cheapest kept here, or it is for sale).
     const filled = townOnMoveIn(content, assets, t, moved);
     expect(filled.households.some((h) => h.household === own.household)).toBe(false);
-    // (No newcomer takes their family name while the names last: a town of more households than names shares some.)
-    if (filled.households.length < content.names.last.length) expect(filled.households.every((h) => h.household.name !== own.household.name)).toBe(true);
+    // (No newcomer takes their family name.)
+    expect(filled.households.every((h) => h.household.name !== own.household.name)).toBe(true);
   });
 
   test("one of the town's households in a flat stays in it (taken over), or moves and leaves only its flat for sale", () => {
@@ -185,6 +185,8 @@ describe('moving in', async () => {
     expect(residents(filled)).toBeLessThanOrEqual(FILL_CAP);
     expect(residents(filled)).toBeGreaterThan(FILL_CAP - 4);
     expect(forSale(filled, { slot: home }).length).toBe(keepForSale(homes(big)));
+    // A family name to every household: the names outlast a town filled to the cap.
+    expect(new Set(filled.households.map((h) => h.household.name)).size).toBe(filled.households.length);
     // The village has its households.
     expect(filled.households.some((h) => (filled.slots[h.slot].area ?? 0) === 1)).toBe(true);
     // A smaller tier: fewer homes.
