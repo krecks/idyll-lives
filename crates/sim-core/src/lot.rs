@@ -192,7 +192,9 @@ pub struct LotFile {
     pub objects: Vec<PlacementRaw>,
     #[serde(default)]
     pub sims: Vec<SimSpawn>,
-    /// Regions of a town (residential lots, parks). Optional for single lots.
+    /// Regions of a town (residential lots, parks). Optional for single lots. The lots on the ground
+    /// come first, in slot order; then every flat (`PlotRaw::of`), each a plot of its own inside its
+    /// building's lot on one storey, its id following the last ground lot's.
     #[serde(default)]
     pub plots: Vec<PlotRaw>,
     #[serde(default)]
@@ -225,7 +227,8 @@ pub struct LotFile {
     #[serde(default)]
     pub meta: serde_json::Value,
     // ---- Open world (sim-travel) -------------------------------
-    /// `size`, `roads`, `areas`, `terrain` and `parking` (`travel.rs`). All optional.
+    /// `size`, `roads`, `areas`, `terrain`, `parking` (marked bays, each with the pose a car parks
+    /// at) and `carParks` (the rows the bays make) (`travel.rs`). All optional.
     #[serde(flatten)]
     pub open_world: crate::travel::OpenWorld,
 }
@@ -252,6 +255,21 @@ pub struct PlotRaw {
     /// page); absent: always.
     #[serde(default)]
     pub hours: Option<crate::world::PlotHours>,
+    // ---- Flats (kind `flat`) ----
+    /// A flat: the ground lot of its building (a flats lot, or a place's with flats over it). Its
+    /// rectangle is on the ground's rows, inside that lot's; its `entry` is the building's street
+    /// door, on the ground, which its flats share.
+    #[serde(default)]
+    pub of: Option<u32>,
+    /// The storey a flat is on (0: the ground).
+    #[serde(default)]
+    pub storey: i8,
+    /// A flat's landing tile before its own door, and the tile behind that door (its middle), both
+    /// on its storey's rows (`storeys.rs`).
+    #[serde(default)]
+    pub door: Option<[i32; 2]>,
+    #[serde(default)]
+    pub inside: Option<[f32; 2]>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -333,6 +351,10 @@ pub struct PlacementRaw {
     /// Centimetres taller (negative: shorter) than its kind.
     #[serde(default)]
     pub tall: i16,
+    /// The plot it belongs to though it stands elsewhere (a flat's letterbox in the hall, its bike
+    /// in the yard): `world::ObjectInstance::keeper`. Absent: the plot it stands on.
+    #[serde(default)]
+    pub plot: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

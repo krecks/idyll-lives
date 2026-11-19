@@ -196,7 +196,8 @@ impl Terrain {
     }
 }
 
-/// What a plot is (`plots[].kind`).
+/// What a plot is (`plots[].kind`): a lot on the ground, or a flat (`Flat`, a plot of its own inside
+/// a building's lot: `world::Plot::of`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PlotKind {
@@ -205,6 +206,10 @@ pub enum PlotKind {
     Public,
     Shop,
     Countryside,
+    /// A building of flats: its hall, stairs, yard and front strip, nobody's home.
+    Flats,
+    /// A flat: one storey of its building's lot.
+    Flat,
 }
 
 /// The open-world fields of a town file, all optional, read along

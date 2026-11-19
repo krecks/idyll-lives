@@ -137,9 +137,7 @@ mod tests {
             w: 1,
             d: 1,
             public,
-            entry: None,
-            roof: None,
-            hours: None,
+            ..Plot::default()
         }
     }
 
