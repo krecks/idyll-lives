@@ -144,6 +144,9 @@
 //! Left out where it has none, so a file without them (every file before it) has its places open
 //! at any hour, as before. A town holds up to 128 servers (`staff::MAX_STAFF`, 48 before); nothing
 //! of them is saved.
+//! Still 40: curtains may be drawn shut (`objects[].shut`, `curtains.rs`), left out while open, so
+//! a file without it (every file before it) has its curtains open, as the renderer's clock used to
+//! draw them by day, and residents draw them at the next moment they would.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -455,6 +458,9 @@ pub struct ObjectSave {
     /// A lamp switched off (absent before v28, or on).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub off: bool,
+    /// Curtains drawn shut (absent: open; see `curtains.rs`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub shut: bool,
     /// A machine's run (see `ObjectInstance::run`): game minutes left while it runs, 0 done
     /// with its load in it (absent before v33, or empty).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -866,6 +872,7 @@ impl World {
                 open: o.open,
                 growth: content.objects[o.def].grows.is_some().then_some(o.growth),
                 off: o.off && content.objects[o.def].switch,
+                shut: o.shut && content.objects[o.def].over_window,
                 run: o.run.filter(|_| content.objects[o.def].runs.is_some()),
                 rack: o.rack.min(content.objects[o.def].rack),
             })
@@ -1416,6 +1423,7 @@ impl World {
                 obj.wear = o.wear.clamp(0.0, 1.0);
                 obj.open = o.open;
                 obj.off = o.off && world.content.objects[obj.def].switch;
+                obj.shut = o.shut && world.content.objects[obj.def].over_window;
                 obj.growth = finite(o.growth.unwrap_or(1.0), 1.0).clamp(-1.0, 1.0);
                 let runs = world.content.objects[obj.def].runs;
                 obj.run = match o.run {

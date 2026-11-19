@@ -92,6 +92,11 @@ pub enum Command {
         object: u32,
         on: bool,
     },
+    /// Draw curtains shut or open them (see `curtains.rs`): at once, nobody walks over.
+    DrawCurtains {
+        object: u32,
+        shut: bool,
+    },
     /// Adds `amount` to a household's funds (a negative one takes money away, down to 0). For
     /// tests and long checks in the browser (`?debug`'s `__addFunds`); no menu sends it.
     AddFunds {
@@ -492,6 +497,7 @@ impl Command {
     pub(crate) fn object_mut(&mut self) -> Option<&mut u32> {
         match self {
             Command::SwitchLamp { object, .. }
+            | Command::DrawCurtains { object, .. }
             | Command::Use { object, .. }
             | Command::Sell { object, .. }
             | Command::MoveObject { object, .. }

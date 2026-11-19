@@ -28,6 +28,7 @@ mod clear_away;
 mod clock;
 mod cooking;
 mod crowded_garden;
+mod curtains;
 mod daily_life;
 mod debug_commands;
 mod departures;

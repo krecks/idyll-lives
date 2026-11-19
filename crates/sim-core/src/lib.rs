@@ -15,6 +15,7 @@ pub mod command;
 pub mod content;
 pub mod conversation;
 pub mod cooking;
+pub mod curtains;
 pub mod error;
 pub mod garages;
 pub mod home;
