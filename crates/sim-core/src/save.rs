@@ -159,6 +159,16 @@
 //! bought yet (`cars[].want`: `body`, `age`, and `by`, who the story says bought it). The story
 //! may tell of it (`boughtCar`, the body in `n`, by id in `refs.car`). A file before it has its
 //! cars as the town picked them: each is fitted as it loads, as a new town's are, nobody told.
+//! 42 = the real town: a town's plots may be flats, each a plot of its own inside its building's
+//! lot on one storey (`plots[].of`, `storey`, and the landing tile before its door and the tile
+//! behind it, `door` and `inside`; its kind, `flat`, with the others' in `openWorld.plotKinds`),
+//! listed after every lot on the ground; a thing may belong to a plot it doesn't stand on
+//! (`objects[].plot`: a flat's letterbox in the hall); public parking is marked bays, each saying
+//! the way a car parked in it faces (`openWorld.parking[].yaw`) and the car park it is one of
+//! (`park`), and the car parks are kept for the renderer as the town file had them
+//! (`openWorld.carParks`). The game opens no file older than this (sim-wasm's
+//! `OLDEST_SAVE_VERSION`: too old, removed); the simulation still reads them for its own tests
+//! until their migrations go, a bay without a yaw facing away from the road nearest it as before.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -177,7 +187,7 @@ use crate::{
     clock::{MAX_SPEED, SUPER_SPEED},
 };
 
-pub const SAVE_VERSION: u32 = 41;
+pub const SAVE_VERSION: u32 = 42;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
