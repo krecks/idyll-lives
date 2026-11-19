@@ -200,6 +200,7 @@
           "id": "program",
           "label": "Program home routines",
           "anim": "type",
+          "sound": "none",
           "seatNear": 4,
           "minutes": 60,
           "effects": { "fun": 0.1, "comfort": 0.05 },

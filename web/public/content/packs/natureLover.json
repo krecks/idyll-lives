@@ -217,6 +217,7 @@
           "id": "mist",
           "label": "Mist the terrarium",
           "anim": "water",
+          "sound": "none",
           "minutes": 15,
           "pose": "stand",
           "autonomous": true,

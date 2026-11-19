@@ -976,6 +976,7 @@
           "id": "breakfast",
           "label": "Have breakfast at the island",
           "anim": "eat",
+          "sound": "cutlery",
           "seatNear": 3,
           "minutes": 20,
           "effects": {
@@ -1067,6 +1068,7 @@
           "id": "breakfast",
           "label": "Have breakfast",
           "anim": "eat",
+          "sound": "cutlery",
           "minutes": 20,
           "pose": "sit",
           "effects": {
@@ -1138,6 +1140,7 @@
           "id": "breakfast",
           "label": "Have breakfast",
           "anim": "eat",
+          "sound": "cutlery",
           "minutes": 20,
           "pose": "sit",
           "effects": {
@@ -1209,6 +1212,7 @@
           "id": "breakfast",
           "label": "Have breakfast",
           "anim": "eat",
+          "sound": "cutlery",
           "minutes": 20,
           "pose": "sit",
           "effects": {
@@ -1247,6 +1251,7 @@
           "id": "dinner",
           "label": "Linger over dinner",
           "anim": "eat",
+          "sound": "cutlery",
           "minutes": 40,
           "pose": "sit",
           "effects": {
@@ -3505,6 +3510,7 @@
           "id": "game",
           "label": "Play PC games",
           "anim": "play",
+          "sound": "arcade",
           "minutes": 60,
           "pose": "sit",
           "effects": {
@@ -5136,6 +5142,7 @@
           "id": "picnic",
           "label": "Have a picnic",
           "anim": "eat",
+          "sound": "cutlery",
           "minutes": 25,
           "pose": "sit",
           "effects": {

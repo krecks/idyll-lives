@@ -3040,6 +3040,7 @@
           "id": "cut",
           "label": "Cut some flowers",
           "anim": "tend",
+          "sound": "shears",
           "minutes": 6,
           "autonomous": false,
           "effects": {

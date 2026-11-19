@@ -10,12 +10,12 @@
  * out there, so one sound against another reads here as it does in the game.
  */
 
-import { BLIPS, FOOTWEAR, MONO, MUSIC, ONCE, ONCE_MONO, ONCE_THINGS, SPECIES, SURFACES, type Footwear, type MadeKind, type MusicKind, type Stereo, type Surface } from './kinds';
+import { BLIPS, FOOTWEAR, MONO, MUSIC, ONCE, ONCE_HOME, ONCE_MONO, ONCE_THINGS, SPECIES, SURFACES, type Footwear, type MadeKind, type MusicKind, type Stereo, type Surface } from './kinds';
 import { blipSamples, makeSound, monoSamples, songSamples, stepSamples } from './synth';
 
-/** A sound played once (`ONCE`, `ONCE_THINGS`), not looped. */
-export type OnceKind = (typeof ONCE)[number] | (typeof ONCE_THINGS)[number];
-export const ONCE_KINDS: readonly string[] = [...ONCE, ...ONCE_THINGS];
+/** A sound played once (`ONCE`, `ONCE_THINGS`, `ONCE_HOME`), not looped. */
+export type OnceKind = (typeof ONCE)[number] | (typeof ONCE_THINGS)[number] | (typeof ONCE_HOME)[number];
+export const ONCE_KINDS: readonly string[] = [...ONCE, ...ONCE_THINGS, ...ONCE_HOME];
 /** A sound that loops while something is in use (or runs by itself). */
 export type LoopKind = 'sizzle' | 'chop' | 'tv' | 'music' | 'drums' | MusicKind | Exclude<MadeKind, OnceKind>;
 /** A world sound: a loop, or one played once (as a use starts, when it's a use's sound). */
@@ -79,6 +79,19 @@ export const LOOPS: Record<LoopKind, LoopDef> = {
   cello: { level: 0.29 },
   punchBag: { level: 0.33 },
   smash: { level: 0.33 },
+  vacuum: { level: 0.22, drift: 0.02 },
+  mower: { level: 0.25, drift: 0.02 },
+  hose: { level: 0.17, drift: 0.03 },
+  wateringCan: { level: 0.115, drift: 0.03 },
+  kettle: { level: 0.28, drift: 0.03 },
+  saunaStove: { level: 0.29 },
+  sweep: { level: 0.24 },
+  mop: { level: 0.26 },
+  shears: { level: 0.235 },
+  iron: { level: 0.155 },
+  typing: { level: 0.22 },
+  cutlery: { level: 0.13 },
+  fireplaceElectric: { level: 0.115 },
 };
 
 /**
@@ -94,7 +107,7 @@ export function pieceAt(hour: number, dancing: boolean): MusicKind {
 }
 
 /** Levels of the sounds played once. */
-export const ONCE_LEVEL: Record<OnceKind, number> = { flush: 0.3, fridgeDoor: 0.27, binLid: 0.29, vendSnack: 0.25, vendCan: 0.25, phoneBox: 0.23, hangUp: 0.23, ping: 0.21, toastPop: 0.27, pour: 0.21 };
+export const ONCE_LEVEL: Record<OnceKind, number> = { flush: 0.3, fridgeDoor: 0.27, binLid: 0.29, vendSnack: 0.25, vendCan: 0.25, phoneBox: 0.23, hangUp: 0.23, ping: 0.21, toastPop: 0.27, pour: 0.21, kettleOff: 0.295 };
 
 /**
  * The outdoors: the bed of wind (its level at night, and how much the day adds), the crickets at night, the

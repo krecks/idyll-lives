@@ -5,19 +5,21 @@
  * - the street and the weather (`outside.ts`): the cars driving past, the town from above as the camera
  *   zooms out, the wind in the leaves by the gusts the grass shows;
  * - things in use on the lot being looked at: a sizzling pan, a shower, a tap, washing up, a bath, the
- *   washing machine and the dryer, the dishwasher being loaded, a TV, music, drums, and the machines,
- *   games and tools (a treadmill, a blender, darts, a cello...). One loop per kind of sound, louder the
+ *   washing machine and the dryer, the dishwasher being loaded, a TV, music, drums, the machines,
+ *   games and tools (a treadmill, a blender, darts, a cello...), and at home and in the garden the
+ *   cleaning (a vacuum, a mop), a kettle, typing, a mower, a hose, a watering can, shears, a sauna's
+ *   stove and a knife and fork on a plate. One loop per kind of sound, louder the
  *   more residents make it, placed left or right like voices; every sound is made in Rust (`crates/sound`,
  *   through `synth.ts`: the water's, the things', the outdoors' and the music in the sound worker,
  *   `water.worker.ts`; those of one channel, a pan, a knife, the TV, drums, the outdoor bed, crickets, the
  *   knock, here), the music a folk tune by day, a slow one in the evening, a dance while someone dances; the
  *   level of each is in `catalog.ts`. What a use sounds like comes from the thing
- *   (content `sound` and `sounds`), else from its animation (`ACTION_SOUNDS`);
+ *   (content `sound` and `sounds`), else from its animation (`ACTION_SOUNDS`; eating, by what's on the plate);
  * - things that sound by themselves (content `ambient`: a fountain; a machine running on its own, its
  *   `runs.sound`: the washer loaded, nobody at it), while their lot is looked at, some only while a use
  *   under them sounds (`ambientWhile`: a cooker hood over a hob in use);
  * - sounds as something happens: a fridge door as its use starts (a `sound` played once), a toilet's
- *   flush as its use ends (content `endSound`), a visitor's knock at the front door;
+ *   flush or a kettle switching off as its use ends (content `endSound`), a visitor's knock at the front door;
  * - the footsteps of the residents in view (`footsteps.ts`).
  *
  * A thing's sound is placed (`space.ts`): left or right by where it is on screen, in the reverb of the
@@ -31,6 +33,7 @@
 import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
 import { storeyOfRow, storeyRow, type StoreyLayout, type WorldStructure } from '../core/protocol';
+import { eatenWithFork } from '../render/shared/characters/actions';
 import { townView } from '../render/shared/townView';
 import { birdActivity, STOREY_HEIGHT, type Renderer, type ViewRect } from '../render/types';
 import { game } from '../ui/state.svelte';
@@ -69,6 +72,10 @@ const ACTION_SOUNDS: Record<string, LoopKind> = {
   dance: 'music',
   // A cooking step in an oven: its fan (a pizza oven's fire, a microwave's hum: by the object's `sounds`).
   bake: 'ovenFan',
+  // At a computer, a keyboard; plants watered from a can, a hedge or a rose cut back with shears.
+  type: 'typing',
+  water: 'wateringCan',
+  prune: 'shears',
 };
 
 /** Content `sound` that silences a use whose animation would otherwise make one (toast isn't fried). */
@@ -78,10 +85,12 @@ const SILENT = 'none';
  * What a resident's action sounds like, by what they use: the use's own `sound` (not a recipe's,
  * whose steps sound by where they're done), else the cooking step's (`recipe`: the snapshot's,
  * index + 1; a bake), else the object's for that animation (`sounds`: an oven's `stir` is silent),
- * else by the animation (`ACTION_SOUNDS`), with washing by what's washed. A sound played once (a
- * fridge door) is played as the action starts. `def` and `interaction` are the snapshot's (-1: none).
+ * else by the animation (`ACTION_SOUNDS`), with washing by what's washed and eating by what's eaten
+ * (`plate`, its item id: cutlery if it's eaten with a fork, else nothing: an apple, a sandwich). A sound
+ * played once (a fridge door) is played as the action starts. `def` and `interaction` are the
+ * snapshot's (-1: none).
  */
-export function soundOf(content: Content, tag: string, def: number, interaction: number, recipe = 0): SoundKind | undefined {
+export function soundOf(content: Content, tag: string, def: number, interaction: number, recipe = 0, plate = ''): SoundKind | undefined {
   const object = def >= 0 ? content.objectList[def] : undefined;
   const use = interaction >= 0 ? object?.interactions[interaction] : undefined;
   const step = recipe > 0 ? content.recipes[recipe - 1]?.steps.find((s) => s.anim === tag && s.sound !== undefined) : undefined;
@@ -95,6 +104,7 @@ export function soundOf(content: Content, tag: string, def: number, interaction:
     // Getting ready at a dressing table washes without a tap.
     return use.tags?.includes('handwash') ? 'tap' : undefined;
   }
+  if (tag === 'eat') return eatenWithFork(plate) ? 'cutlery' : undefined;
   return ACTION_SOUNDS[tag];
 }
 
@@ -346,7 +356,10 @@ export class WorldSound {
         this.made.sound(end, ac.sampleRate);
       }
       const drawn = tag !== undefined && this.renderer.simHead(i, this.head);
-      let kind = tag === undefined ? undefined : soundOf(this.content, tag, def, interaction, k.recipe === undefined ? 0 : curr[o + k.recipe]);
+      // What they eat (`items` index + 1), as `residents.ts` reads it: a plate eaten with a fork sounds of cutlery.
+      const plateAt = k.plate !== undefined ? curr[o + k.plate] | 0 : 0;
+      const plate = plateAt > 0 && layout.items ? (layout.items[plateAt - 1] ?? '') : '';
+      let kind = tag === undefined ? undefined : soundOf(this.content, tag, def, interaction, k.recipe === undefined ? 0 : curr[o + k.recipe], plate);
       // A sound played once as they start something (a fridge door): heard if they're drawn, once it's made.
       const doing = tag === undefined ? '' : `${object}:${interaction}:${tag}`;
       const before = this.doing.get(id);
