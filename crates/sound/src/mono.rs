@@ -4,11 +4,13 @@
 //! stereo panner) and its level (`catalog.ts`).
 //!
 //! They were Web Audio graphs once (a buffer through a `BiquadFilterNode`; the knock oscillators and a burst of
-//! noise): `node_filter` and `sweep` (in `dsp`) are those nodes' own arithmetic, and what they make here is what
-//! the graphs made (compared sample by sample against Chromium's rendering of them when they moved).
+//! noise): `node_filter` and `sweep` (in `dsp`) are those nodes' own arithmetic, and what the sizzle, the TV,
+//! the drums, the bed and the crickets make here is what the graphs made (compared sample by sample against
+//! Chromium's rendering of them when they moved). The knife's chop and the knock have moved on: each is now
+//! rung from the modes of what is struck (a blade and a board, a door's panel: `Modal`).
 
 use crate::dsp::m::*;
-use crate::dsp::{Filter, Rng, add, node_filter, raw, sample_at, sweep};
+use crate::dsp::{Decay, Filter, Modal, Mode, Rng, add, node_filter, raw, sample_at, sweep};
 
 /// The sounds of one channel, by name (`MONO`).
 pub const KINDS: [&str; 7] = ["sizzle", "chop", "tv", "drums", "bed", "crickets", "knock"];
@@ -51,27 +53,49 @@ fn sizzle(rate: f64) -> Vec<f32> {
     node_filter(&d, rate, Filter::Highpass, 1800.0, 0.5, true)
 }
 
-/// A knife on a chopping board: short woody knocks in uneven runs.
+/// A knife on a chopping board: short woody knocks in uneven runs. Each chop is the blade's ring (its tone and
+/// an overtone over it, gone in a few hundredths of a second), the board's thump under it and a hiss of noise
+/// as the blade lands, rung as a bank of modes (`Modal`); the noise drawn from a generator of its own, so the
+/// rhythm is the runs' alone.
 fn chop(rate: f64) -> Vec<f32> {
     let mut r = Rng::new(9.0);
+    let mut grit = Rng::new(109.0);
     let d = raw(rate, 3.0, |d| {
         let n = d.len();
+        let len = round_usize(0.06 * rate);
+        let fade = 0.005 * rate;
         let mut i = 0;
         while i < n {
             // A run of quick chops, then a pause to move the food along.
             let chops = 3.0 + (r.next() * 6.0).floor();
             let mut c = 0.0;
             while c < chops && i < n {
-                let len = round_usize(0.035 * rate);
                 let level = 0.6 + r.next() * 0.4;
                 let tone = 900.0 + r.next() * 500.0;
+                let mode = |hz, tau, level| Mode {
+                    hz,
+                    tau,
+                    level,
+                    phase: 0.0,
+                };
+                // (The overtone and the thump kept low, the noise's share as the old chop's: the whole is set
+                // by its peak before the band, so what the band then takes off only makes the chop quieter.)
+                let mut ring = Modal::new(
+                    rate,
+                    &[
+                        mode(tone, 0.011, 1.0),
+                        mode(tone * 2.76, 0.006, 0.2),
+                        mode(210.0, 0.018, 0.12),
+                    ],
+                );
+                let mut land = Decay::new(0.33, 0.011, rate);
                 let mut j = 0;
                 while j < len && i + j < n {
-                    let decay = exp((-(j as f64) / rate) * 90.0);
-                    d[i + j] = (((r.next() * 2.0 - 1.0) * 0.5
-                        + sin((2.0 * PI * tone * j as f64) / rate))
+                    // (Out over the last 5 ms, so the board's thump is not cut off.)
+                    let out = min(1.0, (len - j) as f64 / fade);
+                    d[i + j] = ((ring.next() + (grit.next() * 2.0 - 1.0) * land.next())
                         * level
-                        * decay) as f32;
+                        * out) as f32;
                     j += 1;
                 }
                 i += round_usize((0.16 + r.next() * 0.08) * rate);
@@ -259,8 +283,19 @@ fn crickets(rate: f64) -> Vec<f32> {
 /// Where in a second of noise each of the knock's three clicks is read from.
 const CLICKS: [f64; 3] = [0.25, 0.5, 0.75];
 
-/// Three knocks on a wooden door: each a low tone falling from 220 to 95 Hz as it dies away, with a click of
-/// noise (round 1400 Hz) on top; the third a touch late.
+/// A door's panel struck: its modes (Hz, the time to die to a third in s, level), the lowest the panel
+/// flexing whole.
+const PANEL: [[f64; 3]; 6] = [
+    [98.0, 0.040, 1.0],
+    [171.0, 0.032, 0.7],
+    [247.0, 0.026, 0.5],
+    [388.0, 0.018, 0.32],
+    [571.0, 0.012, 0.2],
+    [840.0, 0.008, 0.1],
+];
+
+/// Three knocks on a wooden door: each the door's panel ringing (a bank of its modes, `Modal`) with a click of
+/// noise (round 1400 Hz) on top where the knuckle lands; the third a touch late.
 fn knock(rate: f64) -> Vec<f32> {
     let mut r = Rng::new(1.0);
     let white = raw(rate, 1.0, |d| {
@@ -269,17 +304,26 @@ fn knock(rate: f64) -> Vec<f32> {
         }
     });
     let mut d = vec![0.0f32; round_usize(0.6 * rate)];
+    // One knock of the panel, rung once, its peak 0.45; each knock a copy at its own level, ringing on under the
+    // next.
+    let modes = PANEL.map(|[hz, tau, level]| Mode {
+        hz,
+        tau,
+        level,
+        phase: 0.0,
+    });
+    let mut bank = Modal::new(rate, &modes);
+    let mut panel: Vec<f64> = (0..d.len()).map(|_| bank.next()).collect();
+    let peak = panel.iter().fold(0.0f64, |p, v| max(p, v.abs()));
+    for v in panel.iter_mut() {
+        *v *= 0.45 / peak;
+    }
     for (n, click) in CLICKS.iter().enumerate() {
         let at = 0.02 + n as f64 * 0.17 + if n == 2 { 0.02 } else { 0.0 };
         let first = sample_at(at, rate);
-        // The tone: a sine sliding down, up to half level in 4 ms and away by 110 ms.
-        let env = |t| sweep(&[0.0001, 0.5, 0.0001], &[0.0, 0.004, 0.11], t);
-        let hz = |t| sweep(&[220.0, 95.0], &[0.0, 0.08], t);
-        let mut phase = 0.0;
-        for i in first..d.len().min(sample_at(at + 0.13, rate)) {
-            let t = i as f64 / rate - at;
-            add(&mut d, i, env(t) * sin(2.0 * PI * phase));
-            phase += hz(t) / rate;
+        let level = [1.0, 0.85, 0.9][n];
+        for (j, v) in panel.iter().take(d.len() - first).enumerate() {
+            add(&mut d, first + j, v * level);
         }
         // The click: a moment of the noise through a band, gone in 30 ms.
         let len = sample_at(at + 0.04, rate) - first;
