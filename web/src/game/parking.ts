@@ -85,9 +85,10 @@ export function carParkFits(roads: readonly RoadPlan[], ground: Ground, f: Front
   if (!straightAround(road.points, f.s, half + BAY_WIDE, PARK_BEND, ls)) return null;
   for (const s of [f.s - half, f.s + half]) if (!offCorners({ ...f, s, p: pointAt(road.points, s, ls).p })) return null;
   const laid = carParkAt(roads, f, n, 0);
-  // (Every tile it touches but the road's own, which reach a little past its verge: `roads.ts` `roadMask`.)
+  // (Every tile it touches but its own road's, which reach a little past its verge: `roads.ts` `roadMask`.)
   const roads0 = ground.roadTiles();
-  const bad = tilesOf(laid.clear, 0, (x, z) => x < EDGE || z < EDGE || x >= ground.w - EDGE || z >= ground.d - EDGE || (!roads0[z * ground.w + x] && ground.takenAt(x + 0.5, z + 0.5)));
+  const own = (x: number, z: number) => roads0[z * ground.w + x] === 1 && nearest(road.points, x + 0.5, z + 0.5, ls).dist < road.width / 2 + 1.5;
+  const bad = tilesOf(laid.clear, 0, (x, z) => x < EDGE || z < EDGE || x >= ground.w - EDGE || z >= ground.d - EDGE || (!own(x, z) && ground.takenAt(x + 0.5, z + 0.5)));
   if (bad) return null;
   // (No bay by a driveway, and every bay nearer its own street than any other road.)
   if (!clearOf(laid.bays, drives)) return null;
