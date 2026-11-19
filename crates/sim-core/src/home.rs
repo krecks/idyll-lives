@@ -72,6 +72,16 @@ fn edge_kind(kind: EdgeKind) -> Edge {
 }
 
 /// Where an edit's wall is (after the bounds checks: coordinates are on the lot).
+/// The tiles on either side of an edge (the tile itself, twice, for a diagonal), and whether it is
+/// a diagonal.
+fn edge_sides(axis: EdgeAxis, x: i32, z: i32) -> ([(i32, i32); 2], bool) {
+    match axis {
+        EdgeAxis::H => ([(x, z - 1), (x, z)], false),
+        EdgeAxis::V => ([(x - 1, z), (x, z)], false),
+        EdgeAxis::Dp | EdgeAxis::Dn => ([(x, z), (x, z)], true),
+    }
+}
+
 fn edge_ref(axis: EdgeAxis, x: i32, z: i32) -> EdgeRef {
     let (x, z) = (x as u16, z as u16);
     match axis {
@@ -347,12 +357,24 @@ impl World {
     /// The roof over the household's home: a style and a colour (free; only for looks).
     pub fn set_roof(&mut self, household: u32, style: u8, color: u8) -> Result<(), Error> {
         let (_, plot) = self.home_of(household)?;
+        self.not_a_flat(plot, "roof")?;
         let b = &self.content.build;
         if style as usize >= b.roofs.len().max(1) || color as usize >= b.roof_colors.len().max(1) {
             return Err(Error::new("unknown roof style or colour"));
         }
         self.plots[plot as usize].roof = Some(crate::world::RoofLook { style, color });
         self.structure_version = self.structure_version.wrapping_add(1);
+        Ok(())
+    }
+
+    /// Refuses an edit of `what` (a roof, a garage, a porch, a blueprint) on `plot` if it is a flat:
+    /// its building's envelope is the building's, and a flat is built on inside only.
+    pub(crate) fn not_a_flat(&self, plot: u32, what: &str) -> Result<(), Error> {
+        if self.plots.get(plot as usize).is_some_and(|p| p.is_flat()) {
+            return Err(Error::new(format!(
+                "in a flat you build inside it only: no {what}"
+            )));
+        }
         Ok(())
     }
 
@@ -683,6 +705,9 @@ impl World {
         })?;
         if !self.fits_on_plot(&obj, plot) {
             return Err(Error::new("that has to go on your own lot"));
+        }
+        if self.content.objects[def].stairs && self.plots[plot as usize].is_flat() {
+            return Err(Error::new("a flat is all on one storey: no stairs in it"));
         }
         if self.content.objects[def].outdoors && !self.all_outdoors(&obj) {
             return Err(Error::new("that has to go outside"));
@@ -1458,6 +1483,11 @@ impl World {
             if !self.edge_on_plot(plot, e.axis, e.x, e.z) {
                 return Err(Error::new("you can only build on your own lot"));
             }
+            if self.plots[plot as usize].is_flat() && !self.edge_in_flat(plot, e.axis, e.x, e.z) {
+                return Err(Error::new(
+                    "a flat's outer walls are the building's: build inside it",
+                ));
+            }
             check_look(rules, e)?;
             let target = edge_kind(e.kind);
             let diagonal = e.axis.diagonal();
@@ -1790,9 +1820,15 @@ impl World {
         Ok(())
     }
 
-    /// Whether a wall edge (or the diagonal across a tile) lies on plot `plot` and on the lot.
+    /// Whether a wall edge (or the diagonal across a tile) lies on plot `plot` and on the lot. A
+    /// flat's are those with a tile of it on one side (its own storey's), its outer walls too
+    /// (`edge_in_flat` says which are inside it).
     pub(crate) fn edge_on_plot(&self, plot: u32, axis: EdgeAxis, x: i32, z: i32) -> bool {
         let p = &self.plots[plot as usize];
+        if p.is_flat() {
+            let ([a, b], _) = edge_sides(axis, x, z);
+            return self.on_plot(plot, a.0, a.1) || self.on_plot(plot, b.0, b.1);
+        }
         let (lw, ld) = (self.lot.width as i32, self.lot.depth as i32);
         if x < 0 || z < 0 || z > ld {
             return false;
@@ -1808,6 +1844,13 @@ impl World {
             }
             EdgeAxis::Dp | EdgeAxis::Dn => p.contains(x, z) && self.lot.in_bounds(x, z),
         }
+    }
+
+    /// Whether an edge on flat `plot` (`edge_on_plot`) is inside it: a tile of it on both sides. Its
+    /// outer walls are its building's, not its household's to build on.
+    pub(crate) fn edge_in_flat(&self, plot: u32, axis: EdgeAxis, x: i32, z: i32) -> bool {
+        let ([a, b], _) = edge_sides(axis, x, z);
+        self.on_plot(plot, a.0, a.1) && self.on_plot(plot, b.0, b.1)
     }
 
     /// Upstairs stands on downstairs: every room above the ground has a room under each of its
