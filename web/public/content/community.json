@@ -195,13 +195,14 @@
       "group": "street",
       "outdoors": true,
       "decor": 0.2,
-      "description": "A red pillar box. Post a card to a friend: it cheers both of you up a little.",
+      "description": "A red pillar box. Post a card to a friend: it cheers both of you up a little, and lands in their letterbox if they have one.",
       "interactions": [
         {
           "id": "post",
           "label": "Post a card to a friend",
           "anim": "write",
           "minutes": 6,
+          "letter": true,
           "effects": {
             "social": 0.08,
             "fun": 0.03

@@ -933,6 +933,22 @@
     "aeEvansFingerpost": {
       "title": "A E Evans, standard finger post: 2,400 mm high, 1,600 mm across its arms",
       "url": "https://www.aeevans.co.uk/product/standard-finger-post/"
+    },
+    "suncastHosemobile": {
+      "title": "Suncast Hosemobile 175 ft (JNF175): 24 in wide (with the crank) × 20 in deep × 32 in high",
+      "url": "https://www.suncast.com/jnf175.html"
+    },
+    "hyundaiMower46": {
+      "title": "Hyundai HYM460SP 46 cm petrol lawnmower, assembled: 1050 mm high, 530 mm wide, 1440 mm long",
+      "url": "https://hyundaipowerequipment.co.uk/products/hyundai-18-46cm-139cc-self-propelled-petrol-lawnmower-hym460sp"
+    },
+    "earthliteSpirit": {
+      "title": "Earthlite Spirit portable massage table: 73 in long (without the face cradle), 28, 30 or 32 in wide, 23 to 33 in high",
+      "url": "https://massagestore.com/products/spirit-portable-massage-table"
+    },
+    "almostHeavenTyrol": {
+      "title": "Almost Heaven Tyrol, 2–3 person indoor sauna: 76 9/16 in wide × 61 7/16 in deep × 80 5/16 in high, two benches, glass front",
+      "url": "https://www.saunaplace.com/products/almost-heaven-tyrol-basic-medium-view-2-3-person-indoor-sauna"
     }
   },
   "kinds": {
@@ -14731,6 +14747,102 @@
       "sources": [
         "neufert"
       ]
+    },
+    "hoseReelCart": {
+      "label": "Garden hose reel cart",
+      "w": [
+        0.45,
+        0.7
+      ],
+      "h": [
+        0.7,
+        1.0
+      ],
+      "d": [
+        0.4,
+        0.6
+      ],
+      "uses": [
+        "water the garden"
+      ],
+      "sources": [
+        "suncastHosemobile"
+      ]
+    },
+    "lawnMower": {
+      "label": "Petrol push lawnmower, handle up",
+      "w": [
+        0.45,
+        0.65
+      ],
+      "h": [
+        0.9,
+        1.15
+      ],
+      "d": [
+        1.2,
+        1.6
+      ],
+      "uses": [
+        "mow the lawn"
+      ],
+      "sources": [
+        "hyundaiMower46"
+      ]
+    },
+    "massageTable": {
+      "label": "Massage table with a face cradle",
+      "w": [
+        0.58,
+        0.85
+      ],
+      "h": [
+        0.58,
+        0.9
+      ],
+      "d": [
+        1.8,
+        2.15
+      ],
+      "uses": [
+        "lie down for a massage",
+        "give a massage standing beside it"
+      ],
+      "sources": [
+        "earthliteSpirit"
+      ]
+    },
+    "saunaCabin": {
+      "label": "Indoor sauna cabin for two to four",
+      "w": [
+        1.5,
+        2.1
+      ],
+      "h": [
+        1.9,
+        2.2
+      ],
+      "d": [
+        1.4,
+        2.0
+      ],
+      "seat": [
+        0.4,
+        0.5
+      ],
+      "uses": [
+        "sit and sweat",
+        "come in together"
+      ],
+      "mechanisms": {
+        "door": [
+          50,
+          110
+        ]
+      },
+      "sources": [
+        "almostHeavenTyrol"
+      ]
     }
   },
   "groups": {
@@ -15379,7 +15491,13 @@
     "rowingBoat": "rowingBoat",
     "reeds": "reeds",
     "beachHut": "beachHut",
-    "waterBench": "parkBench"
+    "waterBench": "parkBench",
+    "letterbox": "mailbox",
+    "hoseReel": "hoseReelCart",
+    "lawnMower": "lawnMower",
+    "meditationCushion": "floorCushion",
+    "massageTable": "massageTable",
+    "sauna": "saunaCabin"
   },
   "decor": [
     "wallArt",

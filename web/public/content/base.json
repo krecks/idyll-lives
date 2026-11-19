@@ -2137,7 +2137,8 @@
     "setUp": "{a} set up the new {object}",
     "setUpForThem": "{a}'s new {object} was set up for them",
     "sentBack": "There was no room at home for {a}'s {object}: it went back to the shop, the money too",
-    "served": "{a} brought {b} {item}"
+    "served": "{a} brought {b} {item}",
+    "gotLetter": "{a} had a letter from {b} in the post"
   },
   "activities": [
     {
@@ -5127,6 +5128,7 @@
     "catalog2/tabletop.json",
     "catalog2/lighting.json",
     "catalog2/outdoor.json",
+    "catalog2/wellness.json",
     "packs/example.json",
     "packs/foodie.json",
     "packs/bookworm.json",

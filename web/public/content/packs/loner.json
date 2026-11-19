@@ -144,7 +144,7 @@
       "model": "model.loner.soloSauna",
       "footprint": [1, 2],
       "price": 3400,
-      "category": "bathroom",
+      "category": "wellness",
       "stages": ["teen", "youngAdult", "adult", "elder"],
       "fillsWall": true,
       "slots": 1,

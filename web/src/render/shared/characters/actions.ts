@@ -169,6 +169,8 @@ export const STEP_IN: Record<string, StepIn> = {
   // Smelling its flowers knelt up against it too, leant in over the rim (clips/garden.ts `smellBed`), not crouched a
   // tile back: a use's own entry (`def:tag`, `stepInFor`).
   'flowerbed:smell': { by: [[0, ['smellBed'], { to: 0.78 }]] },
+  // Up to the lawnmower's handle (its grip 0.97 m in front of the middle), pushing it (`push`), not a pace short of it.
+  lawnMower: { by: [[0, ['push'], { to: 1.25 }]] },
   // Out on the court (2.5 m from the hoop's middle, a lane each for two), shooting (clips/shot.ts).
   'basketballHoop:exercise': { by: bySize(SHOT), lanes: [-0.45, 0.45] },
   // The streetball hoop's shot from its two places 2.2 m out, a pace apart (content `places`; clips/shot.ts).
@@ -510,8 +512,8 @@ export const PROPS = {
  * (`ACTIONS[tag].prop`, by the plate), not carried: the baby's bottle, fed with the baby in the arms.
  */
 export const PROP_ITEMS = new Set(['babyBottle']);
-/** Watered from a can (`ACTIONS.water`, the house plant's `garden`): not what is misted (the terrarium, the bonsai's leaves). */
-const MISTED = new Set(['natureLover.mossTerrarium', 'loner.bonsaiBench']);
+/** Watered from a can (`ACTIONS.water`, the house plant's `garden`): not what is misted (the terrarium, the bonsai's leaves), nor the garden from the hose reel (its nozzle mimed). */
+const MISTED = new Set(['natureLover.mossTerrarium', 'loner.bonsaiBench', 'hoseReel']);
 /** Painted with a brush (`ACTIONS.paint`); the chalkboard with chalk, the whiteboard with a marker. */
 const BRUSHED = new Set(['easel', 'kidsEasel']);
 /** Children's desks and their little table: written and drawn at with a pencil (`ACTIONS.write`). */
@@ -644,7 +646,8 @@ export const ACTIONS: Record<string, ActionAnim> = {
   nap: { hands: HANDS.open },
   sit: { hands: HANDS.open },
   // (At a fire on foot, warming the hands at it: `WARM_AT`.)
-  relax: { stand: (def) => (WARM_AT.has(def) ? WARM_HANDS : RELAX_STAND), hands: HANDS.open },
+  // (Beside the massage table, giving the massage: the hands at work on the one lying there.)
+  relax: { stand: (def) => (WARM_AT.has(def) ? WARM_HANDS : def === 'massageTable' ? ['interact', 'spell'] : RELAX_STAND), hands: HANDS.open },
   type: { stand: ['spell'], sit: 'sitHands', hands: HANDS.keys },
   write: {
     stand: ['interact', 'spell'],
@@ -659,7 +662,8 @@ export const ACTIONS: Record<string, ActionAnim> = {
     stand: (def) => (def === 'noticeBoard' || def === 'busStop' ? ['idle'] : ['lantern']),
     upper: 'lantern',
     hands: HANDS.hold,
-    prop: (def) => (def === 'foodie.cookbookLectern' ? null : PROPS.book),
+    // (The post read at the letterbox: a card in the hands.)
+    prop: (def) => (def === 'foodie.cookbookLectern' ? null : def === 'letterbox' ? PROPS.postcard : PROPS.book),
   },
   watch: { stand: ['foldArms', 'idle'], hands: HANDS.open },
   // Darts thrown and the table-tennis bat swung (mimed, closed hands: `clips/games.ts`); the pool table and the foosball
@@ -704,7 +708,7 @@ export const ACTIONS: Record<string, ActionAnim> = {
   sing: { stand: ['talk'], hands: HANDS.relaxed },
   clean: {
     stand: (def) =>
-      def.includes('Mop') || def.includes('Vacuum') ? ['push'] : def.includes('laundry') ? ['spell', 'interact', 'pickUp'] : DISHWASHERS.has(def) ? DISHWASHER_RACK : ['interact', 'spell'],
+      def.includes('Mop') || def.includes('Vacuum') || def === 'lawnMower' ? ['push'] : def.includes('laundry') ? ['spell', 'interact', 'pickUp'] : DISHWASHERS.has(def) ? DISHWASHER_RACK : ['interact', 'spell'],
     hands: HANDS.hold,
   },
   // Gardening, by task (older content and packs: `garden`).

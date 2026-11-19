@@ -58,6 +58,7 @@ const ICONS: Record<string, string> = {
   setUpForThem: 'icon.ui.home',
   sentBack: 'icon.ui.funds',
   served: 'icon.social.offer',
+  gotLetter: 'icon.need.social',
 };
 
 const LOVE = new Set(['crush', 'firstKiss', 'startedDating', 'movedInWith', 'expecting', 'born', 'adopted']);

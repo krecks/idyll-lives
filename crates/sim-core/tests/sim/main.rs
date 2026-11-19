@@ -75,6 +75,7 @@ mod player_household;
 mod population_cap;
 mod porches;
 mod positions;
+mod post;
 mod privacy;
 mod public_places;
 mod reach_incremental;
