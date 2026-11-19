@@ -107,7 +107,7 @@ export function pieceAt(hour: number, dancing: boolean): MusicKind {
 }
 
 /** Levels of the sounds played once. */
-export const ONCE_LEVEL: Record<OnceKind, number> = { flush: 0.3, fridgeDoor: 0.27, binLid: 0.29, vendSnack: 0.25, vendCan: 0.25, phoneBox: 0.23, hangUp: 0.23, ping: 0.21, toastPop: 0.27, pour: 0.21, kettleOff: 0.47 };
+export const ONCE_LEVEL: Record<OnceKind, number> = { flush: 0.3, fridgeDoor: 0.27, binLid: 0.29, vendSnack: 0.25, vendCan: 0.25, phoneBox: 0.23, hangUp: 0.23, ping: 0.21, toastPop: 0.27, pour: 0.21, kettleOff: 0.295 };
 
 /**
  * The outdoors: the bed of wind (its level at night, and how much the day adds), the crickets at night, the

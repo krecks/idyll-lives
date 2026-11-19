@@ -491,7 +491,7 @@ fn kettle_off(rate: f64) -> Stereo {
     strike(
         &mut out,
         0.12,
-        0.9,
+        0.4,
         0.0,
         &[
             [1500.0, 0.012, 1.0],
