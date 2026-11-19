@@ -46,7 +46,7 @@ import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
 import type { Lighting, RGB } from '../shared/environment';
 import type { RoomLight } from '../shared/house';
-import { ROOM, roomLight } from '../shared/roomLight';
+import { ROOM, roomDay, roomLight } from '../shared/roomLight';
 import { WALL_HEIGHT } from '../shared/walls';
 import type { ViewRect } from '../types';
 
@@ -413,6 +413,10 @@ export class Lamps {
   applyLighting(l: Lighting): void {
     this.lampsLevel = l.lamps;
     this.exposure = Math.max(l.exposure, 1e-3);
+    const day = roomDay(l.lamps);
+    const tint = linearHex(ROOM.dayTint);
+    const toned = (c: number) => 1 + (c - 1) * day.tint;
+    this.lib.setRoomDay(day.ambient, day.fill, { r: toned(tint.r), g: toned(tint.g), b: toned(tint.b) });
     this.applyRoomLights();
     this.applyGlow();
   }

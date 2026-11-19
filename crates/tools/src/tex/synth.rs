@@ -613,7 +613,7 @@ pub const SETS: [Set; 21] = [
 /// `cargo tex synth [set...]`.
 pub fn run(only: &[&str]) -> Result<(), String> {
     for name in only {
-        if *name != "sky" && !SETS.iter().any(|s| s.name == *name) {
+        if *name != "sky" && !SETS.iter().any(|s| s.name == *name) && variant(name).is_none() {
             return Err(format!("unknown texture set: {name}"));
         }
     }
@@ -624,10 +624,25 @@ pub fn run(only: &[&str]) -> Result<(), String> {
         }
         write_set(&assets, &set)?;
     }
+    // A set's variants, when named (`floor_wood.calm`): beside the set, in `textures/floor_wood.calm`.
+    for set in only.iter().filter_map(|name| variant(name)) {
+        write_set(&assets, &set)?;
+    }
     if only.contains(&"sky") {
         println!("sky: textures/sky/clouds.png is `cargo tex clouds`, unchanged");
     }
     Ok(())
+}
+
+/// A set's variant by its name (`floor_wood.calm`: `built::variants`), as a set of that name with the set's own
+/// sizes and response: a candidate for a look sheet, made only when named and kept out of git.
+fn variant(name: &str) -> Option<Set> {
+    let (base, which) = name.split_once('.')?;
+    let set = SETS.iter().find(|s| s.name == base)?;
+    (!which.is_empty() && built::variants(base).contains(&which)).then(|| Set {
+        name: Box::leak(name.to_string().into_boxed_str()),
+        ..*set
+    })
 }
 
 /// A set's maps at their sizes: (albedo, normal, arm).
@@ -752,7 +767,8 @@ fn generate(name: &str, size: usize) -> Surface {
     if let Some(o) = organic::generate(name, size) {
         return Surface::plain((o.height, o.albedo.rgb()));
     }
-    let n = Noise::new(seed(name));
+    // (A variant has its set's seed: its boards lie where the set's do.)
+    let n = Noise::new(seed(name.split('.').next().unwrap_or(name)));
     built::generate(name, &n, size).unwrap_or_else(|| unreachable!("unknown set {name}"))
 }
 
