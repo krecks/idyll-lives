@@ -591,7 +591,7 @@ export class MaterialLibrary {
 
   /**
    * `material` sinking into the land where the haze's veil takes it (`GAME_VEIL_SINK`, `shaders/fog.ts`): a copy, kept
-   * per material, as `instanceColored`'s (for the far crowns: the plain finish's copy is everyone's).
+   * per material, as `instanceColored`'s.
    */
   veilSinking(material: pc.StandardMaterial): pc.StandardMaterial {
     let copy = this.sinking.get(material);

@@ -5,7 +5,8 @@
  * - the menus' town is let go of as soon as the loading screen covers it, before the game's world is
  *   built, and the game fades in rather than the camera flying in (`game/host.ts`);
  * - the voices and the language model load when they're first wanted, not as the page boots
- *   (`voice/service.svelte.ts`, `talk/talk.svelte.ts`).
+ *   (`voice/service.svelte.ts`, `talk/talk.svelte.ts`);
+ * - a Big world's street keeps the vertex arrays of 8 MB of chunks not drawn, not 24 MB (`render/pc/street.ts`).
  */
 
 /** The most memory (GB, as `navigator.deviceMemory` says it) a machine has and still counts as low on memory. */

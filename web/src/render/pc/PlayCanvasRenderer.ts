@@ -583,6 +583,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    */
   private townBuildings!: TownBuildings;
   private townMovers!: TownMovers;
+  /** The eye (game space) this frame, for the woods' impostors (`Landscape.frameTiles`). */
+  private readonly eyeNow = { x: 0, y: 0, z: 0 };
   private townGround!: TownGroundMap;
   private townLotsBy: { chunks: unknown; houses: readonly TownLotHouse[] | null; up: string } = { chunks: null, houses: null, up: '' };
   /** The far lots with someone up in their house (`findTownUp`: by lot id, and as a key), and when they were last looked for. */
@@ -1500,7 +1502,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.followShadows();
     this.frameTownView();
     this.street.frame(o.target.x, o.target.z);
-    this.lot.landscape?.frameTiles(o.target.x, o.target.z, this.diag.has('notownwoods') ? 0 : this.townBlend, o.radius);
+    this.lot.landscape?.frameTiles(o.target.x, o.target.z, this.diag.has('notownwoods') ? 0 : this.townBlend, o.radius, this.diag.has('noimpostors') ? undefined : this.camera.eyeInGame(this.eyeNow));
     this.roam.pinned = this.followIndex !== null || this.gameRig.active || this.flight.active;
     const aspect = this.cssSize.width / Math.max(1, this.cssSize.height);
     const fovH = 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect);
@@ -3065,6 +3067,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const t0 = performance.now();
     await this.framesRendered(1);
     this.shaderWatch.note(`warm-up frame done in ${Math.round(performance.now() - t0)} ms`);
+    // The woods' impostors baked and their cards drawn once now, not at the town view's first look (`nature.ts`).
+    const landscape = this.lot.landscape;
+    if (landscape && !this.disposed) {
+      this.loadListener?.('Warming up (trees)', 0.7);
+      await perfTimeAsync('warm: impostors', () => landscape.warmImpostors(() => this.framesRendered(1)));
+      this.warmNext = true;
+      await this.framesRendered(1);
+      this.shaderWatch.note(`warm-up impostors done in ${Math.round(performance.now() - t0)} ms`);
+    }
     // A big world: the camera roams to lots of every kind, each drawn in full once it settles. A few
     // that between them have most of what its houses are made of are built and drawn here too, so
     // those lots make few pipelines in play (each first one costs its frame tens of ms); then the lot

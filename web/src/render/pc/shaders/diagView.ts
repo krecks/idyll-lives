@@ -3,7 +3,9 @@
  * as its base colour or its world normal instead of its shading, for screenshots that compare
  * geometry and colour with the lighting left out (also against the game's pictures up to 0.3.2).
  *
- * `endPS` is replaced (`GAME_DIAG_ALBEDO`, `GAME_DIAG_NORMALS`): no fog, no tone mapping, the
+ * `endPS` is replaced (`GAME_DIAG_ALBEDO`, `GAME_DIAG_NORMALS`, and `GAME_DIAG_SURFACE`, the tree impostors' bake alone:
+ * the occlusion, the glossiness and the share of the plant's own tint its leaves take, `nature.ts` `LEAVES`, linear, in
+ * red, green and blue, `impostors.ts`): no fog, no tone mapping, the
  * colour itself. The base colour as the soft look takes it (`BASE`: the base colour less what its
  * dielectric reflects, and metals in their own colour, not PBR's black diffuse), in gamma space;
  * the normal as `n * 0.5 + 0.5` in game space (z mirrored back, `space.ts`), as the earlier
@@ -32,10 +34,20 @@ export const DIAG_VIEW: ShaderFeature = {
   priority: 1000,
   glsl: {
     end: {
-      when: 'defined(GAME_DIAG_ALBEDO) || defined(GAME_DIAG_NORMALS)',
+      when: 'defined(GAME_DIAG_ALBEDO) || defined(GAME_DIAG_NORMALS) || defined(GAME_DIAG_SURFACE)',
       code: `
-	#ifdef GAME_DIAG_NORMALS
+	#if defined(GAME_DIAG_NORMALS)
 		gl_FragColor.rgb = gammaCorrectOutput(pow(gamePos(litArgs_worldNormal) * 0.5 + vec3(0.5), vec3(2.2)));
+	#elif defined(GAME_DIAG_SURFACE)
+		float gameDiagAo = 1.0;
+		#ifdef STD_AO
+			gameDiagAo = litArgs_ao;
+		#endif
+		float gameDiagTint = 0.0;
+		#if defined(GAME_WIND_TINT) && defined(STD_DIFFUSE_VERTEX)
+			gameDiagTint = vVertexColor.a;
+		#endif
+		gl_FragColor.rgb = gammaCorrectOutput(pow(vec3(gameDiagAo, litArgs_gloss, gameDiagTint), vec3(2.2)));
 	#else
 		${BASE.glsl}
 		gl_FragColor.rgb = gammaCorrectOutput(max(base, vec3(0.0)));
@@ -44,10 +56,20 @@ export const DIAG_VIEW: ShaderFeature = {
   },
   wgsl: {
     end: {
-      when: 'defined(GAME_DIAG_ALBEDO) || defined(GAME_DIAG_NORMALS)',
+      when: 'defined(GAME_DIAG_ALBEDO) || defined(GAME_DIAG_NORMALS) || defined(GAME_DIAG_SURFACE)',
       code: `
-	#ifdef GAME_DIAG_NORMALS
+	#if defined(GAME_DIAG_NORMALS)
 		output.color = vec4f(gammaCorrectOutput(pow(gamePos(litArgs_worldNormal) * 0.5 + vec3f(0.5), vec3f(2.2))), output.color.a);
+	#elif defined(GAME_DIAG_SURFACE)
+		var gameDiagAo: f32 = 1.0;
+		#ifdef STD_AO
+			gameDiagAo = litArgs_ao;
+		#endif
+		var gameDiagTint: f32 = 0.0;
+		#if defined(GAME_WIND_TINT) && defined(STD_DIFFUSE_VERTEX)
+			gameDiagTint = vVertexColor.a;
+		#endif
+		output.color = vec4f(gammaCorrectOutput(pow(vec3f(gameDiagAo, litArgs_gloss, gameDiagTint), vec3f(2.2))), output.color.a);
 	#else
 		${BASE.wgsl}
 		output.color = vec4f(gammaCorrectOutput(max(base, vec3f(0.0))), output.color.a);
