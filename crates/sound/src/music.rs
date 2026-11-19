@@ -9,12 +9,18 @@
 //!   over held chords, 120 beats a minute, in A minor;
 //! - `Slow`: a waltz, soft held chords and a tune of long plucked notes, 72 beats a minute, in F.
 //!
+//! The voices: a tune and a strum on plucked strings (`Pluck`, Karplus-Strong) through a small guitar's body, a bass
+//! string with its tone under it, a pad of three saws a hair apart through a low-pass, a kick that glides down
+//! with the click of its beater, a clap of three slaps and a tail, a hat of high noise. Each note is made once and
+//! played wherever it comes again.
+//!
 //! A piece is sixteen bars in four phrases, the first tune coming back (A A B A) and ending on the key's own note,
 //! over a chord a bar from a few well-worn progressions; the tune moves by step along a five-note scale and lands
 //! on a note of the chord on the strong beats.
 
 use crate::dsp::m::*;
 use crate::dsp::*;
+use std::collections::BTreeMap;
 
 /// A piece's style.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -406,112 +412,255 @@ fn exp2(y: f64) -> f64 {
     total.0 * pow(2.0, k)
 }
 
+/// Each voice's level (its notes' own levels are the score's): set so each voice alone, in each piece, is within
+/// 1.5 dB of its RMS on the old voices (sines dying away; `voices_alone` measures it), so the pieces' mix is
+/// what it was. The bass a dB up and the hat a dB down of that: the strings are brighter than the sines were, and
+/// this keeps the pieces' loudness to the ear and their centroid where they were.
+const PLUCK: f64 = 4.07;
+const STRUM: f64 = 3.25;
+const BASS: f64 = 2.38;
+const PAD: f64 = 1.33;
+const KICK: f64 = 0.715;
+const CLAP: f64 = 4.08;
+const HAT: f64 = 2.25;
+
+/// White noise as it is at 48 kHz: at a higher rate, nothing much over 22 kHz (`top`, made by `white_top`).
+fn white(r: &mut Rng, top: &mut Option<Biquad>) -> f64 {
+    let w = r.next() * 2.0 - 1.0;
+    match top {
+        Some(f) => f.run(w),
+        None => w,
+    }
+}
+
+/// The low-pass `white` needs at `rate` (none up to 48 kHz).
+fn white_top(rate: f64) -> Option<Biquad> {
+    (rate > 48000.0).then(|| Biquad::with(rate, Filter::Lowpass, 22000.0, 0.7))
+}
+
+/// A note's sound, as its voice plays it at `rate` (`f` Hz, held `held` s, at `level`), its noise drawn from `r`.
+fn voice(v: Voice, f: f64, held: f64, level: f64, rate: f64, r: &mut Rng) -> Vec<f32> {
+    let sized = |secs: f64| vec![0.0f32; round_usize(secs * rate)];
+    match v {
+        Voice::Pluck | Voice::Strum => {
+            // A plucked string, a strum's duller, shorter and plucked nearer the bridge.
+            let (string, secs, gain) = if v == Voice::Pluck {
+                let tau = 0.35 + 0.25 * min(2.0, held);
+                let string = Pluck {
+                    hz: f,
+                    tau,
+                    dull: 0.3,
+                    soft: 0.45 - 0.25 * level,
+                    place: 0.18,
+                };
+                (string, min(5.0 * tau, 2.5), PLUCK)
+            } else {
+                let string = Pluck {
+                    hz: f,
+                    tau: 0.22,
+                    dull: 0.38,
+                    soft: 0.5,
+                    place: 0.12,
+                };
+                (string, 5.0 * 0.22, STRUM)
+            };
+            let mut d = string.play(rate, secs, r);
+            for x in d.iter_mut() {
+                *x = (*x as f64 * level * gain) as f32;
+            }
+            d
+        }
+        Voice::Bass => {
+            // A round string plucked with the thumb, its tone under it, through a low-pass; let go at its end.
+            let secs = min(2.5, held + 0.6);
+            let mut d = Pluck {
+                hz: f,
+                tau: 0.9,
+                dull: 0.5,
+                soft: 0.75,
+                place: 0.3,
+            }
+            .play(rate, secs, r);
+            let mut tone = Osc::new(f, rate, 0.0);
+            let mut fall = Decay::new(0.35, 0.5, rate);
+            let mut low = Biquad::with(rate, Filter::Lowpass, 700.0, 0.7);
+            let n = d.len();
+            for (j, x) in d.iter_mut().enumerate() {
+                let body = tone.next() * fall.next() * min(1.0, j as f64 / (0.004 * rate));
+                let release = min(1.0, (n - j) as f64 / (0.1 * rate));
+                *x = (low.run(*x as f64 + body) * release * level * BASS) as f32;
+            }
+            d
+        }
+        Voice::Pad => {
+            // A soft held chord's note: three saws a hair apart through a low-pass, in over a third of a second
+            // and out again.
+            let secs = held + 0.5;
+            let mut d = sized(secs);
+            let mut phase = [0.0, 0.33, 0.71];
+            let dt = [0.996, 1.0, 1.004].map(|k| (f * k) / rate);
+            let mut low = Biquad::with(rate, Filter::Lowpass, (3.2 * f).clamp(500.0, 1800.0), 0.7);
+            for (j, x) in d.iter_mut().enumerate() {
+                let t = j as f64 / rate;
+                let mut v = 0.0;
+                for (p, step) in phase.iter_mut().zip(dt) {
+                    v += saw(*p, step);
+                    *p += step;
+                    if *p >= 1.0 {
+                        *p -= 1.0;
+                    }
+                }
+                let env = min(1.0, t / 0.35) * min(1.0, max(0.0, secs - t) / 0.5);
+                *x = (low.run(v * 0.33) * env * level * PAD) as f32;
+            }
+            d
+        }
+        Voice::Kick => {
+            // A drum's skin: a tone gliding down from 140 to 45 Hz as it dies, a click of the beater, driven a
+            // little into its stops.
+            let mut d = sized(0.5);
+            let mut tone = Osc::new(140.0, rate, 0.0);
+            let mut glide = Decay::new(95.0, 0.025, rate);
+            let mut fall = Decay::new(1.0, 0.15, rate);
+            let click = 0.003 * rate;
+            let drive = tanh(1.5);
+            for (j, x) in d.iter_mut().enumerate() {
+                let bend = glide.next();
+                if j % 8 == 0 {
+                    tone.set(45.0 + bend, rate);
+                }
+                let mut v = tone.next() * fall.next() * min(1.0, j as f64 / (0.0008 * rate));
+                if (j as f64) < click {
+                    v += (r.next() * 2.0 - 1.0) * 0.25 * (1.0 - j as f64 / click);
+                }
+                *x = (tanh(1.5 * v) / drive * level * KICK) as f32;
+            }
+            d
+        }
+        Voice::Clap => {
+            // Hands: noise in a band, three quick slaps and the room's tail after them.
+            let mut d = sized(0.3);
+            let mut band = Biquad::with(rate, Filter::Bandpass, 1100.0, 0.9);
+            let mut top = white_top(rate);
+            let mut high = Biquad::with(rate, Filter::Highpass, 600.0, 0.7);
+            let slaps = [0.0, 0.011, 0.022].map(|s| round_usize(s * rate));
+            let mut slap = [0.7, 0.8, 1.0].map(|l| Decay::new(l, 0.004, rate));
+            let tail_from = round_usize(0.03 * rate);
+            let mut tail = Decay::new(0.55, 0.07, rate);
+            for (j, x) in d.iter_mut().enumerate() {
+                let w = high.run(band.run(white(r, &mut top)));
+                let mut env = 0.0;
+                for (at, s) in slaps.iter().zip(slap.iter_mut()) {
+                    if j >= *at {
+                        env += s.next();
+                    }
+                }
+                if j >= tail_from {
+                    env += tail.next();
+                }
+                *x = (w * env * level * CLAP) as f32;
+            }
+            d
+        }
+        Voice::Hat => {
+            // A closed hi-hat: high noise, its tick and its short shimmer.
+            let mut d = sized(0.15);
+            let mut high = Biquad::with(rate, Filter::Highpass, 7500.0, 0.8);
+            let mut top = white_top(rate);
+            let mut tick = Decay::new(0.7, 0.006, rate);
+            let mut shimmer = Decay::new(0.3, 0.035, rate);
+            for x in d.iter_mut() {
+                let w = high.run(white(r, &mut top));
+                *x = (w * (tick.next() + shimmer.next()) * level * HAT) as f32;
+            }
+            d
+        }
+    }
+}
+
+/// `sound` added into `d` from `start`, round the loop's end into its start, at `gain`.
+fn mix_in(d: &mut [f32], start: usize, sound: &[f32], gain: f64) {
+    let n = d.len();
+    let mut from = 0;
+    let mut at = start % n;
+    while from < sound.len() {
+        let run = (sound.len() - from).min(n - at);
+        for (o, &v) in d[at..at + run].iter_mut().zip(&sound[from..from + run]) {
+            *o = (*o as f64 + v as f64 * gain) as f32;
+        }
+        from += run;
+        at = 0;
+    }
+}
+
+/// The notes played (only `only`'s, if given), the strings through the instrument's body: the mix before the
+/// loudspeaker.
+fn play(piece: &Score, rate: f64, only: Option<Voice>) -> Stereo {
+    let n = round_usize(seconds(piece) * rate);
+    let mut strings = Stereo {
+        left: vec![0.0; n],
+        right: vec![0.0; n],
+    };
+    let mut rest = strings.clone();
+    let beat = 60.0 / piece.bpm;
+    let mut r = Rng::new(0xbea7 as f64 + piece.notes.len() as f64);
+    // A note is made once and played wherever it comes again (a piece repeats its chords: A A B A); a drum's hits
+    // and a strum's strings take turns among a few made alike, so repeated hits are not copies.
+    let mut made: BTreeMap<(u8, i64, u64, u64, usize), Vec<f32>> = BTreeMap::new();
+    let mut count = [0usize; 7];
+    for note in &piece.notes {
+        let v = note.voice;
+        let k = count[v as usize];
+        count[v as usize] += 1;
+        if only.is_some_and(|o| o != v) {
+            continue;
+        }
+        let variant = k % match v {
+            Voice::Hat | Voice::Clap => 4,
+            Voice::Strum => 2,
+            _ => 1,
+        };
+        let held = note.len * beat;
+        let key = (
+            v as u8,
+            note.midi,
+            held.to_bits(),
+            note.level.to_bits(),
+            variant,
+        );
+        let sound = made
+            .entry(key)
+            .or_insert_with(|| voice(v, hz(note.midi), held, note.level, rate, &mut r));
+        let (l, rr) = gains(note.pan);
+        let start = round_usize(note.at * beat * rate);
+        let bus = if matches!(v, Voice::Pluck | Voice::Strum | Voice::Bass) {
+            &mut strings
+        } else {
+            &mut rest
+        };
+        mix_in(&mut bus.left, start, sound, l);
+        mix_in(&mut bus.right, start, sound, rr);
+    }
+    // The strings' body (a small guitar's air and its top), run round the loop.
+    for c in 0..2 {
+        let x = strings.ch(c).clone();
+        let air = node_filter(&x, rate, Filter::Bandpass, 105.0, 2.5, true);
+        let top = node_filter(&x, rate, Filter::Bandpass, 210.0, 3.0, true);
+        let out = rest.ch(c);
+        for i in 0..n {
+            out[i] =
+                (out[i] as f64 + 0.8 * x[i] as f64 + 0.5 * air[i] as f64 + 0.35 * top[i] as f64)
+                    as f32;
+        }
+    }
+    rest
+}
+
 /// A piece played, as a loop of two channels at a sample rate: every note on its voice at its place, a note's
 /// tail past the end ringing on into the start, then the whole through the cloth of a loudspeaker (a low-pass)
 /// and brought to an even level.
 pub fn perform(piece: &Score, rate: f64) -> Stereo {
-    let n = round_usize(seconds(piece) * rate);
-    let mut out = Stereo {
-        left: vec![0.0; n],
-        right: vec![0.0; n],
-    };
-    let beat = 60.0 / piece.bpm;
-    let mut r = Rng::new(0xbea7 as f64 + piece.notes.len() as f64);
-    for note in &piece.notes {
-        let (l, rr) = gains(note.pan);
-        let start = round_usize(note.at * beat * rate);
-        let held = note.len * beat;
-        let f = hz(note.midi);
-        // Adds the voice's sound, `sample(t)` for `secs`, round the loop's end.
-        let mut add_voice = |secs: f64, mut sample: Box<dyn FnMut(f64) -> f64 + '_>| {
-            let count = round_usize(secs * rate);
-            for j in 0..count {
-                let v = note.level * sample(j as f64 / rate);
-                let i = (start + j) % n;
-                add(&mut out.left, i, v * l);
-                add(&mut out.right, i, v * rr);
-            }
-        };
-        match note.voice {
-            Voice::Pluck | Voice::Strum => {
-                // A plucked string: its tone and the octave over it, dying away (sooner for a strum's).
-                let decay = if note.voice == Voice::Pluck {
-                    0.16 + 0.12 * min(2.0, held)
-                } else {
-                    0.14
-                };
-                add_voice(
-                    decay * 5.0,
-                    Box::new(|t| {
-                        exp(-t / decay)
-                            * min(1.0, t / 0.002)
-                            * (sin(2.0 * PI * f * t)
-                                + 0.3 * sin(4.0 * PI * f * t)
-                                + 0.08 * sin(6.0 * PI * f * t))
-                    }),
-                );
-            }
-            Voice::Bass => add_voice(
-                min(2.5, held + 0.6),
-                Box::new(|t| {
-                    exp(-t / 0.5)
-                        * min(1.0, t / 0.004)
-                        * min(1.0, (held + 0.6 - t) / 0.1)
-                        * (sin(2.0 * PI * f * t) + 0.3 * sin(4.0 * PI * f * t))
-                }),
-            ),
-            // A soft held tone: three voices a hair apart, in over a third of a second and out again.
-            Voice::Pad => add_voice(
-                held + 0.5,
-                Box::new(|t| {
-                    min(1.0, t / 0.35)
-                        * min(1.0, max(0.0, held + 0.5 - t) / 0.5)
-                        * (sin(2.0 * PI * f * t)
-                            + sin(2.0 * PI * f * 1.004 * t)
-                            + sin(2.0 * PI * f * 0.996 * t)
-                            + 0.25 * sin(4.0 * PI * f * t))
-                        * 0.33
-                }),
-            ),
-            Voice::Kick => {
-                let mut phase = 0.0;
-                add_voice(
-                    0.5,
-                    Box::new(move |t| {
-                        phase += (2.0 * PI * (48.0 + 72.0 * exp(-t / 0.03))) / rate;
-                        exp(-t / 0.14) * sin(phase)
-                    }),
-                );
-            }
-            Voice::Clap => {
-                let mut last_noise = 0.0;
-                let r = &mut r;
-                add_voice(
-                    0.3,
-                    Box::new(move |t| {
-                        let w = r.next() * 2.0 - 1.0;
-                        let high = w - last_noise;
-                        last_noise = w;
-                        0.5 * high * exp(-t / 0.06)
-                            + 0.3 * sin(2.0 * PI * 190.0 * t) * exp(-t / 0.03)
-                    }),
-                );
-            }
-            Voice::Hat => {
-                let mut last_noise = 0.0;
-                let r = &mut r;
-                add_voice(
-                    0.15,
-                    Box::new(move |t| {
-                        let w = r.next() * 2.0 - 1.0;
-                        let high = w - last_noise;
-                        last_noise = w;
-                        high * exp(-t / 0.025)
-                    }),
-                );
-            }
-        }
-    }
+    let out = play(piece, rate, None);
     // Through a loudspeaker's cloth: the highs softened (a dance's less, for its hats), run round the loop.
     let cutoff = if piece.style == Style::Dance {
         5200.0
@@ -706,5 +855,140 @@ mod tests {
         assert_eq!(hz(79), 783.9908719634985);
         assert_eq!(exp2(11.0 / 12.0), 1.8877486253633868);
         assert_eq!(exp2(-2.0), 0.25);
+    }
+
+    /// The biggest step between neighbouring samples, and the step from the last sample round to the first.
+    fn steps(ch: &[f32]) -> (f64, f64) {
+        let inside = ch
+            .windows(2)
+            .map(|w| (w[1] as f64 - w[0] as f64).abs())
+            .fold(0.0, max);
+        (inside, (ch[0] as f64 - ch[ch.len() - 1] as f64).abs())
+    }
+
+    #[test]
+    fn each_pieces_seam_is_no_bigger_a_step_than_the_steps_inside_it() {
+        for (kind, _, _) in PIECES {
+            let s = make(kind, RATE).unwrap();
+            for ch in [&s.left, &s.right] {
+                let (inside, seam) = steps(ch);
+                assert!(
+                    seam <= inside,
+                    "{kind}: {seam} at the seam, {inside} inside"
+                );
+            }
+        }
+    }
+
+    /// Where a sound's energy sits (Hz), as `tools/audio/listen.ts` measures it: the magnitudes of the spectra of
+    /// 4096 samples of the two sides' mean every 2048 (a Hann window), added up, and their mean frequency.
+    fn centroid(s: &Stereo, rate: f64) -> f64 {
+        const N: usize = 4096;
+        let len = s.left.len();
+        let mut power = vec![0.0f64; N / 2];
+        let mut start = 0;
+        while start == 0 || start + N <= len {
+            let mut re = vec![0.0f64; N];
+            let mut im = vec![0.0f64; N];
+            for i in 0..N.min(len - start) {
+                let v = (s.left[start + i] as f64 + s.right[start + i] as f64) / 2.0;
+                re[i] = v * (0.5 - 0.5 * cos((2.0 * PI * i as f64) / (N - 1) as f64));
+            }
+            // An iterative radix-2 FFT.
+            let mut j = 0;
+            for i in 1..N {
+                let mut bit = N >> 1;
+                while j & bit != 0 {
+                    j ^= bit;
+                    bit >>= 1;
+                }
+                j |= bit;
+                if i < j {
+                    re.swap(i, j);
+                    im.swap(i, j);
+                }
+            }
+            let mut size = 2;
+            while size <= N {
+                let (c, sn) = (cos(-2.0 * PI / size as f64), sin(-2.0 * PI / size as f64));
+                for at in (0..N).step_by(size) {
+                    let (mut wr, mut wi) = (1.0, 0.0);
+                    for k in 0..size / 2 {
+                        let (a, b) = (at + k, at + k + size / 2);
+                        let tr = re[b] * wr - im[b] * wi;
+                        let ti = re[b] * wi + im[b] * wr;
+                        re[b] = re[a] - tr;
+                        im[b] = im[a] - ti;
+                        re[a] += tr;
+                        im[a] += ti;
+                        let next = wr * c - wi * sn;
+                        wi = wr * sn + wi * c;
+                        wr = next;
+                    }
+                }
+                size *= 2;
+            }
+            for k in 1..N / 2 {
+                power[k] += re[k] * re[k] + im[k] * im[k];
+            }
+            start += N / 2;
+        }
+        let (mut sum, mut weighted) = (0.0, 0.0);
+        for (k, p) in power.iter().enumerate().skip(1) {
+            let m = sqrt(*p);
+            sum += m;
+            weighted += m * k as f64 * rate / N as f64;
+        }
+        weighted / sum
+    }
+
+    #[test]
+    fn each_piece_sounds_the_same_at_44_1_and_96_khz() {
+        for (kind, _, _) in PIECES {
+            let at48 = centroid(&make(kind, RATE).unwrap(), RATE);
+            for rate in [44100.0, 96000.0] {
+                let c = centroid(&make(kind, rate).unwrap(), rate);
+                println!("{kind} at {rate}: centroid {c:.0} Hz, at 48 kHz {at48:.0}");
+                assert!(
+                    (c / at48 - 1.0).abs() < 0.1,
+                    "{kind} at {rate}: {c:.0} Hz, at 48 kHz {at48:.0}"
+                );
+            }
+        }
+    }
+
+    /// Each voice alone (its RMS over the loop in dBFS, before the loudspeaker and the level), in each piece: what
+    /// the voices' levels are tuned by (`cargo test -p sound --release voices_alone -- --ignored --nocapture`).
+    #[test]
+    #[ignore]
+    fn voices_alone() {
+        let voices = [
+            Voice::Pluck,
+            Voice::Strum,
+            Voice::Bass,
+            Voice::Pad,
+            Voice::Kick,
+            Voice::Clap,
+            Voice::Hat,
+        ];
+        for (kind, style, seed) in PIECES {
+            let piece = score(style, seed);
+            let mut line = kind.to_string();
+            for v in voices {
+                if !piece.notes.iter().any(|n| n.voice == v) {
+                    continue;
+                }
+                let o = play(&piece, RATE, Some(v));
+                let sum: f64 = o
+                    .left
+                    .iter()
+                    .chain(&o.right)
+                    .map(|&x| (x as f64).powi(2))
+                    .sum();
+                let rms = sqrt(sum / (2.0 * o.left.len() as f64));
+                line += &format!(" {v:?} {:.2}", 20.0 * log10(rms));
+            }
+            println!("{line}");
+        }
     }
 }

@@ -15,15 +15,17 @@
 //!
 //! Most are made the same few ways:
 //! - a motor or a fan: a tone at its speed with its harmonics (a transformer's hum at twice the mains,
-//!   100 Hz; a fan's blades passing), over the rush of air or the rumble of what it drives;
+//!   100 Hz; a fan's blades passing), over the rush of air or the rumble of what it drives (the harmonics
+//!   turned from the first, \`harmonics\`: one \`sin\` a sample, not one each);
 //! - something struck (\`strike\`): a few modes ringing out over a short burst of noise, at the frequencies of
-//!   the thing's size and stuff (a basketball's air rings at about 950 Hz);
+//!   the thing's size and stuff (a basketball's air rings at about 950 Hz), rung as a bank of decaying
+//!   rotations (\`Modal\`: no \`sin\` or \`exp\` a sample);
 //! - events in a loop (darts, a rally) wrap round its end into its start, so nothing is cut off at the
 //!   seam; steady sounds under them are cross-faded as the water's are.
 //!
 //! Each is a stereo loop several seconds long (or a sound played once: \`ONCE_THINGS\`), made off the main
 //! thread the first time it's wanted. Was \`web/src/audio/things.ts\`; the arithmetic is the TypeScript's
-//! (\`dsp\`).
+//! (\`dsp\`), to rounding where a tone is turned by rotation rather than a \`sin\` a sample.
 
 use crate::dsp::m::*;
 use crate::dsp::*;
@@ -1966,6 +1968,7 @@ fn cello(rate: f64) -> Stereo {
         let start = round_usize(at * rate);
         let len = round_usize((dur + 0.15) * rate);
         let top = min(40.0, (6000.0 / hz).floor()) as usize;
+        let weights: Vec<f64> = (1..=top).map(|h| 1.0 / h as f64).collect();
         let mut scratch = Biquad::with(rate, Filter::Highpass, 1500.0, 0.7);
         let swell = if k % 2 == 1 { 0.85 } else { 1.0 };
         let mut phase = r.next();
@@ -1974,10 +1977,7 @@ fn cello(rate: f64) -> Stereo {
             // Vibrato: about 5.5 a second, a sixth of a semitone, coming in after a third of a second.
             let vib = 0.01 * ramp(0.3, 0.7, t) * sin(2.0 * PI * 5.5 * t);
             phase += (hz * (1.0 + vib + 0.0008 * (r.next() - 0.5))) / rate;
-            let mut v = 0.0;
-            for h in 1..=top {
-                v += sin(2.0 * PI * h as f64 * phase) / h as f64;
-            }
+            let v = harmonics(phase, &weights);
             // The bow: biting in, a swell along the stroke, lifting off.
             let env = ramp(0.0, 0.1, t)
                 * (1.0 - ramp(dur, dur + 0.15, t))
@@ -2171,16 +2171,14 @@ fn sing(d: &mut [f32], rate: f64, r: &mut Rng, at: f64, seconds: f64, hz: f64, v
     let weights = [1.0, 0.9, 0.6];
     let mut hiss = Biquad::with(rate, Filter::Highpass, 4500.0, 0.7);
     let top = (5000.0 / hz).floor() as usize;
+    let buzz: Vec<f64> = (1..=top).map(|h| 1.0 / pow(h as f64, 1.5)).collect();
     let consonant = r.next() < 0.6;
     let mut phase = 0.0;
     for j in 0..len {
         let t = j as f64 / rate;
         let vib = 0.017 * ramp(0.25, 0.5, t) * sin(2.0 * PI * 5.5 * t);
         phase += (hz * (1.0 + vib)) / rate;
-        let mut src = 0.0;
-        for h in 1..=top {
-            src += sin(2.0 * PI * h as f64 * phase) / pow(h as f64, 1.5);
-        }
+        let mut src = harmonics(phase, &buzz);
         src += (r.next() * 2.0 - 1.0) * 0.05;
         let mut v = 0.0;
         for (f, w) in filters.iter_mut().zip(weights) {
@@ -2206,13 +2204,10 @@ fn sing(d: &mut [f32], rate: f64, r: &mut Rng, at: f64, seconds: f64, hz: f64, v
 fn pad(d: &mut [f32], rate: f64, at: f64, seconds: f64, hz: f64, amp: f64, harmonics: usize) {
     let start = round_usize(at * rate);
     let len = round_usize(seconds * rate);
+    let weights: Vec<f64> = (1..=harmonics).map(|h| 1.0 / (h as f64 * 1.5)).collect();
     for j in 0..len {
         let t = j as f64 / rate;
-        let mut v = 0.0;
-        for h in 1..=harmonics {
-            let h = h as f64;
-            v += sin(2.0 * PI * h * hz * t) / (h * 1.5);
-        }
+        let v = crate::dsp::harmonics(hz * t, &weights);
         let i = (start + j) % d.len();
         add(
             d,
@@ -2267,7 +2262,7 @@ fn fridge_door(rate: f64) -> Stereo {
         let hz = 2000.0 + 600.0 * r.next();
         glass(&mut out, at, 0.12, 0.15, hz);
     }
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,
@@ -2316,7 +2311,7 @@ fn bin_lid(rate: f64) -> Stereo {
         burst(400.0, 0.6, 0.04, 1.0),
     );
     lid(&mut out, 1.75, 0.9);
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,
@@ -2402,7 +2397,7 @@ fn vend_snack(rate: f64) -> Stereo {
         strike(&mut out, at, 0.04, 0.0, &[], burst(hz, 1.0, 0.001, 1.0));
     }
     flap(&mut out, 3.7);
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,
@@ -2484,7 +2479,7 @@ fn vend_can(rate: f64) -> Stereo {
         let hz = 5000.0 + 4000.0 * r.next();
         strike(&mut out, at, 0.015, 0.0, &[], burst(hz, 1.0, 0.0008, 1.0));
     }
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,
@@ -2613,7 +2608,7 @@ fn phone_box(rate: f64) -> Stereo {
             0.7,
         );
     }
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,
@@ -2656,7 +2651,7 @@ fn hang_up(rate: f64) -> Stereo {
         &[[3200.0, 0.004, 1.0]],
         burst(3000.0, 1.0, 0.001, 0.6),
     );
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,
@@ -2708,7 +2703,7 @@ fn ping(rate: f64) -> Stereo {
         &[[420.0, 0.04, 1.0]],
         burst(600.0, 4.0, 0.08, 0.4),
     );
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,
@@ -2757,7 +2752,7 @@ fn toast_pop(rate: f64) -> Stereo {
         );
     }
     rustle(&mut out, &mut r, 0.75, 0.2, 0.06, 0.0, 2500.0, 0.8);
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,
@@ -2818,7 +2813,7 @@ fn pour(rate: f64) -> Stereo {
         }
         t += -log(1.0 - r.next()) / 60.0;
     }
-    done(
+    done_once(
         rate,
         vec![out.into()],
         0.0,
@@ -2947,21 +2942,15 @@ fn once(rate: f64, seconds: f64) -> Ev {
     }
 }
 
-/// Adds \`v\` at sample \`i\`, left and right at \`l\` and \`r\`; past the end it wraps on a loop of events, else
-/// it's dropped. Before the start it's dropped too (in the TypeScript, a write to a typed array at a
-/// negative index does nothing).
+/// Adds \`v\` at sample \`i\`, left and right at \`l\` and \`r\`; past the end or before the start it wraps on a
+/// loop of events (an event set a hair before the loop's start rings on from its end, so the seam is whole),
+/// else it's dropped.
 fn put(t: &mut Ev, i: f64, v: f64, l: f64, r: f64) {
-    if i < 0.0 {
+    let n = t.left.len();
+    if !t.wraps && (i < 0.0 || i >= n as f64) {
         return;
     }
-    let n = t.left.len();
-    let mut i = i as usize;
-    if i >= n {
-        if !t.wraps {
-            return;
-        }
-        i %= n;
-    }
+    let i = (i as i64).rem_euclid(n as i64) as usize;
     add(&mut t.left, i, v * l);
     add(&mut t.right, i, v * r);
 }
@@ -2979,25 +2968,22 @@ fn strike(t: &mut Ev, at: f64, amp: f64, pan: f64, modes: &[Mode], burst: Burst)
         s = (s as u64 * 1_664_525 + 1_013_904_223) as u32;
         s as f64 / 4_294_967_296.0
     };
-    let phase: Vec<f64> = modes.iter().map(|_| rnd() * 2.0 * PI).collect();
-    let step: Vec<f64> = modes
+    let ringing: Vec<crate::dsp::Mode> = modes
         .iter()
-        .map(|m| (2.0 * PI * min(m[0], rate * 0.45)) / rate)
+        .map(|m| crate::dsp::Mode {
+            hz: m[0],
+            tau: m[1],
+            level: m[2],
+            phase: rnd() * 2.0 * PI,
+        })
         .collect();
-    let fall: Vec<f64> = modes.iter().map(|m| exp(-1.0 / (m[1] * rate))).collect();
-    let mut level: Vec<f64> = modes.iter().map(|m| m[2]).collect();
-    let mut noise_level = burst.amp;
-    let noise_fall = exp(-1.0 / (burst.tau * rate));
+    let mut bank = Modal::new(rate, &ringing);
+    let mut noise_level = Decay::new(burst.amp, burst.tau, rate);
     let attack = 0.0004 * rate;
     let mut j = 0.0;
     while j < len {
-        let mut v = 0.0;
-        for m in 0..modes.len() {
-            v += level[m] * sin(phase[m] + step[m] * j);
-            level[m] *= fall[m];
-        }
-        v += band.run(rnd() * 2.0 - 1.0) * noise_level;
-        noise_level *= noise_fall;
+        let mut v = bank.next();
+        v += band.run(rnd() * 2.0 - 1.0) * noise_level.next();
         put(t, start + j, v * amp * min(1.0, j / attack), l, r);
         j += 1.0;
     }
@@ -3046,14 +3032,12 @@ fn motor(n: usize, rate: f64, hz: impl Fn(usize) -> f64, partials: &[f64]) -> Ve
         if phase > 2.0 * PI {
             phase -= 2.0 * PI;
         }
-        let mut v = 0.0;
-        for (k, p) in partials.iter().enumerate() {
-            let k = (k + 1) as f64;
-            if k * f < rate * 0.45 {
-                v += p * sin(k * phase);
-            }
+        // The harmonics under 0.45 of the rate (`k·f < 0.45·rate`), turned from the first.
+        let mut top = 0;
+        while top < partials.len() && (top + 1) as f64 * f < rate * 0.45 {
+            top += 1;
         }
-        *o = v as f32;
+        *o = harmonics(phase / (2.0 * PI), &partials[..top]) as f32;
     }
     d
 }
@@ -3068,7 +3052,8 @@ fn noise(n: usize, rate: f64, r: &mut Rng, kind: Filter, hz: f64, q: f64) -> Vec
 /// Puts the parts together: the steady ones (already folded into their start: \`fold\`) and the events
 /// added; then a room (\`delays\` in ms, none for out of doors, mixed in at \`wet\`), the highs and lows taken
 /// off (\`low\`, \`high\`: a box or a small speaker; 0 for none), and the level set to an average of \`rms\`, or
-/// with 0 to a peak of \`peak\`.
+/// with 0 to a peak of \`peak\`. A loop's filters and room are already ringing at its start, as they were at
+/// its end (\`done_once\` for a sound played once, which starts from silence).
 #[allow(clippy::too_many_arguments)]
 fn done(
     rate: f64,
@@ -3079,6 +3064,37 @@ fn done(
     wet: f64,
     low: f64,
     high: f64,
+) -> Stereo {
+    put_together(rate, parts, rms, peak, delays, wet, low, high, true)
+}
+
+/// \`done\` for a sound played once: its filters and room start from silence.
+#[allow(clippy::too_many_arguments)]
+fn done_once(
+    rate: f64,
+    parts: Vec<Stereo>,
+    rms: f64,
+    peak: f64,
+    delays: &[f64],
+    wet: f64,
+    low: f64,
+    high: f64,
+) -> Stereo {
+    put_together(rate, parts, rms, peak, delays, wet, low, high, false)
+}
+
+/// \`done\`'s work; \`lead\`: a loop, its filters and room run over a second of its end before its start.
+#[allow(clippy::too_many_arguments)]
+fn put_together(
+    rate: f64,
+    parts: Vec<Stereo>,
+    rms: f64,
+    peak: f64,
+    delays: &[f64],
+    wet: f64,
+    low: f64,
+    high: f64,
+    lead: bool,
 ) -> Stereo {
     let n = parts.iter().map(|p| p.left.len()).min().unwrap_or(0);
     let mut result = Stereo {
@@ -3091,24 +3107,32 @@ fn done(
             add(&mut result.right, i, p.right[i] as f64);
         }
     }
+    // A loop's start follows its end: the filters and the room run over a second of the loop (its end, round
+    // and round if it is shorter) before its start, so they are already ringing as they were at its end. A sound
+    // played once starts from silence.
+    let lead = if lead && n > 0 { round_usize(rate) } else { 0 };
     for c in 0..2 {
         let ch = result.ch(c);
+        let mut x: Vec<f32> = (0..lead)
+            .map(|k| ch[(k + n - lead % n) % n])
+            .chain(ch.iter().copied())
+            .collect();
         if low > 0.0 {
             let mut lp = Biquad::with(rate, Filter::Lowpass, low, 0.7);
-            for v in ch.iter_mut() {
+            for v in x.iter_mut() {
                 *v = lp.run(*v as f64) as f32;
             }
         }
         if high > 0.0 {
             let mut hp = Biquad::with(rate, Filter::Highpass, high, 0.7);
-            for v in ch.iter_mut() {
+            for v in x.iter_mut() {
                 *v = hp.run(*v as f64) as f32;
             }
         }
         if !delays.is_empty() {
             let wide: Vec<f64> = delays.iter().map(|d| d * 1.09).collect();
             room(
-                ch,
+                &mut x,
                 rate,
                 if c == 1 { &wide } else { delays },
                 0.55,
@@ -3116,6 +3140,7 @@ fn done(
                 wet,
             );
         }
+        ch.copy_from_slice(&x[lead..]);
     }
     set_level(result, rms, if peak == 0.0 { 1.0 } else { peak })
 }
@@ -3169,6 +3194,34 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// A loop's end runs on into its start at the browser's other rates too (the filters and the room in \`done\`
+    /// already ringing at its start): the things', the home's and the events' loops.
+    #[test]
+    fn every_loop_is_seamless_at_44_1_and_96_khz() {
+        let mut off = Vec::new();
+        for rate in [44100.0, 96000.0] {
+            let loops = THINGS
+                .iter()
+                .filter(|k| !ONCE_THINGS.contains(k))
+                .chain(HOME.iter().filter(|k| !ONCE_HOME.contains(k)))
+                .chain(
+                    events::EVENTS
+                        .iter()
+                        .filter(|k| !events::ONCE_EVENTS.contains(k)),
+                );
+            for kind in loops {
+                let s = make(kind, rate).unwrap();
+                for ch in [&s.left, &s.right] {
+                    let (inside, seam) = steps(ch);
+                    if seam > inside {
+                        off.push(format!("{kind} at {rate}: seam {seam} over {inside}"));
+                    }
+                }
+            }
+        }
+        assert!(off.is_empty(), "{off:#?}");
     }
 
     #[test]

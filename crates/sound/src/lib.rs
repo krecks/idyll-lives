@@ -4,7 +4,9 @@
 //! (`blips`), footsteps (`steps`) and the rooms' reverb (`rooms`). Each is samples at a sample rate, made
 //! the same every time; the browser plays them (`web/src/audio/`, through `crates/sound-wasm`).
 //!
-//! Was `web/src/audio/*.ts`; the arithmetic is the TypeScript's, so the sounds are what they were (`dsp`).
+//! Was `web/src/audio/*.ts`; the arithmetic is the TypeScript's, so most sounds are what they were (`dsp`), the
+//! struck things and the motors to rounding (their tones now turned by rotation). The music (plucked strings,
+//! saws and shaped drums), the knock at the door and the knife's chop (rung from their modes) have moved on.
 
 pub mod birdsong;
 pub mod blips;

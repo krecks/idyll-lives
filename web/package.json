@@ -26,6 +26,7 @@
     "check:clips": "bun ../tools/characters/check_clips.ts --body all --stage all",
     "check:chunks": "cd .. && cargo check-chunks",
     "sounds": "bun ../tools/audio/listen.ts",
+    "sounds:time": "bun ../tools/audio/time.ts",
     "assets": "cd .. && cargo assets",
     "decoders": "cd .. && cargo decoders"
   },
