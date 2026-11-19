@@ -335,6 +335,9 @@
     }
   },
 
+  "$shell": "A home past the town's fill that nobody has moved into is a shell (housegen.ts `Furnishing`): its walls, doors and windows, every kitchen's counter run, the furniture the rooms of these kinds must have (`fitted`: a bathroom's toilet, shower and basin) and ceiling lights, nothing loose and nothing in the garden. A household that buys one furnishes it.",
+  "shell": { "fitted": ["bathroom"] },
+
   "$extras": "Rooms a house gets besides bedrooms, a kitchen, bathrooms and a living room. Rooms measure at most their `maxSide` (short and long side), so a house with more floor than its rooms may take gets extras, in this order, each if `chance` (per lot size) says so and the floor still has room to spare: upstairs in a two-storey house with `floor: \"upper\"`, families only with `minBedrooms`. Floor left over after that makes the house smaller. `label` names the room in the house's description.",
   "extras": [
     { "kind": "dining", "label": "a dining room", "chance": { "terrace": 0.6, "small": 0.4, "medium": 0.7, "large": 0.9 } },

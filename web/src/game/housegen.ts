@@ -59,6 +59,8 @@ export interface HouseGenConfig {
   basement?: BasementSpec;
   /** How a house is furnished for the people living in it (see `Residents`). */
   residents?: ResidentsSpec;
+  /** What a home nobody has moved into keeps when it is a shell (see `Furnishing`). */
+  shell?: ShellSpec;
   names: { first: string[]; second: Record<string, string[]> };
 }
 
@@ -74,6 +76,20 @@ export interface Residents {
   children: number;
   babies: number;
   stages?: string[];
+}
+
+/**
+ * What a home is furnished for: the people living in it (`Residents`), or `'shell'`, a home past
+ * the town's fill that nobody has moved into: its walls, doors and windows, each kitchen's counter
+ * run, the fittings of the rooms `shell.fitted` names (a bathroom's toilet, shower and basin) and
+ * its ceiling lights, but nothing loose (no beds, no sofas, nothing in the garden). Undefined: an
+ * empty home, furnished as its rooms' own recipes have it.
+ */
+export type Furnishing = Residents | 'shell';
+
+/** A shell's fittings: the rooms that keep the furniture their recipes must have (`RoomSpec.furniture` with no `chance`). */
+interface ShellSpec {
+  fitted: Kind[];
 }
 
 /** How much garden a house's lot has round it (see `fitLot`). */
@@ -93,8 +109,9 @@ export interface GardenSpec {
   drive: number;
 }
 
-/** A key for `residents` (empty: undefined). */
-export function residentsKey(r: Residents | undefined): string {
+/** A key for `residents` (empty: undefined; `shell` for a shell). */
+export function residentsKey(r: Furnishing | undefined): string {
+  if (r === 'shell') return 'shell';
   return r ? `${r.couples}.${r.adults}.${r.children}.${r.babies}${r.stages?.length ? `.${[...r.stages].sort().join('+')}` : ''}` : '';
 }
 
@@ -378,7 +395,7 @@ export function generateHouse(
   seed: number,
   lampTiles = 10,
   windowTiles = 6,
-  residents?: Residents,
+  residents?: Furnishing,
   garden?: GardenSize,
 ): HouseTemplate | null {
   const spec = garden ? cfg.gardens?.[garden] : undefined;
@@ -459,7 +476,7 @@ function attemptHouse(
   belowRng: (() => number) | null,
   lampTiles: number,
   windowTiles: number,
-  residents: Residents | undefined,
+  residents: Furnishing | undefined,
   fit?: { spec: GardenSpec; seed: number },
 ): Cut | null | 'basement' {
   const className = weighted(rng, cfg.lots[lotSize] ?? cfg.lots.medium ?? {});
@@ -586,7 +603,8 @@ function attemptHouse(
   const name = `${pick(rng, cfg.names.first)} ${pick(rng, cfg.names.second[cls.label] ?? ['House'])}`;
   // The lot: the whole one, or one cut to fit the house.
   const plot = fit ? fitLot(fit.spec, random(fit.seed), house, doorX, cls.row) : { x: 0, width: lot.width, depth: lot.depth };
-  garden(cfg, info, rng, g, house, plot, washesWithoutDrying(info, [g, up, basement]));
+  // (A shell has nothing in its garden: the last numbers drawn, so the rest is as anyone's.)
+  if (residents !== 'shell') garden(cfg, info, rng, g, house, plot, washesWithoutDrying(info, [g, up, basement]));
 
   // Spawns in front of the front door.
   const spawns: [number, number][] = [
@@ -1186,6 +1204,8 @@ function windows(cfg: HouseGenConfig, rng: () => number, f: Floor, house: Rect, 
 interface Fit {
   plans: Map<Room, Plan[]>;
   keep: (o: ObjectInfo) => boolean;
+  /** A shell: every room (the basement's too) furnished as `shellPlan` has it. */
+  shell?: boolean;
 }
 
 /** A room furnished from `spec` as a room of `kind`. */
@@ -1205,13 +1225,15 @@ interface Plan {
  * them) or for a child of a stage that may use them. An empty house (`residents` undefined) keeps
  * its bedrooms as they are.
  */
-function fitFor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, rooms: Room[], residents: Residents | undefined): Fit {
+function fitFor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, rooms: Room[], furnishing: Furnishing | undefined): Fit {
   const spec = cfg.residents;
-  const kids = !!residents && residents.children + residents.babies > 0;
   const only = spec?.kidsOnly;
+  const forKids = (o: ObjectInfo) => !!only && !!(only.categories?.includes(o.category ?? '') || only.groups?.includes(o.group ?? ''));
+  if (furnishing === 'shell') return { plans: new Map(), keep: (o) => !forKids(o), shell: true };
+  const residents = furnishing;
+  const kids = !!residents && residents.children + residents.babies > 0;
   // (No stages given: any child's.)
   const stages: (string | undefined)[] = residents?.stages?.length ? residents.stages : [undefined];
-  const forKids = (o: ObjectInfo) => !!only && !!(only.categories?.includes(o.category ?? '') || only.groups?.includes(o.group ?? ''));
   const keep = (o: ObjectInfo) => !forKids(o) || (!!residents && (residents.babies > 0 || (residents.children > 0 && stages.some((s) => usableAt(o, s)))));
   const fit: Fit = { plans: new Map(), keep };
   if (!spec) return fit;
@@ -1285,7 +1307,8 @@ function furnish(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, f: F
     if (r.kind === 'hall') lights(cfg, info, f, r, lampTiles);
     else if (!furnishRoom(cfg, info, random(seed + i), f, r, cfg.rooms[r.kind], has, lampTiles)) return false;
   }
-  if (f.rooms.every((r) => !fit.plans.get(r)?.length) && f.objects.every((o) => fit.keep(info(o.def)!))) return true;
+  const plans = (r: Room): Plan[] => (fit.shell ? [shellPlan(cfg, r.kind)] : (fit.plans.get(r) ?? []));
+  if (!fit.shell && f.rooms.every((r) => !plans(r).length) && f.objects.every((o) => fit.keep(info(o.def)!))) return true;
   const own = snapshot(f);
   empty();
   const kept: ObjectInfos = (d) => {
@@ -1299,7 +1322,7 @@ function furnish(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, f: F
     }
     const back = snapshot(f);
     let done = false;
-    for (const plan of [...(fit.plans.get(r) ?? []), { kind: r.kind, spec: cfg.rooms[r.kind] }]) {
+    for (const plan of [...plans(r), { kind: r.kind, spec: cfg.rooms[r.kind] }]) {
       back();
       if (furnishRoom(cfg, kept, random(seed + i), f, { ...r, kind: plan.kind }, plan.spec, has, lampTiles)) {
         done = true;
@@ -1313,6 +1336,18 @@ function furnish(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, f: F
     }
   }
   return true;
+}
+
+/**
+ * Room kind `kind` as a shell has it (see `Furnishing`): its counter run (a kitchen's), the
+ * furniture its recipe must have if `shell.fitted` names it (a bathroom's toilet, shower and basin),
+ * nothing else; `furnishRoom` gives it its ceiling lights. The run and the fittings come first in a
+ * room's own recipe and draw the same numbers, so they stand where they would in a furnished home.
+ */
+function shellPlan(cfg: HouseGenConfig, kind: Kind): Plan {
+  const spec = cfg.rooms[kind];
+  const fitted = cfg.shell?.fitted.includes(kind) ?? false;
+  return { kind, spec: { weight: spec.weight, minSide: spec.minSide, maxSide: spec.maxSide, run: spec.run, furniture: fitted ? spec.furniture.filter((s) => s.chance === undefined || s.chance >= 1) : [] } };
 }
 
 /** Takes what doesn't belong in the house (`fit.keep`) off floor `f`, and the small things on its top. */
