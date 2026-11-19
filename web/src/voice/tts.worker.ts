@@ -11,6 +11,7 @@
  */
 
 import { fetchOnce, forget, gunzipText, openCache, openRuntimeCache, prune } from '../ml/assets';
+import { gpuBuffers, trackGpuBuffers } from '../ml/gpuMemory';
 import { configureOrt, hasWebGpu, importOrt, ORT_WASM, sessionOptions } from '../ml/ort';
 import init, { Voice } from './wasm-pkg/voice_wasm.js';
 import wasmUrl from './wasm-pkg/voice_wasm_bg.wasm?url';
@@ -70,6 +71,7 @@ scope.__wasmPanic = (message) => {
 scope.onmessage = (e) => {
   const msg = e.data;
   if (msg.type === 'load') {
+    if (msg.measure) trackGpuBuffers();
     if (!loading) {
       loading = load(msg.base, msg.device).catch((err) => {
         loading = null;
@@ -80,6 +82,9 @@ scope.onmessage = (e) => {
     }
   } else if (msg.type === 'speak') {
     queue = queue.then(() => speak(msg.id, msg.text, msg.voice));
+  } else if (msg.type === 'memory') {
+    const { live, peak } = gpuBuffers();
+    scope.postMessage({ type: 'memory', gpuLive: live, gpuPeak: peak });
   }
 };
 

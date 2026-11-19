@@ -155,8 +155,8 @@ try {
   if (report) {
     for (const r of [reports.cold, reports.warm].filter(Boolean)) {
       console.log(`${r === reports.cold ? 'cold' : 'warm'} load progress: ${r.loadProgress.map((p) => `${fmt(p.atMs)}ms ${fmt((p.loaded / p.total) * 100)}%`).slice(-4).join(', ')}`);
-      for (const line of r.lines) console.log(`  ${line.name}: ${fmt(line.totalMs)} ms, ${fmt(line.tokPerS, 1)} tok/s, ${line.tokens} tokens, stop ${line.stop} — ${JSON.stringify(line.text)}`);
-      for (const d of r.decode.runs) console.log(`  ${d.name}: ${fmt(d.totalMs)} ms, ${fmt(d.tokPerS, 1)} tok/s, ${d.tokens} tokens, stop ${d.stop}`);
+      for (const line of [...r.lines, ...(r.sampled ?? [])]) console.log(`  ${line.name}: ${fmt(line.totalMs)} ms, ${fmt(line.tokPerS, 1)} tok/s, ${line.tokens} tokens, stop ${line.stop} — ${JSON.stringify(line.text)}`);
+      for (const d of r.decode.runs) console.log(`  ${d.name}: ${fmt(d.totalMs)} ms, ${fmt(d.tokPerS, 1)} tok/s, ${d.tokens} tokens, stop ${d.stop}, per token run/read/pick ${fmt(d.perToken.run, 2)} / ${fmt(d.perToken.read, 2)} / ${fmt(d.perToken.pick, 2)} ms`);
     }
     mkdirSync(OUT, { recursive: true });
     writeFileSync(`${OUT}report.json`, JSON.stringify({ startedAt: new Date().toISOString(), machine: state, options, ...reports }, null, 2));
