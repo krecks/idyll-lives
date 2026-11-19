@@ -113,7 +113,8 @@ export interface HomeForSale {
 /**
  * The homes nobody lives in (private lots no household has, and flats), priced as `game/price.ts` prices a home from
  * what the views carry: the land by its size and the house by its floor (the walls' box, every storey); a flat its
- * share of its building's land (the lot shared evenly by its flats) and its own floor at a flat's rate. A building of
+ * share of its building's land (the lot shared evenly by its flats, and the place under them over a place) and its
+ * own floor at a flat's rate (`FLAT_FLOOR`): flats are the cheapest homes. A building of
  * flats is no home itself. The things in it aren't in the views, so the price is a "from".
  */
 export function homesForSale(plots: readonly PlotInfo[], households: readonly { plot: number | null }[], rates: Rates | undefined, flats: readonly FlatInfo[] = []): HomeForSale[] {
@@ -137,7 +138,8 @@ export function homesForSale(plots: readonly PlotInfo[], households: readonly { 
     const lot = plots[f.of];
     if (taken.has(f.id) || !lot) continue;
     const floor = f.w * f.d;
-    out.push({ plot: f.id, flat: true, price: priced((lot.w * lot.d) / (flatsOf.get(f.of) ?? 1), floor, FLAT_FLOOR), floor, storeys: 1, w: f.w, d: f.d });
+    const shares = (flatsOf.get(f.of) ?? 1) + (lot.public ? 1 : 0);
+    out.push({ plot: f.id, flat: true, price: priced((lot.w * lot.d) / shares, floor, FLAT_FLOOR), floor, storeys: 1, w: f.w, d: f.d });
   }
   return out;
 }
