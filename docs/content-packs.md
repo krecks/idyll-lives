@@ -189,7 +189,8 @@ fields) load unchanged: both mergers rename the keys first (`LEGACY_KEYS` in `pa
 | `hours` | `[from, to]`, hours of the day (0 to 24, two different ones): only started then; past midnight when `from` is later than `to` (the telescope's *Stargaze*: `[20, 5]`, after dark). Residents don't choose it outside them, and the player's order fails with "Ada can only stargaze from 20:00 to 5:00"; one ordered in time but reached too late doesn't start. A use already going runs on. Default: any hour. |
 | `sky` | `true`: only under open sky, the object standing outside on every tile (the telescope). The order fails indoors with "… can only stargaze under open sky: the telescope has to stand outside"; residents don't choose it there. Default `false`. |
 | `workOn` | Something it works on, which must be there for it to start, taken up as it starts: `"dishes"` (dirty dishes or food gone off of the household's to clear: *Wash the dishes*, the dishwasher, sorting the recycling), `"laundry"` (a load of the household's dirty washing: loading the washer), `"washed"` (a washed load, wet: loading the dryer, hanging out the washing) or `"dried"` (a dry load: folding it at the laundry basket). Washing piles up as content `laundry` says (below). Residents don't choose it with nothing there, and the order fails with "Wash the dishes: there are no dishes to wash" / "there's no washing to do" / "there's no washed laundry to dry" / "there's no dry laundry to fold". An unknown value is an error, and so is a load of washing without content `laundry`. Default: nothing needed. |
-| `makes` | A load of washing it leaves the household when it ends (not when cancelled or given up at once): `"washed"` (taking the washing out of the washer), `"dried"` (out of the dryer, in off the line) or `"laundry"`. Such a use goes on to its end. Then the resident carries the load on to the nearest working thing on the same lot with a use that works on it (`workOn`): from the washer to the dryer or the line, from the dryer to the basket; with none, it waits for one. Needs content `laundry`. Default: none. |
+| `makes` | A load of washing it leaves the household when it ends (not when cancelled or given up at once): `"washed"` (taking the washing out of the washer), `"dried"` (out of the dryer, in off the line), `"laundry"` or `"ironed"` (pressed clothes: the ironing board's *Iron the clothes*, which works on a dry load instead of folding it; needs `laundry.pressed`, below). Such a use goes on to its end. Then the resident carries the load on to the nearest working thing on the same lot with a use that works on it (`workOn`): from the washer to the dryer or the line, from the dryer to the basket or the board; with none, it waits for one. Needs content `laundry`. Default: none. |
+| `cleans` | Cleans the floor with a tool: `{"amount": 0.6, "reach": 0, "hardFloors": false, "outdoors": false}` (the vacuum cleaner; the mop `{"amount": 0.9, "hardFloors": true}`, the broom `{"amount": 0.6, "reach": 2, "hardFloors": true, "outdoors": true}`). The resident takes the tool (drawn in the hands by the object's `held`, its part hidden by the model's use clip) to the dirtiest floor at home it cleans and uses it standing there; done, `amount` of dirt comes off every tile of that room within `reach` tiles each way (0: the whole room), less for a use cut short. `hardFloors`: not a carpet (a floor covering whose `finish` is `carpet`, or, where none was laid, a room kind with `carpet`); `outdoors`: the garden too. Free will offers it only with a floor at home dirtier than `roomRules.clean.threshold`, keener the dirtier and the more of the room is dirty (as *Tidy up*, a little keener); never where someone else is cleaning. An order with nothing to clean fails with "Mop the floors: the floors it cleans are clean". A standing use only (no other pose, `inside`, `whole`, `partner`, `seatNear`, `recipe`, `eat`, `yields`, `carried`, `atSlot`, `needsTable`, `workOn`, `loads`, `unloads`, `makes`, `leaves`); `amount` above 0, at most 1. Code: `crates/sim-core/src/sweep.rs`. Default: none. |
 | `loads` | Puts a load in a machine that `runs` (above): only while it's empty ("the … is still running", "the … is done: take the washing out first"), and it starts its run once the use ends. Goes on to its end. Default `false`. |
 | `unloads` | Takes the load out of a machine that `runs`, once its run is done ("there's nothing in the …", "the … is still running"): it's empty again as the use ends. Goes on to its end. Not with `loads`. Default `false`. |
 | `brings` | An item (an `items` id) carried in the arms on the way to it, only to be seen: the basket of washing to the washer, the dryer and the line, an armful of dry washing to the basket. Nothing is put down or picked up. Default: none. |
@@ -470,7 +471,7 @@ Build mode's looks are top-level arrays, appended like objects, so a pack can ad
 | Field | Meaning |
 |---|---|
 | `price` | Wall covering: per wall face covered. Floor covering: per floor tile. Door / window: per door or window (replacing one with another style costs the new style's price). |
-| `finish` | Wall covering texture: `plaster`, `wallpaper`, `siding`, `brick`, `wood`, `stone` or `tile`; floor covering: `wood`, `tile`, `carpet` or `stone`. `color` tints it (wood is a neutral grain: give it its colour). |
+| `finish` | Wall covering texture: `plaster`, `wallpaper`, `siding`, `brick`, `wood`, `stone` or `tile`; floor covering: `wood`, `tile`, `carpet` (soft: what a mop or a broom leaves, `cleans`) or `stone`. `color` tints it (wood is a neutral grain: give it its colour). |
 | `leaf`, `color` | Door: `panel` (painted; without `color`, front doors take the house's accent colour), `oak`, `halfGlass` or `glass` (`color` paints the frame). |
 | `panes`, `sill`, `head`, `inset`, `shutters` | Window: glazing bars (`cross`, `grid`, `bar`, `transom`, `none`), opening bottom and top (m, walls are 2.8 m), wall left either side of the glazing (m, of the 1 m edge), shutters outside (`true`, `false`, or `"house"`: if the house's style has them). |
 
@@ -676,7 +677,7 @@ id) and `last` (household names).
   residents' pace while it is theirs (sad 0.88, embarrassed and relaxed 0.95, inspired 1.03, happy 1.05, angry
   and energized 1.08); its body language is the renderer's, by id (`bodyLanguage.ts` `BEARINGS`).
 - **Buy categories** (groups in brackets): `kitchen` (`appliances`, `counters`, `islands`,
-  `dining`, `cabinets`), `bathroom` (`toilets`, `bathing`, `sinks`, `laundry`), `bedroom`
+  `dining`, `cabinets`), `bathroom` (`toilets`, `bathing`, `sinks`, `laundry`, `cleaning`), `bedroom`
   (`beds`, `nightstands`, `storage`, `dressing`), `kids`, `living` (`seating`, `sectionals`,
   `tables`, `media`, `shelves`), `office` (`desks`, `chairs`), `fitness`, `hobbies` (`music`,
   `games`, `crafts`), `decor` (`wall`, `ornaments`, `textiles`), `tabletop` (things on the
@@ -775,7 +776,9 @@ fully; a lamp's own `light.tiles` comes first); `decorPerTile` and `gardenDecorP
 `loveFeeling` and `dislikeFeeling`; `drift` (how fast the `environment` need follows the room,
 per hour) and `away` (its target at work); `preference` (how much the AI prefers nicer rooms);
 `dirt` (mess by tag); `clean` (the *Tidy up* action: `label`, `minutes`, `threshold`, `amount`,
-`interest`). A need with `"room": true` is the one that follows the room.
+`interest`; a use that `cleans` is tidying up with a tool). A need with `"room": true` is the one
+that follows the room. A room kind's `carpet` (`true` on the bedroom) says its floor is carpet
+where no covering was laid, as the renderer draws it: a mop and a broom leave it.
 
 **Wear and repairs** (`objectRules.wear`: `perUse`, `byCategory`, `perQuality`;
 `objectRules.repair`: `label`, `minutes`, `skill`, `skillGainPerHour`, `chance`,
@@ -798,7 +801,11 @@ as it starts, and one that `makes` a load leaves one as it ends: the washer is l
 load and its washing taken out washed, the dryer is loaded with that and emptied dry, the washing
 line the same, and the dry load is folded at the laundry basket. A household starts with a load
 dirty and one washed. Saved. Without `laundry`, nothing piles up and no interaction may work on
-washing.
+washing. `pressed` (`{"feeling": "pressedClothes", "outfits": 4}`): what ironing does. A dry load
+ironed (a use that `makes` it `ironed`) waits as pressed clothes (up to `most` loads too); a
+resident changing at home (`changesOutfit`) with some waiting puts them on, takes `1 / outfits` of
+a load and gets `feeling`. With none ironed, dressing is as before; without `pressed`, nothing may
+make an ironed load.
 
 **Accidents** (`accidents`): what happens when a need has been empty for `graceMinutes` and the
 home has nothing working for it.
@@ -1124,11 +1131,12 @@ keys share these objects. The rules:
 | An interaction's `fetch` | with `requires`, naming a plain interaction of something that provides all it requires | there'd be nothing to fetch it with |
 | An interaction's `hours` | two different hours of the day, 0 to 24 | the same hour twice is an empty window, and an hour past 24 never comes |
 | An interaction's `workOn` | `dishes`, `laundry`, `washed` or `dried`; the last three only with content `laundry` | with no washing piling up it could never start |
-| An interaction's `makes` | `laundry`, `washed` or `dried`, only with content `laundry` | the dishes aren't a load; with no washing piling up there'd be nowhere to put it |
+| An interaction's `makes` | `laundry`, `washed`, `dried` or `ironed`, only with content `laundry` (`ironed` with `laundry.pressed`) | the dishes aren't a load; with no washing piling up there'd be nowhere to put it |
+| An interaction's `cleans` | `amount` above 0 and at most 1, on a standing use with none of the fields it lists | it's done standing at the dirty floor, the tool in the hands |
 | An interaction's `loads`, `unloads` | on an object that `runs` (`minutes` above 0), not both | there'd be no run to start or to end |
 | An interaction's `brings`, `holds` | an `items` id | there'd be nothing to show |
 | Interactions of things on the `surface` layer | not `lie`, `inside`, `whole`, `baby`, `care`, `needsTable` or a `recipe` | a thing on a top is used standing or sitting at its top |
-| `laundry` | `perDay` above 0, `most` at least 1 | no washing would ever pile up to a load |
+| `laundry` | `perDay` above 0, `most` at least 1; `pressed` a feeling the content has, `outfits` at least 1 | no washing would ever pile up to a load |
 | An object's `staff` | `at` within 1.5 m of the footprint, `hours` two different hours of the day | a server off in the street; an empty window |
 | An interaction's `selfServe` | on an object with `staff`, an `anim` the content has, `minutes` above 0 | nobody could sell it; a use that takes no time |
 | `service` | `share` 0 or more, `waitMinutes` above 0, an `anim` the content has | |

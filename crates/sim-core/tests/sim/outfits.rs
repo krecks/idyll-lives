@@ -95,7 +95,7 @@ fn changing_at_the_wardrobe_puts_on_the_next_outfit_halfway() {
 fn older_saves_load_in_the_creators_outfit() {
     let mut w = world();
     w.sims[0].outfit = 2;
-    w.households[0].laundry = [2.0, 0.5, 0.0];
+    w.households[0].laundry = [2.0, 0.5, 0.0, 0.0];
     let saved: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
     assert_eq!(saved["version"], sim_core::save::SAVE_VERSION);
     assert_eq!(saved["sims"][0]["outfit"], 2);
@@ -109,7 +109,7 @@ fn older_saves_load_in_the_creators_outfit() {
     let back = load(&v30);
     assert_eq!(
         (back.sims[0].outfit, back.households[0].laundry),
-        (0, [2.0, 0.5, 0.0])
+        (0, [2.0, 0.5, 0.0, 0.0])
     );
     // v29 (neither): one load of washing of each to start with, the creator's outfit.
     let mut v29 = saved.clone();

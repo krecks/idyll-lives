@@ -128,7 +128,8 @@ pub(crate) fn use_object(
             || inter.partner
             || inter.loads
             || inter.unloads
-            || inter.makes.is_some();
+            || inter.makes.is_some()
+            || inter.cleans.is_some();
         elapsed >= total
             || (any_gain && satisfied && !planned && !routine && !practising && !job)
             || drained
@@ -138,11 +139,34 @@ pub(crate) fn use_object(
     if inter.changes_outfit && elapsed >= half && elapsed - minutes < half {
         sim.outfit = (sim.outfit + 1) % OUTFITS;
         sim.reshaped = true;
+        // At home with ironed washing waiting: pressed clothes put on (`content::Pressed`).
+        let household = &ctx.households[sim.household as usize];
+        if let Some(pressed) = content.laundry.and_then(|l| l.pressed)
+            && household.laundry[crate::content::WorkOn::Ironed.load().unwrap_or(0)] > 0.0
+            && household.plot.is_some()
+            && ctx.object_plot.get(obj.id as usize).copied().flatten() == household.plot
+        {
+            sim.wore_pressed = true;
+            social::add_feeling(
+                &mut sim.feelings,
+                pressed.feeling,
+                &content.feelings,
+                ctx.tick,
+            );
+        }
     }
     // Homework done: better at school (by how much of it they did).
     if done && inter.homework > 0.0 && content.life.stage_at(sim.age).is_some_and(|s| s.school) {
         let share = (elapsed / inter.minutes.max(1.0)).min(1.0);
         sim.grade = (sim.grade + inter.homework * share).clamp(0.0, 100.0);
+    }
+    // A floor cleaned with a tool: the dirt comes off it (after the step, `sweep::clean`), as
+    // much as they got done of it.
+    if done && let Some(sweep) = inter.cleans {
+        let amount = sweep.amount * (elapsed / total.max(1.0)).min(1.0);
+        sim.swept = sim
+            .sweep
+            .map(|(x, z)| (x, z, crate::content::Sweep { amount, ..sweep }));
     }
     // A finished cook (or wash, or snack) leaves a mess around the object.
     if done && inter.dirt > 0.0 {
@@ -486,6 +510,10 @@ pub(crate) fn arrive(
                 sim.pos = s.slot_position(content, slot);
                 sim.yaw = s.slot_yaw(content, slot);
                 sim.pose = Pose::Sit;
+            } else if inter.cleans.is_some() {
+                // At the floor they took the tool to (`sweep.rs`): cleaning it where they stand,
+                // the way they came.
+                sim.pose = Pose::Stand;
             } else if (inter.pose == Pose::Stand || on_top) && !inter.inside {
                 // At their own spot, come to it (the end of a ping-pong table, their basin at a
                 // double sink: `stand_spot`), facing the way it says; else facing the thing.
@@ -1119,6 +1147,7 @@ pub(crate) fn accident(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance],
 /// (`cooking::after_step`).
 pub(crate) fn end_activity(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance]) {
     sim.join_spot = None;
+    sim.sweep = None;
     sim.kept_out = 0;
     // A talk from the seat over: back to what they sat down to do, still sitting.
     if let Some(paused) = sim.paused.take() {

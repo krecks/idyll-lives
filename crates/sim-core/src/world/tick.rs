@@ -232,6 +232,11 @@ pub(crate) fn reroute_after_change(sim: &mut Sim, ctx: &Ctx, objects: &mut [Obje
         }
     } else {
         let directed = task.directed;
+        // (A floor a tool was taken to: that floor, not the tool, out of reach.)
+        let kind = match sim.sweep {
+            Some((x, z)) if matches!(task.kind, TaskKind::Use { .. }) => TaskKind::Clean { x, z },
+            _ => task.kind,
+        };
         end_activity(sim, ctx.content, objects);
         if !directed {
             let retry = if matches!(task.kind, TaskKind::Social { .. } | TaskKind::Join { .. }) {
@@ -239,7 +244,7 @@ pub(crate) fn reroute_after_change(sim: &mut Sim, ctx: &Ctx, objects: &mut [Obje
             } else {
                 social::minutes_to_ticks(ctx.content.autonomy.retry_minutes)
             };
-            sim.remember_unreachable(task.kind, ctx.tick + retry);
+            sim.remember_unreachable(kind, ctx.tick + retry);
         }
     }
 }

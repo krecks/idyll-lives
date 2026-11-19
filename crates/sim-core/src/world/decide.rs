@@ -313,6 +313,24 @@ pub(crate) fn pick_autonomous(
             if inter.trains_skills() && allowed == Access::Full {
                 s += training_interest(sim, content, inter) * boost / (1.0 + distance * 0.08);
             }
+            // A tool that cleans the floor: only with a floor at home it cleans dirty enough,
+            // the keener the dirtier, as tidying up (`sweep.rs`), from as far as that floor is.
+            if let Some(sweep) = &inter.cleans {
+                let at_home = ctx.object_plot[obj.id as usize].is_some_and(|p| Some(p) == own);
+                let Some(spot) = at_home
+                    .then(|| sweep_spot(sim, ctx, sweep, content.room_rules.clean.threshold))
+                    .flatten()
+                    .filter(|_| here == own)
+                else {
+                    continue;
+                };
+                let distance = ctx
+                    .nav
+                    .stairs
+                    .distance([spot.x as f32 + 0.5, spot.z as f32 + 0.5], sim.pos);
+                s += crate::sweep::keen(content, &spot) * (1.5 - environment)
+                    / (1.0 + distance * 0.08);
+            }
             // The washing waiting at home, the more the keener; a machine done, to be emptied.
             if allowed == Access::Full {
                 s += crate::machines::pull(
@@ -541,23 +559,7 @@ pub(crate) fn pick_autonomous(
         let mut best: Option<(f32, i32, i32)> = None;
         // (Not where they couldn't get to a moment ago, nor where someone else is tidying up:
         // the next dirtiest spot instead.)
-        let mut out_of_reach: Vec<(i32, i32)> = sim
-            .unreachable_now(ctx.tick)
-            .filter_map(|k| {
-                if let TaskKind::Clean { x, z } = k {
-                    Some((x, z))
-                } else {
-                    None
-                }
-            })
-            .collect();
-        out_of_reach.extend(
-            ctx.briefs
-                .iter()
-                .enumerate()
-                .filter(|&(j, _)| j != me)
-                .filter_map(|(_, b)| b.cleaning),
-        );
+        let out_of_reach = cleaning_skip(sim, ctx);
         for z in p.z..p.z + p.d {
             for x in p.x..p.x + p.w {
                 if !lot.in_bounds(x, z) || out_of_reach.contains(&(x, z)) {
@@ -1007,6 +1009,54 @@ pub(crate) fn prefer_factor(
 }
 
 /// A walk's goal at `at`: the point, its tile, and no tags (`start_task`).
+/// Where `sim` won't clean (tidying up or with a tool): where they couldn't get to a moment ago,
+/// and where someone else is cleaning (the briefs' `cleaning`).
+fn cleaning_skip(sim: &Sim, ctx: &Ctx) -> Vec<(i32, i32)> {
+    let mut skip: Vec<(i32, i32)> = sim
+        .unreachable_now(ctx.tick)
+        .filter_map(|k| {
+            if let TaskKind::Clean { x, z } = k {
+                Some((x, z))
+            } else {
+                None
+            }
+        })
+        .collect();
+    skip.extend(
+        ctx.briefs
+            .iter()
+            .enumerate()
+            .filter(|&(j, _)| j != sim.id as usize)
+            .filter_map(|(_, b)| b.cleaning),
+    );
+    skip
+}
+
+/// Where `sim` would take a tool that cleans as `sweep` (`sweep::spot`): the dirtiest floor at
+/// their home it cleans, dirtier than `threshold`, but where they won't clean (`cleaning_skip`).
+pub(crate) fn sweep_spot(
+    sim: &Sim,
+    ctx: &Ctx,
+    sweep: &crate::content::Sweep,
+    threshold: f32,
+) -> Option<crate::sweep::Spot> {
+    let plot = ctx.households[sim.household as usize].plot?;
+    crate::sweep::spot(
+        ctx.content,
+        &ctx.nav,
+        ctx.rooms,
+        ctx.dirt,
+        &ctx.plots[plot as usize],
+        sweep,
+        threshold,
+        &cleaning_skip(sim, ctx),
+    )
+}
+
+/// What dirt a floor needs for the player's order to clean it with a tool (free will waits for
+/// `roomRules.clean.threshold`).
+pub(crate) const SWEEP_ORDERED: f32 = 0.01;
+
 pub(crate) fn goal_at(at: [f32; 2]) -> ([f32; 2], (i32, i32), TagMask) {
     (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
 }
@@ -1189,6 +1239,22 @@ pub(crate) fn start_task(
             if !obj.allows(inter, sim.id) {
                 return;
             }
+            // Cleaning the floor with it (`sweep.rs`): to the dirtiest floor at home it cleans
+            // (any dirt at all, when the player asked); with none, not at all.
+            let swept = match &inter.cleans {
+                Some(sweep) => {
+                    let threshold = if task.directed {
+                        SWEEP_ORDERED
+                    } else {
+                        content.room_rules.clean.threshold
+                    };
+                    let Some(at) = sweep_spot(sim, ctx, sweep, threshold) else {
+                        return;
+                    };
+                    Some((at.x, at.z))
+                }
+                None => None,
+            };
             // What it needs fetched first (`Interaction::fetch`: a coffee poured at the machine):
             // off to get it, then back to this (the follow-up); with no way to it, without.
             if fetched != Some(object)
@@ -1262,6 +1328,7 @@ pub(crate) fn start_task(
                         && !inter.inside
                         && !inter.carried
                         && !inter.at_slot
+                        && swept.is_none()
                 })
                 .and_then(|k| {
                     crate::surface::stand_spot(
@@ -1305,6 +1372,8 @@ pub(crate) fn start_task(
                     .or_else(|| ctx.index.links.approach_of(object))
                     .unwrap_or_else(|| obj.front_tile(content)),
             };
+            let t = swept.unwrap_or(t);
+            sim.sweep = swept;
             let tags = inter.tags;
             (
                 spot.map_or([t.0 as f32 + 0.5, t.1 as f32 + 0.5], |(_, p, _)| p),

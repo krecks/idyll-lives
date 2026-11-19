@@ -1185,6 +1185,15 @@ pub struct Sim {
     /// Mess made (or, negative, cleaned) around a tile this tick; applied after the step
     /// (residents can't change the dirt while stepping).
     pub(crate) mess: Option<(i32, i32, f32)>,
+    /// The floor they're taking a tool to, or cleaning with it (`Interaction::cleans`,
+    /// `sweep.rs`): where its use is done. Not saved: a use under way starts again after a load,
+    /// and finds the dirtiest floor then.
+    pub(crate) sweep: Option<(i32, i32)>,
+    /// A floor cleaned with a tool this tick: where, and how (applied after the step).
+    pub(crate) swept: Option<(i32, i32, crate::content::Sweep)>,
+    /// Put on pressed clothes this tick (`content::Pressed`): an outfit's share of the
+    /// household's ironed washing taken (settled with the laundry, `life::update`).
+    pub(crate) wore_pressed: bool,
     /// Conceived with this partner this tick (the life cycle decides; see `lifecycle::conceive`).
     pub(crate) conceived: Option<u32>,
     /// Their *Try for a baby* with this partner went well this tick: the two go to bed
@@ -1814,16 +1823,19 @@ pub struct Household {
     /// The day a babysitter was booked for (see `life::childcare`).
     pub sitter_day: Option<u32>,
     /// Loads of washing waiting: dirty (piling up as content `laundry` says), washed, to dry,
-    /// and dried, to fold (`content::WorkOn::load`).
-    pub laundry: [f32; 3],
+    /// dried, to fold (or iron), and ironed, to wear (`content::WorkOn::load`).
+    pub laundry: [f32; LOADS],
 }
+
+/// The piles of washing a household has (`Household::laundry`, `content::WorkOn::load`).
+pub const LOADS: usize = 4;
 
 /// Loads of washing a new household has waiting, dirty and washed (one of each: there's always
 /// a bag of washing on moving in); none dry yet.
 pub const LAUNDRY_AT_START: f32 = 1.0;
 
 /// A new household's washing waiting (`Household::laundry`).
-pub const LAUNDRY_START: [f32; 3] = [LAUNDRY_AT_START, LAUNDRY_AT_START, 0.0];
+pub const LAUNDRY_START: [f32; LOADS] = [LAUNDRY_AT_START, LAUNDRY_AT_START, 0.0, 0.0];
 
 /// A household expecting a baby: the parents and the day it's due.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -3520,6 +3532,9 @@ impl World {
             job_search_from: 0,
             planner: Default::default(),
             mess: None,
+            sweep: None,
+            swept: None,
+            wore_pressed: false,
             reshaped: false,
             lit: false,
             care_out: None,
@@ -4038,6 +4053,9 @@ impl World {
                     ),
                 };
                 self.events.push_detail(self.tick, kind, i, Some(n), None);
+            }
+            if let Some((x, z, sweep)) = self.sims[i].swept.take() {
+                crate::sweep::clean(self, x, z, &sweep);
             }
             let Some((x, z, amount)) = self.sims[i].mess.take() else {
                 continue;
@@ -4918,12 +4936,10 @@ impl World {
                 adult: s.adult(&self.content),
                 age: s.age,
                 conversing: None,
-                cleaning: s.current().and_then(|a| {
-                    if let TaskKind::Clean { x, z } = a.task.kind {
-                        Some((x, z))
-                    } else {
-                        None
-                    }
+                cleaning: s.current().and_then(|a| match a.task.kind {
+                    TaskKind::Clean { x, z } => Some((x, z)),
+                    TaskKind::Use { .. } => s.sweep,
+                    _ => None,
                 }),
                 seated: s.pose == Pose::Sit && !s.is_moving(),
                 lying: s.pose == Pose::Lie,
@@ -5798,6 +5814,19 @@ impl World {
                         ),
                         Unmet::Nothing(w) => format!("{}: {}", inter.label, w.none()),
                     }));
+                }
+                // A tool that cleans the floor: only at home, with a floor there it cleans.
+                if let Some(sweep) = &inter.cleans {
+                    let home = self.households[s.household as usize].plot;
+                    if plot.is_none() || plot != home {
+                        return Err(Error::new(format!("{}: only at home", inter.label)));
+                    }
+                    if decide::sweep_spot(s, &self.ctx(), sweep, decide::SWEEP_ORDERED).is_none() {
+                        return Err(Error::new(format!(
+                            "{}: the floors it cleans are clean",
+                            inter.label
+                        )));
+                    }
                 }
                 // Sold at a post outside its hours (or a coffee from a café that's shut): closed.
                 // (As `closed_at`: the objects on its plot, none off the plots.)

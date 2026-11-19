@@ -23,7 +23,7 @@
 //! `objects[].rack`.
 
 use crate::content::{Content, Interaction, WorkOn};
-use crate::world::{Ctx, ObjectInstance, Sim, Task, World};
+use crate::world::{Ctx, LOADS, ObjectInstance, Sim, Task, World};
 
 /// Game minutes between machines' steps: one finishes at most this late.
 pub const STEP_MINUTES: u64 = 5;
@@ -103,7 +103,7 @@ pub(crate) fn carry_on(
 /// that works on a load of washing, `PILE_PULL` with the pile full (content `laundry`'s `most`),
 /// less with less waiting. 0 for anything else.
 pub(crate) fn pull(
-    laundry: [f32; 3],
+    laundry: [f32; LOADS],
     content: &Content,
     o: &ObjectInstance,
     inter: &Interaction,
@@ -125,7 +125,7 @@ pub const PILE_PULL: f32 = 0.3;
 
 /// Settles what a resident took up and left this tick with their household's loads of washing:
 /// one taken from its pile, one put on the next (up to content `laundry`'s `most`).
-pub(crate) fn settle(laundry: &mut [f32; 3], worked: u8, made: u8, most: f32) {
+pub(crate) fn settle(laundry: &mut [f32; LOADS], worked: u8, made: u8, most: f32) {
     for kind in WorkOn::ALL {
         let Some(k) = kind.load() else { continue };
         if worked & kind.bit() != 0 {
@@ -137,13 +137,21 @@ pub(crate) fn settle(laundry: &mut [f32; 3], worked: u8, made: u8, most: f32) {
     }
 }
 
+/// Pressed clothes put on (`content::Pressed`): an outfit's share of the ironed washing,
+/// `1 / outfits` of a load.
+pub(crate) fn wear_pressed(laundry: &mut [f32; LOADS], outfits: f32) {
+    if let Some(k) = WorkOn::Ironed.load() {
+        laundry[k] = (laundry[k] - 1.0 / outfits.max(1.0)).max(0.0);
+    }
+}
+
 /// A household's piles of washing with the loads its residents took up for uses under way given
 /// back (`Sim::taken`, `WorkOn` bits each), as a save keeps them: those uses start again on load.
 pub(crate) fn with_taken(
-    mut laundry: [f32; 3],
+    mut laundry: [f32; LOADS],
     taken: impl Iterator<Item = u8>,
     most: f32,
-) -> [f32; 3] {
+) -> [f32; LOADS] {
     for t in taken {
         settle(&mut laundry, 0, t, most);
     }
