@@ -848,6 +848,11 @@ impl Modal {
 /// and a tuning all-pass, at `hz`, its own note falling to a third in `tau` s. `dull` (0.1 bright .. 0.5 dull)
 /// is how much the loss filter takes off the highs, `soft` (0..1) how soft the pluck (the noise smoothed), `place`
 /// where along the string it is plucked (a fraction of it: the overtones with a node there are missing).
+///
+/// `dull` and `soft` are as heard at 48 kHz; at another rate the note is made to sound the same in Hz: the pluck's
+/// smoothing as long in seconds, and the loss filter taking as much off each overtone a pass round the string
+/// (its `s(1 − s)` by the square of the rate's ratio, run twice or more over above about 52 kHz, where one pass
+/// cannot take that much).
 #[derive(Clone, Copy, Debug)]
 pub struct Pluck {
     pub hz: f64,
@@ -864,10 +869,40 @@ impl Pluck {
         let mut out = vec![0.0f32; len];
         let period = rate / self.hz;
         let w = (2.0 * PI * self.hz) / rate;
-        let s = self.dull;
-        // The loss filter's delay and gain at the note.
-        let d_lp = atan2(s * sin(w), (1.0 - s) + s * cos(w)) / w;
-        let gain = sqrt((1.0 - s) * (1.0 - s) + s * s + 2.0 * s * (1.0 - s) * cos(w));
+        // The loss filter: as much off each overtone at this rate as `dull` takes at 48 kHz (its `s(1 − s)` by the
+        // square of the rates' ratio), in `passes` two-tap filters where one cannot take that much.
+        let at48 = self.dull * (1.0 - self.dull);
+        let wanted = if rate == 48000.0 {
+            at48
+        } else {
+            at48 * (rate / 48000.0) * (rate / 48000.0)
+        };
+        let passes = max(1.0, (wanted / 0.25).ceil());
+        let mut each = wanted / passes;
+        // Where the filter alone would take more off the note itself than it should lose a period, less of it.
+        let g = exp(-period / (self.tau * rate)) / 0.99995;
+        if g < 1.0 {
+            each = min(each, (1.0 - pow(g, 2.0 / passes)) / (2.0 * (1.0 - cos(w))));
+        } else {
+            each = 0.0;
+        }
+        let s = if passes == 1.0 && each >= at48 {
+            self.dull
+        } else {
+            (1.0 - sqrt(max(0.0, 1.0 - 4.0 * each))) / 2.0
+        };
+        let passes = passes as usize;
+        // Its delay and gain at the note.
+        let d_lp = passes as f64 * atan2(s * sin(w), (1.0 - s) + s * cos(w)) / w;
+        let gain = pow(
+            sqrt((1.0 - s) * (1.0 - s) + s * s + 2.0 * s * (1.0 - s) * cos(w)),
+            passes as f64,
+        );
+        let soft = if rate == 48000.0 {
+            self.soft
+        } else {
+            pow(self.soft, 48000.0 / rate)
+        };
         let whole = (period - d_lp - 0.1).floor();
         if whole < 2.0 {
             // Too high for the rate: a sine dying away.
@@ -885,7 +920,7 @@ impl Pluck {
             let mut e = vec![0.0f64; n];
             let mut last = 0.0;
             for v in e.iter_mut() {
-                last = (1.0 - self.soft) * (r.next() * 2.0 - 1.0) + self.soft * last;
+                last = (1.0 - soft) * (r.next() * 2.0 - 1.0) + soft * last;
                 *v = last;
             }
             let m = (js_round(self.place * n as f64) as usize).clamp(1, n);
@@ -896,14 +931,21 @@ impl Pluck {
             for v in line.iter_mut() {
                 *v = (*v - mean) * scale;
             }
-            let (mut u1, mut v1, mut w1) = (0.0, 0.0, 0.0);
+            // Each pass's last input.
+            let mut before = vec![0.0f64; passes];
+            let (mut v1, mut w1) = (0.0, 0.0);
             let mut i = 0;
             for o in out.iter_mut() {
                 let y = line[i];
                 *o = y as f32;
-                let v = rho * ((1.0 - s) * y + s * u1);
+                let mut u = y;
+                for b in before.iter_mut() {
+                    let next = (1.0 - s) * u + s * *b;
+                    *b = u;
+                    u = next;
+                }
+                let v = rho * u;
                 let x = ap * v + v1 - ap * w1;
-                u1 = y;
                 v1 = v;
                 w1 = x;
                 line[i] = x;
@@ -1194,18 +1236,27 @@ mod tests {
                 assert!(off.abs() <= within, "{hz} Hz, dull {dull}: {off} cents off");
             }
         }
-        // Too high for the rate: a sine, still a note.
+        // Too high for the rate (3950 Hz at 8 kHz: a period of 2.03 samples leaves a line under two): a sine dying
+        // away.
         let mut r = Rng::new(7.0);
+        let (rate, tau) = (8000.0, 0.3);
         let high = Pluck {
-            hz: 3000.0,
-            tau: 0.3,
+            hz: 3950.0,
+            tau,
             dull: 0.3,
             soft: 0.4,
             place: 0.18,
         }
-        .play(8000.0, 0.5, &mut r);
-        assert!(high.iter().any(|&v| v.abs() > 0.2));
-        assert!(high.iter().all(|v| v.is_finite() && v.abs() <= 1.0));
+        .play(rate, 0.5, &mut r);
+        let w = (2.0 * PI * 3950.0) / rate;
+        let len = high.len();
+        for (n, &v) in high.iter().enumerate() {
+            let env = min(min(1.0, n as f64 / 8.0), (len - n) as f64 / 40.0);
+            let want = sin(w * n as f64) * exp(-(n as f64) / (tau * rate)) * env;
+            assert!((v as f64 - want).abs() < 1e-6, "{n}: {v} {want}");
+        }
+        // (Its noise not drawn.)
+        assert_eq!(r.next(), Rng::new(7.0).next());
     }
 
     #[test]

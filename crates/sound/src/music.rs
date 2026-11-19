@@ -424,6 +424,20 @@ const KICK: f64 = 0.715;
 const CLAP: f64 = 4.08;
 const HAT: f64 = 2.25;
 
+/// White noise as it is at 48 kHz: at a higher rate, nothing much over 22 kHz (`top`, made by `white_top`).
+fn white(r: &mut Rng, top: &mut Option<Biquad>) -> f64 {
+    let w = r.next() * 2.0 - 1.0;
+    match top {
+        Some(f) => f.run(w),
+        None => w,
+    }
+}
+
+/// The low-pass `white` needs at `rate` (none up to 48 kHz).
+fn white_top(rate: f64) -> Option<Biquad> {
+    (rate > 48000.0).then(|| Biquad::with(rate, Filter::Lowpass, 22000.0, 0.7))
+}
+
 /// A note's sound, as its voice plays it at `rate` (`f` Hz, held `held` s, at `level`), its noise drawn from `r`.
 fn voice(v: Voice, f: f64, held: f64, level: f64, rate: f64, r: &mut Rng) -> Vec<f32> {
     let sized = |secs: f64| vec![0.0f32; round_usize(secs * rate)];
@@ -527,13 +541,14 @@ fn voice(v: Voice, f: f64, held: f64, level: f64, rate: f64, r: &mut Rng) -> Vec
             // Hands: noise in a band, three quick slaps and the room's tail after them.
             let mut d = sized(0.3);
             let mut band = Biquad::with(rate, Filter::Bandpass, 1100.0, 0.9);
+            let mut top = white_top(rate);
             let mut high = Biquad::with(rate, Filter::Highpass, 600.0, 0.7);
             let slaps = [0.0, 0.011, 0.022].map(|s| round_usize(s * rate));
             let mut slap = [0.7, 0.8, 1.0].map(|l| Decay::new(l, 0.004, rate));
             let tail_from = round_usize(0.03 * rate);
             let mut tail = Decay::new(0.55, 0.07, rate);
             for (j, x) in d.iter_mut().enumerate() {
-                let w = high.run(band.run(r.next() * 2.0 - 1.0));
+                let w = high.run(band.run(white(r, &mut top)));
                 let mut env = 0.0;
                 for (at, s) in slaps.iter().zip(slap.iter_mut()) {
                     if j >= *at {
@@ -551,10 +566,11 @@ fn voice(v: Voice, f: f64, held: f64, level: f64, rate: f64, r: &mut Rng) -> Vec
             // A closed hi-hat: high noise, its tick and its short shimmer.
             let mut d = sized(0.15);
             let mut high = Biquad::with(rate, Filter::Highpass, 7500.0, 0.8);
+            let mut top = white_top(rate);
             let mut tick = Decay::new(0.7, 0.006, rate);
             let mut shimmer = Decay::new(0.3, 0.035, rate);
             for x in d.iter_mut() {
-                let w = high.run(r.next() * 2.0 - 1.0);
+                let w = high.run(white(r, &mut top));
                 *x = (w * (tick.next() + shimmer.next()) * level * HAT) as f32;
             }
             d
@@ -859,6 +875,83 @@ mod tests {
                 assert!(
                     seam <= inside,
                     "{kind}: {seam} at the seam, {inside} inside"
+                );
+            }
+        }
+    }
+
+    /// Where a sound's energy sits (Hz), as `tools/audio/listen.ts` measures it: the magnitudes of the spectra of
+    /// 4096 samples of the two sides' mean every 2048 (a Hann window), added up, and their mean frequency.
+    fn centroid(s: &Stereo, rate: f64) -> f64 {
+        const N: usize = 4096;
+        let len = s.left.len();
+        let mut power = vec![0.0f64; N / 2];
+        let mut start = 0;
+        while start == 0 || start + N <= len {
+            let mut re = vec![0.0f64; N];
+            let mut im = vec![0.0f64; N];
+            for i in 0..N.min(len - start) {
+                let v = (s.left[start + i] as f64 + s.right[start + i] as f64) / 2.0;
+                re[i] = v * (0.5 - 0.5 * cos((2.0 * PI * i as f64) / (N - 1) as f64));
+            }
+            // An iterative radix-2 FFT.
+            let mut j = 0;
+            for i in 1..N {
+                let mut bit = N >> 1;
+                while j & bit != 0 {
+                    j ^= bit;
+                    bit >>= 1;
+                }
+                j |= bit;
+                if i < j {
+                    re.swap(i, j);
+                    im.swap(i, j);
+                }
+            }
+            let mut size = 2;
+            while size <= N {
+                let (c, sn) = (cos(-2.0 * PI / size as f64), sin(-2.0 * PI / size as f64));
+                for at in (0..N).step_by(size) {
+                    let (mut wr, mut wi) = (1.0, 0.0);
+                    for k in 0..size / 2 {
+                        let (a, b) = (at + k, at + k + size / 2);
+                        let tr = re[b] * wr - im[b] * wi;
+                        let ti = re[b] * wi + im[b] * wr;
+                        re[b] = re[a] - tr;
+                        im[b] = im[a] - ti;
+                        re[a] += tr;
+                        im[a] += ti;
+                        let next = wr * c - wi * sn;
+                        wi = wr * sn + wi * c;
+                        wr = next;
+                    }
+                }
+                size *= 2;
+            }
+            for k in 1..N / 2 {
+                power[k] += re[k] * re[k] + im[k] * im[k];
+            }
+            start += N / 2;
+        }
+        let (mut sum, mut weighted) = (0.0, 0.0);
+        for (k, p) in power.iter().enumerate().skip(1) {
+            let m = sqrt(*p);
+            sum += m;
+            weighted += m * k as f64 * rate / N as f64;
+        }
+        weighted / sum
+    }
+
+    #[test]
+    fn each_piece_sounds_the_same_at_44_1_and_96_khz() {
+        for (kind, _, _) in PIECES {
+            let at48 = centroid(&make(kind, RATE).unwrap(), RATE);
+            for rate in [44100.0, 96000.0] {
+                let c = centroid(&make(kind, rate).unwrap(), rate);
+                println!("{kind} at {rate}: centroid {c:.0} Hz, at 48 kHz {at48:.0}");
+                assert!(
+                    (c / at48 - 1.0).abs() < 0.1,
+                    "{kind} at {rate}: {c:.0} Hz, at 48 kHz {at48:.0}"
                 );
             }
         }
