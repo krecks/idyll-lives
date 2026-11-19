@@ -623,8 +623,8 @@ A household's car fits the job of whoever in it earns the most a week (code:
 `crates/sim-core/src/cars/looks.rs`). `carBodies` (in `careers.json`) are the bodies cars come in, in
 the renderer's order (`web/src/render/shared/cars.ts` `CARS`, which draws them; a body is saved as its
 place in the list, so add new ones at the end and only with a drawing of their own):
-`{"id", "label", "len", "wid"}`, the length (2.5 to 6 m) and width (1.4 to 2.2 m) that parking and
-driving go by, the label for the story. A career category's `car` (`{"A": "hatchback", "G":
+`{"id", "label", "len", "wid"}`, the length (2.5 to 5.4 m) and width (1.4 to 2.2 m) that parking and
+driving go by (every body fits inside a parking bay's lines, 2.8 by 5.6 m), the label for the story. A career category's `car` (`{"A": "hatchback", "G":
 "executive"}`) names the body its jobs call for from each grade on (none before the first grade
 given), and a track's own `car` replaces its category's; a grade's `carAge` (`old`, `used` or `new`,
 default `used`) says how old that car is. The base game: an old hatchback or saloon from grade A, a
