@@ -321,15 +321,16 @@ export function saleTags(homes: readonly HomeForSale[], lots: Lots, money: (n: n
     return [
       {
         key: `s:${h.plot}`,
-      kind: 'sale' as const,
-      title: h.price ? `${money(h.price)}+` : 'For sale',
-      detail: size,
-      anchor: { x: p.x + p.w / 2, z: p.z + p.d / 2 },
-      lift: 6,
-      tone: 'sale' as const,
-      action: { kind: 'sale' as const, plot: h.plot },
-      radius: [0, SALE_REACH] as [number, number],
-    }];
+        kind: 'sale' as const,
+        title: h.price ? `${money(h.price)}+` : 'For sale',
+        detail: size,
+        anchor: { x: p.x + p.w / 2, z: p.z + p.d / 2 },
+        lift: 6,
+        tone: 'sale' as const,
+        action: { kind: 'sale' as const, plot: h.plot },
+        radius: [0, SALE_REACH] as [number, number],
+      },
+    ];
   });
 }
 
