@@ -854,6 +854,8 @@ export class Content {
     this.windowTiles = file.roomRules?.windowTiles ?? 6;
     this.economy = { startingFunds: 0, currency: '$', ...file.economy };
     this.animations = [...new Set(file.animations ?? [])];
+    // (An object may leave out its interactions, as sim-core reads it: decor such as a field wall has none.)
+    for (const o of file.objects) o.interactions ??= [];
     this.shop = file.objects.filter((o) => o.price !== undefined);
     this.bondPresets = Object.keys(file.bondPresets ?? {});
     this.eventTexts = file.events ?? {};
