@@ -118,7 +118,9 @@
       "furniture": [
         { "one": ["fridge"], "beside": "run" },
         { "one": ["microwave", "coffeeMachine", "pantry", "pantryTall", "trashCan", "recyclingBins", "breakfastCounter", "counter"], "count": [0, 1] },
-        { "one": ["plant", "lamp", "sideboard", "trashCan"], "chance": 0.4 }
+        { "one": ["plant", "lamp", "sideboard", "trashCan"], "chance": 0.4 },
+        { "one": ["mopBucket"], "chance": 0.9 },
+        { "one": ["broomDustpan"], "chance": 0.8 }
       ],
       "dining": [
         { "tables": ["kitchenIsland", "islandLong"], "chairs": ["stoolCounter", "barStool"], "seats": [2, 3], "oneSide": true, "ifRoom": "dining" },
@@ -167,7 +169,8 @@
         { "one": ["sideTable", "sideTableRound", "nestingTables"], "chance": 0.6 },
         { "one": ["bookcaseLow", "cubeShelf", "consoleTable", "shelvingIndustrial", "bookshelf"], "chance": 0.5 },
         { "one": ["bookshelf", "chessTable", "piano", "computerDesk", "bookcaseWide", "stereo", "fireplace", "keyboardDigital", "bookcaseTall"], "chance": 0.5 },
-        { "one": ["plant", "lamp", "floorLampSimple", "tableLamp", "grandfatherClock", "vasePedestal", "urnPorcelain", "lampFloorArc", "lampTorchiere"], "count": [1, 2] }
+        { "one": ["plant", "lamp", "floorLampSimple", "tableLamp", "grandfatherClock", "vasePedestal", "urnPorcelain", "lampFloorArc", "lampTorchiere"], "count": [1, 2] },
+        { "one": ["vacuumCleaner"], "chance": 0.9 }
       ],
       "dining": [{ "tables": ["coffeeTable", "coffeeTableGlass", "coffeeTableRound", "coffeeTableLong"], "chairs": [], "seats": [0, 0], "chance": 0.6 }],
       "surfaces": [
@@ -241,7 +244,8 @@
         { "one": ["laundryWasher"] },
         { "one": ["laundryDryer"], "chance": 0.4 },
         { "one": ["laundryBasket"], "chance": 0.95 },
-        { "one": ["laundryHamper", "bathCabinetTall"], "chance": 0.3 }
+        { "one": ["laundryHamper", "bathCabinetTall"], "chance": 0.3 },
+        { "one": ["ironingBoard"], "chance": 0.7 }
       ],
       "wall": [{ "one": ["wallCabinet", "kitchenShelfWall"], "chance": 0.5 }],
       "ceiling": [{ "one": ["ceilingLight"], "chance": 0.5 }]
