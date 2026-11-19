@@ -915,7 +915,7 @@
         {
           "id": "treat",
           "label": "Buy a little something",
-          "selfServe": { "label": "Pick a little something and pay at the till", "anim": "idle" },
+          "selfServe": { "label": "Pick a little something and pay at the till", "anim": "idle", "endSound": "till" },
           "anim": "buy",
           "endSound": "till",
           "minutes": 6,
