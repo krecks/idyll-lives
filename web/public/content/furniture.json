@@ -4271,7 +4271,6 @@
       "layer": "wall",
       "decor": 0.4,
       "description": "A clean, round clock.",
-      "ambient": "clockTick",
       "interactions": []
     },
     {
@@ -4420,7 +4419,6 @@
       "group": "ornaments",
       "decor": 1.5,
       "description": "A tall clock with a pendulum. Someone has to wind it.",
-      "ambient": "clockTick",
       "interactions": [
         {
           "id": "wind",

@@ -812,7 +812,6 @@
       "decor": 0.2,
       "radius": 0.09,
       "description": "A red twin-bell alarm clock. It stands on a table, counter, desk or shelf.",
-      "ambient": "clockTick",
       "interactions": []
     },
     {

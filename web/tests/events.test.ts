@@ -89,13 +89,12 @@ describe('curtains', () => {
 });
 
 describe('the sounds', () => {
-  test('each is made, and those played once have a level (the clock a loop)', () => {
+  test('each is made, and those played once have a level', () => {
     for (const kind of EVENT_THINGS) expect(MADE).toContain(kind);
     for (const kind of ONCE_EVENTS) {
       expect(ONCE_KINDS).toContain(kind);
       expect(ONCE_LEVEL[kind]).toBeGreaterThan(0);
     }
-    expect(ONCE_KINDS).not.toContain('clockTick');
   });
 });
 

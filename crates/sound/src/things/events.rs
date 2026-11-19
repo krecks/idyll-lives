@@ -1,7 +1,6 @@
 //! The sounds of things happening, not of things in use (`web/src/audio/events.ts` has the rules that play them):
 //! a door or a gate opened and falling shut, curtains drawn along their rail, a car's door shut and its engine
-//! started, the post dropping through a letterbox, a shop's till, a drawer pulled out and pushed shut, and a clock
-//! ticking (the one loop: a clock keeps time, so it never drifts).
+//! started, the post dropping through a letterbox, a shop's till, and a drawer pulled out and pushed shut.
 //!
 //! All are made from the things' own building blocks (`strike`, `rustle`, `swish`, `motor`, `noise`) and are dry:
 //! the game's rooms add their reverb (`web/src/audio/space.ts`).
@@ -9,7 +8,7 @@
 use super::*;
 
 /// The sounds of things happening, by name.
-pub const EVENTS: [&str; 9] = [
+pub const EVENTS: [&str; 8] = [
     "doorOpen",
     "doorClose",
     "curtain",
@@ -18,10 +17,9 @@ pub const EVENTS: [&str; 9] = [
     "letterbox",
     "till",
     "drawer",
-    "clockTick",
 ];
 
-/// The ones played once as something happens (all but the clock's tick).
+/// The ones played once as something happens (all of them).
 pub const ONCE_EVENTS: [&str; 8] = [
     "doorOpen",
     "doorClose",
@@ -44,7 +42,6 @@ pub(super) fn make(kind: &str, rate: f64) -> Option<Stereo> {
         "letterbox" => letterbox(rate),
         "till" => till(rate),
         "drawer" => drawer(rate),
-        "clockTick" => clock_tick(rate),
         _ => return None,
     })
 }
@@ -309,43 +306,14 @@ fn drawer(rate: f64) -> Stereo {
     dry(rate, out, 0.8, 0.0)
 }
 
-/// A clock ticking, a second a beat: the tick, and the tock a little lower (a loop of two seconds).
-fn clock_tick(rate: f64) -> Stereo {
-    let mut out = looped(rate, 2.0);
-    let modes = |k: f64| {
-        [
-            [2100.0 * k, 0.006, 1.0],
-            [3900.0 * k, 0.004, 0.5],
-            [650.0 * k, 0.012, 0.4],
-        ]
-    };
-    strike(
-        &mut out,
-        0.0,
-        0.5,
-        0.0,
-        &modes(1.0),
-        burst(2800.0, 1.0, 0.0015, 1.0),
-    );
-    strike(
-        &mut out,
-        1.0,
-        0.42,
-        0.0,
-        &modes(0.84),
-        burst(2800.0, 1.0, 0.0015, 1.0),
-    );
-    done(rate, vec![out.into()], 0.0, 0.5, &[], 0.0, 0.0, 0.0)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     const RATE: f64 = 48000.0;
 
-    /// Each as made (before the game's level): long enough, never past full scale, with sound in it, and the
-    /// clock's end running on into its start (`things.rs` `world_sounds`).
+    /// Each as made (before the game's level): long enough, never past full scale, with sound in it, and a
+    /// loop's end running on into its start (`things.rs` `world_sounds`).
     #[test]
     fn event_sounds() {
         for kind in EVENTS {
@@ -382,15 +350,8 @@ mod tests {
     }
 
     #[test]
-    fn the_clock_keeps_time() {
-        let Stereo { left, .. } = make("clockTick", RATE).unwrap();
-        assert_eq!(left.len(), 2 * RATE as usize);
-    }
-
-    #[test]
     fn only_the_events_are_made_here() {
         assert!(make("fridgeDoor", RATE).is_none());
         assert!(ONCE_EVENTS.iter().all(|k| EVENTS.contains(k)));
-        assert!(!ONCE_EVENTS.contains(&"clockTick"));
     }
 }

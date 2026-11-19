@@ -24,8 +24,8 @@ export const ONCE_THINGS = ['fridgeDoor', 'binLid', 'vendSnack', 'vendCan', 'pho
 export const HOME_THINGS = ['vacuum', 'iron', 'sweep', 'mop', 'mower', 'hose', 'wateringCan', 'shears', 'kettle', 'typing', 'saunaStove', 'fireplaceElectric', 'cutlery', 'kettleOff'] as const;
 export const ONCE_HOME = ['kettleOff'] as const satisfies readonly (typeof HOME_THINGS)[number][];
 
-/** The sounds of things happening (`things/events.rs`); all but the clock's tick are played once. */
-export const EVENT_THINGS = ['doorOpen', 'doorClose', 'curtain', 'carDoor', 'carStart', 'letterbox', 'till', 'drawer', 'clockTick'] as const;
+/** The sounds of things happening (`things/events.rs`), all played once. */
+export const EVENT_THINGS = ['doorOpen', 'doorClose', 'curtain', 'carDoor', 'carStart', 'letterbox', 'till', 'drawer'] as const;
 export const ONCE_EVENTS = ['doorOpen', 'doorClose', 'curtain', 'carDoor', 'carStart', 'letterbox', 'till', 'drawer'] as const satisfies readonly (typeof EVENT_THINGS)[number][];
 
 /** Every sound made off the main thread: the water's, the things' (at home and in the garden too) and those of things happening. */

@@ -11,7 +11,7 @@
 //!   a watering can, shears, a kettle boiling (and switching itself off, played once), typing, a sauna's
 //!   stove, an electric fire, a knife and fork on a plate;
 //! - things happening (\`events\`): a door or a gate opened and shut, curtains drawn, a car's door and its
-//!   start, the post through a letterbox, a till, a drawer, and a clock's tick (a loop).
+//!   start, the post through a letterbox, a till, a drawer.
 //!
 //! Most are made the same few ways:
 //! - a motor or a fan: a tone at its speed with its harmonics (a transformer's hum at twice the mains,

@@ -48,7 +48,6 @@ export const LOOPS: Record<LoopKind, LoopDef> = {
   dishwasher: { level: 0.16, drift: 0.02 },
   crockery: { level: 0.35 },
   fountain: { level: 0.2, drift: 0.03 },
-  clockTick: { level: 0.4 },
   tv: { level: 0.35 },
   music: { level: MUSIC_LEVEL },
   musicFolk: { level: MUSIC_LEVEL },
