@@ -87,7 +87,9 @@ export function carParkFits(roads: readonly RoadPlan[], ground: Ground, f: Front
   const laid = carParkAt(roads, f, n, 0);
   // (Every tile it touches but its own road's, which reach a little past its verge: `roads.ts` `roadMask`.)
   const roads0 = ground.roadTiles();
-  const own = (x: number, z: number) => roads0[z * ground.w + x] === 1 && nearest(road.points, x + 0.5, z + 0.5, ls).dist < road.width / 2 + 1.5;
+  const { p: p0, t: t0 } = pointAt(road.points, f.s, ls);
+  const out0 = leftOf(t0).map((v) => v * f.side) as Pt;
+  const own = (x: number, z: number) => roads0[z * ground.w + x] === 1 && (x + 0.5 - p0[0]) * out0[0] + (z + 0.5 - p0[1]) * out0[1] < road.width / 2 + 1.5;
   const bad = tilesOf(laid.clear, 0, (x, z) => x < EDGE || z < EDGE || x >= ground.w - EDGE || z >= ground.d - EDGE || (!own(x, z) && ground.takenAt(x + 0.5, z + 0.5)));
   if (bad) return null;
   // (No bay by a driveway, and every bay nearer its own street than any other road.)

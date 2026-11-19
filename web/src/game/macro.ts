@@ -259,6 +259,8 @@ const PLACE_BAYS: [number, number] = [4, 6];
 /** The places a car park is laid beside (their layouts): the school, the leisure and medical centres, the hotel, the town hall, the garden centre, the church. */
 /** How far out from its heart a main town is built up before its houses go down (`DensePass.lay`), of the way to its box's corners. */
 const INNER = 0.5;
+/** The designs a main town's terraced houses are of (`terraceRows`). */
+const TERRACE_DESIGNS = 16;
 /** How far past an area's box the country roads into it are built along (m: `DensePass.approaches`). */
 const APPROACH = 120;
 const BIG_PLACES = new Set(['school', 'leisure', 'medical', 'hotel', 'townHall', 'gardenCentre', 'church']);
@@ -2791,13 +2793,16 @@ function heightsOf(land: Cells, built: readonly Rect[], roads: readonly RoadPlan
 export function terraceRows(t: Templates, lots: LotPlacer, frontages: readonly (readonly Frontage[])[], spec: Pick<WorldSpec, 'terraces' | 'rows'>, rand: Rand): PlotSlot[][] {
   const out: PlotSlot[][] = [];
   let left = between(rand, spec.terraces);
+  // (Its houses of a few designs, as a terrace built at once is; each design generated once.)
+  const designs = Array.from({ length: TERRACE_DESIGNS }, () => rand());
+  const design = () => designs[Math.floor(rand() * designs.length)];
   // (The longest row that went down last: one longer fits nowhere.)
   let longest = spec.rows[1];
   // (Nowhere for a pair: no more rows.)
   for (let tries = 0; left >= 2 && tries < 400; tries++) {
     let n = Math.min(left, longest, between(rand, spec.rows));
     if (left - n === 1) n = left === 3 && spec.rows[1] >= 3 ? 3 : n - 1;
-    const units = Array.from({ length: Math.max(2, n) }, () => rowHouse(t, rand))
+    const units = Array.from({ length: Math.max(2, n) }, () => rowHouse(t, design))
       .filter((h) => !!h)
       .map((h) => ({ kind: 'house' as const, name: '', lot: 'terrace' as const, area: 0, ...h }));
     // (No terraced house to be had: none generated, the content has no row class.)
