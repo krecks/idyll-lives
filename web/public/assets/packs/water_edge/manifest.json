@@ -1,0 +1,144 @@
+{
+  "$comment": "The water's edge (crates/art/outside/src/water_edge, built by cargo art): a plank jetty on posts, a painted rowing boat, a clump of reeds and bulrushes, a striped beach hut on skids and a slatted bench that faces the water. Listed in the base manifest's packs.",
+  "version": 1,
+  "entries": {
+    "model.waterEdge.jetty": {
+      "type": "model",
+      "url": "../../models/water_edge/jetty.glb",
+      "materials": {
+        "plank": {
+          "finish": "material.finish.wood"
+        },
+        "post": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "plank",
+          "label": "Decking"
+        },
+        {
+          "material": "post",
+          "label": "Posts"
+        }
+      ]
+    },
+    "model.waterEdge.rowingBoat": {
+      "type": "model",
+      "url": "../../models/water_edge/rowingBoat.glb",
+      "materials": {
+        "hull": {
+          "finish": "material.finish.gloss"
+        },
+        "inside": {
+          "finish": "material.finish.satin"
+        },
+        "oar": {
+          "finish": "material.finish.wood"
+        },
+        "seat": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "hull",
+          "label": "Hull"
+        },
+        {
+          "material": "inside",
+          "label": "Interior"
+        },
+        {
+          "material": "seat",
+          "label": "Seats"
+        }
+      ]
+    },
+    "model.waterEdge.reeds": {
+      "type": "model",
+      "url": "../../models/water_edge/reeds.glb",
+      "materials": {
+        "blade": {
+          "finish": "material.finish.foliage"
+        },
+        "head": {
+          "finish": "material.finish.bark"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        }
+      }
+    },
+    "model.waterEdge.beachHut": {
+      "type": "model",
+      "url": "../../models/water_edge/beachHut.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "door": {
+          "finish": "material.finish.satin"
+        },
+        "pane": {
+          "finish": "material.finish.gloss"
+        },
+        "roof": {
+          "finish": "material.finish.satin"
+        },
+        "stripe": {
+          "finish": "material.finish.satin"
+        },
+        "timber": {
+          "finish": "material.finish.wood"
+        },
+        "trim": {
+          "finish": "material.finish.satin"
+        },
+        "wall": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "wall",
+          "label": "Walls"
+        },
+        {
+          "material": "stripe",
+          "label": "Stripes"
+        },
+        {
+          "material": "door",
+          "label": "Door"
+        }
+      ]
+    },
+    "model.waterEdge.bench": {
+      "type": "model",
+      "url": "../../models/water_edge/bench.glb",
+      "materials": {
+        "bench_iron": {
+          "finish": "material.finish.metal"
+        },
+        "bench_wood": {
+          "finish": "material.finish.wood"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "bench_wood",
+          "label": "Slats"
+        },
+        {
+          "material": "bench_iron",
+          "label": "Frame"
+        }
+      ]
+    }
+  }
+}

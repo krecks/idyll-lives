@@ -4167,7 +4167,8 @@
         {"id": "rides", "label": "Bikes & scooters", "outside": true},
         {"id": "lights", "label": "Lights", "outside": true},
         {"id": "decor", "label": "Garden decor", "outside": true},
-        {"id": "yard", "label": "Sheds & garden work", "outside": true}
+        {"id": "yard", "label": "Sheds & garden work", "outside": true},
+        {"id": "waterside", "label": "Water's edge", "outside": true}
       ]
     },
     {
