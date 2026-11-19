@@ -43,7 +43,7 @@ const POND_OVER = 0.2;
 const DEPTH_MOST = 4;
 const bedBelow = (e: number) => Math.min(DEPTH_MOST, e * 0.22 + e * e * 0.004);
 
-/** What of a world the seeding and the grading read: its size, plots and meta (roads, paths, backdrop, look), as a menu's preview or a town file has them. */
+/** What of a world the seeding and the grading read: its size, plots and meta (roads, paths, look), as a menu's preview or a town file has them. */
 export type FollowWorld = Pick<WorldStructure, 'width' | 'depth' | 'plots' | 'meta'> & SurfaceWorld;
 
 /**
@@ -181,7 +181,7 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
       for (let cx = Math.floor((q.x - LAND_CELL) / PAD_CELL); cx <= Math.floor((q.x + q.w + LAND_CELL) / PAD_CELL); cx++) cells.set(cx * 65536 + cz, [...(cells.get(cx * 65536 + cz) ?? []), n]);
     }
   });
-  /** The pad (a lot's or a backdrop building's) but `skip`'s within `by` m (no more than the land's grain) of (x, z), if any (the first). */
+  /** The pad (a lot's) but `skip`'s within `by` m (no more than the land's grain) of (x, z), if any (the first). */
   const padNear = (x: number, z: number, skip: number, by = 0) => {
     for (const n of cells.get(Math.floor(x / PAD_CELL) * 65536 + Math.floor(z / PAD_CELL)) ?? []) {
       const q = all[n];
@@ -210,11 +210,9 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
       if (other >= 0) {
         slopes.retain.lot = Math.max(slopes.retain.lot, step);
         if (step > edgeMost) {
-          // (The backdrop building, else a home's lot before a public one's (a named place's: a shop, a school), else
-          // the later lot, gives way; but a lot gives way to a building that is a place, as one set by hand may be.)
-          const place = other >= world.plots.length && world.meta?.backdrop?.[other - world.plots.length]?.place !== undefined;
+          // (A home's lot before a public one's (a named place's: a shop, a school), else the later lot, gives way.)
           const homeFirst = other < world.plots.length && world.plots[n].public !== world.plots[other].public;
-          const gives = place ? n : other >= world.plots.length ? other : homeFirst ? (world.plots[n].public ? other : n) : Math.max(n, other);
+          const gives = other >= world.plots.length ? other : homeFirst ? (world.plots[n].public ? other : n) : Math.max(n, other);
           if (step > RETAIN_MAX + 0.01) {
             out.push(`lot ${n}'s edge stands ${step.toFixed(2)} m over the pad beside it (at most ${RETAIN_MAX})`);
             note(over.pads, gives, { what: 'edgePad', by: step, most: RETAIN_MAX });
@@ -657,7 +655,7 @@ function giveUp(
  * The main town's places (`after`, area 0) given back the careers that worked there at places
  * given up (in `before`, not in `after`): each at a place of the kind it worked at (a garage's
  * mechanics at another workshop), else at its first office, as the generator gives an office the
- * careers no place took (`backdrop.ts` `places`); its hours widened to their shifts (`hoursFor`).
+ * careers no place took (`dense.ts` `townPlaces`); its hours widened to their shifts (`hoursFor`).
  * `after` as it was if no career lost its place (or none fits).
  */
 function rehome(before: readonly TownPlace[], after: TownPlace[], careers: readonly CareerCategory[]): TownPlace[] {
@@ -980,7 +978,7 @@ export interface GentlePlane {
 
 /**
  * The land (`h`, m per sample) eased under what is built towards gentle ground: each area's box (a
- * town or a village, with its own streets and lanes where they reach out past it), and each lot or backdrop building out of every box, gets a plane fitted to
+ * town or a village, with its own streets and lanes where they reach out past it), and each lot out of every box, gets a plane fitted to
  * the land under what is built in it (least squares, tilted no more than `GENTLE_TILT`), the land
  * on it that plane, and the land round it eased back to its own height over `reach` m (the look's
  * `rise`). Where two come near each other, their planes are blended by how near each is (in its
@@ -1011,14 +1009,7 @@ function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array
   });
   const within = (b: Box, x: number, z: number) => x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1;
   const alone: Box[] = [];
-  const footprints = [
-    ...world.plots.map((p) => ({ x0: p.x, z0: p.z, x1: p.x + p.w, z1: p.z + p.d })),
-    ...(world.meta?.backdrop ?? []).map((b) => {
-      const xs = b.poly.map((q) => q[0]);
-      const zs = b.poly.map((q) => q[1]);
-      return { x0: Math.min(...xs), z0: Math.min(...zs), x1: Math.max(...xs), z1: Math.max(...zs) };
-    }),
-  ];
+  const footprints = world.plots.map((p) => ({ x0: p.x, z0: p.z, x1: p.x + p.w, z1: p.z + p.d }));
   for (const f of footprints) if (!boxes.some((b) => within(b, (f.x0 + f.x1) / 2, (f.z0 + f.z1) / 2))) alone.push(f);
   // Each one's plane: through the land under what is built in it (in a box: every built sample; a lot alone: its own).
   const planes: { box: Box; a: number; bx: number; bz: number; cx: number; cz: number; town: boolean }[] = [];

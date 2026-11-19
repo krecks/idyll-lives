@@ -34,7 +34,7 @@ import { distanceToRect } from '../render/shared/chunks';
 import { areaSize, civicTooBig, CIVIC, namerFor, ZONE, type ZoneKind } from './places';
 import { chooseCentre, narrowCentre } from './centre';
 import { fillPoly, rectPoly } from './footprints';
-import { DensePass, townPlaces } from './dense';
+import { DensePass, raisePlaces, townPlaces } from './dense';
 import { carParkFits, driveMouths, takeCarPark, vergeParking, type CarParkLaid } from './parking';
 import { random } from './housegen';
 import { COVER, COVER_CELL, coverSpan, LAND_CELL, NONE, type Land as LandField } from './land';
@@ -1724,6 +1724,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   densePass?.lay(dense);
   // (And out along the country roads into each area, as far as `APPROACH` m past its box, where the road runs straight over gentle land.)
   densePass?.approaches(dense, ways, (a, p) => offRect(plans[a].rect, p) < APPROACH && gentleBy(p));
+  // (Flats over the shops, cafés and restaurants, real floors over the offices and halls: `dense.ts` `raisePlaces`.)
+  if (!spec.classic) raisePlaces(t, lots.slots, centre ? [centre.poly] : [], dense);
   lots.number(names);
 
   // ---- the named places' names: each lot as its place is called, none twice -------------------

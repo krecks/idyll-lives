@@ -471,7 +471,10 @@ export interface LandCursor {
   tone: 'up' | 'down' | 'water' | 'cover' | 'bad' | UseKind | 'erase';
 }
 
-/** What `Renderer.buildingAt` found. */
+/**
+ * What `Renderer.buildingAt` found: a lot's building. (`building`, a building on no lot, is found no more: every
+ * building is a lot's. It goes once the town's cards no longer ask for it, `ui/town/chosen.ts`.)
+ */
 export type BuildingHit = { kind: 'lot'; plot: number } | { kind: 'building'; index: number };
 
 export interface Renderer {
@@ -527,8 +530,8 @@ export interface Renderer {
   pick(x: number, y: number): PickResult;
   /**
    * The house or building the ray through canvas CSS pixel (`x`, `y`) meets first, other than the
-   * viewed lot's: a lot's house (`plot`) or a backdrop building (`WorldMeta.backdrop` index). Null
-   * when it meets none, or the viewed lot's ground first.
+   * viewed lot's: a lot's house or building (`plot`; a flats building's lot, not a flat). Null when it
+   * meets none, or the viewed lot's ground first.
    */
   buildingAt(x: number, y: number): BuildingHit | null;
   /**
@@ -625,6 +628,12 @@ export interface Renderer {
    * previews and ground picks work on this storey's rows of the lot (see `WorldStructure.storeys`).
    */
   setStorey(storey: number): void;
+  /**
+   * Which flats of the building in view may be shown open (`game/openLots.ts` `mayOpen`, asked of each flat's plot
+   * id); null: every one. A flat that may not keeps a lid over it on the storey in view, and its things, its food and
+   * the residents in it are not drawn. Asked again a few times a second (someone of yours going in opens it).
+   */
+  setFlatsOpen(mayOpen: ((plot: number) => boolean) | null): void;
   /** Build/buy mode: plays a placement, upgrade, sale or construction effect (after `setWorld` showed the change). */
   buildEffect(fx: BuildEffect): void;
   stats(): RenderStats;

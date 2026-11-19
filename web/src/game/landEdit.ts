@@ -16,7 +16,7 @@ import { aimOf, coverCells, coverSamples, isPoint, mountainGhost, mountainOf, pl
 import { outlines, rle, unrle } from './landMasks';
 import { deckTiles } from './macro';
 import { smoothstep } from './noise';
-import { bridgeSpans, inside, type Pt } from './roads';
+import { bridgeSpans, inside } from './roads';
 
 /** Strokes kept to undo, and the most their old values may hold (bytes). */
 export const UNDO_STROKES = 32;
@@ -47,26 +47,25 @@ export const ROAD_SHORE = 2;
 /** What counts as built round a road: half its width and this verge (m), as the renderer's distance-from-built grid has it. */
 const ROAD_VERGE = 2;
 
-/** A world's built land: its size, its lots (and the backdrop's buildings), its roads and trails. */
+/** A world's built land: its size, its lots, its roads and trails. */
 export interface BuiltLand {
   width: number;
   depth: number;
   plots: readonly Rect[];
   roads: readonly RoadPlan[];
-  backdrop?: readonly { poly: Pt[] }[];
 }
 
-/** The built land of a world as the game or the menus' preview has it (`WorldStructure`: its plots, `meta.roads`, `meta.backdrop`). */
+/** The built land of a world as the game or the menus' preview has it (`WorldStructure`: its plots, `meta.roads`). */
 export function builtOf(world: Pick<WorldStructure, 'width' | 'depth' | 'plots' | 'meta'>): BuiltLand {
-  const meta = world.meta as { roads?: RoadPlan[]; backdrop?: { poly: Pt[] }[] } | null | undefined;
-  return { width: world.width, depth: world.depth, plots: world.plots.map(({ x, z, w, d }) => ({ x, z, w, d })), roads: meta?.roads ?? [], backdrop: meta?.backdrop ?? [] };
+  const meta = world.meta as { roads?: RoadPlan[] } | null | undefined;
+  return { width: world.width, depth: world.depth, plots: world.plots.map(({ x, z, w, d }) => ({ x, z, w, d })), roads: meta?.roads ?? [] };
 }
 
 /**
  * What the brushes may do where, from a world's built land, per sample of a `cols` × `rows` land:
- * `free` (how far a sample may change) is 0 within `APRON` m of anything built (a lot, a backdrop
- * building and a metre round it, a road or trail and `ROAD_VERGE` m either side) and rises to 1 over
- * `APRON_FADE` m more; `wettable` is false within `LOT_SHORE` m of a lot or a building and
+ * `free` (how far a sample may change) is 0 within `APRON` m of anything built (a lot, a road or
+ * trail and `ROAD_VERGE` m either side) and rises to 1 over `APRON_FADE` m more; `wettable` is false
+ * within `LOT_SHORE` m of a lot and
  * `ROAD_SHORE` m past a road's side.
  */
 export class Protection {
@@ -113,14 +112,6 @@ export class Protection {
       mark(dist, 0, p.x, p.z, p.x + p.w, p.z + p.d);
       mark(dry, 1, p.x - LOT_SHORE, p.z - LOT_SHORE, p.x + p.w + LOT_SHORE, p.z + p.d + LOT_SHORE);
       mark(this.dryLots, 1, p.x - LOT_SHORE, p.z - LOT_SHORE, p.x + p.w + LOT_SHORE, p.z + p.d + LOT_SHORE);
-    }
-    for (const b of built.backdrop ?? []) {
-      const xs = b.poly.map((q) => q[0]);
-      const zs = b.poly.map((q) => q[1]);
-      const [x0, z0, x1, z1] = [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)];
-      mark(dist, 0, x0 - 1, z0 - 1, x1 + 1, z1 + 1);
-      mark(dry, 1, x0 - LOT_SHORE, z0 - LOT_SHORE, x1 + LOT_SHORE, z1 + LOT_SHORE);
-      mark(this.dryLots, 1, x0 - LOT_SHORE, z0 - LOT_SHORE, x1 + LOT_SHORE, z1 + LOT_SHORE);
     }
     // A road: every sample within its half-width and the verge (built), or the shore (dry), of its middle line.
     for (const r of built.roads) {

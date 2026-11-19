@@ -59,13 +59,13 @@ const { Content } = await import('../../web/src/content/content.ts');
 const { AssetRegistry } = await import('../../web/src/assets/registry.ts');
 const { objectInfos } = await import('../../web/src/game/housegen.ts');
 const { randomHousehold } = await import('../../web/src/game/household.ts');
-const { assembleTown, generateStats, houseTemplate, vacantSlots } = await import('../../web/src/game/town.ts');
+const { assembleTown, flatsIdOf, generateStats, houseTemplate, vacantSlots } = await import('../../web/src/game/town.ts');
 const { fillPlan, fillTown, peopleStreams, populate } = await import('../../web/src/game/people.ts');
 const { runTownJob } = await import('../../web/src/game/townJobs.ts');
 const { landDraft, layOn } = await import('../../web/src/game/macro.ts');
 const { expectations, WORLD_KINDS } = await import('../../web/src/game/world.ts');
 type WorldOptions = import('../../web/src/game/world.ts').WorldOptions;
-const { homePrice } = await import('../../web/src/game/price.ts');
+const { flatPrice, homePrice } = await import('../../web/src/game/price.ts');
 const { savingsOf } = await import('../../web/src/game/wealth.ts');
 const { mulberry32 } = await import('../../web/src/game/noise.ts');
 const { centreBuilt, fillOf, townProblems } = await import('../../web/src/game/townCheck.ts');
@@ -250,9 +250,9 @@ for (const { kind, seed, options } of runs) {
     for (const p of found) problems.push(`${tag}: ${p}`);
     landTable.push({ tag, slopes, ms: landMs, kb: JSON.stringify(file.meta.land).length / 1000, given: given ?? { lots: 0, roads: 0, courts: 0 } });
   }
-  for (const { household, slot } of town.households) {
+  for (const { household, slot, flat } of town.households) {
     const s = town.slots[slot];
-    const price = homePrice(content, templates, s);
+    const price = flat === undefined ? homePrice(content, templates, s) : flatPrice(content, templates, { template: flatsIdOf(s) }, flat);
     const savings = savingsOf(content, household);
     if (savings < price) problems.push(`${tag}: the ${household.name}s saved $${savings} for ${s.name}, which costs $${price}`);
     const house = houseTemplate(templates, s.template);

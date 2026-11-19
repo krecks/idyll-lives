@@ -16,7 +16,7 @@ import type { AssetRegistry } from '../assets/registry';
 import type { Content } from '../content/content';
 import { bedroomsNeeded, randomHousehold, residentsOf, type HouseholdDraft } from './household';
 import { mulberry32 } from './noise';
-import { homePrice } from './price';
+import { flatPrice, homePrice } from './price';
 import { flatsTemplate } from './flats';
 import { houseTemplate, shuffled, type NeighbourhoodDraft, type PlotSlot, type Templates } from './town';
 import { savingsOf } from './wealth';
@@ -215,19 +215,16 @@ export interface Home {
 const keyOf = (h: Pick<Home, 'flat'> & { slot: number | PlotSlot }) => `${typeof h.slot === 'number' ? h.slot : h.slot.index}:${h.flat ?? ''}`;
 
 /**
- * Every home of `town`: each house's lot (its layout's bedrooms, one for an empty lot; its price), then each flat of
- * the flats buildings and of those over places (its bedrooms; its price the building's shared among its flats by
- * their floor, until flats are priced on their own).
+ * Every home of `town`: each house's lot (its layout's bedrooms, one for an empty lot; its price), and each flat of a
+ * flats building or over a place (its bedrooms, its own price: `price.ts` `flatPrice`).
  */
 export function homesOf(content: Content, t: Templates, town: NeighbourhoodDraft): Home[] {
   const out: Home[] = [];
   for (const s of town.slots) {
     if (s.kind === 'house') out.push({ slot: s, bedrooms: houseTemplate(t, s.template)?.bedrooms ?? 1, price: homePrice(content, t, s) });
-    const id = s.kind === 'flats' ? s.template : s.kind === 'shop' ? s.upper : undefined;
+    const id = s.kind === 'flats' ? s.template : s.kind === 'shop' && s.upper?.startsWith('over:') ? s.upper : undefined;
     const units = id ? (flatsTemplate(t, id)?.units ?? []) : [];
-    const floor = units.reduce((n, u) => n + u.rect.w * u.rect.d, 0);
-    const price = units.length ? homePrice(content, t, s) : 0;
-    units.forEach((u, flat) => out.push({ slot: s, flat, bedrooms: u.bedrooms, price: Math.round((price * u.rect.w * u.rect.d) / Math.max(1, floor)) }));
+    units.forEach((u, flat) => out.push({ slot: s, flat, bedrooms: u.bedrooms, price: flatPrice(content, t, { template: id! }, flat) }));
   }
   return out;
 }

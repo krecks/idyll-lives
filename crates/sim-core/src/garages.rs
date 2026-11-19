@@ -91,6 +91,7 @@ impl World {
     /// shut anyone or anything off, beside a garage already there, or without the money for it.
     pub fn build_garage(&mut self, household: u32, b: [f32; 4], rot: u8) -> Result<(), Error> {
         let (h, plot) = self.home_of(household)?;
+        self.not_a_flat(plot, "garage")?;
         if rot > 3 {
             return Err(Error::new(format!(
                 "a garage faces one of four ways, not {rot}"

@@ -1732,11 +1732,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   }
 
   /**
-   * Poses every Sim for this frame. `inView(x, z)` decides visibility; contact-shadow matrices
-   * (one 4x4 per Sim row) are written into `shadows`.
+   * Poses every Sim for this frame. `inView(x, z, k)` decides visibility (a ground point on storey `k`: a flat that may
+   * not be shown open hides who is in it); contact-shadow matrices (one 4x4 per Sim row) are written into `shadows`.
    */
   /** `storey`: the storey in view; residents above it (or, viewing the basement, not in it) aren't drawn. */
-  update(frame: FrameState, inView: (x: number, z: number) => boolean, shadows: Float32Array, storey = Infinity, doorHand?: Float32Array): void {
+  update(frame: FrameState, inView: (x: number, z: number, k: number) => boolean, shadows: Float32Array, storey = Infinity, doorHand?: Float32Array): void {
     this.restTaken.clear();
     this.riddenNow.clear();
     this.parkedNow.clear();
@@ -1902,7 +1902,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       // (Hidden till now: shown again as they are, not held again for being out of the area.)
       const released = now >= this.revealAt[i];
       if (released) this.revealAt[i] = NaN;
-      let show = !!rig && !away && inView(tx, tz) && storeyShown(Math.floor(th + 0.01), storey) && !(now < this.revealAt[i]);
+      const level = Math.floor(th + 0.01);
+      let show = !!rig && !away && inView(tx, tz, level) && storeyShown(level, storey) && !(now < this.revealAt[i]);
       // (Come into view out of it: the camera jumped there, the area follows it this frame and catches them up after.)
       if (show && this.detail && !this.visible[i] && !this.inArea[i] && !released) {
         this.revealAt[i] = now + REVEAL_MS;

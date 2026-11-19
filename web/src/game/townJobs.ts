@@ -179,7 +179,7 @@ function furnish(content: Content, t: Templates, town: NeighbourhoodDraft, house
   }
   for (const [slot, residents] of flats) {
     const s = town.slots[slot];
-    const id = s?.kind === 'flats' ? s.template : s?.upper;
+    const id = s?.kind === 'flats' ? s.template : s?.upper?.startsWith('over:') ? s.upper : undefined;
     if (id && flatsTemplate(t, id, Array.from(residents))) houses++;
   }
   return { houses, ms: performance.now() - t0 };

@@ -79,12 +79,12 @@ function span(road: RoadPlan, wet: (x: number, z: number) => boolean): [number, 
 
 /**
  * A stretch of river (18 m wide, 90 m long, square to the road) where a country road crosses open land nearest the
- * main town (clear of every lot, building and other road), and a bridge on the road over it.
+ * main town (clear of every lot and other road), and a bridge on the road over it.
  */
 function river(world: WorldStructure, meta: WorldMeta, cx: number, cz: number): void {
   const [wide, long] = [18, 90];
   const roads = meta.roads ?? [];
-  const boxes = [...world.plots.map((p) => [p.x, p.z, p.x + p.w, p.z + p.d]), ...(meta.backdrop ?? []).map((b) => [Math.min(...b.poly.map((q) => q[0])), Math.min(...b.poly.map((q) => q[1])), Math.max(...b.poly.map((q) => q[0])), Math.max(...b.poly.map((q) => q[1]))])];
+  const boxes = world.plots.map((p) => [p.x, p.z, p.x + p.w, p.z + p.d]);
   let best: { d: number; road: RoadPlan; poly: Pt[] } | null = null;
   for (const road of roads) {
     if (road.kind !== 'country') continue;

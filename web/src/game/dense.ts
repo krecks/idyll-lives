@@ -20,8 +20,8 @@ import type { Content } from '../content/content';
 import type { BuildingUse, TownPlace, TownSize } from '../core/protocol';
 import type { Centre } from './centre';
 import { townGround } from './edit/ground';
-import { flatsFor, upperFor } from './flats';
-import { placeUnit, slotPlace } from './placeLots';
+import { flatsFor, flatsOverFor, floorsFor, storeysOfId } from './flats';
+import { placeOfTemplate, placeUnit, slotPlace } from './placeLots';
 import { draftAreaSize, HOURS, hoursFor, namerFor, type Namer, type ZoneKind } from './places';
 import { inside, leftOf, lengths, pointAt, RoadIndex, type Pt, type RoadPlan } from './roads';
 import { houseFor, lotAt, LotPlacer, plotRect, slotDims, type Frontage, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates, type Unplaced } from './town';
@@ -97,7 +97,7 @@ const PLACE_OF: Partial<Record<BuildingUse, ZoneKind>> = { shop: 'shop', cafe: '
 export const NEAR_CORNER = 9;
 /** How far into a stretch a lot's middle stands from a junction where a lot with a driveway may (m, `macro.ts` `CORNER`). */
 const CORNER = 18;
-/** Of a centre's shops, cafés and restaurants, the share with flats over them; elsewhere. */
+/** Of a centre's shops, cafés and restaurants, the share with flats over them; elsewhere (`raisePlaces`). */
 const OVER_CENTRE = 0.8;
 const OVER_TOWN = 0.3;
 /** How far a lot set by hand looks for a road to front (m from the road's edge). */
@@ -210,15 +210,7 @@ export class DensePass {
     }
     const what = PLACE_OF[use];
     if (!what) return [];
-    const u: Unplaced = { ...placeUnit(t, what, this.sizeOf(a), rand, true), area: a };
-    // Flats over most of a centre's shops, cafés and restaurants and some elsewhere; an office's own floors over it.
-    const over = what === 'office' ? 'office' : what === 'shop' || what === 'cafe' || what === 'restaurant' ? 'flats' : null;
-    if (over && rand() < (zone === 'centre' ? OVER_CENTRE : over === 'office' ? 0 : OVER_TOWN)) {
-      const storeys = zone === 'centre' ? between(rand, 1, 2) : 1;
-      const id = upperFor(t, u, over, storeys, rand);
-      if (id && u.dress) return [{ ...u, upper: id, dress: { ...u.dress, storeys: 1 + storeys } }];
-    }
-    return [u];
+    return [{ ...placeUnit(t, what, this.sizeOf(a), rand, true), area: a }];
   }
 
   /** Whether frontage at `s` along road `r` is `far` m from every junction along it. */
@@ -436,6 +428,30 @@ export function rowHouse(t: Templates, rand: Rand): ReturnType<typeof houseFor> 
     if (h.template.startsWith('gen:')) return h;
   }
   return null;
+}
+
+/**
+ * What stands over the named places of `slots` (`PlotSlot.upper`, `flats.ts`), drawn from `rand`: flats over most of
+ * a centre's shops, cafés and restaurants (`OVER_CENTRE`; `OVER_TOWN` elsewhere), two storeys of them in a centre
+ * mostly, one elsewhere; an office's or a hall's own real floors over it (one or two storeys). Each look as tall as its
+ * real storeys (`storeysOfId`); a place nothing fits over keeps its own. `centres`: the centres' outlines.
+ */
+export function raisePlaces(t: Templates, slots: readonly PlotSlot[], centres: readonly (readonly Pt[])[], rand: Rand): void {
+  for (const s of slots) {
+    const what = s.kind === 'shop' && s.dress && !s.upper ? placeOfTemplate(s.template) : null;
+    if (!what || !s.dress) continue;
+    const use = s.dress.use;
+    const r = plotRect(t, s);
+    const inCentre = centres.some((poly) => inside(poly, r.x + r.w / 2, r.z + r.d / 2));
+    const storeys = inCentre && rand() < 0.7 ? 3 : 2;
+    let id: string | null = null;
+    if (use === 'shop' || use === 'cafe' || use === 'restaurant') {
+      if (rand() < (inCentre ? OVER_CENTRE : OVER_TOWN)) id = flatsOverFor(t, s.template, storeys, rand);
+    } else if (use === 'office' || use === 'hall') id = floorsFor(t, s.template, use, storeys, rand);
+    if (!id) continue;
+    s.upper = id;
+    s.dress = { ...s.dress, storeys: storeysOfId(id) };
+  }
 }
 
 /**
