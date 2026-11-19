@@ -191,7 +191,7 @@ describe('the renderer on a land the town follows', () => {
     // Taken on: the landscape's surface is the game's (its roads' own objects), the one `surfaceOf` gives the street.
     expect(layout.surface!.roads[0]).toBe(game.meta!.roads![0]);
     expect(surfaceOf(game)).toBe(layout.surface);
-    expect(levelsOf(game)!.surface).toBe(layout.surface);
+    expect(levelsOf(game)!.surface).toBe(layout.surface!);
     // The world as it comes again (the same objects): nothing solved again.
     const same = layout.surface;
     expect(layout.takeRoads(game)).toEqual([]);
