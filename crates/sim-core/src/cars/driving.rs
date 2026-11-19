@@ -40,6 +40,7 @@ pub(crate) fn update(w: &mut World) {
         }
         owners(w, c);
         relocate(w, c);
+        renew(w, c);
         let gone = |w: &World, s: u32| w.sims.get(s as usize).is_none_or(|s| !s.here());
         // Nobody to drive it home (the driver died or moved away while out): it's back. (Not
         // while it's in the picture, nor its spot at home: it would jump there, `in_picture`;

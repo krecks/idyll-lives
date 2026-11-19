@@ -786,6 +786,8 @@ fn job_market(w: &mut World, day: u32) {
         }
         w.events
             .push_career(tick, EventKind::JobFound, i, career, Some(level as i64));
+        let household = w.sims[i].household;
+        crate::cars::job_changed(&mut w.cars, &w.content, &w.sims, household);
     }
 }
 
@@ -1699,6 +1701,7 @@ fn at_work(w: &mut World, i: usize) -> bool {
         sims,
         households,
         events,
+        cars,
         ..
     } = w;
     let sim = &mut sims[i];
@@ -1786,6 +1789,9 @@ fn at_work(w: &mut World, i: usize) -> bool {
             social::add_feeling(&mut sim.feelings, m, &content.feelings, tick);
         }
         events.push_promotion(tick, i, job.career, job.level, bonus);
+        // (The car the new grade calls for: `cars/looks.rs`.)
+        let household = sims[i].household;
+        crate::cars::job_changed(cars, content, sims, household);
     }
     true
 }

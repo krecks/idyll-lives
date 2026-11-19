@@ -1211,6 +1211,56 @@ pub struct CareerLevel {
     /// Minimum skill levels `(skill, level)`, strongest first. Level 0 entries are kept so
     /// over-qualification can be measured even at entry level.
     pub requires: Vec<(usize, f32)>,
+    /// The car the job calls for (`careers.json`: the field's or the track's `car`, by grade, and
+    /// the grade's `carAge`); None: none in particular (a household keeps the car it has).
+    pub car: Option<CarLook>,
+}
+
+/// How old a household's car is, by the grade of the job it fits (`grades[].carAge`): a better,
+/// newer car higher up the ladder.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CarAge {
+    Old,
+    /// Neither old nor new (every car before cars fitted the job).
+    #[default]
+    Used,
+    New,
+}
+
+impl CarAge {
+    /// As the renderer has it (`shared/cars.ts` `CarAge`): 0 old, 1 used, 2 new.
+    pub fn index(self) -> u8 {
+        match self {
+            CarAge::Old => 0,
+            CarAge::Used => 1,
+            CarAge::New => 2,
+        }
+    }
+
+    pub fn is_used(&self) -> bool {
+        *self == CarAge::Used
+    }
+}
+
+/// What a car looks like, but its paint: its body (index into `Content::car_bodies`, the
+/// renderer's `CARS`) and how old it is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CarLook {
+    pub body: u8,
+    pub age: CarAge,
+}
+
+/// A body a household's car may have (`carBodies`, in the renderer's order: `shared/cars.ts`
+/// `CARS`): its size, which parking and driving go by.
+#[derive(Debug, Clone)]
+pub struct CarBodyDef {
+    pub id: String,
+    /// For the story ("bought a new {car}").
+    pub label: String,
+    /// Length and width (m).
+    pub len: f32,
+    pub wid: f32,
 }
 
 #[derive(Debug)]
@@ -1825,6 +1875,8 @@ pub struct Content {
     pub skill_rules: SkillRules,
     pub grades: Vec<GradeDef>,
     pub career_categories: Vec<CategoryDef>,
+    /// The bodies households' cars come in (`carBodies`), in the renderer's order.
+    pub car_bodies: Vec<CarBodyDef>,
     pub day_rhythm: DayRhythm,
     /// How residents weigh their needs when they choose for themselves (`"autonomy"`).
     pub autonomy: crate::ai::AutonomyRules,
@@ -1978,6 +2030,8 @@ struct ContentFile {
     #[serde(default)]
     career_categories: Vec<CategoryRaw>,
     #[serde(default)]
+    car_bodies: Vec<CarBodyRaw>,
+    #[serde(default)]
     day_rhythm: DayRhythmRaw,
     #[serde(default)]
     autonomy: crate::ai::AutonomyRaw,
@@ -2078,6 +2132,54 @@ struct GradeRaw {
     label: String,
     pay_per_hour: f32,
     skill_level: f32,
+    /// How old the car a job at this grade calls for is (absent: used).
+    #[serde(default)]
+    car_age: CarAge,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CarBodyRaw {
+    id: String,
+    label: String,
+    len: f32,
+    wid: f32,
+}
+
+/// A car body's length and width (m): a small car's to a long pickup's, a narrow one's to a van's.
+const CAR_LEN: RangeInclusive<f32> = 2.5..=6.0;
+const CAR_WID: RangeInclusive<f32> = 1.4..=2.2;
+
+/// A field's or a track's `car` (`what`): the look a job at each grade calls for, from the
+/// grade a body is given at on (none before the first one given).
+fn car_by_grade(
+    what: &str,
+    map: &HashMap<String, String>,
+    grades: &[GradeDef],
+    ages: &[CarAge],
+    bodies: &[CarBodyDef],
+) -> Result<Vec<Option<CarLook>>, Error> {
+    let mut from: Vec<Option<u8>> = vec![None; grades.len()];
+    for (grade, body) in map {
+        let g = grades
+            .iter()
+            .position(|d| &d.id == grade)
+            .ok_or_else(|| Error::new(format!("'{what}': car for unknown grade '{grade}'")))?;
+        let b = bodies
+            .iter()
+            .position(|d| &d.id == body)
+            .ok_or_else(|| Error::new(format!("'{what}': unknown car body '{body}'")))?;
+        from[g] = Some(b as u8);
+    }
+    let mut body = None;
+    Ok(from
+        .into_iter()
+        .zip(ages)
+        .map(|(b, &age)| {
+            body = b.or(body);
+            body.map(|body| CarLook { body, age })
+        })
+        .collect())
 }
 
 /// Content's `value`, refused rather than clamped when it is outside `range`. `what` names the
@@ -2130,6 +2232,9 @@ struct CategoryRaw {
     shift: ShiftRaw,
     #[serde(default)]
     work_effects: HashMap<String, f32>,
+    /// The car its jobs call for: a body (`carBodies` id) from each grade on (grade id → body).
+    #[serde(default)]
+    car: Option<HashMap<String, String>>,
     tracks: Vec<TrackRaw>,
 }
 
@@ -2146,6 +2251,9 @@ struct TrackRaw {
     pay_factor: f32,
     #[serde(default)]
     shift: Option<ShiftRaw>,
+    /// As the category's `car`, for this track instead.
+    #[serde(default)]
+    car: Option<HashMap<String, String>>,
     titles: Vec<String>,
 }
 
@@ -4490,6 +4598,7 @@ impl Content {
                         hours: l.hours,
                         days: l.days.iter().fold(0u8, |m, d| m | (1 << d)),
                         requires: skill_list(&l.requires, &c.id)?,
+                        car: None,
                     })
                 })
                 .collect::<Result<Vec<_>, Error>>()?;
@@ -4518,8 +4627,35 @@ impl Content {
                 skill_level: g.skill_level,
             })
             .collect();
+        // The cars' bodies, and which the fields' jobs call for (`car`), grade by grade.
+        if raw.car_bodies.len() > usize::from(u8::MAX) {
+            return Err(Error::new("at most 255 carBodies"));
+        }
+        let mut car_bodies = Vec::with_capacity(raw.car_bodies.len());
+        for b in &raw.car_bodies {
+            let len = checked_range(b.len, &format!("car body '{}': len", b.id), CAR_LEN)?;
+            let wid = checked_range(b.wid, &format!("car body '{}': wid", b.id), CAR_WID)?;
+            if car_bodies.iter().any(|o: &CarBodyDef| o.id == b.id) {
+                return Err(Error::new(format!("duplicate car body '{}'", b.id)));
+            }
+            car_bodies.push(CarBodyDef {
+                id: b.id.clone(),
+                label: b.label.clone(),
+                len,
+                wid,
+            });
+        }
+        let ages: Vec<CarAge> = raw.grades.iter().map(|g| g.car_age).collect();
+        let car_table = |what: &str, map: &HashMap<String, String>| {
+            car_by_grade(what, map, &grades, &ages, &car_bodies)
+        };
         let mut career_categories = Vec::with_capacity(raw.career_categories.len());
         for (ci, cat) in raw.career_categories.iter().enumerate() {
+            let field_cars = cat
+                .car
+                .as_ref()
+                .map(|m| car_table(&cat.id, m))
+                .transpose()?;
             let field_pay = checked_range(
                 cat.pay_factor,
                 &format!("career category '{}': payFactor", cat.id),
@@ -4549,6 +4685,10 @@ impl Content {
                 // does. A one-grade track has no top to reach: `top_grade` is 1 and the factor does
                 // nothing to it.
                 let top_grade = track.titles.len().saturating_sub(1).max(1) as f32;
+                let cars = match &track.car {
+                    Some(m) => Some(car_table(&track.id, m)?),
+                    None => field_cars.clone(),
+                };
                 let levels = track
                     .titles
                     .iter()
@@ -4568,6 +4708,7 @@ impl Content {
                                 .iter()
                                 .map(|&(s, w)| (s, (grade.skill_level * w).round()))
                                 .collect(),
+                            car: cars.as_ref().and_then(|c| c[gi]),
                         }
                     })
                     .collect();
@@ -5259,6 +5400,7 @@ impl Content {
             skill_rules,
             grades,
             career_categories,
+            car_bodies,
             day_rhythm,
             autonomy,
             rent,
@@ -5911,11 +6053,13 @@ mod tests {
             c["skills"] = json!([{"id": "writing", "label": "Writing"}]);
             c["grades"] = json!([{"id": "A", "label": "Entry", "payPerHour": 10, "skillLevel": 0}]);
             c["careerRules"] = json!({});
+            c["carBodies"] = json!([{"id": "van", "label": "van", "len": 5.0, "wid": 1.98},
+                                    {"id": "saloon", "label": "saloon", "len": 4.4, "wid": 1.78}]);
             c["careerCategories"] = json!([{
                 "id": "words", "label": "Words", "payFactor": 1.0,
-                "shift": {"start": 9, "hours": 8, "days": [0]},
+                "shift": {"start": 9, "hours": 8, "days": [0]}, "car": {"A": "saloon"},
                 "tracks": [{"id": "words.low", "label": "Low", "skills": {"writing": 1},
-                            "payFactor": 1.0, "titles": ["Low A"]}]}]);
+                            "payFactor": 1.0, "titles": ["Low A"], "car": {"A": "van"}}]}]);
         };
         // Each row: where the one field is set, the value put there, and what it is refused for.
         for (path, value, says) in [
@@ -5943,6 +6087,28 @@ mod tests {
                 "/careerRules",
                 json!({"probationLevels": 2}),
                 "careerRules.probationLevels 2 must be 0..1",
+            ),
+            // Cars: a body parks and drives by its size, and a field's car names a body and a grade.
+            (
+                "/carBodies/0/len",
+                json!(9),
+                "car body 'van': len 9 must be 2.5..6",
+            ),
+            (
+                "/carBodies/0/wid",
+                json!(0.5),
+                "car body 'van': wid 0.5 must be 1.4..2.2",
+            ),
+            ("/carBodies/1/id", json!("van"), "duplicate car body 'van'"),
+            (
+                "/careerCategories/0/car",
+                json!({"Z": "van"}),
+                "'words': car for unknown grade 'Z'",
+            ),
+            (
+                "/careerCategories/0/tracks/0/car",
+                json!({"A": "bus"}),
+                "'words.low': unknown car body 'bus'",
             ),
         ] {
             refused(

@@ -17,7 +17,7 @@ const TOWN: &str = r#"{"width":40,"depth":30,"exits":[[0.5,25.5],[39.5,25.5]],
     "sims":[{"name":"Ada","household":0,"age":30,"traits":["cheerful"],"x":15.5,"z":18.5,"job":{"career":"journalism.print","level":0}},
             {"name":"Bo","household":0,"age":32,"traits":["kind"],"x":16.5,"z":18.5,"job":{"career":"journalism.print","level":0}}],
     "drives":[{"plot":0,"x":24.0,"z":15.55,"front":1.0,"street":25.5}],
-    "cars":[{"plot":0,"x":24.0,"z":18.2,"yaw":0.0,"street":25.5,"len":4.4,"wid":1.8,"body":1,"paint":2}]}"#;
+    "cars":[{"plot":0,"x":24.0,"z":18.0,"yaw":0.0,"street":25.5,"len":4.0,"wid":1.74,"body":1,"paint":2}]}"#;
 
 /// A single garage (3.14 × 5.4 m between its walls' centre lines) on the line of the driveway,
 /// 2 m back from its end, its door towards the street.
@@ -371,7 +371,7 @@ fn garages_survive_a_save_and_old_files_stay_as_they_were() {
     // And sold after loading, the car goes back.
     let mut back = back;
     sell(&mut back).unwrap();
-    assert_eq!(back.cars[0].spot, [24.0, 18.2]);
+    assert_eq!(back.cars[0].spot, [24.0, 18.0]);
 
     // A town's garage (no facing) saves as it came, and its car parks where the town put it.
     let town = TOWN.replace(
@@ -380,7 +380,7 @@ fn garages_survive_a_save_and_old_files_stay_as_they_were() {
     );
     let w = World::from_json(&content, &town, 1).unwrap();
     assert_eq!(w.garages[0].rot, None);
-    assert_eq!(w.cars[0].spot, [24.0, 18.2]);
+    assert_eq!(w.cars[0].spot, [24.0, 18.0]);
     let saved: Value = serde_json::from_str(&w.save_json()).unwrap();
     assert!(saved["garages"][0].get("rot").is_none());
     assert!(saved["cars"][0].get("driveSpot").is_none());

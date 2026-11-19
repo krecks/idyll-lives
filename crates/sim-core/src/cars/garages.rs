@@ -324,11 +324,12 @@ pub(crate) fn car_tiles_at(car: &Car, spot: [f32; 2], yaw: f32) -> Vec<(i32, i32
     car.tiles_at(spot, yaw)
 }
 
-/// The tiles a car takes up parked on driveway `d` (one as long as the longest car, as
-/// `relocate` parks it), whether or not one is there now.
+/// The tiles a car takes up parked on driveway `d` (one as long and as wide as the longest and
+/// widest body, the pickup's and the van's, as `relocate` parks it), whether or not one is there
+/// now: where no garage or porch is built, so a household's next car fits there (`looks.rs`).
 pub(crate) fn drive_tiles(d: &Drive) -> Vec<(i32, i32)> {
-    const LEN: f32 = 4.8;
-    const WID: f32 = 1.9;
+    const LEN: f32 = 5.2;
+    const WID: f32 = 2.0;
     let Some([ax, _]) = d.way() else {
         return covered_tiles(
             d.x - WID / 2.0,

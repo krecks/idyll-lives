@@ -4,7 +4,10 @@
 //! house's driveway is in its `drives`). Only its owners drive it, and only grown-ups (18 and up):
 //! the household's grown-ups when the town was made (a household left with no owner hands it down
 //! to its grown-ups). Whoever else in the household leaves at the same time rides along. When the
-//! household moves house, the car goes with it, to the new home's driveway (`relocate`).
+//! household moves house, the car goes with it, to the new home's driveway (`relocate`). Which car
+//! it is follows the job of whoever in the household earns the most: a van for a trade, an
+//! executive saloon high up in finance, newer up the ladder; a promotion or a new job buys another
+//! once it stands idle (`looks.rs`).
 //!
 //! A day out by car:
 //! - **Parked.** Those who'll go by car leave home early enough to be at work on time
@@ -446,9 +449,18 @@ pub struct Car {
     /// Its length and width (m).
     pub len: f32,
     pub wid: f32,
-    /// What it looks like (the renderer's bodies and paints).
+    /// What it looks like (the renderer's bodies and paints, `Content::car_bodies`): its body
+    /// fits its household's best earner's job (`looks.rs`), its paint is the town's.
     pub body: u8,
     pub paint: u8,
+    /// How old it is (by the grade of the job it fits). Left out when used, as every car was
+    /// before cars fitted the job.
+    #[serde(default, skip_serializing_if = "crate::content::CarAge::is_used")]
+    pub age: crate::content::CarAge,
+    /// The car a promotion or a new job calls for, bought as soon as this one stands idle at home
+    /// or away at work (`looks::renew`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub want: Option<Want>,
     /// Who may drive it (resident ids).
     pub owners: Vec<u32>,
     #[serde(default)]
@@ -745,6 +757,8 @@ impl Car {
             wid: raw.wid,
             body: raw.body,
             paint: raw.paint,
+            age: Default::default(),
+            want: None,
             owners: Vec::new(),
             state: CarState::Parked,
             since: 0,
@@ -896,6 +910,8 @@ impl Car {
             wid: self.wid,
             body: self.body,
             paint: self.paint,
+            age: self.age,
+            want: None,
             owners: Vec::new(),
             state: self.state,
             since: self.since,
@@ -2920,6 +2936,7 @@ impl Legs {
 mod bodies;
 mod driving;
 mod garages;
+mod looks;
 mod parking;
 mod seats;
 mod trips;
@@ -2927,6 +2944,7 @@ mod trips;
 pub use bodies::*;
 pub(crate) use driving::*;
 pub(crate) use garages::*;
+pub use looks::*;
 pub(crate) use parking::*;
 pub(crate) use seats::*;
 pub(crate) use trips::*;

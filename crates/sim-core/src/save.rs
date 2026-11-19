@@ -144,6 +144,12 @@
 //! Left out where it has none, so a file without them (every file before it) has its places open
 //! at any hour, as before. A town holds up to 128 servers (`staff::MAX_STAFF`, 48 before); nothing
 //! of them is saved.
+//! 41 = a household's car fits its best earner's job (`cars/looks.rs`): its body (`cars[].body`,
+//! now any of `carBodies`, a van or an off-roader too) and how old it is (`cars[].age`: `old` or
+//! `new`, left out when used), and the car a promotion or a new job called for that it hasn't
+//! bought yet (`cars[].want`: `body`, `age`, and `by`, who the story says bought it). The story
+//! may tell of it (`boughtCar`, the body in `n`, by id in `refs.car`). A file before it has its
+//! cars as the town picked them: each is fitted as it loads, as a new town's are, nobody told.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -162,7 +168,7 @@ use crate::{
     clock::{MAX_SPEED, SUPER_SPEED},
 };
 
-pub const SAVE_VERSION: u32 = 40;
+pub const SAVE_VERSION: u32 = 41;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1836,6 +1842,12 @@ impl World {
             .collect();
         let cars = ticks.cars(&save.cars);
         crate::cars::load(&mut world, &cars, &save.drives, &save.garages);
+        // (A file before v41 has its cars as the town picked them: each now the one its household's
+        // best earner's job calls for, as a new town's are.)
+        if save.version < 41 {
+            crate::cars::fit_town(&mut world);
+            crate::cars::settle_all(&mut world);
+        }
         // (The junctions lit are worked out again from the roads: `traffic::settle`.)
         crate::traffic::settle(&mut world);
         // (The lights where they'd got to, for the same lit junctions: each a turn it has.)
@@ -2536,6 +2548,10 @@ fn event_refs(
             n.and_then(|n| content.life.stages.get(n)).map(|d| &d.id),
         ),
         Served => put("item", n.and_then(|n| content.items.get(n)).map(|d| &d.id)),
+        BoughtCar => put(
+            "car",
+            n.and_then(|n| content.car_bodies.get(n)).map(|d| &d.id),
+        ),
         _ => {}
     }
     put(
@@ -2591,6 +2607,7 @@ fn resolve_refs(
         find(refs, "accident", content.accidents.iter().map(|d| &d.id))?,
         find(refs, "stage", content.life.stages.iter().map(|d| &d.id))?,
         find(refs, "item", content.items.iter().map(|d| &d.id))?,
+        find(refs, "car", content.car_bodies.iter().map(|d| &d.id))?,
     ];
     if let Some(i) = n.into_iter().flatten().next() {
         e.n = Some(i64::from(i));

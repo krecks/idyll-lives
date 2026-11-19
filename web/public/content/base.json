@@ -2137,7 +2137,8 @@
     "setUp": "{a} set up the new {object}",
     "setUpForThem": "{a}'s new {object} was set up for them",
     "sentBack": "There was no room at home for {a}'s {object}: it went back to the shop, the money too",
-    "served": "{a} brought {b} {item}"
+    "served": "{a} brought {b} {item}",
+    "boughtCar": "{a} bought a new {car}"
   },
   "activities": [
     {
