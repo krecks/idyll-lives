@@ -1911,6 +1911,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (this.townMode) return 'town';
     if (this.storey !== this.builtStorey) return `storey ${this.storey} built ${this.builtStorey}`;
     if (!sameView(view, this.view)) return 'view';
+    // (A flat of the building in view opened or closed: its things, its residents and its lid, `setFlatsOpen`.)
+    if (this.flatsKey() !== this.closedKey) return 'flats';
     if (built.width !== world.width || built.depth !== world.depth || built.storeys !== world.storeys) return 'size';
     if (built.storeyDepth !== world.storeyDepth || built.basement !== world.basement) return 'storeys';
     // The lot itself (walls, rooms, floors, fences) is what costs a build; a lean message never has it.
@@ -2051,7 +2053,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // The flats of the building in view, and which of them may not be shown open (`setFlatsOpen`).
     this.viewFlats = viewedFlats(world, view);
     this.closedFlats = closedFlats(this.viewFlats, this.flatsOpen);
-    this.closedKey = this.closedFlats.map((f) => f.id).join(',');
+    this.closedKey = this.flatsKey();
     if (this.streamOn) {
       const o = this.orbit;
       const aspect = this.cssSize.width / Math.max(1, this.cssSize.height);
@@ -2258,7 +2260,14 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** Which flats of the building in view may be shown open, asked again: its things, residents and lids drawn again if that changed. */
   private askFlats(): void {
     if (!this.viewFlats.length || !this.lastWorld || this.worldBuilding) return;
-    if (closedFlats(this.viewFlats, this.flatsOpen).map((f) => f.id).join(',') !== this.closedKey) void this.setWorld(this.lastWorld, this.view);
+    if (this.flatsKey() !== this.closedKey) void this.setWorld(this.lastWorld, this.view);
+  }
+
+  /** Which flats of the building in view may not be shown open now, as their ids (`closedKey` is the drawn one's). */
+  private flatsKey(): string {
+    return closedFlats(this.viewFlats, this.flatsOpen)
+      .map((f) => f.id)
+      .join(',');
   }
 
   /**
