@@ -435,6 +435,8 @@ function livingProblems(town: CheckedTown, careers: readonly string[], expect: E
     if (!park) out.push(`parking bay ${k} is in no car park`);
     else if (!inside(park.poly, b.x, b.z)) out.push(`parking bay ${k} is outside its car park`);
   });
+  // (Every area of a generated town has its bays: `macro.ts` `parkingFor`.)
+  if (generated && town.parking) areas.forEach((a, k) => town.parking!.some((b) => b.area === k) || out.push(`${a.name} has no parking bay`));
   parks.forEach((c, k) => {
     for (const [j, p] of town.plots.entries()) if (p.kind !== 'flat' && overlaps(c.poly, corners(p), 0)) out.push(`car park ${k} is on plot ${j}`);
     const mid = c.poly.reduce<Pt>((m, q) => [m[0] + q[0] / c.poly.length, m[1] + q[1] / c.poly.length], [0, 0]);

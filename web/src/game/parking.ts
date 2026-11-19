@@ -31,7 +31,9 @@ export const BAY_LINES: readonly [number, number] = [2.8, 5.6];
 // ---- Laying car parks out ----
 
 /** How far a car park's stretch of road may turn (radians over its length and a bay either side): each bay faces away from the road at its own nearest point. */
-const PARK_BEND = 0.3;
+export const PARK_BEND = 0.3;
+/** How far a single bay's stretch may turn where an area has no straighter one for its share (`vergeParking`'s `bend`). */
+export const LOOSE_BEND = 0.6;
 /** Off the world's edge (m), as the lots keep. */
 const EDGE = 8;
 
@@ -76,13 +78,13 @@ export function carParkAt(roads: readonly RoadPlan[], f: Pick<Frontage, 'road' |
  * end of it on land nothing takes (`ground`) inside the world's edge, every bay clear of every driveway of `drives`
  * (`clearOf`) and nearer its own street than any other road.
  */
-export function carParkFits(roads: readonly RoadPlan[], ground: Ground, f: Frontage, n: number, offCorners: (f: Frontage) => boolean, drives: readonly DriveLine[] = []): CarParkLaid | null {
+export function carParkFits(roads: readonly RoadPlan[], ground: Ground, f: Frontage, n: number, offCorners: (f: Frontage) => boolean, drives: readonly DriveLine[] = [], bend = PARK_BEND): CarParkLaid | null {
   const road = roads[f.road];
   const ls = lengths(road.points);
   const L = ls[ls.length - 1];
   const half = (BAY_WIDE * n) / 2;
   if (f.s - half < 4 || f.s + half > L - 4) return null;
-  if (!straightAround(road.points, f.s, half + BAY_WIDE, PARK_BEND, ls)) return null;
+  if (!straightAround(road.points, f.s, half + BAY_WIDE, bend, ls)) return null;
   for (const s of [f.s - half, f.s + half]) if (!offCorners({ ...f, s, p: pointAt(road.points, s, ls).p })) return null;
   const laid = carParkAt(roads, f, n, 0);
   // (Every tile it touches but its own road's, which reach a little past its verge: `roads.ts` `roadMask`.)
@@ -102,12 +104,12 @@ export function carParkFits(roads: readonly RoadPlan[], ground: Ground, f: Front
  * Pairs of bays by the verge (a single one for the last) along the first of `frontage` each fits (`carParkFits`), of
  * area `area`, till they make `spaces` bays; each car park's land taken on `ground` as it goes down. The car parks laid.
  */
-export function vergeParking(roads: readonly RoadPlan[], ground: Ground, frontage: readonly Frontage[], spaces: number, area: number, offCorners: (f: Frontage) => boolean = () => true, drives: readonly DriveLine[] = []): CarParkLaid[] {
+export function vergeParking(roads: readonly RoadPlan[], ground: Ground, frontage: readonly Frontage[], spaces: number, area: number, offCorners: (f: Frontage) => boolean = () => true, drives: readonly DriveLine[] = [], bend = PARK_BEND): CarParkLaid[] {
   const out: CarParkLaid[] = [];
   for (let n = spaces; n > 0; n = spaces - out.reduce((k, p) => k + p.bays.length, 0)) {
     const want = Math.min(2, n);
     let laid: CarParkLaid | null = null;
-    for (const f of frontage) if ((laid = carParkFits(roads, ground, f, want, offCorners, drives))) break;
+    for (const f of frontage) if ((laid = carParkFits(roads, ground, f, want, offCorners, drives, bend))) break;
     if (!laid) break;
     const own: CarParkLaid = { ...laid, park: { ...laid.park, area }, bays: laid.bays.map((b) => ({ ...b, area })) };
     takeCarPark(ground, own);

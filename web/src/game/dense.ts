@@ -88,7 +88,7 @@ export interface RowLimits {
  */
 const KINDS: Record<Zone, readonly (readonly [BuildingUse, number])[]> = {
   centre: [['shop', 40], ['flats', 16], ['cafe', 12], ['restaurant', 8], ['office', 16], ['terrace', 8]],
-  town: [['house', 34], ['terrace', 30], ['flats', 16], ['shop', 3], ['workshop', 6], ['cafe', 1]],
+  town: [['house', 34], ['terrace', 38], ['flats', 8], ['shop', 3], ['workshop', 6], ['cafe', 1]],
   hamlet: [['house', 58], ['terrace', 16], ['workshop', 8], ['shop', 4], ['cafe', 2]],
 };
 /** What a named place of each use is (`ZONE`). */
@@ -337,9 +337,9 @@ export class DensePass {
         pending = null;
         const depth = Math.max(...units.map((u) => slotDims(this.t, u).depth));
         rows.push({ slots: laid, r, s: s + w / 2, side, back: depth, zone: z, ...(kinds ? { kinds } : {}) });
-        s += w + (z === 'centre' ? 0 : z === 'town' ? between(rand, 0, 2) : between(rand, 2, 6));
+        s += w + (z === 'centre' ? 0 : z === 'town' ? between(rand, 0, 2) : between(rand, 1, 4));
         // (Now and then a gap after it: the more the further out. Where the land asks for kinds, its gaps are where it asks for none.)
-        const skip = z === 'centre' ? 0 : z === 'town' ? 0.16 * (1.2 - density) : 0.45;
+        const skip = z === 'centre' ? 0 : z === 'town' ? 0.12 * (1.2 - density) : 0.25;
         if (!kindsAt && rand() < skip) s += range(rand, 6, 14);
       }
     }
