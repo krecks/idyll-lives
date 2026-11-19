@@ -32,6 +32,8 @@ export function pick<T>(list: readonly T[], x: number, z: number, salt: number):
 // ---- cars ------------------------------------------------------------------------------
 
 export interface CarBody {
+  /** As content's `carBodies` (`careers.json`), in the same order: a car's body is its index. */
+  id: string;
   len: number;
   wid: number;
   wheelR: number;
@@ -44,18 +46,132 @@ export interface CarBody {
   low: [number, number][];
   /** Greenhouse: base rear z, base front z, roof rear z, roof front z, belt y, roof y. */
   cabin: [number, number, number, number, number, number];
+  /** How far in from the sides the roof is (m; absent 0.25): a boxy van's or off-roader's less. */
+  roofIn?: number;
+  /** Along the side window (0 its front, 1 its back): where the front door ends, the back door begins and ends (absent: about halves, `DOOR_SPLIT`). */
+  doors?: [number, number, number];
+  /** The side windows glazed only so far back (0..1 of the side window): a van's back is panelled. */
+  sideGlass?: number;
+  /** No back window (a van's back doors are panelled). */
+  blindRear?: boolean;
+  /** An open load bed from z0 to z1 behind the cab (a pickup's). */
+  bed?: [number, number];
+  /** A spare wheel on its back (an off-roader's) and a roof rack. */
+  spare?: boolean;
+  rack?: boolean;
+  /** Bright trim (an executive saloon's): a chrome line under its windows and a chrome grille, whatever its age. */
+  chrome?: boolean;
+  /** The headlights' foot (m; absent: a little over the wheels' tops), set into its nose and tail wherever they are at that height. */
+  lights?: number;
+  /** A dark rubbing strip along its sides from this height (m), between the wheels' arches (a van's, an off-roader's). */
+  strip?: number;
 }
+
+/** `CarBody.doors` when a body says none. */
+const DOOR_SPLIT: [number, number, number] = [0.505, 0.535, 0.97];
+
+/**
+ * How old a car is (sim-core `content::CarAge`, by the grade of its owner's job): 0 old (its paint faded and dull,
+ * its bumpers grey), 1 used (as every car was before), 2 new (glossy, bumpers in its paint, a chrome line under its
+ * windows).
+ */
+export type CarAge = 0 | 1 | 2;
+export const CAR_AGES = 3;
+/** A car's age as the structure gives it (`CarInfo.age`; absent or out of range: used). */
+export function carAge(age: number | undefined): CarAge {
+  return age === 0 || age === 2 ? age : 1;
+}
+
+/** The paint's roughness by age, and how far an old car's has faded (towards `FADED`). */
+const AGE_GLOSS = [0.46, 0.2, 0.09];
+const FADE = 0.2;
+const FADED = '#B9B6AC';
+const CHROME = '#C9CED3';
 
 export const CARS: CarBody[] = [
   // Saloon.
-  { len: 4.4, wid: 1.78, wheelR: 0.32, wheelBase: 2.65, low: [[-2.2, 0.17], [2.2, 0.17], [2.24, 0.52], [2.14, 0.74], [0.95, 0.88], [-1.35, 0.93], [-2.12, 0.88], [-2.24, 0.58]], cabin: [-1.4, 0.95, -0.8, 0.16, 0.9, 1.42] },
+  { id: 'saloon', len: 4.4, wid: 1.78, wheelR: 0.32, wheelBase: 2.65, low: [[-2.2, 0.17], [2.2, 0.17], [2.24, 0.52], [2.14, 0.74], [0.95, 0.88], [-1.35, 0.93], [-2.12, 0.88], [-2.24, 0.58]], cabin: [-1.4, 0.95, -0.8, 0.16, 0.9, 1.42] },
   // Hatchback.
-  { len: 4.0, wid: 1.74, wheelR: 0.31, wheelBase: 2.5, low: [[-1.98, 0.17], [2.0, 0.17], [2.04, 0.52], [1.96, 0.72], [0.85, 0.87], [-1.9, 0.93], [-2.02, 0.6]], cabin: [-1.9, 0.88, -1.72, 0.08, 0.9, 1.46] },
+  { id: 'hatchback', len: 4.0, wid: 1.74, wheelR: 0.31, wheelBase: 2.5, low: [[-1.98, 0.17], [2.0, 0.17], [2.04, 0.52], [1.96, 0.72], [0.85, 0.87], [-1.9, 0.93], [-2.02, 0.6]], cabin: [-1.9, 0.88, -1.72, 0.08, 0.9, 1.46] },
   // SUV.
-  { len: 4.6, wid: 1.88, wheelR: 0.37, wheelBase: 2.75, low: [[-2.3, 0.23], [2.3, 0.23], [2.34, 0.66], [2.24, 0.92], [1.25, 1.02], [-2.25, 1.06], [-2.34, 0.7]], cabin: [-2.24, 1.28, -2.14, 0.48, 1.02, 1.76] },
+  { id: 'suv', len: 4.6, wid: 1.88, wheelR: 0.37, wheelBase: 2.75, low: [[-2.3, 0.23], [2.3, 0.23], [2.34, 0.66], [2.24, 0.92], [1.25, 1.02], [-2.25, 1.06], [-2.34, 0.7]], cabin: [-2.24, 1.28, -2.14, 0.48, 1.02, 1.76] },
   // Estate.
-  { len: 4.6, wid: 1.8, wheelR: 0.32, wheelBase: 2.7, low: [[-2.3, 0.17], [2.3, 0.17], [2.34, 0.52], [2.24, 0.74], [1.05, 0.88], [-2.25, 0.93], [-2.33, 0.6]], cabin: [-2.24, 1.05, -2.1, 0.25, 0.9, 1.45] },
+  { id: 'estate', len: 4.6, wid: 1.8, wheelR: 0.32, wheelBase: 2.7, low: [[-2.3, 0.17], [2.3, 0.17], [2.34, 0.52], [2.24, 0.74], [1.05, 0.88], [-2.25, 0.93], [-2.33, 0.6]], cabin: [-2.24, 1.05, -2.1, 0.25, 0.9, 1.45] },
+  // Van: a short bonnet, a tall box, glass only in the cab and at the front, panelled behind (a trade's).
+  {
+    id: 'van',
+    len: 5.0,
+    wid: 1.98,
+    wheelR: 0.34,
+    wheelBase: 2.95,
+    low: [[-2.44, 0.2], [2.4, 0.2], [2.5, 0.5], [2.46, 0.86], [1.5, 1.08], [-2.46, 1.12], [-2.5, 0.55]],
+    cabin: [-2.46, 1.5, -2.42, 0.75, 1.08, 1.98],
+    roofIn: 0.12,
+    doors: [0.39, 0.41, 0.7],
+    sideGlass: 0.39,
+    blindRear: true,
+    lights: 0.66,
+    strip: 0.42,
+  },
+  // Pickup: a double cab and an open load bed behind it, high on its wheels.
+  {
+    id: 'pickup',
+    len: 5.2,
+    wid: 1.86,
+    wheelR: 0.38,
+    wheelBase: 3.08,
+    low: [[-2.55, 0.3], [2.5, 0.3], [2.6, 0.6], [2.55, 0.95], [1.35, 1.1], [-2.58, 1.1], [-2.6, 0.62]],
+    cabin: [-0.95, 1.3, -0.9, 0.55, 1.1, 1.82],
+    roofIn: 0.2,
+    bed: [-2.5, -1.0],
+    lights: 0.7,
+  },
+  // Off-roader: boxy and upright, high off the ground, a spare wheel on its back and a rack on its roof.
+  {
+    id: 'offRoader',
+    len: 4.6,
+    wid: 1.9,
+    wheelR: 0.39,
+    wheelBase: 2.75,
+    low: [[-2.05, 0.34], [2.18, 0.34], [2.3, 0.58], [2.28, 0.96], [1.3, 1.1], [-2.08, 1.12], [-2.1, 0.6]],
+    cabin: [-2.08, 1.3, -2.06, 1.0, 1.12, 1.95],
+    roofIn: 0.1,
+    doors: [0.42, 0.45, 0.78],
+    spare: true,
+    rack: true,
+    lights: 0.72,
+    strip: 0.44,
+  },
+  // Executive saloon: long and low, a long bonnet, a sloping back, bright trim.
+  {
+    id: 'executive',
+    len: 4.9,
+    wid: 1.86,
+    wheelR: 0.34,
+    wheelBase: 2.97,
+    low: [[-2.4, 0.16], [2.38, 0.16], [2.45, 0.5], [2.36, 0.7], [1.2, 0.85], [-1.6, 0.9], [-2.36, 0.86], [-2.45, 0.56]],
+    cabin: [-1.75, 1.15, -0.95, 0.12, 0.88, 1.43],
+    roofIn: 0.26,
+    chrome: true,
+    lights: 0.54,
+  },
 ];
+
+/** The bodies a town gives a household's car before anyone's job says otherwise (`parkCar`): the first four, the family cars. */
+export const FAMILY_CARS = 4;
+
+/** `hex` mixed with `with` by `t` (0: `hex`). */
+function mix(hex: string, withHex: string, t: number): string {
+  const a = parseInt(hex.slice(1), 16);
+  const b = parseInt(withHex.slice(1), 16);
+  const c = [16, 8, 0].map((sh) => Math.round(((a >> sh) & 255) * (1 - t) + ((b >> sh) & 255) * t));
+  return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** A car's paint as its age shows it: its colour and roughness. */
+function aged(paint: string, age: CarAge): [string, number] {
+  return [age === 0 ? mix(paint, FADED, FADE) : paint, AGE_GLOSS[age] ?? AGE_GLOSS[1]];
+}
 
 /** Doors (as sim-core `cars::DOORS`): 0 front left (the driver's, on the car's +x side), 1 front right, 2 back left, 3 back right. */
 export const DOORS = 4;
@@ -65,22 +181,25 @@ const INSIDE = '#26282B';
 /** Where door `d` of `body` is: its side (+1: +x), its hinge (front edge, z), its rear edge at the belt line and at the sill, its sill's height, and the part of the side window it carries (`u0`..`u1`, front to back). */
 export function carDoor(body: CarBody, d: number): { side: 1 | -1; hinge: number; rearBelt: number; rearLow: number; sill: number; u0: number; u1: number } {
   const [br, bf] = body.cabin;
+  const [f1, r0, r1] = body.doors ?? DOOR_SPLIT;
   const side = d % 2 === 0 ? 1 : -1;
   const at = (u: number) => bf + (br - bf) * u;
   const arch = body.wheelR + 0.1;
   const sill = Math.max(...body.low.slice(0, 2).map((q) => q[1])) + 0.1;
-  if (d < 2) return { side, hinge: Math.min(bf, body.wheelBase / 2 - arch), rearBelt: at(0.505), rearLow: at(0.505), sill, u0: 0, u1: 0.505 };
-  return { side, hinge: at(0.535), rearBelt: at(0.97), rearLow: Math.max(at(0.97), -body.wheelBase / 2 + arch), sill, u0: 0.535, u1: 0.97 };
+  if (d < 2) return { side, hinge: Math.min(bf, body.wheelBase / 2 - arch), rearBelt: at(f1), rearLow: at(f1), sill, u0: 0, u1: f1 };
+  return { side, hinge: at(r0), rearBelt: at(r1), rearLow: Math.max(at(r1), -body.wheelBase / 2 + arch), sill, u0: r0, u1: r1 };
 }
 
 /**
  * A parked car in `p`'s frame (front towards +z), sitting on the ground at `y`. `apart`: without
  * its doors, the inside showing where they go (each drawn on its own, `paintDoor`, to open).
  * `wheels`: with its wheels (the street's); without, their arches only, the wheels drawn on their
- * own to turn and steer (`paintWheel`, `wheelAt`: the game's cars).
+ * own to turn and steer (`paintWheel`, `wheelAt`: the game's cars). `age`: how old it looks (`CarAge`).
  */
-export function paintCar(p: Painter, body: CarBody, paint: string, apart = false, wheels = true): void {
+export function paintCar(p: Painter, body: CarBody, paint: string, apart = false, wheels = true, age: CarAge = 1): void {
   const { wid, low } = body;
+  const [colour, gloss] = aged(paint, age);
+  const painted = () => p.paint(colour, gloss, 0);
   const hw = wid / 2;
   const inner = hw - 0.045;
   const [cz, cy] = [low.reduce((a, q) => a + q[0], 0) / low.length, low.reduce((a, q) => a + q[1], 0) / low.length];
@@ -89,7 +208,7 @@ export function paintCar(p: Painter, body: CarBody, paint: string, apart = false
     const l = Math.hypot(dz, dy) || 1;
     return [z + (dz / l) * 0.035, y + (dy / l) * 0.035];
   });
-  p.paint(paint, 0.2, 0);
+  painted();
   // Sides, chamfers and the perimeter.
   for (const side of [-1, 1]) {
     p.poly(shrunk.map(([z, y]): V3 => [side * hw, y, z]), [side, 0, 0]);
@@ -106,16 +225,18 @@ export function paintCar(p: Painter, body: CarBody, paint: string, apart = false
       const n: V3 = [side * 0.7, ny * 0.7, nz * 0.7];
       p.poly([[side * hw, s0[1], s0[0]], [side * hw, s1[1], s1[0]], [side * inner, y1, z1], [side * inner, y0, z0]], n);
     }
-    if (ny < -0.9) p.paint(paint, 0.2, 0);
+    if (ny < -0.9) painted();
   }
   // Greenhouse: painted frame and roof, glass inset into it.
   const [br, bf, rr, rf, yb, yr] = body.cabin;
   const hb = hw - 0.07;
-  const hr = hw - 0.25;
+  const hr = hw - (body.roofIn ?? 0.25);
   const B = (x: number, z: number): V3 => [x, yb, z];
   const R = (x: number, z: number): V3 => [x, yr, z];
-  const quad = (q: V3[], out: V3, glass: [number, number, number, number] | null, pillar = false) => {
-    p.paint(paint, 0.2, 0).poly(q, out);
+  const [f1, r0] = body.doors ?? DOOR_SPLIT;
+  const sideGlass = body.sideGlass ?? 1;
+  const quad = (q: V3[], out: V3, glass: [number, number, number, number] | null, pillar: number | null = null) => {
+    painted().poly(q, out);
     if (!glass) return;
     const [u0, u1, v0, v1] = glass;
     // Bilinear sub-rectangle of the quad (q0..q1 along the bottom, q3..q2 along the top).
@@ -127,29 +248,43 @@ export function paintCar(p: Painter, body: CarBody, paint: string, apart = false
       return [n[0], n[1], n[2]];
     };
     p.paint('#1C252D', 0.06, 0).poly([at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)], out);
-    if (pillar) {
-      const mid = 0.52;
+    if (pillar !== null) {
+      const mid = pillar;
       const lift = (v: V3): V3 => {
         const len = Math.hypot(...out) || 1;
         return [v[0] + (out[0] / len) * 0.004, v[1] + (out[1] / len) * 0.004, v[2] + (out[2] / len) * 0.004];
       };
-      p.paint(paint, 0.2, 0).poly([lift(at(mid - 0.025, 0)), lift(at(mid + 0.025, 0)), lift(at(mid + 0.025, 1)), lift(at(mid - 0.025, 1))], out);
+      painted().poly([lift(at(mid - 0.025, 0)), lift(at(mid + 0.025, 0)), lift(at(mid + 0.025, 1)), lift(at(mid - 0.025, 1))], out);
     }
   };
   const ws = facingOut([B(-hb, bf), B(hb, bf), R(hr, rf)], [0, 0.6, 1]);
   quad([B(-hb, bf), B(hb, bf), R(hr, rf), R(-hr, rf)], ws, [0.05, 0.95, 0.06, 0.9]);
   const rw = facingOut([B(hb, br), B(-hb, br), R(-hr, rr)], [0, 0.6, -1]);
-  quad([B(hb, br), B(-hb, br), R(-hr, rr), R(hr, rr)], rw, [0.06, 0.94, 0.1, 0.88]);
+  quad([B(hb, br), B(-hb, br), R(-hr, rr), R(hr, rr)], rw, body.blindRear ? null : [0.06, 0.94, 0.1, 0.88]);
   for (const side of [-1, 1]) {
     const q: V3[] = side > 0 ? [B(hb, bf), B(hb, br), R(hr, rr), R(hr, rf)] : [B(-hb, br), B(-hb, bf), R(-hr, rf), R(-hr, rr)];
     if (!apart) {
-      quad(q, facingOut(q, [side, 0.3, 0]), [0.05, 0.95, 0.1, 0.86], true);
+      // (Glazed from the front as far as `sideGlass`: on the left side the quad runs back to front.)
+      // (Its B-pillar between the doors, where the glass runs past it: mirrored on the left, where the quad runs back
+      // to front, for a body with doors of its own; the family cars' as they always were, 4 cm off on that side.)
+      const [g0, g1] = side > 0 ? [0.05, Math.min(0.95, sideGlass)] : [Math.max(0.05, 1 - sideGlass), 0.95];
+      const split = (f1 + r0) / 2;
+      quad(q, facingOut(q, [side, 0.3, 0]), [g0, g1, 0.1, 0.86], sideGlass > split ? (side < 0 && body.doors ? 1 - split : split) : null);
       continue;
     }
     // The doors carry the side windows: the inside behind them.
     const n = facingOut(q, [side, 0.3, 0]);
-    p.paint(paint, 0.2, 0).poly(q, n);
+    painted().poly(q, n);
     p.paint(INSIDE, 0.9, 0).poly(q.map(([x, y, z]): V3 => [x + n[0] * 0.003, y + n[1] * 0.003, z + n[2] * 0.003]), n);
+    // (Panelled behind the doors' glass: a van's back, which no door carries.)
+    const back = body.doors?.[2] ?? DOOR_SPLIT[2];
+    if (sideGlass < 1 && back < 1) {
+      const at = (u: number, v: number): V3 => {
+        const z = bf + (br - bf) * u + (rf + (rr - rf) * u - (bf + (br - bf) * u)) * v;
+        return [side * (hb + (hr - hb) * v + 0.004), yb + (yr - yb) * v, z];
+      };
+      painted().poly(side > 0 ? [at(back, 0), at(1, 0), at(1, 1), at(back, 1)] : [at(1, 0), at(back, 0), at(back, 1), at(1, 1)], n);
+    }
   }
   if (apart) {
     p.paint(INSIDE, 0.9, 0);
@@ -159,7 +294,7 @@ export function paintCar(p: Painter, body: CarBody, paint: string, apart = false
       p.poly([[x, sill, hinge], [x, yb, hinge], [x, yb, rearBelt], [x, sill, rearLow]], [side, 0, 0]);
     }
   }
-  p.paint(paint, 0.2, 0).poly([R(-hr, rr), R(hr, rr), R(hr, rf), R(-hr, rf)], [0, 1, 0]);
+  painted().poly([R(-hr, rr), R(hr, rr), R(hr, rf), R(-hr, rf)], [0, 1, 0]);
   // Wheels in dark arches, hubcaps.
   const r = body.wheelR;
   for (const wz of [body.wheelBase / 2, -body.wheelBase / 2]) {
@@ -173,21 +308,109 @@ export function paintCar(p: Painter, body: CarBody, paint: string, apart = false
   // Bumpers, lights, grille, plates, mirrors.
   const zf = Math.max(...low.map((q) => q[0]));
   const zb = Math.min(...low.map((q) => q[0]));
-  // Bumpers and lights by the wheels' height, not the sills'.
+  // Bumpers and lights by the wheels' height, not the sills'. A new car's in its paint, an old one's weathered grey.
   const yl = body.wheelR - 0.02;
-  p.paint('#2A2C2E', 0.6, 0);
+  // (Lights at a height of their own stand on the nose and the tail where they are at that height.)
+  const ly = body.lights ?? yl + 0.24;
+  const [lf, lb] = body.lights === undefined ? [zf - 0.02, zb + 0.1] : [Math.max(faceZ(low, ly, 1), faceZ(low, ly + 0.18, 1)) + 0.02, Math.min(faceZ(low, ly, -1), faceZ(low, ly + 0.18, -1)) + 0.06];
+  if (age === 2) painted();
+  else p.paint(age === 0 ? '#45474A' : '#2A2C2E', age === 0 ? 0.85 : 0.6, 0);
   p.box(-hw + 0.04, yl - 0.02, zf - 0.12, hw - 0.04, yl + 0.16, zf + 0.04);
   p.box(-hw + 0.04, yl - 0.02, zb - 0.04, hw - 0.04, yl + 0.16, zb + 0.12);
-  p.box(-0.42, yl + 0.26, zf - 0.08, 0.42, yl + 0.36, zf + 0.0);
+  const bright = body.chrome || age === 2;
+  if (bright) p.paint(CHROME, 0.18, 1);
+  else p.paint('#2A2C2E', 0.6, 0);
+  p.box(-0.42, ly + 0.02, lf - 0.06, 0.42, ly + 0.12, lf + 0.02);
   p.paint('#F5F3EA', 0.1, 0);
-  for (const s of [-1, 1]) p.box(s * (hw - 0.34), yl + 0.24, zf - 0.1, s * (hw - 0.08), yl + 0.36, zf - 0.02);
+  for (const s of [-1, 1]) p.box(s * (hw - 0.34), ly, lf - 0.08, s * (hw - 0.08), ly + 0.12, lf);
   p.paint('#A3161E', 0.2, 0);
-  for (const s of [-1, 1]) p.box(s * (hw - 0.36), yl + 0.28, zb + 0.02, s * (hw - 0.06), yl + 0.42, zb + 0.1);
+  for (const s of [-1, 1]) p.box(s * (hw - 0.36), ly + 0.04, lb - 0.08, s * (hw - 0.06), ly + 0.18, lb);
   p.paint('#E9E6D8', 0.4, 0);
   p.box(-0.26, yl + 0.02, zf + 0.04, 0.26, yl + 0.13, zf + 0.06);
   p.box(-0.26, yl + 0.2, zb - 0.02, 0.26, yl + 0.31, zb);
-  p.paint(paint, 0.2, 0);
+  painted();
   for (const s of [-1, 1]) p.box(Math.min(s * hw, s * (hw + 0.12)), yb + 0.04, bf - 0.32, Math.max(s * hw, s * (hw + 0.12)), yb + 0.14, bf - 0.2);
+  // A chrome line under the side windows (bright trim, a new car).
+  if (bright && !apart) {
+    p.paint(CHROME, 0.18, 1);
+    for (const s of [-1, 1]) p.box(Math.min(s * hw, s * (hw + 0.008)), yb - 0.035, br + 0.05, Math.max(s * hw, s * (hw + 0.008)), yb - 0.005, bf - 0.05, s > 0 ? 'nx' : 'px');
+  }
+  extras(p, body, zb, zf, yr, hr);
+}
+
+/** How far out its side profile `low` reaches at height `y`, at its nose (`end` 1: the most z) or its tail (-1: the least). */
+function faceZ(low: CarBody['low'], y: number, end: 1 | -1): number {
+  let out = end > 0 ? -Infinity : Infinity;
+  for (let i = 0; i < low.length; i++) {
+    const [[z0, y0], [z1, y1]] = [low[i], low[(i + 1) % low.length]];
+    if ((y < Math.min(y0, y1)) || y > Math.max(y0, y1) || y0 === y1) continue;
+    const z = z0 + ((z1 - z0) * (y - y0)) / (y1 - y0);
+    out = end > 0 ? Math.max(out, z) : Math.min(out, z);
+  }
+  return Number.isFinite(out) ? out : end > 0 ? Math.max(...low.map((q) => q[0])) : Math.min(...low.map((q) => q[0]));
+}
+
+/** What some bodies have besides the rest (`CarBody`): a pickup's load bed, an off-roader's spare wheel and roof rack, a van's back doors' seam. */
+function extras(p: Painter, body: CarBody, zb: number, zf: number, yr: number, hr: number): void {
+  const hw = body.wid / 2;
+  if (body.strip !== undefined) {
+    // Between the arches and beyond them, a hand's breadth high.
+    const [y0, y1] = [body.strip, body.strip + 0.09];
+    const [a, r] = [body.wheelBase / 2, body.wheelR + 0.1];
+    const runs: [number, number][] = [[zb + 0.18, -a - r], [-a + r, a - r], [a + r, zf - 0.18]];
+    p.paint('#232527', 0.85, 0);
+    for (const s of [-1, 1]) {
+      for (const [z0, z1] of runs) if (z1 - z0 > 0.1) p.box(Math.min(s * hw, s * (hw + 0.012)), y0, z0, Math.max(s * hw, s * (hw + 0.012)), y1, z1, s > 0 ? 'nx' : 'px');
+    }
+  }
+  if (body.bed) {
+    // The bed's floor and its inner sides, dark, sunk into the body's top; the tailgate's top edge painted.
+    const [z0, z1] = body.bed;
+    const top = Math.max(...body.low.filter(([z]) => z <= z1 + 0.05).map((q) => q[1]));
+    const [x0, x1] = [-hw + 0.09, hw - 0.09];
+    p.paint('#2B2D2F', 0.9, 0);
+    p.poly([[x0, top + 0.004, z0], [x1, top + 0.004, z0], [x1, top + 0.004, z1], [x0, top + 0.004, z1]], [0, 1, 0]);
+    p.paint('#1E2022', 0.95, 0);
+    p.poly([[x0 + 0.03, top + 0.006, z0 + 0.06], [x1 - 0.03, top + 0.006, z0 + 0.06], [x1 - 0.03, top + 0.006, z1 - 0.03], [x0 + 0.03, top + 0.006, z1 - 0.03]], [0, 1, 0]);
+    // (A ribbed floor, seen from above as lines along it.)
+    p.paint('#34373A', 0.8, 0);
+    for (let x = x0 + 0.2; x < x1 - 0.12; x += 0.22) p.poly([[x, top + 0.008, z0 + 0.1], [x + 0.05, top + 0.008, z0 + 0.1], [x + 0.05, top + 0.008, z1 - 0.06], [x, top + 0.008, z1 - 0.06]], [0, 1, 0]);
+    // The seam between the cab and the bed down each side, and the tailgate's across the back.
+    p.paint('#1E2022', 0.8, 0);
+    const sill = body.low[0][1] + 0.12;
+    for (const s of [-1, 1]) p.box(Math.min(s * hw, s * (hw + 0.006)), sill, z1 + 0.02, Math.max(s * hw, s * (hw + 0.006)), top - 0.02, z1 + 0.05, s > 0 ? 'nx' : 'px');
+    const tail = faceZ(body.low, top - 0.15, -1);
+    p.box(-hw + 0.1, top - 0.1, tail - 0.006, hw - 0.1, top - 0.08, tail + 0.01, 'pz');
+  }
+  if (body.spare) {
+    // On the back door, at the belt's height: a tyre and its cover.
+    const y = body.cabin[4] - 0.08;
+    const r = body.wheelR * 0.92;
+    p.paint('#1A1A1C', 0.85, 0).tube('z', zb - 0.2, zb + 0.02, 0, y, r, r, 14);
+    p.paint('#2A2C2E', 0.6, 0).tube('z', zb - 0.215, zb - 0.2, 0, y, r * 0.62, r * 0.62, 12);
+  }
+  if (body.rack) {
+    // Two rails along the roof on feet, and three bars across.
+    const [rr, rf] = [body.cabin[2], body.cabin[3]];
+    p.paint('#1E2022', 0.7, 0);
+    for (const s of [-1, 1]) {
+      const x = s * (hr - 0.06);
+      p.box(x - 0.025, yr + 0.06, rr + 0.12, x + 0.025, yr + 0.1, rf - 0.12, 'ny');
+      for (const z of [rr + 0.18, rf - 0.18]) p.box(x - 0.02, yr, z - 0.03, x + 0.02, yr + 0.06, z + 0.03, 'ny');
+    }
+    for (let k = 0; k < 3; k++) {
+      const z = rr + 0.3 + ((rf - rr - 0.6) * k) / 2;
+      p.box(-(hr - 0.06), yr + 0.07, z - 0.025, hr - 0.06, yr + 0.1, z + 0.025, 'ny');
+    }
+  }
+  if (body.blindRear) {
+    // The back doors' seam down the middle, and their handles.
+    const [br, , rr, , yb] = body.cabin;
+    p.paint('#1E2022', 0.8, 0);
+    p.box(-0.006, body.low[0][1] + 0.2, Math.min(br, rr) - 0.008, 0.006, body.cabin[5] - 0.08, Math.min(br, rr) - 0.002, 'pz');
+    p.paint('#2A2C2E', 0.5, 0);
+    for (const s of [-1, 1]) p.box(s * 0.05 - 0.03, yb - 0.02, Math.min(br, rr) - 0.02, s * 0.05 + 0.03, yb + 0.02, Math.min(br, rr), 'pz');
+  }
 }
 
 // ---- the work taxi ----------------------------------------------------------------------
@@ -335,9 +558,10 @@ export function carRowIsTaxi(snap: ArrayLike<number>, layout: SnapshotLayout, ro
  * on the car's side, on the ground at `y`), shut: the panel, its window in a painted frame, the
  * inside facing in. Turned about its hinge (outwards: rear edge away from the car), it opens.
  */
-export function paintDoor(p: Painter, body: CarBody, paint: string, d: number): void {
+export function paintDoor(p: Painter, body: CarBody, paint: string, d: number, age: CarAge = 1): void {
   const { side, hinge, rearBelt, rearLow, sill, u0, u1 } = carDoor(body, d);
   const [br, bf, rr, rf, yb, yr] = body.cabin;
+  const [colour, gloss] = aged(paint, age);
   const hw = body.wid / 2;
   const out = 0.008;
   // (Relative to the hinge: x outwards from the car's side, z back from the hinge.)
@@ -345,11 +569,11 @@ export function paintDoor(p: Painter, body: CarBody, paint: string, d: number): 
   const Z = (z: number) => z - hinge;
   const n: V3 = [side, 0, 0];
   const panel: V3[] = [[X(hw), sill, Z(hinge)], [X(hw), yb, Z(hinge)], [X(hw), yb, Z(rearBelt)], [X(hw), sill, Z(rearLow)]];
-  p.paint(paint, 0.2, 0).poly(panel, n);
+  p.paint(colour, gloss, 0).poly(panel, n);
   p.paint(INSIDE, 0.9, 0).poly(panel.map(([x, y, z]): V3 => [x - side * 0.035, y, z]), [-side, 0, 0]);
-  // The window: the side window's part between `u0` and `u1`, sloping in to the roof.
+  // The window: the side window's part between `u0` and `u1`, sloping in to the roof (glazed as far back as the body's `sideGlass`).
   const hb = hw - 0.07;
-  const hr = hw - 0.25;
+  const hr = hw - (body.roofIn ?? 0.25);
   const at = (u: number, v: number): V3 => {
     const z = bf + (br - bf) * u + (rf + (rr - rf) * u - (bf + (br - bf) * u)) * v;
     return [X(hb + (hr - hb) * v), yb + (yr - yb) * v, Z(z)];
@@ -357,13 +581,15 @@ export function paintDoor(p: Painter, body: CarBody, paint: string, d: number): 
   const frame: V3[] = [at(u0, 0), at(u1, 0), at(u1, 1), at(u0, 1)];
   const fn = facingOut(frame, [side, 0.3, 0]);
   const face = (q: V3[], normal: V3, lift: number) => p.poly(q.map(([x, y, z]): V3 => [x + normal[0] * lift, y + normal[1] * lift, z + normal[2] * lift]), normal);
-  p.paint(paint, 0.2, 0);
+  p.paint(colour, gloss, 0);
   face(frame, fn, 0);
   const glass = (u: number, v: number) => at(u0 + (u1 - u0) * u, v);
+  const end = Math.min(0.92, ((body.sideGlass ?? 1) - u0) / (u1 - u0));
+  if (end <= 0.2) return;
   p.paint('#1C252D', 0.06, 0);
-  face([glass(0.08, 0.1), glass(0.92, 0.1), glass(0.92, 0.86), glass(0.08, 0.86)], fn, 0.006);
+  face([glass(0.08, 0.1), glass(end, 0.1), glass(end, 0.86), glass(0.08, 0.86)], fn, 0.006);
   const back: V3 = [-fn[0], -fn[1], -fn[2]];
-  face([glass(0.08, 0.1), glass(0.92, 0.1), glass(0.92, 0.86), glass(0.08, 0.86)], back, 0.03);
+  face([glass(0.08, 0.1), glass(end, 0.1), glass(end, 0.86), glass(0.08, 0.86)], back, 0.03);
 }
 
 /** Wheel `w` of `body` (0 front right, 1 front left, 2 back right, 3 back left: front ones steer): its side (+1: +x), and where its hub is (x, z; y is its radius). */
@@ -466,12 +692,13 @@ export interface ParkedCar {
  * The car of the house on `plot`, on its driveway (at its inner end `spot`, `driveEnd`: beside
  * the house, not in the front yard Sims cross), facing the house or the street; null when the
  * house has none (about one in five). From the plot's place, so the town, the menus and the game
- * agree.
+ * agree: one of the family cars (`FAMILY_CARS`), which the sim changes for the one its household's
+ * best earner's job calls for (sim-core `cars/looks.rs`; a town's own game draws the sim's).
  */
 export function parkCar(plot: Rect, spot: DriveEnd, always = false): ParkedCar | null {
   if (!always && hash(plot.x, plot.z, 20) >= 0.8) return null;
   const { front, street } = spot;
-  const body = Math.floor(hash(plot.x, plot.z, 21) * CARS.length) % CARS.length;
+  const body = Math.floor(hash(plot.x, plot.z, 21) * FAMILY_CARS) % FAMILY_CARS;
   const { len, wid } = CARS[body];
   const yaw = (hash(plot.x, plot.z, 22) < 0.65 ? (front > 0 ? Math.PI : 0) : front > 0 ? 0 : Math.PI) + (hash(plot.x, plot.z, 23) - 0.5) * 0.06;
   return {

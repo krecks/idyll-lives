@@ -743,12 +743,13 @@ function fenceSample(style: number): Sample | null {
   return { key: `fence.${def.id}`, kind: 'fence', about: `${def.label}: round 6 m by 4 m, a gate in it`, meshes: [meshOf('fences', BUILT_MATERIALS.plain, p.geo)] };
 }
 
-/** A car body parked, in the street's paint. */
+/** A car body parked, in the street's paint: the family cars used, the others' ages by turns (used, new, old). */
 function carSample(body: number): Sample {
   const p = new Painter(new GeoClass());
-  paintCar(p.at(0, 0), CARS[body], CAR_PAINT[body]);
-  const names = ['saloon', 'hatchback', 'suv', 'estate'];
-  return { key: `car.${names[body] ?? body}`, kind: 'car', about: `the ${names[body] ?? body} parked, paint ${CAR_PAINT[body]}`, meshes: [meshOf('car', BUILT_MATERIALS.plain, p.geo)] };
+  const age = (body < 4 ? 1 : body % 3) as 0 | 1 | 2;
+  paintCar(p.at(0, 0), CARS[body], CAR_PAINT[body], false, true, age);
+  const name = CARS[body].id;
+  return { key: `car.${name}`, kind: 'car', about: `the ${name} parked, paint ${CAR_PAINT[body]}, ${['old', 'used', 'new'][age]}`, meshes: [meshOf('car', BUILT_MATERIALS.plain, p.geo)] };
 }
 
 /** Every sample, in the order it is dumped. */

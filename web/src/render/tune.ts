@@ -13,7 +13,8 @@
  * room's own light, and a room's shares of the sky's by day) in `shared/roomLight.ts`; `lampShadows` (the lamps' shadows) in `pc/lampShadows.ts`; `water` (the water's ripples, flow and foam) in
  * `pc/shaders/water.ts`; `contact` (the contact shading's pass) in `pc/post.ts` and `contactLight` (its share of the lamps' and the
  * sun's light) in `pc/shaders/softLook.ts`; `contactShadow` (the shadows shaped like what casts them) in
- * `shared/contactShadow.ts`; `floor` (the boards of a room with no floor laid) in `shared/house.ts`.
+ * `shared/contactShadow.ts`; `floor` (the boards of a room with no floor laid) in `shared/house.ts`; `cars` (every
+ * household car drawn as each body in turn) in `pc/cars.ts`.
  *
  * A surface of the asset manifest is tuned by its key and one of its own fields (`tunedEntry`, where `pc/materials.ts`
  * makes its material): `material.floor.wood.color:D9C8B4`, `material.floor.wood.uvScale:0.36`,
