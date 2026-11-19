@@ -68,4 +68,14 @@ describe('zones', () => {
     expect(f.edge('water', 200, -100)).toBeGreaterThan(100);
     expect(f.edge('water', 200, 500)).toBeLessThan(-400);
   });
+
+  test('past the world’s edge a meadow or a wood is the land’s mirrored, not a stripe straight out', () => {
+    // A meadow 40 m deep against the edge z = 0: past it, as deep again and then open land (it was carried out forever).
+    const f = new ZoneField([{ kind: 'meadow', poly: square(150, 0, 250, 40) }], 400, 400);
+    expect(f.edge('meadow', 200, -20)).toBeGreaterThan(0);
+    expect(f.edge('meadow', 200, -120)).toBeLessThan(-60);
+    expect(Math.abs(f.edge('meadow', 200, -30) - f.edge('meadow', 200, 30))).toBeLessThan(0.01);
+    // Beside it, past the edge, still open.
+    expect(f.edge('meadow', 50, -200)).toBeLessThan(0);
+  });
 });

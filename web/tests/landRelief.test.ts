@@ -57,10 +57,11 @@ function classicTown(): WorldStructure {
 }
 
 describe('a world without relief draws as it did', () => {
-  // (Taken on the code before relief: `ground`, `terrainColour`, `woods` and `lawns` unchanged for such worlds.)
+  // (Taken on the code before relief: `ground`, `terrainColour`, `woods` and `lawns` unchanged for such worlds. Taken
+  // again when the zones past the edge were mirrored rather than carried straight out: the same inside the world.)
   const GOLDEN = {
-    country: {"heights":"e628244c","colours":"f7ee7ff3","woods":{"far:model.bush":"1153:a427f789","far:model.bush.small":"512:74a3dfd9","far:model.pine":"571:66af52b7","far:model.rock":"675:a593d591","far:model.spruce":"417:e86cec3b","far:model.tree":"3344:1dcd4f7e","far:model.tree.birch":"292:d876753a","far:model.tree.fruit":"28:8e71fe47","far:model.tree.maple":"1800:47395261"},"lawns":"4b71cdc7"},
-    mountain: {"heights":"6f79a8fe","colours":"baad22cb","woods":{"far:model.bush":"404:c14930ac","far:model.bush.small":"196:38645caa","far:model.pine":"1217:2eb1c55d","far:model.rock":"270:ffc6a74d","far:model.spruce":"789:62bbbec9","far:model.tree":"446:d3f9e1cd","far:model.tree.birch":"33:6da98e2e","far:model.tree.fruit":"28:a447f0c","far:model.tree.maple":"250:2c653f01"}},
+    country: {"heights":"cc4631e9","colours":"d101a56c","woods":{"far:model.bush":"1117:49ec1bd5","far:model.bush.small":"502:c529f6a6","far:model.pine":"471:83943815","far:model.rock":"674:9bfc840b","far:model.spruce":"365:12c171b3","far:model.tree":"3165:cf6afb81","far:model.tree.birch":"270:edaf3c90","far:model.tree.fruit":"28:790a690d","far:model.tree.maple":"1763:1e3a1ed3"},"lawns":"4b71cdc7"},
+    mountain: {"heights":"99aa25fc","colours":"4554c464","woods":{"far:model.bush":"361:84f8130","far:model.bush.small":"202:8dc4ca04","far:model.pine":"1030:d30a12ad","far:model.rock":"272:7baad4e2","far:model.spruce":"640:1ea764e2","far:model.tree":"383:b3f97543","far:model.tree.birch":"36:17df64f1","far:model.tree.fruit":"28:220213d6","far:model.tree.maple":"229:5ddfc396"}},
     classic: {"heights":"f391c28a","colours":"8c5a0ae9","woods":{"near:model.bush":"2:c5faa332","near:model.bush.small":"5:6bb28f64","near:model.spruce":"1:b1c81838","near:model.tree":"11:ae55fa60","near:model.tree.birch":"3:5440220c","near:model.tree.maple":"8:e7c6ae","far:model.bush":"205:852147cf","far:model.bush.small":"105:f84ed439","far:model.pine":"251:e78b8c23","far:model.rock":"155:2ae41767","far:model.spruce":"153:89be27b5","far:model.tree":"560:e6daf014","far:model.tree.birch":"54:461e762d","far:model.tree.maple":"313:d3e19b5e"}},
   };
 

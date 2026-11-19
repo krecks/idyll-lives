@@ -3,8 +3,8 @@
  * generator laid out, `game/macro.ts`) as the landscape reads them: each kind rasterised once, at
  * load, on a `ZONE_CELL` m grid over the world, as a signed distance to its edge (m; above 0
  * inside), so the land's height, its colours and what grows on it can follow the zones with soft
- * edges. Past the world's edge a zone carries on as at the edge (a sea along one side goes on to the
- * horizon). Engine-neutral.
+ * edges. Past the world's edge the water carries on as at the edge (a sea along one side goes on to the
+ * horizon); the other kinds are the land's mirrored across its edge (`edge`). Engine-neutral.
  */
 
 import type { WorldZone } from '../../core/protocol';
@@ -23,6 +23,11 @@ export function shareAt(edge: number, soft: number): number {
   if (edge === -Infinity) return 0;
   const t = Math.min(1, Math.max(0, (edge + soft) / (2 * soft)));
   return t * t * (3 - 2 * t);
+}
+
+/** `v` past either end of [0, `size`] mirrored back across that end (once: the land past the edge is narrower than the world). */
+function mirror(v: number, size: number): number {
+  return v < 0 ? -v : v > size ? 2 * size - v : v;
 }
 
 export class ZoneField {
@@ -96,15 +101,19 @@ export class ZoneField {
 
   /**
    * Metres inside the zones of `kind` at (x, z) (below 0: outside, that far from the nearest), read
-   * between the cells' middles; -Infinity without any. Outside the world, the edge's, carried on
-   * outward: deeper in a zone that reaches the edge, further from one that doesn't.
+   * between the cells' middles; -Infinity without any. Outside the world: the water's at the edge,
+   * carried on outward (deeper in water that reaches the edge, further from water that doesn't); the
+   * other kinds' at the point mirrored back across the edge, so a meadow or a wood the edge cuts ends
+   * past it as it began inside, not as a stripe drawn straight out to the horizon.
    */
   edge(kind: ZoneKind, x: number, z: number): number {
     const f = this.fields.get(kind);
     if (!f) return -Infinity;
-    const cx = Math.min(this.w, Math.max(0, x));
-    const cz = Math.min(this.d, Math.max(0, z));
-    const out = Math.hypot(x - cx, z - cz);
+    const carried = kind === 'water';
+    const [mx, mz] = carried ? [x, z] : [mirror(x, this.w), mirror(z, this.d)];
+    const cx = Math.min(this.w, Math.max(0, mx));
+    const cz = Math.min(this.d, Math.max(0, mz));
+    const out = carried ? Math.hypot(x - cx, z - cz) : 0;
     const gx = Math.min(this.gw - 1, Math.max(0, cx / ZONE_CELL - 0.5));
     const gz = Math.min(this.gd - 1, Math.max(0, cz / ZONE_CELL - 0.5));
     const x0 = Math.floor(gx);
