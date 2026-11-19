@@ -404,11 +404,7 @@ fn check(
                 case.name
             ),
         }
-        if let Some(size) = case
-            .lines
-            .get("size")
-            .filter(|_| name != "hedge_block" && name != "street_hedge")
-        {
+        if let Some(size) = case.lines.get("size") {
             // a model built whole: its size, its perches as found and as settled
             let made = scene::meshes();
             let got = artkit::parts::game_size(&made);
@@ -458,40 +454,6 @@ fn check(
                 "{}",
                 case.name
             );
-        }
-        if name == "hedge_block" || name == "street_hedge" {
-            // The card-clad hedges are no longer Blender's loft (see the botany NOTES). Hold their envelope and
-            // their perch count, but do not compare the old smooth mesh or its ray hits to the new cards.
-            let made = scene::meshes();
-            assert!(!made.is_empty(), "{}: a hedge was built", case.name);
-            let got = artkit::parts::game_size(&made);
-            let want = if name == "hedge_block" {
-                [1.546, 1.12, 0.92]
-            } else {
-                [1.547, 1.019, 0.85]
-            };
-            for i in 0..3 {
-                assert!(
-                    (got[i] - want[i]).abs() <= 0.04,
-                    "{}: its size {got:?}",
-                    case.name
-                );
-            }
-            let perches = perch::game();
-            assert_eq!(
-                perches.len(),
-                if name == "street_hedge" && !far { 6 } else { 0 },
-                "{}: its perches",
-                case.name
-            );
-            for p in perches {
-                assert!(
-                    p[1] >= 0.0 && p[1] <= 1.2,
-                    "{}: a perch at {p:?}",
-                    case.name
-                );
-            }
-            continue;
         }
         let made = scene::meshes();
         assert_eq!(

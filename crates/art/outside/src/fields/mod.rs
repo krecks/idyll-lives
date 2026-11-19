@@ -17,13 +17,6 @@ palette! { M:
     stone_dark = ("#6F6D68", matte),    // the shaded stones
     stone_light = ("#A6A39A", matte),   // the sunned stones and coping
     lichen = ("#7F855F", matte),        // the patches on the wall
-    leaf = ("#4E6B35", foliage),        // the hedge's leaves
-    card = ("#FFFFFF", leafcards),      // its leaf cards, tinted from the leaf
-    core = ("#2A331E", leafcards),      // the dark mass under the cards
-    leaf_light = ("#6F8A43", foliage),  // its sunlit leaves
-    leaf_dark = ("#354B27", foliage),   // its shaded leaves
-    stem = ("#5C4936", bark),           // its bare stems
-    twig = ("#6B5540", bark),           // its twigs
     oak = ("#8A6642", wood),            // the gate's and fingerpost's timber
     oak_dark = ("#6E4F33", wood),       // its shaded rails and posts
     iron = ("#2B302E", metal),          // hinges, latch and the fingerpost
@@ -41,8 +34,9 @@ pub fn family() -> Option<Family> {
                 .paint(&[("stone", "Stone")]),
             Model::new("hedgerow", hedges::hedgerow, (1.95, 1.45, 0.95))
                 .tolerance(0.03)
+                .palette(hedges::colours())
                 .habitat("hedge")
-                .paint(&[("leaf_dark", "Leaves")]),
+                .paint(&[("leaf", "Leaves")]),
             Model::new("gate", gates::gate, (1.9, 1.35, 0.21))
                 .tolerance(0.03)
                 .paint(&[("oak", "Wood")]),

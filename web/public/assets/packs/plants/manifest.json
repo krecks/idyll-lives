@@ -1014,16 +1014,7 @@
       "type": "model",
       "url": "../../models/plants/hedge.glb",
       "materials": {
-        "card": {
-          "finish": "material.finish.leafcards"
-        },
-        "core": {
-          "finish": "material.finish.leafcards"
-        },
         "leaf": {
-          "finish": "material.finish.foliage"
-        },
-        "leaf_dark": {
           "finish": "material.finish.foliage"
         },
         "leaf_light": {
@@ -1042,12 +1033,12 @@
         }
       },
       "perches": [
-        [0.232, 1.101, -0.126],
-        [-0.571, 1.002, 0.305],
-        [-0.403, 0.874, -0.339],
-        [-0.089, 1.063, 0.235],
-        [0.659, 0.95, 0.015],
-        [-0.362, 1.097, -0.055]
+        [-0.306, 1.089, 0.17],
+        [0.734, 1.01, 0.007],
+        [-0.406, 0.885, -0.362],
+        [0.219, 1.052, -0.122],
+        [0.555, 1.047, -0.287],
+        [-0.57, 1.048, -0.127]
       ],
       "habitat": "hedge",
       "far": "../../models/plants/hedge.far.glb"
@@ -1554,16 +1545,7 @@
       "type": "model",
       "url": "../../models/plants/streetHedge.glb",
       "materials": {
-        "card": {
-          "finish": "material.finish.leafcards"
-        },
-        "core": {
-          "finish": "material.finish.leafcards"
-        },
         "leaf": {
-          "finish": "material.finish.foliage"
-        },
-        "leaf_dark": {
           "finish": "material.finish.foliage"
         },
         "leaf_light": {
@@ -1577,12 +1559,12 @@
         }
       },
       "perches": [
-        [0.033, 1.005, 0.062],
-        [-0.685, 0.759, 0.007],
-        [0.685, 0.718, 0.116],
-        [0.138, 0.849, -0.307],
-        [-0.291, 0.996, -0.188],
-        [0.554, 0.976, -0.137]
+        [0.542, 0.991, -0.148],
+        [-0.543, 0.805, 0.352],
+        [-0.223, 0.915, -0.246],
+        [0.116, 0.948, 0.03],
+        [0.122, 0.879, -0.341],
+        [-0.329, 0.97, 0.137]
       ],
       "habitat": "hedge",
       "far": "../../models/plants/streetHedge.far.glb"

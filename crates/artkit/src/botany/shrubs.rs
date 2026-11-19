@@ -2,14 +2,13 @@
 //! outline (`leafy_shrub`), a clipped block (`hedge_block`), what is spread over them, their perches, and a plant
 //! grown from random numbers fitted to its size (`fit_to`).
 
-use crate::botany::cards::{Clad, Tiles, clad};
 use crate::botany::flowers::{Florets, florets};
 use crate::botany::leaf::{Leaf, leaf};
 use crate::botany::lump::{Lump, lump};
 use crate::botany::stems::{Twig, twig};
 use crate::far::{is_low, low};
 use crate::forms::{Jitter, Loft, Ring, jitter, loft, ring};
-use crate::materials::{Mat, Palette, hex_of};
+use crate::materials::{Mat, Palette};
 use crate::math::{M4, P3, PI, TAU, V3, atan2, cos, degrees, sin, sqrt, v3};
 use crate::motion::{self, Squash, squash};
 use crate::parts::{join, join_all, measure, new_parts, settle};
@@ -488,14 +487,6 @@ options! {
 pub fn hedge_block(p: &Palette, length: f64, h: f64, depth: f64, o: HedgeBlock) {
     let (name, seed) = (o.name, o.seed);
     let mut rng = Random::new(seed as i128);
-    let leaf = p.get("leaf").colour;
-    let card = Mat::new("card", "#FFFFFF", "leafcards").colour(&hex_of(leaf));
-    let core = Mat::new("core", "#FFFFFF", "foliage").colour(&hex_of([
-        leaf[0] / 2,
-        leaf[1] / 2,
-        leaf[2] / 2,
-    ]));
-    let p = p.with(&[card, core]);
     let made = new_parts(|| {
         let n = low(44, 20);
         let mut secs = Vec::new();
@@ -523,7 +514,7 @@ pub fn hedge_block(p: &Palette, length: f64, h: f64, depth: f64, o: HedgeBlock) 
             format!("{name}_block"),
             &secs,
             Loft {
-                material: Some(p.get("leaf_dark")),
+                material: Some(p.get("leaf")),
                 ..Loft::default()
             },
         );
@@ -588,90 +579,5 @@ pub fn hedge_block(p: &Palette, length: f64, h: f64, depth: f64, o: HedgeBlock) 
             );
         }
     });
-    let still = join(&made, name, Some(P3::ZERO));
-    // The block is the hedge's dark inside; its surface is a dense layer of cut-out leaf cards, as a tree's crown
-    // is, so the silhouette breaks at leaf scale instead of reading as one smooth, rounded block.
-    let mut n = 0;
-    let cols = ((length / 0.32).round() as usize).clamp(5, 7);
-    let rows = ((h / 0.30).round() as usize).clamp(4, 5);
-    let cards = if cols > 5 || rows > 4 { 6 } else { 9 };
-    let mut leaf_mass = |at: (f64, f64, f64), r: f64| {
-        crate::leaves!(
-            format!("{name}_leaf{n}"),
-            r,
-            at,
-            p.get("leaf"),
-            cards = cards,
-            core = true
-        );
-        n += 1;
-    };
-    let across = |i: usize, n: usize, span: f64| (i as f64 / (n - 1) as f64 - 0.5) * span;
-    // A staggered grid over each face: enough overlap to hide the block, few enough cards to stay light.
-    for ix in 0..cols {
-        for iy in 0..3 {
-            leaf_mass(
-                (
-                    across(ix, cols, length * 0.90),
-                    across(iy, 3, depth * 0.60),
-                    h * 0.96,
-                ),
-                rng.uniform(0.18, 0.23),
-            );
-        }
-    }
-    for side in [-1.0, 1.0] {
-        for iz in 0..rows {
-            let z = h * (0.1 + 0.75 * iz as f64 / (rows - 1) as f64);
-            let shift = if iz % 2 == 0 { 0.0 } else { length * 0.05 };
-            for ix in 0..cols {
-                leaf_mass(
-                    (
-                        across(ix, cols, length * 0.94) + shift,
-                        side * depth * 0.47,
-                        z,
-                    ),
-                    rng.uniform(0.19, 0.23),
-                );
-            }
-            for iy in 0..3 {
-                leaf_mass(
-                    (
-                        side * length * 0.48,
-                        across(iy, 3, depth * 0.7) + shift * 0.5,
-                        z,
-                    ),
-                    rng.uniform(0.17, 0.21),
-                );
-            }
-        }
-        // The foot row covers the block's base; it is the only row below the sides.
-        for ix in 0..cols {
-            leaf_mass(
-                (
-                    across(ix, cols, length * 0.94),
-                    side * depth * 0.5,
-                    h * 0.06,
-                ),
-                rng.uniform(0.16, 0.20),
-            );
-        }
-        let ends = if cols > 5 { 3 } else { 2 };
-        for iy in 0..ends {
-            leaf_mass(
-                (side * length * 0.5, across(iy, ends, depth * 0.5), h * 0.06),
-                rng.uniform(0.16, 0.20),
-            );
-        }
-    }
-    clad(
-        &p,
-        still,
-        seed as i128,
-        Clad {
-            tiles: Tiles::default(),
-            ..Clad::default()
-        },
-    );
-    fit_to(&meshes(), length, h, depth);
+    fit_to(&made, length, h, depth);
 }
