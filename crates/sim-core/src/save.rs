@@ -1447,8 +1447,6 @@ impl World {
             .chain((0..tops.len()).filter(|&i| grown[i]))
             .chain((0..tops.len()).filter(|&i| tops[i]))
             .collect();
-        // (A thing's keeper, `ObjectInstance::keeper`, must be one of the plots.)
-        let plots = world.plots.len();
         for i in order {
             let o = &save.objects[i];
             // (A corrupt save's second use of an id gets a fresh one.)
@@ -1500,8 +1498,9 @@ impl World {
                     None => None,
                 };
                 obj.rack = o.rack.min(world.content.objects[obj.def].rack);
-                obj.keeper = o.plot.filter(|&k| (k as usize) < plots);
                 let id = if posts[i] { world.nudge_post(id) } else { id };
+                // (A thing kept by a plot it doesn't stand on: one of the plots, `World::keep`.)
+                world.keep(id, o.plot);
                 used.extend(keep);
                 object_ids.insert(i as u32, id);
             }

@@ -507,8 +507,8 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
             }
         }
     }
-    // Gardens: each plot's outdoor tiles.
-    for (pi, p) in w.plots.iter().enumerate() {
+    // Gardens: each plot's outdoor tiles (a flat has none: its building's yard is the building's).
+    for (pi, p) in w.plots.iter().enumerate().filter(|(_, p)| !p.is_flat()) {
         for z in p.z..p.z + p.d {
             for x in p.x..p.x + p.w {
                 if !lot.in_bounds(x, z) {
@@ -795,9 +795,12 @@ pub(crate) fn compute_near(
             }
         }
     }
-    // Gardens: each plot's outdoor tiles (as `compute`).
+    // Gardens: each plot's outdoor tiles (as `compute`: none for a flat).
     for (&pi, acc) in plots.iter().zip(&mut gardens) {
         let p = &w.plots[pi as usize];
+        if p.is_flat() {
+            continue;
+        }
         for z in p.z..p.z + p.d {
             for x in p.x..p.x + p.w {
                 if !lot.in_bounds(x, z) {

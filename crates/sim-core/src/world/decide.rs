@@ -560,7 +560,13 @@ pub(crate) fn pick_autonomous(
         // (Not where they couldn't get to a moment ago, nor where someone else is tidying up:
         // the next dirtiest spot instead.)
         let out_of_reach = cleaning_skip(sim, ctx);
-        for z in p.z..p.z + p.d {
+        // (A flat's on its own storey; a house's on the ground.)
+        let up = if p.is_flat() {
+            ctx.nav.stairs.storey_row(i32::from(p.storey))
+        } else {
+            0
+        };
+        for z in p.z + up..p.z + p.d + up {
             for x in p.x..p.x + p.w {
                 if !lot.in_bounds(x, z) || out_of_reach.contains(&(x, z)) {
                     continue;

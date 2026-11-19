@@ -515,15 +515,15 @@ impl World {
     /// Whether every tile of `obj` and the tile in front of it lie on `plot` (nobody uses things
     /// without interactions, like tables, or things standing on a top: their front can be off it).
     fn fits_on_plot(&self, obj: &ObjectInstance, plot: u32) -> bool {
-        let p = &self.plots[plot as usize];
         let def = &self.content.objects[obj.def];
         let (fx, fz) = obj.front_tile(&self.content);
-        let on = |x: i32, z: i32| p.contains(x, self.ground_z(z));
+        let on = |x: i32, z: i32| self.on_plot(plot, x, z);
         let used = !def.interactions.is_empty() && def.layer != Layer::Surface;
         (!used || on(fx, fz)) && obj.tiles(&self.content).all(|(x, z)| on(x, z))
     }
 
-    /// Tiles reachable on foot from the plot's entry (a mask over the whole lot).
+    /// Tiles reachable on foot from the plot's entry (a flat's: from behind its own door, on its
+    /// storey), as a mask over the whole lot.
     pub(crate) fn reachable(&self, plot: u32) -> Vec<bool> {
         let lot = &self.lot;
         let nav = NavGrid {
@@ -535,14 +535,15 @@ impl World {
         };
         let p = &self.plots[plot as usize];
         let inside = |x: i32, z: i32| {
-            let z = self.ground_z(z);
+            let gz = self.ground_z(z);
             x >= p.x - REACH_MARGIN
-                && z >= p.z - REACH_MARGIN
+                && gz >= p.z - REACH_MARGIN
                 && x < p.x + p.w + REACH_MARGIN
-                && z < p.z + p.d + REACH_MARGIN
+                && gz < p.z + p.d + REACH_MARGIN
+                && (!p.is_flat() || self.storey_of(z) == i32::from(p.storey))
         };
         let mut seen = vec![false; lot.tile_slots()];
-        let entry = p.arrival_point();
+        let entry = p.home_point();
         let start = (entry[0].floor() as i32, entry[1].floor() as i32);
         if !nav.tile_free(start.0, start.1) {
             return seen;
@@ -597,7 +598,6 @@ impl World {
         skip: Option<u32>,
     ) -> bool {
         let after = self.reach_signature(plot);
-        let p = &self.plots[plot as usize];
         let objects_ok = before
             .0
             .iter()
@@ -608,8 +608,7 @@ impl World {
         // bed, their tile is the bed's, which nobody walks to).
         let sims_ok = self.sims.iter().all(|s| {
             let (x, z) = s.seated_from.unwrap_or_else(|| s.tile());
-            let gz = self.ground_z(z);
-            let on_plot = x >= p.x && gz >= p.z && x < p.x + p.w && gz < p.z + p.d;
+            let on_plot = self.on_plot(plot, x, z);
             let i = self.lot.tile_index(x, z);
             let seen = |s: &[bool]| s.get(i).copied().unwrap_or(false);
             s.away_until.is_some() || !on_plot || !seen(&before.1) || seen(&after.1)
@@ -1010,6 +1009,12 @@ impl World {
         }
         let p = &self.plots[plot as usize];
         let lot = &self.lot;
+        // (A flat's spots are on its own storey; a house's on the ground.)
+        let up = if p.is_flat() {
+            self.storey_row(i32::from(p.storey))
+        } else {
+            0
+        };
         // (What could be in its way anywhere on the plot, found once: as far past the plot's
         // edges as it reaches, turned any way, from a tile on it.)
         let d = &self.content.objects[def];
@@ -1022,12 +1027,12 @@ impl World {
             + 1;
         let near = self.objects_reaching([
             p.x - reach,
-            p.z - reach,
+            p.z + up - reach,
             p.x + p.w + reach,
-            p.z + p.d + reach,
+            p.z + up + p.d + reach,
         ]);
         let mut spots = Vec::new();
-        for z in p.z..p.z + p.d {
+        for z in p.z + up..p.z + p.d + up {
             for x in p.x..p.x + p.w {
                 for rot in 0..4u8 {
                     let Ok(obj) =
@@ -1751,11 +1756,10 @@ impl World {
     pub fn paint_floor(&mut self, household: u32, tiles: &[FloorPaint]) -> Result<(), Error> {
         let (h, plot) = self.home_of(household)?;
         let rules = &self.content.build;
-        let p = &self.plots[plot as usize];
         let mut changes: Vec<(u16, u16, u8)> = Vec::new();
         let mut cost = 0;
         for t in tiles {
-            if !p.contains(t.x, self.ground_z(t.z)) || !self.lot.in_bounds(t.x, t.z) {
+            if !self.on_plot(plot, t.x, t.z) || !self.lot.in_bounds(t.x, t.z) {
                 return Err(Error::new("you can only lay floors on your own lot"));
             }
             if t.covering as usize > rules.floors.len() {
