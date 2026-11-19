@@ -863,7 +863,8 @@
       "grows": {
         "days": 0.5,
         "fallow": 0,
-        "boughtRipe": true
+        "boughtRipe": true,
+        "notRipe": "the garden was watered not long ago"
       },
       "description": "Forty metres of green hose on a reel cart. Watering the garden with it brings every growing crop on the lot on at once, quicker than a can plant by plant; the garden wants it again half a day later.",
       "interactions": [
@@ -905,7 +906,8 @@
       "grows": {
         "days": 3,
         "fallow": 0,
-        "boughtRipe": true
+        "boughtRipe": true,
+        "notRipe": "the grass hasn't grown back yet"
       },
       "description": "A petrol push mower, ready to mow the lawn at once; after a mow the grass wants cutting again in three days. A freshly mown lawn leaves whoever mowed it pleased for two days, and Nature lovers like the job.",
       "interactions": [

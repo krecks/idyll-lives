@@ -155,7 +155,7 @@
           ]
         }
       ],
-      "description": "A spruce cabin for three with a stove and a bucket of water, its roof glazed so you see who's in. A sauna leaves residents comfortable, a little cleaner and loosened up; come in together.",
+      "description": "A spruce cabin for three with a stove and a bucket of water, its roof and the tops of its sides glazed so you see who's in. A sauna leaves residents comfortable, a little cleaner and loosened up; come in together.",
       "interactions": [
         {
           "id": "sauna",
