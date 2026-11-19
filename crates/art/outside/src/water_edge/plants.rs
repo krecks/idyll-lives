@@ -25,7 +25,7 @@ pub fn reeds() -> Vec<Obj> {
             tilt,
             length,
             rng.uniform(0.035, 0.055),
-            M.blade,
+            [M.blade, M.blade_light, M.blade_dark][i % 3],
             shape = "strap",
             droop = rng.uniform(0.10, 0.25),
             thick = 0.005,

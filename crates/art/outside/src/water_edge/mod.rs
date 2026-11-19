@@ -16,9 +16,13 @@ palette! { M:
     inside = ("#E8E1CC", satin),      // its cream-painted interior
     seat = ("#B98A5A", wood),         // its thwarts
     oar = ("#C9A46A", wood),          // its oars
-    blade = ("#5E8F4E", foliage),     // the reeds' blades
-    stem = ("#6E8F4A", foliage),      // their stems
-    head = ("#7A5A32", bark),         // the bulrushes' seed heads
+    // the reeds: all on `foliage`, so blades, stems and heads sway together in one draw; lighter than they read,
+    // as the foliage texture darkens what it is on (the ornamental grass's tones, a little greyer and bluer)
+    blade = ("#8FAE68", foliage),     // the reeds' blades, three tones
+    blade_dark = ("#7C9C5A", foliage),
+    blade_light = ("#A3BC78", foliage),
+    stem = ("#98AE6C", foliage),      // the bulrushes' stems
+    head = ("#9A6A42", foliage),      // their seed heads, a warm brown
     wall = ("#F2EAD8", satin),        // the beach hut's painted boards
     stripe = ("#3E8C8A", satin),      // its stripes
     roof = ("#8A4B3C", satin),        // its roof
