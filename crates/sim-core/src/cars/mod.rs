@@ -1743,9 +1743,10 @@ impl Route {
         // out of as a driveway is, and which way along the road it goes there (from the lane's
         // nearer end); a spot on the road itself is pulled into and out of straight.
         let bay = park.and_then(|(at, yaw)| {
-            let (rp, on, axis) = parking_bay(travel, at)?;
+            let (rp, on, to_road) = parking_bay(travel, at)?;
             let road = &g.roads[on.road as usize];
             let rt = road.tangent(on.s);
+            let axis = bay_axis(yaw, to_road);
             let (a, b) = if home {
                 (lane[0], lane[1])
             } else {
@@ -2022,9 +2023,10 @@ impl Route {
             Some((drive, if side[0] >= 0.0 { 1.0 } else { -1.0 }))
         } else {
             park.and_then(|(at, yaw)| {
-                let (rp, on, axis) = parking_bay(travel, at)?;
+                let (rp, on, to_road) = parking_bay(travel, at)?;
                 let road = &g.roads[on.road as usize];
                 let rt = road.tangent(on.s);
+                let axis = bay_axis(yaw, to_road);
                 let (a, b) = (lane[lane.len() - 2], lane[lane.len() - 1]);
                 let go = (b[0] - a[0]) * rt[0] + (b[1] - a[1]) * rt[1];
                 Some((
@@ -2306,11 +2308,30 @@ impl Bay {
     }
 }
 
+/// The way a car parked in a bay at `yaw` (nose in, as the town file lays it: `park_spot`) runs
+/// out of it to the road: straight back the way it faces, so it drives in along the bay's own
+/// line and stands at the bay's yaw, the one drawn, even where the bay isn't quite square to the
+/// road nearest it. Where that would take it away from the road, `to_road` (`parking_bay`).
+fn bay_axis(yaw: f32, to_road: [f32; 2]) -> [f32; 2] {
+    let back = [-yaw.sin(), -yaw.cos()];
+    // (Within a thousandth of a radian of the way to the road, that way, as it always was: a bay
+    // the town file gives the yaw the simulation would have worked out drives in as before.)
+    let cos = back[0] * to_road[0] + back[1] * to_road[1];
+    if cos > 0.0 && cos < (1e-3f32).cos() {
+        back
+    } else {
+        to_road
+    }
+}
+
 /// A public parking spot at `at` as a bay off the road (one of a big world's, `macro.ts`: square
 /// to the road, off its verge): the point of the road it's nearest, the road's tangent there and
 /// the way from the spot to it. None: no road near, or the spot is on the road itself (pulled into
 /// along it).
-fn parking_bay(travel: &Travel, at: [f32; 2]) -> Option<([f32; 2], RoadPoint, [f32; 2])> {
+pub(crate) fn parking_bay(
+    travel: &Travel,
+    at: [f32; 2],
+) -> Option<([f32; 2], RoadPoint, [f32; 2])> {
     let g = &travel.graph;
     let p = *g.near(at, ROAD_REACH, 1, Mode::Car).first()?;
     let road = &g.roads[p.road as usize];

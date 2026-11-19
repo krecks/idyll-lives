@@ -764,6 +764,14 @@ pub(crate) fn park_out(w: &mut World, c: usize) {
         let (p, yaw, _) = route.at(route.ticks());
         (p, yaw)
     };
+    // (In a bay off the road it stands at the bay's own pose, the one drawn, where its way in
+    // ends: `bay_axis`.)
+    let (at, yaw) =
+        if crate::travel::dist(at, trip.at) < 0.05 && parking_bay(&w.travel, trip.at).is_some() {
+            (trip.at, trip.yaw)
+        } else {
+            (at, yaw)
+        };
     let car = &mut w.cars[c];
     car.state = CarState::Out;
     car.since = tick;

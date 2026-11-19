@@ -17,9 +17,10 @@ use sim_core::{Command, World, clock};
 const ROW: usize = 6;
 
 /// Two hamlets 330 m apart along the country road, four plots a side, cars on the driveways, and
-/// a car park of `ROW` bays by the second hamlet's park; free will off. The world, the park and,
-/// of the first hamlet's cars, `ROW` of them with a driver each (car, resident).
-fn row_town(seed: u64) -> (World, u32, Vec<(usize, usize)>) {
+/// a car park of `ROW` bays by the second hamlet's park, each turned `slant` (rad) off square to
+/// the street; free will off. The world, the park and, of the first hamlet's cars, `ROW` of them
+/// with a driver each (car, resident).
+fn row_town(seed: u64, slant: f64) -> (World, u32, Vec<(usize, usize)>) {
     let content = common::content();
     let h = hamlets_with_car_park(
         &content,
@@ -34,6 +35,9 @@ fn row_town(seed: u64) -> (World, u32, Vec<(usize, usize)>) {
     // (Nobody works: none of them drives off to work instead.)
     for s in town["sims"].as_array_mut().unwrap() {
         s.as_object_mut().unwrap().remove("job");
+    }
+    for bay in town["parking"].as_array_mut().unwrap() {
+        bay["yaw"] = json!(bay["yaw"].as_f64().unwrap() + slant);
     }
     let park = h.plots[1]
         .clone()
@@ -161,8 +165,21 @@ fn every_car_body_fits_a_bays_lines_and_the_lines_a_bay() {
 
 #[test]
 fn a_row_of_bays_fills_and_empties_each_car_parked_as_the_town_file_says() {
+    fill_and_empty(0.0);
+}
+
+#[test]
+fn a_car_stands_at_its_bays_own_yaw_where_the_bay_is_not_square_to_the_street() {
+    // (A car park's bays square to a straight stretch, the street bending a little past it: the
+    // way in from the road nearest each is a few degrees off its lines.)
+    fill_and_empty(0.12);
+}
+
+/// The drivers of `row_town` (its bays `slant` off square) all drive to the other hamlet's park
+/// at once, each parking in a bay of its own at the bay's pose, and all go home at once.
+fn fill_and_empty(slant: f64) {
     let content = common::content();
-    let (mut w, park, drivers) = row_town(5);
+    let (mut w, park, drivers) = row_town(5, slant);
     let homes: Vec<[f32; 2]> = drivers.iter().map(|&(c, _)| w.cars[c].spot).collect();
     // All six off to the other hamlet's park at once: each drives there and parks in a bay of
     // its own.
