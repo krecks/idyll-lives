@@ -7,6 +7,8 @@
   import { townMap } from '../townMap.svelte';
   import { layoutTags, type Box, type TagSpot } from '../../game/tagLayout';
   import { homesForSale, nameLabels, townPlaces } from './places';
+  import { lotOf } from '../../core/protocol';
+  import { plotInfo } from '../place';
   import { homeTag, householdTags, nameTags, nearestFew, peopleTags, mostSales, placesInView, placeTags, saleTags, tagRank, yourPeople, type TagWorld, type TownTag } from './tags';
   import { MINE_SEEN, mineFade, TAGS_FROM, tagFade } from './fade';
   import { townHud } from './townHud.svelte';
@@ -41,14 +43,15 @@
   });
 
   /** The homes for sale's tags (a Big town's hundreds): made again when the plots or households change, not each game minute. */
-  const sales = $derived(saleTags(homesForSale(game.plots, game.households, services.content.economy.homePrice), game.plots, money));
+  const sales = $derived(saleTags(homesForSale(game.plots, game.households, services.content.economy.homePrice, game.flats), game, money));
   const tags = $derived.by((): TownTag[] => {
     if (!world) return [];
     const f = townHud.filters;
     const out: TownTag[] = [];
     if (f.household) {
       out.push(...household.tags);
-      const home = homeTag(homePlot === null ? null : game.plots[homePlot], members, homePlot);
+      // (A flat's tag stands over its building.)
+      const home = homeTag(homePlot === null ? null : plotInfo(game, lotOf(game, homePlot)), members, homePlot);
       if (home) out.push(home);
     }
     // (Up to the blend the rest come in at, the household's own only.)

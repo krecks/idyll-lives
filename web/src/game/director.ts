@@ -8,7 +8,7 @@
  */
 
 import type { Content } from '../content/content';
-import { groundDepth, type SocialEvent, type WorldStructure } from '../core/protocol';
+import { flatOf, groundDepth, lotOf, storeyOfRow, type SocialEvent, type WorldStructure } from '../core/protocol';
 import type { SnapshotLayout } from '../core/snapshot';
 import type { GameShot, WallMode } from '../render/types';
 
@@ -228,10 +228,10 @@ export class Director {
     return { key, priority, sims, walls: 'cutaway', shot: { follow: sims, alpha, beta: 0.98, radius, drift: 0.015, duration: 2.6 } };
   }
 
-  /** Nothing going on: the whole house from above, a resident at home, or the outside. */
+  /** Nothing going on: the whole house from above (a flat's whole building), a resident at home, or the outside. */
   private ambientMoment(): Moment | null {
     const world = this.world;
-    const plot = this.home === null ? null : world?.plots[this.home];
+    const plot = this.home === null || !world ? null : world.plots[lotOf(world, this.home)];
     if (!world || !plot) return null;
     const kind = this.ambient++ % 4;
     const [x0, z0, x1, z1] = plot.house ?? [plot.x, plot.z, plot.x + plot.w, plot.z + plot.d];
@@ -260,16 +260,19 @@ export class Director {
     return out;
   }
 
-  /** Whether resident `i` is on the home lot (and not away at work). */
+  /** Whether resident `i` is on the home lot (in a flat, in it on its storey; and not away at work). */
   private atHome(i: number): boolean {
-    const plot = this.home === null ? null : this.world?.plots[this.home];
-    if (!plot) return false;
+    const world = this.world;
+    const flat = this.home === null || !world ? undefined : flatOf(world, this.home);
+    const plot = flat ?? (this.home === null ? null : world?.plots[this.home]);
+    if (!world || !plot) return false;
     const { layout } = this.deps;
     const snap = this.deps.snapshot();
     if (i < 0 || i >= snap[layout.header.simCount]) return false;
     const o = layout.headerLen + i * layout.simStride;
     if (snap[o + layout.sim.away] > 0) return false;
     const x = snap[o + layout.sim.x];
+    if (flat && storeyOfRow(world, snap[o + layout.sim.z]) !== flat.storey) return false;
     const z = this.groundRow(snap[o + layout.sim.z]);
     return x >= plot.x && z >= plot.z && x < plot.x + plot.w && z < plot.z + plot.d;
   }

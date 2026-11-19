@@ -97,14 +97,14 @@
     }
     if (tool === 'door' || tool === 'window') {
       const label = tool === 'door' ? 'Door' : 'Window';
-      if (!game.buildValid) return { text: label, sub: short ? `${money(cost - game.funds)} short` : 'Needs a full-height wall', bad: true };
+      if (!game.buildValid) return { text: label, sub: short ? `${money(cost - game.funds)} short` : (game.buildWhy ?? 'Needs a full-height wall'), bad: true };
       return cost > 0 ? { text: money(cost), sub: label, bad: false } : null;
     }
     const n = game.buildEdges;
     const room = game.buildRoom;
     const wallUp = tool === 'remove' && game.buildWallUp;
     const what = wallUp ? `Close up ${n === 1 ? 'the opening' : `${n} openings`}` : tool === 'remove' ? `Tear down ${n} m` : room ? `${room[0]} × ${room[1]} room · ${n} m` : `${n} m of ${tool === 'fence' ? 'fence' : 'wall'}`;
-    if (!game.buildValid) return { text: what, sub: short ? `${money(cost - game.funds)} short` : "Can't build here", bad: true };
+    if (!game.buildValid) return { text: what, sub: short ? `${money(cost - game.funds)} short` : (game.buildWhy ?? "Can't build here"), bad: true };
     if (!game.buildStart) {
       if (wallUp) return { text: cost > 0 ? money(cost) : 'Free', sub: 'Click to wall it up', bad: false };
       return cost > 0 ? { text: money(cost), sub: tool === 'remove' ? 'Drag to tear down' : tool === 'room' ? 'Drag out a room' : 'Drag to draw', bad: false } : null;

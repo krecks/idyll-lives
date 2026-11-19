@@ -1,32 +1,16 @@
 /**
  * A building clicked in the play view (`Renderer.buildingAt`) as the town card's choice (`townHud.chosen`): what it is,
- * its icon, where its pin stands, and who is inside now. Pure: `chosenView.svelte.ts` gives it the game's views.
+ * its icon, where its pin stands, who is inside now, and a building's flats (a building of flats', those over a
+ * place), each with who lives there or its price. Pure: `chosenView.svelte.ts` gives it the game's views.
  */
 
-import type { BackdropBuilding, BuildingUse, HouseholdInfo, PlotInfo, TownPlace } from '../../core/protocol';
+import { lotOf, type FlatInfo, type HouseholdInfo, type PlotInfo, type TownPlace } from '../../core/protocol';
 import { CIVIC, civicOf } from '../../game/places';
 import type { BuildingHit } from '../../render/types';
-import { lotTitle } from '../place';
-import { openState, openText } from './places';
+import { flatsIn, lotTitle } from '../place';
+import { openState, openText, type HomeForSale } from './places';
 import { whereabouts, type TagWorld } from './tags';
 import type { Chosen } from './townHud.svelte';
-
-/** A backdrop building that is no place, in words. */
-const USE_TITLE: Record<BuildingUse, string> = {
-  flats: 'Flats',
-  terrace: 'Terraced houses',
-  house: 'House',
-  shop: 'Shop',
-  cafe: 'Café',
-  restaurant: 'Restaurant',
-  office: 'Offices',
-  school: 'School',
-  church: 'Church',
-  hall: 'Hall',
-  workshop: 'Workshop',
-  farm: 'Farm',
-  barn: 'Barn',
-};
 
 /** A place's icon, by its kind. */
 const KIND_ICON: Record<TownPlace['kind'], string> = {
@@ -42,44 +26,49 @@ const KIND_ICON: Record<TownPlace['kind'], string> = {
   farm: 'icon.career.nature',
 };
 
-/** A backdrop building's icon, by its use. */
-const USE_ICON: Record<BuildingUse, string> = {
-  flats: 'icon.ui.home',
-  terrace: 'icon.ui.home',
-  house: 'icon.ui.home',
-  shop: KIND_ICON.shop,
-  cafe: KIND_ICON.cafe,
-  restaurant: KIND_ICON.restaurant,
-  office: KIND_ICON.office,
-  school: KIND_ICON.school,
-  church: KIND_ICON.church,
-  hall: KIND_ICON.church,
-  workshop: KIND_ICON.workshop,
-  farm: KIND_ICON.farm,
-  barn: KIND_ICON.farm,
-};
-
 export interface ChosenTown {
   places: readonly TownPlace[];
-  backdrop: readonly BackdropBuilding[];
   plots: readonly PlotInfo[];
+  /** The town's flats (`WorldStructure.flats`). */
+  flats?: readonly FlatInfo[];
   households: readonly Pick<HouseholdInfo, 'name' | 'plot'>[];
 }
 
-/** What a click on building `hit` chooses: its place (a public lot's, a backdrop place's), else the lot's house or the building. */
+/** What a click on building `hit` chooses: its lot's place (a public lot's), else a building of flats, else the lot's house. */
 export function chosenOf(hit: BuildingHit, t: ChosenTown): Chosen | null {
-  if (hit.kind === 'lot') {
-    const p = t.plots[hit.plot];
-    if (!p) return null;
-    const place = t.places.findIndex((pl) => pl.plot === hit.plot);
-    if (place >= 0) return { kind: 'place', place, plot: hit.plot, title: t.places[place].name, detail: '' };
-    return { kind: 'home', plot: hit.plot, title: lotTitle(p, t.households, 'Empty house'), detail: '' };
-  }
-  const b = t.backdrop[hit.index];
-  if (!b) return null;
-  const place = b.place === undefined ? undefined : t.places[b.place];
-  if (place && b.place !== undefined) return { kind: 'place', place: b.place, plot: place.plot ?? null, title: place.name, detail: '' };
-  return { kind: 'building', building: hit.index, plot: null, title: USE_TITLE[b.use] ?? 'Building', detail: '' };
+  const p = t.plots[hit.plot];
+  if (!p) return null;
+  const place = t.places.findIndex((pl) => pl.plot === hit.plot);
+  if (place >= 0) return { kind: 'place', place, plot: hit.plot, title: t.places[place].name, detail: '' };
+  if (p.kind === 'flats' || flatsIn(t, p.id).length) return { kind: 'flats', plot: hit.plot, title: p.name, detail: '' };
+  return { kind: 'home', plot: hit.plot, title: lotTitle(p, t.households, 'Empty house'), detail: '' };
+}
+
+/** A flat on its building's card: its name there ("Flat 3"), its storey, who lives there ("The Coles"; null: nobody) and, for sale, its price. */
+export interface FlatRow {
+  plot: number;
+  name: string;
+  storey: number;
+  who: string | null;
+  /** Its price while it is for sale (`places.ts` `homesForSale`), else null. */
+  price: number | null;
+}
+
+/** The flats of lot `lot` as its card lists them, by storey (`sale`: the homes for sale, priced). */
+export function flatRows(lot: number, t: ChosenTown, sale: readonly HomeForSale[]): FlatRow[] {
+  const building = t.plots[lot]?.name;
+  return flatsIn(t, lot).map((f) => {
+    const hh = t.households.find((h) => h.plot === f.id);
+    // (Its building's name goes without saying on its building's card.)
+    const name = building && f.name.endsWith(`, ${building}`) ? f.name.slice(0, -building.length - 2) : f.name;
+    return { plot: f.id, name, storey: f.storey, who: hh ? `The ${hh.name}s` : null, price: hh ? null : (sale.find((s) => s.plot === f.id)?.price ?? null) };
+  });
+}
+
+/** A building of flats' card line: "4 flats · 1 for sale". */
+export function flatsDetail(rows: readonly FlatRow[]): string {
+  const free = rows.filter((r) => r.who === null).length;
+  return [`${rows.length} ${rows.length === 1 ? 'flat' : 'flats'}`, free ? `${free} for sale` : ''].filter(Boolean).join(' · ');
 }
 
 /**
@@ -102,35 +91,23 @@ export function placeDetail(place: TownPlace | undefined, hours: TownPlace['hour
 }
 
 /** The choice's icon (`Icon` name). */
-export function chosenIcon(c: Chosen, t: Pick<ChosenTown, 'places' | 'backdrop'>): string {
+export function chosenIcon(c: Chosen, t: Pick<ChosenTown, 'places'>): string {
   if (c.kind === 'place') return KIND_ICON[t.places[c.place]?.kind] ?? 'icon.ui.town';
-  if (c.kind === 'building') return USE_ICON[t.backdrop[c.building]?.use] ?? 'icon.ui.town';
-  if (c.kind === 'home') return 'icon.ui.home';
+  if (c.kind === 'home' || c.kind === 'flats') return 'icon.ui.home';
   return 'icon.ui.face';
 }
 
 /** Where the choice's pin stands: over its building's middle (town metres), `lift` m over the ground; null for a person. */
-export function chosenAnchor(c: Chosen, t: Pick<ChosenTown, 'places' | 'backdrop' | 'plots'>): { x: number; z: number; lift: number } | null {
+export function chosenAnchor(c: Chosen, t: Pick<ChosenTown, 'places' | 'plots'>): { x: number; z: number; lift: number } | null {
   if (c.kind === 'place') {
     const p = t.places[c.place];
     return p ? { x: p.x, z: p.z, lift: 7 } : null;
   }
-  if (c.kind === 'home') {
+  if (c.kind === 'home' || c.kind === 'flats') {
     const p = t.plots[c.plot];
     if (!p) return null;
     const [x0, z0, x1, z1] = p.house ?? [p.x, p.z, p.x + p.w, p.z + p.d];
     return { x: (x0 + x1) / 2, z: (z0 + z1) / 2, lift: 3 + 3 * (p.storeys ?? 1) };
-  }
-  if (c.kind === 'building') {
-    const b = t.backdrop[c.building];
-    if (!b?.poly.length) return null;
-    let x = 0;
-    let z = 0;
-    for (const [px, pz] of b.poly) {
-      x += px;
-      z += pz;
-    }
-    return { x: x / b.poly.length, z: z / b.poly.length, lift: 3 * b.storeys + 3 };
   }
   return null;
 }
@@ -143,13 +120,15 @@ export interface Inside {
 
 /**
  * Who is inside the choice now: at the place (on its lot, or working there: `whereabouts`, as the place tags count
- * them), or in the house (on its lot, not away). Null for a person, or a building nobody is simulated in.
+ * them), in the house (on its lot, not away), or in a building of flats (in its flats, its hall or its yard). Null
+ * for a person.
  */
 export function whoIsIn(c: Chosen, w: TagWorld, yours: ReadonlyMap<number, string>): Inside | null {
-  if (c.kind !== 'place' && c.kind !== 'home') return null;
+  if (c.kind === 'person') return null;
   const out: Inside = { names: [], others: 0 };
   for (const s of w.sims) {
-    const there = c.kind === 'place' ? whereabouts(s, w).place === c.place : s.plot === c.plot && s.awayUntil === null;
+    const at = c.kind === 'flats' && s.plot !== null ? lotOf(w, s.plot) : s.plot;
+    const there = c.kind === 'place' ? whereabouts(s, w).place === c.place : at === c.plot && s.awayUntil === null;
     if (!there) continue;
     const name = yours.get(s.id);
     if (name) out.names.push(name);

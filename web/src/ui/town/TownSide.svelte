@@ -1,12 +1,12 @@
 <script lang="ts">
   import Icon from '../Icon.svelte';
-  import { clock, WEEKDAYS } from '../format';
+  import { clock, money, WEEKDAYS } from '../format';
   import { services } from '../services';
   import { settings } from '../../settings/settings.svelte';
   import { game } from '../state.svelte';
   import { townMap } from '../townMap.svelte';
   import { TAG_ORDER, type TagKind } from './kinds';
-  import { lotInSentence } from '../place';
+  import { lotInSentence, plotInfo } from '../place';
   import { areaAt, closedWhy } from './places';
   import { eventText, nextEvents, waitText, type TodayMember } from './today';
   import { townHud } from './townHud.svelte';
@@ -15,17 +15,16 @@
 
   /**
    * The town view's left column: the tag the player clicked (one of your people, to
-   * visit or call; a place), "Today in <town>" with the household's next events and who is away out of sight, and
-   * the tag menu. The card stays until closed, also back down in the play view; the rest shows in the town view.
+   * visit or call; a place; a building, its flats listed, each to look inside or visit), "Today in <town>" with the
+   * household's next events and who is away out of sight, and the tag menu. The card stays until closed, also back
+   * down in the play view; the rest shows in the town view.
    */
   const LABELS: Record<TagKind, string> = { household: 'Household', people: 'People', places: 'Places', sale: 'For sale', names: 'Names' };
   const time = (m: number) => clock(m, settings.clock24h);
 
   const meta = $derived(townMap.world?.meta ?? null);
-  const home = $derived.by(() => {
-    const id = game.households.find((h) => h.player)?.plot;
-    return id == null ? null : (game.plots[id] ?? null);
-  });
+  /** The home (a lot, or a flat as a lot of its own). */
+  const home = $derived(plotInfo(game, game.households.find((h) => h.player)?.plot) ?? null);
   const town = $derived.by(() => {
     const areas = meta?.areas ?? [];
     if (home && areas.length) return areas[areaAt(home.x + home.w / 2, home.z + home.d / 2, areas)]?.name ?? meta?.name;
@@ -65,11 +64,19 @@
   });
   /** Where a visit goes ("the Smiths", "Town Park"): the lot they're on, else their home. */
   const visitTo = $derived.by(() => {
-    const p = chosen?.plot == null ? null : game.plots[chosen.plot];
+    const p = plotInfo(game, chosen?.plot);
     return p ? lotInSentence(p, game.households) : '';
   });
   /** Why the buttons are greyed out, in a line. */
-  const why = $derived([chosen?.plot != null && visitWhy ? `Visit: ${visitWhy}` : '', callWhy ? `Call: ${callWhy}` : ''].filter(Boolean).join(' · '));
+  const why = $derived([chosen?.plot != null && chosen.kind !== 'flats' && visitWhy ? `Visit: ${visitWhy}` : '', callWhy ? `Call: ${callWhy}` : ''].filter(Boolean).join(' · '));
+  /** A building's flats (`chosenView.flats`): who lives there, or for sale and its price. */
+  const flats = $derived(chosenView.flats);
+  /** Why the one selected can't visit flat `plot` now, or null. */
+  const flatVisitWhy = (plot: number) => (!me ? 'Nobody selected' : me.plot === plot ? `${me.name} is there` : (me.homebound ?? null));
+  function visitFlat(plot: number) {
+    services.controls.visit(plot);
+    townHud.chosen = null;
+  }
   /** The lot of the choice, to look inside (a house, a public place's lot); and whether it is shown open now, by "Look inside". */
   const lookPlot = $derived(chosen?.kind === 'home' || chosen?.kind === 'place' ? chosen.plot : null);
   const looking = $derived(lookPlot !== null && game.lookInside === lookPlot && game.viewPlot === lookPlot);
@@ -100,8 +107,30 @@
         </header>
         {#if detail}<p class="muted">{detail}</p>{/if}
         {#if inside}<p class="inside"><Icon name="icon.need.social" size={13} />{inside}</p>{/if}
+        {#if flats.length}
+          <ul class="flats" aria-label="Flats">
+            {#each flats as f (f.plot)}
+              {@const why = flatVisitWhy(f.plot)}
+              <li>
+                <span class="flat"><b>{f.name}</b><span class="muted">{f.plot === home?.id ? 'Your home' : (f.who ?? (f.price !== null && !game.creative ? `For sale · ${money(f.price)}+` : 'For sale'))}</span></span>
+                {#if f.plot !== home?.id}
+                  {#if f.who !== null}
+                    <button class="btn small icon" disabled={!!why} title={why ?? `${me?.name} visits ${f.who.replace(/^The /, 'the ')}`} aria-label="Visit {f.name}" onclick={() => visitFlat(f.plot)}>
+                      <Icon name="icon.ui.home" size={14} />
+                    </button>
+                  {/if}
+                  {#if game.lookInside === f.plot}
+                    <button class="btn small icon" title="Close {f.name} up again" aria-label="Close {f.name} up" onclick={() => services.controls.lookInside(null)}><Icon name="icon.ui.wallsUp" size={14} /></button>
+                  {:else}
+                    <button class="btn small icon" title="Look inside {f.name}" aria-label="Look inside {f.name}" onclick={() => services.controls.lookInside(f.plot)}><Icon name="icon.ui.wallsDown" size={14} /></button>
+                  {/if}
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
         <div class="actions">
-          {#if chosen.plot !== null && chosen.plot !== home?.id}
+          {#if chosen.plot !== null && chosen.plot !== home?.id && chosen.kind !== 'flats'}
             <button class="btn small primary" disabled={!!visitWhy} title={visitWhy ?? `${me?.name} goes to ${visitTo}`} onclick={visit}>
               <Icon name="icon.ui.home" size={14} />{me ? `${me.name}: visit` : 'Visit'}
             </button>
@@ -234,6 +263,30 @@
   }
   .why {
     font-size: 11px;
+  }
+  ul.flats {
+    margin-top: 8px;
+    gap: 2px;
+  }
+  .flats li {
+    align-items: center;
+    gap: 4px;
+  }
+  .flat {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .flat .muted {
+    font-size: 11px;
+  }
+  .btn.icon {
+    width: 30px;
+    padding: 0;
+    justify-content: center;
   }
   .eyebrow {
     font-size: 10.5px;

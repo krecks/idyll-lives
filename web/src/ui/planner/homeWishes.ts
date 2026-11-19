@@ -56,10 +56,9 @@ export function describeHomeWish(content: Content, w: HomeWish): WishInfo {
   }
 }
 
-/** The broken thing a fix wish is about, at home. */
+/** The broken thing a fix wish is about, at home (a flat's on its own storey). */
 export function brokenAtHome(def: string) {
-  const plot = game.households[game.home]?.plot;
-  const home = plot == null ? null : game.plots[plot];
+  const home = game.homeArea;
   if (!home) return undefined;
   return game.objects.find(
     (o) => o.def === def && (o.wear ?? 0) >= 1 && o.x >= home.x && o.z >= home.z && o.x < home.x + home.w && o.z < home.z + home.d,

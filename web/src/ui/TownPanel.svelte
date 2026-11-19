@@ -7,7 +7,8 @@
   import { game } from './state.svelte';
   import { townMap } from './townMap.svelte';
   import { layoutLabels, mapScale, screenToMap, type MapLabel } from './mapView';
-  import { lotTitle, wayText } from './place';
+  import { flatsIn, lotTitle, plotInfo, wayText } from './place';
+  import { lotOf } from '../core/protocol';
   import { settings } from '../settings/settings.svelte';
   import { homesForSale, type HomeForSale } from './town/places';
 
@@ -27,8 +28,15 @@
   const big = $derived(Math.max(width, depth) > 300);
   const me = $derived(game.selectedSim);
   const homePlot = $derived(game.households.find((h) => h.player)?.plot ?? null);
+  /** The ground lot the home is on (a flat's building). */
+  const homeLot = $derived(homePlot === null ? null : lotOf(game, homePlot));
+  /** The lot picked, or one of its flats (picked from its building's list, or a flat for sale's tag). */
   let picked = $state<number | null>(null);
-  const plot = $derived(picked === null ? null : plots[picked]);
+  const plot = $derived(plotInfo(game, picked) ?? null);
+  /** The ground lot of the one picked: the map rings it. */
+  const pickedLot = $derived(picked === null ? null : lotOf(game, picked));
+  /** The flats of the building picked (a building of flats', or those over a place), to pick one from. */
+  const flatsHere = $derived(pickedLot === null ? [] : flatsIn(game, pickedLot));
   const household = $derived(plot ? game.households.find((h) => h.plot === plot.id) : undefined);
   const residents = $derived(household ? game.sims.filter((s) => s.household === household.id) : []);
   const info = (id: number) => game.roster.find((r) => r.id === id);
@@ -37,11 +45,16 @@
     [
       'For sale',
       h.price && !game.creative ? `from ${money(h.price)}` : '',
-      `${h.floor ? `${h.storeys > 1 ? `${h.storeys} floors, ` : ''}${Math.round(h.floor)} m² of house` : 'an empty lot'} on ${h.w} × ${h.d} m`,
+      h.flat ? `a flat of ${Math.round(h.floor)} m²` : `${h.floor ? `${h.storeys > 1 ? `${h.storeys} floors, ` : ''}${Math.round(h.floor)} m² of house` : 'an empty lot'} on ${h.w} × ${h.d} m`,
     ]
       .filter(Boolean)
       .join(' · ');
-  const sale = $derived(plot && !plot.public && !household ? homesForSale([plot], [], services.content.economy.homePrice)[0] : null);
+  const sale = $derived(plot && !plot.public && !household ? (homesForSale(game.plots, game.households, services.content.economy.homePrice, game.flats).find((h) => h.plot === plot.id) ?? null) : null);
+  /** A flat in the building's list: who lives there, or that it is for sale. */
+  const flatLine = (id: number) => {
+    const hh = game.households.find((h) => h.plot === id);
+    return hh ? `The ${hh.name}s` : 'For sale';
+  };
   const homeCount = (plotId: number) => game.sims.filter((s) => s.plot === plotId).length;
 
   // ---- the view: zoom 1..12 round its middle (m); the map's width on screen (px) ----
@@ -83,7 +96,7 @@
       // Names where there's room for them on screen (outdoor places always).
       const roomy = p.w * ppm > 46;
       if (!roomy && !spots.has(p.id)) continue;
-      const wins = p.id === homePlot ? 0 : p.id === picked ? 1 : null;
+      const wins = p.id === homeLot ? 0 : p.id === pickedLot ? 1 : null;
       list.push({ key: p.id, x: p.x + p.w / 2, z: p.z + p.d / 2, text: lotTitle(p, game.households, 'Empty'), size: 11, sub: roomy ? 9 : undefined, rank: spots.has(p.id) ? 1 : 2, wins });
     }
     areas.forEach((a, i) => list.push({ key: `a${i}`, x: a.x + a.w / 2, z: a.z + a.d / 2, text: a.name, size: 14, rank: 0 }));
@@ -159,7 +172,7 @@
   function pickPlot(id: number) {
     if (dragged) return;
     picked = id;
-    const p = plots[id];
+    const p = plotInfo(game, id);
     if (p) target = [p.x + p.w / 2, p.z + p.d / 2];
   }
   // A lot handed over to pick as the map opens (a home for sale's tag, `town/TownTags.svelte`): picked, shown.
@@ -169,7 +182,7 @@
     townMap.pick = null;
     dragged = false;
     pickPlot(id);
-    const p = plots[id];
+    const p = plotInfo(game, id);
     if (p) {
       zoom = Math.max(zoom, 3);
       mid = [p.x + p.w / 2, p.z + p.d / 2];
@@ -191,13 +204,13 @@
   }
 
   function status(s: (typeof game.sims)[number]): string {
-    const way = wayText(s, game.households[s.household]?.plot ?? null, game.plots, game.households, (m) => clock(m, settings.clock24h));
+    const way = wayText(s, game.households[s.household]?.plot ?? null, game, game.households, (m) => clock(m, settings.clock24h));
     if (way) return way;
     if (s.awayUntil !== null) return `At work until ${clock(s.awayUntil, settings.clock24h)}`;
-    if (s.visiting !== null) return `Visiting ${game.plots[s.visiting]?.name ?? ''}`;
+    if (s.visiting !== null) return `Visiting ${plotInfo(game, s.visiting)?.name ?? ''}`;
     if (s.plot === null) return 'Out and about';
     const hh = game.households[s.household];
-    return s.plot === hh?.plot ? 'At home' : `At ${game.plots[s.plot]?.name}`;
+    return s.plot === hh?.plot ? 'At home' : `At ${plotInfo(game, s.plot)?.name}`;
   }
 </script>
 
@@ -279,14 +292,14 @@
           {@const at = labels.get(p.id)}
           <g
             class="plot"
-            class:mine={p.id === homePlot}
-            class:picked={p.id === picked}
+            class:mine={p.id === homeLot}
+            class:picked={p.id === pickedLot}
             class:viewing={p.id === game.viewPlot}
             class:spot={spots.has(p.id)}
             role="button"
             tabindex="0"
             aria-label="{name}{p.public || name === 'Empty' ? '' : `, ${p.name}`}"
-            aria-pressed={p.id === picked}
+            aria-pressed={p.id === pickedLot}
             onclick={() => pickPlot(p.id)}
             ondblclick={() => {
               pickPlot(p.id);
@@ -349,6 +362,14 @@
         {#if sale}
           <p class="sale muted">{saleText(sale)}</p>
         {/if}
+        {#if flatsHere.length}
+          <!-- A building of flats (or a place with flats over it): each flat, picked to see who lives there or what it costs. -->
+          <ul class="flats" aria-label="Flats">
+            {#each flatsHere as f (f.id)}
+              <li><button class="flat" class:on={f.id === picked} onclick={() => pickPlot(f.id)}><b>{f.name}</b><span class="muted">{flatLine(f.id)}</span></button></li>
+            {/each}
+          </ul>
+        {/if}
         <ul>
           {#each residents as s (s.id)}
             {@const who = info(s.id)}
@@ -358,7 +379,7 @@
             </li>
           {/each}
         </ul>
-        {#if me && plot.id !== me.plot && plot.id !== homePlot}
+        {#if me && plot.id !== me.plot && plot.id !== homePlot && plot.kind !== 'flats'}
           <!-- (Greyed out, saying why, when the sim would refuse it.) -->
           <button class="btn primary" disabled={!!me.homebound} title={me.homebound} onclick={() => services.controls.visit(plot.id)}>
             Send {me.name} to visit
@@ -609,6 +630,23 @@
   .hint,
   .sale {
     margin: 0;
+  }
+  .flats {
+    gap: 2px;
+  }
+  .flat {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    text-align: left;
+  }
+  .flat:hover,
+  .flat.on {
+    background: var(--hairline);
   }
   .why {
     margin-top: -4px;
