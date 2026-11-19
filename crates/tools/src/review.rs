@@ -371,6 +371,7 @@ pub fn objects(dir: &Path) -> Result<Vec<Object>, String> {
                 sim_core::content::Approach::Around => "around",
                 sim_core::content::Approach::Side => "side",
                 sim_core::content::Approach::Behind => "behind",
+                sim_core::content::Approach::Door => "door",
             },
             uses,
             lamp: raw.get("light").is_some_and(|l| !l.is_null()),

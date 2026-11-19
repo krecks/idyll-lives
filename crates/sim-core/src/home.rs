@@ -1128,9 +1128,10 @@ impl World {
                 })
                 .ok_or_else(|| Error::new("there's no free spot for that at home"))?,
         };
-        // A crop bought new is just planted: it ripens over its days.
-        if self.content.objects[def].grows.is_some() {
-            self.objects[id as usize].growth = 0.0;
+        // A crop bought new is just planted: it ripens over its days (a lawn to mow is there
+        // to mow at once: `Growth::bought_ripe`).
+        if let Some(g) = self.content.objects[def].grows {
+            self.objects[id as usize].growth = if g.bought_ripe { 1.0 } else { 0.0 };
         }
         // A lamp (or a fire) comes switched off: residents switch it on as they come in when
         // it's dark, or the player does (see `lights.rs`).

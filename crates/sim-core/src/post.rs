@@ -2,7 +2,7 @@
 //! `letter`), and the hose's round of the garden (content `waters`).
 //!
 //! Every morning at `POST_MINUTE` the post comes to the letterboxes on each household's home
-//! plot (`deliver`): each one empty (closed) is opened, its flag up (`ObjectInstance::open`,
+//! plot (`deliver`): each one empty (closed) is opened, a letter in its slot (`ObjectInstance::open`,
 //! saved as any object's). Someone at home fetches it (`Interaction::post`, offered while it's
 //! open, closing it as they start): a household with free will sends the nearest one at home
 //! who is up and between things, from then until `FETCH_UNTIL` (`prompt`), as short a use would
@@ -68,7 +68,7 @@ pub(crate) fn after_step(world: &mut World) {
     }
 }
 
-/// The morning's post: every empty letterbox on a household's home plot opens, its flag up.
+/// The morning's post: every empty letterbox on a household's home plot opens, a letter in its slot.
 pub(crate) fn deliver(world: &mut World) {
     let mut changed = false;
     for h in 0..world.households.len() {

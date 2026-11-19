@@ -431,6 +431,9 @@ impl Interaction {
 pub struct Growth {
     pub days: f32,
     pub fallow_days: f32,
+    /// Bought ripe rather than just planted (content `boughtRipe`: the lawnmower's lawn, there to
+    /// mow at once; its `days` only after a mow).
+    pub bought_ripe: bool,
 }
 
 #[derive(Debug)]
@@ -758,6 +761,9 @@ pub enum Approach {
     /// Its seat behind the work (a desk's chair, a drum kit's throne): from behind the slot, else
     /// beside it, else the front.
     Behind,
+    /// Got into through a door in its front (a sauna cabin): as `Front`, and its `places` too
+    /// are come to from the tile in front, never round the back through its walls.
+    Door,
 }
 
 /// Where an object goes (content `layer`). Things on a wall, the ceiling or the floor's surface
@@ -2871,6 +2877,9 @@ struct GrowsRaw {
     days: f32,
     #[serde(default = "half_a_day")]
     fallow: f32,
+    /// Ripe when bought (see `Growth::bought_ripe`).
+    #[serde(default, rename = "boughtRipe")]
+    bought_ripe: bool,
 }
 
 /// An object's `runs`: `{"minutes": 60}` (and, for the renderer, the `sound` it makes running).
@@ -4061,9 +4070,10 @@ impl Content {
                 Some("around") => Approach::Around,
                 Some("side") => Approach::Side,
                 Some("behind") => Approach::Behind,
+                Some("door") => Approach::Door,
                 Some(other) => {
                     return Err(Error::new(format!(
-                        "object '{}': unknown approach '{other}' (front, around, side or behind)",
+                        "object '{}': unknown approach '{other}' (front, around, side, behind or door)",
                         obj.id
                     )));
                 }
@@ -4297,7 +4307,7 @@ impl Content {
                     n => n,
                 },
                 grows: match &obj.grows {
-                    Some(g) if g.days > 0.0 && g.fallow >= 0.0 => Some(Growth { days: g.days, fallow_days: g.fallow }),
+                    Some(g) if g.days > 0.0 && g.fallow >= 0.0 => Some(Growth { days: g.days, fallow_days: g.fallow, bought_ripe: g.bought_ripe }),
                     Some(_) => {
                         return Err(Error::new(format!("object '{}': `grows` needs days > 0 and fallow >= 0", obj.id)));
                     }

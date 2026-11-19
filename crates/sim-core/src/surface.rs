@@ -700,7 +700,8 @@ const SIDE_ROW: f32 = 0.15;
 /// middle, the slot's own side first, a bunk's lower sleeper from its ladder side first and the
 /// upper one from the front, up the ladder; a bike, a chaise), behind it for
 /// a seat behind the work (`Approach::Behind`: a desk's chair, the drum kit's throne), else
-/// beside it; in front of its own slot on a seat for several (the end of a sofa). Each side
+/// beside it; in front of its own slot on a seat for several (the end of a sofa); none for a
+/// cabin got into through its door (`Approach::Door`: from its front). Each side
 /// nearer `from` (where they are now) first where the slot is in the middle. None when none of
 /// those can be stood on.
 pub fn seat_approach(
@@ -711,6 +712,10 @@ pub fn seat_approach(
     from: [f32; 2],
 ) -> Option<(i32, i32)> {
     let def = &content.objects[obj.def];
+    // (Into a cabin through its door: from the front, whichever side the place is on.)
+    if def.approach == Approach::Door {
+        return None;
+    }
     if !def.places.is_empty() {
         return slot_approach(content, nav, obj, slot);
     }

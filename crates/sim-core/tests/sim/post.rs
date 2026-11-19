@@ -111,7 +111,11 @@ fn the_post_comes_each_morning_and_is_fetched() {
     let version = w.structure_version();
     order(&mut w, ADA, LETTERBOX, 0).unwrap();
     assert!(until(&mut w, 30, |w| !w.objects[LETTERBOX as usize].open));
-    assert_ne!(w.structure_version(), version, "the flag goes down");
+    assert_ne!(
+        w.structure_version(),
+        version,
+        "the post is out of its slot"
+    );
     assert!(until(&mut w, 30, |w| idle(w, ADA)), "fetched and read");
     assert!(
         order(&mut w, BO, LETTERBOX, 0).is_err(),
@@ -237,4 +241,19 @@ fn a_household_fetches_its_post_by_itself() {
         was_open = open;
     }
     assert_eq!(fetched, 2, "the post fetched each morning");
+}
+
+/// A lawnmower bought new mows at once (`grows.boughtRipe`); after a mow the grass grows back
+/// over its days.
+#[test]
+fn a_new_lawnmower_mows_at_once_then_waits_for_the_grass() {
+    let (mut w, _) = common::garden_home();
+    common::buy(&mut w, "lawnMower", 6, 16);
+    let mower = w.objects.len() as u32 - 1;
+    assert!(w.objects[mower as usize].ripe(), "the lawn is there to mow");
+    order(&mut w, 0, mower, 0).unwrap();
+    assert!(until(&mut w, 60, |w| idle(w, 0)), "mowed");
+    assert!(!w.objects[mower as usize].ripe(), "just mown");
+    let err = order(&mut w, 0, mower, 0).unwrap_err();
+    assert!(err.contains("isn't ripe yet"), "{err}");
 }
