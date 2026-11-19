@@ -1752,6 +1752,16 @@ struct StructureView<'a> {
     /// there are none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     junctions: Vec<JunctionView>,
+    /// Public parking: every marked bay, where a car parked in it stands and faces (`parking_views`);
+    /// left out when there are none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    parking: Vec<ParkingView>,
+    /// The car parks the bays are grouped into, as the town file has them; left out when none.
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    car_parks: &'a [crate::travel::CarPark],
+    /// The flats (`flat_views`), each a plot of its own after the ground lots; left out when none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    flats: Vec<FlatView<'a>>,
 }
 
 /// A junction (`StructureView::junctions`, `traffic::Signal`): its middle (m), on a roundabout's
@@ -2150,6 +2160,79 @@ struct PlotView<'a> {
     /// and the days from Monday a bit each); absent: always (a home, a park).
     #[serde(skip_serializing_if = "Option::is_none")]
     hours: Option<crate::world::PlotHours>,
+    /// What the lot is (the town file's `plots[].kind`); absent: a file without kinds.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    kind: Option<crate::travel::PlotKind>,
+}
+
+/// A flat (`StructureView::flats`, `world::Plot::of`): its plot id (after the last ground lot's),
+/// its building's lot, its storey, its rectangle on the ground's rows, its name, and the landing
+/// tile before its door, on its storey's rows.
+#[derive(Serialize)]
+struct FlatView<'a> {
+    id: u32,
+    of: u32,
+    storey: i8,
+    x: i32,
+    z: i32,
+    w: i32,
+    d: i32,
+    name: &'a str,
+    door: Option<[i32; 2]>,
+}
+
+/// `StructureView::flats`: every flat, in id order.
+fn flat_views(world: &World) -> Vec<FlatView<'_>> {
+    world
+        .plots
+        .iter()
+        .filter_map(|p| {
+            Some(FlatView {
+                id: p.id,
+                of: p.of?,
+                storey: p.storey,
+                x: p.x,
+                z: p.z,
+                w: p.w,
+                d: p.d,
+                name: &p.name,
+                door: p.door.map(|(x, z)| [x, z]),
+            })
+        })
+        .collect()
+}
+
+/// A marked parking bay (`StructureView::parking`, `travel::Parking`): where a car parked in it
+/// stands and faces (the pose `Travel::parked` holds, the one cars park at), its area and car park.
+#[derive(Serialize)]
+struct ParkingView {
+    x: f32,
+    z: f32,
+    yaw: f32,
+    area: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    park: Option<u32>,
+}
+
+/// `StructureView::parking`: every bay a car may park at, in the town file's order.
+fn parking_views(world: &World) -> Vec<ParkingView> {
+    let travel = &world.travel;
+    travel
+        .file
+        .parking
+        .iter()
+        .enumerate()
+        .filter_map(|(k, p)| {
+            let (at, yaw, _) = crate::cars::parked_at(travel, k)?;
+            Some(ParkingView {
+                x: at[0],
+                z: at[1],
+                yaw,
+                area: p.area,
+                park: p.park,
+            })
+        })
+        .collect()
 }
 
 /// Bounding box of all wall/door edges (and diagonal walls) inside a plot. A wall on the plot's own
@@ -2522,6 +2605,9 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
         pull_over_streets: pull_over_street_views(world),
         light_poles: light_pole_views(world),
         junctions: junction_views(world),
+        parking: parking_views(world),
+        car_parks: &world.travel.file.car_parks,
+        flats: flat_views(world),
     })
     .expect("structure serializes")
 }
@@ -2570,10 +2656,12 @@ fn household_views(world: &World) -> Vec<HouseholdView<'_>> {
         .collect()
 }
 
+/// `StructureView::plots`: the lots on the ground, in id order (flats go in `flats`).
 fn plot_views(world: &World) -> Vec<PlotView<'_>> {
     world
         .plots
         .iter()
+        .filter(|p| !p.is_flat())
         .map(|p| PlotView {
             id: p.id,
             name: &p.name,
@@ -2593,6 +2681,7 @@ fn plot_views(world: &World) -> Vec<PlotView<'_>> {
                     })
                     .count() as u8,
             hours: p.hours,
+            kind: p.kind,
         })
         .collect()
 }
@@ -2722,6 +2811,12 @@ impl StructureSync {
         parts.part("lightPoles", Some(&poles).filter(|p| !p.is_empty()));
         let junctions = junction_views(world);
         parts.part("junctions", Some(&junctions).filter(|j| !j.is_empty()));
+        let parking = parking_views(world);
+        parts.part("parking", Some(&parking).filter(|p| !p.is_empty()));
+        let car_parks = &world.travel.file.car_parks;
+        parts.part("carParks", Some(car_parks).filter(|c| !c.is_empty()));
+        let flats = flat_views(world);
+        parts.part("flats", Some(&flats).filter(|f| !f.is_empty()));
         // The lot's parts, those that changed (asked for only when the lot did; never unset).
         if lot {
             let (walls, openings, fences) = wall_edges(&world.lot, world.lot.walls());

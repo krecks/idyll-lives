@@ -20,7 +20,7 @@
  * and stone; its window glass is apart, in `PANE_SETS` sets lit at night by the town view's rule (`litAt`).
  */
 
-import type { BackdropUse } from '../../core/protocol';
+import type { BuildingUse } from '../../core/protocol';
 import { Geo, facing, type V3 } from './geometry';
 import { addRoof, HOUSE_MATERIALS, type HousePart } from './house';
 import { EAVE, MANSARD_BREAK, MANSARD_IN, PARAPET, STOREY, type TownBuilding } from './townBuildings';
@@ -49,9 +49,9 @@ const OVERHANG = 0.35;
 /** A terrace's homes are about this wide (m). */
 const TERRACE_HOME = 5.5;
 
-const HOMES: ReadonlySet<BackdropUse> = new Set<BackdropUse>(['house', 'terrace', 'farm']);
-const SHOPS: ReadonlySet<BackdropUse> = new Set<BackdropUse>(['shop', 'cafe', 'restaurant']);
-const BOARDED: ReadonlySet<BackdropUse> = new Set<BackdropUse>(['barn', 'workshop']);
+const HOMES: ReadonlySet<BuildingUse> = new Set<BuildingUse>(['house', 'terrace', 'farm']);
+const SHOPS: ReadonlySet<BuildingUse> = new Set<BuildingUse>(['shop', 'cafe', 'restaurant']);
+const BOARDED: ReadonlySet<BuildingUse> = new Set<BuildingUse>(['barn', 'workshop']);
 
 /** A number from 0 to 1 for `a`, `b`, `c` (stable). */
 function h(a: number, b: number, c = 0): number {
@@ -270,7 +270,7 @@ export function frontSide(t: Pick<TownBuilding, 'cx' | 'cz' | 'ux' | 'uz' | 'w' 
  * (`lotLookBuilding`), where its own front door is (town metres, on that side): the door drawn there, and a church's
  * tower over it where the door is on an end.
  */
-export function dressBackdrop(t: TownBuilding, use: BackdropUse, to: readonly [number, number] | null, door: readonly [number, number] | null = null): BackdropDress {
+export function dressBackdrop(t: TownBuilding, use: BuildingUse, to: readonly [number, number] | null, door: readonly [number, number] | null = null): BackdropDress {
   const W = t.w / 2;
   const D = t.d / 2;
   const seed = t.seed;

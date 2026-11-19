@@ -646,8 +646,8 @@ fn no_trip_parks_on_a_driveway() {
             "sims":[{{"name":"D","household":0,"x":83.5,"z":17.5}}],
             "drives":[{{"plot":0,"x":90,"z":8.5,"front":1,"street":30,"road":0,"s":89.5}}],
             "cars":[{{"plot":0,"x":90,"z":11.25,"yaw":0,"street":30,"len":4.6,"wid":1.88,"body":2,"paint":0}}],
-            "parking":[{{"x":91.0,"z":20.0,"rot":0,"area":0}},{{"x":93.0,"z":25.0,"rot":0,"area":0}},
-                       {{"x":140.0,"z":24.0,"rot":0,"area":0}}]}}"#,
+            "parking":[{{"x":91.0,"z":20.0,"yaw":3.1416,"area":0}},{{"x":93.0,"z":25.0,"yaw":3.1416,"area":0}},
+                       {{"x":140.0,"z":24.0,"yaw":3.1416,"area":0}}]}}"#,
         road.join(",")
     );
     let w = World::from_json(CONTENT, &town, 1).unwrap();

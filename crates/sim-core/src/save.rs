@@ -159,6 +159,16 @@
 //! bought yet (`cars[].want`: `body`, `age`, and `by`, who the story says bought it). The story
 //! may tell of it (`boughtCar`, the body in `n`, by id in `refs.car`). A file before it has its
 //! cars as the town picked them: each is fitted as it loads, as a new town's are, nobody told.
+//! 42 = the real town: a town's plots may be flats, each a plot of its own inside its building's
+//! lot on one storey (`plots[].of`, `storey`, and the landing tile before its door and the tile
+//! behind it, `door` and `inside`; its kind, `flat`, with the others' in `openWorld.plotKinds`),
+//! listed after every lot on the ground; a thing may belong to a plot it doesn't stand on
+//! (`objects[].plot`: a flat's letterbox in the hall); public parking is marked bays, each saying
+//! the way a car parked in it faces (`openWorld.parking[].yaw`) and the car park it is one of
+//! (`park`), and the car parks are kept for the renderer as the town file had them
+//! (`openWorld.carParks`). The game opens no file older than this (sim-wasm's
+//! `OLDEST_SAVE_VERSION`: too old, removed); the simulation still reads them for its own tests
+//! until their migrations go, a bay without a yaw facing away from the road nearest it as before.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -177,7 +187,7 @@ use crate::{
     clock::{MAX_SPEED, SUPER_SPEED},
 };
 
-pub const SAVE_VERSION: u32 = 41;
+pub const SAVE_VERSION: u32 = 42;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -481,6 +491,10 @@ pub struct ObjectSave {
     /// or none).
     #[serde(default, skip_serializing_if = "is_zero")]
     pub rack: u8,
+    /// The plot it belongs to though it stands on another (`ObjectInstance::keeper`; absent: the
+    /// plot it stands on).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plot: Option<u32>,
 }
 
 fn is_level(tall: &i16) -> bool {
@@ -848,6 +862,21 @@ pub struct PlotSave {
     /// When the place on it is open (`world::PlotHours`; absent: always).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hours: Option<crate::world::PlotHours>,
+    /// A flat (`world::Plot::of`): its building's lot, its storey, the landing tile before its door
+    /// and the tile behind it. Absent: a lot on the ground. (Its kind is with the others', in
+    /// `openWorld.plotKinds`.)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub of: Option<u32>,
+    #[serde(default, skip_serializing_if = "is_zero_i8")]
+    pub storey: i8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub door: Option<[i32; 2]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inside: Option<[f32; 2]>,
+}
+
+fn is_zero_i8(v: &i8) -> bool {
+    *v == 0
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -891,6 +920,7 @@ impl World {
                 shut: o.shut && content.objects[o.def].over_window,
                 run: o.run.filter(|_| content.objects[o.def].runs.is_some()),
                 rack: o.rack.min(content.objects[o.def].rack),
+                plot: o.keeper,
             })
             .collect();
         let sims = self
@@ -1114,6 +1144,10 @@ impl World {
                         [id(&b.roofs, r.style), id(&b.roof_colors, r.color)]
                     }),
                     hours: p.hours,
+                    of: p.of,
+                    storey: p.storey,
+                    door: p.door.map(|(x, z)| [x, z]),
+                    inside: p.inside.filter(|i| i.iter().all(|v| v.is_finite())),
                 })
                 .collect(),
             relationships,
@@ -1309,8 +1343,19 @@ impl World {
                     (!b.roofs.is_empty()).then_some(crate::world::RoofLook { style, color })
                 }),
                 hours: p.hours,
+                kind: save.open_world.plot_kinds.get(i).copied().flatten(),
+                of: p.of,
+                storey: p.storey,
+                door: p.door.map(|[x, z]| (x, z)),
+                inside: p.inside,
             })
             .collect();
+        crate::world::check_flats(
+            &world.plots,
+            i32::from(world.storeys.max(1)),
+            world.storey_depth(),
+        )
+        .map_err(|e| Error::new(format!("saved plots: {}", e.0)))?;
         let starting_funds = world.content.starting_funds;
         world.households = if save.households.is_empty() {
             vec![Household {
@@ -1402,6 +1447,8 @@ impl World {
             .chain((0..tops.len()).filter(|&i| grown[i]))
             .chain((0..tops.len()).filter(|&i| tops[i]))
             .collect();
+        // (A thing's keeper, `ObjectInstance::keeper`, must be one of the plots.)
+        let plots = world.plots.len();
         for i in order {
             let o = &save.objects[i];
             // (A corrupt save's second use of an id gets a fresh one.)
@@ -1453,6 +1500,7 @@ impl World {
                     None => None,
                 };
                 obj.rack = o.rack.min(world.content.objects[obj.def].rack);
+                obj.keeper = o.plot.filter(|&k| (k as usize) < plots);
                 let id = if posts[i] { world.nudge_post(id) } else { id };
                 used.extend(keep);
                 object_ids.insert(i as u32, id);

@@ -22,7 +22,7 @@
 
 import { readFileSync } from 'node:fs';
 import type { DoorStyleDef, FenceStyleDef, FloorCoveringDef, ObjectDef, RoofColorDef, RoofStyleDef, WallCoveringDef, WindowStyleDef } from '../../web/src/content/content';
-import type { BackdropBuilding, BackdropUse, DiagonalWall, FenceEdge, ObjectPlacement, Opening, PlotInfo, RoadPlan, WallEdge, WorldStructure } from '../../web/src/core/protocol';
+import type { BackdropBuilding, BuildingUse, DiagonalWall, FenceEdge, ObjectPlacement, Opening, PlotInfo, RoadPlan, WallEdge, WorldStructure } from '../../web/src/core/protocol';
 import type { HouseTemplate } from '../../web/src/game/town';
 import type { Geo } from '../../web/src/render/shared/geometry';
 import type { HousePart, HouseScheme } from '../../web/src/render/shared/house';
@@ -612,7 +612,7 @@ function unitMeshesOf(b: TownBuilding): DumpMesh[] {
 // ---- the backdrop -----------------------------------------------------------------------------------
 
 /** A building of each use: its size (m along its ridge and across), its roof and its storeys, as the town's generator makes them about. */
-const BACKDROP: [BackdropUse, number, number, BackdropBuilding['roof'], number][] = [
+const BACKDROP: [BuildingUse, number, number, BackdropBuilding['roof'], number][] = [
   ['house', 12, 8, 'gable', 2],
   ['terrace', 22, 9, 'gable', 2],
   ['flats', 16, 11, 'flat', 4],

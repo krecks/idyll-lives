@@ -39,8 +39,9 @@ fn start() {
     }));
 }
 
-/// Oldest save version `sim_core::save` still reads (it migrates everything from 1 on).
-const OLDEST_SAVE_VERSION: u64 = 1;
+/// Oldest save version the game opens: 42, the real town's (flats, parking bays). `sim_core::save`
+/// still reads older files for its own tests until their migrations go; the game refuses them.
+const OLDEST_SAVE_VERSION: u64 = 42;
 
 /// Why a save can't be opened. The menu keeps one from a newer version, and one this version
 /// failed to load (a later version may open it), and skips them; it removes one that is too old
@@ -81,8 +82,34 @@ impl LoadError {
     }
 }
 
-/// Loads a save; when that fails, works out whether (and how) the save is to blame.
+/// The version a save says it is, read off its start (a save's `version` comes first), so a save
+/// too old to open is known without reading the rest. None: it doesn't start so.
+fn version_of(save_json: &str) -> Option<u64> {
+    let rest = save_json
+        .trim_start()
+        .strip_prefix('{')?
+        .trim_start()
+        .strip_prefix("\"version\"")?
+        .trim_start()
+        .strip_prefix(':')?
+        .trim_start();
+    let digits = rest
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(rest.len());
+    rest[..digits].parse().ok()
+}
+
+/// Loads a save; when that fails, works out whether (and how) the save is to blame. One older
+/// than the game opens (`OLDEST_SAVE_VERSION`) is refused as too old before it is read.
 fn load_save(content_json: &str, save_json: &str) -> Result<World, LoadError> {
+    if let Some(v) = version_of(save_json).filter(|&v| v < OLDEST_SAVE_VERSION) {
+        return Err(LoadError {
+            problem: Some(SaveProblem::TooOld),
+            message: format!(
+                "save version {v} is older than this game opens ({OLDEST_SAVE_VERSION})"
+            ),
+        });
+    }
     World::from_save_json(content_json, save_json).map_err(|e| LoadError {
         problem: save_problem(content_json, save_json, &e.0),
         message: e.0,
@@ -503,7 +530,8 @@ mod tests {
         sim_core::merge_content(&base, &parts).unwrap()
     }
 
-    /// Saves written by released builds: 0.1.0 (version 17) and the live site's d7c506e (19).
+    /// Saves written by released builds: 0.1.0 (version 17) and the live site's d7c506e (19). The
+    /// game no longer opens them; `sim_core` still reads them (`current_save`).
     fn old_save(name: &str) -> String {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests/saves")
@@ -518,27 +546,32 @@ mod tests {
             .problem
     }
 
+    /// An old release's save as this version writes it (read by `sim_core` and saved again).
+    fn current_save(content: &str, name: &str) -> String {
+        World::from_save_json(content, &old_save(name))
+            .unwrap_or_else(|e| panic!("{name}: {}", e.0))
+            .save_json()
+    }
+
     #[test]
-    fn old_releases_saves_load() {
+    fn old_releases_saves_are_too_old() {
         let content = content();
         for name in ["v0.1.0-day5.json", "d7c506e-day5.json"] {
-            let world = load_save(&content, &old_save(name))
-                .unwrap_or_else(|e| panic!("{name}: {}", e.message));
-            assert!(
-                world.sims.len() > 10,
-                "{name}: {} residents",
-                world.sims.len()
-            );
+            let err = load_save(&content, &old_save(name)).err().expect("refused");
+            assert_eq!(err.kind(), "tooOld", "{name}: {}", err.message);
         }
+        let world = load_save(&content, &current_save(&content, "v0.1.0-day5.json"))
+            .unwrap_or_else(|e| panic!("{}", e.message));
+        assert!(world.sims.len() > 10, "{} residents", world.sims.len());
     }
 
     #[test]
     fn unloadable_saves_say_why() {
         let content = content();
-        let good = old_save("v0.1.0-day5.json");
-        assert!(good.starts_with("{\"version\":17,"));
-        let with_version =
-            |v: &str| good.replacen("\"version\":17", &format!("\"version\":{v}"), 1);
+        let good = current_save(&content, "v0.1.0-day5.json");
+        let now = format!("\"version\":{SAVE_VERSION}");
+        assert!(good.starts_with(&format!("{{{now},")));
+        let with_version = |v: &str| good.replacen(&now, &format!("\"version\":{v}"), 1);
         assert_eq!(
             problem(&content, &with_version("999")),
             Some(SaveProblem::TooNew)
@@ -559,7 +592,7 @@ mod tests {
         assert_eq!(problem(&content, ""), Some(SaveProblem::Corrupt));
         assert_eq!(problem(&content, &good[..5000]), Some(SaveProblem::Corrupt));
         assert_eq!(
-            problem(&content, "{\"version\":17}"),
+            problem(&content, &format!("{{{now}}}")),
             Some(SaveProblem::Corrupt)
         );
         assert_eq!(

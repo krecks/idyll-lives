@@ -151,15 +151,39 @@ pub enum AreaKind {
     Countryside,
 }
 
-/// Public parking for car trips between areas.
+/// A marked public parking bay, for car trips between areas (the town file's `parking`): its
+/// middle, the way a car parked in it faces (`yaw`, nose in, away from the road: `cars::park_spot`
+/// parks at exactly this pose, the one the renderer draws), its area and the car park it is one of
+/// (`OpenWorld::car_parks` index; none: a bay on its own by the verge).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Parking {
     pub x: f32,
     pub z: f32,
-    #[serde(default)]
-    pub rot: f32,
+    /// Absent only in a save from before bays said (41 and older): worked out from the road nearest
+    /// it, as it was then (`cars::park_spot`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub yaw: Option<f32>,
     #[serde(default)]
     pub area: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub park: Option<u32>,
+}
+
+/// A car park (the town file's `carParks`): a row of nose-in bays (`Parking::park`) off a straight
+/// stretch of street on one apron. Its area, its asphalt (4 corners, counter-clockwise seen from
+/// above), where its P sign stands (`x`, `z` and the way it faces), the plot of the place it is by
+/// (`serves`), and whether it is the square's. The simulation reads none of it but the bays: it
+/// keeps it for the renderer (`view.rs`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CarPark {
+    #[serde(default)]
+    pub area: u32,
+    pub poly: Vec<[f32; 2]>,
+    pub sign: [f32; 3],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub serves: Option<u32>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub square: bool,
 }
 
 /// Run-length masks over the ground grid (`[run, value, run, value, ...]`, row-major from tile
@@ -196,7 +220,8 @@ impl Terrain {
     }
 }
 
-/// What a plot is (`plots[].kind`).
+/// What a plot is (`plots[].kind`): a lot on the ground, or a flat (`Flat`, a plot of its own inside
+/// a building's lot: `world::Plot::of`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PlotKind {
@@ -205,6 +230,10 @@ pub enum PlotKind {
     Public,
     Shop,
     Countryside,
+    /// A building of flats: its hall, stairs, yard and front strip, nobody's home.
+    Flats,
+    /// A flat: one storey of its building's lot.
+    Flat,
 }
 
 /// The open-world fields of a town file, all optional, read along
@@ -223,6 +252,8 @@ pub struct OpenWorld {
     pub terrain: Option<Terrain>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parking: Vec<Parking>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub car_parks: Vec<CarPark>,
     /// Older saves only: which of their exits were bus stops (indices), dropped from
     /// `World::exits` as they load (no longer ways out). Never written.
     #[serde(default, skip_serializing)]
@@ -241,6 +272,7 @@ impl OpenWorld {
             && self.areas.is_empty()
             && self.terrain.as_ref().is_none_or(Terrain::is_empty)
             && self.parking.is_empty()
+            && self.car_parks.is_empty()
             && self.stops.is_empty()
             && self.plot_areas.iter().all(Option::is_none)
             && self.plot_kinds.iter().all(Option::is_none)

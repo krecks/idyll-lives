@@ -5,7 +5,7 @@
  * under its ground to its storeys, its roof's rise), and the unit meshes themselves.
  */
 
-import type { BackdropBuilding, BackdropUse, LotLook, RoadPlan, TownPlace } from '../../core/protocol';
+import type { BackdropBuilding, BuildingUse, LotLook, RoadPlan, TownPlace } from '../../core/protocol';
 import { chunkAt } from './chunks';
 import { Geo, facing, type V3 } from './geometry';
 
@@ -65,7 +65,7 @@ const ROOF_TONE = 0.72;
  * A building's window style by what it is, and the share of its windows lit at night: a place's while it is open
  * (`litAt`: an open shop's front is lit, the windows over it half as often), a home's in the evening (`homeLights`).
  */
-export const STYLE: Record<BackdropUse, [number, number]> = {
+export const STYLE: Record<BuildingUse, [number, number]> = {
   house: [TOWN_STYLE.house, 0.45],
   terrace: [TOWN_STYLE.house, 0.48],
   flats: [TOWN_STYLE.flats, 0.5],
@@ -81,7 +81,7 @@ export const STYLE: Record<BackdropUse, [number, number]> = {
   barn: [TOWN_STYLE.none, 0],
 };
 /** The backdrop's homes: their lights go by the hour. */
-const HOMES: ReadonlySet<BackdropUse> = new Set<BackdropUse>(['house', 'terrace', 'flats', 'farm']);
+const HOMES: ReadonlySet<BuildingUse> = new Set<BuildingUse>(['house', 'terrace', 'flats', 'farm']);
 /** What a closed place keeps of its lights (a night light, a lit sign), and the share of a home's lights on in the small hours and at breakfast. */
 const CLOSED = 0.06;
 const SMALL_HOURS = 0.15;
@@ -415,8 +415,8 @@ export function lotBuilding(h: TownLotHouse, ground: (x: number, z: number) => n
  * or a barn on a bare yard, a house in a garden with a hedge round it.
  */
 export type GroundKind = 'forecourt' | 'yard' | 'garden';
-export const FORECOURT: ReadonlySet<BackdropUse> = new Set<BackdropUse>(['flats', 'shop', 'cafe', 'restaurant', 'office', 'school', 'church', 'hall']);
-const YARD: ReadonlySet<BackdropUse> = new Set<BackdropUse>(['workshop', 'barn']);
+export const FORECOURT: ReadonlySet<BuildingUse> = new Set<BuildingUse>(['flats', 'shop', 'cafe', 'restaurant', 'office', 'school', 'church', 'hall']);
+const YARD: ReadonlySet<BuildingUse> = new Set<BuildingUse>(['workshop', 'barn']);
 /** How far round its walls a building's ground goes (m), and how far off a road its way to it goes at most. */
 export const AROUND: Record<GroundKind, number> = { forecourt: 2, yard: 2.5, garden: 3.5 };
 const WAY_MOST = 45;

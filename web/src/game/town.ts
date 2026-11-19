@@ -13,7 +13,7 @@
  */
 
 import type { Content } from '../content/content';
-import type { GameKind, LandscapeParams, Lifespan, LotLook, PorchInfo, TownArea, TownExit, TownPlace, WorldLook, WorldMeta, WorldOptions, WorldSize } from '../core/protocol';
+import type { GameKind, LandscapeParams, Lifespan, LotLook, ParkingBay, PlotKind, PorchInfo, TownArea, TownExit, TownPlace, WorldLook, WorldMeta, WorldOptions, WorldSize } from '../core/protocol';
 import { fetchText } from '../content/content';
 import { householdBonds, householdSpawns, residentsOf, type HouseholdDraft, type SimSpawn } from './household';
 import { homePrice } from './price';
@@ -1639,8 +1639,22 @@ function nearestRoad(list: readonly RoadPlan[], roads: ReturnType<typeof roadInd
   return near ? { road: near[0], s: near[1].s } : null;
 }
 
-/** What a plot is, for the simulation. */
-type PlotKind = 'home' | 'farm' | 'public' | 'shop' | 'countryside';
+/** How far from a parking space the simulation looks for the road it turns in from (m, sim-core `cars::ROAD_REACH`). */
+const ROAD_REACH = 30;
+/** The way a car parked in a space facing `Facing` faces, nose in (rad: away from its road). */
+const BAY_YAW = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+
+/**
+ * A public parking space of the draft as the town file's bay (`ParkingBay`): where it is, and the
+ * way a car parked in it faces, nose in and away from the nearest road for cars (as the simulation
+ * worked it out for itself before the file said); with no road near, the way the space faces.
+ */
+function bayOf(list: readonly RoadPlan[], roads: ReturnType<typeof roadIndex>, p: OpenWorldDraft['parking'][number]): ParkingBay {
+  const near = [...roads.around(p.x, p.z, ROAD_REACH)].filter(([r]) => list[r].kind !== 'trail').sort((x, y) => x[1].dist - y[1].dist)[0];
+  const q = near && near[1].dist > list[near[0]].width / 2 + 0.5 ? pointAt(list[near[0]].points, near[1].s).p : null;
+  const yaw = q ? Math.atan2(p.x - q[0], p.z - q[1]) : BAY_YAW[p.rot & 3];
+  return { x: p.x, z: p.z, yaw: Math.round(yaw * 1e4) / 1e4, area: p.area };
+}
 
 /**
  * The town file's open-world fields: its areas, every house's driveway
@@ -1670,7 +1684,7 @@ function openWorldFields(town: NeighbourhoodDraft, drives: TownLayout['drives'],
   return {
     areas,
     exits,
-    file: { terrain: { water: open.water }, parking: open.parking, drives: filed, cars: parked },
+    file: { terrain: { water: open.water }, parking: open.parking?.map((p) => bayOf(town.roads, roads, p)), drives: filed, cars: parked },
     meta: { zones: open.zones, pads: open.pads, areas, ...(open.backdrop ? { backdrop: open.backdrop } : {}), ...(open.places ? { places: open.places } : {}), ...(open.centre ? { centre: open.centre } : {}), ...(open.relief ? { relief: open.relief } : {}), ...(open.land && (open.land.edited || open.land.seeded === 'follow') ? { land: encodeLand(open.land) } : {}) },
   };
 }

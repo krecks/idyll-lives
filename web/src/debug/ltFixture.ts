@@ -14,7 +14,7 @@
  * always gets the same fixture (seeded by `meta.seed`). Debug only: nothing outside `?ltFixture` calls it.
  */
 
-import type { BackdropBuilding, BackdropUse, LotLook, RoadPlan, TownPlace, WorldMeta, WorldStructure } from '../core/protocol';
+import type { BackdropBuilding, BuildingUse, LotLook, RoadPlan, TownPlace, WorldMeta, WorldStructure } from '../core/protocol';
 import { groundDepth } from '../core/protocol';
 import { mulberry32 } from '../game/noise';
 import { lengths, pointAt } from '../game/roads';
@@ -81,7 +81,7 @@ export function applyLotLooksFixture(world: WorldStructure): boolean {
 }
 
 /** The fixture's looks in turn: a use, its storeys and its roof. */
-const LOOK_TURNS: readonly [BackdropUse, number, LotLook['roof']][] = [
+const LOOK_TURNS: readonly [BuildingUse, number, LotLook['roof']][] = [
   ['school', 2, 'hip'],
   ['church', 1, 'gable'],
   ['hall', 2, 'hip'],
@@ -208,7 +208,7 @@ interface Style {
   /** Rows of buildings back from the road (the first along it, the rest behind it, each facing it), and the yard between rows (m). */
   rows: number;
   yard: [number, number];
-  uses: readonly [BackdropUse, number][];
+  uses: readonly [BuildingUse, number][];
   roofs: readonly [BackdropBuilding['roof'], number][];
 }
 
@@ -261,7 +261,7 @@ const COUNTRY: Style = {
   roofs: [['gable', 5], ['hip', 1]],
 };
 
-const PLACE_KIND: Partial<Record<BackdropUse, TownPlace['kind']>> = { shop: 'shop', cafe: 'cafe', restaurant: 'restaurant', office: 'office', school: 'school', church: 'church', workshop: 'workshop', farm: 'farm' };
+const PLACE_KIND: Partial<Record<BuildingUse, TownPlace['kind']>> = { shop: 'shop', cafe: 'cafe', restaurant: 'restaurant', office: 'office', school: 'school', church: 'church', workshop: 'workshop', farm: 'farm' };
 const PLACE_NAMES: Record<TownPlace['kind'], readonly string[]> = {
   shop: ['Corner Shop', 'Greengrocer', 'Hardware', 'Bookshop', 'Florist', 'Butcher', 'Chemist', 'Newsagent', 'Bakery', 'Deli'],
   cafe: ['Little Café', 'Tea Room', 'Coffee House', 'Morning Cup'],
