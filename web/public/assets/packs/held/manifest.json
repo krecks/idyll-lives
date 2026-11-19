@@ -1704,6 +1704,21 @@
           "finish": "material.finish.metal"
         }
       }
+    },
+    "tool.iron": {
+      "type": "model",
+      "url": "../../models/held/iron.glb",
+      "materials": {
+        "iron_shell": {
+          "finish": "material.finish.plastic"
+        },
+        "iron_trim": {
+          "finish": "material.finish.plastic"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      }
     }
   }
 }

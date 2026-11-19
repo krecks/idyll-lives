@@ -228,6 +228,7 @@ mod tests {
             private: false,
             conceive: false,
             served: None,
+            cleans: None,
         }
     }
 

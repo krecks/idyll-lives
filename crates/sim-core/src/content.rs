@@ -264,6 +264,25 @@ pub struct Interaction {
     /// and it's closed outside the post's hours; elsewhere (a household's own cart) they help
     /// themselves, as the `selfServe` label says (`staff.rs`).
     pub served: Option<crate::staff::SelfServe>,
+    /// Cleans the floor (content `cleans`: the vacuum cleaner, the mop, the broom): the tool is
+    /// taken to the dirtiest floor at home it can clean and used there, and as it ends the dirt
+    /// comes off that floor (`sweep.rs`). Only offered with such a floor to clean.
+    pub cleans: Option<Sweep>,
+}
+
+/// How a use cleans the floor (content `cleans`; see `sweep.rs`): tidying up with a tool, over
+/// more of the room than `roomRules.clean` takes.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Sweep {
+    /// Dirt taken off each tile it cleans (0..1).
+    pub amount: f32,
+    /// Tiles it reaches each way from the spot it's used at, in the same room; 0: the whole room.
+    pub reach: u8,
+    /// Hard floors only (content `hardFloors`: a mop, a broom): not a carpet (a covering whose
+    /// finish is `carpet`, or a room kind's `carpet` floor where none was laid).
+    pub hard: bool,
+    /// The garden too (content `outdoors`: a broom sweeping the patio).
+    pub outdoors: bool,
 }
 
 /// Something a use works on (content `workOn`), which must be there for it to start.
@@ -278,16 +297,22 @@ pub enum WorkOn {
     /// A load the household washed, wet (`Household::laundry[1]`): the use dries it (a dryer, a
     /// washing line).
     Washed,
-    /// A load dried (`Household::laundry[2]`): the use folds it.
+    /// A load dried (`Household::laundry[2]`): the use folds it (or irons it, and `makes` it
+    /// `Ironed`).
     Dried,
+    /// A load ironed (`Household::laundry[3]`): clothes pressed, put on a few at a time as
+    /// residents dress at home (`LaundryRules::pressed`). Nothing works on it: a use only
+    /// `makes` it.
+    Ironed,
 }
 
 impl WorkOn {
-    pub const ALL: [WorkOn; 4] = [
+    pub const ALL: [WorkOn; 5] = [
         WorkOn::Dishes,
         WorkOn::Laundry,
         WorkOn::Washed,
         WorkOn::Dried,
+        WorkOn::Ironed,
     ];
 
     /// Its bit in a mask of what there is to work on (`world::work_waiting`).
@@ -302,17 +327,19 @@ impl WorkOn {
             WorkOn::Laundry => "there's no washing to do",
             WorkOn::Washed => "there's no washed laundry to dry",
             WorkOn::Dried => "there's no dry laundry to fold",
+            WorkOn::Ironed => "there are no pressed clothes",
         }
     }
 
     /// Which of a household's loads of washing it is (`Household::laundry`): dirty, washed,
-    /// dried. None for the dishes.
+    /// dried, ironed. None for the dishes.
     pub fn load(self) -> Option<usize> {
         match self {
             WorkOn::Dishes => None,
             WorkOn::Laundry => Some(0),
             WorkOn::Washed => Some(1),
             WorkOn::Dried => Some(2),
+            WorkOn::Ironed => Some(3),
         }
     }
 }
@@ -333,9 +360,23 @@ pub fn in_hours(window: [f32; 2], hour: f32) -> bool {
 pub struct LaundryRules {
     /// Loads of washing each resident at home makes a day.
     pub per_day: f32,
-    /// Most loads that pile up (dirty, washed waiting to dry, and dried waiting to be folded,
-    /// each).
+    /// Most loads that pile up (dirty, washed waiting to dry, dried waiting to be folded, and
+    /// ironed waiting to be worn, each).
     pub most: f32,
+    /// What ironed washing does (content `pressed`): none, nothing irons.
+    pub pressed: Option<Pressed>,
+}
+
+/// Ironed washing (content `laundry.pressed`): a dry load ironed (an ironing board's use that
+/// `makes` it `ironed`, instead of folding it) is pressed clothes, which residents put on as they
+/// change at home (a use that `changesOutfit`), `1 / outfits` of a load each time, and feel the
+/// better for (`feeling`). With none ironed, dressing is as it always was.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Pressed {
+    /// The feeling of putting pressed clothes on (index into `Content::feelings`).
+    pub feeling: usize,
+    /// Outfits a load makes.
+    pub outfits: f32,
 }
 
 /// A harvest's produce (content `yields`): `servings` of a food item (that of `recipe`, a hidden
@@ -1055,6 +1096,9 @@ pub struct RoomKind {
     /// and children — comes and goes, and its door keeps everyone else out (`privacy.rs`). Only
     /// with `private`, which is what keeps the door shut at all, and never a passage.
     pub claimed: bool,
+    /// Its floor is carpet where no covering was laid (content `carpet`: a bedroom, as the
+    /// renderer draws it): soft, what a mop or a broom leaves (`Sweep::hard`).
+    pub carpet: bool,
 }
 
 /// How rooms are scored (content `roomRules`; see `rooms.rs`).
@@ -1752,6 +1796,9 @@ impl Default for LandPrices {
 pub struct BuildStyle {
     pub id: String,
     pub price: i64,
+    /// A soft floor (a floor covering whose `finish` is `carpet`): what a mop or a broom leaves
+    /// (`Sweep::hard`).
+    pub soft: bool,
 }
 
 impl BuildRules {
@@ -2421,6 +2468,8 @@ struct RoomKindRaw {
     private: bool,
     #[serde(default)]
     claimed: bool,
+    #[serde(default)]
+    carpet: bool,
 }
 
 #[derive(Deserialize, Default)]
@@ -2571,6 +2620,9 @@ struct BuildStyleRaw {
     id: String,
     #[serde(default)]
     price: i64,
+    /// How it's drawn (a floor covering's `wood`, `tile`, `carpet`...; see `BuildStyle::soft`).
+    #[serde(default)]
+    finish: Option<String>,
 }
 
 fn one() -> f32 {
@@ -3038,6 +3090,22 @@ struct InteractionRaw {
     /// `Interaction::served`).
     #[serde(default)]
     self_serve: Option<crate::staff::SelfServeRaw>,
+    /// Cleans the floor (see `Interaction::cleans`).
+    #[serde(default)]
+    cleans: Option<SweepRaw>,
+}
+
+/// An interaction's `cleans` (see `Sweep`).
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SweepRaw {
+    amount: f32,
+    #[serde(default)]
+    reach: u8,
+    #[serde(default)]
+    hard_floors: bool,
+    #[serde(default)]
+    outdoors: bool,
 }
 
 /// Content `laundry` (see `LaundryRules`).
@@ -3046,6 +3114,16 @@ struct InteractionRaw {
 struct LaundryRaw {
     per_day: f32,
     most: f32,
+    #[serde(default)]
+    pressed: Option<PressedRaw>,
+}
+
+/// Content `laundry.pressed` (see `Pressed`).
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PressedRaw {
+    feeling: String,
+    outfits: f32,
 }
 
 /// An interaction's `yields`: the food item, how many servings, and how long eating one takes.
@@ -3765,6 +3843,12 @@ impl Content {
                         .as_ref()
                         .map(|r| crate::staff::self_serve(r, &anim_index, &ctx))
                         .transpose()?,
+                    cleans: it.cleans.as_ref().map(|c| Sweep {
+                        amount: c.amount,
+                        reach: c.reach,
+                        hard: c.hard_floors,
+                        outdoors: c.outdoors,
+                    }),
                 });
                 // A game for two: at an object with two places, one each, used there as any use.
                 if it.partner
@@ -3789,6 +3873,30 @@ impl Content {
                 {
                     return Err(Error::new(format!(
                         "{ctx}: `conceive` is a use for two lying down (`partner`, `\"pose\": \"lie\"`), not chosen on its own (`\"autonomous\": false`), with no `alone`"
+                    )));
+                }
+                // Cleaning the floor: done standing at the dirty spot, the tool in the hands.
+                if let Some(c) = &it.cleans
+                    && (!(c.amount > 0.0 && c.amount <= 1.0)
+                        || it.pose != Pose::Stand
+                        || it.inside
+                        || it.whole
+                        || it.partner
+                        || it.seat_near > 0.0
+                        || it.recipe.is_some()
+                        || it.eat.is_some()
+                        || it.yields.is_some()
+                        || it.carried
+                        || it.at_slot
+                        || it.needs_table
+                        || it.work_on.is_some()
+                        || it.loads
+                        || it.unloads
+                        || it.makes.is_some()
+                        || it.leaves.is_some())
+                {
+                    return Err(Error::new(format!(
+                        "{ctx}: a use that `cleans` (an `amount` above 0, at most 1) is done standing at the dirty floor, the tool in the hands: no other pose, inside, whole, partner, seatNear, recipe, eat, yields, carried, atSlot, needsTable, workOn, loads, unloads, makes or leaves"
                     )));
                 }
                 if it.alone.is_some() && !it.partner {
@@ -3825,7 +3933,7 @@ impl Content {
                 match it.makes {
                     Some(WorkOn::Dishes) => {
                         return Err(Error::new(format!(
-                            "{ctx}: `makes` is a load of washing: laundry, washed or dried"
+                            "{ctx}: `makes` is a load of washing: laundry, washed, dried or ironed"
                         )));
                     }
                     Some(_) if raw.laundry.is_none() => {
@@ -3833,7 +3941,19 @@ impl Content {
                             "{ctx}: `makes` needs content `laundry` (how the washing piles up)"
                         )));
                     }
+                    Some(WorkOn::Ironed)
+                        if raw.laundry.as_ref().is_none_or(|l| l.pressed.is_none()) =>
+                    {
+                        return Err(Error::new(format!(
+                            "{ctx}: `makes` ironed needs content `laundry.pressed` (what pressed clothes do)"
+                        )));
+                    }
                     _ => {}
+                }
+                if it.work_on == Some(WorkOn::Ironed) {
+                    return Err(Error::new(format!(
+                        "{ctx}: nothing works on ironed washing (`workOn`): it's worn"
+                    )));
                 }
                 if obj.rack > 0 && it.loads {
                     return Err(Error::new(format!(
@@ -4904,6 +5024,7 @@ impl Content {
                     passage: k.passage,
                     private: k.private,
                     claimed: k.claimed,
+                    carpet: k.carpet,
                 })
             })
             .collect::<Result<_, Error>>()?;
@@ -5226,9 +5347,24 @@ impl Content {
                     && l.most >= 1.0
                     && l.most.is_finite() =>
             {
+                let pressed = match &l.pressed {
+                    Some(p) if p.outfits >= 1.0 && p.outfits.is_finite() => Some(Pressed {
+                        feeling: feeling_index.get(&p.feeling).copied().ok_or_else(|| {
+                            Error::new(format!("laundry.pressed: unknown feeling '{}'", p.feeling))
+                        })?,
+                        outfits: p.outfits,
+                    }),
+                    Some(_) => {
+                        return Err(Error::new(
+                            "laundry.pressed: `outfits` at least 1 (a load's worth)",
+                        ));
+                    }
+                    None => None,
+                };
                 Some(LaundryRules {
                     per_day: l.per_day,
                     most: l.most,
+                    pressed,
                 })
             }
             Some(_) => {
@@ -5476,6 +5612,7 @@ fn build_styles(raw: &[BuildStyleRaw], what: &str) -> Result<Vec<BuildStyle>, Er
         out.push(BuildStyle {
             id: r.id.clone(),
             price: r.price,
+            soft: r.finish.as_deref() == Some("carpet"),
         });
     }
     Ok(out)
@@ -5981,6 +6118,33 @@ mod tests {
         refused(
             &|c| c["laundry"] = json!({"perDay": 0, "most": 4}),
             "laundry: `perDay` above 0",
+        );
+        // Ironing makes pressed clothes, which content `laundry.pressed` says what they do.
+        refused(
+            &|c| {
+                c["laundry"] = json!({"perDay": 0.4, "most": 4});
+                c["objects"][0]["interactions"][0]["makes"] = json!("ironed");
+            },
+            "fridge.snack: `makes` ironed needs content `laundry.pressed`",
+        );
+        refused(
+            &|c| {
+                c["laundry"] =
+                    json!({"perDay": 0.4, "most": 4, "pressed": {"feeling": "nope", "outfits": 4}})
+            },
+            "laundry.pressed: unknown feeling 'nope'",
+        );
+        // Cleaning the floor: standing at it, the tool in the hands.
+        refused(
+            &|c| {
+                c["objects"][0]["interactions"][0]["cleans"] = json!({"amount": 0.5});
+                c["objects"][0]["interactions"][0]["pose"] = json!("sit");
+            },
+            "fridge.snack: a use that `cleans`",
+        );
+        refused(
+            &|c| c["objects"][0]["interactions"][0]["cleans"] = json!({"amount": 1.5}),
+            "fridge.snack: a use that `cleans`",
         );
         // Sold by someone: at an object someone serves at, standing near it (`staff.rs`).
         refused(

@@ -320,6 +320,11 @@ are the examples; `hinged`, `turn`, `swing!` and `slide!` do the work.
   ```json
   "motions": { "uses": { "fetch": "fridge_open", "drink": "fridge_open" }, "hold": 3.5 }
   ```
+- **A part taken in hand** (content `held`: a guitar, a barbell, a mop) is one node, its origin where it's held
+  from (a pole's foot on the floor: the mop's, the vacuum cleaner's head), hidden while used by a `squash!` to
+  0.001 in `uses` (`mop_off`). A tool that cleans the floor (content `cleans`) is used where the floor is dirty,
+  not where it stands: the clip plays there all the same, the part gone from its place while it's in the hands
+  (crates/art/wet/src/laundry, `cleaning.rs`).
 - **Several clips, each its own hold:** a use's value may be `{"clip", "hold"}` (its own `hold`, over
   the model's) or a list of clips, so one use can shut a door after a second while the water runs on.
   A clip closed after its hold stays closed until the use ends.

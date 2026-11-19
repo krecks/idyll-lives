@@ -24,6 +24,7 @@ mod check_states;
 mod chess_table_saves;
 mod childcare;
 mod children;
+mod cleaning_tools;
 mod clear_away;
 mod clock;
 mod cooking;

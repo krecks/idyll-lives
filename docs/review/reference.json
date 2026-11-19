@@ -7715,6 +7715,114 @@
         "neufert"
       ]
     },
+    "uprightVacuum": {
+      "label": "Upright vacuum cleaner, standing",
+      "w": [
+        0.25,
+        0.45
+      ],
+      "h": [
+        1.0,
+        1.2
+      ],
+      "d": [
+        0.25,
+        0.4
+      ],
+      "uses": [
+        "vacuum a room"
+      ],
+      "minutes": {
+        "vacuum": [
+          15,
+          45
+        ]
+      },
+      "sources": [
+        "neufert"
+      ]
+    },
+    "mopBucket": {
+      "label": "Mop standing in its bucket with a wringer",
+      "w": [
+        0.28,
+        0.45
+      ],
+      "h": [
+        1.2,
+        1.45
+      ],
+      "d": [
+        0.25,
+        0.4
+      ],
+      "uses": [
+        "mop a hard floor"
+      ],
+      "minutes": {
+        "mop": [
+          15,
+          45
+        ]
+      },
+      "sources": [
+        "neufert"
+      ]
+    },
+    "broomDustpan": {
+      "label": "Long-handled broom against the wall, a dustpan and brush by it",
+      "w": [
+        0.3,
+        0.7
+      ],
+      "h": [
+        1.2,
+        1.5
+      ],
+      "d": [
+        0.15,
+        0.35
+      ],
+      "uses": [
+        "sweep up"
+      ],
+      "minutes": {
+        "sweep": [
+          5,
+          20
+        ]
+      },
+      "sources": [
+        "neufert"
+      ]
+    },
+    "ironingBoard": {
+      "label": "Ironing board, set up, the iron on its rest",
+      "w": [
+        1.1,
+        1.55
+      ],
+      "h": [
+        0.75,
+        1.1
+      ],
+      "d": [
+        0.3,
+        0.45
+      ],
+      "uses": [
+        "iron the washing"
+      ],
+      "minutes": {
+        "iron": [
+          15,
+          60
+        ]
+      },
+      "sources": [
+        "neufert"
+      ]
+    },
     "deliveryHatch": {
       "label": "Parcel locker or wall delivery hatch",
       "w": [
@@ -15074,6 +15182,10 @@
     "cheerful.partyBooth": "partyBooth",
     "outgoing.danceFloor": "danceFloor",
     "neat.steamMopDock": "steamMop",
+    "vacuumCleaner": "uprightVacuum",
+    "mopBucket": "mopBucket",
+    "broomDustpan": "broomDustpan",
+    "ironingBoard": "ironingBoard",
     "neat.robotVacuumDock": "robotVacuum",
     "lazy.deliveryLocker": "deliveryHatch",
     "loner.deliveryHatch": "deliveryHatch",

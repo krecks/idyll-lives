@@ -1126,7 +1126,8 @@
     {"id": "gotWish", "label": "Got what they wanted", "emotion": "happy", "mood": 0.15, "hours": 24},
     {"id": "deniedAgain", "label": "Told no again", "emotion": "angry", "mood": -0.12, "hours": 12},
     {"id": "fedUp", "label": "Fed up with being told no", "emotion": "angry", "mood": -0.25, "hours": 24},
-    {"id": "brokenSleep", "label": "Up in the night with the baby", "emotion": "sad", "mood": -0.04, "hours": 8}
+    {"id": "brokenSleep", "label": "Up in the night with the baby", "emotion": "sad", "mood": -0.04, "hours": 8},
+    {"id": "pressedClothes", "label": "Crisply pressed", "emotion": "happy", "mood": 0.05, "hours": 8, "effects": {"needDecay": {"hygiene": 0.9, "comfort": 0.9}}}
   ],
   "socials": [
     {
@@ -3855,7 +3856,7 @@
     "babyWakes": {"needs": ["hunger", "bladder", "hygiene"], "below": 0.3, "tendBelow": 0.6, "cooldownMinutes": 90, "feeling": "brokenSleep"}
   },
   "autonomy": {"urgent": ["hunger", "energy", "bladder", "hygiene"], "urgentBelow": 0.1, "comfortBoost": 2, "lookAhead": 0.25, "quickMinutes": 30, "retryMinutes": 30},
-  "laundry": {"perDay": 0.4, "most": 4},
+  "laundry": {"perDay": 0.4, "most": 4, "pressed": {"feeling": "pressedClothes", "outfits": 4}},
   "objectRules": {
     "freeRotation": ["decor", "garden", "outdoor", "lighting", "kids", "community"],
     "wear": {"perUse": 0.004, "byCategory": {"bathroom": 0.006, "garden": 0, "outdoor": 0, "decor": 0}, "perQuality": 0.2},
@@ -3989,7 +3990,7 @@
   "roomKinds": [
     {"id": "bathroom", "icon": "icon.category.bathroom", "label": "Bathroom", "tags": ["bathroom"], "essentials": [["bathroom"], ["hygiene"]], "size": [3, 6], "exclusive": true, "private": true},
     {"id": "kitchen", "icon": "icon.category.kitchen", "label": "Kitchen", "tags": ["cooking"], "essentials": [["cooking"]], "size": [6, 12], "exclusive": true},
-    {"id": "bedroom", "icon": "icon.category.bedroom", "label": "Bedroom", "tags": ["sleep"], "essentials": [["sleep"]], "size": [6, 12], "exclusive": true, "private": true, "claimed": true},
+    {"id": "bedroom", "icon": "icon.category.bedroom", "label": "Bedroom", "tags": ["sleep"], "essentials": [["sleep"]], "size": [6, 12], "exclusive": true, "private": true, "claimed": true, "carpet": true},
     {"id": "living", "icon": "icon.category.living", "label": "Living room", "tags": ["lounge", "entertainment", "screen"], "size": [9, 20]},
     {"id": "study", "icon": "icon.category.office", "label": "Study", "tags": ["reading", "training", "creative", "fitness"], "size": [4, 9]},
     {"id": "hall", "icon": "icon.ui.home", "label": "Hallway", "tags": [], "passage": true, "size": [2, 6]}
@@ -4065,7 +4066,8 @@
         {"id": "toilets", "label": "Toilets"},
         {"id": "bathing", "label": "Showers & baths"},
         {"id": "sinks", "label": "Sinks & mirrors"},
-        {"id": "laundry", "label": "Laundry & towels"}
+        {"id": "laundry", "label": "Laundry & towels"},
+        {"id": "cleaning", "label": "Cleaning"}
       ]
     },
     {

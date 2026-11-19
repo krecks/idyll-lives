@@ -94,7 +94,7 @@ fn using(w: &World, object: u32, id: &str) -> bool {
 #[test]
 fn the_washing_is_loaded_washes_on_its_own_and_goes_on_to_the_dryer_and_the_basket() {
     let (mut w, _) = world();
-    let [dirty, washed, dried] = w.households[0].laundry;
+    let [dirty, washed, dried, _] = w.households[0].laundry;
     assert!(
         dirty >= 1.0 && washed == 1.0 && dried == 0.0,
         "a dirty load and a washed one to start with: {:?}",
@@ -346,7 +346,7 @@ fn an_older_save_takes_in_the_washing_left_out_and_has_none_dry() {
         loaded.objects[WASHER as usize].run.is_none(),
         "the washer empty"
     );
-    assert_eq!(loaded.households[0].laundry, [2.0, 0.5, 0.0]);
+    assert_eq!(loaded.households[0].laundry, [2.0, 0.5, 0.0, 0.0]);
 }
 
 #[test]
@@ -359,7 +359,7 @@ fn free_will_takes_the_washing_out_once_its_done() {
     .unwrap();
     w.objects[WASHER as usize].run = Some(0.0);
     w.objects[DRYER as usize].run = Some(0.0);
-    w.households[0].laundry = [0.0, 0.0, 0.0];
+    w.households[0].laundry = [0.0; 4];
     // (Her needs full: what draws her is the washing waiting, `machines::pull`.)
     let unloaded = until(&mut w, 3 * 60, |w| {
         w.objects[WASHER as usize].run.is_none() && w.objects[DRYER as usize].run.is_none()

@@ -147,6 +147,10 @@
 //! Still 40: curtains may be drawn shut (`objects[].shut`, `curtains.rs`), left out while open, so
 //! a file without it (every file before it) has its curtains open, as the renderer's clock used to
 //! draw them by day, and residents draw them at the next moment they would.
+//! Still 40: a household's washing has a fourth pile, the ironed (`households[].laundry[3]`,
+//! pressed clothes to wear: `content::Pressed`); a file with three has none ironed, and an older
+//! build reads the first three. Where a tool is taken to clean the floor (`sweep.rs`) isn't saved:
+//! the use starts again after a load, as any.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -809,9 +813,9 @@ pub struct HouseholdSave {
     /// The day a babysitter was booked for (absent: none).
     #[serde(default, rename = "sitterDay", skip_serializing_if = "Option::is_none")]
     pub sitter_day: Option<u32>,
-    /// Loads of washing waiting: dirty, washed to dry, and dried to fold (see
+    /// Loads of washing waiting: dirty, washed to dry, dried to fold and ironed to wear (see
     /// `Household::laundry`; absent before v30: one dirty and one washed; before v33 without
-    /// the dried).
+    /// the dried; without the ironed, none).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub laundry: Option<Vec<f32>>,
 }

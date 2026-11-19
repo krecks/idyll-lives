@@ -24,6 +24,8 @@ palette! { M:
     iron = ("#3A3D42", metal),
     iron_inside = ("#7C8188", metal),
     steel = ("#C9CED4", metal),
+    iron_shell = ("#EEF1F3", plastic), // the steam iron's shell and handle
+    iron_trim = ("#3FA3B8", plastic),  // its water window and dial
     grip = ("#2B2D31", satin),
     board = ("#B88A57", wood),
     board_dark = ("#9A6A3E", wood),

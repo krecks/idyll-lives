@@ -104,8 +104,17 @@ export interface InteractionDef {
   loads?: boolean;
   /** Takes the load out of a machine once its run is done: only then; it's empty again as the use ends. */
   unloads?: boolean;
-  /** Leaves the household a load of washing to work on next, as the use ends (taken out washed, or dry): then on with it to what works on it. */
-  makes?: 'laundry' | 'washed' | 'dried';
+  /**
+   * Leaves the household a load of washing to work on next, as the use ends (taken out washed, or dry): then on with it to what works on it;
+   * `ironed`: pressed clothes, put on as residents change at home (content `laundry.pressed`).
+   */
+  makes?: 'laundry' | 'washed' | 'dried' | 'ironed';
+  /**
+   * Cleans the floor (a vacuum cleaner, a mop, a broom; sim-core `sweep.rs`): the tool is taken to the dirtiest floor at home it cleans and
+   * used there, and `amount` of dirt comes off every tile of that room within `reach` (0: all of it); `hardFloors` leaves a carpet,
+   * `outdoors` sweeps the garden too.
+   */
+  cleans?: { amount: number; reach?: number; hardFloors?: boolean; outdoors?: boolean };
   /** An item carried in the arms on the way to it (the basket of washing to the dryer): only shown, the snapshot's `held`. */
   brings?: string;
   /** An item held in the hands while it's done (a towel being folded): only shown, as `brings`. */

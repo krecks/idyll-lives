@@ -665,6 +665,15 @@ pub(crate) fn update(w: &mut World) {
             made,
             most,
         );
+        // (Pressed clothes put on: an outfit's share of the ironed washing.)
+        if std::mem::take(&mut w.sims[i].wore_pressed)
+            && let Some(p) = w.content.laundry.and_then(|l| l.pressed)
+        {
+            crate::machines::wear_pressed(
+                &mut w.households[w.sims[i].household as usize].laundry,
+                p.outfits,
+            );
+        }
         if let Some(transition) = w.sims[i].transition.take() {
             apply_transition(w, i, transition);
         }
