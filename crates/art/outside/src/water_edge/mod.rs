@@ -24,7 +24,7 @@ palette! { M:
     roof = ("#8A4B3C", satin),        // its roof
     trim = ("#F7F3EA", satin),        // its window and door frames
     door = ("#2F6F6A", satin),        // its door
-    glass = ("#CFE3E6", glass),       // its window
+    pane = ("#3A4A52", gloss),        // its windows, dark from outside (opaque)
     timber = ("#7A5A3E", wood),       // its skids and floor
     brass = ("#C9A54A", metal),       // its knob and the bench's plaque
     bench_wood = ("#9A6B45", wood),   // the bench's slats
@@ -46,7 +46,7 @@ pub fn family() -> Option<Family> {
                 .key("model.waterEdge.rowingBoat")
                 .paint(&[("hull", "Hull"), ("inside", "Interior"), ("seat", "Seats")]),
             Model::new("reeds", plants::reeds, (0.801, 1.539, 1.086)).key("model.waterEdge.reeds"),
-            Model::new("beachHut", structures::beach_hut, (1.98, 2.185, 1.96))
+            Model::new("beachHut", structures::beach_hut, (1.939, 2.51, 1.95))
                 .key("model.waterEdge.beachHut")
                 .paint(&[("wall", "Walls"), ("stripe", "Stripes"), ("door", "Door")]),
             Model::new("bench", seats::bench, (1.746, 0.928, 0.521))

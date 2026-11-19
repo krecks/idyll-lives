@@ -81,8 +81,8 @@
         "door": {
           "finish": "material.finish.satin"
         },
-        "glass": {
-          "finish": "material.finish.glass"
+        "pane": {
+          "finish": "material.finish.gloss"
         },
         "roof": {
           "finish": "material.finish.satin"
