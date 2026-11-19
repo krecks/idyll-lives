@@ -72,7 +72,8 @@ The first `bun run dev` or `bun run build` downloads the voice model (398 MB as 
 | `bun run lint` | Lint the web code |
 | `bun run test` | The renderer's engine-neutral tests (`web/tests`, `bun test`) |
 | `bun run check:chunks` | Check that the PlayCanvas internals the renderer patches or reads are still there (`cargo check-chunks` over the list in `tools/render/chunks.json`; run it after a PlayCanvas upgrade) |
-| `bun run sounds` | (After `bun run sound`.) Render every synthesised sound of the game (things in use, the outdoors, the interface) to a WAV with its length, level, loudness and spectral centroid, and the content that sounds it (`tools/audio/listen.ts`; for listening to them, `G-53`) |
+| `bun run sounds` | (After `bun run sound`.) Render every synthesised sound of the game (things in use, the outdoors, the interface) to a WAV with its length, level, loudness and spectral centroid, and the content that sounds it (`tools/audio/listen.ts`; for listening to them, `G-53`); `--out <folder>` writes them there, `--against <folder>` holds them to an earlier render (each sound's loudness and centroid that moved, exit 1 past 1 LU) |
+| `bun run sounds:time` | (After `bun run sound`.) Time every sound made through the WebAssembly, slowest first, with a total a family (`tools/audio/time.ts`; `--runs <n>`, `--json <file>`, `--compare <file>`, `--max-music <ms>`) |
 | `bun run test:sim` | Run the Rust simulation tests |
 | `bun run test:sound` | Run the sound crate's tests (each sound made and held to what it should be) |
 | `bun run test:voice` | Run the voice crate's tests (needs `bun run voice` for the dictionary) |
