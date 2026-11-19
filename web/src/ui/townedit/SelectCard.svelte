@@ -231,7 +231,7 @@
         </div>
         <p class="hint">
           {fronting.length ? `Along it: ${listed(fronting)}.` : 'Nothing fronts it.'}
-          {builtCount ? `${count(builtCount, 'of the town\'s buildings', 'of the town\'s buildings')} may be cleared.` : ''}
+          {builtCount ? `${builtCount} of them the town's buildings (terraces, flats, town houses, small shops and workplaces), which Clear takes.` : ''}
           {#if builtNote?.road === roadId}{builtNote.text}{/if}
         </p>
       </div>
