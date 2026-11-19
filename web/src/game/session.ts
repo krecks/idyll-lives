@@ -1161,7 +1161,8 @@ async function openSession(
   services.previews.keep(true);
 
   // Goal ideas and wishes as they come up, to accept or decline.
-  const ideas = ideaToasts();
+  // (Their chime once the game is revealed: a wish toasted as the world arrives stays quiet behind the loading screen.)
+  const ideas = ideaToasts(() => revealed && game.mode === 'live');
   bridge.onError((message) => {
     if (disposed) return;
     toast(message);
