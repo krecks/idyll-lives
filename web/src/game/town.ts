@@ -951,7 +951,8 @@ const FARMYARD: [string, number, number, number | null][] = [
  * A farm lot's fields and farmyard (plot coordinates, street at z = 0), round a farmhouse that
  * stands as on a large lot: a field of crops in rows beside the house (a path between each pair
  * of rows), a fallow field with hay behind it, and a yard behind the house: its barn at the back (a
- * real one, `BARN`: walls, a wide door to the yard, the tractor and hay inside) and the silo, coop and
+ * real one, `BARN`: walls, a wide door to the yard and a window each side; the farm's things are for outdoors, so the
+ * tractor and the hay stand in the yard) and the silo, coop and
  * the rest round it. Clear of the house, its garden and its driveway.
  */
 function farmstead(content: Content, t: Templates, slot: PlotSlot, rand: Rand): NonNullable<PlotSlot['farm']> {
@@ -1015,13 +1016,8 @@ function farmstead(content: Content, t: Templates, slot: PlotSlot, rand: Rand): 
       windows: [{ x: bx, z: bz + Math.floor(BARN.d / 2), axis: 'z' }, { x: x1, z: bz + Math.floor(BARN.d / 2), axis: 'z' }],
     };
     taken.push({ x: bx - 1, z: bz - 2, w: BARN.w + 2, d: BARN.d + 2 });
-    // (The tractor on one side of the door, the hay on the other, the way in between them clear.)
-    if (has('farm.tractor')) objects.push({ def: 'farm.tractor', x: bx + 1, z: bz + 2, rot: 0 });
-    if (has('farm.hayBale')) for (const z of [bz + 1, bz + 4]) objects.push({ def: 'farm.hayBale', x: bx + BARN.w - 3, z, rot: 0 });
   }
   for (const [def, fewest, most, turned] of FARMYARD) {
-    // (The tractor is in the barn, if there is one.)
-    if (def === 'farm.tractor' && barn) continue;
     if (!has(def)) continue;
     for (let k = 0, n = fewest + Math.floor(rand() * (most - fewest + 1)); k < n; k++) {
       for (let tries = 0; tries < 40; tries++) {
@@ -1041,7 +1037,7 @@ function farmstead(content: Content, t: Templates, slot: PlotSlot, rand: Rand): 
   return { objects, fields: [cropField, ...(fallow.d >= 3 ? [fallow] : [])], ...(barn ? { barn } : {}) };
 }
 
-/** A farm's barn (m inside its walls): wide enough for the tractor beside two bales of hay, deep enough for the tractor. */
+/** A farm's barn (m inside its walls). */
 const BARN = { w: 8, d: 7 };
 
 /** Driveways are paths wider than this (garden paths are 1 m); see `driveway`. */
