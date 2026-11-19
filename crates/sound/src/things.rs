@@ -10,15 +10,17 @@
 //!
 //! Most are made the same few ways:
 //! - a motor or a fan: a tone at its speed with its harmonics (a transformer's hum at twice the mains,
-//!   100 Hz; a fan's blades passing), over the rush of air or the rumble of what it drives;
+//!   100 Hz; a fan's blades passing), over the rush of air or the rumble of what it drives (the harmonics
+//!   turned from the first, \`harmonics\`: one \`sin\` a sample, not one each);
 //! - something struck (\`strike\`): a few modes ringing out over a short burst of noise, at the frequencies of
-//!   the thing's size and stuff (a basketball's air rings at about 950 Hz);
+//!   the thing's size and stuff (a basketball's air rings at about 950 Hz), rung as a bank of decaying
+//!   rotations (\`Modal\`: no \`sin\` or \`exp\` a sample);
 //! - events in a loop (darts, a rally) wrap round its end into its start, so nothing is cut off at the
 //!   seam; steady sounds under them are cross-faded as the water's are.
 //!
 //! Each is a stereo loop several seconds long (or a sound played once: \`ONCE_THINGS\`), made off the main
 //! thread the first time it's wanted. Was \`web/src/audio/things.ts\`; the arithmetic is the TypeScript's
-//! (\`dsp\`).
+//! (\`dsp\`), to rounding where a tone is turned by rotation rather than a \`sin\` a sample.
 
 use crate::dsp::m::*;
 use crate::dsp::*;
@@ -1957,6 +1959,7 @@ fn cello(rate: f64) -> Stereo {
         let start = round_usize(at * rate);
         let len = round_usize((dur + 0.15) * rate);
         let top = min(40.0, (6000.0 / hz).floor()) as usize;
+        let weights: Vec<f64> = (1..=top).map(|h| 1.0 / h as f64).collect();
         let mut scratch = Biquad::with(rate, Filter::Highpass, 1500.0, 0.7);
         let swell = if k % 2 == 1 { 0.85 } else { 1.0 };
         let mut phase = r.next();
@@ -1965,10 +1968,7 @@ fn cello(rate: f64) -> Stereo {
             // Vibrato: about 5.5 a second, a sixth of a semitone, coming in after a third of a second.
             let vib = 0.01 * ramp(0.3, 0.7, t) * sin(2.0 * PI * 5.5 * t);
             phase += (hz * (1.0 + vib + 0.0008 * (r.next() - 0.5))) / rate;
-            let mut v = 0.0;
-            for h in 1..=top {
-                v += sin(2.0 * PI * h as f64 * phase) / h as f64;
-            }
+            let v = harmonics(phase, &weights);
             // The bow: biting in, a swell along the stroke, lifting off.
             let env = ramp(0.0, 0.1, t)
                 * (1.0 - ramp(dur, dur + 0.15, t))
@@ -2162,16 +2162,14 @@ fn sing(d: &mut [f32], rate: f64, r: &mut Rng, at: f64, seconds: f64, hz: f64, v
     let weights = [1.0, 0.9, 0.6];
     let mut hiss = Biquad::with(rate, Filter::Highpass, 4500.0, 0.7);
     let top = (5000.0 / hz).floor() as usize;
+    let buzz: Vec<f64> = (1..=top).map(|h| 1.0 / pow(h as f64, 1.5)).collect();
     let consonant = r.next() < 0.6;
     let mut phase = 0.0;
     for j in 0..len {
         let t = j as f64 / rate;
         let vib = 0.017 * ramp(0.25, 0.5, t) * sin(2.0 * PI * 5.5 * t);
         phase += (hz * (1.0 + vib)) / rate;
-        let mut src = 0.0;
-        for h in 1..=top {
-            src += sin(2.0 * PI * h as f64 * phase) / pow(h as f64, 1.5);
-        }
+        let mut src = harmonics(phase, &buzz);
         src += (r.next() * 2.0 - 1.0) * 0.05;
         let mut v = 0.0;
         for (f, w) in filters.iter_mut().zip(weights) {
@@ -2197,13 +2195,10 @@ fn sing(d: &mut [f32], rate: f64, r: &mut Rng, at: f64, seconds: f64, hz: f64, v
 fn pad(d: &mut [f32], rate: f64, at: f64, seconds: f64, hz: f64, amp: f64, harmonics: usize) {
     let start = round_usize(at * rate);
     let len = round_usize(seconds * rate);
+    let weights: Vec<f64> = (1..=harmonics).map(|h| 1.0 / (h as f64 * 1.5)).collect();
     for j in 0..len {
         let t = j as f64 / rate;
-        let mut v = 0.0;
-        for h in 1..=harmonics {
-            let h = h as f64;
-            v += sin(2.0 * PI * h * hz * t) / (h * 1.5);
-        }
+        let v = crate::dsp::harmonics(hz * t, &weights);
         let i = (start + j) % d.len();
         add(
             d,
@@ -2970,25 +2965,22 @@ fn strike(t: &mut Ev, at: f64, amp: f64, pan: f64, modes: &[Mode], burst: Burst)
         s = (s as u64 * 1_664_525 + 1_013_904_223) as u32;
         s as f64 / 4_294_967_296.0
     };
-    let phase: Vec<f64> = modes.iter().map(|_| rnd() * 2.0 * PI).collect();
-    let step: Vec<f64> = modes
+    let ringing: Vec<crate::dsp::Mode> = modes
         .iter()
-        .map(|m| (2.0 * PI * min(m[0], rate * 0.45)) / rate)
+        .map(|m| crate::dsp::Mode {
+            hz: m[0],
+            tau: m[1],
+            level: m[2],
+            phase: rnd() * 2.0 * PI,
+        })
         .collect();
-    let fall: Vec<f64> = modes.iter().map(|m| exp(-1.0 / (m[1] * rate))).collect();
-    let mut level: Vec<f64> = modes.iter().map(|m| m[2]).collect();
-    let mut noise_level = burst.amp;
-    let noise_fall = exp(-1.0 / (burst.tau * rate));
+    let mut bank = Modal::new(rate, &ringing);
+    let mut noise_level = Decay::new(burst.amp, burst.tau, rate);
     let attack = 0.0004 * rate;
     let mut j = 0.0;
     while j < len {
-        let mut v = 0.0;
-        for m in 0..modes.len() {
-            v += level[m] * sin(phase[m] + step[m] * j);
-            level[m] *= fall[m];
-        }
-        v += band.run(rnd() * 2.0 - 1.0) * noise_level;
-        noise_level *= noise_fall;
+        let mut v = bank.next();
+        v += band.run(rnd() * 2.0 - 1.0) * noise_level.next();
         put(t, start + j, v * amp * min(1.0, j / attack), l, r);
         j += 1.0;
     }
@@ -3037,14 +3029,12 @@ fn motor(n: usize, rate: f64, hz: impl Fn(usize) -> f64, partials: &[f64]) -> Ve
         if phase > 2.0 * PI {
             phase -= 2.0 * PI;
         }
-        let mut v = 0.0;
-        for (k, p) in partials.iter().enumerate() {
-            let k = (k + 1) as f64;
-            if k * f < rate * 0.45 {
-                v += p * sin(k * phase);
-            }
+        // The harmonics under 0.45 of the rate (`k·f < 0.45·rate`), turned from the first.
+        let mut top = 0;
+        while top < partials.len() && (top + 1) as f64 * f < rate * 0.45 {
+            top += 1;
         }
-        *o = v as f32;
+        *o = harmonics(phase / (2.0 * PI), &partials[..top]) as f32;
     }
     d
 }

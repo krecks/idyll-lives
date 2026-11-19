@@ -352,12 +352,6 @@ pub fn clink(
         s = (s as u64 * 1_664_525 + 1_013_904_223) as u32;
         s as f64 / 4_294_967_296.0
     };
-    struct Partial {
-        f: f64,
-        a: f64,
-        tau: f64,
-        phase: f64,
-    }
     let mut partials = Vec::new();
     for (i, k) in ratios.iter().enumerate() {
         let i = i as f64;
@@ -368,7 +362,12 @@ pub fn clink(
         #[allow(clippy::approx_constant)]
         let phase = rnd() * 6.28;
         if f < if under { 2500.0 } else { 16000.0 } {
-            partials.push(Partial { f, a, tau, phase });
+            partials.push(Mode {
+                hz: f,
+                tau,
+                level: a,
+                phase,
+            });
         }
     }
     let len = min(out.left.len() as f64 - start, js_round(ring * 6.0 * rate));
@@ -376,12 +375,9 @@ pub fn clink(
         return;
     }
     let (start, len) = (start as usize, len as usize);
+    let mut bank = Modal::new(rate, &partials);
     for j in 0..len {
-        let t = j as f64 / rate;
-        let mut v = 0.0;
-        for p in &partials {
-            v += p.a * exp(-t / p.tau) * sin(2.0 * PI * p.f * t + p.phase);
-        }
+        let mut v = bank.next();
         if (j as f64) < 0.002 * rate && !under {
             v += (rnd() * 2.0 - 1.0) * 0.6 * (1.0 - j as f64 / (0.002 * rate));
         }
