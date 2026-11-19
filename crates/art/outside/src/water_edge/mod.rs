@@ -42,7 +42,7 @@ pub fn family() -> Option<Family> {
             Model::new("jetty", structures::jetty, (1.92, 0.985, 3.82))
                 .key("model.waterEdge.jetty")
                 .paint(&[("plank", "Decking"), ("post", "Posts")]),
-            Model::new("rowingBoat", boats::rowing_boat, (1.28, 0.695, 2.943))
+            Model::new("rowingBoat", boats::rowing_boat, (1.28, 0.696, 2.965))
                 .key("model.waterEdge.rowingBoat")
                 .paint(&[("hull", "Hull"), ("inside", "Interior"), ("seat", "Seats")]),
             Model::new("reeds", plants::reeds, (0.801, 1.539, 1.086)).key("model.waterEdge.reeds"),

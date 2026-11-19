@@ -3,7 +3,8 @@
 
 use super::{F, M};
 use artkit::bevel::{EdgeOrder, bevel_edges};
-use artkit::math::{P3, cos, sin};
+use artkit::forms::catmull;
+use artkit::math::{P3, cos, sin, v3};
 use artkit::parts::{join_all, settle_all};
 use artkit::scene::Obj;
 use artkit::shapes::SHARP;
@@ -29,6 +30,22 @@ const STATIONS: [(f64, f64, f64, f64); 9] = [
     (1.35, 0.24, 0.17, 0.19),
     (1.50, 0.07, 0.07, 0.15),
 ];
+
+/// The stations with two more on a smooth curve between each pair, so the sheer and the bilge run fair rather
+/// than kinking at each station.
+fn stations() -> Vec<(f64, f64, f64, f64)> {
+    let beam: Vec<_> = STATIONS
+        .iter()
+        .map(|&(z, rx, ry, _)| v3(z, rx, ry))
+        .collect();
+    let bilge: Vec<_> = STATIONS.iter().map(|&(z, _, _, cy)| v3(z, cy, 0)).collect();
+    let (beam, _) = catmull(&beam, 3, false);
+    let (bilge, _) = catmull(&bilge, 3, false);
+    beam.iter()
+        .zip(bilge.iter())
+        .map(|(b, c)| (b.x as f64, b.y as f64, b.z as f64, c.y as f64))
+        .collect()
+}
 
 /// One cross-section of the hull at `z`: the closed outline of the planking, so the loft leaves an open well.
 /// `rx` across, `ry` deep below the turn of the bilge at `cy`; `wall` thick, topped at `top`.
@@ -83,22 +100,45 @@ fn well(rx: f64, ry: f64, cy: f64, z: f64, top: f64) -> Vec<P3> {
 }
 
 pub fn rowing_boat() -> Vec<Obj> {
-    let hull: Vec<Vec<P3>> = STATIONS
+    let stations = stations();
+    let hull: Vec<Vec<P3>> = stations
         .iter()
         .map(|&(z, rx, ry, cy)| section(rx, ry, cy, z, WALL, rim(z)))
         .collect();
-    let hull = loft!("hull", &hull, material = M.hull);
-    // the sheer and the keel are long, hard lines: round them a little so they catch the light
-    bevel_edges(hull, 0.004, 2, SHARP, &EdgeOrder::Corners);
+    // not bevelled (the kernel's bevel can't follow the fair stations' edges): the gunwale is under the cap rail,
+    // the stern behind the transom and the bow's end behind the stem
+    loft!("hull", &hull, material = M.hull);
+    let (z, rx, ry, cy) = STATIONS[STATIONS.len() - 1];
+    fbox!(
+        F,
+        "stem",
+        2.0 * rx + 0.02,
+        rim(z) + 0.01 - (cy - ry),
+        0.04,
+        (0, (rim(z) + 0.01 + cy - ry) / 2.0, z + 0.015),
+        M.seat,
+        bevel = 0.008
+    );
     // the cream liner inside the planking, stopping short of the bow's tip
-    let liner: Vec<Vec<P3>> = STATIONS[..8]
+    let liner: Vec<Vec<P3>> = stations
         .iter()
-        .map(|&(z, rx, ry, cy)| section(rx - WALL - 0.002, ry - WALL - 0.002, cy, z.max(-1.40), 0.012, rim(z)))
+        .filter(|s| s.0 <= STATIONS[7].0 + 1e-9)
+        .map(|&(z, rx, ry, cy)| {
+            section(
+                rx - WALL - 0.002,
+                ry - WALL - 0.002,
+                cy,
+                z.max(-1.40),
+                0.012,
+                rim(z),
+            )
+        })
         .collect();
     let liner = loft!("liner", &liner, material = M.inside);
     bevel_edges(liner, 0.004, 2, SHARP, &EdgeOrder::Corners);
-    // the transom, closing the well at the stern and standing a little proud of the planking
+    // the transom, closing the stern and standing a centimetre proud of the planking all round (its end hidden)
     let (_, rx, ry, cy) = STATIONS[0];
+    let (rx, ry) = (rx + WALL + 0.01, ry + WALL + 0.01);
     let transom = loft!(
         "transom",
         &[
@@ -110,7 +150,7 @@ pub fn rowing_boat() -> Vec<Obj> {
     bevel_edges(transom, 0.004, 2, SHARP, &EdgeOrder::Corners);
     // a wood cap rail along each gunwale
     for (i, s) in [-1.0_f64, 1.0].into_iter().enumerate() {
-        let rail: Vec<(f64, f64, f64)> = STATIONS
+        let rail: Vec<(f64, f64, f64)> = stations
             .iter()
             .map(|&(z, rx, _, _)| (s * (rx - 0.02), rim(z) + 0.008, z))
             .collect();
