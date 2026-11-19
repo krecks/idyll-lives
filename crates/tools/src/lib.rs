@@ -19,6 +19,7 @@ pub mod licenses;
 pub mod llmfetch;
 pub mod llmslim;
 pub mod m1table;
+pub mod nbits;
 pub mod pbr;
 pub mod pcg64;
 pub mod pins;

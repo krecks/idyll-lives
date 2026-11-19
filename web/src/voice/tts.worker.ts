@@ -11,6 +11,7 @@
  */
 
 import { fetchOnce, forget, gunzipText, openCache, openRuntimeCache, prune } from '../ml/assets';
+import { gpuBuffers, trackGpuBuffers } from '../ml/gpuMemory';
 import { configureOrt, hasWebGpu, importOrt, ORT_WASM, sessionOptions } from '../ml/ort';
 import init, { Voice } from './wasm-pkg/voice_wasm.js';
 import wasmUrl from './wasm-pkg/voice_wasm_bg.wasm?url';
@@ -28,23 +29,24 @@ const scope = self as WorkerScope;
 
 /** Bumped when the files change; older caches are deleted. (New files under new names don't need it.) */
 const CACHE_PREFIX = 'littlelives-voice-';
-// v6: the graphs' weights in 8-bit integers (0.7.0), the same names.
-const CACHE = `${CACHE_PREFIX}v6`;
+// v7: the matrix weights read in 8 bits on the GPU (`MatMulNBits`, 0.8.3), the same names.
+const CACHE = `${CACHE_PREFIX}v7`;
 /** Pocket TTS's encoded voices, no longer used: deleted. */
 const OLD_VOICES_PREFIX = 'littlelives-voices-';
 
 /**
  * Files under `voice/` (made by `cargo fetch-voice`), with sizes in bytes for the progress
  * bar. The graphs come with their weights in 8-bit integers (the duration predictor's in 16-bit
- * floats), gzipped (`.onnxz`: unpacked by `fetchOnce`).
+ * floats), gzipped (`.onnxz`: unpacked by `fetchOnce`). The matrix weights, nearly all of them,
+ * stay 8-bit on the GPU (`crates/tools/src/nbits.rs`): about 130 MB of GPU memory, not 400.
  */
 type File = [name: string, bytes: number];
 const MODEL_DIR = 'supertonic-3/';
 const MODELS = {
   duration: ['duration_predictor.onnxz', 1_633_681],
-  text: ['text_encoder.onnxz', 8_500_990],
-  vector: ['vector_estimator.onnxz', 55_258_368],
-  vocoder: ['vocoder.onnxz', 21_749_302],
+  text: ['text_encoder.onnxz', 9_142_040],
+  vector: ['vector_estimator.onnxz', 63_712_058],
+  vocoder: ['vocoder.onnxz', 24_824_344],
 } satisfies Record<keyof Engine['sessions'], File>;
 /** A voice style file is about 291 KB. */
 const STYLE_BYTES = 291_500;
@@ -54,6 +56,9 @@ const SMALL: File[] = [
   ['en-us.lexz', 1_310_821],
 ];
 const VOICE_WASM_BYTES = 162_000;
+
+/** `GPUBufferUsage` STORAGE | COPY_SRC | COPY_DST: an input ONNX Runtime can read (and download). */
+const INPUT_USAGE = 0x80 | 0x04 | 0x08;
 
 let engine: Engine | null = null;
 let loading: Promise<void> | null = null;
@@ -70,6 +75,7 @@ scope.__wasmPanic = (message) => {
 scope.onmessage = (e) => {
   const msg = e.data;
   if (msg.type === 'load') {
+    if (msg.measure) trackGpuBuffers();
     if (!loading) {
       loading = load(msg.base, msg.device).catch((err) => {
         loading = null;
@@ -80,6 +86,9 @@ scope.onmessage = (e) => {
     }
   } else if (msg.type === 'speak') {
     queue = queue.then(() => speak(msg.id, msg.text, msg.voice));
+  } else if (msg.type === 'memory') {
+    const { live, peak } = gpuBuffers();
+    scope.postMessage({ type: 'memory', gpuLive: live, gpuPeak: peak });
   }
 };
 
@@ -153,12 +162,16 @@ async function load(base: string, device: VoiceDevice): Promise<void> {
   const ort = await importOrt();
   configureOrt(ort, ortWasm, device);
   const sessions = {} as Record<keyof typeof MODELS, Session>;
-  // The runtime creates one session at a time. On the GPU the vector estimator's latent stays there
-  // between its passes and goes straight into the vocoder, and the other graphs hand back the few
-  // numbers we need on the CPU; on the processor everything comes back as CPU tensors.
+  // The runtime creates one session at a time. On the GPU the text encoder's output and the vector
+  // estimator's latent stay there: the text into every pass, the latent from pass to pass and
+  // straight into the vocoder, with no download and upload between the graphs. The duration
+  // predictor and the vocoder hand back what we need on the CPU; on the processor everything
+  // comes back as CPU tensors.
   for (const [i, k] of names.entries()) {
-    sessions[k] = await ort.InferenceSession.create(new Uint8Array(models[i]), sessionOptions(device, k === 'vector' ? 'gpu-buffer' : undefined));
+    sessions[k] = await ort.InferenceSession.create(new Uint8Array(models[i]), sessionOptions(device, k === 'vector' || k === 'text' ? 'gpu-buffer' : undefined));
   }
+  // What every pass reads goes up to the GPU once a line (`Engine.upload`).
+  const gpu = device === 'gpu' ? await ort.env.webgpu.device : null;
   engine = {
     ort,
     sessions,
@@ -166,6 +179,14 @@ async function load(base: string, device: VoiceDevice): Promise<void> {
     indexer: json<number[]>(indexer),
     styles: new Map(STYLE_IDS.map((id, i) => [id, parseStyle(json<StyleFile>(styles[i]))])),
     phonemizer: new Voice(await gunzipText(lexicon)),
+    upload: gpu
+      ? (data, dims) => {
+          // Sized up to 16 bytes: the runtime's kernels read four floats at a time.
+          const buffer = gpu.createBuffer({ size: Math.ceil(data.byteLength / 16) * 16, usage: INPUT_USAGE });
+          gpu.queue.writeBuffer(buffer, 0, data);
+          return ort.Tensor.fromGpuBuffer(buffer, { dataType: 'float32', dims, dispose: () => buffer.destroy() });
+        }
+      : undefined,
   };
   // The sessions and the engine have their own copies.
   for (const f of files) forget(f.url);

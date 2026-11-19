@@ -3,11 +3,13 @@
 //!
 //! - Supertone's Supertonic 3 (BigScience OpenRAIL-M: its licence, with its use restrictions, is
 //!   fetched with it and goes along), its config, text indexer and ten voice styles as published,
-//!   and its four ONNX graphs with their big weights stored smaller, computing in float32 as
-//!   before (a `NOTICE` says so): the text encoder, vector estimator and vocoder as 8-bit integers
-//!   with a scale per channel (`int8.rs`), the duration predictor as 16-bit floats (`fp16.rs`; in
-//!   int8 some lines came out a frame longer or shorter); gzipped (`.onnxz`, unpacked by the
-//!   browser): 398 MB as published, 87 MB here. https://huggingface.co/Supertone/supertonic-3
+//!   and its four ONNX graphs with their big weights stored smaller (a `NOTICE` says so): in the
+//!   text encoder, vector estimator and vocoder the matrix weights as 8-bit integers that stay so
+//!   on the GPU, read by ONNX Runtime's `MatMulNBits` with a scale per block of 32 (`nbits.rs`:
+//!   a third of the GPU memory, faster), the rest as 8-bit integers with a scale per channel
+//!   (`int8.rs`); the duration predictor as 16-bit floats (`fp16.rs`; in int8 some lines came out
+//!   a frame longer or shorter); gzipped (`.onnxz`, unpacked by the browser): 398 MB as published,
+//!   98 MB here. https://huggingface.co/Supertone/supertonic-3
 //! - Misaki's US English dictionaries (Apache-2.0, its licence goes along as `misaki-LICENSE.txt`),
 //!   for mouth shapes: https://github.com/hexgrad/misaki
 //!
@@ -17,7 +19,7 @@
 
 use crate::download::{self, agent, gzip9, sha256_hex};
 use crate::fp16::weights_to_fp16;
-use crate::int8::weights_to_int8;
+use crate::nbits::weights_to_nbits8;
 use std::path::{Path, PathBuf};
 
 const SUPERTONIC: &str = "https://huggingface.co/Supertone/supertonic-3/resolve/3cadd1ee6394adea1bd021217a0e650ede09a323";
@@ -30,7 +32,8 @@ pub const MODEL_DIR: &str = "supertonic-3/";
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Store {
     Fp16,
-    Int8,
+    /// Matrix weights read by 8-bit `MatMulNBits`, the rest int8 (`nbits.rs`).
+    Nbits8,
 }
 
 /// Supertonic 3's graphs: as published, and as stored (saved gzipped as `<name>.onnxz`).
@@ -44,20 +47,20 @@ const GRAPHS: [(&str, &str, &str, Store); 4] = [
     (
         "text_encoder",
         "c7befd5ea8c3119769e8a6c1486c4edc6a3bc8365c67621c881bbb774b9902ff",
-        "374d6738efba99252a5413613b2e07631939473e49262e8c3d1e62e7279327f9",
-        Store::Int8,
+        "cd962e8655ce06da6551eb82dbaeb53d390a124ff552aba32b98bd135ae21892",
+        Store::Nbits8,
     ),
     (
         "vector_estimator",
         "883ac868ea0275ef0e991524dc64f16b3c0376efd7c320af6b53f5b780d7c61c",
-        "07bae522192843cfb973a3042d7bd7ebee041fbfa4f90c3fc46334ecf7a75212",
-        Store::Int8,
+        "cdde82f0571c9bb31e0d2ef8f4ed7f0688710b28658d8d9626ad97e78e4b3c8e",
+        Store::Nbits8,
     ),
     (
         "vocoder",
         "085de76dd8e8d5836d6ca66826601f615939218f90e519f70ee8a36ed2a4c4ba",
-        "43ccb274d069d68e73592366519e886ce67b777550724c4f2407e5471349fe54",
-        Store::Int8,
+        "d230d59f057405246e25e2a6c011316e439bda6c3832627f7f05d46cdd3c63cf",
+        Store::Nbits8,
     ),
 ];
 
@@ -157,12 +160,15 @@ const LEXICON: [(&str, &str); 2] = [
 const NOTICE: &str = "Supertonic 3 (Supertone Inc.), https://huggingface.co/Supertone/supertonic-3, revision 3cadd1ee.
 Licensed under the BigScience OpenRAIL-M licence (LICENSE.txt), including its use restrictions.
 
-Modified by Idyll Lives (cargo fetch-voice, crates/tools/src/int8.rs and fp16.rs): in
-text_encoder, vector_estimator and vocoder, every float32 weight of 1,024 values or more with two
-or more axes is stored as 8-bit integers with a float32 scale per channel, and the other float32
-weights of 1,024 values or more as float16; in duration_predictor every float32 weight of 1,024
-values or more is stored as float16. All are turned back into float32 when the model loads, and
-the files are gzipped (.onnxz). Nothing was retrained. tts.json, unicode_indexer.json and the
+Modified by Idyll Lives (cargo fetch-voice, crates/tools/src/nbits.rs, int8.rs and fp16.rs): in
+text_encoder, vector_estimator and vocoder, every float32 weight of 1,024 values or more that a
+MatMul or a pointwise (1x1) Conv multiplies by is stored as 8-bit integers with a scale per block
+of 32 (stored as float16) and multiplied by as such (ONNX Runtime's MatMulNBits; such a Conv
+becomes a MatMulNBits between two Transposes); every other float32 weight of 1,024 values or more
+with two or more axes is stored as 8-bit integers with a float32 scale per channel, and the other
+float32 weights of 1,024 values or more as float16; in duration_predictor every float32 weight of
+1,024 values or more is stored as float16. All but the MatMulNBits weights are turned back into
+float32 when the model loads, and the files are gzipped (.onnxz). Nothing was retrained. tts.json, unicode_indexer.json and the
 voice styles (F1-F5, M1-M5) are unchanged.
 ";
 
@@ -221,9 +227,10 @@ fn run() -> Result<(), String> {
         let published = download::download(&agent, &format!("{SUPERTONIC}/onnx/{name}.onnx"), sha)?;
         let (converted, weights, saved) = match store {
             Store::Fp16 => weights_to_fp16(&published)?,
-            Store::Int8 => {
-                let c = weights_to_int8(&published)?;
-                (c.model, c.int8 + c.fp16, c.saved)
+            Store::Nbits8 => {
+                let c = weights_to_nbits8(&published)?;
+                let saved = published.len().saturating_sub(c.model.len());
+                (c.model, c.nbits + c.int8 + c.fp16, saved)
             }
         };
         let actual = sha256_hex(&converted);
@@ -312,9 +319,9 @@ mod tests {
             stores,
             [
                 ("duration_predictor", Store::Fp16),
-                ("text_encoder", Store::Int8),
-                ("vector_estimator", Store::Int8),
-                ("vocoder", Store::Int8)
+                ("text_encoder", Store::Nbits8),
+                ("vector_estimator", Store::Nbits8),
+                ("vocoder", Store::Nbits8)
             ]
         );
     }

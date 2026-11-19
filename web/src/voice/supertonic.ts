@@ -70,6 +70,12 @@ export interface Engine {
   /** Voice styles by id (`F1`…`M5`). */
   styles: Map<string, Style>;
   phonemizer: Phonemizer;
+  /**
+   * Puts float32 data on the GPU as an input tensor (the worker on WebGPU): what every pass of the
+   * vector estimator reads (the voice style, the masks, the step numbers) goes up once a line
+   * instead of once a pass. Without it (the processor, Node) inputs are plain CPU tensors.
+   */
+  upload?(data: Float32Array, dims: readonly number[]): OrtTensor;
 }
 
 /** The voice styles Supertonic 3 comes with, as its files name them. */
@@ -158,9 +164,10 @@ export async function synthesizeLine(engine: Engine, text: string, voice: VoiceP
       ids.push(BigInt(c < engine.indexer.length ? engine.indexer[c] : -1));
     }
     const n = ids.length;
+    const floats = (data: Float32Array, dims: readonly number[]) => (engine.upload ? engine.upload(data, dims) : new ort.Tensor('float32', data, dims));
     const textIds = new ort.Tensor('int64', BigInt64Array.from(ids), [1, n]);
-    const textMask = new ort.Tensor('float32', new Float32Array(n).fill(1), [1, 1, n]);
-    const styleTtl = new ort.Tensor('float32', style.ttl.data, style.ttl.dims);
+    const textMask = floats(new Float32Array(n).fill(1), [1, 1, n]);
+    const styleTtl = floats(style.ttl.data, style.ttl.dims);
     const styleDp = new ort.Tensor('float32', style.dp.data, style.dp.dims);
     let t = performance.now();
     const durationOut = (await sessions.duration.run({ text_ids: textIds, style_dp: styleDp, text_mask: textMask })).duration;
@@ -177,8 +184,9 @@ export async function synthesizeLine(engine: Engine, text: string, voice: VoiceP
     const dim = config.ttl.latent_dim * config.ttl.chunk_compress_factor;
     const frames = Math.max(1, Math.ceil(Math.floor(seconds * rate) / chunk));
     let latent = new ort.Tensor('float32', noise(hashString(`${voice.style}|${speed.toFixed(3)}|${plain}`), dim * frames), [1, dim, frames]);
-    const latentMask = new ort.Tensor('float32', new Float32Array(frames).fill(1), [1, 1, frames]);
-    const total = new ort.Tensor('float32', Float32Array.of(STEPS), [1]);
+    const latentMask = floats(new Float32Array(frames).fill(1), [1, 1, frames]);
+    const total = floats(Float32Array.of(STEPS), [1]);
+    const steps = Array.from({ length: STEPS }, (_, step) => floats(Float32Array.of(step), [1]));
     let vectorMs = 0;
     try {
       // Keep each step's latent where the runtime put it (on the GPU in the browser): the next
@@ -191,7 +199,7 @@ export async function synthesizeLine(engine: Engine, text: string, voice: VoiceP
           style_ttl: styleTtl,
           latent_mask: latentMask,
           text_mask: textMask,
-          current_step: new ort.Tensor('float32', Float32Array.of(step), [1]),
+          current_step: steps[step],
           total_step: total,
         });
         vectorMs += performance.now() - stepStart;
@@ -217,6 +225,7 @@ export async function synthesizeLine(engine: Engine, text: string, voice: VoiceP
       textMask.dispose?.();
       latentMask.dispose?.();
       total.dispose?.();
+      for (const t of steps) t.dispose?.();
     }
   } finally {
     line.free();

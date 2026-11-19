@@ -89,6 +89,12 @@ export interface GenResult {
   stop: 'eos' | 'newline' | 'text' | 'length' | 'aborted' | 'deadline';
   /** Some logits weren't finite numbers (a broken model or runtime: the text is garbage). */
   nonFinite: boolean;
+  /**
+   * Where the writing time went, ms: running the model (`run`, until it hands its outputs back),
+   * getting the logits to the processor (`read`: on the GPU this waits for the model to finish),
+   * and choosing the token (`pick`: sampling, decoding the text, the stops).
+   */
+  steps: { run: number; read: number; pick: number };
 }
 
 /** Model state: tensors by input name (`past_…`). */
@@ -230,7 +236,7 @@ function release(engine: LlmEngine, state: State): void {
  * Runs the model on `ids` after `past` tokens in `state`: the next state, and the logits for
  * the token after the last (if wanted). The old state is not freed here.
  */
-async function step(engine: LlmEngine, ids: readonly number[], state: State, past: number, wantLogits: boolean): Promise<{ state: State; logits: Float32Array | null }> {
+async function step(engine: LlmEngine, ids: readonly number[], state: State, past: number, wantLogits: boolean, times?: GenResult['steps']): Promise<{ state: State; logits: Float32Array | null }> {
   const { Tensor } = engine.ort;
   const names = engine.session.inputNames;
   const n = ids.length;
@@ -241,7 +247,10 @@ async function step(engine: LlmEngine, ids: readonly number[], state: State, pas
   if (names.includes('num_logits_to_keep')) feeds.num_logits_to_keep = new Tensor('int64', BigInt64Array.of(1n), []);
   if (names.includes('position_ids')) feeds.position_ids = new Tensor('int64', BigInt64Array.from({ length: n }, (_, i) => BigInt(past + i)), [1, n]);
   for (const [name, t] of state) feeds[name] = t;
+  const t0 = performance.now();
   const out = await engine.session.run(feeds);
+  const t1 = performance.now();
+  if (times) times.run += t1 - t0;
   const next: State = new Map();
   for (const name of state.keys()) {
     const t = out[presentName(name)];
@@ -256,6 +265,7 @@ async function step(engine: LlmEngine, ids: readonly number[], state: State, pas
     logits = lastRow(data as Float32Array | Uint16Array, vocab, raw.type === 'float16');
   }
   raw.dispose?.();
+  if (times) times.read += performance.now() - t1;
   return { state: next, logits };
 }
 
@@ -344,7 +354,9 @@ export async function generate(
   let nonFinite = false;
   const seen = { nonFinite: false };
   const wanted = params.sentences ?? 0;
+  const steps = { run: 0, read: 0, pick: 0 };
   for (;;) {
+    const pickAt = performance.now();
     const logits = ran.logits!;
     if (!ids.length) for (const id of barred) logits[id] = -Infinity;
     // Not done yet: only plain speech, so it can't end (or drift off) here.
@@ -387,7 +399,8 @@ export async function generate(
       stop = 'aborted';
       break;
     }
-    ran = await step(engine, [id], state, past, true);
+    steps.pick += performance.now() - pickAt;
+    ran = await step(engine, [id], state, past, true, steps);
     release(engine, state);
     state = ran.state;
     past++;
@@ -402,6 +415,7 @@ export async function generate(
     decodeMs: performance.now() - t1,
     stop,
     nonFinite,
+    steps,
   };
 }
 
