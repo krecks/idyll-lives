@@ -1473,7 +1473,10 @@ async function openSession(
       try {
         // (`?bench=bigworld`: the town tiled for the renderer, a big world: `debug/tileWorld.ts`.)
         if (benchBig) return await renderer.setWorld(await benchBig, benchView);
-        return await renderer.setWorld(BENCH && BENCH.tile > 1 ? tileWorld(w, BENCH.tile) : w, view);
+        await renderer.setWorld(BENCH && BENCH.tile > 1 ? tileWorld(w, BENCH.tile) : w, view);
+        // (A storey chosen before the renderer knew how many the world has, as a flat upstairs is shown on arriving, goes
+        // to it now: the renderer held the ground till then.)
+        renderer.setStorey(game.storey);
       } finally {
         perfEnd(buildSpan);
       }
