@@ -16,7 +16,8 @@
  * 4. windows go along the outside walls, daylight enough for every room that has one; kitchens
  *    get a counter run along one wall (sink, stove); furniture goes against the walls (doors and
  *    stairs kept clear, every piece reachable), tables stand free with chairs round them, small
- *    things go on tops (counters, tables, shelves), floor lamps and such keep to corners and out
+ *    things go on tops (counters, tables, shelves) a resident can get at (free floor beside the
+ *    top, else a seat pulled up to it, as the game's load check has it), floor lamps and such keep to corners and out
  *    of doorways, every room gets ceiling lights enough for all of it at night, and a few things
  *    (a patio set) go into the garden, by the garden door. The furniture is for whoever lives
  *    there (`Residents`): a couple's bed for two, a bed each for everyone else (a child's for
@@ -33,7 +34,7 @@
  */
 
 import type { ObjectDef, SurfaceKind } from '../content/content';
-import { approachCandidates, covers, freeSpots, frontTile, middleOf, overhangTiles, topOf, type Shape, type Shapes, type Top } from './surfaces';
+import { approachCandidates, covers, facedTable, freeSpots, frontTile, middleOf, overhangTiles, sizeOf, topOf, type Shape, type Shapes, type Top } from './surfaces';
 import type { Door, HouseTemplate, Placement, PlannedRoom, Wall } from './town';
 import { mulberry32 as random } from './noise';
 
@@ -1395,6 +1396,7 @@ function furnishRoom(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, 
     }
   }
   lights(cfg, info, f, r, lampTiles);
+  dropOutOfReach(f, r, shapes, info);
   return true;
 }
 
@@ -1685,7 +1687,7 @@ function onTops(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos, rng: () =>
     if (thing?.layer !== 'surface') continue;
     const tops = f.objects
       .map((o) => topOf(shapes, o))
-      .filter((t): t is Top => !!t && inside(r, t.host.x, t.host.z) && slot.on.includes(t.kind) && !info(t.host.def)?.keepClear && !info(t.host.def)?.surface?.dressed && (!slot.of || slot.of.includes(t.host.def)) && 2 * Math.min(t.hw, t.hd) >= (slot.minSide ?? 0));
+      .filter((t): t is Top => !!t && inside(r, t.host.x, t.host.z) && slot.on.includes(t.kind) && !info(t.host.def)?.keepClear && !info(t.host.def)?.surface?.dressed && (!slot.of || slot.of.includes(t.host.def)) && 2 * Math.min(t.hw, t.hd) >= (slot.minSide ?? 0) && withinReach(f, r, shapes, t.host as Placement));
     const riders = (top: Top) => f.objects.filter((o) => info(o.def)?.layer === 'surface' && covers(top, ...middleOf(shapes, o))).length;
     const order = tops.map((t) => ({ t, n: riders(t) + rng() })).sort((a, b) => a.n - b.n);
     for (const { t } of order) {
@@ -1699,6 +1701,43 @@ function onTops(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos, rng: () =>
       f.objects.splice(at, 0, { def, x: spot.x, z: spot.z, rot, ...(angle % 90 ? { turn: angle % 90 } : {}), ...(spot.offset[0] || spot.offset[1] ? { offset: spot.offset } : {}) });
       f.fronts.splice(at, 0, null);
       break;
+    }
+  }
+}
+
+/**
+ * Whether a resident can get at a small thing on `host`'s top in room `r`, as the simulation's
+ * load check has it (sim-core `surface::use_tiles`): from free floor of the room beside the top
+ * (the room's free floor is all reached: `reachable`); with none, from a seat pulled up to it
+ * (`facedTable`); with none of those, from where the top itself is used (`Floor.fronts`). A coffee
+ * table boxed in by a sofa, a side table and the walls has no way to what's on it.
+ */
+function withinReach(f: Floor, r: Room, shapes: Shapes, host: Placement): boolean {
+  const free = ([x, z]: [number, number]) => inside(r, x, z) && !f.taken.has(key(x, z));
+  const [w, d] = sizeOf(shapes.object(host.def), host.rot);
+  const on = (x: number, z: number) => x >= host.x && z >= host.z && x < host.x + w && z < host.z + d;
+  for (let z = host.z; z < host.z + d; z++) {
+    for (let x = host.x; x < host.x + w; x++) {
+      const beside: [number, number][] = [[x + 1, z], [x - 1, z], [x, z + 1], [x, z - 1]];
+      if (beside.some((t) => !on(...t) && free(t))) return true;
+    }
+  }
+  const usedFrom = (o: Placement) => (f.fronts[f.objects.indexOf(o)] ?? []).some(free);
+  // (Seats in the room: no wall between one and the top in front of it.)
+  const seats = f.objects.filter((o) => inside(r, o.x, o.z) && facedTable(shapes, f.objects, o, () => false) === host);
+  return seats.length ? seats.some(usedFrom) : usedFrom(host);
+}
+
+/** Takes the small things on tops in room `r` that nobody can get at any more (`withinReach`: furnishing it after, a lamp put beside a top). */
+function dropOutOfReach(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos): void {
+  const tops = f.objects.map((o) => topOf(shapes, o)).filter((t): t is Top => !!t && inside(r, t.host.x, t.host.z));
+  const gone = tops.filter((t) => !withinReach(f, r, shapes, t.host as Placement));
+  if (!gone.length) return;
+  for (let i = f.objects.length - 1; i >= 0; i--) {
+    const o = f.objects[i];
+    if (info(o.def)?.layer === 'surface' && gone.some((t) => covers(t, ...middleOf(shapes, o)))) {
+      f.objects.splice(i, 1);
+      f.fronts.splice(i, 1);
     }
   }
 }
