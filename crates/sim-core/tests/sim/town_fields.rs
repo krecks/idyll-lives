@@ -1,6 +1,7 @@
 //! A town file's open-world fields are read, kept on the world
 //! (`World::travel`, `travel::OpenWorld`) and saved with the game: size, roads, areas, typed
-//! exits, terrain masks, parking, plots' areas and kinds, driveways' roads. A town without them
+//! exits, terrain masks, parking bays and car parks, plots' areas and kinds, flats, driveways'
+//! roads. A town without them
 //! takes its meta's roads as the network (every town is open now: cosy and normal were dropped in
 //! 0.8.0).
 
@@ -73,4 +74,128 @@ fn a_town_without_them_is_big_and_uses_its_metas_roads() {
     assert!(json.get("openWorld").is_none());
     let back = World::from_save_json(&content, &world.save_json()).unwrap();
     assert_eq!(back.travel.graph.roads.len(), 1);
+}
+
+/// The real town's fixture (`tests/towns/flats.json`): a flats building of two storeys on a lot of
+/// its own (plot 0), its four flats (plots 1 to 4: two a storey, the hall between them), two of
+/// them with a bay in the front strip, and a car park of four bays down the street.
+const FLATS: &str = include_str!("../towns/flats.json");
+
+#[test]
+fn flats_are_plots_of_their_own_per_storey() {
+    let content = common::content();
+    let mut w = World::from_json(&content, FLATS, 1).unwrap();
+    assert_eq!(w.plots.len(), 5);
+    assert_eq!(w.plots[0].kind, Some(PlotKind::Flats));
+    assert!(!w.plots[0].is_flat());
+    for (id, storey) in [(1, 0), (2, 0), (3, 1), (4, 1)] {
+        let p = &w.plots[id];
+        assert_eq!(
+            (p.kind, p.of, p.storey),
+            (Some(PlotKind::Flat), Some(0), storey)
+        );
+    }
+    // Home is behind the flat's own door; arriving is at the building's street door.
+    assert_eq!(w.plots[1].home_point(), [11.5, 15.5]);
+    assert_eq!(w.plots[1].arrival_point(), [13.5, 17.5]);
+    assert_eq!(w.plots[0].home_point(), w.plots[0].arrival_point());
+    // Each tile's plot, on each storey: the flat there, else the building's lot.
+    let up = w.storey_row(1);
+    assert_eq!(up, 40);
+    assert_eq!(w.plot_at(10, 12), Some(1));
+    assert_eq!(w.plot_at(16, 12), Some(2));
+    assert_eq!(w.plot_at(10, 12 + up), Some(3));
+    assert_eq!(w.plot_at(16, 12 + up), Some(4));
+    assert_eq!(w.plot_at(13, 12), Some(0), "the hall");
+    assert_eq!(w.plot_at(13, 12 + up), Some(0), "the landing upstairs");
+    assert_eq!(w.plot_at(10, 25), Some(0), "the front strip");
+    assert_eq!(w.plot_at(30, 10), None);
+    // The letterboxes by the street door are their flats'.
+    let keepers: Vec<Option<u32>> = w
+        .objects
+        .iter()
+        .filter(|o| w.content.objects[o.def].id == "letterbox")
+        .map(|o| o.keeper)
+        .collect();
+    assert_eq!(keepers, [Some(1), Some(2), Some(3), Some(4)]);
+    // An hour goes by with them in it.
+    for _ in 0..sim_core::TICKS_PER_MINUTE * 60 {
+        w.tick_once();
+    }
+    // Saved and loaded back as they were (the cached tiles made again).
+    let back = World::from_save_json(&content, &w.save_json()).unwrap();
+    assert_eq!(back.plots, w.plots);
+    assert_eq!(back.plot_at(10, 12 + up), Some(3));
+    let kept = |w: &World| w.objects.iter().map(|o| o.keeper).collect::<Vec<_>>();
+    assert_eq!(kept(&back), kept(&w));
+}
+
+#[test]
+fn bays_park_as_the_file_says_and_the_structure_sends_them() {
+    let content = common::content();
+    let w = World::from_json(&content, FLATS, 1).unwrap();
+    let f = &w.travel.file;
+    assert_eq!(f.parking.len(), 4);
+    // (Nose in, away from the street: towards -z.)
+    let away = |yaw: f64| (yaw - std::f64::consts::PI).abs() < 1e-4;
+    assert!(
+        f.parking
+            .iter()
+            .all(|p| p.yaw.is_some_and(|y| away(f64::from(y))) && p.park == Some(0))
+    );
+    assert_eq!(f.car_parks.len(), 1);
+    let s: serde_json::Value = serde_json::from_str(&sim_core::view::structure_json(&w)).unwrap();
+    // The ground lots only (the building), with its kind; the flats on their own.
+    assert_eq!(s["plots"].as_array().unwrap().len(), 1);
+    assert_eq!(s["plots"][0]["kind"], "flats");
+    let flats = s["flats"].as_array().unwrap();
+    assert_eq!(flats.len(), 4);
+    assert_eq!(flats[2]["id"], 3);
+    assert_eq!(flats[2]["of"], 0);
+    assert_eq!(flats[2]["storey"], 1);
+    assert_eq!(flats[2]["door"], json!([12, 55]));
+    // Each bay as a car parks in it: the file's pose.
+    let parking = s["parking"].as_array().unwrap();
+    assert_eq!(parking.len(), 4);
+    for (bay, x) in parking.iter().zip([27.5, 30.5, 33.5, 36.5]) {
+        assert_eq!(bay["x"].as_f64(), Some(x));
+        assert!(away(bay["yaw"].as_f64().unwrap()));
+        assert_eq!(bay["park"], 0);
+    }
+    assert_eq!(s["carParks"][0]["sign"], json!([25.5, 30.5, 0.0]));
+    // The first update of a view sends them; the next, nothing having changed, doesn't again.
+    let mut sync = sim_core::view::StructureSync::default();
+    let first: serde_json::Value = serde_json::from_str(&sync.update_json(&w, true)).unwrap();
+    for key in ["flats", "parking", "carParks"] {
+        assert_eq!(first[key], s[key], "{key}");
+    }
+    let next: serde_json::Value = serde_json::from_str(&sync.update_json(&w, false)).unwrap();
+    for key in ["flats", "parking", "carParks"] {
+        assert!(next.get(key).is_none(), "{key} again");
+    }
+}
+
+#[test]
+fn flats_out_of_place_are_refused() {
+    let content = common::content();
+    let town: serde_json::Value = serde_json::from_str(FLATS).unwrap();
+    let refused = |change: &dyn Fn(&mut serde_json::Value)| {
+        let mut t = town.clone();
+        change(&mut t);
+        World::from_json(&content, &t.to_string(), 1)
+            .err()
+            .map(|e| e.0)
+    };
+    let out = refused(&|t| t["plots"][1]["x"] = json!(0)).unwrap();
+    assert!(out.contains("reaches out"), "{out}");
+    let up = refused(&|t| t["plots"][3]["storey"] = json!(2)).unwrap();
+    assert!(up.contains("no storey"), "{up}");
+    let door = refused(&|t| t["plots"][3]["door"] = json!([12, 15])).unwrap();
+    assert!(door.contains("door"), "{door}");
+    let after = refused(&|t| {
+        let lot = t["plots"][0].clone();
+        t["plots"].as_array_mut().unwrap().push(lot);
+    })
+    .unwrap();
+    assert!(after.contains("after the flats"), "{after}");
 }
