@@ -199,8 +199,7 @@ describe('flats', async () => {
   });
 
   test('flats over a shop: a stair hall of their own cut from its ground floor', () => {
-    // (Not the café with its tables out front: its letterboxes would have nowhere clear of the porch over its door.)
-    for (const place of ['shopSmall', 'cafeTiny', 'boutique']) {
+    for (const place of ['shopSmall', 'cafeSmall', 'boutique']) {
       for (const storeys of [2, 3]) {
         const b = flatsTemplate(t, overId(place, 77 + storeys, storeys))!;
         expect(b.place).toBe(place);
