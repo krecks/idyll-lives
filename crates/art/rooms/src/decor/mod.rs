@@ -10,7 +10,8 @@
 //!     wound (`door_open`, `wind`): its case is plain satin, not wood, and the entry's `draws` of 5 allows the door;
 //!   - the hanging plant sways when watered (`sway`);
 //!   - the fireplace's flames grow on the logs while a resident warms up (`flames`);
-//!   - the curtains are drawn closed at night (`close`), on cloth tabs over the rail.
+//!   - the curtains are drawn closed (`close`, `motions.night`: held while the game has them drawn, sim-core
+//!     `curtains.rs`), on cloth tabs over the rail.
 
 use artkit::family::{Family, Model, motions};
 use artkit::json::Json;

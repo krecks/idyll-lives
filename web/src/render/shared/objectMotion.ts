@@ -8,8 +8,9 @@
  * long when the use ends (a phone box's door letting the caller out). A loop (`loops`: a
  * rocking chair) goes round from rest to rest while the use lasts, then finishes its round. An
  * object that is open (the sim's `open`: a wall bed folded down) holds its `motions.open` clip
- * open as long as it stays so, and its `motions.night` clip (curtains drawn) from dusk to dawn,
- * whoever is asleep (a thing it lights, the candles' flames, only while its room's lights are on: `setUnlit`). A machine
+ * open as long as it stays so, and its `motions.night` clip (a coop's hatch shut) from dusk to dawn,
+ * whoever is asleep (a thing it lights, the candles' flames, only while its room's lights are on: `setUnlit`);
+ * curtains (content `overWindow`) hold theirs (drawn) while the sim has them drawn shut (`setCurtainsShut`), not by the clock. A machine
  * running on its own (the sim's `running`: a washer loaded, nobody at it) goes round its `motions.running` clip as a use's
  * loop does, finishing its round once it stops. A crop's `motions.growth` clip is held where its growth stage is, moving on
  * to the next stage at the clip's own pace. An ambient clip (`idle`: a ceiling fan, a fountain's water) goes
@@ -142,6 +143,8 @@ export interface MovingObject<D> {
   lamp?: boolean;
   /** A fire (content `light.fire`): these clips (its flames, its uses') are held open while it burns at night. */
   burns?: readonly string[];
+  /** Curtains (content `overWindow`): their `night` clip is held while they're drawn shut (`setCurtainsShut`), not from dusk to dawn. */
+  curtain?: boolean;
 }
 
 /** Metres from the camera within which clocks show the time, at least (Low has no ambient range). */
@@ -231,6 +234,10 @@ export class ObjectMotion<D> {
   private snapNight = false;
   /** Lamps and fires switched off (`setLampsOff`). */
   private lampsOff: ReadonlySet<number> = new Set();
+  /** Curtains drawn shut (`setCurtainsShut`); null until the sim first says. */
+  private curtainsShut: ReadonlySet<number> | null = null;
+  /** The curtains go straight to where the sim has them (the first word of it), without playing. */
+  private snapCurtains = false;
   /** Whether an object's glow is out with its room's lights (`setUnlit`): a night clip that lights it (candles) stays shut. */
   private unlit: (id: number) => boolean = () => false;
 
@@ -253,6 +260,12 @@ export class ObjectMotion<D> {
   /** The lamps (and fires) switched off, by object id (the sim's `lampsOff`): a fan's blades stop, a fire's flames die down. */
   setLampsOff(off: ReadonlySet<number>): void {
     this.lampsOff = off;
+  }
+
+  /** The curtains drawn shut, by object id (the sim's `curtainsShut`): drawn while they are, played as they're drawn or opened. */
+  setCurtainsShut(shut: ReadonlySet<number>): void {
+    if (this.curtainsShut === null) this.snapCurtains = true;
+    this.curtainsShut = shut;
   }
 
   /**
@@ -359,11 +372,11 @@ export class ObjectMotion<D> {
     return clip ? { name: name!, clip, at: (GROWTH_TIMES[o.stage!] ?? 0) * clip.duration } : undefined;
   }
 
-  /** The clips `o` holds open now: its `open` one while open, its `night` one at night, a fire's flames while it burns at night. */
+  /** The clips `o` holds open now: its `open` one while open, its `night` one at night (curtains' while drawn), a fire's flames while it burns at night. */
   private held(o: MovingObject<D>, held: string[] = []): string[] {
     held.length = 0;
     if (o.open && o.motions.open) held.push(o.motions.open);
-    if (this.night && o.motions.night && !this.unlit(o.id)) held.push(o.motions.night);
+    if (o.motions.night && (o.curtain ? !!this.curtainsShut?.has(o.id) : this.night && !this.unlit(o.id))) held.push(o.motions.night);
     if (this.night && o.burns && !this.lampsOff.has(o.id)) held.push(...o.burns);
     return held;
   }
@@ -401,8 +414,8 @@ export class ObjectMotion<D> {
         const clip = o.motion.clips.get(name);
         if (clip && !clips.has(name)) clips.set(name, { clip, time: 0, use: '', until: Infinity, start: 0, kind: 'use' });
       }
-      // The first lighting of a world: night clips as it is, without playing.
-      const snap = this.snapNight && o.motions.night !== undefined ? o.motions.night : undefined;
+      // The first lighting of a world: night clips as it is, without playing (curtains as the sim first says).
+      const snap = o.motions.night !== undefined && (o.curtain ? this.snapCurtains : this.snapNight) ? o.motions.night : undefined;
       if (growth && !clips.has(growth.name)) clips.set(growth.name, { clip: growth.clip, time: growth.at, use: '', until: Infinity, start: 0, kind: 'growth' });
       const idleClip = idle ? o.motion.clips.get(idle) : undefined;
       if (idle && idleClip && !clips.has(idle)) clips.set(idle, { clip: idleClip, time: 0, use: '', until: Infinity, start: 0, kind: 'idle' });
@@ -514,6 +527,7 @@ export class ObjectMotion<D> {
       if (!clips.size) this.states.delete(id);
     }
     this.snapNight = false;
+    this.snapCurtains = false;
     if (this.clocks.length && this.setClocks(eye, written)) ambient = true;
     // Each buffer written goes up once, however many of its instances moved; culled by where the parts
     // are now (an open door reaches out of the closed model's box). Ambient clips stay about where they

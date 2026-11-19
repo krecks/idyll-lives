@@ -150,6 +150,10 @@ export class SimBridge {
   /** The lamps switched off (object ids; sim-core `lights.rs`), as last sent. */
   private lampsOff: ReadonlySet<number> | null = null;
   private lampListeners: Listener<ReadonlySet<number>>[] = [];
+  /** The curtains drawn shut (object ids; sim-core `curtains.rs`), as last sent. */
+  private curtainsShut: ReadonlySet<number> | null = null;
+  private curtainsDue = false;
+  private curtainListeners: Listener<ReadonlySet<number>>[] = [];
   private uiListeners: Listener<UiUpdate>[] = [];
   private errorListeners: Listener<string>[] = [];
   private fatalListeners: Listener<string>[] = [];
@@ -396,6 +400,17 @@ export class SimBridge {
     return !!this.lampsOff?.has(id);
   }
 
+  /** The curtains drawn shut (object ids) whenever that changes; the latest replayed to late subscribers. */
+  onCurtains(fn: Listener<ReadonlySet<number>>): void {
+    this.curtainListeners.push(fn);
+    if (this.curtainsShut) fn(this.curtainsShut);
+  }
+
+  /** Whether curtains `id` are drawn shut, as last sent. */
+  curtainShut(id: number): boolean {
+    return !!this.curtainsShut?.has(id);
+  }
+
   /** The item `id` as last sent. */
   item(id: number): ItemPlacement | undefined {
     return this.items?.find((it) => it.id === id);
@@ -503,7 +518,7 @@ export class SimBridge {
     this.deliverTimer ??= setTimeout(this.deliver, DELIVER_LATE_MS);
   }
 
-  /** Hands the latest lamps, food and world to their listeners (the lamps first: the world is built with them). */
+  /** Hands the latest lamps, curtains, food and world to their listeners (the lamps and curtains first: the world is built with them). */
   private readonly deliver = (): void => {
     if (this.deliverTimer !== null) clearTimeout(this.deliverTimer);
     this.deliverTimer = null;
@@ -511,6 +526,10 @@ export class SimBridge {
     if (this.lampsDue && this.lampsOff) {
       this.lampsDue = false;
       notify(this.lampListeners, this.lampsOff);
+    }
+    if (this.curtainsDue && this.curtainsShut) {
+      this.curtainsDue = false;
+      notify(this.curtainListeners, this.curtainsShut);
     }
     if (this.itemsDue && this.items) {
       this.itemsDue = false;
@@ -543,6 +562,11 @@ export class SimBridge {
       case 'lamps':
         this.lampsOff = new Set(msg.off);
         this.lampsDue = true;
+        this.deliverSoon();
+        break;
+      case 'curtains':
+        this.curtainsShut = new Set(msg.shut);
+        this.curtainsDue = true;
         this.deliverSoon();
         break;
       case 'ui':

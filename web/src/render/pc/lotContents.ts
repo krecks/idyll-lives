@@ -809,10 +809,10 @@ export class LotContents {
           built: { template, motions },
         });
         if (motion && motions) {
-          // A lamp's fan turns while it's on; a fire's flames (its uses' clips) burn while it's lit.
+          // A lamp's fan turns while it's on; a fire's flames (its uses' clips) burn while it's lit; curtains are drawn as the sim has them.
           const light = def?.light;
           const burns = light?.fire ? [...new Set(Object.values(motions.uses).flatMap((clips) => clips.map((c) => c.clip)))] : undefined;
-          moving.push({ id: o.id, target: pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id), open: !!o.open, stage: o.growth, running: !!o.running, slotOf: slotOf(o, def), lamp: !!light && light.switch !== false, burns });
+          moving.push({ id: o.id, target: pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id), open: !!o.open, stage: o.growth, running: !!o.running, slotOf: slotOf(o, def), lamp: !!light && light.switch !== false, burns, curtain: !!def?.overWindow });
         }
         // Mirrors on a moving part (a mirror cabinet's door) follow that part's buffer.
         for (const [part, surfaces] of Map.groupBy(template.mirrors ?? [], (s) => s.part ?? -1)) {
@@ -1157,6 +1157,11 @@ export class LotContents {
   setLampsOff(off: ReadonlySet<number>): void {
     this.lampsOff = off;
     this.motion.setLampsOff(off);
+  }
+
+  /** The curtains drawn shut, by object id: drawn (their `night` clip) while they are. */
+  setCurtainsShut(shut: ReadonlySet<number>): void {
+    this.motion.setCurtainsShut(shut);
   }
 
   /**

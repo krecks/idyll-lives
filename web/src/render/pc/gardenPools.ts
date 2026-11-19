@@ -14,7 +14,7 @@ import { gradientTexture } from './street';
 import type { RGB } from '../shared/environment';
 import type { GardenPool } from '../shared/gardenPools';
 
-export { gardenPool, windowPools, type GardenPool } from '../shared/gardenPools';
+export { backEdges, curtainsLetThrough, gardenPool, windowPools, type GardenPool } from '../shared/gardenPools';
 
 /** A hair over the ground, so the pool isn't lost in it. */
 const LIFT = 0.03;

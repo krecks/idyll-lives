@@ -478,6 +478,8 @@ export interface Renderer {
   setItems(items: readonly ItemPlacement[]): void;
   /** The lamps switched off (object ids): no light, no glow (sim-core `lights.rs`). */
   setLampsOff(off: ReadonlySet<number>): void;
+  /** The curtains drawn shut (object ids): their `motions.night` clip held drawn, their windows' light kept in (sim-core `curtains.rs`). */
+  setCurtainsShut(shut: ReadonlySet<number>): void;
   /** Called every frame before drawing; must not allocate. */
   update(frame: FrameState): void;
   /**

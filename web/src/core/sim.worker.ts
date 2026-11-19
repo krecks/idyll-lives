@@ -52,6 +52,7 @@ let writer: SharedSnapshotWriter | null = null;
 let lastStructure = -1;
 let lastItems = -1;
 let lastLights = -1;
+let lastCurtains = -1;
 /** Lot version and region the renderer last got the lot (walls, rooms, meshes) for. */
 let lastLot = -1;
 let lastRegion = '';
@@ -325,6 +326,12 @@ function publish(now = false): void {
     lastLights = lights;
     worldAt = at;
     scope.postMessage({ type: 'lamps', off: JSON.parse(g.lamps_off()) });
+  }
+  const curtains = g.curtains_version();
+  if (due && (version !== lastStructure || curtains !== lastCurtains)) {
+    lastCurtains = curtains;
+    worldAt = at;
+    scope.postMessage({ type: 'curtains', shut: JSON.parse(g.curtains_shut()) });
   }
   if (due && version !== lastStructure) {
     postWorld();

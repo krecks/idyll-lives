@@ -124,7 +124,7 @@ export interface Motions {
   open?: string;
   /** The clip that goes round all the time, near the camera (a ceiling fan, a fountain's water; `ambientRange`). */
   idle?: string;
-  /** The clip held open from dusk to dawn, while the lamps are lit (curtains drawn), whoever is asleep. */
+  /** The clip held open from dusk to dawn, while the lamps are lit (a coop's hatch shut), whoever is asleep; curtains' (content `overWindow`) while the sim has them drawn shut (sim-core `curtains.rs`). */
   night?: string;
   /**
    * A crop's clip, held where its growth stage is (`GROWTH_TIMES`): ripe at rest, then picked,

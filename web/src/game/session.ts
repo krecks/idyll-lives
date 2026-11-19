@@ -737,6 +737,11 @@ async function openSession(
       bridge.send({ type: 'switchLamp', object: objectId, on: bridge.lampOff(objectId) });
       game.menu = null;
     },
+    drawCurtains(objectId) {
+      if (game.mode !== 'live') return;
+      bridge.send({ type: 'drawCurtains', object: objectId, shut: !bridge.curtainShut(objectId) });
+      game.menu = null;
+    },
     cancelAction(index) {
       bridge.send({ type: 'cancel', sim: game.selected, index });
     },
@@ -1272,6 +1277,9 @@ async function openSession(
   bridge.onLamps((off) => {
     if (!disposed) renderer.setLampsOff(off);
   });
+  bridge.onCurtains((shut) => {
+    if (!disposed) renderer.setCurtainsShut(shut);
+  });
   /**
    * Each resident's look as last made, by id: what it was made from (`key`), the look from their
    * seed (`base`, what their babies' come from) and at their life stage (`look`). The same look
@@ -1651,6 +1659,8 @@ async function openSession(
     // A lamp: its switch; a fire is lit and put out.
     const off = bridge.lampOff(objectId);
     if (def.light && def.light.switch !== false) items.unshift({ label: def.light.fire ? (off ? 'Light the fire' : 'Put out the fire') : off ? 'Turn on' : 'Turn off', index: -1 });
+    // Curtains (content `overWindow`): drawn or opened (`PieMenu`'s -2).
+    if (def.overWindow) items.unshift({ label: bridge.curtainShut(objectId) ? 'Open the curtains' : 'Draw the curtains', index: -2 });
     // Upgrades are bought in the catalog, not from here.
     if (items.length === 0) return;
     game.menu = { objectId, title: placement.quality ? `${def.name} ${'★'.repeat(placement.quality)}` : def.name, x, y, items };
