@@ -221,7 +221,7 @@ const CALL_REACH: f32 = 15.0;
 /// the household's car goes: on it, or (a flat's household) on its building's lot on the ground,
 /// its hall, stairs, yard and front strip, where the flat's car stands in its bay (its `Drive`).
 pub(crate) fn at_home_for_car(plots: &[Plot], on: Option<u32>, home: u32) -> bool {
-    on == Some(home) || on.is_some_and(|p| plots.get(home as usize).and_then(|h| h.of) == Some(p))
+    on == Some(home) || on.is_some_and(|p| plots.get(home as usize).is_some_and(|h| h.lot() == p))
 }
 /// Clearance from the inner end of a driveway to the car (m), as the town parks them.
 const PARK_GAP: f32 = 0.45;
