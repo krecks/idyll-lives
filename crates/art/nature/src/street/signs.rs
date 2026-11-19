@@ -1,6 +1,6 @@
-//! The street-name sign and the taxi rank's sign.
+//! The street-name sign, the taxi rank's sign and the car park's P sign.
 
-use super::common::{_band, _box, _lettering, _post};
+use super::common::{_band, _box, _lettering, _post, _post_turned};
 use super::{F, M};
 use artkit::far::{is_low, low};
 use artkit::forms::rounded_rect;
@@ -11,6 +11,7 @@ use artkit::place::Facing;
 use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
 use artkit::{fextrude, revolve};
+use std::f64::consts::{FRAC_PI_2, PI};
 
 pub fn sign() -> Vec<Obj> {
     let mut rng = Random::new(7);
@@ -247,6 +248,94 @@ pub fn taxi_sign() -> Vec<Obj> {
         );
     }
     join_all("taxiSign");
+    settle_with(
+        &meshes(),
+        Settle {
+            centre: false,
+            floor: true,
+        },
+    );
+    meshes()
+}
+
+// --- the car park's P sign: a white P on a blue panel, white-bordered, on a plate clamped to a post ----------------
+/// An outline in a face's plane (x, y).
+type Outline = Vec<(f64, f64)>;
+
+/// The P (game metres from the panel's middle, x right and y up): its stem, and its bowl round to the right of it, the
+/// bowl's hole cut through. Its curves in `segments` steps a half turn.
+fn letter_p(segments: usize) -> (Outline, Outline) {
+    let (stem, top, foot, waist) = ((-0.085, -0.03), 0.14, -0.14, -0.005);
+    let (cx, cy) = (0.03, (top + waist) / 2.0);
+    let (outer, inner) = ((top - waist) / 2.0, (top - waist) / 2.0 - 0.052);
+    let arc = |r: f64| -> Outline {
+        (0..=segments)
+            .map(|k| {
+                let a = -FRAC_PI_2 + PI * k as f64 / segments as f64;
+                (cx + r * a.cos(), cy + r * a.sin())
+            })
+            .collect()
+    };
+    let mut outline = vec![(stem.0, foot), (stem.1, foot), (stem.1, waist)];
+    outline.extend(arc(outer));
+    outline.push((stem.0, top));
+    let mut hole = vec![(stem.1, cy - inner)];
+    hole.extend(arc(inner));
+    hole.push((stem.1, cy + inner));
+    // (The hole the other way round: a hole in the outline. Both mirrored: an outline on the front is drawn as seen
+    // from behind it, `GameFrame::extrude`.)
+    hole.reverse();
+    let mirror = |v: Outline| v.into_iter().map(|(x, y)| (-x, y)).collect();
+    (mirror(outline), mirror(hole))
+}
+
+pub fn parking_sign() -> Vec<Obj> {
+    let full = !is_low();
+    // the post, capped, and the plate clamped to its front at the height a driver's eye finds it
+    _post_turned(&F, 2.4, 0.075, 0.035, 8);
+    _band(&F, "cap", 2.405, 0.04, 0.012);
+    let y = 2.15;
+    for dy in [-0.15, 0.15] {
+        let name = float_repr(y + dy);
+        if full {
+            _band(&F, format!("clamp{name}"), y + dy, 0.037, 0.03);
+        }
+        _box(
+            &F,
+            format!("lug{name}"),
+            0.05,
+            0.03,
+            0.016,
+            (0, y + dy, 0.043),
+            M.pole,
+            0.0,
+        );
+    }
+    // the plate: grey metal behind, white at its front with the blue panel set in
+    _box(&F, "plate", 0.46, 0.46, 0.012, (0, y, 0.057), M.pole, 0.004);
+    _box(&F, "border", 0.45, 0.45, 0.002, (0, y, 0.064), M.plate, 0.0);
+    let panel = rounded_rect(0.4, 0.4, low(0.02, 0.0), low(3, 1));
+    fextrude!(
+        F,
+        "panel",
+        &panel,
+        0.002,
+        (0, y, 0.066),
+        M.sign_blue,
+        plane = Facing::Front
+    );
+    let (outline, hole) = letter_p(low(10, 4));
+    fextrude!(
+        F,
+        "letter",
+        &outline,
+        0.002,
+        (0, y, 0.068),
+        M.plate,
+        plane = Facing::Front,
+        holes = [hole]
+    );
+    join_all("parkingSign");
     settle_with(
         &meshes(),
         Settle {

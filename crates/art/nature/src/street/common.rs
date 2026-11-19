@@ -203,7 +203,12 @@ pub fn _lettering(
 /// A round steel post from a flanged foot bolted to the ground up to `top`: the foot's profile turned, a collar
 /// where the post leaves it.
 pub fn _post(f: &GameFrame, top: f64, foot: f64, r: f64) {
-    let n = low(12, 6);
+    _post_turned(f, top, foot, r, 6);
+}
+
+/// `_post`, its far version turned in `far` sides (8 keeps the foot as deep as the full one's from the front).
+pub fn _post_turned(f: &GameFrame, top: f64, foot: f64, r: f64, far: usize) {
+    let n = low(12, far);
     let c = (r + 0.01).min(foot);
     let prof = [
         (0.0, 0.0),

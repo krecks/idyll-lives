@@ -1,11 +1,11 @@
 # Street: notes
 
 The street's dressing props (`model.street.*`): the kerbside bench, the planter with its little tree, the flower tub,
-the street-name sign, the taxi rank's sign, the door pot, the garden path light and the flower clump.
+the street-name sign, the taxi rank's sign, the car park's P sign, the door pot, the garden path light and the flower clump.
 One pack, `packs/street/manifest.json`, models in `models/street/`. Built 2026-10-16. They aren't buyable: no content entry, no Validate group.
 
 `render/pc/street.ts` draws them as thin instances (`PROP`, `FOLIAGE`): benches, planters and flower tubs along
-the kerb in front of the public places, the taxi rank's sign at a row's end beside its shelter (one a street at most, 60 m apart), the street-name signs at the ends of the streets, pots by the
+the kerb in front of the public places, the taxi rank's sign at a row's end beside its shelter (one a street at most, 60 m apart), the P sign by each car park (where the town file's `carParks` stand it: `render/shared/streetGround.ts`), the street-name signs at the ends of the streets, pots by the
 neighbours' front doors and path lights along their garden paths, flower clumps in the beds along their house fronts.
 The town overview draws the same street again from afar, from the far versions (`BuildOptions.far`). Each model is
 built where the game places it (game axes, `F`), at its size within 2 %; the bench and the taxi rank's sign stand
@@ -40,6 +40,7 @@ each at most half its size class's triangle target (street props stand by the do
 | `flowerTub` | 0.70 × 0.56 × 0.70 m | 1,952 | 466 | 2 | the same tub (no groove), a leafy mound and corner leaves, five big open blooms (five or six rounded petals round a raised eye, each on a cushion of leaves) and twelve smaller ones, tilted |
 | `sign` | 0.90 × 2.66 × 0.90 m | 1,684 | 272 | 1 | a post on a flanged foot with four bolts and a collar, a turned finial, two green blades with rounded corners crossing, white panels set in, a clamp band above and below each, dark green lettering (a capital to each word) on both faces |
 | `taxiSign` | 0.50 × 2.57 × 0.11 m | 1,660 | 288 | 1 (+1 at night) | the taxi rank's sign (2026-11-05, in place of the bus-stop sign, `busSign`, when the bus went): a slim post on a flanged foot up into a yellow case, a light box lettered TAXI on both faces (`taxi_word`; `sign_light`, `glow` `#FFE7A0`, lit at night as the taxi's roof sign looks) over two rows of the taxi's chequers (`chequer`); the fares (a yellow head lettered TAXI, lines and prices) in a framed case under a hood, clamped by two bands with lugs |
+| `parkingSign` | 0.46 × 2.41 × 0.15 m | 848 | 224 | 1 | the car park's P sign (2026-11-19, the real town): the street-name sign's post on its flanged foot (its far version turned in eight sides, so its foot is as deep), capped, two clamp bands with lugs holding a grey metal plate to its front at 2.15 m, white at its face, a blue panel with rounded corners set in (`sign_blue`), a white P on it (its stem and its bowl round to the right, the bowl's hole cut through: the kit's letters have no P) |
 | `pot` | 0.43 × 0.87 × 0.42 m | 1,264 | 282 | 2 | a terracotta pot with a foot ring and a rolled rim on a saucer, jittered soil, a clipped leafy ball with a smaller one on top |
 | `pathLight` | 0.18 × 0.56 × 0.18 m | 992 | 172 | 1 (+1 at night) | a dark bollard on a stepped, flared foot, a collar, the frosted lens behind three louvre rings on four thin bars, a domed cap, the access hatch's screw |
 | `flowers` | 0.60 × 0.34 × 0.53 m | 1,868 | 288 | 1 | three leafy clumps and three tufts, fourteen open flowers in seven colours, each on its stem from where the clump is under it (found by a ray cast), turned to face out |
@@ -50,7 +51,7 @@ which nothing drew, was dropped (2026-10-21, authenticity review M-town-02).
 Draws are unchanged by the detail pass. Before it (2026-10-16 to 10-22) the bench was 820 triangles, the planter
 1,092, the tub 1,408, the sign 944, the bus sign (now the taxi rank's) 700, the pot 704, the path light 308 and the clump 860.
 
-`check-glb`: 8 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings on all sixteen files.
+`check-glb`: 9 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings on all eighteen files.
 
 Built in Rust since 2026-11-18, proved against the last Blender build (`cargo check-glb --against ref/blender`). The
 clump's flowers are found on what stands when each is made: the clump and the flowers before it.
@@ -58,6 +59,6 @@ clump's flowers are found on what stands when each is made: the clump and the fl
 ## Rebuild
 
 ```
-cargo art street            # the eight .glb and .far.glb, the pack, check-glb
+cargo art street            # the nine .glb and .far.glb, the pack, check-glb
 cargo art street --preview  # previews/street/<id>.png, <id>.far.png
 ```
