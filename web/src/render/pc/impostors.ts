@@ -162,20 +162,21 @@ function impostorCode(lang: Language): ShaderFeature['glsl'] {
 #ifdef GAME_IMPOSTOR
 	dAlpha = ${tex('game_impostorDay')}.a;
 #endif`;
-  // (Rougher where the leaves' normals, blended in the far mipmaps, no longer agree: the shorter their average, the
-  // more ways the leaves under the texel face, and a crown can't catch the moon or the sun as one smooth sheen.)
+  // (Rougher only where the pictures a texel blends between disagree, read at their finest level as the lighting
+  // normal is: a picture's own leaves disagree in its mipmaps, and from 250 m out the fetch is coarse and the average
+  // short, so the gloss was gone on every far card — its crown catching the sky's blue at night, not the moon's sheen.)
   const gloss = wgsl
     ? `
 #ifdef GAME_IMPOSTOR
 	{
-		let impL = clamp(length(${tex('game_impostorNormal')}.rgb * 2.0 - vec3f(1.0)), 0.0, 1.0);
+		let impL = clamp(length(${fine('game_impostorNormal')}.rgb * 2.0 - vec3f(1.0)), 0.0, 1.0);
 		dGlossiness = ${tex('game_impostorSurface')}.g * pow(impL, ${float(TOKSVIG)});
 	}
 #endif`
     : `
 #ifdef GAME_IMPOSTOR
 	{
-		float impL = clamp(length(${tex('game_impostorNormal')}.rgb * 2.0 - vec3(1.0)), 0.0, 1.0);
+		float impL = clamp(length(${fine('game_impostorNormal')}.rgb * 2.0 - vec3(1.0)), 0.0, 1.0);
 		dGlossiness = ${tex('game_impostorSurface')}.g * pow(impL, ${float(TOKSVIG)});
 	}
 #endif`;
