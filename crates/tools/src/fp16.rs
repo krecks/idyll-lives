@@ -152,6 +152,19 @@ fn half(bits: u32) -> u16 {
     sign | h
 }
 
+/// `value` rounded to the nearest float16 (as `to_half` stores it), back as float32.
+pub(crate) fn round_to_half(value: f32) -> f32 {
+    let h = half(value.to_bits());
+    let sign = if h & 0x8000 != 0 { -1.0 } else { 1.0 };
+    let exp = i32::from((h >> 10) & 0x1f);
+    let mant = f32::from(h & 0x3ff);
+    match exp {
+        0 => sign * mant * 2f32.powi(-24),
+        0x1f => sign * f32::INFINITY,
+        e => sign * (1.0 + mant / 1024.0) * 2f32.powi(e - 15),
+    }
+}
+
 /// A float32 tensor's values as float16 bytes, or `None` if one doesn't fit (it would become
 /// infinite).
 pub(crate) fn to_half(values: &[f32]) -> Option<Vec<u8>> {

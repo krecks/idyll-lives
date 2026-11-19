@@ -29,23 +29,24 @@ const scope = self as WorkerScope;
 
 /** Bumped when the files change; older caches are deleted. (New files under new names don't need it.) */
 const CACHE_PREFIX = 'littlelives-voice-';
-// v6: the graphs' weights in 8-bit integers (0.7.0), the same names.
-const CACHE = `${CACHE_PREFIX}v6`;
+// v7: the matrix weights read in 8 bits on the GPU (`MatMulNBits`, 0.8.3), the same names.
+const CACHE = `${CACHE_PREFIX}v7`;
 /** Pocket TTS's encoded voices, no longer used: deleted. */
 const OLD_VOICES_PREFIX = 'littlelives-voices-';
 
 /**
  * Files under `voice/` (made by `cargo fetch-voice`), with sizes in bytes for the progress
  * bar. The graphs come with their weights in 8-bit integers (the duration predictor's in 16-bit
- * floats), gzipped (`.onnxz`: unpacked by `fetchOnce`).
+ * floats), gzipped (`.onnxz`: unpacked by `fetchOnce`). The matrix weights, nearly all of them,
+ * stay 8-bit on the GPU (`crates/tools/src/nbits.rs`): about 130 MB of GPU memory, not 400.
  */
 type File = [name: string, bytes: number];
 const MODEL_DIR = 'supertonic-3/';
 const MODELS = {
   duration: ['duration_predictor.onnxz', 1_633_681],
-  text: ['text_encoder.onnxz', 8_500_990],
-  vector: ['vector_estimator.onnxz', 55_258_368],
-  vocoder: ['vocoder.onnxz', 21_749_302],
+  text: ['text_encoder.onnxz', 9_142_040],
+  vector: ['vector_estimator.onnxz', 63_712_058],
+  vocoder: ['vocoder.onnxz', 24_824_344],
 } satisfies Record<keyof Engine['sessions'], File>;
 /** A voice style file is about 291 KB. */
 const STYLE_BYTES = 291_500;

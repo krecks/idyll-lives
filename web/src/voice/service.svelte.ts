@@ -66,7 +66,7 @@ export interface VoiceThreadStats {
 // Before `voiceStatus`, which reads stored results with them.
 const BENCH_KEY = 'littlelives.voiceBench';
 /** The model, its voices and the runtime: a new id discards old speed-test results and cached clips. */
-export const MODEL_ID = 'supertonic-3@3cadd1e+fp16w+6steps/ort-web@1.31.1';
+export const MODEL_ID = 'supertonic-3@3cadd1e+nb8w+6steps/ort-web@1.31.1';
 
 export const voiceStatus = $state({
   state: 'off' as ModelState,
@@ -79,8 +79,12 @@ export const voiceStatus = $state({
   bench: readBench(),
 });
 
-/** The download, MB: the runtime's WebGPU build, our WASM and dictionary (about 30.2 MB), the model (87.1 MB: 8-bit weights, gzipped) and its voices and text files (3.2 MB). */
-export const DOWNLOAD_MB = 120.6;
+/**
+ * The download, MB: the runtime's WebGPU build, our WASM and dictionary (about 30.2 MB), the
+ * model (99.3 MB: 8-bit weights, the matrix ones with a scale per block of 32, gzipped) and its
+ * voices and text files (3.2 MB).
+ */
+export const DOWNLOAD_MB = 132.8;
 const BENCH_LINES = [
   'Hello there!',
   "I'm so hungry, I could eat a whole pizza by myself.",

@@ -58,7 +58,7 @@ bun install
 bun run dev      # builds the WASM modules, fetches the voice and language models, then starts Vite on http://localhost:5173
 ```
 
-The first `bun run dev` or `bun run build` downloads the voice model (398 MB as published, its weights stored in 8 bits as 87 MB) and the language model (294 MB of weights as published, repacked to 228 MB without changing what it computes, stored gzipped as 196 MB) into `web/public/voice/` and `web/public/llm/` (not in git). Every file is pinned and checked by SHA-256, and files already there are kept.
+The first `bun run dev` or `bun run build` downloads the voice model (398 MB as published, its weights stored in 8 bits as 99 MB) and the language model (294 MB of weights as published, repacked to 228 MB without changing what it computes, stored gzipped as 196 MB) into `web/public/voice/` and `web/public/llm/` (not in git). Every file is pinned and checked by SHA-256, and files already there are kept.
 
 | Command (in `web/`) | What it does |
 |---|---|
