@@ -54,6 +54,14 @@ export interface SeenBird {
   distance: number;
 }
 
+/** A door or a gate that opened or fell shut (`Renderer.doorSounds`): the doorway's middle in tiles (`row` in lot rows, the storey in it). */
+export interface DoorSound {
+  x: number;
+  row: number;
+  shut: boolean;
+  gate: boolean;
+}
+
 /** A resident's stride as the renderer draws it (`Renderer.simStride`). */
 export interface SimStride {
   /** How far through its cycle it is, 0..1: the left heel strikes at 0, the right at 0.5. */
@@ -544,6 +552,8 @@ export interface Renderer {
   birds(): readonly SeenBird[];
   /** Bird `id` (`SeenBird.id`) sings for `seconds`: it lifts its head meanwhile. */
   birdSings(id: number, seconds: number): void;
+  /** The doors and gates that opened or fell shut since the last call, for the world's sound: kept and refilled, read it at once. */
+  doorSounds(): readonly DoorSound[];
   /** Centres the camera on a world point. */
   focus(x: number, z: number): void;
   /** Flies the camera to a world point, smoothly (the town map's "look here"; `shared/focus.ts` `Flight`). */

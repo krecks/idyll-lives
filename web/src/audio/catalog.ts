@@ -130,6 +130,17 @@ export const STEPS = {
 };
 
 /**
+ * Things that happen (`events.ts`): doors and gates (`gate`: a gate's share of a door's level; at most `voices`
+ * within `within` s and never two closer than `apart` s; none past `farthest` of the camera's distance gain, nor
+ * above game speed `fastest`), curtains (`most` a change) and cars (heard from nearness `near` up, `perLook` a look).
+ */
+export const EVENTS = {
+  door: { gate: 0.6, voices: 3, within: 0.6, apart: 0.15, farthest: 0.35, fastest: 2 },
+  curtain: { most: 2 },
+  car: { near: 0.25, perLook: 2 },
+};
+
+/**
  * The street and the weather (`outside.ts`, the loops of `crates/sound/src/outdoors.rs`).
  * - `car`: a car driving past: its engine's and its tyres' level right by the middle of the picture at `full` m/s
  *   on screen or more (a street's 32 km/h on the traffic's clock, four times as fast as real time: 35 m/s; stood at a light the engine idles at `idle` of that, the tyres are silent); how near it

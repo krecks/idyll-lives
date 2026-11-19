@@ -1279,6 +1279,7 @@ async function openSession(
   });
   bridge.onCurtains((shut) => {
     if (!disposed) renderer.setCurtainsShut(shut);
+    if (!disposed) worldSound.curtains(shut);
   });
   /**
    * Each resident's look as last made, by id: what it was made from (`key`), the look from their
