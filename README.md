@@ -2,7 +2,7 @@
 
 A home-building game with a living town, in the browser: you build and furnish a home, and its residents live in it on their own while you watch. Rust compiled to WebAssembly runs the simulation, PlayCanvas draws it on the GPU (WebGPU, with a WebGL2 fallback) and the interface is Svelte 5. Desktop only.
 
-**▶ Play it in your browser: https://krecks.github.io/idyll-lives/** (desktop Chrome, Edge, Brave or Safari; other browsers use the WebGL2 fallback). The language model for residents' lines needs WebGPU; voices use it when they can and otherwise run on the processor.
+**▶ Play it in your browser: https://krecks.github.io/idyll-lives/** (desktop Chrome, Edge, Brave or Safari; other browsers use the WebGL2 fallback). The voices and the language model for residents' lines use WebGPU when they can and otherwise run on the processor (Settings, Voices, Runs on), where the language model writes too slowly for most lines.
 
 ## Screenshots
 
@@ -11,7 +11,7 @@ A home-building game with a living town, in the browser: you build and furnish a
 <table>
 <tr>
 <td width="50%"><img src="docs/screenshots/night.jpg" alt="The same home in the evening, its lamps lit"><br><em>Evening: residents switch the lamps on as they come in.</em></td>
-<td width="50%"><img src="docs/screenshots/build.jpg" alt="Build mode with the catalog open"><br><em>Build › Furnish: over 500 objects, every one built in Blender.</em></td>
+<td width="50%"><img src="docs/screenshots/build.jpg" alt="Build mode with the catalog open"><br><em>Build › Furnish: over 500 objects, every one generated in code.</em></td>
 </tr>
 <tr>
 <td><img src="docs/screenshots/neighbourhood.jpg" alt="Choosing a household in a generated town"><br><em>A new game: a generated town and the households who live there.</em></td>
@@ -27,16 +27,16 @@ A home-building game with a living town, in the browser: you build and furnish a
 
 Build a home and watch the people who live in it.
 
-- **Start:** create a world (a town, a farm, a seaside village, a mountain hamlet, …), choose the neighbours, then play one of the households who already live there or make your own in **Creation**, and move in.
+- **Start:** New game goes in five steps: the land (a countryside, a river valley, an island, …, shaped with brushes if you like), its streets and zones, the town built from them, a household (one of the town's own or your own from **Creation**) and the home they move into.
 - **Live (L):** everyone in town works, makes friends, falls in love and grows older on their own, your household included, and gets about on foot, by bike or e-scooter, in the household's car or on a neighbour's lift. Click a resident to see their needs and plans and to step in; leave the game alone and the camera follows what happens at home.
-- **Build (B):** time stands still while you furnish (V), build walls, rooms, doors, windows and stairs (C) and see how each room is doing (O).
+- **Build (B):** time stands still while you furnish (V), build walls, rooms, doors, windows and stairs (C), see how each room is doing (O) and shape the land (G).
 - **A life:** 1000 jobs, 13 skills, a weekly planner (P), rent and bills, a garden to grow, and residents who can speak lines of their own (a voice model and a small language model, both run in the browser).
 
 | Input | Action |
 |---|---|
 | Left-click | A resident: their panel · an object: what to do with it · the floor: walk there |
 | Left- or middle-drag / right-drag / wheel | Rotate / pan / zoom (arrow keys and + / − too, once the view has the focus) |
-| Space, 0–5 | Pause, game speed |
+| Space, 0–4 | Pause, game speed (4: super speed, 30×, 60× in quiet hours) |
 | L / B | Live / Build |
 | F · H · J · P · M | Follow · whole house · journal · planner · town map |
 | Tab, double-click a card | Look at the next resident, follow one |
@@ -55,29 +55,32 @@ rustup toolchain install       # in the repo: the pinned toolchain, as CI does
 cargo install wasm-bindgen-cli --version 0.2.130
 cd web
 bun install
-bun run dev      # builds both WASM modules, fetches the voice and language models, then starts Vite on http://localhost:5173
+bun run dev      # builds the WASM modules, fetches the voice and language models, then starts Vite on http://localhost:5173
 ```
 
-The first `bun run dev` or `bun run build` downloads the voice model (398 MB as published, its weights stored in 8 bits as 87 MB) and the language model (294 MB of weights as published, repacked to 228 MB without changing what it computes, stored gzipped as 196 MB) into `web/public/voice/` and `web/public/llm/` (not in git). Every file is pinned and checked by SHA-256, and files already there are kept.
+The first `bun run dev` or `bun run build` downloads the voice model (398 MB as published, its weights stored in 8 bits as 99 MB) and the language model (294 MB of weights as published, repacked to 228 MB without changing what it computes, stored gzipped as 196 MB) into `web/public/voice/` and `web/public/llm/` (not in git). Every file is pinned and checked by SHA-256, and files already there are kept.
 
 | Command (in `web/`) | What it does |
 |---|---|
-| `bun run dev` | `wasm`, `voice` and `llm`, then the dev server |
+| `bun run dev` | `wasm`, `sound`, `voice` and `llm`, then the dev server |
 | `bun run build` / `bun run preview` | Production build / serve it |
 | `bun run wasm` | Build the simulation's WASM (release, `--locked`) |
+| `bun run sound` | Build the sounds' WASM (`crates/sound`: every sound the game makes; the tests that make sounds need it too) |
 | `bun run voice` | Build the voice WASM and fetch the voice model and dictionary (`cargo fetch-voice`) |
 | `bun run llm` | Fetch the language model (`cargo fetch-llm`) |
 | `bun run check` | Type-check TypeScript and Svelte |
 | `bun run lint` | Lint the web code |
 | `bun run test` | The renderer's engine-neutral tests (`web/tests`, `bun test`) |
 | `bun run check:chunks` | Check that the PlayCanvas internals the renderer patches or reads are still there (`cargo check-chunks` over the list in `tools/render/chunks.json`; run it after a PlayCanvas upgrade) |
-| `bun run sounds` | Render every synthesised sound of the game (things in use, the outdoors, the interface) to a WAV with its length, level, loudness and spectral centroid, and the content that sounds it (`tools/audio/listen.ts`; for listening to them, `G-53`) |
+| `bun run sounds` | (After `bun run sound`.) Render every synthesised sound of the game (things in use, the outdoors, the interface) to a WAV with its length, level, loudness and spectral centroid, and the content that sounds it (`tools/audio/listen.ts`; for listening to them, `G-53`); `--out <folder>` writes them there, `--against <folder>` holds them to an earlier render (each sound's loudness and centroid that moved, exit 1 past 1 LU) |
+| `bun run sounds:time` | (After `bun run sound`.) Time every sound made through the WebAssembly, slowest first, with a total a family (`tools/audio/time.ts`; `--runs <n>`, `--json <file>`, `--compare <file>`, `--max-music <ms>`, `--wasm <file>`) |
 | `bun run test:sim` | Run the Rust simulation tests |
+| `bun run test:sound` | Run the sound crate's tests (each sound made and held to what it should be) |
 | `bun run test:voice` | Run the voice crate's tests (needs `bun run voice` for the dictionary) |
 | `bun run check:voice` | Check the voices in Bun against golden hashes (`tools/voice/check.mjs`) |
 | `bun run check:llm` | Check the language model's prompts, cleaning and golden lines in Bun (`tools/llm/check.mjs`; several minutes). Run it by hand when a prompt, a cleaning rule or the model changes, not on every release |
 | `bun run devices:llm` | Run the voices and language model's device test in Chromium (`tools/llm/devices.mjs`) |
-| `bun ../tools/llm/bench.mjs` | Benchmark the language model on its own: the game's worker, model and prompts with no game around it (load, prompt, tokens a second, the game's five lines), cold and with the page reloaded; writes `bench-results/llm-*/` |
+| `bun ../tools/llm/bench.mjs` | Benchmark the language model on its own: the game's worker, model and prompts with no game around it (load, prompt, tokens a second, the game's five lines), cold and with the page reloaded; `--cpu` on the processor; writes `bench-results/llm-*/` |
 | `bun run assets` | Build or update the compressed asset copies (the build does this too) |
 | `bun run decoders` | Refresh `public/decoders` (PlayCanvas's Basis Universal transcoder for KTX2 textures) after a PlayCanvas upgrade (`cargo decoders`) |
 
@@ -132,6 +135,7 @@ Main thread                                   Sim worker
 |---|---|---|
 | `crates/sim-core` | All game rules: needs, AI, pathfinding, town, social life, saves, geometry generation | Know about browsers, rendering or asset files |
 | `crates/sim-wasm` | JS bindings | Contain game logic |
+| `crates/artkit`, `crates/art` | The item models: the kernel and the families that build them into `.glb` files and packs (`cargo art`) | Ship with the game (it reads only the files they write) |
 | `web/src/core` | Worker, bridge, protocol, snapshot channel | Render or touch the DOM |
 | `web/src/render` | Everything drawn; `types.ts` is the contract (below) | Contain game rules; allocate per frame |
 | `web/src/assets` | Key → file resolution | Hard-code art anywhere else |
@@ -162,7 +166,7 @@ All art is referenced by **key**, never by path:
 - `web/public/content/base.json`: gameplay data. Objects name their model key (`"model": "model.fridge"`); needs name their icon key.
 - `web/public/assets/manifest.json`: maps keys to files.
 
-A model entry is its file, with what the game needs to know about it. Every object's model is a glTF built in Blender (`tools/art/blender`, `cargo art`), listed in a pack per family (`assets/packs/<family>/manifest.json`, all under the base manifest's `"packs"`): `materials` maps each material to one of the game's finishes, `paint` names the parts the player can colour, and `motions` the clips a use plays (here, shortened):
+A model entry is its file, with what the game needs to know about it. Every object's model is a glTF generated in Rust (`crates/art`, `cargo art`), listed in a pack per family (`assets/packs/<family>/manifest.json`, all under the base manifest's `"packs"`): `materials` maps each material to one of the game's finishes, `paint` names the parts the player can colour, and `motions` the clips a use plays (here, shortened):
 
 ```json
 "model.fridge": {
@@ -183,7 +187,7 @@ To ship a whole art set without editing the base manifest, create a pack and lis
 { "version": 1, "entries": { "icon.need.hunger": { "type": "icon", "url": "icons/hunger.png", "mode": "image" } } }
 ```
 
-Model conventions: 1 unit = 1 metre, origin at the footprint centre on the floor, front facing +Z. How to build a new object in Blender (scale, budgets, finishes, export, checks): [docs/design/objects.md](docs/design/objects.md). Monochrome SVG icons are recoloured by CSS (`mode: "mask"`); use `mode: "image"` for full-colour art.
+Model conventions: 1 unit = 1 metre, origin at the footprint centre on the floor, front facing +Z. How to build a new object (scale, budgets, finishes, export, checks): [docs/design/objects.md](docs/design/objects.md); the code and the commands: [crates/art/README.md](crates/art/README.md). Monochrome SVG icons are recoloured by CSS (`mode: "mask"`); use `mode: "image"` for full-colour art.
 
 ## Adding gameplay content
 
@@ -200,21 +204,21 @@ Pack authors: see [docs/content-packs.md](docs/content-packs.md).
 
 ## Versions and releasing
 
-The current version is **0.8.2**. One version number covers the whole game: `web/package.json` (shown in the main menu and Credits, with the commit it was built from), the Rust workspace in `Cargo.toml` and the workspace crates' entries in `Cargo.lock`. `cargo release-version` prints it and fails if they differ (CI checks this); `cargo release-version 0.3.0` sets all three. Each release is a git tag `vX.Y.Z` with notes in [CHANGELOG.md](CHANGELOG.md).
+The current version is **0.8.3**. One version number covers the whole game: `web/package.json` (shown in the main menu and Credits, with the commit it was built from), the Rust workspace in `Cargo.toml` and the workspace crates' entries in `Cargo.lock`. `cargo release-version` prints it and fails if they differ (CI checks this); `cargo release-version 0.3.0` sets all three. Each release is a git tag `vX.Y.Z` with notes in [CHANGELOG.md](CHANGELOG.md).
 
-Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save.rs`: 39 since 0.8.1, for the town's backdrop, places and centres (38) and the porches (39) (37 in 0.8.0, for the traffic's own clock; 36 in 0.7.0, for its new clock of 60 ticks a real second and 75 a game minute; 35 in 0.6.0, 33 in 0.5.0 and 0.5.1, 32 in 0.3.1 to 0.4.2, 29 in 0.3.0, 23 in 0.2.0; 0.1.0 wrote 17). Older saves are migrated when they load, and `crates/sim-core/tests/sim/old_saves.rs` loads real saves from 0.1.0 and the build after it. A save from a newer version is kept and skipped, and a damaged one is removed with a notice.
+Saves have their own format version, `SAVE_VERSION` in `crates/sim-core/src/save.rs`: 41 since 0.8.3, for the household's car that fits its best earner's job (40, for the speed super speed drops back to; 39 in 0.8.1 and 0.8.2, for the town's backdrop, places and centres (38) and the porches (39); 37 in 0.8.0, for the traffic's own clock; 36 in 0.7.0, for its new clock of 60 ticks a real second and 75 a game minute; 35 in 0.6.0, 33 in 0.5.0 and 0.5.1, 32 in 0.3.1 to 0.4.2, 29 in 0.3.0, 23 in 0.2.0; 0.1.0 wrote 17). Older saves are migrated when they load, and `crates/sim-core/tests/sim/old_saves.rs` loads real saves from 0.1.0 and the build after it. A save from a newer version is kept and skipped, and a damaged one is removed with a notice.
 
 **Releasing** (`.github/workflows/pages.yml`):
 1. `cargo release-version <x.y.z>` (it updates `Cargo.lock` too, so no `cargo build` is needed), and a `## <x.y.z> — <date>` section in CHANGELOG.md, with the date set by hand. Commit both on `main`, and `git push origin main`: the dry run builds what GitHub has.
-2. A dry run on `main`: `gh workflow run pages.yml --ref main -f deploy=false`. `gh run watch` needs the run's id: `gh run list --workflow pages.yml -L1 --json databaseId -q '.[0].databaseId'`, then `gh run watch <id> --exit-status`. It runs what only a release build checks (the version, the voice tests, `bun run check:voice`, `check` and `lint`, the build, a size check under 900 MB) without publishing; the tests (clippy with `-D warnings`, the simulation, tools and renderer tests, tickbench, `check:chunks`) are CI's, which ran on the push to `main`. It works on any branch, and `-f deploy=true` publishes once a CI run on that commit has passed. Run it on `main` just before tagging: the caches it saves there (the Rust build, voice and language models, assets) can be read by the tag's run.
-3. Tag and push: `git tag -a v<x.y.z> -m "..."` and `git push origin v<x.y.z>`. The tag's run checks that the tag matches the version and that CHANGELOG.md has its heading, builds, waits for the tag's own CI run (every test, the generated worlds and the slow tests too, about 20 minutes) to pass, and publishes to GitHub Pages; if that CI run fails, nothing is published. Pushes to `main` alone don't publish. Watch it as in step 2 (`gh run list --workflow pages.yml --event push -L1 …`), and don't start other runs while it waits: GitHub keeps only one waiting run per concurrency group and cancels the older one.
+2. A dry run on `main`: `gh workflow run pages.yml --ref main -f deploy=false`. `gh run watch` needs the run's id: `gh run list --workflow pages.yml -L1 --json databaseId -q '.[0].databaseId'`, then `gh run watch <id> --exit-status`. It runs what only a release build checks (the version, the voice tests, `bun run check:voice`, `check` and `lint`, the build, a size check under 900 MB) without publishing; the tests (clippy with `-D warnings`, the simulation, tools and renderer tests, tickbench, `check:chunks`) are CI's, which ran on the push to `main`. It works on any branch, and `-f deploy=true` publishes once a CI run on that commit has passed. Run it on `main` just before tagging: the caches it saves there (voice and language models, assets) can be read by the tag's run; the Rust build stays on the self-hosted runner.
+3. Tag and push: `git tag -a v<x.y.z> -m "..."` and `git push origin v<x.y.z>`. The tag's run checks that the tag matches the version and that CHANGELOG.md has its heading, builds, waits for the tag's own CI run (every test, the generated worlds and the slow tests too; on the one self-hosted runner its jobs and the build go one after another) to pass, and publishes to GitHub Pages; if that CI run fails, nothing is published. Pushes to `main` alone don't publish. Watch it as in step 2 (`gh run list --workflow pages.yml --event push -L1 …`), and don't start other runs while it waits: GitHub keeps only one waiting run per concurrency group and cancels the older one.
 4. Check the live site:
    - The menu shows the new version, and Credits "Version <x.y.z> (build <the tagged commit>)". (To find the version in the bundle, search `index-*.js` for it without double quotes: it sits in backticks.)
    - F3 shows Shared memory: on, and a game runs.
    - The large files download in full, which only the live site can show: `llm/lfm2.5-350m/model_q4.onnx_dataz` returns 200 and is 195,523,654 bytes (gunzipped, its SHA-256 is the one in `crates/tools/src/llmfetch.rs`), and `voice/supertonic-3/vector_estimator.onnxz` is 55,258,368 bytes (both packed by the Rust fetch tools; what matters is the unzipped SHA-256).
 5. Publish the release notes: `gh release create v<x.y.z> --verify-tag --title "Idyll Lives <x.y.z>" --notes-file <the version's CHANGELOG section>`.
 
-**If a release goes wrong,** fix forward, or redeploy the last good build (`gh workflow run pages.yml --ref <tag> -f deploy=true`). 0.8.1 and 0.8.2 share save format 39, so 0.8.1 is a safe build to go back to (with 0.8.2's fix to the shadows on WebGPU undone). 0.8.0 can't open 0.8.1's saves (format 39, for the town's backdrop and the porches), so it is one to go back to only with that in mind: it keeps them and lists only the saves it can open. 0.7.0 can't open 0.8.0's saves (format 37, for the traffic's own clock), so it is one to go back to only with that in mind: it keeps them and lists only the saves it can open. 0.6.0 can't open 0.7.0's saves (format 36, for the new clock), so it is one to go back to only with that in mind: it keeps them and lists only the saves it can open. 0.5.1 can't open 0.6.0's saves (format 35), so it is one to go back to only with that in mind; 0.5.0 and 0.5.1 share save format 33, so 0.5.0 is a safe build to go back to; 0.4.2 can't open format 33, so it is one to go back to only with that in mind (0.3.1 to 0.4.2 share format 32); 0.3.0 can't open 0.3.1's saves (format 32), 0.2.0 can't open 0.3.0's (format 29), and v0.1.0 can't open 0.2.0's database (version 2): an older build keeps the newer saves and skips them, so it lists only the saves it can open. Nothing is lost; the saves come back with the newer build.
+**If a release goes wrong,** fix forward, or redeploy the last good build (`gh workflow run pages.yml --ref <tag> -f deploy=true`). 0.8.2 can't open 0.8.3's saves (format 41, for the speed super speed drops back to and the cars that fit their owners' jobs), so it is one to go back to only with that in mind: it keeps them and lists only the saves it can open. 0.8.1 and 0.8.2 share save format 39, so 0.8.1 is a safe build to go back to (with 0.8.2's fix to the shadows on WebGPU undone). 0.8.0 can't open 0.8.1's saves (format 39, for the town's backdrop and the porches), so it is one to go back to only with that in mind: it keeps them and lists only the saves it can open. 0.7.0 can't open 0.8.0's saves (format 37, for the traffic's own clock), so it is one to go back to only with that in mind: it keeps them and lists only the saves it can open. 0.6.0 can't open 0.7.0's saves (format 36, for the new clock), so it is one to go back to only with that in mind: it keeps them and lists only the saves it can open. 0.5.1 can't open 0.6.0's saves (format 35), so it is one to go back to only with that in mind; 0.5.0 and 0.5.1 share save format 33, so 0.5.0 is a safe build to go back to; 0.4.2 can't open format 33, so it is one to go back to only with that in mind (0.3.1 to 0.4.2 share format 32); 0.3.0 can't open 0.3.1's saves (format 32), 0.2.0 can't open 0.3.0's (format 29), and v0.1.0 can't open 0.2.0's database (version 2): an older build keeps the newer saves and skips them, so it lists only the saves it can open. Nothing is lost; the saves come back with the newer build.
 
 Each CI run keeps the site's WASM with function names as an artifact for 90 days (`wasm-with-names-<sha>`). It runs the same optimisations as the site with the name section kept, so its function numbers match the shipped WASM and a crash stack from the site can be read with it.
 
