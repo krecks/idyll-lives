@@ -363,7 +363,8 @@ pub fn clink(
         // (6.28 as the TypeScript has it, not 2π: the phases are what they were.)
         #[allow(clippy::approx_constant)]
         let phase = rnd() * 6.28;
-        if f < if under { 2500.0 } else { 16000.0 } {
+        // (Under 0.45 of the rate too: a partial a low rate cannot carry is left out, not held at its top.)
+        if f < min(if under { 2500.0 } else { 16000.0 }, 0.45 * rate) {
             partials.push(Mode {
                 hz: f,
                 tau,
