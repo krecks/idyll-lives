@@ -1684,7 +1684,7 @@ function openWorldFields(town: NeighbourhoodDraft, drives: TownLayout['drives'],
   return {
     areas,
     exits,
-    file: { terrain: { water: open.water }, parking: open.parking.map((p) => bayOf(town.roads, roads, p)), drives: filed, cars: parked },
+    file: { terrain: { water: open.water }, parking: open.parking?.map((p) => bayOf(town.roads, roads, p)), drives: filed, cars: parked },
     meta: { zones: open.zones, pads: open.pads, areas, ...(open.backdrop ? { backdrop: open.backdrop } : {}), ...(open.places ? { places: open.places } : {}), ...(open.centre ? { centre: open.centre } : {}), ...(open.relief ? { relief: open.relief } : {}), ...(open.land && (open.land.edited || open.land.seeded === 'follow') ? { land: encodeLand(open.land) } : {}) },
   };
 }
