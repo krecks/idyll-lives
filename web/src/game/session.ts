@@ -2272,7 +2272,12 @@ async function openSession(
         const out = { x: 0, y: 0 };
         return renderer.project(x, y, z, out) ? out : null;
       },
-      home: () => buildBuy.home(),
+      /** The player's home as the views have it (`plotInfo`: a flat its own rectangle and id) on its storey, whatever storey is in view. */
+      home() {
+        const plot = game.households.find((h) => h.player)?.plot;
+        const home = plotInfo(game, plot);
+        return home ? { ...home, storey: flatOf(game, plot!)?.storey ?? 0 } : null;
+      },
       /** Sim-clock minute of the newest snapshot (changes when one arrives). */
       snapshotMinute: () => bridge.latest()[bridge.layout.header.minute],
       renderer,
