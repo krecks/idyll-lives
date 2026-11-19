@@ -827,7 +827,7 @@
       "group": "yard",
       "outdoors": true,
       "decor": 0.1,
-      "description": "The household's own letterbox: the post comes every morning and its flag goes up. Someone fetches it and reads it over; now and then there's a letter from a friend, and letters written at home reach friends who have a letterbox too.",
+      "description": "The household's own letterbox on a post: the post comes every morning, a letter showing in its slot. Someone fetches it and reads it over; now and then there's a letter from a friend, and letters written at home reach friends who have a letterbox too.",
       "interactions": [
         {
           "id": "fetchPost",
@@ -860,13 +860,20 @@
       "freeRotation": true,
       "group": "yard",
       "outdoors": true,
-      "description": "Forty metres of green hose on a reel cart. Watering the garden with it brings every growing crop on the lot on at once, quicker than a can plant by plant.",
+      "grows": {
+        "days": 0.5,
+        "fallow": 0,
+        "boughtRipe": true
+      },
+      "description": "Forty metres of green hose on a reel cart. Watering the garden with it brings every growing crop on the lot on at once, quicker than a can plant by plant; the garden wants it again half a day later.",
       "interactions": [
         {
           "id": "waterGarden",
           "label": "Water the garden",
           "anim": "water",
           "minutes": 15,
+          "when": "ripe",
+          "leaves": "picked",
           "waters": 0.05,
           "effects": {
             "fun": 0.08
@@ -897,9 +904,10 @@
       "outdoors": true,
       "grows": {
         "days": 3,
-        "fallow": 0
+        "fallow": 0,
+        "boughtRipe": true
       },
-      "description": "A petrol push mower. The grass wants cutting every three days; a freshly mown lawn leaves whoever mowed it pleased for two days, and Nature lovers like the job.",
+      "description": "A petrol push mower, ready to mow the lawn at once; after a mow the grass wants cutting again in three days. A freshly mown lawn leaves whoever mowed it pleased for two days, and Nature lovers like the job.",
       "interactions": [
         {
           "id": "mow",

@@ -4112,6 +4112,11 @@
       "icon": "icon.category.fitness"
     },
     {
+      "id": "wellness",
+      "label": "Wellness",
+      "icon": "icon.category.wellness"
+    },
+    {
       "id": "hobbies",
       "label": "Hobbies",
       "icon": "icon.category.hobbies",

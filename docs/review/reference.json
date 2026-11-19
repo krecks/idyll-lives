@@ -949,6 +949,18 @@
     "almostHeavenTyrol": {
       "title": "Almost Heaven Tyrol, 2–3 person indoor sauna: 76 9/16 in wide × 61 7/16 in deep × 80 5/16 in high, two benches, glass front",
       "url": "https://www.saunaplace.com/products/almost-heaven-tyrol-basic-medium-view-2-3-person-indoor-sauna"
+    },
+    "burgPotsdam878": {
+      "title": "Burg-Wächter Potsdam 878 fence post box: 322 × 362 × 100 mm (H × W × D)",
+      "url": "https://www.esafes.co.uk/burg-wachter-potsdam-878-fence-post-box"
+    },
+    "burgComfort913": {
+      "title": "Burg-Wächter Comfort 913 post box: 340 × 380 × 148 mm, for a wall or a freestanding rack",
+      "url": "https://www.esafes.co.uk/burg-wachter-comfort-913-post-box"
+    },
+    "burgEuropaStand": {
+      "title": "BURG-WÄCHTER stand for the Europa letter box (freestanding): 1200 × 80 × 80 mm, set in concrete",
+      "url": "https://uk.burg.biz/p/post-box/stand-for-europa"
     }
   },
   "kinds": {
@@ -14843,6 +14855,35 @@
       "sources": [
         "almostHeavenTyrol"
       ]
+    },
+    "gardenLetterbox": {
+      "label": "Garden letterbox on a post (a house's own)",
+      "w": [
+        0.25,
+        0.45
+      ],
+      "h": [
+        1.1,
+        1.6
+      ],
+      "d": [
+        0.1,
+        0.35
+      ],
+      "uses": [
+        "collect the post"
+      ],
+      "mechanisms": {
+        "door": [
+          90,
+          180
+        ]
+      },
+      "sources": [
+        "burgPotsdam878",
+        "burgComfort913",
+        "burgEuropaStand"
+      ]
     }
   },
   "groups": {
@@ -15492,7 +15533,7 @@
     "reeds": "reeds",
     "beachHut": "beachHut",
     "waterBench": "parkBench",
-    "letterbox": "mailbox",
+    "letterbox": "gardenLetterbox",
     "hoseReel": "hoseReelCart",
     "lawnMower": "lawnMower",
     "meditationCushion": "floorCushion",
