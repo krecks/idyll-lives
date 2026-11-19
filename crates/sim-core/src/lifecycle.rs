@@ -179,6 +179,7 @@ fn retire_if_due(w: &mut World, i: usize, reached: bool) {
     sim.retired = true;
     sim.pension = pension;
     sim.job = None;
+    crate::cars::job_lost(&mut w.cars, i as u32);
     if let Some(f) = feeling {
         social::add_feeling(&mut sim.feelings, f, &w.content.feelings, w.tick);
     }

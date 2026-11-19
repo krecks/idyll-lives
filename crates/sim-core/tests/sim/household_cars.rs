@@ -1,6 +1,7 @@
 //! A household's car fits its best earner's job (`cars/looks.rs`): the body a field's grade calls
 //! for (`careerCategories[].car`) and how old it is (`grades[].carAge`), from the start, after a
-//! promotion or a new job (bought once it stands idle, the story told), kept by a household with
+//! promotion or a new job (bought once it stands idle, the story told; not if the job is given up
+//! first), kept by a household with
 //! nobody at work, kept where a longer one wouldn't fit, and kept in the save.
 
 use crate::common;
@@ -146,6 +147,25 @@ fn a_new_job_buys_the_car_it_calls_for_and_out_of_work_they_keep_it() {
     .unwrap();
     w.tick_once();
     assert_eq!((w.cars[1].body, w.cars[1].age), (0, CarAge::Old));
+}
+
+#[test]
+fn a_car_called_for_by_a_job_given_up_before_it_is_bought_is_not_bought() {
+    let mut w = world("", "");
+    w.autonomy = false;
+    w.apply(Command::JoinCareer {
+        sim: 2,
+        career: 1,
+        level: 0,
+    })
+    .unwrap();
+    assert!(w.cars[1].want.is_some(), "a van wanted");
+    // (Quit before the car stood idle for it to be bought.)
+    w.apply(Command::QuitCareer { sim: 2 }).unwrap();
+    assert!(w.cars[1].want.is_none());
+    w.tick_once();
+    assert_eq!(w.cars[1].body, 0, "the saloon kept");
+    assert!(!w.events.iter().any(|e| e.kind == EventKind::BoughtCar));
 }
 
 #[test]

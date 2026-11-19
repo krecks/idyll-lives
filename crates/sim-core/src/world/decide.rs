@@ -1008,7 +1008,6 @@ pub(crate) fn prefer_factor(
     }
 }
 
-/// A walk's goal at `at`: the point, its tile, and no tags (`start_task`).
 /// Where `sim` won't clean (tidying up or with a tool): where they couldn't get to a moment ago,
 /// and where someone else is cleaning (the briefs' `cleaning`).
 fn cleaning_skip(sim: &Sim, ctx: &Ctx) -> Vec<(i32, i32)> {
@@ -1057,6 +1056,7 @@ pub(crate) fn sweep_spot(
 /// `roomRules.clean.threshold`).
 pub(crate) const SWEEP_ORDERED: f32 = 0.01;
 
+/// A walk's goal at `at`: the point, its tile, and no tags (`start_task`).
 pub(crate) fn goal_at(at: [f32; 2]) -> ([f32; 2], (i32, i32), TagMask) {
     (at, (at[0].floor() as i32, at[1].floor() as i32), 0)
 }

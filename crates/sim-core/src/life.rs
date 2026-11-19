@@ -763,6 +763,7 @@ fn job_market(w: &mut World, day: u32) {
                 }
                 w.events
                     .push_career(tick, EventKind::QuitJob, i, career, Some(level as i64));
+                crate::cars::job_lost(&mut w.cars, i as u32);
             }
             continue;
         }
@@ -971,7 +972,6 @@ fn set_off(
     });
 }
 
-/// On their way to work or school (or about to set off).
 /// Whether `sim` is at the wheel of a car on its way, or getting in or out of one: off to work
 /// only once they're out of it (`schedule_work`). Called away mid-drive, a driver on a trip walked
 /// off to work and left the car standing on the road for good with them still its driver
@@ -985,6 +985,7 @@ fn in_a_car(sim: &Sim) -> bool {
     })
 }
 
+/// On their way to work or school (or about to set off).
 pub(crate) fn heading_out(sim: &Sim) -> bool {
     matches!(
         sim.current.as_ref().map(|a| a.task.kind),
@@ -999,6 +1000,7 @@ fn miss_shift(w: &mut World, i: usize, day: u32) {
         sims,
         events,
         tick,
+        cars,
         ..
     } = w;
     let tick = *tick;
@@ -1023,6 +1025,7 @@ fn miss_shift(w: &mut World, i: usize, day: u32) {
             social::add_feeling(&mut sim.feelings, m, &content.feelings, tick);
         }
         events.push_career(tick, EventKind::Fired, i, career, Some(level as i64));
+        crate::cars::job_lost(cars, i as u32);
     }
 }
 

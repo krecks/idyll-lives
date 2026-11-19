@@ -3670,6 +3670,7 @@ impl World {
         sim.planner.run = None;
         sim.planner.thought = None;
         sim.gone = Some(Gone { why, day });
+        crate::cars::job_lost(&mut self.cars, id);
         // Nobody talks to them, listens in, opens the door to them or rings them any more (their
         // slot may soon be someone else's), and a visitor waits for someone else to come.
         let with_them = |t: &Task| match t.kind {
@@ -6103,6 +6104,7 @@ impl World {
             }
             Command::QuitCareer { sim } => {
                 self.sim_mut(sim)?.job = None;
+                crate::cars::job_lost(&mut self.cars, sim);
             }
             Command::Visit { sim, plot } => {
                 if plot as usize >= self.plots.len() {

@@ -6,7 +6,8 @@
 //! The household's car is the one its best earner's job calls for (the most pay a week, then the
 //! first of them): a town's households have theirs from the start (`fit_town`), and a promotion
 //! or a new job in the household (`job_changed`) has it buy the one that job calls for, if that's
-//! another body or a newer one (`Car::want`). The car changes as soon as it stands idle at home
+//! another body or a newer one (`Car::want`); one who quits, is fired, retires or leaves town
+//! before it's bought doesn't buy it (`job_lost`). The car changes as soon as it stands idle at home
 //! (nobody in it or on their way to it) or is away at work (`renew`): it parks as one of its
 //! length does there, and the story says who bought it (`EventKind::BoughtCar`). A household with
 //! nobody at work (retired, out of work, at school) keeps the car it has, and so does one whose
@@ -78,6 +79,16 @@ pub(crate) fn job_changed(cars: &mut [Car], content: &Content, sims: &[Sim], hou
                 age: look.age,
                 by: Some(by),
             });
+    }
+}
+
+/// `sim` has no job any more (quit, fired, retired, gone): a car their job called for that their
+/// household hasn't bought yet isn't bought.
+pub(crate) fn job_lost(cars: &mut [Car], sim: u32) {
+    for car in cars {
+        if car.want.is_some_and(|w| w.by == Some(sim)) {
+            car.want = None;
+        }
     }
 }
 
@@ -219,9 +230,12 @@ pub(crate) fn renew(w: &mut World, c: usize) {
         ..
     } = &mut *w;
     cars[c].settle(exits, Some(travel));
-    // (Parked as another size: its tiles are worked out again; the renderer draws its new look.)
+    // (Parked as another size: its tiles are worked out again, and whether it's built over, its
+    // own only, as the other cars in this tick's loop are as they were; the renderer draws its
+    // new look.)
     w.cars_parked = None;
-    refresh(w);
+    let things = things_on(w, &[w.cars[c].plot]);
+    w.cars[c].blocked = built_over(&w.lot, &things, &w.cars[c].tiles());
     w.structure_version = w.structure_version.wrapping_add(1);
     if let Some(by) = want.by.filter(|&s| (s as usize) < w.sims.len()) {
         w.events.push_detail(
