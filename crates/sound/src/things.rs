@@ -2922,8 +2922,15 @@ fn looped(rate: f64, seconds: f64) -> Ev {
     }
 }
 
+thread_local! {
+    /// Whether the sound being made is played once (\`once\` made its track): \`done\` then runs its filters and
+    /// room from silence rather than from the loop's end, and clears it.
+    static PLAYED_ONCE: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
+}
+
 /// A track for a sound played once: nothing wraps.
 fn once(rate: f64, seconds: f64) -> Ev {
+    PLAYED_ONCE.with(|o| o.set(true));
     let t = track(rate, seconds, 0.0);
     Ev {
         left: t.left,
@@ -2933,21 +2940,15 @@ fn once(rate: f64, seconds: f64) -> Ev {
     }
 }
 
-/// Adds \`v\` at sample \`i\`, left and right at \`l\` and \`r\`; past the end it wraps on a loop of events, else
-/// it's dropped. Before the start it's dropped too (in the TypeScript, a write to a typed array at a
-/// negative index does nothing).
+/// Adds \`v\` at sample \`i\`, left and right at \`l\` and \`r\`; past the end or before the start it wraps on a
+/// loop of events (an event set a hair before the loop's start rings on from its end, so the seam is whole),
+/// else it's dropped.
 fn put(t: &mut Ev, i: f64, v: f64, l: f64, r: f64) {
-    if i < 0.0 {
+    let n = t.left.len();
+    if !t.wraps && (i < 0.0 || i >= n as f64) {
         return;
     }
-    let n = t.left.len();
-    let mut i = i as usize;
-    if i >= n {
-        if !t.wraps {
-            return;
-        }
-        i %= n;
-    }
+    let i = (i as i64).rem_euclid(n as i64) as usize;
     add(&mut t.left, i, v * l);
     add(&mut t.right, i, v * r);
 }
@@ -3072,24 +3073,36 @@ fn done(
             add(&mut result.right, i, p.right[i] as f64);
         }
     }
+    // A loop's start follows its end: the filters and the room run over a second of the loop (its end, round
+    // and round if it is shorter) before its start, so they are already ringing as they were at its end. A sound
+    // played once (\`once\`) starts from silence.
+    let lead = if PLAYED_ONCE.with(|o| o.replace(false)) || n == 0 {
+        0
+    } else {
+        round_usize(rate)
+    };
     for c in 0..2 {
         let ch = result.ch(c);
+        let mut x: Vec<f32> = (0..lead)
+            .map(|k| ch[(k + n - lead % n) % n])
+            .chain(ch.iter().copied())
+            .collect();
         if low > 0.0 {
             let mut lp = Biquad::with(rate, Filter::Lowpass, low, 0.7);
-            for v in ch.iter_mut() {
+            for v in x.iter_mut() {
                 *v = lp.run(*v as f64) as f32;
             }
         }
         if high > 0.0 {
             let mut hp = Biquad::with(rate, Filter::Highpass, high, 0.7);
-            for v in ch.iter_mut() {
+            for v in x.iter_mut() {
                 *v = hp.run(*v as f64) as f32;
             }
         }
         if !delays.is_empty() {
             let wide: Vec<f64> = delays.iter().map(|d| d * 1.09).collect();
             room(
-                ch,
+                &mut x,
                 rate,
                 if c == 1 { &wide } else { delays },
                 0.55,
@@ -3097,6 +3110,7 @@ fn done(
                 wet,
             );
         }
+        ch.copy_from_slice(&x[lead..]);
     }
     set_level(result, rms, if peak == 0.0 { 1.0 } else { peak })
 }
@@ -3150,6 +3164,25 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// A loop's end runs on into its start at the browser's other rates too (the filters and the room in \`done\`
+    /// already ringing at its start).
+    #[test]
+    fn every_loop_is_seamless_at_44_1_and_96_khz() {
+        let mut off = Vec::new();
+        for rate in [44100.0, 96000.0] {
+            for kind in THINGS.iter().filter(|k| !ONCE_THINGS.contains(k)) {
+                let s = make(kind, rate).unwrap();
+                for ch in [&s.left, &s.right] {
+                    let (inside, seam) = steps(ch);
+                    if seam > inside {
+                        off.push(format!("{kind} at {rate}: seam {seam} over {inside}"));
+                    }
+                }
+            }
+        }
+        assert!(off.is_empty(), "{off:#?}");
     }
 
     #[test]
