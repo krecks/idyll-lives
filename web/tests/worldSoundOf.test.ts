@@ -6,7 +6,7 @@ import type { Content } from '../src/content/content';
 // (The game's state and the settings are Svelte's, the mixer the browser's: not needed to say what a use sounds like.)
 mock.module('../src/ui/state.svelte', () => ({ game: {} }));
 mock.module('../src/settings/settings.svelte', () => ({ settings: {} }));
-mock.module('../src/audio/mixer', () => ({ audioContext: () => null, bus: () => null, space: () => null, updateVolumes: () => {} }));
+mock.module('../src/audio/mixer', () => ({ audioContext: () => null, bus: () => null, musicGain: () => 1, space: () => null, updateVolumes: () => {} }));
 const { soundOf } = await import('../src/audio/world');
 
 /** Content with just the objects `soundOf` reads. */

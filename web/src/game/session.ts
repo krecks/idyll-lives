@@ -1295,6 +1295,7 @@ async function openSession(
   });
   bridge.onCurtains((shut) => {
     if (!disposed) renderer.setCurtainsShut(shut);
+    if (!disposed) worldSound.curtains(shut);
   });
   /**
    * Each resident's look as last made, by id: what it was made from (`key`), the look from their
@@ -2247,7 +2248,7 @@ async function openSession(
         const it = def >= 0 && use !== null ? content.objectList[def].interactions.findIndex((i) => i.id === use) : -1;
         const tag = anim ?? (it >= 0 ? (content.objectList[def].interactions[it].anim ?? '') : '');
         const cooking = recipe === undefined ? 0 : content.recipes.findIndex((r) => r.id === recipe) + 1;
-        return { loop: soundOf(content, tag, def, it, cooking) ?? null, end: endSoundOf(content, def, it) ?? null, ambient: (def >= 0 && content.objectList[def].ambient) || null };
+        return { loop: soundOf(content, tag, def, it, cooking) ?? null, end: endSoundOf(content, tag, def, it) ?? null, ambient: (def >= 0 && content.objectList[def].ambient) || null };
       },
       save: (id: string) => session.save(id, id),
       autosave: () => autosave(),

@@ -24,8 +24,12 @@ export const ONCE_THINGS = ['fridgeDoor', 'binLid', 'vendSnack', 'vendCan', 'pho
 export const HOME_THINGS = ['vacuum', 'iron', 'sweep', 'mop', 'mower', 'hose', 'wateringCan', 'shears', 'kettle', 'typing', 'saunaStove', 'fireplaceElectric', 'cutlery', 'kettleOff'] as const;
 export const ONCE_HOME = ['kettleOff'] as const satisfies readonly (typeof HOME_THINGS)[number][];
 
-/** Every sound made off the main thread: the water's and the things' (at home and in the garden too). */
-export const MADE = [...WATER, ...THINGS, ...HOME_THINGS] as const;
+/** The sounds of things happening (`things/events.rs`); all but the clock's tick are played once. */
+export const EVENT_THINGS = ['doorOpen', 'doorClose', 'curtain', 'carDoor', 'carStart', 'letterbox', 'till', 'drawer', 'clockTick'] as const;
+export const ONCE_EVENTS = ['doorOpen', 'doorClose', 'curtain', 'carDoor', 'carStart', 'letterbox', 'till', 'drawer'] as const satisfies readonly (typeof EVENT_THINGS)[number][];
+
+/** Every sound made off the main thread: the water's, the things' (at home and in the garden too) and those of things happening. */
+export const MADE = [...WATER, ...THINGS, ...HOME_THINGS, ...EVENT_THINGS] as const;
 export type MadeKind = (typeof MADE)[number];
 
 /** The outdoors' loops (`outdoors.rs`): one channel for what has a place (a car), two for what is all round. */

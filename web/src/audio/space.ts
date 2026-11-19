@@ -11,6 +11,9 @@
  * (one channel), what comes out is wide (the response's two channels differ), so the room is all round
  * whichever side the sound is on. It joins the bus before the distance, so a far room is far too.
  *
+ * A sound played once (a fridge door, a door shut, a car's door) gets a place of its own for as long as it lasts
+ * (`playOnce`).
+ *
  * Built on a `BaseAudioContext`, so the same graph renders in an `OfflineAudioContext` to be measured.
  */
 
@@ -151,4 +154,21 @@ export class Placed {
     this.panner.disconnect();
     for (const send of this.sends.values()) send.disconnect();
   }
+}
+
+/**
+ * Plays a sound once at `level` at its place in `space` (`rate`: how fast, and with it how high; `offset`: from that
+ * many seconds into it), then takes it out of the graph.
+ */
+export function playOnce(ac: BaseAudioContext, space: Space, buffer: AudioBuffer, level: number, place: Place, rate = 1, offset = 0): void {
+  const source = ac.createBufferSource();
+  source.buffer = buffer;
+  source.playbackRate.value = rate;
+  const gain = ac.createGain();
+  gain.gain.value = level;
+  const placed = new Placed(ac, space, place);
+  source.connect(gain).connect(placed.input);
+  // (Its room goes on a moment after it: the longest response is under a second.)
+  source.onended = () => setTimeout(() => placed.disconnect(), 1000);
+  source.start(0, offset);
 }
