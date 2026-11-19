@@ -1,6 +1,7 @@
 //! The interface's little sounds, synthesised (was `web/src/audio/blips.ts`): picking things up, putting them
-//! down, money changing hands, walls going up. Each is a few pitched blips and puffs of noise (`parts`), made
-//! as samples at a sample rate.
+//! down, money changing hands, walls going up; in Live, a pie menu opening, the clock's speed, money in and out
+//! and the household's milestones. Each is a few pitched blips and puffs of noise (`parts`), made as samples at
+//! a sample rate.
 //!
 //! They were Web Audio graphs once (an `OscillatorNode` under a gain envelope; noise through a low-pass): the
 //! waves here are the browser's own band-limited ones (`wave`), and what is made is what the graphs made
@@ -10,9 +11,28 @@ use crate::dsp::m::*;
 use crate::dsp::{Filter, Rng, add, node_filter, sample_at, sweep};
 
 /// The blips' names (`Blip`).
-pub const NAMES: [&str; 12] = [
-    "pick", "place", "sell", "rotate", "error", "build", "remove", "paint", "upgrade", "tab",
-    "open", "close",
+pub const NAMES: [&str; 21] = [
+    "pick",
+    "place",
+    "sell",
+    "rotate",
+    "error",
+    "build",
+    "remove",
+    "paint",
+    "upgrade",
+    "tab",
+    "open",
+    "close",
+    "menu",
+    "choose",
+    "speed",
+    "pause",
+    "resume",
+    "moneyIn",
+    "moneyOut",
+    "notify",
+    "notifyLow",
 ];
 
 /// A wave an oscillator plays.
@@ -134,6 +154,45 @@ pub fn parts(name: &str) -> Option<Vec<Part>> {
         "close" => vec![
             tone(Triangle, 784.0, 784.0, 0.0, 0.1, 0.07),
             tone(Triangle, 523.0, 523.0, 0.07, 0.14, 0.07),
+        ],
+        // Live mode's: a pie menu opening (a quick rise and a breath), an item of it chosen.
+        "menu" => vec![
+            tone(Sine, 587.0, 880.0, 0.0, 0.07, 0.07),
+            hiss(2500.0, 0.0, 0.03, 0.03),
+        ],
+        "choose" => vec![
+            tone(Triangle, 880.0, 880.0, 0.0, 0.05, 0.07),
+            tone(Sine, 1319.0, 1319.0, 0.03, 0.08, 0.05),
+        ],
+        // The clock: a faster or slower speed (a tick), paused (falling), going again (rising).
+        "speed" => vec![tone(Sine, 1480.0, 1760.0, 0.0, 0.04, 0.05)],
+        "pause" => vec![
+            tone(Triangle, 659.0, 659.0, 0.0, 0.09, 0.08),
+            tone(Triangle, 440.0, 440.0, 0.08, 0.14, 0.08),
+        ],
+        "resume" => vec![
+            tone(Triangle, 440.0, 440.0, 0.0, 0.09, 0.08),
+            tone(Triangle, 659.0, 659.0, 0.08, 0.14, 0.08),
+        ],
+        // Money in: a bright coin; money out: a falling note and a rustle.
+        "moneyIn" => vec![
+            tone(Triangle, 1047.0, 1047.0, 0.0, 0.06, 0.05),
+            tone(Sine, 2093.0, 2093.0, 0.0, 0.1, 0.06),
+            tone(Sine, 2637.0, 2637.0, 0.07, 0.18, 0.06),
+        ],
+        "moneyOut" => vec![
+            tone(Triangle, 784.0, 523.0, 0.0, 0.13, 0.08),
+            hiss(1400.0, 0.0, 0.06, 0.05),
+        ],
+        // A milestone of the household: a rising chime, or a falling one for bad news.
+        "notify" => vec![
+            tone(Sine, 784.0, 784.0, 0.0, 0.45, 0.09),
+            tone(Sine, 1175.0, 1175.0, 0.13, 0.55, 0.08),
+            tone(Sine, 2349.0, 2349.0, 0.13, 0.3, 0.02),
+        ],
+        "notifyLow" => vec![
+            tone(Sine, 587.0, 587.0, 0.0, 0.45, 0.07),
+            tone(Sine, 440.0, 440.0, 0.15, 0.53, 0.07),
         ],
         _ => return None,
     })
