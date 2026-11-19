@@ -3,17 +3,17 @@
     {
       "name": "living-town-meta",
       "file": "web/src/core/protocol.ts",
-      "sha256": "a59a98f4ecfa0d031d141011a94e5392bcf87a5811f8b9cc6ba8a8c33505b90d",
-      "by": "docs/cleanup",
-      "reason": "comments only: the pointer to a deleted design doc (docs/design/) is gone",
+      "sha256": "15041764db92b504f905094de42a8d89c7a211960f51305a77775e414d98da85",
+      "by": "integrator",
+      "reason": "owner's OK 2026-11-19: protocol.ts living-town parts as changed by 0.8.3 (land, speeds, visitable places, curtains and cars messages)",
       "region": "living-town-meta"
     },
     {
       "name": "living-town-types",
       "file": "web/src/core/protocol.ts",
-      "sha256": "c1e71709c5280f4b24533973e22a1fe743c5d4ba16ec33b374be864df1b6b3fa",
-      "by": "docs/cleanup",
-      "reason": "comments only: the pointer to a deleted design doc (docs/design/) is gone",
+      "sha256": "3f1f692a2d3e707e440ab6539906ef6d68e8b1d8c06a2c6e017c2caa079014a8",
+      "by": "integrator",
+      "reason": "owner's OK 2026-11-19: protocol.ts living-town parts as changed by 0.8.3 (land, speeds, visitable places, curtains and cars messages)",
       "region": "living-town-types"
     },
     {
