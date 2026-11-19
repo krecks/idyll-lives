@@ -614,6 +614,26 @@ The base game: the toilet on getting up (below 0.95), before bed (0.9), before l
 getting home (0.9) and after a meal (0.85); a shower before bed below 0.3 hygiene; a snack before
 leaving below 0.7 hunger; `readyMinutes` 45.
 
+## Careers' cars
+
+A household's car fits the job of whoever in it earns the most a week (code:
+`crates/sim-core/src/cars/looks.rs`). `carBodies` (in `careers.json`) are the bodies cars come in, in
+the renderer's order (`web/src/render/shared/cars.ts` `CARS`, which draws them; a body is saved as its
+place in the list, so add new ones at the end and only with a drawing of their own):
+`{"id", "label", "len", "wid"}`, the length (2.5 to 6 m) and width (1.4 to 2.2 m) that parking and
+driving go by, the label for the story. A career category's `car` (`{"A": "hatchback", "G":
+"executive"}`) names the body its jobs call for from each grade on (none before the first grade
+given), and a track's own `car` replaces its category's; a grade's `carAge` (`old`, `used` or `new`,
+default `used`) says how old that car is. The base game: an old hatchback or saloon from grade A, a
+newer one from D, an executive saloon at the top of finance, the law, politics and the like, a van and
+then a pickup for the trades, a pickup on the farm, an off-roader in the army and for rangers; old
+from A to C, new from H. A town gives each household with a worker its fitting car from the start
+(the others keep the town's: one of the first four bodies); a promotion or a new job that calls for
+another body, or the same one newer, buys it once the car stands idle at home or away at work, and
+the story tells of it (`events.boughtCar`, `{car}` the body's label). Nobody at work, the car stays;
+one that wouldn't fit where it parks (something in the way of a longer body) isn't bought. Its paint
+stays the town's. Content without `carBodies` keeps every car as the town made it.
+
 ## Life: ages, family, moving
 
 Content `life` (an object, so a pack can change single keys):
@@ -1149,6 +1169,8 @@ keys share these objects. The rules:
 | `careerRules.probationLevels` | 0 to 1 | a shortfall of more than a level is never close enough to hire on probation |
 | `careerRules.performanceSlowdown` | 0 to 2 | below 0 later grades would come quicker; past 2 the top grade's shifts count for almost nothing |
 | `careerRules.lateShare` | 0 to 1 | what a late shift counts for, from nothing to a full shift |
+| A car body's `len` and `wid` (`carBodies`) | 2.5 to 6 m and 1.4 to 2.2 m; ids unique, at most 255 | cars park, take up tiles and drive by them; a car keeps its body as a byte |
+| A career category's or track's `car` | grades and `carBodies` ids the content has | there'd be no car to buy |
 
 At run time the game also keeps needs between 0 and 1, and friendship and romance within ±100,
 whatever the content says; a score that isn't a number is never chosen. The hours of the

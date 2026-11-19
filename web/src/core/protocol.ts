@@ -991,6 +991,8 @@ export interface CarInfo {
   yaw: number;
   body: number;
   paint: number;
+  /** How old it is (`shared/cars.ts` `CarAge`: 0 old, 1 used, 2 new; absent: used). */
+  age?: number;
 }
 
 /** One of the town's servers (`WorldStructure.staff`). */

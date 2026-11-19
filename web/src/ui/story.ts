@@ -58,6 +58,7 @@ const ICONS: Record<string, string> = {
   setUpForThem: 'icon.ui.home',
   sentBack: 'icon.ui.funds',
   served: 'icon.social.offer',
+  boughtCar: 'icon.ui.funds',
 };
 
 const LOVE = new Set(['crush', 'firstKiss', 'startedDating', 'movedInWith', 'expecting', 'born', 'adopted']);
@@ -136,6 +137,7 @@ export function storyText(e: SocialEvent): string {
     .replace('{accident}', services.content.accidents[e.n ?? -1]?.story ?? 'had a bad moment')
     .replace('{stage}', services.content.lifeStages[e.n ?? -1]?.story ?? 'is a year older')
     .replace('{item}', () => someOf(e.n))
+    .replace('{car}', services.content.carBodies[e.n ?? -1]?.label ?? 'car')
     .replace(/.*\{object\}.*/, (text) => fillObject(text, e.object ?? e.n))
     .replace('{grade}', (() => {
       const l = gradeLetter(e.n ?? 0);

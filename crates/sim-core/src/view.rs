@@ -1858,6 +1858,8 @@ struct CarView {
     yaw: f32,
     body: u8,
     paint: u8,
+    /// How old it is: 0 old, 1 used, 2 new (`content::CarAge`).
+    age: u8,
 }
 
 /// One of the town's servers: what they look like (`seed`, the renderer makes the look) and the
@@ -2634,6 +2636,7 @@ fn car_views(world: &World) -> Option<Vec<CarView>> {
                 yaw: c.yaw,
                 body: c.body,
                 paint: c.paint,
+                age: c.age.index(),
             })
             .collect()
     })

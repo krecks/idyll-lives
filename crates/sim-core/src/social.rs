@@ -949,6 +949,9 @@ pub enum EventKind {
     /// `a` brought their guest `b` something to eat or drink (`n`: the item, an index into
     /// `Content::items`; `hosting.rs`).
     Served,
+    /// `a`'s household bought the car `a`'s promotion or new job called for (`n`: its body, an
+    /// index into `Content::car_bodies`; `cars/looks.rs`).
+    BoughtCar,
 }
 
 impl EventKind {
@@ -962,7 +965,7 @@ impl EventKind {
             BecameFriends | BecameGoodFriends | BecameEnemies | Crush | ProposalRejected
             | Fight | Jealous | QuitJob | RentDebt | Broke | Accident | TurnedAway | WantsToBuy
             | Bought | DeniedAgain | StayedHome | NoBed | NotClosed | PlayedAlone | NoPartner
-            | SetUp | SetUpForThem | SentBack => 1,
+            | SetUp | SetUpForThem | SentBack | BoughtCar => 1,
             Met | MissedWork | SkillUp | PaidRent | Upgraded | Visited | GoalSuggested
             | Repaired | NobodyHome | Invited | Declined | Babysitter | Served => 0,
         }

@@ -555,6 +555,17 @@ export interface CareerGrade {
   label: string;
   payPerHour: number;
   skillLevel: number;
+  /** How old the car a job at this grade calls for is (absent: used; sim-core `cars/looks.rs`). */
+  carAge?: 'old' | 'used' | 'new';
+}
+
+/** A body households' cars come in (`careers.json` `carBodies`), in the renderer's order (`render/shared/cars.ts` `CARS`). */
+export interface CarBodyDef {
+  id: string;
+  /** For the story ("bought a new {car}"). */
+  label: string;
+  len: number;
+  wid: number;
 }
 
 export interface CareerCategory {
@@ -565,7 +576,9 @@ export interface CareerCategory {
   /** Pay against the grades' (sim-core `content.rs` `careers`); the tracks' shift, unless they have their own. */
   payFactor?: number;
   shift?: Shift;
-  tracks: { id: string; label: string; titles: string[]; payFactor?: number; shift?: Shift }[];
+  /** The car its jobs call for: a body (`carBodies` id) from each grade on (grade id → body); a track's own instead. */
+  car?: Record<string, string>;
+  tracks: { id: string; label: string; titles: string[]; payFactor?: number; shift?: Shift; car?: Record<string, string> }[];
 }
 
 export interface Economy {
@@ -693,6 +706,7 @@ interface ContentFile {
   socials: SocialDef[];
   careerCategories?: CareerCategory[];
   grades?: CareerGrade[];
+  carBodies?: CarBodyDef[];
   bondPresets: Record<string, unknown>;
   events: Record<string, string>;
   objects: ObjectDef[];
@@ -743,6 +757,8 @@ export class Content {
   readonly careerCategories: readonly CareerCategory[];
   /** The grades every career's titles are, in order. */
   readonly careerGrades: readonly CareerGrade[];
+  /** The bodies households' cars come in, in the renderer's order. */
+  readonly carBodies: readonly CarBodyDef[];
   /** The age residents retire at (their job becomes a pension). */
   readonly retireAt: number;
   readonly skills: readonly SkillDef[];
@@ -814,6 +830,7 @@ export class Content {
     this.socials = file.socials ?? [];
     this.careerCategories = file.careerCategories ?? [];
     this.careerGrades = file.grades ?? [];
+    this.carBodies = file.carBodies ?? [];
     this.retireAt = file.life?.retireAt ?? 65;
     this.skills = file.skills ?? [];
     this.objectColors = file.objectColors ?? [];

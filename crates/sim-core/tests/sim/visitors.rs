@@ -98,6 +98,36 @@ fn a_friend_knocks_and_is_let_in() {
 }
 
 #[test]
+fn setting_off_again_for_the_place_they_are_visiting_goes_on_with_the_visit() {
+    let mut w = world("friends");
+    w.apply(Command::Visit { sim: 1, plot: 0 }).unwrap();
+    for _ in 0..common::mins(90.0) {
+        w.tick_once();
+        if w.events.iter().any(|e| e.kind == EventKind::Visited) {
+            break;
+        }
+    }
+    minutes(&mut w, 1.0);
+    let visit = w.sims[1].visiting.expect("let in");
+    assert!(visit.arrived > 0);
+    // (A walk across it set off again: a Visit to the same place, there already.)
+    w.apply(Command::Visit { sim: 1, plot: 0 }).unwrap();
+    minutes(&mut w, 2.0);
+    let now = w.sims[1].visiting.expect("still visiting");
+    assert_eq!(
+        (now.arrived, now.until),
+        (visit.arrived, visit.until),
+        "the same visit"
+    );
+    let told = w
+        .events
+        .iter()
+        .filter(|e| e.kind == EventKind::Visited)
+        .count();
+    assert_eq!(told, 1, "told once");
+}
+
+#[test]
 fn the_host_steps_out_to_greet_a_visitor_rather_than_talk_through_the_front_door() {
     // Ada's house has walls round it and a front door onto the garden path (at x 10, z 8): Bo
     // knocks on the doorstep, and Ada comes out to him to say hello.

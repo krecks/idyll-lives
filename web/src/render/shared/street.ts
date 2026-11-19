@@ -50,7 +50,7 @@ import type { FenceStyleDef } from '../../content/content';
 import { groundDepth, objectCentre, storeyOfRow, storeyRow, type BackdropBuilding, type FenceEdge, type GarageInfo, type LotLook, type ObjectPlacement, type Opening, type PlotInfo, type RoadPlan, type TownPlace, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Geo, type V3 } from './geometry';
-import { CARS, CAR_PAINT, garageAt, garageFor, hash, paintCar, parkCar, pick, type CarBody } from './cars';
+import { CARS, CAR_PAINT, carAge, garageAt, garageFor, hash, paintCar, parkCar, pick, type CarAge, type CarBody } from './cars';
 import { chunkAt, chunkCoords, chunkId, distanceToRect, hashNumbers, hashString, RectGrid } from './chunks';
 import { canopyBack, type HousePart, type HousePlanner, type SilhouettePlan, type SilhouetteSpec } from './house';
 import { compose, quatYawPitchRoll, type Quat } from './math';
@@ -1935,7 +1935,7 @@ export class TownStreet {
         const id = chunkAt(c.x, c.z);
         let P = out.get(id);
         if (!P) out.set(id, (P = new Parts(this.options.has)));
-        parked(P, c.x, c.z, c.yaw, CARS[c.body % CARS.length], CAR_PAINT[c.paint % CAR_PAINT.length], levels ? levels.at(c.x, c.z) : 0);
+        parked(P, c.x, c.z, c.yaw, CARS[c.body % CARS.length], CAR_PAINT[c.paint % CAR_PAINT.length], levels ? levels.at(c.x, c.z) : 0, carAge(c.age));
       }
     }
     return (this.cars = out);
@@ -2461,8 +2461,8 @@ function nose(p: Painter, side: number, half: number, at: number, down: number =
 }
 
 /** A parked car on a driveway, its contact shadow. */
-function parked(parts: Parts, x: number, z: number, yaw: number, body: CarBody, paint: string, y = 0): void {
-  paintCar(parts.props.at(x, z, yaw, 0.015 + y), body, paint);
+function parked(parts: Parts, x: number, z: number, yaw: number, body: CarBody, paint: string, y = 0, age: CarAge = 1): void {
+  paintCar(parts.props.at(x, z, yaw, 0.015 + y), body, paint, false, true, age);
   blob(parts.shadows, x, z, body.wid * 0.62, body.len * 0.56, yaw, 0.55, 0.03 + y);
 }
 

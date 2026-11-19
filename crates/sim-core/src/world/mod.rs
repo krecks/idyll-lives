@@ -6081,6 +6081,9 @@ impl World {
                 ));
                 // Back to work: no more pension.
                 (s.retired, s.pension) = (false, 0);
+                // (The car the new job calls for: `cars/looks.rs`.)
+                let household = s.household;
+                crate::cars::job_changed(&mut self.cars, &self.content, &self.sims, household);
             }
             Command::QuitCareer { sim } => {
                 self.sim_mut(sim)?.job = None;

@@ -9,6 +9,7 @@ import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { glbOf, type DumpMesh } from '../../tools/built/glb';
 import { index, samples, type Sample } from '../../tools/built/samples';
+import { CARS } from '../src/render/shared/cars';
 
 const content = JSON.parse(readFileSync(new URL('../public/content/base.json', import.meta.url), 'utf8')) as {
   wallCoverings: { finish: string }[];
@@ -82,7 +83,7 @@ describe('the built world as dumped', async () => {
     const uses = ['flats', 'terrace', 'house', 'shop', 'cafe', 'restaurant', 'office', 'school', 'church', 'hall', 'workshop', 'farm', 'barn'];
     expect(list.filter((s) => s.kind === 'backdrop').map((s) => s.key).sort()).toEqual(uses.map((u) => `backdrop.${u}`).sort());
     expect(list.filter((s) => s.kind === 'fence').map((s) => s.key)).toEqual(content.fenceStyles.map((f) => `fence.${f.id}`));
-    expect(list.filter((s) => s.kind === 'car').length).toBe(4);
+    expect(list.filter((s) => s.kind === 'car').map((s) => s.key)).toEqual(CARS.map((b) => `car.${b.id}`));
     // The street: its road, its sidewalks, its markings, the neighbours' houses and what stands along it.
     const street = by.get('street.block')!;
     for (const material of ['material.road', 'material.sidewalk', 'built.roadPaint', 'material.roof', 'built.plain']) expect([material, street.meshes.some((m) => m.material === material)]).toEqual([material, true]);

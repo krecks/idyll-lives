@@ -57,6 +57,11 @@ pub(crate) fn load(w: &mut World, saved: &[Car], drives: &[Drive], garages: &[Ga
             .trip
             .filter(|t| t.driver < sims && (t.plot as usize) < w.plots.len());
         car.riders.retain(|&o| o < sims);
+        let bodies = w.content.car_bodies.len();
+        car.want = car.want.filter(|n| usize::from(n.body) < bodies);
+        if let Some(n) = car.want.as_mut() {
+            n.by = n.by.filter(|&o| o < sims);
+        }
         if car.trip.is_none() {
             car.riders.clear();
         }
@@ -70,7 +75,8 @@ pub(crate) fn load(w: &mut World, saved: &[Car], drives: &[Drive], garages: &[Ga
 }
 
 /// Builds the town's cars from its file: each goes to the household living on its plot (none
-/// there: no car), owned by its grown-ups.
+/// there: no car), owned by its grown-ups, and is the car its best earner's job calls for
+/// (`fit_town`; the file's body where nobody works).
 pub(crate) fn from_file(w: &mut World, raw: &[CarRaw], drives: &[Drive], garages: &[Garage]) {
     w.drives = drives.to_vec();
     w.garages = garages.to_vec();
@@ -89,6 +95,8 @@ pub(crate) fn from_file(w: &mut World, raw: &[CarRaw], drives: &[Drive], garages
         })
         .take(MAX_CARS)
         .collect();
+    // (Each the car its household's best earner's job calls for: `looks.rs`.)
+    fit_town(w);
     settle_all(w);
 }
 

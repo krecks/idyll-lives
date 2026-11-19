@@ -7,7 +7,7 @@
  * ground is hidden then), and while it's outside the chunks streamed in or far off (`setView`).
  *
  * Drawn in as few draws as will do: the parked ones with their doors shut one instanced draw per
- * body and paint (a mesh each, shared); those driving, or with a door open, an entity of their own
+ * body, paint and age (a mesh each, shared); those driving, or with a door open, an entity of their own
  * (the body, tilted a little as it speeds up and slows down, and its four doors on their hinges,
  * drawn in one piece with it while they're all shut); every car's wheels one instanced draw (they
  * turn as it goes and the front ones steer: `paintWheel`), and their soft contact shadows another.
@@ -27,13 +27,14 @@ import { LIFT, rollWheels, Vehicles } from './vehicles';
 import type { FrameState } from '../../core/bridge';
 import type { Seat } from '../shared/characters/seats';
 import type { WorldStructure } from '../../core/protocol';
-import { CARS, CAR_PAINT, TAXI_PAINT, carDoor, carriedAlong, carRowIsTaxi, DOORS, inCar, paintCar, paintDoor, paintTaxi, paintTaxiDoor, TAXI_BODY, wheelAt, type CarBody, type CarPose } from '../shared/cars';
+import { CARS, CAR_PAINT, TAXI_PAINT, carAge, carDoor, carriedAlong, carRowIsTaxi, DOORS, inCar, paintCar, paintDoor, paintTaxi, paintTaxiDoor, TAXI_BODY, wheelAt, type CarAge, type CarBody, type CarPose } from '../shared/cars';
 import { lerpAngle } from '../shared/characters/rig';
 import { DOOR_SWING, ease } from '../shared/doors';
 import { Geo } from '../shared/geometry';
 import { playbackRate } from '../shared/gameSpeed';
 import { compose, quatYawPitchRoll } from '../shared/math';
 import { Painter } from '../shared/street';
+import { tuned } from '../tune';
 
 /**
  * How wide a door opens (degrees). It swings as a house's door does, `DOOR_SWING` s of the sim's real time (9 ticks
@@ -55,6 +56,13 @@ const PITCH_PER_ACCEL = 0.006;
 const PITCH_RATE = 5;
 /** How quickly the speed the tilt goes by follows the car's (per second): the frames between snapshots go in steps. */
 const SPEED_RATE = 4;
+/**
+ * Dev only (`?tune=cars.every:1`, `render/tune.ts`): each household's car drawn as the next of `CARS` in turn (the
+ * first as body `every - 1`) and of the ages (`cars.age:1` all old, `2` used, `3` new), the sheet the bodies are
+ * judged by at the play camera. The sim's cars keep their own sizes.
+ */
+const SHOW = tuned('cars', { every: 0, age: 0 });
+
 /** Each body's four wheels (`wheelAt`), worked out once. */
 const WHEELS = CARS.map((body) => [0, 1, 2, 3].map((w) => wheelAt(body, w)));
 
@@ -75,10 +83,11 @@ interface Drawn {
   /** A work taxi (its look the taxi's: `paintTaxi`), else a household's car (`body`, `paint`). */
   taxi: boolean;
   shape: CarBody;
-  /** Its body and paint (`body paint`, or `taxi`): the instanced draw it's in while parked. */
+  /** Its body, paint and age (`body paint age`, or `taxi`): the instanced draw it's in while parked. */
   look: string;
   body: number;
   paint: number;
+  age: CarAge;
   /** Where it's drawn now (`shown`: the snapshot's, 0 out of town, 1 parked, 2 moving). */
   at: { x: number; z: number; yaw: number; shown: number };
   /** Where it was drawn last frame (its wheels turn by the way between), and whether and how (`at.shown`). */
@@ -105,7 +114,7 @@ interface Drawn {
   speed: number;
 }
 
-/** The parked cars of a look (body and paint), one instanced draw. */
+/** The parked cars of a look (body, paint and age), one instanced draw. */
 interface Parked {
   draw: Instances;
   /** Its cars changed (or one moved): its copies are written again. */
@@ -118,7 +127,7 @@ export class Cars extends Vehicles {
   /** The snapshot's car rows looked at for a taxi so far (the households' and the taxis' come before). */
   private scanned = 0;
   private lastNow = 0;
-  /** The parked cars by look (their body meshes, by body and paint, shared by the cars of a build that look alike). */
+  /** The parked cars by look (their body meshes, by body, paint and age, shared by the cars of a build that look alike). */
   private readonly parked = new Map<string, Parked>();
   /** The wheels and contact shadows are written again: every car's (one came or went), or only those of the cars drawn that moved (`stirred`). */
   private around = true;
@@ -136,11 +145,15 @@ export class Cars extends Vehicles {
   /** The world's cars (built again only when they change: another town, another save). */
   build(world: WorldStructure): void {
     const list = world.cars ?? [];
-    const key = JSON.stringify(list.map((c) => [c.plot, c.body, c.paint]));
+    const key = JSON.stringify(list.map((c) => [c.plot, c.body, c.paint, c.age]));
     if (key === this.key) return;
     this.clear();
     this.key = key;
-    list.forEach((info, row) => this.cars.push(drawnCar(row, false, info.body % CARS.length, info.paint % CAR_PAINT.length, info.x, info.z, info.yaw)));
+    list.forEach((info, row) => {
+      // (Dev only, `?tune=cars.every:1`: every body in turn and every age, to judge them side by side.)
+      const [body, age] = SHOW.every ? [(row + SHOW.every - 1) % CARS.length, carAge(SHOW.age ? SHOW.age - 1 : row % 3)] : [info.body % CARS.length, carAge(info.age)];
+      this.cars.push(drawnCar(row, false, body, info.paint % CAR_PAINT.length, age, info.x, info.z, info.yaw));
+    });
     this.scanned = list.length;
     this.ensureAround('car', list.length, 0.55);
     this.around = true;
@@ -271,7 +284,7 @@ export class Cars extends Vehicles {
       const row = this.scanned;
       if (!carRowIsTaxi(curr, layout, row)) continue;
       const o = base + row * stride;
-      this.cars.push(drawnCar(row, true, TAXI_BODY, -1, curr[o + f.x], curr[o + f.z], curr[o + f.yaw]));
+      this.cars.push(drawnCar(row, true, TAXI_BODY, -1, 1, curr[o + f.x], curr[o + f.z], curr[o + f.yaw]));
       this.ensureAround('car', this.cars.length, 0.55);
       this.around = true;
     }
@@ -448,7 +461,7 @@ export class Cars extends Vehicles {
     const bare = this.mesh(`body ${car.look}`, () => {
       const p = new Painter(new Geo());
       if (car.taxi) paintTaxi(p.at(0, 0, 0, LIFT), true, false);
-      else paintCar(p.at(0, 0, 0, LIFT), shape, hex, true, false);
+      else paintCar(p.at(0, 0, 0, LIFT), shape, hex, true, false, car.age);
       return p.geo;
     });
     if (bare) drawMesh(apart, 'carBody', bare, this.lib.plainFinish(), { castShadows: this.shadows });
@@ -458,7 +471,7 @@ export class Cars extends Vehicles {
       const mesh = this.mesh(`door ${car.look} ${d}`, () => {
         const p = new Painter(new Geo());
         if (car.taxi) paintTaxiDoor(p.at(0, 0, 0, LIFT), d);
-        else paintDoor(p.at(0, 0, 0, LIFT), shape, hex, d);
+        else paintDoor(p.at(0, 0, 0, LIFT), shape, hex, d, car.age);
         return p.geo;
       });
       const door = new pc.Entity('carDoor');
@@ -477,7 +490,7 @@ export class Cars extends Vehicles {
     return this.mesh(`whole ${car.look}`, () => {
       const p = new Painter(new Geo());
       if (car.taxi) paintTaxi(p.at(0, 0, 0, LIFT), false, false);
-      else paintCar(p.at(0, 0, 0, LIFT), car.shape, CAR_PAINT[car.paint], false, false);
+      else paintCar(p.at(0, 0, 0, LIFT), car.shape, CAR_PAINT[car.paint], false, false, car.age);
       return p.geo;
     });
   }
@@ -495,16 +508,17 @@ export class Cars extends Vehicles {
 
 }
 
-/** A car to draw: row `row` of the snapshot's cars, a household's (`body`, `paint`) or a work taxi, where it first stands. */
-function drawnCar(row: number, taxi: boolean, body: number, paint: number, x: number, z: number, yaw: number): Drawn {
+/** A car to draw: row `row` of the snapshot's cars, a household's (`body`, `paint`, `age`) or a work taxi, where it first stands. */
+function drawnCar(row: number, taxi: boolean, body: number, paint: number, age: CarAge, x: number, z: number, yaw: number): Drawn {
   const shape = CARS[body];
   return {
     row,
     taxi,
     shape,
-    look: taxi ? 'taxi' : `${body} ${paint}`,
+    look: taxi ? 'taxi' : `${body} ${paint} ${age}`,
     body,
     paint,
+    age,
     at: { x, z, yaw, shown: 0 },
     last: { x, z, yaw, shown: 0 },
     snap: { x, z, yaw, driving: false },
