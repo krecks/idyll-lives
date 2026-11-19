@@ -983,7 +983,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   }
 
   /**
-   * In the town view (`eye`; null out of it), each woods square's trees further than `IMPOSTOR.from` from the eye are
+   * In the town view (`eye`; null out of it), each woods square's trees further than `IMPOSTOR.switchDistance` from the eye are
    * drawn as their impostors (`impostors.ts`: baked as the first square of a model wants them; until then its trees),
    * their cards under the trees' draw for the square, so they are shown as it is. Every frame: the eye moves with the
    * camera turning round a still target. Out of it, no cards (the trees' own visibility is `frameLevels`'s).
@@ -1006,7 +1006,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     setImpostorEye(app.graphicsDevice, eye);
     const impostors = (this.impostors ??= new TreeImpostors(app, () => {}));
     for (const c of this.woodsCells) {
-      const far = Math.hypot(c.x - eye.x, c.y - eye.y, c.z - eye.z) - c.r > IMPOSTOR.from;
+      const far = Math.hypot(c.x - eye.x, c.y - eye.y, c.z - eye.z) - c.r > IMPOSTOR.switchDistance;
       const template = far ? this.bakeFrom.get(c.key) : undefined;
       const parent = c.draws[0].entity.parent as pc.Entity | null;
       const impostor = template && parent ? impostors.get(c.key, template, parent) : null;
@@ -1045,7 +1045,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       let baking = false;
       for (const c of this.woodsCells) {
         const w = wanted(c);
-        if (w && !impostors.get(c.key, w.template, w.parent) && !impostors.settled(c.key)) baking = true;
+        if (w && impostors.want(c.key, w.template, w.parent) === 'baking') baking = true;
       }
       if (!baking) break;
       await frame();
