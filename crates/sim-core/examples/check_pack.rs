@@ -110,8 +110,13 @@ fn check_object(merged: &str, content: &Content, id: &str) -> bool {
         "objects": [{"def": id, "x": 5, "z": 4, "rot": 0}],
         "sims": [{"name": "Tester", "traits": [neutral_trait(content)], "x": 2.5, "z": 12.5}],
     });
-    // Things on a wall or the ceiling hang in a room (its back wall runs behind them).
-    if matches!(def.layer, Layer::Wall | Layer::Ceiling) {
+    // Things on a wall or the ceiling hang in a room (its back wall runs behind them), and a tool
+    // that cleans a floor indoors needs a room's floor to clean.
+    let cleans_indoors = def
+        .interactions
+        .iter()
+        .any(|i| i.cleans.as_ref().is_some_and(|c| !c.outdoors));
+    if matches!(def.layer, Layer::Wall | Layer::Ceiling) || cleans_indoors {
         lot["walls"] = json!([
             [3, 4, 11, 4],
             [3, 11, 11, 11],
@@ -148,6 +153,14 @@ fn check_object(merged: &str, content: &Content, id: &str) -> bool {
                 w.sims[0].skills[s] = l;
             }
             let skills_before = w.sims[0].skills;
+            // A use that needs something to work on finds it: a floor to clean (`cleans`), a
+            // machine's load done (`unloads`).
+            if inter.cleans.is_some() {
+                w.dirt.iter_mut().for_each(|d| *d = 0.6);
+            }
+            if inter.unloads {
+                w.objects[0].run = Some(0.0);
+            }
             let label = match (inter.skill, level) {
                 (Some(s), Some(l)) => format!("{}.{} [{} {l}]", id, inter.id, content.skills[s].id),
                 _ => format!("{}.{}", id, inter.id),

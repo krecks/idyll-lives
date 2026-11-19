@@ -1342,44 +1342,7 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
             {
                 return;
             }
-            let visits = &w.content.visits;
-            let hours = if directed {
-                visits.directed_hours
-            } else {
-                visits.hours
-            };
-            // (Till they're there: then it's from then, `world::arrive`, or from being let in,
-            // `answer`.)
-            let until = tick + ticks(hours * 60.0);
-            w.sims[i].visiting = Some(Visit {
-                plot,
-                until,
-                idle: 0,
-                farewell: 0,
-                offer_at: 0,
-                arrived: 0,
-                leaving: false,
-                home_by: false,
-            });
-            // With door rules the story is told when they're let in (`answer`).
-            if w.content.visits.door.is_some() && !w.plots[plot as usize].public {
-                return;
-            }
-            // Tell the story if the hosts are home.
-            let host = w
-                .households
-                .iter()
-                .find(|h| h.plot == Some(plot))
-                .map(|h| h.id);
-            if let Some(host) = host
-                && let Some(j) = w.sims.iter().position(|s| {
-                    s.here()
-                        && s.household == host
-                        && w.plot_at(s.tile().0, s.tile().1) == Some(plot)
-                })
-            {
-                w.events.push(tick, EventKind::Visited, i, j, None);
-            }
+            begin_visit(w, i, plot, directed);
         }
         // Into a work taxi (`taxi.rs`).
         Transition::Board { car } if w.cars.get(car as usize).is_some_and(|c| c.taxi) => {
@@ -1409,7 +1372,10 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
             car,
             plot,
             directed,
-        } => crate::cars::start_trip(w, i, car, plot, directed),
+        } => {
+            on_the_way(w, i, plot, directed);
+            crate::cars::start_trip(w, i, car, plot, directed);
+        }
         Transition::DriveHome { car } => {
             // (Off home: not off on another visit for `visits.againMinutes`.)
             if w.sims[i].visiting.take().is_some() {
@@ -1421,7 +1387,12 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
             car,
             plot,
             directed,
-        } => crate::cars::ride(w, i, car, plot, directed),
+        } => {
+            if let Some(plot) = plot {
+                on_the_way(w, i, plot, directed);
+            }
+            crate::cars::ride(w, i, car, plot, directed);
+        }
         Transition::Home => {
             // (Back from a visit or an outing: not off on another for `visits.againMinutes`.)
             if w.sims[i].visiting.take().is_some() {
@@ -1440,6 +1411,60 @@ fn apply_transition(w: &mut World, i: usize, transition: Transition) {
             }
         }
         Transition::Answered { guest } => answer(w, i, guest as usize),
+    }
+}
+
+/// `i` sets off to visit `plot` (`Transition::Visit`): a guest from now on, till `visits.hours`
+/// from now (the player's visits `directedHours`), and the story told if the hosts are home (with
+/// door rules, when they're let in: `answer`).
+fn begin_visit(w: &mut World, i: usize, plot: u32, directed: bool) {
+    let tick = w.tick;
+    let visits = &w.content.visits;
+    let hours = if directed {
+        visits.directed_hours
+    } else {
+        visits.hours
+    };
+    // (Till they're there: then it's from then, `world::arrive`, or from being let in,
+    // `answer`.)
+    let until = tick + ticks(hours * 60.0);
+    w.sims[i].visiting = Some(Visit {
+        plot,
+        until,
+        idle: 0,
+        farewell: 0,
+        offer_at: 0,
+        arrived: 0,
+        leaving: false,
+        home_by: false,
+    });
+    // With door rules the story is told when they're let in (`answer`).
+    if w.content.visits.door.is_some() && !w.plots[plot as usize].public {
+        return;
+    }
+    // Tell the story if the hosts are home.
+    let host = w
+        .households
+        .iter()
+        .find(|h| h.plot == Some(plot))
+        .map(|h| h.id);
+    if let Some(host) = host
+        && let Some(j) = w.sims.iter().position(|s| {
+            s.here() && s.household == host && w.plot_at(s.tile().0, s.tile().1) == Some(plot)
+        })
+    {
+        w.events.push(tick, EventKind::Visited, i, j, None);
+    }
+}
+
+/// At a car's door to drive or ride to `plot` (`Transition::Drive`, `Transition::Ride`): on their
+/// way to a visit, as they've been since they set off for the car, or from now when they set off
+/// at its door (stood there already, they got to it in the step they set off: getting in took the
+/// place of the visit's start, `Sim::transition`, and they drove off a guest of nowhere, at home as
+/// far as moving house knew, `lifecycle::may_move`).
+fn on_the_way(w: &mut World, i: usize, plot: u32, directed: bool) {
+    if !w.sims[i].visiting.is_some_and(|v| v.plot == plot) {
+        begin_visit(w, i, plot, directed);
     }
 }
 

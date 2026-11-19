@@ -111,6 +111,20 @@ pub(crate) fn driving(cars: &[Car], sim: u32) -> Option<u32> {
         .map(|c| c as u32)
 }
 
+/// Whether `sim` is out on a trip by car (`Trip`), there or back: its driver (from getting in till
+/// it's home), in it or come in it, or on their way to its door to ride along.
+pub(crate) fn on_trip(cars: &[Car], sim: &Sim) -> bool {
+    let me = sim.id;
+    sim.bound_for_car
+        .and_then(|c| cars.get(c as usize))
+        .is_some_and(|car| car.trip.is_some())
+        || cars.iter().any(|car| {
+            car.trip.is_some_and(|t| {
+                t.driver == me || car.aboard.contains(&me) || car.riders.contains(&me)
+            })
+        })
+}
+
 /// Whether car `c` is parked out on a trip `sim` drives.
 pub(crate) fn parked_out(cars: &[Car], c: u32, sim: u32) -> bool {
     cars.get(c as usize)

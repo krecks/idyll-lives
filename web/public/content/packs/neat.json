@@ -21,6 +21,7 @@
           "pose": "stand",
           "autonomous": true,
           "effects": { "fun": 0.15, "comfort": 0.1, "hygiene": -0.05 },
+          "cleans": { "amount": 0.9, "hardFloors": true },
           "tags": ["chores", "cleaning"],
           "skills": { "dexterity": 0.05 },
           "feeling": "neat.spotless"
