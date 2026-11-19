@@ -235,7 +235,7 @@
   "model.farm.trough": [0.0, 0.0],
   "model.farmhouseSink": [0.0, -0.095],
   "model.fields.dryStoneWall": [0.0, 0.0],
-  "model.fields.fingerpost": [0.0, 0.0],
+  "model.fields.fingerpost": [0.0, 0.17],
   "model.fields.gate": [0.0, 0.0],
   "model.fields.hedgerow": [0.0, 0.0],
   "model.fields.stile": [0.0, 0.0],

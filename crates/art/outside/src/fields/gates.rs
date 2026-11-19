@@ -4,7 +4,7 @@
 use super::{F, M};
 use artkit::parts::{join_all, settle};
 use artkit::scene::Obj;
-use artkit::{fbox, fcyl, fextrude, fsphere};
+use artkit::{fbox, fcyl, fextrude, fsphere, settle};
 
 /// A five-bar gate between two oak posts, with a diagonal brace, three iron hinges and a latch.
 pub fn gate() -> Vec<Obj> {
@@ -122,7 +122,10 @@ pub fn gate() -> Vec<Obj> {
     settle(&[join_all("gate")])
 }
 
-/// A fingerpost: an iron post on a stone footing, with three white arms at different heights, each pointed the way.
+/// A fingerpost at a T junction: an iron post on a stone footing, with three white arms at different heights, two
+/// pointing along the lane and one down the side lane, each with a pointed end. Its arms are about 2.1 to 2.5 m up
+/// and reach 0.5 m from the post, so the two along the lane span its 1 m tile (the 1920s national design had
+/// them 8 to 9 ft up and at least 3 ft 6 in long; a lane's are smaller).
 pub fn fingerpost() -> Vec<Obj> {
     fcyl!(
         F,
@@ -135,17 +138,17 @@ pub fn fingerpost() -> Vec<Obj> {
         bevel = 0.006,
         bevel_segments = 2
     );
-    fcyl!(F, "post", 0.055, 2.18, (0.0, 1.21, 0.0), M.iron, verts = 10);
-    fsphere!(F, "finial", 0.07, (0.0, 2.31, 0.0), M.iron);
+    fcyl!(F, "post", 0.055, 2.50, (0.0, 1.37, 0.0), M.iron, verts = 10);
+    fsphere!(F, "finial", 0.07, (0.0, 2.63, 0.0), M.iron);
     // the three arms: a flat blade with a pointed end, swung out over the lane
     let arm = [
-        (0.02, -0.045),
-        (0.34, -0.045),
-        (0.42, 0.0),
-        (0.34, 0.045),
-        (0.02, 0.045),
+        (0.03, -0.065),
+        (0.41, -0.065),
+        (0.50, 0.0),
+        (0.41, 0.065),
+        (0.03, 0.065),
     ];
-    for (i, (y, turn)) in [(1.55, 0.0), (1.78, 45.0), (2.01, 180.0)]
+    for (i, (y, turn)) in [(2.10, 0.0), (2.30, 90.0), (2.50, 180.0)]
         .iter()
         .enumerate()
     {
@@ -170,5 +173,7 @@ pub fn fingerpost() -> Vec<Obj> {
             bevel_segments = 1
         );
     }
-    settle(&[join_all("fingerpost")])
+    // the post stays on the middle of its tile; the side lane's arm makes the box reach further one way
+    let post = join_all("fingerpost");
+    settle!(&[post], centre = false)
 }

@@ -43,7 +43,8 @@ pub fn family() -> Option<Family> {
             Model::new("stile", walls::stile, (0.94, 0.96, 0.9))
                 .tolerance(0.03)
                 .paint(&[("stone", "Stone")]),
-            Model::new("fingerpost", gates::fingerpost, (0.85, 2.38, 0.43))
+            Model::new("fingerpost", gates::fingerpost, (0.99, 2.70, 0.62))
+                .centre(0.0, 0.17)
                 .tolerance(0.03)
                 .paint(&[("paint", "Paint")]),
         ],
