@@ -1,6 +1,6 @@
 // The real town's contracts (`core/protocol.ts`): a household's plot may be a flat, past the ground
 // lots; `flatOf` and `lotOf` take it to its flat and its building's lot, and a ground lot to itself.
-// The renderer's paving reads the fixture's town and gives nothing paved until the ground stream draws it.
+// The renderer's paving reads the fixture's town: its centre, court and car park paved, its bays drawn.
 import { describe, expect, test } from 'bun:test';
 import { flatOf, lotOf } from '../src/core/protocol';
 import { townPaving } from '../src/render/shared/townPaving';
@@ -31,9 +31,11 @@ describe('the real town', () => {
     expect(t.parking!.every((b) => b.park === 0)).toBe(true);
   });
 
-  test('nothing is paved until the ground stream draws it', () => {
+  test('its centre, court and car park are paved; its bays are drawn with the car park’s P sign', () => {
     const p = townPaving(realTown());
-    expect(p.pieces).toEqual([]);
-    expect(p.mask(W, STOREY).every((v) => v === 0)).toBe(true);
+    expect(p.pieces.map((q) => q.kind).sort()).toEqual(['carpark', 'centre', 'court', 'square']);
+    expect(p.mask(W, STOREY).some((v) => v === 1)).toBe(true);
+    expect(p.bays).toHaveLength(4);
+    expect(p.signs).toHaveLength(1);
   });
 });
