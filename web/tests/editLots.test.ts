@@ -31,7 +31,7 @@ describe('lot edits', async () => {
   const { unrle } = await import('../src/game/landMasks');
   const { lengths } = await import('../src/game/roads');
   const { townProblems } = await import('../src/game/townCheck');
-  const { assembleTown, boundsOf, frontageOf, generatedId, generateWorld, houseFor, LotPlacer, plotRect, useTownContent, vacantSlots } = await import('../src/game/town');
+  const { assembleTown, boundsOf, frontageOf, generatedId, generateWorld, homesOn: homesOnLot, houseFor, LotPlacer, plotRect, useTownContent, vacantSlots } = await import('../src/game/town');
   const { entriesOf, groundOf, townGround } = await import('../src/game/edit/ground');
   const lots = await import('../src/game/edit/lots');
   type Templates = import('../src/game/town').Templates;
@@ -232,11 +232,11 @@ describe('lot edits', async () => {
 
   test("the town's last home and last park are kept", () => {
     // (Its homes: houses, buildings of flats and the places with flats over them.)
-    const homes = new Set(hamlet.slots.filter((s) => lots.homesOn(t, s) > 0).map((s) => s.index));
+    const homes = new Set(hamlet.slots.filter((s) => homesOnLot(s, { farms: true }) > 0).map((s) => s.index));
     expect(lots.removeLotsEdit(hamlet, homes)).toEqual({ refused: 'The town keeps its last home.' });
     const allButOne = new Set([...homes].slice(1));
     const one = made(lots.removeLotsEdit(hamlet, allButOne));
-    expect(one.slots.filter((s) => lots.homesOn(t, s) > 0).length).toBe(1);
+    expect(one.slots.filter((s) => homesOnLot(s, { farms: true }) > 0).length).toBe(1);
     const parks = hamlet.slots.filter((s) => s.kind === 'park' && s.template !== 'market');
     expect(parks.length).toBe(1);
     expect(lots.removeLotsEdit(hamlet, new Set([parks[0].index]))).toEqual({ refused: 'The town keeps its last park.' });

@@ -881,6 +881,27 @@ export function roadIndex(roads: readonly RoadPlan[]): RoadIndex {
 }
 
 /**
+ * Where along each of the roads `own` (indices into `roads`; arc lengths) another road meets it: its joined ends, and
+ * where another road's end joins it or another runs by it close enough to touch (within half their widths and 2 m).
+ * The other roads are looked along every `step` m (0: at their points only), those `skip` names left out.
+ */
+export function roadMeets(roads: readonly RoadPlan[], own: Iterable<number>, { step = 2, skip }: { step?: number; skip?: (r: number) => boolean } = {}): Map<number, number[]> {
+  const meets = new Map<number, number[]>();
+  for (const r of new Set(own)) {
+    const ls = roadLengths(roads[r]);
+    meets.set(r, roads[r].ends.flatMap((e, k) => (e === 'join' ? [k ? ls[ls.length - 1] : 0] : [])));
+  }
+  const index = new RoadIndex(roads);
+  roads.forEach((o, j) => {
+    if (skip?.(j)) return;
+    for (const [x, z] of step ? evenly(o.points, step) : o.points) {
+      for (const [r, hit] of index.around(x, z, 10)) if (r !== j && meets.has(r) && hit.dist <= (o.width + roads[r].width) / 2 + 2) meets.get(r)!.push(hit.s);
+    }
+  });
+  return meets;
+}
+
+/**
  * Lanes that join a road begin at its kerb, not its middle: a lane's sidewalks then begin at the
  * road's, and it cuts the road's sidewalk only on its own side. (The road it joins: the one whose
  * middle is nearest the lane's end.)

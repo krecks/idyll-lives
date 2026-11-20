@@ -24,10 +24,10 @@ describe("Choose Home's homes", async () => {
   const { AssetRegistry } = await import('../src/assets/registry');
   const { objectInfos } = await import('../src/game/housegen');
   const { flatsIdOf, generateWorld, useTownContent } = await import('../src/game/town');
-  const { flatsTemplate } = await import('../src/game/flats');
+  const { flatName, flatsTemplate } = await import('../src/game/flats');
   const { flatPrice } = await import('../src/game/price');
   const { peopleStreams, populate } = await import('../src/game/people');
-  const { flatName, homeKey, homeOffers, homeOnLot, homeRows, homesForSale, livedIn, sameHome, storeyName } = await import('../src/ui/homes');
+  const { homeKey, homeOffers, homeOnLot, homeRows, homesForSale, livedIn, sameHome, storeyName } = await import('../src/ui/homes');
   type Templates = import('../src/game/town').Templates;
   type PlotSlot = import('../src/game/town').PlotSlot;
   type HomeOffer = import('../src/ui/homes').HomeOffer;
@@ -49,7 +49,7 @@ describe("Choose Home's homes", async () => {
     for (const f of flats) {
       const b = flatsTemplate(t, flatsIdOf(f.lot))!;
       expect(f.lot.kind === 'flats' || f.lot.kind === 'shop').toBe(true);
-      expect(f.name).toBe(flatName(f.lot, f.flat!));
+      expect(f.name).toBe(flatName(f.lot.name, f.flat!));
       expect(f.name).toBe(`Flat ${f.flat! + 1}, ${f.lot.name}`);
       expect(f.storey).toBe(b.units[f.flat!].storey);
       expect(f.storey).toBeGreaterThanOrEqual(0);

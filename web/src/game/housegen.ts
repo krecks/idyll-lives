@@ -36,7 +36,7 @@
 import type { ObjectDef, SurfaceKind } from '../content/content';
 import { approachCandidates, covers, facedTable, freeSpots, frontTile, middleOf, overhangTiles, sizeOf, topOf, type Shape, type Shapes, type Top } from './surfaces';
 import type { Door, HouseTemplate, Placement, PlannedRoom, Wall } from './town';
-import { mulberry32 as random } from './noise';
+import { between, mulberry32 as random, pick } from './noise';
 
 export interface HouseGenConfig {
   classes: Record<string, HouseClass>;
@@ -475,14 +475,6 @@ function shuffle<T>(rng: () => number, list: T[]): T[] {
     [list[i], list[j]] = [list[j], list[i]];
   }
   return list;
-}
-
-function pick<T>(rng: () => number, list: readonly T[]): T {
-  return list[Math.floor(rng() * list.length)];
-}
-
-function between(rng: () => number, [a, b]: readonly [number, number]): number {
-  return a + Math.floor(rng() * (b - a + 1));
 }
 
 /** One of the keys of `weights`, as likely as its weight (null: none weighs anything). */
@@ -2373,28 +2365,64 @@ function flatDoor(f: Floor, rect: Rect, [from, to]: [number, number], rng: () =>
 
 /** Whether every room of floor `f` can be walked into from tile `from` (through doors and open walls, round what stands on it). */
 function reachesAll(f: Floor, [x0, z0]: [number, number]): boolean {
-  const room = (x: number, z: number) => f.rooms.some((r) => inside(r, x, z));
   const open = (e: string) => {
     const v = f.edges.get(e);
     return v === undefined || v === 'door';
   };
-  const seen = new Set([key(x0, z0)]);
-  const queue: [number, number][] = [[x0, z0]];
+  // (The tile walked from counts wherever it is.)
+  const floor = (x: number, z: number) => (x === x0 && z === z0) || (f.rooms.some((r) => inside(r, x, z)) && !f.taken.has(key(x, z)));
+  const seen = walked([[x0, z0]], floor, open);
+  return f.rooms.every((r) => tilesOf(r.x, r.z, r.w, r.d).some((t) => seen.has(t)));
+}
+
+// ---- the unit-edge model: a wall, door or window on a tile's edge is keyed `h:x:z` (along x on line z) or `v:x:z` (along z on line x) ----
+
+/** Walls as unit edges (`h:x:z` along x on line z, `v:x:z` along z on line x). */
+export function unitEdges(walls: Iterable<readonly [number, number, number, number]>): Set<string> {
+  const out = new Set<string>();
+  for (const [x0, z0, x1, z1] of walls) {
+    if (z0 === z1) for (let x = Math.min(x0, x1); x < Math.max(x0, x1); x++) out.add(`h:${x}:${z0}`);
+    else for (let z = Math.min(z0, z1); z < Math.max(z0, z1); z++) out.add(`v:${x0}:${z}`);
+  }
+  return out;
+}
+
+/** The tiles beside (`x`, `z`) and the unit edge between it and each. */
+export const besideTiles = (x: number, z: number): [number, number, string][] => [
+  [x + 1, z, `v:${x + 1}:${z}`],
+  [x - 1, z, `v:${x}:${z}`],
+  [x, z + 1, `h:${x}:${z + 1}`],
+  [x, z - 1, `h:${x}:${z}`],
+];
+
+/** The floor tiles (keyed `x:z`) walked to from `starts` (`floor`: a tile of the floor; `open`: an edge one walks through). */
+export function walked(starts: readonly [number, number][], floor: (x: number, z: number) => boolean, open: (e: string) => boolean): Set<string> {
+  const seen = new Set(starts.filter(([x, z]) => floor(x, z)).map(([x, z]) => key(x, z)));
+  const queue = [...seen].map((k) => k.split(':').map(Number) as [number, number]);
   while (queue.length) {
     const [x, z] = queue.pop()!;
-    for (const [nx, nz, e] of [
-      [x + 1, z, `v:${x + 1}:${z}`],
-      [x - 1, z, `v:${x}:${z}`],
-      [x, z + 1, `h:${x}:${z + 1}`],
-      [x, z - 1, `h:${x}:${z}`],
-    ] as [number, number, string][]) {
+    for (const [nx, nz, e] of besideTiles(x, z)) {
       const k = key(nx, nz);
-      if (seen.has(k) || !room(nx, nz) || f.taken.has(k) || !open(e)) continue;
+      if (seen.has(k) || !floor(nx, nz) || !open(e)) continue;
       seen.add(k);
       queue.push([nx, nz]);
     }
   }
-  return f.rooms.every((r) => tilesOf(r.x, r.z, r.w, r.d).some((t) => seen.has(t)));
+  return seen;
+}
+
+/** A thing's footprint as it stands (tiles along x and z: turned a quarter, its width and depth swap). */
+export function thingSize(o: Pick<Placement, 'def' | 'rot'>, info: ObjectInfos): [number, number] {
+  const [fw, fd] = info(o.def)?.footprint ?? [1, 1];
+  return o.rot % 2 === 0 ? [fw, fd] : [fd, fw];
+}
+
+/** The tiles a thing takes (its footprint turned). */
+export function thingTiles(o: Placement, info: ObjectInfos): [number, number][] {
+  const [w, d] = thingSize(o, info);
+  const out: [number, number][] = [];
+  for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) out.push([o.x + dx, o.z + dz]);
+  return out;
 }
 
 /**

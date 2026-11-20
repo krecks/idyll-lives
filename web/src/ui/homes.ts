@@ -7,7 +7,7 @@
  */
 
 import type { Content } from '../content/content';
-import { flatsTemplate } from '../game/flats';
+import { flatName, flatsTemplate } from '../game/flats';
 import { homesOf } from '../game/people';
 import { flatsIdOf, type NeighbourhoodDraft, type PlotSlot, type Templates } from '../game/town';
 
@@ -45,18 +45,13 @@ export function storeyName(storey: number): string {
   return storey <= 0 ? 'Ground floor' : `Floor ${storey}`;
 }
 
-/** A flat's name as the town file gives it (`assembleTown`): "Flat 2, Mill Court". */
-export function flatName(lot: Pick<PlotSlot, 'name'>, flat: number): string {
-  return `Flat ${flat + 1}, ${lot.name}`;
-}
-
 /** Every home of `town` (`people.ts` `homesOf`): each house's lot and each flat, with its name and a flat's storey. */
 export function homeOffers(content: Content, t: Templates, town: NeighbourhoodDraft): HomeOffer[] {
   return homesOf(content, t, town).map((h) => {
     const ref: HomeRef = { slot: h.slot.index, ...(h.flat === undefined ? {} : { flat: h.flat }) };
     if (h.flat === undefined) return { ...ref, key: homeKey(ref), lot: h.slot, name: h.slot.name, bedrooms: h.bedrooms, price: h.price };
     const storey = flatsTemplate(t, flatsIdOf(h.slot))?.units[h.flat]?.storey ?? 0;
-    return { ...ref, key: homeKey(ref), lot: h.slot, name: flatName(h.slot, h.flat), storey, bedrooms: h.bedrooms, price: h.price };
+    return { ...ref, key: homeKey(ref), lot: h.slot, name: flatName(h.slot.name, h.flat), storey, bedrooms: h.bedrooms, price: h.price };
   });
 }
 

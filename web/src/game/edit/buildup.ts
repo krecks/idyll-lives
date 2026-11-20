@@ -28,12 +28,10 @@ import type { RoadPlan } from '../../core/protocol';
 import { CUT_MAX, ENTRY_MAX, RETAIN_MAX } from '../../render/shared/builtSurface';
 import { CIVIC, civicChoices, civicLabel, civicTooBig, draftAreaSize, ZONE } from '../places';
 import { DensePass, raisePlaces } from '../dense';
-import { flatsTemplate } from '../flats';
 import { heightAt, LAND_CELL, type Land } from '../land';
 import { mulberry32 } from '../noise';
-import { lengths, pointAt, RoadIndex, type Pt } from '../roads';
+import { lengths, pointAt, RoadIndex } from '../roads';
 import { plotRect, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates } from '../town';
-import { rectPoly } from '../footprints';
 import { placeOfTemplate } from '../placeLots';
 import { placeOf, specOf } from '../world';
 import type { Edited } from './edited';
@@ -146,14 +144,6 @@ function homeShare(draft: NeighbourhoodDraft): number {
 
 // ---- the slope limits, judged ------------------------------------------------------------------
 
-/** A footprint's box. */
-function boxOf(poly: readonly Pt[]): Rect {
-  const xs = poly.map((p) => p[0]);
-  const zs = poly.map((p) => p[1]);
-  const [x0, z0] = [Math.min(...xs), Math.min(...zs)];
-  return { x: x0, z: z0, w: Math.max(...xs) - x0, d: Math.max(...zs) - z0 };
-}
-
 /**
  * The slope limits judged on the land as laid (`land`), building by building, as the settle's
  * surface would grade it: a road's height is the land along it averaged `PROFILE_REACH` m either
@@ -202,9 +192,8 @@ class SlopeJudge {
     return n ? sum / n : null;
   }
 
-  /** Whether a lot on `poly` keeps within the limits; kept as standing if it does. */
-  keep(poly: readonly Pt[]): boolean {
-    const box = boxOf(poly);
+  /** Whether a lot on `box` keeps within the limits; kept as standing if it does. */
+  keep(box: Rect): boolean {
     const entry = this.entryOf(box);
     if (entry === null) return true;
     let [lo, hi] = [Infinity, -Infinity];
@@ -286,7 +275,7 @@ export function buildUp(draft: NeighbourhoodDraft, t: Templates, content: Conten
   const land = landOf(next);
   const judge = land ? new SlopeJudge(land, next.roads, next.slots.map((s) => plotRect(t, s))) : null;
   const fresh = slots.slice(from).filter(near);
-  const kept = judge ? fresh.filter((s) => judge.keep(rectPoly(plotRect(t, s)))) : fresh;
+  const kept = judge ? fresh.filter((s) => judge.keep(plotRect(t, s))) : fresh;
   const leftOut = fresh.length - kept.length;
   if (!homes && !kept.length) return { refused: leftOut ? `the ground along ${name} is too steep for anything more to be built there` : `nothing more fits along ${name}` };
   // (Numbered on from the lots standing.)
@@ -298,7 +287,7 @@ export function buildUp(draft: NeighbourhoodDraft, t: Templates, content: Conten
 /**
  * `draft` with its lots from slot `from` on (laid by the dense pass: `dense.ts`) made what the generator makes
  * of them: flats over a shop, a café or a restaurant and real floors over an office (`raisePlaces`), a
- * building of flats called as its template names it, a named place's lot called as its place is (none
+ * named place's lot called as its place is (none
  * twice: `withPlaceName`), and every public lot (a park, an outdoor spot, a shop) given its place
  * (`withLotPlace`). Drawn from `seed`.
  */
@@ -306,7 +295,6 @@ export function withBuildings(draft: NeighbourhoodDraft, t: Templates, content: 
   const rand = mulberry32(seed);
   const fresh = draft.slots.slice(from).map((s) => ({ ...s }));
   raisePlaces(t, fresh, (draft.open?.centre ?? []).map((c) => c.poly), rand);
-  for (const s of fresh) if (s.kind === 'flats') s.name = flatsTemplate(t, s.template)?.name ?? s.name;
   let next: NeighbourhoodDraft = { ...draft, slots: [...draft.slots.slice(0, from), ...fresh] };
   for (const s of fresh) {
     if (s.kind === 'house' || s.kind === 'flats') continue;

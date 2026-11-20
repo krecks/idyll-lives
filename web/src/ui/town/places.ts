@@ -5,7 +5,7 @@
  */
 
 import type { FlatInfo, PlotInfo, RoadPlan, TownArea, TownPlace, WorldMeta } from '../../core/protocol';
-import { FLAT_FLOOR } from '../../game/price';
+import { FLAT_FLOOR, flatLandShare, landAndBuilt, roundPrice } from '../../game/price';
 
 type Rates = { perTile: number; perFloorTile: number; round: number; sizeRef?: number; sizePremium?: number };
 
@@ -121,9 +121,8 @@ export function homesForSale(plots: readonly PlotInfo[], households: readonly { 
   const taken = new Set(households.map((h) => h.plot));
   const priced = (tiles: number, floor: number, share: number) => {
     if (!rates) return 0;
-    const built = share * rates.perFloorTile * floor * (floor / (rates.sizeRef ?? 100)) ** (rates.sizePremium ?? 0);
-    const step = Math.max(1, rates.round);
-    return Math.round((rates.perTile * tiles + built) / step) * step;
+    const { land, built } = landAndBuilt(rates, tiles, floor, share);
+    return roundPrice(rates, land + built);
   };
   const flatsOf = new Map<number, number>();
   for (const f of flats) flatsOf.set(f.of, (flatsOf.get(f.of) ?? 0) + 1);
@@ -138,8 +137,7 @@ export function homesForSale(plots: readonly PlotInfo[], households: readonly { 
     const lot = plots[f.of];
     if (taken.has(f.id) || !lot) continue;
     const floor = f.w * f.d;
-    const shares = (flatsOf.get(f.of) ?? 1) + (lot.public ? 1 : 0);
-    out.push({ plot: f.id, flat: true, price: priced((lot.w * lot.d) / shares, floor, FLAT_FLOOR), floor, storeys: 1, w: f.w, d: f.d });
+    out.push({ plot: f.id, flat: true, price: priced(flatLandShare(lot.w * lot.d, flatsOf.get(f.of) ?? 1, lot.public), floor, FLAT_FLOOR), floor, storeys: 1, w: f.w, d: f.d });
   }
   return out;
 }

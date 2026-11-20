@@ -13,7 +13,7 @@ import { flatsTemplate } from './flats';
 import { encodeLand, type Land } from './land';
 import { settleEdit, settleLand } from './landFollow';
 import { editedProblems } from './edit/checked';
-import { assembleTown, generatedHouses, generateWorld, houseTemplate, loadTemplates, primeHouses, type AssembleOptions, type HouseTemplate, type NeighbourhoodDraft, type Templates } from './town';
+import { assembleTown, flatsIdOf, generatedHouses, generateWorld, houseTemplate, loadTemplates, primeHouses, type AssembleOptions, type HouseTemplate, type NeighbourhoodDraft, type Templates } from './town';
 import { previewWorld } from './townPreview';
 import { landDraft, layOn } from './macro';
 import type { Pt } from './roads';
@@ -179,7 +179,7 @@ function furnish(content: Content, t: Templates, town: NeighbourhoodDraft, house
   }
   for (const [slot, residents] of flats) {
     const s = town.slots[slot];
-    const id = s?.kind === 'flats' ? s.template : s?.upper?.startsWith('over:') ? s.upper : undefined;
+    const id = s && flatsIdOf(s);
     if (id && flatsTemplate(t, id, Array.from(residents))) houses += residents.filter((r) => !!r).length;
   }
   return { houses, ms: performance.now() - t0 };

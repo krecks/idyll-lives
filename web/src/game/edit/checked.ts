@@ -10,9 +10,8 @@
 import type { Content } from '../../content/content';
 import { wetTile } from '../landEdit';
 import { roadExits } from '../roads';
-import { plotKindOf, plotRect, type NeighbourhoodDraft, type Templates } from '../town';
+import { homesOn, plotKindOf, plotRect, type NeighbourhoodDraft, type Templates } from '../town';
 import { townProblems, type CheckedTown } from '../townCheck';
-import { homesOn } from './lots';
 
 /** The checks of how the generator fills a town (the centre the densest), which an edited town needn't keep. */
 const GENERATED_ONLY: readonly RegExp[] = [/^the centre's open land is /, /^the main town has no centre$/];
@@ -67,7 +66,7 @@ export function editedProblems(draft: NeighbourhoodDraft, t: Templates, content:
   const size = draft.world?.options?.town;
   const expect = { built: 0, empty: null, meadow: false, quarters: 0, homes: 0, careers: size === 'town' || size === 'city', exits: null };
   const found = townProblems(checkedTown(draft, t), expect, { river: false, careers: content.careerCategories.map((c) => c.id), generated: false });
-  const homes = draft.slots.reduce((n, s) => n + homesOn(t, s), 0);
+  const homes = draft.slots.reduce((n, s) => n + homesOn(s, { farms: true }), 0);
   // (How the generator fills a town, which an edited one needn't keep: its centre the densest.)
   const hard = found.hard.filter((line) => !GENERATED_ONLY.some((p) => p.test(line)));
   return { hard: homes < 2 ? [...hard, `fewer than two homes (${homes})`] : hard, soft: found.soft };

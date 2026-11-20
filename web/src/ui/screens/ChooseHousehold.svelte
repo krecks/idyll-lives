@@ -11,12 +11,13 @@
    */
   import { onDestroy, onMount } from 'svelte';
   import { lookAtAge, type SimDraft } from '../../game/household';
+  import { flatName } from '../../game/flats';
   import { reducedMotion } from '../../game/host';
   import { menuScene } from '../../game/menuScene';
   import { householdsAtMost, peopleStreams, populate } from '../../game/people';
   import { flatPrice, homePrice } from '../../game/price';
   import { flatsIdOf, loadTemplates, type NeighbourhoodDraft, type Templates } from '../../game/town';
-  import { flatName, homeKey, homeOffers, sameHome, type HomeRef } from '../homes';
+  import { homeKey, homeOffers, sameHome, type HomeRef } from '../homes';
   import { app } from '../app.svelte';
   import { lifespanHint, money } from '../format';
   import Icon from '../Icon.svelte';
@@ -89,7 +90,7 @@
     const s = town?.slots[home.slot];
     const area = s?.area ?? 0;
     const name = area === 0 ? (town?.name ?? '') : (town?.open?.areas[area]?.name ?? '');
-    return { street: s ? (home.flat === undefined ? s.name : flatName(s, home.flat)) : '', place: name, village: area !== 0 };
+    return { street: s ? (home.flat === undefined ? s.name : flatName(s.name, home.flat)) : '', place: name, village: area !== 0 };
   }
 
   /** A resident in brief: "Ben, 34", and their first two traits. */

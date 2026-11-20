@@ -10,14 +10,13 @@
  * step 2 hatches (`hatched`); and how much a layout would build (`usesSummary`, step 2's live line).
  */
 
-import { flatsInId } from './flats';
 import { CIVIC, civicChoices, civicTooBig } from './places';
 import { placeOfTemplate } from './placeLots';
 import { inCentre } from './edit/ground';
 import { noUseCells, roadReach, usesOfDraft } from './edit/uses';
 import { BEND, BEND_MOST, cornersOf } from './macro';
 import { inside, lengths, leftOf, pointAt, straightAround, tangent, type Pt, type RoadPlan } from './roads';
-import { flatsIdOf, plotRect, type Frontage, type NeighbourhoodDraft, type Rect, type Templates } from './town';
+import { homesOn, plotRect, type Frontage, type NeighbourhoodDraft, type Rect, type Templates } from './town';
 import type { LaidTown, Proposal } from './townJobs';
 import { placeOf, specOf } from './world';
 import { layoutHash, NO_USE, packUses, unpackUses, USE_CELL, USE_CODE, useOfCode, type UseKind, type UseLayer } from './uses';
@@ -412,7 +411,7 @@ const ROWS_AWAY = 0.5;
  */
 export function townSummary(draft: NeighbourhoodDraft): UsesSummary {
   return {
-    homes: draft.slots.reduce((n, s) => n + (s.kind === 'house' && s.lot !== 'farm' ? 1 : flatsInId(flatsIdOf(s))), 0),
+    homes: draft.slots.reduce((n, s) => n + homesOn(s, { farms: false }), 0),
     shops: draft.slots.filter((s) => s.kind === 'shop' && !civicLot(s.template)).length,
     parks: draft.slots.filter((s) => s.kind === 'park' || s.kind === 'outdoor').length,
     public: draft.slots.filter((s) => civicLot(s.template)).length,

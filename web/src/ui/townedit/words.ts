@@ -6,9 +6,8 @@
 
 import { CIVIC, civicLabel, draftAreaSize } from '../../game/places';
 import { placeOfTemplate } from '../../game/placeLots';
-import { homesOn } from '../../game/edit/lots';
 import type { Goes } from '../../game/edit/streets';
-import type { NeighbourhoodDraft, PlotSlot, Templates } from '../../game/town';
+import { homesOn, type NeighbourhoodDraft, type PlotSlot } from '../../game/town';
 
 /** What a named place's lot of another kind than a civic place is (`places.ts` `ZONE`). */
 const ZONE_KIND: Record<string, string> = { shop: 'Shop', cafe: 'Café', restaurant: 'Restaurant', office: 'Offices', workshop: 'Workshop', farm: 'Farm shop' };
@@ -45,9 +44,9 @@ export function lotKind(s: NeighbourhoodDraft['slots'][number], draft?: Neighbou
 }
 
 /** The flats lot `s` holds, in words ("its 6 flats", "the 2 flats over it"); null: none (a house, a place with nothing over it). */
-export function flatsLine(t: Templates, s: Pick<PlotSlot, 'kind' | 'template' | 'upper'>): string | null {
+export function flatsLine(s: Pick<PlotSlot, 'kind' | 'template' | 'upper' | 'lot'>): string | null {
   if (s.kind === 'house') return null;
-  const n = homesOn(t, s);
+  const n = homesOn(s, { farms: true });
   if (!n) return null;
   return s.kind === 'flats' ? `its ${count(n, 'flat')}` : `the ${count(n, 'flat')} over it`;
 }
@@ -56,12 +55,12 @@ export function flatsLine(t: Templates, s: Pick<PlotSlot, 'kind' | 'template' | 
  * What a removal takes besides the thing itself (`streets.ts` `whatGoes`): other roads, bridges left leading nowhere,
  * homes (a house, each flat of a building of flats or over a place), other lots, parking spaces (their car parks whole).
  */
-export function whatGoesLine(draft: NeighbourhoodDraft, t: Templates, goes: Pick<Goes, 'roads' | 'lots' | 'parking'> & Partial<Pick<Goes, 'bridges'>>, road: number): string[] {
+export function whatGoesLine(draft: NeighbourhoodDraft, goes: Pick<Goes, 'roads' | 'lots' | 'parking'> & Partial<Pick<Goes, 'bridges'>>, road: number): string[] {
   const bridged = new Set(goes.bridges ?? []);
   const name = (r: number) => draft.roads[r]?.name ?? 'a road';
   const roads = goes.roads.filter((r) => r !== road && !bridged.has(r)).map(name);
   const bridges = [...bridged].filter((r) => r !== road).map(name);
-  const homes = goes.lots.reduce((n, i) => n + (draft.slots[i] ? homesOn(t, draft.slots[i]) : 0), 0);
+  const homes = goes.lots.reduce((n, i) => n + (draft.slots[i] ? homesOn(draft.slots[i], { farms: true }) : 0), 0);
   const others = goes.lots.filter((i) => draft.slots[i] && draft.slots[i].kind !== 'house' && draft.slots[i].kind !== 'flats').length;
   return [
     ...(roads.length ? [`${count(roads.length, 'road')} left joined to nothing (${listed(roads)})`] : []),

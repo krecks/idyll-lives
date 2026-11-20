@@ -23,7 +23,7 @@ function removal(editor: TownEditor, p: Picked): { ghosts: Partial<TownGhosts>; 
     const s = draft.slots[p.slot];
     if (!s) return null;
     const why = removalRefused(draft, new Set([p.slot]));
-    const flats = flatsLine(t, s);
+    const flats = flatsLine(s);
     return { ghosts: { lots: [{ ...lotBox(t, s), tone: why ? 'bad' : 'gone' }] }, line: why ?? `Removes ${s.name}${flats ? `, and with it ${flats}` : ''}.`, refused: !!why };
   }
   if (p.kind === 'road') {
@@ -31,7 +31,7 @@ function removal(editor: TownEditor, p: Picked): { ghosts: Partial<TownGhosts>; 
     if (!r) return null;
     const goes = goesOf(editor, p.road);
     if ('refused' in goes) return { ghosts: { roads: [roadGhost(r, 'bad')] }, line: sentence(goes.refused), refused: true };
-    const also = whatGoesLine(draft, t, goes, p.road);
+    const also = whatGoesLine(draft, goes, p.road);
     const streets = madeStreetsLine(draft, goes);
     return {
       ghosts: {

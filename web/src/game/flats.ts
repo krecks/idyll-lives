@@ -21,7 +21,8 @@
  */
 
 import type { LotLook } from '../core/protocol';
-import { generateFlat, placeFloor, random, residentsKey, stairHall, type FlatFrame, type FlatPlan, type FloorPlan, type Furnishing, type HouseGenConfig, type ObjectInfos } from './housegen';
+import { besideTiles, generateFlat, placeFloor, random, residentsKey, stairHall, thingSize, thingTiles, unitEdges, walked, type FlatFrame, type FlatPlan, type FloorPlan, type Furnishing, type HouseGenConfig, type ObjectInfos } from './housegen';
+import { between, pick } from './noise';
 import { frontTile } from './surfaces';
 import { turner, type Door, type Placement, type PlannedRoom, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Wall } from './town';
 
@@ -97,14 +98,12 @@ export interface PlaceFloors {
   floors: FloorPlan[];
 }
 
-/** A flats building as a slot takes it: its template (`flats:<seed>:<storeys>:<wide>[:p]`), its lot's size and its look. */
-export type FlatsSlot = Pick<PlotSlot, 'template' | 'w' | 'd' | 'dress'>;
+/** A flats building as a slot takes it: its template (`flats:<seed>:<storeys>:<wide>[:p]`), its name (the template's), its lot's size and its look. */
+export type FlatsSlot = Pick<PlotSlot, 'template' | 'name' | 'w' | 'd' | 'dress'>;
 
 /** Time spent generating buildings of flats and floors above places (ms), and how many. */
 export const flatsStats = { ms: 0, made: 0 };
 
-const between = (rng: Rand, [a, b]: readonly [number, number]) => a + Math.floor(rng() * (b - a + 1));
-const pick = <T>(rng: Rand, list: readonly T[]): T => list[Math.floor(rng() * list.length)];
 const tileKey = (x: number, z: number) => `${x}:${z}`;
 
 /** The id of a building of flats (see the module's note). */
@@ -165,7 +164,7 @@ export function flatsFor(t: Templates, zone: 'centre' | 'town', rand: Rand): Fla
   const id = flatsId((rand() * 2 ** 31) >>> 0, storeys, wide, bays);
   const b = flatsTemplate(t, id);
   if (!b) return null;
-  return { template: id, w: b.lot.width, d: b.lot.depth, dress: b.look };
+  return { template: id, name: b.name, w: b.lot.width, d: b.lot.depth, dress: b.look };
 }
 
 /** The flats over a named place of layout `place`, `storeys` high in all (2 or 3), drawn from `rand`: its id, or null where none fit (a place too narrow, or one with a storey of its own above). */
@@ -180,9 +179,30 @@ export function floorsFor(t: Templates, place: string, use: string, storeys: num
   return placeFloors(t, id) ? id : null;
 }
 
+/**
+ * The buildings, the flats' plans and the places with floors made so far, each kept till this many more have been asked
+ * for (the least lately asked for dropped first: one asked for again is made again, the same). Laying a town out tries
+ * many a building that never goes down, and a game makes towns one after another.
+ */
+const KEEP_BUILDINGS = 1024;
+const KEEP_PLANS = 4096;
 const buildings = new Map<string, FlatsTemplate | null>();
 const plans = new Map<string, FlatPlan | null>();
 const withFloors = new Map<string, PlaceFloors | null>();
+
+/** `cache`'s value for `key` (`make` makes it if it has none), kept as the latest asked for; `most` kept at most. */
+function kept<V>(cache: Map<string, V>, most: number, key: string, make: () => V): V {
+  if (cache.has(key)) {
+    const v = cache.get(key) as V;
+    cache.delete(key);
+    cache.set(key, v);
+    return v;
+  }
+  const v = make();
+  cache.set(key, v);
+  if (cache.size > most) cache.delete(cache.keys().next().value!);
+  return v;
+}
 
 /**
  * A building of flats (`flats:`) or the flats over a place (`over:`) by its id, each flat furnished
@@ -191,42 +211,44 @@ const withFloors = new Map<string, PlaceFloors | null>();
  */
 export function flatsTemplate(t: Templates, id: string, residents: readonly (Furnishing | undefined)[] = []): FlatsTemplate | undefined {
   const at = `${id}#${residents.map(residentsKey).join('/')}`;
-  if (!buildings.has(at)) {
+  const made = kept(buildings, KEEP_BUILDINGS, at, () => {
     const t0 = performance.now();
     const parts = id.split(':');
-    const made = parts[0] === 'flats' ? flatsBuilding(t, Number(parts[1]), Number(parts[2]), parts[3] === '1', parts[4] === 'p', residents) : parts[0] === 'over' ? flatsOver(t, parts[1], Number(parts[2]), Number(parts[3]), residents) : null;
-    if (made) made.id = id;
-    buildings.set(at, made);
+    const b = parts[0] === 'flats' ? flatsBuilding(t, Number(parts[1]), Number(parts[2]), parts[3] === '1', parts[4] === 'p', residents) : parts[0] === 'over' ? flatsOver(t, parts[1], Number(parts[2]), Number(parts[3]), residents) : null;
+    if (b) b.id = id;
     flatsStats.ms += performance.now() - t0;
     flatsStats.made++;
-  }
-  return buildings.get(at) ?? undefined;
+    return b;
+  });
+  return made ?? undefined;
 }
 
 /** A named place with real storeys above it (`floors:`) by its id; undefined if the id makes none. */
 export function placeFloors(t: Templates, id: string): PlaceFloors | undefined {
-  if (!withFloors.has(id)) {
+  const made = kept(withFloors, KEEP_BUILDINGS, id, () => {
     const t0 = performance.now();
     const [kind, place, seed, storeys, use] = id.split(':');
-    withFloors.set(id, kind === 'floors' ? floorsAbove(t, id, place, Number(seed), Number(storeys), use ?? 'office') : null);
+    const f = kind === 'floors' ? floorsAbove(t, id, place, Number(seed), Number(storeys), use ?? 'office') : null;
     flatsStats.ms += performance.now() - t0;
     flatsStats.made++;
-  }
-  return withFloors.get(id) ?? undefined;
+    return f;
+  });
+  return made ?? undefined;
 }
 
 /** A flat's plan in `frame` (cached: the same seed, frame and furnishing give the same flat). */
 function flatPlan(t: Templates, frame: FlatFrame, seed: number, residents: Furnishing | undefined): FlatPlan | null {
   const at = `${seed}:${JSON.stringify(frame)}#${residentsKey(residents)}`;
-  if (!plans.has(at)) plans.set(at, generateFlat(t.gen!, t.info!, frame, seed, t.lampTiles, t.windowTiles, residents));
-  return plans.get(at) ?? null;
+  return kept(plans, KEEP_PLANS, at, () => generateFlat(t.gen!, t.info!, frame, seed, t.lampTiles, t.windowTiles, residents));
 }
 
-/** The stairs' length (tiles), and the first row past a stair hall's flights from `front`: a flat's door is on that row or behind it. */
-function stairRows(cfg: HouseGenConfig, info: ObjectInfos, front: number): { len: number; doors: number } {
-  const len = info(cfg.stairs)?.footprint[1] ?? 4;
-  return { len, doors: front + len + 1 };
+/** The stairs' length (tiles): a flat's door is on the first row past a stair hall's flights, or behind it. */
+function stairLen(cfg: HouseGenConfig, info: ObjectInfos): number {
+  return info(cfg.stairs)?.footprint[1] ?? 4;
 }
+
+/** What a thing costs, as its object's info has it (0: none given). */
+const priceIn = (info: ObjectInfos) => (def: string) => (info(def) as { price?: number } | undefined)?.price ?? 0;
 
 /**
  * A flat beside a stair hall, in its building: its rectangle `rect` (the hall on its +x side if
@@ -250,9 +272,6 @@ function placeFlat(plan: FlatPlan, rect: Rect, left: boolean, footprint: (def: s
   return { layout, door: [hallX, front.z], inside: [homeX + 0.5, front.z + 0.5] };
 }
 
-/** A furnishing per unit: `residents` as given, padded with undefined. */
-const residentAt = (residents: readonly (Furnishing | undefined)[], i: number) => residents[i];
-
 /**
  * The flats beside `hall` on `storeys` storeys (from `first` up), one each `sides` gives a storey:
  * the same plan on every storey (the door on the hall's floor past its flights), furnished per flat.
@@ -262,7 +281,7 @@ function flatsBeside(t: Templates, hall: Rect, sides: { x: number; w: number; le
   const cfg = t.gen!;
   const info = t.info!;
   const footprint = (def: string): [number, number] => info(def)?.footprint ?? [1, 1];
-  const { len } = stairRows(cfg, info, hall.z);
+  const len = stairLen(cfg, info);
   // Its door on the hall's floor past the flights, in the flat's own frame (along the hall from the far end, or from the front).
   const frameOf = (side: (typeof sides)[number]): FlatFrame => ({ w: hall.d, d: side.w, door: side.left ? [len + 1, hall.d - 1] : [0, hall.d - len - 2], ...(side.blind ? { blind: side.blind } : {}) });
   // A side's plan: from its seed, else (a frame some seeds lay out no flat in) the next of a few.
@@ -272,7 +291,7 @@ function flatsBeside(t: Templates, hall: Rect, sides: { x: number; w: number; le
   for (let k = first; k < storeys; k++) {
     for (const [i, side] of sides.entries()) {
       const rect: Rect = { x: side.x, z: hall.z, w: side.w, d: hall.d };
-      const plan = flatPlan(t, frameOf(side), seeds[i]!, residentAt(residents, units.length));
+      const plan = flatPlan(t, frameOf(side), seeds[i]!, residents[units.length]);
       if (!plan) return null;
       const { layout, door, inside } = placeFlat(plan, rect, side.left, footprint);
       units.push({ storey: k, rect, door, inside, bedrooms: plan.bedrooms, layout });
@@ -400,16 +419,6 @@ function yardThings(cfg: HouseGenConfig, info: ObjectInfos, rng: Rand, yard: Rec
 
 // ---- over a place --------------------------------------------------------------------
 
-/** A layout's walls as unit edges (`h:x:z` along x on line z, `v:x:z` along z on line x). */
-function unitEdges(walls: readonly Wall[]): Set<string> {
-  const out = new Set<string>();
-  for (const [x0, z0, x1, z1] of walls) {
-    if (z0 === z1) for (let x = Math.min(x0, x1); x < Math.max(x0, x1); x++) out.add(`h:${x}:${z0}`);
-    else for (let z = Math.min(z0, z1); z < Math.max(z0, z1); z++) out.add(`v:${x0}:${z}`);
-  }
-  return out;
-}
-
 /** Unit edges merged into wall runs. */
 function wallRuns(edges: Set<string>): Wall[] {
   const h = new Map<number, number[]>();
@@ -446,40 +455,7 @@ function boxOf(walls: readonly Wall[]): Rect | null {
   return { x, z, w: Math.max(...xs) - x, d: Math.max(...zs) - z };
 }
 
-/** The tiles a thing takes (its footprint turned). */
-function thingTiles(o: Placement, info: ObjectInfos): [number, number][] {
-  const [fw, fd] = info(o.def)?.footprint ?? [1, 1];
-  const [w, d] = o.rot % 2 === 0 ? [fw, fd] : [fd, fw];
-  const out: [number, number][] = [];
-  for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) out.push([o.x + dx, o.z + dz]);
-  return out;
-}
-
 const inRect = (r: Rect, x: number, z: number) => x >= r.x && z >= r.z && x < r.x + r.w && z < r.z + r.d;
-
-/** The tiles beside (`x`, `z`) and the unit edge between it and each. */
-const around = (x: number, z: number): [number, number, string][] => [
-  [x + 1, z, `v:${x + 1}:${z}`],
-  [x - 1, z, `v:${x}:${z}`],
-  [x, z + 1, `h:${x}:${z + 1}`],
-  [x, z - 1, `h:${x}:${z}`],
-];
-
-/** The floor tiles walked to from `starts` (`floor`: a tile of the floor; `open`: an edge one walks through). */
-function walked(starts: [number, number][], floor: (x: number, z: number) => boolean, open: (e: string) => boolean): Set<string> {
-  const seen = new Set(starts.filter(([x, z]) => floor(x, z)).map(([x, z]) => tileKey(x, z)));
-  const queue = [...seen].map((k) => k.split(':').map(Number) as [number, number]);
-  while (queue.length) {
-    const [x, z] = queue.pop()!;
-    for (const [nx, nz, e] of around(x, z)) {
-      const k = tileKey(nx, nz);
-      if (seen.has(k) || !floor(nx, nz) || !open(e)) continue;
-      seen.add(k);
-      queue.push([nx, nz]);
-    }
-  }
-  return seen;
-}
 
 /**
  * Place layout `p` (its walls' box `box`) with `cut` taken out of its ground floor for a stair hall
@@ -507,7 +483,7 @@ function cutOut(p: PublicTemplate, box: Rect, cut: Rect | null, add: Placement[]
   const usable = (o: Placement, seen: Set<string>, open: (e: string) => boolean) => {
     const tiles = thingTiles(o, info);
     const mine = new Set(tiles.map(([x, z]) => tileKey(x, z)));
-    return tiles.some(([x, z]) => around(x, z).some(([nx, nz, e]) => !mine.has(tileKey(nx, nz)) && seen.has(tileKey(nx, nz)) && open(e)));
+    return tiles.some(([x, z]) => besideTiles(x, z).some(([nx, nz, e]) => !mine.has(tileKey(nx, nz)) && seen.has(tileKey(nx, nz)) && open(e)));
   };
   const was = blockedBy(p.objects);
   const openBefore = (e: string) => !walls.has(e) || doors.has(e);
@@ -535,8 +511,7 @@ function cutOut(p: PublicTemplate, box: Rect, cut: Rect | null, add: Placement[]
   const gone = new Set<Placement>();
   const lostTile = (x: number, z: number) => (cut && inRect(cut, x, z)) || added.has(tileKey(x, z));
   for (const o of p.objects) {
-    const [fw, fd] = info(o.def)?.footprint ?? [1, 1];
-    const [w, d] = o.rot % 2 === 0 ? [fw, fd] : [fd, fw];
+    const [w, d] = thingSize(o, info);
     if (thingTiles(o, info).some(([x, z]) => lostTile(x, z)) || (blocks(o) && lostTile(...frontTile(o.x, o.z, w, d, o.rot)))) gone.add(o);
   }
   const floor = (x: number, z: number) => inRect(box, x, z) && !(cut && inRect(cut, x, z));
@@ -577,12 +552,12 @@ function flatsOver(t: Templates, place: string, seed: number, storeys: number, r
   if (!cfg || !info || !spec || !at || !(storeys >= 2 && storeys <= 3)) return null;
   const { p, box } = at;
   const hw = spec.narrowHall;
-  const { len } = stairRows(cfg, info, box.z);
+  const len = stairLen(cfg, info);
   // Too narrow for a flat and a shop, or too shallow for the stairs and a door past them.
   if (box.w - hw < 6 || box.d < len + 3) return null;
   // A flat no wider than the class has them (narrower beside a deep hall): over a wide place, roof beside it.
   const across = Math.min(box.w - hw, box.d >= 12 ? 8 : 9);
-  const price = (def: string) => (info(def) as { price?: number } | undefined)?.price ?? 0;
+  const price = priceIn(info);
   const cuts = [true, false]
     .map((left) => {
       const hall: Rect = { x: left ? box.x : box.x + box.w - hw, z: box.z, w: hw, d: box.d };
@@ -647,9 +622,9 @@ function floorsAbove(t: Templates, id: string, place: string, seed: number, stor
   const at = placeLayout(t, place);
   if (!cfg || !info || !at || !(storeys >= 2 && storeys <= 3)) return null;
   const { p, box } = at;
-  const { len } = stairRows(cfg, info, box.z);
+  const len = stairLen(cfg, info);
   if (box.w < 7 || box.d < len + 3) return null;
-  const price = (def: string) => (info(def) as { price?: number } | undefined)?.price ?? 0;
+  const price = priceIn(info);
   const walls = unitEdges(p.walls ?? []);
   const options: { left: boolean; outer: number; inner: number; flight: Placement; ground: PublicTemplate; lost: number }[] = [];
   for (const left of [true, false]) {

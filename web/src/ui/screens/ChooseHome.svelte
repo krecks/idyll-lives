@@ -21,7 +21,7 @@
   import { onDestroy, onMount } from 'svelte';
   import { menuScene } from '../../game/menuScene';
   import { flatsIdOf, houseTemplate, loadTemplates, slotDims, withGarden, type PlotSlot, type Templates } from '../../game/town';
-  import { flatsTemplate } from '../../game/flats';
+  import { flatName, flatsTemplate } from '../../game/flats';
   import { GARDEN_SIZES, type GardenSize } from '../../game/housegen';
   import { lookAtAge, residentsOf, sleepersOf, type SimDraft } from '../../game/household';
   import { flatPriceParts, priceParts } from '../../game/price';
@@ -30,7 +30,7 @@
   import { tierFor } from '../../game/people';
   import { furnishAhead } from '../../game/townJobs';
   import { householdsAhead, stepLabel } from '../newGame';
-  import { flatName, homeKey, homeOffers, homeOnLot, homeRows, sameHome, storeyName, type HomeOffer, type HomeRef } from '../homes';
+  import { homeKey, homeOffers, homeOnLot, homeRows, sameHome, storeyName, type HomeOffer, type HomeRef } from '../homes';
   import { app } from '../app.svelte';
   import { money } from '../format';
   import Icon from '../Icon.svelte';
@@ -181,7 +181,7 @@
   const budget = $derived(creative ? 'Free: this is a Creative game' : money(staying ? householdFunds(content, savings, ownPrice ?? 0) : householdFunds(content, savings, parts?.total ?? 0, emptyLot)));
 
   /** A household's home in words: its lot's name, or its flat's. */
-  const homeName = (h: HomeRef) => (h.flat === undefined ? (town.slots[h.slot]?.name ?? '') : flatName(town.slots[h.slot], h.flat));
+  const homeName = (h: HomeRef) => (h.flat === undefined ? (town.slots[h.slot]?.name ?? '') : flatName(town.slots[h.slot].name, h.flat));
   const neighbours = $derived(
     selected
       ? town.households

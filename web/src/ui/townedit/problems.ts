@@ -24,9 +24,8 @@ import type { RoadPlan } from '../../core/protocol';
 import { pointAt, lengths } from '../../game/roads';
 import { areasFor } from '../../game/build';
 import { checkedTown } from '../../game/edit/checked';
-import { homesOn } from '../../game/edit/lots';
 import { townProblems } from '../../game/townCheck';
-import { plotRect, type NeighbourhoodDraft, type Templates } from '../../game/town';
+import { homesOn, plotRect, type NeighbourhoodDraft, type Templates } from '../../game/town';
 
 /** A problem as the list shows it: what it says, and where it is on the town (if it is somewhere). */
 export interface Issue {
@@ -164,7 +163,7 @@ export function townIssues(plan: NeighbourhoodDraft, t: Templates, content: Cont
   // (Only the main town's careers are expected, in a town or a city; nothing about how filled it is.)
   const expect = { built: 0, empty: null, meadow: false, quarters: 0, homes: 0, careers: !layout && (size === 'town' || size === 'city'), exits: null };
   const found = townProblems(checkedTown(draft, t), expect, { river: false, careers, generated: false });
-  const homes = draft.slots.reduce((n, s) => n + homesOn(t, s), 0);
+  const homes = draft.slots.reduce((n, s) => n + homesOn(s, { farms: true }), 0);
   const lines = [...found.hard];
   if (homes < 2 && !layout) lines.push(`fewer than two homes (${homes})`);
   const had = new Set(base?.blocking.map((i) => i.text) ?? []);

@@ -24,7 +24,7 @@
  *   draws for an area of its kind, `ZONE.lots` or `ZONE.around`, and as many as were cleared; the main
  *   town's on their compact layouts, as the generator lays them), each a lot of its own along the shops
  *   frontage nearest its heart (`placeNamed`);
- * - terraced rows along terraces and flats (`rowHouse`, `LotPlacer.placeRow`), as many as the main town's
+ * - terraced rows along terraces and flats (`dense.ts` `terraceUnits`, `LotPlacer.placeRow`), as many as the main town's
  *   or as were cleared, and half the land newly painted holds;
  * - houses of the place's lot mix along homes (`LotPlacer`, no gaps drawn: the land painted has them),
  *   none in a town centre;
@@ -49,8 +49,8 @@ import type { Content } from '../content/content';
 import type { BuildingUse, CarPark, RoadPlan, TownArea } from '../core/protocol';
 import { CIVIC, civicChoices, civicTooBig, draftAreaSize, ZONE, type ZoneKind } from './places';
 import { rectPoly } from './footprints';
-import { bayRect, carParkFits, driveLines, takeCarPark, vergeParking, type CarParkLaid } from './parking';
-import { DensePass } from './dense';
+import { bayRect, besidePlace, bySquare, driveLines, parkAlong, vergeParking, type CarParkLaid } from './parking';
+import { DensePass, terraceUnits } from './dense';
 import { roadKey, withBuildings } from './edit/buildup';
 import { entryOf, frontOf, inCentre, townGround, withoutBays } from './edit/ground';
 import { removeLots, renumber } from './edit/lots';
@@ -58,11 +58,11 @@ import { roadReach, usesOfDraft } from './edit/uses';
 import { encodeLand, heightAt } from './land';
 import { openUnderBuilt, settleLand } from './landFollow';
 import { unrle } from './landMasks';
-import { AREA_APART, BEND, BEND_MOST, BIG_PLACES, cells8, cornersOf, FARM_SHOP_REACH, grown, hamletOf, parkingFor, PLACE_BAYS, placeReaches, rowHouse, SQUARE_BAYS, trailTo, type AreaPlan } from './macro';
+import { AREA_APART, BEND, BEND_MOST, BIG_PLACES, cells8, cornersOf, FARM_SHOP_REACH, grown, hamletOf, parkingFor, PLACE_BAYS, placeReaches, SQUARE_BAYS, trailTo, type AreaPlan } from './macro';
 import { mulberry32 } from './noise';
 import { placeOfTemplate, placeUnit } from './placeLots';
 import { fronted, greenSpots, hatched, SPOT_NEAR, SPOT_REACH, stretchesOf, type Stretch } from './proposal';
-import { inside, lengths, leftOf, pointAt, RoadIndex, straightAround, type Pt } from './roads';
+import { centroid, inside, lengths, leftOf, pointAt, RoadIndex, straightAround, type Pt } from './roads';
 import { boundsOf, frontageOf, generatedHouses, Ground, lotAt, LotPlacer, plotRect, shuffled, slotDims, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
 import { previewWorld } from './townPreview';
 import type { LaidTown, Proposal } from './townJobs';
@@ -128,7 +128,6 @@ function mix(seed: number, ...words: (string | number)[]): number {
 const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const offRect = (r: Rect, [x, z]: Pt) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
 const middle = (a: Rect): Pt => [a.x + a.w / 2, a.z + a.d / 2];
-const centroidOf = (poly: readonly Pt[]): Pt => [poly.reduce((s, p) => s + p[0], 0) / poly.length, poly.reduce((s, p) => s + p[1], 0) / poly.length];
 /** A thing's footprint (tiles) for the driveways' test: the content's (`parking.ts` `driveLines`). */
 const footprintIn = (content: Content) => (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
 
@@ -166,7 +165,7 @@ function polyCells(poly: readonly Pt[], cols: number, rows: number): number[] {
   const [j0, j1] = [Math.max(0, Math.floor(Math.min(...zs) / USE_CELL)), Math.min(rows - 1, Math.floor(Math.max(...zs) / USE_CELL))];
   for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (inside(poly as Pt[], (i + 0.5) * USE_CELL, (j + 0.5) * USE_CELL)) out.push(j * cols + i);
   if (!out.length) {
-    const [cx, cz] = centroidOf(poly);
+    const [cx, cz] = centroid(poly);
     const [ci, cj] = [Math.floor(cx / USE_CELL), Math.floor(cz / USE_CELL)];
     if (ci >= 0 && cj >= 0 && ci < cols && cj < rows) out.push(cj * cols + ci);
   }
@@ -680,7 +679,7 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
   });
   const heartOf = (a: number): Pt => {
     const c = draft.open!.centre?.find((q) => q.area === a && q.poly.length >= 3);
-    return c ? centroidOf(c.poly) : middle(areas[a]);
+    return c ? centroid(c.poly) : middle(areas[a]);
   };
   const wanted = (a: number) => byArea[a].length > 0 && (full || touched.has(a));
 
@@ -708,7 +707,7 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
       return r.x < box.x + box.w && box.x < r.x + r.w && r.z < box.z + box.d && box.z < r.z + r.d;
     });
     if (taken) continue;
-    const c = centroidOf(poly);
+    const c = centroid(poly);
     const area = nearestArea(c);
     const u = publicLot(t, GREEN_LOTS[0], area);
     if (!u) continue;
@@ -807,9 +806,7 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
     for (let k = 0; k < 400 && left >= 2 && rowFronts.length; k++) {
       let n = rowSpec.rows[0] + Math.floor(rand() * (rowSpec.rows[1] - rowSpec.rows[0] + 1));
       n = Math.min(n, left - (left - n === 1 ? 1 : 0));
-      const units = Array.from({ length: Math.max(2, n) }, () => rowHouse(t, rand))
-        .filter((h) => !!h)
-        .map((h): Unplaced => ({ kind: 'house', name: '', lot: 'terrace', area: a, ...h }));
+      const units = terraceUnits(t, Math.max(2, n), a, rand);
       if (units.length < 2) break;
       let placed: PlotSlot[] = [];
       for (let m = units.length; m >= 2 && !placed.length; m--) placed = rowAlong(placer, t, roads, units.slice(0, m), rowFronts, mask, cols, rows);
@@ -1053,22 +1050,14 @@ function parkedAgain(draft: NeighbourhoodDraft, t: Templates, content: Content, 
   const { roads } = draft;
   const drives = driveLines(t, draft.slots, roads, footprintIn(content));
   const offAll = cornersOf(roads, roads.flatMap((r, i) => (r.kind === 'trail' ? [] : [i])));
-  const put = (laid: CarParkLaid, a: number) => {
-    takeCarPark(ground, laid);
-    parking.push(...laid.bays.map((b) => ({ ...b, area: a, park: carParks.length })));
-    carParks.push({ ...laid.park, area: a });
+  const put = (laid: CarParkLaid) => {
+    parking.push(...laid.bays.map((b) => ({ ...b, park: carParks.length })));
+    carParks.push(laid.park);
   };
-  /** A car park of `few` to `most` bays (as many as fit) along the first of `frontage` it fits: whether one went down. */
-  const parkAlong = (frontage: readonly Frontage[], [few, most]: readonly [number, number], a: number, also: Pick<CarPark, 'serves' | 'square'> = {}) => {
-    for (let n = most; n >= few; n--) {
-      for (const f of frontage) {
-        const fit = carParkFits(roads, ground, f, n, offAll, drives);
-        if (!fit) continue;
-        put({ ...fit, park: { ...fit.park, ...also } }, a);
-        return true;
-      }
-    }
-    return false;
+  /** A car park of `few` to `most` bays (as many as fit) along the first of `frontage` it fits (`parking.ts` `parkAlong`). */
+  const parkBy = (frontage: readonly Frontage[], bays: readonly [number, number], area: number, also: Pick<CarPark, 'serves' | 'square'>) => {
+    const laid = parkAlong(roads, ground, frontage, bays, offAll, { drives, area, also });
+    if (laid) put(laid);
   };
   const allRoads = roads.flatMap((r, i) => (r.kind === 'trail' ? [] : [i]));
   for (const a of [...areas].sort((x, y) => x - y)) {
@@ -1080,8 +1069,8 @@ function parkedAgain(draft: NeighbourhoodDraft, t: Templates, content: Content, 
     // By the square: on the streets nearest it.
     const square = open.centre?.find((c) => c.area === a)?.square ?? (a === 0 ? open.squares?.[0] : undefined);
     if (square?.length) {
-      const sq = centroidOf(square);
-      parkAlong(frontageOf(roads, allRoads, sq, rand).filter((f) => dist(f.p, sq) < 120 && roads[f.road].kind !== 'country'), SQUARE_BAYS, a, { square: true });
+      const sq = centroid(square);
+      parkBy(bySquare(roads, frontageOf(roads, allRoads, sq, rand), sq), SQUARE_BAYS, a, { square: true });
     }
     // By each big place, on its road beside its lot.
     for (const s of draft.slots) {
@@ -1089,16 +1078,13 @@ function parkedAgain(draft: NeighbourhoodDraft, t: Templates, content: Content, 
       const spot = entryOf(draft, t, s);
       if (spot.road < 0) continue;
       const r = plotRect(t, s);
-      parkAlong(frontageOf(roads, [spot.road], middle(r), rand).filter((g) => g.side === spot.side && g.far < Math.max(r.w, r.d) / 2 + 40), PLACE_BAYS, a, { serves: s.index });
+      parkBy(besidePlace(frontageOf(roads, [spot.road], middle(r), rand), spot.side, r), PLACE_BAYS, a, { serves: s.index });
     }
     // (Pairs of bays by the verge, as the generator lays them, its car parks' bays counted: `parking.ts` `vergeParking`.)
     const homes = draft.slots.filter((s) => s.kind === 'house' && (s.area ?? 0) === a).length;
     const spaces = parkingFor(homes, a === 0) - parking.filter((p) => p.area === a).length;
     const front = frontageOf(roads, own, middle(area), mulberry32(mix(seed, 'parking', a)));
-    for (const p of vergeParking(roads, ground, front, spaces, a, offAll, drives)) {
-      parking.push(...p.bays.map((b) => ({ ...b, park: carParks.length })));
-      carParks.push(p.park);
-    }
+    for (const p of vergeParking(roads, ground, front, spaces, a, offAll, drives)) put(p);
   }
   return { ...draft, open: { ...open, parking, carParks } };
 }
