@@ -42,7 +42,7 @@ fn open_world_fields_are_read_kept_and_saved() {
     // (A bus stop, in a town file from when the town had buses, is no way out: left out.)
     assert_eq!(world.exits, vec![[0.5, 30.0]]);
     assert_eq!(f.parking.len(), 1);
-    assert_eq!(f.parking[0].yaw, Some(3.0));
+    assert_eq!(f.parking[0].yaw, 3.0);
     assert_eq!(f.plot_areas[0], Some(0));
     assert_eq!(f.plot_kinds[0], Some(PlotKind::Home));
     assert_eq!(f.plot_kinds[1], None);
@@ -141,7 +141,7 @@ fn bays_park_as_the_file_says_and_the_structure_sends_them() {
     assert!(
         f.parking
             .iter()
-            .all(|p| p.yaw.is_some_and(|y| away(f64::from(y))) && p.park == Some(0))
+            .all(|p| away(f64::from(p.yaw)) && p.park == Some(0))
     );
     assert_eq!(f.car_parks.len(), 1);
     let s: serde_json::Value = serde_json::from_str(&sim_core::view::structure_json(&w)).unwrap();

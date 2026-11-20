@@ -328,28 +328,6 @@ fn a_load_cut_short_goes_back_on_its_pile() {
 }
 
 #[test]
-fn an_older_save_takes_in_the_washing_left_out_and_has_none_dry() {
-    let (mut w, content) = world();
-    w.objects[LINE as usize].open = true;
-    w.objects[LINE as usize].run = None;
-    let mut old: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
-    old["version"] = 32.into();
-    for h in old["households"].as_array_mut().unwrap() {
-        h["laundry"] = serde_json::json!([2.0, 0.5]);
-    }
-    let loaded = World::from_save_json(&content, &old.to_string()).unwrap();
-    assert!(
-        loaded.objects[LINE as usize].done(),
-        "the washing out on the line is dry"
-    );
-    assert!(
-        loaded.objects[WASHER as usize].run.is_none(),
-        "the washer empty"
-    );
-    assert_eq!(loaded.households[0].laundry, [2.0, 0.5, 0.0, 0.0]);
-}
-
-#[test]
 fn free_will_takes_the_washing_out_once_its_done() {
     let (mut w, _) = world();
     w.apply(Command::SetAutonomy {

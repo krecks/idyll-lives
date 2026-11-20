@@ -10,7 +10,7 @@
 //! post piece's), and the middle tile of either row stays open: the way up to the door is the
 //! porch's front, and building one that would shut anyone or anything off is refused. The town
 //! puts one over the front door of a house or a shop that the garden path meets (`LotFile::
-//! porches`; a file or a save from before porches has them worked out again, `guess`), and the
+//! porches`; a town file without them has them worked out, `guess`), and the
 //! player builds or takes one down on any outside door of their home for content `build.porch`,
 //! sold back for `objectRules.resale` of it as a garage is. The door goes, so does its porch (a
 //! wall or a window instead of it, the room round it moved: it goes with the room, `move_room`).
@@ -700,7 +700,7 @@ impl World {
         door && self.lot.in_bounds(fx, fz) && self.lot.room_at(fx, fz) == OUTDOORS
     }
 
-    /// The porches a town file or a save from before porches had drawn over its doors (the
+    /// The porches a town file without them had drawn over its doors (the
     /// renderer's old `porchDoors`): over each door on the ground storey in the outline of a
     /// house's walls (`view::house_bounds`) that the plot's garden path (its first path narrower
     /// than a driveway, `meta.paths`) comes up to, its middle within 0.6 m of the path's, on the

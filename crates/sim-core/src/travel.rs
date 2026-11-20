@@ -159,10 +159,8 @@ pub enum AreaKind {
 pub struct Parking {
     pub x: f32,
     pub z: f32,
-    /// Absent only in a save from before bays said (41 and older): worked out from the road nearest
-    /// it, as it was then (`cars::park_spot`).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub yaw: Option<f32>,
+    /// The way a car parked in it faces (rad, nose in, away from the road).
+    pub yaw: f32,
     #[serde(default)]
     pub area: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -254,10 +252,6 @@ pub struct OpenWorld {
     pub parking: Vec<Parking>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub car_parks: Vec<CarPark>,
-    /// Older saves only: which of their exits were bus stops (indices), dropped from
-    /// `World::exits` as they load (no longer ways out). Never written.
-    #[serde(default, skip_serializing)]
-    pub stops: Vec<u32>,
     /// Saves only: each plot's area and kind (`plots[].area/kind`), by plot index.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub plot_areas: Vec<Option<u32>>,
@@ -273,7 +267,6 @@ impl OpenWorld {
             && self.terrain.as_ref().is_none_or(Terrain::is_empty)
             && self.parking.is_empty()
             && self.car_parks.is_empty()
-            && self.stops.is_empty()
             && self.plot_areas.iter().all(Option::is_none)
             && self.plot_kinds.iter().all(Option::is_none)
     }

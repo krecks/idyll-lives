@@ -2205,7 +2205,7 @@ pub struct World {
     /// Bumped per slot when someone new takes it (views rebuild that resident).
     pub(crate) generations: Vec<u32>,
     pub(crate) rng: Rng,
-    /// The seed the game started from (0: unknown, a save from before v23), for bug reports.
+    /// The seed the game started from (0: unknown), for bug reports.
     pub seed: u32,
     pub(crate) structure_version: u32,
     /// Bumped only when something a walker can or can't step through changes: walls, doors,

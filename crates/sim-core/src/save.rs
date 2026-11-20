@@ -4,7 +4,8 @@
 //! (not index), so saves survive content changes; anything that no longer exists is
 //! dropped on load. In-progress activities restart from the beginning on load.
 //!
-//! Version history: 1 = single household; 2 = town (households, plots), relationships,
+//! Version history (what each version brought; this build opens none older than
+//! `OLDEST_SAVE_VERSION`, so what an older file lacked no longer matters): 1 = single household; 2 = town (households, plots), relationships,
 //! feelings, gender and attraction; 3 = jobs, funds, visits, exits; 4 = skills, object
 //! quality/style/value, household style; 5 = diagonal walls (`lot.diagonals`, absent in
 //! older files, which load without any); 6 = wall looks (`lot.looks`: coverings, half walls,
@@ -53,23 +54,18 @@
 //! file the washing out on a line is done, dry) and dried washing waits to be folded (a third
 //! number in `households[].laundry`; absent: none), the dirty things in a dishwasher's rack waiting
 //! for it to run (`objects[].rack`; absent: none); and the home chess table is 2 × 1 (it
-//! was 1 × 1): an older file's goes over the tile it stood on where it fits, else at a free spot
-//! at home, else it is sold back (`migrate_32_grown`); and an older file's posts in town (content
-//! `staff`) with their back to a wall move a tile out from it, where there's room, for their server
-//! (`World::nudge_post`); 34 = households' cars (`cars`: where each parks, its look, its
+//! was 1 × 1), and the town's posts (content `staff`) stand a tile out from a wall, where
+//! there's room, for their server; 34 = households' cars (`cars`: where each parks, its look, its
 //! owners and where it is on its day out), every house's driveway (`drives`, where a car goes
 //! when its household moves) and the garages on them (`garages`); absent: none, and the renderer draws the cars it used to draw,
-//! parked for good. Older files load. Saves
-//! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
-//! alias still reads it.
+//! parked for good.
 //! 35 = open worlds: the lot's edge and diagonal strings may be
 //! run-length coded (a `~` and then `<char><count>` runs split by commas; dense strings still
 //! load), chemistry is one string for every pair (`chemistry`: base64 of the upper triangle,
 //! `(0, 1), (0, 2), …, (1, 2), …`, as little-endian f32s) and relationships list only the pairs
 //! that aren't as new (no `chemistry` of their own), and the town file's open-world fields are
 //! kept as they came (`openWorld`, `travel::OpenWorld`: size, roads, areas, terrain masks,
-//! parking, plots' areas and kinds (and, written before the bus was dropped, which exits were bus
-//! stops); driveways keep their `road` and `s` in `drives`); a car on a trip between hamlets keeps
+//! parking, plots' areas and kinds); driveways keep their `road` and `s` in `drives`); a car on a trip between hamlets keeps
 //! it (`cars[].trip`, state `out` while it's parked there) and who rides with it
 //! (`cars[].riders`; absent: nobody, as in files written before passengers, so no new version).
 //! Absent: a town file without them, whose network is made from the meta's roads
@@ -84,11 +80,9 @@
 //! a resident asked for, bought and waiting to be set up at home (`setups`: the household, who
 //! asked, the object by id, the tick it was bought and what was paid; `setup.rs`), left out when
 //! there are none, so an older file has none; setting one up isn't saved mid-way (the parcel is
-//! back at the front door after a load). Still 35: a file written while the town had buses (its
-//! bus stops among its exits, `openWorld.stops`) loads without them: the stops are no ways out,
-//! dropped from the exits as it loads, and nothing of the buses was ever saved. Still 35: the
+//! back at the front door after a load). Still 35: the
 //! traffic lights (`traffic::Signal`, worked out again on load) are saved where they'd got to (`lights`: each lit junction's phase, its
-//! stage, the tick it began; `arm` before phases), left out where there are none; absent (an
+//! stage, the tick it began), left out where there are none; absent (an
 //! older file, another number of lit junctions, or a phase one hasn't), they start over at their
 //! first phase's green.
 //! Still 35: a resident late for the shift they're at says so (`job.late`, left out when on
@@ -99,28 +93,19 @@
 //! down after a load.
 //! 36 = ticks counted in this build's units, `TICKS_PER_SECOND` to a real second and
 //! `TICKS_PER_MINUTE` to a game minute (60 and 75 from 0.8.0: a game day of 30 real minutes); a
-//! file before it counted 20 and 20, and its ticks are rescaled as it loads (`Rescale`): the
-//! clock's (`tick`, and the ticks things began, were made, happened or are due at) by the game
-//! minute's, so it plays on at the same minute of the same day, and places along a car's or a
-//! taxi's way (`cars[].progress`, its detour's and its way round a taxi's, `taxis.runs[].progress`)
-//! by the real second's, as they're driven.
+//! file before it counted 20 and 20.
 //! 37 = cars, the taxi, bikes and e-scooters go on the traffic's own clock, `DRIVE_SCALE` (4) times
-//! as fast as real time (`DRIVE_TICKS_PER_SECOND` ticks to a second of it): a file before it timed
-//! places along a car's or a taxi's way (`cars[].progress`, its detour's and its way round a
-//! taxi's, `taxis.runs[].progress`) and the tick a traffic light's stage began (`lights`) in real
-//! seconds, and they're rescaled as it loads (`Rescale::drive`): each place along its way is the
-//! same place, as its way is now timed, and each light as many seconds into its stage.
-//! 38 = the town's living-town fields are in its `meta`:
-//! `backdrop` (buildings nobody lives in), `places` (what the town tags name) and `centre` (each
-//! main town's square and high street), as the town file had them; and its homes may be terrace
-//! lots (`terrace`, narrow houses a metre apart). The simulation reads none of them: a file before
-//! it has none and plays as before.
+//! as fast as real time (`DRIVE_TICKS_PER_SECOND` ticks to a second of it): places along a car's
+//! or a taxi's way (`cars[].progress`, its detour's and its way round a taxi's,
+//! `taxis.runs[].progress`) and the tick a traffic light's stage began (`lights`) are in its ticks.
+//! 38 = the town's living-town fields are in its `meta`: `places` (what the town tags name) and
+//! `centre` (each main town's square and high street), as the town file had them; and its homes may
+//! be terrace lots (`terrace`, narrow houses a metre apart). The simulation reads none of them.
 //! 39 = porches are the simulation's (`porches.rs`): the porches over doors (`porches`: each its
 //! plot, its door's edge, `axis`, `x`, `z`, and the side it stands on, `out`) and the porch pieces
 //! standing on their own (`porchPieces`: a post, a canopy or a step platform, its tiles and its
 //! facing), built and taken down in Build mode. A file before it had its porches drawn by the
-//! renderer over the front door the garden path met: they're worked out again from its doors and
-//! its paths as it loads (`World::guess_porches`), so the town looks as it did; it has no pieces.
+//! renderer over the front door the garden path met.
 //! Still 39: the land may be shaped in play (Build mode's Land tab, `land.rs`). Its heights, water
 //! levels and cover are the page's, carried in the meta (`meta.land`: the land's size and its
 //! tiles, `h` and `wl` coded strings by tile, `cover` run-length; `meta.zones` worked out again
@@ -137,8 +122,7 @@
 //! 40 = four speeds: 0 paused, 1 normal, 2 fast, 3 faster (10×) and 4 super speed (as fast as
 //! the machine goes, up to 60×, only while the player's household is all asleep or out), with
 //! the speed super speed drops back to (`resumeSpeed`). A file before it had 4 and 5 for 30×
-//! and 60×: it loads at super speed with 3 to drop back to, which the first step leaves if
-//! someone at home is up.
+//! and 60×.
 //! Still 40: a public place's plot may say when it is open (`plots[].hours`: minutes of the day it
 //! opens and closes and the days it opens, bit 0 Monday, as the town file gave them; `Plot::open_at`).
 //! Left out where it has none, so a file without them (every file before it) has its places open
@@ -157,8 +141,7 @@
 //! now any of `carBodies`, a van or an off-roader too) and how old it is (`cars[].age`: `old` or
 //! `new`, left out when used), and the car a promotion or a new job called for that it hasn't
 //! bought yet (`cars[].want`: `body`, `age`, and `by`, who the story says bought it). The story
-//! may tell of it (`boughtCar`, the body in `n`, by id in `refs.car`). A file before it has its
-//! cars as the town picked them: each is fitted as it loads, as a new town's are, nobody told.
+//! may tell of it (`boughtCar`, the body in `n`, by id in `refs.car`).
 //! 42 = the real town: a town's plots may be flats, each a plot of its own inside its building's
 //! lot on one storey (`plots[].of`, `storey`, and the landing tile before its door and the tile
 //! behind it, `door` and `inside`; its kind, `flat`, with the others' in `openWorld.plotKinds`),
@@ -166,9 +149,8 @@
 //! (`objects[].plot`: a flat's letterbox in the hall); public parking is marked bays, each saying
 //! the way a car parked in it faces (`openWorld.parking[].yaw`) and the car park it is one of
 //! (`park`), and the car parks are kept for the renderer as the town file had them
-//! (`openWorld.carParks`). The game opens no file older than this (sim-wasm's
-//! `OLDEST_SAVE_VERSION`: too old, removed); the simulation still reads them for its own tests
-//! until their migrations go, a bay without a yaw facing away from the road nearest it as before.
+//! (`openWorld.carParks`). No file older than this opens (`OLDEST_SAVE_VERSION`: the game says
+//! it is too old and removes it); none is migrated.
 //! A town holds up to 256 servers (`staff::MAX_STAFF`, 128 before); nothing of them is saved.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -184,11 +166,14 @@ use crate::rng::Rng;
 use crate::social::{self, Relationship};
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{
-    DRIVE_TICKS_PER_SECOND, Error, MINUTES_PER_TICK, TICKS_PER_MINUTE, TICKS_PER_SECOND,
+    Error, MINUTES_PER_TICK,
     clock::{MAX_SPEED, SUPER_SPEED},
 };
 
 pub const SAVE_VERSION: u32 = 42;
+/// The oldest save version this build opens: older files are refused, none migrated (until 1.0 a
+/// change of format leaves the saves before it behind).
+pub const OLDEST_SAVE_VERSION: u32 = 42;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -268,8 +253,7 @@ pub struct SaveFile {
     pub drives: Vec<crate::cars::Drive>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub garages: Vec<crate::cars::Garage>,
-    /// Porches over doors (absent before v39: worked out from the doors and the garden paths,
-    /// `World::guess_porches`; from v39, absent: none) and porch pieces (absent: none).
+    /// Porches over doors and porch pieces (absent: none).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub porches: Vec<crate::porches::Porch>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -295,12 +279,10 @@ pub struct SaveFile {
     pub taxis: crate::taxi::Taxis,
 }
 
-/// A lit junction's lights (`traffic::Light`): whose turn it is (its phase, or its walk phase;
-/// `arm` in files before phases, an arm's index: loaded as a phase if there's one, else they start
-/// over), how far through it (0 green, 1 amber, 2 all red), and the tick that began.
+/// A lit junction's lights (`traffic::Light`): whose turn it is (its phase, or its walk phase),
+/// how far through it (0 green, 1 amber, 2 all red), and the tick that began.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct LightSave {
-    #[serde(alias = "arm")]
     pub phase: u8,
     pub stage: u8,
     pub since: u64,
@@ -540,7 +522,6 @@ pub struct SimSave {
     /// Sorted so identical worlds produce identical save files.
     pub needs: BTreeMap<String, f32>,
     #[serde(default)]
-    #[serde(alias = "moodlets")] // key before the moodlet → feeling rename
     pub feelings: Vec<FeelingSave>,
     /// Skill levels by id (sorted). Missing in old saves: traits decide.
     #[serde(default)]
@@ -1250,9 +1231,9 @@ impl World {
     }
 
     pub fn from_save(content: Content, save: &SaveFile) -> Result<Self, Error> {
-        if save.version == 0 || save.version > SAVE_VERSION {
+        if save.version < OLDEST_SAVE_VERSION || save.version > SAVE_VERSION {
             return Err(Error::new(format!(
-                "unsupported save version {}",
+                "unsupported save version {} (this build opens {OLDEST_SAVE_VERSION} to {SAVE_VERSION})",
                 save.version
             )));
         }
@@ -1285,41 +1266,25 @@ impl World {
         }
         world.mode = save.mode;
         world.seed = save.seed;
-        // (Before v36: ticks counted at 20 a real second and 20 a game minute; before v37, cars
-        // timed in real seconds.)
-        let ticks = Rescale::of(save.version);
-        world.tick = ticks.tick(save.tick);
-        // (Before v40, 4 and 5 were 30× and 60×: super speed now, 10× under it.)
-        let (speed, resume) = if save.version < 40 && save.speed > 3 {
-            (SUPER_SPEED, Some(3))
-        } else {
-            (save.speed.min(MAX_SPEED), save.resume_speed)
-        };
+        world.tick = save.tick;
+        let speed = save.speed.min(MAX_SPEED);
         world.speed = speed;
         world.auto_super = save.auto_super && speed == SUPER_SPEED;
-        world.resume_speed = resume
+        world.resume_speed = save
+            .resume_speed
             .unwrap_or(if (1..SUPER_SPEED).contains(&speed) {
                 speed
             } else {
                 1
             })
             .clamp(1, SUPER_SPEED - 1);
-        // Before v8 the one free-will switch was the player's setting; now each household has one.
-        let legacy_free_will = save.version < 8;
-        world.autonomy = save.autonomy || legacy_free_will;
+        world.autonomy = save.autonomy;
         world.lifespan = save.lifespan.unwrap_or(crate::lifecycle::Lifespan::Off);
         world.player_moves = save.player_moves.unwrap_or(true);
         world.residents_most_given = save.residents_most;
         world.meta = save.meta.clone();
         world.note_paths();
-        // (Bus stops, in a file written while the town had buses, are no ways out.)
-        world.exits = save
-            .exits
-            .iter()
-            .enumerate()
-            .filter(|&(i, _)| !save.open_world.stops.contains(&(i as u32)))
-            .map(|(_, e)| *e)
-            .collect();
+        world.exits = save.exits.clone();
         world.set_travel(save.open_world.clone());
         world.plots = save
             .plots
@@ -1383,9 +1348,7 @@ impl World {
                     plot: h.plot,
                     player: h.player,
                     funds: h.funds.unwrap_or(starting_funds),
-                    free_will: h
-                        .free_will
-                        .unwrap_or(!h.player || save.autonomy || !legacy_free_will),
+                    free_will: h.free_will.unwrap_or(true),
                     routines: h
                         .routines
                         .iter()
@@ -1432,21 +1395,8 @@ impl World {
                 .is_some_and(|d| world.content.objects[d].layer == crate::content::Layer::Surface)
         };
         let tops: Vec<bool> = save.objects.iter().map(on_top).collect();
-        // (v33: kinds that grew go in once everything else stands, where they now fit: `migrate_32_grown`.)
-        let grown: Vec<bool> = save
-            .objects
-            .iter()
-            .map(|o| grown_since_32(save.version, o))
-            .collect();
-        // (v33: the town's posts go in after the rest, so one with its back to a wall can move out
-        // from it where there's room: `migrate_32_post`.)
-        let posts: Vec<bool> = (0..tops.len())
-            .map(|i| !tops[i] && !grown[i] && post_since_32(&world.content, save, i, &tops))
-            .collect();
         let order: Vec<usize> = (0..tops.len())
-            .filter(|&i| !tops[i] && !grown[i] && !posts[i])
-            .chain((0..tops.len()).filter(|&i| posts[i]))
-            .chain((0..tops.len()).filter(|&i| grown[i]))
+            .filter(|&i| !tops[i])
             .chain((0..tops.len()).filter(|&i| tops[i]))
             .collect();
         for i in order {
@@ -1454,7 +1404,6 @@ impl World {
             // (A corrupt save's second use of an id gets a fresh one.)
             let keep = o.id.filter(|s| !used.contains(s));
             let placed = match world.content.object_index(&o.def) {
-                Some(def) if grown[i] => migrate_32_grown(&mut world, def, o, keep),
                 Some(def) => {
                     let value = o
                         .value
@@ -1494,13 +1443,9 @@ impl World {
                 let runs = world.content.objects[obj.def].runs;
                 obj.run = match o.run {
                     Some(m) => runs.map(|full| finite(m, 0.0).clamp(0.0, full)),
-                    // Before v33 nothing ran on its own: washing left out on the line (open) is
-                    // dry by now, ready to take in.
-                    None if save.version < 33 && obj.open => runs.map(|_| 0.0),
                     None => None,
                 };
                 obj.rack = o.rack.min(world.content.objects[obj.def].rack);
-                let id = if posts[i] { world.nudge_post(id) } else { id };
                 // (A thing kept by a plot it doesn't stand on: one of the plots, `World::keep`.)
                 world.keep(id, o.plot);
                 used.extend(keep);
@@ -1549,16 +1494,11 @@ impl World {
             if let Some(g) = s.grade {
                 sim.grade = g.clamp(0.0, 100.0);
             }
-            // (v31: residents change outfits; before it everyone wore the creator's.)
-            sim.outfit = if save.version >= 31 {
-                s.outfit % crate::world::OUTFITS
-            } else {
-                0
-            };
-            // (v32: the school day is kept; before it, once today's school has begun it counts as
-            // seen to, or the load would mark the day missed.)
+            sim.outfit = s.outfit % crate::world::OUTFITS;
+            // (Without a school day saved, once today's school has begun it counts as seen to, or
+            // the load would mark the day missed.)
             sim.school_day = match s.school_day {
-                Some(day) if save.version >= 32 => day,
+                Some(day) => day,
                 _ => match crate::life::school_today(content, sim, tick) {
                     Some((_, start, _)) if tick > start => crate::clock::day(tick),
                     _ => 0,
@@ -1607,11 +1547,11 @@ impl World {
                     def: content.item_index(&h.def)?,
                     servings: h.servings,
                     quality: h.quality,
-                    made_at: ticks.tick(h.made_at),
+                    made_at: h.made_at,
                     recipe: h.recipe.as_deref().and_then(|r| content.recipe_index(r)),
                 })
             });
-            sim.night_woken = ticks.tick(s.night_woken);
+            sim.night_woken = s.night_woken;
             // At work, or a pupil at school.
             let pupil = content
                 .life
@@ -1760,8 +1700,8 @@ impl World {
         }
 
         // (Since v35 a save whose pairs are all as new lists none, but keeps their chemistry.)
-        if save.version < 2 || (save.relationships.is_empty() && save.chemistry.is_empty()) {
-            // Older saves have no relationships: start the household as housemates.
+        if save.relationships.is_empty() && save.chemistry.is_empty() {
+            // No relationships saved: start the household as housemates.
             world.init_relationships(&[])?;
         } else {
             for r in &save.relationships {
@@ -1802,10 +1742,8 @@ impl World {
         let content = &world.content;
         let events = save.events.iter().filter_map(|v| {
             let mut e: social::SocialEvent = serde_json::from_value(v.clone()).ok()?;
-            e.tick = ticks.tick(e.tick);
-            match v.get("refs") {
-                Some(refs) => resolve_refs(content, &mut e, refs)?,
-                None => migrate_refs(content, &mut e, save.version),
+            if let Some(refs) = v.get("refs") {
+                resolve_refs(content, &mut e, refs)?;
             }
             let formers = save.former.len();
             let known = |s: u32| {
@@ -1854,7 +1792,7 @@ impl World {
                     at,
                     servings: it.servings,
                     quality: it.quality,
-                    made_at: ticks.tick(it.made_at),
+                    made_at: it.made_at,
                     household: it.household,
                     spoiled: it.spoiled,
                     recipe: it.recipe.as_deref().and_then(|r| content.recipe_index(r)),
@@ -1877,47 +1815,31 @@ impl World {
                 continue;
             };
             match object {
-                Some(object) if (s.sim as usize) < world.sims.len() => {
-                    world.setups.push(crate::setup::Setup::new(
-                        s.household,
-                        s.sim,
-                        object,
-                        ticks.tick(s.since),
-                        s.paid,
-                    ))
-                }
+                Some(object) if (s.sim as usize) < world.sims.len() => world.setups.push(
+                    crate::setup::Setup::new(s.household, s.sim, object, s.since, s.paid),
+                ),
                 // (Gone from the content: the money back.)
                 _ => h.funds += s.paid,
             }
         }
         world.make_storeys();
         world.refresh_rooms();
-        // The porches (a file before v39: as they were drawn) and the pieces, before the cars: a
-        // post's tile is kept as a garage's (`cars::reblock`).
+        // The porches and the pieces, before the cars: a post's tile is kept as a garage's
+        // (`cars::reblock`).
         let plots = world.plots.len();
-        world.porches = if save.version < 39 {
-            world.guess_porches()
-        } else {
-            save.porches
-                .iter()
-                .filter(|p| (p.plot as usize) < plots)
-                .copied()
-                .collect()
-        };
+        world.porches = save
+            .porches
+            .iter()
+            .filter(|p| (p.plot as usize) < plots)
+            .copied()
+            .collect();
         world.porch_pieces = save
             .porch_pieces
             .iter()
             .filter(|p| (p.plot as usize) < plots && p.w > 0 && p.d > 0)
             .copied()
             .collect();
-        let cars = ticks.cars(&save.cars);
-        crate::cars::load(&mut world, &cars, &save.drives, &save.garages);
-        // (A file before v41 has its cars as the town picked them: each now the one its household's
-        // best earner's job calls for, as a new town's are.)
-        if save.version < 41 {
-            crate::cars::fit_town(&mut world);
-            crate::cars::settle_all(&mut world);
-        }
+        crate::cars::load(&mut world, &save.cars, &save.drives, &save.garages);
         // (The junctions lit are worked out again from the roads: `traffic::settle`.)
         crate::traffic::settle(&mut world);
         // (The lights where they'd got to, for the same lit junctions: each a turn it has.)
@@ -1938,13 +1860,12 @@ impl World {
                         2 => crate::traffic::Stage::Clear,
                         _ => crate::traffic::Stage::Green,
                     },
-                    since: ticks.drive_since(l.since, save.tick),
+                    since: l.since,
                 })
                 .collect();
         }
         // The work taxis' runs, their riders booked and the taxis under way where they were.
         world.taxis = save.taxis.clone();
-        ticks.taxis(&mut world.taxis);
         crate::taxi::settle(&mut world);
         // What someone was eating or washing up is put down (those don't go on after loading).
         crate::cooking::settle(&mut world);
@@ -2701,214 +2622,6 @@ fn resolve_refs(
     Some(())
 }
 
-/// Ticks as files before v36 counted them: 20 to a real second and 20 to a game minute.
-const OLD_TICKS_PER_SECOND: u32 = 20;
-const OLD_TICKS_PER_MINUTE: u64 = 20;
-
-/// How a file's ticks become this build's (v36: before it, `OLD_TICKS_PER_SECOND` and
-/// `OLD_TICKS_PER_MINUTE`; v37: before it, cars timed in real seconds). The clock's ticks
-/// (`World::tick`, and the ticks things began, were made, happened or are due at) by the game
-/// minute's ticks, now over then: tick 0 is 08:00 on day 1 either way, so each is the same minute
-/// of the same day. Places along a car's or a taxi's way (ticks of its route, timed by its speeds)
-/// by a second of drive time's ticks (`DRIVE_TICKS_PER_SECOND`) over the file's (its real second's
-/// before v37: the same place along the same way). The tick a traffic light's stage began
-/// (`traffic::Light`, timed in drive time, `drive_secs`) as far into its stage as it was
-/// (`drive_since`). A car's state and a taxi standing at its stop began at a tick of the clock:
-/// what they wait for is game minutes (a car boarding `cars::BOARD_WAIT_TICKS`, a taxi
-/// `taxi.waitMinutes` and `taxi::COMING_WAIT`), and their seconds' floors and dwells
-/// (`BOARD_MIN_TICKS`, `DWELL`, `PASS_BY_MOST`) end within the second. Nothing else is saved in
-/// ticks: what's left of a nap, a visit, a feeling or a machine's run is saved in game minutes,
-/// and the day things happened on in days.
-#[derive(Debug, Clone, Copy, PartialEq)]
-struct Rescale {
-    /// Ticks in a game minute, now and in the file.
-    game: (u64, u64),
-    /// Ticks in a second of drive time now over those in the file (its real second's before v37).
-    drive: f32,
-}
-
-impl Rescale {
-    /// For a file of save version `version`.
-    fn of(version: u32) -> Self {
-        // (Ticks to the second cars were timed in, in the file.)
-        let file_drive = match version {
-            ..36 => OLD_TICKS_PER_SECOND as f32,
-            36 => TICKS_PER_SECOND as f32,
-            _ => DRIVE_TICKS_PER_SECOND,
-        };
-        Self {
-            game: if version < 36 {
-                (TICKS_PER_MINUTE, OLD_TICKS_PER_MINUTE)
-            } else {
-                (1, 1)
-            },
-            drive: DRIVE_TICKS_PER_SECOND / file_drive,
-        }
-    }
-
-    /// A tick of the clock, to the nearest (0, never, stays 0; the same tick stays the same).
-    fn tick(self, t: u64) -> u64 {
-        let (now, then) = self.game;
-        if now == then {
-            return t;
-        }
-        let scaled = (u128::from(t) * u128::from(now) + u128::from(then / 2)) / u128::from(then);
-        u64::try_from(scaled).unwrap_or(u64::MAX)
-    }
-
-    /// A place along a way, in ticks of its route.
-    fn route(self, t: f32) -> f32 {
-        t * self.drive
-    }
-
-    /// The tick something timed in drive time began (`since`; in real time before v37), the
-    /// file's clock at `now`: as many of its seconds before the clock's tick (`tick`) as it was.
-    /// (By the clock's ticks, a traffic light green for 4 seconds was at it for 5.)
-    fn drive_since(self, since: u64, now: u64) -> u64 {
-        if since >= now {
-            return self.tick(since);
-        }
-        let ago = ((now - since) as f64 * f64::from(self.drive)).round() as u64;
-        self.tick(now).saturating_sub(ago)
-    }
-
-    fn detour(self, d: &mut crate::cars::Detour) {
-        d.from = self.route(d.from);
-        d.back = self.route(d.back);
-    }
-
-    /// The households' cars: when their state began and when one away sets off back, where they
-    /// are along their way, and their way turned round or round a taxi.
-    fn cars<'a>(self, cars: &'a [crate::cars::Car]) -> std::borrow::Cow<'a, [crate::cars::Car]> {
-        if self.game.0 == self.game.1 && self.drive == 1.0 {
-            return cars.into();
-        }
-        let mut cars = cars.to_vec();
-        for c in &mut cars {
-            c.since = self.tick(c.since);
-            c.ready_at = self.tick(c.ready_at);
-            c.progress = self.route(c.progress);
-            if let Some(d) = c.detour.as_mut() {
-                self.detour(d);
-            }
-            if let Some(p) = c.pass_by.as_mut() {
-                p.from = self.route(p.from);
-                p.out = self.route(p.out);
-                p.back = self.route(p.back);
-                p.to = self.route(p.to);
-            }
-        }
-        cars.into()
-    }
-
-    /// The work taxis' runs: when each comes in, is due out (and was planned to be), leaves work
-    /// and stands at its stop since, when each stop is due and its rider leaves home for it, and
-    /// where it is along its way.
-    fn taxis(self, taxis: &mut crate::taxi::Taxis) {
-        for r in &mut taxis.runs {
-            r.enter = self.tick(r.enter);
-            r.due_out = self.tick(r.due_out);
-            r.planned_out = self.tick(r.planned_out);
-            r.depart = self.tick(r.depart);
-            r.since = self.tick(r.since);
-            r.progress = self.route(r.progress);
-            if let Some(d) = r.detour.as_mut() {
-                self.detour(d);
-            }
-            for st in &mut r.stops {
-                st.due = self.tick(st.due);
-                st.leave = self.tick(st.leave);
-            }
-        }
-    }
-}
-
-/// Kinds whose footprint grew in save version 33: the home chess table, 1 × 1 to 2 × 1 (a chair
-/// at each end, M-hobbies-11).
-const GROWN_IN_33: [&str; 1] = ["chessTable"];
-
-/// Whether a saved object is one of `GROWN_IN_33` from an older file, at its kind's old size (a
-/// resized one keeps its own size and loads as any).
-fn grown_since_32(version: u32, o: &ObjectSave) -> bool {
-    version < 33 && o.size.is_none() && GROWN_IN_33.contains(&o.def.as_str())
-}
-
-/// Whether saved object `i` is one of the town's posts (content `staff`) from a file older than
-/// v33, with nothing standing on it: placed after the rest, it may move out from a wall
-/// (`World::nudge_post`).
-fn post_since_32(content: &Content, save: &SaveFile, i: usize, tops: &[bool]) -> bool {
-    let o = &save.objects[i];
-    let Some(def) = content.object_index(&o.def) else {
-        return false;
-    };
-    let d = &content.objects[def];
-    if save.version >= 33 || d.staff.is_none() {
-        return false;
-    }
-    // (Anything on its top stays where it was saved: so does the post.)
-    let (w, dd) = if o.rot.is_multiple_of(2) {
-        (d.footprint[0], d.footprint[1])
-    } else {
-        (d.footprint[1], d.footprint[0])
-    };
-    let under =
-        |t: &ObjectSave| t.x >= o.x && t.x < o.x + w as i32 && t.z >= o.z && t.z < o.z + dd as i32;
-    !save
-        .objects
-        .iter()
-        .enumerate()
-        .any(|(j, t)| tops[j] && under(t))
-}
-
-/// v32 to v33: a thing whose kind grew (`grown_since_32`) goes over the tile it stood on where it
-/// now fits and blocks nothing, else at its home's first good free spot (`World::place_grown`);
-/// with no room for it anywhere there, it is sold back to the household living on its plot for
-/// what it was worth, and left out. Never placed overlapping anything, nor shutting anyone or
-/// anything off.
-fn migrate_32_grown(
-    world: &mut World,
-    def: usize,
-    o: &ObjectSave,
-    keep: Option<u32>,
-) -> Result<u32, crate::Error> {
-    let value = o
-        .value
-        .unwrap_or(world.content.objects[def].price.unwrap_or(0));
-    let colors = crate::world::parse_colors(&o.colors, o.color.as_deref());
-    if let Some(id) = world.place_grown(def, o.x, o.z, o.rot, colors, o.quality, value) {
-        if let Some(stable) = keep {
-            world.objects[id as usize].stable = stable;
-        }
-        return Ok(id);
-    }
-    let plot = world.plot_at(o.x, o.z);
-    if let Some(h) = world
-        .households
-        .iter_mut()
-        .find(|h| plot.is_some() && h.plot == plot)
-    {
-        h.funds += value;
-    }
-    Err(crate::Error::new(format!(
-        "no room for the {} any more",
-        world.content.objects[def].name.to_lowercase()
-    )))
-}
-
-/// Events from before content ids were saved name content by index. The one change since: the
-/// base game's crib (0.13, save 14) came at the end of the base objects, so objects from packs
-/// (after it) moved up one.
-fn migrate_refs(content: &Content, e: &mut social::SocialEvent, version: u32) {
-    use social::EventKind::*;
-    if version < 14
-        && matches!(e.kind, Broke | Repaired)
-        && let (Some(crib), Some(n)) = (content.object_index("crib"), e.n)
-        && n >= crib as i64
-    {
-        e.n = Some(n + 1);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{Command, World};
@@ -3055,41 +2768,11 @@ mod tests {
     }
 
     #[test]
-    fn saves_with_moodlets_still_load() {
-        // Saves written before the moodlet → feeling rename store `moodlets` per Sim.
-        let mut w = World::from_json(CONTENT, LOT, 3).unwrap();
-        crate::social::add_feeling(&mut w.sims[0].feelings, 0, &w.content.feelings, w.tick);
-        let mut saved: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
-        let sim = saved["sims"][0].as_object_mut().unwrap();
-        let feelings = sim.remove("feelings").expect("new saves write `feelings`");
-        assert_eq!(feelings[0]["id"], "happy");
-        sim.insert("moodlets".into(), feelings);
-        let loaded = World::from_save_json(CONTENT, &saved.to_string()).unwrap();
-        assert_eq!(loaded.sims[0].feelings.len(), 1);
-        assert_eq!(
-            loaded.content.feelings[loaded.sims[0].feelings[0].def].id,
-            "happy"
-        );
-    }
-
-    #[test]
-    fn version_one_saves_still_load() {
-        let v1 = r#"{"version":1,"tick":10,"speed":1,"autonomy":true,"rng":5,
-            "lot":{"width":4,"depth":4,"hEdges":"00000000000000000000","vEdges":"00000000000000000000"},
-            "objects":[],"sims":[{"name":"Old","appearance":null,"traits":[],"perks":[],"pos":[1.5,1.5],"yaw":0,
-              "needs":{"hunger":0.5},"tasks":[]}]}"#;
-        let w = World::from_save_json(CONTENT, v1).unwrap();
-        assert_eq!(w.sims[0].gender, "female", "defaults to the first gender");
-        assert_eq!(w.sims[0].attracted_to.len(), 2);
-    }
-
-    #[test]
-    fn the_speeds_of_older_saves() {
-        // Before v40, 4 and 5 were 30× and 60×: super speed now (30× with Old awake), 10× under it;
-        // the speed under super speed is saved.
-        for (version, speed, now, back) in
-            [(39, 5, 4, 3), (39, 4, 4, 3), (39, 2, 2, 2), (40, 4, 4, 1)]
-        {
+    fn the_speed_and_the_one_under_super_speed_load() {
+        // A file without the speed super speed drops back to: normal under super speed, else the
+        // speed it's at.
+        let version = super::SAVE_VERSION;
+        for (speed, now, back) in [(4, 4, 1), (2, 2, 2)] {
             let file = format!(
                 r#"{{"version":{version},"tick":10,"speed":{speed},"autonomy":true,"rng":5,
                 "lot":{{"width":4,"depth":4,"hEdges":"00000000000000000000","vEdges":"00000000000000000000"}},
@@ -3145,14 +2828,13 @@ mod tests {
 
     #[test]
     fn saves_without_diagonals_still_load() {
-        // A version 4 save (before diagonal walls): no `diagonals` in the lot.
+        // A lot without diagonal walls writes no `diagonals`.
         let w = World::from_json(CONTENT, LOT, 3).unwrap();
         let mut saved: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
         assert!(
             saved["lot"].get("diagonals").is_none(),
             "lots without diagonals don't write them"
         );
-        saved["version"] = 4.into();
         let loaded = World::from_save_json(CONTENT, &saved.to_string()).unwrap();
         assert!(loaded.lot.diagonals().iter().all(Option::is_none));
         assert_eq!(loaded.lot.rooms(), w.lot.rooms());
@@ -3271,161 +2953,30 @@ mod tests {
         assert!(loaded.exits.is_empty());
     }
 
-    /// v36: an older file's ticks are rescaled as it loads, from 20 to a real second and 20 to a
-    /// game minute (`Rescale`); at those rates still, a v35 file loads just as it was saved, a car
-    /// on its way and the story as they were.
+    /// A file older than this build opens (`OLDEST_SAVE_VERSION`) is refused, as one newer than
+    /// it is: nothing is migrated.
     #[test]
-    fn a_v35_file_loads_as_it_was_saved() {
-        const CONTENT: &str = r#"{
-            "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.02}],
-            "objects":[{"id":"chair","name":"Chair","interactions":[{"id":"sit","label":"Sit","minutes":30,"tags":["lounge"]}]}],
-            "careers":[{"id":"office","label":"Office","workEffects":{"hunger":-0.2},"levels":[
-                {"title":"Intern","pay":100,"start":9,"hours":4,"days":[0,1,2,3,4,5,6]}]}],
-            "economy":{"startingFunds":500}}"#;
-        // A house on a street, its car parked beside it; two grown-ups at the same office.
-        const TOWN: &str = r#"{"width":60,"depth":14,"exits":[[0.5,9.5],[59.5,9.5]],
-            "plots":[{"name":"Home","x":20,"z":0,"w":20,"d":8,"entry":[25.5,7.5]}],
-            "households":[{"name":"Ones","plot":0}],
-            "sims":[{"name":"Ada","household":0,"job":{"career":"office"},"x":25.5,"z":3.5},
-                    {"name":"Bo","household":0,"job":{"career":"office"},"x":26.5,"z":3.5}],
-            "cars":[{"plot":0,"x":34.0,"z":3.0,"yaw":0.0,"street":9.5,"len":4.4,"wid":1.8,"body":1,"paint":2}]}"#;
-        let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
-        w.autonomy = false;
-        let by = crate::clock::tick_at(1, 10.0 * 60.0).unwrap();
-        while !(w.cars[0].state == crate::cars::CarState::Leaving && w.cars[0].progress > 0.0) {
-            w.tick_once();
-            assert!(w.tick < by, "the car never set off");
-        }
-        w.events
-            .push(w.tick - 7, crate::social::EventKind::Met, 0, 1, None);
+    fn a_file_of_another_version_is_refused() {
+        let w = World::from_json(CONTENT, LOT, 1).unwrap();
         let json = w.save_json();
-        let mut old: serde_json::Value = serde_json::from_str(&json).unwrap();
-        old["version"] = 35.into();
-        let loaded = World::from_save_json(CONTENT, &old.to_string()).unwrap();
-        // (As this build counts them: the same at 20 and 20.)
-        let r = super::Rescale::of(35);
-        assert_eq!(loaded.tick, r.tick(w.tick));
-        assert_eq!(loaded.cars[0].since, r.tick(w.cars[0].since));
-        assert_eq!(
-            loaded.cars[0].progress.to_bits(),
-            r.route(w.cars[0].progress).to_bits()
-        );
-        let ticks = |w: &World| w.events.iter().map(|e| e.tick).collect::<Vec<_>>();
-        assert_eq!(
-            ticks(&loaded),
-            ticks(&w).into_iter().map(|t| r.tick(t)).collect::<Vec<_>>()
-        );
-        if r == super::Rescale::of(super::SAVE_VERSION) {
-            assert_eq!(
-                loaded.save_json(),
-                World::from_save_json(CONTENT, &json).unwrap().save_json()
+        let mut file: serde_json::Value = serde_json::from_str(&json).unwrap();
+        for v in [1, super::OLDEST_SAVE_VERSION - 1, super::SAVE_VERSION + 1] {
+            file["version"] = v.into();
+            assert!(
+                World::from_save_json(CONTENT, &file.to_string()).is_err(),
+                "version {v}"
             );
         }
+        file["version"] = super::OLDEST_SAVE_VERSION.into();
+        assert!(World::from_save_json(CONTENT, &file.to_string()).is_ok());
     }
 
-    /// From 20 ticks a game minute to 75 (and 20 a real second to 60): each tick of the clock is
-    /// the same minute of the same day, the same tick stays the same and never stays never; places
-    /// along a way are three times the ticks.
-    #[test]
-    fn older_ticks_keep_their_minute_at_another_rate() {
-        let r = super::Rescale {
-            game: (75, 20),
-            drive: 3.0,
-        };
-        // (The clock by hand: tick 0 is 08:00 on day 1.)
-        let at = |t: u64, per_minute: u64| {
-            let m = t + 8 * 60 * per_minute;
-            (
-                m / (1440 * per_minute),
-                m % (1440 * per_minute) / per_minute,
-            )
-        };
-        for t in [0, 1, 19, 20, 21, 1_199, 9_599, 9_600, 28_813, 123_456_789] {
-            assert_eq!(at(t, 20), at(r.tick(t), 75), "tick {t}");
-        }
-        assert_eq!(r.tick(0), 0);
-        assert_eq!(r.tick(1_000), 3_750);
-        // A traffic light's stage, at it for 100 ticks (5 seconds) of the file's clock at 1000: 5
-        // seconds before the clock's tick still (300 ticks, not the game minutes' 375).
-        assert_eq!(r.drive_since(900, 1_000), 3_450);
-        assert_eq!(r.drive_since(1_000, 1_000), 3_750);
-        assert_eq!(r.drive_since(0, 10), 8);
-        let car: crate::cars::Car = serde_json::from_value(serde_json::json!({
-            "plot":0,"household":0,"spot":[34.0,3.0],"yaw":0.0,"street":9.5,"len":4.4,"wid":1.8,
-            "body":1,"paint":2,"owners":[0],"state":"leaving","since":1000,"readyAt":2000,
-            "progress":40.5,"detour":{"home":false,"from":30.0,"back":12.0,"avoid":3},
-            "passBy":{"home":false,"taxi":1,"from":50.0,"out":55.0,"back":70.0,"to":75.0,"off":-2.0,"at":[1.0,2.0]}}))
-        .unwrap();
-        let cars = r.cars(std::slice::from_ref(&car));
-        let c = &cars[0];
-        assert_eq!((c.since, c.ready_at), (3_750, 7_500));
-        assert_eq!(c.progress, 121.5);
-        let d = c.detour.unwrap();
-        assert_eq!((d.from, d.back, d.avoid), (90.0, 36.0, 3));
-        let p = c.pass_by.unwrap();
-        assert_eq!(
-            (p.from, p.out, p.back, p.to, p.off),
-            (150.0, 165.0, 210.0, 225.0, -2.0)
-        );
-        let mut taxis: crate::taxi::Taxis = serde_json::from_value(serde_json::json!({
-            "runs":[{"id":0,"group":[0,1],"enter":100,"dueOut":220,"plannedOut":200,"depart":0,
-                "stops":[{"sim":0,"plot":0,"due":160,"leave":140,"state":"booked"}],
-                "progress":12.0,"since":160}]}))
-        .unwrap();
-        r.taxis(&mut taxis);
-        let run = &taxis.runs[0];
-        assert_eq!(
-            (
-                run.enter,
-                run.due_out,
-                run.planned_out,
-                run.depart,
-                run.since
-            ),
-            (375, 825, 750, 0, 600)
-        );
-        assert_eq!((run.stops[0].due, run.stops[0].leave), (600, 525));
-        assert_eq!(run.progress, 36.0);
-        // Today's file needs nothing.
-        let today = super::Rescale::of(super::SAVE_VERSION);
-        assert_eq!(today.drive_since(900, 1_000), 900);
-        assert_eq!(
-            super::Rescale::of(super::SAVE_VERSION),
-            super::Rescale {
-                game: (1, 1),
-                drive: 1.0
-            }
-        );
-        // (A v36 file's cars timed in real seconds: a place along the way a quarter of the ticks
-        // on, the clock as it was; a v35 file's both.)
-        assert_eq!(
-            super::Rescale::of(36),
-            super::Rescale {
-                game: (1, 1),
-                drive: 1.0 / crate::DRIVE_SCALE
-            }
-        );
-        assert_eq!(
-            super::Rescale::of(35).drive,
-            crate::DRIVE_TICKS_PER_SECOND / super::OLD_TICKS_PER_SECOND as f32
-        );
-    }
-
-    /// v23: the seed the game started from is kept (absent in older saves: 0, unknown).
+    /// The seed the game started from is kept.
     #[test]
     fn the_starting_seed_is_saved() {
         let w = World::from_json(CONTENT, LOT, 1234).unwrap();
         assert_eq!(w.seed, 1234);
         let json = w.save_json();
         assert_eq!(World::from_save_json(CONTENT, &json).unwrap().seed, 1234);
-        let mut old: serde_json::Value = serde_json::from_str(&json).unwrap();
-        old["version"] = 22.into();
-        old.as_object_mut().unwrap().remove("seed");
-        assert_eq!(
-            World::from_save_json(CONTENT, &old.to_string())
-                .unwrap()
-                .seed,
-            0
-        );
     }
 }

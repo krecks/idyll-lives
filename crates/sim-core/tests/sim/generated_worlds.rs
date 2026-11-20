@@ -617,7 +617,7 @@ fn out_of_its_bay(w: &World, car: &sim_core::cars::Car) -> Option<String> {
             at[0], at[1]
         ));
     };
-    let want = bay.yaw.unwrap_or(yaw);
+    let want = bay.yaw;
     if (want - yaw).sin().abs() > 1e-3 || (want - yaw).cos() < 0.0 {
         return Some(format!(
             "parked at {:.2},{:.2} facing {yaw:.3}, its bay {want:.3}",
