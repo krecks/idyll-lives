@@ -6,10 +6,11 @@
  */
 
 import type { CarPark, ParkingBay } from '../core/protocol';
+import { EDGE } from './centre';
 import { flatsTemplate } from './flats';
-import { rectFrom, tilesOf } from './footprints';
-import { leftOf, nearest, pointAt, roadIndex, roadLengths, straightAround, type Pt, type RoadPlan } from './roads';
-import { DRIVE_REACH, driveMeets, driveways, houseTemplate, onLot, slotDims, turner, type Frontage, type Ground, type PlotSlot, type Rect, type Templates } from './town';
+import { add, r2, rectFrom, tilesOf } from './footprints';
+import { leftOf, nearest, pointAt, RoadIndex, roadIndex, roadLengths, straightAround, type Pt, type RoadPlan } from './roads';
+import { boundsOf, houseDrive, houseTemplate, lineMeets, onLot, turnOnto, type Frontage, type Ground, type PlotSlot, type Rect, type Templates } from './town';
 
 // ---- The simulation's parking rules (sim-core `cars/parking.rs`, held to it by `web/tests/parkingRules.test.ts`) ----
 
@@ -36,11 +37,10 @@ export const PARK_BEND = 0.3;
 export const LOOSE_BEND = 0.6;
 /** How far off the grid's axes (radians) a row of more than two bays may run (`carParkFits`). */
 const ROW_SLANT = 0.35;
-/** Off the world's edge (m), as the lots keep. */
-const EDGE = 8;
+/** A main town's car park by its square goes on the streets this near it (m, `bySquare`), one by a big place on its road this far past its lot's half-size at most (`besidePlace`). */
+const SQUARE_REACH = 120;
+const PLACE_REACH = 40;
 
-const add = (a: Pt, b: Pt, k = 1): Pt => [a[0] + b[0] * k, a[1] + b[1] * k];
-const r2 = (v: number) => Math.round(v * 100) / 100;
 const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
 
 /** A car park laid out (`carParkAt`): the car park, its bays, and its asphalt with `MOUTH_CLEAR` m more along the road either end (what it keeps clear). */
@@ -74,13 +74,21 @@ export function carParkAt(roads: readonly RoadPlan[], f: Pick<Frontage, 'road' |
   return { park, bays, clear: rectFrom(front, t, out, BAY_WIDE * n + 2 * MOUTH_CLEAR, BAY_DEEP) };
 }
 
+/** What a car park is checked against and laid as (`carParkFits`): the driveways its bays keep clear of, how far its stretch may bend (`PARK_BEND` unless given), its area (0 unless given) and what else it is (`CarPark.serves`, `square`). */
+export interface ParkAs {
+  drives?: readonly DriveLine[];
+  bend?: number;
+  area?: number;
+  also?: Pick<CarPark, 'serves' | 'square'>;
+}
+
 /**
- * Whether a car park of `n` bays fits at frontage `f` (`carParkAt`): its stretch of road straight, its ends
- * `PARK_CORNER` m from a junction (`offCorners`, `macro.ts` `cornersOf`), its asphalt and `MOUTH_CLEAR` m either
- * end of it on land nothing takes (`ground`) inside the world's edge, every bay clear of every driveway of `drives`
- * (`clearOf`) and nearer its own street than any other road.
+ * Whether a car park of `n` bays fits at frontage `f` (`carParkAt`, of `as`'s area and `also`): its stretch of road
+ * straight (`as.bend`), its ends `PARK_CORNER` m from a junction (`offCorners`, `macro.ts` `cornersOf`), its asphalt
+ * and `MOUTH_CLEAR` m either end of it on land nothing takes (`ground`) inside the world's edge, every bay clear of
+ * every driveway of `as.drives` (`clearOf`) and nearer its own street than any other road.
  */
-export function carParkFits(roads: readonly RoadPlan[], ground: Ground, f: Frontage, n: number, offCorners: (f: Frontage) => boolean, drives: readonly DriveLine[] = [], bend = PARK_BEND): CarParkLaid | null {
+export function carParkFits(roads: readonly RoadPlan[], ground: Ground, f: Frontage, n: number, offCorners: (f: Frontage) => boolean, { drives = [], bend = PARK_BEND, area = 0, also = {} }: ParkAs = {}): CarParkLaid | null {
   const road = roads[f.road];
   const ls = roadLengths(road);
   const L = ls[ls.length - 1];
@@ -95,7 +103,7 @@ export function carParkFits(roads: readonly RoadPlan[], ground: Ground, f: Front
     if (Math.min(a, Math.PI / 2 - a) > ROW_SLANT) return null;
   }
   for (const s of [f.s - half, f.s + half]) if (!offCorners({ ...f, s, p: pointAt(road.points, s, ls).p })) return null;
-  const laid = carParkAt(roads, f, n, 0);
+  const laid = carParkAt(roads, f, n, area, also);
   // (Every tile it touches but its own road's, which reach a little past its verge: `roads.ts` `roadMask`.)
   const roads0 = ground.roadTiles();
   const { p: p0, t: t0 } = pointAt(road.points, f.s, ls);
@@ -105,8 +113,35 @@ export function carParkFits(roads: readonly RoadPlan[], ground: Ground, f: Front
   if (bad) return null;
   // (No bay by a driveway, and every bay nearer its own street than any other road.)
   if (!clearOf(laid.bays, drives)) return null;
-  for (const b of laid.bays) if (nearestRoad(roads, b.x, b.z) !== f.road) return null;
+  const index = indexOf(roads);
+  for (const b of laid.bays) if (nearestRoad(roads, index, b.x, b.z, nearest(road.points, b.x, b.z).dist + 1) !== f.road) return null;
   return laid;
+}
+
+/**
+ * A car park of `few` to `most` bays (the most that fit) along the first of `frontage` it fits (`carParkFits`, laid as
+ * `as` says), its land taken on `ground`: the car park, or null.
+ */
+export function parkAlong(roads: readonly RoadPlan[], ground: Ground, frontage: readonly Frontage[], [few, most]: readonly [number, number], offCorners: (f: Frontage) => boolean, as: ParkAs = {}): CarParkLaid | null {
+  for (let n = most; n >= few; n--) {
+    for (const f of frontage) {
+      const laid = carParkFits(roads, ground, f, n, offCorners, as);
+      if (!laid) continue;
+      takeCarPark(ground, laid);
+      return laid;
+    }
+  }
+  return null;
+}
+
+/** Of `frontage`, that on the streets near a main town's square (its middle `sq`; no country road), where its car park goes. */
+export function bySquare(roads: readonly RoadPlan[], frontage: readonly Frontage[], sq: Pt): Frontage[] {
+  return frontage.filter((f) => Math.hypot(f.p[0] - sq[0], f.p[1] - sq[1]) < SQUARE_REACH && roads[f.road].kind !== 'country');
+}
+
+/** Of `frontage` (along a big place's road), that on the place's side of it near its lot `r` (`Frontage.far` from its middle), where its car park goes. */
+export function besidePlace(frontage: readonly Frontage[], side: 1 | -1, r: Rect): Frontage[] {
+  return frontage.filter((g) => g.side === side && g.far < Math.max(r.w, r.d) / 2 + PLACE_REACH);
 }
 
 /**
@@ -118,11 +153,10 @@ export function vergeParking(roads: readonly RoadPlan[], ground: Ground, frontag
   for (let n = spaces; n > 0; n = spaces - out.reduce((k, p) => k + p.bays.length, 0)) {
     const want = Math.min(2, n);
     let laid: CarParkLaid | null = null;
-    for (const f of frontage) if ((laid = carParkFits(roads, ground, f, want, offCorners, drives, bend))) break;
+    for (const f of frontage) if ((laid = carParkFits(roads, ground, f, want, offCorners, { drives, bend, area }))) break;
     if (!laid) break;
-    const own: CarParkLaid = { ...laid, park: { ...laid.park, area }, bays: laid.bays.map((b) => ({ ...b, area })) };
-    takeCarPark(ground, own);
-    out.push(own);
+    takeCarPark(ground, laid);
+    out.push(laid);
   }
   return out;
 }
@@ -137,10 +171,7 @@ export function takeCarPark(ground: Ground, laid: CarParkLaid): void {
 
 /** The box (town tiles) a car park's asphalt covers (what edits keep clear of it, as of a lot). */
 export function carParkRect(p: Pick<CarPark, 'poly'>): Rect {
-  const xs = p.poly.map((q) => q[0]);
-  const zs = p.poly.map((q) => q[1]);
-  const [x0, z0] = [Math.floor(Math.min(...xs)), Math.floor(Math.min(...zs))];
-  return { x: x0, z: z0, w: Math.ceil(Math.max(...xs)) - x0, d: Math.ceil(Math.max(...zs)) - z0 };
+  return boundsOf(p.poly);
 }
 
 /** The box (town tiles) a bay covers: its `BAY_WIDE` × `BAY_DEEP` turned to its yaw. */
@@ -153,31 +184,23 @@ export function bayRect(b: Pick<ParkingBay, 'x' | 'z' | 'yaw'>): Rect {
 }
 
 /**
- * The driveways of the houses of `slots` (and the bays of its flats buildings) as `layoutTown` lays them (the side that meets its road squarely, else the
- * first: `town.ts` `driveMeets`), each as `DriveLine`.
+ * The driveways of the houses of `slots` (and the bays of its flats buildings) as `layoutTown` lays them (`town.ts`
+ * `houseDrive` and `lineMeets`), each as `DriveLine`.
  */
 export function driveLines(t: Templates, slots: readonly PlotSlot[], roads: readonly RoadPlan[], footprint: (def: string) => [number, number]): DriveLine[] {
   const index = roadIndex(roads);
   const out: DriveLine[] = [];
   for (const s of slots) {
-    const { width, depth } = slotDims(t, s);
-    const turn = turner(s.x, s.z, width, depth, s.facing);
+    const turn = turnOnto(t, s);
+    const line = (r: Rect, meets: { road: number; s: number } | null) => {
+      if (meets) out.push({ inner: turn.point([r.x + r.w / 2, r.d]), mouth: pointAt(roads[meets.road].points, meets.s).p });
+    };
     // (A flats building's bays are its flats' driveways.)
     const f = s.kind === 'flats' ? flatsTemplate(t, s.template) : undefined;
-    for (const { rect: r } of f?.bays ?? []) {
-      const [a, b] = [turn.point([r.x + r.w / 2, 0]), turn.point([r.x + r.w / 2, -1])];
-      const meets = driveMeets(roads, index, a, [b[0] - a[0], b[1] - a[1]], DRIVE_REACH);
-      if (meets) out.push({ inner: turn.point([r.x + r.w / 2, r.d]), mouth: pointAt(roads[meets.road].points, meets.s).p });
-    }
+    for (const { rect: r } of f?.bays ?? []) line(r, lineMeets(roads, index, turn, r));
     const h = s.kind === 'house' ? houseTemplate(t, s.template) : undefined;
-    if (!h) continue;
-    const sides = driveways(onLot(t, h, s, footprint), width, depth, footprint).map((r) => {
-      const [a, b] = [turn.point([r.x + r.w / 2, 0]), turn.point([r.x + r.w / 2, -1])];
-      return { r, meets: driveMeets(roads, index, a, [b[0] - a[0], b[1] - a[1]], DRIVE_REACH) };
-    });
-    const side = sides.find((o) => o.meets?.square) ?? sides[0];
-    if (!side?.meets) continue;
-    out.push({ inner: turn.point([side.r.x + side.r.w / 2, side.r.d]), mouth: pointAt(roads[side.meets.road].points, side.meets.s).p });
+    const side = h && houseDrive(t, s, onLot(t, h, s, footprint), roads, index, footprint);
+    if (side) line(side.r, side.meets);
   }
   return out;
 }
@@ -196,19 +219,58 @@ function offSegment([x, z]: Pt, [ax, az]: Pt, [bx, bz]: Pt): number {
   return Math.hypot(x - ax - dx * k, z - az - dz * k);
 }
 
-/** Whether every bay's middle is `MOUTH_CLEAR` m from every driveway's mouth and `DRIVE_CLEAR` m from its line (sim-core `by_a_mouth`). */
-export function clearOf(bays: readonly Pick<ParkingBay, 'x' | 'z'>[], drives: readonly DriveLine[]): boolean {
-  return bays.every((b) => drives.every((d) => Math.hypot(b.x - d.mouth[0], b.z - d.mouth[1]) >= MOUTH_CLEAR && offSegment([b.x, b.z], d.inner, d.mouth) >= DRIVE_CLEAR));
+/** Grid cells (m) the driveways are filed under for `clearOf`. */
+const DRIVE_CELL = 16;
+/** Each list of driveways filed by grid cell (`DRIVE_CELL`): each under every cell its line comes within `MOUTH_CLEAR` m of, about. */
+const driveCells = new WeakMap<readonly DriveLine[], Map<number, DriveLine[]>>();
+function drivesNear(drives: readonly DriveLine[], x: number, z: number): readonly DriveLine[] {
+  let cells = driveCells.get(drives);
+  if (!cells) {
+    cells = new Map();
+    for (const d of drives) {
+      const [x0, x1] = [Math.min(d.inner[0], d.mouth[0]) - MOUTH_CLEAR, Math.max(d.inner[0], d.mouth[0]) + MOUTH_CLEAR];
+      const [z0, z1] = [Math.min(d.inner[1], d.mouth[1]) - MOUTH_CLEAR, Math.max(d.inner[1], d.mouth[1]) + MOUTH_CLEAR];
+      for (let cz = Math.floor(z0 / DRIVE_CELL); cz <= Math.floor(z1 / DRIVE_CELL); cz++) {
+        for (let cx = Math.floor(x0 / DRIVE_CELL); cx <= Math.floor(x1 / DRIVE_CELL); cx++) {
+          const key = cx * 65536 + cz;
+          (cells.get(key) ?? cells.set(key, []).get(key)!).push(d);
+        }
+      }
+    }
+    driveCells.set(drives, cells);
+  }
+  return cells.get(Math.floor(x / DRIVE_CELL) * 65536 + Math.floor(z / DRIVE_CELL)) ?? [];
 }
 
-/** The road (not a trail) whose middle line is nearest a point, by index (-1: none). */
-function nearestRoad(roads: readonly RoadPlan[], x: number, z: number): number {
+/**
+ * Whether every bay's middle is `MOUTH_CLEAR` m from every driveway's mouth and `DRIVE_CLEAR` m from its line (sim-core
+ * `by_a_mouth`). Only the driveways filed near a bay are measured (`drivesNear`): one further off is clear of it.
+ */
+export function clearOf(bays: readonly Pick<ParkingBay, 'x' | 'z'>[], drives: readonly DriveLine[]): boolean {
+  return bays.every((b) => drivesNear(drives, b.x, b.z).every((d) => Math.hypot(b.x - d.mouth[0], b.z - d.mouth[1]) >= MOUTH_CLEAR && offSegment([b.x, b.z], d.inner, d.mouth) >= DRIVE_CLEAR));
+}
+
+/** Each list of roads' index for `nearestRoad`, and how many roads it was made for (made again once more are added). */
+const indexes = new WeakMap<readonly RoadPlan[], { n: number; index: RoadIndex }>();
+function indexOf(roads: readonly RoadPlan[]): RoadIndex {
+  const had = indexes.get(roads);
+  if (had && had.n === roads.length) return had.index;
+  const index = new RoadIndex(roads);
+  indexes.set(roads, { n: roads.length, index });
+  return index;
+}
+
+/**
+ * The road (not a trail) whose middle line is nearest a point, by index (-1: none within `reach` m): of those the index
+ * finds within `reach`, the nearest as `nearest` measures them, the first of those as near.
+ */
+function nearestRoad(roads: readonly RoadPlan[], index: RoadIndex, x: number, z: number, reach: number): number {
   let best = { r: -1, d: Infinity };
-  roads.forEach((r, i) => {
-    if (r.kind === 'trail') return;
-    const d = nearest(r.points, x, z).dist;
+  for (const i of index.roadsNear(x, z, reach)) {
+    if (roads[i].kind === 'trail') continue;
+    const d = nearest(roads[i].points, x, z).dist;
     if (d < best.d) best = { r: i, d };
-  });
+  }
   return best.r;
 }
 

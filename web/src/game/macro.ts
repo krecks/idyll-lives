@@ -35,7 +35,7 @@ import { areaSize, civicTooBig, CIVIC, namerFor, ZONE, type ZoneKind } from './p
 import { chooseCentre, densestCentre, type Centre } from './centre';
 import { tilesOf } from './footprints';
 import { DensePass, NEAR_CORNER, raisePlaces, townPlaces } from './dense';
-import { carParkFits, clearOfDrives, driveLines, LOOSE_BEND, takeCarPark, vergeParking, type CarParkLaid } from './parking';
+import { besidePlace, bySquare, clearOfDrives, driveLines, LOOSE_BEND, parkAlong, vergeParking, type CarParkLaid } from './parking';
 import { random } from './housegen';
 import { COVER, COVER_CELL, coverSpan, LAND_CELL, NONE, type Land as LandField } from './land';
 import { APRON, landZones, Protection, wetTiles, type BuiltLand } from './landEdit';
@@ -1536,29 +1536,21 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const parks: CarParkLaid[] = [];
   const offAll = cornersOf(worldRoads, allRoads, CORNER, meets);
   const nearCorners = cornersOf(worldRoads, allRoads, NEAR_CORNER, meets);
-  /** A car park of `n` (fewest to most) bays along the first of `frontage` it fits, by area `a`'s `also`: whether one went down. */
-  const parkAlong = (frontage: readonly Frontage[], [few, most]: [number, number], a: number, also: Pick<CarPark, 'serves' | 'square'> = {}) => {
-    for (let n = most; n >= few; n--) {
-      for (const f of frontage) {
-        const fit = carParkFits(worldRoads, ground, f, n, offAll);
-        if (!fit) continue;
-        const { park, bays } = fit;
-        const laid: CarParkLaid = { ...fit, park: { ...park, area: a, ...also }, bays: bays.map((b) => ({ ...b, area: a })) };
-        takeCarPark(ground, laid);
-        parks.push(laid);
-        return true;
-      }
-    }
-    return false;
+  /** A car park of `n` (fewest to most) bays along the first of `frontage` it fits, of area `area` and `also` (`parking.ts` `parkAlong`): whether one went down. */
+  const parkBy = (frontage: readonly Frontage[], bays: readonly [number, number], area: number, also: Pick<CarPark, 'serves' | 'square'> = {}) => {
+    const laid = parkAlong(worldRoads, ground, frontage, bays, offAll, { area, also });
+    if (laid) parks.push(laid);
+    return !!laid;
   };
-  if (centre && !spec.classic) {
+  // (The centre's heart: its square, else its high street's middle.)
+  const heart0 = centre && (centre.square ? centroid(centre.square) : pointAt(worldRoads[centre.road].points, (centre.s0 + centre.s1) / 2).p);
+  if (centre && heart0 && !spec.classic) {
     // By the square: on the streets nearest it.
-    const sq = centre.square ? centroid(centre.square) : pointAt(worldRoads[centre.road].points, (centre.s0 + centre.s1) / 2).p;
-    const by = frontageOf(worldRoads, allRoads, sq, dense).filter((f) => dist(f.p, sq) < 120 && worldRoads[f.road].kind !== 'country');
+    const by = bySquare(worldRoads, frontageOf(worldRoads, allRoads, heart0, dense), heart0);
     // (On a side street first: the high street's frontage is the centre's shops'.)
     // (A row where a street runs along the grid, else a pair: `parking.ts` `carParkFits`.)
     const streets = [...by.filter((f) => f.road !== centre.road), ...by.filter((f) => f.road === centre.road)];
-    if (!parkAlong(streets, SQUARE_BAYS, 0, { square: true })) parkAlong(streets, [1, 2], 0, { square: true });
+    if (!parkBy(streets, SQUARE_BAYS, 0, { square: true })) parkBy(streets, [1, 2], 0, { square: true });
   }
   /** A car park by each big place (`BIG_PLACES`) laid since the last call, on its road beside its lot. */
   let parkedUpTo = 0;
@@ -1570,8 +1562,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       if (!f || !BIG_PLACES.has(s.template)) continue;
       const r = plotRect(t, s);
       const mid: Pt = [r.x + r.w / 2, r.z + r.d / 2];
-      const along = frontageOf(worldRoads, [f.road], mid, dense).filter((g) => g.side === f.side && g.far < Math.max(r.w, r.d) / 2 + 40);
-      if (!parkAlong(along, PLACE_BAYS, s.area ?? 0, { serves: s.index })) parkAlong(along, [1, 2], s.area ?? 0, { serves: s.index });
+      const along = besidePlace(frontageOf(worldRoads, [f.road], mid, dense), f.side, r);
+      if (!parkBy(along, PLACE_BAYS, s.area ?? 0, { serves: s.index })) parkBy(along, [1, 2], s.area ?? 0, { serves: s.index });
     }
   };
   // The named places' lots, from a stream of their own (`namedLots`): with no room in their area, along the
@@ -1603,7 +1595,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       for (const u of lots.place(places, fronts.get(a)!.filter((f) => !inCentre(f)), plan.greens, plan.centre, a, true)) left.push({ u, from: a });
       // Its named places' lots (`namedLots`) round its heart (its square, else its high street's middle; else its
       // middle), its shops and cafés in parades along its high street; then the rest of its centre built up (`dense.ts`).
-      const heart = centre ? (centre.square ? centroid(centre.square) : pointAt(worldRoads[centre.road].points, (centre.s0 + centre.s1) / 2).p) : plan.centre;
+      const heart = heart0 ?? plan.centre;
       const near = frontageOf(worldRoads, plan.roads, heart, placeRand);
       const street = centre ? near.filter((f) => f.road === centre.road && f.s >= centre.s0 && f.s <= centre.s1) : near;
       // (Its civic places before its homes, nearest its heart; its other places before them only in its centre,
@@ -1629,7 +1621,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       // its lots along its own roads (`hamletLots`).
       if (!spec.classic) {
         const by = frontageOf(worldRoads, plan.roads, plan.centre, dense);
-        if (!parkAlong(by, [1, 2], a)) parks.push(...vergeParking(worldRoads, ground, by, 1, a, nearCorners, [], LOOSE_BEND));
+        if (!parkBy(by, [1, 2], a)) parks.push(...vergeParking(worldRoads, ground, by, 1, a, nearCorners, [], LOOSE_BEND));
       }
       const laid = hamletLots(content, t, spec, plan, a, lots, worldRoads, offCorners, rand);
       // (Its named places' lots once every home has found room.)
@@ -1764,7 +1756,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   // No lot whose front door gets no path to a road (on a bend, its door looking past the road): left out
   // (`diagnostics.dropped`), the lots after it numbered again with what names them (the pads, the car parks' `serves`).
   const roadIdx = roadIndex(worldRoads);
-  const pathless = new Set(slots.filter((s) => !reachesRoad(content, t, roadIdx, slots, s)).map((s) => s.index));
+  const rects = slots.map(rectOf);
+  const pathless = new Set(slots.filter((s) => !reachesRoad(content, t, roadIdx, rects, s)).map((s) => s.index));
   if (pathless.size) {
     for (const s of slots) if (pathless.has(s.index)) lots.dropped.push({ name: s.name, kind: s.kind, ...(s.lot ? { lot: s.lot } : {}) });
     const kept = slots.filter((s) => !pathless.has(s.index));

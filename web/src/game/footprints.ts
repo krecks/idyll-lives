@@ -11,7 +11,10 @@ import type { Rect } from './town';
 /** A building's side runs within this (radians) of the way the road nearest it runs, or square to it. */
 export const FACING = (15 * Math.PI) / 180;
 
-const add = (a: Pt, b: Pt, k = 1): Pt => [a[0] + b[0] * k, a[1] + b[1] * k];
+/** `a` moved `k` times `b` along. */
+export const add = (a: Pt, b: Pt, k = 1): Pt => [a[0] + b[0] * k, a[1] + b[1] * k];
+/** A coordinate rounded to the centimetre, as the town file has it. */
+export const r2 = (v: number) => Math.round(v * 100) / 100;
 const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
 /** Twice the signed area of a polygon (x·z' − x'·z summed): negative when it goes counter-clockwise seen from above. */

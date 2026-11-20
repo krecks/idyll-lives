@@ -6,7 +6,7 @@
 
 import { inside, leftOf, lengths, nearest, pointAt, roadMask, type Pt, type RoadPlan } from './roads';
 import type { Ground, Rect } from './town';
-import { fillPoly, rectFrom, rectPoly, signedArea2, tilesOf } from './footprints';
+import { add, fillPoly, r2, rectFrom, rectPoly, signedArea2, tilesOf } from './footprints';
 
 /** How long a main town's high street is (m, at most), and how far its centre reaches either side of its middle line. */
 const HIGH_STREET = 180;
@@ -39,9 +39,7 @@ export interface Centre {
   at?: { s: number; w: number; d: number; side: 1 | -1; front: number };
 }
 
-const add = (a: Pt, b: Pt, k = 1): Pt => [a[0] + b[0] * k, a[1] + b[1] * k];
 const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
-const r2 = (v: number) => Math.round(v * 100) / 100;
 
 /** Whether a polyline crosses itself (two segments not next to each other meeting). */
 export function selfCrossing(poly: readonly Pt[]): boolean {
