@@ -659,9 +659,7 @@ fn a_customer_in_the_shop_under_their_flat_is_not_at_home() {
         if !home {
             assert_eq!(b.plot, Some(shop), "in the shop at {at:?}");
         }
-        let here = b
-            .plot
-            .is_some_and(|p| at_home(&w.plots, Some(flat), p, b.hall));
+        let here = b.at_home(&w.plots, Some(flat));
         assert_eq!(here, home, "at home at {at:?}");
         let drives = crate::cars::can_drive(
             &w.travel,
