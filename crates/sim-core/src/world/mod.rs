@@ -2590,7 +2590,7 @@ impl World {
             .collect();
         check_flats(
             &world.plots,
-            i32::from(lot_file.storeys.unwrap_or(1).max(1)),
+            i32::from(storeys),
             &world.stairs,
         )?;
         world.map_plots();

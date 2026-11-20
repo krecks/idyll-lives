@@ -2356,12 +2356,14 @@ pub(crate) fn turned_round(w: &mut World, c: usize, d: Detour) {
         ..
     } = &mut *w;
     let car = &mut cars[c];
-    let Some((_, had)) = car.route.take() else {
+    let Some((was_home, had)) = car.route.take() else {
         return;
     };
     let progress = car.progress;
     let Some(new) = car.detoured(exits, travel, d.home, &d, &had) else {
-        car.route = Some((true, had));
+        // (Its way as it was, homeward or not: a household's car giving up its turn round,
+        // `give_up_turn`, may be on its way out.)
+        car.route = Some((was_home, had));
         return;
     };
     let halts = d.same.then(|| moved_along(&had, &new, d.back));
