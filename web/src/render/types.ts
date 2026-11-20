@@ -927,5 +927,5 @@ export interface SimPreviews {
   wardrobe(gender: string): Promise<Wardrobe | null>;
 }
 
-/** How much higher each storey stands (the house's wall height, `house.ts` `WALL_HEIGHT`). */
+/** How much higher each storey stands (the house's wall height, `walls.ts` `WALL_HEIGHT`). */
 export const STOREY_HEIGHT = 2.8;

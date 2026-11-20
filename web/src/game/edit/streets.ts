@@ -83,7 +83,7 @@ export { ROOM } from '../roads';
 export const TRAIL_APART = 6;
 /** A street drawn this near an area's box (m) is one of its streets. */
 const NEAR_AREA = 30;
-/** A drawn line is simplified to this (m), and has a point every `CTRL_APART` m (a country road's) before it is made a curve. Widths: `macro.ts` `ROAD_WIDTH`, `TRAIL_WIDTH`. */
+/** A drawn line is simplified to this (m), and has a point every `CTRL_APART` m (a country road's) before it is made a curve. Widths: `countryRouter.ts` `ROAD_WIDTH`, `macro.ts` `TRAIL_WIDTH`. */
 const SIMPLIFY = 5;
 /** How much of a drawn line (m) is turned to meet a road, or to carry on a dead end's way. */
 const APPROACH = 16;
