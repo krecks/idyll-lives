@@ -30,6 +30,7 @@ pub use encode::*;
 pub(crate) use json::*;
 pub use model::*;
 pub(crate) use numbers::*;
+pub use numbers::{ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER, FLOAT, UINT, USHORT};
 pub(crate) use order::*;
 pub use parse::*;
 pub(crate) use read::*;

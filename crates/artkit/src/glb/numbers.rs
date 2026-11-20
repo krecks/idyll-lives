@@ -2,11 +2,11 @@
 
 use super::*;
 
-pub(crate) const FLOAT: u32 = 5126;
-pub(crate) const USHORT: u32 = 5123;
-pub(crate) const UINT: u32 = 5125;
-pub(crate) const ARRAY_BUFFER: u32 = 34962;
-pub(crate) const ELEMENT_ARRAY_BUFFER: u32 = 34963;
+pub const FLOAT: u32 = 5126;
+pub const USHORT: u32 = 5123;
+pub const UINT: u32 = 5125;
+pub const ARRAY_BUFFER: u32 = 34962;
+pub const ELEMENT_ARRAY_BUFFER: u32 = 34963;
 
 /// A number as the files have them: whole ones without a point, the rest as Python writes a float.
 pub(crate) fn num(x: f64) -> String {
