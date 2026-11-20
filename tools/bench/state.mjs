@@ -15,8 +15,9 @@
  *   the build's first seed, its households from the code's people seed, then Play on a household offered on the first
  *   page whose home is \`--home house|flat|any\` (the \`--household\`-th of them, from 0) and Move in, the homes still for
  *   sale filled at \`--tier\` (full: every preset's).
- * - \`--scene\`: scene.mjs's recipe (\`--world\`, \`--options\`, \`--seed\`, \`--home first|town|flat\`): the world generated
- *   at once, its neighbours and a household of four from the seed, moving into a home for sale.
+ * - \`--scene\`: scene.mjs's recipe (\`web/src/debug/sceneRecipe.ts\`; \`--world\`, \`--options\`, \`--seed\`,
+ *   \`--home first|town|flat\`): the world generated at once, its neighbours and a household of four from the seed,
+ *   moving into a home for sale.
  * - \`--from <file or name>\`: a save as it is (a \`.json\`, a \`.json.gz\`, or the name of one in \`debug-states/\` or
  *   \`web/public/bench/\`).
  *

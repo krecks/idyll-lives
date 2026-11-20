@@ -13,8 +13,9 @@ import { useTownContent, generateWorld } from '../../../web/src/game/town.ts';
 import { runTownJob } from '../../../web/src/game/townJobs.ts';
 import { peopleStreams, populate } from '../../../web/src/game/people.ts';
 import { firstCode, layoutPlan, moveInRequest, offerPage, optionsOf, peopleSeedOf, townOnMoveIn } from '../../../web/src/ui/newGame.ts';
-import { homeKey, homesForSale } from '../../../web/src/ui/homes.ts';
-import { randomHousehold } from '../../../web/src/game/household.ts';
+import { homeKey } from '../../../web/src/ui/homes.ts';
+import { readLayout } from '../../../web/src/core/snapshot.ts';
+import { sceneHome, sceneTown } from '../../../web/src/debug/sceneRecipe.ts';
 import { writeCode } from '../../../web/src/game/worldCode.ts';
 import { worldFlags } from '../worldFlags.mjs';
 
@@ -75,36 +76,14 @@ async function newGame() {
     const seed = flag('seed', null) === null ? null : Number(flag('seed', null));
     if (seed === null) stop('--scene needs --seed (the same town every time)');
     const empty = generateWorld(content, t, world, seed, undefined, undefined, options);
-    const dice = Math.random;
-    const seeded = (n) => {
-      let a = (n ^ 0x9e3779b9) >>> 0;
-      Math.random = () => {
-        a = (a + 0x6d2b79f5) >>> 0;
-        let x = Math.imul(a ^ (a >>> 15), 1 | a);
-        x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
-        return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
-      };
-    };
-    seeded(seed);
-    const town = populate(content, assets, t, empty);
-    seeded(seed + 1);
-    const household = randomHousehold(content, assets, 4, town.households.map((h) => h.household.name));
-    Math.random = dice;
-    const vacant = homesForSale(content, t, town);
-    const houses = vacant.filter((h) => h.flat === undefined);
-    let home = houses[0] ?? vacant[0];
-    const main = town.open?.areas?.[0];
-    const [cx, cz] = main ? [main.x + main.w / 2, main.z + main.d / 2] : [town.width / 2, town.depth / 2];
-    const far = (h) => Math.hypot(h.lot.x - cx, h.lot.z - cz);
-    if (homeKind === 'town') {
-      const inMain = houses.filter((h) => (h.lot.area ?? 0) === 0).sort((a, b) => far(a) - far(b) || a.slot - b.slot);
-      if (inMain.length) home = inMain[Math.floor(inMain.length / 2)];
-    } else if (homeKind === 'flat') {
-      const flats = vacant.filter((h) => h.flat !== undefined).sort((a, b) => Number((b.storey ?? 0) > 0) - Number((a.storey ?? 0) > 0) || far(a) - far(b) || a.key.localeCompare(b.key));
-      if (!flats.length) stop('no flat for sale in this world');
-      home = flats[0];
+    const { town, household } = sceneTown(content, assets, t, empty, seed);
+    let home;
+    let ref;
+    try {
+      ({ home, ref } = sceneHome(content, t, town, homeKind));
+    } catch (err) {
+      stop(err.message);
     }
-    const ref = home.flat === undefined ? { slot: home.slot } : { slot: home.slot, flat: home.flat };
     request = { ...moveInRequest({ town, ...ref, household, from: null, emptyLot: false, mode: 'living', lifespan: 'normal' }), peopleSeed: seed };
     simSeed = seed;
     made = { recipe: 'scene', world, options, seed, home: homeKind, homeName: home.name };
@@ -177,7 +156,6 @@ const madeIn = performance.now() - started;
 
 // When it is asked for: a tick, ticks on, or a moment of the game's clock (worked out once the game is open: a new
 // game's tick 0 is its first morning, not midnight).
-const TICKS_PER_MINUTE = 75;
 const when = flag('tick', null) !== null ? { tick: Number(flag('tick', null)) } : flag('ticks', null) !== null ? { ticks: Number(flag('ticks', null)) } : flag('at', null) !== null ? { at: flag('at', '') } : { at: flag('day', '1') + ':' + flag('hour', '13') + ':-5' };
 const watchSide = flag('watch', '320');
 
@@ -201,7 +179,7 @@ if (!cached) {
   else if ('ticks' in when) target = tick + when.ticks;
   else {
     const [d, h, m] = when.at.split(':').map(Number);
-    target = tick + Math.round(((d - day0) * 1440 + h * 60 + m - minute0) * TICKS_PER_MINUTE);
+    target = tick + Math.round(((d - day0) * 1440 + h * 60 + m - minute0) * readLayout(game.snapshot_layout()).ticksPerMinute);
   }
   if (!Number.isInteger(target) || target < tick) stop('the moment asked for (' + JSON.stringify(when) + ', tick ' + target + ') is before the game starts (tick ' + tick + ', day ' + day0 + ' minute ' + minute0 + ')');
   // The view: the player's lot (\`session.ts\` \`showPlot\`); the watch round it.
