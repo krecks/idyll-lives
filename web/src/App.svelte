@@ -121,6 +121,8 @@
     bench?.prepareBench();
     // (`hud=0` on any debug page: the world without the interface, for checks' pictures.)
     if (!BENCH && new URLSearchParams(location.search).get('hud') === '0') (await import('./debug/bench')).hideHud();
+    // (`__benchTime`: a game state swapped in and played in fixed steps, on a benchmark's page and the dev server's `?debug` ones.)
+    if (BENCH || (import.meta.env.DEV && new URLSearchParams(location.search).has('debug'))) void import('./debug/benchTime').then((m) => m.installBenchTime());
     let data: Awaited<ReturnType<typeof loadGameData>>;
     // The menu's picture: the last world made, else the one the game ships (read meanwhile).
     const still = within(loadStill(), STILL_LIMIT_MS, null).then((kept) => kept ?? FIRST_STILL);
