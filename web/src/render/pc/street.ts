@@ -927,8 +927,8 @@ export class Street {
     out.set('streetLamps', { material: () => this.glowMat, colors: false, cast: false, receive: true });
     out.set('streetLightPools', { material: () => this.poolMat, colors: false, cast: false, receive: false, alphaIndex: 5 });
     out.set('streetShadows', { material: () => this.lib.contactShadow(false), colors: true, cast: false, receive: true });
-    // The ground layers as the lot draws its own: double-sided, in the house's lamps' light.
-    for (const g of shape.ground) out.set(g.name, { material: () => (g.paint ? this.lib.roadPaint() : this.lib.surface(g.material, { doubleSided: true, vertexColors: !!g.toned })), colors: !!g.paint || !!g.toned, cast: false, receive: true, lit: true });
+    // The ground layers as the lot draws its own: double-sided, in the house's lamps' light; one draw for those alike.
+    for (const g of shape.ground) out.set(groundDraw(g), { material: () => (g.paint ? this.lib.roadPaint() : this.lib.surface(g.material, { doubleSided: true, vertexColors: !!g.toned })), colors: !!g.paint || !!g.toned, cast: false, receive: true, lit: true });
     return out;
   }
 
@@ -1296,8 +1296,27 @@ function chunkData(plan: ChunkPlan): Map<string, MeshData> {
   put('streetLamps', plan.glow, false);
   put('streetLightPools', plan.pools, false);
   put('streetShadows', plan.shadows, true);
-  for (const g of plan.ground) put(g.name, g.geo, !!g.paint || !!g.toned);
+  // (The ground layers that look alike as one mesh, `groundDraw`.)
+  const ground = new Map<string, MeshData[]>();
+  for (const g of plan.ground) {
+    if (g.geo.empty) continue;
+    const key = groundDraw(g);
+    const data = g.geo.meshData({ colors: !!g.paint || !!g.toned });
+    const list = ground.get(key);
+    if (list) list.push(data);
+    else ground.set(key, [data]);
+  }
+  for (const [key, list] of ground) out.set(key, concatMeshData(list)!);
   return out;
+}
+
+/**
+ * The draw a ground layer goes into: one for each look (its material, and whether it is toned or the road's paint), so
+ * the layers that look alike (the road and the car parks' aprons, the garden paths and the yards, the road's markings
+ * and the bays' lines) are one draw in a group, not one each.
+ */
+function groundDraw(g: Omit<GroundLayer, 'geo'>): string {
+  return g.paint ? 'groundPaint' : `ground:${g.material}${g.toned ? ':toned' : ''}`;
 }
 
 /** Vertex arrays one after the other as one mesh's (null: nothing). */
