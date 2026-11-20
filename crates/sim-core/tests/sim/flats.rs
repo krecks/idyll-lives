@@ -6,7 +6,8 @@
 //! own things, a visitor knocks at the flat's own door off the landing and is let in, the post is
 //! fetched from the hall, newcomers move into a vacant flat, rent is by the flat, the building's
 //! envelope is not the flat's to build on, a watched building watches its flats, and the shop's
-//! customers keep out of the flats' hall, which stays the flats' way home when the shop is shut.
+//! customers keep out of the flats' hall, which stays the flats' way home when the shop is shut, and
+//! one in the hall is in no place for the views (the shop isn't opened for them).
 
 use crate::common;
 
@@ -483,4 +484,38 @@ fn the_flats_door_is_theirs_when_the_shop_is_shut() {
         .find(|e| e.kind == EventKind::Visited)
         .expect("let in");
     assert_eq!((visited.a, visited.b), (EVE, GUS));
+}
+
+/// Fay in the flats' stair hall, on the ground or on its landing upstairs, is on the shop's lot as
+/// the simulation has it (the hall is the flats' way in, `path::Halls`), but in no place for the
+/// views: the shop isn't opened for one walking through to the flats. On the shop's floor she is
+/// in the shop.
+#[test]
+fn one_in_the_flats_hall_is_in_no_place_for_the_views() {
+    let mut w = world(OVER_SHOP);
+    w.autonomy = false;
+    let plot = |w: &World| {
+        let ui: Value = serde_json::from_str(&sim_core::view::ui_state_json(w)).unwrap();
+        let fay = ui["sims"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["id"] == FAY)
+            .expect("in the UI state")
+            .clone();
+        fay["plot"].as_u64()
+    };
+    let up = w.storey_row(1) as f32;
+    for at in [[16.5, 12.5], [16.5, 12.5 + up]] {
+        w.sims[FAY as usize].pos = at;
+        let (x, z) = w.sims[FAY as usize].tile();
+        assert!(in_hall((x, w.ground_z(z))));
+        assert_eq!(w.plot_at(x, z), Some(SHOP), "the shop's lot at {at:?}");
+        assert_eq!(plot(&w), None, "in no place at {at:?}");
+    }
+    w.sims[FAY as usize].pos = [10.5, 12.5];
+    let (x, z) = w.sims[FAY as usize].tile();
+    assert!(!in_hall((x, z)));
+    assert_eq!(w.plot_at(x, z), Some(SHOP));
+    assert_eq!(plot(&w), Some(u64::from(SHOP)), "in the shop");
 }

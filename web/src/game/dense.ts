@@ -111,6 +111,8 @@ const OVER_TOWN = 0.6;
 const DESIGNS = 16;
 /** How far a lot set by hand looks for a road to front (m from the road's edge). */
 const FILL_REACH = 30;
+/** A centre's buildings of flats stand at least this far apart along each side of a street (m, `DensePass.centreFlats`). */
+const FLATS_APART = 50;
 
 const range = (rand: Rand, lo: number, hi: number) => lo + (hi - lo) * rand();
 /** How far a point is from a box (0 inside it). */
@@ -353,6 +355,46 @@ export class DensePass {
       }
     }
     return rows;
+  }
+
+  /**
+   * Buildings of flats on the streets of area `area`'s centre, `most` at most, before its named places go down there:
+   * each where a street has room for one in the centre (the whole lot in it), `FLATS_APART` m from the last along that
+   * side at least, so they stand at the ends of its parades and its shops keep the middle. The centre's homes, most of
+   * them otherwise over its shops (`raisePlaces`). Each building is drawn once and tried on along the street till it
+   * goes down. How many went down.
+   */
+  centreFlats(rand: Rand, most: number, area = 0): number {
+    const { roads, t } = this;
+    if (!this.outlines.length || !this.areas[area]) return 0;
+    let laid = 0;
+    for (const r of this.areas[area].roads) {
+      if (roads[r].kind === 'trail') continue;
+      const ls = lengths(roads[r].points);
+      const L = ls[ls.length - 1];
+      // (The land 6 m back from the road's edge: whether it is the centre's.)
+      const inCentre = (s: number, side: 1 | -1) => {
+        const f = this.frontage(r, Math.min(s, L), side, ls);
+        const reach = roads[r].width / 2 + 6;
+        return this.centreAt([f.p[0] + f.n[0] * reach, f.p[1] + f.n[1] * reach]);
+      };
+      for (const side of roads[r].lots ? [roads[r].lots] : ([1, -1] as const)) {
+        let units: Unplaced[] | null = null;
+        for (let s = 4, last = -Infinity; s < L - 4 && laid < most; s += 2) {
+          if (s - last < FLATS_APART || !inCentre(s, side) || this.takenAt(r, s + 1, side, ls)) continue;
+          units ??= this.unitsOf('flats', area, 'centre', rand);
+          if (units[0]?.kind !== 'flats') return laid;
+          const w = slotDims(t, units[0]).width;
+          if (s + w > L - 4 || !inCentre(s + w, side) || this.takenAt(r, s + w - 1, side, ls)) continue;
+          if (!this.put(units, r, s + w / 2, side, ls, 'flats', 0).length) continue;
+          laid++;
+          last = s;
+          s += w;
+          units = null;
+        }
+      }
+    }
+    return laid;
   }
 
   /**

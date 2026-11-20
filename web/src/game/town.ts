@@ -650,8 +650,16 @@ export function lotAt(ground: Ground, road: RoadPlan, f: Frontage, w: number, d:
  */
 export function fronting(facing: Facing, front: number, along: number, W: number, D: number): Rect {
   const a = Math.round(along - (facing % 2 ? D : W) / 2);
-  const at = [{ x: a, z: front }, { x: front, z: a }, { x: a, z: front - D }, { x: front - W, z: a }][facing];
-  return { ...at, w: W, d: D };
+  switch (facing) {
+    case 0:
+      return { x: a, z: front, w: W, d: D };
+    case 1:
+      return { x: front, z: a, w: W, d: D };
+    case 2:
+      return { x: a, z: front - D, w: W, d: D };
+    default:
+      return { x: front - W, z: a, w: W, d: D };
+  }
 }
 
 /** Every lot of a row stands with the middle of its front this near its road's edge at most (m; `LotPlacer.placeRow`). */

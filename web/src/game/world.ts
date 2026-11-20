@@ -12,7 +12,7 @@
 import type { Content, WorldNames } from '../content/content';
 import { DEFAULT_LANDSCAPE, type LandSize, type LandscapeParams, type TownSize, type WorldOptions } from '../core/protocol';
 import type { GardenSize } from './housegen';
-import { branch, centroid, clearOf, crossing, crossStreet, cutAround, inside, lane, leftOf, lengths, loop, nearest, pointAt, range, ring, RoadIndex, roomAt, roundabout, through, type Box, type Pt, type RoadPlan } from './roads';
+import { branch, centroid, clearOf, crossing, crossStreet, cutAround, inside, lane, leftOf, lengths, loop, nearest, pointAt, range, ring, roadDistance, RoadIndex, roomAt, roundabout, through, type Box, type Pt, type RoadPlan } from './roads';
 
 export type { LandSize, TownSize, WorldOptions };
 
@@ -395,19 +395,24 @@ export function clearing(rand: Rand, box: Box, scale = 1): RoadLayout {
 export function extend(rand: Rand, roads: readonly RoadPlan[], box: Box, count: number, scale = 1, greens: readonly Pt[][] = []): RoadPlan[] {
   const out = [...roads];
   const fit = { box, greens };
+  // (The roads' lengths and their index, worked out again only when a street is added.)
+  const length = new Map<RoadPlan, number>();
+  const lengthOfRoad = (r: RoadPlan) => length.get(r) ?? length.set(r, lengthOf(r)).get(r)!;
+  let index = new RoadIndex(out);
   for (let n = 0, tries = 0; n < count && tries < count * 40; tries++) {
-    const parents = out.filter((r) => !r.island && r.kind !== 'trail' && lengthOf(r) > 40);
+    const parents = out.filter((r) => !r.island && r.kind !== 'trail' && lengthOfRoad(r) > 40);
     if (!parents.length) break;
     const parent = parents[Math.floor(rand() * parents.length)];
     const from = out.indexOf(parent);
-    const { p, t } = pointAt(parent.points, lengthOf(parent) * range(rand, 0.1, 0.9));
+    const { p, t } = pointAt(parent.points, lengthOfRoad(parent) * range(rand, 0.1, 0.9));
     const sd = parent.lots ?? side(rand);
     const n0 = leftOf(t);
     const a = range(rand, -0.3, 0.3);
     const dir: Pt = [(n0[0] * Math.cos(a) - n0[1] * Math.sin(a)) * sd, (n0[0] * Math.sin(a) + n0[1] * Math.cos(a)) * sd];
-    const street = crossStreet(out, new RoadIndex(out), from, p, dir, fit, 110 * scale);
+    const street = crossStreet(out, index, from, p, dir, fit, 110 * scale);
     if (!street) continue;
     out.push(street);
+    index = new RoadIndex(out);
     n++;
   }
   return out;
@@ -427,17 +432,27 @@ export function fill(rand: Rand, roads: readonly RoadPlan[], box: Box, count: nu
   const out = [...roads];
   const fit = { box, greens };
   const tried: Pt[] = [];
+  // Points 10 m apart over the box, each as far from the nearest road's middle as it is (200 m at
+  // most; 0 within `EMPTY` of one, for good: roads are only ever added). Worked out over the roads
+  // once, then brought down by each street laid since (`measured`: the roads they count).
+  const points: { x: number; z: number; d: number }[] = [];
+  for (let z = 34; z <= box.d - 34; z += 10) for (let x = 34; x <= box.w - 34; x += 10) points.push({ x, z, d: 0 });
+  let measured = 0;
   for (let n = 0, tries = 0; n < count && tries < count * 4; tries++) {
     const index = new RoadIndex(out);
-    let best: { p: Pt; d: number } | null = null;
-    for (let z = 34; z <= box.d - 34; z += 10) {
-      for (let x = 34; x <= box.w - 34; x += 10) {
-        if (tried.some((t) => Math.hypot(t[0] - x, t[1] - z) < 40) || greens.some((g) => inside(g, x, z))) continue;
+    for (const q of points) {
+      if (!measured) {
         // (Most points are near a road: asked how near only when not.)
-        if (index.nearest(x, z, EMPTY)) continue;
-        const d = index.nearest(x, z, 200)?.dist ?? 200;
-        if (!best || d > best.d) best = { p: [x, z], d };
+        q.d = index.nearest(q.x, q.z, EMPTY) ? 0 : (index.nearest(q.x, q.z, 200)?.dist ?? 200);
+        continue;
       }
+      for (let r = measured; r < out.length && q.d > EMPTY; r++) q.d = Math.min(q.d, roadDistance(out[r], q.x, q.z));
+    }
+    measured = out.length;
+    let best: { p: Pt; d: number } | null = null;
+    for (const { x, z, d } of points) {
+      if (tried.some((t) => Math.hypot(t[0] - x, t[1] - z) < 40) || greens.some((g) => inside(g, x, z)) || d <= EMPTY) continue;
+      if (!best || d > best.d) best = { p: [x, z], d };
     }
     if (!best) break;
     const p = best.p;
@@ -862,22 +877,17 @@ export const TOWN_SIZES: readonly TownSize[] = ['hamlet', 'village', 'town', 'ci
 const TOWN_LOTS: [number, number] = [66, 84];
 
 /**
- * How big a main town of `homes` homes is: the biggest size whose fewest homes it has, a size's fewest halfway
- * between the most the size below it lays (its lots and terraced houses: `SIZES`) and the fewest it lays itself.
- * (Laid by the generator, a main town of each size measured 11–38, 57–78, 122–179 and 193–230 homes over three
- * places and two seeds, 2026-11-17: each its own size or below.)
+ * The fewest homes (its houses' lots, the dense pass's terraced houses and homes on tight gardens among them) a
+ * main town of each size has by its homes (`sizeByHomes`): a few more than the most the size below lays. Laid by
+ * the generator, a main town of each size measured 28–74, 48–115, 71–191 and 123–257 homes over the nine places
+ * and six seeds, 2026-11-20. The sizes overlap since the dense pass lays homes where the backdrop stood: a main
+ * town is its place's size first (`places.ts` `draftAreaSize`), and its homes only ever make it bigger.
  */
+const GROWN_FROM: Record<TownSize, number> = { hamlet: 0, village: 80, town: 120, city: 200 };
+
+/** How big a main town of `homes` homes is: the biggest size whose fewest homes it has (`GROWN_FROM`), so a town the generator laid is its own size or below. */
 export function sizeByHomes(homes: number): TownSize {
-  const span = (size: TownSize): [number, number] => {
-    const [lots, terraces] = [SIZES[size].lots ?? TOWN_LOTS, SIZES[size].terraces];
-    return [lots[0] + terraces[0], lots[1] + terraces[1]];
-  };
-  let out: TownSize = 'hamlet';
-  for (let k = 1; k < TOWN_SIZES.length; k++) {
-    const least = (span(TOWN_SIZES[k - 1])[1] + span(TOWN_SIZES[k])[0]) / 2;
-    if (homes >= least) out = TOWN_SIZES[k];
-  }
-  return out;
+  return TOWN_SIZES.reduce<TownSize>((out, size) => (homes >= GROWN_FROM[size] ? size : out), 'hamlet');
 }
 
 /** The land a new world has (m, both ways) by its size (`WorldOptions.size`). */

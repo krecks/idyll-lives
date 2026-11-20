@@ -59,6 +59,14 @@ export function lengths(pts: readonly Pt[]): number[] {
   return out;
 }
 
+/** Each road's arc lengths (`lengths` of its points), worked out once: a road's points are never changed in place. */
+const roadLengthsOf = new WeakMap<readonly Pt[], number[]>();
+export function roadLengths(road: Pick<RoadPlan, 'points'>): readonly number[] {
+  let ls = roadLengthsOf.get(road.points);
+  if (!ls) roadLengthsOf.set(road.points, (ls = lengths(road.points)));
+  return ls;
+}
+
 /** The unit direction along a polyline at point `i`. */
 export function tangent(pts: readonly Pt[], i: number): Pt {
   const [a, b] = [pts[Math.max(0, i - 1)], pts[Math.min(pts.length - 1, i + 1)]];
@@ -70,7 +78,7 @@ export function tangent(pts: readonly Pt[], i: number): Pt {
 export const leftOf = ([x, z]: Pt): Pt => [z, -x];
 
 /** The point at arc length `s` along a polyline, and the direction there. */
-export function pointAt(pts: readonly Pt[], s: number, ls = lengths(pts)): { p: Pt; t: Pt; i: number } {
+export function pointAt(pts: readonly Pt[], s: number, ls: readonly number[] = lengths(pts)): { p: Pt; t: Pt; i: number } {
   let i = 0;
   while (i < ls.length - 2 && ls[i + 1] < s) i++;
   const f = Math.max(0, Math.min(1, (s - ls[i]) / (ls[i + 1] - ls[i] || 1)));
@@ -79,7 +87,7 @@ export function pointAt(pts: readonly Pt[], s: number, ls = lengths(pts)): { p: 
 }
 
 /** Whether a polyline turns no more than `most` radians from `half` m before arc length `s` to `half` m after it (its directions there). */
-export function straightAround(pts: readonly Pt[], s: number, half: number, most: number, ls = lengths(pts)): boolean {
+export function straightAround(pts: readonly Pt[], s: number, half: number, most: number, ls: readonly number[] = lengths(pts)): boolean {
   const [a, b] = [pointAt(pts, s - half, ls).t, pointAt(pts, s + half, ls).t];
   return a[0] * b[0] + a[1] * b[1] >= Math.cos(most);
 }
@@ -244,21 +252,24 @@ export function sharpestTurn(pts: readonly Pt[], span = 20): { angle: number; s:
 }
 
 /** The nearest point of a polyline: its distance, arc length and which side (+1: the left). */
-export function nearest(pts: readonly Pt[], x: number, z: number, ls = lengths(pts)): { dist: number; s: number; side: 1 | -1 } {
-  let best = { dist: Infinity, s: 0, side: 1 as 1 | -1 };
+export function nearest(pts: readonly Pt[], x: number, z: number, ls?: readonly number[]): { dist: number; s: number; side: 1 | -1 } {
+  let [dist, at, along, side] = [Infinity, 0, 0, 1 as 1 | -1];
   for (let i = 0; i + 1 < pts.length; i++) {
     const [[ax, az], [bx, bz]] = [pts[i], pts[i + 1]];
     const [dx, dz] = [bx - ax, bz - az];
     const l2 = dx * dx + dz * dz || 1;
     const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2));
-    const dist = Math.hypot(x - (ax + dx * t), z - (az + dz * t));
-    if (dist < best.dist) {
+    const d = Math.hypot(x - (ax + dx * t), z - (az + dz * t));
+    if (d < dist) {
       // Left of the way along: (dx, dz) turned a quarter, as `leftOf`.
       const cross = (x - ax) * dz - (z - az) * dx;
-      best = { dist, s: ls[i] + t * Math.sqrt(l2), side: cross >= 0 ? 1 : -1 };
+      [dist, at, along, side] = [d, i, t * Math.sqrt(l2), cross >= 0 ? 1 : -1];
     }
   }
-  return best;
+  // (The arc length to the nearest segment's start, summed as `lengths` sums it, only that far: most ask how far only.)
+  let s = ls?.[at] ?? 0;
+  if (!ls) for (let i = 1; i <= at; i++) s += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  return { dist, s: s + along, side };
 }
 
 // ---- shapes ------------------------------------------------------------------------------
@@ -791,12 +802,10 @@ export class RoadIndex {
   /** Distance from (x, z) to segment `id`, the arc length there and the side (+1: the road's left). */
   private measure(id: number, x: number, z: number): [dist: number, s: number, side: 1 | -1] {
     const { road, k, s } = this.segs[id];
-    const [[ax, az], [bx, bz]] = [this.roads[road].points[k], this.roads[road].points[k + 1]];
-    const [dx, dz] = [bx - ax, bz - az];
-    const l = Math.hypot(dx, dz) || 1;
-    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (l * l)));
+    const [a, b] = [this.roads[road].points[k], this.roads[road].points[k + 1]];
+    const [dist, t, l] = toSegment(a, b, x, z);
     // Left of the way along: (dx, dz) turned a quarter, as `leftOf`.
-    return [Math.hypot(x - (ax + dx * t), z - (az + dz * t)), s + t * l, (x - ax) * dz - (z - az) * dx >= 0 ? 1 : -1];
+    return [dist, s + t * l, (x - a[0]) * (b[1] - a[1]) - (z - a[1]) * (b[0] - a[0]) >= 0 ? 1 : -1];
   }
 
   /** Distance from road `i`'s middle, if it's within `within` m (else Infinity). */
@@ -846,6 +855,21 @@ export class RoadIndex {
     });
     return best;
   }
+}
+
+/** How far (x, z) is from the segment `a` to `b`, how far along it (0..1) its nearest point is, and its length (1 if none): as `RoadIndex` measures a road. */
+function toSegment([ax, az]: Pt, [bx, bz]: Pt, x: number, z: number): [dist: number, t: number, l: number] {
+  const [dx, dz] = [bx - ax, bz - az];
+  const l = Math.hypot(dx, dz) || 1;
+  const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (l * l)));
+  return [Math.hypot(x - (ax + dx * t), z - (az + dz * t)), t, l];
+}
+
+/** How far (x, z) is from `road`'s middle, as `RoadIndex` measures it (`nearest`), however far. */
+export function roadDistance(road: RoadPlan, x: number, z: number): number {
+  let best = Infinity;
+  for (let k = 0; k + 1 < road.points.length; k++) best = Math.min(best, toSegment(road.points[k], road.points[k + 1], x, z)[0]);
+  return best;
 }
 
 /** Each set of roads' `RoadIndex`, built once. */

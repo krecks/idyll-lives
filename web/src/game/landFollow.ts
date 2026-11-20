@@ -279,7 +279,7 @@ function recentred(draft: NeighbourhoodDraft, world: FollowWorld): Neighbourhood
   const area = high && open?.areas[high.area];
   if (!open || !high || !area || !open.centre?.length) return draft;
   const c: Centre = { ...high, poly: open.centre[0].poly };
-  const lots = draft.slots.map((s, i) => ({ rect: world.plots[i], place: !!s.dress && s.kind === 'shop' }));
+  const lots = draft.slots.map((s, i) => ({ rect: world.plots[i], built: !!s.dress && (s.kind === 'shop' || s.kind === 'flats') }));
   densestCentre(c, draft.roads, draft.width, draft.depth, unrle(open.water, draft.width * draft.depth), draft.greens, lots, { x: area.x, z: area.z, w: area.w, d: area.d });
   return { ...draft, open: { ...open, centre: open.centre.map((q, k) => (k === 0 ? { ...q, poly: c.poly } : q)), highStreets: [c] } };
 }

@@ -1014,11 +1014,15 @@ fn sim_patch(
         &mut sent.pension,
     );
     // Plot the Sim is on (None on the street or at work); minute of day they're back from work.
+    // (In the flats' stair hall over a public place, or on its landings, on none: the hall is
+    // the flats', not the place's, and the place isn't opened for one walking through it.)
     let (x, z) = s.tile();
     let plot = if s.away_until.is_some() {
         None
     } else {
-        world.plot_at(x, z)
+        world
+            .plot_at(x, z)
+            .filter(|&p| world.halls.at(p, x, world.ground_z(z)).is_none())
     };
     o.changed("plot", &plot, &mut sent.plot);
     o.changed(

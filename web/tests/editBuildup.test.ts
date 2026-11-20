@@ -296,7 +296,7 @@ describe('build-up', async () => {
 
   test("the main town is offered its size's civic places, the bigger of its place's and its homes', those for careers nobody there employs first", () => {
     // A main town's size by its homes (as the generator lays each size's).
-    expect([20, 40, 60, 110, 150, 210, 240].map(sizeByHomes)).toEqual(['hamlet', 'hamlet', 'village', 'village', 'town', 'town', 'city']);
+    expect([20, 70, 90, 110, 150, 190, 240].map(sizeByHomes)).toEqual(['hamlet', 'hamlet', 'village', 'village', 'town', 'town', 'city']);
     // A hamlet is offered no police station, nor a village's school, until it has grown.
     const hamlet = planOf('country', 11, { town: 'hamlet', villages: 'none', size: 'small' });
     const homes = hamlet.slots.filter((s) => s.kind === 'house' && (s.area ?? 0) === 0);
