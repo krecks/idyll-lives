@@ -1238,8 +1238,11 @@ fn childcare(w: &mut World, b: usize) {
     }
     // The baby's crib (or the home's), for what caring for them takes: what they hold a place
     // at, else the first crib on the home plot (from the objects by plot, unless objects came or
-    // went since it was built this tick). A baby left with a sitter has this asked every tick,
-    // so it looks at their own and their home's objects, not at every object in town.
+    // went since it was built this tick, when it looks through every object: rebuilding it here
+    // costs more than that look, a third of a millisecond for 9,000 objects, and what comes later
+    // in the tick would find another index than it does). A baby left with a sitter has this
+    // asked every tick, so it looks at their own and their home's objects, not at every object
+    // in town.
     let content = &w.content;
     let is_crib = |o: &crate::world::ObjectInstance| {
         content.objects[o.def]
