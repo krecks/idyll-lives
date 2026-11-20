@@ -15,7 +15,7 @@
 
 import type { GameCamera } from './camera';
 import type { LotContents } from './lotContents';
-import { WALL_HEIGHT } from '../shared/house';
+import { WALL_HEIGHT } from '../shared/walls';
 import type { PickResult } from '../types';
 
 /** How picking reads the storeys (the renderer's). */

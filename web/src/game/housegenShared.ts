@@ -35,7 +35,6 @@
 import type { ObjectDef, SurfaceKind } from '../content/content';
 import { type Shape } from './surfaces';
 import type { Placement } from './town';
-import { mulberry32 as random } from './noise';
 export interface HouseGenConfig {
   classes: Record<string, HouseClass>;
   /** Class weights per lot size. */
@@ -382,7 +381,6 @@ export interface Floor {
 }
 export const key = (x: number, z: number) => `${x}:${z}`;
 // (The small seeded generator, `noise.ts`'s mulberry32.)
-export { random };
 /**
  * `lampTiles`: tiles a lamp lights at night unless its `light.tiles` says (content
  * `roomRules.lampTiles`); every room gets lights enough for all of it. `windowTiles`: tiles one window lights by day (`roomRules.windowTiles`).

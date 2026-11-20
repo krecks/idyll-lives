@@ -14,7 +14,6 @@ import { COVER, LAND_CELL } from '../../game/land';
 import { SKIRT_MOST, type BuiltSurface } from './builtSurface';
 import { roadTiles } from './roads';
 import { compose, quatAxisAngle } from './math';
-import { fbm, hash, mulberry32, ridged, smoothstep, valueNoise } from '../../game/noise';
 import { type ZoneKind } from './zones';
 import { townPaving } from './townPaving';
 
@@ -236,7 +235,6 @@ export interface PlantPlacement {
 // ---- Deterministic noise ------------------------------------------------------------
 
 // (The seeded generator, lattice hash, value noise, fractal noise, ridged noise and smooth step: the world generator's own, `game/noise.ts`, so the land it lays out and the land drawn agree.)
-export { fbm, hash, mulberry32, ridged, smoothstep, valueNoise };
 
 /**
  * The smaller of `a` and `b` (both 0 or more), rounded off where they come within `k` of each other (a

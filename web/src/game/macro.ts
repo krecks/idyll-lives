@@ -6,13 +6,12 @@ import { chooseCentre, densestCentre } from './centre';
 import { tilesOf } from './footprints';
 import { designs, DensePass, NEAR_CORNER, pooled, raisePlaces, terraceUnits, townPlaces } from './dense';
 import { besidePlace, bySquare, clearOfDrives, driveLines, LOOSE_BEND, parkAlong, vergeParking, type CarParkLaid } from './parking';
-import { random } from './housegen';
 import { COVER, COVER_CELL, coverSpan, LAND_CELL, NONE, type Land as LandField } from './land';
 import { APRON, landZones, Protection, wetTiles, type BuiltLand } from './landEdit';
 import { bridgeSites, dryPieces, type Bounds } from './landPieces';
 import { GENTLE_TILT, seedBare, smoothHeights } from './landFollow';
 import { outlines, rasterize, rle, simplify } from './landMasks';
-import { between, fbm } from './noise';
+import { between, fbm, mulberry32 } from './noise';
 import { along, astar, CELL, Cells, clearOfBoxes, COUNTRY_GRADE, COUNTRY_WIDTH, CountryRouter, CTRL_APART, FACING, ROAD_WIDTH, ROUTE_GRADE, SIDE_COST, TRIES, type Port, type Way } from './countryRouter';
 import { centroid, cropRoads, curve, evenly, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadIndex, roadLengths, roadMeets, straightAround, type Box, type Pt, type RoadPlan } from './roads';
 import { lotName, placeOfTemplate, placeUnit } from './placeLots';
@@ -279,7 +278,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const plan = lay?.plan;
   /** The land's water as its plan has it: the plan's river is the town's to bridge, and the town may go on either bank. */
   const kept = !!(plan && lay?.waterKept);
-  const rand = random(lay?.townSeed ?? seed);
+  const rand = mulberry32(lay?.townSeed ?? seed);
   const rolledName = worldName(content, spec.names, rand);
   const tagline = worldTagline(content, spec, rand);
   const rolledW = Math.round(range(rand, ...spec.world) / 64) * 64;
@@ -293,7 +292,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
 
   // ---- the land: hills (a valley between the massif's mountains), woods -----------------------
   const valley = !!spec.massif;
-  const massif = spec.massif ? range(random((seed ^ MASSIF) >>> 0), ...spec.massif) : 0;
+  const massif = spec.massif ? range(mulberry32((seed ^ MASSIF) >>> 0), ...spec.massif) : 0;
   const valleyZ = (x: number) => D / 2 + (fbm(x / 420, 3.7, nseed + 3, 3) - 0.47) * 260;
   const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
   for (let i = 0; i < gw * gd && !shaped; i++) {
@@ -401,7 +400,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   ox = Math.max(EDGE, Math.min(W - EDGE - box.w, ox));
   // (Room for the town between the river and the world's edge, on its side of it.)
   const room = EDGE / 2 + box.d + 40;
-  const river = spec.water !== 'river' ? null : shaped ? planRiver : riverAcross(random((seed ^ RIVER) >>> 0), W, D, [ox, ox + box.w], nseed, waterSide === 'zmax' ? [room, D] : [0, D - room]);
+  const river = spec.water !== 'river' ? null : shaped ? planRiver : riverAcross(mulberry32((seed ^ RIVER) >>> 0), W, D, [ox, ox + box.w], nseed, waterSide === 'zmax' ? [room, D] : [0, D - room]);
   if (river) {
     for (let i = 0; i < gw * gd && !shaped; i++) {
       const [x, z] = land.centre(i);
@@ -1377,9 +1376,9 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   ground.block(spec.classic ? waterMask : grown(waterMask, W, D, SHORE_GAP));
   // The living town's own draws (the centre, the terraces, the dense pass), apart from the layout's:
   // the rest of the world is laid out as it was.
-  const dense = random(((lay?.townSeed ?? seed) ^ 0x2545f491) >>> 0);
+  const dense = mulberry32(((lay?.townSeed ?? seed) ^ 0x2545f491) >>> 0);
   // (The centre's buildings of flats from a stream of their own, so the rest is drawn as it was.)
-  const centreFlats = random(((lay?.townSeed ?? seed) ^ 0x51ed270b) >>> 0);
+  const centreFlats = mulberry32(((lay?.townSeed ?? seed) ^ 0x51ed270b) >>> 0);
   // The main town's centre: its high street and a square off it, kept clear of lots.
   const centre = chooseCentre(worldRoads, plans[0].roads, plans[0].centre, ground, 0, (x, z) => !spec.classic && land.slope(land.cell(x, z)) > PLACE_STEEP);
   const inCentre = (f: Frontage) => !!centre && inside(centre.poly, f.p[0] + f.n[0] * 10, f.p[1] + f.n[1] * 10);
@@ -1432,7 +1431,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   };
   // The named places' lots, from a stream of their own (`namedLots`): with no room in their area, along the
   // country roads leaving it, where they run straight over gentle land.
-  const placeRand = random(((lay?.townSeed ?? seed) ^ PLACES) >>> 0);
+  const placeRand = mulberry32(((lay?.townSeed ?? seed) ^ PLACES) >>> 0);
   const ways = worldRoads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : []));
   /**
    * Each area's named places to go down on what its homes leave once every home has found room: the main
@@ -1647,7 +1646,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   }
 
   // ---- the named places' names: each lot as its place is called, none twice -------------------
-  nameLots(content, slots, plans, worldRoads, spec.civic, random(((lay?.townSeed ?? seed) ^ PLACE_NAMES) >>> 0));
+  nameLots(content, slots, plans, worldRoads, spec.civic, mulberry32(((lay?.townSeed ?? seed) ^ PLACE_NAMES) >>> 0));
 
   // ---- the centre made the densest: narrowed to its high street where the land round it is the emptier ----
   if (centre && !spec.classic) densestCentre(centre, worldRoads, W, D, waterMask, allGreens, slots.map((s) => ({ rect: rectOf(s), built: !!s.dress && (s.kind === 'shop' || s.kind === 'flats') })), plans[0].rect);
@@ -1724,7 +1723,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const areas: TownArea[] = plans.map((p) => ({ name: p.name, kind: 'hamlet', x: p.rect.x, z: p.rect.z, w: p.rect.w, d: p.rect.d }));
   // (The landscape round the world: its sea or lake is in the zones now. A place's from its own
   // stream; its mountains as high as the massif.)
-  const { water: _water, ...landscape } = spec.landscape(spec.classic ? rand : random((seed ^ LOOK) >>> 0), W, D, waterSide);
+  const { water: _water, ...landscape } = spec.landscape(spec.classic ? rand : mulberry32((seed ^ LOOK) >>> 0), W, D, waterSide);
   if (!spec.classic && massif) landscape.mountains = Math.round(massif);
   const relief = spec.classic ? undefined : reliefOf(land, slots.map(rectOf), shaped ? 0 : undefined);
   const signed = spec.classic || shaped ? undefined : heightsOf(land, slots.map(rectOf), worldRoads);
@@ -2195,10 +2194,10 @@ function planned(spec: WorldSpec, seed: number): Planned {
   const land = new Cells(W, D);
   const { gw, gd } = land;
   const nseed = (seed % 100000) + 17;
-  const rand = random((seed ^ PLAN) >>> 0);
+  const rand = mulberry32((seed ^ PLAN) >>> 0);
   const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
   const valley = !!spec.massif;
-  const massif = spec.massif ? range(random((seed ^ MASSIF) >>> 0), ...spec.massif) : 0;
+  const massif = spec.massif ? range(mulberry32((seed ^ MASSIF) >>> 0), ...spec.massif) : 0;
   const valleyZ = (x: number) => D / 2 + (fbm(x / 420, 3.7, nseed + 3, 3) - 0.47) * 260;
   for (let i = 0; i < gw * gd; i++) {
     const [x, z] = land.centre(i);
@@ -2259,7 +2258,7 @@ function planned(spec: WorldSpec, seed: number): Planned {
   if (spec.water === 'river') {
     // (Calm along the site's reach; room for the town between it and the world's edge, on its bank.)
     const room = EDGE / 2 + box.d + 40;
-    riverPlan = { ...riverDrawn(random((seed ^ RIVER) >>> 0), D, side === 'zmax' ? [room, D] : [0, D - room]), reach: [round2(spotX - box.w / 2), round2(spotX + box.w / 2)] };
+    riverPlan = { ...riverDrawn(mulberry32((seed ^ RIVER) >>> 0), D, side === 'zmax' ? [room, D] : [0, D - room]), reach: [round2(spotX - box.w / 2), round2(spotX + box.w / 2)] };
     river = riverOf(riverPlan, W, nseed);
     for (let i = 0; i < gw * gd; i++) {
       const [x, z] = land.centre(i);
@@ -2403,10 +2402,10 @@ function planned(spec: WorldSpec, seed: number): Planned {
 function bareDraft(content: Content, spec: WorldSpec, seed: number): NeighbourhoodDraft {
   const { plan, land, waterPolys, woods, meadow, hills } = planned(spec, seed);
   const { W, D, gw, gd } = land;
-  const rand = random(seed);
+  const rand = mulberry32(seed);
   const name = worldName(content, spec.names, rand);
   const tagline = worldTagline(content, spec, rand);
-  const { water: _water, ...landscape } = spec.landscape(random((seed ^ LOOK) >>> 0), W, D, plan.side);
+  const { water: _water, ...landscape } = spec.landscape(mulberry32((seed ^ LOOK) >>> 0), W, D, plan.side);
   if (plan.massif) landscape.mountains = Math.round(plan.massif);
   const zones: WorldZone[] = [
     ...waterPolys.map((poly): WorldZone => ({ kind: 'water', poly })),

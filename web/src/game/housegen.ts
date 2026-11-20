@@ -4,7 +4,7 @@ import { between, mulberry32 as random, pick } from './noise';
 import type { HouseGenConfig, Furnishing, HouseClass, GardenSize, GardenSpec, RoomKind, Kind, RoomSpec, Slot, CounterRun, TableSet, TopSlot, ObjectInfo, ObjectInfos, Rect, Room, Floor } from './housegenShared';
 import { ROW_GAP, crownClear, usableAt, key } from './housegenShared';
 export type { HouseGenConfig, Residents, Furnishing, GardenSize, GardenSpec, ObjectInfo, ObjectInfos } from './housegenShared';
-export { GARDEN_SIZES, residentsKey, ROW_GAP, crownClear, objectInfos, random } from './housegenShared';
+export { GARDEN_SIZES, residentsKey, ROW_GAP, crownClear, objectInfos } from './housegenShared';
 export function generateHouse(
   cfg: HouseGenConfig,
   info: ObjectInfos,

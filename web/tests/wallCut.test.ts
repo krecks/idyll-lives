@@ -10,7 +10,8 @@ import { expect, test } from 'bun:test';
 import type { DiagonalWall, Opening, WallEdge, WorldStructure } from '../src/core/protocol';
 import { Cut } from '../src/render/shared/geometry';
 import { CUTAWAY } from '../src/render/pc/shaders/cutaway';
-import { HOUSE_LOOK, HousePlanner, WALL_HALF, WALL_HEIGHT, WALL_STUB, type HousePlan } from '../src/render/shared/house';
+import { HOUSE_LOOK, HousePlanner, WALL_STUB, type HousePlan } from '../src/render/shared/house';
+import { WALL_HALF, WALL_HEIGHT } from '../src/render/shared/walls';
 
 /** Downstairs: a doorway whose first jamb is at the back wall (the wall along row 2). */
 const MEETS = { x: 5, z: 2 };

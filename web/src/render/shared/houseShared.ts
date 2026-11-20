@@ -67,7 +67,6 @@ export interface HousePart {
   glass: boolean;
 }
 
-export { WALL_HALF, WALL_HEIGHT };
 export const WALL_STUB = 0.35;
 export const T = WALL_HALF; // half wall thickness (sim-core WALL_THICKNESS / 2)
 /** How far a post's face against a wall sits inside it (m): its edges on the wall's faces showed as lines. */
