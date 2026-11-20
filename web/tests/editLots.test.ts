@@ -260,7 +260,7 @@ describe('lot edits', async () => {
 
   test("a lot's garden, house, public place and a civic place's lot changed", () => {
     // The garden: the same house, its lot cut again with its front where it was.
-    const home = hamlet.slots.find((s) => s.kind === 'house' && s.template.startsWith('gen:') && s.lot !== 'farm' && s.lot !== 'terrace' && s.garden !== 'snug')!;
+    const home = hamlet.slots.find((s) => s.kind === 'house' && s.template.startsWith('gen:') && s.lot !== 'farm' && s.lot !== 'terrace' && s.garden !== 'snug' && s.garden !== 'tight')!;
     const snug = made(lots.setGarden(hamlet, t, home.index, 'snug'));
     const cut = snug.slots[home.index];
     expect(cut.garden).toBe('snug');
