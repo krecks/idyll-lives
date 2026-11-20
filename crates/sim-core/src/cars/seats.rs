@@ -25,7 +25,7 @@ pub(crate) fn seat(
     }
     if me
         .plot
-        .is_none_or(|p| crate::world::at_home(plots, Some(home), p))
+        .is_none_or(|p| crate::world::at_home(plots, Some(home), p, me.hall))
         && let Some(seat) = own_seat(cars, briefs, plots, sim, me, home)
     {
         return Some(seat);
@@ -86,7 +86,7 @@ pub(crate) fn own_seat(
         // At home, or still close by on the street.
         let near = me
             .plot
-            .is_some_and(|p| crate::world::at_home(plots, Some(home), p))
+            .is_some_and(|p| crate::world::at_home(plots, Some(home), p, me.hall))
             || (sim.pos[0] - car.spot[0]).hypot(sim.pos[1] - car.spot[1]) < CALL_REACH;
         // (Not one setting off on a trip: `trip_ride`.)
         if car.household != sim.household

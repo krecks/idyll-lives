@@ -800,16 +800,23 @@ pub(crate) fn order_access(
     let home = households[sim.household as usize].plot;
     match plot {
         None => Access::Full,
-        Some(p) if plots[p as usize].public || at_home(plots, home, p) => Access::Full,
+        Some(p) if plots[p as usize].public || at_home(plots, home, p, false) => Access::Full,
         _ => access_in(households, plots, sim, plot),
     }
 }
 
-/// Whether plot `p` is home to those living on `home`: it, or the building their flat is in (its
-/// hall, stairs, yard and front strip). What they may use there (`access`), and where a household
-/// sets off in its car from: a flat's car stands in its bay in the building's front strip.
-pub(crate) fn at_home(plots: &[Plot], home: Option<u32>, p: u32) -> bool {
-    home.is_some_and(|h| h == p || plots.get(h as usize).and_then(|f| f.of) == Some(p))
+/// Whether plot `p` is home to those living on `home`: it, or the building their flat is in
+/// when that is a building of flats (its hall, stairs, yard and front strip). A public place with
+/// flats over it is never home, though their flat is over it: only its stair hall is (`hall`:
+/// they stand in it, `SimBrief::hall`), not the shop's or the café's floor, where they are
+/// customers like anyone. What they may use there (`access`), and where a household sets off in
+/// its car from: a flat's car stands in its bay in the building's front strip.
+pub(crate) fn at_home(plots: &[Plot], home: Option<u32>, p: u32, hall: bool) -> bool {
+    home.is_some_and(|h| {
+        h == p
+            || plots.get(h as usize).and_then(|f| f.of) == Some(p)
+                && (hall || plots.get(p as usize).is_some_and(|l| !l.public))
+    })
 }
 
 /// `access` outside a step.
@@ -830,7 +837,7 @@ pub(crate) fn access_in(
     }
     match plot {
         None => Access::Full,
-        Some(p) if plots[p as usize].public || at_home(plots, home, p) => Access::Full,
+        Some(p) if plots[p as usize].public || at_home(plots, home, p, false) => Access::Full,
         Some(p) if sim.visiting.is_some_and(|v| v.plot == p) => Access::Guest,
         Some(_) => Access::None,
     }

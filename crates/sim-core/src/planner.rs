@@ -1596,10 +1596,13 @@ pub(crate) fn place_wanted(
 /// Swaps `old` out for `id`: `old` is sold and `id` bought over the tiles it stood on, so the new
 /// thing stands in the old one's place. If it won't go there, it's put anywhere now free; if even
 /// that doesn't fit, `old` goes back as it was. Only for something nothing stands on and nobody
-/// uses.
+/// uses, standing on their own plot: not one a flat keeps outside it (its letterbox by the
+/// building's door, `ObjectInstance::keeper`), whose place is not the flat's to buy on nor to put
+/// it back on (`replace_at_home`), so it would be sold and lost.
 fn swap_in(w: &mut World, h: u32, old: u32, id: &str, charge: bool) -> Option<u32> {
     let o = w.objects.get(old as usize)?.clone();
-    if o.users.iter().any(Option::is_some)
+    if o.keeper.is_some()
+        || o.users.iter().any(Option::is_some)
         || !crate::surface::riders(&w.content, &w.objects, old).is_empty()
     {
         return None;

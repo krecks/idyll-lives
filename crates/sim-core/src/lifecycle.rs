@@ -412,7 +412,7 @@ fn may_move(w: &World, i: usize) -> bool {
 fn vacant_plot(w: &World, n: usize) -> Option<u32> {
     w.plots
         .iter()
-        .filter(|p| p.is_home())
+        .filter(|p| w.is_home(p.id))
         .filter(|p| {
             !w.households
                 .iter()
@@ -583,7 +583,7 @@ fn moving(w: &mut World, rules: &crate::content::MovingRules) {
 /// household now and then. They come in at the street door (a flat's building's).
 fn newcomers(w: &mut World, rules: &crate::content::NewcomerRules) {
     for p in 0..w.plots.len() as u32 {
-        if !w.plots[p as usize].is_home()
+        if !w.is_home(p)
             || beds(w, p).most(grown_stage(w)) == 0
             || w.households
                 .iter()

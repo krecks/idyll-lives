@@ -501,7 +501,7 @@ pub(crate) fn exit_on_foot(ctx: &Ctx, sim: &Sim) -> Option<[f32; 2]> {
         && ctx
             .briefs
             .get(sim.id as usize)
-            .is_some_and(|b| b.plot.is_none_or(|p| at_home(ctx.plots, home, p)))
+            .is_some_and(|b| b.plot.is_none_or(|p| at_home(ctx.plots, home, p, b.hall)))
     {
         return Some(exit);
     }

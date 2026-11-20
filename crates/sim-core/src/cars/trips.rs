@@ -35,7 +35,7 @@ pub(crate) fn can_drive(
         && briefs.get(sim.id as usize).is_some_and(|b| {
             b.adult
                 && b.plot
-                    .is_some_and(|p| crate::world::at_home(plots, Some(home), p))
+                    .is_some_and(|p| crate::world::at_home(plots, Some(home), p, b.hall))
         })
         && cars.iter().any(|car| {
             car.household == sim.household
@@ -77,7 +77,7 @@ pub(crate) fn trip_car(
     if !me.adult
         || !me
             .plot
-            .is_some_and(|p| crate::world::at_home(ctx.plots, Some(home), p))
+            .is_some_and(|p| crate::world::at_home(ctx.plots, Some(home), p, me.hall))
     {
         return None;
     }
@@ -661,7 +661,7 @@ pub(crate) fn trip_ride(
     })?;
     let near = me
         .plot
-        .is_some_and(|p| crate::world::at_home(ctx.plots, Some(home), p))
+        .is_some_and(|p| crate::world::at_home(ctx.plots, Some(home), p, me.hall))
         || crate::travel::dist(sim.pos, car.spot) < CALL_REACH;
     let c = c as u32;
     // A seat of their own: after those in it and on their way to it.

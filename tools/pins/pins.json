@@ -86,16 +86,16 @@
     {
       "name": "sim-planner",
       "file": "crates/sim-core/src/planner.rs",
-      "sha256": "42601b843ee9b66052a94abd7ff6d3e791bfef20b7aa631b41f8c12017b41f87",
-      "by": "setup",
-      "reason": "household behaviour: not this run's to change"
+      "sha256": "c15a2d24851345638777a37633330d607c627f870bfc527cbdb1e893dd30c290",
+      "by": "real-town-review",
+      "reason": "owner's choice (real-town code review): a thing a flat keeps outside it (its letterbox by the building's door) is not swapped in over its place by swap_in, so a failed swap no longer sells and loses it"
     },
     {
       "name": "sim-lifecycle",
       "file": "crates/sim-core/src/lifecycle.rs",
-      "sha256": "3fea8575ace2dce6e4bd66caec5823a1e382d0d6bea65dcb05c547c4ef46382c",
-      "by": "real-town-t1",
-      "reason": "owner's OK, real town: newcomers and movers take a vacant home, a house or a flat (Plot::is_home), and arrive at a flat's own door (Plot::home_point) (S1)"
+      "sha256": "b3e68f15195f9c508f8238311e79b0fbe1333c1e26246b5fd9256c69e777dd82",
+      "by": "real-town-review",
+      "reason": "owner's choice (real-town code review): newcomers and movers ask World::is_home, so a lot with flats in it is nobody's home whatever its kind or with none"
     },
     {
       "name": "sim-hosting",

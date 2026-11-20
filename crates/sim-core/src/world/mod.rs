@@ -1864,12 +1864,6 @@ impl Plot {
         self.of.unwrap_or(self.id)
     }
 
-    /// Whether someone may live on it: not a public place, nor a building of flats (its hall,
-    /// stairs and yard are its flats'; each flat is a home of its own).
-    pub fn is_home(&self) -> bool {
-        !self.public && self.kind != Some(crate::travel::PlotKind::Flats)
-    }
-
     /// Whether the place on it is open at `minute` of day `day` (`clock::day`, `clock::minute_of_day`):
     /// always without hours. Hours past midnight count for the day they opened on.
     pub fn open_at(&self, day: u32, minute: f32) -> bool {
@@ -2087,6 +2081,9 @@ pub(crate) struct SimBrief {
     /// from the whole of every resident again (`privacy::refresh`).
     pub carried: bool,
     pub private: Option<(u32, usize)>,
+    /// In the stair hall (or on its landings) of a public place with flats over it
+    /// (`path::Halls`): on the place's lot, but not in the place (`world::at_home`).
+    pub hall: bool,
 }
 
 /// Who belongs to each household by the tick's briefs (`SimBrief::household`), built with them:
@@ -2588,11 +2585,7 @@ impl World {
                 inside: p.inside,
             })
             .collect();
-        check_flats(
-            &world.plots,
-            i32::from(storeys),
-            &world.stairs,
-        )?;
+        check_flats(&world.plots, i32::from(storeys), &world.stairs)?;
         world.map_plots();
         let starting_funds = world.content.starting_funds;
         world.households = if lot_file.households.is_empty() {
@@ -3123,6 +3116,16 @@ impl World {
     /// The flats, in id order after every lot on the ground (`flats_of`).
     pub fn flats(&self) -> &[Plot] {
         flats_of(&self.plots)
+    }
+
+    /// Whether someone may live on plot `p`: not a public place, nor a lot with flats in it
+    /// (`flats_in`) or of the kind for them (its hall, stairs and yard are its flats'; each flat
+    /// is a home of its own), whatever kind the town file gives it, or none.
+    pub fn is_home(&self, p: u32) -> bool {
+        self.plots
+            .get(p as usize)
+            .is_some_and(|plot| !plot.public && plot.kind != Some(crate::travel::PlotKind::Flats))
+            && self.flats_in.get(p as usize).is_none_or(|&k| k == 0)
     }
 
     /// The plot a tile is on (on any storey): the lot on the ground there, and in a building with
@@ -5265,14 +5268,15 @@ impl World {
         briefs.clear();
         for s in &self.sims {
             let (x, z) = s.tile();
-            let plot = self.plot_at(x, z);
+            let plot = self.plot_at(x, z).filter(|_| s.here());
+            let hall = plot.is_some_and(|p| self.halls.at(p, x, self.ground_z(z)).is_some());
             let available = s.here() && s.available_for_social(&self.content);
             briefs.push(SimBrief {
                 pos: s.pos,
                 available,
                 gender_ix: s.gender_ix,
                 household: s.household,
-                plot: plot.filter(|_| s.here()),
+                plot,
                 away: s.away_until.is_some() || !s.here(),
                 leaving: crate::life::leaving_home(self, s),
                 baby: s.here() && self.content.life.baby(s.age),
@@ -5315,6 +5319,7 @@ impl World {
                 },
                 carried: s.carried_by.is_some(),
                 private: crate::privacy::private_use(&self.content, &self.objects, s),
+                hall,
             });
         }
         // Who's in a conversation, and whose (for joining in).
