@@ -63,8 +63,8 @@ bun tools/bench/render.mjs --preview --throttle 1,3
 bun tools/bench/render.mjs --preview --shots /tmp/shots-new --presets medium
 bun tools/bench/render.mjs --compare /tmp/shots-base /tmp/shots-new --out /tmp/shots-diff
 
-# A new scene
-bun tools/bench/scene.mjs --name village --world country --hour 18
+# A new scene (the bench's village, as made for save format 42)
+bun tools/bench/scene.mjs --name village --world country --hour 18 --seed 7
 
 # The real game (a debug state), 90 s at 5x speed, Medium
 bun tools/bench/profile.mjs --state readme-village --speed 5 --secs 90 --preset medium
