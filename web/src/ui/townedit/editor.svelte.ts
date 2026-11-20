@@ -30,6 +30,7 @@ import { EditSession, type SettleTiming } from './session';
 import { settle, type Settled } from './settle';
 import { toolsFor, type EditStep, type TownEditor, type TownStageTool, type TownTool, type TownToolId } from './tools';
 import { sentence } from './words';
+import { DEBUG_HOOKS } from '../../debug/hooks';
 
 /** What the screen gives the editor: its step, the town's name as the step's field has it, and the camera's glide to a lot of the town on screen. */
 export interface EditorHooks {
@@ -80,7 +81,7 @@ export class TownEditorState implements TownEditor {
     this.step = hooks.step ?? 'build';
     this.tools = toolsFor(this.step);
     // (The bench drives the editor and reads its settles' timings: `tools/bench/create.mjs`.)
-    if (import.meta.env.DEV) Object.assign(globalThis, { __townEditor: this });
+    if (DEBUG_HOOKS) Object.assign(globalThis, { __townEditor: this });
     void loadTemplates().then((t) => {
       this.templates = t;
       this.changed();

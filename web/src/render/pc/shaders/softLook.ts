@@ -26,6 +26,7 @@ import { RESIDENT_LIGHT } from './character';
 import { ROOM } from './envBrdf';
 import { SPECULAR_UNITS } from '../lightUnits';
 import { tuned } from '../../tune';
+import { DEBUG_HOOKS } from '../../../debug/hooks';
 
 const LUM = { glsl: 'vec3(0.2126, 0.7152, 0.0722)', wgsl: 'vec3f(0.2126, 0.7152, 0.0722)' };
 
@@ -332,11 +333,11 @@ export function shadingFromSettings(): Shading {
   return softLookWanted() ? 'soft' : 'classic';
 }
 
-/** `?look=soft|classic|pbr` on the dev server: the look to draw whatever the setting says (read once). */
+/** `?look=soft|classic|pbr` on the dev server (or the benchmark's build): the look to draw whatever the setting says (read once). */
 const LOOKS: Record<string, Shading> = { soft: 'soft', classic: 'classic', pbr: 'classic' };
 let askedLook: Shading | null | undefined;
 export function softLookFromURL(): Shading | null {
-  if (!import.meta.env.DEV) return null;
+  if (!DEBUG_HOOKS) return null;
   if (askedLook === undefined) askedLook = LOOKS[new URLSearchParams(location.search).get('look') ?? ''] ?? null;
   return askedLook;
 }

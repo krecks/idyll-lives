@@ -9,7 +9,7 @@
  * - `startup`: browser launch → the main menu shown (the loading screen gone);
  * - `entry`: "New game" → "Lay out the streets" → "Build the town" → "Choose a household" → that
  *   household's "Play" → step 5's "Move in" → the game interface up (`.hud-root`, the loading screen gone);
- * - `steady`: `--secs` seconds from the entry (default 300), sampled every second.
+ * - `steady`: `--secs` seconds from the entry (default 150), sampled every second.
  *
  * What is sampled:
  * - frames: every `requestAnimationFrame` timestamp in the page (raw gaps kept), and the renderer's
@@ -50,13 +50,13 @@
  *
  *   bun tools/bench/gameplay.mjs [options]
  *     --runs 2                 full runs (each in a fresh context), compared at the end
- *     --secs 300               steady state after the household is entered
+ *     --secs 150               steady state after the household is entered
  *     --seed 7                 the page's Math.random seed
  *     --code country-lrstm-7   the world's code (`?code=`): the countryside as a new player gets it, at seed 7
  *     --world country --options town=city   step 1's place and options instead of a code
  *     --home house             the household's home: a `house`, a `flat`, or `any`
  *     --household 0            which household's Play is pressed (its index among those of that home)
- *     --reads 30,90,150,210,270   the collected reads, seconds of play into the steady window (`none`: no reads)
+ *     --reads 30,70,110,140    the collected reads, seconds of play into the steady window (`none`: no reads)
  *     --preset medium          graphics preset (low, medium, high)
  *     --renderer webgpu        or webgl
  *     --hud 1                  the interface shown
@@ -71,7 +71,9 @@
  *     --no-dumps               no memory-infra dumps (they pause the processes for a moment)
  *     --lowmem                 the page as on an 8 GB machine (`?lowmem`)
  *     --voices                 the residents' voices on (the setting; off by default)
- *     --prod                   a production build made for the benchmark (`VITE_BENCH_STATS=1`), served by `vite preview`
+ *     --prod                   a production build made for the benchmark (`lib/build.mjs`: `VITE_BENCH=1`, kept in
+ *                              bench-results/.dist and reused while web/ is the same), served by `vite preview`; its
+ *                              textures are the sources unless `--assets prod`
  *
  * Needs the dev server (the `?gpustats` hook is dev-only), so `--url` must point at one; or `--prod`.
  */
@@ -84,6 +86,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { quiet } from './quiet.mjs';
 import { worldFlags } from './worldFlags.mjs';
+import { benchBuild } from './lib/build.mjs';
 
 const STARTED = Date.now();
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -96,7 +99,7 @@ const flag = (name, fallback) => {
 const has = (name) => args.includes(`--${name}`);
 
 const runs = Number(flag('runs', '2'));
-const secs = Number(flag('secs', '300'));
+const secs = Number(flag('secs', '150'));
 const seed = Number(flag('seed', '7'));
 const pick = Number(flag('household', '0'));
 // The world: a code (the same land, town and people on every build that reads codes alike), or step 1's
@@ -108,7 +111,7 @@ const worldQuery = [made.world ? `world=${made.world}` : '', made.query ? `optio
 /** The kind of home the household played lives in: `house` (a house's lot), `flat`, or `any`. */
 const homeKind = flag('home', 'house');
 /** The collected reads, seconds of play into the steady window. */
-const readsFlag = flag('reads', '30,90,150,210,270');
+const readsFlag = flag('reads', '30,70,110,140');
 const readsAt = readsFlag === 'none' ? [] : readsFlag.split(',').map(Number);
 const preset = flag('preset', 'medium');
 const renderer = flag('renderer', 'webgpu');
@@ -137,13 +140,13 @@ if (has('help') || args.includes('-h')) {
   console.log(`Usage: bun tools/bench/gameplay.mjs [options]
 
   --runs 2                 full runs (each in a fresh context), compared at the end
-  --secs 300               steady state after the household is entered
+  --secs 150               steady state after the household is entered
   --seed 7                 the page's Math.random seed
   --code country-lrstm-7   the world's code (?code=): the countryside as a new player gets it, at seed 7
   --world country --options town=city   step 1's place and options instead of a code
   --home house             the household's home: a house, a flat, or any
   --household 0            which household's Play is pressed (its index among those of that home)
-  --reads 30,90,150,210,270   the collected reads (paused, collected, then measured), seconds into the steady window; none: no reads
+  --reads 30,70,110,140    the collected reads (paused, collected, then measured), seconds into the steady window; none: no reads
   --preset medium          graphics preset (low, medium, high)
   --renderer webgpu        or webgl
   --hud 1                  the interface shown (0 hides it)
@@ -169,7 +172,7 @@ const bad = (msg) => {
   process.exit(2);
 };
 if (!Number.isInteger(runs) || runs < 1) bad(`--runs must be a positive integer, not ${JSON.stringify(flag('runs', '2'))}`);
-if (!(secs > 0)) bad(`--secs must be a positive number, not ${JSON.stringify(flag('secs', '300'))}`);
+if (!(secs > 0)) bad(`--secs must be a positive number, not ${JSON.stringify(flag('secs', '150'))}`);
 if (!Number.isInteger(seed)) bad(`--seed must be an integer, not ${JSON.stringify(flag('seed', '7'))}`);
 if (!Number.isInteger(pick) || pick < 0) bad(`--household must be a non-negative index, not ${JSON.stringify(flag('household', '0'))}`);
 if (!['low', 'medium', 'high'].includes(preset)) bad(`--preset must be low, medium or high, not ${preset}`);
@@ -241,11 +244,13 @@ let serverMode = 'reused';
 const base = flag('url', null) ?? `http://localhost:${port}`;
 let serverReadyAt = STARTED;
 if (prod) {
-  // A build of this tree with the benchmark's hooks kept (`VITE_BENCH_STATS=1`), served as a release is.
-  const dist = join(out, 'dist');
-  console.log(`building for --prod into ${dist} …`);
-  const built = spawnSync(`${WEB}node_modules/.bin/vite`, ['build', '--outDir', dist, '--emptyOutDir'], { cwd: WEB, stdio: 'inherit', env: { ...process.env, VITE_BENCH_STATS: '1' } });
-  if (built.status !== 0) bad('the --prod build failed');
+  // This tree's build for the benchmark (`lib/build.mjs`: `VITE_BENCH=1`, made once while web/ is the same), served as a release is.
+  let dist;
+  try {
+    dist = (await benchBuild({ assets: flag('assets', 'source') })).dir;
+  } catch (err) {
+    bad(`the --prod build failed: ${err.message}`);
+  }
   if (await running(base)) bad(`--prod: something already answers on ${base} (pick a free --port)`);
   serverMode = 'preview';
   server = spawn(`${WEB}node_modules/.bin/vite`, ['preview', '--outDir', dist, '--port', String(port), '--strictPort'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] });

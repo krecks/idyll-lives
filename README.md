@@ -64,8 +64,8 @@ The first `bun run dev` or `bun run build` downloads the voice model (398 MB as 
 |---|---|
 | `bun run dev` | `wasm`, `sound`, `voice` and `llm`, then the dev server |
 | `bun run build` / `bun run preview` | Production build / serve it |
-| `bun run wasm` | Build the simulation's WASM (release, `--locked`) |
-| `bun run sound` | Build the sounds' WASM (`crates/sound`: every sound the game makes; the tests that make sounds need it too) |
+| `bun run wasm` | Build the simulation's WASM (release, `--locked`), or copy it from the cache of packages already built (below) |
+| `bun run sound` | Build the sounds' WASM (`crates/sound`: every sound the game makes; the tests that make sounds need it too), or copy it from the cache |
 | `bun run voice` | Build the voice WASM and fetch the voice model and dictionary (`cargo fetch-voice`) |
 | `bun run llm` | Fetch the language model (`cargo fetch-llm`) |
 | `bun run check` | Type-check TypeScript and Svelte |
@@ -83,6 +83,18 @@ The first `bun run dev` or `bun run build` downloads the voice model (398 MB as 
 | `bun ../tools/llm/bench.mjs` | Benchmark the language model on its own: the game's worker, model and prompts with no game around it (load, prompt, tokens a second, the game's five lines), cold and with the page reloaded; `--cpu` on the processor; writes `bench-results/llm-*/` |
 | `bun run assets` | Build or update the compressed asset copies (the build does this too) |
 | `bun run decoders` | Refresh `public/decoders` (PlayCanvas's Basis Universal transcoder for KTX2 textures) after a PlayCanvas upgrade (`cargo decoders`) |
+
+**The WASM packages are kept between checkouts.** `bun run wasm`, `bun run sound` and `bun run voice:wasm` go through `tools/wasm-cache.sh sim|sound|voice`: a package is kept under `~/.cache/idyll-lives/wasm-pkg/<pkg>/<key>/`, its key a hash of what it is built from (its crates' git trees, the uncommitted changes and untracked files in them, the workspace's `Cargo.toml`, `Cargo.lock`, `.cargo/` and `rust-toolchain.toml`, and the versions of rustc and wasm-bindgen). A worktree whose crates match one built before copies it (0.2 s) instead of building it (the simulation's: 80 s from nothing on an M3 Pro, fat LTO in one unit, so even a small change to sim-core costs most of that); one that doesn't builds it in its own `target/` under the key's lock and keeps it. The newest 12 of each are kept. `LL_WASM_CACHE=0` builds without it, and CI (`$CI` set) does unless `LL_WASM_CACHE=1`.
+
+**sccache for the tests and clippy (local, opt-in).** Cargo's test, clippy and tool builds can share compiled crates between worktrees through sccache (`brew install sccache`), not in `.cargo/config.toml` (the CI runner has none). Its base directories must name every worktree, so a crate's paths are the same in each; the server reads them when it starts:
+
+```sh
+export RUSTC_WRAPPER=sccache CARGO_INCREMENTAL=0
+export SCCACHE_BASEDIRS=$(git worktree list --porcelain | sed -n 's/^worktree //p' | paste -sd: -)
+sccache --stop-server; sccache --start-server   # again after adding a worktree
+```
+
+A fresh worktree's first `cargo test -p sim-core --no-run` then took 30 s instead of 69 s (2026-11-20, all 13 cacheable compiles hit; what is left is linking the test binaries, which sccache can't keep). Without the base directories sccache hits only the registry's crates (9 of 13) and saves nothing (65 s). It never helps the WASM packages: their final crate links, with fat LTO.
 
 From the repo root: `cargo fmt --all` (CI checks the code is formatted) and `cargo clippy --workspace --all-targets -- -D warnings` (CI gates on it), `bun tools/bench/render.mjs` (the rendering benchmark and reference screenshots, see [tools/bench/README.md](tools/bench/README.md)) and `cargo release-version` (the version, see [Versions and releasing](#versions-and-releasing)).
 

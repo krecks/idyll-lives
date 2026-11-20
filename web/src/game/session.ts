@@ -11,6 +11,7 @@ import { flatOf, groundDepth, lotOf, lowestStorey, storeyRow } from '../core/pro
 import { townMap } from '../ui/townMap.svelte';
 import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { BENCH } from '../debug/benchFlags';
+import { DEBUG_HOOKS } from '../debug/hooks';
 import { GAMEPLAY_STATS, installGameplayStats } from '../debug/gameplayStats';
 import { installPlaceHooks } from '../debug/places';
 import { tileWorld } from '../debug/tileWorld';
@@ -1117,6 +1118,8 @@ async function openSession(
     Object.assign(window, { __controls: controls, __showPlot: showPlot, __world: () => withLamps(world), __send: (cmd: Command) => bridge.send(cmd), __items: () => itemsSeen });
     // `__places()` and `__lookInside(name, storey?)`: the named places' lots, looked inside by name (dev only).
     installPlaceHooks(controls, () => world);
+    // `__bench`: the benchmark's poses, hours, freeze, settle and counts on this page (`debug/bench.ts` `BenchApi`).
+    if (!BENCH) void import('../debug/bench').then((m) => m.installDebugBench(renderer, controls));
     // `__sims()`: every resident as the newest snapshot shows them (where, pose, the object and use,
     // needs; `debug/sims.ts`), to wait on; `__content` the game's content (`__content.object(id)`).
     // `__addFunds(amount)`: money for the player's household. `__customise(id)`: the colour studio
@@ -2262,8 +2265,8 @@ async function openSession(
     },
   };
   session.applySettings(settings);
-  if (import.meta.env.DEV) {
-    // Test hook for automated browser checks; not present in production builds.
+  if (DEBUG_HOOKS) {
+    // Test hook for automated browser checks; not present in production builds (but the benchmark's).
     window.__osw = {
       simScreen(id: number) {
         const head = { x: 0, y: 0, z: 0 };
