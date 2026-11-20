@@ -437,10 +437,27 @@ const workerName = (url) => {
 };
 
 /**
- * `p`, or `fallback` once `ms` have passed: a read's every step has a limit, so a page or a DevTools call that
- * never answers (a busy page, a memory dump that never completes) costs a read, not the run.
+ * A read's step `step`: `p`, or `fallback` when it fails or `ms` pass first. Every step has a limit, so a page or a
+ * DevTools call that never answers (a busy page, a memory dump that never completes) costs a read, not the run; a step
+ * that missed is put in `missed` (the read's own list: the step and why) and said on the console, so a hang is found.
  */
-const within = (p, ms, fallback = null) => Promise.race([Promise.resolve(p).catch(() => fallback), sleep(ms).then(() => fallback)]);
+async function within(missed, step, p, ms, fallback = null) {
+  const late = Symbol('late');
+  let timer;
+  let why;
+  try {
+    const r = await Promise.race([p, new Promise((resolve) => (timer = setTimeout(resolve, ms, late)))]);
+    if (r !== late) return r;
+    why = `no answer in ${ms / 1000} s`;
+  } catch (err) {
+    why = String(err?.message ?? err).split('\n')[0];
+  } finally {
+    clearTimeout(timer);
+  }
+  missed.push({ step, why });
+  console.warn(`  read: ${step}: ${why}`);
+  return fallback;
+}
 
 /** The workers' heaps summed (MB). */
 const workersSum = (heaps, key) => (heaps?.length ? +heaps.reduce((a, w) => a + (w[key] ?? 0), 0).toFixed(1) : null);
@@ -683,16 +700,19 @@ async function runOnce(n) {
    */
   const collectedRead = async (t) => {
     const began = Date.now();
+    /** The steps that failed or ran out of time (`within`). */
+    const missed = [];
     // (The speed the game had, as its top bar shows it: its buttons are speeds 0 to 4 in turn, as their keys.)
-    const speedKey = await within(page.evaluate(() => [...document.querySelectorAll('.speeds button')].findIndex((b) => b.getAttribute('aria-pressed') === 'true')), 15000, -1);
+    const speedKey = await within(missed, 'speed', page.evaluate(() => [...document.querySelectorAll('.speeds button')].findIndex((b) => b.getAttribute('aria-pressed') === 'true')), 15000, -1);
     await page.keyboard.press('0');
     await sleep(1000);
     // (The footprint as it stood, before anything was collected: what the reads at the window's edges used to be.)
     const uncollected = footprintMB(byRole(processTree(psTable(), browserPid ?? 0)).renderer?.pid);
     // What the page counts, read before the collection, so what reading it makes is collected too.
-    let counts = null;
-    try {
-      counts = await within(page.evaluate(async () => {
+    const counts = await within(
+      missed,
+      'counts',
+      page.evaluate(async () => {
         const osw = window.__osw;
         let town = null;
         try {
@@ -710,22 +730,19 @@ async function runOnce(n) {
           objects: osw?.objects?.().length ?? null,
           minute: osw?.snapshotMinute?.() ?? null,
         };
-      }), 15000);
-    } catch {}
-    let game = null;
-    let census = null;
-    try {
-      game = await within(page.evaluate(() => window.__gameStats?.() ?? null), 15000);
-      census = await within(page.evaluate(() => window.__memCensus?.() ?? null), 15000);
-    } catch {}
+      }),
+      15000,
+    );
+    const game = await within(missed, 'game stats', page.evaluate(() => window.__gameStats?.() ?? null), 15000);
+    const census = await within(missed, 'census', page.evaluate(() => window.__memCensus?.() ?? null), 15000);
     const collect = async () => {
-      await within(cdp.send('HeapProfiler.collectGarbage'), 15000);
-      await within(workers?.collect(), 15000);
+      await within(missed, 'collect garbage', cdp.send('HeapProfiler.collectGarbage'), 15000);
+      await within(missed, "collect the workers' garbage", workers?.collect(), 15000);
     };
     await collect();
     await collect();
     // (Chrome's own answer to a machine short of memory: caches dropped, free pages given back, and V8 collects again.)
-    await within(cdp.send('Memory.simulatePressureNotification', { level: 'critical' }), 15000);
+    await within(missed, 'memory pressure', cdp.send('Memory.simulatePressureNotification', { level: 'critical' }), 15000);
     await sleep(2000);
     await collect();
     await sleep(500);
@@ -734,17 +751,12 @@ async function runOnce(n) {
     const gpuFootprint = footprintMB(role.gpu?.pid);
     let dump = null;
     if (devtools) {
-      try {
-        const d = await within(memoryDump(devtools, true), 60000);
-        if (!d) throw new Error('the memory dump did not complete in 60 s');
-        dump = { renderer: d.processes[role.renderer?.pid] ?? null, gpu: d.processes[role.gpu?.pid] ?? null };
-      } catch (err) {
-        dump = { error: String(err).split('\n')[0] };
-      }
+      const d = await within(missed, 'memory dump', memoryDump(devtools, true), 60000);
+      dump = d ? { renderer: d.processes[role.renderer?.pid] ?? null, gpu: d.processes[role.gpu?.pid] ?? null } : { error: missed.at(-1)?.why ?? 'no dump' };
     }
-    const usage = await within(heapUsage(cdp), 15000);
-    const wh = workers ? await within(workers.heaps(), 15000) : null;
-    const pausedMinute = await within(page.evaluate(() => window.__osw?.snapshotMinute?.() ?? null), 15000);
+    const usage = await within(missed, 'heap usage', heapUsage(cdp), 15000);
+    const wh = workers ? await within(missed, "workers' heaps", workers.heaps(), 15000) : null;
+    const pausedMinute = await within(missed, 'paused minute', page.evaluate(() => window.__osw?.snapshotMinute?.() ?? null), 15000);
     await page.keyboard.press(String(speedKey > 0 ? speedKey : 1));
     const storage = census ? Object.values(census.storage) : [];
     const read = {
@@ -780,6 +792,7 @@ async function runOnce(n) {
           }
         : null,
       counts,
+      missed,
     };
     reads.push(read);
     raw(read);
