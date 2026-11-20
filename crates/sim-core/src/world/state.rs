@@ -516,3 +516,100 @@ impl World {
         self.nav_log.changed_since(seen, self.nav_version, rect)
     }
 }
+
+impl World {
+    /// The road network and the rest of the travel state from the town file's open-world
+    /// fields (on load too: the graph isn't saved).
+    pub(crate) fn set_travel(&mut self, file: crate::travel::OpenWorld) {
+        let mut travel = crate::travel::Travel::new(file, &self.meta);
+        travel.country_speed = self.content.cars.country_speed;
+        // Water and other ground nobody walks on: blocked underneath everything (`base_blocked`).
+        if let Some(terrain) = &travel.file.terrain {
+            travel.base_blocked = self.terrain_blocked(terrain);
+            for &i in &travel.base_blocked {
+                if let Some(b) = self.blocked.get_mut(i) {
+                    *b = true;
+                }
+            }
+        }
+        self.travel = travel;
+    }
+
+    /// Sizes the per-tile arrays (by slot: `Lot::tile_index`) to the lot's slots, after the lot
+    /// got new chunks (or was put back as it was before some, by an undo): new slots start
+    /// unblocked and clean.
+    pub(crate) fn sync_tile_arrays(&mut self) {
+        let slots = self.lot.tile_slots();
+        if self.blocked.len() != slots {
+            self.blocked.resize(slots, false);
+        }
+        if self.dirt.len() != slots {
+            self.dirt.resize(slots, 0.0);
+        }
+    }
+
+    /// The slot of tile `(x, z)` to write a per-tile value to (`blocked`, `dirt`): its chunk is
+    /// allocated first if it wasn't, and the per-tile arrays follow. Off the lot, the void slot
+    /// (which nothing may write to).
+    pub(crate) fn tile_slot_mut(&mut self, x: i32, z: i32) -> usize {
+        if self.lot.in_bounds(x, z) && self.lot.ensure_tile(x, z) {
+            self.sync_tile_arrays();
+        }
+        self.lot.tile_index(x, z)
+    }
+
+    /// `paths` from `meta.paths`.
+    pub(crate) fn note_paths(&mut self) {
+        self.paths = self.meta["paths"]
+            .as_array()
+            .map_or_else(Vec::new, |paths| {
+                paths
+                    .iter()
+                    .map(|r| {
+                        let k = |key: &str| r[key].as_f64().unwrap_or(0.0) as f32;
+                        [k("x"), k("z"), k("x") + k("w"), k("z") + k("d")]
+                    })
+                    .collect()
+            });
+    }
+
+    /// The context a resident's update has (`Ctx`), outside the residents' updates: everyone
+    /// else as they are now.
+    pub(crate) fn ctx(&self) -> Ctx<'_> {
+        let tick = self.tick;
+        Ctx {
+            content: &self.content,
+            nav: self.nav(),
+            reach: &self.reach,
+            nav_version: self.nav_version,
+            nav_log: &self.nav_log,
+            rels: &self.relationships,
+            briefs: &self.briefs,
+            members: &self.members,
+            households: &self.households,
+            plots: &self.plots,
+            tile_plot: &self.tile_plot,
+            object_plot: &self.object_plot,
+            index: &self.object_index,
+            exits: &self.exits,
+            travel: &self.travel,
+            cars: &self.cars,
+            lights: &self.traffic.lights,
+            taxis: &self.taxis,
+            autonomy: self.autonomy,
+            room_in_town: self.room_in_town(),
+            room_score: &self.room_score,
+            dirt: &self.dirt,
+            hour: crate::clock::hour(tick),
+            day: crate::clock::day(tick),
+            minute: crate::clock::minute_of_day(tick),
+            tick,
+            work: &self.work,
+            shut: &self.shut,
+            rooms: &self.rooms,
+            staff: &self.staff,
+            paths: &self.paths,
+            others: Others::all(&self.sims),
+        }
+    }
+}

@@ -1,674 +1,15 @@
-//! `cargo check-glb --against <rev|dir> [keys… | --family <f>] [--dir <built>]`: whether a build of the models is
-//! the build it is held against. The proof for moving the models' generator: it reads only `.glb` files, the packs
-//! and centres.json, and neither the generator that wrote the old files nor the one that wrote the new.
+//! The measurements themselves: geometry, surfaces, texels and shading.
 //!
-//!   cargo check-glb --against ref/blender                    every model of the working tree against that revision
-//!   cargo check-glb --against HEAD model.fridge model.oak    only these keys
-//!   cargo check-glb --against HEAD --family trees            the models of models/trees/ or packs/trees/
-//!   cargo check-glb --against ref/blender --dir target/art   the files under target/art in place of the working tree's
-//!
-//! The old side is a git revision (its files read with `git cat-file`), or, if git knows no such revision, a
-//! directory; the new side is the working tree, or `--dir`. A directory is a checkout's root (it has
-//! `web/public/assets`, and centres.json where the repo has it) or an assets root (`models/`, `packs/` and, if it
-//! has one, `centres.json` beside them). One without a `manifest.json` is a build of some models only: what it
-//! lacks is the working tree's, and without keys or a family only the models it has files for are compared.
-//! The content and furniture.json, which the gate reads beside the models, are the working tree's on both sides.
-//!
-//! Each model, and its far version, is one of:
-//! - `same`: the two files' digests are equal (`digest`: the same nodes, materials, triangles and clips to the
-//!   bit, in whatever order) and so are its pack entry and its centre;
-//! - `near`: every row of `METRICS` is within its limit (the constants below);
-//! - `CHANGED`: a row is not. Each is printed with its part, its value, its limit and the worst point (in the
-//!   part's own axes, which are glTF's: x is the game's -x), and the command exits 1.
-//!
-//! A row that is right as it is takes a line in tools/art/port-accepted.json, `{"<key>": {"<metric>": "<why>"}}`
-//! (a far version's key is `<key> far`, a manifest's its path under the assets), and is then printed as
-//! `accepted`. As with the gate's `accept`, one that names no row, gives no reason or is not needed is an error.
-//! But `decimated`, which says what a far version is (a decimation made it, which another build need not
-//! repeat): where the rows fail it, it is held to that rule in their place (`METRICS`); where they pass, it passes.
+//! Split from `against.rs` (see `mod.rs`).
 
-use super::digest;
-use super::glb::{Glb, R, parse_glb};
-use super::near::{self, Across, P3, Part, Rest, Surface, Tolerance};
-use super::py::{self, J, dirname, join, normpath, relpath};
-use super::{Facts, Finishes, Furniture, Paths};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::io::{BufRead, BufReader, Read, Write};
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-
-/// A node's origin may be this far off (m): a tenth of a millimetre, a quarter of what f32 keeps at 3 m, so
-/// only rounding passes (a picked fruit, a door's hinge and a hand's reach are fitted to origins).
-pub const ORIGIN: f64 = 1e-4;
-/// A node's turn at rest may be this far off (degrees): rounding, 0.2 mm at the end of a 1 m door.
-pub const REST_TURN: f64 = 0.01;
-/// A node's scale, at rest or in a clip, may be this far off: 1 mm on a part a metre long.
-pub const SCALE: f64 = 0.001;
-/// A material's base colour may be this far off per channel: one step of the 8 bits it is drawn with.
-pub const COLOUR: f64 = 1.0 / 255.0;
-/// A clip's first and last keys may be this far off (s): a sixteenth of a frame at 60 Hz, so no frame shows it.
-pub const CLIP_LENGTH: f64 = 0.001;
-/// The clips are compared where the game samples them (modelClips.ts): 60 times a second.
-pub const CLIP_HZ: f64 = 60.0;
-/// A part's place in a clip may be this far off at a sample (m), as its origin at rest.
-pub const CLIP_MOVE: f64 = 1e-4;
-/// A part's turn in a clip may be this far off at a sample (degrees): 2 mm at the end of a 1 m door, and what two
-/// ways of joining the same keys (an arc, a straight line) differ by between keys 5 degrees apart.
-pub const CLIP_TURN: f64 = 0.1;
-/// A perch may be this far off (m). The birds' recorded day (web/tests/birds.test.ts) takes them as written, so
-/// one that is off at all is said even where it passes.
-pub const PERCH: f64 = 0.001;
-/// A node's box, a model's size and its functional heights may be this far off (m): half a millimetre, an
-/// eighth of a pixel at the play camera, and under the gate's own slack everywhere.
-pub const BOUNDS: f64 = 0.0005;
-/// A material may have this share fewer or more triangles: a bevel or a hole's fill cut another way, not a part
-/// gone or doubled.
-pub const TRIANGLES: (f64, f64) = (-0.20, 0.10);
-/// Surface samples a square metre (one a square centimetre), and the fewest and the most for a part: enough to
-/// find a face of a square centimetre, bounded so the largest tree takes a second.
-pub const SAMPLES: (f64, usize, usize) = (1e4, 2000, 50000);
-/// A part's surface may lie this far from the other build's on average (m): a whole part moved by a quarter of a
-/// millimetre fails.
-pub const SURFACE_MEAN: f64 = 0.0002;
-/// No point of a part may be further than this from the other build's surface (m): half a pixel at the play
-/// camera, room for a bevel's band cut another way.
-pub const SURFACE_MAX: f64 = 0.002;
-/// The same for a moving part and for fruit (m): a hand, a hinge or a lid is fitted to them
-/// (web/src/render/shared/characters/clips/uses.ts `FRUIT`, `HARVEST_APPLE`).
-pub const SURFACE_FITTED: f64 = 0.0005;
-/// Materials that are fruit a resident reaches for (their names start so): held to `SURFACE_FITTED`.
-pub const FRUIT: [&str; 3] = ["fruit", "apple", "lemon"];
-/// A normal turned by more than this (degrees) shows as another shade; a bevel's band rounded another way stays under.
-pub const NORMAL_TURN: f64 = 15.0;
-/// The share of a part's surface whose normal may be turned that far: the bands along its edges.
-pub const NORMAL_SHARE: f64 = 0.01;
-/// A normal turned by more than this (degrees) faces the other way: a face inside out. None may.
-pub const NORMAL_AWAY: f64 = 90.0;
-/// The counterpart of a point may be this much further than the nearest point if it faces more as the point does
-/// (m): of two faces back to back or meeting in an edge, the one meant.
-pub const NORMAL_REACH: f64 = 0.0002;
-/// Faces whose nearest points are within this of each other are one place (m): parts laid into each other,
-/// whose texture and shading there are either's.
-pub const SAME_PLACE: f64 = 1e-5;
-/// A material's area may differ by this share: a face gone or doubled inside another shows here first.
-pub const AREA: f64 = 0.01;
-/// A part's texels a metre may differ by this share: the texture's scale is the finish's look.
-pub const TEXELS: f64 = 0.02;
-/// A texture coordinate may be this far off, measured on the surface (m): half a pixel at the play camera.
-pub const UV_OFF: f64 = 0.002;
-/// The share of a part's surface whose texture must be within `UV_OFF`: all but its seams and its bevels' bands.
-/// Two Blender builds of one script differ on up to 3.9 % of a part (measured 2026-11-17, the porch swing's frame:
-/// a face at 45° between two sides takes its texture from either), so 5 % may be off.
-pub const UV_SHARE: f64 = 0.95;
-/// The baked shading is rounded to this many greys (artkit's shade.rs `LEVELS`).
-pub const SHADE_LEVELS: f64 = 32.0;
-/// A part's shading may differ by this many greys on average. Two Blender builds of one script differ by up to
-/// 1.36 (measured 2026-11-17, the pizza oven's cup: a vertex's rays hit or miss by a hair), so 2.
-pub const SHADE_MEAN: f64 = 2.0;
-/// 95 % of a part's surface must be within this many greys. Two Blender builds differ by up to 8.6 there (the
-/// same cup), so 10.
-pub const SHADE_MOST: f64 = 10.0;
-/// A far version held to `decimated` may differ from the old one's size by this share a side: the gate's own
-/// rule for a far version against its model is 5 %.
-pub const DECIMATED_SIZE: f64 = 0.02;
-/// Its lowest point may be this far from the full model's (m): the gate's own rule, a far version stands where
-/// its model stands.
-pub const DECIMATED_FLOOR: f64 = 0.005;
-/// It may have this share more triangles than the old one: a far version is there to be cheap.
-pub const DECIMATED_TRIANGLES: f64 = 0.10;
-/// No point of it may be further than this from the old one's surface (m). Two Blender builds of one script
-/// were up to 55 mm apart (measured 2026-11-17, the ping-pong table's far version), so 60 mm.
-pub const DECIMATED_SURFACE: f64 = 0.06;
-
-/// What is compared, by the name a finding and a line of port-accepted.json have.
-pub const METRICS: &[(&str, &str)] = &[
-    ("file", "a file is missing or cannot be read"),
-    (
-        "nodes",
-        "the nodes' names and parents, their origins, turns and scales at rest",
-    ),
-    (
-        "materials",
-        "the materials, their colours and the rest they say, each part's material and its attributes",
-    ),
-    ("draws", "the draw calls, as the gate counts them"),
-    (
-        "clips",
-        "the clips' names and lengths, and each part's place, turn and size sampled at 60 Hz",
-    ),
-    ("pack", "the model's pack entry, or the rest of a manifest"),
-    (
-        "perches",
-        "the perches: as many, in the same order, each within a millimetre",
-    ),
-    ("centre", "the model's centre in centres.json"),
-    ("bounds", "each node's box"),
-    ("size", "the model's size as the gate measures it"),
-    (
-        "heights",
-        "its functional heights (seat, top, mattress, light)",
-    ),
-    (
-        "gate",
-        "the gate's errors and warnings for the key: none new",
-    ),
-    (
-        "triangles",
-        "the triangles of each material, and the budget's target",
-    ),
-    (
-        "surface",
-        "how far each part's surface is from the other build's, both ways",
-    ),
-    ("normals", "the normals at the nearest points"),
-    ("area", "each material's area"),
-    ("texels", "each part's texels a metre"),
-    ("uv", "the texture coordinates at the nearest points"),
-    ("shading", "the baked shading at the nearest points"),
-    (
-        "decimated",
-        "a far version a decimation made, which another build need not repeat: where the rows above fail it is \
-         held to its own rule in their place (the old size within 2 %, its lowest point within 0.5 cm of the \
-         model's, at most a tenth more triangles, its surface within 6 cm of the old one's)",
-    ),
-];
-
-/// One row of `METRICS` that is over its limit.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Finding {
-    pub metric: &'static str,
-    pub text: String,
-}
-
-fn found(metric: &'static str, text: String) -> Finding {
-    debug_assert!(METRICS.iter().any(|(m, _)| *m == metric), "{metric}");
-    Finding { metric, text }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Class {
-    Same,
-    Near,
-    Changed,
-}
-
-/// The largest differences measured between two files that are not the same, for a `near` line.
-#[derive(Clone, Debug, Default)]
-pub struct Numbers {
-    /// Which parts of the digest differ (`digest::Parts::differing`).
-    pub differs: Vec<&'static str>,
-    /// The worst part's mean and largest distance (m).
-    pub surface_mean: f64,
-    pub surface_max: f64,
-    /// The worst part's share of turned normals, of texture coordinates off, and mean shading difference (greys).
-    pub turned: f64,
-    pub uv_off: f64,
-    pub shade: f64,
-    /// The material whose triangle count changed most, as a share (signed).
-    pub triangles: f64,
-}
-
-impl Numbers {
-    fn text(&self) -> String {
-        let mut out = Vec::new();
-        if !self.differs.is_empty() {
-            out.push(format!("differs in {}", self.differs.join(", ")));
-        }
-        out.push(format!(
-            "surface {} mean, {} at most",
-            mm(self.surface_mean),
-            mm(self.surface_max)
-        ));
-        if self.turned > 0.0 {
-            out.push(format!("normals {} turned", share(self.turned)));
-        }
-        if self.uv_off > 0.0 {
-            out.push(format!("texture {} off", share(self.uv_off)));
-        }
-        if self.shade > 0.0 {
-            out.push(format!("shading {:.2} greys", self.shade));
-        }
-        if self.triangles != 0.0 {
-            out.push(format!("triangles {:+.1} %", self.triangles * 100.0));
-        }
-        out.join("; ")
-    }
-}
-
-fn mm(v: f64) -> String {
-    if v.is_finite() {
-        format!("{:.3} mm", v * 1000.0)
-    } else {
-        "no surface".into()
-    }
-}
-
-fn share(v: f64) -> String {
-    format!("{:.2} %", v * 100.0)
-}
-
-fn point(p: P3) -> String {
-    format!("({:.4}, {:.4}, {:.4})", p[0], p[1], p[2])
-}
-
-/// Two files compared: whether they are the same, else what is over its limit and the numbers.
-#[derive(Debug, Default)]
-pub struct Compared {
-    pub same: bool,
-    pub findings: Vec<Finding>,
-    pub numbers: Numbers,
-}
-
-/// Compares two `.glb` files' bytes: `same` if their digests are equal, else every row of `METRICS` a file alone
-/// answers (the pack, the centre and the gate's rows need its entry: `against`).
-pub fn compare(old: &[u8], new: &[u8]) -> Compared {
-    compare_by(old, new, &measure)
-}
-
-/// `compare` for a far version held to `decimated` (the `DECIMATED_` limits); `model` is the new build's full
-/// model, whose lowest point the far version's is held to (None: not held to it).
-pub fn compare_decimated(old: &[u8], new: &[u8], model: Option<&[u8]>) -> Compared {
-    let floor = model
-        .and_then(|data| parse_glb(data).ok())
-        .and_then(|g| whole(&g).ok())
-        .and_then(|part| part.bounds())
-        .map(|(lo, _)| lo[1]);
-    compare_by(old, new, &|o, n, out, numbers| {
-        measure_decimated(o, n, floor, out, numbers)
-    })
-}
-
-/// What two files that are not the same are measured by: their findings and numbers.
-type Measure<'a> = &'a dyn Fn(&Glb, &Glb, &mut Vec<Finding>, &mut Numbers) -> R<()>;
-
-fn compare_by(old: &[u8], new: &[u8], measure: Measure) -> Compared {
-    let mut out = Compared::default();
-    if old == new {
-        out.same = true;
-        return out;
-    }
-    let read = |data: &[u8], which: &str| {
-        parse_glb(data).map_err(|e| found("file", format!("the {which} file is no .glb: {e}")))
-    };
-    let (o, n) = match (read(old, "old"), read(new, "new")) {
-        (Ok(o), Ok(n)) => (o, n),
-        (o, n) => {
-            out.findings.extend(o.err().into_iter().chain(n.err()));
-            return out;
-        }
-    };
-    let measured = (|| -> R<()> {
-        if digest::digest(&o)? == digest::digest(&n)? {
-            out.same = true;
-            return Ok(());
-        }
-        out.numbers.differs = digest::parts(&o)?.differing(&digest::parts(&n)?);
-        measure(&o, &n, &mut out.findings, &mut out.numbers)
-    })();
-    if let Err(e) = measured {
-        out.findings
-            .push(found("file", format!("cannot be compared: {e}")));
-    }
-    out
-}
-
-/// A list of names for a finding: the first six, then how many more.
-fn names(list: &[String]) -> String {
-    let mut out = list.iter().take(6).cloned().collect::<Vec<_>>().join(", ");
-    if list.len() > 6 {
-        out += &format!(" and {} more", list.len() - 6);
-    }
-    out
-}
-
-/// What is only in one of two sets, as findings.
-fn only<'a>(
-    metric: &'static str,
-    what: &str,
-    old: impl Iterator<Item = &'a String>,
-    new: impl Iterator<Item = &'a String>,
-    out: &mut Vec<Finding>,
-) {
-    let (old, new): (BTreeSet<&String>, BTreeSet<&String>) = (old.collect(), new.collect());
-    for (side, list) in [("old", old.difference(&new)), ("new", new.difference(&old))] {
-        let list: Vec<String> = list.map(|s| s.to_string()).collect();
-        if !list.is_empty() {
-            out.push(found(
-                metric,
-                format!("{what} only in the {side} file: {}", names(&list)),
-            ));
-        }
-    }
-}
-
-/// A file read for the rows of `METRICS`: its nodes, their rests, its clips and its parts.
-struct Model {
-    tree: digest::Tree,
-    rests: Vec<Rest>,
-    clips: Vec<near::Clip>,
-    parts: Vec<Part>,
-    meshes: HashSet<String>,
-}
-
-fn read(g: &Glb) -> R<Model> {
-    let tree = digest::tree(&g.gltf)?;
-    let nodes = g.gltf.get("nodes").and_then(J::list).unwrap_or(&[]);
-    Ok(Model {
-        rests: near::rests(&g.gltf)?,
-        clips: near::clips(g, &tree)?,
-        parts: near::parts(g, &tree)?,
-        meshes: nodes
-            .iter()
-            .enumerate()
-            .filter(|(_, n)| n.has("mesh"))
-            .map(|(i, _)| tree.paths[i].clone())
-            .collect(),
-        tree,
-    })
-}
-
-impl Model {
-    fn rest(&self, path: &str) -> Option<&Rest> {
-        self.tree
-            .paths
-            .iter()
-            .position(|p| p == path)
-            .map(|i| &self.rests[i])
-    }
-}
-
-fn measure(o: &Glb, n: &Glb, out: &mut Vec<Finding>, numbers: &mut Numbers) -> R<()> {
-    let (old, new) = (read(o)?, read(n)?);
-    nodes_differ(&old, &new, out);
-    materials_differ(o, n, out);
-    clips_differ(&old, &new, out);
-    parts_differ(&old, &new, out, numbers);
-    Ok(())
-}
-
-/// The nodes: the same paths (names under the same parents), each with or without a mesh as before, at rest where
-/// it was.
-fn nodes_differ(old: &Model, new: &Model, out: &mut Vec<Finding>) {
-    only(
-        "nodes",
-        "nodes",
-        old.tree.paths.iter(),
-        new.tree.paths.iter(),
-        out,
-    );
-    for (i, path) in old.tree.paths.iter().enumerate() {
-        let (a, Some(b)) = (&old.rests[i], new.rest(path)) else {
-            continue;
-        };
-        if old.meshes.contains(path) != new.meshes.contains(path) {
-            let side = if old.meshes.contains(path) {
-                "old"
-            } else {
-                "new"
-            };
-            out.push(found(
-                "nodes",
-                format!("{path}: has a mesh only in the {side} file"),
-            ));
-        }
-        let moved = py::dist(&a.translation, &b.translation);
-        if moved > ORIGIN {
-            out.push(found(
-                "nodes",
-                format!(
-                    "{path}: its origin moved {}, at most {} (from {} to {})",
-                    mm(moved),
-                    mm(ORIGIN),
-                    point(a.translation),
-                    point(b.translation)
-                ),
-            ));
-        }
-        let turned = near::turn(a.rotation, b.rotation);
-        if turned > REST_TURN {
-            out.push(found(
-                "nodes",
-                format!("{path}: turned {turned:.3}° at rest, at most {REST_TURN}"),
-            ));
-        }
-        let scaled = (0..3)
-            .map(|k| (a.scale[k] - b.scale[k]).abs())
-            .fold(0.0, f64::max);
-        if scaled > SCALE {
-            out.push(found(
-                "nodes",
-                format!(
-                    "{path}: its scale at rest {} is {}, at most {SCALE} off",
-                    point(a.scale),
-                    point(b.scale)
-                ),
-            ));
-        }
-    }
-}
-
-/// The differences between two JSON values, each with its path: a number by its value, an object whatever the
-/// order of its keys.
-fn json_differ(a: Option<&J>, b: Option<&J>, path: &str, out: &mut Vec<String>) {
-    let short = |v: &J| {
-        let text = digest::canon(v);
-        if text.chars().count() > 60 {
-            format!("{}…", text.chars().take(60).collect::<String>())
-        } else {
-            text
-        }
-    };
-    match (a, b) {
-        (None, None) => {}
-        (Some(a), None) => out.push(format!("{path} ({}) is gone", short(a))),
-        (None, Some(b)) => out.push(format!("{path} ({}) is new", short(b))),
-        (Some(J::Obj(a)), Some(J::Obj(b))) => {
-            let mut keys: Vec<&String> = a.iter().map(|(k, _)| k).collect();
-            keys.extend(
-                b.iter()
-                    .map(|(k, _)| k)
-                    .filter(|k| !a.iter().any(|(x, _)| x == *k)),
-            );
-            for k in keys {
-                let of =
-                    |o: &'_ [(String, J)]| o.iter().find(|(x, _)| x == k).map(|(_, v)| v.clone());
-                let inner = if path.is_empty() {
-                    k.clone()
-                } else {
-                    format!("{path}.{k}")
-                };
-                json_differ(of(a).as_ref(), of(b).as_ref(), &inner, out);
-            }
-        }
-        (Some(J::Arr(a)), Some(J::Arr(b))) if a.len() == b.len() => {
-            for (i, (x, y)) in a.iter().zip(b).enumerate() {
-                json_differ(Some(x), Some(y), &format!("{path}[{i}]"), out);
-            }
-        }
-        (Some(a), Some(b)) => {
-            if digest::canon(a) != digest::canon(b) {
-                out.push(format!("{path}: {} is now {}", short(a), short(b)));
-            }
-        }
-    }
-}
-
-/// An object without some of its keys.
-fn without(v: &J, keys: &[&str]) -> J {
-    match v {
-        J::Obj(o) => J::Obj(
-            o.iter()
-                .filter(|(k, _)| !keys.contains(&k.as_str()))
-                .cloned()
-                .collect(),
-        ),
-        other => other.clone(),
-    }
-}
-
-/// The materials: the same names, each with its base colour within a step and everything else it says.
-fn materials_differ(o: &Glb, n: &Glb, out: &mut Vec<Finding>) {
-    let named = |g: &Glb| -> BTreeMap<String, J> {
-        g.gltf
-            .get("materials")
-            .and_then(J::list)
-            .unwrap_or(&[])
-            .iter()
-            .map(|m| (m.get("name").map(J::key).unwrap_or_default(), m.clone()))
-            .collect()
-    };
-    let (old, new) = (named(o), named(n));
-    only("materials", "materials", old.keys(), new.keys(), out);
-    for (name, a) in &old {
-        let Some(b) = new.get(name) else { continue };
-        let colour = |m: &J| -> [f64; 4] {
-            let list: Vec<f64> = m
-                .get("pbrMetallicRoughness")
-                .and_then(|p| p.get("baseColorFactor"))
-                .and_then(J::list)
-                .unwrap_or(&[])
-                .iter()
-                .filter_map(|v| v.num().map(|x| x.f()))
-                .collect();
-            list.try_into().unwrap_or([1.0; 4])
-        };
-        let (ca, cb) = (colour(a), colour(b));
-        let off = (0..4).map(|k| (ca[k] - cb[k]).abs()).fold(0.0, f64::max);
-        if off > COLOUR {
-            let text =
-                |c: [f64; 4]| format!("({:.3}, {:.3}, {:.3}, {:.3})", c[0], c[1], c[2], c[3]);
-            out.push(found(
-                "materials",
-                format!(
-                    "material {name}: its base colour {} is now {}, {:.1} of 255 off, at most 1",
-                    text(ca),
-                    text(cb),
-                    off * 255.0
-                ),
-            ));
-        }
-        let rest = |m: &J| {
-            let mut m = without(m, &["name"]);
-            if let Some(pbr) = m
-                .get("pbrMetallicRoughness")
-                .map(|p| without(p, &["baseColorFactor"]))
-            {
-                m.set("pbrMetallicRoughness", pbr);
-            }
-            m
-        };
-        let mut differs = Vec::new();
-        json_differ(Some(&rest(a)), Some(&rest(b)), "", &mut differs);
-        if !differs.is_empty() {
-            out.push(found(
-                "materials",
-                format!("material {name}: {}", names(&differs)),
-            ));
-        }
-    }
-}
-
-/// The clips: the same names, as long, and every part they move where it was at each sixtieth of a second (a part
-/// one build's clip leaves alone is at rest there). How many keys a clip has is free.
-fn clips_differ(old: &Model, new: &Model, out: &mut Vec<Finding>) {
-    only(
-        "clips",
-        "clips",
-        old.clips.iter().map(|c| &c.name),
-        new.clips.iter().map(|c| &c.name),
-        out,
-    );
-    for a in &old.clips {
-        let Some(b) = new.clips.iter().find(|c| c.name == a.name) else {
-            continue;
-        };
-        for (what, x, y) in [("starts", a.start, b.start), ("ends", a.end, b.end)] {
-            if (x - y).abs() > CLIP_LENGTH {
-                out.push(found(
-                    "clips",
-                    format!(
-                        "clip {}: {what} at {y:.4} s, was {x:.4} (at most 1 ms off)",
-                        a.name
-                    ),
-                ));
-            }
-        }
-        let end = a.end.max(b.end);
-        let mut times: Vec<f64> = (0..=(end * CLIP_HZ).floor() as usize)
-            .map(|k| k as f64 / CLIP_HZ)
-            .collect();
-        times.push(end);
-        let tracks: BTreeSet<&(String, String)> = a.tracks.keys().chain(b.tracks.keys()).collect();
-        for track in tracks {
-            let (node, path) = track;
-            let (Some(ra), Some(rb)) = (old.rest(node), new.rest(node)) else {
-                continue;
-            };
-            let rest = |r: &Rest| -> Vec<f64> {
-                match path.as_str() {
-                    "translation" => r.translation.to_vec(),
-                    "rotation" => r.rotation.to_vec(),
-                    "scale" => r.scale.to_vec(),
-                    _ => Vec::new(),
-                }
-            };
-            let rotation = path == "rotation";
-            // (off by, at, limit, unit)
-            let mut worst: Option<(f64, f64)> = None;
-            let (limit, unit) = match path.as_str() {
-                "translation" => (CLIP_MOVE * 1000.0, "mm"),
-                "rotation" => (CLIP_TURN, "°"),
-                _ => (SCALE, ""),
-            };
-            for &t in &times {
-                let va = a
-                    .tracks
-                    .get(track)
-                    .and_then(|k| k.at(t, rotation))
-                    .unwrap_or_else(|| rest(ra));
-                let vb = b
-                    .tracks
-                    .get(track)
-                    .and_then(|k| k.at(t, rotation))
-                    .unwrap_or_else(|| rest(rb));
-                let off = if va.len() != vb.len() {
-                    f64::INFINITY
-                } else {
-                    match path.as_str() {
-                        "translation" => py::dist(&va, &vb) * 1000.0,
-                        "rotation" if va.len() == 4 => {
-                            near::turn([va[0], va[1], va[2], va[3]], [vb[0], vb[1], vb[2], vb[3]])
-                        }
-                        _ => va
-                            .iter()
-                            .zip(&vb)
-                            .map(|(x, y)| (x - y).abs())
-                            .fold(0.0, f64::max),
-                    }
-                };
-                if worst.is_none_or(|(w, _)| off > w) {
-                    worst = Some((off, t));
-                }
-            }
-            if let Some((off, t)) = worst.filter(|(off, _)| *off > limit) {
-                out.push(found(
-                    "clips",
-                    format!(
-                        "clip {}: {node}'s {path} is {off:.3}{unit} off at {t:.3} s, at most {limit}{unit}",
-                        a.name
-                    ),
-                ));
-            }
-        }
-    }
-}
+use super::*;
 
 /// Whether a material is fruit a resident reaches for (`FRUIT`).
-fn fruit(material: &str) -> bool {
+pub(crate) fn fruit(material: &str) -> bool {
     FRUIT.iter().any(|f| material.starts_with(f))
 }
 
-fn tolerance() -> Tolerance {
+pub(crate) fn tolerance() -> Tolerance {
     Tolerance {
         per_m2: SAMPLES.0,
         few: SAMPLES.1,
@@ -682,7 +23,7 @@ fn tolerance() -> Tolerance {
 }
 
 /// Two builds of a part measured against each other, both ways: (old against new, new against old).
-fn both_ways(a: &Part, b: &Part) -> (Across, Across) {
+pub(crate) fn both_ways(a: &Part, b: &Part) -> (Across, Across) {
     let (sa, sb) = (Surface::new(a), Surface::new(b));
     let (area, uv) = (a.area(), a.uv_area());
     let uv_metres = if uv > 0.0 { (area / uv).sqrt() } else { 0.0 };
@@ -696,7 +37,12 @@ fn both_ways(a: &Part, b: &Part) -> (Across, Across) {
 /// The parts: the same nodes' triangles of the same materials with the same attributes, about as many triangles
 /// and as much area a material, each node's box, and each part's surface, normals, texture and shading against the
 /// other build's.
-fn parts_differ(old: &Model, new: &Model, out: &mut Vec<Finding>, numbers: &mut Numbers) {
+pub(crate) fn parts_differ(
+    old: &Model,
+    new: &Model,
+    out: &mut Vec<Finding>,
+    numbers: &mut Numbers,
+) {
     // (A part of a node the other file has not is the nodes' finding.)
     let names_of = |r: &Model, other: &Model| -> Vec<String> {
         r.parts
@@ -975,7 +321,7 @@ fn parts_differ(old: &Model, new: &Model, out: &mut Vec<Finding>, numbers: &mut 
 }
 
 /// A model at rest as one part: every node's triangles where the node stands.
-fn whole(g: &Glb) -> R<Part> {
+pub(crate) fn whole(g: &Glb) -> R<Part> {
     let r = read(g)?;
     let worlds = near::worlds(&r.tree, &r.rests);
     let mut all = Part {
@@ -1006,7 +352,7 @@ fn whole(g: &Glb) -> R<Part> {
 /// A far version held to `decimated`, the whole of it at rest as one surface: each side of its box within
 /// `DECIMATED_SIZE` of the old one's, its lowest point within `DECIMATED_FLOOR` of `floor` (the full model's),
 /// at most `DECIMATED_TRIANGLES` more triangles, and every point of it within `DECIMATED_SURFACE` of the old one.
-fn measure_decimated(
+pub(crate) fn measure_decimated(
     o: &Glb,
     n: &Glb,
     floor: Option<f64>,
@@ -1139,7 +485,7 @@ impl Outcome {
 }
 
 /// A folder for this run's copies of a revision's files, gone when the run is.
-struct Scratch(PathBuf);
+pub(crate) struct Scratch(PathBuf);
 
 impl Scratch {
     fn new() -> Result<Scratch, String> {
@@ -1159,7 +505,7 @@ impl Drop for Scratch {
     }
 }
 
-fn git(root: &str, args: &[&str]) -> Result<Vec<u8>, String> {
+pub(crate) fn git(root: &str, args: &[&str]) -> Result<Vec<u8>, String> {
     let out = Command::new("git")
         .arg("-C")
         .arg(root)
@@ -1178,7 +524,7 @@ fn git(root: &str, args: &[&str]) -> Result<Vec<u8>, String> {
 }
 
 /// Whether git knows `rev` as a commit of the checkout.
-fn is_rev(root: &str, rev: &str) -> bool {
+pub(crate) fn is_rev(root: &str, rev: &str) -> bool {
     !rev.starts_with('-')
         && git(
             root,
@@ -1194,7 +540,7 @@ fn is_rev(root: &str, rev: &str) -> bool {
 
 /// Writes the files `paths` (from the checkout's root) as revision `rev` has them under `into`; one it has not is
 /// left out.
-fn checkout(root: &str, rev: &str, paths: &[String], into: &str) -> Result<(), String> {
+pub(crate) fn checkout(root: &str, rev: &str, paths: &[String], into: &str) -> Result<(), String> {
     if paths.is_empty() {
         return Ok(());
     }
@@ -1245,7 +591,7 @@ fn checkout(root: &str, rev: &str, paths: &[String], into: &str) -> Result<(), S
 }
 
 /// How a side's model files get where its manifests name them.
-enum Origin {
+pub(crate) enum Origin {
     /// They are there.
     Here,
     /// Read from a revision into the scratch folder `at`, laid out as the checkout.
@@ -1255,7 +601,7 @@ enum Origin {
 }
 
 /// One side of the comparison: where it is read from, its manifests stacked and its centres.
-struct Side {
+pub(crate) struct Side {
     paths: Paths,
     origin: Origin,
     root: String,
@@ -1265,13 +611,13 @@ struct Side {
     centres: J,
 }
 
-const ASSETS: &str = "web/public/assets";
-const CENTRES: &str = "tools/art/centres.json";
+pub(crate) const ASSETS: &str = "web/public/assets";
+pub(crate) const CENTRES: &str = "tools/art/centres.json";
 /// Where a revision from before the models' tools moved has its centres (the tags ref/blender and
 /// ref/blender-civic).
-const CENTRES_BEFORE: &str = "tools/art/blender/centres.json";
+pub(crate) const CENTRES_BEFORE: &str = "tools/art/blender/centres.json";
 
-fn copy(from: &Path, to: &Path) -> Result<(), String> {
+pub(crate) fn copy(from: &Path, to: &Path) -> Result<(), String> {
     if let Some(dir) = to.parent() {
         std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     }
@@ -1281,7 +627,7 @@ fn copy(from: &Path, to: &Path) -> Result<(), String> {
 }
 
 /// The manifests of the packs under an assets root: `packs/<name>/manifest.json`, from the root.
-fn pack_manifests(assets: &str) -> Vec<String> {
+pub(crate) fn pack_manifests(assets: &str) -> Vec<String> {
     let mut out: Vec<String> = std::fs::read_dir(Path::new(assets).join("packs"))
         .into_iter()
         .flatten()
@@ -1385,8 +731,8 @@ impl Side {
                             )?;
                         }
                     }
-                    let mut centres = super::read_centres(&tree.centres)?;
-                    for (k, c) in super::read_centres(&found.centres)?
+                    let mut centres = super::super::read_centres(&tree.centres)?;
+                    for (k, c) in super::super::read_centres(&found.centres)?
                         .entries()
                         .unwrap_or(&[])
                     {
@@ -1409,9 +755,9 @@ impl Side {
                 }
             }
         };
-        let stack = super::asset_manifests(&paths)?;
-        let (entries, fin) = super::model_entries(&stack);
-        let centres = super::read_centres(&paths.centres)?;
+        let stack = super::super::asset_manifests(&paths)?;
+        let (entries, fin) = super::super::model_entries(&stack);
+        let centres = super::super::read_centres(&paths.centres)?;
         Ok(Side {
             paths,
             origin,
@@ -1474,7 +820,7 @@ impl Side {
 }
 
 /// The folders an entry's model is of: its file's under `models/` and its manifest's under `packs/`.
-fn families(entry: &J, manifest: &str) -> Vec<String> {
+pub(crate) fn families(entry: &J, manifest: &str) -> Vec<String> {
     let mut out = Vec::new();
     if let Some(url) = entry.get("url").and_then(J::str) {
         let dir = dirname(url);
@@ -1494,7 +840,7 @@ fn families(entry: &J, manifest: &str) -> Vec<String> {
 }
 
 /// A family's name as `--family` compares it: case and underscores aside, with or without `pack` before it.
-fn family_name(name: &str) -> String {
+pub(crate) fn family_name(name: &str) -> String {
     let plain: String = name
         .chars()
         .filter(|c| *c != '_')
@@ -1508,7 +854,7 @@ fn family_name(name: &str) -> String {
 }
 
 /// What the rows are compared with: the two sides, and the working tree's content for the gate.
-struct Context {
+pub(crate) struct Context {
     old: Side,
     new: Side,
     facts: HashMap<String, Vec<Facts>>,
@@ -1518,7 +864,7 @@ struct Context {
 }
 
 /// A digit run as `#`, so two findings that differ in their numbers alone are one finding.
-fn masked(text: &str) -> String {
+pub(crate) fn masked(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut digits = false;
     for c in text.chars() {
@@ -1534,7 +880,7 @@ fn masked(text: &str) -> String {
 }
 
 /// The texts of `new` that `old` has not, numbers aside (each of `old` answers for one of `new`).
-fn newly<'a>(old: &[String], new: &'a [String]) -> Vec<&'a String> {
+pub(crate) fn newly<'a>(old: &[String], new: &'a [String]) -> Vec<&'a String> {
     let mut have: HashMap<String, usize> = HashMap::new();
     for text in old {
         *have.entry(masked(text)).or_default() += 1;
@@ -1551,7 +897,7 @@ fn newly<'a>(old: &[String], new: &'a [String]) -> Vec<&'a String> {
 }
 
 /// The draw calls in the gate's summary of a model (`check`'s "N draws").
-fn draws(summary: &str) -> Option<usize> {
+pub(crate) fn draws(summary: &str) -> Option<usize> {
     let words: Vec<&str> = summary.split_whitespace().collect();
     let at = words.iter().position(|w| *w == "draws")?;
     words.get(at.checked_sub(1)?)?.parse().ok()
@@ -1559,8 +905,8 @@ fn draws(summary: &str) -> Option<usize> {
 
 impl Context {
     /// What the gate says of `key` on a side; a file it cannot read is its one error.
-    fn gate(&self, side: &Side, key: &str) -> super::Checked {
-        let unread = |err: String| super::Checked {
+    fn gate(&self, side: &Side, key: &str) -> super::super::Checked {
+        let unread = |err: String| super::super::Checked {
             errors: vec![format!("cannot be read: {err}")],
             warnings: Vec::new(),
             accepted: Vec::new(),
@@ -1571,13 +917,13 @@ impl Context {
             return unread("its entry has no file".into());
         };
         // The gate's own rules only: the counted checks answer to the baseline of one tree, not to a build.
-        let baseline = super::baseline::Baseline::default();
-        let counting = super::Counting {
+        let baseline = super::super::baseline::Baseline::default();
+        let counting = super::super::Counting {
             baseline: &baseline,
             file: &[],
             batch: std::collections::BTreeMap::new(),
         };
-        super::check(
+        super::super::check(
             key,
             &side.fin,
             entry,
@@ -1615,9 +961,9 @@ impl Context {
             out.push(found("draws", format!("{is} draw calls, was {was}")));
         }
         let measured = (|| -> R<()> {
-            let side = |s: &Side| -> R<Option<super::Model>> {
+            let side = |s: &Side| -> R<Option<super::super::Model>> {
                 match (s.entries.get(key), s.file(key, "url")) {
-                    (Some((entry, _)), Some(path)) => super::model(entry, &path).map(Some),
+                    (Some((entry, _)), Some(path)) => super::super::model(entry, &path).map(Some),
                     _ => Ok(None),
                 }
             };
@@ -1641,8 +987,10 @@ impl Context {
                 ));
             }
             for f in self.facts.get(key).map(Vec::as_slice).unwrap_or(&[]) {
-                let ha = super::heights(&a.file, &a.entry, &f.object, &self.furniture, true)?;
-                let hb = super::heights(&b.file, &b.entry, &f.object, &self.furniture, true)?;
+                let ha =
+                    super::super::heights(&a.file, &a.entry, &f.object, &self.furniture, true)?;
+                let hb =
+                    super::super::heights(&b.file, &b.entry, &f.object, &self.furniture, true)?;
                 let id = py::str_of(&f.id);
                 if ha.len() != hb.len() {
                     out.push(found(
@@ -1656,7 +1004,7 @@ impl Context {
                     continue;
                 }
                 for (x, y) in ha.iter().zip(&hb) {
-                    let values = |h: &super::Height| -> Vec<Option<f64>> {
+                    let values = |h: &super::super::Height| -> Vec<Option<f64>> {
                         vec![h.mesh, h.span.map(|s| s.0), h.span.map(|s| s.1)]
                     };
                     for (p, q) in values(x).into_iter().zip(values(y)) {
@@ -1941,7 +1289,7 @@ impl Context {
 
 /// A manifest without its model entries: what the models' rows do not cover. Nor its `$comment`, which says what
 /// builds the pack (a script, then a crate) and which the game does not read.
-fn rest_of(manifest: &J) -> J {
+pub(crate) fn rest_of(manifest: &J) -> J {
     let mut out = match manifest.entries() {
         Some(fields) => J::Obj(
             fields
@@ -1968,14 +1316,14 @@ fn rest_of(manifest: &J) -> J {
 }
 
 /// port-accepted.json, {row: {metric: why}}, and what is wrong with it: a metric that is none, a reason left out.
-fn accepted(path: &str) -> (BTreeMap<String, BTreeMap<String, String>>, Vec<String>) {
+pub(crate) fn accepted(path: &str) -> (BTreeMap<String, BTreeMap<String, String>>, Vec<String>) {
     let (mut out, mut errors) = (BTreeMap::new(), Vec::new());
     let data = match std::fs::read(path) {
         Ok(data) => data,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return (out, errors),
         Err(e) => return (out, vec![format!("{path}: {e}")]),
     };
-    let json = match super::json::loads_text(&data) {
+    let json = match super::super::json::loads_text(&data) {
         Ok(json @ J::Obj(_)) => json,
         Ok(_) => return (out, vec![format!("{path} is {{key: {{metric: why}}}}")]),
         Err(e) => return (out, vec![format!("{path}: {e}")]),
@@ -2078,14 +1426,14 @@ pub fn against(opts: &Options) -> Result<Outcome, String> {
         side.fetch(&files)?;
     }
 
-    let defs = super::content(&tree)?;
+    let defs = super::super::content(&tree)?;
     let path = opts
         .accepted
         .clone()
         .unwrap_or_else(|| join(&opts.root, "tools/art/port-accepted.json"));
     let (accepted, mut errors) = accepted(&path);
     let context = Context {
-        facts: super::content_objects(&defs)?,
+        facts: super::super::content_objects(&defs)?,
         furniture: Furniture::read(&tree)?,
         old,
         new,
@@ -2262,211 +1610,6 @@ pub fn against(opts: &Options) -> Result<Outcome, String> {
 }
 
 /// Whether either side's manifests have a model entry `key`.
-fn all_has(context: &Context, key: &str) -> bool {
+pub(crate) fn all_has(context: &Context, key: &str) -> bool {
     context.old.entries.contains_key(key) || context.new.entries.contains_key(key)
-}
-
-/// `cargo check-glb --against <rev|dir> [keys… | --family <f>] [--dir <built>]`: the exit code.
-pub fn main(args: &[String]) -> i32 {
-    let root = super::repo_root();
-    let mut opts = Options {
-        root: root.clone(),
-        old: Source::Tree,
-        new: Source::Tree,
-        keys: Vec::new(),
-        family: None,
-        accepted: None,
-    };
-    let mut args = args.iter();
-    let mut held = false;
-    while let Some(arg) = args.next() {
-        let mut value = |what: &str| {
-            args.next()
-                .filter(|v| !v.starts_with("--"))
-                .cloned()
-                .ok_or_else(|| format!("{arg} takes {what}"))
-        };
-        let taken = match arg.as_str() {
-            "--against" => value("a revision or a directory").and_then(|v| {
-                held = true;
-                // (A revision first: a directory of a revision's name is written ./name.)
-                opts.old = if is_rev(&root, &v) {
-                    Source::Rev(v)
-                } else if Path::new(&v).is_dir() {
-                    Source::Dir(v)
-                } else {
-                    return Err(format!(
-                        "{v} is neither a revision git knows nor a directory"
-                    ));
-                };
-                Ok(())
-            }),
-            "--dir" => value("a directory").map(|v| opts.new = Source::Dir(v)),
-            "--family" => value("a family").map(|v| opts.family = Some(v)),
-            key if key.starts_with("model.")
-                || key.starts_with("item.")
-                || key.starts_with("tool.") =>
-            {
-                opts.keys.push(key.to_string());
-                Ok(())
-            }
-            other => Err(format!(
-                "{other}: --against takes keys (model., item., tool.), --family <f> and --dir <built>"
-            )),
-        };
-        if let Err(e) = taken {
-            eprintln!("{e}");
-            return 2;
-        }
-    }
-    if !held {
-        eprintln!("--against takes a revision or a directory");
-        return 2;
-    }
-    if !opts.keys.is_empty() && opts.family.is_some() {
-        eprintln!("name keys or a family, not both");
-        return 2;
-    }
-    let started = std::time::Instant::now();
-    match against(&opts) {
-        Ok(outcome) => {
-            print!("{}", outcome.text);
-            eprintln!("compared in {:.1} s", started.elapsed().as_secs_f64());
-            outcome.failed() as i32
-        }
-        Err(e) => {
-            eprintln!("{e}");
-            1
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn findings_that_differ_in_their_numbers_alone_are_one() {
-        assert_eq!(
-            masked("4321 triangles, aim for 4000 (1.25 m)"),
-            "# triangles, aim for # (# m)"
-        );
-        assert_eq!(
-            masked("wing.L is saved at scale 0."),
-            "wing.L is saved at scale #"
-        );
-        let old = vec!["4 draw calls, aim for 3 at most".to_string(), "a".into()];
-        let new = vec![
-            "5 draw calls, aim for 3 at most".to_string(),
-            "b".into(),
-            "a".into(),
-            "a".into(),
-        ];
-        assert_eq!(newly(&old, &new), [&"b".to_string(), &"a".to_string()]);
-        assert!(newly(&new, &old).is_empty());
-    }
-
-    /// The draw calls are read from the gate's own line: the coin's, as the gate writes it today.
-    #[test]
-    fn the_draw_calls_are_the_gate_s() {
-        assert_eq!(
-            draws(
-                "  305.0 KB   7616 tris 4 draws 26 materials  1.89 x 1.90 x 0.92 m  3 moving parts, 2 clips"
-            ),
-            Some(4)
-        );
-        assert_eq!(draws(""), None);
-        let fin = Finishes {
-            plain: HashMap::new(),
-            see_through: HashSet::new(),
-            textures: HashMap::new(),
-        };
-        let path = join(
-            &super::super::repo_root(),
-            "web/public/assets/models/held/coin.glb",
-        );
-        let entry =
-            super::super::json::loads_text(br#"{"type": "model", "url": "coin.glb"}"#).unwrap();
-        let baseline = super::super::baseline::Baseline::default();
-        let counting = super::super::Counting {
-            baseline: &baseline,
-            file: &[],
-            batch: std::collections::BTreeMap::new(),
-        };
-        let checked = super::super::check(
-            "tool.coin",
-            &fin,
-            &entry,
-            &path,
-            None,
-            None,
-            None,
-            None,
-            &counting,
-        )
-        .unwrap();
-        assert_eq!(draws(&checked.summary), Some(1), "{}", checked.summary);
-    }
-
-    #[test]
-    fn a_family_is_a_folder_of_models_or_packs_however_it_is_written() {
-        let j = |text: &str| super::super::json::loads_text(text.as_bytes()).unwrap();
-        assert_eq!(
-            families(
-                &j(r#"{"url": "../../models/garden/gnome.glb"}"#),
-                "/a/assets/packs/gardenDecor/manifest.json"
-            ),
-            ["garden", "gardenDecor"]
-        );
-        assert!(
-            families(
-                &j(r#"{"url": "models/rock.glb"}"#),
-                "/a/assets/manifest.json"
-            )
-            .is_empty()
-        );
-        for (written, folder) in [
-            ("garden_decor", "gardenDecor"),
-            ("gloomy", "pack_gloomy"),
-            ("pack_gloomy", "pack_gloomy"),
-        ] {
-            assert_eq!(family_name(written), family_name(folder));
-        }
-        assert_ne!(family_name("kitchen"), family_name("kitchen_cooking"));
-        assert_eq!(family_name("pack"), "pack");
-    }
-
-    #[test]
-    fn two_values_differ_where_their_paths_say() {
-        let j = |text: &str| super::super::json::loads_text(text.as_bytes()).unwrap();
-        let differ = |a: &str, b: &str| {
-            let mut out = Vec::new();
-            json_differ(Some(&j(a)), Some(&j(b)), "", &mut out);
-            out
-        };
-        assert!(differ(r#"{"a": 1, "b": [1, 2.0]}"#, r#"{"b": [1.0, 2], "a": 1.0}"#).is_empty());
-        assert_eq!(
-            differ(
-                r#"{"a": {"x": 1, "y": [1, 2]}, "gone": true}"#,
-                r#"{"a": {"x": 2, "y": [1, 3]}, "new": "n"}"#
-            ),
-            [
-                "a.x: 1.0 is now 2.0",
-                "a.y[1]: 2.0 is now 3.0",
-                "gone (true) is gone",
-                "new (\"n\") is new"
-            ]
-        );
-        assert_eq!(
-            differ("[1, 2]", "[1, 2, 3]"),
-            [": [1.0,2.0] is now [1.0,2.0,3.0]"]
-        );
-    }
-
-    #[test]
-    fn every_metric_has_its_name_once_and_fruit_is_fitted() {
-        let names: HashSet<&str> = METRICS.iter().map(|(m, _)| *m).collect();
-        assert_eq!(names.len(), METRICS.len());
-        assert!(fruit("fruit2") && fruit("apple_blush") && fruit("lemon") && !fruit("leaf"));
-    }
 }

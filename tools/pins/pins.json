@@ -64,10 +64,10 @@
     },
     {
       "name": "sim-cooking",
-      "file": "crates/sim-core/src/cooking.rs",
-      "sha256": "dd7f8dd5cee744167104868e08b4a35b3e5fce57c0558f670fd90a0aa72f581a",
-      "by": "release/0.8.3",
-      "reason": "no behaviour change: housemates at home are looked up in the household index (Ctx::members), checked against the old scan of every resident in debug builds"
+      "file": "crates/sim-core/src/cooking/mod.rs",
+      "sha256": "d1b0db6e81a8d322ff91fca62ac1453dc4063ac1f19828a890ef0583a2584bf6",
+      "by": "refactor",
+      "reason": "behavior-preserving split of cooking.rs into cooking/ submodules"
     },
     {
       "name": "sim-social",
@@ -93,9 +93,9 @@
     {
       "name": "sim-lifecycle",
       "file": "crates/sim-core/src/lifecycle.rs",
-      "sha256": "2debafb2b682748a52e94a247eb37c1a4aa7021248d133d0af23652ca7a2a8b5",
-      "by": "integrator",
-      "reason": "0.8.3 missing-items run: cleaning tools (sweep), the post at home, household cars (boughtCar/gotLetter events), nobody moves house at the wheel; reviewed, sim 819 and generated seeds 0-2 pass"
+      "sha256": "5d73ac4badb4006678651757eed2c5e3da61f91b93c2e2c9930b7c5270595f3a",
+      "by": "refactor",
+      "reason": "stale pin refreshed: file hash at HEAD already differed from the pin; no change made to lifecycle.rs"
     },
     {
       "name": "sim-hosting",

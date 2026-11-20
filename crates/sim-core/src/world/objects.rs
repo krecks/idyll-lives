@@ -2,6 +2,8 @@
 //!
 //! Split from `world.rs` (see `mod.rs`).
 
+use std::f32::consts::FRAC_PI_2;
+
 use super::*;
 
 /// One tick of using an object (`minutes` long: more when catching up on a turn, see
