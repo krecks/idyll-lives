@@ -18,6 +18,7 @@
  *     --seed 7                     the world's seed
  *     --port 5297 | --url <u>      a dev server on the port (started if none answers), or one already running
  *     --out <dir>                  default /tmp/ng-render/
+ *     --timings                    how long each picture waited to be ready (the glide, the textures, the frames)
  *     --no-time                    pictures only
  *     --no-shots                   timings only (from the bare land)
  *     --follow                     the town on a land it follows (`withLand`), as every new game's will be
@@ -109,6 +110,23 @@ async function frameShot({ which, shot, home = null }) {
   await ng.menuScene.settled();
 }
 
+/**
+ * In the page: the picture ready, instead of a fixed wait: the camera's glide over (`menuScene.settled`), the town's
+ * model files and textures there, and three frames drawn. Each wait's time is logged (`__settleMs`).
+ */
+async function settleShot() {
+  const t = [performance.now()];
+  const [{ host }, { settings }] = await Promise.all([import('/src/game/host.ts'), import('/src/settings/settings.svelte.ts')]);
+  await window.__ng.menuScene.settled();
+  t.push(performance.now());
+  const renderer = await host.rendererNow(settings);
+  await renderer.texturesReady();
+  t.push(performance.now());
+  await renderer.framesRendered(3);
+  t.push(performance.now());
+  return t.slice(1).map((x, i) => Math.round(x - t[i]));
+}
+
 const { chromium } = await playwright();
 const browser = await chromium.launch({
   headless: !has('headed'),
@@ -128,8 +146,9 @@ try {
     await page.waitForFunction(() => !!document.querySelector('.menu') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 200 });
     const facts = await page.evaluate(setUp, { kind: made.world, options: made.options, seed, side: Math.round(width * 0.24), follow: has('follow') });
     console.log(`townShots: ${renderer}: ${made.world} ${made.query || '(its own options)'} seed ${seed}: ${facts.width}x${facts.depth} m, ${facts.areas} areas, ${facts.slots} lots, ${facts.roads} roads, land ${facts.land}`);
-    const shoot = async (name, wait = 1200) => {
-      await page.waitForTimeout(wait);
+    const shoot = async (name) => {
+      const ms = await page.evaluate(settleShot);
+      if (has('timings')) console.log(`  settled in ${ms.join(' + ')} ms (glide, textures, frames)`);
       const file = join(out, `${renderer}-${name}.png`);
       await page.screenshot({ path: file });
       console.log(`townShots: ${file}`);
@@ -137,7 +156,7 @@ try {
 
     if (shots) {
       await page.evaluate(frameShot, { which: 'land', shot: { kind: 'world' } });
-      await shoot('land-world', 2500);
+      await shoot('land-world');
       // Panned far past the land's edge: the camera stops over the land (its target at the corner).
       await page.evaluate(() => window.__ng.menuScene.pan(-5000, -5000));
       await shoot('land-panned');
@@ -149,7 +168,7 @@ try {
       await shoot('land-dragged');
 
       await page.evaluate(frameShot, { which: 'town', shot: { kind: 'world' } });
-      await shoot('town-world', 2500);
+      await shoot('town-world');
       await page.evaluate(frameShot, { which: 'town', shot: { kind: 'area', area: 0 } });
       await shoot('town-area0');
       if (facts.areas > 1) {
@@ -239,7 +258,7 @@ try {
       // Back to the bare land with every lot outlined (as step 1 asks): no ring of the town's lots is left on it.
       await page.evaluate(() => window.__ng.menuScene.highlight({ outlines: true }, true));
       await page.evaluate(frameShot, { which: 'land', shot: { kind: 'area', area: 0 } });
-      await shoot('land-again', 2500);
+      await shoot('land-again');
       await page.evaluate(() => window.__ng.menuScene.highlight({}, true));
     } else await page.evaluate(frameShot, { which: 'land', shot: { kind: 'world' } });
 

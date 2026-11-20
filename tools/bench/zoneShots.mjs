@@ -19,6 +19,7 @@
  *     --seed 7                     the world's seed
  *     --port 5431 | --url <u>      a dev server on the port (started if none answers), or one already running
  *     --out <dir>                  default /tmp/zone-shots/
+ *     --timings                    how long each picture waited to be ready (the glide, the textures, the frames)
  *
  * Needs Playwright like render.mjs (`PLAYWRIGHT=<path to playwright/index.mjs>`).
  */
@@ -154,6 +155,23 @@ async function frameShot(shot) {
   await zs.menuScene.settled();
 }
 
+/**
+ * In the page: the picture ready, instead of a fixed wait: the camera's glide over (`menuScene.settled`), the town's
+ * model files and textures there, and three frames drawn. Each wait's time is logged (`__settleMs`).
+ */
+async function settleShot() {
+  const t = [performance.now()];
+  const [{ host }, { settings }] = await Promise.all([import('/src/game/host.ts'), import('/src/settings/settings.svelte.ts')]);
+  await window.__zs.menuScene.settled();
+  t.push(performance.now());
+  const renderer = await host.rendererNow(settings);
+  await renderer.texturesReady();
+  t.push(performance.now());
+  await renderer.framesRendered(3);
+  t.push(performance.now());
+  return t.slice(1).map((x, i) => Math.round(x - t[i]));
+}
+
 const { chromium } = await playwright();
 const browser = await chromium.launch({
   headless: !has('headed'),
@@ -173,15 +191,16 @@ try {
     await page.waitForFunction(() => !!document.querySelector('.menu') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 200 });
     const facts = await page.evaluate(setUp, { kind: made.world, options: made.options, seed, side: Math.round(width * 0.24) });
     console.log(`zoneShots: ${renderer}: ${made.world} seed ${seed}: ${facts.width}x${facts.depth} m (${facts.cols}x${facts.rows} cells), ${facts.areas} areas, ${facts.painted} cells painted, ${facts.far} hatched`);
-    const shoot = async (name, wait = 1500) => {
-      await page.waitForTimeout(wait);
+    const shoot = async (name) => {
+      const ms = await page.evaluate(settleShot);
+      if (has('timings')) console.log(`  settled in ${ms.join(' + ')} ms (glide, textures, frames)`);
       const file = join(out, `${renderer}-${name}.png`);
       await page.screenshot({ path: file });
       console.log(`zoneShots: ${file}`);
     };
 
     await page.evaluate(frameShot, { kind: 'world' });
-    await shoot('uses-world', 3000);
+    await shoot('uses-world');
     await page.evaluate(frameShot, { kind: 'area', area: 0 });
     await shoot('uses-area0');
     // Closer, on the town's middle: the runs, their edges, the hatching where there is some.
@@ -191,13 +210,13 @@ try {
     // A far field (no road within 36 m), hatched, close up: from the whole world's shot, the wheel's zoom towards it.
     await page.evaluate(frameShot, { kind: 'world' });
     // (Projected through the camera as drawn: a frame or two after the cut.)
-    await page.waitForTimeout(500);
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await page.evaluate(() => {
       const zs = window.__zs;
       const out = { x: 0, y: 0 };
       if (zs.menuScene.project(zs.town.width * 0.2, 0, zs.town.depth * 0.2, out)) zs.menuScene.zoomAt(out.x, out.y, 14);
     });
-    await shoot('uses-hatched', 3000);
+    await shoot('uses-hatched');
 
     // A brush's stamp (a disc of shops 16 m across) against the whole layer drawn again.
     const ms = await page.evaluate(() => {
@@ -228,26 +247,26 @@ try {
       zs.menuScene.setNearest(zs.OVERVIEW_CLOSE);
       zs.menuScene.nudge(0, 2, 0.6);
     });
-    await shoot('camera-tilted-low', 2500);
+    await shoot('camera-tilted-low');
     await page.evaluate(() => {
       const zs = window.__zs;
       // (Towards the land under the stage's middle, as the wheel does.)
       const [x, y] = [(zs.frame.left + zs.frame.right) / 2, innerHeight / 2];
       for (let k = 0; k < 60; k++) zs.menuScene.zoomAt(x, y, 1.2);
     });
-    await shoot('camera-close-10m', 3000);
+    await shoot('camera-close-10m');
     const close = await page.evaluate(() => window.__zs.menuScene.distance);
     console.log(`zoneShots: ${renderer}: in as near as ${close.toFixed(2)} m`);
     await page.evaluate(() => window.__zs.menuScene.nudge(0, 1 / 6, -0.3));
-    await shoot('camera-near', 2500);
+    await shoot('camera-near');
     await page.evaluate(() => window.__zs.menuScene.nudge(2.2, 1));
-    await shoot('camera-turned', 2500);
+    await shoot('camera-turned');
     await page.evaluate(() => window.__zs.menuScene.panView(60, 0));
-    await shoot('camera-panned-right', 2500);
+    await shoot('camera-panned-right');
     await page.evaluate(() => window.__zs.menuScene.setUses(null));
     await shoot('camera-turned-no-uses');
     await page.evaluate(() => window.__zs.menuScene.reframe());
-    await shoot('camera-reframed', 2500);
+    await shoot('camera-reframed');
 
     for (const e of errors) {
       faults++;
