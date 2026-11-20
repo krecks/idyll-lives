@@ -2048,7 +2048,8 @@ export class TownStreet {
       const road = this.staticParts().get(id)?.road;
       if (road && !road.empty) out.push({ name: 'streets', material: 'material.road', geo: road, toned: true });
       const trail = this.staticParts().get(id)?.trail;
-      if (trail && !trail.empty) out.push({ name: 'trails', material: 'material.path', geo: trail });
+      // (Toned white, which draws them as they are untoned, so they go into one draw with the garden paths: `groundDraw`.)
+      if (trail && !trail.empty) out.push({ name: 'trails', material: 'material.path', geo: trail, toned: true });
       const marks = this.staticParts().get(id)?.marks;
       if (marks && !marks.empty) out.push({ name: 'roadMarks', material: 'paint', geo: marks, paint: true });
       const all = new Map(this.groundRects().map(([name, rects]) => [name, rects]));
