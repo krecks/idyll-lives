@@ -1,6 +1,7 @@
 //! The sources, options and outcomes of a measure.
 
-use super::*;
+use crate::checkglb::against::{Class, Finding, Numbers};
+use std::path::PathBuf;
 
 /// Where a side's files come from.
 #[derive(Clone, Debug, PartialEq)]

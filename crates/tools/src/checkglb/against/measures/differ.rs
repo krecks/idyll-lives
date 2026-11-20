@@ -1,6 +1,13 @@
 //! How two parts differ.
 
 use super::*;
+use crate::checkglb::against::{
+    AREA, BOUNDS, Finding, Model, NORMAL_AWAY, NORMAL_SHARE, NORMAL_TURN, Numbers, SHADE_LEVELS,
+    SHADE_MEAN, SHADE_MOST, SURFACE_FITTED, SURFACE_MAX, SURFACE_MEAN, TEXELS, TRIANGLES, UV_OFF,
+    UV_SHARE, found, mm, only, point, share,
+};
+use crate::checkglb::near::{P3, Part};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The parts: the same nodes' triangles of the same materials with the same attributes, about as many triangles
 /// and as much area a material, each node's box, and each part's surface, normals, texture and shading against the

@@ -1,6 +1,9 @@
 //! A side's files, read.
 
 use super::*;
+use crate::checkglb::Paths;
+use crate::checkglb::py::{self, J, dirname, join, normpath, relpath};
+use std::path::Path;
 
 impl Side {
     pub(crate) fn open(
@@ -98,8 +101,8 @@ impl Side {
                             )?;
                         }
                     }
-                    let mut centres = super::super::super::read_centres(&tree.centres)?;
-                    for (k, c) in super::super::super::read_centres(&found.centres)?
+                    let mut centres = crate::checkglb::read_centres(&tree.centres)?;
+                    for (k, c) in crate::checkglb::read_centres(&found.centres)?
                         .entries()
                         .unwrap_or(&[])
                     {
@@ -122,9 +125,9 @@ impl Side {
                 }
             }
         };
-        let stack = super::super::super::asset_manifests(&paths)?;
-        let (entries, fin) = super::super::super::model_entries(&stack);
-        let centres = super::super::super::read_centres(&paths.centres)?;
+        let stack = crate::checkglb::asset_manifests(&paths)?;
+        let (entries, fin) = crate::checkglb::model_entries(&stack);
+        let centres = crate::checkglb::read_centres(&paths.centres)?;
         Ok(Side {
             paths,
             origin,

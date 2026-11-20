@@ -1,6 +1,8 @@
 //! The context a comparison runs in.
 
 use super::*;
+use crate::checkglb::{Facts, Furniture};
+use std::collections::{BTreeMap, HashMap};
 
 /// What the rows are compared with: the two sides, and the working tree's content for the gate.
 pub(crate) struct Context {

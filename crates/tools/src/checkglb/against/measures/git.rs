@@ -1,6 +1,8 @@
 //! Reading a revision out of git.
 
-use super::*;
+use std::io::{BufRead, BufReader, Read, Write};
+use std::path::Path;
+use std::process::{Command, Stdio};
 
 pub(crate) fn git(root: &str, args: &[&str]) -> Result<Vec<u8>, String> {
     let out = Command::new("git")

@@ -1,6 +1,8 @@
 //! What has been accepted, and what a manifest still says.
 
-use super::*;
+use crate::checkglb::against::METRICS;
+use crate::checkglb::py::{self, J};
+use std::collections::BTreeMap;
 
 /// A manifest without its model entries: what the models' rows do not cover. Nor its `$comment`, which says what
 /// builds the pack (a script, then a crate) and which the game does not read.
@@ -38,7 +40,7 @@ pub(crate) fn accepted(path: &str) -> (BTreeMap<String, BTreeMap<String, String>
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return (out, errors),
         Err(e) => return (out, vec![format!("{path}: {e}")]),
     };
-    let json = match super::super::super::json::loads_text(&data) {
+    let json = match crate::checkglb::json::loads_text(&data) {
         Ok(json @ J::Obj(_)) => json,
         Ok(_) => return (out, vec![format!("{path} is {{key: {{metric: why}}}}")]),
         Err(e) => return (out, vec![format!("{path}: {e}")]),

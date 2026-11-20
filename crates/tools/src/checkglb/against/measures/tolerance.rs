@@ -1,6 +1,9 @@
 //! What counts as fruit, and how far off a measure may be.
 
-use super::*;
+use crate::checkglb::against::{
+    FRUIT, NORMAL_AWAY, NORMAL_REACH, NORMAL_TURN, SAME_PLACE, SAMPLES, SHADE_LEVELS, UV_OFF,
+};
+use crate::checkglb::near::{self, Across, Part, Surface, Tolerance};
 
 /// Whether a material is fruit a resident reaches for (`FRUIT`).
 pub(crate) fn fruit(material: &str) -> bool {

@@ -1,10 +1,11 @@
 //! The `--against` command line.
 
 use super::*;
+use std::path::Path;
 
 /// `cargo check-glb --against <rev|dir> [keys… | --family <f>] [--dir <built>]`: the exit code.
 pub fn main(args: &[String]) -> i32 {
-    let root = super::super::repo_root();
+    let root = crate::checkglb::repo_root();
     let mut opts = Options {
         root: root.clone(),
         old: Source::Tree,

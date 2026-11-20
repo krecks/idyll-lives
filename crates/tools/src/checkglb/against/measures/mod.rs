@@ -1,9 +1,5 @@
 //! The measurements themselves: geometry, surfaces, texels and shading.
 
-// The children's own `use super::*` take these from here (constants, aliases and the shared imports of
-// `against/mod.rs`), so this module has none of its own uses for them.
-#[allow(unused_imports)]
-use super::*;
 mod accepted;
 mod against;
 mod context;

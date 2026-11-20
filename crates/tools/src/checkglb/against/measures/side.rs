@@ -1,6 +1,9 @@
 //! The two sides of a comparison, and where their files come from.
 
-use super::*;
+use crate::checkglb::py::J;
+use crate::checkglb::{Finishes, Paths};
+use std::collections::BTreeMap;
+use std::path::Path;
 
 /// How a side's model files get where its manifests name them.
 pub(crate) enum Origin {

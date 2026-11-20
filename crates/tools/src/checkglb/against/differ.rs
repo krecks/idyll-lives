@@ -1,6 +1,11 @@
 //! What differs between two models: nodes, materials, clips.
 
 use super::*;
+use crate::checkglb::digest;
+use crate::checkglb::glb::Glb;
+use crate::checkglb::near::{self, Rest};
+use crate::checkglb::py::{self, J};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The nodes: the same paths (names under the same parents), each with or without a mesh as before, at rest where
 /// it was.

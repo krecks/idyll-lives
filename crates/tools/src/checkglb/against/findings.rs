@@ -1,6 +1,7 @@
 //! Findings, their classes, and the numbers a comparison keeps.
 
 use super::*;
+use crate::checkglb::near::P3;
 
 /// One row of `METRICS` that is over its limit.
 #[derive(Clone, Debug, PartialEq)]

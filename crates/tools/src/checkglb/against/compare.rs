@@ -1,6 +1,11 @@
 //! Comparing two models: the measurements and their tolerances.
 
 use super::*;
+use crate::checkglb::digest;
+use crate::checkglb::glb::{Glb, R, parse_glb};
+use crate::checkglb::near::{self, Part, Rest};
+use crate::checkglb::py::J;
+use std::collections::{BTreeSet, HashSet};
 
 /// Compares two `.glb` files' bytes: `same` if their digests are equal, else every row of `METRICS` a file alone
 /// answers (the pack, the centre and the gate's rows need its entry: `against`).
