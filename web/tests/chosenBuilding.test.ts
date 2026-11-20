@@ -5,6 +5,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { PlotInfo, SimView, TownPlace } from '../src/core/protocol';
 import { chosenAnchor, chosenIcon, chosenOf, flatRows, flatsDetail, insideText, placeDetail, placeLabel, whoIsIn, type ChosenTown } from '../src/ui/town/chosen';
+import { FLAT_FLOOR } from '../src/game/price';
 import { homesForSale } from '../src/ui/town/places';
 import type { TagWorld } from '../src/ui/town/tags';
 import { BUILDING, FLATS, realTown } from './fixtures/realTown';
@@ -59,7 +60,7 @@ describe("a building of flats' card (the real town: Mill Court, flats 1 to 4)", 
       [4, 'Flat 4', 1, null],
     ]);
     // (The lot of 520 m² shared by four flats, and its own 63 m² at a flat's rate.)
-    expect(rows[3].price).toBe(Math.round((10 * 130 + 0.6 * 100 * 63) / 10) * 10);
+    expect(rows[3].price).toBe(Math.round((10 * 130 + FLAT_FLOOR * 100 * 63) / 10) * 10);
     expect(rows.slice(0, 3).every((r) => r.price === null)).toBe(true);
     expect(flatsDetail(rows)).toBe('4 flats · 1 for sale');
     expect(flatsDetail(rows.slice(0, 3))).toBe('3 flats');

@@ -5,6 +5,7 @@
  */
 import { describe, expect, test } from 'bun:test';
 import { flatRefuses } from '../src/game/flatBuild';
+import { FLAT_FLOOR } from '../src/game/price';
 import type { BuildTool } from '../src/ui/state.svelte';
 import { homesForSale } from '../src/ui/town/places';
 import { saleTags } from '../src/ui/town/tags';
@@ -20,7 +21,7 @@ describe('flats for sale', () => {
     const sale = homesForSale(world.plots, households, RATES, world.flats);
     expect(sale.map((h) => h.plot)).toEqual([FLATS[1], FLATS[3]]);
     expect(sale.every((h) => h.flat && h.storeys === 1 && h.floor === 63 && h.w === 7 && h.d === 9)).toBe(true);
-    expect(sale[0].price).toBe(Math.round((10 * ((20 * 26) / 4) + 0.6 * 100 * 63) / 10) * 10);
+    expect(sale[0].price).toBe(Math.round((10 * ((20 * 26) / 4) + FLAT_FLOOR * 100 * 63) / 10) * 10);
     // (Without the flats in the views, the building of flats isn't put up for sale whole.)
     expect(homesForSale(world.plots, [], RATES).some((h) => h.plot === BUILDING)).toBe(false);
   });
