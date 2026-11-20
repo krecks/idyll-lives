@@ -117,11 +117,12 @@ export async function serve({ mode = 'dev', port, web = WEB, outDir = null } = {
   const vite = spawn(join(web, 'node_modules/.bin/vite'), args, { cwd: web, stdio: ['ignore', 'pipe', 'inherit'] });
   const stop = () => vite.kill();
   process.on('exit', stop);
+  let limit;
   const url = await new Promise((resolve, reject) => {
     vite.stdout.on('data', (d) => String(d).includes('Local') && resolve(`http://127.0.0.1:${port}`));
     vite.on('exit', (code) => reject(new Error(`vite exited (${code})`)));
-    setTimeout(() => reject(new Error('vite did not report "Local" in 120 s')), 120_000);
-  });
+    limit = setTimeout(() => reject(new Error('vite did not report "Local" in 120 s')), 120_000);
+  }).finally(() => clearTimeout(limit));
   return { url, stop, port };
 }
 
