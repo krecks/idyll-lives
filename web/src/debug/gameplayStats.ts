@@ -4,15 +4,16 @@
  * with the renderer's own numbers, on demand, so a harness never has to wait for the 5 s dev play log
  * sample. Off by default, and absent from production builds: `import.meta.env.DEV` is false there, so
  * `GAMEPLAY_STATS` is `false` and the hook is never installed (and the flag is tree-shaken away). A
- * build made for the benchmark (`VITE_BENCH_STATS=1 vite build`, `gameplay.mjs --prod`) keeps it.
+ * build made for the benchmark (`VITE_BENCH=1`, `tools/bench/lib/build.mjs`; `VITE_BENCH_STATS=1` keeps this hook alone) keeps it.
  */
 
 import type { MemoryCensus, RenderStats } from '../render/types';
+import { DEBUG_HOOKS } from './hooks';
 
 const params = new URLSearchParams(location.search);
 
 /** Whether the gameplay benchmark asked for the renderer's stats (`?gpustats`, dev only). */
-export const GAMEPLAY_STATS = (import.meta.env.DEV || import.meta.env.VITE_BENCH_STATS === '1') && params.has('gpustats');
+export const GAMEPLAY_STATS = (DEBUG_HOOKS || import.meta.env.VITE_BENCH_STATS === '1') && params.has('gpustats');
 
 /**
  * What `window.__gameStats()` answers: the renderer's stats, the GPU passes it timed, and the

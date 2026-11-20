@@ -9,6 +9,11 @@
  *     --port 5221              Vite's port (it starts its own; `--url http://localhost:5221` uses a running one)
  *     --preview                the production build (`vite preview` of web/dist: compressed textures and
  *                              models, minified code; what players get) instead of the dev server; `--build` builds it first
+ *     --prod                   a production build made for the benchmark (`lib/build.mjs`: `VITE_BENCH=1`, kept in
+ *                              bench-results/.dist/<key> and reused while web/ is the same), served by `vite preview`;
+ *                              its textures are the sources unless `--assets prod` (pictures compare with the dev server's)
+ *     --attach [keep|<port>]   the pages a kept browser holds loaded (`keep.mjs`; `--url` picks the build), used as
+ *                              they are and reset after: no game load
  *     --scene village          web/public/bench/<scene>.json(.gz)
  *     --presets low,medium,high
  *     --backends webgpu,webgl
@@ -37,6 +42,8 @@
  *                              `town`: the town view, over the main town's centre and over the home from 150, 400
  *                              and 900 m at midday, at dusk and by night, the game in its `town-day|dusk|night` scenes
  *                              with the interface, or `--scene bigworld` for the drawing alone)
+ *     --reload-per-pose        a page for every picture (as before 2026-11-20) instead of one page per scene stepped
+ *                              through its poses and hours (`window.__bench`, `web/src/debug/bench.ts`)
  *     --pages [gallery,…]      with --shots: the dev pages instead (`PAGES`: the gallery, clips, residents and
  *                              poses benches, each held still), one PNG per page × backend × diag
  *   --compare <dirA> <dirB>    pixel differences between two shot folders (and `--out` for the difference images):
@@ -65,14 +72,11 @@
 
 import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { attach, keepInfo, launchArgs, openBench, playwright, ROOT, serve, step, twoFrames, VIEWPORT, SITE_STORAGE, WEB } from './lib/browser.mjs';
+import { benchBuild } from './lib/build.mjs';
 import { quiet } from './quiet.mjs';
 import { worldFlags } from './worldFlags.mjs';
-
-const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const WEB = join(ROOT, 'web/');
 
 const SCENARIOS = {
   'orbit-day': 'cam=orbit&hour=13',
@@ -254,6 +258,10 @@ function optionsOf(args) {
     url: flag('url', null),
     preview: has('preview'),
     build: has('build'),
+    prod: has('prod'),
+    assets: flag('assets', 'source'),
+    attach: has('attach') ? flag('attach', 'keep') : null,
+    reload: has('reload-per-pose'),
     fresh: has('fresh'),
     scene: flag('scene', 'village'),
     presets: list('presets', shots ? 'medium' : 'low,medium,high'),
@@ -273,15 +281,6 @@ function optionsOf(args) {
     left: Number(flag('left', '2600')),
     out: flag('out', shots ? flag('shots') : join(ROOT, 'bench-results', stamp)),
   };
-}
-
-async function playwright() {
-  if (process.env.PLAYWRIGHT) return import(process.env.PLAYWRIGHT);
-  try {
-    return await import(createRequire(WEB + 'package.json').resolve('playwright'));
-  } catch {
-    throw new Error('Playwright not found: install it, or set PLAYWRIGHT=<path to playwright/index.mjs>');
-  }
 }
 
 /**
@@ -307,6 +306,23 @@ process.on('exit', () => {
 async function serverFor(o) {
   profilePort ??= o.port;
   if (o.url) return o.url;
+  // (A kept browser's first build, unless `--url` names another of them.)
+  if (o.attach === 'keep') return keepInfo().builds[0].url;
+  if (o.prod) {
+    if (!servers.has('prod')) {
+      nextPort ??= o.port;
+      const port = nextPort++;
+      servers.set(
+        'prod',
+        benchBuild({ assets: o.assets }).then(async ({ dir }) => {
+          const { url, stop } = await serve({ mode: 'preview', port, outDir: dir });
+          quit.push(stop);
+          return url;
+        }),
+      );
+    }
+    return servers.get('prod');
+  }
   if (o.build && !built) {
     const build = spawn(`${WEB}node_modules/.bin/vite`, ['build'], { cwd: WEB, stdio: ['ignore', 'ignore', 'inherit'] });
     await new Promise((resolve, reject) => build.on('exit', (code) => (code ? reject(new Error(`vite build failed (${code})`)) : resolve())));
@@ -329,12 +345,13 @@ async function serverFor(o) {
   return servers.get(mode);
 }
 
-const VIEWPORT = { viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 };
-/** What a kept browser clears before each page: everything the site stores, not the HTTP or shader caches. */
-const SITE_STORAGE = 'cookies,file_systems,indexeddb,local_storage,service_workers,cache_storage';
 
 /** The browser for a job's kind: `{ context }` (kept, with its profile) or `{ browser }` (`--fresh`). */
 async function browserFor(o) {
+  if (o.attach) {
+    if (!browsers.has('attached')) browsers.set('attached', attach(o.attach));
+    return browsers.get('attached');
+  }
   const kind = `${o.headed ? 'window' : 'headless'}${o.throughput ? '-fast' : ''}${o.fresh ? '-fresh' : ''}`;
   if (!browsers.has(kind)) {
     const { chromium } = await playwright();
@@ -342,16 +359,8 @@ async function browserFor(o) {
       headless: !o.headed,
       // (Without one of its own: Playwright's full Chromium, which has the GPU headless too.)
       ...(process.env.CHROME ? { executablePath: process.env.CHROME } : { channel: 'chromium' }),
-      args: [
-        '--enable-unsafe-webgpu',
-        // Full-precision GPU timestamps (otherwise rounded to 0.1 ms).
-        '--enable-webgpu-developer-features',
-        // Keep drawing at full rate in a window nobody looks at.
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding',
-        '--disable-background-timer-throttling',
-        ...(o.throughput ? ['--disable-gpu-vsync', '--disable-frame-rate-limit'] : []),
-      ],
+      // (WebGPU, full-precision GPU timestamps, drawing at full rate in a window nobody looks at: `lib/browser.mjs`.)
+      args: launchArgs({ throughput: o.throughput }),
     };
     browsers.set(
       kind,
@@ -395,6 +404,8 @@ async function place(context, page, left) {
 async function open(o, query, throttle, key, timeoutMs, path = '/') {
   const base = await serverFor(o);
   const b = await browserFor(o);
+  // A kept browser's page with this scene and these settings, used as it is (`keep.mjs`); else a new one in it.
+  if (b.attached) return openBench(b.context, base, query, { attached: true, timeoutMs, path, key });
   let context = b.context;
   if (!context) {
     context = await b.browser.newContext(VIEWPORT);
@@ -452,8 +463,10 @@ try {
   }
 } finally {
   for (const b of browsers.values()) {
-    const { context, browser } = await b.catch(() => ({}));
-    await (context ?? browser)?.close();
+    const { context, browser, attached } = await b.catch(() => ({}));
+    // (A kept browser stays as it is: only the connection goes.)
+    if (attached) await browser.close().catch(() => {});
+    else await (context ?? browser)?.close();
   }
   for (const kill of quit) kill();
 }
@@ -541,36 +554,61 @@ function table(o, results) {
   return rows.join('\n') + '\n';
 }
 
+/**
+ * The poses' pictures, one page per scene × preset × backend × diag stepped through its poses and hours
+ * (`window.__bench`: `lib/browser.mjs` `step`), each pose settled before its picture; the menus' town (`cam=town`)
+ * and Build mode (`cam=build`) on a page of their own. `--reload-per-pose`: a page for every picture, as before.
+ */
 async function shots(o) {
   const { backends, presets, diags, warmup, out } = o;
   const poses = o.list('poses', Object.keys(POSES).filter((p) => !NAMED_ONLY.test(p)).join(',')).flatMap((p) => (p === 'play' ? PLAY : p === 'day' ? DAY : p === 'close' ? CLOSE : p === 'town' ? TOWN : [p]));
+  const started = performance.now();
+  let taken = 0;
   for (const backend of backends) {
     for (const preset of presets) {
-      for (const pose of poses) {
-        for (const diag of diags) {
-          const d = ['freeze', ...(diag === 'none' ? [] : diag.split('+'))].join(',');
-          const name = `${preset}-${backend}-${pose}${diag === 'none' ? '' : `-${diag}`}.png`;
-          process.stdout.write(`${name} … `);
-          try {
-            // (The town set is the game in its town's scene at that hour, interface and all, unless the command line gives a scene.)
-            const town = TOWN.includes(pose) && !o.args.includes('--scene');
-            const scene = town ? townScene(pose) : o.scene;
-            const { page, done } = await open(o, queryOf(o, preset, backend, `${POSES[pose]}&diag=${d}&hud=${town ? 'game' : '0'}&secs=0&warmup=${warmup}`, scene), 1, '__benchReady', warmup * 1000 + 240_000);
+      for (const diag of diags) {
+        const d = ['freeze', ...(diag === 'none' ? [] : diag.split('+'))].join(',');
+        // (The town set is the game in its town's scene at that hour, interface and all, unless the command line gives a scene.)
+        const groups = new Map();
+        for (const pose of poses) {
+          const town = TOWN.includes(pose) && !o.args.includes('--scene');
+          const scene = town ? townScene(pose) : o.scene;
+          const alone = o.reload || /(^|&)cam=(town|build)(&|$)/.test(POSES[pose]);
+          const key = `${scene}|${town}|${alone ? pose : ''}`;
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push({ name: pose, query: POSES[pose], scene, town });
+        }
+        for (const list of groups.values()) {
+          // (The town view over the home first: the game opens on the home, so its lot is the focus as on a page opened
+          // there, and the camera then goes once to the centre as a page opened there does. The other way round, the
+          // lots round the home come back dressed otherwise: 0.2 % of the picture.)
+          list.sort((a, b) => Number(!/(^|&)over=home(&|$)/.test(a.query)) - Number(!/(^|&)over=home(&|$)/.test(b.query)));
+          const [first] = list;
+          const file = (p) => `${preset}-${backend}-${p.name}${diag === 'none' ? '' : `-${diag}`}.png`;
+          const shoot = async (page, p) => {
             // (The tags are placed a frame after the camera, and fade in.)
-            if (town) await page.waitForTimeout(1200);
+            if (p.town) await page.waitForTimeout(1200);
             // Two more frames, then the picture.
-            await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-            await page.screenshot({ path: join(out, name) });
-            await done();
-            console.log('ok');
+            await twoFrames(page);
+            await page.screenshot({ path: join(out, file(p)) });
+            taken++;
+            console.log(`${file(p)} ok (${((performance.now() - started) / 1000).toFixed(0)} s)`);
+          };
+          let opened = null;
+          try {
+            opened = await open(o, queryOf(o, preset, backend, `${first.query}&diag=${d}&hud=${first.town ? 'game' : '0'}&secs=0&warmup=${warmup}`, first.scene), 1, '__benchReady', warmup * 1000 + 240_000);
+            // A kept page shows whatever pose it last had: the first pose too is stepped to.
+            await step(opened.page, opened.kept ? list : list.slice(1), shoot, { before: opened.kept ? null : () => shoot(opened.page, first) });
           } catch (err) {
-            console.log(`failed: ${err}`);
+            console.log(`${list.map(file).join(', ')}: failed: ${err}`);
+          } finally {
+            await opened?.done();
           }
         }
       }
     }
   }
-  console.log(`shots in ${out}`);
+  console.log(`${taken} shots in ${out} in ${((performance.now() - started) / 1000).toFixed(1)} s`);
 }
 
 /** The dev pages (`PAGES`), drawn still: one picture per page × backend × diag (the page's `__ready`). */

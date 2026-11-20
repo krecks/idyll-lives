@@ -476,8 +476,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   private readonly diag = benchDiag();
   private readonly debug = new URLSearchParams(location.search).has('debug');
-  /** `?hour=`: the light held at that hour. */
-  private readonly fixedHour: number | null;
+  /** `?hour=`: the light held at that hour (`setFixedHour` changes it). */
+  private fixedHour: number | null;
+  /** `?diag=freeze`: time stands still (`setFrozen` changes it). */
+  private frozen = this.diag.has('freeze');
 
   /**
    * The player's camera input and the game camera's pose (the director's rig drives it too). One zoom from the play
@@ -1235,9 +1237,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       else if (!this.frameWaiters.length) return;
     }
     const start = performance.now();
-    const frozen = this.diag.has('freeze');
     // (Never less than none: the frames after fixed-step playback, back on the wall clock, may be timed before its last.)
-    const dt = (this.frameDt = frozen ? 0 : Math.min(this.lastTime ? Math.max(0, time - this.lastTime) : 1000 / 60, MAX_FRAME_MS));
+    const dt = (this.frameDt = this.frozen ? 0 : Math.min(this.lastTime ? Math.max(0, time - this.lastTime) : 1000 / 60, MAX_FRAME_MS));
     this.lastTime = time;
     // (What moves only for the eye, the wind, the clouds and the selection marker's bob, stands still while the frame is
     // held, and goes on from there when it is drawn again: `heldFrames.ts`.)
@@ -2195,7 +2196,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.placeLids();
     this.applyWallMode();
     this.applyStoreys();
-    const birds = this.birdLife.settle(world, view, this.fixedHour !== null ? this.fixedHour * 60 : this.lastMinute, { landscape: this.lot.landscape, street: this.street.plants, roofs: this.roofs, houseTop: (plot) => this.house.roofTop(plot) }); // (where the birds live.)
+    const birds = this.settleBirds(world, view, this.fixedHour !== null ? this.fixedHour * 60 : this.lastMinute); // (where the birds live.)
     if (!this.birdsWaited && !this.warming) {
       // The game's first build waits for its birds a little, behind the loading screen (their models
       // built): they popped in in the first seconds of play. Later builds let them come when they come.
@@ -3156,7 +3157,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // in view again. (Load time for smooth roaming: about a second more.)
     const world = this.lastWorld;
     const home = this.view;
-    if (world?.meta?.world?.size === 'big' && home && !this.disposed) {
+    // (`diag=nowarm`: not for a bench that counts draws, which waits long enough for the pipelines anyway.)
+    if (world?.meta?.world?.size === 'big' && home && !this.disposed && !this.diag.has('nowarm')) {
       const gains: number[] = [];
       const lots = warmLots(world, home, WARM_LOTS, gains);
       for (const [i, lot] of lots.entries()) {
@@ -4073,6 +4075,30 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const tex = v.tex ?? 0;
     const geom = (v.vb ?? 0) + (v.ib ?? 0);
     return { tex, geom, total: tex + geom + (v.ub ?? 0) + (v.sb ?? 0) };
+  }
+
+  /** Where the birds live in `world` round `view` at `minute`'s hour. */
+  private settleBirds(world: WorldStructure, view: ViewRect | null, minute: number): Promise<void> {
+    return this.birdLife.settle(world, view, minute, { landscape: this.lot.landscape, street: this.street.plants, roofs: this.roofs, houseTop: (plot) => this.house.roofTop(plot) });
+  }
+
+  setFixedHour(hour: number | null): Promise<void> {
+    this.fixedHour = hour;
+    if (this.townMode) {
+      this.lastLightMinute = -1;
+      return Promise.resolve();
+    }
+    // Lit now, not at the next frame's update; the birds settled again as a world built at that hour has them.
+    const minute = hour !== null ? hour * 60 : this.lastMinute;
+    this.lastMinute = minute;
+    this.applyLighting(minute);
+    this.lastLightMinute = minute;
+    const world = this.lastWorld;
+    return world ? this.settleBirds(world, this.view, minute) : Promise.resolve();
+  }
+
+  setFrozen(on: boolean): void {
+    this.frozen = on;
   }
 
   setFrameProbe(probe: FrameProbe | null): void {

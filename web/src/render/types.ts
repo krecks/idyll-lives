@@ -660,6 +660,13 @@ export interface Renderer {
   benchInfo(): Record<string, unknown> & { passes: RenderPassInfo[] };
   /** Benchmark: the world last drawn (its town shown as the menus' for `cam=town`), or null. */
   benchWorld(): WorldStructure | null;
+  /**
+   * Benchmark: the light held at `hour` (as `?hour=`; null: the game's clock again), lit at once, the sun's map told if
+   * the sun turned. Resolves once the birds have settled for that hour (where they perch differs by night).
+   */
+  setFixedHour(hour: number | null): Promise<void>;
+  /** Benchmark: time stood still (as `?diag=freeze`: frames advance nothing, not the wind nor a fade) or going again. */
+  setFrozen(on: boolean): void;
   configure(options: LiveRenderOptions): void;
   /** Small JPEG data URL of the current view, or null if capture isn't possible. */
   captureThumbnail(width: number, height: number): Promise<string | null>;
