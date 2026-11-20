@@ -574,14 +574,15 @@ async function shots(o) {
           const town = TOWN.includes(pose) && !o.args.includes('--scene');
           const scene = town ? townScene(pose) : o.scene;
           const alone = o.reload || /(^|&)cam=(town|build)(&|$)/.test(POSES[pose]);
-          // (A page per spot of the town view: the focus lot and what was built round it stay when the camera goes to
-          // another spot, which a page opened there wouldn't have.)
-          const spot = new URLSearchParams(POSES[pose]).get('over') ?? '';
-          const key = `${scene}|${town}|${spot}|${alone ? pose : ''}`;
+          const key = `${scene}|${town}|${alone ? pose : ''}`;
           if (!groups.has(key)) groups.set(key, []);
           groups.get(key).push({ name: pose, query: POSES[pose], scene, town });
         }
         for (const list of groups.values()) {
+          // (The town view over the home first: the game opens on the home, so its lot is the focus as on a page opened
+          // there, and the camera then goes once to the centre as a page opened there does. The other way round, the
+          // lots round the home come back dressed otherwise: 0.2 % of the picture.)
+          list.sort((a, b) => Number(!/(^|&)over=home(&|$)/.test(a.query)) - Number(!/(^|&)over=home(&|$)/.test(b.query)));
           const [first] = list;
           const file = (p) => `${preset}-${backend}-${p.name}${diag === 'none' ? '' : `-${diag}`}.png`;
           const shoot = async (page, p) => {
