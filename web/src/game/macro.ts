@@ -10,7 +10,7 @@ import { GENTLE_TILT, seedBare, smoothHeights } from './landFollow';
 import { outlines, rasterize, rle, simplify } from './landMasks';
 import { fbm } from './noise';
 import { along, astar, CELL, Cells, clearOfBoxes, COUNTRY_GRADE, COUNTRY_WIDTH, CountryRouter, CTRL_APART, FACING, ROAD_WIDTH, ROUTE_GRADE, SIDE_COST, TRIES, type Port, type Way } from './countryRouter';
-import { centroid, cropRoads, curve, evenly, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, straightAround, type Box, type Pt, type RoadPlan } from './roads';
+import { centroid, cropRoads, curve, evenly, inside, leftOf, lengths, nearest, pointAt, RoadIndex, straightAround, type Box, type Pt, type RoadPlan } from './roads';
 import { lotName, placeOfTemplate, placeUnit } from './placeLots';
 import { BIG_COURTS, boundsOf, COURTS, frontageOf, Ground, houseFor, joinUp, lotAt, LotPlacer, plotRect, settleRoads, shuffled, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
 import { LAND_SIZE, LEGACY_KINDS, placeOf, specOf, streetNames, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind, type WorldSpec, type WorldStep } from './world';
@@ -2823,9 +2823,4 @@ export function trailTo(slot: PlotSlot, plan: AreaPlan, roads: readonly RoadPlan
 /** The middles of a big world's areas, and a centroid helper for the menus. */
 export function areaCentre(a: TownArea): Pt {
   return centroid([[a.x, a.z], [a.x + a.w, a.z + a.d]]);
-}
-
-/** Where the roads lead out of a big world: their `out` ends (on its edge). */
-export function worldExits(roads: readonly RoadPlan[]): Pt[] {
-  return roadEnds(roads.filter((r) => r.kind !== 'trail')).map(({ x, z }): Pt => [x, z]);
 }

@@ -76,7 +76,6 @@ const DOOR_SPLIT: [number, number, number] = [0.505, 0.535, 0.97];
  * windows).
  */
 export type CarAge = 0 | 1 | 2;
-export const CAR_AGES = 3;
 /** A car's age as the structure gives it (`CarInfo.age`; absent or out of range: used). */
 export function carAge(age: number | undefined): CarAge {
   return age === 0 || age === 2 ? age : 1;
