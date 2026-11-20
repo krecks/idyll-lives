@@ -3,7 +3,7 @@
 //! A car belongs to a household and stands on its home's driveway (the town file's `cars`; every
 //! house's driveway is in its `drives`); a flat's stands in its own bay in the building's front
 //! strip, and its household sets off in it from anywhere on the building's lot, the hall or the
-//! yard as much as the flat (`at_home_for_car`). Only its owners drive it, and only grown-ups (18
+//! yard as much as the flat (`world::at_home`). Only its owners drive it, and only grown-ups (18
 //! and up): the household's grown-ups when the town was made (a household left with no owner hands
 //! it down to its grown-ups). Whoever else in the household leaves at the same time rides along. When the
 //! household moves house, the car goes with it, to the new home's driveway (`relocate`). Which car
@@ -217,12 +217,6 @@ const SEATS: usize = 5;
 /// How far from the car (m) someone already on the street turns back for a ride.
 const CALL_REACH: f32 = 15.0;
 
-/// Whether someone standing on plot `on` (`SimBrief::plot`) is at home on plot `home` as far as
-/// the household's car goes: on it, or (a flat's household) on its building's lot on the ground,
-/// its hall, stairs, yard and front strip, where the flat's car stands in its bay (its `Drive`).
-pub(crate) fn at_home_for_car(plots: &[Plot], on: Option<u32>, home: u32) -> bool {
-    on == Some(home) || on.is_some_and(|p| plots.get(home as usize).is_some_and(|h| h.lot() == p))
-}
 /// Clearance from the inner end of a driveway to the car (m), as the town parks them.
 const PARK_GAP: f32 = 0.45;
 /// On the town's roads (`Route::on_roads`): how far from the road a driveway or exit may be (m),

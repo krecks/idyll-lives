@@ -805,7 +805,9 @@ pub(crate) fn order_access(
     }
 }
 
-/// Whether plot `p` is home to those living on `home`: it, or the building their flat is in.
+/// Whether plot `p` is home to those living on `home`: it, or the building their flat is in (its
+/// hall, stairs, yard and front strip). What they may use there (`access`), and where a household
+/// sets off in its car from: a flat's car stands in its bay in the building's front strip.
 pub(crate) fn at_home(plots: &[Plot], home: Option<u32>, p: u32) -> bool {
     home.is_some_and(|h| h == p || plots.get(h as usize).and_then(|f| f.of) == Some(p))
 }

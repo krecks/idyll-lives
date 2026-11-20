@@ -23,7 +23,9 @@ pub(crate) fn seat(
     if !sim.here() || me.baby || sim.taxi.is_some() {
         return None;
     }
-    if (me.plot.is_none() || at_home_for_car(plots, me.plot, home))
+    if me
+        .plot
+        .is_none_or(|p| crate::world::at_home(plots, Some(home), p))
         && let Some(seat) = own_seat(cars, briefs, plots, sim, me, home)
     {
         return Some(seat);
@@ -82,7 +84,9 @@ pub(crate) fn own_seat(
 ) -> Option<(u32, usize)> {
     cars.iter().enumerate().find_map(|(c, car)| {
         // At home, or still close by on the street.
-        let near = at_home_for_car(plots, me.plot, home)
+        let near = me
+            .plot
+            .is_some_and(|p| crate::world::at_home(plots, Some(home), p))
             || (sim.pos[0] - car.spot[0]).hypot(sim.pos[1] - car.spot[1]) < CALL_REACH;
         // (Not one setting off on a trip: `trip_ride`.)
         if car.household != sim.household
