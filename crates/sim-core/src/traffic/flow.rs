@@ -2,6 +2,10 @@
 
 use super::*;
 
+mod begin;
+mod go;
+mod lights;
+
 /// A car on the road this tick, as the others keep out of its way (`Traffic::begin`): its
 /// key (`cars::Driving::first`), its body, the way it goes and how far it can still pull over
 /// (`Sample::pass`); whether it moved last tick, and where it'll be along its way in the next ticks
@@ -263,7 +267,3 @@ impl Traffic {
         found
     }
 }
-
-mod begin;
-mod go;
-mod lights;

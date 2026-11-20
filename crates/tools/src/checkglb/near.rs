@@ -16,7 +16,9 @@ use crate::characters::meshops::nearest_weights;
 use crate::vec3::{cross, dot, length, sub};
 use std::collections::BTreeMap;
 
+mod anim;
 mod geom;
+pub use anim::*;
 pub use geom::*;
 
 /// A node's triangles of one material, in the node's own space.
@@ -615,9 +617,6 @@ pub fn across(from: &Part, onto: &Surface, tol: &Tolerance, uv_metres: f64, leve
     }
     out
 }
-
-mod anim;
-pub use anim::*;
 
 #[cfg(test)]
 mod tests {

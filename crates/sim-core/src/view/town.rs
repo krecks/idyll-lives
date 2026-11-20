@@ -2,6 +2,9 @@
 
 use super::*;
 
+mod json;
+pub use json::*;
+
 /// On their way somewhere (`SimView.trip`): to which plot, and about when they're there.
 #[derive(Serialize)]
 pub(crate) struct TripView {
@@ -797,9 +800,6 @@ pub(crate) fn object_view<'a>(
         repair_cost: (o.wear > 0.0).then(|| crate::home::repair_cost(content, o)),
     }
 }
-
-mod json;
-pub use json::*;
 
 /// `StructureView::basement`.
 pub(crate) fn basement_block(world: &World) -> Option<i32> {
