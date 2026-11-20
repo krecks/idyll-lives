@@ -8,7 +8,8 @@ import { Geo } from '../src/render/shared/geometry';
 import { carriageway, pavedRects, repair, STREET_LOOK } from '../src/render/shared/paving';
 import { roadMeshes } from '../src/render/shared/roads';
 import { carriageway as kerbToKerb } from '../src/render/shared/junctions';
-import { townPaving, type Rect } from '../src/render/shared/townPaving';
+import { BAY, LINE, townPaving, type Rect } from '../src/render/shared/townPaving';
+import { BAY_DEEP, BAY_LINES, BAY_WIDE } from '../src/game/parking';
 import { realTown, STOREY, W } from './fixtures/realTown';
 
 /** The red of the vertex nearest `(x, z)` in `g` (0..1, sRGB). */
@@ -198,7 +199,7 @@ describe('the town’s paving (`townPaving`)', () => {
     const lines = p.bays.flatMap((b) => b.lines);
     expect(lines).toHaveLength(9);
     const along = lines.filter(([a, b]) => Math.abs(a[0] - b[0]) < 1e-3).map(([a]) => a[0]).sort((a, b) => a - b);
-    expect(along.map((x) => Math.round(x * 100) / 100)).toEqual([26.05, 29, 32, 35, 37.95]);
+    expect(along.map((x) => Math.round(x * 100) / 100)).toEqual([26.1, 29, 32, 35, 37.9]);
     // The far ends away from the street (nose in): at z = 27.5 - 2.75.
     const across = lines.filter(([a, b]) => Math.abs(a[1] - b[1]) < 1e-3);
     expect(across).toHaveLength(4);
@@ -211,5 +212,16 @@ describe('the town’s paving (`townPaving`)', () => {
     expect(q.pieces.filter((r) => r.kind === 'carpark')).toHaveLength(1);
     expect(q.bays[0].lines).toHaveLength(3);
     expect(q.signs).toEqual([]);
+    // A lone bay's sides' lines as far apart as the simulation has them, as long, and its far end's line where they end.
+    const [l, r, end] = q.bays[0].lines;
+    expect(Math.abs(l[0][0] - r[0][0])).toBeCloseTo(BAY_LINES[0], 6);
+    expect(Math.abs(l[0][1] - l[1][1])).toBeCloseTo(BAY_LINES[1], 6);
+    expect(Math.abs(end[0][1] - 36.5)).toBeCloseTo(BAY_LINES[1] / 2 - LINE / 2, 6);
+  });
+
+  test('a bay is drawn as big as the simulation parks in it (`parking.ts`)', () => {
+    expect([BAY.w, BAY.d]).toEqual([BAY_WIDE, BAY_DEEP]);
+    const lines: readonly number[] = BAY.lines;
+    expect(lines).toEqual(BAY_LINES);
   });
 });

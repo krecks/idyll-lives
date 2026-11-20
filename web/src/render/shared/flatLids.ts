@@ -95,11 +95,18 @@ export function closedParts(world: Pick<WorldStructure, 'rooms' | 'width'>, lot:
   if (!mayOpen || !lot) return [];
   const out: ClosedPart[] = closedFlats(flats, mayOpen).map((f) => ({ plot: f.id, storey: f.storey, rects: [{ x: f.x, z: f.z, w: f.w, d: f.d }] }));
   if (lot.kind !== 'flats' && flats.length && !mayOpen(lot.id)) {
-    const rects = placeFloor(world, lot, flats, rowOf);
+    // (The same while the world's rooms are: asked again a few times a second.)
+    let byLot = floors.get(world.rooms);
+    if (!byLot) floors.set(world.rooms, (byLot = new Map()));
+    let rects = byLot.get(lot.id);
+    if (!rects) byLot.set(lot.id, (rects = placeFloor(world, lot, flats, rowOf)));
     if (rects.length) out.push({ plot: lot.id, storey: 0, rects });
   }
   return out;
 }
+
+/** Each world's places' ground floors under their flats (`placeFloor`), by its rooms and the lot's id. */
+const floors = new WeakMap<object, Map<number, TileRect[]>>();
 
 /** Whether ground point (`x`, `z`, on the ground's rows) on storey `k` is in one of `parts`. */
 export function inClosed(parts: readonly ClosedPart[], x: number, z: number, k: number): boolean {

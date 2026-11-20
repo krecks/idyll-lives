@@ -17,11 +17,13 @@ import { groundDepth, type WorldStructure } from '../../core/protocol';
 import { valueNoise } from '../../game/noise';
 import { CHUNK, chunkAt, chunkRect, hashNumbers, hashString } from './chunks';
 import { LAND_CELL } from '../../game/land';
+import { centroid } from '../../game/roads';
 import type { BuiltSurface } from './builtSurface';
 import { Geo, type V3 } from './geometry';
+import { toLinear } from './math';
 import { lotsFilled } from './nature';
 import type { ChunkPlan, GroundLayer } from './street';
-import { clipBy, clipRect, COURSE, courseCells, LINE, PAVING_LOOK, TILE, townPaving, type Poly, type Rect, type TownPaving } from './townPaving';
+import { boxOf, clipBy, clipRect, COURSE, courseCells, LINE, PAVING_LOOK, TILE, townPaving, type BayDraw, type PavingDraw, type Poly, type Rect, type TownPaving } from './townPaving';
 
 /** What the near paving reads (as `townPaving.ts` `PavingWorld`), and the world's size. */
 export type StreetGroundWorld = Pick<WorldStructure, 'plots' | 'meta' | 'parking' | 'carParks' | 'width' | 'depth' | 'storeyDepth'>;
@@ -49,7 +51,7 @@ const UP: V3 = [0, 1, 0];
  * What each surface the paving is drawn with makes of a vertex colour (linear light, a channel each):
  * its texture's mean times its material's colour (the base manifest's `material.sidewalk`,
  * `material.path`, `material.road`). The vertex colours are the paving's colours through them
- * (`toned`); a texture whose mean moves is another number here.
+ * (`toner`); a texture whose mean moves is another number here.
  */
 const SURFACE_TONE: Record<'sidewalk' | 'path' | 'road', V3> = {
   sidewalk: scaled(linear('#E4E0D8'), 0.7362),
@@ -57,11 +59,10 @@ const SURFACE_TONE: Record<'sidewalk' | 'path' | 'road', V3> = {
   road: [0.1154, 0.1129, 0.103],
 };
 
-/** An sRGB colour's channels in linear light (as the far map's shader reads them: a power of 2.2). */
+/** An sRGB colour's channels in linear light (as the far map's shader reads them: a power of 2.2, `toLinear`). */
 function linear(hex: string): V3 {
   const v = parseInt(hex.slice(1), 16);
-  const c = (b: number) => Math.pow(b / 255, 2.2);
-  return [c((v >> 16) & 255), c((v >> 8) & 255), c(v & 255)];
+  return [toLinear(((v >> 16) & 255) / 255), toLinear(((v >> 8) & 255) / 255), toLinear((v & 255) / 255)];
 }
 
 /** `v` times `k`. */
@@ -69,17 +70,51 @@ function scaled(v: V3, k: number): V3 {
   return [v[0] * k, v[1] * k, v[2] * k];
 }
 
-/** A colour (sRGB hex) as the vertex colour that shows it on `surface` (no brighter than white), `k` times its light. */
-function toned(hex: string, surface: V3, k = 1): V3 {
-  const [c, s] = [linear(hex), (i: number) => Math.pow(Math.min(1, (c[i] * k) / surface[i]), 1 / 2.2)];
-  return [s(0), s(1), s(2)];
+/**
+ * A colour (sRGB hex) as the vertex colour that shows it on `surface` (no brighter than white): worked out once, and
+ * then for `k` times its light (1: as it is) at each vertex.
+ */
+function toner(hex: string, surface: V3): (k?: number) => V3 {
+  const c = linear(hex).map((v, i) => Math.pow(v / surface[i], 1 / 2.2));
+  return (k = 1) => {
+    const f = Math.pow(k, 1 / 2.2);
+    return [Math.min(1, c[0] * f), Math.min(1, c[1] * f), Math.min(1, c[2] * f)];
+  };
 }
 
-/** A layer's name, material and what its tiles are toned to. */
+/** A layer's name, material and what its tiles and the joints between their courses are toned to. */
 const LAYERS = {
-  [TILE.stone]: { name: 'townPaving', material: 'material.sidewalk', colour: PAVING_LOOK.stone, surface: SURFACE_TONE.sidewalk },
-  [TILE.yard]: { name: 'townYards', material: 'material.path', colour: PAVING_LOOK.yard, surface: SURFACE_TONE.path },
+  [TILE.stone]: { name: 'townPaving', material: 'material.sidewalk', tone: toner(PAVING_LOOK.stone, SURFACE_TONE.sidewalk), joint: toner(PAVING_LOOK.joint, SURFACE_TONE.sidewalk) },
+  [TILE.yard]: { name: 'townYards', material: 'material.path', tone: toner(PAVING_LOOK.yard, SURFACE_TONE.path), joint: toner(PAVING_LOOK.joint, SURFACE_TONE.path) },
 } as const;
+/** A car park's apron, toned as the road's asphalt shows it. */
+const ASPHALT = toner(PAVING_LOOK.asphalt, SURFACE_TONE.road)();
+
+/** A chunk's share of what is drawn by its own outline: the car parks' aprons, the bays and the P signs whose middles are in it. */
+interface Share {
+  aprons: PavingDraw[];
+  bays: BayDraw[];
+  signs: [number, number, number][];
+}
+
+/** Each paving's shares, by chunk. */
+const sharesOf = new WeakMap<TownPaving, Map<number, Share>>();
+
+function shares(paving: TownPaving): Map<number, Share> {
+  let out = sharesOf.get(paving);
+  if (out) return out;
+  const by = (out = new Map<number, Share>());
+  const of = (id: number) => {
+    let s = by.get(id);
+    if (!s) by.set(id, (s = { aprons: [], bays: [], signs: [] }));
+    return s;
+  };
+  for (const p of paving.pieces) if (p.edge === 'exact') of(chunkAt(...centroid(p.poly))).aprons.push(p);
+  for (const b of paving.bays) of(chunkAt(...centroid(b.corners))).bays.push(b);
+  for (const s of paving.signs) of(chunkAt(s[0], s[1])).signs.push(s);
+  sharesOf.set(paving, out);
+  return out;
+}
 
 /** The ground's tiles across and down (`groundDepth`: the ground storey's rows). */
 function groundOf(world: StreetGroundWorld): [number, number] {
@@ -129,8 +164,7 @@ function lay(g: Geo, poly: [number, number][], y: number, tint: (x: number, z: n
     g.poly(poly.map(([x, z]) => [x, y, z] as V3), UP, undefined, undefined, poly.map(([x, z]) => tint(x, z)));
     return;
   }
-  let [x0, z0, x1, z1] = [Infinity, Infinity, -Infinity, -Infinity];
-  for (const [x, z] of poly) [x0, z0, x1, z1] = [Math.min(x0, x), Math.min(z0, z), Math.max(x1, x), Math.max(z1, z)];
+  const [x0, z0, x1, z1] = boxOf(poly);
   const c = LAND_CELL;
   for (let j = Math.floor(z0 / c); j * c < z1; j++) {
     for (let i = Math.floor(x0 / c); i * c < x1; i++) {
@@ -149,10 +183,10 @@ function lay(g: Geo, poly: [number, number][], y: number, tint: (x: number, z: n
 /**
  * The layers of the paved ground in `area` (none: the whole town): its tiles (those in `skip`, the
  * viewed lot's, left to it), and unless `tilesOnly` the car parks' aprons and the bays' lines whose
- * middles are in it, on the ground as the ground tiles draw it where the town follows its land
- * (`surface`; none: at 0).
+ * middles are in it (`share`: those, as a chunk's share), on the ground as the ground tiles draw it where
+ * the town follows its land (`surface`; none: at 0).
  */
-export function pavingLayers(world: StreetGroundWorld, area: Rect | null, options: { surface?: BuiltSurface | null; skip?: Rect | null; tilesOnly?: boolean } = {}): GroundLayer[] {
+export function pavingLayers(world: StreetGroundWorld, area: Rect | null, options: { surface?: BuiltSurface | null; skip?: Rect | null; tilesOnly?: boolean; share?: Share } = {}): GroundLayer[] {
   const paving = townPaving(world);
   const [w, d] = groundOf(world);
   const tiles = paving.tiles(w, d);
@@ -185,17 +219,13 @@ export function pavingLayers(world: StreetGroundWorld, area: Rect | null, option
   }
   if (options.tilesOnly) return out;
   const within = (x: number, z: number) => x >= a.x && z >= a.z && x < a.x + a.w && z < a.z + a.d;
+  const share = options.share ?? { aprons: paving.pieces.filter((p) => p.edge === 'exact' && within(...centroid(p.poly))), bays: paving.bays.filter((b) => within(...centroid(b.corners))) };
   const aprons = new Geo();
-  const asphalt = toned(PAVING_LOOK.asphalt, SURFACE_TONE.road);
-  for (const p of paving.pieces) {
-    if (p.edge !== 'exact' || p.surface !== 'asphalt') continue;
-    if (within(...middle(p.poly))) lay(aprons, p.poly.map(([x, z]) => [x, z]), APRON_Y, () => asphalt, terrain);
-  }
+  for (const p of share.aprons) if (p.surface === 'asphalt') lay(aprons, p.poly.map(([x, z]) => [x, z]), APRON_Y, () => ASPHALT, terrain);
   if (!aprons.empty) out.push({ name: 'carParks', material: 'material.road', geo: aprons, toned: true });
   const lines = new Geo().color(PAVING_LOOK.line, PAINT_FINISH);
   const paint = (): V3 => [lines.r, lines.g, lines.b];
-  for (const b of paving.bays) {
-    if (!within(...middle(b.corners))) continue;
+  for (const b of share.bays) {
     for (const [p, q] of b.lines) {
       const l = Math.hypot(q[0] - p[0], q[1] - p[1]);
       if (l < 1e-6) continue;
@@ -207,11 +237,6 @@ export function pavingLayers(world: StreetGroundWorld, area: Rect | null, option
   return out;
 }
 
-/** A polygon's middle (the mean of its corners). */
-function middle(poly: readonly (readonly [number, number])[]): [number, number] {
-  return [poly.reduce((s, p) => s + p[0], 0) / poly.length, poly.reduce((s, p) => s + p[1], 0) / poly.length];
-}
-
 /**
  * A paved cell (`s` × `t` m from (`x`, `z`)) of tiles paved with `c` into `g`: the stone cut at its joints, each part
  * toned; a tile laid in part (`part`), only that part of it.
@@ -219,8 +244,8 @@ function middle(poly: readonly (readonly [number, number])[]): [number, number] 
 function layCell(g: Geo, x: number, z: number, s: number, t: number, c: number, terrain: Terrain | null, part?: readonly Poly[]): void {
   const L = LAYERS[c as keyof typeof LAYERS];
   for (const { cell: [a0, b0, a1, b1], joint } of courseCells(x, z, x + s, z + t, c === TILE.stone ? COURSE : 0)) {
-    const colour = joint ? PAVING_LOOK.joint : L.colour;
-    const tint = (u: number, v: number) => toned(colour, L.surface, 1 + (valueNoise(u / 2.3, v / 2.3, 977) - 0.5) * 2 * VARY);
+    const tone = joint ? L.joint : L.tone;
+    const tint = (u: number, v: number) => tone(1 + (valueNoise(u / 2.3, v / 2.3, 977) - 0.5) * 2 * VARY);
     if (!part) lay(g, [[a0, b0], [a1, b0], [a1, b1], [a0, b1]], PAVING_Y, tint, terrain);
     else for (const q of part) lay(g, clipRect(q, a0, b0, a1, b1), PAVING_Y, tint, terrain);
   }
@@ -244,9 +269,7 @@ export function streetGroundChunks(world: StreetGroundWorld): number[] {
       x = (Math.floor(x / CHUNK) + 1) * CHUNK - 1;
     }
   }
-  for (const p of paving.pieces) if (p.edge === 'exact') ids.add(chunkAt(...middle(p.poly)));
-  for (const b of paving.bays) ids.add(chunkAt(...middle(b.corners)));
-  for (const [x, z] of paving.signs) ids.add(chunkAt(x, z));
+  for (const id of shares(paving).keys()) ids.add(id);
   return [...ids];
 }
 
@@ -277,10 +300,10 @@ export function streetGroundKey(world: StreetGroundWorld, id: number, focus = -1
         for (const q of parts.get(z * w + x) ?? []) codes.push(-1, ...q.flat());
       }
     }
-    const mine = (p: readonly (readonly [number, number])[]) => chunkAt(...middle(p)) === id;
-    const aprons = paving.pieces.filter((p) => p.edge === 'exact' && mine(p.poly)).flatMap((p) => p.poly.flat());
-    const bays = paving.bays.filter((b) => mine(b.corners)).flatMap((b) => b.lines.flat(2));
-    const signs = paving.signs.filter(([x, z]) => chunkAt(x, z) === id).flat();
+    const share = shares(paving).get(id);
+    const aprons = share?.aprons.flatMap((p) => p.poly.flat()) ?? [];
+    const bays = share?.bays.flatMap((b) => b.lines.flat(2)) ?? [];
+    const signs = share?.signs.flat() ?? [];
     const tilesKey = any ? `t${hashNumbers(codes)}` : '';
     const rest = aprons.length || bays.length ? `a${hashNumbers([...aprons, -1, ...bays])}` : '';
     key = tilesKey || rest || signs.length ? `${tilesKey}|${rest}|${signs.length ? hashNumbers(signs) : ''}` : '';
@@ -291,7 +314,7 @@ export function streetGroundKey(world: StreetGroundWorld, id: number, focus = -1
     const signs = key.split('|')[2];
     return signs ? `s${signs}` : '';
   }
-  const lot = focus >= 0 ? world.plots.find((p) => p.id === focus) : undefined;
+  const lot = focus >= 0 ? world.plots[focus] : undefined;
   if (!lot || !key.startsWith('t')) return key;
   const r = chunkRect(id);
   const meets = lot.x < r.x + r.w && lot.x + lot.w > r.x && lot.z < r.z + r.d && lot.z + lot.d > r.z;
@@ -305,8 +328,8 @@ export function streetGroundKey(world: StreetGroundWorld, id: number, focus = -1
  */
 export function streetGround(plan: ChunkPlan, world: StreetGroundWorld, id: number, surface?: BuiltSurface | null, focus = -1, layers = true): void {
   if (!streetGroundKey(world, id, focus, layers)) return;
-  const paving = townPaving(world);
-  const signs = paving.signs.filter(([x, z]) => chunkAt(x, z) === id);
+  const share = shares(townPaving(world)).get(id);
+  const signs = share?.signs ?? [];
   if (signs.length) {
     let list = plan.batches.get(PARKING_SIGN);
     if (!list) plan.batches.set(PARKING_SIGN, (list = []));
@@ -317,7 +340,7 @@ export function streetGround(plan: ChunkPlan, world: StreetGroundWorld, id: numb
     }
   }
   if (!layers) return;
-  const lot = focus >= 0 ? world.plots.find((p) => p.id === focus) : undefined;
-  plan.ground.push(...pavingLayers(world, chunkRect(id), { surface, skip: lot ?? null }));
+  const lot = focus >= 0 ? world.plots[focus] : undefined;
+  plan.ground.push(...pavingLayers(world, chunkRect(id), { surface, skip: lot ?? null, share: share ?? { aprons: [], bays: [], signs: [] } }));
 }
 

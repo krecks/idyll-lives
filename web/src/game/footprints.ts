@@ -24,6 +24,11 @@ export function signedArea2(poly: readonly Pt[]): number {
   return n;
 }
 
+/** `poly` wound counter-clockwise seen from above (x right, z down the screen: its signed area negative), turned in place if it was not. */
+export function ccw(poly: Pt[]): Pt[] {
+  return signedArea2(poly) > 0 ? poly.reverse() : poly;
+}
+
 /** A rectangle `w` along `t` and `d` along `n` (unit, square to each other) from the middle of its front edge `c`, counter-clockwise seen from above. */
 export function rectFrom(c: Pt, t: Pt, n: Pt, w: number, d: number): Pt[] {
   const a = add(c, t, -w / 2);

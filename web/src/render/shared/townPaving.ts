@@ -18,7 +18,8 @@
  */
 
 import type { PavedPiece, RoadPlan, WorldStructure } from '../../core/protocol';
-import { rasterRoads } from '../../game/roads';
+import { ccw, signedArea2, toOutline } from '../../game/footprints';
+import { centroid, rasterRoads } from '../../game/roads';
 import { carriageway } from './junctions';
 
 /** An outline on the ground (town metres, x and z). */
@@ -106,12 +107,16 @@ export const PAVING_LOOK = {
 export const COURSE = 5;
 export const JOINT = 0.5;
 /**
- * A bay: 3 m along its road by 6 deep; its lines (`LINE` m wide) run along its sides, 1.45 m either side
- * of its middle (two bays side by side share one), and across its far end, 2.75 m in from its middle.
- * A lone bay's apron is a little bigger than the bay, so its lines lie on asphalt.
+ * A bay as the simulation parks in it (`parking.ts` `BAY_WIDE`, `BAY_DEEP` and `BAY_LINES`, which `paving.test.ts` holds
+ * these to: that module brings the town's generator with it): 3 m along its road by 6 deep, its lines (`LINE` m wide)
+ * 2.8 m apart along its sides (two bays side by side share one, between them) and 5.6 m long, and one across its far
+ * end, as far out as they reach. A lone bay's apron is a little bigger than the bay, so its lines lie on asphalt.
  */
-export const BAY = { w: 3, d: 6, side: 1.45, end: 2.75, half: 2.8 } as const;
+export const BAY = { w: 3, d: 6, lines: [2.8, 5.6] } as const;
 export const LINE = 0.1;
+/** Where a bay's lines run from its middle: its sides' across it, how far they reach along it, its far end's along it. */
+const [SIDE, HALF] = [BAY.lines[0] / 2, BAY.lines[1] / 2];
+const END = HALF - LINE / 2;
 const LONE = { w: 3.4, d: 6.2 } as const;
 /** A tile wholly under a road's carriageway is the road's, not paved: its middle this far inside the kerb (half its diagonal). */
 const UNDER_ROAD = Math.SQRT1_2;
@@ -176,18 +181,21 @@ function drawPaving(world: PavingWorld): TownPaving {
     const park = lone ? -1 - i : bay.park!;
     const at = bayFrame(bay.x, bay.z, bay.yaw);
     if (lone) pieces.push({ kind: 'carpark', poly: at.rect(LONE.w, LONE.d), holes: [], course: 0, surface: 'asphalt', edge: 'exact' });
-    const lines: BayDraw['lines'] = [at.seg(-BAY.side, -BAY.half, -BAY.side, BAY.half), at.seg(BAY.side, -BAY.half, BAY.side, BAY.half), at.seg(-BAY.w / 2, BAY.end, BAY.w / 2, BAY.end)];
+    const lines: BayDraw['lines'] = [at.seg(-SIDE, -HALF, -SIDE, HALF), at.seg(SIDE, -HALF, SIDE, HALF), at.seg(-BAY.w / 2, END, BAY.w / 2, END)];
     bays.push({ corners: at.rect(BAY.w, BAY.d), lines });
     sides.push({ park, a: lines[0][0], b: lines[0][1] }, { park, a: lines[1][0], b: lines[1][1] });
   });
   // Two bays side by side share the line between them: the two sides' lines as one, between where they were.
-  for (let i = 0; i < sides.length; i++) {
-    for (let j = i + 1; j < sides.length; j++) {
-      const [s, t] = [sides[i], sides[j]];
-      if (s.park !== t.park || Math.hypot(s.a[0] - t.a[0], s.a[1] - t.a[1]) > 0.3 || Math.hypot(s.b[0] - t.b[0], s.b[1] - t.b[1]) > 0.3) continue;
-      const mid = (p: [number, number], q: [number, number]) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2] as [number, number];
-      [s.a, s.b] = [mid(s.a, t.a), mid(s.b, t.b)];
-      [t.a, t.b] = [s.a, s.b];
+  // (Only a car park's own: a lone bay is a park of its own.)
+  const mid = (p: [number, number], q: [number, number]) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2] as [number, number];
+  for (const row of Map.groupBy(sides, (s) => s.park).values()) {
+    for (let i = 0; i < row.length; i++) {
+      for (let j = i + 1; j < row.length; j++) {
+        const [s, t] = [row[i], row[j]];
+        if (Math.hypot(s.a[0] - t.a[0], s.a[1] - t.a[1]) > 0.3 || Math.hypot(s.b[0] - t.b[0], s.b[1] - t.b[1]) > 0.3) continue;
+        [s.a, s.b] = [mid(s.a, t.a), mid(s.b, t.b)];
+        [t.a, t.b] = [s.a, s.b];
+      }
     }
   }
   bays.forEach((b, i) => {
@@ -248,16 +256,6 @@ function bayFrame(x: number, z: number, yaw: number) {
   };
 }
 
-/** `poly` wound counter-clockwise seen from above (x right, z down the screen: its signed area x·z' − x'·z negative). */
-function ccw(poly: [number, number][]): [number, number][] {
-  let n = 0;
-  for (let i = 0; i < poly.length; i++) {
-    const [a, b] = [poly[i], poly[(i + 1) % poly.length]];
-    n += a[0] * b[1] - b[0] * a[1];
-  }
-  return n > 0 ? poly.reverse() : poly;
-}
-
 /** A polygon's box: x0, z0, x1, z1. */
 export function boxOf(poly: readonly (readonly [number, number])[]): [number, number, number, number] {
   let [x0, z0, x1, z1] = [Infinity, Infinity, -Infinity, -Infinity];
@@ -299,15 +297,23 @@ function layTiles(pieces: readonly PavingDraw[], roads: readonly RoadPlan[], w: 
       const k = (z - z0) * cw + x - x0;
       let v = signed.get(k);
       if (v === undefined) {
-        v = edgeDistance(p.poly, x, z);
-        for (const c of cuts) v = Math.min(v, edgeDistance(c, x, z));
+        v = toOutline(p.poly, x, z);
+        for (const c of cuts) v = Math.min(v, toOutline(c, x, z));
         // (A corner on the outline takes the side its tile's corners were counted on, a hair from it.)
         v = Math.max(v, ON_EDGE);
         signed.set(k, (v = corner[k] ? v : -v));
       }
       return v;
     };
-    const holed = (x: number, z: number) => p.holes.some((r) => x + 0.5 >= r.x && x + 0.5 < r.x + r.w && z + 0.5 >= r.z && z + 0.5 < r.z + r.d);
+    // (The tiles whose middles are in a hole, marked once for the piece.)
+    const bw = x1 - x0;
+    const holes = new Uint8Array(bw * (z1 - z0));
+    for (const r of p.holes) {
+      for (let z = Math.max(z0, Math.ceil(r.z - 0.5)); z < Math.min(z1, Math.ceil(r.z + r.d - 0.5)); z++) {
+        for (let x = Math.max(x0, Math.ceil(r.x - 0.5)); x < Math.min(x1, Math.ceil(r.x + r.w - 0.5)); x++) holes[(z - z0) * bw + x - x0] = 1;
+      }
+    }
+    const holed = (x: number, z: number) => holes[(z - z0) * bw + x - x0] === 1;
     for (let z = z0; z < z1; z++) {
       for (let x = x0; x < x1; x++) {
         const k = (z - z0) * cw + x - x0;
@@ -363,18 +369,6 @@ function spans(poly: readonly (readonly [number, number])[], z: number, x0: numb
   for (let k = 0; k + 1 < xs.length; k += 2) for (let x = Math.max(x0, Math.ceil(xs[k])); x <= Math.min(x1, xs[k + 1]); x++) each(x);
 }
 
-/** How far (`x`, `z`) is from the nearest side of `poly`. */
-function edgeDistance(poly: readonly (readonly [number, number])[], x: number, z: number): number {
-  let best = Infinity;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [[ax, az], [bx, bz]] = [poly[j], poly[i]];
-    const [ux, uz] = [bx - ax, bz - az];
-    const l = ux * ux + uz * uz;
-    const t = l > 0 ? Math.min(1, Math.max(0, ((x - ax) * ux + (z - az) * uz) / l)) : 0;
-    best = Math.min(best, Math.hypot(x - ax - ux * t, z - az - uz * t));
-  }
-  return best;
-}
 
 /**
  * The part of tile (`x`, `z`) on the paved side of an edge (its corners' signed distances `v`, round from (`x`, `z`)
@@ -398,11 +392,7 @@ function crossTile(x: number, z: number, v: readonly number[]): Poly | null {
 }
 
 /** The area of outline `poly` (m²). */
-function area(poly: Poly): number {
-  let a = 0;
-  for (let k = 0; k < poly.length; k++) a += poly[k][0] * poly[(k + 1) % poly.length][1] - poly[(k + 1) % poly.length][0] * poly[k][1];
-  return Math.abs(a) / 2;
-}
+const area = (poly: Poly): number => Math.abs(signedArea2(poly)) / 2;
 
 /** `poly` (convex) less what lies on the right of the line from `a` to `b` (seen from above, x right and z down). */
 export function clipBy(poly: readonly (readonly [number, number])[], a: readonly [number, number], b: readonly [number, number]): Poly {
@@ -462,12 +452,12 @@ export function courseCells(x0: number, z0: number, x1: number, z1: number, cour
  * Marks (1) the tiles of a `w` × `d` grid a convex outline `q` covers the middle of, less `holes`
  * (`any`: those it reaches into at all, near enough: a tile's middle within half its diagonal of it).
  */
-export function fillConvex(out: Uint8Array, w: number, d: number, q: readonly (readonly [number, number])[], holes: readonly Rect[] = [], any = false): void {
+export function fillConvex(out: Uint8Array, w: number, d: number, q: readonly [number, number][], holes: readonly Rect[] = [], any = false): void {
   const grow = any ? Math.SQRT1_2 : 0;
   const [bx0, bz0, bx1, bz1] = boxOf(q);
   const [x0, x1] = [Math.max(0, Math.floor(bx0 - grow)), Math.min(w - 1, Math.ceil(bx1 + grow))];
   const [z0, z1] = [Math.max(0, Math.floor(bz0 - grow)), Math.min(d - 1, Math.ceil(bz1 + grow))];
-  const [cx, cz] = [q.reduce((a, p) => a + p[0], 0) / q.length, q.reduce((a, p) => a + p[1], 0) / q.length];
+  const [cx, cz] = centroid(q);
   const holed = (x: number, z: number) => holes.some((r) => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.d);
   for (let z = z0; z <= z1; z++) {
     for (let x = x0; x <= x1; x++) {

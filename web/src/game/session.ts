@@ -427,14 +427,20 @@ async function openSession(
     const home = homePlot();
     return home === null || !world ? home : lotOf(world, home);
   };
+  /** The player's sims as a set (`playerSims`), made again only when the roster or the households are. */
+  let mine: { roster: unknown; households: unknown; ids: ReadonlySet<number> } | null = null;
+  const mineNow = (): ReadonlySet<number> => {
+    if (mine?.roster !== game.roster || mine.households !== game.households) mine = { roster: game.roster, households: game.households, ids: new Set(playerSims()) };
+    return mine.ids;
+  };
   /**
    * Whether plot `plot` may be shown open now: the home, one of the household there, or looked inside; a building of
-   * flats if one of its flats may (`openLots.ts`). The renderer asks it of each flat of the building in view.
+   * flats if one of its flats may (`openLots.ts`), unless `byFlats` is false (by the plot alone).
    */
-  const mayOpenNow = (plot: number) => mayOpen(plot, { home: homePlot(), lookInside: game.lookInside, sims: game.sims, mine: new Set(playerSims()), flats: world?.flats });
+  const mayOpenNow = (plot: number, byFlats = true) => mayOpen(plot, { home: homePlot(), lookInside: game.lookInside, sims: game.sims, mine: mineNow(), flats: byFlats ? world?.flats : undefined });
   // (The renderer asks of each flat of the building in view, and of a place under flats for its own ground floor: by
   // the plot alone, not by its flats.)
-  renderer.setFlatsOpen((plot) => mayOpen(plot, { home: homePlot(), lookInside: game.lookInside, sims: game.sims, mine: new Set(playerSims()) }));
+  renderer.setFlatsOpen((plot) => mayOpenNow(plot, false));
   /**
    * The lot in view closes up when nothing keeps it open any more (the household left it, the player looked away
    * from it): the home is shown again, the camera left where it is. Not while following someone (their lot is shown).

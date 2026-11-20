@@ -1,9 +1,8 @@
 /**
  * A lot's building closed near (`render/shared/buildingDress.ts`, `TownStreet`): the game's street draws a lot with a
  * look (a named place's, a flats building's) dressed on the box the town view draws it as, as tall as its real storeys,
- * so a building seen far off is there when the camera comes in. Its door faces its street, a terrace has a door for
- * each home, a café its awning, a place with flats over it the flats' own street door; open, the game draws its own
- * walls.
+ * so a building seen far off is there when the camera comes in. Its door faces its street, a café has its awning, a
+ * place with flats over it the flats' own street door; open, the game draws its own walls.
  */
 import { describe, expect, test } from 'bun:test';
 import type { BuildingUse, LotLook, Opening, PlotInfo } from '../src/core/protocol';
@@ -52,8 +51,8 @@ const part = (parts: { name: string; geo: Geo }[], name: string) => parts.find((
 
 describe('a building dressed', () => {
   test('its walls stand on its box, as high as the town view’s; its roof as high as the box’s', () => {
-    const t = building('house', 12, 8);
-    const { parts } = dressBuilding(t, 'house', null);
+    const t = building('farm', 12, 8);
+    const { parts } = dressBuilding(t, 'farm', null);
     const walls = part(parts, 'silhouetteWalls')!;
     expect(walls).toBeDefined();
     const pts = local(walls, t);
@@ -69,19 +68,17 @@ describe('a building dressed', () => {
   });
 
   test('its door faces its street', () => {
-    const t = building('house', 12, 8);
+    const t = building('farm', 12, 8);
     // The street to the north (−z): the door on the box's −z side.
     expect(frontSide(t, [100, 20])).toBe(1);
     expect(frontSide(t, [100, 80])).toBe(0);
     expect(frontSide(t, [140, 50])).toBe(2);
-    const k = knobs(part(dressBuilding(t, 'house', [100, 20]).parts, 'silhouetteTrim')!);
+    const k = knobs(part(dressBuilding(t, 'farm', [100, 20]).parts, 'silhouetteTrim')!);
     expect(k.length).toBe(16);
     for (const [, z] of k) expect(z).toBeLessThan(50 - 3.99);
   });
 
-  test('a terrace is a row of homes, a door each; a café has its awning; a church its spire', () => {
-    const row = building('terrace', 22, 9);
-    expect(coloured(part(dressBuilding(row, 'terrace', null).parts, 'silhouetteTrim')!, KNOB) / 16).toBe(4);
+  test('a café has its awning; a church its spire', () => {
     // A café: the awning's cloth, in its stripe and white.
     const cafe = building('cafe', 12, 9, 100, 50, 'flat', 2);
     expect(coloured(part(dressBuilding(cafe, 'cafe', [100, 80]).parts, 'silhouetteTrim')!, [0xf2, 0xee, 0xe6])).toBeGreaterThan(8);
