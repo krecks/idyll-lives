@@ -50,7 +50,7 @@ import type { ModelEntry } from '../../assets/types';
 import type { FenceStyleDef } from '../../content/content';
 import { groundDepth, objectCentre, storeyOfRow, storeyRow, type FenceEdge, type GarageInfo, type LotLook, type ObjectPlacement, type Opening, type PlotInfo, type RoadPlan, type TownPlace, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
-import { Geo, type V3 } from './geometry';
+import { encodeFinish, Geo, type V3 } from './geometry';
 import { CARS, CAR_PAINT, carAge, garageAt, garageFor, hash, paintCar, parkCar, pick, type CarAge, type CarBody } from './cars';
 import { chunkAt, chunkCoords, chunkId, distanceToRect, hashNumbers, hashString, RectGrid } from './chunks';
 import { canopyBack, type HousePart, type HousePlanner, type SilhouettePlan, type SilhouetteSpec } from './house';
@@ -67,12 +67,6 @@ import { Levels, levelsOf } from './landSurface';
 import type { BuiltSurface } from './builtSurface';
 import { dressBuilding } from './buildingDress';
 import { farBuilding, lotLookBuilding, type TownBuilding } from './townBuildings';
-
-/** Vertex-colour alpha for the plain finish, as the material libraries' `encodeFinish`: [0, 0.5) dielectric, [0.5, 1] metal; roughness scaled within. */
-function encodeFinish(roughness: number, metallic: number): number {
-  const r = Math.min(0.999, Math.max(0, roughness)) * 0.5;
-  return metallic >= 0.5 ? 0.5 + r : r;
-}
 
 export interface Rect {
   x: number;

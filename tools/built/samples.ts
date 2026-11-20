@@ -61,7 +61,7 @@ export interface Sample {
 
 /** The materials that are no manifest entry: what the street and the town view draw in their own. */
 export const BUILT_MATERIALS = {
-  /** The plain finish: the vertex colour, its roughness and metalness in the vertex alpha (`street.ts` `encodeFinish`). */
+  /** The plain finish: the vertex colour, its roughness and metalness in the vertex alpha (`geometry.ts` `encodeFinish`). */
   plain: 'built.plain',
   /** Lamp glass: unlit, glowing at night. */
   glow: 'built.glow',

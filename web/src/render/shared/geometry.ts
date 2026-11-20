@@ -8,6 +8,15 @@
 
 export type V3 = readonly [number, number, number];
 
+/**
+ * Vertex-colour alpha for the plain finish: [0, 0.5) dielectric, [0.5, 1] metal; roughness scaled within. The
+ * surface shader decodes it (`pc/shaders/surface.ts`).
+ */
+export function encodeFinish(roughness: number, metallic: number): number {
+  const r = Math.min(0.999, Math.max(0, roughness)) * 0.5;
+  return metallic >= 0.5 ? 0.5 + r : r;
+}
+
 /** Custom vertex attribute: [mask A, kind, mask B, 0]; see `WallCutPlugin`. */
 export const WALL_CUT_KIND = 'wallCut';
 
