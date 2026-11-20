@@ -438,9 +438,9 @@ pub struct Grounds<'a> {
     /// Plot per tile of the ground storey, row by row (upper storeys are over the same ground;
     /// `NO_PLOT` off the plots).
     pub tile_plot: &'a [u16],
-    /// Per plot (by id): whether this resident may walk across it.
+    /// Per lot on the ground (by id; `World::lots`): whether this resident may walk across it.
     pub open: Vec<bool>,
-    /// Per plot (by id): whether its sides are fenced off from the plots beside it (a garden; a
+    /// Per lot on the ground (by id): whether its sides are fenced off from the plots beside it (a garden; a
     /// public place isn't).
     pub fenced: Vec<bool>,
     /// The flats' stair halls over public places, and per hall whether this resident may walk

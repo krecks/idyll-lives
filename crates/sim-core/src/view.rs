@@ -2188,7 +2188,7 @@ struct FlatView<'a> {
 /// `StructureView::flats`: every flat, in id order.
 fn flat_views(world: &World) -> Vec<FlatView<'_>> {
     world
-        .plots
+        .flats()
         .iter()
         .filter_map(|p| {
             Some(FlatView {
@@ -2663,9 +2663,8 @@ fn household_views(world: &World) -> Vec<HouseholdView<'_>> {
 /// `StructureView::plots`: the lots on the ground, in id order (flats go in `flats`).
 fn plot_views(world: &World) -> Vec<PlotView<'_>> {
     world
-        .plots
+        .lots()
         .iter()
-        .filter(|p| !p.is_flat())
         .map(|p| PlotView {
             id: p.id,
             name: &p.name,
@@ -2796,9 +2795,16 @@ impl StructureSync {
         let (print, plots) = plots_json(&mut self.plots, world);
         parts.put("plots", Some(print), plots.as_bytes());
         parts.part("exits", Some(&world.exits));
-        // (Presentation data the simulation carries unchanged: sent the first time only.)
+        // (What the simulation carries unchanged once loaded: sent the first time only. The
+        // town's bays, car parks and flats are as its file laid them.)
         if fresh {
             parts.part("meta", Some(&world.meta));
+            let parking = parking_views(world);
+            parts.part("parking", Some(&parking).filter(|p| !p.is_empty()));
+            let car_parks = &world.travel.file.car_parks;
+            parts.part("carParks", Some(car_parks).filter(|c| !c.is_empty()));
+            let flats = flat_views(world);
+            parts.part("flats", Some(&flats).filter(|f| !f.is_empty()));
         }
         let staff = staff_views(world);
         parts.part("staff", Some(&staff).filter(|s| !s.is_empty()));
@@ -2815,12 +2821,6 @@ impl StructureSync {
         parts.part("lightPoles", Some(&poles).filter(|p| !p.is_empty()));
         let junctions = junction_views(world);
         parts.part("junctions", Some(&junctions).filter(|j| !j.is_empty()));
-        let parking = parking_views(world);
-        parts.part("parking", Some(&parking).filter(|p| !p.is_empty()));
-        let car_parks = &world.travel.file.car_parks;
-        parts.part("carParks", Some(car_parks).filter(|c| !c.is_empty()));
-        let flats = flat_views(world);
-        parts.part("flats", Some(&flats).filter(|f| !f.is_empty()));
         // The lot's parts, those that changed (asked for only when the lot did; never unset).
         if lot {
             let (walls, openings, fences) = wall_edges(&world.lot, world.lot.walls());

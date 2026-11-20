@@ -1740,12 +1740,22 @@ impl FlatTiles {
     }
 }
 
-/// Checks a town's flats (`Plot::of`): each comes after every lot on the ground, stands in a lot
-/// on the ground on one of its `storeys` (not the basement), inside that lot's rectangle, and its
-/// door and the tile behind it, where it says them, are in that lot on its storey's rows (a block
-/// of `depth` rows a storey, `storeys.rs`).
-pub(crate) fn check_flats(plots: &[Plot], storeys: i32, depth: i32) -> Result<(), Error> {
+/// Checks a town's flats (`Plot::of`): each comes after every lot on the ground (a lot's storey is
+/// the ground's), stands in a lot on the ground on one of its `storeys` (not the basement), inside
+/// that lot's rectangle, and its door and the tile behind it, where it says them, are in that lot
+/// on its storey's rows (as `stairs` stacks them, `storeys.rs`).
+pub(crate) fn check_flats(
+    plots: &[Plot],
+    storeys: i32,
+    stairs: &crate::path::StairMap,
+) -> Result<(), Error> {
     let ground = plots.iter().take_while(|p| p.of.is_none()).count();
+    if let Some(lot) = plots[..ground].iter().find(|p| p.storey != 0) {
+        return Err(Error::new(format!(
+            "lot '{}' is on a storey (only a flat is)",
+            lot.name
+        )));
+    }
     for p in &plots[ground..] {
         let bad = |why: &str| Err(Error::new(format!("flat '{}' {why}", p.name)));
         let Some(of) = p.of else {
@@ -1763,10 +1773,7 @@ pub(crate) fn check_flats(plots: &[Plot], storeys: i32, depth: i32) -> Result<()
         if p.x < lot.x || p.z < lot.z || p.x + p.w > lot.x + lot.w || p.z + p.d > lot.z + lot.d {
             return bad("reaches out of its building's lot");
         }
-        let on_storey = |x: i32, z: i32| {
-            z.div_euclid(depth.max(1)) == i32::from(p.storey)
-                && lot.contains(x, z.rem_euclid(depth.max(1)))
-        };
+        let on_storey = |x: i32, z: i32| lot.holds(stairs, x, z) && p.on_storey(stairs, z);
         if p.door.is_some_and(|(x, z)| !on_storey(x, z))
             || p.inside
                 .is_some_and(|[x, z]| !on_storey(x.floor() as i32, z.floor() as i32))
@@ -1775,6 +1782,18 @@ pub(crate) fn check_flats(plots: &[Plot], storeys: i32, depth: i32) -> Result<()
         }
     }
     Ok(())
+}
+
+/// The lots on the ground of `plots`: every plot before the first flat (`check_flats` keeps the
+/// flats after them all). Passes over the town's ground take these, and a flat's rectangle, its
+/// building's ground, is never taken for a lot of its own.
+pub(crate) fn lots_of(plots: &[Plot]) -> &[Plot] {
+    &plots[..plots.partition_point(|p| !p.is_flat())]
+}
+
+/// The flats of `plots`: every plot after the lots on the ground (`lots_of`).
+pub(crate) fn flats_of(plots: &[Plot]) -> &[Plot] {
+    &plots[lots_of(plots).len()..]
 }
 
 /// When a public place is open: minutes of the day `[open, close)` on the days in `days` (bit 0
@@ -1810,8 +1829,20 @@ impl Plot {
     /// Whether tile (`x`, `z`: stacked rows, as `stairs` has them) is on it: inside its rectangle
     /// on any storey, and a flat's on its own storey.
     pub fn holds(&self, stairs: &crate::path::StairMap, x: i32, z: i32) -> bool {
-        self.contains(x, stairs.ground_z(z))
-            && (!self.is_flat() || stairs.storey(z) == i32::from(self.storey))
+        self.contains(x, stairs.ground_z(z)) && self.on_storey(stairs, z)
+    }
+
+    /// Whether row `z` (stacked rows, as `stairs` has them) is on its storey: any storey for a
+    /// lot on the ground (what stands upstairs on it is on it too), a flat's own only.
+    pub fn on_storey(&self, stairs: &crate::path::StairMap, z: i32) -> bool {
+        !self.is_flat() || stairs.storey(z) == i32::from(self.storey)
+    }
+
+    /// Its rows on its own storey (stacked rows, as `stairs` has them): a flat's on its storey, a
+    /// lot's on the ground (a lot's storey is 0).
+    pub fn rows(&self, stairs: &crate::path::StairMap) -> std::ops::Range<i32> {
+        let up = stairs.storey_row(i32::from(self.storey));
+        self.z + up..self.z + self.d + up
     }
 
     /// Where one coming to it stands at its door: a flat's landing before its own door (on its
@@ -2560,8 +2591,9 @@ impl World {
         check_flats(
             &world.plots,
             i32::from(lot_file.storeys.unwrap_or(1).max(1)),
-            i32::from(lot_file.depth),
+            &world.stairs,
         )?;
+        world.map_plots();
         let starting_funds = world.content.starting_funds;
         world.households = if lot_file.households.is_empty() {
             vec![Household {
@@ -3083,37 +3115,34 @@ impl World {
         Some(eta)
     }
 
+    /// The lots on the ground, in id order (`lots_of`).
+    pub fn lots(&self) -> &[Plot] {
+        lots_of(&self.plots)
+    }
+
+    /// The flats, in id order after every lot on the ground (`flats_of`).
+    pub fn flats(&self) -> &[Plot] {
+        flats_of(&self.plots)
+    }
+
     /// The plot a tile is on (on any storey): the lot on the ground there, and in a building with
     /// flats, the flat on the tile's storey where one is (else the building's lot).
     pub fn plot_at(&self, x: i32, z: i32) -> Option<u32> {
         let ground = self.ground_z(z);
         let width = self.lot.width as i32;
-        let lot = if (0..width).contains(&x)
-            && ground >= 0
-            && let Some(&plot) = self.tile_plot.get((ground * width + x) as usize)
-        {
-            (plot != crate::path::NO_PLOT).then_some(u32::from(plot))
-        } else {
-            self.plots
-                .iter()
-                .find(|p| !p.is_flat() && p.contains(x, ground))
-                .map(|p| p.id)
-        }?;
+        if !(0..width).contains(&x) || ground < 0 {
+            return None;
+        }
+        let lot = self
+            .tile_plot
+            .get((ground * width + x) as usize)
+            .filter(|&&p| p != crate::path::NO_PLOT)
+            .map(|&p| u32::from(p))?;
         match self.flats_in.get(lot as usize) {
             Some(&k) if k > 0 => Some(
                 self.flat_tiles[usize::from(k) - 1]
                     .at(x, ground, self.storey_of(z))
                     .unwrap_or(lot),
-            ),
-            _ if self.flats_in.is_empty() && self.plots.iter().any(Plot::is_flat) => Some(
-                self.plots
-                    .iter()
-                    .find(|p| {
-                        p.of == Some(lot)
-                            && i32::from(p.storey) == self.storey_of(z)
-                            && p.contains(x, ground)
-                    })
-                    .map_or(lot, |p| p.id),
             ),
             _ => Some(lot),
         }
@@ -3130,12 +3159,12 @@ impl World {
         }
         halls.of_lot = vec![0; self.plots.len()];
         let nav = self.nav();
-        for lot in self.plots.iter().filter(|p| !p.is_flat() && p.public) {
+        for lot in self.lots().iter().filter(|p| p.public) {
             if self.flats_in.get(lot.id as usize).is_none_or(|&k| k == 0) {
                 continue;
             }
             let Some(entry) = self
-                .plots
+                .flats()
                 .iter()
                 .find(|f| f.of == Some(lot.id))
                 .and_then(|f| f.entry)
@@ -3174,15 +3203,16 @@ impl World {
     }
 
     /// Notes the plot of every ground tile (plots never move; upper storeys are the same
-    /// ground), so `plot_at` needn't search them, and the flats of each building with flats by
-    /// storey (`flat_tiles`). Flats leave the ground tiles to their building.
-    fn map_plots(&mut self) {
+    /// ground), which `plot_at` and the walks (`path::Grounds`) look up, and the flats of each
+    /// building with flats by storey (`flat_tiles`). Flats leave the ground tiles to their
+    /// building. Made as the plots are loaded, before anything is placed on them.
+    pub(crate) fn map_plots(&mut self) {
         let (width, depth) = (self.lot.width as i32, self.storey_depth());
         if self.tile_plot.len() == (width * depth) as usize {
             return;
         }
         self.tile_plot = vec![crate::path::NO_PLOT; (width * depth) as usize];
-        for p in self.plots.iter().rev().filter(|p| !p.is_flat()) {
+        for p in lots_of(&self.plots).iter().rev() {
             for z in p.z.max(0)..(p.z + p.d).min(depth) {
                 for x in p.x.max(0)..(p.x + p.w).min(width) {
                     self.tile_plot[(z * width + x) as usize] = p.id as u16;
@@ -3191,7 +3221,7 @@ impl World {
         }
         self.flat_tiles.clear();
         self.flats_in = vec![0; self.plots.len()];
-        for f in self.plots.iter().filter(|p| p.is_flat()) {
+        for f in flats_of(&self.plots) {
             let Some(lot) = f.of.and_then(|of| self.plots.get(of as usize)) else {
                 continue;
             };
@@ -4789,7 +4819,7 @@ impl World {
         let rooms = &self.rooms;
         let mut source = vec![crate::rooms::NO_ROOM; self.lot.tile_slots()];
         // (A flat has no garden: its rectangle's ground is its building's.)
-        for (pi, p) in self.plots.iter().enumerate().filter(|(_, p)| !p.is_flat()) {
+        for (pi, p) in self.lots().iter().enumerate() {
             let garden = rooms
                 .iter()
                 .position(|r| r.garden && r.plot == Some(pi as u32))
@@ -4882,11 +4912,12 @@ impl World {
         let rect = [x0 - 1, z0 - 1, x1 + 1, z1 + 1];
         let meets =
             |r: [i32; 4]| r[0] < rect[2] && rect[0] < r[2] && r[1] < rect[3] && rect[1] < r[3];
-        // The plots there, on any storey (what stands upstairs outdoors is in the garden).
+        // The lots there, on any storey (what stands upstairs outdoors is in the garden; a flat
+        // has none).
         let depth = self.storey_depth().max(1);
         let blocks = (self.lot.depth as i32 / depth).max(1);
         let plots: Vec<u32> = self
-            .plots
+            .lots()
             .iter()
             .enumerate()
             .filter(|(_, p)| {
@@ -4928,9 +4959,11 @@ impl World {
         let lot = &self.lot;
         // The last plot over each tile sets its garden's score there (as `refresh_rooms`).
         let last_plot = |x: i32, z: i32| {
-            plots.iter().rev().copied().find(|&p| {
-                !self.plots[p as usize].is_flat() && self.plots[p as usize].contains(x, z)
-            })
+            plots
+                .iter()
+                .rev()
+                .copied()
+                .find(|&p| self.plots[p as usize].contains(x, z))
         };
         let gardens: Vec<u32> = found
             .iter()
@@ -4943,14 +4976,10 @@ impl World {
                 let pi = room.plot.expect("a garden is a plot's");
                 let p = &self.plots[pi as usize];
                 // (A later plot over the same tiles scores them: as `refresh_rooms`.)
-                let later: Vec<&Plot> = self.plots[pi as usize + 1..]
+                let later: Vec<&Plot> = self.lots()[pi as usize + 1..]
                     .iter()
                     .filter(|q| {
-                        !q.is_flat()
-                            && q.x < p.x + p.w
-                            && p.x < q.x + q.w
-                            && q.z < p.z + p.d
-                            && p.z < q.z + q.d
+                        q.x < p.x + p.w && p.x < q.x + q.w && q.z < p.z + p.d && p.z < q.z + q.d
                     })
                     .collect();
                 for z in p.z..p.z + p.d {

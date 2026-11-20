@@ -145,10 +145,12 @@ pub(crate) fn grounds<'a>(
     sim: &Sim,
     goal: (i32, i32),
 ) -> Grounds<'a> {
+    // (Per lot on the ground: a tile's plot is one, or a hall, never a flat.)
+    let lots = crate::world::lots_of(plots);
     let mut grounds = Grounds {
         tile_plot,
-        open: plots.iter().map(|p| p.public).collect(),
-        fenced: plots.iter().map(|p| !p.public).collect(),
+        open: lots.iter().map(|p| p.public).collect(),
+        fenced: lots.iter().map(|p| !p.public).collect(),
         halls,
         hall_open: vec![false; halls.list.len()],
     };

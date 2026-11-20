@@ -562,7 +562,7 @@ impl World {
                 && gz >= p.z - REACH_MARGIN
                 && x < p.x + p.w + REACH_MARGIN
                 && gz < p.z + p.d + REACH_MARGIN
-                && (!p.is_flat() || self.storey_of(z) == i32::from(p.storey))
+                && p.on_storey(&self.stairs, z)
         };
         let mut seen = vec![false; lot.tile_slots()];
         let entry = p.home_point();
@@ -912,11 +912,7 @@ impl World {
         let p = &self.plots[plot as usize];
         let lot = &self.lot;
         // (A flat's spots are on its own storey; a house's on the ground.)
-        let up = if p.is_flat() {
-            self.storey_row(i32::from(p.storey))
-        } else {
-            0
-        };
+        let rows = p.rows(&self.stairs);
         // (What could be in its way anywhere on the plot, found once: as far past the plot's
         // edges as it reaches, turned any way, from a tile on it.)
         let d = &self.content.objects[def];
@@ -929,12 +925,12 @@ impl World {
             + 1;
         let near = self.objects_reaching([
             p.x - reach,
-            p.z + up - reach,
+            rows.start - reach,
             p.x + p.w + reach,
-            p.z + up + p.d + reach,
+            rows.end + reach,
         ]);
         let mut spots = Vec::new();
-        for z in p.z + up..p.z + p.d + up {
+        for z in rows {
             for x in p.x..p.x + p.w {
                 for rot in 0..4u8 {
                     let Ok(obj) =
