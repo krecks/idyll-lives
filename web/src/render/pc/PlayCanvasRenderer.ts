@@ -812,6 +812,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly vTmp = new pc.Vec3();
   private readonly vTmp2 = new pc.Vec3();
   private readonly qTmp = new pc.Quat();
+  /** The sun's way it was last turned to (PlayCanvas space; `applyLighting`): none yet. */
+  private readonly sunWay = new pc.Vec3(NaN, NaN, NaN);
   private readonly colorTmp = new pc.Color();
   /** `?lightmix=sun,sky,env` (dev server): each part of the daylight scaled, to compare them one by one with reference pictures. */
   private readonly lightMix = import.meta.env.DEV ? lightMixFromURL() : null;
@@ -999,9 +1001,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.cars.setShadowTest(inMap);
     this.signals = new Signals(this.app, this.root, this.deps.assets, { shadows: this.quality.streetShadows, lod: this.quality.streetLod });
     this.characters.setShadowTest(inMap);
-    // (A parked bike's draw is the same for the sun's map while its copies there are: one ridden off across town draws
-    // no picture of the still casters again.)
-    this.sunShadows.castKey = (mi) => this.parkedRides.castKey(mi, inMap);
+    // (A parked bike's or car's draw is the same for the sun's map while its copies there are: one ridden or driven off
+    // across town draws no picture of the still casters again.)
+    this.sunShadows.castKey = (mi) => this.parkedRides.castKey(mi, inMap) ?? this.cars.castKey(mi, inMap);
     // (Their shadow-only copies only where they may cast: near the sun's square, and on the lot in view, whose rooms'
     // lamps cast too.)
     this.characters.setCastTest((x, z) => {
@@ -3299,14 +3301,19 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
     // A directional light shines along its entity's -y: turned from straight down to the sun's way (game space to PlayCanvas).
     const to = toEngine(l.sunDirection.x, l.sunDirection.y, l.sunDirection.z, this.vTmp).normalize();
-    const axis = this.vTmp2.cross(DOWN, to);
-    const sin = axis.length();
-    const angle = Math.atan2(sin, DOWN.dot(to)) * pc.math.RAD_TO_DEG;
-    this.sun.setRotation(sin > 1e-6 ? this.qTmp.setFromAxisAngle(axis.mulScalar(1 / sin), angle) : this.qTmp.set(0, 0, 0, 1));
+    // Only a sun that turned draws its map again: a step that only changes the light's colour (every step of the
+    // night, whose moon stands still) leaves the shadows as they are; the held reflections take the new light still.
+    if (!to.equals(this.sunWay)) {
+      this.sunWay.copy(to);
+      const axis = this.vTmp2.cross(DOWN, to);
+      const sin = axis.length();
+      const angle = Math.atan2(sin, DOWN.dot(to)) * pc.math.RAD_TO_DEG;
+      this.sun.setRotation(sin > 1e-6 ? this.qTmp.setFromAxisAngle(axis.mulScalar(1 / sin), angle) : this.qTmp.set(0, 0, 0, 1));
+      this.sunShadows.moved(true, false);
+    } else this.mirrors.changed();
     // The look's colours are used as linear; PlayCanvas takes sRGB and linearises it,
     // so the strength goes into the colour (an intensity below 1 would be linearised with it).
     this.sun.light!.color = gammaColor(l.sunColor, l.sunIntensity * SUN_UNITS, this.colorTmp);
-    this.sunShadows.moved(true, false);
     // The sky's hemispheric fill and its image-based light.
     this.lib.setSkyFill(l.skyColor, l.groundColor, l.skyIntensity * SKY_UNITS);
     this.lib.setEnvironmentIntensity(l.envIntensity * ENV_UNITS);
@@ -4145,7 +4152,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         mirrorsLive: this.mirrors.live,
         mirrorSpots: this.mirrors.spots,
         mirrorDraws: this.mirrors.draws,
-        sunShadowDraws: { ...this.sunShadows.draws },
+        sunShadowDraws: ((d) => ({ whole: d.whole, moving: d.moving, why: { ...d.why }, by: Object.fromEntries(d.by) }))(this.sunShadows.draws),
         nightGrade: this.post?.night ?? 0,
         lightingUpdates: this.counts.lightingUpdates,
         shaders: this.shaderWatch.shaders,

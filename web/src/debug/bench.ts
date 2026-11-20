@@ -46,6 +46,21 @@ import { plotInfo } from '../ui/place';
 import { BENCH, type BenchFlags } from './benchFlags';
 import { gpuInfo, loadState } from './report';
 
+/** The sun's redraws as the renderer counts them (`benchInfo().scene.sunShadowDraws`). */
+interface SunDraws {
+  whole: number;
+  moving: number;
+  why: Record<string, number>;
+  by: Record<string, number>;
+}
+
+/** Each count of `end` less its count in `start`, the ones that grew. */
+function since(end: Record<string, number>, start: Record<string, number>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [k, n] of Object.entries(end)) if (n > (start[k] ?? 0)) out[k] = n - (start[k] ?? 0);
+  return out;
+}
+
 /** Camera paths: distance, height angle and seconds per turn round the home lot. */
 const PATHS = {
   orbit: { radius: 24, beta: 0.9, period: 40 },
@@ -179,6 +194,8 @@ export interface BenchResult {
   reflectionsPerSecond: number;
   /** The sun's map drawn again a second: with the still casters too, and only what moves over their picture (`sunShadows.ts`). */
   sunShadowsPerSecond?: { whole: number; moving: number };
+  /** Why the still casters' picture was drawn again over the measured stretch (`SunShadows.draws`: the check that failed, and on which draws). */
+  sunShadowWhy?: { why: Record<string, number>; by: Record<string, number> };
   longTasks: { count: number; maxMs: number; totalMs: number };
   /** Frames that took longer than two at 60 Hz (33 ms between them). */
   over33?: number;
@@ -362,7 +379,7 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
     renderer.gpuPasses(true);
     const lighting0 = (info.scene as { lightingUpdates: number }).lightingUpdates;
     const reflections0 = (info.scene as { mirrorDraws: number }).mirrorDraws;
-    const sun0 = (info.scene as { sunShadowDraws?: { whole: number; moving: number } }).sunShadowDraws ?? { whole: 0, moving: 0 };
+    const sun0 = (info.scene as { sunShadowDraws?: SunDraws }).sunShadowDraws ?? { whole: 0, moving: 0, why: {}, by: {} };
     const long: number[] = [];
     const observer = typeof PerformanceObserver !== 'undefined' && PerformanceObserver.supportedEntryTypes?.includes('longtask')
       ? new PerformanceObserver((list) => list.getEntries().forEach((e) => long.push(e.duration)))
@@ -414,7 +431,8 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
       residentsMs: per(sums.residents),
       lightingPerSecond: ((end.scene as { lightingUpdates: number }).lightingUpdates - lighting0) / secs,
       reflectionsPerSecond: ((end.scene as { mirrorDraws: number }).mirrorDraws - reflections0) / secs,
-      sunShadowsPerSecond: ((sun) => ({ whole: (sun.whole - sun0.whole) / secs, moving: (sun.moving - sun0.moving) / secs }))((end.scene as { sunShadowDraws?: { whole: number; moving: number } }).sunShadowDraws ?? sun0),
+      sunShadowsPerSecond: ((sun) => ({ whole: (sun.whole - sun0.whole) / secs, moving: (sun.moving - sun0.moving) / secs }))((end.scene as { sunShadowDraws?: SunDraws }).sunShadowDraws ?? sun0),
+      sunShadowWhy: ((sun) => ({ why: since(sun.why, sun0.why), by: since(sun.by, sun0.by) }))((end.scene as { sunShadowDraws?: SunDraws }).sunShadowDraws ?? sun0),
       longTasks: { count: long.length, maxMs: Math.max(0, ...long), totalMs: long.reduce((a, x) => a + x, 0) },
       over33: intervals.filter((ms) => ms > 33.4).length,
       slow,

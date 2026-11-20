@@ -19,7 +19,7 @@ import { colorsKey, objectCentre, type ObjectPlacement, type WorldStructure } fr
 import { chunkAt } from '../shared/chunks';
 import { compose, quatYawPitchRoll, type Quat } from '../shared/math';
 import { painted, placementVariation } from '../shared/modelEntry';
-import { type Away, castKey, placements } from '../shared/parked';
+import { type Away, placements } from '../shared/parked';
 
 /** Within this far of the camera's target (m), the whole model; further, its far version. */
 const NEAR = 45;
@@ -62,8 +62,8 @@ export class ParkedRides {
   /** Bumped by each build: templates that come after another build has begun are let go of. */
   private generation = 0;
   private readonly q: Quat = [0, 0, 0, 1];
-  /** Each draw's copies as last written (their matrices), by its mesh instance: what it casts (`castKey`). */
-  private readonly written = new Map<pc.MeshInstance, ArrayLike<number>[]>();
+  /** Each draw by its mesh instance: what it casts (`castKey`). */
+  private readonly keyed = new Map<pc.MeshInstance, Instances>();
 
   constructor(
     private readonly app: pc.AppBase,
@@ -195,7 +195,6 @@ export class ParkedRides {
           list.forEach((p, i) => draw.setMatrix(i, p.matrix));
           draw.update();
           draw.enabled = list.length > 0;
-          this.written.set(draw.meshInstance, list.map((p) => p.matrix));
         }
       }
     }
@@ -211,6 +210,7 @@ export class ParkedRides {
       t.meshes.map((m) => {
         const draw = new Instances(this.app.graphicsDevice, this.root, m.mesh, m.material, { name: m.name, castShadows: this.shadows, receiveShadows: true, capacity: 4 });
         draw.enabled = false;
+        this.keyed.set(draw.meshInstance, draw);
         return draw;
       });
     return { near: draws(near), far: draws(far), templates: [near, far] };
@@ -218,16 +218,15 @@ export class ParkedRides {
 
   /**
    * What draw `mi` casts where `reaches` (the sun's map: `SunShadows.castKey`), as a number: its copies there, where
-   * they stand and which way; undefined: not one of these draws.
+   * they stand and which way (0: none there); undefined: not one of these draws.
    */
   castKey(mi: pc.MeshInstance, reaches: (x: number, z: number) => boolean): number | undefined {
-    const copies = this.written.get(mi);
-    return copies && castKey(copies, reaches);
+    return this.keyed.get(mi)?.castKey(reaches);
   }
 
   private dropLook(look: Look): void {
     for (const draw of [...look.near, ...look.far]) {
-      this.written.delete(draw.meshInstance);
+      this.keyed.delete(draw.meshInstance);
       draw.destroy();
     }
     for (const t of look.templates) disposeTemplate(t);

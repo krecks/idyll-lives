@@ -6,7 +6,7 @@ import * as pc from '../src/render/pc/engine';
 const realLocation = globalThis.location;
 Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
 afterAll(() => Object.assign(globalThis, { location: realLocation }));
-const { CASTER_REACH, SunShadows } = await import('../src/render/pc/sunShadows');
+const { CASTER_REACH, SunShadows, fitSquare } = await import('../src/render/pc/sunShadows');
 
 function sun(rate = 0) {
   const canvas = { width: 1, height: 1, style: {}, addEventListener() {}, removeEventListener() {}, getBoundingClientRect: () => ({ width: 1, height: 1 }) } as unknown as HTMLCanvasElement;
@@ -127,7 +127,7 @@ describe("the sun's map over the still casters' picture", () => {
     shadows.posed();
     expect(draw()).toEqual(['copy still → map', 'map: body']);
     expect(visibleCasters).toEqual([house, body, tree]);
-    expect(shadows.draws).toEqual({ whole: 1, moving: 1 });
+    expect(shadows.draws).toMatchObject({ whole: 1, moving: 1, why: { moved: 1, view: 0, depth: 0 } });
   });
 
   test('anything else drawn again first: a thing moved, a still caster moved or went, the light turned', () => {
@@ -148,6 +148,13 @@ describe("the sun's map over the still casters' picture", () => {
     cam.node.setPosition(1 + 1e-9, 50, 0);
     shadows.posed();
     expect(draw()).toEqual(['copy still → map', 'map: body']);
+    // Nor the same casters culled in another order.
+    visibleCasters.unshift(visibleCasters.pop()!);
+    shadows.posed();
+    expect(draw()).toEqual(['copy still → map', 'map: body']);
+    // Each redraw of the picture counted by the first check that failed, and the draw it failed on.
+    expect(shadows.draws.why).toMatchObject({ moved: 2, list: 1, box: 1, view: 1 });
+    expect(Object.fromEntries(shadows.draws.by)).toEqual({ 'box ?': 1, 'list ?': 1 });
   });
 
   test('a draw with a cast key (the parked bikes) is drawn again only when its key changes, not its copies elsewhere', () => {
@@ -181,3 +188,48 @@ describe("the sun's map over the still casters' picture", () => {
   });
 });
 
+
+// The light's view (`fitSquare`, after PlayCanvas's `cull`): the one the still casters' picture was drawn with while
+// PlayCanvas's differs from it only by float noise and its casters lie within its depth; PlayCanvas's own else, and
+// whenever the picture is drawn in full anyway.
+describe("the light's view of the square", () => {
+  function light() {
+    const cam = new pc.Camera(new pc.NullGraphicsDevice({ width: 1, height: 1, style: {}, addEventListener() {}, removeEventListener() {}, getBoundingClientRect: () => ({ width: 1, height: 1 }) } as unknown as HTMLCanvasElement));
+    cam.node = new pc.GraphNode('light');
+    cam.projection = pc.PROJECTION_ORTHOGRAPHIC;
+    cam.node.setEulerAngles(-70, 30, 0);
+    const square = { centre: new pc.Vec3(100, 0, -40), radius: 30, relief: 2, fit: { at: new pc.Vec3(), across: new pc.Vec3(), dir: new pc.Vec3(), height: 0, far: 0, lo: 0, hi: 0, valid: false, fresh: true } };
+    // As PlayCanvas leaves it: 0.1 m before the nearest caster along the light, `noise` m off across it.
+    const culled = (lo: number, hi: number, noise = 0) => {
+      const dir = cam.node.forward;
+      const p = square.centre.clone().add(cam.node.right.clone().mulScalar(noise)).add(dir.clone().mulScalar(lo - 0.1 - square.centre.dot(dir)));
+      cam.node.setPosition(p);
+      cam.orthoHeight = 32 * (1 + noise / 10);
+      cam.farClip = hi - lo + 0.2;
+      fitSquare(square, cam);
+      return { at: cam.node.getLocalPosition().clone(), height: cam.orthoHeight, far: cam.farClip };
+    };
+    return { cam, square, culled };
+  }
+
+  test('the first fit is PlayCanvas\'s; the same view after while it differs by float noise and its casters lie within it', () => {
+    const { culled } = light();
+    const first = culled(-50, 60);
+    expect(first.height).toBe(32);
+    expect(first.far).toBeCloseTo(110.2, 9);
+    expect(culled(-40, 55, 3e-5)).toEqual(first);
+    expect(culled(-50.03, 60.02, -2e-6)).toEqual(first);
+  });
+
+  test("PlayCanvas's own when a caster lies out of it, the view moved or the sun turned, or the picture is drawn in full", () => {
+    const { cam, square, culled } = light();
+    const first = culled(-50, 60);
+    expect(culled(-50, 61).far).toBeCloseTo(111.2, 9);
+    expect(culled(-50, 60.5).far).toBeCloseTo(111.2, 9);
+    expect(culled(-50, 60, 0.04).at).not.toEqual(first.at);
+    cam.node.setEulerAngles(-71, 30, 0);
+    expect(culled(-50, 60).far).toBeCloseTo(110.2, 9);
+    square.fit.fresh = true;
+    expect(culled(-50, 50).far).toBeCloseTo(100.2, 9);
+  });
+});
