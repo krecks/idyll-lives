@@ -29,3 +29,25 @@ export function placements<P extends { id: number; x: number; z: number; home: b
   }
   return out;
 }
+
+/** The elements of a copy's matrix that say where it stands and which way (`castKey`), and a float's bits read as one. */
+const KEYED = [0, 2, 12, 13, 14] as const;
+const BITS_F = new Float32Array(1);
+const BITS_U = new Uint32Array(BITS_F.buffer);
+
+/**
+ * The copies of a draw (their matrices, game space) that stand where `reaches` says (the sun's map), where they stand
+ * and which way, as a number: the same while those are, however many copies there are elsewhere. For
+ * `ParkedRides.castKey`, and its test.
+ */
+export function castKey(copies: readonly ArrayLike<number>[], reaches: (x: number, z: number) => boolean): number {
+  let h = 0x811c9dc5;
+  for (const m of copies) {
+    if (!reaches(m[12], m[14])) continue;
+    for (const k of KEYED) {
+      BITS_F[0] = m[k];
+      h = Math.imul(h ^ BITS_U[0], 0x01000193);
+    }
+  }
+  return h >>> 0;
+}

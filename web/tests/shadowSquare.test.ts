@@ -150,6 +150,22 @@ describe("the sun's map over the still casters' picture", () => {
     expect(draw()).toEqual(['copy still → map', 'map: body']);
   });
 
+  test('a draw with a cast key (the parked bikes) is drawn again only when its key changes, not its copies elsewhere', () => {
+    const { shadows, draw, tree } = split();
+    let key = 1;
+    shadows.castKey = (mi) => (mi === tree ? key : undefined);
+    draw();
+    // A bike ridden off across town: fewer copies, another box, the same ones in the map.
+    (tree as unknown as { instancingCount: number }).instancingCount = 3;
+    tree.aabb.center.x += 40;
+    shadows.posed();
+    expect(draw()).toEqual(['copy still → map', 'map: body']);
+    // One in the map ridden off.
+    key = 2;
+    shadows.posed();
+    expect(draw()[0]).toBe('still: house tree');
+  });
+
   // On WebGPU a bottom-up target is drawn with Y flipped: a picture the other way up was copied in mirrored (0.8.1).
   test('the picture is drawn the same way up as the map', () => {
     const { draw, origins } = split();
@@ -164,3 +180,4 @@ describe("the sun's map over the still casters' picture", () => {
     expect(shadows.splits({ numCascades: 1 } as never)).toBe(false);
   });
 });
+

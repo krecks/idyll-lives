@@ -999,6 +999,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.cars.setShadowTest(inMap);
     this.signals = new Signals(this.app, this.root, this.deps.assets, { shadows: this.quality.streetShadows, lod: this.quality.streetLod });
     this.characters.setShadowTest(inMap);
+    // (A parked bike's draw is the same for the sun's map while its copies there are: one ridden off across town draws
+    // no picture of the still casters again.)
+    this.sunShadows.castKey = (mi) => this.parkedRides.castKey(mi, inMap);
     // (Their shadow-only copies only where they may cast: near the sun's square, and on the lot in view, whose rooms'
     // lamps cast too.)
     this.characters.setCastTest((x, z) => {
