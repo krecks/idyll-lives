@@ -8,7 +8,7 @@ import { constant, rustConst } from './snapshotLayout';
 describe("parking.ts's rules", () => {
   test('are the simulation\'s', () => {
     expect(MOUTH_CLEAR).toBe(constant('MOUTH_CLEAR'));
-    expect(DRIVE_CLEAR).toBe(constant('DRIVE_CLEAR'));
+    expect(DRIVE_CLEAR).toBe(constant('DRIVE_CLEAR', undefined, 'cars/parking.rs'));
     expect(BAY_WIDE).toBe(constant('BAY_WIDE'));
     expect(BAY_DEEP).toBe(constant('BAY_DEEP'));
     expect(BAY_LINES).toEqual(JSON.parse(rustConst('BAY_LINES')));

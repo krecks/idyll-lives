@@ -14,24 +14,27 @@ const SIM = join(import.meta.dir, '../../crates/sim-core/src');
 const source = (file: string) => readFileSync(join(SIM, file), 'utf8');
 export const SNAPSHOT_RS = source('snapshot.rs');
 
-/** Every `.rs` file under sim-core's `src/`, read once. */
-const SOURCES = (readdirSync(SIM, { recursive: true }) as string[]).filter((f) => f.endsWith('.rs')).map(source);
+/** Every `.rs` file under sim-core's `src/` (its path there, `/`-separated), read once. */
+const SOURCES = (readdirSync(SIM, { recursive: true }) as string[])
+  .filter((f) => f.endsWith('.rs'))
+  .map((f) => ({ file: f.split('\\').join('/'), src: source(f) }));
 
 /**
  * The value of sim-core's constant `name` as its source writes it (the text between `=` and `;`), wherever it is
- * declared under `src/`, so a test names only the constant, not its file. It is the one `pub const NAME`; with none,
- * the one `const NAME` of any visibility. None, or more than one, fails.
+ * declared under `src/`, so a test names only the constant, not its file. A const of that name of any visibility
+ * counts; where more than one module declares one, the test says which with `file` (its path under `src/`). None, or
+ * more than one, fails, so a const of the same name added elsewhere can't quietly become the one a test reads.
  */
-export function rustConst(name: string): string {
-  const find = (vis: string) => SOURCES.flatMap((src) => [...src.matchAll(new RegExp(`^\\s*${vis}const ${name}: [^=]+= ([^;]+);`, 'gm'))].map((m) => m[1].trim()));
-  const pub = find('pub ');
-  const found = pub.length ? pub : find('(?:pub(?:\\([^)]*\\))? )?');
-  if (found.length !== 1) throw new Error(`${found.length ? 'more than one' : 'no'} const ${name} in sim-core`);
+export function rustConst(name: string, file?: string): string {
+  const found = SOURCES.filter((s) => !file || s.file === file).flatMap((s) =>
+    [...s.src.matchAll(new RegExp(`^\\s*(?:pub(?:\\([^)]*\\))? )?const ${name}: [^=]+= ([^;]+);`, 'gm'))].map((m) => m[1].trim()),
+  );
+  if (found.length !== 1) throw new Error(`${found.length ? 'more than one' : 'no'} const ${name} in sim-core${file ? `'s ${file}` : ''}`);
   return found[0];
 }
 
-/** sim-core's constant `name` (`rustConst`; in snapshot.rs's `pub mod module`, when given), as a number. */
-export function constant(name: string, module?: string): number {
+/** sim-core's constant `name` (`rustConst`, in `file` where given; in snapshot.rs's `pub mod module`, when given), as a number. */
+export function constant(name: string, module?: string, file?: string): number {
   let value: string;
   if (module) {
     const from = SNAPSHOT_RS.indexOf(`pub mod ${module} {`);
@@ -39,7 +42,7 @@ export function constant(name: string, module?: string): number {
     const m = new RegExp(`pub const ${name}: \\w+ = ([0-9._]+);`).exec(SNAPSHOT_RS.slice(from));
     if (!m) throw new Error(`no ${module}::${name}`);
     value = m[1];
-  } else value = rustConst(name);
+  } else value = rustConst(name, file);
   const n = Number(value.replace(/_/g, ''));
   if (Number.isNaN(n)) throw new Error(`const ${name} is not a number: ${value}`);
   return n;
