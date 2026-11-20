@@ -1,5 +1,5 @@
 //! Group conversations with the shipped content: while two residents chat, a lonely third one
-//! comes over and joins in (`conversation.rs`, socials with `joinable`); two sitting on the sofa
+//! comes over and joins in (`conversation/`, socials with `joinable`); two sitting on the sofa
 //! talk from their seats, and the third walks over to listen. One listening in doesn't stay to wait
 //! by a hug the leader is taken into (A-social-02).
 

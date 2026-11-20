@@ -741,7 +741,7 @@ fn check_cars(
     stacked.retain(|k, _| now.contains(k));
 }
 
-/// A work taxi standing at the kerb for its riders (`taxi.rs`) stands parallel to its lane within
+/// A work taxi standing at the kerb for its riders (`taxi/`) stands parallel to its lane within
 /// this (rad: about 5°), its body clear of its lane's kerb by this at least (m: a little under, as
 /// pulled over for one coming the other way on a lane too narrow to pass, `Car::shift`, onto the
 /// pavement no further than that) and of the kerbside furniture always (`cars::kerbside`).
@@ -1595,7 +1595,7 @@ fn generated_worlds_cars_keep_to_the_roads() {
         eprintln!(
             "{n} worlds, {cars} cars ({stay} with no way out or no door to open), {commutes} drives to work, {trips} trips, {taxi} at work by taxi ({mean_late:.2} min late on average)"
         );
-        // Some residents a long way out of town ride the work taxi, about on time (`taxi.rs`).
+        // Some residents a long way out of town ride the work taxi, about on time (`taxi/`).
         if *taxi == 0 {
             failures.push("nobody went to work by taxi".to_string());
         }

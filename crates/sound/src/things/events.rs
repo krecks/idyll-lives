@@ -313,7 +313,7 @@ mod tests {
     const RATE: f64 = 48000.0;
 
     /// Each as made (before the game's level): long enough, never past full scale, with sound in it, and a
-    /// loop's end running on into its start (`things.rs` `world_sounds`).
+    /// loop's end running on into its start (`things/` `world_sounds`).
     #[test]
     fn event_sounds() {
         for kind in EVENTS {

@@ -468,10 +468,3 @@ export function rotate(qx: number, qy: number, qz: number, qw: number, vx: numbe
   out[o + 1] = vy + qw * ty + (qz * tx - qx * tz);
   out[o + 2] = vz + qw * tz + (qx * ty - qy * tx);
 }
-
-/** World position of bone `b` from the last `skin` call. */
-export function bonePosition(scratch: PoseScratch, b: number, out: Float32Array, o: number): void {
-  out[o] = scratch.worldT[b * 3];
-  out[o + 1] = scratch.worldT[b * 3 + 1];
-  out[o + 2] = scratch.worldT[b * 3 + 2];
-}

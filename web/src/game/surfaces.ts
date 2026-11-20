@@ -133,18 +133,6 @@ export function onTop(content: Shapes, o: Placed): boolean {
   return content.object(o.def)?.layer === 'surface';
 }
 
-/** The top a thing on the `surface` layer stands on (from where it stands). */
-export function hostOf(content: Shapes, objects: readonly Placed[], o: Placed): Top | null {
-  if (!onTop(content, o)) return null;
-  const [x, z] = middleOf(content, o);
-  for (const h of objects) {
-    if (h === o || (h.id !== undefined && h.id === o.id)) continue;
-    const top = topOf(content, h);
-    if (top && covers(top, x, z)) return top;
-  }
-  return null;
-}
-
 /** Why a thing can't stand somewhere on a surface. */
 export type Misfit = 'noTop' | 'overEdge' | 'crowded';
 

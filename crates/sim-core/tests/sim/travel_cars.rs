@@ -421,7 +421,7 @@ fn two_cars_meeting_on_a_7_m_street_pass_each_other_in_their_lanes() {
     );
 }
 
-// ---- Taking turns where ways cross (`traffic.rs`) --------------------------------------------
+// ---- Taking turns where ways cross (`traffic/`) --------------------------------------------
 
 /// A house in `roads_town`: its plot (x, z, w, d), and its driveway's inner end (x, z), the way it
 /// runs to its road (+1/-1 along z, or along x: `along_x`), the road it meets (`roads` index) and

@@ -43,7 +43,7 @@ export const BASES = {
 
 const HEADER_LEN = constant('HEADER_LEN');
 const SIM_STRIDE = constant('SIM_STRIDE');
-const MAX_SIMS = constant('MAX_SIMS', undefined, source('world/mod.rs'));
+const MAX_SIMS = constant('MAX_SIMS', undefined, source('world/sim.rs'));
 const MAX_STAFF = constant('MAX_STAFF', undefined, source('staff.rs'));
 const MAX_CARS = constant('MAX_CARS', undefined, source('cars/mod.rs'));
 const CAR_STRIDE = constant('CAR_STRIDE');

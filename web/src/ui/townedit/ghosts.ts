@@ -19,9 +19,6 @@ type Box = { x: number; z: number; w: number; d: number };
 type LotGhost = TownGhosts['lots'][number];
 type RoadGhost = TownGhosts['roads'][number];
 
-/** No ghosts. */
-export const NO_GHOSTS: TownGhosts = { roads: [], lots: [], boxes: [] };
-
 /** A lot's rectangle on the town (m). */
 export const lotBox = (t: Templates, s: PlotSlot): Box => plotRect(t, s);
 

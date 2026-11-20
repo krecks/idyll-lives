@@ -123,7 +123,6 @@ export interface PublicTemplate {
  * terraced house (`housegen.ts` `HouseClass.row`, `LotPlacer.placeRow`).
  */
 export type LotSize = 'small' | 'medium' | 'large' | 'farm' | 'terrace';
-export const LOT_SIZES: readonly LotSize[] = ['small', 'medium', 'large'];
 
 /** The lot size a lot's house is made for (a farmhouse is a large lot's house). */
 const houseLot = (size: LotSize | undefined): LotSize => (size === 'farm' ? 'large' : (size ?? 'medium'));

@@ -7,7 +7,7 @@ use super::*;
 /// The car `sim` would take to work (or school) now, and their seat in it (0: they drive): an
 /// owner 18 or older takes their household's car from home when it's parked there; anyone else in
 /// the household rides along when an owner is about to drive off in it (or on their way to). Not
-/// one booked on a work taxi (`taxi.rs`): it comes for them as planned.
+/// one booked on a work taxi (`taxi/`): it comes for them as planned.
 pub(crate) fn seat(
     cars: &[Car],
     briefs: &[SimBrief],

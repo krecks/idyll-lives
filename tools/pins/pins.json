@@ -41,7 +41,7 @@
     },
     {
       "name": "HOUSE_LOOK",
-      "file": "web/src/render/shared/house.ts",
+      "file": "web/src/render/shared/houseShared.ts",
       "sha256": "a6b0a5b18ebaaf1cc352ec4d87116842afd759cfdca93a12128101f3673cc466",
       "by": "art-rust",
       "reason": "house detail (W3): roofValley 0.8 added for the valley flashing of L/U roofs; no accepted value changed",
@@ -64,17 +64,17 @@
     },
     {
       "name": "sim-cooking",
-      "file": "crates/sim-core/src/cooking.rs",
-      "sha256": "33d18584cbe42d37dbf282f9812853fac096b1fe09dd749b84e98f94734d4d00",
-      "by": "real-town-t1",
-      "reason": "owner's OK, real town: a flat's household is at home on its own storey (Plot::holds, World::on_plot) for an invitation to eat and the food left at home (S1)"
+      "file": "crates/sim-core/src/cooking/mod.rs",
+      "sha256": "d1b0db6e81a8d322ff91fca62ac1453dc4063ac1f19828a890ef0583a2584bf6",
+      "by": "refactor",
+      "reason": "behavior-preserving split of cooking.rs into cooking/ submodules"
     },
     {
       "name": "sim-social",
-      "file": "crates/sim-core/src/social.rs",
-      "sha256": "8d7e4254d6fa359ed451ac82086e49e3d1f3e07d9dc9f5349788adad02b64a00",
-      "by": "integrator",
-      "reason": "0.8.3 missing-items run: cleaning tools (sweep), the post at home, household cars (boughtCar/gotLetter events), nobody moves house at the wheel; reviewed, sim 819 and generated seeds 0-2 pass"
+      "file": "crates/sim-core/src/social/mod.rs",
+      "sha256": "5c0d5011b0ffc70ba00cc3eb89a752e7dd039b7b32a376bde6faec4b38989581",
+      "by": "refactor",
+      "reason": "split into social/ (mod, defs, parse, relationships, events); behaviour unchanged"
     },
     {
       "name": "sim-partners",
@@ -85,17 +85,17 @@
     },
     {
       "name": "sim-planner",
-      "file": "crates/sim-core/src/planner.rs",
-      "sha256": "c15a2d24851345638777a37633330d607c627f870bfc527cbdb1e893dd30c290",
-      "by": "real-town-review",
-      "reason": "owner's choice (real-town code review): a thing a flat keeps outside it (its letterbox by the building's door) is not swapped in over its place by swap_in, so a failed swap no longer sells and loses it"
+      "file": "crates/sim-core/src/planner/mod.rs",
+      "sha256": "c71571fdf286ceb3797dcf7c3b438c1d35ddbd0e8b814f50d9b79b3836d1516b",
+      "by": "setup",
+      "reason": "split into planner/ (mod, model, update, goals, purchases, factors, parse); behaviour unchanged"
     },
     {
       "name": "sim-lifecycle",
-      "file": "crates/sim-core/src/lifecycle.rs",
-      "sha256": "b3e68f15195f9c508f8238311e79b0fbe1333c1e26246b5fd9256c69e777dd82",
-      "by": "real-town-review",
-      "reason": "owner's choice (real-town code review): newcomers and movers ask World::is_home, so a lot with flats in it is nobody's home whatever its kind or with none"
+      "file": "crates/sim-core/src/lifecycle/mod.rs",
+      "sha256": "8122e129fc121c0f8e9d376e64d100fe5fc1b25884ae48ae74e592340a18678a",
+      "by": "refactor",
+      "reason": "split into lifecycle/ (mod, moving, arrival, babies, children); behaviour unchanged"
     },
     {
       "name": "sim-hosting",
@@ -114,9 +114,9 @@
     {
       "name": "sim-privacy",
       "file": "crates/sim-core/src/privacy.rs",
-      "sha256": "6fa2606c5848c1b0c3f2c135b751cf1ecbf6903d81fcd9afd570313cc18f0644",
-      "by": "release/0.8.3",
-      "reason": "speed for a full town: the rooms kept shut found once a tick, sorted by room with a per-resident bit, and a bedroom's people looked for among its plot's, not the whole town"
+      "sha256": "d09c594b019256dde393cf655cd0d5f07394b43c70bec4d39aa9e4c09d751e14",
+      "by": "integrate-cleanup",
+      "reason": "code cleanup integrated with the real town"
     },
     {
       "name": "living-town-lens",
@@ -133,6 +133,146 @@
       "by": "setup",
       "reason": "the contract's shared town view state",
       "region": "living-town-view"
+    },
+    {
+      "name": "sim-planner-model",
+      "file": "crates/sim-core/src/planner/model.rs",
+      "sha256": "2d6f6633f5cc7e5ca1a8dfc667bc733fe2295a3598b8a0459ff9762bea16875d",
+      "by": "refactor",
+      "reason": "split out of planner.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-planner-update",
+      "file": "crates/sim-core/src/planner/update.rs",
+      "sha256": "a65ef0445f45c27061f7cd33d54e3fcb8b050519c9fc1835ce8acdd9da56a7e3",
+      "by": "refactor",
+      "reason": "split out of planner.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-planner-goals",
+      "file": "crates/sim-core/src/planner/goals.rs",
+      "sha256": "567d77edbd99fb09c742c4c36596c7ac44f19b2fa43c726f9e6562059ecfc22f",
+      "by": "refactor",
+      "reason": "split out of planner.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-planner-purchases",
+      "file": "crates/sim-core/src/planner/purchases.rs",
+      "sha256": "81035427a1c30febb525a5f5ab8a093829e81e55d0c0105831da8e9d9f058440",
+      "by": "integrate-cleanup",
+      "reason": "code cleanup integrated with the real town"
+    },
+    {
+      "name": "sim-planner-factors",
+      "file": "crates/sim-core/src/planner/factors.rs",
+      "sha256": "9bc960cf9735cdc96e1eea72c909fb85d6971f43818c6eeac2ec603acb4bee48",
+      "by": "refactor",
+      "reason": "split out of planner.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-planner-parse",
+      "file": "crates/sim-core/src/planner/parse.rs",
+      "sha256": "c97c57b13b254a7d10e6213aaf79791b7c3bccb5518e3ea0b18fa80b0fb75fae",
+      "by": "refactor",
+      "reason": "split out of planner.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-social-defs",
+      "file": "crates/sim-core/src/social/defs.rs",
+      "sha256": "7b89902cb484da67522a67e8fa2dcc3a3d773becb53ff0810282f56c8f4f2f38",
+      "by": "integrate-cleanup",
+      "reason": "code cleanup integrated with the real town"
+    },
+    {
+      "name": "sim-social-parse",
+      "file": "crates/sim-core/src/social/parse.rs",
+      "sha256": "6b49ccbc47b180f35d21ade710df4a075e49f826c37f5eb8dba9b816e91973e7",
+      "by": "refactor",
+      "reason": "split out of social.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-social-relationships",
+      "file": "crates/sim-core/src/social/relationships.rs",
+      "sha256": "1df757f0486c1187d305185c085db1564e8ad3ca0413109f38a9167fa8487350",
+      "by": "refactor",
+      "reason": "split out of social.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-social-events",
+      "file": "crates/sim-core/src/social/events.rs",
+      "sha256": "64ab589d3ec4bd8accedef194946e0cfc9120e0fc62cf368fe1e6c0e16b82b55",
+      "by": "refactor",
+      "reason": "split out of social.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-lifecycle-moving",
+      "file": "crates/sim-core/src/lifecycle/moving.rs",
+      "sha256": "48bb5ce755c357a3fc9f3b51e065ee9673fd895f6de632da8929853c0e8b94a8",
+      "by": "integrate-cleanup",
+      "reason": "code cleanup integrated with the real town"
+    },
+    {
+      "name": "sim-lifecycle-arrival",
+      "file": "crates/sim-core/src/lifecycle/arrival.rs",
+      "sha256": "81d308b810b63090996289b62e9611bdec574ae5b5c7e6c47050ff673c2ace8a",
+      "by": "integrate-cleanup",
+      "reason": "code cleanup integrated with the real town"
+    },
+    {
+      "name": "sim-lifecycle-babies",
+      "file": "crates/sim-core/src/lifecycle/babies.rs",
+      "sha256": "f1c1b2648da28f1f10aed486e6a9403ad99969e21e704db226339bf59d9c6b9d",
+      "by": "refactor",
+      "reason": "split out of lifecycle.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-lifecycle-children",
+      "file": "crates/sim-core/src/lifecycle/children.rs",
+      "sha256": "a87d5b2f19c2279d0169afe94e9e1d2ad9636ac22ed9db73b081fc635de82d92",
+      "by": "integrate-cleanup",
+      "reason": "code cleanup integrated with the real town"
+    },
+    {
+      "name": "sim-cooking-cook",
+      "file": "crates/sim-core/src/cooking/cook.rs",
+      "sha256": "ef21fb980debd36cd67e3e7453d0bcd75049dfd4a3a55d62c5cac0fdd4f3e18b",
+      "by": "integrate-cleanup",
+      "reason": "behavior-preserving split of cooking.rs into cooking/ submodules: each part pinned, as planner's, lifecycle's and social's are"
+    },
+    {
+      "name": "sim-cooking-dishes",
+      "file": "crates/sim-core/src/cooking/dishes.rs",
+      "sha256": "d6e4697bb05fdfe07afea70ed4240005c5333fc6b107cab7df6560b0b8b23fe9",
+      "by": "integrate-cleanup",
+      "reason": "behavior-preserving split of cooking.rs into cooking/ submodules: each part pinned, as planner's, lifecycle's and social's are"
+    },
+    {
+      "name": "sim-cooking-eat",
+      "file": "crates/sim-core/src/cooking/eat.rs",
+      "sha256": "93e8b7d3d26abf80a618fbc9db582f24d675e28c39032ee62698865f2a18ffb0",
+      "by": "integrate-cleanup",
+      "reason": "behavior-preserving split of cooking.rs into cooking/ submodules: each part pinned, as planner's, lifecycle's and social's are"
+    },
+    {
+      "name": "sim-cooking-household",
+      "file": "crates/sim-core/src/cooking/household.rs",
+      "sha256": "070a61520b2e580bccd7cfeed66651774de15427a0e9964e0406114b4b0a6174",
+      "by": "integrate-cleanup",
+      "reason": "behavior-preserving split of cooking.rs into cooking/ submodules: each part pinned, as planner's, lifecycle's and social's are"
+    },
+    {
+      "name": "sim-cooking-serve",
+      "file": "crates/sim-core/src/cooking/serve.rs",
+      "sha256": "c06a721e3ad75f3b9276cd1dc4869d4c0614d0f11b170cf8f3f81a182498dcc5",
+      "by": "integrate-cleanup",
+      "reason": "behavior-preserving split of cooking.rs into cooking/ submodules: each part pinned, as planner's, lifecycle's and social's are"
+    },
+    {
+      "name": "sim-cooking-step",
+      "file": "crates/sim-core/src/cooking/step.rs",
+      "sha256": "ae51cb6024c1d6bb4a4f3dc4548f7de78f700d6d99f4cd888e547a1b9b165e35",
+      "by": "integrate-cleanup",
+      "reason": "behavior-preserving split of cooking.rs into cooking/ submodules: each part pinned, as planner's, lifecycle's and social's are"
     }
   ]
 }

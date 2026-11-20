@@ -250,7 +250,6 @@ export const QUALITY: Record<GraphicsPreset, QualitySettings> = {
   high: { shadowMapSize: 4096, shadowRate: 30, msaaSamples: 4, webglMsaaSamples: 4, anisotropy: 8, clusteredLamps: true, lampShadows: 4, lampShadowRate: 30, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 90, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 60, birds: { count: 40, range: 50 }, residentRadius: 200, openWorld: OPEN_WORLD, leanTargets: false, contactShading: true, cloudShadows: true, finishLayers: true },
 };
 
-export const GRAPHICS_PRESETS = Object.keys(QUALITY) as GraphicsPreset[];
 
 export function isGraphicsPreset(value: unknown): value is GraphicsPreset {
   return typeof value === 'string' && Object.hasOwn(QUALITY, value);

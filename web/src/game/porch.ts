@@ -12,9 +12,6 @@
 
 import type { PorchInfo, PorchPieceInfo, PorchPieceKind } from '../core/protocol';
 
-/** What the Porch tool builds: a porch over a door, or a piece on its own. */
-export type PorchMode = 'door' | PorchPieceKind;
-
 /** Tiles across and deep a piece may be at most (sim-core `CANOPY_MOST`, `STEP_MOST`). */
 export const PIECE_MOST: Record<PorchPieceKind, readonly [number, number]> = { post: [1, 1], canopy: [3, 6], step: [4, 4] };
 

@@ -1,4 +1,4 @@
-//! Long walks in an open world go by road (`travel.rs`): a trip between two hamlets follows the
+//! Long walks in an open world go by road (`travel/`): a trip between two hamlets follows the
 //! country road, and its legs to and from the road keep out of other people's gardens.
 
 use crate::common;

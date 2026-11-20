@@ -3,10 +3,9 @@
  * renderer, input and HUD to it. Sessions start hidden and paused — they can be prepared
  * in the background while the player is still in a menu — and go live with `reveal()`.
  */
-
 import { prefetch, prefetchNow, planStream, reprioritize, whenStreamSettled } from '../assets/stream';
 import { SaveRefused, SimBridge, type FrameState } from '../core/bridge';
-import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SimInfo, SocialEvent, WorldStructure } from '../core/protocol';
+import type { Command, GameSource, ItemPlacement, Routine, SimInfo, SocialEvent, WorldStructure } from '../core/protocol';
 import { flatOf, groundDepth, lotOf, lowestStorey, storeyRow } from '../core/protocol';
 import { townMap } from '../ui/townMap.svelte';
 import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
@@ -52,13 +51,13 @@ import { flatRefuses } from './flatBuild';
 import { ownSize } from './surfaces';
 import { colorValues } from '../ui/buy/catalog';
 import { play } from '../ui/sfx';
-import { faceFromId, householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
+import { faceFromId, householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance } from './household';
 import { clockTime, openAt, staffed, staffResidents } from './staff';
 import { PointerInput, routeKey } from './input';
 import { LandMode } from './landMode';
 import { installLandHook } from '../ui/land/landHook';
 import { brushOf } from '../ui/land/landTools';
-import { loadTemplates, type NeighbourhoodDraft } from './town';
+import { loadTemplates } from './town';
 import { townOnMoveIn } from '../ui/newGame';
 import { peopleStreams, tierFor } from './people';
 import { compileSim, loadGameData } from './gameData';
@@ -68,138 +67,9 @@ import { GameSpeed, SUPER_SPEED } from './speed';
 import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
 import { fixedStart } from '../render/shared/frameClock';
-
-declare global {
-  interface Window {
-    /** What the benches drive the game through (`tools/bench/scene.mjs`); set only in development builds. */
-    __osw?: Record<string, unknown>;
-  }
-}
-
-/** Click radius (CSS px) around a Sim's projected centre. */
-const SIM_PICK_RADIUS = 32;
-const STATS_INTERVAL_MS = 500;
-/** After the player picks a storey, the view stays on it this long before following residents again. */
-const STOREY_STAY_MS = 8000;
-/** The storey in view follows residents only while the camera's target is within this many metres of the viewed lot. */
-const STOREY_NEAR = 40;
-const THUMBNAIL = { width: 320, height: 200 };
-/** Longest wait for a save's picture (it needs a drawn frame); the save then keeps the last one. */
-const THUMBNAIL_WAIT_MS = 1000;
-/** Leaving the page (tab hidden, closed) autosaves at most this often. */
-const LEAVE_AUTOSAVE_MS = 60_000;
-
-export type StartRequest =
-  | {
-      kind: 'new';
-      town: NeighbourhoodDraft;
-      household: HouseholdDraft;
-      /** The home: a house's lot, or flat `flat` (its index in its building's flats) of the building on it. */
-      slot: number;
-      flat?: number;
-      /** `household` already lives in `town` at `slot` (and `flat`): the player takes it over instead of moving a new one in. */
-      existing?: boolean;
-      /** Living (default) or Creative. */
-      mode?: GameKind;
-      /** How fast residents age (default normal). */
-      lifespan?: Lifespan;
-      /**
-       * The people seed the town's households were drawn from (`people.ts` `peopleStreams`): the
-       * neighbours' bonds and the simulation's own dice come from it too (the page's `?seed=` still
-       * wins for the dice). Missing: both are random.
-       */
-      peopleSeed?: number;
-      /**
-       * The homes still for sale are filled on the way in (`ui/newGame.ts` `townOnMoveIn`): all but a
-       * few, from the people seed's streams (step 4's Move in).
-       */
-      fill?: boolean;
-    }
-  | { kind: 'load'; saveId: string };
-
-/** How long a story-feed entry stays visible. */
-const FEED_MS = 12_000;
-/** Story-feed entries shown at once. */
-const FEED_SIZE = 3;
-/** Live: the camera starts watching this long after a game is revealed. */
-const START_WATCH_MS = 2500;
-/** Shift+R turns things that turn freely by this many degrees. */
-const FINE_TURN = 15;
-/** At super speed the sim's full-detail area is only the chunks round the camera's (`Renderer.setDetailTight`). */
-const TIGHT_SPEED = SUPER_SPEED;
-/** How long the interface stays after the mouse moves while it watches quietly. */
-const HUD_AWAKE_MS = 3000;
-/** How long a big moment plays at normal speed before the game speeds up again. */
-const SLOW_MS = 25_000;
-/** Frames drawn before a prepared session counts as ready (shaders compiled, textures up). */
-const WARM_FRAMES = 3;
-/** Longest wait for the household's portraits before a prepared session counts as ready anyway. */
-const PORTRAIT_WAIT_MS = 8000;
-/** Longest wait for the first snapshot (its residents' looks) before warming the game's draw. */
-const FIRST_FRAME_WAIT_MS = 1500;
-/** After this long in the game, the catalog's pictures are drawn in idle moments (the catalog then opens with them). */
-const PREFETCH_PICTURES_MS = 4000;
-/** Longest wait for the simulation compiled at boot (`compileSim`) before a game's worker compiles its own. */
-const SIM_COMPILE_WAIT_MS = 15_000;
-/** Longest wait for the street to build the chunks round the camera before the warm-up's frame (a big world). */
-const STREAM_WAIT_MS = 4000;
-/** Longest wait for the textures asked for to load before the warm-up's frame (it then uploads them). */
-const TEXTURES_WAIT_MS = 5000;
-/** Story events the journal keeps: as many as the simulation does (`EVENT_LOG_CAPACITY`). */
-const JOURNAL_SIZE = 300;
-/** Keys that act again while held (R turns, PageUp/PageDown change storey, Ctrl+Z/Y undo and redo); the rest act once per press. */
-const REPEATING = new Set(['r', 'R', 'PageUp', 'PageDown', 'z', 'Z', 'y', 'Y']);
-/** Longest wait for a debug report's picture or GPU details (it goes without them). */
-const REPORT_PART_MS = 4000;
-
-export interface GameSession {
-  /** Saves into `slotId` (a new slot when omitted). Returns the slot id. */
-  save(name: string, slotId?: string): Promise<string>;
-  /** Saves into the older of the game's two autosaves (the crash screen's Save and reload). */
-  saveAutosave(): Promise<string>;
-  applySettings(settings: Settings): void;
-  /** Pauses for menus; `false` restores the previous speed. */
-  setMenuPause(paused: boolean): void;
-  /** The player's household (its address until a family moves in). */
-  readonly household: string;
-  /** The simulation still runs (it hasn't stopped after an error): the game can be saved. */
-  readonly alive: boolean;
-  /**
-   * Resolves when the world is built and drawn and the HUD's portraits exist: revealing is then
-   * instant. Rejects if the simulation stops before that.
-   */
-  readonly ready: Promise<void>;
-  /** Compiles and draws the game's own look (the mirror's clip-plane shaders too), if not done yet; `progress` hears its steps (0..1). */
-  warm(progress?: ProgressReport): Promise<void>;
-  /** Unpauses the game and attaches input. */
-  reveal(): void;
-  /** Ends the session; resolves once it has let go of the renderer, which is kept for the next one. */
-  dispose(): Promise<void>;
-  /**
-   * Fixed-step playback (benchmarks, `debug/benchTime.ts`): the simulation's clock stops and the frames wait for
-   * `step`, each `ticks` ticks of the game later than the one before; null: back to real time. The game should run
-   * at normal speed (a faster one's steps should divide `ticks`), with no super speed in quiet hours. Asked again while
-   * stepping, only the ticks a frame change.
-   */
-  stepMode(ticks: number | null): void;
-  /**
-   * Fixed-step playback: a run's start, alike however the frames before it went. The residents and the birds set up
-   * afresh (`Renderer.restartLife`); then, with the clocks of what moves only for the eye from 0 again and the frames'
-   * clock a second on (what was held back by its rate is due then), one frame with the clock held, which draws whatever
-   * the restart left waiting; then the clocks from 0 again and the frames' clock a second on, for the run's first frame.
-   */
-  restartPlayback(): Promise<void>;
-  /**
-   * Fixed-step playback: runs the frame's ticks, then draws it at their time. The ticks run (0: none, the game is
-   * paused or not stepping). `still`: a frame with no ticks and the clock held (what a camera put somewhere streams in
-   * and builds, drawn before a run without moving what is drawn at a rate of its own on).
-   */
-  step(still?: boolean): Promise<number>;
-}
-
-/** Reports a loading step and the overall progress (0..1) while a session is prepared. */
-export type ProgressReport = (label: string, value: number) => void;
-
+export { type StartRequest, type GameSession, type ProgressReport } from './sessionShared';
+import { SIM_PICK_RADIUS, STATS_INTERVAL_MS, STOREY_STAY_MS, STOREY_NEAR, THUMBNAIL, THUMBNAIL_WAIT_MS, LEAVE_AUTOSAVE_MS, FEED_MS, FEED_SIZE, START_WATCH_MS, FINE_TURN, TIGHT_SPEED, HUD_AWAKE_MS, SLOW_MS, WARM_FRAMES, PORTRAIT_WAIT_MS, FIRST_FRAME_WAIT_MS, PREFETCH_PICTURES_MS, SIM_COMPILE_WAIT_MS, STREAM_WAIT_MS, TEXTURES_WAIT_MS, JOURNAL_SIZE, REPEATING, REPORT_PART_MS } from './sessionShared';
+import type { StartRequest, GameSession, ProgressReport } from './sessionShared';
 export async function startSession(
   renderer: Renderer,
   canvas: HTMLCanvasElement,
@@ -220,7 +90,6 @@ export async function startSession(
     throw err;
   }
 }
-
 /** `startSession`, holding inference until the game is ready (`releaseInference` lets go, and is swapped for the stream's hold). */
 async function openSession(
   releaseInference: () => void,
@@ -243,7 +112,6 @@ async function openSession(
   const started = perfStart('session: start→ready');
   progress(request.kind === 'load' ? 'Reading your save' : 'Laying out the neighbourhood', 0.05);
   const { content, assets } = await perfTimeAsync('session: loadGameData', loadGameData);
-
   let source: GameSource;
   let household: string;
   /** The save being loaded (none for a new game). */
@@ -278,7 +146,6 @@ async function openSession(
     household = saved.household;
     gameId = saved.game ?? saved.id;
   }
-
   progress('Starting the simulation', 0.15);
   // What every game needs whatever its world (the surfaces, the garden, the street, the residents,
   // the birds) downloads while the simulation starts; the house's own things come with its world.
@@ -358,7 +225,6 @@ async function openSession(
   };
   /** `?debug`'s `__crash('render')`: every frame fails. */
   let failFrames = false;
-
   let world: WorldStructure | null = null;
   /** The lot the last world structure showed (edit feedback compares worlds of the same lot). */
   let worldView: number | null = null;
@@ -472,7 +338,6 @@ async function openSession(
     if (game.mode !== 'live' || game.follow !== null || viewPlot === null || home === null || mayOpenNow(viewPlot)) return;
     showPlot(home, false);
   }
-
   // --- Watching: after a while without input the director takes the camera ----------------
   const director = new Director({
     content,
@@ -593,7 +458,6 @@ async function openSession(
    * goes off on their own before a check turns it off); the setting is sent once it's changed.
    */
   let autonomy: boolean | null = params.has('state') ? settings.autonomy : null;
-
   /** A speed for the game: the player's (with a blip for pausing, going again or a speed changed) or the game's own (`onStory`, silent). */
   function chooseSpeed(to: number, byPlayer: boolean) {
     // Time stands still in Build and Create.
@@ -606,7 +470,6 @@ async function openSession(
     speed.choose(to);
     if (byPlayer && to !== was) play(to === 0 ? 'pause' : was === 0 ? 'resume' : 'speed');
   }
-
   const controls: GameControls = {
     setSpeed(to) {
       chooseSpeed(to, true);
@@ -1221,7 +1084,6 @@ async function openSession(
   game.household = household;
   // Portraits of new faces in play come from a studio already warmed up.
   services.previews.keep(true);
-
   // Goal ideas and wishes as they come up, to accept or decline.
   // (Their chime once the game is revealed: a wish toasted as the world arrives stays quiet behind the loading screen.)
   const ideas = ideaToasts(() => revealed && game.mode === 'live');
@@ -1562,7 +1424,6 @@ async function openSession(
       })
       .catch((err) => toast(`Rendering failed: ${err}`));
   });
-
   function onStory(fresh: SocialEvent[]) {
     const now = Date.now();
     // The open journal keeps up (it's fetched again when it opens).
@@ -1584,7 +1445,6 @@ async function openSession(
       toast('Slowed down for a moment');
     }
   }
-
   /**
    * Switches the view to a lot: the worker sends that lot's geometry, then the scene is rebuilt.
    * The camera moves to its middle, unless it is going along with someone the player follows.
@@ -1686,9 +1546,7 @@ async function openSession(
     readAhead(ranks);
   });
   controls.setWallMode(game.wallMode);
-
   const inLot = (x: number, z: number) => !!world && x >= 0 && z >= 0 && x < world.width && z < world.depth;
-
   const screen = { x: 0, y: 0 };
   const head = { x: 0, y: 0, z: 0 };
   /** Nearest Sim whose projected body centre is within the pick radius. */
@@ -1710,7 +1568,6 @@ async function openSession(
     }
     return best;
   };
-
   const openMenu = (objectId: number, x: number, y: number) => {
     const placement = world?.objects.find((o) => o.id === objectId);
     const def = placement && content.object(placement.def);
@@ -1767,7 +1624,6 @@ async function openSession(
     game.menu = { objectId, title: placement.quality ? `${def.name} ${'★'.repeat(placement.quality)}` : def.name, x, y, items };
     play('menu');
   };
-
   /** Food or a dish: eat a serving, or clear it away (to the sink). */
   const openItemMenu = (itemId: number, x: number, y: number) => {
     const it = bridge.item(itemId);
@@ -1782,7 +1638,6 @@ async function openSession(
     game.menu = { objectId: -1, itemId, title: `${def.label}${it.state === 'spoiled' ? ' (gone off)' : servings}`, x, y, items };
     play('menu');
   };
-
   let pointer: PointerInput | null = null;
   const attachPointer = () => new PointerInput(canvas, {
     click(x, y) {
@@ -1876,7 +1731,6 @@ async function openSession(
     cancel: () => (landTab() ? landMode.cancel() : buildBuy.cancelDrawing()),
     abort: () => (landTab() ? void landMode.cancel() : buildBuy.abortPress()),
   });
-
   /** Puts what the eyedropper picked up in hand: a build tool with its look, or another object. */
   function usePicked(p: Picked | null) {
     game.eyedropper = false;
@@ -1890,7 +1744,6 @@ async function openSession(
     controls.startPlacing(p.def);
     if (game.placing) game.placing = { ...game.placing, rot: p.rot, turn: p.turn, colors: p.colors, size: p.size, tall: p.tall };
   }
-
   const onKey = (e: KeyboardEvent) => {
     const t = e.target;
     if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || (t instanceof HTMLElement && t.isContentEditable)) return;
@@ -2047,7 +1900,6 @@ async function openSession(
       }
     }
   };
-
   // The gameplay benchmark (`tools/bench/gameplay.mjs`): the renderer's numbers on demand, with GPU
   // time measured for the whole session (`?gpustats`, dev only; nothing is installed without it).
   installGameplayStats(() => ({
@@ -2055,7 +1907,6 @@ async function openSession(
     gpuPasses: renderer.gpuPasses(),
     simMemoryBytes: bridge.threadStats?.memoryBytes ?? null,
   }));
-
   const statsTimer = setInterval(() => {
     // GPU timing costs a little, so it runs only while the overlay is open (or the benchmark asks).
     renderer.measureGpu(game.perfOpen || GAMEPLAY_STATS);
@@ -2065,7 +1916,6 @@ async function openSession(
     game.stats = renderer.stats();
     game.threads = threadStats(game.stats, bridge.threadStats, voices.stats());
   }, STATS_INTERVAL_MS);
-
   // The dev play log (`debug/devlog.ts`): what the game is doing every few seconds, the size drawn when it
   // changes, and stalls between frames.
   let lastFrameAt = 0;
@@ -2090,7 +1940,6 @@ async function openSession(
         devlogNextSample();
       }, SAMPLE_MS)
     : 0;
-
   /** This frame's interpolation state (for what is placed over the view once the camera has moved). */
   let shown: FrameState | null = null;
   renderer.run((now) => {
@@ -2129,7 +1978,6 @@ async function openSession(
     bubbles.update(shown);
     if (roomOverlayOn()) roomOverlay.update();
   });
-
   const session: GameSession = {
     get household() {
       return household;
