@@ -71,10 +71,10 @@
     },
     {
       "name": "sim-social",
-      "file": "crates/sim-core/src/social.rs",
-      "sha256": "8d7e4254d6fa359ed451ac82086e49e3d1f3e07d9dc9f5349788adad02b64a00",
-      "by": "integrator",
-      "reason": "0.8.3 missing-items run: cleaning tools (sweep), the post at home, household cars (boughtCar/gotLetter events), nobody moves house at the wheel; reviewed, sim 819 and generated seeds 0-2 pass"
+      "file": "crates/sim-core/src/social/mod.rs",
+      "sha256": "5c0d5011b0ffc70ba00cc3eb89a752e7dd039b7b32a376bde6faec4b38989581",
+      "by": "refactor",
+      "reason": "split into social/ (mod, defs, parse, relationships, events); behaviour unchanged"
     },
     {
       "name": "sim-partners",
@@ -92,10 +92,10 @@
     },
     {
       "name": "sim-lifecycle",
-      "file": "crates/sim-core/src/lifecycle.rs",
-      "sha256": "5d73ac4badb4006678651757eed2c5e3da61f91b93c2e2c9930b7c5270595f3a",
+      "file": "crates/sim-core/src/lifecycle/mod.rs",
+      "sha256": "8122e129fc121c0f8e9d376e64d100fe5fc1b25884ae48ae74e592340a18678a",
       "by": "refactor",
-      "reason": "stale pin refreshed: file hash at HEAD already differed from the pin; no change made to lifecycle.rs"
+      "reason": "split into lifecycle/ (mod, moving, arrival, babies, children); behaviour unchanged"
     },
     {
       "name": "sim-hosting",
@@ -175,6 +175,62 @@
       "sha256": "c97c57b13b254a7d10e6213aaf79791b7c3bccb5518e3ea0b18fa80b0fb75fae",
       "by": "refactor",
       "reason": "split out of planner.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-social-defs",
+      "file": "crates/sim-core/src/social/defs.rs",
+      "sha256": "1087a872fb796b6f212068d4a86ce2b3fc4d79fb5dca19792d160c6180c60aa9",
+      "by": "refactor",
+      "reason": "split out of social.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-social-parse",
+      "file": "crates/sim-core/src/social/parse.rs",
+      "sha256": "6b49ccbc47b180f35d21ade710df4a075e49f826c37f5eb8dba9b816e91973e7",
+      "by": "refactor",
+      "reason": "split out of social.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-social-relationships",
+      "file": "crates/sim-core/src/social/relationships.rs",
+      "sha256": "1df757f0486c1187d305185c085db1564e8ad3ca0413109f38a9167fa8487350",
+      "by": "refactor",
+      "reason": "split out of social.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-social-events",
+      "file": "crates/sim-core/src/social/events.rs",
+      "sha256": "64ab589d3ec4bd8accedef194946e0cfc9120e0fc62cf368fe1e6c0e16b82b55",
+      "by": "refactor",
+      "reason": "split out of social.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-lifecycle-moving",
+      "file": "crates/sim-core/src/lifecycle/moving.rs",
+      "sha256": "7d530ba133c78ae376921c908ae3609e9d4495555249015d556e4322ec53e70a",
+      "by": "refactor",
+      "reason": "split out of lifecycle.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-lifecycle-arrival",
+      "file": "crates/sim-core/src/lifecycle/arrival.rs",
+      "sha256": "f10015429d8453183c8b5761b74c5b123f0edcc5e46e62ac0fc3e984fefab512",
+      "by": "refactor",
+      "reason": "split out of lifecycle.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-lifecycle-babies",
+      "file": "crates/sim-core/src/lifecycle/babies.rs",
+      "sha256": "f1c1b2648da28f1f10aed486e6a9403ad99969e21e704db226339bf59d9c6b9d",
+      "by": "refactor",
+      "reason": "split out of lifecycle.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-lifecycle-children",
+      "file": "crates/sim-core/src/lifecycle/children.rs",
+      "sha256": "0bde6e641ff3f63fad9575a685777de83b8eda6173ba10b0e8d0340fca44f2f3",
+      "by": "refactor",
+      "reason": "split out of lifecycle.rs; behaviour unchanged"
     }
   ]
 }
