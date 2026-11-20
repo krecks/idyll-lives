@@ -286,11 +286,14 @@ describe('the land drawn round a lot whose edge is on the land\'s grain', () => 
     expect(filled[at(s, 10, 14)]).toBeCloseTo(s.padY(0), 5);
   });
 
-  test('beside land further off, its edge is the land carried in, a retaining edge between', async () => {
+  test('beside land further off, its edge keeps its pad and the land is graded up to it: no retaining edge between', async () => {
     const { lotsFilled } = await import('../src/render/shared/nature');
     const s = sloped(0.2);
     const filled = lotsFilled(s, 1);
-    expect(Math.abs(s.conformed[at(s, 22, 14)] - s.padY(0))).toBeGreaterThan(SKIRT_MOST);
-    expect(Math.abs(filled[at(s, 20, 14)] - s.padY(0))).toBeGreaterThan(SKIRT_MOST);
+    const pad = s.padY(0);
+    // (Out from its edge the ground falls away no faster than the cones allow a cell (`bank` m per m): a slope, not a
+    // wall, however far the land beside it lies below.)
+    expect(Math.abs(s.conformed[at(s, 22, 14)] - pad)).toBeLessThanOrEqual(s.bank * LAND_CELL);
+    expect(filled[at(s, 20, 14)]).toBeCloseTo(pad, 5);
   });
 });
