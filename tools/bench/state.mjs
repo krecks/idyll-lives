@@ -3,7 +3,7 @@
  * Makes a game state without a browser: the new game a world's code (or scene.mjs's recipe) starts, or a save, run
  * to an exact tick by the sim's own WebAssembly (\`web/src/core/wasm-pkg\`, \`bun run wasm\`) under Bun, as the sim
  * worker runs it, and saved paused. What \`?state=<name>\` (\`debug-states/\`) and \`?bench=<name>\`
- * (\`web/public/bench/<name>.json.gz\`) open, and what \`__benchTime.load\` swaps into an open page.
+ * (\`web/public/bench/<name>.json.gz\`) open, and what \`__bench.load\` swaps into an open page.
  *
  *   bun tools/bench/state.mjs --code country-lrstm-7 --home house --hour 13 --name day13
  *   bun tools/bench/state.mjs --scene --world country --options town=village --seed 7 --home town --hour 13 --name town-day --bench
