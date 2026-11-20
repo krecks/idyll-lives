@@ -11,9 +11,9 @@
     {
       "name": "living-town-types",
       "file": "web/src/core/protocol.ts",
-      "sha256": "8f2ffee31290eeea423eac94a81449cb7c8a20c6c899766e97270142d49c91e2",
-      "by": "real-town-t1",
-      "reason": "owner's OK, real town: the backdrop goes (BackdropBuilding and WorldMeta.backdrop), every place a lot's (TownPlace.plot required), LotLook's roof spelled out",
+      "sha256": "feff89eba0cde0204b16dcf3f9bf8ed0aaf14851cc619955f92f6d21151b0e76",
+      "by": "real-town-simp-render",
+      "reason": "simplify round: 'barn' dropped from BuildingUse, a use no lot's look has (no generator, sample or reader makes one since the backdrop went)",
       "region": "living-town-types"
     },
     {

@@ -640,8 +640,7 @@ export type BuildingUse =
   | 'church'
   | 'hall'
   | 'workshop'
-  | 'farm'
-  | 'barn';
+  | 'farm';
 
 /** Somewhere the town tags name: a public lot. */
 export interface TownPlace {
