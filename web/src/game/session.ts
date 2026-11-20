@@ -178,7 +178,8 @@ export interface GameSession {
   /**
    * Fixed-step playback (benchmarks, `debug/benchTime.ts`): the simulation's clock stops and the frames wait for
    * `step`, each `ticks` ticks of the game later than the one before; null: back to real time. The game should run
-   * at normal speed (a faster one's steps should divide `ticks`), with no super speed in quiet hours.
+   * at normal speed (a faster one's steps should divide `ticks`), with no super speed in quiet hours. Asked again while
+   * stepping, the frames' clock moves a second on (what was held back by its rate is due at the next frame).
    */
   stepMode(ticks: number | null): void;
   /**
@@ -2161,8 +2162,9 @@ async function openSession(
       // watching on its own: the benchmark holds it.)
       if (!stepping) bridge.send({ type: 'setAutoFast', enabled: false });
       if (game.watching) stopWatching();
-      // (Past every frame drawn before: whatever they held back by its rate is due by then.)
-      stepping = stepping ? { ...stepping, ticks } : { ticks, frames: 0, from: fixedStart(), tick: 0 };
+      // (Past every frame drawn before: whatever they held back by its rate is due by then. Asked again, a second on:
+      // what the frames before held back is due at the next frame, however they went.)
+      stepping = stepping ? { ...stepping, ticks, from: stepping.from + 1000 } : { ticks, frames: 0, from: fixedStart(), tick: 0 };
       bridge.pace(true);
       renderer.framesOnDemand(true);
     },

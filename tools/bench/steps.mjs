@@ -6,7 +6,7 @@
  * the same numbers (\`hash\`), so one run a pose is enough, and two builds compare frame for frame.
  *
  *   bun tools/bench/steps.mjs --state town-day --poses centre:24,centre:60,home:24 [--frames 600] [--ticks 1]
- *     [--backends webgl,webgpu] [--runs 1] [--quality medium] [--port 5317 | --url http://127.0.0.1:5317] [--out dir]
+ *     [--backends webgl,webgpu] [--runs 1] [--quality medium] [--port <p> | --url http://127.0.0.1:5317] [--out dir]
  *
  * \`--state\`: a state by name (\`debug-states/<name>.json\`, else \`web/public/bench/<name>.json.gz\`: \`state.mjs --name\`).
  * A pose is \`home\` or \`centre\` and the camera's distance (m), from the game's opening angle. \`--runs 2\` runs each pose
@@ -15,14 +15,10 @@
  * frame's counts to \`bench-results/steps-<time>/\` (or \`--out\`), with the page's load times (\`__benchTime.load\`).
  */
 
-import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
 import { quiet } from './quiet.mjs';
+import { launch, ROOT, serve, VIEWPORT } from './lib/browser.mjs';
 
-const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const WEB = ROOT + 'web/';
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
   const i = args.indexOf('--' + name);
@@ -39,33 +35,19 @@ const poses = flag('poses', 'centre:24,centre:60,home:24').split(',').map((p) =>
   if (!['home', 'centre'].includes(over) || !(Number(radius) > 0)) throw new Error('steps: a pose is home:<m> or centre:<m>, not ' + p);
   return { over, radius: Number(radius) };
 });
-const port = Number(flag('port', '5317'));
-const base = flag('url', null) ?? 'http://127.0.0.1:' + port;
+const port = flag('port', null);
 const out = flag('out', ROOT + 'bench-results/steps-' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19));
 
-async function playwright() {
-  if (process.env.PLAYWRIGHT) return import(process.env.PLAYWRIGHT);
-  return import(createRequire(WEB + 'package.json').resolve('playwright'));
-}
-
-let vite = null;
-if (!flag('url', null)) {
-  vite = spawn(WEB + 'node_modules/.bin/vite', ['--port', String(port), '--strictPort', '--host', '127.0.0.1'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] });
-  process.on('exit', () => vite.kill());
-  await new Promise((resolve, reject) => {
-    vite.stdout.on('data', (d) => String(d).includes('Local') && resolve());
-    vite.on('exit', (code) => reject(new Error('vite exited (' + code + ')')));
-  });
-}
-
-const { chromium } = await playwright();
+// (Its own Vite unless `--url` names one.)
+const vite = flag('url', null) ? null : await serve({ port: port === null ? undefined : Number(port) });
+const base = flag('url', null) ?? vite.url;
 mkdirSync(out, { recursive: true });
 const results = [];
 try {
   for (const backend of backends) {
-    const browser = await chromium.launch({ headless: !args.includes('--headed'), ...(process.env.CHROME ? { executablePath: process.env.CHROME } : { channel: 'chromium' }), args: ['--enable-unsafe-webgpu', '--use-angle=metal', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'] });
+    const { browser } = await launch({ headless: !args.includes('--headed') });
     try {
-      const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+      const page = await browser.newPage(VIEWPORT);
       await page.addInitScript(quiet);
       page.on('pageerror', (e) => console.error('page error: ' + e.message));
       const t0 = Date.now();
@@ -102,6 +84,8 @@ try {
   }
 } finally {
   writeFileSync(out + '/summary.json', JSON.stringify({ state, frames, ticks, runs, quality, results }, null, 2));
-  vite?.kill();
+  vite?.stop();
 }
 console.log('steps: ' + out);
+// (A browser that never said it closed would keep the process.)
+process.exit(0);

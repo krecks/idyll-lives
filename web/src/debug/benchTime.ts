@@ -244,6 +244,9 @@ export const benchTime = {
     // (The residents and the birds set up afresh and the clocks of what moves only for the eye from 0 again: however the frames before
     // went and however many settling took, the run starts alike.)
     await renderer.restartLife();
+    // (A frame a second on, with the clock held, draws whatever the restart left waiting; the run a second after it.)
+    s.stepMode(ticks);
+    await s.step(true);
     s.stepMode(ticks);
     services.controls.setSpeed(options.speed ?? 1);
     const draws: number[] = [];
