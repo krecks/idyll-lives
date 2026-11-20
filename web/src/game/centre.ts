@@ -6,7 +6,7 @@
 
 import { inside, leftOf, lengths, nearest, pointAt, roadMask, type Pt, type RoadPlan } from './roads';
 import type { Ground, Rect } from './town';
-import { add, fillPoly, r2, rectFrom, rectPoly, signedArea2, tilesOf } from './footprints';
+import { add, ccw, fillPoly, r2, rectFrom, rectPoly, tilesOf } from './footprints';
 
 /** How long a main town's high street is (m, at most), and how far its centre reaches either side of its middle line. */
 const HIGH_STREET = 180;
@@ -238,7 +238,7 @@ export function outline(roads: readonly RoadPlan[], c: Centre, band: number, rig
     rights.push(add(p, n, -(near && at?.side === -1 ? Math.max(right, round) : right)));
   }
   const poly = [...lefts, ...rights.reverse()].map(([x, z]): Pt => [r2(x), r2(z)]);
-  return signedArea2(poly) > 0 ? poly.reverse() : poly;
+  return ccw(poly);
 }
 
 /**

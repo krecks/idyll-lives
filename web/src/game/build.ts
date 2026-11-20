@@ -48,7 +48,7 @@
 import type { Content } from '../content/content';
 import type { BuildingUse, CarPark, RoadPlan, TownArea } from '../core/protocol';
 import { CIVIC, civicChoices, civicTooBig, draftAreaSize, ZONE, type ZoneKind } from './places';
-import { centroidOf, rectPoly } from './footprints';
+import { rectPoly } from './footprints';
 import { bayRect, besidePlace, bySquare, driveLines, parkAlong, vergeParking, type CarParkLaid } from './parking';
 import { DensePass, terraceUnits } from './dense';
 import { roadKey, withBuildings } from './edit/buildup';
@@ -62,7 +62,7 @@ import { AREA_APART, BEND, BEND_MOST, BIG_PLACES, cells8, cornersOf, FARM_SHOP_R
 import { mulberry32 } from './noise';
 import { placeOfTemplate, placeUnit } from './placeLots';
 import { fronted, greenSpots, hatched, SPOT_NEAR, SPOT_REACH, stretchesOf, type Stretch } from './proposal';
-import { inside, lengths, leftOf, pointAt, RoadIndex, straightAround, type Pt } from './roads';
+import { centroid, inside, lengths, leftOf, pointAt, RoadIndex, straightAround, type Pt } from './roads';
 import { boundsOf, frontageOf, generatedHouses, Ground, lotAt, LotPlacer, plotRect, shuffled, slotDims, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
 import { previewWorld } from './townPreview';
 import type { LaidTown, Proposal } from './townJobs';
@@ -165,7 +165,7 @@ function polyCells(poly: readonly Pt[], cols: number, rows: number): number[] {
   const [j0, j1] = [Math.max(0, Math.floor(Math.min(...zs) / USE_CELL)), Math.min(rows - 1, Math.floor(Math.max(...zs) / USE_CELL))];
   for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (inside(poly as Pt[], (i + 0.5) * USE_CELL, (j + 0.5) * USE_CELL)) out.push(j * cols + i);
   if (!out.length) {
-    const [cx, cz] = centroidOf(poly);
+    const [cx, cz] = centroid(poly);
     const [ci, cj] = [Math.floor(cx / USE_CELL), Math.floor(cz / USE_CELL)];
     if (ci >= 0 && cj >= 0 && ci < cols && cj < rows) out.push(cj * cols + ci);
   }
@@ -679,7 +679,7 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
   });
   const heartOf = (a: number): Pt => {
     const c = draft.open!.centre?.find((q) => q.area === a && q.poly.length >= 3);
-    return c ? centroidOf(c.poly) : middle(areas[a]);
+    return c ? centroid(c.poly) : middle(areas[a]);
   };
   const wanted = (a: number) => byArea[a].length > 0 && (full || touched.has(a));
 
@@ -707,7 +707,7 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
       return r.x < box.x + box.w && box.x < r.x + r.w && r.z < box.z + box.d && box.z < r.z + r.d;
     });
     if (taken) continue;
-    const c = centroidOf(poly);
+    const c = centroid(poly);
     const area = nearestArea(c);
     const u = publicLot(t, GREEN_LOTS[0], area);
     if (!u) continue;
@@ -1069,7 +1069,7 @@ function parkedAgain(draft: NeighbourhoodDraft, t: Templates, content: Content, 
     // By the square: on the streets nearest it.
     const square = open.centre?.find((c) => c.area === a)?.square ?? (a === 0 ? open.squares?.[0] : undefined);
     if (square?.length) {
-      const sq = centroidOf(square);
+      const sq = centroid(square);
       parkBy(bySquare(roads, frontageOf(roads, allRoads, sq, rand), sq), SQUARE_BAYS, a, { square: true });
     }
     // By each big place, on its road beside its lot.

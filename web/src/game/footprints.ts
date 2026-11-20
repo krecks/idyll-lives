@@ -5,7 +5,7 @@
  * generator's passes (the centre, the dense pass, the parking) and the checks of a laid town.
  */
 
-import { inside, lengths, pointAt, type RoadIndex, type Pt, type RoadPlan } from './roads';
+import { centroid, inside, lengths, pointAt, type RoadIndex, type Pt, type RoadPlan } from './roads';
 import type { Rect } from './town';
 
 /** A building's side runs within this (radians) of the way the road nearest it runs, or square to it. */
@@ -27,12 +27,16 @@ export function signedArea2(poly: readonly Pt[]): number {
   return n;
 }
 
+/** `poly` wound counter-clockwise seen from above (x right, z down the screen: its signed area negative), turned in place if it was not. */
+export function ccw(poly: Pt[]): Pt[] {
+  return signedArea2(poly) > 0 ? poly.reverse() : poly;
+}
+
 /** A rectangle `w` along `t` and `d` along `n` (unit, square to each other) from the middle of its front edge `c`, counter-clockwise seen from above. */
 export function rectFrom(c: Pt, t: Pt, n: Pt, w: number, d: number): Pt[] {
   const a = add(c, t, -w / 2);
   const b = add(c, t, w / 2);
-  const poly: Pt[] = [a, b, add(b, n, d), add(a, n, d)];
-  return signedArea2(poly) > 0 ? poly.reverse() : poly;
+  return ccw([a, b, add(b, n, d), add(a, n, d)]);
 }
 
 /** Whether two convex polygons overlap by more than `slack` m (separating axes): touching is no overlap. */
@@ -107,7 +111,7 @@ export function tilesOf(poly: readonly Pt[], grow: number, fn: (x: number, z: nu
  * within `FACING` of the road's way there, or square to it (`FACING` from that too). tools/worlds/sample.ts asks the same.
  */
 export function facesRoad(poly: readonly Pt[], roads: readonly RoadPlan[], index: RoadIndex, slack = 0): boolean {
-  const c = centroidOf(poly);
+  const c = centroid(poly);
   const near = [...index.around(c[0], c[1], 90)].filter(([r]) => roads[r].kind !== 'trail');
   if (!near.length) return false;
   const least = Math.min(...near.map(([, hit]) => hit.dist));
@@ -165,9 +169,4 @@ export function rectPoly(r: Rect): Pt[] {
     [r.x + r.w, r.z + r.d],
     [r.x + r.w, r.z],
   ];
-}
-
-/** A polygon's centroid (the mean of its corners). */
-export function centroidOf(poly: readonly Pt[]): Pt {
-  return [poly.reduce((s, p) => s + p[0], 0) / poly.length, poly.reduce((s, p) => s + p[1], 0) / poly.length];
 }
