@@ -6,7 +6,6 @@ import { describe, expect, test } from 'bun:test';
 import type { PlotInfo, SimView, TownPlace } from '../src/core/protocol';
 import { FLAT_FLOOR } from '../src/game/price';
 import { chosenAnchor, chosenIcon, chosenOf, flatRows, flatsDetail, insideText, placeDetail, placeLabel, whoIsIn, type ChosenTown } from '../src/ui/town/chosen';
-import { FLAT_FLOOR } from '../src/game/price';
 import { homesForSale } from '../src/ui/town/places';
 import type { TagWorld } from '../src/ui/town/tags';
 import { BUILDING, FLATS, realTown } from './fixtures/realTown';
