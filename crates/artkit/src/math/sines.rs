@@ -114,7 +114,7 @@ pub(crate) fn cosf_alone(x: f32) -> f32 {
 /// it the arc sine's polynomial in 1 - |x| by the root of that, taken from a half turn for a number under none;
 /// then rounded. Of -1 it is the single just under pi: no angle over a half turn. (Its code, read from the
 /// library; every single from -1 to 1 gives the library's bits.)
-pub(crate) fn acosf(x: f32) -> f32 {
+pub(super) fn acosf(x: f32) -> f32 {
     let (a, k) = (x.abs(), f64::from_bits);
     if a >= 1.0 {
         return if a > 1.0 {
@@ -173,7 +173,7 @@ fn arc_near(x: f64) -> f64 {
 /// The arc sine as Blender's C library (Apple's) works it out, which is not always the nearest single: in double,
 /// a polynomial in x squared up to a half and in 1 - |x| over it, each step fused, then rounded. (Its code, read
 /// from the library; every single from -1 to 1 gives the library's bits.)
-pub(crate) fn asinf(x: f32) -> f32 {
+pub(super) fn asinf(x: f32) -> f32 {
     let (a, k) = (x.abs(), f64::from_bits);
     if a >= 1.0 {
         return if a == 1.0 {

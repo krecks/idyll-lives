@@ -14,13 +14,13 @@ mod recessed;
 mod shaker;
 
 pub use bench::*;
-pub(crate) use carve::*;
+use carve::*;
 pub use corner::*;
 pub use cut::*;
-pub(crate) use extent::*;
+use extent::*;
 pub use fillet::*;
-pub(crate) use hole::*;
+use hole::*;
 pub use moulding::*;
-pub(crate) use polygon::*;
+use polygon::*;
 pub use recessed::*;
 pub use shaker::*;

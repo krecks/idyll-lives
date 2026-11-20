@@ -89,7 +89,7 @@ pub(crate) fn rest(obj: Obj, path: Path, index: usize) -> f64 {
     }) as f64
 }
 
-pub(crate) fn mark_peak(obj: Obj, clip: &str, frame: i32) -> Obj {
+pub(super) fn mark_peak(obj: Obj, clip: &str, frame: i32) -> Obj {
     obj.edit(|o| {
         if let Some(t) = o.tracks.iter_mut().find(|t| t.name == clip) {
             t.peak = Some(frame);

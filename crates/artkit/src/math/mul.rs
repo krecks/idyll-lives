@@ -22,7 +22,7 @@ pub(crate) fn mul_m3_v3(m: &M3, v: V3) -> V3 {
     )
 }
 
-pub(crate) fn mul_m3_m3m3(a: &M3, b: &M3) -> M3 {
+pub(super) fn mul_m3_m3m3(a: &M3, b: &M3) -> M3 {
     let (a, b) = (&a.0, &b.0);
     let mut out = [[0.0_f32; 3]; 3];
     for (c, col) in out.iter_mut().enumerate() {

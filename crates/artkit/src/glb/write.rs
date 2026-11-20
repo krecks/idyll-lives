@@ -298,7 +298,7 @@ pub fn write(objs: &[Obj], texcoords: bool, finishes: &Finishes) -> Vec<u8> {
     out
 }
 
-pub(crate) fn quoted(s: &str) -> String {
+pub(super) fn quoted(s: &str) -> String {
     crate::json::Json::Str(s.to_string()).dumps()
 }
 

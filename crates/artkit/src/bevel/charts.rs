@@ -5,16 +5,16 @@ use super::*;
 /// Which old face a strip or a corner's polygon takes its texture from where the faces round it don't share one
 /// (Blender's `choose_rep_face`): each old face's number among the groups of faces whose UVs run on across their
 /// shared edges, its material and its middle.
-pub(crate) struct Charts<'a> {
-    pub(crate) old: &'a Mesh,
-    pub(crate) uvs: &'a [[f32; 2]],
+pub(super) struct Charts<'a> {
+    pub(super) old: &'a Mesh,
+    pub(super) uvs: &'a [[f32; 2]],
     /// (Only for an odd number of strips, as in Blender; none otherwise.)
-    pub(crate) group: Option<Vec<u32>>,
-    pub(crate) sides: Sides,
+    pub(super) group: Option<Vec<u32>>,
+    pub(super) sides: Sides,
 }
 
 impl<'a> Charts<'a> {
-    pub(crate) fn new(
+    pub(super) fn new(
         old: &'a Mesh,
         uvs: &'a [[f32; 2]],
         odd: bool,
@@ -46,7 +46,7 @@ impl<'a> Charts<'a> {
     }
 
     /// Whether the UVs run on from face `f` to face `g` across the edge `e` they share: the same at both its ends.
-    pub(crate) fn runs_on(&self, e: (u32, u32), f: u32, g: u32) -> bool {
+    pub(super) fn runs_on(&self, e: (u32, u32), f: u32, g: u32) -> bool {
         let Some(faces) = self.sides.get(&edge(e.0, e.1)) else {
             return false;
         };
@@ -171,7 +171,7 @@ impl<'a> Charts<'a> {
 
     /// The one of `faces` a texture is taken from: the lowest group, then material, then middle (z, x, y), the
     /// first of them where all are alike.
-    pub(crate) fn pick(&self, faces: &[u32]) -> u32 {
+    pub(super) fn pick(&self, faces: &[u32]) -> u32 {
         let values: Vec<[f32; 5]> = faces
             .iter()
             .map(|&f| {
@@ -222,7 +222,7 @@ impl Charts<'_> {
     /// picked either side of each bevelled edge, in Blender's order of the vertex's edges, the pick of those the
     /// corner's new points, laid onto the face, keep an area on; the first of them all where none does (a corner
     /// cut back by under 14 mm at right angles has too little on any).
-    pub(crate) fn centre(&self, new: &Mesh, vert: u32, centre: &Centre) -> u32 {
+    pub(super) fn centre(&self, new: &Mesh, vert: u32, centre: &Centre) -> u32 {
         let (edges, ring) = centre;
         let points: Vec<V3> = ring.iter().map(|&v| new.verts[v as usize]).collect();
         let (mut choices, mut any): (Vec<u32>, Option<u32>) = (Vec::new(), None);

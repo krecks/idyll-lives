@@ -3,19 +3,19 @@
 use super::*;
 
 /// The corners of one vertex that shade as one, in the order Blender walks them round the vertex.
-pub(crate) struct Fan {
-    pub(crate) corners: Vec<usize>,
+pub(super) struct Fan {
+    pub(super) corners: Vec<usize>,
     /// The fan's own normal: its faces' weighed by their angles at the vertex.
-    pub(crate) normal: V3,
+    pub(super) normal: V3,
     /// The directions of the edges it crosses, from the one it starts at to the one it ends at.
-    pub(crate) edges: Vec<V3>,
+    pub(super) edges: Vec<V3>,
     /// A corner with a sharp edge either side: its frame is its own two sides'.
-    pub(crate) single: bool,
+    pub(super) single: bool,
 }
 
 /// The fans of `mesh`'s corners: round each vertex from a sharp edge to the next (or all the way round, if none
 /// is sharp), started as Blender starts them.
-pub(crate) fn fans(mesh: &Mesh, face_normals: &[V3]) -> Vec<Fan> {
+pub(super) fn fans(mesh: &Mesh, face_normals: &[V3]) -> Vec<Fan> {
     let nl = mesh.loops.len();
     let mut face_of = vec![0usize; nl];
     let mut on_edge: BTreeMap<(u32, u32), Vec<usize>> = BTreeMap::new();

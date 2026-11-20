@@ -10,7 +10,7 @@ pub const ARRAY_BUFFER: u32 = 34962;
 pub const ELEMENT_ARRAY_BUFFER: u32 = 34963;
 
 /// A number as the files have them: whole ones without a point, the rest as Python writes a float.
-pub(crate) fn num(x: f64) -> String {
+pub(super) fn num(x: f64) -> String {
     if x == x.trunc() && x.abs() < 1e15 {
         format!("{}", x as i64)
     } else {
@@ -18,16 +18,16 @@ pub(crate) fn num(x: f64) -> String {
     }
 }
 
-pub(crate) fn nums(xs: &[f32]) -> String {
+pub(super) fn nums(xs: &[f32]) -> String {
     let parts: Vec<String> = xs.iter().map(|&x| num(x as f64)).collect();
     format!("[{}]", parts.join(","))
 }
 
 #[derive(Default)]
-pub(crate) struct File {
-    pub(crate) bin: Vec<u8>,
-    pub(crate) accessors: Vec<String>,
-    pub(crate) views: Vec<String>,
+pub(super) struct File {
+    pub(super) bin: Vec<u8>,
+    pub(super) accessors: Vec<String>,
+    pub(super) views: Vec<String>,
     /// The clips' accessors by their bytes: channels keyed alike share one.
-    pub(crate) shared: BTreeMap<(Vec<u8>, &'static str), usize>,
+    pub(super) shared: BTreeMap<(Vec<u8>, &'static str), usize>,
 }

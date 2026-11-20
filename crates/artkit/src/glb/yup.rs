@@ -3,14 +3,14 @@
 use crate::math::{EulerOrder, V3, cos, sin};
 
 /// Blender (x, y, z) as the file's (x, z, -y).
-pub(crate) fn y_up(v: V3) -> [f32; 3] {
+pub(super) fn y_up(v: V3) -> [f32; 3] {
     [v.x, v.z, -v.y]
 }
 
 /// A normal as the files carry them: to four decimals, then a unit vector again (corners that all but agree
 /// share a vertex), and only then turned +Y up, as Blender's exporter does it (its squares are summed x, y, z as
 /// Blender has them: summed as the file has them, one normal in nine comes out a unit in the last place off).
-pub(crate) fn rounded_normal(n: V3) -> [f32; 3] {
+pub(super) fn rounded_normal(n: V3) -> [f32; 3] {
     let r = n.array().map(|x| (x * 10000.0).round_ties_even() / 10000.0);
     let len = (r[0] * r[0] + r[1] * r[1] + r[2] * r[2]).sqrt();
     // (no normal at all, which Blender reads at a corner whose fan has no frame, a clamped bevel's: straight up,
@@ -26,7 +26,7 @@ pub(crate) fn rounded_normal(n: V3) -> [f32; 3] {
 }
 
 /// A part's turn as the file's quaternion (x, y, z, w), +Y up: its quaternion's, or its Euler angles' in its order.
-pub(crate) fn turn_y_up(rot: V3, order: EulerOrder, quat: Option<crate::math::Quat>) -> [f32; 4] {
+pub(super) fn turn_y_up(rot: V3, order: EulerOrder, quat: Option<crate::math::Quat>) -> [f32; 4] {
     match (quat, order) {
         (Some(q), _) => [q.x, q.z, -q.y, q.w],
         (None, EulerOrder::XYZ) => quat_y_up(rot),

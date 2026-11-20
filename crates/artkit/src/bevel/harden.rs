@@ -3,7 +3,7 @@
 use super::*;
 
 /// How much of its old place a patch's middle keeps when it is subdivided, by its sides (Sabin's weights).
-pub(crate) fn sabin_gamma(n: usize) -> f32 {
+pub(super) fn sabin_gamma(n: usize) -> f32 {
     match n {
         0..=2 => 0.0,
         3 => 0.065_247_58,
@@ -26,14 +26,14 @@ pub(crate) fn sabin_gamma(n: usize) -> f32 {
 /// A patch's points as Blender keeps them: a block for each side by (ring, step), the points the blocks share
 /// kept in one of them and copied to the others.
 #[derive(Clone)]
-pub(crate) struct Grid {
-    pub(crate) n: usize,
-    pub(crate) ns: usize,
-    pub(crate) co: Vec<V3>,
+pub(super) struct Grid {
+    pub(super) n: usize,
+    pub(super) ns: usize,
+    pub(super) co: Vec<V3>,
 }
 
 impl Grid {
-    pub(crate) fn new(n: usize, ns: usize) -> Grid {
+    pub(super) fn new(n: usize, ns: usize) -> Grid {
         Grid {
             n,
             ns,
@@ -44,23 +44,23 @@ impl Grid {
         (i * (self.ns / 2 + 1) + j) * (self.ns + 1) + k
     }
     /// The slot itself.
-    pub(crate) fn raw(&mut self, i: usize, j: usize, k: usize) -> &mut V3 {
+    pub(super) fn raw(&mut self, i: usize, j: usize, k: usize) -> &mut V3 {
         let at = self.index(i, j, k);
         &mut self.co[at]
     }
-    pub(crate) fn at(&self, i: usize, j: usize, k: usize) -> V3 {
+    pub(super) fn at(&self, i: usize, j: usize, k: usize) -> V3 {
         self.co[self.index(i, j, k)]
     }
     /// The point that stands for the slot.
-    pub(crate) fn get(&self, i: usize, j: usize, k: usize) -> V3 {
+    pub(super) fn get(&self, i: usize, j: usize, k: usize) -> V3 {
         let (i, j, k) = canon(self.n, self.ns, i, j, k);
         self.at(i, j, k)
     }
-    pub(crate) fn set(&mut self, i: usize, j: usize, k: usize, co: V3) {
+    pub(super) fn set(&mut self, i: usize, j: usize, k: usize, co: V3) {
         let (i, j, k) = canon(self.n, self.ns, i, j, k);
         *self.raw(i, j, k) = co;
     }
-    pub(crate) fn copy_equiv(&mut self) {
+    pub(super) fn copy_equiv(&mut self) {
         for i in 0..self.n {
             for j in 0..=self.ns / 2 {
                 for k in 0..=self.ns {
@@ -78,7 +78,7 @@ impl Grid {
 /// Hardened normals: a face of the mesh keeps its own (smooth across the edges left smooth), a strip's corners
 /// take the face they touch or the mean of the strips either side, a corner patch's the face, strips or
 /// vertex they stand on.
-pub(crate) fn harden(
+pub(super) fn harden(
     out: &mut Mesh,
     kinds: &[Kind],
     long: &BTreeSet<(u32, u32)>,

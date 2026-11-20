@@ -3,19 +3,19 @@
 use super::*;
 
 /// A fan's frame for the normals stored in it, as Blender defines it.
-pub(crate) struct Space {
-    pub(crate) lnor: V3,
-    pub(crate) vec_ref: V3,
-    pub(crate) vec_ortho: V3,
-    pub(crate) ref_alpha: f32,
-    pub(crate) ref_beta: f32,
+pub(super) struct Space {
+    pub(super) lnor: V3,
+    pub(super) vec_ref: V3,
+    pub(super) vec_ortho: V3,
+    pub(super) ref_alpha: f32,
+    pub(super) ref_beta: f32,
 }
 
 impl Space {
     const TRIGO: f32 = 0.9999;
     const TWO_PI: f32 = std::f32::consts::TAU;
 
-    pub(crate) fn new(fan: &Fan) -> Space {
+    pub(super) fn new(fan: &Fan) -> Space {
         let lnor = fan.normal;
         let (vec_ref, vec_other) = (fan.edges[0], fan.edges[fan.edges.len() - 1]);
         let (dtp_ref, dtp_other) = (dot_v3(vec_ref, lnor), dot_v3(vec_other, lnor));
@@ -81,7 +81,7 @@ impl Space {
     }
 
     /// A normal as the two shares stored for it.
-    pub(crate) fn store(&self, custom: V3) -> [i32; 2] {
+    pub(super) fn store(&self, custom: V3) -> [i32; 2] {
         let close = (0..3).all(|i| (self.lnor[i] - custom[i]).abs() <= 1e-4);
         if dot_v3(custom, custom) == 0.0 || close {
             return [0, 0];

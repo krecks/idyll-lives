@@ -25,7 +25,7 @@ impl Axis {
     }
 }
 
-pub(crate) fn angle_wrap(angle: f32) -> f32 {
+pub(super) fn angle_wrap(angle: f32) -> f32 {
     let (pi, tau) = (std::f32::consts::PI, std::f32::consts::PI * 2.0);
     let a = angle + pi;
     (a - tau * (a / tau).floor()) - pi

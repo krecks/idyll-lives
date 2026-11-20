@@ -4,7 +4,7 @@ use super::*;
 
 /// A round profile from `start` to `end` about `middle`, its points square to the edge `along` on the plane
 /// through `start` with the normal `plane_no`: the points 1 to `ns` - 1.
-pub(crate) fn profile(
+pub(super) fn profile(
     start: V3,
     middle: V3,
     end: V3,
@@ -39,7 +39,7 @@ pub(crate) fn profile(
 }
 
 /// A corner patch of a cube of side one, `ns` segments: its points by (bound, ring, step), on the unit sphere.
-pub(crate) fn cube_corner(ns: usize) -> Result<BTreeMap<(usize, usize, usize), V3>, String> {
+pub(super) fn cube_corner(ns: usize) -> Result<BTreeMap<(usize, usize, usize), V3>, String> {
     let unit = |i: usize, a: f32, b: f32, c: f32| {
         // (a along the bound's own axis, b along the next, c along the third)
         let mut p = [0.0_f32; 3];
@@ -66,13 +66,13 @@ pub(crate) fn cube_corner(ns: usize) -> Result<BTreeMap<(usize, usize, usize), V
 }
 
 /// The patch of three segments, as Blender's subdivision leaves it on the sphere (measured from its output).
-pub(crate) const CORNER3: &[(usize, usize, [f32; 3])] = &[
+pub(super) const CORNER3: &[(usize, usize, [f32; 3])] = &[
     (0, 1, [0.866_403_8, 0.499_344, 0.0]),
     (1, 0, [0.866_403_8, 0.0, 0.499_344]),
     (1, 1, [0.736_632_6, 0.478_211_55, 0.478_211_55]),
 ];
 /// The patch of four segments.
-pub(crate) const CORNER4: &[(usize, usize, [f32; 3])] = &[
+pub(super) const CORNER4: &[(usize, usize, [f32; 3])] = &[
     (0, 1, [0.923_879_5, 0.382_683_43, 0.0]),
     (0, 2, [0.707_106_77, 0.707_106_77, 0.0]),
     (1, 0, [0.923_879_5, 0.0, 0.382_683_43]),

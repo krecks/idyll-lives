@@ -34,7 +34,7 @@ pub use clips::*;
 pub use decompose::*;
 pub use ease::*;
 pub use eval::*;
-pub(crate) use handles::*;
+use handles::*;
 pub use keypoints::*;
 pub use keys::*;
 pub use moves::*;

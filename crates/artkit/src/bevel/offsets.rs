@@ -5,7 +5,7 @@ use super::*;
 /// Evens the widths along each run of new points that slid along an edge: where a point slides, the cut on
 /// one side of it is tied to the cut on the other, so the offsets asked for can't all be met; each run (a chain
 /// between two points that didn't slide, or a ring) is given the offsets that fit together.
-pub(crate) fn adjust_offsets(corners: &mut BTreeMap<u32, Corner>) {
+pub(super) fn adjust_offsets(corners: &mut BTreeMap<u32, Corner>) {
     let keys: Vec<u32> = corners.keys().copied().collect();
     // the point at the far end of bevelled edge `half` of `v`, on the same side of it
     let other = |corners: &BTreeMap<u32, Corner>,
@@ -79,7 +79,7 @@ pub(crate) fn adjust_offsets(corners: &mut BTreeMap<u32, Corner>) {
 
 /// One run's offsets: the least squares of each edge's two ends differing in width and, a fifth as heavy, of
 /// each offset differing from what it was.
-pub(crate) fn adjust_run(corners: &mut BTreeMap<u32, Corner>, start: (u32, usize), ring: bool) {
+pub(super) fn adjust_run(corners: &mut BTreeMap<u32, Corner>, start: (u32, usize), ring: bool) {
     let mut run = vec![start];
     while let Some(next) = corners[&run[run.len() - 1].0].bounds[run[run.len() - 1].1].chain {
         if next == start {

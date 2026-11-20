@@ -3,7 +3,7 @@
 use super::*;
 
 /// The F-curve through `b` at `time` (`fcurve_eval_keyframes`), held level beyond its ends.
-pub(crate) fn eval(b: &[Bez], time: f32) -> f32 {
+pub(super) fn eval(b: &[Bez], time: f32) -> f32 {
     let (first, last) = (b[0], b[b.len() - 1]);
     if time <= first.co[0] {
         return first.co[1];

@@ -2,17 +2,17 @@
 
 use super::*;
 
-pub(crate) struct Work<'a> {
-    pub(crate) mesh: &'a Mesh,
-    pub(crate) normals: Vec<V3>,
-    pub(crate) vertex_normals: Vec<V3>,
+pub(super) struct Work<'a> {
+    pub(super) mesh: &'a Mesh,
+    pub(super) normals: Vec<V3>,
+    pub(super) vertex_normals: Vec<V3>,
     /// The face and corner a directed edge leaves from.
-    pub(crate) leaving: BTreeMap<(u32, u32), (u32, u32)>,
-    pub(crate) corners: BTreeMap<u32, Corner>,
+    pub(super) leaving: BTreeMap<(u32, u32), (u32, u32)>,
+    pub(super) corners: BTreeMap<u32, Corner>,
 }
 
 impl Work<'_> {
-    pub(crate) fn co(&self, v: u32) -> V3 {
+    pub(super) fn co(&self, v: u32) -> V3 {
         self.mesh.verts[v as usize]
     }
 
@@ -23,7 +23,7 @@ impl Work<'_> {
 
     /// The largest offset the edge `i` of `corner` has room for before the cut faces collide (Blender's
     /// `geometry_collide_offset`, in its arithmetic: a slab's clamped corners close to the last bit or don't).
-    pub(crate) fn collide_offset(&self, corner: &Corner, i: usize, offset: f32) -> f32 {
+    pub(super) fn collide_offset(&self, corner: &Corner, i: usize, offset: f32) -> f32 {
         let no_collide = offset + 1e6;
         let mut limit = no_collide;
         let eb = &corner.edges[i];
@@ -198,7 +198,7 @@ impl Work<'_> {
 
     /// The new points round a vertex, one between each bevelled edge and the next: made, or (`again`) moved to
     /// where the edges' offsets now put them.
-    pub(crate) fn build_boundary(&self, corner: &mut Corner, again: bool) {
+    pub(super) fn build_boundary(&self, corner: &mut Corner, again: bool) {
         let n = corner.edges.len();
         if !again {
             corner.bounds.clear();
@@ -284,7 +284,7 @@ impl Work<'_> {
 impl Work<'_> {
     /// The profile from a vertex's new point `i` to the next, across the bevelled edge between them: its points
     /// between the two, on `plane` (a normal) if given.
-    pub(crate) fn profile_of(
+    pub(super) fn profile_of(
         &self,
         corner: &Corner,
         i: usize,
@@ -356,7 +356,7 @@ impl Work<'_> {
     }
 
     /// The points of the patch where three or more bevelled edges meet, by (bound, ring, step).
-    pub(crate) fn patch(
+    pub(super) fn patch(
         &self,
         corner: &Corner,
         ns: usize,
