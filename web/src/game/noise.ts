@@ -1,7 +1,7 @@
 /**
  * Noise for laying out land: a seeded generator (and a pick and a whole number drawn from one), a
- * lattice hash, value noise and fractal noise over it, and a smooth step. The same functions the renderer's landscape uses (`render/shared/nature.ts`
- * re-exports these), so the world's generator and its drawing agree.
+ * lattice hash, value noise and fractal noise over it, and a smooth step. The renderer's landscape uses the same
+ * functions (`render/shared/nature.ts` imports them from here), so the world's generator and its drawing agree.
  */
 
 /** A small seeded generator (mulberry32): numbers 0..1, as `Math.random` gives them. */

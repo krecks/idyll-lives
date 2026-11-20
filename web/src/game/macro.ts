@@ -1,27 +1,153 @@
+/**
+ * A big world, laid out from its `WorldSpec` (`world.ts`): its land (896 to 1024 m of it in the
+ * classic worlds) with a main town (the spec's shape, its streets reaching all of its box), its
+ * hamlets (five to seven in the classic worlds) 170 m or more from each other and spread over the
+ * whole world, country roads between
+ * them and out of the world with farmsteads and cottages along them, and countryside: woods in
+ * copses, meadows, hills, water, farmland and orchards round the hamlets and farmsteads, and
+ * outdoor places (a picnic meadow, a fishing jetty, a lookout, a campfire, an orchard, a hammock
+ * grove) reached by trails from the nearest hamlet.
+ *
+ * A place's land comes first (`planLand`, `landDraft`: step 1), from streams of its own, with no
+ * town on it: its size, its water, its mountains and the main town's site; its town is laid on it
+ * after (step 2), the same way whether the player shaped it or not.
+ *
+ * A place's water may be a river across the world (its town on a bank, a bridge from the town's
+ * waterfront street, one or two more where it runs straight; country roads keep to one bank but
+ * over a bridge) or the sea round an island (causeways out over it are the world's ways out). A
+ * bridge or a causeway is a straight country road whose deck over the water is `RoadPlan.bridge`;
+ * the sim's walkers walk its deck dry (`deckOf`). A place's world carries its relief (`reliefOf`).
+ *
+ * The land is a cost grid of 8 m cells rolled from noise (how steep, how wooded, where the water
+ * is); the areas go where it is flat and dry, far enough apart (a Poisson disc); country roads
+ * leave an area by a street's end straight on or by a T square off a street, and are paths over
+ * the grid that turn as a road does (`steer`: wide bends, never back on themselves), smoothed
+ * into curves with no hairpins (`COUNTRY_TURN`); one whose path follows a road laid already shares
+ * it, joining it and leaving it in a T, rather than running beside it (`alongExisting`); trails
+ * are A* paths on a finer grid round the lots. One `Ground` covers the whole world, and each
+ * area's lots go along its own roads, nearest its middle first (`town.ts` `LotPlacer`).
+ */
+
 import type { Content } from '../content/content';
-import type { CarPark, LandSize, TownArea, TownSize, WorldMeta, WorldOptions, WorldZone } from '../core/protocol';
+import type { CarPark, LandSize, ParkingBay, Rle, TownArea, TownPlace, TownSize, WorldMeta, WorldOptions, WorldZone } from '../core/protocol';
 import { distanceToRect } from '../render/shared/chunks';
 import { areaSize, civicTooBig, CIVIC, namerFor, ZONE, type ZoneKind } from './places';
-import { chooseCentre, densestCentre } from './centre';
+import { chooseCentre, densestCentre, type Centre } from './centre';
 import { tilesOf } from './footprints';
 import { designs, DensePass, NEAR_CORNER, pooled, raisePlaces, terraceUnits, townPlaces } from './dense';
 import { besidePlace, bySquare, clearOfDrives, driveLines, LOOSE_BEND, parkAlong, vergeParking, type CarParkLaid } from './parking';
-import { random } from './housegen';
 import { COVER, COVER_CELL, coverSpan, LAND_CELL, NONE, type Land as LandField } from './land';
 import { APRON, landZones, Protection, wetTiles, type BuiltLand } from './landEdit';
 import { bridgeSites, dryPieces, type Bounds } from './landPieces';
-import { GENTLE_TILT, seedBare, smoothHeights } from './landFollow';
+import { GENTLE_TILT, seedBare, smoothHeights, type GentlePlane } from './landFollow';
 import { outlines, rasterize, rle, simplify } from './landMasks';
-import { between, fbm } from './noise';
+import { between, fbm, mulberry32 } from './noise';
+import type { UseLayer } from './uses';
 import { along, astar, CELL, Cells, clearOfBoxes, COUNTRY_GRADE, COUNTRY_WIDTH, CountryRouter, CTRL_APART, FACING, ROAD_WIDTH, ROUTE_GRADE, SIDE_COST, TRIES, type Port, type Way } from './countryRouter';
 import { centroid, cropRoads, curve, evenly, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadIndex, roadLengths, roadMeets, straightAround, type Box, type Pt, type RoadPlan } from './roads';
 import { lotName, placeOfTemplate, placeUnit } from './placeLots';
 import { BIG_COURTS, boundsOf, COURTS, frontageOf, Ground, houseFor, joinUp, lotAt, LotPlacer, plotRect, reachesRoad, settleRoads, shuffled, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
 import { LAND_SIZE, LEGACY_KINDS, placeOf, specOf, streetNames, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind, type WorldSpec, type WorldStep } from './world';
 
-export { type OpenWorldDraft, type LandPlan, type LayOptions, chaikin, outlines, rasterize, rle, simplifyRing, unrle, COUNTRY_TURN, evenly, ROAD_WIDTH, type Port, type Way } from './macroShared';
-import type { Rand, OpenWorldDraft, LandPlan, LayOptions } from './macroShared';
+type Rand = () => number;
 
+/** A big world's areas, land and parking, as the town file carries them (`assembleTown`). */
+export interface OpenWorldDraft {
+  /** Area 0 is the main town. */
+  areas: TownArea[];
+  zones: WorldZone[];
+  /** The water's tiles (1 m, row-major over the world), run-length (`Rle`). */
+  water: Rle;
+  /** The height (m) each outdoor plot is levelled to, by plot index. */
+  pads: Record<number, number>;
+  /** The public parking's bays (`parking.ts`): where a car parked in each stands and faces, by area. */
+  parking: ParkingBay[];
+  /** The car parks the bays make up (`parking.ts` `carParkAt`): by the square, by the big places, pairs by the verge. */
+  carParks?: CarPark[];
+  /** The places the tags name, and the main town's centre (its outline and its square). */
+  places?: TownPlace[];
+  centre?: { area: number; poly: Pt[]; square?: Pt[] }[];
+  /** Each centre's high street (`centre.ts` `Centre`), to narrow its outline again once lots are given up (`landFollow.ts`); not in the town file. */
+  highStreets?: Centre[];
+  /** The centres' squares (kept clear of lots: `withGarden`); not in the town file. */
+  squares?: Pt[][];
+  /** How high the land stands over the level the towns are built at (`reliefOf`); none in a classic world. */
+  relief?: WorldMeta['relief'];
+  /**
+   * The land's height (m) per 8 m cell, read at the cells' middles, over the level the towns are
+   * built at (`heightsOf`: below it too, unlike `relief`), row-major from the world's corner. What
+   * a place's land as a height field is seeded from (`landFollow.ts` `withLand`); none in a classic
+   * world or one laid again on a shaped land, and not in the town file.
+   */
+  heights?: { cell: number; cols: number; rows: number; h: Float32Array };
+  /**
+   * The land as a height field (`land.ts`), once the player has shaped it (step 1's brushes,
+   * `landEdit.ts` `applyLand`) or the town was laid again on it (`generateFromSpec`'s `shaped`):
+   * the town file carries it as `meta.land` once it is `edited`.
+   */
+  land?: LandField;
+  /** How the place's land was planned (`LandPlan`), carried with the land so the town laid on it finds its water. */
+  plan?: LandPlan;
+  /** Where the main town was laid (the middle of its box, m): the plan's site, or where the player moved it, as the shore and the dry land let it. */
+  site?: Pt;
+  /**
+   * The gentle ground the town was laid with, an area's plane each (`landFollow.ts` `GentlePlane`):
+   * step 2's settles ease the land to them again, so an edit moves the land only round itself. Not
+   * in the town file nor the world's code.
+   */
+  gentle?: GentlePlane[];
+  /**
+   * What the player painted the land to be used for in step 2 (`uses.ts`), while the new game is set
+   * up: Build makes the town from it. Not in the town file nor the world's code.
+   */
+  uses?: UseLayer;
+}
+
+/**
+ * A place's land before any town is laid on it, as its own seed plans it (`planLand`): its size,
+ * the side its water is on (the main town's, as it faces it), the main town's site (the middle of
+ * its box: on flat dry ground, by the shore), the level the towns are built at (the land's height
+ * there, m: the land field's 0), the mountains' height, and its water: a river across it (where
+ * it runs: its middle `c`, how it tilts, how far its meanders swing, their noise's offset `k`, and
+ * the calm reach by the site), a lake, an island's coast, ponds. A town laid on a land whose water
+ * is as planned uses these, so its bridges and causeways are as a generated world's.
+ */
+export interface LandPlan {
+  v: 1;
+  kind: WorldKind;
+  seed: number;
+  size: LandSize;
+  side: 'zmin' | 'zmax';
+  site: Pt;
+  level: number;
+  massif: number;
+  river?: { c: number; tilt: number; amp: number; k: number; reach: [number, number] };
+  lake?: { x: number; z: number; rx: number; rz: number };
+  coast?: Pt[];
+  ponds?: { x: number; z: number; r: number }[];
+}
+
+/**
+ * How a town is laid on a land (`generateFromSpec`'s `lay`): from its own seed (`townSeed`; else
+ * the land's), with its main town's box round `site` (its middle; else the plan's), on the land
+ * `plan` planned (`landDraft`'s `open.plan`; none: a land from elsewhere, its town where it fits),
+ * and `waterKept` when the land's water is as its plan has it (the town then uses the plan's river
+ * for its bridges, and may go on either bank).
+ */
+export interface LayOptions {
+  townSeed?: number;
+  site?: Pt;
+  waterKept?: boolean;
+  plan?: LandPlan;
+}
+
+/**
+ * A place's land, with no town on it (step 1): `kind` with `options` (the place's own where not
+ * given) from `seed`, as `planLand` plans it and `landFollow.ts` `seedBare` seeds it: no lots,
+ * roads, greens, places or areas; its land (`open.land`: heights, water, woods, meadows)
+ * and its plan (`open.plan`), the water and zones from them, its hills' relief over its level. Its
+ * name and tagline are the ones its town takes when laid from the same seed.
+ */
 export function landDraft(content: Content, _t: Templates, kind: string, options: Partial<WorldOptions> | undefined, seed: number): NeighbourhoodDraft {
   const chosen = { ...options };
   if (Object.hasOwn(LEGACY_KINDS, kind)) chosen.town ??= LEGACY_KINDS[kind].town;
@@ -279,7 +405,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const plan = lay?.plan;
   /** The land's water as its plan has it: the plan's river is the town's to bridge, and the town may go on either bank. */
   const kept = !!(plan && lay?.waterKept);
-  const rand = random(lay?.townSeed ?? seed);
+  const rand = mulberry32(lay?.townSeed ?? seed);
   const rolledName = worldName(content, spec.names, rand);
   const tagline = worldTagline(content, spec, rand);
   const rolledW = Math.round(range(rand, ...spec.world) / 64) * 64;
@@ -293,7 +419,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
 
   // ---- the land: hills (a valley between the massif's mountains), woods -----------------------
   const valley = !!spec.massif;
-  const massif = spec.massif ? range(random((seed ^ MASSIF) >>> 0), ...spec.massif) : 0;
+  const massif = spec.massif ? range(mulberry32((seed ^ MASSIF) >>> 0), ...spec.massif) : 0;
   const valleyZ = (x: number) => D / 2 + (fbm(x / 420, 3.7, nseed + 3, 3) - 0.47) * 260;
   const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
   for (let i = 0; i < gw * gd && !shaped; i++) {
@@ -401,7 +527,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   ox = Math.max(EDGE, Math.min(W - EDGE - box.w, ox));
   // (Room for the town between the river and the world's edge, on its side of it.)
   const room = EDGE / 2 + box.d + 40;
-  const river = spec.water !== 'river' ? null : shaped ? planRiver : riverAcross(random((seed ^ RIVER) >>> 0), W, D, [ox, ox + box.w], nseed, waterSide === 'zmax' ? [room, D] : [0, D - room]);
+  const river = spec.water !== 'river' ? null : shaped ? planRiver : riverAcross(mulberry32((seed ^ RIVER) >>> 0), W, D, [ox, ox + box.w], nseed, waterSide === 'zmax' ? [room, D] : [0, D - room]);
   if (river) {
     for (let i = 0; i < gw * gd && !shaped; i++) {
       const [x, z] = land.centre(i);
@@ -1377,9 +1503,9 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   ground.block(spec.classic ? waterMask : grown(waterMask, W, D, SHORE_GAP));
   // The living town's own draws (the centre, the terraces, the dense pass), apart from the layout's:
   // the rest of the world is laid out as it was.
-  const dense = random(((lay?.townSeed ?? seed) ^ 0x2545f491) >>> 0);
+  const dense = mulberry32(((lay?.townSeed ?? seed) ^ 0x2545f491) >>> 0);
   // (The centre's buildings of flats from a stream of their own, so the rest is drawn as it was.)
-  const centreFlats = random(((lay?.townSeed ?? seed) ^ 0x51ed270b) >>> 0);
+  const centreFlats = mulberry32(((lay?.townSeed ?? seed) ^ 0x51ed270b) >>> 0);
   // The main town's centre: its high street and a square off it, kept clear of lots.
   const centre = chooseCentre(worldRoads, plans[0].roads, plans[0].centre, ground, 0, (x, z) => !spec.classic && land.slope(land.cell(x, z)) > PLACE_STEEP);
   const inCentre = (f: Frontage) => !!centre && inside(centre.poly, f.p[0] + f.n[0] * 10, f.p[1] + f.n[1] * 10);
@@ -1432,7 +1558,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   };
   // The named places' lots, from a stream of their own (`namedLots`): with no room in their area, along the
   // country roads leaving it, where they run straight over gentle land.
-  const placeRand = random(((lay?.townSeed ?? seed) ^ PLACES) >>> 0);
+  const placeRand = mulberry32(((lay?.townSeed ?? seed) ^ PLACES) >>> 0);
   const ways = worldRoads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : []));
   /**
    * Each area's named places to go down on what its homes leave once every home has found room: the main
@@ -1647,7 +1773,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   }
 
   // ---- the named places' names: each lot as its place is called, none twice -------------------
-  nameLots(content, slots, plans, worldRoads, spec.civic, random(((lay?.townSeed ?? seed) ^ PLACE_NAMES) >>> 0));
+  nameLots(content, slots, plans, worldRoads, spec.civic, mulberry32(((lay?.townSeed ?? seed) ^ PLACE_NAMES) >>> 0));
 
   // ---- the centre made the densest: narrowed to its high street where the land round it is the emptier ----
   if (centre && !spec.classic) densestCentre(centre, worldRoads, W, D, waterMask, allGreens, slots.map((s) => ({ rect: rectOf(s), built: !!s.dress && (s.kind === 'shop' || s.kind === 'flats') })), plans[0].rect);
@@ -1724,7 +1850,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const areas: TownArea[] = plans.map((p) => ({ name: p.name, kind: 'hamlet', x: p.rect.x, z: p.rect.z, w: p.rect.w, d: p.rect.d }));
   // (The landscape round the world: its sea or lake is in the zones now. A place's from its own
   // stream; its mountains as high as the massif.)
-  const { water: _water, ...landscape } = spec.landscape(spec.classic ? rand : random((seed ^ LOOK) >>> 0), W, D, waterSide);
+  const { water: _water, ...landscape } = spec.landscape(spec.classic ? rand : mulberry32((seed ^ LOOK) >>> 0), W, D, waterSide);
   if (!spec.classic && massif) landscape.mountains = Math.round(massif);
   const relief = spec.classic ? undefined : reliefOf(land, slots.map(rectOf), shaped ? 0 : undefined);
   const signed = spec.classic || shaped ? undefined : heightsOf(land, slots.map(rectOf), worldRoads);
@@ -2195,10 +2321,10 @@ function planned(spec: WorldSpec, seed: number): Planned {
   const land = new Cells(W, D);
   const { gw, gd } = land;
   const nseed = (seed % 100000) + 17;
-  const rand = random((seed ^ PLAN) >>> 0);
+  const rand = mulberry32((seed ^ PLAN) >>> 0);
   const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
   const valley = !!spec.massif;
-  const massif = spec.massif ? range(random((seed ^ MASSIF) >>> 0), ...spec.massif) : 0;
+  const massif = spec.massif ? range(mulberry32((seed ^ MASSIF) >>> 0), ...spec.massif) : 0;
   const valleyZ = (x: number) => D / 2 + (fbm(x / 420, 3.7, nseed + 3, 3) - 0.47) * 260;
   for (let i = 0; i < gw * gd; i++) {
     const [x, z] = land.centre(i);
@@ -2259,7 +2385,7 @@ function planned(spec: WorldSpec, seed: number): Planned {
   if (spec.water === 'river') {
     // (Calm along the site's reach; room for the town between it and the world's edge, on its bank.)
     const room = EDGE / 2 + box.d + 40;
-    riverPlan = { ...riverDrawn(random((seed ^ RIVER) >>> 0), D, side === 'zmax' ? [room, D] : [0, D - room]), reach: [round2(spotX - box.w / 2), round2(spotX + box.w / 2)] };
+    riverPlan = { ...riverDrawn(mulberry32((seed ^ RIVER) >>> 0), D, side === 'zmax' ? [room, D] : [0, D - room]), reach: [round2(spotX - box.w / 2), round2(spotX + box.w / 2)] };
     river = riverOf(riverPlan, W, nseed);
     for (let i = 0; i < gw * gd; i++) {
       const [x, z] = land.centre(i);
@@ -2403,10 +2529,10 @@ function planned(spec: WorldSpec, seed: number): Planned {
 function bareDraft(content: Content, spec: WorldSpec, seed: number): NeighbourhoodDraft {
   const { plan, land, waterPolys, woods, meadow, hills } = planned(spec, seed);
   const { W, D, gw, gd } = land;
-  const rand = random(seed);
+  const rand = mulberry32(seed);
   const name = worldName(content, spec.names, rand);
   const tagline = worldTagline(content, spec, rand);
-  const { water: _water, ...landscape } = spec.landscape(random((seed ^ LOOK) >>> 0), W, D, plan.side);
+  const { water: _water, ...landscape } = spec.landscape(mulberry32((seed ^ LOOK) >>> 0), W, D, plan.side);
   if (plan.massif) landscape.mountains = Math.round(plan.massif);
   const zones: WorldZone[] = [
     ...waterPolys.map((poly): WorldZone => ({ kind: 'water', poly })),

@@ -22,7 +22,8 @@ import { groundDepth, type WorldStructure } from '../../core/protocol';
 import type { RGB } from './environment';
 import { lawnMap } from './lawn';
 import { updateGroundShade, type TexelRect } from './groundShade';
-import { bareTiles, fbm, lawnMask, smoothstep, splitHalf, WIND, type LawnMask } from './nature';
+import { bareTiles, lawnMask, splitHalf, WIND, type LawnMask } from './nature';
+import { fbm, smoothstep } from '../../game/noise';
 
 /** Blades a patch at full density (`GRASS.perPatch`), and the draws: each a step of √2 sparser (`GRASS.lods`). */
 const PER_PATCH = 448;

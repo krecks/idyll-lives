@@ -32,7 +32,8 @@ import type { DumpMesh } from './glb';
 // The renderer's modules read the page's address (and its frames' timing) as they load.
 Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' }, requestAnimationFrame: () => 0, window: { addEventListener: () => {}, removeEventListener: () => {} } });
 const { Geo: GeoClass } = await import('../../web/src/render/shared/geometry');
-const { HousePlanner, houseScheme, HOUSE_MATERIALS, WALL_HEIGHT, WALL_STUB } = await import('../../web/src/render/shared/house');
+const { HousePlanner, houseScheme, HOUSE_MATERIALS, WALL_STUB } = await import('../../web/src/render/shared/house');
+const { WALL_HEIGHT } = await import('../../web/src/render/shared/walls');
 const { planStreet, TownStreet, Painter, NO_FOCUS } = await import('../../web/src/render/shared/street');
 const { lotBuilding, lotLookBuilding, unitMeshes } = await import('../../web/src/render/shared/townBuildings');
 const { dressBuilding } = await import('../../web/src/render/shared/buildingDress');
@@ -60,7 +61,7 @@ export interface Sample {
 
 /** The materials that are no manifest entry: what the street and the town view draw in their own. */
 export const BUILT_MATERIALS = {
-  /** The plain finish: the vertex colour, its roughness and metalness in the vertex alpha (`street.ts` `encodeFinish`). */
+  /** The plain finish: the vertex colour, its roughness and metalness in the vertex alpha (`geometry.ts` `encodeFinish`). */
   plain: 'built.plain',
   /** Lamp glass: unlit, glowing at night. */
   glow: 'built.glow',

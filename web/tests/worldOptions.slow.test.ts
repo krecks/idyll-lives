@@ -29,7 +29,7 @@ describe('world options', async () => {
   const { randomHousehold } = await import('../src/game/household');
   const { assembleTown, generateWorld, populate, useTownContent, vacantSlots } = await import('../src/game/town');
   const { defaultsOf, expectations, placeOf, specOf } = await import('../src/game/world');
-  const macro = await import('../src/game/macro');
+  const landMasks = await import('../src/game/landMasks');
   const { inside, lengths } = await import('../src/game/roads');
   const lengthOf = (r: { points: [number, number][] }) => lengths(r.points).at(-1)!;
   type Templates = import('../src/game/town').Templates;
@@ -140,7 +140,7 @@ describe('world options', async () => {
   }, 60_000);
 
   test("a river's bridge spans it, its deck dry to walk on; an island's causeways are its ways out", () => {
-    const { unrle } = macro;
+    const { unrle } = landMasks;
     for (const [kind, options, crossings] of [['river', { town: 'village' }, 1], ['island', { town: 'village' }, 1], ['island', { town: 'town' }, 2]] as const) {
       const d = world(options, kind, 31);
       const bridges = d.roads.filter((r) => r.bridge);

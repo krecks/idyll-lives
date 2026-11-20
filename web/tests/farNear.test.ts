@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { Geo } from '../src/render/shared/geometry';
-import { asDrawn, HOUSE_MATERIALS, HousePlanner, houseScheme, WALL_HEIGHT, type SilhouetteSpec } from '../src/render/shared/house';
+import { asDrawn, HOUSE_MATERIALS, HousePlanner, houseScheme, type SilhouetteSpec } from '../src/render/shared/house';
+import { WALL_HEIGHT } from '../src/render/shared/walls';
 import type { WallEdge } from '../src/core/protocol';
 import { realTown, STOREY, W } from './fixtures/realTown';
 

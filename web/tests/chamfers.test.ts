@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import type { Opening, WallEdge, WorldStructure } from '../src/core/protocol';
-import { HousePlanner, WALL_HALF, type HousePart } from '../src/render/shared/house';
+import { HousePlanner, type HousePart } from '../src/render/shared/house';
+import { WALL_HALF } from '../src/render/shared/walls';
 
 /**
  * The house's boards are built with their arrises eased: a chamfer of 4 mm at 45° on the long edges that show (frames,

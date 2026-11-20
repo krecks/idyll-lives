@@ -1,10 +1,419 @@
-import { approachCandidates, covers, facedTable, freeSpots, frontTile, middleOf, overhangTiles, sizeOf, topOf, type Shapes, type Top } from './surfaces';
+/**
+ * Generated houses (0.18): every neighbour's home is laid out from `content/housegen.json`.
+ *
+ * A house class is picked by lot size (bedrooms, size, whether it has a living room, a second
+ * bathroom or a second storey), then:
+ * 1. the footprint is split into rooms (a guillotine plan: each cut divides the rooms left into
+ *    two groups by the floor they want), so every room is a rectangle and the plan stays connected;
+ * 2. doors join the rooms (a tree from the entrance, the living room its hub where it can be,
+ *    no way through a bedroom, no bathroom off the room the front door opens into), the front
+ *    door faces the street and a garden door leads out of a shared room at the back (else at a
+ *    side); kitchen and living room may share an open space;
+ * 3. two-storey houses get stairs along an outside wall of the living room, an upstairs hall over
+ *    them, and the bedrooms and a bathroom off that hall; some houses get a basement: stairs down
+ *    along a wall of the living room (or the entrance hall, the dining room, the kitchen), a hall
+ *    at their foot and a room or two off it (a games room, a gym, a workshop...), under the house;
+ * 4. windows go along the outside walls, daylight enough for every room that has one; kitchens
+ *    get a counter run along one wall (sink, stove); furniture goes against the walls (doors and
+ *    stairs kept clear, every piece reachable), tables stand free with chairs round them, small
+ *    things go on tops (counters, tables, shelves) a resident can get at (free floor beside the
+ *    top, else a seat pulled up to it, as the game's load check has it), floor lamps and such keep to corners and out
+ *    of doorways, every room gets ceiling lights enough for all of it at night, and a few things
+ *    (a patio set) go into the garden, by the garden door. The furniture is for whoever lives
+ *    there (`Residents`): a couple's bed for two, a bed each for everyone else (a child's for
+ *    their age: no race car bed for a teenager), toys only where there are children young enough
+ *    for them, and spare bedrooms (and playrooms) as guest rooms, studies and such.
+ *
+ * Seeded: the same seed, lot size and config always give the same house (laid out the same for
+ * any residents), so a town keeps only `gen:<lot size>:<seed>[:<garden>]` per lot (see `town.ts`).
+ * With a `GardenSize` the lot is cut to fit the house (`fitLot`): a front yard, a garden behind
+ * and beside it in proportion to the house, room for a driveway on one side; the house's `lot`
+ * says how big it came out, and the layout is in that lot's frame. Without one (older ids) it is
+ * in the layouts' frame (drawn for a medium lot). Front to the street at z = 0, with `upper` for
+ * storey 1 and `basement` for storey -1 (both on the same rows as the ground).
+ */
+
+import type { ObjectDef, SurfaceKind } from '../content/content';
+import { approachCandidates, covers, facedTable, freeSpots, frontTile, middleOf, overhangTiles, sizeOf, topOf, type Shape, type Shapes, type Top } from './surfaces';
 import type { Door, HouseTemplate, Placement, PlannedRoom, Wall } from './town';
 import { between, mulberry32 as random, pick } from './noise';
-import type { HouseGenConfig, Furnishing, HouseClass, GardenSize, GardenSpec, RoomKind, Kind, RoomSpec, Slot, CounterRun, TableSet, TopSlot, ObjectInfo, ObjectInfos, Rect, Room, Floor } from './housegenShared';
-import { ROW_GAP, crownClear, usableAt, key } from './housegenShared';
-export type { HouseGenConfig, Residents, Furnishing, GardenSize, GardenSpec, ObjectInfo, ObjectInfos } from './housegenShared';
-export { GARDEN_SIZES, residentsKey, ROW_GAP, crownClear, objectInfos, random } from './housegenShared';
+
+export interface HouseGenConfig {
+  classes: Record<string, HouseClass>;
+  /** Class weights per lot size. */
+  lots: Record<string, Record<string, number>>;
+  margins: { front: [number, number]; back: number; side: number };
+  /** How much garden a lot cut to fit its house gets (`fitLot`). */
+  gardens?: Record<GardenSize, GardenSpec>;
+  rooms: Record<Kind, RoomSpec>;
+  /** Rooms besides bedrooms, kitchen, bathroom and living room, where the house has more floor than its rooms may take. */
+  extras?: ExtraRoom[];
+  openPlan: number;
+  /** `daylight`: the share of each room's floor its windows should light by day (`windowTiles` each). */
+  windows: { spacing: [number, number]; daylight?: number };
+  stairs: string;
+  /** `washingLine`: put in the garden of a home that washes with nowhere to dry the washing (`washesWithoutDrying`). */
+  garden: { objects: string[]; count: [number, number]; sets?: TableSet[]; washingLine?: string; area?: number };
+  /** Ceiling lights for rooms whose own `ceiling` slots have none (the upstairs hall, the basement's). */
+  lights?: string[];
+  basement?: BasementSpec;
+  /** How a house is furnished for the people living in it (see `Residents`). */
+  residents?: ResidentsSpec;
+  /** What a home nobody has moved into keeps when it is a shell (see `Furnishing`). */
+  shell?: ShellSpec;
+  /** The real storeys above a named place's ground floor, by what the place is (`placeFloor`). */
+  floors?: Record<string, FloorsSpec>;
+  /** Buildings of flats (`flats.ts`). */
+  flats?: FlatsSpec;
+  names: { first: string[]; second: Record<string, string[]> };
+}
+
+/**
+ * Who lives in a house: `couples` (a bed for two), `adults` on their own and `children` (a bed
+ * each), `babies` (a crib, which the simulation brings); `stages`, the children's life stages
+ * (content `life.stages` ids, one each: their beds and toys are for them; absent: any child's).
+ * The layout never depends on it, only the furniture: undefined is an empty house.
+ */
+export interface Residents {
+  couples: number;
+  adults: number;
+  children: number;
+  babies: number;
+  stages?: string[];
+}
+
+/**
+ * What a home is furnished for: the people living in it (`Residents`), or `'shell'`, a home past
+ * the town's fill that nobody has moved into: its walls, doors and windows, each kitchen's counter
+ * run, the fittings of the rooms `shell.fitted` names (a bathroom's toilet, shower and basin) and
+ * its ceiling lights, but nothing loose (no beds, no sofas, nothing in the garden). Undefined: an
+ * empty home, furnished as its rooms' own recipes have it.
+ */
+export type Furnishing = Residents | 'shell';
+
+/** A shell's fittings: the rooms that keep the furniture their recipes must have (`RoomSpec.furniture` with no `chance`). */
+interface ShellSpec {
+  fitted: Kind[];
+}
+
+/**
+ * The storeys above a named place of one kind (`placeFloor`): the rooms off the hall over its
+ * stairs, in order (`rooms`, as many as the floor takes, the list repeated), each furnished from
+ * its recipe in `rooms`.
+ */
+interface FloorsSpec {
+  rooms: Kind[];
+}
+
+/**
+ * Buildings of flats (`flats.ts`): the stair hall's width (`hall`; `narrowHall` with flats on one
+ * side of it, and over a place), the lot round the building (`side` m beside it, a `front` strip,
+ * `frontBays` deep with parking bays, a `yard` behind, m, a range, with `yardThings` in it), each
+ * flat's `letterbox` by the street door, and the second word of a building's name (`names`).
+ */
+interface FlatsSpec {
+  hall: number;
+  narrowHall: number;
+  side: number;
+  front: number;
+  frontBays: number;
+  yard: [number, number];
+  letterbox: string;
+  yardThings: string[];
+  names: string[];
+}
+
+/** How much garden a house's lot has round it (see `fitLot`; `tight`: a dense street's, no driveway, never offered to choose). */
+export type GardenSize = 'tight' | 'snug' | 'roomy' | 'big';
+export const GARDEN_SIZES: readonly GardenSize[] = ['snug', 'roomy', 'big'];
+
+/**
+ * A lot cut to fit its house: `back`, the garden behind it as a share of the house's depth (a
+ * range, and at least and at most `backMin`..`backMax` m); `side`, the garden beside it (m, a
+ * range); `drive`, the least on the driveway's side.
+ */
+interface GardenSpec {
+  back: [number, number];
+  backMin: number;
+  backMax: number;
+  side: [number, number];
+  drive: number;
+}
+
+/** A key for `residents` (empty: undefined; `shell` for a shell). */
+export function residentsKey(r: Furnishing | undefined): string {
+  if (r === 'shell') return 'shell';
+  return r ? `${r.couples}.${r.adults}.${r.children}.${r.babies}${r.stages?.length ? `.${[...r.stages].sort().join('+')}` : ''}` : '';
+}
+
+/**
+ * Furnishing for the residents: the beds bedrooms get (`couple`, `single` for a room two share,
+ * `child`, `bunk` for two children short of floor), what goes into a child's room besides
+ * (`childRoom`), what a bedroom nobody sleeps in becomes (`spareRoom`, by weight: `guest`, a
+ * bedroom with a single bed, else a room kind), and what only a home with children has (`kidsOnly`:
+ * content categories and groups; a playroom without children becomes a spare room too).
+ */
+interface ResidentsSpec {
+  beds: { couple: string[]; single: string[]; child: string[]; bunk?: string[] };
+  childRoom?: Slot[];
+  spareRoom: Record<string, number>;
+  kidsOnly: { categories?: string[]; groups?: string[] };
+}
+
+interface HouseClass {
+  label: string;
+  bedrooms: [number, number];
+  /** Chance of a living room. */
+  living: number;
+  /** Chance of a second bathroom. */
+  extraBathroom: number;
+  storeys: { one: number; two: number };
+  width: [number, number];
+  depth: [number, number];
+  /**
+   * A house in a row (a terrace's or a semi-detached pair's): its lot cut to it with `ROW_GAP` m
+   * beside it on one side (its +x) and none on the other, no room for a driveway, and the front
+   * yard `margins.front`'s least, so the fronts of a row line up. Next door's house, its own wall
+   * on its lot's edge, stands `ROW_GAP` m off.
+   */
+  row?: boolean;
+}
+
+/** The gap between two houses in a row (m): see `HouseClass.row`. */
+export const ROW_GAP = 1;
+
+type RoomKind = Kind | 'hall';
+/** Rooms with a recipe in the config (`bedroom`, `kitchen`, `bathroom`, `living` and extras; halls have none). */
+type Kind = string;
+
+/**
+ * A room a house may get on top of the ones it must have: only while its floor is bigger than
+ * its rooms may take (`maxSide`), if `chance` (a number, or per lot size) says so, with at least
+ * `minBedrooms`. `floor: "upper"` puts it upstairs in a two-storey house; `label` names it in the
+ * house's description.
+ */
+interface ExtraRoom {
+  kind: Kind;
+  chance: number | Record<string, number>;
+  minBedrooms?: number;
+  floor?: 'ground' | 'upper';
+  label?: string;
+}
+
+/**
+ * Basements: a share of houses (`chance`, a number or per lot size) get one, with `count` rooms
+ * of the kinds in `rooms` (picked by `weight`, none the house has already; `label` names them in
+ * the house's description), off a hall at the foot of the stairs down.
+ */
+interface BasementSpec {
+  chance: number | Record<string, number>;
+  count: [number, number];
+  rooms: { kind: Kind; weight?: number; label?: string }[];
+}
+
+interface RoomSpec {
+  weight: number;
+  minSide: number;
+  /** Per lot size, a narrowest width instead of `minSide` (a large house's kitchen, room for an island). */
+  minSideOn?: Record<string, number>;
+  /** The most a room may measure (tiles: its short side, its long side); bigger floors get more rooms. */
+  maxSide?: [number, number];
+  /** Kitchens: a counter run along one wall, placed before the furniture. */
+  run?: CounterRun;
+  furniture: Slot[];
+  /** Tables with chairs round them (or desks with a chair), after the furniture that must come. */
+  dining?: TableSet[];
+  /** Small things on the tops of what's in the room (content `layer: "surface"`), after the furniture. */
+  surfaces?: TopSlot[];
+  /**
+   * Things that take no floor space (content `layer`), after the furniture: on the walls (their
+   * back on a wall or a window), from the ceiling and rugs on the floor. Only things nobody uses
+   * (pictures, lamps, rugs), so nothing needs to reach them.
+   */
+  wall?: Slot[];
+  ceiling?: Slot[];
+  rug?: Slot[];
+}
+
+interface Slot {
+  one: string[];
+  chance?: number;
+  count?: [number, number];
+  opposite?: string;
+  /** On the same wall as another piece if there's room (`"run"`: the kitchen's counter run; a fridge at its end). */
+  beside?: string;
+  /** Things on walls: on the wall behind one of these if the room has one (a mirror over the basin). */
+  over?: string[];
+}
+
+/** Counter pieces side by side along a wall: each of `with` (one id per slot) among plain `segments`, `length` tiles in all. */
+interface CounterRun {
+  segments: string[];
+  with: Slot[];
+  length: [number, number];
+  /** Rows of room it leaves in front of it where a wall allows (an island and its stools). */
+  clear?: number;
+}
+
+/**
+ * A table and chairs facing it, all the same chair (`seats`: how many, as many as fit up to the
+ * most; fewer than the least and the set isn't placed). It stands free in the room, unless
+ * `wall` (desks): then against a wall with its chairs along its front.
+ */
+interface TableSet {
+  tables: string[];
+  chairs: string[];
+  seats: [number, number];
+  chance?: number;
+  wall?: boolean;
+  /** Chairs (stools at an island) along one long side only (the back of a table someone uses); a square one, two sides across from each other. */
+  oneSide?: boolean;
+  /** Only in a house with (`ifRoom`) or without (`unlessRoom`) a room of this kind. */
+  ifRoom?: Kind;
+  unlessRoom?: Kind;
+}
+
+/** Things to put on tops of the given kinds (`minSide`: only tops at least this wide and deep, m). */
+interface TopSlot {
+  on: SurfaceKind[];
+  /** Only on these objects (an island's top). */
+  of?: string[];
+  one: string[];
+  count?: [number, number];
+  chance?: number;
+  minSide?: number;
+}
+
+/** What the generator needs to know of an object type (from the game's content). */
+interface ObjectInfo extends Shape {
+  /** `[w, d]` (along x and z, facing +z). */
+  footprint: [number, number];
+  /** The disc it takes on a top (m), its default and limits applied (`Content.radius`). */
+  radius: number;
+  /** Whether it has interactions or cooking stations: someone must be able to get to it. */
+  used: boolean;
+  /** Whether it gives light (content `light`): it counts for its room's light at night. */
+  lamp: boolean;
+  /** Tiles it lights at night (content `light.tiles`; undefined: `roomRules.lampTiles`). */
+  lightTiles?: number;
+  /** As tall as the wall: nothing hangs on the wall or from the ceiling over it (content `fillsWall`). */
+  fillsWall?: boolean;
+  /** Belongs over a window (content `overWindow`): only such things hang on one. */
+  overWindow?: boolean;
+  /** Built to stand back to a wall (content `againstWall`): only with plain wall all along its back. */
+  againstWall?: boolean;
+  /** Hangs from the ceiling at head height (content `headHeight`): nobody walks under it (its tiles are taken from the floor's way through). */
+  headHeight?: boolean;
+  /** Hangs from the ceiling low enough to walk into (content `hangsLow`). */
+  hangsLow?: boolean;
+  /** Tiles beside its own it reaches over at head height (content `overhang`: an arc lamp's shade over the next tile). */
+  overhang?: [number, number][];
+  /** A staircase. */
+  stairs?: boolean;
+  /** Sat or lain on (an interaction with pose `sit` or `lie`): a sofa, a chair, a bed. */
+  seated?: boolean;
+  /** A hob or a grill (stations `stove`, `grill`) or a sink (`dishes`, where hands are washed): no small things on its top. */
+  keepClear: boolean;
+  /** Content category and group (`residents.kidsOnly`: things only for a home with children). */
+  category?: string;
+  group?: string;
+  /** The life stages (content `stages` ids) that may use it, by any of its uses (undefined: anyone): the race car bed and the toy box are a child's. */
+  usedBy?: string[];
+  /** How far a tree's crown reaches out from its middle (m, content `crown`): no wall closer (`crownClear`). */
+  crown?: number;
+}
+
+/**
+ * Whether no wall of floor `g` (with a door or window or not) stands closer than `crown` m to the
+ * point (`x`, `z`): a tree's crown there doesn't grow into the house (as the game's `home.rs`
+ * `crown_meets_wall` refuses).
+ */
+export function crownClear(g: { edges: Map<string, string> }, x: number, z: number, crown: number): boolean {
+  for (const e of g.edges.keys()) {
+    const [axis, xs, zs] = e.split(':');
+    const [ex, ez] = [Number(xs), Number(zs)];
+    const [dx, dz] = axis === 'h' ? [x - Math.min(Math.max(x, ex), ex + 1), z - ez] : [x - ex, z - Math.min(Math.max(z, ez), ez + 1)];
+    if (Math.hypot(dx, dz) < crown) return false;
+  }
+  return true;
+}
+
+/** Whether object type `o` is a hob, a grill or a sink (see `ObjectInfo.keepClear`). */
+function cooksOrWashes(o: ObjectDef): boolean {
+  const stations = o.stations ?? [];
+  const sink = stations.includes('dishes') && (o.interactions ?? []).some((i) => (i.tags ?? []).includes('handwash'));
+  return sink || stations.includes('stove') || stations.includes('grill');
+}
+
+/** An object type's details, or undefined if it doesn't exist. */
+export type ObjectInfos = (def: string) => ObjectInfo | undefined;
+
+/** The generator's view of the game's content (`Content`, or the content files read by a tool). */
+export function objectInfos(content: { object(id: string): ObjectDef | undefined; radius(def: ObjectDef | undefined): number }): ObjectInfos {
+  const known = new Map<string, ObjectInfo | undefined>();
+  return (def) => {
+    if (!known.has(def)) {
+      const o = content.object(def);
+      known.set(def, o && { ...o, footprint: o.footprint ?? [1, 1], radius: content.radius(o), used: (o.interactions ?? []).length > 0 || (o.stations ?? []).length > 0, lamp: !!o.light, lightTiles: o.light?.tiles, keepClear: cooksOrWashes(o), seated: (o.interactions ?? []).some((i) => i.pose === 'sit' || i.pose === 'lie'), usedBy: usedBy(o) });
+    }
+    return known.get(def);
+  };
+}
+
+/** The life stages that may use `o` (`ObjectInfo.usedBy`): its uses' `stages`, else the object's; undefined if one is anyone's. */
+function usedBy(o: ObjectDef): string[] | undefined {
+  const each = (o.interactions ?? []).filter((i) => !i.baby).map((i) => i.stages ?? o.stages);
+  if (!each.length) return o.stages;
+  return each.some((s) => !s) ? undefined : [...new Set(each.flatMap((s) => s ?? []))];
+}
+
+/** Whether someone of life stage `stage` may use `o` (`ObjectInfo.usedBy`; no stage: anyone may). */
+function usableAt(o: ObjectInfo | undefined, stage: string | undefined): boolean {
+  return !o?.usedBy || !stage || o.usedBy.includes(stage);
+}
+
+interface Rect {
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+}
+
+interface Room extends Rect {
+  kind: RoomKind;
+}
+
+/** One storey's plan while it's being made (lot coordinates). */
+interface Floor {
+  rooms: Room[];
+  /** Unit wall edges: `h:x:z` (along x on line z) and `v:x:z` (along z on line x) → what stands there. */
+  edges: Map<string, 'wall' | 'door' | 'window'>;
+  objects: Placement[];
+  /**
+   * Where each of `objects` is used from: its front tile, or (chairs) any of the tiles it may be
+   * approached from; null: nowhere that matters (garden things, things on walls and tops).
+   */
+  fronts: ([number, number][] | null)[];
+  /** Tiles nothing may stand on (by doors, stairs, the landing). */
+  keep: Set<string>;
+  /** Of `keep`, the tiles along an open kitchen and living room's missing wall: an island's stools may stand on them. */
+  open?: Set<string>;
+  /** Tiles taken by furniture. */
+  taken: Set<string>;
+  /** Tiles taken on the wall, ceiling and rug layers (`wall:x:z`, ...). */
+  layers?: Set<string>;
+  /** Tiles open to the stairs down to the basement (the stairwell): nothing hangs or lies there either. */
+  well?: Set<string>;
+  /** Tiles a shade reaches over from beside (content `overhang`, an arc lamp's): nothing hangs low or at head height there. */
+  shaded?: Set<string>;
+}
+
+const key = (x: number, z: number) => `${x}:${z}`;
+
+/**
+ * `lampTiles`: tiles a lamp lights at night unless its `light.tiles` says (content
+ * `roomRules.lampTiles`); every room gets lights enough for all of it. `windowTiles`: tiles one window lights by day (`roomRules.windowTiles`).
+ */
 export function generateHouse(
   cfg: HouseGenConfig,
   info: ObjectInfos,
@@ -52,6 +461,7 @@ export function generateHouse(
   }
   return null;
 }
+
 /**
  * `list` shuffled in place (Fisher-Yates). Not `sort(() => rng() - 0.5)`: what a sort does with such
  * answers is up to the engine, and JavaScriptCore's gave one seed other houses from call to call.
@@ -63,6 +473,7 @@ function shuffle<T>(rng: () => number, list: T[]): T[] {
   }
   return list;
 }
+
 /** One of the keys of `weights`, as likely as its weight (null: none weighs anything). */
 export function weighted(rng: () => number, weights: Record<string, number>): string | null {
   const entries = Object.entries(weights).filter(([, w]) => w > 0);
@@ -71,6 +482,7 @@ export function weighted(rng: () => number, weights: Record<string, number>): st
   for (const [k, w] of entries) if ((r -= w) <= 0) return k;
   return entries[entries.length - 1]?.[0] ?? null;
 }
+
 /**
  * `belowRng`: the random numbers for the basement (null: no basement). `'basement'`: there's no
  * room for the house's furniture with the stairs down (it may do without a basement).
@@ -94,6 +506,7 @@ function attemptHouse(
   const living = rng() < cls.living;
   const extraBath = rng() < cls.extraBathroom;
   const two = (weighted(rng, { one: cls.storeys.one, two: cls.storeys.two }) ?? 'one') === 'two';
+
   // Footprint, within the lot's garden margins.
   const { margins } = cfg;
   const front = cls.row ? margins.front[0] : between(rng, margins.front);
@@ -102,6 +515,7 @@ function attemptHouse(
   let W = Math.min(maxW, between(rng, cls.width));
   let D = Math.min(maxD, between(rng, cls.depth));
   if (W < 6 || D < 6) return null;
+
   // Who goes where.
   const ground: Kind[] = ['kitchen'];
   const upstairs: Kind[] = [];
@@ -161,6 +575,7 @@ function attemptHouse(
     else break;
   }
   if (!g) return null;
+
   let up: Floor | null = null;
   if (two) {
     up = upperFloor(cfg, info, rng, house, g, upstairs);
@@ -210,6 +625,7 @@ function attemptHouse(
   const plot = fit ? fitLot(fit.spec, random(fit.seed), house, doorX, cls.row) : { x: 0, width: lot.width, depth: lot.depth };
   // (A shell has nothing in its garden: the last numbers drawn, so the rest is as anyone's.)
   if (residents !== 'shell') garden(cfg, info, rng, g, house, plot, washesWithoutDrying(info, [g, up, basement]));
+
   // Spawns in front of the front door.
   const spawns: [number, number][] = [
     [doorX + 0.5, house.z - 1.5],
@@ -217,6 +633,7 @@ function attemptHouse(
     [doorX - 0.5, house.z - 1.5],
     [doorX + 2.5, house.z - 1.5],
   ];
+
   const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six'];
   const parts = [
     `${words[bedrooms] ?? bedrooms} bedroom${bedrooms === 1 ? '' : 's'}`,
@@ -227,6 +644,7 @@ function attemptHouse(
   ].filter((p): p is string => !!p);
   const listed = listOf(parts);
   const description = `A ${two ? 'two-storey ' : ''}${cls.label} with ${listed}.`;
+
   const out = (f: Floor) => {
     const e = edgesOut(f);
     // The front door first (the garden path and driveway start from it).
@@ -246,8 +664,10 @@ function attemptHouse(
     ...(fit ? { cut: plot } : {}),
   };
 }
+
 /** A house as `attemptHouse` lays it out, with the lot cut to fit it (`fitLot`; lot coordinates). */
 type Cut = HouseTemplate & { cut?: { x: number; width: number; depth: number } };
+
 /**
  * A lot cut to fit `house` (lot coordinates, its front yard before it): garden behind it in
  * proportion to its depth, a little beside it, and room for the driveway on the side away from
@@ -267,28 +687,35 @@ export function fitLot(spec: GardenSpec, rng: () => number, house: Rect, doorX: 
   const back = Math.max(spec.backMin, Math.min(spec.backMax, Math.round(house.d * share)));
   return { x: house.x - left, width: left + house.w + right, depth: house.z + house.d + back };
 }
+
 /** `a, b and c`. */
 function listOf(parts: string[]): string {
   return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
 }
+
 // ---- floor plans ------------------------------------------------------------------------
+
 /** How much more floor the rooms may take than a storey has: room for the plan to fall into rectangles. */
 const ROOM_SLACK = 1.2;
 /** How much more floor than its rooms' least a storey needs to fall into rooms at all. */
 const LEAST_SLACK = 1.4;
+
 /** The most a room of this kind may measure, `[short side, long side]`. */
 function cap(cfg: HouseGenConfig, k: Kind): [number, number] {
   return cfg.rooms[k]?.maxSide ?? [Infinity, Infinity];
 }
+
 function capArea(cfg: HouseGenConfig, k: Kind): number {
   const [a, b] = cap(cfg, k);
   return a * b;
 }
+
 /** Whether a room of kind `k` may measure `w` by `d`. */
 function fits(cfg: HouseGenConfig, k: Kind, w: number, d: number): boolean {
   const [a, b] = cap(cfg, k);
   return Math.min(w, d) >= cfg.rooms[k].minSide && Math.min(w, d) <= a && Math.max(w, d) <= b;
 }
+
 /** Splits `rect` among `kinds` (a guillotine plan) so that `doors` can join the rooms; null if they don't fit. */
 function floorPlan(cfg: HouseGenConfig, rng: () => number, rect: Rect, kinds: Kind[], doors: (f: Floor) => boolean): Floor | null {
   for (let tries = 0; tries < 60; tries++) {
@@ -302,6 +729,7 @@ function floorPlan(cfg: HouseGenConfig, rng: () => number, rect: Rect, kinds: Ki
   }
   return null;
 }
+
 function split(cfg: HouseGenConfig, rng: () => number, r: Rect, kinds: Kind[]): Room[] | null {
   const spec = (k: Kind) => cfg.rooms[k];
   if (kinds.length === 1) return fits(cfg, kinds[0], r.w, r.d) ? [{ ...r, kind: kinds[0] }] : null;
@@ -339,6 +767,7 @@ function split(cfg: HouseGenConfig, rng: () => number, r: Rect, kinds: Kind[]): 
   }
   return null;
 }
+
 /** Walls around every room (shared walls once). */
 function walls(f: Floor): void {
   for (const r of f.rooms) {
@@ -352,6 +781,7 @@ function walls(f: Floor): void {
     }
   }
 }
+
 /** Edges two rooms share (unit edges, as keys). */
 function shared(a: Rect, b: Rect): string[] {
   const out: string[] = [];
@@ -365,12 +795,14 @@ function shared(a: Rect, b: Rect): string[] {
   }
   return out;
 }
+
 /** The tiles on both sides of an edge. */
 function sides(edge: string): [[number, number], [number, number]] {
   const [axis, xs, zs] = edge.split(':');
   const [x, z] = [Number(xs), Number(zs)];
   return axis === 'h' ? [[x, z - 1], [x, z]] : [[x - 1, z], [x, z]];
 }
+
 /** Puts a door on one of `edges` (not at a corner where possible) and keeps its tiles clear. */
 function door(f: Floor, rng: () => number, edges: string[]): boolean {
   if (!edges.length) return false;
@@ -380,6 +812,7 @@ function door(f: Floor, rng: () => number, edges: string[]): boolean {
   for (const [x, z] of sides(e)) f.keep.add(key(x, z));
   return true;
 }
+
 /**
  * The front door, from the street into the entrance hall (false if the house has one that isn't
  * on the street) or the living room, else the kitchen or the dining room; never a bedroom or a bathroom.
@@ -392,7 +825,9 @@ function frontDoor(f: Floor, house: Rect, rng: () => number): boolean {
   const edges = Array.from({ length: entry.w }, (_, i) => `h:${entry.x + i}:${house.z}`);
   return door(f, rng, edges);
 }
+
 const PUBLIC: RoomKind[] = ['entry', 'living', 'kitchen', 'dining'];
+
 /**
  * Doors so every room can be reached: a tree from the entrance, the living room its hub where
  * possible (else the other shared rooms), nobody walking through a bathroom, a laundry or a
@@ -443,6 +878,7 @@ function connect(f: Floor, rng: () => number, openPlan: boolean): boolean {
   }
   return true;
 }
+
 /**
  * A second way out, into the back garden: a door in the back wall of the living room (else the
  * dining room, else the kitchen), clear of the stairs and the corners, leaving the room outside
@@ -481,18 +917,22 @@ function gardenDoor(f: Floor, house: Rect, rng: () => number): void {
     }
   }
 }
+
 function inside(r: Rect, x: number, z: number): boolean {
   return x >= r.x && z >= r.z && x < r.x + r.w && z < r.z + r.d;
 }
+
 function hasOpenPlan(f: Floor): boolean {
   const k = f.rooms.find((r) => r.kind === 'kitchen');
   const l = f.rooms.find((r) => r.kind === 'living');
   return !!k && !!l && shared(k, l).length > 0 && shared(k, l).every((e) => !f.edges.has(e));
 }
+
 /** Rooms the stairs may go up from. */
 const STAIR_ROOMS: RoomKind[] = ['living', 'entry', 'dining'];
 /** Rooms the stairs down to the basement may start in (a kitchen too, if none of those has room). */
 const DOWN_ROOMS: RoomKind[] = [...STAIR_ROOMS, 'kitchen'];
+
 /**
  * Stairs along an outside wall of the living room, the entrance hall or the dining room
  * (climbing away from the street), and the
@@ -533,6 +973,7 @@ function upperFloor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, h
   }
   return null;
 }
+
 /**
  * A floor of `hall` with rooms of `kinds` in `rest` beside it, each with a door off the hall (or
  * off a corridor from it across `rest`, if they need one: see `upperRooms`); the hall and the
@@ -556,8 +997,10 @@ function offHall(cfg: HouseGenConfig, rng: () => number, hall: Rect, rest: Rect,
   }
   return f;
 }
+
 /** How many basement plans (`offHall`) are tried at most: for one place of the stairs, and in all. */
 const BASEMENT_TRIES = [40, 400];
+
 /**
  * A basement under the house: stairs down from a ground-floor room (the living room, the
  * entrance hall or the dining room; else the kitchen), along one of its walls (its only outside
@@ -660,6 +1103,7 @@ function basementFloor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number
   }
   return null;
 }
+
 /**
  * The rooms upstairs besides the hall: a row of rooms the width of the floor, each off the hall;
  * else (the floor is wider than its rooms may be) a corridor across the floor from the hall,
@@ -690,6 +1134,7 @@ function upperRooms(cfg: HouseGenConfig, rng: () => number, rest: Rect, kinds: K
   }
   return null;
 }
+
 /** Rooms side by side in `r` (along x, else along z), each across the whole of it; null if they don't fit. */
 function row(cfg: HouseGenConfig, rng: () => number, r: Rect, kinds: Kind[], alongX: boolean): Room[] | null {
   const len = alongX ? r.w : r.d;
@@ -721,7 +1166,9 @@ function row(cfg: HouseGenConfig, rng: () => number, r: Rect, kinds: Kind[], alo
   }
   return null;
 }
+
 // ---- windows, furniture, garden ---------------------------------------------------------
+
 /**
  * Windows along each room's outside walls: one every so many tiles (`windows.spacing`), a
  * bathroom one. A room they leave short of daylight (`windows.daylight`: the share of its floor
@@ -770,6 +1217,7 @@ function windows(cfg: HouseGenConfig, rng: () => number, f: Floor, house: Rect, 
     }
   }
 }
+
 /**
  * What the rooms of a house become for the people living in it (`Residents`): per room, the
  * recipes to try in turn before its own (`plans`; the house's planned rooms keep the kinds they
@@ -781,11 +1229,13 @@ interface Fit {
   /** A shell: every room (the basement's too) furnished as `shellPlan` has it. */
   shell?: boolean;
 }
+
 /** A room furnished from `spec` as a room of `kind`. */
 interface Plan {
   kind: Kind;
   spec: RoomSpec;
 }
+
 /**
  * Who sleeps where (config `residents`): the biggest bedrooms first, a couple's with a bed for
  * two, an adult's with any bed, a child's with a child's bed and toys; short of bedrooms,
@@ -850,6 +1300,7 @@ function fitFor(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, rooms
   });
   return fit;
 }
+
 /** What `furnish` may take back: everything placed on the floor and the tiles it took. */
 function snapshot(f: Floor): () => void {
   const [objects, fronts, taken, keep, layers] = [[...f.objects], [...f.fronts], new Set(f.taken), new Set(f.keep), new Set(f.layers ?? [])];
@@ -861,6 +1312,7 @@ function snapshot(f: Floor): () => void {
     f.layers = new Set(layers);
   };
 }
+
 /**
  * Furnishes each room (`furnishRoom`), each with random numbers of its own. Whether everything
  * that must be in the rooms fits is up to their own recipes, so a house works out the same for
@@ -934,6 +1386,7 @@ function shellPlan(cfg: HouseGenConfig, kind: Kind): Plan {
   const fitted = cfg.shell?.fitted.includes(kind) ?? false;
   return { kind, spec: { weight: spec.weight, minSide: spec.minSide, maxSide: spec.maxSide, run: spec.run, furniture: fitted ? spec.furniture.filter((s) => s.chance === undefined || s.chance >= 1) : [] } };
 }
+
 /** Takes what doesn't belong in the house (`fit.keep`) off floor `f`, and the small things on its top. */
 function strip(f: Floor, info: ObjectInfos, fit: Fit): void {
   const gone = f.objects.filter((o) => !fit.keep(info(o.def)!));
@@ -951,6 +1404,7 @@ function strip(f: Floor, info: ObjectInfos, fit: Fit): void {
     }
   }
 }
+
 /**
  * Furnishes room `r` from `spec`: its counter run, the furniture that must come, its tables and
  * chairs (some only in houses with or without a room of some kind: `has`), the rest of its
@@ -1017,6 +1471,7 @@ function furnishRoom(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, 
   dropOutOfReach(f, r, shapes, info);
   return true;
 }
+
 /**
  * Lights from the ceiling until room `r` is lit right through at night, as the simulation scores
  * rooms: each lamp lights its `light.tiles` (else `lampTiles`), and lamps already in it (on the
@@ -1069,8 +1524,10 @@ function lights(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, lampT
   const others = kinds.filter((d) => d !== def && !info(d)!.headHeight).sort((a, b) => need(a) - need(b));
   while (lit() < tiles) if (![def, ...others].some((d) => mount(cfg, info, f, r, d, info(d)!.footprint, 'ceiling', rng))) return;
 }
+
 /** The floor tiles a lamp at head height took from walking (`mount`), freed when it comes down. */
 const hungLow = new WeakMap<Placement, string[]>();
+
 /** Takes a ceiling light down again (and frees its ceiling tiles, and the floor a lamp at head height took). */
 function unhang(f: Floor, info: ObjectInfos, o: Placement): void {
   const at = f.objects.indexOf(o);
@@ -1081,18 +1538,21 @@ function unhang(f: Floor, info: ObjectInfos, o: Placement): void {
   const [w, d] = o.rot % 2 === 0 ? [fw, fd] : [fd, fw];
   for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) f.layers?.delete(`ceiling:${key(o.x + dx, o.z + dz)}`);
 }
+
 /** Tiles of a footprint (min corner, rotated size). */
 function tilesOf(x: number, z: number, w: number, d: number): string[] {
   const tiles: string[] = [];
   for (let dz = 0; dz < d; dz++) for (let dx = 0; dx < w; dx++) tiles.push(key(x + dx, z + dz));
   return tiles;
 }
+
 /** Takes back everything placed on `f` since it had `n` objects (their tiles too). */
 function undo(f: Floor, n: number, tiles: string[]): void {
   f.objects.length = n;
   f.fronts.length = n;
   for (const t of tiles) f.taken.delete(t);
 }
+
 /**
  * A kitchen's counter run: the pieces of `run.with` (one of each slot that comes; a sink, a
  * stove, maybe a dishwasher) in a random order among plain segments, side by side along one wall,
@@ -1159,8 +1619,10 @@ function counterRun(f: Floor, r: Room, info: ObjectInfos, rng: () => number, run
   if (!pieces.every((p) => place(f, r, p.def, info(p.def)!, rng) !== null || !p.required)) return false;
   return undefined;
 }
+
 /** Room a chair takes along a table's edge (m). */
 const SEAT_WIDTH = 0.6;
+
 /**
  * The tiles round a table (at `x`, `z`, turned `rot`) where chairs go, each with the way a chair
  * there faces the table, best first: down its long sides from the middle out, across from each
@@ -1190,6 +1652,7 @@ function seatTiles(table: ObjectInfo, x: number, z: number, rot: number, sides =
   }
   return out;
 }
+
 /**
  * A table and its chairs in room `r`: the table free in the room (off the walls where it can
  * be, near the middle; a desk with `wall` against one), chairs of one kind on its free sides,
@@ -1278,6 +1741,7 @@ function tableSet(f: Floor, r: Room, info: ObjectInfos, rng: () => number, set: 
   }
   return false;
 }
+
 /**
  * Small things on tops in room `r`: each on the emptiest top of a kind it may go on (a table's
  * in its middle, elsewhere anywhere free; never a hob's or a sink's, nor one whose model brings its
@@ -1312,6 +1776,7 @@ function onTops(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos, rng: () =>
     }
   }
 }
+
 /**
  * Whether a resident can get at a small thing on `host`'s top in room `r`, as the simulation's
  * load check has it (sim-core `surface::use_tiles`): from free floor of the room beside the top
@@ -1334,6 +1799,7 @@ function withinReach(f: Floor, r: Room, shapes: Shapes, host: Placement): boolea
   const seats = f.objects.filter((o) => inside(r, o.x, o.z) && facedTable(shapes, f.objects, o, () => false) === host);
   return seats.length ? seats.some(usedFrom) : usedFrom(host);
 }
+
 /** Takes the small things on tops in room `r` that nobody can get at any more (`withinReach`: furnishing it after, a lamp put beside a top). */
 function dropOutOfReach(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos): void {
   const tops = f.objects.map((o) => topOf(shapes, o)).filter((t): t is Top => !!t && inside(r, t.host.x, t.host.z));
@@ -1347,6 +1813,7 @@ function dropOutOfReach(f: Floor, r: Room, shapes: Shapes, info: ObjectInfos): v
     }
   }
 }
+
 /**
  * One thing on the wall, ceiling or rug layer of room `r` (it never blocks anything): on a wall,
  * its back on wall edges (or window ones, for what goes over a window), not over furniture as tall
@@ -1477,6 +1944,7 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
   }
   return false;
 }
+
 /**
  * One piece against a wall of room `r`, facing into it (`prefer`: a side first, 0 the side
  * towards the street, then clockwise). Returns the side, or null if there's no place for it.
@@ -1565,6 +2033,7 @@ function place(f: Floor, r: Room, def: string, { footprint: [fw, fd], againstWal
   }
   return null;
 }
+
 /**
  * Every free tile of the room the doors need is still connected, and so is a way to everything
  * in it: its front tile (which must be free), or for chairs one of the free tiles round them;
@@ -1602,6 +2071,7 @@ function reachable(f: Floor, r: Room): boolean {
   for (let z = r.z; z < r.z + r.d; z++) for (let x = r.x; x < r.x + r.w; x++) if (free(x, z) && !seen.has(key(x, z))) return false;
   return true;
 }
+
 /**
  * Whether a home washes with nowhere to dry the washing: something on its floors leaves a washed load
  * (content `makes`: the washer's *Take out the washing*) and nothing works on one (`workOn`: a dryer).
@@ -1610,6 +2080,7 @@ function washesWithoutDrying(info: ObjectInfos, floors: (Floor | null)[]): boole
   const uses = floors.flatMap((f) => f?.objects ?? []).flatMap((o) => info(o.def)?.interactions ?? []);
   return uses.some((i) => i.makes === 'washed') && !uses.some((i) => i.workOn === 'washed');
 }
+
 /**
  * Things outside the house: the washing line first, for a home that washes with nowhere to dry
  * (`line`: behind the house or to its sides, out on the lawn with a clear tile all round, by the
@@ -1688,6 +2159,7 @@ function garden(cfg: HouseGenConfig, info: ObjectInfos, rng: () => number, g: Fl
     n++;
   }
 }
+
 /** Unit edges merged into wall runs, and the doors and windows in them. */
 function edgesOut(f: Floor): { walls: Wall[]; doors: Door[]; windows: Door[] } {
   const walls: Wall[] = [];

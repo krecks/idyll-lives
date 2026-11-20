@@ -26,7 +26,9 @@
 import type { CarPark, LandFile, ParkingBay, RoadPlan, TownPlace } from '../core/protocol';
 import { centreDensity } from './centre';
 import { fillPoly, overlaps } from './footprints';
-import { AREA_APART, COUNTRY_TURN, unrle } from './macro';
+import { AREA_APART } from './macro';
+import { COUNTRY_TURN } from './countryRouter';
+import { unrle } from './landMasks';
 import { COURT, inside, lengths, nearest, pointAt, RoadIndex, roadMask, sharpestTurn, sideBySide, type Pt } from './roads';
 import { BIG_COURTS, COURTS, NEIGHBOUR_CAP, turner, type Facing } from './town';
 import type { Expected } from './world';

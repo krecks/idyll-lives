@@ -21,8 +21,8 @@
  */
 
 import type { LotLook } from '../core/protocol';
-import { besideTiles, generateFlat, placeFloor, random, residentsKey, stairHall, thingSize, thingTiles, unitEdges, walked, type FlatFrame, type FlatPlan, type FloorPlan, type Furnishing, type HouseGenConfig, type ObjectInfos } from './housegen';
-import { between, pick } from './noise';
+import { besideTiles, generateFlat, placeFloor, residentsKey, stairHall, thingSize, thingTiles, unitEdges, walked, type FlatFrame, type FlatPlan, type FloorPlan, type Furnishing, type HouseGenConfig, type ObjectInfos } from './housegen';
+import { between, mulberry32, pick } from './noise';
 import { frontTile } from './surfaces';
 import { turner, type Door, type Placement, type PlannedRoom, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Wall } from './town';
 
@@ -320,7 +320,7 @@ function flatsBuilding(t: Templates, seed: number, storeys: number, wide: boolea
   const spec = cfg?.flats;
   const cls = cfg?.classes.flat;
   if (!cfg || !info || !spec || !cls || !(storeys >= 1 && storeys <= 3)) return null;
-  const rng = random((seed ^ 0x2c1b3c6d) >>> 0);
+  const rng = mulberry32((seed ^ 0x2c1b3c6d) >>> 0);
   const depth = between(rng, cls.depth);
   const widths = wide ? [between(rng, cls.width), between(rng, cls.width)] : [between(rng, cls.width)];
   const hw = wide ? spec.hall : spec.narrowHall;
@@ -569,7 +569,7 @@ function flatsOver(t: Templates, place: string, seed: number, storeys: number, r
     })
     .filter((c) => !!c);
   if (!cuts.length) return null;
-  const rng = random((seed ^ 0x5be0cd19) >>> 0);
+  const rng = mulberry32((seed ^ 0x5be0cd19) >>> 0);
   const best = cuts.sort((a, b) => a.lost - b.lost || Number(rng() < 0.5) - 0.5)[0];
   const { hall, left } = best;
   const outer = left ? hall.x : hall.x + hw - 1;

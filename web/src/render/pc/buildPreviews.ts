@@ -30,7 +30,8 @@ import { setWallHole, wallHoleFor, type WallHole } from './wallHole';
 import type { Content } from '../../content/content';
 import type { DiagonalWall, Opening, WallEdge, WorldStructure } from '../../core/protocol';
 import type { EdgePreview, GaragePreview, PaintPreviewFace, PorchPreview, RoomOverlayTile, ViewRect, WallMode } from '../types';
-import { GARAGE_HEIGHT, HALF_WALL_HEIGHT, WALL_HEIGHT, type HouseSurfaces } from '../shared/house';
+import { GARAGE_HEIGHT, HALF_WALL_HEIGHT, type HouseSurfaces } from '../shared/house';
+import { WALL_HEIGHT } from '../shared/walls';
 import { toLinear } from '../shared/math';
 
 /** Fences and gates previewed as films: as tall as this (m). */

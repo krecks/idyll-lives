@@ -51,7 +51,7 @@ const STOP_LINE = 0.3;
 const STRIPE = 0.5;
 const STRIPE_GAP = 0.5;
 const MARK_IN = 0.15;
-/** The markings' paint: a vertex colour (worn white: no brighter than the sidewalks) with the plain finish's roughness in its alpha (`street.ts` `encodeFinish`: 0.7, not metal). */
+/** The markings' paint: a vertex colour (worn white: no brighter than the sidewalks) with the plain finish's roughness in its alpha (`geometry.ts` `encodeFinish`: 0.7, not metal). */
 const PAINT = '#D6D6D0';
 const PAINT_FINISH = 0.35;
 /** The course of kerb stones along the back of a sidewalk, by the lots (m wide). */

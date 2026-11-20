@@ -51,7 +51,8 @@ import { birdActivity, type SeenBird, type ViewRect } from '../types';
 import { angleDelta as turn } from './angles';
 import { compose, multiply, quatYawPitchRoll, rotationX, rotationZ, scaling, transformNormal, transformPoint, translation, type Quat } from './math';
 import { entrySpace, placementVariation } from './modelEntry';
-import { bareTiles, hash, mulberry32, smoothstep, windDirection, type PlantPlacement } from './nature';
+import { bareTiles, windDirection, type PlantPlacement } from './nature';
+import { hash, mulberry32, smoothstep } from '../../game/noise';
 import { WALL_HEIGHT } from './walls';
 import { frameRandom } from './frameClock';
 

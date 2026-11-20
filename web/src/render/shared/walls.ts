@@ -1,6 +1,6 @@
 /**
- * A house's wall sizes, shared by the house builder (`house.ts`, which re-exports them) and what
- * stands against its walls (`models.ts`) without pulling in the whole builder.
+ * A house's wall sizes, shared by the house builder (`house.ts`) and what stands against its walls
+ * (`models.ts`) without pulling in the whole builder.
  */
 
 /** A storey's wall height (m). */

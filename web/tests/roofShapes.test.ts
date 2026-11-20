@@ -8,7 +8,8 @@
 import { expect, test } from 'bun:test';
 import type { RoofStyleDef } from '../src/content/content';
 import type { WallEdge, WorldStructure } from '../src/core/protocol';
-import { HousePlanner, WALL_HALF, WALL_HEIGHT, type HousePart } from '../src/render/shared/house';
+import { HousePlanner, type HousePart } from '../src/render/shared/house';
+import { WALL_HALF, WALL_HEIGHT } from '../src/render/shared/walls';
 
 /** The world's size, and where a plan's first tile stands on it. */
 const W = 16;

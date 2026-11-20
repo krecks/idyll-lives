@@ -218,3 +218,9 @@ export function transformNormal(m: Readonly<Mat4>, x: number, y: number, z: numb
 export function toLinear(c: number): number {
   return Math.pow(c, 2.2);
 }
+
+/** A hex colour (`#rrggbb`, sRGB) in linear light, each channel through `toLinear`. */
+export function linearHex(hex: string): { r: number; g: number; b: number } {
+  const v = parseInt(hex.slice(1), 16);
+  return { r: toLinear(((v >> 16) & 255) / 255), g: toLinear(((v >> 8) & 255) / 255), b: toLinear((v & 255) / 255) };
+}

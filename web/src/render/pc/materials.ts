@@ -40,6 +40,7 @@ import type { MaterialEntry } from '../../assets/types';
 import { settings } from '../../settings/settings.svelte';
 import { isGraphicsPreset, QUALITY } from '../quality';
 import type { RGB } from '../shared/environment';
+export { encodeFinish } from '../shared/geometry';
 import { WALL_HEIGHT } from '../shared/walls';
 import { tunedEntry } from '../tune';
 import type { Shading } from '../types';
@@ -1049,12 +1050,6 @@ export function textureWithFallback(app: pc.AppBase, source: string, anisotropy?
       console.warn(`[render] texture ${copy} unavailable`, err);
       return null;
     });
-}
-
-/** Vertex-colour alpha for the plain finish: [0, 0.5) dielectric, [0.5, 1] metal; roughness scaled within. */
-export function encodeFinish(roughness: number, metallic: number): number {
-  const r = Math.min(0.999, Math.max(0, roughness)) * 0.5;
-  return metallic >= 0.5 ? 0.5 + r : r;
 }
 
 /** Whether a lighting value moved enough to pass on (see `LIGHT_CHANGE`). */

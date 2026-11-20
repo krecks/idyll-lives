@@ -44,8 +44,9 @@ import { benchDiag } from '../../debug/benchFlags';
 import type { WorldStructure } from '../../core/protocol';
 import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
-import type { Lighting, RGB } from '../shared/environment';
+import type { Lighting } from '../shared/environment';
 import type { RoomLight } from '../shared/house';
+import { linearHex } from '../shared/math';
 import { ROOM, roomDay, roomLight } from '../shared/roomLight';
 import { WALL_HEIGHT } from '../shared/walls';
 import type { ViewRect } from '../types';
@@ -605,13 +606,6 @@ export class Lamps {
 /** sRGB of a linear value (PlayCanvas takes light colours in sRGB). */
 function gamma(v: number): number {
   return Math.pow(Math.max(0, v), 1 / 2.2);
-}
-
-/** A hex colour (sRGB) in linear light, `pow(c, 2.2)` as the materials decode colours. */
-function linearHex(hex: string): RGB {
-  const v = parseInt(hex.slice(1), 16);
-  const lin = (c: number) => Math.pow(c / 255, 2.2);
-  return { r: lin((v >> 16) & 255), g: lin((v >> 8) & 255), b: lin(v & 255) };
 }
 
 /**

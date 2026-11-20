@@ -20,7 +20,7 @@ import { LAND_CELL } from '../../game/land';
 import { centroid } from '../../game/roads';
 import type { BuiltSurface } from './builtSurface';
 import { Geo, type V3 } from './geometry';
-import { toLinear } from './math';
+import { linearHex } from './math';
 import { lotsFilled } from './nature';
 import type { ChunkPlan, GroundLayer } from './street';
 import { boxOf, clipBy, clipRect, COURSE, courseCells, LINE, PAVING_LOOK, TILE, townPaving, type BayDraw, type PavingDraw, type Poly, type Rect, type TownPaving } from './townPaving';
@@ -61,8 +61,8 @@ const SURFACE_TONE: Record<'sidewalk' | 'path' | 'road', V3> = {
 
 /** An sRGB colour's channels in linear light (as the far map's shader reads them: a power of 2.2, `toLinear`). */
 function linear(hex: string): V3 {
-  const v = parseInt(hex.slice(1), 16);
-  return [toLinear(((v >> 16) & 255) / 255), toLinear(((v >> 8) & 255) / 255), toLinear((v & 255) / 255)];
+  const { r, g, b } = linearHex(hex);
+  return [r, g, b];
 }
 
 /** `v` times `k`. */

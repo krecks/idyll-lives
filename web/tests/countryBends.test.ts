@@ -27,7 +27,8 @@ describe('country road bends', async () => {
   const { Content } = await import('../src/content/content');
   const { objectInfos } = await import('../src/game/housegen');
   const { useTownContent } = await import('../src/game/town');
-  const { COUNTRY_TURN, generateFromSpec } = await import('../src/game/macro');
+  const { generateFromSpec } = await import('../src/game/macro');
+  const { COUNTRY_TURN } = await import('../src/game/countryRouter');
   type Templates = import('../src/game/town').Templates;
   const content = await Content.load('http://localhost/content/base.json');
   useTownContent(content);

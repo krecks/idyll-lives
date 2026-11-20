@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import type { Opening, WallEdge, WorldStructure } from '../src/core/protocol';
 import { Geo } from '../src/render/shared/geometry';
-import { HousePlanner, houseScheme, WALL_HEIGHT, type HousePart } from '../src/render/shared/house';
+import { HousePlanner, houseScheme, type HousePart } from '../src/render/shared/house';
+import { WALL_HEIGHT } from '../src/render/shared/walls';
 
 /**
  * Gutters and downpipes: a gutter hangs along every level eave over the open (a hip's all round, a gable's along
