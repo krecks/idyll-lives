@@ -18,10 +18,9 @@
  * fresh start: load and entry times, memory (`gameplay.mjs`, `memory-ab.mjs`), the first frames' shader compiles.
  */
 
-import { existsSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
-import { freePort, launch, openBench, ROOT, serve } from './lib/browser.mjs';
-import { benchBuild } from './lib/build.mjs';
+import { rmSync, writeFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
+import { freePort, launch, openBench, ROOT, serveBuild } from './lib/browser.mjs';
 
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
@@ -43,19 +42,10 @@ const stops = [];
 const served = [];
 for (const [i, where] of builds.entries()) {
   const name = builds.length > 1 ? String.fromCharCode(97 + i) : 'a';
-  if (/^https?:\/\//.test(where)) {
-    served.push({ name, where, url: where.replace(/\/$/, '') });
-    continue;
-  }
-  const tree = resolve(where);
-  const web = join(tree, 'web');
-  if (!existsSync(join(web, 'node_modules/.bin/vite'))) throw new Error(`${tree}: no web/node_modules (link the main checkout's)`);
-  const port = await freePort(5300, 5399);
   // (Builds one after another: each wants every core.)
-  const outDir = prod ? (await benchBuild({ tree })).dir : null;
-  const { url, stop } = await serve({ mode: prod ? 'preview' : 'dev', port, web, outDir });
+  const { where: at, url, stop } = await serveBuild(where, { prod, port: /^https?:\/\//.test(where) ? undefined : await freePort(5300, 5399) });
   stops.push(stop);
-  served.push({ name, where: tree, url });
+  served.push({ name, where: at, url });
 }
 
 const { context } = await launch({ headless: !args.includes('--headed'), profileDir: join(ROOT, 'bench-results', '.browser', `keep-${debugPort}`), debugPort });

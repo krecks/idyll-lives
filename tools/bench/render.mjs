@@ -73,9 +73,8 @@
 import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { attach, keepInfo, launchArgs, openBench, playwright, ROOT, serve, step, twoFrames, VIEWPORT, SITE_STORAGE, WEB } from './lib/browser.mjs';
+import { attach, benchContext, keepInfo, launch, openBench, ROOT, serve, step, twoFrames, WEB } from './lib/browser.mjs';
 import { benchBuild } from './lib/build.mjs';
-import { quiet } from './quiet.mjs';
 import { worldFlags } from './worldFlags.mjs';
 
 const SCENARIOS = {
@@ -332,13 +331,11 @@ async function serverFor(o) {
   if (!servers.has(mode)) {
     nextPort ??= o.port;
     const port = nextPort++;
-    const vite = spawn(`${WEB}node_modules/.bin/vite`, [...(o.preview ? ['preview'] : []), '--port', String(port), '--strictPort'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] });
-    quit.push(() => vite.kill());
     servers.set(
       mode,
-      new Promise((resolve, reject) => {
-        vite.stdout.on('data', (d) => String(d).includes('Local') && resolve(`http://localhost:${port}`));
-        vite.on('exit', (code) => reject(new Error(`vite exited (${code})`)));
+      serve({ mode, port }).then(({ url, stop }) => {
+        quit.push(stop);
+        return url;
       }),
     );
   }
@@ -354,25 +351,17 @@ async function browserFor(o) {
   }
   const kind = `${o.headed ? 'window' : 'headless'}${o.throughput ? '-fast' : ''}${o.fresh ? '-fresh' : ''}`;
   if (!browsers.has(kind)) {
-    const { chromium } = await playwright();
-    const options = {
-      headless: !o.headed,
-      // (Without one of its own: Playwright's full Chromium, which has the GPU headless too.)
-      ...(process.env.CHROME ? { executablePath: process.env.CHROME } : { channel: 'chromium' }),
-      // (WebGPU, full-precision GPU timestamps, drawing at full rate in a window nobody looks at: `lib/browser.mjs`.)
-      args: launchArgs({ throughput: o.throughput }),
-    };
     browsers.set(
       kind,
       (async () => {
-        if (o.fresh) return { browser: await chromium.launch(options) };
         // (One profile per kind and port, the first job's: two invocations at once, on their own ports, don't share one.)
-        const context = await chromium.launchPersistentContext(join(ROOT, 'bench-results', '.browser', `${kind}-${profilePort ?? o.port}`), { ...options, ...VIEWPORT });
-        await context.addInitScript(quiet);
+        const profileDir = o.fresh ? null : join(ROOT, 'bench-results', '.browser', `${kind}-${profilePort ?? o.port}`);
+        const b = await launch({ headless: !o.headed, throughput: o.throughput, profileDir });
+        if (!b.context) return b;
         // Its first window stays open (the browser with it), out of the way like the others; each page gets a window of its own (`newWindow`).
-        const first = context.pages()[0] ?? (await context.newPage());
-        if (o.headed) await place(context, first, o.left);
-        return { context };
+        const first = b.context.pages()[0] ?? (await b.context.newPage());
+        if (o.headed) await place(b.context, first, o.left);
+        return b;
       })(),
     );
   }
@@ -406,27 +395,22 @@ async function open(o, query, throttle, key, timeoutMs, path = '/') {
   const b = await browserFor(o);
   // A kept browser's page with this scene and these settings, used as it is (`keep.mjs`); else a new one in it.
   if (b.attached) return openBench(b.context, base, query, { attached: true, timeoutMs, path, key });
-  let context = b.context;
-  if (!context) {
-    context = await b.browser.newContext(VIEWPORT);
-    await context.addInitScript(quiet);
-  }
-  const page = b.context ? await newWindow(context) : await context.newPage();
-  const done = () => (b.context ? page.close() : context.close());
-  try {
-    const cdp = await context.newCDPSession(page);
-    if (b.context) await cdp.send('Storage.clearDataForOrigin', { origin: new URL(base).origin, storageTypes: SITE_STORAGE });
+  // A window of its own in the kept browser, or a new context (`--fresh`); placed off to the right, and slowed down.
+  const context = b.context ?? (await benchContext(b.browser));
+  const newPage = async () => {
+    const page = b.context ? await newWindow(context) : await context.newPage();
     if (o.headed) await place(context, page, o.left);
-    if (throttle > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: throttle });
-    page.on('pageerror', (e) => console.error(`  page error: ${e.message}`));
-    page.on('console', (m) => m.type() === 'error' && console.error(`  page: ${m.text().slice(0, 300)}`));
-    await page.goto(`${base}${path}?${query}`);
-    await page.waitForFunction((k) => !!window[k], key, { timeout: timeoutMs, polling: 250 });
+    // (The session stays open: the slow-down lasts while it does.)
+    if (throttle > 1) await (await context.newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: throttle });
+    return page;
+  };
+  try {
+    const opened = await openBench(context, base, query, { timeoutMs, path, key, newPage });
+    return b.context ? opened : { ...opened, done: () => context.close() };
   } catch (err) {
-    await done();
+    if (!b.context) await context.close();
     throw err;
   }
-  return { page, done };
 }
 
 const queryOf = (o, preset, backend, more, scene = o.scene) =>
@@ -632,7 +616,7 @@ async function pageShots(o) {
           if (p.prepare) await page.evaluate(p.prepare);
           // A moment for late loads (hair, props), then two more frames, then the picture.
           await page.waitForTimeout(1500);
-          await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+          await twoFrames(page);
           await page.screenshot({ path: join(out, file) });
           await done();
           console.log('ok');

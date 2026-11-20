@@ -1,5 +1,6 @@
 /**
- * What the bench tools share: Playwright, Chromium's launch, a Vite server (dev or a preview of a build), a bench page
+ * What the bench tools share: Playwright, Chromium's launch, a Vite server (dev or a preview of a build; a tree's, for
+ * an A/B: `serveBuild`), a bench page
  * opened once and stepped through its poses (`window.__bench`, `web/src/debug/bench.ts`), and pages kept loaded in a
  * browser another process started (`keep.mjs`, `--attach`). The recipe for a script of one's own is in
  * tools/bench/README.md ("One page, many poses").
@@ -9,21 +10,24 @@ import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:net';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { quiet } from '../quiet.mjs';
+import { benchBuild } from './build.mjs';
 
 export const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 export const WEB = join(ROOT, 'web/');
 
-/** Playwright: `PLAYWRIGHT=<path to playwright/index.mjs>`, else the one web/ resolves. */
+/** Playwright: `PLAYWRIGHT=<path to playwright/index.mjs>`, else the one web/ resolves (`playwright-core`: the same API). */
 export async function playwright() {
   if (process.env.PLAYWRIGHT) return import(process.env.PLAYWRIGHT);
-  try {
-    return await import(createRequire(WEB + 'package.json').resolve('playwright'));
-  } catch {
-    throw new Error('Playwright not found: install it, or set PLAYWRIGHT=<path to playwright/index.mjs>');
+  const require = createRequire(WEB + 'package.json');
+  for (const name of ['playwright', 'playwright-core']) {
+    try {
+      return await import(require.resolve(name));
+    } catch {}
   }
+  throw new Error('Playwright not found: install it, or set PLAYWRIGHT=<path to playwright/index.mjs>');
 }
 
 /** The window every bench page has: 1920 × 1080 at device pixel ratio 1. */
@@ -60,6 +64,13 @@ export async function launch({ headless = true, throughput = false, profileDir =
   const context = await chromium.launchPersistentContext(profileDir, { ...options, ...VIEWPORT });
   await context.addInitScript(quiet);
   return { context };
+}
+
+/** A new context in a browser `launch` gave without a profile: nothing kept, the page's console quiet; `options` its window (`VIEWPORT`). */
+export async function benchContext(browser, options = VIEWPORT) {
+  const context = await browser.newContext(options);
+  await context.addInitScript(quiet);
+  return context;
 }
 
 /**
@@ -112,6 +123,44 @@ export async function serve({ mode = 'dev', port, web = WEB, outDir = null } = {
     setTimeout(() => reject(new Error('vite did not report "Local" in 120 s')), 120_000);
   });
   return { url, stop, port };
+}
+
+/** Whether a server answers at `url` (within 1.5 s). */
+export async function answers(url) {
+  try {
+    return (await fetch(url, { signal: AbortSignal.timeout(1500) })).ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The dev server a tool's pages come from: `url` as it is, else the one already answering on `port`, else one
+ * started there (`serve`). Resolves `{ url, stop, started }` (`stop` does nothing to a server this didn't start).
+ */
+export async function devServer({ url = null, port }) {
+  if (url) return { url: url.replace(/\/$/, ''), stop: () => {}, started: false };
+  const there = `http://localhost:${port}`;
+  if (await answers(there)) return { url: there, stop: () => {}, started: false };
+  const { url: started, stop } = await serve({ port });
+  return { url: started, stop, started: true };
+}
+
+/**
+ * A build to measure: `where` a running server's URL, used as it is, or a tree (a checkout or a worktree, its wasm
+ * built) served by its own Vite on `port` (a free one when not given): its dev server, or with `prod` its build for
+ * the benchmark (`lib/build.mjs`, made on a miss) under `vite preview`. Resolves `{ where, url, stop }`, `where` the
+ * tree's full path.
+ */
+export async function serveBuild(where, { prod = false, port } = {}) {
+  if (/^https?:\/\//.test(where)) return { where, url: where.replace(/\/$/, ''), stop: () => {} };
+  const tree = resolve(where);
+  const web = join(tree, 'web');
+  if (!existsSync(join(web, 'node_modules/.bin/vite'))) throw new Error(`${tree}: no web/node_modules (link the main checkout's)`);
+  if (!existsSync(join(web, 'src/core/wasm-pkg/sim_wasm_bg.wasm'))) throw new Error(`${tree}: its wasm isn't built (bun run wasm and bun run sound in its web/)`);
+  const outDir = prod ? (await benchBuild({ tree })).dir : null;
+  const { url, stop } = await serve({ mode: prod ? 'preview' : 'dev', port, web, outDir });
+  return { where: tree, url, stop };
 }
 
 /** The flags that make one bench page another (the scene, the build's settings): the rest a page changes as it goes. */
