@@ -34,7 +34,7 @@ pub struct Graph {
     cols: usize,
     rows: usize,
     /// Its junctions' boxes (`traffic::boxes`): their middles and how far round them they reach
-    /// (m). Cars take turns driving through them (`traffic.rs`).
+    /// (m). Cars take turns driving through them (`traffic/`).
     pub boxes: Vec<([f32; 2], f32)>,
 }
 

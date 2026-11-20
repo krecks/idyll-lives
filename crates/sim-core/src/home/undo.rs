@@ -190,7 +190,7 @@ impl World {
         }
         self.porches = s.porches;
         self.porch_pieces = s.porch_pieces;
-        // (The work taxis as they are now: the runs drive them, `taxi.rs`.)
+        // (The work taxis as they are now: the runs drive them, `taxi/`.)
         let taxis: Vec<crate::cars::Car> = self.cars.iter().filter(|c| c.taxi).cloned().collect();
         self.cars = s
             .cars

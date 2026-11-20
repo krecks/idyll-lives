@@ -261,7 +261,7 @@ pub(crate) fn refresh_commute(w: &mut World, i: usize, day: u32) -> bool {
     let searched = crate::path::nodes_searched();
     let metres = commute_metres(w, i, from, ground, exit);
     let (mut minutes, mut total) = walk_commute(w, metres, ground, walk, exit);
-    // (A ride out longer than `BIKE_MOST` is ridden in the work taxi, `taxi.rs`, or walked.)
+    // (A ride out longer than `BIKE_MOST` is ridden in the work taxi, `taxi/`, or walked.)
     let long_ride = bike.is_some() && minutes - OUT_OF_THE_HOUSE > BIKE_MOST;
     if long_ride {
         bike = None;

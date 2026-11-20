@@ -60,7 +60,7 @@ pub(crate) fn update(w: &mut World) {
         }
         if w.sims[i].away_until.is_some() {
             // (Done, and waiting for their car home or in it: `cars.rs` brings them back; or the
-            // work taxi, `taxi.rs`.) Done now: home in the car (`cars::off_work`), by taxi
+            // work taxi, `taxi/`.) Done now: home in the car (`cars::off_work`), by taxi
             // (`taxi::off_work`), or on their own.
             if !crate::cars::homeward(w, i)
                 && w.sims[i].taxi.is_none()

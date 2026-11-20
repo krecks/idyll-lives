@@ -48,7 +48,7 @@ pub mod header {
     /// customer's use is; `OBJECT` is -1 (they stand behind it, not at it).
     pub const STAFF_COUNT: usize = 9;
     /// The cars (`cars.rs`): as many rows as this from `CAR_BASE`, each laid out as `car`. The
-    /// households' first, in the structure's `cars` order; then the work taxis' (`taxi.rs`, `KIND`
+    /// households' first, in the structure's `cars` order; then the work taxis' (`taxi/`, `KIND`
     /// a taxi: none in the structure), a row each for good once one has come (an unused one not to
     /// be seen).
     pub const CAR_COUNT: usize = 10;
@@ -90,7 +90,7 @@ pub mod car {
     /// back right), while someone gets in or out.
     pub const DOORS: usize = 4;
     /// What it is: `HOUSEHOLD` (its look in the structure's `cars`) or `TAXI` (a work taxi,
-    /// `taxi.rs`: its look the renderer's own).
+    /// `taxi/`: its look the renderer's own).
     pub const KIND: usize = 5;
     /// `KIND`'s values.
     pub const HOUSEHOLD: f32 = 0.0;
@@ -155,7 +155,7 @@ pub mod sim {
     /// The recipe they're cooking: index into `Content::recipes` + 1, else 0. While cooking,
     /// `OBJECT` is the station they're at (or heading to) and `ACTION` the step's animation.
     pub const RECIPE: usize = 22;
-    /// Calling out someone's name (to talk; see `conversation.rs`): their id + 1, else 0.
+    /// Calling out someone's name (to talk; see `conversation/`): their id + 1, else 0.
     pub const CALL: usize = 23;
     /// While walking, the waypoint they're walking to (`YAW` faces it); else where they stand.
     pub const WAY_X: usize = 24;

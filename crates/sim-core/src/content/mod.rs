@@ -144,9 +144,9 @@ pub struct Content {
     /// How dirty washing piles up (content `laundry`; None: it never does, and nothing works
     /// on it).
     pub laundry: Option<LaundryRules>,
-    /// How cars drive (content `cars`; see `cars.rs`, `travel.rs`).
+    /// How cars drive (content `cars`; see `cars.rs`, `travel/`).
     pub cars: CarRules,
-    /// The work taxi (content `taxi`; see `taxi.rs`).
+    /// The work taxi (content `taxi`; see `taxi/`).
     pub taxi: TaxiRules,
     /// The uses (object def, interaction) with `"trail": true`: done walking out along the trail
     /// the thing stands at and back (a trailhead's *Walk the trail*; `world::trail_step`).

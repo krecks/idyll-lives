@@ -967,7 +967,7 @@ fn state(w: &World, s: &Sim) -> State {
         | Phase::Knocking { .. }
         | Phase::Boarding { .. }
         | Phase::Alighting { .. }
-        // (At the kerb for the work taxi: `taxi.rs`.)
+        // (At the kerb for the work taxi: `taxi/`.)
         | Phase::AtKerb { .. } => State::Waiting(d),
     }
 }

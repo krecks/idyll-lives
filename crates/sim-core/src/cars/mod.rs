@@ -68,7 +68,7 @@
 //! of each other. A trip's car parks only in a spot no other car is parked at or on its way to
 //! (`parking_for`).
 //!
-//! Where its way crosses or meets another's, it takes turns with the other cars (`traffic.rs`):
+//! Where its way crosses or meets another's, it takes turns with the other cars (`traffic/`):
 //! into a junction's box, across a lane out of its driveway or a bay (or into one), and round a 6 m
 //! lane's tight bend where it couldn't pass one coming the other way, only holding its claim to it
 //! (`traffic::Traffic::may_go`), and never into what's left of another's

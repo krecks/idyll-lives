@@ -2,8 +2,8 @@
 //!
 //! Builds the residents' character set from code (rig.json version 5 and its binaries; see
 //! docs/characters-format.md): per family and life stage the head interface (head.rs) says where
-//! the face is, then the body (body.rs), the face (face.rs), the hair (hair.rs) and the clothes
-//! (clothes.rs) are made (the ears are pieces set into the head, ear.rs), and write.rs writes the base stage whole and the other stages as deltas.
+//! the face is, then the body (body/), the face (face/), the hair (hair/) and the clothes
+//! (clothes/) are made (the ears are pieces set into the head, ear.rs), and write.rs writes the base stage whole and the other stages as deltas.
 //! identity.rs makes the identity channels (a face per resident) as differences of two builds.
 //! check.rs holds a set to the contract; diff.rs compares two sets. Everything is deterministic.
 //!

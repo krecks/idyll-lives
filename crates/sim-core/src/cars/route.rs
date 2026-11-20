@@ -576,7 +576,7 @@ impl Route {
             avoid,
         };
         let speed = travel.country_speed;
-        // (A work taxi, its halts behind it: out of town where its run goes, `taxi.rs`.)
+        // (A work taxi, its halts behind it: out of town where its run goes, `taxi/`.)
         let taxi = car.taxi;
         let ends = if taxi {
             vec![had.points.last()?.0]

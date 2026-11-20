@@ -107,7 +107,7 @@ pub(crate) fn arrive(
                     sim.queue.push_front(a.task);
                 }
             }
-            // At their kerb: they wait for the work taxi (`taxi.rs`).
+            // At their kerb: they wait for the work taxi (`taxi/`).
             None if at_kerb => {
                 sim.pose = Pose::Stand;
                 act.phase = Phase::AtKerb { ticks: 0 };
@@ -117,7 +117,7 @@ pub(crate) fn arrive(
                 sim.transition = Some(crate::life::Transition::Work);
             }
         },
-        // At the door of the taxi standing for them (`taxi.rs`): facing it, they open it and get
+        // At the door of the taxi standing for them (`taxi/`): facing it, they open it and get
         // in; at their kerb, they wait for it.
         TaskKind::Visit { .. } | TaskKind::GoHome
             if sim

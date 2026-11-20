@@ -448,7 +448,7 @@ pub fn why_not(w: &World, me: usize, contact: usize, action: usize) -> Option<&'
 /// or None if it goes ahead (whether the contact says yes is another matter): the phone out of
 /// use (`unusable`), the contact out of reach or the visit out (`why_not`), or going over to
 /// theirs would leave a baby home alone (`life::homebound`). The command handler
-/// (`check_order`) and the UI (`view.rs`) both ask this, so a button is greyed out exactly when
+/// (`check_order`) and the UI (`view/`) both ask this, so a button is greyed out exactly when
 /// pressing it would be refused.
 pub fn refusal(
     w: &World,

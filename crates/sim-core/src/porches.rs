@@ -26,7 +26,7 @@
 //! garage. A room built round one, or a room moved onto one, isn't allowed through it: walls,
 //! fences and diagonals don't go through a porch or a piece (`porch_across`).
 //!
-//! Both are kept for undo (`home.rs`), in blueprints (`blueprint.rs`) and in saves (`save.rs`).
+//! Both are kept for undo (`home.rs`), in blueprints (`blueprint.rs`) and in saves (`save/`).
 
 use serde::{Deserialize, Serialize};
 

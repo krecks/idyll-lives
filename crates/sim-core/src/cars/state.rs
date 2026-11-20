@@ -34,7 +34,7 @@ pub struct Detour {
     pub back: f32,
     pub avoid: u32,
     /// It only backs up out of the way, and goes on the way it had: a work taxi with its stops
-    /// still ahead on it (`taxi.rs`).
+    /// still ahead on it (`taxi/`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub same: bool,
     /// It turns round in a driveway's mouth it came by (`MouthTurn`), backing into it and out the
@@ -298,12 +298,12 @@ pub struct Car {
     /// Not saved.
     #[serde(skip)]
     pub(crate) backed_for: Option<u64>,
-    /// A work taxi (`taxi.rs`), not a household's: it comes in at a way out on a run, drives it
+    /// A work taxi (`taxi/`), not a household's: it comes in at a way out on a run, drives it
     /// and goes again, and nothing of the households' (`update`) is its. Not saved with the cars
     /// (the runs are, `taxi::Taxis`).
     #[serde(skip)]
     pub taxi: bool,
-    /// A taxi standing at a stop (`taxi.rs`): shown standing, its doors as its riders open them.
+    /// A taxi standing at a stop (`taxi/`): shown standing, its doors as its riders open them.
     /// Not saved.
     #[serde(skip)]
     pub standing: bool,
@@ -321,7 +321,7 @@ pub struct Car {
     /// Its way turned round, held up (`unjam`); none: the way it always takes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detour: Option<Detour>,
-    /// A work taxi that gave its way up in sight (`taxi.rs`): its run over, it turns round and
+    /// A work taxi that gave its way up in sight (`taxi/`): its run over, it turns round and
     /// drives off out of town (`drive_off`) rather than leave the road where it is. Not saved.
     #[serde(skip)]
     pub(crate) off_run: bool,

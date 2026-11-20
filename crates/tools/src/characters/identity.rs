@@ -2,7 +2,7 @@
 //! sets once per resident (docs/characters-format.md; household.ts `Appearance.face`).
 //!
 //! A channel is one number of `Identity` (-1..1; all 0: the family's shared face). Its shape is a
-//! difference: the base stage's head, face and lids built with that one number at 1 (head.rs and face.rs
+//! difference: the base stage's head, face and lids built with that one number at 1 (head.rs and face/
 //! read it where they shape the jaw, the chin, the cheeks, the nose, the brow, the eyes and the mouth)
 //! minus the ones built with it at -1, halved, vertex by vertex (the topology is the same). The middle
 //! difference, so the morph is as near the face built outright at -1 as at 1: a lid's seam slides over
@@ -130,7 +130,7 @@ pub struct Mask {
 const UNDER_HAIRLINE: (f64, f64) = (0.12, 0.02);
 const ROUND_EARS: (f64, f64) = (0.015, 0.09);
 const TOWARDS_BACK: (f64, f64) = (100.0, 135.0);
-/// The head's share of a skin vertex (body.rs regions) from which the shape fades in down the neck.
+/// The head's share of a skin vertex (body/ regions) from which the shape fades in down the neck.
 const NECK: (f64, f64) = (0.1, 0.7);
 
 impl Mask {
@@ -169,11 +169,11 @@ impl Mask {
 /// One channel's shape on a family's base stage (position and normal deltas at 1).
 pub struct Channel {
     pub name: &'static str,
-    /// The body's skin (`body`'s first vertices, body.rs `Surface::pos`).
+    /// The body's skin (`body`'s first vertices, body/ `Surface::pos`).
     pub skin: (Vec<V3>, Vec<V3>),
     /// The same on the close-up body's skin (`hd.body`: level 2, `Surface::fine_pos`).
     pub skin_hd: (Vec<V3>, Vec<V3>),
-    /// The face's parts (face.rs `PARTS`; `body`: the lids and lips, after the skin).
+    /// The face's parts (face/ `PARTS`; `body`: the lids and lips, after the skin).
     pub parts: Vec<(&'static str, Vec<V3>, Vec<V3>)>,
     /// The right eyeball: how far its centre moves (m; the left's x mirrored) and how much larger it is (of 1).
     pub eye: [f64; 4],

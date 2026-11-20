@@ -389,7 +389,7 @@ pub(crate) fn start_task(
                     // On their bike: on it to the way out.
                     goal_at(exit)
                 } else if let Some(kerb) = crate::taxi::kerb_for(ctx, sim, &TaskKind::Work) {
-                    // By the work taxi they're booked on (`taxi.rs`): to the kerb, to wait for it.
+                    // By the work taxi they're booked on (`taxi/`): to the kerb, to wait for it.
                     crate::ride::get_off(sim, objects);
                     goal_at(kerb)
                 } else if let Some(bike) = sim.bound_for_bike.or_else(|| {
@@ -406,7 +406,7 @@ pub(crate) fn start_task(
             }
         }
         // (Their visit starts once there's a way there: see below.)
-        // By the taxi they're booked on there (`taxi.rs`): to its door as it stands for them, else
+        // By the taxi they're booked on there (`taxi/`): to its door as it stands for them, else
         // out to their kerb to wait for it.
         TaskKind::Visit { .. } | TaskKind::GoHome
             if sim.riding.is_none()

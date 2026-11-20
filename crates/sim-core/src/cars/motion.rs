@@ -61,7 +61,7 @@ impl Car {
         }
     }
 
-    /// A work taxi's car slot (`taxi.rs`), free (out of town) till a run takes it.
+    /// A work taxi's car slot (`taxi/`), free (out of town) till a run takes it.
     pub(crate) fn taxi(at: [f32; 2], len: f32, wid: f32) -> Self {
         let raw = CarRaw {
             plot: u32::MAX,
@@ -80,7 +80,7 @@ impl Car {
         car
     }
 
-    /// A taxi on a run (`taxi.rs`): coming into town along `route` (at `progress` along it, a game
+    /// A taxi on a run (`taxi/`): coming into town along `route` (at `progress` along it, a game
     /// just loaded).
     pub(crate) fn set_taxi_route(&mut self, route: Route, progress: f32) {
         self.state = CarState::Arriving;
@@ -283,7 +283,7 @@ impl Car {
         self.pose_on(exits, None)
     }
 
-    /// `pose`, on the town's roads (`travel.rs`) where it has them.
+    /// `pose`, on the town's roads (`travel/`) where it has them.
     pub fn pose_on(
         &mut self,
         exits: &[[f32; 2]],
@@ -507,7 +507,7 @@ pub(crate) fn extend_past(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
 /// each): `FAST` in the hamlets, `Travel::country_speed` on country roads, and `JUNCTION_SPEED`
 /// through a junction (within `JUNCTION_REACH` of it, `junctions`) where the way turns there by
 /// more than `TURN_AT`. Straight through one it keeps its speed (its bends limit it,
-/// `Legs::timed`'s `SIDEWAYS`; the lights and the stop lines stop it, `traffic.rs`).
+/// `Legs::timed`'s `SIDEWAYS`; the lights and the stop lines stop it, `traffic/`).
 pub(crate) fn lane_tops(
     lane: &[[f32; 2]],
     travel: &Travel,

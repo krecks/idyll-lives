@@ -29,7 +29,7 @@ pub struct Surface {
     /// follows per triangle, in this order).
     pub head_tri_ix: Vec<[usize; 3]>,
     pub head_tris: Vec<[V3; 3]>,
-    /// The same triangles without the eye sockets (where the closed lids lie, face.rs).
+    /// The same triangles without the eye sockets (where the closed lids lie, `characters/face/`).
     pub bare_tris: Vec<[V3; 3]>,
     pub cranium: Vec<V3>,
     /// The close-up body (`hd.body`): the whole body at level 2. Positions (snapped,
@@ -98,7 +98,7 @@ fn make_surface(family: &str, stage: &str, id: &Identity) -> Surface {
     let fine_tags = tags.subdivided(&topo.fine_m);
     // Normals from the finer (level-2) limit surface: smooth shading on the coarse level 1 (whose
     // vertices are the first of level 2's), as it is without the eye sockets: the lids cover them
-    // (face.rs), and the skin round a lid is shaded as the face it carries on.
+    // (face/), and the skin round a lid is shaded as the face it carries on.
     let bare = topo.snapped(true, &base, &ctrl, &onto, &|p| p);
     let bare_nor = smooth_normals(&bare, &triangles(&topo.s2.quads, &bare).concat());
     let nor = bare_nor[..pos.len()].to_vec();

@@ -222,7 +222,7 @@ pub(crate) fn turn_round_by(w: &mut World, c: usize, d: Detour) -> bool {
     let passing = car.pass_by.take();
     car.detour = Some(d);
     let mut halts: Option<Box<dyn Fn(f32) -> f32>> = None;
-    // (Turned round from its way as it is: a work taxi's is its run's, `taxi.rs`; one turned round
+    // (Turned round from its way as it is: a work taxi's is its run's, `taxi/`; one turned round
     // before, the way it turned round to. After a load that's worked out from the way it always
     // takes, `Car::route`: a car turned round twice is where the second way has it then. So too
     // one whose way isn't the way it always takes as it backs up along it, as one set off from

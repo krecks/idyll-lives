@@ -259,7 +259,7 @@ pub(crate) fn apply_transition(w: &mut World, i: usize, transition: Transition) 
             }
             begin_visit(w, i, plot, directed);
         }
-        // Into a work taxi (`taxi.rs`).
+        // Into a work taxi (`taxi/`).
         Transition::Board { car } if w.cars.get(car as usize).is_some_and(|c| c.taxi) => {
             crate::taxi::boarded(w, i, car);
         }

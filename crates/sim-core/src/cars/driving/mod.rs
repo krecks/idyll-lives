@@ -40,7 +40,7 @@ pub(crate) fn update(w: &mut World) {
         }
     }
     for c in 0..w.cars.len() {
-        // (A work taxi is the taxis' own: `taxi.rs`; but one driving off, its run given up in
+        // (A work taxi is the taxis' own: `taxi/`; but one driving off, its run given up in
         // sight.)
         if w.cars[c].taxi {
             if w.cars[c].off_run {
@@ -677,13 +677,13 @@ pub(crate) fn drive_off(w: &mut World, c: usize) {
     }
 }
 
-/// A work taxi a tick on along its run (`taxi.rs`): as any car drives on.
+/// A work taxi a tick on along its run (`taxi/`): as any car drives on.
 pub(crate) fn drive_taxi(w: &mut World, c: usize) {
     w.cars[c].standing = false;
     drive_on(w, c);
 }
 
-/// A work taxi standing at a stop (`taxi.rs`): pulled over for one coming the other way as far as
+/// A work taxi standing at a stop (`taxi/`): pulled over for one coming the other way as far as
 /// it has room, as any car standing.
 pub(crate) fn stand_taxi(w: &mut World, c: usize) {
     // (Standing, it holds no claim but the one it stands in: none on ahead.)

@@ -75,7 +75,7 @@ pub fn garment_cuts(family: &str, p: &[V3; NB]) -> Cuts {
             ("top", "long") => top(0.965, lm.hip + 0.045, Some(0.0), None, true),
             ("top", "shirt") => top(0.965, hem - 0.07, Some(-0.012), None, true),
             // The apron a server wears: the shirt under it is painted as a shirt (long sleeves, its hem at the hip)
-            // and the apron itself is a shell over the front (clothes.rs `apron`), from the waist down to above the
+            // and the apron itself is a shell over the front (clothes/ `apron`), from the waist down to above the
             // knees. The shell's heights are its own (`APRON_WAIST`, `APRON_HEM`): the cut is the shirt's.
             ("top", "apron") => top(0.965, lm.hip + 0.02, Some(-0.012), None, true),
             ("top", "jacket") => top(0.975, lm.hip + 0.025, Some(0.0), None, true),

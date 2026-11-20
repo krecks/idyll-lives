@@ -100,7 +100,7 @@ impl World {
                 h.name
             )));
         }
-        // The road network and the town's other open-world fields (`travel.rs`).
+        // The road network and the town's other open-world fields (`travel/`).
         let mut open_world = lot_file.open_world.clone();
         if lot_file
             .plots

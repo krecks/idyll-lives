@@ -109,7 +109,7 @@ pub struct Traffic {
     pub unjam_impossible: std::collections::BTreeMap<&'static str, u64>,
     /// Rings `cars::unjam` last tried (by their least key), and when.
     pub(crate) unjam_tried: Vec<(u64, u64)>,
-    /// Work taxis held still on their way so long they gave their way up (`taxi.rs`): in sight
+    /// Work taxis held still on their way so long they gave their way up (`taxi/`): in sight
     /// (driving off, `cars::drive_off`) and out of it (gone), since the game was loaded.
     pub give_ups: [u64; 2],
     /// Each car turning round (`cars::unjam`): the ground it still backs up over, its bodies

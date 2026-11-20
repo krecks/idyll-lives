@@ -26,7 +26,7 @@ pub(crate) struct CarsRaw {
     pub(crate) country_speed: Option<f32>,
 }
 
-/// The work taxi (content `taxi`, `taxi.rs`): who rides it and how it runs.
+/// The work taxi (content `taxi`, `taxi/`): who rides it and how it runs.
 #[derive(Debug, Clone, Copy)]
 pub struct TaxiRules {
     /// Seats for riders (`seats`, 1 to 4, default 4): more riders than that take more taxis.

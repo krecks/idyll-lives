@@ -97,7 +97,7 @@ export interface BodyData {
   /** Skin reference colour (linear RGB; 1 = Sim skin colours are used as they are). */
   skinRef: [number, number, number];
   parts: Map<string, MeshPart>;
-  /** Garments (id -> cuts painted on the body, see crates/tools/src/characters/clothes.rs); some also have a shell part. */
+  /** Garments (id -> cuts painted on the body, see crates/tools/src/characters/clothes/); some also have a shell part. */
   garments: Record<string, GarmentCut>;
   /** Other life stages of a base body, loaded on demand (`loadStage`). */
   stages: Record<string, StageJson>;

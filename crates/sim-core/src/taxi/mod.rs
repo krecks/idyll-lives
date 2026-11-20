@@ -43,7 +43,7 @@
 //! while it turns), pulling over, the last-resort guard. A taxi's car slot is kept once it's come
 //! (the snapshot's car rows, `KIND` a taxi) and taken again by the next run.
 //!
-//! **Saved** (`save.rs`'s `taxis`, absent: none): the runs planned and under way, where each taxi
+//! **Saved** (`save/`'s `taxis`, absent: none): the runs planned and under way, where each taxi
 //! has got to and who's at which stop; their routes, stands, slots and the bookings are worked out
 //! again on load (`settle`).
 

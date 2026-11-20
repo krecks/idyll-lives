@@ -496,7 +496,7 @@ pub struct World {
     broadcast_scratch: BroadcastScratch,
     /// Where Sims leave town for work.
     pub exits: Vec<[f32; 2]>,
-    /// The road network and the town file's other open-world fields (`travel.rs`).
+    /// The road network and the town file's other open-world fields (`travel/`).
     pub travel: crate::travel::Travel,
     /// Households' cars (see `cars.rs`), and every house's driveway (where a car goes when its
     /// household moves).
@@ -505,7 +505,7 @@ pub struct World {
     /// (`traffic::Traffic`). Not saved.
     pub traffic: crate::traffic::Traffic,
     pub drives: Vec<crate::cars::Drive>,
-    /// The work taxis' runs, planned and under way (`taxi.rs`).
+    /// The work taxis' runs, planned and under way (`taxi/`).
     pub taxis: crate::taxi::Taxis,
     /// Garages at the inner ends of driveways (`cars::Garage`).
     pub garages: Vec<crate::cars::Garage>,

@@ -37,18 +37,26 @@ Check: `rg -n '\bworldExits\b' web tools` (and the other names) returns the decl
 
 ## 3. Doc comments point at files the splits removed
 
-The split series moved code into directories but left doc comments naming the old files, so a
-reader following them finds nothing:
+The split series moved code into directories but left comments naming the old files, so a reader
+following them finds nothing. A sweep of every comment line in `crates/` that names a `*.rs` file
+no longer in the tree found 77 lines in 53 files, all from the same splits:
 
-| Comment | Says | Now |
-|---|---|---|
-| `crates/tools/src/characters/build.rs:6-9` | `body.rs`, `face.rs`, `hair.rs`, `clothes.rs`, `ear.rs` | `body/`, `face/`, `hair/`, `clothes/`, `ear.rs` |
-| `crates/tools/src/characters/body/surface.rs:32` | `face.rs` | `characters/face/` |
-| `crates/tools/src/characters/body/pose.rs:14` | `clothes.rs` | `characters/clothes/` |
-| `crates/sim-core/src/phone.rs:451` | `view.rs` | `view/` |
-| `crates/sim-core/src/cars/driving/mod.rs:43` | `taxi.rs` | `taxi/` |
-| `crates/sim-core/src/land.rs:24` | `save.rs` | `save/` |
-| `web/src/render/shared/characters/data.ts:100` | `crates/tools/src/characters/clothes.rs` | `crates/tools/src/characters/clothes/` |
+| Old name | Now |
+|---|---|
+| `body.rs`, `face.rs`, `hair.rs`, `clothes.rs` | `crates/tools/src/characters/{body,face,hair,clothes}/` |
+| `conversation.rs` | `crates/sim-core/src/conversation/` |
+| `save.rs` | `crates/sim-core/src/save/` |
+| `taxi.rs` | `crates/sim-core/src/taxi/` |
+| `traffic.rs` | `crates/sim-core/src/traffic/` |
+| `travel.rs` | `crates/sim-core/src/travel/` |
+| `view.rs` | `crates/sim-core/src/view/` |
+| `things.rs` | `crates/sound/src/things/` |
+| `math.rs` | `crates/artkit/src/math/` |
+| `crates/tools/src/characters/clothes.rs` (`web/src/render/shared/characters/data.ts:100`) | `crates/tools/src/characters/clothes/` |
+
+`ear.rs`, `head.rs`, `write.rs` and the rest still exist and are left as they are. So are the
+`Split from `x.rs`` headers at the top of each new module: they say where the code came from, which
+is still true, and they name no file a reader is meant to open.
 
 Check: `ls crates/tools/src/characters/face.rs crates/sim-core/src/view.rs` (both gone).
 

@@ -225,7 +225,7 @@ pub struct LotFile {
     #[serde(default)]
     pub meta: serde_json::Value,
     // ---- Open world (sim-travel) -------------------------------
-    /// `size`, `roads`, `areas`, `terrain` and `parking` (`travel.rs`). All optional.
+    /// `size`, `roads`, `areas`, `terrain` and `parking` (`travel/`). All optional.
     #[serde(flatten)]
     pub open_world: crate::travel::OpenWorld,
 }

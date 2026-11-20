@@ -406,7 +406,7 @@ fn soft_boxes_are_gamekits_in_blender() {
             let line = format!("{} {}{points}: {}", words[1], words[2], differ.join(", "));
             // A piping cord's points are swept through turns from one ring to the next, and Blender's C library
             // takes the angle's asinf and the half angle's sine and cosine (one call) its own way, a unit out now
-            // and then (math.rs): a few of the cord's points a unit or two out, everything else to the bit.
+            // and then (math/): a few of the cord's points a unit or two out, everything else to the bit.
             if differ == ["v"] && far_off.is_some_and(|f| f <= 2) {
                 near.push(line);
             } else {

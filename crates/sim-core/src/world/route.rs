@@ -189,7 +189,7 @@ pub(crate) fn walk_route(
     )
 }
 
-/// `route`, by road for a long trip in a town with a road network (`travel.rs`): a tile leg to
+/// `route`, by road for a long trip in a town with a road network (`travel/`): a tile leg to
 /// the road, along it, and a tile leg off it to `target`; A* over the tiles as ever for the rest
 /// (or when there's no way by road).
 #[allow(clippy::too_many_arguments)]

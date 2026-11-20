@@ -1,6 +1,6 @@
 //! The residents' control cage: a closed polygon mesh of cross-section rings (superellipses) joined
 //! by fixed patches at the shoulders, the crotch and the neck, plus the palm, fingers, thumb,
-//! shoe-like feet and the head (head.rs). subdiv.rs subdivides it once for the `body` part (body.rs
+//! shoe-like feet and the head (head.rs). subdiv.rs subdivides it once for the `body` part (body/
 //! fits it so its limit surface passes through the ring points); the cage at its limit is the LOD.
 //!
 //! `Cage::add(point, weights, region, tags) -> vertex id`; `ring(points, ...) -> ids`;
@@ -89,7 +89,7 @@ pub struct Cage {
     pub faces: Vec<Vec<usize>>,
     /// The LOD's faces: the cage's, with the head's coarser grid (some vertices unused).
     pub lod_faces: Vec<Vec<usize>>,
-    /// The shoulder cap's loop round the neck (body.rs sets it; the necklines are cut from it).
+    /// The shoulder cap's loop round the neck (body/ sets it; the necklines are cut from it).
     pub neck_loop: Vec<usize>,
 }
 

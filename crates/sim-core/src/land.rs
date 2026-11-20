@@ -21,7 +21,7 @@
 //! sends each such road's deck spans by its index, merged into `meta.roads[i].bridges`; the deck's
 //! tiles stay dry in the water mask, so the road's check below holds.
 //!
-//! Both `meta.land` and the water mask are saved as they are (`save.rs`, still 39).
+//! Both `meta.land` and the water mask are saved as they are (`save/`, still 39).
 
 use serde_json::Value;
 

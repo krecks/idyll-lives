@@ -276,7 +276,7 @@ pub(crate) fn pull_want(
     };
     let (at, yaw, back) = route.at(t);
     // (In a junction's box only for one coming the other way beside it now, their bodies nearer
-    // than `GAP` and `PASSING`: there they take turns, `traffic.rs`, and turning there it faces
+    // than `GAP` and `PASSING`: there they take turns, `traffic/`, and turning there it faces
     // any way, those following it in too; but two let in together pass each other in their lanes,
     // and round a bend there their ends swing across towards each other further than the claims'
     // samples have it: neither could go on, `guard`. For one coming the other way into it, as

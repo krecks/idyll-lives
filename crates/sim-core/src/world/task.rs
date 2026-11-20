@@ -20,7 +20,7 @@ pub enum TaskKind {
         social: usize,
     },
     /// Join the conversation `leader` started and listen (a group conversation; see
-    /// `conversation.rs`): `Routing` on the way, `Conversing` while listening, `Waiting` between
+    /// `conversation/`): `Routing` on the way, `Conversing` while listening, `Waiting` between
     /// two of the leader's socials.
     Join {
         leader: u32,
@@ -199,7 +199,7 @@ pub enum Phase {
     /// or `GoHome` task): the car drives (`cars::update`), they sit in it.
     Driving,
     /// At their kerb on their way to work or school, waiting for the work taxi they're booked on
-    /// (`Sim::taxi`, `taxi.rs`): it calls them to its door.
+    /// (`Sim::taxi`, `taxi/`): it calls them to its door.
     AtKerb {
         ticks: u32,
     },

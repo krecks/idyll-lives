@@ -933,7 +933,7 @@ pub(crate) fn settle(w: &mut World) {
     }
 }
 
-/// What resident `s` is doing with the taxi, for the UI (`view.rs`): waiting for it at the kerb,
+/// What resident `s` is doing with the taxi, for the UI (`view/`): waiting for it at the kerb,
 /// in it to work (and when they're there, a tick), or on their way home in it (waiting at work for
 /// it, or in it).
 pub fn status(w: &World, s: &crate::world::Sim) -> Option<(&'static str, Option<u64>)> {

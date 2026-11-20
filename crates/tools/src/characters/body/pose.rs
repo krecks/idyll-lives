@@ -11,7 +11,7 @@ fn rx(a: f64) -> M3 {
 
 /// Seated (thighs turned `flex` degrees forward about the hips, a quarter turn for `seat_drop`; shins
 /// straight down from the knees; every other bone at rest): each bone's skinning transform
-/// `x -> R x + t` (seat_drop; the shells' seated corrective, clothes.rs).
+/// `x -> R x + t` (seat_drop; the shells' seated corrective, `characters/clothes/`).
 pub fn seated_pose(p: &[V3; NB], flex: f64) -> Vec<(M3, V3)> {
     let up = rx(radians(-flex));
     let down = rx(radians(flex));

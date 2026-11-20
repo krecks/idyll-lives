@@ -215,7 +215,7 @@ pub const ADULT: Proportions = Proportions {
 const MAN_SHOULDER: f64 = 0.136;
 
 /// How far a life stage shows the grown body's and face's differences between the families (the ones
-/// `body.rs` and `head.rs` add on top of the shared shapes): none on babies and children, most of them
+/// `body/` and `head.rs` add on top of the shared shapes): none on babies and children, most of them
 /// on a teen.
 pub fn maturity(stage: &str) -> f64 {
     match stage {

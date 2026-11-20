@@ -3,8 +3,8 @@
 //! web/public/assets/characters).
 //!
 //! Per family and life stage it asks the head interface (head.rs) where the face is, then builds
-//! the body (body.rs), the face (face.rs: eyes, lids, lashes, brows, mouth and the morph channels),
-//! the hair (hair.rs) and the clothes (clothes.rs), merges the face's skin pieces and the ears (ear.rs)
+//! the body (body/), the face (face/: eyes, lids, lashes, brows, mouth and the morph channels),
+//! the hair (hair/) and the clothes (clothes/), merges the face's skin pieces and the ears (ear.rs)
 //! into the body,
 //! bakes the base stage's ambient occlusion into tone.w (ao.rs; the stages share it), adds the
 //! identity channels (identity.rs: a face per resident) to the base stage's morphs, and writes
@@ -183,7 +183,7 @@ type OnSkin = ([usize; 3], [f64; 3], f64);
 
 /// A lid's normal at a point: the face's it lies on, the skin as it would be without the eye sockets
 /// (`skin`; `nor`: the body's normals, which are the skin's so), at its nearest point, not
-/// the eyeball's the lid is made round. The lids reach over the sockets out to the face (face.rs), where
+/// the eyeball's the lid is made round. The lids reach over the sockets out to the face (face/), where
 /// that is the skin's own, so a lid, open or closed, carries on the face round it rather than showing as a
 /// patch. (Not the low-detail body's: its coarse socket would turn them inside out.)
 fn lid_shading<'a>(skin: &'a OnMesh, nor: &'a [V3]) -> impl Fn(V3) -> V3 + 'a {
@@ -200,7 +200,7 @@ fn lid_shading<'a>(skin: &'a OnMesh, nor: &'a [V3]) -> impl Fn(V3) -> V3 + 'a {
 /// `spread.0` of the body, where `spread.1` says) each vertex's shade is spread over its triangles
 /// (`ao::occlusion_spread`). The lids then take the shade of the skin they lie on (`build_family`).
 /// The hair's wisps take the shade of the hair they grow from (a wisp's vertices come in twos, its
-/// root, where a vertex of the hair is, then its end: hair.rs `wisps`), so an edge and its wisps are
+/// root, where a vertex of the hair is, then its end: hair/ `wisps`), so an edge and its wisps are
 /// one colour.
 fn bake_ao(parts: &mut [(String, Mesh)], spread: (usize, &dyn Fn(V3) -> bool), n_hd: usize) {
     let (body, lod) = (get(parts, "body").clone(), get(parts, "lod.body").clone());
@@ -339,7 +339,7 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
         m.tone = t;
     }
     // The skin is baked as it is without the eye sockets: they lie under the lids, which carry the face on
-    // over them (face.rs), so the skin round a lid and the lid take the shade the face has there.
+    // over them (face/), so the skin round a lid and the lid take the shade the face has there.
     let socketed = part(&mut base.parts, "body").pos[..base.n_skin].to_vec();
     part(&mut base.parts, "body").pos[..base.n_skin].copy_from_slice(&base.unsocketed);
     let hd_socketed = part(&mut base.parts, HD).pos[..base.n_hd].to_vec();
