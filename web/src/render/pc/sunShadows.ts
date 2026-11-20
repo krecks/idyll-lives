@@ -357,11 +357,12 @@ export class SunShadows {
   /**
    * Whether a caster moving at (x, z) (game space) could change the map: it is within `CASTER_REACH` m
    * of the square (always, in the menus' town, whose map follows the view). What the cars and
-   * residents ask of each that moved: one moving across town leaves the map as it is.
+   * residents ask of each that moved: one moving across town leaves the map as it is. `slack`: so many metres
+   * further out too.
    */
-  reaches(x: number, z: number): boolean {
+  reaches(x: number, z: number, slack = 0): boolean {
     const g = this.ground;
-    const r = CASTER_REACH;
+    const r = CASTER_REACH + slack;
     return this.overview || (x >= g.x0 - r && x <= g.x1 + r && z >= g.z0 - r && z <= g.z1 + r);
   }
 
