@@ -65,9 +65,9 @@
     {
       "name": "sim-cooking",
       "file": "crates/sim-core/src/cooking.rs",
-      "sha256": "dd7f8dd5cee744167104868e08b4a35b3e5fce57c0558f670fd90a0aa72f581a",
-      "by": "release/0.8.3",
-      "reason": "no behaviour change: housemates at home are looked up in the household index (Ctx::members), checked against the old scan of every resident in debug builds"
+      "sha256": "33d18584cbe42d37dbf282f9812853fac096b1fe09dd749b84e98f94734d4d00",
+      "by": "real-town-t1",
+      "reason": "owner's OK, real town: a flat's household is at home on its own storey (Plot::holds, World::on_plot) for an invitation to eat and the food left at home (S1)"
     },
     {
       "name": "sim-social",
@@ -93,9 +93,9 @@
     {
       "name": "sim-lifecycle",
       "file": "crates/sim-core/src/lifecycle.rs",
-      "sha256": "2debafb2b682748a52e94a247eb37c1a4aa7021248d133d0af23652ca7a2a8b5",
-      "by": "integrator",
-      "reason": "0.8.3 missing-items run: cleaning tools (sweep), the post at home, household cars (boughtCar/gotLetter events), nobody moves house at the wheel; reviewed, sim 819 and generated seeds 0-2 pass"
+      "sha256": "3fea8575ace2dce6e4bd66caec5823a1e382d0d6bea65dcb05c547c4ef46382c",
+      "by": "real-town-t1",
+      "reason": "owner's OK, real town: newcomers and movers take a vacant home, a house or a flat (Plot::is_home), and arrive at a flat's own door (Plot::home_point) (S1)"
     },
     {
       "name": "sim-hosting",
