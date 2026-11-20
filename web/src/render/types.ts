@@ -654,6 +654,12 @@ export interface Renderer {
   framesOnDemand(on: boolean): void;
   /** Fixed-step playback: draws the next frame now, at `time` (ms). False when none was drawn (the loop stopped, a menu covers the view). */
   drawFrame(time: number): boolean;
+  /**
+   * Fixed-step playback: the residents and the birds set up afresh from the world drawn, as a page's first build sets
+   * them up (what each resident was in the middle of, its clips and their times, goes; the birds perch anew from the
+   * playback's own dice), so a run starts alike however the frames before it went.
+   */
+  restartLife(): Promise<void>;
   /** Measures GPU time (`RenderStats.gpuMs`) while the overlay or the benchmark asks for it. */
   measureGpu(on: boolean, who?: 'overlay' | 'bench'): void;
   /** Benchmark: per-pass GPU times (ms per frame, WebGPU only, while measured; empty otherwise); `reset` starts them over. */

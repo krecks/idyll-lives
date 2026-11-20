@@ -71,6 +71,10 @@ try {
       const t0 = Date.now();
       await page.goto(base + '/?debug&hud=0&quality=' + quality + (backend === 'webgl' ? '&renderer=webgl' : ''));
       await page.waitForFunction(() => !!window.__benchTime, null, { timeout: 120_000, polling: 250 });
+      // (The page to its menu: what a fresh page load costs before any game, against `load`'s swap in an open page.)
+      const bootMs = Date.now() - t0;
+      console.error('steps: ' + backend + ' page up in ' + (bootMs / 1000).toFixed(1) + ' s');
+      results.push({ backend, bootMs });
       for (const pose of poses) {
         // A warm-up first, not counted: what the frames ask for the first time in a page (a prop, a model, a face)
         // is built then, so every counted run draws it from its first frame.
@@ -92,7 +96,8 @@ try {
       }
       console.error('steps: ' + backend + ' done in ' + ((Date.now() - t0) / 1000).toFixed(0) + ' s');
     } finally {
-      await browser.close();
+      // (Not waited for long: a headless Chromium sometimes never says it has closed.)
+      await Promise.race([browser.close(), new Promise((resolve) => setTimeout(resolve, 10_000))]);
     }
   }
 } finally {

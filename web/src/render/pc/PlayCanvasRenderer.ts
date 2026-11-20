@@ -1131,6 +1131,16 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
   }
 
+  async restartLife(): Promise<void> {
+    const world = this.builtWorld;
+    if (!world) return;
+    await this.characters.build(world.staffSims?.length ? { ...world, sims: [...world.sims, ...world.staffSims] } : world, false);
+    // (The birds' clock first: their timers are set by it as they perch.)
+    this.birdLife.life.restartClock();
+    restartDice(true);
+    if (this.lastWorld && !this.townMode) await this.settleBirds(this.lastWorld, this.view, this.lastMinute);
+  }
+
   drawFrame(time: number): boolean {
     const drawn = this.framesDrawn;
     // (What is drawn at a rate of its own goes by the frame's time, until the next frame's.)

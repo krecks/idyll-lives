@@ -228,7 +228,7 @@ export const benchTime = {
         let last = -2;
         while (settleFrames < SETTLE_FRAMES) {
           await s.step(true);
-          await templateBuilds().settled();
+          await Promise.race([templateBuilds().settled(), sleep(SETTLE_LIMIT_MS)]);
           settleFrames++;
           if (drawn !== last || renderer.benchInfo().building) {
             last = drawn;
@@ -241,7 +241,9 @@ export const benchTime = {
         renderer.setFrameProbe(held);
       }
     }
-    // (The clocks of what moves only for the eye from 0 again: however many frames settling took, the run starts alike.)
+    // (The residents and the birds set up afresh and the clocks of what moves only for the eye from 0 again: however the frames before
+    // went and however many settling took, the run starts alike.)
+    await renderer.restartLife();
     s.stepMode(ticks);
     services.controls.setSpeed(options.speed ?? 1);
     const draws: number[] = [];
@@ -286,7 +288,7 @@ export const benchTime = {
         // (A frame that asked for a template not built yet drew without it; the next ones wait for it.)
         if (templateBuilds().started !== builds) {
           lateBuilds.push(i);
-          await templateBuilds().settled();
+          await Promise.race([templateBuilds().settled(), sleep(SETTLE_LIMIT_MS)]);
         }
       }
     } finally {
