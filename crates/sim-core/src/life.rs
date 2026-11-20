@@ -1236,7 +1236,10 @@ fn childcare(w: &mut World, b: usize) {
     if carer_home(w, h, plot, None) {
         return;
     }
-    // The baby's crib (or the home's), for what caring for them takes.
+    // The baby's crib (or the home's), for what caring for them takes: what they hold a place
+    // at, else the first crib on the home plot (from the objects by plot, unless objects came or
+    // went since it was built this tick). A baby left with a sitter has this asked every tick,
+    // so it looks at their own and their home's objects, not at every object in town.
     let content = &w.content;
     let is_crib = |o: &crate::world::ObjectInstance| {
         content.objects[o.def]
@@ -1244,18 +1247,38 @@ fn childcare(w: &mut World, b: usize) {
             .iter()
             .any(|i| i.baby_bed())
     };
-    let crib = w
-        .objects
-        .iter()
-        .find(|o| o.users().any(|u| u as usize == b))
-        .or_else(|| {
+    let home_crib = || {
+        if w.object_index.version == w.objects_version {
+            w.object_index
+                .on(plot)
+                .iter()
+                .map(|&o| &w.objects[o as usize])
+                .find(|o| is_crib(o))
+        } else {
             w.objects
                 .iter()
                 .zip(&w.object_plot)
                 .find(|&(o, &p)| p == Some(plot) && is_crib(o))
                 .map(|(o, _)| o)
-        })
-        .map(|o| o.def);
+        }
+    };
+    let crib = crate::world::held_by(&w.sims[b], &w.objects)
+        .next()
+        .or_else(home_crib);
+    debug_assert_eq!(
+        crib.map(|o| o.id),
+        w.objects
+            .iter()
+            .find(|o| o.users().any(|u| u as usize == b))
+            .or_else(|| w
+                .objects
+                .iter()
+                .zip(&w.object_plot)
+                .find(|&(o, &p)| p == Some(plot) && is_crib(o))
+                .map(|(o, _)| o))
+            .map(|o| o.id)
+    );
+    let crib = crib.map(|o| o.def);
     let Some(crib) = crib else { return };
     let day = clock::day(w.tick);
     if w.households[h].sitter_day != Some(day) {

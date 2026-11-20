@@ -570,6 +570,23 @@ pub(crate) fn held_object(kind: TaskKind) -> Option<u32> {
     }
 }
 
+/// The objects `sim` holds a place at, in id order: what they're doing holds (`held_object`)
+/// and what a talk from the seat over paused. Those are the only objects with `sim` among their
+/// users, so this finds what a scan of every object in town for them would, without the scan.
+pub(crate) fn held_by<'a>(
+    sim: &Sim,
+    objects: &'a [ObjectInstance],
+) -> impl Iterator<Item = &'a ObjectInstance> + 'a {
+    let mut held =
+        [&sim.current, &sim.paused].map(|a| a.as_ref().and_then(|a| held_object(a.task.kind)));
+    held.sort_unstable();
+    let id = sim.id;
+    held.into_iter()
+        .flatten()
+        .filter_map(|o| objects.get(o as usize))
+        .filter(move |o| o.users().any(|u| u == id))
+}
+
 /// A free crib at home for a baby (one with no other baby in it): they're put straight in.
 pub(crate) fn crib_for(sim: &mut Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<Task> {
     let home = ctx.households[sim.household as usize].plot?;
