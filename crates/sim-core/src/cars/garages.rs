@@ -1,6 +1,4 @@
 //! Arriving home, driveways and garages, and the tiles parked cars take up.
-//!
-//! Split from `cars.rs` (see `mod.rs`).
 
 use super::*;
 

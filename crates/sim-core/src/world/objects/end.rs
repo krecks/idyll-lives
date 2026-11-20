@@ -1,8 +1,8 @@
 //! Stopping what they are doing and stepping away from it.
-//!
-//! Split from `world/objects.rs` (see `mod.rs`).
 
-use super::*;
+use crate::content::{Content, Pose};
+use crate::world::{LADDER_DOWN_TICKS, ObjectInstance, Sim, TaskKind, held_object, wrap_angle};
+use std::f32::consts::FRAC_PI_2;
 
 /// Stops what they're doing: the object they used (or cooked at, sat at to eat, washed up at)
 /// is free again, and they stand up in front of it (or step out of the shower; climbing down from

@@ -1,8 +1,7 @@
 //! The matrices: `M3`, `M4` and the axes.
-//!
-//! Split from `crates/artkit/src/math.rs` (see `mod.rs`).
 
 use super::*;
+use std::ops::Mul;
 
 /// `mathutils.Matrix` of 3 x 3, kept as Blender keeps it: `m.0[column][row]`.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -26,7 +25,7 @@ impl Axis {
     }
 }
 
-pub(crate) fn angle_wrap(angle: f32) -> f32 {
+pub(super) fn angle_wrap(angle: f32) -> f32 {
     let (pi, tau) = (std::f32::consts::PI, std::f32::consts::PI * 2.0);
     let a = angle + pi;
     (a - tau * (a / tau).floor()) - pi

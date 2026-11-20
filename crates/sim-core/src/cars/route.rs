@@ -1,6 +1,4 @@
 //! A car's route: the legs of it and the samples along each.
-//!
-//! Split from `cars/mod.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -11,16 +9,16 @@ pub(crate) struct Route {
     pub(crate) points: Vec<([f32; 2], f32, f32, bool)>,
     /// At each point, how far right of its lane a car can pull over there to pass one coming the
     /// other way (m, `pull_room`; none off the lanes, turning or backing).
-    pub(crate) room: Vec<f32>,
+    pub(super) room: Vec<f32>,
     /// At each point, how far right of the road's middle its lane is (m, `lane_on`; off the lanes,
     /// `LANE`).
-    pub(crate) lane: Vec<f32>,
+    pub(super) lane: Vec<f32>,
     /// How far it can pull over to pass one coming the other way (m, `room`), ticks along it, as
     /// its claims have it.
-    pub(crate) pass: Vec<(f32, f32)>,
+    pub(super) pass: Vec<(f32, f32)>,
     /// Where it turns out of a driveway, a parking bay or a spot on the road onto the lane, or off
     /// it into one (ticks along it, from and to): claims of their own (`traffic::claims`).
-    pub(crate) mouths: Vec<(f32, f32)>,
+    pub(super) mouths: Vec<(f32, f32)>,
     /// Where it must hold a claim to drive on (`traffic::Claim`): junctions' boxes and the mouths,
     /// worked out with the route (`Route::build`).
     pub(crate) claims: Vec<crate::traffic::Claim>,
@@ -31,25 +29,25 @@ pub(crate) struct Route {
     pub(crate) zebras: Vec<crate::traffic::ZebraStop>,
     /// Where it takes turns with one passing a work taxi standing at the kerb the other way
     /// (ticks along it, from and to: `pass_stands`), claims of their own.
-    pub(crate) spans: Vec<(f32, f32)>,
+    pub(super) spans: Vec<(f32, f32)>,
     /// Its way out round a work taxi standing at the kerb in its lane as laid on it (`PassBy`),
     /// with what it took the place of, to put back (`Leg`).
-    pub(crate) leg: Option<Leg>,
+    pub(super) leg: Option<Leg>,
     /// The taxis standing it was last looked at against (`Traffic::stand_gen`; 0: never).
-    pub(crate) stand_gen: u64,
+    pub(super) stand_gen: u64,
 }
 
 /// A car's way round a taxi standing at the kerb (`PassBy`) as laid on its route: the points
 /// from `at` on it took the place of, and their rooms and lanes (`Route::room`, `Route::lane`),
 /// and how many it laid there.
 #[derive(Debug, Clone)]
-pub(crate) struct Leg {
-    pub(crate) pass: PassBy,
+pub(super) struct Leg {
+    pub(super) pass: PassBy,
     at: usize,
     laid: usize,
     points: Vec<([f32; 2], f32, f32, bool)>,
-    pub(crate) room: Vec<f32>,
-    pub(crate) lane: Vec<f32>,
+    pub(super) room: Vec<f32>,
+    pub(super) lane: Vec<f32>,
 }
 
 impl Route {
@@ -176,7 +174,7 @@ impl Route {
     /// Lays `pass` on it (`PassBy`): its points from `pass.from` to `pass.to` a tick apart, each
     /// moved its share of `pass.off` to its right, facing on to the next, with no room to pull
     /// over. False: no such stretch on it (backing up there, or past its end).
-    pub(crate) fn lay_leg(&mut self, pass: PassBy) -> bool {
+    pub(super) fn lay_leg(&mut self, pass: PassBy) -> bool {
         let n = self.points.len();
         if self.leg.is_some()
             || n < 2
@@ -243,7 +241,7 @@ impl Route {
     }
 
     /// Its way round a standing taxi taken off it again (`lay_leg`), as it was.
-    pub(crate) fn unlay_leg(&mut self) {
+    pub(super) fn unlay_leg(&mut self) {
         if let Some(l) = self.leg.take() {
             let r = l.at..l.at + l.laid;
             self.points.splice(r.clone(), l.points);
@@ -286,7 +284,7 @@ impl Route {
     }
 
     /// `legacy`, to a road out of town.
-    pub(crate) fn off_roads(car: &Car, exits: &[[f32; 2]], home: bool) -> Route {
+    pub(super) fn off_roads(car: &Car, exits: &[[f32; 2]], home: bool) -> Route {
         Self::legacy(car, exits, home)
     }
 
@@ -301,7 +299,7 @@ impl Route {
     /// mouth; the lanes right of the roads' middle lines (`lane_on`); `FAST` in the hamlets,
     /// `Travel::country_speed` on country roads, slower at junctions. Sampled more where it
     /// bends (`ROUTE_TOLERANCE`). None: no road near, or no way out by road.
-    pub(crate) fn on_roads(
+    pub(super) fn on_roads(
         car: &Car,
         exits: &[[f32; 2]],
         travel: &Travel,
@@ -494,7 +492,7 @@ impl Route {
     /// the way it faces, round the stretch it was held up on (`Detour::avoid`), to where it was
     /// going: into its driveway (home), its trip's parking spot, or out of town. None: no such
     /// way (only by that stretch, say).
-    pub(crate) fn detour(
+    pub(super) fn detour(
         car: &Car,
         exits: &[[f32; 2]],
         travel: &Travel,

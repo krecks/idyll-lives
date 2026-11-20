@@ -1,8 +1,6 @@
 //! Relationships and feelings
 //!
 //! The directional relationship matrix, family links and active feelings.
-//!
-//! Split from `social.rs` (see `mod.rs`).
 
 use super::*;
 

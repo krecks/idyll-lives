@@ -1,16 +1,14 @@
 //! Accessors and the buffer views behind them.
-//!
-//! Split from `assets/model.rs` (see `mod.rs`).
 
 use super::*;
 
-pub(crate) fn list<'a>(j: &'a J, key: &str) -> &'a [J] {
+pub(super) fn list<'a>(j: &'a J, key: &str) -> &'a [J] {
     j.get(key)
         .and_then(J::as_array)
         .map_or(&[], |a| a.as_slice())
 }
 
-pub(crate) fn uint(j: &J, key: &str) -> Option<usize> {
+pub(super) fn uint(j: &J, key: &str) -> Option<usize> {
     j.get(key).and_then(J::as_u64).map(|v| v as usize)
 }
 
@@ -38,20 +36,20 @@ fn component_size(component: u64) -> Result<usize, String> {
 
 /// An accessor's elements, packed (little-endian, no padding between them).
 #[derive(Clone)]
-pub(crate) struct Accessor {
-    pub(crate) component: u64,
-    pub(crate) normalized: bool,
-    pub(crate) kind: String,
-    pub(crate) count: usize,
-    pub(crate) width: usize,
-    pub(crate) data: Vec<u8>,
-    pub(crate) min: Option<J>,
-    pub(crate) max: Option<J>,
+pub(super) struct Accessor {
+    pub(super) component: u64,
+    pub(super) normalized: bool,
+    pub(super) kind: String,
+    pub(super) count: usize,
+    pub(super) width: usize,
+    pub(super) data: Vec<u8>,
+    pub(super) min: Option<J>,
+    pub(super) max: Option<J>,
 }
 
 impl Accessor {
     /// Element `i`'s component `c` as the number the spec reads it as (a normalised integer as 0..1 or -1..1).
-    pub(crate) fn value(&self, i: usize, c: usize) -> f32 {
+    pub(super) fn value(&self, i: usize, c: usize) -> f32 {
         let size = self.data.len() / (self.count * self.width).max(1);
         let at = (i * self.width + c) * size;
         let b = &self.data[at..at + size];
@@ -85,7 +83,7 @@ impl Accessor {
         }
     }
 
-    pub(crate) fn index(&self, i: usize) -> u32 {
+    pub(super) fn index(&self, i: usize) -> u32 {
         let size = self.data.len() / self.count.max(1);
         let b = &self.data[i * size..(i + 1) * size];
         match size {
@@ -97,12 +95,12 @@ impl Accessor {
 }
 
 /// The buffer views' bytes: as they are in the file, or decoded where `EXT_meshopt_compression` holds them.
-pub(crate) struct Views {
-    pub(crate) bytes: Vec<Option<Vec<u8>>>,
-    pub(crate) strides: Vec<Option<usize>>,
+pub(super) struct Views {
+    pub(super) bytes: Vec<Option<Vec<u8>>>,
+    pub(super) strides: Vec<Option<usize>>,
 }
 
-pub(crate) fn views(g: &Glb) -> Result<Views, String> {
+pub(super) fn views(g: &Glb) -> Result<Views, String> {
     let mut bytes = Vec::new();
     let mut strides = Vec::new();
     for view in list(&g.json, "bufferViews") {
@@ -171,7 +169,7 @@ pub(crate) fn views(g: &Glb) -> Result<Views, String> {
     Ok(Views { bytes, strides })
 }
 
-pub(crate) fn accessor(g: &Glb, views: &Views, index: usize) -> Result<Accessor, String> {
+pub(super) fn accessor(g: &Glb, views: &Views, index: usize) -> Result<Accessor, String> {
     let a = list(&g.json, "accessors")
         .get(index)
         .ok_or_else(|| format!("no accessor {index}"))?;

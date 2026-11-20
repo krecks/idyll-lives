@@ -1,6 +1,4 @@
 //! Bays and kerbs: where a car parks, pulls over and keeps to the side.
-//!
-//! Split from `cars/mod.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -66,7 +64,7 @@ impl Bay {
         ((lane - self.kerb) / self.u[1]).max(0.0) + KERB_SLACK
     }
 
-    pub(crate) fn local(&self, p: [f32; 2]) -> [f32; 2] {
+    pub(super) fn local(&self, p: [f32; 2]) -> [f32; 2] {
         let (dx, dz) = (p[0] - self.mp[0], p[1] - self.mp[1]);
         [
             dx * self.t[0] + dz * self.t[1],
@@ -140,7 +138,7 @@ impl Bay {
 /// out of it to the road: straight back the way it faces, so it drives in along the bay's own
 /// line and stands at the bay's yaw, the one drawn, even where the bay isn't quite square to the
 /// road nearest it. Where that would take it away from the road, `to_road` (`parking_bay`).
-pub(crate) fn bay_axis(yaw: f32, to_road: [f32; 2]) -> [f32; 2] {
+pub(super) fn bay_axis(yaw: f32, to_road: [f32; 2]) -> [f32; 2] {
     let back = [-yaw.sin(), -yaw.cos()];
     // (Within a thousandth of a radian of the way to the road, that way, as it always was: a bay
     // the town file gives the yaw the simulation would have worked out drives in as before.)
@@ -171,7 +169,7 @@ pub(crate) fn parking_bay(
 
 /// How far from its middle line a road's kerbs are (m): its width takes in the sidewalks of a
 /// street or lane (`roads.ts` `SIDEWALK`); a country road has none.
-pub(crate) fn kerb_off(road: &crate::travel::Road) -> f32 {
+pub(super) fn kerb_off(road: &crate::travel::Road) -> f32 {
     kerb_of(road.width, road.kind)
 }
 

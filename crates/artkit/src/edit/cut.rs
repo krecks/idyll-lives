@@ -1,10 +1,8 @@
 //! A face while it is cut, and bmesh's split of one face in two.
 //!
 //! `OpenEdge` (a face along an edge) is here too: the shell's rim and `holes_fill` both read it.
-//!
-//! Split from `edit.rs` (see `mod.rs`).
 
-use super::*;
+use crate::math::V3;
 
 /// A face along an edge: (the face, the vertex it comes from, the vertex it goes to).
 pub(super) type OpenEdge = (usize, u32, u32);

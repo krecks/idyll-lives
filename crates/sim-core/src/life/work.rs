@@ -23,7 +23,7 @@ fn take_breaks(sim: &mut Sim, content: &Content, mut funds: Option<&mut i64>) {
 
 /// Off the map at work: needs change and skills grow, then (true) they're done, with pay and maybe
 /// a promotion: the caller sees them home.
-pub(crate) fn at_work(w: &mut World, i: usize) -> bool {
+pub(super) fn at_work(w: &mut World, i: usize) -> bool {
     let tick = w.tick;
     let World {
         content,
@@ -127,7 +127,7 @@ pub(crate) fn at_work(w: &mut World, i: usize) -> bool {
 
 /// Story events for new skill levels (the player's household only: across a whole town they
 /// would crowd out everything else).
-pub(crate) fn report_skill_ups(w: &mut World, i: usize) {
+pub(super) fn report_skill_ups(w: &mut World, i: usize) {
     let sim = &mut w.sims[i];
     let mut ups = std::mem::take(&mut sim.skill_ups);
     if ups == 0 || !w.households[sim.household as usize].player {
@@ -173,7 +173,7 @@ pub fn weekly_costs(w: &World, h: usize) -> Option<(i64, i64)> {
 
 /// Weekly rent and bills; households that can't cover them go into debt and worry about it
 /// every day.
-pub(crate) fn charge_rent(w: &mut World, day: u32) {
+pub(super) fn charge_rent(w: &mut World, day: u32) {
     let Some(rent) = w.content.rent.clone() else {
         return;
     };

@@ -1,6 +1,4 @@
 //! Building a world, and the read-only view of it: what is where, and what is open.
-//!
-//! Split from `world.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -380,7 +378,7 @@ impl World {
     /// Why resident `i` can't be sent to `plot` now for its hours (`Plot::open_at`): it's shut,
     /// or it shuts before they could get there (the way they'd go, `leisure_eta_now`). Ok: open
     /// for them (or a place with no hours).
-    pub(crate) fn check_open(&self, i: usize, plot: u32) -> Result<(), Error> {
+    pub(super) fn check_open(&self, i: usize, plot: u32) -> Result<(), Error> {
         let p = &self.plots[plot as usize];
         if p.hours.is_none() {
             return Ok(());
@@ -422,7 +420,7 @@ impl World {
     }
     /// About how many minutes resident `i` would take to get to `plot` from where they are now,
     /// the way they'd go (`leisure_way`: the car, a bike of theirs, the taxi, else on foot).
-    pub(crate) fn leisure_eta_now(&self, i: usize, plot: u32) -> Option<f32> {
+    pub(super) fn leisure_eta_now(&self, i: usize, plot: u32) -> Option<f32> {
         let (Some(sim), Some(p)) = (self.sims.get(i), self.plots.get(plot as usize)) else {
             return None;
         };
@@ -523,7 +521,7 @@ impl World {
     /// Finds the flats' stair hall in each public place with flats over it (`path::Halls`): the
     /// room on the ground in at the flats' street door (their `entry`), when it is not the place's
     /// own (its `entry` is elsewhere). Rooms change with walls, so with them (`refresh_rooms`).
-    pub(crate) fn map_halls(&mut self) {
+    pub(super) fn map_halls(&mut self) {
         let mut halls = crate::path::Halls::default();
         if !self.flats_in.iter().any(|&k| k > 0) {
             self.halls = halls;

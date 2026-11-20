@@ -1,7 +1,7 @@
 //! The road network: its nodes, edges and the points along them.
 //!
-//! Split from `travel.rs` (see `mod.rs`); the index, the seeking and the paths are its own
-//! submodules, so the graph's fields stay private to it.
+//! The index, the seeking and the paths are its own submodules, so the graph's fields stay
+//! private to it.
 
 use super::*;
 
@@ -26,9 +26,9 @@ pub struct Graph {
     pub nodes: Vec<[f32; 2]>,
     pub edges: Vec<Edge>,
     /// Edges at each node.
-    pub(crate) adj: Vec<Vec<u32>>,
+    pub(super) adj: Vec<Vec<u32>>,
     /// Per road, its edges in order along it.
-    pub(crate) road_edges: Vec<Vec<u32>>,
+    pub(super) road_edges: Vec<Vec<u32>>,
     /// Spatial cells (`CELL` m): the road segments `(road, segment)` near each.
     cells: Vec<Vec<(u32, u32)>>,
     cols: usize,

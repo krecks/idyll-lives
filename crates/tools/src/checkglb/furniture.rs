@@ -1,6 +1,4 @@
 //! Furniture: what it is, its height and the seats it offers.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -23,11 +21,11 @@ const GROUND: f64 = 0.02;
 /// furniture.json: where residents sit and lie on each object (characters.ts `SEATS`, `BEDS`, `BUNKS` and their
 /// defaults). An object in `seats` takes that seat over the content's `seat` (characters.ts `seatOf`).
 pub struct Furniture {
-    pub(crate) seats: J,
-    pub(crate) default_seat: J,
-    pub(crate) beds: J,
-    pub(crate) default_bed: J,
-    pub(crate) bunks: J,
+    pub(super) seats: J,
+    pub(super) default_seat: J,
+    pub(super) beds: J,
+    pub(super) default_bed: J,
+    pub(super) bunks: J,
 }
 
 impl Furniture {
@@ -55,14 +53,14 @@ fn number(d: Option<&J>, k: &str, default: f64) -> f64 {
 
 /// A model as the game draws it, its parts where a pose puts them, to measure heights on: its faces (hidden
 /// materials, and parts flattened to nothing at rest, left out) and the entry's `scale`.
-pub(crate) struct Sampler {
+pub(super) struct Sampler {
     tris: Vec<Tri>,
     scale: f64,
 }
 
 impl Sampler {
     /// None if its positions can't be read here (compressed).
-    pub(crate) fn new(g: &Glb, entry: &J, pose: Option<&Pose>) -> R<Option<Sampler>> {
+    pub(super) fn new(g: &Glb, entry: &J, pose: Option<&Pose>) -> R<Option<Sampler>> {
         let materials = g.gltf.get("materials").and_then(J::list).unwrap_or(&[]);
         let no_overrides = J::Obj(Vec::new());
         let overrides = entry.get("materials").unwrap_or(&no_overrides);
@@ -112,7 +110,7 @@ impl Sampler {
     /// The top (m) at (x, depth) nearest `near`: of the faces looking up there, the one nearest that height (what
     /// lies on a top, a vase or a pillow, and what is under it aren't its top). If none looks up (inside out),
     /// any face. None: nothing there.
-    pub(crate) fn top(&self, x: f64, z: f64, near: f64) -> Option<f64> {
+    pub(super) fn top(&self, x: f64, z: f64, near: f64) -> Option<f64> {
         self.top_in(x, z, [near, near])
     }
 
@@ -141,7 +139,7 @@ impl Sampler {
     }
 
     /// `top`, nearest the range `[lo, hi]` (of those in it, nearest its middle).
-    pub(crate) fn top_in(&self, x: f64, z: f64, [lo, hi]: [f64; 2]) -> Option<f64> {
+    pub(super) fn top_in(&self, x: f64, z: f64, [lo, hi]: [f64; 2]) -> Option<f64> {
         let off = |h: f64| ((lo - h).max(h - hi).max(0.0), (h - (lo + hi) / 2.0).abs());
         self.tops_at(x, z).into_iter().min_by(|a, b| {
             off(*a)
@@ -151,7 +149,7 @@ impl Sampler {
     }
 
     /// The heights `top` chooses from at (x, depth): the faces looking up, or every face if none does.
-    pub(crate) fn tops_at(&self, x: f64, z: f64) -> Vec<f64> {
+    pub(super) fn tops_at(&self, x: f64, z: f64) -> Vec<f64> {
         let found = self.line(x, z, true);
         if found.is_empty() {
             self.line(x, z, false)
@@ -163,7 +161,7 @@ impl Sampler {
     /// Where a seat ends in front (m forward of the footprint's middle): from the hips' point (x, depth) forward a
     /// centimetre at a time while the model reaches up to within `FRONT_DROP` of the seat's height `h` there (a
     /// cushion's top, a bean bag's bulge), the last such depth; None: nothing that high under the hips.
-    pub(crate) fn front(&self, x: f64, z: f64, h: f64) -> Option<f64> {
+    pub(super) fn front(&self, x: f64, z: f64, h: f64) -> Option<f64> {
         let on = |z: f64| self.span(x, z).is_some_and(|(_, hi)| hi >= h - FRONT_DROP);
         if !on(z) {
             return None;
@@ -190,7 +188,7 @@ impl Sampler {
     }
 
     /// The box of its faces (m, game axes): (lowest corner, highest); None: no face.
-    pub(crate) fn extent(&self) -> Option<([f64; 3], [f64; 3])> {
+    pub(super) fn extent(&self) -> Option<([f64; 3], [f64; 3])> {
         let mut corners = self.tris.iter().flat_map(|t| self.corners(t));
         let first = corners.next()?;
         Some(corners.fold((first, first), |(lo, hi), c| {
@@ -205,7 +203,7 @@ impl Sampler {
     /// backs): the highest of its faces that are no more than `OVER_TOP` over the top, or whose middle, seen from
     /// above, is over the top (the box of the flat faces looking up within 1 cm of it: a vase, a screen on it).
     /// None: no face looks up there.
-    pub(crate) fn height_by(&self, top: f64) -> Option<f64> {
+    pub(super) fn height_by(&self, top: f64) -> Option<f64> {
         const OVER_TOP: f64 = 0.02;
         let flat_at = |t: &Tri, c: &[[f64; 3]; 3]| {
             t.nrm[1] > 0.9 * hypot(&t.nrm) && c.iter().all(|v| (v[1] - top).abs() <= 0.01)
@@ -240,7 +238,7 @@ impl Sampler {
     /// A stair's steps: on the line up its middle (across), front to back every centimetre, the highest face
     /// looking up (a tread, not the handrails at its sides); the heights of those 2 cm or more up, a centimetre
     /// apart or more, are its steps. (The top step's height, how many); None: none.
-    pub(crate) fn steps(&self) -> Option<(f64, usize)> {
+    pub(super) fn steps(&self) -> Option<(f64, usize)> {
         let (lo, hi) = self.extent()?;
         let x = (lo[0] + hi[0]) / 2.0;
         let mut found: Vec<f64> = (0..=((hi[2] - lo[2]) * 100.0) as usize)
@@ -259,7 +257,7 @@ impl Sampler {
 
 /// Where the clip `clip` leaves the model's parts: each channel's last key (a bed pulled out or folded down,
 /// held open: `motions.open`).
-pub(crate) fn open_pose(g: &Glb, clip: &J) -> R<Pose> {
+pub(super) fn open_pose(g: &Glb, clip: &J) -> R<Pose> {
     let empty = J::Arr(Vec::new());
     let nodes = g.gltf.get("nodes").unwrap_or(&empty);
     let mut pose: Pose = HashMap::new();
@@ -333,7 +331,7 @@ impl Height {
     }
 
     /// The gate's warnings about it: the model off it, and a second source that says otherwise.
-    pub(crate) fn warnings(&self) -> Vec<String> {
+    pub(super) fn warnings(&self) -> Vec<String> {
         let mut out = Vec::new();
         let open = self
             .open
@@ -393,11 +391,11 @@ impl Height {
 
 /// Where residents sit on a content object (`seat_of`): the seat's height (m), what says so, what a second source
 /// says when it says otherwise, and the hips' points (m, game axes).
-pub(crate) struct Seat {
+pub(super) struct Seat {
     h: f64,
     source: &'static str,
     disagrees: Option<String>,
-    pub(crate) points: Vec<[f64; 2]>,
+    pub(super) points: Vec<[f64; 2]>,
     /// Where its top ends in front (furniture.json `seats` `front`, m forward of the middle), if the table says.
     front: Option<f64>,
 }
@@ -451,7 +449,7 @@ fn slot_points(object: &J, fwd: f64) -> Vec<[f64; 2]> {
 /// The seat of content object `object` (furniture.json `seats`, else the content's `seat`, else `defaultSeat` for
 /// one sat on), the hips' point `fwd` ahead of each slot's place (`slot_points`; along the object for a bath, `along`).
 /// None: no one sits on it.
-pub(crate) fn seat_of(object: &J, furniture: &Furniture) -> Option<Seat> {
+pub(super) fn seat_of(object: &J, furniture: &Furniture) -> Option<Seat> {
     // A thing that stands on a top (content `layer: "surface"`) has no seat of its own: a `sit` use of the mugs or
     // the books is the resident sitting at the table they stand on, not on them.
     if object.get("layer").is_some_and(|l| l.key() == "surface") {
@@ -537,7 +535,7 @@ pub(crate) fn seat_of(object: &J, furniture: &Furniture) -> Option<Seat> {
 ///   low point), `fwd` forward, at each slot (in the middle for one lain on across, but a baby's at its slot), held open if it opens;
 ///   with `every_slot` false at slot 0 only (`cargo review sizes`: a crib's slot 1 is its changing table);
 /// - its lamp's light (content `light`, only with an `at`: the shade).
-pub(crate) fn heights(
+pub(super) fn heights(
     g: &Glb,
     entry: &J,
     object: &J,

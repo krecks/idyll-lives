@@ -1,14 +1,13 @@
 //! A far version against what it stands in for.
-//!
-//! Split from `built.rs` (see `mod.rs`).
 
 use super::*;
+use crate::vec3::dot;
 
 // ---- a far version against its near one ---------------------------------------------------------------
 
 /// A triangle as a camera far off sees it: its corners, its normal and its colour as drawn (linear, 0..1: its
 /// vertices' mean times its material's colour and texture).
-pub(crate) struct Seen {
+pub(super) struct Seen {
     p: [V3; 3],
     n: V3,
     colour: [f64; 3],
@@ -16,7 +15,7 @@ pub(crate) struct Seen {
 
 /// What shows of a sample from far off along `w` (towards the camera): its triangles filed by the cells of a grid
 /// across the view, to ask which of them is nearest the camera at a point.
-pub(crate) struct View<'a> {
+pub(super) struct View<'a> {
     seen: &'a [Seen],
     /// Each triangle's corners in the view's own axes (across, up, towards the camera); None: not drawn from here.
     flat: Vec<Option<[V3; 3]>>,
@@ -26,17 +25,13 @@ pub(crate) struct View<'a> {
 }
 
 /// The grid's cells (m): the triangles a point may lie in are a cell's.
-pub(crate) const CELL: f64 = 0.5;
+pub(super) const CELL: f64 = 0.5;
 /// How far apart the views are sampled (m): a tenth of a metre shows a corner board, and a house is ten thousand points.
-pub(crate) const STEP: f64 = 0.1;
-
-pub(crate) fn dot(a: V3, b: V3) -> f64 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
+pub(super) const STEP: f64 = 0.1;
 
 impl<'a> View<'a> {
     /// The view of `seen` along `w`, `u` across and `v` up the picture (the three at right angles).
-    pub(crate) fn new(seen: &'a [Seen], u: V3, v: V3, w: V3) -> View<'a> {
+    pub(super) fn new(seen: &'a [Seen], u: V3, v: V3, w: V3) -> View<'a> {
         let (mut lo, mut hi) = ([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]);
         for p in seen.iter().flat_map(|t| t.p) {
             for (k, axis) in [u, v].into_iter().enumerate() {
@@ -84,7 +79,7 @@ impl<'a> View<'a> {
     }
 
     /// The triangle nearest the camera at (`a`, `b`) of the picture, and how far along `w` it is there.
-    pub(crate) fn first(&self, a: f64, b: f64) -> Option<(&'a Seen, f64)> {
+    pub(super) fn first(&self, a: f64, b: f64) -> Option<(&'a Seen, f64)> {
         let (ca, cb) = (
             ((a - self.lo[0]) / CELL).floor(),
             ((b - self.lo[1]) / CELL).floor(),
@@ -118,7 +113,7 @@ impl<'a> View<'a> {
     }
 
     /// Every point of the picture `STEP` apart with what shows there: `each(a, b, triangle, depth)`.
-    pub(crate) fn points(&self, mut each: impl FnMut(f64, f64, &'a Seen, f64)) {
+    pub(super) fn points(&self, mut each: impl FnMut(f64, f64, &'a Seen, f64)) {
         let count = [0, 1].map(|k| (self.size[k] as f64 * CELL / STEP).ceil() as usize);
         for j in 0..count[1] {
             for i in 0..count[0] {
@@ -136,11 +131,11 @@ impl<'a> View<'a> {
 
 /// Colours by how much of a picture they cover: each (sRGB bytes) with its area, to find the one most of it is.
 #[derive(Default)]
-pub(crate) struct Palette(BTreeMap<[u8; 3], (f64, [f64; 3])>);
+pub(super) struct Palette(BTreeMap<[u8; 3], (f64, [f64; 3])>);
 
 impl Palette {
     /// `area` more of `colour` (linear).
-    pub(crate) fn add(&mut self, colour: [f64; 3], area: f64) {
+    pub(super) fn add(&mut self, colour: [f64; 3], area: f64) {
         // (Sixteen steps a channel: a wall's shading by vertex stays one colour, another paint is another.)
         let bin = colour.map(|c| ((srgb(c.clamp(0.0, 1.0)) * 255.0).round() as u8) >> 4);
         let slot = self.0.entry(bin).or_default();
@@ -151,7 +146,7 @@ impl Palette {
     }
 
     /// The colour most of it is (sRGB bytes: the mean of its bin and the bins beside it), and its share.
-    pub(crate) fn most(&self) -> Option<([u8; 3], f64)> {
+    pub(super) fn most(&self) -> Option<([u8; 3], f64)> {
         let total: f64 = self.0.values().map(|v| v.0).sum();
         let (bin, _) = self
             .0
@@ -200,16 +195,16 @@ pub(crate) struct Look {
 }
 
 /// What a roof is at least this high over the ground (m): a porch's landing and a sill look up too.
-pub(crate) const ROOFS_FROM: f64 = 1.2;
+pub(super) const ROOFS_FROM: f64 = 1.2;
 /// A face looking up less steeply than this (the y of its normal) is a wall's, not a roof's.
-pub(crate) const UP: f64 = 0.2;
+pub(super) const UP: f64 = 0.2;
 /// A roof pitched under this (rise over run) is flat.
-pub(crate) const LEVEL: f64 = 0.1;
+pub(super) const LEVEL: f64 = 0.1;
 /// A stack is no wider than this (m), and stands this far over the roof's top at least.
-pub(crate) const STACK: f64 = 1.6;
-pub(crate) const STACK_OVER: f64 = 0.3;
+pub(super) const STACK: f64 = 1.6;
+pub(super) const STACK_OVER: f64 = 0.3;
 /// Gable ends are at least this share of a gable roof's plan (a porch's little gable is under it).
-pub(crate) const GABLES: f64 = 0.04;
+pub(super) const GABLES: f64 = 0.04;
 
 /// `parts`' look (`Look`): the roofs from above, the walls from the four sides.
 pub(crate) fn look(parts: &[Part], surfaces: &Surfaces, pictures: &mut Pictures) -> Look {
@@ -427,26 +422,26 @@ pub(crate) fn look(parts: &[Part], surfaces: &Surfaces, pictures: &mut Pictures)
     }
 }
 
-pub(crate) fn inside(plan: [f64; 4], at: [f64; 2]) -> bool {
+pub(super) fn inside(plan: [f64; 4], at: [f64; 2]) -> bool {
     at[0] >= plan[0] && at[0] <= plan[2] && at[1] >= plan[1] && at[1] <= plan[3]
 }
 
 /// How far a far version may be off its near one: a side of its plan (m; a porch stands out less), its plan's
 /// area (a share: the eaves' overhang differs by less), its top (m), its pitch (degrees), a colour's channel (of
 /// 255: the same paint under a texture and in the plain finish).
-pub(crate) const PLAN: f64 = 1.5;
-pub(crate) const AREA: f64 = 0.1;
-pub(crate) const TOP: f64 = 0.5;
-pub(crate) const PITCH: f64 = 4.0;
-pub(crate) const COLOUR: u8 = 28;
+pub(super) const PLAN: f64 = 1.5;
+pub(super) const AREA: f64 = 0.1;
+pub(super) const TOP: f64 = 0.5;
+pub(super) const PITCH: f64 = 4.0;
+pub(super) const COLOUR: u8 = 28;
 
-pub(crate) fn hex_of(c: Option<[u8; 3]>) -> String {
+pub(super) fn hex_of(c: Option<[u8; 3]>) -> String {
     c.map_or("none".into(), |c| {
         format!("#{:02X}{:02X}{:02X}", c[0], c[1], c[2])
     })
 }
 
-pub(crate) fn roof_name(r: Roof) -> &'static str {
+pub(super) fn roof_name(r: Roof) -> &'static str {
     match r {
         Roof::Flat => "flat",
         Roof::Gable => "gable",

@@ -1,6 +1,4 @@
 //! Seeking: the nearest stretch, and those within reach.
-//!
-//! Split from `travel.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -170,7 +168,7 @@ impl Graph {
 
     /// Cost of `len` metres of a road of `kind` for `mode` (metres on foot, seconds of drive time by
     /// car).
-    pub(crate) fn cost(kind: RoadKind, len: f32, mode: Mode, country: f32) -> f32 {
+    pub(super) fn cost(kind: RoadKind, len: f32, mode: Mode, country: f32) -> f32 {
         match mode {
             Mode::Foot => len,
             Mode::Car => {

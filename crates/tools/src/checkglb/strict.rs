@@ -1,6 +1,4 @@
 //! Strict mode: the tags that carry a strict failure up through a check.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -68,13 +66,13 @@ pub const COUNTED: [&str; 5] = ["validator", "reference", "edges", "texels", "pb
 /// Marks a finding of the strict check `kind` (`STRICT`), carried among the warnings until `strictly` sorts it.
 const TAG: char = '\u{1f}';
 
-pub(crate) fn strict(kind: &str, text: String) -> String {
+pub(super) fn strict(kind: &str, text: String) -> String {
     debug_assert!(STRICT.iter().any(|(k, _)| *k == kind), "{kind}");
     format!("{TAG}{kind}{TAG}{text}")
 }
 
 /// (kind, text) of a strict finding (`strict`), or None.
-pub(crate) fn untag(s: &str) -> Option<(&str, &str)> {
+pub(super) fn untag(s: &str) -> Option<(&str, &str)> {
     s.strip_prefix(TAG)?.split_once(TAG)
 }
 
@@ -82,7 +80,7 @@ pub(crate) fn untag(s: &str) -> Option<(&str, &str)> {
 /// `accept` names the check, an accepted note with the reason. An `accept` that names no strict check, gives no
 /// reason, or that the model no longer needs is an error: a stale one would hide the next (a counted check's
 /// only where it ran, `ran`). Returns (errors, warnings, accepted).
-pub(crate) fn strictly(
+pub(super) fn strictly(
     entry: &J,
     errors: Vec<String>,
     warnings: Vec<String>,

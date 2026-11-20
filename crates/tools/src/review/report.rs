@@ -1,6 +1,4 @@
 //! The sizes report.
-//!
-//! Split from `review.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Plants: their row and the species columns.
-//!
-//! Split from `review.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -37,10 +35,10 @@ pub fn sizes(
     report(objects, &size_rows(objects, measures, reference), reference)
 }
 
-pub(crate) const SPECIES_HEAD: &str = "| Object | Kind | Species | Plant H | Crown W | Crown W/H | Clear trunk | Bark | Colours | Leaf cards | Outside |\n|---|---|---|---|---|---|---|---|---|---|---|";
+pub(super) const SPECIES_HEAD: &str = "| Object | Kind | Species | Plant H | Crown W | Crown W/H | Clear trunk | Bark | Colours | Leaf cards | Outside |\n|---|---|---|---|---|---|---|---|---|---|---|";
 
 /// A plant's row of the species table: each measure with its range.
-pub(crate) fn species_cells(r: &SizeRow, reference: &Reference) -> String {
+pub(super) fn species_cells(r: &SizeRow, reference: &Reference) -> String {
     let k = r.kind.as_deref().and_then(|k| reference.kind(k));
     let sp = k.and_then(|k| k.species.as_ref());
     let Some(s) = &r.species else {
@@ -91,7 +89,7 @@ pub(crate) fn species_cells(r: &SizeRow, reference: &Reference) -> String {
     )
 }
 
-pub(crate) fn short(v: f32) -> String {
+pub(super) fn short(v: f32) -> String {
     let s = format!("{v:.2}");
     s.trim_end_matches('0').trim_end_matches('.').to_string()
 }

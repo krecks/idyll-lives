@@ -1,9 +1,9 @@
 //! The small judgements a choice leans on: how much a relationship invites a social,
 //! what cleaning skips, where to sweep, and a goal at a point.
-//!
-//! Split from `world/decide.rs` (see `mod.rs`).
 
-use super::*;
+use crate::content::TagMask;
+use crate::social::{self, Prefer};
+use crate::world::{Ctx, Sim, TaskKind};
 
 /// How much a relationship invites a social of the given kind.
 pub(crate) fn prefer_factor(
@@ -29,7 +29,7 @@ pub(crate) fn prefer_factor(
 
 /// Where `sim` won't clean (tidying up or with a tool): where they couldn't get to a moment ago,
 /// and where someone else is cleaning (the briefs' `cleaning`).
-pub(crate) fn cleaning_skip(sim: &Sim, ctx: &Ctx) -> Vec<(i32, i32)> {
+pub(super) fn cleaning_skip(sim: &Sim, ctx: &Ctx) -> Vec<(i32, i32)> {
     let mut skip: Vec<(i32, i32)> = sim
         .unreachable_now(ctx.tick)
         .filter_map(|k| {

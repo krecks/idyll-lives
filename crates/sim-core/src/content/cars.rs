@@ -1,6 +1,4 @@
-//! [(2007, 2064)]
-//!
-//! Split from `content.rs` (see `mod.rs`).
+//! How cars and taxis drive (content `cars` and `taxi`).
 
 use super::*;
 
@@ -22,8 +20,8 @@ impl Default for CarRules {
 
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
-pub(crate) struct CarsRaw {
-    pub(crate) country_speed: Option<f32>,
+pub(super) struct CarsRaw {
+    pub(super) country_speed: Option<f32>,
 }
 
 /// The work taxi (content `taxi`, `taxi/`): who rides it and how it runs.
@@ -55,9 +53,9 @@ impl Default for TaxiRules {
 
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
-pub(crate) struct TaxiRaw {
-    pub(crate) seats: Option<usize>,
-    pub(crate) min_walk_minutes: Option<f32>,
-    pub(crate) window: Option<f32>,
-    pub(crate) wait_minutes: Option<f32>,
+pub(super) struct TaxiRaw {
+    pub(super) seats: Option<usize>,
+    pub(super) min_walk_minutes: Option<f32>,
+    pub(super) window: Option<f32>,
+    pub(super) wait_minutes: Option<f32>,
 }

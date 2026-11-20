@@ -1,6 +1,4 @@
 //! Pulling over and passing: the room, who passes whom, and the pass itself.
-//!
-//! Split from `driving.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -203,7 +201,7 @@ impl Near {
     }
 
     /// Puts car `c` at `at` (as it is now). One not in it is looked at whatever (`near`).
-    pub(crate) fn put(&mut self, c: usize, at: [f32; 2]) {
+    pub(super) fn put(&mut self, c: usize, at: [f32; 2]) {
         let Some(k) = self.by_x.iter().position(|&(_, o)| o == c) else {
             return;
         };

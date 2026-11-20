@@ -1,6 +1,4 @@
 //! Finishing: clearing the ears, the wisps and the final mesh.
-//!
-//! Split from `characters/hair.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -53,7 +51,7 @@ const STRIP_STARTS: f64 = 2.0;
 /// in that order, both with its normal, skin and tone (the occlusion follows in build.rs). Fields: x =
 /// metres along the edge, y = 0 at the root and 1 at the end, z = how loose the strands are, w = how
 /// far along they stay one.
-pub(crate) fn wisps(comps: &[Comp], solid: &Mesh, h: &HeadFrame, ears: &Ears) -> Mesh {
+pub(super) fn wisps(comps: &[Comp], solid: &Mesh, h: &HeadFrame, ears: &Ears) -> Mesh {
     let mut m = Mesh::default();
     let mut first = 0;
     let mut strips = 0;
@@ -99,7 +97,7 @@ pub(crate) fn wisps(comps: &[Comp], solid: &Mesh, h: &HeadFrame, ears: &Ears) ->
 }
 
 /// The components merged, pushed clear of the head, skinned, with fields and tone.
-pub(crate) fn finish(
+pub(super) fn finish(
     comps: &[Comp],
     h: &HeadFrame,
     ears: &Ears,

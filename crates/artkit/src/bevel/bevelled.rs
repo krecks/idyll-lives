@@ -1,6 +1,4 @@
 //! The bevel itself: the mesh with its edges cut back and rounded.
-//!
-//! Split from `bevel.rs` (see `mod.rs`).
 
 use super::*;
 

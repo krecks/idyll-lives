@@ -27,11 +27,11 @@
 pub mod against;
 pub mod baseline;
 pub mod built;
-pub(crate) mod digest;
+mod digest;
 pub(crate) mod glb;
 pub(crate) mod json;
 pub mod meshes;
-pub(crate) mod near;
+mod near;
 pub mod preview;
 pub(crate) mod py;
 pub mod validate;
@@ -104,8 +104,8 @@ mod strict;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use birds::*;
-pub(crate) use clips::*;
+use birds::*;
+use clips::*;
 pub use files::*;
 pub use furniture::*;
 pub use main::*;

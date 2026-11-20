@@ -1,6 +1,4 @@
 //! Nodes: their places, matrices and poses.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -11,7 +9,7 @@ const IDENTITY: Matrix = {
 };
 
 /// A point `v` through a column-major 4x4 matrix `m` (glTF axes: the game's x is its -x).
-pub(crate) fn apply(m: &Matrix, v: &[Num]) -> [Num; 3] {
+pub(super) fn apply(m: &Matrix, v: &[Num]) -> [Num; 3] {
     [
         m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12],
         m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13],
@@ -23,7 +21,7 @@ pub(crate) fn applied(m: &Matrix, v: &[Num]) -> [f64; 3] {
     apply(m, v).map(Num::f)
 }
 
-pub(crate) fn nums(v: &J, what: usize) -> R<Vec<Num>> {
+pub(super) fn nums(v: &J, what: usize) -> R<Vec<Num>> {
     let l = v
         .list()
         .ok_or_else(|| format!("cannot unpack non-iterable {} object", glb::type_name(v)))?;
@@ -43,7 +41,7 @@ pub(crate) fn nums(v: &J, what: usize) -> R<Vec<Num>> {
 }
 
 /// A node's index (`nodes[i]`, an int of the file, which must be one of its nodes).
-pub(crate) fn node_index(nodes: &J, i: &J) -> R<usize> {
+pub(super) fn node_index(nodes: &J, i: &J) -> R<usize> {
     index(nodes, i)?;
     match i {
         J::Int(i) if *i >= 0 => Ok(*i as usize),
@@ -52,7 +50,7 @@ pub(crate) fn node_index(nodes: &J, i: &J) -> R<usize> {
 }
 
 /// A node an animation channel names (`c['target']['node']`), as an index.
-pub(crate) fn target_node(node: &J) -> usize {
+pub(super) fn target_node(node: &J) -> usize {
     match node {
         J::Int(i) if *i >= 0 => *i as usize,
         _ => usize::MAX,
@@ -60,7 +58,7 @@ pub(crate) fn target_node(node: &J) -> usize {
 }
 
 /// `nodes[i].get('name', i)`, as printed.
-pub(crate) fn node_name(nodes: &J, i: usize) -> String {
+pub(super) fn node_name(nodes: &J, i: usize) -> String {
     match nodes.at(i as i64).and_then(|n| n.get("name")) {
         Some(name) => str_of(name),
         None => i.to_string(),
@@ -72,13 +70,13 @@ pub(crate) fn node_name(nodes: &J, i: usize) -> String {
 pub(crate) struct Placed {
     pub(crate) mesh: J,
     pub(crate) m: Matrix,
-    pub(crate) part: Option<usize>,
-    pub(crate) node: usize,
+    pub(super) part: Option<usize>,
+    pub(super) node: usize,
 }
 
 /// Translations, rotations and scales (by node and path) that put nodes elsewhere than at rest (a part grown,
 /// `grown`; a bed pulled out, `open_pose`).
-pub(crate) type Pose = HashMap<(usize, &'static str), Vec<Num>>;
+pub(super) type Pose = HashMap<(usize, &'static str), Vec<Num>>;
 
 /// The mesh nodes of the default scene (`Placed`), their parts where `pose` puts them; `worlds`, if given,
 /// gets every node's world matrix.
@@ -254,7 +252,7 @@ fn placed_in(
 }
 
 /// The nodes the file's animations move.
-pub(crate) fn moved_nodes(gltf: &J) -> R<HashSet<usize>> {
+pub(super) fn moved_nodes(gltf: &J) -> R<HashSet<usize>> {
     let mut out = HashSet::new();
     for a in gltf.get("animations").and_then(J::list).unwrap_or(&[]) {
         for c in key(a, "channels")?.list().unwrap_or(&[]) {
@@ -276,7 +274,7 @@ fn json_number(v: &J) -> Option<f64> {
 }
 
 /// What is wrong with a bird entry's `bird` itself (`BIRD_KEYS`): no file needed.
-pub(crate) fn bird_fields(bird: &J) -> Vec<String> {
+pub(super) fn bird_fields(bird: &J) -> Vec<String> {
     let Some(fields) = bird.entries() else {
         return vec![format!(
             "`bird` is {{\"length\", \"wingspan\", ...}} (metres), not {}",
@@ -323,13 +321,13 @@ pub(crate) fn bird_fields(bird: &J) -> Vec<String> {
 
 /// A bird's file as `bird_errors` needs it: which of `BIRD_PARTS` it has, each part's vertices at rest (game axes),
 /// and the parts saved at scale 0.
-pub(crate) struct BirdParts {
-    pub(crate) names: BTreeSet<String>,
-    pub(crate) points: HashMap<String, Vec<[f64; 3]>>,
-    pub(crate) flat: Vec<String>,
+pub(super) struct BirdParts {
+    pub(super) names: BTreeSet<String>,
+    pub(super) points: HashMap<String, Vec<[f64; 3]>>,
+    pub(super) flat: Vec<String>,
 }
 
-pub(crate) fn bird_parts(g: &Glb) -> R<BirdParts> {
+pub(super) fn bird_parts(g: &Glb) -> R<BirdParts> {
     let nodes = g.gltf.get("nodes").and_then(J::list).unwrap_or(&[]);
     let name = |i: usize| {
         nodes
@@ -373,7 +371,7 @@ pub(crate) fn bird_parts(g: &Glb) -> R<BirdParts> {
 /// What is wrong with a bird (its `bird`, already sound by `bird_fields`) against its file: its parts, its wings
 /// spread to its sides at scale 1, its wingspan across them, its length from bill (`head`) to tail tip (`tail`),
 /// and its body's middle within its height. `dims` is the file's size (game width, height, depth).
-pub(crate) fn bird_errors(bird: &J, parts: &BirdParts, dims: [f64; 3]) -> Vec<String> {
+pub(super) fn bird_errors(bird: &J, parts: &BirdParts, dims: [f64; 3]) -> Vec<String> {
     let mut errors = Vec::new();
     let missing: Vec<&str> = BIRD_PARTS
         .iter()
@@ -443,7 +441,7 @@ pub(crate) fn bird_errors(bird: &J, parts: &BirdParts, dims: [f64; 3]) -> Vec<St
 
 /// What is wrong with an entry's `perches` (where the game's birds sit: [[x, y, z], ...] in the model's game axes,
 /// metres, before the entry's `scale`) against the model's box (`lo`, `hi`, game axes, at rest, scaled by `scale`).
-pub(crate) fn perch_errors(perches: &J, lo: [f64; 3], hi: [f64; 3], scale: f64) -> Vec<String> {
+pub(super) fn perch_errors(perches: &J, lo: [f64; 3], hi: [f64; 3], scale: f64) -> Vec<String> {
     let Some(list) = perches.list() else {
         return vec![format!(
             "`perches` is a list of [x, y, z] (metres), not {}",
@@ -488,7 +486,7 @@ pub(crate) fn perch_errors(perches: &J, lo: [f64; 3], hi: [f64; 3], scale: f64) 
 
 /// What is wrong with an entry's `habitat` (the kind of plant its `perches` are on, which sets the birds that sit
 /// there: one of `HABITATS`), if it has one.
-pub(crate) fn habitat_errors(entry: &J) -> Vec<String> {
+pub(super) fn habitat_errors(entry: &J) -> Vec<String> {
     let Some(habitat) = entry.get("habitat") else {
         return Vec::new();
     };

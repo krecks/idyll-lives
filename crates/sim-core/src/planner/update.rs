@@ -1,6 +1,4 @@
 //! The tick's planning: starting, following and finishing blocks, and offering work.
-//!
-//! Split from `planner.rs` (see `mod.rs`).
 
 use super::*;
 

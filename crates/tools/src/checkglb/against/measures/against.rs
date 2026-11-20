@@ -1,8 +1,10 @@
 //! The comparison itself.
-//!
-//! Split from `checkglb/against/measures.rs` (see `mod.rs`).
 
 use super::*;
+use crate::checkglb::against::{Class, found, json_differ, names};
+use crate::checkglb::py::{self, J, join};
+use crate::checkglb::{Furniture, Paths};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Compares the new side with the old (`Options`), every row on as many threads as the machine has.
 pub fn against(opts: &Options) -> Result<Outcome, String> {
@@ -70,14 +72,14 @@ pub fn against(opts: &Options) -> Result<Outcome, String> {
         side.fetch(&files)?;
     }
 
-    let defs = super::super::super::content(&tree)?;
+    let defs = crate::checkglb::content(&tree)?;
     let path = opts
         .accepted
         .clone()
         .unwrap_or_else(|| join(&opts.root, "tools/art/port-accepted.json"));
     let (accepted, mut errors) = accepted(&path);
     let context = Context {
-        facts: super::super::super::content_objects(&defs)?,
+        facts: crate::checkglb::content_objects(&defs)?,
         furniture: Furniture::read(&tree)?,
         old,
         new,
@@ -254,6 +256,6 @@ pub fn against(opts: &Options) -> Result<Outcome, String> {
 }
 
 /// Whether either side's manifests have a model entry `key`.
-pub(crate) fn all_has(context: &Context, key: &str) -> bool {
+pub(super) fn all_has(context: &Context, key: &str) -> bool {
     context.old.entries.contains_key(key) || context.new.entries.contains_key(key)
 }

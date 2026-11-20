@@ -1,6 +1,4 @@
 //! How far a copy has drifted from its source.
-//!
-//! Split from `assets/model.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,5 +1,6 @@
 use super::super::glb::tests::glb;
 use super::*;
+use crate::vec3::dot;
 
 /// A part named `name` on `material`, nothing in it yet.
 fn part(name: &str, material: &str) -> Part {

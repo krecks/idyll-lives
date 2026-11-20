@@ -1,6 +1,4 @@
 //! A mesh, its edges and the faces that meet at them.
-//!
-//! Split from `crates/tools/src/edges.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -40,7 +38,7 @@ pub struct Edge {
 
 /// A hasher for keys that are already spread (welded places, pairs of indices): multiply and rotate.
 #[derive(Default)]
-pub(crate) struct Mix(u64);
+pub(super) struct Mix(u64);
 
 impl Hasher for Mix {
     fn finish(&self) -> u64 {
@@ -70,32 +68,32 @@ impl Hasher for Mix {
     }
 }
 
-pub(crate) type Map<K, V> = HashMap<K, V, BuildHasherDefault<Mix>>;
+pub(super) type Map<K, V> = HashMap<K, V, BuildHasherDefault<Mix>>;
 
 /// A triangle of the welded shape.
-pub(crate) struct Face {
-    pub(crate) mesh: u32,
+pub(super) struct Face {
+    pub(super) mesh: u32,
     /// Its corners' places.
-    pub(crate) v: [u32; 3],
+    pub(super) v: [u32; 3],
     /// Its corners in its mesh.
-    pub(crate) c: [u32; 3],
+    pub(super) c: [u32; 3],
     /// Its normal, from its winding.
-    pub(crate) n: V3,
+    pub(super) n: V3,
 }
 
 /// The triangles on an edge: how many, and the first two as (face, the corner the edge starts at there).
 #[derive(Clone, Copy, Default)]
-pub(crate) struct Sides {
-    pub(crate) count: u32,
-    pub(crate) at: [(u32, u8); 2],
+pub(super) struct Sides {
+    pub(super) count: u32,
+    pub(super) at: [(u32, u8); 2],
 }
 
 /// Every mesh's triangles with their positions welded: what the eye takes for one shape.
-pub(crate) struct Shape<'a> {
-    pub(crate) meshes: &'a [Mesh],
-    pub(crate) place: Vec<V3>,
-    pub(crate) faces: Vec<Face>,
-    pub(crate) edges: Map<(u32, u32), Sides>,
+pub(super) struct Shape<'a> {
+    pub(super) meshes: &'a [Mesh],
+    pub(super) place: Vec<V3>,
+    pub(super) faces: Vec<Face>,
+    pub(super) edges: Map<(u32, u32), Sides>,
     /// The edges in the order they were met.
-    pub(crate) order: Vec<(u32, u32)>,
+    pub(super) order: Vec<(u32, u32)>,
 }

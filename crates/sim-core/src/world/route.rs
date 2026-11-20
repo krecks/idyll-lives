@@ -1,6 +1,4 @@
 //! Where to fetch things, seats and grounds, and the ways to them.
-//!
-//! Split from `world.rs` (see `mod.rs`).
 
 use super::*;
 

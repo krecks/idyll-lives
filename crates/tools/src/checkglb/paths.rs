@@ -1,6 +1,4 @@
 //! Paths, manifests and the content that names what a model is for.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -189,7 +187,7 @@ fn model_key(d: &J, prefix: &str) -> R<String> {
 
 /// {model key: what draws it ('object fridge')}: the model each content object and item draws
 /// (`model_key`). The game's own models (the rock, the marker, the street's) are drawn by code and aren't here.
-pub(crate) fn content_keys(defs: &Content) -> R<BTreeMap<String, String>> {
+pub(super) fn content_keys(defs: &Content) -> R<BTreeMap<String, String>> {
     let mut keys = BTreeMap::new();
     for (kind, prefix, found) in [
         ("object", "model", &defs.objects),
@@ -226,21 +224,21 @@ pub fn known_keys(paths: &Paths) -> Result<BTreeSet<String>, String> {
 }
 
 /// The facts of a content object that draws a model, for the checks against what the game does with it.
-pub(crate) struct Facts {
-    pub(crate) id: J,
-    pub(crate) footprint: J,
-    pub(crate) layer: J,
-    pub(crate) outside: bool,
-    pub(crate) stairs: bool,
+pub(super) struct Facts {
+    pub(super) id: J,
+    pub(super) footprint: J,
+    pub(super) layer: J,
+    pub(super) outside: bool,
+    pub(super) stairs: bool,
     /// The disc a thing on a top takes (content.ts `radius`: default 0.12, kept within 0.02-0.45).
-    pub(crate) radius: f64,
+    pub(super) radius: f64,
     /// The content object itself, for its functional heights (`seat`, `surface`, `light`, its uses' poses: `heights`).
-    pub(crate) object: J,
+    pub(super) object: J,
 }
 
 /// {model key: [facts of each content object that draws it]}: where the wall's face is (a footprint's
 /// back, `WALL` in), the footprint, the disc a thing on a top takes.
-pub(crate) fn content_objects(defs: &Content) -> R<HashMap<String, Vec<Facts>>> {
+pub(super) fn content_objects(defs: &Content) -> R<HashMap<String, Vec<Facts>>> {
     let mut out: HashMap<String, Vec<Facts>> = HashMap::new();
     let none = J::Obj(Vec::new());
     for o in &defs.objects {
@@ -301,22 +299,22 @@ pub(crate) fn content_objects(defs: &Content) -> R<HashMap<String, Vec<Facts>>> 
 
 /// The finishes the manifests have: {key: plain (untextured, opaque)}, and those see-through (`alpha` under
 /// 1, the glass).
-pub(crate) struct Finishes {
-    pub(crate) plain: HashMap<String, bool>,
-    pub(crate) see_through: HashSet<String>,
+pub(super) struct Finishes {
+    pub(super) plain: HashMap<String, bool>,
+    pub(super) see_through: HashSet<String>,
     /// The textured ones: {key: (its `uvScale`, its texture's file)}.
-    pub(crate) textures: HashMap<String, (f64, String)>,
+    pub(super) textures: HashMap<String, (f64, String)>,
 }
 
 impl Finishes {
     /// Whether `finish` is a textured one (wood, fabric, bark, foliage): neither plain nor see-through.
-    pub(crate) fn textured(&self, finish: &J) -> bool {
+    pub(super) fn textured(&self, finish: &J) -> bool {
         finish
             .str()
             .is_some_and(|f| self.plain.get(f) == Some(&false) && !self.see_through.contains(f))
     }
 
-    pub(crate) fn see_through(&self, finish: Option<&J>) -> bool {
+    pub(super) fn see_through(&self, finish: Option<&J>) -> bool {
         finish
             .and_then(J::str)
             .is_some_and(|f| self.see_through.contains(f))

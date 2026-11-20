@@ -1,8 +1,7 @@
 //! The sources, options and outcomes of a measure.
-//!
-//! Split from `checkglb/against/measures.rs` (see `mod.rs`).
 
-use super::*;
+use crate::checkglb::against::{Class, Finding, Numbers};
+use std::path::PathBuf;
 
 /// Where a side's files come from.
 #[derive(Clone, Debug, PartialEq)]
@@ -64,10 +63,10 @@ impl Outcome {
 }
 
 /// A folder for this run's copies of a revision's files, gone when the run is.
-pub(crate) struct Scratch(pub(crate) PathBuf);
+pub(super) struct Scratch(pub(crate) PathBuf);
 
 impl Scratch {
-    pub(crate) fn new() -> Result<Scratch, String> {
+    pub(super) fn new() -> Result<Scratch, String> {
         // (One a run: two runs of one process, as its tests are, don't share one.)
         static RUNS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let run = RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);

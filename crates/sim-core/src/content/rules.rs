@@ -1,6 +1,4 @@
-//! [(1576, 1691)]
-//!
-//! Split from `content.rs` (see `mod.rs`).
+//! Rent and bills, schedule windows, visits, offers and doors.
 
 use super::*;
 

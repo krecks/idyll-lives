@@ -1,8 +1,8 @@
 //! A whole model as one part.
-//!
-//! Split from `checkglb/against/measures.rs` (see `mod.rs`).
 
-use super::*;
+use crate::checkglb::against::read;
+use crate::checkglb::glb::{Glb, R};
+use crate::checkglb::near::{self, Part};
 
 /// A model at rest as one part: every node's triangles where the node stands.
 pub(crate) fn whole(g: &Glb) -> R<Part> {

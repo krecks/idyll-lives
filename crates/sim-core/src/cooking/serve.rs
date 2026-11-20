@@ -1,6 +1,4 @@
 //! Serving the dish: where it goes, and carrying it there.
-//!
-//! Split from `cooking.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -166,7 +164,7 @@ impl Place<'_> {
     }
 }
 
-pub(crate) fn place<'a>(ctx: &Ctx<'a>, objects: &'a [ObjectInstance], household: u32) -> Place<'a> {
+pub(super) fn place<'a>(ctx: &Ctx<'a>, objects: &'a [ObjectInstance], household: u32) -> Place<'a> {
     Place {
         content: ctx.content,
         objects,
@@ -178,7 +176,7 @@ pub(crate) fn place<'a>(ctx: &Ctx<'a>, objects: &'a [ObjectInstance], household:
 /// The last step is done: the dish is carried to the dining table and served there (else served
 /// near the cook), or, made to eat at once, they keep the plate and sit down with it. Called again
 /// with the dish in hand (the table broke on the way), they carry on with it.
-pub(crate) fn serve(
+pub(super) fn serve(
     sim: &mut Sim,
     task: Task,
     ctx: &Ctx,
@@ -264,7 +262,7 @@ pub(crate) fn serving(content: &Content, task: &Task) -> bool {
 
 /// With `dish` made: in hand to the dining table, if there is one near, to be put down there
 /// (`step_done`); else put down near the cook straight away.
-pub(crate) fn carry_dish(
+pub(super) fn carry_dish(
     sim: &mut Sim,
     task: Task,
     ctx: &Ctx,
@@ -339,7 +337,7 @@ pub(crate) fn carry_dish(
 /// will sit down to it), the nearest within `cooking.tableRange` on this storey, an outdoor one
 /// first for a dish cooked `outdoor` (a barbecue on the picnic table), an indoor one first
 /// otherwise; a table before a counter or bar with stools.
-pub(crate) fn serving_table(
+pub(super) fn serving_table(
     sim: &Sim,
     ctx: &Ctx,
     objects: &[ObjectInstance],
@@ -421,7 +419,7 @@ pub(crate) fn serving_table(
 
 /// The dish is on the table (or wherever it went): "dinner's ready", and hungry themselves, they
 /// have some too.
-pub(crate) fn served(
+pub(super) fn served(
     sim: &mut Sim,
     task: Task,
     ctx: &Ctx,
@@ -449,7 +447,7 @@ pub(crate) fn served(
 
 /// At the table with the dish (`serving`): it goes down on a free spot of it, near its middle
 /// (else wherever there's room near), and is served.
-pub(crate) fn put_dish_down(
+pub(super) fn put_dish_down(
     sim: &mut Sim,
     task: Task,
     ctx: &Ctx,

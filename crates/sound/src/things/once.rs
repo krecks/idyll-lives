@@ -1,6 +1,4 @@
 //! The things played once: a fridge door, a pedal bin, the vending machines, a phone box, the microwave's ping, toast popping up, coffee poured.
-//!
-//! Split from `things.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -9,7 +7,7 @@ use super::*;
 /// A fridge door opened and shut: the handle, the seal letting go with a soft suck, the bottles in the door
 /// clinking as it swings, a jar taken out, and about a second and a half later the door pushed shut (a rush
 /// of air and the seal's thump), the bottles rattling again.
-pub(crate) fn fridge_door(rate: f64) -> Stereo {
+pub(super) fn fridge_door(rate: f64) -> Stereo {
     let mut r = Rng::new(60.0);
     let mut out = once(rate, 2.6);
     strike(
@@ -63,7 +61,7 @@ pub(crate) fn fridge_door(rate: f64) -> Stereo {
 
 /// A pedal bin: the pedal pressed and the steel lid flying up against its stop, the plate scraped with a
 /// fork (a squeaky scratch, three strokes) and the leftovers dropping in, the lid let fall shut.
-pub(crate) fn bin_lid(rate: f64) -> Stereo {
+pub(super) fn bin_lid(rate: f64) -> Stereo {
     let mut r = Rng::new(61.0);
     let mut out = once(rate, 2.8);
     strike(
@@ -111,7 +109,7 @@ pub(crate) fn bin_lid(rate: f64) -> Stereo {
 }
 
 /// A thin steel lid hitting its stop or the bin's rim: a quick metal ring.
-pub(crate) fn lid(out: &mut Ev, at: f64, amp: f64) {
+pub(super) fn lid(out: &mut Ev, at: f64, amp: f64) {
     strike(
         out,
         at,
@@ -129,7 +127,7 @@ pub(crate) fn lid(out: &mut Ev, at: f64, amp: f64) {
 
 /// A snack from a vending machine: the coins in and rolling down the chute, a button, the spiral's motor
 /// turning for a second and a half, the packet dropping into the tray and the flap pushed.
-pub(crate) fn vend_snack(rate: f64) -> Stereo {
+pub(super) fn vend_snack(rate: f64) -> Stereo {
     let mut r = Rng::new(62.0);
     let mut out = once(rate, 4.2);
     coins(&mut out, &mut r, 0.0);
@@ -198,7 +196,7 @@ pub(crate) fn vend_snack(rate: f64) -> Stereo {
 
 /// A can from a vending machine: the coins, a button, the latch letting go and the can tumbling down inside
 /// (a full can's dull clank) into the metal tray, the flap; then the can opened, a crack and a hiss.
-pub(crate) fn vend_can(rate: f64) -> Stereo {
+pub(super) fn vend_can(rate: f64) -> Stereo {
     let mut r = Rng::new(63.0);
     let mut out = once(rate, 4.8);
     coins(&mut out, &mut r, 0.0);
@@ -279,7 +277,7 @@ pub(crate) fn vend_can(rate: f64) -> Stereo {
 }
 
 /// A coin into a machine: its clink at the slot and the rattle down the chute into the box.
-pub(crate) fn coins(out: &mut Ev, r: &mut Rng, at: f64) {
+pub(super) fn coins(out: &mut Ev, r: &mut Rng, at: f64) {
     strike(
         out,
         at,
@@ -315,7 +313,7 @@ pub(crate) fn coins(out: &mut Ev, r: &mut Rng, at: f64) {
 }
 
 /// A machine's flap pushed in and swinging back.
-pub(crate) fn flap(out: &mut Ev, at: f64) {
+pub(super) fn flap(out: &mut Ev, at: f64) {
     strike(
         out,
         at,
@@ -337,7 +335,7 @@ pub(crate) fn flap(out: &mut Ev, at: f64) {
 /// A call from a phone box: the receiver lifted, the dial tone (350 and 440 Hz) faint from the earpiece, a
 /// coin dropped in, the number pressed (each button's click and its pair of tones), and the ringing at the
 /// other end (400 and 450 Hz, twice in a row, then a pause).
-pub(crate) fn phone_box(rate: f64) -> Stereo {
+pub(super) fn phone_box(rate: f64) -> Stereo {
     let mut r = Rng::new(64.0);
     let mut out = once(rate, 7.5);
     strike(
@@ -408,7 +406,7 @@ pub(crate) fn phone_box(rate: f64) -> Stereo {
 }
 
 /// The receiver put back on its hook: a plastic clack, a bounce, and the hook's switch.
-pub(crate) fn hang_up(rate: f64) -> Stereo {
+pub(super) fn hang_up(rate: f64) -> Stereo {
     let mut out = once(rate, 0.8);
     strike(
         &mut out,
@@ -452,7 +450,7 @@ pub(crate) fn hang_up(rate: f64) -> Stereo {
 
 /// A microwave done: the timer's click and its bell's ping, then the door's latch let go and the door swung
 /// open.
-pub(crate) fn ping(rate: f64) -> Stereo {
+pub(super) fn ping(rate: f64) -> Stereo {
     let mut out = once(rate, 2.4);
     strike(
         &mut out,
@@ -504,7 +502,7 @@ pub(crate) fn ping(rate: f64) -> Stereo {
 
 /// Toast popping up: the spring letting go, the carriage's clank at the top (and a bounce), the slices
 /// knocking, then lifted out.
-pub(crate) fn toast_pop(rate: f64) -> Stereo {
+pub(super) fn toast_pop(rate: f64) -> Stereo {
     let mut r = Rng::new(65.0);
     let mut out = once(rate, 1.6);
     strike(
@@ -553,7 +551,7 @@ pub(crate) fn toast_pop(rate: f64) -> Stereo {
 
 /// Coffee poured into a cup: the stream's splash, and the ring of the air left in the cup rising as it fills
 /// (a quarter wave in the space above the coffee: about 950 Hz with 9 cm left, near 2.4 kHz with 3.5 cm).
-pub(crate) fn pour(rate: f64) -> Stereo {
+pub(super) fn pour(rate: f64) -> Stereo {
     let mut r = Rng::new(66.0);
     let mut out = once(rate, 2.6);
     let n = out.left.len();
@@ -613,7 +611,7 @@ pub(crate) fn pour(rate: f64) -> Stereo {
 }
 
 /// A glass bottle or jar knocking another: a clink.
-pub(crate) fn glass(out: &mut Ev, at: f64, amp: f64, pan: f64, hz: f64) {
+pub(super) fn glass(out: &mut Ev, at: f64, amp: f64, pan: f64, hz: f64) {
     strike(
         out,
         at,
@@ -629,7 +627,7 @@ pub(crate) fn glass(out: &mut Ev, at: f64, amp: f64, pan: f64, hz: f64) {
 }
 
 /// A short electronic beep.
-pub(crate) fn beep(out: &mut Ev, at: f64, seconds: f64, hz: f64, amp: f64) {
+pub(super) fn beep(out: &mut Ev, at: f64, seconds: f64, hz: f64, amp: f64) {
     let rate = out.rate;
     let start = js_round(at * rate);
     let len = round_usize(seconds * rate);
@@ -646,7 +644,7 @@ pub(crate) fn beep(out: &mut Ev, at: f64, seconds: f64, hz: f64, amp: f64) {
 }
 
 /// A pair of tones (a telephone's), on for \`seconds\`.
-pub(crate) fn tones(d: &mut [f32], rate: f64, at: f64, seconds: f64, hz: &[f64]) {
+pub(super) fn tones(d: &mut [f32], rate: f64, at: f64, seconds: f64, hz: &[f64]) {
     let start = js_round(at * rate);
     let len = min(d.len() as f64 - start, js_round(seconds * rate));
     let mut j = 0.0;

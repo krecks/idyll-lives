@@ -1,6 +1,4 @@
 //! What a model is read into: its materials, meshes, nodes and channels.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
 use super::*;
 

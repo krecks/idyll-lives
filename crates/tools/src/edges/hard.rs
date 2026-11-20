@@ -1,8 +1,7 @@
 //! The hard edges themselves.
-//!
-//! Split from `crates/tools/src/edges.rs` (see `mod.rs`).
 
 use super::*;
+use crate::vec3::{add, cross, dot, length, mul, sub, unit};
 
 /// A mesh edge that is hard (the module's rule, but for how much of it shows).
 struct Hard {

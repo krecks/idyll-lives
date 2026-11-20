@@ -1,6 +1,4 @@
 //! Tests for leisure runs leaving.
-//!
-//! Split from `taxi.rs` (see `mod.rs`).
 
 use super::*;
 use crate::world::Activity;

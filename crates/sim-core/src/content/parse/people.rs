@@ -1,6 +1,4 @@
 //! Career, skill, grade and rhythm shapes (content `careers`, `skills`, `grades`).
-//!
-//! Split from `content/parse.rs` (see `mod.rs`).
 
 use super::*;
 

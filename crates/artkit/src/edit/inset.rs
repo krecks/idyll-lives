@@ -1,8 +1,9 @@
 //! Drawing each face in from its edges.
-//!
-//! Split from `edit.rs` (see `mod.rs`).
 
-use super::*;
+use crate::math::{V3, dot_v3, normalize_v3};
+use crate::mesh::Mesh;
+use crate::scene::Obj;
+use crate::shapes::options;
 
 options! {
     /// The options of inset_individual, Blender's own defaults: thickness is how far in from its edges each face

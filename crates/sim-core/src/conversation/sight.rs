@@ -1,13 +1,11 @@
 //! Sight and earshot: who can see whom, who hears whom, and the tiles between.
-//!
-//! Split from `conversation.rs` (see `mod.rs`).
 
 use super::*;
 /// Whether the edge from tile `a` to its neighbour `b` stands shut to voices and eyes: a wall, a
 /// window, or a front door (between the house and outdoors), which stays shut but for someone
 /// going through it (as the renderer swings it: `doors.ts`). A doorway inside the house stands
 /// open, and fences and gates are talked over.
-pub(crate) fn shut(lot: &Lot, (ax, az): (i32, i32), (bx, bz): (i32, i32)) -> bool {
+pub(super) fn shut(lot: &Lot, (ax, az): (i32, i32), (bx, bz): (i32, i32)) -> bool {
     let side = match (bx - ax, bz - az) {
         (1, 0) => Side::PosX,
         (-1, 0) => Side::NegX,

@@ -1,6 +1,4 @@
-//! [(846, 1100)]
-//!
-//! Split from `content.rs` (see `mod.rs`).
+//! Life rules: accidents, children, school, newcomers, moving, death, grief and life stages.
 
 use super::*;
 

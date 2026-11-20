@@ -1,6 +1,4 @@
 //! The .glb container: its JSON and its binary.
-//!
-//! Split from `assets/model.rs` (see `mod.rs`).
 
 use super::*;
 

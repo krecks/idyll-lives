@@ -1,10 +1,4 @@
 //! Using an object, arriving at it, and what follows (leaving, needs, habits).
-//!
-//! Split from `world.rs` (see `mod.rs`).
-
-use std::f32::consts::FRAC_PI_2;
-
-use super::*;
 
 mod accident;
 mod arrive;

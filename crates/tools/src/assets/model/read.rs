@@ -1,6 +1,4 @@
 //! Reading a model.
-//!
-//! Split from `assets/model.rs` (see `mod.rs`).
 
 use super::*;
 

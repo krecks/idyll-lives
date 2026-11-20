@@ -1,6 +1,4 @@
 //! How far a search reached, and what it reached first.
-//!
-//! Split from `path.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -85,7 +83,7 @@ impl Reach {
     /// on. (A way out of town on the ground's far side is on its last row's far edge, and the row
     /// past it is the storey above's first: in Foundrygate someone set down at one looked up the
     /// void slot's steps, none, where their step back onto the ground was open, and found no way.)
-    pub(crate) fn steps_at(&self, c: usize, s: usize) -> Option<u8> {
+    pub(super) fn steps_at(&self, c: usize, s: usize) -> Option<u8> {
         if s == crate::lot::VOID || self.all_dirty || !self.stepped.get(c).copied().unwrap_or(false)
         {
             return None;

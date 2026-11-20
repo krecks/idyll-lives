@@ -1,45 +1,43 @@
 //! Shoes: the styles and the foot they are built on.
-//!
-//! Split from `characters/clothes.rs` (see `mod.rs`).
 
 use super::*;
 
 /// A shoe type's shape (m, on a body 1.7 m tall and scaled with the body; heights over the ankle
 /// joint are on the base body, as the cuts are).
-pub(crate) struct ShoeStyle {
+pub(super) struct ShoeStyle {
     /// The upper's lift off the skin, more on top of the toe box, round the heel counter, in a padded
     /// collar and at a boot's top.
-    pub(crate) lift: f64,
-    pub(crate) toe: f64,
-    pub(crate) heel: f64,
-    pub(crate) pad: f64,
-    pub(crate) shaft: f64,
+    pub(super) lift: f64,
+    pub(super) toe: f64,
+    pub(super) heel: f64,
+    pub(super) pad: f64,
+    pub(super) shaft: f64,
     /// How far the toe is drawn out forward: a dress shoe's long toe.
-    pub(crate) point: f64,
+    pub(super) point: f64,
     /// The collar's height over the ankle joint at the back, the sides and the front (the tongue, or
     /// a dress shoe's low throat, which ends at `throat` along the foot: the vamp covers the toes).
-    pub(crate) collar: [f64; 3],
-    pub(crate) throat: f64,
+    pub(super) collar: [f64; 3],
+    pub(super) throat: f64,
     /// The sock's top over the ankle joint: the painted cut (`shoe`), above the collar's sides.
-    pub(crate) sock: f64,
+    pub(super) sock: f64,
     /// The sole's thickness under the ball and under the heel, where the heel's thickness gives way to
     /// the ball's (along the foot, 0 heel .. 1 toe), how far its edge stands out from the upper, the
     /// arch's lift off the floor between the heel and the ball, and the light midsole's share of its edge.
-    pub(crate) sole: f64,
-    pub(crate) heel_h: f64,
-    pub(crate) block: (f64, f64),
-    pub(crate) welt: f64,
-    pub(crate) arch: f64,
-    pub(crate) midsole: f64,
+    pub(super) sole: f64,
+    pub(super) heel_h: f64,
+    pub(super) block: (f64, f64),
+    pub(super) welt: f64,
+    pub(super) arch: f64,
+    pub(super) midsole: f64,
     /// The toe's lift off the floor at the tip: the whole sole rises there, so the shoe's underside is a
     /// curve rather than a slab lying flat on the ground (`spring_at`).
-    pub(crate) spring: f64,
-    pub(crate) laces: bool,
+    pub(super) spring: f64,
+    pub(super) laces: bool,
     /// Polished leather (glossier).
-    pub(crate) polish: bool,
+    pub(super) polish: bool,
 }
 
-pub(crate) fn shoe_style(gid: &str) -> ShoeStyle {
+pub(super) fn shoe_style(gid: &str) -> ShoeStyle {
     match gid {
         // Chunky: a padded collar, a round toe box, a thick white cup sole on a dark outsole, laces.
         "shoes.sneakers" => ShoeStyle {
@@ -131,19 +129,19 @@ pub(crate) fn shoe_style(gid: &str) -> ShoeStyle {
 
 impl ShoeStyle {
     /// The sole's top (m on a 1.7 m body) at `u` along the foot (0 heel .. 1 toe).
-    pub(crate) fn top(&self, u: f64) -> f64 {
+    pub(super) fn top(&self, u: f64) -> f64 {
         self.sole + (self.heel_h - self.sole) * (1.0 - smoothstep(self.block.0, self.block.1, u))
     }
 
     /// The toe spring's lift (m on a 1.7 m body) at `u` along the foot: the whole sole's, its top and
     /// its underside alike, and so the upper's cut inside it.
-    pub(crate) fn spring_at(&self, u: f64) -> f64 {
+    pub(super) fn spring_at(&self, u: f64) -> f64 {
         self.spring * smoothstep(0.7, 1.0, u).powi(2)
     }
 
     /// The collar's height over the ankle joint at a point `dx` to the side of it, `dz` ahead and `u`
     /// along the foot.
-    pub(crate) fn collar_at(&self, dx: f64, dz: f64, u: f64) -> f64 {
+    pub(super) fn collar_at(&self, dx: f64, dz: f64, u: f64) -> f64 {
         let c = dz / dx.hypot(dz).max(1e-9);
         let [back, side, front] = self.collar;
         side + (front - side) * c.max(0.0)
@@ -153,13 +151,13 @@ impl ShoeStyle {
 }
 
 /// The upper below the sole's top (m on a 1.7 m body): cut there, inside the sole.
-pub(crate) const UPPER_IN_SOLE: f64 = 0.005;
+pub(super) const UPPER_IN_SOLE: f64 = 0.005;
 
 static FINER: Cache<(String, String, bool), Vec<V3>> = Cache::new();
 
 /// The next level of a body's surface, on its limit (level 2 under the body, level 1 under the
 /// low-detail body): there, the point a cut edge's middle lies on.
-pub(crate) fn finer(family: &str, stage: &str, lod: bool) -> Arc<Vec<V3>> {
+pub(super) fn finer(family: &str, stage: &str, lod: bool) -> Arc<Vec<V3>> {
     FINER.get((family.to_string(), stage.to_string(), lod), || {
         let s = surface(family, stage);
         if lod {
@@ -173,7 +171,7 @@ pub(crate) fn finer(family: &str, stage: &str, lod: bool) -> Arc<Vec<V3>> {
 /// Per edge of a surface's triangles (its faces' own edges, and the diagonals they are cut along), the
 /// next level's vertex at its middle: an edge's point, or the face's (subdiv.rs: the `edges`' points
 /// come after the `n` vertices, then the faces').
-pub(crate) fn edge_mids(
+pub(super) fn edge_mids(
     faces: &[Vec<usize>],
     edges: &[(usize, usize)],
     n: usize,

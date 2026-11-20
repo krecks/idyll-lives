@@ -1,8 +1,10 @@
 //! Splitting chosen edges and the faces along them.
-//!
-//! Split from `edit.rs` (see `mod.rs`).
 
 use super::*;
+use crate::math::V3;
+use crate::mesh::{Mesh, edge};
+use crate::scene::Obj;
+use crate::shapes::options;
 
 options! {
     /// The options of subdivide_edges, Blender's own defaults: cuts is how many points each chosen edge takes;

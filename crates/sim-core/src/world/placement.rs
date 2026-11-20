@@ -1,6 +1,4 @@
 //! Where objects stand and how they fit.
-//!
-//! Split from `world.rs` (see `mod.rs`).
 
 use super::*;
 

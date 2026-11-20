@@ -1,6 +1,4 @@
 //! What a part asks for: a pending bevel, and applying it to an object.
-//!
-//! Split from `bevel.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -41,7 +39,7 @@ pub fn bevel_edges(obj: Obj, width: f64, segments: usize, angle: f64, order: &Ed
 
 /// The mesh of `obj` with the bevel it was to be given (`None`: it was to be given none), and what each of its
 /// faces came from.
-pub(crate) fn rounded(o: &crate::scene::Object) -> Option<Bevelled> {
+pub(super) fn rounded(o: &crate::scene::Object) -> Option<Bevelled> {
     let p = o.bevel.as_ref()?;
     match bevelled(&o.mesh, p.width, p.segments, p.angle, &p.order) {
         Ok(made) => Some(made),

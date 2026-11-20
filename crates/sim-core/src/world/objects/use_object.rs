@@ -1,8 +1,11 @@
 //! One tick of using an object.
-//!
-//! Split from `world/objects.rs` (see `mod.rs`).
 
 use super::*;
+use crate::social;
+use crate::world::{
+    Access, Ctx, MIN_AUTONOMY_SCORE, OUTFITS, ObjectInstance, Sim, TaskKind, access, before_dawn,
+    getting_up, practise, quality_boost, training_interest,
+};
 
 /// One tick of using an object (`minutes` long: more when catching up on a turn, see
 /// `lod.rs`), with needs `pressing` (`urgent_needs`). Returns whether the Sim is done.

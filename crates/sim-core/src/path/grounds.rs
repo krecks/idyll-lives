@@ -1,22 +1,20 @@
 //! Grounds: the plot a tile belongs to and how a walk over it is charged.
-//!
-//! Split from `path.rs` (see `mod.rs`).
 
 use super::*;
 
 /// Going up or down a storey counts as this many metres of walking (for choosing what to do).
 pub const STOREY_WALK: f32 = 4.0;
 
-pub(crate) const ORTHO: u32 = 10;
-pub(crate) const DIAG: u32 = 14;
+pub(super) const ORTHO: u32 = 10;
+pub(super) const DIAG: u32 = 14;
 /// Extra cost of stepping onto a tile of someone else's plot: twenty tiles of walking.
-pub(crate) const TRESPASS: u32 = ORTHO * 20;
+pub(super) const TRESPASS: u32 = ORTHO * 20;
 /// Extra cost of stepping straight from one plot into another beside a garden (`Grounds::fenced`):
 /// three hundred tiles, so a garden is entered from the street at its front wherever there is one,
 /// and only crossed into where there isn't. Gardens are kept apart all round, though the renderer
 /// draws their fences and hedges (`shared/street.ts`) only from the house's front back, and none
 /// round some: next door is by the street, as a visitor would go.
-pub(crate) const OVER_THE_FENCE: u32 = ORTHO * 300;
+pub(super) const OVER_THE_FENCE: u32 = ORTHO * 300;
 
 /// The stair halls of buildings with flats over a public place (a shop, a café): the flats' own
 /// way in from the street, on their building's lot but no part of the place. Only those living
@@ -111,7 +109,7 @@ impl Grounds<'_> {
     }
 
     /// Whether plot `p` (a tile's) is one this resident shouldn't walk across.
-    pub(crate) fn foreign(&self, p: Option<u32>) -> bool {
+    pub(super) fn foreign(&self, p: Option<u32>) -> bool {
         p.is_some_and(|p| {
             let open = if p & HALL != 0 {
                 &self.hall_open[..]
@@ -124,7 +122,7 @@ impl Grounds<'_> {
 
     /// A step from plot `a` straight into plot `b` (tiles'), over the fence between them, open
     /// or not: a garden's side or back, not between two public places.
-    pub(crate) fn over_the_fence(&self, a: Option<u32>, b: Option<u32>) -> bool {
+    pub(super) fn over_the_fence(&self, a: Option<u32>, b: Option<u32>) -> bool {
         let fenced = |p: u32| self.fenced.get(p as usize).copied().unwrap_or(false);
         matches!((a, b), (Some(a), Some(b)) if a != b && (fenced(a) || fenced(b)))
     }

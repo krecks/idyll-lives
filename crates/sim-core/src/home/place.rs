@@ -1,11 +1,9 @@
 //! Placing objects: what a spot must keep clear, and putting things there.
-//!
-//! Split from `home.rs` (see `mod.rs`).
 
 use super::*;
 
 impl World {
-    pub(crate) fn home_object(&self, household: u32, object: u32) -> Result<(usize, u32), Error> {
+    pub(super) fn home_object(&self, household: u32, object: u32) -> Result<(usize, u32), Error> {
         let (h, plot) = self.home_of(household)?;
         if object as usize >= self.objects.len() {
             return Err(Error::new(format!("unknown object {object}")));
@@ -18,7 +16,7 @@ impl World {
 
     /// Whether every tile of `obj` and the tile in front of it lie on `plot` (nobody uses things
     /// without interactions, like tables, or things standing on a top: their front can be off it).
-    pub(crate) fn fits_on_plot(&self, obj: &ObjectInstance, plot: u32) -> bool {
+    pub(super) fn fits_on_plot(&self, obj: &ObjectInstance, plot: u32) -> bool {
         let def = &self.content.objects[obj.def];
         let (fx, fz) = obj.front_tile(&self.content);
         let on = |x: i32, z: i32| self.on_plot(plot, x, z);

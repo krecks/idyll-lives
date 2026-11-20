@@ -1,12 +1,12 @@
 //! What has been accepted, and what a manifest still says.
-//!
-//! Split from `checkglb/against/measures.rs` (see `mod.rs`).
 
-use super::*;
+use crate::checkglb::against::METRICS;
+use crate::checkglb::py::{self, J};
+use std::collections::BTreeMap;
 
 /// A manifest without its model entries: what the models' rows do not cover. Nor its `$comment`, which says what
 /// builds the pack (a script, then a crate) and which the game does not read.
-pub(crate) fn rest_of(manifest: &J) -> J {
+pub(super) fn rest_of(manifest: &J) -> J {
     let mut out = match manifest.entries() {
         Some(fields) => J::Obj(
             fields
@@ -33,14 +33,14 @@ pub(crate) fn rest_of(manifest: &J) -> J {
 }
 
 /// port-accepted.json, {row: {metric: why}}, and what is wrong with it: a metric that is none, a reason left out.
-pub(crate) fn accepted(path: &str) -> (BTreeMap<String, BTreeMap<String, String>>, Vec<String>) {
+pub(super) fn accepted(path: &str) -> (BTreeMap<String, BTreeMap<String, String>>, Vec<String>) {
     let (mut out, mut errors) = (BTreeMap::new(), Vec::new());
     let data = match std::fs::read(path) {
         Ok(data) => data,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return (out, errors),
         Err(e) => return (out, vec![format!("{path}: {e}")]),
     };
-    let json = match super::super::super::json::loads_text(&data) {
+    let json = match crate::checkglb::json::loads_text(&data) {
         Ok(json @ J::Obj(_)) => json,
         Ok(_) => return (out, vec![format!("{path} is {{key: {{metric: why}}}}")]),
         Err(e) => return (out, vec![format!("{path}: {e}")]),

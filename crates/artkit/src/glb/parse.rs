@@ -1,8 +1,8 @@
 //! A model read whole.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
 use super::*;
+use crate::json::Json;
+use std::collections::BTreeMap;
 
 /// Reads a .glb: its nodes, meshes (positions, normals, UVs, COLOR_0 and indices of each primitive), materials
 /// and clips. Triangles only, in the file's own buffer; a part placed by a matrix, a sparse accessor or another

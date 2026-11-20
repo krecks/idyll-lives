@@ -1,6 +1,4 @@
 //! The sole under an upper, and the shoe that is both.
-//!
-//! Split from `characters/clothes.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -159,7 +157,7 @@ fn sole(
 }
 
 /// A shoe: the upper and a sole under each foot (cut round `full`, the full-detail upper).
-pub(crate) fn shoe(family: &str, stage: &str, gid: &str, full: &Mesh, lod: bool) -> Mesh {
+pub(super) fn shoe(family: &str, stage: &str, gid: &str, full: &Mesh, lod: bool) -> Mesh {
     let s = surface(family, stage);
     let lod_up = lod.then(|| upper(family, stage, gid, true));
     let up = lod_up.as_ref().unwrap_or(full);

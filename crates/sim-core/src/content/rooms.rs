@@ -1,6 +1,4 @@
-//! [(1101, 1238)]
-//!
-//! Split from `content.rs` (see `mod.rs`).
+//! Room kinds, room rules, cleaning, and the modifiers a room gives.
 
 use super::*;
 

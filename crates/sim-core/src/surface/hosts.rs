@@ -1,11 +1,9 @@
 //! Hosts: which object a thing stands on, and whether it fits there.
-//!
-//! Split from `surface.rs` (see `mod.rs`).
 
 use super::*;
 
 /// Which way an object faces, turn included (radians; see `ObjectInstance::angle`).
-pub(crate) fn angle(o: &ObjectInstance) -> f32 {
+pub(super) fn angle(o: &ObjectInstance) -> f32 {
     o.angle()
 }
 
@@ -19,7 +17,7 @@ pub fn middle(content: &Content, o: &ObjectInstance) -> [f32; 2] {
 }
 
 /// Things standing on surfaces near a top: their middles and radii.
-pub(crate) fn clutter_on(
+pub(super) fn clutter_on(
     content: &Content,
     objects: &[ObjectInstance],
     top: &Top,
@@ -40,7 +38,7 @@ pub(crate) fn clutter_on(
     }
 }
 
-pub(crate) fn overlaps(discs: &[([f32; 2], f32)], p: [f32; 2], radius: f32) -> bool {
+pub(super) fn overlaps(discs: &[([f32; 2], f32)], p: [f32; 2], radius: f32) -> bool {
     discs
         .iter()
         .any(|(q, r)| (q[0] - p[0]).hypot(q[1] - p[1]) < r + radius - SLACK)
@@ -66,7 +64,7 @@ pub fn host_of(content: &Content, objects: &[ObjectInstance], obj: &ObjectInstan
 }
 
 /// `host_of`, of `tops` (in id order).
-pub(crate) fn host_among(
+pub(super) fn host_among(
     content: &Content,
     mut tops: impl Iterator<Item = Top>,
     obj: &ObjectInstance,

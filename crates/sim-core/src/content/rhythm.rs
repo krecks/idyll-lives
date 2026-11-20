@@ -1,6 +1,4 @@
-//! [(1466, 1575)]
-//!
-//! Split from `content.rs` (see `mod.rs`).
+//! The day's rhythm: sleep and waking, babies waking, work breaks and habits.
 
 use super::*;
 

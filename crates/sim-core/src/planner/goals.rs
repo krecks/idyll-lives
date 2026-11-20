@@ -1,6 +1,4 @@
 //! Goals: progress, reviewing, suggesting and the object they ask for.
-//!
-//! Split from `planner.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -93,7 +91,7 @@ pub fn goal_skills(content: &Content, sim: &Sim, g: &Goal) -> Vec<(usize, f32)> 
     out
 }
 
-pub(crate) fn check_goals(w: &mut World, i: usize) {
+pub(super) fn check_goals(w: &mut World, i: usize) {
     let tick = w.tick;
     // Ideas that came true meanwhile just go.
     let mut k = 0;
@@ -143,7 +141,7 @@ pub(crate) fn check_goals(w: &mut World, i: usize) {
 
 /// Once a day: progress history, and maybe a new goal suggested from their traits (the
 /// neighbours, who have no player, take theirs on straight away).
-pub(crate) fn review_goals(w: &mut World, i: usize, day: u32) {
+pub(super) fn review_goals(w: &mut World, i: usize, day: u32) {
     for k in 0..w.sims[i].planner.goals.len() {
         let g = w.sims[i].planner.goals[k];
         let p = progress(w, i, &g);

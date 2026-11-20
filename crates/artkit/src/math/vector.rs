@@ -1,8 +1,7 @@
 //! Points and vectors: `P3` and `V3`.
-//!
-//! Split from `crates/artkit/src/math.rs` (see `mod.rs`).
 
 use super::*;
+use std::ops::{Add, AddAssign, Div, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign};
 
 /// A point or a size as a script wrote it, a tuple of three Python floats: `at=(0.1, 0, 2.5)`.
 #[derive(Clone, Copy, PartialEq, Debug, Default)]

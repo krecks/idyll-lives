@@ -1,8 +1,9 @@
 //! What a tick reads of a Sim: their queue, the hour, their interests and training.
-//!
-//! Split from `world/tick.rs` (see `mod.rs`).
 
-use super::*;
+use crate::content::{Content, MAX_SKILLS};
+use crate::social;
+use crate::world::{Ctx, MAX_QUEUE, Sim, Task, TaskKind, leave_today};
+use std::collections::VecDeque;
 
 /// Keeps a queue within `MAX_QUEUE` by dropping what was chosen for them from the back, but
 /// never the first `keep` tasks (just put there), the player's orders, nor a recipe whose

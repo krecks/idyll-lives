@@ -1,6 +1,4 @@
 //! The building blocks the things are made with: loops and one-shots, strikes, motors, noise, and putting a stereo sound together.
-//!
-//! Split from `things.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -8,14 +6,14 @@ use super::*;
 
 /// The average level of the loops of separate knocks (darts, a rally): set by their average rather than
 /// their peak, as their knocks are short; the sharpest are rounded off a little (\`set_level\`).
-pub(crate) const SPARSE: f64 = 0.046;
+pub(super) const SPARSE: f64 = 0.046;
 
 /// A mode: its frequency (Hz), the time it takes to die to a third (s) and its level.
 type Mode = [f64; 3];
 
 /// A short burst of noise in a band (its centre in Hz, its Q), dying away over \`tau\` seconds, at \`amp\`.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Burst {
+pub(super) struct Burst {
     hz: f64,
     q: f64,
     tau: f64,
@@ -23,17 +21,17 @@ pub(crate) struct Burst {
 }
 
 /// A burst (\`{ hz, q, tau, amp }\`).
-pub(crate) fn burst(hz: f64, q: f64, tau: f64, amp: f64) -> Burst {
+pub(super) fn burst(hz: f64, q: f64, tau: f64, amp: f64) -> Burst {
     Burst { hz, q, tau, amp }
 }
 
 /// A track of events: its two channels, its rate, and whether its events wrap round its end into its start
 /// (a loop of events, \`looped\`) or are cut off there (a sound played once, \`once\`). No overlap.
-pub(crate) struct Ev {
-    pub(crate) left: Vec<f32>,
-    pub(crate) right: Vec<f32>,
-    pub(crate) rate: f64,
-    pub(crate) wraps: bool,
+pub(super) struct Ev {
+    pub(super) left: Vec<f32>,
+    pub(super) right: Vec<f32>,
+    pub(super) rate: f64,
+    pub(super) wraps: bool,
 }
 
 impl From<Ev> for Stereo {
@@ -47,7 +45,7 @@ impl From<Ev> for Stereo {
 
 /// A track whose events wrap round its end into its start (a loop of events, no overlap; the TypeScript's
 /// \`loop\`).
-pub(crate) fn looped(rate: f64, seconds: f64) -> Ev {
+pub(super) fn looped(rate: f64, seconds: f64) -> Ev {
     let t = track(rate, seconds, 0.0);
     Ev {
         left: t.left,
@@ -58,7 +56,7 @@ pub(crate) fn looped(rate: f64, seconds: f64) -> Ev {
 }
 
 /// A track for a sound played once: nothing wraps.
-pub(crate) fn once(rate: f64, seconds: f64) -> Ev {
+pub(super) fn once(rate: f64, seconds: f64) -> Ev {
     let t = track(rate, seconds, 0.0);
     Ev {
         left: t.left,
@@ -71,7 +69,7 @@ pub(crate) fn once(rate: f64, seconds: f64) -> Ev {
 /// Adds \`v\` at sample \`i\`, left and right at \`l\` and \`r\`; past the end or before the start it wraps on a
 /// loop of events (an event set a hair before the loop's start rings on from its end, so the seam is whole),
 /// else it's dropped.
-pub(crate) fn put(t: &mut Ev, i: f64, v: f64, l: f64, r: f64) {
+pub(super) fn put(t: &mut Ev, i: f64, v: f64, l: f64, r: f64) {
     let n = t.left.len();
     if !t.wraps && (i < 0.0 || i >= n as f64) {
         return;
@@ -82,7 +80,7 @@ pub(crate) fn put(t: &mut Ev, i: f64, v: f64, l: f64, r: f64) {
 }
 
 /// Something struck: its modes ringing out over a burst of noise, from \`at\` (s), at \`amp\`, placed at \`pan\`.
-pub(crate) fn strike(t: &mut Ev, at: f64, amp: f64, pan: f64, modes: &[Mode], burst: Burst) {
+pub(super) fn strike(t: &mut Ev, at: f64, amp: f64, pan: f64, modes: &[Mode], burst: Burst) {
     let rate = t.rate;
     let start = js_round(at * rate);
     let longest = modes.iter().fold(burst.tau, |a, m| max(a, m[1]));
@@ -118,7 +116,7 @@ pub(crate) fn strike(t: &mut Ev, at: f64, amp: f64, pan: f64, modes: &[Mode], bu
 /// A rustle or a rub: noise in a band (\`hz\`, \`q\`; the TypeScript's defaults 4000 and 0.5), swelling and
 /// fading over \`seconds\`.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn rustle(
+pub(super) fn rustle(
     t: &mut Ev,
     r: &mut Rng,
     at: f64,
@@ -143,7 +141,7 @@ pub(crate) fn rustle(
 }
 
 /// A rush of air (a door swung): low noise swelling and fading.
-pub(crate) fn swish(t: &mut Ev, r: &mut Rng, at: f64, seconds: f64, amp: f64, hz: f64) {
+pub(super) fn swish(t: &mut Ev, r: &mut Rng, at: f64, seconds: f64, amp: f64, hz: f64) {
     let rate = t.rate;
     let start = js_round(at * rate);
     let len = js_round(seconds * rate);
@@ -158,7 +156,7 @@ pub(crate) fn swish(t: &mut Ev, r: &mut Rng, at: f64, seconds: f64, amp: f64, hz
 
 /// A motor's (or a fan's) tone: harmonics at \`partials\` levels (the fundamental first) of a speed \`hz(i)\`
 /// (Hz at sample \`i\`).
-pub(crate) fn motor(n: usize, rate: f64, hz: impl Fn(usize) -> f64, partials: &[f64]) -> Vec<f32> {
+pub(super) fn motor(n: usize, rate: f64, hz: impl Fn(usize) -> f64, partials: &[f64]) -> Vec<f32> {
     let mut d = vec![0.0f32; n];
     let mut phase = 0.0;
     for (i, o) in d.iter_mut().enumerate() {
@@ -178,7 +176,7 @@ pub(crate) fn motor(n: usize, rate: f64, hz: impl Fn(usize) -> f64, partials: &[
 }
 
 /// Pink noise through a filter: a rush, a hiss or a rumble.
-pub(crate) fn noise(n: usize, rate: f64, r: &mut Rng, kind: Filter, hz: f64, q: f64) -> Vec<f32> {
+pub(super) fn noise(n: usize, rate: f64, r: &mut Rng, kind: Filter, hz: f64, q: f64) -> Vec<f32> {
     let mut p = Pink::new();
     let mut f = Biquad::with(rate, kind, hz, q);
     (0..n).map(|_| f.run(p.next(r)) as f32).collect()
@@ -190,7 +188,7 @@ pub(crate) fn noise(n: usize, rate: f64, r: &mut Rng, kind: Filter, hz: f64, q: 
 /// with 0 to a peak of \`peak\`. A loop's filters and room are already ringing at its start, as they were at
 /// its end (\`done_once\` for a sound played once, which starts from silence).
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn done(
+pub(super) fn done(
     rate: f64,
     parts: Vec<Stereo>,
     rms: f64,
@@ -205,7 +203,7 @@ pub(crate) fn done(
 
 /// \`done\` for a sound played once: its filters and room start from silence.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn done_once(
+pub(super) fn done_once(
     rate: f64,
     parts: Vec<Stereo>,
     rms: f64,
@@ -220,7 +218,7 @@ pub(crate) fn done_once(
 
 /// \`done\`'s work; \`lead\`: a loop, its filters and room run over a second of its end before its start.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn put_together(
+pub(super) fn put_together(
     rate: f64,
     parts: Vec<Stereo>,
     rms: f64,

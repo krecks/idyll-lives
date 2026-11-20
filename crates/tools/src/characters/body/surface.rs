@@ -1,6 +1,4 @@
 //! The surface of a body: its positions, normals and indices, cached.
-//!
-//! Split from `characters/body.rs` (see `mod.rs`).
 
 use super::*;
 

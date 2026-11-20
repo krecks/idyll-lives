@@ -1,6 +1,4 @@
 //! Economy, schedule and visit shapes (content `economy`, `schedule`, `visits`).
-//!
-//! Split from `content/parse.rs` (see `mod.rs`).
 
 use super::*;
 

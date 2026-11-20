@@ -1,16 +1,14 @@
-//! [(2937, 3123)]
-//!
-//! Split from `view.rs` (see `mod.rs`).
+//! The catalog view: grades, careers, the workweek, and the object and build rules.
 
 use super::*;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct CatalogView<'a> {
+pub(super) struct CatalogView<'a> {
     pub(crate) grades: Vec<GradeView<'a>>,
     pub categories: Vec<&'a str>,
     pub(crate) careers: Vec<CareerView<'a>>,
-    pub(crate) workweek: Vec<WorkweekView<'a>>,
+    pub(super) workweek: Vec<WorkweekView<'a>>,
     pub probation_levels: f32,
     pub max_skill: f32,
     pub(crate) object_rules: ObjectRulesView,
@@ -19,7 +17,7 @@ pub(crate) struct CatalogView<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct GradeView<'a> {
+pub(super) struct GradeView<'a> {
     pub id: &'a str,
     pub label: &'a str,
     pub pay_per_hour: f32,
@@ -27,7 +25,7 @@ pub(crate) struct GradeView<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct CareerView<'a> {
+pub(super) struct CareerView<'a> {
     pub id: &'a str,
     pub label: &'a str,
     /// Category id.
@@ -39,7 +37,7 @@ pub(crate) struct CareerView<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct LevelView<'a> {
+pub(super) struct LevelView<'a> {
     pub title: &'a str,
     pub grade: Option<&'a str>,
     pub pay: i64,
@@ -51,7 +49,7 @@ pub(crate) struct LevelView<'a> {
 }
 
 #[derive(Serialize)]
-pub(crate) struct WorkweekView<'a> {
+pub(super) struct WorkweekView<'a> {
     pub fit: f32,
     pub days: i8,
     pub label: &'a str,
@@ -59,7 +57,7 @@ pub(crate) struct WorkweekView<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ObjectRulesView {
+pub(super) struct ObjectRulesView {
     pub max_quality: u8,
     pub quality_bonus: f32,
     pub upgrade_cost: f32,
@@ -68,7 +66,7 @@ pub(crate) struct ObjectRulesView {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct BuildView {
+pub(super) struct BuildView {
     pub wall: i64,
     pub door: i64,
     pub window: i64,
@@ -177,7 +175,7 @@ pub fn catalog_json(content: &Content) -> String {
     .expect("catalog serializes")
 }
 
-pub(crate) fn is_level(tall: &i16) -> bool {
+pub(super) fn is_level(tall: &i16) -> bool {
     *tall == 0
 }
 

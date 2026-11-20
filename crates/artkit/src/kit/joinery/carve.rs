@@ -1,12 +1,13 @@
 //! Carving a hole out of a face.
-//!
-//! Split from `kit/joinery.rs` (see `mod.rs`).
 
 use super::*;
+use crate::math::V3;
+use crate::mesh::{Mesh, edge, normal_newell};
+use std::collections::BTreeMap;
 
 /// What a recess leaves of a body: `tool` (its points `pts` in the body's frame) pushed in along axis `k` from
 /// the side `side` (-1: from below, +1: from above).
-pub(crate) fn carve(
+pub(super) fn carve(
     body: &Mesh,
     tool: &Mesh,
     pts: &[V3],

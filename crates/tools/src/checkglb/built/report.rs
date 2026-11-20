@@ -1,6 +1,4 @@
 //! The report and the command line.
-//!
-//! Split from `built.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -206,7 +204,7 @@ pub(crate) fn report(r: &Report) -> String {
     text
 }
 
-pub(crate) const USAGE: &str = "usage: cargo check-glb --built <dir> [sample keys…] [--report] [--update-baseline] [--seed-baseline] (the dir `bun tools/built/dump.ts <dir>` wrote)";
+pub(super) const USAGE: &str = "usage: cargo check-glb --built <dir> [sample keys…] [--report] [--update-baseline] [--seed-baseline] (the dir `bun tools/built/dump.ts <dir>` wrote)";
 
 /// `cargo check-glb --built <dir> …`: the exit code.
 pub(crate) fn main(args: &[String]) -> i32 {

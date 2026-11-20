@@ -1,10 +1,8 @@
 //! The JSON a model is written as.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
 use super::*;
 
-pub(crate) fn material_json(m: &Material) -> String {
+pub(super) fn material_json(m: &Material) -> String {
     let mut pbr = Vec::new();
     if m.base[..3] != [1.0, 1.0, 1.0] {
         pbr.push(format!("\"baseColorFactor\":{}", nums(&m.base)));
@@ -32,7 +30,7 @@ pub(crate) fn material_json(m: &Material) -> String {
     out
 }
 
-pub(crate) fn primitive_json(file: &mut File, p: &Primitive) -> String {
+pub(super) fn primitive_json(file: &mut File, p: &Primitive) -> String {
     let flat = |v: &[[f32; 3]]| -> Vec<f32> { v.iter().flatten().copied().collect() };
     let mut attributes = Vec::new();
     attributes.push(format!(
@@ -98,7 +96,7 @@ pub(crate) fn primitive_json(file: &mut File, p: &Primitive) -> String {
     )
 }
 
-pub(crate) fn node_json(n: &Node) -> String {
+pub(super) fn node_json(n: &Node) -> String {
     let mut node = Vec::new();
     if !n.children.is_empty() {
         let kids: Vec<String> = n.children.iter().map(|k| k.to_string()).collect();

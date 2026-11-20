@@ -1,12 +1,13 @@
-//! [(1522, 1631), (1680, 1903), (1908, 2334), (2335, 2660)]
-//!
-//! Split from `view.rs` (see `mod.rs`).
+//! The town's view: trips and rides, structures and junctions, cars, walls, objects and plots.
 
 use super::*;
 
+mod json;
+pub use json::*;
+
 /// On their way somewhere (`SimView.trip`): to which plot, and about when they're there.
 #[derive(Serialize)]
-pub(crate) struct TripView {
+pub(super) struct TripView {
     pub to: u32,
     /// Minute of day, in steps of `TRIP_STEP` (it's an estimate: and the UI isn't sent a new one
     /// every few ticks as they go). None: not worked out (`trip_view`'s `timed`).
@@ -25,7 +26,7 @@ const TRIP_STEP: f32 = 5.0;
 /// `timed` false: a visit or the way home without the time, which takes a search along the roads
 /// (the UI updates ten times a second: that's for the residents whose details are shown; the
 /// town map says where the others are off to). The car home from work has its time either way.
-pub(crate) fn trip_view(world: &World, s: &Sim, riders: &[u32], timed: bool) -> Option<TripView> {
+pub(super) fn trip_view(world: &World, s: &Sim, riders: &[u32], timed: bool) -> Option<TripView> {
     let home = world.households.get(s.household as usize)?.plot;
     let step = |tick: u64| {
         let m = (clock::minute_of_day(tick) / TRIP_STEP).round() * TRIP_STEP;
@@ -73,7 +74,7 @@ pub(crate) fn trip_view(world: &World, s: &Sim, riders: &[u32], timed: bool) -> 
 /// On a bike or an e-scooter of theirs (`SimView.ride`, `ride.rs`): what it is, and whether they're
 /// off to work, to school, out (a visit or an outing) or home on it.
 #[derive(Serialize)]
-pub(crate) struct RideView {
+pub(super) struct RideView {
     pub kind: crate::content::VehicleKind,
     pub to: &'static str,
 }
@@ -82,13 +83,13 @@ pub(crate) struct RideView {
 /// `at` the minute of the day they're there) or `home` (on their way home in it, or waiting for it
 /// at work: `at` about when they're back).
 #[derive(Serialize)]
-pub(crate) struct TaxiView {
+pub(super) struct TaxiView {
     pub state: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub at: Option<f32>,
 }
 
-pub(crate) fn taxi_view(world: &World, s: &Sim) -> Option<TaxiView> {
+pub(super) fn taxi_view(world: &World, s: &Sim) -> Option<TaxiView> {
     let (state, at) = crate::taxi::status(world, s)?;
     Some(TaxiView {
         state,
@@ -97,7 +98,7 @@ pub(crate) fn taxi_view(world: &World, s: &Sim) -> Option<TaxiView> {
 }
 
 /// What resident `s` rides now, on their way (not while away at work with it).
-pub(crate) fn ride_view(world: &World, s: &Sim) -> Option<RideView> {
+pub(super) fn ride_view(world: &World, s: &Sim) -> Option<RideView> {
     let bike = world.objects.get(s.riding? as usize)?;
     let kind = world.content.objects[bike.def].vehicle?.kind;
     if s.away_until.is_some() {
@@ -118,7 +119,7 @@ pub(crate) fn ride_view(world: &World, s: &Sim) -> Option<RideView> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct StructureView<'a> {
+pub(super) struct StructureView<'a> {
     pub version: u32,
     /// `World::lot_version`: the lot parts below are left out when the caller already has them.
     pub lot_version: u32,
@@ -139,35 +140,35 @@ pub(crate) struct StructureView<'a> {
     /// Names of former residents (story events name them with `social::FORMER`).
     #[serde(skip_serializing_if = "<[_]>::is_empty")]
     pub former: &'a [crate::world::Former],
-    pub(crate) households: Vec<HouseholdView<'a>>,
-    pub(crate) plots: Vec<PlotView<'a>>,
+    pub(super) households: Vec<HouseholdView<'a>>,
+    pub(super) plots: Vec<PlotView<'a>>,
     pub exits: &'a [[f32; 2]],
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rooms: Option<Vec<u16>>,
     /// Every edge with a wall on it (plain walls, and walls with a door or window).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) walls: Option<Vec<EdgeView>>,
+    pub(super) walls: Option<Vec<EdgeView>>,
     /// Doors and windows (also listed in `walls`).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) openings: Option<Vec<OpeningView>>,
+    pub(super) openings: Option<Vec<OpeningView>>,
     /// Diagonal walls (with or without a door or window), one per tile at most.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) diagonals: Option<Vec<DiagonalView>>,
+    pub(super) diagonals: Option<Vec<DiagonalView>>,
     /// Fences and gates (not walls: they make no rooms).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) fences: Option<Vec<FenceView>>,
+    pub(super) fences: Option<Vec<FenceView>>,
     /// Floor coverings: `[x, z, covering]` per tile that has one (a floor covering + 1).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub floors: Option<Vec<[u16; 3]>>,
     pub meta: &'a serde_json::Value,
     /// The town's servers (`staff.rs`), in their snapshot rows' order (after the residents').
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub(crate) staff: Vec<StaffView>,
+    pub(super) staff: Vec<StaffView>,
     /// Households' cars (`cars.rs`), in their snapshot rows' order (`snapshot::car`). Left out
     /// only for a game saved before cars, which has no driveways either (the renderer parks its
     /// own by the neighbours' driveways); a town where nobody has one sends none.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) cars: Option<Vec<CarView>>,
+    pub(super) cars: Option<Vec<CarView>>,
     /// Garages at the inner ends of driveways (`cars::Garage`); left out when there are none.
     #[serde(skip_serializing_if = "<[_]>::is_empty")]
     pub garages: &'a [crate::cars::Garage],
@@ -180,7 +181,7 @@ pub(crate) struct StructureView<'a> {
     /// The streets where the kerbside furniture keeps back for cars to pass pulled over
     /// (`cars::pull_over_streets`); left out when there are none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub(crate) pull_over_streets: Vec<PullOverStreetView>,
+    pub(super) pull_over_streets: Vec<PullOverStreetView>,
     /// Where the traffic lights' poles stand and which way their heads face (`traffic::SignalArm`:
     /// x, z and yaw, in their snapshot rows' order): the kerbside furniture keeps clear of them;
     /// left out when there are none.
@@ -192,7 +193,7 @@ pub(crate) struct StructureView<'a> {
     /// ones first, in their heads' rows' order, then those giving way (no rows); left out when
     /// there are none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub(crate) junctions: Vec<JunctionView>,
+    pub(super) junctions: Vec<JunctionView>,
     /// Public parking: every marked bay, where a car parked in it stands and faces (`parking_views`);
     /// left out when there are none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -208,12 +209,12 @@ pub(crate) struct StructureView<'a> {
 /// A junction (`StructureView::junctions`, `traffic::Signal`): its middle (m), on a roundabout's
 /// ring (`roundabout`: the renderer leaves its pad and markings out), and its arms.
 #[derive(Serialize)]
-pub(crate) struct JunctionView {
+pub(super) struct JunctionView {
     pub x: f32,
     pub z: f32,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub roundabout: bool,
-    pub(crate) arms: Vec<JunctionArmView>,
+    pub(super) arms: Vec<JunctionArmView>,
 }
 
 /// A junction's arm (`traffic::SignalArm`): its road (`meta.roads` index), the way out along it
@@ -224,7 +225,7 @@ pub(crate) struct JunctionView {
 /// (`snapshot::light`; none: not lit).
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct JunctionArmView {
+pub(super) struct JunctionArmView {
     pub road: u32,
     pub dir: [f32; 2],
     pub width: f32,
@@ -237,7 +238,7 @@ pub(crate) struct JunctionArmView {
 
 /// `StructureView::junctions`: the lit junctions in their heads' rows' order, then those giving
 /// way.
-pub(crate) fn junction_views(world: &World) -> Vec<JunctionView> {
+pub(super) fn junction_views(world: &World) -> Vec<JunctionView> {
     let g = &world.travel.graph;
     let mut head = 0u32;
     world
@@ -273,7 +274,7 @@ pub(crate) fn junction_views(world: &World) -> Vec<JunctionView> {
 }
 
 /// `StructureView::light_poles`.
-pub(crate) fn light_pole_views(world: &World) -> Vec<[f32; 3]> {
+pub(super) fn light_pole_views(world: &World) -> Vec<[f32; 3]> {
     world
         .travel
         .signals
@@ -287,13 +288,13 @@ pub(crate) fn light_pole_views(world: &World) -> Vec<[f32; 3]> {
 /// (`meta.roads` index) and how far in from its edges its kerbside furniture may reach (m,
 /// `cars::kerbside`).
 #[derive(Serialize)]
-pub(crate) struct PullOverStreetView {
+pub(super) struct PullOverStreetView {
     pub road: u32,
     pub keep: f32,
 }
 
 /// `StructureView::pull_over_streets`.
-pub(crate) fn pull_over_street_views(world: &World) -> Vec<PullOverStreetView> {
+pub(super) fn pull_over_street_views(world: &World) -> Vec<PullOverStreetView> {
     crate::cars::pull_over_streets(&world.travel)
         .into_iter()
         .map(|(road, keep)| PullOverStreetView { road, keep })
@@ -302,7 +303,7 @@ pub(crate) fn pull_over_street_views(world: &World) -> Vec<PullOverStreetView> {
 
 /// A household's car: where it's parked (its middle, its yaw) and its look.
 #[derive(Serialize)]
-pub(crate) struct CarView {
+pub(super) struct CarView {
     pub plot: u32,
     pub x: f32,
     pub z: f32,
@@ -316,7 +317,7 @@ pub(crate) struct CarView {
 /// One of the town's servers: what they look like (`seed`, the renderer makes the look) and the
 /// posts they serve at (stable object ids).
 #[derive(Serialize)]
-pub(crate) struct StaffView {
+pub(super) struct StaffView {
     pub seed: u32,
     pub posts: Vec<u32>,
 }
@@ -325,20 +326,20 @@ pub(crate) struct StaffView {
 /// (`\`) from `(x, z + 1)` to `(x + 1, z)`. `rooms` are the rooms of the tile's two halves:
 /// half 0 touches the tile's `-z` side, half 1 its `+z` side.
 #[derive(Serialize)]
-pub(crate) struct DiagonalView {
+pub(super) struct DiagonalView {
     pub x: usize,
     pub z: usize,
     pub axis: &'static str,
     pub kind: &'static str,
     pub rooms: [u16; 2],
     #[serde(flatten)]
-    pub(crate) look: LookView,
+    pub(super) look: LookView,
 }
 
 /// A wall's look, when it isn't the default: face coverings (0 = automatic, else wall covering
 /// + 1; face 0 towards `-z` / `-x` / half 0), `form` 1 for a half wall, door or window `style`.
 #[derive(Serialize, Default)]
-pub(crate) struct LookView {
+pub(super) struct LookView {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub faces: Option<[u8; 2]>,
     #[serde(skip_serializing_if = "is_zero")]
@@ -365,7 +366,7 @@ impl LookView {
     }
 }
 
-pub(crate) fn diagonals(
+pub(super) fn diagonals(
     lot: &crate::lot::Lot,
     list: impl Iterator<Item = (usize, usize, crate::lot::Diagonal)>,
 ) -> Vec<DiagonalView> {
@@ -389,7 +390,7 @@ pub(crate) fn diagonals(
 
 /// A wall edge: `h` runs from `(x, z)` to `(x + 1, z)`, `v` from `(x, z)` to `(x, z + 1)`.
 #[derive(Serialize)]
-pub(crate) struct EdgeView {
+pub(super) struct EdgeView {
     pub axis: &'static str,
     pub x: usize,
     pub z: usize,
@@ -401,7 +402,7 @@ pub(crate) struct EdgeView {
 }
 
 #[derive(Serialize)]
-pub(crate) struct OpeningView {
+pub(super) struct OpeningView {
     pub axis: &'static str,
     pub x: usize,
     pub z: usize,
@@ -417,7 +418,7 @@ pub(crate) struct OpeningView {
 
 /// A fence or gate on edge `axis` `(x, z)` (as walls), in a fence style.
 #[derive(Serialize)]
-pub(crate) struct FenceView {
+pub(super) struct FenceView {
     pub axis: &'static str,
     pub x: usize,
     pub z: usize,
@@ -428,7 +429,7 @@ pub(crate) struct FenceView {
 
 /// Wall edges, openings (doors, windows) and fences among `list` (`Lot::walls` for the whole
 /// lot, in grid order).
-pub(crate) fn wall_edges(
+pub(super) fn wall_edges(
     lot: &crate::lot::Lot,
     list: impl Iterator<Item = (crate::lot::EdgeRef, Edge)>,
 ) -> (Vec<EdgeView>, Vec<OpeningView>, Vec<FenceView>) {
@@ -491,7 +492,7 @@ pub(crate) fn wall_edges(
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ObjectView<'a> {
+pub(super) struct ObjectView<'a> {
     pub id: u32,
     pub def: &'a str,
     pub x: i32,
@@ -539,7 +540,7 @@ pub(crate) struct ObjectView<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct SimInfo<'a> {
+pub(super) struct SimInfo<'a> {
     pub id: u32,
     pub name: &'a str,
     pub household: u32,
@@ -568,7 +569,7 @@ fn is_zero_u32(n: &u32) -> bool {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct HouseholdView<'a> {
+pub(super) struct HouseholdView<'a> {
     pub id: u32,
     pub name: &'a str,
     pub plot: Option<u32>,
@@ -577,7 +578,7 @@ pub(crate) struct HouseholdView<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct PlotView<'a> {
+pub(super) struct PlotView<'a> {
     pub id: u32,
     pub name: &'a str,
     pub x: i32,
@@ -606,7 +607,7 @@ pub(crate) struct PlotView<'a> {
 /// its building's lot, its storey, its rectangle on the ground's rows, its name, and the landing
 /// tile before its door, on its storey's rows.
 #[derive(Serialize)]
-pub(crate) struct FlatView<'a> {
+pub(super) struct FlatView<'a> {
     id: u32,
     of: u32,
     storey: i8,
@@ -619,7 +620,7 @@ pub(crate) struct FlatView<'a> {
 }
 
 /// `StructureView::flats`: every flat, in id order.
-pub(crate) fn flat_views(world: &World) -> Vec<FlatView<'_>> {
+pub(super) fn flat_views(world: &World) -> Vec<FlatView<'_>> {
     world
         .flats()
         .iter()
@@ -642,7 +643,7 @@ pub(crate) fn flat_views(world: &World) -> Vec<FlatView<'_>> {
 /// A marked parking bay (`StructureView::parking`, `travel::Parking`): where a car parked in it
 /// stands and faces (the pose `Travel::parked` holds, the one cars park at), its area and car park.
 #[derive(Serialize)]
-pub(crate) struct ParkingView {
+pub(super) struct ParkingView {
     x: f32,
     z: f32,
     yaw: f32,
@@ -652,7 +653,7 @@ pub(crate) struct ParkingView {
 }
 
 /// `StructureView::parking`: every bay a car may park at, in the town file's order.
-pub(crate) fn parking_views(world: &World) -> Vec<ParkingView> {
+pub(super) fn parking_views(world: &World) -> Vec<ParkingView> {
     let travel = &world.travel;
     travel
         .file
@@ -711,11 +712,11 @@ pub(crate) fn house_bounds(world: &World, x0: i32, z0: i32, x1: i32, z1: i32) ->
 }
 
 /// Per object, the height of the top it stands on (`surface_lifts`).
-pub(crate) type Lifts = Vec<Option<f32>>;
+pub(super) type Lifts = Vec<Option<f32>>;
 
 /// Per object, the height of the top it stands on (things on the `surface` layer; None for the
 /// rest, or on a top at floor level).
-pub(crate) fn surface_lifts(world: &World) -> Lifts {
+pub(super) fn surface_lifts(world: &World) -> Lifts {
     let content = &world.content;
     let on_top = |o: &crate::world::ObjectInstance| {
         content.objects[o.def].layer == crate::content::Layer::Surface
@@ -762,7 +763,7 @@ pub(crate) fn surface_lifts(world: &World) -> Lifts {
 }
 
 /// An object as views send it.
-pub(crate) fn object_view<'a>(
+pub(super) fn object_view<'a>(
     world: &'a World,
     lifts: &[Option<f32>],
     o: &'a crate::world::ObjectInstance,
@@ -800,15 +801,12 @@ pub(crate) fn object_view<'a>(
     }
 }
 
-mod json;
-pub use json::*;
-
 /// `StructureView::basement`.
-pub(crate) fn basement_block(world: &World) -> Option<i32> {
+pub(super) fn basement_block(world: &World) -> Option<i32> {
     (world.stair_map().basement > 0).then_some(world.stair_map().basement)
 }
 
-pub(crate) fn sim_infos(world: &World) -> Vec<SimInfo<'_>> {
+pub(super) fn sim_infos(world: &World) -> Vec<SimInfo<'_>> {
     let content = &world.content;
     world
         .sims
@@ -834,7 +832,7 @@ pub(crate) fn sim_infos(world: &World) -> Vec<SimInfo<'_>> {
         .collect()
 }
 
-pub(crate) fn household_views(world: &World) -> Vec<HouseholdView<'_>> {
+pub(super) fn household_views(world: &World) -> Vec<HouseholdView<'_>> {
     world
         .households
         .iter()
@@ -848,7 +846,7 @@ pub(crate) fn household_views(world: &World) -> Vec<HouseholdView<'_>> {
 }
 
 /// `StructureView::plots`: the lots on the ground, in id order (flats go in `flats`).
-pub(crate) fn plot_views(world: &World) -> Vec<PlotView<'_>> {
+pub(super) fn plot_views(world: &World) -> Vec<PlotView<'_>> {
     world
         .lots()
         .iter()
@@ -876,7 +874,7 @@ pub(crate) fn plot_views(world: &World) -> Vec<PlotView<'_>> {
         .collect()
 }
 
-pub(crate) fn floor_views(world: &World) -> Vec<[u16; 3]> {
+pub(super) fn floor_views(world: &World) -> Vec<[u16; 3]> {
     world
         .lot
         .floors()
@@ -884,7 +882,7 @@ pub(crate) fn floor_views(world: &World) -> Vec<[u16; 3]> {
         .collect()
 }
 
-pub(crate) fn staff_views(world: &World) -> Vec<StaffView> {
+pub(super) fn staff_views(world: &World) -> Vec<StaffView> {
     crate::staff::current(world)
         .servers
         .iter()
@@ -901,7 +899,7 @@ pub(crate) fn staff_views(world: &World) -> Vec<StaffView> {
 }
 
 /// `StructureView::cars`.
-pub(crate) fn car_views(world: &World) -> Option<Vec<CarView>> {
+pub(super) fn car_views(world: &World) -> Option<Vec<CarView>> {
     (!world.cars.is_empty() || !world.drives.is_empty()).then(|| {
         world
             .cars
@@ -921,6 +919,6 @@ pub(crate) fn car_views(world: &World) -> Option<Vec<CarView>> {
     })
 }
 
-pub(crate) fn is_zero(n: &u8) -> bool {
+pub(super) fn is_zero(n: &u8) -> bool {
     *n == 0
 }

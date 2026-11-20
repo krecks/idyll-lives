@@ -143,7 +143,7 @@ pub struct Taxis {
     early: Vec<(u32, u32)>,
     /// Each house's stand with no other taxi about (`stop_for`), kept once found. Not saved.
     #[serde(skip)]
-    pub(crate) kerbs: Kerbs,
+    kerbs: Kerbs,
 }
 
 mod jams;
@@ -158,10 +158,10 @@ mod routes;
 mod runs;
 mod way;
 
-pub(crate) use jams::*;
+use jams::*;
 pub(crate) use kerbs::*;
 pub(crate) use leisure::*;
 pub use plan::*;
 pub(crate) use routes::*;
 pub use runs::*;
-pub(crate) use way::*;
+use way::*;

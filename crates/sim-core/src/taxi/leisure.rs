@@ -1,6 +1,4 @@
 //! Out for leisure: booking, timing and bringing riders back.
-//!
-//! Split from `taxi.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -10,7 +8,7 @@ use super::*;
 /// traffic's clock (`crate::DRIVE_SCALE`) a taxi beats any walk out of reach, and with no such
 /// limit a big world's evening had some 20 out at once and 150 runs a day where 5 to 20 ran
 /// before, jammed solid round a junction in view (seed base 16: Sand Quay, Eaglescar).
-pub(crate) const LEISURE_FLEET: usize = 6;
+pub(super) const LEISURE_FLEET: usize = 6;
 
 /// About how many minutes a taxi would take `sim` from `from` to `plot` on a visit or an outing
 /// (`world::leisure_way`, after the household's car and a bike of theirs, before walking), a way
@@ -339,7 +337,7 @@ pub(crate) fn waiting_out(taxis: &Taxis, sim: &crate::world::Sim) -> bool {
 /// Those booked on a leisure run whose time to go out to their kerb has come: off they go, there
 /// (their visit or outing, `world`'s way there: to the kerb, `kerb_for`) or home from the place,
 /// their stay over (the taxi back comes when the first of those sharing it is done, `book_back`).
-pub(crate) fn leisure_leaving(w: &mut World) {
+pub(super) fn leisure_leaving(w: &mut World) {
     let tick = w.tick;
     let mut go: Vec<(usize, u32, bool, bool)> = Vec::new();
     for r in &w.taxis.runs {
@@ -412,7 +410,7 @@ pub(crate) fn leisure_leaving(w: &mut World) {
 /// and more, a visit to a house with nobody in). Off that run (still to come into town) and
 /// booked on one for now, shared as ever (`book_back`), if it's sooner; else as they were. Once
 /// for each run they're on (`Taxis::early`).
-pub(crate) fn bring_backs_forward(w: &mut World) {
+pub(super) fn bring_backs_forward(w: &mut World) {
     let tick = w.tick;
     let mut early: Vec<(usize, u32)> = Vec::new();
     for r in &w.taxis.runs {
@@ -502,7 +500,7 @@ pub(crate) fn bring_backs_forward(w: &mut World) {
 /// Those put down at a place by a leisure taxi (`alight_at`), there now on their visit or outing:
 /// a taxi back home booked for when it ends (`crate::world::Visit::until`), shared with others
 /// there going home about then.
-pub(crate) fn book_backs(w: &mut World) {
+pub(super) fn book_backs(w: &mut World) {
     let mut k = 0;
     while k < w.taxis.out_at.len() {
         let (i, place) = w.taxis.out_at[k];
@@ -559,7 +557,7 @@ pub(crate) fn book_backs(w: &mut World) {
 /// Resident `i`, at `place` on a visit or an outing they came to by taxi, books one home for
 /// `due` (when the visit ends): with others there going home about then, else one of its own.
 /// False: none can come for them now.
-pub(crate) fn book_back(w: &mut World, i: usize, place: u32, due: u64) -> bool {
+pub(super) fn book_back(w: &mut World, i: usize, place: u32, due: u64) -> bool {
     let Some(home) = w
         .households
         .get(w.sims[i].household as usize)
@@ -619,7 +617,7 @@ fn kerb_walks(
 
 /// Resident `i` gets out of taxi `c` (seat `seat`) at `place`'s kerb and walks on in, a visit or
 /// an outing (`directed`: the player's), a taxi back booked once they're there (`book_backs`).
-pub(crate) fn alight_at(
+pub(super) fn alight_at(
     w: &mut World,
     i: usize,
     c: usize,
@@ -651,7 +649,7 @@ pub(crate) fn alight_at(
 }
 
 /// Riders in a leisure taxi sit in their seats as it drives (as in a household's car on a trip).
-pub(crate) fn seat_riders(w: &mut World) {
+pub(super) fn seat_riders(w: &mut World) {
     for r in w.taxis.runs.iter().filter(|r| r.place.is_some()) {
         let Some(c) = r.car else { continue };
         let car = &w.cars[c as usize];

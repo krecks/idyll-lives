@@ -1,8 +1,9 @@
 //! What a finished use changes, and what is done just before leaving for work.
-//!
-//! Split from `world/objects.rs` (see `mod.rs`).
 
 use super::*;
+use crate::content::{Content, HabitTime};
+use crate::social;
+use crate::world::{Ctx, ObjectInstance, Sim, Task, TaskKind};
 
 /// A use done that changed the object as the hands went (`Interaction::gradual`, a crop's
 /// `picks`): now it is so. The washing is out on the line (or in); the crop is picked, and lies

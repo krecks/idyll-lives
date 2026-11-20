@@ -1,6 +1,4 @@
 //! Affine matrices: composing them, and applying them to points and normals.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
 use super::*;
 

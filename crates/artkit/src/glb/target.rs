@@ -1,11 +1,9 @@
 //! What a model is written for, and how its animation is interpolated.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
 use super::*;
 
 impl Target {
-    pub(crate) fn name(self) -> &'static str {
+    pub(super) fn name(self) -> &'static str {
         match self {
             Target::Translation => "translation",
             Target::Rotation => "rotation",
@@ -29,7 +27,7 @@ pub enum Interpolation {
 }
 
 impl Interpolation {
-    pub(crate) fn name(self) -> &'static str {
+    pub(super) fn name(self) -> &'static str {
         match self {
             Interpolation::Linear => "LINEAR",
             Interpolation::Step => "STEP",

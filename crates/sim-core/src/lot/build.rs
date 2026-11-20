@@ -1,6 +1,4 @@
 //! Making a lot: empty, from a file, from edges, and growing it deeper.
-//!
-//! Split from `lot.rs` (see `mod.rs`).
 
 use super::*;
 

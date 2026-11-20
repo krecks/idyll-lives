@@ -1,6 +1,4 @@
 //! Who takes which car, where they sit, and how they board.
-//!
-//! Split from `cars.rs` (see `mod.rs`).
 
 use super::*;
 

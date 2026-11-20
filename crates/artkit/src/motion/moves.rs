@@ -1,6 +1,4 @@
 //! The moves a part can be given: swing, slide, squash, stages, grow, spin, scroll, rock, turns, path and wobble.
-//!
-//! Split from `motion.rs` (see `mod.rs`).
 
 use super::*;
 

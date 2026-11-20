@@ -1,8 +1,7 @@
 //! Inverting a matrix, and the products that need the reciprocal.
-//!
-//! Split from `crates/artkit/src/math.rs` (see `mod.rs`).
 
 use super::*;
+use std::ops::Mul;
 
 /// Blender's own inverse of an object's matrix (`invert_m4_m4`: Eigen's, for a 4 x 4 of singles): the matrix in
 /// four 2 x 2 blocks, their adjugates and determinants, every step in single precision in Eigen's order. What a

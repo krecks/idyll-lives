@@ -1,11 +1,13 @@
 //! The parts every bike shares: the bottom bracket, the spindle and the chain line.
-//!
-//! Split from `yard/rides.rs` (see `mod.rs`).
 
-use super::*;
+use crate::yard::common::{F, M};
+use crate::yard::play::Bike;
+use artkit::far::low;
+use artkit::fcyl;
+use artkit::parts::numbered;
 
 /// The bottom bracket's shell, across the frame where its tubes meet.
-pub(crate) fn bb_shell(s: &Bike, width: f64) {
+pub(super) fn bb_shell(s: &Bike, width: f64) {
     fcyl!(
         F,
         numbered("bb_shell"),
@@ -19,7 +21,7 @@ pub(crate) fn bb_shell(s: &Bike, width: f64) {
 }
 
 /// The cranks' axle through the bottom bracket (in the cranks, which turn about it).
-pub(crate) fn spindle(s: &Bike) {
+pub(super) fn spindle(s: &Bike) {
     fcyl!(
         F,
         numbered("spindle"),
@@ -33,7 +35,7 @@ pub(crate) fn spindle(s: &Bike) {
 }
 
 /// The chain's top run's height at game x.
-pub(crate) fn chain_top(s: &Bike, x: f64) -> f64 {
+pub(super) fn chain_top(s: &Bike, x: f64) -> f64 {
     let (y0, y1) = (s.bb.1 + s.ring, s.r + s.ring * s.chain_drop);
     y0 + (x - s.bb.0) * (y1 - y0) / (s.rear - s.bb.0)
 }

@@ -1,6 +1,4 @@
 //! The tick’s driving: owners and trips, the way on, and the zebras.
-//!
-//! Split from `cars.rs` (see `mod.rs`), then from `driving.rs`.
 
 use super::*;
 

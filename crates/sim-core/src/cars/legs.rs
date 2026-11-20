@@ -1,6 +1,4 @@
 //! Legs and turns: laying a route through junctions.
-//!
-//! Split from `cars/mod.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -10,8 +8,8 @@ use super::*;
 /// A driveway square to the road turns a quarter, as `Route::legacy` does.
 pub(crate) struct Turn {
     /// Where it begins and ends, the arc's middle and radius (0: straight on).
-    pub(crate) from: [f32; 2],
-    pub(crate) to: [f32; 2],
+    pub(super) from: [f32; 2],
+    pub(super) to: [f32; 2],
     centre: [f32; 2],
     r: f32,
     /// How far from the corner it begins and ends (m).
@@ -19,7 +17,7 @@ pub(crate) struct Turn {
 }
 
 impl Turn {
-    pub(crate) fn round(corner: [f32; 2], din: [f32; 2], dout: [f32; 2], room: f32) -> Turn {
+    pub(super) fn round(corner: [f32; 2], din: [f32; 2], dout: [f32; 2], room: f32) -> Turn {
         let cos = (din[0] * dout[0] + din[1] * dout[1]).clamp(-0.999, 1.0);
         // tan(θ/2) of the angle turned (exactly 1 for a quarter turn).
         let tan = ((1.0 - cos) / (1.0 + cos)).sqrt();
@@ -49,7 +47,7 @@ impl Turn {
     }
 
     /// The arc onto `legs`, on the town (`world`: from the road's frame).
-    pub(crate) fn drive(
+    pub(super) fn drive(
         &self,
         legs: &mut Legs,
         world: &impl Fn([f32; 2]) -> [f32; 2],
@@ -74,8 +72,8 @@ pub(crate) struct Legs {
     pub(crate) pts: Vec<([f32; 2], bool, f32)>,
     /// At each point, how far a car can pull over there (`Route::room`), and its lane
     /// (`Route::lane`).
-    pub(crate) room: Vec<f32>,
-    pub(crate) lane: Vec<f32>,
+    pub(super) room: Vec<f32>,
+    pub(super) lane: Vec<f32>,
     /// Its mouths (`Route::mouths`), from point to point (None: to the end).
     pub(crate) mouths: Vec<(usize, Option<usize>)>,
 }
@@ -137,7 +135,7 @@ impl Legs {
     }
 
     /// A quarter turn about `c` from `a` to `b` (both `r` from it).
-    pub(crate) fn arc(&mut self, c: [f32; 2], r: f32, a: [f32; 2], b: [f32; 2], reverse: bool) {
+    pub(super) fn arc(&mut self, c: [f32; 2], r: f32, a: [f32; 2], b: [f32; 2], reverse: bool) {
         let a0 = (a[1] - c[1]).atan2(a[0] - c[0]);
         let a1 = a0 + wrap_angle((b[1] - c[1]).atan2(b[0] - c[0]) - a0);
         let n = ((a1 - a0).abs() * r / STEP).ceil().max(1.0) as usize;

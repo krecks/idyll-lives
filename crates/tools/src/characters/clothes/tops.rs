@@ -1,6 +1,4 @@
 //! Tops, worn as they are painted.
-//!
-//! Split from `characters/clothes.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -52,7 +50,7 @@ fn tops_layout(family: &str) -> Arc<Layout> {
 /// cuts are on all four of the body's fields: the height in fields.w, as the trousers', and the
 /// sleeve parameter and the two necklines in the tone's x, y and z, where the other shells have
 /// their seated corrective (it has none). No `lod.` copy.
-pub(crate) fn tops(family: &str, stage: &str) -> Mesh {
+pub(super) fn tops(family: &str, stage: &str) -> Mesh {
     let lay = tops_layout(family);
     let (pos, nor, dense) = shell_on(family, stage, &lay.src, false);
     let fl = base_fields(family);

@@ -1,8 +1,7 @@
 //! What the home can fill, what is about to run out, and how far it is.
-//!
-//! Split from `world/objects.rs` (see `mod.rs`).
 
-use super::*;
+use crate::content::{Content, MAX_NEEDS};
+use crate::world::{Access, Ctx, ObjectInstance, Sim, access, requirements_met, unfit};
 
 /// Whether their home has something working that fills need `n` (a toilet, a bed, a fridge),
 /// busy or not.

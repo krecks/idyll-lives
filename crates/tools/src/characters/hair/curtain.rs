@@ -1,32 +1,30 @@
 //! Curtains and fringes: hair falling from a ring.
-//!
-//! Split from `characters/hair.rs` (see `mod.rs`).
 
 use super::*;
 
 /// A curtain's shape (see `curtain`).
-pub(crate) struct Curtain<'a> {
-    pub(crate) a0: f64,
-    pub(crate) a1: f64,
-    pub(crate) top: &'a dyn Fn(f64) -> f64,
-    pub(crate) bottom: &'a dyn Fn(f64) -> f64,
+pub(super) struct Curtain<'a> {
+    pub(super) a0: f64,
+    pub(super) a1: f64,
+    pub(super) top: &'a dyn Fn(f64) -> f64,
+    pub(super) bottom: &'a dyn Fn(f64) -> f64,
     /// The inner face's offset out from the scalp it hangs from (m), flaring by `flare` (a share) to the hem.
-    pub(crate) off: f64,
-    pub(crate) locks: usize,
-    pub(crate) rows: usize,
-    pub(crate) flare: f64,
+    pub(super) off: f64,
+    pub(super) locks: usize,
+    pub(super) rows: usize,
+    pub(super) flare: f64,
     /// Thick in a lock's middle (m; a third of that between locks), the hem curled in by `curl`.
-    pub(crate) thick: f64,
-    pub(crate) curl: f64,
+    pub(super) thick: f64,
+    pub(super) curl: f64,
     /// A lock's tip hangs down to this much lower than the partings beside it (m), the more pointed the
     /// higher `sharp` (1: round).
-    pub(crate) tip: f64,
-    pub(crate) sharp: f64,
-    pub(crate) back: Option<&'a dyn Fn(f64) -> f64>,
-    pub(crate) wave: f64,
-    pub(crate) seed: i64,
+    pub(super) tip: f64,
+    pub(super) sharp: f64,
+    pub(super) back: Option<&'a dyn Fn(f64) -> f64>,
+    pub(super) wave: f64,
+    pub(super) seed: i64,
     /// Wisps this long (m) hang from the hem.
-    pub(crate) wisp: f64,
+    pub(super) wisp: f64,
 }
 
 /// Hair hanging round the head in locks between azimuths a0..a1, from height top(a) down to
@@ -34,7 +32,7 @@ pub(crate) struct Curtain<'a> {
 /// hem, coming out from under the cap, over the ears and falling straight from the head's widest. `back(y)`
 /// (optional): the furthest forward its inner face may come at height y (so it clears the
 /// shoulders and back).
-pub(crate) fn curtain(sc: &Scalp, mut c: Curtain) -> Comp {
+pub(super) fn curtain(sc: &Scalp, mut c: Curtain) -> Comp {
     let h = sc.h;
     c.rows = dense_rows(c.rows);
     let cols = LOCK * c.locks + 1;
@@ -122,30 +120,30 @@ pub(crate) fn curtain(sc: &Scalp, mut c: Curtain) -> Comp {
 }
 
 /// A fringe's shape (see `fringe`).
-pub(crate) struct Fringe<'a> {
-    pub(crate) a0: f64,
-    pub(crate) a1: f64,
-    pub(crate) top: &'a dyn Fn(f64) -> f64,
-    pub(crate) bottom: &'a dyn Fn(f64) -> f64,
+pub(super) struct Fringe<'a> {
+    pub(super) a0: f64,
+    pub(super) a1: f64,
+    pub(super) top: &'a dyn Fn(f64) -> f64,
+    pub(super) bottom: &'a dyn Fn(f64) -> f64,
     /// Its inner face `off - thin` off the skin (m; more by `flare` towards the hem), at least clear of it.
-    pub(crate) off: f64,
-    pub(crate) thin: f64,
-    pub(crate) locks: usize,
-    pub(crate) rows: usize,
+    pub(super) off: f64,
+    pub(super) thin: f64,
+    pub(super) locks: usize,
+    pub(super) rows: usize,
     /// Thick in a lock's middle (m), and how much lower a lock's tip hangs (m; pointed as `sharp`).
-    pub(crate) thick: f64,
-    pub(crate) tip: f64,
-    pub(crate) sharp: f64,
-    pub(crate) flare: f64,
-    pub(crate) seed: f64,
+    pub(super) thick: f64,
+    pub(super) tip: f64,
+    pub(super) sharp: f64,
+    pub(super) flare: f64,
+    pub(super) seed: f64,
     /// Wisps this long (m) hang from the hem.
-    pub(crate) wisp: f64,
+    pub(super) wisp: f64,
 }
 
 /// Hair falling over the forehead in locks, on the face as drawn (`face`: a Scalp that isn't held
 /// to the cranium): between azimuths a0..a1, from polar angle top(a) (under the cap) down to height
 /// bottom(a) (m) and the locks' tips below.
-pub(crate) fn fringe(face: &Scalp, mut c: Fringe) -> Comp {
+pub(super) fn fringe(face: &Scalp, mut c: Fringe) -> Comp {
     c.rows = dense_rows(c.rows);
     let cols = LOCK * c.locks + 1;
     let a = linspace(c.a0, c.a1, cols);
@@ -184,7 +182,7 @@ pub(crate) fn fringe(face: &Scalp, mut c: Fringe) -> Comp {
 }
 
 /// The polar angle (below `from`) at which the surface at azimuth a comes down to height y.
-pub(crate) fn at_height(sc: &Scalp, a: f64, y: f64, from: f64) -> f64 {
+pub(super) fn at_height(sc: &Scalp, a: f64, y: f64, from: f64) -> f64 {
     let (mut lo, mut hi) = (from, radians(150.0));
     for _ in 0..24 {
         let mid = (lo + hi) / 2.0;
@@ -200,7 +198,7 @@ pub(crate) fn at_height(sc: &Scalp, a: f64, y: f64, from: f64) -> f64 {
 /// A lock falling over the face (`face`: a Scalp that isn't held to the cranium) from deep in the cap
 /// at (a0, phi0) through points (azimuth, height, offset off the skin; m): a flattened tube `wide`
 /// across, `thick` deep, tapering to a point.
-pub(crate) fn face_lock(
+pub(super) fn face_lock(
     face: &Scalp,
     a0: f64,
     phi0: f64,

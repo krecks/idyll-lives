@@ -1,6 +1,4 @@
-//! [(2065, 3486)]
-//!
-//! Split from `content.rs` (see `mod.rs`).
+//! The content file's raw JSON shapes and the serde defaults they share.
 
 use super::*;
 
@@ -17,23 +15,23 @@ pub(crate) use people::*;
 pub(crate) use rooms::*;
 
 /// Serde default: one (a rate or a count).
-pub(crate) fn one() -> f32 {
+pub(super) fn one() -> f32 {
     1.0
 }
 
 /// Serde default: Sunday, the week's last day (content weeks start on Monday).
-pub(crate) fn sunday() -> u32 {
+pub(super) fn sunday() -> u32 {
     6
 }
 
 /// Serde default: noon.
-pub(crate) fn noon() -> f32 {
+pub(super) fn noon() -> f32 {
     12.0
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ContentFile {
+pub(super) struct ContentFile {
     pub(crate) needs: Vec<NeedRaw>,
     pub(crate) objects: Vec<ObjectRaw>,
     #[serde(default)]
@@ -43,18 +41,18 @@ pub(crate) struct ContentFile {
     #[serde(default)]
     pub(crate) genders: Vec<GenderRaw>,
     #[serde(default)]
-    pub(crate) rules: CharacterRules,
+    pub(super) rules: CharacterRules,
     #[serde(default)]
-    pub(crate) emotions: Vec<EmotionRaw>,
+    pub(super) emotions: Vec<EmotionRaw>,
     #[serde(default)]
     #[serde(alias = "moodlets")] // key before the moodlet → feeling rename
-    pub(crate) feelings: Vec<FeelingRaw>,
+    pub(super) feelings: Vec<FeelingRaw>,
     #[serde(default)]
-    pub(crate) socials: Vec<SocialRaw>,
+    pub(super) socials: Vec<SocialRaw>,
     #[serde(default)]
-    pub(crate) bond_presets: HashMap<String, BondPreset>,
+    pub(super) bond_presets: HashMap<String, BondPreset>,
     #[serde(default)]
-    pub(crate) social_rules: SocialRulesRaw,
+    pub(super) social_rules: SocialRulesRaw,
     #[serde(default)]
     pub(crate) careers: Vec<CareerRaw>,
     #[serde(default)]
@@ -62,7 +60,7 @@ pub(crate) struct ContentFile {
     #[serde(default)]
     pub(crate) schedule: Vec<ScheduleRaw>,
     #[serde(default)]
-    pub(crate) visits: VisitRaw,
+    pub(super) visits: VisitRaw,
     #[serde(default)]
     pub(crate) economy: EconomyRaw,
     #[serde(default)]
@@ -78,7 +76,7 @@ pub(crate) struct ContentFile {
     #[serde(default)]
     pub(crate) day_rhythm: DayRhythmRaw,
     #[serde(default)]
-    pub(crate) autonomy: crate::ai::AutonomyRaw,
+    pub(super) autonomy: crate::ai::AutonomyRaw,
     #[serde(default)]
     pub(crate) object_rules: ObjectRulesRaw,
     #[serde(default)]
@@ -88,53 +86,53 @@ pub(crate) struct ContentFile {
     #[serde(default)]
     pub(crate) life: LifeRaw,
     #[serde(default)]
-    pub(crate) names: Names,
+    pub(super) names: Names,
     #[serde(default)]
     pub(crate) room_rules: RoomRulesRaw,
     #[serde(default)]
     pub(crate) build: BuildRaw,
     #[serde(default)]
-    pub(crate) wall_coverings: Vec<BuildStyleRaw>,
+    pub(super) wall_coverings: Vec<BuildStyleRaw>,
     #[serde(default)]
-    pub(crate) door_styles: Vec<BuildStyleRaw>,
+    pub(super) door_styles: Vec<BuildStyleRaw>,
     #[serde(default)]
-    pub(crate) window_styles: Vec<BuildStyleRaw>,
+    pub(super) window_styles: Vec<BuildStyleRaw>,
     #[serde(default)]
-    pub(crate) fence_styles: Vec<BuildStyleRaw>,
+    pub(super) fence_styles: Vec<BuildStyleRaw>,
     #[serde(default)]
-    pub(crate) roof_styles: Vec<BuildStyleRaw>,
+    pub(super) roof_styles: Vec<BuildStyleRaw>,
     #[serde(default)]
-    pub(crate) roof_colors: Vec<BuildStyleRaw>,
+    pub(super) roof_colors: Vec<BuildStyleRaw>,
     #[serde(default)]
-    pub(crate) floor_coverings: Vec<BuildStyleRaw>,
+    pub(super) floor_coverings: Vec<BuildStyleRaw>,
     /// Extra tags that no interaction or social uses (yet), so traits and emotions can refer to them.
     #[serde(default)]
-    pub(crate) tags: Vec<String>,
+    pub(super) tags: Vec<String>,
     /// Animation tags interactions may use as `anim`.
     #[serde(default)]
-    pub(crate) animations: Vec<String>,
+    pub(super) animations: Vec<String>,
     #[serde(default)]
-    pub(crate) activities: Vec<crate::planner::ActivityRaw>,
+    pub(super) activities: Vec<crate::planner::ActivityRaw>,
     #[serde(default)]
-    pub(crate) planner: crate::planner::PlannerRaw,
+    pub(super) planner: crate::planner::PlannerRaw,
     #[serde(default)]
-    pub(crate) goals: Vec<crate::planner::GoalRaw>,
+    pub(super) goals: Vec<crate::planner::GoalRaw>,
     #[serde(default)]
-    pub(crate) cooking: crate::cooking::CookingRaw,
+    pub(super) cooking: crate::cooking::CookingRaw,
     #[serde(default)]
-    pub(crate) items: Vec<crate::cooking::ItemRaw>,
+    pub(super) items: Vec<crate::cooking::ItemRaw>,
     #[serde(default)]
-    pub(crate) recipes: Vec<crate::cooking::RecipeRaw>,
+    pub(super) recipes: Vec<crate::cooking::RecipeRaw>,
     #[serde(default)]
-    pub(crate) phone: crate::phone::PhoneRaw,
+    pub(super) phone: crate::phone::PhoneRaw,
     #[serde(default)]
-    pub(crate) service: Option<crate::staff::ServiceRaw>,
+    pub(super) service: Option<crate::staff::ServiceRaw>,
     #[serde(default)]
     pub(crate) laundry: Option<LaundryRaw>,
     #[serde(default)]
-    pub(crate) cars: CarsRaw,
+    pub(super) cars: CarsRaw,
     #[serde(default)]
-    pub(crate) taxi: TaxiRaw,
+    pub(super) taxi: TaxiRaw,
 }
 
 fn one_by_one() -> [u8; 2] {
@@ -145,7 +143,7 @@ fn yes() -> bool {
     true
 }
 
-pub(crate) fn intern(tags: &mut Vec<String>, tag: &str) -> Result<(), Error> {
+pub(super) fn intern(tags: &mut Vec<String>, tag: &str) -> Result<(), Error> {
     if !tags.iter().any(|t| t == tag) {
         if tags.len() == MAX_TAGS {
             return Err(Error::new(format!("more than {MAX_TAGS} tags")));

@@ -1,24 +1,22 @@
 //! A corner's patch of an odd number of segments, and what is carried across.
-//!
-//! Split from `bevel.rs` (see `mod.rs`).
 
 use super::*;
 
 /// A corner's patch of an odd number of segments, for its texture (Blender's bevel_build_rings): which old face
 /// each corner of its quads reads, and the old edge a corner on the patch's middle lines is read on.
-pub(crate) struct Patch<'a> {
-    pub(crate) vert: u32,
-    pub(crate) across: &'a [(u32, u32, u32)],
+pub(super) struct Patch<'a> {
+    pub(super) vert: u32,
+    pub(super) across: &'a [(u32, u32, u32)],
     /// For each new point, whether its face is taken before the next point's where the two meet.
-    pub(crate) beats: Vec<bool>,
+    pub(super) beats: Vec<bool>,
     /// Whether the UVs break across each new point's bevelled edge.
-    pub(crate) seam: Vec<bool>,
+    pub(super) seam: Vec<bool>,
     /// The face the patch's middle takes its texture from.
-    pub(crate) centre: u32,
+    pub(super) centre: u32,
 }
 
 impl<'a> Patch<'a> {
-    pub(crate) fn new(
+    pub(super) fn new(
         charts: &Charts,
         vert: u32,
         across: &'a [(u32, u32, u32)],
@@ -97,7 +95,7 @@ impl<'a> Patch<'a> {
 }
 
 /// The point of the segment a-b nearest to `p`.
-pub(crate) fn on_segment(p: V3, a: V3, b: V3) -> V3 {
+pub(super) fn on_segment(p: V3, a: V3, b: V3) -> V3 {
     let d = b - a;
     let length = dot_v3(d, d);
     if length == 0.0 {
@@ -307,7 +305,7 @@ pub fn carried(
 }
 
 /// Two UVs Blender takes for one: within a ten-thousandth each way.
-pub(crate) fn uv_joined(a: [f32; 2], b: [f32; 2]) -> bool {
+pub(super) fn uv_joined(a: [f32; 2], b: [f32; 2]) -> bool {
     (a[0] - b[0]).abs() <= 0.0001 && (a[1] - b[1]).abs() <= 0.0001
 }
 
@@ -318,7 +316,7 @@ pub(crate) fn uv_joined(a: [f32; 2], b: [f32; 2]) -> bool {
 /// projection), the corner polygon's corner, read on that edge, is averaged in with the two beside it, which
 /// pulls a strip that would have no area in the texture a little off its line.
 /// `source`: the old face each new corner's UV was read from.
-pub(crate) fn merge_uvs(
+pub(super) fn merge_uvs(
     old: &Mesh,
     uvs: &[[f32; 2]],
     new: &Mesh,

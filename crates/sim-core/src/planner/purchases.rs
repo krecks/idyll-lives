@@ -1,6 +1,4 @@
 //! Buying what a goal asks for, and the resident's answer.
-//!
-//! Split from `planner.rs` (see `mod.rs`).
 
 use super::*;
 

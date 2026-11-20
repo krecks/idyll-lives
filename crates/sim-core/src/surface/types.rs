@@ -1,6 +1,4 @@
 //! Surface spots, hosts and the things standing on them.
-//!
-//! Split from `surface.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -221,7 +219,7 @@ impl Top {
 
     /// How far from its middle (each way, in its own frame) the middle of a disc of `radius`
     /// may stand: inside the margin along its edges. Negative if the disc doesn't fit at all.
-    pub(crate) fn room(&self, radius: f32) -> [f32; 2] {
+    pub(super) fn room(&self, radius: f32) -> [f32; 2] {
         let m = self.surface.inset + radius;
         [self.half[0] - m, self.half[1] - m]
     }

@@ -1,6 +1,4 @@
 //! Sitting: where the legs and the hands go, and how far the seat drops.
-//!
-//! Split from `characters/body.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -29,7 +27,7 @@ pub fn seated_pose(p: &[V3; NB], flex: f64) -> Vec<(M3, V3)> {
 }
 
 /// Seated (`seated_pose`): the pelvis joint's height above the lowest skin under the hips.
-pub(crate) fn seat_drop(body: &Mesh, p: &[V3; NB]) -> f64 {
+pub(super) fn seat_drop(body: &Mesh, p: &[V3; NB]) -> f64 {
     let mats = seated_pose(p, 90.0);
     let n = body.pos.len();
     let mut out = vec![V3::zeros(); n];
@@ -52,7 +50,7 @@ pub(crate) fn seat_drop(body: &Mesh, p: &[V3; NB]) -> f64 {
 }
 
 /// The left palm's centre (just off the skin) relative to the wrist.
-pub(crate) fn grip(family: &str, stage: &str) -> [f64; 3] {
+pub(super) fn grip(family: &str, stage: &str) -> [f64; 3] {
     let s = surface(family, stage);
     let (wr, k1) = (s.p[b("hand_l")], s.p[b("fingers_01_l")]);
     let d = unit(k1 - wr);
@@ -65,7 +63,7 @@ pub(crate) fn grip(family: &str, stage: &str) -> [f64; 3] {
 /// Level 1's fingers past the middle joint: subdividing blends `fingers_01` into `fingers_02` all
 /// along the outer segment, which a fist then folds flat (blended skinning collapses); instead the
 /// split follows the distance past the joint, all `fingers_02` from 0.06 palm lengths on.
-pub(crate) fn rigid_fingertips(mut dense: Vec<Dense>, pos: &[V3], p: &[V3; NB]) -> Vec<Dense> {
+pub(super) fn rigid_fingertips(mut dense: Vec<Dense>, pos: &[V3], p: &[V3; NB]) -> Vec<Dense> {
     for sd in ["l", "r"] {
         let (wr, i1, i2) = (
             p[b(&format!("hand_{sd}"))],
@@ -88,7 +86,7 @@ pub(crate) fn rigid_fingertips(mut dense: Vec<Dense>, pos: &[V3], p: &[V3; NB]) 
 // Fields and tone -----------------------------------------------------------------------------
 
 /// A smooth even function of the angle round the neck through the samples (least squares).
-pub(crate) fn fourier(theta: &[f64], y: &[f64], n: usize) -> impl Fn(f64) -> f64 {
+pub(super) fn fourier(theta: &[f64], y: &[f64], n: usize) -> impl Fn(f64) -> f64 {
     let a = DMatrix::from_fn(theta.len(), n, |i, k| (k as f64 * theta[i]).cos());
     let coef = lstsq(&a, &DVector::from_column_slice(y));
     move |t: f64| (0..n).fold(0.0, |s, k| s + (k as f64 * t).cos() * coef[k])

@@ -1,6 +1,4 @@
 //! The small shed as parts are given them.
-//!
-//! Split from `yard/garden.rs` (see `mod.rs`).
 
 use super::*;
 

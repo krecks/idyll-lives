@@ -1,17 +1,15 @@
 //! World state and the per-tick update.
 
-use crate::clock::{MAX_SPEED, SUPER_BUSY, SUPER_SPEED, TICKS_PER_STEP};
+use crate::clock::{MAX_SPEED, SUPER_SPEED};
 use crate::content::{
-    Content, HabitTime, Layer, MAX_NEEDS, MAX_SKILLS, MAX_SLOTS, Modifiers, Pose, TagMask, stage_in,
+    Content, HabitTime, Layer, MAX_NEEDS, MAX_SKILLS, MAX_SLOTS, Modifiers, Pose, TagMask,
 };
 use crate::index::ObjectIndex;
 use crate::lot::{BondRaw, Lot, LotFile, SimSpawn};
 use crate::path::{Grounds, NavGrid};
 use crate::rng::Rng;
-use crate::social::{self, ActiveFeeling, EventLog, Prefer, Relationships};
-use crate::{
-    Command, Error, MINUTES_PER_TICK, TICKS_PER_MINUTE, TICKS_PER_SECOND, ai, conversation,
-};
+use crate::social::{self, ActiveFeeling, EventLog, Relationships};
+use crate::{Command, Error, MINUTES_PER_TICK, TICKS_PER_MINUTE, TICKS_PER_SECOND, conversation};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, VecDeque};
 

@@ -1,10 +1,8 @@
-//! [(1239, 1269), (1692, 1719)]
-//!
-//! Split from `content.rs` (see `mod.rs`).
+//! Traits, perks, genders and the character rules.
 
 use super::*;
 
-pub(crate) fn each_tag(mask: TagMask) -> impl Iterator<Item = usize> {
+pub(super) fn each_tag(mask: TagMask) -> impl Iterator<Item = usize> {
     let mut bits = mask;
     std::iter::from_fn(move || {
         if bits == 0 {

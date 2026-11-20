@@ -1,6 +1,4 @@
 //! The raised bed: its soil, its plants and the lettuce in them.
-//!
-//! Split from `yard/garden.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,8 +1,6 @@
-//! The vector arithmetic the check needs.
-//!
-//! Split from `crates/tools/src/edges.rs` (see `mod.rs`).
+//! Arithmetic on 3-vectors of f64, for the checks that measure models (edges, near, far views, facets).
 
-use super::*;
+type V3 = [f64; 3];
 
 pub(crate) fn sub(a: V3, b: V3) -> V3 {
     [a[0] - b[0], a[1] - b[1], a[2] - b[2]]

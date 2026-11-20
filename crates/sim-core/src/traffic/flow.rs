@@ -1,8 +1,10 @@
 //! Traffic itself: who is moving, who is waiting and who has been asked to wait.
-//!
-//! Split from `traffic.rs` (see `mod.rs`).
 
 use super::*;
+
+mod begin;
+mod go;
+mod lights;
 
 /// A car on the road this tick, as the others keep out of its way (`Traffic::begin`): its
 /// key (`cars::Driving::first`), its body, the way it goes and how far it can still pull over
@@ -27,8 +29,8 @@ pub(crate) struct Mover {
 pub(crate) type Place = (u64, u32, f32);
 
 #[derive(Debug, Clone)]
-pub(crate) struct Hold {
-    pub(crate) key: u64,
+pub(super) struct Hold {
+    pub(super) key: u64,
     tag: u32,
     claim: Claim,
     /// How far along its route its holder was as the tick began.
@@ -38,9 +40,9 @@ pub(crate) struct Hold {
 /// A vehicle's ask for the parts of a group of its route's claims (`Claim::group`), in order:
 /// granted all at once, in the order the vehicles asked (`tick`).
 #[derive(Debug, Clone)]
-pub(crate) struct Ask {
+pub(super) struct Ask {
     tick: u64,
-    pub(crate) key: u64,
+    pub(super) key: u64,
     route: u32,
     group: u32,
     parts: Vec<(u32, Claim)>,
@@ -48,9 +50,9 @@ pub(crate) struct Ask {
     /// dropped).
     seen: u64,
     /// Whom it waited for as the tick began (their keys: their claims, bodies).
-    pub(crate) by: Vec<u64>,
+    pub(super) by: Vec<u64>,
     /// The earlier asks it waited for as the tick began (their keys).
-    pub(crate) fifo: Vec<u64>,
+    pub(super) fifo: Vec<u64>,
     /// Of `by`, those only on the move into its way, not in it: they're to stop short, it doesn't
     /// wait for them to go first (`begin`, rule 3).
     coming: Vec<u64>,
@@ -79,24 +81,24 @@ const KEPT_ASK: f32 = crate::drive_ticks(3.25);
 
 /// An ask this old (ticks of drive time) yields only to those it waits for itself
 /// (`Traffic::begin`, rule 2).
-pub(crate) const OLD_ASK: u64 = crate::drive_secs(20.0);
+pub(super) const OLD_ASK: u64 = crate::drive_secs(20.0);
 
 /// The claims held and asked for (see the module notes). Not saved.
 #[derive(Debug, Clone, Default)]
 pub struct Traffic {
     /// The tick (`begin`).
-    pub(crate) tick: u64,
-    pub(crate) holds: Vec<Hold>,
-    pub(crate) asks: Vec<Ask>,
+    pub(super) tick: u64,
+    pub(super) holds: Vec<Hold>,
+    pub(super) asks: Vec<Ask>,
     /// Each lit junction's lights (`Travel::signals`): the arm whose turn it is, how far through
     /// it (`Light`), and since when.
     pub(crate) lights: Vec<Light>,
-    pub(crate) movers: Vec<Mover>,
+    pub(super) movers: Vec<Mover>,
     /// `movers` by key: each key and the first of them with it, sorted (`mover`).
-    pub(crate) mover_ix: Vec<(u64, u32)>,
+    pub(super) mover_ix: Vec<(u64, u32)>,
     /// Where each vehicle on its way to the start of its next claim, not yet there, will wait for
     /// it (its key, the claim's first sample: `may_go`, this tick).
-    pub(crate) starts: Vec<(u64, Sample)>,
+    pub(super) starts: Vec<(u64, Sample)>,
     /// Ticks a car was kept from moving deeper into another by the last-resort check
     /// (`cars::guard`), since the game was loaded.
     pub guarded: u64,
@@ -124,12 +126,12 @@ pub struct Traffic {
     pub(crate) passing: Vec<(u64, u64)>,
     /// Per lit junction, the phases anyone waits at and comes through (`change_lights`'s own,
     /// kept so it isn't made anew every tick).
-    pub(crate) lit_phases: Vec<[u64; 4]>,
+    pub(super) lit_phases: Vec<[u64; 4]>,
     /// Per lit junction, since when its green is held for those through it from a lit junction
     /// just before (`Claim::gate2`, `GREEN_HELD`), and whether one may still be granted through
     /// it (`Traffic::green_through`).
-    pub(crate) held: Vec<Option<u64>>,
-    pub(crate) fresh: Vec<bool>,
+    pub(super) held: Vec<Option<u64>>,
+    pub(super) fresh: Vec<bool>,
     /// The lit junctions someone on foot waits at a crosswalk of (`Signal` indices, this tick:
     /// `kerb_stop`, `traffic::begin`), and the phase they wait for (`Signal::wants`: the walk, or
     /// on a side road's crosswalk its main road's green).
@@ -164,13 +166,13 @@ pub(crate) struct OnZebra {
 pub(crate) const APPROACH: f32 = crate::drive_ticks(2.0);
 
 /// Claim `k` of a route tagged `route` (`Place`).
-pub(crate) fn tag(route: u32, k: usize) -> u32 {
+pub(super) fn tag(route: u32, k: usize) -> u32 {
     route << 16 | k as u32
 }
 
 impl Traffic {
     /// Whether `key` holds its claim `tag`.
-    pub(crate) fn holds(&self, key: u64, tag: u32) -> bool {
+    pub(super) fn holds(&self, key: u64, tag: u32) -> bool {
         self.holds.iter().any(|h| h.key == key && h.tag == tag)
     }
 
@@ -265,7 +267,3 @@ impl Traffic {
         found
     }
 }
-
-mod begin;
-mod go;
-mod lights;

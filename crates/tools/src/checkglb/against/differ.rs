@@ -1,12 +1,15 @@
 //! What differs between two models: nodes, materials, clips.
-//!
-//! Split from `against.rs` (see `mod.rs`).
 
 use super::*;
+use crate::checkglb::digest;
+use crate::checkglb::glb::Glb;
+use crate::checkglb::near::{self, Rest};
+use crate::checkglb::py::{self, J};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The nodes: the same paths (names under the same parents), each with or without a mesh as before, at rest where
 /// it was.
-pub(crate) fn nodes_differ(old: &Model, new: &Model, out: &mut Vec<Finding>) {
+pub(super) fn nodes_differ(old: &Model, new: &Model, out: &mut Vec<Finding>) {
     only(
         "nodes",
         "nodes",
@@ -67,7 +70,7 @@ pub(crate) fn nodes_differ(old: &Model, new: &Model, out: &mut Vec<Finding>) {
 
 /// The differences between two JSON values, each with its path: a number by its value, an object whatever the
 /// order of its keys.
-pub(crate) fn json_differ(a: Option<&J>, b: Option<&J>, path: &str, out: &mut Vec<String>) {
+pub(super) fn json_differ(a: Option<&J>, b: Option<&J>, path: &str, out: &mut Vec<String>) {
     let short = |v: &J| {
         let text = digest::canon(v);
         if text.chars().count() > 60 {
@@ -112,7 +115,7 @@ pub(crate) fn json_differ(a: Option<&J>, b: Option<&J>, path: &str, out: &mut Ve
 }
 
 /// An object without some of its keys.
-pub(crate) fn without(v: &J, keys: &[&str]) -> J {
+pub(super) fn without(v: &J, keys: &[&str]) -> J {
     match v {
         J::Obj(o) => J::Obj(
             o.iter()
@@ -125,7 +128,7 @@ pub(crate) fn without(v: &J, keys: &[&str]) -> J {
 }
 
 /// The materials: the same names, each with its base colour within a step and everything else it says.
-pub(crate) fn materials_differ(o: &Glb, n: &Glb, out: &mut Vec<Finding>) {
+pub(super) fn materials_differ(o: &Glb, n: &Glb, out: &mut Vec<Finding>) {
     let named = |g: &Glb| -> BTreeMap<String, J> {
         g.gltf
             .get("materials")

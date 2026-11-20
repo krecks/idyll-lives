@@ -1,6 +1,4 @@
 //! Checking one file at a time, and counting what the checks find.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -27,26 +25,26 @@ fn dims_text(dims: &[Num; 3]) -> String {
 
 /// Whether the model `key` is only ever drawn in a resident's hand (a held pack's `tool.*`: a fork, a coin, a phone),
 /// never on a floor or a top. (The pack's `item.*` are set down too: a plate on a table, a parcel on the doorstep.)
-pub(crate) fn in_hand(key: &str) -> bool {
+pub(super) fn in_hand(key: &str) -> bool {
     key.starts_with("tool.")
 }
 
 /// A model file as a counted check gets it: the model's key and entry, the file, the manifests' finishes, and
 /// whether it is the model's far version.
-pub(crate) struct ModelFile<'a> {
-    pub(crate) key: &'a str,
-    pub(crate) entry: &'a J,
-    pub(crate) glb: &'a Glb,
-    pub(crate) fin: &'a Finishes,
-    pub(crate) far: bool,
+pub(super) struct ModelFile<'a> {
+    pub(super) key: &'a str,
+    pub(super) entry: &'a J,
+    pub(super) glb: &'a Glb,
+    pub(super) fin: &'a Finishes,
+    pub(super) far: bool,
 }
 
 /// A counted check (`COUNTED`) run on each model file as the gate reads it, the full model's and its far
 /// version's (whose findings are the model's): what it finds in the file.
-pub(crate) type FileCheck = fn(&ModelFile) -> R<Found>;
+pub(super) type FileCheck = fn(&ModelFile) -> R<Found>;
 
 /// The counted checks run on each model file, by name.
-pub(crate) const FILE_CHECKS: &[(&str, FileCheck)] =
+pub(super) const FILE_CHECKS: &[(&str, FileCheck)] =
     &[("edges", meshes::hard_edges), ("texels", meshes::texels)];
 
 /// A counted check (`COUNTED`) run over every model file at once (an outside program, `--validate`) before the
@@ -55,11 +53,11 @@ pub type BatchCheck =
     fn(&[(String, String, Option<String>)]) -> Result<BTreeMap<String, Found>, String>;
 
 /// The counted checks of a gate run and the baseline they are judged by.
-pub(crate) struct Counting<'a> {
-    pub(crate) baseline: &'a Baseline,
-    pub(crate) file: &'a [(&'static str, FileCheck)],
+pub(super) struct Counting<'a> {
+    pub(super) baseline: &'a Baseline,
+    pub(super) file: &'a [(&'static str, FileCheck)],
     /// What the batch checks (`BatchCheck`) found: {check: {key: …}}.
-    pub(crate) batch: BTreeMap<&'static str, BTreeMap<String, Found>>,
+    pub(super) batch: BTreeMap<&'static str, BTreeMap<String, Found>>,
 }
 
 /// One model's findings of a counted check by the baseline (`baseline::sort`), as (errors, warnings) for
@@ -105,7 +103,7 @@ fn ratchet(
 /// `facts`: those of each content object that draws it (`content_objects`); `centre`: where it's built
 /// centred (centres.json; None: not built here, not checked); `counting`: the counted checks.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn check(
+pub(super) fn check(
     entry_key: &str,
     fin: &Finishes,
     entry: &J,
@@ -253,13 +251,13 @@ pub(crate) fn check(
 
 /// What `check` found of one model: its errors, its warnings, the strict findings its entry `accept`s (each with
 /// its reason), and its numbers.
-pub(crate) struct Checked {
-    pub(crate) errors: Vec<String>,
-    pub(crate) warnings: Vec<String>,
-    pub(crate) accepted: Vec<String>,
-    pub(crate) summary: String,
+pub(super) struct Checked {
+    pub(super) errors: Vec<String>,
+    pub(super) warnings: Vec<String>,
+    pub(super) accepted: Vec<String>,
+    pub(super) summary: String,
     /// What the counted checks that ran counted, as the baseline may keep it (`ratchet`).
-    pub(crate) counts: Vec<(&'static str, u64)>,
+    pub(super) counts: Vec<(&'static str, u64)>,
 }
 
 /// (errors, warnings, numbers) for one model entry and a file of it (`far`: its far version); `facts`: those of

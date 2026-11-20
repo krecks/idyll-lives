@@ -1,8 +1,12 @@
 //! Arriving at an object: paying for the use and taking a place at it.
-//!
-//! Split from `world/objects.rs` (see `mod.rs`).
 
 use super::*;
+use crate::TICKS_PER_MINUTE;
+use crate::content::{HabitTime, Layer, Pose};
+use crate::world::{
+    Ctx, News, ObjectInstance, Phase, Sim, TaskKind, affordable, closed_at, conditions_met,
+    missing_requirement, outing_leave_by,
+};
 
 pub(crate) fn arrive(
     sim: &mut Sim,

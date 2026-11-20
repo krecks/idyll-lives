@@ -49,7 +49,6 @@ mod report;
 mod shape;
 mod solid;
 mod types;
-mod vec;
 
 pub use hard::*;
 pub use main::*;
@@ -57,11 +56,11 @@ pub use mesh::*;
 pub use report::*;
 pub use solid::*;
 pub use types::*;
-pub(crate) use vec::*;
 
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use crate::vec3::{cross, dot, length, sub, unit};
 
     /// A flat face of four corners, its own corners with its own normal, wound to look along `n`.
     fn quad(mesh: &mut Mesh, corners: [V3; 4], n: V3) {

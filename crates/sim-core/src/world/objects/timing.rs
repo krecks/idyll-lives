@@ -1,8 +1,8 @@
 //! When work or school takes them away today.
-//!
-//! Split from `world/objects.rs` (see `mod.rs`).
 
-use super::*;
+use crate::MINUTES_PER_TICK;
+use crate::content::Content;
+use crate::world::{Ctx, Sim};
 
 /// Minutes before `sim` must leave for work or school today, for a visit or an outing to fit
 /// (`leaves_for_work`). Infinite with none today.

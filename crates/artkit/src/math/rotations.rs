@@ -1,6 +1,4 @@
 //! The rotations between vectors, and the products of quaternions.
-//!
-//! Split from `crates/artkit/src/math.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -38,7 +36,7 @@ fn dominant(v: V3) -> usize {
     }
 }
 
-pub(crate) fn ortho(v: V3) -> V3 {
+pub(super) fn ortho(v: V3) -> V3 {
     match dominant(v) {
         0 => V3::new(-v.y - v.z, v.x, v.x),
         1 => V3::new(v.y, -v.x - v.z, v.y),
@@ -46,7 +44,7 @@ pub(crate) fn ortho(v: V3) -> V3 {
     }
 }
 
-pub(crate) fn saacos(f: f32) -> f32 {
+pub(super) fn saacos(f: f32) -> f32 {
     acosf(f.clamp(-1.0, 1.0))
 }
 
@@ -73,7 +71,7 @@ fn angle_normalized(a: V3, b: V3) -> f32 {
     }
 }
 
-pub(crate) fn axis_angle_normalized_to_quat(axis: V3, angle: f32) -> Quat {
+pub(super) fn axis_angle_normalized_to_quat(axis: V3, angle: f32) -> Quat {
     let phi = 0.5 * angle;
     let (si, co) = (sinf(phi), cosf(phi));
     Quat {
@@ -84,7 +82,7 @@ pub(crate) fn axis_angle_normalized_to_quat(axis: V3, angle: f32) -> Quat {
     }
 }
 
-pub(crate) fn rotation_between(a: V3, b: V3) -> Quat {
+pub(super) fn rotation_between(a: V3, b: V3) -> Quat {
     let (axis, len) = normalize_v3(a.cross(b));
     if len > f32::EPSILON {
         axis_angle_normalized_to_quat(axis, angle_normalized(a, b))
@@ -97,7 +95,7 @@ pub(crate) fn rotation_between(a: V3, b: V3) -> Quat {
     }
 }
 
-pub(crate) fn vec_to_quat(vec: V3, axis: usize, up: usize) -> Quat {
+pub(super) fn vec_to_quat(vec: V3, axis: usize, up: usize) -> Quat {
     let len = len_v3(vec);
     if len == 0.0 {
         return Quat::IDENTITY;
@@ -153,7 +151,7 @@ pub(crate) fn vec_to_quat(vec: V3, axis: usize, up: usize) -> Quat {
     mul_qt_qtqt(q2, q)
 }
 
-pub(crate) fn mul_qt_qtqt(a: Quat, b: Quat) -> Quat {
+pub(super) fn mul_qt_qtqt(a: Quat, b: Quat) -> Quat {
     let t0 = a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z;
     let t1 = a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y;
     let t2 = a.w * b.y + a.y * b.w + a.z * b.x - a.x * b.z;

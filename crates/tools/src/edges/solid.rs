@@ -1,17 +1,16 @@
 //! A solid: the vertices welded, and the faces that close it.
-//!
-//! Split from `crates/tools/src/edges.rs` (see `mod.rs`).
 
 use super::*;
+use crate::vec3::{add, cross, dot, length, mul, sub, unit};
 
-pub(crate) fn edge_key(a: u32, b: u32) -> (u32, u32) {
+pub(super) fn edge_key(a: u32, b: u32) -> (u32, u32) {
     (a.min(b), a.max(b))
 }
 
 /// The ways to the play camera from what it looks at: every 30° or so round, at four heights between its lowest
 /// (13° over the ground) and its steepest (73°). (From whole numbers, roots and divisions only: the same on every
 /// machine.)
-pub(crate) fn views() -> &'static [V3] {
+pub(super) fn views() -> &'static [V3] {
     static VIEWS: std::sync::OnceLock<Vec<V3>> = std::sync::OnceLock::new();
     VIEWS.get_or_init(|| {
         let mut round: Vec<(f64, f64)> = Vec::new();
@@ -31,7 +30,7 @@ pub(crate) fn views() -> &'static [V3] {
 }
 
 /// For each of the `views`, the triangle that hid the last point looked at from there.
-pub(crate) type Hid = [Option<usize>; 48];
+pub(super) type Hid = [Option<usize>; 48];
 
 /// A box in a tree of boxes over triangles: a leaf's triangles `a..b`, or its two children `a` and `b`.
 struct Node {
@@ -273,7 +272,7 @@ impl Solid {
     /// two or more of the play camera's `views` on its side (of those `from` takes), and neither of its faces (normal, the way into it from
     /// the edge) is covered: `OUT` in from the edge another face lies on it or within `OUT` in front of it, or it
     /// goes into something before it is `WIDTH` wide.
-    pub(crate) fn shows(
+    pub(super) fn shows(
         &self,
         p: V3,
         out: V3,

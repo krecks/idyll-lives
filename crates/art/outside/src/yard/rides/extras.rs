@@ -1,12 +1,17 @@
 //! What each kind of bike adds to the shape: stands, racks, baskets and motors.
-//!
-//! Split from `yard/rides.rs` (see `mod.rs`).
 
 use super::*;
+use crate::yard::common::{F, M, bent, board, rod};
+use crate::yard::play::Bike;
+use artkit::far::{is_low, low};
+use artkit::forms::rounded_rect;
+use artkit::math::{cosd, pow, sind};
+use artkit::parts::numbered;
+use artkit::{fbox, fcyl, fextrude, fsweep, loft, ring, torus};
 
 /// The city bike's own things: a chain guard, a wicker basket on the bars with a lamp, a carrier with a red
 /// light, the centre stand's plate.
-pub(crate) fn city_extras(s: &Bike) {
+pub(super) fn city_extras(s: &Bike) {
     let (z, bx, by) = (s.z, s.bb.0, s.bb.1);
     bb_shell(s, 0.075);
     // the chain guard over the top of the chain ring and the top run, between the ring and the crank
@@ -237,7 +242,7 @@ pub(crate) fn city_extras(s: &Bike) {
 }
 
 /// A double-leg centre stand, down: a yoke on its pivot, two legs splayed to rubber feet either side.
-pub(crate) fn city_stand(s: &Bike) {
+pub(super) fn city_stand(s: &Bike) {
     let (px, py) = CITY_STAND;
     let z = s.z;
     fcyl!(
@@ -281,7 +286,7 @@ pub(crate) fn city_stand(s: &Bike) {
 
 /// The kids' bike's own things: a chain case, a brace across the bars, streamers from the grips' ends, the
 /// stabilisers (their brackets, their little wheels on the floor either side of the back wheel).
-pub(crate) fn kid_extras(s: &Bike) {
+pub(super) fn kid_extras(s: &Bike) {
     let (z, bx, by) = (s.z, s.bb.0, s.bb.1);
     bb_shell(s, 0.06);
     // the chain case: round the ring and the cog, between the ring and the crank
@@ -402,7 +407,7 @@ pub(crate) fn kid_extras(s: &Bike) {
 }
 
 /// The mountain bike's own things: a suspension fork's crown and stanchions, and a disc brake at each wheel.
-pub(crate) fn mtb_extras(s: &Bike) {
+pub(super) fn mtb_extras(s: &Bike) {
     let z = s.z;
     let (cx, cy) = s.crown.unwrap_or(s.hb);
     fbox!(
@@ -461,7 +466,7 @@ pub(crate) fn mtb_extras(s: &Bike) {
 }
 
 /// The road bike's own things: a bottle on the down tube, a brake caliper at each wheel.
-pub(crate) fn road_extras(s: &Bike) {
+pub(super) fn road_extras(s: &Bike) {
     let z = s.z;
     bb_shell(s, 0.07);
     board(
@@ -511,7 +516,7 @@ pub(crate) fn road_extras(s: &Bike) {
 
 /// The cargo bike's own things: the long box between the rider and the front wheel, with a padded bench, a
 /// wooden floor and rails, a lamp on its front and a red light at the back.
-pub(crate) fn cargo_extras(s: &Bike) {
+pub(super) fn cargo_extras(s: &Bike) {
     let z = s.z;
     bb_shell(s, 0.08);
     let (x0, x1, y0, y1, hz) = (0.42, 1.00, 0.30, 0.66, 0.30); // the box's ends (x), its floor and top rail (y), its half depth (z)
@@ -615,7 +620,7 @@ pub(crate) fn cargo_extras(s: &Bike) {
 
 /// The e-bike's own things: the battery in the down tube, the motor at the bottom bracket, a display on the
 /// bars, built-in lights, and a carrier over the back wheel.
-pub(crate) fn ebike_extras(s: &Bike) {
+pub(super) fn ebike_extras(s: &Bike) {
     let z = s.z;
     bb_shell(s, 0.08);
     fcyl!(

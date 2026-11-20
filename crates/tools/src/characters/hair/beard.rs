@@ -1,13 +1,11 @@
 //! The beard.
-//!
-//! Split from `characters/hair.rs` (see `mod.rs`).
 
 use super::*;
 
 /// A shell over the jaw, chin and upper lip with a hole round the lips (cells inside it collapse
 /// onto its edge), in locks: thicker down their middles, their tips hanging below the jaw at the
 /// chin, thinning to the skin at its lower edge.
-pub(crate) fn beard(sc: &Scalp) -> Comp {
+pub(super) fn beard(sc: &Scalp) -> Comp {
     let h = sc.h;
     let hh = h.hh;
     let (cols, rows) = (25, 12);

@@ -1,8 +1,12 @@
 //! Measuring a decimated model.
-//!
-//! Split from `checkglb/against/measures.rs` (see `mod.rs`).
 
 use super::*;
+use crate::checkglb::against::{
+    DECIMATED_FLOOR, DECIMATED_SIZE, DECIMATED_SURFACE, DECIMATED_TRIANGLES, Finding, Numbers,
+    found, mm, point, share,
+};
+use crate::checkglb::glb::{Glb, R};
+use crate::checkglb::near::P3;
 
 /// A far version held to `decimated`, the whole of it at rest as one surface: each side of its box within
 /// `DECIMATED_SIZE` of the old one's, its lowest point within `DECIMATED_FLOOR` of `floor` (the full model's),

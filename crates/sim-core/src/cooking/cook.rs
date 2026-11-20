@@ -1,13 +1,11 @@
 //! Choosing a recipe, its stations, and walking the cook through its steps.
-//!
-//! Split from `cooking.rs` (see `mod.rs`).
 
 use super::*;
 
 // ---- Cooking, eating, washing up (a resident's step) --------------------------------------
 
 /// The tile a resident uses `obj` from (`surface::Links`, cached for the tick).
-pub(crate) fn approach(ctx: &Ctx, obj: &ObjectInstance) -> (i32, i32) {
+pub(super) fn approach(ctx: &Ctx, obj: &ObjectInstance) -> (i32, i32) {
     ctx.index
         .links
         .approach_of(obj.id)
@@ -55,7 +53,7 @@ pub(crate) fn home_stations(ctx: &Ctx, household: u32, objects: &[ObjectInstance
 }
 
 /// Who's at home in the household (babies aside), the resident too.
-pub(crate) fn at_home<'a>(sim: &Sim, ctx: &'a Ctx) -> impl Iterator<Item = usize> + 'a {
+pub(super) fn at_home<'a>(sim: &Sim, ctx: &'a Ctx) -> impl Iterator<Item = usize> + 'a {
     let home = ctx.households[sim.household as usize].plot;
     let household = sim.household;
     let found = move |j: usize| {
@@ -109,7 +107,7 @@ pub(crate) fn eating(sim: &Sim, items: &Items) -> Option<usize> {
 }
 
 /// A station for a step.
-pub(crate) enum Found {
+pub(super) enum Found {
     At(u32),
     /// There is one, but someone's using it.
     Busy,
@@ -123,7 +121,7 @@ pub(crate) enum Found {
 /// interactions: a wall cabinet) needs the tile in front of it free, and one higher than they
 /// reach (a wall cupboard for a child) is passed over.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn find_station(
+pub(super) fn find_station(
     sim: &Sim,
     ctx: &Ctx,
     objects: &[ObjectInstance],
@@ -219,7 +217,7 @@ pub(crate) fn start(
 }
 
 /// Heads for `obj` (reserving a slot) for `task`; false if it can't be reached or is taken.
-pub(crate) fn go_to(
+pub(super) fn go_to(
     sim: &mut Sim,
     task: Task,
     ctx: &Ctx,
@@ -262,7 +260,7 @@ pub(crate) fn go_to(
 }
 
 /// Walks to tile `goal` for `task`.
-pub(crate) fn walk_to(
+pub(super) fn walk_to(
     sim: &mut Sim,
     task: Task,
     ctx: &Ctx,
@@ -285,7 +283,7 @@ pub(crate) fn walk_to(
 /// The tiles to stand on to reach an item, best first: in front of what it's on or in, then
 /// the free tiles round it nearest the item (a table with chairs pulled up to its front); on
 /// the floor, its tile, then the free ones beside it.
-pub(crate) fn item_access(ctx: &Ctx, objects: &[ObjectInstance], at: &ItemAt) -> Vec<(i32, i32)> {
+pub(super) fn item_access(ctx: &Ctx, objects: &[ObjectInstance], at: &ItemAt) -> Vec<(i32, i32)> {
     let nav = &ctx.nav;
     let free = |(x, z): (i32, i32)| nav.tile_free(x, z) && nav.stairs.step(x, z).is_none();
     let Some(o) = crate::items::holder(ctx.content, objects, at) else {
@@ -325,7 +323,7 @@ pub(crate) fn item_access(ctx: &Ctx, objects: &[ObjectInstance], at: &ItemAt) ->
 
 /// Waits for a busy station for `task` (`waited` ticks so far: `Phase::Queued`), first stepping
 /// aside off the spot they used (`aside`) so the next one to use it doesn't stand inside them.
-pub(crate) fn queue(sim: &mut Sim, task: Task, ctx: &Ctx, tags: TagMask, waited: Option<u32>) {
+pub(super) fn queue(sim: &mut Sim, task: Task, ctx: &Ctx, tags: TagMask, waited: Option<u32>) {
     if waited.is_none() && aside(sim, ctx).is_some_and(|t| walk_to(sim, task, ctx, t, tags)) {
         return;
     }
@@ -341,7 +339,7 @@ pub(crate) fn queue(sim: &mut Sim, task: Task, ctx: &Ctx, tags: TagMask, waited:
 /// The tile beside `sim` to wait on: free, on their storey, nothing used from it (no object's
 /// approach tile) and nobody else standing there; the ones straight beside first. None when
 /// they aren't on a tile something is used from, or there is no such tile.
-pub(crate) fn aside(sim: &Sim, ctx: &Ctx) -> Option<(i32, i32)> {
+pub(super) fn aside(sim: &Sim, ctx: &Ctx) -> Option<(i32, i32)> {
     let nav = &ctx.nav;
     let used = |t: (i32, i32)| ctx.index.links.approach.contains(&t);
     let (x, z) = sim.tile();
@@ -378,7 +376,7 @@ pub(crate) fn aside(sim: &Sim, ctx: &Ctx) -> Option<(i32, i32)> {
 }
 
 /// Walks for `task` to the first of `goals` (a few at most) there's a way to.
-pub(crate) fn walk_to_any(
+pub(super) fn walk_to_any(
     sim: &mut Sim,
     task: Task,
     ctx: &Ctx,
@@ -392,7 +390,7 @@ pub(crate) fn walk_to_any(
 }
 
 /// Tags of a recipe being made (its interaction's, for "busy" checks and plans).
-pub(crate) fn cook_tags(
+pub(super) fn cook_tags(
     content: &Content,
     objects: &[ObjectInstance],
     origin: Option<u32>,
@@ -405,7 +403,7 @@ pub(crate) fn cook_tags(
 /// waiting for a busy one (`waited` ticks so far). `last` is the station of the step just done.
 /// The minutes of optional steps done without are carried in the task's `minutes` to the next
 /// step that has a station (no counter: they chop by the stove).
-pub(crate) fn cook_next(
+pub(super) fn cook_next(
     sim: &mut Sim,
     mut task: Task,
     ctx: &Ctx,
@@ -545,7 +543,7 @@ pub(crate) fn called_away(
 }
 
 /// A recipe left off before its step: to go on later from there, finding a station again.
-pub(crate) fn left_off(task: Task) -> Task {
+pub(super) fn left_off(task: Task) -> Task {
     let TaskKind::Cook {
         recipe,
         step,
@@ -573,7 +571,7 @@ pub(crate) fn left_off(task: Task) -> Task {
 }
 
 /// Whether `task` is care for a crying baby they were called away to (not the player's).
-pub(crate) fn baby_care(task: &Task, content: &Content, objects: &[ObjectInstance]) -> bool {
+pub(super) fn baby_care(task: &Task, content: &Content, objects: &[ObjectInstance]) -> bool {
     let TaskKind::Use {
         object,
         interaction,
@@ -591,7 +589,7 @@ pub(crate) fn baby_care(task: &Task, content: &Content, objects: &[ObjectInstanc
 /// A step done with a crying baby waiting (`called_away`): they go now. The rest of the recipe
 /// waits in the queue after the baby; a dish just served stays where it was put (they don't
 /// sit down to it now: a plate in hand is put down, `settle`).
-pub(crate) fn leave_for_baby(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance]) {
+pub(super) fn leave_for_baby(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance]) {
     if !sim
         .queue
         .front()
@@ -614,7 +612,7 @@ pub(crate) fn leave_for_baby(sim: &mut Sim, content: &Content, objects: &mut [Ob
 }
 
 /// Nowhere to make it: they think about wanting somewhere to cook.
-pub(crate) fn cannot_cook(sim: &mut Sim, ctx: &Ctx, tags: TagMask) {
+pub(super) fn cannot_cook(sim: &mut Sim, ctx: &Ctx, tags: TagMask) {
     let content = ctx.content;
     sim.current = None;
     let eat = content.cooking.eat_tags;
@@ -631,12 +629,12 @@ pub(crate) fn cannot_cook(sim: &mut Sim, ctx: &Ctx, tags: TagMask) {
 }
 
 /// How many servings to make: one each for whoever's at home, within the recipe's.
-pub(crate) fn servings_for(sim: &Sim, ctx: &Ctx, r: &RecipeDef) -> u8 {
+pub(super) fn servings_for(sim: &Sim, ctx: &Ctx, r: &RecipeDef) -> u8 {
     (at_home(sim, ctx).count().clamp(1, 255) as u8).clamp(r.servings[0], r.servings[1])
 }
 
 /// Pays for the ingredients (how many servings); None if the money ran out.
-pub(crate) fn buy_ingredients(sim: &mut Sim, ctx: &Ctx, r: &RecipeDef) -> Option<u8> {
+pub(super) fn buy_ingredients(sim: &mut Sim, ctx: &Ctx, r: &RecipeDef) -> Option<u8> {
     let n = servings_for(sim, ctx, r);
     let cost = r.cost(n);
     let funds = ctx.households[sim.household as usize].funds - sim.pending_spend;
@@ -648,7 +646,7 @@ pub(crate) fn buy_ingredients(sim: &mut Sim, ctx: &Ctx, r: &RecipeDef) -> Option
 }
 
 /// The household's objects that things can be put on or in.
-pub(crate) fn home_objects<'a>(ctx: &Ctx<'a>, household: u32) -> &'a [u32] {
+pub(super) fn home_objects<'a>(ctx: &Ctx<'a>, household: u32) -> &'a [u32] {
     ctx.households[household as usize]
         .plot
         .map_or(&[], |p| ctx.index.on(p))

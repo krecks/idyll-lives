@@ -1,6 +1,4 @@
 //! Objects: the content's objects, their interactions, and the way to them.
-//!
-//! Split from `content/load/mod.rs` (see `mod.rs`).
 
 use super::*;
 

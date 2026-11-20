@@ -1,6 +1,4 @@
 //! Euler angles: the orders, and the turns to and from them.
-//!
-//! Split from `crates/artkit/src/math.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Who is waiting on whom, and keeping stopped traffic off junctions.
-//!
-//! Split from `traffic.rs` (see `mod.rs`).
 
 use super::*;
 

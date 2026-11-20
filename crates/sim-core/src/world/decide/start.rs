@@ -1,8 +1,14 @@
 //! Starting a task: what it takes, and what happens when it cannot be started.
-//!
-//! Split from `world/decide.rs` (see `mod.rs`).
 
 use super::*;
+use crate::content::{HabitTime, Layer, Pose};
+use crate::conversation;
+use crate::world::{
+    Access, Activity, Ctx, News, ObjectInstance, Phase, Sim, Task, TaskKind, access, closed_now,
+    conditions_met, exit_on_foot, fetch_source, footstool_slots, guest_may, habit, leisure_ride,
+    no_bike_out, open_ground_near, order_access, outing_fits_now, seat_near_object, taxi_from_home,
+    unfit, upper_barred, walk_route,
+};
 
 pub(crate) fn start_task(
     sim: &mut Sim,

@@ -1,11 +1,10 @@
 //! Reading a model: its chunks, its accessors and its primitives.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
 use super::*;
+use crate::json::Json;
 
 /// The JSON and the binary chunk of a .glb.
-pub(crate) fn chunks(data: &[u8]) -> Result<(Json, &[u8]), String> {
+pub(super) fn chunks(data: &[u8]) -> Result<(Json, &[u8]), String> {
     let u32_at = |at: usize| -> Result<u32, String> {
         data.get(at..at + 4)
             .map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
@@ -40,14 +39,14 @@ pub(crate) fn chunks(data: &[u8]) -> Result<(Json, &[u8]), String> {
     Ok((json.ok_or("no JSON chunk")?, bin))
 }
 
-pub(crate) fn int(v: Option<&Json>) -> Option<usize> {
+pub(super) fn int(v: Option<&Json>) -> Option<usize> {
     match v {
         Some(Json::Int(i)) if *i >= 0 => Some(*i as usize),
         _ => None,
     }
 }
 
-pub(crate) fn float(v: &Json) -> Option<f32> {
+pub(super) fn float(v: &Json) -> Option<f32> {
     match v {
         Json::Int(i) => Some(*i as f32),
         Json::Num(x) => Some(*x as f32),
@@ -55,7 +54,7 @@ pub(crate) fn float(v: &Json) -> Option<f32> {
     }
 }
 
-pub(crate) fn floats<const N: usize>(v: Option<&Json>, or: [f32; N]) -> Result<[f32; N], String> {
+pub(super) fn floats<const N: usize>(v: Option<&Json>, or: [f32; N]) -> Result<[f32; N], String> {
     match v {
         None => Ok(or),
         Some(Json::Arr(items)) if items.len() == N => {
@@ -69,7 +68,7 @@ pub(crate) fn floats<const N: usize>(v: Option<&Json>, or: [f32; N]) -> Result<[
     }
 }
 
-pub(crate) fn list<'a>(j: &'a Json, key: &str) -> &'a [Json] {
+pub(super) fn list<'a>(j: &'a Json, key: &str) -> &'a [Json] {
     match j.get(key) {
         Some(Json::Arr(items)) => items,
         _ => &[],
@@ -79,14 +78,14 @@ pub(crate) fn list<'a>(j: &'a Json, key: &str) -> &'a [Json] {
 /// Where an accessor's elements lie in the buffer.
 struct Layout {
     /// glTF's component type
-    pub(crate) kind: usize,
+    pub(super) kind: usize,
     /// a component's bytes
-    pub(crate) size: usize,
+    pub(super) size: usize,
     /// numbers an element
-    pub(crate) per: usize,
-    pub(crate) count: usize,
+    pub(super) per: usize,
+    pub(super) count: usize,
     /// (first byte, bytes from one element to the next); none without a buffer view (all zeros)
-    pub(crate) place: Option<(usize, usize)>,
+    pub(super) place: Option<(usize, usize)>,
 }
 
 fn layout(j: &Json, index: usize) -> Result<Layout, String> {
@@ -139,7 +138,7 @@ fn layout(j: &Json, index: usize) -> Result<Layout, String> {
 }
 
 /// An accessor's values as floats (normalised integers scaled to 0..1 or -1..1), and how many make one element.
-pub(crate) fn accessor(j: &Json, bin: &[u8], index: usize) -> Result<(Vec<f32>, usize), String> {
+pub(super) fn accessor(j: &Json, bin: &[u8], index: usize) -> Result<(Vec<f32>, usize), String> {
     let Layout {
         kind,
         size,
@@ -228,7 +227,7 @@ fn grouped<const N: usize>(
     Ok(values.as_chunks::<N>().0.to_vec())
 }
 
-pub(crate) fn primitive(j: &Json, bin: &[u8], p: &Json, mi: usize) -> Result<Primitive, String> {
+pub(super) fn primitive(j: &Json, bin: &[u8], p: &Json, mi: usize) -> Result<Primitive, String> {
     let mode = int(p.get("mode")).unwrap_or(4);
     if mode != 4 {
         return Err(format!(

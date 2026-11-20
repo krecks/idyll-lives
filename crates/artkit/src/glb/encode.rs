@@ -1,6 +1,4 @@
 //! A model encoded as a .glb.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
 use super::*;
 

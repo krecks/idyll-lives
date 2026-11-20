@@ -1,10 +1,10 @@
 //! Reading a revision out of git.
-//!
-//! Split from `checkglb/against/measures.rs` (see `mod.rs`).
 
-use super::*;
+use std::io::{BufRead, BufReader, Read, Write};
+use std::path::Path;
+use std::process::{Command, Stdio};
 
-pub(crate) fn git(root: &str, args: &[&str]) -> Result<Vec<u8>, String> {
+pub(super) fn git(root: &str, args: &[&str]) -> Result<Vec<u8>, String> {
     let out = Command::new("git")
         .arg("-C")
         .arg(root)
@@ -39,7 +39,7 @@ pub(crate) fn is_rev(root: &str, rev: &str) -> bool {
 
 /// Writes the files `paths` (from the checkout's root) as revision `rev` has them under `into`; one it has not is
 /// left out.
-pub(crate) fn checkout(root: &str, rev: &str, paths: &[String], into: &str) -> Result<(), String> {
+pub(super) fn checkout(root: &str, rev: &str, paths: &[String], into: &str) -> Result<(), String> {
     if paths.is_empty() {
         return Ok(());
     }

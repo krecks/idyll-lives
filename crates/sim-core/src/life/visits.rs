@@ -23,7 +23,7 @@ fn carer_home(w: &World, h: usize, plot: u32, except: Option<usize>) -> bool {
 /// Who `i` would stay home for if they left for work now: a baby at home with no other
 /// grown-up there, no babysitter booked for today and no money for one (content
 /// `life.childcare`; without it, nobody stays home).
-pub(crate) fn stays_home_for(w: &World, i: usize) -> Option<usize> {
+pub(super) fn stays_home_for(w: &World, i: usize) -> Option<usize> {
     let rules = w.content.life.childcare?;
     let h = w.sims[i].household as usize;
     let household = &w.households[h];
@@ -126,7 +126,7 @@ pub(crate) fn minding_baby(sim: &Sim, ctx: &Ctx) -> bool {
 /// the baby is left with no grown-up at home while they're out (at work, visiting, wherever);
 /// while nobody's home, the babysitter does the care interactions of the baby's crib whenever
 /// a need they fill is low.
-pub(crate) fn childcare(w: &mut World, b: usize) {
+pub(super) fn childcare(w: &mut World, b: usize) {
     let Some(rules) = w.content.life.childcare else {
         return;
     };
@@ -255,7 +255,7 @@ fn still_to_go(w: &World, out: u64) -> u64 {
     out + crate::cars::off_map_ticks(w)
 }
 
-pub(crate) fn apply_transition(w: &mut World, i: usize, transition: Transition) {
+pub(super) fn apply_transition(w: &mut World, i: usize, transition: Transition) {
     let tick = w.tick;
     match transition {
         // At the way out of town (or, with no way out, where they are).
@@ -397,7 +397,7 @@ fn on_the_way(w: &mut World, i: usize, plot: u32, directed: bool) {
 }
 
 /// The plot a visitor is knocking at, and how long they've waited and who is coming, if they are.
-pub(crate) fn knocking(sim: &crate::world::Sim) -> Option<(u32, u32, Option<u32>)> {
+pub(super) fn knocking(sim: &crate::world::Sim) -> Option<(u32, u32, Option<u32>)> {
     match sim.current.as_ref()? {
         Activity {
             task:
@@ -414,7 +414,7 @@ pub(crate) fn knocking(sim: &crate::world::Sim) -> Option<(u32, u32, Option<u32>
 
 /// Visitors at front doors (`visits.door`): someone at home is sent to answer; with nobody to
 /// answer, the visitor gives up after a while and goes home.
-pub(crate) fn doors(w: &mut World) {
+pub(super) fn doors(w: &mut World) {
     let Some(rules) = w.content.visits.door.clone() else {
         return;
     };

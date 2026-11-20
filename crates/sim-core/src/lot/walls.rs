@@ -1,6 +1,4 @@
 //! Walls and diagonals: reading and setting the edges of the grid.
-//!
-//! Split from `lot.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -116,7 +114,7 @@ impl Lot {
     }
 
     /// Notes a change between built and open in chunk `c`.
-    pub(crate) fn count(&mut self, c: usize, was: bool, is: bool) {
+    pub(super) fn count(&mut self, c: usize, was: bool, is: bool) {
         match (was, is) {
             (false, true) => self.built[c] += 1,
             (true, false) => self.built[c] -= 1,

@@ -1,6 +1,4 @@
 //! Trips out: who can drive, setting off, riding along and coming home.
-//!
-//! Split from `cars.rs` (see `mod.rs`).
 
 use super::*;
 

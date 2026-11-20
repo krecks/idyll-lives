@@ -1,6 +1,4 @@
-//! [(1720, 1928)]
-//!
-//! Split from `content.rs` (see `mod.rs`).
+//! Buying, upgrading, repairing and selling objects, and the build rules (land prices, styles).
 
 use super::*;
 

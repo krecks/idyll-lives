@@ -1,12 +1,10 @@
-//! [(456, 511), (1105, 1161), (1417, 1521), (2909, 2936)]
-//!
-//! Split from `view.rs` (see `mod.rs`).
+//! Feelings, actions, the phone and its contacts, relationships, and the social options.
 
 use super::*;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct FeelingView<'a> {
+pub(super) struct FeelingView<'a> {
     pub id: &'a str,
     pub label: &'a str,
     pub mood: f32,
@@ -15,7 +13,7 @@ pub(crate) struct FeelingView<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ActionView {
+pub(super) struct ActionView {
     pub label: String,
     /// The object it's done at (its stable id, as everywhere in the view).
     pub object: Option<u32>,
@@ -30,16 +28,16 @@ pub(crate) struct ActionView {
 /// reach.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct PhoneView {
+pub(super) struct PhoneView {
     pub off: Option<&'static str>,
-    pub(crate) contacts: Vec<ContactView>,
+    pub(super) contacts: Vec<ContactView>,
 }
 
 /// Someone in a resident's phone: what keeps them from it (asleep, at work...), and per phone
 /// action (content order) why it's out with them right now, if it is.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ContactView {
+pub(super) struct ContactView {
     pub id: u32,
     pub status: Option<&'static str>,
     pub why: Vec<Option<&'static str>>,
@@ -47,7 +45,7 @@ pub(crate) struct ContactView {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct RelView {
+pub(super) struct RelView {
     pub a: u32,
     pub b: u32,
     pub friendship: f32,
@@ -62,7 +60,7 @@ pub(crate) struct RelView {
 // ---- UI updates ------------------------------------------------------------------------------
 
 /// Their phone, if the content gives residents one: everyone they've met who has one too.
-pub(crate) fn phone_view(world: &World, s: &Sim) -> Option<PhoneView> {
+pub(super) fn phone_view(world: &World, s: &Sim) -> Option<PhoneView> {
     let content = &world.content;
     if content.phone.actions.is_empty() {
         return None;
@@ -92,7 +90,7 @@ pub(crate) fn phone_view(world: &World, s: &Sim) -> Option<PhoneView> {
 }
 
 /// "Visit the Smiths", or the plot's name when nobody lives there.
-pub(crate) fn host_name(world: &World, plot: u32) -> String {
+pub(super) fn host_name(world: &World, plot: u32) -> String {
     world
         .households
         .iter()
@@ -105,7 +103,7 @@ pub(crate) fn host_name(world: &World, plot: u32) -> String {
 
 /// The recipe of what's being eaten (the dish's name is the pot's, not the plate's: "Eat
 /// Home-cooked meal").
-pub(crate) fn dish(
+pub(super) fn dish(
     world: &World,
     held: Option<crate::items::Held>,
     item: Option<u32>,
@@ -119,7 +117,7 @@ pub(crate) fn dish(
 }
 
 /// What a resident is doing and has queued; work or school, and being talked to, come first.
-pub(crate) fn actions(world: &World, s: &Sim) -> Vec<ActionView> {
+pub(super) fn actions(world: &World, s: &Sim) -> Vec<ActionView> {
     let content = &world.content;
     let mut actions = Vec::new();
     if let Some(until) = s.away_until {
@@ -205,7 +203,7 @@ pub(crate) fn actions(world: &World, s: &Sim) -> Vec<ActionView> {
     actions
 }
 
-pub(crate) fn feelings<'a>(world: &'a World, s: &Sim) -> Vec<FeelingView<'a>> {
+pub(super) fn feelings<'a>(world: &'a World, s: &Sim) -> Vec<FeelingView<'a>> {
     s.feelings
         .iter()
         .map(|m| {
@@ -224,7 +222,7 @@ pub(crate) fn feelings<'a>(world: &'a World, s: &Sim) -> Vec<FeelingView<'a>> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct OptionView<'a> {
+pub(super) struct OptionView<'a> {
     pub index: usize,
     pub id: &'a str,
     pub label: &'a str,

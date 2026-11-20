@@ -1,6 +1,4 @@
-//! [(1270, 1465)]
-//!
-//! Split from `content.rs` (see `mod.rs`).
+//! Careers, their levels, grades and categories, the job market, cars by job, and skills.
 
 use super::*;
 

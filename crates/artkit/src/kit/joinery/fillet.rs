@@ -1,8 +1,10 @@
 //! Bending a path round its corners.
-//!
-//! Split from `kit/joinery.rs` (see `mod.rs`).
 
 use super::*;
+use crate::kit::{least, most};
+use crate::materials::Mat;
+use crate::math::{V3, pow, tan};
+use crate::shapes::options;
 
 /// The path through `points` (any axes) with each inner corner rounded to about `radius` (`steps` points round
 /// it, on a curve that never overshoots, however uneven the spacing: Catmull-Rom loops on a short leg beside a long

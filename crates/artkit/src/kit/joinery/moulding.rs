@@ -1,8 +1,12 @@
 //! A moulding.
-//!
-//! Split from `kit/joinery.rs` (see `mod.rs`).
 
 use super::*;
+use crate::materials::Mat;
+use crate::math::{V3, pow};
+use crate::place::{Facing, GameFrame};
+use crate::scene::Obj;
+use crate::shapes::options;
+use crate::{forms, py};
 
 /// A moulding run round a closed `outline` with mitred corners: a picture or mirror frame, a panel's bead, a
 /// plinth's or a cornice's band. `outline` is game (x, height) points drawn at depth `at` (`Facing::Front`), or

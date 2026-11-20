@@ -1,11 +1,9 @@
 //! The file a model is written into: its buffers and its JSON.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
 use super::*;
 
 impl File {
-    pub(crate) fn view(&mut self, bytes: &[u8], target: Option<u32>) -> usize {
+    pub(super) fn view(&mut self, bytes: &[u8], target: Option<u32>) -> usize {
         while !self.bin.len().is_multiple_of(4) {
             self.bin.push(0);
         }
@@ -21,7 +19,7 @@ impl File {
         self.views.len() - 1
     }
 
-    pub(crate) fn floats(
+    pub(super) fn floats(
         &mut self,
         values: &[f32],
         kind: &'static str,

@@ -1,6 +1,4 @@
 //! Life, household and accident shapes (content `life`).
-//!
-//! Split from `content/parse.rs` (see `mod.rs`).
 
 use super::*;
 

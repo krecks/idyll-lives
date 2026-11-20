@@ -1,6 +1,4 @@
 //! The scalar functions: the `math` module of a Python float.
-//!
-//! Split from `crates/artkit/src/math.rs` (see `mod.rs`).
 
 pub const PI: f64 = std::f64::consts::PI;
 pub const TAU: f64 = std::f64::consts::TAU;

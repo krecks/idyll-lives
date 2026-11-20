@@ -1,6 +1,4 @@
 //! Keys given as points, and the traits that let them be.
-//!
-//! Split from `motion.rs` (see `mod.rs`).
 
 use super::*;
 

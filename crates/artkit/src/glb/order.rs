@@ -1,8 +1,7 @@
 //! The order objects go into the file in.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
-use super::*;
+use crate::scene::Obj;
+use std::collections::BTreeMap;
 
 /// A name as Blender's exporter sorts nodes by it: its runs of digits as numbers, the text between without case
 /// (`door1` before `door-1`, `water` before `water.001`, `leg2` before `leg10`).
@@ -34,7 +33,7 @@ fn natural_key(name: &str) -> Vec<(String, u128)> {
 /// The parts as the file has its nodes: the ones with no parent among them by name (as `natural_key` sorts),
 /// each after its children, they by name too; and the order the clips are met in: each parent before its
 /// children. Blender's exporter walks the scene so, whatever order the parts were made or given in.
-pub(crate) fn file_order(objs: &[Obj]) -> (Vec<Obj>, Vec<usize>) {
+pub(super) fn file_order(objs: &[Obj]) -> (Vec<Obj>, Vec<usize>) {
     let by_name = |list: &mut Vec<Obj>| list.sort_by_cached_key(|o| natural_key(&o.name()));
     let mut roots: Vec<Obj> = Vec::new();
     let mut children: BTreeMap<Obj, Vec<Obj>> = BTreeMap::new();
@@ -65,7 +64,7 @@ pub(crate) fn file_order(objs: &[Obj]) -> (Vec<Obj>, Vec<usize>) {
 }
 
 /// An order for floats that sorts them as numbers.
-pub(crate) fn key(x: f32) -> i64 {
+pub(super) fn key(x: f32) -> i64 {
     let b = x.to_bits() as i64;
     if b < 0x8000_0000 {
         b

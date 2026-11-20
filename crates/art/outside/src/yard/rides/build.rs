@@ -1,8 +1,12 @@
 //! The bikes as parts are given them.
-//!
-//! Split from `yard/rides.rs` (see `mod.rs`).
 
 use super::*;
+use crate::yard::common::F;
+use crate::yard::play::{Bike, bike, wheel};
+use artkit::far::is_low;
+use artkit::math::P3;
+use artkit::parts::{Settle, join, join_all, new_parts, settle_with};
+use artkit::scene::{Obj, meshes};
 
 /// A bike `S` in its nodes (the note above): `extras` and `stand` (its pivot at game (x, height) `pivot`) build what
 /// this one has of its own.

@@ -1,6 +1,4 @@
 //! Trips and outings: when to go, how long for, and the way out of town.
-//!
-//! Split from `world.rs` (see `mod.rs`).
 
 use super::*;
 

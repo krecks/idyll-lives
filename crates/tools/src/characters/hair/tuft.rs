@@ -1,17 +1,15 @@
 //! Tufts and tousled locks.
-//!
-//! Split from `characters/hair.rs` (see `mod.rs`).
 
 use super::*;
 
 /// How far a lock's tip wisps are drawn in from the ring they leave it at (`brush`).
-pub(crate) const TIP_TAPER: f64 = 0.45;
+pub(super) const TIP_TAPER: f64 = 0.45;
 
 /// A lock lying on the scalp from (a, phi), `len` (rad of arc) long, turned `turn` from straight
 /// down the head and lifting off it by `lift` (m) at its tip: a flattened tube `wide` across and
 /// `thick` deep, tapering to a point.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn tuft(
+pub(super) fn tuft(
     sc: &Scalp,
     a: f64,
     phi: f64,
@@ -75,7 +73,7 @@ fn tuft_clears(sc: &Scalp, a: f64, phi: f64, len: f64, turn: f64, wide: f64) -> 
 
 /// The tousled style's locks as its seed lays them: each one's azimuth, how far down to the hairline it
 /// grows (of the hairline's polar angle), its length, its turn, and its lift and breadth (of hh).
-pub(crate) fn tousled_locks() -> Vec<[f64; 6]> {
+pub(super) fn tousled_locks() -> Vec<[f64; 6]> {
     let mut rng = Pcg64::new(11);
     (0..22)
         .map(|k| {
@@ -96,7 +94,7 @@ pub(crate) fn tousled_locks() -> Vec<[f64; 6]> {
 
 /// A tousled lock's length on a head: one that would lie on an ear is cut shorter until it ends above it
 /// (`tuft_clears`); none, if it grows from beside one.
-pub(crate) fn tousled_cut(sc: &Scalp, hh: f64, lock: [f64; 6]) -> Option<f64> {
+pub(super) fn tousled_cut(sc: &Scalp, hh: f64, lock: [f64; 6]) -> Option<f64> {
     let [a, down, len, turn, _, wide] = lock;
     let phi = sc.hairline(a) * down;
     (0..8)
@@ -108,7 +106,7 @@ static TOUSLED: Cache<String, Vec<bool>> = Cache::new();
 
 /// Which of the tousled locks a family has: those that clear the ears on its base stage. Every stage has
 /// the same ones (the style is one topology, and the ears' ovals differ a little from stage to stage).
-pub(crate) fn tousled_kept(family: &str) -> Arc<Vec<bool>> {
+pub(super) fn tousled_kept(family: &str) -> Arc<Vec<bool>> {
     TOUSLED.get(family.to_string(), || {
         let h = head_frame(family, BASE_STAGE);
         let sc = Scalp::new(&h, true).round(&Ears::of(family, BASE_STAGE, &h));

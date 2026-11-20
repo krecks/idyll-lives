@@ -1,12 +1,10 @@
 //! Jackets: the shell over the torso, and the collar on its neckline.
-//!
-//! Split from `characters/clothes.rs` (see `mod.rs`).
 
 use super::*;
 
 /// A band turned back from each open edge towards the skin (the cloth's thickness); edges with
 /// both ends in `skip` get none.
-pub(crate) fn rim(
+pub(super) fn rim(
     pos: &[V3],
     nor: &[V3],
     idx: &[usize],
@@ -32,7 +30,7 @@ pub(crate) fn rim(
 }
 
 /// A shell's positions, unit normals and skinning on `stage`'s body, from its source edges `src` on the base body.
-pub(crate) fn shell_on(
+pub(super) fn shell_on(
     family: &str,
     stage: &str,
     src: &Src,
@@ -50,7 +48,7 @@ pub(crate) fn shell_on(
     (pos, nor, shell_dense(src, dense))
 }
 
-pub(crate) fn jacket(family: &str, stage: &str, gid: &str, lod: bool) -> Mesh {
+pub(super) fn jacket(family: &str, stage: &str, gid: &str, lod: bool) -> Mesh {
     let lay = jacket_layout(family, gid, lod);
     let (pos, nor, mut d) = shell_on(family, stage, &lay.src, lod);
     let cut = &lay.cut;
@@ -121,7 +119,7 @@ pub(crate) fn jacket(family: &str, stage: &str, gid: &str, lod: bool) -> Mesh {
 }
 
 /// A turned-down collar on the neckline (open at the front).
-pub(crate) fn collar(family: &str, stage: &str, gid: &str, cuts: &Cuts) -> Mesh {
+pub(super) fn collar(family: &str, stage: &str, gid: &str, cuts: &Cuts) -> Mesh {
     let s = surface(family, stage);
     let sb = surface(family, BASE_STAGE);
     let p = &s.p;
@@ -216,6 +214,6 @@ pub(crate) fn collar(family: &str, stage: &str, gid: &str, cuts: &Cuts) -> Mesh 
     }
 }
 
-pub(crate) fn surface_tris(family: &str) -> Arc<Vec<usize>> {
+pub(super) fn surface_tris(family: &str) -> Arc<Vec<usize>> {
     tris(family)
 }

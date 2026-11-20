@@ -1,8 +1,7 @@
 //! `Quat`, as `mathutils` has it.
-//!
-//! Split from `crates/artkit/src/math.rs` (see `mod.rs`).
 
 use super::*;
+use std::ops::Mul;
 
 /// `mathutils.Quaternion`: (w, x, y, z), single precision.
 #[derive(Clone, Copy, PartialEq, Debug)]

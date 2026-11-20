@@ -1,6 +1,4 @@
 //! The compact encodings a save uses (run lengths, base64, edges, looks, floors, diagonals).
-//!
-//! Split from `save.rs` (see `mod.rs`).
 
 use super::*;
 

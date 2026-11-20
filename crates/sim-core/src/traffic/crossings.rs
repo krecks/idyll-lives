@@ -1,6 +1,4 @@
 //! Pedestrians crossing, and the kerb they stop at.
-//!
-//! Split from `traffic.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -20,7 +18,7 @@ const CROSS_CELL: f32 = 16.0;
 const KERB_STEP: f32 = 0.25;
 
 impl Crossings {
-    pub(crate) fn new(signals: &[Signal]) -> Self {
+    pub(super) fn new(signals: &[Signal]) -> Self {
         let lit = || signals.iter().filter(|s| s.walk_clear > 0);
         let far = lit().fold([0.0f32; 2], |m, s| {
             let r = s.crossing_reach();
@@ -50,7 +48,7 @@ impl Crossings {
 /// Whether lit junction `s`'s crosswalk on arm `arm` is open to those on foot: its walk phase,
 /// while they may step out (`WALK_OPEN`), or a side road's on its main road's green
 /// (`Signal::opens_with`).
-pub(crate) fn walk_open(signals: &[Signal], lights: &[Light], s: usize, arm: usize) -> bool {
+pub(super) fn walk_open(signals: &[Signal], lights: &[Light], s: usize, arm: usize) -> bool {
     let sig = &signals[s];
     lights.get(s).is_some_and(|l| {
         l.stage == Stage::Green

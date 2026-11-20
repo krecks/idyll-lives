@@ -1,8 +1,14 @@
 //! One Sim's tick: what they do next and how they get there.
-//!
-//! Split from `world/tick.rs` (see `mod.rs`).
 
 use super::*;
+use crate::content::Pose;
+use crate::rng::Rng;
+use crate::world::{
+    AUTONOMY_DELAY_TICKS, BABY_CRIES_BELOW, Ctx, ObjectInstance, PERSON_UNREACHABLE_TICKS, Phase,
+    Sim, Task, TaskKind, accident, crib_for, end_activity, filling, home_fills, outing_leave_by,
+    pick_autonomous, progress, ready_to_leave, start_task,
+};
+use crate::{conversation, social};
 
 pub(crate) fn step_sim(
     sim: &mut Sim,

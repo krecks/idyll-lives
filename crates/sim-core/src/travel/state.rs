@@ -1,6 +1,4 @@
 //! The town's travel state: entries and doors, ETAs and walk plans.
-//!
-//! Split from `travel.rs` (see `mod.rs`).
 
 use super::*;
 /// How a way is searched for (`Graph::path_by`): setting off only towards this node (an end of the
@@ -12,19 +10,19 @@ pub struct Way {
 }
 
 /// A stretch of a road: the road, and from and to how far along it (m).
-pub(crate) type Piece = (u32, f32, f32);
+pub(super) type Piece = (u32, f32, f32);
 
 /// Road searches' state kept between them (`Graph::search`): a big world's network has
 /// thousands of nodes, too many to allocate for every estimate.
 #[derive(Default)]
-pub(crate) struct RoadScratch {
-    pub(crate) search: crate::path::Scratch<f32, Option<u32>, (u64, u32)>,
+pub(super) struct RoadScratch {
+    pub(super) search: crate::path::Scratch<f32, Option<u32>, (u64, u32)>,
     /// The stretches of road the way found goes along.
-    pub(crate) pieces: Vec<Piece>,
+    pub(super) pieces: Vec<Piece>,
 }
 
 thread_local! {
-    pub(crate) static ROAD_SCRATCH: std::cell::RefCell<RoadScratch> = std::cell::RefCell::default();
+    pub(super) static ROAD_SCRATCH: std::cell::RefCell<RoadScratch> = std::cell::RefCell::default();
 }
 
 /// Everything the sim knows about getting about (`World::travel`).

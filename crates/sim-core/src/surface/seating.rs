@@ -1,11 +1,9 @@
 //! Standing spots, seating and dining seats.
-//!
-//! Split from `surface.rs` (see `mod.rs`).
 
 use super::*;
 
 /// The tile `p` is on.
-pub(crate) fn tile_of(p: [f32; 2]) -> (i32, i32) {
+pub(super) fn tile_of(p: [f32; 2]) -> (i32, i32) {
     (p[0].floor() as i32, p[1].floor() as i32)
 }
 
@@ -153,7 +151,7 @@ pub fn at_stand_spot(
 
 /// The table `seat` faces: the top covering its front tile, of a kind it tucks under (its
 /// `seatAt`), on the same storey with no wall between (`top_at`: the top over a tile on the lot).
-pub(crate) fn faced(
+pub(super) fn faced(
     content: &Content,
     objects: &[ObjectInstance],
     nav: &NavGrid,

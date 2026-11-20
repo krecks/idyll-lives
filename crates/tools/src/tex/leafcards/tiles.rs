@@ -1,6 +1,4 @@
 //! The tiles: the atlas the leaves are packed into.
-//!
-//! Split from `leafcards.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -9,7 +7,7 @@ use super::*;
 /// A species' cards' mean width, metres: what its cluster tiles show (`cargo art trees`' models, measured), and the
 /// size and width of its leaves there. A little larger than life where the leaf's shape is the species' mark and
 /// would otherwise be a few pixels at the play camera.
-pub(crate) struct Kind {
+pub(super) struct Kind {
     name: &'static str,
     across: f64,
     leaf: Leaf,
@@ -17,7 +15,7 @@ pub(crate) struct Kind {
     wide: f64,
 }
 
-pub(crate) const KINDS: [Kind; 9] = [
+pub(super) const KINDS: [Kind; 9] = [
     Kind {
         name: "oak",
         across: 0.62,
@@ -85,10 +83,10 @@ pub(crate) const KINDS: [Kind; 9] = [
 
 /// A willow strand's card, metres (crates/art/nature/src/trees/willow.rs: a strand 0.2 wide, its cards half as wide
 /// again and 0.75 tall).
-pub(crate) const STRAND: (f64, f64) = (0.3, 0.75);
+pub(super) const STRAND: (f64, f64) = (0.3, 0.75);
 
 /// Tile `i` of the atlas (`ATLAS`'s order) drawn: `TILE_PX` a side.
-pub(crate) fn tile(i: usize) -> Picture {
+pub(super) fn tile(i: usize) -> Picture {
     let (name, _, pictured) = ATLAS[i];
     let kind = KINDS
         .iter()
@@ -278,13 +276,13 @@ pub(crate) fn tile(i: usize) -> Picture {
 }
 
 /// A texel's luminance, linear.
-pub(crate) fn luminance(p: &[u8; 4]) -> f32 {
+pub(super) fn luminance(p: &[u8; 4]) -> f32 {
     let c = raster::linear([p[0], p[1], p[2]]);
     0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
 }
 
 /// `picture`'s texels `keep` says, lit by `k`.
-pub(crate) fn relight(picture: &mut Picture, k: f32) {
+pub(super) fn relight(picture: &mut Picture, k: f32) {
     for p in picture.rgba.as_chunks_mut::<4>().0 {
         let c = raster::linear([p[0], p[1], p[2]]);
         for i in 0..3 {
@@ -294,7 +292,7 @@ pub(crate) fn relight(picture: &mut Picture, k: f32) {
 }
 
 /// Linear light as an sRGB byte.
-pub(crate) fn encode(c: f32) -> u8 {
+pub(super) fn encode(c: f32) -> u8 {
     let c = c.clamp(0.0, 1.0);
     let v = if c <= 0.003_130_8 {
         c * 12.92
@@ -306,7 +304,7 @@ pub(crate) fn encode(c: f32) -> u8 {
 
 /// A cluster as drawn, as its tile: its covered texels' mean luminance `CLUSTER_LIGHT`, its colour bled out into the
 /// clear texels round it. A cluster that reaches its tile's edge is a fault in its drawing.
-pub(crate) fn cut_out(mut picture: Picture) -> Picture {
+pub(super) fn cut_out(mut picture: Picture) -> Picture {
     let (w, h) = (picture.width, picture.height);
     let covered: Vec<&[u8; 4]> = picture
         .rgba
@@ -332,7 +330,7 @@ pub(crate) fn cut_out(mut picture: Picture) -> Picture {
 
 /// A wall of leaves as drawn (`DENSE` of a tile across), as its tile: opaque in the tile's middle, its gaps the
 /// dark of a crown's inside, every texel's mean luminance `DENSE_LIGHT`; round it a clear gutter in its mean colour.
-pub(crate) fn dense(wall: Picture) -> Picture {
+pub(super) fn dense(wall: Picture) -> Picture {
     let d = wall.width;
     let o = (TILE_PX - d) / 2;
     let covered: Vec<&[u8; 4]> = wall
@@ -474,7 +472,7 @@ pub fn tiles_json() -> String {
 }
 
 /// Writes `picture` as a PNG.
-pub(crate) fn save(picture: &Picture, out: &Path) -> Result<(), String> {
+pub(super) fn save(picture: &Picture, out: &Path) -> Result<(), String> {
     use image::ImageEncoder;
     let f = std::fs::File::create(out).map_err(|e| format!("{}: {e}", out.display()))?;
     image::codecs::png::PngEncoder::new_with_quality(

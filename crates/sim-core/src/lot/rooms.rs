@@ -1,6 +1,4 @@
 //! Rooms: the flood that finds them and what a tile belongs to.
-//!
-//! Split from `lot.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -284,13 +282,13 @@ const SEEN: u16 = u16::MAX - 1;
 /// A node of the room flood: half `h` of the tile in slot `i` at `(x, z)`, or a whole chunk
 /// that isn't allocated (all open).
 #[derive(Clone, Copy)]
-pub(crate) enum RoomNode {
+pub(super) enum RoomNode {
     Tile(usize, usize, i32, i32),
     Void(usize),
 }
 
 /// Grows tiles `r` (`[x0, z0, x1, z1)`) over tile `(x, z)`.
-pub(crate) fn grow(r: &mut [i32; 4], x: i32, z: i32) {
+pub(super) fn grow(r: &mut [i32; 4], x: i32, z: i32) {
     r[0] = r[0].min(x);
     r[1] = r[1].min(z);
     r[2] = r[2].max(x + 1);

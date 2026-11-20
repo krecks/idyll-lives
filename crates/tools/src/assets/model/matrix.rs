@@ -1,10 +1,8 @@
 //! A node's matrix, and a chain of them.
-//!
-//! Split from `assets/model.rs` (see `mod.rs`).
 
 use super::*;
 
-pub(crate) fn local(node: &J) -> Mat {
+pub(super) fn local(node: &J) -> Mat {
     let get = |key: &str, default: &[f32]| -> Vec<f32> {
         node.get(key)
             .and_then(J::as_array)
@@ -35,7 +33,7 @@ pub(crate) fn local(node: &J) -> Mat {
     [0, 1, 2].map(|i| [r[i][0] * s[0], r[i][1] * s[1], r[i][2] * s[2], t[i]])
 }
 
-pub(crate) fn chain(a: &Mat, b: &Mat) -> Mat {
+pub(super) fn chain(a: &Mat, b: &Mat) -> Mat {
     [0, 1, 2].map(|i| {
         let mut row = [0f32; 4];
         for (j, cell) in row.iter_mut().enumerate() {

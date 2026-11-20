@@ -278,7 +278,6 @@ mod score;
 
 pub(crate) use opinions::*;
 pub(crate) use score::*;
-use score::{Things, score_dirt};
 
 /// Thought subject for a room: its kind (garden 0, kind + 1, or 63 for a room nothing marks)
 /// times 8 plus a factor (`FACTORS`).

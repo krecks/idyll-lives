@@ -1,6 +1,4 @@
 //! Reading the built world: the sample list, its parts and surfaces, and pictures.
-//!
-//! Split from `built.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -155,14 +153,14 @@ pub struct Pictures {
 }
 
 impl Pictures {
-    pub(crate) fn side(&mut self, file: &str) -> Option<f64> {
+    pub(super) fn side(&mut self, file: &str) -> Option<f64> {
         *self.sides.entry(file.to_string()).or_insert_with(|| {
             let (w, h) = image_size(&std::fs::read(file).ok()?)?;
             Some((w as f64 * h as f64).sqrt())
         })
     }
 
-    pub(crate) fn mean(&mut self, file: &str) -> Option<[f64; 3]> {
+    pub(super) fn mean(&mut self, file: &str) -> Option<[f64; 3]> {
         *self.means.entry(file.to_string()).or_insert_with(|| {
             let rgb = image::load_from_memory(&std::fs::read(file).ok()?)
                 .ok()?
@@ -234,14 +232,14 @@ pub fn read(g: &Glb) -> R<Vec<Part>> {
                     .collect()
             };
             let material = match prim.get("material") {
-                Some(i) => super::super::glb::index(gltf.get("materials").unwrap_or(&none), i)?
+                Some(i) => crate::checkglb::glb::index(gltf.get("materials").unwrap_or(&none), i)?
                     .get("name")
                     .and_then(J::str)
                     .unwrap_or_default()
                     .to_string(),
                 None => String::new(),
             };
-            let triangles = super::super::digest::indices(g, prim, positions.len())?
+            let triangles = crate::checkglb::digest::indices(g, prim, positions.len())?
                 .as_chunks::<3>()
                 .0
                 .to_vec();

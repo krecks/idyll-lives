@@ -1,13 +1,17 @@
 //! The context's own measures.
-//!
-//! Split from `checkglb/against/measures.rs` (see `mod.rs`).
 
 use super::*;
+use crate::checkglb::against::{
+    BOUNDS, Class, Compared, Finding, Numbers, PERCH, compare, compare_decimated, found,
+    json_differ, mm, names, without,
+};
+use crate::checkglb::glb::R;
+use crate::checkglb::py::{self, J, relpath};
 
 impl Context {
     /// What the gate says of `key` on a side; a file it cannot read is its one error.
-    fn gate(&self, side: &Side, key: &str) -> super::super::super::Checked {
-        let unread = |err: String| super::super::super::Checked {
+    fn gate(&self, side: &Side, key: &str) -> crate::checkglb::Checked {
+        let unread = |err: String| crate::checkglb::Checked {
             errors: vec![format!("cannot be read: {err}")],
             warnings: Vec::new(),
             accepted: Vec::new(),
@@ -18,13 +22,13 @@ impl Context {
             return unread("its entry has no file".into());
         };
         // The gate's own rules only: the counted checks answer to the baseline of one tree, not to a build.
-        let baseline = super::super::super::baseline::Baseline::default();
-        let counting = super::super::super::Counting {
+        let baseline = crate::checkglb::baseline::Baseline::default();
+        let counting = crate::checkglb::Counting {
             baseline: &baseline,
             file: &[],
             batch: std::collections::BTreeMap::new(),
         };
-        super::super::super::check(
+        crate::checkglb::check(
             key,
             &side.fin,
             entry,
@@ -62,10 +66,10 @@ impl Context {
             out.push(found("draws", format!("{is} draw calls, was {was}")));
         }
         let measured = (|| -> R<()> {
-            let side = |s: &Side| -> R<Option<super::super::super::Model>> {
+            let side = |s: &Side| -> R<Option<crate::checkglb::Model>> {
                 match (s.entries.get(key), s.file(key, "url")) {
                     (Some((entry, _)), Some(path)) => {
-                        super::super::super::model(entry, &path).map(Some)
+                        crate::checkglb::model(entry, &path).map(Some)
                     }
                     _ => Ok(None),
                 }
@@ -90,20 +94,10 @@ impl Context {
                 ));
             }
             for f in self.facts.get(key).map(Vec::as_slice).unwrap_or(&[]) {
-                let ha = super::super::super::heights(
-                    &a.file,
-                    &a.entry,
-                    &f.object,
-                    &self.furniture,
-                    true,
-                )?;
-                let hb = super::super::super::heights(
-                    &b.file,
-                    &b.entry,
-                    &f.object,
-                    &self.furniture,
-                    true,
-                )?;
+                let ha =
+                    crate::checkglb::heights(&a.file, &a.entry, &f.object, &self.furniture, true)?;
+                let hb =
+                    crate::checkglb::heights(&b.file, &b.entry, &f.object, &self.furniture, true)?;
                 let id = py::str_of(&f.id);
                 if ha.len() != hb.len() {
                     out.push(found(
@@ -117,7 +111,7 @@ impl Context {
                     continue;
                 }
                 for (x, y) in ha.iter().zip(&hb) {
-                    let values = |h: &super::super::super::Height| -> Vec<Option<f64>> {
+                    let values = |h: &crate::checkglb::Height| -> Vec<Option<f64>> {
                         vec![h.mesh, h.span.map(|s| s.0), h.span.map(|s| s.1)]
                     };
                     for (p, q) in values(x).into_iter().zip(values(y)) {
@@ -294,7 +288,7 @@ impl Context {
     }
 
     /// The rows of one key: the model, and its far version if either side has one.
-    pub(crate) fn rows(&self, key: &str) -> Vec<Row> {
+    pub(super) fn rows(&self, key: &str) -> Vec<Row> {
         let row = |name: String| Row {
             name,
             class: Class::Same,
@@ -377,7 +371,7 @@ impl Context {
     }
 
     /// A row with what port-accepted.json accepts of it taken out of its findings, and its class.
-    pub(crate) fn classed(&self, mut row: Row, same: bool) -> Row {
+    pub(super) fn classed(&self, mut row: Row, same: bool) -> Row {
         if let Some(accepted) = self.accepted.get(&row.name) {
             let (taken, left): (Vec<Finding>, Vec<Finding>) = std::mem::take(&mut row.findings)
                 .into_iter()

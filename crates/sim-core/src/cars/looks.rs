@@ -14,8 +14,6 @@
 //! new car wouldn't fit where it parks (something stands where its longer body would, or it would
 //! stand further off its plot). Whether a house has a car at all is the town's, as before; its
 //! paint is the town's too and stays.
-//!
-//! Split from `cars.rs` (see `mod.rs`).
 
 use super::*;
 use crate::content::{CarAge, CarLook, Content};

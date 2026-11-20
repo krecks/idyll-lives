@@ -1,13 +1,12 @@
 //! A hole in a face, triangulated into it.
-//!
-//! Split from `kit/joinery.rs` (see `mod.rs`).
 
 use super::*;
+use std::collections::BTreeMap;
 
 /// A face with a hole whole inside it (`outer` anticlockwise, `hole` the other way round, each point's place
 /// in `place`) as the two faces Blender leaves: one between the face's side nearest the hole and the hole, the
 /// rest round the hole's other sides. (The rest, the one beside.)
-pub(crate) fn round_hole(
+pub(super) fn round_hole(
     outer: &[u32],
     hole: &[u32],
     place: &BTreeMap<u32, P2>,

@@ -1,6 +1,4 @@
 //! Trousers: the bottoms with legs.
-//!
-//! Split from `characters/clothes.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -14,7 +12,7 @@ pub const LEGGED: [&str; 4] = [
 ];
 /// The trousers' shell reaches this far (m) past the highest waist and the lowest hem of the
 /// bottoms with legs: the shader's cut lies inside the mesh.
-pub(crate) const CUT_ROOM: f64 = 0.006;
+pub(super) const CUT_ROOM: f64 = 0.006;
 
 /// The trousers' piece of the base body: the surface from the highest waistband down to the lowest
 /// hem, the arms and hands left out (the bottom's predicate, as the shader paints it).
@@ -58,7 +56,7 @@ fn trousers_layout(family: &str) -> Arc<Layout> {
 /// lifts it off the skin by the resident's ease, as it lifts the cloth it paints, and cuts it at the
 /// resident's waist and hem: fields.w is the body's height there). No `lod.` copy: far off, the
 /// low-detail body is painted as before.
-pub(crate) fn trousers(family: &str, stage: &str) -> Mesh {
+pub(super) fn trousers(family: &str, stage: &str) -> Mesh {
     let lay = trousers_layout(family);
     let (pos, nor, dense) = shell_on(family, stage, &lay.src, false);
     let n = pos.len();

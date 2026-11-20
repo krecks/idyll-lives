@@ -1,6 +1,4 @@
 //! Writing a save: `World::to_save` and the shapes it builds.
-//!
-//! Split from `save.rs` (see `mod.rs`).
 
 use super::pack::*;
 use super::*;

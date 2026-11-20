@@ -1,6 +1,4 @@
 //! Lanes: bending, rounding corners and gentle bends.
-//!
-//! Split from `cars/mod.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -75,27 +73,27 @@ pub(crate) fn round_corners(lane: &[[f32; 2]]) -> Vec<[f32; 2]> {
     out
 }
 
-pub(crate) fn sub2(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
+pub(super) fn sub2(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
     [a[0] - b[0], a[1] - b[1]]
 }
 
-pub(crate) fn dot2(a: [f32; 2], b: [f32; 2]) -> f32 {
+pub(super) fn dot2(a: [f32; 2], b: [f32; 2]) -> f32 {
     a[0] * b[0] + a[1] * b[1]
 }
 
-pub(crate) fn cross2(a: [f32; 2], b: [f32; 2]) -> f32 {
+pub(super) fn cross2(a: [f32; 2], b: [f32; 2]) -> f32 {
     a[0] * b[1] - a[1] * b[0]
 }
 
 /// The way from `a` to `b`, a unit long.
-pub(crate) fn unit2(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
+pub(super) fn unit2(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
     let l = crate::travel::dist(a, b).max(1e-6);
     [(b[0] - a[0]) / l, (b[1] - a[1]) / l]
 }
 
 /// How far going `b` is turned from going `a` (radians, + to the right: the town's x runs right
 /// and z down).
-pub(crate) fn turned(a: [f32; 2], b: [f32; 2]) -> f32 {
+pub(super) fn turned(a: [f32; 2], b: [f32; 2]) -> f32 {
     cross2(a, b).atan2(dot2(a, b))
 }
 

@@ -1,11 +1,9 @@
 //! The extent of a set of points.
-//!
-//! Split from `kit/joinery.rs` (see `mod.rs`).
 
-use super::*;
+use crate::math::V3;
 
 /// The lowest and highest of each coordinate.
-pub(crate) fn extent(points: &[V3]) -> ([f32; 3], [f32; 3]) {
+pub(super) fn extent(points: &[V3]) -> ([f32; 3], [f32; 3]) {
     let (mut lo, mut hi) = ([f32::INFINITY; 3], [f32::NEG_INFINITY; 3]);
     for p in points {
         for k in 0..3 {

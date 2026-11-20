@@ -1,6 +1,4 @@
 //! Reading routines and goals from content (and the UI's own forms).
-//!
-//! Split from `planner.rs` (see `mod.rs`).
 
 use super::*;
 

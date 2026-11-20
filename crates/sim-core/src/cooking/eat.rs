@@ -1,6 +1,4 @@
 //! Eating a serving: finding a seat, company, and the plate left behind.
-//!
-//! Split from `cooking.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -62,7 +60,7 @@ pub(crate) fn made_quality(
 /// Where someone eats: on the plot they're on (at home, at a host's, in a park). Its objects,
 /// and whose plates are left there: the household living there (a guest's dirty plate is the
 /// host's to wash up), else nobody's (`None`: nothing is left behind).
-pub(crate) fn dining<'a>(sim: &Sim, ctx: &Ctx<'a>) -> (&'a [u32], Option<u32>) {
+pub(super) fn dining<'a>(sim: &Sim, ctx: &Ctx<'a>) -> (&'a [u32], Option<u32>) {
     let home = ctx.households[sim.household as usize].plot;
     let Some(here) = ctx.briefs.get(sim.id as usize).and_then(|b| b.plot) else {
         return (home_objects(ctx, sim.household), Some(sim.household));
@@ -82,7 +80,7 @@ pub(crate) fn dining<'a>(sim: &Sim, ctx: &Ctx<'a>) -> (&'a [u32], Option<u32>) {
 /// Who keeps someone eating company, and where: those eating (or on their way to a seat to eat:
 /// where they'll sit) first, then those sitting down free for a word (each in id order). At
 /// home, their guests there; at a host's, the hosts there. None elsewhere.
-pub(crate) fn company(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Vec<(u8, [f32; 2])> {
+pub(super) fn company(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Vec<(u8, [f32; 2])> {
     let me = sim.id as usize;
     let Some(here) = ctx.briefs.get(me).and_then(|b| b.plot) else {
         return Vec::new();
@@ -128,7 +126,7 @@ pub(crate) fn company(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Vec<(
 /// eating before one only sitting), so the two talk over the meal (`conversation::from_seat`);
 /// else the best nearest to them.
 /// (`skip`: seats there's no way to.)
-pub(crate) fn eat_seat(
+pub(super) fn eat_seat(
     sim: &Sim,
     ctx: &Ctx,
     objects: &[ObjectInstance],
@@ -227,7 +225,7 @@ pub(crate) fn eat_seat(
 
 /// Where the plate goes for someone sitting at `seat`: on the table in front of them, or on
 /// the seat's own table.
-pub(crate) fn plate_spot(
+pub(super) fn plate_spot(
     sim: &Sim,
     ctx: &Ctx,
     objects: &[ObjectInstance],
@@ -263,7 +261,7 @@ pub(crate) fn plate_spot(
 }
 
 /// Eating, step by step: fetch a serving, then sit down with it (or eat standing).
-pub(crate) fn eat_next(
+pub(super) fn eat_next(
     sim: &mut Sim,
     task: Task,
     ctx: &Ctx,
@@ -339,7 +337,7 @@ pub(crate) fn eat_next(
 }
 
 /// Takes a serving of `id` into their hands (false: it's gone or spoilt).
-pub(crate) fn take_serving(sim: &mut Sim, content: &Content, items: &mut Items, id: u32) -> bool {
+pub(super) fn take_serving(sim: &mut Sim, content: &Content, items: &mut Items, id: u32) -> bool {
     let household = sim.household;
     let Some(it) = items
         .get_mut(id)

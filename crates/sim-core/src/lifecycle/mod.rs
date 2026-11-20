@@ -234,4 +234,4 @@ pub(crate) use arrival::*;
 pub(crate) use babies::*;
 pub use children::adopt;
 pub(crate) use children::*;
-pub(crate) use moving::*;
+use moving::*;

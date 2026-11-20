@@ -1,6 +1,4 @@
 //! Clips: turning, sweeping and the checks a clip must pass.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -74,17 +72,17 @@ fn turning(g: &Glb, motions: &J) -> R<Vec<(String, usize, [f64; 3])>> {
 
 /// A part that goes round: its clip, its name, the floor-plan box it sweeps (x, depth), and how far it
 /// reaches from its axis.
-pub(crate) struct Swept {
-    pub(crate) clip: String,
-    pub(crate) name: String,
-    pub(crate) x: (f64, f64),
-    pub(crate) z: (f64, f64),
-    pub(crate) radius: f64,
+pub(super) struct Swept {
+    pub(super) clip: String,
+    pub(super) name: String,
+    pub(super) x: (f64, f64),
+    pub(super) z: (f64, f64),
+    pub(super) radius: f64,
 }
 
 /// The floor-plan box each `turning` part sweeps, a whole circle round its pivot (in game axes), and how far
 /// it reaches from its axis.
-pub(crate) fn swept(g: &Glb, motions: &J) -> R<Vec<Swept>> {
+pub(super) fn swept(g: &Glb, motions: &J) -> R<Vec<Swept>> {
     let turns = turning(g, motions)?;
     if turns.is_empty() {
         return Ok(Vec::new());
@@ -163,7 +161,7 @@ pub(crate) fn swept(g: &Glb, motions: &J) -> R<Vec<Swept>> {
 
 /// (errors, warnings) for a file's animations: moving parts turned or slid by node clips
 /// (docs/design/objects.md, "Moving parts"), each starting at rest, each played by the entry's `motions`.
-pub(crate) fn check_clips(g: &Glb, entry: &J) -> R<(Vec<String>, Vec<String>)> {
+pub(super) fn check_clips(g: &Glb, entry: &J) -> R<(Vec<String>, Vec<String>)> {
     let (mut errors, mut warnings) = (Vec::new(), Vec::new());
     let empty = J::Arr(Vec::new());
     let animations = g.gltf.get("animations").and_then(J::list).unwrap_or(&[]);
@@ -391,7 +389,7 @@ fn turn_per_step(g: &Glb, sampler: &J) -> R<f64> {
 /// [(mesh, faces)] for the meshes with faces over `FLIPPED_AREA` whose stored normals all point against the
 /// face's winding: lit as if from behind (dark where the light falls), the way a bevel's arc miter turned a
 /// frame's inner corners round. In each mesh's own space.
-pub(crate) fn flipped_faces(g: &Glb) -> R<Vec<(String, usize)>> {
+pub(super) fn flipped_faces(g: &Glb) -> R<Vec<(String, usize)>> {
     let mut out = Vec::new();
     for mesh in g.gltf.get("meshes").and_then(J::list).unwrap_or(&[]) {
         let mut bad = 0;

@@ -1,12 +1,10 @@
 //! The small geometry the bevel leans on: angles, normals and line intersections.
-//!
-//! Split from `bevel.rs` (see `mod.rs`).
 
 use super::*;
 
 /// The faces' normals as the mesh the bevel works on keeps them (Blender's BMesh): a triangle or a quad of no
 /// area has none, where a mesh's own is straight up.
-pub(crate) fn face_normals(mesh: &Mesh) -> Vec<V3> {
+pub(super) fn face_normals(mesh: &Mesh) -> Vec<V3> {
     (0..mesh.faces.len())
         .map(|f| {
             let p: Vec<V3> = mesh
@@ -23,15 +21,15 @@ pub(crate) fn face_normals(mesh: &Mesh) -> Vec<V3> {
         .collect()
 }
 
-pub(crate) fn mid(a: V3, b: V3) -> V3 {
+pub(super) fn mid(a: V3, b: V3) -> V3 {
     V3::new(0.5 * (a.x + b.x), 0.5 * (a.y + b.y), 0.5 * (a.z + b.z))
 }
 
-pub(crate) fn madd(a: V3, b: V3, k: f32) -> V3 {
+pub(super) fn madd(a: V3, b: V3, k: f32) -> V3 {
     V3::new(a.x + b.x * k, a.y + b.y * k, a.z + b.z * k)
 }
 
-pub(crate) fn saasin(f: f32) -> f32 {
+pub(super) fn saasin(f: f32) -> f32 {
     if f <= -1.0 {
         -std::f32::consts::FRAC_PI_2
     } else if f >= 1.0 {
@@ -43,7 +41,7 @@ pub(crate) fn saasin(f: f32) -> f32 {
 }
 
 /// The angle between two unit vectors, as Blender takes it.
-pub(crate) fn angle_normalized(a: V3, b: V3) -> f32 {
+pub(super) fn angle_normalized(a: V3, b: V3) -> f32 {
     if dot_v3(a, b) >= 0.0 {
         2.0 * saasin(len_v3(b - a) / 2.0)
     } else {
@@ -51,13 +49,13 @@ pub(crate) fn angle_normalized(a: V3, b: V3) -> f32 {
     }
 }
 
-pub(crate) fn angle(a: V3, b: V3) -> f32 {
+pub(super) fn angle(a: V3, b: V3) -> f32 {
     angle_normalized(normalize_v3(a).0, normalize_v3(b).0)
 }
 
 /// Where two lines pass nearest each other: (how they lie: 0 one line, 1 they meet, 2 skew; the point on the
 /// first; the point on the second).
-pub(crate) fn isect_line_line(v1: V3, v2: V3, v3: V3, v4: V3) -> (u8, V3, V3) {
+pub(super) fn isect_line_line(v1: V3, v2: V3, v3: V3, v4: V3) -> (u8, V3, V3) {
     let c = v3 - v1;
     let a = v2 - v1;
     let b = v4 - v3;

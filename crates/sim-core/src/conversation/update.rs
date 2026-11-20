@@ -1,6 +1,4 @@
 //! The tick's conversations: the states, joining, places and grouping.
-//!
-//! Split from `conversation.rs` (see `mod.rs`).
 
 use super::*;
 #[derive(Clone, Copy)]
@@ -376,7 +374,7 @@ pub(crate) fn update(w: &mut World) {
 /// Whether `sim`, talked to with `s`, stays in their seat: sitting at something they carry on
 /// with afterwards (the sofa, a coffee at the table, a meal; or talking from it themselves), for
 /// a social they needn't get up for.
-pub(crate) fn keeps_seat(sim: &Sim, s: &SocialDef) -> bool {
+pub(super) fn keeps_seat(sim: &Sim, s: &SocialDef) -> bool {
     let sitting = sim.paused.is_some()
         || sim.current.as_ref().is_some_and(|a| {
             matches!(
@@ -623,7 +621,7 @@ fn group_outcome(
     }
 }
 
-pub(crate) fn set_phase(sim: &mut Sim, phase: Phase) {
+pub(super) fn set_phase(sim: &mut Sim, phase: Phase) {
     if let Some(act) = sim.current.as_mut() {
         act.phase = phase;
     }

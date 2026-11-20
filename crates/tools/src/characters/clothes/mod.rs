@@ -71,17 +71,17 @@ mod tops;
 mod trousers;
 mod upper;
 
-pub(crate) use apron::*;
+use apron::*;
 pub(crate) use build::*;
 pub(crate) use cut::*;
-pub(crate) use jacket::*;
-pub(crate) use mesh::*;
-pub(crate) use shoe::*;
-pub(crate) use skirt::*;
-pub(crate) use sole::*;
+use jacket::*;
+use mesh::*;
+use shoe::*;
+use skirt::*;
+use sole::*;
 pub(crate) use tops::*;
 pub(crate) use trousers::*;
-pub(crate) use upper::*;
+use upper::*;
 
 #[cfg(test)]
 mod tests;

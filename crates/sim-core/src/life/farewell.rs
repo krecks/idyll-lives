@@ -4,7 +4,7 @@ use super::*;
 
 /// Guests go home when the visit is over, it's late, they need something, or there's nothing
 /// for them to do (saying goodbye to one of the hosts first, if one is free).
-pub(crate) fn end_visit_if_due(w: &mut World, i: usize, hour: f32) {
+pub(super) fn end_visit_if_due(w: &mut World, i: usize, hour: f32) {
     let tick = w.tick;
     let Some(visit) = w.sims[i].visiting else {
         return;

@@ -1,8 +1,8 @@
 //! Habits at the turning points of a day, and what follows a use.
-//!
-//! Split from `world/objects.rs` (see `mod.rs`).
 
 use super::*;
+use crate::content::{Content, HabitTime, TagMask};
+use crate::world::{Ctx, ObjectInstance, Phase, Sim, Task, TaskKind, affordable};
 
 /// What they do out of habit at a turning point of their day (`DayRhythm::habits`): for the
 /// habit for `at` whose need is lowest (for it), the nearest quick thing on `plot` that fills

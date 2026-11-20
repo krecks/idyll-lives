@@ -1,6 +1,4 @@
 //! Undo and redo: snapshots of a household's home, and restoring them.
-//!
-//! Split from `home.rs` (see `mod.rs`).
 
 use super::*;
 

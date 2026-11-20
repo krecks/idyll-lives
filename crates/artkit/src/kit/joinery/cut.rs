@@ -1,8 +1,12 @@
 //! Cutting one object out of another.
-//!
-//! Split from `kit/joinery.rs` (see `mod.rs`).
 
 use super::*;
+use crate::bevel::EdgeOrder;
+use crate::materials::Mat;
+use crate::math::V3;
+use crate::mesh::edge;
+use crate::scene::Obj;
+use crate::shapes::options;
 
 /// Cuts `cutter`'s volume out of `obj` and takes the cutter away: what gamekit's `forms.cut` and the kitchen's
 /// boolean modifiers (Blender's exact difference) made of the families' bodies, without a boolean. One of two

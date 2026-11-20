@@ -1,12 +1,10 @@
-//! [(71, 455), (1162, 1416), (1632, 1679)]
-//!
-//! Split from `view.rs` (see `mod.rs`).
+//! A household's funds, routine, goals, plans and purchases, and a resident's job.
 
 use super::*;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct FundsView<'a> {
+pub(super) struct FundsView<'a> {
     pub id: u32,
     pub funds: i64,
     /// Weekly rent for this household's home, if rent is charged.
@@ -18,7 +16,7 @@ pub(crate) struct FundsView<'a> {
     pub redo: usize,
     /// The household's routine template (the player's household only).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) routines: Option<Vec<RoutineView<'a>>>,
+    pub(super) routines: Option<Vec<RoutineView<'a>>>,
     /// A baby on the way: the parents and the day it's due.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expecting: Option<crate::world::Expecting>,
@@ -26,7 +24,7 @@ pub(crate) struct FundsView<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct RoutineView<'a> {
+pub(super) struct RoutineView<'a> {
     pub id: u16,
     pub activity: &'a str,
     pub skill: Option<&'a str>,
@@ -36,7 +34,7 @@ pub(crate) struct RoutineView<'a> {
     pub minutes: u16,
 }
 
-pub(crate) fn routine_view<'a>(content: &'a Content, r: &Routine) -> RoutineView<'a> {
+pub(super) fn routine_view<'a>(content: &'a Content, r: &Routine) -> RoutineView<'a> {
     RoutineView {
         id: r.id,
         activity: &content.activities[r.activity].id,
@@ -50,7 +48,7 @@ pub(crate) fn routine_view<'a>(content: &'a Content, r: &Routine) -> RoutineView
 /// Why a block wasn't kept: `trait` (with the trait id), `need` (with the need id), `mood`,
 /// `away`, `noPlace`.
 #[derive(Serialize)]
-pub(crate) struct ReasonView<'a> {
+pub(super) struct ReasonView<'a> {
     pub code: &'static str,
     #[serde(rename = "trait", skip_serializing_if = "Option::is_none")]
     pub trait_id: Option<&'a str>,
@@ -76,7 +74,7 @@ fn reason_view(content: &Content, r: Reason) -> ReasonView<'_> {
 /// A block that's running or over: `status` is `active`, `kept`, `cut`, `skipped` or `noPlace`.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct BlockView<'a> {
+pub(super) struct BlockView<'a> {
     pub routine: u16,
     pub household: bool,
     pub activity: &'a str,
@@ -85,14 +83,14 @@ pub(crate) struct BlockView<'a> {
     pub start: u16,
     pub minutes: u16,
     pub status: &'static str,
-    pub(crate) reason: Option<ReasonView<'a>>,
+    pub(super) reason: Option<ReasonView<'a>>,
     /// Minutes spent on it.
     pub done: f32,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct GoalView<'a> {
+pub(super) struct GoalView<'a> {
     pub def: &'a str,
     pub kind: GoalKind,
     pub icon: &'a str,
@@ -107,12 +105,12 @@ pub(crate) struct GoalView<'a> {
     pub since_day: u32,
     /// What it still takes: the skill levels a career goal needs (reached ones drop off), the
     /// performance bar, the money for something they want.
-    pub(crate) steps: Vec<GoalStepView<'a>>,
+    pub(super) steps: Vec<GoalStepView<'a>>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct GoalStepView<'a> {
+pub(super) struct GoalStepView<'a> {
     /// `skill`, `performance` or `funds`.
     pub kind: &'static str,
     pub skill: Option<&'a str>,
@@ -174,15 +172,15 @@ fn goal_view<'a>(world: &'a World, s: &Sim, g: &Goal) -> GoalView<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct PlanView<'a> {
-    pub(crate) routines: Vec<RoutineView<'a>>,
+pub(super) struct PlanView<'a> {
+    pub(super) routines: Vec<RoutineView<'a>>,
     /// Household template blocks this resident doesn't follow.
     pub skip_household: &'a [u16],
-    pub(crate) current: Option<BlockView<'a>>,
+    pub(super) current: Option<BlockView<'a>>,
     /// Blocks of the last week, oldest first.
-    pub(crate) history: Vec<BlockView<'a>>,
-    pub(crate) goals: Vec<GoalView<'a>>,
-    pub(crate) suggestions: Vec<GoalView<'a>>,
+    pub(super) history: Vec<BlockView<'a>>,
+    pub(super) goals: Vec<GoalView<'a>>,
+    pub(super) suggestions: Vec<GoalView<'a>>,
     /// Activities they'd like a place for (`skill` for training).
     pub wishes: Vec<(&'a str, Option<&'a str>)>,
     /// What they'd like for the home (as saved: `room` + `factor`, `fix` or `another`).
@@ -190,19 +188,19 @@ pub(crate) struct PlanView<'a> {
     /// How well they stick to plans now (1 = average).
     pub adherence: f32,
     /// What they're asking to buy (waiting for a yes or no).
-    pub(crate) purchase: Option<PurchaseView<'a>>,
+    pub(super) purchase: Option<PurchaseView<'a>>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct PurchaseView<'a> {
+pub(super) struct PurchaseView<'a> {
     pub object: &'a str,
     pub price: i64,
     /// Times they were told no for it before.
     pub declines: u8,
 }
 
-pub(crate) fn plan_view<'a>(world: &'a World, s: &'a Sim) -> PlanView<'a> {
+pub(super) fn plan_view<'a>(world: &'a World, s: &'a Sim) -> PlanView<'a> {
     let content = &world.content;
     let p = &s.planner;
     let today = clock::day(world.tick);
@@ -319,7 +317,7 @@ pub(crate) fn plan_view<'a>(world: &'a World, s: &'a Sim) -> PlanView<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct JobView<'a> {
+pub(super) struct JobView<'a> {
     /// Index into the career catalog.
     pub index: usize,
     pub career: &'a str,
@@ -357,7 +355,7 @@ pub(crate) struct JobView<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct NextLevel<'a> {
+pub(super) struct NextLevel<'a> {
     pub title: &'a str,
     pub grade: Option<&'a str>,
     pub pay_per_hour: f32,
@@ -365,13 +363,13 @@ pub(crate) struct NextLevel<'a> {
 }
 
 #[derive(Serialize)]
-pub(crate) struct Requirement<'a> {
+pub(super) struct Requirement<'a> {
     pub skill: &'a str,
     pub level: f32,
     pub have: f32,
 }
 
-pub(crate) fn weekdays(mask: u8) -> Vec<u8> {
+pub(super) fn weekdays(mask: u8) -> Vec<u8> {
     (0..7).filter(|d| mask & (1 << d) != 0).collect()
 }
 
@@ -390,7 +388,7 @@ fn requirements<'a>(
 }
 
 /// One of a resident's actions (`held`: what they carry, for the current one).
-pub(crate) fn task_view(
+pub(super) fn task_view(
     world: &World,
     task: &Task,
     phase: Option<&Phase>,
@@ -644,7 +642,7 @@ pub(crate) fn task_view(
     }
 }
 
-pub(crate) fn job_view<'a>(content: &'a Content, s: &Sim) -> Option<JobView<'a>> {
+pub(super) fn job_view<'a>(content: &'a Content, s: &Sim) -> Option<JobView<'a>> {
     let j = s.job.as_ref()?;
     let career = &content.careers[j.career];
     let level = &career.levels[j.level];

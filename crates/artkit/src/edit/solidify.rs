@@ -1,8 +1,12 @@
 //! Making a surface a shell, and taking vertices out.
-//!
-//! Split from `edit.rs` (see `mod.rs`).
 
 use super::*;
+use crate::math::{V3, angle_normalized_v3v3, dot_v3, normalize_v3};
+use crate::mesh::{Mesh, edge};
+use crate::normals;
+use crate::scene::Obj;
+use crate::shapes::options;
+use std::collections::BTreeMap;
 
 options! {
     /// `solidify`'s options, Blender's own defaults: `offset` -1 grows the shell inwards (against the normals), 1

@@ -1,6 +1,4 @@
-//! [(58, 845)]
-//!
-//! Split from `content.rs` (see `mod.rs`).
+//! Object definitions: needs, interactions, poses, vehicles, slots and surfaces.
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! The report of them.
-//!
-//! Split from `crates/tools/src/edges.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -26,7 +24,7 @@ fn cm(v: f64) -> String {
 }
 
 /// Where an edge is, as its model is built (x across, y back, z up: a file's x, -z and y) and which way it runs.
-pub(crate) fn place(e: &Edge) -> String {
+pub(super) fn place(e: &Edge) -> String {
     let built = |p: V3| [p[0], -p[2], p[1]];
     let (at, along) = (built(e.at), built(e.along));
     let axis = (0..3).find(|&k| along[k].abs() > 0.985);

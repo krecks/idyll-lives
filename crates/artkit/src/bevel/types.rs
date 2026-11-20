@@ -1,6 +1,4 @@
 //! What a bevel is asked for and what it makes: the order, the kinds, the picks.
-//!
-//! Split from `bevel.rs` (see `mod.rs`).
 
 use super::*;
 

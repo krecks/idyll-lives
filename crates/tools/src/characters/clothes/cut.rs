@@ -1,21 +1,19 @@
 //! Cuts: the paint a garment takes, and the layouts its shell is built on.
-//!
-//! Split from `characters/clothes.rs` (see `mod.rs`).
 
 use super::*;
 
 /// Shells: lift off the skin (m).
-pub(crate) fn jacket_lift(gid: &str) -> f64 {
+pub(super) fn jacket_lift(gid: &str) -> f64 {
     if gid == "top.jacket" { 0.009 } else { 0.008 }
 }
 /// The jacket shells' sleeves end (sleeve parameter) on the upper arm; the rest is painted.
-pub(crate) const SHELL_SLEEVE: f64 = 0.42;
+pub(super) const SHELL_SLEEVE: f64 = 0.42;
 /// The skirt's rings round and down. Seven rows left the flare between the hips and the hem three
 /// kinks deep, which read as facets on the closest camera (1 px is 4 mm there); twelve take the
 /// kinks below a pixel and cost 240 triangles, of a 1500 shell budget. Twenty-four sides round is
 /// already past what the hem's 0.24 m radius shows as corners.
-pub(crate) const SKIRT_SEGS: usize = 24;
-pub(crate) const SKIRT_ROWS: usize = 12;
+pub(super) const SKIRT_SEGS: usize = 24;
+pub(super) const SKIRT_ROWS: usize = 12;
 
 /// A garment's cut (the keys a kind has, in rig.json's order).
 #[derive(Clone, Debug, Default, Serialize)]
@@ -124,11 +122,11 @@ pub fn top_coverage(f: &[f64; 4], cut: &Cut) -> f64 {
     g
 }
 
-pub(crate) type Fields = (Vec<[f64; 4]>, Vec<[f64; 4]>);
-pub(crate) static BASE_FIELDS: Cache<String, Fields> = Cache::new();
+pub(super) type Fields = (Vec<[f64; 4]>, Vec<[f64; 4]>);
+pub(super) static BASE_FIELDS: Cache<String, Fields> = Cache::new();
 
 /// The base body's fields and its LOD's.
-pub(crate) fn base_fields(family: &str) -> Arc<Fields> {
+pub(super) fn base_fields(family: &str) -> Arc<Fields> {
     BASE_FIELDS.get(family.to_string(), || {
         let s = surface(family, BASE_STAGE);
         let h = head_frame(family, BASE_STAGE);
@@ -139,7 +137,7 @@ pub(crate) fn base_fields(family: &str) -> Arc<Fields> {
 }
 
 /// Values lerped along each new vertex's source edge.
-pub(crate) fn lerp_src<T: Copy + std::ops::Mul<f64, Output = T> + std::ops::Add<Output = T>>(
+pub(super) fn lerp_src<T: Copy + std::ops::Mul<f64, Output = T> + std::ops::Add<Output = T>>(
     src: &Src,
     arr: &[T],
 ) -> Vec<T> {
@@ -149,7 +147,7 @@ pub(crate) fn lerp_src<T: Copy + std::ops::Mul<f64, Output = T> + std::ops::Add<
         .collect()
 }
 
-pub(crate) fn shell_dense(src: &Src, dense: &[Dense]) -> Vec<Dense> {
+pub(super) fn shell_dense(src: &Src, dense: &[Dense]) -> Vec<Dense> {
     let (a, bv, t) = src;
     (0..a.len())
         .map(|i| {
@@ -163,17 +161,17 @@ pub(crate) fn shell_dense(src: &Src, dense: &[Dense]) -> Vec<Dense> {
 }
 
 /// The jacket's piece of the base body: clipped faces and their source edges (stage independent).
-pub(crate) struct Layout {
-    pub(crate) src: Src,
-    pub(crate) idx: Vec<usize>,
-    pub(crate) hem_y: Vec<f64>,
-    pub(crate) sleeve: Vec<f64>,
-    pub(crate) cut: Cut,
+pub(super) struct Layout {
+    pub(super) src: Src,
+    pub(super) idx: Vec<usize>,
+    pub(super) hem_y: Vec<f64>,
+    pub(super) sleeve: Vec<f64>,
+    pub(super) cut: Cut,
 }
 
-pub(crate) static LAYOUTS: Cache<(String, String, bool), Layout> = Cache::new();
+pub(super) static LAYOUTS: Cache<(String, String, bool), Layout> = Cache::new();
 
-pub(crate) fn jacket_layout(family: &str, gid: &str, lod: bool) -> Arc<Layout> {
+pub(super) fn jacket_layout(family: &str, gid: &str, lod: bool) -> Arc<Layout> {
     LAYOUTS.get((family.to_string(), gid.to_string(), lod), || {
         let s = surface(family, BASE_STAGE);
         let fl = base_fields(family);

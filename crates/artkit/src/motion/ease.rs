@@ -1,6 +1,4 @@
 //! The ease of a key, and the overshoot it may take.
-//!
-//! Split from `motion.rs` (see `mod.rs`).
 
 /// How a clip eases from one key to the next.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]

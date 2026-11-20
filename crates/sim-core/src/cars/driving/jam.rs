@@ -1,6 +1,4 @@
 //! Holding up: jams, backing off, and the room a car keeps.
-//!
-//! Split from `driving.rs` (see `mod.rs`).
 
 use super::*;
 

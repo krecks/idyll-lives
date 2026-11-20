@@ -160,18 +160,6 @@ pub const METRICS: &[(&str, &str)] = &[
          model's, at most a tenth more triangles, its surface within 6 cm of the old one's)",
     ),
 ];
-pub(crate) use super::digest;
-/// One row of `METRICS` that is over its limit.
-pub(crate) use super::glb::{Glb, R, parse_glb};
-pub(crate) use super::near;
-pub(crate) use super::near::{Across, P3, Part, Rest, Surface, Tolerance};
-pub(crate) use super::py;
-pub(crate) use super::py::{J, dirname, join, normpath, relpath};
-pub(crate) use super::{Facts, Finishes, Furniture, Paths};
-pub(crate) use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-pub(crate) use std::io::{BufRead, BufReader, Read, Write};
-pub(crate) use std::path::{Path, PathBuf};
-pub(crate) use std::process::{Command, Stdio};
 
 mod compare;
 mod differ;

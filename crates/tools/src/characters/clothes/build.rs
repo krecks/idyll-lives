@@ -1,6 +1,4 @@
 //! Building every shell of a family at a stage.
-//!
-//! Split from `characters/clothes.rs` (see `mod.rs`).
 
 use super::*;
 

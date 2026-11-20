@@ -1,24 +1,22 @@
 //! The bezier handles of a curve: how they are found, smoothed and limited.
-//!
-//! Split from `motion.rs` (see `mod.rs`).
 
 use super::*;
 
 /// A key on an F-curve: its left handle, its place (frame, value), its right handle.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Bez {
-    pub(crate) h1: [f32; 2],
-    pub(crate) co: [f32; 2],
-    pub(crate) h2: [f32; 2],
-    pub(crate) ease: Ease,
-    pub(crate) back: f32,
+pub(super) struct Bez {
+    pub(super) h1: [f32; 2],
+    pub(super) co: [f32; 2],
+    pub(super) h2: [f32; 2],
+    pub(super) ease: Ease,
+    pub(super) back: f32,
     /// Its handles stay as they are (a peak, a trough, an end): Blender's `HD_AUTOTYPE_LOCKED_FINAL`.
-    pub(crate) locked: bool,
+    pub(super) locked: bool,
 }
 
 /// Blender's auto-clamped handles of a key (`calchandleNurb_intern` for an F-curve smoothed for continuous
 /// acceleration): a third of the way to each neighbour, level at a peak or a trough, never past a neighbour's value.
-pub(crate) fn calc_handles(bezt: &mut Bez, prev: Option<[f32; 2]>, next: Option<[f32; 2]>) {
+pub(super) fn calc_handles(bezt: &mut Bez, prev: Option<[f32; 2]>, next: Option<[f32; 2]>) {
     bezt.locked = false;
     let p2 = bezt.co;
     let p1 = match prev {
@@ -102,7 +100,7 @@ pub(crate) fn calc_handles(bezt: &mut Bez, prev: Option<[f32; 2]>, next: Option<
 
 /// Blender's second pass over auto handles (`BKE_nurb_handle_smooth_fcurve`): each run of free keys between two locked
 /// ones gets the handles that keep the acceleration continuous through it, clamped as auto-clamped handles are.
-pub(crate) fn smooth_handles(b: &mut [Bez]) {
+pub(super) fn smooth_handles(b: &mut [Bez]) {
     let total = b.len();
     let (mut start, mut count) = (0, 1);
     for j in 1..total {

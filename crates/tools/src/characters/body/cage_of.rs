@@ -1,11 +1,9 @@
 //! The cage itself, fitted to a family and a stage.
-//!
-//! Split from `characters/body.rs` (see `mod.rs`).
 
 use super::*;
 
 /// The cage with a face of its own (`id`; identity.rs): the head's part of it differs.
-pub(crate) fn body_cage_of(family: &str, stage: &str, id: &Identity) -> (Cage, [V3; NB]) {
+pub(super) fn body_cage_of(family: &str, stage: &str, id: &Identity) -> (Cage, [V3; NB]) {
     let pr = proportions(family, stage);
     let p = joints(family, stage);
     let pj = |n: &str| p[b(n)];

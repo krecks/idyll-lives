@@ -1,6 +1,4 @@
 //! The cap: the surface the hair grows from, its strips and its grid.
-//!
-//! Split from `characters/hair.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -9,13 +7,13 @@ use super::*;
 /// edges; and how loose it hangs (`sway`: 0 on the head, as most are; see `finish`).
 #[derive(Clone, Default)]
 pub struct Comp {
-    pub(crate) pos: Vec<V3>,
-    pub(crate) idx: Vec<usize>,
-    pub(crate) f: Vec<f64>,
-    pub(crate) z: Vec<f64>,
-    pub(crate) y: Vec<f64>,
-    pub(crate) wisps: Vec<Strip>,
-    pub(crate) sway: f64,
+    pub(super) pos: Vec<V3>,
+    pub(super) idx: Vec<usize>,
+    pub(super) f: Vec<f64>,
+    pub(super) z: Vec<f64>,
+    pub(super) y: Vec<f64>,
+    pub(super) wisps: Vec<Strip>,
+    pub(super) sway: f64,
 }
 
 /// Hair that hangs moves after the head (the runtime's lag vector times tone.x, `sway.ts`): a
@@ -23,29 +21,29 @@ pub struct Comp {
 /// (its `f`, 0 at the head) as the power `TAIL`; on a curtain by the height below `FROM` head
 /// heights over the chin (about the ears: above, it lies on the head), all of it `OVER` head
 /// heights further down (the shoulder blades), as the power `FALL` between.
-pub(crate) const SWAY_TAIL: f64 = 1.3;
-pub(crate) const SWAY_FROM: f64 = 0.4;
-pub(crate) const SWAY_OVER: f64 = 1.2;
-pub(crate) const SWAY_FALL: f64 = 1.5;
+pub(super) const SWAY_TAIL: f64 = 1.3;
+pub(super) const SWAY_FROM: f64 = 0.4;
+pub(super) const SWAY_OVER: f64 = 1.2;
+pub(super) const SWAY_FALL: f64 = 1.5;
 
 /// A soft edge: a row of quads growing from an edge of a component (or, where it has none, from a
 /// row of its surface: `shingles`), each from two of its vertices next to each other out to where
 /// their wisps end (`wisps`). The vertices are the solid hair's own, so the strip starts exactly on
 /// it, and takes their shade, normals and skin.
 #[derive(Clone)]
-pub(crate) struct Strip {
+pub(super) struct Strip {
     /// The edge's vertices (of the component), in order.
-    pub(crate) at: Vec<usize>,
+    pub(super) at: Vec<usize>,
     /// Where each one's wisp ends, from the vertex (m).
-    pub(crate) by: Vec<V3>,
+    pub(super) by: Vec<V3>,
     /// The edge is a ring: the last vertex's quad goes on to the first.
-    pub(crate) closed: bool,
+    pub(super) closed: bool,
     /// How loose the strands are (fields.z): 0 combed, lying side by side; 1 a curl's, crossing and
     /// broken along their length.
-    pub(crate) loose: f64,
+    pub(super) loose: f64,
     /// The share of each quad's length, from its root, over which the strands are still one (fields.w):
     /// solid hair, as over a hem's lip, which the wisps hang down in front of.
-    pub(crate) rooted: Vec<f64>,
+    pub(super) rooted: Vec<f64>,
 }
 
 /// Maximal runs of `show` round a ring of columns as strips (`by(k)`: column k's wisp); the whole
@@ -81,7 +79,7 @@ fn rim_strips(show: &[bool], by: &dyn Fn(usize) -> V3) -> Vec<Strip> {
 /// `span`: over the lock's outer face only, that many points either side of the ring's first (a flat
 /// lock lying on the head has no other side to show); without, all round the ring, a sleeve (a
 /// tail's end).
-pub(crate) fn brush(
+pub(super) fn brush(
     pos: &[V3],
     segs: usize,
     back: usize,
@@ -111,7 +109,7 @@ pub(crate) fn brush(
 }
 
 /// A component with faces turned to point along `out` (if given).
-pub(crate) fn comp(
+pub(super) fn comp(
     pos: Vec<V3>,
     idx: Vec<usize>,
     out: Option<Vec<V3>>,
@@ -144,20 +142,20 @@ type Field<'a> = &'a dyn Fn(f64, f64) -> f64;
 /// resolution they are cut at: the locks keep their count and width, each on more columns.
 const DETAIL: f64 = 1.5;
 /// Columns a lock is wide in a style's layout.
-pub(crate) const LAYOUT_LOCK: usize = 4;
+pub(super) const LAYOUT_LOCK: usize = 4;
 /// Columns a lock is wide as built: `LAYOUT_LOCK` at `DETAIL` (even, so a lock has a middle column).
-pub(crate) const LOCK: usize = 6;
+pub(super) const LOCK: usize = 6;
 const _: () = assert!(
     LOCK as f64 == LAYOUT_LOCK as f64 * DETAIL,
     "LOCK is LAYOUT_LOCK at DETAIL"
 );
 /// A cap's `n` layout columns (a multiple of `LAYOUT_LOCK`) at `DETAIL`: the same locks, `LOCK`
 /// columns each.
-pub(crate) fn dense_cols(n: usize) -> usize {
+pub(super) fn dense_cols(n: usize) -> usize {
     (n / LAYOUT_LOCK).max(1) * LOCK
 }
 /// `n` rows at `DETAIL`.
-pub(crate) fn dense_rows(n: usize) -> usize {
+pub(super) fn dense_rows(n: usize) -> usize {
     ((n as f64 * DETAIL).round() as usize).max(2)
 }
 /// How far into a lock column j of a sheet or cap is, its locks `w` columns wide: 0 on the parting
@@ -167,48 +165,48 @@ fn lock_at(j: f64, w: usize) -> f64 {
 }
 
 /// `lock_at` across `cols` columns starting half a lock in (whole locks at the edges).
-pub(crate) fn locks(cols: usize, w: usize) -> Vec<f64> {
+pub(super) fn locks(cols: usize, w: usize) -> Vec<f64> {
     (0..cols).map(|j| lock_at((j + w / 2) as f64, w)).collect()
 }
 
 /// A fixed 0..1 for lock k of a component (seed), so lengths and tips vary from lock to lock.
-pub(crate) fn jitter(k: usize, seed: f64) -> f64 {
+pub(super) fn jitter(k: usize, seed: f64) -> f64 {
     let v = ((k as f64 + 1.0) * 12.9898 + seed * 78.233).sin() * 43758.5453;
     v - v.floor()
 }
 
 /// The skull cap's shape (see `cap`).
-pub(crate) struct Cap<'a> {
+pub(super) struct Cap<'a> {
     /// Thickness (m) by azimuth and u (0 at the crown .. 1 at the hairline).
-    pub(crate) thick: Field<'a>,
-    pub(crate) rows: usize,
+    pub(super) thick: Field<'a>,
+    pub(super) rows: usize,
     /// Columns round the head in the layout, a multiple of `LAYOUT_LOCK` (a lock is that many wide;
     /// built at `DETAIL`, `dense_cols`).
-    pub(crate) cols: usize,
+    pub(super) cols: usize,
     /// The hairline's polar angle by azimuth (else the scalp's).
-    pub(crate) limit: Option<&'a dyn Fn(f64) -> f64>,
+    pub(super) limit: Option<&'a dyn Fn(f64) -> f64>,
     /// Thickness at the rim (m).
-    pub(crate) edge: f64,
+    pub(super) edge: f64,
     /// Locks combed down from the crown: the grooves between them this deep (a share of the
     /// thickness), and their tips this far past the hairline (rad of polar angle, by azimuth).
-    pub(crate) ridge: f64,
-    pub(crate) tips: Option<&'a dyn Fn(f64) -> f64>,
+    pub(super) ridge: f64,
+    pub(super) tips: Option<&'a dyn Fn(f64) -> f64>,
     /// A parting: its azimuth (the columns turn so a groove lies on it) and the u it starts at.
-    pub(crate) part: Option<(f64, f64)>,
+    pub(super) part: Option<(f64, f64)>,
     /// Clump bands by azimuth and u (else the locks': light in their middles).
-    pub(crate) bands: Option<Field<'a>>,
+    pub(super) bands: Option<Field<'a>>,
     /// How it meets the ears.
-    pub(crate) ears: Meet,
+    pub(super) ears: Meet,
     /// Wisps past the rim, on over the skin: their length (m) by azimuth (0: none there, where other
     /// hair covers the rim); none round an ear. Only on a cap whose rim goes round the ears
     /// (`Meet::Round`).
-    pub(crate) wisps: Option<&'a dyn Fn(f64) -> f64>,
+    pub(super) wisps: Option<&'a dyn Fn(f64) -> f64>,
 }
 
 /// How a cap meets the ears: `Round(n)`, its rim goes round each in an arc, with n more columns there;
 /// `Over`, it stands off them (the rim at the hairline) and closes under itself above them.
 #[derive(Clone, Copy, PartialEq)]
-pub(crate) enum Meet {
+pub(super) enum Meet {
     Round(usize),
     Over,
 }
@@ -242,7 +240,7 @@ fn over_skin(h: &HeadFrame, p: V3, dir: V3, len: f64) -> V3 {
 /// `edge` at the rim; in locks, with a parting. Round an ear (`Meet::Round`) the rim follows an arc
 /// over it (`Oval::rim`) on more columns, and the rows above bend round it too; over them
 /// (`Meet::Over`) the cap stands off the ear and closes under itself in a hem above it.
-pub(crate) fn cap(sc: &Scalp, mut c: Cap) -> Comp {
+pub(super) fn cap(sc: &Scalp, mut c: Cap) -> Comp {
     let h = sc.h;
     // A layout column (the parting's width is in them), then the columns as built.
     let layout_step = TAU / c.cols as f64;
@@ -462,7 +460,7 @@ pub(crate) fn cap(sc: &Scalp, mut c: Cap) -> Comp {
 }
 
 /// Unit normals of a grid of points (rows, cols), turned to point along `out(p)`.
-pub(crate) fn grid_normals(p: &[Vec<V3>], out: &dyn Fn(V3) -> V3) -> Vec<Vec<V3>> {
+pub(super) fn grid_normals(p: &[Vec<V3>], out: &dyn Fn(V3) -> V3) -> Vec<Vec<V3>> {
     let (r, c) = (p.len(), p[0].len());
     (0..r)
         .map(|i| {
@@ -506,7 +504,7 @@ const HEM_DROP: f64 = 0.9;
 /// rounded edges, and under the last a rounded hem, curled in by `curl` (a share of the thickness).
 /// Clump bands per column. Wisps hang `wisp` (m) below the hem: from the outer face's last row, down
 /// in front of the hem's lip (as one to its lowest line) and on, turned in half as far as it is.
-pub(crate) fn slab(
+pub(super) fn slab(
     mid: &[Vec<V3>],
     nrm: &[Vec<V3>],
     half: &[Vec<f64>],
@@ -577,7 +575,7 @@ pub(crate) fn slab(
 
 /// Clump bands across a sheet's columns (whole locks at its edges): light in the locks' middles,
 /// varying from lock to lock.
-pub(crate) fn lock_bands(cols: usize, seed: f64) -> Vec<f64> {
+pub(super) fn lock_bands(cols: usize, seed: f64) -> Vec<f64> {
     locks(cols, LOCK)
         .iter()
         .enumerate()
@@ -593,7 +591,7 @@ pub(crate) fn lock_bands(cols: usize, seed: f64) -> Vec<f64> {
 
 /// How far out hair hangs at azimuth a, by height: the scalp's section there (a share of the skull
 /// ellipsoid's radii), and below its widest straight down from it.
-pub(crate) fn hang(sc: &Scalp, a: f64) -> impl Fn(f64) -> f64 {
+pub(super) fn hang(sc: &Scalp, a: f64) -> impl Fn(f64) -> f64 {
     let h = sc.h;
     // Depths below the centre (rising) and scales.
     let (mut ds, mut ss) = (Vec::new(), Vec::new());

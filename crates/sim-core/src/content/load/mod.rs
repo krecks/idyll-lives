@@ -1,6 +1,4 @@
-//! [(3487, 6446)]
-//!
-//! Split from `content.rs` (see `mod.rs`).
+//! `Content::from_json`: the raw content checked and turned into definitions.
 
 use super::*;
 

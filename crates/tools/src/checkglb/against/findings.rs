@@ -1,16 +1,16 @@
 //! Findings, their classes, and the numbers a comparison keeps.
-//!
-//! Split from `against.rs` (see `mod.rs`).
 
 use super::*;
+use crate::checkglb::near::P3;
 
+/// One row of `METRICS` that is over its limit.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Finding {
     pub metric: &'static str,
     pub text: String,
 }
 
-pub(crate) fn found(metric: &'static str, text: String) -> Finding {
+pub(super) fn found(metric: &'static str, text: String) -> Finding {
     debug_assert!(METRICS.iter().any(|(m, _)| *m == metric), "{metric}");
     Finding { metric, text }
 }
@@ -39,7 +39,7 @@ pub struct Numbers {
 }
 
 impl Numbers {
-    pub(crate) fn text(&self) -> String {
+    pub(super) fn text(&self) -> String {
         let mut out = Vec::new();
         if !self.differs.is_empty() {
             out.push(format!("differs in {}", self.differs.join(", ")));
@@ -65,7 +65,7 @@ impl Numbers {
     }
 }
 
-pub(crate) fn mm(v: f64) -> String {
+pub(super) fn mm(v: f64) -> String {
     if v.is_finite() {
         format!("{:.3} mm", v * 1000.0)
     } else {
@@ -73,11 +73,11 @@ pub(crate) fn mm(v: f64) -> String {
     }
 }
 
-pub(crate) fn share(v: f64) -> String {
+pub(super) fn share(v: f64) -> String {
     format!("{:.2} %", v * 100.0)
 }
 
-pub(crate) fn point(p: P3) -> String {
+pub(super) fn point(p: P3) -> String {
     format!("({:.4}, {:.4}, {:.4})", p[0], p[1], p[2])
 }
 

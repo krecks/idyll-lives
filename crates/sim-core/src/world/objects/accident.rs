@@ -1,8 +1,8 @@
 //! An accident happening where they are.
-//!
-//! Split from `world/objects.rs` (see `mod.rs`).
 
 use super::*;
+use crate::social;
+use crate::world::{Activity, Ctx, News, ObjectInstance, Phase, Sim, Task, TaskKind};
 
 /// Accident `a` happens to `sim` where they are (see `Content::accidents`).
 pub(crate) fn accident(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], a: usize) {

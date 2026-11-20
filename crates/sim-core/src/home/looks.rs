@@ -1,11 +1,9 @@
 //! The looks of a wall edge: what an edit may set and what it costs to repair.
-//!
-//! Split from `home.rs` (see `mod.rs`).
 
 use super::*;
 
 /// Whether an edit's look exists in the content (form, covering, door or window style).
-pub(crate) fn check_look(rules: &crate::content::BuildRules, e: &EdgeEdit) -> Result<(), Error> {
+pub(super) fn check_look(rules: &crate::content::BuildRules, e: &EdgeEdit) -> Result<(), Error> {
     if e.form.is_some_and(|f| f > FORM_HALF) {
         return Err(Error::new("a wall is full height (0) or a half wall (1)"));
     }
@@ -60,7 +58,7 @@ pub(crate) fn check_look(rules: &crate::content::BuildRules, e: &EdgeEdit) -> Re
 
 /// The look a wall has after an edit: new walls take the edit's form and covering, new doors
 /// and windows its style; standing ones keep their faces and change only what the edit names.
-pub(crate) fn next_look(current: Edge, target: Edge, old: EdgeLook, e: &EdgeEdit) -> EdgeLook {
+pub(super) fn next_look(current: Edge, target: Edge, old: EdgeLook, e: &EdgeEdit) -> EdgeLook {
     match target {
         Edge::Open => EdgeLook::default(),
         // Fences and gates have only a style; a gate put into a fence keeps the fence's.
