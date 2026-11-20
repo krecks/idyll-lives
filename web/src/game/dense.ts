@@ -356,26 +356,32 @@ export class DensePass {
   }
 
   /**
-   * A lot of area `area` near each of `points` (set by hand), on the frontage of the road nearest it,
-   * of the kinds the land there asks for (`kindsAt`: none if null). The slots laid, by index.
+   * A lot of area `area` near each of `points` (set by hand), of the kinds the land there asks for (`kindsAt`:
+   * none if null), on the frontage of the road nearest it, else of the next nearest within reach (a point by a
+   * corner is nearer the side street than the road its lot would front). The slots laid, by index.
    */
   fillPoints(area: number, points: readonly Pt[], rand: Rand, kindsAt: (p: Pt) => readonly BuildingUse[] | null): number[] {
     return points.flatMap((p) => {
       const kinds = kindsAt(p);
       if (kinds === null) return [];
-      let best: { road: number; dist: number; s: number } | null = null;
-      for (const [road, hit] of this.index.around(p[0], p[1], FILL_REACH + 10)) {
-        if (this.roads[road].kind === 'trail' || (best && best.dist <= hit.dist)) continue;
-        best = { road, dist: hit.dist, s: hit.s };
-      }
-      if (!best || best.dist - this.roads[best.road].width / 2 > FILL_REACH) return [];
-      const ls = lengths(this.roads[best.road].points);
-      const { p: q, t } = pointAt(this.roads[best.road].points, best.s, ls);
-      const side: 1 | -1 = (p[0] - q[0]) * -t[1] + (p[1] - q[1]) * t[0] >= 0 ? 1 : -1;
+      const near = [...this.index.around(p[0], p[1], FILL_REACH + 10)]
+        .filter(([road, hit]) => this.roads[road].kind !== 'trail' && hit.dist - this.roads[road].width / 2 <= FILL_REACH)
+        .sort((a, b) => a[1].dist - b[1].dist);
+      if (!near.length) return [];
       const zone = this.zoneAt(area, p);
       const use = this.pickUse(zone, rand, kinds);
       const units = use ? this.unitsOf(use, area, zone, rand) : [];
-      return use && units.length ? this.put(units, best.road, best.s, side, ls, use, 0) : [];
+      if (!use || !units.length) return [];
+      for (const [road, hit] of near) {
+        const ls = lengths(this.roads[road].points);
+        const { p: q, t } = pointAt(this.roads[road].points, hit.s, ls);
+        // (The side the point is on: `leftOf` the road's way is side 1.)
+        const [lx, lz] = leftOf(t);
+        const side: 1 | -1 = (p[0] - q[0]) * lx + (p[1] - q[1]) * lz >= 0 ? 1 : -1;
+        const laid = this.put(units, road, hit.s, side, ls, use, 0);
+        if (laid.length) return laid;
+      }
+      return [];
     });
   }
 
