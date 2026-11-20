@@ -20,7 +20,7 @@
  *   `?gpustats`), plus the GPU process's CPU time from `ps`;
  * - memory: per-process RSS by role (the renderer — the tab running the game —, the GPU process, the
  *   browser), their sum (a ceiling: shared pages count once per process), CDP JSHeapUsedSize + DOM
- *   nodes at 1 Hz, and the renderer's `phys_footprint` at the edges of the steady window;
+ *   nodes at 1 Hz, and the renderer's and the GPU process's `phys_footprint` at the collected reads (below);
  * - I/O and network: every request (CDP Network: URL, type, status, encoded bytes, timing, cache),
  *   the page's resource timings (decoded bytes), asset bytes and request counts per stage, and
  *   external (non-localhost) requests, which the game should make none of at runtime. Per-process
@@ -33,6 +33,14 @@
  * - Chrome's memory-infra dump (`Tracing.requestMemoryDump`) at the menu, the entry and the steady
  *   end: each process's allocators (V8, PartitionAlloc's ArrayBuffer partition, malloc, the GPU's) and
  *   its private footprint;
+ * - the collected reads (`--reads`, the memory to compare builds by): at fixed points of the steady
+ *   window the game is paused, every heap is collected (`HeapProfiler.collectGarbage` on the page and
+ *   on each worker, then a critical memory-pressure notification, which has Chrome give back what its
+ *   allocators and caches can), and then the renderer's and the GPU process's `phys_footprint`, a
+ *   memory-infra dump with each process's allocators (V8, PartitionAlloc, malloc, the GPU's), the sim's
+ *   WASM memory, the renderer's census and the world's plots, households, residents and objects are
+ *   read; their median and spread over the reads are in `summary.json` (`memory.collected`). The game
+ *   plays on afterwards, and the time a read takes is left out of the steady window;
  * - the entry's peak: the renderer's RSS and the page's and workers' heaps twice a second through it;
  * - the renderer's census (`window.__memCensus()`): CPU copies of GPU buffers, typed-array texture
  *   levels, the model files' decoded pieces, the scene's geometry by owner;
@@ -44,7 +52,11 @@
  *     --runs 2                 full runs (each in a fresh context), compared at the end
  *     --secs 300               steady state after the household is entered
  *     --seed 7                 the page's Math.random seed
- *     --household 0            which household's Play is pressed (its index in the list)
+ *     --code country-lrstm-7   the world's code (`?code=`): the countryside as a new player gets it, at seed 7
+ *     --world country --options town=city   step 1's place and options instead of a code
+ *     --home house             the household's home: a `house`, a `flat`, or `any`
+ *     --household 0            which household's Play is pressed (its index among those of that home)
+ *     --reads 30,90,150,210,270   the collected reads, seconds of play into the steady window (`none`: no reads)
  *     --preset medium          graphics preset (low, medium, high)
  *     --renderer webgpu        or webgl
  *     --hud 1                  the interface shown
@@ -71,6 +83,7 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { quiet } from './quiet.mjs';
+import { worldFlags } from './worldFlags.mjs';
 
 const STARTED = Date.now();
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -86,6 +99,17 @@ const runs = Number(flag('runs', '2'));
 const secs = Number(flag('secs', '300'));
 const seed = Number(flag('seed', '7'));
 const pick = Number(flag('household', '0'));
+// The world: a code (the same land, town and people on every build that reads codes alike), or step 1's
+// place and options; none given: the countryside as a new player gets it, at seed 7 (its defaults:
+// large, rolling, some woods, a town and many villages).
+const made = flag('world', null) ? worldFlags(flag, null) : { world: null, query: '' };
+const code = made.world ? flag('code', null) : flag('code', 'country-lrstm-7');
+const worldQuery = [made.world ? `world=${made.world}` : '', made.query ? `options=${made.query}` : '', code ? `code=${encodeURIComponent(code)}` : ''];
+/** The kind of home the household played lives in: `house` (a house's lot), `flat`, or `any`. */
+const homeKind = flag('home', 'house');
+/** The collected reads, seconds of play into the steady window. */
+const readsFlag = flag('reads', '30,90,150,210,270');
+const readsAt = readsFlag === 'none' ? [] : readsFlag.split(',').map(Number);
 const preset = flag('preset', 'medium');
 const renderer = flag('renderer', 'webgpu');
 const hud = flag('hud', '1');
@@ -115,7 +139,11 @@ if (has('help') || args.includes('-h')) {
   --runs 2                 full runs (each in a fresh context), compared at the end
   --secs 300               steady state after the household is entered
   --seed 7                 the page's Math.random seed
-  --household 0            which household's Play is pressed (its index in the list)
+  --code country-lrstm-7   the world's code (?code=): the countryside as a new player gets it, at seed 7
+  --world country --options town=city   step 1's place and options instead of a code
+  --home house             the household's home: a house, a flat, or any
+  --household 0            which household's Play is pressed (its index among those of that home)
+  --reads 30,90,150,210,270   the collected reads (paused, collected, then measured), seconds into the steady window; none: no reads
   --preset medium          graphics preset (low, medium, high)
   --renderer webgpu        or webgl
   --hud 1                  the interface shown (0 hides it)
@@ -146,6 +174,9 @@ if (!Number.isInteger(seed)) bad(`--seed must be an integer, not ${JSON.stringif
 if (!Number.isInteger(pick) || pick < 0) bad(`--household must be a non-negative index, not ${JSON.stringify(flag('household', '0'))}`);
 if (!['low', 'medium', 'high'].includes(preset)) bad(`--preset must be low, medium or high, not ${preset}`);
 if (!['webgpu', 'webgl'].includes(renderer)) bad(`--renderer must be webgpu or webgl, not ${renderer}`);
+if (!['house', 'flat', 'any'].includes(homeKind)) bad(`--home must be house, flat or any, not ${homeKind}`);
+if (!readsAt.every((s) => Number.isFinite(s) && s >= 0)) bad(`--reads must be seconds (30,90,…) or none, not ${readsFlag}`);
+if (readsAt.some((s) => s >= secs)) bad(`--reads: every read must come before the steady window ends (--secs ${secs})`);
 if (!['0', '1'].includes(hud)) bad(`--hud must be 0 or 1, not ${hud}`);
 if (!(startupTimeout > 0 && entryTimeout > 0 && steadyGrace >= 0)) bad('the timeouts must be positive');
 
@@ -436,6 +467,10 @@ async function watchWorkers(raw, pageTargetId, onSeen = () => {}) {
   const { sessionId } = await raw.send('Target.attachToTarget', { targetId: pageTargetId, flatten: true });
   await auto(sessionId);
   return {
+    /** Collects every worker's garbage (a full GC on each worker's isolate). */
+    async collect() {
+      await Promise.all([...workers.keys()].map((sid) => Promise.race([raw.send('HeapProfiler.collectGarbage', {}, sid).catch(() => null), sleep(5000)])));
+    },
     /** Each worker's heap (MB): used, total, and the ArrayBuffers' backing store. */
     async heaps() {
       const out = [];
@@ -464,15 +499,16 @@ const workersSum = (heaps, key) => (heaps?.length ? +heaps.reduce((a, w) => a + 
 /**
  * Chrome's memory-infra dump of every process (tracing on for the dump alone): each process's
  * allocators (the top level and their main parts, MB) and its totals (RSS, private footprint). Takes a
- * second or two and pauses each process briefly while it is dumped.
+ * second or two and pauses each process briefly while it is dumped. `deterministic`: each process
+ * collects its garbage first.
  */
-async function memoryDump(raw) {
+async function memoryDump(raw, deterministic = false) {
   await raw.send('Tracing.start', {
     traceConfig: { includedCategories: ['disabled-by-default-memory-infra'], excludedCategories: ['*'], memoryDumpConfig: { triggers: [] } },
     transferMode: 'ReturnAsStream',
     streamFormat: 'json',
   });
-  const dumped = await raw.send('Tracing.requestMemoryDump', { deterministic: false, levelOfDetail: 'detailed' });
+  const dumped = await raw.send('Tracing.requestMemoryDump', { deterministic, levelOfDetail: 'detailed' });
   const complete = raw.once('Tracing.tracingComplete');
   await raw.send('Tracing.end');
   const { stream } = await complete;
@@ -494,8 +530,9 @@ async function memoryDump(raw) {
     const proc = (processes[e.pid] ??= { residentMB: null, privateFootprintMB: null, allocators: {} });
     for (const [name, a] of Object.entries(d.allocators ?? {})) {
       const size = hex(a.attrs?.size?.value);
-      // (The top level and two levels down, where they are big enough to matter.)
-      if (name.split('/').length <= 3 && size >= 1 << 20) proc.allocators[name] = mb(size);
+      // (Every top level, and two levels down where they are big enough to matter.)
+      const depth = name.split('/').length;
+      if (depth === 1 || (depth <= 3 && size >= 1 << 20)) proc.allocators[name] = mb(size);
     }
     const totals = d.process_totals;
     if (totals?.resident_set_bytes) proc.residentMB = mb(hex(totals.resident_set_bytes));
@@ -591,8 +628,10 @@ async function runOnce(n, chromium, executablePath) {
   const workersSeen = [];
   const entrySamples = [];
   let resources = [];
-  let footprintStart = { available: false, reason: 'not taken' };
-  let footprintEnd = { available: false, reason: 'not taken' };
+  /** The collected reads through the steady window (`--reads`). */
+  const reads = [];
+  /** The world played: its code as step 1 showed it, and the home and household chosen. */
+  const played = { code: null, home: null, household: null, homeKind };
   const launchAt = Date.now();
   const devtoolsPort = await freePort();
   const browser = await chromium.launch({
@@ -698,6 +737,114 @@ async function runOnce(n, chromium, executablePath) {
     raw(b);
     return b;
   };
+  /**
+   * A collected read (`--reads`): the game paused, what the page counts read, every heap collected
+   * and the allocators asked to give back what they can, then the footprints, the allocators and the
+   * heaps measured, and the game set going again at the speed it had. `t`: seconds of play.
+   */
+  const collectedRead = async (t) => {
+    const began = Date.now();
+    // (The speed the game had, as its top bar shows it: its buttons are speeds 0 to 4 in turn, as their keys.)
+    const speedKey = await page.evaluate(() => [...document.querySelectorAll('.speeds button')].findIndex((b) => b.getAttribute('aria-pressed') === 'true')).catch(() => -1);
+    await page.keyboard.press('0');
+    await sleep(1000);
+    // (The footprint as it stood, before anything was collected: what the reads at the window's edges used to be.)
+    const uncollected = footprintMB(byRole(processTree(psTable(), browserPid ?? 0)).renderer?.pid);
+    // What the page counts, read before the collection, so what reading it makes is collected too.
+    let counts = null;
+    try {
+      counts = await page.evaluate(async () => {
+        const osw = window.__osw;
+        let town = null;
+        try {
+          // (The dev server's module, the same instance the game uses.)
+          town = (await import('/src/ui/app.svelte.ts')).app.town;
+        } catch {}
+        const home = osw?.home?.() ?? null;
+        const sims = osw?.sims?.() ?? null;
+        return {
+          plots: town?.slots?.length ?? null,
+          households: town ? town.households.length + 1 : null,
+          residents: sims?.length ?? null,
+          // (The household's residents on its own lot just then: the rest are out.)
+          atHome: sims && home ? sims.filter((s) => s.plot === home.id).length : null,
+          objects: osw?.objects?.().length ?? null,
+          minute: osw?.snapshotMinute?.() ?? null,
+        };
+      });
+    } catch {}
+    let game = null;
+    let census = null;
+    try {
+      game = await page.evaluate(() => window.__gameStats?.() ?? null);
+      census = await page.evaluate(() => window.__memCensus?.() ?? null);
+    } catch {}
+    const collect = async () => {
+      await cdp.send('HeapProfiler.collectGarbage').catch(() => {});
+      await workers?.collect().catch(() => {});
+    };
+    await collect();
+    await collect();
+    // (Chrome's own answer to a machine short of memory: caches dropped, free pages given back, and V8 collects again.)
+    await cdp.send('Memory.simulatePressureNotification', { level: 'critical' }).catch(() => {});
+    await sleep(2000);
+    await collect();
+    await sleep(500);
+    const role = byRole(processTree(psTable(), browserPid ?? 0));
+    const rendererFootprint = footprintMB(role.renderer?.pid);
+    const gpuFootprint = footprintMB(role.gpu?.pid);
+    let dump = null;
+    if (devtools) {
+      try {
+        const d = await memoryDump(devtools, true);
+        dump = { renderer: d.processes[role.renderer?.pid] ?? null, gpu: d.processes[role.gpu?.pid] ?? null };
+      } catch (err) {
+        dump = { error: String(err).split('\n')[0] };
+      }
+    }
+    const usage = await heapUsage(cdp);
+    const wh = workers ? await workers.heaps().catch(() => null) : null;
+    const pausedMinute = await page.evaluate(() => window.__osw?.snapshotMinute?.() ?? null).catch(() => null);
+    await page.keyboard.press(String(speedKey > 0 ? speedKey : 1));
+    const storage = census ? Object.values(census.storage) : [];
+    const read = {
+      type: 'read',
+      t,
+      at: since(),
+      ms: Date.now() - began,
+      // (The sim's clock still over the read: the pause held.)
+      held: counts?.minute != null && pausedMinute != null ? counts.minute === pausedMinute : null,
+      speedKey,
+      rendererFootprintMB: rendererFootprint.available ? rendererFootprint.mb : null,
+      rendererUncollectedMB: uncollected.available ? uncollected.mb : null,
+      gpuFootprintMB: gpuFootprint.available ? gpuFootprint.mb : null,
+      rendererRssMB: rssMB(role.renderer),
+      gpuRssMB: rssMB(role.gpu),
+      renderer: dump?.renderer ?? null,
+      gpu: dump?.gpu ?? null,
+      dumpError: dump?.error ?? null,
+      heapMB: mb(usage?.usedSize),
+      backingMB: mb(usage?.backingStorageSize),
+      workers: wh,
+      workersHeapMB: workersSum(wh, 'usedMB'),
+      workersBackingMB: workersSum(wh, 'backingMB'),
+      simWasmMB: mb(game?.simMemoryBytes),
+      vramMB: mb(game?.vram?.total),
+      census: census
+        ? {
+            cpuMB: mb(storage.reduce((a, s) => a + s.bytes, 0)),
+            gpuMB: mb(storage.reduce((a, s) => a + s.gpuBytes, 0)),
+            textureLevelsMB: mb(census.textureLevels),
+            modelPiecesMB: mb(census.modelFiles.pieceBytes),
+            modelClipsMB: mb(census.modelFiles.clipBytes),
+          }
+        : null,
+      counts,
+    };
+    reads.push(read);
+    raw(read);
+    return read;
+  };
   try {
     browserPid = browser.process?.()?.pid ?? null;
   } catch {}
@@ -765,7 +912,7 @@ async function runOnce(n, chromium, executablePath) {
     raw({ type: 'net', ...r, failed: e.errorText });
   });
 
-  const query = ['profile', 'gpustats', `quality=${preset}`, `hud=${hud}`, renderer === 'webgl' ? 'renderer=webgl' : '', memtrace ? 'memtrace' : '', lowmem ? 'lowmem' : ''].filter(Boolean).join('&');
+  const query = ['profile', 'gpustats', `quality=${preset}`, `hud=${hud}`, renderer === 'webgl' ? 'renderer=webgl' : '', memtrace ? 'memtrace' : '', lowmem ? 'lowmem' : '', ...worldQuery].filter(Boolean).join('&');
   const url = `${base}/?${query}`;
   const menuUp = () => page.waitForFunction(() => !!document.querySelector('.main-menu, .menu') && !document.querySelector('.loading'), null, { timeout: startupTimeout * 1000, polling: 100 });
 
@@ -838,6 +985,8 @@ async function runOnce(n, chromium, executablePath) {
       await button.waitFor({ timeout: entryTimeout * 1000 });
       await enabled(label);
       await page.waitForTimeout(500);
+      // (Step 1's code field: the world as this build reads the code, recorded so two builds' runs can be held to the same one.)
+      if (!played.code) played.code = await page.evaluate(() => document.querySelector('input.code')?.value ?? null);
       await button.click();
     }
     await page.waitForFunction(
@@ -849,10 +998,18 @@ async function runOnce(n, chromium, executablePath) {
       { timeout: entryTimeout * 1000, polling: 50 },
     );
     await page.waitForTimeout(500);
-    const plays = page.locator('.offer .card[data-home] .go');
-    const count = await plays.count();
-    if (!count) fail('no household to Play (no .offer .card[data-home] .go)');
-    await plays.nth(Math.min(pick, count - 1)).click({ timeout: entryTimeout * 1000 });
+    // The households whose home is of the kind asked for: a card's `data-home` is "12" for a house's lot and
+    // "12:3" for a flat (builds before flats name the lot alone, `data-slot`).
+    const cards = await page.evaluate(() =>
+      [...document.querySelectorAll('.offer .card[data-home], .offer .card[data-slot]')].map((c) => ({ home: c.getAttribute('data-home') ?? c.getAttribute('data-slot'), name: c.querySelector('.info b')?.textContent?.trim() ?? '' })),
+    );
+    const fitting = cards.map((c, i) => ({ ...c, i })).filter((c) => homeKind === 'any' || (homeKind === 'flat') === c.home.includes(':'));
+    const count = fitting.length;
+    if (!count) fail(`no household living in a ${homeKind} to Play (of ${cards.length} offered)`);
+    const chosen = fitting[Math.min(pick, count - 1)];
+    played.home = chosen.home;
+    played.household = chosen.name;
+    await page.locator('.offer .card[data-home] .go, .offer .card[data-slot] .go').nth(chosen.i).click({ timeout: entryTimeout * 1000 });
     const moveIn = page.locator('.btn.move-in');
     await moveIn.waitFor({ timeout: entryTimeout * 1000 });
     await page.waitForFunction(() => !!document.querySelector('.btn.move-in:not(:disabled)'), null, wait);
@@ -881,6 +1038,7 @@ async function runOnce(n, chromium, executablePath) {
     timeline.entryStageMs = enteredAt - entryFrom;
     timeline.pageMarks.entered = await page.evaluate(() => performance.now());
     timeline.household = Math.min(pick, count - 1);
+    timeline.households = cards.length;
     stagesSeen.entry = enteredAt;
     raw({ type: 'stage', stage: 'entry', event: 'end', at: since(), ms: timeline.entryMs, households: count, frames: (await drainFrames(page, frames, 'entry')).length });
     await boundary('entry');
@@ -899,15 +1057,24 @@ async function runOnce(n, chromium, executablePath) {
         raw({ type: 'heapprofile', stage: 'steady', error: String(err).split('\n')[0] });
       }
     }
-    // (`footprint` suspends the renderer while it reads it: taken before the window and after it.)
-    {
-      const r0 = byRole(processTree(psTable(), browserPid ?? 0));
-      footprintStart = footprintMB(r0.renderer?.pid);
-      raw({ type: 'footprint', stage: 'steadyStart', ...footprintStart, rendererRssMB: rssMB(r0.renderer) });
-    }
+    // The window is counted in seconds of play: the collected reads (`--reads`), which pause the game
+    // and suspend the renderer while `footprint` reads it, are left out of it, their frames too.
+    let readMs = 0;
+    const pending = [...readsAt].sort((a, b) => a - b);
     let previous = null;
-    for (let i = 0; Date.now() - steadyFrom < secs * 1000; i++) {
-      const target = steadyFrom + (i + 1) * 1000;
+    for (let i = 0; Date.now() - steadyFrom - readMs < secs * 1000; i++) {
+      if (pending.length && Date.now() - steadyFrom - readMs >= pending[0] * 1000) {
+        const t = pending.shift();
+        await drainFrames(page, frames, 'steady');
+        const from = Date.now();
+        const r = await collectedRead(t);
+        await drainFrames(page, frames, 'read');
+        readMs += Date.now() - from;
+        // (The next sample's deltas would span the read.)
+        previous = null;
+        console.log(`  read at ${t} s: renderer ${r.rendererFootprintMB} MB, GPU process ${r.gpuFootprintMB} MB (${(r.ms / 1000).toFixed(1)} s${r.held === false ? ', the pause did not hold' : ''})`);
+      }
+      const target = steadyFrom + readMs + (i + 1) * 1000;
       const at = Date.now();
       let metrics;
       try {
@@ -935,7 +1102,7 @@ async function runOnce(n, chromium, executablePath) {
       const sample = {
         type: 'sample',
         stage,
-        t: +( (at - steadyFrom) / 1000 ).toFixed(3),
+        t: +((at - steadyFrom - readMs) / 1000).toFixed(3),
         at: since(),
         metrics: {
           // (CDP's durations are seconds, cumulative: the interval's share is a delta.)
@@ -988,7 +1155,8 @@ async function runOnce(n, chromium, executablePath) {
       const rest = target - Date.now();
       if (rest > 0) await sleep(rest);
     }
-    timeline.steadyMs = Date.now() - steadyFrom;
+    timeline.steadyMs = Date.now() - steadyFrom - readMs;
+    timeline.readsMs = readMs;
     if (profileHeap) {
       try {
         const { profile } = await cdp.send('HeapProfiler.stopSampling');
@@ -1018,9 +1186,6 @@ async function runOnce(n, chromium, executablePath) {
     resources = await page.evaluate(() =>
       performance.getEntriesByType('resource').map((e) => ({ name: e.name, type: e.initiatorType, start: +e.startTime.toFixed(1), duration: +e.duration.toFixed(1), transfer: e.transferSize, decoded: e.decodedBodySize, encoded: e.encodedBodySize })),
     ).catch(() => []);
-    const roleEnd = byRole(processTree(psTable(), browserPid ?? 0));
-    footprintEnd = footprintMB(roleEnd.renderer?.pid);
-    raw({ type: 'footprint', stage: 'steadyEnd', ...footprintEnd, rendererRssMB: rssMB(roleEnd.renderer) });
     await boundary('steadyEnd');
     raw({ type: 'stage', stage: 'steady', event: 'end', at: since(), ms: timeline.steadyMs });
     raw({ type: 'perf', report: perf });
@@ -1119,8 +1284,9 @@ async function runOnce(n, chromium, executablePath) {
     gpuStartMB: series[0]?.gpuMB ?? null,
     gpuEndMB: series[series.length - 1]?.gpuMB ?? null,
     gpuGrowthMB: growth('gpuMB'),
-    footprintStart: footprintStart ?? null,
-    footprintEnd,
+    reads,
+    readKeys: reads.map(readKeys),
+    collected: collectedStats(reads),
     boundaries,
     heapStartMB: first.heapMB ?? null,
     heapEndMB: last.heapMB ?? null,
@@ -1178,6 +1344,9 @@ async function runOnce(n, chromium, executablePath) {
     finishedAt: new Date().toISOString(),
     url,
     seed,
+    code,
+    world: made.world ? { place: made.world, options: made.query } : null,
+    played,
     preset,
     renderer,
     hud,
@@ -1210,10 +1379,84 @@ async function runOnce(n, chromium, executablePath) {
 }
 
 /**
- * The heap profile's self sizes by call site: where the objects still alive at the end of the window were
- * allocated. Sampling misses short-lived objects (it walks the heap at a fixed interval), which is the
- * point: this answers "what is still there", not "what was allocated".
+ * A collected read as flat keys, MB (counts as they are): the footprints, each process's allocators at
+ * the top level and the parts that say most (the ArrayBuffer and Blink partitions, V8's main isolate and
+ * its workers', the GPU's own), the sim's WASM, the workers' heaps, the census and the counts. They are
+ * kept per read in `summary.json` (`memory.readKeys`), where the A/B compare (`memory-ab.mjs`) reads them.
  */
+function readKeys(r) {
+  const out = {
+    'renderer footprint': r.rendererFootprintMB,
+    'renderer footprint before collecting': r.rendererUncollectedMB,
+    'gpu process footprint': r.gpuFootprintMB,
+    'renderer private footprint (dump)': r.renderer?.privateFootprintMB ?? null,
+    'gpu process private footprint (dump)': r.gpu?.privateFootprintMB ?? null,
+    'page JS heap': r.heapMB,
+    'page JS external': r.backingMB,
+    'workers JS heap': r.workersHeapMB,
+    'workers JS external': r.workersBackingMB,
+    'sim WASM': r.simWasmMB,
+    'VRAM (PlayCanvas)': r.vramMB,
+  };
+  const part = /^(v8\/(main|workers)|partition_alloc\/partitions\/(array_buffer|buffer|fast_malloc|layout)|gpu\/(gl|dawn|shared_images|transfer_cache)|malloc\/allocated_objects)$/;
+  for (const [who, d] of [['renderer', r.renderer], ['gpu process', r.gpu]]) {
+    for (const [name, v] of Object.entries(d?.allocators ?? {})) if (!name.includes('/') || part.test(name)) out[`${who} ${name}`] = v;
+  }
+  for (const [k, v] of Object.entries(r.census ?? {})) out[`census ${k.replace(/MB$/, '')}`] = v;
+  for (const [k, v] of Object.entries(r.counts ?? {})) if (k !== 'minute') out[`count ${k}`] = v;
+  return out;
+}
+
+/** Median, least and most of each key over a run's collected reads, and the spread (most − least). */
+function collectedStats(reads) {
+  const keyed = reads.map(readKeys);
+  const keys = [...new Set(keyed.flatMap((k) => Object.keys(k)))];
+  const out = {};
+  for (const key of keys) {
+    const xs = keyed.map((k) => k[key]).filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
+    if (!xs.length) continue;
+    out[key] = { n: xs.length, median: medianOf(xs), min: xs[0], max: xs[xs.length - 1], spread: +(xs[xs.length - 1] - xs[0]).toFixed(1) };
+  }
+  return out;
+}
+
+/** The median of sorted numbers (the mean of the middle two for an even count). */
+function medianOf(sorted) {
+  const n = sorted.length;
+  if (!n) return null;
+  return +(n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2).toFixed(1);
+}
+
+/** The collected reads (`--reads`): each run's reads, then each key's median and spread over them. */
+function collectedSection(summaries) {
+  if (!summaries.some((x) => x.memory.reads?.length)) return [];
+  const f = (x) => (x == null ? '—' : x);
+  const lines = [
+    '## Collected reads',
+    '',
+    "At each read the game is paused, the page's and every worker's heap collected (`HeapProfiler.collectGarbage`) and a critical memory-pressure notification sent (Chrome drops caches and gives free pages back), then `phys_footprint` (`/usr/bin/footprint`: dirty and compressed pages, what Activity Monitor shows) is read for the renderer, the tab running the game with its workers, and for the GPU process, which holds the GPU's buffers and textures. The game plays on after it; the read's time is not in the steady window.",
+    '',
+    '| run | t (s) | read (s) | renderer footprint | GPU process footprint | renderer v8 | partition_alloc | malloc | renderer gpu | GPU process gpu | sim WASM | plots | residents | objects |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+  ];
+  for (const [i, x] of summaries.entries()) {
+    for (const r of x.memory.reads ?? []) {
+      const a = r.renderer?.allocators ?? {};
+      lines.push(`| run ${i + 1} | ${r.t} | ${(r.ms / 1000).toFixed(1)} | ${f(r.rendererFootprintMB)} | ${f(r.gpuFootprintMB)} | ${f(a.v8)} | ${f(a.partition_alloc)} | ${f(a.malloc)} | ${f(a.gpu)} | ${f(r.gpu?.allocators?.gpu)} | ${f(r.simWasmMB)} | ${f(r.counts?.plots)} | ${f(r.counts?.residents)} | ${f(r.counts?.objects)} |`);
+    }
+  }
+  lines.push('', 'Over the reads (median, least–most; MB, counts as they are):', '', '| key | ' + summaries.map((_, i) => `run ${i + 1}`).join(' | ') + ' |', '| --- |' + summaries.map(() => ' --- |').join(''));
+  const keys = [...new Set(summaries.flatMap((x) => Object.keys(x.memory.collected ?? {})))];
+  for (const key of keys) {
+    lines.push(`| ${key} | ` + summaries.map((x) => {
+      const c = x.memory.collected?.[key];
+      return c ? `${c.median} (${c.min}–${c.max})` : '—';
+    }).join(' | ') + ' |');
+  }
+  lines.push('');
+  return lines;
+}
+
 /** The canvas census, or nothing when the run predates it (`boundary()` samples it). */
 function censusSection(summaries) {
   const rows = summaries.flatMap((x, i) =>
@@ -1341,6 +1584,11 @@ function attributionSections(summaries) {
   return lines;
 }
 
+/**
+ * The heap profile's self sizes by call site: where the objects still alive at the end of the window were
+ * allocated. Sampling misses short-lived objects (it walks the heap at a fixed interval), which is the
+ * point: this answers "what is still there", not "what was allocated".
+ */
 function topAllocations(profile) {
   const bySite = new Map();
   // A stack, not recursion: a long run's profile nests thousands of frames deep. `head` is absent when
@@ -1426,7 +1674,7 @@ const environment = {
   serverMode,
   serverReadyMs: serverReadyAt - STARTED,
   runType: warm ? 'warm' : 'cold',
-  flags: { runs, secs, seed, household: pick, preset, renderer, hud, warm, headed: has('headed'), startupTimeout, entryTimeout, steadyGrace, heapprofile: profileHeap, memtrace, dumps, lowmem, voices, prod },
+  flags: { runs, secs, seed, code, world: made.world, options: made.query, home: homeKind, reads: readsAt, household: pick, preset, renderer, hud, warm, headed: has('headed'), startupTimeout, entryTimeout, steadyGrace, heapprofile: profileHeap, memtrace, dumps, lowmem, voices, prod },
 };
 
 // ---------------------------------------------------------------- the runs
@@ -1446,6 +1694,10 @@ try {
     );
     console.log(
       `  steady: ${st.frames} frames, gap p50 ${st.frameGapMs?.median} ms p95 ${st.frameGapMs?.p95} ms p99 ${st.frameGapMs?.p99} ms · gpu ${st.gpuMs?.mean ?? 'n/a'} ms · task ${st.taskBusyPct?.mean ?? 'n/a'} % · renderer RSS ${summary.memory.rendererStartMB}→${summary.memory.rendererEndMB} MB`,
+    );
+    const fp = summary.memory.collected?.['renderer footprint'];
+    console.log(
+      `  world ${summary.played.code ?? '?'} · home ${summary.played.home} (${summary.played.household}) · collected renderer footprint ${fp ? `${fp.median} MB (${fp.min}–${fp.max})` : 'not read'}`,
     );
   }
 } finally {
@@ -1540,7 +1792,7 @@ const md = [
   '## Command',
   '',
   '```',
-  `bun tools/bench/gameplay.mjs --runs ${runs} --secs ${secs} --seed ${seed} --preset ${preset} --renderer ${renderer} --hud ${hud}${warm ? ' --warm' : ''}${has('headed') ? ' --headed' : ''}${profileHeap ? ' --heapprofile' : ''}${memtrace ? ' --memtrace' : ''}${dumps ? '' : ' --no-dumps'}${lowmem ? ' --lowmem' : ''}${voices ? ' --voices' : ''}${prod ? ' --prod' : ''}`,
+  `bun tools/bench/gameplay.mjs --runs ${runs} --secs ${secs} --seed ${seed}${code ? ` --code ${code}` : ''}${made.world ? ` --world ${made.world}${made.query ? ` --options ${made.query.replaceAll(':', '=')}` : ''}` : ''} --home ${homeKind} --household ${pick} --reads ${readsFlag} --preset ${preset} --renderer ${renderer} --hud ${hud}${warm ? ' --warm' : ''}${has('headed') ? ' --headed' : ''}${profileHeap ? ' --heapprofile' : ''}${memtrace ? ' --memtrace' : ''}${dumps ? '' : ' --no-dumps'}${lowmem ? ' --lowmem' : ''}${voices ? ' --voices' : ''}${prod ? ' --prod' : ''}`,
   '```',
   '',
   `Expected runtime: ~${Math.round((secs + 40) * runs / 60)} min (${secs} s steady + ~40 s startup/entry/shutdown per run).`,
@@ -1591,15 +1843,9 @@ const md = [
   'GPU buffers) are counted once per process and the figure is a ceiling, not a footprint: do not compare it',
   'with Activity Monitor\'s total. `ps` RSS also over-counts a process\'s own shared and file-backed pages.',
   'The JS heap is V8\'s `JSHeapUsedSize` as CDP reports it, unforced (no GC before the read), so it includes',
-  'garbage waiting for a collection. `phys_footprint` (from `/usr/bin/footprint`, which suspends the process',
-  'for a few hundred ms while it reads it, hence only at the edges of the window) is the number Activity',
-  'Monitor would show for the renderer:',
+  'garbage waiting for a collection. The collected reads below are the numbers to compare builds by.',
   '',
-  ...summaries.map(
-    (x, i) =>
-      `run ${i + 1}: renderer phys_footprint ${x.memory.footprintStart?.available ? `${x.memory.footprintStart.mb} → ${x.memory.footprintEnd?.mb} MB` : `unavailable (${x.memory.footprintStart?.reason ?? 'not taken'})`}.`,
-  ),
-  '',
+  ...collectedSection(summaries),
   ...censusSection(summaries),
   '## GPU memory and the simulation',
   '',
