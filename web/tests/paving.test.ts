@@ -221,6 +221,7 @@ describe('the town’s paving (`townPaving`)', () => {
 
   test('a bay is drawn as big as the simulation parks in it (`parking.ts`)', () => {
     expect([BAY.w, BAY.d]).toEqual([BAY_WIDE, BAY_DEEP]);
-    expect(BAY.lines).toEqual(BAY_LINES);
+    const lines: readonly number[] = BAY.lines;
+    expect(lines).toEqual(BAY_LINES);
   });
 });
