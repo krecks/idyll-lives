@@ -42,7 +42,7 @@
   async function loadPasted() {
     stateError = '';
     try {
-      app.start({ kind: 'load', saveId: await loadState(pasted.trim()) });
+      app.start({ kind: 'load', saveId: (await loadState(pasted.trim())).saveId });
       pasted = '';
     } catch (err) {
       stateError = err instanceof Error ? err.message : String(err);

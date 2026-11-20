@@ -70,7 +70,7 @@ import { TemplateCache } from './templateCache';
 import { Thumbnails } from './thumbnail';
 import { benchDiag } from '../../debug/benchFlags';
 import { perfEnd, perfStart, perfTime, perfTimeAsync } from '../../debug/perf';
-import { fetched } from '../../assets/stream';
+import { fetched, whenStreamSettled } from '../../assets/stream';
 import { both, within } from '../../core/async';
 import { LOOK } from '../look';
 import type { RenderQuality } from '../quality';
@@ -823,7 +823,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   /** `?lightmix=sun,sky,env` (dev server): each part of the daylight scaled, to compare them one by one with reference pictures. */
   private readonly lightMix = import.meta.env.DEV ? lightMixFromURL() : null;
 
-  private probe: FrameProbe | null = null;
+  /** The frame probes (`addFrameProbe`), in the order they were added. */
+  private readonly probes: FrameProbe[] = [];
   private readonly counts: FrameCounts = { drawCalls: 0, triangles: 0, shadowDrawCalls: 0, shadowTriangles: 0, mirrorDrawCalls: 0, mirrorTriangles: 0, lightingUpdates: 0, gpuFrames: 0, gpuMs: 0, residentsMs: 0, sunShadows: { whole: 0, moving: 0, why: {} } };
   private frameMs = 1000 / 60;
   private cpuMs = 0;
@@ -1111,16 +1112,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   framesOnDemand(on: boolean): void {
-    if (on) {
-      // What moves by a clock of its own (the residents' and the things' clips, the birds, the wind, the clouds) starts
-      // again from 0, each time it is asked for (a run after frames drawn to settle a pose asks again): the same frames
-      // from the same state draw the same picture, however long the page has been open or the pose took to settle.
-      this.shownMs = 0;
-      this.characters.restartClock();
-      this.lot.restartClocks();
-      this.birdLife.life.restartClock();
-      restartDice(true);
-    }
+    if (on) this.restartClocks();
     this.pacer.manual(on);
     if (!on) {
       fixFrameClock(null);
@@ -1128,13 +1120,23 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
   }
 
+  restartClocks(): void {
+    // What moves by a clock of its own (the residents' and the things' clips, the birds, the wind, the clouds) starts
+    // again from 0, and the playback's dice from their start: the same frames from the same state draw the same
+    // picture, however long the page has been open or the pose took to settle.
+    this.shownMs = 0;
+    this.characters.restartClock();
+    this.lot.restartClocks();
+    this.birdLife.life.restartClock();
+    restartDice(true);
+  }
+
   async restartLife(): Promise<void> {
     const world = this.builtWorld;
     if (!world) return;
     await this.characters.build(world.staffSims?.length ? { ...world, sims: [...world.sims, ...world.staffSims] } : world, false);
-    // (The birds' clock first: their timers are set by it as they perch.)
-    this.birdLife.life.restartClock();
-    restartDice(true);
+    // (The clocks first: the birds' timers are set by theirs as they perch, from the playback's dice.)
+    this.restartClocks();
     if (this.lastWorld && !this.townMode) await this.settleBirds(this.lastWorld, this.view, this.lastMinute);
   }
 
@@ -1163,6 +1165,18 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (A model file's textures load with it; a surface's on their own, and a model may ask for surfaces.)
     await modelFilesSettled(this.app);
     await this.lib.texturesReady();
+  }
+
+  async whenSettled(limitMs: number): Promise<void> {
+    const until = performance.now() + limitMs;
+    const left = () => Math.max(0, until - performance.now());
+    await within(whenStreamSettled(), left(), undefined);
+    await this.streamSettled(left());
+    while (!this.disposed && this.building() && performance.now() < until) await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  building(): string {
+    return [this.worldBuilding ? 'world' : '', this.streaming ? 'stream' : ''].filter(Boolean).join('+');
   }
 
   async streamSettled(limitMs: number): Promise<void> {
@@ -1250,11 +1264,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // held, and goes on from there when it is drawn again: `heldFrames.ts`.)
     const shownDt = this.held.holding ? 0 : dt;
     this.shownMs += shownDt;
-    const probe = this.probe;
+    const probes = this.probes;
     let updated = start;
-    if (probe) this.drawCounts.reset();
+    if (probes.length) this.drawCounts.reset();
     try {
-      probe?.before(start);
+      for (const probe of probes) probe.before(start);
       this.onFrame?.(this.pacer.frameTime || performance.now());
       updated = performance.now();
       if (this.townMode) this.townFrame(dt);
@@ -1306,7 +1320,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const end = performance.now();
     this.cpuMs += (end - start - this.cpuMs) * 0.1;
     if (dt > 0) this.frameMs += (dt - this.frameMs) * 0.1;
-    if (probe) {
+    if (probes.length) {
       // (`gpuTiming.ts`.)
       const c = this.counts;
       const d = this.drawCounts;
@@ -1319,7 +1333,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       c.gpuFrames = this.gpuTiming.frames;
       c.gpuMs = this.gpuTiming.ms;
       c.sunShadows = this.sunShadows.draws;
-      probe.after(start, updated, end, c);
+      for (const probe of probes) probe.after(start, updated, end, c);
     }
   };
 
@@ -4108,15 +4122,16 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.frozen = on;
   }
 
-  frameProbe(): FrameProbe | null {
-    return this.probe;
-  }
-
-  setFrameProbe(probe: FrameProbe | null): void {
-    this.probe = probe;
+  addFrameProbe(probe: FrameProbe): () => void {
+    this.probes.push(probe);
     // Draws and triangles per pass, counted only while something reads them.
-    if (probe) this.drawCounts.install(this.passKind);
-    else this.drawCounts.remove();
+    if (this.probes.length === 1) this.drawCounts.install(this.passKind);
+    return () => {
+      const i = this.probes.indexOf(probe);
+      if (i < 0) return;
+      this.probes.splice(i, 1);
+      if (!this.probes.length) this.drawCounts.remove();
+    };
   }
 
   measureGpu(on: boolean, who: 'overlay' | 'bench' = 'overlay'): void {
@@ -4211,7 +4226,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       street: this.street.stats(),
       focusSwitches: [...this.focusSwitches],
       // What is being built now (the bench notes it at each slow frame): a world (a focus lot), the street streaming, both or nothing.
-      building: [this.worldBuilding ? 'world' : '', this.streaming ? 'stream' : ''].filter(Boolean).join('+'),
+      building: this.building(),
       scene: {
         ...scene,
         textures: d.textures.size,
