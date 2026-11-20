@@ -34,34 +34,17 @@
  */
 
 import { host } from '../game/host';
-import { whenStreamSettled } from '../assets/stream';
-import { deleteSave } from '../persistence/saves';
 import type { WorldStructure } from '../core/protocol';
+import { within } from '../core/async';
 import { DEFAULT_ORBIT, TOWN_FULL, TOWN_MAX } from '../render/shared/lens';
 import type { FrameCounts, FrameProbe, Renderer, RenderPassInfo } from '../render/types';
 import { settings, unsavedSettings } from '../settings/settings.svelte';
-import { app } from '../ui/app.svelte';
-import { services, type GameControls } from '../ui/services';
+import { services } from '../ui/services';
 import { game } from '../ui/state.svelte';
 import { plotInfo } from '../ui/place';
 import { BENCH, type BenchCamera, type BenchFlags } from './benchFlags';
-import { gpuInfo, loadState } from './report';
-import { benchTime, type Loaded, type StepRun } from './benchTime';
-
-/** The sun's redraws as the renderer counts them (`benchInfo().scene.sunShadowDraws`). */
-interface SunDraws {
-  whole: number;
-  moving: number;
-  why: Record<string, number>;
-  by: Record<string, number>;
-}
-
-/** Each count of `end` less its count in `start`, the ones that grew. */
-function since(end: Record<string, number>, start: Record<string, number>): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const [k, n] of Object.entries(end)) if (n > (start[k] ?? 0)) out[k] = n - (start[k] ?? 0);
-  return out;
-}
+import { gpuInfo } from './report';
+import { benchState, benchTime, SETTLE_LIMIT_MS, sleep, START_ALPHA, sunDraws, sunSince, townCentre, type Loaded, type RunPose, type StepRun, type SunDraws } from './benchTime';
 
 /** Camera paths: distance, height angle and seconds per turn round the home lot. */
 const PATHS = {
@@ -100,9 +83,8 @@ const TOWN_VIEW = { beta: DEFAULT_ORBIT.beta, settle: 2.5, period: 60 };
 function townSpots(world: WorldStructure | null, home: [number, number, number] | null): { centre: [number, number, number]; home: [number, number, number] } {
   if (!world) return { centre: home ?? [0, 0, 0], home: home ?? [0, 0, 0] };
   const main = world.meta?.areas?.[0];
-  const square = world.meta?.centre?.find((c) => c.area === 0) ?? world.meta?.centre?.[0];
-  const mid = (pts: [number, number][]): [number, number] => [pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length];
-  const [cx, cz] = square?.poly.length ? mid(square.poly) : main ? [main.x + main.w / 2, main.z + main.d / 2] : [world.width / 2, world.depth / 2];
+  const centre = townCentre(world);
+  const [cx, , cz] = centre;
   let at = home;
   if (!at) {
     const inMain = (p: { x: number; z: number; w: number; d: number }) => !main || (p.x + p.w / 2 >= main.x && p.x + p.w / 2 <= main.x + main.w && p.z + p.d / 2 >= main.z && p.z + p.d / 2 <= main.z + main.d);
@@ -111,7 +93,7 @@ function townSpots(world: WorldStructure | null, home: [number, number, number] 
     const p = homes[Math.floor(homes.length * 0.75)];
     at = p ? [p.x + p.w / 2, 0, p.z + p.d / 2] : [cx, 0, cz];
   }
-  return { centre: [cx, 0, cz], home: at };
+  return { centre, home: at };
 }
 /** The camera's pose as `?bench=`'s flags give it (`benchFlags.ts`), and as `__bench.pose` changes it. */
 export interface BenchView {
@@ -151,7 +133,7 @@ export interface BenchCounts {
   /** The middle frame's draws (sorted). */
   medianDraws: number;
   /** The sun's map drawn again over those frames: whole (the still casters too), only what moves, and why (`SunShadows.draws`). */
-  sun: { whole: number; moving: number; why: Record<string, number>; by: Record<string, number> };
+  sun: SunDraws;
 }
 
 /**
@@ -191,11 +173,12 @@ export interface BenchApi {
   /** Fixed-step playback at `ticks` a frame (null: real time again). */
   step(ticks: number | null): void;
   /**
-   * Exactly `frames` frames in fixed steps from where the game is, with the pose held (`pose` first): frames drawn
+   * Exactly `frames` frames in fixed steps from where the game is, with the pose held (`__bench.pose` first, or
+   * `pose`: the camera let go by the bench's and put over the home or the centre, or a pose as it is): frames drawn
    * with the clock held until the picture stands still, then each frame's counts. The same state, pose and frames
    * give the same counts and pictures, however busy the machine.
    */
-  run(frames: number, options?: { ticks?: number }): Promise<StepRun & { settleFrames: number }>;
+  run(frames: number, options?: { ticks?: number; pose?: RunPose }): Promise<StepRun & { settleFrames: number }>;
   /** The game's state as it is now (JSON). */
   state(): Promise<string>;
 }
@@ -235,20 +218,20 @@ class BenchRig {
   private place: BenchPlace;
   private measured: FrameProbe['after'] | null = null;
   private counting: { left: number; draws: number[]; sum: BenchCounts['sum']; done: () => void } | null = null;
-  private probing = false;
+  /** Takes the rig's frame probe off (null: not on). */
+  private detach: (() => void) | null = null;
   /** The walls as the game had them before the bench held them. */
   private readonly ownWalls = game.wallMode;
 
   constructor(
     readonly renderer: Renderer,
-    readonly controls: GameControls,
     readonly flags: BenchFlags,
   ) {
     this.view = { cam: flags.cam, at: flags.at, hold: flags.hold, orbit: { ...flags.orbit }, alpha: null, over: flags.over, walls: flags.walls };
     this.frozen = flags.diag.has('freeze');
     this.place = this.placeOf(this.view);
-    if (this.place.mirror) controls.setWallMode('up');
-    else if (this.view.walls) controls.setWallMode(this.view.walls);
+    if (this.place.mirror) services.controls.setWallMode('up');
+    else if (this.view.walls) services.controls.setWallMode(this.view.walls);
   }
 
   /** Where the view's camera goes: round what, the town view's spots, the street's eye, the mirror's glass. */
@@ -292,16 +275,14 @@ class BenchRig {
   }
 
   private attach(): void {
-    if (this.probing) return;
-    this.probing = true;
-    this.renderer.setFrameProbe({ before: (now) => this.before(now), after: (s, u, e, c) => this.after(s, u, e, c) });
+    this.detach ??= this.renderer.addFrameProbe({ before: (now) => this.before(now), after: (s, u, e, c) => this.after(s, u, e, c) });
   }
 
   /** The camera the player's again. */
   release(): void {
-    this.probing = false;
+    this.detach?.();
+    this.detach = null;
     this.measured = null;
-    this.renderer.setFrameProbe(null);
   }
 
   setView(pose: BenchPose): void {
@@ -396,11 +377,6 @@ class BenchRig {
   }
 }
 
-/** The sun's map's redraws so far (`benchInfo().scene.sunShadowDraws`). */
-function sunDraws(renderer: Renderer): SunDraws {
-  return (renderer.benchInfo().scene as { sunShadowDraws?: SunDraws }).sunShadowDraws ?? { whole: 0, moving: 0, why: {}, by: {} };
-}
-
 /** `window.__bench` over the bench's camera. */
 function benchApi(camera: BenchRig): BenchApi {
   const { renderer, flags } = camera;
@@ -430,11 +406,9 @@ function benchApi(camera: BenchRig): BenchApi {
         await renderer.framesRendered(2);
         await sleep(Math.min(HOUR_SETTLE_MS, left()));
       }
-      await Promise.race([whenStreamSettled(), sleep(left())]);
-      await renderer.streamSettled(left());
-      while (renderer.benchInfo().building && performance.now() < until) await sleep(250);
-      await Promise.race([renderer.texturesReady(), sleep(left())]);
-      await Promise.race([camera.birds, sleep(left())]);
+      await renderer.whenSettled(left());
+      await within(renderer.texturesReady(), left(), undefined);
+      await within(camera.birds, left(), undefined);
       await renderer.framesRendered(3);
       camera.settledAt = performance.now();
     },
@@ -444,13 +418,13 @@ function benchApi(camera: BenchRig): BenchApi {
       const sun = sunDraws(renderer);
       const n = draws.length;
       const mean = Object.fromEntries(Object.entries(sum).map(([k, v]) => [k, v / n])) as BenchCounts['mean'];
-      return { frames: n, sum, mean, medianDraws: [...draws].sort((a, z) => a - z)[Math.floor(n / 2)], sun: { whole: sun.whole - sun0.whole, moving: sun.moving - sun0.moving, why: since(sun.why, sun0.why), by: since(sun.by, sun0.by) } };
+      return { frames: n, sum, mean, medianDraws: [...draws].sort((a, z) => a - z)[Math.floor(n / 2)], sun: sunSince(sun, sun0) };
     },
     walls: (mode) => camera.walls(mode),
     view: () => structuredClone(camera.view),
     release: () => camera.release(),
     idle: (on) => renderer.setActive(!on),
-    ...timeApi(),
+    ...timeApi(() => camera.release()),
     async reset() {
       const f = flags;
       camera.setView({ cam: f.cam, at: f.at, radius: f.orbit.radius, beta: f.orbit.beta, tx: f.orbit.tx, tz: f.orbit.tz, over: f.over, walls: f.walls, townCentre: f.orbit.town });
@@ -460,15 +434,28 @@ function benchApi(camera: BenchRig): BenchApi {
   };
 }
 
+/** A `?debug` page's bench: the renderer its games draw with (`installDebugBench`), and its camera once asked for. */
+let debugBench: { renderer: Renderer; camera: BenchRig | null; made: BenchApi | null } | null = null;
+
 /**
- * `?debug` game pages (`?state=…&debug`): `window.__bench` without the benchmark, its camera the player's until the
- * first `pose` (the bench's defaults otherwise: an orbit round the home lot, held at the path's start).
+ * `?debug` pages (`?state=…&debug`, or from the main menu on: bench time loads a state there): `window.__bench`
+ * without the benchmark, put up once; its camera the player's until the first `pose` (the bench's defaults otherwise:
+ * an orbit round the home lot, held at the path's start), and held through the games loaded after it, as a bench
+ * page's is. A game started gives it its `renderer` (the camera's and the counts' need one).
  */
-export function installDebugBench(renderer: Renderer, controls: GameControls): void {
+export function installDebugBench(renderer?: Renderer): void {
+  if (renderer && debugBench?.renderer !== renderer) {
+    debugBench?.camera?.release();
+    debugBench = { renderer, camera: null, made: null };
+  }
+  if (window.__bench) return;
   const flags: BenchFlags = { scene: '', tile: 1, big: null, options: {}, quality: null, hour: null, cam: 'orbit', res: 'auto', secs: 0, warmup: 0, cap: 0, speed: 1, hud: true, summary: false, gpu: false, at: 0, hold: true, orbit: { radius: null, beta: null, tx: 0, tz: 0, town: false }, over: 'home', walls: null, diag: new Set(), label: '' };
-  let camera: BenchRig | null = null;
-  let made: BenchApi | null = null;
-  const api = (): BenchApi => (made ??= benchApi((camera ??= new BenchRig(renderer, controls, flags))));
+  const api = (): BenchApi => {
+    const d = debugBench;
+    if (!d) throw new Error('No game is being played.');
+    return (d.made ??= benchApi((d.camera ??= new BenchRig(d.renderer, flags))));
+  };
+  const release = () => debugBench?.camera?.release();
   window.__bench = {
     pose: (pose) => api().pose(pose),
     hour: (hour) => api().hour(hour),
@@ -477,20 +464,24 @@ export function installDebugBench(renderer: Renderer, controls: GameControls): v
     counts: (frames) => api().counts(frames),
     walls: (mode) => api().walls(mode),
     view: () => api().view(),
-    release: () => camera?.release(),
-    reset: async () => camera?.release(),
-    idle: (on) => renderer.setActive(!on),
-    ...timeApi(),
+    release,
+    reset: async () => release(),
+    idle: (on) => debugBench?.renderer.setActive(!on),
+    ...timeApi(release),
   };
 }
 
-/** `__bench`'s bench time (`benchTime.ts`): a state loaded in the page, frames in fixed steps. */
-function timeApi(): Pick<BenchApi, 'load' | 'step' | 'run' | 'state'> {
+/** `__bench`'s bench time (`benchTime.ts`): a state loaded in the page, frames in fixed steps. `release`: the bench's camera let go. */
+function timeApi(release: () => void): Pick<BenchApi, 'load' | 'step' | 'run' | 'state'> {
   return {
     load: (state, options) => benchTime.load(state, options),
     step: (ticks) => benchTime.step(ticks),
-    // (The pose as `__bench.pose` holds it: settled with the clock held, in frames of the game's time.)
-    run: (frames, options) => benchTime.run(frames, { ticks: options?.ticks, settle: true }),
+    // (The pose as `__bench.pose` holds it, or `pose`'s with the bench's camera let go: settled with the clock held, in
+    // frames of the game's time.)
+    run: (frames, options) => {
+      if (options?.pose) release();
+      return benchTime.run(frames, { ticks: options?.ticks, pose: options?.pose, settle: true });
+    },
     state: () => benchTime.state(),
   };
 }
@@ -531,13 +522,6 @@ function roamPose(t: number, b: { x0: number; z0: number; x1: number; z1: number
   const hz = c * Math.cos(th);
   return { alpha: Math.atan2(-hz, -hx), beta: ROAM.beta, radius: ROAM.radius, target: [x, 0, z] };
 }
-
-/** Where every path starts (the game's own opening angle). */
-const START_ALPHA = -Math.PI * 0.62;
-/** Longest wait for the game to start (loading, shaders). */
-const START_LIMIT_MS = 120_000;
-/** Longest wait, before a picture, for the town's files to arrive and for what they hold to be built. */
-const SETTLE_LIMIT_MS = 60_000;
 
 interface Stats {
   avg: number;
@@ -653,23 +637,17 @@ export async function runBench(): Promise<void> {
 
 async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
   // (The big world is the village's, tiled for the renderer: `tile`.)
-  const saveId = await loadState(await sceneText(b.scene === 'bigworld' ? 'village' : b.scene), `bench ${b.scene}`);
-  app.start({ kind: 'load', saveId });
+  const scene = await benchState(b.scene === 'bigworld' ? 'village' : b.scene);
+  if (scene === null) throw new Error(`Benchmark scene "${b.scene}" not found`);
   // Live once the game screen shows its interface (the session is revealed by then).
-  const until = performance.now() + START_LIMIT_MS;
-  while (!(app.screen === 'game' && !app.loading && services.controls && document.querySelector('.hud-root'))) {
-    if (performance.now() > until) throw new Error('The game did not start');
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  // The scene was copied into a save slot to start it; it isn't the player's.
-  await deleteSave(saveId).catch(() => {});
+  await benchTime.load(scene, { settle: false, name: `bench ${b.scene}` });
   const renderer = await host.rendererNow(settings);
   const controls = services.controls;
   if (b.cam === 'build') controls.setMode('build');
   renderer.setGameShot(null);
   renderer.followSim(null);
 
-  const camera = new BenchRig(renderer, controls, b);
+  const camera = new BenchRig(renderer, b);
   const frozen = b.diag.has('freeze');
 
   const intervals: number[] = [];
@@ -706,9 +684,7 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
     await sleep(b.warmup * 1000);
     // A picture waits for the town's files and for what is built from them (a measurement keeps its timing).
     if (frozen) {
-      await Promise.race([whenStreamSettled(), sleep(SETTLE_LIMIT_MS)]);
-      const until = performance.now() + SETTLE_LIMIT_MS;
-      while (renderer.benchInfo().building && performance.now() < until) await sleep(250);
+      await renderer.whenSettled(SETTLE_LIMIT_MS);
       await renderer.framesRendered(3);
     }
     if (b.cam === 'town') await showTown(renderer, (b.hour ?? 13) * 60);
@@ -719,7 +695,7 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
     renderer.gpuPasses(true);
     const lighting0 = (info.scene as { lightingUpdates: number }).lightingUpdates;
     const reflections0 = (info.scene as { mirrorDraws: number }).mirrorDraws;
-    const sun0 = (info.scene as { sunShadowDraws?: SunDraws }).sunShadowDraws ?? { whole: 0, moving: 0, why: {}, by: {} };
+    const sun0 = sunDraws(renderer);
     const long: number[] = [];
     const observer = typeof PerformanceObserver !== 'undefined' && PerformanceObserver.supportedEntryTypes?.includes('longtask')
       ? new PerformanceObserver((list) => list.getEntries().forEach((e) => long.push(e.duration)))
@@ -733,7 +709,7 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
       if (stop) return;
       if (last) intervals.push(time - last);
       // (When the slow ones came, s into the measurement, and what the frame's build was then: `slow`.)
-      if (last && time - last > 33.4) slow.push({ at: Math.round(time - started) / 1000, ms: Math.round(time - last), building: renderer.benchInfo().building as string });
+      if (last && time - last > 33.4) slow.push({ at: Math.round(time - started) / 1000, ms: Math.round(time - last), building: renderer.building() });
       last = time;
       rafCount++;
       requestAnimationFrame(raf);
@@ -748,6 +724,7 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
     observer?.disconnect();
     const passes = renderer.gpuPasses();
     const end = renderer.benchInfo();
+    const sun = sunSince(sunDraws(renderer), sun0);
     const frames = cpuFrame.length;
     const per = (n: number) => (frames ? n / frames : 0);
     const timed = gpuFrame.filter((ms) => ms > 0);
@@ -771,8 +748,8 @@ async function measure(b: BenchFlags, startedAt: string): Promise<BenchResult> {
       residentsMs: per(sums.residents),
       lightingPerSecond: ((end.scene as { lightingUpdates: number }).lightingUpdates - lighting0) / secs,
       reflectionsPerSecond: ((end.scene as { mirrorDraws: number }).mirrorDraws - reflections0) / secs,
-      sunShadowsPerSecond: ((sun) => ({ whole: (sun.whole - sun0.whole) / secs, moving: (sun.moving - sun0.moving) / secs }))((end.scene as { sunShadowDraws?: SunDraws }).sunShadowDraws ?? sun0),
-      sunShadowWhy: ((sun) => ({ why: since(sun.why, sun0.why), by: since(sun.by, sun0.by) }))((end.scene as { sunShadowDraws?: SunDraws }).sunShadowDraws ?? sun0),
+      sunShadowsPerSecond: { whole: sun.whole / secs, moving: sun.moving / secs },
+      sunShadowWhy: { why: sun.why, by: sun.by },
       longTasks: { count: long.length, maxMs: Math.max(0, ...long), totalMs: long.reduce((a, x) => a + x, 0) },
       over33: intervals.filter((ms) => ms > 33.4).length,
       slow,
@@ -815,24 +792,6 @@ function mirrorView(scene: { mirrorSpots?: Spot[] }, plot: { x: number; z: numbe
   return { alpha: Math.atan2(home.nz, home.nx), glass: [home.x, home.y, home.z] };
 }
 
-/**
- * The scene's game state: `bench/<scene>.json.gz` (a whole town's save is half a megabyte of JSON,
- * a tenth of that gzipped), or a plain `.json`.
- */
-async function sceneText(scene: string): Promise<string> {
-  const base = `${import.meta.env.BASE_URL}bench/${scene}.json`;
-  const packed = await fetch(`${base}.gz`);
-  if (packed.ok && packed.body) {
-    // Served as a file (no Content-Encoding): unpacked here, unless the server already did.
-    const bytes = new Uint8Array(await packed.arrayBuffer());
-    if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) return new TextDecoder().decode(bytes);
-    return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
-  }
-  const plain = await fetch(base);
-  if (!plain.ok) throw new Error(`Benchmark scene "${scene}" not found`);
-  return plain.text();
-}
-
 function emptyResult(b: BenchFlags, startedAt: string): BenchResult {
   return {
     ok: false,
@@ -869,8 +828,6 @@ function stats(values: number[]): Stats | null {
   const at = (q: number) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))];
   return { avg: values.reduce((a, x) => a + x, 0) / values.length, p50: at(0.5), p95: at(0.95), p99: at(0.99), max: sorted[sorted.length - 1] };
 }
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** A few lines to read (and paste). */
 export function summary(r: BenchResult): string {

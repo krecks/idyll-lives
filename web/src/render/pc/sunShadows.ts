@@ -44,6 +44,7 @@ import { shadowOnlyLayer } from './layers';
 import { toEngine } from './space';
 import type { Language } from './shaders/chunks';
 import { frameNow } from '../shared/frameClock';
+import { keyedDraws } from '../shared/parked';
 
 export { shadowOnlyLayer } from './layers';
 
@@ -355,13 +356,6 @@ export class SunShadows {
    * still casters' picture (`still`); null: every redraw draws everything.
    */
   movers: ((out: pc.MeshInstance[]) => void) | null = null;
-  /**
-   * A still caster's copies that can cast into the map, as a number (`reaches`: the parked bikes' and cars' draws,
-   * whose copies stand all over town, `Instances.castKey`; undefined: not such a draw). Such a draw is the same for the
-   * still casters' picture while its number is, however many copies it has elsewhere and however big its box: a bike
-   * ridden off or a car parked across town draws no picture again.
-   */
-  castKey: ((mi: pc.MeshInstance) => number | undefined) | null = null;
   /** Whether the still casters' picture is kept (`SunShadowOptions.still`). */
   readonly still: boolean;
   /**
@@ -378,6 +372,11 @@ export class SunShadows {
   /** Whether this redraw's `drawStill` copied the still casters' picture into the map (`drawPass` then draws only what moves). */
   private copied = false;
   private readonly drawn = { viewProj: new Float32Array(16), map: null as object | null, casters: [] as pc.MeshInstance[], index: new Map<pc.MeshInstance, number>(), boxes: new Float64Array(0), counts: new Float64Array(0), keys: new Float64Array(0) };
+  /** This redraw's still casters' keys (`castKey`; NaN: not keyed), worked out once for the check and the picture. */
+  private stillKeys = new Float64Array(0);
+  /** Bumped whenever what `reaches` says moves (the square, the menus' town): the keyed draws work their keys out again. */
+  private groundVer = 0;
+  private readonly inMap = (x: number, z: number): boolean => this.reaches(x, z);
   /** This redraw's casters: those that move (`movers`), the still ones, and all of them as PlayCanvas culled them. */
   private readonly moving = new Set<pc.MeshInstance>();
   private readonly movingList: pc.MeshInstance[] = [];
@@ -438,6 +437,7 @@ export class SunShadows {
     g.z0 = z - radius;
     g.x1 = x + radius;
     g.z1 = z + radius;
+    this.groundVer++;
     this.applyBias();
     this.moved();
   }
@@ -457,6 +457,7 @@ export class SunShadows {
   /** The menus' town (fitted round the view, drawn every frame, no fade at its edge) or the game. */
   setOverview(on: boolean): void {
     this.overview = on;
+    this.groundVer++;
     if (on) squares.delete(this.light.light);
     else squares.set(this.light.light, this.square);
     this.fadeId.setValue(on ? 0 : this.fade);
@@ -539,9 +540,12 @@ export class SunShadows {
     for (const mi of casters) if (!moving.has(mi)) still.push(mi);
     this.lightViewProj(data.shadowCamera);
     if (!map?.depthBuffer) return;
-    const change = this.whole ? 'moved' : this.stillChange(light, still);
+    if (this.stillKeys.length < still.length) this.stillKeys = new Float64Array(Math.max(still.length, this.stillKeys.length * 2));
+    const keys = this.stillKeys;
+    for (let i = 0; i < still.length; i++) keys[i] = this.castKey(still[i]) ?? NaN;
+    const change = this.whole ? 'moved' : this.stillChange(light, still, keys);
     const redraw = change !== null;
-    if (redraw && !this.drawStillCasters(pass, map, still)) return;
+    if (redraw && !this.drawStillCasters(pass, map, still, keys)) return;
     // SAFETY: both of PlayCanvas 2.23's devices copy a render target's depth with `copyRenderTarget(source, dest,
     // color, depth)` (WebGPU `copyTextureToTexture`, WebGL2 `blitFramebuffer`), outside a pass (`check:chunks`).
     (this.device as unknown as { copyRenderTarget(source: pc.RenderTarget, dest: pc.RenderTarget, color: boolean, depth: boolean): boolean }).copyRenderTarget(this.stillTarget!, map, false, true);
@@ -581,8 +585,21 @@ export class SunShadows {
     light._shadowCascadesInvalidated = false;
   }
 
-  /** What differs between the still casters and those the picture was drawn of, as they were, seen the same way; null: nothing. */
-  private stillChange(light: SceneLight, still: readonly pc.MeshInstance[]): StillChange | null {
+  /**
+   * A still caster's copies that can cast into the map, as a number (a `castKeyed` draw's, `Instances.castKey`: the
+   * parked bikes' and cars', whose copies stand all over town; undefined: not such a draw). Such a draw is the same for
+   * the still casters' picture while its number is, however many copies it has elsewhere and however big its box: a
+   * bike ridden off or a car parked across town draws no picture again.
+   */
+  castKey(mi: pc.MeshInstance): number | undefined {
+    return keyedDraws.get(mi)?.castKey(this.inMap, this.groundVer);
+  }
+
+  /**
+   * What differs between the still casters (`keys`: theirs, `castKey`) and those the picture was drawn of, as they
+   * were, seen the same way; null: nothing.
+   */
+  private stillChange(light: SceneLight, still: readonly pc.MeshInstance[], keys: Float64Array): StillChange | null {
     const d = this.drawn;
     if (!this.stillTarget || light._shadowMap !== d.map) return 'map';
     const vp = this.viewProj.data;
@@ -594,8 +611,8 @@ export class SunShadows {
       // (In whatever order PlayCanvas culled them: depths are depths whatever order they are drawn in.)
       const j = mi === d.casters[i] ? i : (d.index.get(mi) ?? -1);
       if (j < 0) return this.changedBy('list', mi);
-      const key = this.castKey?.(mi);
-      if (key !== undefined) {
+      const key = keys[i];
+      if (!Number.isNaN(key)) {
         if (key !== d.keys[j]) return this.changedBy('key', mi);
         continue;
       }
@@ -628,7 +645,7 @@ export class SunShadows {
    * remembered. The origin matters on WebGPU: PlayCanvas makes the map bottom-up (`RENDERTARGET_ORIGIN_BOTTOM`, drawn
    * with Y flipped there), and a picture drawn the other way up would be copied in mirrored.
    */
-  private drawStillCasters(pass: ShadowPass, map: pc.RenderTarget, still: readonly pc.MeshInstance[]): boolean {
+  private drawStillCasters(pass: ShadowPass, map: pc.RenderTarget, still: readonly pc.MeshInstance[], keys: Float64Array): boolean {
     const { light, camera, shadowRenderer } = pass;
     const depth = map.depthBuffer!;
     let target = this.stillTarget;
@@ -666,7 +683,7 @@ export class SunShadows {
       for (const mi of all) casters.push(mi);
       all.length = 0;
     }
-    this.remember(light, still);
+    this.remember(light, still, keys);
     return true;
   }
 
@@ -677,8 +694,8 @@ export class SunShadows {
     this.viewProj.mul2(cam.projectionMatrix, this.view);
   }
 
-  /** What the still casters' picture was drawn of: the light's view, the map, the casters with their boxes and copies. */
-  private remember(light: SceneLight, still: readonly pc.MeshInstance[]): void {
+  /** What the still casters' picture was drawn of: the light's view, the map, the casters with their boxes and copies (`keys`). */
+  private remember(light: SceneLight, still: readonly pc.MeshInstance[], keys: Float64Array): void {
     const d = this.drawn;
     d.viewProj.set(this.viewProj.data);
     d.map = light._shadowMap;
@@ -692,7 +709,7 @@ export class SunShadows {
       d.casters.push(mi);
       d.index.set(mi, i);
       d.counts[i] = mi.instancingCount;
-      d.keys[i] = this.castKey?.(mi) ?? NaN;
+      d.keys[i] = keys[i];
       const b = mi.aabb;
       const o = i * 6;
       d.boxes[o] = b.center.x;

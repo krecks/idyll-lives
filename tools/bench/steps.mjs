@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Draw counts in fixed steps (\`web/src/debug/benchTime.ts\`): a game state loaded into one page, the camera held at each
+ * Draw counts in fixed steps (\`web/src/debug/benchTime.ts\`, through \`window.__bench\`): a game state loaded into one page, the camera held at each
  * pose, and exactly \`--frames\` frames drawn \`--ticks\` ticks apart, each run starting from the state as saved. The
  * counts depend on the state, the frames and the camera only, not on the machine's load: two runs of the same give
  * the same numbers (\`hash\`), so one run a pose is enough, and two builds compare frame for frame.
@@ -12,7 +12,7 @@
  * A pose is \`home\` or \`centre\` and the camera's distance (m), from the game's opening angle. \`--runs 2\` runs each pose
  * twice, the state loaded again in the same page between: what proves the counts repeat. Prints a line a pose and
  * backend (draws a frame: mean, least, most; the sun's still picture drawn again; the fingerprint) and writes every
- * frame's counts to \`bench-results/steps-<time>/\` (or \`--out\`), with the page's load times (\`__benchTime.load\`).
+ * frame's counts to \`bench-results/steps-<time>/\` (or \`--out\`), with the page's load times (\`__bench.load\`).
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -52,7 +52,7 @@ try {
       page.on('pageerror', (e) => console.error('page error: ' + e.message));
       const t0 = Date.now();
       await page.goto(base + '/?debug&hud=0&quality=' + quality + (backend === 'webgl' ? '&renderer=webgl' : ''));
-      await page.waitForFunction(() => !!window.__benchTime, null, { timeout: 120_000, polling: 250 });
+      await page.waitForFunction(() => !!window.__bench, null, { timeout: 120_000, polling: 250 });
       // (The page to its menu: what a fresh page load costs before any game, against `load`'s swap in an open page.)
       const bootMs = Date.now() - t0;
       console.error('steps: ' + backend + ' page up in ' + (bootMs / 1000).toFixed(1) + ' s');
@@ -61,12 +61,12 @@ try {
         // A warm-up first, not counted: what the frames ask for the first time in a page (a prop, a model, a face)
         // is built then, so every counted run draws it from its first frame.
         if (!args.includes('--cold')) {
-          await page.evaluate((s) => window.__benchTime.load(s), state);
-          await page.evaluate(([n, t, p]) => window.__benchTime.run(n, { ticks: t, pose: p }), [frames, ticks, pose]);
+          await page.evaluate((s) => window.__bench.load(s), state);
+          await page.evaluate(([n, t, p]) => window.__bench.run(n, { ticks: t, pose: p }), [frames, ticks, pose]);
         }
         for (let run = 0; run < runs; run++) {
-          const loaded = await page.evaluate((s) => window.__benchTime.load(s), state);
-          const r = await page.evaluate(([n, t, p]) => window.__benchTime.run(n, { ticks: t, pose: p }), [frames, ticks, pose]);
+          const loaded = await page.evaluate((s) => window.__bench.load(s), state);
+          const r = await page.evaluate(([n, t, p]) => window.__bench.run(n, { ticks: t, pose: p }), [frames, ticks, pose]);
           r.minute = await page.evaluate(() => window.__osw?.snapshotMinute?.() ?? null);
           const line = { backend, pose: pose.over + ':' + pose.radius, run, loaded, frames: r.frames, ticks: r.ticks, settleFrames: r.settleFrames, drawsMean: +r.drawsMean.toFixed(1), drawsMin: r.drawsMin, drawsMax: r.drawsMax, shadowMean: +(r.shadowDraws.reduce((a, n) => a + n, 0) / r.frames).toFixed(1), sunStill: r.sunShadows.whole, sunMoving: r.sunShadows.moving, why: r.sunShadows.why, hash: r.hash, building: r.building, ms: Math.round(r.ms) };
           results.push(line);

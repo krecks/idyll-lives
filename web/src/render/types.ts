@@ -511,6 +511,13 @@ export interface Renderer {
   /** Resolves once the street has built the chunks streamed in round the camera, or after `limitMs`. */
   streamSettled(limitMs: number): Promise<void>;
   /**
+   * Benchmark: resolves once what the town streams in has come (`assets/stream.ts`), the street has built it
+   * (`streamSettled`) and nothing is being built (`building`), or after `limitMs` in all.
+   */
+  whenSettled(limitMs: number): Promise<void>;
+  /** Benchmark: what is being built now: 'world' (a world build, a focus lot), 'stream' (the street streaming), both ('world+stream') or '' (nothing). */
+  building(): string;
+  /**
    * The loading screen covers the view (on) or no longer (off): world builds hold the main thread
    * longer between frames, which nobody sees (the warm-up's always do).
    */
@@ -646,10 +653,8 @@ export interface Renderer {
   stats(): RenderStats;
   /** Benchmark: where the renderer's bytes are (a walk of the whole scene: on demand, never per frame). */
   memoryCensus(): MemoryCensus | null;
-  /** Benchmark: hooks around every drawn frame (null: none). */
-  setFrameProbe(probe: FrameProbe | null): void;
-  /** Benchmark: the hooks set now (one wrapping them hands on to them). */
-  frameProbe(): FrameProbe | null;
+  /** Benchmark: hooks around every drawn frame, after those added before; the function takes them off again. */
+  addFrameProbe(probe: FrameProbe): () => void;
   /**
    * Fixed-step playback (benchmarks): frames are drawn only as `drawFrame` asks, each at the time it gives (the
    * game's clock, not the wall's), as fast as they are asked for; false: at the display's refreshes again.
@@ -658,9 +663,14 @@ export interface Renderer {
   /** Fixed-step playback: draws the next frame now, at `time` (ms). False when none was drawn (the loop stopped, a menu covers the view). */
   drawFrame(time: number): boolean;
   /**
+   * Fixed-step playback: the clocks of what moves only for the eye (the residents' and the things' clips, the birds, the
+   * wind, the clouds) from 0 again, and the playback's dice from their start (`framesOnDemand` does it as it turns on).
+   */
+  restartClocks(): void;
+  /**
    * Fixed-step playback: the residents and the birds set up afresh from the world drawn, as a page's first build sets
-   * them up (what each resident was in the middle of, its clips and their times, goes; the birds perch anew from the
-   * playback's own dice), so a run starts alike however the frames before it went.
+   * them up (what each resident was in the middle of, its clips and their times, goes; the clocks start again and the
+   * birds perch anew from the playback's own dice), so a run starts alike however the frames before it went.
    */
   restartLife(): Promise<void>;
   /** Measures GPU time (`RenderStats.gpuMs`) while the overlay or the benchmark asks for it. */
