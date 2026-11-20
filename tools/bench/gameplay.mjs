@@ -75,22 +75,22 @@
  *                              bench-results/.dist and reused while web/ is the same), served by `vite preview`; its
  *                              textures are the sources unless `--assets prod`
  *
- * Needs the dev server (the `?gpustats` hook is dev-only), so `--url` must point at one; or `--prod`.
+ * Needs the dev server (the `?gpustats` hook is a debug hook), so `--url` must point at one; or `--prod` (a build that keeps
+ * the debug hooks).
  */
-import { spawn, spawnSync } from 'node:child_process';
-import { createServer } from 'node:net';
-import { appendFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
-import { homedir, cpus } from 'node:os';
-import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { cpus } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { quiet } from './quiet.mjs';
 import { worldFlags } from './worldFlags.mjs';
+import { answers, devServer, freePort, launch, playwright, serve } from './lib/browser.mjs';
 import { benchBuild } from './lib/build.mjs';
+import { median } from './lib/stats.mjs';
 
 const STARTED = Date.now();
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const WEB = join(ROOT, 'web/');
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
   const i = args.indexOf(`--${name}`);
@@ -156,14 +156,14 @@ if (has('help') || args.includes('-h')) {
   --no-dumps               no memory-infra dumps at the boundaries
   --lowmem                 the page as on an 8 GB machine (?lowmem)
   --voices                 the residents' voices on (the setting; off by default)
-  --prod                   a production build with the benchmark's hooks (VITE_BENCH_STATS=1), served by vite preview
+  --prod                   a production build with the benchmark's hooks (VITE_BENCH=1, lib/build.mjs), served by vite preview
   --headed                 in a window (default headless: the real GPU either way)
   --port 5222 | --url <u>  a dev server on the port (started if none answers), or one already running
   --startup-timeout 120    seconds for startup, --entry-timeout 180 for the entry
   --steady-grace 30        seconds the steady state may overrun --secs before it fails
   --out <dir>              default bench-results/gameplay-<time>/
 
-Needs a dev server (the ?gpustats hook is dev-only). See the comment at the top of this file.`);
+Needs a dev server or --prod (the ?gpustats hook is a debug hook). See the comment at the top of this file.`);
   process.exit(0);
 }
 
@@ -197,51 +197,11 @@ const sh = (cmd, a, opts) => {
 /** Milliseconds since this process started. */
 const since = () => Date.now() - STARTED;
 
-async function playwright() {
-  if (process.env.PLAYWRIGHT) return import(process.env.PLAYWRIGHT);
-  const require = createRequire(WEB + 'package.json');
-  try {
-    return await import(require.resolve('playwright'));
-  } catch {}
-  // (`playwright-core` is what the repo has: same Chromium API, an explicit executable.)
-  try {
-    return await import(require.resolve('playwright-core'));
-  } catch {}
-  throw new Error('Playwright not found: install it, or set PLAYWRIGHT=<path to playwright/index.mjs>');
-}
-
-/** The Chromium in Playwright's browser cache (for `playwright-core`, which has no registry). */
-function cachedChromium() {
-  const cache = join(homedir(), 'Library/Caches/ms-playwright');
-  if (!existsSync(cache)) return null;
-  const dirs = readdirSync(cache).filter((d) => /^chromium-\d+$/.test(d)).sort((a, b) => Number(b.split('-')[1]) - Number(a.split('-')[1]));
-  for (const d of dirs) {
-    for (const flavour of readdirSync(join(cache, d)).filter((f) => f.startsWith('chrome-mac'))) {
-      const apps = readdirSync(join(cache, d, flavour)).filter((f) => f.endsWith('.app'));
-      for (const app of apps) {
-        for (const exe of ['Chromium', 'Google Chrome for Testing', 'Google Chrome']) {
-          const f = join(cache, d, flavour, app, 'Contents/MacOS', exe);
-          if (existsSync(f)) return f;
-        }
-      }
-    }
-  }
-  return null;
-}
-
-async function running(url) {
-  try {
-    return (await fetch(url, { signal: AbortSignal.timeout(1500) })).ok;
-  } catch {
-    return false;
-  }
-}
-
 // ---------------------------------------------------------------- the server (started only if needed)
 
 let server = null;
 let serverMode = 'reused';
-const base = flag('url', null) ?? `http://localhost:${port}`;
+let base = flag('url', null) ?? `http://localhost:${port}`;
 let serverReadyAt = STARTED;
 if (prod) {
   // This tree's build for the benchmark (`lib/build.mjs`: `VITE_BENCH=1`, made once while web/ is the same), served as a release is.
@@ -251,26 +211,18 @@ if (prod) {
   } catch (err) {
     bad(`the --prod build failed: ${err.message}`);
   }
-  if (await running(base)) bad(`--prod: something already answers on ${base} (pick a free --port)`);
+  if (await answers(base)) bad(`--prod: something already answers on ${base} (pick a free --port)`);
   serverMode = 'preview';
-  server = spawn(`${WEB}node_modules/.bin/vite`, ['preview', '--outDir', dist, '--port', String(port), '--strictPort'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] });
-  process.on('exit', () => server?.kill());
-  await new Promise((resolve, reject) => {
-    server.stdout.on('data', (d) => String(d).includes('Local') && resolve());
-    server.on('exit', (code) => reject(new Error(`vite preview exited (${code})`)));
-    setTimeout(() => reject(new Error('vite preview did not report "Local" in 120 s')), 120_000);
-  });
+  server = await serve({ mode: 'preview', port, outDir: dist });
+  base = server.url;
   serverReadyAt = Date.now();
-} else if (!flag('url', null) && !(await running(base))) {
-  serverMode = 'started';
-  server = spawn(`${WEB}node_modules/.bin/vite`, ['--port', String(port), '--strictPort'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] });
-  process.on('exit', () => server?.kill());
-  await new Promise((resolve, reject) => {
-    server.stdout.on('data', (d) => String(d).includes('Local') && resolve());
-    server.on('exit', (code) => reject(new Error(`vite exited (${code})`)));
-    setTimeout(() => reject(new Error('vite did not report "Local" in 120 s')), 120_000);
-  });
-  serverReadyAt = Date.now();
+} else {
+  server = await devServer({ url: flag('url', null), port });
+  base = server.url;
+  if (server.started) {
+    serverMode = 'started';
+    serverReadyAt = Date.now();
+  }
 }
 
 // ---------------------------------------------------------------- page-side helpers
@@ -386,19 +338,6 @@ async function heapUsage(cdp) {
 
 // ---------------------------------------------------------------- a second DevTools connection
 
-/** A free TCP port on this machine (the browser's DevTools port). */
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const srv = createServer();
-    srv.unref();
-    srv.on('error', reject);
-    srv.listen(0, '127.0.0.1', () => {
-      const { port: p } = srv.address();
-      srv.close(() => resolve(p));
-    });
-  });
-}
-
 /**
  * A plain CDP client on the browser's DevTools socket: flattened sessions (each message names its
  * session), which Playwright's own CDP sessions can't address, so the workers' heaps and the browser's
@@ -499,10 +438,27 @@ const workerName = (url) => {
 };
 
 /**
- * `p`, or `fallback` once `ms` have passed: a read's every step has a limit, so a page or a DevTools call that
- * never answers (a busy page, a memory dump that never completes) costs a read, not the run.
+ * A read's step `step`: `p`, or `fallback` when it fails or `ms` pass first. Every step has a limit, so a page or a
+ * DevTools call that never answers (a busy page, a memory dump that never completes) costs a read, not the run; a step
+ * that missed is put in `missed` (the read's own list: the step and why) and said on the console, so a hang is found.
  */
-const within = (p, ms, fallback = null) => Promise.race([Promise.resolve(p).catch(() => fallback), sleep(ms).then(() => fallback)]);
+async function within(missed, step, p, ms, fallback = null) {
+  const late = Symbol('late');
+  let timer;
+  let why;
+  try {
+    const r = await Promise.race([p, new Promise((resolve) => (timer = setTimeout(resolve, ms, late)))]);
+    if (r !== late) return r;
+    why = `no answer in ${ms / 1000} s`;
+  } catch (err) {
+    why = String(err?.message ?? err).split('\n')[0];
+  } finally {
+    clearTimeout(timer);
+  }
+  missed.push({ step, why });
+  console.warn(`  read: ${step}: ${why}`);
+  return fallback;
+}
 
 /** The workers' heaps summed (MB). */
 const workersSum = (heaps, key) => (heaps?.length ? +heaps.reduce((a, w) => a + (w[key] ?? 0), 0).toFixed(1) : null);
@@ -613,7 +569,7 @@ function stats(xs) {
  * One full run: launch, menus, a household, `secs` seconds of play, shutdown. Writes `raw.jsonl` and
  * `summary.json` in `dir` and returns the summary. Throws on any failed stage (never partial success).
  */
-async function runOnce(n, chromium, executablePath) {
+async function runOnce(n) {
   const dir = join(out, `run${n}`);
   mkdirSync(dir, { recursive: true });
   const rawPath = join(dir, 'raw.jsonl');
@@ -645,18 +601,8 @@ async function runOnce(n, chromium, executablePath) {
   const played = { code: null, home: null, household: null, homeKind };
   const launchAt = Date.now();
   const devtoolsPort = await freePort();
-  const browser = await chromium.launch({
-    headless: !has('headed'),
-    ...(executablePath ? { executablePath } : { channel: 'chromium' }),
-    args: [
-      '--enable-unsafe-webgpu',
-      '--enable-webgpu-developer-features',
-      '--disable-backgrounding-occluded-windows',
-      '--disable-renderer-backgrounding',
-      '--disable-background-timer-throttling',
-      `--remote-debugging-port=${devtoolsPort}`,
-    ],
-  });
+  // (A new browser every run, nothing kept: a cold start unless `--warm` primes it.)
+  const { browser } = await launch({ headless: !has('headed'), debugPort: devtoolsPort });
   timeline.launchMs = Date.now() - launchAt;
   const browserVersion = browser.version();
   let browserPid = null;
@@ -755,16 +701,19 @@ async function runOnce(n, chromium, executablePath) {
    */
   const collectedRead = async (t) => {
     const began = Date.now();
+    /** The steps that failed or ran out of time (`within`). */
+    const missed = [];
     // (The speed the game had, as its top bar shows it: its buttons are speeds 0 to 4 in turn, as their keys.)
-    const speedKey = await within(page.evaluate(() => [...document.querySelectorAll('.speeds button')].findIndex((b) => b.getAttribute('aria-pressed') === 'true')), 15000, -1);
+    const speedKey = await within(missed, 'speed', page.evaluate(() => [...document.querySelectorAll('.speeds button')].findIndex((b) => b.getAttribute('aria-pressed') === 'true')), 15000, -1);
     await page.keyboard.press('0');
     await sleep(1000);
     // (The footprint as it stood, before anything was collected: what the reads at the window's edges used to be.)
     const uncollected = footprintMB(byRole(processTree(psTable(), browserPid ?? 0)).renderer?.pid);
     // What the page counts, read before the collection, so what reading it makes is collected too.
-    let counts = null;
-    try {
-      counts = await within(page.evaluate(async () => {
+    const counts = await within(
+      missed,
+      'counts',
+      page.evaluate(async () => {
         const osw = window.__osw;
         let town = null;
         try {
@@ -782,22 +731,19 @@ async function runOnce(n, chromium, executablePath) {
           objects: osw?.objects?.().length ?? null,
           minute: osw?.snapshotMinute?.() ?? null,
         };
-      }), 15000);
-    } catch {}
-    let game = null;
-    let census = null;
-    try {
-      game = await within(page.evaluate(() => window.__gameStats?.() ?? null), 15000);
-      census = await within(page.evaluate(() => window.__memCensus?.() ?? null), 15000);
-    } catch {}
+      }),
+      15000,
+    );
+    const game = await within(missed, 'game stats', page.evaluate(() => window.__gameStats?.() ?? null), 15000);
+    const census = await within(missed, 'census', page.evaluate(() => window.__memCensus?.() ?? null), 15000);
     const collect = async () => {
-      await within(cdp.send('HeapProfiler.collectGarbage'), 15000);
-      await within(workers?.collect(), 15000);
+      await within(missed, 'collect garbage', cdp.send('HeapProfiler.collectGarbage'), 15000);
+      await within(missed, "collect the workers' garbage", workers?.collect(), 15000);
     };
     await collect();
     await collect();
     // (Chrome's own answer to a machine short of memory: caches dropped, free pages given back, and V8 collects again.)
-    await within(cdp.send('Memory.simulatePressureNotification', { level: 'critical' }), 15000);
+    await within(missed, 'memory pressure', cdp.send('Memory.simulatePressureNotification', { level: 'critical' }), 15000);
     await sleep(2000);
     await collect();
     await sleep(500);
@@ -806,17 +752,12 @@ async function runOnce(n, chromium, executablePath) {
     const gpuFootprint = footprintMB(role.gpu?.pid);
     let dump = null;
     if (devtools) {
-      try {
-        const d = await within(memoryDump(devtools, true), 60000);
-        if (!d) throw new Error('the memory dump did not complete in 60 s');
-        dump = { renderer: d.processes[role.renderer?.pid] ?? null, gpu: d.processes[role.gpu?.pid] ?? null };
-      } catch (err) {
-        dump = { error: String(err).split('\n')[0] };
-      }
+      const d = await within(missed, 'memory dump', memoryDump(devtools, true), 60000);
+      dump = d ? { renderer: d.processes[role.renderer?.pid] ?? null, gpu: d.processes[role.gpu?.pid] ?? null } : { error: missed.at(-1)?.why ?? 'no dump' };
     }
-    const usage = await within(heapUsage(cdp), 15000);
-    const wh = workers ? await within(workers.heaps(), 15000) : null;
-    const pausedMinute = await within(page.evaluate(() => window.__osw?.snapshotMinute?.() ?? null), 15000);
+    const usage = await within(missed, 'heap usage', heapUsage(cdp), 15000);
+    const wh = workers ? await within(missed, "workers' heaps", workers.heaps(), 15000) : null;
+    const pausedMinute = await within(missed, 'paused minute', page.evaluate(() => window.__osw?.snapshotMinute?.() ?? null), 15000);
     await page.keyboard.press(String(speedKey > 0 ? speedKey : 1));
     const storage = census ? Object.values(census.storage) : [];
     const read = {
@@ -852,6 +793,7 @@ async function runOnce(n, chromium, executablePath) {
           }
         : null,
       counts,
+      missed,
     };
     reads.push(read);
     raw(read);
@@ -1297,7 +1239,6 @@ async function runOnce(n, chromium, executablePath) {
     gpuEndMB: series[series.length - 1]?.gpuMB ?? null,
     gpuGrowthMB: growth('gpuMB'),
     reads,
-    readKeys: reads.map(readKeys),
     collected: collectedStats(reads),
     boundaries,
     heapStartMB: first.heapMB ?? null,
@@ -1393,8 +1334,8 @@ async function runOnce(n, chromium, executablePath) {
 /**
  * A collected read as flat keys, MB (counts as they are): the footprints, each process's allocators at
  * the top level and the parts that say most (the ArrayBuffer and Blink partitions, V8's main isolate and
- * its workers', the GPU's own), the sim's WASM, the workers' heaps, the census and the counts. They are
- * kept per read in `summary.json` (`memory.readKeys`), where the A/B compare (`memory-ab.mjs`) reads them.
+ * its workers', the GPU's own), the sim's WASM, the workers' heaps, the census and the counts: what
+ * `collectedStats` sums up.
  */
 function readKeys(r) {
   const out = {
@@ -1427,16 +1368,9 @@ function collectedStats(reads) {
   for (const key of keys) {
     const xs = keyed.map((k) => k[key]).filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
     if (!xs.length) continue;
-    out[key] = { n: xs.length, median: medianOf(xs), min: xs[0], max: xs[xs.length - 1], spread: +(xs[xs.length - 1] - xs[0]).toFixed(1) };
+    out[key] = { n: xs.length, median: median(xs), min: xs[0], max: xs[xs.length - 1], spread: +(xs[xs.length - 1] - xs[0]).toFixed(1) };
   }
   return out;
-}
-
-/** The median of sorted numbers (the mean of the middle two for an even count). */
-function medianOf(sorted) {
-  const n = sorted.length;
-  if (!n) return null;
-  return +(n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2).toFixed(1);
 }
 
 /** The collected reads (`--reads`): each run's reads, then each key's median and spread over them. */
@@ -1691,14 +1625,13 @@ const environment = {
 
 // ---------------------------------------------------------------- the runs
 
-const { chromium } = await playwright();
-const executablePath = process.env.CHROME ?? cachedChromium();
-if (!executablePath) throw new Error('no Chromium found (set CHROME, or install Playwright browsers)');
+// (Loaded before the first run: its launch time is the browser's alone.)
+await playwright();
 const summaries = [];
 try {
   for (let n = 1; n <= runs; n++) {
     console.log(`run ${n}/${runs}: ${warm ? 'warm' : 'cold'}, ${preset}/${renderer}, ${secs} s steady …`);
-    const summary = await runOnce(n, chromium, executablePath);
+    const summary = await runOnce(n);
     summaries.push(summary);
     const st = summary.stages.steady;
     console.log(
@@ -1713,7 +1646,7 @@ try {
     );
   }
 } finally {
-  server?.kill();
+  server?.stop();
 }
 
 // ---------------------------------------------------------------- the report

@@ -3,7 +3,7 @@
  * Makes a game state without a browser: the new game a world's code (or scene.mjs's recipe) starts, or a save, run
  * to an exact tick by the sim's own WebAssembly (\`web/src/core/wasm-pkg\`, \`bun run wasm\`) under Bun, as the sim
  * worker runs it, and saved paused. What \`?state=<name>\` (\`debug-states/\`) and \`?bench=<name>\`
- * (\`web/public/bench/<name>.json.gz\`) open, and what \`__benchTime.load\` swaps into an open page.
+ * (\`web/public/bench/<name>.json.gz\`) open, and what \`__bench.load\` swaps into an open page.
  *
  *   bun tools/bench/state.mjs --code country-lrstm-7 --home house --hour 13 --name day13
  *   bun tools/bench/state.mjs --scene --world country --options town=village --seed 7 --home town --hour 13 --name town-day --bench
@@ -15,8 +15,9 @@
  *   the build's first seed, its households from the code's people seed, then Play on a household offered on the first
  *   page whose home is \`--home house|flat|any\` (the \`--household\`-th of them, from 0) and Move in, the homes still for
  *   sale filled at \`--tier\` (full: every preset's).
- * - \`--scene\`: scene.mjs's recipe (\`--world\`, \`--options\`, \`--seed\`, \`--home first|town|flat\`): the world generated
- *   at once, its neighbours and a household of four from the seed, moving into a home for sale.
+ * - \`--scene\`: scene.mjs's recipe (\`web/src/debug/sceneRecipe.ts\`; \`--world\`, \`--options\`, \`--seed\`,
+ *   \`--home first|town|flat\`): the world generated at once, its neighbours and a household of four from the seed,
+ *   moving into a home for sale.
  * - \`--from <file or name>\`: a save as it is (a \`.json\`, a \`.json.gz\`, or the name of one in \`debug-states/\` or
  *   \`web/public/bench/\`).
  *

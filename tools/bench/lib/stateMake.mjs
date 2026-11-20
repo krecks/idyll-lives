@@ -13,8 +13,9 @@ import { useTownContent, generateWorld } from '../../../web/src/game/town.ts';
 import { runTownJob } from '../../../web/src/game/townJobs.ts';
 import { peopleStreams, populate } from '../../../web/src/game/people.ts';
 import { firstCode, layoutPlan, moveInRequest, offerPage, optionsOf, peopleSeedOf, townOnMoveIn } from '../../../web/src/ui/newGame.ts';
-import { homeKey, homesForSale } from '../../../web/src/ui/homes.ts';
-import { randomHousehold } from '../../../web/src/game/household.ts';
+import { homeKey } from '../../../web/src/ui/homes.ts';
+import { readLayout } from '../../../web/src/core/snapshot.ts';
+import { sceneHome, sceneTown } from '../../../web/src/debug/sceneRecipe.ts';
 import { writeCode } from '../../../web/src/game/worldCode.ts';
 import { worldFlags } from '../worldFlags.mjs';
 
@@ -56,10 +57,13 @@ function readSave(what) {
   return (file.endsWith('.gz') ? gunzipSync(bytes) : bytes).toString('utf8');
 }
 
-const content = await Content.load('http://localhost/content/base.json');
+/** The game's content, loaded the first time it is asked for: a state already kept needs none. */
+let loaded = null;
+const contentNow = async () => (loaded ??= await Content.load('http://localhost/content/base.json'));
 
 /** The town file and the sim's dice of a new game, made as the page makes them. */
 async function newGame() {
+  const content = await contentNow();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json', []);
   useTownContent(content);
   const json = (name) => JSON.parse(readFileSync(WEB + 'public/content/' + name, 'utf8'));
@@ -75,36 +79,14 @@ async function newGame() {
     const seed = flag('seed', null) === null ? null : Number(flag('seed', null));
     if (seed === null) stop('--scene needs --seed (the same town every time)');
     const empty = generateWorld(content, t, world, seed, undefined, undefined, options);
-    const dice = Math.random;
-    const seeded = (n) => {
-      let a = (n ^ 0x9e3779b9) >>> 0;
-      Math.random = () => {
-        a = (a + 0x6d2b79f5) >>> 0;
-        let x = Math.imul(a ^ (a >>> 15), 1 | a);
-        x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
-        return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
-      };
-    };
-    seeded(seed);
-    const town = populate(content, assets, t, empty);
-    seeded(seed + 1);
-    const household = randomHousehold(content, assets, 4, town.households.map((h) => h.household.name));
-    Math.random = dice;
-    const vacant = homesForSale(content, t, town);
-    const houses = vacant.filter((h) => h.flat === undefined);
-    let home = houses[0] ?? vacant[0];
-    const main = town.open?.areas?.[0];
-    const [cx, cz] = main ? [main.x + main.w / 2, main.z + main.d / 2] : [town.width / 2, town.depth / 2];
-    const far = (h) => Math.hypot(h.lot.x - cx, h.lot.z - cz);
-    if (homeKind === 'town') {
-      const inMain = houses.filter((h) => (h.lot.area ?? 0) === 0).sort((a, b) => far(a) - far(b) || a.slot - b.slot);
-      if (inMain.length) home = inMain[Math.floor(inMain.length / 2)];
-    } else if (homeKind === 'flat') {
-      const flats = vacant.filter((h) => h.flat !== undefined).sort((a, b) => Number((b.storey ?? 0) > 0) - Number((a.storey ?? 0) > 0) || far(a) - far(b) || a.key.localeCompare(b.key));
-      if (!flats.length) stop('no flat for sale in this world');
-      home = flats[0];
+    const { town, household } = sceneTown(content, assets, t, empty, seed);
+    let home;
+    let ref;
+    try {
+      ({ home, ref } = sceneHome(content, t, town, homeKind));
+    } catch (err) {
+      stop(err.message);
     }
-    const ref = home.flat === undefined ? { slot: home.slot } : { slot: home.slot, flat: home.flat };
     request = { ...moveInRequest({ town, ...ref, household, from: null, emptyLot: false, mode: 'living', lifespan: 'normal' }), peopleSeed: seed };
     simSeed = seed;
     made = { recipe: 'scene', world, options, seed, home: homeKind, homeName: home.name };
@@ -177,15 +159,19 @@ const madeIn = performance.now() - started;
 
 // When it is asked for: a tick, ticks on, or a moment of the game's clock (worked out once the game is open: a new
 // game's tick 0 is its first morning, not midnight).
-const TICKS_PER_MINUTE = 75;
 const when = flag('tick', null) !== null ? { tick: Number(flag('tick', null)) } : flag('ticks', null) !== null ? { ticks: Number(flag('ticks', null)) } : flag('at', null) !== null ? { at: flag('at', '') } : { at: flag('day', '1') + ':' + flag('hour', '13') + ':-5' };
 const watchSide = flag('watch', '320');
 
 // (This tool's own way of running the sim is in the key too.)
 const key = sha(JSON.stringify([from ? sha(source.save) : sha(source.lot), from ? 0 : source.simSeed, sha(wasmBytes), sha(TOOL.map((tool) => readFileSync(tool, 'utf8')).join('')), watchSide, when])).slice(0, 16);
 const file = dir + key + '.json';
-let cached = existsSync(file) && !has('fresh');
+const metaFile = dir + key + '.meta.json';
+const cached = existsSync(file) && !has('fresh');
+/** What the state is (its tick, day and minute, how it was made); its save as made, when made here. */
+let meta;
+let save = null;
 if (!cached) {
+  const content = await contentNow();
   const wasm = await import(pkg + '/sim_wasm.js');
   const { memory } = wasm.initSync({ module: wasmBytes });
   const game = from ? wasm.Game.fromSave(content.json, source.save) : new wasm.Game(content.json, source.lot, source.simSeed);
@@ -201,7 +187,7 @@ if (!cached) {
   else if ('ticks' in when) target = tick + when.ticks;
   else {
     const [d, h, m] = when.at.split(':').map(Number);
-    target = tick + Math.round(((d - day0) * 1440 + h * 60 + m - minute0) * TICKS_PER_MINUTE);
+    target = tick + Math.round(((d - day0) * 1440 + h * 60 + m - minute0) * readLayout(game.snapshot_layout()).ticksPerMinute);
   }
   if (!Number.isInteger(target) || target < tick) stop('the moment asked for (' + JSON.stringify(when) + ', tick ' + target + ') is before the game starts (tick ' + tick + ', day ' + day0 + ' minute ' + minute0 + ')');
   // The view: the player's lot (\`session.ts\` \`showPlot\`); the watch round it.
@@ -227,24 +213,23 @@ if (!cached) {
     game.end_step();
   }
   game.command(JSON.stringify({ type: 'setSpeed', speed: 0 }));
-  const save = game.save();
+  save = game.save();
   const at = JSON.parse(save).tick;
   if (at !== target) stop('ran to tick ' + at + ', not ' + target);
   const [, dayAt, minuteAt] = snap();
   game.free();
   mkdirSync(dir, { recursive: true });
   writeFileSync(file, save);
-  writeFileSync(dir + key + '.meta.json', JSON.stringify({ key, tick: target, day: dayAt, minute: minuteAt, from, made: source.made ?? null, simSeed: source.simSeed ?? null, watch: watchSide, ticksRun: target - save0.tick, ms: Math.round(performance.now() - t0), makeMs: Math.round(madeIn), wasm: sha(wasmBytes).slice(0, 16) }, null, 2));
-}
-const save = readFileSync(file, 'utf8');
-const state = JSON.parse(save);
+  meta = { key, tick: target, day: dayAt, minute: minuteAt, from, made: source.made ?? null, simSeed: source.simSeed ?? null, watch: watchSide, ticksRun: target - save0.tick, ms: Math.round(performance.now() - t0), makeMs: Math.round(madeIn), wasm: sha(wasmBytes).slice(0, 16) };
+  writeFileSync(metaFile, JSON.stringify(meta, null, 2));
+} else meta = JSON.parse(readFileSync(metaFile, 'utf8'));
 const name = flag('name', null);
 if (name) {
   if (!/^[\w.-]+$/.test(name)) stop('--name: letters, digits, dots and dashes only');
+  save ??= readFileSync(file, 'utf8');
   mkdirSync(ROOT + 'debug-states', { recursive: true });
   writeFileSync(ROOT + 'debug-states/' + name + '.json', save);
   if (has('bench')) writeFileSync(WEB + 'public/bench/' + name + '.json.gz', gzipSync(save, { level: 9 }));
 }
-const meta = existsSync(dir + key + '.meta.json') ? JSON.parse(readFileSync(dir + key + '.meta.json', 'utf8')) : {};
 if (meta.made) console.error('state: ' + JSON.stringify(meta.made));
-console.log('state: ' + file + ' tick ' + state.tick + ' day ' + meta.day + ' minute ' + Math.round(meta.minute) + ' ' + (cached ? 'cached' : 'made') + ' ' + Math.round(performance.now() - started) + (name ? ' name ' + name : ''));
+console.log('state: ' + file + ' tick ' + meta.tick + ' day ' + meta.day + ' minute ' + Math.round(meta.minute) + ' ' + (cached ? 'cached' : 'made') + ' ' + Math.round(performance.now() - started) + (name ? ' name ' + name : ''));

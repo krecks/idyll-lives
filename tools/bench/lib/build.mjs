@@ -110,7 +110,7 @@ export async function benchBuild({ tree = ROOT, assets = 'source', log = console
     log(`bench build ${key} of ${tree} (assets: ${assets}) …`);
     const tmp = `${dir}.new`;
     rmSync(tmp, { recursive: true, force: true });
-    const env = { ...process.env, VITE_BENCH: '1', VITE_BENCH_STATS: '1', ...(assets === 'source' ? { LL_ASSETS: 'source' } : {}) };
+    const env = { ...process.env, VITE_BENCH: '1', ...(assets === 'source' ? { LL_ASSETS: 'source' } : {}) };
     const r = spawnSync(join(web, 'node_modules/.bin/vite'), ['build', '--outDir', tmp, '--emptyOutDir'], { cwd: web, stdio: ['ignore', 'ignore', 'inherit'], env });
     if (r.status !== 0) throw new Error(`the bench build of ${tree} failed (${r.status})`);
     renameSync(tmp, dir);

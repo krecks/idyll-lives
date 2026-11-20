@@ -1,10 +1,9 @@
 /**
- * The gameplay benchmark's window into the renderer (`tools/bench/gameplay.mjs`): `?gpustats` (dev
- * server only) has the game measure GPU time for the whole session and answers `window.__gameStats()`
- * with the renderer's own numbers, on demand, so a harness never has to wait for the 5 s dev play log
- * sample. Off by default, and absent from production builds: `import.meta.env.DEV` is false there, so
- * `GAMEPLAY_STATS` is `false` and the hook is never installed (and the flag is tree-shaken away). A
- * build made for the benchmark (`VITE_BENCH=1`, `tools/bench/lib/build.mjs`; `VITE_BENCH_STATS=1` keeps this hook alone) keeps it.
+ * The gameplay benchmark's window into the renderer (`tools/bench/gameplay.mjs`): `?gpustats` has the game
+ * measure GPU time for the whole session and answers `window.__gameStats()` with the renderer's own numbers, on
+ * demand, so a harness never has to wait for the 5 s dev play log sample. Off by default, and only where the debug
+ * hooks are (`DEBUG_HOOKS`: the dev server and a build made for the benchmark, `tools/bench/lib/build.mjs`); a
+ * release leaves the hook out.
  */
 
 import type { MemoryCensus, RenderStats } from '../render/types';
@@ -12,8 +11,8 @@ import { DEBUG_HOOKS } from './hooks';
 
 const params = new URLSearchParams(location.search);
 
-/** Whether the gameplay benchmark asked for the renderer's stats (`?gpustats`, dev only). */
-export const GAMEPLAY_STATS = (DEBUG_HOOKS || import.meta.env.VITE_BENCH_STATS === '1') && params.has('gpustats');
+/** Whether the gameplay benchmark asked for the renderer's stats (`?gpustats`, where the debug hooks are). */
+export const GAMEPLAY_STATS = DEBUG_HOOKS && params.has('gpustats');
 
 /**
  * What `window.__gameStats()` answers: the renderer's stats, the GPU passes it timed, and the
@@ -27,7 +26,7 @@ export type GameplayStats = RenderStats & {
 
 declare global {
   interface Window {
-    /** The renderer's stats on demand (`?gpustats`, dev only; `tools/bench/gameplay.mjs`). */
+    /** The renderer's stats on demand (`?gpustats`; `tools/bench/gameplay.mjs`). */
     __gameStats?: () => GameplayStats;
     /** Where the renderer's bytes are, on demand (`?gpustats`; `Renderer.memoryCensus`). */
     __memCensus?: () => MemoryCensus | null;

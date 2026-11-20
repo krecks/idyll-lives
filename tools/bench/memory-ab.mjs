@@ -27,13 +27,13 @@
  * Writes each run's `gameplay.mjs` output under `--out` (default `bench-results/memory-ab-<time>/`,
  * `a-1/`, `b-1/`, …) and `compare.json` and `compare.md` there, and prints the table.
  */
-import { spawn, spawnSync } from 'node:child_process';
-import { createServer } from 'node:net';
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { cpus, loadavg } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { benchBuild } from './lib/build.mjs';
+import { serveBuild } from './lib/browser.mjs';
+import { median } from './lib/stats.mjs';
 
 const HERE = fileURLToPath(new URL('./', import.meta.url));
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -66,38 +66,11 @@ const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '
 const out = resolve(flag('out', join(ROOT, 'bench-results', `memory-ab-${stamp}`)));
 mkdirSync(out, { recursive: true });
 
-/** A free TCP port on this machine. */
-function freePort() {
-  return new Promise((ok, no) => {
-    const srv = createServer();
-    srv.on('error', no);
-    srv.listen(0, '127.0.0.1', () => {
-      const { port } = srv.address();
-      srv.close(() => ok(port));
-    });
-  });
-}
-
-const servers = [];
-process.on('exit', () => servers.forEach((s) => s.kill()));
-/** A build to measure: a URL as it is, or a tree served by its own Vite (the tree's own dependencies and wasm). */
+/** A build to measure (`lib/browser.mjs` `serveBuild`), with the commit its tree is at. */
 async function serve(name, where) {
-  if (/^https?:\/\//.test(where)) return { name, where, url: where.replace(/\/$/, ''), commit: null };
-  const web = join(resolve(where), 'web');
-  const vite = join(web, 'node_modules/.bin/vite');
-  if (!existsSync(vite)) throw new Error(`${where}: no web/node_modules/.bin/vite (link or install its node_modules)`);
-  if (!existsSync(join(web, 'src/core/wasm-pkg/sim_wasm_bg.wasm'))) throw new Error(`${where}: its wasm isn't built (bun run wasm and bun run sound in its web/)`);
-  const port = await freePort();
-  const dist = prod ? (await benchBuild({ tree: where })).dir : null;
-  const server = spawn(vite, [...(dist ? ['preview', '--outDir', dist] : []), '--port', String(port), '--strictPort', '--host', '127.0.0.1'], { cwd: web, stdio: ['ignore', 'pipe', 'inherit'] });
-  servers.push(server);
-  await new Promise((ok, no) => {
-    server.stdout.on('data', (d) => String(d).includes('Local') && ok());
-    server.on('exit', (code) => no(new Error(`${where}: vite exited (${code})`)));
-    setTimeout(() => no(new Error(`${where}: vite did not report "Local" in 120 s`)), 120_000);
-  });
-  const commit = spawnSync('git', ['-C', resolve(where), 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).stdout.trim() || null;
-  return { name, where: resolve(where), url: `http://127.0.0.1:${port}`, commit };
+  const b = await serveBuild(where, { prod });
+  const commit = /^https?:\/\//.test(where) ? null : spawnSync('git', ['-C', b.where, 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).stdout.trim() || null;
+  return { name, where: b.where, url: b.url, commit, stop: b.stop };
 }
 
 const builds = [await serve('a', flag('a', null)), await serve('b', flag('b', null))];
@@ -123,14 +96,8 @@ for (let i = 0; i < runs; i++) {
     results[b.name].push({ run: i + 1, load: +load.toFixed(1), played: run.played, medians, spreads: Object.fromEntries(Object.entries(run.memory.collected ?? {}).map(([k, v]) => [k, v.spread])) });
   }
 }
-servers.forEach((s) => s.kill());
+for (const b of builds) b.stop();
 
-const median = (xs) => {
-  const s = xs.filter(Number.isFinite).sort((p, q) => p - q);
-  if (!s.length) return null;
-  const n = s.length;
-  return +(n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2).toFixed(1);
-};
 // (Allocators that hold nothing in either build are left out.)
 const keys = [...new Set([...results.a, ...results.b].flatMap((r) => Object.keys(r.medians)))].filter((k) => k.startsWith('count ') || [...results.a, ...results.b].some((r) => Math.abs(r.medians[k] ?? 0) >= 0.5));
 const rows = keys.map((key) => {

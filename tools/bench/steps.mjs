@@ -16,8 +16,7 @@
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { quiet } from './quiet.mjs';
-import { launch, ROOT, serve, VIEWPORT } from './lib/browser.mjs';
+import { benchContext, launch, openBench, ROOT, serve } from './lib/browser.mjs';
 
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
@@ -47,12 +46,8 @@ try {
   for (const backend of backends) {
     const { browser } = await launch({ headless: !args.includes('--headed') });
     try {
-      const page = await browser.newPage(VIEWPORT);
-      await page.addInitScript(quiet);
-      page.on('pageerror', (e) => console.error('page error: ' + e.message));
       const t0 = Date.now();
-      await page.goto(base + '/?debug&hud=0&quality=' + quality + (backend === 'webgl' ? '&renderer=webgl' : ''));
-      await page.waitForFunction(() => !!window.__bench, null, { timeout: 120_000, polling: 250 });
+      const { page } = await openBench(await benchContext(browser), base, 'debug&hud=0&quality=' + quality + (backend === 'webgl' ? '&renderer=webgl' : ''), { key: '__bench', timeoutMs: 120_000 });
       // (The page to its menu: what a fresh page load costs before any game, against `load`'s swap in an open page.)
       const bootMs = Date.now() - t0;
       console.error('steps: ' + backend + ' page up in ' + (bootMs / 1000).toFixed(1) + ' s');
