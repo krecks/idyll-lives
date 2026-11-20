@@ -83,3 +83,11 @@ Check: `rg -n 'still 39|SAVE_VERSION' crates/sim-core/src/save/mod.rs`.
 - `console.error` / `console.warn` in `web/src`: the game's error reporting, all prefixed by area.
 - No `TODO`, `FIXME`, `XXX` or `HACK` markers in `crates/` or `web/src` (the only `XXXX` hits are
   JSON `\uXXXX` escape handling).
+
+## Deferred
+
+- `crates/sim-core/src/privacy.rs:707` and `crates/sim-core/src/social/defs.rs:230` still say
+  `conversation.rs`. Both files are pinned parts (`tools/pins/pins.json`: `sim-privacy`,
+  `sim-social-defs`), so the gate holds their sha256 and a comment change fails `pins` until an
+  integrator re-accepts them with `cargo pins --update <name> --by <who> --reason <why>`. Two
+  comments are not worth re-accepting accepted work for; they go back with that update.
