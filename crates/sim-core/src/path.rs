@@ -1102,9 +1102,14 @@ impl Reach {
     }
 
     /// The steps open from slot `s` (a tile of chunk `c`) to each of `NEIGHBOURS` (bit `k`),
-    /// stairs aside, if its chunk's are up to date (`steps`).
+    /// stairs aside, if its chunk's are up to date (`steps`). None for the void slot: a chunk not
+    /// allocated has no tiles to work steps out for (`step_chunk`), though one may still be stood
+    /// on. (A way out of town on the ground's far side is on its last row's far edge, and the row
+    /// past it is the storey above's first: in Foundrygate someone set down at one looked up the
+    /// void slot's steps, none, where their step back onto the ground was open, and found no way.)
     fn steps_at(&self, c: usize, s: usize) -> Option<u8> {
-        if self.all_dirty || !self.stepped.get(c).copied().unwrap_or(false) {
+        if s == crate::lot::VOID || self.all_dirty || !self.stepped.get(c).copied().unwrap_or(false)
+        {
             return None;
         }
         self.steps.get(s).copied()
@@ -2266,6 +2271,41 @@ mod tests {
         assert!(nav.can_step(3, 6, 3, 5));
         assert!(!nav.can_step(2, 5, 3, 5));
         assert!(!nav.can_step(3, 5, 2, 5));
+    }
+
+    #[test]
+    fn one_at_a_way_out_on_the_grounds_far_side_steps_back_onto_it() {
+        // A lot a chunk deep grown by a storey whose rows nobody has built on (their chunks not
+        // there): someone at the ground's far edge (`z` its depth, as a way out of town there
+        // is) is on the storey above's first row, and their search reads the steps the regions
+        // worked out. Their step back onto the ground is open, as `can_step` has it.
+        let file: LotFile = serde_json::from_str(r#"{"width":16,"depth":16}"#).unwrap();
+        let mut lot = Lot::from_file(&file).unwrap();
+        lot.grow_depth(32);
+        assert!(!lot.allocated(4, 16), "the storey above isn't there");
+        let blocked = nav_of(&lot);
+        let stairs = StairMap {
+            depth: 16,
+            ..Default::default()
+        };
+        let plain = NavGrid {
+            lot: &lot,
+            blocked: &blocked,
+            stairs: &stairs,
+            kept_off: &[],
+            steps: None,
+        };
+        let reach = Reach::build(&plain);
+        let nav = NavGrid {
+            steps: Some(&reach),
+            ..plain
+        };
+        assert!(nav.can_step(4, 16, 4, 15));
+        assert_eq!(
+            nav.find_path((4, 16), (4, 8)),
+            plain.find_path((4, 16), (4, 8))
+        );
+        assert!(nav.find_path((4, 16), (4, 8)).is_some());
     }
 
     #[test]
