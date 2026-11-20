@@ -86,6 +86,7 @@ import { quiet } from './quiet.mjs';
 import { worldFlags } from './worldFlags.mjs';
 import { answers, devServer, freePort, launch, playwright, serve } from './lib/browser.mjs';
 import { benchBuild } from './lib/build.mjs';
+import { median } from './lib/stats.mjs';
 
 const STARTED = Date.now();
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -1224,7 +1225,6 @@ async function runOnce(n) {
     gpuEndMB: series[series.length - 1]?.gpuMB ?? null,
     gpuGrowthMB: growth('gpuMB'),
     reads,
-    readKeys: reads.map(readKeys),
     collected: collectedStats(reads),
     boundaries,
     heapStartMB: first.heapMB ?? null,
@@ -1320,8 +1320,8 @@ async function runOnce(n) {
 /**
  * A collected read as flat keys, MB (counts as they are): the footprints, each process's allocators at
  * the top level and the parts that say most (the ArrayBuffer and Blink partitions, V8's main isolate and
- * its workers', the GPU's own), the sim's WASM, the workers' heaps, the census and the counts. They are
- * kept per read in `summary.json` (`memory.readKeys`), where the A/B compare (`memory-ab.mjs`) reads them.
+ * its workers', the GPU's own), the sim's WASM, the workers' heaps, the census and the counts: what
+ * `collectedStats` sums up.
  */
 function readKeys(r) {
   const out = {
@@ -1354,16 +1354,9 @@ function collectedStats(reads) {
   for (const key of keys) {
     const xs = keyed.map((k) => k[key]).filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
     if (!xs.length) continue;
-    out[key] = { n: xs.length, median: medianOf(xs), min: xs[0], max: xs[xs.length - 1], spread: +(xs[xs.length - 1] - xs[0]).toFixed(1) };
+    out[key] = { n: xs.length, median: median(xs), min: xs[0], max: xs[xs.length - 1], spread: +(xs[xs.length - 1] - xs[0]).toFixed(1) };
   }
   return out;
-}
-
-/** The median of sorted numbers (the mean of the middle two for an even count). */
-function medianOf(sorted) {
-  const n = sorted.length;
-  if (!n) return null;
-  return +(n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2).toFixed(1);
 }
 
 /** The collected reads (`--reads`): each run's reads, then each key's median and spread over them. */

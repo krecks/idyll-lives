@@ -33,6 +33,7 @@ import { cpus, loadavg } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serveBuild } from './lib/browser.mjs';
+import { median } from './lib/stats.mjs';
 
 const HERE = fileURLToPath(new URL('./', import.meta.url));
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -97,12 +98,6 @@ for (let i = 0; i < runs; i++) {
 }
 for (const b of builds) b.stop();
 
-const median = (xs) => {
-  const s = xs.filter(Number.isFinite).sort((p, q) => p - q);
-  if (!s.length) return null;
-  const n = s.length;
-  return +(n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2).toFixed(1);
-};
 // (Allocators that hold nothing in either build are left out.)
 const keys = [...new Set([...results.a, ...results.b].flatMap((r) => Object.keys(r.medians)))].filter((k) => k.startsWith('count ') || [...results.a, ...results.b].some((r) => Math.abs(r.medians[k] ?? 0) >= 0.5));
 const rows = keys.map((key) => {
