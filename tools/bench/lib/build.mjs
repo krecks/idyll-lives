@@ -21,9 +21,10 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
-/** Where the builds are kept (this tree's, for every tree built), and how many (about 190 MB each). */
+/** Where the builds are kept (this tree's, for every tree built): the newest `KEEP` (about 190 MB each), none older than `MAX_AGE_DAYS`. */
 const STORE = join(ROOT, 'bench-results', '.dist');
 const KEEP = 4;
+const MAX_AGE_DAYS = 7;
 /** What the key is made of besides the tree: bump it when what a build holds changes. */
 const RECIPE = 'bench-1';
 
@@ -62,6 +63,16 @@ export function buildKey({ tree = ROOT, assets = 'source' } = {}) {
   return h.digest('hex').slice(0, 20);
 }
 
+/** The newest `KEEP` builds kept, none older than `MAX_AGE_DAYS` (a build used is touched: its age is since then). */
+function prune() {
+  const oldest = Date.now() - MAX_AGE_DAYS * 86_400_000;
+  const builds = readdirSync(STORE)
+    .filter((d) => /^[0-9a-f]{20}$/.test(d))
+    .map((d) => ({ d, t: statSync(join(STORE, d)).mtimeMs }))
+    .sort((a, b) => b.t - a.t);
+  for (const [i, { d, t }] of builds.entries()) if (i >= KEEP || t < oldest) rmSync(join(STORE, d), { recursive: true, force: true });
+}
+
 /** The build of `tree` (this one by default): `{ dir, key, hit, secs }`, built on a miss. */
 export async function benchBuild({ tree = ROOT, assets = 'source', log = console.log } = {}) {
   tree = resolve(tree);
@@ -92,6 +103,7 @@ export async function benchBuild({ tree = ROOT, assets = 'source', log = console
     if (existsSync(join(dir, 'index.html'))) {
       const now = new Date();
       utimesSync(dir, now, now);
+      prune();
       log(`bench build ${key} kept (${tree})`);
       return { dir, key, hit: true, secs: (performance.now() - started) / 1000 };
     }
@@ -102,13 +114,7 @@ export async function benchBuild({ tree = ROOT, assets = 'source', log = console
     const r = spawnSync(join(web, 'node_modules/.bin/vite'), ['build', '--outDir', tmp, '--emptyOutDir'], { cwd: web, stdio: ['ignore', 'ignore', 'inherit'], env });
     if (r.status !== 0) throw new Error(`the bench build of ${tree} failed (${r.status})`);
     renameSync(tmp, dir);
-    // The newest `KEEP` builds kept.
-    const old = readdirSync(STORE)
-      .filter((d) => /^[0-9a-f]{20}$/.test(d))
-      .map((d) => ({ d, t: statSync(join(STORE, d)).mtimeMs }))
-      .sort((a, b) => b.t - a.t)
-      .slice(KEEP);
-    for (const { d } of old) rmSync(join(STORE, d), { recursive: true, force: true });
+    prune();
     const secs = (performance.now() - started) / 1000;
     log(`bench build ${key} made in ${secs.toFixed(0)} s`);
     return { dir, key, hit: false, secs };
