@@ -2087,6 +2087,9 @@ pub(crate) struct SimBrief {
     /// from the whole of every resident again (`privacy::refresh`).
     pub carried: bool,
     pub private: Option<(u32, usize)>,
+    /// In the stair hall (or on its landings) of a public place with flats over it
+    /// (`path::Halls`): on the place's lot, but not in the place (`world::at_home`).
+    pub hall: bool,
 }
 
 /// Who belongs to each household by the tick's briefs (`SimBrief::household`), built with them:
@@ -2588,11 +2591,7 @@ impl World {
                 inside: p.inside,
             })
             .collect();
-        check_flats(
-            &world.plots,
-            i32::from(storeys),
-            &world.stairs,
-        )?;
+        check_flats(&world.plots, i32::from(storeys), &world.stairs)?;
         world.map_plots();
         let starting_funds = world.content.starting_funds;
         world.households = if lot_file.households.is_empty() {
@@ -5265,14 +5264,15 @@ impl World {
         briefs.clear();
         for s in &self.sims {
             let (x, z) = s.tile();
-            let plot = self.plot_at(x, z);
+            let plot = self.plot_at(x, z).filter(|_| s.here());
+            let hall = plot.is_some_and(|p| self.halls.at(p, x, self.ground_z(z)).is_some());
             let available = s.here() && s.available_for_social(&self.content);
             briefs.push(SimBrief {
                 pos: s.pos,
                 available,
                 gender_ix: s.gender_ix,
                 household: s.household,
-                plot: plot.filter(|_| s.here()),
+                plot,
                 away: s.away_until.is_some() || !s.here(),
                 leaving: crate::life::leaving_home(self, s),
                 baby: s.here() && self.content.life.baby(s.age),
@@ -5315,6 +5315,7 @@ impl World {
                 },
                 carried: s.carried_by.is_some(),
                 private: crate::privacy::private_use(&self.content, &self.objects, s),
+                hall,
             });
         }
         // Who's in a conversation, and whose (for joining in).
