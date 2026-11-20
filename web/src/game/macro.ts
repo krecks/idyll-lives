@@ -45,7 +45,7 @@ import { chaikin, outlines, rasterize, rle, simplify, simplifyRing, unrle } from
 import { fbm } from './noise';
 import type { UseLayer } from './uses';
 import { along, astar, CELL, Cells, clearOfBoxes, COUNTRY_GRADE, COUNTRY_TURN, COUNTRY_WIDTH, CountryRouter, CTRL_APART, FACING, ROAD_WIDTH, ROUTE_GRADE, SIDE_COST, TRIES, type Port, type Way } from './countryRouter';
-import { centroid, cropRoads, curve, evenly, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, roadIndex, roadLengths, straightAround, type Box, type Pt, type RoadPlan } from './roads';
+import { centroid, cropRoads, curve, evenly, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, roadIndex, roadLengths, roadMeets, straightAround, type Box, type Pt, type RoadPlan } from './roads';
 import { lotName, placeOfTemplate, placeUnit } from './placeLots';
 import { BIG_COURTS, boundsOf, COURTS, frontageOf, Ground, houseFor, joinUp, lotAt, LotPlacer, plotRect, reachesRoad, settleRoads, shuffled, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
 import { LAND_SIZE, LEGACY_KINDS, placeOf, specOf, streetNames, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind, type WorldSpec, type WorldStep } from './world';
@@ -2055,30 +2055,6 @@ export function cornersOf(roads: readonly RoadPlan[], areaRoads: Iterable<number
     if (!((own.has(f.road) && meets.get(f.road)) || []).every((s) => Math.abs(f.s - s) >= corner)) return false;
     return straightAround(roads[f.road].points, f.s, corner / 2, TIGHT_BEND, roadLengths(roads[f.road]));
   };
-}
-
-/**
- * Where along each of `areaRoads` (arc lengths) it meets another road, for `cornersOf`: its joined ends, and where
- * another road's end joins it or another runs by close enough to touch. (Worked out once for the roads several
- * `cornersOf` ask about.)
- */
-export function roadMeets(roads: readonly RoadPlan[], areaRoads: Iterable<number>): Map<number, number[]> {
-  const meets = new Map<number, number[]>();
-  const own = new Set(areaRoads);
-  for (const r of own) {
-    const ls = lengths(roads[r].points);
-    meets.set(r, roads[r].ends.flatMap((e, k) => (e === 'join' ? [k ? ls[ls.length - 1] : 0] : [])));
-  }
-  // (Where another road's end joins it, or another road runs by it, close enough to touch.)
-  const byRoad = new RoadIndex(roads);
-  roads.forEach((o, j) => {
-    for (const [x, z] of evenly(o.points, 2)) {
-      for (const [r, hit] of byRoad.around(x, z, 10)) {
-        if (r !== j && own.has(r) && hit.dist <= (o.width + roads[r].width) / 2 + 2) meets.get(r)!.push(hit.s);
-      }
-    }
-  });
-  return meets;
 }
 
 /**

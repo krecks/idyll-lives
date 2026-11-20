@@ -22,7 +22,7 @@ import { townGround } from './edit/ground';
 import { flatsFor, flatsOverFor, floorsFor, storeysOfId } from './flats';
 import { placeOfTemplate, placeUnit, slotPlace } from './placeLots';
 import { draftAreaSize, HOURS, hoursFor, namerFor, type Namer, type ZoneKind } from './places';
-import { inside, leftOf, lengths, pointAt, RoadIndex, type Pt, type RoadPlan } from './roads';
+import { inside, leftOf, lengths, pointAt, RoadIndex, roadMeets, type Pt, type RoadPlan } from './roads';
 import { houseFor, lotAt, LotPlacer, plotRect, slotDims, type Frontage, type Ground, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates, type Unplaced } from './town';
 
 type Rand = () => number;
@@ -176,7 +176,9 @@ export class DensePass {
     }
     this.before = this.lots.slots.length;
     this.index = new RoadIndex(this.roads);
-    this.meets = junctions(this.roads);
+    // (Every road's; the others are read at their points only, not every 2 m as `macro.ts` `cornersOf` reads them:
+    // the generated towns were laid so.)
+    this.meets = roadMeets(this.roads, this.roads.keys(), { step: 0 });
   }
 
   /** How many lots there are so far (a draft's among them). */
@@ -471,23 +473,6 @@ export class DensePass {
     const added = slots.slice(this.before).filter((s) => s.kind === 'shop').map((s) => slotPlace(draft, this.t, this.content, s));
     return { slots, places: [...this.placesBefore, ...added] };
   }
-}
-
-/** Where each road is met by another, m along it: its ends that join one, and where another runs by it close enough to touch. */
-function junctions(roads: readonly RoadPlan[]): Map<number, number[]> {
-  const meets = new Map<number, number[]>();
-  const index = new RoadIndex(roads);
-  roads.forEach((r, i) => {
-    const ls = lengths(r.points);
-    meets.set(i, r.ends.flatMap((e, k) => (e === 'join' ? [k ? ls[ls.length - 1] : 0] : [])));
-  });
-  roads.forEach((o, j) => {
-    for (let k = 0; k < o.points.length; k++) {
-      const [x, z] = o.points[k];
-      for (const [r, hit] of index.around(x, z, 10)) if (r !== j && hit.dist <= (o.width + roads[r].width) / 2 + 2) meets.get(r)!.push(hit.s);
-    }
-  });
-  return meets;
 }
 
 /**

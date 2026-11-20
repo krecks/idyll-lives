@@ -29,7 +29,7 @@ import { heightAt } from '../land';
 import { BEND, BEND_MOST, CORNER, placeReaches, TIGHT_BEND, TRAIL_WIDTH } from '../macro';
 import { mulberry32 } from '../noise';
 import { lotName, lotPlaceKind, placeOfTemplate, placeUnit, slotPlace, type PlaceWhat } from '../placeLots';
-import { evenly, leftOf, lengths, pointAt, roadIndex, straightAround, tangent, type Pt } from '../roads';
+import { leftOf, lengths, pointAt, roadMeets, straightAround, tangent, type Pt } from '../roads';
 import {
   drivesOut as drivesOutOn,
   fitsLot,
@@ -111,21 +111,8 @@ const junctions = new WeakMap<readonly RoadPlan[], Map<number, number[]>>();
 function meetsOf(roads: readonly RoadPlan[]): Map<number, number[]> {
   const had = junctions.get(roads);
   if (had) return had;
-  const out = new Map<number, number[]>();
-  roads.forEach((r, i) => {
-    if (r.kind === 'trail') return;
-    const ls = lengths(r.points);
-    out.set(i, r.ends.flatMap((e, k) => (e === 'join' ? [k ? ls[ls.length - 1] : 0] : [])));
-  });
-  const index = roadIndex(roads);
-  roads.forEach((o, j) => {
-    if (o.kind === 'trail') return;
-    for (const [x, z] of evenly(o.points, 2)) {
-      for (const [r, hit] of index.around(x, z, 10)) {
-        if (r !== j && out.has(r) && hit.dist <= (o.width + roads[r].width) / 2 + 2) out.get(r)!.push(hit.s);
-      }
-    }
-  });
+  const trail = (r: number) => roads[r].kind === 'trail';
+  const out = roadMeets(roads, [...roads.keys()].filter((r) => !trail(r)), { skip: trail });
   junctions.set(roads, out);
   return out;
 }
