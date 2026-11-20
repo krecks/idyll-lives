@@ -1117,6 +1117,8 @@ async function openSession(
     Object.assign(window, { __controls: controls, __showPlot: showPlot, __world: () => withLamps(world), __send: (cmd: Command) => bridge.send(cmd), __items: () => itemsSeen });
     // `__places()` and `__lookInside(name, storey?)`: the named places' lots, looked inside by name (dev only).
     installPlaceHooks(controls, () => world);
+    // `__bench`: the benchmark's poses, hours, freeze, settle and counts on this page (`debug/bench.ts` `BenchApi`).
+    if (!BENCH) void import('../debug/bench').then((m) => m.installDebugBench(renderer, controls));
     // `__sims()`: every resident as the newest snapshot shows them (where, pose, the object and use,
     // needs; `debug/sims.ts`), to wait on; `__content` the game's content (`__content.object(id)`).
     // `__addFunds(amount)`: money for the player's household. `__customise(id)`: the colour studio
