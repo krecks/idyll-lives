@@ -1,6 +1,9 @@
 //! The rules of use: who may use what, what is missing, and when things are closed.
 
-use super::*;
+use crate::content::{Content, Pose, stage_in};
+use crate::index::ObjectIndex;
+use crate::lot::Lot;
+use crate::world::{Ctx, Household, ObjectInstance, Plot, Sim};
 
 /// What a Sim may use on a plot: everything at home (and in a flat, its building's shared
 /// things: the hall's, the yard's) or in public places; as a guest, anything that isn't private

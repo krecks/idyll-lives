@@ -1,7 +1,9 @@
 //! The small judgements a choice leans on: how much a relationship invites a social,
 //! what cleaning skips, where to sweep, and a goal at a point.
 
-use super::*;
+use crate::content::TagMask;
+use crate::social::{self, Prefer};
+use crate::world::{Ctx, Sim, TaskKind};
 
 /// How much a relationship invites a social of the given kind.
 pub(crate) fn prefer_factor(

@@ -1,7 +1,5 @@
 //! The tick’s step: choosing, using and leaving things, and what can be used.
 
-use super::*;
-
 mod route;
 mod rules;
 mod state;

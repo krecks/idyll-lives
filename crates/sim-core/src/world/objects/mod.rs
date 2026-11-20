@@ -1,9 +1,5 @@
 //! Using an object, arriving at it, and what follows (leaving, needs, habits).
 
-use std::f32::consts::FRAC_PI_2;
-
-use super::*;
-
 mod accident;
 mod arrive;
 mod completion;

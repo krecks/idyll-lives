@@ -1,6 +1,5 @@
 //! What a resident chooses to do on their own, and how a task is started.
 
-use super::*;
 mod helpers;
 mod pick;
 mod start;

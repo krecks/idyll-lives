@@ -1,4 +1,5 @@
 use super::*;
+use crate::clock::{SUPER_BUSY, TICKS_PER_STEP};
 
 const CONTENT: &str = r#"{
         "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.1},

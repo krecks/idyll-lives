@@ -1,6 +1,18 @@
 //! Choosing: what a Sim does on their own when nothing is asked of them.
 
 use super::*;
+use crate::content::{MAX_NEEDS, TagMask, stage_in};
+use crate::conversation;
+use crate::rng::Rng;
+use crate::social::{self, Prefer};
+use crate::world::{
+    Access, Choice, Ctx, Goer, MIN_AUTONOMY_SCORE, OUTING_K, ObjectInstance, Sim, Task, TaskKind,
+    UNWANTED_MEAL, access, affordable, before_dawn, breaks_off, could_conceive, exhausted,
+    free_before_work, getting_up, guest_may, has_bed, home_needs, hosts_about_till, lasts,
+    leave_today, leisure_way, outing_fits, place_serves, quality_boost, reach, requirements_met,
+    runs_out, training_interest, unfit, upper_barred, urgent_needs, usable_here, visit_fits,
+};
+use crate::{MINUTES_PER_TICK, TICKS_PER_MINUTE, ai};
 
 /// What a Sim chooses to do on their own. `from_seat`: sitting, only a word with someone sitting
 /// within that many metres, or listening in on a talk there (`conversation::from_seat`).

@@ -1,6 +1,9 @@
 //! Finding the nearest thing that fits a use.
 
-use super::*;
+use crate::world::{
+    Access, Ctx, ObjectInstance, Sim, Task, TaskKind, access, requirements_met, route, unfit,
+    upper_barred, usable_here,
+};
 
 /// The nearest working object on `plot` (but `except`) with an interaction that `fits`, one
 /// they may use and can get to, as a routine task.

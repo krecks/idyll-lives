@@ -1,6 +1,10 @@
 //! Searches and routes: what a tick may search, and re-routing after a change.
 
-use super::*;
+use crate::social;
+use crate::world::{
+    Activity, Ctx, ObjectInstance, PERSON_UNREACHABLE_TICKS, Phase, Sim, TaskKind, end_activity,
+    walk_route,
+};
 
 /// The tiles a tick's searches may expand (`path::nodes_searched`) before those who may look for a
 /// way wait for the next tick (open-world towns: a whole hamlet setting off at once). The

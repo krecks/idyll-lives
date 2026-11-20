@@ -1,6 +1,14 @@
 //! The world's own tick.
 
 use super::*;
+use crate::clock::{SUPER_BUSY, SUPER_SPEED, TICKS_PER_STEP};
+use crate::content::Pose;
+use crate::path::NavGrid;
+use crate::world::{
+    BroadcastScratch, BroadcastSource, Ctx, GROWTH_STEP_MINUTES, Others, Phase, ROOM_REFRESH_TICKS,
+    SimBrief, TICKS_PER_DAY, TICKS_PER_HOUR, Task, TaskKind, end_activity, held_by, leaves_by,
+};
+use crate::{TICKS_PER_MINUTE, World, conversation, social};
 
 impl World {
     /// Advances one real-time step (1 / TICKS_PER_SECOND s) at the current speed; at super
