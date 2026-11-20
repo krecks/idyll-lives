@@ -57,10 +57,13 @@ function readSave(what) {
   return (file.endsWith('.gz') ? gunzipSync(bytes) : bytes).toString('utf8');
 }
 
-const content = await Content.load('http://localhost/content/base.json');
+/** The game's content, loaded the first time it is asked for: a state already kept needs none. */
+let loaded = null;
+const contentNow = async () => (loaded ??= await Content.load('http://localhost/content/base.json'));
 
 /** The town file and the sim's dice of a new game, made as the page makes them. */
 async function newGame() {
+  const content = await contentNow();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json', []);
   useTownContent(content);
   const json = (name) => JSON.parse(readFileSync(WEB + 'public/content/' + name, 'utf8'));
@@ -162,8 +165,13 @@ const watchSide = flag('watch', '320');
 // (This tool's own way of running the sim is in the key too.)
 const key = sha(JSON.stringify([from ? sha(source.save) : sha(source.lot), from ? 0 : source.simSeed, sha(wasmBytes), sha(TOOL.map((tool) => readFileSync(tool, 'utf8')).join('')), watchSide, when])).slice(0, 16);
 const file = dir + key + '.json';
-let cached = existsSync(file) && !has('fresh');
+const metaFile = dir + key + '.meta.json';
+const cached = existsSync(file) && !has('fresh');
+/** What the state is (its tick, day and minute, how it was made); its save as made, when made here. */
+let meta;
+let save = null;
 if (!cached) {
+  const content = await contentNow();
   const wasm = await import(pkg + '/sim_wasm.js');
   const { memory } = wasm.initSync({ module: wasmBytes });
   const game = from ? wasm.Game.fromSave(content.json, source.save) : new wasm.Game(content.json, source.lot, source.simSeed);
@@ -205,24 +213,23 @@ if (!cached) {
     game.end_step();
   }
   game.command(JSON.stringify({ type: 'setSpeed', speed: 0 }));
-  const save = game.save();
+  save = game.save();
   const at = JSON.parse(save).tick;
   if (at !== target) stop('ran to tick ' + at + ', not ' + target);
   const [, dayAt, minuteAt] = snap();
   game.free();
   mkdirSync(dir, { recursive: true });
   writeFileSync(file, save);
-  writeFileSync(dir + key + '.meta.json', JSON.stringify({ key, tick: target, day: dayAt, minute: minuteAt, from, made: source.made ?? null, simSeed: source.simSeed ?? null, watch: watchSide, ticksRun: target - save0.tick, ms: Math.round(performance.now() - t0), makeMs: Math.round(madeIn), wasm: sha(wasmBytes).slice(0, 16) }, null, 2));
-}
-const save = readFileSync(file, 'utf8');
-const state = JSON.parse(save);
+  meta = { key, tick: target, day: dayAt, minute: minuteAt, from, made: source.made ?? null, simSeed: source.simSeed ?? null, watch: watchSide, ticksRun: target - save0.tick, ms: Math.round(performance.now() - t0), makeMs: Math.round(madeIn), wasm: sha(wasmBytes).slice(0, 16) };
+  writeFileSync(metaFile, JSON.stringify(meta, null, 2));
+} else meta = JSON.parse(readFileSync(metaFile, 'utf8'));
 const name = flag('name', null);
 if (name) {
   if (!/^[\w.-]+$/.test(name)) stop('--name: letters, digits, dots and dashes only');
+  save ??= readFileSync(file, 'utf8');
   mkdirSync(ROOT + 'debug-states', { recursive: true });
   writeFileSync(ROOT + 'debug-states/' + name + '.json', save);
   if (has('bench')) writeFileSync(WEB + 'public/bench/' + name + '.json.gz', gzipSync(save, { level: 9 }));
 }
-const meta = existsSync(dir + key + '.meta.json') ? JSON.parse(readFileSync(dir + key + '.meta.json', 'utf8')) : {};
 if (meta.made) console.error('state: ' + JSON.stringify(meta.made));
-console.log('state: ' + file + ' tick ' + state.tick + ' day ' + meta.day + ' minute ' + Math.round(meta.minute) + ' ' + (cached ? 'cached' : 'made') + ' ' + Math.round(performance.now() - started) + (name ? ' name ' + name : ''));
+console.log('state: ' + file + ' tick ' + meta.tick + ' day ' + meta.day + ' minute ' + Math.round(meta.minute) + ' ' + (cached ? 'cached' : 'made') + ' ' + Math.round(performance.now() - started) + (name ? ' name ' + name : ''));
