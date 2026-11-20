@@ -121,13 +121,13 @@
       "layer": "surface",
       "decor": 0.3,
       "radius": 0.13,
-      "description": "A countertop machine that churns ice cream, sorbet, gelato or a milkshake, with a chute for toppings. It stands on a table, counter, desk or shelf.",
+      "description": "A countertop machine that churns a tub of ice cream. It stands on a table, counter, desk or shelf.",
       "interactions": [
         {
           "id": "churn",
           "label": "Churn a tub of ice cream",
           "anim": "cook",
-          "sound": "blender",
+          "sound": "mixer",
           "minutes": 6,
           "eat": {
             "item": "iceCream",
@@ -135,8 +135,7 @@
           },
           "effects": {
             "hunger": 0.18,
-            "fun": 0.3,
-            "comfort": 0.06
+            "fun": 0.22
           },
           "tags": [
             "food"
@@ -268,7 +267,7 @@
       "group": "kitchenware",
       "layer": "surface",
       "decor": 0.2,
-      "radius": 0.13,
+      "radius": 0.21,
       "description": "A board with a loaf and some tomatoes. It stands on a table, counter, desk or shelf.",
       "interactions": []
     },

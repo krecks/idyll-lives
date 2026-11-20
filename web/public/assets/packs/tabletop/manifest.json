@@ -1315,17 +1315,17 @@
         "dark": {
           "finish": "material.finish.satin"
         },
-        "glass": {
-          "finish": "material.finish.glass"
+        "glass_pale": {
+          "finish": "material.finish.gloss"
+        },
+        "ice_cream_maker": {
+          "finish": "material.finish.metal"
         },
         "icecream": {
           "finish": "material.finish.satin"
         },
         "red": {
           "finish": "material.finish.gloss"
-        },
-        "steel": {
-          "finish": "material.finish.metal"
         }
       },
       "motions": {
@@ -1335,7 +1335,7 @@
       },
       "paint": [
         {
-          "material": "steel",
+          "material": "ice_cream_maker",
           "label": "Body"
         }
       ]
