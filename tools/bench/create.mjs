@@ -6,7 +6,8 @@
  * its end. Then, at the first size, an arrow key in the place grid (down a row: another place) and the
  * making panel while that land is made. Then "Lay out the streets →": step 2's proposed layout on that
  * land (its making panel shot meanwhile), shot at each size the same way. Then "Build the town →": step
- * 3's town built from the layout, shot at each size, and "Build again". Then "Choose a household →":
+ * 3's town built from the layout, shot at each size, its high street close (`closeTo`), and "Build again"
+ * with its high street close from two sides. Then "Choose a household →":
  * step 4's households offered as cards, shot at each size once the portraits in view are drawn (the
  * narrowest with its cards scrolled to their end), then at the first size with a card chosen (the
  * camera on its area) and after "Show others".
@@ -22,7 +23,8 @@
  *
  * With `--shots …,edit`, between steps 3 and 4, a scripted edit session in step 3's town editor
  * (`web/src/ui/townedit/`), each step shot at the edit sizes (`--edit-sizes`): a lot picked, removed,
- * the removal undone, a home put down, a lot dragged elsewhere, a park made another public place, a
+ * the removal undone, a home put down, a building of flats put down close (what it is said as its ghost
+ * follows the pointer), a lot dragged elsewhere, a park made another public place, a
  * street renamed, then a street removed with its lots. It measures the frames while the Lot tool's
  * ghost follows the pointer, and each edit's way to the town built again (the pause, the settle, the
  * town shown: the editor's own timings), and says them (`create: edit …`). Then the Street tool: a
@@ -278,7 +280,7 @@ function benchHelpers() {
               const fit = lots.canPlace(d, t, { road: i, s, side }, what, 1);
               if ('refused' in fit) continue;
               const p = screen(fit.x + fit.w / 2, fit.z + fit.d / 2);
-              if (p) out.push(p);
+              if (p) out.push({ ...p, gx: fit.x + fit.w / 2, gz: fit.z + fit.d / 2 });
             }
           }
         }
@@ -569,6 +571,53 @@ function benchHelpers() {
  * brush and the Street tool) or step 3's built town ('edit': lots, build-up, villages). Each step shot at every edit
  * size, each edit's way to the town settled again measured, the frames while a tool's ghost follows the pointer.
  */
+/**
+ * In the page: the camera brought `metres` from a ground point (`[x, z]`, or `'centre'`: the main town's compact shop with
+ * flats over it with the most others round it, else its centre's middle),
+ * the point dragged to the middle of the view and the view tilted `tilt` radians lower. False if the point is off screen.
+ * `menuScene.reframe` takes it back.
+ */
+async function closeTo(page, at, metres, tilt = 0) {
+  const ok = await page.evaluate(
+    async ([at, metres, tilt]) => {
+      const { menuScene } = await import('/src/game/menuScene.ts');
+      let p = at;
+      if (at === 'centre') {
+        const d = window.__townEditor?.draft;
+        const mid = (s) => (s.facing % 2 ? [s.x + s.d / 2, s.z + s.w / 2] : [s.x + s.w / 2, s.z + s.d / 2]);
+        // (The compact shops and cafés of the high street, shoulder to shoulder: `places.ts` `ZONE`'s `compact`.)
+        const over = (d?.slots ?? []).filter((s) => (s.area ?? 0) === 0 && /^(shopTiny|cafeTiny|restaurantSmall)$/.test(s.template) && s.upper?.startsWith('over:')).map(mid);
+        const round = (q) => over.filter((o) => Math.hypot(o[0] - q[0], o[1] - q[1]) < 50).length;
+        const c = d?.open?.centre?.find((q) => q.area === 0);
+        p = over.length ? over.reduce((a, q) => (round(q) > round(a) ? q : a)) : c?.poly.length ? [c.poly.reduce((s, q) => s + q[0], 0) / c.poly.length, c.poly.reduce((s, q) => s + q[1], 0) / c.poly.length] : null;
+        if (!p) return false;
+      }
+      const screen = () => {
+        const out = { x: 0, y: 0 };
+        if (!menuScene.project(p[0], 0, p[1], out)) return null;
+        const g = menuScene.landAt(out.x, out.y);
+        return g && menuScene.project(p[0], g.y, p[1], out) ? out : null;
+      };
+      const stage = document.querySelector('.stage')?.getBoundingClientRect();
+      const s = screen();
+      const far = menuScene.distance;
+      if (!s || !stage || !far) return false;
+      menuScene.drag(s.x, s.y, (stage.left + stage.right) / 2, (stage.top + stage.bottom) / 2);
+      if (tilt) menuScene.nudge(0, 1, tilt);
+      const m = screen();
+      if (m) menuScene.zoomAt(m.x, m.y, far / metres);
+      return true;
+    },
+    [at, metres, tilt],
+  );
+  // (The camera glides there.)
+  await page.waitForTimeout(3000);
+  return ok;
+}
+
+/** In the page: the camera back to the step's own shot. */
+const reframe = (page) => page.evaluate(async () => (await import('/src/game/menuScene.ts')).menuScene.reframe(0));
+
 async function editSession(page, renderer, shootAs, setStep, step, parts) {
   setStep(step);
   const [first] = editSizes;
@@ -683,6 +732,41 @@ async function editSession(page, renderer, shootAs, setStep, step, parts) {
     if (!placed) fault(`${renderer} edit: no home put down (${(await state()).hint})`);
     await shots('add');
     await built('add a home');
+
+    // 4b. A building of flats put down with the Lot tool, close: what it is said under the tools as its ghost follows the
+    // pointer, then the building.
+    await page.locator('.lot-card [role="radio"]', { hasText: 'Flats' }).first().click();
+    const where = (await bench(() => window.__bench.spots({ kind: 'flats' }, 1)))[0];
+    if (where) await closeTo(page, [where.gx, where.gz], 70, 0.2);
+    const flatSpots = await bench(() => window.__bench.spots({ kind: 'flats' }, 24));
+    let flats = null;
+    for (const p of flatSpots) {
+      await page.mouse.move(p.x, p.y, { steps: 3 });
+      await page.waitForTimeout(60);
+      const hint = (await state()).hint ?? '';
+      if (!/Click to put it down/.test(hint)) continue;
+      if (!/building of .+ flats/.test(hint)) fault(`${renderer} edit: the flats' ghost says "${hint}"`);
+      await shots('flats-ghost');
+      const had = (await state()).slots;
+      await page.mouse.click(p.x, p.y);
+      await page.waitForTimeout(200);
+      flats = await page.evaluate((had) => {
+        const s = window.__townEditor.draft.slots;
+        return s.length === had + 1 && s.at(-1).kind === 'flats' ? { name: s.at(-1).name, x: s.at(-1).x, z: s.at(-1).z, w: s.at(-1).w, d: s.at(-1).d, facing: s.at(-1).facing } : null;
+      }, had);
+      break;
+    }
+    if (!flats) fault(`${renderer} edit: no building of flats put down (${(await state()).hint})`);
+    else {
+      await built('add a building of flats');
+      console.log(`create: ${renderer} edit: ${flats.name} put down`);
+      await page.mouse.move(5, 5);
+      await page.waitForTimeout(500);
+      await shots('flats-put');
+    }
+    await reframe(page);
+    await page.waitForTimeout(1500);
+    await page.locator('.lot-card [role="radio"]', { hasText: 'House' }).first().click();
 
     // 5. A lot dragged elsewhere with the Lot tool.
     const mover = await bench(() => window.__bench.lot('home', 6));
@@ -1368,6 +1452,10 @@ try {
       await everySize();
       await page.setViewportSize(sizes[0]);
       await page.waitForTimeout(800);
+      // The main town's centre close as the generator built it (its shops, most with flats over them), then built again.
+      if (await closeTo(page, 'centre', 80, 0.2)) await shoot(`${sizes[0].width}x${sizes[0].height}-centre-proposed`);
+      await reframe(page);
+      await page.waitForTimeout(1500);
       const t0 = Date.now();
       await page.getByRole('button', { name: /Build again/ }).click();
       await page.waitForTimeout(300);
@@ -1377,6 +1465,15 @@ try {
       console.log(`create: ${renderer} step 3: built again in ${Date.now() - t0} ms`);
       await page.waitForTimeout(1500);
       await shoot(`${sizes[0].width}x${sizes[0].height}-built-again`);
+      // (From two sides.)
+      if (await closeTo(page, 'centre', 80, 0.2)) {
+        await shoot(`${sizes[0].width}x${sizes[0].height}-centre`);
+        await page.evaluate(async () => (await import('/src/game/menuScene.ts')).menuScene.nudge(Math.PI * 0.6, 1));
+        await page.waitForTimeout(2500);
+        await shoot(`${sizes[0].width}x${sizes[0].height}-centre-turned`);
+      } else fault(`${renderer} step 3: the main town's centre not on screen`);
+      await reframe(page);
+      await page.waitForTimeout(1500);
     }
 
     if (shots.has('edit')) {

@@ -321,10 +321,8 @@ describe('build from uses', async () => {
     }
     lines.push(['all'.padEnd(24), ...kinds.map((k) => `${total[k][0]} → ${total[k][1].toFixed(0)} (${Math.round((100 * total[k][1]) / total[k][0])}%)`.padStart(18))].join(''));
     console.log(`Generator's town → built again (mean of seeds ${seeds.join(', ')}):\n${lines.join('\n')}`);
-    // Over all the worlds, each kind within a sixth of the generator's (parks, fewer and the most scattered, within a quarter;
-    // the shops and the buildings within three tenths and a quarter: the town's compact shops and cafés are 8 m wide, two of the
-    // zones' cells, and a gap that narrow is lost to a lot of the zones' drawn a metre off it or a civic place a few metres along).
-    const within = { homes: 0.15, terraces: 0.15, shops: 0.3, buildings: 0.25, parks: 0.25, public: 0.15 };
+    // Over all the worlds, each kind within a sixth of the generator's (shops and parks, fewer and the most scattered, within a quarter).
+    const within = { homes: 0.15, terraces: 0.15, shops: 0.25, buildings: 0.15, parks: 0.25, public: 0.15 };
     for (const k of kinds) expect({ k, ok: Math.abs(total[k][1] / total[k][0] - 1) <= within[k] }).toEqual({ k, ok: true });
   }, 300_000);
 

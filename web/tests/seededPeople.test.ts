@@ -126,9 +126,9 @@ describe('seeded people', async () => {
     expect(first.households.length).toBe(45);
     expect(filled.households.length).toBe(56);
     expect(offer.length).toBe(27);
-    expect(filled.households[0].household.name).toBe('Zhang');
-    expect(pin(first.households)).toBe('33e952bfe4b2fb4e');
-    expect(pin(filled.households)).toBe('46bfd8d3b0b822cc');
+    expect(filled.households[0].household.name).toBe('Lima');
+    expect(pin(first.households)).toBe('1a4545996bde245c');
+    expect(pin(filled.households)).toBe('e6e9335469720fd8');
     expect(pin(offer)).toBe('3795e135ec008d44');
   });
 

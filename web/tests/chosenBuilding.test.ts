@@ -4,6 +4,7 @@
  */
 import { describe, expect, test } from 'bun:test';
 import type { PlotInfo, SimView, TownPlace } from '../src/core/protocol';
+import { FLAT_FLOOR } from '../src/game/price';
 import { chosenAnchor, chosenIcon, chosenOf, flatRows, flatsDetail, insideText, placeDetail, placeLabel, whoIsIn, type ChosenTown } from '../src/ui/town/chosen';
 import { homesForSale } from '../src/ui/town/places';
 import type { TagWorld } from '../src/ui/town/tags';
@@ -59,7 +60,7 @@ describe("a building of flats' card (the real town: Mill Court, flats 1 to 4)", 
       [4, 'Flat 4', 1, null],
     ]);
     // (The lot of 520 m² shared by four flats, and its own 63 m² at a flat's rate.)
-    expect(rows[3].price).toBe(Math.round((10 * 130 + 0.6 * 100 * 63) / 10) * 10);
+    expect(rows[3].price).toBe(Math.round((10 * 130 + FLAT_FLOOR * 100 * 63) / 10) * 10);
     expect(rows.slice(0, 3).every((r) => r.price === null)).toBe(true);
     expect(flatsDetail(rows)).toBe('4 flats · 1 for sale');
     expect(flatsDetail(rows.slice(0, 3))).toBe('3 flats');
@@ -70,6 +71,9 @@ describe("a building of flats' card (the real town: Mill Court, flats 1 to 4)", 
     const mixed: ChosenTown = { ...t, places: [shop], plots: [{ ...world.plots[0], public: true, kind: 'shop' }] };
     expect(chosenOf({ kind: 'lot', plot: BUILDING }, mixed)).toEqual({ kind: 'place', place: 0, plot: BUILDING, title: 'Corner Shop', detail: '' });
     expect(flatRows(BUILDING, mixed, []).length).toBe(4);
+    // (Over a place the land is shared with the place too: five shares of the 520 m².)
+    const sale = homesForSale(mixed.plots, world.households.filter((h) => h.plot !== FLATS[3]), { perTile: 10, perFloorTile: 100, round: 10 }, world.flats);
+    expect(sale.map((h) => [h.plot, h.price])).toEqual([[FLATS[3], Math.round((10 * 104 + FLAT_FLOOR * 100 * 63) / 10) * 10]]);
   });
 
   test('inside: those in its flats, its hall and its yard', () => {

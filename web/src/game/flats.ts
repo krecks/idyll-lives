@@ -135,6 +135,18 @@ export function storeysOfId(id: string): number {
   return 1;
 }
 
+/**
+ * How many flats a building of flats or the flats over a place have, by its id (0: neither): one a storey each side of
+ * a wide building's hall and one a storey beside a narrow one's (`flatsBuilding`), one a storey over a place
+ * (`flatsOver`). Read without making the building.
+ */
+export function flatsInId(id: string): number {
+  const parts = id.split(':');
+  if (parts[0] === 'flats') return storeysOfId(id) * (parts[3] === '1' ? 2 : 1);
+  if (parts[0] === 'over') return storeysOfId(id) - 1;
+  return 0;
+}
+
 /** What the flats of a building are called: `Flat 3, Mill Court`. */
 export function flatName(building: string, unit: number): string {
   return `Flat ${unit + 1}, ${building}`;
