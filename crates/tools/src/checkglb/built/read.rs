@@ -232,14 +232,14 @@ pub fn read(g: &Glb) -> R<Vec<Part>> {
                     .collect()
             };
             let material = match prim.get("material") {
-                Some(i) => super::super::glb::index(gltf.get("materials").unwrap_or(&none), i)?
+                Some(i) => crate::checkglb::glb::index(gltf.get("materials").unwrap_or(&none), i)?
                     .get("name")
                     .and_then(J::str)
                     .unwrap_or_default()
                     .to_string(),
                 None => String::new(),
             };
-            let triangles = super::super::digest::indices(g, prim, positions.len())?
+            let triangles = crate::checkglb::digest::indices(g, prim, positions.len())?
                 .as_chunks::<3>()
                 .0
                 .to_vec();

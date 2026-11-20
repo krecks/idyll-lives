@@ -234,7 +234,7 @@ pub fn clips(g: &Glb, tree: &Tree) -> R<Vec<Clip>> {
                 Some(_) => return Err("a clip moves a node the file has not".into()),
                 None => continue,
             };
-            let sampler = super::super::glb::index(key(a, "samplers")?, key(c, "sampler")?)?;
+            let sampler = crate::checkglb::glb::index(key(a, "samplers")?, key(c, "sampler")?)?;
             let times: Vec<f64> = values(g, key(sampler, "input")?)?
                 .iter()
                 .filter_map(|t| t.first().copied())
