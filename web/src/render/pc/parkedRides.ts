@@ -62,8 +62,6 @@ export class ParkedRides {
   /** Bumped by each build: templates that come after another build has begun are let go of. */
   private generation = 0;
   private readonly q: Quat = [0, 0, 0, 1];
-  /** Each draw by its mesh instance: what it casts (`castKey`). */
-  private readonly keyed = new Map<pc.MeshInstance, Instances>();
 
   constructor(
     private readonly app: pc.AppBase,
@@ -208,27 +206,17 @@ export class ParkedRides {
     const [near, far] = await Promise.all([buildModel(this.app, `ride:${key}`, entry, footprint), buildModel(this.app, `ride:${key}:far`, entry, footprint, { far: true })]);
     const draws = (t: ModelTemplate) =>
       t.meshes.map((m) => {
-        const draw = new Instances(this.app.graphicsDevice, this.root, m.mesh, m.material, { name: m.name, castShadows: this.shadows, receiveShadows: true, capacity: 4 });
+        // (Keyed by its copies that cast into the sun's map: a bike ridden off across town draws no picture of the
+        // still casters again.)
+        const draw = new Instances(this.app.graphicsDevice, this.root, m.mesh, m.material, { name: m.name, castShadows: this.shadows, receiveShadows: true, capacity: 4, castKeyed: true });
         draw.enabled = false;
-        this.keyed.set(draw.meshInstance, draw);
         return draw;
       });
     return { near: draws(near), far: draws(far), templates: [near, far] };
   }
 
-  /**
-   * What draw `mi` casts where `reaches` (the sun's map: `SunShadows.castKey`), as a number: its copies there, where
-   * they stand and which way (0: none there); undefined: not one of these draws.
-   */
-  castKey(mi: pc.MeshInstance, reaches: (x: number, z: number) => boolean): number | undefined {
-    return this.keyed.get(mi)?.castKey(reaches);
-  }
-
   private dropLook(look: Look): void {
-    for (const draw of [...look.near, ...look.far]) {
-      this.keyed.delete(draw.meshInstance);
-      draw.destroy();
-    }
+    for (const draw of [...look.near, ...look.far]) draw.destroy();
     for (const t of look.templates) disposeTemplate(t);
   }
 }

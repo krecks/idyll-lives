@@ -142,9 +142,10 @@ export async function loadDebugReport(name: string): Promise<string> {
 
 /**
  * Puts a pasted game state into a save slot and returns its id: the simulation's own save
- * (`World::save_json`, what the tests write with `DUMP_STATES=1`) or a whole debug report.
+ * (`World::save_json`, what the tests write with `DUMP_STATES=1`) or a whole debug report; and the state's tick (read
+ * as it is checked: a caller needs no parse of its own).
  */
-export async function loadState(text: string, name = 'Pasted state'): Promise<string> {
+export async function loadState(text: string, name = 'Pasted state'): Promise<{ saveId: string; tick: number }> {
   let parsed: { tick?: number; households?: { name: string; player: boolean }[]; sims?: { name: string; household: number }[]; save?: string };
   try {
     parsed = JSON.parse(text);
@@ -172,12 +173,12 @@ export async function loadState(text: string, name = 'Pasted state'): Promise<st
     data,
   };
   await writeSave(record);
-  return record.id;
+  return { saveId: record.id, tick: state.tick };
 }
 
 /** `?state=<name>` (dev server): a state the simulation's tests wrote to `debug-states/`. */
 export async function fetchState(name: string): Promise<string> {
   const res = await fetch(`/__debug/states/${encodeURIComponent(name)}`);
   if (!res.ok) throw new Error(`Game state "${name}" not found (run the tests with DUMP_STATES=1)`);
-  return loadState(await res.text(), name);
+  return (await loadState(await res.text(), name)).saveId;
 }

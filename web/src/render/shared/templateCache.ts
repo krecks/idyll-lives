@@ -15,6 +15,8 @@
  * its owner invalidates it as it would have.
  */
 
+import { DEBUG_HOOKS } from '../../debug/hooks';
+
 /** What a cache needs of a template: the files it was built without. */
 export interface CachedTemplate {
   failed?: string[];
@@ -32,7 +34,7 @@ export interface TemplateHooks<T> {
   dispose(template: T): void;
 }
 
-/** Template builds started in any cache so far, and those under way (`templateBuilds`). */
+/** Template builds started in any cache so far, and those under way (`templateBuilds`; counted only where the bench's hooks are). */
 let started = 0;
 const underWay = new Set<Promise<unknown>>();
 
@@ -66,9 +68,11 @@ export class TemplateCache<T extends CachedTemplate | null> {
     if (known) return known.promise;
     const entry: Entry<T> = { promise: build() };
     this.entries.set(key, entry);
-    started++;
-    underWay.add(entry.promise);
-    void entry.promise.finally(() => underWay.delete(entry.promise)).catch(() => {});
+    if (DEBUG_HOOKS) {
+      started++;
+      underWay.add(entry.promise);
+      void entry.promise.finally(() => underWay.delete(entry.promise)).catch(() => {});
+    }
     // (A build that throws stays cached as it is, as it always has; its rejection is the caller's.)
     entry.promise.then(
       (value) => {

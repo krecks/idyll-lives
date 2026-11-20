@@ -257,9 +257,12 @@ export abstract class Vehicles {
     this.meshes.clear();
   }
 
-  /** An instanced draw of `mesh` under the root, out of the house's lamps (`streams` beside each copy's matrix: `instancing.ts`). */
-  protected instanced(name: string, mesh: pc.Mesh, material: pc.Material, castShadows: boolean, capacity: number, streams: readonly InstanceStream[] = []): Instances {
-    const draw = new Instances(this.app.graphicsDevice, this.root, mesh, material, { name, castShadows, capacity: Math.max(1, capacity), streams });
+  /**
+   * An instanced draw of `mesh` under the root, out of the house's lamps (`streams` beside each copy's matrix,
+   * `castKeyed`: `instancing.ts`).
+   */
+  protected instanced(name: string, mesh: pc.Mesh, material: pc.Material, castShadows: boolean, capacity: number, streams: readonly InstanceStream[] = [], castKeyed = false): Instances {
+    const draw = new Instances(this.app.graphicsDevice, this.root, mesh, material, { name, castShadows, capacity: Math.max(1, capacity), streams, castKeyed });
     this.lib.excludeFromLights([], [draw.meshInstance]);
     draw.enabled = false;
     return draw;

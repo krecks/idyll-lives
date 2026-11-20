@@ -82,9 +82,8 @@ interface Drawn {
   shape: CarBody;
   /** Its body, paint and age (`body paint age`, or `taxi`): its own entity's meshes, shared by the cars that look alike. */
   look: string;
-  /** Its body and age (`body age`, or `taxi`): the instanced draw it's in while parked, and its paint there (`tintOf`). */
+  /** Its body and age (`body age`, or `taxi`): the instanced draw it's in while parked (its paint there: `tintOf`). */
   parkedLook: string;
-  tint: readonly number[];
   body: number;
   paint: number;
   age: CarAge;
@@ -141,8 +140,6 @@ export class Cars extends Vehicles {
   stillMoved = false;
   /** The parked cars' draws by body and age (`parkedLook`; their meshes shared by the cars of a build alike). */
   private readonly parked = new Map<string, Parked>();
-  /** The parked draws by their mesh instance (`castKey`). */
-  private readonly parkedDraws = new Map<pc.MeshInstance, Instances>();
   /** The wheels and contact shadows are written again: every car's (one came or went), or only those of the cars drawn that moved (`stirred`). */
   private around = true;
   private readonly stirred: Drawn[] = [];
@@ -232,14 +229,6 @@ export class Cars extends Vehicles {
     this.flush();
   }
 
-  /**
-   * What parked draw `mi` casts where `reaches` (the sun's map: `SunShadows.castKey`), as a number (`Instances.castKey`):
-   * a car parking or driving off across town leaves it as it was; undefined: not a parked draw.
-   */
-  castKey(mi: pc.MeshInstance, reaches: (x: number, z: number) => boolean): number | undefined {
-    return this.parkedDraws.get(mi)?.castKey(reaches);
-  }
-
   /** As `Vehicles.movingCasters`, and the cars drawn by their own entities (driving, or a door open). */
   override movingCasters(out: pc.MeshInstance[]): void {
     super.movingCasters(out);
@@ -295,7 +284,6 @@ export class Cars extends Vehicles {
     this.driving.length = 0;
     for (const p of this.parked.values()) p.draw.destroy();
     this.parked.clear();
-    this.parkedDraws.clear();
     this.clearDraws();
     this.key = '';
     this.scanned = 0;
@@ -423,7 +411,7 @@ export class Cars extends Vehicles {
       for (const car of this.cars) {
         if (car.parkedLook !== look || !car.drawn || car.owned) continue;
         p.draw.setMatrix(n, this.carMatrix(car.at, car.shape));
-        if (p.tinted) p.draw.set(INSTANCE_COLOR, n, car.tint);
+        if (p.tinted) p.draw.set(INSTANCE_COLOR, n, tintOf(car.paint, car.age));
         n++;
       }
       p.draw.update();
@@ -554,9 +542,9 @@ export class Cars extends Vehicles {
         : this.wholeMesh(car);
       if (!mesh) return null;
       const material = tinted ? this.lib.instanceColored(this.lib.plainFinish(), true) : this.lib.plainFinish();
-      const draw = this.instanced('carsParked', mesh, material, this.shadows, 4, tinted ? [INSTANCE_COLOR] : []);
+      // (Keyed by its copies that cast into the sun's map: a car parking or driving off across town leaves it as it was.)
+      const draw = this.instanced('carsParked', mesh, material, this.shadows, 4, tinted ? [INSTANCE_COLOR] : [], true);
       this.parked.set(car.parkedLook, (p = { draw, tinted, dirty: true }));
-      this.parkedDraws.set(draw.meshInstance, draw);
     }
     return p;
   }
@@ -570,8 +558,6 @@ function placeOf(car: Drawn): CarAt {
 
 /** Each paint at each age as a parked car's copy has it (`tintOf`), by `paint age`, worked out once. */
 const TINTS = new Map<string, readonly number[]>();
-/** The taxis' copies: untinted. */
-const UNTINTED = [1, 1, 1, 1] as const;
 
 /** A household's car's paint (`CAR_PAINT` index) at its age as its parked copy's colour (`carPaintColour`: sRGB 0..1, opaque). */
 function tintOf(paint: number, age: CarAge): readonly number[] {
@@ -593,7 +579,6 @@ function drawnCar(row: number, taxi: boolean, body: number, paint: number, age: 
     shape,
     look: taxi ? 'taxi' : `${body} ${paint} ${age}`,
     parkedLook: taxi ? 'taxi' : `${body} ${age}`,
-    tint: taxi ? UNTINTED : tintOf(paint, age),
     body,
     paint,
     age,

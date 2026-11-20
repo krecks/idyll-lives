@@ -5019,16 +5019,27 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       }
     }
     // Low detail far from the camera (with a gap between switching down and up; the mesh's measured at
-    // `LOD_HEIGHT_PX` tall, the pose's as drawn); those not drawn keep theirs.
+    // `LOD_HEIGHT_PX` tall, the pose's as drawn); those not drawn keep theirs. And who may cast into a shadow map now
+    // (`castsAt`, where they were posed): one who came there has the sun's map drawn again (`upload`), wherever they
+    // were before.
     const { far, poseFar } = this;
     const atLod = this.hasCam && c[3] > 0 ? LOD_HEIGHT_PX / c[3] : 1;
+    const castsAt = this.castsAt;
+    let cast = false;
     for (let i = 0; i < count; i++) {
-      if (!shown[i]) continue;
-      const lodPx = px[i] * atLod;
-      if (far[i] && lodPx > LOD_NEAR_PX) far[i] = 0;
-      else if (!far[i] && lodPx < LOD_FAR_PX && this.hasLod) far[i] = 1;
-      if (poseFar[i] && px[i] > POSE_NEAR_PX) poseFar[i] = 0;
-      else if (!poseFar[i] && px[i] < POSE_FAR_PX) poseFar[i] = 1;
+      let casts = 0;
+      if (shown[i]) {
+        const lodPx = px[i] * atLod;
+        if (far[i] && lodPx > LOD_NEAR_PX) far[i] = 0;
+        else if (!far[i] && lodPx < LOD_FAR_PX && this.hasLod) far[i] = 1;
+        if (poseFar[i] && px[i] > POSE_NEAR_PX) poseFar[i] = 0;
+        else if (!poseFar[i] && px[i] < POSE_FAR_PX) poseFar[i] = 1;
+        casts = !castsAt || castsAt(this.posedAt[i * 2], this.posedAt[i * 2 + 1]) ? 1 : 0;
+      }
+      if (casts === this.casting[i]) continue;
+      if (casts) this.castGained = true;
+      this.casting[i] = casts;
+      cast = true;
     }
     // Who is drawn changed (or every part's rows were set again): the parts drawn whatever the distance too.
     let all = this.listsStale;
@@ -5042,17 +5053,6 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       if (!pm.enabled || (!all && !pm.detail && pm.range === Range.Always)) continue;
       const perFrame = !!pm.detail || pm.range !== Range.Always;
       this.listRows(pm, perFrame ? 'rows' : 'new', true);
-    }
-    // Who may cast into a shadow map now (`castsAt`, where they were posed); one who came there has the sun's map
-    // drawn again (`upload`), wherever they were before.
-    let cast = false;
-    const castsAt = this.castsAt;
-    for (let i = 0; i < count; i++) {
-      const c = shown[i] && (!castsAt || castsAt(this.posedAt[i * 2], this.posedAt[i * 2 + 1])) ? 1 : 0;
-      if (c === this.casting[i]) continue;
-      if (c) this.castGained = true;
-      this.casting[i] = c;
-      cast = true;
     }
     // The shadow-only copies: who is drawn and may cast, wearing the shells (they keep their rows till any changes).
     if (!all && !this.shadowsBare && !cast) return;
