@@ -14,7 +14,7 @@
 
 import * as pc from './engine';
 import { drawAfter } from './meshes';
-import { toLinear } from '../shared/math';
+import { linearHex } from '../shared/math';
 import type { ResizeHandle } from '../types';
 
 /** Arrow length (m) at the reference distance, and the distance (m) at which arrows are that size. */
@@ -23,14 +23,14 @@ const REFERENCE = 9;
 /** A press this close (CSS px) to an arrow's middle takes it. */
 const REACH = 26;
 
-const BLUE = linearHex('#4FA7E8');
+const BLUE = linearArray('#4FA7E8');
 /** The hover tile's colour (the interface's accent) and how much of it shows. */
-const ACCENT = linearHex('#5B7CFA');
+const ACCENT = linearArray('#5B7CFA');
 const TILE_ALPHA = 0.35;
 /** The hover tile's side (m) and height over the floor (m). */
 const TILE_SIZE = 0.92;
 const TILE_Y = 0.025;
-const HOT = linearHex('#9AD4FF');
+const HOT = linearArray('#9AD4FF');
 
 type Shape = 'xz' | 'xy' | 'up' | 'down';
 
@@ -189,9 +189,9 @@ export class HoverTile {
 }
 
 /** An sRGB hex colour in linear light (what an unlit material passes on to the image processing). */
-function linearHex(hex: string): Float32Array {
-  const v = parseInt(hex.slice(1), 16);
-  return Float32Array.of(toLinear(((v >> 16) & 255) / 255), toLinear(((v >> 8) & 255) / 255), toLinear((v & 255) / 255));
+function linearArray(hex: string): Float32Array {
+  const { r, g, b } = linearHex(hex);
+  return Float32Array.of(r, g, b);
 }
 
 /** A chunky arrow centred on its middle: pointing +x in the xz plane or the xy plane, or pointing +y or -y (`up`, `down`: in the xy plane). */

@@ -99,7 +99,7 @@ import { GrassPush } from '../shared/grass';
 import { idleMoment } from '../shared/idle';
 import { coveringSurface, HOUSE_MATERIALS, houseObjectKey, placeLights, WALL_STUB, type HouseSurfaces, type RoomLight, type RoomTiles } from '../shared/house';
 import { WALL_HEIGHT } from '../shared/walls';
-import { compose, quatYawPitchRoll, toLinear, type Quat } from '../shared/math';
+import { compose, linearHex, quatYawPitchRoll, toLinear, type Quat } from '../shared/math';
 import { OrbitControls } from '../shared/orbit';
 import { Flight, panBounds, Roam, WARM_LOTS, warmLots, type FocusPlot } from '../shared/focus';
 import { CHUNK, chunkCoords, distanceToRect, RectGrid } from '../shared/chunks';
@@ -439,12 +439,6 @@ function lightMixFromURL(): [number, number, number] | null {
 function skyLuma(l: Lighting): number {
   const luma = (c: RGB) => 0.2126 * toLinear(c.r) + 0.7152 * toLinear(c.g) + 0.0722 * toLinear(c.b);
   return Math.max((luma(l.skyColor) + luma(l.groundColor)) / 2, 1e-3);
-}
-
-/** A hex colour (sRGB) in linear light (`pow(c, 2.2)`). */
-function linearHex(hex: string): RGB {
-  const v = parseInt(hex.slice(1), 16);
-  return { r: toLinear(((v >> 16) & 255) / 255), g: toLinear(((v >> 8) & 255) / 255), b: toLinear((v & 255) / 255) };
 }
 
 /** A linear colour (the look's keys are used as linear) as PlayCanvas takes it (sRGB, linearised when lit). */
