@@ -39,12 +39,12 @@
 import type { Content } from '../../content/content';
 import type { RoadPlan, TownArea } from '../../core/protocol';
 import { crossWater, DRAWN_SPAN, wetSpans, withoutDeck } from '../bridges';
-import { along, clearOfBoxes, CountryRouter, TRIES, type Cells, type Onward, type Port, type Way } from '../countryRouter';
+import { along, clearOfBoxes, CountryRouter, ROAD_WIDTH, TRIES, type Cells, type Onward, type Port, type Way } from '../countryRouter';
 import { heightAt, type Land } from '../land';
 import { wetTiles } from '../landEdit';
 import { rle, unrle } from '../landMasks';
 import { bridgeSites, dryPieces } from '../landPieces';
-import { AREA_APART, BRIDGE_IN, cells8, cornersOf, DECK_PAST, deckTiles, hamletFits, hamletLots, hamletOf, parkingFor, putHamlet, ROAD_WIDTH, type AreaPlan } from '../macro';
+import { AREA_APART, BRIDGE_IN, cells8, cornersOf, DECK_PAST, deckTiles, hamletFits, hamletLots, hamletOf, parkingFor, putHamlet, type AreaPlan } from '../macro';
 import { mulberry32 } from '../noise';
 import { COURT, endDir, evenly, leftOf, lengths, nearest, pointAt, RoadIndex, roadIndex, tangent, type Pt } from '../roads';
 import { boundsOf, frontageOf, LotPlacer, plotRect, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates } from '../town';

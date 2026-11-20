@@ -19,7 +19,7 @@ import { lotName, placeOfTemplate, placeUnit } from './placeLots';
 import { BIG_COURTS, boundsOf, COURTS, frontageOf, Ground, houseFor, joinUp, lotAt, LotPlacer, plotRect, reachesRoad, settleRoads, shuffled, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
 import { LAND_SIZE, LEGACY_KINDS, placeOf, specOf, streetNames, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind, type WorldSpec, type WorldStep } from './world';
 
-export { type OpenWorldDraft, type LandPlan, type LayOptions, chaikin, outlines, rasterize, rle, simplifyRing, unrle, COUNTRY_TURN, evenly, ROAD_WIDTH, type Port, type Way } from './macroShared';
+export { type OpenWorldDraft, type LandPlan, type LayOptions } from './macroShared';
 import type { Rand, OpenWorldDraft, LandPlan, LayOptions } from './macroShared';
 
 export function landDraft(content: Content, _t: Templates, kind: string, options: Partial<WorldOptions> | undefined, seed: number): NeighbourhoodDraft {

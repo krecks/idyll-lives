@@ -32,17 +32,10 @@ import type { CarPark, LandSize, ParkingBay, Rle, TownArea, TownPlace, WorldMeta
 import { type Centre } from './centre';
 import { type Land as LandField } from './land';
 import { type GentlePlane } from './landFollow';
-import { chaikin, outlines, rasterize, rle, simplifyRing, unrle } from './landMasks';
 import type { UseLayer } from './uses';
-import { COUNTRY_TURN, ROAD_WIDTH, type Port, type Way } from './countryRouter';
-import { evenly, type Pt } from './roads';
+import { type Pt } from './roads';
 import { type WorldKind } from './world';
 
-/** The mask helpers moved to `landMasks.ts`; still here for those that import them from the generator. */
-export { chaikin, outlines, rasterize, rle, simplifyRing, unrle };
-/** The country roads' pieces moved to `countryRouter.ts`, and the road helpers to `roads.ts`; still here for those that import them from the generator. */
-export { COUNTRY_TURN, evenly, ROAD_WIDTH };
-export type { Port, Way };
 
 export type Rand = () => number;
 

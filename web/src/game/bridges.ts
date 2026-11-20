@@ -19,7 +19,8 @@
 import type { RoadPlan } from '../core/protocol';
 import { BRIDGE_CLEAR } from '../render/shared/builtSurface';
 import { heightAt, LAND_CELL, NONE, type Land } from './land';
-import { BRIDGE_IN, BRIDGE_SPAN, DECK_PAST, deckOf, deckTiles, ROAD_WIDTH } from './macro';
+import { BRIDGE_IN, BRIDGE_SPAN, DECK_PAST, deckOf, deckTiles } from './macro';
+import { ROAD_WIDTH } from './countryRouter';
 import { bends, connector, lengths, nearest, pointAt, type Pt } from './roads';
 
 /** The generator's bridge limits (`macro.ts`): its longest deck, how far before the bank it runs straight, how far past the water its deck reaches. */
