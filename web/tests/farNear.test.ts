@@ -195,6 +195,8 @@ describe('the town’s paving far and near', () => {
     const turn = (x: number, z: number): [number, number] => [30 + (x - 30) * Math.cos(0.3) - (z - 27) * Math.sin(0.3), 27 + (x - 30) * Math.sin(0.3) + (z - 27) * Math.cos(0.3)];
     t.carParks = [{ area: 0, poly: [turn(26.1, 24.6), turn(26.1, 30.4), turn(37.9, 30.4), turn(37.9, 24.6)], sign: [25.5, 30.5, 0] }];
     t.meta!.paving!.push({ kind: 'yard', poly: [[0, 0], [0, 4], [3, 4], [3, 0]] });
+    // (And a centre whose west side runs slantwise, its edge tiles laid in part.)
+    t.meta!.paving!.push({ kind: 'centre', poly: [[26, 2], [39, 2], [39, 15], [30, 15], [26, 8]] });
     const g = new Recorder();
     paintPaving(g as unknown as Parameters<typeof paintPaving>[0], townPaving(t), W, STOREY);
     const colours = new Set<string>([PAVING_LOOK.stone, PAVING_LOOK.joint, PAVING_LOOK.yard, PAVING_LOOK.asphalt]);

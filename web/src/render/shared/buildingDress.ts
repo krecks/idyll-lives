@@ -9,7 +9,8 @@
  *   way to the road leaves by, a chimney on some roofs. A terrace is a row of homes (one door each, a stack on each
  *   party wall).
  * - **Shops, cafés, restaurants**: a shopfront on the ground floor (glass, a door, a fascia, an awning on most). With
- *   flats over it (`TownBuilding.flats`), the flats' windows above and their own street door beside the shopfront.
+ *   flats over it (`TownBuilding.flats`), the flats' windows above (their glass lit as homes', `BuildingDress.panes`)
+ *   and their own street door beside the shopfront under a canopy of its own, the awning stopping short of it.
  * - **Flats, offices, schools, halls**: render (or brick), bands between storeys, closer and wider windows, a door
  *   under a canopy.
  * - **A church**: stone, tall windows, a tower with a spire at one end. **A workshop, a barn**: boards, a wide door,
@@ -32,7 +33,11 @@ export const PANE_SETS = 4;
 /** Whether pane set `k` of a building is lit while `share` of its windows are (`litAt`). */
 export const paneSetLit = (k: number, share: number): boolean => share > (k + 0.5) / PANE_SETS;
 
-/** A building as dressed: its parts (by the silhouettes' names where they share a material) and its window glass by set. */
+/**
+ * A building as dressed: its parts (by the silhouettes' names where they share a material) and its window glass by set:
+ * `PANE_SETS` sets, and for a place with flats over it as many more after them, its flats' (lit as homes are,
+ * `litAt`'s `part`).
+ */
 export interface BuildingDress {
   parts: HousePart[];
   panes: Geo[];
@@ -49,6 +54,12 @@ const STRIPES = ['#B23A3A', '#2F6B5A', '#2F4E7A', '#C27B2A'];
 const OVERHANG = 0.35;
 /** A terrace's homes are about this wide (m). */
 const TERRACE_HOME = 5.5;
+/**
+ * How far (m) a shop's awning stops short of the flats' street door beside it (their door's canopy reaches 0.35 past
+ * it), and the shortest stretch of awning drawn (m).
+ */
+const AWNING_CLEAR = 0.55;
+const AWNING_SHORTEST = 0.8;
 /** Flats' windows (and a hall's): bays this far apart (m), this wide, their sill and head over the storey's floor. */
 const FLATS_WINDOWS = [2.4, 1.2, 0.9, 2.3] as const;
 
@@ -101,14 +112,19 @@ class Dresser {
   readonly plinth = new Geo().color('#D8D2C8');
   readonly roof = new Geo();
   readonly trim = new Geo().color(TRIM);
-  readonly panes = Array.from({ length: PANE_SETS }, () => new Geo());
+  readonly panes: Geo[];
   private paneCount = 0;
+  /** The panes put now are the flats' over a place (the second `PANE_SETS` sets). */
+  upstairs = false;
 
   constructor(
     readonly W: number,
     readonly D: number,
     readonly seed: number,
-  ) {}
+    flats = false,
+  ) {
+    this.panes = Array.from({ length: flats ? 2 * PANE_SETS : PANE_SETS }, () => new Geo());
+  }
 
   /** A side's half length and its normal (x, z). */
   half(s: Side): number {
@@ -141,7 +157,7 @@ class Dresser {
   /** A pane of glass on side `s`, in one of the building's pane sets. */
   pane(s: Side, a0: number, a1: number, y0: number, y1: number): void {
     const k = Math.floor(h(this.seed, this.paneCount++, 31) * PANE_SETS);
-    this.quad(this.panes[k], s, a0, a1, y0, y1, 0.006);
+    this.quad(this.panes[k + (this.upstairs ? PANE_SETS : 0)], s, a0, a1, y0, y1, 0.006);
   }
 
   /** Centres along side `s` of as many bays `apart` m apart as fit, `margin` m clear of its ends. */
@@ -278,7 +294,10 @@ export function dressBuilding(t: TownBuilding, use: BuildingUse, to: readonly [n
   const W = t.w / 2;
   const D = t.d / 2;
   const seed = t.seed;
-  const d = new Dresser(W, D, seed);
+  // (A place with flats over it: the flats' street door beside its own, apart from the shopfront; their windows
+  // upstairs lit as homes', in panes of their own.)
+  const flats = !!t.flats && SHOPS.has(use);
+  const d = new Dresser(W, D, seed, flats);
   const { floor, base, top } = t;
   const storeys = Math.max(1, Math.round((top - floor) / STOREY));
   const front = frontSide(t, to);
@@ -332,14 +351,12 @@ export function dressBuilding(t: TownBuilding, use: BuildingUse, to: readonly [n
   }
 
   // ---- doors: where, then the windows round them ----
-  const doors: { s: Side; a: number; wide: number }[] = [];
+  const doors: { s: Side; a: number; wide: number; flats?: true }[] = [];
   const L = d.half(front);
   // (A lot's own door along the front side, in the building's frame, kept off its corners.)
   const along = (p: readonly [number, number]) => ((dx: number, dz: number) => (front < 2 ? dx * t.ux + dz * t.uz : -dx * t.uz + dz * t.ux))(p[0] - t.cx, p[1] - t.cz);
   const own = door && along(door);
   const at = (wide: number, fallback: number, a: number | null = own) => (a === null ? fallback : Math.max(-L + wide / 2 + 0.3, Math.min(L - wide / 2 - 0.3, a)));
-  // (A place with flats over it: the flats' street door beside its own, apart from the shopfront.)
-  const flats = !!t.flats && shop;
   if (use === 'terrace') {
     for (let i = 0; i < homesIn; i++) {
       // (Each home's door at the same end of its frontage, its window beside it; along x on the long sides.)
@@ -349,7 +366,7 @@ export function dressBuilding(t: TownBuilding, use: BuildingUse, to: readonly [n
   } else if (shop) {
     const a = at(1.1, (h(seed, 13) - 0.5) * Math.max(0, L - 2.2));
     doors.push({ s: front, a, wide: 1.1 });
-    if (flats) doors.push({ s: front, a: at(1.1, a > 0 ? -L + 1.2 : L - 1.2, flatsDoor && along(flatsDoor)), wide: 1.1 });
+    if (flats) doors.push({ s: front, a: at(1.1, a > 0 ? -L + 1.2 : L - 1.2, flatsDoor && along(flatsDoor)), wide: 1.1, flats: true });
   } else if (boarded) {
     const wide = Math.min(3.2, L * 2 - 1.4);
     doors.push({ s: front, a: at(wide, (h(seed, 13) - 0.5) * Math.max(0, L - 3)), wide });
@@ -375,8 +392,9 @@ export function dressBuilding(t: TownBuilding, use: BuildingUse, to: readonly [n
         // (The shopfront is the front's ground floor.)
         if (shop && k === 0 && s === front) continue;
         const y = floor + k * STOREY;
-        // (Flats over a place have flats' windows.)
+        // (Flats over a place have flats' windows, their glass in the flats' panes.)
         const [apart, wide, sill, head] = flats && k > 0 ? FLATS_WINDOWS : windows;
+        d.upstairs = flats && k > 0;
         for (const a of d.bays(s, apart, 0.9)) {
           if (nearDoor(s, a, k, wide / 2)) continue;
           // (A terrace's party walls keep clear.)
@@ -401,8 +419,9 @@ export function dressBuilding(t: TownBuilding, use: BuildingUse, to: readonly [n
       tr.color(TRIM);
       d.box(tr, o.s, d0 - 0.1, d1 + 0.1, floor + 2.8, floor + 2.95, 0, 0.07);
       d.box(d.plinth, o.s, d0 - 0.2, d1 + 0.2, base, floor + 0.02, 0, 0.5);
-    } else d.door(o.s, o.a, floor, base, use === 'church' ? '#5A3F2A' : accent, o.wide, !shop);
+    } else d.door(o.s, o.a, floor, base, use === 'church' ? '#5A3F2A' : accent, o.wide, !shop || !!o.flats);
   }
+  d.upstairs = false;
 
   // ---- a shopfront on the ground floor of the front ----
   if (shop) {
@@ -435,23 +454,32 @@ export function dressBuilding(t: TownBuilding, use: BuildingUse, to: readonly [n
     d.box(tr, s, -span - 0.4, span + 0.4, floor + 2.6, floor + 2.95, 0, 0.12);
     tr.color(TRIM);
     d.box(tr, s, -span - 0.45, span + 0.45, floor + 2.95, floor + 3.02, 0, 0.16);
-    // An awning over the glass (a café's and a restaurant's always, most shops'): striped cloth sloping out.
+    // An awning over the glass (a café's and a restaurant's always, most shops'): striped cloth sloping out. It stops
+    // short of the flats' street door, which has its own little canopy (`door`).
     if (use !== 'shop' || h(seed, 19) < 0.6) {
       const stripe = pick(STRIPES, h(seed, 23));
       const [y0, y1, out] = [floor + 2.55, floor + 2.1, 1.3];
       const [nx, nz] = d.normal(s);
       const P = (a: number, y: number, o: number): V3 => (s < 2 ? [a, y, nz * (D + o)] : [nx * (W + o), y, a]);
-      const n = Math.max(2, Math.round((2 * span) / 0.5));
-      for (let j = 0; j < n; j++) {
-        const [a0, a1] = [-span + (2 * span * j) / n, -span + (2 * span * (j + 1)) / n];
-        tr.color(j % 2 ? '#F2EEE6' : stripe);
-        const q: V3[] = [P(a0, y0, 0.02), P(a1, y0, 0.02), P(a1, y1, out), P(a0, y1, out)];
-        const up = facing(q[0], q[1], q[2], [nx, 1, nz]);
-        tr.poly(q, up);
-        tr.poly(q, [-up[0], -up[1], -up[2]]);
-        // Its valance.
-        const v: V3[] = [P(a0, y1, out), P(a1, y1, out), P(a1, y1 - 0.22, out), P(a0, y1 - 0.22, out)];
-        tr.poly(v, [nx, 0, nz]);
+      let spans: [number, number][] = [[-span, span]];
+      for (const o of doors) {
+        if (!o.flats || o.s !== s) continue;
+        const [c0, c1] = [o.a - o.wide / 2 - AWNING_CLEAR, o.a + o.wide / 2 + AWNING_CLEAR];
+        spans = spans.flatMap(([a0, a1]): [number, number][] => [[a0, Math.min(a1, c0)], [Math.max(a0, c1), a1]]).filter(([a0, a1]) => a1 - a0 >= AWNING_SHORTEST);
+      }
+      for (const [b0, b1] of spans) {
+        const n = Math.max(2, Math.round((b1 - b0) / 0.5));
+        for (let j = 0; j < n; j++) {
+          const [a0, a1] = [b0 + ((b1 - b0) * j) / n, b0 + ((b1 - b0) * (j + 1)) / n];
+          tr.color(j % 2 ? '#F2EEE6' : stripe);
+          const q: V3[] = [P(a0, y0, 0.02), P(a1, y0, 0.02), P(a1, y1, out), P(a0, y1, out)];
+          const up = facing(q[0], q[1], q[2], [nx, 1, nz]);
+          tr.poly(q, up);
+          tr.poly(q, [-up[0], -up[1], -up[2]]);
+          // Its valance.
+          const v: V3[] = [P(a0, y1, out), P(a1, y1, out), P(a1, y1 - 0.22, out), P(a0, y1 - 0.22, out)];
+          tr.poly(v, [nx, 0, nz]);
+        }
       }
       tr.color(TRIM);
     }

@@ -7,7 +7,7 @@
 import * as pc from './engine';
 import { groundDepth, type RoadPlan, type WorldStructure, type WorldZone } from '../../core/protocol';
 import { carriageway, hasSidewalks } from '../shared/junctions';
-import { boxOf, COURSE, JOINT, LINE, PAVING_LOOK, TILE, townPaving, type TownPaving } from '../shared/townPaving';
+import { boxOf, clipRect, COURSE, courseCells, JOINT, LINE, PAVING_LOOK, TILE, townPaving, type TownPaving } from '../shared/townPaving';
 import { bridgeSpans, stretchOf } from '../shared/roads';
 import { BRIDGE } from '../shared/street';
 
@@ -95,18 +95,22 @@ const groundVersions = new WeakMap<object, { plots: WorldStructure['plots']; par
 export type PavingCanvas = Pick<OffscreenCanvasRenderingContext2D, 'fillStyle' | 'strokeStyle' | 'lineWidth' | 'lineCap' | 'fillRect' | 'beginPath' | 'moveTo' | 'lineTo' | 'closePath' | 'rect' | 'fill' | 'stroke'>;
 
 /**
- * The town's paving into the map (`g`, in town metres over a `W` × `D` ground): the tiles it lays (`TownPaving.tiles`)
- * a row's run of them at a time, the stone's joints over them (`COURSE` m apart, `JOINT` wide) as the near ground cuts
- * them, then the pieces laid by their own outlines (a car park's apron) less the lots in them, and the bays' lines.
+ * The town's paving into the map (`g`, in town metres over a `W` × `D` ground): the tiles it lays whole
+ * (`TownPaving.tiles`) a row's run of them at a time, the stone's joints over them (`COURSE` m apart, `JOINT` wide) as
+ * the near ground cuts them, the tiles laid in part along a piece's edge (`TownPaving.parts`) as far as it, cut at their
+ * joints as the near ground cuts them, then the pieces laid by their own outlines (a car park's apron) less the lots in
+ * them, and the bays' lines.
  */
 export function paintPaving(g: PavingCanvas, paving: TownPaving, W: number, D: number): void {
-  const tiles = paving.tiles(W, D);
+  const laid = paving.tiles(W, D);
+  const parts = paving.parts(W, D);
+  const whole = (i: number) => (parts.has(i) ? 0 : laid[i]);
   const runs: [number, number, number, number][] = [];
   for (let z = 0; z < D; z++) {
     for (let x = 0; x < W; ) {
-      const c = tiles[z * W + x];
+      const c = whole(z * W + x);
       let e = x + 1;
-      while (e < W && tiles[z * W + e] === c) e++;
+      while (e < W && whole(z * W + e) === c) e++;
       if (c) runs.push([c, x, z, e - x]);
       x = e;
     }
@@ -127,6 +131,21 @@ export function paintPaving(g: PavingCanvas, paving: TownPaving, W: number, D: n
     for (let k = Math.ceil((z - h) / COURSE); k * COURSE - h < z + 1; k++) {
       const [a, b] = [Math.max(z, k * COURSE - h), Math.min(z + 1, k * COURSE + h)];
       if (b > a) g.fillRect(x, a, n, b - a);
+    }
+  }
+  // (Each cell of a part on its own: two pieces' parts in one tile may overlap.)
+  for (const [i, polys] of parts) {
+    const [x, z, c] = [i % W, Math.floor(i / W), laid[i]];
+    for (const { cell, joint } of courseCells(x, z, x + 1, z + 1, c === TILE.stone ? COURSE : 0)) {
+      g.fillStyle = joint ? MAP.joint : c === TILE.yard ? MAP.yard : MAP.paving;
+      for (const q of polys) {
+        const part = clipRect(q, ...cell);
+        if (part.length < 3) continue;
+        g.beginPath();
+        part.forEach(([px, pz], k) => (k ? g.lineTo(px, pz) : g.moveTo(px, pz)));
+        g.closePath();
+        g.fill();
+      }
     }
   }
   for (const p of paving.pieces) {

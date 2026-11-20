@@ -10,15 +10,19 @@
  * town did not say: a town whose generator wrote no `paving` has its centres and squares paved from
  * `meta.centre`, and its bays drawn where the simulation parks.
  *
- * Paving is laid by whole tiles (a tile is paved when its middle is in a piece, less its holes):
- * the lawn's grass is hidden tile by tile too, so the paving and the grass meet on the same line
- * near and far. A car park's apron is turned to its road and is drawn by its own outline.
+ * Paving is laid by tiles, a tile whole where it is wholly in a piece (less its holes and cuts) and
+ * in part along a piece's edge, cut straight along it (`parts`), so a slanted outline is not
+ * stepped; the far map and the near ground draw the same tiles and the same parts. The lawn's grass
+ * is hidden on every tile paved at all (`mask`'s `any`). A car park's apron is turned to its road
+ * and is drawn by its own outline.
  */
 
 import type { PavedPiece, RoadPlan, WorldStructure } from '../../core/protocol';
-import { fillPoly } from '../../game/footprints';
 import { rasterRoads } from '../../game/roads';
 import { carriageway } from './junctions';
+
+/** An outline on the ground (town metres, x and z). */
+export type Poly = [number, number][];
 
 /** A rectangle on the ground (town metres, x and z its corner). */
 export interface Rect {
@@ -69,10 +73,16 @@ export interface TownPaving {
    */
   mask(w: number, d: number, any?: boolean): Uint8Array;
   /**
-   * What each tile laid by tiles is paved with, over `w` × `d`: `TILE.stone`, `TILE.yard`, else 0
-   * (the pieces laid by their own outlines are not in it). Near and far draw these tiles.
+   * What each tile laid by tiles is paved with, over `w` × `d`, whole or in part: `TILE.stone`,
+   * `TILE.yard`, else 0 (the pieces laid by their own outlines are not in it). Near and far draw
+   * these tiles.
    */
   tiles(w: number, d: number): Uint8Array;
+  /**
+   * The tiles laid in part, along a piece's edge (by index over `w` × `d`): the part of each that
+   * is paved, convex outlines inside the tile (more than one where two pieces' edges meet in it).
+   */
+  parts(w: number, d: number): ReadonlyMap<number, readonly Poly[]>;
 }
 
 /** What `TownPaving.tiles` holds per tile. */
@@ -105,13 +115,16 @@ export const LINE = 0.1;
 const LONE = { w: 3.4, d: 6.2 } as const;
 /** A tile wholly under a road's carriageway is the road's, not paved: its middle this far inside the kerb (half its diagonal). */
 const UNDER_ROAD = Math.SQRT1_2;
+/** A tile's part along an edge smaller than this (m²) is not paved; a corner this near an outline (m) is on it. */
+const SLIVER = 1e-3;
+const ON_EDGE = 1e-6;
 /** How a piece's courses are by kind. */
 const COURSES: Record<PavedPiece['kind'], number> = { centre: COURSE, square: COURSE, court: COURSE, yard: 0 };
 
 /** Each meta's paving, for the lots, bays and car parks it was drawn with. */
 const made = new WeakMap<object, { plots: unknown; parking: unknown; carParks: unknown; paving: TownPaving }>();
 /** Nothing paved: a world without a meta (the build previews, older tests). */
-const NONE: TownPaving = { pieces: [], bays: [], signs: [], mask: (w, d) => new Uint8Array(w * d), tiles: (w, d) => new Uint8Array(w * d) };
+const NONE: TownPaving = { pieces: [], bays: [], signs: [], mask: (w, d) => new Uint8Array(w * d), tiles: (w, d) => new Uint8Array(w * d), parts: () => new Map() };
 
 /** The town's paved ground (see the top of this file), the same object for the same meta, lots, bays and car parks. */
 export function townPaving(world: PavingWorld): TownPaving {
@@ -195,26 +208,33 @@ function drawPaving(world: PavingWorld): TownPaving {
   }
   const signs = parks.map((c) => [c.sign[0], c.sign[1], c.sign[2]] as [number, number, number]);
   const roads = meta.roads ?? [];
-  const tileMemo = new Map<string, Uint8Array>();
+  const tileMemo = new Map<string, ReturnType<typeof layTiles>>();
   const maskMemo = new Map<string, Uint8Array>();
-  const tiles = (w: number, d: number): Uint8Array => {
+  const laidAt = (w: number, d: number) => {
     const key = `${w}x${d}`;
     let out = tileMemo.get(key);
     if (!out) tileMemo.set(key, (out = layTiles(pieces, roads, w, d)));
     return out;
   };
+  const tiles = (w: number, d: number): Uint8Array => laidAt(w, d).codes;
+  const parts = (w: number, d: number): ReadonlyMap<number, readonly Poly[]> => laidAt(w, d).parts;
   const mask = (w: number, d: number, any = false): Uint8Array => {
     const key = `${w}x${d}${any ? '+' : ''}`;
     let out = maskMemo.get(key);
     if (out) return out;
     out = new Uint8Array(w * d);
-    const laid = tiles(w, d);
-    for (let i = 0; i < out.length; i++) if (laid[i]) out[i] = 1;
+    const { codes, parts: cut } = laidAt(w, d);
+    // (A tile laid in part: paved at all with `any`, else where its middle is.)
+    for (let i = 0; i < out.length; i++) {
+      if (!codes[i]) continue;
+      const polys = cut.get(i);
+      if (!polys || any || polys.some((q) => inConvex(q, (i % w) + 0.5, Math.floor(i / w) + 0.5))) out[i] = 1;
+    }
     for (const p of pieces) if (p.edge === 'exact') fillConvex(out, w, d, p.poly, p.holes, any);
     maskMemo.set(key, out);
     return out;
   };
-  return { pieces, bays, signs, mask, tiles };
+  return { pieces, bays, signs, mask, tiles, parts };
 }
 
 /** A bay's frame: a point `u` across it and `v` along the way its car faces (from its middle), as segments and rectangles. */
@@ -246,30 +266,194 @@ export function boxOf(poly: readonly (readonly [number, number])[]): [number, nu
 }
 
 /**
- * The tiles the pieces laid by tiles pave (`TownPaving.tiles`): each piece's tiles less its holes and
- * cuts, stone over yard where two meet, and none wholly under a carriageway (the road is drawn there).
+ * The tiles the pieces laid by tiles pave (`TownPaving.tiles`), and the part of each tile they pave in part
+ * (`TownPaving.parts`): each piece's ground less its holes and cuts, stone over yard where two meet, and none on a tile
+ * wholly under a carriageway (the road is drawn there). A tile is paved whole where its four corners are in the piece;
+ * where some are, it is paved as far as the piece's edge, which runs straight across the tile between where its sides
+ * cross the edge (each side cut where the distance to the outline, signed, comes to nothing): so a slanted outline
+ * is paved along its line, not in steps of a tile, near and far alike. A lot (a hole) is whole tiles, as lots are.
  */
-function layTiles(pieces: readonly PavingDraw[], roads: readonly RoadPlan[], w: number, d: number): Uint8Array {
-  const out = new Uint8Array(w * d);
-  const mine = new Uint8Array(w * d);
+function layTiles(pieces: readonly PavingDraw[], roads: readonly RoadPlan[], w: number, d: number): { codes: Uint8Array; parts: Map<number, Poly[]> } {
+  const codes = new Uint8Array(w * d);
+  const whole = new Uint8Array(w * d);
+  const parts = new Map<number, Poly[]>();
   for (const p of pieces) {
     if (p.edge !== 'tiles') continue;
     const code = p.surface === 'yard' ? TILE.yard : TILE.stone;
-    const marked: number[] = [];
-    fillPoly(p.poly, w, d, (i) => {
-      mine[i] = 1;
-      marked.push(i);
-    });
-    for (const r of p.holes) for (let z = Math.max(0, Math.floor(r.z)); z < Math.min(d, Math.ceil(r.z + r.d)); z++) for (let x = Math.max(0, Math.floor(r.x)); x < Math.min(w, Math.ceil(r.x + r.w)); x++) mine[z * w + x] = 0;
-    for (const c of p.cuts ?? []) fillPoly(c, w, d, (i) => (mine[i] = 0));
-    for (const i of marked) {
-      if (mine[i] && out[i] !== TILE.stone) out[i] = code;
-      mine[i] = 0;
+    const [bx0, bz0, bx1, bz1] = boxOf(p.poly);
+    const [x0, z0] = [Math.max(0, Math.floor(bx0)), Math.max(0, Math.floor(bz0))];
+    const [x1, z1] = [Math.min(w, Math.ceil(bx1)), Math.min(d, Math.ceil(bz1))];
+    if (x1 <= x0 || z1 <= z0) continue;
+    const cuts = p.cuts ?? [];
+    // Which of the tiles' corners are in the piece (and in none of its cuts), row by row.
+    const cw = x1 - x0 + 1;
+    const corner = new Uint8Array(cw * (z1 - z0 + 1));
+    for (let z = z0; z <= z1; z++) {
+      const row = (z - z0) * cw;
+      spans(p.poly, z, x0, x1, (x) => (corner[row + x - x0] = 1));
+      for (const c of cuts) spans(c, z, x0, x1, (x) => (corner[row + x - x0] = 0));
+    }
+    // (The signed distance at a corner, worked out only where a tile's corners differ: in the piece, positive.)
+    const signed = new Map<number, number>();
+    const at = (x: number, z: number) => {
+      const k = (z - z0) * cw + x - x0;
+      let v = signed.get(k);
+      if (v === undefined) {
+        v = edgeDistance(p.poly, x, z);
+        for (const c of cuts) v = Math.min(v, edgeDistance(c, x, z));
+        // (A corner on the outline takes the side its tile's corners were counted on, a hair from it.)
+        v = Math.max(v, ON_EDGE);
+        signed.set(k, (v = corner[k] ? v : -v));
+      }
+      return v;
+    };
+    const holed = (x: number, z: number) => p.holes.some((r) => x + 0.5 >= r.x && x + 0.5 < r.x + r.w && z + 0.5 >= r.z && z + 0.5 < r.z + r.d);
+    for (let z = z0; z < z1; z++) {
+      for (let x = x0; x < x1; x++) {
+        const k = (z - z0) * cw + x - x0;
+        const n = corner[k] + corner[k + 1] + corner[k + cw] + corner[k + cw + 1];
+        const i = z * w + x;
+        if (!n || whole[i] === TILE.stone || (whole[i] && code === TILE.yard) || holed(x, z)) continue;
+        if (n === 4) {
+          whole[i] = codes[i] = code;
+          parts.delete(i);
+          continue;
+        }
+        if (whole[i]) continue;
+        const poly = crossTile(x, z, [at(x, z), at(x + 1, z), at(x + 1, z + 1), at(x, z + 1)]);
+        if (!poly) continue;
+        // (Cut along a tile's own sides, it is whole after all.)
+        if (area(poly) > 1 - SLIVER) {
+          whole[i] = codes[i] = code;
+          parts.delete(i);
+          continue;
+        }
+        const list = parts.get(i);
+        if (!list) parts.set(i, [poly]);
+        else if (!list.some((q) => q.length === poly.length && q.every((c, k) => c[0] === poly[k][0] && c[1] === poly[k][1]))) list.push(poly);
+        if (codes[i] !== TILE.stone) codes[i] = code;
+      }
     }
   }
   if (roads.length) {
     const under = rasterRoads(roads, w, d, (r) => carriageway(r) / 2 - UNDER_ROAD);
-    for (let i = 0; i < out.length; i++) if (under[i]) out[i] = 0;
+    for (let i = 0; i < codes.length; i++) {
+      if (!under[i]) continue;
+      codes[i] = 0;
+      parts.delete(i);
+    }
+  }
+  return { codes, parts };
+}
+
+/**
+ * Calls `each` with every whole `x` from `x0` to `x1` (both in) at which point (`x`, `z`) is inside `poly` (even-odd)
+ * or on its outline.
+ */
+function spans(poly: readonly (readonly [number, number])[], z: number, x0: number, x1: number, each: (x: number) => void): void {
+  const xs: number[] = [];
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [[xi, zi], [xj, zj]] = [poly[i], poly[j]];
+    if (zi > z !== zj > z) xs.push(xi + ((z - zi) * (xj - xi)) / (zj - zi));
+    // (On a side along the row, or at a corner on it: on the outline.)
+    if (zi === z && zj === z) for (let x = Math.max(x0, Math.ceil(Math.min(xi, xj))); x <= Math.min(x1, Math.max(xi, xj)); x++) each(x);
+    else if (zi === z && Number.isInteger(xi) && xi >= x0 && xi <= x1) each(xi);
+  }
+  xs.sort((a, b) => a - b);
+  for (let k = 0; k + 1 < xs.length; k += 2) for (let x = Math.max(x0, Math.ceil(xs[k])); x <= Math.min(x1, xs[k + 1]); x++) each(x);
+}
+
+/** How far (`x`, `z`) is from the nearest side of `poly`. */
+function edgeDistance(poly: readonly (readonly [number, number])[], x: number, z: number): number {
+  let best = Infinity;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [[ax, az], [bx, bz]] = [poly[j], poly[i]];
+    const [ux, uz] = [bx - ax, bz - az];
+    const l = ux * ux + uz * uz;
+    const t = l > 0 ? Math.min(1, Math.max(0, ((x - ax) * ux + (z - az) * uz) / l)) : 0;
+    best = Math.min(best, Math.hypot(x - ax - ux * t, z - az - uz * t));
+  }
+  return best;
+}
+
+/**
+ * The part of tile (`x`, `z`) on the paved side of an edge (its corners' signed distances `v`, round from (`x`, `z`)
+ * along x first, paved where over 0: a corner on the edge is not): its paved corners and where its sides cross the
+ * edge, convex; null if it is a sliver.
+ */
+function crossTile(x: number, z: number, v: readonly number[]): Poly | null {
+  const c: [number, number][] = [[x, z], [x + 1, z], [x + 1, z + 1], [x, z + 1]];
+  const out: Poly = [];
+  for (let k = 0; k < 4; k++) {
+    const [a, b] = [v[k], v[(k + 1) % 4]];
+    if (a > 0) out.push(c[k]);
+    if (a > 0 !== b > 0) {
+      const t = a / (a - b);
+      const [p, q] = [c[k], c[(k + 1) % 4]];
+      const e: [number, number] = [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+      if (!out.length || out[out.length - 1][0] !== e[0] || out[out.length - 1][1] !== e[1]) out.push(e);
+    }
+  }
+  return out.length >= 3 && area(out) > SLIVER ? out : null;
+}
+
+/** The area of outline `poly` (m²). */
+function area(poly: Poly): number {
+  let a = 0;
+  for (let k = 0; k < poly.length; k++) a += poly[k][0] * poly[(k + 1) % poly.length][1] - poly[(k + 1) % poly.length][0] * poly[k][1];
+  return Math.abs(a) / 2;
+}
+
+/** `poly` (convex) less what lies on the right of the line from `a` to `b` (seen from above, x right and z down). */
+export function clipBy(poly: readonly (readonly [number, number])[], a: readonly [number, number], b: readonly [number, number]): Poly {
+  const side = (p: readonly [number, number]) => (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+  const out: Poly = [];
+  for (let k = 0; k < poly.length; k++) {
+    const [p, q] = [poly[k], poly[(k + 1) % poly.length]];
+    const [sp, sq] = [side(p), side(q)];
+    if (sp >= 0) out.push([p[0], p[1]]);
+    if (sp >= 0 !== sq >= 0) {
+      const t = sp / (sp - sq);
+      out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]);
+    }
+  }
+  return out;
+}
+
+/** `poly` (convex) inside the rectangle `x0`..`x1` by `z0`..`z1` (fewer than three corners: none of it is). */
+export function clipRect(poly: readonly (readonly [number, number])[], x0: number, z0: number, x1: number, z1: number): Poly {
+  const c: [number, number][] = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+  let out: Poly = poly.map(([x, z]) => [x, z]);
+  for (let k = 0; k < 4 && out.length >= 3; k++) out = clipBy(out, c[k], c[(k + 1) % 4]);
+  return out;
+}
+
+/** Where a side from `a` to `b` is cut: its ends, and each joint's two edges between them (`course` m apart; 0: none). */
+function stops(a: number, b: number, course: number): number[] {
+  const out = [a];
+  if (course) {
+    for (let k = Math.ceil((a - JOINT / 2) / course); k * course - JOINT / 2 < b; k++) {
+      for (const e of [k * course - JOINT / 2, k * course + JOINT / 2]) if (e > a + 1e-6 && e < b - 1e-6) out.push(e);
+    }
+  }
+  out.push(b);
+  return out;
+}
+
+/** Whether `v` is in a joint between two courses `course` m apart. */
+const inJoint = (v: number, course: number) => course > 0 && Math.abs(v - Math.round(v / course) * course) < JOINT / 2;
+
+/**
+ * A stretch of paving (`x0`..`x1` by `z0`..`z1`) cut at its joints (`course` m apart; 0: none): each cell
+ * (x0, z0, x1, z1) and whether it is in a joint. The near ground lays these and the far map paints them.
+ */
+export function courseCells(x0: number, z0: number, x1: number, z1: number, course: number): { cell: [number, number, number, number]; joint: boolean }[] {
+  const [xs, zs] = [stops(x0, x1, course), stops(z0, z1, course)];
+  const out: { cell: [number, number, number, number]; joint: boolean }[] = [];
+  for (let j = 0; j + 1 < zs.length; j++) {
+    for (let i = 0; i + 1 < xs.length; i++) {
+      out.push({ cell: [xs[i], zs[j], xs[i + 1], zs[j + 1]], joint: inJoint((xs[i] + xs[i + 1]) / 2, course) || inJoint((zs[j] + zs[j + 1]) / 2, course) });
+    }
   }
   return out;
 }

@@ -157,6 +157,39 @@ describe('the town’s paving (`townPaving`)', () => {
     expect(q.mask(W, STOREY)[20 * W + 30]).toBe(1);
   });
 
+  test('a slanted outline is paved along its line, not in steps of a tile: its edge tiles in part, cut where it runs', () => {
+    const t = realTown();
+    // (A centre whose west side runs slantwise from (26, 8) to (30, 15), clear of the lot, the square, the car park and
+    // the road.)
+    const poly: [number, number][] = [[26, 2], [39, 2], [39, 15], [30, 15], [26, 8]];
+    t.meta!.paving = [...t.meta!.paving!, { kind: 'centre', poly }];
+    const p = townPaving(t);
+    const [tiles, parts] = [p.tiles(W, STOREY), p.parts(W, STOREY)];
+    const area = (q: readonly (readonly [number, number])[]) => Math.abs(q.reduce((a, c, k) => a + c[0] * q[(k + 1) % q.length][1] - q[(k + 1) % q.length][0] * c[1], 0)) / 2;
+    // The tiles the line crosses are laid in part, and each part's corners off its tile's are on the line.
+    const off = (x: number, z: number) => Math.abs((x - 26) * 7 - (z - 8) * 4) / Math.hypot(7, 4);
+    let cut = 0;
+    for (let z = 8; z < 15; z++) {
+      // Row by row, as much is paved west of x 31 as the outline holds there (to within a few hundredths of a m²).
+      let paved = 0;
+      for (let x = 24; x < 31; x++) {
+        const i = z * W + x;
+        if (!tiles[i]) continue;
+        const q = parts.get(i);
+        paved += q ? area(q[0]) : 1;
+        if (!q) continue;
+        cut++;
+        for (const [px, pz] of q[0]) if (!((px === x || px === x + 1) && (pz === z || pz === z + 1))) expect(off(px, pz)).toBeLessThan(1e-6);
+        // The lawn's mask: a tile paved at all (`any`); without, one whose middle is.
+        expect(p.mask(W, STOREY, true)[i]).toBe(1);
+        expect(p.mask(W, STOREY)[i]).toBe((x + 0.5 - 26) * 7 - (z + 0.5 - 8) * 4 > 0 ? 1 : 0);
+      }
+      const x0 = 26 + ((z + 0.5 - 8) * 4) / 7;
+      expect(Math.abs(paved - (31 - x0))).toBeLessThan(0.02);
+    }
+    expect(cut).toBeGreaterThanOrEqual(7);
+  });
+
   test('bays: their lines, one between two side by side, the P sign; a lone bay its own apron', () => {
     const t = realTown();
     const p = townPaving(t);

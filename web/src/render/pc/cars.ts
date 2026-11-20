@@ -27,7 +27,7 @@ import { LIFT, rollWheels, Vehicles } from './vehicles';
 import type { FrameState } from '../../core/bridge';
 import type { Seat } from '../shared/characters/seats';
 import type { WorldStructure } from '../../core/protocol';
-import { CARS, CAR_PAINT, TAXI_PAINT, carAge, carDoor, carriedAlong, carRowIsTaxi, DOORS, inCar, paintCar, paintDoor, paintTaxi, paintTaxiDoor, TAXI_BODY, wheelAt, type CarAge, type CarBody, type CarPose } from '../shared/cars';
+import { CARS, CAR_PAINT, TAXI_PAINT, carAge, carDoor, carriedAlong, carRowIsTaxi, DOOR_OPEN, DOORS, doorSwing, inCar, paintCar, paintDoor, paintTaxi, paintTaxiDoor, TAXI_BODY, wheelAt, type CarAge, type CarAt, type CarBody, type CarPose } from '../shared/cars';
 import { lerpAngle } from '../shared/characters/rig';
 import { DOOR_SWING, ease } from '../shared/doors';
 import { Geo } from '../shared/geometry';
@@ -35,12 +35,6 @@ import { playbackRate } from '../shared/gameSpeed';
 import { compose, quatYawPitchRoll } from '../shared/math';
 import { Painter } from '../shared/street';
 import { tuned } from '../tune';
-
-/**
- * How wide a door opens (degrees). It swings as a house's door does, `DOOR_SWING` s of the sim's real time (9 ticks
- * at 20 a second), which getting in and out leave it (sim-core `cars::DOOR_OPENS`, 0.5 s).
- */
-const DOOR_OPEN = 62;
 
 /** A car's seat (sim-core `Car::seat_at`): lower than a chair's, so a grown-up's head stays under the roof. */
 const CAR_SEAT: Seat = { h: 0.3, fwd: 0 };
@@ -98,9 +92,14 @@ interface Drawn {
   snap: { x: number; z: number; yaw: number; driving: boolean };
   /** Where it was drawn the frame before (`update`): its shadow in the sun's map was cast from there. */
   castFrom: { x: number; z: number };
-  /** How far open each door is (0..1), which way each opens (+1 or -1), and whether any is open at all. */
+  /**
+   * How far open each door is (0..1), which way each opens (+1 or -1), how wide it opens (degrees: `doorSwing`, part
+   * way between two cars in a row of bays), and whether any is open at all. A door swings as a house's does,
+   * `DOOR_SWING` s of the sim's real time, which getting in and out leave it (sim-core `cars::DOOR_OPENS`, 0.5 s).
+   */
   open: number[];
   sides: number[];
+  swing: number[];
   ajar: boolean;
   /** Its own entity, made the first time it drives or opens a door (null till then). */
   own: Own | null;
@@ -203,6 +202,8 @@ export class Cars extends Vehicles {
         let ajar = false;
         for (let d = 0; d < DOORS; d++) {
           const target = open & (1 << d) ? 1 : 0;
+          // (How wide it opens, from the cars beside it as it starts to.)
+          if (target && car.open[d] === 0) car.swing[d] = doorSwing(car.shape, d, placeOf(car), this.cars.filter((c) => c !== car && c.at.shown).map(placeOf));
           if (car.open[d] !== target) {
             car.open[d] = target > car.open[d] ? Math.min(1, car.open[d] + step) : Math.max(0, car.open[d] - step);
             changed = true;
@@ -450,7 +451,7 @@ export class Cars extends Vehicles {
     // (Nose up: turned back about x.)
     own.tilt.setLocalEulerAngles((-(car.pitch + stand.pitch) * 180) / Math.PI, 0, 0);
     // The rear edge swings out (`paintDoor`).
-    for (let d = 0; d < DOORS; d++) own.doors[d].setLocalEulerAngles(0, -car.sides[d] * DOOR_OPEN * ease(car.open[d]), 0);
+    for (let d = 0; d < DOORS; d++) own.doors[d].setLocalEulerAngles(0, -car.sides[d] * car.swing[d] * ease(car.open[d]), 0);
     const shut = !car.ajar;
     if (own.whole.enabled !== shut) {
       own.whole.enabled = shut;
@@ -527,6 +528,11 @@ export class Cars extends Vehicles {
 
 }
 
+/** Where `car` stands now and its body's size (`doorSwing`'s `CarAt`). */
+function placeOf(car: Drawn): CarAt {
+  return { x: car.at.x, z: car.at.z, yaw: car.at.yaw, len: car.shape.len, wid: car.shape.wid };
+}
+
 /** A car to draw: row `row` of the snapshot's cars, a household's (`body`, `paint`, `age`) or a work taxi, where it first stands. */
 function drawnCar(row: number, taxi: boolean, body: number, paint: number, age: CarAge, x: number, z: number, yaw: number): Drawn {
   const shape = CARS[body];
@@ -544,6 +550,7 @@ function drawnCar(row: number, taxi: boolean, body: number, paint: number, age: 
     castFrom: { x, z },
     open: new Array<number>(DOORS).fill(0),
     sides: Array.from({ length: DOORS }, (_, d) => carDoor(shape, d).side),
+    swing: new Array<number>(DOORS).fill(DOOR_OPEN),
     ajar: false,
     own: null,
     drawn: false,

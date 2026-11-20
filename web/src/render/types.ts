@@ -627,8 +627,10 @@ export interface Renderer {
   setStorey(storey: number): void;
   /**
    * Which flats of the building in view may be shown open (`game/openLots.ts` `mayOpen`, asked of each flat's plot
-   * id); null: every one. A flat that may not keeps a lid over it on the storey in view, and its things, its food and
-   * the residents in it are not drawn. Asked again a few times a second (someone of yours going in opens it).
+   * id), and whether a place with flats over it may show its own ground floor (asked of the place's lot: by the lot
+   * alone, not by its flats); null: every one. A part that may not keeps a lid over it, and its things, its food and
+   * the residents in it are not drawn (a place's flats' stair hall is theirs, never lidded). Asked again a few times a
+   * second (someone of yours going in opens it).
    */
   setFlatsOpen(mayOpen: ((plot: number) => boolean) | null): void;
   /** Build/buy mode: plays a placement, upgrade, sale or construction effect (after `setWorld` showed the change). */

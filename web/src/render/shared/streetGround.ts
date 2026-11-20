@@ -1,7 +1,8 @@
 /**
  * The town's paved ground near, as the street's chunks draw it (`street.ts` `TownStreet.chunk`):
  * for each stream chunk, the tiles `townPaving` paves, in cells of 2 m or less draped over the
- * ground, the stone's courses as joints between them; the car parks' aprons, their bays' lines just
+ * ground (a tile along a piece's edge only as far as the edge, `TownPaving.parts`), the stone's
+ * courses as joints between them; the car parks' aprons, their bays' lines just
  * over the asphalt, and a P sign by each car park. The viewed lot draws what is paved on it itself
  * (`pavingLayers`, `pc/PlayCanvasRenderer.ts`), as it does its paths; the menus' town draws the whole
  * town's at once (`pc/overview.ts`). `streetGroundKey` says what a chunk's share is drawn from, so a
@@ -20,7 +21,7 @@ import type { BuiltSurface } from './builtSurface';
 import { Geo, type V3 } from './geometry';
 import { lotsFilled } from './nature';
 import type { ChunkPlan, GroundLayer } from './street';
-import { COURSE, JOINT, LINE, PAVING_LOOK, TILE, townPaving, type Rect, type TownPaving } from './townPaving';
+import { clipBy, clipRect, COURSE, courseCells, LINE, PAVING_LOOK, TILE, townPaving, type Poly, type Rect, type TownPaving } from './townPaving';
 
 /** What the near paving reads (as `townPaving.ts` `PavingWorld`), and the world's size. */
 export type StreetGroundWorld = Pick<WorldStructure, 'plots' | 'meta' | 'parking' | 'carParks' | 'width' | 'depth' | 'storeyDepth'>;
@@ -118,22 +119,6 @@ function terrainOf(surface: BuiltSurface, plots: number): Terrain {
   return terrain;
 }
 
-/** `poly` (convex) less what lies on the right of the line from `a` to `b` (seen from above, x right and z down). */
-function clipBy(poly: [number, number][], a: readonly [number, number], b: readonly [number, number]): [number, number][] {
-  const side = (p: readonly [number, number]) => (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
-  const out: [number, number][] = [];
-  for (let k = 0; k < poly.length; k++) {
-    const [p, q] = [poly[k], poly[(k + 1) % poly.length]];
-    const [sp, sq] = [side(p), side(q)];
-    if (sp >= 0) out.push(p);
-    if ((sp >= 0) !== (sq >= 0)) {
-      const t = sp / (sp - sq);
-      out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]);
-    }
-  }
-  return out;
-}
-
 /**
  * A flat convex piece (`poly`) of the paving into `g`, `y` over the ground, its vertices coloured by `tint`: on
  * the ground as drawn (`terrain`), cut into the parts in each of its triangles; on a flat town, as it is.
@@ -171,6 +156,7 @@ export function pavingLayers(world: StreetGroundWorld, area: Rect | null, option
   const paving = townPaving(world);
   const [w, d] = groundOf(world);
   const tiles = paving.tiles(w, d);
+  const parts = paving.parts(w, d);
   const { skip } = options;
   const terrain = options.surface ? terrainOf(options.surface, world.plots.length) : null;
   const a = area ?? { x: 0, z: 0, w, d };
@@ -180,13 +166,15 @@ export function pavingLayers(world: StreetGroundWorld, area: Rect | null, option
   const cell = (x: number, z: number, s: number, t: number, c: number) => {
     let g = geos.get(c);
     if (!g) geos.set(c, (g = new Geo()));
-    layCell(g, x, z, s, t, c, terrain);
+    // (A tile laid in part: the part of it paved, `TownPaving.parts`.)
+    layCell(g, x, z, s, t, c, terrain, s === 1 ? parts.get(z * w + x) : undefined);
   };
-  // In 2 m cells where all four of its tiles are paved alike, else a tile at a time.
+  // In 2 m cells where all four of its tiles are paved alike and whole, else a tile at a time.
+  const whole = (x: number, z: number) => !parts.has(z * w + x);
   for (let z = z0 - (z0 & 1); z < z1; z += CELL) {
     for (let x = x0 - (x0 & 1); x < x1; x += CELL) {
       const cs = [code(x, z), code(x + 1, z), code(x, z + 1), code(x + 1, z + 1)];
-      if (cs[0] && cs.every((c) => c === cs[0])) cell(x, z, 2, 2, cs[0]);
+      if (cs[0] && cs.every((c) => c === cs[0]) && whole(x, z) && whole(x + 1, z) && whole(x, z + 1) && whole(x + 1, z + 1)) cell(x, z, 2, 2, cs[0]);
       else cs.forEach((c, k) => c && cell(x + (k & 1), z + (k >> 1), 1, 1, c));
     }
   }
@@ -224,33 +212,17 @@ function middle(poly: readonly (readonly [number, number])[]): [number, number] 
   return [poly.reduce((s, p) => s + p[0], 0) / poly.length, poly.reduce((s, p) => s + p[1], 0) / poly.length];
 }
 
-/** Where a side from `a` to `b` is cut: its ends, and each joint's two edges between them (`course` m apart; 0: none). */
-function stops(a: number, b: number, course: number): number[] {
-  const out = [a];
-  if (course) {
-    for (let k = Math.ceil((a - JOINT / 2) / course); k * course - JOINT / 2 < b; k++) {
-      for (const e of [k * course - JOINT / 2, k * course + JOINT / 2]) if (e > a + 1e-6 && e < b - 1e-6) out.push(e);
-    }
-  }
-  out.push(b);
-  return out;
-}
-
-/** Whether `v` is in a joint between two courses `course` m apart. */
-const inJoint = (v: number, course: number) => course > 0 && Math.abs(v - Math.round(v / course) * course) < JOINT / 2;
-
-/** A paved cell (`s` × `t` m from (`x`, `z`)) of tiles paved with `c` into `g`: the stone cut at its joints, each part toned. */
-function layCell(g: Geo, x: number, z: number, s: number, t: number, c: number, terrain: Terrain | null): void {
+/**
+ * A paved cell (`s` × `t` m from (`x`, `z`)) of tiles paved with `c` into `g`: the stone cut at its joints, each part
+ * toned; a tile laid in part (`part`), only that part of it.
+ */
+function layCell(g: Geo, x: number, z: number, s: number, t: number, c: number, terrain: Terrain | null, part?: readonly Poly[]): void {
   const L = LAYERS[c as keyof typeof LAYERS];
-  const course = c === TILE.stone ? COURSE : 0;
-  const [xs, zs] = [stops(x, x + s, course), stops(z, z + t, course)];
-  for (let j = 0; j + 1 < zs.length; j++) {
-    for (let i = 0; i + 1 < xs.length; i++) {
-      const joint = inJoint((xs[i] + xs[i + 1]) / 2, course) || inJoint((zs[j] + zs[j + 1]) / 2, course);
-      const colour = joint ? PAVING_LOOK.joint : L.colour;
-      const tint = (u: number, v: number) => toned(colour, L.surface, 1 + (valueNoise(u / 2.3, v / 2.3, 977) - 0.5) * 2 * VARY);
-      lay(g, [[xs[i], zs[j]], [xs[i + 1], zs[j]], [xs[i + 1], zs[j + 1]], [xs[i], zs[j + 1]]], PAVING_Y, tint, terrain);
-    }
+  for (const { cell: [a0, b0, a1, b1], joint } of courseCells(x, z, x + s, z + t, c === TILE.stone ? COURSE : 0)) {
+    const colour = joint ? PAVING_LOOK.joint : L.colour;
+    const tint = (u: number, v: number) => toned(colour, L.surface, 1 + (valueNoise(u / 2.3, v / 2.3, 977) - 0.5) * 2 * VARY);
+    if (!part) lay(g, [[a0, b0], [a1, b0], [a1, b1], [a0, b1]], PAVING_Y, tint, terrain);
+    else for (const q of part) lay(g, clipRect(q, a0, b0, a1, b1), PAVING_Y, tint, terrain);
   }
 }
 
@@ -292,6 +264,7 @@ export function streetGroundKey(world: StreetGroundWorld, id: number, focus = -1
   if (key === undefined) {
     const [w, d] = groundOf(world);
     const tiles = paving.tiles(w, d);
+    const parts = paving.parts(w, d);
     const r = chunkRect(id);
     const codes: number[] = [];
     let any = false;
@@ -300,6 +273,8 @@ export function streetGroundKey(world: StreetGroundWorld, id: number, focus = -1
         const c = tiles[z * w + x];
         codes.push(c);
         any ||= c > 0;
+        // (A tile laid in part: where its edge runs.)
+        for (const q of parts.get(z * w + x) ?? []) codes.push(-1, ...q.flat());
       }
     }
     const mine = (p: readonly (readonly [number, number])[]) => chunkAt(...middle(p)) === id;
