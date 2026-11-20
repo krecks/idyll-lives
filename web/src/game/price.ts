@@ -20,6 +20,8 @@ export interface PriceParts {
 }
 
 type Rates = NonNullable<Economy['homePrice']>;
+/** What `landAndBuilt` and `roundPrice` read of the rates (the views' homes for sale have no furniture rate). */
+type LandRates = Pick<Rates, 'perTile' | 'perFloorTile' | 'round' | 'sizeRef' | 'sizePremium'>;
 type Floor = { walls: Wall[]; objects: HouseTemplate['objects']; rooms?: HouseTemplate['rooms'] };
 
 /**
@@ -59,18 +61,36 @@ export const FLAT_FLOOR = 0.25;
 export function flatPriceOf(objectPrice: (def: string) => number, rates: Rates | undefined, b: FlatsTemplate, unit: number): PriceParts {
   const flat = b.units[unit];
   if (!rates || !flat) return { land: 0, house: 0, furniture: 0, total: 0 };
-  return partsOf(objectPrice, rates, (b.lot.width * b.lot.depth) / (b.units.length + (b.place ? 1 : 0)), [flat.layout], FLAT_FLOOR);
+  return partsOf(objectPrice, rates, flatLandShare(b.lot.width * b.lot.depth, b.units.length, !!b.place), [flat.layout], FLAT_FLOOR);
+}
+
+/** A flat's share of its building's lot (`lotTiles`): the lot shared evenly by its `flats`, and the place under them if they are over one. */
+export function flatLandShare(lotTiles: number, flats: number, overPlace: boolean): number {
+  return lotTiles / (flats + (overPlace ? 1 : 0));
+}
+
+/**
+ * The land (`tiles` of it) and the house (`floor` tiles of floor, `share` of a house's rate a tile) at `rates`, not
+ * rounded. A bigger house costs more a tile of floor too (a villa isn't a cottage three times over): `sizePremium`
+ * against `sizeRef` tiles.
+ */
+export function landAndBuilt(rates: LandRates, tiles: number, floor: number, share: number): { land: number; built: number } {
+  return { land: rates.perTile * tiles, built: share * rates.perFloorTile * floor * (floor / (rates.sizeRef ?? 100)) ** (rates.sizePremium ?? 0) };
+}
+
+/** A price rounded to the rates' step (`round`). */
+export function roundPrice(rates: Pick<Rates, 'round'>, price: number): number {
+  const step = Math.max(1, rates.round);
+  return Math.round(price / step) * step;
 }
 
 /** The land (`tiles` of it), the floor of `floors` (`share` of a house's a tile) and what's in them, priced at `rates`. */
 function partsOf(objectPrice: (def: string) => number, rates: Rates, tiles: number, floors: Floor[], share: number): PriceParts {
-  const land = Math.round(rates.perTile * tiles);
-  // A bigger house costs more a tile of floor too (a villa isn't a cottage three times over): `sizePremium` against `sizeRef` tiles.
-  const floor = floors.reduce((n, f) => n + floorTiles(f), 0);
-  const built = Math.round(share * rates.perFloorTile * floor * (floor / (rates.sizeRef ?? 100)) ** (rates.sizePremium ?? 0));
+  const parts = landAndBuilt(rates, tiles, floors.reduce((n, f) => n + floorTiles(f), 0), share);
+  const land = Math.round(parts.land);
+  const built = Math.round(parts.built);
   const furniture = Math.round(rates.furniture * floors.reduce((n, f) => n + f.objects.reduce((m, o) => m + objectPrice(o.def), 0), 0));
-  const step = Math.max(1, rates.round);
-  return { land, house: built, furniture, total: Math.round((land + built + furniture) / step) * step };
+  return { land, house: built, furniture, total: roundPrice(rates, land + built + furniture) };
 }
 
 /**
