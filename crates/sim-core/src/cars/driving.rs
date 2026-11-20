@@ -2548,16 +2548,15 @@ pub(crate) fn mouth_behind(
             s -= 1.0;
         }
         let Some(back) = back else { continue };
-        // (Every pose of it, backing in and pulling out, clear of the others.)
+        // (Every pose of it, backing in and pulling out, clear of the others: the first too, the
+        // deepest in the mouth. Its pose a step out was clear of a car parked up the driveway, the
+        // pose it backed in to wasn't, and it waited behind that car for good, Station Cross.)
         let poses = |pts: &[([f32; 2], bool, f32)]| {
             pts.windows(2).all(|k| {
                 let (a, b) = (k[0].0, k[1].0);
-                let r = Rect {
-                    at: b,
-                    yaw: (b[0] - a[0]).atan2(b[1] - a[1]),
-                    half,
-                };
-                crate::travel::dist(a, b) < 1e-3 || clear(&r)
+                let yaw = (b[0] - a[0]).atan2(b[1] - a[1]);
+                crate::travel::dist(a, b) < 1e-3
+                    || [a, b].into_iter().all(|at| clear(&Rect { at, yaw, half }))
             })
         };
         if poses(&into.pts) && poses(&out.pts) {
