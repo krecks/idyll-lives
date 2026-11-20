@@ -231,6 +231,48 @@
       "sha256": "a87d5b2f19c2279d0169afe94e9e1d2ad9636ac22ed9db73b081fc635de82d92",
       "by": "integrate-cleanup",
       "reason": "code cleanup integrated with the real town"
+    },
+    {
+      "name": "sim-cooking-cook",
+      "file": "crates/sim-core/src/cooking/cook.rs",
+      "sha256": "ef21fb980debd36cd67e3e7453d0bcd75049dfd4a3a55d62c5cac0fdd4f3e18b",
+      "by": "integrate-cleanup",
+      "reason": "behavior-preserving split of cooking.rs into cooking/ submodules: each part pinned, as planner's, lifecycle's and social's are"
+    },
+    {
+      "name": "sim-cooking-dishes",
+      "file": "crates/sim-core/src/cooking/dishes.rs",
+      "sha256": "d6e4697bb05fdfe07afea70ed4240005c5333fc6b107cab7df6560b0b8b23fe9",
+      "by": "integrate-cleanup",
+      "reason": "behavior-preserving split of cooking.rs into cooking/ submodules: each part pinned, as planner's, lifecycle's and social's are"
+    },
+    {
+      "name": "sim-cooking-eat",
+      "file": "crates/sim-core/src/cooking/eat.rs",
+      "sha256": "93e8b7d3d26abf80a618fbc9db582f24d675e28c39032ee62698865f2a18ffb0",
+      "by": "integrate-cleanup",
+      "reason": "behavior-preserving split of cooking.rs into cooking/ submodules: each part pinned, as planner's, lifecycle's and social's are"
+    },
+    {
+      "name": "sim-cooking-household",
+      "file": "crates/sim-core/src/cooking/household.rs",
+      "sha256": "070a61520b2e580bccd7cfeed66651774de15427a0e9964e0406114b4b0a6174",
+      "by": "integrate-cleanup",
+      "reason": "behavior-preserving split of cooking.rs into cooking/ submodules: each part pinned, as planner's, lifecycle's and social's are"
+    },
+    {
+      "name": "sim-cooking-serve",
+      "file": "crates/sim-core/src/cooking/serve.rs",
+      "sha256": "c06a721e3ad75f3b9276cd1dc4869d4c0614d0f11b170cf8f3f81a182498dcc5",
+      "by": "integrate-cleanup",
+      "reason": "behavior-preserving split of cooking.rs into cooking/ submodules: each part pinned, as planner's, lifecycle's and social's are"
+    },
+    {
+      "name": "sim-cooking-step",
+      "file": "crates/sim-core/src/cooking/step.rs",
+      "sha256": "ae51cb6024c1d6bb4a4f3dc4548f7de78f700d6d99f4cd888e547a1b9b165e35",
+      "by": "integrate-cleanup",
+      "reason": "behavior-preserving split of cooking.rs into cooking/ submodules: each part pinned, as planner's, lifecycle's and social's are"
     }
   ]
 }
