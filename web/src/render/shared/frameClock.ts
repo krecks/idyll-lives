@@ -6,6 +6,8 @@
  * frame takes) stays the wall clock's.
  */
 
+import { mulberry32 } from '../../game/noise';
+
 let fixed: number | null = null;
 /** The latest time the clock has been fixed at (fixed-step playback runs ahead of the wall clock). */
 let latest = 0;
@@ -30,22 +32,18 @@ export function fixedStart(): number {
   return Math.ceil(Math.max(performance.now(), latest)) + 1000;
 }
 
-/** Fixed-step playback's dice (`restartDice`; a mulberry32 stream), or none: `Math.random`. */
-let dice: number | null = null;
+/** Fixed-step playback's dice (`restartDice`), or none: `Math.random`. */
+let dice: (() => number) | null = null;
 
 /**
  * Dice for what the eye alone sees (a bird's glance, its hop): `Math.random`, or in fixed-step playback a stream that
  * starts again with it (`restartDice`), so the same frames draw the same birds.
  */
 export function frameRandom(): number {
-  if (dice === null) return Math.random();
-  dice = (dice + 0x6d2b79f5) >>> 0;
-  let t = Math.imul(dice ^ (dice >>> 15), 1 | dice);
-  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  return dice ? dice() : Math.random();
 }
 
 /** Fixed-step playback: its dice from the start (`on`), or `Math.random` again. */
 export function restartDice(on: boolean): void {
-  dice = on ? 1 : null;
+  dice = on ? mulberry32(1) : null;
 }
