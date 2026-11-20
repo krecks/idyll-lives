@@ -9,7 +9,7 @@ import { fbm, hash, mulberry32, ridged, smoothstep, valueNoise } from '../../gam
 import { tuned } from '../tune';
 import { shareAt, ZONE_CELL, ZoneField, type ZoneKind } from './zones';
 
-export { RING, landscapeRing, APRON, BIG_WOODS_CELL, BIG_FLOWERS_CELL, GROUND_TILE, lotsFilled, LAND_BLOCK, WATER_Y, SPLIT_TRIANGLES, type PlantPlacement, smoothMin, type Woods, type LawnPlacement, type LawnLayer, type LawnMask, type LawnInputs, splitHalf, bareTiles, keepBareTiles, unlawned, lawnMask, lawnInputs, sameLawnInputs, hideLawn, lawnLayer, groupInstances } from './natureShared';
+export { RING, landscapeRing, APRON, GROUND_TILE, lotsFilled, LAND_BLOCK, WATER_Y, SPLIT_TRIANGLES, type PlantPlacement, type Woods, type LawnPlacement, type LawnLayer, type LawnMask, type LawnInputs, splitHalf, bareTiles, keepBareTiles, unlawned, lawnMask, lawnInputs, sameLawnInputs, hideLawn, lawnLayer, groupInstances } from './natureShared';
 import { RING, landscapeRing, APRON, BUILT_CELL, BIG_WOODS_CELL, BIG_FLOWERS_CELL, ORCHARD_ROWS, ORCHARD_STEP, BIG_HILLS, TERRAIN_STEP, TERRAIN_SEGMENTS, SHADOW_RANGE, LAND_EDGE_FADE, END_BANK, END_REACH, PAD_CELL, between, lotsFilled, LAND_PEAKS, LAND_BLOCK, BLOCK_GRID, COVER_ZONES, TREELINE, ROCK_SNOW, RELIEF_ROCK_SNOW, RELIEF_TREELINE, RELIEF_BLEND, RELIEF_SLOPE, EDGE_MOUNTAINS, TUFT_DRAWS, LAWN_CLEAR, WATER_Y, ROUND_IN, BLEND_IN, SHORE_RISE, BANK_TOP, RELAY_REACH, BEACH, FOREST_SECTORS, smoothMin, lerp, terrainPalette, placed, scatter, unlawned, TAKEN_BLOCK, canonicalJson, sameRoad } from './natureShared';
 import type { PlantPlacement, Rgb, TerrainPalette, Woods, LawnPlacement } from './natureShared';
 

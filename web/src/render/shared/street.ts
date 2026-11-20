@@ -20,7 +20,7 @@ import type { BuiltSurface } from './builtSurface';
 import { dressBuilding } from './buildingDress';
 import { farBuilding, lotLookBuilding, type TownBuilding } from './townBuildings';
 
-export { type Rect, KERBSIDE_REACH, RANK_APART, RANK_HALF, RANK_GAP, FOLIAGE, type FoliageKind, type Inst, type ObjectLook } from './streetShared';
+export { type Rect, RANK_APART, RANK_HALF, RANK_GAP, FOLIAGE, type FoliageKind, type Inst, type ObjectLook } from './streetShared';
 import { encodeFinish, DRIVEWAY_MIN_WIDTH, KERBSIDE_REACH, CAR_SWING, RANK_APART, RANK_OBJECT, RANK_OUT, RANK_BACK, RANK_HALF, RANK_GAP, RANK_SPAN, T, MAILBOX, BIN, FOLIAGE, PROP, AWNINGS, overlaps, localRect, townRect, townPoint, townYaw, townBox } from './streetShared';
 import type { Rect, FoliageKind, Inst, ObjectLook } from './streetShared';
 

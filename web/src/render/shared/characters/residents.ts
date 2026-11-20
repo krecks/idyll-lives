@@ -93,7 +93,6 @@ export { PLAYBACK_RATE, SUPER_SPEED } from '../gameSpeed';
 import { CURL, CURL_QUILT, FAR_EVERY, FAR_LAG, GROUND_EASE, GROUND_STEP, REVEAL_MS, RISE_CATCH_UP, STATION_ALONG_MAX, STATION_ALONG_SHARED, STATION_REACH, STATION_STEP_MAX, TOOL_END_MARGIN, UPPER_FADE_RATE, type CarRide, type ParkedAt } from './residentsSetup';
 
 export { REVEAL_MS } from './residentsSetup';
-export type { CarRide, ParkedAt } from './residentsSetup';
 
 export { MAX_CHARACTERS } from './rig';
 export { EXPRESSIONS, FRIENDLY, STANCE, type StageDirection } from './expressions';
