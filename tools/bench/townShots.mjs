@@ -112,7 +112,7 @@ async function frameShot({ which, shot, home = null }) {
 
 /**
  * In the page: the picture ready, instead of a fixed wait: the camera's glide over (`menuScene.settled`), the town's
- * model files and textures there, and three frames drawn. Each wait's time is logged (`__settleMs`).
+ * model files and textures there, three animation frames and at least 1200 ms (the longer fixed waits, up to 3 s, went).
  */
 async function settleShot() {
   const t = [performance.now()];
@@ -122,7 +122,10 @@ async function settleShot() {
   const renderer = await host.rendererNow(settings);
   await renderer.texturesReady();
   t.push(performance.now());
-  await renderer.framesRendered(3);
+  // (Animation frames, not the renderer's: the menus' town holds its picture while nothing in it moves, and draws none.)
+  for (let k = 0; k < 3; k++) await new Promise((resolve) => requestAnimationFrame(resolve));
+  // At least 1200 ms in all, as the shots always waited: a frame drawn just after a cut is softer for about a second.
+  await new Promise((resolve) => setTimeout(resolve, Math.max(0, t[0] + 1200 - performance.now())));
   t.push(performance.now());
   return t.slice(1).map((x, i) => Math.round(x - t[i]));
 }
