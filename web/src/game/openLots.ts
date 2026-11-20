@@ -29,6 +29,24 @@ export interface OpenLots {
 export function mayOpen(plot: number, s: OpenLots): boolean {
   if (plot === s.home || plot === s.lookInside) return true;
   for (const sim of s.sims) if (sim.plot === plot && sim.awayUntil === null && s.mine.has(sim.id)) return true;
-  for (const f of s.flats ?? []) if (f.of === plot && mayOpen(f.id, s)) return true;
+  if (s.flats) for (const f of flatsIn(s.flats, plot)) if (mayOpen(f, s)) return true;
   return false;
+}
+
+/** Each town's flats (`OpenLots.flats`) by the building they are in. */
+const buildings = new WeakMap<readonly Pick<FlatInfo, 'id' | 'of'>[], Map<number, number[]>>();
+
+/** The flats (their plot ids) of building `lot` among `flats`. */
+function flatsIn(flats: readonly Pick<FlatInfo, 'id' | 'of'>[], lot: number): readonly number[] {
+  let by = buildings.get(flats);
+  if (!by) {
+    by = new Map();
+    for (const f of flats) {
+      const list = by.get(f.of);
+      if (list) list.push(f.id);
+      else by.set(f.of, [f.id]);
+    }
+    buildings.set(flats, by);
+  }
+  return by.get(lot) ?? [];
 }
