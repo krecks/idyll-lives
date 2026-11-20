@@ -23,7 +23,7 @@
  * in the main town.
  */
 
-import type { BackdropBuilding, CarPark, LandFile, ParkingBay, RoadPlan, TownPlace } from '../core/protocol';
+import type { CarPark, LandFile, ParkingBay, RoadPlan, TownPlace } from '../core/protocol';
 import { centreDensity } from './centre';
 import { fillPoly, overlaps } from './footprints';
 import { AREA_APART, COUNTRY_TURN, unrle } from './macro';
@@ -61,8 +61,6 @@ export type CheckedTown = {
     facing?: number[];
     zones?: { kind: string; poly: Pt[] }[];
     greens?: Pt[][];
-    /** None now: every building is a lot (a town edited by hand before Build lays lots may still have some). */
-    backdrop?: BackdropBuilding[];
     places?: TownPlace[];
     centre?: { area: number; poly: Pt[]; square?: Pt[] }[];
     /** The named places' lots' looks, by plot (`placeLots.ts`): which plots are a named place's. */
@@ -395,7 +393,7 @@ export function centreBuilt(town: CheckedTown): { centre: number; rest: number }
 }
 
 /**
- * The living town's world data: every building a lot (no backdrop: `dense.ts`), and every lot with a door to the
+ * The living town's world data: every lot with a door to the
  * street reached from a road (its path out of its front gets to one, as `town.ts` `layoutTown` lays it); every
  * parking bay inside its car park, every car park on no lot, road or water; the centre's open land built over more
  * densely than the rest of the main town's box's (`centreBuilt`). Every public lot a place, and every place a lot's;
@@ -407,7 +405,6 @@ function livingProblems(town: CheckedTown, careers: readonly string[], expect: E
   const places = town.meta.places;
   if (!places) return ['no places'];
   const areas = town.areas ?? [];
-  if (town.meta.backdrop?.length) out.push(`${town.meta.backdrop.length} backdrop buildings (every building a lot)`);
   // Every lot with a door reached from a road: a path out of its front onto one.
   const paths = town.meta.paths ?? [];
   const pathCells = new Map<number, Rect[]>();

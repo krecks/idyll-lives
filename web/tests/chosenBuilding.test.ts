@@ -13,7 +13,7 @@ import { BUILDING, FLATS, realTown } from './fixtures/realTown';
 const plot = (id: number, name: string, pub: boolean, extra: Partial<PlotInfo> = {}): PlotInfo => ({ id, name, x: id * 20, z: 0, w: 16, d: 20, public: pub, entry: null, house: null, ...extra });
 const places: TownPlace[] = [
   { name: 'Bakery', kind: 'shop', x: 45, z: 5, work: ['culinary'], area: 0, plot: 2 },
-  { name: 'Town Offices', kind: 'office', x: 100, z: 100, work: ['business'], area: 0 },
+  { name: 'Town Offices', kind: 'office', x: 100, z: 100, work: ['business'], area: 0, plot: 3 },
 ];
 const town: ChosenTown = {
   places,

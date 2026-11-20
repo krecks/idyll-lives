@@ -1,7 +1,7 @@
 /**
  * The built world's dump (`tools/built/samples.ts`, read by `cargo check-glb --built`): the samples are the same
  * every time they are made, they cover what the gate is there to hold (each roof, each covering and style, a porch,
- * a garage, diagonal walls, each backdrop use, each fence, each car), every far version names the sample it is the
+ * a garage, diagonal walls, each building's use, each fence, each car), every far version names the sample it is the
  * far version of, and a sample's file is a `.glb` whose triangles wind as their normals say once the game's z is
  * mirrored.
  */
@@ -35,13 +35,13 @@ describe('the built world as dumped', async () => {
     for (const s of list) {
       expect(s.meshes.length).toBeGreaterThan(0);
       if (s.kind === 'neighbour' || s.kind === 'far' || s.kind === 'town') expect(by.get(s.of!)?.kind).toBe('house');
-      else if (s.kind === 'backdropFar') expect(by.get(s.of!)?.kind).toBe('backdrop');
+      else if (s.kind === 'buildingFar') expect(by.get(s.of!)?.kind).toBe('building');
       else expect(s.of).toBeUndefined();
     }
-    // A house is dumped four ways, a backdrop building two.
+    // A house is dumped four ways, a lot's building closed two.
     const houses = list.filter((s) => s.kind === 'house');
     for (const kind of ['neighbour', 'far', 'town'] as const) expect(list.filter((s) => s.kind === kind).map((s) => s.of)).toEqual(houses.map((s) => s.key));
-    expect(list.filter((s) => s.kind === 'backdropFar').length).toBe(list.filter((s) => s.kind === 'backdrop').length);
+    expect(list.filter((s) => s.kind === 'buildingFar').length).toBe(list.filter((s) => s.kind === 'building').length);
   });
 
   test('the houses cover the roofs, the storeys, a porch, a garage and diagonal walls', () => {
@@ -79,9 +79,9 @@ describe('the built world as dumped', async () => {
     expect(triangles(part(s, 'windows'))).toBeGreaterThan(0);
   });
 
-  test('every backdrop use, every fence style that is built, every car', () => {
+  test('every building use, every fence style that is built, every car', () => {
     const uses = ['flats', 'terrace', 'house', 'shop', 'cafe', 'restaurant', 'office', 'school', 'church', 'hall', 'workshop', 'farm', 'barn'];
-    expect(list.filter((s) => s.kind === 'backdrop').map((s) => s.key).sort()).toEqual(uses.map((u) => `backdrop.${u}`).sort());
+    expect(list.filter((s) => s.kind === 'building').map((s) => s.key).sort()).toEqual(uses.map((u) => `building.${u}`).sort());
     expect(list.filter((s) => s.kind === 'fence').map((s) => s.key)).toEqual(content.fenceStyles.map((f) => `fence.${f.id}`));
     expect(list.filter((s) => s.kind === 'car').map((s) => s.key)).toEqual(CARS.map((b) => `car.${b.id}`));
     // The street: its road, its sidewalks, its markings, the neighbours' houses and what stands along it.
@@ -90,7 +90,7 @@ describe('the built world as dumped', async () => {
   });
 
   test("a sample's file is a .glb whose triangles wind as their normals say", () => {
-    for (const key of ['house.cottage', 'neighbour.cottage', 'far.cottage', 'town.cottage', 'backdrop.cafe', 'backdropFar.cafe', 'fence.picket', 'car.saloon']) {
+    for (const key of ['house.cottage', 'neighbour.cottage', 'far.cottage', 'town.cottage', 'building.cafe', 'buildingFar.cafe', 'fence.picket', 'car.saloon']) {
       const s = by.get(key)!;
       const glb = glbOf(s.meshes);
       const view = new DataView(glb.buffer);

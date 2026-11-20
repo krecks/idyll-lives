@@ -211,7 +211,7 @@ describe('places', () => {
   });
 
   test('the town file’s places come as they are', () => {
-    const own: TownPlace[] = [{ name: 'Mill Café', kind: 'cafe', x: 1, z: 2, area: 0 }];
+    const own: TownPlace[] = [{ name: 'Mill Café', kind: 'cafe', x: 1, z: 2, area: 0, plot: 1 }];
     expect(townPlaces({ places: own }, [plot(1, 'The Bakery', true)])).toBe(own);
   });
 
@@ -338,10 +338,10 @@ describe('who and where', () => {
 
   test('a hamlet’s place whose name another has says which hamlet; the main town’s and a name of its own don’t', () => {
     const same: TownPlace[] = [
-      { name: 'Bakery', kind: 'shop', x: 5, z: 5, area: 0 },
-      { name: 'Bakery', kind: 'shop', x: 400, z: 5, area: 1 },
-      { name: 'Mill Café', kind: 'cafe', x: 410, z: 5, area: 1 },
-      { name: 'Bakery', kind: 'shop', x: 900, z: 5, area: 2 },
+      { name: 'Bakery', kind: 'shop', x: 5, z: 5, area: 0, plot: 0 },
+      { name: 'Bakery', kind: 'shop', x: 400, z: 5, area: 1, plot: 1 },
+      { name: 'Mill Café', kind: 'cafe', x: 410, z: 5, area: 1, plot: 2 },
+      { name: 'Bakery', kind: 'shop', x: 900, z: 5, area: 2, plot: 3 },
     ];
     const w = { ...world([]), places: same, placeOfPlot: new Map<number, number>(), areas: [{ name: 'Brightfield', kind: 'hamlet' as const }, { name: 'Millbrook', kind: 'hamlet' as const }, { name: 'Far Fields', kind: 'countryside' as const }] };
     const tags = placeTags(w, new Map());

@@ -972,7 +972,7 @@ export function rename(draft: NeighbourhoodDraft, what: Named, name: string): Ed
   if (!open) return { draft: { ...draft, name: wanted }, cleared: { lots: [] } };
   if (what.kind === 'place') {
     const place = places[what.place];
-    const slots = place.plot === undefined ? draft.slots : draft.slots.map((s) => (s.index === place.plot && s.name === old ? { ...s, name: wanted } : s));
+    const slots = draft.slots.map((s) => (s.index === place.plot && s.name === old ? { ...s, name: wanted } : s));
     return { draft: { ...draft, slots, open: { ...open, places: places.map((p, i) => (i === what.place ? { ...p, name: wanted } : p)) } }, cleared: { lots: [] } };
   }
   const k = town ? 0 : (what as { area: number }).area;

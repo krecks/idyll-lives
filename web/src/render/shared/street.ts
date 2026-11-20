@@ -2417,7 +2417,7 @@ export function lotDresses(world: Pick<WorldStructure, 'plots' | 'meta' | 'flats
   const looks = world.meta?.lotLooks;
   if (!looks) return out;
   const hours = new Map<number, NonNullable<TownPlace['hours']>>();
-  for (const p of world.meta?.places ?? []) if (p.plot !== undefined && p.hours) hours.set(p.plot, p.hours);
+  for (const p of world.meta?.places ?? []) if (p.hours) hours.set(p.plot, p.hours);
   const flats = new Set((world.flats ?? []).map((f) => f.of));
   for (const [k, look] of Object.entries(looks)) {
     const i = Number(k);

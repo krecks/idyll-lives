@@ -3,17 +3,17 @@
     {
       "name": "living-town-meta",
       "file": "web/src/core/protocol.ts",
-      "sha256": "a845a22616775e3dd3f544faca99860b9f55a8fb4d6d1da13db56c1884969da2",
-      "by": "real-town-contracts",
-      "reason": "owner's OK, real town: the contracts of stage 0 (BuildingUse for BackdropUse; parking bays, car parks, paved pieces, plot kinds and flats; the centre's square and the town's paving in the meta)",
+      "sha256": "21f01292caa4428ccb37c943a0b7b2c8cf769eeff7a8c543c05c8864a7c755ae",
+      "by": "real-town-t1",
+      "reason": "owner's OK, real town: the backdrop goes (BackdropBuilding and WorldMeta.backdrop), every place a lot's (TownPlace.plot required), LotLook's roof spelled out",
       "region": "living-town-meta"
     },
     {
       "name": "living-town-types",
       "file": "web/src/core/protocol.ts",
-      "sha256": "a49c31a5f2016a6be91961e13ceab5cf4bf6a10aeacb2dc730473cc4afcc1d71",
-      "by": "real-town-contracts",
-      "reason": "owner's OK, real town: the contracts of stage 0 (BuildingUse for BackdropUse; parking bays, car parks, paved pieces, plot kinds and flats; the centre's square and the town's paving in the meta)",
+      "sha256": "8f2ffee31290eeea423eac94a81449cb7c8a20c6c899766e97270142d49c91e2",
+      "by": "real-town-t1",
+      "reason": "owner's OK, real town: the backdrop goes (BackdropBuilding and WorldMeta.backdrop), every place a lot's (TownPlace.plot required), LotLook's roof spelled out",
       "region": "living-town-types"
     },
     {

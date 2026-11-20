@@ -8,7 +8,7 @@
  * its shading (`render/pc/shaders/diagView.ts`), and `nosims` leaves the residents out: geometry
  * and colour compared without the lighting (the reference pictures for the PlayCanvas port). `linear` draws the lit colour as it is,
  * without tone mapping, exposure or grading: the light compared without the image processing. `notown` leaves the town view's
- * drawing out (`render/pc/townView.ts`: the backdrop, the far lots, crowns, movers, the ground's map), the far LOD as before it;
+ * drawing out (`render/pc/townView.ts`: the far lots, crowns, movers, the ground's map), the far LOD as before it;
  * `notownwoods`, `notownground` and `notownbuildings` one part of it: the woods as before, no colour map, no buildings;
  * `noimpostors` the far trees as themselves, not their impostors (`render/pc/impostors.ts`).
  * `wholeshadows` draws every caster into the sun's map every time, also when only the residents moved (`render/pc/sunShadows.ts`).

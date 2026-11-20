@@ -6,7 +6,7 @@
  */
 
 import type { CareerCategory } from '../content/content';
-import type { BackdropBuilding, BuildingUse, TownPlace, TownSize } from '../core/protocol';
+import type { BuildingUse, LotLook, TownPlace, TownSize } from '../core/protocol';
 import type { NeighbourhoodDraft } from './town';
 import { placeOfTemplate } from './placeLots';
 import { placeOf, sizeByHomes, specOf } from './world';
@@ -21,10 +21,10 @@ export interface Kind {
   w: [number, number];
   d: [number, number];
   storeys: [number, number];
-  roofs: readonly BackdropBuilding['roof'][];
+  roofs: readonly LotLook['roof'][];
 }
 /** A kind of building: its use, how long along the road and how deep (m), its storeys and roofs. */
-export const K = (use: BuildingUse, w: [number, number], d: [number, number], storeys: [number, number], roofs: readonly BackdropBuilding['roof'][]): Kind => ({ use, w, d, storeys, roofs });
+export const K = (use: BuildingUse, w: [number, number], d: [number, number], storeys: [number, number], roofs: readonly LotLook['roof'][]): Kind => ({ use, w, d, storeys, roofs });
 
 /**
  * A town's civic places, each a lot (`placeLots.ts`), a main town's laid first, nearest its square (its
@@ -76,15 +76,15 @@ export const CIVIC: readonly Civic[] = [
   { label: 'Boutique', kind: K('shop', [8, 10], [10, 12], [2, 3], ['gable', 'mansard']), place: 'shop', name: (n) => (n.size === 'hamlet' ? `${n.last()}'s Village Shop` : `${n.last()}'s Boutique`), work: ['fashion', 'retail'], least: 'hamlet', templates: { hamlet: 'villageShop', village: 'boutique', town: 'boutique', city: 'boutique' }, labels: { hamlet: 'Village shop' }, known: /'s (Village Shop|Boutique)$/ },
   { label: 'Garden centre', kind: K('shop', [14, 20], [12, 16], [1, 1], ['flat', 'gable']), place: 'shop', name: (n) => `${n.town} Garden Centre`, work: ['nature', 'retail'], least: 'village', templates: every('gardenCentre'), known: / Garden Centre$/ },
 ];
-/** What a named place of the other kinds is (a backdrop place that is no civic one: `placeOf`). */
+/** What a named place of the other kinds is (one that is no civic one: `placeOf`). */
 export type ZoneKind = 'shop' | 'cafe' | 'restaurant' | 'office' | 'workshop' | 'farm';
 /**
  * The named places besides the civic ones, by kind, as lots (`placeLots.ts`): the layouts a lot of
  * the kind is built from (`houses.json` `parks` of kind `place`, one drawn for each), its compact
  * layouts (`compact`: a narrow lot of a street built up shoulder to shoulder, `dense.ts`), the kind of
  * building it looks like from outside (its roof: `LotLook`), and how many a main town of
- * each size has (`lots`, fewest and most) and every other area (`around`): as many as the backdrop
- * named of the kind when these were its buildings (measured over the places' sample worlds,
+ * each size has (`lots`, fewest and most) and every other area (`around`): as many as a town named
+ * of the kind when these were buildings nobody went into (measured over the places' sample worlds,
  * 2026-11-17). A farm shop is a farmstead's own, one by each (`macro.ts`), none of these.
  */
 export const ZONE: Record<ZoneKind, { templates: readonly string[]; compact: readonly string[]; kind: Kind; lots: Record<TownSize, [number, number]>; around: [number, number] }> = {
@@ -118,7 +118,7 @@ export const HOURS: Record<Exclude<TownPlace['kind'], 'park' | 'outdoor'>, NonNu
 export const LOT_HOURS: NonNullable<TownPlace['hours']> = { open: 7 * 60, close: 23 * 60, days: 0b1111111 };
 /** The careers working at the sim's public places, by template. */
 export const LOT_WORK: Record<string, string[]> = { cafe: ['culinary', 'hospitality'], grocer: ['retail'], bakery: ['culinary', 'retail'], market: ['retail', 'nature'] };
-/** The careers working at a backdrop place of a kind besides the civic ones. */
+/** The careers working at a named place of a kind besides the civic ones. */
 export const KIND_WORK: Partial<Record<TownPlace['kind'], string[]>> = { shop: ['retail'], cafe: ['culinary', 'hospitality'], restaurant: ['culinary', 'hospitality'], office: ['business'], workshop: ['trades'], farm: ['nature'] };
 /** The kinds of named place a building may be (not a park or the outdoors). */
 export const PLACE_KINDS: readonly TownPlace['kind'][] = ['shop', 'cafe', 'restaurant', 'office', 'school', 'church', 'workshop', 'farm'];

@@ -84,7 +84,7 @@ export function placeUnit(t: Templates, what: Civic | ZoneKind, size: TownSize, 
 
 /**
  * The name a named place's lot gets (its `PlotSlot.name`, and its place's): a civic place's own
- * (`Civic.name`: "Ashby School"), else one a backdrop place of its kind would get (`placeName`; a
+ * (`Civic.name`: "Ashby School"), else one for a place of its kind (`placeName`; a
  * farm shop the farmer's), none twice (`namer.unique`: `namer` is its area's). Null: the lot is no
  * named place's.
  */

@@ -906,7 +906,7 @@ export function moveVillage(draft: NeighbourhoodDraft, t: Templates, area: numbe
 
   // Its lots, places, car parks, greens and orchards with it; a car park by a road taken up goes.
   const slots = draft.slots.map((s) => (parts.lots.has(s.index) ? { ...s, x: s.x + dx, z: s.z + dz, ...(s.anchor === undefined ? {} : { anchor: s.anchor + (s.facing % 2 ? dz : dx) }) } : s));
-  const places = open.places?.map((p) => (p.plot !== undefined && parts.lots.has(p.plot) ? { ...p, x: r2(p.x + dx), z: r2(p.z + dz) } : p));
+  const places = open.places?.map((p) => (parts.lots.has(p.plot) ? { ...p, x: r2(p.x + dx), z: r2(p.z + dz) } : p));
   const index = roadIndex(draft.roads);
   const ownParks = new Set([...parts.parking].flatMap((i) => (open.parking[i].park === undefined ? [] : [open.parking[i].park!])));
   const carParks = open.carParks?.map((p, k) => (ownParks.has(k) ? { ...p, poly: p.poly.map(moved), sign: [r2(p.sign[0] + dx), r2(p.sign[1] + dz), p.sign[2]] as [number, number, number] } : p));
