@@ -260,6 +260,8 @@ export const PLACE_BAYS: [number, number] = [4, 6];
 export const BIG_PLACES = new Set(['school', 'leisure', 'medical', 'hotel', 'townHall', 'gardenCentre', 'church']);
 /** How far out from its heart a main town is built up before its houses go down (`DensePass.lay`), of the way to its box's corners. */
 const INNER = 0.5;
+/** The buildings of flats a main town of each size has on its centre's streets at most (`DensePass.centreFlats`). */
+const CENTRE_FLATS: Record<TownSize, number> = { hamlet: 1, village: 2, town: 3, city: 4 };
 /** The designs a main town's terraced houses are of (`terraceRows`). */
 const TERRACE_DESIGNS = 16;
 /** How far past an area's box the country roads into it are built along (m: `DensePass.approaches`). */
@@ -1515,6 +1517,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   // The living town's own draws (the centre, the terraces, the dense pass), apart from the layout's:
   // the rest of the world is laid out as it was.
   const dense = random(((lay?.townSeed ?? seed) ^ 0x2545f491) >>> 0);
+  // (The centre's buildings of flats from a stream of their own, so the rest is drawn as it was.)
+  const centreFlats = random(((lay?.townSeed ?? seed) ^ 0x51ed270b) >>> 0);
   // The main town's centre: its high street and a square off it, kept clear of lots.
   const centre = chooseCentre(worldRoads, plans[0].roads, plans[0].centre, ground, 0, (x, z) => !spec.classic && land.slope(land.cell(x, z)) > PLACE_STEEP);
   const inCentre = (f: Frontage) => !!centre && inside(centre.poly, f.p[0] + f.n[0] * 10, f.p[1] + f.n[1] * 10);
@@ -1608,6 +1612,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       // (Its civic places before its homes, nearest its heart; its other places before them only in its centre,
       // which no home fronts: the rest once every home has found room.)
       const inTheCentre = near.filter(inCentre);
+      // (A few buildings of flats on its centre's streets first, at the ends of its parades.)
+      densePass?.centreFlats(centreFlats, CENTRE_FLATS[spec.civic]);
       const others = namedLots(t, lots, worldRoads, a, spec.civic, true, near, street, placeRand).filter((u) => !putPlace(lots, t, worldRoads, u, inTheCentre));
       parkBigPlaces();
       // (Out of room in the town: on along the country roads leaving it, where they run straight.)
@@ -1794,7 +1800,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   nameLots(content, slots, plans, worldRoads, spec.civic, random(((lay?.townSeed ?? seed) ^ PLACE_NAMES) >>> 0));
 
   // ---- the centre made the densest: narrowed to its high street where the land round it is the emptier ----
-  if (centre && !spec.classic) densestCentre(centre, worldRoads, W, D, waterMask, allGreens, slots.map((s) => ({ rect: rectOf(s), place: !!s.dress && s.kind === 'shop' })), plans[0].rect);
+  if (centre && !spec.classic) densestCentre(centre, worldRoads, W, D, waterMask, allGreens, slots.map((s) => ({ rect: rectOf(s), built: !!s.dress && (s.kind === 'shop' || s.kind === 'flats') })), plans[0].rect);
 
   // ---- the places the tags name ---------------------------------------------------------------
   const places = townPlaces(content, t, worldRoads, areaList, slots, centre ? [centre.area] : [], (a) => (a === 0 ? spec.civic : areaSize(spec.civic, a)), dense);

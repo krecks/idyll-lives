@@ -13,7 +13,8 @@
  * big world takes (its land, its town's layout without generating houses, its land settled under
  * it, and assembling its file: a problem at twice the budget). Problems are listed (and the exit
  * code is 1). Every world is a Big one now (cosy and normal were dropped in 0.8.0).
- * Each world's line counts its homes (terraced ones among them), flats, named places' lots (`placeLots.ts`), places,
+ * Each world's line counts its homes (terraced ones among them), flats (and the buildings of them, those in its centre
+ * among them), named places' lots (`placeLots.ts`), places,
  * parking bays and car parks, shells (homes nobody moved into: `people.ts` `fillTown`) and buildings; and a table of each
  * place's first world's buildings against those it had before every building was a lot (`BASELINE`).
  *
@@ -76,6 +77,7 @@ const { measureLand, settleLand } = await import('../../web/src/game/landFollow.
 type Slopes = import('../../web/src/game/landFollow.ts').Slopes;
 type FollowWorld = import('../../web/src/game/landFollow.ts').FollowWorld;
 const { decodeLand } = await import('../../web/src/game/land.ts');
+const { inside: insidePoly } = await import('../../web/src/game/roads.ts');
 type Land = import('../../web/src/game/land.ts').Land;
 
 /**
@@ -101,6 +103,12 @@ function slopeChecks(town: TownFile, seeded: Land): { problems: string[]; slopes
 }
 
 const problems: string[] = [];
+
+/** Whether lot `plot` of a town file stands in one of its centres (the middle of its rectangle). */
+function inACentre(town: TownFile, plot: number): boolean {
+  const p = (town.plots as { x: number; z: number; w: number; d: number }[])[plot];
+  return !!p && (town.meta.centre ?? []).some((c) => insidePoly(c.poly, p.x + p.w / 2, p.z + p.d / 2));
+}
 
 const content = await Content.load(new URL('content/base.json', root).href);
 const assets = await AssetRegistry.load(new URL('assets/manifest.json', root).href);
@@ -280,6 +288,7 @@ for (const { kind, seed, options } of runs) {
     homes: town.slots.filter((s) => s.kind === 'house').length,
     flats: (file.plots as { kind?: string }[]).filter((p) => p.kind === 'flat').length,
     buildingsOfFlats: town.slots.filter((s) => s.kind === 'flats').length,
+    centreFlats: town.slots.filter((s) => s.kind === 'flats' && inACentre(file, s.index)).length,
     places: town.slots.filter((s) => s.kind === 'shop' && s.dress).length,
     bays: (file.parking ?? []).length,
     parks: (file.carParks ?? []).length,
@@ -303,7 +312,7 @@ for (const { kind, seed, options } of runs) {
     `${tag}: ${town.name} (${town.world?.tagline}) ${town.width}×${town.depth}, ${town.roads.length} road(s) (${courts} courts), ` +
       `${town.open ? `${town.open.areas.length} areas, ${spots} outdoor places, ${((f) => `${(f.built * 100).toFixed(0)}% built and farmed, ${(f.empty * 100).toFixed(0)}% squares empty, `)(fillOf(file, expect.meadow))}` : ''}` +
       `${town.slots.filter((s) => s.kind === 'house').length} houses${farms ? ` (${farms} farms)` : ''} (${town.slots.filter((s) => s.lot === 'terrace').length} terraced)${dropped ? `, ${dropped} lots left out${placesOut ? ` (${placesOut} named places')` : ''}` : ''}, ${basements} with a basement, ${town.households.length} households, ` +
-      `${count.homes} homes, ${count.flats} flats (${count.buildingsOfFlats} buildings), ${count.places} place lots (${town.slots.filter((s) => s.kind === 'shop' && s.dress && !s.area).length} in the main town), ${town.open?.places?.length ?? 0} places, ${count.bays} bays in ${count.parks} car parks, ${count.shells} shells, ${count.buildings} buildings, centre ${count.centre}, ` +
+      `${count.homes} homes, ${count.flats} flats (${count.buildingsOfFlats} buildings, ${count.centreFlats} in the centre), ${count.places} place lots (${town.slots.filter((s) => s.kind === 'shop' && s.dress && !s.area).length} in the main town), ${town.open?.places?.length ?? 0} places, ${count.bays} bays in ${count.parks} car parks, ${count.shells} shells, ${count.buildings} buildings, centre ${count.centre}, ` +
       `${servers} servers, ${file.sims.length} residents, residentsMost ${file.residentsMost}, ${file.relationships.length} relationships, ${file.objects.length} things, ${(text.length / 1e6).toFixed(2)} MB; ` +
       `land ${landJob.toFixed(0)} ms, town ${(layout + houses + landMs).toFixed(0)} ms (${layout.toFixed(0)} layout + ${houses.toFixed(0)} houses + ${landMs.toFixed(0)} settled), ${furnished.houses} furnished ahead in ${furnished.ms.toFixed(0)} ms, file ${assemble.toFixed(0)} ms`,
   );

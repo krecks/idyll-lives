@@ -173,16 +173,17 @@ export function narrowCentre(roads: readonly RoadPlan[], c: Centre, W: number, D
 
 /**
  * Centre `c` of a town of `W` × `D` made the densest (`narrowCentre`) over its land as laid: its open land is no road
- * of `roads` (but a trail), water (`water`, one per tile, if any), green (`greens`) or lot but a named place's
- * (`lots`: each lot's rectangle, and whether it is a named place's, built over), against the rest of its area's box `box`.
+ * of `roads` (but a trail), water (`water`, one per tile, if any), green (`greens`) or lot but a building's (`lots`:
+ * each lot's rectangle, and whether it is a building's, built over: a named place's or a building of flats'; a home's
+ * lot is mostly its garden), against the rest of its area's box `box`.
  */
-export function densestCentre(c: Centre, roads: readonly RoadPlan[], W: number, D: number, water: Uint8Array | null, greens: readonly (readonly Pt[])[], lots: readonly { rect: Rect; place: boolean }[], box: Rect): void {
+export function densestCentre(c: Centre, roads: readonly RoadPlan[], W: number, D: number, water: Uint8Array | null, greens: readonly (readonly Pt[])[], lots: readonly { rect: Rect; built: boolean }[], box: Rect): void {
   const taken = roadMask(roads.filter((r) => r.kind !== 'trail'), W, D, 0);
   if (water) for (let i = 0; i < taken.length; i++) if (water[i]) taken[i] = 1;
   for (const g of greens) fillPoly(g, W, D, (i) => (taken[i] = 1));
   const built: Pt[][] = [];
-  for (const { rect: r, place } of lots) {
-    if (place) built.push(rectPoly(r));
+  for (const { rect: r, built: building } of lots) {
+    if (building) built.push(rectPoly(r));
     else for (let z = Math.max(0, r.z); z < Math.min(D, r.z + r.d); z++) for (let x = Math.max(0, r.x); x < Math.min(W, r.x + r.w); x++) taken[z * W + x] = 1;
   }
   narrowCentre(roads, c, W, D, taken, box, built);
@@ -213,7 +214,7 @@ export function outline(roads: readonly RoadPlan[], c: Centre, band: number, rig
 /**
  * How built over a main town's centre is against the rest of its box: of each one's open land
  * (`taken`: the tiles that are a road, a lot, a green or water, one per tile over `W` × `D`), the
- * share under a backdrop building (`polys`) whose tiles' middles are in it. `per`: each
+ * share under a building (`polys`: the named places' and the buildings of flats' lots) whose tiles' middles are in it. `per`: each
  * building's tiles counted towards the rest of the box. tools/worlds/sample.ts checks the centre is the denser.
  */
 export function centreDensity(W: number, D: number, taken: Uint8Array, box: Rect, centre: readonly Pt[], polys: readonly (readonly Pt[])[]): { centre: number; rest: number; open: [number, number]; built: [number, number]; per: number[] } {
