@@ -7,7 +7,7 @@ use super::*;
 /// A workbench: a nail hammered in (the steel's ring rising as it goes in, then the dull last blows on the
 /// wood), a board sawn in strokes (the teeth catching, the push louder than the pull), the cut-off dropping,
 /// sanding, a screwdriver's ratchet, a tool put down.
-pub(crate) fn tools(rate: f64) -> Stereo {
+pub(super) fn tools(rate: f64) -> Stereo {
     let mut r = Rng::new(50.0);
     let seconds = 20.0;
     let mut ev = looped(rate, seconds);
@@ -107,7 +107,7 @@ pub(crate) fn tools(rate: f64) -> Stereo {
 
 /// A hand saw's stroke: the teeth catching about 70 times a second, in a high band, swelling and fading with
 /// the stroke.
-pub(crate) fn saw(out: &mut Ev, r: &mut Rng, at: f64, seconds: f64, amp: f64, pan: f64) {
+pub(super) fn saw(out: &mut Ev, r: &mut Rng, at: f64, seconds: f64, amp: f64, pan: f64) {
     let rate = out.rate;
     let start = js_round(at * rate);
     let len = js_round(seconds * rate);
@@ -128,7 +128,7 @@ pub(crate) fn saw(out: &mut Ev, r: &mut Rng, at: f64, seconds: f64, amp: f64, pa
 
 /// A bike looked after on its stand: a wheel spun and its freewheel ticking slower and slower, a spanner's
 /// ratchet, the gears changed, the tyres pumped up.
-pub(crate) fn bike_tools(rate: f64) -> Stereo {
+pub(super) fn bike_tools(rate: f64) -> Stereo {
     let mut r = Rng::new(51.0);
     let seconds = 14.0;
     let mut ev = looped(rate, seconds);
@@ -201,7 +201,7 @@ pub(crate) fn bike_tools(rate: f64) -> Stereo {
 /// A punch bag worked over: combinations of punches (each the glove's slap on the leather and the thump of
 /// the heavy bag, about 85 Hz), the chain jingling above as it swings, the mount creaking, a sharp breath out
 /// with each punch.
-pub(crate) fn punch_bag(rate: f64) -> Stereo {
+pub(super) fn punch_bag(rate: f64) -> Stereo {
     let mut r = Rng::new(52.0);
     let seconds = 12.0;
     let mut ev = looped(rate, seconds);
@@ -277,7 +277,7 @@ pub(crate) fn punch_bag(rate: f64) -> Stereo {
 /// Plates and glasses smashed in a metal bin: each the crash of the impact (the bin's body ringing under it),
 /// then the shards: dozens of small pieces clinking down, the bigger ones landing last, then a tinkle as they
 /// settle. Glass rings higher and longer than china.
-pub(crate) fn smash(rate: f64) -> Stereo {
+pub(super) fn smash(rate: f64) -> Stereo {
     let mut r = Rng::new(53.0);
     let seconds = 12.0;
     let mut ev = looped(rate, seconds);
@@ -352,7 +352,7 @@ pub(crate) fn smash(rate: f64) -> Stereo {
 /// A cello played with a bow, a slow lament in D minor: each note a bowed string (a sawtooth, with the bow's
 /// scratch as it bites and its hiss along the string), vibrato coming in as it's held, through the body's
 /// resonances (the air near 100 Hz, the wood near 190 and 290 Hz, the bridge near 2.2 kHz); in a living room.
-pub(crate) fn cello(rate: f64) -> Stereo {
+pub(super) fn cello(rate: f64) -> Stereo {
     let mut r = Rng::new(54.0);
     let notes = [
         [50.0, 2.0],
@@ -441,7 +441,7 @@ pub(crate) fn cello(rate: f64) -> Stereo {
 /// Someone singing to a karaoke track: a pop backing (pad chords round C, G, A minor and F, a bass, a soft
 /// kick, snare and hi-hat at 120 bpm) and over it a voice (a glottal buzz through the formants of the vowel
 /// being sung, vibrato on the held notes, the consonants' hiss), a little echo on the microphone.
-pub(crate) fn singing(rate: f64) -> Stereo {
+pub(super) fn singing(rate: f64) -> Stereo {
     let mut r = Rng::new(55.0);
     let beat = 0.5;
     let seconds = 16.0 * beat;
@@ -555,7 +555,7 @@ pub(crate) fn singing(rate: f64) -> Stereo {
 }
 
 /// The first three formants of a vowel (Hz), a sung voice's.
-pub(crate) fn formants(vowel: char) -> [f64; 3] {
+pub(super) fn formants(vowel: char) -> [f64; 3] {
     match vowel {
         'a' => [800.0, 1150.0, 2900.0],
         'e' => [480.0, 1720.0, 2520.0],
@@ -568,7 +568,7 @@ pub(crate) fn formants(vowel: char) -> [f64; 3] {
 /// A sung note: a glottal buzz (harmonics falling 9 dB an octave) through the vowel's formants, with a
 /// consonant's hiss at the start and vibrato as it's held.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn sing(
+pub(super) fn sing(
     d: &mut [f32],
     rate: f64,
     r: &mut Rng,
@@ -618,7 +618,7 @@ pub(crate) fn sing(
 
 /// A soft synth note: a few harmonics, slowly attacked and released (the backing's pad and bass; the
 /// TypeScript's default \`harmonics\` was 6).
-pub(crate) fn pad(
+pub(super) fn pad(
     d: &mut [f32],
     rate: f64,
     at: f64,

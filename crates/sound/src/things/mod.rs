@@ -132,11 +132,11 @@ mod machines;
 mod once;
 mod synth;
 
-pub(crate) use crafts::*;
-pub(crate) use games::*;
-pub(crate) use machines::*;
-pub(crate) use once::*;
-pub(crate) use synth::*;
+use crafts::*;
+use games::*;
+use machines::*;
+use once::*;
+use synth::*;
 
 #[cfg(test)]
 mod tests {

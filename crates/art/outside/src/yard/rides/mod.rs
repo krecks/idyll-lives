@@ -8,8 +8,8 @@ mod extras;
 mod parts;
 mod scooter;
 
-pub(crate) use bikes::*;
+use bikes::*;
 pub use build::*;
-pub(crate) use extras::*;
-pub(crate) use parts::*;
+use extras::*;
+use parts::*;
 pub use scooter::*;

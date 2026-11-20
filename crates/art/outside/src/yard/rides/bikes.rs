@@ -7,7 +7,7 @@ use crate::yard::play::Bike;
 // its parts by code, each a top-level node with its origin on its pivot (NOTES.md): `frame`, `wheel_front` and
 // `wheel_rear` (turned about their axles, game z), `cranks` (turned about the bottom bracket), `stand` (hidden while
 // it's ridden).
-pub(crate) fn city() -> Bike {
+pub(super) fn city() -> Bike {
     Bike {
         r: 0.335,
         k: 1.08,
@@ -73,9 +73,9 @@ pub(crate) fn city() -> Bike {
         ..Bike::default()
     }
 }
-pub(crate) const CITY_STAND: (f64, f64) = (-0.13, 0.27); // the centre stand's pivot, behind the bottom bracket
+pub(super) const CITY_STAND: (f64, f64) = (-0.13, 0.27); // the centre stand's pivot, behind the bottom bracket
 
-pub(crate) fn kid() -> Bike {
+pub(super) fn kid() -> Bike {
     Bike {
         r: 0.18,
         k: 0.62,
@@ -144,7 +144,7 @@ pub(crate) fn kid() -> Bike {
 
 // The other bikes: a mountain bike, a road bike, a long cargo bike and an e-bike. Each is built along x like the city
 // bike; the cargo bike is centred after building (its long front box puts its bounds ahead of the rider).
-pub(crate) fn mtb() -> Bike {
+pub(super) fn mtb() -> Bike {
     Bike {
         r: 0.345,
         k: 1.08,
@@ -208,7 +208,7 @@ pub(crate) fn mtb() -> Bike {
     }
 }
 
-pub(crate) fn road() -> Bike {
+pub(super) fn road() -> Bike {
     Bike {
         r: 0.345,
         k: 1.06,
@@ -273,7 +273,7 @@ pub(crate) fn road() -> Bike {
     }
 }
 
-pub(crate) fn cargo() -> Bike {
+pub(super) fn cargo() -> Bike {
     Bike {
         r: 0.30,
         k: 1.05,
@@ -342,7 +342,7 @@ pub(crate) fn cargo() -> Bike {
     }
 }
 
-pub(crate) fn ebike() -> Bike {
+pub(super) fn ebike() -> Bike {
     Bike {
         r: 0.335,
         k: 1.08,

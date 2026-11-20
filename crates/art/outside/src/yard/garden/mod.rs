@@ -28,5 +28,5 @@ mod shed_build;
 pub use barrel::*;
 pub use beds::*;
 pub use compost::*;
-pub(crate) use shed::*;
+use shed::*;
 pub use shed_build::*;

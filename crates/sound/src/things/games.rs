@@ -7,7 +7,7 @@ use super::*;
 /// Pool: a shot every few seconds. The cue's leather tip on the cue ball (a dull tock), the balls clacking
 /// (phenolic resin: a click of a few milliseconds, most of it 3 to 6 kHz), a cushion's thump, the balls
 /// rolling on the cloth, now and then one dropping into a pocket; a cue chalked.
-pub(crate) fn pool(rate: f64) -> Stereo {
+pub(super) fn pool(rate: f64) -> Stereo {
     let mut r = Rng::new(44.0);
     let seconds = 20.0;
     let mut ev = looped(rate, seconds);
@@ -97,7 +97,7 @@ pub(crate) fn pool(rate: f64) -> Stereo {
 }
 
 /// Two pool balls clacking: a very short, hard click.
-pub(crate) fn ball(out: &mut Ev, at: f64, amp: f64, pan: f64) {
+pub(super) fn ball(out: &mut Ev, at: f64, amp: f64, pan: f64) {
     strike(
         out,
         at,
@@ -111,7 +111,7 @@ pub(crate) fn ball(out: &mut Ev, at: f64, amp: f64, pan: f64) {
 /// Foosball: the hard ball whacked by the plastic men and knocking round the wooden box, the rods slid and
 /// spun, quick flurries between quieter build-ups, and a goal (the ball's clunk into the goal and its rumble
 /// down the return).
-pub(crate) fn foosball(rate: f64) -> Stereo {
+pub(super) fn foosball(rate: f64) -> Stereo {
     let mut r = Rng::new(45.0);
     let seconds = 12.0;
     let mut ev = looped(rate, seconds);
@@ -198,7 +198,7 @@ pub(crate) fn foosball(rate: f64) -> Stereo {
 }
 
 /// A planned moment of a rally (\`pingPongSound\`'s plan).
-pub(crate) enum Play {
+pub(super) enum Play {
     /// The serve, by the server (-1 or 1).
     Serve { at: f64, server: f64 },
     /// A shot: the ball bouncing, then the bat a \`gap\` later at \`loud\`, from the side \`from\`.
@@ -214,7 +214,7 @@ pub(crate) enum Play {
 
 /// Ping-pong: rallies of the ball off the bats and the table, a hit then a bounce about a quarter of a
 /// second later, back and forth; a rally ends with the ball bouncing away on the floor, a pause, and a serve.
-pub(crate) fn ping_pong(rate: f64) -> Stereo {
+pub(super) fn ping_pong(rate: f64) -> Stereo {
     let mut r = Rng::new(46.0);
     // Two rallies, planned first: the loop is as long as they take.
     let mut plan = Vec::new();
@@ -297,7 +297,7 @@ pub(crate) fn ping_pong(rate: f64) -> Stereo {
 }
 
 /// A ping-pong ball off a bat: its shell's pock over the bat's wooden knock.
-pub(crate) fn bat(out: &mut Ev, at: f64, amp: f64, pan: f64) {
+pub(super) fn bat(out: &mut Ev, at: f64, amp: f64, pan: f64) {
     strike(
         out,
         at,
@@ -313,7 +313,7 @@ pub(crate) fn bat(out: &mut Ev, at: f64, amp: f64, pan: f64) {
 }
 
 /// A ping-pong ball bouncing on the table: the pock and the table top's thump under it.
-pub(crate) fn bounce(out: &mut Ev, at: f64, amp: f64, pan: f64) {
+pub(super) fn bounce(out: &mut Ev, at: f64, amp: f64, pan: f64) {
     strike(
         out,
         at,
@@ -332,7 +332,7 @@ pub(crate) fn bounce(out: &mut Ev, at: f64, amp: f64, pan: f64) {
 /// Darts: three thrown about a second apart, each a dull thud into the bristle board (with the board's
 /// backing knocking on the wall), then a walk to the board and the three pulled out; now and then one hits
 /// the wire and falls to the floor.
-pub(crate) fn darts(rate: f64) -> Stereo {
+pub(super) fn darts(rate: f64) -> Stereo {
     let mut r = Rng::new(47.0);
     let seconds = 12.0;
     let mut ev = looped(rate, seconds);
@@ -412,7 +412,7 @@ pub(crate) fn darts(rate: f64) -> Stereo {
 /// An arcade cabinet: a chiptune (square-wave lead and a triangle bass in A minor, a noise hi-hat), the
 /// game's own zaps, booms and a bonus jingle, and the player's buttons and joystick clicking; through the
 /// cabinet's small speaker.
-pub(crate) fn arcade(rate: f64) -> Stereo {
+pub(super) fn arcade(rate: f64) -> Stereo {
     let mut r = Rng::new(48.0);
     let beat = 60.0 / 140.0;
     let seconds = 16.0 * beat;
@@ -527,7 +527,7 @@ pub(crate) fn arcade(rate: f64) -> Stereo {
 }
 
 /// A square-ish note (a pulse of \`duty\`, its harmonics added up to 8 kHz), with a short attack and release.
-pub(crate) fn chip(d: &mut [f32], rate: f64, at: f64, seconds: f64, hz: f64, duty: f64, amp: f64) {
+pub(super) fn chip(d: &mut [f32], rate: f64, at: f64, seconds: f64, hz: f64, duty: f64, amp: f64) {
     let start = round_usize(at * rate);
     let len = round_usize(seconds * rate);
     let top = (8000.0 / hz).floor() as usize;
@@ -554,7 +554,7 @@ pub(crate) fn chip(d: &mut [f32], rate: f64, at: f64, seconds: f64, hz: f64, dut
 }
 
 /// A triangle-wave note (the chip's bass).
-pub(crate) fn tri(d: &mut [f32], rate: f64, at: f64, seconds: f64, hz: f64, amp: f64) {
+pub(super) fn tri(d: &mut [f32], rate: f64, at: f64, seconds: f64, hz: f64, amp: f64) {
     let start = round_usize(at * rate);
     let len = round_usize(seconds * rate);
     for j in 0..len {
@@ -574,7 +574,7 @@ pub(crate) fn tri(d: &mut [f32], rate: f64, at: f64, seconds: f64, hz: f64, amp:
 }
 
 /// A game's zap: a square wave falling fast in pitch.
-pub(crate) fn zap(out: &mut Ev, at: f64, from: f64, amp: f64) {
+pub(super) fn zap(out: &mut Ev, at: f64, from: f64, amp: f64) {
     let rate = out.rate;
     let start = round_usize(at * rate);
     let len = round_usize(0.14 * rate);
@@ -596,7 +596,7 @@ pub(crate) fn zap(out: &mut Ev, at: f64, from: f64, amp: f64) {
 /// it, about 950 and 1500 Hz for a ball 24 cm across), a shot that goes in with a swish of the net or clangs
 /// off the rim and the board, and the ball bouncing away under the hoop, each bounce lower and sooner (it
 /// keeps about 80 % of its speed).
-pub(crate) fn basketball(rate: f64) -> Stereo {
+pub(super) fn basketball(rate: f64) -> Stereo {
     let mut r = Rng::new(49.0);
     // Two shots, the second after more dribbling, and the ball picked up again as the loop comes round.
     let seconds = 21.5;
@@ -663,7 +663,7 @@ pub(crate) fn basketball(rate: f64) -> Stereo {
 }
 
 /// A basketball hitting the court: the slap of its skin and the ring of the air inside.
-pub(crate) fn dribble(out: &mut Ev, at: f64, amp: f64, pan: f64) {
+pub(super) fn dribble(out: &mut Ev, at: f64, amp: f64, pan: f64) {
     strike(
         out,
         at,

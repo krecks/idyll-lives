@@ -7,7 +7,7 @@ use super::*;
 /// A treadmill with someone running on it: the motor's hum (about 58 Hz, turning the belt at a run), the
 /// belt's hiss over the deck, the rollers' rumble, the feet landing at 165 steps a minute (each a thump in
 /// the deck and a slap on the belt, one foot a little heavier) and the belt's seam ticking past once a turn.
-pub(crate) fn treadmill(rate: f64) -> Stereo {
+pub(super) fn treadmill(rate: f64) -> Stereo {
     let mut r = Rng::new(31.0);
     let seconds = 8.0;
     let mut bed = track(rate, seconds, 0.6);
@@ -83,7 +83,7 @@ pub(crate) fn treadmill(rate: f64) -> Stereo {
 
 /// An exercise bike pedalled at 80 a minute: the flywheel's whirr against its brake swelling with each push
 /// of a pedal (two a turn), the drive's hum under it and a pedal creaking once a turn.
-pub(crate) fn bike(rate: f64) -> Stereo {
+pub(super) fn bike(rate: f64) -> Stereo {
     let mut r = Rng::new(32.0);
     let seconds = 6.0;
     let mut bed = track(rate, seconds, 0.6);
@@ -133,7 +133,7 @@ pub(crate) fn bike(rate: f64) -> Stereo {
 
 /// A sewing machine: runs of stitching (the motor speeding up to about 13 stitches a second, its whirr, and
 /// the needle bar and the hook clacking each stitch), pauses to turn the cloth, the odd snip of scissors.
-pub(crate) fn sewing(rate: f64) -> Stereo {
+pub(super) fn sewing(rate: f64) -> Stereo {
     let mut r = Rng::new(33.0);
     let seconds = 10.0;
     let mut bed = track(rate, seconds, 0.6);
@@ -234,7 +234,7 @@ pub(crate) fn sewing(rate: f64) -> Stereo {
 /// A potter's wheel: the motor's quiet whine and the hum of its controller, the head turning about 150 a
 /// minute, wet hands on the spinning clay (a swish that comes round with each turn and squelches when they
 /// press), water squeezed from a sponge.
-pub(crate) fn pottery_wheel(rate: f64) -> Stereo {
+pub(super) fn pottery_wheel(rate: f64) -> Stereo {
     let mut r = Rng::new(34.0);
     let seconds = 9.0;
     let mut bed = track(rate, seconds, 0.6);
@@ -291,7 +291,7 @@ pub(crate) fn pottery_wheel(rate: f64) -> Stereo {
 
 /// A chemistry set: a flask boiling over a burner (small bubbles crowding up the glass, now and then a big
 /// one), the burner's soft roar, a glass rod stirred against the beaker.
-pub(crate) fn bubbling(rate: f64) -> Stereo {
+pub(super) fn bubbling(rate: f64) -> Stereo {
     let mut r = Rng::new(35.0);
     let seconds = 8.0;
     let mut bed = track(rate, seconds, 0.6);
@@ -358,7 +358,7 @@ pub(crate) fn bubbling(rate: f64) -> Stereo {
 /// out), the grounds tamped and the handle locked in, the pump's buzz (a vibration pump: 50 Hz and its
 /// harmonics) with the coffee trickling into the cup, the steam wand hissing into milk (a tearing hiss as it
 /// froths, then a deeper roll as it heats), and the old grounds knocked out.
-pub(crate) fn espresso(rate: f64) -> Stereo {
+pub(super) fn espresso(rate: f64) -> Stereo {
     let mut r = Rng::new(36.0);
     let seconds = 16.0;
     let mut bed = track(rate, seconds, 0.6);
@@ -463,7 +463,7 @@ pub(crate) fn espresso(rate: f64) -> Stereo {
 /// A blender: a universal motor at about 18,000 turns a minute (300 Hz and its many harmonics, with the
 /// commutator's whine high above), its fan's rush, the fruit and ice churning in the jug, the speed dipping
 /// as lumps hit the blades and knocking the glass.
-pub(crate) fn blender(rate: f64) -> Stereo {
+pub(super) fn blender(rate: f64) -> Stereo {
     let mut r = Rng::new(37.0);
     let seconds = 5.0;
     let mut bed = track(rate, seconds, 0.6);
@@ -525,7 +525,7 @@ pub(crate) fn blender(rate: f64) -> Stereo {
 
 /// A stand mixer: a slower motor (about 160 Hz) with its gears' whine, and the beater slapping the batter
 /// round the bowl.
-pub(crate) fn mixer(rate: f64) -> Stereo {
+pub(super) fn mixer(rate: f64) -> Stereo {
     let mut r = Rng::new(38.0);
     let seconds = 6.0;
     let mut bed = track(rate, seconds, 0.6);
@@ -571,7 +571,7 @@ pub(crate) fn mixer(rate: f64) -> Stereo {
 /// A microwave cooking: the transformer's hum (twice the 50 Hz mains, 100 Hz, with its harmonics), the
 /// cooling fan's rush and its blades, the turntable's motor, the odd spit from the food; all inside a metal
 /// box.
-pub(crate) fn microwave(rate: f64) -> Stereo {
+pub(super) fn microwave(rate: f64) -> Stereo {
     let mut r = Rng::new(39.0);
     let seconds = 8.0;
     let mut bed = track(rate, seconds, 0.6);
@@ -609,7 +609,7 @@ pub(crate) fn microwave(rate: f64) -> Stereo {
 }
 
 /// A toaster browning: the elements ticking as they heat, a faint buzz and the hiss of the heat.
-pub(crate) fn toaster(rate: f64) -> Stereo {
+pub(super) fn toaster(rate: f64) -> Stereo {
     let mut r = Rng::new(40.0);
     let seconds = 5.0;
     let mut bed = track(rate, seconds, 0.6);
@@ -652,7 +652,7 @@ pub(crate) fn toaster(rate: f64) -> Stereo {
 
 /// A fan oven: its motor's hum (50 Hz mains, 100 Hz), the fan at about 2,700 turns a minute with eight
 /// blades (a tone near 360 Hz), the hot air's rush inside the oven, a tick of the metal now and then.
-pub(crate) fn oven_fan(rate: f64) -> Stereo {
+pub(super) fn oven_fan(rate: f64) -> Stereo {
     let mut r = Rng::new(41.0);
     let seconds = 8.0;
     let mut bed = track(rate, seconds, 0.6);
@@ -696,7 +696,7 @@ pub(crate) fn oven_fan(rate: f64) -> Stereo {
 
 /// A cooker hood drawing the steam off a hob: a centrifugal fan's broad rush, its blades' whine and the
 /// motor's hum.
-pub(crate) fn hood(rate: f64) -> Stereo {
+pub(super) fn hood(rate: f64) -> Stereo {
     let mut r = Rng::new(42.0);
     let seconds = 8.0;
     let mut bed = track(rate, seconds, 0.6);
@@ -733,7 +733,7 @@ pub(crate) fn hood(rate: f64) -> Stereo {
 
 /// A wood fire: the flames' low roar flickering, crackles all the time (most tiny, some sharp pops as sap
 /// bursts) and now and then the hiss of steam from damp wood.
-pub(crate) fn fire(rate: f64) -> Stereo {
+pub(super) fn fire(rate: f64) -> Stereo {
     let mut r = Rng::new(43.0);
     let seconds = 10.0;
     let mut bed = track(rate, seconds, 0.6);

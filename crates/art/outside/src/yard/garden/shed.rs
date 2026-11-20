@@ -8,10 +8,10 @@ const SD: f64 = 1.6;
 const SZ: f64 = -0.08;
 const EAVE: f64 = 1.72; // the walls' top and the roof's ridge
 const RIDGE: f64 = 2.3;
-pub(crate) const DOOR_X: f64 = -0.3; // the doorway: its middle, width, top (from 0.08)
-pub(crate) const DOOR_W: f64 = 0.68;
-pub(crate) const DOOR_H: f64 = 1.48;
-pub(crate) const FRONT_Z: f64 = SZ + SD / 2.0; // the front wall's face
+pub(super) const DOOR_X: f64 = -0.3; // the doorway: its middle, width, top (from 0.08)
+pub(super) const DOOR_W: f64 = 0.68;
+pub(super) const DOOR_H: f64 = 1.48;
+pub(super) const FRONT_Z: f64 = SZ + SD / 2.0; // the front wall's face
 const OVER: f64 = 0.08; // the roof's overhang at the eaves
 const LAP: f64 = 0.16; // the weatherboards' pitch
 
@@ -105,7 +105,7 @@ fn wall_sweep(name: &str, path: [(f64, f64, f64); 2], prof: &[(f64, f64)], o: V3
     artkit::forms::object(name, vs, &faces, Some(M.shed), false, SHARP, false)
 }
 
-pub(crate) fn shed_walls() {
+pub(super) fn shed_walls() {
     let t = 0.04;
     let base = 0.08;
     let h = EAVE - base;
@@ -307,7 +307,7 @@ pub(crate) fn shed_walls() {
     }
 }
 
-pub(crate) fn shed_roof() {
+pub(super) fn shed_roof() {
     let run = artkit::py::hypot(
         SW / 2.0 + OVER,
         (RIDGE - EAVE) * (SW / 2.0 + OVER) / (SW / 2.0),
@@ -406,7 +406,7 @@ pub(crate) fn shed_roof() {
 }
 
 /// In the shadow behind the doorway: dark lining, a shelf of pots, a fork and a rake on the wall.
-pub(crate) fn shed_inside() {
+pub(super) fn shed_inside() {
     let t = 0.04;
     let (lz0, lz1) = (SZ - SD / 2.0 + t, FRONT_Z - t);
     fbox!(
@@ -501,7 +501,7 @@ pub(crate) fn shed_inside() {
 
 /// A black T-hinge on a door at game (x = its knuckle, y, z = the door's face): a strap tapering to a rounded end
 /// across the door, a plate on the frame, and three bolt heads.
-pub(crate) fn t_hinge(name: &str, x: f64, y: f64, z: f64, length: f64, material: Mat) {
+pub(super) fn t_hinge(name: &str, x: f64, y: f64, z: f64, length: f64, material: Mat) {
     let strap = [
         (0.0, -0.022),
         (length - 0.02, -0.01),
