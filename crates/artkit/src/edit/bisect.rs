@@ -1,6 +1,11 @@
 //! Cutting a mesh along a plane, and closing what the cut leaves open.
 
 use super::*;
+use crate::math::{P3, V3, dot_v3, normalize_v3};
+use crate::mesh::{Mesh, edge};
+use crate::scene::Obj;
+use crate::shapes::options;
+use std::collections::BTreeMap;
 
 options! {
     /// The options of bisect_plane, Blender's own defaults: dist is how near the plane a vertex counts as on

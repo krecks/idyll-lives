@@ -1,6 +1,6 @@
 //! The extent of a set of points.
 
-use super::*;
+use crate::math::V3;
 
 /// The lowest and highest of each coordinate.
 pub(crate) fn extent(points: &[V3]) -> ([f32; 3], [f32; 3]) {

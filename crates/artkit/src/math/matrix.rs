@@ -1,6 +1,7 @@
 //! The matrices: `M3`, `M4` and the axes.
 
 use super::*;
+use std::ops::Mul;
 
 /// `mathutils.Matrix` of 3 x 3, kept as Blender keeps it: `m.0[column][row]`.
 #[derive(Clone, Copy, PartialEq, Debug)]

@@ -1,6 +1,11 @@
 //! The weighted-normal modifier.
 
-use super::*;
+use crate::math::{V3, normalize_v3};
+use crate::mesh::{Mesh, edge};
+use crate::normals;
+use crate::scene::Obj;
+use crate::shapes::options;
+use std::collections::BTreeMap;
 
 options! {
     /// The options of weighted_normal, Blender's own defaults: keep_sharp gives every smooth run of faces round a

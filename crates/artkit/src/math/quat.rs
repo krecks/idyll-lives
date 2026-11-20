@@ -1,6 +1,7 @@
 //! `Quat`, as `mathutils` has it.
 
 use super::*;
+use std::ops::Mul;
 
 /// `mathutils.Quaternion`: (w, x, y, z), single precision.
 #[derive(Clone, Copy, PartialEq, Debug)]

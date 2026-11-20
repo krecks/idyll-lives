@@ -1,6 +1,7 @@
 //! Reading a model: its chunks, its accessors and its primitives.
 
 use super::*;
+use crate::json::Json;
 
 /// The JSON and the binary chunk of a .glb.
 pub(crate) fn chunks(data: &[u8]) -> Result<(Json, &[u8]), String> {

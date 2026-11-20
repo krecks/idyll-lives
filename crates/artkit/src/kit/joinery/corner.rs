@@ -1,6 +1,6 @@
 //! A point of a path to bend, and the shapes one may be.
 
-use super::*;
+use crate::math::{Num, P3, V3};
 
 /// A point of a path to bend (`fillet`): a tuple of three numbers or a vector, or a tuple of two for a path drawn
 /// flat (an outline, a lathe's profile). The bent path's points are tuples of as many floats.

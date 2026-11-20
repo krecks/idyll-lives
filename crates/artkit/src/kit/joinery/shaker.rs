@@ -1,6 +1,13 @@
 //! A shaker door.
 
 use super::*;
+use crate::forms::{self, Extrude, Holes, Loft, rounded_rect};
+use crate::kit::least;
+use crate::materials::Mat;
+use crate::math::P3;
+use crate::place::{Coord, Facing, GameFrame};
+use crate::scene::Obj;
+use crate::shapes::{Cube, SHARP, options};
 
 /// A frame-and-panel front `w` x `h`, `t` thick, centred at game `at`, facing the front (a cabinet's door, a
 /// drawer's front): a frame `rail` wide round a panel set back `recess`, flat, or `raised` (its edges chamfered up

@@ -1,6 +1,7 @@
 //! Numbers as glTF writes them.
 
-use super::*;
+use crate::json::float_repr;
+use std::collections::BTreeMap;
 
 pub const FLOAT: u32 = 5126;
 pub const USHORT: u32 = 5123;

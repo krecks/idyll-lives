@@ -1,6 +1,12 @@
 //! Writing a model out.
 
 use super::*;
+use crate::materials::Finishes;
+use crate::math::V3;
+use crate::motion::{self, Path};
+use crate::normals::corner_normals;
+use crate::scene::{self, FPS, Obj};
+use std::collections::BTreeMap;
 
 /// The .glb of `objs` as they stand in the scene (shaded: `shade::bake_ao`; their UVs made: `uv::ensure`).
 /// `texcoords`: whether the UVs are written (a model with a part on a textured finish). `finishes`: the game's,

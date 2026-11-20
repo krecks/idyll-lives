@@ -1,6 +1,14 @@
 //! A bench end.
 
 use super::*;
+use crate::forms::{self, Profile, Scale, Sweep, rounded_rect};
+use crate::json::float_repr;
+use crate::kit::{Scroll, least, scroll};
+use crate::materials::Mat;
+use crate::math::{Num, P3, PI, sin};
+use crate::place::{Coord, GameFrame};
+use crate::scene::Obj;
+use crate::shapes::{Cube, options};
 
 /// A cast-iron bench end in one plane at game x, each member a flat bar `t` thick and `w` deep: the back leg
 /// rising in one curve into the upright, leaning back to `top` (height, depth); the front leg, straight up and,

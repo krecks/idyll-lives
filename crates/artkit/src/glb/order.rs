@@ -1,6 +1,7 @@
 //! The order objects go into the file in.
 
-use super::*;
+use crate::scene::Obj;
+use std::collections::BTreeMap;
 
 /// A name as Blender's exporter sorts nodes by it: its runs of digits as numbers, the text between without case
 /// (`door1` before `door-1`, `water` before `water.001`, `leg2` before `leg10`).

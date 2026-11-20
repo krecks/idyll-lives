@@ -1,6 +1,8 @@
 //! Cutting faces into triangles, as Blender's polyfill does.
 
-use super::*;
+use crate::math::{V3, dot_v3, normalize_v3};
+use crate::mesh::{Mesh, edge};
+use crate::scene::Obj;
 
 /// How bmesh.ops.triangulate cuts a quad in two.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]

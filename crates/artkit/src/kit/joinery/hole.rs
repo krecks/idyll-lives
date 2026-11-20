@@ -1,6 +1,7 @@
 //! A hole in a face, triangulated into it.
 
 use super::*;
+use std::collections::BTreeMap;
 
 /// A face with a hole whole inside it (`outer` anticlockwise, `hole` the other way round, each point's place
 /// in `place`) as the two faces Blender leaves: one between the face's side nearest the hole and the hole, the

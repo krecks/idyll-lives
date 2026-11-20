@@ -1,6 +1,6 @@
 //! Y up: the turn from Blender's Z up to glTF's.
 
-use super::*;
+use crate::math::{EulerOrder, V3, cos, sin};
 
 /// Blender (x, y, z) as the file's (x, z, -y).
 pub(crate) fn y_up(v: V3) -> [f32; 3] {

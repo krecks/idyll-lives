@@ -4,10 +4,6 @@
 //! as are `Quat` and the matrices. A build repeats the scripts' arithmetic bit for bit where that decides where
 //! a vertex or a perch ends up.
 
-pub(crate) use std::ops::{
-    Add, AddAssign, Div, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign,
-};
-
 mod euler;
 mod invert;
 mod matrix;

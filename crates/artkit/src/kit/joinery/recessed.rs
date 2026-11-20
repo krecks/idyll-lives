@@ -1,6 +1,10 @@
 //! A recessed box.
 
 use super::*;
+use crate::materials::Mat;
+use crate::place::{Coord, GameFrame};
+use crate::scene::Obj;
+use crate::shapes::Cube;
 
 /// A box (game `w` x `h` x `d` at `at`) with a box-shaped recess in it: `cavity` (its width, height and depth)
 /// at game `cavity_at`, reaching out of the box through the one face it opens: an oven's carcass and its mouth,

@@ -3,14 +3,6 @@
 //! primitive a material with POSITION, NORMAL, TEXCOORD_0 (only where a textured finish is used) and COLOR_0 (the
 //! baked shading), materials as a name and a base colour, clips as animations from 0 s with a key a frame.
 
-use crate::json::{Json, float_repr};
-use crate::materials::Finishes;
-use crate::math::{EulerOrder, V3, cos, sin};
-use crate::motion::{self, Path};
-use crate::normals::corner_normals;
-use crate::scene::{self, FPS, Obj};
-use std::collections::BTreeMap;
-
 mod affine;
 mod encode;
 mod file;
