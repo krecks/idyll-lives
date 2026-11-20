@@ -83,6 +83,9 @@ export const CASTER_REACH = 8;
  */
 const VIEW_NOISE = 1e-6;
 
+/** Why the still casters' picture was drawn again (`SunShadows.draws.why`). */
+type StillChange = 'moved' | 'view' | 'depth' | 'map' | 'list' | 'key' | 'count' | 'box';
+
 /** The sun's pass as PlayCanvas 2.23 makes it (`RenderPassShadowDirectional`; `check:chunks`). */
 interface ShadowPass {
   light: SceneLight;
@@ -288,8 +291,13 @@ export class SunShadows {
   castKey: ((mi: pc.MeshInstance) => number | undefined) | null = null;
   /** Whether the still casters' picture is kept (`SunShadowOptions.still`). */
   readonly still: boolean;
-  /** Redraws since the page opened: of the still casters too, and of only what moves (the bench's counts). */
-  readonly draws = { whole: 0, moving: 0 };
+  /**
+   * Redraws since the page opened: of the still casters too, and of only what moves (the bench's counts); and why the
+   * still casters' picture was drawn again (`why`: asked for by `moved`, else the first check that failed: the light's
+   * view across the map or in depth, the map, the casters' list, a keyed draw's copies, a draw's count or box), with
+   * the names of the draws whose copies, count or box changed or that came or went (`by`).
+   */
+  readonly draws = { whole: 0, moving: 0, why: { moved: 0, view: 0, depth: 0, map: 0, list: 0, key: 0, count: 0, box: 0 } as Record<StillChange, number>, by: new Map<string, number>() };
   /** The still casters' picture is drawn again at the next redraw: something in it changed (`moved`). */
   private whole = true;
   /** The still casters' picture (a depth texture the map's size) and what it was drawn of. */
@@ -458,14 +466,17 @@ export class SunShadows {
     for (const mi of casters) if (!moving.has(mi)) still.push(mi);
     this.lightViewProj(data.shadowCamera);
     if (!map?.depthBuffer) return;
-    const redraw = this.whole || !this.sameStill(light, still);
+    const change = this.whole ? 'moved' : this.stillChange(light, still);
+    const redraw = change !== null;
     if (redraw && !this.drawStillCasters(pass, map, still)) return;
     // SAFETY: both of PlayCanvas 2.23's devices copy a render target's depth with `copyRenderTarget(source, dest,
     // color, depth)` (WebGPU `copyTextureToTexture`, WebGL2 `blitFramebuffer`), outside a pass (`check:chunks`).
     (this.device as unknown as { copyRenderTarget(source: pc.RenderTarget, dest: pc.RenderTarget, color: boolean, depth: boolean): boolean }).copyRenderTarget(this.stillTarget!, map, false, true);
     this.copied = true;
-    if (redraw) this.draws.whole++;
-    else this.draws.moving++;
+    if (change) {
+      this.draws.whole++;
+      this.draws.why[change]++;
+    } else this.draws.moving++;
     this.whole = false;
   }
 
@@ -497,29 +508,44 @@ export class SunShadows {
     light._shadowCascadesInvalidated = false;
   }
 
-  /** Whether the still casters are those the picture was drawn of, as they were, seen the same way. */
-  private sameStill(light: SceneLight, still: readonly pc.MeshInstance[]): boolean {
+  /** What differs between the still casters and those the picture was drawn of, as they were, seen the same way; null: nothing. */
+  private stillChange(light: SceneLight, still: readonly pc.MeshInstance[]): StillChange | null {
     const d = this.drawn;
-    if (!this.stillTarget || light._shadowMap !== d.map || d.casters.length !== still.length) return false;
+    if (!this.stillTarget || light._shadowMap !== d.map) return 'map';
     const vp = this.viewProj.data;
-    // (The fit's float noise as the camera moves isn't a change: `VIEW_NOISE`.)
-    for (let k = 0; k < 16; k++) if (Math.abs(vp[k] - d.viewProj[k]) > VIEW_NOISE) return false;
+    // (The fit's float noise as the camera moves isn't a change: `VIEW_NOISE`. The third row is the depth.)
+    for (let k = 0; k < 16; k++) if (Math.abs(vp[k] - d.viewProj[k]) > VIEW_NOISE) return k % 4 === 2 ? 'depth' : 'view';
+    if (d.casters.length !== still.length) return this.changedBy('list', this.cameOrWent(still));
     for (let i = 0; i < still.length; i++) {
       const mi = still[i];
-      if (mi !== d.casters[i]) return false;
+      if (mi !== d.casters[i]) return this.changedBy('list', this.cameOrWent(still));
       const key = this.castKey?.(mi);
       if (key !== undefined) {
-        if (key !== d.keys[i]) return false;
+        if (key !== d.keys[i]) return this.changedBy('key', mi);
         continue;
       }
-      if (mi.instancingCount !== d.counts[i]) return false;
+      if (mi.instancingCount !== d.counts[i]) return this.changedBy('count', mi);
       const b = mi.aabb;
       const o = i * 6;
       const c = b.center;
       const h = b.halfExtents;
-      if (c.x !== d.boxes[o] || c.y !== d.boxes[o + 1] || c.z !== d.boxes[o + 2] || h.x !== d.boxes[o + 3] || h.y !== d.boxes[o + 4] || h.z !== d.boxes[o + 5]) return false;
+      if (c.x !== d.boxes[o] || c.y !== d.boxes[o + 1] || c.z !== d.boxes[o + 2] || h.x !== d.boxes[o + 3] || h.y !== d.boxes[o + 4] || h.z !== d.boxes[o + 5]) return this.changedBy('box', mi);
     }
-    return true;
+    return null;
+  }
+
+  /** The first draw that is among the still casters now and wasn't when the picture was drawn, or the other way round. */
+  private cameOrWent(still: readonly pc.MeshInstance[]): pc.MeshInstance | undefined {
+    const was = new Set(this.drawn.casters);
+    const now = new Set(still);
+    return still.find((mi) => !was.has(mi)) ?? this.drawn.casters.find((mi) => !now.has(mi));
+  }
+
+  /** `change`, with the draw it was seen on counted by its node's name (`draws.by`). */
+  private changedBy(change: StillChange, mi: pc.MeshInstance | undefined): StillChange {
+    const name = `${change} ${mi?.node?.name || mi?.node?.parent?.name || mi?.material?.name || '?'}`;
+    this.draws.by.set(name, (this.draws.by.get(name) ?? 0) + 1);
+    return change;
   }
 
   /**

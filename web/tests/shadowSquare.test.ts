@@ -127,7 +127,7 @@ describe("the sun's map over the still casters' picture", () => {
     shadows.posed();
     expect(draw()).toEqual(['copy still → map', 'map: body']);
     expect(visibleCasters).toEqual([house, body, tree]);
-    expect(shadows.draws).toEqual({ whole: 1, moving: 1 });
+    expect(shadows.draws).toMatchObject({ whole: 1, moving: 1, why: { moved: 1, view: 0, depth: 0 } });
   });
 
   test('anything else drawn again first: a thing moved, a still caster moved or went, the light turned', () => {
@@ -180,4 +180,3 @@ describe("the sun's map over the still casters' picture", () => {
     expect(shadows.splits({ numCascades: 1 } as never)).toBe(false);
   });
 });
-

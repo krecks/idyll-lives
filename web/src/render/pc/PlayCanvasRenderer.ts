@@ -4145,7 +4145,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         mirrorsLive: this.mirrors.live,
         mirrorSpots: this.mirrors.spots,
         mirrorDraws: this.mirrors.draws,
-        sunShadowDraws: { ...this.sunShadows.draws },
+        sunShadowDraws: ((d) => ({ whole: d.whole, moving: d.moving, why: { ...d.why }, by: Object.fromEntries(d.by) }))(this.sunShadows.draws),
         nightGrade: this.post?.night ?? 0,
         lightingUpdates: this.counts.lightingUpdates,
         shaders: this.shaderWatch.shaders,
