@@ -3,7 +3,8 @@
  *
  * - Vertex tweaks. Vertex colours are authored in sRGB: PlayCanvas converts them itself
  *   (`vertexColorGamma`), and `GAME_SRGB_COLORS` does the same for a per-instance colour
- *   (`GAME_INSTANCE_COLOR`: the `INSTANCE_COLOR_SEMANTIC` stream, multiplied into the albedo). A
+ *   (`GAME_INSTANCE_COLOR`: the `INSTANCE_COLOR_SEMANTIC` stream, multiplied into the albedo; with
+ *   `GAME_TINT_WHITE` only where the vertex colour is pure white, a parked car's paint, `shared/cars.ts`). A
  *   glow's strength per instance (`GAME_GLOW_TINT`, `models.ts` `glowByInstance`) multiplies the
  *   same stream into its (unlit, emissive) vertex colour, linearised as the glow's is.
  *   Planar UVs (`GAME_PLANAR_UV`) are the local XZ position in metres, for flat meshes built
@@ -32,6 +33,8 @@ import { OUT } from './roomLights';
 const STRIPE_DEPTH = '0.12';
 /** How far up a metal's reflection goes for one that would go down (1: as far up as it went down). */
 const SKY_FOR_GROUND = '0.3';
+/** Under this a vertex colour's channel isn't white (`GAME_TINT_WHITE`): 255 is 1, 254 under it. */
+const WHITE = '0.998';
 /** The plain finish where a mesh has no vertex colours: matte (`encodeFinish(0.75, 0)`). */
 const MATTE = '0.375';
 
@@ -51,6 +54,9 @@ export const VERTEX_TWEAKS: ShaderFeature = {
 	vGameTint = game_instanceColor;
 	#ifdef GAME_SRGB_COLORS
 		vGameTint.rgb = pow(max(vGameTint.rgb, vec3(0.0)), vec3(2.2));
+	#endif
+	#if defined(GAME_TINT_WHITE) && defined(VERTEX_COLOR)
+		if (min(vVertexColor.r, min(vVertexColor.g, vVertexColor.b)) < ${WHITE}) vGameTint = vec4(1.0);
 	#endif
 #endif
 #if defined(GAME_GLOW_TINT) && defined(VERTEX_COLOR)
@@ -78,6 +84,11 @@ export const VERTEX_TWEAKS: ShaderFeature = {
 	output.vGameTint = game_instanceColor;
 	#ifdef GAME_SRGB_COLORS
 		output.vGameTint = vec4f(pow(max(game_instanceColor.rgb, vec3f(0.0)), vec3f(2.2)), game_instanceColor.a);
+	#endif
+	#if defined(GAME_TINT_WHITE) && defined(VERTEX_COLOR)
+		if (min(output.vVertexColor.r, min(output.vVertexColor.g, output.vVertexColor.b)) < ${WHITE}) {
+			output.vGameTint = vec4f(1.0);
+		}
 	#endif
 #endif
 #if defined(GAME_GLOW_TINT) && defined(VERTEX_COLOR)

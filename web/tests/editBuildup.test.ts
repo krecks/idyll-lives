@@ -1,12 +1,14 @@
 // Step 2's build-up (`game/edit/buildup.ts`) on a town laid as step 2 lays one (the `land` and `town`
 // jobs: its plan, the land as laid): a street built up the same way twice for the same seed; nothing
-// built off the street's frontage and nothing standing moved; a street through the centre gets no
-// homes there, a village's street a village's kinds; the homes the same whichever mode; undo gives
-// the draft's bytes back; a civic place offered until the town has it, put down a lot of its own, and a
-// civic place's lot made another; a street built up until it is
-// full, then refused with why; its buildings cleared; on hilly land the settle takes every building
-// built (those that would break a slope limit left out first); a street drawn with the town's buildings
-// along it in one edit; and a town built up so has no hard problem it hadn't (`edit/checked.ts` `editedProblems`).
+// built off the street's frontage and nothing standing moved, every new building a real lot (a named
+// place called as one and given its place, a building of flats called as its template names it); a
+// street through the centre gets no homes of the lot mix there but the centre's buildings, flats over
+// its shops among them, a village's street a village's kinds; the homes the same whichever mode; undo
+// gives the draft's bytes back; a civic place offered until the town has it, put down a lot of its own,
+// and a civic place's lot made another; a street built up until it is full, then refused with why; its
+// buildings cleared with their flats and places; on hilly land the settle takes every lot built (those
+// that would break a slope limit left out first); a street drawn with the town's buildings along it in
+// one edit; and a town built up so has no hard problem it hadn't (`edit/checked.ts` `editedProblems`).
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 
@@ -31,13 +33,15 @@ describe('build-up', async () => {
   const { plotRect, useTownContent } = await import('../src/game/town');
   const { runTownJob } = await import('../src/game/townJobs');
   const { inside, lengths, RoadIndex } = await import('../src/game/roads');
-  const { CIVIC, civicChoices, civicOf, draftAreaSize } = await import('../src/game/backdrop');
+  const { CIVIC, civicChoices, civicOf, draftAreaSize } = await import('../src/game/places');
   const { sizeByHomes } = await import('../src/game/world');
   const { civicOfLot, removeLots, swapCivic } = await import('../src/game/edit/lots');
   const { entriesOf, frontOf } = await import('../src/game/edit/ground');
   const { TownHistory } = await import('../src/game/edit/history');
   const { editedProblems } = await import('../src/game/edit/checked');
-  const { addCivic, areaOfRoad, buildingsOn, builtAlong, buildUp, clearBuildings, civicOffered } = await import('../src/game/edit/buildup');
+  const { addCivic, areaOfRoad, buildingsOn, builtAlong, buildUp, clearBuildings, civicOffered, isTownBuilding } = await import('../src/game/edit/buildup');
+  const { homesOn } = await import('../src/game/town');
+  const { flatsTemplate } = await import('../src/game/flats');
   const { drawStreet, removeRoad } = await import('../src/game/edit/streets');
   type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
@@ -63,12 +67,10 @@ describe('build-up', async () => {
     if ('refused' in e) throw new Error(`refused: ${e.refused}`);
     return e.draft;
   };
-  const centroid = (poly: readonly [number, number][]): [number, number] => [poly.reduce((s, p) => s + p[0], 0) / poly.length, poly.reduce((s, p) => s + p[1], 0) / poly.length];
-  /** `draft` with road `road` stripped bare: its lots and the buildings fronting it gone. */
+  /** `draft` with road `road` stripped bare: every lot fronting it gone. */
   const bare = (draft: NeighbourhoodDraft, road: number): NeighbourhoodDraft => {
     const e = entriesOf(draft, t);
-    const lots = new Set(draft.slots.filter((_, i) => e[i].road === road).map((s) => s.index));
-    return removeLots(draft, lots, new Set(buildingsOn(draft, road)));
+    return removeLots(draft, new Set(draft.slots.filter((_, i) => e[i].road === road).map((s) => s.index)));
   };
   /** The roads of area `area` (streets and lanes) by length, longest first. */
   const streetsOf = (draft: NeighbourhoodDraft, area: number) =>
@@ -95,40 +97,45 @@ describe('build-up', async () => {
     expect(bytes(plain)).toBe(before);
     // Another seed, another street's worth.
     const c = made(buildUp(plain, t, content, { road: plainRoad, mode: 'both', seed: 8 }));
-    expect(bytes(c.open!.backdrop)).not.toBe(bytes(made(a).open!.backdrop));
+    expect(bytes(c.slots)).not.toBe(bytes(made(a).slots));
   });
 
-  test('nothing is built off the street, and nothing standing moves', () => {
+  test('nothing is built off the street, nothing standing moves, and every building is a real lot', () => {
     const e = buildUp(plain, t, content, { road: plainRoad, mode: 'both', seed: 7 });
     const d = made(e);
-    const had = plain.open!.backdrop!.length;
-    const fresh = d.open!.backdrop!.slice(had);
-    expect(fresh.length).toBeGreaterThan(3);
-    expect(d.open!.backdrop!.slice(0, had)).toEqual(plain.open!.backdrop!);
+    const fresh = d.slots.slice(plain.slots.length);
+    const buildings = fresh.filter(isTownBuilding);
+    expect(buildings.length).toBeGreaterThan(1);
     expect(d.slots.slice(0, plain.slots.length).map((s) => [s.x, s.z, s.facing, s.template])).toEqual(plain.slots.map((s) => [s.x, s.z, s.facing, s.template]));
     expect(d.open!.places!.slice(0, plain.open!.places!.length)).toEqual(plain.open!.places!);
-    // Every new building fronts the street (the road nearest it), and every new home meets it.
-    const on = new Set(buildingsOn(d, plainRoad));
-    for (let k = had; k < d.open!.backdrop!.length; k++) expect(on.has(k)).toBe(true);
+    // Every new lot meets the street, and the town's buildings fronting it are the new ones.
     const entries = entriesOf(d, t);
     for (let i = plain.slots.length; i < d.slots.length; i++) expect(entries[i].road).toBe(plainRoad);
-    // No building is a place (the named places are lots): no place is added.
-    expect(d.open!.backdrop!.every((b) => b.place === undefined)).toBe(true);
-    expect(d.open!.places!.length - plain.open!.places!.length).toBe(d.slots.slice(plain.slots.length).filter((s) => s.kind !== 'house').length);
-    console.log(`plain street: ${d.slots.length - plain.slots.length} homes, ${fresh.length} buildings, ${d.open!.places!.length - plain.open!.places!.length} places, left out ${'leftOut' in e ? e.leftOut : 0}`);
+    expect(buildingsOn(d, t, plainRoad)).toEqual(buildings.map((s) => s.index));
+    // Every new public lot has its place, called as it is, none twice; a building of flats is called as its template names it.
+    const places = d.open!.places!;
+    expect(places.length - plain.open!.places!.length).toBe(fresh.filter((s) => s.kind === 'shop').length);
+    for (const s of fresh.filter((q) => q.kind === 'shop')) expect(places.find((p) => p.plot === s.index)?.name).toBe(s.name);
+    expect(new Set(places.map((p) => p.name)).size).toBe(places.length);
+    for (const s of fresh.filter((q) => q.kind === 'flats')) expect(s.name).toBe(flatsTemplate(t, s.template)!.name);
+    const homes = fresh.reduce((n, s) => n + homesOn(s, { farms: true }), 0);
+    console.log(`plain street: ${fresh.length} lots (${homes} homes: ${fresh.filter((s) => s.kind === 'flats').length} buildings of flats, ${fresh.filter((s) => s.kind === 'shop' && s.upper?.startsWith('over:')).length} places with flats over them), ${buildings.length} of them the town's buildings, ${places.length - plain.open!.places!.length} places, left out ${'leftOut' in e ? e.leftOut : 0}`);
   });
 
-  test("a street through the centre gets no homes there, and the centre's buildings", () => {
+  test("a street through the centre gets no homes of the lot mix there, but the centre's buildings, flats over its shops among them", () => {
     const d = made(buildUp(high, t, content, { road: highRoad, mode: 'both', seed: 3 }));
-    for (const s of d.slots.slice(high.slots.length)) {
-      const [x, z] = frontOf(t, s);
-      expect(inside(centre, x, z)).toBe(false);
-    }
-    const inCentre = d.open!.backdrop!.slice(high.open!.backdrop!.length).filter((b) => inside(centre, ...centroid(b.poly)));
+    const fresh = d.slots.slice(high.slots.length);
+    // (The lot mix's homes outside it; in it, the centre's kinds: shops, cafés, restaurants, offices, flats, terraces.)
+    const inCentre = fresh.filter((s) => inside(centre, ...frontOf(t, s)));
     expect(inCentre.length).toBeGreaterThan(3);
-    const CENTRE_USES = new Set(['shop', 'flats', 'cafe', 'restaurant', 'office', 'terrace', 'hall']);
-    for (const b of inCentre) expect(CENTRE_USES.has(b.use)).toBe(true);
-    console.log(`high street: ${inCentre.length} buildings in the centre (${[...new Set(inCentre.map((b) => b.use))].join(', ')}), ${d.slots.length - high.slots.length} homes outside it`);
+    for (const s of inCentre) expect(isTownBuilding(s)).toBe(true);
+    expect(inCentre.some((s) => s.kind === 'house' && s.garden === 'tight')).toBe(false);
+    const uses = inCentre.map((s) => s.dress?.use ?? (s.lot === 'terrace' ? 'terrace' : s.kind));
+    for (const u of uses) expect(['shop', 'flats', 'cafe', 'restaurant', 'office', 'terrace']).toContain(u);
+    // (Most of its shops, cafés and restaurants with flats over them: `dense.ts` `raisePlaces`.)
+    const over = inCentre.filter((s) => s.upper?.startsWith('over:')).length;
+    expect(over + inCentre.filter((s) => s.kind === 'flats').length).toBeGreaterThan(0);
+    console.log(`high street: ${inCentre.length} lots in the centre (${[...new Set(uses)].join(', ')}; ${over} with flats over them), ${fresh.length - inCentre.length} lots outside it`);
   });
 
   test("a village's street gets a village's kinds and homes", () => {
@@ -138,14 +145,15 @@ describe('build-up', async () => {
     expect(areaOfRoad(town, road)).toBe(area);
     const v = bare(town, road);
     const d = made(buildUp(v, t, content, { road, mode: 'both', seed: 5 }));
-    const fresh = d.open!.backdrop!.slice(v.open!.backdrop!.length);
-    expect(d.slots.length).toBeGreaterThan(v.slots.length);
-    const HAMLET_USES = new Set(['house', 'terrace', 'workshop', 'barn', 'shop', 'cafe', 'hall']);
-    for (const b of fresh) {
-      expect(HAMLET_USES.has(b.use)).toBe(true);
-      expect(b.area).toBe(area);
+    const fresh = d.slots.slice(v.slots.length);
+    expect(fresh.length).toBeGreaterThan(0);
+    // (A hamlet's kinds: homes, terraces, workshops, a shop or a café; no flats, offices or restaurants.)
+    const uses = fresh.map((s) => s.dress?.use ?? (s.lot === 'terrace' ? 'terrace' : s.kind));
+    for (const [k, s] of fresh.entries()) {
+      expect(['house', 'terrace', 'workshop', 'shop', 'cafe']).toContain(uses[k]);
+      expect(s.area ?? 0).toBe(area);
     }
-    console.log(`village street: ${d.slots.length - v.slots.length} homes, ${fresh.length} buildings (${[...new Set(fresh.map((b) => b.use))].join(', ')})`);
+    console.log(`village street: ${fresh.length} lots (${[...new Set(uses)].join(', ')})`);
   });
 
   test('a country road out of every town and village is not built up, and says why', () => {
@@ -156,7 +164,8 @@ describe('build-up', async () => {
   });
 
   test('the homes stay the same whichever mode', () => {
-    const sig = (d: NeighbourhoodDraft) => d.slots.slice(plain.slots.length).map((s) => JSON.stringify(plotRect(t, s)) + s.template);
+    // (The lot mix's homes: those that are none of the town's buildings.)
+    const sig = (d: NeighbourhoodDraft) => d.slots.slice(plain.slots.length).filter((s) => !isTownBuilding(s)).map((s) => JSON.stringify(plotRect(t, s)) + s.template);
     const homes = sig(made(buildUp(plain, t, content, { road: plainRoad, mode: 'homes', seed: 9 })));
     const both = sig(made(buildUp(plain, t, content, { road: plainRoad, mode: 'both', seed: 9 })));
     const buildings = made(buildUp(plain, t, content, { road: plainRoad, mode: 'buildings', seed: 9 }));
@@ -164,8 +173,10 @@ describe('build-up', async () => {
     // (Both: the main town's homes on a share of the frontage, the first the lot fill puts down.)
     expect(both.length).toBeLessThan(homes.length);
     expect(homes.slice(0, both.length)).toEqual(both);
-    expect(buildings.slots.length).toBe(plain.slots.length);
-    expect(buildings.open!.backdrop!.length).toBeGreaterThan(plain.open!.backdrop!.length);
+    // Buildings alone: none of the lot mix's homes, only the town's buildings.
+    const fresh = buildings.slots.slice(plain.slots.length);
+    expect(fresh.length).toBeGreaterThan(0);
+    expect(fresh.every(isTownBuilding)).toBe(true);
   });
 
   test("undo gives the draft's bytes back", () => {
@@ -185,25 +196,25 @@ describe('build-up', async () => {
       else d = e.draft;
     }
     expect(refused).toBe(`nothing more fits along ${plain.roads[plainRoad].name}`);
-    const on = buildingsOn(d, plainRoad);
+    const on = buildingsOn(d, t, plainRoad);
     expect(on.length).toBeGreaterThan(0);
-    const cleared = clearBuildings(d, plainRoad);
+    const cleared = clearBuildings(d, t, plainRoad);
     const c = made(cleared);
-    expect('cleared' in cleared && cleared.cleared.backdrop).toEqual(on);
-    expect(buildingsOn(c, plainRoad)).toEqual([]);
-    expect(c.open!.backdrop!.length).toBe(d.open!.backdrop!.length - on.length);
-    // No place goes with them: none of them is one.
-    expect(c.open!.places).toEqual(d.open!.places);
-    expect(c.slots).toEqual(d.slots);
-    expect('refused' in clearBuildings(c, plainRoad) && (clearBuildings(c, plainRoad) as { refused: string }).refused).toMatch(/nothing is built along/);
+    expect('cleared' in cleared && cleared.cleared.lots).toEqual(on);
+    expect(buildingsOn(c, t, plainRoad)).toEqual([]);
+    expect(c.slots.length).toBe(d.slots.length - on.length);
+    // The places of those that were places go with them; the homes of the lot mix stay.
+    const gone = new Set(on);
+    expect(c.open!.places!.length).toBe(d.open!.places!.filter((p) => p.plot === undefined || !gone.has(p.plot)).length);
+    expect(c.slots.map((s) => [s.x, s.z, s.template])).toEqual(d.slots.filter((s) => !gone.has(s.index)).map((s) => [s.x, s.z, s.template]));
+    expect('refused' in clearBuildings(c, t, plainRoad) && (clearBuildings(c, t, plainRoad) as { refused: string }).refused).toMatch(/nothing is built along/);
   });
 
   /** The lot of civic place `civic` (an index into `CIVIC`) in area `area` of `draft`, by slot index; -1 if none. */
   const civicLot = (draft: NeighbourhoodDraft, area: number, civic: number) => draft.slots.findIndex((s) => (s.area ?? 0) === area && civicOfLot(s) === civic);
 
   test('a civic place is offered until the town has it, then refused; put down by hand, it is a lot of its own', () => {
-    // The town's civic places are lots (no backdrop building is a place); its church taken away, offered, put back by hand.
-    expect(town.open!.backdrop!.every((b) => b.place === undefined)).toBe(true);
+    // The town's civic places are lots; its church taken away, offered, put back by hand.
     const church = civicLot(town, 0, 1);
     expect(church).toBeGreaterThanOrEqual(0);
     expect(civicOf(town.open!.places!.find((p) => p.plot === church))).toBe(1);
@@ -227,7 +238,7 @@ describe('build-up', async () => {
     }
     expect(put).not.toBeNull();
     const d = put!;
-    expect(d.open!.backdrop).toEqual(without.open!.backdrop);
+    expect(d.slots.length).toBe(without.slots.length + 1);
     const lot = d.slots.at(-1)!;
     expect(lot).toMatchObject({ kind: 'shop', template: 'church', area: 0, index: d.slots.length - 1 });
     expect(lot.dress).toMatchObject({ use: 'church' });
@@ -285,7 +296,7 @@ describe('build-up', async () => {
 
   test("the main town is offered its size's civic places, the bigger of its place's and its homes', those for careers nobody there employs first", () => {
     // A main town's size by its homes (as the generator lays each size's).
-    expect([20, 40, 60, 110, 150, 210, 240].map(sizeByHomes)).toEqual(['hamlet', 'hamlet', 'village', 'village', 'town', 'town', 'city']);
+    expect([20, 70, 90, 110, 150, 190, 240].map(sizeByHomes)).toEqual(['hamlet', 'hamlet', 'village', 'village', 'town', 'town', 'city']);
     // A hamlet is offered no police station, nor a village's school, until it has grown.
     const hamlet = planOf('country', 11, { town: 'hamlet', villages: 'none', size: 'small' });
     const homes = hamlet.slots.filter((s) => s.kind === 'house' && (s.area ?? 0) === 0);
@@ -317,7 +328,7 @@ describe('build-up', async () => {
     const at = civicLot(noBank, 0, police);
     const e = swapCivic(noBank, t, content, at, bank, 1);
     const d = made(e);
-    expect(e).toHaveProperty('cleared', { lots: [], backdrop: [] });
+    expect(e).toHaveProperty('cleared', { lots: [] });
     const [was, now] = [noBank.slots[at], d.slots[at]];
     expect([now.x, now.z, now.facing, now.w, now.d, now.anchor]).toEqual([was.x, was.z, was.facing, was.w, was.d, was.anchor]);
     expect(now.template).toBe('bank');
@@ -331,7 +342,7 @@ describe('build-up', async () => {
     expect(civicOffered(d, 0).some((c) => c.civic === police)).toBe(true);
   });
 
-  test('on hilly land the settle takes every building a street is built up with: those that would break a slope limit are left out first', () => {
+  test('on hilly land the settle takes every lot a street is built up with: those that would break a slope limit are left out first', () => {
     const settle = (steps: readonly NeighbourhoodDraft[]) => inWorker({ kind: 'edit', plan: steps[steps.length - 1], ops: steps.length - 1, steps, check: false });
     const hilly = planOf('heath', 5, { town: 'town', villages: 'few', size: 'medium', hills: 'hilly' });
     let [built, left] = [0, 0];
@@ -339,12 +350,12 @@ describe('build-up', async () => {
       const b = bare(hilly, road);
       const e = buildUp(b, t, content, { road, mode: 'both', seed: 1 });
       if ('refused' in e) continue;
-      built += e.draft.open!.backdrop!.length - b.open!.backdrop!.length;
+      built += e.draft.slots.length - b.slots.length;
       left += e.leftOut ?? 0;
       expect(settle([b, e.draft]).refused).toEqual([]);
     }
     expect(built).toBeGreaterThan(10);
-    console.log(`hilly: ${built} buildings, ${left} left out`);
+    console.log(`hilly: ${built} lots, ${left} left out`);
   }, 120_000);
 
   test('a street drawn with the town buildings along it is one edit: the street, its homes and its buildings', () => {
@@ -372,11 +383,11 @@ describe('build-up', async () => {
     expect(road).toBeGreaterThanOrEqual(0);
     expect(areaOfRoad(d, road)).toBe(0);
     expect(d.slots.length).toBeGreaterThan(gone.slots.length);
-    expect(buildingsOn(d, road).length).toBeGreaterThan(0);
+    expect(buildingsOn(d, t, road).length).toBeGreaterThan(0);
     expect(made(builtAlong(gone, drawn, t, content, 'both', 6))).toEqual(d);
-    // Homes alone: `drawStreet`'s own fill, no buildings.
+    // Homes alone: `drawStreet`'s own fill, none of the town's buildings.
     const homes = made(drawStreet(gone, t, content, { points, kind: 'street', clear: true, fill: true, seed: 6 }));
-    expect(homes.open!.backdrop!.length).toBe(gone.open!.backdrop!.length);
+    expect(homes.slots.slice(gone.slots.length).some(isTownBuilding)).toBe(false);
   });
 
   test('a town built up has no hard problem it had not', () => {

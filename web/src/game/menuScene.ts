@@ -116,7 +116,8 @@ class MenuScene {
   /**
    * Shows a neighbourhood behind the menus (the renderer rebuilds it only when its layout
    * changed). Again after a game, too: starting one hides the overview. `home`: the lot the
-   * player will live on (the chosen home, the household's), drawn as the game will show it.
+   * player will live on (the chosen home, the household's), drawn as the game will show it: a house's
+   * lot (a flat's building is no house: it is shown with no home, in its own look).
    * `onStep`: the parts of the town as they are built (none for a town already shown). `covered`: no
    * town is in view meanwhile (a panel says how its making goes): it is built in longer slices.
    */

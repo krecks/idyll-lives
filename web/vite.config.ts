@@ -481,6 +481,34 @@ function isolationWorker(): Plugin {
   };
 }
 
+/**
+ * A build made for the benchmark (`VITE_BENCH=1`, `tools/bench/lib/build.mjs`): the debug hooks a bench needs kept
+ * (`src/debug/hooks.ts`), and only what a bench page loads: `public/` copied without the voice and language models
+ * (`benchPublic`; 290 MB a bench never asks for) and no licence file.
+ */
+const BENCH_BUILD = process.env.VITE_BENCH === '1';
+/** The folders of public/ a build for the benchmark leaves out. */
+const BENCH_LEFT_OUT = new Set(['llm', 'voice']);
+
+/** `public/` into the build without `BENCH_LEFT_OUT` (before the plugins that read the copied files at closeBundle). */
+function benchPublic(): Plugin {
+  let outDir = '';
+  let publicDir = '';
+  return {
+    name: 'bench-public',
+    apply: 'build',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+      publicDir = config.publicDir;
+    },
+    async writeBundle() {
+      for (const entry of await readdir(publicDir)) {
+        if (!BENCH_LEFT_OUT.has(entry)) await cp(join(publicDir, entry), join(outDir, entry), { recursive: true, dereference: true });
+      }
+    },
+  };
+}
+
 /** The npm packages whose code the bundles hold (the page's and the workers'), by directory. */
 const bundledPackages = new Set<string>();
 
@@ -536,7 +564,7 @@ The game itself is free software under the GNU General Public License v3.0 or la
 }
 
 export default defineConfig({
-  plugins: [svelte(), debugReports(), modelWatch(), earlyEnvironment(), optimizedAssets(), minifiedManifests(), dataBundle(), isolationWorker(), releaseWasm(), collectPackages(), thirdPartyLicenses()],
+  plugins: [svelte(), debugReports(), modelWatch(), earlyEnvironment(), ...(BENCH_BUILD ? [benchPublic()] : []), optimizedAssets(), minifiedManifests(), dataBundle(), isolationWorker(), releaseWasm(), collectPackages(), ...(BENCH_BUILD ? [] : [thirdPartyLicenses()])],
   // The game's version (one number for web and Rust; `cargo release-version <x.y.z>` bumps it).
   define: { __APP_VERSION__: JSON.stringify(pkg.version), __APP_COMMIT__: JSON.stringify(COMMIT), __BUILD_ID__: JSON.stringify(BUILD_ID) },
   server: { headers: crossOriginIsolation, ...(linkedModules ? { fs: { allow: [searchForWorkspaceRoot(process.cwd()), linkedModules] } } : {}) },
@@ -551,6 +579,7 @@ export default defineConfig({
   // if one grows past that.
   build: {
     target: 'es2022',
+    copyPublicDir: !BENCH_BUILD,
     chunkSizeWarningLimit: 2000,
     rolldownOptions: { output: { codeSplitting: { groups: [{ name: 'playcanvas', test: /[\\/]node_modules[\\/]playcanvas[\\/]/ }] } } },
   },

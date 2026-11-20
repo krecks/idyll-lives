@@ -17,7 +17,7 @@ afterAll(() => Object.assign(globalThis, { location: realLocation }));
 const material = () => new pc.StandardMaterial();
 mock.module('../src/render/pc/materials', () => ({
   INSTANCE_COLOR_SEMANTIC: pc.SEMANTIC_ATTR10,
-  MaterialLibrary: { for: () => ({ plainFinish: material, contactShadow: material, excludeFromLights: () => {} }) },
+  MaterialLibrary: { for: () => ({ plainFinish: material, instanceColored: material, contactShadow: material, excludeFromLights: () => {} }) },
 }));
 // (The shader chunks' module reads the settings too: only the cutaway's attribute, which the meshes name.)
 mock.module('../src/render/pc/shaders/chunks', () => ({ WALL_CUT_SEMANTIC: pc.SEMANTIC_ATTR7 }));

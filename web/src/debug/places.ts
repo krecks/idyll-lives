@@ -11,6 +11,7 @@
 import type { PlotInfo, TownPlace, WorldStructure } from '../core/protocol';
 import { loadTemplates, type PublicTemplate } from '../game/town';
 import type { GameControls } from '../ui/services';
+import { DEBUG_HOOKS } from './hooks';
 
 /** A place as `__places()` gives it. */
 export interface PlaceSeen {
@@ -52,9 +53,9 @@ function templateOf(templates: readonly PublicTemplate[], plot: PlotInfo, world:
   return sized.map((t) => ({ id: t.id, score: likeness(t, defs) })).sort((a, b) => b.score - a.score)[0].id;
 }
 
-/** Installs `__places` and `__lookInside` on a dev build; does nothing in production. */
+/** Installs `__places` and `__lookInside` on a dev build (and the benchmark's); does nothing in production. */
 export function installPlaceHooks(controls: GameControls, world: () => WorldStructure | null): void {
-  if (!import.meta.env.DEV) return;
+  if (!DEBUG_HOOKS) return;
   const seen = (w: WorldStructure, templates: readonly PublicTemplate[]): PlaceSeen[] =>
     (w.meta?.places ?? []).flatMap((p) => {
       const plot = p.plot === undefined ? undefined : w.plots[p.plot];

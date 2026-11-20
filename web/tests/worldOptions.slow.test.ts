@@ -174,7 +174,6 @@ describe('world options', async () => {
     expect(small.careers).toBe(false);
     const big = expectations('country', { town: 'city', villages: 'many' });
     expect(big.homes).toBe(150 + 70);
-    expect(big.mainLeast).toBe(60);
     expect(big.careers).toBe(true);
     expect(expectations('heath').meadow).toBe(true);
   });

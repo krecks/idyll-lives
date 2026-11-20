@@ -26,6 +26,7 @@
 import * as pc from './engine';
 import { onModelFileArrived } from './models';
 import { fogFrom } from './shaders/fog';
+import { frameNow } from '../shared/frameClock';
 
 /** Frames still drawn after a change before the view is held. */
 const SETTLE = 3;
@@ -74,7 +75,7 @@ export class HeldFrames {
   /** Something in the view changed that `draw` can't see: the next frames are drawn. */
   changed(): void {
     this.left = SETTLE;
-    if (this.settleMs > 0) this.changedAt = performance.now();
+    if (this.settleMs > 0) this.changedAt = frameNow();
   }
 
   /**
@@ -83,7 +84,7 @@ export class HeldFrames {
    */
   draw(wanted = false): boolean {
     this.holding = false;
-    const now = performance.now();
+    const now = frameNow();
     if (!this.enabled || !this.active) {
       this.left = SETTLE;
       return this.drawn(now);

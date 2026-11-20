@@ -97,6 +97,13 @@ export class CloudShadows {
     this.id.setValue(this.value);
   }
 
+  /** Fixed-step playback: the clouds back where they start. */
+  restart(): void {
+    this.x = CLOUDS.at[0];
+    this.z = CLOUDS.at[1];
+    this.place();
+  }
+
   /** The clouds drift on with the wind for `dt` ms. */
   drift(dt: number): void {
     if (dt <= 0) return;

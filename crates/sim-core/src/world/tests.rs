@@ -610,3 +610,132 @@ fn others_are_everyone_but_the_one_stepped() {
     assert!(others.get(0).is_some() && others.get(1).is_none() && others.get(2).is_some());
     assert!(others.get(3).is_none());
 }
+
+/// The shipped content, merged as the web loads it.
+fn shipped_content() -> String {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/public/content");
+    let read = |n: &str| std::fs::read_to_string(dir.join(n)).unwrap();
+    let base = read("base.json");
+    let includes: Vec<String> = serde_json::from_value(
+        serde_json::from_str::<serde_json::Value>(&base).unwrap()["include"].clone(),
+    )
+    .unwrap();
+    let parts: Vec<String> = includes.iter().map(|n| read(n)).collect();
+    let parts: Vec<&str> = parts.iter().map(String::as_str).collect();
+    crate::merge_content(&base, &parts).unwrap()
+}
+
+/// Fay, living in a flat over the Corner Shop (`tests/towns/flats_over_shop.json`, given a car on
+/// a driveway in the shop's front strip and a parking bay), is at home in her flat and in the
+/// flats' stair hall (on the ground or its landing upstairs), and sets off in her car from there;
+/// on the shop's floor, a customer like anyone, she is not at home and doesn't set off in it from
+/// there as from home.
+#[test]
+fn a_customer_in_the_shop_under_their_flat_is_not_at_home() {
+    let mut town: serde_json::Value =
+        serde_json::from_str(include_str!("../../tests/towns/flats_over_shop.json")).unwrap();
+    town["drives"] =
+        serde_json::json!([{"plot": 2, "x": 22.5, "z": 21.5, "front": 1, "street": 34.5}]);
+    town["cars"] = serde_json::json!([{"plot": 2, "x": 22.5, "z": 24.25, "yaw": 0, "street": 34.5,
+                                      "len": 4.4, "wid": 1.8, "body": 1, "paint": 2}]);
+    town["parking"] = serde_json::json!([{"x": 2.5, "z": 37.5, "yaw": 0, "area": 0}]);
+    let mut w = World::from_json(&shipped_content(), &town.to_string(), 1).unwrap();
+    w.autonomy = false;
+    let (fay, flat, shop) = (0usize, 2u32, 0u32);
+    assert_eq!(w.households[0].plot, Some(flat));
+    assert_eq!(w.cars[0].owners, vec![0], "Fay's car");
+    let up = w.storey_row(1) as f32;
+    for (at, home) in [
+        ([14.5, 50.5], true),
+        ([16.5, 12.5], true),
+        ([16.5, 12.5 + up], true),
+        ([6.5, 9.5], false),
+    ] {
+        w.sims[fay].pos = at;
+        w.tick_once();
+        let (x, z) = w.sims[fay].tile();
+        let b = &w.briefs[fay];
+        assert_eq!(b.plot, w.plot_at(x, z));
+        if !home {
+            assert_eq!(b.plot, Some(shop), "in the shop at {at:?}");
+        }
+        let here = b
+            .plot
+            .is_some_and(|p| at_home(&w.plots, Some(flat), p, b.hall));
+        assert_eq!(here, home, "at home at {at:?}");
+        let drives = crate::cars::can_drive(
+            &w.travel,
+            &w.households,
+            &w.plots,
+            &w.briefs,
+            &w.cars,
+            &w.sims[fay],
+        );
+        assert_eq!(drives, home, "could set off in her car from {at:?}");
+        let seat = crate::cars::seat(
+            &w.cars,
+            &w.briefs,
+            &w.households,
+            &w.plots,
+            &w.relationships,
+            &w.sims[fay],
+        );
+        assert_eq!(seat.is_some(), home, "takes her car to work from {at:?}");
+    }
+}
+
+/// Ada's letterbox stands by Mill Court's street door, kept by her flat (`tests/towns/flats.json`,
+/// `ObjectInstance::keeper`). A better one she wants (a brass one, doing all the old one does) is
+/// not swapped in over it, as its place is not the flat's, and the flat has no room outdoors for
+/// it: the purchase fails, and the old letterbox stays where it stood, still the flat's, and the
+/// money with the household.
+#[test]
+fn a_kept_letterbox_stays_when_a_better_one_has_no_room() {
+    let mut content: serde_json::Value = serde_json::from_str(&shipped_content()).unwrap();
+    let objects = content["objects"].as_array_mut().unwrap();
+    let mut brass = objects
+        .iter()
+        .find(|o| o["id"] == "letterbox")
+        .unwrap()
+        .clone();
+    brass["id"] = "letterboxBrass".into();
+    brass["price"] = 300.into();
+    objects.push(brass);
+    let mut w = World::from_json(
+        &content.to_string(),
+        include_str!("../../tests/towns/flats.json"),
+        1,
+    )
+    .unwrap();
+    let flat = w.households[0].plot.unwrap();
+    let kept = |w: &World| {
+        let o = w.objects.iter().find(|o| o.keeper == Some(flat))?;
+        Some((w.content.objects[o.def].id.clone(), o.x, o.z))
+    };
+    let before = kept(&w).expect("Ada's letterbox, kept by her flat");
+    assert_eq!(before.0, "letterbox");
+    assert!(!w.on_plot(flat, before.1, before.2), "outside her flat");
+    let brass = w.content.object_index("letterboxBrass").unwrap();
+    let old = crate::planner::replaces(&w, 0, brass).expect("the brass one does all it does");
+    assert_eq!(w.objects[old as usize].keeper, Some(flat));
+    let funds = w.households[0].funds;
+    assert!(crate::planner::buy_wanted(&mut w, 0, brass).is_err());
+    assert_eq!(kept(&w), Some(before), "the old letterbox where it stood");
+    assert_eq!(w.households[0].funds, funds);
+}
+
+/// Mill Court's lot (`tests/towns/flats.json`) from a file without kinds: it has flats in it, so
+/// it is nobody's home (newcomers and movers never take its hall and yard), and each flat is.
+#[test]
+fn a_lot_with_flats_is_no_home_without_kinds() {
+    let mut town: serde_json::Value =
+        serde_json::from_str(include_str!("../../tests/towns/flats.json")).unwrap();
+    for p in town["plots"].as_array_mut().unwrap() {
+        p.as_object_mut().unwrap().remove("kind");
+    }
+    let w = World::from_json(&shipped_content(), &town.to_string(), 1).unwrap();
+    assert!(w.plots.iter().all(|p| p.kind.is_none()), "no kinds");
+    assert!(!w.plots[0].public && w.lots().len() == 1);
+    assert!(!w.is_home(0), "Mill Court's hall and yard");
+    assert!(w.flats().iter().all(|f| w.is_home(f.id)), "its flats");
+}

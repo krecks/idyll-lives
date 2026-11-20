@@ -587,8 +587,9 @@ pub(crate) fn off_the_road(sim: &Sim, ctx: &Ctx) -> Option<Task> {
 pub(crate) const OFF_ROAD_IN: f32 = 0.3;
 pub(crate) const OFF_ROAD_MOST: usize = 1024;
 
-/// What a Sim may use on a plot: everything at home or in public places; as a guest,
-/// anything that isn't private (bed, bathroom...); nothing on other people's lots.
+/// What a Sim may use on a plot: everything at home (and in a flat, its building's shared
+/// things: the hall's, the yard's) or in public places; as a guest, anything that isn't private
+/// (bed, bathroom...); nothing on other people's lots, nor in the neighbours' flats.
 #[derive(PartialEq)]
 pub(crate) enum Access {
     Full,
@@ -799,9 +800,23 @@ pub(crate) fn order_access(
     let home = households[sim.household as usize].plot;
     match plot {
         None => Access::Full,
-        Some(p) if plots[p as usize].public || home == Some(p) => Access::Full,
+        Some(p) if plots[p as usize].public || at_home(plots, home, p, false) => Access::Full,
         _ => access_in(households, plots, sim, plot),
     }
+}
+
+/// Whether plot `p` is home to those living on `home`: it, or the building their flat is in
+/// when that is a building of flats (its hall, stairs, yard and front strip). A public place with
+/// flats over it is never home, though their flat is over it: only its stair hall is (`hall`:
+/// they stand in it, `SimBrief::hall`), not the shop's or the café's floor, where they are
+/// customers like anyone. What they may use there (`access`), and where a household sets off in
+/// its car from: a flat's car stands in its bay in the building's front strip.
+pub(crate) fn at_home(plots: &[Plot], home: Option<u32>, p: u32, hall: bool) -> bool {
+    home.is_some_and(|h| {
+        h == p
+            || plots.get(h as usize).and_then(|f| f.of) == Some(p)
+                && (hall || plots.get(p as usize).is_some_and(|l| !l.public))
+    })
 }
 
 /// `access` outside a step.
@@ -822,7 +837,7 @@ pub(crate) fn access_in(
     }
     match plot {
         None => Access::Full,
-        Some(p) if plots[p as usize].public || home == Some(p) => Access::Full,
+        Some(p) if plots[p as usize].public || at_home(plots, home, p, false) => Access::Full,
         Some(p) if sim.visiting.is_some_and(|v| v.plot == p) => Access::Guest,
         Some(_) => Access::None,
     }

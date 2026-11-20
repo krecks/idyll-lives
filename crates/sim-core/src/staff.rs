@@ -35,7 +35,9 @@ use crate::error::Error;
 use crate::world::{Activity, Ctx, ObjectInstance, Phase, Task, TaskKind, WALK_SPEED, World};
 
 /// Most servers in a town (snapshot rows after the residents'). Posts past them stay self-serve.
-pub const MAX_STAFF: usize = 128;
+/// A real town's every shop, café and office is a named place with its posts, so a city may have
+/// some two hundred of them.
+pub const MAX_STAFF: usize = 256;
 /// Last orders (hours): someone who set off for a post while it was open and gets there this long
 /// after it closed is still served (the server waits for them), as no shop turns away the one
 /// coming through the door at closing time.

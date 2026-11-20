@@ -1,6 +1,6 @@
 /**
- * Noise for laying out land: a seeded generator, a lattice hash, value noise and fractal noise over
- * it, and a smooth step. The same functions the renderer's landscape uses (`render/shared/nature.ts`
+ * Noise for laying out land: a seeded generator (and a pick and a whole number drawn from one), a
+ * lattice hash, value noise and fractal noise over it, and a smooth step. The same functions the renderer's landscape uses (`render/shared/nature.ts`
  * re-exports these), so the world's generator and its drawing agree.
  */
 
@@ -14,6 +14,16 @@ export function mulberry32(seed: number): () => number {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+/** One of `list`, drawn from `rand`. */
+export function pick<T>(rand: () => number, list: readonly T[]): T {
+  return list[Math.floor(rand() * list.length)];
+}
+
+/** A whole number from `lo` to `hi` (both in), drawn from `rand`. */
+export function between(rand: () => number, [lo, hi]: readonly [number, number]): number {
+  return lo + Math.floor(rand() * (hi - lo + 1));
 }
 
 /** A number 0..1 for a lattice point and a seed. */

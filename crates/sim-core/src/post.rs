@@ -2,7 +2,7 @@
 //! `letter`), and the hose's round of the garden (content `waters`).
 //!
 //! Every morning at `POST_MINUTE` the post comes to the letterboxes on each household's home
-//! plot (`deliver`): each one empty (closed) is opened, a letter in its slot (`ObjectInstance::open`,
+//! plot, a flat's kept for it in its building's hall (`ObjectInstance::keeper`) (`deliver`): each one empty (closed) is opened, a letter in its slot (`ObjectInstance::open`,
 //! saved as any object's). Someone at home fetches it (`Interaction::post`, offered while it's
 //! open, closing it as they start): a household with free will sends the nearest one at home
 //! who is up and between things, from then until `FETCH_UNTIL` (`prompt`), as short a use would

@@ -489,7 +489,8 @@ pub(crate) fn no_bike_out(sim: &Sim) -> bool {
 
 /// The way out of town `sim` takes on foot: the quickest (`travel::Travel::eta`).
 pub(crate) fn exit_on_foot(ctx: &Ctx, sim: &Sim) -> Option<[f32; 2]> {
-    // From home, the way their commute was timed by (on foot).
+    // From home (a flat's building too: its hall, its yard), the way their commute was timed by
+    // (on foot).
     let home = ctx
         .households
         .get(sim.household as usize)
@@ -500,7 +501,7 @@ pub(crate) fn exit_on_foot(ctx: &Ctx, sim: &Sim) -> Option<[f32; 2]> {
         && ctx
             .briefs
             .get(sim.id as usize)
-            .is_some_and(|b| b.plot.is_none() || b.plot == home)
+            .is_some_and(|b| b.plot.is_none_or(|p| at_home(ctx.plots, home, p, b.hall)))
     {
         return Some(exit);
     }
@@ -567,6 +568,23 @@ pub(crate) fn held_object(kind: TaskKind) -> Option<u32> {
         TaskKind::Eat { seat, .. } | TaskKind::Phone { seat, .. } => seat,
         _ => None,
     }
+}
+
+/// The objects `sim` holds a place at, in id order: what they're doing holds (`held_object`)
+/// and what a talk from the seat over paused. Those are the only objects with `sim` among their
+/// users, so this finds what a scan of every object in town for them would, without the scan.
+pub(crate) fn held_by<'a>(
+    sim: &Sim,
+    objects: &'a [ObjectInstance],
+) -> impl Iterator<Item = &'a ObjectInstance> + 'a {
+    let mut held =
+        [&sim.current, &sim.paused].map(|a| a.as_ref().and_then(|a| held_object(a.task.kind)));
+    held.sort_unstable();
+    let id = sim.id;
+    held.into_iter()
+        .flatten()
+        .filter_map(|o| objects.get(o as usize))
+        .filter(move |o| o.users().any(|u| u == id))
 }
 
 /// A free crib at home for a baby (one with no other baby in it): they're put straight in.

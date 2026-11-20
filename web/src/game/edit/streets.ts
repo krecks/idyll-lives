@@ -24,7 +24,7 @@
  *   most, laid through the water's middle and turned squarer where the line drawn won't make one,
  *   its deck carried on over the dip a river lies in, the street split round it) where it may, and
  *   is refused where it may not;
- * - clears the lots and backdrop buildings under it (`clear`; else it is refused), and the parking;
+ * - clears the lots under it (`clear`; else it is refused), and the car parks (each whole);
  * - is named, and the roads it is split into at its bridges, with names nobody in town has.
  *
  * The dead ends (the player's choice): a drawn dead end may reach as far past the last road it
@@ -38,6 +38,7 @@
 
 import type { Content } from '../../content/content';
 import type { RoadKind, RoadPlan } from '../../core/protocol';
+import { bayRect, carParkRect } from '../parking';
 import { surfacePlots } from '../../render/shared/builtSurface';
 import { crossWater, DRAWN_SPAN, wetSpans, withBridge, withoutDeck } from '../bridges';
 import { CTRL_APART } from '../countryRouter';
@@ -48,6 +49,7 @@ import { bends, clearOf, connector, COURT, cropRoads, curve, endDir, evenly, ins
 import { plotRect, type NeighbourhoodDraft, type Rect, type Templates } from '../town';
 import { placeOf, specOf, streetNames } from '../world';
 import type { Edited } from './edited';
+import { wholeParks, withoutBays } from './ground';
 import { fillStreet, removalRefused, removeLots } from './lots';
 import { withoutEmptyAreas } from './villages';
 
@@ -89,7 +91,7 @@ const APPROACH = 16;
 const STRAIGHT_IN = 4;
 /** The shortest street drawn (m). */
 const SHORTEST = 16;
-/** Lots, buildings and parking keep this far from a new road's edge (m), else they are in its way. */
+/** Lots and parking keep this far from a new road's edge (m), else they are in its way. */
 const CORRIDOR = 1.5;
 /** A street joins a road no nearer its end than this (m): one drawn nearer meets it this far in. */
 const NEAR_END = 6;
@@ -171,9 +173,6 @@ function offPoly(poly: readonly Pt[], x: number, z: number): number {
   }
   return best;
 }
-
-/** A parking space's ground (`macro.ts` lays them 3 × 6 m, turned with the verge). */
-const spaceOf = (p: { x: number; z: number; rot: number }): Rect => (p.rot % 2 ? { x: p.x - 3, z: p.z - 1.5, w: 6, d: 3 } : { x: p.x - 1.5, z: p.z - 3, w: 3, d: 6 });
 
 /** Every name in town: its roads', its places', its areas' and its own. */
 function namesIn(draft: NeighbourhoodDraft): Set<string> {
@@ -447,10 +446,11 @@ export function areaOf(draft: NeighbourhoodDraft, line: readonly Pt[]): number {
 }
 
 /**
- * The lots (slot indices) and backdrop buildings (`open.backdrop` indices) under `roads` (within
- * their width and `CORRIDOR` m), and the parking spaces (`open.parking` indices).
+ * The lots (slot indices) under `roads` (within their width and `CORRIDOR` m), and the parking bays
+ * (`open.parking` indices) of every car park whose asphalt or one of whose bays is under them (a car park
+ * goes whole: `ground.ts` `wholeParks`).
  */
-function inTheWay(draft: NeighbourhoodDraft, t: Templates, roads: readonly RoadPlan[]): { lots: number[]; backdrop: number[]; parking: number[] } {
+function inTheWay(draft: NeighbourhoodDraft, t: Templates, roads: readonly RoadPlan[]): { lots: number[]; parking: number[] } {
   const pts = roads.flatMap((r) => evenly(r.points, 1).map((p) => ({ p, half: r.width / 2 + CORRIDOR })));
   const xs = pts.map((q) => q.p[0]);
   const zs = pts.map((q) => q.p[1]);
@@ -462,17 +462,18 @@ function inTheWay(draft: NeighbourhoodDraft, t: Templates, roads: readonly RoadP
     const r = plotRect(t, s);
     return under(r, (x, z) => offRect(r, x, z));
   });
-  const backdrop = (draft.open?.backdrop ?? []).flatMap((b, i) => {
-    const bx = b.poly.map((q) => q[0]);
-    const bz = b.poly.map((q) => q[1]);
-    const r = { x: Math.min(...bx), z: Math.min(...bz), w: Math.max(...bx) - Math.min(...bx), d: Math.max(...bz) - Math.min(...bz) };
-    return under(r, (x, z) => offPoly(b.poly, x, z)) ? [i] : [];
-  });
-  const parking = (draft.open?.parking ?? []).flatMap((q, i) => {
-    const r = spaceOf(q);
+  const open = draft.open;
+  if (!open) return { lots: lots.map((s) => s.index), parking: [] };
+  const parks = new Set((open.carParks ?? []).flatMap((p, k) => {
+    const r = carParkRect(p);
+    return under(r, (x, z) => offPoly(p.poly, x, z)) ? [k] : [];
+  }));
+  const bays = open.parking.flatMap((q, i) => {
+    if (q.park !== undefined && parks.has(q.park)) return [i];
+    const r = bayRect(q);
     return under(r, (x, z) => offRect(r, x, z)) ? [i] : [];
   });
-  return { lots: lots.map((s) => s.index), backdrop, parking };
+  return { lots: lots.map((s) => s.index), parking: wholeParks(open, bays) };
 }
 
 /** How far each dead end (not a trail's) of roads `which` reaches past the last road meeting it (m), the longest. */
@@ -645,10 +646,7 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
 
   // What is in its way (before the water: a bridge's own check is for what stands there now).
   const way = inTheWay(draft, t, [{ ...laid, points: base >= 0 ? part : laid.points }]);
-  if (!stroke.clear && (way.lots.length || way.backdrop.length)) {
-    const what = [way.lots.length ? `${way.lots.length} lot${way.lots.length > 1 ? 's' : ''}` : '', way.backdrop.length ? `${way.backdrop.length} building${way.backdrop.length > 1 ? 's' : ''}` : ''].filter(Boolean).join(' and ');
-    return refused(`${what} ${way.lots.length + way.backdrop.length > 1 ? 'are' : 'is'} in its way`);
-  }
+  if (!stroke.clear && way.lots.length) return refused(`${way.lots.length} lot${way.lots.length > 1 ? 's are' : ' is'} in its way`);
   const gone = new Set(way.lots);
   const plots = draft.slots.filter((s) => !gone.has(s.index)).map((s) => plotRect(t, s));
 
@@ -701,13 +699,12 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
   }
 
   // ---- the town with it ----
-  const parkingGone = new Set(way.parking);
   let drawn: NeighbourhoodDraft = {
     ...draft,
     roads: next,
-    ...(open ? { open: { ...open, ...(walk ? { water: rle(walk) } : {}), parking: open.parking.filter((_, i) => !parkingGone.has(i)) } } : {}),
+    ...(open ? { open: { ...open, ...(walk ? { water: rle(walk) } : {}), ...withoutBays(open, way.parking) } } : {}),
   };
-  drawn = removeLots(drawn, gone, new Set(way.backdrop));
+  drawn = removeLots(drawn, gone);
   if (stroke.fill && !trail) {
     for (const [k, i] of fresh.entries()) {
       const r = drawn.roads[i];
@@ -716,7 +713,7 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
       if ('draft' in filled) drawn = filled.draft;
     }
   }
-  return { draft: drawn, cleared: { lots: way.lots, backdrop: way.backdrop }, made: fresh };
+  return { draft: drawn, cleared: { lots: way.lots }, made: fresh };
 }
 
 /** A line's wet stretches (`wetSpans`) as the crossings bridged: those closer than `ONE_CROSSING` m one. */
@@ -824,7 +821,7 @@ export interface Goes {
   /** The country roads that led onto a bridge that goes, left ending there in a dead end longer than `COURT`: made streets of no area (as a drawn one is: `drawStreet`). */
   streets: number[];
   lots: number[];
-  backdrop: number[];
+  /** The parking bays that go (`open.parking` indices): those by a road that goes, and the rest of their car parks with them. */
   parking: number[];
 }
 
@@ -832,8 +829,8 @@ export interface Goes {
  * What removing road `road` from `draft` takes with it (`Goes`): the roads left joined to no way out
  * of the world (with `road` itself), and a bridge left ending in a dead end (it led onto `road`: a
  * bridge has a road on at each end, as a drawn one must), the lots whose way in is on one of them and
- * the outdoor places at a gone trail's end (slot indices), the backdrop buildings fronting them, the
- * parking by them; and the country roads that led onto such a bridge, left ending there more than
+ * the outdoor places at a gone trail's end (slot indices), the car parks by them (`ground.ts`
+ * `wholeParks`); and the country roads that led onto such a bridge, left ending there more than
  * `COURT` m past the last road they meet, which become streets of no area (no taxi turns round in a
  * country road: the rule a drawn one is made by, `drawStreet`; the Build step gives each an area). Or
  * why it may not go: no road out of the world would be left, the roads left would be two networks
@@ -878,22 +875,19 @@ export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number):
   }
   const open = draft.open;
   const rects = draft.slots.map((s) => plotRect(t, s));
-  const entries = surfacePlots({ plots: rects, meta: { roads, facing: draft.slots.map((s) => s.facing), backdrop: open?.backdrop ?? [] } });
+  const entries = surfacePlots({ plots: rects, meta: { roads, facing: draft.slots.map((s) => s.facing) } });
   const trailEnds = [...gone].filter((i) => roads[i].kind === 'trail').flatMap((i) => [roads[i].points[0], roads[i].points[roads[i].points.length - 1]]);
   const lots = draft.slots.filter((s, n) => (entries[n].entry && gone.has(entries[n].entry!.road)) || (s.kind === 'outdoor' && trailEnds.some(([x, z]) => offRect(rects[n], x, z) < TRAIL_END))).map((s) => s.index);
-  const backdrop = (open?.backdrop ?? []).flatMap((_, i) => {
-    const e = entries[rects.length + i]?.entry;
-    return e && gone.has(e.road) ? [i] : [];
-  });
   // (The town keeps its last home and its last park, as a lot removed on its own does.)
   const kept = removalRefused(draft, new Set(lots));
   if (kept) return { refused: `${kept.replace(/\.$/, '')}: without ${roads[road].name ?? 'it'} it would go` };
   const index = new RoadIndex(roads);
-  const parking = (open?.parking ?? []).flatMap((p, i) => {
+  const bays = (open?.parking ?? []).flatMap((p, i) => {
     const near = index.nearest(p.x, p.z, ROAD_WIDTH / 2 + 6);
     return near && gone.has(near.road) ? [i] : [];
   });
-  return { roads: [...gone].sort((a, b) => a - b), bridges: bridges.sort((a, b) => a - b), streets: streets.sort((a, b) => a - b), lots, backdrop, parking };
+  const parking = open ? wholeParks(open, bays) : [];
+  return { roads: [...gone].sort((a, b) => a - b), bridges: bridges.sort((a, b) => a - b), streets: streets.sort((a, b) => a - b), lots, parking };
 }
 
 /** `roads` without those in `gone`; a join left with nothing to join is a dead end (`ended`: those roads, by their index in what is left; `from`: each road's index in `roads`). */
@@ -936,7 +930,6 @@ export function removeRoad(draft: NeighbourhoodDraft, t: Templates, road: number
   let next: NeighbourhoodDraft = { ...draft, roads };
   if (open) {
     const [W, D] = [draft.width, draft.depth];
-    const parking = new Set(goes.parking);
     let water = open.water;
     const bridges = goes.roads.filter((i) => draft.roads[i].bridge);
     if (bridges.length) {
@@ -946,10 +939,10 @@ export function removeRoad(draft: NeighbourhoodDraft, t: Templates, road: number
       for (const i of bridges) walk = withoutDeck(draft.roads[i], walk, wetAt, W, D);
       water = rle(walk);
     }
-    next = { ...next, open: { ...open, water, parking: open.parking.filter((_, i) => !parking.has(i)) } };
+    next = { ...next, open: { ...open, water, ...withoutBays(open, goes.parking) } };
   }
   // (A village whose only road it was goes with it: its streets and lots went, so its area does too, the others numbered again.)
-  return { draft: withoutEmptyAreas(removeLots(next, new Set(goes.lots), new Set(goes.backdrop))), cleared: { lots: goes.lots, backdrop: goes.backdrop } };
+  return { draft: withoutEmptyAreas(removeLots(next, new Set(goes.lots))), cleared: { lots: goes.lots } };
 }
 
 /**
@@ -967,22 +960,22 @@ export function rename(draft: NeighbourhoodDraft, what: Named, name: string): Ed
   const town = what.kind === 'town' || (what.kind === 'area' && what.area === 0);
   const old = town ? draft.name : what.kind === 'road' ? draft.roads[what.road]?.name : what.kind === 'place' ? places[what.place]?.name : areas[(what as { area: number }).area]?.name;
   if (old === undefined && !(what.kind === 'road' && draft.roads[what.road])) return refused('there is nothing there to name');
-  if (wanted === old) return { draft, cleared: { lots: [], backdrop: [] } };
+  if (wanted === old) return { draft, cleared: { lots: [] } };
   const taken = namesIn(draft);
   if (taken.has(wanted)) return refused(`${wanted} is taken`);
   if (what.kind === 'road') {
     const roads = draft.roads.map((r, i) => (i === what.road ? { ...r, name: wanted } : r));
     // (Its houses' addresses: their number, then its name.)
     const slots = old ? draft.slots.map((s) => (s.name.endsWith(` ${old}`) && /^\d+$/.test(s.name.slice(0, -old.length - 1)) ? { ...s, name: `${s.name.slice(0, -old.length)}${wanted}` } : s)) : draft.slots;
-    return { draft: { ...draft, roads, slots }, cleared: { lots: [], backdrop: [] } };
+    return { draft: { ...draft, roads, slots }, cleared: { lots: [] } };
   }
-  if (!open) return { draft: { ...draft, name: wanted }, cleared: { lots: [], backdrop: [] } };
+  if (!open) return { draft: { ...draft, name: wanted }, cleared: { lots: [] } };
   if (what.kind === 'place') {
     const place = places[what.place];
-    const slots = place.plot === undefined ? draft.slots : draft.slots.map((s) => (s.index === place.plot && s.name === old ? { ...s, name: wanted } : s));
-    return { draft: { ...draft, slots, open: { ...open, places: places.map((p, i) => (i === what.place ? { ...p, name: wanted } : p)) } }, cleared: { lots: [], backdrop: [] } };
+    const slots = draft.slots.map((s) => (s.index === place.plot && s.name === old ? { ...s, name: wanted } : s));
+    return { draft: { ...draft, slots, open: { ...open, places: places.map((p, i) => (i === what.place ? { ...p, name: wanted } : p)) } }, cleared: { lots: [] } };
   }
   const k = town ? 0 : (what as { area: number }).area;
   const renamed = areas.map((a, i) => (i === k ? { ...a, name: wanted } : a));
-  return { draft: { ...draft, ...(town ? { name: wanted } : {}), open: { ...open, areas: renamed } }, cleared: { lots: [], backdrop: [] } };
+  return { draft: { ...draft, ...(town ? { name: wanted } : {}), open: { ...open, areas: renamed } }, cleared: { lots: [] } };
 }

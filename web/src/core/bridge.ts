@@ -127,6 +127,8 @@ export class SimBridge {
   private pending = false;
   /** Sim step of the snapshot posted last (without shared memory). */
   private pendingStep = 0;
+  /** Fixed-step playback (`pace`): frames show the newest snapshot, not one between two by the wall clock. */
+  private framePaced = false;
   private readonly frameState: FrameState;
 
   /** The world as the worker's messages built it up, and as its listeners last got it (`mergeWorld`: a message always leaves the two apart, until the world is handed over). */
@@ -270,6 +272,20 @@ export class SimBridge {
   /** The tile rectangle the camera streams in: the sim's full-detail area (until sent: the view's; null = the view's again). */
   setWatch(region: [number, number, number, number] | null): void {
     this.worker.postMessage({ type: 'watch', region } satisfies ToWorker);
+  }
+
+  /**
+   * Fixed-step playback (benchmarks): the worker's clock stops, ticks run only as `advance` asks, and every frame
+   * shows the newest snapshot as it is (no interpolation by the wall clock); false: back to real time.
+   */
+  pace(frames: boolean): void {
+    this.framePaced = frames;
+    this.worker.postMessage({ type: 'pace', frames } satisfies ToWorker);
+  }
+
+  /** Fixed-step playback: runs `ticks` ticks; resolves with the ticks run once their snapshot and what they changed have come. */
+  advance(ticks: number): Promise<number> {
+    return this.request<number>((requestId) => ({ type: 'advance', requestId, ticks }));
   }
 
   /** Serialized game state, taken between two sim steps. */
@@ -487,6 +503,14 @@ export class SimBridge {
   /** Interpolation state for rendering: draws one step behind the sim for smooth motion. */
   frame(now: number): FrameState {
     const f = this.frameState;
+    if (this.framePaced) {
+      f.prev = this.prev;
+      f.curr = this.curr;
+      f.steps = Math.max(1, this.step0 - this.step1);
+      f.alpha = 1;
+      f.now = now;
+      return f;
+    }
     // The (fractional) sim step shown now.
     const at = (now - this.clockBase) / this.stepMs - 1;
     if (at < this.step1) {
@@ -584,6 +608,9 @@ export class SimBridge {
         break;
       case 'blueprint':
         this.resolve(msg.requestId, { data: msg.data, error: msg.error });
+        break;
+      case 'advanced':
+        this.resolve(msg.requestId, msg.ticks);
         break;
       case 'shaped':
         this.resolve(msg.requestId, null);

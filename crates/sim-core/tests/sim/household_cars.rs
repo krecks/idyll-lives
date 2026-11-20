@@ -229,28 +229,3 @@ fn the_cars_look_and_the_one_wanted_are_saved() {
     assert_eq!((loaded.cars[0].body, loaded.cars[0].age), (3, CarAge::New));
     assert_eq!(loaded.cars[1].want, w.cars[1].want);
 }
-
-#[test]
-fn an_older_saves_cars_are_fitted_as_it_loads() {
-    let w = world("", "");
-    let mut save: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
-    save["version"] = 40.into();
-    for car in save["cars"].as_array_mut().unwrap() {
-        car["body"] = 0.into();
-        car["len"] = 4.4.into();
-        car["wid"] = 1.78.into();
-        car.as_object_mut().unwrap().remove("age");
-    }
-    save["cars"][0]["spot"][1] = 3.2.into();
-    let loaded = World::from_save_json(CONTENT, &save.to_string()).unwrap();
-    assert_eq!(
-        (loaded.cars[0].body, loaded.cars[0].age, loaded.cars[0].len),
-        (3, CarAge::New, 4.9)
-    );
-    assert!((parked_from_inner_end(&loaded, 0) - 0.45).abs() < 1e-4);
-    assert_eq!(loaded.cars[1].body, 0, "nobody at work: kept");
-    assert!(
-        !loaded.events.iter().any(|e| e.kind == EventKind::BoughtCar),
-        "nobody told"
-    );
-}

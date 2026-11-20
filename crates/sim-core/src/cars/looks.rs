@@ -21,7 +21,7 @@ use super::*;
 use crate::content::{CarAge, CarLook, Content};
 
 /// The car a promotion or a new job calls for (`Car::want`), and who the story says bought it
-/// (none: nobody is told, as a town's cars or an older save's are fitted).
+/// (none: nobody is told, as a town's cars are fitted).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Want {
@@ -92,7 +92,7 @@ pub(crate) fn job_lost(cars: &mut [Car], sim: u32) {
     }
 }
 
-/// The town's (or an older save's) cars, each the one its household's best earner's job calls
+/// The town's cars, each the one its household's best earner's job calls
 /// for, nobody told: those standing idle at once, the others when they next do (`renew`). The
 /// caller settles them after (`settle_all`).
 pub(crate) fn fit_town(w: &mut World) {

@@ -16,8 +16,9 @@ import type { AssetRegistry } from '../assets/registry';
 import type { Content } from '../content/content';
 import { bedroomsNeeded, randomHousehold, residentsOf, type HouseholdDraft } from './household';
 import { mulberry32 } from './noise';
-import { homePrice } from './price';
-import { houseTemplate, shuffled, type NeighbourhoodDraft, type PlotSlot, type Templates } from './town';
+import { flatPrice, homePrice } from './price';
+import { flatsTemplate } from './flats';
+import { flatsIdOf, houseTemplate, shuffled, type NeighbourhoodDraft, type PlotSlot, type Templates } from './town';
 import { savingsOf } from './wealth';
 
 type Rand = () => number;
@@ -85,11 +86,12 @@ export function residentsMost(tier: FillTier = 'full'): number {
  * The tier each graphics preset fills the town at (`render/quality.ts` `GraphicsPreset`): full on all
  * of them. A preset gets a tier when the sim's wasm build, with the camera's 320-tile square in full
  * detail as the game streams it, keeps up with the fastest speed the player picks at any hour, 10×
- * (10 ticks a step, 600 ticks a second), on the slowest machine the preset is for. Measured on 2026-11-17 on an M3
- * Pro over a game day of the seaside, river and forest cities (`tools/m1/run.sh`,
- * `tools/bench/simtick.mjs` under Node), the wasm's slowest city ran about 1,220 ticks a second in
- * full; an M1, low and medium's floor, at 0.72 of that about 880 (756 to 952 between a fanless Air
- * held at its sustained speed and one at its best), so even the M1 has room at 10× with a full town.
+ * (10 ticks a step, 600 ticks a second), on the slowest machine the preset is for. Measured on 2026-11-20 on an M3
+ * Pro over a game day of the seaside, river and forest cities of the real town (`tools/m1/run.sh`'s way,
+ * `tools/bench/simtick.mjs` under Node), the wasm's slowest city (the seaside) ran about 1,340 ticks a
+ * second of CPU time in full; an M1, low and medium's floor, at 0.72 of that about 960 (830 to 1,040
+ * between a fanless Air held at its sustained speed and one at its best), so even the M1 has room at
+ * 10× with a full town.
  * Super speed has no rate to keep up with: it runs as fast as the machine can, up to 30× (60× in quiet
  * hours).
  */
@@ -136,10 +138,10 @@ export interface PeopleStreams {
    */
   order(x: number, z: number): number;
   /**
-   * The household that lives on the lot at (`x`, `z`), whichever wave fills it. Keyed by the lot's
-   * position to the metre, not its number, so a lot added or taken away elsewhere leaves it alone.
+   * The household that lives on the lot at (`x`, `z`) (`unit`: in its flat of that number), whichever wave fills it.
+   * Keyed by the lot's position to the metre, not its number, so a lot added or taken away elsewhere leaves it alone.
    */
-  lot(x: number, z: number): Rand;
+  lot(x: number, z: number, unit?: number): Rand;
   /** Which residents step 3 offers, and in which order. */
   offer(): Rand;
   /** The seed of the neighbours' bonds (the assemble job's `random`). */
@@ -178,7 +180,7 @@ export function peopleStreams(seed: number): PeopleStreams {
   return {
     seed: base,
     order: (x, z) => mix(base, ORDER, Math.round(x), Math.round(z)),
-    lot: (x, z) => mulberry32(mix(base, LOT, Math.round(x), Math.round(z))),
+    lot: (x, z, unit) => mulberry32(unit === undefined ? mix(base, LOT, Math.round(x), Math.round(z)) : mix(base, LOT, Math.round(x), Math.round(z), unit + 1)),
     offer: () => mulberry32(mix(base, OFFER)),
     bonds: mix(base, BONDS),
     // (Never 0: the page takes 0 for "none given".)
@@ -199,8 +201,34 @@ const HOUSEHOLD_TRIES = 36;
 /** Savings beyond this many times a home's price make a household too well off for it (taken only when nothing closer turns up). */
 const RICH_FOR = 4;
 
-/** A home's bedrooms (one for an empty lot). */
-const bedroomsOf = (t: Templates, s: PlotSlot) => houseTemplate(t, s.template)?.bedrooms ?? 1;
+/**
+ * A home a household may live in: a house's lot, or a flat of a flats building or over a place (`flat`: its index
+ * in the building's flats). Its slot (where it is, its area), its bedrooms and its price.
+ */
+export interface Home {
+  slot: PlotSlot;
+  flat?: number;
+  bedrooms: number;
+  price: number;
+}
+
+/** A home's key (`Home`): its slot, and its flat. */
+const keyOf = (h: Pick<Home, 'flat'> & { slot: number | PlotSlot }) => `${typeof h.slot === 'number' ? h.slot : h.slot.index}:${h.flat ?? ''}`;
+
+/**
+ * Every home of `town`: each house's lot (its layout's bedrooms, one for an empty lot; its price), and each flat of a
+ * flats building or over a place (its bedrooms, its own price: `price.ts` `flatPrice`).
+ */
+export function homesOf(content: Content, t: Templates, town: NeighbourhoodDraft): Home[] {
+  const out: Home[] = [];
+  for (const s of town.slots) {
+    if (s.kind === 'house') out.push({ slot: s, bedrooms: houseTemplate(t, s.template)?.bedrooms ?? 1, price: homePrice(content, t, s) });
+    const id = flatsIdOf(s);
+    const units = id ? (flatsTemplate(t, id)?.units ?? []) : [];
+    units.forEach((u, flat) => out.push({ slot: s, flat, bedrooms: u.bedrooms, price: flatPrice(content, t, { template: id }, flat) }));
+  }
+  return out;
+}
 
 /**
  * The first wave of neighbours: `count` households (default: as many as the town's homes allow,
@@ -214,30 +242,32 @@ export function populate(content: Content, assets: AssetRegistry, t: Templates, 
   const streams = streamsOf(people);
   // (A big world starts with about 120 residents unless asked for more, up to its cap.)
   const MAX_NEIGHBOURS = count === undefined ? BIG_START : NEIGHBOUR_CAP;
-  const houses = town.slots.filter((s) => s.kind === 'house');
-  const wanted = Math.max(0, Math.min(count ?? houses.length, householdsAtMost(houses.length)));
-  const price = new Map(houses.map((s) => [s.index, homePrice(content, t, s)]));
-  const dearestFirst = (list: PlotSlot[]) => [...list].sort((a, b) => price.get(b.index)! - price.get(a.index)!);
-  // The houses picked first; the others stand in for any of them nobody could buy. The town's
+  const homes = homesOf(content, t, town);
+  const wanted = Math.max(0, Math.min(count ?? homes.length, householdsAtMost(homes.length)));
+  const dearestFirst = (list: Home[]) => [...list].sort((a, b) => b.price - a.price);
+  // The homes picked first; the others stand in for any of them nobody could buy. The town's
   // cheapest home stays for sale (if it can): a starter home within reach of a young household.
-  const cheapest = houses.reduce<PlotSlot | undefined>((a, s) => (!a || price.get(s.index)! < price.get(a.index)! ? s : a), undefined);
-  const rank = new Map(houses.map((s) => [s.index, streams.order(s.x, s.z)]));
-  const picked = houses.filter((s) => s !== cheapest).sort((a, b) => rank.get(a.index)! - rank.get(b.index)! || a.x - b.x || a.z - b.z);
+  const cheapest = homes.reduce<Home | undefined>((a, h) => (!a || h.price < a.price ? h : a), undefined);
+  const rank = new Map(homes.map((h) => [h, streams.order(h.slot.x, h.slot.z)]));
+  const picked = homes.filter((h) => h !== cheapest).sort((a, b) => rank.get(a)! - rank.get(b)! || byPlace(a, b));
   const order = [...picked, ...(cheapest ? [cheapest] : [])];
   const queue = [...dearestFirst(order.slice(0, wanted)), ...dearestFirst(order.slice(wanted))];
   const taken = new Set<string>();
   const households: NeighbourhoodDraft['households'] = [];
   let residents = 0;
-  for (const slot of queue) {
+  for (const home of queue) {
     if (households.length >= wanted || residents >= MAX_NEIGHBOURS) break;
-    const household = householdFor(content, assets, bedroomsOf(t, slot), price.get(slot.index)!, MAX_NEIGHBOURS - residents, [...taken], streams.lot(slot.x, slot.z));
+    const household = householdFor(content, assets, home.bedrooms, home.price, MAX_NEIGHBOURS - residents, [...taken], streams.lot(home.slot.x, home.slot.z, home.flat));
     if (!household) continue;
     taken.add(household.name);
     residents += household.members.length;
-    households.push({ household, slot: slot.index });
+    households.push({ household, slot: home.slot.index, ...(home.flat === undefined ? {} : { flat: home.flat }) });
   }
   return { ...town, households };
 }
+
+/** Homes by where they are (ties: a lot elsewhere coming or going changes no order here), a building's flats in turn. */
+const byPlace = (a: Home, b: Home) => a.slot.x - b.slot.x || a.slot.z - b.slot.z || (a.flat ?? -1) - (b.flat ?? -1);
 
 /** Residents step 3 offers at the least (all of them if there are fewer) and at the most. */
 const OFFER_LEAST = 10;
@@ -297,6 +327,8 @@ export interface FillOptions {
   tier?: FillTier;
   cap?: number;
   avoid?: readonly string[];
+  /** The player's home is this flat of the building on their slot. */
+  flat?: number;
 }
 
 /** Homes this near the player's (m), in the same area, are filled first: the player's own street, roughly. */
@@ -327,21 +359,10 @@ export function fillPlan(
   town: NeighbourhoodDraft,
   playerSlot: number | undefined,
   streams: PeopleStreams,
-  { tier = 'full', cap = FILL_CAP, avoid = [] }: FillOptions = {},
-): { slot: number; household: HouseholdDraft }[] {
-  const houses = town.slots.filter((s) => s.kind === 'house');
-  const lived = new Set(town.households.map((h) => h.slot));
-  const price = new Map(houses.map((s) => [s.index, homePrice(content, t, s)]));
-  // (Ties by position, not number: a lot elsewhere coming or going changes no order here.)
-  const byPlace = (a: PlotSlot, b: PlotSlot) => a.x - b.x || a.z - b.z;
-  const forSale = houses.filter((s) => !lived.has(s.index) && s.index !== playerSlot);
-  const kept = new Set(
-    [...forSale]
-      .sort((a, b) => price.get(a.index)! - price.get(b.index)! || byPlace(a, b))
-      .slice(0, keepForSale(houses.length))
-      .map((s) => s.index),
-  );
-  const homes = forSale.filter((s) => !kept.has(s.index));
+  { tier = 'full', cap = FILL_CAP, avoid = [], flat: playerFlat }: FillOptions = {},
+): { slot: number; flat?: number; household: HouseholdDraft }[] {
+  const all = homesOf(content, t, town);
+  const { homes } = forSaleOf(all, town, playerSlot, playerFlat);
   // The order they move in.
   const areas = town.open?.areas ?? [];
   const middle = (k: number): [number, number] => {
@@ -350,43 +371,45 @@ export function fillPlan(
   };
   const player = playerSlot === undefined ? undefined : town.slots[playerSlot];
   const from: [number, number] = player ? [player.x, player.z] : middle(0);
-  const far = (s: PlotSlot, [x, z]: [number, number]) => Math.hypot(s.x - x, s.z - z);
-  const areaOf = (s: PlotSlot) => s.area ?? 0;
-  const street = new Set(player ? homes.filter((s) => areaOf(s) === areaOf(player) && far(s, from) <= STREET_NEAR).map((s) => s.index) : []);
-  const villageFirst = new Set<number>();
+  const far = (h: Home, [x, z]: [number, number]) => Math.hypot(h.slot.x - x, h.slot.z - z);
+  const areaOf = (h: Home) => h.slot.area ?? 0;
+  const street = new Set(player ? homes.filter((h) => areaOf(h) === (player.area ?? 0) && far(h, from) <= STREET_NEAR) : []);
+  const villageFirst = new Set<Home>();
   areas.forEach((a, k) => {
     if (k === 0 || a.kind !== 'hamlet') return;
     const at = middle(k);
-    const own = homes.filter((s) => areaOf(s) === k && !street.has(s.index)).sort((p, q) => far(p, at) - far(q, at) || byPlace(p, q));
-    for (const s of own.slice(0, VILLAGE_FIRST)) villageFirst.add(s.index);
+    const own = homes.filter((h) => areaOf(h) === k && !street.has(h)).sort((p, q) => far(p, at) - far(q, at) || byPlace(p, q));
+    for (const h of own.slice(0, VILLAGE_FIRST)) villageFirst.add(h);
   });
-  const band = (s: PlotSlot) => (street.has(s.index) ? 0 : villageFirst.has(s.index) ? 1 : areaOf(s) === 0 ? 2 : 3);
+  const band = (h: Home) => (street.has(h) ? 0 : villageFirst.has(h) ? 1 : areaOf(h) === 0 ? 2 : 3);
   const order = [...homes].sort((a, b) => band(a) - band(b) || far(a, from) - far(b, from) || byPlace(a, b));
 
   // Each home's household as it would naturally be, in that order (the family names taken in it).
   const taken = new Set<string>([...avoid, ...town.households.map((h) => h.household.name)]);
-  const roll = (s: PlotSlot, room: number) => householdFor(content, assets, bedroomsOf(t, s), price.get(s.index)!, room, [...taken], streams.lot(s.x, s.z));
-  const drawn = new Map<number, HouseholdDraft>();
-  for (const s of order) {
-    const household = roll(s, 4);
+  // (Once every family name is taken, a household may share a neighbour's: never one `avoid` names, the player's.)
+  const names = () => (taken.size < content.names.last.length ? [...taken] : [...avoid]);
+  const roll = (h: Home, room: number) => householdFor(content, assets, h.bedrooms, h.price, room, names(), streams.lot(h.slot.x, h.slot.z, h.flat));
+  const drawn = new Map<Home, HouseholdDraft>();
+  for (const h of order) {
+    const household = roll(h, 4);
     if (!household) continue;
-    drawn.set(s.index, household);
+    drawn.set(h, household);
     taken.add(household.name);
   }
   // Smaller households in the smallest homes while the total would pass the cap: one or two
   // people first, then one alone.
-  const already = town.households.filter((h) => h.slot !== playerSlot).reduce((n, h) => n + h.household.members.length, 0);
+  const already = town.households.filter((h) => !(h.slot === playerSlot && h.flat === playerFlat)).reduce((n, h) => n + h.household.members.length, 0);
   let total = already + [...drawn.values()].reduce((n, h) => n + h.members.length, 0);
-  const smallest = homes.filter((s) => drawn.has(s.index)).sort((a, b) => bedroomsOf(t, a) - bedroomsOf(t, b) || price.get(a.index)! - price.get(b.index)! || byPlace(a, b));
+  const smallest = homes.filter((h) => drawn.has(h)).sort((a, b) => a.bedrooms - b.bedrooms || a.price - b.price || byPlace(a, b));
   for (const most of [2, 1]) {
-    for (const s of smallest) {
+    for (const h of smallest) {
       if (total <= cap) break;
-      const before = drawn.get(s.index)!;
+      const before = drawn.get(h)!;
       if (before.members.length <= most) continue;
       taken.delete(before.name);
-      const household = roll(s, most) ?? before;
+      const household = roll(h, most) ?? before;
       taken.add(household.name);
-      drawn.set(s.index, household);
+      drawn.set(h, household);
       total -= before.members.length - household.members.length;
     }
   }
@@ -394,28 +417,41 @@ export function fillPlan(
   // each area the first half (or third) in each lot's own order.
   const fills = (() => {
     if (tier === 'full') return () => true;
-    const whole = (s: PlotSlot) => (tier === 'half' ? areaOf(s) === 0 || (player !== undefined && areaOf(s) === areaOf(player)) : far(s, from) <= TIER_NEAR);
+    const whole = (h: Home) => (tier === 'half' ? areaOf(h) === 0 || (player !== undefined && areaOf(h) === (player.area ?? 0)) : far(h, from) <= TIER_NEAR);
     const share = tier === 'half' ? 1 / 2 : 1 / 3;
-    const rest = new Map<number, PlotSlot[]>();
-    for (const s of order) if (drawn.has(s.index) && !whole(s)) rest.set(areaOf(s), [...(rest.get(areaOf(s)) ?? []), s]);
-    const some = new Set<number>();
+    const rest = new Map<number, Home[]>();
+    for (const h of order) if (drawn.has(h) && !whole(h)) rest.set(areaOf(h), [...(rest.get(areaOf(h)) ?? []), h]);
+    const some = new Set<Home>();
     for (const list of rest.values()) {
-      const ranked = [...list].sort((a, b) => streams.order(a.x, a.z) - streams.order(b.x, b.z) || byPlace(a, b));
-      for (const s of ranked.slice(0, Math.ceil(list.length * share))) some.add(s.index);
+      const ranked = [...list].sort((a, b) => streams.order(a.slot.x, a.slot.z) - streams.order(b.slot.x, b.slot.z) || byPlace(a, b));
+      for (const h of ranked.slice(0, Math.ceil(list.length * share))) some.add(h);
     }
-    return (s: PlotSlot) => whole(s) || some.has(s.index);
+    return (h: Home) => whole(h) || some.has(h);
   })();
   const limit = tier === 'full' ? cap : Math.min(cap, TIERS[tier].fill);
   // Moved in in order, while there is room.
-  const plan: { slot: number; household: HouseholdDraft }[] = [];
+  const plan: { slot: number; flat?: number; household: HouseholdDraft }[] = [];
   let residents = already;
-  for (const s of order) {
-    const household = drawn.get(s.index);
-    if (!household || !fills(s) || residents + household.members.length > limit) continue;
+  for (const h of order) {
+    const household = drawn.get(h);
+    if (!household || !fills(h) || residents + household.members.length > limit) continue;
     residents += household.members.length;
-    plan.push({ slot: s.index, household });
+    plan.push({ slot: h.slot.index, ...(h.flat === undefined ? {} : { flat: h.flat }), household });
   }
   return plan;
+}
+
+/**
+ * Of `homes` (`homesOf` `town`), those for sale once the first wave lives in its own and the player in theirs
+ * (`playerSlot`, `playerFlat`): those the second wave fills (`homes`), and the `keepForSale` cheapest it leaves
+ * for sale (`kept`).
+ */
+function forSaleOf(all: readonly Home[], town: NeighbourhoodDraft, playerSlot: number | undefined, playerFlat: number | undefined): { homes: Home[]; kept: Set<Home> } {
+  const lived = new Set(town.households.map(keyOf));
+  const mine = playerSlot === undefined ? '' : keyOf({ slot: playerSlot, flat: playerFlat });
+  const forSale = all.filter((h) => !lived.has(keyOf(h)) && keyOf(h) !== mine);
+  const kept = new Set([...forSale].sort((a, b) => a.price - b.price || byPlace(a, b)).slice(0, keepForSale(all.length)));
+  return { homes: forSale.filter((h) => !kept.has(h)), kept };
 }
 
 /**
@@ -432,7 +468,11 @@ export function fillTown(
   streams: PeopleStreams,
   options?: FillOptions,
 ): NeighbourhoodDraft {
-  return { ...town, households: [...town.households, ...fillPlan(content, assets, t, town, playerSlot, streams, options)], residentsMost: residentsMost(options?.tier) };
+  const households = [...town.households, ...fillPlan(content, assets, t, town, playerSlot, streams, options)];
+  // Every home nobody moved into but the few kept for sale (and the player's) is a shell (`NeighbourhoodDraft.shells`).
+  const { homes } = forSaleOf(homesOf(content, t, town), { ...town, households }, playerSlot, options?.flat);
+  const shells = homes.map((h) => ({ slot: h.slot.index, ...(h.flat === undefined ? {} : { flat: h.flat }) }));
+  return { ...town, households, residentsMost: residentsMost(options?.tier), ...(shells.length ? { shells } : {}) };
 }
 
 /** Ties a neighbour has with the others, on average (about what three in ten of a town of ~120 gave each). */

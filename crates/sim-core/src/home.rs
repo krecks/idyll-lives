@@ -72,6 +72,16 @@ fn edge_kind(kind: EdgeKind) -> Edge {
 }
 
 /// Where an edit's wall is (after the bounds checks: coordinates are on the lot).
+/// The tiles on either side of an edge (the tile itself, twice, for a diagonal), and whether it is
+/// a diagonal.
+fn edge_sides(axis: EdgeAxis, x: i32, z: i32) -> ([(i32, i32); 2], bool) {
+    match axis {
+        EdgeAxis::H => ([(x, z - 1), (x, z)], false),
+        EdgeAxis::V => ([(x - 1, z), (x, z)], false),
+        EdgeAxis::Dp | EdgeAxis::Dn => ([(x, z), (x, z)], true),
+    }
+}
+
 fn edge_ref(axis: EdgeAxis, x: i32, z: i32) -> EdgeRef {
     let (x, z) = (x as u16, z as u16);
     match axis {
@@ -347,12 +357,24 @@ impl World {
     /// The roof over the household's home: a style and a colour (free; only for looks).
     pub fn set_roof(&mut self, household: u32, style: u8, color: u8) -> Result<(), Error> {
         let (_, plot) = self.home_of(household)?;
+        self.not_a_flat(plot, "roof")?;
         let b = &self.content.build;
         if style as usize >= b.roofs.len().max(1) || color as usize >= b.roof_colors.len().max(1) {
             return Err(Error::new("unknown roof style or colour"));
         }
         self.plots[plot as usize].roof = Some(crate::world::RoofLook { style, color });
         self.structure_version = self.structure_version.wrapping_add(1);
+        Ok(())
+    }
+
+    /// Refuses an edit of `what` (a roof, a garage, a porch, a blueprint) on `plot` if it is a flat:
+    /// its building's envelope is the building's, and a flat is built on inside only.
+    pub(crate) fn not_a_flat(&self, plot: u32, what: &str) -> Result<(), Error> {
+        if self.plots.get(plot as usize).is_some_and(|p| p.is_flat()) {
+            return Err(Error::new(format!(
+                "in a flat you build inside it only: no {what}"
+            )));
+        }
         Ok(())
     }
 
@@ -515,15 +537,15 @@ impl World {
     /// Whether every tile of `obj` and the tile in front of it lie on `plot` (nobody uses things
     /// without interactions, like tables, or things standing on a top: their front can be off it).
     fn fits_on_plot(&self, obj: &ObjectInstance, plot: u32) -> bool {
-        let p = &self.plots[plot as usize];
         let def = &self.content.objects[obj.def];
         let (fx, fz) = obj.front_tile(&self.content);
-        let on = |x: i32, z: i32| p.contains(x, self.ground_z(z));
+        let on = |x: i32, z: i32| self.on_plot(plot, x, z);
         let used = !def.interactions.is_empty() && def.layer != Layer::Surface;
         (!used || on(fx, fz)) && obj.tiles(&self.content).all(|(x, z)| on(x, z))
     }
 
-    /// Tiles reachable on foot from the plot's entry (a mask over the whole lot).
+    /// Tiles reachable on foot from the plot's entry (a flat's: from behind its own door, on its
+    /// storey), as a mask over the whole lot.
     pub(crate) fn reachable(&self, plot: u32) -> Vec<bool> {
         let lot = &self.lot;
         let nav = NavGrid {
@@ -535,14 +557,15 @@ impl World {
         };
         let p = &self.plots[plot as usize];
         let inside = |x: i32, z: i32| {
-            let z = self.ground_z(z);
+            let gz = self.ground_z(z);
             x >= p.x - REACH_MARGIN
-                && z >= p.z - REACH_MARGIN
+                && gz >= p.z - REACH_MARGIN
                 && x < p.x + p.w + REACH_MARGIN
-                && z < p.z + p.d + REACH_MARGIN
+                && gz < p.z + p.d + REACH_MARGIN
+                && p.on_storey(&self.stairs, z)
         };
         let mut seen = vec![false; lot.tile_slots()];
-        let entry = p.arrival_point();
+        let entry = p.home_point();
         let start = (entry[0].floor() as i32, entry[1].floor() as i32);
         if !nav.tile_free(start.0, start.1) {
             return seen;
@@ -597,7 +620,6 @@ impl World {
         skip: Option<u32>,
     ) -> bool {
         let after = self.reach_signature(plot);
-        let p = &self.plots[plot as usize];
         let objects_ok = before
             .0
             .iter()
@@ -608,8 +630,7 @@ impl World {
         // bed, their tile is the bed's, which nobody walks to).
         let sims_ok = self.sims.iter().all(|s| {
             let (x, z) = s.seated_from.unwrap_or_else(|| s.tile());
-            let gz = self.ground_z(z);
-            let on_plot = x >= p.x && gz >= p.z && x < p.x + p.w && gz < p.z + p.d;
+            let on_plot = self.on_plot(plot, x, z);
             let i = self.lot.tile_index(x, z);
             let seen = |s: &[bool]| s.get(i).copied().unwrap_or(false);
             s.away_until.is_some() || !on_plot || !seen(&before.1) || seen(&after.1)
@@ -685,6 +706,9 @@ impl World {
         if !self.fits_on_plot(&obj, plot) {
             return Err(Error::new("that has to go on your own lot"));
         }
+        if self.content.objects[def].stairs && self.plots[plot as usize].is_flat() {
+            return Err(Error::new("a flat is all on one storey: no stairs in it"));
+        }
         if self.content.objects[def].outdoors && !self.all_outdoors(&obj) {
             return Err(Error::new("that has to go outside"));
         }
@@ -733,129 +757,6 @@ impl World {
             return Err(Error::new("that would block the way"));
         }
         Ok(id)
-    }
-
-    /// Places a thing from an older save whose kind has grown since (the chess table: 1 × 1 until
-    /// save version 33, 2 × 1 since), which stood at `x`, `z` facing `rot`: over the tile it stood
-    /// on where it now fits, its own way round first and moved as little as it can; else at its
-    /// plot's first good free spot (`find_spot`). On a plot it must block nothing there
-    /// (`place_at_home`). None if it fits nowhere: the caller sells it back.
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn place_grown(
-        &mut self,
-        def: usize,
-        x: i32,
-        z: i32,
-        rot: u8,
-        colors: crate::world::Colors,
-        quality: u8,
-        value: i64,
-    ) -> Option<u32> {
-        let plot = self.plot_at(x, z);
-        let mut near: Vec<(i32, i32, u8)> = Vec::new();
-        for turn in 0..4u8 {
-            let r = (rot + turn) % 4;
-            let mut shifts: Vec<(i32, i32)> = (-1..=1)
-                .flat_map(|dx| (-1..=1).map(move |dz| (dx, dz)))
-                .collect();
-            shifts.sort_by_key(|&(dx, dz)| dx.abs() + dz.abs());
-            for (dx, dz) in shifts {
-                let covers = self
-                    .check_fit(def, x + dx, z + dz, r, Layout::default())
-                    .is_ok_and(|o| o.tiles(&self.content).any(|t| t == (x, z)));
-                if covers {
-                    near.push((x + dx, z + dz, r));
-                }
-            }
-        }
-        let Some(plot) = plot else {
-            // (A lot without plots, as the oldest saves: placed as anything loads, where it fits.)
-            return near.into_iter().find_map(|(cx, cz, r)| {
-                self.place(
-                    def,
-                    cx,
-                    cz,
-                    r,
-                    Layout::default(),
-                    colors.clone(),
-                    quality,
-                    value,
-                    None,
-                )
-                .ok()
-            });
-        };
-        let spots = self
-            .find_spot(plot, def)
-            .into_iter()
-            .map(|(cx, cz, r, _)| (cx, cz, r));
-        let tries: Vec<(i32, i32, u8)> = near.into_iter().chain(spots).collect();
-        tries.into_iter().find_map(|(cx, cz, r)| {
-            self.place_at_home(
-                plot,
-                def,
-                cx,
-                cz,
-                r,
-                Layout::default(),
-                colors.clone(),
-                quality,
-                value,
-            )
-            .ok()
-        })
-    }
-
-    /// v32 to v33: `id`, a post of the town's (content `staff`) on a public lot just placed as it was
-    /// saved, the last object, with no room behind it for its server (its back to a wall, as the
-    /// café's and the bakery's counters stood before 0.5.0): moved one tile to its front, as the
-    /// town's lots have it now, where it fits there, blocks nothing and then has its server's room.
-    /// Else it stays (and is self-serve, as it was). Returns its id.
-    pub(crate) fn nudge_post(&mut self, id: u32) -> u32 {
-        let o = &self.objects[id as usize];
-        let Some(plot) = self.plot_at(o.x, o.z) else {
-            return id;
-        };
-        if id as usize + 1 != self.objects.len()
-            || self.content.objects[o.def].staff.is_none()
-            || !self.plots[plot as usize].public
-            || crate::staff::room_behind(self, &self.nav(), o, plot).is_some()
-        {
-            return id;
-        }
-        let a = o.angle();
-        let (dx, dz) = (a.sin().round() as i32, a.cos().round() as i32);
-        let old = self.remove_object(id);
-        if let Ok(moved) = self.replace_at_home(
-            plot,
-            &old,
-            old.x + dx,
-            old.z + dz,
-            old.rot,
-            Layout::of(&old),
-        ) {
-            if crate::staff::room_behind(self, &self.nav(), &self.objects[moved as usize], plot)
-                .is_some()
-            {
-                return moved;
-            }
-            self.remove_object(moved);
-        }
-        // (Where it was: it stood there a moment ago.)
-        let back = self.place(
-            old.def,
-            old.x,
-            old.z,
-            old.rot,
-            Layout::of(&old),
-            old.colors.clone(),
-            old.quality,
-            old.value,
-            None,
-        );
-        let back = back.expect("it stood there");
-        self.objects[back as usize].carry_state(&old);
-        back
     }
 
     /// Places `old`, lifted out, back on the home plot at `x`, `z` (see `place_at_home`), keeping
@@ -1010,6 +911,8 @@ impl World {
         }
         let p = &self.plots[plot as usize];
         let lot = &self.lot;
+        // (A flat's spots are on its own storey; a house's on the ground.)
+        let rows = p.rows(&self.stairs);
         // (What could be in its way anywhere on the plot, found once: as far past the plot's
         // edges as it reaches, turned any way, from a tile on it.)
         let d = &self.content.objects[def];
@@ -1022,12 +925,12 @@ impl World {
             + 1;
         let near = self.objects_reaching([
             p.x - reach,
-            p.z - reach,
+            rows.start - reach,
             p.x + p.w + reach,
-            p.z + p.d + reach,
+            rows.end + reach,
         ]);
         let mut spots = Vec::new();
-        for z in p.z..p.z + p.d {
+        for z in rows {
             for x in p.x..p.x + p.w {
                 for rot in 0..4u8 {
                     let Ok(obj) =
@@ -1453,6 +1356,11 @@ impl World {
             if !self.edge_on_plot(plot, e.axis, e.x, e.z) {
                 return Err(Error::new("you can only build on your own lot"));
             }
+            if self.plots[plot as usize].is_flat() && !self.edge_in_flat(plot, e.axis, e.x, e.z) {
+                return Err(Error::new(
+                    "a flat's outer walls are the building's: build inside it",
+                ));
+            }
             check_look(rules, e)?;
             let target = edge_kind(e.kind);
             let diagonal = e.axis.diagonal();
@@ -1751,11 +1659,10 @@ impl World {
     pub fn paint_floor(&mut self, household: u32, tiles: &[FloorPaint]) -> Result<(), Error> {
         let (h, plot) = self.home_of(household)?;
         let rules = &self.content.build;
-        let p = &self.plots[plot as usize];
         let mut changes: Vec<(u16, u16, u8)> = Vec::new();
         let mut cost = 0;
         for t in tiles {
-            if !p.contains(t.x, self.ground_z(t.z)) || !self.lot.in_bounds(t.x, t.z) {
+            if !self.on_plot(plot, t.x, t.z) || !self.lot.in_bounds(t.x, t.z) {
                 return Err(Error::new("you can only lay floors on your own lot"));
             }
             if t.covering as usize > rules.floors.len() {
@@ -1786,9 +1693,15 @@ impl World {
         Ok(())
     }
 
-    /// Whether a wall edge (or the diagonal across a tile) lies on plot `plot` and on the lot.
+    /// Whether a wall edge (or the diagonal across a tile) lies on plot `plot` and on the lot. A
+    /// flat's are those with a tile of it on one side (its own storey's), its outer walls too
+    /// (`edge_in_flat` says which are inside it).
     pub(crate) fn edge_on_plot(&self, plot: u32, axis: EdgeAxis, x: i32, z: i32) -> bool {
         let p = &self.plots[plot as usize];
+        if p.is_flat() {
+            let ([a, b], _) = edge_sides(axis, x, z);
+            return self.on_plot(plot, a.0, a.1) || self.on_plot(plot, b.0, b.1);
+        }
         let (lw, ld) = (self.lot.width as i32, self.lot.depth as i32);
         if x < 0 || z < 0 || z > ld {
             return false;
@@ -1804,6 +1717,13 @@ impl World {
             }
             EdgeAxis::Dp | EdgeAxis::Dn => p.contains(x, z) && self.lot.in_bounds(x, z),
         }
+    }
+
+    /// Whether an edge on flat `plot` (`edge_on_plot`) is inside it: a tile of it on both sides. Its
+    /// outer walls are its building's, not its household's to build on.
+    pub(crate) fn edge_in_flat(&self, plot: u32, axis: EdgeAxis, x: i32, z: i32) -> bool {
+        let ([a, b], _) = edge_sides(axis, x, z);
+        self.on_plot(plot, a.0, a.1) && self.on_plot(plot, b.0, b.1)
     }
 
     /// Upstairs stands on downstairs: every room above the ground has a room under each of its

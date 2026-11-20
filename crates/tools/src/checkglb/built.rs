@@ -1,5 +1,5 @@
 //! `cargo check-glb --built <dir>`: the gate for the built world, the geometry the game makes as it runs (houses, the
-//! neighbours' and the far houses, the backdrop's buildings, roads, sidewalks, junctions, bridges, fences, cars),
+//! neighbours' and the far houses, the lots' buildings closed, roads, sidewalks, junctions, bridges, fences, cars),
 //! held to the rules the models are held to.
 //!
 //! The game builds all of it in TypeScript (web/src/render/shared), so there is no file to read as a model's is.
@@ -13,7 +13,7 @@
 //! - `built.texels`: the models' texel rule (`texels::measure`) over each part on a textured material, with the
 //!   manifest's `uvScale` and the texture's size (a material projected from above takes its UVs from x and z);
 //! - `built.farNear`: each far version against what it is the far version of (the neighbour's silhouette, the
-//!   street's far house and the town view's box against the viewed house; a backdrop building's box against it
+//!   street's far house and the town view's box against the viewed house; a lot's building's box against it
 //!   dressed): its plan, its height, its roof's kind and pitch, a chimney on both or neither, its walls' and its
 //!   roof's colour (`Look`);
 //!
@@ -48,10 +48,10 @@ pub const FAR_NEAR: &str = "built.farNear";
 pub const CHECKS: [&str; 3] = [EDGES, TEXELS, FAR_NEAR];
 
 /// The sample kinds that are far versions: judged against what they are the far version of, not for edges or texels.
-const FAR: [&str; 4] = ["neighbour", "far", "town", "backdropFar"];
+const FAR: [&str; 4] = ["neighbour", "far", "town", "buildingFar"];
 /// The far versions drawn from so far that no edge or texel of theirs shows (a neighbour's silhouette is across
 /// the street: it is judged for both).
-const DISTANT: [&str; 3] = ["far", "town", "backdropFar"];
+const DISTANT: [&str; 3] = ["far", "town", "buildingFar"];
 
 /// What `built.json` says of a sample.
 #[derive(serde::Deserialize, Clone, Debug, Default)]

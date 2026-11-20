@@ -26,8 +26,9 @@ describe("step 3's households from the world code", async () => {
   const { AssetRegistry } = await import('../src/assets/registry');
   const { objectInfos } = await import('../src/game/housegen');
   const { generateWorld, useTownContent } = await import('../src/game/town');
-  const { householdsAtMost, offered, peopleStreams, populate } = await import('../src/game/people');
+  const { homesOf, householdsAtMost, offered, peopleStreams, populate } = await import('../src/game/people');
   const { offerPage, peopleKey, peopleSeedOf, startCode, townKey, withSeed } = await import('../src/ui/newGame');
+  const { homeKey } = await import('../src/ui/homes');
   type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
   const content = await Content.load('http://localhost/content/base.json');
@@ -58,8 +59,8 @@ describe("step 3's households from the world code", async () => {
     expect(b.offer).toEqual(a.offer);
     expect(a.offer.length).toBeGreaterThanOrEqual(10);
     expect(a.offer.length).toBeLessThanOrEqual(30);
-    // (The first offer is the people's own, `offered`.)
-    expect(a.offer).toEqual(offered(a.lived, a.streams));
+    // (The first offer is the people's own, `offered`, which names each household by its lot.)
+    expect(a.offer.map((h) => h.slot)).toEqual(offered(a.lived, a.streams));
     // A people seed of its own (the dice), carried in the code: other households.
     const other = step3(world, { ...code, peopleSeed: 77 });
     expect(JSON.stringify(other.lived.households)).not.toBe(JSON.stringify(a.lived.households));
@@ -90,8 +91,10 @@ describe("step 3's households from the world code", async () => {
     expect(all).toBeGreaterThan(30);
     const pages = [0, 1, 2, 3, 4, 5].map((p) => offerPage(lived, streams, p));
     expect([0, 1, 2, 3, 4, 5].map((p) => offerPage(lived, streams, p))).toEqual(pages);
-    const seen = new Set<number>();
-    for (const page of pages) {
+    const seen = new Set<string>();
+    for (const homes of pages) {
+      // (A household by its home: a house's lot, or a flat of a building, whose households share its lot.)
+      const page = homes.map(homeKey);
       expect(page.length).toBeGreaterThan(0);
       expect(page.length).toBeLessThanOrEqual(30);
       expect(new Set(page).size).toBe(page.length);
@@ -100,12 +103,13 @@ describe("step 3's households from the world code", async () => {
       if (seen.size + 10 <= all) expect(fresh).toEqual(page);
       else seen.clear();
       for (const s of page) seen.add(s);
-      for (const s of page) expect(lived.households.some((h) => h.slot === s)).toBe(true);
+      for (const s of page) expect(lived.households.some((h) => homeKey(h) === s)).toBe(true);
     }
   });
 
   test('the Neighbours slider ends where the first wave stops', () => {
-    const homes = world.slots.filter((s) => s.kind === 'house').length;
+    // (Every home: a house's lot, or a flat.)
+    const homes = homesOf(content, t, world).length;
     const most = householdsAtMost(homes);
     expect(most).toBe(homes - Math.max(6, Math.ceil(homes / 4)));
     const code = startCode('country', 5150);

@@ -1,6 +1,6 @@
 /**
  * A machine with 8 GB of memory or less (`navigator.deviceMemory`, which the browser rounds down to a
- * power of two: an 8 GB machine says 8, a 16 GB one 16), or `?lowmem` on the dev server to try it on a
+ * power of two: an 8 GB machine says 8, a 16 GB one 16), or `?lowmem` on the dev server (or the benchmark's build) to try it on a
  * bigger one. There the game holds less at once:
  * - the menus' town is let go of as soon as the loading screen covers it, before the game's world is
  *   built, and the game fades in rather than the camera flying in (`game/host.ts`);
@@ -9,10 +9,12 @@
  * - a Big world's street keeps the vertex arrays of 8 MB of chunks not drawn, not 24 MB (`render/pc/street.ts`).
  */
 
+import { DEBUG_HOOKS } from '../debug/hooks';
+
 /** The most memory (GB, as `navigator.deviceMemory` says it) a machine has and still counts as low on memory. */
 const LOW_MEMORY_GB = 8;
 
 // (Read where there's a page: a test's stand-in has neither.)
 const memory = (globalThis.navigator as (Navigator & { deviceMemory?: number }) | undefined)?.deviceMemory;
 
-export const LOW_MEMORY = (import.meta.env.DEV && new URLSearchParams(globalThis.location?.search ?? '').has('lowmem')) || (memory !== undefined && memory <= LOW_MEMORY_GB);
+export const LOW_MEMORY = (DEBUG_HOOKS && new URLSearchParams(globalThis.location?.search ?? '').has('lowmem')) || (memory !== undefined && memory <= LOW_MEMORY_GB);

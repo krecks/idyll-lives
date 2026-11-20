@@ -10,7 +10,8 @@
  *
  * `--seed <n>`: the new world's seed (the same place, options and seed give the same town, neighbours and household).
  * `--home town`: the household moves into a home for sale in the main town (the one
- * halfway out among those for sale there) instead of the first for sale anywhere. The town view's scenes
+ * halfway out among those for sale there) instead of the first for sale anywhere. `--home flat`: into a
+ * flat for sale (the main town's nearest its middle, upstairs if one is), so the game starts in a flat. The town view's scenes
  * (`render.mjs --poses town`: `town-day`, `town-dusk`, `town-night`) are made so, one town at three hours:
  *
  *   bun tools/bench/scene.mjs --name town-day --world country --options town=village --seed 7 --home town --hour 13
@@ -74,7 +75,8 @@ try {
     async ({ kind, seed, homeIn, options }) => {
       const { app } = await import('/src/ui/app.svelte.ts');
       const { services } = await import('/src/ui/services.ts');
-      const { generateWorld, populate, loadTemplates, vacantSlots } = await import('/src/game/town.ts');
+      const { generateWorld, populate, loadTemplates } = await import('/src/game/town.ts');
+      const { homesForSale } = await import('/src/ui/homes.ts');
       const { randomHousehold } = await import('/src/game/household.ts');
       const t = await loadTemplates();
       const empty = generateWorld(services.content, t, kind, seed ?? undefined, undefined, undefined, options);
@@ -95,21 +97,28 @@ try {
       if (seed !== null) seeded(seed + 1);
       const household = randomHousehold(services.content, services.assets, 4, town.households.map((h) => h.household.name));
       Math.random = dice;
-      // The home: the first for sale, or (`--home town`) the one halfway out among those for sale in the main town.
-      const vacant = vacantSlots(town);
-      let slot = vacant[0].index;
-      const main = town.areas?.[0];
-      if (homeIn === 'town' && main) {
-        const [cx, cz] = [main.x + main.w / 2, main.z + main.d / 2];
-        const far = (s) => Math.hypot(s.x - cx, s.z - cz);
-        const inMain = vacant.filter((s) => (s.area ?? 0) === 0).sort((a, b) => far(a) - far(b) || a.index - b.index);
-        if (inMain.length) slot = inMain[Math.floor(inMain.length / 2)].index;
+      // The home: the first house for sale, or (`--home town`) the one halfway out among the houses for sale in the main
+      // town, or (`--home flat`) the flat for sale nearest the main town's middle, upstairs if one is.
+      const vacant = homesForSale(services.content, t, town);
+      const houses = vacant.filter((h) => h.flat === undefined);
+      let home = houses[0] ?? vacant[0];
+      const main = town.open?.areas?.[0];
+      const [cx, cz] = main ? [main.x + main.w / 2, main.z + main.d / 2] : [town.width / 2, town.depth / 2];
+      const far = (h) => Math.hypot(h.lot.x - cx, h.lot.z - cz);
+      if (homeIn === 'town') {
+        const inMain = houses.filter((h) => (h.lot.area ?? 0) === 0).sort((a, b) => far(a) - far(b) || a.slot - b.slot);
+        if (inMain.length) home = inMain[Math.floor(inMain.length / 2)];
+      } else if (homeIn === 'flat') {
+        const flats = vacant.filter((h) => h.flat !== undefined).sort((a, b) => Number((b.storey ?? 0) > 0) - Number((a.storey ?? 0) > 0) || far(a) - far(b) || a.key.localeCompare(b.key));
+        if (!flats.length) throw new Error('no flat for sale in this world');
+        home = flats[0];
       }
-      Object.assign(app, { world: empty, town, household, homeSlot: slot });
+      const ref = home.flat === undefined ? { slot: home.slot } : { slot: home.slot, flat: home.flat };
+      Object.assign(app, { world: empty, town, household, home: ref });
       // (The rest of the homes for sale are filled on the way in: from the seed too, when there is one.)
-      const request = app.homeRequest(slot);
+      const request = app.homeRequest(ref);
       app.start(seed === null ? request : { ...request, peopleSeed: seed });
-      return { world: town.world?.kind, seed: town.seed, slot, households: town.households.length, neighbours: town.households.reduce((n, h) => n + h.household.members.length, 0) };
+      return { world: town.world?.kind, seed: town.seed, home: home.name, storey: home.storey, households: town.households.length, neighbours: town.households.reduce((n, h) => n + h.household.members.length, 0) };
     },
     { kind: world, seed, homeIn, options },
   );

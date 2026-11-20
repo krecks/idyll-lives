@@ -37,7 +37,7 @@ interface Pad {
   y: number;
 }
 
-/** The pads of the first `count` of `surface`'s plots (the world's lots; its backdrop's buildings stand on their own). */
+/** The pads of the first `count` of `surface`'s plots (the world's lots). */
 export function padsOf(surface: BuiltSurface, count: number): Pad[] {
   const out: Pad[] = [];
   for (let i = 0; i < Math.min(count, surface.plots.length); i++) {

@@ -34,7 +34,7 @@ import type { GrassPusher } from './grass';
 import { setDaylight } from './daylight';
 import { CloudShadows } from './cloudShadows';
 import { smoothstep } from '../../game/noise';
-import { installNature, Landscape, NATURE_DIAGS, setWaterCalm, setWind, Sky, windStill, type NatureRebuild, type NatureStep, type RoadBuilder } from './nature';
+import { installNature, Landscape, NATURE_DIAGS, restartWind, setWaterCalm, setWind, Sky, windStill, type NatureRebuild, type NatureStep, type RoadBuilder } from './nature';
 import { ObjectMotion, writeInstance, type MovingObject, type PopTarget } from './objectMotion';
 import { ObjectShadows, type ShadowSource } from './objectShadows';
 import { toGame } from './space';
@@ -72,6 +72,8 @@ export interface LotView {
   rowOf(k: number): number;
   /** Whether a ground point (tiles) is in the lot being viewed, `margin` round it. */
   inView(x: number, z: number, margin: number): boolean;
+  /** Whether a ground point (tiles) on storey `k` is in a flat that may not be shown open: what is in it isn't drawn. */
+  closed(x: number, z: number, k: number): boolean;
 }
 
 /** What the renderer does for the lot's contents. */
@@ -599,6 +601,14 @@ export class LotContents {
     setWaterCalm(this.app, on);
   }
 
+  /** Fixed-step playback: what moves by a clock of its own here (the things' clips, the clouds, the wind and the water) back to its start. */
+  restartClocks(): void {
+    this.motion.restartClock();
+    this.sky.restart();
+    this.cloudShadows?.restart();
+    restartWind(this.app);
+  }
+
   /** Each frame, game or overview, once the camera is placed: the sky round it, the clouds' drift (`dt` ms), the grass in view. */
   frame(dt: number, held = false): void {
     const eye = toGame(this.camera.getPosition(), this.eye);
@@ -767,7 +777,11 @@ export class LotContents {
     this.wallItemsHidden.clear();
     this.riddenHidden.clear();
     const down = (o: ObjectPlacement) => storey >= 0 && v.storeyOf(o.z) === -1 && !!this.deps.content.object(o.def)?.stairs;
-    const shown = world.objects.filter((o) => (storeyShown(v.storeyOf(o.z), storey) || down(o)) && v.inView(o.x + o.w / 2, o.z - v.rowOf(v.storeyOf(o.z)) + o.d / 2, 0));
+    const shown = world.objects.filter((o) => {
+      const k = v.storeyOf(o.z);
+      const [x, z] = [o.x + o.w / 2, o.z - v.rowOf(k) + o.d / 2];
+      return (storeyShown(k, storey) || down(o)) && v.inView(x, z, 0) && !v.closed(x, z, k);
+    });
     // One template per model and size (things the player resized get their own).
     const byModel = Map.groupBy(shown, (o) => `${o.def}|${this.objectModel(o)}${resizeKey(this.objectResize(o))}${colorsKey(this.objectColors(o))}`);
     const lists = [...byModel.values()];
@@ -1188,7 +1202,7 @@ export class LotContents {
   showItems(): void {
     const v = this.view;
     const storey = v.storey();
-    this.items.show({ storey, storeyOf: (z) => v.storeyOf(z), shown: (k) => storeyShown(k, storey), groundZ: (z) => z - v.rowOf(v.storeyOf(z)), storeyHeight: WALL_HEIGHT, inView: (x, z) => v.inView(x, z, 0) });
+    this.items.show({ storey, storeyOf: (z) => v.storeyOf(z), shown: (k) => storeyShown(k, storey), groundZ: (z) => z - v.rowOf(v.storeyOf(z)), storeyHeight: WALL_HEIGHT, inView: (x, z, k) => v.inView(x, z, 0) && !v.closed(x, z, k) });
   }
 
   /** New items from the simulation. */

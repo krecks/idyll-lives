@@ -24,6 +24,7 @@
  */
 
 import * as pc from './engine';
+import { castKeyOf } from '../shared/parked';
 import { INSTANCE_COLOR_SEMANTIC } from './materials';
 
 /** A per-instance stream beside the matrix: the vertex attribute (semantic) a shader reads it from, and its floats. */
@@ -177,6 +178,14 @@ export class Instances {
     const out = new Float32Array(this.count * 16);
     for (let i = 0; i < this.count; i++) out.set(this.data.subarray(i * this.stride, i * this.stride + 16), i * 16);
     return out;
+  }
+
+  /**
+   * The copies that stand where `reaches` says (the sun's map), where they stand and which way, as a number (0: none
+   * there): what the draw casts into the map, the same however many copies it has elsewhere (`SunShadows.castKey`).
+   */
+  castKey(reaches: (x: number, z: number) => boolean): number {
+    return castKeyOf(this.data, this.count, this.stride, reaches);
   }
 
   /** Copy `i`'s values of `stream` (its `components` floats from `values` at `offset`). */

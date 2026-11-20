@@ -1,21 +1,24 @@
 /**
- * What the Lot tool puts down, as its card (`LotCard.svelte`) sets it: a home of a size with a
- * garden, a farm, a public place, an outdoor spot or a civic place. Kept while the tool is put down
+ * What the Lot tool puts down, as its card (`LotCard.svelte`) sets it: a home (a house of a size with a
+ * garden, or a building of flats), a farm, a public place, an outdoor spot or a civic place. Kept while the tool is put down
  * and taken up again.
  */
 
 import type { GardenSize } from '../../game/housegen';
 import { civicOffered } from '../../game/edit/buildup';
-import { draftAreaSize } from '../../game/backdrop';
+import { draftAreaSize } from '../../game/places';
 import { CIVIC_PLACES, publicChoices, type LotChoice } from '../../game/edit/lots';
 import { placeTemplate } from '../../game/placeLots';
 import type { NeighbourhoodDraft, Templates } from '../../game/town';
 
 export type LotGroup = 'home' | 'farm' | 'public' | 'outdoor' | 'civic';
+/** A home is a house on its lot, or a building of flats. */
+export type HomeKind = 'house' | 'flats';
 export type HomeSize = 'small' | 'medium' | 'large';
 
 export const lotChoice = $state({
   group: 'home' as LotGroup,
+  home: 'house' as HomeKind,
   size: 'medium' as HomeSize,
   /** A home's garden; `any`: as the world's homes have theirs. */
   garden: 'any' as GardenSize | 'any',
@@ -26,6 +29,9 @@ export const lotChoice = $state({
   civic: -1,
   civicArea: 0,
 });
+
+/** About how big a building of flats' lot is (m), for its ghost where it can't go: each is drawn where it goes. */
+const FLATS_LOT = { width: 20, depth: 24 };
 
 /** The outdoor spots' templates. */
 export const outdoorChoices = (t: Templates): string[] => t.parks.filter((p) => p.kind === 'outdoor').map((p) => p.id);
@@ -46,7 +52,7 @@ export function choiceOf(t: Templates): LotChoice | null {
   const c = lotChoice;
   switch (c.group) {
     case 'home':
-      return { kind: 'house', size: c.size, ...(c.garden === 'any' ? {} : { garden: c.garden }) };
+      return c.home === 'flats' ? { kind: 'flats' } : { kind: 'house', size: c.size, ...(c.garden === 'any' ? {} : { garden: c.garden }) };
     case 'farm':
       return { kind: 'farm' };
     case 'public': {
@@ -68,7 +74,9 @@ export function choiceSize(t: Templates, draft?: NeighbourhoodDraft): { w: numbe
   const c = lotChoice;
   const frame =
     c.group === 'home'
-      ? t.lotSizes?.[c.size]
+      ? c.home === 'flats'
+        ? FLATS_LOT
+        : t.lotSizes?.[c.size]
       : c.group === 'farm'
         ? t.lotSizes?.farm
         : c.group === 'outdoor'

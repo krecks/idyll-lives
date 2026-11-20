@@ -64,15 +64,36 @@ pub const BAY_GAP: i64 = 6;
 /// bay off the street, square to it beyond its verge, on free ground by the park: the plots of
 /// both rows east of the park moved on `BAY_GAP` m to leave it (the hamlet that much wider). The
 /// bay's middle is half the street's width, half a metre and half its 6 m length off the
-/// street's line on the park's side, its `rot` a facing (0-3) as `macro.ts` gives it: 0 a bay on
-/// the street's +z side, 2 on its -z side.
+/// street's line on the park's side, its `yaw` nose in, away from the street.
 pub fn hamlets_with_parking(
+    content: &str,
+    seed: u64,
+    columns: i64,
+    places: &[Place],
+    size: (i64, i64),
+    bay: Option<usize>,
+) -> Hamlets {
+    hamlets_with_car_park(content, seed, columns, places, size, bay, 1)
+}
+
+/// How wide the gap `hamlets_with_car_park` leaves beside a hamlet's park for a car park of
+/// `bays` bays in a row (m): 3 m a bay and the metre and a half either side (`BAY_GAP` for one).
+pub fn car_park_gap(bays: usize) -> i64 {
+    3 * bays as i64 + 3
+}
+
+/// `hamlets_with_parking` with a car park of `bays` bays side by side in hamlet `bay` (if any),
+/// as a real town lays one (`parking.ts`): a row of nose-in bays 3 m apart square to the street
+/// beyond its verge, on one apron (the town file's `carParks`), every bay of it (`park` 0). The
+/// gap by the park is `car_park_gap(bays)` m wide, the hamlet that much wider.
+pub fn hamlets_with_car_park(
     content: &str,
     seed: u64,
     columns: i64,
     places: &[Place],
     (width, depth): (i64, i64),
     bay: Option<usize>,
+    bays: usize,
 ) -> Hamlets {
     let mut out = json!({
         "width": width, "depth": depth, "size": "big",
@@ -98,7 +119,7 @@ pub fn hamlets_with_parking(
         ))
         .unwrap();
         // (Where the bay goes, in the block: just east of its park; the park's middle (z).)
-        let parking = (bay == Some(k)).then(|| open_gap(&mut block));
+        let parking = (bay == Some(k)).then(|| open_gap(&mut block, car_park_gap(bays)));
         let (dx, dz) = (at.x, at.z);
         let bw = block["width"].as_i64().unwrap();
         let bd = block["depth"].as_i64().unwrap();
@@ -125,9 +146,25 @@ pub fn hamlets_with_parking(
             // (The street is 6 m wide.)
             let side = if park_z + dz as f64 > z { 1.0 } else { -1.0 };
             let off = 6.0 / 2.0 + 0.5 + 3.0;
-            out["parking"] = json!([{
-                "x": (dx + cut) as f64 + BAY_GAP as f64 / 2.0, "z": z + side * off,
-                "rot": if side > 0.0 { 0 } else { 2 }, "area": k,
+            // (The first bay's middle 3 m into the gap: its metre and a half, and half the bay.)
+            let x0 = (dx + cut) as f64 + 3.0;
+            out["parking"] = (0..bays)
+                .map(|b| {
+                    json!({
+                        "x": x0 + 3.0 * b as f64, "z": z + side * off,
+                        // (Nose in, away from the street.)
+                        "yaw": if side > 0.0 { 0.0 } else { std::f64::consts::PI },
+                        "area": k, "park": 0,
+                    })
+                })
+                .collect();
+            // (The apron: the bays' 3 by 6 m, the P sign at its street corner.)
+            let (near, far) = (z + side * (off - 3.0), z + side * (off + 3.0));
+            let (xa, xb) = (x0 - 1.5, x0 - 1.5 + 3.0 * bays as f64);
+            out["carParks"] = json!([{
+                "area": k,
+                "poly": [[xa, near.min(far)], [xb, near.min(far)], [xb, near.max(far)], [xa, near.max(far)]],
+                "sign": [xa - 0.5, near, 0.0],
             }]);
         }
         let pts = line([x0 + 0.5, z], [x1 - 0.5, z]);
@@ -164,10 +201,10 @@ pub fn hamlets_with_parking(
     }
 }
 
-/// Opens a gap of `BAY_GAP` m in `block` (a `town_with` town file of one street) just east of
-/// its park: everything of the plots east of it moved on that far, the block that much wider.
+/// Opens a gap of `gap` m in `block` (a `town_with` town file of one street) just east of its
+/// park: everything of the plots east of it moved on that far, the block that much wider.
 /// Returns where the gap starts (x) and the park's middle (z).
-fn open_gap(block: &mut Value) -> (i64, f64) {
+fn open_gap(block: &mut Value, gap: i64) -> (i64, f64) {
     let park = block["plots"]
         .as_array()
         .unwrap()
@@ -179,8 +216,8 @@ fn open_gap(block: &mut Value) -> (i64, f64) {
     let past = |v: &Value| v.as_f64().unwrap() >= cut as f64;
     let on = |v: &mut Value| {
         *v = match v.as_i64() {
-            Some(n) => json!(n + BAY_GAP),
-            None => json!(v.as_f64().unwrap() + BAY_GAP as f64),
+            Some(n) => json!(n + gap),
+            None => json!(v.as_f64().unwrap() + gap as f64),
         }
     };
     for w in block["walls"].as_array_mut().unwrap() {

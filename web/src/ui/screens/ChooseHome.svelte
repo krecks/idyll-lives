@@ -9,21 +9,28 @@
    * and what the chosen home is; under it the homes for sale as a list, for the keyboard, and the
    * main control on a narrow screen.
    *
-   * A household of the town's (chosen in step 4, `app.playSlot`) has its own home chosen already:
+   * A home is a house's lot or a flat (`homes.ts`): a building of flats, or the flats over a shop or a
+   * café, is lit while one of its flats for sale is, and a click on it chooses its flat chosen already,
+   * else the cheapest the household can afford; the card lists the building's other flats for sale,
+   * and the list keeps a building's flats together under its name, each with its storey.
+   *
+   * A household of the town's (chosen in step 4, `app.play`) has its own home chosen already:
    * it may stay (the game takes it over as it is) or move to a home for sale, its old home then for
    * sale too. On Move in the rest of the homes for sale are filled (`newGame.ts` `moveInRequest`).
    */
   import { onDestroy, onMount } from 'svelte';
   import { menuScene } from '../../game/menuScene';
-  import { houseTemplate, loadTemplates, slotDims, vacantSlots, withGarden, type PlotSlot, type Templates } from '../../game/town';
+  import { flatsIdOf, houseTemplate, loadTemplates, slotDims, withGarden, type PlotSlot, type Templates } from '../../game/town';
+  import { flatName, flatsTemplate } from '../../game/flats';
   import { GARDEN_SIZES, type GardenSize } from '../../game/housegen';
   import { lookAtAge, residentsOf, sleepersOf, type SimDraft } from '../../game/household';
-  import { homePrice, priceParts } from '../../game/price';
+  import { flatPriceParts, priceParts } from '../../game/price';
   import { householdFunds, jobTitle, savingsOf } from '../../game/wealth';
   import { settings } from '../../settings/settings.svelte';
   import { tierFor } from '../../game/people';
   import { furnishAhead } from '../../game/townJobs';
   import { householdsAhead, stepLabel } from '../newGame';
+  import { homeKey, homeOffers, homeOnLot, homeRows, sameHome, storeyName, type HomeOffer, type HomeRef } from '../homes';
   import { app } from '../app.svelte';
   import { money } from '../format';
   import Icon from '../Icon.svelte';
@@ -40,62 +47,88 @@
   /** Changes when a lot's garden is made bigger or smaller (the lots along the street move). */
   const town = $derived(app.town!);
   /** The home of the town's household chosen in step 4 (null: a household made in Creation). */
-  const from = app.residentSlot;
+  const from = app.residentHome;
   const household = app.mover!;
   const name = household.name;
 
-  const vacant = $derived(vacantSlots(town));
-  const vacantIds = $derived(vacant.map((v) => v.index));
+  /** Every home of the town (houses and flats, `homes.ts`), once the templates are known. */
+  const all = $derived(templates ? homeOffers(content, templates, town) : []);
+  const lived = $derived(new Set(town.households.map(homeKey)));
+  /** The homes for sale. */
+  const vacant = $derived(all.filter((h) => !lived.has(h.key)));
   /** What can be chosen: the homes for sale, and the household's own home if it has one. */
-  const choosable = $derived(new Set(from === null ? vacantIds : [from, ...vacantIds]));
+  const choosable = $derived(from === null ? vacant : [...all.filter((h) => sameHome(h, from)), ...vacant]);
+  const byKey = $derived(new Map(choosable.map((h) => [h.key, h])));
+  /** The lots with a home to choose on them (a building's once for all its flats). */
+  const choosableLots = $derived(new Set(choosable.map((h) => h.slot)));
 
   /**
    * The home chosen: a household of the town's opens on its own; one made in Creation on the home
-   * chosen last time, else (once the prices are known) the one it can afford nearest the town's middle.
+   * chosen last time if it is still for sale, else (once the prices are known) the one it can afford nearest the town's middle.
    */
-  let selectedIndex = $state<number | null>(from ?? (app.homeSlot !== null && vacantSlots(app.town!).some((v) => v.index === app.homeSlot) ? app.homeSlot : null));
-  const selected = $derived(selectedIndex === null ? null : (town.slots[selectedIndex] ?? null));
+  let chosen = $state.raw<HomeRef | null>(from ?? app.home);
+  const selected = $derived(chosen ? (byKey.get(homeKey(chosen)) ?? null) : null);
   /** The household stays in its own home (the game takes it over as it is). */
-  const staying = $derived(from !== null && selectedIndex === from);
+  const staying = $derived(sameHome(selected, from));
   $effect(() => {
-    app.homeSlot = selectedIndex;
+    if (templates) app.home = selected ? refOf(selected) : null;
   });
+  /** A home as the request names it (its lot, and its flat). */
+  const refOf = (h: HomeRef): HomeRef => (h.flat === undefined ? { slot: h.slot } : { slot: h.slot, flat: h.flat });
 
-  /** The house as it stands, or an empty lot to build on (not for a household staying in its own home). */
+  /** The chosen flat's building, and the flat as it would be furnished for sale (none for a house). */
+  const building = $derived(templates && selected?.flat !== undefined ? flatsTemplate(templates, flatsIdOf(selected.lot)) : undefined);
+  const flat = $derived(building && selected?.flat !== undefined ? building.units[selected.flat] : undefined);
+  /** The flats of the chosen flat's building to choose from (its own, and the others for sale there), by storey. */
+  const flatsHere = $derived(selected?.flat === undefined ? [] : homeRows(choosable.filter((h) => h.slot === selected!.slot), null));
+
+  /** The house as it stands, or an empty lot to build on (not for a household staying in its own home, nor a flat). */
   let lot = $state<'house' | 'empty'>(app.emptyLot && from === null ? 'empty' : 'house');
   $effect(() => {
-    app.emptyLot = lot === 'empty' && !staying;
+    app.emptyLot = lot === 'empty' && !staying && selected?.flat === undefined;
   });
 
-  const garden = $derived<GardenSize | undefined>(selected?.garden);
-  const dims = $derived(templates && selected ? slotDims(templates, selected) : null);
+  const garden = $derived<GardenSize | undefined>(selected?.flat === undefined ? selected?.lot.garden : undefined);
+  /** The lot's size (m), or a flat's own. */
+  const dims = $derived(templates && selected ? (flat ? { width: flat.rect.w, depth: flat.rect.d } : slotDims(templates, selected.lot)) : null);
   function setGarden(size: GardenSize) {
-    if (templates && selected) app.town = withGarden(templates, town, selected.index, size);
+    if (templates && selected) app.town = withGarden(templates, town, selected.slot, size);
   }
   /** The garden sizes to choose from: one that doesn't fit beside the neighbours can't be picked. */
   const gardens = $derived(
     GARDEN_SIZES.map((value) => ({
       value,
       label: value[0].toUpperCase() + value.slice(1),
-      disabled: !!templates && !!selected && value !== garden && withGarden(templates, town, selected.index, value) === town,
+      disabled: !!templates && !!selected && value !== garden && withGarden(templates, town, selected.slot, value) === town,
     })),
   );
 
-  const house = $derived(templates && selected ? houseTemplate(templates, selected.template) : undefined);
+  const house = $derived(templates && selected && selected.flat === undefined ? houseTemplate(templates, selected.lot.template) : undefined);
   const residents = $derived(residentsOf(content, household));
   /**
-   * Sleeping places in the house as it would be furnished for this household (empty lot, or their
+   * Sleeping places in the home as it would be furnished for this household (empty lot, or their
    * own home: none asked), counted as the simulation counts them (sim-core `lifecycle::beds`): a slot
    * on anything with a sleep interaction, but a couple's bed (one where partners try for a baby) is
    * a place for one unless one of the household's couples sleeps in it.
    */
   const bedPlaces = $derived.by(() => {
     const sleep = content.sleepTags;
-    if (!templates || !selected || staying || lot === 'empty' || !sleep.length) return null;
-    const fitted = houseTemplate(templates, selected.template, residents);
-    if (!fitted) return null;
+    if (!templates || !selected || staying || app.emptyLot || !sleep.length) return null;
+    let objects: { def: string }[];
+    if (selected.flat !== undefined) {
+      // (A building's flats are furnished together, each for who lives there: this one for the household.)
+      const furnished: (typeof residents | undefined)[] = [];
+      furnished[selected.flat] = residents;
+      const unit = flatsTemplate(templates, flatsIdOf(selected.lot), furnished)?.units[selected.flat];
+      if (!unit) return null;
+      objects = unit.layout.objects;
+    } else {
+      const fitted = houseTemplate(templates, selected.lot.template, residents);
+      if (!fitted) return null;
+      objects = [fitted, fitted.upper, fitted.basement].flatMap((floor) => floor?.objects ?? []);
+    }
     let [places, couples] = [0, 0];
-    for (const o of [fitted, fitted.upper, fitted.basement].flatMap((floor) => floor?.objects ?? [])) {
+    for (const o of objects) {
       const def = content.object(o.def);
       if (!def || !content.offersTags(def, sleep)) continue;
       const slots = def.slots ?? 1;
@@ -115,33 +148,45 @@
   const creative = $derived(app.mode === 'creative');
   /** What the household has saved: what it can pay for a home (Living). */
   const savings = savingsOf(content, household);
-  /** Each home's price as it stands, by lot (their own home's too: what they paid). */
-  const prices = $derived(templates ? new Map([...choosable].map((i) => [i, homePrice(content, templates!, town.slots[i])])) : null);
   /** More than the household has saved (Living): still there to look at, as a faint ring once "All for sale" is chosen. */
-  const dear = (plot: number) => !creative && plot !== from && (prices?.get(plot) ?? 0) > savings;
-  const dearIds = $derived(prices ? vacantIds.filter(dear) : []);
+  const dear = (h: HomeOffer) => !creative && !sameHome(h, from) && h.price > savings;
+  const dearCount = $derived(vacant.filter(dear).length);
   /** Which homes for sale the map lights (Living, with some too dear): those within their savings, or all of them, the rest faint. */
   let lit = $state<'within' | 'all'>('within');
   /** There is a choice to make: a Living game, the prices known, and some homes beyond their savings. */
-  const litChoice = $derived(!creative && dearIds.length > 0);
+  const litChoice = $derived(!creative && dearCount > 0);
   const showAll = $derived(!litChoice || lit === 'all');
-  const litIds = $derived(showAll ? vacantIds : vacantIds.filter((i) => !dear(i)));
-  /** Bought as an empty lot: chosen so, or no house stands on it (as `assembleTown` sees it: money to build with besides). */
-  const emptyLot = $derived(!staying && (lot === 'empty' || (!!templates && !!selected && !house)));
+  /** The lots lit: a home for sale on them within their savings (or any, all shown); and those whose every home for sale is too dear. */
+  const litLots = $derived([...new Set(vacant.filter((h) => showAll || !dear(h)).map((h) => h.slot))]);
+  const dearLots = $derived.by(() => {
+    if (!litChoice || !showAll) return [];
+    const within = new Set(vacant.filter((h) => !dear(h)).map((h) => h.slot));
+    return [...new Set(vacant.filter((h) => !within.has(h.slot)).map((h) => h.slot))];
+  });
+  /** Bought as an empty lot: chosen so, or no house stands on it (as `assembleTown` sees it: money to build with besides). Never a flat. */
+  const emptyLot = $derived(!staying && !!selected && selected.flat === undefined && (lot === 'empty' || (!!templates && !house)));
   /** The chosen home's price (an empty lot: the land alone), and what it's made of. */
-  const parts = $derived(templates && selected && !staying ? priceParts(content, templates, selected, emptyLot) : null);
+  const parts = $derived(
+    templates && selected && !staying
+      ? selected.flat === undefined
+        ? priceParts(content, templates, selected.lot, emptyLot)
+        : flatPriceParts(content, templates, { template: flatsIdOf(selected.lot) }, selected.flat)
+      : null,
+  );
   /** The chosen home costs more than the household has saved: it can't move in (Living). */
   const tooDear = $derived(!creative && !!parts && parts.total > savings);
+  /** What their own home cost them (a household of the town's). */
+  const ownPrice = $derived(from === null ? undefined : all.find((h) => sameHome(h, from))?.price);
   /** What the household has to build with once it has bought its home (Living), or "free" (Creative). */
-  const budget = $derived(
-    creative ? 'Free: this is a Creative game' : money(staying ? householdFunds(content, savings, prices?.get(from!) ?? 0) : householdFunds(content, savings, parts?.total ?? 0, emptyLot)),
-  );
+  const budget = $derived(creative ? 'Free: this is a Creative game' : money(staying ? householdFunds(content, savings, ownPrice ?? 0) : householdFunds(content, savings, parts?.total ?? 0, emptyLot)));
 
+  /** A household's home in words: its lot's name, or its flat's. */
+  const homeName = (h: HomeRef) => (h.flat === undefined ? (town.slots[h.slot]?.name ?? '') : flatName(town.slots[h.slot].name, h.flat));
   const neighbours = $derived(
     selected
       ? town.households
-          .filter((h) => h.slot !== from && h.slot !== selected!.index)
-          .map((h) => ({ ...h, distance: Math.hypot(town.slots[h.slot].x - selected!.x, town.slots[h.slot].z - selected!.z) }))
+          .filter((h) => !sameHome(h, from) && !sameHome(h, selected))
+          .map((h) => ({ ...h, key: homeKey(h), distance: Math.hypot(town.slots[h.slot].x - selected!.lot.x, town.slots[h.slot].z - selected!.lot.z) }))
           .sort((a, b) => a.distance - b.distance)
           .slice(0, 3)
       : [],
@@ -152,7 +197,7 @@
   const areas = $derived(town.open?.areas ?? []);
   const areaName = (s: PlotSlot) => areas[s.area ?? 0]?.name || town.name;
   /** Homes lit in each area (for sale; within their savings while only those are lit). */
-  const forSaleIn = $derived(areas.map((_, k) => vacant.filter((s) => (s.area ?? 0) === k && (showAll || !dear(s.index))).length));
+  const forSaleIn = $derived(areas.map((_, k) => vacant.filter((h) => (h.lot.area ?? 0) === k && (showAll || !dear(h))).length));
   /** What the camera frames with no home in focus: the whole world, or one of its areas. */
   let shot = $state<'world' | { area: number }>('world');
   /** The camera is on the chosen home (false: on `shot`). */
@@ -165,14 +210,20 @@
     menuScene.reframe();
   }
 
-  /** A home clicked (on the map, its tag, or the list): chosen, and the camera glides in. Empty ground: back to the shot. */
+  /** A lot clicked on the map or its tag: its home chosen (a building's: `homes.ts` `homeOnLot`), and the camera glides in. Empty ground: back to the shot. */
   function choose(plot: number | null) {
-    if (plot === null || !choosable.has(plot)) {
+    const home = plot === null ? null : homeOnLot(choosable, plot, selected, from, dear);
+    if (!home) {
       close = false;
       return;
     }
-    selectedIndex = plot;
-    if (plot === from) lot = 'house';
+    pick(home);
+  }
+
+  /** A home chosen (from the list, the map or the card's flats), and the camera glides in. */
+  function pick(home: HomeOffer) {
+    chosen = refOf(home);
+    if (sameHome(home, from)) lot = 'house';
     close = true;
   }
 
@@ -194,36 +245,51 @@
   }
   onDestroy(() => clearTimeout(hoverOff));
 
-  function bedrooms(s: PlotSlot): string {
-    const n = templates ? houseTemplate(templates, s.template)?.bedrooms : undefined;
-    return n ? `${n} bedroom${n === 1 ? '' : 's'}` : 'An empty lot';
+  /** A home's bedrooms in words; a house's lot with no house on it, "An empty lot". */
+  function bedrooms(h: HomeOffer): string {
+    if (h.flat === undefined && templates && !houseTemplate(templates, h.lot.template)) return 'An empty lot';
+    return `${h.bedrooms} bedroom${h.bedrooms === 1 ? '' : 's'}`;
   }
 
   /** The chosen home's tag wins room first, then the one looked at. */
   const ORDER: readonly LotLabel['kind'][] = ['mine', 'sale', 'home', 'park'];
 
   const labels = $derived.by((): LotLabel[] => {
-    const shown = [...new Set([selected?.index ?? null, from, hover])].filter((p): p is number => p !== null && !!town.slots[p]);
+    const shown = [...new Set([selected?.slot ?? null, from?.slot ?? null, hover])].filter((p): p is number => p !== null && !!town.slots[p]);
     return shown.map((plot): LotLabel => {
       const s = town.slots[plot];
-      if (plot === selected?.index) return { plot, title: `The ${name}s`, sub: staying ? 'Their home' : emptyLot ? 'An empty lot' : 'Your new home', kind: 'mine' };
-      if (plot === from) return { plot, title: `The ${name}s`, sub: 'Their home now', kind: 'home' };
+      if (plot === selected?.slot) {
+        const sub = staying ? 'Their home' : emptyLot ? 'An empty lot' : selected.storey !== undefined ? `Your new home · ${storeyName(selected.storey)}` : 'Your new home';
+        return { plot, title: `The ${name}s`, sub, kind: 'mine' };
+      }
+      if (plot === from?.slot) return { plot, title: `The ${name}s`, sub: 'Their home now', kind: 'home' };
+      const sale = vacant.filter((h) => h.slot === plot);
+      const flats = sale.filter((h) => h.flat !== undefined);
+      if (flats.length) {
+        // A building's flats for sale: how many, from what price, how many bedrooms.
+        const cheapest = Math.min(...flats.map((h) => h.price));
+        const beds = [...new Set(flats.map((h) => h.bedrooms))].sort((a, b) => a - b);
+        const price = creative ? '' : ` · ${flats.length > 1 ? 'from ' : ''}${money(cheapest)}`;
+        const title = `${flats.length === 1 ? 'Flat' : `${flats.length} flats`} for sale${price}`;
+        const words = `${beds.length > 1 ? `${beds[0]}–${beds.at(-1)}` : beds[0]} bedroom${beds.at(-1) === 1 ? '' : 's'}`;
+        return { plot, title, sub: `${words} · ${s.name}${flats.every(dear) ? ' · more than they have' : ''}`, kind: 'sale' };
+      }
       const h = town.households.find((x) => x.slot === plot);
-      if (h) return { plot, title: `The ${h.household.name}s`, sub: s.name, kind: 'home' };
-      if (s.kind !== 'house') return { plot, title: s.name, sub: (s.area ?? 0) > 0 ? areaName(s) : undefined, kind: 'park' };
-      const price = creative || !prices ? undefined : prices.get(plot);
-      return { plot, title: price === undefined ? 'For sale' : `For sale · ${money(price)}`, sub: `${bedrooms(s)}${dear(plot) ? ' · more than they have' : ''}`, kind: 'sale' };
+      if (h && s.kind === 'house') return { plot, title: `The ${h.household.name}s`, sub: s.name, kind: 'home' };
+      if (sale.length) {
+        const [home] = sale;
+        return { plot, title: creative ? 'For sale' : `For sale · ${money(home.price)}`, sub: `${bedrooms(home)}${dear(home) ? ' · more than they have' : ''}`, kind: 'sale' };
+      }
+      return { plot, title: s.name, sub: (s.area ?? 0) > 0 ? areaName(s) : undefined, kind: 'park' };
     });
   });
 
   // ---- The list ----------------------------------------------------------------------------------
 
-  /** The homes to choose from as the list has them: their own first, then the main town's, then each village's, cheapest first. */
-  const rows = $derived(
-    [...choosable]
-      .map((i) => town.slots[i])
-      .sort((a, b) => Number(b.index === from) - Number(a.index === from) || (a.area ?? 0) - (b.area ?? 0) || (prices?.get(a.index) ?? 0) - (prices?.get(b.index) ?? 0) || a.index - b.index),
-  );
+  /** The homes to choose from as the list has them (`homes.ts` `homeRows`: a building's flats together). */
+  const rows = $derived(homeRows(choosable, from));
+  /** A row's element id (a key's ":" left out, for the selector). */
+  const rowId = (h: HomeOffer) => `home-${h.key.replace(':', '-')}`;
   let innerWidth = $state(window.innerWidth);
   /** Too narrow for the world beside the panel (as `SetupShell` lays it out): the list is the main control. */
   const narrow = $derived(innerWidth / settings.uiScale <= 760);
@@ -238,9 +304,9 @@
   function moveActive(to: number) {
     if (!rows.length) return;
     active = Math.max(0, Math.min(rows.length - 1, to));
-    const plot = rows[active].index;
-    setHover(plot);
-    listEl?.querySelector(`#home-${plot}`)?.scrollIntoView({ block: 'nearest' });
+    const row = rows[active];
+    setHover(row.slot);
+    listEl?.querySelector(`#${rowId(row)}`)?.scrollIntoView({ block: 'nearest' });
   }
 
   function listKey(e: KeyboardEvent) {
@@ -248,7 +314,7 @@
     if (e.key in step) moveActive((active < 0 ? 0 : active) + step[e.key]);
     else if (e.key === 'Home') moveActive(0);
     else if (e.key === 'End') moveActive(rows.length - 1);
-    else if ((e.key === 'Enter' || e.key === ' ') && active >= 0) choose(rows[active].index);
+    else if ((e.key === 'Enter' || e.key === ' ') && active >= 0) pick(rows[active]);
     else return;
     e.preventDefault();
   }
@@ -301,7 +367,7 @@
   }
 
   function start() {
-    const request = selected && app.homeRequest(selected.index);
+    const request = selected && app.homeRequest(refOf(selected));
     if (!request) return;
     confirming = false;
     menuScene.highlight({});
@@ -321,21 +387,23 @@
       const ahead = householdsAhead(content, assets, templates, town, seed, household, tierFor(settings.graphics));
       furnishAhead(content, town, ahead).catch(() => {});
     }
-    if (selectedIndex !== null) return;
+    if (selected) return;
     const a = areas[0];
     const [cx, cz] = a ? [a.x + a.w / 2, a.z + a.d / 2] : [town.width / 2, town.depth / 2];
-    const near = (s: PlotSlot) => ((s.area ?? 0) === 0 ? 0 : 1e6) + Math.hypot(s.x - cx, s.z - cz);
-    selectedIndex = vacant.filter((s) => !dear(s.index)).sort((p, q) => near(p) - near(q))[0]?.index ?? null;
+    const near = (h: HomeOffer) => ((h.lot.area ?? 0) === 0 ? 0 : 1e6) + Math.hypot(h.lot.x - cx, h.lot.z - cz);
+    const first = vacant.filter((h) => !dear(h)).sort((p, q) => near(p) - near(q) || p.price - q.price)[0];
+    chosen = first ? refOf(first) : null;
   });
 
-  // The 3D town shows the chosen home as the game will (cleared when starting on an empty lot).
+  // The 3D town shows the chosen home as the game will (cleared when starting on an empty lot). A flat's building is
+  // no house: it is shown with no home, in its own look as the town has it (`lotLooks`), lit and tagged as the home.
   $effect(() => {
-    const plot = selected?.index ?? null;
-    const shown = plot === null || plot === from ? town : app.homeTown(plot);
-    if (shown) void menuScene.show(shown, plot ?? from);
+    const shown = !selected || staying ? town : app.homeTown(selected);
+    const home = selected ?? from;
+    if (shown) void menuScene.show(shown, home && home.flat === undefined ? home.slot : null);
   });
   $effect(() => {
-    menuScene.highlight({ hover, selected: selected?.index ?? null, marked: litIds, dear: litChoice && showAll ? dearIds : [], outlines: false });
+    menuScene.highlight({ hover, selected: selected?.slot ?? null, marked: litLots, dear: dearLots, outlines: false });
   });
   $effect(() => () => menuScene.highlight({}));
 
@@ -352,7 +420,7 @@
 {#snippet panel()}
   {#if narrow}{@render homes()}{/if}
   <section class="group who" aria-labelledby="who-head">
-    <h2 class="eyebrow" id="who-head">{from === null ? 'Moving in' : `Living at ${town.slots[from]?.name ?? ''}`}</h2>
+    <h2 class="eyebrow" id="who-head">{from === null ? 'Moving in' : `Living at ${homeName(from)}`}</h2>
     <span class="family">The {name}s</span>
     <ul class="members">
       {#each household.members as m (m.uid)}
@@ -380,7 +448,7 @@
   <section class="group home" aria-labelledby="home-head">
     {#if selected}
       <h2 class="eyebrow" id="home-head">{staying ? 'Their home' : 'The home chosen'}</h2>
-      {#if house && !staying}
+      {#if house && !staying && selected.flat === undefined}
         <Segmented
           fill
           label="Start with"
@@ -392,42 +460,66 @@
         />
       {/if}
       <!-- A generated house's lot is cut to fit it: its garden can be made bigger or smaller. A farm keeps its size (its fields and farmyard come with it). -->
-      {#if garden && selected.lot !== 'farm' && !staying}
+      {#if garden && selected.lot.lot !== 'farm' && !staying}
         <div class="lot-size">
           <span class="eyebrow sub">Garden</span>
           <Segmented label="Garden" bind:value={() => garden, setGarden} options={gardens} />
         </div>
       {/if}
-      {#key `${selected.index}:${lot}:${selected.template}`}
+      {#key `${selected.key}:${lot}:${selected.lot.template}`}
         <div class="card">
-          <span class="eyebrow sub">{areaName(selected)}</span>
+          <span class="eyebrow sub">{areaName(selected.lot)}</span>
           <h3>{selected.name}</h3>
-          {#if emptyLot}
+          {#if flat && selected.storey !== undefined}
+            <b class="house">A flat · {storeyName(selected.storey)}</b>
+            <p>
+              {selected.storey === 0 ? 'On the ground floor of' : building?.place ? 'Over' : 'Upstairs in'}
+              {selected.lot.name}, in at the building's street door{selected.storey === 0 ? '' : ' and up its stairs'}. No garden of its own: inside, the walls and the furniture
+              are theirs to change.
+            </p>
+          {:else if emptyLot}
             <b class="house">An empty lot</b>
             <p>The house is cleared away: build your own from the ground up.</p>
           {:else if house}
             <b class="house">{house.name}</b>
             <p>{house.description}</p>
           {/if}
+          {#if flatsHere.length > 1}
+            <!-- The building's other flats to choose from, each with its storey and price. -->
+            <div class="flats" role="radiogroup" aria-label="Flats in {selected.lot.name}">
+              {#each flatsHere as f (f.key)}
+                {@const on = f.key === selected.key}
+                <button class:on class:dear={dear(f)} role="radio" aria-checked={on} onclick={() => pick(f)}>
+                  <b>Flat {(f.flat ?? 0) + 1}</b>
+                  <small>{storeyName(f.storey ?? 0)} · {f.bedrooms} bed{f.bedrooms === 1 ? '' : 's'}{sameHome(f, from) ? ' · theirs' : creative ? '' : ` · ${money(f.price)}`}</small>
+                </button>
+              {/each}
+            </div>
+          {/if}
           <dl>
             {#if dims}
-              <dt>Lot</dt>
+              <dt>{flat ? 'Flat' : 'Lot'}</dt>
               <dd>{dims.width} × {dims.depth} m{economy.rent ? ` · rent ${money(economy.rent.base + Math.round(economy.rent.perTile * dims.width * dims.depth))} a week` : ''}</dd>
             {/if}
-            {#if house && !emptyLot}
+            {#if flat}
+              <dt>Bedrooms</dt>
+              <dd>{flat.bedrooms}</dd>
+              <dt>Building</dt>
+              <dd>{building?.units.length} flat{building?.units.length === 1 ? '' : 's'} · {building?.storeys} storeys</dd>
+            {:else if house && !emptyLot}
               <dt>Bedrooms</dt>
               <dd>{house.bedrooms}</dd>
             {/if}
-            {#if staying && !creative && prices?.has(from!)}
+            {#if staying && !creative && ownPrice !== undefined}
               <dt>Bought for</dt>
-              <dd>{money(prices.get(from!)!)}</dd>
+              <dd>{money(ownPrice)}</dd>
             {/if}
             {#if parts && !creative}
               <dt>Price</dt>
               <dd>
                 {money(parts.total)}
                 {#if parts.house || parts.furniture}
-                  <small class="parts">land {money(parts.land)} · house {money(parts.house)} · furniture {money(parts.furniture)}</small>
+                  <small class="parts">land {money(parts.land)} · {flat ? 'flat' : 'house'} {money(parts.house)} · furniture {money(parts.furniture)}</small>
                 {/if}
               </dd>
             {/if}
@@ -440,7 +532,7 @@
           </dl>
           {#if tooDear && parts}
             <p class="warn" role="status">
-              Too expensive: the {name}s have {money(savings)} saved, {money(parts.total - savings)} short.{lot === 'empty' ? '' : ' Start on an empty lot, or choose a home that costs less.'}
+              Too expensive: the {name}s have {money(savings)} saved, {money(parts.total - savings)} short.{lot === 'empty' && !flat ? '' : flat ? ' Choose a home that costs less.' : ' Start on an empty lot, or choose a home that costs less.'}
             </p>
           {/if}
           {#if shortage}
@@ -449,13 +541,13 @@
             </p>
           {/if}
           {#if from !== null && !staying}
-            <p class="hint">Their home at {town.slots[from]?.name} goes up for sale, and another household may move in.</p>
+            <p class="hint">Their home at {homeName(from)} goes up for sale, and another household may move in.</p>
           {/if}
           {#if neighbours.length}
             <span class="eyebrow sub">Closest neighbours</span>
             <ul class="near">
-              {#each neighbours as n (n.slot)}
-                <li><b>The {n.household.name}s</b> · {town.slots[n.slot].name}</li>
+              {#each neighbours as n (n.key)}
+                <li><b>The {n.household.name}s</b> · {homeName(n)}</li>
               {/each}
             </ul>
           {/if}
@@ -464,10 +556,10 @@
     {:else if vacant.length}
       <h2 class="eyebrow" id="home-head">A home</h2>
       <p class="hint">
-        Choose one of the {vacant.length} homes for sale on the map{creative ? '' : `: ${vacant.length - dearIds.length} within the ${money(savings)} they've saved`}. The chips under the map take you to the town and each village.
+        Choose one of the {vacant.length} homes for sale on the map, houses and flats{creative ? '' : `: ${vacant.length - dearCount} within the ${money(savings)} they've saved`}. The chips under the map take you to the town and each village.
       </p>
     {:else}
-      <p class="hint">Every house is taken. Go back and remove a neighbour household.</p>
+      <p class="hint">Every home is taken. Go back and remove a neighbour household.</p>
     {/if}
     <p class="hint after">Once you move in, the other homes for sale find households too, but for a few.</p>
   </section>
@@ -489,34 +581,40 @@
         role="listbox"
         tabindex="0"
         aria-label="Homes to choose from"
-        aria-activedescendant={active >= 0 && rows[active] ? `home-${rows[active].index}` : undefined}
+        aria-activedescendant={active >= 0 && rows[active] ? rowId(rows[active]) : undefined}
         bind:this={listEl}
         onkeydown={listKey}
-        onfocus={() => active < 0 && moveActive(Math.max(0, rows.findIndex((r) => r.index === selected?.index)))}
+        onfocus={() => active < 0 && moveActive(Math.max(0, rows.findIndex((r) => r.key === selected?.key)))}
         onblur={() => setHover(null)}
       >
-        {#each rows as r, i (r.index)}
+        {#each rows as r, i (r.key)}
+          {#if r.flat !== undefined && (rows[i - 1]?.slot !== r.slot || sameHome(rows[i - 1], from))}
+            <!-- A building's flats together, under its name. -->
+            {@const n = rows.filter((x) => x.slot === r.slot && !sameHome(x, from)).length}
+            <li class="building" role="presentation">{r.lot.name}{sameHome(r, from) ? '' : ` · ${n} flat${n === 1 ? '' : 's'} for sale`}</li>
+          {/if}
           <!-- (The keys are the list's: an option of a listbox is not a stop of its own.) -->
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <li
-            id="home-{r.index}"
+            id={rowId(r)}
             role="option"
-            aria-selected={r.index === selected?.index}
+            aria-selected={r.key === selected?.key}
             class:active={i === active}
-            class:dear={dear(r.index)}
-            class:own={r.index === from}
-            onclick={() => ((active = i), choose(r.index))}
-            onmouseenter={() => setHover(r.index)}
+            class:dear={dear(r)}
+            class:own={sameHome(r, from)}
+            class:unit={r.flat !== undefined}
+            onclick={() => ((active = i), pick(r))}
+            onmouseenter={() => setHover(r.slot)}
             onmouseleave={() => setHover(null)}
           >
             <span class="dot" aria-hidden="true"></span>
             <span class="addr">
-              <b>{r.name}</b>
-              <small>{r.index === from ? 'Their home' : `${areaName(r)} · ${bedrooms(r)}`}</small>
+              <b>{r.flat === undefined ? r.name : `Flat ${r.flat + 1} · ${storeyName(r.storey ?? 0)}`}</b>
+              <small>{sameHome(r, from) ? 'Their home' : `${areaName(r.lot)} · ${bedrooms(r)}`}</small>
             </span>
             <span class="price">
-              {#if r.index !== from && !creative && prices}{money(prices.get(r.index) ?? 0)}{/if}
-              {#if dear(r.index)}<small>too dear</small>{/if}
+              {#if !sameHome(r, from) && !creative}{money(r.price)}{/if}
+              {#if dear(r)}<small>too dear</small>{/if}
             </span>
           </li>
         {/each}
@@ -531,10 +629,10 @@
     {labels}
     order={ORDER}
     {hover}
-    selected={selected?.index ?? null}
-    focus={close ? (selected?.index ?? null) : null}
+    selected={selected?.slot ?? null}
+    focus={close ? (selected?.slot ?? null) : null}
     {shot}
-    selectable={(p) => choosable.has(p)}
+    selectable={(p) => choosableLots.has(p)}
     onhover={setHover}
     onselect={choose}
   />
@@ -553,7 +651,7 @@
       {#if litChoice}
         <div class="jump" role="radiogroup" aria-label="Homes lit on the map">
           <button class="chip" class:on={lit === 'within'} role="radio" aria-checked={lit === 'within'} onclick={() => (lit = 'within')}>
-            Within savings <span class="n">{vacant.length - dearIds.length}</span>
+            Within savings <span class="n">{vacant.length - dearCount}</span>
           </button>
           <button class="chip" class:on={lit === 'all'} role="radio" aria-checked={lit === 'all'} onclick={() => (lit = 'all')}>
             All for sale <span class="n">{vacant.length}</span>
@@ -573,7 +671,7 @@
 
 {#snippet figures()}
   <span><b>{vacant.length}</b> for sale</span>
-  {#if !creative && templates}<span><b>{vacant.length - dearIds.length}</b> within their savings</span>{/if}
+  {#if !creative && templates}<span><b>{vacant.length - dearCount}</b> within their savings</span>{/if}
   {#if areas.length > 1}<span><b>{areas.length - 1}</b> {areas.length === 2 ? 'village' : 'villages'}</span>{/if}
 {/snippet}
 
@@ -809,6 +907,54 @@
   .homes li[aria-selected='true'] {
     background: var(--accent);
     color: #fff;
+  }
+  /* A building's name over its flats in the list; its flats indented under it. */
+  .homes li.building {
+    padding: 8px 9px 2px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--text-muted);
+    cursor: default;
+  }
+  .homes li.building:hover {
+    background: none;
+  }
+  .homes li.unit {
+    padding-left: 18px;
+  }
+  /* The chosen flat's building's flats, to choose another. */
+  .flats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+  }
+  .flats button {
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 5px 9px;
+    border-radius: var(--radius-md);
+    background: rgba(29, 34, 48, 0.05);
+    border: 1px solid transparent;
+    font-size: 12px;
+    color: var(--text-strong);
+    line-height: 1.25;
+  }
+  .flats button small {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .flats button.dear {
+    opacity: 0.6;
+  }
+  .flats button.on {
+    background: var(--accent);
+    color: #fff;
+  }
+  .flats button.on small {
+    color: rgba(255, 255, 255, 0.85);
   }
   .homes .dot {
     flex: none;

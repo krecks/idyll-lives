@@ -10,13 +10,13 @@
  * step 2 hatches (`hatched`); and how much a layout would build (`usesSummary`, step 2's live line).
  */
 
-import { CIVIC, civicChoices, civicOf, civicTooBig } from './backdrop';
+import { CIVIC, civicChoices, civicTooBig } from './places';
 import { placeOfTemplate } from './placeLots';
 import { inCentre } from './edit/ground';
 import { noUseCells, roadReach, usesOfDraft } from './edit/uses';
 import { BEND, BEND_MOST, cornersOf } from './macro';
 import { inside, lengths, leftOf, pointAt, straightAround, tangent, type Pt, type RoadPlan } from './roads';
-import { plotRect, type Frontage, type NeighbourhoodDraft, type Rect, type Templates } from './town';
+import { homesOn, plotRect, type Frontage, type NeighbourhoodDraft, type Rect, type Templates } from './town';
 import type { LaidTown, Proposal } from './townJobs';
 import { placeOf, specOf } from './world';
 import { layoutHash, NO_USE, packUses, unpackUses, USE_CELL, USE_CODE, useOfCode, type UseKind, type UseLayer } from './uses';
@@ -40,30 +40,6 @@ const CLOSE = 2;
 
 // ---- what a town built is painted as -----------------------------------------------------------------
 
-/** Which use each backdrop building is (null: none, a farm's barn). */
-function backdropUse(use: string, civic: boolean): UseKind | null {
-  if (civic) return 'public';
-  switch (use) {
-    case 'house':
-      return 'homes';
-    case 'terrace':
-    case 'flats':
-      return 'rows';
-    case 'shop':
-    case 'cafe':
-    case 'restaurant':
-    case 'office':
-    case 'workshop':
-      return 'shops';
-    case 'church':
-    case 'school':
-    case 'hall':
-      return 'public';
-    default:
-      return null;
-  }
-}
-
 /** Whether a lot built from layout `template` is a civic place's (`placeLots.ts`). */
 const civicLot = (template: string) => 'civic' in (placeOfTemplate(template) ?? {});
 
@@ -71,11 +47,10 @@ const civicLot = (template: string) => 'civic' in (placeOfTemplate(template) ?? 
 const PAINT_ORDER: readonly UseKind[] = ['green', 'homes', 'rows', 'shops', 'public'];
 
 /**
- * The uses a town built shows (`draft`, a big world's): its homes (house lots, the backdrop's houses),
- * its terraces and flats (terraced lots, the backdrop's terraces and flats), its shops and work (shop,
- * café and market lots, the other named places' lots, the backdrop's shops, offices and workshops), its
- * parks and greens (parks, playgrounds, outdoor spots and the greens the roads go round) and its public
- * places (the civic places' lots, `placeLots.ts`, and the backdrop's halls, churches and schools), each painted over the cells whose middles it covers;
+ * The uses a town built shows (`draft`, a big world's): its homes (house lots), its terraces and flats
+ * (terraced lots, the buildings of flats), its shops and work (shop, café and market lots, the other named
+ * places' lots), its parks and greens (parks, playgrounds, outdoor spots and the greens the roads go round)
+ * and its public places (the civic places' lots, `placeLots.ts`), each painted over the cells whose middles it covers;
  * farms none. Gaps of `CLOSE` cells or fewer between cells of one use are closed, the cells no use goes
  * on cleared (`noUseCells`: under roads and water), and so are those too far from a road to build on
  * (`BUILD_REACH`), but the greens that are outdoor spots (`greenSpots`).
@@ -83,17 +58,11 @@ const PAINT_ORDER: readonly UseKind[] = ['green', 'homes', 'rows', 'shops', 'pub
 export function usesOf(draft: NeighbourhoodDraft, t: Templates): UseLayer {
   const { cols, rows } = usesOfDraft(draft);
   const codes = new Uint8Array(cols * rows);
-  const open = draft.open;
-  const places = open?.places ?? [];
   const shapes: { kind: UseKind; rect?: Rect; poly?: readonly Pt[] }[] = [];
   for (const g of draft.greens) shapes.push({ kind: 'green', poly: g });
   for (const s of draft.slots) {
-    const kind: UseKind | null = s.kind === 'house' ? (s.lot === 'farm' ? null : s.lot === 'terrace' ? 'rows' : 'homes') : civicLot(s.template) ? 'public' : s.kind === 'shop' || s.template === 'market' ? 'shops' : 'green';
+    const kind: UseKind | null = s.kind === 'house' ? (s.lot === 'farm' ? null : s.lot === 'terrace' ? 'rows' : 'homes') : s.kind === 'flats' ? 'rows' : civicLot(s.template) ? 'public' : s.kind === 'shop' || s.template === 'market' ? 'shops' : 'green';
     if (kind) shapes.push({ kind, rect: plotRect(t, s) });
-  }
-  for (const b of open?.backdrop ?? []) {
-    const kind = backdropUse(b.use, b.place !== undefined && civicOf(places[b.place]) >= 0);
-    if (kind) shapes.push({ kind, poly: b.poly });
   }
   for (const kind of PAINT_ORDER) {
     const code = USE_CODE[kind];
@@ -174,8 +143,8 @@ function withLayer(draft: NeighbourhoodDraft, layer: UseLayer): NeighbourhoodDra
  * The proposal of a town the `town` job laid and settled (`town`: its `LaidTown`): the town built
  * (`built`: its draft with the uses it shows, `usesOf`; its own plan, `builtPlan`, and `marks` as
  * `builtMarks`), and the layout step 2 starts from (`plan`: the town's plan, its land as laid, with the
- * same roads, greens, areas, centre and squares, and the uses, but no lots, households, backdrop,
- * places, pads or parking), with the layout's `layoutHash`.
+ * same roads, greens, areas, centre and squares, and the uses, but no lots, households, places, pads
+ * or parking), with the layout's `layoutHash`.
  */
 export function proposalOf(town: Pick<LaidTown, 'draft' | 'plan' | 'marks'>, t: Templates): Proposal {
   const layer = usesOf(town.draft, t);
@@ -187,7 +156,7 @@ export function proposalOf(town: Pick<LaidTown, 'draft' | 'plan' | 'marks'>, t: 
     ...from,
     slots: [],
     households: [],
-    ...(from.open ? { open: { ...from.open, backdrop: [], places: [], parking: [], pads: {}, uses: layer } } : {}),
+    ...(from.open ? { open: { ...from.open, places: [], parking: [], carParks: [], pads: {}, uses: layer } } : {}),
     diagnostics: { dropped: [], ...(roadsFailed ? { roads: roadsFailed } : {}), ...(pieces ? { pieces } : {}) },
   };
   return { plan, built, hash: layoutHash(plan), ...(town.plan ? { builtPlan: town.plan, builtMarks: town.marks ?? [] } : {}) };
@@ -412,14 +381,18 @@ export interface UsesSummary {
  * How much each thing takes, as Build fills a layout (measured over the places' worlds, their proposals
  * built again): a home along homes and a terraced home along terraces and flats (m of frontage a lot may
  * front: out of a town centre, a home's off the corners and bends), a shop or workplace on shops and work
- * (cells of it, not hatched: a named place's lot or one of the sim's shops, the backdrop's buildings in what
- * they leave being no places), a park along a green stretch (m of it at least), and a civic place (a run of
+ * (cells of it, not hatched: a named place's lot, a compact one among them, or one of the sim's shops), a
+ * park along a green stretch (m of it at least), and a civic place (a run of
  * public frontage this share of its lot's narrowest at least, its kind's building and `CIVIC_LOT` wide, and
  * the gap after it, m).
  */
-const HOME_FRONT = 17.5;
-const ROW_HOME_FRONT = 17;
-const SHOP_CELLS = 35;
+const HOME_FRONT = 15;
+const ROW_HOME_FRONT = 13.5;
+const SHOP_CELLS = 19;
+/** Shops and work are read this far from a road at most (m, `roadReach`): a shop's lot deep, land painted further back holds no more of them. */
+const SHOP_DEEP = 20;
+/** Flats over the shops and workplaces, a shop (most of a centre's shops, cafés and restaurants have one or two over them, `dense.ts` `raisePlaces`). */
+const FLATS_OVER = 0.6;
 const FIRST_PARK = 26;
 const CIVIC_SHORT = 0.8;
 const CIVIC_GAP = 5;
@@ -430,23 +403,18 @@ const CIVIC_DEEP = [6, 12];
 /** Of the terraces and flats away from the main town, the share terraced homes take (Build's `TERRACE_SHARE`). */
 const ROWS_AWAY = 0.5;
 
-/** The backdrop's kinds that are shops and workplaces. */
-const SHOP_KINDS: readonly string[] = ['shop', 'cafe', 'restaurant', 'office', 'workshop'];
-
 /**
  * What a town built has, counted as `usesSummary` estimates it: homes (house lots, terraced ones among
- * them, not farms), shops and workplaces (shop lots, the other named places' among them, and the
- * backdrop's shops, cafés, restaurants, offices and workshops, but the civic places), parks (parks,
- * playgrounds, markets and outdoor spots), and civic places (their lots, `placeLots.ts`, and those of the
- * backdrop: `civicOf`).
+ * them, not farms, and every flat: a building of flats' and those over the places, `flats.ts` `flatsInId`),
+ * shops and workplaces (shop lots, the named places' among them, but the civic places), parks (parks,
+ * playgrounds, markets and outdoor spots), and civic places (their lots, `placeLots.ts`).
  */
 export function townSummary(draft: NeighbourhoodDraft): UsesSummary {
-  const places = draft.open?.places ?? [];
   return {
-    homes: draft.slots.filter((s) => s.kind === 'house' && s.lot !== 'farm').length,
-    shops: draft.slots.filter((s) => s.kind === 'shop' && !civicLot(s.template)).length + places.filter((q) => q.plot === undefined && SHOP_KINDS.includes(q.kind) && civicOf(q) < 0).length,
+    homes: draft.slots.reduce((n, s) => n + homesOn(s, { farms: false }), 0),
+    shops: draft.slots.filter((s) => s.kind === 'shop' && !civicLot(s.template)).length,
     parks: draft.slots.filter((s) => s.kind === 'park' || s.kind === 'outdoor').length,
-    public: draft.slots.filter((s) => civicLot(s.template)).length + places.filter((q) => q.plot === undefined && civicOf(q) >= 0).length,
+    public: draft.slots.filter((s) => civicLot(s.template)).length,
   };
 }
 
@@ -455,7 +423,7 @@ const cornersFor = new WeakMap<readonly RoadPlan[], (f: Frontage) => boolean>();
 
 /**
  * How much `draft`'s layout would build, from its frontage (`stretchesOf`) and its land: homes along its homes, terraced homes along its terraces and flats (the
- * main town's no more than its place has: `WorldSpec.terraces`), shops and workplaces on its shops and
+ * main town's no more than its place has at most: `WorldSpec.terraces`) and the flats over its shops (`FLATS_OVER`), shops and workplaces on its shops and
  * work, a park or a playground along each green stretch, an outdoor spot or a park on each patch of green
  * big enough for one and with no stretch along it, and as many of
  * the civic places each town and village may have
@@ -535,15 +503,17 @@ function estimated(draft: NeighbourhoodDraft): UsesSummary {
     } else if (st.kind === 'green') greens.push(st);
   }
   const spec = specOf(placeOf(draft.world?.kind ?? 'country'), draft.world?.options);
-  rows.forEach((n, a) => (homes += a === 0 ? Math.min(n, (spec.terraces[0] + spec.terraces[1]) / 2) : n * ROWS_AWAY));
+  rows.forEach((n, a) => (homes += a === 0 ? Math.min(n, spec.terraces[1]) : n * ROWS_AWAY));
   // A park, a playground or an outdoor spot on each patch of green big enough for one (cells side by side; not hatched).
   const layer = usesOfDraft(draft);
   const codes = unpackUses(layer);
   const far = hatched(draft);
-  // Shops and workplaces on its land painted shops and work (the named places' lots and its shop lots; the backdrop's buildings there are no places).
+  // Shops and workplaces on its land painted shops and work (the named places' lots, the compact ones among them, and its shop lots), as deep as a shop's lot.
   let shopCells = 0;
-  for (let k = 0; k < codes.length; k++) if (codes[k] === USE_CODE.shops && !far[k]) shopCells++;
+  const reach = roadReach(draft);
+  for (let k = 0; k < codes.length; k++) if (codes[k] === USE_CODE.shops && !far[k] && reach[k] <= SHOP_DEEP) shopCells++;
   const shops = shopCells / SHOP_CELLS;
+  homes += shops * FLATS_OVER;
   const patches = greenPatches(codes, far, layer.cols, layer.rows);
   const alongside = new Set<number>();
   let parks = 0;

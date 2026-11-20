@@ -26,7 +26,6 @@ import { buildModel, disposeTemplate, glowByInstance, type ModelTemplate } from 
 import { windStill } from './nature';
 import { Street } from './street';
 import { TemplateCache } from './templateCache';
-import { TownBuildings, townBackdrop } from './townView';
 import type { AssetRegistry } from '../../assets/registry';
 import type { Content } from '../../content/content';
 import { groundDepth, objectCentre, type ObjectPlacement, type PlotInfo, type WorldStructure } from '../../core/protocol';
@@ -36,14 +35,14 @@ import { Geo, type V3 } from '../shared/geometry';
 import { compose, quatYawPitchRoll, type Quat } from '../shared/math';
 import { placementVariation, standInOf } from '../shared/modelEntry';
 import { pavedRects } from '../shared/paving';
+import { pavingLayers } from '../shared/streetGround';
 import { townRoadMesh, type RoadMeshData } from '../shared/roads';
-import { backdropKey, roadKey, townKey } from '../shared/overviewKeys';
+import { looksKey, roadKey, townKey } from '../shared/overviewKeys';
 import { surfaceOf } from '../shared/landSurface';
 import type { BuiltSurface } from '../shared/builtSurface';
-import { hashNumbers } from '../shared/chunks';
+import { hashNumbers, hashString } from '../shared/chunks';
 import { townRoadMeshOffThread } from '../shared/renderData';
 import { fieldLayers } from '../shared/street';
-import type { TownBuilding } from '../shared/townBuildings';
 import { perfEnd, perfStart } from '../../debug/perf';
 
 /** Height that labels and fits allow for (roofs, crowns). */
@@ -147,19 +146,11 @@ export class TownOverview {
   /** The town's ground draws (the roads and their markings, the paths, the fields), each with what it was made from: kept for another town with the same. */
   private ground = new Map<string, { key: string; entity: pc.Entity }>();
   private readonly templates: TemplateCache<ModelTemplate>;
-  /**
-   * The backdrop's buildings (shops, offices, terraces nobody lives in, the civic places) and their gardens' hedges, as
-   * the game's town view draws them (`townView.ts`: a few instanced draws for the whole world, cheap from any
-   * distance), on the land as the town's built surface has it; and those drawn last, by what each is drawn from
-   * (`townBackdrop`'s `kept`).
-   */
-  private readonly buildings: TownBuildings;
-  private readonly drawnBuildings = new Map<string, TownBuilding>();
   private readonly placed = new Map<string, Placed>();
   private readonly templatesInUse = new Set<string>();
   private key = '';
-  /** What the backdrop's buildings were drawn from (`backdropKey`): a town whose layout (`key`) is the same but for them has only them drawn again. */
-  private backdropKey = '';
+  /** What the lots' looks were drawn from (`looksKey`): a town whose layout (`key`) is the same but for them has only the street planned again. */
+  private looksKey = '';
   plots: PlotInfo[] = [];
   width = 0;
   depth = 0;
@@ -205,9 +196,8 @@ export class TownOverview {
     this.root = new pc.Entity('townOverview');
     parent.addChild(this.root);
     this.templates = new TemplateCache(app);
-    // (The backdrop's buildings dressed as the game draws them near: `backdropDress.ts`.)
-    this.street = new Street(app, this.root, assets, house, { layers: this.layers, fenceStyles: content.fenceStyles, backdrop: true });
-    this.buildings = new TownBuildings(app, this.root, { layers: this.layers, castShadows: true });
+    // (The lots with a look dressed as the game draws them near: `buildingDress.ts`.)
+    this.street = new Street(app, this.root, assets, house, { layers: this.layers, fenceStyles: content.fenceStyles });
     // Unlit: the output is the vertex colour times the instance colour (`glowByInstance`), added by its alpha.
     const mat = new pc.StandardMaterial();
     mat.name = 'lotGlow';
@@ -264,15 +254,13 @@ export class TownOverview {
   async build(world: WorldStructure, pace?: () => Promise<void>): Promise<boolean> {
     const roadsKey = roadKey(world);
     const key = townKey(world, roadsKey);
-    const drawn = backdropKey(world);
-    if (key === this.key && drawn === this.backdropKey) return false;
+    const drawn = looksKey(world);
+    if (key === this.key && drawn === this.looksKey) return false;
     if (key === this.key) {
-      // Only the backdrop changed (a street built up with the town's buildings alone, or cleared of them): the ground
-      // and the things are as they were; the street plans again only the chunks whose buildings changed.
+      // Only the lots' looks changed (a place's hours, a look given): the ground and the things are as they were; the
+      // street plans again only the chunks whose buildings changed.
       await this.street.build(world, null, pace);
-      this.buildings.setBackdrop(this.backdropOf(world));
-      this.buildings.show(1);
-      this.backdropKey = drawn;
+      this.looksKey = drawn;
       return true;
     }
     // (Asked for first: the render data worker makes the town's road mesh while the street is planned. Not for
@@ -283,7 +271,6 @@ export class TownOverview {
     const objects = await this.buildObjects(world, pace);
     await pace?.();
     const surface = surfaceOf(world);
-    const backdrop = this.backdropOf(world);
 
     const swap = perfStart('town: swap');
     // Swap: the previous town's ground and things go (those it keeps stay), the new ones are shown.
@@ -291,8 +278,6 @@ export class TownOverview {
     this.ground = ground;
     for (const { entity } of ground.values()) entity.enabled = true;
     for (const [k, p] of this.placed) if (!objects.has(k)) for (const d of p.draws) d.enabled = false;
-    this.buildings.setBackdrop(backdrop);
-    this.buildings.show(1);
     this.templatesInUse.clear();
     for (const [k, { template, matrices, sig }] of objects) {
       this.templatesInUse.add(k);
@@ -317,7 +302,7 @@ export class TownOverview {
     // The previous overview's boxes for files that have come since are drawn no more.
     this.disposeStale();
     this.key = key;
-    this.backdropKey = drawn;
+    this.looksKey = drawn;
     this.plots = world.plots;
     this.width = world.width;
     this.depth = groundDepth(world);
@@ -326,38 +311,22 @@ export class TownOverview {
     return true;
   }
 
-  /**
-   * `world`'s backdrop buildings as boxes, on its built surface (`townBackdrop`; those drawn last kept where nothing of
-   * them changed): those of the chunks the street doesn't draw (it draws every chunk of the menus' town, dressed: none,
-   * unless a building stands in no chunk the street has).
-   */
-  private backdropOf(world: WorldStructure): TownBuilding[] {
-    const surface = surfaceOf(world);
-    const height = surface ? (x: number, z: number) => surface.at(x, z) : () => 0;
-    const span = perfStart('town: backdrop');
-    const out = townBackdrop(world, height, surface ? height : null, this.drawnBuildings).filter((b) => b.chunk === undefined || !this.street.chunkDrawn(b.chunk));
-    perfEnd(span, `${world.meta?.backdrop?.length ?? 0} buildings, ${out.length} as boxes`);
-    return out;
-  }
-
   /** Streetlights, porch lamps and window glass follow the lighting key's lamp level (`glow`: the lamps' colour, linear). */
   setNight(lamps: number, glow: RGB): void {
     this.lamps = lamps;
     this.street.setNight(lamps, glow);
-    this.buildings.setNight(lamps, glow);
   }
-  /** The lamps' level last given (`setNight`): the backdrop's windows go by the hour only while they are on. */
+  /** The lamps' level last given (`setNight`): the lots' buildings' windows go by the hour only while they are on. */
   private lamps = 0;
 
-  /** The hour shown (`minute` of the day, on `weekday`, 0 Monday): the backdrop's lit windows, a shop's while it is open (`litAt`), near and far alike. */
+  /** The hour shown (`minute` of the day, on `weekday`, 0 Monday): the lots' buildings' lit windows, a shop's while it is open (`litAt`). */
   setTime(minute: number, weekday: number): void {
     this.hour = { minute, weekday };
-    this.buildings.setTime(minute, weekday);
     this.street.setTime(minute, weekday, this.lamps > 0);
   }
   private hour = { minute: 12 * 60, weekday: 0 };
 
-  /** Each frame: the backdrop's windows the street held back (it draws them again at most once a second) drawn once due; true when they were. */
+  /** Each frame: the buildings' windows the street held back (it draws them again at most once a second) drawn once due; true when they were. */
   frameLights(): boolean {
     return this.street.setTime(this.hour.minute, this.hour.weekday, this.lamps > 0);
   }
@@ -422,7 +391,6 @@ export class TownOverview {
 
   destroy(): void {
     this.street.destroy();
-    this.buildings.destroy();
     for (const { entity } of this.ground.values()) entity.destroy();
     this.ground.clear();
     this.dropHighlights();
@@ -500,6 +468,20 @@ export class TownOverview {
       const entity = drawMesh(this.root, name, mesh, this.lib.surface(material, { doubleSided: true, vertexColors: toned }), { receiveShadows: true, layers: this.layers });
       entity.enabled = false;
       out.set(name, { key, entity });
+    }
+    // The town's paving (`townPaving`: the centre, courts and yards, car parks and their bays' lines), as the game's street lays it.
+    const meta = world.meta;
+    const paved = `${roadsKey}|${hashString(JSON.stringify([meta?.centre, meta?.paving, meta?.greens, world.parking, world.carParks, world.plots.map((p) => [p.x, p.z, p.w, p.d])]))}`;
+    // (Kept as they are for the same paving: every layer drawn of it was drawn with its key.)
+    if (!['townPaving', 'townYards', 'carParks', 'bayLines'].filter((name) => keep(name, paved)).length) {
+      await pace?.();
+      for (const { name, material, geo, paint } of pavingLayers(world, null)) {
+        const mesh = meshFrom(this.device, geo.meshData({ colors: true }));
+        if (!mesh) continue;
+        const entity = drawMesh(this.root, name, mesh, paint ? this.lib.roadPaint() : this.lib.surface(material, { doubleSided: true, vertexColors: true }), { receiveShadows: true, layers: this.layers });
+        entity.enabled = false;
+        out.set(name, { key: paved, entity });
+      }
     }
     return out;
   }

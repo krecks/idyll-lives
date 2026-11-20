@@ -2220,7 +2220,8 @@ struct CarBodyRaw {
 }
 
 /// A car body's length and width (m): a small car's to a long pickup's, a narrow one's to a van's.
-const CAR_LEN: RangeInclusive<f32> = 2.5..=6.0;
+/// Each fits inside a parking bay's lines with room to spare (`cars::BAY_LINES`, 2.8 by 5.6).
+const CAR_LEN: RangeInclusive<f32> = 2.5..=5.4;
 const CAR_WID: RangeInclusive<f32> = 1.4..=2.2;
 
 /// A field's or a track's `car` (`what`): the look a job at each grade calls for, from the
@@ -6289,7 +6290,7 @@ mod tests {
             (
                 "/carBodies/0/len",
                 json!(9),
-                "car body 'van': len 9 must be 2.5..6",
+                "car body 'van': len 9 must be 2.5..5.4",
             ),
             (
                 "/carBodies/0/wid",

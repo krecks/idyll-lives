@@ -80,9 +80,8 @@ function town(river = 30): NeighbourhoodDraft {
       zones: [{ kind: 'water', poly: rect(0, 200, RIVER_END, 200 + river) }],
       water: rle(water),
       pads: {},
-      parking: [{ x: LANE_X + 7, z: 120, rot: 0, area: 0 }],
+      parking: [{ x: LANE_X + 7, z: 120, yaw: 0, area: 0 }],
       places: [],
-      backdrop: [],
     },
   };
 }
@@ -579,7 +578,7 @@ describe('removing a road', () => {
 
   test('its parking goes; a road joined to it ends there in a dead end; the water under a bridge is water again', () => {
     const goes = whatGoes(town(), t, 1);
-    expect(goes).toEqual({ roads: [1], bridges: [], streets: [], lots: [], backdrop: [], parking: [0] });
+    expect(goes).toEqual({ roads: [1], bridges: [], streets: [], lots: [], parking: [0] });
     const { draft } = made(removeRoad(town(), t, 1));
     expect(draft.roads.length).toBe(3);
     expect(draft.open!.parking).toEqual([]);

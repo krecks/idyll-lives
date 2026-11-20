@@ -56,6 +56,15 @@
       "storeys": { "one": 0.25, "two": 0.75 },
       "width": [16, 22],
       "depth": [11, 14]
+    },
+    "flat": {
+      "label": "flat",
+      "bedrooms": [1, 2],
+      "living": 1,
+      "extraBathroom": 0,
+      "storeys": { "one": 1, "two": 0 },
+      "width": [7, 9],
+      "depth": [9, 11]
     }
   },
 
@@ -72,6 +81,7 @@
 
   "$gardens": "A lot cut to fit its house, by garden size (a town's world says which its houses get): the garden behind the house as a share of the house's depth (`back`, a range; at least `backMin` and at most `backMax` m), beside it (`side`, m, a range) and at least `drive` m on the driveway's side (away from the front door). The front yard is `margins.front`.",
   "gardens": {
+    "tight": { "back": [0.2, 0.35], "backMin": 3, "backMax": 5, "side": [1, 1], "drive": 0 },
     "snug": { "back": [0.35, 0.6], "backMin": 5, "backMax": 8, "side": [1, 2], "drive": 4 },
     "roomy": { "back": [0.6, 0.9], "backMin": 6, "backMax": 11, "side": [1, 3], "drive": 4 },
     "big": { "back": [0.9, 1.3], "backMin": 9, "backMax": 16, "side": [2, 5], "drive": 5 }
@@ -332,14 +342,81 @@
       "surfaces": [{ "on": ["shelf", "low"], "one": ["booksUpright", "potSmall", "toyBlocks", "vaseSmall"], "count": [0, 2] }],
       "wall": [{ "one": ["wallShelf", "kitchenShelfWall"], "chance": 0.4 }],
       "ceiling": [{ "one": ["ceilingLight"], "chance": 0.5 }]
+    },
+    "office": {
+      "weight": 4,
+      "minSide": 3,
+      "maxSide": [5, 7],
+      "furniture": [
+        { "one": ["filingCabinet"] },
+        { "one": ["bookcaseWide", "bookshelf", "shelvingIndustrial", "cubeShelf", "filingCabinet"], "chance": 0.7 },
+        { "one": ["plant", "garden.fiddleFig", "garden.monstera", "floorLampSimple"], "chance": 0.6 },
+        { "one": ["vendingDrink", "filingCabinet", "plant"], "chance": 0.2 }
+      ],
+      "dining": [
+        { "tables": ["deskSimple"], "chairs": ["chairTask", "officeChair"], "seats": [1, 1], "wall": true },
+        { "tables": ["deskSimple"], "chairs": ["chairTask", "officeChair"], "seats": [1, 1], "wall": true, "chance": 0.8 },
+        { "tables": ["deskSimple"], "chairs": ["chairTask", "officeChair"], "seats": [1, 1], "wall": true, "chance": 0.6 },
+        { "tables": ["deskSimple"], "chairs": ["chairTask", "officeChair"], "seats": [1, 1], "wall": true, "chance": 0.4 }
+      ],
+      "surfaces": [{ "on": ["desk"], "one": ["monitor", "laptopClosed", "deskOrganiser", "lampBanker"], "count": [1, 3] }],
+      "wall": [{ "one": ["corkboard", "printFramed", "wallClock", "wallShelf"], "count": [1, 2] }],
+      "ceiling": [{ "one": ["ceilingLight"], "chance": 0.5 }]
+    },
+    "meeting": {
+      "weight": 3,
+      "minSide": 3,
+      "maxSide": [5, 6],
+      "furniture": [
+        { "one": ["sideboard", "consoleTable", "bookcaseLow"], "chance": 0.5 },
+        { "one": ["plant", "garden.fiddleFig", "garden.monstera"], "chance": 0.6 }
+      ],
+      "dining": [{ "tables": ["tableDining6", "tableDining4", "tableRound4"], "chairs": ["chairModern", "chairUpholstered", "chairArm"], "seats": [3, 6] }],
+      "surfaces": [{ "on": ["table"], "one": ["vaseFlowers", "mugs", "bookStack"], "chance": 0.6, "minSide": 0.8 }],
+      "wall": [{ "one": ["corkboard", "printFramed", "canvasAbstract", "wallClock"], "count": [1, 2] }],
+      "ceiling": [{ "one": ["ceilingPendant", "ceilingLight"], "chance": 0.5 }]
+    },
+    "stockroom": {
+      "weight": 3,
+      "minSide": 3,
+      "maxSide": [5, 7],
+      "furniture": [
+        { "one": ["shelvingIndustrial"] },
+        { "one": ["shelvingIndustrial", "cubeShelf", "filingCabinet", "toolChest", "workbench"], "count": [1, 3] },
+        { "one": ["shelvingIndustrial", "cedarChest", "bathCabinetTall", "laundryBasket"], "chance": 0.5 }
+      ],
+      "surfaces": [{ "on": ["shelf"], "one": ["booksUpright", "potSmall", "tableClock", "vaseSmall"], "count": [0, 2] }],
+      "wall": [{ "one": ["wallShelf", "kitchenShelfWall", "corkboard"], "count": [0, 2] }],
+      "ceiling": [{ "one": ["ceilingLight", "pendantIndustrial"], "chance": 0.5 }]
+    },
+    "washroom": {
+      "weight": 1.2,
+      "minSide": 2,
+      "maxSide": [3, 5],
+      "furniture": [{ "one": ["toilet", "toiletCompact"] }, { "one": ["sinkPedestal"] }, { "one": ["toilet", "toiletCompact"], "chance": 0.5 }],
+      "wall": [{ "one": ["mirrorCabinet", "mirrorRound"], "over": ["sinkPedestal"] }],
+      "ceiling": [{ "one": ["ceilingLight"], "chance": 0.4 }]
     }
   },
 
+  "$shell": "A home past the town's fill that nobody has moved into is a shell (housegen.ts `Furnishing`): its walls, doors and windows, every kitchen's counter run, the furniture the rooms of these kinds must have (`fitted`: a bathroom's toilet, shower and basin) and ceiling lights, nothing loose and nothing in the garden. A household that buys one furnishes it.",
+  "shell": { "fitted": ["bathroom"] },
+
+  "$floors": "The real storeys above a named place's ground floor (an office's, a hall's, a workshop's: flats.ts `floorsFor`, housegen.ts `placeFloor`), by what the place is: a hall two tiles wide over the stairs along one side wall, and off it as many rooms as the floor takes, of these kinds in turn, furnished from their recipes above.",
+  "floors": {
+    "office": { "rooms": ["office", "meeting", "office", "washroom", "office"] },
+    "hall": { "rooms": ["meeting", "washroom", "meeting", "storage"] },
+    "workshop": { "rooms": ["stockroom", "office", "washroom", "stockroom"] }
+  },
+
+  "$flats": "Buildings of flats (flats.ts): a stair hall (`hall` tiles wide, `narrowHall` in a building with flats on one side of it and over a shop) with a flat of the `flat` class beside it on each storey (its size: the class's `width` across, `depth` along the hall), on a lot with `side` m beside the building, a front strip (`front` m, `frontBays` with parking bays for some of its flats) and a yard behind (`yard` m, a range) with these `yardThings`. Each flat's letterbox (`letterbox`) stands in the front strip by the street door. Over a place (a shop, a café, a restaurant), the stair hall is cut from one side of its ground floor, with a street door of its own.",
+  "flats": { "hall": 3, "narrowHall": 2, "side": 1, "front": 3, "frontBays": 6, "yard": [4, 6], "letterbox": "letterbox", "yardThings": ["recyclingBins", "bikeRack", "benchGarden3"], "names": ["Court", "House", "Mansions", "Buildings", "Place"] },
+
   "$extras": "Rooms a house gets besides bedrooms, a kitchen, bathrooms and a living room. Rooms measure at most their `maxSide` (short and long side), so a house with more floor than its rooms may take gets extras, in this order, each if `chance` (per lot size) says so and the floor still has room to spare: upstairs in a two-storey house with `floor: \"upper\"`, families only with `minBedrooms`. Floor left over after that makes the house smaller. `label` names the room in the house's description.",
   "extras": [
-    { "kind": "dining", "label": "a dining room", "chance": { "terrace": 0.6, "small": 0.4, "medium": 0.7, "large": 0.9 } },
-    { "kind": "entry", "label": "an entrance hall", "chance": { "terrace": 0.3, "small": 0.2, "medium": 0.4, "large": 0.6 } },
-    { "kind": "study", "label": "a study", "floor": "upper", "chance": { "terrace": 0.3, "small": 0.3, "medium": 0.5, "large": 0.7 } },
+    { "kind": "dining", "label": "a dining room", "chance": { "terrace": 0.6, "small": 0.4, "medium": 0.7, "large": 0.9, "flat": 0.3 } },
+    { "kind": "entry", "label": "an entrance hall", "chance": { "terrace": 0.3, "small": 0.2, "medium": 0.4, "large": 0.6, "flat": 0.4 } },
+    { "kind": "study", "label": "a study", "floor": "upper", "chance": { "terrace": 0.3, "small": 0.3, "medium": 0.5, "large": 0.7, "flat": 0.2 } },
     { "kind": "playroom", "label": "a playroom", "floor": "upper", "minBedrooms": 2, "chance": { "terrace": 0.2, "small": 0.3, "medium": 0.5, "large": 0.6 } },
     { "kind": "laundry", "label": "a laundry", "chance": { "terrace": 0.4, "small": 0.3, "medium": 0.5, "large": 0.7 } },
     { "kind": "hobby", "label": "a hobby room", "floor": "upper", "chance": { "terrace": 0.2, "small": 0.2, "medium": 0.4, "large": 0.6 } }

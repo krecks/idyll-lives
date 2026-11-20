@@ -25,7 +25,7 @@ import { builtAlong } from '../../game/edit/buildup';
 import { drawStreet, Meeting, SNAP, streetsBare, streetWidth, type Magnet } from '../../game/edit/streets';
 import { lengths, nearest, pointAt, type Pt } from '../../game/roads';
 import type { TownGhosts } from '../../render/types';
-import { buildingBox, lotBox, roadGhost } from './ghosts';
+import { lotBox, roadGhost } from './ghosts';
 import StreetCard from './StreetCard.svelte';
 import { alongFor, fillsHomes, streetChoice, strokeKind, type Along } from './streetChoice.svelte';
 import { liveStreet, newRoads, runsOf, unfinished, verdictOf, warmLive, type LiveStreet, type StrokeKind } from './streetLive';
@@ -215,7 +215,6 @@ export function streetGhosts(editor: Pick<TownEditor, 'draft' | 't'>, live: Live
   // What it clears out of its way.
   if (made) {
     for (const i of made.cleared.lots) if (draft.slots[i]) ghosts.lots.push({ ...lotBox(editor.t, draft.slots[i]), tone: 'gone' });
-    for (const i of made.cleared.backdrop) if (draft.open?.backdrop?.[i]) ghosts.lots.push({ ...buildingBox(draft.open.backdrop[i]), tone: 'gone' });
   }
   for (const j of live.joins) ghosts.lots.push(mark(j.at, j.ok));
   return ghosts;
@@ -356,14 +355,14 @@ export const streetTool: TownTool = {
       if (live.excess) return `${sentence(live.slope!)} Draw it another way, where the land is gentler.`;
       if (live.slope) return `${sentence(live.slope)} The town would refuse it once brought up to date.`;
       const what = kindLine(editor.draft, live, verdict);
-      const clears = verdict && 'draft' in verdict ? verdict.cleared.lots.length + verdict.cleared.backdrop.length : 0;
-      const also = clears ? `, clearing ${clears === 1 ? 'a lot or building' : `${clears} lots and buildings`} out of its way` : '';
+      const clears = verdict && 'draft' in verdict ? verdict.cleared.lots.length : 0;
+      const also = clears ? `, clearing ${clears === 1 ? 'a lot' : `${clears} lots`} out of its way` : '';
       const joins = live.finishOn >= 0 ? editor.draft.roads[live.finishOn]?.name : undefined;
       if (live.reached) return joins ? `${what}${also}. Joins ${joins} — ${press ? 'let go' : 'click'} to finish.` : `${what}${also}. ${press ? 'Let go' : 'Click'} to draw it.`;
       if (carried && 'draft' in carried.verdict) {
         const onto = editor.draft.roads[carried.live.finishOn]?.name ?? 'the road';
-        const n = carried.verdict.cleared.lots.length + carried.verdict.cleared.backdrop.length;
-        const clearing = n ? `, clearing ${n === 1 ? 'a lot or building' : `${n} lots and buildings`} out of its way` : '';
+        const n = carried.verdict.cleared.lots.length;
+        const clearing = n ? `, clearing ${n === 1 ? 'a lot' : `${n} lots`} out of its way` : '';
         return `${kindLine(editor.draft, carried.live, carried.verdict)}${clearing}. Click to set a point; Enter or a double click carries it on to ${onto} just ahead.`;
       }
       const open = live.open ?? (verdict && 'refused' in verdict ? verdict.refused : null);

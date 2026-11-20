@@ -4,6 +4,7 @@
   import { services } from '../services';
   import { play } from '../sfx';
   import { game, type BuildTool } from '../state.svelte';
+  import { plotInfo } from '../place';
 
   /**
    * Build mode's looks for the tool in hand: form and covering for walls and rooms, covering for
@@ -20,8 +21,8 @@
   const fences = content.fenceStyles;
   const roofs = content.roofStyles;
   const roofColors = content.roofColors;
-  /** The roof over the home now (`[style, colour]`; undefined: the house's own look). */
-  const roof = $derived(game.plots[game.households.find((h) => h.player)?.plot ?? -1]?.roof);
+  /** The roof over the home now (`[style, colour]`; undefined: the house's own look, or a flat's, which has none of its own). */
+  const roof = $derived(plotInfo(game, game.households.find((h) => h.player)?.plot)?.roof);
   const roofColour = $derived(roofColors[roof?.[1] ?? 0]?.color ?? '#5C626A');
   function setRoof(style: number, color: number) {
     play('tab');

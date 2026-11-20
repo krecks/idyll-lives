@@ -3,17 +3,17 @@
     {
       "name": "living-town-meta",
       "file": "web/src/core/protocol.ts",
-      "sha256": "15041764db92b504f905094de42a8d89c7a211960f51305a77775e414d98da85",
-      "by": "integrator",
-      "reason": "owner's OK 2026-11-19: protocol.ts living-town parts as changed by 0.8.3 (land, speeds, visitable places, curtains and cars messages)",
+      "sha256": "21f01292caa4428ccb37c943a0b7b2c8cf769eeff7a8c543c05c8864a7c755ae",
+      "by": "real-town-t1",
+      "reason": "owner's OK, real town: the backdrop goes (BackdropBuilding and WorldMeta.backdrop), every place a lot's (TownPlace.plot required), LotLook's roof spelled out",
       "region": "living-town-meta"
     },
     {
       "name": "living-town-types",
       "file": "web/src/core/protocol.ts",
-      "sha256": "3f1f692a2d3e707e440ab6539906ef6d68e8b1d8c06a2c6e017c2caa079014a8",
-      "by": "integrator",
-      "reason": "owner's OK 2026-11-19: protocol.ts living-town parts as changed by 0.8.3 (land, speeds, visitable places, curtains and cars messages)",
+      "sha256": "feff89eba0cde0204b16dcf3f9bf8ed0aaf14851cc619955f92f6d21151b0e76",
+      "by": "real-town-simp-render",
+      "reason": "simplify round: 'barn' dropped from BuildingUse, a use no lot's look has (no generator, sample or reader makes one since the backdrop went)",
       "region": "living-town-types"
     },
     {
@@ -65,9 +65,9 @@
     {
       "name": "sim-cooking",
       "file": "crates/sim-core/src/cooking.rs",
-      "sha256": "dd7f8dd5cee744167104868e08b4a35b3e5fce57c0558f670fd90a0aa72f581a",
-      "by": "release/0.8.3",
-      "reason": "no behaviour change: housemates at home are looked up in the household index (Ctx::members), checked against the old scan of every resident in debug builds"
+      "sha256": "33d18584cbe42d37dbf282f9812853fac096b1fe09dd749b84e98f94734d4d00",
+      "by": "real-town-t1",
+      "reason": "owner's OK, real town: a flat's household is at home on its own storey (Plot::holds, World::on_plot) for an invitation to eat and the food left at home (S1)"
     },
     {
       "name": "sim-social",
@@ -86,16 +86,16 @@
     {
       "name": "sim-planner",
       "file": "crates/sim-core/src/planner.rs",
-      "sha256": "42601b843ee9b66052a94abd7ff6d3e791bfef20b7aa631b41f8c12017b41f87",
-      "by": "setup",
-      "reason": "household behaviour: not this run's to change"
+      "sha256": "c15a2d24851345638777a37633330d607c627f870bfc527cbdb1e893dd30c290",
+      "by": "real-town-review",
+      "reason": "owner's choice (real-town code review): a thing a flat keeps outside it (its letterbox by the building's door) is not swapped in over its place by swap_in, so a failed swap no longer sells and loses it"
     },
     {
       "name": "sim-lifecycle",
       "file": "crates/sim-core/src/lifecycle.rs",
-      "sha256": "2debafb2b682748a52e94a247eb37c1a4aa7021248d133d0af23652ca7a2a8b5",
-      "by": "integrator",
-      "reason": "0.8.3 missing-items run: cleaning tools (sweep), the post at home, household cars (boughtCar/gotLetter events), nobody moves house at the wheel; reviewed, sim 819 and generated seeds 0-2 pass"
+      "sha256": "b3e68f15195f9c508f8238311e79b0fbe1333c1e26246b5fd9256c69e777dd82",
+      "by": "real-town-review",
+      "reason": "owner's choice (real-town code review): newcomers and movers ask World::is_home, so a lot with flats in it is nobody's home whatever its kind or with none"
     },
     {
       "name": "sim-hosting",

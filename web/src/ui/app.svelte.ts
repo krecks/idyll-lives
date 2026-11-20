@@ -9,6 +9,7 @@ import type { Pt } from '../game/roads';
 import type { StartRequest } from '../game/session';
 import { EMPTY_LOT, withLot, type NeighbourhoodDraft } from '../game/town';
 import { moveInRequest, peopleSeedOf, type Chosen } from './newGame';
+import { homeKey, sameHome, type HomeRef } from './homes';
 
 /**
  * New game, in five steps (`newGame.ts` `STEPS`): land (step 1) → streets and zones (step 2, `streets`:
@@ -109,8 +110,8 @@ class AppState {
   /** Step 4's town with its neighbours, and what it was filled from: step 3's town and the people's seed (`newGame.ts` `peopleKey`). */
   town = $state.raw<NeighbourhoodDraft | null>(null);
   townOf = '';
-  /** The households step 3 offers (their lots, in order); empty until step 3 offers a sample of the town's. */
-  offer = $state.raw<readonly number[]>([]);
+  /** The households step 3 offers (their homes, in order); empty until step 3 offers a sample of the town's. */
+  offer = $state.raw<readonly HomeRef[]>([]);
   /** How many times step 3's "Show others" was pressed for `offer` (`newGame.ts` `offerPage`). */
   offerPage = $state(0);
   household = $state.raw<HouseholdDraft | null>(null);
@@ -118,16 +119,16 @@ class AppState {
   mode = $state<GameKind>('living');
   /** How fast residents age (the new game's choice). */
   lifespan = $state<Lifespan>('normal');
-  /** The home is an empty lot (its house cleared away) rather than the house as it stands. */
+  /** The home is an empty lot (its house cleared away) rather than the house as it stands (never a flat). */
   emptyLot = $state(false);
-  /** House picked on the home screen (prepared in the background). */
-  homeSlot = $state<number | null>(null);
+  /** The home picked on the home screen, a house's lot or a flat (prepared in the background). */
+  home = $state.raw<HomeRef | null>(null);
   /**
-   * The household chosen in step 3 from those living in town, by its home's slot (step 4 opens on
-   * that home); null: the player's own from Creation (`household`). It wins over `household`: a
+   * The household chosen in step 3 from those living in town, by its home (step 4 opens on that
+   * home); null: the player's own from Creation (`household`). It wins over `household`: a
    * household made in Creation is kept while the player looks through the town's.
    */
-  playSlot = $state<number | null>(null);
+  play = $state.raw<HomeRef | null>(null);
   /** A live 3D scene is rendering behind the menus. */
   liveBackdrop = $state(false);
   /** The main menu's picture (the last world made, `menuStill.ts`); null: the painted backdrop only. */
@@ -154,8 +155,8 @@ class AppState {
     this.offer = [];
     this.offerPage = 0;
     this.household = null;
-    this.playSlot = null;
-    this.homeSlot = null;
+    this.play = null;
+    this.home = null;
     this.emptyLot = false;
     this.screen = 'land';
   }
@@ -170,34 +171,34 @@ class AppState {
     return this.code ? peopleSeedOf(this.code) : undefined;
   }
 
-  /** The town as the home screen shows it: the chosen lot cleared when starting on an empty lot. */
-  homeTown(slot: number): NeighbourhoodDraft | null {
+  /** The town as the home screen shows it: the chosen lot cleared when starting on an empty lot (a house's: a flat is never one). */
+  homeTown(home: HomeRef): NeighbourhoodDraft | null {
     const town = this.town;
     if (!town) return null;
-    return this.emptyLot ? withLot(town, slot, EMPTY_LOT) : town;
+    return this.emptyLot && home.flat === undefined ? withLot(town, home.slot, EMPTY_LOT) : town;
   }
 
-  /** The home of the town's household chosen to play (`playSlot`), while one still lives there; null: the household is Creation's. */
-  get residentSlot(): number | null {
-    const slot = this.playSlot;
-    return slot !== null && !!this.town?.households.some((h) => h.slot === slot) ? slot : null;
+  /** The home of the town's household chosen to play (`play`), while one still lives there; null: the household is Creation's. */
+  get residentHome(): HomeRef | null {
+    const home = this.play;
+    return home && !!this.town?.households.some((h) => sameHome(h, home)) ? home : null;
   }
 
   /** The household moving in: the town's chosen in step 3, else the one made in Creation. */
   get mover(): HouseholdDraft | null {
-    const from = this.residentSlot;
-    return from === null ? this.household : (this.town?.households.find((h) => h.slot === from)?.household ?? null);
+    const from = this.residentHome;
+    return from === null ? this.household : (this.town?.households.find((h) => homeKey(h) === homeKey(from))?.household ?? null);
   }
 
   /**
-   * The new game Move in starts on `slot` (`newGame.ts` `moveInRequest`): the household taking over
-   * its own home, or moving into this one; the rest of the homes for sale filled on the way in.
+   * The new game Move in starts in `home` (`newGame.ts` `moveInRequest`): the household taking over
+   * its own home, or moving into this one (a house's lot, or a flat); the rest of the homes for sale filled on the way in.
    */
-  homeRequest(slot: number): StartRequest | null {
+  homeRequest(home: HomeRef): StartRequest | null {
     const town = this.town;
     const household = this.mover;
     if (!town || !household) return null;
-    return moveInRequest({ town, slot, household, from: this.residentSlot, emptyLot: this.emptyLot, mode: this.mode, lifespan: this.lifespan, ...(this.code ? { peopleSeed: peopleSeedOf(this.code) } : {}) });
+    return moveInRequest({ town, ...home, household, from: this.residentHome, emptyLot: this.emptyLot, mode: this.mode, lifespan: this.lifespan, ...(this.code ? { peopleSeed: peopleSeedOf(this.code) } : {}) });
   }
 
   start(request: StartRequest): void {

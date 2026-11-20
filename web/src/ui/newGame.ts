@@ -24,6 +24,7 @@ import { fillPlan, fillTown, offered, peopleStreams, type FillTier, type PeopleS
 import type { Pt } from '../game/roads';
 import type { StartRequest } from '../game/session';
 import { EMPTY_LOT, withLot, type NeighbourhoodDraft, type Templates } from '../game/town';
+import { homeKey, sameHome, type HomeRef } from './homes';
 import { defaultsOf, LAND_SIZE, LEGACY_KINDS, placeOf, sizeFor, townFits, type WorldKind } from '../game/world';
 import { readCode, type WorldCode } from '../game/worldCode';
 import { layoutHash } from '../game/uses';
@@ -242,15 +243,18 @@ export function peopleKey(town: string, seed: number): string {
 const FRESH_LEAST = 10;
 
 /**
- * The households step 3 offers once "Show others" has been pressed `page` times: each offer is
+ * The households step 3 offers once "Show others" has been pressed `page` times, by their homes: each offer is
  * `offered` from one stream running on, among the households not offered yet, so every press shows
  * others; once fewer than ten are left the round starts again from all of them. Page 0 is
  * `offered(town, streams)` itself, so the same code offers the same households first.
  */
-export function offerPage(town: NeighbourhoodDraft, streams: PeopleStreams, page: number): number[] {
+export function offerPage(town: NeighbourhoodDraft, streams: PeopleStreams, page: number): HomeRef[] {
   const rand = streams.offer();
   const running: PeopleStreams = { ...streams, offer: () => rand };
-  const all = town.households;
+  // (`offered` names a household by its lot, which the households of a building's flats share: it is
+  // asked of the town with a lot of its own for each household, a copy of its home's, and answers by household.)
+  const all = town.households.map((h, i) => ({ ...h, slot: i }));
+  const lots = town.households.map((h, i) => ({ ...town.slots[h.slot], index: i }));
   let shown = new Set<number>();
   let offer: number[] = [];
   for (let p = 0; p <= page; p++) {
@@ -259,10 +263,13 @@ export function offerPage(town: NeighbourhoodDraft, streams: PeopleStreams, page
       shown = new Set();
       rest = all;
     }
-    offer = offered({ ...town, households: rest }, running);
-    for (const slot of offer) shown.add(slot);
+    offer = offered({ ...town, slots: lots, households: rest }, running);
+    for (const i of offer) shown.add(i);
   }
-  return offer;
+  return offer.map((i) => {
+    const { slot, flat } = town.households[i];
+    return flat === undefined ? { slot } : { slot, flat };
+  });
 }
 
 /** Step 1's figures: the land's size (m), and the share of it under water and under woods (0..1). */
@@ -309,12 +316,13 @@ function polygonArea(poly: readonly [number, number][]): number {
 export interface MoveIn {
   /** Step 3's town with its neighbours (the first wave). */
   town: NeighbourhoodDraft;
-  /** The home chosen. */
+  /** The home chosen: a house's lot, or flat `flat` of the building on it. */
   slot: number;
+  flat?: number;
   household: HouseholdDraft;
   /** The home of the town's household chosen in step 3 (null: a household made in Creation). */
-  from: number | null;
-  /** Start on an empty lot, the house there cleared away (not for a household staying in its own home). */
+  from: HomeRef | null;
+  /** Start on an empty lot, the house there cleared away (not for a household staying in its own home, nor in a flat). */
   emptyLot: boolean;
   mode: GameKind;
   lifespan: Lifespan;
@@ -326,14 +334,17 @@ export interface MoveIn {
  * The new game Move in starts. A household of the town's that stays in its home is taken over as
  * it is (`existing`). One that moves leaves its old home empty, for sale and for the fill like any
  * other, and moves into the new one as a household made in Creation does. Either way the homes
- * still for sale are filled on the way in (`fill`, `townOnMoveIn`).
+ * still for sale are filled on the way in (`fill`, `townOnMoveIn`). A flat is handed over as its
+ * building's lot and its index there (`flat`); a flat is never an empty lot.
  */
 export function moveInRequest(m: MoveIn): Extract<StartRequest, { kind: 'new' }> {
   const common = { mode: m.mode, lifespan: m.lifespan, fill: true, ...(m.peopleSeed === undefined ? {} : { peopleSeed: m.peopleSeed }) };
-  if (m.from === m.slot) return { kind: 'new', town: m.town, household: m.household, slot: m.slot, existing: true, ...common };
-  let town = m.from === null ? m.town : { ...m.town, households: m.town.households.filter((h) => h.slot !== m.from) };
-  if (m.emptyLot) town = withLot(town, m.slot, EMPTY_LOT);
-  return { kind: 'new', town, household: m.household, slot: m.slot, ...common };
+  const home: HomeRef = m.flat === undefined ? { slot: m.slot } : { slot: m.slot, flat: m.flat };
+  if (sameHome(m.from, home)) return { kind: 'new', town: m.town, household: m.household, ...home, existing: true, ...common };
+  const from = m.from && homeKey(m.from);
+  let town = from === null ? m.town : { ...m.town, households: m.town.households.filter((h) => homeKey(h) !== from) };
+  if (m.emptyLot && m.flat === undefined) town = withLot(town, m.slot, EMPTY_LOT);
+  return { kind: 'new', town, household: m.household, ...home, ...common };
 }
 
 /**
@@ -353,7 +364,7 @@ export function townOnMoveIn(
 ): NeighbourhoodDraft {
   if (!request.fill) return request.town;
   const streams = peopleStreams(request.peopleSeed ?? (random() * 2 ** 32) >>> 0);
-  return fillTown(content, assets, t, request.town, request.slot, streams, { tier, avoid: [request.household.name] });
+  return fillTown(content, assets, t, request.town, request.slot, streams, { tier, avoid: [request.household.name], ...(request.flat === undefined ? {} : { flat: request.flat }) });
 }
 
 /**
@@ -371,6 +382,6 @@ export function householdsAhead(
   peopleSeed: number,
   household: HouseholdDraft,
   tier: FillTier = 'full',
-): { slot: number; household: HouseholdDraft }[] {
+): { slot: number; flat?: number; household: HouseholdDraft }[] {
   return [...town.households, ...fillPlan(content, assets, t, town, undefined, peopleStreams(peopleSeed), { tier, avoid: [household.name] })];
 }
