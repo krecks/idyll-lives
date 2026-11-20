@@ -10,10 +10,12 @@
  * renderer's census and the world's plots, residents and objects.
  *
  * A build is a tree (a checkout or a worktree, its wasm built: `bun run wasm` and `bun run sound` in it),
- * served by its own Vite on a free port, or the URL of a dev server already running. The harness is
- * this tree's `gameplay.mjs` for both, so both are measured the same way.
+ * served by its own Vite on a free port, or the URL of a dev server already running. `--prod`: each tree's
+ * production build for the benchmark instead (`lib/build.mjs`, made one after the other and kept while the tree's web/
+ * is the same), served by `vite preview`. The harness is this tree's `gameplay.mjs` for both, so both are measured the
+ * same way.
  *
- *   bun tools/bench/memory-ab.mjs --a <tree|url> --b <tree|url> [--runs 5] [--out <dir>] [-- <gameplay.mjs options>]
+ *   bun tools/bench/memory-ab.mjs --a <tree|url> --b <tree|url> [--runs 3] [--prod] [--out <dir>] [-- <gameplay.mjs options>]
  *
  * For example, release/0.8.3 against this tree, 5 runs each, 300 s of play, reads at 30/90/150/210/270 s:
  *
@@ -31,6 +33,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { cpus, loadavg } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { benchBuild } from './lib/build.mjs';
 
 const HERE = fileURLToPath(new URL('./', import.meta.url));
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -42,15 +45,17 @@ const flag = (name, fallback) => {
   return i >= 0 && args[i + 1] !== undefined && !args[i + 1].startsWith('--') ? args[i + 1] : fallback;
 };
 if (args.includes('--help') || args.includes('-h') || !flag('a', null) || !flag('b', null)) {
-  console.log(`Usage: bun tools/bench/memory-ab.mjs --a <tree|url> --b <tree|url> [--runs 5] [--out <dir>] [-- <gameplay.mjs options>]
+  console.log(`Usage: bun tools/bench/memory-ab.mjs --a <tree|url> --b <tree|url> [--runs 3] [--prod] [--out <dir>] [-- <gameplay.mjs options>]
 
   --a, --b     a build: a tree (its web/ served by its own Vite on a free port) or a dev server's URL
-  --runs 5     runs of each, in turn (A B, B A, …)
+  --runs 3     runs of each, in turn (A B, B A, …)
+  --prod       each tree's production build for the benchmark (lib/build.mjs), served by vite preview
   --out <dir>  default bench-results/memory-ab-<time>/
   -- …         options for gameplay.mjs (--secs, --reads, --code, --home, --renderer, --preset, …)`);
   process.exit(flag('a', null) && flag('b', null) ? 0 : 2);
 }
-const runs = Number(flag('runs', '5'));
+const runs = Number(flag('runs', '3'));
+const prod = args.includes('--prod');
 if (!Number.isInteger(runs) || runs < 1) {
   console.error('memory-ab.mjs: --runs must be a positive integer');
   process.exit(2);
@@ -81,7 +86,8 @@ async function serve(name, where) {
   if (!existsSync(vite)) throw new Error(`${where}: no web/node_modules/.bin/vite (link or install its node_modules)`);
   if (!existsSync(join(web, 'src/core/wasm-pkg/sim_wasm_bg.wasm'))) throw new Error(`${where}: its wasm isn't built (bun run wasm and bun run sound in its web/)`);
   const port = await freePort();
-  const server = spawn(vite, ['--port', String(port), '--strictPort', '--host', '127.0.0.1'], { cwd: web, stdio: ['ignore', 'pipe', 'inherit'] });
+  const dist = prod ? (await benchBuild({ tree: where })).dir : null;
+  const server = spawn(vite, [...(dist ? ['preview', '--outDir', dist] : []), '--port', String(port), '--strictPort', '--host', '127.0.0.1'], { cwd: web, stdio: ['ignore', 'pipe', 'inherit'] });
   servers.push(server);
   await new Promise((ok, no) => {
     server.stdout.on('data', (d) => String(d).includes('Local') && ok());

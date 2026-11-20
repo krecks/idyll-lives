@@ -11,6 +11,7 @@ import { flatOf, groundDepth, lotOf, lowestStorey, storeyRow } from '../core/pro
 import { townMap } from '../ui/townMap.svelte';
 import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { BENCH } from '../debug/benchFlags';
+import { DEBUG_HOOKS } from '../debug/hooks';
 import { GAMEPLAY_STATS, installGameplayStats } from '../debug/gameplayStats';
 import { installPlaceHooks } from '../debug/places';
 import { tileWorld } from '../debug/tileWorld';
@@ -2264,8 +2265,8 @@ async function openSession(
     },
   };
   session.applySettings(settings);
-  if (import.meta.env.DEV) {
-    // Test hook for automated browser checks; not present in production builds.
+  if (DEBUG_HOOKS) {
+    // Test hook for automated browser checks; not present in production builds (but the benchmark's).
     window.__osw = {
       simScreen(id: number) {
         const head = { x: 0, y: 0, z: 0 };

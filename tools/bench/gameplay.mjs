@@ -71,7 +71,9 @@
  *     --no-dumps               no memory-infra dumps (they pause the processes for a moment)
  *     --lowmem                 the page as on an 8 GB machine (`?lowmem`)
  *     --voices                 the residents' voices on (the setting; off by default)
- *     --prod                   a production build made for the benchmark (`VITE_BENCH_STATS=1`), served by `vite preview`
+ *     --prod                   a production build made for the benchmark (`lib/build.mjs`: `VITE_BENCH=1`, kept in
+ *                              bench-results/.dist and reused while web/ is the same), served by `vite preview`; its
+ *                              textures are the sources unless `--assets prod`
  *
  * Needs the dev server (the `?gpustats` hook is dev-only), so `--url` must point at one; or `--prod`.
  */
@@ -84,6 +86,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { quiet } from './quiet.mjs';
 import { worldFlags } from './worldFlags.mjs';
+import { benchBuild } from './lib/build.mjs';
 
 const STARTED = Date.now();
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -241,11 +244,13 @@ let serverMode = 'reused';
 const base = flag('url', null) ?? `http://localhost:${port}`;
 let serverReadyAt = STARTED;
 if (prod) {
-  // A build of this tree with the benchmark's hooks kept (`VITE_BENCH_STATS=1`), served as a release is.
-  const dist = join(out, 'dist');
-  console.log(`building for --prod into ${dist} …`);
-  const built = spawnSync(`${WEB}node_modules/.bin/vite`, ['build', '--outDir', dist, '--emptyOutDir'], { cwd: WEB, stdio: 'inherit', env: { ...process.env, VITE_BENCH_STATS: '1' } });
-  if (built.status !== 0) bad('the --prod build failed');
+  // This tree's build for the benchmark (`lib/build.mjs`: `VITE_BENCH=1`, made once while web/ is the same), served as a release is.
+  let dist;
+  try {
+    dist = (await benchBuild({ assets: flag('assets', 'source') })).dir;
+  } catch (err) {
+    bad(`the --prod build failed: ${err.message}`);
+  }
   if (await running(base)) bad(`--prod: something already answers on ${base} (pick a free --port)`);
   serverMode = 'preview';
   server = spawn(`${WEB}node_modules/.bin/vite`, ['preview', '--outDir', dist, '--port', String(port), '--strictPort'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] });

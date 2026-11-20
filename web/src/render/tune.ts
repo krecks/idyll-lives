@@ -1,7 +1,7 @@
 /**
  * Look tuning on the dev server: `?tune=lawn.tip:1.12;lawn.sky:0.85,0.95;look.vignette:0.8;key.13.skyColor:8FB4EE`
  * replaces named constants as their modules load, so one build is shot in several variants side by side
- * (`tools/bench/play.mjs --sheet`). A leaf module. Nothing is read in a production build or in the tests,
+ * (`tools/bench/play.mjs --sheet`). A leaf module. Nothing is read in a production build (but the benchmark's, `debug/hooks.ts`) or in the tests,
  * and a worker has no such flag in its address.
  *
  * The groups: `look` (`LOOK`'s own fields), `key.<hour>` (one time-of-day keyframe) and `night` (the night's,
@@ -20,6 +20,8 @@
  * makes its material): `material.floor.wood.color:D9C8B4`, `material.floor.wood.uvScale:0.36`,
  * `material.floor.wood.texture:../floor_wood.calm/albedo.jpg` (a file named from the entry's own).
  */
+
+import { DEBUG_HOOKS } from '../debug/hooks';
 
 /** `a.b:1;c.d:x` as path → value, both as written. */
 export function parseTune(text: string): Map<string, string> {
@@ -57,9 +59,9 @@ export function applyTune<T extends object>(group: string, base: T, tune: Readon
 
 let asked: ReadonlyMap<string, string> | undefined;
 
-/** `base` as `?tune=` asks for it on the dev server; `base` itself otherwise. */
+/** `base` as `?tune=` asks for it on the dev server (or the benchmark's build); `base` itself otherwise. */
 export function tuned<T extends object>(group: string, base: T): T {
-  if (!import.meta.env.DEV || typeof location === 'undefined') return base;
+  if (!DEBUG_HOOKS || typeof location === 'undefined') return base;
   asked ??= parseTune(new URLSearchParams(location.search).get('tune') ?? '');
   return asked.size ? applyTune(group, base, asked) : base;
 }
@@ -77,9 +79,9 @@ export function applyEntryTune<T extends object>(key: string, entry: T, tune: Re
   return own.size ? applyTune(key, entry, own) : entry;
 }
 
-/** A manifest entry as `?tune=` asks for it on the dev server; `entry` itself otherwise. */
+/** A manifest entry as `?tune=` asks for it on the dev server (or the benchmark's build); `entry` itself otherwise. */
 export function tunedEntry<T extends object>(key: string, entry: T): T {
-  if (!import.meta.env.DEV || typeof location === 'undefined') return entry;
+  if (!DEBUG_HOOKS || typeof location === 'undefined') return entry;
   asked ??= parseTune(new URLSearchParams(location.search).get('tune') ?? '');
   return asked.size ? applyEntryTune(key, entry, asked) : entry;
 }
