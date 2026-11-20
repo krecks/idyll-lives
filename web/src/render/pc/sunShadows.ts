@@ -355,10 +355,10 @@ export class SunShadows {
    */
   movers: ((out: pc.MeshInstance[]) => void) | null = null;
   /**
-   * A still caster's copies that can cast into the map, as a number (`reaches`: the parked bikes' draws, whose copies
-   * stand all over town; undefined: not such a draw). Such a draw is the same for the still casters' picture while its
-   * number is, however many copies it has elsewhere and however big its box: a bike ridden off across town draws no
-   * picture again.
+   * A still caster's copies that can cast into the map, as a number (`reaches`: the parked bikes' and cars' draws,
+   * whose copies stand all over town, `Instances.castKey`; undefined: not such a draw). Such a draw is the same for the
+   * still casters' picture while its number is, however many copies it has elsewhere and however big its box: a bike
+   * ridden off or a car parked across town draws no picture again.
    */
   castKey: ((mi: pc.MeshInstance) => number | undefined) | null = null;
   /** Whether the still casters' picture is kept (`SunShadowOptions.still`). */

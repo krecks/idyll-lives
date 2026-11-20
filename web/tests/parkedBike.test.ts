@@ -28,7 +28,7 @@ describe('a bike left out by a place', async () => {
   const { TemplateCache } = await import('../src/render/shared/templateCache');
   const { Pose, simFields } = await import('../src/core/snapshot');
   const { MOUNTS, MOUNT_SECONDS } = await import('../src/render/shared/characters/vehicles');
-  const { castKey, placements } = await import('../src/render/shared/parked');
+  const { castKey, castKeyOf, placements } = await import('../src/render/shared/parked');
   type Prop = import('../src/render/shared/characters/view').ResidentProp;
   type View = import('../src/render/shared/characters/view').ResidentView<object, object, Prop>;
   type SnapshotLayout = import('../src/core/snapshot').SnapshotLayout;
@@ -236,6 +236,16 @@ describe('a bike left out by a place', async () => {
     expect(castKey([at(200)], reaches)).not.toBe(here);
     expect(castKey([at(11), at(200)], reaches)).not.toBe(here);
     expect(castKey([at(10, 1), at(200)], reaches)).not.toBe(here);
+    // None there: 0.
+    expect(castKey([at(200)], (x) => x < 0)).toBe(0);
+  });
+
+  test("castKeyOf: an instanced draw's copies (a parked car's, with its colour beside the matrix) as castKey has them; a hidden copy stands nowhere", () => {
+    const at = (x: number) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, 0, 5, 1];
+    const reaches = (x: number) => x < 50;
+    const strided = (copies: number[][]) => new Float32Array(copies.flatMap((m) => [...m, 0.2, 0.4, 0.6, 1]));
+    expect(castKeyOf(strided([at(10), at(200)]), 2, 20, reaches)).toBe(castKey([at(10)], reaches));
+    expect(castKeyOf(strided([at(10), new Array(16).fill(0)]), 2, 20, () => true)).toBe(castKey([at(10)], reaches));
   });
 
   test('placements: left out, drawn there wherever it is from; else at home when off the viewed lot and not ridden', () => {
