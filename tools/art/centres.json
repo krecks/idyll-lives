@@ -349,6 +349,7 @@
   "model.hotTubCedar": [0.0, 0.008],
   "model.hotelReception": [0.0, 0.0],
   "model.iceCreamCart": [-0.0235, 0.0023],
+  "model.iceCreamMaker": [0.0, 0.0],
   "model.ironingBoard": [0.0908, 0.1],
   "model.islandLong": [0.0, 0.0255],
   "model.islandSmall": [0.0, 0.0255],

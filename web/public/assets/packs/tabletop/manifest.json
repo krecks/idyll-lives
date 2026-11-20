@@ -1304,6 +1304,41 @@
           "label": "Body"
         }
       ]
+    },
+    "model.iceCreamMaker": {
+      "type": "model",
+      "url": "../../models/tabletop/iceCreamMaker.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "glass_pale": {
+          "finish": "material.finish.gloss"
+        },
+        "ice_cream_maker": {
+          "finish": "material.finish.metal"
+        },
+        "icecream": {
+          "finish": "material.finish.satin"
+        },
+        "red": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "loops": {
+          "churn": "whirr"
+        }
+      },
+      "paint": [
+        {
+          "material": "ice_cream_maker",
+          "label": "Body"
+        }
+      ]
     }
   }
 }

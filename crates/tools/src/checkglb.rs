@@ -1241,9 +1241,13 @@ fn uses(motions: &J) -> Vec<(String, J)> {
     out
 }
 
+/// The `motions` kinds naming one clip each (`played`; `cargo review`'s motions column).
+pub(crate) const CLIP_KINDS: [&str; 7] = ["open", "idle", "night", "growth", "ride", "running", "burn"];
+
 /// {clip: what plays it} for an entry's `motions` (in the order they're first named): `uses`, `loops`,
 /// `open`, `idle`, `night`, `growth`, `ride` (the clip whose part carries its users), `running` (round and
-/// round while a machine runs on its own) and `clock` (`hour`, `minute`: hands set by the time).
+/// round while a machine runs on its own), `burn` (round while a fire burns) and `clock` (`hour`, `minute`:
+/// hands set by the time).
 pub(crate) fn played(motions: &J) -> R<Vec<(J, String)>> {
     let mut out: Vec<(J, String)> = Vec::new();
     let mut add = |clip: &J, by: String| {
@@ -1262,7 +1266,7 @@ pub(crate) fn played(motions: &J) -> R<Vec<(J, String)>> {
     {
         add(clip, format!("loop {}", repr_str(name)));
     }
-    for kind in ["open", "idle", "night", "growth", "ride", "running"] {
+    for kind in CLIP_KINDS {
         if let Some(clip) = motions.get(kind).filter(|c| c.truthy()) {
             add(clip, kind.into());
         }
@@ -1277,7 +1281,7 @@ pub(crate) fn played(motions: &J) -> R<Vec<(J, String)>> {
 }
 
 /// The clips of `motions` that go round, or from rest to rest (and so must end where they start): loops,
-/// `idle`, `running`, a use's clip that repeats (`every`) and a clock's hands (a whole turn). As dict keys.
+/// `idle`, `running`, `burn`, a use's clip that repeats (`every`) and a clock's hands (a whole turn). As dict keys.
 fn loops(motions: &J) -> R<HashSet<String>> {
     let mut out = HashSet::new();
     for (_, clip) in motions
@@ -1288,7 +1292,7 @@ fn loops(motions: &J) -> R<HashSet<String>> {
     {
         out.insert(clip.key());
     }
-    for kind in ["idle", "running"] {
+    for kind in ["idle", "running", "burn"] {
         if let Some(clip) = motions.get(kind).filter(|c| c.truthy()) {
             out.insert(clip.key());
         }

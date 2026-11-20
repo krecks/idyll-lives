@@ -12,10 +12,12 @@ import { describe, expect, test } from 'bun:test';
 import type { RoadPlan } from '../src/core/protocol';
 import { blankLand, heightAt, LAND_CELL, NONE, type Land } from '../src/game/land';
 import { bridgeSpans, lengths, pointAt, type Pt } from '../src/game/roads';
-import { BRIDGE_CLEAR, BuiltSurface, builtSurfaceOf, CUT_MAX, ENTRY_MAX, GRADE, RETAIN_MAX, ROAD_SINK, SKIRT_MOST, surfacePlots, type SurfaceWorld } from '../src/render/shared/builtSurface';
+import { BRIDGE_CLEAR, BuiltSurface, builtSurfaceOf, CUT_MAX, ENTRY_MAX, GRADE, PAD_STEP, RETAIN_MAX, ROAD_SINK, surfacePlots, type SurfaceWorld } from '../src/render/shared/builtSurface';
 import { chunkAt } from '../src/render/shared/chunks';
 
 const [W, D] = [160, 120];
+/** How near the ground beside a lot must be to its pad (m): the land's grain is 2 m, so this is "the same height". */
+const TOUCH = 0.01;
 /** The channel the street bridges (x, m), its water's level and its bed (m). */
 const CHANNEL: [number, number] = [70, 84];
 const WATER = 0;
@@ -142,7 +144,7 @@ describe('built land on a slope', () => {
     expect(graded[(26 / LAND_CELL) * land.cols + 16 / LAND_CELL]).toBe(Math.round(surface.padY(0) * 100));
   });
 
-  test('lots side by side on a steep street step no more than a retaining edge', () => {
+  test('lots side by side on a steep street step no more than PAD_STEP', () => {
     // A street climbing at 8 %, the land with it; two lots on it, side by side, their entries 1.6 m apart.
     const slope = blankLand(120, 60, 'follow');
     for (let j = 0; j < slope.rows; j++) for (let i = 0; i < slope.cols; i++) slope.h[j * slope.cols + i] = Math.round(0.08 * i * LAND_CELL * 100);
@@ -153,8 +155,29 @@ describe('built land on a slope', () => {
     ];
     const both = new BuiltSurface(slope, street, lots, [], 0.4);
     expect(Math.abs(both.entryY(1) - both.entryY(0))).toBeGreaterThan(RETAIN_MAX);
-    expect(Math.abs(both.padY(1) - both.padY(0))).toBeLessThanOrEqual(RETAIN_MAX);
+    expect(Math.abs(both.padY(1) - both.padY(0))).toBeLessThanOrEqual(PAD_STEP + 1e-9);
     for (const i of [0, 1]) expect(Math.abs(both.padY(i) - both.entryY(i))).toBeLessThanOrEqual(ENTRY_MAX + 1e-9);
+  });
+
+  test('lots that touch step no more than PAD_STEP, each as near the land under it as that lets it; a lot apart is held by none', () => {
+    // A 4 % slope along x; two lots off any road side by side (the land under them 0.56 m apart), a third well away.
+    const slope = blankLand(120, 60, 'follow');
+    for (let j = 0; j < slope.rows; j++) for (let i = 0; i < slope.cols; i++) slope.h[j * slope.cols + i] = Math.round(0.04 * i * LAND_CELL * 100);
+    const [a, b, apart] = [
+      { x: 10, z: 10, w: 15, d: 15, entry: null },
+      { x: 25, z: 10, w: 15, d: 15, entry: null },
+      { x: 80, z: 10, w: 15, d: 15, entry: null },
+    ];
+    const s = new BuiltSurface(slope, [], [a, b, apart], [], 0.4);
+    const step = s.padY(1) - s.padY(0);
+    expect(step).toBeGreaterThan(PAD_STEP - 1e-9);
+    expect(step).toBeLessThanOrEqual(PAD_STEP + 1e-9);
+    // (Not one level: their middles, 0.72 and 1.28 m, no further apart than they must be.)
+    expect(s.padY(0)).toBeGreaterThanOrEqual(0.72 - 1e-9);
+    expect(s.padY(1)).toBeLessThanOrEqual(1.28 + 1e-9);
+    expect(s.padY(2)).toBeCloseTo(0.04 * 88, 6);
+    // One taken away: the lot apart stands where it stood.
+    expect(new BuiltSurface(slope, [], [b, apart], [], 0.4).padY(1)).toBe(s.padY(2));
   });
 
   test('the bridge clears its water', () => {
@@ -350,12 +373,20 @@ describe('round a lot whose edges are off the land\'s grain', () => {
     for (let k = 0; k < again.conformed.length; k++) expect(Math.abs(again.conformed[k] - surface.conformed[k])).toBeLessThan(0.006);
   });
 
-  test('on a steep slope, further from its pad than SKIRT_MOST, the land is left to a retaining edge', () => {
+  test('on a steep slope, the land beside its edge meets its pad: a bank, no retaining edge', () => {
     const steep = blankLand(60, 60, 'follow');
     for (let j = 0; j < steep.rows; j++) for (let i = 0; i < steep.cols; i++) steep.h[j * steep.cols + i] = Math.round(0.1 * j * LAND_CELL * 100);
     const s = new BuiltSurface(steep, [], [lot], [], 0.75);
     const k = (16 / LAND_CELL) * steep.cols + 14 / LAND_CELL;
-    expect(Math.abs(s.conformed[k] - s.padY(0))).toBeGreaterThan(SKIRT_MOST);
-    expect(s.conformed[k]).toBeCloseTo(steep.h[k] / 100, 4);
+    const pad = s.padY(0);
+    // (A step the 2 m grain cannot draw: the sample beside the lot is its pad's, and so is the ground drawn just
+    // outside its edge on every side, so no stone edge stands there.)
+    expect(Math.abs(s.conformed[k] - pad)).toBeLessThan(TOUCH);
+    for (let n = 1; n <= 6; n++) {
+      const t = n / 7;
+      for (const [x, z] of [[lot.x + lot.w * t, lot.z - 0.01], [lot.x + lot.w * t, lot.z + lot.d + 0.01], [lot.x - 0.01, lot.z + lot.d * t], [lot.x + lot.w + 0.01, lot.z + lot.d * t]]) {
+        expect(Math.abs(s.landAt(x, z) - pad)).toBeLessThan(TOUCH);
+      }
+    }
   });
 });

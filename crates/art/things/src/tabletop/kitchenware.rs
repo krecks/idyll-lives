@@ -330,6 +330,180 @@ fn _blender_jar() {
     );
 }
 
+/// A countertop ice cream maker: a black motor head between silver cheeks, standing over a tub of churned mint
+/// ice cream with a chunky black handle, on a black collar and a silver plinth. The tub is drawn opaque, as the
+/// blender's jug, so the ice cream shows as its lower two thirds from any distance; it is a part of its own, with
+/// its handle, and twists on the collar while the machine churns (`whirr`).
+pub fn ice_cream_maker() -> Vec<Obj> {
+    let body = new_parts(_ice_cream_maker_body);
+    join!(&body, "iceCreamMaker", origin = (0, 0, 0));
+    let parts = new_parts(_ice_cream_maker_tub);
+    let tub = join!(&parts, "tub", origin = (0, 0, 0.08));
+    settle!();
+    rock!(tub, "whirr", 2.5, seconds = 0.2, axis = Axis::Z); // a quick twist each way, as the paddle bites
+    meshes()
+}
+
+fn _ice_cream_maker_body() {
+    turned!(
+        "foot",
+        &[
+            (0.104, 0.104, 0.0),
+            (0.11, 0.11, 0.006),
+            (0.11, 0.11, 0.016),
+            (0.106, 0.106, 0.02)
+        ],
+        M.dark,
+        verts = 24,
+        square = 2
+    );
+    turned!(
+        "plinth",
+        &[
+            (0.1, 0.1, 0.018),
+            (0.112, 0.112, 0.03),
+            (0.112, 0.112, 0.046),
+            (0.104, 0.104, 0.052)
+        ],
+        M.ice_cream_maker,
+        verts = 24,
+        square = 2
+    );
+    turned!(
+        "collar",
+        &[
+            (0.09, 0.09, 0.05),
+            (0.094, 0.094, 0.058),
+            (0.094, 0.094, 0.078),
+            (0.09, 0.09, 0.082),
+            (0.086, 0.086, 0.082)
+        ],
+        M.dark,
+        verts = 20,
+        square = 3
+    );
+    // the black rim the head seats on, over the tub's top
+    turned!(
+        "rim",
+        &[
+            (0.076, 0.076, 0.224),
+            (0.08, 0.08, 0.228),
+            (0.08, 0.08, 0.234),
+            (0.076, 0.076, 0.238),
+            (0.07, 0.07, 0.238)
+        ],
+        M.dark,
+        verts = 20,
+        square = 2
+    );
+    turned!(
+        "headBase",
+        &[
+            (0.08, 0.08, 0.236),
+            (0.086, 0.086, 0.242),
+            (0.086, 0.086, 0.256),
+            (0.082, 0.082, 0.26),
+            (0.078, 0.078, 0.26)
+        ],
+        M.dark,
+        verts = 20,
+        square = 3
+    );
+    turned!(
+        "head",
+        &[
+            (0.082, 0.054, 0.26),
+            (0.086, 0.056, 0.272),
+            (0.086, 0.056, 0.378),
+            (0.082, 0.054, 0.39)
+        ],
+        M.ice_cream_maker,
+        verts = 24,
+        square = 8
+    );
+    box_!(
+        "face",
+        (0.118, 0.012, 0.11),
+        (0, -0.052, 0.325),
+        M.dark,
+        bevel = 0.005
+    );
+    box_!(
+        "screen",
+        (0.076, 0.004, 0.012),
+        (0, -0.059, 0.362),
+        M.chrome,
+        bevel = 0.002
+    );
+    turned!(
+        "power",
+        &[(0.008, 0.0), (0.008, 0.004), (0.005, 0.005), (0.0, 0.006)],
+        M.red,
+        at = (0, -0.059, 0.288),
+        rot = (90, 0, 0),
+        verts = 12
+    );
+    // the program grid: two columns of three, as on the machine
+    for (i, z) in [0.343, 0.327, 0.311].into_iter().enumerate() {
+        for (j, x) in [-0.022, 0.022].into_iter().enumerate() {
+            box_!(
+                format!("program{i}{j}"),
+                (0.016, 0.004, 0.009),
+                (x, -0.059, z),
+                M.chrome,
+                bevel = 0.001
+            );
+        }
+    }
+    // a low domed lid, its open skirt buried in the head's top: a lip, then a shallow dome
+    turned!(
+        "cap",
+        &[
+            (0.08, 0.052, 0.386),
+            (0.088, 0.058, 0.393),
+            (0.0, 0.0, 0.4025)
+        ],
+        M.dark,
+        verts = 20,
+        square = 8,
+        caps = false
+    );
+}
+
+fn _ice_cream_maker_tub() {
+    // the tub drawn opaque: the ice cream its lower two thirds, the pale glass above it, and a chunky D handle
+    turned!(
+        "ice_cream",
+        &[(0.072, 0.072, 0.08), (0.0747, 0.0747, 0.178)],
+        M.icecream,
+        verts = 20,
+        square = 2
+    );
+    turned!(
+        "tub",
+        &[(0.0747, 0.0747, 0.178), (0.076, 0.076, 0.226)],
+        M.glass_pale,
+        verts = 20,
+        square = 2
+    );
+    bar!(
+        "handle",
+        &fillet(
+            &[
+                (0.068, 0.0, 0.205),
+                (0.112, 0.0, 0.205),
+                (0.112, 0.0, 0.1),
+                (0.068, 0.0, 0.1)
+            ],
+            0.022,
+            2
+        ),
+        oval(0.02, 0.03, 6),
+        M.dark,
+        up = (0, 1, 0)
+    );
+}
+
 /// A tilt-head stand mixer: a rounded base, the column rising into the head (lofted, swelling over the bowl to
 /// its nose, a chrome band and hub there), the speed lever, the steel bowl with batter in it and the beater's
 /// shaft. The beater on its shaft is a part of its own: `beat` turns it round in the bowl while the mixer runs.

@@ -16,7 +16,8 @@
  * to the next stage at the clip's own pace. An ambient clip (`idle`: a ceiling fan, a fountain's water) goes
  * round all the time (a lamp's only while it's switched on: the fan's blades with its light), but
  * only within `ambientRange` of the camera (none on Low), without the shadows being redrawn for it.
- * A fire (content `light.fire`) holds its uses' clips (its flames) open while it burns at night. A clock's hands (`clock`) show the game's time, set each game
+ * A fire (content `light.fire`) holds its uses' clips (its flames) open while it burns at night, and
+ * its `burn` clip goes round (the flames' lean and sway). A clock's hands (`clock`) show the game's time, set each game
  * minute (each five on Low) within `CLOCK_RANGE` of the camera or the ambient range. A part moved by
  * several clips at once takes all their poses (`partPose`: a record spinning as it swings up; a use's clip
  * on top of a crop's growth stage, the veggie bed's plants rustling as tall as they have grown). Each
@@ -176,10 +177,11 @@ interface ClipState {
   progress?: number;
   /**
    * Opens and closes (a use's, or held open), goes round while used (`loops`), plays from rest to rest
-   * every so often while used (`repeat`), goes round always (`idle`), is held where a crop's stage
-   * (`growth`) or the game's time (`clock`) has it, or where the use has got to (`over`).
+   * every so often while used (`repeat`), goes round always (`idle`), goes round while a fire burns
+   * (`burn`), is held where a crop's stage (`growth`) or the game's time (`clock`) has it, or where
+   * the use has got to (`over`).
    */
-  kind: 'use' | 'loop' | 'repeat' | 'idle' | 'growth' | 'clock' | 'over';
+  kind: 'use' | 'loop' | 'repeat' | 'idle' | 'growth' | 'clock' | 'over' | 'burn';
 }
 
 /** A clip a use wants this frame. */
@@ -247,6 +249,8 @@ export class ObjectMotion<D> {
   private snapCurtains = false;
   /** Whether an object's glow is out with its room's lights (`setUnlit`): a night clip that lights it (candles) stays shut. */
   private unlit: (id: number) => boolean = () => false;
+  /** Reduce motion (the settings'): a fire's flames hold still. */
+  reducedMotion = false;
 
   /**
    * The lamps' level (the lighting's `lamps`, 0 by day to 1 at night): night clips close from about
@@ -313,6 +317,12 @@ export class ObjectMotion<D> {
   /** Object `id`'s model clips (dev tools: `RendererDebugHooks.objectMotions`). */
   motionsOf(id: number): Motions | null {
     return this.objects.get(id)?.motions ?? null;
+  }
+
+  /** Whether fire `id`'s flames are going round (`burn`: lit, at night, near the camera, motion not reduced): its glow flickers with them. */
+  burning(id: number): boolean {
+    const burn = this.objects.get(id)?.motions.burn;
+    return burn !== undefined && !this.reducedMotion && !!this.states.get(id)?.has(burn);
   }
 
   /** The objects of a newly built world; those still mid-clip are posed again. */
@@ -413,9 +423,12 @@ export class ObjectMotion<D> {
       const held = this.held(o, this.heldNow);
       // (A lamp's, a fan's blades, only while it's switched on.)
       const idle = o.motions.idle !== undefined && reach > 0 && !(o.lamp && this.lampsOff.has(id)) && this.distance2(o, eye) < reach ? o.motions.idle : undefined;
+      // A fire's flames flicker: their `burn` clip goes round while it burns at night, near the camera as an idle clip
+      // (not with Reduce motion: dropped, the flames go back to rest).
+      const burning = o.motions.burn !== undefined && this.night && !this.reducedMotion && !this.lampsOff.has(id) && reach > 0 && this.distance2(o, eye) < reach ? o.motions.burn : undefined;
       let clips = this.states.get(id);
       const growth = this.growth(o);
-      if ((wanted || held.length || idle || growth) && !clips) this.states.set(id, (clips = new Map()));
+      if ((wanted || held.length || idle || growth || burning) && !clips) this.states.set(id, (clips = new Map()));
       if (!clips) continue;
       for (const name of held) {
         const clip = o.motion.clips.get(name);
@@ -426,6 +439,9 @@ export class ObjectMotion<D> {
       if (growth && !clips.has(growth.name)) clips.set(growth.name, { clip: growth.clip, time: growth.at, use: '', until: Infinity, start: 0, kind: 'growth' });
       const idleClip = idle ? o.motion.clips.get(idle) : undefined;
       if (idle && idleClip && !clips.has(idle)) clips.set(idle, { clip: idleClip, time: 0, use: '', until: Infinity, start: 0, kind: 'idle' });
+      // (Each fire on a beat of its own: its id offsets where its flames are in their round.)
+      const burningClip = burning ? o.motion.clips.get(burning) : undefined;
+      if (burning && burningClip && !clips.has(burning)) clips.set(burning, { clip: burningClip, time: (id * 0.37) % burningClip.duration, use: '', until: Infinity, start: 0, kind: 'burn' });
       let changed = false;
       let drifted = false;
       if (wanted) for (const [name, want] of wanted) {
@@ -447,9 +463,9 @@ export class ObjectMotion<D> {
       for (const [name, state] of clips) {
         const d = state.clip.duration;
         if (state.kind === 'clock') continue;
-        if (state.kind === 'idle') {
-          // Round and round near the camera; at rest further off.
-          if (name !== idle) {
+        if (state.kind === 'idle' || state.kind === 'burn') {
+          // Round and round near the camera (a fire's flames while it burns); at rest further off (put out, still grown).
+          if (name !== (state.kind === 'idle' ? idle : burning)) {
             clips.delete(name);
             drifted = true;
           } else if (dt && d > 0) {

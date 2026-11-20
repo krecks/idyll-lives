@@ -1279,7 +1279,7 @@ fn motions_cell(m: Option<&Value>) -> String {
             ));
         }
     }
-    for part in ["open", "idle", "night", "growth", "ride", "running"] {
+    for part in checkglb::CLIP_KINDS {
         if let Some(c) = m[part].as_str() {
             parts.push(format!("{part} {c}"));
         }

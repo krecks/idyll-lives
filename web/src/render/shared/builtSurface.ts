@@ -19,8 +19,10 @@
  *   *entry* (`entryY`), and its pad (`padY`) is within `ENTRY_MAX` of that: a short sloped drive or
  *   a step or two between them. Within that, a pad stands as near the middle of the land under it
  *   as it can (the least cut and fill), no further than `RETAIN_MAX` from its road along its front,
- *   and no further than that from the pads it touches, as far as the windows allow. A lot off any
- *   road stands at the middle of the land under it.
+ *   and no further than `PAD_STEP` from the pads it touches (a low step between two gardens, not a
+ *   wall), as far as its window allows, else at the end of its window nearest them. Only the pads it
+ *   touches hold it, so an edit moves only the pads near it. A lot off any road has no window: it
+ *   stands at the middle of the land under it, within `PAD_STEP` of the pads it touches.
  * - **The land round them** is held between two cones from everything built, `bank` (the world's
  *   `LandscapeParams.slope`) steep: no higher than the built land nearest plus `bank` a metre away
  *   from it, no lower than it less as much. Under a road it is the road's height less `ROAD_SINK`
@@ -52,10 +54,14 @@ export const CUT_MAX = 4;
  * Round a lot, the land at the samples a cell or less outside it (the corners of the cells its edge crosses) is
  * graded to its pad where it lies within this (m) of it (`solveLand`). Lots don't keep to the land's 2 m grain, so
  * without it the land drawn across such a cell stood over the pad's edge or under it: on a gentle slope a lawn with a
- * crease and a small step at the lot's front, burying its path's first metre and its fence's foot. Further off, a
- * retaining edge stands as ever.
+ * crease and a small step at the lot's front, burying its path's first metre and its fence's foot.
+ *
+ * It reaches the whole retaining reach (`RETAIN_MAX`, less a little): a wider step is one the grain cannot draw, and
+ * leaves a stone edge standing up out of the grass. So the land meets the pad at its edge and the cones ramp the
+ * difference away past that cell: a bank, not a wall. (A little short of it, so a sample a full retaining edge from
+ * the pad is the land's, ramped by the cones, never graded flat to the pad.)
  */
-export const SKIRT_MOST = 0.5;
+export const SKIRT_MOST = RETAIN_MAX - 0.05;
 /** Among mountains (a world whose Hills are `mountains`), a country road (a pass, a way out of the world) may be cut into the rock or stand over the land by this much (m). */
 export const CUT_MAX_MOUNTAIN_ROAD = 10;
 /** The graded land under a road lies this far below it (m), so it never shows through on a bend. */
@@ -117,8 +123,13 @@ export function onPad(p: SurfacePlot, x: number, z: number): boolean {
 export const ENTRY_MAX = 1;
 /** How many times the pads are set again to meet their neighbours'. */
 const PAD_PASSES = 8;
-/** Pads touching each other (no more than the land's grain apart) are kept this near (m): a retaining edge, less a little. */
-const PAD_STEP = RETAIN_MAX - 0.05;
+/**
+ * Pads touching each other (no more than the land's grain apart) are kept this near (m): a step of up to a retaining
+ * edge (`RETAIN_MAX`) between two gardens showed as a stone wall between the lawns. Not one level for all that touch:
+ * that level was a whole street's, moved all along it by a lot added or taken away. Not lower: a row of lots up a slope
+ * then holds each other all along it, and an edit regrades the land far off.
+ */
+export const PAD_STEP = 0.25;
 
 /** A road's solved height: its samples (arc length, where they stand, the land there, the height). */
 interface Profile {
@@ -268,7 +279,7 @@ export class BuiltSurface {
 
   /** Lot `plot`'s pad (m): the level its ground stands at (within `ENTRY_MAX` of `entryY`). */
   padY(plot: number): number {
-    return this.pads[plot] ?? 0;
+    return plot >= 0 && plot < this.pads.length ? this.pads[plot] : 0;
   }
 
   /**
@@ -558,11 +569,14 @@ export class BuiltSurface {
       window[2 * i + 1] = to;
       pads[i] = Math.min(to, Math.max(from, middle[i]));
     });
-    // Near the pads they touch, as far as their windows let them.
+    // Near the pads they touch, as far as their windows let them: where a neighbour's reach misses a lot's window
+    // altogether, the end of its window nearest it.
     for (let pass = 0; pass < PAD_PASSES; pass++) {
       for (let i = 0; i < n; i++) {
         let [from, to] = [window[2 * i], window[2 * i + 1]];
-        for (const j of touching[i]) [from, to] = narrowed(from, to, pads[j] - PAD_STEP, pads[j] + PAD_STEP);
+        for (const j of touching[i]) {
+          [from, to] = towards(from, to, pads[j] - PAD_STEP, pads[j] + PAD_STEP);
+        }
         pads[i] = Math.min(to, Math.max(from, middle[i]));
       }
     }
@@ -1116,6 +1130,11 @@ const SKIRT = 4;
 function narrowed(from: number, to: number, lo: number, hi: number): [number, number] {
   const [a, b] = [Math.max(from, lo), Math.min(to, hi)];
   return a <= b ? [a, b] : [from, to];
+}
+
+/** Window [`from`, `to`] narrowed to within [`lo`, `hi`]; where they don't meet, the end of the window nearest it. */
+function towards(from: number, to: number, lo: number, hi: number): [number, number] {
+  return [Math.min(Math.max(from, lo), to), Math.max(Math.min(to, hi), from)];
 }
 
 /** The land settled under what is built this many times at most after a stroke (`settleCuts`), this many samples round what changed. */
