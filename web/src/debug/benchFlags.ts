@@ -12,6 +12,8 @@
  * `notownwoods`, `notownground` and `notownbuildings` one part of it: the woods as before, no colour map, no buildings;
  * `noimpostors` the far trees as themselves, not their impostors (`render/pc/impostors.ts`).
  * `wholeshadows` draws every caster into the sun's map every time, also when only the residents moved (`render/pc/sunShadows.ts`).
+ * `nowarm` leaves out the load's warm-up of a Big world's lots (`warmGameNow`: a few lots built and drawn so their
+ * pipelines are made before play): a page that counts draws or takes pictures loads sooner, its first frames slower.
  *
  * `?world=<place>` (and `?options=town:city,villages:many`, `game/worldOptions.ts`) works without
  * `?bench` too: step 1 of a new game makes its first world there, with those options (`WORLD_FLAG`;
@@ -28,7 +30,7 @@ import { isResolution, type Resolution } from '../render/shared/resolution';
 
 export type BenchCamera = 'orbit' | 'wide' | 'build' | 'dusk' | 'mirror' | 'mirror-still' | 'roam' | 'street' | 'town' | 'over' | 'zoom';
 
-export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nowoods', 'nofarwoods', 'noflowers', 'nograss', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'noao', 'noclouds', 'nolayers', 'noflow', 'freeze', 'albedo', 'normals', 'nosims', 'linear', 'shaders', 'notown', 'notownwoods', 'noimpostors', 'notownground', 'notownbuildings', 'wholeshadows'] as const;
+export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nowoods', 'nofarwoods', 'noflowers', 'nograss', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'noao', 'noclouds', 'nolayers', 'noflow', 'freeze', 'albedo', 'normals', 'nosims', 'linear', 'shaders', 'notown', 'notownwoods', 'noimpostors', 'notownground', 'notownbuildings', 'wholeshadows', 'nowarm'] as const;
 export type BenchDiag = (typeof BENCH_DIAGS)[number];
 
 export interface BenchFlags {

@@ -3124,7 +3124,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // in view again. (Load time for smooth roaming: about a second more.)
     const world = this.lastWorld;
     const home = this.view;
-    if (world?.meta?.world?.size === 'big' && home && !this.disposed) {
+    // (`diag=nowarm`: not for a bench that counts draws, which waits long enough for the pipelines anyway.)
+    if (world?.meta?.world?.size === 'big' && home && !this.disposed && !this.diag.has('nowarm')) {
       const gains: number[] = [];
       const lots = warmLots(world, home, WARM_LOTS, gains);
       for (const [i, lot] of lots.entries()) {
