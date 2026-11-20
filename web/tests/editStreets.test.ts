@@ -533,7 +533,7 @@ describe('removing a road', () => {
     if ('refused' in goes) throw new Error(goes.refused);
     expect(goes.roads).toEqual([bridge, far].sort((a, b) => a - b));
     expect(goes.bridges).toEqual([bridge]);
-    expect(whatGoesLine(drawn, t, goes, far)).toEqual([`1 bridge left leading nowhere (${drawn.roads[bridge].name})`]);
+    expect(whatGoesLine(drawn, goes, far)).toEqual([`1 bridge left leading nowhere (${drawn.roads[bridge].name})`]);
     const after = made(removeRoad(drawn, t, far)).draft;
     expect(after.roads.some((r) => r.bridge)).toBe(false);
     expect(after.roads).toHaveLength(5);

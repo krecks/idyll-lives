@@ -125,8 +125,8 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
   });
   if (Object.keys(lotLooks).length) meta.lotLooks = lotLooks;
   // Each flat a plot of its own after the lots on the ground (`assembleTown`'s ids), and the households in them.
-  const flats: FlatInfo[] = layout.flats.map((f, k) => ({ id: layout.plots.length + k, of: f.of, storey: f.storey, ...f.rect, name: `Flat ${f.unit + 1}, ${town.slots[f.of].name}`, door: f.door }));
-  const flatId = (slot: number, flat: number | undefined) => (flat === undefined ? slot : (flats.find((f, k) => f.of === slot && layout.flats[k].unit === flat)?.id ?? slot));
+  const flats: FlatInfo[] = layout.flats.map((f) => ({ id: f.id, of: f.of, storey: f.storey, ...f.rect, name: f.name, door: f.door }));
+  const flatId = (slot: number, flat: number | undefined) => (flat === undefined ? slot : (layout.flats.find((f) => f.of === slot && f.unit === flat)?.id ?? slot));
   return {
     version: 0,
     lotVersion: 0,

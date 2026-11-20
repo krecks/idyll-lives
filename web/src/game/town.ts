@@ -27,7 +27,7 @@ import { garageAt, garageFor, hash, houseCar, type ParkedCar } from '../render/s
 import { placeRides, ridesFor } from './townRides';
 import { fenceRuns, townFences, type TownFence } from './gardenFences';
 import { defaultResidentsMost, neighbourBonds } from './people';
-import { flatsTemplate, placeFloors, type FlatsTemplate, type PlaceFloors } from './flats';
+import { flatName, flatsInId, flatsTemplate, placeFloors, type FlatsTemplate, type PlaceFloors } from './flats';
 import { rectPoly } from './footprints';
 import { clearOf, type DriveLine } from './parking';
 
@@ -1135,7 +1135,7 @@ export interface TownLayout {
    * its storey, its rectangle (town tiles, the ground's rows), the landing tile before its door and the tile behind it
    * (town tiles, its storey's rows), the building's street door (the ground's rows).
    */
-  flats: { of: number; unit: number; storey: number; rect: Rect; door: [number, number]; inside: [number, number]; entry: [number, number] }[];
+  flats: { id: number; name: string; of: number; unit: number; storey: number; rect: Rect; door: [number, number]; inside: [number, number]; entry: [number, number] }[];
   /** Each lot's walls' box on the ground storey (town tiles), where it has walls: what is built on it (`paving`, `gardenFences.ts`). */
   built: (Rect | null)[];
 }
@@ -1218,7 +1218,7 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
   };
   /** A flats building's flats, or those over a named place (`PlotSlot.upper` an `over:` id), each furnished for its household or as a shell. */
   const flatsOf = (s: PlotSlot): FlatsTemplate | undefined => {
-    const id = s.kind === 'flats' ? s.template : s.kind === 'shop' && s.upper?.startsWith('over:') ? s.upper : undefined;
+    const id = flatsIdOf(s);
     if (!id) return undefined;
     const who = flatLiving.get(s.index);
     const known = [...(who?.keys() ?? []), ...(town.shells ?? []).flatMap((q) => (q.slot === s.index && q.flat !== undefined ? [q.flat] : []))];
@@ -1300,7 +1300,7 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
         return [Math.round(x * 100) / 100, Math.round(z * 100) / 100 + lift];
       };
       const entry = at(f.entry);
-      f.units.forEach((u, k) => flats.push({ of: s.index, unit: k, storey: u.storey, rect: turn.rect(u.rect), door: tile(u.door, u.storey * town.depth), inside: at(u.inside, u.storey * town.depth), entry }));
+      f.units.forEach((u, k) => flats.push({ id: first + k, name: flatName(s.name, k), of: s.index, unit: k, storey: u.storey, rect: turn.rect(u.rect), door: tile(u.door, u.storey * town.depth), inside: at(u.inside, u.storey * town.depth), entry }));
       const who = flatLiving.get(s.index);
       for (const { rect: bay, unit } of f.bays) {
         const [a, b] = [turn.point([bay.x + bay.w / 2, 0]), turn.point([bay.x + bay.w / 2, -1])];
@@ -1639,6 +1639,15 @@ export function flatsIdOf(s: Pick<PlotSlot, 'kind' | 'template' | 'upper'>): str
   return s.kind === 'flats' ? s.template : s.upper?.startsWith('over:') ? s.upper : '';
 }
 
+/**
+ * How many homes lot `s` holds, read from its ids (no template made): a house's one, a building of flats' flats, the
+ * flats over a named place (`flats.ts` `flatsInId`); none on another lot. `farms`: whether a farm counts as a home.
+ */
+export function homesOn(s: Pick<PlotSlot, 'kind' | 'template' | 'upper' | 'lot'>, { farms }: { farms: boolean }): number {
+  if (s.kind === 'house') return farms || s.lot !== 'farm' ? 1 : 0;
+  return flatsInId(flatsIdOf(s));
+}
+
 /** A lot's kind as the town file and the structure have it (`PlotKind`). */
 export function plotKindOf(s: Pick<PlotSlot, 'kind' | 'lot'>): PlotKind {
   return s.kind === 'house' ? (s.lot === 'farm' ? 'farm' : 'home') : s.kind === 'flats' ? 'flats' : s.kind === 'shop' ? 'shop' : s.kind === 'outdoor' ? 'countryside' : 'public';
@@ -1680,7 +1689,7 @@ export function assembleTown(
 
   if (existing && !town.households.some((h) => h.slot === playerSlot && h.flat === playerFlat)) throw new Error('Nobody lives in that house.');
   // Each flat's plot id: after every lot on the ground, in the order the layout filed them.
-  const flatId = new Map(flats.map((f, k) => [`${f.of}:${f.unit}`, town.slots.length + k]));
+  const flatId = new Map(flats.map((f) => [`${f.of}:${f.unit}`, f.id]));
   const plotOf = (slot: number, flat: number | undefined) => (flat === undefined ? slot : (flatId.get(`${slot}:${flat}`) ?? slot));
   // A new household first, then the neighbours (one of whom may be the player's).
   const neighbours = town.households.map((h) => ({ ...h, player: existing && h.slot === playerSlot && h.flat === playerFlat }));
@@ -1744,7 +1753,7 @@ export function assembleTown(
   // Then every flat, a plot of its own on its storey inside its building's lot (`of`), entered by the building's street door.
   for (const f of flats) {
     const s = town.slots[f.of];
-    filed.push({ name: `Flat ${f.unit + 1}, ${s.name}`, ...f.rect, public: false, entry: f.entry, storeys: 1, area: s.area ?? 0, kind: 'flat', of: f.of, storey: f.storey, door: f.door, inside: f.inside });
+    filed.push({ name: f.name, ...f.rect, public: false, entry: f.entry, storeys: 1, area: s.area ?? 0, kind: 'flat', of: f.of, storey: f.storey, door: f.door, inside: f.inside });
   }
   return JSON.stringify({
     mode,

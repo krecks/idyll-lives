@@ -33,6 +33,7 @@ import { evenly, leftOf, lengths, pointAt, roadIndex, straightAround, tangent, t
 import {
   drivesOut as drivesOutOn,
   fitsLot,
+  flatsIdOf,
   fronting,
   frontageOf,
   generatedId,
@@ -346,7 +347,7 @@ export function publicChoices(t: Templates, frame: { width: number; depth: numbe
 /**
  * What `choice` puts on a new lot at road spot `at`, drawn from `seed` (the same seed, the same house), or why it can't be:
  * a building of flats as the dense pass draws one for its zone (a town centre's mostly three storeys, a flat each side of
- * its hall). Its name comes later (`addLot`).
+ * its hall), called as its template names it.
  */
 function unplacedOf(draft: NeighbourhoodDraft, t: Templates, choice: LotChoice, seed: number, at: RoadSpot): Unplaced | string {
   const rand = mulberry32(seed);
@@ -354,7 +355,9 @@ function unplacedOf(draft: NeighbourhoodDraft, t: Templates, choice: LotChoice, 
     const f = frontageAt(draft.roads, at);
     const centre = typeof f !== 'string' && inCentre(draft, [f.p[0] + f.n[0] * 10, f.p[1] + f.n[1] * 10]);
     const b = flatsFor(t, centre ? 'centre' : 'town', rand);
-    return b ? { kind: 'flats', name: '', lot: 'medium', ...b } : 'This world has no buildings of flats.';
+    if (!b) return 'This world has no buildings of flats.';
+    const { name, ...building } = b;
+    return { kind: 'flats', name, lot: 'medium', ...building };
   }
   const garden = (): GardenSize => (weighted(rand, specFor(draft).gardens as Record<string, number>) ?? 'roomy') as GardenSize;
   if (choice.kind === 'house') return { kind: 'house', name: '', lot: choice.size, ...houseFor(t, choice.size, choice.garden ?? garden(), rand) };
@@ -414,8 +417,8 @@ export function canPlace(draft: NeighbourhoodDraft, t: Templates, at: RoadSpot, 
 /**
  * `draft` with a lot of `choice` at `at`, its house drawn from `seed` (the same seed, the same
  * house): where `canPlace` says it fits. A home is numbered along its road (`renumber`), a farm gets
- * its fields and farmyard (`LotPlacer`) and a name, a building of flats its template's name (as Build
- * names one: `buildup.ts` `withBuildings`; its flats priced by `price.ts` `flatPrice`), a public place its place (named, with hours), a
+ * its fields and farmyard (`LotPlacer`) and a name (a building of flats has its template's already, its flats
+ * priced by `price.ts` `flatPrice`), a public place its place (named, with hours), a
  * named place's lot its area (`choice.area`), its name as its place's (`withPlaceName`) and its
  * place, an outdoor spot its place, its level and a short trail into it from the road.
  */
@@ -426,7 +429,7 @@ export function addLot(draft: NeighbourhoodDraft, t: Templates, content: Content
   if ('refused' in fit) return fit;
   const rand = mulberry32((seed ^ 0x5bd1e995) >>> 0);
   const area = choice.kind === 'place' ? choice.area : areaAt(draft, at.road, fit.f.p);
-  const u: Unplaced = { ...u0, area, ...(u0.lot === 'farm' ? { name: farmName(draft, content, rand) } : {}), ...(u0.kind === 'flats' ? { name: flatsTemplate(t, u0.template)?.name ?? 'Flats' } : {}), ...(u0.kind === 'outdoor' ? { name: `${draft.open?.areas[area]?.name ?? draft.name} ${u0.name}` } : {}) };
+  const u: Unplaced = { ...u0, area, ...(u0.lot === 'farm' ? { name: farmName(draft, content, rand) } : {}), ...(u0.kind === 'outdoor' ? { name: `${draft.open?.areas[area]?.name ?? draft.name} ${u0.name}` } : {}) };
   // (Put down by the generator's own placer: a farm's fields and farmyard drawn round its house.)
   const placer = new LotPlacer(content, t, townGround(draft, t), draft.roads, [0, 0], rand, true);
   const slot: PlotSlot = { ...placer.put(u, { x: fit.x, z: fit.z, facing: fit.facing, anchor: fit.anchor }, fit.f), index: draft.slots.length };
@@ -714,15 +717,8 @@ export function renumber(draft: NeighbourhoodDraft, t: Templates, roads: readonl
   return { ...draft, slots: draft.slots.map((s, i) => (named.has(i) && named.get(i) !== s.name ? { ...s, name: named.get(i)! } : s)) };
 }
 
-/** How many homes lot `s` holds: a house's one (a farm's among them), a flats building's flats, the flats over a named place; none on another lot. */
-export function homesOn(t: Templates, s: Pick<PlotSlot, 'kind' | 'template' | 'upper'>): number {
-  if (s.kind === 'house') return 1;
-  const id = s.kind === 'flats' ? s.template : s.kind === 'shop' && s.upper?.startsWith('over:') ? s.upper : undefined;
-  return id ? (flatsTemplate(t, id)?.units.length ?? 0) : 0;
-}
-
 /** Whether lot `s` is somebody's home, or holds homes: a house's, a flats building's, a named place's with flats over it. */
-const holdsHomes = (s: Pick<PlotSlot, 'kind' | 'upper'>) => s.kind === 'house' || s.kind === 'flats' || (s.kind === 'shop' && !!s.upper?.startsWith('over:'));
+const holdsHomes = (s: PlotSlot) => s.kind === 'house' || !!flatsIdOf(s);
 
 /** Why the lots on `lots` (slot indices) may not all go from `draft`, or null: the town keeps its last home (a house or a building of flats) and its last park. */
 export function removalRefused(draft: NeighbourhoodDraft, lots: ReadonlySet<number>): string | null {

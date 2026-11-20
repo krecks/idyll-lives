@@ -18,7 +18,7 @@ import { bedroomsNeeded, randomHousehold, residentsOf, type HouseholdDraft } fro
 import { mulberry32 } from './noise';
 import { flatPrice, homePrice } from './price';
 import { flatsTemplate } from './flats';
-import { houseTemplate, shuffled, type NeighbourhoodDraft, type PlotSlot, type Templates } from './town';
+import { flatsIdOf, houseTemplate, shuffled, type NeighbourhoodDraft, type PlotSlot, type Templates } from './town';
 import { savingsOf } from './wealth';
 
 type Rand = () => number;
@@ -223,9 +223,9 @@ export function homesOf(content: Content, t: Templates, town: NeighbourhoodDraft
   const out: Home[] = [];
   for (const s of town.slots) {
     if (s.kind === 'house') out.push({ slot: s, bedrooms: houseTemplate(t, s.template)?.bedrooms ?? 1, price: homePrice(content, t, s) });
-    const id = s.kind === 'flats' ? s.template : s.kind === 'shop' && s.upper?.startsWith('over:') ? s.upper : undefined;
+    const id = flatsIdOf(s);
     const units = id ? (flatsTemplate(t, id)?.units ?? []) : [];
-    units.forEach((u, flat) => out.push({ slot: s, flat, bedrooms: u.bedrooms, price: flatPrice(content, t, { template: id! }, flat) }));
+    units.forEach((u, flat) => out.push({ slot: s, flat, bedrooms: u.bedrooms, price: flatPrice(content, t, { template: id }, flat) }));
   }
   return out;
 }

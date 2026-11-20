@@ -14,7 +14,7 @@
    * - the main town: rename it (step 2's own name field, the two kept as one).
    */
   import { areaOfRoad, buildingsOn, buildUp, clearBuildings, notBuilt, roadKey, type BuildMode } from '../../game/edit/buildup';
-  import { anotherHouse, civicSwaps, homesOn, lotKey, publicChoices, removeLotsEdit, setGarden, swapCivic, swapPlace } from '../../game/edit/lots';
+  import { anotherHouse, civicSwaps, lotKey, publicChoices, removeLotsEdit, setGarden, swapCivic, swapPlace } from '../../game/edit/lots';
   import { entriesOf } from '../../game/edit/ground';
   import { storeysOfId } from '../../game/flats';
   import { placeOfTemplate } from '../../game/placeLots';
@@ -22,7 +22,7 @@
   import { removeVillage, villageGoes } from '../../game/edit/villages';
   import type { GardenSize } from '../../game/housegen';
   import { lengths, roadIndex } from '../../game/roads';
-  import { generatedId, slotDims, type LotSize } from '../../game/town';
+  import { generatedId, homesOn, slotDims, type LotSize } from '../../game/town';
   import Icon from '../Icon.svelte';
   import Segmented from '../kit/Segmented.svelte';
   import RenameField from './RenameField.svelte';
@@ -56,13 +56,13 @@
   /** A building of flats, or a place with flats over it: its flats and storeys, in words. */
   const flatsOf = $derived.by(() => {
     if (!lot) return null;
-    const n = homesOn(t, lot);
+    const n = homesOn(lot, { farms: true });
     if (lot.kind === 'house' || !n) return null;
     const storeys = storeysOfId(lot.kind === 'flats' ? lot.template : (lot.upper ?? ''));
     return lot.kind === 'flats' ? `${count(n, 'flat')} on ${count(storeys, 'storey')}` : `${count(n, 'flat')} over it, ${count(storeys, 'storey')} in all`;
   });
   /** What removing the lot takes with it besides: its flats. */
-  const lotFlats = $derived(lot ? flatsLine(t, lot) : null);
+  const lotFlats = $derived(lot ? flatsLine(lot) : null);
   const swaps = $derived(lot && (lot.kind === 'park' || lot.kind === 'shop') && !placeOfTemplate(lot.template) ? publicChoices(t, slotDims(t, lot)) : []);
   /** A civic place's lot: the civic places it may become. */
   const civics = $derived(picked?.kind === 'lot' ? civicSwaps(draft, picked.slot) : []);
@@ -94,7 +94,7 @@
   // ---- a road ----
   const road = $derived(picked?.kind === 'road' ? draft.roads[picked.road] : undefined);
   const goes = $derived(picked?.kind === 'road' ? whatGoes(draft, t, picked.road) : null);
-  const goesLines = $derived(goes && !('refused' in goes) && picked?.kind === 'road' ? whatGoesLine(draft, t, goes, picked.road) : []);
+  const goesLines = $derived(goes && !('refused' in goes) && picked?.kind === 'road' ? whatGoesLine(draft, goes, picked.road) : []);
   const madeStreets = $derived(goes && !('refused' in goes) ? madeStreetsLine(draft, goes) : null);
   const roadLength = $derived(road ? Math.round(lengths(road.points).at(-1) ?? 0) : 0);
   const BUILD: readonly { value: BuildMode; label: string }[] = [
@@ -113,7 +113,7 @@
     if (picked?.kind !== 'road') return [];
     const spots = entriesOf(draft, t);
     const on = draft.slots.filter((_, i) => spots[i]?.road === picked.road);
-    const homes = on.reduce((n, s) => n + homesOn(t, s), 0);
+    const homes = on.reduce((n, s) => n + homesOn(s, { farms: true }), 0);
     const flats = on.filter((s) => s.kind === 'flats').length;
     const places = on.filter((s) => s.kind === 'shop' || s.kind === 'park' || s.kind === 'outdoor').length;
     // (A car park by the bays in it: those whose road nearest is this one.)
@@ -140,7 +140,7 @@
   const villageGoesLines = $derived.by(() => {
     const g = villageGone;
     if (!g || 'refused' in g) return [];
-    const homes = g.lots.reduce((n, i) => n + (draft.slots[i] ? homesOn(t, draft.slots[i]) : 0), 0);
+    const homes = g.lots.reduce((n, i) => n + (draft.slots[i] ? homesOn(draft.slots[i], { farms: true }) : 0), 0);
     const others = g.lots.filter((i) => draft.slots[i] && draft.slots[i].kind !== 'house' && draft.slots[i].kind !== 'flats').length;
     return [
       count(g.roads, 'street'),
@@ -237,7 +237,7 @@
       </div>
       {/if}
     {:else if area && picked.kind === 'village'}
-      <span class="eyebrow sub">Village · {count(areaLots.reduce((n, s) => n + homesOn(t, s), 0), 'home')}</span>
+      <span class="eyebrow sub">Village · {count(areaLots.reduce((n, s) => n + homesOn(s, { farms: true }), 0), 'home')}</span>
       <RenameField label="Village name" value={area.name} onname={renamed({ kind: 'area', area: picked.area })} />
       <div class="row">
         <button class="btn small" title="Take the Village tool to move it: click where it goes" onclick={() => moveWithTool(editor, picked.area)}><Icon name="icon.ui.move" size={14} /> Move</button>

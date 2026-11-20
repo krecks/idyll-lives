@@ -16,11 +16,10 @@
    */
   import { onMount, untrack } from 'svelte';
   import { TownHistory } from '../../game/edit/history';
-  import { flatsInId } from '../../game/flats';
   import { rename } from '../../game/edit/streets';
   import { menuScene } from '../../game/menuScene';
   import { OVERVIEW_CLOSE } from '../../render/shared/overviewCamera';
-  import { flatsIdOf, NEIGHBOUR_CAP, type NeighbourhoodDraft } from '../../game/town';
+  import { homesOn, NEIGHBOUR_CAP, type NeighbourhoodDraft } from '../../game/town';
   import { keepHouses, Superseded, townJob } from '../../game/townJobs';
   import { specOf, worldName, type WorldStep } from '../../game/world';
   import { worldLine } from '../../game/worldOptions';
@@ -98,7 +97,7 @@
   };
   // (Homes: the houses and every flat, of a building of flats or over a place, read from its id: the town is counted
   // before the templates are loaded too; a farm's house is a farm, counted on its own.)
-  const homes = $derived(figure((d) => d.slots.reduce((n, s) => n + (s.lot === 'farm' ? 0 : s.kind === 'house' ? 1 : flatsInId(flatsIdOf(s))), 0)));
+  const homes = $derived(figure((d) => d.slots.reduce((n, s) => n + homesOn(s, { farms: false }), 0)));
   const farms = $derived(figure((d) => d.slots.filter((s) => s.lot === 'farm').length));
   const flats = $derived(figure((d) => d.slots.filter((s) => s.kind === 'flats').length));
   const places = $derived(figure((d) => d.slots.filter((s) => s.kind !== 'house' && s.kind !== 'flats').length));

@@ -40,7 +40,7 @@ describe('build-up', async () => {
   const { TownHistory } = await import('../src/game/edit/history');
   const { editedProblems } = await import('../src/game/edit/checked');
   const { addCivic, areaOfRoad, buildingsOn, builtAlong, buildUp, clearBuildings, civicOffered, isTownBuilding } = await import('../src/game/edit/buildup');
-  const { homesOn } = await import('../src/game/edit/lots');
+  const { homesOn } = await import('../src/game/town');
   const { flatsTemplate } = await import('../src/game/flats');
   const { drawStreet, removeRoad } = await import('../src/game/edit/streets');
   type Templates = import('../src/game/town').Templates;
@@ -118,7 +118,7 @@ describe('build-up', async () => {
     for (const s of fresh.filter((q) => q.kind === 'shop')) expect(places.find((p) => p.plot === s.index)?.name).toBe(s.name);
     expect(new Set(places.map((p) => p.name)).size).toBe(places.length);
     for (const s of fresh.filter((q) => q.kind === 'flats')) expect(s.name).toBe(flatsTemplate(t, s.template)!.name);
-    const homes = fresh.reduce((n, s) => n + homesOn(t, s), 0);
+    const homes = fresh.reduce((n, s) => n + homesOn(s, { farms: true }), 0);
     console.log(`plain street: ${fresh.length} lots (${homes} homes: ${fresh.filter((s) => s.kind === 'flats').length} buildings of flats, ${fresh.filter((s) => s.kind === 'shop' && s.upper?.startsWith('over:')).length} places with flats over them), ${buildings.length} of them the town's buildings, ${places.length - plain.open!.places!.length} places, left out ${'leftOut' in e ? e.leftOut : 0}`);
   });
 

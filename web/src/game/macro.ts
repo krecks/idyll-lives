@@ -35,7 +35,6 @@ import { areaSize, civicTooBig, CIVIC, namerFor, ZONE, type ZoneKind } from './p
 import { chooseCentre, densestCentre, type Centre } from './centre';
 import { tilesOf } from './footprints';
 import { DensePass, NEAR_CORNER, raisePlaces, townPlaces } from './dense';
-import { flatsTemplate } from './flats';
 import { carParkFits, clearOfDrives, driveLines, LOOSE_BEND, takeCarPark, vergeParking, type CarParkLaid } from './parking';
 import { random } from './housegen';
 import { COVER, COVER_CELL, coverSpan, LAND_CELL, NONE, type Land as LandField } from './land';
@@ -1794,8 +1793,6 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       carParks.push(p.park);
     }
   }
-  // (A flats building is called as its template names it: "Mill Court".)
-  for (const s of lots.slots) if (s.kind === 'flats') s.name = flatsTemplate(t, s.template)?.name ?? s.name;
 
   // ---- the named places' names: each lot as its place is called, none twice -------------------
   nameLots(content, slots, plans, worldRoads, spec.civic, random(((lay?.townSeed ?? seed) ^ PLACE_NAMES) >>> 0));

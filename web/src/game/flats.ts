@@ -97,8 +97,8 @@ export interface PlaceFloors {
   floors: FloorPlan[];
 }
 
-/** A flats building as a slot takes it: its template (`flats:<seed>:<storeys>:<wide>[:p]`), its lot's size and its look. */
-export type FlatsSlot = Pick<PlotSlot, 'template' | 'w' | 'd' | 'dress'>;
+/** A flats building as a slot takes it: its template (`flats:<seed>:<storeys>:<wide>[:p]`), its name (the template's), its lot's size and its look. */
+export type FlatsSlot = Pick<PlotSlot, 'template' | 'name' | 'w' | 'd' | 'dress'>;
 
 /** Time spent generating buildings of flats and floors above places (ms), and how many. */
 export const flatsStats = { ms: 0, made: 0 };
@@ -165,7 +165,7 @@ export function flatsFor(t: Templates, zone: 'centre' | 'town', rand: Rand): Fla
   const id = flatsId((rand() * 2 ** 31) >>> 0, storeys, wide, bays);
   const b = flatsTemplate(t, id);
   if (!b) return null;
-  return { template: id, w: b.lot.width, d: b.lot.depth, dress: b.look };
+  return { template: id, name: b.name, w: b.lot.width, d: b.lot.depth, dress: b.look };
 }
 
 /** The flats over a named place of layout `place`, `storeys` high in all (2 or 3), drawn from `rand`: its id, or null where none fit (a place too narrow, or one with a storey of its own above). */

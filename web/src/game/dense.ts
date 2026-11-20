@@ -229,7 +229,9 @@ export class DensePass {
     if (use === 'flats') {
       const f = flatsFor(t, zone === 'centre' ? 'centre' : 'town', rand);
       // (Until flats are made: a terrace row stands in, its homes as many as a small building's flats.)
-      return f ? [{ kind: 'flats', name: '', lot: 'medium', area: a, ...f }] : row(between(rand, 3, 4));
+      if (!f) return row(between(rand, 3, 4));
+      const { name, ...building } = f;
+      return [{ kind: 'flats', name, lot: 'medium', area: a, ...building }];
     }
     const what = PLACE_OF[use];
     if (!what) return [];

@@ -28,7 +28,6 @@ import type { RoadPlan } from '../../core/protocol';
 import { CUT_MAX, ENTRY_MAX, RETAIN_MAX } from '../../render/shared/builtSurface';
 import { CIVIC, civicChoices, civicLabel, civicTooBig, draftAreaSize, ZONE } from '../places';
 import { DensePass, raisePlaces } from '../dense';
-import { flatsTemplate } from '../flats';
 import { heightAt, LAND_CELL, type Land } from '../land';
 import { mulberry32 } from '../noise';
 import { lengths, pointAt, RoadIndex, type Pt } from '../roads';
@@ -298,7 +297,7 @@ export function buildUp(draft: NeighbourhoodDraft, t: Templates, content: Conten
 /**
  * `draft` with its lots from slot `from` on (laid by the dense pass: `dense.ts`) made what the generator makes
  * of them: flats over a shop, a café or a restaurant and real floors over an office (`raisePlaces`), a
- * building of flats called as its template names it, a named place's lot called as its place is (none
+ * named place's lot called as its place is (none
  * twice: `withPlaceName`), and every public lot (a park, an outdoor spot, a shop) given its place
  * (`withLotPlace`). Drawn from `seed`.
  */
@@ -306,7 +305,6 @@ export function withBuildings(draft: NeighbourhoodDraft, t: Templates, content: 
   const rand = mulberry32(seed);
   const fresh = draft.slots.slice(from).map((s) => ({ ...s }));
   raisePlaces(t, fresh, (draft.open?.centre ?? []).map((c) => c.poly), rand);
-  for (const s of fresh) if (s.kind === 'flats') s.name = flatsTemplate(t, s.template)?.name ?? s.name;
   let next: NeighbourhoodDraft = { ...draft, slots: [...draft.slots.slice(0, from), ...fresh] };
   for (const s of fresh) {
     if (s.kind === 'house' || s.kind === 'flats') continue;
