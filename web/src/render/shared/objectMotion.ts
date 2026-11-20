@@ -319,6 +319,11 @@ export class ObjectMotion<D> {
     return this.objects.get(id)?.motions ?? null;
   }
 
+  /** Whether fire `id`'s flames are going round (`burn`: lit, at night, near the camera, motion not reduced): its glow flickers with them. */
+  burning(id: number): boolean {
+    return !this.reducedMotion && !!this.states.get(id)?.get(this.objects.get(id)?.burnClip ?? '');
+  }
+
   /** Where a fire's flames stand in their round (`burn`): each fire on a beat of its own, its id shifting it. */
   private burnPhase(id: number, clip: ModelClip): number {
     return (id * 0.37) % clip.duration;
@@ -346,13 +351,6 @@ export class ObjectMotion<D> {
         let clips = this.states.get(o.id);
         if (!clips) this.states.set(o.id, (clips = new Map()));
         if (!clips.has(name)) clips.set(name, { clip, time: clip.duration, use: '', until: Infinity, start: 0, kind: 'use' });
-      }
-      const burning = o.burnClip !== undefined && this.night && !this.lampsOff.has(o.id) ? o.burnClip : undefined;
-      const burningClip = burning === undefined ? undefined : o.motion.clips.get(burning);
-      if (burning && burningClip) {
-        let clips = this.states.get(o.id);
-        if (!clips) this.states.set(o.id, (clips = new Map()));
-        if (!clips.has(burning)) clips.set(burning, { clip: burningClip, time: this.burnPhase(o.id, burningClip), use: '', until: Infinity, start: 0, kind: 'burn' });
       }
     }
     // Clocks: their hands are set by the next frame (`setClocks`).
@@ -429,8 +427,8 @@ export class ObjectMotion<D> {
       const held = this.held(o, this.heldNow);
       // (A lamp's, a fan's blades, only while it's switched on.)
       const idle = o.motions.idle !== undefined && reach > 0 && !(o.lamp && this.lampsOff.has(id)) && this.distance2(o, eye) < reach ? o.motions.idle : undefined;
-      // A fire's flames flicker: their `burn` clip goes round while it burns at night.
-      const burning = o.burnClip !== undefined && this.night && !this.lampsOff.has(id) ? o.burnClip : undefined;
+      // A fire's flames flicker: their `burn` clip goes round while it burns at night, near the camera as an idle clip.
+      const burning = o.burnClip !== undefined && this.night && !this.lampsOff.has(id) && reach > 0 && this.distance2(o, eye) < reach ? o.burnClip : undefined;
       let clips = this.states.get(id);
       const growth = this.growth(o);
       if ((wanted || held.length || idle || growth || burning) && !clips) this.states.set(id, (clips = new Map()));
@@ -469,10 +467,10 @@ export class ObjectMotion<D> {
         const d = state.clip.duration;
         if (state.kind === 'clock') continue;
         if (state.kind === 'burn') {
-          // Round and round while the fire burns; put out, back to rest (the flames flatten).
+          // Round and round while the fire burns near the camera; put out or further off, back to rest (still grown).
           if (name !== burning) {
             clips.delete(name);
-            changed = true;
+            drifted = true;
           } else if (dt && d > 0 && this.reducedMotion) {
             // Reduce motion: back to rest once, rather than flickering.
             if (state.time) {

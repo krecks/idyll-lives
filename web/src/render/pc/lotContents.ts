@@ -1331,18 +1331,19 @@ export class LotContents {
 
   /**
    * Fires flicker: the flames' glow wavers a little about the level the lighting gives it, each fire
-   * on a beat of its own, so the warm light it seems to give changes over time. Reduce motion holds
-   * it steady (and the flames themselves still, `ObjectMotion`). `applyGlow` says whether they're drawn.
+   * on a beat of its own, so the warm light it seems to give changes over time, while its flames sway
+   * (`ObjectMotion.burning`: near the camera, not on Low, not with Reduce motion); otherwise it holds
+   * steady. `applyGlow` says whether they're drawn.
    */
   private animateFires(frame: FrameState): void {
     const t = frame.now / 1000;
-    const flicker = !this.motion.reducedMotion;
     for (const g of this.glows) {
       if (!g.base || g.draw.destroyed) continue;
       let changed = false;
       for (let i = 0; i < g.ids.length; i++) {
         const base = g.base[i];
-        const f = flicker && base > 0 ? Math.fround(base * fireFlicker(g.ids[i], t)) : base;
+        // (Only while its flames sway: near the camera, not on Low, not with Reduce motion.)
+        const f = base > 0 && this.motion.burning(g.ids[i]) ? Math.fround(base * fireFlicker(g.ids[i], t)) : base;
         if (g.colors[i * 4] === f) continue;
         g.colors.fill(f, i * 4, i * 4 + 3);
         g.colors[i * 4 + 3] = 1;

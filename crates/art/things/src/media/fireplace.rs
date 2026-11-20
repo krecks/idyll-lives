@@ -6,7 +6,7 @@ use super::{F, M};
 use artkit::forms::smooth_outline;
 use artkit::kit;
 use artkit::math::{Axis, P3, cos, radians, sin};
-use artkit::motion::{flat, keys, Path};
+use artkit::motion::{Ease, Path, flat, keys};
 use artkit::parts::{join, new_parts};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
@@ -431,12 +431,13 @@ pub fn fireplace_electric() -> Vec<Obj> {
     // foot, so the tongues at its ends sweep further than the middle's. (No scale: the part is flattened
     // on its height axis, and a scale clip would carry that flatness into the grown flames it plays with.)
     const PERIOD: f64 = 2.4;
-    // (24 samples round the loop, one every 0.1 s; the exporter resamples them at the frame rate.)
+    // (24 samples round the loop, one every 0.1 s, joined at an even speed: an eased key would slow the flames to a
+    // stop at every sample and at the seam. The exporter resamples them at the frame rate.)
     const STEPS: usize = 24;
     const STEP: f64 = PERIOD / STEPS as f64;
     // (A sum of whole cycles of sines, and of cosines taken from 1, so the loop starts and ends at rest;
     // the cosine terms keep it from swinging back through rest at half time, which reads as a metronome.)
-    let wave = |terms: &[(f64, f64, bool)], amp: f64| -> Vec<(f64, f64)> {
+    let wave = |terms: &[(f64, f64, bool)], amp: f64| -> Vec<(f64, f64, Ease)> {
         (0..=STEPS)
             .map(|k| {
                 let t = STEP * k as f64;
@@ -448,7 +449,7 @@ pub fn fireplace_electric() -> Vec<Obj> {
                         share * if cosine { x.cos() - 1.0 } else { x.sin() }
                     })
                     .sum();
-                (t, amp * swing)
+                (t, amp * swing, Ease::Linear)
             })
             .collect()
     };
