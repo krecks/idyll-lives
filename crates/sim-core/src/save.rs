@@ -1319,6 +1319,7 @@ impl World {
             .collect();
         crate::world::check_flats(&world.plots, i32::from(world.storeys.max(1)), &world.stairs)
             .map_err(|e| Error::new(format!("saved plots: {}", e.0)))?;
+        world.map_plots();
         let starting_funds = world.content.starting_funds;
         world.households = if save.households.is_empty() {
             vec![Household {

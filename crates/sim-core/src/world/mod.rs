@@ -2593,6 +2593,7 @@ impl World {
             i32::from(lot_file.storeys.unwrap_or(1).max(1)),
             &world.stairs,
         )?;
+        world.map_plots();
         let starting_funds = world.content.starting_funds;
         world.households = if lot_file.households.is_empty() {
             vec![Household {
@@ -3129,32 +3130,19 @@ impl World {
     pub fn plot_at(&self, x: i32, z: i32) -> Option<u32> {
         let ground = self.ground_z(z);
         let width = self.lot.width as i32;
-        let lot = if (0..width).contains(&x)
-            && ground >= 0
-            && let Some(&plot) = self.tile_plot.get((ground * width + x) as usize)
-        {
-            (plot != crate::path::NO_PLOT).then_some(u32::from(plot))
-        } else {
-            self.plots
-                .iter()
-                .find(|p| !p.is_flat() && p.contains(x, ground))
-                .map(|p| p.id)
-        }?;
+        if !(0..width).contains(&x) || ground < 0 {
+            return None;
+        }
+        let lot = self
+            .tile_plot
+            .get((ground * width + x) as usize)
+            .filter(|&&p| p != crate::path::NO_PLOT)
+            .map(|&p| u32::from(p))?;
         match self.flats_in.get(lot as usize) {
             Some(&k) if k > 0 => Some(
                 self.flat_tiles[usize::from(k) - 1]
                     .at(x, ground, self.storey_of(z))
                     .unwrap_or(lot),
-            ),
-            _ if self.flats_in.is_empty() && self.plots.iter().any(Plot::is_flat) => Some(
-                self.plots
-                    .iter()
-                    .find(|p| {
-                        p.of == Some(lot)
-                            && i32::from(p.storey) == self.storey_of(z)
-                            && p.contains(x, ground)
-                    })
-                    .map_or(lot, |p| p.id),
             ),
             _ => Some(lot),
         }
@@ -3215,9 +3203,10 @@ impl World {
     }
 
     /// Notes the plot of every ground tile (plots never move; upper storeys are the same
-    /// ground), so `plot_at` needn't search them, and the flats of each building with flats by
-    /// storey (`flat_tiles`). Flats leave the ground tiles to their building.
-    fn map_plots(&mut self) {
+    /// ground), which `plot_at` and the walks (`path::Grounds`) look up, and the flats of each
+    /// building with flats by storey (`flat_tiles`). Flats leave the ground tiles to their
+    /// building. Made as the plots are loaded, before anything is placed on them.
+    pub(crate) fn map_plots(&mut self) {
         let (width, depth) = (self.lot.width as i32, self.storey_depth());
         if self.tile_plot.len() == (width * depth) as usize {
             return;
