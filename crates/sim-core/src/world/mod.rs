@@ -2372,295 +2372,6 @@ enum Choice {
 }
 
 impl World {
-    pub fn from_json(content_json: &str, lot_json: &str, seed: u32) -> Result<Self, Error> {
-        let content = Content::from_json(content_json)?;
-        let lot_file: LotFile = serde_json::from_str(lot_json)?;
-        let world = Self::new(content, &lot_file, seed)?;
-        Ok(world)
-    }
-
-    pub fn new(content: Content, lot_file: &LotFile, seed: u32) -> Result<Self, Error> {
-        let styles: Vec<&str> = content.build.fences.iter().map(|s| s.id.as_str()).collect();
-        let lot = Lot::from_file_styled(lot_file, &styles)?;
-        let mut world = Self::empty(content, lot, Rng::new(seed));
-        world.seed = seed;
-        // Storeys from the file before its objects (stairs, furniture upstairs).
-        let storeys = lot_file.storeys.unwrap_or(1).clamp(1, 4);
-        if storeys > 1 || lot_file.basement {
-            world.storeys = storeys;
-            world.stairs.depth = lot_file.depth as i32;
-        }
-        // The basement's block after the storeys' (storeys the content adds go after it).
-        if lot_file.basement {
-            world.stairs.basement = storeys as i32;
-        }
-        world.mode = lot_file.mode;
-        world.lifespan = lot_file.lifespan;
-        world.residents_most_given = lot_file.residents_most;
-        world.meta = lot_file.meta.clone();
-        world.note_paths();
-        // (A bus stop in an older town file is no way out: left out.)
-        world.exits = lot_file
-            .exits
-            .iter()
-            .filter(|e| e.kind() != crate::travel::ExitKind::Stop)
-            .map(|e| e.point())
-            .collect();
-        world.plots = lot_file
-            .plots
-            .iter()
-            .enumerate()
-            .map(|(i, p)| Plot {
-                id: i as u32,
-                name: p.name.clone(),
-                x: p.x,
-                z: p.z,
-                w: p.w,
-                d: p.d,
-                public: p.public,
-                entry: p.entry,
-                roof: None,
-                hours: p.hours,
-            })
-            .collect();
-        let starting_funds = world.content.starting_funds;
-        world.households = if lot_file.households.is_empty() {
-            vec![Household {
-                id: 0,
-                name: "Household".into(),
-                plot: None,
-                player: true,
-                funds: starting_funds,
-                free_will: true,
-                routines: Vec::new(),
-                expecting: None,
-                sitter_day: None,
-                laundry: LAUNDRY_START,
-                letters: Vec::new(),
-            }]
-        } else {
-            lot_file
-                .households
-                .iter()
-                .enumerate()
-                .map(|(i, h)| Household {
-                    id: i as u32,
-                    name: h.name.clone(),
-                    plot: h.plot,
-                    player: h.player,
-                    funds: h.funds.unwrap_or(starting_funds),
-                    free_will: true,
-                    routines: Vec::new(),
-                    expecting: None,
-                    sitter_day: None,
-                    laundry: LAUNDRY_START,
-                    letters: Vec::new(),
-                })
-                .collect()
-        };
-        if let Some(h) = world
-            .households
-            .iter()
-            .find(|h| h.plot.is_some_and(|p| p as usize >= world.plots.len()))
-        {
-            return Err(Error::new(format!(
-                "household '{}' lives on an unknown plot",
-                h.name
-            )));
-        }
-        // The road network and the town's other open-world fields (`travel.rs`).
-        let mut open_world = lot_file.open_world.clone();
-        if lot_file
-            .plots
-            .iter()
-            .any(|p| p.area.is_some() || p.kind.is_some())
-        {
-            open_world.plot_areas = lot_file.plots.iter().map(|p| p.area).collect();
-            open_world.plot_kinds = lot_file.plots.iter().map(|p| p.kind).collect();
-        }
-        world.set_travel(open_world);
-        for p in &lot_file.objects {
-            let def = world
-                .content
-                .object_index(&p.def)
-                .ok_or_else(|| Error::new(format!("unknown object '{}'", p.def)))?;
-            // Turned (only what turns freely may be), set off its tile's middle or resized.
-            let at = |e: Error| Error::new(format!("'{}' at {},{}: {e}", p.def, p.x, p.z));
-            let turn = world.check_turn(def, p.turn).map_err(at)?;
-            let layout = world
-                .check_layout(
-                    def,
-                    p.rot,
-                    Layout {
-                        offset: p.offset,
-                        extent: p.size,
-                        tall: p.tall,
-                    },
-                )
-                .map_err(at)?;
-            let value = world.content.objects[def].price.unwrap_or(0);
-            let id = world.place(
-                def,
-                p.x,
-                p.z,
-                p.rot,
-                layout,
-                Default::default(),
-                0,
-                value,
-                None,
-            )?;
-            world.objects[id as usize].turn = turn;
-        }
-        if lot_file.sims.len() > MAX_SIMS {
-            return Err(Error::new(format!("at most {MAX_SIMS} residents per town")));
-        }
-        for s in &lot_file.sims {
-            world.spawn_sim(s)?;
-        }
-        world.init_relationships(&lot_file.relationships)?;
-        // Porches as the file has them (a file from before them: as they were drawn), and the
-        // pieces (before the cars: a post's tile is kept as a garage's, `cars::reblock`).
-        world.porches = match &lot_file.porches {
-            Some(list) => list
-                .iter()
-                .filter(|p| (p.plot as usize) < world.plots.len())
-                .copied()
-                .collect(),
-            None => world.guess_porches(),
-        };
-        world.porch_pieces = lot_file
-            .porch_pieces
-            .iter()
-            .filter(|p| (p.plot as usize) < world.plots.len())
-            .copied()
-            .collect();
-        crate::cars::from_file(
-            &mut world,
-            &lot_file.cars,
-            &lot_file.drives,
-            &lot_file.garages,
-        );
-        if !world.porch_pieces.is_empty() {
-            crate::cars::posts_changed(&mut world);
-        }
-        crate::traffic::settle(&mut world);
-        // Babies come with a crib (a crowded home is reported to the player as time starts).
-        for h in 0..world.households.len() {
-            crate::lifecycle::cribs_for_babies(&mut world, h);
-        }
-        world.make_storeys();
-        world.refresh_rooms();
-        // A new lot's lamps come on only where someone is (`lights::Watch::fresh`).
-        world.light_watch.fresh = true;
-        // And its curtains are drawn as fits the hour (`curtains::Watch::fresh`).
-        world.curtain_watch.fresh = true;
-        Ok(world)
-    }
-
-    pub(crate) fn empty(content: Content, lot: Lot, rng: Rng) -> Self {
-        let tiles = lot.tile_slots();
-        Self {
-            content,
-            mode: GameMode::Living,
-            lot,
-            objects: Vec::new(),
-            next_object_id: 0,
-            items: Default::default(),
-            setups: Vec::new(),
-            object_plot: Vec::new(),
-            object_index: ObjectIndex::default(),
-            sims: Vec::new(),
-            households: Vec::new(),
-            plots: Vec::new(),
-            tile_plot: Vec::new(),
-            relationships: Relationships::default(),
-            events: EventLog::default(),
-            blocked: vec![false; tiles],
-            tick: 0,
-            speed: 1,
-            resume_speed: 1,
-            was_calm: false,
-            auto_super: false,
-            step_ticks: 0,
-            autonomy: true,
-            lifespan: Default::default(),
-            player_moves: true,
-            residents_most_given: None,
-            former: Vec::new(),
-            generations: Vec::new(),
-            rng,
-            seed: 0,
-            structure_version: 1,
-            nav_version: 1,
-            nav_log: Default::default(),
-            search_mark: 0,
-            search_budget: SEARCH_BUDGET,
-            objects_version: 1,
-            reach: Default::default(),
-            reach_version: 0,
-            lot_version: 1,
-            briefs: Vec::new(),
-            members: Members::default(),
-            shut: Vec::new(),
-            shut_by: Vec::new(),
-            private_rooms: Vec::new(),
-            claimed_rooms: Vec::new(),
-            claimed_places: Vec::new(),
-            claimants_cache: Vec::new(),
-            work: Vec::new(),
-            first: Vec::new(),
-            turns: Vec::new(),
-            turns_fresh: false,
-            broadcast_scratch: BroadcastScratch::default(),
-            exits: Vec::new(),
-            travel: Default::default(),
-            cars: Vec::new(),
-            traffic: Default::default(),
-            drives: Vec::new(),
-            taxis: Default::default(),
-            garages: Vec::new(),
-            porches: Vec::new(),
-            porch_pieces: Vec::new(),
-            car_tiles: Vec::new(),
-            cars_nav: 0,
-            cars_parked: None,
-            cars_near: Default::default(),
-            meta: serde_json::Value::Null,
-            paths: Vec::new(),
-            undo: Vec::new(),
-            redo: Vec::new(),
-            auto_fast: false,
-            offers: Vec::new(),
-            offers_version: 0,
-            dirt: vec![0.0; tiles],
-            rooms: Vec::new(),
-            rooms_version: 0,
-            room_layout_version: 1,
-            rooms_things: false,
-            rooms_things_at: Vec::new(),
-            rooms_things_all: false,
-            rooms_out: Vec::new(),
-            rooms_dirty: false,
-            rooms_rescore: false,
-            room_score: Vec::new(),
-            room_tiles: Default::default(),
-            storeys: 1,
-            stairs: crate::path::StairMap::default(),
-            lod: true,
-            view: None,
-            watch: None,
-            watched: Vec::new(),
-            lights_version: 0,
-            light_watch: Default::default(),
-            curtains_version: 0,
-            curtain_watch: Default::default(),
-            while_lit: Vec::new(),
-            staff: Default::default(),
-            walk_memo: Vec::new(),
-        }
-    }
-
     /// The road network and the rest of the travel state from the town file's open-world
     /// fields (on load too: the graph isn't saved).
     pub(crate) fn set_travel(&mut self, file: crate::travel::OpenWorld) {
@@ -2676,30 +2387,6 @@ impl World {
             }
         }
         self.travel = travel;
-    }
-
-    /// Bumped whenever walls or objects change, so renderers know to rebuild.
-    pub fn structure_version(&self) -> u32 {
-        self.structure_version
-    }
-
-    /// Bumped whenever a lamp is switched (see `lights::lamps_off`).
-    pub fn lights_version(&self) -> u32 {
-        self.lights_version
-    }
-
-    /// Bumped whenever curtains are drawn or opened (see `curtains::shut`).
-    pub fn curtains_version(&self) -> u32 {
-        self.curtains_version
-    }
-
-    /// Changes whenever the lot does (see `lot_version`); never while only objects move.
-    pub fn lot_version(&self) -> u32 {
-        self.lot_version
-    }
-
-    pub fn blocked(&self) -> &[bool] {
-        &self.blocked
     }
 
     /// Sizes the per-tile arrays (by slot: `Lot::tile_index`) to the lot's slots, after the lot
@@ -2725,12 +2412,6 @@ impl World {
         self.lot.tile_index(x, z)
     }
 
-    /// Whether someone at `b` hears someone at `a` call their name (see
-    /// `conversation::within_earshot`).
-    pub fn within_earshot(&self, a: [f32; 2], b: [f32; 2]) -> bool {
-        conversation::within_earshot(&self.nav(), a, b)
-    }
-
     /// `paths` from `meta.paths`.
     pub(crate) fn note_paths(&mut self) {
         self.paths = self.meta["paths"]
@@ -2744,37 +2425,6 @@ impl World {
                     })
                     .collect()
             });
-    }
-
-    /// The most residents the town grows to by newcomers and births: the town file's
-    /// `residentsMost`, at most `MAX_SIMS`.
-    pub fn residents_most(&self) -> usize {
-        self.residents_most_given
-            .map_or(MAX_SIMS, |n| (n as usize).min(MAX_SIMS))
-    }
-
-    /// Whether a newcomer or a baby would find room in town (fewer here than `residents_most`).
-    pub(crate) fn room_in_town(&self) -> bool {
-        self.sims.iter().filter(|s| s.here()).count() < self.residents_most()
-    }
-
-    /// Whether people at `a` and `b` see each other, as two talking must (see
-    /// `conversation::in_sight`).
-    pub fn in_sight(&self, a: [f32; 2], b: [f32; 2]) -> bool {
-        conversation::in_sight(&self.nav(), a, b)
-    }
-
-    /// Who to look through for the residents of household `h` as they are now (here or not; a
-    /// caller still asks each's household): its members by the tick's briefs (`Members`) while
-    /// nobody has moved house or come to town since, else everyone.
-    pub(crate) fn household_sims(&self, h: u32) -> impl Iterator<Item = usize> + '_ {
-        let fresh = !self.members.moved && self.members_cover();
-        let (list, all) = if fresh {
-            (self.members.of(h), 0..0)
-        } else {
-            (&[][..], 0..self.sims.len())
-        };
-        list.iter().map(|&j| j as usize).chain(all)
     }
 
     /// Whether the briefs (and `members`) cover every resident.
@@ -2822,135 +2472,6 @@ impl World {
         }
     }
 
-    /// Whether resident `i` would set off now to visit `plot` (an invitation over the phone):
-    /// the way isn't too long, as they'd go (`leisure_way`), they'd be there in visiting hours
-    /// with time for the stay before they leave for work or school themselves (`visit_fits`,
-    /// `free_before_work`), and a household living there isn't all off to work or school before
-    /// they could stay `visits.leastMinutes` (`hosts_about_till`).
-    pub(crate) fn visit_fits_now(&self, i: usize, plot: u32) -> bool {
-        let Some(eta) = self.leisure_eta_now(i, plot) else {
-            return false;
-        };
-        let stay = crate::mins(eta + self.content.visits.least_minutes);
-        // (With time for it before they leave for work or school, as a visit they'd choose for
-        // themselves: invited round, a guest let in was off to work 39 minutes on, Brightton.)
-        let ctx = self.ctx();
-        visit_fits(
-            &self.content,
-            eta,
-            ctx.hour,
-            free_before_work(&self.sims[i], &ctx),
-        ) && self
-            .households
-            .iter()
-            .find(|h| h.plot == Some(plot))
-            .is_none_or(|h| hosts_about_till(&ctx, h.id) >= self.tick + stay)
-    }
-
-    /// Why resident `i` can't be sent to `plot` now for its hours (`Plot::open_at`): it's shut,
-    /// or it shuts before they could get there (the way they'd go, `leisure_eta_now`). Ok: open
-    /// for them (or a place with no hours).
-    fn check_open(&self, i: usize, plot: u32) -> Result<(), Error> {
-        let p = &self.plots[plot as usize];
-        if p.hours.is_none() {
-            return Ok(());
-        }
-        let (day, minute) = (
-            crate::clock::day(self.tick),
-            crate::clock::minute_of_day(self.tick),
-        );
-        let clock = |m: u16| format!("{:02}:{:02}", m / 60 % 24, m % 60);
-        if !p.open_at(day, minute) {
-            let when = p.opens_next(day, minute).map(|(d, m)| match d - day {
-                0 => format!(" (opens at {})", clock(m)),
-                1 => format!(" (opens tomorrow at {})", clock(m)),
-                _ => format!(
-                    " (opens on {} at {})",
-                    WEEKDAYS[crate::clock::weekday(d) as usize],
-                    clock(m)
-                ),
-            });
-            return Err(Error::new(format!(
-                "{} is closed{}",
-                p.name,
-                when.unwrap_or_default()
-            )));
-        }
-        let open = p.open_for(day, minute);
-        if let Some(eta) = self.leisure_eta_now(i, plot)
-            && open < eta
-        {
-            let shuts = (minute + open).round() as u16;
-            return Err(Error::new(format!(
-                "{} closes at {}, before {} could get there",
-                p.name,
-                clock(shuts % (24 * 60)),
-                self.sims[i].name
-            )));
-        }
-        Ok(())
-    }
-
-    /// About how many minutes resident `i` would take to get to `plot` from where they are now,
-    /// the way they'd go (`leisure_way`: the car, a bike of theirs, the taxi, else on foot).
-    fn leisure_eta_now(&self, i: usize, plot: u32) -> Option<f32> {
-        let (Some(sim), Some(p)) = (self.sims.get(i), self.plots.get(plot as usize)) else {
-            return None;
-        };
-        let pos = self.nav().stairs.ground_pos(sim.pos);
-        let goer = Goer {
-            drives: crate::cars::can_drive(
-                &self.travel,
-                &self.households,
-                &self.briefs,
-                &self.cars,
-                sim,
-            ),
-            bike: crate::ride::leisure_bike(
-                &self.content,
-                &self.object_index,
-                &self.briefs,
-                &self.households,
-                &self.objects,
-                sim,
-            )
-            .map(|(_, speed, min)| (speed, min)),
-        };
-        let door = p.arrival_point();
-        let taxi = self
-            .taxis
-            .takes(sim)
-            .then(|| {
-                crate::taxi::leisure_eta(&self.travel, &self.exits, &self.content, sim, pos, door)
-            })
-            .flatten();
-        let (_, eta) = leisure_way(
-            &self.travel,
-            &self.content,
-            pos,
-            sim.walk_per_minute(&self.content),
-            plot,
-            door,
-            goer,
-            taxi,
-            &mut [None, None],
-        );
-        Some(eta)
-    }
-
-    /// The plot a tile is on (on any storey).
-    pub fn plot_at(&self, x: i32, z: i32) -> Option<u32> {
-        let z = self.ground_z(z);
-        let width = self.lot.width as i32;
-        if (0..width).contains(&x)
-            && z >= 0
-            && let Some(&plot) = self.tile_plot.get((z * width + x) as usize)
-        {
-            return (plot != crate::path::NO_PLOT).then_some(plot as u32);
-        }
-        self.plots.iter().find(|p| p.contains(x, z)).map(|p| p.id)
-    }
-
     /// Notes the plot of every ground tile (plots never move; upper storeys are the same
     /// ground), so `plot_at` needn't search them.
     fn map_plots(&mut self) {
@@ -2966,16 +2487,6 @@ impl World {
                 }
             }
         }
-    }
-
-    /// The index in `World::objects` of the object with stable id `stable`, if it still exists.
-    pub fn index_of(&self, stable: u32) -> Option<usize> {
-        self.objects.iter().position(|o| o.stable == stable)
-    }
-
-    /// The stable id of the object at `index` in `World::objects` (the inverse of `index_of`).
-    pub fn stable_of(&self, index: u32) -> Option<u32> {
-        self.objects.get(index as usize).map(|o| o.stable)
     }
 
     pub fn place_object(&mut self, def_id: &str, x: i32, z: i32, rot: u8) -> Result<u32, Error> {
@@ -3001,33 +2512,10 @@ impl World {
     /// `check_layout`):
     /// inside the lot, on free tiles without a diagonal wall, facing a tile on the lot. Things
     /// on the `Surface` layer need a top to stand on instead (see `surface::fit_on_top`).
-    pub(crate) fn check_fit(
-        &self,
-        def: usize,
-        x: i32,
-        z: i32,
-        rot: u8,
-        layout: Layout,
-    ) -> Result<ObjectInstance, Error> {
-        self.check_fit_among(def, x, z, rot, layout, None)
-    }
-
-    /// `check_fit`, looking for what's in the way only among `near` (in id order) when given:
-    /// every object whose tiles or overhang reach where it would go (`ObjectInstance::reach`),
-    /// found once for many tries over one plot (`find_spot`). Without it, those are found among
-    /// the whole town first: a check of each tile against every object in a full town, for every
-    /// spot a delivered bed was tried at, made the noon a newcomer or an adoption came half a
-    /// second long.
-    pub(crate) fn check_fit_among(
-        &self,
-        def: usize,
-        x: i32,
-        z: i32,
-        rot: u8,
-        layout: Layout,
-        near: Option<&[&ObjectInstance]>,
-    ) -> Result<ObjectInstance, Error> {
-        let obj = ObjectInstance {
+    /// The `ObjectInstance` `check_fit_among` would place, as it would be there: its footprint
+    /// and extent from `layout`, where it gives them.
+    fn candidate(&self, def: usize, x: i32, z: i32, rot: u8, layout: Layout) -> ObjectInstance {
+        ObjectInstance {
             id: self.objects.len() as u32,
             stable: 0,
             def,
@@ -3056,7 +2544,36 @@ impl World {
             shut: false,
             run: None,
             rack: 0,
-        };
+        }
+    }
+
+    pub(crate) fn check_fit(
+        &self,
+        def: usize,
+        x: i32,
+        z: i32,
+        rot: u8,
+        layout: Layout,
+    ) -> Result<ObjectInstance, Error> {
+        self.check_fit_among(def, x, z, rot, layout, None)
+    }
+
+    /// `check_fit`, looking for what's in the way only among `near` (in id order) when given:
+    /// every object whose tiles or overhang reach where it would go (`ObjectInstance::reach`),
+    /// found once for many tries over one plot (`find_spot`). Without it, those are found among
+    /// the whole town first: a check of each tile against every object in a full town, for every
+    /// spot a delivered bed was tried at, made the noon a newcomer or an adoption came half a
+    /// second long.
+    pub(crate) fn check_fit_among(
+        &self,
+        def: usize,
+        x: i32,
+        z: i32,
+        rot: u8,
+        layout: Layout,
+        near: Option<&[&ObjectInstance]>,
+    ) -> Result<ObjectInstance, Error> {
+        let obj = self.candidate(def, x, z, rot, layout);
         let d = &self.content.objects[def];
         let name = &d.id;
         let layer = d.layer;
@@ -3969,155 +3486,6 @@ impl World {
         }
     }
 
-    /// Whether time may skip ahead: everyone in the player's household is asleep or away at
-    /// work, and nothing notable happened to them in the last game hour.
-    pub fn calm(&self) -> bool {
-        let home = |h: u32| self.households[h as usize].player;
-        let mut members = self
-            .sims
-            .iter()
-            .filter(|s| s.here() && home(s.household))
-            .peekable();
-        if members.peek().is_none() {
-            return false;
-        }
-        let quiet = members.all(|s| s.away_until.is_some() || s.asleep(&self.content));
-        let hour_ago = self.tick.saturating_sub(TICKS_PER_HOUR);
-        quiet
-            && !self
-                .events
-                .iter()
-                .rev()
-                .take_while(|e| e.tick >= hour_ago)
-                .any(|e| {
-                    e.kind.importance() >= 1
-                        && [Some(e.a), Some(e.b), e.c]
-                            .into_iter()
-                            .flatten()
-                            .any(|s| self.sims.get(s as usize).is_some_and(|s| home(s.household)))
-                })
-    }
-
-    /// Every room and garden of the town with its scores (current as of the last refresh).
-    /// Everything found with the rooms, for tests that compare two ways of finding them: the
-    /// rooms, the score per tile, the private and claimed rooms and the places in those.
-    #[doc(hidden)]
-    pub fn room_state(&self) -> (Vec<crate::rooms::RoomInfo>, Vec<f32>, Vec<u16>, Vec<u16>) {
-        (
-            self.rooms.clone(),
-            self.room_score.clone(),
-            self.private_rooms.clone(),
-            self.claimed_rooms.clone(),
-        )
-    }
-
-    pub fn rooms(&self) -> &[crate::rooms::RoomInfo] {
-        &self.rooms
-    }
-
-    /// The room (or garden) a tile belongs to.
-    pub fn room_at_tile(&self, x: i32, z: i32) -> Option<&crate::rooms::RoomInfo> {
-        if !self.lot.in_bounds(x, z) {
-            return None;
-        }
-        let id = self.lot.room_at(x, z);
-        if id == crate::lot::OUTDOORS {
-            let plot = self.plot_at(x, z)?;
-            self.rooms.iter().find(|r| r.garden && r.plot == Some(plot))
-        } else {
-            self.rooms.iter().find(|r| !r.garden && r.id == id)
-        }
-    }
-
-    /// Mess residents made, and cleaning they finished, this tick: a mess spreads over the
-    /// tile and (less) the tiles around it in the same room; cleaning clears them all.
-    fn apply_messes(&mut self) {
-        for i in 0..self.sims.len() {
-            if let Some(partner) = self.sims[i].conceived.take() {
-                // (Both done trying at once: one chance, not two.)
-                if let Some(p) = self
-                    .sims
-                    .get_mut(partner as usize)
-                    .filter(|p| p.conceived == Some(i as u32))
-                {
-                    p.conceived = None;
-                }
-                crate::lifecycle::conceive(self, i, partner as usize);
-            }
-            if let Some((baby, gains)) = self.sims[i].care_out.take()
-                && let Some(b) = self.sims.get_mut(baby as usize)
-            {
-                for (n, g) in gains.iter().enumerate() {
-                    b.needs[n] = (b.needs[n] + g).min(1.0);
-                }
-            }
-            if std::mem::take(&mut self.sims[i].reshaped) {
-                // An object opened or closed, or someone changed clothes: how it looks changes.
-                self.structure_version = self.structure_version.wrapping_add(1);
-                self.rooms_need_clean_rescore();
-            }
-            if std::mem::take(&mut self.sims[i].lit) {
-                self.lights_version = self.lights_version.wrapping_add(1);
-            }
-            if let Some(news) = self.sims[i].news.take() {
-                // Broken or mended: what the house offers and how it looks change.
-                self.structure_version = self.structure_version.wrapping_add(1);
-                let at = match news {
-                    News::Broke(o) | News::Repaired(o) | News::NotClosed(o) => {
-                        let o = &self.objects[o as usize];
-                        (o.x, o.z)
-                    }
-                    News::Accident(_) => self.sims[i].tile(),
-                };
-                self.rooms_things_changed(at);
-                let (kind, n) = match news {
-                    News::Broke(o) => (
-                        social::EventKind::Broke,
-                        self.objects[o as usize].def as i64,
-                    ),
-                    News::Repaired(o) => (
-                        social::EventKind::Repaired,
-                        self.objects[o as usize].def as i64,
-                    ),
-                    News::Accident(a) => (social::EventKind::Accident, a as i64),
-                    News::NotClosed(o) => (
-                        social::EventKind::NotClosed,
-                        self.objects[o as usize].def as i64,
-                    ),
-                };
-                self.events.push_detail(self.tick, kind, i, Some(n), None);
-            }
-            if let Some((x, z, sweep)) = self.sims[i].swept.take() {
-                crate::sweep::clean(self, x, z, &sweep);
-            }
-            let Some((x, z, amount)) = self.sims[i].mess.take() else {
-                continue;
-            };
-            if !self.lot.in_bounds(x, z) {
-                continue;
-            }
-            let room = self.lot.room_at(x, z);
-            for dz in -1..=1 {
-                for dx in -1..=1 {
-                    let (tx, tz) = (x + dx, z + dz);
-                    if !self.lot.in_bounds(tx, tz) || self.lot.room_at(tx, tz) != room {
-                        continue;
-                    }
-                    let share = if amount < 0.0 || (dx, dz) == (0, 0) {
-                        1.0
-                    } else if dx == 0 || dz == 0 {
-                        0.5
-                    } else {
-                        0.25
-                    };
-                    let t = self.tile_slot_mut(tx, tz);
-                    self.dirt[t] = (self.dirt[t] + amount * share).clamp(0.0, 1.0);
-                    self.room_tiles.touch(t);
-                }
-            }
-        }
-    }
-
     /// A baby crying (content `dayRhythm.babyWakes`) in the crib at home with every grown-up of
     /// the household there asleep wakes one of them: family first, then someone not worn out,
     /// then whoever's turn it is (woken longest ago: partners take turns), then the most rested.
@@ -4352,20 +3720,6 @@ impl World {
         crate::path::nodes_searched() - self.search_mark > self.search_budget
     }
 
-    /// The navigation version: bumped whenever something walkers can or can't step through
-    /// changes (see `nav_changed_in`).
-    pub fn nav_version(&self) -> u32 {
-        self.nav_version
-    }
-
-    /// Whether walking may have changed within tiles `[x0, z0, x1, z1)` (stacked rows, as
-    /// positions are) since navigation version `seen`: a change there was logged since, or the
-    /// log (`path::NAV_LOG` changes) doesn't go back that far. A walker whose way lies outside
-    /// every change since it planned it can keep it.
-    pub fn nav_changed_since(&self, seen: u32, rect: [i32; 4]) -> bool {
-        self.nav_log.changed_since(seen, self.nav_version, rect)
-    }
-
     /// Catches up on what changed for walking since the last tick (the walkable regions, the
     /// objects-by-plot index and the links), as the next tick would: for benchmarks and tools.
     pub fn refresh_navigation(&mut self) {
@@ -4450,471 +3804,6 @@ impl World {
         self.reach.mark(&self.lot, rect);
     }
 
-    /// Notes that the lot's rooms changed (walls, storeys, a blueprint, an undo): the next tick
-    /// finds and scores the rooms again.
-    pub(crate) fn rooms_layout_changed(&mut self) {
-        self.room_layout_version = self.room_layout_version.wrapping_add(1);
-    }
-
-    /// Notes that a room's scores changed without its layout (a wall painted, a floor covered):
-    /// the next tick recomputes the rooms once.
-    pub(crate) fn rooms_need_rescore(&mut self) {
-        self.rooms_dirty = true;
-    }
-
-    /// Notes that a thing standing on tile `at` came, went, broke, was mended or upgraded, and
-    /// nothing else about the rooms changed: the next tick scores the room (or garden) there
-    /// again for what stands in it (`refresh_room_things`) without finding it again.
-    pub(crate) fn rooms_things_changed(&mut self, at: (i32, i32)) {
-        self.rooms_things = true;
-        if self.rooms_things_at.len() < MOST_THINGS_AT {
-            self.rooms_things_at.push(at);
-        } else {
-            self.rooms_things_all = true;
-        }
-    }
-
-    /// Notes that things may have changed anywhere (an undo put them back): every room is scored
-    /// again for what stands in it.
-    pub(crate) fn rooms_things_changed_everywhere(&mut self) {
-        self.rooms_things = true;
-        self.rooms_things_all = true;
-    }
-
-    /// Notes that only cleanliness may have changed (a crop grew, a thing opened): the next
-    /// tick rescores the rooms' cleanliness without walking the whole lot.
-    pub(crate) fn rooms_need_clean_rescore(&mut self) {
-        self.rooms_rescore = true;
-    }
-
-    /// Recomputes rooms and their scores (see `rooms.rs`). Call it after changing `dirt`
-    /// directly; messes residents make are rescored on their own.
-    pub fn refresh_rooms(&mut self) {
-        self.sync_tile_arrays();
-        self.map_plots();
-        // (Everything is found again: what the lot says changed since doesn't matter.)
-        self.lot.take_room_changes();
-        let (rooms, cells) = crate::rooms::compute(self);
-        self.rooms = rooms;
-        self.rooms_out = crate::privacy::doors_out(&self.content, &self.rooms, &self.lot);
-        self.refresh_privacy();
-        self.rooms_version = self.room_layout_version;
-        self.rooms_dirty = false;
-        self.rooms_things = false;
-        self.rooms_things_all = false;
-        self.rooms_things_at.clear();
-        self.rooms_rescore = false;
-        // The room (index into `rooms`) whose score each tile takes: its plot's garden, then
-        // indoor tiles anywhere their room; off the plots, none (`roomRules.away`).
-        let rooms = &self.rooms;
-        let mut source = vec![crate::rooms::NO_ROOM; self.lot.tile_slots()];
-        for (pi, p) in self.plots.iter().enumerate() {
-            let garden = rooms
-                .iter()
-                .position(|r| r.garden && r.plot == Some(pi as u32))
-                .map_or(crate::rooms::NO_ROOM, |k| k as u32);
-            for z in p.z..p.z + p.d {
-                for x in p.x..p.x + p.w {
-                    if self.lot.in_bounds(x, z) {
-                        source[self.lot.tile_index(x, z)] = garden;
-                    }
-                }
-            }
-        }
-        source[crate::lot::VOID] = crate::rooms::NO_ROOM;
-        let max_id = rooms
-            .iter()
-            .filter(|r| !r.garden)
-            .map(|r| r.id as usize)
-            .max()
-            .unwrap_or(0);
-        let mut by_id = vec![None; max_id + 1];
-        for (k, r) in rooms.iter().enumerate().filter(|(_, r)| !r.garden) {
-            by_id[r.id as usize] = Some(k);
-        }
-        for (_, _, i) in self.lot.indoor_tiles() {
-            let id = self.lot.rooms()[i];
-            if let Some(Some(k)) = by_id
-                .get(id as usize)
-                .filter(|_| id != crate::lot::OUTDOORS)
-            {
-                source[i] = *k as u32;
-            }
-        }
-        let away = self.content.room_rules.away;
-        self.room_score = source
-            .iter()
-            .map(|&k| match k {
-                crate::rooms::NO_ROOM => away,
-                k => rooms[k as usize].scores.overall,
-            })
-            .collect();
-        self.room_tiles = crate::rooms::RoomTiles::new(cells, &source);
-    }
-
-    /// Catches up on the rooms after walls, coverings, things or dirt changed: as `refresh_rooms`
-    /// would give, but finding and scoring again only the rooms round what was built
-    /// (`refresh_rooms_near`) and where things changed (`refresh_room_things`), and the rest only
-    /// for their dirt where there was a mess.
-    fn update_rooms(&mut self) {
-        // The per-tile lists follow the lot's slots (chunks allocated since: outdoors).
-        let slots = self.lot.tile_slots();
-        if self.room_score.len() < slots {
-            self.room_score.resize(slots, self.content.room_rules.away);
-        }
-        self.room_tiles.grow(slots);
-        let layout = self.rooms_version != self.room_layout_version || self.rooms_dirty;
-        if layout {
-            let changes = self.lot.take_room_changes();
-            if changes.full {
-                self.refresh_rooms();
-                return;
-            }
-            self.refresh_rooms_near(&changes);
-            self.rooms_version = self.room_layout_version;
-            self.rooms_dirty = false;
-        }
-        let things = self.rooms_things;
-        if things {
-            self.refresh_room_things();
-        } else {
-            self.rescore_rooms();
-        }
-        self.rooms_rescore = false;
-        if layout || things {
-            self.refresh_privacy();
-        }
-    }
-
-    /// The rooms found and scored again inside `changes.rect` (grown a tile, for the rooms across
-    /// a wall from it) and the gardens of the plots there; the rest keep their scores, renumbered
-    /// as the lot renumbered them (`Lot::take_room_changes`). What `refresh_rooms` would give.
-    fn refresh_rooms_near(&mut self, changes: &crate::lot::RoomChanges) {
-        use crate::rooms::room_order;
-        self.sync_tile_arrays();
-        self.map_plots();
-        let away = self.content.room_rules.away;
-        let Some([x0, z0, x1, z1]) = changes.rect else {
-            return;
-        };
-        let rect = [x0 - 1, z0 - 1, x1 + 1, z1 + 1];
-        let meets =
-            |r: [i32; 4]| r[0] < rect[2] && rect[0] < r[2] && r[1] < rect[3] && rect[1] < r[3];
-        // The plots there, on any storey (what stands upstairs outdoors is in the garden).
-        let depth = self.storey_depth().max(1);
-        let blocks = (self.lot.depth as i32 / depth).max(1);
-        let plots: Vec<u32> = self
-            .plots
-            .iter()
-            .enumerate()
-            .filter(|(_, p)| {
-                (0..blocks).any(|b| meets([p.x, p.z + b * depth, p.x + p.w, p.z + p.d + b * depth]))
-            })
-            .map(|(k, _)| k as u32)
-            .collect();
-        // The rooms there now, and the ones kept (renumbered).
-        let ids: Vec<u16> = (1..=self.lot.room_count() as u16)
-            .filter(|&id| self.lot.room_rect(id).is_some_and(meets))
-            .collect();
-        let rooms = std::mem::take(&mut self.rooms);
-        let handles = self.room_tiles.take_handles();
-        let old_out = std::mem::take(&mut self.rooms_out);
-        let mut kept: Vec<(crate::rooms::RoomInfo, u32)> = Vec::with_capacity(rooms.len());
-        let mut out_kept: Vec<(u16, bool)> = Vec::new();
-        for (mut room, h) in rooms.into_iter().zip(handles) {
-            let keep = if room.garden {
-                room.plot.is_some_and(|p| plots.binary_search(&p).is_err())
-            } else {
-                let id = changes
-                    .remap
-                    .as_ref()
-                    .map_or(room.id, |m| m.get(room.id as usize).copied().unwrap_or(0));
-                if id != crate::lot::OUTDOORS {
-                    out_kept.push((id, old_out.get(room.id as usize).copied().unwrap_or(false)));
-                }
-                room.id = id;
-                id != crate::lot::OUTDOORS && ids.binary_search(&id).is_err()
-            };
-            if keep {
-                kept.push((room, h));
-            } else {
-                self.room_tiles.drop_room(h);
-            }
-        }
-        // Found and scored again, with the tiles that take each one's score.
-        let found = crate::rooms::compute_near(self, &ids, &plots);
-        let lot = &self.lot;
-        // The last plot over each tile sets its garden's score there (as `refresh_rooms`).
-        let last_plot = |x: i32, z: i32| {
-            plots
-                .iter()
-                .rev()
-                .copied()
-                .find(|&p| self.plots[p as usize].contains(x, z))
-        };
-        let gardens: Vec<u32> = found
-            .iter()
-            .filter(|(r, _)| r.garden)
-            .filter_map(|(r, _)| r.plot)
-            .collect();
-        for (room, cells) in found {
-            let mut scored = Vec::new();
-            if room.garden {
-                let pi = room.plot.expect("a garden is a plot's");
-                let p = &self.plots[pi as usize];
-                // (A later plot over the same tiles scores them: as `refresh_rooms`.)
-                let later: Vec<&Plot> = self.plots[pi as usize + 1..]
-                    .iter()
-                    .filter(|q| {
-                        q.x < p.x + p.w && p.x < q.x + q.w && q.z < p.z + p.d && p.z < q.z + q.d
-                    })
-                    .collect();
-                for z in p.z..p.z + p.d {
-                    for x in p.x..p.x + p.w {
-                        if !lot.in_bounds(x, z) {
-                            continue;
-                        }
-                        let i = lot.tile_index(x, z);
-                        if i != crate::lot::VOID
-                            && lot.rooms()[i] == crate::lot::OUTDOORS
-                            && !later.iter().any(|q| q.contains(x, z))
-                        {
-                            scored.push(i as u32);
-                        }
-                    }
-                }
-            } else if let Some([rx0, rz0, rx1, rz1]) = lot.room_rect(room.id) {
-                for z in rz0..rz1 {
-                    for x in rx0..rx1 {
-                        let i = lot.tile_index(x, z);
-                        if i != crate::lot::VOID && lot.rooms()[i] == room.id {
-                            scored.push(i as u32);
-                        }
-                    }
-                }
-            }
-            for &i in &scored {
-                self.room_score[i as usize] = room.scores.overall;
-            }
-            let h = self.room_tiles.add_room(cells, scored);
-            kept.push((room, h));
-        }
-        // Tiles there no room or garden scores: away from home.
-        for z in rect[1].max(0)..rect[3].min(lot.depth as i32) {
-            for x in rect[0].max(0)..rect[2].min(lot.width as i32) {
-                let i = lot.tile_index(x, z);
-                if i == crate::lot::VOID || lot.rooms()[i] != crate::lot::OUTDOORS {
-                    continue;
-                }
-                let garden = (z < depth)
-                    .then(|| last_plot(x, z))
-                    .flatten()
-                    .filter(|p| gardens.contains(p));
-                if garden.is_none() {
-                    self.room_score[i] = away;
-                }
-            }
-        }
-        kept.sort_by_key(|(r, _)| room_order(r));
-        let (rooms, handles): (Vec<_>, Vec<_>) = kept.into_iter().unzip();
-        self.rooms = rooms;
-        self.room_tiles.set_handles(handles);
-        // Doors to the outside, per room id (as `privacy::doors_out`).
-        if self.content.room_kinds.iter().any(|k| k.private) {
-            let most = self.rooms.iter().map(|r| r.id as usize).max().unwrap_or(0);
-            let mut out = vec![false; most + 1];
-            for (id, o) in out_kept {
-                if let Some(slot) = out.get_mut(id as usize) {
-                    *slot = o;
-                }
-            }
-            for &id in &ids {
-                if let Some(slot) = out.get_mut(id as usize) {
-                    *slot = crate::privacy::door_out(&self.lot, id);
-                }
-            }
-            self.rooms_out = out;
-        }
-    }
-
-    /// Scores the rooms again for what stands in them, the rooms themselves as they are (things
-    /// came, went, broke, were mended or upgraded, and nothing was built: `rooms_things_changed`):
-    /// the rooms where things changed, or all of them if things may have changed anywhere, and
-    /// the rest for their dirt where there was a mess. The same as `refresh_rooms` would give,
-    /// at the cost of the things and the rooms' dirt, not of finding the rooms and walking every
-    /// tile.
-    fn refresh_room_things(&mut self) {
-        let mut rooms = std::mem::take(&mut self.rooms);
-        let mut tiles = std::mem::take(&mut self.room_tiles);
-        let mut score = std::mem::take(&mut self.room_score);
-        let at = std::mem::take(&mut self.rooms_things_at);
-        let only = (!self.rooms_things_all).then(|| {
-            let mut picked = vec![false; rooms.len()];
-            for &(x, z) in &at {
-                let id = self.lot.room_at(x, z);
-                let k = if id == crate::lot::OUTDOORS {
-                    let plot = self.plot_at(x, z);
-                    rooms
-                        .iter()
-                        .position(|r| r.garden && plot.is_some() && r.plot == plot)
-                } else {
-                    rooms.iter().position(|r| !r.garden && r.id == id)
-                };
-                if let Some(k) = k {
-                    picked[k] = true;
-                }
-            }
-            picked
-        });
-        crate::rooms::rescore_things(self, &mut rooms, &mut tiles, &mut score, only.as_deref());
-        (self.rooms, self.room_tiles, self.room_score) = (rooms, tiles, score);
-        self.rooms_things = false;
-        self.rooms_things_all = false;
-        self.rooms_rescore = false;
-    }
-
-    /// The rooms kept shut and the claimed ones among them, and the places in those (`privacy`),
-    /// from the rooms as they are.
-    fn refresh_privacy(&mut self) {
-        let (private, claimed) =
-            crate::privacy::private_rooms(&self.content, &self.plots, &self.rooms, &self.rooms_out);
-        self.private_rooms = private;
-        self.claimed_rooms = claimed;
-        self.claimed_places = crate::privacy::claimed_places(
-            &self.content,
-            &self.lot,
-            &self.claimed_rooms,
-            &self.objects,
-        );
-        self.claimants_cache.clear();
-    }
-
-    /// Catches up on the rooms as the next tick would (found again, scored again for what stands
-    /// in them, or for their dirt), for benchmarks and tools.
-    pub fn catch_up_rooms(&mut self) {
-        if self.rooms_version != self.room_layout_version
-            || self.rooms_dirty
-            || self.rooms_things
-            || self.rooms_rescore
-        {
-            self.update_rooms();
-        }
-    }
-
-    /// For tests: catches up on the rooms as the next tick would, and checks that what that gave
-    /// (found again only round what changed, scored again only where things changed) is what
-    /// finding and scoring every room again gives: the lot's rooms and their numbers, every room
-    /// and garden with its scores, the score per tile, the rooms' tiles, doors to the outside,
-    /// private and claimed rooms, and `structure_json`. The rooms are left as they were kept.
-    #[doc(hidden)]
-    pub fn check_rooms(&mut self) -> Result<(), String> {
-        self.catch_up_rooms();
-        // (Messes since the tick began are scored at the next refresh, as any refresh does.)
-        self.rescore_rooms();
-        // (Chunks allocated since, by an edit given up: outdoors, away, as a short list reads.)
-        let slots = self.lot.tile_slots();
-        if self.room_score.len() < slots {
-            self.room_score.resize(slots, self.content.room_rules.away);
-        }
-        self.room_tiles.grow(slots);
-        let mut lot = self.lot.clone();
-        lot.compute_all_rooms();
-        if lot != self.lot || lot.rooms_row_major() != self.lot.rooms_row_major() {
-            return Err("the lot's rooms differ from finding them all again".into());
-        }
-        if lot.room_count() != self.lot.room_count()
-            || (1..=lot.room_count() as u16).any(|id| lot.room_rect(id) != self.lot.room_rect(id))
-            || !lot.indoor_tiles().eq(self.lot.indoor_tiles())
-        {
-            return Err("the lot's rooms are kept differently".into());
-        }
-        let kept = (
-            std::mem::take(&mut self.rooms),
-            std::mem::take(&mut self.room_score),
-            std::mem::take(&mut self.room_tiles),
-            std::mem::take(&mut self.rooms_out),
-            std::mem::take(&mut self.private_rooms),
-            std::mem::take(&mut self.claimed_rooms),
-            std::mem::take(&mut self.claimed_places),
-        );
-        self.rooms.clone_from(&kept.0);
-        self.room_score.clone_from(&kept.1);
-        self.rooms_out.clone_from(&kept.3);
-        self.private_rooms.clone_from(&kept.4);
-        self.claimed_rooms.clone_from(&kept.5);
-        self.claimed_places.clone_from(&kept.6);
-        let structure = crate::view::structure_json(self);
-        let tiles = kept.2.summary();
-        self.refresh_rooms();
-        let mut wrong = Vec::new();
-        if self.rooms != kept.0 {
-            let n = self.rooms.len().max(kept.0.len());
-            let first = (0..n).find(|&k| self.rooms.get(k) != kept.0.get(k));
-            wrong.push(format!(
-                "rooms ({} kept, {} found; first apart: {:?} kept, {:?} found)",
-                kept.0.len(),
-                self.rooms.len(),
-                first.and_then(|k| kept.0.get(k)),
-                first.and_then(|k| self.rooms.get(k)),
-            ));
-        }
-        let bits = |v: &[f32]| v.iter().map(|f| f.to_bits()).collect::<Vec<_>>();
-        if bits(&self.room_score) != bits(&kept.1) {
-            let at = (0..self.room_score.len().max(kept.1.len())).find(|&i| {
-                self.room_score.get(i).map(|f| f.to_bits()) != kept.1.get(i).map(|f| f.to_bits())
-            });
-            wrong.push(format!(
-                "score per tile (first at slot {at:?}: {:?} kept, {:?} found)",
-                at.and_then(|i| kept.1.get(i)),
-                at.and_then(|i| self.room_score.get(i)),
-            ));
-        }
-        let full = self.room_tiles.summary();
-        if full.0 != tiles.0 {
-            wrong.push("the rooms' tiles".into());
-        }
-        if full.1 != tiles.1 {
-            wrong.push("the rooms per tile".into());
-        }
-        if self.rooms_out != kept.3 {
-            wrong.push("doors to the outside".into());
-        }
-        if self.private_rooms != kept.4 || self.claimed_rooms != kept.5 {
-            wrong.push("private rooms".into());
-        }
-        if self.claimed_places != kept.6 {
-            wrong.push("claimed places".into());
-        }
-        if crate::view::structure_json(self) != structure {
-            wrong.push("structure_json".into());
-        }
-        (
-            self.rooms,
-            self.room_score,
-            self.room_tiles,
-            self.rooms_out,
-            self.private_rooms,
-            self.claimed_rooms,
-            self.claimed_places,
-        ) = kept;
-        if wrong.is_empty() {
-            Ok(())
-        } else {
-            Err(wrong.join("; "))
-        }
-    }
-
-    /// Scores cleanliness again in rooms that had a mess since: between structure changes
-    /// only the dirt changes, so the rooms needn't be found again (a whole-town job).
-    fn rescore_rooms(&mut self) {
-        self.room_tiles.rescore(
-            &mut self.rooms,
-            &self.content.room_rules,
-            &self.dirt,
-            &mut self.room_score,
-        );
-    }
-
     pub fn tick_once(&mut self) {
         self.sync_tile_arrays();
         // Time moves on: edits can no longer be taken back.
@@ -4947,78 +3836,7 @@ impl World {
 
         crate::profile::phase("partners::refresh", || crate::partners::refresh(self));
         crate::profile::phase("staff::update", || crate::staff::update(self));
-        let briefs_start = crate::profile::start();
-        let mut briefs = std::mem::take(&mut self.briefs);
-        briefs.clear();
-        for s in &self.sims {
-            let (x, z) = s.tile();
-            let plot = self.plot_at(x, z);
-            let available = s.here() && s.available_for_social(&self.content);
-            briefs.push(SimBrief {
-                pos: s.pos,
-                available,
-                gender_ix: s.gender_ix,
-                household: s.household,
-                plot: plot.filter(|_| s.here()),
-                away: s.away_until.is_some() || !s.here(),
-                leaving: crate::life::leaving_home(self, s),
-                baby: s.here() && self.content.life.baby(s.age),
-                needs: s.needs,
-                here: s.here(),
-                partnered: self.relationships.partner_of(s.id as usize).is_some(),
-                adult: s.adult(&self.content),
-                age: s.age,
-                conversing: None,
-                cleaning: s.current().and_then(|a| match a.task.kind {
-                    TaskKind::Clean { x, z } => Some((x, z)),
-                    TaskKind::Use { .. } => s.sweep,
-                    _ => None,
-                }),
-                seated: s.pose == Pose::Sit && !s.is_moving(),
-                lying: s.pose == Pose::Lie,
-                eating: s.eating_seated(),
-                game: s.game,
-                // (`partners::free_now`, its start just above.)
-                free: {
-                    let free = available && crate::partners::free_besides(&self.content, s, tick);
-                    debug_assert_eq!(free, crate::partners::free_now(&self.content, s, tick));
-                    free
-                },
-                bound_for_car: s.bound_for_car.filter(|_| {
-                    s.current()
-                        .is_some_and(|a| matches!(a.task.kind, TaskKind::Work))
-                }),
-                trip_car: s.bound_for_car.filter(|_| {
-                    s.current().is_some_and(|a| {
-                        matches!(a.task.kind, TaskKind::Visit { .. } | TaskKind::GoHome)
-                    })
-                }),
-                bike: s.commute.and_then(|c| c.bike),
-                bike_spot: s.bike_spot.map(|(at, _)| at),
-                guest_at: s.visiting.map(|v| v.plot),
-                eats_at: match s.current().map(|a| a.task.kind) {
-                    Some(TaskKind::Eat { seat, stage: 1, .. }) => seat,
-                    _ => None,
-                },
-                carried: s.carried_by.is_some(),
-                private: crate::privacy::private_use(&self.content, &self.objects, s),
-            });
-        }
-        // Who's in a conversation, and whose (for joining in).
-        for (i, s) in self.sims.iter().enumerate() {
-            if let Some((t, social, ..)) = s.conversation(&self.content) {
-                briefs[i].conversing = Some((i as u32, social));
-                briefs[t as usize].conversing = Some((i as u32, social));
-            }
-        }
-        for (i, s) in self.sims.iter().enumerate() {
-            if let Some(l) = s.listening_to() {
-                briefs[i].conversing = briefs[l as usize].conversing.filter(|c| c.0 == l);
-            }
-        }
-        self.members.build(&briefs);
-        self.briefs = briefs;
-        crate::profile::end("briefs", briefs_start);
+        self.build_briefs(tick);
         crate::profile::phase("privacy::refresh", || crate::privacy::refresh(self));
         crate::profile::phase("lod::plan", || crate::lod::plan(self));
         let steps_start = crate::profile::start();
@@ -5163,6 +3981,89 @@ impl World {
             crate::rooms::opinions(self);
         }
 
+        self.update_after_step(tick);
+    }
+
+    /// The tick's `SimBrief` for each resident, into `self.briefs` (`members`, and those near
+    /// them, `tick_once`).
+    fn build_briefs(&mut self, tick: u64) {
+        let briefs_start = crate::profile::start();
+        let mut briefs = std::mem::take(&mut self.briefs);
+        briefs.clear();
+        for s in &self.sims {
+            let (x, z) = s.tile();
+            let plot = self.plot_at(x, z);
+            let available = s.here() && s.available_for_social(&self.content);
+            briefs.push(SimBrief {
+                pos: s.pos,
+                available,
+                gender_ix: s.gender_ix,
+                household: s.household,
+                plot: plot.filter(|_| s.here()),
+                away: s.away_until.is_some() || !s.here(),
+                leaving: crate::life::leaving_home(self, s),
+                baby: s.here() && self.content.life.baby(s.age),
+                needs: s.needs,
+                here: s.here(),
+                partnered: self.relationships.partner_of(s.id as usize).is_some(),
+                adult: s.adult(&self.content),
+                age: s.age,
+                conversing: None,
+                cleaning: s.current().and_then(|a| match a.task.kind {
+                    TaskKind::Clean { x, z } => Some((x, z)),
+                    TaskKind::Use { .. } => s.sweep,
+                    _ => None,
+                }),
+                seated: s.pose == Pose::Sit && !s.is_moving(),
+                lying: s.pose == Pose::Lie,
+                eating: s.eating_seated(),
+                game: s.game,
+                // (`partners::free_now`, its start just above.)
+                free: {
+                    let free = available && crate::partners::free_besides(&self.content, s, tick);
+                    debug_assert_eq!(free, crate::partners::free_now(&self.content, s, tick));
+                    free
+                },
+                bound_for_car: s.bound_for_car.filter(|_| {
+                    s.current()
+                        .is_some_and(|a| matches!(a.task.kind, TaskKind::Work))
+                }),
+                trip_car: s.bound_for_car.filter(|_| {
+                    s.current().is_some_and(|a| {
+                        matches!(a.task.kind, TaskKind::Visit { .. } | TaskKind::GoHome)
+                    })
+                }),
+                bike: s.commute.and_then(|c| c.bike),
+                bike_spot: s.bike_spot.map(|(at, _)| at),
+                guest_at: s.visiting.map(|v| v.plot),
+                eats_at: match s.current().map(|a| a.task.kind) {
+                    Some(TaskKind::Eat { seat, stage: 1, .. }) => seat,
+                    _ => None,
+                },
+                carried: s.carried_by.is_some(),
+                private: crate::privacy::private_use(&self.content, &self.objects, s),
+            });
+        }
+        // Who's in a conversation, and whose (for joining in).
+        for (i, s) in self.sims.iter().enumerate() {
+            if let Some((t, social, ..)) = s.conversation(&self.content) {
+                briefs[i].conversing = Some((i as u32, social));
+                briefs[t as usize].conversing = Some((i as u32, social));
+            }
+        }
+        for (i, s) in self.sims.iter().enumerate() {
+            if let Some(l) = s.listening_to() {
+                briefs[i].conversing = briefs[l as usize].conversing.filter(|c| c.0 == l);
+            }
+        }
+        self.members.build(&briefs);
+        self.briefs = briefs;
+        crate::profile::end("briefs", briefs_start);
+    }
+
+    /// The tick's tail: feelings fade and buffs refresh, relationships decay by the day, crops
+    /// grow and machines run (`tick_once`).
+    fn update_after_step(&mut self, tick: u64) {
         for s in self.sims.iter_mut().filter(|s| s.steps > 0) {
             s.feelings.retain(|m| m.expires > tick);
             if self.content.buff_feelings {
@@ -5189,16 +4090,9 @@ impl World {
         self.broadcast_scratch = scratch;
     }
 
-    /// `broadcast` with its buffers (`BroadcastScratch`) out of `self`.
-    fn broadcast_with(&mut self, scratch: &mut BroadcastScratch) {
-        let BroadcastScratch {
-            sources,
-            rooms,
-            storeys,
-            plots,
-            asleep,
-            heard,
-        } = scratch;
+    /// `broadcast_with`'s sources: what each resident using something that carries
+    /// (`broadcast`) is using, where, and what it gives.
+    fn broadcast_sources(&self, sources: &mut Vec<BroadcastSource>) {
         let content = &self.content;
         sources.clear();
         for sim in &self.sims {
@@ -5244,9 +4138,23 @@ impl World {
                 user: sim.id,
             });
         }
+    }
+
+    /// `broadcast` with its buffers (`BroadcastScratch`) out of `self`.
+    fn broadcast_with(&mut self, scratch: &mut BroadcastScratch) {
+        let BroadcastScratch {
+            sources,
+            rooms,
+            storeys,
+            plots,
+            asleep,
+            heard,
+        } = scratch;
+        self.broadcast_sources(sources);
         if sources.is_empty() {
             return;
         }
+        let content = &self.content;
         rooms.clear();
         rooms.extend(self.sims.iter().map(|s| {
             let (x, z) = s.tile();
@@ -5377,968 +4285,6 @@ impl World {
         }
     }
 
-    /// Applies a player command. Build and buy edits can be undone (`Command::Undo`) until time
-    /// moves on or the player gives the household another kind of order. A command naming an
-    /// object that's gone since the view showed it (sold, undone: an id handed out before and
-    /// not there now) does nothing; an id never handed out is an error.
-    pub fn apply(&mut self, mut cmd: Command) -> Result<(), Error> {
-        // A command names objects by their stable ids; the simulation works in indices.
-        if let Some(object) = cmd.object_mut() {
-            let stable = *object;
-            match self.index_of(stable) {
-                Some(i) => *object = i as u32,
-                None if stable < self.next_object_id => return Ok(()),
-                None => return Err(Error::new(format!("unknown object {stable}"))),
-            }
-        }
-        let history = match cmd {
-            Command::Undo { household } => Some(self.undo(household)),
-            Command::Redo { household } => Some(self.redo(household)),
-            _ => None,
-        };
-        if let Some(result) = history {
-            result?;
-            self.refresh_rooms();
-            return Ok(());
-        }
-        let snapshot = cmd.home_edit().and_then(|h| self.home_snapshot(h));
-        let keeps_history = matches!(
-            cmd,
-            Command::SetSpeed { .. }
-                | Command::SetLifespan { .. }
-                | Command::SetPlayerMoves { .. }
-                | Command::AddFunds { .. }
-                | Command::SetSkill { .. }
-                | Command::SetNeed { .. }
-                | Command::SetBond { .. }
-                | Command::SetAutonomy { .. }
-                | Command::SetAutoFast { .. }
-                | Command::SetRoutines { .. }
-                | Command::SetHouseholdRoutines { .. }
-                | Command::SkipHouseholdRoutine { .. }
-                | Command::AddGoal { .. }
-                | Command::RemoveGoal { .. }
-                | Command::MoveGoal { .. }
-                | Command::AcceptSuggestion { .. }
-                | Command::DismissSuggestion { .. }
-                | Command::DeclinePurchase { .. }
-                // (The land keeps its own undo; `shape_land` carries what it changed into the
-                // home edits kept.)
-                | Command::ShapeLand { .. }
-        );
-        if let Err(e) = self.apply_command(cmd) {
-            // (Nothing to keep for undo.)
-            if let Some(s) = snapshot {
-                self.lot.log_forget(s.lot_mark());
-            }
-            return Err(e);
-        }
-        self.catch_up_rooms();
-        // Someone an order or an edit stopped (the sink they carried dishes to was moved) puts
-        // down what they carry now, not when time moves on (Build mode stands still).
-        // (The objects' index catches up as time moves on, if nobody has anything to put down.)
-        if crate::cooking::must_settle(self) {
-            crate::cooking::settle(self);
-        }
-        match snapshot {
-            Some(s) => self.remember(s),
-            None if !keeps_history => {
-                self.undo.clear();
-                self.redo.clear();
-            }
-            None => {}
-        }
-        Ok(())
-    }
-
-    fn apply_command(&mut self, cmd: Command) -> Result<(), Error> {
-        match cmd {
-            Command::SetSpeed { speed } => {
-                if speed > MAX_SPEED {
-                    return Err(Error::new(format!("speed must be 0..={MAX_SPEED}")));
-                }
-                // (The player's pick, super speed too: it stays when the quiet ends.)
-                self.speed = speed;
-                self.auto_super = false;
-                if (1..SUPER_SPEED).contains(&self.speed) {
-                    self.resume_speed = self.speed;
-                }
-            }
-            Command::SetAutoFast { enabled } => {
-                // (Turned on while it's quiet: super speed starts at the next step.)
-                if enabled && !self.auto_fast {
-                    self.was_calm = false;
-                }
-                self.auto_fast = enabled;
-            }
-            Command::SetRoutines { sim, routines } => {
-                let routines = crate::planner::routines_from(&self.content, &routines)?;
-                let s = self.sim_mut(sim)?;
-                s.planner.routines = routines;
-                // A changed block starts over (with today's plan).
-                s.planner.run = None;
-            }
-            Command::SetHouseholdRoutines { sim, routines } => {
-                let routines = crate::planner::routines_from(&self.content, &routines)?;
-                let h = self.sim(sim)?.household as usize;
-                self.households[h].routines = routines;
-                for s in self.sims.iter_mut().filter(|s| s.household as usize == h) {
-                    s.planner.run = None;
-                }
-            }
-            Command::SkipHouseholdRoutine { sim, routine, skip } => {
-                let skips = &mut self.sim_mut(sim)?.planner.skip_household;
-                skips.retain(|&r| r != routine);
-                if skip {
-                    skips.push(routine);
-                }
-            }
-            Command::AddGoal { sim, goal } => {
-                let day = crate::clock::day(self.tick);
-                let goal = crate::planner::goal_from(&self.content, &goal, self.sim(sim)?, day)?;
-                if crate::planner::progress(self, sim as usize, &goal) >= 1.0 {
-                    return Err(Error::new(format!(
-                        "{} is there already",
-                        self.sims[sim as usize].name
-                    )));
-                }
-                let max = self.content.planner.max_goals;
-                let s = self.sim_mut(sim)?;
-                if s.planner.goals.len() >= max {
-                    return Err(Error::new(format!("{} has {max} goals already", s.name)));
-                }
-                if s.planner.goals.iter().any(|g| g.same(&goal)) {
-                    return Err(Error::new(format!("{} has that goal already", s.name)));
-                }
-                s.planner.goals.push(goal);
-            }
-            Command::RemoveGoal { sim, index } => {
-                let goals = &mut self.sim_mut(sim)?.planner.goals;
-                if index < goals.len() {
-                    goals.remove(index);
-                }
-            }
-            Command::MoveGoal { sim, index, to } => {
-                let goals = &mut self.sim_mut(sim)?.planner.goals;
-                if index < goals.len() && to < goals.len() {
-                    let goal = goals.remove(index);
-                    goals.insert(to, goal);
-                }
-            }
-            Command::AcceptSuggestion { sim, index } => {
-                let max = self.content.planner.max_goals;
-                let day = crate::clock::day(self.tick);
-                let s = self.sim_mut(sim)?;
-                if index < s.planner.suggestions.len() {
-                    if s.planner.goals.len() >= max {
-                        return Err(Error::new(format!("{} has {max} goals already", s.name)));
-                    }
-                    let mut goal = s.planner.suggestions.remove(index);
-                    goal.since_day = day;
-                    // Already on the list (the player added it meanwhile): the idea just goes.
-                    if !s.planner.goals.iter().any(|g| g.same(&goal)) {
-                        s.planner.goals.push(goal);
-                    }
-                }
-            }
-            Command::DismissSuggestion { sim, index } => {
-                let suggestions = &mut self.sim_mut(sim)?.planner.suggestions;
-                if index < suggestions.len() {
-                    suggestions.remove(index);
-                }
-            }
-            Command::AcceptPurchase { sim } => {
-                self.sim(sim)?;
-                crate::planner::accept_purchase(self, sim as usize)?;
-            }
-            Command::DeclinePurchase { sim } => {
-                self.sim(sim)?;
-                crate::planner::decline_purchase(self, sim as usize)?;
-            }
-            Command::SetLifespan { lifespan } => self.lifespan = lifespan,
-            Command::SetPlayerMoves { enabled } => self.player_moves = enabled,
-            Command::AddFunds { household, amount } => {
-                let h = self
-                    .households
-                    .get_mut(household as usize)
-                    .ok_or_else(|| Error::new(format!("unknown household {household}")))?;
-                h.funds = (h.funds + amount).max(0);
-            }
-            Command::SetNeed { sim, need, value } => {
-                self.sim(sim)?;
-                let n = self.content.needs.len();
-                let which: Vec<usize> = if need == "all" {
-                    (0..n).collect()
-                } else {
-                    vec![
-                        self.content
-                            .needs
-                            .iter()
-                            .position(|d| d.id == need)
-                            .ok_or_else(|| Error::new(format!("unknown need '{need}'")))?,
-                    ]
-                };
-                let value = if value.is_finite() {
-                    value.clamp(0.0, 1.0)
-                } else {
-                    0.5
-                };
-                let sim = &mut self.sims[sim as usize];
-                for k in which {
-                    sim.needs[k] = value;
-                }
-                sim.planner.recheck = true;
-            }
-            Command::SetBond {
-                a,
-                b,
-                friendship,
-                romance,
-                chemistry,
-                partners,
-            } => {
-                self.sim(a)?;
-                self.sim(b)?;
-                if a == b {
-                    return Err(Error::new("a bond is between two residents"));
-                }
-                let (a, b) = (a as usize, b as usize);
-                // (Only those who may court: the game can't get anyone else there, so a check can't either.)
-                let grown_ups =
-                    self.sims[a].adult(&self.content) && self.sims[b].adult(&self.content);
-                if !conversation::may_court(grown_ups, self.relationships.get(a, b))
-                    && (romance.is_some_and(|f| f > 0.0) || partners == Some(true))
-                {
-                    return Err(Error::new(
-                        "only grown-ups who aren't family can be partners or in love",
-                    ));
-                }
-                let r = &mut self.relationships;
-                for (x, y) in [(a, b), (b, a)] {
-                    let rel = r.get_mut(x, y);
-                    rel.met = true;
-                    if let Some(f) = friendship.filter(|f| f.is_finite()) {
-                        rel.friendship = f.clamp(-100.0, 100.0);
-                    }
-                    if let Some(f) = romance.filter(|f| f.is_finite()) {
-                        rel.romance = f.clamp(-100.0, 100.0);
-                    }
-                }
-                if let Some(c) = chemistry.filter(|c| c.is_finite()) {
-                    r.set_chemistry(a, b, c);
-                }
-                if let Some(p) = partners {
-                    // (One partner each: a new one ends what either had.)
-                    if p {
-                        for x in [a, b] {
-                            if let Some(old) = r.partner_of(x).filter(|&o| o != a && o != b) {
-                                r.set_partners(x, old, false);
-                            }
-                        }
-                    }
-                    r.set_partners(a, b, p);
-                }
-                self.sims[a].planner.recheck = true;
-                self.sims[b].planner.recheck = true;
-            }
-            Command::SetSkill { sim, skill, level } => {
-                self.sim(sim)?;
-                let s = self
-                    .content
-                    .skill_index(&skill)
-                    .ok_or_else(|| Error::new(format!("unknown skill '{skill}'")))?;
-                let level = if level.is_finite() {
-                    level.clamp(0.0, self.content.skill_rules.max_level)
-                } else {
-                    0.0
-                };
-                let sim = &mut self.sims[sim as usize];
-                sim.skills[s] = level;
-                sim.planner.recheck = true;
-            }
-            Command::Adopt { household, child } => {
-                crate::lifecycle::adopt(self, household, child)?;
-            }
-            Command::SetAutonomy { enabled, household } => {
-                if let Some(h) = household {
-                    self.households
-                        .get_mut(h as usize)
-                        .ok_or_else(|| Error::new(format!("unknown household {h}")))?
-                        .free_will = enabled;
-                } else {
-                    for h in self.households.iter_mut().filter(|h| h.player) {
-                        h.free_will = enabled;
-                    }
-                }
-            }
-            Command::SwitchLamp { object, on } => {
-                let obj = &self.objects[object as usize];
-                if !crate::lights::switchable(self, obj.def) {
-                    return Err(Error::new(format!(
-                        "the {} has no switch",
-                        self.content.objects[obj.def].name.to_lowercase()
-                    )));
-                }
-                crate::lights::set(self, object, on);
-            }
-            Command::DrawCurtains { object, shut } => {
-                let obj = &self.objects[object as usize];
-                if !crate::curtains::is_curtain(self, obj.def) {
-                    return Err(Error::new(format!(
-                        "the {} has no curtains to draw",
-                        self.content.objects[obj.def].name.to_lowercase()
-                    )));
-                }
-                crate::curtains::set(self, object, shut);
-            }
-            Command::Use {
-                sim,
-                object,
-                interaction,
-            } => {
-                // (Who serves where, as the objects are now: `staff::closed`.)
-                crate::staff::refresh(self);
-                let obj = &self.objects[object as usize];
-                let Some(inter) = self.content.objects[obj.def].interactions.get(interaction)
-                else {
-                    return Err(Error::new(format!(
-                        "object {object} has no interaction {interaction}"
-                    )));
-                };
-                if obj.broken() {
-                    return Err(Error::new(format!(
-                        "the {} is broken — repair it first",
-                        self.content.objects[obj.def].name
-                    )));
-                }
-                // Trying for a baby is asked of a partner (the social), not done at the bed alone.
-                if inter.conceive {
-                    return Err(Error::new(format!(
-                        "{} is asked of a partner: click them",
-                        inter.label
-                    )));
-                }
-                if let Some(required) = missing_requirement(
-                    &self.content,
-                    &self.object_plot,
-                    None,
-                    &self.objects,
-                    object,
-                    inter,
-                ) {
-                    return Err(Error::new(format!(
-                        "{} needs a working object on this lot that provides {required}",
-                        inter.label
-                    )));
-                }
-                if !obj.allows(inter, sim) {
-                    let name = self.content.objects[obj.def].name.to_lowercase();
-                    return Err(Error::new(match inter.when {
-                        Some(w) if w != obj.open && obj.open => {
-                            format!("the {name} is already open")
-                        }
-                        Some(w) if w != obj.open => format!("the {name} is closed"),
-                        _ if inter.ripe && !obj.ripe() => self.content.objects[obj.def]
-                            .not_ripe
-                            .clone()
-                            .unwrap_or_else(|| format!("the {name} isn't ripe yet")),
-                        _ if (inter.loads
-                            || inter.unloads
-                            || inter.work_on == Some(crate::content::WorkOn::Dishes))
-                            && obj.running() =>
-                        {
-                            format!("the {name} is still running")
-                        }
-                        _ if inter.work_on == Some(crate::content::WorkOn::Dishes)
-                            && obj.done() =>
-                        {
-                            format!("the {name} is done: empty it first")
-                        }
-                        _ if inter.loads && obj.done() => {
-                            format!("the {name} is done: take the washing out first")
-                        }
-                        _ if inter.unloads && obj.run.is_none() => {
-                            format!("there's nothing in the {name}")
-                        }
-                        _ => format!("someone is using the {name}"),
-                    }));
-                }
-                // (Lying along the whole window seat: not with someone else on it.)
-                if inter.whole && !obj.can_use_for(sim, &self.content.objects[obj.def], interaction)
-                {
-                    let name = self.content.objects[obj.def].name.to_lowercase();
-                    return Err(Error::new(format!("someone is using the {name}")));
-                }
-                if inter.needs_table
-                    && crate::surface::faced_table(
-                        &self.content,
-                        &self.objects,
-                        &self.nav(),
-                        object,
-                    )
-                    .is_none()
-                {
-                    return Err(Error::new(format!(
-                        "{} needs a table: pull the {} up to one",
-                        inter.label,
-                        self.content.objects[obj.def].name.to_lowercase()
-                    )));
-                }
-                // Only their own home's things and public places', and what guests may use where
-                // they're a guest (or on their way to be one).
-                let s = self.sim(sim)?;
-                let plot = self.object_plot.get(object as usize).copied().flatten();
-                let visiting = |p: u32| {
-                    let visit = |t: &Task| matches!(t.kind, TaskKind::Visit { plot } if plot == p);
-                    s.current.as_ref().is_some_and(|a| visit(&a.task)) || s.queue.iter().any(visit)
-                };
-                let allowed = match order_access(&self.households, &self.plots, s, plot) {
-                    Access::None if plot.is_some_and(visiting) => Access::Guest,
-                    a => a,
-                };
-                let thing = self.content.objects[obj.def].name.to_lowercase();
-                if allowed == Access::None {
-                    return Err(Error::new(format!("the {thing} isn't {}'s to use", s.name)));
-                }
-                if allowed == Access::Guest && self.content.objects[obj.def].private {
-                    return Err(Error::new(format!(
-                        "{} is a guest there, and the {thing} is the household's own",
-                        s.name
-                    )));
-                }
-                if allowed == Access::Guest
-                    && !guest_may(&self.content, &self.content.objects[obj.def], inter)
-                {
-                    return Err(Error::new(format!(
-                        "{} is a guest there, and guests don't {}",
-                        s.name,
-                        inter.label.to_lowercase()
-                    )));
-                }
-                // Who may use what, as free will keeps it: wine and the stove not for a child,
-                // the kids' things not for grown-ups, homework for pupils, the baby's care for
-                // grown-ups (and only with the baby there).
-                if let Some(why) = unfit(&self.content, s.age, inter) {
-                    return Err(Error::new(match why {
-                        Unfit::TooYoung => {
-                            format!("{} is too young to {}", s.name, inter.label.to_lowercase())
-                        }
-                        Unfit::TooBig => format!("{} is too big for the {thing}", s.name),
-                        Unfit::NoHomework => format!("{} has no homework to do", s.name),
-                        Unfit::TooYoungToCare => {
-                            format!("{} is too young to look after a baby", s.name)
-                        }
-                    }));
-                }
-                // Its conditions, as free will keeps them: stargazing after dark under open sky,
-                // washing up with dishes to wash.
-                let work = self
-                    .work_waiting()
-                    .get(s.household as usize)
-                    .copied()
-                    .unwrap_or(0);
-                if let Some(why) = unmet(
-                    &self.lot,
-                    crate::clock::hour(self.tick),
-                    obj,
-                    &self.content,
-                    inter,
-                    work,
-                ) {
-                    let label = inter.label.to_lowercase();
-                    return Err(Error::new(match why {
-                        Unmet::Hours => {
-                            let [from, to] = inter.hours.unwrap_or_default();
-                            format!(
-                                "{} can only {label} from {} to {}",
-                                s.name,
-                                clock_time(from),
-                                clock_time(to)
-                            )
-                        }
-                        Unmet::Sky => format!(
-                            "{} can only {label} under open sky: the {thing} has to stand outside",
-                            s.name
-                        ),
-                        Unmet::Nothing(w) => format!("{}: {}", inter.label, w.none()),
-                    }));
-                }
-                // A tool that cleans the floor: only at home, with a floor there it cleans.
-                if let Some(sweep) = &inter.cleans {
-                    let home = self.households[s.household as usize].plot;
-                    if plot.is_none() || plot != home {
-                        return Err(Error::new(format!("{}: only at home", inter.label)));
-                    }
-                    if decide::sweep_spot(s, &self.ctx(), sweep, decide::SWEEP_ORDERED).is_none() {
-                        return Err(Error::new(format!(
-                            "{}: the floors it cleans are clean",
-                            inter.label
-                        )));
-                    }
-                }
-                // Sold at a post outside its hours (or a coffee from a café that's shut): closed.
-                // (As `closed_at`: the objects on its plot, none off the plots.)
-                let plot = self.object_plot.get(object as usize).copied().flatten();
-                let on: Vec<u32> = match plot {
-                    Some(p) => self
-                        .objects
-                        .iter()
-                        .filter(|o| {
-                            self.object_plot.get(o.id as usize).copied().flatten() == Some(p)
-                        })
-                        .map(|o| o.id)
-                        .collect(),
-                    None => Vec::new(),
-                };
-                if let Some(post) = crate::staff::closed(
-                    &self.content,
-                    &self.staff,
-                    &self.objects,
-                    &on,
-                    object,
-                    inter,
-                    crate::clock::hour(self.tick),
-                ) {
-                    let name = self.content.objects[self.objects[post as usize].def]
-                        .name
-                        .to_lowercase();
-                    let opens = crate::staff::opens(&self.content, &self.objects, post)
-                        .map_or(String::new(), |h| {
-                            format!(": it opens at {}", clock_time(h))
-                        });
-                    return Err(Error::new(format!("the {name} is closed{opens}")));
-                }
-                // A game for two: its places free (or one taken by someone there for the same
-                // game, to play along with), and someone free to play, or a use for one to do
-                // instead (`partners.rs`).
-                if inter.partner {
-                    let def = &self.content.objects[obj.def];
-                    let mut others = obj.users[def.slots_for(interaction)]
-                        .iter()
-                        .flatten()
-                        .filter(|&&u| u != sim);
-                    let (first, more) = (others.next().copied(), others.next().is_some());
-                    let along = |u: u32| {
-                        crate::partners::game(self, u)
-                            .is_some_and(|(o, i, _)| (o, i) == (object, interaction))
-                    };
-                    if more || first.is_some_and(|u| !along(u)) {
-                        return Err(Error::new(format!("someone is using the {thing}")));
-                    }
-                    if first.is_none()
-                        && inter.alone.is_none()
-                        && crate::partners::partner_for(self, sim as usize, object, interaction)
-                            .is_none()
-                    {
-                        return Err(Error::new(format!(
-                            "nobody is free to {} with {}",
-                            inter.label.to_lowercase(),
-                            s.name
-                        )));
-                    }
-                }
-                if inter.cares()
-                    && !obj.users().any(|u| {
-                        self.sims
-                            .get(u as usize)
-                            .is_some_and(|b| self.content.life.baby(b.age))
-                    })
-                {
-                    return Err(Error::new(format!("there's no baby in the {thing}")));
-                }
-                if upper_barred(&self.content, obj, sim, s.age) {
-                    let young = crate::content::all_older(
-                        self.content.objects[obj.def].upper_stages,
-                        self.content.life.stage(s.age),
-                    );
-                    return Err(Error::new(format!(
-                        "{} is too {} for the top bunk",
-                        s.name,
-                        if young { "young" } else { "old" }
-                    )));
-                }
-                let household = s.household as usize;
-                if !affordable(inter.cost, self.households[household].funds) {
-                    return Err(Error::new(format!(
-                        "not enough money: {} costs {}",
-                        inter.label, inter.cost
-                    )));
-                }
-                // Something in a public place or at someone else's: not leaving a baby home alone.
-                crate::life::check_cover_at(
-                    self,
-                    sim as usize,
-                    self.object_plot.get(object as usize).copied().flatten(),
-                )?;
-                self.enqueue(
-                    sim,
-                    TaskKind::Use {
-                        object,
-                        interaction,
-                    },
-                )?;
-            }
-            Command::UseItem { sim, item, action } => {
-                let household = self.sim(sim)?.household;
-                let it = self
-                    .items
-                    .get(item)
-                    .filter(|it| it.household == household)
-                    .ok_or_else(|| Error::new("that isn't theirs"))?;
-                let kind = match action {
-                    crate::command::ItemAction::Eat => {
-                        if !it.edible() {
-                            return Err(Error::new(if it.spoiled {
-                                "that's gone off"
-                            } else {
-                                "there's nothing left to eat"
-                            }));
-                        }
-                        TaskKind::Eat {
-                            item: Some(item),
-                            seat: None,
-                            plate: None,
-                            stage: 0,
-                        }
-                    }
-                    crate::command::ItemAction::Clear => {
-                        // (With no sink, into the bin.)
-                        let dishes = self.content.cooking.dishes | self.content.cooking.bin;
-                        let home = self.households[household as usize].plot;
-                        let sink = self.objects.iter().any(|o| {
-                            self.content.objects[o.def].stations & dishes != 0
-                                && !o.broken()
-                                && self.object_plot[o.id as usize] == home
-                        });
-                        if !sink {
-                            return Err(Error::new(
-                                "there's nowhere to wash up: buy a sink, a dishwasher or a bin",
-                            ));
-                        }
-                        TaskKind::Dishes {
-                            item,
-                            station: None,
-                            stage: 0,
-                            scraps: 0,
-                        }
-                    }
-                };
-                self.enqueue(sim, kind)?;
-            }
-            Command::MoveTo { sim, x, z } => {
-                if !self.lot.in_bounds(x.floor() as i32, z.floor() as i32) {
-                    return Err(Error::new("move target is off the lot"));
-                }
-                crate::life::check_cover_at(
-                    self,
-                    sim as usize,
-                    self.plot_at(x.floor() as i32, z.floor() as i32),
-                )?;
-                self.enqueue(sim, TaskKind::MoveTo { x, z })?;
-            }
-            Command::Social {
-                sim,
-                target,
-                social,
-            } => {
-                let (a, t) = (self.sim(sim)?, self.sim(target)?);
-                let def = self
-                    .content
-                    .socials
-                    .get(social)
-                    .ok_or_else(|| Error::new(format!("unknown social {social}")))?;
-                if !conversation::social_allowed(&self.content, &self.relationships, a, t, def) {
-                    return Err(Error::new(format!(
-                        "{} isn't possible right now",
-                        def.label
-                    )));
-                }
-                // Trying for a baby needs a bed behind a shut door (`privacy.rs`).
-                if def.success.effect == social::Effect::Conceive
-                    && crate::privacy::beds_in_content(&self.content)
-                    && crate::privacy::bed_in_world(self, sim as usize, target as usize).is_none()
-                {
-                    return Err(Error::new(format!(
-                        "{} and {} have nowhere private to try for a baby: a double bed in a room of its own",
-                        a.name, t.name
-                    )));
-                }
-                // Walking over to someone out of the house (in the park, say).
-                let (tx, tz) = t.tile();
-                crate::life::check_cover_at(self, sim as usize, self.plot_at(tx, tz))?;
-                self.enqueue(sim, TaskKind::Social { target, social })?;
-            }
-            Command::JoinCareer { sim, career, level } => {
-                let def = self
-                    .content
-                    .careers
-                    .get(career)
-                    .ok_or_else(|| Error::new(format!("unknown career {career}")))?;
-                let position = def
-                    .levels
-                    .get(level)
-                    .ok_or_else(|| Error::new(format!("{} has no level {level}", def.label)))?;
-                if !self.sim(sim)?.adult(&self.content) {
-                    return Err(Error::new(format!(
-                        "{} is too young to work",
-                        self.sims[sim as usize].name
-                    )));
-                }
-                let s = &mut self.sims[sim as usize];
-                if !crate::life::can_join(&self.content, position, &s.skills) {
-                    return Err(Error::new(format!(
-                        "{} doesn't have the skills to be a {} yet",
-                        s.name, position.title
-                    )));
-                }
-                s.job = Some(crate::life::Job::new(
-                    career,
-                    level,
-                    crate::clock::day(self.tick),
-                ));
-                // Back to work: no more pension.
-                (s.retired, s.pension) = (false, 0);
-                // (The car the new job calls for: `cars/looks.rs`.)
-                let household = s.household;
-                crate::cars::job_changed(&mut self.cars, &self.content, &self.sims, household);
-            }
-            Command::QuitCareer { sim } => {
-                self.sim_mut(sim)?.job = None;
-                crate::cars::job_lost(&mut self.cars, sim);
-            }
-            Command::Visit { sim, plot } => {
-                if plot as usize >= self.plots.len() {
-                    return Err(Error::new(format!("unknown plot {plot}")));
-                }
-                self.sim(sim)?;
-                self.check_open(sim as usize, plot)?;
-                // Not leaving a baby home alone with no money for a babysitter.
-                crate::life::check_cover_at(self, sim as usize, Some(plot))?;
-                self.enqueue(sim, TaskKind::Visit { plot })?;
-            }
-            Command::GoHome { sim } => {
-                // A guest sent home says goodbye to one of the hosts first, if one is free (as at
-                // the end of any visit), leaving whatever they chose to do themselves.
-                let s = self.sim(sim)?;
-                let goodbye = s
-                    .visiting
-                    .and_then(|v| crate::life::farewell(self, sim as usize, v.plot));
-                if let Some((host, social)) =
-                    goodbye.filter(|_| self.sims[sim as usize].queue.len() + 1 < MAX_QUEUE)
-                {
-                    let World {
-                        sims,
-                        content,
-                        objects,
-                        ..
-                    } = self;
-                    let s = &mut sims[sim as usize];
-                    if s.current.as_ref().is_some_and(|a| !a.task.directed) {
-                        end_activity(s, content, objects);
-                    }
-                    s.queue.push_back(Task {
-                        kind: TaskKind::Social {
-                            target: host as u32,
-                            social,
-                        },
-                        directed: false,
-                        routine: false,
-                    });
-                }
-                self.enqueue(sim, TaskKind::GoHome)?;
-            }
-            Command::Phone {
-                sim,
-                action,
-                contact,
-            } => {
-                self.sim(sim)?;
-                crate::phone::check_order(self, sim as usize, action, contact)?;
-                self.enqueue(
-                    sim,
-                    TaskKind::Phone {
-                        action,
-                        contact,
-                        seat: None,
-                        answer: crate::phone::Answer::Pending,
-                    },
-                )?;
-            }
-            Command::Buy {
-                household,
-                object,
-                at,
-                colors,
-                turn,
-                offset,
-                size,
-                tall,
-            } => {
-                let def = self.content.object_index(&object);
-                let turn = def
-                    .map(|d| self.check_turn(d, turn.unwrap_or(0)))
-                    .transpose()?;
-                let rot = at.map_or(0, |a| a[2] as u8);
-                let layout = Layout {
-                    offset: offset.unwrap_or([0, 0]),
-                    extent: size,
-                    tall: tall.unwrap_or(0),
-                };
-                let layout = def.map(|d| self.check_layout(d, rot, layout)).transpose()?;
-                let colors = check_colors(colors)?;
-                let id = self.buy_at(household, &object, at, colors, layout.unwrap_or_default())?;
-                self.objects[id as usize].turn = turn.unwrap_or(0);
-            }
-            Command::Sell { household, object } => self.sell(household, object)?,
-            Command::MoveObject {
-                household,
-                object,
-                x,
-                z,
-                rot,
-                turn,
-                offset,
-                size,
-                tall,
-            } => {
-                let old = self.objects.get(object as usize).map(Layout::of);
-                let def = self.objects.get(object as usize).map(|o| o.def);
-                let turn = match (def, turn) {
-                    (Some(d), Some(t)) => Some(self.check_turn(d, t)?),
-                    _ => None,
-                };
-                // What isn't given stays as it was (checked against the new facing).
-                let layout = match (def, old) {
-                    (Some(d), Some(old)) => {
-                        // An offset it keeps that doesn't suit its new facing (along another wall) goes.
-                        let kept = if self.check_offset(d, rot, old.offset).is_ok() {
-                            old.offset
-                        } else {
-                            [0, 0]
-                        };
-                        let wanted = Layout {
-                            offset: offset.unwrap_or(kept),
-                            extent: size.or(old.extent),
-                            tall: tall.unwrap_or(old.tall),
-                        };
-                        Some(self.check_layout(d, rot, wanted)?)
-                    }
-                    _ => None,
-                };
-                let (offset, size, tall) = (
-                    layout.map(|l| l.offset),
-                    layout.and_then(|l| l.extent),
-                    layout.map(|l| l.tall),
-                );
-                self.move_object_to(household, object, x, z, rot, turn, offset, size, tall)?;
-            }
-            Command::Recolor {
-                household,
-                object,
-                colors,
-            } => self.recolor(household, object, check_colors(colors)?)?,
-            Command::Upgrade { household, object } => {
-                self.upgrade(household, object)?;
-            }
-            Command::Build { household, edits } => self.build(household, &edits)?,
-            Command::Paint { household, faces } => self.paint(household, &faces)?,
-            Command::PaintFloor { household, tiles } => self.paint_floor(household, &tiles)?,
-            Command::Undo { household } => self.undo(household)?,
-            Command::Redo { household } => self.redo(household)?,
-            Command::SetRoof {
-                household,
-                style,
-                color,
-            } => self.set_roof(household, style, color)?,
-            Command::Repair { household, object } => self.repair(household, object)?,
-            Command::BuildBlueprint {
-                household,
-                blueprint,
-            } => self.build_blueprint(household, &blueprint)?,
-            Command::MoveRoom {
-                household,
-                x,
-                z,
-                dx,
-                dz,
-            } => self.move_room(household, x, z, dx, dz)?,
-            Command::BuildGarage {
-                household,
-                x0,
-                z0,
-                x1,
-                z1,
-                rot,
-            } => self.build_garage(household, [x0, z0, x1, z1], rot)?,
-            Command::SellGarage { household } => self.sell_garage(household)?,
-            Command::BuildPorch {
-                household,
-                axis,
-                x,
-                z,
-            } => self.build_porch(household, axis, x, z)?,
-            Command::RemovePorch {
-                household,
-                axis,
-                x,
-                z,
-            } => self.remove_porch(household, axis, x, z)?,
-            Command::BuildPorchPiece {
-                household,
-                kind,
-                x,
-                z,
-                w,
-                d,
-                rot,
-            } => self.build_porch_piece(household, kind, x, z, w, d, rot)?,
-            Command::RemovePorchPiece {
-                household,
-                kind,
-                x,
-                z,
-            } => self.remove_porch_piece(household, kind, x, z)?,
-            Command::ShapeLand {
-                household,
-                cost,
-                meta,
-                water,
-            } => self.shape_land(household, cost, &meta, water)?,
-            Command::MoveIn {
-                household,
-                name,
-                sims,
-                bonds,
-            } => self.move_in(household, name, &sims, &bonds)?,
-            Command::Cancel { sim, index } => {
-                let World {
-                    sims,
-                    objects,
-                    content,
-                    ..
-                } = self;
-                let s = sims
-                    .get_mut(sim as usize)
-                    .ok_or_else(|| Error::new(format!("unknown resident {sim}")))?;
-                let offset = (s.current.is_some()
-                    || s.engaged_with.is_some()
-                    || s.heeding.is_some()) as usize;
-                if index < offset {
-                    // (Called over: they don't go after all.)
-                    s.heeding = None;
-                    if s.current.is_some() {
-                        end_activity(s, content, objects);
-                    } else {
-                        s.engaged_with = None;
-                    }
-                } else if index - offset < s.queue.len() {
-                    s.queue.remove(index - offset);
-                }
-            }
-        }
-        Ok(())
-    }
-
     fn sim(&self, id: u32) -> Result<&Sim, Error> {
         self.sims
             .get(id as usize)
@@ -6367,13 +4313,16 @@ impl World {
     }
 }
 
-// ---- the tick's helpers, split by what they do ---------------------------------------------
+// ---- the world's helpers, split by what they do --------------------------------------------
 
 mod colors;
+mod commands;
 mod decide;
 mod objects;
 mod outings;
+mod rooms;
 mod route;
+mod state;
 mod tick;
 
 pub use colors::*;
