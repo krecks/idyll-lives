@@ -12982,6 +12982,33 @@
         "neufert"
       ]
     },
+    "iceCreamMaker": {
+      "label": "Countertop ice cream maker",
+      "w": [
+        0.15,
+        0.25
+      ],
+      "h": [
+        0.3,
+        0.45
+      ],
+      "d": [
+        0.15,
+        0.25
+      ],
+      "uses": [
+        "churn a tub of ice cream"
+      ],
+      "minutes": {
+        "churn": [
+          2,
+          8
+        ]
+      },
+      "sources": [
+        "neufert"
+      ]
+    },
     "espressoMachine": {
       "label": "Espresso machine",
       "w": [
@@ -15565,6 +15592,7 @@
     "toaster": "toaster",
     "blender": "blender",
     "standMixer": "standMixer",
+    "iceCreamMaker": "iceCreamMaker",
     "espressoMachineSmall": "espressoMachine",
     "knifeBlock": "knifeBlock",
     "utensilCrock": "utensilPot",

@@ -57,6 +57,7 @@ palette! { M:
     stalk = ("#5A4632", matte),
     white = ("#F2F0EA", satin),
     blush = ("#E4B8AE", satin),
+    icecream = ("#8FD1A6", satin),     // churned mint: green, so it isn't the blender's pink smoothie
     rose = ("#E07B7B", satin),
     pink = ("#E07BC3", satin),
     bread = ("#D9A55B", matte),
@@ -69,6 +70,7 @@ palette! { M:
     blender_base = ("#3A3D41", satin),
     jug = ("#DCE6EA", gloss),          // opaque, so the smoothie shows as the jug's lower half
     smoothie = ("#E9A3B5", gloss),
+    ice_cream_maker = ("#C3C7CB", metal), // its plinth and head, painted; nothing else wears it
     mixer = ("#C0473A", gloss),
     espresso = ("#C3C7CB", metal),
     knife_block = ("#9C6B43", satin),
@@ -197,6 +199,9 @@ pub fn family() -> Option<Family> {
             // the jug shaking on its base, the beater turning round, for as long as each runs
             t("blender", "model.blender", blender, (0.18, 0.356, 0.146), &[("blender_base", BODY), ("smoothie", "Smoothie")])
                 .motions(motions(r#"{"loops": {"smoothie": "whirr"}}"#)),
+            // the tub twisting on its collar for as long as it churns
+            t("iceCreamMaker", "model.iceCreamMaker", ice_cream_maker, (0.237, 0.403, 0.224), &[("ice_cream_maker", BODY)])
+                .motions(motions(r#"{"loops": {"churn": "whirr"}}"#)),
             t("standMixer", "model.standMixer", stand_mixer, (0.3, 0.356, 0.17), &[("mixer", BODY)])
                 .motions(motions(r#"{"loops": {"bake": "beat"}}"#)),
             // the coffee running into the cup, then stopped while it's drunk
