@@ -1264,21 +1264,8 @@ fn childcare(w: &mut World, b: usize) {
     };
     let crib = crate::world::held_by(&w.sims[b], &w.objects)
         .next()
-        .or_else(home_crib);
-    debug_assert_eq!(
-        crib.map(|o| o.id),
-        w.objects
-            .iter()
-            .find(|o| o.users().any(|u| u as usize == b))
-            .or_else(|| w
-                .objects
-                .iter()
-                .zip(&w.object_plot)
-                .find(|&(o, &p)| p == Some(plot) && is_crib(o))
-                .map(|(o, _)| o))
-            .map(|o| o.id)
-    );
-    let crib = crib.map(|o| o.def);
+        .or_else(home_crib)
+        .map(|o| o.def);
     let Some(crib) = crib else { return };
     let day = clock::day(w.tick);
     if w.households[h].sitter_day != Some(day) {
@@ -2585,6 +2572,72 @@ mod tests {
         assert!(
             w.sims[i].commute.unwrap().ticks > home,
             "on foot: at least the walk from there"
+        );
+    }
+
+    /// A baby, a crib and two parents who both work 9 to 5 (with babysitting in the content).
+    const NURSERY: &str = r#"{
+        "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.1},{"id":"bladder","label":"Bladder","decayPerHour":0.12},
+                 {"id":"energy","label":"Energy","decayPerHour":0.02}],
+        "objects":[{"id":"crib","name":"Crib","price":350,"footprint":[2,1],"slots":2,"interactions":[
+            {"id":"lie","label":"Lie in the crib","minutes":720,"pose":"lie","baby":true,"autonomous":false,"effects":{"energy":1.0},"tags":["rest"]},
+            {"id":"feed","label":"Feed the baby","minutes":15,"care":{"hunger":0.8},"tags":["care"]},
+            {"id":"change","label":"Change the baby","minutes":10,"care":{"bladder":1.0},"tags":["care"]}]},
+          {"id":"fridge","name":"Fridge","price":100,"interactions":[
+            {"id":"snack","label":"Snack","minutes":10,"effects":{"hunger":0.5},"tags":["food"]}]},
+          {"id":"toilet","name":"Toilet","price":100,"interactions":[
+            {"id":"use","label":"Use","minutes":5,"effects":{"bladder":1.0},"tags":["bathroom"]}]}],
+        "skills":[{"id":"writing","label":"Writing"}],
+        "grades":[{"id":"A","label":"Entry","payPerHour":10,"skillLevel":0}],
+        "careerCategories":[{"id":"press","label":"Press","shift":{"start":9,"hours":8,"days":[0,1,2,3,4]},
+          "tracks":[{"id":"press.print","label":"Print","skills":{"writing":1},"titles":["Runner"]}]}],
+        "life":{"daysPerYear":2,"stages":[
+            {"id":"baby","label":"Baby","from":0,"baby":true},
+            {"id":"child","label":"Child","from":2,"school":true},
+            {"id":"adult","label":"Adult","from":18},
+            {"id":"elder","label":"Elder","from":60}],
+            "childcare":{"cost":40,"below":0.45}},
+        "bondPresets":{"partners":{"friendship":55,"romance":75,"partners":true},"parent":{"friendship":50,"kin":"parent"}},
+        "economy":{"startingFunds":1000}}"#;
+
+    const NURSERY_TOWN: &str = r#"{"width":12,"depth":12,
+        "plots":[{"name":"Home","x":0,"z":0,"w":12,"d":12,"entry":[5.5,11.5]}],
+        "households":[{"name":"Park","plot":0,"player":true}],
+        "objects":[{"def":"crib","x":2,"z":2},{"def":"fridge","x":8,"z":2},{"def":"toilet","x":10,"z":6}],
+        "exits":[[5.5,11.9]],
+        "sims":[{"name":"Ada","x":4.5,"z":8.5,"age":30,"job":{"career":"press.print","level":0}},
+                {"name":"Ben","x":5.5,"z":8.5,"age":32,"job":{"career":"press.print","level":0}},
+                {"name":"Cleo","x":3.5,"z":8.5,"age":0.5}],
+        "relationships":[{"a":0,"b":1,"preset":"partners"},{"a":2,"b":0,"preset":"parent"},{"a":2,"b":1,"preset":"parent"}]}"#;
+
+    /// What each resident holds a place at, found from what they're doing (`world::held_by`: the
+    /// babysitter's care and a crying baby's call look there), is what a scan of every object for
+    /// them finds, in id order: tick by tick, as the parents leave for work and a babysitter minds
+    /// the baby in her crib.
+    #[test]
+    fn what_a_baby_home_alone_holds_a_place_at_is_what_a_scan_of_every_object_finds() {
+        let mut w = World::from_json(NURSERY, NURSERY_TOWN, 1).unwrap();
+        until_hour(&mut w, 2, 7.0);
+        let (baby, crib) = (2, 0);
+        let mut minded = 0;
+        while clock::hour(w.tick) < 13.0 {
+            w.tick_once();
+            for s in &w.sims {
+                let held: Vec<u32> = crate::world::held_by(s, &w.objects).map(|o| o.id).collect();
+                let scan: Vec<u32> = (w.objects.iter())
+                    .filter(|o| o.users().any(|u| u == s.id))
+                    .map(|o| o.id)
+                    .collect();
+                assert_eq!(held, scan, "{} at tick {}", s.name, w.tick);
+            }
+            let away = w.sims[..2].iter().all(|s| s.away_until.is_some());
+            let in_crib = crate::world::held_by(&w.sims[baby], &w.objects).any(|o| o.id == crib);
+            minded += usize::from(away && in_crib);
+        }
+        assert!(minded > 0, "the baby in her crib with both parents at work");
+        assert!(
+            (w.events.iter()).any(|e| e.kind == EventKind::Babysitter && e.b == baby as u32),
+            "a babysitter for her"
         );
     }
 }
