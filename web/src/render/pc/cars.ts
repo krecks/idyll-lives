@@ -82,9 +82,8 @@ interface Drawn {
   shape: CarBody;
   /** Its body, paint and age (`body paint age`, or `taxi`): its own entity's meshes, shared by the cars that look alike. */
   look: string;
-  /** Its body and age (`body age`, or `taxi`): the instanced draw it's in while parked, and its paint there (`tintOf`). */
+  /** Its body and age (`body age`, or `taxi`): the instanced draw it's in while parked (its paint there: `tintOf`). */
   parkedLook: string;
-  tint: readonly number[];
   body: number;
   paint: number;
   age: CarAge;
@@ -423,7 +422,7 @@ export class Cars extends Vehicles {
       for (const car of this.cars) {
         if (car.parkedLook !== look || !car.drawn || car.owned) continue;
         p.draw.setMatrix(n, this.carMatrix(car.at, car.shape));
-        if (p.tinted) p.draw.set(INSTANCE_COLOR, n, car.tint);
+        if (p.tinted) p.draw.set(INSTANCE_COLOR, n, tintOf(car.paint, car.age));
         n++;
       }
       p.draw.update();
@@ -570,8 +569,6 @@ function placeOf(car: Drawn): CarAt {
 
 /** Each paint at each age as a parked car's copy has it (`tintOf`), by `paint age`, worked out once. */
 const TINTS = new Map<string, readonly number[]>();
-/** The taxis' copies: untinted. */
-const UNTINTED = [1, 1, 1, 1] as const;
 
 /** A household's car's paint (`CAR_PAINT` index) at its age as its parked copy's colour (`carPaintColour`: sRGB 0..1, opaque). */
 function tintOf(paint: number, age: CarAge): readonly number[] {
@@ -593,7 +590,6 @@ function drawnCar(row: number, taxi: boolean, body: number, paint: number, age: 
     shape,
     look: taxi ? 'taxi' : `${body} ${paint} ${age}`,
     parkedLook: taxi ? 'taxi' : `${body} ${age}`,
-    tint: taxi ? UNTINTED : tintOf(paint, age),
     body,
     paint,
     age,
