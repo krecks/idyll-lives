@@ -1777,6 +1777,18 @@ pub(crate) fn check_flats(plots: &[Plot], storeys: i32, depth: i32) -> Result<()
     Ok(())
 }
 
+/// The lots on the ground of `plots`: every plot before the first flat (`check_flats` keeps the
+/// flats after them all). Passes over the town's ground take these, and a flat's rectangle, its
+/// building's ground, is never taken for a lot of its own.
+pub(crate) fn lots_of(plots: &[Plot]) -> &[Plot] {
+    &plots[..plots.partition_point(|p| !p.is_flat())]
+}
+
+/// The flats of `plots`: every plot after the lots on the ground (`lots_of`).
+pub(crate) fn flats_of(plots: &[Plot]) -> &[Plot] {
+    &plots[lots_of(plots).len()..]
+}
+
 /// When a public place is open: minutes of the day `[open, close)` on the days in `days` (bit 0
 /// Monday), as the town file and saves carry it (`plots[].hours`, the page's `TownPlace.hours`).
 /// A `close` at or before `open` runs on past midnight into the next morning.
@@ -3083,6 +3095,16 @@ impl World {
         Some(eta)
     }
 
+    /// The lots on the ground, in id order (`lots_of`).
+    pub fn lots(&self) -> &[Plot] {
+        lots_of(&self.plots)
+    }
+
+    /// The flats, in id order after every lot on the ground (`flats_of`).
+    pub fn flats(&self) -> &[Plot] {
+        flats_of(&self.plots)
+    }
+
     /// The plot a tile is on (on any storey): the lot on the ground there, and in a building with
     /// flats, the flat on the tile's storey where one is (else the building's lot).
     pub fn plot_at(&self, x: i32, z: i32) -> Option<u32> {
@@ -3130,12 +3152,12 @@ impl World {
         }
         halls.of_lot = vec![0; self.plots.len()];
         let nav = self.nav();
-        for lot in self.plots.iter().filter(|p| !p.is_flat() && p.public) {
+        for lot in self.lots().iter().filter(|p| p.public) {
             if self.flats_in.get(lot.id as usize).is_none_or(|&k| k == 0) {
                 continue;
             }
             let Some(entry) = self
-                .plots
+                .flats()
                 .iter()
                 .find(|f| f.of == Some(lot.id))
                 .and_then(|f| f.entry)
@@ -3182,7 +3204,7 @@ impl World {
             return;
         }
         self.tile_plot = vec![crate::path::NO_PLOT; (width * depth) as usize];
-        for p in self.plots.iter().rev().filter(|p| !p.is_flat()) {
+        for p in lots_of(&self.plots).iter().rev() {
             for z in p.z.max(0)..(p.z + p.d).min(depth) {
                 for x in p.x.max(0)..(p.x + p.w).min(width) {
                     self.tile_plot[(z * width + x) as usize] = p.id as u16;
@@ -3191,7 +3213,7 @@ impl World {
         }
         self.flat_tiles.clear();
         self.flats_in = vec![0; self.plots.len()];
-        for f in self.plots.iter().filter(|p| p.is_flat()) {
+        for f in flats_of(&self.plots) {
             let Some(lot) = f.of.and_then(|of| self.plots.get(of as usize)) else {
                 continue;
             };
@@ -4789,7 +4811,7 @@ impl World {
         let rooms = &self.rooms;
         let mut source = vec![crate::rooms::NO_ROOM; self.lot.tile_slots()];
         // (A flat has no garden: its rectangle's ground is its building's.)
-        for (pi, p) in self.plots.iter().enumerate().filter(|(_, p)| !p.is_flat()) {
+        for (pi, p) in self.lots().iter().enumerate() {
             let garden = rooms
                 .iter()
                 .position(|r| r.garden && r.plot == Some(pi as u32))
@@ -4882,11 +4904,12 @@ impl World {
         let rect = [x0 - 1, z0 - 1, x1 + 1, z1 + 1];
         let meets =
             |r: [i32; 4]| r[0] < rect[2] && rect[0] < r[2] && r[1] < rect[3] && rect[1] < r[3];
-        // The plots there, on any storey (what stands upstairs outdoors is in the garden).
+        // The lots there, on any storey (what stands upstairs outdoors is in the garden; a flat
+        // has none).
         let depth = self.storey_depth().max(1);
         let blocks = (self.lot.depth as i32 / depth).max(1);
         let plots: Vec<u32> = self
-            .plots
+            .lots()
             .iter()
             .enumerate()
             .filter(|(_, p)| {
@@ -4928,9 +4951,11 @@ impl World {
         let lot = &self.lot;
         // The last plot over each tile sets its garden's score there (as `refresh_rooms`).
         let last_plot = |x: i32, z: i32| {
-            plots.iter().rev().copied().find(|&p| {
-                !self.plots[p as usize].is_flat() && self.plots[p as usize].contains(x, z)
-            })
+            plots
+                .iter()
+                .rev()
+                .copied()
+                .find(|&p| self.plots[p as usize].contains(x, z))
         };
         let gardens: Vec<u32> = found
             .iter()
@@ -4943,14 +4968,10 @@ impl World {
                 let pi = room.plot.expect("a garden is a plot's");
                 let p = &self.plots[pi as usize];
                 // (A later plot over the same tiles scores them: as `refresh_rooms`.)
-                let later: Vec<&Plot> = self.plots[pi as usize + 1..]
+                let later: Vec<&Plot> = self.lots()[pi as usize + 1..]
                     .iter()
                     .filter(|q| {
-                        !q.is_flat()
-                            && q.x < p.x + p.w
-                            && p.x < q.x + q.w
-                            && q.z < p.z + p.d
-                            && p.z < q.z + q.d
+                        q.x < p.x + p.w && p.x < q.x + q.w && q.z < p.z + p.d && p.z < q.z + q.d
                     })
                     .collect();
                 for z in p.z..p.z + p.d {

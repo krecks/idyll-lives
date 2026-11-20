@@ -2188,7 +2188,7 @@ struct FlatView<'a> {
 /// `StructureView::flats`: every flat, in id order.
 fn flat_views(world: &World) -> Vec<FlatView<'_>> {
     world
-        .plots
+        .flats()
         .iter()
         .filter_map(|p| {
             Some(FlatView {
@@ -2663,9 +2663,8 @@ fn household_views(world: &World) -> Vec<HouseholdView<'_>> {
 /// `StructureView::plots`: the lots on the ground, in id order (flats go in `flats`).
 fn plot_views(world: &World) -> Vec<PlotView<'_>> {
     world
-        .plots
+        .lots()
         .iter()
-        .filter(|p| !p.is_flat())
         .map(|p| PlotView {
             id: p.id,
             name: &p.name,

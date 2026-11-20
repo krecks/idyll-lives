@@ -710,7 +710,7 @@ impl World {
         const GARDEN_PATH: f32 = 1.8;
         let mut out = Vec::new();
         // (A flat has no front door of its own outdoors: its building's hall has it.)
-        for (i, p) in self.plots.iter().enumerate().filter(|(_, p)| !p.is_flat()) {
+        for (i, p) in self.lots().iter().enumerate() {
             let Some([bx0, bz0, bx1, bz1]) =
                 crate::view::house_bounds(self, p.x, p.z, p.x + p.w, p.z + p.d)
             else {

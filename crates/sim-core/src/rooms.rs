@@ -508,7 +508,7 @@ pub(crate) fn compute(w: &World) -> (Vec<RoomInfo>, Vec<Vec<(u32, f32)>>) {
         }
     }
     // Gardens: each plot's outdoor tiles (a flat has none: its building's yard is the building's).
-    for (pi, p) in w.plots.iter().enumerate().filter(|(_, p)| !p.is_flat()) {
+    for (pi, p) in w.lots().iter().enumerate() {
         for z in p.z..p.z + p.d {
             for x in p.x..p.x + p.w {
                 if !lot.in_bounds(x, z) {
@@ -683,7 +683,7 @@ fn finish_garden(w: &World, plot: u32, a: Acc) -> (RoomInfo, Vec<(u32, f32)>) {
     (garden, a.cells)
 }
 
-/// Rooms `ids` (lot ids, each once) and the gardens of `plots` (each once), exactly as `compute`
+/// Rooms `ids` (lot ids, each once) and the gardens of `plots` (lots on the ground, each once), exactly as `compute`
 /// finds them, walking only the tiles round each (`Lot::room_rect`) and the plots: for
 /// `World::refresh_rooms_near`, after a wall was built. A room or garden with no tiles is left
 /// out, as `compute` leaves it out; the rest come in no particular order.
@@ -795,12 +795,9 @@ pub(crate) fn compute_near(
             }
         }
     }
-    // Gardens: each plot's outdoor tiles (as `compute`: none for a flat).
+    // Gardens: each lot's outdoor tiles (as `compute`).
     for (&pi, acc) in plots.iter().zip(&mut gardens) {
         let p = &w.plots[pi as usize];
-        if p.is_flat() {
-            continue;
-        }
         for z in p.z..p.z + p.d {
             for x in p.x..p.x + p.w {
                 if !lot.in_bounds(x, z) {
