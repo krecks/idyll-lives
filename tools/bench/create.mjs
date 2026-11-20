@@ -1528,7 +1528,7 @@ try {
       const allAt = Date.now() - opened;
       const offer = await page.evaluate(() => ({
         step: document.querySelector('.side .head .eyebrow')?.textContent ?? '',
-        cards: [...document.querySelectorAll('.offer .card[data-slot]')].map((c) => Number(c.getAttribute('data-slot'))),
+        cards: [...document.querySelectorAll('.offer .card[data-home]')].map((c) => c.getAttribute('data-home')),
         faces: document.querySelectorAll('.offer .face').length,
         households: Number(/(\d+) households/.exec(document.querySelector('.view .stats')?.textContent ?? '')?.[1] ?? NaN),
       }));
@@ -1540,7 +1540,7 @@ try {
       // A card chosen: its home lit, the camera on its area, the way on naming them.
       await page.setViewportSize(sizes[0]);
       await page.waitForTimeout(1200);
-      await page.locator('.offer .card[data-slot] .pick').nth(2).click();
+      await page.locator('.offer .card[data-home] .pick').nth(2).click();
       await page.waitForTimeout(2500);
       const way = await page.evaluate(() => document.querySelector('.view .actions .btn.primary')?.textContent?.trim() ?? '');
       if (!/^Play the .+s →$/.test(way)) fault(`${renderer}: with a card chosen the way on says "${way}"`);
@@ -1550,7 +1550,7 @@ try {
       await page.waitForTimeout(400);
       await inView();
       await page.waitForTimeout(1500);
-      const others = await page.evaluate(() => [...document.querySelectorAll('.offer .card[data-slot]')].map((c) => Number(c.getAttribute('data-slot'))));
+      const others = await page.evaluate(() => [...document.querySelectorAll('.offer .card[data-home]')].map((c) => c.getAttribute('data-home')));
       const again = others.filter((s) => offer.cards.includes(s)).length;
       console.log(`create: ${renderer} step 4: Show others offers ${others.length}, ${again} of them shown before`);
       if (offer.households > offer.cards.length + 10 && again) fault(`${renderer}: Show others offered ${again} households again`);

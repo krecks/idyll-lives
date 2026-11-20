@@ -849,9 +849,9 @@ async function runOnce(n, chromium, executablePath) {
       { timeout: entryTimeout * 1000, polling: 50 },
     );
     await page.waitForTimeout(500);
-    const plays = page.locator('.offer .card[data-slot] .go');
+    const plays = page.locator('.offer .card[data-home] .go');
     const count = await plays.count();
-    if (!count) fail('no household to Play (no .offer .card[data-slot] .go)');
+    if (!count) fail('no household to Play (no .offer .card[data-home] .go)');
     await plays.nth(Math.min(pick, count - 1)).click({ timeout: entryTimeout * 1000 });
     const moveIn = page.locator('.btn.move-in');
     await moveIn.waitFor({ timeout: entryTimeout * 1000 });
