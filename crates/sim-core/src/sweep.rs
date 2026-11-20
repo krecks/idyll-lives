@@ -55,9 +55,8 @@ fn plot_rows(lot: &Lot, stairs: &StairMap, p: &Plot) -> impl Iterator<Item = (i3
     } else {
         1
     };
-    let flat = p.is_flat().then_some(i32::from(p.storey));
     (0..blocks)
-        .filter(move |&b| flat.is_none_or(|s| stairs.storey(b * depth) == s))
+        .filter(move |&b| p.on_storey(stairs, b * depth))
         .flat_map(move |b| (p.z..p.z + p.d).map(move |z| (z + b * depth, b == 0)))
 }
 
