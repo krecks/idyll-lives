@@ -184,12 +184,12 @@ pub(crate) fn may_move(w: &World, i: usize) -> bool {
         && (w.player_moves || !w.households[s.household as usize].player)
 }
 
-/// A house nobody lives in (not a park, not the player's home), with beds for `n`: one, or two
-/// partners.
+/// A home nobody lives in (a house or a flat; not a park, not the player's home), with beds for
+/// `n`: one, or two partners.
 pub(crate) fn vacant_plot(w: &World, n: usize) -> Option<u32> {
     w.plots
         .iter()
-        .filter(|p| !p.public)
+        .filter(|p| w.is_home(p.id))
         .filter(|p| {
             !w.households
                 .iter()
@@ -243,7 +243,7 @@ pub(crate) fn move_to(w: &mut World, i: usize, to: usize) {
     crate::cars::job_lost(&mut w.cars, id);
     let arrive = w.households[to]
         .plot
-        .map(|p| w.plots[p as usize].arrival_point());
+        .map(|p| w.plots[p as usize].home_point());
     // (The household index no longer matches the residents: `World::household_sims`.)
     w.members.moved = true;
     let sim = &mut w.sims[i];

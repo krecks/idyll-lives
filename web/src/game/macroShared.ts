@@ -28,7 +28,8 @@
  * area's lots go along its own roads, nearest its middle first (`town.ts` `LotPlacer`).
  */
 
-import type { BackdropBuilding, LandSize, Rle, TownArea, TownPlace, WorldMeta, WorldZone } from '../core/protocol';
+import type { CarPark, LandSize, ParkingBay, Rle, TownArea, TownPlace, WorldMeta, WorldZone } from '../core/protocol';
+import { type Centre } from './centre';
 import { type Land as LandField } from './land';
 import { type GentlePlane } from './landFollow';
 import { chaikin, outlines, rasterize, rle, simplifyRing, unrle } from './landMasks';
@@ -54,11 +55,15 @@ export interface OpenWorldDraft {
   water: Rle;
   /** The height (m) each outdoor plot is levelled to, by plot index. */
   pads: Record<number, number>;
-  parking: { x: number; z: number; rot: number; area: number }[];
-  /** The living town (`backdrop.ts`): buildings nobody lives in, the places the tags name, the main town's centre. */
-  backdrop?: BackdropBuilding[];
+  /** The public parking's bays (`parking.ts`): where a car parked in each stands and faces, by area. */
+  parking: ParkingBay[];
+  /** The car parks the bays make up (`parking.ts` `carParkAt`): by the square, by the big places, pairs by the verge. */
+  carParks?: CarPark[];
+  /** The places the tags name, and the main town's centre (its outline and its square). */
   places?: TownPlace[];
-  centre?: { area: number; poly: Pt[] }[];
+  centre?: { area: number; poly: Pt[]; square?: Pt[] }[];
+  /** Each centre's high street (`centre.ts` `Centre`), to narrow its outline again once lots are given up (`landFollow.ts`); not in the town file. */
+  highStreets?: Centre[];
   /** The centres' squares (kept clear of lots: `withGarden`); not in the town file. */
   squares?: Pt[][];
   /** How high the land stands over the level the towns are built at (`reliefOf`); none in a classic world. */
@@ -134,7 +139,7 @@ export interface LayOptions {
 /**
  * A place's land, with no town on it (step 1): `kind` with `options` (the place's own where not
  * given) from `seed`, as `planLand` plans it and `landFollow.ts` `seedBare` seeds it: no lots,
- * roads, greens, backdrop, places or areas; its land (`open.land`: heights, water, woods, meadows)
+ * roads, greens, places or areas; its land (`open.land`: heights, water, woods, meadows)
  * and its plan (`open.plan`), the water and zones from them, its hills' relief over its level. Its
  * name and tagline are the ones its town takes when laid from the same seed.
  */

@@ -206,7 +206,9 @@ export class ParkedRides {
     const [near, far] = await Promise.all([buildModel(this.app, `ride:${key}`, entry, footprint), buildModel(this.app, `ride:${key}:far`, entry, footprint, { far: true })]);
     const draws = (t: ModelTemplate) =>
       t.meshes.map((m) => {
-        const draw = new Instances(this.app.graphicsDevice, this.root, m.mesh, m.material, { name: m.name, castShadows: this.shadows, receiveShadows: true, capacity: 4 });
+        // (Keyed by its copies that cast into the sun's map: a bike ridden off across town draws no picture of the
+        // still casters again.)
+        const draw = new Instances(this.app.graphicsDevice, this.root, m.mesh, m.material, { name: m.name, castShadows: this.shadows, receiveShadows: true, capacity: 4, castKeyed: true });
         draw.enabled = false;
         return draw;
       });

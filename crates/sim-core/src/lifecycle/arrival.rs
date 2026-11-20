@@ -6,11 +6,11 @@ use super::*;
 
 // ---- Newcomers -----------------------------------------------------------------------------
 
-/// Vacant houses (furnished, nobody living there, not the player's) get a new household now
-/// and then.
+/// Vacant homes (houses and flats: furnished, nobody living there, not the player's) get a new
+/// household now and then. They come in at the street door (a flat's building's).
 pub(crate) fn newcomers(w: &mut World, rules: &crate::content::NewcomerRules) {
     for p in 0..w.plots.len() as u32 {
-        if w.plots[p as usize].public
+        if !w.is_home(p)
             || beds(w, p).most(grown_stage(w)) == 0
             || w.households
                 .iter()

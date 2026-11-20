@@ -2,8 +2,8 @@
 //!
 //! Split from `save.rs` (see `mod.rs`).
 
+use super::pack::*;
 use super::*;
-use super::{migrate::*, pack::*};
 
 impl World {
     pub fn from_save_json(content_json: &str, save_json: &str) -> Result<Self, Error> {
@@ -13,9 +13,9 @@ impl World {
     }
 
     pub fn from_save(content: Content, save: &SaveFile) -> Result<Self, Error> {
-        if save.version == 0 || save.version > SAVE_VERSION {
+        if save.version < OLDEST_SAVE_VERSION || save.version > SAVE_VERSION {
             return Err(Error::new(format!(
-                "unsupported save version {}",
+                "unsupported save version {} (this build opens {OLDEST_SAVE_VERSION} to {SAVE_VERSION})",
                 save.version
             )));
         }
@@ -48,41 +48,25 @@ impl World {
         }
         world.mode = save.mode;
         world.seed = save.seed;
-        // (Before v36: ticks counted at 20 a real second and 20 a game minute; before v37, cars
-        // timed in real seconds.)
-        let ticks = Rescale::of(save.version);
-        world.tick = ticks.tick(save.tick);
-        // (Before v40, 4 and 5 were 30× and 60×: super speed now, 10× under it.)
-        let (speed, resume) = if save.version < 40 && save.speed > 3 {
-            (SUPER_SPEED, Some(3))
-        } else {
-            (save.speed.min(MAX_SPEED), save.resume_speed)
-        };
+        world.tick = save.tick;
+        let speed = save.speed.min(MAX_SPEED);
         world.speed = speed;
         world.auto_super = save.auto_super && speed == SUPER_SPEED;
-        world.resume_speed = resume
+        world.resume_speed = save
+            .resume_speed
             .unwrap_or(if (1..SUPER_SPEED).contains(&speed) {
                 speed
             } else {
                 1
             })
             .clamp(1, SUPER_SPEED - 1);
-        // Before v8 the one free-will switch was the player's setting; now each household has one.
-        let legacy_free_will = save.version < 8;
-        world.autonomy = save.autonomy || legacy_free_will;
+        world.autonomy = save.autonomy;
         world.lifespan = save.lifespan.unwrap_or(crate::lifecycle::Lifespan::Off);
         world.player_moves = save.player_moves.unwrap_or(true);
         world.residents_most_given = save.residents_most;
         world.meta = save.meta.clone();
         world.note_paths();
-        // (Bus stops, in a file written while the town had buses, are no ways out.)
-        world.exits = save
-            .exits
-            .iter()
-            .enumerate()
-            .filter(|&(i, _)| !save.open_world.stops.contains(&(i as u32)))
-            .map(|(_, e)| *e)
-            .collect();
+        world.exits = save.exits.clone();
         world.set_travel(save.open_world.clone());
         world.plots = save
             .plots
@@ -108,8 +92,16 @@ impl World {
                     (!b.roofs.is_empty()).then_some(crate::world::RoofLook { style, color })
                 }),
                 hours: p.hours,
+                kind: save.open_world.plot_kinds.get(i).copied().flatten(),
+                of: p.of,
+                storey: p.storey,
+                door: p.door.map(|[x, z]| (x, z)),
+                inside: p.inside,
             })
             .collect();
+        crate::world::check_flats(&world.plots, i32::from(world.storeys.max(1)), &world.stairs)
+            .map_err(|e| Error::new(format!("saved plots: {}", e.0)))?;
+        world.map_plots();
         let starting_funds = world.content.starting_funds;
         world.households = if save.households.is_empty() {
             vec![Household {
@@ -135,9 +127,7 @@ impl World {
                     plot: h.plot,
                     player: h.player,
                     funds: h.funds.unwrap_or(starting_funds),
-                    free_will: h
-                        .free_will
-                        .unwrap_or(!h.player || save.autonomy || !legacy_free_will),
+                    free_will: h.free_will.unwrap_or(true),
                     routines: h
                         .routines
                         .iter()
@@ -184,21 +174,8 @@ impl World {
                 .is_some_and(|d| world.content.objects[d].layer == crate::content::Layer::Surface)
         };
         let tops: Vec<bool> = save.objects.iter().map(on_top).collect();
-        // (v33: kinds that grew go in once everything else stands, where they now fit: `migrate_32_grown`.)
-        let grown: Vec<bool> = save
-            .objects
-            .iter()
-            .map(|o| grown_since_32(save.version, o))
-            .collect();
-        // (v33: the town's posts go in after the rest, so one with its back to a wall can move out
-        // from it where there's room: `migrate_32_post`.)
-        let posts: Vec<bool> = (0..tops.len())
-            .map(|i| !tops[i] && !grown[i] && post_since_32(&world.content, save, i, &tops))
-            .collect();
         let order: Vec<usize> = (0..tops.len())
-            .filter(|&i| !tops[i] && !grown[i] && !posts[i])
-            .chain((0..tops.len()).filter(|&i| posts[i]))
-            .chain((0..tops.len()).filter(|&i| grown[i]))
+            .filter(|&i| !tops[i])
             .chain((0..tops.len()).filter(|&i| tops[i]))
             .collect();
         for i in order {
@@ -206,7 +183,6 @@ impl World {
             // (A corrupt save's second use of an id gets a fresh one.)
             let keep = o.id.filter(|s| !used.contains(s));
             let placed = match world.content.object_index(&o.def) {
-                Some(def) if grown[i] => migrate_32_grown(&mut world, def, o, keep),
                 Some(def) => {
                     let value = o
                         .value
@@ -246,13 +222,11 @@ impl World {
                 let runs = world.content.objects[obj.def].runs;
                 obj.run = match o.run {
                     Some(m) => runs.map(|full| finite(m, 0.0).clamp(0.0, full)),
-                    // Before v33 nothing ran on its own: washing left out on the line (open) is
-                    // dry by now, ready to take in.
-                    None if save.version < 33 && obj.open => runs.map(|_| 0.0),
                     None => None,
                 };
                 obj.rack = o.rack.min(world.content.objects[obj.def].rack);
-                let id = if posts[i] { world.nudge_post(id) } else { id };
+                // (A thing kept by a plot it doesn't stand on: one of the plots, `World::keep`.)
+                world.keep(id, o.plot);
                 used.extend(keep);
                 object_ids.insert(i as u32, id);
             }
@@ -299,16 +273,11 @@ impl World {
             if let Some(g) = s.grade {
                 sim.grade = g.clamp(0.0, 100.0);
             }
-            // (v31: residents change outfits; before it everyone wore the creator's.)
-            sim.outfit = if save.version >= 31 {
-                s.outfit % crate::world::OUTFITS
-            } else {
-                0
-            };
-            // (v32: the school day is kept; before it, once today's school has begun it counts as
-            // seen to, or the load would mark the day missed.)
+            sim.outfit = s.outfit % crate::world::OUTFITS;
+            // (Without a school day saved, once today's school has begun it counts as seen to, or
+            // the load would mark the day missed.)
             sim.school_day = match s.school_day {
-                Some(day) if save.version >= 32 => day,
+                Some(day) => day,
                 _ => match crate::life::school_today(content, sim, tick) {
                     Some((_, start, _)) if tick > start => crate::clock::day(tick),
                     _ => 0,
@@ -357,11 +326,11 @@ impl World {
                     def: content.item_index(&h.def)?,
                     servings: h.servings,
                     quality: h.quality,
-                    made_at: ticks.tick(h.made_at),
+                    made_at: h.made_at,
                     recipe: h.recipe.as_deref().and_then(|r| content.recipe_index(r)),
                 })
             });
-            sim.night_woken = ticks.tick(s.night_woken);
+            sim.night_woken = s.night_woken;
             // At work, or a pupil at school.
             let pupil = content
                 .life
@@ -510,8 +479,8 @@ impl World {
         }
 
         // (Since v35 a save whose pairs are all as new lists none, but keeps their chemistry.)
-        if save.version < 2 || (save.relationships.is_empty() && save.chemistry.is_empty()) {
-            // Older saves have no relationships: start the household as housemates.
+        if save.relationships.is_empty() && save.chemistry.is_empty() {
+            // No relationships saved: start the household as housemates.
             world.init_relationships(&[])?;
         } else {
             for r in &save.relationships {
@@ -552,10 +521,8 @@ impl World {
         let content = &world.content;
         let events = save.events.iter().filter_map(|v| {
             let mut e: social::SocialEvent = serde_json::from_value(v.clone()).ok()?;
-            e.tick = ticks.tick(e.tick);
-            match v.get("refs") {
-                Some(refs) => resolve_refs(content, &mut e, refs)?,
-                None => migrate_refs(content, &mut e, save.version),
+            if let Some(refs) = v.get("refs") {
+                resolve_refs(content, &mut e, refs)?;
             }
             let formers = save.former.len();
             let known = |s: u32| {
@@ -604,7 +571,7 @@ impl World {
                     at,
                     servings: it.servings,
                     quality: it.quality,
-                    made_at: ticks.tick(it.made_at),
+                    made_at: it.made_at,
                     household: it.household,
                     spoiled: it.spoiled,
                     recipe: it.recipe.as_deref().and_then(|r| content.recipe_index(r)),
@@ -627,47 +594,31 @@ impl World {
                 continue;
             };
             match object {
-                Some(object) if (s.sim as usize) < world.sims.len() => {
-                    world.setups.push(crate::setup::Setup::new(
-                        s.household,
-                        s.sim,
-                        object,
-                        ticks.tick(s.since),
-                        s.paid,
-                    ))
-                }
+                Some(object) if (s.sim as usize) < world.sims.len() => world.setups.push(
+                    crate::setup::Setup::new(s.household, s.sim, object, s.since, s.paid),
+                ),
                 // (Gone from the content: the money back.)
                 _ => h.funds += s.paid,
             }
         }
         world.make_storeys();
         world.refresh_rooms();
-        // The porches (a file before v39: as they were drawn) and the pieces, before the cars: a
-        // post's tile is kept as a garage's (`cars::reblock`).
+        // The porches and the pieces, before the cars: a post's tile is kept as a garage's
+        // (`cars::reblock`).
         let plots = world.plots.len();
-        world.porches = if save.version < 39 {
-            world.guess_porches()
-        } else {
-            save.porches
-                .iter()
-                .filter(|p| (p.plot as usize) < plots)
-                .copied()
-                .collect()
-        };
+        world.porches = save
+            .porches
+            .iter()
+            .filter(|p| (p.plot as usize) < plots)
+            .copied()
+            .collect();
         world.porch_pieces = save
             .porch_pieces
             .iter()
             .filter(|p| (p.plot as usize) < plots && p.w > 0 && p.d > 0)
             .copied()
             .collect();
-        let cars = ticks.cars(&save.cars);
-        crate::cars::load(&mut world, &cars, &save.drives, &save.garages);
-        // (A file before v41 has its cars as the town picked them: each now the one its household's
-        // best earner's job calls for, as a new town's are.)
-        if save.version < 41 {
-            crate::cars::fit_town(&mut world);
-            crate::cars::settle_all(&mut world);
-        }
+        crate::cars::load(&mut world, &save.cars, &save.drives, &save.garages);
         // (The junctions lit are worked out again from the roads: `traffic::settle`.)
         crate::traffic::settle(&mut world);
         // (The lights where they'd got to, for the same lit junctions: each a turn it has.)
@@ -688,13 +639,12 @@ impl World {
                         2 => crate::traffic::Stage::Clear,
                         _ => crate::traffic::Stage::Green,
                     },
-                    since: ticks.drive_since(l.since, save.tick),
+                    since: l.since,
                 })
                 .collect();
         }
         // The work taxis' runs, their riders booked and the taxis under way where they were.
         world.taxis = save.taxis.clone();
-        ticks.taxis(&mut world.taxis);
         crate::taxi::settle(&mut world);
         // What someone was eating or washing up is put down (those don't go on after loading).
         crate::cooking::settle(&mut world);

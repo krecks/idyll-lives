@@ -220,7 +220,7 @@ async function visit(page, cdp) {
     await choose.waitFor({ timeout: 60_000 });
     await choose.click();
   } else {
-    const plays = page.locator('.offer .card[data-slot] .go');
+    const plays = page.locator('.offer .card[data-home] .go');
     await plays.nth(Math.min(pick, (await plays.count()) - 1)).click();
   }
   // (Step 5's way on: "Move in", or "Play the …s" for a household of the town's staying in its home.)
@@ -249,7 +249,7 @@ async function visit(page, cdp) {
     const { game } = await import('/src/ui/state.svelte.ts');
     const { homesForSale } = await import('/src/ui/town/places.ts');
     const { services } = await import('/src/ui/services.ts');
-    const forSale = homesForSale(game.plots, game.households, services.content.economy.homePrice).length;
+    const forSale = homesForSale(game.plots, game.households, services.content.economy.homePrice, game.flats).length;
     return { residents: sims.length, homes: new Set(sims.map((s) => s.plot)).size, forSale };
   });
   const marks = { boot, newGame, made, proposePressed, proposed, layPressed, laid, opened, shown, pressed, entered };

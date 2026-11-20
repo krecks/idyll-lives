@@ -570,6 +570,7 @@
   "model.street.bench": [0.0, -0.037],
   "model.street.flowerTub": [0.0, 0.0],
   "model.street.flowers": [0.0, 0.0],
+  "model.street.parkingSign": [0.0, 0.0],
   "model.street.pathLight": [0.0, 0.0],
   "model.street.planter": [0.0, 0.0],
   "model.street.pot": [0.0, 0.0],

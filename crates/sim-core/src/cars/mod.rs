@@ -1,9 +1,11 @@
 //! Households' cars: parked on their driveway, driven to work (or school) and back.
 //!
 //! A car belongs to a household and stands on its home's driveway (the town file's `cars`; every
-//! house's driveway is in its `drives`). Only its owners drive it, and only grown-ups (18 and up):
-//! the household's grown-ups when the town was made (a household left with no owner hands it down
-//! to its grown-ups). Whoever else in the household leaves at the same time rides along. When the
+//! house's driveway is in its `drives`); a flat's stands in its own bay in the building's front
+//! strip, and its household sets off in it from anywhere on the building's lot, the hall or the
+//! yard as much as the flat (`world::at_home`). Only its owners drive it, and only grown-ups (18
+//! and up): the household's grown-ups when the town was made (a household left with no owner hands
+//! it down to its grown-ups). Whoever else in the household leaves at the same time rides along. When the
 //! household moves house, the car goes with it, to the new home's driveway (`relocate`). Which car
 //! it is follows the job of whoever in the household earns the most: a van for a trade, an
 //! executive saloon high up in finance, newer up the ladder; a promotion or a new job buys another
@@ -31,7 +33,9 @@
 //! near the place (the town file's `parking`) walks to the driver's door instead (`trip_car`),
 //! gets in and drives off along the roads (`Phase::Driving`, sat at the wheel), parks at the spot
 //! (`CarState::Out`) and walks on. Going home they walk back to it and drive home, and get out
-//! as after work. The trip is saved with the car.
+//! as after work. The trip is saved with the car. A spot is a marked bay, often one of a car
+//! park's row 3 m apart: the car parks at the bay's own pose (the one drawn), and between two
+//! parked cars they squeeze in and out by a door opened only part way (`Car::door_in_bay`).
 //!
 //! Passengers (`Car::riders`): the household setting off at the same time for somewhere the car
 //! parks near (the same parking spot) comes along. The driver gets in and waits in the driveway
@@ -212,6 +216,7 @@ const DOOR_OUT: f32 = 0.45;
 const SEATS: usize = 5;
 /// How far from the car (m) someone already on the street turns back for a ride.
 const CALL_REACH: f32 = 15.0;
+
 /// Clearance from the inner end of a driveway to the car (m), as the town parks them.
 const PARK_GAP: f32 = 0.45;
 /// On the town's roads (`Route::on_roads`): how far from the road a driveway or exit may be (m),
@@ -300,6 +305,7 @@ pub(crate) use legs::*;
 pub use looks::*;
 pub use motion::*;
 pub(crate) use parking::*;
+pub use parking::{BAY_DEEP, BAY_LINES, BAY_WIDE, DRIVE_CLEAR, MOUTH_CLEAR};
 pub use parts::*;
 pub(crate) use route::*;
 pub(crate) use seats::*;

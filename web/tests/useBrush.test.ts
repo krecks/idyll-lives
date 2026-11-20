@@ -105,7 +105,7 @@ describe('the zone brush', () => {
     const e = paintUses(d, [{ x: 40, z: 50, size: 16 }], 'public');
     expect('needsSettle' in e && e.needsSettle).toBe(false);
     expect(needsSettle(e)).toBe(false);
-    expect(needsSettle({ draft: d, cleared: { lots: [], backdrop: [] } })).toBe(true);
+    expect(needsSettle({ draft: d, cleared: { lots: [] } })).toBe(true);
     const plan = painted(e);
     // Its roads, lots and land as they were: the same objects.
     expect(plan.roads).toBe(d.roads);

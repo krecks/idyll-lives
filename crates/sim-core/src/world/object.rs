@@ -123,6 +123,9 @@ pub struct ObjectInstance {
     /// refused (`allows`). Derived from their tasks: set when the use reserves a slot, cleared
     /// when it ends; not saved (a reloaded use starts again and sets it).
     pub(crate) closed_users: SimSet,
+    /// The plot it belongs to though it stands on another (a flat's letterbox in its building's
+    /// hall, its bike in the yard: the town file's `objects[].plot`). None: the plot it stands on.
+    pub keeper: Option<u32>,
 }
 
 /// A crop's stage, from its `growth`: what's offered (`when`: "ripe") and what the renderer

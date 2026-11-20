@@ -10,6 +10,23 @@ impl World {
         self.briefs.len() == self.sims.len()
     }
 
+    /// Says which plot object `id` belongs to though it stands elsewhere (`ObjectInstance::keeper`:
+    /// a flat's letterbox in the hall), or that it belongs where it stands (None). What it is
+    /// counted on (`object_plot`) follows.
+    pub(crate) fn keep(&mut self, id: u32, keeper: Option<u32>) {
+        let keeper = keeper.filter(|&k| (k as usize) < self.plots.len());
+        let Some(o) = self.objects.get_mut(id as usize) else {
+            return;
+        };
+        o.keeper = keeper;
+        let (x, z) = (o.x, o.z);
+        let plot = keeper.or_else(|| self.plot_at(x, z));
+        if self.object_plot[id as usize] != plot {
+            self.object_plot[id as usize] = plot;
+            self.objects_version = self.objects_version.wrapping_add(1);
+        }
+    }
+
     /// Adds a Sim with random starting needs. Identity, traits and perks are validated.
     pub fn spawn_sim(&mut self, spawn: &SimSpawn) -> Result<u32, Error> {
         self.spawn_at(spawn, false)

@@ -127,10 +127,10 @@ impl World {
         let plot = self.households[h]
             .plot
             .filter(|_| self.autonomy && self.households[h].free_will)?;
-        // In a crib at home, with care for what they're crying for.
-        let crib = self.objects.iter().find(|o| {
-            o.users().any(|u| u as usize == b) && self.object_plot[o.id as usize] == Some(plot)
-        })?;
+        // In a crib at home, with care for what they're crying for (of what they hold a place
+        // at, not every object in town: a baby nobody comes for asks this every tick).
+        let crib =
+            held_by(baby, &self.objects).find(|o| self.object_plot[o.id as usize] == Some(plot))?;
         let def = &content.objects[crib.def];
         let care = |i: &crate::content::Interaction, below: f32| {
             i.cares() && (0..content.needs.len()).any(|n| i.care[n] > 0.0 && wants(n, below))
@@ -313,6 +313,7 @@ impl World {
                 households,
                 plots,
                 tile_plot,
+                halls,
                 object_plot,
                 object_index,
                 exits,
@@ -352,6 +353,7 @@ impl World {
                 households,
                 plots,
                 tile_plot,
+                halls,
                 object_plot,
                 index: object_index,
                 exits,
@@ -440,14 +442,15 @@ impl World {
         briefs.clear();
         for s in &self.sims {
             let (x, z) = s.tile();
-            let plot = self.plot_at(x, z);
+            let plot = self.plot_at(x, z).filter(|_| s.here());
+            let hall = plot.is_some_and(|p| self.halls.at(p, x, self.ground_z(z)).is_some());
             let available = s.here() && s.available_for_social(&self.content);
             briefs.push(SimBrief {
                 pos: s.pos,
                 available,
                 gender_ix: s.gender_ix,
                 household: s.household,
-                plot: plot.filter(|_| s.here()),
+                plot,
                 away: s.away_until.is_some() || !s.here(),
                 leaving: crate::life::leaving_home(self, s),
                 baby: s.here() && self.content.life.baby(s.age),
@@ -490,6 +493,7 @@ impl World {
                 },
                 carried: s.carried_by.is_some(),
                 private: crate::privacy::private_use(&self.content, &self.objects, s),
+                hall,
             });
         }
         // Who's in a conversation, and whose (for joining in).

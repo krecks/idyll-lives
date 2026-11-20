@@ -15,6 +15,8 @@
  * its owner invalidates it as it would have.
  */
 
+import { DEBUG_HOOKS } from '../../debug/hooks';
+
 /** What a cache needs of a template: the files it was built without. */
 export interface CachedTemplate {
   failed?: string[];
@@ -30,6 +32,19 @@ export interface TemplateHooks<T> {
   hide(template: T): void;
   /** Disposes a template set aside (its materials are shared and stay). */
   dispose(template: T): void;
+}
+
+/** Template builds started in any cache so far, and those under way (`templateBuilds`; counted only where the bench's hooks are). */
+let started = 0;
+const underWay = new Set<Promise<unknown>>();
+
+/**
+ * Fixed-step playback (`debug/benchTime.ts`): how many template builds have started in any cache, and a promise for
+ * those under way. A frame that started one (a prop first held) drew without it: the frames after it wait for it, so a
+ * page that hadn't built it yet draws them as one that had.
+ */
+export function templateBuilds(): { started: number; settled: () => Promise<void> } {
+  return { started, settled: () => Promise.allSettled([...underWay]).then(() => {}) };
 }
 
 interface Entry<T> {
@@ -53,6 +68,11 @@ export class TemplateCache<T extends CachedTemplate | null> {
     if (known) return known.promise;
     const entry: Entry<T> = { promise: build() };
     this.entries.set(key, entry);
+    if (DEBUG_HOOKS) {
+      started++;
+      underWay.add(entry.promise);
+      void entry.promise.finally(() => underWay.delete(entry.promise)).catch(() => {});
+    }
     // (A build that throws stays cached as it is, as it always has; its rejection is the caller's.)
     entry.promise.then(
       (value) => {

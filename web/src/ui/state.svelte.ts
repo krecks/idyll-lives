@@ -1,6 +1,6 @@
 /** Reactive UI state. Written by the game layer at ~10 Hz, read by components. */
 
-import type { Catalog, FormerResident, HouseholdInfo, Lifespan, ObjectPlacement, PartColors, PlotInfo, RelationshipView, RoomView, Routine, SimInfo, SimView, SocialEvent, SocialOption } from '../core/protocol';
+import type { Catalog, FlatInfo, FormerResident, HouseholdInfo, Lifespan, ObjectPlacement, PartColors, PlotInfo, RelationshipView, RoomView, Routine, SimInfo, SimView, SocialEvent, SocialOption } from '../core/protocol';
 import type { ThreadStats } from '../debug/threads';
 import type { RenderStats, WallMode } from '../render/types';
 import { NO_LAND, startBrush, type BrushState, type LandState } from './land/landTools';
@@ -122,6 +122,13 @@ class GameState {
   former = $state.raw<FormerResident[]>([]);
   households = $state.raw<HouseholdInfo[]>([]);
   plots = $state.raw<PlotInfo[]>([]);
+  /** The flats (each a plot of its own inside a ground lot, `WorldStructure.flats`): a household's `plot` may be one. */
+  flats = $state.raw<FlatInfo[]>([]);
+  /**
+   * The player's home where its things stand, in lot tiles: a house's lot (on the ground's rows), a flat's rectangle on
+   * its storey's rows; null without a home.
+   */
+  homeArea = $state.raw<{ x: number; z: number; w: number; d: number } | null>(null);
   /** Pairs with a resident in `sims` that has details, both ways (as `sims`, unchanged pairs keep their objects). */
   relationships = $state.raw<RelationshipView[]>([]);
   socialMenu = $state.raw<SocialMenuState | null>(null);
@@ -191,6 +198,8 @@ class GameState {
   /** Wall edges the build preview changes, and whether it can be built (for the cursor tag). */
   buildEdges = $state(0);
   buildValid = $state(true);
+  /** Why the build edit in hand can't go there, in the simulation's words, when it says more than "can't build here" (a flat's outer walls). */
+  buildWhy = $state<string | null>(null);
   /** The Room tool's rectangle in tiles while one is drawn. */
   buildRoom = $state.raw<[number, number] | null>(null);
   /** Whether the object in hand fits where the pointer is. */
@@ -283,6 +292,8 @@ class GameState {
     this.former = [];
     this.households = [];
     this.plots = [];
+    this.flats = [];
+    this.homeArea = null;
     this.relationships = [];
     this.socialMenu = null;
     this.feed = [];

@@ -1,17 +1,20 @@
 /**
  * The generator's `Ground` (`town.ts`: what is taken on a world, where a lot may go) made again
  * from a draft, for the town edits: its roads, greens, water with its shore strip, every lot, the
- * backdrop, the parking, the squares, the trails and the orchards, each taken as the generator took
- * it when it laid them (`macro.ts` `generateFromSpec`). And where each lot meets its road.
+ * parking (its car parks and their bays), the squares, the trails and the orchards, each taken as the
+ * generator took it when it laid them (`macro.ts` `generateFromSpec`). And where each lot meets its
+ * road, and the public parking without some of its bays (a car park goes whole: `withoutBays`).
  *
  * What the lots do not change (the roads, greens, water, parking, squares, trails and orchards) is
- * worked out once per set of roads and kept; the lots and the backdrop are put on a copy of it.
+ * worked out once per set of roads and kept; the lots are put on a copy of it.
  */
 
 import { unrle } from '../landMasks';
 import { grown, SHORE_GAP } from '../macro';
 import { inside, nearest, pointAt, roadIndex, type Pt, type RoadPlan } from '../roads';
+import type { OpenWorldDraft } from '../macro';
 import { boundsOf, Ground, plotRect, turner, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates } from '../town';
+import { bayRect, carParkRect } from '../parking';
 
 /** A place along a road: which road, how far along it (m), and which side (+1: its left, looking along it; -1: its right). */
 export interface RoadSpot {
@@ -33,6 +36,7 @@ interface Base {
   greens: unknown;
   water: unknown;
   parking: unknown;
+  carParks: unknown;
   squares: unknown;
   zones: unknown;
   mask: Uint8Array;
@@ -45,14 +49,15 @@ const bases = new WeakMap<readonly RoadPlan[], Base>();
 function baseOf(draft: NeighbourhoodDraft): Uint8Array {
   const { width: W, depth: D, roads, greens, open } = draft;
   const had = bases.get(roads);
-  if (had && had.w === W && had.d === D && had.greens === greens && had.water === open?.water && had.parking === open?.parking && had.squares === open?.squares && had.zones === open?.zones) return had.mask;
+  if (had && had.w === W && had.d === D && had.greens === greens && had.water === open?.water && had.parking === open?.parking && had.carParks === open?.carParks && had.squares === open?.squares && had.zones === open?.zones) return had.mask;
   const mask = new Uint8Array(W * D);
   const take = (r: Rect, grow = 0) => {
     for (let z = Math.max(0, r.z - grow); z < Math.min(D, r.z + r.d + grow); z++) for (let x = Math.max(0, r.x - grow); x < Math.min(W, r.x + r.w + grow); x++) mask[z * W + x] = 1;
   };
   if (open?.water) mask.set(grown(unrle(open.water, W * D), W, D, SHORE_GAP));
-  // A parking space as the generator laid it: 6 m along the verge, 3 m deep, and a metre round it.
-  for (const p of open?.parking ?? []) take(p.rot % 2 ? { x: Math.round(p.x - 3), z: Math.round(p.z - 1.5), w: 6, d: 3 } : { x: Math.round(p.x - 1.5), z: Math.round(p.z - 3), w: 3, d: 6 }, 1);
+  // A car park's asphalt (`parking.ts` `carParkRect`) and a parking bay's ground (`bayRect`), and a metre round each.
+  for (const p of open?.carParks ?? []) take(carParkRect(p), 1);
+  for (const p of open?.parking ?? []) take(bayRect(p), 1);
   // A square's own tiles (those whose middle is in it), as the generator keeps them clear (`chooseCentre`).
   for (const q of open?.squares ?? []) {
     const b = boundsOf(q);
@@ -61,22 +66,20 @@ function baseOf(draft: NeighbourhoodDraft): Uint8Array {
   // Nothing goes down on a trail (a tile round each of its points), nor in an orchard (and 2 m round it).
   for (const r of roads) if (r.kind === 'trail') for (const [x, z] of r.points) take({ x: Math.floor(x) - 1, z: Math.floor(z) - 1, w: 3, d: 3 });
   for (const zone of open?.zones ?? []) if (zone.kind === 'orchard' && zone.poly.length) take(boundsOf(zone.poly), 2);
-  bases.set(roads, { w: W, d: D, greens, water: open?.water, parking: open?.parking, squares: open?.squares, zones: open?.zones, mask });
+  bases.set(roads, { w: W, d: D, greens, water: open?.water, parking: open?.parking, carParks: open?.carParks, squares: open?.squares, zones: open?.zones, mask });
   return mask;
 }
 
 /**
  * The ground of `draft` as the generator would have it with everything on it laid already: what
- * its roads, greens, water and shore strip, parking, squares, trails and orchards take, every lot
- * (a terrace lot with a metre round it, as `LotPlacer.placeRow` takes a row), and every backdrop
- * building with a metre round it (as `withGarden` keeps off them). `except`: that lot left off
- * (one being moved or refitted). A new `Ground` each call, the caller's to take more of.
+ * its roads, greens, water and shore strip, parking, squares, trails and orchards take, and every lot
+ * (a terrace lot with a metre round it, as `LotPlacer.placeRow` takes a row). `except`: that lot left
+ * off (one being moved or refitted). A new `Ground` each call, the caller's to take more of.
  */
 export function townGround(draft: NeighbourhoodDraft, t: Templates, except = -1): Ground {
   const ground = new Ground(draft.width, draft.depth, draft.roads, draft.greens);
   ground.block(baseOf(draft));
   for (const s of draft.slots) if (s.index !== except) ground.take(plotRect(t, s), s.lot === 'terrace' ? 1 : 0);
-  for (const b of draft.open?.backdrop ?? []) ground.take(boundsOf(b.poly), 1);
   return ground;
 }
 
@@ -150,4 +153,37 @@ export function entryOf(draft: NeighbourhoodDraft, t: Templates, s: Pick<PlotSlo
 /** Whether point `p` is inside one of the town centres' outlines (`open.centre`). */
 export function inCentre(draft: NeighbourhoodDraft, [x, z]: Pt): boolean {
   return (draft.open?.centre ?? []).some((c) => c.poly.length >= 3 && inside(c.poly, x, z));
+}
+
+// ---- the public parking --------------------------------------------------------------------------------
+
+/**
+ * The bays of `open` that go with `bays` (indices into `open.parking`): every bay of a car park any of them is
+ * in, since a car park goes whole (its asphalt is laid for all of its bays, `parking.ts` `carParkAt`). Sorted.
+ */
+export function wholeParks(open: Pick<OpenWorldDraft, 'parking'>, bays: Iterable<number>): number[] {
+  const out = new Set<number>();
+  const parks = new Set<number>();
+  for (const i of bays) {
+    const b = open.parking[i];
+    if (!b) continue;
+    out.add(i);
+    if (b.park !== undefined) parks.add(b.park);
+  }
+  if (parks.size) open.parking.forEach((b, i) => b.park !== undefined && parks.has(b.park) && out.add(i));
+  return [...out].sort((a, b) => a - b);
+}
+
+/**
+ * `open`'s public parking without the bays `bays` (indices into `open.parking`) and the car parks they are in, whole
+ * (`wholeParks`): the bays left, each numbered by its car park again (`ParkingBay.park`), and the car parks left.
+ */
+export function withoutBays(open: Pick<OpenWorldDraft, 'parking' | 'carParks'>, bays: Iterable<number>): Pick<OpenWorldDraft, 'parking' | 'carParks'> {
+  const gone = new Set(wholeParks(open, bays));
+  const left = open.parking.filter((_, i) => !gone.has(i));
+  if (!open.carParks) return { parking: left };
+  // (A car park none of whose bays is left goes.)
+  const kept = open.carParks.flatMap((_, k) => (left.some((b) => b.park === k) ? [k] : []));
+  const number = new Map(kept.map((k, i) => [k, i]));
+  return { parking: left.map((b) => (b.park === undefined ? b : { ...b, park: number.get(b.park)! })), carParks: kept.map((k) => open.carParks![k]) };
 }

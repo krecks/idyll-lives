@@ -442,6 +442,7 @@ impl World {
     /// there. Furniture that doesn't fit (something already stands there) is left out.
     pub fn build_blueprint(&mut self, household: u32, bp: &Blueprint) -> Result<(), Error> {
         let (h, plot) = self.home_of(household)?;
+        self.not_a_flat(plot, "blueprints")?;
         let p = self.plots[plot as usize].clone();
         if self.plot_edges(&p).iter().any(|(.., e)| e.is_wall()) {
             return Err(Error::new(
@@ -681,6 +682,7 @@ impl World {
         dz: i32,
     ) -> Result<(), Error> {
         let (_, plot) = self.home_of(household)?;
+        self.not_a_flat(plot, "moving rooms")?;
         let p = self.plots[plot as usize].clone();
         // On the room's own storey.
         let up = self.storey_row(self.storey_of(z));

@@ -169,7 +169,7 @@ pub(crate) fn add_child(
         .or_else(|| {
             w.households[h]
                 .plot
-                .map(|p| w.plots[p as usize].arrival_point())
+                .map(|p| w.plots[p as usize].home_point())
         })?;
     let (traits, perks) = random_character(w);
     let seed = w.rng.next_u32();

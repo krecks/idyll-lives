@@ -72,6 +72,16 @@ fn edge_kind(kind: EdgeKind) -> Edge {
 }
 
 /// Where an edit's wall is (after the bounds checks: coordinates are on the lot).
+/// The tiles on either side of an edge (the tile itself, twice, for a diagonal), and whether it is
+/// a diagonal.
+fn edge_sides(axis: EdgeAxis, x: i32, z: i32) -> ([(i32, i32); 2], bool) {
+    match axis {
+        EdgeAxis::H => ([(x, z - 1), (x, z)], false),
+        EdgeAxis::V => ([(x - 1, z), (x, z)], false),
+        EdgeAxis::Dp | EdgeAxis::Dn => ([(x, z), (x, z)], true),
+    }
+}
+
 fn edge_ref(axis: EdgeAxis, x: i32, z: i32) -> EdgeRef {
     let (x, z) = (x as u16, z as u16);
     match axis {

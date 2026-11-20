@@ -22,7 +22,7 @@ import type { LaidTown, Layout } from '../app.svelte';
 import { app } from '../app.svelte';
 import { toast } from '../state.svelte';
 import { checkTown } from './checkJob';
-import { buildingBox, editGhosts, joinGhosts, lotBox, roadGhost } from './ghosts';
+import { editGhosts, joinGhosts, lotBox, roadGhost } from './ghosts';
 import { hatched, shownUses } from './layoutApi';
 import { find, keyOf, pick, type Picked, type PickWhat } from './pick';
 import type { Issue, TownIssues } from './problems';
@@ -30,6 +30,7 @@ import { EditSession, type SettleTiming } from './session';
 import { settle, type Settled } from './settle';
 import { toolsFor, type EditStep, type TownEditor, type TownStageTool, type TownTool, type TownToolId } from './tools';
 import { sentence } from './words';
+import { DEBUG_HOOKS } from '../../debug/hooks';
 
 /** What the screen gives the editor: its step, the town's name as the step's field has it, and the camera's glide to a lot of the town on screen. */
 export interface EditorHooks {
@@ -80,7 +81,7 @@ export class TownEditorState implements TownEditor {
     this.step = hooks.step ?? 'build';
     this.tools = toolsFor(this.step);
     // (The bench drives the editor and reads its settles' timings: `tools/bench/create.mjs`.)
-    if (import.meta.env.DEV) Object.assign(globalThis, { __townEditor: this });
+    if (DEBUG_HOOKS) Object.assign(globalThis, { __townEditor: this });
     void loadTemplates().then((t) => {
       this.templates = t;
       this.changed();
@@ -448,7 +449,7 @@ export class TownEditorState implements TownEditor {
 
   // ---- drawing ---------------------------------------------------------------------------------
 
-  /** What is picked or pointed at that the renderer's lot lights don't show (a road, a building, a village, a lot not built yet), as ghosts. */
+  /** What is picked or pointed at that the renderer's lot lights don't show (a road, a village, a lot not built yet), as ghosts. */
   private litGhosts(): Partial<TownGhosts> | null {
     const s = this.session;
     const t = this.templates;
@@ -458,7 +459,6 @@ export class TownEditorState implements TownEditor {
       if (!p) continue;
       // (A road picked or pointed at is outlined: the road shows through, never a band over it.)
       if (p.kind === 'road' && s.plan.roads[p.road]) out.roads.push(roadGhost(s.plan.roads[p.road], 'pick'));
-      else if (p.kind === 'building' && s.plan.open?.backdrop?.[p.building]) out.lots.push({ ...buildingBox(s.plan.open.backdrop[p.building]), tone: 'new' });
       else if (p.kind === 'village' && s.plan.open?.areas[p.area]) {
         const a = s.plan.open.areas[p.area];
         out.boxes.push({ x: a.x, z: a.z, w: a.w, d: a.d, tone: 'new' });

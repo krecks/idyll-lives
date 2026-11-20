@@ -43,7 +43,7 @@ export const SETTLE_FAILED = 'the town could not be built again with your change
 
 /**
  * An edit the settle took back (`landFollow.ts` `EditRefusal`), as the editor shows it: why, in words (a clause),
- * where (`at`: a road's points with its `width`, else a lot's or a building's corners; none if not known), and
+ * where (`at`: a road's points with its `width`, else a lot's corners; none if not known), and
  * until when (`now()` ms) it stays red.
  */
 export interface SettleRefusal {
@@ -258,7 +258,7 @@ export class EditSession {
     return first ? said(first.why) : null;
   }
 
-  /** What the last settle took back, red over the town for `REFUSED_SHOW` ms after: a road as a `bad` road, a lot or building as a `bad` box. Null: nothing. */
+  /** What the last settle took back, red over the town for `REFUSED_SHOW` ms after: a road as a `bad` road, a lot as a `bad` box. Null: nothing. */
   refusalGhosts(): TownGhosts | null {
     const now = this.now();
     const out: TownGhosts = { roads: [], lots: [], boxes: [] };

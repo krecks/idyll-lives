@@ -308,6 +308,8 @@ fn residents_go_round_by_the_street_not_through_the_neighbours_garden() {
         tile_plot: &tile_plot,
         open: vec![true, false, true],
         fenced: vec![true; 3],
+        halls: &Halls::NONE,
+        hall_open: Vec::new(),
     };
     let path = nav.find_path_with((5, 8), (25, 8), Some(&grounds)).unwrap();
     assert_walkable(&nav, &path);
@@ -359,6 +361,8 @@ fn into_the_garden_next_door_by_the_street_not_over_the_hedge() {
         tile_plot: &tile_plot,
         open: vec![true, true, false],
         fenced: vec![true; 3],
+        halls: &Halls::NONE,
+        hall_open: Vec::new(),
     };
     let path = nav.find_path_with((8, 3), (12, 3), Some(&grounds)).unwrap();
     assert_walkable(&nav, &path);
@@ -384,6 +388,8 @@ fn into_the_garden_next_door_by_the_street_not_over_the_hedge() {
         tile_plot: &tile_plot,
         open: vec![true; 3],
         fenced: vec![false; 3],
+        halls: &Halls::NONE,
+        hall_open: Vec::new(),
     };
     assert_eq!(
         nav.find_path_with((8, 3), (12, 3), Some(&grounds))
@@ -410,6 +416,8 @@ fn a_garden_is_crossed_when_there_is_no_other_way() {
         tile_plot: &tile_plot,
         open: vec![true, false, true],
         fenced: vec![true; 3],
+        halls: &Halls::NONE,
+        hall_open: Vec::new(),
     };
     let path = nav
         .find_path_with((5, 12), (25, 12), Some(&grounds))
@@ -422,6 +430,8 @@ fn a_garden_is_crossed_when_there_is_no_other_way() {
         tile_plot: &tile_plot,
         open: vec![false; 3],
         fenced: vec![true; 3],
+        halls: &Halls::NONE,
+        hall_open: Vec::new(),
     };
     let out = nav
         .find_path_with((15, 2), (15, 12), Some(&grounds))
@@ -559,6 +569,41 @@ fn a_spiral_is_walked_round_and_onto_from_any_side() {
     assert!(nav.can_step(3, 6, 3, 5));
     assert!(!nav.can_step(2, 5, 3, 5));
     assert!(!nav.can_step(3, 5, 2, 5));
+}
+
+#[test]
+fn one_at_a_way_out_on_the_grounds_far_side_steps_back_onto_it() {
+    // A lot a chunk deep grown by a storey whose rows nobody has built on (their chunks not
+    // there): someone at the ground's far edge (`z` its depth, as a way out of town there
+    // is) is on the storey above's first row, and their search reads the steps the regions
+    // worked out. Their step back onto the ground is open, as `can_step` has it.
+    let file: LotFile = serde_json::from_str(r#"{"width":16,"depth":16}"#).unwrap();
+    let mut lot = Lot::from_file(&file).unwrap();
+    lot.grow_depth(32);
+    assert!(!lot.allocated(4, 16), "the storey above isn't there");
+    let blocked = nav_of(&lot);
+    let stairs = StairMap {
+        depth: 16,
+        ..Default::default()
+    };
+    let plain = NavGrid {
+        lot: &lot,
+        blocked: &blocked,
+        stairs: &stairs,
+        kept_off: &[],
+        steps: None,
+    };
+    let reach = Reach::build(&plain);
+    let nav = NavGrid {
+        steps: Some(&reach),
+        ..plain
+    };
+    assert!(nav.can_step(4, 16, 4, 15));
+    assert_eq!(
+        nav.find_path((4, 16), (4, 8)),
+        plain.find_path((4, 16), (4, 8))
+    );
+    assert!(nav.find_path((4, 16), (4, 8)).is_some());
 }
 
 #[test]

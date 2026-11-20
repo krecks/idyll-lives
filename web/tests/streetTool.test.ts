@@ -71,7 +71,7 @@ function town(river = 30, land?: Land): NeighbourhoodDraft {
     roads,
     greens: [],
     households: [],
-    open: { areas: [{ name: 'Ashby', kind: 'hamlet', x: 50, z: 50, w: 300, d: 200 }], zones: [], water: rle(water), pads: {}, parking: [], places: [], backdrop: [], ...(land ? { land } : {}) },
+    open: { areas: [{ name: 'Ashby', kind: 'hamlet', x: 50, z: 50, w: 300, d: 200 }], zones: [], water: rle(water), pads: {}, parking: [], places: [], ...(land ? { land } : {}) },
   } as unknown as NeighbourhoodDraft;
 }
 
@@ -340,7 +340,7 @@ describe('the hint names what the street will be', () => {
     expect(kindLine(draft, liveStreet(draft, t, short, 'street', true), verdictOf(draft, t, content, short, 'street', true, 7))).toBe('A country road');
     // Split at a bridge, the stretch before it a country road and the one past it made a street.
     const road = (kind: RoadPlan['kind'], bridge?: [number, number]): RoadPlan => ({ points: line(0, 0, 0, 40), width: 7, ends: ['join', 'join'], kind, ...(bridge ? { bridge } : {}) });
-    const split = { draft: { ...draft, roads: [...draft.roads, road('country'), road('country', [5, 30]), road('street')] }, cleared: { lots: [], backdrop: [] }, made: [4, 5, 6] } as Edited;
+    const split = { draft: { ...draft, roads: [...draft.roads, road('country'), road('country', [5, 30]), road('street')] }, cleared: { lots: [] }, made: [4, 5, 6] } as Edited;
     expect(kindLine(draft, { ...live, bridges: [24] }, split)).toBe('A country road with a 24 m bridge, then a street to its dead end');
   });
 });

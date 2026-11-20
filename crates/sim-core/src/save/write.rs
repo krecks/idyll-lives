@@ -35,6 +35,7 @@ impl World {
                 shut: o.shut && content.objects[o.def].over_window,
                 run: o.run.filter(|_| content.objects[o.def].runs.is_some()),
                 rack: o.rack.min(content.objects[o.def].rack),
+                plot: o.keeper,
             })
             .collect();
         let sims = self
@@ -59,7 +60,8 @@ impl World {
                     // down to do isn't saved.)
                     pos = [fx as f32 + 0.5, fz as f32 + 0.5];
                 }
-                // (Lost somewhere: back at home's front door, or the middle of town.)
+                // (Lost somewhere: back at home (a flat's: behind its own door), or the middle of
+                // town.)
                 if !pos.iter().all(|p| p.is_finite()) {
                     let home = self
                         .households
@@ -67,7 +69,7 @@ impl World {
                         .and_then(|h| h.plot);
                     pos = home.map_or(
                         [self.lot.width as f32 / 2.0, self.lot.depth as f32 / 2.0],
-                        |p| self.plots[p as usize].arrival_point(),
+                        |p| self.plots[p as usize].home_point(),
                     );
                 }
                 let tasks = s
@@ -258,6 +260,10 @@ impl World {
                         [id(&b.roofs, r.style), id(&b.roof_colors, r.color)]
                     }),
                     hours: p.hours,
+                    of: p.of,
+                    storey: p.storey,
+                    door: p.door.map(|(x, z)| [x, z]),
+                    inside: p.inside.filter(|i| i.iter().all(|v| v.is_finite())),
                 })
                 .collect(),
             relationships,

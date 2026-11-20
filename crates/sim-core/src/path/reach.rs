@@ -80,9 +80,14 @@ impl Reach {
     }
 
     /// The steps open from slot `s` (a tile of chunk `c`) to each of `NEIGHBOURS` (bit `k`),
-    /// stairs aside, if its chunk's are up to date (`steps`).
+    /// stairs aside, if its chunk's are up to date (`steps`). None for the void slot: a chunk not
+    /// allocated has no tiles to work steps out for (`step_chunk`), though one may still be stood
+    /// on. (A way out of town on the ground's far side is on its last row's far edge, and the row
+    /// past it is the storey above's first: in Foundrygate someone set down at one looked up the
+    /// void slot's steps, none, where their step back onto the ground was open, and found no way.)
     pub(crate) fn steps_at(&self, c: usize, s: usize) -> Option<u8> {
-        if self.all_dirty || !self.stepped.get(c).copied().unwrap_or(false) {
+        if s == crate::lot::VOID || self.all_dirty || !self.stepped.get(c).copied().unwrap_or(false)
+        {
             return None;
         }
         self.steps.get(s).copied()

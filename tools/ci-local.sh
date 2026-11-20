@@ -87,7 +87,7 @@ step() {
     sizes) cargo review sizes --check ;;
     uses) cargo review uses --check ;;
     models) (cd web && "${bun_ci[@]}" install --frozen-lockfile) && cargo check-glb --validate ;;
-    # What the game builds as it runs (houses near and far, the backdrop, a street, fences, cars) at the models'
+    # What the game builds as it runs (houses near and far, the lots' buildings closed, a street, fences, cars) at the models'
     # gate: a fixed set of samples dumped by the game's own generators (about 2 s; no browser, no wasm, no
     # packages), then held to the same rules, what they find today by tools/art/gate-baseline.json (about 12 s).
     built) "${bun_ci[@]}" tools/built/dump.ts target/built && cargo check-glb --built target/built ;;

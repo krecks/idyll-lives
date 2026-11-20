@@ -1,5 +1,5 @@
 {
-  "$comment": "The street's dressing (crates/art/nature/src/street, built by cargo art): the kerbside bench, the planter with its little tree, the flower tub, the street-name sign, the taxi rank's sign, the door pot, the garden path light and the flower clump that render/pc/street.ts draws as thin instances along the kerbs and front gardens. Listed in the base manifest's packs. Each has a far version for the town overview. Leaves and flowers are on the foliage finish, so they sway in the wind; the path light's lens glows at night.",
+  "$comment": "The street's dressing (crates/art/nature/src/street, built by cargo art): the kerbside bench, the planter with its little tree, the flower tub, the street-name sign, the taxi rank's sign, the car park's P sign, the door pot, the garden path light and the flower clump that render/pc/street.ts draws as thin instances along the kerbs and front gardens. Listed in the base manifest's packs. Each has a far version for the town overview. Leaves and flowers are on the foliage finish, so they sway in the wind; the path light's lens glows at night.",
   "version": 1,
   "entries": {
     "model.street.bench": {
@@ -209,6 +209,22 @@
         }
       },
       "far": "../../models/street/taxiSign.far.glb"
+    },
+    "model.street.parkingSign": {
+      "type": "model",
+      "url": "../../models/street/parkingSign.glb",
+      "materials": {
+        "plate": {
+          "finish": "material.finish.gloss"
+        },
+        "pole": {
+          "finish": "material.finish.metal"
+        },
+        "sign_blue": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "far": "../../models/street/parkingSign.far.glb"
     }
   }
 }

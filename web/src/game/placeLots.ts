@@ -1,26 +1,26 @@
 /**
  * The town's named places as lots. The building of a civic place (a town hall, a church, a school, a
- * fire station: `backdrop.ts` `CIVIC`) or of a place of another kind (a shop, a café, an office, a
+ * fire station: `places.ts` `CIVIC`) or of a place of another kind (a shop, a café, an office, a
  * workshop, a farm shop: `ZONE`) is a public lot of the sim's (`PlotSlot.kind` `shop`), built from a
  * layout of its own (`houses.json` `parks` of kind `place`, on a lot of that layout's size) and looking
- * from outside as a backdrop building of its kind would (`PlotSlot.dress`, the town file's
- * `meta.lotLooks`).
+ * from outside as a building of its kind (`PlotSlot.dress`, the town file's `meta.lotLooks`), as tall as
+ * its real storeys.
  *
  * - `placeTemplate`: the layout a named place's lot is built from, and `placeOfTemplate` the other way.
  * - `placeUnit`: a named place's lot before it is placed (`LotPlacer.place`).
  * - `lotName`: the name it gets once placed, as its place is called.
  * - `slotPlace`: the place (`TownPlace`) any public lot is: its kind, name, tag, hours and the careers
- *   working there. A civic place keeps its kind's hours (`HOURS`) widened to its careers' shifts, as its
- *   backdrop building did; the sim's own shops and the park keep theirs (`LOT_HOURS`, none).
+ *   working there. A civic place keeps its kind's hours (`HOURS`) widened to its careers' shifts; the
+ *   sim's own shops and the park keep theirs (`LOT_HOURS`, none).
  *
- * (`CIVIC` is only read when these are called: `backdrop.ts` reaches this module's imports again
- * through `town.ts`, and may not have made it yet as this module loads.)
+ * (`CIVIC` is only read when these are called: `places.ts` reaches this module's imports again, and
+ * may not have made it yet as this module loads.)
  */
 
 import type { Content } from '../content/content';
 import type { LotLook, TownPlace, TownSize } from '../core/protocol';
-import { CIVIC, HOURS, hoursFor, KIND_WORK, LOT_HOURS, LOT_WORK, placeName, ZONE, type Civic, type Kind, type Namer, type ZoneKind } from './backdrop';
-import { plotRect, type NeighbourhoodDraft, type PlotSlot, type Templates, type Unplaced } from './town';
+import { CIVIC, HOURS, hoursFor, KIND_WORK, LOT_HOURS, LOT_WORK, placeName, ZONE, type Civic, type Kind, type Namer, type ZoneKind } from './places';
+import { plotRect, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Templates, type Unplaced } from './town';
 
 type Rand = () => number;
 
@@ -28,7 +28,6 @@ type Rand = () => number;
 export type PlaceWhat = { civic: number } | { zone: ZoneKind };
 
 const pick = <T>(rand: Rand, list: readonly T[]): T => list[Math.floor(rand() * list.length)];
-const between = (rand: Rand, lo: number, hi: number) => lo + Math.floor(rand() * (hi - lo + 1));
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
 /** The town sizes, smallest first (a civic place's layout for a size it names none for: the nearest smaller one's, else larger). */
@@ -38,11 +37,11 @@ const SIZES: readonly TownSize[] = ['hamlet', 'village', 'town', 'city'];
  * The layout (a `parks` id of kind `place`) the lot of civic place `what` (a `CIVIC` entry) or of a
  * place of kind `what` is built from, in a place of `size`: a civic place's own for that size (a
  * hamlet's or a village's hall is the parish hall, a town's the town hall), one of the kind's
- * drawn from `rand` (a kind with one layout draws nothing).
+ * drawn from `rand` (a kind with one layout draws nothing); `compact`: one of its compact layouts (`ZONE`), if it has any.
  */
-export function placeTemplate(what: Civic | ZoneKind, size: TownSize, rand: Rand): string {
+export function placeTemplate(what: Civic | ZoneKind, size: TownSize, rand: Rand, compact = false): string {
   if (typeof what === 'string') {
-    const list = ZONE[what].templates;
+    const list = compact && ZONE[what].compact.length ? ZONE[what].compact : ZONE[what].templates;
     return list.length === 1 ? list[0] : pick(rand, list);
   }
   // (Its own for the size, else the nearest smaller size's, else the nearest larger's.)
@@ -55,33 +54,37 @@ export function placeTemplate(what: Civic | ZoneKind, size: TownSize, rand: Rand
 export function placeOfTemplate(template: string): PlaceWhat | null {
   const civic = CIVIC.findIndex((c) => Object.values(c.templates).includes(template));
   if (civic >= 0) return { civic };
-  const zone = (Object.keys(ZONE) as ZoneKind[]).find((k) => ZONE[k].templates.includes(template));
+  const zone = (Object.keys(ZONE) as ZoneKind[]).find((k) => ZONE[k].templates.includes(template) || ZONE[k].compact.includes(template));
   return zone ? { zone } : null;
 }
 
-/** How a lot of `kind` looks from outside: its use, storeys and roof as the kind's (`Kind`), its colours (as `BackdropPass` draws a building's), from `rand`. */
-function dressOf(kind: Kind, rand: Rand): LotLook {
-  return { use: kind.use, storeys: between(rand, kind.storeys[0], kind.storeys[1]), roof: pick(rand, kind.roofs), look: Math.floor(rand() * 1024) };
+/**
+ * How a lot of `kind` built from layout `p` looks from outside: its use and roof as the kind's (`Kind`), its
+ * colours, from `rand`; as many storeys as it really has (its ground floor, and the storey above if its layout
+ * has one). What stands over it (`PlotSlot.upper`: flats over a shop, an office's floors) raises it with them.
+ */
+function dressOf(kind: Kind, p: PublicTemplate, rand: Rand): LotLook {
+  return { use: kind.use, storeys: p.upper ? 2 : 1, roof: pick(rand, kind.roofs), look: Math.floor(rand() * 1024) };
 }
 
 /**
  * A named place's lot before it is placed (`LotPlacer.place`): civic place `what` (a `CIVIC` entry)
- * or a place of kind `what`, in a place of `size`. Its layout (`placeTemplate`), its lot the layout's
- * own (`w`, `d`), the layout's name until it is named (`lotName`), and how it looks from outside
- * (`dress`), drawn from `rand` in that order. A `shop` lot, as the sim's own shops.
+ * or a place of kind `what`, in a place of `size`. Its layout (`placeTemplate`; `compact`: one of its kind's
+ * compact ones), its lot the layout's own (`w`, `d`), the layout's name until it is named (`lotName`), and how
+ * it looks from outside (`dress`), drawn from `rand` in that order. A `shop` lot, as the sim's own shops.
  */
-export function placeUnit(t: Templates, what: Civic | ZoneKind, size: TownSize, rand: Rand): Unplaced {
-  const template = placeTemplate(what, size, rand);
+export function placeUnit(t: Templates, what: Civic | ZoneKind, size: TownSize, rand: Rand, compact = false): Unplaced {
+  const template = placeTemplate(what, size, rand, compact);
   const p = t.parks.find((q) => q.id === template);
   if (!p || p.kind !== 'place') throw new Error(`no place layout "${template}"`);
   const frame = p.lot ?? t.plot;
   const kind = typeof what === 'string' ? ZONE[what].kind : (what.kinds?.[size] ?? what.kind);
-  return { kind: 'shop', template, name: p.name, lot: 'medium', w: frame.width, d: frame.depth, dress: dressOf(kind, rand) };
+  return { kind: 'shop', template, name: p.name, lot: 'medium', w: frame.width, d: frame.depth, dress: dressOf(kind, p, rand) };
 }
 
 /**
  * The name a named place's lot gets (its `PlotSlot.name`, and its place's): a civic place's own
- * (`Civic.name`: "Ashby School"), else one a backdrop place of its kind would get (`placeName`; a
+ * (`Civic.name`: "Ashby School"), else one for a place of its kind (`placeName`; a
  * farm shop the farmer's), none twice (`namer.unique`: `namer` is its area's). Null: the lot is no
  * named place's.
  */

@@ -171,6 +171,7 @@ impl World {
         self.lot.take_room_changes();
         let (rooms, cells) = crate::rooms::compute(self);
         self.rooms = rooms;
+        self.map_halls();
         self.rooms_out = crate::privacy::doors_out(&self.content, &self.rooms, &self.lot);
         self.refresh_privacy();
         self.rooms_version = self.room_layout_version;
@@ -183,7 +184,8 @@ impl World {
         // indoor tiles anywhere their room; off the plots, none (`roomRules.away`).
         let rooms = &self.rooms;
         let mut source = vec![crate::rooms::NO_ROOM; self.lot.tile_slots()];
-        for (pi, p) in self.plots.iter().enumerate() {
+        // (A flat has no garden: its rectangle's ground is its building's.)
+        for (pi, p) in self.lots().iter().enumerate() {
             let garden = rooms
                 .iter()
                 .position(|r| r.garden && r.plot == Some(pi as u32))
@@ -268,6 +270,7 @@ impl World {
         use crate::rooms::room_order;
         self.sync_tile_arrays();
         self.map_plots();
+        self.map_halls();
         let away = self.content.room_rules.away;
         let Some([x0, z0, x1, z1]) = changes.rect else {
             return;
@@ -275,11 +278,12 @@ impl World {
         let rect = [x0 - 1, z0 - 1, x1 + 1, z1 + 1];
         let meets =
             |r: [i32; 4]| r[0] < rect[2] && rect[0] < r[2] && r[1] < rect[3] && rect[1] < r[3];
-        // The plots there, on any storey (what stands upstairs outdoors is in the garden).
+        // The lots there, on any storey (what stands upstairs outdoors is in the garden; a flat
+        // has none).
         let depth = self.storey_depth().max(1);
         let blocks = (self.lot.depth as i32 / depth).max(1);
         let plots: Vec<u32> = self
-            .plots
+            .lots()
             .iter()
             .enumerate()
             .filter(|(_, p)| {
@@ -338,7 +342,7 @@ impl World {
                 let pi = room.plot.expect("a garden is a plot's");
                 let p = &self.plots[pi as usize];
                 // (A later plot over the same tiles scores them: as `refresh_rooms`.)
-                let later: Vec<&Plot> = self.plots[pi as usize + 1..]
+                let later: Vec<&Plot> = self.lots()[pi as usize + 1..]
                     .iter()
                     .filter(|q| {
                         q.x < p.x + p.w && p.x < q.x + q.w && q.z < p.z + p.d && p.z < q.z + q.d

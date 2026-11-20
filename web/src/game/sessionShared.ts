@@ -31,8 +31,10 @@ export type StartRequest =
       kind: 'new';
       town: NeighbourhoodDraft;
       household: HouseholdDraft;
+      /** The home: a house's lot, or flat `flat` (its index in its building's flats) of the building on it. */
       slot: number;
-      /** `household` already lives in `town` at `slot`: the player takes it over instead of moving a new one in. */
+      flat?: number;
+      /** `household` already lives in `town` at `slot` (and `flat`): the player takes it over instead of moving a new one in. */
       existing?: boolean;
       /** Living (default) or Creative. */
       mode?: GameKind;
@@ -108,6 +110,26 @@ export interface GameSession {
   reveal(): void;
   /** Ends the session; resolves once it has let go of the renderer, which is kept for the next one. */
   dispose(): Promise<void>;
+  /**
+   * Fixed-step playback (benchmarks, `debug/benchTime.ts`): the simulation's clock stops and the frames wait for
+   * `step`, each `ticks` ticks of the game later than the one before; null: back to real time. The game should run
+   * at normal speed (a faster one's steps should divide `ticks`), with no super speed in quiet hours. Asked again while
+   * stepping, only the ticks a frame change.
+   */
+  stepMode(ticks: number | null): void;
+  /**
+   * Fixed-step playback: a run's start, alike however the frames before it went. The residents and the birds set up
+   * afresh (`Renderer.restartLife`); then, with the clocks of what moves only for the eye from 0 again and the frames'
+   * clock a second on (what was held back by its rate is due then), one frame with the clock held, which draws whatever
+   * the restart left waiting; then the clocks from 0 again and the frames' clock a second on, for the run's first frame.
+   */
+  restartPlayback(): Promise<void>;
+  /**
+   * Fixed-step playback: runs the frame's ticks, then draws it at their time. The ticks run (0: none, the game is
+   * paused or not stepping). `still`: a frame with no ticks and the clock held (what a camera put somewhere streams in
+   * and builds, drawn before a run without moving what is drawn at a rate of its own on).
+   */
+  step(still?: boolean): Promise<number>;
 }
 /** Reports a loading step and the overall progress (0..1) while a session is prepared. */
 export type ProgressReport = (label: string, value: number) => void;

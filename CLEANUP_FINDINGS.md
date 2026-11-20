@@ -86,8 +86,6 @@ Check: `rg -n 'still 39|SAVE_VERSION' crates/sim-core/src/save/mod.rs`.
 
 ## Deferred
 
-- `crates/sim-core/src/privacy.rs:707` and `crates/sim-core/src/social/defs.rs:230` still say
-  `conversation.rs`. Both files are pinned parts (`tools/pins/pins.json`: `sim-privacy`,
-  `sim-social-defs`), so the gate holds their sha256 and a comment change fails `pins` until an
-  integrator re-accepts them with `cargo pins --update <name> --by <who> --reason <why>`. Two
-  comments are not worth re-accepting accepted work for; they go back with that update.
+- Done when the cleanup was integrated with the real town: `crates/sim-core/src/privacy.rs` and
+  `crates/sim-core/src/social/defs.rs` now say `conversation/`, and their pins (`sim-privacy`,
+  `sim-social-defs`) were re-accepted with the integration's other pin updates.

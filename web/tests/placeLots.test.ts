@@ -30,13 +30,13 @@ describe('named places as lots', async () => {
   const { objectInfos } = await import('../src/game/housegen');
   const { randomHousehold } = await import('../src/game/household');
   const { mulberry32 } = await import('../src/game/noise');
-  const { CIVIC, HOURS, hoursFor, LOT_HOURS, namerFor, ZONE } = await import('../src/game/backdrop');
+  const { CIVIC, HOURS, hoursFor, LOT_HOURS, namerFor, ZONE } = await import('../src/game/places');
   const { assembleTown, generateWorld, layoutTown, useTownContent, vacantSlots } = await import('../src/game/town');
   const { lotName, lotPlaceKind, placeOfTemplate, placeTemplate, placeUnit, slotPlace } = await import('../src/game/placeLots');
   type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
   type PlotSlot = import('../src/game/town').PlotSlot;
-  type ZoneKind = import('../src/game/backdrop').ZoneKind;
+  type ZoneKind = import('../src/game/places').ZoneKind;
   const content = await Content.load('http://localhost/content/base.json');
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json', []);
   useTownContent(content);
@@ -68,7 +68,7 @@ describe('named places as lots', async () => {
       }
     }
     for (const k of zones) {
-      for (const id of ZONE[k].templates) {
+      for (const id of [...ZONE[k].templates, ...ZONE[k].compact]) {
         expect(layouts.map((p) => p.id), k).toContain(id);
         expect(placeOfTemplate(id)).toEqual({ zone: k });
         used.add(id);
@@ -84,7 +84,7 @@ describe('named places as lots', async () => {
     for (const id of ['park', 'market', 'cafe', 'grocer', 'picnicMeadow']) expect(placeOfTemplate(id)).toBeNull();
   });
 
-  test("a lot made for a place is its layout's size, a shop, dressed as its kind, the same from the same draws", () => {
+  test("a lot made for a place is its layout's size, a shop, dressed as its kind and as tall as its real storeys, the same from the same draws", () => {
     for (const what of [...CIVIC, ...zones]) {
       const u = placeUnit(t, what, 'town', mulberry32(7));
       const p = t.parks.find((q) => q.id === u.template)!;
@@ -92,8 +92,8 @@ describe('named places as lots', async () => {
       expect(u.kind).toBe('shop');
       expect([u.w, u.d]).toEqual([p.lot!.width, p.lot!.depth]);
       expect(u.dress!.use).toBe(kind.use);
-      expect(u.dress!.storeys).toBeGreaterThanOrEqual(kind.storeys[0]);
-      expect(u.dress!.storeys).toBeLessThanOrEqual(kind.storeys[1]);
+      // (Its ground floor, and the storey above where its layout has one: nothing stands over it yet.)
+      expect(u.dress!.storeys).toBe(p.upper ? 2 : 1);
       expect(kind.roofs).toContain(u.dress!.roof);
       expect(placeUnit(t, what, 'town', mulberry32(7))).toEqual(u);
     }
@@ -111,7 +111,8 @@ describe('named places as lots', async () => {
   });
 
   test("a public lot's place is the one the generator gives it, called as its lot is", () => {
-    const publicLots = hamlet.slots.filter((s) => s.kind !== 'house');
+    // (A flats building is homes, no place.)
+    const publicLots = hamlet.slots.filter((s) => s.kind !== 'house' && s.kind !== 'flats');
     expect(publicLots.length).toBeGreaterThan(0);
     // (But the main town's first office, which takes the careers no place there has, its hours widened to theirs.)
     const office = hamlet.open!.places!.find((p) => p.area === 0 && p.kind === 'office')!;
@@ -175,8 +176,9 @@ describe('named places as lots', async () => {
     for (const seed of [1, 2, 3]) {
       const world = generateWorld(content, t, 'country', seed, undefined, undefined, { town: 'town', villages: 'few' });
       // Every lot built from a named place's layout is dressed as one (`placeUnit`), and no other is.
-      expect(world.slots.filter((s) => !!placeOfTemplate(s.template) !== !!s.dress).map((s) => s.template)).toEqual([]);
-      const named = world.slots.filter((s) => s.dress);
+      // (A flats building is dressed as flats, no place.)
+      expect(world.slots.filter((s) => s.kind !== 'flats' && !!placeOfTemplate(s.template) !== !!s.dress).map((s) => s.template)).toEqual([]);
+      const named = world.slots.filter((s) => s.dress && s.kind === 'shop');
       // Every civic place of a town in the main town; a hamlet's in every other area.
       const civicOfSlot = (s: PlotSlot) => {
         const what = placeOfTemplate(s.template);
@@ -190,8 +192,6 @@ describe('named places as lots', async () => {
         expect(place.kind).toBe(lotPlaceKind(s));
       }
       expect(new Set(named.map((s) => s.name)).size).toBe(named.length);
-      // No backdrop building is a place.
-      expect(world.open!.backdrop!.filter((b) => b.place !== undefined)).toEqual([]);
     }
   }, 120_000);
 });

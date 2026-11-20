@@ -18,22 +18,18 @@
  *     --seed 7                     the world's seed
  *     --port 5297 | --url <u>      a dev server on the port (started if none answers), or one already running
  *     --out <dir>                  default /tmp/ng-render/
+ *     --timings                    how long each picture waited to be ready (the glide, the textures, the frames)
  *     --no-time                    pictures only
  *     --no-shots                   timings only (from the bare land)
  *     --follow                     the town on a land it follows (`withLand`), as every new game's will be
  *
  * Needs Playwright like render.mjs (`PLAYWRIGHT=<path to playwright/index.mjs>`).
  */
-import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { quiet } from './quiet.mjs';
+import { benchContext, devServer, launch, settleShot } from './lib/browser.mjs';
 import { worldFlags } from './worldFlags.mjs';
 
-const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const WEB = join(ROOT, 'web/');
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
   const i = args.indexOf(`--${name}`);
@@ -51,33 +47,7 @@ const timing = !has('no-time');
 const shots = !has('no-shots');
 mkdirSync(out, { recursive: true });
 
-async function playwright() {
-  if (process.env.PLAYWRIGHT) return import(process.env.PLAYWRIGHT);
-  try {
-    return await import(createRequire(WEB + 'package.json').resolve('playwright'));
-  } catch {
-    throw new Error('Playwright not found: install it, or set PLAYWRIGHT=<path to playwright/index.mjs>');
-  }
-}
-
-async function running(url) {
-  try {
-    return (await fetch(url, { signal: AbortSignal.timeout(1500) })).ok;
-  } catch {
-    return false;
-  }
-}
-
-let server = null;
-const base = flag('url', null) ?? `http://localhost:${port}`;
-if (!flag('url', null) && !(await running(base))) {
-  server = spawn(`${WEB}node_modules/.bin/vite`, ['--port', String(port), '--strictPort'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] });
-  process.on('exit', () => server.kill());
-  await new Promise((resolve, reject) => {
-    server.stdout.on('data', (d) => String(d).includes('Local') && resolve());
-    server.on('exit', (code) => reject(new Error(`vite exited (${code})`)));
-  });
-}
+const { url: base, stop } = await devServer({ url: flag('url', null), port });
 
 /** In the page: the modules the shots need, the UI hidden, a band where the side panel would be. */
 async function setUp({ kind, options, seed, side, follow }) {
@@ -109,17 +79,11 @@ async function frameShot({ which, shot, home = null }) {
   await ng.menuScene.settled();
 }
 
-const { chromium } = await playwright();
-const browser = await chromium.launch({
-  headless: !has('headed'),
-  ...(process.env.CHROME ? { executablePath: process.env.CHROME } : { channel: 'chromium' }),
-  args: ['--enable-unsafe-webgpu', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'],
-});
+const { browser } = await launch({ headless: !has('headed') });
 let faults = 0;
 try {
   for (const renderer of renderers) {
-    const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
-    await context.addInitScript(quiet);
+    const context = await benchContext(browser, { viewport: { width, height }, deviceScaleFactor: 1 });
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
@@ -128,8 +92,9 @@ try {
     await page.waitForFunction(() => !!document.querySelector('.menu') && !document.querySelector('.loading'), null, { timeout: 180_000, polling: 200 });
     const facts = await page.evaluate(setUp, { kind: made.world, options: made.options, seed, side: Math.round(width * 0.24), follow: has('follow') });
     console.log(`townShots: ${renderer}: ${made.world} ${made.query || '(its own options)'} seed ${seed}: ${facts.width}x${facts.depth} m, ${facts.areas} areas, ${facts.slots} lots, ${facts.roads} roads, land ${facts.land}`);
-    const shoot = async (name, wait = 1200) => {
-      await page.waitForTimeout(wait);
+    const shoot = async (name) => {
+      const ms = await page.evaluate(settleShot, { hook: '__ng', minMs: 1200 });
+      if (has('timings')) console.log(`  settled in ${ms.join(' + ')} ms (glide, textures, frames)`);
       const file = join(out, `${renderer}-${name}.png`);
       await page.screenshot({ path: file });
       console.log(`townShots: ${file}`);
@@ -137,7 +102,7 @@ try {
 
     if (shots) {
       await page.evaluate(frameShot, { which: 'land', shot: { kind: 'world' } });
-      await shoot('land-world', 2500);
+      await shoot('land-world');
       // Panned far past the land's edge: the camera stops over the land (its target at the corner).
       await page.evaluate(() => window.__ng.menuScene.pan(-5000, -5000));
       await shoot('land-panned');
@@ -149,7 +114,7 @@ try {
       await shoot('land-dragged');
 
       await page.evaluate(frameShot, { which: 'town', shot: { kind: 'world' } });
-      await shoot('town-world', 2500);
+      await shoot('town-world');
       await page.evaluate(frameShot, { which: 'town', shot: { kind: 'area', area: 0 } });
       await shoot('town-area0');
       if (facts.areas > 1) {
@@ -239,7 +204,7 @@ try {
       // Back to the bare land with every lot outlined (as step 1 asks): no ring of the town's lots is left on it.
       await page.evaluate(() => window.__ng.menuScene.highlight({ outlines: true }, true));
       await page.evaluate(frameShot, { which: 'land', shot: { kind: 'area', area: 0 } });
-      await shoot('land-again', 2500);
+      await shoot('land-again');
       await page.evaluate(() => window.__ng.menuScene.highlight({}, true));
     } else await page.evaluate(frameShot, { which: 'land', shot: { kind: 'world' } });
 
@@ -289,6 +254,6 @@ try {
   }
 } finally {
   await browser.close();
-  server?.kill();
+  stop();
 }
 console.log(faults ? `townShots: ${faults} fault(s); pictures in ${out}` : `townShots: clean; pictures in ${out}`);

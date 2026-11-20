@@ -37,6 +37,7 @@ pub(crate) fn update(w: &mut World) {
         households,
         plots,
         tile_plot,
+        halls,
         reach,
         travel,
         ..
@@ -49,7 +50,7 @@ pub(crate) fn update(w: &mut World) {
         steps: None,
     };
     // (Round other people's gardens, as for any walk.)
-    let walk = |sim: &Sim, goal| grounds(tile_plot, plots, households, &nav, sim, goal);
+    let walk = |sim: &Sim, goal| grounds(tile_plot, halls, plots, households, &nav, sim, goal);
     let n = sims.len();
 
     // Drop engagements whose actor stopped talking (cancelled, interrupted, finished).

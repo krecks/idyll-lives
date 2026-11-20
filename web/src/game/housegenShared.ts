@@ -57,6 +57,12 @@ export interface HouseGenConfig {
   basement?: BasementSpec;
   /** How a house is furnished for the people living in it (see `Residents`). */
   residents?: ResidentsSpec;
+  /** What a home nobody has moved into keeps when it is a shell (see `Furnishing`). */
+  shell?: ShellSpec;
+  /** The real storeys above a named place's ground floor, by what the place is (`placeFloor`). */
+  floors?: Record<string, FloorsSpec>;
+  /** Buildings of flats (`flats.ts`). */
+  flats?: FlatsSpec;
   names: { first: string[]; second: Record<string, string[]> };
 }
 /**
@@ -72,8 +78,49 @@ export interface Residents {
   babies: number;
   stages?: string[];
 }
-/** How much garden a house's lot has round it (see `fitLot`). */
-export type GardenSize = 'snug' | 'roomy' | 'big';
+/**
+ * What a home is furnished for: the people living in it (`Residents`), or `'shell'`, a home past
+ * the town's fill that nobody has moved into: its walls, doors and windows, each kitchen's counter
+ * run, the fittings of the rooms `shell.fitted` names (a bathroom's toilet, shower and basin) and
+ * its ceiling lights, but nothing loose (no beds, no sofas, nothing in the garden). Undefined: an
+ * empty home, furnished as its rooms' own recipes have it.
+ */
+export type Furnishing = Residents | 'shell';
+
+/** A shell's fittings: the rooms that keep the furniture their recipes must have (`RoomSpec.furniture` with no `chance`). */
+interface ShellSpec {
+  fitted: Kind[];
+}
+
+/**
+ * The storeys above a named place of one kind (`placeFloor`): the rooms off the hall over its
+ * stairs, in order (`rooms`, as many as the floor takes, the list repeated), each furnished from
+ * its recipe in `rooms`.
+ */
+interface FloorsSpec {
+  rooms: Kind[];
+}
+
+/**
+ * Buildings of flats (`flats.ts`): the stair hall's width (`hall`; `narrowHall` with flats on one
+ * side of it, and over a place), the lot round the building (`side` m beside it, a `front` strip,
+ * `frontBays` deep with parking bays, a `yard` behind, m, a range, with `yardThings` in it), each
+ * flat's `letterbox` by the street door, and the second word of a building's name (`names`).
+ */
+export interface FlatsSpec {
+  hall: number;
+  narrowHall: number;
+  side: number;
+  front: number;
+  frontBays: number;
+  yard: [number, number];
+  letterbox: string;
+  yardThings: string[];
+  names: string[];
+}
+
+/** How much garden a house's lot has round it (see `fitLot`; `tight`: a dense street's, no driveway, never offered to choose). */
+export type GardenSize = 'tight' | 'snug' | 'roomy' | 'big';
 export const GARDEN_SIZES: readonly GardenSize[] = ['snug', 'roomy', 'big'];
 /**
  * A lot cut to fit its house: `back`, the garden behind it as a share of the house's depth (a
@@ -87,8 +134,9 @@ export interface GardenSpec {
   side: [number, number];
   drive: number;
 }
-/** A key for `residents` (empty: undefined). */
-export function residentsKey(r: Residents | undefined): string {
+/** A key for `residents` (empty: undefined; `shell` for a shell). */
+export function residentsKey(r: Furnishing | undefined): string {
+  if (r === 'shell') return 'shell';
   return r ? `${r.couples}.${r.adults}.${r.children}.${r.babies}${r.stages?.length ? `.${[...r.stages].sort().join('+')}` : ''}` : '';
 }
 /**

@@ -3,17 +3,17 @@
     {
       "name": "living-town-meta",
       "file": "web/src/core/protocol.ts",
-      "sha256": "15041764db92b504f905094de42a8d89c7a211960f51305a77775e414d98da85",
-      "by": "integrator",
-      "reason": "owner's OK 2026-11-19: protocol.ts living-town parts as changed by 0.8.3 (land, speeds, visitable places, curtains and cars messages)",
+      "sha256": "21f01292caa4428ccb37c943a0b7b2c8cf769eeff7a8c543c05c8864a7c755ae",
+      "by": "real-town-t1",
+      "reason": "owner's OK, real town: the backdrop goes (BackdropBuilding and WorldMeta.backdrop), every place a lot's (TownPlace.plot required), LotLook's roof spelled out",
       "region": "living-town-meta"
     },
     {
       "name": "living-town-types",
       "file": "web/src/core/protocol.ts",
-      "sha256": "3f1f692a2d3e707e440ab6539906ef6d68e8b1d8c06a2c6e017c2caa079014a8",
-      "by": "integrator",
-      "reason": "owner's OK 2026-11-19: protocol.ts living-town parts as changed by 0.8.3 (land, speeds, visitable places, curtains and cars messages)",
+      "sha256": "feff89eba0cde0204b16dcf3f9bf8ed0aaf14851cc619955f92f6d21151b0e76",
+      "by": "real-town-simp-render",
+      "reason": "simplify round: 'barn' dropped from BuildingUse, a use no lot's look has (no generator, sample or reader makes one since the backdrop went)",
       "region": "living-town-types"
     },
     {
@@ -114,9 +114,9 @@
     {
       "name": "sim-privacy",
       "file": "crates/sim-core/src/privacy.rs",
-      "sha256": "6fa2606c5848c1b0c3f2c135b751cf1ecbf6903d81fcd9afd570313cc18f0644",
-      "by": "release/0.8.3",
-      "reason": "speed for a full town: the rooms kept shut found once a tick, sorted by room with a per-resident bit, and a bedroom's people looked for among its plot's, not the whole town"
+      "sha256": "d09c594b019256dde393cf655cd0d5f07394b43c70bec4d39aa9e4c09d751e14",
+      "by": "integrate-cleanup",
+      "reason": "code cleanup integrated with the real town"
     },
     {
       "name": "living-town-lens",
@@ -158,9 +158,9 @@
     {
       "name": "sim-planner-purchases",
       "file": "crates/sim-core/src/planner/purchases.rs",
-      "sha256": "079353a1791ef687112517706fcf4f283a7c7d1f767a5b8c1df53b7e4008fa02",
-      "by": "refactor",
-      "reason": "split out of planner.rs; behaviour unchanged"
+      "sha256": "81035427a1c30febb525a5f5ab8a093829e81e55d0c0105831da8e9d9f058440",
+      "by": "integrate-cleanup",
+      "reason": "code cleanup integrated with the real town"
     },
     {
       "name": "sim-planner-factors",
@@ -179,9 +179,9 @@
     {
       "name": "sim-social-defs",
       "file": "crates/sim-core/src/social/defs.rs",
-      "sha256": "1087a872fb796b6f212068d4a86ce2b3fc4d79fb5dca19792d160c6180c60aa9",
-      "by": "refactor",
-      "reason": "split out of social.rs; behaviour unchanged"
+      "sha256": "7b89902cb484da67522a67e8fa2dcc3a3d773becb53ff0810282f56c8f4f2f38",
+      "by": "integrate-cleanup",
+      "reason": "code cleanup integrated with the real town"
     },
     {
       "name": "sim-social-parse",
@@ -207,16 +207,16 @@
     {
       "name": "sim-lifecycle-moving",
       "file": "crates/sim-core/src/lifecycle/moving.rs",
-      "sha256": "7d530ba133c78ae376921c908ae3609e9d4495555249015d556e4322ec53e70a",
-      "by": "refactor",
-      "reason": "split out of lifecycle.rs; behaviour unchanged"
+      "sha256": "48bb5ce755c357a3fc9f3b51e065ee9673fd895f6de632da8929853c0e8b94a8",
+      "by": "integrate-cleanup",
+      "reason": "code cleanup integrated with the real town"
     },
     {
       "name": "sim-lifecycle-arrival",
       "file": "crates/sim-core/src/lifecycle/arrival.rs",
-      "sha256": "f10015429d8453183c8b5761b74c5b123f0edcc5e46e62ac0fc3e984fefab512",
-      "by": "refactor",
-      "reason": "split out of lifecycle.rs; behaviour unchanged"
+      "sha256": "81d308b810b63090996289b62e9611bdec574ae5b5c7e6c47050ff673c2ace8a",
+      "by": "integrate-cleanup",
+      "reason": "code cleanup integrated with the real town"
     },
     {
       "name": "sim-lifecycle-babies",
@@ -228,9 +228,9 @@
     {
       "name": "sim-lifecycle-children",
       "file": "crates/sim-core/src/lifecycle/children.rs",
-      "sha256": "0bde6e641ff3f63fad9575a685777de83b8eda6173ba10b0e8d0340fca44f2f3",
-      "by": "refactor",
-      "reason": "split out of lifecycle.rs; behaviour unchanged"
+      "sha256": "a87d5b2f19c2279d0169afe94e9e1d2ad9636ac22ed9db73b081fc635de82d92",
+      "by": "integrate-cleanup",
+      "reason": "code cleanup integrated with the real town"
     }
   ]
 }

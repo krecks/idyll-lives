@@ -167,13 +167,77 @@ function mix(hex: string, withHex: string, t: number): string {
   return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
+/**
+ * The paint a body is painted in to be tinted copy by copy (`pc/cars.ts`: the parked cars of a body and age are one draw,
+ * each car's paint its copy's colour, `carPaintColour`): white, never faded (an old car's fade is in its colour). No
+ * other part of a car is pure white, so the tint goes on the paint alone (`GAME_TINT_WHITE`, `pc/shaders/surface.ts`).
+ */
+export const TINT_PAINT = '#FFFFFF';
+
 /** A car's paint as its age shows it: its colour and roughness. */
 function aged(paint: string, age: CarAge): [string, number] {
-  return [age === 0 ? mix(paint, FADED, FADE) : paint, AGE_GLOSS[age] ?? AGE_GLOSS[1]];
+  return [age === 0 && paint !== TINT_PAINT ? mix(paint, FADED, FADE) : paint, AGE_GLOSS[age] ?? AGE_GLOSS[1]];
+}
+
+/** A car's paint (`CAR_PAINT`, sRGB) as its age shows it: the colour `paintCar` paints its body in, a parked one's tint. */
+export function carPaintColour(paint: string, age: CarAge): string {
+  return aged(paint, age)[0];
 }
 
 /** Doors (as sim-core `cars::DOORS`): 0 front left (the driver's, on the car's +x side), 1 front right, 2 back left, 3 back right. */
 export const DOORS = 4;
+/**
+ * How wide a door opens (degrees), wide open; the room (m) beside a car's side it needs for that (sim-core
+ * `cars::SWING`); and how far out from the side (m) a door opened only part way reaches, where a driver squeezes in or
+ * out by it (`cars::DOOR_OUT`: `Car::door_in_bay`, a car in a full row of bays).
+ */
+export const DOOR_OPEN = 62;
+export const DOOR_SWING_ROOM = 1.2;
+export const DOOR_OUT = 0.45;
+/** The simulation asks its tiles (a metre each) clear as far out as `DOOR_SWING_ROOM`: a car this much further off is still in the way (m). */
+const SWING_TILE = 0.3;
+
+/** A car standing somewhere: its middle, its yaw (rad, as the sim's: its front along (sin, cos)), its body's size. */
+export interface CarAt {
+  x: number;
+  z: number;
+  yaw: number;
+  len: number;
+  wid: number;
+}
+
+/**
+ * How wide (degrees) door `d` of `car` (its body `body`) opens with `others` standing round it: wide open
+ * (`DOOR_OPEN`), unless another car beside it on that door's side leaves too little room there for that (`DOOR_SWING_ROOM`
+ * as the simulation's tiles have it: a full row of bays, 3 m apart); then only part way, its rear edge `DOOR_OUT` out from the side as the sim has it, and never as
+ * far as the other car.
+ */
+export function doorSwing(body: CarBody, d: number, car: CarAt, others: Iterable<CarAt>): number {
+  const { side, hinge, rearBelt, rearLow } = carDoor(body, d);
+  const long = hinge - Math.min(rearBelt, rearLow);
+  const [s, c] = [Math.sin(car.yaw), Math.cos(car.yaw)];
+  let gap = Infinity;
+  for (const o of others) {
+    if (o === car) continue;
+    const [dx, dz] = [o.x - car.x, o.z - car.z];
+    if (Math.abs(dx) > 8 || Math.abs(dz) > 8) continue;
+    // (Its corners in this car's frame: across it, +x on the door's side, and along it.)
+    const [os, oc] = [Math.sin(o.yaw), Math.cos(o.yaw)];
+    let [near, v0, v1] = [Infinity, Infinity, -Infinity];
+    for (const [u, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      const [cx, cz] = [dx + (u * o.wid * oc) / 2 + (v * o.len * os) / 2, dz - (u * o.wid * os) / 2 + (v * o.len * oc) / 2];
+      const across = side * (cx * c - cz * s);
+      const along = cx * s + cz * c;
+      near = Math.min(near, across);
+      [v0, v1] = [Math.min(v0, along), Math.max(v1, along)];
+    }
+    // (Beside the door: on its side, and reaching along the car past it.)
+    if (near > body.wid / 2 - 0.2 && v0 < hinge && v1 > hinge - long) gap = Math.min(gap, near - body.wid / 2);
+  }
+  if (gap >= DOOR_SWING_ROOM + SWING_TILE) return DOOR_OPEN;
+  const out = Math.max(0, Math.min(DOOR_OUT, gap - 0.1));
+  return Math.min(DOOR_OPEN, (Math.asin(Math.min(1, out / long)) * 180) / Math.PI);
+}
 /** Paint of the inside of a car, where an open door shows it. */
 const INSIDE = '#26282B';
 

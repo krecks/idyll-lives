@@ -164,6 +164,11 @@ export interface FrameCounts {
   gpuMs: number;
   /** Posing the residents (`RenderStats.residentsMs`). */
   residentsMs: number;
+  /**
+   * The sun's map drawn so far (`SunShadows.draws`, read in place): with the still casters' picture drawn again
+   * (`whole`), over it with only what moves (`moving`), and why the picture was drawn again, by the check that failed.
+   */
+  sunShadows: { readonly whole: number; readonly moving: number; readonly why: Readonly<Record<string, number>> };
 }
 
 /** A render pass of a frame (benchmark reports: pixels × samples × bytes is the memory traffic it causes). */
@@ -474,8 +479,8 @@ export interface LandCursor {
   tone: 'up' | 'down' | 'water' | 'cover' | 'bad' | UseKind | 'erase';
 }
 
-/** What `Renderer.buildingAt` found. */
-export type BuildingHit = { kind: 'lot'; plot: number } | { kind: 'building'; index: number };
+/** What `Renderer.buildingAt` found: a lot's building (every building is a lot's). */
+export type BuildingHit = { kind: 'lot'; plot: number };
 
 export interface Renderer {
   init(canvas: HTMLCanvasElement): Promise<void>;
@@ -506,6 +511,13 @@ export interface Renderer {
   /** Resolves once the street has built the chunks streamed in round the camera, or after `limitMs`. */
   streamSettled(limitMs: number): Promise<void>;
   /**
+   * Benchmark: resolves once what the town streams in has come (`assets/stream.ts`), the street has built it
+   * (`streamSettled`) and nothing is being built (`building`), or after `limitMs` in all.
+   */
+  whenSettled(limitMs: number): Promise<void>;
+  /** Benchmark: what is being built now: 'world' (a world build, a focus lot), 'stream' (the street streaming), both ('world+stream') or '' (nothing). */
+  building(): string;
+  /**
    * The loading screen covers the view (on) or no longer (off): world builds hold the main thread
    * longer between frames, which nobody sees (the warm-up's always do).
    */
@@ -530,8 +542,8 @@ export interface Renderer {
   pick(x: number, y: number): PickResult;
   /**
    * The house or building the ray through canvas CSS pixel (`x`, `y`) meets first, other than the
-   * viewed lot's: a lot's house (`plot`) or a backdrop building (`WorldMeta.backdrop` index). Null
-   * when it meets none, or the viewed lot's ground first.
+   * viewed lot's: a lot's house or building (`plot`; a flats building's lot, not a flat). Null when it
+   * meets none, or the viewed lot's ground first.
    */
   buildingAt(x: number, y: number): BuildingHit | null;
   /**
@@ -628,13 +640,39 @@ export interface Renderer {
    * previews and ground picks work on this storey's rows of the lot (see `WorldStructure.storeys`).
    */
   setStorey(storey: number): void;
+  /**
+   * Which flats of the building in view may be shown open (`game/openLots.ts` `mayOpen`, asked of each flat's plot
+   * id), and whether a place with flats over it may show its own ground floor (asked of the place's lot: by the lot
+   * alone, not by its flats); null: every one. A part that may not keeps a lid over it, and its things, its food and
+   * the residents in it are not drawn (a place's flats' stair hall is theirs, never lidded). Asked again a few times a
+   * second (someone of yours going in opens it).
+   */
+  setFlatsOpen(mayOpen: ((plot: number) => boolean) | null): void;
   /** Build/buy mode: plays a placement, upgrade, sale or construction effect (after `setWorld` showed the change). */
   buildEffect(fx: BuildEffect): void;
   stats(): RenderStats;
   /** Benchmark: where the renderer's bytes are (a walk of the whole scene: on demand, never per frame). */
   memoryCensus(): MemoryCensus | null;
-  /** Benchmark: hooks around every drawn frame (null: none). */
-  setFrameProbe(probe: FrameProbe | null): void;
+  /** Benchmark: hooks around every drawn frame, after those added before; the function takes them off again. */
+  addFrameProbe(probe: FrameProbe): () => void;
+  /**
+   * Fixed-step playback (benchmarks): frames are drawn only as `drawFrame` asks, each at the time it gives (the
+   * game's clock, not the wall's), as fast as they are asked for; false: at the display's refreshes again.
+   */
+  framesOnDemand(on: boolean): void;
+  /** Fixed-step playback: draws the next frame now, at `time` (ms). False when none was drawn (the loop stopped, a menu covers the view). */
+  drawFrame(time: number): boolean;
+  /**
+   * Fixed-step playback: the clocks of what moves only for the eye (the residents' and the things' clips, the birds, the
+   * wind, the clouds) from 0 again, and the playback's dice from their start (`framesOnDemand` does it as it turns on).
+   */
+  restartClocks(): void;
+  /**
+   * Fixed-step playback: the residents and the birds set up afresh from the world drawn, as a page's first build sets
+   * them up (what each resident was in the middle of, its clips and their times, goes; the clocks start again and the
+   * birds perch anew from the playback's own dice), so a run starts alike however the frames before it went.
+   */
+  restartLife(): Promise<void>;
   /** Measures GPU time (`RenderStats.gpuMs`) while the overlay or the benchmark asks for it. */
   measureGpu(on: boolean, who?: 'overlay' | 'bench'): void;
   /** Benchmark: per-pass GPU times (ms per frame, WebGPU only, while measured; empty otherwise); `reset` starts them over. */
@@ -643,6 +681,13 @@ export interface Renderer {
   benchInfo(): Record<string, unknown> & { passes: RenderPassInfo[] };
   /** Benchmark: the world last drawn (its town shown as the menus' for `cam=town`), or null. */
   benchWorld(): WorldStructure | null;
+  /**
+   * Benchmark: the light held at `hour` (as `?hour=`; null: the game's clock again), lit at once, the sun's map told if
+   * the sun turned. Resolves once the birds have settled for that hour (where they perch differs by night).
+   */
+  setFixedHour(hour: number | null): Promise<void>;
+  /** Benchmark: time stood still (as `?diag=freeze`: frames advance nothing, not the wind nor a fade) or going again. */
+  setFrozen(on: boolean): void;
   configure(options: LiveRenderOptions): void;
   /** Small JPEG data URL of the current view, or null if capture isn't possible. */
   captureThumbnail(width: number, height: number): Promise<string | null>;

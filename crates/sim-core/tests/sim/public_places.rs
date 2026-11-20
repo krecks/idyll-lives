@@ -1397,97 +1397,6 @@ fn last_orders_at_closing_time() {
     assert!(!w.staff.servers[k].present, "and the seller went home");
 }
 
-#[test]
-fn an_older_towns_counters_move_out_from_the_wall_for_their_server() {
-    // Before 0.5.0 the café's and the bakery's counters, cases and coffee machine stood against
-    // the back wall (a tile further back than now), with no room behind them for a server. A
-    // save from then (v32) moves each out to where it is now; one from v33 is left as saved.
-    let merged = common::content();
-    let content: Value = serde_json::from_str(&merged).unwrap();
-    let houses = houses();
-    let mut moved = 0;
-    for place in houses["parks"].as_array().unwrap() {
-        let (w, d) = frame(&houses, place);
-        let mut old = place.clone();
-        let mut back = 0;
-        for o in old["objects"].as_array_mut().unwrap() {
-            let id = o["def"].as_str().unwrap();
-            if ["shopCounter", "coffeeMachine", "bakeryCase"].contains(&id)
-                && o["rot"] == 2
-                && o["z"] == 11
-            {
-                o["z"] = json!(12);
-                back += 1;
-            }
-        }
-        if back == 0 {
-            continue;
-        }
-        for rotated in [false, true] {
-            let id = format!("{}{}", place["id"], if rotated { " (turned)" } else { "" });
-            let (walls, doors, windows, objects, entry) =
-                stamp(&content, &old, (w, d), 0, rotated, d);
-            let lot = json!({
-                "width": w, "depth": d, "storeys": storeys(place), "walls": walls, "doors": doors, "windows": windows, "objects": objects,
-                "plots": [{"name": place["name"], "x": 0, "z": 0, "w": w, "d": d, "public": true, "entry": entry}],
-            });
-            let world = World::from_json(&merged, &lot.to_string(), 1).unwrap();
-            let posts = |w: &World| {
-                w.objects
-                    .iter()
-                    .filter(|o| w.content.objects[o.def].staff.is_some())
-                    .count()
-            };
-            let served = |w: &World| {
-                let staff = sim_core::staff::plan(w);
-                w.objects
-                    .iter()
-                    .filter(|o| {
-                        w.content.objects[o.def].staff.is_some() && staff.server_of(o.id).is_some()
-                    })
-                    .count()
-            };
-            assert!(
-                served(&world) < posts(&world),
-                "{id}: the old layout leaves a post with nobody behind it"
-            );
-            let mut save: Value = serde_json::from_str(&world.save_json()).unwrap();
-            // As saved by 0.4.2.
-            save["version"] = json!(32);
-            let loaded = World::from_save_json(&merged, &save.to_string()).unwrap();
-            assert_eq!(
-                loaded.objects.len(),
-                world.objects.len(),
-                "{id}: nothing left out"
-            );
-            assert_eq!(
-                served(&loaded),
-                posts(&loaded),
-                "{id}: every post has its server"
-            );
-            let stables = |w: &World| w.objects.iter().map(|o| o.stable).collect::<BTreeSet<_>>();
-            assert_eq!(
-                stables(&loaded),
-                stables(&world),
-                "{id}: the same things, by id"
-            );
-            moved += back;
-            // Saved since: left as it is.
-            save["version"] = json!(33);
-            let kept = World::from_save_json(&merged, &save.to_string()).unwrap();
-            assert_eq!(
-                served(&kept),
-                served(&world),
-                "{id}: a v33 save is left as it was"
-            );
-        }
-    }
-    assert!(
-        moved >= 6,
-        "the café's and the bakery's (both sides of the street): {moved}"
-    );
-}
-
 /// `id`'s frame as `houses.json` has it (its lot, the four walls round it with its front door, its
 /// stairs and its storey above), with nothing in it but the stairs and `upstairs` on the storey
 /// above: what a test puts there, whatever the place is furnished with.
@@ -1743,7 +1652,7 @@ fn nobody_uses_a_closed_places_things() {
 #[test]
 fn past_the_most_servers_the_other_posts_are_self_serve() {
     let merged = common::content();
-    let (cols, rows) = (12, 12);
+    let (cols, rows) = (16, 17);
     let objects: Vec<Value> = (0..rows)
         .flat_map(|r| {
             (0..cols).map(
@@ -1753,9 +1662,9 @@ fn past_the_most_servers_the_other_posts_are_self_serve() {
         .collect();
     assert!(objects.len() > sim_core::staff::MAX_STAFF);
     let lot = json!({
-        "width": 90, "depth": 52, "objects": objects,
+        "width": 110, "depth": 72, "objects": objects,
         "plots": [{"name": "Home", "x": 0, "z": 0, "w": 26, "d": 22, "entry": [13.0, 1.5]},
-                  {"name": "Arcade", "x": 26, "z": 0, "w": 64, "d": 52, "public": true, "entry": [27.5, 1.5]}],
+                  {"name": "Arcade", "x": 26, "z": 0, "w": 84, "d": 72, "public": true, "entry": [27.5, 1.5]}],
         "households": [{"name": "Ada's", "plot": 0, "player": true, "funds": 500}],
         "sims": [{"name": "Ada", "traits": ["cheerful"], "x": 13.0, "z": 3.5}],
     });

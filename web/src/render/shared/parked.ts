@@ -29,3 +29,41 @@ export function placements<P extends { id: number; x: number; z: number; home: b
   }
   return out;
 }
+
+/** What a draw keyed by its copies answers (`Instances.castKey`: `castKeyOf` of its copies, kept while they are). */
+export interface CastKeyed {
+  castKey(reaches: (x: number, z: number) => boolean, ground: number): number;
+}
+
+/**
+ * The draws keyed by their copies (`InstancesOptions.castKeyed`: the parked cars' and bikes'), by their mesh instance:
+ * what the sun's map asks of a still caster (`SunShadows.castKey`).
+ */
+export const keyedDraws = new WeakMap<object, CastKeyed>();
+
+/** The elements of a copy's matrix that say where it stands and which way (`castKeyOf`), and a float's bits read as one. */
+const KEYED = [0, 2, 12, 13, 14] as const;
+const BITS_F = new Float32Array(1);
+const BITS_U = new Uint32Array(BITS_F.buffer);
+
+/**
+ * The copies of a draw that stand where `reaches` says (the sun's map), where they stand and which way, as a number:
+ * the same while those are, however many copies there are elsewhere; 0 when none is there. The `count` copies are laid
+ * out `stride` floats apart in `data`, each starting with its matrix (game space; an instanced draw's buffer:
+ * `Instances.castKey`). A copy hidden (an all-zero matrix) stands nowhere.
+ */
+export function castKeyOf(data: ArrayLike<number>, count: number, stride: number, reaches: (x: number, z: number) => boolean): number {
+  let h = 0x811c9dc5;
+  let any = false;
+  for (let i = 0; i < count; i++) {
+    const o = i * stride;
+    if (data[o + 15] === 0 || !reaches(data[o + 12], data[o + 14])) continue;
+    any = true;
+    for (const k of KEYED) {
+      BITS_F[0] = data[o + k];
+      h = Math.imul(h ^ BITS_U[0], 0x01000193);
+    }
+  }
+  // (0 is kept for none there; a hash that came out 0 is 1.)
+  return any ? h >>> 0 || 1 : 0;
+}

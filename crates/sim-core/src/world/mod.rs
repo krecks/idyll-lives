@@ -34,8 +34,9 @@ pub struct RoofLook {
     pub color: u8,
 }
 
-/// A region of the town: a residential lot or a public place.
-#[derive(Debug, Clone, PartialEq)]
+/// A region of the town: a residential lot or a public place on the ground, or a flat (`of`): a
+/// plot of its own inside its building's lot, on one storey (`storey`).
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Plot {
     pub id: u32,
     pub name: String,
@@ -51,6 +52,100 @@ pub struct Plot {
     pub roof: Option<RoofLook>,
     /// When the place on it is open (None: always, as a home, a park or a plot from an older file).
     pub hours: Option<PlotHours>,
+    /// What it is (the town file's `plots[].kind`; None: a file without kinds).
+    pub kind: Option<crate::travel::PlotKind>,
+    /// A flat: the ground lot of its building (a flats lot, or a place's with flats over it). Its
+    /// rectangle is on the ground's rows, inside that lot's; its `entry` is the building's street
+    /// door. None: a lot on the ground.
+    pub of: Option<u32>,
+    /// The storey a flat is on (0: the ground; a lot's is 0).
+    pub storey: i8,
+    /// A flat's landing tile before its own door, on its storey's rows (its door opens off an
+    /// indoor landing, not the street).
+    pub door: Option<(i32, i32)>,
+    /// A flat's tile behind its door (its middle, on its storey's rows): where one home is home.
+    pub inside: Option<[f32; 2]>,
+}
+
+/// A building with flats in it (`World::flat_tiles`, by its lot: `World::flats_in`): its lot's
+/// rectangle (ground rows), and for each storey with flats on it the plot of each of the
+/// rectangle's tiles, row-major (`path::NO_PLOT`: the building's own: its hall, its stairs, its yard).
+#[derive(Debug, Clone, Default)]
+pub(crate) struct FlatTiles {
+    x: i32,
+    z: i32,
+    w: i32,
+    d: i32,
+    storeys: Vec<(i32, Vec<u16>)>,
+}
+
+impl FlatTiles {
+    /// The flat at ground tile (`x`, `z`) of `storey`, if one is there.
+    fn at(&self, x: i32, z: i32, storey: i32) -> Option<u32> {
+        let (dx, dz) = (x - self.x, z - self.z);
+        if dx < 0 || dz < 0 || dx >= self.w || dz >= self.d {
+            return None;
+        }
+        let (_, tiles) = self.storeys.iter().find(|(s, _)| *s == storey)?;
+        let plot = *tiles.get((dz * self.w + dx) as usize)?;
+        (plot != crate::path::NO_PLOT).then_some(u32::from(plot))
+    }
+}
+
+/// Checks a town's flats (`Plot::of`): each comes after every lot on the ground (a lot's storey is
+/// the ground's), stands in a lot on the ground on one of its `storeys` (not the basement), inside
+/// that lot's rectangle, and its door and the tile behind it, where it says them, are in that lot
+/// on its storey's rows (as `stairs` stacks them, `storeys.rs`).
+pub(crate) fn check_flats(
+    plots: &[Plot],
+    storeys: i32,
+    stairs: &crate::path::StairMap,
+) -> Result<(), Error> {
+    let ground = plots.iter().take_while(|p| p.of.is_none()).count();
+    if let Some(lot) = plots[..ground].iter().find(|p| p.storey != 0) {
+        return Err(Error::new(format!(
+            "lot '{}' is on a storey (only a flat is)",
+            lot.name
+        )));
+    }
+    for p in &plots[ground..] {
+        let bad = |why: &str| Err(Error::new(format!("flat '{}' {why}", p.name)));
+        let Some(of) = p.of else {
+            return Err(Error::new(format!(
+                "lot '{}' comes after the flats (flats follow every lot on the ground)",
+                p.name
+            )));
+        };
+        let Some(lot) = plots[..ground].get(of as usize) else {
+            return bad("is in no lot on the ground");
+        };
+        if !(0..storeys).contains(&i32::from(p.storey)) {
+            return bad("is on no storey the town has");
+        }
+        if p.x < lot.x || p.z < lot.z || p.x + p.w > lot.x + lot.w || p.z + p.d > lot.z + lot.d {
+            return bad("reaches out of its building's lot");
+        }
+        let on_storey = |x: i32, z: i32| lot.holds(stairs, x, z) && p.on_storey(stairs, z);
+        if p.door.is_some_and(|(x, z)| !on_storey(x, z))
+            || p.inside
+                .is_some_and(|[x, z]| !on_storey(x.floor() as i32, z.floor() as i32))
+        {
+            return bad("has its door out of its building on its storey");
+        }
+    }
+    Ok(())
+}
+
+/// The lots on the ground of `plots`: every plot before the first flat (`check_flats` keeps the
+/// flats after them all). Passes over the town's ground take these, and a flat's rectangle, its
+/// building's ground, is never taken for a lot of its own.
+pub(crate) fn lots_of(plots: &[Plot]) -> &[Plot] {
+    &plots[..plots.partition_point(|p| !p.is_flat())]
+}
+
+/// The flats of `plots`: every plot after the lots on the ground (`lots_of`).
+pub(crate) fn flats_of(plots: &[Plot]) -> &[Plot] {
+    &plots[lots_of(plots).len()..]
 }
 
 /// When a public place is open: minutes of the day `[open, close)` on the days in `days` (bit 0
@@ -68,11 +163,57 @@ impl Plot {
         x >= self.x && z >= self.z && x < self.x + self.w && z < self.z + self.d
     }
 
+    /// Where one coming to it arrives from the street: its entry (a flat's: its building's street
+    /// door, on the ground), else its middle. What travel, taxis, cars and outings measure from.
     pub fn arrival_point(&self) -> [f32; 2] {
         self.entry.unwrap_or([
             self.x as f32 + self.w as f32 / 2.0,
             self.z as f32 + self.d as f32 / 2.0,
         ])
+    }
+
+    /// Where one who lives on it is at home: a flat's tile behind its door (on its storey's rows),
+    /// else where it is arrived at (`arrival_point`).
+    pub fn home_point(&self) -> [f32; 2] {
+        self.inside.unwrap_or_else(|| self.arrival_point())
+    }
+
+    /// Whether tile (`x`, `z`: stacked rows, as `stairs` has them) is on it: inside its rectangle
+    /// on any storey, and a flat's on its own storey.
+    pub fn holds(&self, stairs: &crate::path::StairMap, x: i32, z: i32) -> bool {
+        self.contains(x, stairs.ground_z(z)) && self.on_storey(stairs, z)
+    }
+
+    /// Whether row `z` (stacked rows, as `stairs` has them) is on its storey: any storey for a
+    /// lot on the ground (what stands upstairs on it is on it too), a flat's own only.
+    pub fn on_storey(&self, stairs: &crate::path::StairMap, z: i32) -> bool {
+        !self.is_flat() || stairs.storey(z) == i32::from(self.storey)
+    }
+
+    /// Its rows on its own storey (stacked rows, as `stairs` has them): a flat's on its storey, a
+    /// lot's on the ground (a lot's storey is 0).
+    pub fn rows(&self, stairs: &crate::path::StairMap) -> std::ops::Range<i32> {
+        let up = stairs.storey_row(i32::from(self.storey));
+        self.z + up..self.z + self.d + up
+    }
+
+    /// Where one coming to it stands at its door: a flat's landing before its own door (on its
+    /// storey's rows), else where it is arrived at (`arrival_point`).
+    pub fn doorstep(&self) -> [f32; 2] {
+        match self.door {
+            Some((x, z)) => [x as f32 + 0.5, z as f32 + 0.5],
+            None => self.arrival_point(),
+        }
+    }
+
+    /// Whether it is a flat (a plot inside its building's lot, `of`).
+    pub fn is_flat(&self) -> bool {
+        self.of.is_some()
+    }
+
+    /// The lot on the ground it stands on: a flat's building, else itself.
+    pub fn lot(&self) -> u32 {
+        self.of.unwrap_or(self.id)
     }
 
     /// Whether the place on it is open at `minute` of day `day` (`clock::day`, `clock::minute_of_day`):
@@ -292,6 +433,18 @@ pub(crate) struct SimBrief {
     /// from the whole of every resident again (`privacy::refresh`).
     pub carried: bool,
     pub private: Option<(u32, usize)>,
+    /// In the stair hall (or on its landings) of a public place with flats over it
+    /// (`path::Halls`): on the place's lot, but not in the place (`world::at_home`).
+    pub hall: bool,
+}
+
+impl SimBrief {
+    /// Whether they stand at home, for those living on `home`: on a plot that is home to them
+    /// (`at_home`), in its stair hall or not as they stand (`hall`). Off every plot, not.
+    pub fn at_home(&self, plots: &[Plot], home: Option<u32>) -> bool {
+        self.plot
+            .is_some_and(|p| at_home(plots, home, p, self.hall))
+    }
 }
 
 /// Who belongs to each household by the tick's briefs (`SimBrief::household`), built with them:
@@ -397,8 +550,16 @@ pub struct World {
     pub sims: Vec<Sim>,
     pub households: Vec<Household>,
     pub plots: Vec<Plot>,
-    /// Plot per ground tile, row by row (see `map_plots`; `path::NO_PLOT` off the plots).
+    /// Plot per ground tile, row by row (see `map_plots`; `path::NO_PLOT` off the plots). A flats
+    /// building's tiles hold its lot; its flats are found per storey in `flat_tiles`.
     pub(crate) tile_plot: Vec<u16>,
+    /// Each building with flats in it, the plot of its tiles on each storey (`FlatTiles`), and by
+    /// ground lot which of them is its (index + 1; 0: none). Made with `tile_plot`.
+    pub(crate) flat_tiles: Vec<FlatTiles>,
+    pub(crate) flats_in: Vec<u16>,
+    /// The flats' stair halls over public places (`path::Halls`), found with the rooms
+    /// (`map_halls`).
+    pub(crate) halls: crate::path::Halls,
     pub relationships: Relationships,
     pub events: EventLog,
     pub(crate) blocked: Vec<bool>,
@@ -433,7 +594,7 @@ pub struct World {
     /// Bumped per slot when someone new takes it (views rebuild that resident).
     pub(crate) generations: Vec<u32>,
     pub(crate) rng: Rng,
-    /// The seed the game started from (0: unknown, a save from before v23), for bug reports.
+    /// The seed the game started from (0: unknown), for bug reports.
     pub seed: u32,
     pub(crate) structure_version: u32,
     /// Bumped only when something a walker can or can't step through changes: walls, doors,
@@ -617,6 +778,8 @@ pub(crate) struct Ctx<'a> {
     pub plots: &'a [Plot],
     /// Plot per ground tile (`World::tile_plot`).
     pub tile_plot: &'a [u16],
+    /// The flats' stair halls over public places (`World::halls`).
+    pub halls: &'a crate::path::Halls,
     pub object_plot: &'a [Option<u32>],
     /// Objects by plot (`World::object_index`).
     pub index: &'a ObjectIndex,

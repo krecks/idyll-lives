@@ -246,6 +246,30 @@ impl Car {
     /// their own, else the nearest other one with room outdoors to stand and for the door to
     /// swing open (`SWING`: not into the house, a fence or a thing).
     pub fn door(&self, nav: &crate::path::NavGrid, seat: usize) -> Option<(usize, [f32; 2])> {
+        self.door_swung(nav, seat, &[0.25, 0.6, SWING])
+    }
+
+    /// `door`, for a car parked out in a public bay (`CarState::Out`, posed there): with cars in
+    /// the bays either side (3 m apart, `BAY_WIDE`) none has room to swing a door wide open, so
+    /// one opened only as far as where they stand (`DOOR_OUT`) does: they squeeze in or out by
+    /// it, as anyone does in a full car park.
+    pub fn door_in_bay(
+        &self,
+        nav: &crate::path::NavGrid,
+        seat: usize,
+    ) -> Option<(usize, [f32; 2])> {
+        self.door(nav, seat)
+            .or_else(|| self.door_swung(nav, seat, &[0.25, DOOR_OUT]))
+    }
+
+    /// `door` with the door swung out as far as each of `swing` (m from the car's side, along
+    /// its length) clear of anything in the way.
+    fn door_swung(
+        &self,
+        nav: &crate::path::NavGrid,
+        seat: usize,
+        swing: &[f32],
+    ) -> Option<(usize, [f32; 2])> {
         const ORDER: [[usize; DOORS]; 4] = [[0, 1, 2, 3], [1, 3, 0, 2], [3, 1, 2, 0], [2, 0, 3, 1]];
         let own = self.tiles();
         let open = |x: i32, z: i32| {
@@ -262,7 +286,7 @@ impl Car {
                 // nor a fence or a wall between it and where they stand.
                 let swept_clear = || {
                     [-0.5f32, 0.0, 0.5].into_iter().all(|a| {
-                        [0.25f32, 0.6, SWING].into_iter().all(|o| {
+                        swing.iter().all(|&o| {
                             let q = self.local(along + a, (side + o) * k);
                             let (qx, qz) = (q[0].floor() as i32, q[1].floor() as i32);
                             let next = (qx - x).abs() + (qz - z).abs() == 1;

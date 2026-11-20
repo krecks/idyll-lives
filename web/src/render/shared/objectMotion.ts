@@ -230,6 +230,13 @@ export class ObjectMotion<D> {
   /** The game's minute of the day, as the last frame had it. */
   private minute = 0;
 
+  /** Fixed-step playback: the clips' clock back to 0, so the same frames move the same. */
+  restartClock(): void {
+    this.clock = 0;
+    this.lastNow = 0;
+    this.clockFrames = 0;
+  }
+
   /** Night (the lamps are lit): `motions.night` clips are held open. Null until the lighting first says. */
   private night: boolean | null = null;
   /** The night clips go straight to where the lighting has them (the first lighting of a world), without playing. */

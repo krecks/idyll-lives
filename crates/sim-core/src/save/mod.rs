@@ -4,7 +4,8 @@
 //! (not index), so saves survive content changes; anything that no longer exists is
 //! dropped on load. In-progress activities restart from the beginning on load.
 //!
-//! Version history: 1 = single household; 2 = town (households, plots), relationships,
+//! Version history (what each version brought; this build opens none older than
+//! `OLDEST_SAVE_VERSION`, so what an older file lacked no longer matters): 1 = single household; 2 = town (households, plots), relationships,
 //! feelings, gender and attraction; 3 = jobs, funds, visits, exits; 4 = skills, object
 //! quality/style/value, household style; 5 = diagonal walls (`lot.diagonals`, absent in
 //! older files, which load without any); 6 = wall looks (`lot.looks`: coverings, half walls,
@@ -53,23 +54,18 @@
 //! file the washing out on a line is done, dry) and dried washing waits to be folded (a third
 //! number in `households[].laundry`; absent: none), the dirty things in a dishwasher's rack waiting
 //! for it to run (`objects[].rack`; absent: none); and the home chess table is 2 × 1 (it
-//! was 1 × 1): an older file's goes over the tile it stood on where it fits, else at a free spot
-//! at home, else it is sold back (`migrate_32_grown`); and an older file's posts in town (content
-//! `staff`) with their back to a wall move a tile out from it, where there's room, for their server
-//! (`World::nudge_post`); 34 = households' cars (`cars`: where each parks, its look, its
+//! was 1 × 1), and the town's posts (content `staff`) stand a tile out from a wall, where
+//! there's room, for their server; 34 = households' cars (`cars`: where each parks, its look, its
 //! owners and where it is on its day out), every house's driveway (`drives`, where a car goes
 //! when its household moves) and the garages on them (`garages`); absent: none, and the renderer draws the cars it used to draw,
-//! parked for good. Older files load. Saves
-//! written before feelings were renamed from "moodlets" store them under `moodlets`; a serde
-//! alias still reads it.
+//! parked for good.
 //! 35 = open worlds: the lot's edge and diagonal strings may be
 //! run-length coded (a `~` and then `<char><count>` runs split by commas; dense strings still
 //! load), chemistry is one string for every pair (`chemistry`: base64 of the upper triangle,
 //! `(0, 1), (0, 2), …, (1, 2), …`, as little-endian f32s) and relationships list only the pairs
 //! that aren't as new (no `chemistry` of their own), and the town file's open-world fields are
 //! kept as they came (`openWorld`, `travel::OpenWorld`: size, roads, areas, terrain masks,
-//! parking, plots' areas and kinds (and, written before the bus was dropped, which exits were bus
-//! stops); driveways keep their `road` and `s` in `drives`); a car on a trip between hamlets keeps
+//! parking, plots' areas and kinds); driveways keep their `road` and `s` in `drives`); a car on a trip between hamlets keeps
 //! it (`cars[].trip`, state `out` while it's parked there) and who rides with it
 //! (`cars[].riders`; absent: nobody, as in files written before passengers, so no new version).
 //! Absent: a town file without them, whose network is made from the meta's roads
@@ -84,11 +80,9 @@
 //! a resident asked for, bought and waiting to be set up at home (`setups`: the household, who
 //! asked, the object by id, the tick it was bought and what was paid; `setup.rs`), left out when
 //! there are none, so an older file has none; setting one up isn't saved mid-way (the parcel is
-//! back at the front door after a load). Still 35: a file written while the town had buses (its
-//! bus stops among its exits, `openWorld.stops`) loads without them: the stops are no ways out,
-//! dropped from the exits as it loads, and nothing of the buses was ever saved. Still 35: the
+//! back at the front door after a load). Still 35: the
 //! traffic lights (`traffic::Signal`, worked out again on load) are saved where they'd got to (`lights`: each lit junction's phase, its
-//! stage, the tick it began; `arm` before phases), left out where there are none; absent (an
+//! stage, the tick it began), left out where there are none; absent (an
 //! older file, another number of lit junctions, or a phase one hasn't), they start over at their
 //! first phase's green.
 //! Still 35: a resident late for the shift they're at says so (`job.late`, left out when on
@@ -99,28 +93,19 @@
 //! down after a load.
 //! 36 = ticks counted in this build's units, `TICKS_PER_SECOND` to a real second and
 //! `TICKS_PER_MINUTE` to a game minute (60 and 75 from 0.8.0: a game day of 30 real minutes); a
-//! file before it counted 20 and 20, and its ticks are rescaled as it loads (`Rescale`): the
-//! clock's (`tick`, and the ticks things began, were made, happened or are due at) by the game
-//! minute's, so it plays on at the same minute of the same day, and places along a car's or a
-//! taxi's way (`cars[].progress`, its detour's and its way round a taxi's, `taxis.runs[].progress`)
-//! by the real second's, as they're driven.
+//! file before it counted 20 and 20.
 //! 37 = cars, the taxi, bikes and e-scooters go on the traffic's own clock, `DRIVE_SCALE` (4) times
-//! as fast as real time (`DRIVE_TICKS_PER_SECOND` ticks to a second of it): a file before it timed
-//! places along a car's or a taxi's way (`cars[].progress`, its detour's and its way round a
-//! taxi's, `taxis.runs[].progress`) and the tick a traffic light's stage began (`lights`) in real
-//! seconds, and they're rescaled as it loads (`Rescale::drive`): each place along its way is the
-//! same place, as its way is now timed, and each light as many seconds into its stage.
-//! 38 = the town's living-town fields are in its `meta`:
-//! `backdrop` (buildings nobody lives in), `places` (what the town tags name) and `centre` (each
-//! main town's square and high street), as the town file had them; and its homes may be terrace
-//! lots (`terrace`, narrow houses a metre apart). The simulation reads none of them: a file before
-//! it has none and plays as before.
+//! as fast as real time (`DRIVE_TICKS_PER_SECOND` ticks to a second of it): places along a car's
+//! or a taxi's way (`cars[].progress`, its detour's and its way round a taxi's,
+//! `taxis.runs[].progress`) and the tick a traffic light's stage began (`lights`) are in its ticks.
+//! 38 = the town's living-town fields are in its `meta`: `places` (what the town tags name) and
+//! `centre` (each main town's square and high street), as the town file had them; and its homes may
+//! be terrace lots (`terrace`, narrow houses a metre apart). The simulation reads none of them.
 //! 39 = porches are the simulation's (`porches.rs`): the porches over doors (`porches`: each its
 //! plot, its door's edge, `axis`, `x`, `z`, and the side it stands on, `out`) and the porch pieces
 //! standing on their own (`porchPieces`: a post, a canopy or a step platform, its tiles and its
 //! facing), built and taken down in Build mode. A file before it had its porches drawn by the
-//! renderer over the front door the garden path met: they're worked out again from its doors and
-//! its paths as it loads (`World::guess_porches`), so the town looks as it did; it has no pieces.
+//! renderer over the front door the garden path met.
 //! Still 39: the land may be shaped in play (Build mode's Land tab, `land.rs`). Its heights, water
 //! levels and cover are the page's, carried in the meta (`meta.land`: the land's size and its
 //! tiles, `h` and `wl` coded strings by tile, `cover` run-length; `meta.zones` worked out again
@@ -137,8 +122,7 @@
 //! 40 = four speeds: 0 paused, 1 normal, 2 fast, 3 faster (10×) and 4 super speed (as fast as
 //! the machine goes, up to 60×, only while the player's household is all asleep or out), with
 //! the speed super speed drops back to (`resumeSpeed`). A file before it had 4 and 5 for 30×
-//! and 60×: it loads at super speed with 3 to drop back to, which the first step leaves if
-//! someone at home is up.
+//! and 60×.
 //! Still 40: a public place's plot may say when it is open (`plots[].hours`: minutes of the day it
 //! opens and closes and the days it opens, bit 0 Monday, as the town file gave them; `Plot::open_at`).
 //! Left out where it has none, so a file without them (every file before it) has its places open
@@ -157,8 +141,17 @@
 //! now any of `carBodies`, a van or an off-roader too) and how old it is (`cars[].age`: `old` or
 //! `new`, left out when used), and the car a promotion or a new job called for that it hasn't
 //! bought yet (`cars[].want`: `body`, `age`, and `by`, who the story says bought it). The story
-//! may tell of it (`boughtCar`, the body in `n`, by id in `refs.car`). A file before it has its
-//! cars as the town picked them: each is fitted as it loads, as a new town's are, nobody told.
+//! may tell of it (`boughtCar`, the body in `n`, by id in `refs.car`).
+//! 42 = the real town: a town's plots may be flats, each a plot of its own inside its building's
+//! lot on one storey (`plots[].of`, `storey`, and the landing tile before its door and the tile
+//! behind it, `door` and `inside`; its kind, `flat`, with the others' in `openWorld.plotKinds`),
+//! listed after every lot on the ground; a thing may belong to a plot it doesn't stand on
+//! (`objects[].plot`: a flat's letterbox in the hall); public parking is marked bays, each saying
+//! the way a car parked in it faces (`openWorld.parking[].yaw`) and the car park it is one of
+//! (`park`), and the car parks are kept for the renderer as the town file had them
+//! (`openWorld.carParks`). No file older than this opens (`OLDEST_SAVE_VERSION`: the game says
+//! it is too old and removes it); none is migrated.
+//! A town holds up to 256 servers (`staff::MAX_STAFF`, 128 before); nothing of them is saved.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -173,16 +166,18 @@ use crate::rng::Rng;
 use crate::social::{self, Relationship};
 use crate::world::{GameMode, Household, Plot, Task, TaskKind, World};
 use crate::{
-    DRIVE_TICKS_PER_SECOND, Error, MINUTES_PER_TICK, TICKS_PER_MINUTE, TICKS_PER_SECOND,
+    Error, MINUTES_PER_TICK,
     clock::{MAX_SPEED, SUPER_SPEED},
 };
 
-mod migrate;
 mod pack;
 mod read;
 mod write;
 
-pub const SAVE_VERSION: u32 = 41;
+pub const SAVE_VERSION: u32 = 42;
+/// The oldest save version this build opens: older files are refused, none migrated (until 1.0 a
+/// change of format leaves the saves before it behind).
+pub const OLDEST_SAVE_VERSION: u32 = 42;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -262,8 +257,7 @@ pub struct SaveFile {
     pub drives: Vec<crate::cars::Drive>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub garages: Vec<crate::cars::Garage>,
-    /// Porches over doors (absent before v39: worked out from the doors and the garden paths,
-    /// `World::guess_porches`; from v39, absent: none) and porch pieces (absent: none).
+    /// Porches over doors and porch pieces (absent: none).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub porches: Vec<crate::porches::Porch>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -289,12 +283,10 @@ pub struct SaveFile {
     pub taxis: crate::taxi::Taxis,
 }
 
-/// A lit junction's lights (`traffic::Light`): whose turn it is (its phase, or its walk phase;
-/// `arm` in files before phases, an arm's index: loaded as a phase if there's one, else they start
-/// over), how far through it (0 green, 1 amber, 2 all red), and the tick that began.
+/// A lit junction's lights (`traffic::Light`): whose turn it is (its phase, or its walk phase),
+/// how far through it (0 green, 1 amber, 2 all red), and the tick that began.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct LightSave {
-    #[serde(alias = "arm")]
     pub phase: u8,
     pub stage: u8,
     pub since: u64,
@@ -486,6 +478,10 @@ pub struct ObjectSave {
     /// or none).
     #[serde(default, skip_serializing_if = "is_zero")]
     pub rack: u8,
+    /// The plot it belongs to though it stands on another (`ObjectInstance::keeper`; absent: the
+    /// plot it stands on).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plot: Option<u32>,
 }
 
 fn is_level(tall: &i16) -> bool {
@@ -530,7 +526,6 @@ pub struct SimSave {
     /// Sorted so identical worlds produce identical save files.
     pub needs: BTreeMap<String, f32>,
     #[serde(default)]
-    #[serde(alias = "moodlets")] // key before the moodlet → feeling rename
     pub feelings: Vec<FeelingSave>,
     /// Skill levels by id (sorted). Missing in old saves: traits decide.
     #[serde(default)]
@@ -853,6 +848,21 @@ pub struct PlotSave {
     /// When the place on it is open (`world::PlotHours`; absent: always).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hours: Option<crate::world::PlotHours>,
+    /// A flat (`world::Plot::of`): its building's lot, its storey, the landing tile before its door
+    /// and the tile behind it. Absent: a lot on the ground. (Its kind is with the others', in
+    /// `openWorld.plotKinds`.)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub of: Option<u32>,
+    #[serde(default, skip_serializing_if = "is_zero_i8")]
+    pub storey: i8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub door: Option<[i32; 2]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inside: Option<[f32; 2]>,
+}
+
+fn is_zero_i8(v: &i8) -> bool {
+    *v == 0
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -866,8 +876,6 @@ pub struct RelationshipSave {
     pub chemistry: Option<f32>,
 }
 
-#[cfg(test)]
-use migrate::*;
 #[cfg(test)]
 use pack::*;
 

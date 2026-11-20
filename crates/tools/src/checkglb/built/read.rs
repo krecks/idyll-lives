@@ -12,10 +12,10 @@ pub const FAR_NEAR: &str = "built.farNear";
 pub const CHECKS: [&str; 3] = [EDGES, TEXELS, FAR_NEAR];
 
 /// The sample kinds that are far versions: judged against what they are the far version of, not for edges or texels.
-pub const FAR: [&str; 4] = ["neighbour", "far", "town", "backdropFar"];
+pub const FAR: [&str; 4] = ["neighbour", "far", "town", "buildingFar"];
 /// The far versions drawn from so far that no edge or texel of theirs shows (a neighbour's silhouette is across
 /// the street: it is judged for both).
-pub const DISTANT: [&str; 3] = ["far", "town", "backdropFar"];
+pub const DISTANT: [&str; 3] = ["far", "town", "buildingFar"];
 
 /// What `built.json` says of a sample.
 #[derive(serde::Deserialize, Clone, Debug, Default)]

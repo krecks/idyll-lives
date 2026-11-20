@@ -414,11 +414,15 @@ fn sim_patch(
         &mut sent.pension,
     );
     // Plot the Sim is on (None on the street or at work); minute of day they're back from work.
+    // (In the flats' stair hall over a public place, or on its landings, on none: the hall is
+    // the flats', not the place's, and the place isn't opened for one walking through it.)
     let (x, z) = s.tile();
     let plot = if s.away_until.is_some() {
         None
     } else {
-        world.plot_at(x, z)
+        world
+            .plot_at(x, z)
+            .filter(|&p| world.halls.at(p, x, world.ground_z(z)).is_none())
     };
     o.changed("plot", &plot, &mut sent.plot);
     o.changed(
@@ -562,9 +566,16 @@ impl StructureSync {
         let (print, plots) = plots_json(&mut self.plots, world);
         parts.put("plots", Some(print), plots.as_bytes());
         parts.part("exits", Some(&world.exits));
-        // (Presentation data the simulation carries unchanged: sent the first time only.)
+        // (What the simulation carries unchanged once loaded: sent the first time only. The
+        // town's bays, car parks and flats are as its file laid them.)
         if fresh {
             parts.part("meta", Some(&world.meta));
+            let parking = parking_views(world);
+            parts.part("parking", Some(&parking).filter(|p| !p.is_empty()));
+            let car_parks = &world.travel.file.car_parks;
+            parts.part("carParks", Some(car_parks).filter(|c| !c.is_empty()));
+            let flats = flat_views(world);
+            parts.part("flats", Some(&flats).filter(|f| !f.is_empty()));
         }
         let staff = staff_views(world);
         parts.part("staff", Some(&staff).filter(|s| !s.is_empty()));

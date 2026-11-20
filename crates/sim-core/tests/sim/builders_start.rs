@@ -324,18 +324,14 @@ fn moving_in_is_all_or_nothing() {
 }
 
 #[test]
-fn saves_from_before_the_mode_load_as_living() {
+fn a_creative_game_loads_as_creative() {
     let w = world("creative");
-    let mut save: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
+    let save: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
     assert_eq!(save["mode"], "creative");
     let creative = World::from_save_json(CONTENT, &save.to_string()).unwrap();
     assert_eq!(creative.mode, GameMode::Creative);
-    save.as_object_mut().unwrap().remove("mode");
-    save["version"] = 9.into();
-    let old = World::from_save_json(CONTENT, &save.to_string()).unwrap();
-    assert_eq!(old.mode, GameMode::Living);
     assert_eq!(
-        old.households[0].name, "1 Elm Street",
+        creative.households[0].name, "1 Elm Street",
         "an empty household loads too"
     );
 }

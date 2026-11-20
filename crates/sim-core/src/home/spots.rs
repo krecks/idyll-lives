@@ -131,6 +131,8 @@ impl World {
         }
         let p = &self.plots[plot as usize];
         let lot = &self.lot;
+        // (A flat's spots are on its own storey; a house's on the ground.)
+        let rows = p.rows(&self.stairs);
         // (What could be in its way anywhere on the plot, found once: as far past the plot's
         // edges as it reaches, turned any way, from a tile on it.)
         let d = &self.content.objects[def];
@@ -143,12 +145,12 @@ impl World {
             + 1;
         let near = self.objects_reaching([
             p.x - reach,
-            p.z - reach,
+            rows.start - reach,
             p.x + p.w + reach,
-            p.z + p.d + reach,
+            rows.end + reach,
         ]);
         let mut spots = Vec::new();
-        for z in p.z..p.z + p.d {
+        for z in rows {
             for x in p.x..p.x + p.w {
                 for rot in 0..4u8 {
                     let Ok(obj) =

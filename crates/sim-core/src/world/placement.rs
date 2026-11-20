@@ -6,17 +6,57 @@ use super::*;
 
 impl World {
     /// Notes the plot of every ground tile (plots never move; upper storeys are the same
-    /// ground), so `plot_at` needn't search them.
+    /// ground), which `plot_at` and the walks (`path::Grounds`) look up, and the flats of each
+    /// building with flats by storey (`flat_tiles`). Flats leave the ground tiles to their
+    /// building. Made as the plots are loaded, before anything is placed on them.
     pub(crate) fn map_plots(&mut self) {
         let (width, depth) = (self.lot.width as i32, self.storey_depth());
         if self.tile_plot.len() == (width * depth) as usize {
             return;
         }
         self.tile_plot = vec![crate::path::NO_PLOT; (width * depth) as usize];
-        for p in self.plots.iter().rev() {
+        for p in lots_of(&self.plots).iter().rev() {
             for z in p.z.max(0)..(p.z + p.d).min(depth) {
                 for x in p.x.max(0)..(p.x + p.w).min(width) {
                     self.tile_plot[(z * width + x) as usize] = p.id as u16;
+                }
+            }
+        }
+        self.flat_tiles.clear();
+        self.flats_in = vec![0; self.plots.len()];
+        for f in flats_of(&self.plots) {
+            let Some(lot) = f.of.and_then(|of| self.plots.get(of as usize)) else {
+                continue;
+            };
+            let k = match self.flats_in[lot.id as usize] {
+                0 => {
+                    self.flat_tiles.push(FlatTiles {
+                        x: lot.x,
+                        z: lot.z,
+                        w: lot.w,
+                        d: lot.d,
+                        storeys: Vec::new(),
+                    });
+                    self.flats_in[lot.id as usize] = self.flat_tiles.len() as u16;
+                    self.flat_tiles.len() - 1
+                }
+                k => usize::from(k) - 1,
+            };
+            let t = &mut self.flat_tiles[k];
+            let storey = i32::from(f.storey);
+            let level = match t.storeys.iter().position(|(s, _)| *s == storey) {
+                Some(i) => i,
+                None => {
+                    let tiles = vec![crate::path::NO_PLOT; (t.w * t.d).max(0) as usize];
+                    t.storeys.push((storey, tiles));
+                    t.storeys.len() - 1
+                }
+            };
+            let (x0, z0, w) = (t.x, t.z, t.w);
+            let tiles = &mut t.storeys[level].1;
+            for z in f.z.max(z0)..(f.z + f.d).min(z0 + t.d) {
+                for x in f.x.max(x0)..(f.x + f.w).min(x0 + w) {
+                    tiles[((z - z0) * w + (x - x0)) as usize] = f.id as u16;
                 }
             }
         }
@@ -77,6 +117,7 @@ impl World {
             shut: false,
             run: None,
             rack: 0,
+            keeper: None,
         }
     }
 

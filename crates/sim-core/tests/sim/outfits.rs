@@ -92,7 +92,7 @@ fn changing_at_the_wardrobe_puts_on_the_next_outfit_halfway() {
 }
 
 #[test]
-fn older_saves_load_in_the_creators_outfit() {
+fn the_outfit_is_saved() {
     let mut w = world();
     w.sims[0].outfit = 2;
     w.households[0].laundry = [2.0, 0.5, 0.0, 0.0];
@@ -101,29 +101,10 @@ fn older_saves_load_in_the_creators_outfit() {
     assert_eq!(saved["sims"][0]["outfit"], 2);
     let load =
         |save: &serde_json::Value| World::from_save_json(CONTENT, &save.to_string()).unwrap();
-    // v31 keeps it.
-    assert_eq!(load(&saved).sims[0].outfit, 2);
-    // v30 (washing piles up, no outfits yet): the laundry kept, everyone in the creator's.
-    let mut v30 = saved.clone();
-    v30["version"] = 30.into();
-    let back = load(&v30);
+    let back = load(&saved);
     assert_eq!(
         (back.sims[0].outfit, back.households[0].laundry),
-        (0, [2.0, 0.5, 0.0, 0.0])
-    );
-    // v29 (neither): one load of washing of each to start with, the creator's outfit.
-    let mut v29 = saved.clone();
-    v29["version"] = 29.into();
-    for h in v29["households"].as_array_mut().unwrap() {
-        h.as_object_mut().unwrap().remove("laundry");
-    }
-    for s in v29["sims"].as_array_mut().unwrap() {
-        s.as_object_mut().unwrap().remove("outfit");
-    }
-    let back = load(&v29);
-    assert_eq!(
-        (back.sims[0].outfit, back.households[0].laundry),
-        (0, sim_core::world::LAUNDRY_START)
+        (2, [2.0, 0.5, 0.0, 0.0])
     );
 }
 

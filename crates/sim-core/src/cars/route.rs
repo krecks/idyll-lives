@@ -381,9 +381,10 @@ impl Route {
         // out of as a driveway is, and which way along the road it goes there (from the lane's
         // nearer end); a spot on the road itself is pulled into and out of straight.
         let bay = park.and_then(|(at, yaw)| {
-            let (rp, on, axis) = parking_bay(travel, at)?;
+            let (rp, on, to_road) = parking_bay(travel, at)?;
             let road = &g.roads[on.road as usize];
             let rt = road.tangent(on.s);
+            let axis = bay_axis(yaw, to_road);
             let (a, b) = if home {
                 (lane[0], lane[1])
             } else {
@@ -660,9 +661,10 @@ impl Route {
             Some((drive, if side[0] >= 0.0 { 1.0 } else { -1.0 }))
         } else {
             park.and_then(|(at, yaw)| {
-                let (rp, on, axis) = parking_bay(travel, at)?;
+                let (rp, on, to_road) = parking_bay(travel, at)?;
                 let road = &g.roads[on.road as usize];
                 let rt = road.tangent(on.s);
+                let axis = bay_axis(yaw, to_road);
                 let (a, b) = (lane[lane.len() - 2], lane[lane.len() - 1]);
                 let go = (b[0] - a[0]) * rt[0] + (b[1] - a[1]) * rt[1];
                 Some((

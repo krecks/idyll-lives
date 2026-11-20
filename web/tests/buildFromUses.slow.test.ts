@@ -118,7 +118,6 @@ describe('build from uses', async () => {
       expect(proposal.plan.open!.centre).toEqual(town.draft.open!.centre);
       expect(proposal.plan.greens).toEqual(town.draft.greens);
       expect(proposal.plan.slots).toEqual([]);
-      expect(proposal.plan.open!.backdrop).toEqual([]);
       expect(proposal.plan.open!.places).toEqual([]);
       expect(proposal.plan.open!.parking).toEqual([]);
       expect(proposal.hash).toBe(layoutHash(proposal.plan));
@@ -298,12 +297,12 @@ describe('build from uses', async () => {
     // (The worlds above and a few more: a river town, a mountain town, a city.)
     const worlds = [...cases, { world: 'river', seed: 5, options: { town: 'town', villages: 'few' } }, { world: 'mountain', seed: 8, options: { town: 'town', villages: 'few', hills: 'mountains' } }, { world: 'country', seed: 21, options: { town: 'city', villages: 'few' } }] as const;
     const kinds = ['homes', 'terraces', 'shops', 'buildings', 'parks', 'public'] as const;
-    /** What a town has of each kind: house lots (not terraced, not farms), terraced lots, shops and workplaces (lots and the backdrop's places), the buildings no home's lot is (the backdrop's, not a farm's, and the named places' lots), parks and outdoor spots, civic places. */
+    /** What a town has of each kind: house lots (not terraced, not farms), terraced lots, shops and workplaces (their lots), the buildings no home's lot is (the named places' lots and the buildings of flats), parks and outdoor spots, civic places. */
     const density = (d: NeighbourhoodDraft): Record<(typeof kinds)[number], number> => ({
       ...counts(d),
       homes: d.slots.filter((s) => s.kind === 'house' && s.lot !== 'farm' && s.lot !== 'terrace').length,
       terraces: d.slots.filter((s) => s.lot === 'terrace').length,
-      buildings: (d.open?.backdrop ?? []).filter((b) => b.use !== 'farm' && b.use !== 'barn').length + d.slots.filter((s) => placeOfTemplate(s.template)).length,
+      buildings: d.slots.filter((s) => s.kind === 'flats' || placeOfTemplate(s.template)).length,
     });
     const seeds = [9, 23];
     const total = Object.fromEntries(kinds.map((k) => [k, [0, 0]])) as Record<(typeof kinds)[number], [number, number]>;

@@ -67,6 +67,11 @@ impl World {
             if !self.edge_on_plot(plot, e.axis, e.x, e.z) {
                 return Err(Error::new("you can only build on your own lot"));
             }
+            if self.plots[plot as usize].is_flat() && !self.edge_in_flat(plot, e.axis, e.x, e.z) {
+                return Err(Error::new(
+                    "a flat's outer walls are the building's: build inside it",
+                ));
+            }
             check_look(rules, e)?;
             let target = edge_kind(e.kind);
             let diagonal = e.axis.diagonal();
@@ -365,11 +370,10 @@ impl World {
     pub fn paint_floor(&mut self, household: u32, tiles: &[FloorPaint]) -> Result<(), Error> {
         let (h, plot) = self.home_of(household)?;
         let rules = &self.content.build;
-        let p = &self.plots[plot as usize];
         let mut changes: Vec<(u16, u16, u8)> = Vec::new();
         let mut cost = 0;
         for t in tiles {
-            if !p.contains(t.x, self.ground_z(t.z)) || !self.lot.in_bounds(t.x, t.z) {
+            if !self.on_plot(plot, t.x, t.z) || !self.lot.in_bounds(t.x, t.z) {
                 return Err(Error::new("you can only lay floors on your own lot"));
             }
             if t.covering as usize > rules.floors.len() {
@@ -400,9 +404,15 @@ impl World {
         Ok(())
     }
 
-    /// Whether a wall edge (or the diagonal across a tile) lies on plot `plot` and on the lot.
+    /// Whether a wall edge (or the diagonal across a tile) lies on plot `plot` and on the lot. A
+    /// flat's are those with a tile of it on one side (its own storey's), its outer walls too
+    /// (`edge_in_flat` says which are inside it).
     pub(crate) fn edge_on_plot(&self, plot: u32, axis: EdgeAxis, x: i32, z: i32) -> bool {
         let p = &self.plots[plot as usize];
+        if p.is_flat() {
+            let ([a, b], _) = edge_sides(axis, x, z);
+            return self.on_plot(plot, a.0, a.1) || self.on_plot(plot, b.0, b.1);
+        }
         let (lw, ld) = (self.lot.width as i32, self.lot.depth as i32);
         if x < 0 || z < 0 || z > ld {
             return false;
@@ -418,6 +428,13 @@ impl World {
             }
             EdgeAxis::Dp | EdgeAxis::Dn => p.contains(x, z) && self.lot.in_bounds(x, z),
         }
+    }
+
+    /// Whether an edge on flat `plot` (`edge_on_plot`) is inside it: a tile of it on both sides. Its
+    /// outer walls are its building's, not its household's to build on.
+    pub(crate) fn edge_in_flat(&self, plot: u32, axis: EdgeAxis, x: i32, z: i32) -> bool {
+        let ([a, b], _) = edge_sides(axis, x, z);
+        self.on_plot(plot, a.0, a.1) && self.on_plot(plot, b.0, b.1)
     }
 
     /// Upstairs stands on downstairs: every room above the ground has a room under each of its

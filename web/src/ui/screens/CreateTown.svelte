@@ -19,7 +19,7 @@
   import { rename } from '../../game/edit/streets';
   import { menuScene } from '../../game/menuScene';
   import { OVERVIEW_CLOSE } from '../../render/shared/overviewCamera';
-  import { NEIGHBOUR_CAP, type NeighbourhoodDraft } from '../../game/town';
+  import { homesOn, NEIGHBOUR_CAP, type NeighbourhoodDraft } from '../../game/town';
   import { keepHouses, Superseded, townJob } from '../../game/townJobs';
   import { specOf, worldName, type WorldStep } from '../../game/world';
   import { worldLine } from '../../game/worldOptions';
@@ -95,10 +95,13 @@
     if (!editor.ready) return town ? of(town) : 0;
     return of(editor.shown) + of(editor.draft) - of(editor.shownFrom);
   };
-  // (Homes as step 2's summary counts them: a farm's house is a farm, counted on its own.)
-  const homes = $derived(figure((d) => d.slots.filter((s) => s.kind === 'house' && s.lot !== 'farm').length));
+  // (Homes: the houses and every flat, of a building of flats or over a place, read from its id: the town is counted
+  // before the templates are loaded too; a farm's house is a farm, counted on its own.)
+  const homes = $derived(figure((d) => d.slots.reduce((n, s) => n + homesOn(s, { farms: false }), 0)));
   const farms = $derived(figure((d) => d.slots.filter((s) => s.lot === 'farm').length));
-  const places = $derived(figure((d) => d.slots.filter((s) => s.kind !== 'house').length));
+  const flats = $derived(figure((d) => d.slots.filter((s) => s.kind === 'flats').length));
+  const places = $derived(figure((d) => d.slots.filter((s) => s.kind !== 'house' && s.kind !== 'flats').length));
+  const carParks = $derived(figure((d) => d.open?.carParks?.length ?? 0));
   const roadCount = $derived(figure((d) => d.roads.length));
   const villages = $derived(figure((d) => Math.max(0, (d.open?.areas.length ?? 1) - 1)));
   /** The town in a line: homes, its size, land, how many residents it holds. */
@@ -327,8 +330,10 @@
   {#if town}
     <span><b>{roadCount}</b> {roadCount === 1 ? 'road' : 'roads'}</span>
     <span><b>{homes}</b> homes</span>
+    {#if flats}<span><b>{flats}</b> {flats === 1 ? 'building' : 'buildings'} of flats</span>{/if}
     {#if farms}<span><b>{farms}</b> {farms === 1 ? 'farm' : 'farms'}</span>{/if}
     <span><b>{places}</b> public {places === 1 ? 'place' : 'places'}</span>
+    {#if carParks}<span><b>{carParks}</b> {carParks === 1 ? 'car park' : 'car parks'}</span>{/if}
     {#if villages}<span><b>{villages}</b> {villages === 1 ? 'village' : 'villages'}</span>{/if}
   {/if}
 {/snippet}

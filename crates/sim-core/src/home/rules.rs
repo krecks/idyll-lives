@@ -8,12 +8,24 @@ impl World {
     /// The roof over the household's home: a style and a colour (free; only for looks).
     pub fn set_roof(&mut self, household: u32, style: u8, color: u8) -> Result<(), Error> {
         let (_, plot) = self.home_of(household)?;
+        self.not_a_flat(plot, "roof")?;
         let b = &self.content.build;
         if style as usize >= b.roofs.len().max(1) || color as usize >= b.roof_colors.len().max(1) {
             return Err(Error::new("unknown roof style or colour"));
         }
         self.plots[plot as usize].roof = Some(crate::world::RoofLook { style, color });
         self.structure_version = self.structure_version.wrapping_add(1);
+        Ok(())
+    }
+
+    /// Refuses an edit of `what` (a roof, a garage, a porch, a blueprint) on `plot` if it is a flat:
+    /// its building's envelope is the building's, and a flat is built on inside only.
+    pub(crate) fn not_a_flat(&self, plot: u32, what: &str) -> Result<(), Error> {
+        if self.plots.get(plot as usize).is_some_and(|p| p.is_flat()) {
+            return Err(Error::new(format!(
+                "in a flat you build inside it only: no {what}"
+            )));
+        }
         Ok(())
     }
 

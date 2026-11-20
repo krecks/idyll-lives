@@ -27,6 +27,11 @@ export const TOWN_FADE = 0.03;
 /** A far bike's frame (sRGB). */
 export const BIKE: readonly [number, number, number] = [0.22, 0.22, 0.24];
 
+/** How often (ms) the flats of the building in view are asked again whether they may be shown open (`setFlatsOpen`). */
+export const FLATS_ASK_MS = 250;
+/** How far (m) under the floor over it a closed part's lid lies while a storey over it is in view (`placeLidHeights`). */
+export const LID_UNDER = 0.02;
+
 /** Longest wait (ms) for the birds of a game's first build (their models built): they'd pop in in play otherwise. */
 export const BIRDS_WAIT_MS = 3000;
 /** Idle time (ms) a frame must have left for a model file to be read ahead of time (`parseAhead`). */
@@ -54,6 +59,12 @@ export const GAME_SETTLE_MS = 250;
 export const WATER_FRAME_MS = 1000 / 30;
 /** Metres the sun's shadow square reaches past the viewed lot. */
 export const SHADOW_MARGIN = 10;
+/**
+ * Metres past where a resident could cast into the sun's map that their shadow-only copy is still drawn
+ * (`Characters.setCastTest`): the square moves in 8 m steps as the camera roams, and those it takes in are listed
+ * the frame after it moved, so they are listed a step or two before.
+ */
+export const CAST_SLACK = 16;
 /** The game camera's target eases to the ground under it over this (s): `settleTarget`. */
 export const TARGET_EASE = 0.25;
 /** The basement's pit (and the ground dug away over it) reaches this far past the plot (m), clear of walls on its edge. */

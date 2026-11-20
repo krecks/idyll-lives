@@ -464,7 +464,7 @@ fn refuses_content_that_would_break_the_game() {
         (
             "/carBodies/0/len",
             json!(9),
-            "car body 'van': len 9 must be 2.5..6",
+            "car body 'van': len 9 must be 2.5..5.4",
         ),
         (
             "/carBodies/0/wid",

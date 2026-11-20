@@ -1,30 +1,34 @@
 <script lang="ts">
   /**
    * What can be done to what is picked (`editor.selected`):
-   * - a home: another house, its garden, remove it; a public place: another of its size; a civic
-   *   place's lot: another civic place the area hasn't got (`lots.ts` `swapCivic`); any lot: remove it;
+   * - a home: another house, its garden, remove it; a building of flats: how many flats on how many
+   *   storeys, remove it with them; a public place: another of its size; a civic place's lot: another
+   *   civic place the area hasn't got (`lots.ts` `swapCivic`); a place with flats over it says so; any
+   *   lot: remove it;
    * - a street: rename it, remove it (what goes with it listed first), build it up with homes, the
    *   town's other buildings or both (`buildup.ts`: both in the main town, homes elsewhere, unless
-   *   chosen; each press another seed), or clear the buildings fronting it;
-   * - a building (none is a place: the named places are lots): remove it;
+   *   chosen; each press another seed), what fronts it listed (homes, flats, places, car parks), or
+   *   clear the town's buildings fronting it;
    * - a village: rename it, move it (the Village tool taken in hand for it), remove it (what goes with
    *   it listed first);
    * - the main town: rename it (step 2's own name field, the two kept as one).
    */
   import { areaOfRoad, buildingsOn, buildUp, clearBuildings, notBuilt, roadKey, type BuildMode } from '../../game/edit/buildup';
   import { anotherHouse, civicSwaps, lotKey, publicChoices, removeLotsEdit, setGarden, swapCivic, swapPlace } from '../../game/edit/lots';
+  import { entriesOf } from '../../game/edit/ground';
+  import { storeysOfId } from '../../game/flats';
   import { placeOfTemplate } from '../../game/placeLots';
   import { removeRoad, rename, whatGoes } from '../../game/edit/streets';
   import { removeVillage, villageGoes } from '../../game/edit/villages';
   import type { GardenSize } from '../../game/housegen';
-  import { lengths } from '../../game/roads';
-  import { generatedId, slotDims, type LotSize } from '../../game/town';
+  import { lengths, roadIndex } from '../../game/roads';
+  import { generatedId, homesOn, slotDims, type LotSize } from '../../game/town';
   import Icon from '../Icon.svelte';
   import Segmented from '../kit/Segmented.svelte';
   import RenameField from './RenameField.svelte';
   import type { TownEditor } from './tools';
   import { applyVillage, moveWithTool } from './villageChoice.svelte';
-  import { count, listed, lotKind, madeStreetsLine, sentence, whatGoesLine } from './words';
+  import { count, flatsLine, listed, lotKind, madeStreetsLine, sentence, whatGoesLine } from './words';
 
   const { editor }: { editor: TownEditor } = $props();
 
@@ -33,12 +37,12 @@
   const t = $derived(editor.t);
 
   const GARDENS: readonly { value: GardenSize; label: string }[] = [
+    { value: 'tight', label: 'Tight' },
     { value: 'snug', label: 'Snug' },
     { value: 'roomy', label: 'Roomy' },
     { value: 'big', label: 'Big' },
   ];
   const ROAD_KIND: Record<string, string> = { street: 'Street', lane: 'Lane', country: 'Country road', trail: 'Footpath' };
-  const USE: Record<string, string> = { office: 'Offices', shop: 'Shop', restaurant: 'Restaurant', school: 'School', church: 'Church', workshop: 'Workshop', home: 'Homes', flats: 'Flats', terrace: 'Terrace', barn: 'Barn' };
 
   // ---- a lot ----
   const lot = $derived(picked?.kind === 'lot' ? draft.slots[picked.slot] : undefined);
@@ -49,6 +53,16 @@
     return { size: size as LotSize, garden: (garden ?? lot.garden ?? 'roomy') as GardenSize };
   });
   const homeLike = $derived(!!lot && lot.kind === 'house' && lot.lot !== 'farm' && lot.lot !== 'terrace');
+  /** A building of flats, or a place with flats over it: its flats and storeys, in words. */
+  const flatsOf = $derived.by(() => {
+    if (!lot) return null;
+    const n = homesOn(lot, { farms: true });
+    if (lot.kind === 'house' || !n) return null;
+    const storeys = storeysOfId(lot.kind === 'flats' ? lot.template : (lot.upper ?? ''));
+    return lot.kind === 'flats' ? `${count(n, 'flat')} on ${count(storeys, 'storey')}` : `${count(n, 'flat')} over it, ${count(storeys, 'storey')} in all`;
+  });
+  /** What removing the lot takes with it besides: its flats. */
+  const lotFlats = $derived(lot ? flatsLine(lot) : null);
   const swaps = $derived(lot && (lot.kind === 'park' || lot.kind === 'shop') && !placeOfTemplate(lot.template) ? publicChoices(t, slotDims(t, lot)) : []);
   /** A civic place's lot: the civic places it may become. */
   const civics = $derived(picked?.kind === 'lot' ? civicSwaps(draft, picked.slot) : []);
@@ -93,7 +107,20 @@
   let buildChosen = $state<{ road: string; mode: BuildMode } | null>(null);
   const buildMode = $derived<BuildMode>(buildChosen?.road === roadId ? buildChosen.mode : picked?.kind === 'road' && areaOfRoad(draft, picked.road) === 0 ? 'both' : 'homes');
   const buildNo = $derived(picked?.kind === 'road' ? notBuilt(draft, picked.road) : null);
-  const builtCount = $derived(picked?.kind === 'road' ? buildingsOn(draft, picked.road).length : 0);
+  const builtCount = $derived(picked?.kind === 'road' ? buildingsOn(draft, t, picked.road).length : 0);
+  /** What fronts the street, in words: its homes (houses and flats), its buildings of flats, its places, its car parks. */
+  const fronting = $derived.by(() => {
+    if (picked?.kind !== 'road') return [];
+    const spots = entriesOf(draft, t);
+    const on = draft.slots.filter((_, i) => spots[i]?.road === picked.road);
+    const homes = on.reduce((n, s) => n + homesOn(s, { farms: true }), 0);
+    const flats = on.filter((s) => s.kind === 'flats').length;
+    const places = on.filter((s) => s.kind === 'shop' || s.kind === 'park' || s.kind === 'outdoor').length;
+    // (A car park by the bays in it: those whose road nearest is this one.)
+    const index = roadIndex(draft.roads);
+    const parks = new Set((draft.open?.parking ?? []).flatMap((b, i) => (index.nearest(b.x, b.z, 12)?.road === picked.road ? [b.park ?? `bay ${i}`] : []))).size;
+    return [...(homes ? [count(homes, 'home')] : []), ...(flats ? [count(flats, 'building of flats', 'buildings of flats')] : []), ...(places ? [count(places, 'place')] : []), ...(parks ? [count(parks, 'car park')] : [])];
+  });
   /** What the last build-up of this road left out where the ground is too steep. */
   let builtNote = $state<{ road: string; text: string } | null>(null);
 
@@ -105,9 +132,6 @@
     builtNote = e.leftOut ? { road: key, text: `${count(e.leftOut, 'building was', 'buildings were')} left out where the ground is too steep.` } : null;
   }
 
-  // ---- a building ----
-  const building = $derived(picked?.kind === 'building' ? draft.open?.backdrop?.[picked.building] : undefined);
-
   // ---- a village ----
   const area = $derived(picked?.kind === 'village' ? draft.open?.areas[picked.area] : undefined);
   const areaLots = $derived(picked?.kind === 'village' ? draft.slots.filter((s) => s.area === picked.area) : []);
@@ -116,13 +140,13 @@
   const villageGoesLines = $derived.by(() => {
     const g = villageGone;
     if (!g || 'refused' in g) return [];
-    const homes = g.lots.filter((i) => draft.slots[i]?.kind === 'house').length;
+    const homes = g.lots.reduce((n, i) => n + (draft.slots[i] ? homesOn(draft.slots[i], { farms: true }) : 0), 0);
+    const others = g.lots.filter((i) => draft.slots[i] && draft.slots[i].kind !== 'house' && draft.slots[i].kind !== 'flats').length;
     return [
       count(g.roads, 'street'),
       ...(g.others ? [count(g.others, 'road that led to it', 'roads that led to it')] : []),
       ...(homes ? [count(homes, 'home')] : []),
-      ...(g.lots.length > homes ? [count(g.lots.length - homes, 'other lot')] : []),
-      ...(g.backdrop.length ? [count(g.backdrop.length, 'building')] : []),
+      ...(others ? [count(others, 'other lot')] : []),
       ...(g.parking ? [count(g.parking, 'parking space')] : []),
     ];
   });
@@ -143,6 +167,7 @@
     {#if lot && picked.kind === 'lot'}
       <span class="eyebrow sub">{lotKind(lot, draft)}</span>
       <h3>{lot.name}</h3>
+      {#if flatsOf}<p class="hint">{flatsOf}.</p>{/if}
       {#if homeLike && gen}
         <div class="row">
           <button class="btn small" onclick={another}><Icon name="icon.ui.dice" size={14} /> Another house</button>
@@ -174,7 +199,7 @@
         </div>
       {/if}
       <div class="row">
-        <button class="btn small danger-soft" onclick={() => editor.apply(removeLotsEdit(draft, new Set([picked.slot])))}><Icon name="icon.ui.trash" size={14} /> Remove</button>
+        <button class="btn small danger-soft" title={lotFlats ? `Removes ${lot.name} and ${lotFlats}` : undefined} onclick={() => editor.apply(removeLotsEdit(draft, new Set([picked.slot])))}><Icon name="icon.ui.trash" size={14} /> Remove</button>
       </div>
     {:else if road && picked.kind === 'road'}
       <span class="eyebrow sub">{ROAD_KIND[road.kind ?? 'street'] ?? 'Road'}{road.bridge ? ', a bridge' : ''} · {roadLength} m</span>
@@ -202,22 +227,17 @@
         {/if}
         <div class="row">
           <button class="btn small" disabled={!!buildNo} title="Fills the free frontage; press again for another go" onclick={buildIt}><Icon name="icon.ui.home" size={14} /> Build up this street</button>
-          <button class="btn small danger-soft" disabled={!builtCount} onclick={() => picked.kind === 'road' && editor.apply(clearBuildings(draft, picked.road))}><Icon name="icon.ui.trash" size={14} /> Clear its buildings</button>
+          <button class="btn small danger-soft" disabled={!builtCount} onclick={() => picked.kind === 'road' && editor.apply(clearBuildings(draft, t, picked.road))}><Icon name="icon.ui.trash" size={14} /> Clear its buildings</button>
         </div>
         <p class="hint">
-          {builtCount ? `${count(builtCount, 'building')} front${builtCount === 1 ? 's' : ''} it.` : 'No buildings front it.'}
+          {fronting.length ? `Along it: ${listed(fronting)}.` : 'Nothing fronts it.'}
+          {builtCount ? `${builtCount} of them the town's buildings (terraces, flats, town houses, small shops and workplaces), which Clear takes.` : ''}
           {#if builtNote?.road === roadId}{builtNote.text}{/if}
         </p>
       </div>
       {/if}
-    {:else if building && picked.kind === 'building'}
-      <span class="eyebrow sub">Building · {USE[building.use] ?? building.use}, {count(building.storeys, 'storey')}</span>
-      <h3>A building</h3>
-      <div class="row">
-        <button class="btn small danger-soft" onclick={() => editor.apply(removeLotsEdit(draft, new Set(), new Set([picked.building])))}><Icon name="icon.ui.trash" size={14} /> Remove</button>
-      </div>
     {:else if area && picked.kind === 'village'}
-      <span class="eyebrow sub">Village · {count(areaLots.filter((s) => s.kind === 'house').length, 'home')}</span>
+      <span class="eyebrow sub">Village · {count(areaLots.reduce((n, s) => n + homesOn(s, { farms: true }), 0), 'home')}</span>
       <RenameField label="Village name" value={area.name} onname={renamed({ kind: 'area', area: picked.area })} />
       <div class="row">
         <button class="btn small" title="Take the Village tool to move it: click where it goes" onclick={() => moveWithTool(editor, picked.area)}><Icon name="icon.ui.move" size={14} /> Move</button>

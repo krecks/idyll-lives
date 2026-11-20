@@ -242,6 +242,9 @@ pub fn structure_json_with(world: &World, lot: bool) -> String {
         pull_over_streets: pull_over_street_views(world),
         light_poles: light_pole_views(world),
         junctions: junction_views(world),
+        parking: parking_views(world),
+        car_parks: &world.travel.file.car_parks,
+        flats: flat_views(world),
     })
     .expect("structure serializes")
 }

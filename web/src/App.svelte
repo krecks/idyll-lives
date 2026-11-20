@@ -3,6 +3,7 @@
   import { host, loadSessionCode } from './game/host';
   import { menuScene } from './game/menuScene';
   import { BENCH } from './debug/benchFlags';
+  import { DEBUG_HOOKS } from './debug/hooks';
   import { watchLog } from './debug/log';
   import { perfEnd, perfPhase, perfStart, perfTimeAsync } from './debug/perf';
   import { fetchNewGameReport, fetchState, loadDebugReport } from './debug/report';
@@ -121,6 +122,9 @@
     bench?.prepareBench();
     // (`hud=0` on any debug page: the world without the interface, for checks' pictures.)
     if (!BENCH && new URLSearchParams(location.search).get('hud') === '0') (await import('./debug/bench')).hideHud();
+    // (`__bench` on `?debug` pages from the main menu on, with the bench's hooks: a game state swapped in and played in fixed
+    // steps, `debug/benchTime.ts`. A benchmark's page puts its own up once it has warmed up.)
+    if (!BENCH && DEBUG_HOOKS && new URLSearchParams(location.search).has('debug')) void import('./debug/bench').then((m) => m.installDebugBench());
     let data: Awaited<ReturnType<typeof loadGameData>>;
     // The menu's picture: the last world made, else the one the game ships (read meanwhile).
     const still = within(loadStill(), STILL_LIMIT_MS, null).then((kept) => kept ?? FIRST_STILL);

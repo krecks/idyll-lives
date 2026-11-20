@@ -507,7 +507,8 @@ pub(crate) fn start_task(
             let knock = (content.visits.door.is_some() && !p.public)
                 .then(|| crate::life::knock_spot(nav, p))
                 .flatten();
-            let mut door = p.arrival_point();
+            // (At a flat, its own door off the landing: `Plot::doorstep`.)
+            let mut door = p.doorstep();
             // A public place without an entry: the open ground nearest its middle, not whatever
             // stands there.
             if p.public && p.entry.is_none() {
@@ -547,8 +548,9 @@ pub(crate) fn start_task(
             } else if let (Some(_), Some(at)) = (sim.bound_for_bike, sim.bike_parked) {
                 goal_at(at)
             } else {
+                // (Into a flat, behind its own door: `Plot::home_point`.)
                 let home = ctx.households[sim.household as usize].plot;
-                let Some(door) = home.map(|p| ctx.plots[p as usize].arrival_point()) else {
+                let Some(door) = home.map(|p| ctx.plots[p as usize].home_point()) else {
                     sim.transition = Some(crate::life::Transition::Home);
                     return;
                 };

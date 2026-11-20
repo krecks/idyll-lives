@@ -165,6 +165,13 @@ pub(crate) fn unjam(w: &mut World) {
             }
             why = "no way";
         }
+        // (None of them can: one backing up as it turns round, held up by one come up behind it
+        // that waits for it in turn, gives the turn round up and goes on its way from where it
+        // stands. The one behind could back up no further, the turning one would turn round no
+        // second time, and the riders behind them waited the rest of the day, Skerry Island.)
+        if !fired {
+            fired = ring.iter().any(|&c| give_up_turn(w, c));
+        }
         if !fired && !again {
             *w.traffic.unjam_impossible.entry(why).or_default() += 1;
         }
@@ -201,6 +208,45 @@ pub(crate) fn unjam(w: &mut World) {
     }
     w.traffic.turning = turning;
 }
+
+/// Car `c`, turning round (backing up along the way it came, `Detour`), gives it up where it
+/// stands: it goes on from there as the way it turned round to would from a turn round there,
+/// round the stretch it was held up on if there's another way, else on along it (`turned_round`;
+/// as one turned round twice, after a load it is where that way has it then). `unjam`: a ring
+/// none of whose cars can turn round. Whether it did.
+pub(crate) fn give_up_turn(w: &mut World, c: usize) -> bool {
+    let car = &w.cars[c];
+    let (Some(d), Some((_, r))) = (car.detour, car.route.as_ref()) else {
+        return false;
+    };
+    let t = car.progress;
+    if d.mouth.is_some() || t < 1.0 || !r.at(t + 1.0).2 {
+        return false;
+    }
+    // (A turn round no further back than where it stands: `Route::detour` wants one back at all.)
+    let here = Detour {
+        from: t,
+        back: t - GIVE_UP_BACK,
+        mouth: None,
+        ..d
+    };
+    turned_round(w, c, here);
+    let car = &mut w.cars[c];
+    let gave_up = car.detour == Some(here);
+    if gave_up {
+        // (Its new way begins where it stands, as `turn_round_by` has a turned car's.)
+        let tick = w.tick;
+        car.progress = 0.01;
+        car.let_by = None;
+        car.unhold();
+        car.stall = (car.progress, tick);
+        w.traffic.forget(car_first(c));
+    }
+    gave_up
+}
+
+/// How far back (ticks along its way) a car giving up its turn round turns round from (`give_up_turn`).
+const GIVE_UP_BACK: f32 = 0.01;
 
 /// Car `c` turned round `d` (`Detour`, `unjam`): its way that way from now on, its claims let go.
 /// False: there's no such way (as it was).
@@ -370,12 +416,14 @@ pub(crate) fn turned_round(w: &mut World, c: usize, d: Detour) {
         ..
     } = &mut *w;
     let car = &mut cars[c];
-    let Some((_, had)) = car.route.take() else {
+    let Some((was_home, had)) = car.route.take() else {
         return;
     };
     let progress = car.progress;
     let Some(new) = car.detoured(exits, travel, d.home, &d, &had) else {
-        car.route = Some((true, had));
+        // (Its way as it was, homeward or not: a household's car giving up its turn round,
+        // `give_up_turn`, may be on its way out.)
+        car.route = Some((was_home, had));
         return;
     };
     let halts = d.same.then(|| moved_along(&had, &new, d.back));
@@ -608,16 +656,15 @@ pub(crate) fn mouth_behind(
             s -= 1.0;
         }
         let Some(back) = back else { continue };
-        // (Every pose of it, backing in and pulling out, clear of the others.)
+        // (Every pose of it, backing in and pulling out, clear of the others: the first too, the
+        // deepest in the mouth. Its pose a step out was clear of a car parked up the driveway, the
+        // pose it backed in to wasn't, and it waited behind that car for good, Station Cross.)
         let poses = |pts: &[([f32; 2], bool, f32)]| {
             pts.windows(2).all(|k| {
                 let (a, b) = (k[0].0, k[1].0);
-                let r = Rect {
-                    at: b,
-                    yaw: (b[0] - a[0]).atan2(b[1] - a[1]),
-                    half,
-                };
-                crate::travel::dist(a, b) < 1e-3 || clear(&r)
+                let yaw = (b[0] - a[0]).atan2(b[1] - a[1]);
+                crate::travel::dist(a, b) < 1e-3
+                    || [a, b].into_iter().all(|at| clear(&Rect { at, yaw, half }))
             })
         };
         if poses(&into.pts) && poses(&out.pts) {

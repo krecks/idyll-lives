@@ -1,7 +1,7 @@
 /**
  * The Lot tool: puts down what its card chose (`lotChoice`) along the road nearest the pointer, as
  * the generator would put one there (`lots.ts` `canPlace`: off the corners, on free ground, a car
- * able to drive out). Its ghost follows the pointer, snapped to where it would go: blue where it
+ * able to drive out; a building of flats drawn as the generator draws one there, what it is said under the tools). Its ghost follows the pointer, snapped to where it would go: blue where it
  * fits, red where it doesn't, with why under the tools. A click puts it down (`addLot`). A lot
  * dragged is moved (`moveLot`), keeping its house, garden and kind; one clicked is picked.
  *
@@ -14,7 +14,7 @@ import type { RoadSpot } from '../../game/edit/ground';
 import { addCivic, areaOfRoad } from '../../game/edit/buildup';
 import type { Edited } from '../../game/edit/edited';
 import { addLot, canPlace, CIVIC_PLACES, moveLot, type LotChoice } from '../../game/edit/lots';
-import { civicLabel, draftAreaSize } from '../../game/backdrop';
+import { civicLabel, draftAreaSize } from '../../game/places';
 import type { TownGhosts } from '../../render/types';
 import { choiceOf, choiceSize, civicChosen, lotChoice } from './lotChoice.svelte';
 import LotCard from './LotCard.svelte';
@@ -30,7 +30,7 @@ export const lotTool: TownTool = {
   id: 'lot',
   label: 'Lot',
   icon: 'icon.ui.home',
-  does: 'Put a home, a farm or a public place down along a road; drag a lot to move it.',
+  does: 'Put a home, a farm, a building of flats or a public place down along a road; drag a lot to move it.',
   stage(editor: TownEditor) {
     /** The house the next lot gets (the ghost shows it; a new one after each lot put down). */
     let seed = editor.seed();
@@ -112,7 +112,7 @@ export const lotTool: TownTool = {
         return null;
       }
       editor.preview({ lots: [{ x: fit.x, z: fit.z, w: fit.w, d: fit.d, tone: 'new' }] });
-      editor.hint(`Click to put it down on ${draft.roads[at.road]?.name ?? 'this road'}.`);
+      editor.hint(`${fit.about ? `${fit.about} ` : ''}Click to put it down on ${draft.roads[at.road]?.name ?? 'this road'}.`);
       return { at, choice };
     };
 

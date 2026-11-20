@@ -319,40 +319,53 @@ fn worn_out_with_the_bladder_low_the_toilet_comes_first_then_bed() {
     assert!(on_the_floor(&w, &[0], start).is_empty(), "not on the floor");
 }
 
-/// The owner's town (Sunnybury, F8 report 2026-11-11 14:47, the same game 30 minutes of play
-/// before the report at 15:16): 20:38 on day 1, the Nakamuras of 12 Birch Road (household 36:
-/// Jonah 109 and Elif 110, partners of 57, their son Ravi 111, 17) on their way home. Their home
-/// has a double bed and a race car bed: Ravi, too old for that, fell asleep on the floor the
-/// first night and his father the next two (kept out of the bedroom Ravi was in). To 1 am on day
-/// 3, after Ravi turns 18 at midnight: the parents in their bed, Ravi on the sofa, nobody on the
-/// floor. (Since most junctions give way, Ravi's walk home goes along the roads, not over open
-/// ground as when every junction's box was kept off those on foot: home at half past one, not a
-/// quarter to twelve. Worn out for two hours of it, he dropped on the doorstep; he sets off with
-/// energy enough to get home on, as he did in the owner's game: what's tested is where they
-/// sleep there. With 0.4 he ran out at 1:17, a quarter of an hour short of the door, and what he
-/// did there with none left (the toilet and the sofa, or an espresso at the café and off to work
-/// at four, asleep on the way) came down to the town's one dice roll, which every resident's
-/// choices anywhere move: the junctions' changes moved it, 2026-11-13. With 0.6 he gets in with
-/// some left.)
+/// The owner's evening at 12 Birch Road (F8 report 2026-11-11), over two nights: from 20:38 on
+/// day 1, the Nakamuras coming in (Ravi, 17, at the front door with energy enough to get in on,
+/// his parents tired in the living room) to 1 am on day 3. In the owner's game Ravi, too old for
+/// his race car bed, fell asleep on the floor the first night and his father the next two (kept
+/// out of the bedroom Ravi was in). Now the parents sleep in their bed and Ravi on the sofa both
+/// nights, nobody on the floor, and the player is told Ravi has no bed. (Fed and washed through
+/// the day between, as `evening` keeps them: what's tested is where they sleep.)
 #[test]
-fn nobody_on_birch_road_sleeps_on_the_floor() {
-    let path =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves/v037_birch_road.json");
-    let json = std::fs::read_to_string(&path).unwrap();
-    let mut w = World::from_save_json(&common::content(), &json).unwrap();
-    let [jonah, elif, ravi] = [109, 110, 111];
-    assert_eq!(
-        [&w.sims[jonah].name, &w.sims[elif].name, &w.sims[ravi].name],
-        ["Jonah", "Elif", "Ravi"]
+fn two_nights_at_12_birch_road_nobody_sleeps_on_the_floor() {
+    let town = HOUSE.replace(
+        r#""x":7.5,"z":4.5,"age":18"#,
+        r#""x":14.5,"z":4.5,"age":17"#,
     );
-    let energy = need(&w, "energy");
-    w.sims[ravi].needs[energy] = w.sims[ravi].needs[energy].max(0.6);
-    let plot = w.households[36].plot.unwrap();
-    common::look_at(&mut w, plot);
+    let mut w = World::from_json(&common::content(), &town, 3).unwrap();
+    let [jonah, elif, ravi] = [0, 1, 2];
+    let (n, energy) = (w.content.needs.len(), need(&w, "energy"));
+    let fed = |w: &mut World| {
+        for s in &mut w.sims {
+            let rest = s.needs[energy];
+            s.needs[..n].fill(1.0);
+            s.needs[energy] = rest;
+        }
+    };
+    // (A day without free will to 20:38, fed and rested every hour.)
+    w.autonomy = false;
+    let evening = 20.0 + 38.0 / 60.0;
+    for hour in 9..=21 {
+        common::run_to(&mut w, 1, (hour as f32).min(evening));
+        for s in &mut w.sims {
+            s.needs[..n].fill(1.0);
+        }
+    }
+    w.autonomy = true;
+    for (i, s) in w.sims.iter_mut().enumerate() {
+        s.needs[energy] = if i == ravi { 0.6 } else { 0.45 };
+    }
     let end = clock::tick_at(3, 60.0).unwrap();
+    let meals: Vec<u64> = (8..20)
+        .map(|hour| clock::tick_at(2, hour as f32 * 60.0).unwrap())
+        .collect();
     let mut beds: [Vec<String>; 3] = Default::default();
     while w.tick < end {
         w.tick_once();
+        // (Fed and washed on the hour through day 2's daytime.)
+        if meals.contains(&w.tick) {
+            fed(&mut w);
+        }
         for (k, s) in [jonah, elif, ravi].into_iter().enumerate() {
             if let Some(o) = sleeping_in(&w, s) {
                 let def = &w.content.objects[w.objects[o as usize].def].id;

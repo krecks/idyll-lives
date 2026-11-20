@@ -93,15 +93,15 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   /**
    * Whether `world` is another town on the land this landscape was laid out for, which it can take on in place
    * (`relayout`): a land its town follows (a surface), the same land's size, seed, look and options, but other roads,
-   * lots, backdrop or heights (step 2's edits: a lot removed, a street drawn, a village placed).
+   * lots or heights (step 2's edits: a lot removed, a street drawn, a village placed).
    */
   canRelay(world: WorldStructure): boolean {
     return !!this.surface && world.meta?.land?.seeded === 'follow' && LandscapeLayout.relayKey(world) === LandscapeLayout.relayKey(this.laidOut);
   }
 
   /**
-   * Whether `world` lays out the same town as the one laid out (`relayout` would change nothing): the same land, roads,
-   * lots and backdrop, whatever arrays they come in (a menu's preview made again for the same draft).
+   * Whether `world` lays out the same town as the one laid out (`relayout` would change nothing): the same land, roads
+   * and lots, whatever arrays they come in (a menu's preview made again for the same draft).
    */
   sameLayout(world: WorldStructure): boolean {
     const a = this.laidOut;
@@ -110,10 +110,10 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const [la, lb] = [land(a), land(world)];
     if (la !== lb && (!la || !lb || la.cols !== lb.cols || la.rows !== lb.rows || la.h.join() !== lb.h.join() || la.wl.join() !== lb.wl.join() || (la.flow ?? []).join() !== (lb.flow ?? []).join() || la.cover.join() !== lb.cover.join())) return false;
     const rects = (w: WorldStructure) => w.plots.map((p) => `${p.x},${p.z},${p.w},${p.d}`).join(';');
-    return a.plots.length === world.plots.length && rects(a) === rects(world) && JSON.stringify(a.meta?.roads ?? []) === JSON.stringify(world.meta?.roads ?? []) && JSON.stringify(a.meta?.backdrop ?? []) === JSON.stringify(world.meta?.backdrop ?? []);
+    return a.plots.length === world.plots.length && rects(a) === rects(world) && JSON.stringify(a.meta?.roads ?? []) === JSON.stringify(world.meta?.roads ?? []);
   }
 
-  /** `baseKey` without the roads and the backdrop: what another town on the same land keeps (`canRelay`). */
+  /** `baseKey` without the roads: what another town on the same land keeps (`canRelay`). */
   static relayKey(world: WorldStructure): string {
     const look = world.meta?.world;
     const options = look?.options ? `:o${canonicalJson(look.options)}` : '';
@@ -122,7 +122,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   }
 
   /**
-   * Takes on another town on the same land (`canRelay`): its roads, lots and backdrop, and its land (the settle may
+   * Takes on another town on the same land (`canRelay`): its roads and lots, and its land (the settle may
    * have graded it again): the surface solved for it, the country roads laid again, a big world's built field, the
    * field's water and zones. Says what its drawing must do again: the samples whose drawn land changed (`rect`) and
    * the box (m) its roads, lots, buildings or land changed in (`box`, for the woods and the lawn); null: nothing.
@@ -183,11 +183,6 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       }
       const plots = new Set(b.plots.map((p) => `${p.x},${p.z},${p.w},${p.d}`));
       for (const p of a.plots) if (!plots.has(`${p.x},${p.z},${p.w},${p.d}`)) add(p.x - RELAY_REACH, p.z - RELAY_REACH, p.x + p.w + RELAY_REACH, p.z + p.d + RELAY_REACH);
-      const backdrop = new Set((b.meta?.backdrop ?? []).map((q) => JSON.stringify(q.poly)));
-      for (const q of a.meta?.backdrop ?? []) {
-        if (backdrop.has(JSON.stringify(q.poly))) continue;
-        for (const [x, z] of q.poly) add(x - RELAY_REACH, z - RELAY_REACH, x + RELAY_REACH, z + RELAY_REACH);
-      }
     }
     if (box[0] <= box[2]) {
       take(Math.max(0, Math.floor(box[0] / LAND_CELL)), Math.max(0, Math.floor(box[1] / LAND_CELL)));
@@ -462,13 +457,11 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   static baseKey(world: WorldStructure): string {
     const look = world.meta?.world;
     const streets = [...(world.meta?.streets ?? []).map((s) => `${s.z}`), ...(world.meta?.roads ?? []).map((r) => `${r.points[0]}:${r.points.length}`)].join(',');
-    // (A backdrop is built land too, `builtField`: a town with one has a landscape of its own.)
-    const backdrop = world.meta?.backdrop?.length ? `:b${world.meta.backdrop.length}` : '';
     // (The options, the zones and the relief too: a world made again with only its woods or its hills changed
     // keeps its seed, name and roads, and must not keep the landscape it had.)
     const options = look?.options ? `:o${canonicalJson(look.options)}` : '';
     const relief = world.meta?.relief ? `:r${reliefSum(world.meta.relief)}` : '';
-    return `${world.meta?.seed ?? 1}:${world.width}x${groundDepth(world)}:${world.meta?.name ?? ''}:${streets}${look ? `:${look.kind}:${canonicalJson(look.landscape)}` : ''}${backdrop}${options}${relief}`;
+    return `${world.meta?.seed ?? 1}:${world.width}x${groundDepth(world)}:${world.meta?.name ?? ''}:${streets}${look ? `:${look.kind}:${canonicalJson(look.landscape)}` : ''}${options}${relief}`;
   }
 
   /**
@@ -644,12 +637,6 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       }
     };
     for (const p of world.plots) mark(p.x, p.z, p.x + p.w, p.z + p.d);
-    // (The living town's backdrop buildings too, and a metre round them: no tree grows in one.)
-    for (const b of world.meta?.backdrop ?? []) {
-      const xs = b.poly.map((q) => q[0]);
-      const zs = b.poly.map((q) => q[1]);
-      mark(Math.min(...xs) - 1, Math.min(...zs) - 1, Math.max(...xs) + 1, Math.max(...zs) + 1);
-    }
     for (const r of world.meta?.roads ?? []) {
       const half = r.width / 2 + 2;
       for (let i = 0; i + 1 < r.points.length; i++) {
@@ -706,7 +693,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   }
 
   /**
-   * On a land its town follows, the pad (m) of the lot (or the backdrop's building) a point is in (the highest where
+   * On a land its town follows, the pad (m) of the lot a point is in (the highest where
    * two touch), or null outside every one (the grass levels its patches on them: `shared/grass.ts` `settlePads`).
    * Undefined: no surface.
    */
@@ -731,8 +718,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         let best: number | null = null;
         for (const i of grid.get(Math.floor(x / PAD_CELL) * 65536 + Math.floor(z / PAD_CELL)) ?? []) {
           const p = surface.plots[i];
-          // (A backdrop building's on its ground only, and not on a road: `BuiltSurface.at`.)
-          if (!onPad(p, x, z) || (p.poly && surface.roadAt(x, z))) continue;
+          if (!onPad(p, x, z)) continue;
           const y = surface.padY(i);
           if (best === null || y > best) best = y;
         }

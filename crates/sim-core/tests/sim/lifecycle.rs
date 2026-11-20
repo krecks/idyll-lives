@@ -105,24 +105,6 @@ fn the_lifespan_sets_the_pace_and_off_stops_it() {
     assert!((w.sims[0].age - 60.2).abs() < 1e-3, "off: nobody ages");
 }
 
-#[test]
-fn older_saves_load_with_aging_off() {
-    let w = world();
-    let mut save: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
-    save["version"] = 12.into();
-    save.as_object_mut().unwrap().remove("lifespan");
-    for s in save["sims"].as_array_mut().unwrap() {
-        s.as_object_mut().unwrap().remove("age");
-    }
-    let loaded = World::from_save_json(CONTENT, &save.to_string()).unwrap();
-    assert_eq!(
-        loaded.lifespan,
-        Lifespan::Off,
-        "an older game doesn't start aging by surprise"
-    );
-    assert!((25.0..=50.0).contains(&loaded.sims[0].age));
-}
-
 const LATER_LIFE: &str = r#"{
     "needs":[{"id":"energy","label":"Energy","decayPerHour":0.0}],
     "objects":[],

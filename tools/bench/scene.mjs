@@ -10,7 +10,8 @@
  *
  * `--seed <n>`: the new world's seed (the same place, options and seed give the same town, neighbours and household).
  * `--home town`: the household moves into a home for sale in the main town (the one
- * halfway out among those for sale there) instead of the first for sale anywhere. The town view's scenes
+ * halfway out among those for sale there) instead of the first for sale anywhere. `--home flat`: into a
+ * flat for sale (the main town's nearest its middle, upstairs if one is), so the game starts in a flat. The town view's scenes
  * (`render.mjs --poses town`: `town-day`, `town-dusk`, `town-night`) are made so, one town at three hours:
  *
  *   bun tools/bench/scene.mjs --name town-day --world country --options town=village --seed 7 --home town --hour 13
@@ -74,42 +75,17 @@ try {
     async ({ kind, seed, homeIn, options }) => {
       const { app } = await import('/src/ui/app.svelte.ts');
       const { services } = await import('/src/ui/services.ts');
-      const { generateWorld, populate, loadTemplates, vacantSlots } = await import('/src/game/town.ts');
-      const { randomHousehold } = await import('/src/game/household.ts');
+      const { generateWorld, loadTemplates } = await import('/src/game/town.ts');
+      const { sceneHome, sceneTown } = await import('/src/debug/sceneRecipe.ts');
       const t = await loadTemplates();
       const empty = generateWorld(services.content, t, kind, seed ?? undefined, undefined, undefined, options);
-      // (With a seed, the neighbours and the household are the same ones every time too: their dice are the seed's
-      // while they are made, the household's its own, however many the neighbours took.)
-      const dice = Math.random;
-      const seeded = (n) => {
-        let a = (n ^ 0x9e3779b9) >>> 0;
-        Math.random = () => {
-          a = (a + 0x6d2b79f5) >>> 0;
-          let t = Math.imul(a ^ (a >>> 15), 1 | a);
-          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-        };
-      };
-      if (seed !== null) seeded(seed);
-      const town = populate(services.content, services.assets, t, empty);
-      if (seed !== null) seeded(seed + 1);
-      const household = randomHousehold(services.content, services.assets, 4, town.households.map((h) => h.household.name));
-      Math.random = dice;
-      // The home: the first for sale, or (`--home town`) the one halfway out among those for sale in the main town.
-      const vacant = vacantSlots(town);
-      let slot = vacant[0].index;
-      const main = town.areas?.[0];
-      if (homeIn === 'town' && main) {
-        const [cx, cz] = [main.x + main.w / 2, main.z + main.d / 2];
-        const far = (s) => Math.hypot(s.x - cx, s.z - cz);
-        const inMain = vacant.filter((s) => (s.area ?? 0) === 0).sort((a, b) => far(a) - far(b) || a.index - b.index);
-        if (inMain.length) slot = inMain[Math.floor(inMain.length / 2)].index;
-      }
-      Object.assign(app, { world: empty, town, household, homeSlot: slot });
+      const { town, household } = sceneTown(services.content, services.assets, t, empty, seed);
+      const { home, ref } = sceneHome(services.content, t, town, homeIn);
+      Object.assign(app, { world: empty, town, household, home: ref });
       // (The rest of the homes for sale are filled on the way in: from the seed too, when there is one.)
-      const request = app.homeRequest(slot);
+      const request = app.homeRequest(ref);
       app.start(seed === null ? request : { ...request, peopleSeed: seed });
-      return { world: town.world?.kind, seed: town.seed, slot, households: town.households.length, neighbours: town.households.reduce((n, h) => n + h.household.members.length, 0) };
+      return { world: town.world?.kind, seed: town.seed, home: home.name, storey: home.storey, households: town.households.length, neighbours: town.households.reduce((n, h) => n + h.household.members.length, 0) };
     },
     { kind: world, seed, homeIn, options },
   );

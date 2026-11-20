@@ -2043,6 +2043,12 @@ export function windStill(meshInstance: pc.MeshInstance, m: ModelMesh): void {
   if (m.windStill) meshInstance.setParameter('game_windFlutter', 0);
 }
 
+/** Fixed-step playback: the wind's and the water's clocks back to 0 (`Renderer.framesOnDemand`). */
+export function restartWind(app: pc.AppBase): void {
+  const state = windStates.get(app);
+  if (state) state.time = state.water = 0;
+}
+
 /** How strongly the wind moves an app's plants (1 as made; 0 still, for reduce motion and `?still`). */
 export function setWind(app: pc.AppBase, strength: number): void {
   const state = windStates.get(app);
@@ -2099,6 +2105,11 @@ export class Sky {
   private readonly cloudMaterial: pc.StandardMaterial | null = null;
   private readonly device: pc.GraphicsDevice;
   private spin = 0;
+
+  /** Fixed-step playback: the clouds' band turned back to where it starts. */
+  restart(): void {
+    this.spin = 0;
+  }
 
   constructor(app: pc.AppBase, parent: pc.Entity, private readonly radius: number, cloudsUrl?: string) {
     const device = (this.device = app.graphicsDevice);

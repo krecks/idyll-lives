@@ -1,8 +1,10 @@
 // The classic worlds (the eight kinds a world was before places and options, `support/classicWorlds.ts`)
 // come out byte for byte as they did: each world's draft, as JSON, hashes to what it did when the
 // generator read the kinds' own tables (`CHARACTER` and `WORLDS`, 2026-11-15), re-pinned when the town's named
-// places became lots of their own (`macro.ts` `namedLots`, 2026-11-17) and when a village's hall
-// got a look of its own (`Civic.kinds`, 2026-11-18). Seeds 11 and 22 of
+// places became lots of their own (`macro.ts` `namedLots`, 2026-11-17), when a village's hall
+// got a look of its own (`Civic.kinds`, 2026-11-18), and for the real town (2026-11-20: every building a
+// lot, laid by the dense pass, with buildings of flats, car parks and bays; the country road's corner rule;
+// 679 family names). Seeds 11 and 22 of
 // each kind, and the worlds the pinned tests name (continuedPorts, countryBends, countryCorridors,
 // driveways, gardenFences). A change that moves one on purpose re-pins it here.
 import { afterAll, describe, expect, test } from 'bun:test';
@@ -14,40 +16,40 @@ const WEB = new URL('../', import.meta.url).pathname;
 
 /** Each world: its kind, its seed, and the first 16 hex digits of its draft's SHA-256. */
 const GOLDEN: [ClassicKind, number, string][] = [
-  ['small', 11, 'd0e7c82381e75cad'],
-  ['small', 22, '46c623224bcdda1b'],
-  ['medium', 11, '05809e01803237e9'],
-  ['medium', 22, '936ed5916c13f4c4'],
-  ['dense', 11, '4501e35be0935355'],
-  ['dense', 22, '328f8e4769d1469e'],
-  ['farm', 11, '7f99767cbc1b8e70'],
-  ['farm', 22, '8df989700c88f710'],
-  ['seaside', 11, '6087af459e4e8b9b'],
-  ['seaside', 22, 'ba8ce3648cea7b88'],
-  ['mountain', 11, '88a64f1f0a43179c'],
-  ['mountain', 22, 'c4b009964424f3b8'],
-  ['lakeside', 11, '9c614b995c06b97b'],
-  ['lakeside', 22, '65f513b223e9fcb2'],
-  ['forest', 11, '3ad173cb405e0ec7'],
-  ['forest', 22, '638981e1e1bf2292'],
-  ['dense', 808114082, '269bbf8fe369ad4e'],
-  ['small', 199762, 'a4f3e8e9ab188bd3'],
-  ['forest', 223520, '27a47ae7ca4212fe'],
-  ['medium', 104735, '51df84f531c65cdb'],
-  ['mountain', 231441, '3aca7bce3d3df61f'],
-  ['lakeside', 239360, 'fb0af91373e6ade1'],
-  ['farm', 271032, '660122595f179933'],
-  ['small', 278952, 'f5e4929505d646b4'],
-  ['forest', 278953, '2d916ca8293d3c6a'],
-  ['forest', 425059, '0fad02a75c7d98c4'],
-  ['lakeside', 215603, '5fa8ed17c931e956'],
-  ['forest', 320330, '3b07a329b450820c'],
-  ['dense', 320329, 'e141e24aebdbbaa6'],
-  ['seaside', 215602, 'da215999c1eb36de'],
-  ['forest', 104735, '4e48b6d0f840ee86'],
-  ['forest', 112654, '539b4ac246683c3a'],
-  ['lakeside', 225304, '1c07bbf4df0272f0'],
-  ['small', 314192, 'ac263e1fa6b51ad6'],
+  ['small', 11, '3d9227655ebfe9dc'],
+  ['small', 22, '6ad7f41082bd66a2'],
+  ['medium', 11, '4909f41e7000bdd1'],
+  ['medium', 22, '0d4b19adbf3af0a4'],
+  ['dense', 11, '1f1a242101ee2f8e'],
+  ['dense', 22, 'a817305645090a0d'],
+  ['farm', 11, 'd708670f22d717f2'],
+  ['farm', 22, 'b27f95101362f936'],
+  ['seaside', 11, '720b3bbbaf2bc456'],
+  ['seaside', 22, '540dedd887ef7818'],
+  ['mountain', 11, 'f50fd689893f7d6f'],
+  ['mountain', 22, '9ece85d3a0c95bcf'],
+  ['lakeside', 11, 'f3fea687551341ef'],
+  ['lakeside', 22, '04257be9db8b5047'],
+  ['forest', 11, 'e11b78823849e74a'],
+  ['forest', 22, '08057addf8b177d4'],
+  ['dense', 808114082, 'ed93ae09db773b30'],
+  ['small', 199762, '3fe1c61c744070fd'],
+  ['forest', 223520, 'cf1a69f6e7c3475c'],
+  ['medium', 104735, '66f24554280dd7cb'],
+  ['mountain', 231441, '6c375fa9df540335'],
+  ['lakeside', 239360, '3b7d1ee2ebdf83db'],
+  ['farm', 271032, '9fb6c264e38584f9'],
+  ['small', 278952, '673b977eeb7adb7a'],
+  ['forest', 278953, '532c0f4a29e2f527'],
+  ['forest', 425059, '5818192cca0c4606'],
+  ['lakeside', 215603, '3c9efe3efe1496ee'],
+  ['forest', 320330, 'fcdacfe9a70200cf'],
+  ['dense', 320329, '9a8631f340ca23ee'],
+  ['seaside', 215602, '74e909ddea32264a'],
+  ['forest', 104735, 'ccca0ba61b7fab9f'],
+  ['forest', 112654, '969d1ece389c9950'],
+  ['lakeside', 225304, '36ffef092aca7789'],
+  ['small', 314192, '6684f2b66654b198'],
 ];
 
 describe('classic worlds', async () => {

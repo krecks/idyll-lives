@@ -50,10 +50,9 @@
     }
     return map;
   });
-  /** How many of each item stand on the home lot. */
+  /** How many of each item stand at home (on its lot; a flat's on its own storey). */
   const owned = $derived.by(() => {
-    const plot = game.households.find((h) => h.player)?.plot;
-    const home = plot == null ? null : game.plots[plot];
+    const home = game.homeArea;
     const map = new Map<string, number>();
     if (!home) return map;
     for (const o of game.objects) {

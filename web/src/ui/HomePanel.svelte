@@ -64,10 +64,8 @@
     if (r.dirt >= 0.3) out.push('Needs tidying');
     return out;
   }
-  const home = $derived.by(() => {
-    const plot = game.households[game.home]?.plot;
-    return plot == null ? null : game.plots[plot];
-  });
+  /** Where the home's things stand (a flat's on its own storey). */
+  const home = $derived(game.homeArea);
   const broken = $derived(
     home ? game.objects.filter((o) => (o.wear ?? 0) >= 1 && o.x >= home.x && o.z >= home.z && o.x < home.x + home.w && o.z < home.z + home.d) : [],
   );

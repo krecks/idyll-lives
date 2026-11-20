@@ -143,40 +143,11 @@ pub(super) fn old_upgrade_tasks_are_dropped_on_load() {
 }
 
 #[test]
-pub(super) fn saves_with_moodlets_still_load() {
-    // Saves written before the moodlet → feeling rename store `moodlets` per Sim.
-    let mut w = World::from_json(CONTENT, LOT, 3).unwrap();
-    crate::social::add_feeling(&mut w.sims[0].feelings, 0, &w.content.feelings, w.tick);
-    let mut saved: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
-    let sim = saved["sims"][0].as_object_mut().unwrap();
-    let feelings = sim.remove("feelings").expect("new saves write `feelings`");
-    assert_eq!(feelings[0]["id"], "happy");
-    sim.insert("moodlets".into(), feelings);
-    let loaded = World::from_save_json(CONTENT, &saved.to_string()).unwrap();
-    assert_eq!(loaded.sims[0].feelings.len(), 1);
-    assert_eq!(
-        loaded.content.feelings[loaded.sims[0].feelings[0].def].id,
-        "happy"
-    );
-}
-
-#[test]
-pub(super) fn version_one_saves_still_load() {
-    let v1 = r#"{"version":1,"tick":10,"speed":1,"autonomy":true,"rng":5,
-        "lot":{"width":4,"depth":4,"hEdges":"00000000000000000000","vEdges":"00000000000000000000"},
-        "objects":[],"sims":[{"name":"Old","appearance":null,"traits":[],"perks":[],"pos":[1.5,1.5],"yaw":0,
-          "needs":{"hunger":0.5},"tasks":[]}]}"#;
-    let w = World::from_save_json(CONTENT, v1).unwrap();
-    assert_eq!(w.sims[0].gender, "female", "defaults to the first gender");
-    assert_eq!(w.sims[0].attracted_to.len(), 2);
-}
-
-#[test]
-pub(super) fn the_speeds_of_older_saves() {
-    // Before v40, 4 and 5 were 30× and 60×: super speed now (30× with Old awake), 10× under it;
-    // the speed under super speed is saved.
-    for (version, speed, now, back) in [(39, 5, 4, 3), (39, 4, 4, 3), (39, 2, 2, 2), (40, 4, 4, 1)]
-    {
+pub(super) fn the_speed_and_the_one_under_super_speed_load() {
+    // A file without the speed super speed drops back to: normal under super speed, else the
+    // speed it's at.
+    let version = super::SAVE_VERSION;
+    for (speed, now, back) in [(4, 4, 1), (2, 2, 2)] {
         let file = format!(
             r#"{{"version":{version},"tick":10,"speed":{speed},"autonomy":true,"rng":5,
             "lot":{{"width":4,"depth":4,"hEdges":"00000000000000000000","vEdges":"00000000000000000000"}},
@@ -232,14 +203,13 @@ pub(super) fn diagonal_walls_survive_saving() {
 
 #[test]
 pub(super) fn saves_without_diagonals_still_load() {
-    // A version 4 save (before diagonal walls): no `diagonals` in the lot.
+    // A lot without diagonal walls writes no `diagonals`.
     let w = World::from_json(CONTENT, LOT, 3).unwrap();
     let mut saved: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
     assert!(
         saved["lot"].get("diagonals").is_none(),
         "lots without diagonals don't write them"
     );
-    saved["version"] = 4.into();
     let loaded = World::from_save_json(CONTENT, &saved.to_string()).unwrap();
     assert!(loaded.lot.diagonals().iter().all(Option::is_none));
     assert_eq!(loaded.lot.rooms(), w.lot.rooms());
@@ -358,160 +328,29 @@ pub(super) fn broken_numbers_never_make_a_save_unloadable() {
     assert!(loaded.exits.is_empty());
 }
 
-/// v36: an older file's ticks are rescaled as it loads, from 20 to a real second and 20 to a
-/// game minute (`Rescale`); at those rates still, a v35 file loads just as it was saved, a car
-/// on its way and the story as they were.
+/// A file older than this build opens (`OLDEST_SAVE_VERSION`) is refused, as one newer than
+/// it is: nothing is migrated.
 #[test]
-pub(super) fn a_v35_file_loads_as_it_was_saved() {
-    const CONTENT: &str = r#"{
-        "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.02}],
-        "objects":[{"id":"chair","name":"Chair","interactions":[{"id":"sit","label":"Sit","minutes":30,"tags":["lounge"]}]}],
-        "careers":[{"id":"office","label":"Office","workEffects":{"hunger":-0.2},"levels":[
-            {"title":"Intern","pay":100,"start":9,"hours":4,"days":[0,1,2,3,4,5,6]}]}],
-        "economy":{"startingFunds":500}}"#;
-    // A house on a street, its car parked beside it; two grown-ups at the same office.
-    const TOWN: &str = r#"{"width":60,"depth":14,"exits":[[0.5,9.5],[59.5,9.5]],
-        "plots":[{"name":"Home","x":20,"z":0,"w":20,"d":8,"entry":[25.5,7.5]}],
-        "households":[{"name":"Ones","plot":0}],
-        "sims":[{"name":"Ada","household":0,"job":{"career":"office"},"x":25.5,"z":3.5},
-                {"name":"Bo","household":0,"job":{"career":"office"},"x":26.5,"z":3.5}],
-        "cars":[{"plot":0,"x":34.0,"z":3.0,"yaw":0.0,"street":9.5,"len":4.4,"wid":1.8,"body":1,"paint":2}]}"#;
-    let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
-    w.autonomy = false;
-    let by = crate::clock::tick_at(1, 10.0 * 60.0).unwrap();
-    while !(w.cars[0].state == crate::cars::CarState::Leaving && w.cars[0].progress > 0.0) {
-        w.tick_once();
-        assert!(w.tick < by, "the car never set off");
-    }
-    w.events
-        .push(w.tick - 7, crate::social::EventKind::Met, 0, 1, None);
+pub(super) fn a_file_of_another_version_is_refused() {
+    let w = World::from_json(CONTENT, LOT, 1).unwrap();
     let json = w.save_json();
-    let mut old: serde_json::Value = serde_json::from_str(&json).unwrap();
-    old["version"] = 35.into();
-    let loaded = World::from_save_json(CONTENT, &old.to_string()).unwrap();
-    // (As this build counts them: the same at 20 and 20.)
-    let r = super::Rescale::of(35);
-    assert_eq!(loaded.tick, r.tick(w.tick));
-    assert_eq!(loaded.cars[0].since, r.tick(w.cars[0].since));
-    assert_eq!(
-        loaded.cars[0].progress.to_bits(),
-        r.route(w.cars[0].progress).to_bits()
-    );
-    let ticks = |w: &World| w.events.iter().map(|e| e.tick).collect::<Vec<_>>();
-    assert_eq!(
-        ticks(&loaded),
-        ticks(&w).into_iter().map(|t| r.tick(t)).collect::<Vec<_>>()
-    );
-    if r == super::Rescale::of(super::SAVE_VERSION) {
-        assert_eq!(
-            loaded.save_json(),
-            World::from_save_json(CONTENT, &json).unwrap().save_json()
+    let mut file: serde_json::Value = serde_json::from_str(&json).unwrap();
+    for v in [1, super::OLDEST_SAVE_VERSION - 1, super::SAVE_VERSION + 1] {
+        file["version"] = v.into();
+        assert!(
+            World::from_save_json(CONTENT, &file.to_string()).is_err(),
+            "version {v}"
         );
     }
+    file["version"] = super::OLDEST_SAVE_VERSION.into();
+    assert!(World::from_save_json(CONTENT, &file.to_string()).is_ok());
 }
 
-/// From 20 ticks a game minute to 75 (and 20 a real second to 60): each tick of the clock is
-/// the same minute of the same day, the same tick stays the same and never stays never; places
-/// along a way are three times the ticks.
-#[test]
-pub(super) fn older_ticks_keep_their_minute_at_another_rate() {
-    let r = super::Rescale {
-        game: (75, 20),
-        drive: 3.0,
-    };
-    // (The clock by hand: tick 0 is 08:00 on day 1.)
-    let at = |t: u64, per_minute: u64| {
-        let m = t + 8 * 60 * per_minute;
-        (
-            m / (1440 * per_minute),
-            m % (1440 * per_minute) / per_minute,
-        )
-    };
-    for t in [0, 1, 19, 20, 21, 1_199, 9_599, 9_600, 28_813, 123_456_789] {
-        assert_eq!(at(t, 20), at(r.tick(t), 75), "tick {t}");
-    }
-    assert_eq!(r.tick(0), 0);
-    assert_eq!(r.tick(1_000), 3_750);
-    // A traffic light's stage, at it for 100 ticks (5 seconds) of the file's clock at 1000: 5
-    // seconds before the clock's tick still (300 ticks, not the game minutes' 375).
-    assert_eq!(r.drive_since(900, 1_000), 3_450);
-    assert_eq!(r.drive_since(1_000, 1_000), 3_750);
-    assert_eq!(r.drive_since(0, 10), 8);
-    let car: crate::cars::Car = serde_json::from_value(serde_json::json!({
-        "plot":0,"household":0,"spot":[34.0,3.0],"yaw":0.0,"street":9.5,"len":4.4,"wid":1.8,
-        "body":1,"paint":2,"owners":[0],"state":"leaving","since":1000,"readyAt":2000,
-        "progress":40.5,"detour":{"home":false,"from":30.0,"back":12.0,"avoid":3},
-        "passBy":{"home":false,"taxi":1,"from":50.0,"out":55.0,"back":70.0,"to":75.0,"off":-2.0,"at":[1.0,2.0]}}))
-    .unwrap();
-    let cars = r.cars(std::slice::from_ref(&car));
-    let c = &cars[0];
-    assert_eq!((c.since, c.ready_at), (3_750, 7_500));
-    assert_eq!(c.progress, 121.5);
-    let d = c.detour.unwrap();
-    assert_eq!((d.from, d.back, d.avoid), (90.0, 36.0, 3));
-    let p = c.pass_by.unwrap();
-    assert_eq!(
-        (p.from, p.out, p.back, p.to, p.off),
-        (150.0, 165.0, 210.0, 225.0, -2.0)
-    );
-    let mut taxis: crate::taxi::Taxis = serde_json::from_value(serde_json::json!({
-        "runs":[{"id":0,"group":[0,1],"enter":100,"dueOut":220,"plannedOut":200,"depart":0,
-            "stops":[{"sim":0,"plot":0,"due":160,"leave":140,"state":"booked"}],
-            "progress":12.0,"since":160}]}))
-    .unwrap();
-    r.taxis(&mut taxis);
-    let run = &taxis.runs[0];
-    assert_eq!(
-        (
-            run.enter,
-            run.due_out,
-            run.planned_out,
-            run.depart,
-            run.since
-        ),
-        (375, 825, 750, 0, 600)
-    );
-    assert_eq!((run.stops[0].due, run.stops[0].leave), (600, 525));
-    assert_eq!(run.progress, 36.0);
-    // Today's file needs nothing.
-    let today = super::Rescale::of(super::SAVE_VERSION);
-    assert_eq!(today.drive_since(900, 1_000), 900);
-    assert_eq!(
-        super::Rescale::of(super::SAVE_VERSION),
-        super::Rescale {
-            game: (1, 1),
-            drive: 1.0
-        }
-    );
-    // (A v36 file's cars timed in real seconds: a place along the way a quarter of the ticks
-    // on, the clock as it was; a v35 file's both.)
-    assert_eq!(
-        super::Rescale::of(36),
-        super::Rescale {
-            game: (1, 1),
-            drive: 1.0 / crate::DRIVE_SCALE
-        }
-    );
-    assert_eq!(
-        super::Rescale::of(35).drive,
-        crate::DRIVE_TICKS_PER_SECOND / super::OLD_TICKS_PER_SECOND as f32
-    );
-}
-
-/// v23: the seed the game started from is kept (absent in older saves: 0, unknown).
+/// The seed the game started from is kept.
 #[test]
 pub(super) fn the_starting_seed_is_saved() {
     let w = World::from_json(CONTENT, LOT, 1234).unwrap();
     assert_eq!(w.seed, 1234);
     let json = w.save_json();
     assert_eq!(World::from_save_json(CONTENT, &json).unwrap().seed, 1234);
-    let mut old: serde_json::Value = serde_json::from_str(&json).unwrap();
-    old["version"] = 22.into();
-    old.as_object_mut().unwrap().remove("seed");
-    assert_eq!(
-        World::from_save_json(CONTENT, &old.to_string())
-            .unwrap()
-            .seed,
-        0
-    );
 }

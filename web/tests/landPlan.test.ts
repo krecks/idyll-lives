@@ -55,7 +55,6 @@ describe("a place's land", async () => {
     const open = land.open!;
     expect(open.areas).toEqual([]);
     expect(open.parking).toEqual([]);
-    expect(open.backdrop ?? []).toEqual([]);
     expect(open.places ?? []).toEqual([]);
     // (No farmland or orchards: they come with a town's farms.)
     expect(open.zones.filter((z) => z.kind === 'fields' || z.kind === 'orchard')).toEqual([]);

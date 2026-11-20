@@ -6,8 +6,9 @@
  * the fences and hedges round gardens and fields, and flower beds along their house
  * fronts, with pots by the door and little lights along the garden path; the things standing in
  * their gardens. The town's public places seen from another lot: shops as silhouettes with an awning,
- * a named place's lot (`WorldMeta.lotLooks`: a school, a church, a shop on the high street) as the backdrop building
- * its look says (`backdropDress.ts`, its door where its own is; open, the game draws its real walls), and the park,
+ * a lot with a look (`WorldMeta.lotLooks`: a school, a church, a shop on the high street, a flats building) closed as
+ * the building its look says, as tall as its real storeys (`buildingDress.ts`, its door where its own is; open, the
+ * game draws its real walls), and the park,
  * playground and market things standing in the open. At the ends of the street a taxi
  * rank and street signs; benches, planters and bins along the kerb in front of the public places.
  *
