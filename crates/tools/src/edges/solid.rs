@@ -1,6 +1,7 @@
 //! A solid: the vertices welded, and the faces that close it.
 
 use super::*;
+use crate::vec3::{add, cross, dot, length, mul, sub, unit};
 
 pub(crate) fn edge_key(a: u32, b: u32) -> (u32, u32) {
     (a.min(b), a.max(b))

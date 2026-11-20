@@ -1,4 +1,5 @@
 use super::*;
+use crate::vec3::length;
 
 /// A node at rest: where its origin is in its parent, how it is turned (x, y, z, w) and scaled.
 #[derive(Clone, Copy)]

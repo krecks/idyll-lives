@@ -13,6 +13,7 @@ use super::glb::{Glb, R, item, key, values};
 use super::py::J;
 use crate::characters::V3;
 use crate::characters::meshops::nearest_weights;
+use crate::vec3::{cross, dot, length, sub};
 use std::collections::BTreeMap;
 
 mod geom;

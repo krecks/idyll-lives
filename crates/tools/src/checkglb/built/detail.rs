@@ -1,6 +1,7 @@
 //! What a house has of the detail a real one has.
 
 use super::*;
+use crate::vec3::dot;
 
 // ---- what a house has of the detail a real one has ------------------------------------------------------
 

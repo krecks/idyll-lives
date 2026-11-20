@@ -1,6 +1,7 @@
 //! The shape a model is, as its faces and the edges between them.
 
 use super::*;
+use crate::vec3::{add, cross, dot, length, mul, sub, unit};
 
 impl<'a> Shape<'a> {
     pub(crate) fn new(meshes: &'a [Mesh]) -> Shape<'a> {

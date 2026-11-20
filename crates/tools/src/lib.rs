@@ -28,6 +28,7 @@ pub mod shots;
 pub mod species;
 pub mod tex;
 pub mod texels;
+pub(crate) mod vec3;
 pub mod version;
 pub mod voicefetch;
 pub mod wasmopt;

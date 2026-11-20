@@ -1,6 +1,7 @@
 //! A far version against what it stands in for.
 
 use super::*;
+use crate::vec3::dot;
 
 // ---- a far version against its near one ---------------------------------------------------------------
 
@@ -27,10 +28,6 @@ pub(crate) struct View<'a> {
 pub(crate) const CELL: f64 = 0.5;
 /// How far apart the views are sampled (m): a tenth of a metre shows a corner board, and a house is ten thousand points.
 pub(crate) const STEP: f64 = 0.1;
-
-pub(crate) fn dot(a: V3, b: V3) -> f64 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
 
 impl<'a> View<'a> {
     /// The view of `seen` along `w`, `u` across and `v` up the picture (the three at right angles).

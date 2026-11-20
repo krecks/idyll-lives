@@ -1,24 +1,5 @@
+use crate::vec3::{dot, length};
 pub type P3 = [f64; 3];
-
-pub(super) fn sub(a: P3, b: P3) -> P3 {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-
-pub(super) fn dot(a: P3, b: P3) -> f64 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-
-pub(super) fn cross(a: P3, b: P3) -> P3 {
-    [
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
-    ]
-}
-
-pub(super) fn length(a: P3) -> f64 {
-    dot(a, a).sqrt()
-}
 
 /// `a` at length 1, or zero for one that has none.
 pub(super) fn unit(a: P3) -> P3 {

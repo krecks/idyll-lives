@@ -17,6 +17,7 @@
 //! cargo review facets [--all] [--check]
 //! ```
 
+use crate::vec3::{cross, dot, length, sub};
 use serde_json::Value as J;
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
@@ -29,26 +30,6 @@ pub const PIXEL: f64 = 0.004;
 const FLAT: f64 = 0.5;
 
 type V3 = [f64; 3];
-
-fn sub(a: V3, b: V3) -> V3 {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-
-fn dot(a: V3, b: V3) -> f64 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
-
-fn cross(a: V3, b: V3) -> V3 {
-    [
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
-    ]
-}
-
-fn length(a: V3) -> f64 {
-    dot(a, a).sqrt()
-}
 
 /// A smooth edge whose outline stands off the curve it is drawn for.
 #[derive(Debug, Clone, Copy, PartialEq)]
