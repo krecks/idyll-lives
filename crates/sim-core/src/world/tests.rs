@@ -723,3 +723,19 @@ fn a_kept_letterbox_stays_when_a_better_one_has_no_room() {
     assert_eq!(kept(&w), Some(before), "the old letterbox where it stood");
     assert_eq!(w.households[0].funds, funds);
 }
+
+/// Mill Court's lot (`tests/towns/flats.json`) from a file without kinds: it has flats in it, so
+/// it is nobody's home (newcomers and movers never take its hall and yard), and each flat is.
+#[test]
+fn a_lot_with_flats_is_no_home_without_kinds() {
+    let mut town: serde_json::Value =
+        serde_json::from_str(include_str!("../../tests/towns/flats.json")).unwrap();
+    for p in town["plots"].as_array_mut().unwrap() {
+        p.as_object_mut().unwrap().remove("kind");
+    }
+    let w = World::from_json(&shipped_content(), &town.to_string(), 1).unwrap();
+    assert!(w.plots.iter().all(|p| p.kind.is_none()), "no kinds");
+    assert!(!w.plots[0].public && w.lots().len() == 1);
+    assert!(!w.is_home(0), "Mill Court's hall and yard");
+    assert!(w.flats().iter().all(|f| w.is_home(f.id)), "its flats");
+}

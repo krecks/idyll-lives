@@ -1864,12 +1864,6 @@ impl Plot {
         self.of.unwrap_or(self.id)
     }
 
-    /// Whether someone may live on it: not a public place, nor a building of flats (its hall,
-    /// stairs and yard are its flats'; each flat is a home of its own).
-    pub fn is_home(&self) -> bool {
-        !self.public && self.kind != Some(crate::travel::PlotKind::Flats)
-    }
-
     /// Whether the place on it is open at `minute` of day `day` (`clock::day`, `clock::minute_of_day`):
     /// always without hours. Hours past midnight count for the day they opened on.
     pub fn open_at(&self, day: u32, minute: f32) -> bool {
@@ -3122,6 +3116,16 @@ impl World {
     /// The flats, in id order after every lot on the ground (`flats_of`).
     pub fn flats(&self) -> &[Plot] {
         flats_of(&self.plots)
+    }
+
+    /// Whether someone may live on plot `p`: not a public place, nor a lot with flats in it
+    /// (`flats_in`) or of the kind for them (its hall, stairs and yard are its flats'; each flat
+    /// is a home of its own), whatever kind the town file gives it, or none.
+    pub fn is_home(&self, p: u32) -> bool {
+        self.plots
+            .get(p as usize)
+            .is_some_and(|plot| !plot.public && plot.kind != Some(crate::travel::PlotKind::Flats))
+            && self.flats_in.get(p as usize).is_none_or(|&k| k == 0)
     }
 
     /// The plot a tile is on (on any storey): the lot on the ground there, and in a building with
