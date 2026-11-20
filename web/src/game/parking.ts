@@ -8,7 +8,7 @@
 import type { CarPark, ParkingBay } from '../core/protocol';
 import { flatsTemplate } from './flats';
 import { rectFrom, tilesOf } from './footprints';
-import { leftOf, lengths, nearest, pointAt, roadIndex, straightAround, type Pt, type RoadPlan } from './roads';
+import { leftOf, nearest, pointAt, roadIndex, roadLengths, straightAround, type Pt, type RoadPlan } from './roads';
 import { DRIVE_REACH, driveMeets, driveways, houseTemplate, onLot, slotDims, turner, type Frontage, type Ground, type PlotSlot, type Rect, type Templates } from './town';
 
 // ---- The simulation's parking rules (sim-core `cars/parking.rs`, held to it by `web/tests/parkingRules.test.ts`) ----
@@ -58,7 +58,7 @@ export interface CarParkLaid {
  */
 export function carParkAt(roads: readonly RoadPlan[], f: Pick<Frontage, 'road' | 's' | 'side'>, n: number, area: number, also: Pick<CarPark, 'serves' | 'square'> = {}): CarParkLaid {
   const road = roads[f.road];
-  const ls = lengths(road.points);
+  const ls = roadLengths(road);
   const { p, t } = pointAt(road.points, f.s, ls);
   const out = leftOf(t).map((v) => v * f.side) as Pt;
   const reach = road.width / 2 + 0.5;
@@ -82,7 +82,7 @@ export function carParkAt(roads: readonly RoadPlan[], f: Pick<Frontage, 'road' |
  */
 export function carParkFits(roads: readonly RoadPlan[], ground: Ground, f: Frontage, n: number, offCorners: (f: Frontage) => boolean, drives: readonly DriveLine[] = [], bend = PARK_BEND): CarParkLaid | null {
   const road = roads[f.road];
-  const ls = lengths(road.points);
+  const ls = roadLengths(road);
   const L = ls[ls.length - 1];
   const half = (BAY_WIDE * n) / 2;
   if (f.s - half < 4 || f.s + half > L - 4) return null;

@@ -46,7 +46,7 @@ import { chaikin, outlines, rasterize, rle, simplify, simplifyRing, unrle } from
 import { fbm } from './noise';
 import type { UseLayer } from './uses';
 import { along, astar, CELL, Cells, clearOfBoxes, COUNTRY_GRADE, COUNTRY_TURN, COUNTRY_WIDTH, CountryRouter, CTRL_APART, FACING, ROAD_WIDTH, ROUTE_GRADE, SIDE_COST, TRIES, type Port, type Way } from './countryRouter';
-import { centroid, cropRoads, curve, evenly, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, roadIndex, straightAround, type Box, type Pt, type RoadPlan } from './roads';
+import { centroid, cropRoads, curve, evenly, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, roadIndex, roadLengths, straightAround, type Box, type Pt, type RoadPlan } from './roads';
 import { lotName, placeOfTemplate, placeUnit } from './placeLots';
 import { BIG_COURTS, boundsOf, COURTS, frontageOf, Ground, houseFor, joinUp, lotAt, LotPlacer, plotRect, reachesRoad, settleRoads, shuffled, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
 import { LAND_SIZE, LEGACY_KINDS, placeOf, specOf, streetNames, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind, type WorldSpec, type WorldStep } from './world';
@@ -1523,15 +1523,18 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const fronts = new Map<number, ReturnType<typeof frontageOf>>();
   const left: { u: Parameters<typeof lots.place>[0][number]; from: number }[] = [];
   // No lot's middle by a junction or on a tight bend (`cornersOf`).
-  const offCorners = cornersOf(worldRoads, plans.flatMap((plan) => plan.roads));
+  // (Where the roads meet, worked out once for every road this pass asks about: the areas' and all but the trails.)
+  const allRoads = worldRoads.flatMap((r, i) => (r.kind === 'trail' ? [] : [i]));
+  const areaRoads = plans.flatMap((plan) => plan.roads);
+  const meets = roadMeets(worldRoads, [...allRoads, ...areaRoads]);
+  const offCorners = cornersOf(worldRoads, areaRoads, CORNER, meets);
   // The dense pass (`dense.ts`): the main town's middle built up before its houses spread out, every street after.
   const areaList = plans.map((p) => ({ name: p.name, rect: p.rect, centre: p.centre, roads: p.roads }));
   const densePass = spec.classic ? null : new DensePass({ content, t, roads: worldRoads, areas: areaList, lots, centres: centre ? [centre] : [], density: spec.density, civic: spec.civic });
   // ---- the public parking's car parks (`parking.ts`): by the square before any lot, by each big place as it goes down ----
   const parks: CarParkLaid[] = [];
-  const allRoads = worldRoads.flatMap((r, i) => (r.kind === 'trail' ? [] : [i]));
-  const offAll = cornersOf(worldRoads, allRoads);
-  const nearCorners = cornersOf(worldRoads, allRoads, NEAR_CORNER);
+  const offAll = cornersOf(worldRoads, allRoads, CORNER, meets);
+  const nearCorners = cornersOf(worldRoads, allRoads, NEAR_CORNER, meets);
   /** A car park of `n` (fewest to most) bays along the first of `frontage` it fits, by area `a`'s `also`: whether one went down. */
   const parkAlong = (frontage: readonly Frontage[], [few, most]: [number, number], a: number, also: Pick<CarPark, 'serves' | 'square'> = {}) => {
     for (let n = most; n >= few; n--) {
@@ -1643,7 +1646,11 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     const placed = others.some((a) => !lots.place([u], fronts.get(a)!, [], plans[a].centre, a, true).length);
     if (placed) continue;
     // Else along a country road, near its own area's end of it.
-    country ??= frontageOf(worldRoads, worldRoads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : [])), plans[0].centre, rand).filter((f) => straight(worldRoads[f.road].points, f.s, lengths(worldRoads[f.road].points)) && gentleBy(f.p));
+    if (!country) {
+      const ls = new Map<number, number[]>();
+      const lengthsOf = (r: number) => ls.get(r) ?? ls.set(r, lengths(worldRoads[r].points)).get(r)!;
+      country = frontageOf(worldRoads, worldRoads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : [])), plans[0].centre, rand).filter((f) => straight(worldRoads[f.road].points, f.s, lengthsOf(f.road)) && gentleBy(f.p));
+    }
     const r = plans[from].rect;
     const off = (p: Pt) => offRect(r, p);
     const near = country.filter((f) => off(f.p) < SPILL).sort((x, y) => dist(x.p, plans[from].centre) - dist(y.p, plans[from].centre));
@@ -2037,7 +2044,21 @@ export function hamletFits(land: Cells, p: Pt, [bw, bd]: readonly [number, numbe
  * another runs by close enough to touch: a car turning out of a driveway there swings across the
  * corner), and off a tight bend (`TIGHT_BEND`). Worked out for the areas' roads `areaRoads`; `corner` m from a junction (`CORNER` unless given).
  */
-export function cornersOf(roads: readonly RoadPlan[], areaRoads: Iterable<number>, corner = CORNER): (f: Frontage) => boolean {
+export function cornersOf(roads: readonly RoadPlan[], areaRoads: Iterable<number>, corner = CORNER, meets = roadMeets(roads, areaRoads)): (f: Frontage) => boolean {
+  const own = new Set(areaRoads);
+  // (Nor on a tight bend: out of a driveway there a car swings off the road.)
+  return (f: Frontage) => {
+    if (!((own.has(f.road) && meets.get(f.road)) || []).every((s) => Math.abs(f.s - s) >= corner)) return false;
+    return straightAround(roads[f.road].points, f.s, corner / 2, TIGHT_BEND, roadLengths(roads[f.road]));
+  };
+}
+
+/**
+ * Where along each of `areaRoads` (arc lengths) it meets another road, for `cornersOf`: its joined ends, and where
+ * another road's end joins it or another runs by close enough to touch. (Worked out once for the roads several
+ * `cornersOf` ask about.)
+ */
+export function roadMeets(roads: readonly RoadPlan[], areaRoads: Iterable<number>): Map<number, number[]> {
   const meets = new Map<number, number[]>();
   const own = new Set(areaRoads);
   for (const r of own) {
@@ -2053,11 +2074,7 @@ export function cornersOf(roads: readonly RoadPlan[], areaRoads: Iterable<number
       }
     }
   });
-  // (Nor on a tight bend: out of a driveway there a car swings off the road.)
-  return (f: Frontage) => {
-    if (!(meets.get(f.road) ?? []).every((s) => Math.abs(f.s - s) >= corner)) return false;
-    return straightAround(roads[f.road].points, f.s, corner / 2, TIGHT_BEND);
-  };
+  return meets;
 }
 
 /**
