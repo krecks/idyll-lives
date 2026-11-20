@@ -179,9 +179,30 @@ export function floorsFor(t: Templates, place: string, use: string, storeys: num
   return placeFloors(t, id) ? id : null;
 }
 
+/**
+ * The buildings, the flats' plans and the places with floors made so far, each kept till this many more have been asked
+ * for (the least lately asked for dropped first: one asked for again is made again, the same). Laying a town out tries
+ * many a building that never goes down, and a game makes towns one after another.
+ */
+const KEEP_BUILDINGS = 1024;
+const KEEP_PLANS = 4096;
 const buildings = new Map<string, FlatsTemplate | null>();
 const plans = new Map<string, FlatPlan | null>();
 const withFloors = new Map<string, PlaceFloors | null>();
+
+/** `cache`'s value for `key` (`make` makes it if it has none), kept as the latest asked for; `most` kept at most. */
+function kept<V>(cache: Map<string, V>, most: number, key: string, make: () => V): V {
+  if (cache.has(key)) {
+    const v = cache.get(key) as V;
+    cache.delete(key);
+    cache.set(key, v);
+    return v;
+  }
+  const v = make();
+  cache.set(key, v);
+  if (cache.size > most) cache.delete(cache.keys().next().value!);
+  return v;
+}
 
 /**
  * A building of flats (`flats:`) or the flats over a place (`over:`) by its id, each flat furnished
@@ -190,35 +211,35 @@ const withFloors = new Map<string, PlaceFloors | null>();
  */
 export function flatsTemplate(t: Templates, id: string, residents: readonly (Furnishing | undefined)[] = []): FlatsTemplate | undefined {
   const at = `${id}#${residents.map(residentsKey).join('/')}`;
-  if (!buildings.has(at)) {
+  const made = kept(buildings, KEEP_BUILDINGS, at, () => {
     const t0 = performance.now();
     const parts = id.split(':');
-    const made = parts[0] === 'flats' ? flatsBuilding(t, Number(parts[1]), Number(parts[2]), parts[3] === '1', parts[4] === 'p', residents) : parts[0] === 'over' ? flatsOver(t, parts[1], Number(parts[2]), Number(parts[3]), residents) : null;
-    if (made) made.id = id;
-    buildings.set(at, made);
+    const b = parts[0] === 'flats' ? flatsBuilding(t, Number(parts[1]), Number(parts[2]), parts[3] === '1', parts[4] === 'p', residents) : parts[0] === 'over' ? flatsOver(t, parts[1], Number(parts[2]), Number(parts[3]), residents) : null;
+    if (b) b.id = id;
     flatsStats.ms += performance.now() - t0;
     flatsStats.made++;
-  }
-  return buildings.get(at) ?? undefined;
+    return b;
+  });
+  return made ?? undefined;
 }
 
 /** A named place with real storeys above it (`floors:`) by its id; undefined if the id makes none. */
 export function placeFloors(t: Templates, id: string): PlaceFloors | undefined {
-  if (!withFloors.has(id)) {
+  const made = kept(withFloors, KEEP_BUILDINGS, id, () => {
     const t0 = performance.now();
     const [kind, place, seed, storeys, use] = id.split(':');
-    withFloors.set(id, kind === 'floors' ? floorsAbove(t, id, place, Number(seed), Number(storeys), use ?? 'office') : null);
+    const f = kind === 'floors' ? floorsAbove(t, id, place, Number(seed), Number(storeys), use ?? 'office') : null;
     flatsStats.ms += performance.now() - t0;
     flatsStats.made++;
-  }
-  return withFloors.get(id) ?? undefined;
+    return f;
+  });
+  return made ?? undefined;
 }
 
 /** A flat's plan in `frame` (cached: the same seed, frame and furnishing give the same flat). */
 function flatPlan(t: Templates, frame: FlatFrame, seed: number, residents: Furnishing | undefined): FlatPlan | null {
   const at = `${seed}:${JSON.stringify(frame)}#${residentsKey(residents)}`;
-  if (!plans.has(at)) plans.set(at, generateFlat(t.gen!, t.info!, frame, seed, t.lampTiles, t.windowTiles, residents));
-  return plans.get(at) ?? null;
+  return kept(plans, KEEP_PLANS, at, () => generateFlat(t.gen!, t.info!, frame, seed, t.lampTiles, t.windowTiles, residents));
 }
 
 /** The stairs' length (tiles): a flat's door is on the first row past a stair hall's flights, or behind it. */

@@ -149,10 +149,7 @@ export function chooseCentre(roads: readonly RoadPlan[], areaRoads: readonly num
  * stays inside it (`outline` goes round it).
  */
 export function narrowCentre(roads: readonly RoadPlan[], c: Centre, W: number, D: number, taken: Uint8Array, box: Rect, polys: readonly (readonly Pt[])[]): void {
-  const ratio = (poly: readonly Pt[]) => {
-    const d = centreDensity(W, D, taken, box, poly, polys);
-    return d.centre / Math.max(1e-6, d.rest);
-  };
+  const ratio = densityRatio(W, D, taken, box, polys);
   let best = { poly: c.poly, r: ratio(c.poly), width: 2 * c.band };
   if (best.r >= DENSEST) return;
   const bands = [...BANDS.filter((b) => b <= c.band), KERB_BAND];
@@ -167,6 +164,41 @@ export function narrowCentre(roads: readonly RoadPlan[], c: Centre, W: number, D
     }
   }
   c.poly = best.poly;
+}
+
+/**
+ * `centreDensity`'s centre against the rest of the box, for one outline after another over the same land: the open
+ * land of the box and the buildings' tiles worked out once (each tile counted for the first building over it, as
+ * `centreDensity` counts them), one buffer marking each outline's tiles.
+ */
+function densityRatio(W: number, D: number, taken: Uint8Array, box: Rect, polys: readonly (readonly Pt[])[]): (centre: readonly Pt[]) => number {
+  const inBox = (x: number, z: number) => x >= box.x && z >= box.z && x < box.x + box.w && z < box.z + box.d;
+  let open = 0;
+  for (let z = Math.max(0, box.z); z < Math.min(D, box.z + box.d); z++) for (let x = Math.max(0, box.x); x < Math.min(W, box.x + box.w); x++) if (!taken[z * W + x]) open++;
+  const built: number[] = [];
+  const seen = new Uint8Array(W * D);
+  for (const poly of polys) {
+    fillPoly(poly, W, D, (i) => {
+      if (seen[i] || taken[i] || !inBox(i % W, Math.floor(i / W))) return;
+      seen[i] = 1;
+      built.push(i);
+    });
+  }
+  const mark = new Int32Array(W * D);
+  let stamp = 0;
+  return (centre) => {
+    stamp++;
+    let openIn = 0;
+    fillPoly(centre, W, D, (i) => {
+      mark[i] = stamp;
+      if (!taken[i] && inBox(i % W, Math.floor(i / W))) openIn++;
+    });
+    let builtIn = 0;
+    for (const i of built) if (mark[i] === stamp) builtIn++;
+    const inside = builtIn / Math.max(1, openIn);
+    const rest = (built.length - builtIn) / Math.max(1, open - openIn);
+    return inside / Math.max(1e-6, rest);
+  };
 }
 
 /**
