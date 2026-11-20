@@ -1,6 +1,4 @@
 //! [(846, 1100)]
-//!
-//! Split from `content.rs` (see `mod.rs`).
 
 use super::*;
 

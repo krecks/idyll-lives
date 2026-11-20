@@ -1,6 +1,4 @@
 //! Pulling over and passing: the room, who passes whom, and the pass itself.
-//!
-//! Split from `driving.rs` (see `mod.rs`).
 
 use super::*;
 

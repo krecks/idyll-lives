@@ -1,6 +1,4 @@
 //! Aprons: the apron's layout and its shell.
-//!
-//! Split from `characters/clothes.rs` (see `mod.rs`).
 
 use super::*;
 

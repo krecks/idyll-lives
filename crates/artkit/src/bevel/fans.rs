@@ -1,6 +1,4 @@
 //! Fans: the corners of a vertex that shade as one.
-//!
-//! Split from `bevel.rs` (see `mod.rs`).
 
 use super::*;
 

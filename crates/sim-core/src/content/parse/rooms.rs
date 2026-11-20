@@ -1,6 +1,4 @@
 //! Room, wear, build and land shapes (content `rooms`, `objectRules`, `build`).
-//!
-//! Split from `content/parse.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! The weighted-normal modifier.
-//!
-//! Split from `edit.rs` (see `mod.rs`).
 
 use super::*;
 

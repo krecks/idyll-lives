@@ -1,6 +1,4 @@
 //! Numbers as glTF writes them.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
 use super::*;
 

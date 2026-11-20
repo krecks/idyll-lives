@@ -1,6 +1,4 @@
 //! The things played once: a fridge door, a pedal bin, the vending machines, a phone box, the microwave's ping, toast popping up, coffee poured.
-//!
-//! Split from `things.rs` (see `mod.rs`).
 
 use super::*;
 

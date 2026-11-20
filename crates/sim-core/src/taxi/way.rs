@@ -1,6 +1,4 @@
 //! Planning a way: the net of roads a taxi may take.
-//!
-//! Split from `taxi.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Paths over the graph: the A*, the ends and the cost.
-//!
-//! Split from `travel.rs` (see `mod.rs`).
 
 use super::*;
 

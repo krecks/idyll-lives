@@ -1,6 +1,4 @@
 //! The bezier handles of a curve: how they are found, smoothed and limited.
-//!
-//! Split from `motion.rs` (see `mod.rs`).
 
 use super::*;
 

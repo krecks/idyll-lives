@@ -1,6 +1,4 @@
 //! What an object is: its tiles, size, layout and the state it keeps (open, worn, growing).
-//!
-//! Split from `world.rs` (see `mod.rs`).
 
 use std::f32::consts::FRAC_PI_2;
 

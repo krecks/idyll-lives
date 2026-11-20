@@ -1,6 +1,4 @@
 //! Kerbs: where a taxi can stop, and how to get to one.
-//!
-//! Split from `taxi.rs` (see `mod.rs`).
 
 use super::*;
 

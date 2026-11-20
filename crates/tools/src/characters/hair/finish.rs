@@ -1,6 +1,4 @@
 //! Finishing: clearing the ears, the wisps and the final mesh.
-//!
-//! Split from `characters/hair.rs` (see `mod.rs`).
 
 use super::*;
 

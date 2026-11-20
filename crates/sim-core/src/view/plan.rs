@@ -1,6 +1,4 @@
 //! [(71, 455), (1162, 1416), (1632, 1679)]
-//!
-//! Split from `view.rs` (see `mod.rs`).
 
 use super::*;
 

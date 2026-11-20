@@ -1,6 +1,4 @@
 //! Measures: how big a model is drawn and the tops it offers.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 use super::*;
 

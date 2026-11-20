@@ -1,6 +1,4 @@
 //! Meeting: following, chasing, the halfway point and engaging.
-//!
-//! Split from `conversation.rs` (see `mod.rs`).
 
 use super::*;
 /// The target of `i`'s social moved off: after them (`chase`) while they're someone to talk to

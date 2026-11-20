@@ -1,6 +1,4 @@
 //! The regions of a body, and the weights a point there is given.
-//!
-//! Split from `characters/body.rs` (see `mod.rs`).
 
 use super::*;
 

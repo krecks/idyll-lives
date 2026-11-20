@@ -1,6 +1,4 @@
 //! Stopping what they are doing and stepping away from it.
-//!
-//! Split from `world/objects.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! A mesh, its edges and the faces that meet at them.
-//!
-//! Split from `crates/tools/src/edges.rs` (see `mod.rs`).
 
 use super::*;
 

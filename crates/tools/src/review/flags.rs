@@ -1,6 +1,4 @@
 //! What looks wrong in an object's uses: the flags and their medians.
-//!
-//! Split from `review.rs` (see `mod.rs`).
 
 use super::*;
 

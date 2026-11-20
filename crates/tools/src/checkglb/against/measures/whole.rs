@@ -1,6 +1,4 @@
 //! A whole model as one part.
-//!
-//! Split from `checkglb/against/measures.rs` (see `mod.rs`).
 
 use super::*;
 

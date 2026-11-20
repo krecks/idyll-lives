@@ -1,6 +1,4 @@
 //! Out for leisure: booking, timing and bringing riders back.
-//!
-//! Split from `taxi.rs` (see `mod.rs`).
 
 use super::*;
 

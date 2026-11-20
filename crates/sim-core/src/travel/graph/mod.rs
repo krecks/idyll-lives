@@ -1,7 +1,7 @@
 //! The road network: its nodes, edges and the points along them.
 //!
-//! Split from `travel.rs` (see `mod.rs`); the index, the seeking and the paths are its own
-//! submodules, so the graph's fields stay private to it.
+//! The index, the seeking and the paths are its own submodules, so the graph's fields stay
+//! private to it.
 
 use super::*;
 

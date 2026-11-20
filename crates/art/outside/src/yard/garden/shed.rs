@@ -1,6 +1,4 @@
 //! The shed's walls, roof and inside, and the hinges on its door.
-//!
-//! Split from `yard/garden.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Turning round and unjamming: the detours, the mouths and the reasons why.
-//!
-//! Split from `driving.rs` (see `mod.rs`).
 
 use super::*;
 

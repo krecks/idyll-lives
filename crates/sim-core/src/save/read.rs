@@ -1,6 +1,4 @@
 //! Reading a save back: `World::from_save`.
-//!
-//! Split from `save.rs` (see `mod.rs`).
 
 use super::pack::*;
 use super::*;

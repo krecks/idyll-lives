@@ -1,6 +1,4 @@
 //! A shaker door.
-//!
-//! Split from `kit/joinery.rs` (see `mod.rs`).
 
 use super::*;
 

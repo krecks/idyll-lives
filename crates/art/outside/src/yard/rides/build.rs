@@ -1,6 +1,4 @@
 //! The bikes as parts are given them.
-//!
-//! Split from `yard/rides.rs` (see `mod.rs`).
 
 use super::*;
 

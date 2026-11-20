@@ -1,6 +1,4 @@
 //! Placing objects: what a spot must keep clear, and putting things there.
-//!
-//! Split from `home.rs` (see `mod.rs`).
 
 use super::*;
 

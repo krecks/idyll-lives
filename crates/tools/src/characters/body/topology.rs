@@ -1,6 +1,4 @@
 //! The topology of the mesh: which vertices are which, and their tags.
-//!
-//! Split from `characters/body.rs` (see `mod.rs`).
 
 use super::*;
 

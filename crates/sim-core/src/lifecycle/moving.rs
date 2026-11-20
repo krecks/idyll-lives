@@ -1,6 +1,4 @@
 //! Moving house and newcomers (content `life.moving`, `life.newcomers`).
-//!
-//! Split from `lifecycle.rs` (see `mod.rs`).
 
 use super::*;
 

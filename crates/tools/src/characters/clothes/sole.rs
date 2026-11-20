@@ -1,6 +1,4 @@
 //! The sole under an upper, and the shoe that is both.
-//!
-//! Split from `characters/clothes.rs` (see `mod.rs`).
 
 use super::*;
 

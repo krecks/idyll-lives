@@ -1,6 +1,4 @@
 //! The gate: running the checks over every sample.
-//!
-//! Split from `built.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! What differs between two models: nodes, materials, clips.
-//!
-//! Split from `against.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Legs and turns: laying a route through junctions.
-//!
-//! Split from `cars/mod.rs` (see `mod.rs`).
 
 use super::*;
 

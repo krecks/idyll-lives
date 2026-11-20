@@ -1,6 +1,4 @@
 //! A model as it is compared: its primitives and corners.
-//!
-//! Split from `assets/model.rs` (see `mod.rs`).
 
 /// A triangle's corner as the game gets it.
 #[derive(Clone, Copy, Debug)]

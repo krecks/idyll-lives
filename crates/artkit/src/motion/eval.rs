@@ -1,6 +1,4 @@
 //! Evaluating a curve at a time.
-//!
-//! Split from `motion.rs` (see `mod.rs`).
 
 use super::*;
 

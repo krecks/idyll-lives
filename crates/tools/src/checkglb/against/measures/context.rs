@@ -1,6 +1,4 @@
 //! The context a comparison runs in.
-//!
-//! Split from `checkglb/against/measures.rs` (see `mod.rs`).
 
 use super::*;
 

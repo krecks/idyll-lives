@@ -1,6 +1,4 @@
 //! Marking a clip's peak.
-//!
-//! Split from `motion.rs` (see `mod.rs`).
 
 use super::*;
 

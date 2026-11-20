@@ -1,7 +1,5 @@
 //! The small judgements a choice leans on: how much a relationship invites a social,
 //! what cleaning skips, where to sweep, and a goal at a point.
-//!
-//! Split from `world/decide.rs` (see `mod.rs`).
 
 use super::*;
 

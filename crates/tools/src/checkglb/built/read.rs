@@ -1,6 +1,4 @@
 //! Reading the built world: the sample list, its parts and surfaces, and pictures.
-//!
-//! Split from `built.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! The navigation grid: tiles, edges and what may be walked.
-//!
-//! Split from `path.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Strict mode: the tags that carry a strict failure up through a check.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 use super::*;
 

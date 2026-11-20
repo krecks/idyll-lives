@@ -1,6 +1,4 @@
 //! The clips of a scene: which objects have them, and which move away.
-//!
-//! Split from `motion.rs` (see `mod.rs`).
 
 use super::*;
 

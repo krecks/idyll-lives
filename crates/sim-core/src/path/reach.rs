@@ -1,6 +1,4 @@
 //! How far a search reached, and what it reached first.
-//!
-//! Split from `path.rs` (see `mod.rs`).
 
 use super::*;
 

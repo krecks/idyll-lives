@@ -1,6 +1,4 @@
 //! What each kind of bike adds to the shape: stands, racks, baskets and motors.
-//!
-//! Split from `yard/rides.rs` (see `mod.rs`).
 
 use super::*;
 

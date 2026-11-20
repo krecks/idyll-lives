@@ -1,6 +1,4 @@
 //! A model, and sampling its animation.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
 use super::*;
 

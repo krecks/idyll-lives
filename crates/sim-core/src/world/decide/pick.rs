@@ -1,6 +1,4 @@
 //! Choosing: what a Sim does on their own when nothing is asked of them.
-//!
-//! Split from `world/decide.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Corners: one end of an edge at a vertex, and the order round it.
-//!
-//! Split from `bevel.rs` (see `mod.rs`).
 
 use super::*;
 

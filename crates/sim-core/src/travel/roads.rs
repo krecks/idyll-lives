@@ -1,6 +1,4 @@
 //! Roads and their ends: the stretches, the edges, and where they cross.
-//!
-//! Split from `travel.rs` (see `mod.rs`).
 
 use super::*;
 /// A road of the network: its middle line and how far along it each point is.

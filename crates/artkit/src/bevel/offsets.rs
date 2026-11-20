@@ -1,6 +1,4 @@
 //! Evens the widths along each run of new points.
-//!
-//! Split from `bevel.rs` (see `mod.rs`).
 
 use super::*;
 

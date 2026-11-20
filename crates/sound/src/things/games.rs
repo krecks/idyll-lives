@@ -1,6 +1,4 @@
 //! The games: pool, foosball, ping-pong, darts, an arcade cabinet and basketball.
-//!
-//! Split from `things.rs` (see `mod.rs`).
 
 use super::*;
 

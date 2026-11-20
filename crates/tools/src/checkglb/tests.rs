@@ -1,6 +1,4 @@
 //! Tests for the glb checks.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 use super::*;
 

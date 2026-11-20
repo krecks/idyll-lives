@@ -1,6 +1,4 @@
 //! Junction signals: their phases, their arms and where they stand.
-//!
-//! Split from `traffic.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Edges and what is on them: walls, looks and floors, tile by tile.
-//!
-//! Split from `lot.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Checking one file at a time, and counting what the checks find.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 use super::*;
 

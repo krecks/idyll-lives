@@ -1,6 +1,4 @@
 //! Whether two claims on the same road actually conflict.
-//!
-//! Split from `traffic.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Bays and kerbs: where a car parks, pulls over and keeps to the side.
-//!
-//! Split from `cars/mod.rs` (see `mod.rs`).
 
 use super::*;
 

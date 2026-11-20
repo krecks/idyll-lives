@@ -1,6 +1,4 @@
 //! Skirts: their profile, their shell, and how they sit when seated.
-//!
-//! Split from `characters/clothes.rs` (see `mod.rs`).
 
 use super::*;
 

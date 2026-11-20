@@ -1,6 +1,4 @@
 //! The gate baseline: counting, judging, lowering and seeding it.
-//!
-//! Split from `review.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Findings, their classes, and the numbers a comparison keeps.
-//!
-//! Split from `against.rs` (see `mod.rs`).
 
 use super::*;
 

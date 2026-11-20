@@ -1,6 +1,4 @@
 //! Polygons in a plane: their turns, areas and where a point lies.
-//!
-//! Split from `kit/joinery.rs` (see `mod.rs`).
 
 /// A point seen along the way the cutter is pushed in.
 pub(crate) type P2 = [f64; 2];

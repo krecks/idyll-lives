@@ -1,6 +1,4 @@
 //! Writing a model out.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
 use super::*;
 

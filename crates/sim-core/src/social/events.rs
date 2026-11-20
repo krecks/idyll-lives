@@ -1,8 +1,6 @@
 //! Events
 //!
 //! The social event log and the milestone events a relationship change implies.
-//!
-//! Split from `social.rs` (see `mod.rs`).
 
 use super::*;
 

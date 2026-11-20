@@ -1,6 +1,4 @@
 //! The control cage: its shape, and the ring points it is made of.
-//!
-//! Split from `characters/body.rs` (see `mod.rs`).
 
 use super::*;
 

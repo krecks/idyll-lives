@@ -1,6 +1,4 @@
 //! Rooms: finding them, scoring them, and keeping their state as the lot changes.
-//!
-//! Split from `world.rs` (see `mod.rs`).
 
 use super::*;
 

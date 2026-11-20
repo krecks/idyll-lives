@@ -1,6 +1,4 @@
 //! Standing spots, seating and dining seats.
-//!
-//! Split from `surface.rs` (see `mod.rs`).
 
 use super::*;
 

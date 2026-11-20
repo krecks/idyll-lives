@@ -1,6 +1,4 @@
 //! Keys, channels and tracks: what a clip is made of.
-//!
-//! Split from `motion.rs` (see `mod.rs`).
 
 use super::*;
 

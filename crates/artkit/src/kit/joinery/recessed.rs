@@ -1,6 +1,4 @@
 //! A recessed box.
-//!
-//! Split from `kit/joinery.rs` (see `mod.rs`).
 
 use super::*;
 

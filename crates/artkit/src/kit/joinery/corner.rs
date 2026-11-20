@@ -1,6 +1,4 @@
 //! A point of a path to bend, and the shapes one may be.
-//!
-//! Split from `kit/joinery.rs` (see `mod.rs`).
 
 use super::*;
 

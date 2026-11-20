@@ -1,6 +1,4 @@
 //! Finding the nearest thing that fits a use.
-//!
-//! Split from `world/objects.rs` (see `mod.rs`).
 
 use super::*;
 

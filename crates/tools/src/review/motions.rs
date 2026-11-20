@@ -1,6 +1,4 @@
 //! Motions and sounds: which animation a use plays and what it sounds like.
-//!
-//! Split from `review.rs` (see `mod.rs`).
 
 use super::*;
 

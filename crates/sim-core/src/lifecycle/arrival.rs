@@ -1,6 +1,4 @@
 //! Newcomers arriving in town (content `life.newcomers`).
-//!
-//! Split from `lifecycle.rs` (see `mod.rs`).
 
 use super::*;
 

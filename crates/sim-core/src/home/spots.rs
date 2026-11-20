@@ -1,6 +1,4 @@
 //! Finding a spot: crowns, doorways and the places an object may stand.
-//!
-//! Split from `home.rs` (see `mod.rs`).
 
 use super::*;
 

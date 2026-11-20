@@ -1,6 +1,4 @@
 //! The numbers a point or a vector may be made of.
-//!
-//! Split from `crates/artkit/src/math.rs` (see `mod.rs`).
 
 /// A number a script wrote, whole or not: `v3(0, 0.5, 1)`.
 pub trait Num: Copy {

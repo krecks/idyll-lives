@@ -1,6 +1,4 @@
 //! The leaves: their shapes, veins and colours.
-//!
-//! Split from `leafcards.rs` (see `mod.rs`).
 
 use super::*;
 

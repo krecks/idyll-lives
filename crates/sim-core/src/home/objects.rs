@@ -1,6 +1,4 @@
 //! Buying, selling and changing objects at home.
-//!
-//! Split from `home.rs` (see `mod.rs`).
 
 use super::*;
 

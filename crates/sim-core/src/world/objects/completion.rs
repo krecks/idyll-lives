@@ -1,6 +1,4 @@
 //! What a finished use changes, and what is done just before leaving for work.
-//!
-//! Split from `world/objects.rs` (see `mod.rs`).
 
 use super::*;
 

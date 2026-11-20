@@ -1,6 +1,4 @@
 //! The texel rule over the built world.
-//!
-//! Split from `built.rs` (see `mod.rs`).
 
 use super::*;
 

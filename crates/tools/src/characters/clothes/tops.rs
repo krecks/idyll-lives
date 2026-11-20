@@ -1,6 +1,4 @@
 //! Tops, worn as they are painted.
-//!
-//! Split from `characters/clothes.rs` (see `mod.rs`).
 
 use super::*;
 

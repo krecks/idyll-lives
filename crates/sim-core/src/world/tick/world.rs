@@ -1,6 +1,4 @@
 //! The world's own tick.
-//!
-//! Split from `world/tick.rs` (see `mod.rs`).
 
 use super::*;
 

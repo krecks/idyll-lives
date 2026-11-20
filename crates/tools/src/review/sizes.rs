@@ -1,6 +1,4 @@
 //! Size rows: one object against the reference, and the tops of them.
-//!
-//! Split from `review.rs` (see `mod.rs`).
 
 use super::*;
 

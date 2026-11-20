@@ -1,6 +1,4 @@
 //! One resident step of cooking, eating or washing up.
-//!
-//! Split from `cooking.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! The tick's conversations: the states, joining, places and grouping.
-//!
-//! Split from `conversation.rs` (see `mod.rs`).
 
 use super::*;
 #[derive(Clone, Copy)]

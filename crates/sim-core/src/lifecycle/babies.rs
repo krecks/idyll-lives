@@ -1,6 +1,4 @@
 //! Beds for babies and residents (content `life.stages`).
-//!
-//! Split from `lifecycle.rs` (see `mod.rs`).
 
 use super::*;
 

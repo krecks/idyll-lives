@@ -1,8 +1,6 @@
 //! Parsing
 //!
 //! Turning the raw JSON into definitions, against the shared indices.
-//!
-//! Split from `social.rs` (see `mod.rs`).
 
 use super::*;
 

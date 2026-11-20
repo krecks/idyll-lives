@@ -1,6 +1,4 @@
 //! [(2007, 2064)]
-//!
-//! Split from `content.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Y up: the turn from Blender's Z up to glTF's.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
 use super::*;
 

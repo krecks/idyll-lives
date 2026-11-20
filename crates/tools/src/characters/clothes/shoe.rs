@@ -1,6 +1,4 @@
 //! Shoes: the styles and the foot they are built on.
-//!
-//! Split from `characters/clothes.rs` (see `mod.rs`).
 
 use super::*;
 

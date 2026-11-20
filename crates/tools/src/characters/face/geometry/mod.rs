@@ -1,6 +1,4 @@
 //! The face's geometry: its skin and the pieces laid on it, by feature (see `face`).
-//!
-//! (Split from face.rs: the parameters, the pieces and the public build stay in `face`.)
 
 use super::*;
 

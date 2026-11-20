@@ -1,6 +1,4 @@
 //! Splitting chosen edges and the faces along them.
-//!
-//! Split from `edit.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! The graph's index: merging junctions, the grid of stretches and the edges near a point.
-//!
-//! Split from `travel.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! The quantisation a model may be written with.
-//!
-//! Split from `assets/model.rs` (see `mod.rs`).
 
 /// A material named for a finish of leaves (`name@foliage`, `name@leafcards`, or `foliage` itself): its
 /// model's geometry keeps its floats, as does one a manifest maps to such a finish.

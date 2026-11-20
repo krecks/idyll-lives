@@ -1,6 +1,4 @@
 //! Building the body: its parts, meta and joints.
-//!
-//! Split from `characters/body.rs` (see `mod.rs`).
 
 use super::*;
 

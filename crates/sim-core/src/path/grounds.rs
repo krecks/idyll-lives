@@ -1,6 +1,4 @@
 //! Grounds: the plot a tile belongs to and how a walk over it is charged.
-//!
-//! Split from `path.rs` (see `mod.rs`).
 
 use super::*;
 

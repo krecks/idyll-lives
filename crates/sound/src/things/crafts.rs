@@ -1,6 +1,4 @@
 //! The rest: a workbench and a bike's tools, a chemistry set bubbling, a punch bag, crockery smashed in a bin, a cello and someone singing.
-//!
-//! Split from `things.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! The comparison itself.
-//!
-//! Split from `checkglb/against/measures.rs` (see `mod.rs`).
 
 use super::*;
 

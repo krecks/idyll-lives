@@ -1,6 +1,4 @@
 //! The cage itself, fitted to a family and a stage.
-//!
-//! Split from `characters/body.rs` (see `mod.rs`).
 
 use super::*;
 

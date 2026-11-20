@@ -1,8 +1,6 @@
 //! Definitions
 //!
 //! Social interaction, feeling, emotion and rule definitions, and their raw JSON shapes.
-//!
-//! Split from `social.rs` (see `mod.rs`).
 
 use super::*;
 

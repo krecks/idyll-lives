@@ -1,6 +1,4 @@
 //! Surface spots, hosts and the things standing on them.
-//!
-//! Split from `surface.rs` (see `mod.rs`).
 
 use super::*;
 

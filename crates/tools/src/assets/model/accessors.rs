@@ -1,6 +1,4 @@
 //! Accessors and the buffer views behind them.
-//!
-//! Split from `assets/model.rs` (see `mod.rs`).
 
 use super::*;
 

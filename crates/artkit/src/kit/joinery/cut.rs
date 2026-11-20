@@ -1,6 +1,4 @@
 //! Cutting one object out of another.
-//!
-//! Split from `kit/joinery.rs` (see `mod.rs`).
 
 use super::*;
 

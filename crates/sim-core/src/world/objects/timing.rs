@@ -1,6 +1,4 @@
 //! When work or school takes them away today.
-//!
-//! Split from `world/objects.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Rooms: the flood that finds them and what a tile belongs to.
-//!
-//! Split from `lot.rs` (see `mod.rs`).
 
 use super::*;
 

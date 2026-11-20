@@ -1,6 +1,4 @@
 //! Optimising a model: its accessors quantised and its meshes deduplicated.
-//!
-//! Split from `assets/model.rs` (see `mod.rs`).
 
 use super::*;
 

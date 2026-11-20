@@ -1,6 +1,4 @@
 //! Making a surface a shell, and taking vertices out.
-//!
-//! Split from `edit.rs` (see `mod.rs`).
 
 use super::*;
 

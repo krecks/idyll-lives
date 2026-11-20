@@ -1,8 +1,6 @@
 //! A face while it is cut, and bmesh's split of one face in two.
 //!
 //! `OpenEdge` (a face along an edge) is here too: the shell's rim and `holes_fill` both read it.
-//!
-//! Split from `edit.rs` (see `mod.rs`).
 
 use super::*;
 

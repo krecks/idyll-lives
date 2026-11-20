@@ -1,6 +1,4 @@
 //! The small geometry the bevel leans on: angles, normals and line intersections.
-//!
-//! Split from `bevel.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Paths, manifests and the content that names what a model is for.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 use super::*;
 

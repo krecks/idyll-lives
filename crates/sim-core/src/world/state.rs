@@ -1,6 +1,4 @@
 //! Building a world, and the read-only view of it: what is where, and what is open.
-//!
-//! Split from `world.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Habits at the turning points of a day, and what follows a use.
-//!
-//! Split from `world/objects.rs` (see `mod.rs`).
 
 use super::*;
 

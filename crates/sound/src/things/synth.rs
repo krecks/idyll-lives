@@ -1,6 +1,4 @@
 //! The building blocks the things are made with: loops and one-shots, strikes, motors, noise, and putting a stereo sound together.
-//!
-//! Split from `things.rs` (see `mod.rs`).
 
 use super::*;
 

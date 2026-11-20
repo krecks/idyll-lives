@@ -1,6 +1,4 @@
 //! Walking the roads: sides, offsets, thinning and distances.
-//!
-//! Split from `travel.rs` (see `mod.rs`).
 
 use super::*;
 /// Where a long walk may get on and off the roads (`Travel::walk_plan`).

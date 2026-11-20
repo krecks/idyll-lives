@@ -1,6 +1,4 @@
 //! Objects as the review sees them, read from the content.
-//!
-//! Split from `review.rs` (see `mod.rs`).
 
 use super::*;
 

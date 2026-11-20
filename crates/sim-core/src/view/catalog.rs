@@ -1,6 +1,4 @@
 //! [(2937, 3123)]
-//!
-//! Split from `view.rs` (see `mod.rs`).
 
 use super::*;
 

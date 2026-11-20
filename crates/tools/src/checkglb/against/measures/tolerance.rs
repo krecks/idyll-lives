@@ -1,6 +1,4 @@
 //! What counts as fruit, and how far off a measure may be.
-//!
-//! Split from `checkglb/against/measures.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -3,8 +3,6 @@
 //!
 //! Runs as a world-level phase after Sims and conversations each tick, so it can move Sims
 //! between "at home", "travelling" and "away at work", pay households, and record story events.
-//!
-//! Split from `life.rs` (see `mod.rs`).
 
 mod commute;
 mod farewell;

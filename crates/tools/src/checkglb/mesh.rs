@@ -1,6 +1,4 @@
 //! Meshes: primitives, samplers, finishes and the clips a model plays.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! What a resident chooses to do on their own, and how a task is started.
-//!
-//! Split from `world.rs` (see `mod.rs`).
 
 use super::*;
 mod helpers;

@@ -1,6 +1,4 @@
 //! A model read whole.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
 use super::*;
 

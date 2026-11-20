@@ -1,6 +1,4 @@
 //! The household's food after every step: going off, dirt, and invitations.
-//!
-//! Split from `cooking.rs` (see `mod.rs`).
 
 use super::*;
 

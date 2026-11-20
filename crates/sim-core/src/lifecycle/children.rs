@@ -1,6 +1,4 @@
 //! Conceiving, births and adoption (content `life.pregnancy`, `life.adoption`).
-//!
-//! Split from `lifecycle.rs` (see `mod.rs`).
 
 use super::*;
 

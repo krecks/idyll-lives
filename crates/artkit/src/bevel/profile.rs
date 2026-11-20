@@ -1,6 +1,4 @@
 //! The round profile a bevel sweeps, and the corners it starts from.
-//!
-//! Split from `bevel.rs` (see `mod.rs`).
 
 use super::*;
 

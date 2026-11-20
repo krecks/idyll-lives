@@ -1,6 +1,4 @@
 //! What the home can fill, what is about to run out, and how far it is.
-//!
-//! Split from `world/objects.rs` (see `mod.rs`).
 
 use super::*;
 

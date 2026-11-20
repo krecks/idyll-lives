@@ -1,6 +1,4 @@
 //! A far version against what it stands in for.
-//!
-//! Split from `built.rs` (see `mod.rs`).
 
 use super::*;
 

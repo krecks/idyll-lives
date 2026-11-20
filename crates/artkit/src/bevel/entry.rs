@@ -1,6 +1,4 @@
 //! What a part asks for: a pending bevel, and applying it to an object.
-//!
-//! Split from `bevel.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! A matrix taken apart: where it is, how it is turned and how big.
-//!
-//! Split from `motion.rs` (see `mod.rs`).
 
 use super::*;
 

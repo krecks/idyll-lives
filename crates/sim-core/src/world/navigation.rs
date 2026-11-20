@@ -1,6 +1,4 @@
 //! The navigation grid: rebuilding it when the world changes.
-//!
-//! Split from `world.rs` (see `mod.rs`).
 
 use super::*;
 

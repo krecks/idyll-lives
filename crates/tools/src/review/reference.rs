@@ -1,6 +1,4 @@
 //! The reference: the accepted sizes and their tolerance.
-//!
-//! Split from `review.rs` (see `mod.rs`).
 
 use super::*;
 

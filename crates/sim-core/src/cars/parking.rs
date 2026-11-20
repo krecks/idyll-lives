@@ -1,6 +1,4 @@
 //! Loading and saving cars, and the parking spots trips use.
-//!
-//! Split from `cars.rs` (see `mod.rs`).
 
 use super::*;
 

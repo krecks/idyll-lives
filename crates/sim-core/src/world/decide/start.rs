@@ -1,6 +1,4 @@
 //! Starting a task: what it takes, and what happens when it cannot be started.
-//!
-//! Split from `world/decide.rs` (see `mod.rs`).
 
 use super::*;
 

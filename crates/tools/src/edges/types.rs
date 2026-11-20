@@ -1,6 +1,4 @@
 //! What an edge is measured against, and the vector it is measured with.
-//!
-//! Split from `crates/tools/src/edges.rs` (see `mod.rs`).
 
 /// Positions nearer than this (m) are one place.
 pub(crate) const WELD: f64 = 1e-4;

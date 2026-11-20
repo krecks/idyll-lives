@@ -1,6 +1,4 @@
 //! A car's route: the legs of it and the samples along each.
-//!
-//! Split from `cars/mod.rs` (see `mod.rs`).
 
 use super::*;
 

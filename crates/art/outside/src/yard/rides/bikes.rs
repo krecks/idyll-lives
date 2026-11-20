@@ -1,6 +1,4 @@
 //! The bikes themselves: city, child's, mountain, road, cargo and electric.
-//!
-//! Split from `yard/rides.rs` (see `mod.rs`).
 
 use super::*;
 

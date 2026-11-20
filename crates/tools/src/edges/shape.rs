@@ -1,6 +1,4 @@
 //! The shape a model is, as its faces and the edges between them.
-//!
-//! Split from `crates/tools/src/edges.rs` (see `mod.rs`).
 
 use super::*;
 

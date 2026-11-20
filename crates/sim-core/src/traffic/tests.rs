@@ -1,6 +1,4 @@
 //! Tests for the traffic model.
-//!
-//! Split from `traffic.rs` (see `mod.rs`).
 
 use super::*;
 

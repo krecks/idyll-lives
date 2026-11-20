@@ -1,6 +1,4 @@
 //! One Sim's tick: what they do next and how they get there.
-//!
-//! Split from `world/tick.rs` (see `mod.rs`).
 
 use super::*;
 

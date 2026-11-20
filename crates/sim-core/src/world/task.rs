@@ -1,6 +1,4 @@
 //! What a resident is doing: tasks, their phases, and the activity around them.
-//!
-//! Split from `world.rs` (see `mod.rs`).
 
 use super::*;
 

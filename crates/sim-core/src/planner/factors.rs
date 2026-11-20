@@ -1,6 +1,4 @@
 //! How strongly plans, objects, people and work pull a choice.
-//!
-//! Split from `planner.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Charts: which old face a strip or a corner's polygon belongs to.
-//!
-//! Split from `bevel.rs` (see `mod.rs`).
 
 use super::*;
 

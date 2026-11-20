@@ -1,6 +1,4 @@
 //! A side's files, read.
-//!
-//! Split from `checkglb/against/measures.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Curtains and fringes: hair falling from a ring.
-//!
-//! Split from `characters/hair.rs` (see `mod.rs`).
 
 use super::*;
 

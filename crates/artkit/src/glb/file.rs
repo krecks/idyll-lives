@@ -1,6 +1,4 @@
 //! The file a model is written into: its buffers and its JSON.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
 use super::*;
 

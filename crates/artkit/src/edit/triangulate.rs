@@ -1,6 +1,4 @@
 //! Cutting faces into triangles, as Blender's polyfill does.
-//!
-//! Split from `edit.rs` (see `mod.rs`).
 
 use super::*;
 

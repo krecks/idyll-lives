@@ -1,6 +1,4 @@
 //! The build rules: what a household may pay for and where a piece may go.
-//!
-//! Split from `home.rs` (see `mod.rs`).
 
 use super::*;
 

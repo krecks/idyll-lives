@@ -1,6 +1,4 @@
 //! The planner's model: routines, goals, thoughts, wishes and the planner itself.
-//!
-//! Split from `planner.rs` (see `mod.rs`).
 
 use super::*;
 

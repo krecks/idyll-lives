@@ -1,6 +1,4 @@
 //! Serving the dish: where it goes, and carrying it there.
-//!
-//! Split from `cooking.rs` (see `mod.rs`).
 
 use super::*;
 

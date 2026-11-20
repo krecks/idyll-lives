@@ -1,6 +1,4 @@
 //! Moving a car: its own place, its way along and its doors.
-//!
-//! Split from `cars/mod.rs` (see `mod.rs`).
 
 use super::*;
 

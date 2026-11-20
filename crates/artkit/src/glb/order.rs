@@ -1,6 +1,4 @@
 //! The order objects go into the file in.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
 use super::*;
 

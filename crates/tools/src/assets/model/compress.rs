@@ -1,6 +1,4 @@
 //! Compressing a stream, and the builder that writes one.
-//!
-//! Split from `assets/model.rs` (see `mod.rs`).
 
 use super::*;
 

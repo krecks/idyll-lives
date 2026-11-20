@@ -1,6 +1,4 @@
 //! The cap: the surface the hair grows from, its strips and its grid.
-//!
-//! Split from `characters/hair.rs` (see `mod.rs`).
 
 use super::*;
 

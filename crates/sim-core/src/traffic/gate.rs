@@ -1,6 +1,4 @@
 //! Getting through a junction: signals, zebra crossings and narrow spots.
-//!
-//! Split from `traffic.rs` (see `mod.rs`).
 
 use super::*;
 

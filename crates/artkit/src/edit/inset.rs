@@ -1,6 +1,4 @@
 //! Drawing each face in from its edges.
-//!
-//! Split from `edit.rs` (see `mod.rs`).
 
 use super::*;
 

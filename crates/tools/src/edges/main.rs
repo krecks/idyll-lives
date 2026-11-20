@@ -1,6 +1,4 @@
 //! `cargo review edges` and the gate's check.
-//!
-//! Split from `crates/tools/src/edges.rs` (see `mod.rs`).
 
 use super::*;
 

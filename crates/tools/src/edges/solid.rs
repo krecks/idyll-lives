@@ -1,6 +1,4 @@
 //! A solid: the vertices welded, and the faces that close it.
-//!
-//! Split from `crates/tools/src/edges.rs` (see `mod.rs`).
 
 use super::*;
 

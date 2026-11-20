@@ -1,6 +1,4 @@
 //! The log of navigation changes, for clients that patch their own copy.
-//!
-//! Split from `path.rs` (see `mod.rs`).
 
 /// The last changes to walking (`World::nav_changed_in`), with the navigation versions they made
 /// and the tiles `[x0, z0, x1, z1)` they touched: a walker whose way doesn't go near any change

@@ -1,6 +1,4 @@
 //! One tick of using an object.
-//!
-//! Split from `world/objects.rs` (see `mod.rs`).
 
 use super::*;
 

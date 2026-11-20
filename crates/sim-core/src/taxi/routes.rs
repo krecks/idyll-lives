@@ -1,6 +1,4 @@
 //! Where a run goes: kerbs, stands, ways in and ways out.
-//!
-//! Split from `taxi.rs` (see `mod.rs`).
 
 use super::*;
 

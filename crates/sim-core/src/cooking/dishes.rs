@@ -1,6 +1,4 @@
 //! Washing up: the queue, the minutes, and what a load holds.
-//!
-//! Split from `cooking.rs` (see `mod.rs`).
 
 use super::*;
 

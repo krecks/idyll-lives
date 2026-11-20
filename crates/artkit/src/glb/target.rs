@@ -1,6 +1,4 @@
 //! What a model is written for, and how its animation is interpolated.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
 use super::*;
 

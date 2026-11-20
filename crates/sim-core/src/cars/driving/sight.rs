@@ -1,6 +1,4 @@
 //! Sight: what a car can see, what it waits for, and being stuck out of the picture.
-//!
-//! Split from `driving.rs` (see `mod.rs`).
 
 use super::*;
 

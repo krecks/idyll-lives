@@ -1,6 +1,4 @@
 //! Cuts: the paint a garment takes, and the layouts its shell is built on.
-//!
-//! Split from `characters/clothes.rs` (see `mod.rs`).
 
 use super::*;
 

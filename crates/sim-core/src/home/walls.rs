@@ -1,6 +1,4 @@
 //! Walls, floors and paint: building on the home plot and checking it holds.
-//!
-//! Split from `home.rs` (see `mod.rs`).
 
 use super::*;
 

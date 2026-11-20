@@ -1,6 +1,4 @@
 //! Running a booked taxi: picking up, setting down, giving up and settling.
-//!
-//! Split from `taxi.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! The tiles: the atlas the leaves are packed into.
-//!
-//! Split from `leafcards.rs` (see `mod.rs`).
 
 use super::*;
 

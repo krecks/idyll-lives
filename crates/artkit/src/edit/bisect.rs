@@ -1,6 +1,4 @@
 //! Cutting a mesh along a plane, and closing what the cut leaves open.
-//!
-//! Split from `edit.rs` (see `mod.rs`).
 
 use super::*;
 

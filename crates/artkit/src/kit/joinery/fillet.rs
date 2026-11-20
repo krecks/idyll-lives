@@ -1,6 +1,4 @@
 //! Bending a path round its corners.
-//!
-//! Split from `kit/joinery.rs` (see `mod.rs`).
 
 use super::*;
 

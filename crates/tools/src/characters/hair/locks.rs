@@ -1,6 +1,4 @@
 //! Locks: bent capsules, grooved, shingled and laid loose.
-//!
-//! Split from `characters/hair.rs` (see `mod.rs`).
 
 use super::*;
 

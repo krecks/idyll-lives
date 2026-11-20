@@ -1,6 +1,4 @@
 //! The report and the command line.
-//!
-//! Split from `built.rs` (see `mod.rs`).
 
 use super::*;
 

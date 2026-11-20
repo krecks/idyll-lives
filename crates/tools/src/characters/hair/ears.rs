@@ -1,6 +1,4 @@
 //! Ears, and the hair kept clear of them.
-//!
-//! Split from `characters/hair.rs` (see `mod.rs`).
 
 use super::*;
 

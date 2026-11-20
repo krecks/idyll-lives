@@ -1,6 +1,4 @@
 //! Where cars are drawn and what they are in the way of: bodies, passing and touching.
-//!
-//! Split from `cars.rs` (see `mod.rs`).
 
 use super::*;
 

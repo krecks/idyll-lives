@@ -1,6 +1,4 @@
 //! Jackets: the shell over the torso, and the collar on its neckline.
-//!
-//! Split from `characters/clothes.rs` (see `mod.rs`).
 
 use super::*;
 

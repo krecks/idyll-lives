@@ -1,6 +1,4 @@
 //! A bench end.
-//!
-//! Split from `kit/joinery.rs` (see `mod.rs`).
 
 use super::*;
 

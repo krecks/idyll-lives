@@ -1,6 +1,4 @@
 //! What a tick reads of a Sim: their queue, the hour, their interests and training.
-//!
-//! Split from `world/tick.rs` (see `mod.rs`).
 
 use super::*;
 

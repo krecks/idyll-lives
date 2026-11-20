@@ -1,6 +1,4 @@
 //! Building a hairstyle from its parts.
-//!
-//! Split from `characters/hair.rs` (see `mod.rs`).
 
 use super::*;
 

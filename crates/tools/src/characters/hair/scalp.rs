@@ -1,6 +1,4 @@
 //! The scalp: points on the skull by direction, and its oval and the line along it.
-//!
-//! Split from `characters/hair.rs` (see `mod.rs`).
 
 use super::*;
 

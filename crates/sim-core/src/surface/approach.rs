@@ -1,6 +1,4 @@
 //! Approach tiles: where a resident stands to use an object or a seat.
-//!
-//! Split from `surface.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! A node's matrix, and a chain of them.
-//!
-//! Split from `assets/model.rs` (see `mod.rs`).
 
 use super::*;
 

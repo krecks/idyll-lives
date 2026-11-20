@@ -1,6 +1,4 @@
 //! What has been accepted, and what a manifest still says.
-//!
-//! Split from `checkglb/against/measures.rs` (see `mod.rs`).
 
 use super::*;
 

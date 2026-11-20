@@ -1,6 +1,4 @@
 //! A pose at a frame, and the channel behind a key.
-//!
-//! Split from `motion.rs` (see `mod.rs`).
 
 use super::*;
 

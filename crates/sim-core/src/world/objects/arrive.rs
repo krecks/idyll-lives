@@ -1,6 +1,4 @@
 //! Arriving at an object: paying for the use and taking a place at it.
-//!
-//! Split from `world/objects.rs` (see `mod.rs`).
 
 use super::*;
 

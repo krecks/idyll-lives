@@ -1,6 +1,4 @@
 //! Traffic itself: who is moving, who is waiting and who has been asked to wait.
-//!
-//! Split from `traffic.rs` (see `mod.rs`).
 
 use super::*;
 

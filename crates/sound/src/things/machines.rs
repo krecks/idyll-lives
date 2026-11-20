@@ -1,6 +1,4 @@
 //! The machines: a treadmill, bikes, a sewing machine, a pottery wheel, coffee machines, a blender, a mixer, a microwave, a toaster, an oven fan, a cooker hood, a fire, and the things played once at the fridge, bin, vending machines and phone box.
-//!
-//! Split from `things.rs` (see `mod.rs`).
 
 use super::*;
 

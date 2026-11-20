@@ -1,6 +1,4 @@
 //! Chunks: the tiles of a lot, allocated as they are built on.
-//!
-//! Split from `lot.rs` (see `mod.rs`).
 
 use super::*;
 

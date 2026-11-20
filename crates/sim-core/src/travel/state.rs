@@ -1,6 +1,4 @@
 //! The town's travel state: entries and doors, ETAs and walk plans.
-//!
-//! Split from `travel.rs` (see `mod.rs`).
 
 use super::*;
 /// How a way is searched for (`Graph::path_by`): setting off only towards this node (an end of the

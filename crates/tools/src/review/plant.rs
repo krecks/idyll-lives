@@ -1,6 +1,4 @@
 //! Plants: their row and the species columns.
-//!
-//! Split from `review.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! A fan's frame for the normals stored in it.
-//!
-//! Split from `bevel.rs` (see `mod.rs`).
 
 use super::*;
 

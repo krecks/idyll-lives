@@ -1,6 +1,4 @@
 //! What a house has of the detail a real one has.
-//!
-//! Split from `built.rs` (see `mod.rs`).
 
 use super::*;
 

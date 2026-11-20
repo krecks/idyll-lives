@@ -1,6 +1,4 @@
 //! Sight and earshot: who can see whom, who hears whom, and the tiles between.
-//!
-//! Split from `conversation.rs` (see `mod.rs`).
 
 use super::*;
 /// Whether the edge from tile `a` to its neighbour `b` stands shut to voices and eyes: a wall, a

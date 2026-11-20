@@ -1,6 +1,4 @@
 //! Poses: bounds, reach, triangles and what a model warns about.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 use super::*;
 

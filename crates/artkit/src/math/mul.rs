@@ -1,6 +1,4 @@
 //! The products of matrices with vectors and with each other.
-//!
-//! Split from `crates/artkit/src/math.rs` (see `mod.rs`).
 
 use super::*;
 

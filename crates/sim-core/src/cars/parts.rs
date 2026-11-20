@@ -1,6 +1,4 @@
 //! The parts of the driving world: a drive, a garage and where things sit on one.
-//!
-//! Split from `cars/mod.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Walls and diagonals: reading and setting the edges of the grid.
-//!
-//! Split from `lot.rs` (see `mod.rs`).
 
 use super::*;
 

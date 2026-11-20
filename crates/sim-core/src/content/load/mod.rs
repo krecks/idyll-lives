@@ -1,6 +1,4 @@
 //! [(3487, 6446)]
-//!
-//! Split from `content.rs` (see `mod.rs`).
 
 use super::*;
 

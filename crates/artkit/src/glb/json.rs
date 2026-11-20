@@ -1,6 +1,4 @@
 //! The JSON a model is written as.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
 use super::*;
 

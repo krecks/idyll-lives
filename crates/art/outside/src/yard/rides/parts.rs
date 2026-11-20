@@ -1,6 +1,4 @@
 //! The parts every bike shares: the bottom bracket, the spindle and the chain line.
-//!
-//! Split from `yard/rides.rs` (see `mod.rs`).
 
 use super::*;
 

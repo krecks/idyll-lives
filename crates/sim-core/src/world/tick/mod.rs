@@ -1,6 +1,4 @@
 //! The tick’s step: choosing, using and leaving things, and what can be used.
-//!
-//! Split from `world.rs` (see `mod.rs`).
 
 use super::*;
 

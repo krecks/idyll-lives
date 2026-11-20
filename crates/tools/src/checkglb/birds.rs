@@ -1,6 +1,4 @@
 //! Birds: their parts, their size and where they may perch.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 pub(crate) const SWEEP: f64 = 0.01;
 /// How far (m) a model's middle at rest may be off its `centre` (centres.json).

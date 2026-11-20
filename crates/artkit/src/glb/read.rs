@@ -1,6 +1,4 @@
 //! Reading a model: its chunks, its accessors and its primitives.
-//!
-//! Split from `glb.rs` (see `mod.rs`).
 
 use super::*;
 

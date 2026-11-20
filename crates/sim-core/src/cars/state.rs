@@ -1,6 +1,4 @@
 //! What a car is, and what it is about: its state, its trip and what it has seen.
-//!
-//! Split from `cars/mod.rs` (see `mod.rs`).
 
 use super::*;
 

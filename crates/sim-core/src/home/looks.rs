@@ -1,6 +1,4 @@
 //! The looks of a wall edge: what an edit may set and what it costs to repair.
-//!
-//! Split from `home.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! The player's commands: what each changes, and the checks before it does.
-//!
-//! Split from `world.rs` (see `mod.rs`).
 
 use super::*;
 

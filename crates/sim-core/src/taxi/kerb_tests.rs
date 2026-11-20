@@ -1,6 +1,4 @@
 //! Tests for kerbs and stopping.
-//!
-//! Split from `taxi.rs` (see `mod.rs`).
 
 use super::*;
 

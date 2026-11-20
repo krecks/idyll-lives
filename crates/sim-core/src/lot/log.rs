@@ -1,6 +1,4 @@
 //! The log of what changed, so clients can patch and undo.
-//!
-//! Split from `lot.rs` (see `mod.rs`).
 
 use super::*;
 

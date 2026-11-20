@@ -1,6 +1,4 @@
 //! Clips: turning, sweeping and the checks a clip must pass.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 use super::*;
 

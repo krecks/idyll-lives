@@ -1,6 +1,4 @@
 //! The extent of a set of points.
-//!
-//! Split from `kit/joinery.rs` (see `mod.rs`).
 
 use super::*;
 

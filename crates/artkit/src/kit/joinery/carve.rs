@@ -1,6 +1,4 @@
 //! Carving a hole out of a face.
-//!
-//! Split from `kit/joinery.rs` (see `mod.rs`).
 
 use super::*;
 

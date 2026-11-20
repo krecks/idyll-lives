@@ -1,6 +1,4 @@
 //! Lanes: bending, rounding corners and gentle bends.
-//!
-//! Split from `cars/mod.rs` (see `mod.rs`).
 
 use super::*;
 

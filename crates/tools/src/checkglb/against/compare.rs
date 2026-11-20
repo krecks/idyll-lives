@@ -1,6 +1,4 @@
 //! Comparing two models: the measurements and their tolerances.
-//!
-//! Split from `against.rs` (see `mod.rs`).
 
 use super::*;
 

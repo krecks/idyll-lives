@@ -1,6 +1,4 @@
 //! An accident happening where they are.
-//!
-//! Split from `world/objects.rs` (see `mod.rs`).
 
 use super::*;
 

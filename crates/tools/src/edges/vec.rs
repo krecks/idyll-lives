@@ -1,6 +1,4 @@
 //! The vector arithmetic the check needs.
-//!
-//! Split from `crates/tools/src/edges.rs` (see `mod.rs`).
 
 use super::*;
 

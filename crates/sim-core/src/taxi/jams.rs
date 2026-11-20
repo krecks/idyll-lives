@@ -1,6 +1,4 @@
 //! Taxi jams: noticing them and getting round them.
-//!
-//! Split from `taxi.rs` (see `mod.rs`).
 
 use super::*;
 

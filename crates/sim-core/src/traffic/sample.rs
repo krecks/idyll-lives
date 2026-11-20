@@ -1,6 +1,4 @@
 //! Where a moving thing will be, sampled along its route.
-//!
-//! Split from `traffic.rs` (see `mod.rs`).
 
 use super::*;
 

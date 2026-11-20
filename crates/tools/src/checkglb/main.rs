@@ -1,6 +1,4 @@
 //! The command: what `cargo check-glb` does with its arguments.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 use super::*;
 

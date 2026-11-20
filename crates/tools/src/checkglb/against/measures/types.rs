@@ -1,6 +1,4 @@
 //! The sources, options and outcomes of a measure.
-//!
-//! Split from `checkglb/against/measures.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Deciding who rides, and booking the runs that carry them.
-//!
-//! Split from `taxi.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Goals: progress, reviewing, suggesting and the object they ask for.
-//!
-//! Split from `planner.rs` (see `mod.rs`).
 
 use super::*;
 

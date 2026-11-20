@@ -1,6 +1,4 @@
 //! Furniture: what it is, its height and the seats it offers.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 use super::*;
 

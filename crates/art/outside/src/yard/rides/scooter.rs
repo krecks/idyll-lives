@@ -1,6 +1,4 @@
 //! The child's scooter and the electric scooter.
-//!
-//! Split from `yard/rides.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! The residents: moving in, out, and looking them up.
-//!
-//! Split from `world.rs` (see `mod.rs`).
 
 use super::*;
 

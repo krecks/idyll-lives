@@ -1,6 +1,4 @@
 //! Choosing a recipe, its stations, and walking the cook through its steps.
-//!
-//! Split from `cooking.rs` (see `mod.rs`).
 
 use super::*;
 

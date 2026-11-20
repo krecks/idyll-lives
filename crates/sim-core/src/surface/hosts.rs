@@ -1,6 +1,4 @@
 //! Hosts: which object a thing stands on, and whether it fits there.
-//!
-//! Split from `surface.rs` (see `mod.rs`).
 
 use super::*;
 

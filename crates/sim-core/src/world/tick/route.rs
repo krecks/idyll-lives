@@ -1,6 +1,4 @@
 //! Searches and routes: what a tick may search, and re-routing after a change.
-//!
-//! Split from `world/tick.rs` (see `mod.rs`).
 
 use super::*;
 

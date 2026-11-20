@@ -1,6 +1,4 @@
 //! The beard.
-//!
-//! Split from `characters/hair.rs` (see `mod.rs`).
 
 use super::*;
 

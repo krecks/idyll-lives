@@ -1,6 +1,4 @@
 //! A hole in a face, triangulated into it.
-//!
-//! Split from `kit/joinery.rs` (see `mod.rs`).
 
 use super::*;
 

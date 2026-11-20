@@ -1,6 +1,4 @@
 //! The mesh helpers: turning triangles outward and stripping rows into shells.
-//!
-//! Split from `characters/clothes.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Eating a serving: finding a seat, company, and the plate left behind.
-//!
-//! Split from `cooking.rs` (see `mod.rs`).
 
 use super::*;
 

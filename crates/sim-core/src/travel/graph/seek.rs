@@ -1,6 +1,4 @@
 //! Seeking: the nearest stretch, and those within reach.
-//!
-//! Split from `travel.rs` (see `mod.rs`).
 
 use super::*;
 

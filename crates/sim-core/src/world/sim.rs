@@ -1,6 +1,4 @@
 //! A resident, and the set of them: what they are, wear and carry, and what they can do.
-//!
-//! Split from `world.rs` (see `mod.rs`).
 
 use super::*;
 

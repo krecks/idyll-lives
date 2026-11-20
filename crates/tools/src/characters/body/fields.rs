@@ -1,6 +1,4 @@
 //! The fields a body is shaded with, and its tone.
-//!
-//! Split from `characters/body.rs` (see `mod.rs`).
 
 use super::*;
 

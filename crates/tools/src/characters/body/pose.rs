@@ -1,6 +1,4 @@
 //! Sitting: where the legs and the hands go, and how far the seat drops.
-//!
-//! Split from `characters/body.rs` (see `mod.rs`).
 
 use super::*;
 

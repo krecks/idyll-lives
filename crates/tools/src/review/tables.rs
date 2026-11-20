@@ -1,6 +1,4 @@
 //! The markdown tables of motions and uses.
-//!
-//! Split from `review.rs` (see `mod.rs`).
 
 use super::*;
 

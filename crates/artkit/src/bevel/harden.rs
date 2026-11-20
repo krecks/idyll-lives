@@ -1,6 +1,4 @@
 //! Hardening: shading a bevel's new edges to keep their crease.
-//!
-//! Split from `bevel.rs` (see `mod.rs`).
 
 use super::*;
 

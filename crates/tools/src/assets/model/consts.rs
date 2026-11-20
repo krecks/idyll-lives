@@ -1,6 +1,4 @@
 //! The glTF constants a model is read with.
-//!
-//! Split from `assets/model.rs` (see `mod.rs`).
 
 pub(crate) const FLOAT: u64 = 5126;
 pub(crate) const BYTE: u64 = 5120;

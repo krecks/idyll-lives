@@ -1,6 +1,4 @@
 //! Nodes: their places, matrices and poses.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 use super::*;
 

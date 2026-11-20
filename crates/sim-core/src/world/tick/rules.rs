@@ -1,6 +1,4 @@
 //! The rules of use: who may use what, what is missing, and when things are closed.
-//!
-//! Split from `world/tick.rs` (see `mod.rs`).
 
 use super::*;
 

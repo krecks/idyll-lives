@@ -1,6 +1,4 @@
 //! The hard edges themselves.
-//!
-//! Split from `crates/tools/src/edges.rs` (see `mod.rs`).
 
 use super::*;
 

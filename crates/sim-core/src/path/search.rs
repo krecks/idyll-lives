@@ -1,6 +1,4 @@
 //! The search itself: scratch space, node budget, stats and reconstructing the way.
-//!
-//! Split from `path.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! Pedestrians crossing, and the kerb they stop at.
-//!
-//! Split from `traffic.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! A shoe's upper: the body triangles refined into a layout and shelled.
-//!
-//! Split from `characters/clothes.rs` (see `mod.rs`).
 
 use super::*;
 

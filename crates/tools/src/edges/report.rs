@@ -1,6 +1,4 @@
 //! The report of them.
-//!
-//! Split from `crates/tools/src/edges.rs` (see `mod.rs`).
 
 use super::*;
 

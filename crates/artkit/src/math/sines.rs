@@ -1,6 +1,4 @@
 //! The single-precision sines and cosines, as `mathutils` rounds them.
-//!
-//! Split from `crates/artkit/src/math.rs` (see `mod.rs`).
 
 /// The sine and cosine of `x` as Blender's C library (Apple's) works both out at once, which is what Blender's
 /// code gets wherever it takes the two of one angle: not always the nearest singles (one in a few thousand is a

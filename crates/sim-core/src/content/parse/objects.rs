@@ -1,6 +1,4 @@
 //! Need, object, vehicle, surface and interaction shapes (content `needs`, `objects`).
-//!
-//! Split from `content/parse.rs` (see `mod.rs`).
 
 use super::*;
 

@@ -1,6 +1,4 @@
 //! The bevel's working state: what it collects as it walks the mesh.
-//!
-//! Split from `bevel.rs` (see `mod.rs`).
 
 use super::*;
 

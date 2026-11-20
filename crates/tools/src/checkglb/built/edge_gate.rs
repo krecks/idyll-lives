@@ -1,6 +1,4 @@
 //! The hard-edge rule over the built world, as the game draws it.
-//!
-//! Split from `built.rs` (see `mod.rs`).
 
 use super::*;
 

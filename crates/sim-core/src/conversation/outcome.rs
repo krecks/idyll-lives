@@ -1,6 +1,4 @@
 //! Outcomes: applying them, breaking up, the gains and the helpers.
-//!
-//! Split from `conversation.rs` (see `mod.rs`).
 
 use super::*;
 #[allow(clippy::too_many_arguments)]

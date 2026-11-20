@@ -1,6 +1,4 @@
 //! The measurements themselves: geometry, surfaces, texels and shading.
-//!
-//! Split from `against.rs` (see `mod.rs`).
 
 // The children's own `use super::*` take these from here (constants, aliases and the shared imports of
 // `against/mod.rs`), so this module has none of its own uses for them.

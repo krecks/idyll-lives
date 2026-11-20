@@ -1,6 +1,4 @@
 //! A corner's patch of an odd number of segments, and what is carried across.
-//!
-//! Split from `bevel.rs` (see `mod.rs`).
 
 use super::*;
 

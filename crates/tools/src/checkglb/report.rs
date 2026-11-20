@@ -1,6 +1,4 @@
 //! Reports: the gate, its baseline and updating one.
-//!
-//! Split from `checkglb.rs` (see `mod.rs`).
 
 use super::*;
 

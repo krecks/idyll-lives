@@ -1,6 +1,4 @@
 //! Points and vectors: `P3` and `V3`.
-//!
-//! Split from `crates/artkit/src/math.rs` (see `mod.rs`).
 
 use super::*;
 

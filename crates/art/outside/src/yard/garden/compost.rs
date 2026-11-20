@@ -1,6 +1,4 @@
 //! The compost bin.
-//!
-//! Split from `yard/garden.rs` (see `mod.rs`).
 
 use super::*;
 
