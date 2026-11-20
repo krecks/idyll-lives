@@ -3346,7 +3346,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // A directional light shines along its entity's -y: turned from straight down to the sun's way (game space to PlayCanvas).
     const to = toEngine(l.sunDirection.x, l.sunDirection.y, l.sunDirection.z, this.vTmp).normalize();
     // Only a sun that turned draws its map again: a step that only changes the light's colour (every step of the
-    // night, whose moon stands still) leaves the shadows as they are; the held reflections take the new light still.
+    // night, whose moon stands still) leaves the shadows as they are; the held reflections take the new light either way.
+    this.mirrors.changed();
     if (!to.equals(this.sunWay)) {
       this.sunWay.copy(to);
       const axis = this.vTmp2.cross(DOWN, to);
@@ -3354,7 +3355,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       const angle = Math.atan2(sin, DOWN.dot(to)) * pc.math.RAD_TO_DEG;
       this.sun.setRotation(sin > 1e-6 ? this.qTmp.setFromAxisAngle(axis.mulScalar(1 / sin), angle) : this.qTmp.set(0, 0, 0, 1));
       this.sunShadows.moved(true, false);
-    } else this.mirrors.changed();
+    }
     // The look's colours are used as linear; PlayCanvas takes sRGB and linearises it,
     // so the strength goes into the colour (an intensity below 1 would be linearised with it).
     this.sun.light!.color = gammaColor(l.sunColor, l.sunIntensity * SUN_UNITS, this.colorTmp);
