@@ -227,7 +227,7 @@ pub struct SocialDef {
     pub anim: u8,
     pub autonomous: bool,
     pub autonomy_weight: f32,
-    /// Others nearby may join in and listen (a group conversation; see `conversation/`).
+    /// Others nearby may join in and listen (a group conversation; see `conversation.rs`).
     pub joinable: bool,
     pub tags: TagMask,
     pub requires: Requirements,

@@ -704,7 +704,7 @@ pub(crate) fn shut_away(ctx: &Ctx, sim: &Sim, at: (i32, i32)) -> bool {
 
 /// Whether `sim`, walking, is about to step into a room kept shut to them: within `LOOK` metres
 /// along their way, into another room than the one they're in. Not on the way to someone to
-/// talk to or to meet someone who called them (`conversation/` walks them), nor on their way out to work, home, a visit or the
+/// talk to or to meet someone who called them (`conversation.rs` walks them), nor on their way out to work, home, a visit or the
 /// door (a house whose only way out is through the bathroom: they go through rather than miss
 /// the shift).
 pub(crate) fn shut_ahead(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> bool {
