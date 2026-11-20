@@ -116,6 +116,7 @@ The game is **English only for now; other languages will follow, for text and fo
   - The dense pass's approaches along country roads into town keep their own corner rule (`dense.ts` `COUNTRY_CORNER`), apart from `macro.ts` `roadMeets`.
   - The childcare check counts using the building's shared things as leaving home; `lifecycle::arrive` doesn't check `is_home` itself.
   - Villages with lots out along the country road into them can't be moved in step 2 (their outskirts reach the town only through them).
+  - Measured against 0.8.3 before the run (2026-11-20, M3 Pro, back to back): the river city's step p99 at 10× is 22 % over it (the budget was 20 %), with 155 residents at full detail round the home on average against 136 (the town is denser there); and the town view at 400 m draws about 12 % more (the budget was as many). Neither of the plan's levers helps the first: flats at two storeys left the river city as it was, and the homes kept for sale made shells slowed it 18 % (`life::update`'s residents 49 % dearer natively, not yet found), so a town with shells (a lower fill tier) has a cost to chase.
 - **Left open by 0.7.0** (for the owner, [plan/release-0.7.0.md](plan/release-0.7.0.md)): the money balance after faster promotions, the 30-minute late grace, only four idea toasts at once, nothing to drink for a host to serve, the Firefox model-load fix unverified in Firefox, Big towns' rush-hour traffic (a preview), and coarse parked-car tiles.
 
 ### Known issues and findings from the first build
