@@ -5,58 +5,58 @@ use super::*;
 /// How far either side of a taxi's body the road it stands on is kept straight and clear of a
 /// junction's box (m), and how far it may turn over that stretch at most (rad: about 4°, the
 /// body parallel to its lane all along).
-pub(crate) const STAND_ROOM: f32 = 1.0;
+pub(super) const STAND_ROOM: f32 = 1.0;
 const STAND_STRAIGHT: f32 = 0.07;
 /// How far along the road from a rider's driveway mouth the taxi may stand for them at most (m),
 /// tried this often (m) nearest first.
 const STAND_REACH: f32 = 30.0;
 const STAND_STEP: f32 = 0.5;
 /// Room between two taxis standing on one stretch (m, between their bodies).
-pub(crate) const STAND_GAP: f32 = 3.0;
+pub(super) const STAND_GAP: f32 = 3.0;
 /// How far from a way out of town along its road a taxi doesn't stand (m).
 const STAND_OUT: f32 = 20.0;
 /// How far the claim of a taxi standing at the kerb reaches before and after its middle, past half
 /// its length (m): those behind it, or turning out of a driveway by it, wait for it.
-pub(crate) const KERB_CLAIM: f32 = 2.0;
+pub(super) const KERB_CLAIM: f32 = 2.0;
 /// Its own lane's kerb a standing taxi keeps this far from (m: its corners too, on a lane that
 /// turns a little over its length, `STAND_STRAIGHT`).
-pub(crate) const KERB_KEEP: f32 = 0.15;
+pub(super) const KERB_KEEP: f32 = 0.15;
 /// Over how much of the way before it the taxi eases to where it stands (m).
-pub(crate) const STAND_EASE: f32 = 8.0;
+pub(super) const STAND_EASE: f32 = 8.0;
 /// Turning round in a dead end's turning circle (`u_turn`): how far its kerb reaches past the
 /// lane's (m, `roads.ts` `TURNING`), how far over it a front corner may swing (m), the swerve's
 /// radius into it and out (m), and the speed (m/s).
-pub(crate) const TURNING: f32 = 2.4;
-pub(crate) const TURN_OVER: f32 = 0.3;
-pub(crate) const SWERVE: f32 = 2.0;
-pub(crate) const TURN_SPEED: f32 = crate::cars::JUNCTION_SPEED;
+pub(super) const TURNING: f32 = 2.4;
+pub(super) const TURN_OVER: f32 = 0.3;
+pub(super) const SWERVE: f32 = 2.0;
+pub(super) const TURN_SPEED: f32 = crate::cars::JUNCTION_SPEED;
 /// What turning round costs the way it's weighed (s of drive time, as the drive's own:
 /// `travel::Graph::path`), on top of the drive, and standing for a rider on the far side of the
 /// road from their house (s: they cross it).
-pub(crate) const TURN_COST: f32 = 6.0;
+pub(super) const TURN_COST: f32 = 6.0;
 /// What turning round in a side street costs, the way it's weighed (s of drive time: slowly in and
 /// backing out).
-pub(crate) const SIDE_COST: f32 = 12.0;
-pub(crate) const FAR_SIDE: f32 = 8.0;
+pub(super) const SIDE_COST: f32 = 12.0;
+pub(super) const FAR_SIDE: f32 = 8.0;
 /// Runs coming into town by the same way are planned this far apart at least (ticks, `time_run`),
 /// one sooner by as much as `ENTRY_SHIFT` for it.
-pub(crate) const ENTRY_GAP: u64 = 2 * TICKS_PER_MINUTE;
-pub(crate) const ENTRY_SHIFT: u64 = 20 * TICKS_PER_MINUTE;
+pub(super) const ENTRY_GAP: u64 = 2 * TICKS_PER_MINUTE;
+pub(super) const ENTRY_SHIFT: u64 = 20 * TICKS_PER_MINUTE;
 /// A way in with this many cars or more queued at it (`queued`: waiting to come in, or stood
 /// still within `QUEUE_NEAR` m of it) isn't taken while another will do (`route_in`), of the
 /// `QUEUE_TRIES` nearest.
-pub(crate) const QUEUE_MOST: usize = 3;
-pub(crate) const QUEUE_NEAR: f32 = 40.0;
-pub(crate) const QUEUE_TRIES: usize = 3;
+pub(super) const QUEUE_MOST: usize = 3;
+pub(super) const QUEUE_NEAR: f32 = 40.0;
+pub(super) const QUEUE_TRIES: usize = 3;
 /// The most a way round a hold-up may take over the straight way (ticks, `way_for`): about as
 /// long as a run waits one out (`JAM_WAIT`).
-pub(crate) const DETOUR_MOST: u64 = JAM_WAIT;
+pub(super) const DETOUR_MOST: u64 = JAM_WAIT;
 /// A stretch through a place cars are held up now (`jammed`) as a run's way is weighed (s of drive
 /// time): driven
 /// only with no other way round, a way round no longer than `DETOUR_MOST` over the straight way
 /// (else that, `way_for`: a run came two hours late to its riders round a car stood still half an
 /// hour on its way).
-pub(crate) const JAM_COST: f32 = 600.0;
+pub(super) const JAM_COST: f32 = 600.0;
 
 /// Where a taxi stands for a halt (`kerb_at`): its middle `s` m along road `road` (the network's),
 /// in its lane and parallel to it, the way it comes there deciding which side; and the rider's
@@ -80,7 +80,7 @@ fn drive_axis(d: &crate::cars::Drive) -> Option<[f32; 2]> {
 /// Where the house on `plot` meets the road its riders wait by and the way to it from the house
 /// (a unit vector): its driveway's mouth, else (no driveway) the road nearest its front door,
 /// where its front path comes out.
-pub(crate) fn home_way(w: &World, plot: u32) -> Option<(crate::travel::RoadPoint, [f32; 2])> {
+pub(super) fn home_way(w: &World, plot: u32) -> Option<(crate::travel::RoadPoint, [f32; 2])> {
     let g = &w.travel.graph;
     if let Some(d) = w.drives.iter().find(|d| d.plot == plot)
         && let Some(axis) = drive_axis(d)
@@ -102,7 +102,7 @@ pub(crate) fn home_way(w: &World, plot: u32) -> Option<(crate::travel::RoadPoint
 
 /// Whether end `end` (0: its start, 1: its end) of the network's road `road` is a dead end with a
 /// turning circle (the town file's `ends`, `dead`): a street's or a lane's.
-pub(crate) fn dead_end(
+pub(super) fn dead_end(
     travel: &crate::travel::Travel,
     meta: &serde_json::Value,
     road: u32,

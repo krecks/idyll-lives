@@ -52,15 +52,15 @@ pub fn chunk_fingerprints(world: &World) -> (usize, usize, Vec<u64>) {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct RectView<'a> {
+pub(super) struct RectView<'a> {
     /// The tiles `[x0, z0, x1, z1)` (stacked rows) this covers.
     pub rect: [i32; 4],
     pub version: u32,
     pub lot_version: u32,
-    pub(crate) walls: Vec<EdgeView>,
-    pub(crate) openings: Vec<OpeningView>,
-    pub(crate) fences: Vec<FenceView>,
-    pub(crate) diagonals: Vec<DiagonalView>,
+    pub(super) walls: Vec<EdgeView>,
+    pub(super) openings: Vec<OpeningView>,
+    pub(super) fences: Vec<FenceView>,
+    pub(super) diagonals: Vec<DiagonalView>,
     pub floors: Vec<[u16; 3]>,
     /// The objects whose tile (`x`, `z`) is inside.
     pub(crate) objects: Vec<ObjectView<'a>>,
@@ -123,7 +123,7 @@ pub fn structure_json(world: &World) -> String {
 /// Food and dishes for the renderer (`ItemPlacement` in protocol.ts).
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ItemView<'a> {
+pub(super) struct ItemView<'a> {
     pub id: u32,
     pub def: &'a str,
     /// Where it stands, in tiles (`z` on the lot's rows, like objects; see `storeys.rs`).

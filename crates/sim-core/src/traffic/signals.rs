@@ -73,7 +73,7 @@ impl Signal {
 
     /// The phase someone on foot waiting at arm `arm`'s crosswalk waits for (`Traffic::walkers`):
     /// its main road's green on a side road's (`opens_with`), else the walk.
-    pub(crate) fn wants(&self, arm: usize) -> Option<u8> {
+    pub(super) fn wants(&self, arm: usize) -> Option<u8> {
         self.opens_with(arm).or_else(|| self.walk_phase())
     }
 
@@ -104,7 +104,7 @@ impl Signal {
     /// the kerbs out to the crosswalks (out past the box on an arm without one), and on an arm with
     /// one, from its far side out to `KEEP_OFF` past the stop line; not on a crosswalk itself.
     /// (Not a roundabout's.)
-    pub(crate) fn off_limits(&self, p: [f32; 2]) -> bool {
+    pub(super) fn off_limits(&self, p: [f32; 2]) -> bool {
         if self.roundabout {
             return false;
         }
@@ -124,7 +124,7 @@ impl Signal {
     }
 
     /// How far from its middle its crosswalks reach at most (m).
-    pub(crate) fn crossing_reach(&self) -> f32 {
+    pub(super) fn crossing_reach(&self) -> f32 {
         self.arms
             .iter()
             .filter(|a| a.crosswalk)
@@ -240,22 +240,22 @@ pub(crate) const LIT_ARMS: usize = 4;
 pub(crate) const LIT_MAIN_ARMS: usize = 3;
 /// How long a phase's green lasts at least, its amber, and all red after while the box
 /// clears (ticks of drive time, as the cars go through).
-pub(crate) const MIN_GREEN: u64 = crate::drive_secs(5.0);
+pub(super) const MIN_GREEN: u64 = crate::drive_secs(5.0);
 /// Every phase's turn comes round in this long at most (ticks of drive time): a phase's green
 /// lasts no longer than its share of it (`change_lights`).
-pub(crate) const CYCLE: u64 = crate::drive_secs(50.0);
-pub(crate) const AMBER: u64 = crate::drive_secs(2.0);
+pub(super) const CYCLE: u64 = crate::drive_secs(50.0);
+pub(super) const AMBER: u64 = crate::drive_secs(2.0);
 /// Through two lit junctions too near to wait between (`Claim::gate2`): the second's green is
 /// kept on for those waiting at the first's stop line or granted through both, from when one
 /// first is, for `CYCLE` at most (the first's turn comes round for them meanwhile); one is
 /// granted through only with `GREEN_HELD` of that still to come (its way to the second's stop
 /// line).
-pub(crate) const GREEN_HELD: u64 = crate::drive_secs(10.0);
-pub(crate) const ALL_RED: u64 = crate::drive_secs(4.0);
+pub(super) const GREEN_HELD: u64 = crate::drive_secs(10.0);
+pub(super) const ALL_RED: u64 = crate::drive_secs(4.0);
 /// A route this near a lit junction's middle goes through its lights (m, `gate`), and its arm is
 /// the one it's on where it first comes this near (`GATE_REACH`).
-pub(crate) const GATE_THROUGH: f32 = BOX_LEAST + 1.0;
-pub(crate) const GATE_REACH: f32 = BOX_MOST + 2.0;
+pub(super) const GATE_THROUGH: f32 = BOX_LEAST + 1.0;
+pub(super) const GATE_REACH: f32 = BOX_MOST + 2.0;
 /// How far out past its arm's box a roundabout's signal pole stands (another's stands at the stop
 /// line), and how far in from the kerb on the pavement (or the road's edge) any stands (m).
 const POLE_OUT: f32 = 1.0;
@@ -282,7 +282,7 @@ pub const STOP_GAP: f32 = 0.5;
 pub const KEEP_OFF: f32 = 3.0;
 /// How far round a lit junction's tiles kept off (tiles) the ground is looked over for any they
 /// would cut off (`left_open`).
-pub(crate) const KEEP_OFF_ROOM: i32 = 4;
+pub(super) const KEEP_OFF_ROOM: i32 = 4;
 const KERB_IN: f32 = 0.25;
 /// An arm's crosswalk is measured along its own road (`SignalArm::span`) where that goes out within
 /// 30° of its way (the cosine), its crosswalk this near as far out as the arm's (m); else along
@@ -292,10 +292,10 @@ const SPAN_OFF: f32 = 2.0;
 /// The walk phase (`Signal::walk_phase`): how long those on foot may step out (ticks of real time,
 /// as people walk), and the pace its clearance gives the slowest to get across the widest arm
 /// (m a second; `Signal::walk_clear`), `WALK_CLEAR_LEAST` at least (s).
-pub(crate) const WALK_OPEN: u64 = crate::secs(5.0);
+pub(super) const WALK_OPEN: u64 = crate::secs(5.0);
 /// The walk phase is open this long at least (ticks of real time): those waiting at the kerb step
 /// out (`change_lights`).
-pub(crate) const WALK_LEAST: u64 = crate::secs(1.0);
+pub(super) const WALK_LEAST: u64 = crate::secs(1.0);
 const WALK_PACE: f32 = 1.0;
 const WALK_CLEAR_LEAST: f32 = 3.0;
 

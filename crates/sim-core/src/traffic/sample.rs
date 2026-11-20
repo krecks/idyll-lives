@@ -25,9 +25,9 @@ pub(crate) struct Claim {
     pub to: f32,
     /// Its group: parts of a route its body comes to before it's out of the one before (`claims`).
     pub group: u32,
-    pub(crate) samples: Vec<Sample>,
+    pub(super) samples: Vec<Sample>,
     /// The box round all its samples' bodies (x0, z0, x1, z1).
-    pub(crate) bounds: [f32; 4],
+    pub(super) bounds: [f32; 4],
     /// The traffic lights its group goes through, and the phase of the arm it comes in by
     /// (`Travel::signals`, `gate`): it's asked for only on that phase's green.
     pub gate: Option<(u16, u8)>,
@@ -47,7 +47,7 @@ pub(crate) struct Claim {
 }
 
 impl Claim {
-    pub(crate) fn new(from: f32, to: f32, samples: Vec<Sample>) -> Claim {
+    pub(super) fn new(from: f32, to: f32, samples: Vec<Sample>) -> Claim {
         let mut b = [
             f32::INFINITY,
             f32::INFINITY,
@@ -99,7 +99,7 @@ impl Claim {
 }
 
 /// How far from its middle a body reaches at most (m).
-pub(crate) fn reach(r: &Rect) -> f32 {
+pub(super) fn reach(r: &Rect) -> f32 {
     r.half[0].hypot(r.half[1])
 }
 

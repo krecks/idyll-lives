@@ -39,7 +39,7 @@ const FIRM_UP_MINUTES: f32 = 6.0;
 /// `leave_for`, worked out again from where they are once it's close (`FIRM_UP_MINUTES`).
 /// `fresh`: their commute was worked out anew just now, in this tick and from where they are
 /// (`update`), at the cost of this many tiles searched.
-pub(crate) fn firm_leave(
+pub(super) fn firm_leave(
     w: &mut World,
     i: usize,
     leave: u64,
@@ -355,7 +355,7 @@ const UNHURRIED_MINUTES: f32 = 6.0 * 60.0;
 /// Whether `i`'s work or school doesn't start for `UNHURRIED_MINUTES` yet: neither today's, if
 /// it's still to come or begun no longer than `late_minutes` ago (a game begun after they'd have
 /// set off), nor the next.
-pub(crate) fn unhurried(w: &World, i: usize) -> bool {
+pub(super) fn unhurried(w: &World, i: usize) -> bool {
     let late = ticks(w.content.career_rules.late_minutes);
     let first = start_on(&w.content, &w.sims[i], w.tick)
         .filter(|&start| start + late > w.tick)

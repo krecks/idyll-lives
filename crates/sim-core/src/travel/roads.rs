@@ -84,7 +84,7 @@ impl Road {
 
     /// The nearest point of segment `i` (points `i`, `i + 1`) to `p`: how far along the road it is
     /// and how far from `p`.
-    pub(crate) fn project_segment(&self, i: usize, p: [f32; 2]) -> (f32, f32) {
+    pub(super) fn project_segment(&self, i: usize, p: [f32; 2]) -> (f32, f32) {
         let (a, b) = (self.pts[i], self.pts[i + 1]);
         let (dx, dz) = (b[0] - a[0], b[1] - a[1]);
         let len2 = (dx * dx + dz * dz).max(1e-9);
@@ -117,7 +117,7 @@ impl Road {
         out
     }
 
-    pub(crate) fn walkable(&self) -> bool {
+    pub(super) fn walkable(&self) -> bool {
         true
     }
 
@@ -151,7 +151,7 @@ impl Edge {
 /// merge_junctions`): each within the other's box (`traffic::boxes`, 6 m round its middle at
 /// least) and a little more. Two side roads meeting a road a few metres apart either side are a
 /// crossroads: as two junctions, each one's lights stood in the middle of the other.
-pub(crate) const MERGE: f32 = 8.0;
+pub(super) const MERGE: f32 = 8.0;
 
 /// Two roads' middle lines this near (m) away from their ends meet there (`crossings`): two cars
 /// in their lanes on them would touch.
@@ -169,7 +169,7 @@ const CROSS_GAP: f32 = 4.0;
 /// short stretch, is one place (`CROSS_RUN`); a road laid on another for longer meets it where
 /// they come together and where they part. A town file's roads should meet at their ends; a
 /// country road laid across or along another meets it all the same.
-pub(crate) fn crossings(roads: &[Road]) -> Vec<(usize, usize, f32, f32, [f32; 2])> {
+pub(super) fn crossings(roads: &[Road]) -> Vec<(usize, usize, f32, f32, [f32; 2])> {
     let bounds: Vec<[f32; 4]> = roads
         .iter()
         .map(|r| {

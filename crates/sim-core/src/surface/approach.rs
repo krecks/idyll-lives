@@ -219,7 +219,7 @@ pub fn seat_at_top(
 /// Whether a resident can stand on tile `t` to use a thing on storey `storey` from it: free, on
 /// that storey, not on a stair, and (beside its tile `inner`, on the lot) with no wall or fence
 /// between.
-pub(crate) fn stands_by(nav: &NavGrid, storey: i32, t: (i32, i32), inner: (i32, i32)) -> bool {
+pub(super) fn stands_by(nav: &NavGrid, storey: i32, t: (i32, i32), inner: (i32, i32)) -> bool {
     nav.tile_free(t.0, t.1)
         && nav.lot.in_bounds(inner.0, inner.1)
         && nav.stairs.storey(t.1) == storey

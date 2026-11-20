@@ -134,13 +134,13 @@ pub(crate) struct BuildRaw {
 #[derive(Deserialize, Default)]
 #[serde(default)]
 pub(crate) struct LandPricesRaw {
-    pub(crate) earth: Option<f64>,
-    pub(crate) mountain: Option<f64>,
-    pub(crate) water: Option<f64>,
-    pub(crate) woods: Option<f64>,
-    pub(crate) meadow: Option<f64>,
-    pub(crate) fields: Option<f64>,
-    pub(crate) clear: Option<f64>,
+    pub(super) earth: Option<f64>,
+    pub(super) mountain: Option<f64>,
+    pub(super) water: Option<f64>,
+    pub(super) woods: Option<f64>,
+    pub(super) meadow: Option<f64>,
+    pub(super) fields: Option<f64>,
+    pub(super) clear: Option<f64>,
 }
 
 impl LandPricesRaw {

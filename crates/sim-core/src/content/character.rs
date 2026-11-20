@@ -2,7 +2,7 @@
 
 use super::*;
 
-pub(crate) fn each_tag(mask: TagMask) -> impl Iterator<Item = usize> {
+pub(super) fn each_tag(mask: TagMask) -> impl Iterator<Item = usize> {
     let mut bits = mask;
     std::iter::from_fn(move || {
         if bits == 0 {

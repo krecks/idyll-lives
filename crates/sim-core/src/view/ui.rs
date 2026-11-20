@@ -55,7 +55,7 @@ pub struct UiSync {
     pub full: bool,
     pub inspected: Option<u32>,
     /// Per resident slot: what they were sent (None: not listed).
-    pub(crate) sims: Vec<Option<SimSent>>,
+    pub(super) sims: Vec<Option<SimSent>>,
     pub households: Vec<u64>,
     /// Relationship pairs and rooms sent, with the update that last found them.
     pub relationships: HashMap<(u32, u32), (u64, u32)>,
@@ -67,7 +67,7 @@ pub struct UiSync {
 
 /// Fingerprints of a resident's fields as last sent (0: not sent; the UI has its default).
 #[derive(Default)]
-pub(crate) struct SimSent {
+pub(super) struct SimSent {
     pub detailed: bool,
     pub detail: u64,
     pub name: u64,
@@ -85,11 +85,11 @@ pub(crate) struct SimSent {
     pub taxi: u64,
     pub job: u64,
     /// Reset when the details stop (the UI drops them).
-    pub(crate) details: DetailsSent,
+    pub(super) details: DetailsSent,
 }
 
 #[derive(Default)]
-pub(crate) struct DetailsSent {
+pub(super) struct DetailsSent {
     pub grade: u64,
     pub needs: u64,
     pub mood: u64,
@@ -100,12 +100,12 @@ pub(crate) struct DetailsSent {
     pub phone: u64,
     pub homebound: u64,
     pub plan: u64,
-    pub(crate) plan_parts: PlanSent,
+    pub(super) plan_parts: PlanSent,
 }
 
 /// The plan is sent part by part: the week's history is long, and the rest changes all day.
 #[derive(Default)]
-pub(crate) struct PlanSent {
+pub(super) struct PlanSent {
     pub routines: u64,
     pub skip_household: u64,
     pub current: u64,
@@ -709,7 +709,7 @@ impl StructureSync {
 
 /// `StructureSync::update_json`'s parts as it writes them: each only if it changed since it was
 /// last sent (`sent`).
-pub(crate) struct Parts<'a> {
+pub(super) struct Parts<'a> {
     pub sent: &'a mut HashMap<&'static str, u64>,
     pub out: Vec<u8>,
     /// A part as it is now, to see whether it changed.

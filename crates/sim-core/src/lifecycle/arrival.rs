@@ -6,7 +6,7 @@ use super::*;
 
 /// Vacant homes (houses and flats: furnished, nobody living there, not the player's) get a new
 /// household now and then. They come in at the street door (a flat's building's).
-pub(crate) fn newcomers(w: &mut World, rules: &crate::content::NewcomerRules) {
+pub(super) fn newcomers(w: &mut World, rules: &crate::content::NewcomerRules) {
     for p in 0..w.plots.len() as u32 {
         if !w.is_home(p)
             || beds(w, p).most(grown_stage(w)) == 0
@@ -23,7 +23,7 @@ pub(crate) fn newcomers(w: &mut World, rules: &crate::content::NewcomerRules) {
     }
 }
 
-pub(crate) fn pick<'a, T>(rng: &mut crate::rng::Rng, list: &'a [T]) -> Option<&'a T> {
+pub(super) fn pick<'a, T>(rng: &mut crate::rng::Rng, list: &'a [T]) -> Option<&'a T> {
     (!list.is_empty()).then(|| &list[(rng.next_u32() as usize) % list.len()])
 }
 
@@ -171,7 +171,7 @@ pub fn arrive(w: &mut World, plot: u32) -> bool {
     true
 }
 
-pub(crate) fn spawns_age(spawns: &[serde_json::Value], k: usize) -> f32 {
+pub(super) fn spawns_age(spawns: &[serde_json::Value], k: usize) -> f32 {
     spawns
         .get(k)
         .and_then(|s| s["age"].as_f64())
@@ -179,7 +179,7 @@ pub(crate) fn spawns_age(spawns: &[serde_json::Value], k: usize) -> f32 {
 }
 
 /// Traits (no two that clash) and perks within the points, at random.
-pub(crate) fn random_character(w: &mut World) -> (Vec<String>, Vec<String>) {
+pub(super) fn random_character(w: &mut World) -> (Vec<String>, Vec<String>) {
     let rules = w.content.rules;
     let span = rules.max_traits.saturating_sub(rules.min_traits) + 1;
     let target = rules.min_traits + (w.rng.next_u32() as usize) % span;

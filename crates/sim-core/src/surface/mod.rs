@@ -21,15 +21,15 @@ use crate::world::{MAX_OFFSET, ObjectInstance};
 use std::f32::consts::{FRAC_PI_2, PI};
 
 /// Slack (m) when checking that a disc stays on a top: offsets are whole centimetres.
-pub(crate) const SLACK: f32 = 0.006;
+const SLACK: f32 = 0.006;
 /// How far in from a table's edge a plate goes in front of a chair (m).
-pub(crate) const PLATE_IN: f32 = 0.3;
+const PLATE_IN: f32 = 0.3;
 /// How far in front of the middle of a seat built into a table its plate goes (m).
-pub(crate) const PLATE_AHEAD: f32 = 0.2;
+const PLATE_AHEAD: f32 = 0.2;
 /// Spacing (m) of the places tried on a top.
-pub(crate) const STEP: f32 = 0.05;
+const STEP: f32 = 0.05;
 /// How far a plate may go from right in front of its diner when that place is taken (m).
-pub(crate) const PLATE_SEARCH: f32 = 0.6;
+const PLATE_SEARCH: f32 = 0.6;
 
 mod approach;
 mod hosts;

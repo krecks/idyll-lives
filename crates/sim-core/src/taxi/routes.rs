@@ -68,7 +68,7 @@ pub(crate) fn booked_leave(
 
 /// `booked_leave` for any run that picks its riders up (to work or school, to a place or back
 /// from it, `leisure_leaving`).
-pub(crate) fn leave_for(
+pub(super) fn leave_for(
     taxis: &Taxis,
     cars: &[crate::cars::Car],
     tick: u64,
@@ -141,7 +141,7 @@ pub(crate) fn door_for(
 /// Where a rider waits for the taxi standing at `stop`: at the back of the pavement on their
 /// house's side, by where it stands (a step to its doors, or across the road to them), not in
 /// their driveway's mouth (`WAIT_ASIDE` along from it at least).
-pub(crate) fn wait_spot(travel: &crate::travel::Travel, stop: &Kerb) -> [f32; 2] {
+pub(super) fn wait_spot(travel: &crate::travel::Travel, stop: &Kerb) -> [f32; 2] {
     let g = &travel.graph;
     let road = &g.roads[stop.road as usize];
     let mouth = g.point(stop.mouth);
@@ -166,7 +166,7 @@ pub(crate) fn wait_spot(travel: &crate::travel::Travel, stop: &Kerb) -> [f32; 2]
 
 /// A slot for a taxi in `World::cars`: one free (a taxi done with its run), else a new one (none
 /// past `cars::MAX_CARS`).
-pub(crate) fn slot(w: &mut World) -> Option<u32> {
+pub(super) fn slot(w: &mut World) -> Option<u32> {
     let busy: Vec<u32> = w.taxis.runs.iter().filter_map(|r| r.car).collect();
     if let Some(c) = (0..w.cars.len())
         .find(|&c| w.cars[c].taxi && !w.cars[c].off_run && !busy.contains(&(c as u32)))
@@ -183,7 +183,7 @@ pub(crate) fn slot(w: &mut World) -> Option<u32> {
 
 /// The plots of run `k`'s halts, in order (housemates' one; a leisure run's place, `Run::place`,
 /// last going there, first coming back).
-pub(crate) fn halts_of(run: &Run) -> Vec<u32> {
+pub(super) fn halts_of(run: &Run) -> Vec<u32> {
     let n = run.halts() as usize;
     let mut halts = vec![u32::MAX; n];
     for st in &run.stops {
@@ -269,7 +269,7 @@ fn kerbs_for(
 /// by where it'd stand with no other taxi about, then clear of the other runs' taxis standing at
 /// about the time it's at each (a run's stands held for all its hours in town left a house in a
 /// row of driveways with none, and its riders walked: the run home didn't come).
-pub(crate) fn stands_and_way(
+pub(super) fn stands_and_way(
     w: &World,
     halts: &[u32],
     skip: Option<u32>,
@@ -364,7 +364,7 @@ fn lay_way(
 
 /// Run `k`'s route and the ticks along it where it stands at each halt, and where it stands there
 /// (its kerbs as planned; worked out again, after a load). None: no way.
-pub(crate) fn route_of(
+pub(super) fn route_of(
     w: &World,
     k: usize,
 ) -> Option<(crate::cars::Route, Vec<f32>, Vec<Kerb>, u64)> {
@@ -372,7 +372,7 @@ pub(crate) fn route_of(
 }
 
 /// `route_of`, coming in by the way out `by` (a point of `World::exits`) if one is given.
-pub(crate) fn route_via(
+pub(super) fn route_via(
     w: &World,
     k: usize,
     by: Option<[f32; 2]>,
@@ -407,7 +407,7 @@ pub(crate) fn route_via(
 /// The way in at `at` (a point of `World::exits`): how many cars wait out of sight to come in by
 /// it (`Car::waits_to_come_in_at`), and stand still on their way near it (`QUEUE_NEAR`, a second
 /// of drive time or more): a queue into its first junction.
-pub(crate) fn queued(w: &World, at: [f32; 2]) -> usize {
+pub(super) fn queued(w: &World, at: [f32; 2]) -> usize {
     let outside = w.cars.iter().filter(|c| c.waits_to_come_in_at(at)).count();
     let held = w
         .cars

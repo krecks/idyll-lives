@@ -29,7 +29,7 @@ pub(crate) fn prefer_factor(
 
 /// Where `sim` won't clean (tidying up or with a tool): where they couldn't get to a moment ago,
 /// and where someone else is cleaning (the briefs' `cleaning`).
-pub(crate) fn cleaning_skip(sim: &Sim, ctx: &Ctx) -> Vec<(i32, i32)> {
+pub(super) fn cleaning_skip(sim: &Sim, ctx: &Ctx) -> Vec<(i32, i32)> {
     let mut skip: Vec<(i32, i32)> = sim
         .unreachable_now(ctx.tick)
         .filter_map(|k| {

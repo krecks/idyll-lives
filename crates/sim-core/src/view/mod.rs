@@ -20,7 +20,7 @@ use crate::{MINUTES_PER_TICK, conversation};
 /// function, overall (0..1).
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct RoomView {
+struct RoomView {
     /// Lot room id (0 for the garden); changes when walls do.
     pub id: u16,
     pub garden: bool,
@@ -42,7 +42,7 @@ pub(crate) struct RoomView {
 
 /// A story event plus how much it matters (0 everyday, 1 notable, 2 a milestone).
 #[derive(Serialize)]
-pub(crate) struct EventView<'a> {
+struct EventView<'a> {
     #[serde(flatten)]
     pub event: &'a SocialEvent,
     pub importance: u8,
@@ -85,7 +85,7 @@ fn fingerprint(bytes: &[u8]) -> u64 {
 }
 
 /// A JSON object written field by field into a buffer.
-pub(crate) struct Obj<'a> {
+struct Obj<'a> {
     pub out: &'a mut Vec<u8>,
     pub fields: usize,
 }
@@ -157,7 +157,7 @@ impl<'a> Obj<'a> {
 
 /// The items of a JSON array, written one by one.
 #[derive(Default)]
-pub(crate) struct List {
+struct List {
     pub out: Vec<u8>,
     pub len: usize,
 }
@@ -169,7 +169,7 @@ mod town;
 mod ui;
 
 pub use catalog::*;
-pub(crate) use plan::*;
+use plan::*;
 pub use social::*;
 pub use town::*;
 pub use ui::*;

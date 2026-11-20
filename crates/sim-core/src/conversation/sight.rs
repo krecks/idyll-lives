@@ -5,7 +5,7 @@ use super::*;
 /// window, or a front door (between the house and outdoors), which stays shut but for someone
 /// going through it (as the renderer swings it: `doors.ts`). A doorway inside the house stands
 /// open, and fences and gates are talked over.
-pub(crate) fn shut(lot: &Lot, (ax, az): (i32, i32), (bx, bz): (i32, i32)) -> bool {
+pub(super) fn shut(lot: &Lot, (ax, az): (i32, i32), (bx, bz): (i32, i32)) -> bool {
     let side = match (bx - ax, bz - az) {
         (1, 0) => Side::PosX,
         (-1, 0) => Side::NegX,

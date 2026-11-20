@@ -9,7 +9,7 @@ impl Graph {
     /// to their middle with every arm of them; the stretches between them go, the road's
     /// stretches either side meeting half way between (its geometry as it was). Not on a
     /// roundabout's ring (a road whose ends are one node: its entries stay apart).
-    pub(crate) fn merge_junctions(&mut self) {
+    pub(super) fn merge_junctions(&mut self) {
         let n = self.nodes.len();
         let car = |g: &Graph, e: &Edge| g.roads[e.road as usize].drivable();
         let ring = |g: &Graph, r: u32| {
@@ -137,7 +137,7 @@ impl Graph {
         }
     }
 
-    pub(crate) fn index(&mut self) {
+    pub(super) fn index(&mut self) {
         let (mut max_x, mut max_z) = (0.0f32, 0.0f32);
         for r in &self.roads {
             for p in &r.pts {
@@ -163,7 +163,7 @@ impl Graph {
         }
     }
 
-    pub(crate) fn cell(&self, v: f32, n: usize) -> usize {
+    pub(super) fn cell(&self, v: f32, n: usize) -> usize {
         ((v.max(0.0) / CELL) as usize).min(n.saturating_sub(1))
     }
 

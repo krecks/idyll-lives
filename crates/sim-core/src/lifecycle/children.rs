@@ -37,7 +37,7 @@ pub(crate) fn room_for_one(w: &World, h: usize) -> bool {
 }
 
 /// At midnight: babies who are due are born (returned).
-pub(crate) fn births(w: &mut World) -> Vec<usize> {
+pub(super) fn births(w: &mut World) -> Vec<usize> {
     let today = clock::day(w.tick);
     let mut born = Vec::new();
     for h in 0..w.households.len() {
@@ -123,7 +123,7 @@ pub fn adopt(w: &mut World, household: u32, child: bool) -> Result<u32, crate::E
 /// household's name, random traits, a look (from the parents if `born` to them: an appearance
 /// seed with them; adopted children look like themselves), family links to the parents and
 /// their other children, and a crib for a baby.
-pub(crate) fn add_child(
+pub(super) fn add_child(
     w: &mut World,
     h: usize,
     age: f32,
@@ -211,7 +211,7 @@ pub(crate) fn add_child(
 
 /// Now and then a neighbour household of grown-ups with no children, room and the money for it
 /// adopts (content `adoption.neighbours`, a daily chance).
-pub(crate) fn neighbours_adopt(w: &mut World) {
+pub(super) fn neighbours_adopt(w: &mut World) {
     let (Some(cost), chance) = (w.content.life.adoption_cost, w.content.life.adoption_chance)
     else {
         return;

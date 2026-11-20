@@ -30,7 +30,7 @@ impl Routine {
     }
 
     /// Whether this routine has a block starting on `day` or still running from the day before.
-    pub(crate) fn touches(&self, day: u32) -> bool {
+    pub(super) fn touches(&self, day: u32) -> bool {
         let on = |d: u32| d >= 1 && self.days & (1 << clock::weekday(d)) != 0;
         on(day) || (day > 1 && on(day - 1) && self.start as u32 + self.minutes as u32 > 1440)
     }
@@ -228,7 +228,7 @@ pub const WAIT_FORGET_DAYS: u32 = 14;
 /// Results kept for the planner's look back.
 pub const HISTORY: usize = 80;
 /// How long a thought shows (game minutes).
-pub(crate) const THOUGHT_MINUTES: f32 = 60.0;
+pub(super) const THOUGHT_MINUTES: f32 = 60.0;
 
 #[derive(Debug, Clone, Default)]
 pub struct Planner {

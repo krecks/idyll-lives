@@ -26,19 +26,19 @@ pub struct Drive {
 }
 
 impl Drive {
-    pub(crate) fn meets(&self) -> Option<(u32, f32)> {
+    pub(super) fn meets(&self) -> Option<(u32, f32)> {
         Some((self.road?, self.s.filter(|s| s.is_finite())?))
     }
 
     /// The way it runs from its inner end to the street (a unit vector: `front`, `front_x`).
-    pub(crate) fn way(&self) -> Option<[f32; 2]> {
+    pub(super) fn way(&self) -> Option<[f32; 2]> {
         let (x, z) = (self.front_x, self.front);
         let l = x.hypot(z);
         (l.is_finite() && l > 0.5).then(|| [x / l, z / l])
     }
 
     /// Where a car `len` long parks on it: its middle `PARK_GAP` on from the inner end.
-    pub(crate) fn spot(&self, len: f32) -> [f32; 2] {
+    pub(super) fn spot(&self, len: f32) -> [f32; 2] {
         let [x, z] = self.way().unwrap_or([0.0, 0.0]);
         let k = PARK_GAP + len / 2.0;
         [self.x + x * k, self.z + z * k]
@@ -86,7 +86,7 @@ impl Garage {
 }
 
 /// The tiles the box from (x0, z0) to (x1, z1) covers at least half of each way.
-pub(crate) fn covered_tiles(x0: f32, z0: f32, x1: f32, z1: f32) -> Vec<(i32, i32)> {
+pub(super) fn covered_tiles(x0: f32, z0: f32, x1: f32, z1: f32) -> Vec<(i32, i32)> {
     let covers = |a: f32, b: f32, t: i32| (b.min(t as f32 + 1.0) - a.max(t as f32)) >= 0.5;
     let mut out = Vec::new();
     for z in z0.floor() as i32..=z1.floor() as i32 {
@@ -109,7 +109,7 @@ pub(crate) fn along_x<T>(sorted: &[T], x_of: impl Fn(&T) -> f32, x: f32, reach: 
 
 /// The point `along` the length (forward) and `left` across (to the left) of a car standing at
 /// `spot` facing `yaw`.
-pub(crate) fn local_at(spot: [f32; 2], yaw: f32, along: f32, left: f32) -> [f32; 2] {
+pub(super) fn local_at(spot: [f32; 2], yaw: f32, along: f32, left: f32) -> [f32; 2] {
     let (s, c) = yaw.sin_cos();
     [
         spot[0] + s * along + c * left,

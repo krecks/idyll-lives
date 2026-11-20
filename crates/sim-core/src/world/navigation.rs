@@ -69,7 +69,7 @@ impl World {
 
     /// Labels the walkable regions of the lot again if the navigation changed (see
     /// `path::Reach`): an unreachable goal is then refused before a search can flood the town.
-    pub(crate) fn refresh_reach(&mut self) {
+    pub(super) fn refresh_reach(&mut self) {
         if self.reach_version == self.nav_version && !self.reach.stale() {
             return;
         }

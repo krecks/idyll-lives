@@ -126,7 +126,7 @@ impl Car {
 
     /// Out of sight (`Sight`): it waits for nobody on the road or on foot, nor stays backed up or
     /// pulled over for anyone.
-    pub(crate) fn unhold(&mut self) {
+    pub(super) fn unhold(&mut self) {
         self.moved = false;
         self.waits_for = None;
         self.on_foot.clear();
@@ -144,13 +144,13 @@ impl Car {
     }
 
     /// Whether `j` may drive it: an owner, grown up.
-    pub(crate) fn driven_by(&self, briefs: &[SimBrief], j: u32) -> bool {
+    pub(super) fn driven_by(&self, briefs: &[SimBrief], j: u32) -> bool {
         self.owners.contains(&j) && briefs.get(j as usize).is_some_and(|b| b.adult)
     }
 
     /// The point `along` its length (forward) and `left` across it (to its left) from its middle,
     /// parked.
-    pub(crate) fn local(&self, along: f32, left: f32) -> [f32; 2] {
+    pub(super) fn local(&self, along: f32, left: f32) -> [f32; 2] {
         local_at(self.spot, self.yaw, along, left)
     }
 
@@ -224,7 +224,7 @@ impl Car {
     }
 
     /// Where someone stands to get in by door `d` (or out): beside it, outside the car.
-    pub(crate) fn door_at(&self, d: usize) -> [f32; 2] {
+    pub(super) fn door_at(&self, d: usize) -> [f32; 2] {
         let (k, along) = self.door_side(d);
         self.local(along, (self.wid / 2.0 + DOOR_OUT) * k)
     }
@@ -340,7 +340,7 @@ impl Car {
     /// Where its middle is, for the checks that pair it with another (`Near`): along its way, as
     /// `pull_want` has it (not as drawn: one waiting to come into town isn't, yet comes in this
     /// tick); else as it's drawn, or its spot.
-    pub(crate) fn middle(&self) -> [f32; 2] {
+    pub(super) fn middle(&self) -> [f32; 2] {
         match self.route.as_ref() {
             Some((_, r)) if r.points.len() >= 2 => r.at(self.progress).0,
             _ => self.shown.map_or(self.spot, |s| s.0),
@@ -349,7 +349,7 @@ impl Car {
 
     /// Coming into town from the way in (not from a trip's parking spot), it hasn't yet: out of
     /// sight there, waiting for room to come in (`drive_on`).
-    pub(crate) fn outside(&self) -> bool {
+    pub(super) fn outside(&self) -> bool {
         self.state == CarState::Arriving && self.trip.is_none() && self.progress <= 0.0
     }
 
@@ -364,7 +364,7 @@ impl Car {
     }
 
     /// Its route out of town or (`home`) back (worked out when first asked for).
-    pub(crate) fn route(
+    pub(super) fn route(
         &mut self,
         exits: &[[f32; 2]],
         travel: Option<&Travel>,
@@ -389,7 +389,7 @@ impl Car {
     /// Its way turned round `d` from the way it had (`Route::detour`), with its claims: none
     /// backing up out of the way it came (it backs into room that's clear, `unjam`, never deeper
     /// into another, `guard`).
-    pub(crate) fn detoured(
+    pub(super) fn detoured(
         &self,
         exits: &[[f32; 2]],
         travel: &Travel,
@@ -413,7 +413,7 @@ impl Car {
     }
 
     /// Works out again what follows from where it parks (after it came home, moved, or loaded).
-    pub(crate) fn settle(&mut self, exits: &[[f32; 2]], travel: Option<&Travel>) {
+    pub(super) fn settle(&mut self, exits: &[[f32; 2]], travel: Option<&Travel>) {
         let roads = travel.filter(|t| !t.graph.is_empty());
         let out = match roads.and_then(|t| Route::on_roads(self, exits, t, false)) {
             Some(out) => {
@@ -436,7 +436,7 @@ impl Car {
     }
 
     /// Where its driveway meets the road (`meets`, else the nearest road it can drive on).
-    pub(crate) fn mouth(&self, travel: &Travel) -> Option<RoadPoint> {
+    pub(super) fn mouth(&self, travel: &Travel) -> Option<RoadPoint> {
         let g = &travel.graph;
         self.meets
             .and_then(|(road, s)| g.at_source(road, s))
@@ -464,7 +464,7 @@ impl Car {
 
     /// The yaw it parks with after coming home, nose in: facing up its driveway, away from the
     /// street (`axis`), else away from the road it meets (the street, in towns with no roads).
-    pub(crate) fn nose_in_on(&self, travel: Option<&Travel>) -> f32 {
+    pub(super) fn nose_in_on(&self, travel: Option<&Travel>) -> f32 {
         if let Some([x, z]) = self.axis {
             // (0.0 - …: never -0.0, so a driveway along z gives the yaw `nose_in` does.)
             return (0.0 - x).atan2(0.0 - z);
@@ -482,7 +482,7 @@ impl Car {
     }
 
     /// The yaw it parks with after coming home: nose in, facing away from the street.
-    pub(crate) fn nose_in(&self) -> f32 {
+    pub(super) fn nose_in(&self) -> f32 {
         if self.street > self.spot[1] {
             std::f32::consts::PI
         } else {
@@ -496,7 +496,7 @@ impl Car {
     }
 
     /// The tiles it takes up parked at `at` facing `yaw`.
-    pub(crate) fn tiles_at(&self, at: [f32; 2], yaw: f32) -> Vec<(i32, i32)> {
+    pub(super) fn tiles_at(&self, at: [f32; 2], yaw: f32) -> Vec<(i32, i32)> {
         let (s, c) = yaw.sin_cos();
         // Axis-aligned enough: a car parks along its driveway, or square to the road in a bay.
         let (hw, hl) = if s.abs() > c.abs() {
@@ -509,7 +509,7 @@ impl Car {
     }
 
     /// Where it stands parked out on a trip (`CarState::Out`), and which way it faces.
-    pub(crate) fn out_at(&self) -> Option<([f32; 2], f32)> {
+    pub(super) fn out_at(&self) -> Option<([f32; 2], f32)> {
         self.trip
             .filter(|_| self.state == CarState::Out)
             .map(|t| (t.at, t.yaw))

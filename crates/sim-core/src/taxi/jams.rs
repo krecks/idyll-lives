@@ -9,22 +9,22 @@ use super::*;
 const JAM_STILL: u64 = crate::drive_secs(5.0);
 /// How long one car on its way stands still before the place counts as held up on its own (ticks
 /// of drive time).
-pub(crate) const LONE_STILL: u64 = crate::drive_secs(30.0);
-pub(crate) const JAM_NEAR: f32 = 8.0;
-pub(crate) const JAM_WAIT: u64 = crate::drive_secs(30.0);
+pub(super) const LONE_STILL: u64 = crate::drive_secs(30.0);
+pub(super) const JAM_NEAR: f32 = 8.0;
+pub(super) const JAM_WAIT: u64 = crate::drive_secs(30.0);
 /// A taxi stands clear of another's stand when it's there within this long of it, either way (ticks,
 /// `stand_window`): as each is timed, give or take its stand, a hold-up on its way and a wait at
 /// the edge of town (`JAM_WAIT`). Real time, not drive time: the stand is its riders' (getting
 /// in, `DWELL`, and coming out to it), which don't speed up with the traffic.
-pub(crate) const STAND_NEAR: u64 = crate::secs(30.0);
+pub(super) const STAND_NEAR: u64 = crate::secs(30.0);
 /// A run whose stand another taxi has when it'd be there comes as much later as clears it, by
 /// `STAND_NEAR` at a time, this much at most (ticks, `stands_and_way`).
-pub(crate) const STAND_LATER: u64 = 3 * 60 * TICKS_PER_MINUTE;
+pub(super) const STAND_LATER: u64 = 3 * 60 * TICKS_PER_MINUTE;
 /// A car on its way that stays within this of where it was (m) stands still, as `jammed` has it.
 const STILL_REACH: f32 = 3.0;
 
 /// Since when each car on its way has stood still (`Taxis::still`).
-pub(crate) fn note_still(w: &mut World) {
+pub(super) fn note_still(w: &mut World) {
     let tick = w.tick;
     let red: Vec<bool> = (0..w.cars.len())
         .map(|c| {
@@ -58,7 +58,7 @@ pub(crate) fn note_still(w: &mut World) {
 /// more by it standing still on their way for `JAM_STILL` or longer (a ring of them waiting for
 /// each other, or a queue into one); anywhere else two such cars stand near each other (held up
 /// face to face on a stretch); and any one car standing still on its way `LONE_STILL` or longer.
-pub(crate) fn jammed(w: &World) -> Vec<([f32; 2], f32)> {
+pub(super) fn jammed(w: &World) -> Vec<([f32; 2], f32)> {
     let g = &w.travel.graph;
     let mut out: Vec<([f32; 2], f32)> = w
         .taxis
@@ -108,7 +108,7 @@ pub(crate) fn jammed(w: &World) -> Vec<([f32; 2], f32)> {
 
 /// Whether `route` goes through one of the places held up given (`jammed`), or by it (`JAM_NEAR`:
 /// the junction it holds up, the queue into it).
-pub(crate) fn through(route: &crate::cars::Route, jams: &[([f32; 2], f32)]) -> bool {
+pub(super) fn through(route: &crate::cars::Route, jams: &[([f32; 2], f32)]) -> bool {
     jams.iter().any(|&(m, r)| {
         route
             .points
@@ -122,13 +122,13 @@ pub(crate) fn through(route: &crate::cars::Route, jams: &[([f32; 2], f32)]) -> b
 
 /// The most a taxi ride to a visit or an outing may take, door to door, against walking there:
 /// less than this share of the walk, else they walk (per cent).
-pub(crate) const LEISURE_BEATS: f32 = 0.9;
+pub(super) const LEISURE_BEATS: f32 = 0.9;
 /// The taxi's stands on the way and a rider's wait at the kerb (minutes, `leisure_eta`).
-pub(crate) const LEISURE_KERBS: f32 = 8.0;
+pub(super) const LEISURE_KERBS: f32 = 8.0;
 /// A walk to or from the kerb is about this much longer than as the crow flies (`kerb_walks`).
-pub(crate) const KERB_WINDING: f32 = 1.3;
+pub(super) const KERB_WINDING: f32 = 1.3;
 /// Those off to the same place within this long of each other share a taxi (ticks).
-pub(crate) const LEISURE_WINDOW: u64 = 30 * TICKS_PER_MINUTE;
+pub(super) const LEISURE_WINDOW: u64 = 30 * TICKS_PER_MINUTE;
 /// A taxi back from a place comes this long after its rider's visit ends (ticks: a goodbye and
 /// out to the kerb).
-pub(crate) const BACK_SLACK: u64 = 8 * TICKS_PER_MINUTE;
+pub(super) const BACK_SLACK: u64 = 8 * TICKS_PER_MINUTE;

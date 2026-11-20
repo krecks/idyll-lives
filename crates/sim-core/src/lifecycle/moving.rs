@@ -2,14 +2,14 @@
 
 use super::*;
 
-pub(crate) fn members(w: &World, h: usize) -> Vec<usize> {
+pub(super) fn members(w: &World, h: usize) -> Vec<usize> {
     (0..w.sims.len())
         .filter(|&i| w.sims[i].here() && w.sims[i].household as usize == h)
         .collect()
 }
 
 /// Residents of household `h` who are here and past the crib (who need a bed).
-pub(crate) fn sleepers(w: &World, h: usize) -> Vec<usize> {
+pub(super) fn sleepers(w: &World, h: usize) -> Vec<usize> {
     members(w, h)
         .into_iter()
         .filter(|&i| !w.content.life.baby(w.sims[i].age))
@@ -23,7 +23,7 @@ pub(crate) fn sleepers(w: &World, h: usize) -> Vec<usize> {
 /// the life stages its bed is for (content `stages`: the race car bed is a child's). A spare bed
 /// opened out for the night (`Interaction::spare` and `leaves` open: the sofa bed pulled out) is a
 /// place; a night on the sofa isn't.
-pub(crate) struct Beds {
+pub(super) struct Beds {
     /// A place each, and the stages that may sleep there: a bed, a bunk, or a couple's bed slept
     /// in alone.
     places: Vec<StageMask>,
@@ -36,7 +36,7 @@ impl Beds {
     /// `pairs` couples among them: each takes a place their stage may sleep in, those with the
     /// fewest to choose from first and the place for the fewest stages first; then a couple's
     /// bed's other half for each couple.
-    pub(crate) fn unplaced(&self, stages: &[usize], pairs: usize) -> Vec<usize> {
+    pub(super) fn unplaced(&self, stages: &[usize], pairs: usize) -> Vec<usize> {
         let fits = |mask: StageMask, s: usize| crate::content::stage_in(mask, s);
         let mut places = self.places.clone();
         places.sort_by_key(|m| m.count_ones());
@@ -68,12 +68,12 @@ impl Beds {
     }
 
     /// How many of `stages` have a place here, with `pairs` couples among them.
-    pub(crate) fn placed(&self, stages: &[usize], pairs: usize) -> usize {
+    pub(super) fn placed(&self, stages: &[usize], pairs: usize) -> usize {
         stages.len() - self.unplaced(stages, pairs).len()
     }
 
     /// The most of life stage `stage` who could sleep here: couples in every couple's bed.
-    pub(crate) fn most(&self, stage: usize) -> usize {
+    pub(super) fn most(&self, stage: usize) -> usize {
         let fits = |m: &&StageMask| crate::content::stage_in(**m, stage);
         self.places.iter().filter(fits).count() + self.couples.iter().filter(fits).count()
     }
@@ -82,7 +82,7 @@ impl Beds {
 /// The stages a bed of kind `def` is for (its night's sleep, content `stages`); None: no bed (no
 /// night's sleep, or only a baby's; a spare bed's only if `spare` and it opens out into a bed for
 /// the night, the sofa bed pulled out, not a night curled up on the sofa).
-pub(crate) fn bed_stages(
+pub(super) fn bed_stages(
     content: &crate::content::Content,
     def: &crate::content::ObjectDef,
     spare: bool,
@@ -97,7 +97,7 @@ pub(crate) fn bed_stages(
         .reduce(|a, b| a | b)
 }
 
-pub(crate) fn beds(w: &World, plot: u32) -> Beds {
+pub(super) fn beds(w: &World, plot: u32) -> Beds {
     let mut beds = Beds {
         places: Vec::new(),
         couples: Vec::new(),
@@ -125,14 +125,14 @@ pub(crate) fn beds(w: &World, plot: u32) -> Beds {
 }
 
 /// The life stage of `sims`, each.
-pub(crate) fn stages_of(w: &World, sims: &[usize]) -> Vec<usize> {
+pub(super) fn stages_of(w: &World, sims: &[usize]) -> Vec<usize> {
     sims.iter()
         .map(|&i| w.content.life.stage(w.sims[i].age))
         .collect()
 }
 
 /// The first grown-up life stage (whoever moves in is one).
-pub(crate) fn grown_stage(w: &World) -> usize {
+pub(super) fn grown_stage(w: &World) -> usize {
     w.content
         .life
         .stages
@@ -142,7 +142,7 @@ pub(crate) fn grown_stage(w: &World) -> usize {
 }
 
 /// Couples among `sims` (both of them in it).
-pub(crate) fn pairs(w: &World, sims: &[usize]) -> usize {
+pub(super) fn pairs(w: &World, sims: &[usize]) -> usize {
     sims.iter()
         .filter(|&&a| {
             w.relationships
@@ -154,7 +154,7 @@ pub(crate) fn pairs(w: &World, sims: &[usize]) -> usize {
 
 /// Whether household `h`'s home has a bed and room for one more resident, the partner of one of
 /// them moving in.
-pub(crate) fn has_room_for_partner(w: &World, h: usize) -> bool {
+pub(super) fn has_room_for_partner(w: &World, h: usize) -> bool {
     let Some(plot) = w.households[h].plot else {
         return false;
     };
@@ -173,7 +173,7 @@ pub(crate) fn has_room_for_partner(w: &World, h: usize) -> bool {
 /// that day (moved, they were taken from the host's home ten minutes in), nor out on a trip by
 /// car, there or back (`cars::on_trip`: moved at the wheel, they got out where the car stood, and
 /// it waited in the road for them for good).
-pub(crate) fn may_move(w: &World, i: usize) -> bool {
+pub(super) fn may_move(w: &World, i: usize) -> bool {
     let s = &w.sims[i];
     s.here()
         && s.visiting.is_none()
@@ -184,7 +184,7 @@ pub(crate) fn may_move(w: &World, i: usize) -> bool {
 
 /// A home nobody lives in (a house or a flat; not a park, not the player's home), with beds for
 /// `n`: one, or two partners.
-pub(crate) fn vacant_plot(w: &World, n: usize) -> Option<u32> {
+pub(super) fn vacant_plot(w: &World, n: usize) -> Option<u32> {
     w.plots
         .iter()
         .filter(|p| w.is_home(p.id))
@@ -199,7 +199,7 @@ pub(crate) fn vacant_plot(w: &World, n: usize) -> Option<u32> {
 }
 
 /// A household for the house on `plot`: the empty one already there, else a new one.
-pub(crate) fn household_for(w: &mut World, plot: u32, name: &str) -> usize {
+pub(super) fn household_for(w: &mut World, plot: u32, name: &str) -> usize {
     if let Some(h) = w.households.iter().position(|hh| hh.plot == Some(plot)) {
         let hh = &mut w.households[h];
         hh.name = name.to_string();
@@ -225,7 +225,7 @@ pub(crate) fn household_for(w: &mut World, plot: u32, name: &str) -> usize {
 }
 
 /// Moves resident `i` into household `to`, with their share of their old household's money.
-pub(crate) fn move_to(w: &mut World, i: usize, to: usize) {
+pub(super) fn move_to(w: &mut World, i: usize, to: usize) {
     let from = w.sims[i].household as usize;
     if from == to {
         return;
@@ -256,7 +256,7 @@ pub(crate) fn move_to(w: &mut World, i: usize, to: usize) {
 }
 
 /// Partners move in together; grown children move out (or away).
-pub(crate) fn moving(w: &mut World, rules: &crate::content::MovingRules) {
+pub(super) fn moving(w: &mut World, rules: &crate::content::MovingRules) {
     let tick = w.tick;
     let n = w.sims.len();
     // Partners in different homes.

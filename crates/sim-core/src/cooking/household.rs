@@ -24,7 +24,7 @@ pub(crate) fn after_step(w: &mut World) {
 
 /// "Dinner's ready": everyone else at home, awake and not busy with what the player asked for,
 /// is keener to eat for a while (and drops what they chose themselves if they're hungry).
-pub(crate) fn invite(w: &mut World) {
+pub(super) fn invite(w: &mut World) {
     let tick = w.tick;
     for i in 0..w.sims.len() {
         let Some(item) = w.sims[i].served.take() else {
@@ -81,7 +81,7 @@ pub(crate) fn invite(w: &mut World) {
 /// Whether `s` goes on with what they carry (`settle` leaves it with them): here, and at
 /// something that keeps it (`TaskKind::carries_held`: cooking, carrying a harvest, ...), or about
 /// to cook (a recipe loaded from a save).
-pub(crate) fn going_on(s: &crate::world::Sim) -> bool {
+pub(super) fn going_on(s: &crate::world::Sim) -> bool {
     s.here()
         && match &s.current {
             Some(a) => a.task.kind.carries_held(),
@@ -127,7 +127,7 @@ pub(crate) fn settle(w: &mut World) {
 /// Every `ROOM_REFRESH_TICKS`: food goes off, dirty things make their tile dirtier, and things
 /// whose place is gone (their table sold, their household moved away) go too, as do those left
 /// off their household's plot (a plate at a café or in the park) once nobody eats from them.
-pub(crate) fn update(w: &mut World) {
+pub(super) fn update(w: &mut World) {
     let content = &w.content;
     let rules = &content.cooking;
     let tick = w.tick;

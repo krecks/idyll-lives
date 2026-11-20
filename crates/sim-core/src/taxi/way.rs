@@ -4,13 +4,13 @@ use super::*;
 
 /// A taxi's body keeps this far either side of a driveway's mouth (m, `kerb_at`: a car's length
 /// and a margin; a taxi at its rider's own mouth held the household's car in the driveway).
-pub(crate) const DRIVE_CLEAR: f32 = 5.5;
+pub(super) const DRIVE_CLEAR: f32 = 5.5;
 /// With no stand that clear within reach, at least this clear (m: half a driveway's mouth and a
 /// little, so nobody's way out is across its body).
-pub(crate) const DRIVE_LEAST: f32 = 2.0;
+pub(super) const DRIVE_LEAST: f32 = 2.0;
 /// A taxi's stand keeps this far from a public parking spot (m, `kerb_at`): a car's length, and
 /// a little to swing in or out.
-pub(crate) const PARK_CLEAR: f32 = 4.0;
+pub(super) const PARK_CLEAR: f32 = 4.0;
 
 /// The radii of a taxi's turn round in a dead end's turning circle on a road `width` m wide of
 /// `kind` (`u_turn`): the loop round its middle, the lane's offset, and how far before the end
@@ -28,7 +28,7 @@ fn u_turn_radii(width: f32, kind: crate::travel::RoadKind) -> (f32, f32, f32) {
 }
 
 /// How far before a dead end's end a taxi turning round there begins to (m).
-pub(crate) fn u_turn_reach(width: f32, kind: crate::travel::RoadKind) -> f32 {
+pub(super) fn u_turn_reach(width: f32, kind: crate::travel::RoadKind) -> f32 {
     u_turn_radii(width, kind).2
 }
 
@@ -36,14 +36,14 @@ pub(crate) fn u_turn_reach(width: f32, kind: crate::travel::RoadKind) -> f32 {
 /// a car may take, those of the nodes a car can turn round at (a dead end's turning circle with
 /// its stretch long enough to swerve into it), and the stretches through a place held up now
 /// (`jammed`).
-pub(crate) struct Net {
+pub(super) struct Net {
     adj: Vec<Vec<u32>>,
     turn: Vec<bool>,
     jam: Vec<bool>,
 }
 
 impl Net {
-    pub(crate) fn new(
+    pub(super) fn new(
         travel: &crate::travel::Travel,
         meta: &serde_json::Value,
         jammed: &[([f32; 2], f32)],
@@ -268,7 +268,7 @@ fn far_side(g: &crate::travel::Graph, kerb: &Kerb, d: f32) -> bool {
 /// `way_out`, as a car drives (`way_between`), the way it comes to each kerb chosen for the
 /// quickest way on (`FAR_SIDE` on top for standing across the road from the house). The stretches
 /// driven, in legs: one up to each kerb, then out. None: no way.
-pub(crate) fn plan_way(
+pub(super) fn plan_way(
     travel: &crate::travel::Travel,
     net: &Net,
     way_in: [f32; 2],
@@ -369,7 +369,7 @@ pub(crate) fn plan_way(
 /// turning circle, `u_turn`; else nose first into a side street at a junction and backing out,
 /// `side_turn`; each a claim of its own), and off the map at the end. Its claims worked out
 /// (`Route::claim`); with the ticks along it where it stands at each kerb.
-pub(crate) fn lay_route(
+pub(super) fn lay_route(
     travel: &crate::travel::Travel,
     net: &Net,
     legs: &[Vec<Piece>],

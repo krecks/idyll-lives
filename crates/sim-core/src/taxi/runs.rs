@@ -30,7 +30,7 @@ fn route_in(w: &World, k: usize) -> Option<(crate::cars::Route, Vec<f32>, Vec<Ke
 }
 
 /// The way out of town (`World::exits`) nearest `kerb` as the crow flies.
-pub(crate) fn nearest_way_out(w: &World, kerb: &Kerb) -> Option<[f32; 2]> {
+pub(super) fn nearest_way_out(w: &World, kerb: &Kerb) -> Option<[f32; 2]> {
     let at = w.travel.graph.point(kerb.mouth);
     w.exits
         .iter()
@@ -40,7 +40,7 @@ pub(crate) fn nearest_way_out(w: &World, kerb: &Kerb) -> Option<[f32; 2]> {
 
 /// Run `k` a tick on: into town when it's time, driving, standing at its stop. False: it's over
 /// (out of town at the end of its route, or it couldn't run).
-pub(crate) fn run_on(w: &mut World, k: usize) -> bool {
+pub(super) fn run_on(w: &mut World, k: usize) -> bool {
     let tick = w.tick;
     let run = &w.taxis.runs[k];
     if run.home && run.enter == 0 {
@@ -637,7 +637,7 @@ pub(crate) fn boarded(w: &mut World, i: usize, c: u32) {
 
 /// The run `k` is over: its taxi out of town, its slot free; those on it to work at work (their
 /// arrival noted, `Taxis::arrivals`); anyone still booked on it makes their own way.
-pub(crate) fn finish(w: &mut World, k: usize) {
+pub(super) fn finish(w: &mut World, k: usize) {
     let tick = w.tick;
     let off_map = crate::cars::off_map_ticks(w);
     let run = w.taxis.runs[k].clone();
@@ -807,7 +807,7 @@ fn homeward(w: &World, i: usize) -> Option<(u32, u32)> {
 
 /// The runs home leaving work now: their stops in a short order from the way in, and when the
 /// taxi comes into town (after the way off the map); each rider away till they're dropped off.
-pub(crate) fn close_home_runs(w: &mut World) {
+pub(super) fn close_home_runs(w: &mut World) {
     let tick = w.tick;
     let off_map = crate::cars::off_map_ticks(w);
     for k in 0..w.taxis.runs.len() {

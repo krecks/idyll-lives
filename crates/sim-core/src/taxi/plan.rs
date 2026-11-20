@@ -7,7 +7,7 @@ use super::*;
 /// with the time (asked for by everyone who might ride, each minute, it was most of a big
 /// world's step). Recomputed after a load the same as it was.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct Kerbs {
+pub(super) struct Kerbs {
     /// What they were found for (`kerb_stamp`): the driveways and the network.
     stamp: u64,
     /// `drive_mouths` for it.
@@ -44,7 +44,7 @@ fn kerb_stamp(w: &World) -> u64 {
 
 /// Finds the stand (`stop_for`) of every household's house not yet found (all again when the
 /// driveways or the network have changed since, `kerb_stamp`).
-pub(crate) fn warm_kerbs(w: &mut World) {
+pub(super) fn warm_kerbs(w: &mut World) {
     let stamp = kerb_stamp(w);
     if w.taxis.kerbs.stamp != stamp {
         w.taxis.kerbs = Kerbs {
@@ -133,34 +133,34 @@ pub struct Run {
     pub car: Option<u32>,
     /// The ticks along its route of each stop. Not saved.
     #[serde(skip)]
-    pub(crate) at: Vec<f32>,
+    pub(super) at: Vec<f32>,
     /// Where it stands at each of its halts (`kerb_at`): as planned, else worked out as it comes
     /// into town (and again on load). Not saved.
     #[serde(skip)]
-    pub(crate) kerbs: Vec<Kerb>,
+    pub(super) kerbs: Vec<Kerb>,
     /// Its way as last laid (`way_for`) and what for, as it was timed: coming into town
     /// (`route_in`) round the same places held up, it takes that rather than laying the same way
     /// again. Not saved.
     #[serde(skip)]
-    pub(crate) laid: Option<Box<Laid>>,
+    pub(super) laid: Option<Box<Laid>>,
 }
 
 /// A taxi's way as laid (`way_for`): its route and the ticks along it where it stands at each of
 /// `kerbs`, in at `way_in` and out at `way_out` round the places held up then (`jams`).
 #[derive(Debug, Clone)]
-pub(crate) struct Laid {
-    pub(crate) way_in: [f32; 2],
-    pub(crate) kerbs: Vec<Kerb>,
-    pub(crate) way_out: [f32; 2],
-    pub(crate) jams: Vec<([f32; 2], f32)>,
-    pub(crate) route: crate::cars::Route,
-    pub(crate) at: Vec<f32>,
+pub(super) struct Laid {
+    pub(super) way_in: [f32; 2],
+    pub(super) kerbs: Vec<Kerb>,
+    pub(super) way_out: [f32; 2],
+    pub(super) jams: Vec<([f32; 2], f32)>,
+    pub(super) route: crate::cars::Route,
+    pub(super) at: Vec<f32>,
 }
 
 impl Laid {
     /// Whether it's the way `way_for` lays for these (the network the same: it changes only with a
     /// load).
-    pub(crate) fn is_for(
+    pub(super) fn is_for(
         &self,
         way_in: [f32; 2],
         kerbs: &[Kerb],
@@ -215,18 +215,18 @@ pub struct Booking {
 }
 
 impl Run {
-    pub(crate) fn stop_of(&self, sim: u32) -> Option<usize> {
+    pub(super) fn stop_of(&self, sim: u32) -> Option<usize> {
         self.stops.iter().position(|s| s.sim == sim)
     }
 
     /// Whether it picks its riders up at the kerb (to work or school, out to a place, or back from
     /// one), and at which halt `st` is picked up (back from a place: its first, the place's).
-    pub(crate) fn picks_up(&self) -> bool {
+    pub(super) fn picks_up(&self) -> bool {
         !self.home || self.place.is_some()
     }
 
     /// Whether it's the taxi for one off on `task`: to work or school, to its place, home from it.
-    pub(crate) fn serves(&self, task: &TaskKind) -> bool {
+    pub(super) fn serves(&self, task: &TaskKind) -> bool {
         match (self.place, self.home) {
             (None, _) => matches!(task, TaskKind::Work),
             (Some(p), false) => matches!(task, TaskKind::Visit { plot } if *plot == p),
@@ -234,13 +234,13 @@ impl Run {
         }
     }
 
-    pub(crate) fn pickup_halt(&self, st: &Stop) -> u32 {
+    pub(super) fn pickup_halt(&self, st: &Stop) -> u32 {
         if self.home { 0 } else { st.halt as u32 }
     }
 
     /// The halt where `st` gets out: home (`st.halt`), or out to a place, its last; none on to
     /// work.
-    pub(crate) fn drop_halt(&self, st: &Stop) -> Option<u32> {
+    pub(super) fn drop_halt(&self, st: &Stop) -> Option<u32> {
         match (self.home, self.place) {
             (true, _) => Some(st.halt as u32),
             (false, Some(_)) => Some(self.halts() - 1),
@@ -250,7 +250,7 @@ impl Run {
 
     /// How many halts it makes: one for each house (housemates' one), and the place it goes to or
     /// back from.
-    pub(crate) fn halts(&self) -> u32 {
+    pub(super) fn halts(&self) -> u32 {
         let most = self
             .stops
             .iter()
@@ -263,7 +263,7 @@ impl Run {
 
 /// Resident `i`'s group for the taxi: the way out they leave by (whatever their work or school:
 /// the taxi's shared; 0, then the way out's index).
-pub(crate) fn group(w: &World, i: usize) -> Option<(u32, u32)> {
+pub(super) fn group(w: &World, i: usize) -> Option<(u32, u32)> {
     let c = w.sims[i].commute?;
     Some((0, c.exit as u32))
 }
@@ -271,7 +271,7 @@ pub(crate) fn group(w: &World, i: usize) -> Option<(u32, u32)> {
 /// Where the taxi would stand for resident `i` at home (`kerb_at`), no other taxi about: as found
 /// by `warm_kerbs`, for the same door, driveways and network (`kerb_stamp`); else worked out (not
 /// found yet, or found for a town since changed: whoever asks first, `warm_kerbs` or not).
-pub(crate) fn stop_for(w: &World, i: usize) -> Option<Kerb> {
+pub(super) fn stop_for(w: &World, i: usize) -> Option<Kerb> {
     let plot = w.households.get(w.sims[i].household as usize)?.plot?;
     let door = w
         .plots
@@ -296,7 +296,7 @@ pub(crate) fn stop_for(w: &World, i: usize) -> Option<Kerb> {
 
 /// Where each driveway meets its road (the network's road, and how far along it): a taxi stands
 /// clear of them (`kerb_at`, `DRIVE_CLEAR`).
-pub(crate) fn drive_mouths(w: &World) -> Vec<(u32, f32)> {
+pub(super) fn drive_mouths(w: &World) -> Vec<(u32, f32)> {
     let g = &w.travel.graph;
     w.drives
         .iter()
@@ -362,7 +362,7 @@ pub(crate) fn update(w: &mut World) {
 /// The start of resident `i`'s work (or school) a taxi would take them to: today's still to come,
 /// or begun no longer than `late_minutes` ago with them not yet gone (a game begun after they'd
 /// have set off: late, but sooner than on foot); else the next.
-pub(crate) fn start_for(w: &World, i: usize) -> Option<u64> {
+pub(super) fn start_for(w: &World, i: usize) -> Option<u64> {
     let s = &w.sims[i];
     let day = crate::clock::day(w.tick);
     let gone = match &s.job {

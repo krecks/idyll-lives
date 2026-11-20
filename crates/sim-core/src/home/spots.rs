@@ -56,7 +56,7 @@ impl World {
 
     /// Whether every tile of `obj` is outdoors (a tile split by a diagonal wall counts as indoors
     /// when either half is).
-    pub(crate) fn all_outdoors(&self, obj: &ObjectInstance) -> bool {
+    pub(super) fn all_outdoors(&self, obj: &ObjectInstance) -> bool {
         obj.tiles(&self.content)
             .all(|(x, z)| self.lot.room_at(x, z) == OUTDOORS)
     }
@@ -76,7 +76,7 @@ impl World {
     /// Furniture on the floor (not pictures, ceiling lamps up out of the way, rugs, things on tops or stairs)
     /// doesn't go just inside a door, where it would make the way through a squeeze: a lamp
     /// nobody needs to reach could otherwise stand anywhere that leaves the rest reachable.
-    pub(crate) fn keep_doorway_clear(
+    pub(super) fn keep_doorway_clear(
         &self,
         def: usize,
         x: i32,

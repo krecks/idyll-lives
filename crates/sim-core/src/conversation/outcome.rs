@@ -2,7 +2,7 @@
 
 use super::*;
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn apply_outcome(
+pub(super) fn apply_outcome(
     content: &Content,
     rels: &mut Relationships,
     events: &mut EventLog,
@@ -178,7 +178,7 @@ fn break_up(
     events.push(tick, EventKind::BrokeUp, leaver, left, None);
 }
 
-pub(crate) fn gain(sim: &mut Sim, total: &[f32; MAX_NEEDS], minutes: f32) {
+pub(super) fn gain(sim: &mut Sim, total: &[f32; MAX_NEEDS], minutes: f32) {
     for (n, g) in total.iter().enumerate() {
         if *g != 0.0 {
             sim.needs[n] = (sim.needs[n] + g / minutes * MINUTES_PER_TICK * sim.mods.need_gain[n])
@@ -193,7 +193,7 @@ fn nudge(sim: &mut Sim, delta: &[f32; MAX_NEEDS]) {
     }
 }
 
-pub(crate) fn pair_mut(sims: &mut [Sim], a: usize, b: usize) -> (&mut Sim, &mut Sim) {
+pub(super) fn pair_mut(sims: &mut [Sim], a: usize, b: usize) -> (&mut Sim, &mut Sim) {
     assert_ne!(a, b);
     if a < b {
         let (l, r) = sims.split_at_mut(b);
@@ -204,10 +204,10 @@ pub(crate) fn pair_mut(sims: &mut [Sim], a: usize, b: usize) -> (&mut Sim, &mut 
     }
 }
 
-pub(crate) fn dist(a: [f32; 2], b: [f32; 2]) -> f32 {
+pub(super) fn dist(a: [f32; 2], b: [f32; 2]) -> f32 {
     (a[0] - b[0]).hypot(a[1] - b[1])
 }
 
-pub(crate) fn facing(from: [f32; 2], to: [f32; 2]) -> f32 {
+pub(super) fn facing(from: [f32; 2], to: [f32; 2]) -> f32 {
     (to[0] - from[0]).atan2(to[1] - from[1])
 }

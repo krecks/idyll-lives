@@ -5,7 +5,7 @@ use super::*;
 /// Clearing away, step by step: fetch what's to be cleared (stage 0); scrape the food off
 /// into a bin (1; with none, it's done at the sink); wash up (2; `waited`: ticks waited for a
 /// busy sink); put the clean things away at a counter (3; with none, from the sink).
-pub(crate) fn dishes_next(
+pub(super) fn dishes_next(
     sim: &mut Sim,
     task: Task,
     ctx: &Ctx,
@@ -119,7 +119,7 @@ pub(crate) fn dishes_next(
 
 /// What clearing away `def` leaves to wash up: itself if it's dirty, else what it is empty (a
 /// pot of stew, a dirty pot); none, it's thrown away whole.
-pub(crate) fn washed(content: &Content, def: usize) -> Option<usize> {
+pub(super) fn washed(content: &Content, def: usize) -> Option<usize> {
     let d = &content.items[def];
     if d.dirty { Some(def) } else { d.empty_as }
 }
@@ -165,7 +165,7 @@ pub(crate) fn queued(
 /// `carried`, those skipped since the step before (see `cook_next`), and when no later step has
 /// a station in `mask`, all the later ones too (a fridge-only kitchen makes the whole meal at
 /// the fridge).
-pub(crate) fn extra_minutes(r: &RecipeDef, step: usize, mask: StationMask, carried: u16) -> f32 {
+pub(super) fn extra_minutes(r: &RecipeDef, step: usize, mask: StationMask, carried: u16) -> f32 {
     let later = &r.steps[(step + 1).min(r.steps.len())..];
     let trailing = if later.iter().all(|s| s.optional && s.mask & mask == 0) {
         later.iter().map(|s| s.minutes).sum()
@@ -176,7 +176,7 @@ pub(crate) fn extra_minutes(r: &RecipeDef, step: usize, mask: StationMask, carri
 }
 
 /// Turns to face `o`, standing: straight at it from their own spot along it (`stand_spot`).
-pub(crate) fn face(sim: &mut Sim, ctx: &Ctx, o: &ObjectInstance) {
+pub(super) fn face(sim: &mut Sim, ctx: &Ctx, o: &ObjectInstance) {
     let content = ctx.content;
     let c = o.centre(content);
     sim.yaw = match o

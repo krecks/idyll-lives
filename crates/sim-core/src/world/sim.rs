@@ -14,7 +14,7 @@ pub const MAX_SIMS: usize = 768;
 pub struct SimSet([u64; SIM_WORDS]);
 
 /// Words in a `SimSet`.
-pub(crate) const SIM_WORDS: usize = MAX_SIMS.div_ceil(64);
+pub(super) const SIM_WORDS: usize = MAX_SIMS.div_ceil(64);
 
 impl SimSet {
     pub fn insert(&mut self, sim: u32) {
@@ -63,20 +63,20 @@ pub(crate) const AUTONOMY_DELAY_TICKS: u32 = crate::secs(1.0) as u32;
 /// which they do nothing else (`Sim::ladder_ticks`).
 pub(crate) const LADDER_DOWN_TICKS: u32 = crate::secs(6.5) as u32;
 /// Stepping aside out of a car's way (`cars::make_way`): at most this far in one step (m).
-pub(crate) const SIDESTEP_MOST: f32 = 0.3;
-pub(crate) const MIN_AUTONOMY_SCORE: f32 = 0.01;
+pub(super) const SIDESTEP_MOST: f32 = 0.3;
+pub(super) const MIN_AUTONOMY_SCORE: f32 = 0.01;
 /// How much less a meal nobody at home would eat tempts free will (the cooking practice it
 /// gives aside): cooked only with nothing much else to do.
-pub(crate) const UNWANTED_MEAL: f32 = 0.1;
+pub(super) const UNWANTED_MEAL: f32 = 0.1;
 /// A baby with a need below this cries for someone (and lies awake in the crib).
-pub(crate) const BABY_CRIES_BELOW: f32 = 0.3;
+pub(super) const BABY_CRIES_BELOW: f32 = 0.3;
 pub const TICKS_PER_DAY: u64 = crate::clock::TICKS_PER_DAY;
-pub(crate) const TICKS_PER_HOUR: u64 = 60 * TICKS_PER_MINUTE;
+pub(super) const TICKS_PER_HOUR: u64 = 60 * TICKS_PER_MINUTE;
 /// Rooms are re-scored this often (for dirt), and whenever the structure changes.
 pub(crate) const ROOM_REFRESH_TICKS: u64 = 10 * TICKS_PER_MINUTE;
 /// Past this many tiles where things changed between ticks, every room is scored again for what
 /// stands in it (`World::rooms_things_changed`).
-pub(crate) const MOST_THINGS_AT: usize = 64;
+pub(super) const MOST_THINGS_AT: usize = 64;
 
 /// How many outfits each resident has to change between (`Sim::outfit`).
 pub const OUTFITS: u8 = 3;

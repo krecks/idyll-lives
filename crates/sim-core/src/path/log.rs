@@ -37,7 +37,7 @@ impl NavChanges {
     /// Adds the change that made `version`, over tiles `r`. (With no room, two earlier patches
     /// make room, so the new one is kept as it is and a walker that looked between them isn't
     /// told of a box round older ones.)
-    pub(crate) fn add(&mut self, r: [i32; 4], version: u32) {
+    pub(super) fn add(&mut self, r: [i32; 4], version: u32) {
         if self.len < NAV_LOG_PATCHES {
             self.rects[self.len] = (r, version);
             self.len += 1;

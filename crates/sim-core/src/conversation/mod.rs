@@ -214,7 +214,7 @@ mod outcome;
 mod sight;
 mod update;
 
-pub(crate) use meet::*;
+use meet::*;
 pub(crate) use outcome::*;
 pub(crate) use sight::*;
 pub(crate) use update::*;

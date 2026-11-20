@@ -4,7 +4,7 @@ use super::*;
 
 impl Lot {
     /// Notes an edge whose wall-ness changed (or a diagonal): the rooms round it are found again.
-    pub(crate) fn note(&mut self, e: EdgeRef) {
+    pub(super) fn note(&mut self, e: EdgeRef) {
         if let Some(p) = &mut self.pending {
             if p.len() >= PENDING_MAX {
                 self.pending = None;
@@ -16,7 +16,7 @@ impl Lot {
 
     /// Something changed: the tiles round it may score differently (`RoomChanges::rect`), and
     /// while the log is on it keeps what was there.
-    pub(crate) fn changed(&mut self, change: LotChange) {
+    pub(super) fn changed(&mut self, change: LotChange) {
         if !self.changes.full {
             let edge = |e: EdgeRef| match e {
                 EdgeRef::H(x, z) => [x as i32, z as i32 - 1, x as i32 + 1, z as i32 + 1],

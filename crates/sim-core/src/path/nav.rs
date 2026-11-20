@@ -144,7 +144,7 @@ impl NavGrid<'_> {
 
     /// `can_step` but for the stairs: `b` free and nothing built in the way (`Reach::steps`
     /// keeps it per tile).
-    pub(crate) fn step_open(&self, ax: i32, az: i32, bx: i32, bz: i32) -> bool {
+    pub(super) fn step_open(&self, ax: i32, az: i32, bx: i32, bz: i32) -> bool {
         self.tile_free(bx, bz) && self.walls_allow(ax, az, bx, bz)
     }
 

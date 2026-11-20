@@ -559,7 +559,7 @@ mod rooms;
 mod rooms_near;
 mod walls;
 
-pub(crate) use rooms::*;
+use rooms::*;
 
 #[cfg(test)]
 mod tests;

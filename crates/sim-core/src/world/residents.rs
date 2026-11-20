@@ -4,7 +4,7 @@ use super::*;
 
 impl World {
     /// Whether the briefs (and `members`) cover every resident.
-    pub(crate) fn members_cover(&self) -> bool {
+    pub(super) fn members_cover(&self) -> bool {
         self.briefs.len() == self.sims.len()
     }
 
@@ -543,21 +543,21 @@ impl World {
         Ok(())
     }
 
-    pub(crate) fn sim(&self, id: u32) -> Result<&Sim, Error> {
+    pub(super) fn sim(&self, id: u32) -> Result<&Sim, Error> {
         self.sims
             .get(id as usize)
             .filter(|s| s.here())
             .ok_or_else(|| Error::new(format!("unknown resident {id}")))
     }
 
-    pub(crate) fn sim_mut(&mut self, id: u32) -> Result<&mut Sim, Error> {
+    pub(super) fn sim_mut(&mut self, id: u32) -> Result<&mut Sim, Error> {
         self.sims
             .get_mut(id as usize)
             .filter(|s| s.here())
             .ok_or_else(|| Error::new(format!("unknown resident {id}")))
     }
 
-    pub(crate) fn enqueue(&mut self, sim: u32, kind: TaskKind) -> Result<(), Error> {
+    pub(super) fn enqueue(&mut self, sim: u32, kind: TaskKind) -> Result<(), Error> {
         let s = self.sim_mut(sim)?;
         if s.queue.len() >= MAX_QUEUE {
             return Err(Error::new("action queue is full"));

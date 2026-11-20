@@ -4,13 +4,13 @@ use super::*;
 
 /// Who waits for whom (`graph`), and whom each waits for however far round, worked out once for
 /// each asked about (`reaches`).
-pub(crate) struct Reaches {
-    pub(crate) graph: std::collections::BTreeMap<u64, Vec<u64>>,
+pub(super) struct Reaches {
+    pub(super) graph: std::collections::BTreeMap<u64, Vec<u64>>,
     found: std::cell::RefCell<std::collections::HashMap<u64, std::collections::HashSet<u64>>>,
 }
 
 impl Reaches {
-    pub(crate) fn new(graph: std::collections::BTreeMap<u64, Vec<u64>>) -> Reaches {
+    pub(super) fn new(graph: std::collections::BTreeMap<u64, Vec<u64>>) -> Reaches {
         Reaches {
             graph,
             found: Default::default(),
@@ -18,7 +18,7 @@ impl Reaches {
     }
 
     /// Whether `from` waits for `to`, however far round (`reaches`).
-    pub(crate) fn reaches(&self, from: u64, to: u64) -> bool {
+    pub(super) fn reaches(&self, from: u64, to: u64) -> bool {
         let mut found = self.found.borrow_mut();
         let round = found.entry(from).or_insert_with(|| {
             let mut seen = std::collections::HashSet::new();
@@ -39,7 +39,7 @@ impl Reaches {
 }
 
 /// Whether `from` waits for `to`, however far round, in `graph` (who waits for whom).
-pub(crate) fn reaches(
+pub(super) fn reaches(
     graph: &std::collections::BTreeMap<u64, Vec<u64>>,
     from: u64,
     to: u64,
@@ -61,14 +61,14 @@ pub(crate) fn reaches(
 }
 
 /// Whether body `r` is within reach of `claim`'s samples at all (its box).
-pub(crate) fn in_bounds(claim: &Claim, r: &Rect) -> bool {
+pub(super) fn in_bounds(claim: &Claim, r: &Rect) -> bool {
     let b = claim.bounds;
     let k = reach(r) + CLEAR;
     !(r.at[0] + k < b[0] || r.at[0] - k > b[2] || r.at[1] + k < b[1] || r.at[1] - k > b[3])
 }
 
 /// Whether any of samples `a` (of claim `ca`) is in the way of any of `b` (of `cb`: `conflict`).
-pub(crate) fn overlaps(a: (&Claim, &[Sample]), b: (&Claim, &[Sample])) -> bool {
+pub(super) fn overlaps(a: (&Claim, &[Sample]), b: (&Claim, &[Sample])) -> bool {
     let ((ca, a), (cb, b)) = (a, b);
     let (x, y) = (ca.bounds, cb.bounds);
     if x[2] < y[0] || y[2] < x[0] || x[3] < y[1] || y[3] < x[1] {

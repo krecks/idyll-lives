@@ -322,7 +322,7 @@ pub(crate) fn using(
 
 /// Clearing away, at the table: everything to clear from the same place, up to an armful of one
 /// kind, picked up (the food on it to be scraped off), and on to the bin or the sink.
-pub(crate) fn pick_up(
+pub(super) fn pick_up(
     sim: &mut Sim,
     task: Task,
     ctx: &Ctx,
@@ -437,7 +437,7 @@ pub(crate) fn pick_up(
 }
 
 /// Wears a station a little for a finished step (as a finished use does).
-pub(crate) fn wear(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance], o: u32) {
+pub(super) fn wear(sim: &mut Sim, content: &Content, objects: &mut [ObjectInstance], o: u32) {
     let Some(obj) = objects.get_mut(o as usize) else {
         return;
     };

@@ -4,13 +4,13 @@ use super::*;
 
 impl Lot {
     /// The chunk holding tile `(x, z)` (either may be one past the lot, for far edges).
-    pub(crate) fn chunk_of(&self, x: usize, z: usize) -> usize {
+    pub(super) fn chunk_of(&self, x: usize, z: usize) -> usize {
         (z >> SHIFT) * self.cols + (x >> SHIFT)
     }
 
     /// The slot of tile `(x, z)` (either may be one past the lot); `VOID` if its chunk isn't
     /// allocated.
-    pub(crate) fn slot(&self, x: usize, z: usize) -> usize {
+    pub(super) fn slot(&self, x: usize, z: usize) -> usize {
         match self.base[self.chunk_of(x, z)] as usize {
             0 => VOID,
             b => b + ((z & MASK) << SHIFT | (x & MASK)),
@@ -18,7 +18,7 @@ impl Lot {
     }
 
     /// Allocates chunk `c` (its slots go on the end, all open and outdoors).
-    pub(crate) fn alloc(&mut self, c: usize) {
+    pub(super) fn alloc(&mut self, c: usize) {
         if self.base[c] != 0 {
             return;
         }
@@ -33,7 +33,7 @@ impl Lot {
     }
 
     /// The slot of tile `(x, z)` to write to, allocating its chunk first.
-    pub(crate) fn slot_mut(&mut self, x: usize, z: usize) -> usize {
+    pub(super) fn slot_mut(&mut self, x: usize, z: usize) -> usize {
         let c = self.chunk_of(x, z);
         self.alloc(c);
         let s = self.slot(x, z);
@@ -181,7 +181,7 @@ impl Lot {
     }
 
     /// Row `z`'s slots with `x < width` in chunks with something built, left to right.
-    pub(crate) fn built_row(
+    pub(super) fn built_row(
         &self,
         z: usize,
         width: usize,

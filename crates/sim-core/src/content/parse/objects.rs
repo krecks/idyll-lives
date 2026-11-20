@@ -428,14 +428,14 @@ pub(crate) struct EatRaw {
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub(crate) struct ModifiersRaw {
-    pub(crate) need_decay: HashMap<String, f32>,
-    pub(crate) need_gain: HashMap<String, f32>,
-    pub(crate) tag_preference: HashMap<String, f32>,
-    pub(crate) tag_acceptance: HashMap<String, f32>,
-    pub(crate) tag_success: HashMap<String, f32>,
-    pub(crate) walk_speed: Option<f32>,
-    pub(crate) mood: f32,
-    pub(crate) skill_gain: HashMap<String, f32>,
+    pub(super) need_decay: HashMap<String, f32>,
+    pub(super) need_gain: HashMap<String, f32>,
+    pub(super) tag_preference: HashMap<String, f32>,
+    pub(super) tag_acceptance: HashMap<String, f32>,
+    pub(super) tag_success: HashMap<String, f32>,
+    pub(super) walk_speed: Option<f32>,
+    pub(super) mood: f32,
+    pub(super) skill_gain: HashMap<String, f32>,
 }
 
 #[derive(Deserialize)]

@@ -36,7 +36,7 @@ impl World {
 
     /// Mess residents made, and cleaning they finished, this tick: a mess spreads over the
     /// tile and (less) the tiles around it in the same room; cleaning clears them all.
-    pub(crate) fn apply_messes(&mut self) {
+    pub(super) fn apply_messes(&mut self) {
         for i in 0..self.sims.len() {
             if let Some(partner) = self.sims[i].conceived.take() {
                 // (Both done trying at once: one chance, not two.)
@@ -231,7 +231,7 @@ impl World {
     /// would give, but finding and scoring again only the rooms round what was built
     /// (`refresh_rooms_near`) and where things changed (`refresh_room_things`), and the rest only
     /// for their dirt where there was a mess.
-    pub(crate) fn update_rooms(&mut self) {
+    pub(super) fn update_rooms(&mut self) {
         // The per-tile lists follow the lot's slots (chunks allocated since: outdoors).
         let slots = self.lot.tile_slots();
         if self.room_score.len() < slots {
@@ -583,7 +583,7 @@ impl World {
 
     /// Scores cleanliness again in rooms that had a mess since: between structure changes
     /// only the dirt changes, so the rooms needn't be found again (a whole-town job).
-    pub(crate) fn rescore_rooms(&mut self) {
+    pub(super) fn rescore_rooms(&mut self) {
         self.room_tiles.rescore(
             &mut self.rooms,
             &self.content.room_rules,

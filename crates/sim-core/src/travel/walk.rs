@@ -15,7 +15,7 @@ pub struct WalkPlan {
 /// the verge.
 /// How far round a point the roads are looked over for one whose carriageway it's in (m,
 /// `Travel::on_carriageway`): more than half the widest road's.
-pub(crate) const CARRIAGEWAY_LOOK: f32 = 8.0;
+pub(super) const CARRIAGEWAY_LOOK: f32 = 8.0;
 
 pub(crate) fn side_offset(width: f32, kind: RoadKind) -> f32 {
     match kind {
@@ -26,7 +26,7 @@ pub(crate) fn side_offset(width: f32, kind: RoadKind) -> f32 {
 }
 
 /// `pts` moved to the walkers' side (the right, looking the way they go).
-pub(crate) fn walk_side(pts: &[([f32; 2], f32, RoadKind)]) -> Vec<[f32; 2]> {
+pub(super) fn walk_side(pts: &[([f32; 2], f32, RoadKind)]) -> Vec<[f32; 2]> {
     let n = pts.len();
     (0..n)
         .map(|i| {
@@ -116,7 +116,7 @@ pub(crate) struct NearestPoint {
     start: Vec<u32>,
     items: Vec<u32>,
     /// Too few points for cells to pay, or one not finite: every point scanned.
-    pub(crate) scan: bool,
+    pub(super) scan: bool,
 }
 
 /// Fewer points than this are scanned.
@@ -247,7 +247,7 @@ impl NearestPoint {
     }
 }
 
-pub(crate) fn lerp(a: [f32; 2], b: [f32; 2], t: f32) -> [f32; 2] {
+pub(super) fn lerp(a: [f32; 2], b: [f32; 2], t: f32) -> [f32; 2] {
     [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
 }
 

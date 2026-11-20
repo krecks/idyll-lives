@@ -6,7 +6,7 @@ use super::*;
 /// player's orders go anywhere). Off home or to work, sitting down to eat, busy with what they
 /// were told to do: `i` gives up rather than follow them across town.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn follow<'a>(
+pub(super) fn follow<'a>(
     nav: &NavGrid,
     reach: &crate::path::Reach,
     walk: &impl Fn(&Sim, (i32, i32)) -> Grounds<'a>,
@@ -32,7 +32,7 @@ pub(crate) fn follow<'a>(
 
 /// Re-route toward a target that moved; give up if they're unreachable.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn chase<'a>(
+pub(super) fn chase<'a>(
     nav: &NavGrid,
     reach: &crate::path::Reach,
     walk: &impl Fn(&Sim, (i32, i32)) -> Grounds<'a>,
@@ -64,7 +64,7 @@ pub(crate) fn chase<'a>(
 /// `i` to the middle of it and `t` to a free tile next to that. No way to the middle for `t`:
 /// they wait where they are and `i` walks all the way.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn meet<'a>(
+pub(super) fn meet<'a>(
     nav: &NavGrid,
     reach: &crate::path::Reach,
     walk: &impl Fn(&Sim, (i32, i32)) -> Grounds<'a>,
@@ -130,7 +130,7 @@ pub(crate) fn meet<'a>(
 /// they're walked (`StairMap::distance`: a flight of stairs is a few metres, not the rows between
 /// the storeys' blocks), and a middle on the stairs is the nearer end of them, never a point
 /// between two storeys' rows (somewhere else in town).
-pub(crate) fn halfway(
+pub(super) fn halfway(
     stairs: &StairMap,
     from: [f32; 2],
     path: &[[f32; 2]],
@@ -167,7 +167,7 @@ pub(crate) fn halfway(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn engage(
+pub(super) fn engage(
     content: &Content,
     nav: &NavGrid,
     rels: &mut Relationships,

@@ -139,7 +139,7 @@ pub enum GrowthStage {
 /// Share of the way to ripe at which a crop shows as growing rather than just planted.
 const GROWING_FROM: f32 = 1.0 / 3.0;
 /// Game minutes between crops' growth steps.
-pub(crate) const GROWTH_STEP_MINUTES: u64 = 15;
+pub(super) const GROWTH_STEP_MINUTES: u64 = 15;
 
 impl ObjectInstance {
     /// Worn out: its interactions don't work until it is repaired.
@@ -163,7 +163,7 @@ impl ObjectInstance {
     /// Whether `inter` would close it on someone other than `me` using it (or on their way to):
     /// the one reason `allows` says no that the player hears of when it comes up after an order
     /// (an order to open or close what someone else already did is done).
-    pub(crate) fn closes_on_someone(&self, inter: &crate::content::Interaction, me: u32) -> bool {
+    pub(super) fn closes_on_someone(&self, inter: &crate::content::Interaction, me: u32) -> bool {
         inter.leaves == Some(false) && self.fits(inter) && self.users().any(|u| u != me)
     }
 
@@ -428,7 +428,7 @@ impl ObjectInstance {
     }
 
     /// `slot_position`, for its kind `def`.
-    pub(crate) fn place_at(&self, def: &crate::content::ObjectDef, slot: usize) -> [f32; 2] {
+    pub(super) fn place_at(&self, def: &crate::content::ObjectDef, slot: usize) -> [f32; 2] {
         // (Where it stands on its tiles, as it's drawn.)
         let (w, d) = self.turned_footprint();
         let c = [

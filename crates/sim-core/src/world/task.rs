@@ -213,7 +213,7 @@ pub struct Activity {
 
 /// Whether two tasks are after the same thing (`Sim::unreachable`): the same use of an object,
 /// the same food, tile, broken object, dirty dish, house or person.
-pub(crate) fn same_target(a: TaskKind, b: TaskKind) -> bool {
+pub(super) fn same_target(a: TaskKind, b: TaskKind) -> bool {
     match (a, b) {
         (
             TaskKind::Use {

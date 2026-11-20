@@ -3,7 +3,7 @@
 use super::*;
 
 /// How a search ended.
-pub(crate) enum Search {
+pub(super) enum Search {
     Found(Vec<(i32, i32)>),
     /// Every tile it could reach was tried.
     NoWay,
@@ -15,9 +15,9 @@ pub(crate) enum Search {
 pub const NODE_CAP: u64 = 30_000;
 /// How many tiles kept off (`NavGrid::kept_off`) the way off them looks over at most: a lit
 /// junction's box and carriageway are a few hundred.
-pub(crate) const WAY_OUT_MOST: usize = 4096;
+pub(super) const WAY_OUT_MOST: usize = 4096;
 /// The most a search kept to a corridor tries.
-pub(crate) const CORRIDOR_CAP: u64 = 4 * NODE_CAP;
+pub(super) const CORRIDOR_CAP: u64 = 4 * NODE_CAP;
 
 /// Search state kept between searches: a big town is tens of thousands of tiles (and a big
 /// world's roads thousands of nodes, `travel::Graph`), too many to allocate and clear for every
@@ -55,8 +55,8 @@ impl<G: Clone + Default, C: Clone + Default, K: Ord> Scratch<G, C, K> {
 }
 
 thread_local! {
-    pub(crate) static SCRATCH: RefCell<Scratch<u32, u32, (u32, u32)>> = RefCell::default();
-    pub(crate) static STATS: RefCell<SearchStats> = RefCell::default();
+    pub(super) static SCRATCH: RefCell<Scratch<u32, u32, (u32, u32)>> = RefCell::default();
+    pub(super) static STATS: RefCell<SearchStats> = RefCell::default();
 }
 
 /// What the searches on this thread cost since the last `take_search_stats`: for benchmarks.
@@ -73,7 +73,7 @@ pub struct SearchStats {
 }
 
 impl SearchStats {
-    pub(crate) fn add(&mut self, nodes: u64, found: bool) {
+    pub(super) fn add(&mut self, nodes: u64, found: bool) {
         self.searches += 1;
         self.nodes += nodes;
         self.max_nodes = self.max_nodes.max(nodes);
@@ -106,7 +106,7 @@ pub fn take_search_stats() -> SearchStats {
     STATS.with_borrow_mut(std::mem::take)
 }
 
-pub(crate) const NEIGHBOURS: [(i32, i32); 8] = [
+pub(super) const NEIGHBOURS: [(i32, i32); 8] = [
     (1, 0),
     (-1, 0),
     (0, 1),
@@ -117,14 +117,14 @@ pub(crate) const NEIGHBOURS: [(i32, i32); 8] = [
     (-1, -1),
 ];
 
-pub(crate) fn heuristic(a: (i32, i32), b: (i32, i32)) -> u32 {
+pub(super) fn heuristic(a: (i32, i32), b: (i32, i32)) -> u32 {
     let dx = (a.0 - b.0).unsigned_abs();
     let dz = (a.1 - b.1).unsigned_abs();
     ORTHO * dx.max(dz) + (DIAG - ORTHO) * dx.min(dz)
 }
 
 /// The path to `at`, back along `came` (by slot: the row-major key of the tile before).
-pub(crate) fn reconstruct(lot: &Lot, came: &[u32], mut at: (i32, i32)) -> Vec<(i32, i32)> {
+pub(super) fn reconstruct(lot: &Lot, came: &[u32], mut at: (i32, i32)) -> Vec<(i32, i32)> {
     let width = lot.width as u32;
     let mut out = Vec::new();
     loop {
