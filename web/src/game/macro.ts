@@ -1655,7 +1655,10 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     if (!country) {
       const ls = new Map<number, number[]>();
       const lengthsOf = (r: number) => ls.get(r) ?? ls.set(r, lengths(worldRoads[r].points)).get(r)!;
-      country = frontageOf(worldRoads, worldRoads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : [])), plans[0].centre, rand).filter((f) => straight(worldRoads[f.road].points, f.s, lengthsOf(f.road)) && gentleBy(f.p));
+      // (Off the junctions along them, as a town's lots with a driveway keep, `offAll`: a home's driveway where
+      // another road ran into a short country road's end, on Fernshaw's, had a car backing out of it and two
+      // coming by wait for each other for good.)
+      country = frontageOf(worldRoads, worldRoads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : [])), plans[0].centre, rand).filter((f) => straight(worldRoads[f.road].points, f.s, lengthsOf(f.road)) && gentleBy(f.p) && offAll(f));
     }
     const r = plans[from].rect;
     const off = (p: Pt) => offRect(r, p);
