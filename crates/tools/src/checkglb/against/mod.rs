@@ -161,7 +161,6 @@ pub const METRICS: &[(&str, &str)] = &[
     ),
 ];
 pub(crate) use super::digest;
-/// One row of `METRICS` that is over its limit.
 pub(crate) use super::glb::{Glb, R, parse_glb};
 pub(crate) use super::near;
 pub(crate) use super::near::{Across, P3, Part, Rest, Surface, Tolerance};

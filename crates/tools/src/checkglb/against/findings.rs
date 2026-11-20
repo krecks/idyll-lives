@@ -2,6 +2,7 @@
 
 use super::*;
 
+/// One row of `METRICS` that is over its limit.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Finding {
     pub metric: &'static str,
