@@ -140,8 +140,6 @@ export class Cars extends Vehicles {
   stillMoved = false;
   /** The parked cars' draws by body and age (`parkedLook`; their meshes shared by the cars of a build alike). */
   private readonly parked = new Map<string, Parked>();
-  /** The parked draws by their mesh instance (`castKey`). */
-  private readonly parkedDraws = new Map<pc.MeshInstance, Instances>();
   /** The wheels and contact shadows are written again: every car's (one came or went), or only those of the cars drawn that moved (`stirred`). */
   private around = true;
   private readonly stirred: Drawn[] = [];
@@ -231,14 +229,6 @@ export class Cars extends Vehicles {
     this.flush();
   }
 
-  /**
-   * What parked draw `mi` casts where `reaches` (the sun's map: `SunShadows.castKey`), as a number (`Instances.castKey`):
-   * a car parking or driving off across town leaves it as it was; undefined: not a parked draw.
-   */
-  castKey(mi: pc.MeshInstance, reaches: (x: number, z: number) => boolean): number | undefined {
-    return this.parkedDraws.get(mi)?.castKey(reaches);
-  }
-
   /** As `Vehicles.movingCasters`, and the cars drawn by their own entities (driving, or a door open). */
   override movingCasters(out: pc.MeshInstance[]): void {
     super.movingCasters(out);
@@ -294,7 +284,6 @@ export class Cars extends Vehicles {
     this.driving.length = 0;
     for (const p of this.parked.values()) p.draw.destroy();
     this.parked.clear();
-    this.parkedDraws.clear();
     this.clearDraws();
     this.key = '';
     this.scanned = 0;
@@ -553,9 +542,9 @@ export class Cars extends Vehicles {
         : this.wholeMesh(car);
       if (!mesh) return null;
       const material = tinted ? this.lib.instanceColored(this.lib.plainFinish(), true) : this.lib.plainFinish();
-      const draw = this.instanced('carsParked', mesh, material, this.shadows, 4, tinted ? [INSTANCE_COLOR] : []);
+      // (Keyed by its copies that cast into the sun's map: a car parking or driving off across town leaves it as it was.)
+      const draw = this.instanced('carsParked', mesh, material, this.shadows, 4, tinted ? [INSTANCE_COLOR] : [], true);
       this.parked.set(car.parkedLook, (p = { draw, tinted, dirty: true }));
-      this.parkedDraws.set(draw.meshInstance, draw);
     }
     return p;
   }

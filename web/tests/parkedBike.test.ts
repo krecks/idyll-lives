@@ -2,7 +2,7 @@
 // `parkX`/`parkZ`/`parkYaw`): got off there, it slides from under the rider to where it's left, not home; it's in
 // `parked` there (for `ParkedRides` to draw) once they're off it, and in `ridden` (not drawn at home) all along; got on
 // again, it slides from there to under them, and once they're home it's back at its place. And `placements`: what
-// `ParkedRides` draws where; `castKey`: what its draws cast into the sun's map. `bun test`.
+// `ParkedRides` draws where; `castKeyOf`: what its draws cast into the sun's map. `bun test`.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { TICK_RATES, TICKS_PER_SECOND } from './snapshotLayout';
@@ -28,7 +28,7 @@ describe('a bike left out by a place', async () => {
   const { TemplateCache } = await import('../src/render/shared/templateCache');
   const { Pose, simFields } = await import('../src/core/snapshot');
   const { MOUNTS, MOUNT_SECONDS } = await import('../src/render/shared/characters/vehicles');
-  const { castKey, castKeyOf, placements } = await import('../src/render/shared/parked');
+  const { castKeyOf, placements } = await import('../src/render/shared/parked');
   type Prop = import('../src/render/shared/characters/view').ResidentProp;
   type View = import('../src/render/shared/characters/view').ResidentView<object, object, Prop>;
   type SnapshotLayout = import('../src/core/snapshot').SnapshotLayout;
@@ -225,7 +225,10 @@ describe('a bike left out by a place', async () => {
     }
   }, 30_000);
 
-  test('castKey: only the copies standing where they reach the map count, where they stand and which way', () => {
+  /** `castKeyOf` of copies given as matrices, one after the other. */
+  const castKey = (copies: number[][], reaches: (x: number, z: number) => boolean) => castKeyOf(new Float32Array(copies.flat()), copies.length, 16, reaches);
+
+  test('castKeyOf: only the copies standing where they reach the map count, where they stand and which way', () => {
     const at = (x: number, yaw = 0) => [Math.cos(yaw), 0, -Math.sin(yaw), 0, 0, 1, 0, 0, Math.sin(yaw), 0, Math.cos(yaw), 0, x, 0, 5, 1];
     const reaches = (x: number) => x < 50;
     const here = castKey([at(10), at(200)], reaches);
@@ -240,7 +243,7 @@ describe('a bike left out by a place', async () => {
     expect(castKey([at(200)], (x) => x < 0)).toBe(0);
   });
 
-  test("castKeyOf: an instanced draw's copies (a parked car's, with its colour beside the matrix) as castKey has them; a hidden copy stands nowhere", () => {
+  test("castKeyOf: an instanced draw's copies with a stream beside the matrix (a parked car's colour) as without it; a hidden copy stands nowhere", () => {
     const at = (x: number) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, 0, 5, 1];
     const reaches = (x: number) => x < 50;
     const strided = (copies: number[][]) => new Float32Array(copies.flatMap((m) => [...m, 0.2, 0.4, 0.6, 1]));
