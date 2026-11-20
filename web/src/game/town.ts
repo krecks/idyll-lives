@@ -1739,7 +1739,7 @@ export function assembleTown(
   const plotKinds = town.slots.map(plotKindOf);
   // A public lot's opening hours, as its place has them (`TownPlace.hours`; sim-core `Plot::open_at`).
   const hours = new Map<number, NonNullable<TownPlace['hours']>>();
-  for (const p of town.open?.places ?? []) if (p.plot !== undefined && p.hours) hours.set(p.plot, p.hours);
+  for (const p of town.open?.places ?? []) if (p.hours) hours.set(p.plot, p.hours);
   const filed: object[] = plots.map((p, i) => ({ ...p, area: town.slots[i].area ?? 0, kind: plotKinds[i], ...(hours.has(i) ? { hours: hours.get(i) } : {}) }));
   // Then every flat, a plot of its own on its storey inside its building's lot (`of`), entered by the building's street door.
   for (const f of flats) {

@@ -39,9 +39,9 @@ fn start() {
     }));
 }
 
-/// Oldest save version the game opens: 42, the real town's (flats, parking bays). `sim_core::save`
-/// still reads older files for its own tests until their migrations go; the game refuses them.
-const OLDEST_SAVE_VERSION: u64 = 42;
+/// Oldest save version the game opens (`sim_core::save::OLDEST_SAVE_VERSION`), as the version read
+/// from the start of a file is.
+const OLDEST_SAVE_VERSION: u64 = sim_core::save::OLDEST_SAVE_VERSION as u64;
 
 /// Why a save can't be opened. The menu keeps one from a newer version, and one this version
 /// failed to load (a later version may open it), and skips them; it removes one that is too old
@@ -531,7 +531,7 @@ mod tests {
     }
 
     /// Saves written by released builds: 0.1.0 (version 17) and the live site's d7c506e (19). The
-    /// game no longer opens them; `sim_core` still reads them (`current_save`).
+    /// game no longer opens them.
     fn old_save(name: &str) -> String {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests/saves")
@@ -546,10 +546,13 @@ mod tests {
             .problem
     }
 
-    /// An old release's save as this version writes it (read by `sim_core` and saved again).
-    fn current_save(content: &str, name: &str) -> String {
-        World::from_save_json(content, &old_save(name))
-            .unwrap_or_else(|e| panic!("{name}: {}", e.0))
+    /// A save as this version writes it: `sim_core`'s town of day 5 (its `tests/saves`), loaded and
+    /// saved again.
+    fn current_save(content: &str) -> String {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../sim-core/tests/saves/live_day5.json");
+        World::from_save_json(content, &std::fs::read_to_string(path).unwrap())
+            .unwrap_or_else(|e| panic!("live_day5.json: {}", e.0))
             .save_json()
     }
 
@@ -560,7 +563,7 @@ mod tests {
             let err = load_save(&content, &old_save(name)).err().expect("refused");
             assert_eq!(err.kind(), "tooOld", "{name}: {}", err.message);
         }
-        let world = load_save(&content, &current_save(&content, "v0.1.0-day5.json"))
+        let world = load_save(&content, &current_save(&content))
             .unwrap_or_else(|e| panic!("{}", e.message));
         assert!(world.sims.len() > 10, "{} residents", world.sims.len());
     }
@@ -568,7 +571,7 @@ mod tests {
     #[test]
     fn unloadable_saves_say_why() {
         let content = content();
-        let good = current_save(&content, "v0.1.0-day5.json");
+        let good = current_save(&content);
         let now = format!("\"version\":{SAVE_VERSION}");
         assert!(good.starts_with(&format!("{{{now},")));
         let with_version = |v: &str| good.replacen(&now, &format!("\"version\":{v}"), 1);

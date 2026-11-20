@@ -828,15 +828,6 @@ fn saving_mid_recipe_and_with_food_about_keeps_it_all() {
 }
 
 #[test]
-fn version_18_saves_load_without_food() {
-    let w = world_with(KITCHEN, 1, false);
-    let mut save: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
-    save["version"] = 18.into();
-    let w = World::from_save_json(CONTENT, &save.to_string()).unwrap();
-    assert!(w.items.list.is_empty());
-}
-
-#[test]
 fn cooking_is_deterministic() {
     let run = || {
         let mut w = world_with(KITCHEN, 4, true);

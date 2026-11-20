@@ -514,18 +514,9 @@ fn the_laundry_is_washed_then_dried_and_piles_up_again() {
         w.households[0].laundry
     );
     order(&mut w, "washer", 0).unwrap();
-    // Saved and loaded, the washing waiting is kept; a save from before it starts with a load of each.
-    let saved = w.save_json();
-    let loaded = World::from_save_json(CONTENT, &saved).unwrap();
+    // Saved and loaded, the washing waiting is kept.
+    let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
     assert_eq!(loaded.households[0].laundry, w.households[0].laundry);
-    let mut old: serde_json::Value = serde_json::from_str(&saved).unwrap();
-    old["version"] = 29.into();
-    old["households"][0]
-        .as_object_mut()
-        .unwrap()
-        .remove("laundry");
-    let loaded = World::from_save_json(CONTENT, &old.to_string()).unwrap();
-    assert_eq!(loaded.households[0].laundry, [1.0, 1.0, 0.0, 0.0]);
 }
 
 #[test]

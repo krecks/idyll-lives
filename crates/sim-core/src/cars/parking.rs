@@ -234,18 +234,15 @@ pub(crate) fn parked_at(travel: &Travel, k: usize) -> Option<([f32; 2], f32, boo
 }
 
 /// `parked_at` worked out (`Travel::parked` keeps it): the bay's pose as the town file gives it,
-/// which is the one the renderer draws. A bay without a yaw (a save from before bays had one)
-/// faces away from the road nearest it, as then.
+/// which is the one the renderer draws.
 pub(crate) fn park_spot(travel: &Travel, k: usize) -> Option<([f32; 2], f32, bool)> {
     let p = travel.file.parking.get(k)?;
     let at = [p.x, p.z];
-    at.iter().all(|v| v.is_finite()).then_some(())?;
-    let bay = parking_bay(travel, at);
-    Some(match (p.yaw.filter(|y| y.is_finite()), bay) {
-        (Some(yaw), bay) => (at, yaw, bay.is_some()),
-        (None, Some((_, _, [x, z]))) => (at, (0.0 - x).atan2(0.0 - z), true),
-        (None, None) => (at, 0.0, false),
-    })
+    [p.x, p.z, p.yaw]
+        .iter()
+        .all(|v| v.is_finite())
+        .then_some(())?;
+    Some((at, p.yaw, parking_bay(travel, at).is_some()))
 }
 
 /// Whether there's public parking near `door` for a trip by car (`TRIP_PARK_REACH`), taken or not.

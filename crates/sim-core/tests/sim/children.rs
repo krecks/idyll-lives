@@ -327,15 +327,4 @@ fn a_save_and_load_after_school_costs_no_missed_day() {
         "after a load: {}",
         after_load(&saved)
     );
-    // A save from before the school day was kept (v31): after school has begun, today counts as seen to.
-    let mut v31 = saved.clone();
-    v31["version"] = 31.into();
-    for s in v31["sims"].as_array_mut().unwrap() {
-        s.as_object_mut().unwrap().remove("schoolDay");
-    }
-    assert!(
-        (after_load(&v31) - 62.0).abs() < 0.01,
-        "after loading a v31 save: {}",
-        after_load(&v31)
-    );
 }

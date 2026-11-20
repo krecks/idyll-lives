@@ -192,8 +192,6 @@ describe('named places as lots', async () => {
         expect(place.kind).toBe(lotPlaceKind(s));
       }
       expect(new Set(named.map((s) => s.name)).size).toBe(named.length);
-      // Every building is a lot: no backdrop.
-      expect(world.open!.backdrop ?? []).toEqual([]);
     }
   }, 120_000);
 });

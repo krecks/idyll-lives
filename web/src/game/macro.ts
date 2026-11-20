@@ -29,7 +29,7 @@
  */
 
 import type { Content } from '../content/content';
-import type { BackdropBuilding, CarPark, LandSize, ParkingBay, Rle, TownArea, TownPlace, TownSize, WorldMeta, WorldOptions, WorldZone } from '../core/protocol';
+import type { CarPark, LandSize, ParkingBay, Rle, TownArea, TownPlace, TownSize, WorldMeta, WorldOptions, WorldZone } from '../core/protocol';
 import { distanceToRect } from '../render/shared/chunks';
 import { areaSize, civicTooBig, CIVIC, namerFor, ZONE, type ZoneKind } from './places';
 import { chooseCentre, densestCentre, type Centre } from './centre';
@@ -72,8 +72,6 @@ export interface OpenWorldDraft {
   parking: ParkingBay[];
   /** The car parks the bays make up (`parking.ts` `carParkAt`): by the square, by the big places, pairs by the verge. */
   carParks?: CarPark[];
-  /** Buildings laid by hand in step 2 before Build laid lots (`edit/`): the generator lays none (`dense.ts`). */
-  backdrop?: BackdropBuilding[];
   /** The places the tags name, and the main town's centre (its outline and its square). */
   places?: TownPlace[];
   centre?: { area: number; poly: Pt[]; square?: Pt[] }[];
@@ -154,7 +152,7 @@ export interface LayOptions {
 /**
  * A place's land, with no town on it (step 1): `kind` with `options` (the place's own where not
  * given) from `seed`, as `planLand` plans it and `landFollow.ts` `seedBare` seeds it: no lots,
- * roads, greens, backdrop, places or areas; its land (`open.land`: heights, water, woods, meadows)
+ * roads, greens, places or areas; its land (`open.land`: heights, water, woods, meadows)
  * and its plan (`open.plan`), the water and zones from them, its hills' relief over its level. Its
  * name and tagline are the ones its town takes when laid from the same seed.
  */
@@ -1605,7 +1603,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       // (Out of its centre, which is its named places' and the dense pass's: `inCentre`.)
       for (const u of lots.place(places, fronts.get(a)!.filter((f) => !inCentre(f)), plan.greens, plan.centre, a, true)) left.push({ u, from: a });
       // Its named places' lots (`namedLots`) round its heart (its square, else its high street's middle; else its
-      // middle), its shops and cafés in parades along its high street; then its centre kept for the backdrop.
+      // middle), its shops and cafés in parades along its high street; then the rest of its centre built up (`dense.ts`).
       const heart = centre ? (centre.square ? centroid(centre.square) : pointAt(worldRoads[centre.road].points, (centre.s0 + centre.s1) / 2).p) : plan.centre;
       const near = frontageOf(worldRoads, plan.roads, heart, placeRand);
       const street = centre ? near.filter((f) => f.road === centre.road && f.s >= centre.s0 && f.s <= centre.s1) : near;
@@ -2769,7 +2767,7 @@ const RELIEF = 16;
 /**
  * How high the land stands over the level the towns are built at (`WorldMeta.relief`): the land's
  * height averaged over 16 m cells, less the middle height (the median) of the cells anything
- * stands on (`built`: the lots and the backdrop; `at` instead, if given: the level the land is
+ * stands on (`built`: the lots; `at` instead, if given: the level the land is
  * planned at), in decimetres, never below 0, and 0 where the cell is mostly water. The renderer
  * draws its hills from it.
  */
@@ -2811,7 +2809,7 @@ const BUILT_LOW = 0.05;
 /**
  * The land's signed heights (`OpenWorldDraft.heights`): each 8 m cell's height less the level the
  * towns are built at, the height `BUILT_LOW` of the cells anything is built on stand lower than
- * (the lots, the backdrop and the roads but the trails; not water). Mostly the built land is a
+ * (the lots and the roads but the trails; not water). Mostly the built land is a
  * little over 0, and the sea (`land.ts` `SEA_CM`) a little under it, as the renderer has always
  * drawn them.
  */

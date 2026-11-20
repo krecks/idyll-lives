@@ -10,8 +10,8 @@
  *   and as the town view's box (`town.<name>`). The plans cover the roofs (gable, hip, flat; over a plain box, an L,
  *   a U and a ring), one and two storeys, a porch, a garage, diagonal walls, every wall covering, a floor covering
  *   of each finish, and every door and window style.
- * - **The lots' buildings closed**: a building of each use dressed (`backdrop.<use>`, as a lot with that look) and as
- *   the town view's box (`backdropFar.<use>`).
+ * - **The lots' buildings closed**: a building of each use dressed (`building.<use>`, as a lot with that look) and as
+ *   the town view's box (`buildingFar.<use>`).
  * - **A street** (`street.block`): two streets crossing, a lane with a bend to a dead end, a country road over a
  *   bridge, lots with houses, each fence style round a garden, parked cars.
  * - **Fences** (`fence.<style>`) and **cars** (`car.<body>`) each on their own.
@@ -42,7 +42,7 @@ const { generateHouse, objectInfos } = await import('../../web/src/game/housegen
 const { deriveJunctions } = await import('../../web/tests/fixtures/junctions');
 
 /** What a sample is: the viewed house, its neighbour's silhouette, the street's far house, the town view's box, and so on. */
-export type SampleKind = 'house' | 'neighbour' | 'far' | 'town' | 'backdrop' | 'backdropFar' | 'street' | 'fence' | 'car';
+export type SampleKind = 'house' | 'neighbour' | 'far' | 'town' | 'building' | 'buildingFar' | 'street' | 'fence' | 'car';
 
 /** One sample: its meshes and what the checks need to know of it besides. */
 export interface Sample {
@@ -612,7 +612,7 @@ function unitMeshesOf(b: TownBuilding): DumpMesh[] {
 // ---- the lots' buildings closed ---------------------------------------------------------------------
 
 /** A building of each use: its size (m along its ridge and across), its roof and its storeys (at most the world's three), as the town's generator makes them about. */
-const BACKDROP: [BuildingUse, number, number, LotLook['roof'], number][] = [
+const BUILDINGS: [BuildingUse, number, number, LotLook['roof'], number][] = [
   ['house', 12, 8, 'gable', 2],
   ['terrace', 22, 9, 'gable', 2],
   ['flats', 16, 11, 'flat', 3],
@@ -629,17 +629,17 @@ const BACKDROP: [BuildingUse, number, number, LotLook['roof'], number][] = [
 ];
 
 /** A lot's building of each use closed, dressed as the street draws it near, and as the town view's box. */
-function backdropSamples([use, w, d, roof, storeys]: (typeof BACKDROP)[number], i: number): Sample[] {
+function buildingSamples([use, w, d, roof, storeys]: (typeof BUILDINGS)[number], i: number): Sample[] {
   // (Its road to the south.)
   const [cx, cz] = [100, 50];
   const t = lotLookBuilding([cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2], { use, storeys, roof, look: i }, storeys, 0, () => 0);
   const dress = dressBuilding(t, use, [cx, cz + 30]);
   const about = `a ${use}, ${w} m by ${d} m, ${storeys} storey${storeys === 1 ? '' : 's'} under a ${roof} roof, look ${i}`;
-  const near = [...dress.parts.map((p) => partMesh(p)), ...dress.panes.map((g, k) => meshOf('backdropPanes', HOUSE_MATERIALS.glass, g, { set: k }))];
-  const key = `backdrop.${use}`;
+  const near = [...dress.parts.map((p) => partMesh(p)), ...dress.panes.map((g, k) => meshOf('buildingPanes', HOUSE_MATERIALS.glass, g, { set: k }))];
+  const key = `building.${use}`;
   return [
-    { key, kind: 'backdrop', about, storeys, meshes: merged(near) },
-    { key: `backdropFar.${use}`, kind: 'backdropFar', of: key, about, storeys, meshes: unitMeshesOf(t) },
+    { key, kind: 'building', about, storeys, meshes: merged(near) },
+    { key: `buildingFar.${use}`, kind: 'buildingFar', of: key, about, storeys, meshes: unitMeshesOf(t) },
   ];
 }
 
@@ -752,7 +752,7 @@ function carSample(body: number): Sample {
 export async function samples(): Promise<Sample[]> {
   const out: Sample[] = [];
   for (const plan of plans()) out.push(...(await houseSamples(plan)));
-  BACKDROP.forEach((b, i) => out.push(...backdropSamples(b, i)));
+  BUILDINGS.forEach((b, i) => out.push(...buildingSamples(b, i)));
   out.push(streetSample());
   for (let i = 0; i < fenceStyles.length; i++) {
     const s = fenceSample(i);

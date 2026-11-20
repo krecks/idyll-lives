@@ -86,7 +86,7 @@ fn past_the_lines(w: &World, c: usize) -> Option<(f32, usize)> {
         .iter()
         .position(|p| (p.x - at[0]).hypot(p.z - at[1]) < 0.5)?;
     let bay = &w.travel.file.parking[k];
-    let (fs, fc) = bay.yaw.unwrap().sin_cos();
+    let (fs, fc) = bay.yaw.sin_cos();
     let (s, co) = yaw.sin_cos();
     let mut worst = f32::NEG_INFINITY;
     for (a, b) in [(1.0, 1.0), (1.0, -1.0), (-1.0, -1.0), (-1.0, 1.0)] {
@@ -227,7 +227,7 @@ fn fill_and_empty(slant: f64) {
             .iter()
             .position(|p| p.x == trip.at[0] && p.z == trip.at[1])
             .unwrap_or_else(|| panic!("car {c} parked at {:?}, no bay's middle", trip.at));
-        assert_eq!(trip.yaw, w.travel.file.parking[k].yaw.unwrap(), "car {c}");
+        assert_eq!(trip.yaw, w.travel.file.parking[k].yaw, "car {c}");
         let (at, yaw, moving, _) = car.shown.expect("drawn");
         assert_eq!((at, yaw, moving), (trip.at, trip.yaw, false), "car {c}");
         assert!(!car.aboard.contains(&(i as u32)), "{i} got out of car {c}");

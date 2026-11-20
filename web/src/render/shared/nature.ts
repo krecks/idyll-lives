@@ -87,7 +87,7 @@ function between(values: Float32Array, cols: number, rows: number, x: number, z:
 
 /**
  * The surface's graded land (`BuiltSurface.conformed`) with the samples inside the first `count` of its plots (the
- * world's lots, not its backdrop's buildings, which stand on the land) carried in from the land round them: ring by
+ * world's lots) carried in from the land round them: ring by
  * ring from their edges, each the mean of its neighbours reached already (the terrain beside a lot is the land's, not
  * a slope to its pad: `LandscapeLayout.terrainField`). A sample of a lot beside another lot (a step or less apart:
  * the narrow strip between them, which has no sample of its own) keeps its pad, so the strip lies between the two
@@ -1210,7 +1210,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   }
 
   /**
-   * On a land its town follows, the pad (m) of the lot (or the backdrop's building) a point is in (the highest where
+   * On a land its town follows, the pad (m) of the lot a point is in (the highest where
    * two touch), or null outside every one (the grass levels its patches on them: `shared/grass.ts` `settlePads`).
    * Undefined: no surface.
    */
@@ -1235,8 +1235,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         let best: number | null = null;
         for (const i of grid.get(Math.floor(x / PAD_CELL) * 65536 + Math.floor(z / PAD_CELL)) ?? []) {
           const p = surface.plots[i];
-          // (A backdrop building's on its ground only, and not on a road: `BuiltSurface.at`.)
-          if (!onPad(p, x, z) || (p.poly && surface.roadAt(x, z))) continue;
+          if (!onPad(p, x, z)) continue;
           const y = surface.padY(i);
           if (best === null || y > best) best = y;
         }

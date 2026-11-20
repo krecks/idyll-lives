@@ -2,7 +2,7 @@
  * Footprints on the town's ground: polygons in town metres (x, z), counter-clockwise seen from above
  * (+y up, x right: z runs down the screen, so the signed area x·z' − x'·z is negative), the tiles
  * they cover, whether they overlap, and whether one faces the road nearest it. Shared by the
- * generator's passes (the backdrop, the centre, the parking) and the checks of a laid town.
+ * generator's passes (the centre, the dense pass, the parking) and the checks of a laid town.
  */
 
 import { inside, lengths, pointAt, type RoadIndex, type Pt, type RoadPlan } from './roads';

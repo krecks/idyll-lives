@@ -1,5 +1,5 @@
 /**
- * Dumps the built world's samples (`samples.ts`: houses near and far, the backdrop's buildings, a street, fences,
+ * Dumps the built world's samples (`samples.ts`: houses near and far, the lots' buildings closed, a street, fences,
  * cars, each made by the game's own generators) for their gate: a `.glb` a sample and `built.json`, which lists them.
  *
  * Run: bun tools/built/dump.ts <out dir>, then cargo check-glb --built <out dir>

@@ -757,7 +757,7 @@ export function removeLots(draft: NeighbourhoodDraft, lots: ReadonlySet<number>)
   if (!open) return homes;
   const pads: Record<number, number> = {};
   for (const [k, v] of Object.entries(open.pads)) if (renumber.has(Number(k))) pads[renumber.get(Number(k))!] = v;
-  const places = open.places?.filter((q) => q.plot === undefined || renumber.has(q.plot)).map((q) => (q.plot === undefined ? q : { ...q, plot: renumber.get(q.plot)! }));
+  const places = open.places?.filter((q) => renumber.has(q.plot)).map((q) => ({ ...q, plot: renumber.get(q.plot)! }));
   const carParks = open.carParks?.map((p) => {
     if (p.serves === undefined || p.serves === renumber.get(p.serves)) return p;
     const { serves, ...rest } = p;

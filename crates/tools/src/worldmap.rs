@@ -4,9 +4,8 @@
 //! a tick on the side they face), garden paths and driveways, the ground floor's walls, the things
 //! standing about and the ways out of town (red). A big world also shows its land (water, woods, hills,
 //! meadows, fields, orchards), its country roads and trails (dashed), and its areas' names; and the
-//! living town: its backdrop buildings (coloured by use, darker the more
-//! storeys), each main town's centre (paved, dashed round), and the places the tags name (a dot at the
-//! door, blue for a public lot, red for a backdrop place, with its name). An index.html shows them all
+//! living town: each main town's centre (paved, dashed round), and the places the tags name (a blue
+//! dot at the door, with its name). An index.html shows them all
 //! on one page.
 //!
 //! `cargo world-map worlds.json out-dir [more.json ...]`
@@ -82,26 +81,6 @@ fn zone_colour(kind: &str) -> &'static str {
         "meadow" => "#c3d98f",
         "fields" => "#e2c86b",
         "orchard" => "#7fa653",
-        _ => "#999",
-    }
-}
-
-/// Backdrop buildings' colours, by use.
-fn use_colour(kind: &str) -> &'static str {
-    match kind {
-        "flats" => "#c9a27e",
-        "terrace" => "#d6b48e",
-        "house" => "#e3c9a0",
-        "shop" => "#e98f6b",
-        "cafe" => "#f0b35a",
-        "restaurant" => "#d9714e",
-        "office" => "#9fb3c8",
-        "school" => "#e5d36b",
-        "church" => "#bfa6d6",
-        "hall" => "#c7b79a",
-        "workshop" => "#a3a392",
-        "farm" => "#c98f5a",
-        "barn" => "#a8583e",
         _ => "#999",
     }
 }
@@ -262,26 +241,13 @@ pub fn svg(world: &J) -> String {
             ));
         }
     }
-    // The backdrop: by use, darker the taller.
-    for b in list(meta, "backdrop") {
-        parts.push(format!(
-            "<polygon points=\"{}\" fill=\"{}\" fill-opacity=\"{}\" stroke=\"#4a3426\" stroke-width=\"0.35\"/>",
-            line(&b["poly"]),
-            use_colour(text(b, "use")),
-            n((0.55 + num(b, "storeys") * 0.1).min(1.0))
-        ));
-    }
     for p in places {
         parts.push(format!(
             "<circle cx=\"{}\" cy=\"{}\" r=\"{}\" fill=\"{}\"/>",
             n(num(p, "x")),
             n(num(p, "z")),
             n(px(2.5).max(0.9)),
-            if p.get("plot").is_none() {
-                "#c0392b"
-            } else {
-                "#2b5fa8"
-            }
+            "#2b5fa8"
         ));
     }
     for p in places {
@@ -433,7 +399,7 @@ mod tests {
                 "facing": [2, 9],
                 "roads": [{ "points": [[0, 50], [300, 50.5]], "width": 9, "kind": "street" }, { "points": [[5, 5], [9, 9]], "width": 2, "kind": "trail" }],
                 "zones": [{ "kind": "water", "poly": [[1, 1], [2, 1], [2, 2]] }, { "kind": "hill", "poly": [[3, 3], [4, 3], [4, 4]] }],
-                "places": [{ "name": "Bakery", "x": 12, "z": 30 }, { "name": "School", "x": 14, "z": 31, "plot": 1 }]
+                "places": [{ "name": "Bakery", "x": 12, "z": 30, "plot": 0 }, { "name": "School", "x": 14, "z": 31, "plot": 1 }]
             }
         } });
         let svg = svg(&world);
@@ -445,7 +411,7 @@ mod tests {
         assert_eq!(svg.matches("fill=\"#5a4a3a\"").count(), 1);
         assert!(svg.contains("stroke-width=\"6.3\" stroke-linejoin=\"round\""));
         assert!(svg.contains("stroke-dasharray=\"3.3333333333333335 2\" stroke-linecap=\"round\""));
-        assert!(svg.contains("fill=\"#c0392b\"") && svg.contains("fill=\"#2b5fa8\""));
+        assert_eq!(svg.matches("fill=\"#2b5fa8\"").count(), 2);
         assert!(svg.ends_with(">big 7: Birch &amp; &lt;Co> (300×200 m)</text></svg>"));
     }
 }

@@ -1,8 +1,7 @@
 /**
  * The dense pass: what makes a town as built up as its size wants, every building a real lot on a
- * road's frontage (`LotPlacer`). It took the place of the backdrop, whose buildings nobody lived or
- * worked in. Along every street it lays, by the kinds its zone draws (`KINDS`: the centre's shops,
- * cafés, flats and offices shoulder to shoulder; the rest of a main town's homes, terraces, flats and
+ * road's frontage (`LotPlacer`). Along every street it lays, by the kinds its zone draws (`KINDS`:
+ * the centre's shops, cafés, flats and offices shoulder to shoulder; the rest of a main town's homes, terraces, flats and
  * workshops with gaps; a hamlet's homes and workshops further apart):
  *
  * - a home on a `tight` garden (no driveway, so no car of its own): a small generated house;

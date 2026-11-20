@@ -45,20 +45,3 @@ fn a_story_survives_content_changes() {
     let loaded = World::from_save_json(&without, &w.save_json()).unwrap();
     assert!(broke(&loaded).is_empty());
 }
-
-#[test]
-fn older_saves_from_before_the_crib_are_migrated() {
-    // Base objects, then a pack's lamp; the crib came at the end of the base objects in 0.13.
-    let old = content(&format!("{CHAIR},{LAMP}"));
-    let mut w = World::from_json(&old, TOWN, 1).unwrap();
-    w.events
-        .push_detail(w.tick, EventKind::Broke, 0, Some(1), None);
-    let mut save: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
-    save["version"] = 13.into();
-    for e in save["events"].as_array_mut().unwrap() {
-        e.as_object_mut().unwrap().remove("refs");
-    }
-    let now = content(&format!("{CHAIR},{CRIB},{LAMP}"));
-    let loaded = World::from_save_json(&now, &save.to_string()).unwrap();
-    assert_eq!(broke(&loaded), ["lamp"]);
-}

@@ -186,8 +186,8 @@ const courtsOf: [number, number, number] = [0, 0, 0];
 /** Each world's land: its slopes (`slopeChecks`), how long it took to grade (ms), its size in the file (KB). */
 const landTable: { tag: string; slopes: Slopes; ms: number; kb: number; given: { lots: number; roads: number; courts: number } }[] = [];
 /**
- * The buildings each place's first world had before every building was a lot (houses, backdrop buildings and named
- * places' lots: the real town's stage 0, 2026-11-19, seed base 0), for the density table: at least 90 % of them on
+ * The buildings each place's first world had before every building was a lot (houses, the buildings nobody lived
+ * in that stood among them then, and named places' lots: the real town's stage 0, 2026-11-19, seed base 0), for the density table: at least 90 % of them on
  * average, 80 % in every world, the centre the densest.
  */
 const BASELINE: Record<string, number> = { country: 435, farm: 208, seaside: 252, lakeside: 286, river: 359, mountain: 109, forest: 170, heath: 128, island: 242 };

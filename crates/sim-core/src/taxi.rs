@@ -251,7 +251,7 @@ pub struct Run {
     pub due_out: u64,
     /// When it was planned to be out of town (`time_run`; `due_out` follows it as it runs late):
     /// a rider whose work begins before that and the way off the map rode a late run
-    /// (`Taxis::late_arrivals`). 0: as `due_out` (an older save).
+    /// (`Taxis::late_arrivals`). 0: as `due_out`.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub planned_out: u64,
     /// Home: it leaves work at this tick (those done by then ride it), and comes in after the way

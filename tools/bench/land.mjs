@@ -854,7 +854,7 @@ try {
       if (mode === 'creative') await page.getByRole('radio', { name: 'Creative' }).click();
       await page.waitForTimeout(1500);
       await shot('10-step3');
-      await page.locator('.offer .card[data-slot] .go').first().click();
+      await page.locator('.offer .card[data-home] .go').first().click();
       await page.waitForFunction(() => !!document.querySelector('.btn.move-in:not(:disabled)'), null, { timeout: 180_000, polling: 100 });
       await page.waitForTimeout(500);
       await page.locator('.btn.move-in').click();

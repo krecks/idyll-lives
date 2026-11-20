@@ -574,9 +574,7 @@ export interface WorldMeta {
   /** The areas (hamlets) as the generator laid them out, for the map and the camera. */
   areas?: TownArea[];
   // pin:living-town-meta begin
-  /** Living town: buildings nobody lives in that make a town dense. */
-  backdrop?: BackdropBuilding[];
-  /** Living town: the places the town tags name (backdrop places and public lots). */
+  /** Living town: the places the town tags name (each a lot's). */
   places?: TownPlace[];
   /** Living town: each main town's centre, the square and the high street (`poly`, paved but for its lots and greens), and the square itself. */
   centre?: { area: number; poly: [number, number][]; square?: [number, number][] }[];
@@ -629,7 +627,7 @@ export interface LandFile {
 
 // pin:living-town-types begin
 
-/** What a building is, for how it looks closed (a lot's `LotLook`, a backdrop building's). */
+/** What a building is, for how it looks closed (a lot's `LotLook`). */
 export type BuildingUse =
   | 'flats'
   | 'terrace'
@@ -645,35 +643,15 @@ export type BuildingUse =
   | 'farm'
   | 'barn';
 
-/** A building that makes a town dense without being a lot: drawn only, never simulated. */
-export interface BackdropBuilding {
-  /** Footprint corners, town metres, 4 to 8 points (most are rectangles), counter-clockwise seen from above: the signed area Σ(x·z′ − x′·z) is negative. */
-  poly: [number, number][];
-  /** Ground height of the footprint's lowest corner (m). */
-  y: number;
-  /** Storeys (1 to 6), 3 m each. */
-  storeys: number;
-  roof: 'gable' | 'hip' | 'flat' | 'mansard';
-  /** The ridge's direction for gable and mansard roofs (rad, 0 = along x): a turn around +y (y up), so it runs along (cos r, −sin r) in (x, z). */
-  ridge?: number;
-  use: BuildingUse;
-  /** A wall and roof colour pair: an index into the renderer's backdrop palette, taken modulo its length. */
-  look: number;
-  /** A place's building: its index into `WorldMeta.places`. */
-  place?: number;
-  /** The area (`TownArea` index) it stands in. */
-  area: number;
-}
-
-/** Somewhere the town tags name: a backdrop place or a public lot (every one a lot once the backdrop goes). */
+/** Somewhere the town tags name: a public lot. */
 export interface TownPlace {
   name: string;
   kind: 'shop' | 'cafe' | 'restaurant' | 'office' | 'school' | 'church' | 'park' | 'outdoor' | 'workshop' | 'farm';
   /** Where its tag stands (town metres). */
   x: number;
   z: number;
-  /** A public lot: its plot index. Absent: a backdrop place. */
-  plot?: number;
+  /** Its lot: the plot index. */
+  plot: number;
   /** Opening hours: minutes of the day [open, close) and the days (bit 0 = Monday). Absent: always open. */
   hours?: { open: number; close: number; days: number };
   /** Career categories (`JobView.category`) whose workers are shown as working here. */
@@ -682,14 +660,15 @@ export interface TownPlace {
 }
 
 /**
- * How a named place's lot (a town hall, a school, a shop on the high street: `game/placeLots.ts`) looks
- * from outside, as a backdrop building of its kind would: its use, storeys (3 m each, the ground floor
- * the only real one inside unless its layout has a storey above), roof and colours (`BackdropBuilding`'s).
+ * How a named place's or a building of flats' lot (a town hall, a school, a shop on the high street:
+ * `game/placeLots.ts`) looks from outside, closed: its use, its storeys (3 m each, as many as it really
+ * has, at most the town's), its roof, and its wall and roof colour pair (an index into the renderer's
+ * palette, taken modulo its length).
  */
 export interface LotLook {
   use: BuildingUse;
   storeys: number;
-  roof: BackdropBuilding['roof'];
+  roof: 'gable' | 'hip' | 'flat' | 'mansard';
   look: number;
 }
 

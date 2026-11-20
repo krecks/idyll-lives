@@ -880,7 +880,7 @@ const TOWN_LOTS: [number, number] = [66, 84];
  * The fewest homes (its houses' lots, the dense pass's terraced houses and homes on tight gardens among them) a
  * main town of each size has by its homes (`sizeByHomes`): a few more than the most the size below lays. Laid by
  * the generator, a main town of each size measured 28–74, 48–115, 71–191 and 123–257 homes over the nine places
- * and six seeds, 2026-11-20. The sizes overlap since the dense pass lays homes where the backdrop stood: a main
+ * and six seeds, 2026-11-20. The sizes overlap since the dense pass lays homes besides the houses' lots: a main
  * town is its place's size first (`places.ts` `draftAreaSize`), and its homes only ever make it bigger.
  */
 const GROWN_FROM: Record<TownSize, number> = { hamlet: 0, village: 80, town: 120, city: 200 };
