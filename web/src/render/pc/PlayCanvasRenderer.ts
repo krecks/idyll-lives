@@ -65,7 +65,7 @@ import { Signals } from './signals';
 import { Cars } from './cars';
 import { ParkedRides } from './parkedRides';
 import { SelectionMarker } from './selectionMarker';
-import { SunShadows } from './sunShadows';
+import { CASTER_REACH, SunShadows } from './sunShadows';
 import { TemplateCache } from './templateCache';
 import { Thumbnails } from './thumbnail';
 import { benchDiag } from '../../debug/benchFlags';
@@ -210,6 +210,12 @@ const GAME_SETTLE_MS = 250;
 const WATER_FRAME_MS = 1000 / 30;
 /** Metres the sun's shadow square reaches past the viewed lot. */
 const SHADOW_MARGIN = 10;
+/**
+ * Metres past where a resident could cast into the sun's map that their shadow-only copy is still drawn
+ * (`Characters.setCastTest`): the square moves in 8 m steps as the camera roams, and those it takes in are listed
+ * the frame after it moved, so they are listed a step or two before.
+ */
+const CAST_SLACK = 16;
 /** The game camera's target eases to the ground under it over this (s): `settleTarget`. */
 const TARGET_EASE = 0.25;
 /** The basement's pit (and the ground dug away over it) reaches this far past the plot (m), clear of walls on its edge. */
@@ -993,6 +999,16 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.cars.setShadowTest(inMap);
     this.signals = new Signals(this.app, this.root, this.deps.assets, { shadows: this.quality.streetShadows, lod: this.quality.streetLod });
     this.characters.setShadowTest(inMap);
+    // (A parked bike's draw is the same for the sun's map while its copies there are: one ridden off across town draws
+    // no picture of the still casters again.)
+    this.sunShadows.castKey = (mi) => this.parkedRides.castKey(mi, inMap);
+    // (Their shadow-only copies only where they may cast: near the sun's square, and on the lot in view, whose rooms'
+    // lamps cast too.)
+    this.characters.setCastTest((x, z) => {
+      const v = this.view;
+      const r = CASTER_REACH;
+      return this.sunShadows.reaches(x, z, CAST_SLACK) || (!!v && x >= v.x - r && x <= v.x + v.w + r && z >= v.z - r && z <= v.z + v.d + r);
+    });
     this.characters.setCarRide((frame, x, z, yaw, aboard, out) => this.cars.ride(frame, x, z, yaw, aboard, out));
     // (Out on the hills between hamlets, on the land, not sunk into it: `Characters.setGround`. On a land the town
     // follows, on its roads and its lots' pads too.)

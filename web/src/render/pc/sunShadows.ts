@@ -279,6 +279,13 @@ export class SunShadows {
    * still casters' picture (`still`); null: every redraw draws everything.
    */
   movers: ((out: pc.MeshInstance[]) => void) | null = null;
+  /**
+   * A still caster's copies that can cast into the map, as a number (`reaches`: the parked bikes' draws, whose copies
+   * stand all over town; undefined: not such a draw). Such a draw is the same for the still casters' picture while its
+   * number is, however many copies it has elsewhere and however big its box: a bike ridden off across town draws no
+   * picture again.
+   */
+  castKey: ((mi: pc.MeshInstance) => number | undefined) | null = null;
   /** Whether the still casters' picture is kept (`SunShadowOptions.still`). */
   readonly still: boolean;
   /** Redraws since the page opened: of the still casters too, and of only what moves (the bench's counts). */
@@ -289,7 +296,7 @@ export class SunShadows {
   private stillTarget: pc.RenderTarget | null = null;
   /** Whether this redraw's `drawStill` copied the still casters' picture into the map (`drawPass` then draws only what moves). */
   private copied = false;
-  private readonly drawn = { viewProj: new Float32Array(16), map: null as object | null, casters: [] as pc.MeshInstance[], boxes: new Float64Array(0), counts: new Float64Array(0) };
+  private readonly drawn = { viewProj: new Float32Array(16), map: null as object | null, casters: [] as pc.MeshInstance[], boxes: new Float64Array(0), counts: new Float64Array(0), keys: new Float64Array(0) };
   /** This redraw's casters: those that move (`movers`), the still ones, and all of them as PlayCanvas culled them. */
   private readonly moving = new Set<pc.MeshInstance>();
   private readonly movingList: pc.MeshInstance[] = [];
@@ -357,11 +364,12 @@ export class SunShadows {
   /**
    * Whether a caster moving at (x, z) (game space) could change the map: it is within `CASTER_REACH` m
    * of the square (always, in the menus' town, whose map follows the view). What the cars and
-   * residents ask of each that moved: one moving across town leaves the map as it is.
+   * residents ask of each that moved: one moving across town leaves the map as it is. `slack`: so many metres
+   * further out too.
    */
-  reaches(x: number, z: number): boolean {
+  reaches(x: number, z: number, slack = 0): boolean {
     const g = this.ground;
-    const r = CASTER_REACH;
+    const r = CASTER_REACH + slack;
     return this.overview || (x >= g.x0 - r && x <= g.x1 + r && z >= g.z0 - r && z <= g.z1 + r);
   }
 
@@ -430,7 +438,7 @@ export class SunShadows {
    * Before the sun's pass (outside the GPU's pass): the still casters' picture drawn again if they changed (whole: as
    * PlayCanvas would draw the map, without what moves), then copied into the map. The light's view must be the one
    * the picture was drawn with (within `VIEW_NOISE`), the map the same, and the still casters the same ones in the same
-   * places (each one's box and copies); else it is drawn again.
+   * places (each one's box and copies, or its copies that can cast into the map: `castKey`); else it is drawn again.
    */
   drawStill(pass: ShadowPass): void {
     const { light, camera } = pass;
@@ -498,7 +506,13 @@ export class SunShadows {
     for (let k = 0; k < 16; k++) if (Math.abs(vp[k] - d.viewProj[k]) > VIEW_NOISE) return false;
     for (let i = 0; i < still.length; i++) {
       const mi = still[i];
-      if (mi !== d.casters[i] || mi.instancingCount !== d.counts[i]) return false;
+      if (mi !== d.casters[i]) return false;
+      const key = this.castKey?.(mi);
+      if (key !== undefined) {
+        if (key !== d.keys[i]) return false;
+        continue;
+      }
+      if (mi.instancingCount !== d.counts[i]) return false;
       const b = mi.aabb;
       const o = i * 6;
       const c = b.center;
@@ -570,10 +584,12 @@ export class SunShadows {
     d.casters.length = 0;
     if (d.boxes.length !== still.length * 6) d.boxes = new Float64Array(still.length * 6);
     if (d.counts.length !== still.length) d.counts = new Float64Array(still.length);
+    if (d.keys.length !== still.length) d.keys = new Float64Array(still.length);
     for (let i = 0; i < still.length; i++) {
       const mi = still[i];
       d.casters.push(mi);
       d.counts[i] = mi.instancingCount;
+      d.keys[i] = this.castKey?.(mi) ?? NaN;
       const b = mi.aabb;
       const o = i * 6;
       d.boxes[o] = b.center.x;

@@ -1312,8 +1312,8 @@ function chunkData(plan: ChunkPlan): Map<string, MeshData> {
 
 /**
  * The draw a ground layer goes into: one for each look (its material, and whether it is toned or the road's paint), so
- * the layers that look alike (the road and the car parks' aprons, the garden paths and the yards, the road's markings
- * and the bays' lines) are one draw in a group, not one each.
+ * the layers that look alike (the road and the car parks' aprons, the garden paths, the yards and the trails, the road's
+ * markings and the bays' lines) are one draw in a group, not one each.
  */
 function groundDraw(g: Omit<GroundLayer, 'geo'>): string {
   return g.paint ? 'groundPaint' : `ground:${g.material}${g.toned ? ':toned' : ''}`;

@@ -1,9 +1,9 @@
 // What the residents cost the GPU and the shadow map (`residents.ts` `faceDetail`, `upload`): a resident not drawn
 // (hidden, away, out of view) is in no part's rows, the parts drawn whatever the distance and the shadow-only copies
 // included, so nothing skins them to nothing; and only residents posed inside the sun's shadow square draw its map
-// again (`posed`). And the pose texture's three texels a bone (`layout.ts` `BONE_TEXELS`) are the skinning matrices'
-// rows, number for number; and residents far off are posed in full only every few frames, carried along where they
-// are between. `bun test`.
+// again (`posed`), and the shadow-only copies draw only those who may cast into a map (`setCastTest`). And the pose
+// texture's three texels a bone (`layout.ts` `BONE_TEXELS`) are the skinning matrices' rows, number for number; and
+// residents far off are posed in full only every few frames, carried along where they are between. `bun test`.
 //
 // (What this caught when written: the hair, the eyes and the shadow-only copies kept every resident built, drawn or
 // not, and one hidden counted as far off, so its low-detail body was drawn too; and anyone posed within the preset's
@@ -311,6 +311,54 @@ describe('residents not drawn', async () => {
       const off = run(30);
       expect(off.posed).toBeGreaterThan(20);
       expect(off.shadowPosed).toBe(0);
+    } finally {
+      performance.now = realNow;
+    }
+  }, 30_000);
+
+  test('the shadow-only copies draw only those who may cast into a map, and one who comes there draws the sun\'s again', async () => {
+    const realNow = performance.now;
+    let now = 0;
+    performance.now = () => now;
+    // (The parts of this Sim set only: `parts` holds the other tests' too, still with their counts.)
+    const first = parts.length;
+    try {
+      const characters = new Characters(view, assets, content, { castsShadows: true });
+      expect(await characters.init()).toBe(true);
+      await characters.build({ sims, objects: [] });
+      const prev = new Float32Array(layout.capacity);
+      const curr = new Float32Array(layout.capacity);
+      const frame: FrameState = { prev, curr, alpha: 0, steps: 1, layout, now: 0 };
+      const shadows = new Float32Array(MAX_CHARACTERS * 16);
+      write(prev, -1);
+      write(curr, -1);
+      const rows = (shadow: boolean) => {
+        const ids = new Set<number>();
+        for (const p of parts.slice(first)) if (p.shadow === shadow) for (let j = 0; j < p.count; j++) ids.add(p.rows[j * 4]);
+        return [...ids].sort((a, b) => a - b);
+      };
+      /** A frame; whether the sun's map is to be drawn again for the residents. */
+      const step = () => {
+        now += 1000 / 60;
+        frame.now = now;
+        characters.update(frame, () => true, shadows);
+        return characters.shadowPosed;
+      };
+      for (let f = 0; f < 5; f++) step();
+      expect(rows(true)).toEqual([0, 1, 2, 3, 4, 5]);
+      // Only those short of x = 4 may cast (at 0, 1.5 and 3 m): the others' shadow-only copies go, the bodies stay.
+      characters.setCastTest((x) => x < 4);
+      for (let f = 0; f < 3; f++) step();
+      expect(rows(true)).toEqual([0, 1, 2]);
+      expect(rows(false)).toEqual([0, 1, 2, 3, 4, 5]);
+      // The sun's square 100 m off, so nobody posed in it draws it again; everyone may cast again (the square came to
+      // them): listed again, and the map is drawn again with them, once.
+      characters.setShadowTest(square(100, 0, 30));
+      for (let f = 0; f < 3; f++) step();
+      characters.setCastTest(() => true);
+      expect(step()).toBe(true);
+      expect(rows(true)).toEqual([0, 1, 2, 3, 4, 5]);
+      expect(step()).toBe(false);
     } finally {
       performance.now = realNow;
     }

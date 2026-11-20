@@ -199,6 +199,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   shadowPosed = false;
   /** Whether a Sim at (x, z) casts into the sun's map (the renderer's `SunShadows.reaches`); null: the map covers everything. */
   private inMap: ((x: number, z: number) => boolean) | null = null;
+  /** Whether a Sim at (x, z) may cast into a shadow map (`setCastTest`); null: anywhere. */
+  private castsAt: ((x: number, z: number) => boolean) | null = null;
+  /** Per Sim row: whether it may cast into a shadow map now (`castsAt`): the shadow-only copies draw only those. */
+  private readonly casting = new Uint8Array(MAX_CHARACTERS);
+  /** One came where they may cast since the last upload: the sun's map is drawn again with them (`shadowPosed`). */
+  private castGained = false;
   /** Per Sim row: where it was last posed (x, z on the ground), for `shadowPosed`. */
   private readonly posedAt = new Float32Array(MAX_CHARACTERS * 2);
   private width = 0;
@@ -3342,6 +3348,15 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     this.inMap = inMap;
   }
 
+  /**
+   * Whether a spot may cast into a shadow map (the sun's square with room to move, and the lamps' rooms; null:
+   * everywhere): the shadow-only copies draw only the Sims there, so the sun's pass draws no copy for Sims who can't
+   * cast into it, a town's worth of them seen from the town view.
+   */
+  setCastTest(castsAt: ((x: number, z: number) => boolean) | null): void {
+    this.castsAt = castsAt;
+  }
+
   /** The seat of the car at a spot, for those sitting there with no object under them (getting in or out of it: `pc/cars.ts`). */
   setCarSeat(seatAt: ((x: number, z: number) => Seat | null) | null): void {
     this.carSeatAt = seatAt;
@@ -4538,7 +4553,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       shadowed = !inMap || inMap(this.posedAt[i * 2], this.posedAt[i * 2 + 1]);
     }
     this.posed = lo >= 0;
-    this.shadowPosed = shadowed;
+    this.shadowPosed = shadowed || this.castGained;
+    this.castGained = false;
     if (lo >= 0) this.view.uploadPoseRows(lo, hi - lo + 1);
   }
 
@@ -5008,20 +5024,31 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const perFrame = !!pm.detail || pm.range !== Range.Always;
       this.listRows(pm, perFrame ? 'rows' : 'new', true);
     }
-    // The shadow-only copies: who is drawn, wearing the shells (they keep their rows till either changes).
-    if (!all && !this.shadowsBare) return;
+    // Who may cast into a shadow map now (`castsAt`, where they were posed); one who came there has the sun's map
+    // drawn again (`upload`), wherever they were before.
+    let cast = false;
+    const castsAt = this.castsAt;
+    for (let i = 0; i < count; i++) {
+      const c = shown[i] && (!castsAt || castsAt(this.posedAt[i * 2], this.posedAt[i * 2 + 1])) ? 1 : 0;
+      if (c === this.casting[i]) continue;
+      if (c) this.castGained = true;
+      this.casting[i] = c;
+      cast = true;
+    }
+    // The shadow-only copies: who is drawn and may cast, wearing the shells (they keep their rows till any changes).
+    if (!all && !this.shadowsBare && !cast) return;
     this.shadowsBare = false;
     for (const pm of this.shadowMeshes.values()) {
-      if (pm.enabled) this.listRows(pm, 'new', false);
+      if (pm.enabled) this.listRows(pm, 'new', false, true);
     }
   }
 
   /**
    * The rows of `pm`'s Sims (`all`) drawn now, written where they changed (`change`: as `setInstances` set it, per
-   * frame or not): those shown, not wearing clothes that leave the part out, and (`byDistance`) with a face big
-   * enough for its detail, at its range.
+   * frame or not): those shown, not wearing clothes that leave the part out, (`byDistance`) with a face big
+   * enough for its detail, at its range, and (`cast`) where they may cast into a shadow map (`casting`).
    */
-  private listRows(pm: PartMesh<M>, change: 'rows' | 'new', byDistance: boolean): void {
+  private listRows(pm: PartMesh<M>, change: 'rows' | 'new', byDistance: boolean, cast = false): void {
     const { all, settings: out, detail, range, shell } = pm;
     const { visible: shown, facePx: px, far, bare } = this;
     const anyRange = range === Range.Always;
@@ -5030,7 +5057,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     let changed = false;
     for (let j = 0; j < all.length; j += 4) {
       const id = all[j];
-      if (shown[id] !== 1 || shell & bare[id]) continue;
+      if (shown[id] !== 1 || shell & bare[id] || (cast && !this.casting[id])) continue;
       if (byDistance && (!(px[id] >= detail) || (!anyRange && (far[id] === 1) === near))) continue;
       if (out[n * 4] !== id) {
         out[n * 4] = out[n * 4 + 1] = id;
