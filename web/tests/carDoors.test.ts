@@ -2,12 +2,9 @@
 // cars in a row of bays, as the simulation opens them there (sim-core `cars/mod.rs` `Car::door_in_bay`: `SWING`,
 // `DOOR_OUT`), and never into the next car. `bun test`.
 import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { carDoor, CARS, DOOR_OPEN, DOOR_OUT, DOOR_SWING_ROOM, doorSwing, type CarAt } from '../src/render/shared/cars';
+import { constant } from './snapshotLayout';
 
-const CARS_RS = readFileSync(join(import.meta.dir, '../../crates/sim-core/src/cars/mod.rs'), 'utf8');
-const rust = (name: string) => Number(new RegExp(`const ${name}: f32 = ([0-9.]+);`).exec(CARS_RS)![1]);
 
 /** A row of `n` cars of `body` nose in, 3 m apart along x (as a car park's bays), facing +z or turned `yaw`. */
 function row(body: number, n: number, yaw = 0): CarAt[] {
@@ -23,8 +20,8 @@ function reach(body: number, d: number, deg: number): number {
 
 describe('a car’s doors as drawn', () => {
   test('keep to the simulation’s room and part way', () => {
-    expect(DOOR_OUT).toBe(rust('DOOR_OUT'));
-    expect(DOOR_SWING_ROOM).toBe(rust('SWING'));
+    expect(DOOR_OUT).toBe(constant('DOOR_OUT'));
+    expect(DOOR_SWING_ROOM).toBe(constant('SWING'));
   });
 
   test('open wide with no car beside them', () => {

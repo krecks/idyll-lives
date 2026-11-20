@@ -2,15 +2,11 @@
 // (`driveScale`), all from the snapshot layout, and what keeps to sim-core's own (`lib.rs`, `clock.rs`) without a
 // layout to hand. `bun test`.
 import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { clockGain, maxAlpha } from '../src/core/bridge';
 import { gameMinutesPerSecond, minutesPerTick, readLayout, tickRates } from '../src/core/snapshot';
 import { SUPER_SPEED as GAME_SUPER_SPEED } from '../src/game/speed';
 import { PLAYBACK_RATE, playbackRate, SUPER_SPEED } from '../src/render/shared/gameSpeed';
-import { constant, DRIVE_SCALE, TICKS_PER_MINUTE, TICKS_PER_SECOND } from './snapshotLayout';
-
-const CLOCK_RS = readFileSync(join(import.meta.dir, '../../crates/sim-core/src/clock.rs'), 'utf8');
+import { constant, DRIVE_SCALE, rustConst, TICKS_PER_MINUTE, TICKS_PER_SECOND } from './snapshotLayout';
 
 describe('tick rates', () => {
   test("before a game, the rates are sim-core's (`lib.rs`)", () => {
@@ -19,12 +15,10 @@ describe('tick rates', () => {
   });
 
   test("the playback rate is the ticks a step runs at each speed (`clock::TICKS_PER_STEP`), super speed sim-core's", () => {
-    const steps = /pub const TICKS_PER_STEP: \[u32; \d+\] = \[([^\]]+)\];/.exec(CLOCK_RS);
-    expect(steps).not.toBeNull();
-    expect(PLAYBACK_RATE).toEqual(steps![1].split(',').map((n) => Number(n.trim())));
-    expect(SUPER_SPEED).toBe(constant('SUPER_SPEED', undefined, CLOCK_RS));
+    expect(PLAYBACK_RATE).toEqual(JSON.parse(rustConst('TICKS_PER_STEP')));
+    expect(SUPER_SPEED).toBe(constant('SUPER_SPEED'));
     expect(GAME_SUPER_SPEED).toBe(SUPER_SPEED);
-    expect(SUPER_SPEED).toBe(constant('MAX_SPEED', undefined, CLOCK_RS));
+    expect(SUPER_SPEED).toBe(constant('MAX_SPEED'));
   });
 
   test("a snapshot plays at the ticks its step ran (the header's rate), else at its speed's", () => {
