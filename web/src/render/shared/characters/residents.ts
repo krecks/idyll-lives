@@ -1102,7 +1102,17 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       this.writeProp(this.leftProp, i, null);
       this.writeProp(this.rightProp, i, null);
       this.writeProp(this.handProp, i, null);
+      for (const slot of this.mountProps) this.writeProp(slot, i, null);
     }
+    // What each row had of the last game (where it stood and was posed, how near its face was, what it held, rode or
+    // swayed) goes with it: the next game's residents in those rows start as a page's first do.
+    this.heldBy.fill(-1);
+    this.mountId.fill(-1);
+    this.facePx.fill(1e6);
+    this.spots.fill(NaN);
+    this.onPadOf.fill(null);
+    this.parkAt.fill(null);
+    for (const rows of [this.posedAt, this.cradle, this.bare, this.storeys, this.groups, this.groupMiddle, this.far, this.poseFar, this.inCar, this.inArea, this.mountOn, this.wheelTurn, this.crankTurn, this.headJoints, this.sway]) rows.fill(0);
     // Props built without their files are built (and their files tried) afresh in the next session.
     this.props.dropFailed();
   }

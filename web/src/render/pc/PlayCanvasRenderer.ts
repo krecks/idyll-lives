@@ -499,9 +499,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private covered = false;
   private coveredFrames = 0;
   private readonly frameWaiters: { left: number; resolve: () => void }[] = [];
-  /** Frames drawn so far (`drawFrame` tells whether one was), and whether they are drawn on demand (`framesOnDemand`). */
+  /** Frames drawn so far (`drawFrame` tells whether one was). */
   private framesDrawn = 0;
-  private onDemand = false;
   private onFrame: ((now: number) => void) | null = null;
   private onView: (() => void) | null = null;
   private townListener: (() => void) | null = null;
@@ -1115,16 +1114,16 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   }
 
   framesOnDemand(on: boolean): void {
-    if (on && !this.onDemand) {
+    if (on) {
       // What moves by a clock of its own (the residents' and the things' clips, the birds, the wind, the clouds) starts
-      // again from 0: the same frames from the same state draw the same picture, however long the page has been open.
+      // again from 0, each time it is asked for (a run after frames drawn to settle a pose asks again): the same frames
+      // from the same state draw the same picture, however long the page has been open or the pose took to settle.
       this.shownMs = 0;
       this.characters.restartClock();
       this.lot.restartClocks();
       this.birdLife.life.restartClock();
       restartDice(true);
     }
-    this.onDemand = on;
     this.pacer.manual(on);
     if (!on) {
       fixFrameClock(null);
@@ -4099,6 +4098,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
 
   setFrozen(on: boolean): void {
     this.frozen = on;
+  }
+
+  frameProbe(): FrameProbe | null {
+    return this.probe;
   }
 
   setFrameProbe(probe: FrameProbe | null): void {

@@ -123,7 +123,7 @@ const START_ALPHA = -Math.PI * 0.62;
  * being built to end it: a resident's look or a model that comes later shows as a frame that draws more.
  */
 const SETTLE_FRAMES = 2000;
-const STEADY_MS = 1500;
+const STEADY_MS = 3000;
 const STEADY_FRAMES = 10;
 /** The wall clock's pause between those frames, for what loads meanwhile. */
 const SETTLE_PAUSE_MS = 25;
@@ -197,23 +197,31 @@ export const benchTime = {
   },
 
   /**
-   * `frames` frames in fixed steps of `ticks`. With `pose`, the camera is put there first and frames are drawn with
-   * the game paused until what it streams in and builds has come (`SETTLE_FRAMES` at most), then the game goes on at
-   * normal speed (`speed`) for the run.
+   * `frames` frames in fixed steps of `ticks`. With `pose` (or `settle`, the camera as it is held), the camera is put
+   * there first and frames are drawn with the game paused and the clock held until the picture stands still
+   * (`SETTLE_FRAMES` at most), then the game goes on at normal speed (`speed`) for the run. A camera that moves with
+   * the wall clock (the bench's orbit paths) doesn't repeat: hold it (`cam=over`, `hold=1`).
    */
-  async run(frames: number, options: { ticks?: number; pose?: RunPose; speed?: number } = {}): Promise<StepRun & { settleFrames: number }> {
+  async run(frames: number, options: { ticks?: number; pose?: RunPose; settle?: boolean; speed?: number } = {}): Promise<StepRun & { settleFrames: number }> {
     const s = session();
     const ticks = options.ticks ?? 1;
     const renderer = await host.rendererNow(settings);
     s.stepMode(ticks);
     let settleFrames = 0;
-    if (options.pose) {
+    if (options.pose || options.settle) {
       services.controls.setSpeed(0);
-      renderer.setCameraPose(await poseOf(options.pose));
+      if (options.pose) renderer.setCameraPose(await poseOf(options.pose));
       // (The clock held: however many frames the builds take, what is held back by its rate is due at the same frames of
       // the run. The frames drawn until they draw the same for a while with nothing built.)
       let drawn = -1;
-      renderer.setFrameProbe({ before() {}, after: (_s, _u, _e, c) => void (drawn = c.drawCalls + c.triangles) });
+      const held = renderer.frameProbe();
+      renderer.setFrameProbe({
+        before: (now) => held?.before(now),
+        after(start, updated, end, c) {
+          held?.after(start, updated, end, c);
+          drawn = c.drawCalls + c.triangles;
+        },
+      });
       try {
         let steadyFrom = performance.now();
         let steadyFrames = 0;
@@ -230,9 +238,11 @@ export const benchTime = {
           await sleep(SETTLE_PAUSE_MS);
         }
       } finally {
-        renderer.setFrameProbe(null);
+        renderer.setFrameProbe(held);
       }
     }
+    // (The clocks of what moves only for the eye from 0 again: however many frames settling took, the run starts alike.)
+    s.stepMode(ticks);
     services.controls.setSpeed(options.speed ?? 1);
     const draws: number[] = [];
     const shadowDraws: number[] = [];
@@ -244,9 +254,12 @@ export const benchTime = {
     let last: Sun | null = null;
     let first: Sun | null = null;
     const read = (c: FrameCounts): Sun => ({ whole: c.sunShadows.whole, moving: c.sunShadows.moving, why: { ...c.sunShadows.why } });
+    // (The hooks already set, the bench's camera's, go on holding the camera.)
+    const held = renderer.frameProbe();
     renderer.setFrameProbe({
-      before() {},
-      after(_start, _updated, _end, c) {
+      before: (now) => held?.before(now),
+      after(start, updated, end, c) {
+        held?.after(start, updated, end, c);
         const now = read(c);
         first ??= last ?? now;
         if (last && now.whole > last.whole) {
@@ -277,7 +290,7 @@ export const benchTime = {
         }
       }
     } finally {
-      renderer.setFrameProbe(null);
+      renderer.setFrameProbe(held);
     }
     const ms = performance.now() - t0;
     const end = last ?? { whole: 0, moving: 0, why: {} };

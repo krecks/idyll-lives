@@ -645,6 +645,8 @@ export interface Renderer {
   memoryCensus(): MemoryCensus | null;
   /** Benchmark: hooks around every drawn frame (null: none). */
   setFrameProbe(probe: FrameProbe | null): void;
+  /** Benchmark: the hooks set now (one wrapping them hands on to them). */
+  frameProbe(): FrameProbe | null;
   /**
    * Fixed-step playback (benchmarks): frames are drawn only as `drawFrame` asks, each at the time it gives (the
    * game's clock, not the wall's), as fast as they are asked for; false: at the display's refreshes again.
