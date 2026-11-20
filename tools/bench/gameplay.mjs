@@ -75,7 +75,8 @@
  *                              bench-results/.dist and reused while web/ is the same), served by `vite preview`; its
  *                              textures are the sources unless `--assets prod`
  *
- * Needs the dev server (the `?gpustats` hook is dev-only), so `--url` must point at one; or `--prod`.
+ * Needs the dev server (the `?gpustats` hook is a debug hook), so `--url` must point at one; or `--prod` (a build that keeps
+ * the debug hooks).
  */
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -155,14 +156,14 @@ if (has('help') || args.includes('-h')) {
   --no-dumps               no memory-infra dumps at the boundaries
   --lowmem                 the page as on an 8 GB machine (?lowmem)
   --voices                 the residents' voices on (the setting; off by default)
-  --prod                   a production build with the benchmark's hooks (VITE_BENCH_STATS=1), served by vite preview
+  --prod                   a production build with the benchmark's hooks (VITE_BENCH=1, lib/build.mjs), served by vite preview
   --headed                 in a window (default headless: the real GPU either way)
   --port 5222 | --url <u>  a dev server on the port (started if none answers), or one already running
   --startup-timeout 120    seconds for startup, --entry-timeout 180 for the entry
   --steady-grace 30        seconds the steady state may overrun --secs before it fails
   --out <dir>              default bench-results/gameplay-<time>/
 
-Needs a dev server (the ?gpustats hook is dev-only). See the comment at the top of this file.`);
+Needs a dev server or --prod (the ?gpustats hook is a debug hook). See the comment at the top of this file.`);
   process.exit(0);
 }
 
