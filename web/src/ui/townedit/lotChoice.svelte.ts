@@ -1,6 +1,6 @@
 /**
  * What the Lot tool puts down, as its card (`LotCard.svelte`) sets it: a home of a size with a
- * garden, a farm, a public place, an outdoor spot or a civic place. Kept while the tool is put down
+ * garden, a farm, a building of flats, a public place, an outdoor spot or a civic place. Kept while the tool is put down
  * and taken up again.
  */
 
@@ -11,7 +11,7 @@ import { CIVIC_PLACES, publicChoices, type LotChoice } from '../../game/edit/lot
 import { placeTemplate } from '../../game/placeLots';
 import type { NeighbourhoodDraft, Templates } from '../../game/town';
 
-export type LotGroup = 'home' | 'farm' | 'public' | 'outdoor' | 'civic';
+export type LotGroup = 'home' | 'farm' | 'flats' | 'public' | 'outdoor' | 'civic';
 export type HomeSize = 'small' | 'medium' | 'large';
 
 export const lotChoice = $state({
@@ -26,6 +26,9 @@ export const lotChoice = $state({
   civic: -1,
   civicArea: 0,
 });
+
+/** About how big a building of flats' lot is (m), for its ghost where it can't go: each is drawn where it goes. */
+const FLATS_LOT = { width: 20, depth: 24 };
 
 /** The outdoor spots' templates. */
 export const outdoorChoices = (t: Templates): string[] => t.parks.filter((p) => p.kind === 'outdoor').map((p) => p.id);
@@ -49,6 +52,8 @@ export function choiceOf(t: Templates): LotChoice | null {
       return { kind: 'house', size: c.size, ...(c.garden === 'any' ? {} : { garden: c.garden }) };
     case 'farm':
       return { kind: 'farm' };
+    case 'flats':
+      return { kind: 'flats' };
     case 'public': {
       const template = c.place || publicChoices(t)[0];
       const p = t.parks.find((q) => q.id === template);
@@ -71,6 +76,8 @@ export function choiceSize(t: Templates, draft?: NeighbourhoodDraft): { w: numbe
       ? t.lotSizes?.[c.size]
       : c.group === 'farm'
         ? t.lotSizes?.farm
+        : c.group === 'flats'
+          ? FLATS_LOT
         : c.group === 'outdoor'
           ? t.parks.find((p) => p.id === (c.outdoor || outdoorChoices(t)[0]))?.lot
           : undefined;

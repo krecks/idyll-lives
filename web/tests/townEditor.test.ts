@@ -524,6 +524,35 @@ describe('the Problems list and picking, on a generated town', async () => {
     expect(added.roads.map((r) => r.tone)).toEqual(['laid', 'bridge']);
   });
 
+  test("the Lot tool's building of flats: drawn as the generator draws one where it goes, named by its template, its flats homes priced as flats, blocking nothing", async () => {
+    const { addLot, canPlace } = await import('../src/game/edit/lots');
+    const { flatsInId, flatsTemplate } = await import('../src/game/flats');
+    const { homesOf } = await import('../src/game/people');
+    const { flatPrice } = await import('../src/game/price');
+    const { lengths } = await import('../src/game/roads');
+    const choice = { kind: 'flats' } as const;
+    const spots = hamlet.roads.flatMap((r, road) => (r.kind === 'trail' ? [] : Array.from({ length: Math.floor(lengths(r.points).at(-1)! / 3) }, (_, k) => [1, -1].map((side) => ({ road, s: k * 3, side: side as 1 | -1 }))).flat()));
+    const at = spots.find((p) => !('refused' in canPlace(hamlet, t, p, choice, 11)))!;
+    expect(at).toBeDefined();
+    const fit = canPlace(hamlet, t, at, choice, 11) as { x: number; z: number; w: number; d: number; about?: string };
+    const town = made(addLot(hamlet, t, content, at, choice, 11));
+    const s = town.slots.at(-1)!;
+    const b = flatsTemplate(t, s.template)!;
+    expect(s.kind).toBe('flats');
+    expect(plotRect(t, s)).toEqual({ x: fit.x, z: fit.z, w: fit.w, d: fit.d });
+    expect(s.name).toBe(b.name);
+    expect(fit.about).toBe(b.description);
+    // Every flat a home of its own, at a flat's price; the building no place.
+    const flats = homesOf(content, t, town).filter((h) => h.slot.index === s.index);
+    expect(flats.length).toBe(b.units.length);
+    expect(flats.length).toBe(flatsInId(s.template));
+    expect(flats.every((h, k) => h.flat === k && h.price === flatPrice(content, t, s, k) && h.price > 0)).toBe(true);
+    expect(town.open!.places!.some((p) => p.plot === s.index)).toBe(false);
+    // (The same seed, the same building.)
+    expect(made(addLot(hamlet, t, content, at, choice, 11)).slots.at(-1)!.template).toBe(s.template);
+    expect(townIssues(town, t, content).blocking).toEqual([]);
+  });
+
   // (A city's checks take seconds, which is why they run in their own worker, `checkJob.ts`: printed here to keep an eye on.)
   test('a laid city blocks nothing', () => {
     const city = generateWorld(content, t, 'country', 77, undefined, undefined, { town: 'city', villages: 'many' });

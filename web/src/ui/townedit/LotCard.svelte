@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
    * The Lot tool's card: what it puts down (`lotChoice`). A home of a size, with a garden (or as the
-   * world's homes have theirs); a farm; one of the public places a town's lot can be; an outdoor
+   * world's homes have theirs); a farm; a building of flats; one of the public places a town's lot can be; an outdoor
    * spot; or a civic place the town or village under the pointer hasn't got, put down as its
    * building along a street.
    */
@@ -15,6 +15,7 @@
   const GROUPS: readonly { value: LotGroup; label: string }[] = [
     { value: 'home', label: 'Home' },
     { value: 'farm', label: 'Farm' },
+    { value: 'flats', label: 'Flats' },
     { value: 'public', label: 'Public' },
     { value: 'outdoor', label: 'Outdoor' },
     { value: 'civic', label: 'Civic' },
@@ -53,6 +54,8 @@
     </div>
   {:else if lotChoice.group === 'farm'}
     <p class="hint">A farmhouse with its fields and farmyard. It needs a wide stretch of road, out of the town centre.</p>
+  {:else if lotChoice.group === 'flats'}
+    <p class="hint">A building of flats round a stair hall, two or three storeys high (mostly three in a town centre), each flat a home of its own. Its storeys and flats are shown as you point.</p>
   {:else if lotChoice.group === 'public'}
     <div class="choices" role="radiogroup" aria-label="Public place">
       {#each places as id, i (id)}
