@@ -60,12 +60,16 @@ is still true, and they name no file a reader is meant to open.
 
 Check: `ls crates/tools/src/characters/face.rs crates/sim-core/src/view.rs` (both gone).
 
-## 4. A stale save-format number in `land.rs`
+## 4. ~~A stale save-format number in `land.rs`~~ — not a finding
 
-`crates/sim-core/src/land.rs:24` says the land and the water mask are saved "still 39", but
-`crates/sim-core/src/save/mod.rs:185` has `pub const SAVE_VERSION: u32 = 41;`.
+`crates/sim-core/src/land.rs:24` says the land and the water mask are saved "still 39" while
+`crates/sim-core/src/save/mod.rs:185` has `pub const SAVE_VERSION: u32 = 41;`. That reads like a
+stale number, but it is not: `crates/sim-core/src/save/mod.rs:124` says "Still 39" of the same
+fields, and `crates/sim-core/src/save/mod.rs:130` explains why ("`meta.land` has its land drawn
+from the landscape, as before, so nothing changes version"). Both comments mean "this part of the
+file has not changed since format 39", which is true of format 41.
 
-Check: `rg -n 'SAVE_VERSION' crates/sim-core/src/save/mod.rs`.
+Check: `rg -n 'still 39|SAVE_VERSION' crates/sim-core/src/save/mod.rs`.
 
 ## Reviewed and left alone
 
