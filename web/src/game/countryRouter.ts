@@ -157,7 +157,10 @@ export class Cells {
   }
 }
 
-/** A binary heap of cell indices by priority. */
+/**
+ * A binary heap of cell indices by priority. (Its swaps are plain moves, not swapped by destructuring: the
+ * router's searches pop millions of states, and the arrays a destructuring swap builds were most of their time.)
+ */
 class Heap {
   private readonly items: number[] = [];
   private readonly keys: number[] = [];
@@ -171,7 +174,10 @@ class Heap {
     while (i > 0) {
       const p = (i - 1) >> 1;
       if (keys[p] <= key) break;
-      [items[i], items[p], keys[i], keys[p]] = [items[p], items[i], keys[p], keys[i]];
+      items[i] = items[p];
+      keys[i] = keys[p];
+      items[p] = item;
+      keys[p] = key;
       i = p;
     }
   }
@@ -180,17 +186,22 @@ class Heap {
     const top = items[0];
     const lastItem = items.pop()!;
     const lastKey = keys.pop()!;
-    if (items.length) {
+    const n = items.length;
+    if (n) {
       items[0] = lastItem;
       keys[0] = lastKey;
       let i = 0;
       for (;;) {
-        const [l, r] = [i * 2 + 1, i * 2 + 2];
+        const l = i * 2 + 1;
+        const r = l + 1;
         let m = i;
-        if (l < items.length && keys[l] < keys[m]) m = l;
-        if (r < items.length && keys[r] < keys[m]) m = r;
+        if (l < n && keys[l] < keys[m]) m = l;
+        if (r < n && keys[r] < keys[m]) m = r;
         if (m === i) break;
-        [items[i], items[m], keys[i], keys[m]] = [items[m], items[i], keys[m], keys[i]];
+        items[i] = items[m];
+        keys[i] = keys[m];
+        items[m] = lastItem;
+        keys[m] = lastKey;
         i = m;
       }
     }
@@ -264,7 +275,11 @@ const STEPS: readonly Pt[] = [
 /** The step nearest heading `d`. */
 const octant = ([x, z]: Pt) => (((Math.round(Math.atan2(z, x) / (Math.PI / 4)) % 8) + 8) % 8);
 /** How nearly step `h` heads along `d` (a unit vector): the cosine between them. */
-export const along = (h: number, d: Pt) => (STEPS[h][0] * d[0] + STEPS[h][1] * d[1]) / Math.hypot(...STEPS[h]);
+export const along = (h: number, d: Pt) => (STEPS[h][0] * d[0] + STEPS[h][1] * d[1]) / STEP_LENGTHS[h];
+/** Each of `STEPS`' lengths. */
+const STEP_LENGTHS: readonly number[] = STEPS.map((s) => Math.hypot(...s));
+/** The turns `steer` tries from a state that came as `K`'s ways have it (by its last number): straight on first. */
+const TURNS: readonly (readonly number[])[] = [[0], [0], [0, -1], [0, 1], [0, 1, -1]];
 
 /**
  * The cheapest way over a `gw` × `gd` grid as a road runs, not as a walker does: heading one of
@@ -305,7 +320,7 @@ function steer(gw: number, gd: number, cost: Float32Array, starts: readonly { ce
     const end = goal(i, hd);
     if (end >= 0 && g[k] + end < done.g) done = { k, g: g[k] + end };
     const [x, z] = [i % gw, Math.floor(i / gw)];
-    for (const turn of c === 4 ? [0, 1, -1] : c === 2 ? [0, -1] : c === 3 ? [0, 1] : [0]) {
+    for (const turn of TURNS[c]) {
       const nh = (hd + turn + 8) % 8;
       if (toward && along(nh, toward) < -0.8) continue;
       const [dx, dz] = STEPS[nh];
