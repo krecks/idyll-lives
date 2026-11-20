@@ -10,13 +10,14 @@
  * step 2 hatches (`hatched`); and how much a layout would build (`usesSummary`, step 2's live line).
  */
 
+import { flatsInId } from './flats';
 import { CIVIC, civicChoices, civicTooBig } from './places';
 import { placeOfTemplate } from './placeLots';
 import { inCentre } from './edit/ground';
 import { noUseCells, roadReach, usesOfDraft } from './edit/uses';
 import { BEND, BEND_MOST, cornersOf } from './macro';
 import { inside, lengths, leftOf, pointAt, straightAround, tangent, type Pt, type RoadPlan } from './roads';
-import { plotRect, type Frontage, type NeighbourhoodDraft, type Rect, type Templates } from './town';
+import { flatsIdOf, plotRect, type Frontage, type NeighbourhoodDraft, type Rect, type Templates } from './town';
 import type { LaidTown, Proposal } from './townJobs';
 import { placeOf, specOf } from './world';
 import { layoutHash, NO_USE, packUses, unpackUses, USE_CELL, USE_CODE, useOfCode, type UseKind, type UseLayer } from './uses';
@@ -386,9 +387,13 @@ export interface UsesSummary {
  * public frontage this share of its lot's narrowest at least, its kind's building and `CIVIC_LOT` wide, and
  * the gap after it, m).
  */
-const HOME_FRONT = 17.5;
-const ROW_HOME_FRONT = 17;
-const SHOP_CELLS = 25;
+const HOME_FRONT = 15;
+const ROW_HOME_FRONT = 13.5;
+const SHOP_CELLS = 19;
+/** Shops and work are read this far from a road at most (m, `roadReach`): a shop's lot deep, land painted further back holds no more of them. */
+const SHOP_DEEP = 20;
+/** Flats over the shops and workplaces, a shop (most of a centre's shops, cafés and restaurants have one or two over them, `dense.ts` `raisePlaces`). */
+const FLATS_OVER = 0.6;
 const FIRST_PARK = 26;
 const CIVIC_SHORT = 0.8;
 const CIVIC_GAP = 5;
@@ -401,13 +406,13 @@ const ROWS_AWAY = 0.5;
 
 /**
  * What a town built has, counted as `usesSummary` estimates it: homes (house lots, terraced ones among
- * them, not farms; the flats are not counted, as the frontage the estimate reads holds a terrace's homes),
+ * them, not farms, and every flat: a building of flats' and those over the places, `flats.ts` `flatsInId`),
  * shops and workplaces (shop lots, the named places' among them, but the civic places), parks (parks,
  * playgrounds, markets and outdoor spots), and civic places (their lots, `placeLots.ts`).
  */
 export function townSummary(draft: NeighbourhoodDraft): UsesSummary {
   return {
-    homes: draft.slots.filter((s) => s.kind === 'house' && s.lot !== 'farm').length,
+    homes: draft.slots.reduce((n, s) => n + (s.kind === 'house' && s.lot !== 'farm' ? 1 : flatsInId(flatsIdOf(s))), 0),
     shops: draft.slots.filter((s) => s.kind === 'shop' && !civicLot(s.template)).length,
     parks: draft.slots.filter((s) => s.kind === 'park' || s.kind === 'outdoor').length,
     public: draft.slots.filter((s) => civicLot(s.template)).length,
@@ -419,7 +424,7 @@ const cornersFor = new WeakMap<readonly RoadPlan[], (f: Frontage) => boolean>();
 
 /**
  * How much `draft`'s layout would build, from its frontage (`stretchesOf`) and its land: homes along its homes, terraced homes along its terraces and flats (the
- * main town's no more than its place has: `WorldSpec.terraces`), shops and workplaces on its shops and
+ * main town's no more than its place has at most: `WorldSpec.terraces`) and the flats over its shops (`FLATS_OVER`), shops and workplaces on its shops and
  * work, a park or a playground along each green stretch, an outdoor spot or a park on each patch of green
  * big enough for one and with no stretch along it, and as many of
  * the civic places each town and village may have
@@ -499,15 +504,17 @@ function estimated(draft: NeighbourhoodDraft): UsesSummary {
     } else if (st.kind === 'green') greens.push(st);
   }
   const spec = specOf(placeOf(draft.world?.kind ?? 'country'), draft.world?.options);
-  rows.forEach((n, a) => (homes += a === 0 ? Math.min(n, (spec.terraces[0] + spec.terraces[1]) / 2) : n * ROWS_AWAY));
+  rows.forEach((n, a) => (homes += a === 0 ? Math.min(n, spec.terraces[1]) : n * ROWS_AWAY));
   // A park, a playground or an outdoor spot on each patch of green big enough for one (cells side by side; not hatched).
   const layer = usesOfDraft(draft);
   const codes = unpackUses(layer);
   const far = hatched(draft);
-  // Shops and workplaces on its land painted shops and work (the named places' lots, the compact ones among them, and its shop lots).
+  // Shops and workplaces on its land painted shops and work (the named places' lots, the compact ones among them, and its shop lots), as deep as a shop's lot.
   let shopCells = 0;
-  for (let k = 0; k < codes.length; k++) if (codes[k] === USE_CODE.shops && !far[k]) shopCells++;
+  const reach = roadReach(draft);
+  for (let k = 0; k < codes.length; k++) if (codes[k] === USE_CODE.shops && !far[k] && reach[k] <= SHOP_DEEP) shopCells++;
   const shops = shopCells / SHOP_CELLS;
+  homes += shops * FLATS_OVER;
   const patches = greenPatches(codes, far, layer.cols, layer.rows);
   const alongside = new Set<number>();
   let parks = 0;
