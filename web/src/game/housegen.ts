@@ -36,7 +36,7 @@
 import type { ObjectDef, SurfaceKind } from '../content/content';
 import { approachCandidates, covers, facedTable, freeSpots, frontTile, middleOf, overhangTiles, sizeOf, topOf, type Shape, type Shapes, type Top } from './surfaces';
 import type { Door, HouseTemplate, Placement, PlannedRoom, Wall } from './town';
-import { mulberry32 as random } from './noise';
+import { between, mulberry32 as random, pick } from './noise';
 
 export interface HouseGenConfig {
   classes: Record<string, HouseClass>;
@@ -475,14 +475,6 @@ function shuffle<T>(rng: () => number, list: T[]): T[] {
     [list[i], list[j]] = [list[j], list[i]];
   }
   return list;
-}
-
-function pick<T>(rng: () => number, list: readonly T[]): T {
-  return list[Math.floor(rng() * list.length)];
-}
-
-function between(rng: () => number, [a, b]: readonly [number, number]): number {
-  return a + Math.floor(rng() * (b - a + 1));
 }
 
 /** One of the keys of `weights`, as likely as its weight (null: none weighs anything). */

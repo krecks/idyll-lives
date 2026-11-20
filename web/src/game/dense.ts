@@ -5,7 +5,7 @@
  * workshops with gaps; a hamlet's homes and workshops further apart):
  *
  * - a home on a `tight` garden (no driveway, so no car of its own): a small generated house;
- * - a terrace row of two to four lots (`macro.ts` `rowHouse`, `LotPlacer.placeRow`);
+ * - a terrace row of two to four lots (`rowHouse`, `LotPlacer.placeRow`);
  * - a flats building (`flats.ts` `flatsFor`; a terrace row stands in where flats are not made yet);
  * - a named place from the compact layouts (`places.ts` `ZONE`'s `compact`: a shop or a café 8 m
  *   wide, a restaurant, an office or a workshop of 12 to 14).
@@ -21,8 +21,9 @@ import type { Centre } from './centre';
 import { townGround } from './edit/ground';
 import { flatsFor, flatsOverFor, floorsFor, storeysOfId } from './flats';
 import { placeOfTemplate, placeUnit, slotPlace } from './placeLots';
+import { between } from './noise';
 import { draftAreaSize, HOURS, hoursFor, namerFor, type Namer, type ZoneKind } from './places';
-import { inside, leftOf, lengths, pointAt, RoadIndex, roadMeets, type Pt, type RoadPlan } from './roads';
+import { inside, leftOf, pointAt, RoadIndex, roadLengths, roadMeets, type Pt, type RoadPlan } from './roads';
 import { houseFor, lotAt, LotPlacer, plotRect, slotDims, type Frontage, type Ground, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates, type Unplaced } from './town';
 
 type Rand = () => number;
@@ -106,7 +107,7 @@ const CORNER = 18;
 /** Of a centre's shops, cafés and restaurants, the share with flats over them; elsewhere (`raisePlaces`). */
 const OVER_CENTRE = 1;
 const OVER_TOWN = 0.6;
-/** The designs of the homes on tight gardens and of the terraced houses a pass lays (`DensePass.pooled`). */
+/** The designs of the homes on tight gardens and of the terraced houses a pass lays (`designs`). */
 const DESIGNS = 16;
 /** How far a lot set by hand looks for a road to front (m from the road's edge). */
 const FILL_REACH = 30;
@@ -116,7 +117,6 @@ const FLATS_APART = 50;
 const range = (rand: Rand, lo: number, hi: number) => lo + (hi - lo) * rand();
 /** How far a point is from a box (0 inside it). */
 const offBox = (r: Rect, [x, z]: Pt) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
-const between = (rand: Rand, lo: number, hi: number) => lo + Math.floor(rand() * (hi - lo + 1));
 
 /** The dense pass (see the top of this file). */
 export class DensePass {
@@ -191,9 +191,8 @@ export class DensePass {
    * kind, as a street built at once is (and each design is generated once: `town.ts` `houseTemplate` keeps them).
    */
   private pooled(rand: Rand): Rand {
-    this.designs ??= Array.from({ length: DESIGNS }, () => rand());
-    const designs = this.designs;
-    return () => designs[Math.floor(rand() * designs.length)];
+    this.designs ??= designs(rand);
+    return pooled(this.designs, rand);
   }
   private designs?: number[];
 
@@ -222,16 +221,13 @@ export class DensePass {
    */
   private unitsOf(use: BuildingUse, a: number, zone: Zone, rand: Rand): Unplaced[] {
     const { t } = this;
-    const row = (n: number) =>
-      Array.from({ length: n }, () => rowHouse(t, this.pooled(rand)))
-        .filter((h) => !!h)
-        .map((h): Unplaced => ({ kind: 'house', name: '', lot: 'terrace', area: a, ...h }));
+    const row = (n: number) => terraceUnits(t, n, a, this.pooled(rand));
     if (use === 'house') return [{ kind: 'house', name: '', lot: 'small', area: a, ...houseFor(t, 'small', 'tight', this.pooled(rand)) }];
-    if (use === 'terrace') return row(between(rand, 2, 4));
+    if (use === 'terrace') return row(between(rand, [2, 4]));
     if (use === 'flats') {
       const f = flatsFor(t, zone === 'centre' ? 'centre' : 'town', rand);
       // (Until flats are made: a terrace row stands in, its homes as many as a small building's flats.)
-      if (!f) return row(between(rand, 3, 4));
+      if (!f) return row(between(rand, [3, 4]));
       const { name, ...building } = f;
       return [{ kind: 'flats', name, lot: 'medium', area: a, ...building }];
     }
@@ -246,14 +242,19 @@ export class DensePass {
   }
 
   /** Whether the land 3 m past the verge of road `r` at `s` on `side` is taken already (a lot, a car park, the water...). */
-  private takenAt(r: number, s: number, side: 1 | -1, ls: number[]): boolean {
+  private takenAt(r: number, s: number, side: 1 | -1, ls: readonly number[]): boolean {
+    return this.lots.ground.takenAt(...this.backAt(r, s, side, ls, 3.5));
+  }
+
+  /** The point `metres` back from the edge of road `r` at `s` on `side`. */
+  private backAt(r: number, s: number, side: 1 | -1, ls: readonly number[], metres: number): Pt {
     const f = this.frontage(r, s, side, ls);
-    const reach = this.roads[r].width / 2 + 3.5;
-    return this.lots.ground.takenAt(f.p[0] + f.n[0] * reach, f.p[1] + f.n[1] * reach);
+    const reach = this.roads[r].width / 2 + metres;
+    return [f.p[0] + f.n[0] * reach, f.p[1] + f.n[1] * reach];
   }
 
   /** Frontage of road `r` at `s` on `side` (`Frontage`), its middle on the road's middle line. */
-  private frontage(r: number, s: number, side: 1 | -1, ls: number[]): Frontage {
+  private frontage(r: number, s: number, side: 1 | -1, ls: readonly number[]): Frontage {
     const { p, t } = pointAt(this.roads[r].points, s, ls);
     return { road: r, s, side, p, n: leftOf(t).map((v) => v * side) as Pt, far: 0 };
   }
@@ -263,7 +264,7 @@ export class DensePass {
    * fit there (`lotAt`; a row `LotPlacer.placeRow`), their middle off the junctions (`NEAR_CORNER`; `CORNER` for a
    * lot with a driveway) and wherever `allow` lets them: their slots' indices (none if they don't).
    */
-  private put(us: readonly Unplaced[], r: number, s: number, side: 1 | -1, ls: number[], use: BuildingUse, grow: number): number[] {
+  private put(us: readonly Unplaced[], r: number, s: number, side: 1 | -1, ls: readonly number[], use: BuildingUse, grow: number): number[] {
     const { t, lots, roads } = this;
     const f = this.frontage(r, s, side, ls);
     const drives = us.length === 1 && us[0].kind === 'house' && us[0].garden !== 'tight';
@@ -295,7 +296,7 @@ export class DensePass {
     const { roads, density } = this;
     const { from, to, kindsAt } = limits;
     const r = road;
-    const ls = lengths(roads[r].points);
+    const ls = roadLengths(roads[r]);
     const L = ls[ls.length - 1];
     const end = Math.min(L - 4, to ?? Infinity);
     const rows: Row[] = [];
@@ -305,11 +306,7 @@ export class DensePass {
       let pending: { units: Unplaced[]; use: BuildingUse; w: number; key: string; misses: number } | null = null;
       while (s < end) {
         // (The land 6 m back from the road's edge, a metre on: what it asks for, and which zone it is.)
-        const probe = (k: number) => {
-          const f = this.frontage(r, Math.min(k, L), side, ls);
-          const reach = roads[r].width / 2 + 6;
-          return [f.p[0] + f.n[0] * reach, f.p[1] + f.n[1] * reach] as Pt;
-        };
+        const probe = (k: number) => this.backAt(r, Math.min(k, L), side, ls, 6);
         if (this.within && !this.within(area, probe(s))) {
           s += 4;
           continue;
@@ -351,7 +348,7 @@ export class DensePass {
         pending = null;
         const depth = Math.max(...units.map((u) => slotDims(this.t, u).depth));
         rows.push({ slots: laid, r, s: s + w / 2, side, back: depth, zone: z, ...(kinds ? { kinds } : {}) });
-        s += w + (z === 'centre' ? 0 : z === 'town' ? between(rand, 0, 2) : between(rand, 1, 4));
+        s += w + (z === 'centre' ? 0 : z === 'town' ? between(rand, [0, 2]) : between(rand, [1, 4]));
         // (Now and then a gap after it: the more the further out. Where the land asks for kinds, its gaps are where it asks for none.)
         const skip = z === 'centre' ? 0 : z === 'town' ? 0.12 * (1.2 - density) : 0.25;
         if (!kindsAt && rand() < skip) s += range(rand, 6, 14);
@@ -373,14 +370,10 @@ export class DensePass {
     let laid = 0;
     for (const r of this.areas[area].roads) {
       if (roads[r].kind === 'trail') continue;
-      const ls = lengths(roads[r].points);
+      const ls = roadLengths(roads[r]);
       const L = ls[ls.length - 1];
       // (The land 6 m back from the road's edge: whether it is the centre's.)
-      const inCentre = (s: number, side: 1 | -1) => {
-        const f = this.frontage(r, Math.min(s, L), side, ls);
-        const reach = roads[r].width / 2 + 6;
-        return this.centreAt([f.p[0] + f.n[0] * reach, f.p[1] + f.n[1] * reach]);
-      };
+      const inCentre = (s: number, side: 1 | -1) => this.centreAt(this.backAt(r, Math.min(s, L), side, ls, 6));
       for (const side of roads[r].lots ? [roads[r].lots] : ([1, -1] as const)) {
         let units: Unplaced[] | null = null;
         for (let s = 4, last = -Infinity; s < L - 4 && laid < most; s += 2) {
@@ -418,7 +411,7 @@ export class DensePass {
       const units = use ? this.unitsOf(use, area, zone, rand) : [];
       if (!use || !units.length) return [];
       for (const [road, hit] of near) {
-        const ls = lengths(this.roads[road].points);
+        const ls = roadLengths(this.roads[road]);
         const { p: q, t } = pointAt(this.roads[road].points, hit.s, ls);
         // (The side the point is on: `leftOf` the road's way is side 1.)
         const [lx, lz] = leftOf(t);
@@ -452,7 +445,7 @@ export class DensePass {
     const { areas } = this;
     const near = (p: Pt) => areas.reduce((k, q, i) => (offBox(q.rect, p) < offBox(areas[k].rect, p) ? i : k), 0);
     for (const r of roads) {
-      const ls = lengths(this.roads[r].points);
+      const ls = roadLengths(this.roads[r]);
       // (Each road's area: the one nearest its middle; `only` keeps it to the land near that one.)
       const a = near(pointAt(this.roads[r].points, ls[ls.length - 1] / 2, ls).p);
       const ends = [near(this.roads[r].points[0]), near(this.roads[r].points[this.roads[r].points.length - 1])];
@@ -473,6 +466,26 @@ export class DensePass {
     const added = slots.slice(this.before).filter((s) => s.kind === 'shop').map((s) => slotPlace(draft, this.t, this.content, s));
     return { slots, places: [...this.placesBefore, ...added] };
   }
+}
+
+/** `DESIGNS` numbers drawn from `rand`: the designs a street's or a terrace's houses are of (`pooled`). */
+export function designs(rand: Rand): number[] {
+  return Array.from({ length: DESIGNS }, () => rand());
+}
+
+/**
+ * `rand`, but each draw one of `pool` (`designs`): the homes laid with it are of a few designs, as a street built at
+ * once is (and each design is generated once: `town.ts` `houseTemplate` keeps them).
+ */
+export function pooled(pool: readonly number[], rand: Rand): Rand {
+  return () => pool[Math.floor(rand() * pool.length)];
+}
+
+/** A row of `n` terraced houses of area `area` (`rowHouse`, drawn from `rand`), before they are placed; fewer where none is made. */
+export function terraceUnits(t: Templates, n: number, area: number, rand: Rand): Unplaced[] {
+  return Array.from({ length: n }, () => rowHouse(t, rand))
+    .filter((h) => !!h)
+    .map((h): Unplaced => ({ kind: 'house', name: '', lot: 'terrace', area, ...h }));
 }
 
 /**

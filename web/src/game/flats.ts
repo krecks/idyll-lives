@@ -22,6 +22,7 @@
 
 import type { LotLook } from '../core/protocol';
 import { besideTiles, generateFlat, placeFloor, random, residentsKey, stairHall, thingSize, thingTiles, unitEdges, walked, type FlatFrame, type FlatPlan, type FloorPlan, type Furnishing, type HouseGenConfig, type ObjectInfos } from './housegen';
+import { between, pick } from './noise';
 import { frontTile } from './surfaces';
 import { turner, type Door, type Placement, type PlannedRoom, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Wall } from './town';
 
@@ -103,8 +104,6 @@ export type FlatsSlot = Pick<PlotSlot, 'template' | 'name' | 'w' | 'd' | 'dress'
 /** Time spent generating buildings of flats and floors above places (ms), and how many. */
 export const flatsStats = { ms: 0, made: 0 };
 
-const between = (rng: Rand, [a, b]: readonly [number, number]) => a + Math.floor(rng() * (b - a + 1));
-const pick = <T>(rng: Rand, list: readonly T[]): T => list[Math.floor(rng() * list.length)];
 const tileKey = (x: number, z: number) => `${x}:${z}`;
 
 /** The id of a building of flats (see the module's note). */

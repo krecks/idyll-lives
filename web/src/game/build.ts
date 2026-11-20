@@ -24,7 +24,7 @@
  *   draws for an area of its kind, `ZONE.lots` or `ZONE.around`, and as many as were cleared; the main
  *   town's on their compact layouts, as the generator lays them), each a lot of its own along the shops
  *   frontage nearest its heart (`placeNamed`);
- * - terraced rows along terraces and flats (`rowHouse`, `LotPlacer.placeRow`), as many as the main town's
+ * - terraced rows along terraces and flats (`dense.ts` `terraceUnits`, `LotPlacer.placeRow`), as many as the main town's
  *   or as were cleared, and half the land newly painted holds;
  * - houses of the place's lot mix along homes (`LotPlacer`, no gaps drawn: the land painted has them),
  *   none in a town centre;
@@ -50,7 +50,7 @@ import type { BuildingUse, CarPark, RoadPlan, TownArea } from '../core/protocol'
 import { CIVIC, civicChoices, civicTooBig, draftAreaSize, ZONE, type ZoneKind } from './places';
 import { centroidOf, rectPoly } from './footprints';
 import { bayRect, besidePlace, bySquare, driveLines, parkAlong, vergeParking, type CarParkLaid } from './parking';
-import { DensePass } from './dense';
+import { DensePass, terraceUnits } from './dense';
 import { roadKey, withBuildings } from './edit/buildup';
 import { entryOf, frontOf, inCentre, townGround, withoutBays } from './edit/ground';
 import { removeLots, renumber } from './edit/lots';
@@ -58,7 +58,7 @@ import { roadReach, usesOfDraft } from './edit/uses';
 import { encodeLand, heightAt } from './land';
 import { openUnderBuilt, settleLand } from './landFollow';
 import { unrle } from './landMasks';
-import { AREA_APART, BEND, BEND_MOST, BIG_PLACES, cells8, cornersOf, FARM_SHOP_REACH, grown, hamletOf, parkingFor, PLACE_BAYS, placeReaches, rowHouse, SQUARE_BAYS, trailTo, type AreaPlan } from './macro';
+import { AREA_APART, BEND, BEND_MOST, BIG_PLACES, cells8, cornersOf, FARM_SHOP_REACH, grown, hamletOf, parkingFor, PLACE_BAYS, placeReaches, SQUARE_BAYS, trailTo, type AreaPlan } from './macro';
 import { mulberry32 } from './noise';
 import { placeOfTemplate, placeUnit } from './placeLots';
 import { fronted, greenSpots, hatched, SPOT_NEAR, SPOT_REACH, stretchesOf, type Stretch } from './proposal';
@@ -806,9 +806,7 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
     for (let k = 0; k < 400 && left >= 2 && rowFronts.length; k++) {
       let n = rowSpec.rows[0] + Math.floor(rand() * (rowSpec.rows[1] - rowSpec.rows[0] + 1));
       n = Math.min(n, left - (left - n === 1 ? 1 : 0));
-      const units = Array.from({ length: Math.max(2, n) }, () => rowHouse(t, rand))
-        .filter((h) => !!h)
-        .map((h): Unplaced => ({ kind: 'house', name: '', lot: 'terrace', area: a, ...h }));
+      const units = terraceUnits(t, Math.max(2, n), a, rand);
       if (units.length < 2) break;
       let placed: PlotSlot[] = [];
       for (let m = units.length; m >= 2 && !placed.length; m--) placed = rowAlong(placer, t, roads, units.slice(0, m), rowFronts, mask, cols, rows);

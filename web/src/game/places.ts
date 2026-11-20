@@ -8,12 +8,11 @@
 import type { CareerCategory } from '../content/content';
 import type { BuildingUse, LotLook, TownPlace, TownSize } from '../core/protocol';
 import type { NeighbourhoodDraft } from './town';
+import { pick } from './noise';
 import { placeOfTemplate } from './placeLots';
 import { placeOf, sizeByHomes, specOf } from './world';
 
 type Rand = () => number;
-
-const pick = <T>(rand: Rand, list: readonly T[]): T => list[Math.floor(rand() * list.length)];
 
 /** What a building is, and how big a kind of it is: along the road (m), deep (m), storeys, roofs. */
 export interface Kind {

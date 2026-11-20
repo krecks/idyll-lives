@@ -34,7 +34,7 @@ import { distanceToRect } from '../render/shared/chunks';
 import { areaSize, civicTooBig, CIVIC, namerFor, ZONE, type ZoneKind } from './places';
 import { chooseCentre, densestCentre, type Centre } from './centre';
 import { tilesOf } from './footprints';
-import { DensePass, NEAR_CORNER, raisePlaces, townPlaces } from './dense';
+import { designs, DensePass, NEAR_CORNER, pooled, raisePlaces, terraceUnits, townPlaces } from './dense';
 import { besidePlace, bySquare, clearOfDrives, driveLines, LOOSE_BEND, parkAlong, vergeParking, type CarParkLaid } from './parking';
 import { random } from './housegen';
 import { COVER, COVER_CELL, coverSpan, LAND_CELL, NONE, type Land as LandField } from './land';
@@ -42,7 +42,7 @@ import { APRON, landZones, Protection, wetTiles, type BuiltLand } from './landEd
 import { bridgeSites, dryPieces, type Bounds } from './landPieces';
 import { GENTLE_TILT, seedBare, smoothHeights, type GentlePlane } from './landFollow';
 import { chaikin, outlines, rasterize, rle, simplify, simplifyRing, unrle } from './landMasks';
-import { fbm } from './noise';
+import { between, fbm } from './noise';
 import type { UseLayer } from './uses';
 import { along, astar, CELL, Cells, clearOfBoxes, COUNTRY_GRADE, COUNTRY_TURN, COUNTRY_WIDTH, CountryRouter, CTRL_APART, FACING, ROAD_WIDTH, ROUTE_GRADE, SIDE_COST, TRIES, type Port, type Way } from './countryRouter';
 import { centroid, cropRoads, curve, evenly, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadEnds, roadIndex, roadLengths, roadMeets, straightAround, type Box, type Pt, type RoadPlan } from './roads';
@@ -259,8 +259,6 @@ export const BIG_PLACES = new Set(['school', 'leisure', 'medical', 'hotel', 'tow
 const INNER = 0.5;
 /** The buildings of flats a main town of each size has on its centre's streets at most (`DensePass.centreFlats`). */
 const CENTRE_FLATS: Record<TownSize, number> = { hamlet: 1, village: 2, town: 3, city: 4 };
-/** The designs a main town's terraced houses are of (`terraceRows`). */
-const TERRACE_DESIGNS = 16;
 /** How far past an area's box the country roads into it are built along (m: `DensePass.approaches`). */
 const APPROACH = 180;
 
@@ -270,7 +268,6 @@ export function parkingFor(homes: number, main: boolean): number {
 }
 
 const range = (rand: Rand, lo: number, hi: number) => lo + (hi - lo) * rand();
-const between = (rand: Rand, [lo, hi]: [number, number]) => lo + Math.floor(rand() * (hi - lo + 1));
 const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
@@ -1570,8 +1567,6 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   // country roads leaving it, where they run straight over gentle land.
   const placeRand = random(((lay?.townSeed ?? seed) ^ PLACES) >>> 0);
   const ways = worldRoads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : []));
-  const wayLengths = new Map<number, number[]>();
-  const lengthsOf = (r: number) => wayLengths.get(r) ?? wayLengths.set(r, lengths(worldRoads[r].points)).get(r)!;
   /**
    * Each area's named places to go down on what its homes leave once every home has found room: the main
    * town's that went in no parade nor its centre (`units`), every other area's (`namedLots`); along its
@@ -1580,7 +1575,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const later: { units?: Unplaced[]; near: readonly Frontage[]; a: number }[] = [];
   const spillOf = (a: number) => {
     let list: Frontage[] | undefined;
-    return () => (list ??= frontageOf(worldRoads, ways, plans[a].centre, placeRand).filter((f) => offRect(plans[a].rect, f.p) < TERRACE_SPILL && straight(worldRoads[f.road].points, f.s, lengthsOf(f.road)) && gentleBy(f.p)));
+    return () => (list ??= frontageOf(worldRoads, ways, plans[a].centre, placeRand).filter((f) => offRect(plans[a].rect, f.p) < TERRACE_SPILL && straight(worldRoads[f.road].points, f.s, roadLengths(worldRoads[f.road])) && gentleBy(f.p)));
   };
   for (const [a, plan] of plans.entries()) {
     if (a === 0) {
@@ -1607,8 +1602,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       parkBigPlaces();
       // (Out of room in the town: on along the country roads leaving it, where they run straight.)
       const countryWays = worldRoads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : []));
-      const lens = new Map(countryWays.map((r) => [r, lengths(worldRoads[r].points)]));
-      const out = frontageOf(worldRoads, countryWays, plan.centre, dense).filter((f) => offRect(plan.rect, f.p) < TERRACE_SPILL && straight(worldRoads[f.road].points, f.s, lens.get(f.road)!) && gentleBy(f.p));
+      const out = frontageOf(worldRoads, countryWays, plan.centre, dense).filter((f) => offRect(plan.rect, f.p) < TERRACE_SPILL && straight(worldRoads[f.road].points, f.s, roadLengths(worldRoads[f.road])) && gentleBy(f.p));
       terraceRows(t, lots, [homes, out], spec, dense);
       // (Its middle built up: the centre and the streets round it, `INNER` of the way out to its box's corners.)
       const inner = (INNER * Math.hypot(plan.rect.w, plan.rect.d)) / 2;
@@ -1642,12 +1636,10 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     if (placed) continue;
     // Else along a country road, near its own area's end of it.
     if (!country) {
-      const ls = new Map<number, number[]>();
-      const lengthsOf = (r: number) => ls.get(r) ?? ls.set(r, lengths(worldRoads[r].points)).get(r)!;
       // (Off the junctions along them, as a town's lots with a driveway keep, `offAll`: a home's driveway where
       // another road ran into a short country road's end, on Fernshaw's, had a car backing out of it and two
       // coming by wait for each other for good.)
-      country = frontageOf(worldRoads, worldRoads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : [])), plans[0].centre, rand).filter((f) => straight(worldRoads[f.road].points, f.s, lengthsOf(f.road)) && gentleBy(f.p) && offAll(f));
+      country = frontageOf(worldRoads, worldRoads.flatMap((r, i) => (r.kind === 'country' && !r.bridge ? [i] : [])), plans[0].centre, rand).filter((f) => straight(worldRoads[f.road].points, f.s, roadLengths(worldRoads[f.road])) && gentleBy(f.p) && offAll(f));
     }
     const r = plans[from].rect;
     const off = (p: Pt) => offRect(r, p);
@@ -2806,17 +2798,14 @@ export function terraceRows(t: Templates, lots: LotPlacer, frontages: readonly (
   const out: PlotSlot[][] = [];
   let left = between(rand, spec.terraces);
   // (Its houses of a few designs, as a terrace built at once is; each design generated once.)
-  const designs = Array.from({ length: TERRACE_DESIGNS }, () => rand());
-  const design = () => designs[Math.floor(rand() * designs.length)];
+  const design = pooled(designs(rand), rand);
   // (The longest row that went down last: one longer fits nowhere.)
   let longest = spec.rows[1];
   // (Nowhere for a pair: no more rows.)
   for (let tries = 0; left >= 2 && tries < 400; tries++) {
     let n = Math.min(left, longest, between(rand, spec.rows));
     if (left - n === 1) n = left === 3 && spec.rows[1] >= 3 ? 3 : n - 1;
-    const units = Array.from({ length: Math.max(2, n) }, () => rowHouse(t, design))
-      .filter((h) => !!h)
-      .map((h) => ({ kind: 'house' as const, name: '', lot: 'terrace' as const, area: 0, ...h }));
+    const units = terraceUnits(t, Math.max(2, n), 0, design);
     // (No terraced house to be had: none generated, the content has no row class.)
     if (units.length < 2) break;
     let placed: PlotSlot[] = [];
@@ -2831,21 +2820,8 @@ export function terraceRows(t: Templates, lots: LotPlacer, frontages: readonly (
   return out;
 }
 
-/**
- * A terraced house and its lot (`houseFor` on a terrace lot): one generated (a draw or two in a
- * hundred lays none out; `houseFor` would put a fixed layout, too wide for the lot, in its place).
- * Null: none in 40 draws.
- */
-export function rowHouse(t: Templates, rand: Rand): ReturnType<typeof houseFor> | null {
-  for (let k = 0; k < 40; k++) {
-    const h = houseFor(t, 'terrace', 'snug', rand);
-    if (h.template.startsWith('gen:')) return h;
-  }
-  return null;
-}
-
 /** A country road runs nearly straight round arc length `s` (within `BEND` m either way): a car turns in off it without swinging off the road. */
-const straight = (pts: readonly Pt[], s: number, ls: number[]) => straightAround(pts, s, BEND, BEND_MOST, ls);
+const straight = (pts: readonly Pt[], s: number, ls: readonly number[]) => straightAround(pts, s, BEND, BEND_MOST, ls);
 
 /**
  * Homes along the country roads, on purpose: 2 to 4 cottages where each road leaves an area and
