@@ -23,16 +23,11 @@
  *
  * Needs Playwright like render.mjs (`PLAYWRIGHT=<path to playwright/index.mjs>`).
  */
-import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { quiet } from './quiet.mjs';
+import { benchContext, devServer, launch, settleShot, twoFrames } from './lib/browser.mjs';
 import { worldFlags } from './worldFlags.mjs';
 
-const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const WEB = join(ROOT, 'web/');
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
   const i = args.indexOf(`--${name}`);
@@ -48,33 +43,7 @@ const port = Number(flag('port', '5431'));
 const out = flag('out', '/tmp/zone-shots');
 mkdirSync(out, { recursive: true });
 
-async function playwright() {
-  if (process.env.PLAYWRIGHT) return import(process.env.PLAYWRIGHT);
-  try {
-    return await import(createRequire(WEB + 'package.json').resolve('playwright'));
-  } catch {
-    throw new Error('Playwright not found: install it, or set PLAYWRIGHT=<path to playwright/index.mjs>');
-  }
-}
-
-async function running(url) {
-  try {
-    return (await fetch(url, { signal: AbortSignal.timeout(1500) })).ok;
-  } catch {
-    return false;
-  }
-}
-
-let server = null;
-const base = flag('url', null) ?? `http://localhost:${port}`;
-if (!flag('url', null) && !(await running(base))) {
-  server = spawn(`${WEB}node_modules/.bin/vite`, ['--port', String(port), '--strictPort'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] });
-  process.on('exit', () => server.kill());
-  await new Promise((resolve, reject) => {
-    server.stdout.on('data', (d) => String(d).includes('Local') && resolve());
-    server.on('exit', (code) => reject(new Error(`vite exited (${code})`)));
-  });
-}
+const { url: base, stop } = await devServer({ url: flag('url', null), port });
 
 /** In the page: the town made and shown, its uses painted from what stands on it, the UI hidden, a band where the side panel would be. */
 async function setUp({ kind, options, seed, side }) {
@@ -155,37 +124,11 @@ async function frameShot(shot) {
   await zs.menuScene.settled();
 }
 
-/**
- * In the page: the picture ready, instead of a fixed wait: the camera's glide over (`menuScene.settled`), the town's
- * model files and textures there, three animation frames and at least 1500 ms (the longer fixed waits, up to 3 s, went).
- */
-async function settleShot() {
-  const t = [performance.now()];
-  const [{ host }, { settings }] = await Promise.all([import('/src/game/host.ts'), import('/src/settings/settings.svelte.ts')]);
-  await window.__zs.menuScene.settled();
-  t.push(performance.now());
-  const renderer = await host.rendererNow(settings);
-  await renderer.texturesReady();
-  t.push(performance.now());
-  // (Animation frames, not the renderer's: the menus' town holds its picture while nothing in it moves, and draws none.)
-  for (let k = 0; k < 3; k++) await new Promise((resolve) => requestAnimationFrame(resolve));
-  // At least 1500 ms in all, as the shots always waited: a frame drawn just after a cut is softer for about a second.
-  await new Promise((resolve) => setTimeout(resolve, Math.max(0, t[0] + 1500 - performance.now())));
-  t.push(performance.now());
-  return t.slice(1).map((x, i) => Math.round(x - t[i]));
-}
-
-const { chromium } = await playwright();
-const browser = await chromium.launch({
-  headless: !has('headed'),
-  ...(process.env.CHROME ? { executablePath: process.env.CHROME } : { channel: 'chromium' }),
-  args: ['--enable-unsafe-webgpu', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'],
-});
+const { browser } = await launch({ headless: !has('headed') });
 let faults = 0;
 try {
   for (const renderer of renderers) {
-    const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
-    await context.addInitScript(quiet);
+    const context = await benchContext(browser, { viewport: { width, height }, deviceScaleFactor: 1 });
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
@@ -195,7 +138,7 @@ try {
     const facts = await page.evaluate(setUp, { kind: made.world, options: made.options, seed, side: Math.round(width * 0.24) });
     console.log(`zoneShots: ${renderer}: ${made.world} seed ${seed}: ${facts.width}x${facts.depth} m (${facts.cols}x${facts.rows} cells), ${facts.areas} areas, ${facts.painted} cells painted, ${facts.far} hatched`);
     const shoot = async (name) => {
-      const ms = await page.evaluate(settleShot);
+      const ms = await page.evaluate(settleShot, { hook: '__zs', minMs: 1500 });
       if (has('timings')) console.log(`  settled in ${ms.join(' + ')} ms (glide, textures, frames)`);
       const file = join(out, `${renderer}-${name}.png`);
       await page.screenshot({ path: file });
@@ -213,7 +156,7 @@ try {
     // A far field (no road within 36 m), hatched, close up: from the whole world's shot, the wheel's zoom towards it.
     await page.evaluate(frameShot, { kind: 'world' });
     // (Projected through the camera as drawn: a frame or two after the cut.)
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await twoFrames(page);
     await page.evaluate(() => {
       const zs = window.__zs;
       const out = { x: 0, y: 0 };
@@ -279,6 +222,6 @@ try {
   }
 } finally {
   await browser.close();
-  server?.kill();
+  stop();
 }
 console.log(faults ? `zoneShots: ${faults} fault(s); pictures in ${out}` : `zoneShots: clean; pictures in ${out}`);

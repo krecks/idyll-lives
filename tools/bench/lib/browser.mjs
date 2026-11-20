@@ -250,3 +250,24 @@ export async function step(page, poses, fn, { limitMs = 60_000, before = null } 
 
 /** Two more frames drawn (what was placed a frame after the camera, then the picture). */
 export const twoFrames = (page) => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
+/**
+ * In a dev page showing the menus' town (`page.evaluate(settleShot, { hook, minMs })`, `window[hook].menuScene`): the
+ * picture ready, instead of a fixed wait: the camera's glide over (`menuScene.settled`), the town's model files and
+ * textures there, three animation frames and at least `minMs` in all. Resolves the time each part took (ms).
+ */
+export async function settleShot({ hook, minMs }) {
+  const t = [performance.now()];
+  const [{ host }, { settings }] = await Promise.all([import('/src/game/host.ts'), import('/src/settings/settings.svelte.ts')]);
+  await window[hook].menuScene.settled();
+  t.push(performance.now());
+  const renderer = await host.rendererNow(settings);
+  await renderer.texturesReady();
+  t.push(performance.now());
+  // (Animation frames, not the renderer's: the menus' town holds its picture while nothing in it moves, and draws none.)
+  for (let k = 0; k < 3; k++) await new Promise((resolve) => requestAnimationFrame(resolve));
+  // A frame drawn just after a cut is softer for about a second: the shots always waited this long.
+  await new Promise((resolve) => setTimeout(resolve, Math.max(0, t[0] + minMs - performance.now())));
+  t.push(performance.now());
+  return t.slice(1).map((x, i) => Math.round(x - t[i]));
+}
