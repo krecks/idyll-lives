@@ -77,67 +77,194 @@ impl World {
         Ok(())
     }
 
-    /// Applies a command by handing it to the family that carries it.
+    /// Applies a command: one arm each, a longer one by its own method beside the others of its
+    /// kind (settings.rs, use_command.rs, order.rs, edit.rs).
     fn apply_command(&mut self, cmd: Command) -> Result<(), Error> {
         match cmd {
-            Command::SetSpeed { .. }
-            | Command::SetAutoFast { .. }
-            | Command::SetLifespan { .. }
-            | Command::SetPlayerMoves { .. }
-            | Command::AddFunds { .. }
-            | Command::SetNeed { .. }
-            | Command::SetBond { .. }
-            | Command::SetSkill { .. }
-            | Command::SetAutonomy { .. }
-            | Command::SetRoutines { .. }
-            | Command::SetHouseholdRoutines { .. }
-            | Command::SkipHouseholdRoutine { .. }
-            | Command::AddGoal { .. }
-            | Command::RemoveGoal { .. }
-            | Command::MoveGoal { .. }
-            | Command::AcceptSuggestion { .. }
-            | Command::DismissSuggestion { .. }
-            | Command::AcceptPurchase { .. }
-            | Command::DeclinePurchase { .. }
-            | Command::SwitchLamp { .. }
-            | Command::DrawCurtains { .. } => self.apply_settings(cmd),
-            Command::Use { .. } | Command::UseItem { .. } => self.apply_use(cmd),
-            Command::MoveTo { .. }
-            | Command::Social { .. }
-            | Command::JoinCareer { .. }
-            | Command::QuitCareer { .. }
-            | Command::Visit { .. }
-            | Command::GoHome { .. }
-            | Command::Phone { .. }
-            | Command::Cancel { .. } => self.apply_order(cmd),
-            Command::Buy { .. }
-            | Command::Sell { .. }
-            | Command::MoveObject { .. }
-            | Command::Recolor { .. }
-            | Command::Upgrade { .. }
-            | Command::Build { .. }
-            | Command::Paint { .. }
-            | Command::PaintFloor { .. }
-            | Command::Undo { .. }
-            | Command::Redo { .. }
-            | Command::SetRoof { .. }
-            | Command::Repair { .. }
-            | Command::BuildBlueprint { .. }
-            | Command::MoveRoom { .. }
-            | Command::BuildGarage { .. }
-            | Command::SellGarage { .. }
-            | Command::BuildPorch { .. }
-            | Command::RemovePorch { .. }
-            | Command::BuildPorchPiece { .. }
-            | Command::RemovePorchPiece { .. }
-            | Command::ShapeLand { .. } => self.apply_edit(cmd),
-            Command::Adopt { .. } | Command::MoveIn { .. } => self.apply_household(cmd),
+            // The household's and the player's settings: speed, money, needs, skills, goals,
+            // suggestions, the lamps and curtains.
+            Command::SetSpeed { speed } => self.apply_set_speed(speed)?,
+            Command::SetAutoFast { enabled } => self.apply_set_auto_fast(enabled)?,
+            Command::SetLifespan { lifespan } => self.lifespan = lifespan,
+            Command::SetPlayerMoves { enabled } => self.player_moves = enabled,
+            Command::AddFunds { household, amount } => self.apply_add_funds(household, amount)?,
+            Command::SetNeed { sim, need, value } => self.apply_set_need(sim, need, value)?,
+            Command::SetBond {
+                a,
+                b,
+                friendship,
+                romance,
+                chemistry,
+                partners,
+            } => self.apply_set_bond(a, b, friendship, romance, chemistry, partners)?,
+            Command::SetSkill { sim, skill, level } => self.apply_set_skill(sim, skill, level)?,
+            Command::SetAutonomy { enabled, household } => {
+                self.apply_set_autonomy(enabled, household)?
+            }
+            Command::SetRoutines { sim, routines } => self.apply_set_routines(sim, routines)?,
+            Command::SetHouseholdRoutines { sim, routines } => {
+                self.apply_set_household_routines(sim, routines)?
+            }
+            Command::SkipHouseholdRoutine { sim, routine, skip } => {
+                self.apply_skip_household_routine(sim, routine, skip)?
+            }
+            Command::AddGoal { sim, goal } => self.apply_add_goal(sim, goal)?,
+            Command::RemoveGoal { sim, index } => self.apply_remove_goal(sim, index)?,
+            Command::MoveGoal { sim, index, to } => self.apply_move_goal(sim, index, to)?,
+            Command::AcceptSuggestion { sim, index } => self.apply_accept_suggestion(sim, index)?,
+            Command::DismissSuggestion { sim, index } => {
+                self.apply_dismiss_suggestion(sim, index)?
+            }
+            Command::AcceptPurchase { sim } => {
+                self.sim(sim)?;
+                crate::planner::accept_purchase(self, sim as usize)?;
+            }
+            Command::DeclinePurchase { sim } => {
+                self.sim(sim)?;
+                crate::planner::decline_purchase(self, sim as usize)?;
+            }
+            Command::SwitchLamp { object, on } => self.apply_switch_lamp(object, on)?,
+            Command::DrawCurtains { object, shut } => self.apply_draw_curtains(object, shut)?,
+            // Using something: the object a command names, or the item carried.
+            Command::Use {
+                sim,
+                object,
+                interaction,
+            } => self.apply_use(sim, object, interaction)?,
+            Command::UseItem { sim, item, action } => self.apply_use_item(sim, item, action)?,
+            // Orders to a resident: where to go, whom to talk to, what to do.
+            Command::MoveTo { sim, x, z } => self.apply_move_to(sim, x, z)?,
+            Command::Social {
+                sim,
+                target,
+                social,
+            } => self.apply_social(sim, target, social)?,
+            Command::JoinCareer { sim, career, level } => {
+                self.apply_join_career(sim, career, level)?
+            }
+            Command::QuitCareer { sim } => {
+                self.sim_mut(sim)?.job = None;
+                crate::cars::job_lost(&mut self.cars, sim);
+            }
+            Command::Visit { sim, plot } => self.apply_visit(sim, plot)?,
+            Command::GoHome { sim } => self.apply_go_home(sim)?,
+            Command::Phone {
+                sim,
+                action,
+                contact,
+            } => self.apply_phone(sim, action, contact)?,
+            Command::Cancel { sim, index } => self.apply_cancel(sim, index)?,
+            // Building, buying and editing the lot (with undo and redo).
+            Command::Buy {
+                household,
+                object,
+                at,
+                colors,
+                turn,
+                offset,
+                size,
+                tall,
+            } => self.apply_buy(household, object, at, colors, turn, offset, size, tall)?,
+            Command::Sell { household, object } => self.sell(household, object)?,
+            Command::MoveObject {
+                household,
+                object,
+                x,
+                z,
+                rot,
+                turn,
+                offset,
+                size,
+                tall,
+            } => self.apply_move_object(household, object, x, z, rot, turn, offset, size, tall)?,
+            Command::Recolor {
+                household,
+                object,
+                colors,
+            } => self.recolor(household, object, check_colors(colors)?)?,
+            Command::Upgrade { household, object } => {
+                self.upgrade(household, object)?;
+            }
+            Command::Build { household, edits } => self.build(household, &edits)?,
+            Command::Paint { household, faces } => self.paint(household, &faces)?,
+            Command::PaintFloor { household, tiles } => self.paint_floor(household, &tiles)?,
+            Command::Undo { household } => self.undo(household)?,
+            Command::Redo { household } => self.redo(household)?,
+            Command::SetRoof {
+                household,
+                style,
+                color,
+            } => self.set_roof(household, style, color)?,
+            Command::Repair { household, object } => self.repair(household, object)?,
+            Command::BuildBlueprint {
+                household,
+                blueprint,
+            } => self.build_blueprint(household, &blueprint)?,
+            Command::MoveRoom {
+                household,
+                x,
+                z,
+                dx,
+                dz,
+            } => self.move_room(household, x, z, dx, dz)?,
+            Command::BuildGarage {
+                household,
+                x0,
+                z0,
+                x1,
+                z1,
+                rot,
+            } => self.build_garage(household, [x0, z0, x1, z1], rot)?,
+            Command::SellGarage { household } => self.sell_garage(household)?,
+            Command::BuildPorch {
+                household,
+                axis,
+                x,
+                z,
+            } => self.build_porch(household, axis, x, z)?,
+            Command::RemovePorch {
+                household,
+                axis,
+                x,
+                z,
+            } => self.remove_porch(household, axis, x, z)?,
+            Command::BuildPorchPiece {
+                household,
+                kind,
+                x,
+                z,
+                w,
+                d,
+                rot,
+            } => self.build_porch_piece(household, kind, x, z, w, d, rot)?,
+            Command::RemovePorchPiece {
+                household,
+                kind,
+                x,
+                z,
+            } => self.remove_porch_piece(household, kind, x, z)?,
+            Command::ShapeLand {
+                household,
+                cost,
+                meta,
+                water,
+            } => self.shape_land(household, cost, &meta, water)?,
+            // A household's people: who moves in, and who joins it.
+            Command::Adopt { household, child } => {
+                crate::lifecycle::adopt(self, household, child)?;
+            }
+            Command::MoveIn {
+                household,
+                name,
+                sims,
+                bonds,
+            } => self.move_in(household, name, &sims, &bonds)?,
         }
+        Ok(())
     }
 }
 
 mod edit;
-mod household;
 mod order;
 mod settings;
 mod use_command;
