@@ -432,7 +432,9 @@ async function openSession(
    * flats if one of its flats may (`openLots.ts`). The renderer asks it of each flat of the building in view.
    */
   const mayOpenNow = (plot: number) => mayOpen(plot, { home: homePlot(), lookInside: game.lookInside, sims: game.sims, mine: new Set(playerSims()), flats: world?.flats });
-  renderer.setFlatsOpen(mayOpenNow);
+  // (The renderer asks of each flat of the building in view, and of a place under flats for its own ground floor: by
+  // the plot alone, not by its flats.)
+  renderer.setFlatsOpen((plot) => mayOpen(plot, { home: homePlot(), lookInside: game.lookInside, sims: game.sims, mine: new Set(playerSims()) }));
   /**
    * The lot in view closes up when nothing keeps it open any more (the household left it, the player looked away
    * from it): the home is shown again, the camera left where it is. Not while following someone (their lot is shown).

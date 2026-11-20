@@ -84,7 +84,7 @@ import { applyLandFixture, LAND_FIXTURE } from '../landFixture';
 import { lotBuilding, MOVER_GROW, TownBuildings, TownMovers, type Mover, type TownLotHouse } from './townView';
 import { STOREY as TOWN_STOREY } from '../shared/townBuildings';
 import { lotWallsHeight, rayPrism, rectFootprint } from '../shared/buildingPick';
-import { closedFlats, flatLids, inFlats, viewedFlats } from '../shared/flatLids';
+import { closedParts, flatLids, inClosed, LID_THICK, viewedFlats, viewedLot, type ClosedPart } from '../shared/flatLids';
 import { TownGroundMap } from './groundTiles';
 import { LandHaze } from './landHaze';
 import { cutInView } from '../shared/landVeil';
@@ -180,6 +180,8 @@ const BIKE: readonly [number, number, number] = [0.22, 0.22, 0.24];
 
 /** How often (ms) the flats of the building in view are asked again whether they may be shown open (`setFlatsOpen`). */
 const FLATS_ASK_MS = 250;
+/** How far (m) under the floor over it a closed part's lid lies while a storey over it is in view (`placeLidHeights`). */
+const LID_UNDER = 0.02;
 
 /** Longest wait (ms) for the birds of a game's first build (their models built): they'd pop in in play otherwise. */
 const BIRDS_WAIT_MS = 3000;
@@ -634,12 +636,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private stairwells: ViewRect[] = [];
   /**
    * The flats of the building in view (`WorldStructure.flats` of the viewed lot), whether each may be shown open
-   * (`setFlatsOpen`), those that may not now (and their ids as a key), when that was last asked, and their lids (one
-   * draw a storey, `placeLids`).
+   * (`setFlatsOpen`), the parts that may not now (its flats, and a place's own ground floor under them: `closedParts`;
+   * their plot ids as a key), when that was last asked, and their lids (one draw a storey, `placeLids`).
    */
   private viewFlats: readonly FlatInfo[] = [];
   private flatsOpen: ((plot: number) => boolean) | null = null;
-  private closedFlats: readonly FlatInfo[] = [];
+  private closedParts: readonly ClosedPart[] = [];
   private closedKey = '';
   private flatsAskedAt = 0;
   private lids: { entity: pc.Entity; storey: number }[] = [];
@@ -763,7 +765,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * viewed lot's, as before.
    */
   private readonly simInView = (x: number, z: number, k = 0): boolean => {
-    if (this.diag.has('nosims') || inFlats(this.closedFlats, x, z, k)) return false;
+    if (this.diag.has('nosims') || inClosed(this.closedParts, x, z, k)) return false;
     if (this.inView(x, z, SIM_VIEW_MARGIN)) return true;
     const vp = this.simViewProj;
     const world = this.lastWorld;
@@ -937,7 +939,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // The map's size, filtering and bias are the preset's (`sunShadows.ts`).
     this.sunShadows = new SunShadows(this.app, this.sun, { size: this.quality.shadowMapSize, rate: this.quality.shadowRate, still: !this.diag.has('wholeshadows') });
     // (lotContents.ts: the landscape, sky, objects and items.)
-    this.lot = new LotContents(this.app, this.root, this.sun, this.camera.entity, this.deps, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), inView: (x, z, m) => this.inView(x, z, m), closed: (x, z, k) => inFlats(this.closedFlats, x, z, k) }, { pace: () => this.pace(), shadowsMoved: (urgent) => this.castersMoved(urgent), partsMoved: () => this.partsMoved(), landscapeChanged: () => this.lamps.exclude(this.lot.landscapeDraws()) /* (lamps.ts) */ });
+    this.lot = new LotContents(this.app, this.root, this.sun, this.camera.entity, this.deps, this.quality, { storey: () => this.storey, storeyOf: (z) => this.storeyOf(z), rowOf: (k) => this.rowOf(k), inView: (x, z, m) => this.inView(x, z, m), closed: (x, z, k) => inClosed(this.closedParts, x, z, k) }, { pace: () => this.pace(), shadowsMoved: (urgent) => this.castersMoved(urgent), partsMoved: () => this.partsMoved(), landscapeChanged: () => this.lamps.exclude(this.lot.landscapeDraws()) /* (lamps.ts) */ });
     // (the menus' town on a layer of its own, `overview.ts`, the landscape's draws for it too; the sky on both.)
     this.lot.objectsRoot = this.lotRoot;
     const town = townLayer(this.app).id;
@@ -2053,10 +2055,11 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.roam.setBounds({ x0: pb.x0 - 300, z0: pb.z0 - 300, x1: pb.x1 + 300, z1: pb.z1 + 300 });
     const viewIndex = view ? world.plots.findIndex((p) => p.x === view.x && p.z === view.z && p.w === view.w && p.d === view.d) : -1;
     this.roam.setFocus(viewIndex >= 0 ? viewIndex : null);
-    // The flats of the building in view, and which of them may not be shown open (`setFlatsOpen`).
+    // The flats of the building in view, and which of them (and of a place's ground floor under them) may not be shown
+    // open (`setFlatsOpen`).
     this.viewFlats = viewedFlats(world, view);
-    this.closedFlats = closedFlats(this.viewFlats, this.flatsOpen);
-    this.closedKey = this.flatsKey();
+    this.closedParts = this.partsClosed(world, view);
+    this.closedKey = this.closedParts.map((p) => p.plot).join(',');
     if (this.streamOn) {
       const o = this.orbit;
       const aspect = this.cssSize.width / Math.max(1, this.cssSize.height);
@@ -2271,11 +2274,16 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     if (this.flatsKey() !== this.closedKey) void this.setWorld(this.lastWorld, this.view);
   }
 
-  /** Which flats of the building in view may not be shown open now, as their ids (`closedKey` is the drawn one's). */
+  /** Which parts of the building in view may not be shown open now, as their plot ids (`closedKey` is the drawn one's). */
   private flatsKey(): string {
-    return closedFlats(this.viewFlats, this.flatsOpen)
-      .map((f) => f.id)
-      .join(',');
+    const world = this.lastWorld;
+    return world ? this.partsClosed(world, this.view).map((p) => p.plot).join(',') : '';
+  }
+
+  /** The parts of the building in view (`view`) in `world` that may not be shown open now (`closedParts`). */
+  private partsClosed(world: WorldStructure, view: ViewRect | null): ClosedPart[] {
+    if (!this.viewFlats.length) return [];
+    return closedParts(world, viewedLot(world, view), this.viewFlats, this.flatsOpen, (k) => this.rowOf(k));
   }
 
   /**
@@ -2285,7 +2293,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private placeLids(): void {
     for (const l of this.lids) l.entity.destroy();
     this.lids = [];
-    for (const [k, geo] of flatLids(this.closedFlats, WALL_HEIGHT)) {
+    for (const [k, geo] of flatLids(this.closedParts, WALL_HEIGHT)) {
       const mesh = meshFrom(this.device, geo.meshData({ colors: true }));
       if (mesh) this.lids.push({ entity: drawMesh(this.lotRoot, `flatLids${k}`, mesh, this.lib.surface(HOUSE_MATERIALS.plaster, { vertexColors: true, doubleSided: true }), { castShadows: true }), storey: k });
     }
@@ -2502,7 +2510,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const inView = (x: number, z: number) => {
       const k = this.storeyOf(z);
       const row = z - this.rowOf(k);
-      return (!view || (x >= view.x && row >= view.z && x < view.x + view.w && row < view.z + view.d)) && !inFlats(this.closedFlats, x + 0.5, row + 0.5, k);
+      return (!view || (x >= view.x && row >= view.z && x < view.x + view.w && row < view.z + view.d)) && !inClosed(this.closedParts, x + 0.5, row + 0.5, k);
     };
     this.markWindowless(world, view);
     const lights: RoomLight[] = this.lotRooms ? placeLights(world, inView, this.lotRooms, (def) => this.deps.content.object(def)?.light).filter((l) => shown(l.z)) : [];
@@ -2664,6 +2672,22 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lib.wallCut.params.y = WALL_STUB;
     this.cutLook = -1;
     this.updateCutaway();
+    this.placeLidHeights();
+  }
+
+  /**
+   * The closed parts' lids (`placeLids`) as high as the walls round them stand. With the walls up, one on the storey in
+   * view at its walls' top, and one on a storey under it just under the floor over it (it shows only where that floor
+   * has a gap: a roof's strip beside a flat over a wider place). With the walls cut away or down, each at the cut walls'
+   * stub (every storey's walls are cut alike), so no side shows under it.
+   */
+  private placeLidHeights(): void {
+    const upTo = this.townWhole && this.storey >= 0 ? this.storeys.count - 1 : this.storey;
+    const low = this.shownWallMode !== 'up';
+    for (const l of this.lids) {
+      l.entity.enabled = l.storey <= upTo;
+      l.entity.setLocalPosition(0, low ? WALL_STUB - WALL_HEIGHT : l.storey === upTo ? 0 : -LID_THICK - LID_UNDER, 0);
+    }
   }
 
   /**
@@ -2698,8 +2722,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     // (From the town view the house stands whole, `townWhole`: every storey from the ground up, whichever is in view.)
     const upTo = this.townWhole && this.storey >= 0 ? this.storeys.count - 1 : this.storey;
     for (const { entity, storey } of this.lotEntities) if (storey !== undefined) entity.enabled = storeyShown(storey, upTo);
-    // (A closed flat's lid with its own storey in view: the storey over it has its floor there.)
-    for (const l of this.lids) l.entity.enabled = l.storey === upTo;
+    this.placeLidHeights();
     for (const p of this.decor.values()) for (const d of p.draws) d.enabled = this.storey >= 0 && d.count > 0;
     const v = this.view;
     this.street.showLot(this.storey >= 0);
