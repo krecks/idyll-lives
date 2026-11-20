@@ -17,7 +17,7 @@ import type { GameKind, LandscapeParams, Lifespan, LotLook, PavedPiece, PlotKind
 import { fetchText } from '../content/content';
 import { householdBonds, householdSpawns, residentsOf, type HouseholdDraft, type SimSpawn } from './household';
 import { flatPrice, homePrice } from './price';
-import { crownClear, generateHouse, objectInfos, residentsKey, weighted, type Furnishing, type GardenSize, type HouseGenConfig, type ObjectInfos } from './housegen';
+import { crownClear, generateHouse, objectInfos, residentsKey, unitEdges, weighted, type Furnishing, type GardenSize, type HouseGenConfig, type ObjectInfos } from './housegen';
 import { connect, inside, leftOf, lengths, nearest, pointAt, roadExits, roadIndex, roadMask, tangent, trimJoins, type Box, type Pt, type RoadPlan } from './roads';
 import { householdFunds, savingsOf } from './wealth';
 import { extend, fill, LEGACY_KINDS, placeOf, specOf, type LotMix, type RoadLayout, type SizeSpec, type WorldStep } from './world';
@@ -1525,12 +1525,7 @@ export function frontPorchPosts(walls: readonly Wall[], front: Door | undefined)
 export function dropCrowdedTrees(content: Content, walls: readonly (readonly [number, number, number, number])[], objects: Placement[], depth: number): void {
   const crowned = objects.some((o) => (content.object(o.def)?.crown ?? 0) > 0);
   if (!crowned) return;
-  const edges = new Map<string, string>();
-  for (const [x0, z0, x1, z1] of walls) {
-    if (Math.max(z0, z1) > depth) continue;
-    if (z0 === z1) for (let x = Math.min(x0, x1); x < Math.max(x0, x1); x++) edges.set(`h:${x}:${z0}`, 'wall');
-    else for (let z = Math.min(z0, z1); z < Math.max(z0, z1); z++) edges.set(`v:${x0}:${z}`, 'wall');
-  }
+  const edges = new Map([...unitEdges(walls.filter(([, z0, , z1]) => Math.max(z0, z1) <= depth))].map((e) => [e, 'wall']));
   // Only the walls round each tree are looked at.
   const near = new Map<string, Map<string, string>>();
   const cell = (x: number, z: number) => `${Math.floor(x / 8)}:${Math.floor(z / 8)}`;
@@ -1566,12 +1561,7 @@ function gardenFencesOf(
   const D = town.depth;
   // Wall edges on the ground storey (and the edges in front of things, below): no fence there. Each
   // plot's house: its walls' box there (`built`, sim-core `house_bounds`; a farm's barn stands in its yard, a blocker).
-  const walls = new Set<string>();
-  for (const [x0, z0, x1, z1] of layout.walls) {
-    if (Math.max(z0, z1) > D) continue;
-    if (z0 === z1) for (let x = Math.min(x0, x1); x < Math.max(x0, x1); x++) walls.add(`h:${x}:${z0}`);
-    else for (let z = Math.min(z0, z1); z < Math.max(z0, z1); z++) walls.add(`v:${x0}:${z}`);
-  }
+  const walls = unitEdges(layout.walls.filter(([, z0, , z1]) => Math.max(z0, z1) <= D));
   // What stands on the ground (not a rug, nor what hangs on a wall or stands on a top), and the garages.
   const blockers: (Rect & { use?: boolean })[] = [...layout.garages.map((g) => ({ x: g.x0, z: g.z0, w: g.x1 - g.x0, d: g.z1 - g.z0 })), ...barns];
   for (const o of layout.objects) {
