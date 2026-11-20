@@ -149,10 +149,12 @@ describe('driveways', async () => {
   // has such a driveway moves as the layout does (the worlds below since the named places became
   // lots, 2026-11-17): the first of these worlds with a car whose driveway's line crosses a trail on
   // the way to its road has it paved across.
+  // (Forest 104735 and 112654 and lakeside 225304 had one until the real town's dense pass laid their towns
+  // again, 2026-11-20.)
   const acrossTrail: [ClassicKind, number][] = [
-    ['forest', 104735],
-    ['forest', 112654],
-    ['lakeside', 225304],
+    ['forest', 22],
+    ['forest', 223520],
+    ['medium', 223520],
   ];
   test('a driveway across a trail is paved all the way to its road', () => {
     const crossing = (file: TownFile) =>
