@@ -142,7 +142,7 @@ export interface MirrorInstance {
   index: number;
 }
 
-/** What glows of one model (its shades, a screen): the draw, each instance's room, lamp and object, and whether it's a screen. */
+/** What glows of one model (its shades, a screen, a fire's flames): the draw, each instance's room, lamp and object, and whether it's a screen. */
 interface Glow {
   draw: Instances;
   colors: Float32Array;
@@ -150,6 +150,27 @@ interface Glow {
   lamps: number[];
   ids: number[];
   screen: boolean;
+  /**
+   * A fire's flames (absent on anything else): their glow flickers about the level `applyGlow` gives
+   * it, which this keeps as each fire's base brightness.
+   */
+  base?: Float32Array;
+}
+
+/** A fire's flicker's three waves, in radians a second: a slow breath, a middle flutter and a fast crackle. */
+const BREATH = 2.1;
+const FLUTTER = 7.7;
+const CRACKLE = 17.3;
+
+/**
+ * A fire's flicker at `seconds`, about 0.86..1: a slow breath, a middle flutter and a fast crackle,
+ * each fire's own (its id shifts them apart). Never zero, so the flames keep glowing.
+ */
+function fireFlicker(id: number, seconds: number): number {
+  const breath = 0.5 * Math.sin(seconds * BREATH + id * 1.7);
+  const flutter = 0.3 * Math.sin(seconds * FLUTTER + id * 2.9);
+  const crackle = 0.2 * Math.sin(seconds * CRACKLE + id * 4.1);
+  return 0.93 + 0.07 * (breath + flutter + crackle);
 }
 
 /** One model's draws: a draw per template mesh (and glow), and the buffers they draw from. */
@@ -234,7 +255,6 @@ export class LotContents {
   private readonly objectShadows: ObjectShadows | null;
   /** Lamps (and fires) switched off, by object id (the sim's `lampsOff`). */
   private lampsOff: ReadonlySet<number> = new Set();
-  private reducedMotion = false;
   private readonly vTmp = new Float32Array(16);
   private readonly qTmp: Quat = [0, 0, 0, 1];
   private readonly eye = { x: 0, y: 0, z: 0 };
@@ -559,7 +579,7 @@ export class LotContents {
 
   /** How strongly the wind moves the plants (reduce motion: still), and whether the clouds drift. */
   setReducedMotion(on: boolean): void {
-    this.reducedMotion = on;
+    this.motion.setReducedMotion(on);
     setWind(this.app, on ? 0 : 1);
     setWaterCalm(this.app, on);
   }
@@ -570,9 +590,9 @@ export class LotContents {
     // (Game space: the engine's heights are the datum's lower.)
     eye.y += this.datum;
     this.sky.follow(eye.x, eye.y, eye.z);
-    if (!this.reducedMotion) this.sky.drift(dt);
+    if (!this.motion.reducedMotion) this.sky.drift(dt);
     // (The clouds' shadows hold still with Reduce motion, and in the menus' town, whose picture is held while nothing in it moves.)
-    if (!this.reducedMotion && !held) this.cloudShadows?.drift(dt);
+    if (!this.motion.reducedMotion && !held) this.cloudShadows?.drift(dt);
     const camera = this.camera.camera;
     if (!camera) return;
     const { world, town } = this.natureIn;
@@ -812,7 +832,7 @@ export class LotContents {
           // A lamp's fan turns while it's on; a fire's flames (its uses' clips) burn while it's lit; curtains are drawn as the sim has them.
           const light = def?.light;
           const burns = light?.fire ? [...new Set(Object.values(motions.uses).flatMap((clips) => clips.map((c) => c.clip)))] : undefined;
-          moving.push({ id: o.id, target: pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id), open: !!o.open, stage: o.growth, running: !!o.running, slotOf: slotOf(o, def), lamp: !!light && light.switch !== false, burns, curtain: !!def?.overWindow });
+          moving.push({ id: o.id, target: pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id), open: !!o.open, stage: o.growth, running: !!o.running, slotOf: slotOf(o, def), lamp: !!light && light.switch !== false, burns, burnClip: motions.burn, curtain: !!def?.overWindow });
         }
         // Mirrors on a moving part (a mirror cabinet's door) follow that part's buffer.
         for (const [part, surfaces] of Map.groupBy(template.mirrors ?? [], (s) => s.part ?? -1)) {
@@ -855,7 +875,15 @@ export class LotContents {
         const roomOf = (o: ObjectPlacement) => world.rooms[Math.floor(o.z + o.d / 2) * W + Math.floor(o.x + o.w / 2)] ?? 0;
         // A lamp's shade glows with the lamp (switched on or off), anything else's with its room's lights.
         const light = this.deps.content.object(list[0].def)?.light;
-        glows.push({ draw, colors, rooms: list.map(roomOf), lamps: list.map((o) => (light && light.switch !== false ? o.id : -1)), ids: list.map((o) => o.id), screen: !!screen });
+        glows.push({
+          draw,
+          colors,
+          rooms: list.map(roomOf),
+          lamps: list.map((o) => (light && light.switch !== false ? o.id : -1)),
+          ids: list.map((o) => o.id),
+          screen: !!screen,
+          base: light?.fire ? new Float32Array(list.length) : undefined,
+        });
       });
     });
     this.movingPartsCast = partsCast;
@@ -1258,6 +1286,7 @@ export class LotContents {
         const lamp = g.lamps[i];
         const lampOn = lamp >= 0 ? light.lampOn(lamp) : room ? light.roomOn(room) : 1;
         const f = (room && light.dimmed(room) ? 1 : light.level) * lampOn;
+        if (g.base) g.base[i] = f;
         g.colors.fill(f, i * 4, i * 4 + 3);
         g.colors[i * 4 + 3] = 1;
         lit ||= f > 0;
@@ -1283,7 +1312,7 @@ export class LotContents {
       let f = 0;
       if (this.screenOn.has(id)) {
         on = true;
-        const flicker = this.reducedMotion ? 1 : 0.9 + 0.1 * (0.5 + 0.5 * Math.sin(t * 17.3 + id * 1.7)) * (0.6 + 0.4 * Math.sin(t * 41.1 + id * 2.3));
+        const flicker = this.motion.reducedMotion ? 1 : 0.9 + 0.1 * (0.5 + 0.5 * Math.sin(t * 17.3 + id * 1.7)) * (0.6 + 0.4 * Math.sin(t * 41.1 + id * 2.3));
         f = Math.fround((0.55 + 0.45 * level) * flicker);
       }
       if (g.colors[i * 4] === f) continue;
@@ -1298,6 +1327,34 @@ export class LotContents {
       g.draw.update(false);
     }
     if (g.draw.enabled !== on) g.draw.enabled = on;
+  }
+
+  /**
+   * Fires flicker: the flames' glow wavers a little about the level the lighting gives it, each fire
+   * on a beat of its own, so the warm light it seems to give changes over time, while its flames sway
+   * (`ObjectMotion.burning`: near the camera, not on Low, not with Reduce motion); otherwise it holds
+   * steady. `applyGlow` says whether they're drawn.
+   */
+  private animateFires(frame: FrameState): void {
+    const t = frame.now / 1000;
+    for (const g of this.glows) {
+      if (!g.base || g.draw.destroyed) continue;
+      let changed = false;
+      for (let i = 0; i < g.ids.length; i++) {
+        const base = g.base[i];
+        // (Only while its flames sway: near the camera, not on Low, not with Reduce motion.)
+        const f = base > 0 && this.motion.burning(g.ids[i]) ? Math.fround(base * fireFlicker(g.ids[i], t)) : base;
+        if (g.colors[i * 4] === f) continue;
+        g.colors.fill(f, i * 4, i * 4 + 3);
+        g.colors[i * 4 + 3] = 1;
+        changed = true;
+      }
+      // Uploaded only when a brightness changed.
+      if (changed) {
+        g.draw.setAll(INSTANCE_COLOR, g.colors);
+        g.draw.update(false);
+      }
+    }
   }
 
   /** Which screens are on this frame: the objects residents are using (not just walking to). */
@@ -1331,6 +1388,7 @@ export class LotContents {
     const moved = this.motion.update(frame, frame.layout.actions ?? [], this.eye);
     if (moved.moved && this.movingPartsCast) this.hooks.partsMoved();
     this.animateScreens(frame);
+    this.animateFires(frame);
     return moved.moved;
   }
 

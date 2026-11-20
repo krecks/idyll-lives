@@ -511,7 +511,7 @@ The living room's media (`models/media/tv.glb`, `tvWall.glb`, `tvRetro.glb`, `tv
 by `crates/art/things/src/media` on `artkit` (`cargo art media`) as `.glb` (glTF, original, CC0). The screens glow
 at night; the portable TV's aerial lifts off its case, the low bench's TV rises out of its lift and the home
 cinema's projector screen unrolls while watched; the stereo's CD tray slides out and its woofers pulse, the boombox's
-cassette door tips open, and the electric fire's flames grow while a resident warms up on its floor cushion.
+cassette door tips open, and the electric fire's flames grow while a resident warms up on its floor cushion, and sway while it burns.
 
 The things residents carry and cook with (`models/held/*.glb`: the bag of shopping, the prep bowl, the stew pot and
 the dirty pot, the tasting board, the grill platter and the dirty platter, the pizza, the baking tray and the dirty
