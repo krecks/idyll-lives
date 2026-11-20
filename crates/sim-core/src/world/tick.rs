@@ -810,7 +810,8 @@ pub(crate) fn order_access(
 /// flats over it is never home, though their flat is over it: only its stair hall is (`hall`:
 /// they stand in it, `SimBrief::hall`), not the shop's or the café's floor, where they are
 /// customers like anyone. What they may use there (`access`), and where a household sets off in
-/// its car from: a flat's car stands in its bay in the building's front strip.
+/// its car from: a flat's car stands in its bay in the building's front strip. For a resident
+/// where they stand, `SimBrief::at_home`.
 pub(crate) fn at_home(plots: &[Plot], home: Option<u32>, p: u32, hall: bool) -> bool {
     home.is_some_and(|h| {
         h == p

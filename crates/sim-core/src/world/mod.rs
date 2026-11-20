@@ -2086,6 +2086,15 @@ pub(crate) struct SimBrief {
     pub hall: bool,
 }
 
+impl SimBrief {
+    /// Whether they stand at home, for those living on `home`: on a plot that is home to them
+    /// (`at_home`), in its stair hall or not as they stand (`hall`). Off every plot, not.
+    pub fn at_home(&self, plots: &[Plot], home: Option<u32>) -> bool {
+        self.plot
+            .is_some_and(|p| at_home(plots, home, p, self.hall))
+    }
+}
+
 /// Who belongs to each household by the tick's briefs (`SimBrief::household`), built with them:
 /// a look through one household's people needn't go through the whole town's. Each household's
 /// in the residents' order, as a look through the briefs finds them, so what it finds is the same.

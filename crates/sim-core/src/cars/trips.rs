@@ -32,11 +32,9 @@ pub(crate) fn can_drive(
     };
     !travel.file.parking.is_empty()
         && sim.visiting.is_none()
-        && briefs.get(sim.id as usize).is_some_and(|b| {
-            b.adult
-                && b.plot
-                    .is_some_and(|p| crate::world::at_home(plots, Some(home), p, b.hall))
-        })
+        && briefs
+            .get(sim.id as usize)
+            .is_some_and(|b| b.adult && b.at_home(plots, Some(home)))
         && cars.iter().any(|car| {
             car.household == sim.household
                 && car.plot == home
@@ -74,11 +72,7 @@ pub(crate) fn trip_car(
     }
     let me = ctx.briefs.get(sim.id as usize)?;
     let home = ctx.households.get(sim.household as usize)?.plot?;
-    if !me.adult
-        || !me
-            .plot
-            .is_some_and(|p| crate::world::at_home(ctx.plots, Some(home), p, me.hall))
-    {
+    if !me.adult || !me.at_home(ctx.plots, Some(home)) {
         return None;
     }
     let door = ctx.plots.get(plot as usize)?.arrival_point();
@@ -659,10 +653,8 @@ pub(crate) fn trip_ride(
             && !car.blocked
             && !car.aboard.contains(&sim.id)
     })?;
-    let near = me
-        .plot
-        .is_some_and(|p| crate::world::at_home(ctx.plots, Some(home), p, me.hall))
-        || crate::travel::dist(sim.pos, car.spot) < CALL_REACH;
+    let near =
+        me.at_home(ctx.plots, Some(home)) || crate::travel::dist(sim.pos, car.spot) < CALL_REACH;
     let c = c as u32;
     // A seat of their own: after those in it and on their way to it.
     let seat = car.aboard.len()
