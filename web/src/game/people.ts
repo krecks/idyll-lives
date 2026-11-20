@@ -387,7 +387,8 @@ export function fillPlan(
   // Each home's household as it would naturally be, in that order (the family names taken in it).
   const taken = new Set<string>([...avoid, ...town.households.map((h) => h.household.name)]);
   // (Once every family name is taken, a household may share a neighbour's: never one `avoid` names, the player's.)
-  const names = () => (taken.size < content.names.last.length ? [...taken] : [...avoid]);
+  // (Counted on the list's own names: `taken` holds the player's and the town's too, which may not be on it.)
+  const names = () => (content.names.last.some((n) => !taken.has(n)) ? [...taken] : [...avoid]);
   const roll = (h: Home, room: number) => householdFor(content, assets, h.bedrooms, h.price, room, names(), streams.lot(h.slot.x, h.slot.z, h.flat));
   const drawn = new Map<Home, HouseholdDraft>();
   for (const h of order) {

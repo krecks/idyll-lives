@@ -40,7 +40,8 @@ export function launchArgs({ throughput = false, debugPort = null } = {}) {
   return [
     '--enable-unsafe-webgpu',
     '--enable-webgpu-developer-features',
-    '--use-angle=metal',
+    // (Chromium's default on macOS; there is no Metal elsewhere.)
+    ...(process.platform === 'darwin' ? ['--use-angle=metal'] : []),
     '--disable-backgrounding-occluded-windows',
     '--disable-renderer-backgrounding',
     '--disable-background-timer-throttling',

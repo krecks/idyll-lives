@@ -752,8 +752,10 @@ async function runOnce(n) {
     const gpuFootprint = footprintMB(role.gpu?.pid);
     let dump = null;
     if (devtools) {
+      const missedBefore = missed.length;
       const d = await within(missed, 'memory dump', memoryDump(devtools, true), 60000);
-      dump = d ? { renderer: d.processes[role.renderer?.pid] ?? null, gpu: d.processes[role.gpu?.pid] ?? null } : { error: missed.at(-1)?.why ?? 'no dump' };
+      // (Why it missed, when it was the dump that did: not an earlier step's.)
+      dump = d ? { renderer: d.processes[role.renderer?.pid] ?? null, gpu: d.processes[role.gpu?.pid] ?? null } : { error: missed.length > missedBefore ? missed.at(-1).why : 'no dump' };
     }
     const usage = await within(missed, 'heap usage', heapUsage(cdp), 15000);
     const wh = workers ? await within(missed, "workers' heaps", workers.heaps(), 15000) : null;

@@ -166,7 +166,8 @@ const watchSide = flag('watch', '320');
 const key = sha(JSON.stringify([from ? sha(source.save) : sha(source.lot), from ? 0 : source.simSeed, sha(wasmBytes), sha(TOOL.map((tool) => readFileSync(tool, 'utf8')).join('')), watchSide, when])).slice(0, 16);
 const file = dir + key + '.json';
 const metaFile = dir + key + '.meta.json';
-const cached = existsSync(file) && !has('fresh');
+// (A state without its notes, its making cut short between the two writes, is made again.)
+const cached = existsSync(file) && existsSync(metaFile) && !has('fresh');
 /** What the state is (its tick, day and minute, how it was made); its save as made, when made here. */
 let meta;
 let save = null;
