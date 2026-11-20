@@ -1,7 +1,5 @@
 use super::*;
 
-use super::*;
-
 #[test]
 fn findings_that_differ_in_their_numbers_alone_are_one() {
     assert_eq!(

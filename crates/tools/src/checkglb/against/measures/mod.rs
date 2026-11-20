@@ -2,6 +2,9 @@
 //!
 //! Split from `against.rs` (see `mod.rs`).
 
+// The children's own `use super::*` take these from here (constants, aliases and the shared imports of
+// `against/mod.rs`), so this module has none of its own uses for them.
+#[allow(unused_imports)]
 use super::*;
 mod accepted;
 mod against;
@@ -16,15 +19,14 @@ mod tolerance;
 mod types;
 mod whole;
 
-pub use accepted::*;
+pub(crate) use accepted::*;
 pub use against::*;
-pub use context::*;
-pub use context_of::*;
-pub use decimated::*;
-pub use differ::*;
-pub use git::*;
-pub use side::*;
-pub use side_of::*;
-pub use tolerance::*;
+pub(crate) use context::*;
+pub(crate) use decimated::*;
+pub(crate) use differ::*;
+pub(crate) use git::*;
+pub(crate) use side::*;
+pub(crate) use side_of::*;
+pub(crate) use tolerance::*;
 pub use types::*;
-pub use whole::*;
+pub(crate) use whole::*;

@@ -26,8 +26,6 @@
 //! `accepted`. As with the gate's `accept`, one that names no row, gives no reason or is not needed is an error.
 //! But `decimated`, which says what a far version is (a decimation made it, which another build need not
 //! repeat): where the rows fail it, it is held to that rule in their place (`METRICS`); where they pass, it passes.
-#![allow(unused_imports)]
-
 /// A node's origin may be this far off (m): a tenth of a millimetre, a quarter of what f32 keeps at 3 m, so
 /// only rounding passes (a picked fruit, a door's hinge and a hand's reach are fitted to origins).
 pub const ORIGIN: f64 = 1e-4;
