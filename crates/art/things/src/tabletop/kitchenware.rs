@@ -330,6 +330,214 @@ fn _blender_jar() {
     );
 }
 
+/// A countertop ice cream maker: a black motor head between silver cheeks, standing over a clear tub of churned
+/// ice cream with a chunky black side handle, on a black collar and a silver plinth. The dasher is a part of its
+/// own: it turns in the tub while the machine churns (`whirr`).
+pub fn ice_cream_maker() -> Vec<Obj> {
+    let body = new_parts(_ice_cream_maker_body);
+    join!(&body, "iceCreamMaker", origin = (0, 0, 0));
+    // the tub is glass seen through, a draw and so a part of its own; it never moves: the ice cream, rim and
+    // handle stay with the body
+    let tub = new_parts(_ice_cream_maker_tub);
+    join!(&tub, "tub", origin = (0, 0, 0.08));
+    let parts = new_parts(_ice_cream_maker_dasher);
+    let dasher = join!(&parts, "dasher", origin = (0, 0, 0.285)); // about its shaft
+    settle!();
+    spin!(dasher, "whirr", turns = 1, seconds = 1.2, axis = Axis::Z);
+    meshes()
+}
+
+fn _ice_cream_maker_body() {
+    turned!(
+        "foot",
+        &[
+            (0.104, 0.104, 0.0),
+            (0.11, 0.11, 0.006),
+            (0.11, 0.11, 0.016),
+            (0.106, 0.106, 0.02)
+        ],
+        M.dark,
+        verts = 24,
+        square = 2
+    );
+    turned!(
+        "plinth",
+        &[
+            (0.1, 0.1, 0.018),
+            (0.112, 0.112, 0.03),
+            (0.112, 0.112, 0.046),
+            (0.104, 0.104, 0.052)
+        ],
+        M.steel,
+        verts = 24,
+        square = 2
+    );
+    turned!(
+        "collar",
+        &[
+            (0.09, 0.09, 0.05),
+            (0.094, 0.094, 0.058),
+            (0.094, 0.094, 0.078),
+            (0.09, 0.09, 0.082),
+            (0.086, 0.086, 0.082)
+        ],
+        M.dark,
+        verts = 20,
+        square = 3
+    );
+    // the tub's furniture: the ice cream in the glass (its lower two thirds, rolled 45° over the top so the arris
+    // doesn't read as a drawn edge through the glass), the black rim the head seats on, and the chunky handle bolted
+    // to the collar below and the rim above, clear of the glass
+    turned!(
+        "ice_cream",
+        &[
+            (0.068, 0.068, 0.082),
+            (0.07, 0.07, 0.188),
+            (0.058, 0.058, 0.2)
+        ],
+        M.icecream,
+        verts = 20,
+        square = 2
+    );
+    turned!(
+        "rim",
+        &[
+            (0.076, 0.076, 0.264),
+            (0.08, 0.08, 0.268),
+            (0.08, 0.08, 0.274),
+            (0.076, 0.076, 0.278),
+            (0.07, 0.07, 0.278)
+        ],
+        M.dark,
+        verts = 20,
+        square = 2
+    );
+    box_!(
+        "handleTop",
+        (0.031, 0.05, 0.022),
+        (0.0925, 0.0, 0.266),
+        M.dark,
+        bevel = 0.005
+    );
+    box_!(
+        "handleFoot",
+        (0.031, 0.05, 0.022),
+        (0.0925, 0.0, 0.062),
+        M.dark,
+        bevel = 0.005
+    );
+    box_!(
+        "grip",
+        (0.018, 0.05, 0.204),
+        (0.114, 0.0, 0.164),
+        M.dark,
+        bevel = 0.005
+    );
+    turned!(
+        "headBase",
+        &[
+            (0.08, 0.08, 0.276),
+            (0.086, 0.086, 0.282),
+            (0.086, 0.086, 0.296),
+            (0.082, 0.082, 0.3),
+            (0.078, 0.078, 0.3)
+        ],
+        M.dark,
+        verts = 20,
+        square = 3
+    );
+    turned!(
+        "head",
+        &[
+            (0.082, 0.054, 0.3),
+            (0.086, 0.056, 0.312),
+            (0.086, 0.056, 0.458),
+            (0.082, 0.054, 0.47)
+        ],
+        M.steel,
+        verts = 24,
+        square = 8
+    );
+    box_!(
+        "face",
+        (0.118, 0.012, 0.15),
+        (0, -0.052, 0.386),
+        M.dark,
+        bevel = 0.005
+    );
+    box_!(
+        "screen",
+        (0.076, 0.004, 0.014),
+        (0, -0.059, 0.432),
+        M.chrome,
+        bevel = 0.002
+    );
+    turned!(
+        "power",
+        &[(0.009, 0.0), (0.009, 0.004), (0.006, 0.005), (0.0, 0.006)],
+        M.red,
+        at = (0, -0.059, 0.336),
+        rot = (90, 0, 0),
+        verts = 12
+    );
+    // the program grid: two columns of three, as on the machine
+    for (i, z) in [0.402, 0.383, 0.364].into_iter().enumerate() {
+        for (j, x) in [-0.022, 0.022].into_iter().enumerate() {
+            box_!(
+                format!("program{i}{j}"),
+                (0.016, 0.004, 0.01),
+                (x, -0.059, z),
+                M.chrome,
+                bevel = 0.001
+            );
+        }
+    }
+    // a low domed lid, its open skirt buried in the head's top: a lip, then a shallow dome
+    turned!(
+        "cap",
+        &[
+            (0.08, 0.052, 0.466),
+            (0.088, 0.058, 0.473),
+            (0.0, 0.0, 0.4825)
+        ],
+        M.dark,
+        verts = 20,
+        square = 8,
+        caps = false
+    );
+}
+
+fn _ice_cream_maker_tub() {
+    // glass seen through: its own draw call, so nothing else is in this part
+    turned!(
+        "tub",
+        &[(0.072, 0.072, 0.08), (0.076, 0.076, 0.268)],
+        M.glass,
+        verts = 20,
+        square = 2,
+        caps = false
+    );
+}
+
+fn _ice_cream_maker_dasher() {
+    rod!(
+        "shaft",
+        (0.0, 0.0, 0.285),
+        (0.0, 0.0, 0.1),
+        0.004,
+        material = M.steel,
+        verts = 6
+    );
+    // the blade's upper half stands above the ice cream, so the paddle shows through the glass
+    box_!(
+        "blade",
+        (0.055, 0.006, 0.1),
+        (0.0375, 0.0, 0.195),
+        M.steel,
+        bevel = 0.001
+    );
+}
+
 /// A tilt-head stand mixer: a rounded base, the column rising into the head (lofted, swelling over the bowl to
 /// its nose, a chrome band and hub there), the speed lever, the steel bowl with batter in it and the beater's
 /// shaft. The beater on its shaft is a part of its own: `beat` turns it round in the bowl while the mixer runs.

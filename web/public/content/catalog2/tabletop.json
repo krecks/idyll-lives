@@ -108,6 +108,44 @@
       ]
     },
     {
+      "id": "iceCreamMaker",
+      "name": "Ice cream maker",
+      "model": "model.iceCreamMaker",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 80,
+      "category": "tabletop",
+      "group": "kitchenware",
+      "layer": "surface",
+      "decor": 0.3,
+      "radius": 0.13,
+      "description": "A countertop machine that churns ice cream, sorbet, gelato or a milkshake, with a chute for toppings. It stands on a table, counter, desk or shelf.",
+      "interactions": [
+        {
+          "id": "churn",
+          "label": "Churn a tub of ice cream",
+          "anim": "cook",
+          "sound": "blender",
+          "minutes": 6,
+          "eat": {
+            "item": "iceCream",
+            "minutes": 8
+          },
+          "effects": {
+            "hunger": 0.18,
+            "fun": 0.3,
+            "comfort": 0.06
+          },
+          "tags": [
+            "food"
+          ],
+          "feeling": "home.sweetTreat"
+        }
+      ]
+    },
+    {
       "id": "standMixer",
       "name": "Stand mixer",
       "model": "model.standMixer",
@@ -230,7 +268,7 @@
       "group": "kitchenware",
       "layer": "surface",
       "decor": 0.2,
-      "radius": 0.21,
+      "radius": 0.13,
       "description": "A board with a loaf and some tomatoes. It stands on a table, counter, desk or shelf.",
       "interactions": []
     },

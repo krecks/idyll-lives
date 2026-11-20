@@ -57,6 +57,7 @@ palette! { M:
     stalk = ("#5A4632", matte),
     white = ("#F2F0EA", satin),
     blush = ("#E4B8AE", satin),
+    icecream = ("#F3E2C6", satin),     // churned vanilla: cream, not `blush`
     rose = ("#E07B7B", satin),
     pink = ("#E07BC3", satin),
     bread = ("#D9A55B", matte),
@@ -197,6 +198,9 @@ pub fn family() -> Option<Family> {
             // the jug shaking on its base, the beater turning round, for as long as each runs
             t("blender", "model.blender", blender, (0.18, 0.356, 0.146), &[("blender_base", BODY), ("smoothie", "Smoothie")])
                 .motions(motions(r#"{"loops": {"smoothie": "whirr"}}"#)),
+            // the dasher turning in the tub for as long as it churns
+            t("iceCreamMaker", "model.iceCreamMaker", ice_cream_maker, (0.235, 0.482, 0.224), &[("steel", BODY)])
+                .motions(motions(r#"{"loops": {"churn": "whirr"}}"#)),
             t("standMixer", "model.standMixer", stand_mixer, (0.3, 0.356, 0.17), &[("mixer", BODY)])
                 .motions(motions(r#"{"loops": {"bake": "beat"}}"#)),
             // the coffee running into the cup, then stopped while it's drunk

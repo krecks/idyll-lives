@@ -127,6 +127,13 @@
       }
     },
     {
+      "id": "home.sweetTreat",
+      "label": "Sweet treat",
+      "emotion": "happy",
+      "mood": 0.06,
+      "hours": 3
+    },
+    {
       "id": "home.filmNight",
       "label": "Film night",
       "emotion": "happy",

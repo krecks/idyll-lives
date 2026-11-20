@@ -1,6 +1,6 @@
 # Tabletop: notes
 
-`crates/art/things/src/tabletop` (`cargo art tabletop`) builds the 40 tabletop things into `web/public/assets/models/tabletop/`
+`crates/art/things/src/tabletop` (`cargo art tabletop`) builds the 41 tabletop things into `web/public/assets/models/tabletop/`
 and their entries in `packs/tabletop/manifest.json`. Built 2026-10-14; they sat in Validate (Kitchenware, Tableware, Books And Pots, Small Ornaments, Desk And
 Bath Bits) until checked in play, then went back to `tabletop` and their old group (`kitchenware`, `tableware`, `books`,
 `plants`, `ornaments`, `bath`, `desk`, `toys`).
@@ -17,7 +17,7 @@ Bath Bits) until checked in play, then went back to `tabletop` and their old gro
   the cookie jar, the wine glasses and the snow globe. Elsewhere glass is opaque `gloss` (the blender's jug shows the
   smoothie as its lower half).
 - **Triangles** at most half the size class's target, as they're placed many times on every lot: 750 under 0.35 m,
-  2,000 for the five larger (`espressoMachineSmall`, `plateSet`, `teapotSet`, `vaseFlowers`, `monitor`). The table
+  2,000 for the six larger (`espressoMachineSmall`, `iceCreamMaker`, `plateSet`, `teapotSet`, `vaseFlowers`, `monitor`). The table
   below has each.
 - **Player colour**: the main part's material, labelled `Body` (the cookie jar: its `Lid`); sets of like things (mugs,
   books, towels, blocks) list each one.
@@ -35,6 +35,7 @@ drink's surface), the plants' leaves and flowers the botany's. Sixteen were over
 | `kettle` | 0.23 × 0.24 × 0.17 m | 724 (696) | 2 | jug body swelling to the shoulder on a power base, beak spout, D handle in one piece, red switch, water window; the lid and knob turned, the lid flipping up (`lid_open`) |
 | `toaster` | 0.28 × 0.23 × 0.15 m | 710 (584) | 2 | rounded body on a plinth, two slots with toast (crust round the crumb), lever in its guide, browning dial and pointer, cancel button, chrome trim |
 | `blender` | 0.18 × 0.36 × 0.15 m | 736 (648) | 2 | tapering base with a dial and two buttons, collar, soft-square jug (smoothie its lower half), handle in one piece, lid and filler cap |
+| `iceCreamMaker` | 0.24 × 0.48 × 0.22 m | 1,986 (—) | 3 | silver plinth and black collar under a glass tub (ice cream its lower two thirds, a steel dasher in it) with a chunky side handle, black rim, black head plate and a motor head: silver cheeks, black face with a display strip, a six-button program grid and a red power button, domed black lid |
 | `standMixer` | 0.30 × 0.36 × 0.17 m | 808 (1,180) | 2 | rounded base, column, lofted tilt head swelling to its nose with a chrome band and hub, speed lever, steel bowl with batter, beater (a cut-out paddle) |
 | `espressoMachineSmall` | 0.23 × 0.31 × 0.39 m | 1,914 (844) | 2 | body rounded over the top, head with buttons and light, group, portafilter with two spouts, slotted grate over the drip tray, gauge (bezel, face, needle), steam knob and bent wand, water tank, cup-warmer rail on posts, a cup with crema and handle, a cup upturned on top |
 | `knifeBlock` | 0.12 × 0.30 × 0.23 m | 584 (352) | 1 | leaning block with eased edges on its foot, six knives (a steel bolster under each riveted handle, sized to its blade) |
@@ -128,6 +129,9 @@ nothing while the kettle's lid flipped up. Each now has one moving part (two dra
 - `blender`: the jug with its smoothie, lid, cap and handle is the `jug` part, seated on the collar; `whirr` twists it
   2.5° each way and home in 0.2 s, a loop for as long as *Blend a smoothie* lasts (the jug is opaque, so the blades
   can't show).
+- `iceCreamMaker`: the shaft and its blade are the `dasher` part, its origin on the shaft's top end; `whirr`
+  turns it once round in 1.2 s, a loop for as long as *Churn a tub of ice cream* lasts. The tub is glass seen
+  through, a part of its own (nothing else in it), so the blade's upper half shows above the ice cream.
 - `standMixer`: the beater and its shaft, with a swirl of darker batter round it, are the `beater` part, its origin on
   the shaft; `beat` turns it once round in 0.75 s, a loop while it bakes (*Practise baking*).
 - `espressoMachineSmall`: two thin streams of coffee (`coffee`) from the portafilter's spouts down into the cup, built
