@@ -3134,7 +3134,21 @@ impl World {
         self.plots
             .get(p as usize)
             .is_some_and(|plot| !plot.public && plot.kind != Some(crate::travel::PlotKind::Flats))
-            && self.flats_in.get(p as usize).is_none_or(|&k| k == 0)
+            && !self.has_flats(p)
+    }
+
+    /// Whether lot `lot` is a building with flats in it (`flats_in`).
+    fn has_flats(&self, lot: u32) -> bool {
+        self.flats_on(lot).is_some()
+    }
+
+    /// The building with flats on lot `lot`, if it is one: the plot of each of its tiles on each
+    /// storey (`FlatTiles`).
+    fn flats_on(&self, lot: u32) -> Option<&FlatTiles> {
+        match self.flats_in.get(lot as usize) {
+            Some(&k) if k > 0 => self.flat_tiles.get(usize::from(k) - 1),
+            _ => None,
+        }
     }
 
     /// The plot a tile is on (on any storey): the lot on the ground there, and in a building with
@@ -3150,14 +3164,10 @@ impl World {
             .get((ground * width + x) as usize)
             .filter(|&&p| p != crate::path::NO_PLOT)
             .map(|&p| u32::from(p))?;
-        match self.flats_in.get(lot as usize) {
-            Some(&k) if k > 0 => Some(
-                self.flat_tiles[usize::from(k) - 1]
-                    .at(x, ground, self.storey_of(z))
-                    .unwrap_or(lot),
-            ),
-            _ => Some(lot),
-        }
+        let flat = self
+            .flats_on(lot)
+            .and_then(|f| f.at(x, ground, self.storey_of(z)));
+        Some(flat.unwrap_or(lot))
     }
 
     /// Finds the flats' stair hall in each public place with flats over it (`path::Halls`): the
@@ -3172,7 +3182,7 @@ impl World {
         halls.of_lot = vec![0; self.plots.len()];
         let nav = self.nav();
         for lot in self.lots().iter().filter(|p| p.public) {
-            if self.flats_in.get(lot.id as usize).is_none_or(|&k| k == 0) {
+            if !self.has_flats(lot.id) {
                 continue;
             }
             let Some(entry) = self
