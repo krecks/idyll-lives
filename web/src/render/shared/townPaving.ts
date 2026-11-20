@@ -107,12 +107,16 @@ export const PAVING_LOOK = {
 export const COURSE = 5;
 export const JOINT = 0.5;
 /**
- * A bay: 3 m along its road by 6 deep; its lines (`LINE` m wide) run along its sides, 1.45 m either side
- * of its middle (two bays side by side share one), and across its far end, 2.75 m in from its middle.
- * A lone bay's apron is a little bigger than the bay, so its lines lie on asphalt.
+ * A bay as the simulation parks in it (`parking.ts` `BAY_WIDE`, `BAY_DEEP` and `BAY_LINES`, which `paving.test.ts` holds
+ * these to: that module brings the town's generator with it): 3 m along its road by 6 deep, its lines (`LINE` m wide)
+ * 2.8 m apart along its sides (two bays side by side share one, between them) and 5.6 m long, and one across its far
+ * end, as far out as they reach. A lone bay's apron is a little bigger than the bay, so its lines lie on asphalt.
  */
-export const BAY = { w: 3, d: 6, side: 1.45, end: 2.75, half: 2.8 } as const;
+export const BAY = { w: 3, d: 6, lines: [2.8, 5.6] } as const;
 export const LINE = 0.1;
+/** Where a bay's lines run from its middle: its sides' across it, how far they reach along it, its far end's along it. */
+const [SIDE, HALF] = [BAY.lines[0] / 2, BAY.lines[1] / 2];
+const END = HALF - LINE / 2;
 const LONE = { w: 3.4, d: 6.2 } as const;
 /** A tile wholly under a road's carriageway is the road's, not paved: its middle this far inside the kerb (half its diagonal). */
 const UNDER_ROAD = Math.SQRT1_2;
@@ -177,7 +181,7 @@ function drawPaving(world: PavingWorld): TownPaving {
     const park = lone ? -1 - i : bay.park!;
     const at = bayFrame(bay.x, bay.z, bay.yaw);
     if (lone) pieces.push({ kind: 'carpark', poly: at.rect(LONE.w, LONE.d), holes: [], course: 0, surface: 'asphalt', edge: 'exact' });
-    const lines: BayDraw['lines'] = [at.seg(-BAY.side, -BAY.half, -BAY.side, BAY.half), at.seg(BAY.side, -BAY.half, BAY.side, BAY.half), at.seg(-BAY.w / 2, BAY.end, BAY.w / 2, BAY.end)];
+    const lines: BayDraw['lines'] = [at.seg(-SIDE, -HALF, -SIDE, HALF), at.seg(SIDE, -HALF, SIDE, HALF), at.seg(-BAY.w / 2, END, BAY.w / 2, END)];
     bays.push({ corners: at.rect(BAY.w, BAY.d), lines });
     sides.push({ park, a: lines[0][0], b: lines[0][1] }, { park, a: lines[1][0], b: lines[1][1] });
   });
