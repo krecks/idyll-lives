@@ -59,11 +59,10 @@ export const CUT_MAX = 4;
  *
  * It reaches the whole retaining reach (`RETAIN_MAX`, less a little): a wider step is one the grain cannot draw, and
  * leaves a stone edge standing up out of the grass. So the land meets the pad at its edge and the cones ramp the
- * difference away past that cell: a bank, not a wall.
+ * difference away past that cell: a bank, not a wall. (A little short of it, so a sample a full retaining edge from
+ * the pad is the land's, ramped by the cones, never graded flat to the pad.)
  */
-/** The skirt stops this far short of the whole retaining reach (m), so a sample a full retaining edge from the pad is the land's, ramped by the cones, never graded flat to the pad. */
-export const SKIRT_MARGIN = 0.05;
-export const SKIRT_MOST = RETAIN_MAX - SKIRT_MARGIN;
+export const SKIRT_MOST = RETAIN_MAX - 0.05;
 /** Among mountains (a world whose Hills are `mountains`), a country road (a pass, a way out of the world) may be cut into the rock or stand over the land by this much (m). */
 export const CUT_MAX_MOUNTAIN_ROAD = 10;
 /** The graded land under a road lies this far below it (m), so it never shows through on a bend. */
@@ -612,10 +611,7 @@ export class BuiltSurface {
         let [from, to] = [window[2 * i], window[2 * i + 1]];
         for (const j of touching[i]) {
           if (this.afloat[j]) continue;
-          const [lo, hi] = [pads[j] - PAD_STEP, pads[j] + PAD_STEP];
-          if (hi < from) to = from;
-          else if (lo > to) from = to;
-          else [from, to] = narrowed(from, to, lo, hi);
+          [from, to] = towards(from, to, pads[j] - PAD_STEP, pads[j] + PAD_STEP);
         }
         pads[i] = Math.min(to, Math.max(from, middle[i]));
       }
@@ -1188,6 +1184,11 @@ const SKIRT = 4;
 function narrowed(from: number, to: number, lo: number, hi: number): [number, number] {
   const [a, b] = [Math.max(from, lo), Math.min(to, hi)];
   return a <= b ? [a, b] : [from, to];
+}
+
+/** Window [`from`, `to`] narrowed to within [`lo`, `hi`]; where they don't meet, the end of the window nearest it. */
+function towards(from: number, to: number, lo: number, hi: number): [number, number] {
+  return [Math.min(Math.max(from, lo), to), Math.max(Math.min(to, hi), from)];
 }
 
 /** The land settled under what is built this many times at most after a stroke (`settleCuts`), this many samples round what changed. */

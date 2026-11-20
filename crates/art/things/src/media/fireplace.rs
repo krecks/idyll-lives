@@ -5,7 +5,7 @@ use super::common::{P, WALL};
 use super::{F, M};
 use artkit::forms::smooth_outline;
 use artkit::kit;
-use artkit::math::{Axis, P3, cos, radians, sin};
+use artkit::math::{Axis, P3, TAU, cos, radians, sin};
 use artkit::motion::{Ease, Path, flat, keys};
 use artkit::parts::{join, new_parts};
 use artkit::place::Facing;
@@ -441,12 +441,12 @@ pub fn fireplace_electric() -> Vec<Obj> {
         (0..=STEPS)
             .map(|k| {
                 let t = STEP * k as f64;
-                let turn = std::f64::consts::TAU * t / PERIOD;
+                let turn = TAU * t / PERIOD;
                 let swing: f64 = terms
                     .iter()
                     .map(|&(cycles, share, cosine)| {
                         let x = cycles * turn;
-                        share * if cosine { x.cos() - 1.0 } else { x.sin() }
+                        share * if cosine { cos(x) - 1.0 } else { sin(x) }
                     })
                     .sum();
                 (t, amp * swing, Ease::Linear)

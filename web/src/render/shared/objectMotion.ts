@@ -144,8 +144,6 @@ export interface MovingObject<D> {
   lamp?: boolean;
   /** A fire (content `light.fire`): these clips (its flames, its uses') are held open while it burns at night. */
   burns?: readonly string[];
-  /** A fire (content `light.fire`): this clip goes round while it burns at night (the flames' lean and sway). */
-  burnClip?: string;
   /** Curtains (content `overWindow`): their `night` clip is held while they're drawn shut (`setCurtainsShut`), not from dusk to dawn. */
   curtain?: boolean;
 }
@@ -244,7 +242,7 @@ export class ObjectMotion<D> {
   private snapCurtains = false;
   /** Whether an object's glow is out with its room's lights (`setUnlit`): a night clip that lights it (candles) stays shut. */
   private unlit: (id: number) => boolean = () => false;
-  /** Reduce motion (the settings'): flames, screens, the wind and the clouds hold still. */
+  /** Reduce motion (the settings'): a fire's flames hold still. */
   reducedMotion = false;
 
   /**
@@ -261,11 +259,6 @@ export class ObjectMotion<D> {
   /** Ambient clips play within `range` metres of the camera (0: nowhere, all at rest). */
   setAmbientRange(range: number): void {
     this.ambientRange = range;
-  }
-
-  /** Reduce motion on or off. */
-  setReducedMotion(on: boolean): void {
-    this.reducedMotion = on;
   }
 
   /** The lamps (and fires) switched off, by object id (the sim's `lampsOff`): a fan's blades stop, a fire's flames die down. */
@@ -321,12 +314,8 @@ export class ObjectMotion<D> {
 
   /** Whether fire `id`'s flames are going round (`burn`: lit, at night, near the camera, motion not reduced): its glow flickers with them. */
   burning(id: number): boolean {
-    return !this.reducedMotion && !!this.states.get(id)?.get(this.objects.get(id)?.burnClip ?? '');
-  }
-
-  /** Where a fire's flames stand in their round (`burn`): each fire on a beat of its own, its id shifting it. */
-  private burnPhase(id: number, clip: ModelClip): number {
-    return (id * 0.37) % clip.duration;
+    const burn = this.objects.get(id)?.motions.burn;
+    return burn !== undefined && !this.reducedMotion && !!this.states.get(id)?.has(burn);
   }
 
   /** The objects of a newly built world; those still mid-clip are posed again. */
@@ -427,8 +416,9 @@ export class ObjectMotion<D> {
       const held = this.held(o, this.heldNow);
       // (A lamp's, a fan's blades, only while it's switched on.)
       const idle = o.motions.idle !== undefined && reach > 0 && !(o.lamp && this.lampsOff.has(id)) && this.distance2(o, eye) < reach ? o.motions.idle : undefined;
-      // A fire's flames flicker: their `burn` clip goes round while it burns at night, near the camera as an idle clip.
-      const burning = o.burnClip !== undefined && this.night && !this.lampsOff.has(id) && reach > 0 && this.distance2(o, eye) < reach ? o.burnClip : undefined;
+      // A fire's flames flicker: their `burn` clip goes round while it burns at night, near the camera as an idle clip
+      // (not with Reduce motion: dropped, the flames go back to rest).
+      const burning = o.motions.burn !== undefined && this.night && !this.reducedMotion && !this.lampsOff.has(id) && reach > 0 && this.distance2(o, eye) < reach ? o.motions.burn : undefined;
       let clips = this.states.get(id);
       const growth = this.growth(o);
       if ((wanted || held.length || idle || growth || burning) && !clips) this.states.set(id, (clips = new Map()));
@@ -444,7 +434,7 @@ export class ObjectMotion<D> {
       if (idle && idleClip && !clips.has(idle)) clips.set(idle, { clip: idleClip, time: 0, use: '', until: Infinity, start: 0, kind: 'idle' });
       // (Each fire on a beat of its own: its id offsets where its flames are in their round.)
       const burningClip = burning ? o.motion.clips.get(burning) : undefined;
-      if (burning && burningClip && !clips.has(burning)) clips.set(burning, { clip: burningClip, time: this.burnPhase(id, burningClip), use: '', until: Infinity, start: 0, kind: 'burn' });
+      if (burning && burningClip && !clips.has(burning)) clips.set(burning, { clip: burningClip, time: (id * 0.37) % burningClip.duration, use: '', until: Infinity, start: 0, kind: 'burn' });
       let changed = false;
       let drifted = false;
       if (wanted) for (const [name, want] of wanted) {
@@ -466,26 +456,9 @@ export class ObjectMotion<D> {
       for (const [name, state] of clips) {
         const d = state.clip.duration;
         if (state.kind === 'clock') continue;
-        if (state.kind === 'burn') {
-          // Round and round while the fire burns near the camera; put out or further off, back to rest (still grown).
-          if (name !== burning) {
-            clips.delete(name);
-            drifted = true;
-          } else if (dt && d > 0 && this.reducedMotion) {
-            // Reduce motion: back to rest once, rather than flickering.
-            if (state.time) {
-              state.time = 0;
-              changed = true;
-            }
-          } else if (dt && d > 0) {
-            state.time = (state.time + dt) % d;
-            drifted = true;
-          }
-          continue;
-        }
-        if (state.kind === 'idle') {
-          // Round and round near the camera; at rest further off.
-          if (name !== idle) {
+        if (state.kind === 'idle' || state.kind === 'burn') {
+          // Round and round near the camera (a fire's flames while it burns); at rest further off (put out, still grown).
+          if (name !== (state.kind === 'idle' ? idle : burning)) {
             clips.delete(name);
             drifted = true;
           } else if (dt && d > 0) {

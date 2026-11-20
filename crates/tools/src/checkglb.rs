@@ -1241,6 +1241,9 @@ fn uses(motions: &J) -> Vec<(String, J)> {
     out
 }
 
+/// The `motions` kinds naming one clip each (`played`; `cargo review`'s motions column).
+pub(crate) const CLIP_KINDS: [&str; 7] = ["open", "idle", "night", "growth", "ride", "running", "burn"];
+
 /// {clip: what plays it} for an entry's `motions` (in the order they're first named): `uses`, `loops`,
 /// `open`, `idle`, `night`, `growth`, `ride` (the clip whose part carries its users), `running` (round and
 /// round while a machine runs on its own), `burn` (round while a fire burns) and `clock` (`hour`, `minute`:
@@ -1263,7 +1266,7 @@ pub(crate) fn played(motions: &J) -> R<Vec<(J, String)>> {
     {
         add(clip, format!("loop {}", repr_str(name)));
     }
-    for kind in ["open", "idle", "night", "growth", "ride", "running", "burn"] {
+    for kind in CLIP_KINDS {
         if let Some(clip) = motions.get(kind).filter(|c| c.truthy()) {
             add(clip, kind.into());
         }
