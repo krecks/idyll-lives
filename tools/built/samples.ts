@@ -611,30 +611,30 @@ function unitMeshesOf(b: TownBuilding): DumpMesh[] {
 
 // ---- the lots' buildings closed ---------------------------------------------------------------------
 
-/** A building of each use: its size (m along its ridge and across), its roof and its storeys (at most the world's three), as the town's generator makes them about. */
-const BUILDINGS: [BuildingUse, number, number, LotLook['roof'], number][] = [
-  ['house', 12, 8, 'gable', 2],
-  ['terrace', 22, 9, 'gable', 2],
-  ['flats', 16, 11, 'flat', 3],
-  ['shop', 10, 8, 'flat', 2],
-  ['cafe', 12, 9, 'hip', 2],
-  ['restaurant', 14, 10, 'mansard', 2],
-  ['office', 18, 12, 'flat', 3],
-  ['school', 24, 12, 'hip', 2],
-  ['church', 18, 10, 'gable', 3],
-  ['hall', 16, 11, 'mansard', 2],
-  ['workshop', 12, 9, 'gable', 1],
-  ['farm', 13, 9, 'hip', 2],
-  ['barn', 14, 9, 'gable', 2],
+/**
+ * A building of each use a lot's look has: its size (m along its ridge and across), its roof, its storeys (at most the
+ * world's three), as the town's generator makes them about, and its look (the palette's).
+ */
+const BUILDINGS: [BuildingUse, number, number, LotLook['roof'], number, number][] = [
+  ['flats', 16, 11, 'flat', 3, 2],
+  ['shop', 10, 8, 'flat', 2, 3],
+  ['cafe', 12, 9, 'hip', 2, 4],
+  ['restaurant', 14, 10, 'mansard', 2, 5],
+  ['office', 18, 12, 'flat', 3, 6],
+  ['school', 24, 12, 'hip', 2, 7],
+  ['church', 18, 10, 'gable', 3, 8],
+  ['hall', 16, 11, 'mansard', 2, 9],
+  ['workshop', 12, 9, 'gable', 1, 10],
+  ['farm', 13, 9, 'hip', 2, 11],
 ];
 
 /** A lot's building of each use closed, dressed as the street draws it near, and as the town view's box. */
-function buildingSamples([use, w, d, roof, storeys]: (typeof BUILDINGS)[number], i: number): Sample[] {
+function buildingSamples([use, w, d, roof, storeys, look]: (typeof BUILDINGS)[number]): Sample[] {
   // (Its road to the south.)
   const [cx, cz] = [100, 50];
-  const t = lotLookBuilding([cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2], { use, storeys, roof, look: i }, storeys, 0, () => 0);
+  const t = lotLookBuilding([cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2], { use, storeys, roof, look }, storeys, 0, () => 0);
   const dress = dressBuilding(t, use, [cx, cz + 30]);
-  const about = `a ${use}, ${w} m by ${d} m, ${storeys} storey${storeys === 1 ? '' : 's'} under a ${roof} roof, look ${i}`;
+  const about = `a ${use}, ${w} m by ${d} m, ${storeys} storey${storeys === 1 ? '' : 's'} under a ${roof} roof, look ${look}`;
   const near = [...dress.parts.map((p) => partMesh(p)), ...dress.panes.map((g, k) => meshOf('buildingPanes', HOUSE_MATERIALS.glass, g, { set: k }))];
   const key = `building.${use}`;
   return [
@@ -752,7 +752,7 @@ function carSample(body: number): Sample {
 export async function samples(): Promise<Sample[]> {
   const out: Sample[] = [];
   for (const plan of plans()) out.push(...(await houseSamples(plan)));
-  BUILDINGS.forEach((b, i) => out.push(...buildingSamples(b, i)));
+  for (const b of BUILDINGS) out.push(...buildingSamples(b));
   out.push(streetSample());
   for (let i = 0; i < fenceStyles.length; i++) {
     const s = fenceSample(i);

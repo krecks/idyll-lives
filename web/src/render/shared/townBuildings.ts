@@ -8,7 +8,7 @@
 import type { BuildingUse, LotLook, TownPlace } from '../../core/protocol';
 import { Geo, facing, type V3 } from './geometry';
 
-/** Window styles: none (a barn), a house's, a shop's (a shopfront on the ground floor), flats' and offices' (closer bays). */
+/** Window styles: none (no windows), a house's, a shop's (a shopfront on the ground floor), flats' and offices' (closer bays). */
 export const TOWN_STYLE = { none: 0, house: 1, shop: 2, flats: 3 } as const;
 
 /** The roofs the unit meshes have, in their draws' order. */
@@ -49,8 +49,7 @@ export const PALETTE: readonly (readonly [string, string])[] = [
   ['#E6C9B8', '#9E4A36'],
   ['#BCD0E0', '#7A6A5A'],
 ];
-/** Some uses keep their own look: a barn's boards and tin roof, a church's stone and slate, a flat roof's felt and gravel. */
-const BARN = [['#8A3F2E', '#7B7F80'], ['#6E5040', '#6A6E70'], ['#9A8A70', '#7E5A44']] as const;
+/** Some uses keep their own look: a church's stone and slate, a flat roof's felt and gravel. */
 const CHURCH = ['#BDB5A5', '#55595F'] as const;
 const FLAT_ROOF = '#8C8780';
 
@@ -77,10 +76,9 @@ export const STYLE: Record<BuildingUse, [number, number]> = {
   hall: [TOWN_STYLE.flats, 0.25],
   workshop: [TOWN_STYLE.house, 0.15],
   farm: [TOWN_STYLE.house, 0.4],
-  barn: [TOWN_STYLE.none, 0],
 };
 /** Homes: their lights go by the hour. */
-const HOMES: ReadonlySet<BuildingUse> = new Set<BuildingUse>(['house', 'terrace', 'flats', 'farm']);
+const HOMES: ReadonlySet<BuildingUse> = new Set<BuildingUse>(['flats', 'farm']);
 /** What a closed place keeps of its lights (a night light, a lit sign), and the share of a home's lights on in the small hours and at breakfast. */
 const CLOSED = 0.06;
 const SMALL_HOURS = 0.15;
@@ -263,8 +261,7 @@ export function lotLookBuilding(
   const t = hash2(index, look.look);
   const s = hash2(look.look, index + 7);
   let [wallHex, roofHex] = PALETTE[((look.look % PALETTE.length) + PALETTE.length) % PALETTE.length];
-  if (look.use === 'barn') [wallHex, roofHex] = BARN[look.look % BARN.length];
-  else if (look.use === 'church') [wallHex, roofHex] = CHURCH;
+  if (look.use === 'church') [wallHex, roofHex] = CHURCH;
   let roofColor = hex(roofHex).map((c) => c * ROOF_TONE) as [number, number, number];
   if (roof === 'flat') {
     const g = hex(FLAT_ROOF);

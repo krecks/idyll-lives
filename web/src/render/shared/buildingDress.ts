@@ -4,17 +4,16 @@
  * as a box and a roof (`townBuildings.ts`); this one has the box's measures and colours (`lotLookBuilding`: its
  * rectangle, its walls from under its ground to its real storeys, its roof's rise), dressed:
  *
- * - **Homes** (`house`, `terrace`, `farm`): siding (brick where the palette's wall is brick), corner boards, framed
- *   windows with curtains and shutters on every storey, a panelled front door under a little canopy on the side its
- *   way to the road leaves by, a chimney on some roofs. A terrace is a row of homes (one door each, a stack on each
- *   party wall).
+ * - **A farmhouse** (`farm`): siding (brick where the palette's wall is brick), corner boards, framed windows with
+ *   curtains and shutters on every storey, a panelled front door under a little canopy on the side its way to the road
+ *   leaves by, a chimney on some roofs.
  * - **Shops, cafés, restaurants**: a shopfront on the ground floor (glass, a door, a fascia, an awning on most). With
  *   flats over it (`TownBuilding.flats`), the flats' windows above (their glass lit as homes', `BuildingDress.panes`)
  *   and their own street door beside the shopfront under a canopy of its own, the awning stopping short of it.
  * - **Flats, offices, schools, halls**: render (or brick), bands between storeys, closer and wider windows, a door
  *   under a canopy.
- * - **A church**: stone, tall windows, a tower with a spire at one end. **A workshop, a barn**: boards, a wide door,
- *   few windows.
+ * - **A church**: stone, tall windows, a tower with a spire at one end. **A workshop**: boards, a wide door, few
+ *   windows.
  *
  * Roofs as the box's: a gable or a hip (the house's `addRoof`), a flat roof behind a parapet, a mansard. Built in a
  * frame of the building's own (x along its rectangle, z across) and put in place (`Geo.place`). Its parts are named
@@ -52,8 +51,6 @@ const FASCIA = ['#2F4058', '#3E5A4A', '#7A3B34', '#1F2A33', '#6B4A3A', '#8C6A2E'
 const STRIPES = ['#B23A3A', '#2F6B5A', '#2F4E7A', '#C27B2A'];
 /** How far a roof's eaves overhang near (m), as the neighbours' do. */
 const OVERHANG = 0.35;
-/** A terrace's homes are about this wide (m). */
-const TERRACE_HOME = 5.5;
 /**
  * How far (m) a shop's awning stops short of the flats' street door beside it (their door's canopy reaches 0.35 past
  * it), and the shortest stretch of awning drawn (m).
@@ -63,9 +60,7 @@ const AWNING_SHORTEST = 0.8;
 /** Flats' windows (and a hall's): bays this far apart (m), this wide, their sill and head over the storey's floor. */
 const FLATS_WINDOWS = [2.4, 1.2, 0.9, 2.3] as const;
 
-const HOMES: ReadonlySet<BuildingUse> = new Set<BuildingUse>(['house', 'terrace', 'farm']);
 const SHOPS: ReadonlySet<BuildingUse> = new Set<BuildingUse>(['shop', 'cafe', 'restaurant']);
-const BOARDED: ReadonlySet<BuildingUse> = new Set<BuildingUse>(['barn', 'workshop']);
 
 /** A number from 0 to 1 for `a`, `b`, `c` (stable). */
 function h(a: number, b: number, c = 0): number {
@@ -242,9 +237,9 @@ class Dresser {
     this.box(t, s, d1 + 0.22, d1 + 0.3, top - 0.1, top + 0.3, 0, 0.6);
   }
 
-  /** Plinth, walls (`walls`, in `colour`) from `base` to `top`, a box `x0`..`x1` along x (the whole depth). */
-  walls(walls: Geo, colour: string, x0: number, x1: number, floor: number, top: number, skip: string): void {
-    walls.color(colour).box(x0, floor + PLINTH, -this.D, x1, top, this.D, `ny py ${skip}`);
+  /** The walls (`walls`, in `colour`) from over the plinth to `top`, round the whole box. */
+  walls(walls: Geo, colour: string, floor: number, top: number): void {
+    walls.color(colour).box(-this.W, floor + PLINTH, -this.D, this.W, top, this.D, 'ny py');
   }
 
   parts(): HousePart[] {
@@ -302,11 +297,11 @@ export function dressBuilding(t: TownBuilding, use: BuildingUse, to: readonly [n
   const storeys = Math.max(1, Math.round((top - floor) / STOREY));
   const front = frontSide(t, to);
   const wall = t.wall;
-  const home = HOMES.has(use);
+  const home = use === 'farm';
   const shop = SHOPS.has(use);
-  const boarded = BOARDED.has(use);
-  // The walls' material and colour: a church's stone, brick where the palette's wall is, boards on homes, barns and
-  // workshops, render on the rest.
+  const boarded = use === 'workshop';
+  // The walls' material and colour: a church's stone, brick where the palette's wall is, boards on a farmhouse and a
+  // workshop, render on the rest.
   const brick = use !== 'church' && brickish(wall);
   const walls = use === 'church' ? d.stone : brick ? d.brick : home || boarded ? d.siding : d.render;
   const colour = use === 'church' ? paler(wall, 0.35) : brick ? paler(wall, 0.82) : hexOf(wall);
@@ -317,15 +312,9 @@ export function dressBuilding(t: TownBuilding, use: BuildingUse, to: readonly [n
   const flat = t.roof === 'flat';
   const wallTop = flat ? top + PARAPET : top;
 
-  // ---- plinth and walls (a terrace's homes each a little different) ----
+  // ---- plinth and walls ----
   d.plinth.box(-W - 0.03, base, -D - 0.03, W + 0.03, floor + PLINTH, D + 0.03, 'ny');
-  const homesIn = use === 'terrace' ? Math.max(1, Math.round((2 * W) / TERRACE_HOME)) : 1;
-  const unit = (2 * W) / homesIn;
-  for (let i = 0; i < homesIn; i++) {
-    const tone = homesIn > 1 ? 0.93 + h(seed, i, 41) * 0.12 : 1;
-    const skip = `${i > 0 ? 'nx' : ''} ${i < homesIn - 1 ? 'px' : ''}`;
-    d.walls(walls, homesIn > 1 ? shade(colour, tone) : colour, -W + i * unit, -W + (i + 1) * unit, floor, wallTop, skip);
-  }
+  d.walls(walls, colour, floor, wallTop);
   walls.color(colour);
 
   // ---- trim: corner boards and a frieze on boards; bands between storeys and a cornice on render, brick and stone ----
@@ -344,11 +333,6 @@ export function dressBuilding(t: TownBuilding, use: BuildingUse, to: readonly [n
     }
     if (!flat) trim.box(-W - 0.05, top - 0.22, -D - 0.05, W + 0.05, top, D + 0.05, 'ny');
   }
-  // Pilasters between a terrace's homes.
-  for (let i = 1; i < homesIn; i++) {
-    const x = -W + i * unit;
-    for (const s of [0, 1] as const) d.box(trim, s, x - 0.08, x + 0.08, floor + PLINTH, top - 0.2, 0, 0.03);
-  }
 
   // ---- doors: where, then the windows round them ----
   const doors: { s: Side; a: number; wide: number; flats?: true }[] = [];
@@ -357,13 +341,7 @@ export function dressBuilding(t: TownBuilding, use: BuildingUse, to: readonly [n
   const along = (p: readonly [number, number]) => ((dx: number, dz: number) => (front < 2 ? dx * t.ux + dz * t.uz : -dx * t.uz + dz * t.ux))(p[0] - t.cx, p[1] - t.cz);
   const own = door && along(door);
   const at = (wide: number, fallback: number, a: number | null = own) => (a === null ? fallback : Math.max(-L + wide / 2 + 0.3, Math.min(L - wide / 2 - 0.3, a)));
-  if (use === 'terrace') {
-    for (let i = 0; i < homesIn; i++) {
-      // (Each home's door at the same end of its frontage, its window beside it; along x on the long sides.)
-      const mid = -W + (i + 0.5) * unit;
-      doors.push({ s: front < 2 ? front : 0, a: mid - unit * 0.22, wide: 1 });
-    }
-  } else if (shop) {
+  if (shop) {
     const a = at(1.1, (h(seed, 13) - 0.5) * Math.max(0, L - 2.2));
     doors.push({ s: front, a, wide: 1.1 });
     if (flats) doors.push({ s: front, a: at(1.1, a > 0 ? -L + 1.2 : L - 1.2, flatsDoor && along(flatsDoor)), wide: 1.1, flats: true });
@@ -397,8 +375,6 @@ export function dressBuilding(t: TownBuilding, use: BuildingUse, to: readonly [n
         d.upstairs = flats && k > 0;
         for (const a of d.bays(s, apart, 0.9)) {
           if (nearDoor(s, a, k, wide / 2)) continue;
-          // (A terrace's party walls keep clear.)
-          if (homesIn > 1 && s < 2 && Array.from({ length: homesIn - 1 }, (_, i) => -W + (i + 1) * unit).some((x) => Math.abs(x - a) < wide / 2 + 0.3)) continue;
           if (home) d.houseWindow(s, a, y + sill, y + head, curtain, shutters, wide);
           else d.plainWindow(s, a, y + sill, y + head, wide);
         }
@@ -487,7 +463,7 @@ export function dressBuilding(t: TownBuilding, use: BuildingUse, to: readonly [n
 
   // ---- the roof ----
   const roof = d.roof.color(roofHex);
-  walls.color(homesIn > 1 ? shade(colour, 0.97) : colour);
+  walls.color(colour);
   if (flat) {
     // A deck behind the parapet, its inner faces, and a coping round its top.
     const i = 0.25;
@@ -512,12 +488,10 @@ export function dressBuilding(t: TownBuilding, use: BuildingUse, to: readonly [n
     addRoof({ x0: -W + WALL_T, z0: -D + WALL_T, x1: W - WALL_T, z1: D - WALL_T }, t.roof === 'hip', roof, d.trim.color(TRIM), walls, top, OVERHANG, t.rise / D, true);
   }
 
-  // ---- chimneys: a home's on some roofs, a stack on each of a terrace's party walls ----
-  if (!flat && (use === 'house' || use === 'farm') && h(seed, 8) < 0.6) {
+  // ---- a chimney on some farmhouses' roofs ----
+  if (!flat && home && h(seed, 8) < 0.6) {
     const x = (h(seed, 9) < 0.5 ? -1 : 1) * Math.max(0, W - 1.1);
     chimney(d, x, D * 0.3, top, top + t.rise * 0.7 + 0.8);
-  } else if (!flat && use === 'terrace') {
-    for (let i = 1; i < homesIn; i++) chimney(d, -W + i * unit, 0, top, top + t.rise + 0.6, 0.9);
   }
 
   // ---- a church's tower and spire at one end ----
@@ -581,8 +555,9 @@ function spire(roof: Geo, cx: number, cz: number, half: number, y0: number, y1: 
   }
 }
 
-/** A brick chimney at (`x`, `z`) from `y0` up to `y1`, `wide` m along x, capped. */
-function chimney(d: Dresser, x: number, z: number, y0: number, y1: number, wide = 0.6): void {
-  d.brick.color('#E8DCD4').box(x - wide / 2, y0, z - 0.25, x + wide / 2, y1, z + 0.25, 'ny');
-  d.plinth.box(x - wide / 2 - 0.06, y1, z - 0.31, x + wide / 2 + 0.06, y1 + 0.1, z + 0.31, 'ny');
+/** A brick chimney at (`x`, `z`) from `y0` up to `y1`, 0.6 m along x, capped. */
+function chimney(d: Dresser, x: number, z: number, y0: number, y1: number): void {
+  const half = 0.3;
+  d.brick.color('#E8DCD4').box(x - half, y0, z - 0.25, x + half, y1, z + 0.25, 'ny');
+  d.plinth.box(x - half - 0.06, y1, z - 0.31, x + half + 0.06, y1 + 0.1, z + 0.31, 'ny');
 }
