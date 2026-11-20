@@ -1,13 +1,13 @@
 <script lang="ts">
   /**
-   * The Lot tool's card: what it puts down (`lotChoice`). A home of a size, with a garden (or as the
-   * world's homes have theirs); a farm; a building of flats; one of the public places a town's lot can be; an outdoor
+   * The Lot tool's card: what it puts down (`lotChoice`). A home: a house of a size, with a garden (or as the
+   * world's homes have theirs), or a building of flats; a farm; one of the public places a town's lot can be; an outdoor
    * spot; or a civic place the town or village under the pointer hasn't got, put down as its
    * building along a street.
    */
   import { publicChoices } from '../../game/edit/lots';
   import Segmented from '../kit/Segmented.svelte';
-  import { civicChosen, civicLacking, lotChoice, outdoorChoices, type HomeSize, type LotGroup } from './lotChoice.svelte';
+  import { civicChosen, civicLacking, lotChoice, outdoorChoices, type HomeKind, type HomeSize, type LotGroup } from './lotChoice.svelte';
   import type { TownEditor } from './tools';
 
   const { editor }: { editor: TownEditor } = $props();
@@ -15,10 +15,13 @@
   const GROUPS: readonly { value: LotGroup; label: string }[] = [
     { value: 'home', label: 'Home' },
     { value: 'farm', label: 'Farm' },
-    { value: 'flats', label: 'Flats' },
     { value: 'public', label: 'Public' },
     { value: 'outdoor', label: 'Outdoor' },
     { value: 'civic', label: 'Civic' },
+  ];
+  const KINDS: readonly { value: HomeKind; label: string }[] = [
+    { value: 'house', label: 'House' },
+    { value: 'flats', label: 'Flats' },
   ];
   const SIZES: readonly { value: HomeSize; label: string }[] = [
     { value: 'small', label: 'Small' },
@@ -44,6 +47,11 @@
 <div class="lot-card">
   <Segmented fill label="What to put down" bind:value={lotChoice.group} options={GROUPS} />
   {#if lotChoice.group === 'home'}
+    <Segmented fill label="Home" bind:value={lotChoice.home} options={KINDS} />
+  {/if}
+  {#if lotChoice.group === 'home' && lotChoice.home === 'flats'}
+    <p class="hint">A building of flats round a stair hall, two or three storeys high (mostly three in a town centre), each flat a home of its own. What it is is said as you point.</p>
+  {:else if lotChoice.group === 'home'}
     <div class="option">
       <span class="eyebrow sub">Size</span>
       <Segmented fill label="Home size" bind:value={lotChoice.size} options={SIZES} />
@@ -54,8 +62,6 @@
     </div>
   {:else if lotChoice.group === 'farm'}
     <p class="hint">A farmhouse with its fields and farmyard. It needs a wide stretch of road, out of the town centre.</p>
-  {:else if lotChoice.group === 'flats'}
-    <p class="hint">A building of flats round a stair hall, two or three storeys high (mostly three in a town centre), each flat a home of its own. Its storeys and flats are shown as you point.</p>
   {:else if lotChoice.group === 'public'}
     <div class="choices" role="radiogroup" aria-label="Public place">
       {#each places as id, i (id)}
