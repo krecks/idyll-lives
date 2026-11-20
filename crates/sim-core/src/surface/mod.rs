@@ -36,12 +36,7 @@ mod hosts;
 mod seating;
 mod types;
 
-pub(crate) use approach::stands_by;
 pub use approach::*;
-pub(crate) use hosts::overlaps;
 pub use hosts::*;
-pub(crate) use hosts::{angle, clutter_on, host_among};
-pub(crate) use seating::faced;
-pub(crate) use seating::tile_of;
 pub use seating::*;
 pub use types::*;
