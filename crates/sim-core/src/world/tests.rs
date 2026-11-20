@@ -683,3 +683,43 @@ fn a_customer_in_the_shop_under_their_flat_is_not_at_home() {
         assert_eq!(seat.is_some(), home, "takes her car to work from {at:?}");
     }
 }
+
+/// Ada's letterbox stands by Mill Court's street door, kept by her flat (`tests/towns/flats.json`,
+/// `ObjectInstance::keeper`). A better one she wants (a brass one, doing all the old one does) is
+/// not swapped in over it, as its place is not the flat's, and the flat has no room outdoors for
+/// it: the purchase fails, and the old letterbox stays where it stood, still the flat's, and the
+/// money with the household.
+#[test]
+fn a_kept_letterbox_stays_when_a_better_one_has_no_room() {
+    let mut content: serde_json::Value = serde_json::from_str(&shipped_content()).unwrap();
+    let objects = content["objects"].as_array_mut().unwrap();
+    let mut brass = objects
+        .iter()
+        .find(|o| o["id"] == "letterbox")
+        .unwrap()
+        .clone();
+    brass["id"] = "letterboxBrass".into();
+    brass["price"] = 300.into();
+    objects.push(brass);
+    let mut w = World::from_json(
+        &content.to_string(),
+        include_str!("../../tests/towns/flats.json"),
+        1,
+    )
+    .unwrap();
+    let flat = w.households[0].plot.unwrap();
+    let kept = |w: &World| {
+        let o = w.objects.iter().find(|o| o.keeper == Some(flat))?;
+        Some((w.content.objects[o.def].id.clone(), o.x, o.z))
+    };
+    let before = kept(&w).expect("Ada's letterbox, kept by her flat");
+    assert_eq!(before.0, "letterbox");
+    assert!(!w.on_plot(flat, before.1, before.2), "outside her flat");
+    let brass = w.content.object_index("letterboxBrass").unwrap();
+    let old = crate::planner::replaces(&w, 0, brass).expect("the brass one does all it does");
+    assert_eq!(w.objects[old as usize].keeper, Some(flat));
+    let funds = w.households[0].funds;
+    assert!(crate::planner::buy_wanted(&mut w, 0, brass).is_err());
+    assert_eq!(kept(&w), Some(before), "the old letterbox where it stood");
+    assert_eq!(w.households[0].funds, funds);
+}
