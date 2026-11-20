@@ -4487,10 +4487,19 @@ impl World {
         let plot = self.households[h]
             .plot
             .filter(|_| self.autonomy && self.households[h].free_will)?;
-        // In a crib at home, with care for what they're crying for.
-        let crib = self.objects.iter().find(|o| {
-            o.users().any(|u| u as usize == b) && self.object_plot[o.id as usize] == Some(plot)
-        })?;
+        // In a crib at home, with care for what they're crying for (of what they hold a place
+        // at, not every object in town: a baby nobody comes for asks this every tick).
+        let crib =
+            held_by(baby, &self.objects).find(|o| self.object_plot[o.id as usize] == Some(plot));
+        debug_assert_eq!(
+            crib.map(|o| o.id),
+            self.objects
+                .iter()
+                .find(|o| o.users().any(|u| u as usize == b)
+                    && self.object_plot[o.id as usize] == Some(plot))
+                .map(|o| o.id)
+        );
+        let crib = crib?;
         let def = &content.objects[crib.def];
         let care = |i: &crate::content::Interaction, below: f32| {
             i.cares() && (0..content.needs.len()).any(|n| i.care[n] > 0.0 && wants(n, below))
