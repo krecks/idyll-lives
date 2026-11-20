@@ -46,6 +46,7 @@ import { game } from '../ui/state.svelte';
 import { plotInfo } from '../ui/place';
 import { BENCH, type BenchCamera, type BenchFlags } from './benchFlags';
 import { gpuInfo, loadState } from './report';
+import { benchTime, type Loaded, type StepRun } from './benchTime';
 
 /** The sun's redraws as the renderer counts them (`benchInfo().scene.sunShadowDraws`). */
 interface SunDraws {
@@ -182,6 +183,21 @@ export interface BenchApi {
   reset(): Promise<void>;
   /** Nothing drawn while `on` (a page kept loaded beside the one measured: `keep.mjs`), or drawing again. */
   idle(on: boolean): void;
+  /**
+   * Bench time (`benchTime.ts`): the game in this page replaced by a game state (its JSON, or a name in `debug-states/`
+   * or `public/bench/`) as Continue opens a save, without a page load; resolves once it is up and settled.
+   */
+  load(state: string, options?: { settle?: boolean }): Promise<Loaded>;
+  /** Fixed-step playback at `ticks` a frame (null: real time again). */
+  step(ticks: number | null): void;
+  /**
+   * Exactly `frames` frames in fixed steps from where the game is, with the pose held (`pose` first): frames drawn
+   * with the clock held until the picture stands still, then each frame's counts. The same state, pose and frames
+   * give the same counts and pictures, however busy the machine.
+   */
+  run(frames: number, options?: { ticks?: number }): Promise<StepRun & { settleFrames: number }>;
+  /** The game's state as it is now (JSON). */
+  state(): Promise<string>;
 }
 
 /**
@@ -312,7 +328,8 @@ class BenchRig {
 
   walls(mode: BenchView['walls']): void {
     this.view.walls = mode;
-    this.controls.setWallMode(mode ?? this.ownWalls);
+    // (The game being played now: `load` may have swapped it.)
+    services.controls.setWallMode(mode ?? this.ownWalls);
   }
 
   /** When the town view's moment near over its spot is over (ms, performance clock; 0: no town view). */
@@ -386,7 +403,7 @@ function sunDraws(renderer: Renderer): SunDraws {
 
 /** `window.__bench` over the bench's camera. */
 function benchApi(camera: BenchRig): BenchApi {
-  const { renderer, controls, flags } = camera;
+  const { renderer, flags } = camera;
   return {
     pose: (pose) => camera.setView(pose),
     hour(hour) {
@@ -397,7 +414,8 @@ function benchApi(camera: BenchRig): BenchApi {
     freeze(on) {
       camera.frozen = on;
       renderer.setFrozen(on);
-      controls.setSpeed(on ? 0 : flags.speed || 1);
+      // (The game being played now: `load` may have swapped it.)
+      services.controls.setSpeed(on ? 0 : flags.speed || 1);
     },
     async settle({ limitMs = SETTLE_LIMIT_MS } = {}) {
       const until = performance.now() + limitMs;
@@ -432,6 +450,7 @@ function benchApi(camera: BenchRig): BenchApi {
     view: () => structuredClone(camera.view),
     release: () => camera.release(),
     idle: (on) => renderer.setActive(!on),
+    ...timeApi(),
     async reset() {
       const f = flags;
       camera.setView({ cam: f.cam, at: f.at, radius: f.orbit.radius, beta: f.orbit.beta, tx: f.orbit.tx, tz: f.orbit.tz, over: f.over, walls: f.walls, townCentre: f.orbit.town });
@@ -461,6 +480,18 @@ export function installDebugBench(renderer: Renderer, controls: GameControls): v
     release: () => camera?.release(),
     reset: async () => camera?.release(),
     idle: (on) => renderer.setActive(!on),
+    ...timeApi(),
+  };
+}
+
+/** `__bench`'s bench time (`benchTime.ts`): a state loaded in the page, frames in fixed steps. */
+function timeApi(): Pick<BenchApi, 'load' | 'step' | 'run' | 'state'> {
+  return {
+    load: (state, options) => benchTime.load(state, options),
+    step: (ticks) => benchTime.step(ticks),
+    // (The pose as `__bench.pose` holds it: settled with the clock held, in frames of the game's time.)
+    run: (frames, options) => benchTime.run(frames, { ticks: options?.ticks, settle: true }),
+    state: () => benchTime.state(),
   };
 }
 

@@ -83,6 +83,15 @@ let stopped = false;
 let panicNext = false;
 /** Sim steps run so far: published with each snapshot (the renderer's clock counts steps, not snapshots). */
 let simSteps = 0;
+/**
+ * Fixed-step playback (`pace`): the worker's clock is stopped and ticks run only as `advance` asks, each one a step
+ * of its own; what they change goes out with them, not by the wall clock, so the same asks give the same messages.
+ */
+let framePaced = false;
+/** Ticks run by `advance` since the last UI view: one goes out every `PACED_UI_TICKS` of them. */
+let pacedTicks = 0;
+/** Fixed-step playback's UI view, every this many ticks (a tenth of a second of the game's time at normal speed, as `UI_INTERVAL_MS`). */
+const PACED_UI_TICKS = 6;
 
 scope.__wasmPanic = (message) => {
   panicked = message;
@@ -143,6 +152,11 @@ scope.onmessage = (e) => {
     } else if (msg.type === 'waterMask' && game) {
       const mask = JSON.parse(game.water_mask()) as { water: number[]; width: number; depth: number };
       scope.postMessage({ type: 'waterMask', requestId: msg.requestId, ...mask });
+    } else if (msg.type === 'pace') {
+      framePaced = msg.frames;
+      pacedTicks = 0;
+    } else if (msg.type === 'advance' && game) {
+      scope.postMessage({ type: 'advanced', requestId: msg.requestId, ticks: advance(game, msg.ticks) });
     } else if (msg.type === 'command' && game) {
       game.command(JSON.stringify(msg.command));
       // (What the player did shows at once.)
@@ -251,6 +265,19 @@ function runLoop(stepMs: number): void {
   const superMs = stepMs * SUPER_SHARE;
   const step = () => {
     if (stopped) return;
+    // (Fixed-step playback: `advance` runs the ticks; the clock only waits to go on again, and says once a second
+    // that the worker is there, as its stats do: the main thread takes a long silence for a hang.)
+    if (framePaced) {
+      const now = performance.now();
+      if (now - lastStats >= STATS_INTERVAL_MS) {
+        scope.postMessage({ type: 'stats', stats: { stepsPerSecond: 0, targetPerSecond: 1000 / stepMs, ticksPerSecond: 0, stepMs: 0, stepMaxMs: 0, busy: 0, memoryBytes: memory.buffer.byteLength } });
+        lastStats = now;
+        steps = ticks = busyMs = maxMs = 0;
+      }
+      next = now + stepMs;
+      setTimeout(step, stepMs);
+      return;
+    }
     const start = performance.now();
     let now: number;
     try {
@@ -299,6 +326,29 @@ function runLoop(stepMs: number): void {
     setTimeout(step, Math.max(0, next - now));
   };
   setTimeout(step, stepMs);
+}
+
+/**
+ * Fixed-step playback's ticks (`advance`): `ticks` of them, a step each at normal speed (at a faster one, its steps'
+ * ticks, which should divide `ticks`), then the snapshot and everything they changed sent at once, and a UI view
+ * every `PACED_UI_TICKS`. The ticks run: fewer once the game is paused (a step that runs none ends it).
+ */
+function advance(g: Game, ticks: number): number {
+  let ran = 0;
+  while (ran < ticks) {
+    const t = g.start_step();
+    g.end_step();
+    if (t === 0) break;
+    ran += t;
+    simSteps += t;
+  }
+  publish(true);
+  pacedTicks += ran;
+  if (pacedTicks >= PACED_UI_TICKS) {
+    pacedTicks %= PACED_UI_TICKS;
+    postUi();
+  }
+  return ran;
 }
 
 /** `now`: send what changed at once (a command's effect, the first world), not waiting for `WORLD_INTERVAL_MS`. */

@@ -354,6 +354,11 @@ class GameHost {
     game.reset();
   }
 
+  /** The game being played (made live by `start`), if any. */
+  get session(): GameSession | null {
+    return this.played;
+  }
+
   /** The game being played can still be saved (its simulation runs). */
   get canSave(): boolean {
     return !!this.played?.alive;

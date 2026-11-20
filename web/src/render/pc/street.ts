@@ -47,6 +47,7 @@ import { surfaceOf } from '../shared/landSurface';
 import type { BuiltSurface } from '../shared/builtSurface';
 import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
 import { LOW_MEMORY } from '../../settings/lowMemory';
+import { frameNow } from '../shared/frameClock';
 
 export interface StreetOptions {
   /** Layer ids of everything this street draws (default: the world layer). */
@@ -753,8 +754,8 @@ export class Street {
 
   /** The groups' window glass drawn again where it changed, at most once a second (`WINDOWS_EVERY_MS`); true when it was. */
   private flushWindows(): boolean {
-    if (!this.windowsDue || performance.now() - this.windowsDrawn < WINDOWS_EVERY_MS) return false;
-    this.windowsDrawn = performance.now();
+    if (!this.windowsDue || frameNow() - this.windowsDrawn < WINDOWS_EVERY_MS) return false;
+    this.windowsDrawn = frameNow();
     this.windowsDue = false;
     for (const [id, g] of this.groups) if (g.windowsDue) this.drawWindows(id, g);
     return true;
@@ -1012,7 +1013,7 @@ export class Street {
       }
     }
     for (const [gid, g] of this.groups) if (g.windowsDue) this.drawWindows(gid, g);
-    this.windowsDrawn = performance.now();
+    this.windowsDrawn = frameNow();
   }
 
   /** A group's neighbours' glass again: those with someone up in one mesh, glowing; the rest in another, dark. */

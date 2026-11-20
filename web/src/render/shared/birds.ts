@@ -53,6 +53,7 @@ import { compose, multiply, quatYawPitchRoll, rotationX, rotationZ, scaling, tra
 import { entrySpace, placementVariation } from './modelEntry';
 import { bareTiles, hash, mulberry32, smoothstep, windDirection, type PlantPlacement } from './nature';
 import { WALL_HEIGHT } from './walls';
+import { frameRandom } from './frameClock';
 
 export type BirdSpecies = 'blueTit' | 'chaffinch' | 'warbler' | 'blackbird' | 'collaredDove';
 
@@ -457,8 +458,8 @@ export interface BirdView<L extends BirdLook> {
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const between = (r: () => number, [a, b]: readonly [number, number]) => a + r() * (b - a);
-/** `Math.random`, looked up at each call (a test fixing it after this module loaded still fixes the birds). */
-const rnd = () => Math.random();
+/** `Math.random`, looked up at each call (a test fixing it after this module loaded still fixes the birds); fixed-step playback's own dice then (`frameRandom`). */
+const rnd = () => frameRandom();
 /** A number fixed by a place (to a tenth of a metre). */
 const placeHash = (x: number, z: number, salt: number) => hash(Math.round(x * 10), Math.round(z * 10), salt);
 /** Randoms from a seed in 0..1. */
@@ -508,6 +509,12 @@ export class Birds<L extends BirdLook = BirdLook> {
   private depth = 0;
   private clock = 0;
   private frame = 0;
+
+  /** Fixed-step playback: the birds' clock back to 0. */
+  restartClock(): void {
+    this.clock = 0;
+    this.frame = 0;
+  }
   /** Birds' seconds per real second now (`RATE`), and a slow-motion factor for checks (`?debug`'s `__birdTime`). */
   private rate = 1;
   timeScale = 1;

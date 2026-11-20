@@ -11,6 +11,9 @@
  *
  * The renderer asks it for frames as it would ask `requestAnimationFrame`, and it keeps the
  * timestamp of the refresh being drawn (`frameTime`) for the game's clocks. `pacingDivisor` is pure.
+ *
+ * Frames on demand (`manual`, fixed-step playback): no refresh is asked for, and the frame asked for is drawn when
+ * `release` says, at the time it gives, as fast as the steps come.
  */
 
 /** A cap may round up this much (60 is 72 on 144 Hz, rather than 48). */
@@ -64,6 +67,8 @@ export class FramePacer {
   private readonly gaps = new Float64Array(SAMPLES);
   private readonly sorted = new Float64Array(SAMPLES);
   private gapCount = 0;
+  /** Frames on demand (`manual`): drawn by `release`, never at a refresh. */
+  private onDemand = false;
 
   /** Frames per second at most (0: every refresh). */
   setCap(fps: number): void {
@@ -80,9 +85,31 @@ export class FramePacer {
 
   readonly requestAnimationFrame = (fn: (time: number) => void): number => {
     this.callback = fn;
+    if (this.onDemand) return 1;
     if (!this.raf) this.raf = requestAnimationFrame(this.tick);
     return this.raf;
   };
+
+  /** Frames on demand (true): the refresh asked for is let go, and the frame waits for `release`; false: at the refreshes again. */
+  manual(on: boolean): void {
+    if (on === this.onDemand) return;
+    this.onDemand = on;
+    if (on) {
+      if (this.raf) cancelAnimationFrame(this.raf);
+      this.raf = 0;
+      this.lastTick = 0;
+    } else if (this.callback && !this.raf) this.raf = requestAnimationFrame(this.tick);
+  }
+
+  /** Frames on demand: draws the frame asked for now, at `time` (ms). False when none was asked for (the loop stopped). */
+  release(time: number): boolean {
+    const fn = this.callback;
+    if (!this.onDemand || !fn) return false;
+    this.callback = null;
+    this.lastDrawn = this.frameTime = time;
+    fn(time);
+    return true;
+  }
 
   readonly cancelAnimationFrame = (): void => {
     this.callback = null;

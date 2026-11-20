@@ -164,6 +164,11 @@ export interface FrameCounts {
   gpuMs: number;
   /** Posing the residents (`RenderStats.residentsMs`). */
   residentsMs: number;
+  /**
+   * The sun's map drawn so far (`SunShadows.draws`, read in place): with the still casters' picture drawn again
+   * (`whole`), over it with only what moves (`moving`), and why the picture was drawn again, by the check that failed.
+   */
+  sunShadows: { readonly whole: number; readonly moving: number; readonly why: Readonly<Record<string, number>> };
 }
 
 /** A render pass of a frame (benchmark reports: pixels × samples × bytes is the memory traffic it causes). */
@@ -640,6 +645,21 @@ export interface Renderer {
   memoryCensus(): MemoryCensus | null;
   /** Benchmark: hooks around every drawn frame (null: none). */
   setFrameProbe(probe: FrameProbe | null): void;
+  /** Benchmark: the hooks set now (one wrapping them hands on to them). */
+  frameProbe(): FrameProbe | null;
+  /**
+   * Fixed-step playback (benchmarks): frames are drawn only as `drawFrame` asks, each at the time it gives (the
+   * game's clock, not the wall's), as fast as they are asked for; false: at the display's refreshes again.
+   */
+  framesOnDemand(on: boolean): void;
+  /** Fixed-step playback: draws the next frame now, at `time` (ms). False when none was drawn (the loop stopped, a menu covers the view). */
+  drawFrame(time: number): boolean;
+  /**
+   * Fixed-step playback: the residents and the birds set up afresh from the world drawn, as a page's first build sets
+   * them up (what each resident was in the middle of, its clips and their times, goes; the birds perch anew from the
+   * playback's own dice), so a run starts alike however the frames before it went.
+   */
+  restartLife(): Promise<void>;
   /** Measures GPU time (`RenderStats.gpuMs`) while the overlay or the benchmark asks for it. */
   measureGpu(on: boolean, who?: 'overlay' | 'bench'): void;
   /** Benchmark: per-pass GPU times (ms per frame, WebGPU only, while measured; empty otherwise); `reset` starts them over. */
