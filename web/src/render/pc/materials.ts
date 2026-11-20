@@ -373,6 +373,7 @@ export class MaterialLibrary {
   private readonly lit = new Set<pc.StandardMaterial>();
   private readonly dug = new WeakSet<pc.Material>();
   private readonly instanced = new WeakMap<pc.StandardMaterial, pc.StandardMaterial>();
+  private readonly whiteTinted = new WeakMap<pc.StandardMaterial, pc.StandardMaterial>();
   /** Emissive glows as last set (linear), to pass on only changes one could see. */
   private readonly glows = new WeakMap<pc.StandardMaterial, pc.Color>();
   private shadowMaterials: [pc.StandardMaterial | null, pc.StandardMaterial | null] = [null, null];
@@ -570,17 +571,20 @@ export class MaterialLibrary {
   /**
    * `material` for instanced draws with a per-instance colour (`INSTANCE_COLOR_SEMANTIC`, see
    * `instancing.ts`): a copy, kept per material, that multiplies its albedo by the instance's colour
-   * (converted from sRGB where the material converts vertex colours).
+   * (converted from sRGB where the material converts vertex colours). `white`: only where the vertex colour is
+   * pure white (`GAME_TINT_WHITE`: a parked car's paint, `shared/cars.ts` `TINT_PAINT`), the rest as it is.
    */
-  instanceColored(material: pc.StandardMaterial): pc.StandardMaterial {
-    let copy = this.instanced.get(material);
+  instanceColored(material: pc.StandardMaterial, white = false): pc.StandardMaterial {
+    const copies = white ? this.whiteTinted : this.instanced;
+    let copy = copies.get(material);
     if (!copy) {
       copy = material.clone();
-      copy.name = `${material.name}|instanceColor`;
+      copy.name = `${material.name}|${white ? 'tintWhite' : 'instanceColor'}`;
       copy.setAttribute('game_instanceColor', INSTANCE_COLOR_SEMANTIC);
       copy.setDefine('GAME_INSTANCE_COLOR', '');
+      if (white) copy.setDefine('GAME_TINT_WHITE', '');
       copy.update();
-      this.instanced.set(material, copy);
+      copies.set(material, copy);
       if (this.lit.has(material)) this.lit.add(copy);
       const cutout = this.cutouts.get(material);
       if (cutout !== undefined) this.cutouts.set(copy, cutout);
