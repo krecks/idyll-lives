@@ -7,8 +7,9 @@
  * ground is hidden then), and while it's outside the chunks streamed in or far off (`setView`).
  *
  * Drawn in as few draws as will do: the parked ones with their doors shut one instanced draw per
- * body, paint and age (a mesh each, shared); those driving, or with a door open, an entity of their own
- * (the body, tilted a little as it speeds up and slows down, and its four doors on their hinges,
+ * body and age, whatever their paint (a mesh each, shared, painted white and each copy tinted to its
+ * car's paint: `shared/cars.ts` `TINT_PAINT`, `carPaintColour`; the taxis one of their own); those
+ * driving, or with a door open, an entity of their own (the body, tilted a little as it speeds up and slows down, and its four doors on their hinges,
  * drawn in one piece with it while they're all shut); every car's wheels one instanced draw (they
  * turn as it goes and the front ones steer: `paintWheel`), and their soft contact shadows another.
  * A door swings open while someone gets in or out by it, and shut after (`DOOR_SECONDS`, in game
@@ -21,13 +22,13 @@
  */
 
 import * as pc from './engine';
-import type { Instances } from './instancing';
+import { INSTANCE_COLOR, type Instances } from './instancing';
 import { drawMesh } from './meshes';
 import { LIFT, rollWheels, Vehicles } from './vehicles';
 import type { FrameState } from '../../core/bridge';
 import type { Seat } from '../shared/characters/seats';
 import type { WorldStructure } from '../../core/protocol';
-import { CARS, CAR_PAINT, TAXI_PAINT, carAge, carDoor, carriedAlong, carRowIsTaxi, DOOR_OPEN, DOORS, doorSwing, inCar, paintCar, paintDoor, paintTaxi, paintTaxiDoor, TAXI_BODY, wheelAt, type CarAge, type CarAt, type CarBody, type CarPose } from '../shared/cars';
+import { CARS, CAR_PAINT, TAXI_PAINT, TINT_PAINT, carAge, carDoor, carPaintColour, carriedAlong, carRowIsTaxi, DOOR_OPEN, DOORS, doorSwing, inCar, paintCar, paintDoor, paintTaxi, paintTaxiDoor, TAXI_BODY, wheelAt, type CarAge, type CarAt, type CarBody, type CarPose } from '../shared/cars';
 import { lerpAngle } from '../shared/characters/rig';
 import { DOOR_SWING, ease } from '../shared/doors';
 import { Geo } from '../shared/geometry';
@@ -79,8 +80,11 @@ interface Drawn {
   /** A work taxi (its look the taxi's: `paintTaxi`), else a household's car (`body`, `paint`). */
   taxi: boolean;
   shape: CarBody;
-  /** Its body, paint and age (`body paint age`, or `taxi`): the instanced draw it's in while parked. */
+  /** Its body, paint and age (`body paint age`, or `taxi`): its own entity's meshes, shared by the cars that look alike. */
   look: string;
+  /** Its body and age (`body age`, or `taxi`): the instanced draw it's in while parked, and its paint there (`tintOf`). */
+  parkedLook: string;
+  tint: readonly number[];
   body: number;
   paint: number;
   age: CarAge;
@@ -115,9 +119,11 @@ interface Drawn {
   speed: number;
 }
 
-/** The parked cars of a look (body, paint and age), one instanced draw. */
+/** The parked cars of a body and age (each tinted to its paint) or the taxis, one instanced draw. */
 interface Parked {
   draw: Instances;
+  /** Its copies carry their cars' paint (`INSTANCE_COLOR`): not the taxis'. */
+  tinted: boolean;
   /** Its cars changed (or one moved): its copies are written again. */
   dirty: boolean;
 }
@@ -133,7 +139,7 @@ export class Cars extends Vehicles {
    * casters' picture is drawn again. A car that only drove is `moved` alone (its own entity is a mover: `movingCasters`).
    */
   stillMoved = false;
-  /** The parked cars by look (their body meshes, by body, paint and age, shared by the cars of a build that look alike). */
+  /** The parked cars' draws by body and age (`parkedLook`; their meshes shared by the cars of a build alike). */
   private readonly parked = new Map<string, Parked>();
   /** The parked draws by their mesh instance (`castKey`). */
   private readonly parkedDraws = new Map<pc.MeshInstance, Instances>();
@@ -163,6 +169,9 @@ export class Cars extends Vehicles {
       this.cars.push(drawnCar(row, false, body, info.paint % CAR_PAINT.length, age, info.x, info.z, info.yaw));
     });
     this.scanned = list.length;
+    // Each body and age's parked draw made now, not when its first car parks in view: the warm-up draws them, the
+    // tinted paint's shaders made then (the sun's map's too), so a car parking in play makes none.
+    for (const car of this.cars) this.parkedFor(car);
     this.ensureAround('car', list.length, 0.55);
     this.around = true;
   }
@@ -408,12 +417,14 @@ export class Cars extends Vehicles {
       if (!p.dirty) continue;
       p.dirty = false;
       let n = 0;
-      for (const car of this.cars) if (car.look === look && car.drawn && !car.owned) n++;
+      for (const car of this.cars) if (car.parkedLook === look && car.drawn && !car.owned) n++;
       p.draw.setCount(n);
       n = 0;
       for (const car of this.cars) {
-        if (car.look !== look || !car.drawn || car.owned) continue;
-        p.draw.setMatrix(n++, this.carMatrix(car.at, car.shape));
+        if (car.parkedLook !== look || !car.drawn || car.owned) continue;
+        p.draw.setMatrix(n, this.carMatrix(car.at, car.shape));
+        if (p.tinted) p.draw.set(INSTANCE_COLOR, n, car.tint);
+        n++;
       }
       p.draw.update();
       p.draw.enabled = n > 0;
@@ -526,14 +537,26 @@ export class Cars extends Vehicles {
     });
   }
 
-  /** The parked draw for a car's look (made the first time a car of it parks in view; null: its body has no mesh). */
+  /**
+   * The parked draw for a car's body and age, or the taxis' (made the first time it's asked for; null: its body has no
+   * mesh): a household's car's body painted white (`TINT_PAINT`), each copy tinted to its car's paint.
+   */
   private parkedFor(car: Drawn): Parked | null {
-    let p = this.parked.get(car.look);
+    let p = this.parked.get(car.parkedLook);
     if (!p) {
-      const mesh = this.wholeMesh(car);
+      const tinted = !car.taxi;
+      const mesh = tinted
+        ? this.mesh(`parked ${car.parkedLook}`, () => {
+            const painter = new Painter(new Geo());
+            paintCar(painter.at(0, 0, 0, LIFT), car.shape, TINT_PAINT, false, false, car.age);
+            return painter.geo;
+          })
+        : this.wholeMesh(car);
       if (!mesh) return null;
-      this.parked.set(car.look, (p = { draw: this.instanced('carsParked', mesh, this.lib.plainFinish(), this.shadows, 4), dirty: true }));
-      this.parkedDraws.set(p.draw.meshInstance, p.draw);
+      const material = tinted ? this.lib.instanceColored(this.lib.plainFinish(), true) : this.lib.plainFinish();
+      const draw = this.instanced('carsParked', mesh, material, this.shadows, 4, tinted ? [INSTANCE_COLOR] : []);
+      this.parked.set(car.parkedLook, (p = { draw, tinted, dirty: true }));
+      this.parkedDraws.set(draw.meshInstance, draw);
     }
     return p;
   }
@@ -545,6 +568,22 @@ function placeOf(car: Drawn): CarAt {
   return { x: car.at.x, z: car.at.z, yaw: car.at.yaw, len: car.shape.len, wid: car.shape.wid };
 }
 
+/** Each paint at each age as a parked car's copy has it (`tintOf`), by `paint age`, worked out once. */
+const TINTS = new Map<string, readonly number[]>();
+/** The taxis' copies: untinted. */
+const UNTINTED = [1, 1, 1, 1] as const;
+
+/** A household's car's paint (`CAR_PAINT` index) at its age as its parked copy's colour (`carPaintColour`: sRGB 0..1, opaque). */
+function tintOf(paint: number, age: CarAge): readonly number[] {
+  const key = `${paint} ${age}`;
+  let tint = TINTS.get(key);
+  if (!tint) {
+    const v = parseInt(carPaintColour(CAR_PAINT[paint], age).slice(1), 16);
+    TINTS.set(key, (tint = [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255, 1]));
+  }
+  return tint;
+}
+
 /** A car to draw: row `row` of the snapshot's cars, a household's (`body`, `paint`, `age`) or a work taxi, where it first stands. */
 function drawnCar(row: number, taxi: boolean, body: number, paint: number, age: CarAge, x: number, z: number, yaw: number): Drawn {
   const shape = CARS[body];
@@ -553,6 +592,8 @@ function drawnCar(row: number, taxi: boolean, body: number, paint: number, age: 
     taxi,
     shape,
     look: taxi ? 'taxi' : `${body} ${paint} ${age}`,
+    parkedLook: taxi ? 'taxi' : `${body} ${age}`,
+    tint: taxi ? UNTINTED : tintOf(paint, age),
     body,
     paint,
     age,

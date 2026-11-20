@@ -6,7 +6,7 @@
  */
 
 import * as pc from './engine';
-import { Instances } from './instancing';
+import { Instances, type InstanceStream } from './instancing';
 import { MaterialLibrary } from './materials';
 import { meshFrom } from './meshes';
 import { paintWheel } from '../shared/cars';
@@ -257,9 +257,9 @@ export abstract class Vehicles {
     this.meshes.clear();
   }
 
-  /** An instanced draw of `mesh` under the root, out of the house's lamps. */
-  protected instanced(name: string, mesh: pc.Mesh, material: pc.Material, castShadows: boolean, capacity: number): Instances {
-    const draw = new Instances(this.app.graphicsDevice, this.root, mesh, material, { name, castShadows, capacity: Math.max(1, capacity) });
+  /** An instanced draw of `mesh` under the root, out of the house's lamps (`streams` beside each copy's matrix: `instancing.ts`). */
+  protected instanced(name: string, mesh: pc.Mesh, material: pc.Material, castShadows: boolean, capacity: number, streams: readonly InstanceStream[] = []): Instances {
+    const draw = new Instances(this.app.graphicsDevice, this.root, mesh, material, { name, castShadows, capacity: Math.max(1, capacity), streams });
     this.lib.excludeFromLights([], [draw.meshInstance]);
     draw.enabled = false;
     return draw;

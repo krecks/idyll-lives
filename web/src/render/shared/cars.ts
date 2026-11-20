@@ -168,9 +168,21 @@ function mix(hex: string, withHex: string, t: number): string {
   return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
+/**
+ * The paint a body is painted in to be tinted copy by copy (`pc/cars.ts`: the parked cars of a body and age are one draw,
+ * each car's paint its copy's colour, `carPaintColour`): white, never faded (an old car's fade is in its colour). No
+ * other part of a car is pure white, so the tint goes on the paint alone (`GAME_TINT_WHITE`, `pc/shaders/surface.ts`).
+ */
+export const TINT_PAINT = '#FFFFFF';
+
 /** A car's paint as its age shows it: its colour and roughness. */
 function aged(paint: string, age: CarAge): [string, number] {
-  return [age === 0 ? mix(paint, FADED, FADE) : paint, AGE_GLOSS[age] ?? AGE_GLOSS[1]];
+  return [age === 0 && paint !== TINT_PAINT ? mix(paint, FADED, FADE) : paint, AGE_GLOSS[age] ?? AGE_GLOSS[1]];
+}
+
+/** A car's paint (`CAR_PAINT`, sRGB) as its age shows it: the colour `paintCar` paints its body in, a parked one's tint. */
+export function carPaintColour(paint: string, age: CarAge): string {
+  return aged(paint, age)[0];
 }
 
 /** Doors (as sim-core `cars::DOORS`): 0 front left (the driver's, on the car's +x side), 1 front right, 2 back left, 3 back right. */
