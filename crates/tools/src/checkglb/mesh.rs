@@ -171,7 +171,8 @@ fn uses(motions: &J) -> Vec<(String, J)> {
 }
 
 /// The `motions` kinds naming one clip each (`played`; `cargo review`'s motions column).
-pub(crate) const CLIP_KINDS: [&str; 7] = ["open", "idle", "night", "growth", "ride", "running", "burn"];
+pub(crate) const CLIP_KINDS: [&str; 7] =
+    ["open", "idle", "night", "growth", "ride", "running", "burn"];
 
 /// {clip: what plays it} for an entry's `motions` (in the order they're first named): `uses`, `loops`,
 /// `open`, `idle`, `night`, `growth`, `ride` (the clip whose part carries its users), `running` (round and
