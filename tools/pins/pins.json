@@ -85,10 +85,10 @@
     },
     {
       "name": "sim-planner",
-      "file": "crates/sim-core/src/planner.rs",
-      "sha256": "42601b843ee9b66052a94abd7ff6d3e791bfef20b7aa631b41f8c12017b41f87",
+      "file": "crates/sim-core/src/planner/mod.rs",
+      "sha256": "c71571fdf286ceb3797dcf7c3b438c1d35ddbd0e8b814f50d9b79b3836d1516b",
       "by": "setup",
-      "reason": "household behaviour: not this run's to change"
+      "reason": "split into planner/ (mod, model, update, goals, purchases, factors, parse); behaviour unchanged"
     },
     {
       "name": "sim-lifecycle",
@@ -133,6 +133,48 @@
       "by": "setup",
       "reason": "the contract's shared town view state",
       "region": "living-town-view"
+    },
+    {
+      "name": "sim-planner-model",
+      "file": "crates/sim-core/src/planner/model.rs",
+      "sha256": "2d6f6633f5cc7e5ca1a8dfc667bc733fe2295a3598b8a0459ff9762bea16875d",
+      "by": "refactor",
+      "reason": "split out of planner.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-planner-update",
+      "file": "crates/sim-core/src/planner/update.rs",
+      "sha256": "a65ef0445f45c27061f7cd33d54e3fcb8b050519c9fc1835ce8acdd9da56a7e3",
+      "by": "refactor",
+      "reason": "split out of planner.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-planner-goals",
+      "file": "crates/sim-core/src/planner/goals.rs",
+      "sha256": "567d77edbd99fb09c742c4c36596c7ac44f19b2fa43c726f9e6562059ecfc22f",
+      "by": "refactor",
+      "reason": "split out of planner.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-planner-purchases",
+      "file": "crates/sim-core/src/planner/purchases.rs",
+      "sha256": "079353a1791ef687112517706fcf4f283a7c7d1f767a5b8c1df53b7e4008fa02",
+      "by": "refactor",
+      "reason": "split out of planner.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-planner-factors",
+      "file": "crates/sim-core/src/planner/factors.rs",
+      "sha256": "9bc960cf9735cdc96e1eea72c909fb85d6971f43818c6eeac2ec603acb4bee48",
+      "by": "refactor",
+      "reason": "split out of planner.rs; behaviour unchanged"
+    },
+    {
+      "name": "sim-planner-parse",
+      "file": "crates/sim-core/src/planner/parse.rs",
+      "sha256": "c97c57b13b254a7d10e6213aaf79791b7c3bccb5518e3ea0b18fa80b0fb75fae",
+      "by": "refactor",
+      "reason": "split out of planner.rs; behaviour unchanged"
     }
   ]
 }
