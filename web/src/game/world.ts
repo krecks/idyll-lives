@@ -862,22 +862,17 @@ export const TOWN_SIZES: readonly TownSize[] = ['hamlet', 'village', 'town', 'ci
 const TOWN_LOTS: [number, number] = [66, 84];
 
 /**
- * How big a main town of `homes` homes is: the biggest size whose fewest homes it has, a size's fewest halfway
- * between the most the size below it lays (its lots and terraced houses: `SIZES`) and the fewest it lays itself.
- * (Laid by the generator, a main town of each size measured 11–38, 57–78, 122–179 and 193–230 homes over three
- * places and two seeds, 2026-11-17: each its own size or below.)
+ * The fewest homes (its houses' lots, the dense pass's terraced houses and homes on tight gardens among them) a
+ * main town of each size has by its homes (`sizeByHomes`): a few more than the most the size below lays. Laid by
+ * the generator, a main town of each size measured 28–74, 48–115, 71–191 and 123–257 homes over the nine places
+ * and six seeds, 2026-11-20. The sizes overlap since the dense pass lays homes where the backdrop stood: a main
+ * town is its place's size first (`places.ts` `draftAreaSize`), and its homes only ever make it bigger.
  */
+const GROWN_FROM: Record<TownSize, number> = { hamlet: 0, village: 80, town: 120, city: 200 };
+
+/** How big a main town of `homes` homes is: the biggest size whose fewest homes it has (`GROWN_FROM`), so a town the generator laid is its own size or below. */
 export function sizeByHomes(homes: number): TownSize {
-  const span = (size: TownSize): [number, number] => {
-    const [lots, terraces] = [SIZES[size].lots ?? TOWN_LOTS, SIZES[size].terraces];
-    return [lots[0] + terraces[0], lots[1] + terraces[1]];
-  };
-  let out: TownSize = 'hamlet';
-  for (let k = 1; k < TOWN_SIZES.length; k++) {
-    const least = (span(TOWN_SIZES[k - 1])[1] + span(TOWN_SIZES[k])[0]) / 2;
-    if (homes >= least) out = TOWN_SIZES[k];
-  }
-  return out;
+  return TOWN_SIZES.reduce<TownSize>((out, size) => (homes >= GROWN_FROM[size] ? size : out), 'hamlet');
 }
 
 /** The land a new world has (m, both ways) by its size (`WorldOptions.size`). */
