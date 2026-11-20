@@ -1,4 +1,4 @@
-//! [(1720, 1928)]
+//! Buying, upgrading, repairing and selling objects, and the build rules (land prices, styles).
 
 use super::*;
 

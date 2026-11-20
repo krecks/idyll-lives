@@ -1,4 +1,4 @@
-//! [(1576, 1691)]
+//! Rent and bills, schedule windows, visits, offers and doors.
 
 use super::*;
 

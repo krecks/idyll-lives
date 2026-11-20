@@ -1,4 +1,4 @@
-//! [(456, 511), (1105, 1161), (1417, 1521), (2909, 2936)]
+//! Feelings, actions, the phone and its contacts, relationships, and the social options.
 
 use super::*;
 

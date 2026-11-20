@@ -1,4 +1,4 @@
-//! [(1239, 1269), (1692, 1719)]
+//! Traits, perks, genders and the character rules.
 
 use super::*;
 

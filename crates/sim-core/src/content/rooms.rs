@@ -1,4 +1,4 @@
-//! [(1101, 1238)]
+//! Room kinds, room rules, cleaning, and the modifiers a room gives.
 
 use super::*;
 

@@ -1,4 +1,4 @@
-//! [(61, 70), (616, 1104), (2661, 2908)]
+//! The UI state sent each frame: events, what changed since the last send, and the plots.
 
 use super::*;
 

@@ -1,4 +1,4 @@
-//! [(1270, 1465)]
+//! Careers, their levels, grades and categories, the job market, cars by job, and skills.
 
 use super::*;
 

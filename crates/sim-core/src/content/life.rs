@@ -1,4 +1,4 @@
-//! [(846, 1100)]
+//! Life rules: accidents, children, school, newcomers, moving, death, grief and life stages.
 
 use super::*;
 

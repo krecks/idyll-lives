@@ -1,4 +1,4 @@
-//! [(2065, 3486)]
+//! The content file's raw JSON shapes and the serde defaults they share.
 
 use super::*;
 

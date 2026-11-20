@@ -1,4 +1,4 @@
-//! [(1522, 1631), (1680, 1903), (1908, 2334), (2335, 2660)]
+//! The town's view: trips and rides, structures and junctions, cars, walls, objects and plots.
 
 use super::*;
 

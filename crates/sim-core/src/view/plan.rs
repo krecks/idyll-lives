@@ -1,4 +1,4 @@
-//! [(71, 455), (1162, 1416), (1632, 1679)]
+//! A household's funds, routine, goals, plans and purchases, and a resident's job.
 
 use super::*;
 

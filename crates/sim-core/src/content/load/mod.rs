@@ -1,4 +1,4 @@
-//! [(3487, 6446)]
+//! `Content::from_json`: the raw content checked and turned into definitions.
 
 use super::*;
 

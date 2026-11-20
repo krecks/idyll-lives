@@ -1,4 +1,4 @@
-//! [(1466, 1575)]
+//! The day's rhythm: sleep and waking, babies waking, work breaks and habits.
 
 use super::*;
 

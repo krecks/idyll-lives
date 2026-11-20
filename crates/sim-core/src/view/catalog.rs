@@ -1,4 +1,4 @@
-//! [(2937, 3123)]
+//! The catalog view: grades, careers, the workweek, and the object and build rules.
 
 use super::*;
 

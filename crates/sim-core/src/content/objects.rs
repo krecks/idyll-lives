@@ -1,4 +1,4 @@
-//! [(58, 845)]
+//! Object definitions: needs, interactions, poses, vehicles, slots and surfaces.
 
 use super::*;
 
