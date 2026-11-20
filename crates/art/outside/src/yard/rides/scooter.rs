@@ -1,6 +1,13 @@
 //! The child's scooter and the electric scooter.
 
-use super::*;
+use crate::yard::common::{F, M, arc_points, board};
+use artkit::far::{is_low, low};
+use artkit::forms::rounded_rect;
+use artkit::math::{P3, cosd, sind};
+use artkit::parts::{Settle, join, join_all, new_parts, numbered, settle_with};
+use artkit::place::Facing;
+use artkit::scene::{Obj, meshes};
+use artkit::{fbox, fcyl, fextrude, fsweep, revolve, soft, torus};
 
 // The e-scooter: a low deck between two small solid wheels, a raked stem from the front up to T-bars.
 const SC_R: f64 = 0.105; // its wheels' radius

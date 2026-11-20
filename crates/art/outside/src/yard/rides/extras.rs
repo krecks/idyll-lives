@@ -1,6 +1,13 @@
 //! What each kind of bike adds to the shape: stands, racks, baskets and motors.
 
 use super::*;
+use crate::yard::common::{F, M, bent, board, rod};
+use crate::yard::play::Bike;
+use artkit::far::{is_low, low};
+use artkit::forms::rounded_rect;
+use artkit::math::{cosd, pow, sind};
+use artkit::parts::numbered;
+use artkit::{fbox, fcyl, fextrude, fsweep, loft, ring, torus};
 
 /// The city bike's own things: a chain guard, a wicker basket on the bars with a lamp, a carrier with a red
 /// light, the centre stand's plate.

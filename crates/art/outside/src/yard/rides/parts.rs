@@ -1,6 +1,10 @@
 //! The parts every bike shares: the bottom bracket, the spindle and the chain line.
 
-use super::*;
+use crate::yard::common::{F, M};
+use crate::yard::play::Bike;
+use artkit::far::low;
+use artkit::fcyl;
+use artkit::parts::numbered;
 
 /// The bottom bracket's shell, across the frame where its tubes meet.
 pub(crate) fn bb_shell(s: &Bike, width: f64) {

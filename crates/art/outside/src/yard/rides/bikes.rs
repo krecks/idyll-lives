@@ -1,6 +1,7 @@
 //! The bikes themselves: city, child's, mountain, road, cargo and electric.
 
-use super::*;
+use crate::yard::common::M;
+use crate::yard::play::Bike;
 
 // Each stands along x, its front wheel to +x, its middle line at depth 0, on the floor. No clips: the renderer moves
 // its parts by code, each a top-level node with its origin on its pivot (NOTES.md): `frame`, `wheel_front` and
