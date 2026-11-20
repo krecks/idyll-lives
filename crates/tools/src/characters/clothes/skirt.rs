@@ -4,19 +4,19 @@ use super::*;
 
 /// The skirt's rows (heights), axis z, angles and radii (rows x segs); `hug`: the radii without the
 /// flare (the body's sections with their hollows bridged, plus the ease), where it lies seated.
-pub(crate) struct SkirtProfile {
-    pub(crate) ys: Vec<f64>,
-    pub(crate) cz: f64,
-    pub(crate) ang: Vec<f64>,
-    pub(crate) r: Vec<Vec<f64>>,
-    pub(crate) hug: Vec<Vec<f64>>,
+pub(super) struct SkirtProfile {
+    pub(super) ys: Vec<f64>,
+    pub(super) cz: f64,
+    pub(super) ang: Vec<f64>,
+    pub(super) r: Vec<Vec<f64>>,
+    pub(super) hug: Vec<Vec<f64>>,
 }
 
-pub(crate) static SKIRTS: Cache<(String, String, u64, usize, usize), SkirtProfile> = Cache::new();
+pub(super) static SKIRTS: Cache<(String, String, u64, usize, usize), SkirtProfile> = Cache::new();
 
 /// The body's sections (torso and legs, sampled between the rows) plus ease, snug over the hips
 /// and flaring below.
-pub(crate) fn skirt_profile(
+pub(super) fn skirt_profile(
     family: &str,
     stage: &str,
     waist: f64,
@@ -139,7 +139,7 @@ pub(crate) fn skirt_profile(
 
 /// A ring of radii (`step` rad apart, round the whole ring) with its hollows bridged: each no less
 /// than where the chord between its neighbours crosses its ray (the cloth spans the gap between the legs).
-pub(crate) fn bridged(r: &[f64], step: f64) -> Vec<f64> {
+pub(super) fn bridged(r: &[f64], step: f64) -> Vec<f64> {
     let n = r.len();
     let c = step.cos();
     let mut out = r.to_vec();
@@ -162,7 +162,7 @@ pub(crate) fn bridged(r: &[f64], step: f64) -> Vec<f64> {
 
 /// Points pushed out from the pelvis' axis to lie `lift` outside the skirt where it is (as it lies
 /// seated with `hug`).
-pub(crate) fn over_skirt(
+pub(super) fn over_skirt(
     pos: &[V3],
     family: &str,
     stage: &str,
@@ -217,7 +217,7 @@ pub(crate) fn over_skirt(
 }
 
 /// An A-line skirt from the waistband to above the knees.
-pub(crate) fn skirt_shell(
+pub(super) fn skirt_shell(
     family: &str,
     stage: &str,
     cuts: &Cuts,
@@ -302,24 +302,24 @@ pub(crate) fn skirt_shell(
 
 /// The thighs' turn forward from the hips (degrees) the seated corrective is made for: the `sit`
 /// clip's (clips/seated.ts), which the runtime weighs it by (characters.ts `SIT_FLEX`).
-pub(crate) const SIT_FLEX: f64 = 76.0;
+pub(super) const SIT_FLEX: f64 = 76.0;
 /// Seated, how far (m) a shell keeps off the skin at least: the skirt, and a jacket (over it).
-pub(crate) const SKIRT_CLEAR: f64 = 0.005;
-pub(crate) const JACKET_CLEAR: f64 = 0.008;
+pub(super) const SKIRT_CLEAR: f64 = 0.005;
+pub(super) const JACKET_CLEAR: f64 = 0.008;
 
 /// A body seated (`seated_pose`): its skin skinned so, the skin's normals, a tree of its vertices,
 /// and the seat's height (the lowest skin under the hips, as `seat_drop` has it).
-pub(crate) struct Seated {
-    pub(crate) pose: Vec<(M3, V3)>,
-    pub(crate) pos: Vec<V3>,
-    pub(crate) nor: Vec<V3>,
-    pub(crate) tree: KdTree,
-    pub(crate) seat: f64,
+pub(super) struct Seated {
+    pub(super) pose: Vec<(M3, V3)>,
+    pub(super) pos: Vec<V3>,
+    pub(super) nor: Vec<V3>,
+    pub(super) tree: KdTree,
+    pub(super) seat: f64,
 }
 
-pub(crate) static SEATED: Cache<(String, String), Seated> = Cache::new();
+pub(super) static SEATED: Cache<(String, String), Seated> = Cache::new();
 
-pub(crate) fn seated(family: &str, stage: &str) -> Arc<Seated> {
+pub(super) fn seated(family: &str, stage: &str) -> Arc<Seated> {
     SEATED.get((family.to_string(), stage.to_string()), || {
         let s = surface(family, stage);
         let pose = seated_pose(&s.p, SIT_FLEX);
@@ -349,7 +349,7 @@ pub(crate) fn seated(family: &str, stage: &str) -> Arc<Seated> {
 }
 
 /// `q` with weights `d` skinned by `pose`, and the blend of the bones' rotations there.
-pub(crate) fn skinned(pose: &[(M3, V3)], q: V3, d: &Dense) -> (V3, M3) {
+pub(super) fn skinned(pose: &[(M3, V3)], q: V3, d: &Dense) -> (V3, M3) {
     let mut p = V3::zeros();
     let mut a = M3::zeros();
     for (bi, (r, t)) in pose.iter().enumerate() {
@@ -366,7 +366,7 @@ pub(crate) fn skinned(pose: &[(M3, V3)], q: V3, d: &Dense) -> (V3, M3) {
 /// skinned, pushed out to `clear` off the seated skin where it would sink in. The runtime adds it as
 /// far as the thighs are turned forward (`sitW`, characters.ts), so seated the skirt lies on the lap
 /// and the jacket's hem on it, rather than standing out round the seat as they hang standing.
-pub(crate) fn seated_tone(
+pub(super) fn seated_tone(
     family: &str,
     stage: &str,
     pos: &[V3],

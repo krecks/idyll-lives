@@ -3,7 +3,7 @@
 use super::*;
 
 /// Triangles turned to face away from a vertical axis through `centre` (x, z) where most don't.
-pub(crate) fn outward(pos: &[V3], idx: Vec<usize>, centre: (f64, f64)) -> Vec<usize> {
+pub(super) fn outward(pos: &[V3], idx: Vec<usize>, centre: (f64, f64)) -> Vec<usize> {
     let mut wrong = 0usize;
     let nt = idx.len() / 3;
     for t in idx.chunks(3) {
@@ -21,12 +21,12 @@ pub(crate) fn outward(pos: &[V3], idx: Vec<usize>, centre: (f64, f64)) -> Vec<us
     }
 }
 
-pub(crate) fn flip(idx: &[usize]) -> Vec<usize> {
+pub(super) fn flip(idx: &[usize]) -> Vec<usize> {
     idx.chunks(3).flat_map(|t| [t[0], t[2], t[1]]).collect()
 }
 
 /// A closed mesh's triangles, turned round if they enclose a negative volume.
-pub(crate) fn closed_outward(pos: &[V3], idx: Vec<usize>) -> Vec<usize> {
+pub(super) fn closed_outward(pos: &[V3], idx: Vec<usize>) -> Vec<usize> {
     let v: Vec<f64> = idx
         .chunks(3)
         .map(|t| pos[t[0]].dot(&pos[t[1]].cross(&pos[t[2]])))
@@ -39,7 +39,7 @@ pub(crate) fn closed_outward(pos: &[V3], idx: Vec<usize>) -> Vec<usize> {
 }
 
 /// Points where the mesh's edges (of triangles whose corners are all in `keep`) cross height y.
-pub(crate) fn section(pos: &[V3], tris: &[usize], y: f64, keep: &[bool]) -> Vec<V3> {
+pub(super) fn section(pos: &[V3], tris: &[usize], y: f64, keep: &[bool]) -> Vec<V3> {
     let t: Vec<&[usize]> = tris
         .chunks(3)
         .filter(|t| t.iter().all(|&v| keep[v]))
@@ -58,7 +58,7 @@ pub(crate) fn section(pos: &[V3], tris: &[usize], y: f64, keep: &[bool]) -> Vec<
 }
 
 /// Skin weights from the nearest body vertices.
-pub(crate) fn follow(pos: &[V3], s: &super::body::Surface) -> Vec<Dense> {
+pub(super) fn follow(pos: &[V3], s: &super::body::Surface) -> Vec<Dense> {
     let tree = KdTree::new(&s.pos);
     pos.iter()
         .map(|p| {
@@ -78,7 +78,7 @@ pub(crate) fn follow(pos: &[V3], s: &super::body::Surface) -> Vec<Dense> {
 }
 
 /// Quads of a grid of points (rows along the strip's length).
-pub(crate) fn strip(rows: &[Vec<V3>], closed: bool) -> (Vec<V3>, Vec<usize>) {
+pub(super) fn strip(rows: &[Vec<V3>], closed: bool) -> (Vec<V3>, Vec<usize>) {
     let (r, c) = (rows.len(), rows[0].len());
     let mut idx = Vec::new();
     let cols = if closed { c } else { c - 1 };

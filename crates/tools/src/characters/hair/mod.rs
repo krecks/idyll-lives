@@ -63,12 +63,12 @@ mod locks;
 mod scalp;
 mod tuft;
 
-pub(crate) use beard::*;
+use beard::*;
 pub(crate) use build::*;
 pub(crate) use cap::*;
-pub(crate) use curtain::*;
+use curtain::*;
 pub(crate) use ears::*;
-pub(crate) use finish::*;
-pub(crate) use locks::*;
+use finish::*;
+use locks::*;
 pub(crate) use scalp::*;
-pub(crate) use tuft::*;
+use tuft::*;

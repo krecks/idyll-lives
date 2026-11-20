@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 
 /// A manifest without its model entries: what the models' rows do not cover. Nor its `$comment`, which says what
 /// builds the pack (a script, then a crate) and which the game does not read.
-pub(crate) fn rest_of(manifest: &J) -> J {
+pub(super) fn rest_of(manifest: &J) -> J {
     let mut out = match manifest.entries() {
         Some(fields) => J::Obj(
             fields
@@ -33,7 +33,7 @@ pub(crate) fn rest_of(manifest: &J) -> J {
 }
 
 /// port-accepted.json, {row: {metric: why}}, and what is wrong with it: a metric that is none, a reason left out.
-pub(crate) fn accepted(path: &str) -> (BTreeMap<String, BTreeMap<String, String>>, Vec<String>) {
+pub(super) fn accepted(path: &str) -> (BTreeMap<String, BTreeMap<String, String>>, Vec<String>) {
     let (mut out, mut errors) = (BTreeMap::new(), Vec::new());
     let data = match std::fs::read(path) {
         Ok(data) => data,

@@ -256,6 +256,6 @@ pub fn against(opts: &Options) -> Result<Outcome, String> {
 }
 
 /// Whether either side's manifests have a model entry `key`.
-pub(crate) fn all_has(context: &Context, key: &str) -> bool {
+pub(super) fn all_has(context: &Context, key: &str) -> bool {
     context.old.entries.contains_key(key) || context.new.entries.contains_key(key)
 }

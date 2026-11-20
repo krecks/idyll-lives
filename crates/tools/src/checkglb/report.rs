@@ -3,7 +3,7 @@
 use super::*;
 
 /// The largest side (px) of a texture of its own for a model `side` m across (`TEXTURE_MAX`).
-pub(crate) fn texture_most(side: f64) -> u32 {
+pub(super) fn texture_most(side: f64) -> u32 {
     TEXTURE_MAX
         .iter()
         .find(|(up, _)| side <= *up)
@@ -30,7 +30,7 @@ pub fn gate_with(paths: &Paths, keys: &[String], batch: &[(&'static str, BatchCh
     run_gate(paths, keys, FILE_CHECKS, batch)
 }
 
-pub(crate) fn run_gate(
+pub(super) fn run_gate(
     paths: &Paths,
     keys: &[String],
     file: &[(&'static str, FileCheck)],
@@ -270,7 +270,7 @@ pub fn update_baseline(
     update_with(paths, keys, FILE_CHECKS, batch)
 }
 
-pub(crate) fn update_with(
+pub(super) fn update_with(
     paths: &Paths,
     keys: &[String],
     file: &[(&'static str, FileCheck)],
@@ -285,7 +285,7 @@ pub(crate) fn update_with(
 }
 
 /// The model entries of the manifests once stacked ({key: (entry, the manifest it's in)}), and their finishes.
-pub(crate) fn model_entries(stack: &[(String, J)]) -> (BTreeMap<String, (J, String)>, Finishes) {
+pub(super) fn model_entries(stack: &[(String, J)]) -> (BTreeMap<String, (J, String)>, Finishes) {
     let mut entries: BTreeMap<String, (J, String)> = BTreeMap::new();
     let mut fin = Finishes {
         plain: HashMap::new(),

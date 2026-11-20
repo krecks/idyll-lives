@@ -6,11 +6,11 @@ use super::*;
 /// resident's right; polar angle phi from the top, in the skull ellipsoid's normalised frame);
 /// `cranium`: no further out than the skull ellipsoid (else the face and jaw as drawn).
 pub struct Scalp<'a> {
-    pub(crate) h: &'a HeadFrame,
-    pub(crate) cranium: bool,
-    pub(crate) hl: Periodic,
+    pub(super) h: &'a HeadFrame,
+    pub(super) cranium: bool,
+    pub(super) hl: Periodic,
     /// The ears as caps meet them (`round`).
-    pub(crate) ovals: Vec<Oval>,
+    pub(super) ovals: Vec<Oval>,
 }
 
 impl<'a> Scalp<'a> {
@@ -88,7 +88,7 @@ impl<'a> Scalp<'a> {
     }
 
     /// The same, rounded out to the skull ellipsoid by `round` (0..1) rather than `ROUND`.
-    pub(crate) fn rounded(&self, a: f64, phi: f64, round: f64) -> (V3, V3) {
+    pub(super) fn rounded(&self, a: f64, phi: f64, round: f64) -> (V3, V3) {
         let h = self.h;
         let d = Scalp::dirs(a, phi).component_mul(&h.radii);
         // Over the ears no further out than the skull ellipsoid (which holds the cranium), so the
@@ -142,7 +142,7 @@ impl<'a> Scalp<'a> {
     }
 
     /// The oval of the ear nearest azimuth a, if one was given.
-    pub(crate) fn oval(&self, a: f64) -> Option<&Oval> {
+    pub(super) fn oval(&self, a: f64) -> Option<&Oval> {
         self.ovals
             .iter()
             .min_by(|p, q| round(a - p.a).total_cmp(&round(a - q.a)))
@@ -153,15 +153,15 @@ impl<'a> Scalp<'a> {
 /// faces seen from the head's centre, fitted round and grown by `EAR_CLEAR` and a rim's thickness),
 /// in metres near it (`g`: m per rad of each, where the ear comes nearest the centre, so the margin
 /// holds); and how far the ear stands out of the scalp.
-pub(crate) struct Oval {
-    pub(crate) c: [f64; 2],
-    pub(crate) r: [f64; 2],
+pub(super) struct Oval {
+    pub(super) c: [f64; 2],
+    pub(super) r: [f64; 2],
     /// Its first axis's direction (cos, sin) in that plane.
-    pub(crate) e: [f64; 2],
-    pub(crate) g: [f64; 2],
+    pub(super) e: [f64; 2],
+    pub(super) g: [f64; 2],
     /// Its middle's azimuth, and how far the ear reaches out past the scalp (m).
-    pub(crate) a: f64,
-    pub(crate) reach: f64,
+    pub(super) a: f64,
+    pub(super) reach: f64,
 }
 
 impl Oval {
@@ -260,7 +260,7 @@ impl Oval {
     }
 
     /// How far out of the middle a point is (1 on the oval).
-    pub(crate) fn rho(&self, a: f64, phi: f64) -> f64 {
+    pub(super) fn rho(&self, a: f64, phi: f64) -> f64 {
         let [u, v] = self.local(a, phi);
         u.hypot(v)
     }
@@ -293,7 +293,7 @@ impl Oval {
 
     /// A point inside the oval taken out to it upwards (away from a point below its middle); one
     /// outside as it is.
-    pub(crate) fn up(&self, a: f64, phi: f64) -> (f64, f64) {
+    pub(super) fn up(&self, a: f64, phi: f64) -> (f64, f64) {
         if self.rho(a, phi) >= 1.0 {
             return (a, phi);
         }
@@ -313,7 +313,7 @@ impl Oval {
     /// The hair's edge round the ear from azimuth a0 to a1 (the hairline `hl` there, over the oval
     /// where it would come down into it, rounded where the two meet), and `n` points along it between
     /// its ends, closer together near the ear.
-    pub(crate) fn rim(
+    pub(super) fn rim(
         &self,
         hl: &dyn Fn(f64) -> f64,
         a0: f64,

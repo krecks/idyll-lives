@@ -213,7 +213,7 @@ fn flagged<'a>(
 }
 
 /// Writes `files` into `dir` (made if missing).
-pub(crate) fn write_md(dir: &Path, files: &BTreeMap<String, String>) -> Result<(), String> {
+pub(super) fn write_md(dir: &Path, files: &BTreeMap<String, String>) -> Result<(), String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     for (name, text) in files {
         std::fs::write(dir.join(name), text)

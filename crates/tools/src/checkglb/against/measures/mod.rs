@@ -13,13 +13,13 @@ mod tolerance;
 mod types;
 mod whole;
 
-pub(crate) use accepted::*;
+use accepted::*;
 pub use against::*;
 pub(crate) use context::*;
 pub(crate) use decimated::*;
 pub(crate) use differ::*;
 pub(crate) use git::*;
-pub(crate) use side::*;
+use side::*;
 pub(crate) use side_of::*;
 pub(crate) use tolerance::*;
 pub use types::*;

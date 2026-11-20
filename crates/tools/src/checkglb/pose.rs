@@ -5,7 +5,7 @@ use super::*;
 /// The parts a clip scales up from rest (G.grow: darts, a pot thrown, water), at their largest key, so what
 /// is only small or flattened at rest is measured as it shows. Not by the clips `held` names (`open`,
 /// `night`: a state of its own, a sofa bed pulled out; the model is at rest).
-pub(crate) fn grown(g: &Glb, held: &[Option<J>]) -> R<Pose> {
+pub(super) fn grown(g: &Glb, held: &[Option<J>]) -> R<Pose> {
     let empty = J::Arr(Vec::new());
     let nodes = g.gltf.get("nodes").unwrap_or(&empty);
     let mut out: Pose = HashMap::new();
@@ -55,7 +55,7 @@ pub(crate) fn grown(g: &Glb, held: &[Option<J>]) -> R<Pose> {
     Ok(out)
 }
 
-pub(crate) type Bounds = ([Num; 3], [Num; 3]);
+pub(super) type Bounds = ([Num; 3], [Num; 3]);
 /// Each moving part's bounds (None: the still body), in the order they're met.
 type PartBounds = Vec<(Option<usize>, Bounds)>;
 
@@ -65,7 +65,7 @@ type PartBounds = Vec<(Option<usize>, Bounds)>;
 pub const ASIDE: &str = "_aside";
 
 /// The nodes of the file named as `aside` (their names end with `ASIDE`).
-pub(crate) fn aside_nodes(gltf: &J) -> HashSet<usize> {
+pub(super) fn aside_nodes(gltf: &J) -> HashSet<usize> {
     gltf.get("nodes")
         .and_then(J::list)
         .unwrap_or(&[])
@@ -83,7 +83,7 @@ pub(crate) fn aside_nodes(gltf: &J) -> HashSet<usize> {
 /// The file's bounds in game axes (glTF x -> game -x, as `render/pc/models.ts` bakes a file), from
 /// each primitive's box through its node, and each moving part's (None: the still body), in the order
 /// they're met; the nodes in `skip` left out.
-pub(crate) fn bounds(gltf: &J, pose: &Pose, skip: &HashSet<usize>) -> R<(Bounds, PartBounds)> {
+pub(super) fn bounds(gltf: &J, pose: &Pose, skip: &HashSet<usize>) -> R<(Bounds, PartBounds)> {
     let accessors = gltf.get("accessors").cloned().unwrap_or(J::Arr(Vec::new()));
     let (inf, ninf) = (Num::F(f64::INFINITY), Num::F(f64::NEG_INFINITY));
     let (mut lo, mut hi) = ([inf; 3], [ninf; 3]);
@@ -150,17 +150,17 @@ fn square(x: f64) -> f64 {
 }
 
 /// An opaque triangle of the model at rest, with the node it belongs to.
-pub(crate) struct Tri {
+pub(super) struct Tri {
     node: usize,
-    pub(crate) a: [f64; 3],
-    pub(crate) e1: [f64; 3],
-    pub(crate) e2: [f64; 3],
-    pub(crate) nrm: [f64; 3],
+    pub(super) a: [f64; 3],
+    pub(super) e1: [f64; 3],
+    pub(super) e2: [f64; 3],
+    pub(super) nrm: [f64; 3],
 }
 
 /// Every face the line through p along d crosses (Möller-Trumbore), in the order given: (how far along d,
 /// negative behind p; the face's normal).
-pub(crate) fn hits<'a>(
+pub(super) fn hits<'a>(
     p: &'a [f64; 3],
     d: &'a [f64; 3],
     faces: impl IntoIterator<Item = &'a Tri>,
@@ -213,7 +213,7 @@ fn cast(p: &[f64; 3], d: &[f64; 3], faces: &[&Tri]) -> [(f64, bool); 2] {
 
 /// The triangles of the placed meshes' primitives that `keep` keeps (by their material index), with the node
 /// each belongs to and its normal from the winding; None if some positions can't be read here (compressed).
-pub(crate) fn triangles(
+pub(super) fn triangles(
     g: &Glb,
     placed: &[Placed],
     keep: &dyn Fn(Option<&J>) -> R<bool>,
@@ -289,7 +289,7 @@ pub(crate) fn triangles(
 /// flattened plane isn't inside something opaque (`opaque(material index)`), as the dartboard's flights did
 /// as crosses on its face. Each of its points is looked from along the flattened axis both ways: inside a
 /// solid, the nearest face either way is one leaving it (its normal, from the winding, pointing on).
-pub(crate) fn flattened_in_view(
+pub(super) fn flattened_in_view(
     g: &Glb,
     opaque: &dyn Fn(Option<&J>) -> R<bool>,
 ) -> R<Vec<(String, f64)>> {
@@ -431,7 +431,7 @@ pub(crate) fn flattened_in_view(
 
 /// `overrides.get(name, named_finish(name) or overrides.get('*'))`: a material's entry in `materials`
 /// (None: unmapped).
-pub(crate) fn override_of(overrides: &J, name: &str) -> J {
+pub(super) fn override_of(overrides: &J, name: &str) -> J {
     match overrides.get(name) {
         Some(ov) => ov.clone(),
         None => named_finish(name)
@@ -443,7 +443,7 @@ pub(crate) fn override_of(overrides: &J, name: &str) -> J {
 /// Warnings for a model (at rest `lo`; as it shows, its parts where `pose` puts them: `slo`, `shi`,
 /// `sparts`) against one content object's facts (None: none, a floor thing).
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn content_warnings(
+pub(super) fn content_warnings(
     facts: Option<&Facts>,
     lo: &[Num; 3],
     (slo, shi): &Bounds,

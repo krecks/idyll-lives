@@ -54,7 +54,7 @@ pub(crate) use far::*;
 pub(crate) use gate::*;
 pub use read::*;
 pub(crate) use report::*;
-pub(crate) use texel_gate::*;
+use texel_gate::*;
 
 #[cfg(test)]
 mod tests;

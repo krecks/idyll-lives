@@ -288,7 +288,7 @@ impl Context {
     }
 
     /// The rows of one key: the model, and its far version if either side has one.
-    pub(crate) fn rows(&self, key: &str) -> Vec<Row> {
+    pub(super) fn rows(&self, key: &str) -> Vec<Row> {
         let row = |name: String| Row {
             name,
             class: Class::Same,
@@ -371,7 +371,7 @@ impl Context {
     }
 
     /// A row with what port-accepted.json accepts of it taken out of its findings, and its class.
-    pub(crate) fn classed(&self, mut row: Row, same: bool) -> Row {
+    pub(super) fn classed(&self, mut row: Row, same: bool) -> Row {
         if let Some(accepted) = self.accepted.get(&row.name) {
             let (taken, left): (Vec<Finding>, Vec<Finding>) = std::mem::take(&mut row.findings)
                 .into_iter()

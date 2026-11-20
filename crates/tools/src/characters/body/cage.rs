@@ -2,7 +2,7 @@
 
 use super::*;
 
-pub(crate) fn shape(family: &str, stage: &str) -> Shape {
+pub(super) fn shape(family: &str, stage: &str) -> Shape {
     let pr = proportions(family, stage);
     let (h, g) = (pr.h, pr.girth);
     let female = family == "female";
@@ -28,7 +28,7 @@ pub(crate) fn shape(family: &str, stage: &str) -> Shape {
 
 /// Ring points round centre c: angle 0 towards +V, 90 towards +U; depth bf in front (+V), bb behind.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn ring_pts(
+pub(super) fn ring_pts(
     c: V3,
     u: V3,
     v: V3,

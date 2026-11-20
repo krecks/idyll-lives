@@ -58,7 +58,7 @@ mod topology;
 
 pub use build::*;
 pub use cage::*;
-pub(crate) use cage_of::*;
+use cage_of::*;
 pub use fields::*;
 pub use pose::*;
 pub use regions::*;

@@ -221,7 +221,7 @@ fn size_cell(r: &SizeRow) -> String {
     format!("{:.2} × {h} × {:.2}", s[0], s[2])
 }
 
-pub(crate) fn size_cells(r: &SizeRow) -> String {
+pub(super) fn size_cells(r: &SizeRow) -> String {
     let name = if r.name.is_empty() {
         String::new()
     } else {
@@ -241,11 +241,11 @@ pub(crate) fn size_cells(r: &SizeRow) -> String {
     )
 }
 
-pub(crate) const SIZE_HEAD: &str = "| Object | Kind | W × H × D (m) | Seat | Top | Mattress |";
-pub(crate) const SIZE_RULE: &str = "|---|---|---|---|---|---|";
+pub(super) const SIZE_HEAD: &str = "| Object | Kind | W × H × D (m) | Seat | Top | Mattress |";
+pub(super) const SIZE_RULE: &str = "|---|---|---|---|---|---|";
 
 /// The pages in the buy catalogue's order, then any other.
-pub(crate) fn page_order(pages: impl IntoIterator<Item = String>) -> Vec<String> {
+pub(super) fn page_order(pages: impl IntoIterator<Item = String>) -> Vec<String> {
     const ORDER: [&str; 16] = [
         "kitchen",
         "bathroom",

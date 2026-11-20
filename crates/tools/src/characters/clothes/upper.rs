@@ -5,9 +5,9 @@ use super::*;
 /// A point on a body's triangles: up to three of its vertices (a triangle's, an edge's or one) and
 /// weights summing to 1.
 #[derive(Clone, Copy)]
-pub(crate) struct Bary {
-    pub(crate) v: [usize; 3],
-    pub(crate) w: [f64; 3],
+pub(super) struct Bary {
+    pub(super) v: [usize; 3],
+    pub(super) w: [f64; 3],
 }
 
 impl Bary {
@@ -73,23 +73,23 @@ impl Bary {
 /// A shoe's upper laid out on the base body: the skin under the collar and above the sole's inside,
 /// its edges the collar crosses split (twice, on the full body; so its edge is smooth however coarse the
 /// skin is there), cut exactly along both (stage independent), with what each vertex needs to be lifted.
-pub(crate) struct UpperLayout {
-    pub(crate) pts: Vec<Bary>,
+pub(super) struct UpperLayout {
+    pub(super) pts: Vec<Bary>,
     /// Per point: the finer surface's vertices at its triangle's edges' middles (`finer`), so it lies on
     /// the curved skin, not on the body's flat triangles (whose sag made the collar jagged).
-    pub(crate) mid: Vec<[usize; 3]>,
-    pub(crate) idx: Vec<usize>,
+    pub(super) mid: Vec<[usize; 3]>,
+    pub(super) idx: Vec<usize>,
     /// Per point: the lift along the normal and the toe's offset (m on a 1.7 m body), the distance from
     /// the collar (m, the hem distance), across the instep (m; 1 elsewhere), and whether it lies on the
     /// cut inside the sole (no lining there).
-    pub(crate) lift: Vec<f64>,
-    pub(crate) point: Vec<V3>,
-    pub(crate) hem: Vec<f64>,
-    pub(crate) across: Vec<f64>,
-    pub(crate) low: Vec<bool>,
+    pub(super) lift: Vec<f64>,
+    pub(super) point: Vec<V3>,
+    pub(super) hem: Vec<f64>,
+    pub(super) across: Vec<f64>,
+    pub(super) low: Vec<bool>,
 }
 
-pub(crate) static UPPERS: Cache<(String, String, bool), UpperLayout> = Cache::new();
+pub(super) static UPPERS: Cache<(String, String, bool), UpperLayout> = Cache::new();
 
 /// Triangles split at the middles of the edges `split` says (in 2, 3 or 4, so no T-junctions).
 fn refine(pts: &mut Vec<Bary>, idx: &[usize], split: impl Fn(usize, usize) -> bool) -> Vec<usize> {
@@ -327,7 +327,7 @@ fn upper_layout(family: &str, gid: &str, lod: bool) -> Arc<UpperLayout> {
 
 /// A shoe's upper at `stage`: the layout's skin lifted off it (with the body's own weights, so it
 /// moves as the foot does), and a lining turned in from the collar to the skin.
-pub(crate) fn upper(family: &str, stage: &str, gid: &str, lod: bool) -> Mesh {
+pub(super) fn upper(family: &str, stage: &str, gid: &str, lod: bool) -> Mesh {
     let lay = upper_layout(family, gid, lod);
     let st = shoe_style(gid);
     let s = surface(family, stage);

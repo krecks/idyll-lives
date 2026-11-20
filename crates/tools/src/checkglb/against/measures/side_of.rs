@@ -6,7 +6,7 @@ use crate::checkglb::py::{self, J, dirname, join, normpath, relpath};
 use std::path::Path;
 
 impl Side {
-    pub(crate) fn open(
+    pub(super) fn open(
         what: &str,
         source: &Source,
         root: &str,
@@ -140,7 +140,7 @@ impl Side {
     }
 
     /// The file an entry's `url` or `far` names, if it is one of this side's files.
-    pub(crate) fn file(&self, key: &str, field: &str) -> Option<String> {
+    pub(super) fn file(&self, key: &str, field: &str) -> Option<String> {
         let (entry, manifest) = self.entries.get(key)?;
         let url = entry
             .get(field)
@@ -150,7 +150,7 @@ impl Side {
     }
 
     /// Whether a build of some models (`Origin::Over`) has the file an entry of this side names.
-    pub(crate) fn built(&self, file: &str) -> bool {
+    pub(super) fn built(&self, file: &str) -> bool {
         match &self.origin {
             Origin::Over { built, .. } => Path::new(built)
                 .join(relpath(file, &self.paths.assets))
@@ -160,7 +160,7 @@ impl Side {
     }
 
     /// Puts the model files `files` where this side's manifests name them.
-    pub(crate) fn fetch(&self, files: &[String]) -> Result<(), String> {
+    pub(super) fn fetch(&self, files: &[String]) -> Result<(), String> {
         match &self.origin {
             Origin::Here => Ok(()),
             Origin::Rev { rev, at } => {
@@ -184,7 +184,7 @@ impl Side {
     }
 
     /// A manifest's path from the assets root.
-    pub(crate) fn manifest_name(&self, path: &str) -> String {
+    pub(super) fn manifest_name(&self, path: &str) -> String {
         relpath(path, &self.paths.assets)
     }
 }

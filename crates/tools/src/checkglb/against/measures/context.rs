@@ -5,13 +5,13 @@ use crate::checkglb::{Facts, Furniture};
 use std::collections::{BTreeMap, HashMap};
 
 /// What the rows are compared with: the two sides, and the working tree's content for the gate.
-pub(crate) struct Context {
-    pub(crate) old: Side,
-    pub(crate) new: Side,
-    pub(crate) facts: HashMap<String, Vec<Facts>>,
-    pub(crate) furniture: Furniture,
+pub(super) struct Context {
+    pub(super) old: Side,
+    pub(super) new: Side,
+    pub(super) facts: HashMap<String, Vec<Facts>>,
+    pub(super) furniture: Furniture,
     /// port-accepted.json: {row: {metric: why}}.
-    pub(crate) accepted: BTreeMap<String, BTreeMap<String, String>>,
+    pub(super) accepted: BTreeMap<String, BTreeMap<String, String>>,
 }
 
 /// A digit run as `#`, so two findings that differ in their numbers alone are one finding.

@@ -29,12 +29,12 @@ mod quantize;
 mod read;
 mod types;
 
-pub(crate) use accessors::*;
-pub(crate) use compress::*;
-pub(crate) use consts::*;
+use accessors::*;
+use compress::*;
+use consts::*;
 pub use drift::*;
 pub use glb::*;
-pub(crate) use matrix::*;
+use matrix::*;
 pub use optimize::*;
 pub use quantize::*;
 pub use read::*;

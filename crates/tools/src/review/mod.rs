@@ -62,7 +62,7 @@ pub use main::*;
 pub use motions::*;
 pub use objects::*;
 pub use plant::*;
-pub(crate) use plants::*;
+use plants::*;
 pub use reference::*;
 pub use report::*;
 pub use sizes::*;

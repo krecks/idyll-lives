@@ -75,7 +75,7 @@ impl<'a> Shape<'a> {
 
     /// The two faces of an edge as (face, corner the edge starts at), if it has just two wound the same way
     /// round (each runs along it the other way).
-    pub(crate) fn pair(&self, sides: &Sides) -> Option<[(usize, usize); 2]> {
+    pub(super) fn pair(&self, sides: &Sides) -> Option<[(usize, usize); 2]> {
         if sides.count != 2 {
             return None;
         }
@@ -85,7 +85,7 @@ impl<'a> Shape<'a> {
 
     /// Whether the two faces of an edge are split there in the file: their corners' normals `SPLIT` apart at
     /// both of its ends.
-    pub(crate) fn split(&self, [(a, ka), (b, kb)]: [(usize, usize); 2]) -> bool {
+    pub(super) fn split(&self, [(a, ka), (b, kb)]: [(usize, usize); 2]) -> bool {
         let (fa, fb) = (&self.faces[a], &self.faces[b]);
         let apart =
             |i: usize, j: usize| dot(self.normal(fa, i), self.normal(fb, j)) <= SPLIT + SLACK;
@@ -105,7 +105,7 @@ impl<'a> Shape<'a> {
     /// Whether the surface on `face`'s side of its edge `k` is `limit` wide across the edge's middle: a line drawn
     /// from there straight over the surface (unfolded from triangle to triangle) gets that far before the surface
     /// ends (`ends`).
-    pub(crate) fn wide(&self, mut face: usize, mut k: usize, limit: f64) -> bool {
+    pub(super) fn wide(&self, mut face: usize, mut k: usize, limit: f64) -> bool {
         let f = &self.faces[face];
         let (a, b) = (
             self.place[f.v[k] as usize],
@@ -160,7 +160,7 @@ impl<'a> Shape<'a> {
     }
 
     /// The largest side (m) of the box round each piece (the places joined through triangles), by place.
-    pub(crate) fn pieces(&self) -> Vec<f64> {
+    pub(super) fn pieces(&self) -> Vec<f64> {
         let mut parent: Vec<u32> = (0..self.place.len() as u32).collect();
         fn root(parent: &mut [u32], mut i: u32) -> u32 {
             while parent[i as usize] != i {

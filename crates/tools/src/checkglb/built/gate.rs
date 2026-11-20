@@ -34,7 +34,7 @@ pub(crate) struct Report {
     pub near: HashMap<String, Look>,
 }
 
-pub(crate) fn fail(text: String) -> Report {
+pub(super) fn fail(text: String) -> Report {
     Report {
         text,
         failed: 1,
@@ -254,7 +254,7 @@ pub(crate) fn gate(paths: &Paths, dir: &str, keys: &[String]) -> Report {
 }
 
 /// A sample's file as its parts.
-pub(crate) fn read_parts(data: &[u8]) -> R<Vec<Part>> {
+pub(super) fn read_parts(data: &[u8]) -> R<Vec<Part>> {
     read(&parse_glb(data)?)
 }
 

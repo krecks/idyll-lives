@@ -43,7 +43,7 @@ type Lit = (V3, V3, (f32, f32));
 
 /// The parts of a tile in the making, each with its colour.
 #[derive(Default)]
-pub(crate) struct Sketch {
+struct Sketch {
     /// (the part, its colour, how glossy it is: the sun's glint on it, of the sun's light)
     parts: Vec<(Obj, Tone, f32)>,
 }
@@ -387,7 +387,7 @@ fn bleed(picture: &mut Picture) -> [f32; 3] {
 mod leaves;
 mod tiles;
 
-pub(crate) use leaves::*;
+use leaves::*;
 pub(crate) use tiles::*;
 
 #[cfg(test)]

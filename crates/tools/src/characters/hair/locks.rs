@@ -5,7 +5,7 @@ use super::*;
 /// A bent capsule (lofted along a smooth curve through `points`); `hang` (a, b): it follows the
 /// body more and more from a to b along its length (a tail).
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn lobe(
+pub(super) fn lobe(
     points: &[V3],
     ry: &[f64],
     rz: &[f64],
@@ -34,7 +34,7 @@ pub(crate) fn lobe(
 /// A loft's rings (`segs` points each, laid one after the other) in `grooves` locks round it: each
 /// point pushed out from its ring's middle by up to `depth` (a share) on a lock and in between
 /// them, twisting by `twist` (rad) along its length (t). Clump bands follow the locks.
-pub(crate) fn grooved(
+pub(super) fn grooved(
     m: &mut super::prims::Prim,
     segs: usize,
     grooves: f64,
@@ -61,7 +61,7 @@ pub(crate) fn grooved(
 /// roots, and lifting off the shell by `lift` (m) on the way: tufts standing half up, so the shell's
 /// outline, whichever way it is seen, is strands' ends. Their strands are loose curls. (The rings
 /// come lowest first; `first`: the lowest one the wisps come down to.)
-pub(crate) fn shingles(
+pub(super) fn shingles(
     pos: &[V3],
     centre: V3,
     cols: usize,
@@ -93,13 +93,13 @@ pub(crate) fn shingles(
 }
 
 /// A component that hangs loose (`Comp::sway`): a curtain past the shoulders, a tail, a braid.
-pub(crate) fn loose(mut c: Comp) -> Comp {
+pub(super) fn loose(mut c: Comp) -> Comp {
     c.sway = 1.0;
     c
 }
 
 /// A torus as a component (`_tor`).
-pub(crate) fn tor(t: super::prims::Prim) -> Comp {
+pub(super) fn tor(t: super::prims::Prim) -> Comp {
     let n = t.pos.len();
     let z = (0..n).map(|i| 0.3 + 0.2 * (i as f64 * 0.7).sin()).collect();
     comp(t.pos, t.idx, None, Some(z), Some(vec![0.4; n]), None)

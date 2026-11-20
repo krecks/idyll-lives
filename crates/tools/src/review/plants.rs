@@ -4,7 +4,7 @@ use super::*;
 
 /// Measures each row whose kind has a `species` from its model (`species::read`) and adds what is off
 /// (`species_row`).
-pub(crate) fn measure_plants(
+pub(super) fn measure_plants(
     s: &Sources,
     rows: &mut [SizeRow],
     reference: &Reference,
@@ -37,13 +37,13 @@ pub(crate) fn measure_plants(
 }
 
 /// The checkout's files the review reads.
-pub(crate) struct Sources {
-    pub(crate) root: PathBuf,
-    pub(crate) paths: Paths,
+pub(super) struct Sources {
+    pub(super) root: PathBuf,
+    pub(super) paths: Paths,
 }
 
 impl Sources {
-    pub(crate) fn repo() -> Sources {
+    pub(super) fn repo() -> Sources {
         let root = PathBuf::from(checkglb::repo_root());
         Sources {
             paths: Paths::repo(),
@@ -51,7 +51,7 @@ impl Sources {
         }
     }
 
-    pub(crate) fn read(&self, rel: &str) -> Result<String, String> {
+    pub(super) fn read(&self, rel: &str) -> Result<String, String> {
         std::fs::read_to_string(self.root.join(rel)).map_err(|e| format!("{rel}: {e}"))
     }
 }

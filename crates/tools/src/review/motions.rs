@@ -94,7 +94,7 @@ fn by_anim(
 
 /// The Sound column's cell for a use: what it sounds like, what it plays as it ends, and what the object
 /// sounds like by itself.
-pub(crate) fn sound_cell(sounds: &BTreeMap<String, String>, o: &Object, u: &Use) -> String {
+pub(super) fn sound_cell(sounds: &BTreeMap<String, String>, o: &Object, u: &Use) -> String {
     let mut cell = sound_of(sounds, o, u).unwrap_or_else(|| "—".into());
     if let Some(end) = &u.end_sound {
         let _ = write!(cell, ", then {end}");

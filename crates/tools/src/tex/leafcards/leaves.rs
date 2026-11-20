@@ -5,17 +5,17 @@ use super::*;
 // ---- the leaves -------------------------------------------------------------------------------------------------
 
 /// The dense wall's share of its tile, across and up.
-pub(crate) const DENSE: f64 = 0.8;
+pub(super) const DENSE: f64 = 0.8;
 /// A cluster keeps within this of its tile's middle, of half the tile: no leaf crosses into the next tile, nor
 /// under a card's edge.
-pub(crate) const REACH: f64 = 0.925;
+pub(super) const REACH: f64 = 0.925;
 /// The covered texels' mean luminance (linear) in every cluster's tile, and every texel's in a dense one: the first
 /// atlas's, which the trees' card and core tones were matched to their far versions with.
-pub(crate) const CLUSTER_LIGHT: f32 = 0.44;
-pub(crate) const DENSE_LIGHT: f32 = 0.335;
+pub(super) const CLUSTER_LIGHT: f32 = 0.44;
+pub(super) const DENSE_LIGHT: f32 = 0.335;
 
 /// A matte leaf colour: nearly grey (`value`), a little yellow (`warm` > 0) or blue-green (< 0).
-pub(crate) fn tone(value: f64, warm: f64) -> Tone {
+pub(super) fn tone(value: f64, warm: f64) -> Tone {
     [
         value * (1.0 + 0.10 * warm),
         value,
@@ -25,7 +25,7 @@ pub(crate) fn tone(value: f64, warm: f64) -> Tone {
 }
 
 /// A leaf's colour `depth` (0..1) down in its cluster: three depths, the top the lightest, five tones each.
-pub(crate) fn leaf_tone(rng: &mut Random, depth: f64) -> Tone {
+pub(super) fn leaf_tone(rng: &mut Random, depth: f64) -> Tone {
     const TONES: [(f64, f64); 5] = [
         (0.8, 0.0),
         (0.7, 0.35),
@@ -41,7 +41,7 @@ pub(crate) fn leaf_tone(rng: &mut Random, depth: f64) -> Tone {
 /// How a blade is held: its tilt up (degrees), how it bends down along its length, how its halves lift into a V,
 /// its turn about its midrib by the tip (degrees either way), and its gloss.
 #[derive(Clone, Copy)]
-pub(crate) struct Hold {
+pub(super) struct Hold {
     tilt: (f64, f64),
     droop: (f64, f64),
     fold: (f64, f64),
@@ -51,7 +51,7 @@ pub(crate) struct Hold {
 
 #[allow(clippy::too_many_arguments)]
 /// A blade cut from `edge` (its right half, `cut_leaf`'s), heading `heading` (radians) from `at`.
-pub(crate) fn blade(
+pub(super) fn blade(
     sketch: &mut Sketch,
     rng: &mut Random,
     edge: &[(f64, f64)],
@@ -90,10 +90,10 @@ pub(crate) fn blade(
 }
 
 /// A species' leaf: (sketch, random numbers, where, heading, length, how deep in its cluster 0..1).
-pub(crate) type Leaf = fn(&mut Sketch, &mut Random, (f64, f64, f64), f64, f64, f64);
+pub(super) type Leaf = fn(&mut Sketch, &mut Random, (f64, f64, f64), f64, f64, f64);
 
 /// An English oak's: lobed, four or five rounded lobes a side, widest above the middle.
-pub(crate) fn oak_leaf(
+pub(super) fn oak_leaf(
     sketch: &mut Sketch,
     rng: &mut Random,
     at: (f64, f64, f64),
@@ -128,7 +128,7 @@ pub(crate) fn oak_leaf(
 }
 
 /// A Norway maple's: five pointed lobes with a tooth to each side, as wide as long, held flat.
-pub(crate) fn maple_leaf(
+pub(super) fn maple_leaf(
     sketch: &mut Sketch,
     rng: &mut Random,
     at: (f64, f64, f64),
@@ -156,7 +156,7 @@ pub(crate) fn maple_leaf(
 }
 
 /// A silver birch's: small, triangular with a long point, toothed.
-pub(crate) fn birch_leaf(
+pub(super) fn birch_leaf(
     sketch: &mut Sketch,
     rng: &mut Random,
     at: (f64, f64, f64),
@@ -186,7 +186,7 @@ pub(crate) fn birch_leaf(
 }
 
 /// An apple's: ovate, finely toothed, its halves folded up.
-pub(crate) fn apple_leaf(
+pub(super) fn apple_leaf(
     sketch: &mut Sketch,
     rng: &mut Random,
     at: (f64, f64, f64),
@@ -216,7 +216,7 @@ pub(crate) fn apple_leaf(
 }
 
 /// A Japanese maple's: seven narrow pointed lobes cut nearly to the stalk.
-pub(crate) fn japanese_maple_leaf(
+pub(super) fn japanese_maple_leaf(
     sketch: &mut Sketch,
     rng: &mut Random,
     at: (f64, f64, f64),
@@ -244,7 +244,7 @@ pub(crate) fn japanese_maple_leaf(
 }
 
 /// A saucer magnolia's: large, widest above the middle, a wedge to the stalk.
-pub(crate) fn magnolia_leaf(
+pub(super) fn magnolia_leaf(
     sketch: &mut Sketch,
     rng: &mut Random,
     at: (f64, f64, f64),
@@ -277,7 +277,7 @@ pub(crate) fn magnolia_leaf(
 }
 
 /// A weeping willow's: long and narrow.
-pub(crate) fn willow_leaf(
+pub(super) fn willow_leaf(
     sketch: &mut Sketch,
     rng: &mut Random,
     at: (f64, f64, f64),
@@ -308,7 +308,7 @@ pub(crate) fn willow_leaf(
 }
 
 /// A lemon's: elliptic, pointed, glossy.
-pub(crate) fn lemon_leaf(
+pub(super) fn lemon_leaf(
     sketch: &mut Sketch,
     rng: &mut Random,
     at: (f64, f64, f64),
@@ -340,7 +340,7 @@ pub(crate) fn lemon_leaf(
 
 /// A flowering cherry's young leaf among its blossom: ovate with a long point, folded, bronze. (Its colour is the
 /// bronze over the petals' pink: the card's pink tints the whole tile, the petals pale in it.)
-pub(crate) fn cherry_leaf(
+pub(super) fn cherry_leaf(
     sketch: &mut Sketch,
     rng: &mut Random,
     at: (f64, f64, f64),
@@ -380,7 +380,7 @@ pub(crate) fn cherry_leaf(
 
 /// A double cherry blossom `size` across at `at`: three rings of notched petals, the outer ones lying open, the
 /// inner standing, paler outside and a deeper pink at its heart.
-pub(crate) fn flower(
+pub(super) fn flower(
     sketch: &mut Sketch,
     rng: &mut Random,
     at: (f64, f64, f64),
@@ -438,7 +438,7 @@ pub(crate) fn flower(
 
 /// The longest a leaf from `p` heading `heading` may be (up to `length`) and stay within `reach` (across, up)
 /// of the tile's middle, its tip and both its shoulders (`wide` of its length across).
-pub(crate) fn fits(
+pub(super) fn fits(
     p: (f64, f64),
     heading: f64,
     mut length: f64,
@@ -472,39 +472,39 @@ pub(crate) fn fits(
 
 /// How a species' leaves stand in a cluster: on twigs fanning from the tile's middle.
 #[derive(Clone, Copy)]
-pub(crate) struct Spray {
-    pub(crate) leaf: Leaf,
+pub(super) struct Spray {
+    pub(super) leaf: Leaf,
     /// The tile, metres (the species' cards are about as wide).
-    pub(crate) across: f64,
+    pub(super) across: f64,
     /// A leaf's length, metres, and its width of that (for keeping it in the tile).
-    pub(crate) size: (f64, f64),
-    pub(crate) wide: f64,
+    pub(super) size: (f64, f64),
+    pub(super) wide: f64,
     /// Twigs, how far the first is turned, and each one's length, of the reach.
-    pub(crate) twigs: usize,
-    pub(crate) turn: f64,
-    pub(crate) long: (f64, f64),
+    pub(super) twigs: usize,
+    pub(super) turn: f64,
+    pub(super) long: (f64, f64),
     /// A twig's radius at its foot and its tip, metres, and its colour.
-    pub(crate) wood: (f64, f64, Tone),
+    pub(super) wood: (f64, f64, Tone),
     /// Leaves along each twig (from `from` of the way out), in pairs when `opposite`, standing `lean` radians
     /// off the twig at its foot and at its tip; `tip` more fanned round its end; `fill` lying under them all.
-    pub(crate) per: usize,
-    pub(crate) from: f64,
-    pub(crate) opposite: bool,
-    pub(crate) lean: (f64, f64),
-    pub(crate) tip: usize,
-    pub(crate) fill: usize,
+    pub(super) per: usize,
+    pub(super) from: f64,
+    pub(super) opposite: bool,
+    pub(super) lean: (f64, f64),
+    pub(super) tip: usize,
+    pub(super) fill: usize,
     /// How far out the leaves lying under lie, of the reach.
-    pub(crate) fill_out: f64,
+    pub(super) fill_out: f64,
     /// Leaves laid over the twigs' foot last.
-    pub(crate) top: usize,
+    pub(super) top: usize,
     /// How wide the twigs fan (radians: all round, or to one side as a hanging spray's) and how far back from the
     /// tile's middle their foot is, of the reach.
-    pub(crate) fan: f64,
-    pub(crate) foot: f64,
+    pub(super) fan: f64,
+    pub(super) foot: f64,
 }
 
 /// A cluster in a tile: the leaves lying under it first, then each twig's, the later laid over the earlier.
-pub(crate) fn spray(sketch: &mut Sketch, rng: &mut Random, s: Spray) {
+pub(super) fn spray(sketch: &mut Sketch, rng: &mut Random, s: Spray) {
     let reach = s.across / 2.0 * REACH;
     let total = s.fill + s.top + s.twigs * (s.per * if s.opposite { 2 } else { 1 } + s.tip);
     let mut n = 0;
@@ -625,7 +625,7 @@ pub(crate) fn spray(sketch: &mut Sketch, rng: &mut Random, s: Spray) {
 
 /// A wall of a species' leaves over `across` metres round the tile's middle (and a little past it), at every angle,
 /// a few deep.
-pub(crate) fn wall(
+pub(super) fn wall(
     sketch: &mut Sketch,
     rng: &mut Random,
     leaf: Leaf,
@@ -657,7 +657,7 @@ pub(crate) fn wall(
 
 /// A cluster of cherry blossom: bunches of flowers on short stalks along twigs fanning from the tile's middle,
 /// a couple of bronze young leaves beside each bunch.
-pub(crate) fn blossom(sketch: &mut Sketch, rng: &mut Random, across: f64, twigs: usize, turn: f64) {
+pub(super) fn blossom(sketch: &mut Sketch, rng: &mut Random, across: f64, twigs: usize, turn: f64) {
     let reach = across / 2.0 * REACH;
     let size = (0.06, 0.092);
     let wood = tone(0.32, 1.4);
@@ -749,7 +749,7 @@ pub(crate) fn blossom(sketch: &mut Sketch, rng: &mut Random, across: f64, twigs:
 }
 
 /// A wall of cherry blossom with a few young leaves in it.
-pub(crate) fn blossom_wall(sketch: &mut Sketch, rng: &mut Random, across: f64) {
+pub(super) fn blossom_wall(sketch: &mut Sketch, rng: &mut Random, across: f64) {
     let half = across / 2.0 + 0.04;
     let flowers = (2.2 * (2.0 * half) * (2.0 * half) / (0.078 * 0.078 * 0.8)) as usize;
     for i in 0..flowers {
@@ -773,7 +773,7 @@ pub(crate) fn blossom_wall(sketch: &mut Sketch, rng: &mut Random, across: f64) {
 /// A weeping willow's hanging shoots as its strands' cards show them, `wide` by `tall` metres (the tile's top is
 /// up): slender shoots from the top edge to the bottom, swaying a little, narrow leaves down both sides of each,
 /// pointing down and out.
-pub(crate) fn strands(sketch: &mut Sketch, rng: &mut Random, wide: f64, tall: f64, shoots: usize) {
+pub(super) fn strands(sketch: &mut Sketch, rng: &mut Random, wide: f64, tall: f64, shoots: usize) {
     let reach = (wide / 2.0 * REACH, tall / 2.0 * REACH);
     let wood = tone(0.7, 1.6);
     for s in 0..shoots {

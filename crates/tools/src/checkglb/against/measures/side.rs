@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 /// How a side's model files get where its manifests name them.
-pub(crate) enum Origin {
+pub(super) enum Origin {
     /// They are there.
     Here,
     /// Read from a revision into the scratch folder `at`, laid out as the checkout.
@@ -16,23 +16,23 @@ pub(crate) enum Origin {
 }
 
 /// One side of the comparison: where it is read from, its manifests stacked and its centres.
-pub(crate) struct Side {
-    pub(crate) paths: Paths,
-    pub(crate) origin: Origin,
-    pub(crate) root: String,
-    pub(crate) stack: Vec<(String, J)>,
-    pub(crate) entries: BTreeMap<String, (J, String)>,
-    pub(crate) fin: Finishes,
-    pub(crate) centres: J,
+pub(super) struct Side {
+    pub(super) paths: Paths,
+    pub(super) origin: Origin,
+    pub(super) root: String,
+    pub(super) stack: Vec<(String, J)>,
+    pub(super) entries: BTreeMap<String, (J, String)>,
+    pub(super) fin: Finishes,
+    pub(super) centres: J,
 }
 
-pub(crate) const ASSETS: &str = "web/public/assets";
-pub(crate) const CENTRES: &str = "tools/art/centres.json";
+pub(super) const ASSETS: &str = "web/public/assets";
+pub(super) const CENTRES: &str = "tools/art/centres.json";
 /// Where a revision from before the models' tools moved has its centres (the tags ref/blender and
 /// ref/blender-civic).
-pub(crate) const CENTRES_BEFORE: &str = "tools/art/blender/centres.json";
+pub(super) const CENTRES_BEFORE: &str = "tools/art/blender/centres.json";
 
-pub(crate) fn copy(from: &Path, to: &Path) -> Result<(), String> {
+pub(super) fn copy(from: &Path, to: &Path) -> Result<(), String> {
     if let Some(dir) = to.parent() {
         std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     }
@@ -42,7 +42,7 @@ pub(crate) fn copy(from: &Path, to: &Path) -> Result<(), String> {
 }
 
 /// The manifests of the packs under an assets root: `packs/<name>/manifest.json`, from the root.
-pub(crate) fn pack_manifests(assets: &str) -> Vec<String> {
+pub(super) fn pack_manifests(assets: &str) -> Vec<String> {
     let mut out: Vec<String> = std::fs::read_dir(Path::new(assets).join("packs"))
         .into_iter()
         .flatten()

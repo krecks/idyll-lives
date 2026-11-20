@@ -5,7 +5,7 @@ use super::*;
 /// How far (m) each of a shell's source vertices is from the shell's nearest open edge, on the base body's surface
 /// (so every stage shares it), for the shader's hem band. Edges between two vertices `skip` marks are left out (a
 /// jacket's sleeve ends, which sink into the painted sleeve).
-pub(crate) fn edge_distance(
+pub(super) fn edge_distance(
     family: &str,
     src: &Src,
     idx: &[usize],
@@ -29,18 +29,18 @@ pub(crate) fn edge_distance(
 
 /// The apron's piece of the base body (the front of the torso and thighs, from the waistband to above the knees),
 /// clipped faces and their source edges: stage independent.
-pub(crate) struct ApronLayout {
-    pub(crate) src: Src,
-    pub(crate) idx: Vec<usize>,
+pub(super) struct ApronLayout {
+    pub(super) src: Src,
+    pub(super) idx: Vec<usize>,
 }
 
-pub(crate) static APRON_LAYOUTS: Cache<(String, bool), ApronLayout> = Cache::new();
+pub(super) static APRON_LAYOUTS: Cache<(String, bool), ApronLayout> = Cache::new();
 /// How far the apron reaches round the body from the front (radians either side).
-pub(crate) const APRON_SPAN: f64 = 1.28;
+pub(super) const APRON_SPAN: f64 = 1.28;
 /// Where the apron sits: its waistband above the trousers' (m, on the base body, over the pelvis) and its hem
 /// above the knees.
-pub(crate) const APRON_WAIST: f64 = 0.085;
-pub(crate) const APRON_HEM: f64 = 0.03;
+pub(super) const APRON_WAIST: f64 = 0.085;
+pub(super) const APRON_HEM: f64 = 0.03;
 
 fn apron_layout(family: &str, lod: bool) -> Arc<ApronLayout> {
     APRON_LAYOUTS.get((family.to_string(), lod), || {
@@ -81,7 +81,7 @@ fn apron_layout(family: &str, lod: bool) -> Arc<ApronLayout> {
 /// The apron's shell: the body's own front surface from the waistband to above the knees, lifted off the trousers,
 /// its edges turned back to the cloth's thickness. It is painted in the top's colour, with the shirt painted on the
 /// body under it in white (the runtime's `SHIRTS.apron`); the waist tie is the top edge's band.
-pub(crate) fn apron(family: &str, stage: &str, lod: bool) -> Mesh {
+pub(super) fn apron(family: &str, stage: &str, lod: bool) -> Mesh {
     let lay = apron_layout(family, lod);
     let (pos, nor, mut d) = shell_on(family, stage, &lay.src, lod);
     let k = proportions(family, stage).h / 1.7;

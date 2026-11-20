@@ -80,7 +80,7 @@ pub fn seeded(rows: &[SizeRow], baseline: &Baseline) -> Result<Baseline, String>
 
 /// `sizes`'s baseline flags over `rows`: `--seed-baseline` writes the section (`seeded`), `--update-baseline`
 /// lowers it (`lowered`), then `--check` judges by it (`judged`). The exit code: 1 if `--check` found something.
-pub(crate) fn baselined(paths: &Paths, rows: &[SizeRow], args: &[String]) -> Result<i32, String> {
+pub(super) fn baselined(paths: &Paths, rows: &[SizeRow], args: &[String]) -> Result<i32, String> {
     use crate::checkglb::baseline::FILE;
     let has = |flag: &str| args.iter().any(|a| a == flag);
     let mut baseline = Baseline::read(&paths.baseline)?;

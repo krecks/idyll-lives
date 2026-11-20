@@ -98,7 +98,7 @@ pub fn within(v: f64, [lo, hi]: [f64; 2], tolerance: f64) -> bool {
 
 /// What `within` found wrong, as a table cell, to the millimetre (to the centimetre, 1.2104 over 1.21 read "1.21 >
 /// 1.21"): `H 1.215 > 1.100 (0.78–1.00 ±10 %)`, `top 0.766 > 0.760 (0.71–0.76)`.
-pub(crate) fn outside(name: &str, v: f64, [lo, hi]: [f64; 2], tolerance: f64) -> String {
+pub(super) fn outside(name: &str, v: f64, [lo, hi]: [f64; 2], tolerance: f64) -> String {
     let (l, h) = (lo * (1.0 - tolerance), hi * (1.0 + tolerance));
     let side = if v < l {
         format!("{v:.3} < {l:.3}")

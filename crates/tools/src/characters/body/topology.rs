@@ -11,10 +11,10 @@ pub struct Topology {
     pub body: Csr,
     /// Cage -> its own limit points, and its LU (factored once).
     pub a: Csr,
-    pub(crate) lu: LU<f64, Dyn, Dyn>,
+    pub(super) lu: LU<f64, Dyn, Dyn>,
     /// Per level-1 and level-2 point, how far it is snapped onto the smooth head (`snapped`).
-    pub(crate) snap1: Vec<f64>,
-    pub(crate) snap2: Vec<f64>,
+    pub(super) snap1: Vec<f64>,
+    pub(super) snap2: Vec<f64>,
     pub lod_tris: Vec<[usize; 3]>,
     /// A second level, only to sample the head densely (head_frame).
     pub s2: Subdivision,
@@ -79,7 +79,7 @@ impl Topology {
     }
 
     /// Cage positions whose limit points are `t` (splu's solve, here a dense LU).
-    pub(crate) fn solve(&self, t: &[V3]) -> Vec<V3> {
+    pub(super) fn solve(&self, t: &[V3]) -> Vec<V3> {
         let mut out = vec![V3::zeros(); t.len()];
         for k in 0..3 {
             let rhs = DVector::from_iterator(t.len(), t.iter().map(|p| p[k]));
@@ -97,7 +97,7 @@ impl Topology {
     /// between them the face grid's uneven spacing and the ends of its partial lines (3-valent vertices,
     /// pentagons) dent it by up to 4 mm and turn its normals by up to 17 degrees, which showed as patches
     /// on the cheeks; snapped, the head is the smooth one plus the features.
-    pub(crate) fn snapped(
+    pub(super) fn snapped(
         &self,
         fine: bool,
         base: &[V3],
@@ -132,14 +132,14 @@ pub struct TagArrays {
 }
 
 impl TagArrays {
-    pub(crate) fn of(t: &[Tags]) -> Self {
+    pub(super) fn of(t: &[Tags]) -> Self {
         TagArrays {
             arm: t.iter().map(|t| t.arm).collect(),
             blush: t.iter().map(|t| t.blush).collect(),
         }
     }
 
-    pub(crate) fn subdivided(&self, m: &Csr) -> Self {
+    pub(super) fn subdivided(&self, m: &Csr) -> Self {
         TagArrays {
             arm: m.apply1(&self.arm),
             blush: m.apply1(&self.blush),

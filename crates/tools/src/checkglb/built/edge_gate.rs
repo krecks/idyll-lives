@@ -5,7 +5,7 @@ use super::*;
 // ---- edges --------------------------------------------------------------------------------------------
 
 /// The parts a camera draws (not the shadow map's own), as the edge rule reads them: what hides what behind it.
-pub(crate) fn drawn(parts: &[Part], surfaces: &Surfaces) -> Vec<Mesh> {
+pub(super) fn drawn(parts: &[Part], surfaces: &Surfaces) -> Vec<Mesh> {
     parts
         .iter()
         .filter(|p| !p.shadow_only)
@@ -19,7 +19,7 @@ pub(crate) fn drawn(parts: &[Part], surfaces: &Surfaces) -> Vec<Mesh> {
 /// The cutaway's look bits (web/src/render/shared/geometry.ts `LOOK`) for a camera the way `way` from what it looks at,
 /// as the renderer sets them (`PlayCanvasRenderer.updateCutaway`: a bit where the camera looks more than 0.3 along
 /// an axis). The dump's z is the game's mirrored.
-pub(crate) fn look_bits(way: V3) -> u8 {
+pub(super) fn look_bits(way: V3) -> u8 {
     let flat = (way[0] * way[0] + way[2] * way[2]).sqrt().max(1e-12);
     let (dx, dz) = (-way[0] / flat, way[2] / flat);
     u8::from(dx > 0.3)
@@ -31,7 +31,7 @@ pub(crate) fn look_bits(way: V3) -> u8 {
 /// A house's parts as drawn with the camera near (no roofs) on storey `storey` (those above it hidden), the walls
 /// cut away for a camera looking `look` (0: every wall standing): a vertex whose two masks both have a bit of
 /// `look` drops to the stub's height over its storey's floor, or goes with its triangles (`shaders/cutaway.ts`).
-pub(crate) fn cut_away(
+pub(super) fn cut_away(
     parts: &[Part],
     surfaces: &Surfaces,
     index: &Index,
@@ -67,9 +67,9 @@ pub(crate) fn cut_away(
 
 /// The line an edge lies on, to the millimetre: its part and material, its direction and where it passes
 /// nearest the origin. The same edge found in two states of a house is on the same line.
-pub(crate) type Line = (String, String, [i64; 3], [i64; 3]);
+pub(super) type Line = (String, String, [i64; 3], [i64; 3]);
 
-pub(crate) fn line_of(e: &Edge) -> Line {
+pub(super) fn line_of(e: &Edge) -> Line {
     let first = e
         .along
         .iter()
@@ -94,7 +94,7 @@ pub(crate) struct Edges(pub BTreeMap<Line, (usize, f64, Option<Edge>)>);
 
 impl Edges {
     /// One state's edges by line.
-    pub(crate) fn of(edges: Vec<Edge>) -> Edges {
+    pub(super) fn of(edges: Vec<Edge>) -> Edges {
         let mut out = Edges::default();
         for e in edges {
             let slot = out.0.entry(line_of(&e)).or_default();
@@ -108,7 +108,7 @@ impl Edges {
     }
 
     /// With another state's: a line both have keeps the one that shows more of it.
-    pub(crate) fn or(&mut self, other: Edges) {
+    pub(super) fn or(&mut self, other: Edges) {
         for (line, found) in other.0 {
             match self.0.get_mut(&line) {
                 Some(mine) if mine.1 >= found.1 => {}
@@ -130,7 +130,7 @@ impl Edges {
     }
 
     /// The longest edge of each line, the longest first.
-    pub(crate) fn longest(&self) -> Vec<&Edge> {
+    pub(super) fn longest(&self) -> Vec<&Edge> {
         let mut out: Vec<&Edge> = self.0.values().filter_map(|v| v.2.as_ref()).collect();
         out.sort_by(|a, b| {
             b.length
@@ -195,7 +195,7 @@ pub(crate) fn runs(e: &Edge) -> &'static str {
 }
 
 /// Where an edge is, in the game's own x and z (the dump's z mirrored back), to the centimetre.
-pub(crate) fn place(e: &Edge) -> String {
+pub(super) fn place(e: &Edge) -> String {
     let cm = |v: f64| format!("{:.2}", if v.abs() < 0.005 { 0.0 } else { v });
     format!(
         "{} ({}) {:.2} m {} at ({}, {}, {})",
@@ -210,7 +210,7 @@ pub(crate) fn place(e: &Edge) -> String {
 }
 
 /// The gate's line for a sample's hard edges (none: no line).
-pub(crate) fn edges_line(edges: &Edges) -> Option<String> {
+pub(super) fn edges_line(edges: &Edges) -> Option<String> {
     let longest = edges.longest();
     let first = longest.first()?;
     let n = edges.count();

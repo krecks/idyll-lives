@@ -27,9 +27,9 @@ pub fn compare_decimated(old: &[u8], new: &[u8], model: Option<&[u8]>) -> Compar
 }
 
 /// What two files that are not the same are measured by: their findings and numbers.
-pub(crate) type Measure<'a> = &'a dyn Fn(&Glb, &Glb, &mut Vec<Finding>, &mut Numbers) -> R<()>;
+pub(super) type Measure<'a> = &'a dyn Fn(&Glb, &Glb, &mut Vec<Finding>, &mut Numbers) -> R<()>;
 
-pub(crate) fn compare_by(old: &[u8], new: &[u8], measure: Measure) -> Compared {
+pub(super) fn compare_by(old: &[u8], new: &[u8], measure: Measure) -> Compared {
     let mut out = Compared::default();
     if old == new {
         out.same = true;
@@ -61,7 +61,7 @@ pub(crate) fn compare_by(old: &[u8], new: &[u8], measure: Measure) -> Compared {
 }
 
 /// A list of names for a finding: the first six, then how many more.
-pub(crate) fn names(list: &[String]) -> String {
+pub(super) fn names(list: &[String]) -> String {
     let mut out = list.iter().take(6).cloned().collect::<Vec<_>>().join(", ");
     if list.len() > 6 {
         out += &format!(" and {} more", list.len() - 6);
@@ -70,7 +70,7 @@ pub(crate) fn names(list: &[String]) -> String {
 }
 
 /// What is only in one of two sets, as findings.
-pub(crate) fn only<'a>(
+pub(super) fn only<'a>(
     metric: &'static str,
     what: &str,
     old: impl Iterator<Item = &'a String>,
@@ -91,14 +91,14 @@ pub(crate) fn only<'a>(
 
 /// A file read for the rows of `METRICS`: its nodes, their rests, its clips and its parts.
 pub(crate) struct Model {
-    pub(crate) tree: digest::Tree,
-    pub(crate) rests: Vec<Rest>,
-    pub(crate) clips: Vec<near::Clip>,
-    pub(crate) parts: Vec<Part>,
-    pub(crate) meshes: HashSet<String>,
+    pub(super) tree: digest::Tree,
+    pub(super) rests: Vec<Rest>,
+    pub(super) clips: Vec<near::Clip>,
+    pub(super) parts: Vec<Part>,
+    pub(super) meshes: HashSet<String>,
 }
 
-pub(crate) fn read(g: &Glb) -> R<Model> {
+pub(super) fn read(g: &Glb) -> R<Model> {
     let tree = digest::tree(&g.gltf)?;
     let nodes = g.gltf.get("nodes").and_then(J::list).unwrap_or(&[]);
     Ok(Model {
@@ -125,7 +125,7 @@ impl Model {
     }
 }
 
-pub(crate) fn measure(o: &Glb, n: &Glb, out: &mut Vec<Finding>, numbers: &mut Numbers) -> R<()> {
+pub(super) fn measure(o: &Glb, n: &Glb, out: &mut Vec<Finding>, numbers: &mut Numbers) -> R<()> {
     let (old, new) = (read(o)?, read(n)?);
     nodes_differ(&old, &new, out);
     materials_differ(o, n, out);

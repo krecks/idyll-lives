@@ -5,9 +5,9 @@ use super::*;
 /// A model file read: its size at rest (m, game axes: across its front x, up, front to back, as the gate's
 /// summary has it), the file and its entry (for `heights`).
 pub(crate) struct Model {
-    pub(crate) size: [f64; 3],
-    pub(crate) file: Glb,
-    pub(crate) entry: J,
+    pub(super) size: [f64; 3],
+    pub(super) file: Glb,
+    pub(super) entry: J,
 }
 
 /// A content object's model, its size (`Model`), its functional heights (`heights`, a mattress at slot 0 only)
@@ -36,7 +36,7 @@ pub struct Measure {
 /// stand on another: one with a face 2 cm or more under it on its line that is what another line found is a
 /// thing on the top (a vase, a tool, a plate: the top goes on under it), while a basin's or a hob's floor is
 /// lower than the worktop round it, which has no top under it. (Where, how high); None: no face looks up there.
-pub(crate) fn top_near(
+pub(super) fn top_near(
     s: &Sampler,
     range: [f64; 2],
     seats: &[[f64; 2]],
@@ -66,7 +66,7 @@ pub(crate) fn top_near(
 
 /// The vertical lines `top_near` looks along, those within `SEAT_CLEAR` of `seats` left out (m, game axes;
 /// across, then front to back).
-pub(crate) fn top_lines(s: &Sampler, seats: &[[f64; 2]]) -> Vec<[f64; 2]> {
+pub(super) fn top_lines(s: &Sampler, seats: &[[f64; 2]]) -> Vec<[f64; 2]> {
     const SEAT_CLEAR: f64 = 0.3;
     let Some((lo, hi)) = s.extent() else {
         return Vec::new();
@@ -132,7 +132,7 @@ pub struct Measures {
 
 /// The most draw calls a model may take: the pack entry's `draws` for the one model whose moving parts can't fit
 /// in four (the grandfather clock's trunk door, which swings open while it is wound), four for every other.
-pub(crate) fn draws_allowed(entry: &J) -> Result<usize, String> {
+pub(super) fn draws_allowed(entry: &J) -> Result<usize, String> {
     match entry.get("draws") {
         None => Ok(DRAWS.1),
         Some(v) => match v.num().map(|n| n.f()) {
@@ -146,7 +146,7 @@ pub(crate) fn draws_allowed(entry: &J) -> Result<usize, String> {
 }
 
 /// Reads and measures a model file of the manifests (`path`) with its entry: its size at rest, times `scale`.
-pub(crate) fn model(entry: &J, path: &str) -> R<Model> {
+pub(super) fn model(entry: &J, path: &str) -> R<Model> {
     let file = parse_glb(&std::fs::read(path).map_err(|e| py::os_error(&e, path))?)?;
     // Its own size: what it carries (`ASIDE`) is drawn but isn't the piece of furniture.
     let ((lo, hi), _) = bounds(&file.gltf, &HashMap::new(), &aside_nodes(&file.gltf))?;

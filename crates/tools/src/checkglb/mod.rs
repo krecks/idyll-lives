@@ -104,8 +104,8 @@ mod strict;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use birds::*;
-pub(crate) use clips::*;
+use birds::*;
+use clips::*;
 pub use files::*;
 pub use furniture::*;
 pub use main::*;

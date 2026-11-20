@@ -10,7 +10,7 @@ pub(crate) fn primitives<'a>(gltf: &'a J, mesh: &J) -> R<&'a [J]> {
 }
 
 /// The positions of a primitive: every vertex, or where they can't be read here (compressed), its box's corners.
-pub(crate) fn positions(g: &Glb, prim: &J) -> R<Vec<Vec<Num>>> {
+pub(super) fn positions(g: &Glb, prim: &J) -> R<Vec<Vec<Num>>> {
     let index = key(key(prim, "attributes")?, "POSITION")?;
     if let Some(pos) = accessor(g, index)? {
         return Ok(pos);
@@ -30,7 +30,7 @@ pub(crate) fn positions(g: &Glb, prim: &J) -> R<Vec<Vec<Num>>> {
 /// Whether a primitive's vertex colour (COLOR_0) is anything but grey. The game reads it as the shading baked into
 /// the model's creases (artkit's shade.rs) and multiplies it into the part's colour, so a colour in it would tint
 /// the part. One it can't read here (compressed) passes.
-pub(crate) fn coloured(g: &Glb, prim: &J) -> R<bool> {
+pub(super) fn coloured(g: &Glb, prim: &J) -> R<bool> {
     let Some(index) = key(prim, "attributes")?.get("COLOR_0") else {
         return Ok(false);
     };
@@ -44,7 +44,7 @@ pub(crate) fn coloured(g: &Glb, prim: &J) -> R<bool> {
 
 /// Whether an accessor's values are all the same (or can't be read here: compressed): a plain part's UVs, zero
 /// as built, (0, 1) once the writer has turned v round.
-pub(crate) fn constant(g: &Glb, index: &J) -> R<bool> {
+pub(super) fn constant(g: &Glb, index: &J) -> R<bool> {
     Ok(accessor(g, index)?.is_none_or(|rows| {
         rows.first().is_none_or(|first| {
             rows.iter()
@@ -54,7 +54,7 @@ pub(crate) fn constant(g: &Glb, index: &J) -> R<bool> {
 }
 
 /// An accessor's `min` and `max`.
-pub(crate) fn box_of(acc: &J) -> R<(Vec<Num>, Vec<Num>)> {
+pub(super) fn box_of(acc: &J) -> R<(Vec<Num>, Vec<Num>)> {
     let lo = nums(key(acc, "min")?, 0)?;
     let hi = nums(key(acc, "max")?, 0)?;
     if lo.len() < 3 || hi.len() < 3 {
@@ -64,12 +64,12 @@ pub(crate) fn box_of(acc: &J) -> R<(Vec<Num>, Vec<Num>)> {
 }
 
 /// Every element of a float accessor as given by `values`, as an index into a list: `a['samplers'][c['sampler']]`.
-pub(crate) fn sampler<'a>(a: &'a J, c: &J) -> R<&'a J> {
+pub(super) fn sampler<'a>(a: &'a J, c: &J) -> R<&'a J> {
     index(key(a, "samplers")?, key(c, "sampler")?)
 }
 
 /// Whether a sampler moves at an even speed (each key as far on from the last, per second).
-pub(crate) fn even(g: &Glb, sampler: &J) -> R<bool> {
+pub(super) fn even(g: &Glb, sampler: &J) -> R<bool> {
     let times: Vec<f64> = values(g, key(sampler, "input")?)?
         .iter()
         .map(|t| t[0])
@@ -104,7 +104,7 @@ pub(crate) fn even(g: &Glb, sampler: &J) -> R<bool> {
 
 /// A material named for its finish (`stone@matte`, `tunic@fabric#body`) maps itself to it (models.ts
 /// `namedFinish`; a tint slot `#body`, `#skin` or `#hair` in the name aside).
-pub(crate) fn named_finish(name: &str) -> Option<J> {
+pub(super) fn named_finish(name: &str) -> Option<J> {
     // re.sub(r'#(body|skin|hair)(?=@|$)', '', name)
     let mut s = String::with_capacity(name.len());
     let mut rest = name;
@@ -210,7 +210,7 @@ pub(crate) fn played(motions: &J) -> R<Vec<(J, String)>> {
 
 /// The clips of `motions` that go round, or from rest to rest (and so must end where they start): loops,
 /// `idle`, `running`, `burn`, a use's clip that repeats (`every`) and a clock's hands (a whole turn). As dict keys.
-pub(crate) fn loops(motions: &J) -> R<HashSet<String>> {
+pub(super) fn loops(motions: &J) -> R<HashSet<String>> {
     let mut out = HashSet::new();
     for (_, clip) in motions
         .get("loops")
@@ -242,7 +242,7 @@ pub(crate) fn loops(motions: &J) -> R<HashSet<String>> {
 /// What's wrong with the fields of an entry's `motions` (objectMotion.ts): a use's `delay` and `hold` are
 /// seconds (0 or more), `every` and `out` more than 0, `slot` a slot number, `over` 1 or -1 (along with the use,
 /// forward or back); `clock` names its hands' clips.
-pub(crate) fn motions_errors(motions: &J) -> Vec<String> {
+pub(super) fn motions_errors(motions: &J) -> Vec<String> {
     let mut errors = Vec::new();
     for (name, u) in uses(motions) {
         let name = repr_str(&name);

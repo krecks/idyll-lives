@@ -3,15 +3,15 @@
 use super::*;
 
 /// One buffer view to be: its elements, `stride` bytes each.
-pub(crate) struct Stream {
-    pub(crate) bytes: Vec<u8>,
-    pub(crate) stride: usize,
-    pub(crate) triangles: bool,
+pub(super) struct Stream {
+    pub(super) bytes: Vec<u8>,
+    pub(super) stride: usize,
+    pub(super) triangles: bool,
     /// `ARRAY_BUFFER`, `ELEMENT_ARRAY_BUFFER`, or none (an animation's).
-    pub(crate) target: Option<u64>,
+    pub(super) target: Option<u64>,
 }
 
-pub(crate) fn compress(stream: &Stream) -> Result<Vec<u8>, String> {
+pub(super) fn compress(stream: &Stream) -> Result<Vec<u8>, String> {
     let count = stream.bytes.len() / stream.stride;
     if stream.triangles {
         let indices: Vec<u32> = (0..count)
@@ -54,24 +54,24 @@ pub(crate) fn compress(stream: &Stream) -> Result<Vec<u8>, String> {
 }
 
 /// An accessor to be, on stream `stream`.
-pub(crate) struct Out {
-    pub(crate) stream: usize,
-    pub(crate) offset: usize,
-    pub(crate) component: u64,
-    pub(crate) normalized: bool,
-    pub(crate) kind: String,
-    pub(crate) count: usize,
-    pub(crate) min: Option<J>,
-    pub(crate) max: Option<J>,
+pub(super) struct Out {
+    pub(super) stream: usize,
+    pub(super) offset: usize,
+    pub(super) component: u64,
+    pub(super) normalized: bool,
+    pub(super) kind: String,
+    pub(super) count: usize,
+    pub(super) min: Option<J>,
+    pub(super) max: Option<J>,
 }
 
-pub(crate) struct Builder {
-    pub(crate) streams: Vec<Stream>,
-    pub(crate) accessors: Vec<Out>,
+pub(super) struct Builder {
+    pub(super) streams: Vec<Stream>,
+    pub(super) accessors: Vec<Out>,
 }
 
 impl Builder {
-    pub(crate) fn stream(&mut self, bytes: Vec<u8>, stride: usize, target: Option<u64>) -> usize {
+    pub(super) fn stream(&mut self, bytes: Vec<u8>, stride: usize, target: Option<u64>) -> usize {
         self.streams.push(Stream {
             bytes,
             stride,
@@ -82,7 +82,7 @@ impl Builder {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn accessor(
+    pub(super) fn accessor(
         &mut self,
         stream: usize,
         offset: usize,
@@ -108,7 +108,7 @@ impl Builder {
 }
 
 /// `a`'s elements in `order` (new place -> old vertex), each padded to `stride` bytes.
-pub(crate) fn reordered(a: &Accessor, order: &[u32], stride: usize) -> Vec<u8> {
+pub(super) fn reordered(a: &Accessor, order: &[u32], stride: usize) -> Vec<u8> {
     let size = a.data.len() / a.count.max(1);
     let mut out = vec![0u8; order.len() * stride];
     for (i, &old) in order.iter().enumerate() {
@@ -118,7 +118,7 @@ pub(crate) fn reordered(a: &Accessor, order: &[u32], stride: usize) -> Vec<u8> {
     out
 }
 
-pub(crate) fn bounds_i16(values: &[i16], width: usize) -> (J, J) {
+pub(super) fn bounds_i16(values: &[i16], width: usize) -> (J, J) {
     let mut lo = vec![i16::MAX; width];
     let mut hi = vec![i16::MIN; width];
     for v in values.chunks_exact(width) {
@@ -131,7 +131,7 @@ pub(crate) fn bounds_i16(values: &[i16], width: usize) -> (J, J) {
 }
 
 /// Why a model is left as it is, if it is.
-pub(crate) fn unsupported(j: &J) -> Option<String> {
+pub(super) fn unsupported(j: &J) -> Option<String> {
     if list(j, "buffers").len() != 1 {
         return Some(format!("{} buffers", list(j, "buffers").len()));
     }

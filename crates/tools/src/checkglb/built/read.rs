@@ -153,14 +153,14 @@ pub struct Pictures {
 }
 
 impl Pictures {
-    pub(crate) fn side(&mut self, file: &str) -> Option<f64> {
+    pub(super) fn side(&mut self, file: &str) -> Option<f64> {
         *self.sides.entry(file.to_string()).or_insert_with(|| {
             let (w, h) = image_size(&std::fs::read(file).ok()?)?;
             Some((w as f64 * h as f64).sqrt())
         })
     }
 
-    pub(crate) fn mean(&mut self, file: &str) -> Option<[f64; 3]> {
+    pub(super) fn mean(&mut self, file: &str) -> Option<[f64; 3]> {
         *self.means.entry(file.to_string()).or_insert_with(|| {
             let rgb = image::load_from_memory(&std::fs::read(file).ok()?)
                 .ok()?

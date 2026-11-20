@@ -29,4 +29,4 @@ pub struct Model {
     pub spans: Vec<f32>,
 }
 
-pub(crate) type Mat = [[f32; 4]; 3];
+pub(super) type Mat = [[f32; 4]; 3];

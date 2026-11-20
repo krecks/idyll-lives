@@ -3,27 +3,27 @@
 use super::*;
 
 /// How round the hair's edge is where it meets the ovals round the ears (m: the smoothing's width).
-pub(crate) const RIM_ROUND: f64 = 0.011;
+pub(super) const RIM_ROUND: f64 = 0.011;
 
 /// How far hair keeps off the ears (m); the check wants more than `EAR_MIN`.
-pub(crate) const EAR_CLEAR: f64 = 0.003;
+pub(super) const EAR_CLEAR: f64 = 0.003;
 pub const EAR_MIN: f64 = 0.0015;
 
 /// The ears as drawn (ear.rs: pieces set into the head, which the head's `sdf` knows nothing of), to
 /// keep hair off them: how far a point is into one.
 pub struct Ears {
-    pub(crate) ears: Vec<Ear>,
+    pub(super) ears: Vec<Ear>,
 }
 
-pub(crate) struct Ear {
+pub(super) struct Ear {
     /// Its side (sign of x) and its box grown by 2 cm.
-    pub(crate) side: f64,
-    pub(crate) lo: V3,
-    pub(crate) hi: V3,
+    pub(super) side: f64,
+    pub(super) lo: V3,
+    pub(super) hi: V3,
     /// The ear's own faces, and the same closed over its foot in the head (a ray out to the side
     /// crosses these an odd number of times from inside the ear).
-    pub(crate) own: Vec<[V3; 3]>,
-    pub(crate) closed: Vec<[V3; 3]>,
+    pub(super) own: Vec<[V3; 3]>,
+    pub(super) closed: Vec<[V3; 3]>,
 }
 
 impl Ears {
@@ -95,7 +95,7 @@ impl Ears {
 }
 
 /// The least distance to the head (sdf) at and round a point.
-pub(crate) fn near_sdf(h: &HeadFrame, p: V3) -> f64 {
+pub(super) fn near_sdf(h: &HeadFrame, p: V3) -> f64 {
     let r = 0.0004;
     let mut d = h.sdf(p);
     for e in [
@@ -111,7 +111,7 @@ pub(crate) fn near_sdf(h: &HeadFrame, p: V3) -> f64 {
     d
 }
 
-pub(crate) fn grad(h: &HeadFrame, p: V3, e: f64) -> V3 {
+pub(super) fn grad(h: &HeadFrame, p: V3, e: f64) -> V3 {
     let mut g = V3::zeros();
     for k in 0..3 {
         let mut d = V3::zeros();
