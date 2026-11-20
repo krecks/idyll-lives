@@ -40,6 +40,8 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const cut = process.argv.indexOf('--');
 const args = process.argv.slice(2, cut < 0 ? undefined : cut);
 const passed = cut < 0 ? [] : process.argv.slice(cut + 1);
+/** A run's steady window (s): gameplay.mjs's `--secs` as passed, else its default. */
+const runSecs = passed.includes('--secs') ? Number(passed[passed.indexOf('--secs') + 1]) || 150 : 150;
 const flag = (name, fallback) => {
   const i = args.indexOf(`--${name}`);
   return i >= 0 && args[i + 1] !== undefined && !args[i + 1].startsWith('--') ? args[i + 1] : fallback;
@@ -109,10 +111,11 @@ for (let i = 0; i < runs; i++) {
     const dir = join(out, `${b.name}-${i + 1}`);
     const load = loadavg()[0];
     console.log(`\n${b.name.toUpperCase()} run ${i + 1}/${runs} (load ${load.toFixed(1)} on ${cpus().length} cores)`);
-    const r = spawnSync('bun', [join(HERE, 'gameplay.mjs'), '--url', b.url, '--runs', '1', '--out', dir, ...passed], { stdio: 'inherit', cwd: ROOT, env: process.env });
+    // (A run that outlives its window by ten minutes is stuck, not slow: it is stopped and counted as failed.)
+    const r = spawnSync('bun', [join(HERE, 'gameplay.mjs'), '--url', b.url, '--runs', '1', '--out', dir, ...passed], { stdio: 'inherit', cwd: ROOT, env: process.env, timeout: (runSecs + 600) * 1000, killSignal: 'SIGTERM' });
     const file = join(dir, 'summary.json');
     if (r.status !== 0 || !existsSync(file)) {
-      failures.push(`${b.name}-${i + 1}: gameplay.mjs exited ${r.status}`);
+      failures.push(`${b.name}-${i + 1}: gameplay.mjs ${r.error?.code === 'ETIMEDOUT' ? `stopped after ${runSecs + 600} s` : `exited ${r.status}`}`);
       continue;
     }
     const run = JSON.parse(readFileSync(file, 'utf8')).runs[0];
