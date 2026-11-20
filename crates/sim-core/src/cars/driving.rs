@@ -1003,6 +1003,9 @@ pub(crate) fn pull_over(
 /// `Near` and one looking (`drive_on` a tick on, `back_off` a tick back).
 pub(crate) const PULL_SLACK: f32 = 2.0;
 
+/// None of them (`Near::near`: their numbers have moved, so it looks at every one).
+const NO_CARS: &[([f32; 2], usize)] = &[];
+
 /// Cars by where they are, so a check that pairs one with another (`pull_want`) need only look at
 /// those near it, not at every car in town. `cars::update` builds it each tick; `turn_round_by`
 /// puts one back as it's put back along its way (tens of metres at once).
@@ -1025,14 +1028,17 @@ fn by_x_order(a: &([f32; 2], usize), b: &([f32; 2], usize)) -> std::cmp::Orderin
 
 impl Near {
     /// Builds it afresh from `cars`.
-    fn build(&mut self, cars: &[Car]) {
+    pub(crate) fn build(&mut self, cars: &[Car]) {
         self.by_x.clear();
-        self.by_x
-            .extend(cars.iter().enumerate().map(|(c, car)| (car.middle(), c)));
+        self.most_len = 0.0;
+        self.most_wid = 0.0;
+        for (c, car) in cars.iter().enumerate() {
+            self.by_x.push((car.middle(), c));
+            self.most_len = self.most_len.max(car.len);
+            self.most_wid = self.most_wid.max(car.wid);
+        }
         self.by_x.sort_unstable_by(by_x_order);
         self.built = cars.len();
-        self.most_len = cars.iter().map(|c| c.len).fold(0.0, f32::max);
-        self.most_wid = cars.iter().map(|c| c.wid).fold(0.0, f32::max);
     }
 
     /// Puts car `c` at `at` (as it is now). One not in it is looked at whatever (`near`).
@@ -1071,7 +1077,7 @@ impl Near {
                 self.built..cars,
             )
         } else {
-            (&self.by_x[..0], 0..cars)
+            (NO_CARS, 0..cars)
         };
         window
             .iter()
@@ -1326,54 +1332,13 @@ pub(crate) fn sight(w: &mut World) {
                     }
                 }
                 // (Without a watch the way into town is in sight, where it waits its turn,
-                // `room_to_come_in`.)
+                // `waits_for_queue`.)
                 Some(k) if !in_now && area.is_some() => Sight::Wait(k),
                 // (Its way in held up just inside: out of sight nobody waits, so those coming
                 // would all come in at once. It waits outside till the queue there has room for
                 // it, as the rules would have let it come, `METER`.)
                 None if !in_now && area.is_some() => {
-                    let bodies: Vec<(u64, Rect)> = cars
-                        .iter()
-                        .enumerate()
-                        .filter(|&(o, k)| {
-                            o != c
-                                && k.sight == Sight::Seen
-                                && matches!(k.state, CarState::Leaving | CarState::Arriving)
-                                && (k.standing || tick >= k.stall.1 + METER_STILL)
-                        })
-                        .filter_map(|(o, k)| Some((car_first(o), on(k)?)))
-                        .collect();
-                    let route = &cars[c].route.as_ref().expect("its way").1;
-                    // (Its place on its way in, up to the first junction it takes turns at in
-                    // sight: the queue for it.)
-                    let upto = route
-                        .claims
-                        .iter()
-                        .map(|k| k.from)
-                        .find(|&f| f > t && near(route.at(f).0, 0.0))
-                        .unwrap_or(t + METER.ahead)
-                        .min(t + METER.most);
-                    let full = (0..)
-                        .map(|i| t + 1.0 + i as f32 * SIGHT_STEP)
-                        .take_while(|&s| s < upto)
-                        .find_map(|s| {
-                            let (p, yaw, _) = route.at(s);
-                            let r = Rect {
-                                at: shifted(p, yaw, shift),
-                                yaw,
-                                half,
-                            };
-                            bodies
-                                .iter()
-                                .find(|(_, b)| b.gap(&r) < GAP + METER.gap)
-                                .map(|(k, _)| *k)
-                        });
-                    // (Not for good: waited `METER_MOST`, it comes in as it would have.)
-                    let since = *cars[c].metered.get_or_insert(tick);
-                    match full {
-                        Some(k) if tick < since + METER_MOST => Sight::Wait(k),
-                        _ => Sight::Seen,
-                    }
+                    waits_for_queue(&mut cars[..], c, t, shift, half, tick, near)
                 }
                 _ => Sight::Seen,
             }
@@ -1413,6 +1378,73 @@ pub(crate) fn sight(w: &mut World) {
         if gone(&car.pulled_for) {
             car.pulled_for = None;
         }
+    }
+}
+
+/// `Sight` for one coming into town held up just inside (`sight`): it waits outside for the one in sight its way in is
+/// held up by, if there is one where it would come in within `METER_MOST` of first waiting
+/// (`Sight::Wait`), else it comes in (`Sight::Seen`). `near`: whether a place is in the seen area.
+fn waits_for_queue(
+    cars: &mut [Car],
+    c: usize,
+    t: f32,
+    shift: f32,
+    half: [f32; 2],
+    tick: u64,
+    near: impl Fn([f32; 2], f32) -> bool,
+) -> Sight {
+    let on = |o: &Car| {
+        o.shown.map(|s| Rect {
+            at: s.0,
+            yaw: s.1,
+            half: [o.len / 2.0, o.wid / 2.0],
+        })
+    };
+    let bodies: Vec<(u64, Rect)> = cars
+        .iter()
+        .enumerate()
+        .filter(|&(o, k)| {
+            o != c
+                && k.sight == Sight::Seen
+                && matches!(k.state, CarState::Leaving | CarState::Arriving)
+                && (k.standing || tick >= k.stall.1 + METER_STILL)
+        })
+        .filter_map(|(o, k)| Some((car_first(o), on(k)?)))
+        .collect();
+    // (The way it came in by, made above (`Car::route`): one out of sight waiting has one by now,
+    // but a car without one simply comes in.)
+    let Some((_, route)) = cars[c].route.as_ref() else {
+        return Sight::Seen;
+    };
+    // (Its place on its way in, up to the first junction it takes turns at in sight: the queue for
+    // it.)
+    let upto = route
+        .claims
+        .iter()
+        .map(|k| k.from)
+        .find(|&f| f > t && near(route.at(f).0, 0.0))
+        .unwrap_or(t + METER.ahead)
+        .min(t + METER.most);
+    let full = (0..)
+        .map(|i| t + 1.0 + i as f32 * SIGHT_STEP)
+        .take_while(|&s| s < upto)
+        .find_map(|s| {
+            let (p, yaw, _) = route.at(s);
+            let r = Rect {
+                at: shifted(p, yaw, shift),
+                yaw,
+                half,
+            };
+            bodies
+                .iter()
+                .find(|(_, b)| b.gap(&r) < GAP + METER.gap)
+                .map(|(k, _)| *k)
+        });
+    // (Not for good: waited `METER_MOST`, it comes in as it would have.)
+    let since = *cars[c].metered.get_or_insert(tick);
+    match full {
+        Some(k) if tick < since + METER_MOST => Sight::Wait(k),
+        _ => Sight::Seen,
     }
 }
 
