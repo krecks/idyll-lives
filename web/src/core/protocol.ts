@@ -1436,7 +1436,14 @@ export type ToWorker =
   /** The camera's stream rectangle: the sim's full-detail area. */
   | { type: 'watch'; region: [number, number, number, number] | null }
   /** `?debug`'s `__crash`: the next step panics, an error nobody catches, or the worker hangs. */
-  | { type: 'debugCrash'; what: 'panic' | 'throw' | 'hang' };
+  | { type: 'debugCrash'; what: 'panic' | 'throw' | 'hang' }
+  /**
+   * Fixed-step playback (benchmarks, `SimBridge.pace`): `frames` stops the worker's own clock, and only `advance`
+   * runs ticks from then on; false starts its clock again.
+   */
+  | { type: 'pace'; frames: boolean }
+  /** Fixed-step playback: runs `ticks` ticks now, publishes what they changed, and answers with `advanced`. */
+  | { type: 'advance'; requestId: number; ticks: number };
 
 /** How the sim worker kept up over the last second (for the debug overlay). */
 export interface SimThreadStats {
@@ -1492,7 +1499,9 @@ export type FromWorker =
   /** `fatal`: the simulation stopped for good (a trap, or a step that failed). `problem`: the game couldn't start because of its save. */
   | { type: 'error'; message: string; fatal: boolean; problem?: SaveProblem }
   /** A save `check`ed: `problem` null if it opens. */
-  | { type: 'checked'; problem: SaveProblem | null; message: string };
+  | { type: 'checked'; problem: SaveProblem | null; message: string }
+  /** An `advance` done, after the snapshot and what the ticks changed: the ticks it ran (fewer once the game is paused). */
+  | { type: 'advanced'; requestId: number; ticks: number };
 
 /**
  * The newest thing (highest object id) a resident in `snapshot` uses or walks to, -1 if none. Ids

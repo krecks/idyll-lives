@@ -411,6 +411,13 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private frameNo = 0;
   /** Every resident posed in full every frame (`FAR_EVERY` off: to compare, from the console or a test). */
   everyFrame = false;
+
+  /** Fixed-step playback: the animation's clock and the frames posed back to 0, so the same frames pose everyone the same. */
+  restartClock(): void {
+    this.clock = 0;
+    this.frameNo = 0;
+    this.lastNow = 0;
+  }
   /** Sit / lie pelvis offsets per body (computed once from the clips). */
   private readonly sitPelvis = new Map<string, SeatFit>();
   /** The same for the floor clips (`sitFloor`), per body, then floor sit (`FloorSit.name`). */
@@ -1080,6 +1087,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
   /** Removes the Sims (end of a session); meshes stay cached. */
   clear(): void {
+    // (The next game's residents start on a clock of their own: what they do doesn't hang on how long this one ran.)
+    this.restartClock();
     this.sims = [];
     this.ghosts = [];
     this.objects = [];

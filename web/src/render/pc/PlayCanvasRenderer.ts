@@ -160,6 +160,7 @@ import { TownGhostDraw, type Drape } from './townGhosts';
 import { UseOverlayDraw } from './useOverlay';
 import { installLandDebug } from './landDebug';
 import type { Landscape } from './nature';
+import { fixFrameClock, restartDice } from '../shared/frameClock';
 
 /** The land's work after a stroke runs in slices this long (ms) a frame (`landPace`). */
 const LAND_SLICE_MS = 6;
@@ -496,6 +497,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private covered = false;
   private coveredFrames = 0;
   private readonly frameWaiters: { left: number; resolve: () => void }[] = [];
+  /** Frames drawn so far (`drawFrame` tells whether one was), and whether they are drawn on demand (`framesOnDemand`). */
+  private framesDrawn = 0;
+  private onDemand = false;
   private onFrame: ((now: number) => void) | null = null;
   private onView: (() => void) | null = null;
   private townListener: (() => void) | null = null;
@@ -819,7 +823,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private readonly lightMix = import.meta.env.DEV ? lightMixFromURL() : null;
 
   private probe: FrameProbe | null = null;
-  private readonly counts: FrameCounts = { drawCalls: 0, triangles: 0, shadowDrawCalls: 0, shadowTriangles: 0, mirrorDrawCalls: 0, mirrorTriangles: 0, lightingUpdates: 0, gpuFrames: 0, gpuMs: 0, residentsMs: 0 };
+  private readonly counts: FrameCounts = { drawCalls: 0, triangles: 0, shadowDrawCalls: 0, shadowTriangles: 0, mirrorDrawCalls: 0, mirrorTriangles: 0, lightingUpdates: 0, gpuFrames: 0, gpuMs: 0, residentsMs: 0, sunShadows: { whole: 0, moving: 0, why: {} } };
   private frameMs = 1000 / 60;
   private cpuMs = 0;
   private drawCalls = 0;
@@ -1108,6 +1112,32 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.coveredFrames = HOLD_FRAMES;
   }
 
+  framesOnDemand(on: boolean): void {
+    if (on && !this.onDemand) {
+      // What moves by a clock of its own (the residents' and the things' clips, the birds, the wind, the clouds) starts
+      // again from 0: the same frames from the same state draw the same picture, however long the page has been open.
+      this.shownMs = 0;
+      this.characters.restartClock();
+      this.lot.restartClocks();
+      this.birdLife.life.restartClock();
+      restartDice(true);
+    }
+    this.onDemand = on;
+    this.pacer.manual(on);
+    if (!on) {
+      fixFrameClock(null);
+      restartDice(false);
+    }
+  }
+
+  drawFrame(time: number): boolean {
+    const drawn = this.framesDrawn;
+    // (What is drawn at a rate of its own goes by the frame's time, until the next frame's.)
+    fixFrameClock(time);
+    this.pacer.release(time);
+    return this.framesDrawn !== drawn;
+  }
+
   framesRendered(frames: number): Promise<void> {
     return new Promise((resolve) => {
       const waiter = { left: frames, resolve };
@@ -1206,7 +1236,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
     const start = performance.now();
     const frozen = this.diag.has('freeze');
-    const dt = (this.frameDt = frozen ? 0 : Math.min(this.lastTime ? time - this.lastTime : 1000 / 60, MAX_FRAME_MS));
+    // (Never less than none: the frames after fixed-step playback, back on the wall clock, may be timed before its last.)
+    const dt = (this.frameDt = frozen ? 0 : Math.min(this.lastTime ? Math.max(0, time - this.lastTime) : 1000 / 60, MAX_FRAME_MS));
     this.lastTime = time;
     // (What moves only for the eye, the wind, the clouds and the selection marker's bob, stands still while the frame is
     // held, and goes on from there when it is drawn again: `heldFrames.ts`.)
@@ -1264,6 +1295,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         w.resolve();
       }
     }
+    this.framesDrawn++;
     const end = performance.now();
     this.cpuMs += (end - start - this.cpuMs) * 0.1;
     if (dt > 0) this.frameMs += (dt - this.frameMs) * 0.1;
@@ -1279,6 +1311,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       c.mirrorTriangles = d.triangles[2];
       c.gpuFrames = this.gpuTiming.frames;
       c.gpuMs = this.gpuTiming.ms;
+      c.sunShadows = this.sunShadows.draws;
       probe.after(start, updated, end, c);
     }
   };

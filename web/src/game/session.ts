@@ -66,6 +66,7 @@ import { gameAssetPlan, parseAheadFiles, streamRanks } from './streamPlan';
 import { GameSpeed, SUPER_SPEED } from './speed';
 import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
+import { fixedStart } from '../render/shared/frameClock';
 
 declare global {
   interface Window {
@@ -173,6 +174,18 @@ export interface GameSession {
   reveal(): void;
   /** Ends the session; resolves once it has let go of the renderer, which is kept for the next one. */
   dispose(): Promise<void>;
+  /**
+   * Fixed-step playback (benchmarks, `debug/benchTime.ts`): the simulation's clock stops and the frames wait for
+   * `step`, each `ticks` ticks of the game later than the one before; null: back to real time. The game should run
+   * at normal speed (a faster one's steps should divide `ticks`), with no super speed in quiet hours.
+   */
+  stepMode(ticks: number | null): void;
+  /**
+   * Fixed-step playback: runs the frame's ticks, then draws it at their time. The ticks run (0: none, the game is
+   * paused or not stepping). `still`: a frame with no ticks and the clock held (what a camera put somewhere streams in
+   * and builds, drawn before a run without moving what is drawn at a rate of its own on).
+   */
+  step(still?: boolean): Promise<number>;
 }
 
 /** Reports a loading step and the overall progress (0..1) while a session is prepared. */
@@ -470,6 +483,12 @@ async function openSession(
   /** Speed before a big moment slowed the game down, and until when (restored unless the player picks a speed). */
   let slowedFrom: number | null = null;
   let slowUntil = 0;
+  /**
+   * Fixed-step playback (`stepMode`): the ticks a frame, the frames drawn so and the whole millisecond they started
+   * from (each frame's time is that and its ticks' time, in whole milliseconds: the same frames meet the rates that
+   * hold things back, the sun's map's, the reflections', at the same frames); null: real time.
+   */
+  let stepping: { ticks: number; frames: number; from: number; tick: number } | null = null;
   const canWatch = () =>
     revealed &&
     game.mode === 'live' &&
@@ -483,7 +502,9 @@ async function openSession(
     viewPlot !== null &&
     viewPlot === homeLot() &&
     // (Not from the town view: the player zoomed out to look at the town, and the director's shots are the household's.)
-    townView.blend === 0;
+    townView.blend === 0 &&
+    // (Nor in fixed-step playback: the benchmark holds the camera.)
+    !stepping;
   function startWatching(now: number) {
     if (!world) return;
     playerWalls = game.wallMode;
@@ -2123,6 +2144,38 @@ async function openSession(
       // A save's picture is drawn into its own target: compile its shaders now, not at the first autosave.
       await perfTimeAsync('session: warm thumbnail', () => renderer.captureThumbnail(THUMBNAIL.width, THUMBNAIL.height));
     },
+    stepMode(ticks) {
+      if (ticks === null) {
+        if (!stepping) return;
+        stepping = null;
+        renderer.framesOnDemand(false);
+        bridge.pace(false);
+        bridge.send({ type: 'setAutoFast', enabled: liveSettings.skipQuietHours });
+        return;
+      }
+      if (!(Number.isInteger(ticks) && ticks > 0)) throw new Error(`stepMode: ${ticks} is no number of ticks`);
+      // (No super speed in quiet hours meanwhile: it would run the steps' ticks by the wall clock. Nor the camera
+      // watching on its own: the benchmark holds it.)
+      if (!stepping) bridge.send({ type: 'setAutoFast', enabled: false });
+      if (game.watching) stopWatching();
+      // (Past every frame drawn before: whatever they held back by its rate is due by then.)
+      stepping = stepping ? { ...stepping, ticks } : { ticks, frames: 0, from: fixedStart(), tick: 0 };
+      bridge.pace(true);
+      renderer.framesOnDemand(true);
+    },
+    async step(still = false) {
+      const s = stepping;
+      if (!s || disposed) return 0;
+      const ran = still ? 0 : await bridge.advance(s.ticks);
+      if (stepping !== s || disposed) return ran;
+      // (The frame's clock goes on by the ticks' time at normal speed, paused or not: what moves only for the eye, the
+      // wind and the clouds, moves by the same amount every frame.)
+      s.frames++;
+      if (!still) s.tick += s.ticks;
+      const at = s.from + Math.floor((s.tick * 1000) / bridge.layout.ticksPerSecond);
+      if (!renderer.drawFrame(at)) throw new Error("No frame was drawn (the game isn't on screen).");
+      return ran;
+    },
     reveal() {
       if (revealed) return;
       revealed = true;
@@ -2202,7 +2255,8 @@ async function openSession(
         reducedMotion: s.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches,
       });
       if (s.autonomy !== autonomy) bridge.send({ type: 'setAutonomy', enabled: (autonomy = s.autonomy) });
-      bridge.send({ type: 'setAutoFast', enabled: s.skipQuietHours });
+      // (Not in fixed-step playback: its frames are the ticks they ask for.)
+      bridge.send({ type: 'setAutoFast', enabled: s.skipQuietHours && !stepping });
       if (s.autosaveMinutes !== autosaveMinutes) {
         autosaveMinutes = s.autosaveMinutes;
         clearInterval(autosaveTimer);
@@ -2218,6 +2272,9 @@ async function openSession(
     },
     async dispose() {
       disposed = true;
+      // (The renderer is kept for the next game: back to drawing at the display's refreshes.)
+      if (stepping) renderer.framesOnDemand(false);
+      stepping = null;
       releaseInference();
       ideas.clear();
       clearInterval(statsTimer);

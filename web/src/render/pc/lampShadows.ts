@@ -36,6 +36,7 @@ import { localShadows } from './internals';
 import type { RoomLight } from '../shared/house';
 import { pickCasters } from '../shared/lampShadows';
 import { tuned } from '../tune';
+import { frameNow } from '../shared/frameClock';
 
 export const LAMP_SHADOWS = tuned('lampShadows', {
   /** The cone a lamp's map covers (degrees across), and its last degrees (from the edge in) over which the shadows fade out. */
@@ -214,7 +215,7 @@ export class LampShadows {
     if (!wanted && !this.active) return;
     // (With time held still, the benchmark's pictures, the shadows are as they settle.)
     const step = LAMP_SHADOWS.fade > 0 && dt > 0 ? Math.min(1, dt / LAMP_SHADOWS.fade) : 1;
-    const now = performance.now();
+    const now = frameNow();
     // Those giving up their place first: a place is free once its lamp's shadows are out.
     for (let i = 0; i < this.casts.length; i++) {
       const c = this.casts[i];
@@ -278,7 +279,7 @@ export class LampShadows {
     c.casting = true;
     c.level = 0;
     c.pending = false;
-    c.last = performance.now();
+    c.last = frameNow();
     this.active++;
     this.hooks.shape(i, true);
     maps.set(light.light, this.casters);
@@ -306,7 +307,7 @@ export class LampShadows {
   /** Lamp `i`'s map drawn again in the next frame (`urgent`), or once the rate allows. */
   private draw(i: number, urgent: boolean): void {
     const c = this.casts[i];
-    const now = performance.now();
+    const now = frameNow();
     if (urgent || this.interval <= 0 || now - c.last >= this.interval) {
       c.pending = false;
       c.last = now;

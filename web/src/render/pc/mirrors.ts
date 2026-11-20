@@ -49,6 +49,7 @@ import { directionalShadows } from './internals';
 import type { MirrorInstance } from './lotContents';
 import { multiply, transformNormal, transformPoint } from '../shared/math';
 import type { Language } from './shaders/chunks';
+import { frameNow } from '../shared/frameClock';
 
 export type { MirrorInstance } from './lotContents';
 
@@ -128,13 +129,13 @@ interface Reflection {
   proj: pc.Mat4;
   /** Its viewport in the target (normalised). */
   rect: pc.Vec4;
-  /** When a mirror last used it (`performance.now()`). */
+  /** When a mirror last used it (`frameNow()`). */
   used: number;
   /** The mirror it shows, and its face and the game camera's view × projection (game space) when last drawn. */
   owner: Item | null;
   drawnFace: Float32Array;
   drawnViewProj: Float32Array;
-  /** When the next draw is due (`performance.now()`), held to `rate`. */
+  /** When the next draw is due (`frameNow()`), held to `rate`. */
   due: number;
   /** Who it is being drawn for now, and something in it changed since it was drawn. */
   next: Item | null;
@@ -440,7 +441,7 @@ export class Mirrors {
       return;
     }
     this.hidden = false;
-    const now = performance.now();
+    const now = frameNow();
     this.viewProjNow();
     const viewProj = this.viewProjGame;
     const period = this.quality.rate > 0 ? 1000 / this.quality.rate : 0;
@@ -556,7 +557,7 @@ export class Mirrors {
         forced.push(item);
       }
       const r = this.reflection(item.slot);
-      r.used = performance.now();
+      r.used = frameNow();
       r.viewInv.copy(this.game.entity.getWorldTransform());
       r.proj.copy(this.game.camera.projectionMatrix);
       // (Part of the target, as a glass's rectangle is: the clear is then drawn, and its pipeline made too.)
@@ -575,7 +576,7 @@ export class Mirrors {
     }
     if (alone && !drawn.length && this.pool.length) {
       const r = this.reflection(0);
-      r.used = performance.now();
+      r.used = frameNow();
       r.viewInv.copy(this.game.entity.getWorldTransform());
       r.proj.copy(this.game.camera.projectionMatrix);
       r.rect.set(0, 0, 1, 0.5);

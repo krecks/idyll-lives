@@ -43,6 +43,7 @@ import { directionalShadows } from './internals';
 import { shadowOnlyLayer } from './layers';
 import { toEngine } from './space';
 import type { Language } from './shaders/chunks';
+import { frameNow } from '../shared/frameClock';
 
 export { shadowOnlyLayer } from './layers';
 
@@ -486,7 +487,7 @@ export class SunShadows {
   private redraw(urgent: boolean, casters: boolean): void {
     this.onMoved?.(urgent, casters);
     if (this.overview) return;
-    const now = performance.now();
+    const now = frameNow();
     if (this.interval <= 0 || urgent || now - this.lastDraw >= this.interval) {
       this.pending = false;
       this.lastDraw = now;
@@ -503,9 +504,9 @@ export class SunShadows {
 
   /** Each frame: a pose redraw held back draws once the interval has passed. */
   frame(): void {
-    if (!this.pending || performance.now() - this.lastDraw < this.interval) return;
+    if (!this.pending || frameNow() - this.lastDraw < this.interval) return;
     this.pending = false;
-    this.lastDraw = performance.now();
+    this.lastDraw = frameNow();
     this.light.shadowUpdateMode = pc.SHADOWUPDATE_THISFRAME;
   }
 
