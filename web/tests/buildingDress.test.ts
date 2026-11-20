@@ -8,7 +8,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { BuildingUse, LotLook, Opening, PlotInfo } from '../src/core/protocol';
 import { dressBuilding, frontSide, PANE_SETS, paneSetLit } from '../src/render/shared/buildingDress';
-import { lotLookBuilding, MOST_STOREYS, STYLE } from '../src/render/shared/townBuildings';
+import { litAt, lotLookBuilding, MOST_STOREYS, STYLE } from '../src/render/shared/townBuildings';
 import type { Geo } from '../src/render/shared/geometry';
 import { BUILDING, realTown } from './fixtures/realTown';
 
@@ -118,6 +118,50 @@ describe('a building dressed', () => {
     // Upstairs, the flats' wider windows: fewer and wider than a shop's plain ones.
     const glass = (d: { panes: Geo[] }) => d.panes.reduce((n, g) => n + g.vertexCount / 4, 0);
     expect(glass(mixed)).not.toBe(glass(dressBuilding(alone, 'shop', [100, 80], [100, 55])));
+  });
+
+  test('a café with flats over it: its awning stops short of the flats’ door, which has a canopy of its own', () => {
+    const box: [number, number, number, number] = [90, 45, 110, 55];
+    const cafe = lotLookBuilding(box, { use: 'cafe', storeys: 2, roof: 'flat', look: 1 }, 2, 0, flat, undefined, true);
+    const alone = lotLookBuilding(box, { use: 'cafe', storeys: 2, roof: 'flat', look: 1 }, 2, 0, flat);
+    const cloth = (t: typeof cafe, flatsDoor: [number, number] | null) => {
+      const trim = part(dressBuilding(t, 'cafe', [100, 80], [100, 55], flatsDoor).parts, 'silhouetteTrim')!;
+      const out: number[] = [];
+      for (let i = 0; i < trim.col.length / 4; i++) if (Math.abs(trim.col[i * 4] - 0xf2) <= 1 && Math.abs(trim.col[i * 4 + 1] - 0xee) <= 1 && Math.abs(trim.col[i * 4 + 2] - 0xe6) <= 1) out.push(trim.pos[i * 3]);
+      return out;
+    };
+    // (The flats' door at x 93, 1.1 m wide: the white stripes keep 0.55 m off its frame either side.)
+    const mixed = cloth(cafe, [93, 55]);
+    expect(mixed.length).toBeGreaterThan(8);
+    expect(mixed.some((x) => x > 93 - 0.55 - 0.55 + 0.01 && x < 93 + 0.55 + 0.55 - 0.01)).toBe(false);
+    expect(cloth(alone, null).some((x) => Math.abs(x - 93) < 0.5)).toBe(true);
+    // A canopy over the flats' door alone: its flat top (trim, 0.12 m thick) 1.5 m wider than the door.
+    const trim = part(dressBuilding(cafe, 'cafe', [100, 80], [100, 55], [93, 55]).parts, 'silhouetteTrim')!;
+    const top = 2.1 + 0.42;
+    const canopy = local(trim, cafe).filter(([, v, y]) => Math.abs(y - top) < 1e-6 && v > 5.5);
+    expect(canopy.length).toBeGreaterThan(0);
+    expect(Math.min(...canopy.map(([u]) => u + 100))).toBeCloseTo(93 - 0.55 - 0.35, 5);
+    expect(Math.max(...canopy.map(([u]) => u + 100))).toBeCloseTo(93 + 0.55 + 0.35, 5);
+  });
+
+  test('a place with flats over it: its flats’ glass in sets of their own, lit as homes', () => {
+    const box: [number, number, number, number] = [90, 45, 110, 55];
+    const hours = { open: 540, close: 1080, days: 127 };
+    const shop = lotLookBuilding(box, { use: 'shop', storeys: 2, roof: 'flat', look: 1 }, 2, 0, flat, hours, true);
+    const mixed = dressBuilding(shop, 'shop', [100, 80], [100, 55], [93, 55]);
+    expect(mixed.panes.length).toBe(2 * PANE_SETS);
+    // (The flats' sets hold the glass upstairs, over 3 m; the shop's the rest.)
+    const ys = (gs: Geo[]) => gs.flatMap((g) => local(g, shop).map(([, , y]) => y));
+    expect(Math.min(...ys(mixed.panes.slice(PANE_SETS)))).toBeGreaterThan(3);
+    expect(Math.max(...ys(mixed.panes.slice(0, PANE_SETS)))).toBeLessThan(3);
+    // At noon the shop is open, lit whole; at nine in the evening it is shut and its flats are lit, fewer of them in the
+    // small hours.
+    expect(litAt(shop, 12 * 60, 0, 'place')).toBe(shop.lit);
+    expect(litAt(shop, 3 * 60, 0, 'flats')).toBeLessThan(litAt(shop, 21 * 60, 0, 'flats'));
+    expect(litAt(shop, 21 * 60, 0, 'place')).toBeLessThan(0.1);
+    expect(litAt(shop, 21 * 60, 0, 'flats')).toBe(STYLE.flats[1]);
+    // (A building alone keeps its one set of sets.)
+    expect(dressBuilding(lotLookBuilding(box, { use: 'shop', storeys: 2, roof: 'flat', look: 1 }, 2, 0, flat), 'shop', [100, 80]).panes.length).toBe(PANE_SETS);
   });
 });
 

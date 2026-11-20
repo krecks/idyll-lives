@@ -732,11 +732,17 @@ export class Street {
     return this.flushWindows();
   }
 
-  /** A building's sets of panes lit as the hour has them; its group's windows to be drawn again if that changed. */
+  /**
+   * A building's sets of panes lit as the hour has them (a place with flats over it: its own sets by its hours, its
+   * flats' after them by the hour, `BuildingDress.panes`); its group's windows to be drawn again if that changed.
+   */
   private light(l: Lights): void {
-    const share = this.lightsAt.key === -2 ? 1 : litAt(l.t, this.lightsAt.minute, this.lightsAt.weekday);
-    for (let k = 0; k < PANE_SETS; k++) {
-      const on = paneSetLit(k, share);
+    const { minute, weekday, key } = this.lightsAt;
+    const apart = l.panes.length > PANE_SETS;
+    const share = key === -2 ? 1 : litAt(l.t, minute, weekday, apart ? 'place' : undefined);
+    const flats = key === -2 || !apart ? share : litAt(l.t, minute, weekday, 'flats');
+    for (let k = 0; k < l.panes.length; k++) {
+      const on = paneSetLit(k % PANE_SETS, k < PANE_SETS ? share : flats);
       if (l.on[k] === on) continue;
       l.on[k] = on;
       this.windowsDue = true;
@@ -1000,7 +1006,7 @@ export class Street {
     this.lights = [];
     for (const id of [...this.chunks.keys()].sort((a, b) => a - b)) {
       for (const { t, panes } of this.chunks.get(id)!.shape.buildings) {
-        const l: Lights = { t, panes, on: was.get(t) ?? new Array<boolean>(PANE_SETS).fill(false), group: groupOf(id) };
+        const l: Lights = { t, panes, on: was.get(t) ?? new Array<boolean>(panes.length).fill(false), group: groupOf(id) };
         this.light(l);
         this.lights.push(l);
       }
@@ -1018,7 +1024,7 @@ export class Street {
     const lights = this.lights.filter((l) => l.group === id);
     for (const lit of [true, false]) {
       const panes = mine.filter((h) => h.up === lit).map((h) => h.panes);
-      for (const l of lights) for (let k = 0; k < PANE_SETS; k++) if (l.on[k] === lit && !l.panes[k].empty) panes.push(l.panes[k]);
+      for (const l of lights) for (let k = 0; k < l.panes.length; k++) if (l.on[k] === lit && !l.panes[k].empty) panes.push(l.panes[k]);
       const m = panes.length ? this.house.neighbourWindows(panes, lit, this.root) : null;
       if (!m) continue;
       this.dress(m.entity, false);

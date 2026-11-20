@@ -105,16 +105,19 @@ export function homeLights(minute: number): number {
 /**
  * The share of `b`'s windows lit at `minute` of the day on `weekday` (0 = Monday): a place with opening hours its own
  * while it is open and next to none when it is closed (but its flats', if it has flats over it: those by the hour, as
- * a flats building's), a home its own by the hour (`homeLights`), the rest their own.
+ * a flats building's), a home its own by the hour (`homeLights`), the rest their own. `part`: of a place with flats
+ * over it, the place's own windows only (by its hours) or its flats' only (by the hour, as a flats building's); the
+ * near street lights the two apart (`buildingDress.ts` `BuildingDress.panes`), the town view as one.
  */
-export function litAt(b: Pick<TownBuilding, 'lit' | 'home' | 'hours' | 'flats'>, minute: number, weekday: number): number {
+export function litAt(b: Pick<TownBuilding, 'lit' | 'home' | 'hours' | 'flats'>, minute: number, weekday: number, part?: 'place' | 'flats'): number {
+  if (part === 'flats') return STYLE.flats[1] * homeLights(minute);
   if (b.hours) {
     const { open, close, days } = b.hours;
     const m = ((minute % 1440) + 1440) % 1440;
     // (Hours past midnight when `close` isn't after `open`, as the tags read them: `ui/town/places.ts` `openState`.)
     const on = close > open ? m >= open && m < close && (days >> weekday) & 1 : (m >= open && (days >> weekday) & 1) || (m < close && (days >> ((weekday + 6) % 7)) & 1);
     if (on) return b.lit;
-    return b.flats ? Math.max(b.lit * CLOSED, STYLE.flats[1] * homeLights(minute)) : b.lit * CLOSED;
+    return b.flats && part !== 'place' ? Math.max(b.lit * CLOSED, STYLE.flats[1] * homeLights(minute)) : b.lit * CLOSED;
   }
   return b.home ? b.lit * homeLights(minute) : b.lit;
 }
