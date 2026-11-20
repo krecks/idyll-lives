@@ -134,13 +134,84 @@ function stillPasses(app: pc.AppBase): void {
   };
 }
 
-interface Square {
+export interface Square {
   /** The middle (PlayCanvas space) and the half side (m). */
   centre: pc.Vec3;
   radius: number;
   /** How far (m) the land in it rises or falls from its middle at most (a land with relief): its depth reaches that much further. */
   relief: number;
+  /**
+   * The light's view the still casters' picture was last drawn with in full (`fitSquare`): PlayCanvas's own fit then,
+   * its place and size, and where along the light its casters lay. `fresh`: the next redraw draws the picture in full
+   * (`SunShadows.moved`), so it takes PlayCanvas's fit as it comes.
+   */
+  fit: { at: pc.Vec3; across: pc.Vec3; dir: pc.Vec3; height: number; far: number; lo: number; hi: number; valid: boolean; fresh: boolean };
 }
+
+/**
+ * The light's view for `square` after PlayCanvas's `cull` fitted it: the one the still casters' picture was drawn with,
+ * while this one is that one but for float noise and its casters lie within that one's depth; else PlayCanvas's own
+ * (and remembered). PlayCanvas fits the view again at every redraw, from the square's corners turned into the
+ * camera's space and back (float noise across the light, a millionth of the map as the camera turns) and its depth to
+ * every caster's box (a car or a town-wide instanced draw moving anywhere along the sun's way changed it), so the
+ * picture was drawn again for nothing. A redraw that draws the picture in full anyway (`fresh`: the sun turned,
+ * something moved) takes PlayCanvas's fit as it comes, so a picture is drawn as PlayCanvas would draw it.
+ */
+export function fitSquare(square: Square, cam: pc.Camera): void {
+  // (No casters: PlayCanvas fitted no depth, and nothing is drawn.)
+  if (cam.farClip === UNFITTED_FAR) return;
+  const node = cam.node;
+  const dir = node.forward;
+  const fit = square.fit;
+  const p = node.getLocalPosition();
+  // Where the casters lie along the light, as PlayCanvas fitted them (0.1 m inside the near and far planes), and the
+  // view's place across it.
+  const along = p.dot(dir);
+  const lo = along + 0.1;
+  const hi = along + cam.farClip - 0.1;
+  const across = fitAcross.copy(dir).mulScalar(-along).add(p);
+  if (
+    !fit.fresh &&
+    fit.valid &&
+    fit.dir.equals(dir) &&
+    across.distance(fit.across) <= ACROSS_NOISE &&
+    Math.abs(cam.orthoHeight - fit.height) <= fit.height * HEIGHT_NOISE &&
+    lo >= fit.lo - FIT_NOISE &&
+    hi <= fit.hi + FIT_NOISE
+  ) {
+    node.setLocalPosition(fit.at);
+    cam.orthoHeight = fit.height;
+    cam.farClip = fit.far;
+    return;
+  }
+  fit.fresh = false;
+  fit.valid = true;
+  fit.at.copy(p);
+  fit.across.copy(across);
+  fit.dir.copy(dir);
+  fit.height = cam.orthoHeight;
+  fit.far = cam.farClip;
+  fit.lo = lo;
+  fit.hi = hi;
+}
+
+/**
+ * How far (m) the light's view may lie across the light, and by what share its size may differ, from the one the still
+ * casters' picture was drawn with and be that one (`fitSquare`): PlayCanvas's fit moves by hundredths of a millimetre
+ * and a millionth of its size as the camera turns; a square moved is a texel at least (and draws in full).
+ */
+const ACROSS_NOISE = 1e-3;
+const HEIGHT_NOISE = 1e-5;
+
+/**
+ * Metres a caster may lie past the depth the picture was drawn with and still be within it (`fitSquare`): PlayCanvas
+ * puts the near and far planes 0.1 m past the casters, and the place it fitted carries single floats' noise.
+ */
+const FIT_NOISE = 0.05;
+
+/** PlayCanvas's far plane for a light's view before the depth is fitted to its casters (`ShadowRendererDirectional.cull`). */
+const UNFITTED_FAR = 2e6;
+const fitAcross = new pc.Vec3();
 
 /** The squares of the lights that have one (by PlayCanvas's scene light). */
 const squares = new WeakMap<object, Square>();
@@ -170,10 +241,11 @@ function patch(app: pc.AppBase): void {
       return corners;
     };
     try {
-      return cull(light, comp, camera, casters, mask);
+      cull(light, comp, camera, casters, mask);
     } finally {
       camera.getFrustumCorners = own;
     }
+    if (mask === undefined || mask & 1) fitSquare(square, (light as SceneLight).getRenderData(camera, 0).shadowCamera);
   };
 }
 
@@ -267,7 +339,7 @@ export class SunShadows {
   private pending = false;
   private overview = false;
   private readonly size: number;
-  private readonly square: Square = { centre: new pc.Vec3(), radius: 30, relief: 0 };
+  private readonly square: Square = { centre: new pc.Vec3(), radius: 30, relief: 0, fit: { at: new pc.Vec3(), across: new pc.Vec3(), dir: new pc.Vec3(), height: 0, far: 0, lo: 0, hi: 0, valid: false, fresh: true } };
   /** The square on the ground (game space, m): from (`x0`, `z0`) to (`x1`, `z1`). */
   private readonly ground = { x0: -30, z0: -30, x1: 30, z1: 30 };
   private readonly fadeId: pc.ScopeId;
@@ -304,7 +376,7 @@ export class SunShadows {
   private stillTarget: pc.RenderTarget | null = null;
   /** Whether this redraw's `drawStill` copied the still casters' picture into the map (`drawPass` then draws only what moves). */
   private copied = false;
-  private readonly drawn = { viewProj: new Float32Array(16), map: null as object | null, casters: [] as pc.MeshInstance[], boxes: new Float64Array(0), counts: new Float64Array(0), keys: new Float64Array(0) };
+  private readonly drawn = { viewProj: new Float32Array(16), map: null as object | null, casters: [] as pc.MeshInstance[], index: new Map<pc.MeshInstance, number>(), boxes: new Float64Array(0), counts: new Float64Array(0), keys: new Float64Array(0) };
   /** This redraw's casters: those that move (`movers`), the still ones, and all of them as PlayCanvas culled them. */
   private readonly moving = new Set<pc.MeshInstance>();
   private readonly movingList: pc.MeshInstance[] = [];
@@ -398,7 +470,7 @@ export class SunShadows {
    * shadow but the sun's (a door's leaf).
    */
   moved(urgent = true, casters = true): void {
-    this.whole = true;
+    this.whole = this.square.fit.fresh = true;
     this.redraw(urgent, casters);
   }
 
@@ -407,7 +479,7 @@ export class SunShadows {
    * again at the shadow rate, over the still casters' picture unless something else changed too (`moved`).
    */
   posed(): void {
-    if (!this.still || !this.movers) this.whole = true;
+    if (!this.still || !this.movers) this.whole = this.square.fit.fresh = true;
     this.redraw(false, true);
   }
 
@@ -518,15 +590,17 @@ export class SunShadows {
     if (d.casters.length !== still.length) return this.changedBy('list', this.cameOrWent(still));
     for (let i = 0; i < still.length; i++) {
       const mi = still[i];
-      if (mi !== d.casters[i]) return this.changedBy('list', this.cameOrWent(still));
+      // (In whatever order PlayCanvas culled them: depths are depths whatever order they are drawn in.)
+      const j = mi === d.casters[i] ? i : (d.index.get(mi) ?? -1);
+      if (j < 0) return this.changedBy('list', mi);
       const key = this.castKey?.(mi);
       if (key !== undefined) {
-        if (key !== d.keys[i]) return this.changedBy('key', mi);
+        if (key !== d.keys[j]) return this.changedBy('key', mi);
         continue;
       }
-      if (mi.instancingCount !== d.counts[i]) return this.changedBy('count', mi);
+      if (mi.instancingCount !== d.counts[j]) return this.changedBy('count', mi);
       const b = mi.aabb;
-      const o = i * 6;
+      const o = j * 6;
       const c = b.center;
       const h = b.halfExtents;
       if (c.x !== d.boxes[o] || c.y !== d.boxes[o + 1] || c.z !== d.boxes[o + 2] || h.x !== d.boxes[o + 3] || h.y !== d.boxes[o + 4] || h.z !== d.boxes[o + 5]) return this.changedBy('box', mi);
@@ -536,7 +610,7 @@ export class SunShadows {
 
   /** The first draw that is among the still casters now and wasn't when the picture was drawn, or the other way round. */
   private cameOrWent(still: readonly pc.MeshInstance[]): pc.MeshInstance | undefined {
-    const was = new Set(this.drawn.casters);
+    const was = this.drawn.index;
     const now = new Set(still);
     return still.find((mi) => !was.has(mi)) ?? this.drawn.casters.find((mi) => !now.has(mi));
   }
@@ -608,12 +682,14 @@ export class SunShadows {
     d.viewProj.set(this.viewProj.data);
     d.map = light._shadowMap;
     d.casters.length = 0;
+    d.index.clear();
     if (d.boxes.length !== still.length * 6) d.boxes = new Float64Array(still.length * 6);
     if (d.counts.length !== still.length) d.counts = new Float64Array(still.length);
     if (d.keys.length !== still.length) d.keys = new Float64Array(still.length);
     for (let i = 0; i < still.length; i++) {
       const mi = still[i];
       d.casters.push(mi);
+      d.index.set(mi, i);
       d.counts[i] = mi.instancingCount;
       d.keys[i] = this.castKey?.(mi) ?? NaN;
       const b = mi.aabb;
@@ -637,7 +713,7 @@ export class SunShadows {
   }
 
   private readonly restored = (): void => {
-    this.whole = true;
+    this.whole = this.square.fit.fresh = true;
   };
 
   /** Lets go of the still casters' picture. */
