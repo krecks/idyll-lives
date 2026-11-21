@@ -27,14 +27,14 @@ A home-building game with a living town, in the browser: you build and furnish a
 
 Build a home and watch the people who live in it.
 
-- **Start:** New game goes in five steps: the land (a countryside, a river valley, an island, …, shaped with brushes if you like), its streets and zones, the town built from them, a household (one of the town's own or your own from **Creation**) and the home they move into.
-- **Live (L):** everyone in town works, makes friends, falls in love and grows older on their own, your household included, and gets about on foot, by bike or e-scooter, in the household's car or on a neighbour's lift. Click a resident to see their needs and plans and to step in; leave the game alone and the camera follows what happens at home.
+- **Start:** New game goes in five steps: the land (a countryside, a river valley, an island, …, shaped with brushes if you like), its streets and zones, the town built from them, a household (one of the town's own or your own from **Creation**) and the home they move into: a house, or a flat over a shop or in a building of flats.
+- **Live (L):** everyone in town works, makes friends, falls in love and grows older on their own, your household included, and gets about on foot, by bike or e-scooter, in the household's car or on a neighbour's lift, to work and to the town's places (the school, the café, the church and dozens more), each open in its own hours. Click a resident to see their needs and plans and to step in, or a building for its card (whose home it is or what the place is, and who is inside); leave the game alone and the camera follows what happens at home.
 - **Build (B):** time stands still while you furnish (V), build walls, rooms, doors, windows and stairs (C), see how each room is doing (O) and shape the land (G).
 - **A life:** 1000 jobs, 13 skills, a weekly planner (P), rent and bills, a garden to grow, and residents who can speak lines of their own (a voice model and a small language model, both run in the browser).
 
 | Input | Action |
 |---|---|
-| Left-click | A resident: their panel · an object: what to do with it · the floor: walk there |
+| Left-click | A resident: their panel · an object: what to do with it · a building: its card · the floor: walk there |
 | Left- or middle-drag / right-drag / wheel | Rotate / pan / zoom (arrow keys and + / − too, once the view has the focus) |
 | Space, 0–4 | Pause, game speed (4: super speed, 30×, 60× in quiet hours) |
 | L / B | Live / Build |
@@ -48,14 +48,14 @@ Everything else (jobs, skills, money, building, the garden, every control and th
 
 ## Run it
 
-Requirements: Rust through rustup (the version is pinned in `rust-toolchain.toml`: 1.99.1 with clippy, rustfmt and the `wasm32-unknown-unknown` target), `wasm-bindgen-cli` 0.2.130 (it must match the `wasm-bindgen` crate in `Cargo.lock`), Bun 1.4 (the version is pinned in `web/package.json`).
+Requirements: Rust through rustup (the version is pinned in `rust-toolchain.toml`: 1.100.0 with clippy, rustfmt and the `wasm32-unknown-unknown` target), `wasm-bindgen-cli` 0.2.130 (it must match the `wasm-bindgen` crate in `Cargo.lock`), Bun 1.4 (the version is pinned in `web/package.json`).
 
 ```sh
 rustup toolchain install       # in the repo: the pinned toolchain, as CI does
 cargo install wasm-bindgen-cli --version 0.2.130
 cd web
 bun install
-bun run dev      # builds the WASM modules, fetches the voice and language models, then starts Vite on http://localhost:5173
+bun run dev      # builds the WASM modules (or copies them from the cache, below), fetches the voice and language models, then starts Vite on http://localhost:5173
 ```
 
 The first `bun run dev` or `bun run build` downloads the voice model (398 MB as published, its weights stored in 8 bits as 99 MB) and the language model (294 MB of weights as published, repacked to 228 MB without changing what it computes, stored gzipped as 196 MB) into `web/public/voice/` and `web/public/llm/` (not in git). Every file is pinned and checked by SHA-256, and files already there are kept.
@@ -99,7 +99,7 @@ A fresh worktree's first `cargo test -p sim-core --no-run` then took 30 s instea
 From the repo root: `cargo fmt --all` (CI checks the code is formatted) and `cargo clippy --workspace --all-targets -- -D warnings` (CI gates on it), `bun tools/bench/render.mjs` (the rendering benchmark and reference screenshots, see [tools/bench/README.md](tools/bench/README.md)) and `cargo release-version` (the version, see [Versions and releasing](#versions-and-releasing)).
 
 **The production build** also:
-- runs binaryen's `wasm-opt -O3` on both WASM files and strips their names (`cargo wasm-opt`; about a minute the first time, then cached in `web/.assets/wasm-opt`). The dev server keeps the WASM as built, with its names;
+- runs binaryen's `wasm-opt -O3` on the three WASM files (the simulation, the sounds and the voice) and strips their names (`cargo wasm-opt`; about a minute the first time, then cached in `web/.assets/wasm-opt`). The dev server keeps the WASM as built, with its names;
 - writes `bundle.json`: the content, house templates and asset manifests every start needs, in one file. The files still ship one by one beside it;
 - writes `THIRD-PARTY-LICENSES.txt` with the licences of the code it bundles, and fails if one is missing;
 - asks for every data file in `assets/` and `content/` by a hash of its contents (`?h=<hash>`, listed in `bundle.json`) and for the rest of the runtime fetches from `public/` (`bundle.json` itself) by the build's id (`?v=<id>`), so a new release's data doesn't mix with files cached from the last one, and a file a release didn't change keeps its URL. `voice/` and `llm/` are pinned by SHA-256 and left out, and `index.html` itself isn't versioned (Pages lets the browser keep it for 10 minutes).
@@ -118,6 +118,7 @@ From the repo root: `cargo fmt --all` (CI checks the code is formatted) and `car
 | `?debug` | Console helpers: `__controls`, `__world()`, `__sims()` (residents live: where, pose, what they use, needs), `__cars()` (the cars and work taxis as the newest snapshot shows them: where, which way, `kind` 0 a household's, 1 a taxi), `__lights()` (the traffic lights' heads), `__send(command)`, `__addFunds(n)`, `__camera(pose)`, `__showPlot(i)`, `__characters`, `__renderer` (its debug hooks), and `__crash('panic'\|'throw'\|'hang'\|'render')` to see how the game copes with a failure |
 | `?profile` | Logs where start-up and frames spend their time, with a summary once start-up settles (`debug/perf.ts`) |
 | `?seed=42` | The random seed of a new game |
+| `?code=river-mhs-k2x9q` | The world code New game's step 1 opens with (a bare number: the land's seed) |
 | `?pack=packs/my-art/manifest.json` | Loads an extra asset pack (can be repeated) |
 | `?look=soft\|classic` | Dev server only: draws in that shading whatever the setting says |
 | `?snapshot=0` | Turns off held frames: the menus' town, standing still, is otherwise drawn once and shown again until something in it changes |
@@ -127,7 +128,7 @@ From the repo root: `cargo fmt --all` (CI checks the code is formatted) and `car
 | `?lightmix=sun,sky,env` | Scales the look's sun, sky fill and environment light (1 each), to compare one at a time |
 | `?state=<name>`, `?debugReport=<name>` | Dev server only: starts in a game state written by the simulation's tests (`DUMP_STATES=1 cargo test`), or in a saved debug report |
 
-The dev server also has pages of their own, not in the build: `/gallery.html` (every model), `/clips.html` (their animations), `/characters.html` and `/poses.html` (the residents), `/previews.html` (portraits and catalog pictures) and `/pcload.html` (the loaders and the material library). On the gallery, clips, characters and poses pages `?ground=0` leaves the lawn out, to compare `diag` views; their other flags are in [tools/bench/README.md](tools/bench/README.md).
+The dev server also has pages of their own, not in the build: `/gallery.html` (every model), `/clips.html` (their animations), `/characters.html` and `/poses.html` (the residents), `/previews.html` (portraits and catalog pictures), `/pcload.html` (the loaders and the material library) and `/inspect.html` (one model at a time: its parts, clips and the glTF gate's report; the main menu's Inspect models opens it). On the gallery, clips, characters and poses pages `?ground=0` leaves the lawn out, to compare `diag` views; their other flags are in [tools/bench/README.md](tools/bench/README.md).
 
 ## Architecture
 
@@ -147,6 +148,8 @@ Main thread                                   Sim worker
 |---|---|---|
 | `crates/sim-core` | All game rules: needs, AI, pathfinding, town, social life, saves, geometry generation | Know about browsers, rendering or asset files |
 | `crates/sim-wasm` | JS bindings | Contain game logic |
+| `crates/sound`, `crates/sound-wasm` | Every sound the game makes, synthesised (loops, music, birdsong, footsteps, blips, the rooms' reverb), and its JS bindings | Know about the simulation or the page |
+| `crates/voice`, `crates/voice-wasm` | The residents' voices: phonemes for mouth shapes and the sound shaped around the voice model, and their JS bindings | Know about the simulation or the page |
 | `crates/artkit`, `crates/art` | The item models: the kernel and the families that build them into `.glb` files and packs (`cargo art`) | Ship with the game (it reads only the files they write) |
 | `web/src/core` | Worker, bridge, protocol, snapshot channel | Render or touch the DOM |
 | `web/src/render` | Everything drawn; `types.ts` is the contract (below) | Contain game rules; allocate per frame |
