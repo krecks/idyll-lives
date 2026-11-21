@@ -1,10 +1,11 @@
 /**
  * Chairs pulled up to a table (`shared/tableTuck.ts`), as the PlayCanvas renderer draws the table:
  * its template's meshes (model space, `models.ts`) at its instance's matrix (and its moving parts'
- * at theirs), their vertices and triangles read back from the meshes' own copies.
+ * at theirs), their vertices and triangles read back (`readMesh`: built again from the model's file).
  */
 
 import type * as pc from './engine';
+import { readMesh } from './models';
 import type { PopTarget } from './objectMotion';
 import type { Content } from '../../content/content';
 import type { ObjectPlacement, WorldStructure } from '../../core/protocol';
@@ -31,10 +32,9 @@ export function tableRooms(world: WorldStructure, content: Content, drawn: (id: 
             // (An instance is drawn at its own matrix: the template's meshes have none of their own.)
             const matrix = matrices.slice(o, o + 16);
             for (const { mesh } of meshes) {
-              const positions: number[] = [];
-              const indices: number[] = [];
-              if (!mesh.getPositions(positions) || !mesh.getIndices(indices)) continue;
-              out.push({ positions, indices, matrix });
+              const read = readMesh(mesh);
+              if (!read) continue;
+              out.push({ positions: read.positions, indices: read.indices, matrix });
             }
           };
           add(d.meshes, d.matrices);

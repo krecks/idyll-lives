@@ -99,4 +99,28 @@ describe('render data worker', async () => {
       60_000,
     );
   }
+
+  test("a world with a relief grid: the worker's terrain is the page's", async () => {
+    // (A hand-made one, among mountains: the generator's grid goes over in the world's meta.)
+    const { reliefWorld } = await import('./support/landFixtures');
+    const world = reliefWorld(140, { slope: 0.75, mountains: 140 }, 'mountain');
+    const page = await pageLand(world);
+    const sent = structuredClone(landWorld(world));
+    const worker = new Land(sent);
+    for (const [x0, z0] of [
+      [-200, -200],
+      [200, 380],
+      [world.width + 20, world.depth - 60],
+    ]) {
+      const positions = grid(x0, z0);
+      const colors = new Float32Array((positions.length / 3) * 4);
+      await page.shadeTerrain(positions, colors);
+      const shaded = structuredClone(grid(x0, z0));
+      const shadedColors = structuredClone(await worker.shade(shaded));
+      expect(Buffer.from(shaded.buffer).equals(Buffer.from(positions.buffer))).toBe(true);
+      expect(Buffer.from(shadedColors.buffer).equals(Buffer.from(colors.buffer))).toBe(true);
+      // (And the grid's land is there: well above the classic valley's.)
+      if (z0 === 380) expect(Math.max(...positions.filter((_, i) => i % 3 === 1))).toBeGreaterThan(40);
+    }
+  });
 });

@@ -43,6 +43,42 @@ export async function createDevice(canvas: HTMLCanvasElement, forceWebGL: boolea
   return device;
 }
 
+/**
+ * Hands every texture's decoded source back once it is on the GPU.
+ *
+ * PlayCanvas keeps the `ImageBitmap` behind each level until it is told otherwise
+ * (`releaseSourceAfterUpload`, false by default; `setReleaseSourceAfterUpload` closes the bitmaps now
+ * or after the upload, whichever comes second). Those bitmaps live in the browser's image memory —
+ * not in the JS heap, not in `stats.vram` — so they are invisible to every counter we measure, and
+ * nothing on this side ever re-reads a level once it is uploaded.
+ *
+ * Hooked on the asset registry rather than at each `new pc.Texture`, because that is where textures
+ * arrive: the game's own assets and the containers' (glTF) alike. Textures made outside it (the
+ * town's ground map, the previews' stages) hold a typed array or a canvas instead of a bitmap, which
+ * this flag does not touch.
+ *
+ * Releasing is one-way (`releaseImageSources` nulls the levels and clears the flag), and the engine
+ * re-creates every texture on a device restore (`Texture#recreateImpl`) with nothing left to upload
+ * from — so a restore re-reads the assets instead. A lost context is otherwise fatal for the game
+ * (`meshes.ts:53`: `devicelost` is the crash screen), which is what makes this safe today.
+ */
+function releaseTextureSources(app: pc.AppBase): void {
+  app.assets.on('add', (asset: pc.Asset) => {
+    if (asset.type !== 'texture') return;
+    const release = () => (asset.resource as pc.Texture | null)?.setReleaseSourceAfterUpload();
+    if (asset.resource) release();
+    // Every load, not just the first: `unload()` + `load()` (`container.ts:77-85`, `models.ts:473-474`)
+    // makes a fresh bitmap that would otherwise be kept for the rest of the session.
+    asset.on('load', release);
+  });
+  app.graphicsDevice.on('devicerestored', () => {
+    for (const asset of app.assets.filter((a) => a.type === 'texture' && a.loaded)) {
+      asset.unload();
+      app.assets.load(asset);
+    }
+  });
+}
+
 /** A PlayCanvas app on `device` without its own frame loop: the renderer calls `update` and `render` itself, paced (`shared/pacing.ts`). */
 export function createApp(canvas: HTMLCanvasElement, device: pc.GraphicsDevice): pc.AppBase {
   const options = new pc.AppOptions();
@@ -51,6 +87,7 @@ export function createApp(canvas: HTMLCanvasElement, device: pc.GraphicsDevice):
   options.resourceHandlers = [pc.ContainerHandler, pc.TextureHandler];
   const app = new pc.AppBase(canvas);
   app.init(options);
+  releaseTextureSources(app);
   app.setCanvasFillMode(pc.FILLMODE_NONE);
   app.setCanvasResolution(pc.RESOLUTION_FIXED, Math.max(1, canvas.width), Math.max(1, canvas.height));
   app.start();

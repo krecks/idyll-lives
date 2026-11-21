@@ -52,7 +52,7 @@ import { gameMinutesPerSecond, Pose } from '../../../core/snapshot';
 import { PACE } from '../doors';
 import { seatsItself } from '../../../game/surfaces';
 import { ENERGY_RATE, type VisemeTrack } from '../../../voice/visemes';
-import { PLAYBACK_RATE, QUIET_SPEED } from '../gameSpeed';
+import { playbackRate } from '../gameSpeed';
 import { paintColors } from '../modelEntry';
 import { type TableRoom, furthestAhead, nearestAhead } from '../tableTuck';
 import { ACTIONS, BABY_LIE, BABY_LIE_FADE, BASE_HEIGHT, BUNK_LADDER, CARRY, CROUCH_ONLY, CROUCH_SHOULDER, CUDDLE, DEFAULT_FADE, FINGER_OPEN, GAITS, GAIT_MAX_RATE, GAIT_SWAY, GLIDE_SECONDS, GEARS, GRIPPED, GUITAR, HANDS, HOLD_DROP, HUGGED, IDLE_ONLY, JOINT_OPEN, LANE_SEQ, LANE_SYNC, LEVEL_GAZE, LOOP_STEP, LYING, PROP_ITEMS, PUSH_ONLY, RIDES, SET_DOWN, SET_DOWN_SIDE, SIT_HANDS, SNAP_DISTANCE, STALL, STAND_BACK, STATION_PROPS, STATION_SPOTS, STEP_IN_SPEED, STEP_OUT_S, STEP_OVER, stepInFor, STRADDLED, STRUM, STRUM_SHORT, type HandProp, type StepIn, TOWEL_OUT, USE, WALK_FASTEST, WALK_IN, WALK_SLACK, WALK_WAIT, biteOf, eatClip, SET_DOWN_SPOTS, spotOn, type StationSpot } from './actions';
@@ -87,7 +87,7 @@ import { WALL_HEIGHT } from '../walls';
 import { MOST_CADENCE, MOUNT_SECONDS, MOUNTS, type Mount, mountNodes } from './vehicles';
 import type { ResidentProp, ResidentView } from './view';
 
-export { PLAYBACK_RATE, QUIET_SPEED } from '../gameSpeed';
+export { PLAYBACK_RATE, SUPER_SPEED } from '../gameSpeed';
 
 /** The key suffix of a body's quilt draped over it curled up (`blankets`). */
 const CURL = ':curl';
@@ -107,10 +107,10 @@ export type { Face } from './face';
  * `aboard`: rode in last frame, till it has come to a stop), as the car is drawn this frame (`out`: x,
  * z, yaw); false when they aren't in one (`pc/cars.ts` `ride`).
  */
-export type CarRide = (frame: FrameState, x: number, z: number, yaw: number, aboard: boolean, out: { x: number; z: number; yaw: number }) => boolean;
+type CarRide = (frame: FrameState, x: number, z: number, yaw: number, aboard: boolean, out: { x: number; z: number; yaw: number }) => boolean;
 
 /** Where a bike or an e-scooter left out by a place stands (its middle) and which way it faces (rad, as a placement's turn). */
-export interface ParkedAt {
+interface ParkedAt {
   x: number;
   z: number;
   yaw: number;
@@ -151,6 +151,9 @@ const FAR_LAG = 0.25;
  * frames), or seen to jump further than they could have gone (a catch-up out of it, or after a pause).
  */
 export const REVEAL_MS = 250;
+/** A step in the land under a resident (m) past which it is eased, not taken at once, and the easing's time constant (s: most of the way in 120 ms). */
+const GROUND_STEP = 0.05;
+const GROUND_EASE = 0.04;
 
 /** How fast a rise cut short (`SimRig.riseK`) finishes its step off the seat (per second: a quarter of a second, less
  * when the action runs fast). */
@@ -196,6 +199,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   shadowPosed = false;
   /** Whether a Sim at (x, z) casts into the sun's map (the renderer's `SunShadows.reaches`); null: the map covers everything. */
   private inMap: ((x: number, z: number) => boolean) | null = null;
+  /** Whether a Sim at (x, z) may cast into a shadow map (`setCastTest`); null: anywhere. */
+  private castsAt: ((x: number, z: number) => boolean) | null = null;
+  /** Per Sim row: whether it may cast into a shadow map now (`castsAt`): the shadow-only copies draw only those. */
+  private readonly casting = new Uint8Array(MAX_CHARACTERS);
+  /** One came where they may cast since the last upload: the sun's map is drawn again with them (`shadowPosed`). */
+  private castGained = false;
   /** Per Sim row: where it was last posed (x, z on the ground), for `shadowPosed`. */
   private readonly posedAt = new Float32Array(MAX_CHARACTERS * 2);
   private width = 0;
@@ -402,6 +411,13 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private frameNo = 0;
   /** Every resident posed in full every frame (`FAR_EVERY` off: to compare, from the console or a test). */
   everyFrame = false;
+
+  /** Fixed-step playback: the animation's clock and the frames posed back to 0, so the same frames pose everyone the same. */
+  restartClock(): void {
+    this.clock = 0;
+    this.frameNo = 0;
+    this.lastNow = 0;
+  }
   /** Sit / lie pelvis offsets per body (computed once from the clips). */
   private readonly sitPelvis = new Map<string, SeatFit>();
   /** The same for the floor clips (`sitFloor`), per body, then floor sit (`FloorSit.name`). */
@@ -1071,6 +1087,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
 
   /** Removes the Sims (end of a session); meshes stay cached. */
   clear(): void {
+    // (The next game's residents start on a clock of their own: what they do doesn't hang on how long this one ran.)
+    this.restartClock();
     this.sims = [];
     this.ghosts = [];
     this.objects = [];
@@ -1084,7 +1102,17 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       this.writeProp(this.leftProp, i, null);
       this.writeProp(this.rightProp, i, null);
       this.writeProp(this.handProp, i, null);
+      for (const slot of this.mountProps) this.writeProp(slot, i, null);
     }
+    // What each row had of the last game (where it stood and was posed, how near its face was, what it held, rode or
+    // swayed) goes with it: the next game's residents in those rows start as a page's first do.
+    this.heldBy.fill(-1);
+    this.mountId.fill(-1);
+    this.facePx.fill(1e6);
+    this.spots.fill(NaN);
+    this.onPadOf.fill(null);
+    this.parkAt.fill(null);
+    for (const rows of [this.posedAt, this.cradle, this.bare, this.storeys, this.groups, this.groupMiddle, this.far, this.poseFar, this.inCar, this.inArea, this.mountOn, this.wheelTurn, this.crankTurn, this.headJoints, this.sway]) rows.fill(0);
     // Props built without their files are built (and their files tried) afresh in the next session.
     this.props.dropFailed();
   }
@@ -1729,11 +1757,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   }
 
   /**
-   * Poses every Sim for this frame. `inView(x, z)` decides visibility; contact-shadow matrices
-   * (one 4x4 per Sim row) are written into `shadows`.
+   * Poses every Sim for this frame. `inView(x, z, k)` decides visibility (a ground point on storey `k`: a flat that may
+   * not be shown open hides who is in it); contact-shadow matrices (one 4x4 per Sim row) are written into `shadows`.
    */
   /** `storey`: the storey in view; residents above it (or, viewing the basement, not in it) aren't drawn. */
-  update(frame: FrameState, inView: (x: number, z: number) => boolean, shadows: Float32Array, storey = Infinity, doorHand?: Float32Array): void {
+  update(frame: FrameState, inView: (x: number, z: number, k: number) => boolean, shadows: Float32Array, storey = Infinity, doorHand?: Float32Array): void {
     this.restTaken.clear();
     this.riddenNow.clear();
     this.parkedNow.clear();
@@ -1748,20 +1776,16 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const stalled = dt > STALL;
     if (dt > 0.1) dt = 0.1;
     if (dt < 0) dt = 0;
-    const speed = curr[layout.header.speed] | 0;
-    const quiet = layout.header.calm !== undefined && curr[layout.header.calm] > 0;
-    const gameSpeed = quiet ? Math.max(speed, QUIET_SPEED) : speed;
-    const playRate = PLAYBACK_RATE[gameSpeed] ?? 1;
-    // How far a walker can get from `prev` to `curr` (at the faster of their speeds, over the steps between them):
+    // (At super speed, the ticks its steps ran: as many as the machine had time for.)
+    const playRate = playbackRate(curr, layout.header);
+    // How far a walker can get from `prev` to `curr` (at the faster of their rates, over the steps between them):
     // `world::WALK_SPEED` a tick, times the fastest walkers' factors and some slack.
-    const prevSpeed = prev[layout.header.speed] | 0;
-    const prevGameSpeed = layout.header.calm !== undefined && prev[layout.header.calm] > 0 ? Math.max(prevSpeed, QUIET_SPEED) : prevSpeed;
-    const stride = (PACE / layout.ticksPerSecond) * WALK_FASTEST * WALK_SLACK * Math.max(playRate, PLAYBACK_RATE[prevGameSpeed] ?? 1) * frame.steps;
+    const stride = (PACE / layout.ticksPerSecond) * WALK_FASTEST * WALK_SLACK * Math.max(playRate, playbackRate(prev, layout.header)) * frame.steps;
     const reach = Math.max(SNAP_DISTANCE, stride);
     const animRate = this.debugRate ?? Math.min(playRate, 2.5);
     // Paused (the pause button, Buy and Build mode, menus): everyone freezes mid-motion, walk
     // cycles, breathing, blinks and glances included.
-    if (gameSpeed === 0 && this.debugRate === null) dt = 0;
+    if (playRate === 0 && this.debugRate === null) dt = 0;
     this.clock += dt;
     const time = this.clock;
     const frameDt = dt;
@@ -1903,7 +1927,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       // (Hidden till now: shown again as they are, not held again for being out of the area.)
       const released = now >= this.revealAt[i];
       if (released) this.revealAt[i] = NaN;
-      let show = !!rig && !away && inView(tx, tz) && storeyShown(Math.floor(th + 0.01), storey) && !(now < this.revealAt[i]);
+      const level = Math.floor(th + 0.01);
+      let show = !!rig && !away && inView(tx, tz, level) && storeyShown(level, storey) && !(now < this.revealAt[i]);
       // (Come into view out of it: the camera jumped there, the area follows it this frame and catches them up after.)
       if (show && this.detail && !this.visible[i] && !this.inArea[i] && !released) {
         this.revealAt[i] = now + REVEAL_MS;
@@ -1916,6 +1941,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         }
         if (rig) rig.cover = 0;
         this.visible[i] = 0;
+        // (Shown again: on the ground where they are then, not eased there from where they were.)
+        this.landY[i] = NaN;
         if (rig) rig.visible = false;
         this.writeProp(this.heldProp, i, null);
         this.writeProp(this.toolProp, i, null);
@@ -1938,7 +1965,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         rig.lag += frameDt;
         const moved = curr[o + k.moving] > 0 || riding;
         const dx = moved ? tx - rig.x : 0;
-        const dy = moved ? this.floorAt(th, tx, tz) - rig.floorY : 0;
+        const dy = moved ? this.floorAt(th, tx, tz, i, frameDt) - rig.floorY : 0;
         const dz = moved ? tz - rig.z : 0;
         if (frameDt > 0) rig.speed += (Math.min(Math.hypot(dx, dz) / frameDt, 20) - rig.speed) * (1 - Math.exp(-frameDt * 10));
         if (dx || dy || dz) this.carryPose(rig, i, dx, dy, dz, shadows);
@@ -1948,7 +1975,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const dt = Math.min(FAR_LAG, frameDt + rig.lag);
       rig.lag = 0;
       const dir = (rig.dir = this.directions[i] ?? null);
-      rig.floorY = this.floorAt(th, tx, tz);
+      rig.floorY = this.floorAt(th, tx, tz, i, dt);
       const pose = curr[o + k.pose];
       const moving = curr[o + k.moving] > 0;
       // Calling someone over (sim-core's `call`): a wave, looking at them.
@@ -3340,6 +3367,15 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     this.inMap = inMap;
   }
 
+  /**
+   * Whether a spot may cast into a shadow map (the sun's square with room to move, and the lamps' rooms; null:
+   * everywhere): the shadow-only copies draw only the Sims there, so the sun's pass draws no copy for Sims who can't
+   * cast into it, a town's worth of them seen from the town view.
+   */
+  setCastTest(castsAt: ((x: number, z: number) => boolean) | null): void {
+    this.castsAt = castsAt;
+  }
+
   /** The seat of the car at a spot, for those sitting there with no object under them (getting in or out of it: `pc/cars.ts`). */
   setCarSeat(seatAt: ((x: number, z: number) => Seat | null) | null): void {
     this.carSeatAt = seatAt;
@@ -3362,11 +3398,21 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     this.ground = ground;
   }
 
-  /** The floor Sim at (x, z) stands on, on storey `th` (fractions on the stairs): the storey's height over the land there. */
-  private floorAt(th: number, x: number, z: number): number {
-    const land = this.ground ? this.ground(x, z) : 0;
-    return th * WALL_HEIGHT + (Number.isFinite(land) ? land : 0);
+  /**
+   * The floor Sim `i` at (x, z) stands on, on storey `th` (fractions on the stairs): the storey's height over the land
+   * there. A step in the land (onto a lot's pad, a kerb) of more than `GROUND_STEP` is eased over `GROUND_EASE`
+   * seconds (`dt` since the last), not taken at once; drawn again after being hidden, they stand where they are.
+   */
+  private floorAt(th: number, x: number, z: number, i: number, dt: number): number {
+    const at = this.ground ? this.ground(x, z) : 0;
+    let land = Number.isFinite(at) ? at : 0;
+    const was = this.landY[i];
+    if (!Number.isNaN(was) && Math.abs(land - was) > GROUND_STEP) land = was + (land - was) * (1 - Math.exp(-Math.max(0, dt) / GROUND_EASE));
+    this.landY[i] = land;
+    return th * WALL_HEIGHT + land;
   }
+  /** Each resident's land as last drawn (`floorAt`; NaN: hidden since, taken as it is). */
+  private readonly landY = new Float64Array(MAX_CHARACTERS).fill(NaN);
 
   /**
    * Where the sim moves residents every tick (a big world's chunks streamed in, as sent it: sim-core `lod::full_detail`),
@@ -4526,7 +4572,8 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       shadowed = !inMap || inMap(this.posedAt[i * 2], this.posedAt[i * 2 + 1]);
     }
     this.posed = lo >= 0;
-    this.shadowPosed = shadowed;
+    this.shadowPosed = shadowed || this.castGained;
+    this.castGained = false;
     if (lo >= 0) this.view.uploadPoseRows(lo, hi - lo + 1);
   }
 
@@ -4972,16 +5019,27 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       }
     }
     // Low detail far from the camera (with a gap between switching down and up; the mesh's measured at
-    // `LOD_HEIGHT_PX` tall, the pose's as drawn); those not drawn keep theirs.
+    // `LOD_HEIGHT_PX` tall, the pose's as drawn); those not drawn keep theirs. And who may cast into a shadow map now
+    // (`castsAt`, where they were posed): one who came there has the sun's map drawn again (`upload`), wherever they
+    // were before.
     const { far, poseFar } = this;
     const atLod = this.hasCam && c[3] > 0 ? LOD_HEIGHT_PX / c[3] : 1;
+    const castsAt = this.castsAt;
+    let cast = false;
     for (let i = 0; i < count; i++) {
-      if (!shown[i]) continue;
-      const lodPx = px[i] * atLod;
-      if (far[i] && lodPx > LOD_NEAR_PX) far[i] = 0;
-      else if (!far[i] && lodPx < LOD_FAR_PX && this.hasLod) far[i] = 1;
-      if (poseFar[i] && px[i] > POSE_NEAR_PX) poseFar[i] = 0;
-      else if (!poseFar[i] && px[i] < POSE_FAR_PX) poseFar[i] = 1;
+      let casts = 0;
+      if (shown[i]) {
+        const lodPx = px[i] * atLod;
+        if (far[i] && lodPx > LOD_NEAR_PX) far[i] = 0;
+        else if (!far[i] && lodPx < LOD_FAR_PX && this.hasLod) far[i] = 1;
+        if (poseFar[i] && px[i] > POSE_NEAR_PX) poseFar[i] = 0;
+        else if (!poseFar[i] && px[i] < POSE_FAR_PX) poseFar[i] = 1;
+        casts = !castsAt || castsAt(this.posedAt[i * 2], this.posedAt[i * 2 + 1]) ? 1 : 0;
+      }
+      if (casts === this.casting[i]) continue;
+      if (casts) this.castGained = true;
+      this.casting[i] = casts;
+      cast = true;
     }
     // Who is drawn changed (or every part's rows were set again): the parts drawn whatever the distance too.
     let all = this.listsStale;
@@ -4996,20 +5054,20 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const perFrame = !!pm.detail || pm.range !== Range.Always;
       this.listRows(pm, perFrame ? 'rows' : 'new', true);
     }
-    // The shadow-only copies: who is drawn, wearing the shells (they keep their rows till either changes).
-    if (!all && !this.shadowsBare) return;
+    // The shadow-only copies: who is drawn and may cast, wearing the shells (they keep their rows till any changes).
+    if (!all && !this.shadowsBare && !cast) return;
     this.shadowsBare = false;
     for (const pm of this.shadowMeshes.values()) {
-      if (pm.enabled) this.listRows(pm, 'new', false);
+      if (pm.enabled) this.listRows(pm, 'new', false, true);
     }
   }
 
   /**
    * The rows of `pm`'s Sims (`all`) drawn now, written where they changed (`change`: as `setInstances` set it, per
-   * frame or not): those shown, not wearing clothes that leave the part out, and (`byDistance`) with a face big
-   * enough for its detail, at its range.
+   * frame or not): those shown, not wearing clothes that leave the part out, (`byDistance`) with a face big
+   * enough for its detail, at its range, and (`cast`) where they may cast into a shadow map (`casting`).
    */
-  private listRows(pm: PartMesh<M>, change: 'rows' | 'new', byDistance: boolean): void {
+  private listRows(pm: PartMesh<M>, change: 'rows' | 'new', byDistance: boolean, cast = false): void {
     const { all, settings: out, detail, range, shell } = pm;
     const { visible: shown, facePx: px, far, bare } = this;
     const anyRange = range === Range.Always;
@@ -5018,7 +5076,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     let changed = false;
     for (let j = 0; j < all.length; j += 4) {
       const id = all[j];
-      if (shown[id] !== 1 || shell & bare[id]) continue;
+      if (shown[id] !== 1 || shell & bare[id] || (cast && !this.casting[id])) continue;
       if (byDistance && (!(px[id] >= detail) || (!anyRange && (far[id] === 1) === near))) continue;
       if (out[n * 4] !== id) {
         out[n * 4] = out[n * 4 + 1] = id;

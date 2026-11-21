@@ -7,10 +7,13 @@
 import { prefetch, prefetchNow, planStream, reprioritize, whenStreamSettled } from '../assets/stream';
 import { SaveRefused, SimBridge, type FrameState } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SimInfo, SocialEvent, WorldStructure } from '../core/protocol';
-import { groundDepth, lowestStorey } from '../core/protocol';
+import { flatOf, groundDepth, lotOf, lowestStorey, storeyRow } from '../core/protocol';
 import { townMap } from '../ui/townMap.svelte';
 import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { BENCH } from '../debug/benchFlags';
+import { DEBUG_HOOKS } from '../debug/hooks';
+import { GAMEPLAY_STATS, installGameplayStats } from '../debug/gameplayStats';
+import { installPlaceHooks } from '../debug/places';
 import { tileWorld } from '../debug/tileWorld';
 import { benchBigWorld } from '../debug/bigTown';
 import { recentLog } from '../debug/log';
@@ -29,30 +32,42 @@ import { app } from '../ui/app.svelte';
 import { prefetchCatalog, services, type GameControls } from '../ui/services';
 import { game, nextWallMode, toast } from '../ui/state.svelte';
 import { saveDebugReport } from '../ui/debugReport';
-import { lotInSentence } from '../ui/place';
+import { lotInSentence, plotInfo } from '../ui/place';
+import { chosenOf } from '../ui/town/chosen';
+import { townPlaces } from '../ui/town/places';
+import { townHud } from '../ui/town/townHud.svelte';
+import { mayOpen } from './openLots';
 import { ideaToasts } from '../ui/planner/ideaToasts';
-import { aboutUs } from '../ui/story';
+import { aboutUs, storyTone } from '../ui/story';
 import { BubbleLayer } from './bubbles';
 import { RoomOverlay } from './roomOverlay';
 import { VoiceDirector } from '../voice';
 import { holdInference, holdInferenceWhile } from '../ml/schedule.svelte';
 import { endSoundOf, soundOf, WorldSound } from '../audio/world';
+import { mixNow } from '../audio/mixer';
 import { addBlueprint, blueprints } from '../persistence/blueprints.svelte';
 import { Director } from './director';
 import { addedObjects, BuildBuyInput, editFeedback, liveAdded, placeEffect, type Picked } from './buildmode';
+import { flatRefuses } from './flatBuild';
 import { ownSize } from './surfaces';
 import { colorValues } from '../ui/buy/catalog';
 import { play } from '../ui/sfx';
 import { faceFromId, householdBonds, householdSpawns, lookAtStage, lookFromSeed, palette, type Appearance, type HouseholdDraft } from './household';
 import { clockTime, openAt, staffed, staffResidents } from './staff';
 import { PointerInput, routeKey } from './input';
-import type { NeighbourhoodDraft } from './town';
+import { LandMode } from './landMode';
+import { installLandHook } from '../ui/land/landHook';
+import { brushOf } from '../ui/land/landTools';
+import { loadTemplates, type NeighbourhoodDraft } from './town';
+import { townOnMoveIn } from '../ui/newGame';
+import { peopleStreams, tierFor } from './people';
 import { compileSim, loadGameData } from './gameData';
 import { townJob } from './townJobs';
 import { gameAssetPlan, parseAheadFiles, streamRanks } from './streamPlan';
-import { GameSpeed } from './speed';
+import { GameSpeed, SUPER_SPEED } from './speed';
 import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
+import { fixedStart } from '../render/shared/frameClock';
 
 declare global {
   interface Window {
@@ -79,13 +94,26 @@ export type StartRequest =
       kind: 'new';
       town: NeighbourhoodDraft;
       household: HouseholdDraft;
+      /** The home: a house's lot, or flat `flat` (its index in its building's flats) of the building on it. */
       slot: number;
-      /** `household` already lives in `town` at `slot`: the player takes it over instead of moving a new one in. */
+      flat?: number;
+      /** `household` already lives in `town` at `slot` (and `flat`): the player takes it over instead of moving a new one in. */
       existing?: boolean;
       /** Living (default) or Creative. */
       mode?: GameKind;
       /** How fast residents age (default normal). */
       lifespan?: Lifespan;
+      /**
+       * The people seed the town's households were drawn from (`people.ts` `peopleStreams`): the
+       * neighbours' bonds and the simulation's own dice come from it too (the page's `?seed=` still
+       * wins for the dice). Missing: both are random.
+       */
+      peopleSeed?: number;
+      /**
+       * The homes still for sale are filled on the way in (`ui/newGame.ts` `townOnMoveIn`): all but a
+       * few, from the people seed's streams (step 4's Move in).
+       */
+      fill?: boolean;
     }
   | { kind: 'load'; saveId: string };
 
@@ -97,8 +125,8 @@ const FEED_SIZE = 3;
 const START_WATCH_MS = 2500;
 /** Shift+R turns things that turn freely by this many degrees. */
 const FINE_TURN = 15;
-/** Fastest game speed (`clock::MAX_SPEED`). */
-const MAX_SPEED = 5;
+/** At super speed the sim's full-detail area is only the chunks round the camera's (`Renderer.setDetailTight`). */
+const TIGHT_SPEED = SUPER_SPEED;
 /** How long the interface stays after the mouse moves while it watches quietly. */
 const HUD_AWAKE_MS = 3000;
 /** How long a big moment plays at normal speed before the game speeds up again. */
@@ -147,6 +175,26 @@ export interface GameSession {
   reveal(): void;
   /** Ends the session; resolves once it has let go of the renderer, which is kept for the next one. */
   dispose(): Promise<void>;
+  /**
+   * Fixed-step playback (benchmarks, `debug/benchTime.ts`): the simulation's clock stops and the frames wait for
+   * `step`, each `ticks` ticks of the game later than the one before; null: back to real time. The game should run
+   * at normal speed (a faster one's steps should divide `ticks`), with no super speed in quiet hours. Asked again while
+   * stepping, only the ticks a frame change.
+   */
+  stepMode(ticks: number | null): void;
+  /**
+   * Fixed-step playback: a run's start, alike however the frames before it went. The residents and the birds set up
+   * afresh (`Renderer.restartLife`); then, with the clocks of what moves only for the eye from 0 again and the frames'
+   * clock a second on (what was held back by its rate is due then), one frame with the clock held, which draws whatever
+   * the restart left waiting; then the clocks from 0 again and the frames' clock a second on, for the run's first frame.
+   */
+  restartPlayback(): Promise<void>;
+  /**
+   * Fixed-step playback: runs the frame's ticks, then draws it at their time. The ticks run (0: none, the game is
+   * paused or not stepping). `still`: a frame with no ticks and the clock held (what a camera put somewhere streams in
+   * and builds, drawn before a run without moving what is drawn at a rate of its own on).
+   */
+  step(still?: boolean): Promise<number>;
 }
 
 /** Reports a loading step and the overall progress (0..1) while a session is prepared. */
@@ -185,7 +233,7 @@ async function openSession(
   warm: boolean,
 ): Promise<GameSession> {
   const params = new URLSearchParams(location.search);
-  devlog('session', { event: 'opening', request: request.kind, ...(request.kind === 'load' ? { saveId: request.saveId } : { slot: request.slot, town: request.town.name, mode: request.mode ?? 'living' }) });
+  devlog('session', { event: 'opening', request: request.kind, ...(request.kind === 'load' ? { saveId: request.saveId } : { slot: request.slot, ...(request.flat === undefined ? {} : { flat: request.flat }), town: request.town.name, mode: request.mode ?? 'living' }) });
   // Every loading step names the work in the perf report (a long task or a dropped frame then says which).
   const report = progress;
   progress = (label, value) => {
@@ -204,10 +252,23 @@ async function openSession(
   let gameId: string;
   if (request.kind === 'new') {
     // (In the town worker: a big world's file takes most of a second to put together.)
+    const people = request.peopleSeed === undefined ? null : peopleStreams(request.peopleSeed);
+    const random = people?.bonds ?? (Math.random() * 2 ** 32) >>> 0;
+    // The rest of the homes for sale filled (Move in), at the tier for the machine's graphics preset:
+    // a few tens of milliseconds on the page, said on the loading screen first. (Their houses were
+    // furnished ahead in step 4, in the town worker the assemble job below runs in: `furnishAhead`.)
+    let town = request.town;
+    if (request.fill) {
+      progress('Moving the neighbours in', 0.06);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const t = await loadTemplates();
+      town = perfTime('session: fill the town', () => townOnMoveIn(content, assets, t, request, Math.random, tierFor(liveSettings.graphics)));
+      progress('Laying out the neighbourhood', 0.09);
+    }
     const made = await perfTimeAsync('session: assembleTown', () =>
-      townJob(content, { kind: 'assemble', town: request.town, player: request.household, slot: request.slot, options: { existing: request.existing, mode: request.mode, lifespan: request.lifespan }, random: (Math.random() * 2 ** 32) >>> 0 }),
+      townJob(content, { kind: 'assemble', town, player: request.household, slot: request.slot, options: { existing: request.existing, flat: request.flat, mode: request.mode, lifespan: request.lifespan }, random }),
     );
-    source = { lot: made.lot, seed: Number(params.get('seed')) || (Math.random() * 2 ** 31) >>> 0 };
+    source = { lot: made.lot, seed: Number(params.get('seed')) || (people?.sim ?? (Math.random() * 2 ** 31) >>> 0) };
     household = request.household.name.trim();
     gameId = crypto.randomUUID();
   } else {
@@ -316,7 +377,7 @@ async function openSession(
   const bubbles = new BubbleLayer(overlay, renderer, content, assets);
   const roomOverlay = new RoomOverlay(overlay, renderer, content);
   /** Build mode's Home tab: the rooms at home tinted by their scores. */
-  const roomOverlayOn = () => game.mode === 'build' && game.buildTab === 'home' && world !== null && worldView === homePlot();
+  const roomOverlayOn = () => game.mode === 'build' && game.buildTab === 'home' && world !== null && worldView === homeLot();
   const refreshRoomOverlay = () => roomOverlay.set(roomOverlayOn() ? world : null, game.rooms, game.storey);
   /** When the player last chose a storey (the view then stays there a while rather than following residents). */
   let storeyChosenAt = -Infinity;
@@ -330,7 +391,8 @@ async function openSession(
     const { layout } = bridge;
     if (id === null || layout.sim.height === undefined || id >= snap[layout.header.simCount]) return;
     const o = layout.headerLen + id * layout.simStride;
-    if (snap[o + layout.sim.away] > 0 || game.sims.find((s) => s.id === id)?.plot !== viewPlot) return;
+    const on = game.sims.find((s) => s.id === id)?.plot;
+    if (snap[o + layout.sim.away] > 0 || on == null || !world || lotOf(world, on) !== viewPlot) return;
     // (Not while the camera is away from the lot, roaming a big world: a storey changed is a build of
     // the lot's objects and residents, 20-60 ms of frames, for a cutaway nobody sees.)
     const lot = viewPlot === null ? null : world?.plots[viewPlot];
@@ -356,11 +418,60 @@ async function openSession(
     setStorey(storey);
   };
   game.catalog = bridge.catalog;
+  /** Build mode's Land tab: the world's land shaped by brush strokes (`landMode.ts`). */
+  const landMode = new LandMode({
+    renderer,
+    shapeLand: (command) => bridge.shapeLand(command),
+    waterMask: () => bridge.waterMask(),
+    world: () => world,
+    household: () => game.home,
+    prices: () => game.catalog?.build.land ?? null,
+    creative: () => game.creative,
+    funds: () => game.funds,
+    brush: () => brushOf(game.landBrush),
+    changed: (state) => (game.land = state),
+    refused: (why) => {
+      play('error');
+      toast(why);
+    },
+    ghost: (path) => (game.landGhost = path),
+  });
+  const landTab = () => game.mode === 'build' && game.buildTab === 'land';
+  /** `?debug`'s `window.__land` for the game's land (put up the first time the tab is: step 1's is gone by then). */
+  let landHook: (() => void) | null = null;
   /** Sims the player controls. */
   const playerSims = () => game.roster.filter((s) => game.households[s.household]?.player).map((s) => s.id);
   /** Names of the player's household: a save's members (Load game lists them), not the whole town. */
   const householdNames = () => game.sims.filter((s) => game.households[s.household]?.player).map((s) => s.name);
   const homePlot = (): number | null => game.households.find((h) => h.player)?.plot ?? null;
+  /** The ground lot the home is on: a flat's building, else the home's lot. */
+  const homeLot = (): number | null => {
+    const home = homePlot();
+    return home === null || !world ? home : lotOf(world, home);
+  };
+  /** The player's sims as a set (`playerSims`), made again only when the roster or the households are. */
+  let mine: { roster: unknown; households: unknown; ids: ReadonlySet<number> } | null = null;
+  const mineNow = (): ReadonlySet<number> => {
+    if (mine?.roster !== game.roster || mine.households !== game.households) mine = { roster: game.roster, households: game.households, ids: new Set(playerSims()) };
+    return mine.ids;
+  };
+  /**
+   * Whether plot `plot` may be shown open now: the home, one of the household there, or looked inside; a building of
+   * flats if one of its flats may (`openLots.ts`), unless `byFlats` is false (by the plot alone).
+   */
+  const mayOpenNow = (plot: number, byFlats = true) => mayOpen(plot, { home: homePlot(), lookInside: game.lookInside, sims: game.sims, mine: mineNow(), flats: byFlats ? world?.flats : undefined });
+  // (The renderer asks of each flat of the building in view, and of a place under flats for its own ground floor: by
+  // the plot alone, not by its flats.)
+  renderer.setFlatsOpen((plot) => mayOpenNow(plot, false));
+  /**
+   * The lot in view closes up when nothing keeps it open any more (the household left it, the player looked away
+   * from it): the home is shown again, the camera left where it is. Not while following someone (their lot is shown).
+   */
+  function closeUp() {
+    const home = homePlot();
+    if (game.mode !== 'live' || game.follow !== null || viewPlot === null || home === null || mayOpenNow(viewPlot)) return;
+    showPlot(home, false);
+  }
 
   // --- Watching: after a while without input the director takes the camera ----------------
   const director = new Director({
@@ -381,6 +492,12 @@ async function openSession(
   /** Speed before a big moment slowed the game down, and until when (restored unless the player picks a speed). */
   let slowedFrom: number | null = null;
   let slowUntil = 0;
+  /**
+   * Fixed-step playback (`stepMode`): the ticks a frame, the frames drawn so and the whole millisecond they started
+   * from (each frame's time is that and its ticks' time, in whole milliseconds: the same frames meet the rates that
+   * hold things back, the sun's map's, the reflections', at the same frames); null: real time.
+   */
+  let stepping: { ticks: number; frames: number; from: number; tick: number } | null = null;
   const canWatch = () =>
     revealed &&
     game.mode === 'live' &&
@@ -392,9 +509,11 @@ async function openSession(
     !game.jobBoardOpen &&
     !game.plannerOpen &&
     viewPlot !== null &&
-    viewPlot === homePlot() &&
+    viewPlot === homeLot() &&
     // (Not from the town view: the player zoomed out to look at the town, and the director's shots are the household's.)
-    townView.blend === 0;
+    townView.blend === 0 &&
+    // (Nor in fixed-step playback: the benchmark holds the camera.)
+    !stepping;
   function startWatching(now: number) {
     if (!world) return;
     playerWalls = game.wallMode;
@@ -440,6 +559,8 @@ async function openSession(
   const speed = new GameSpeed((running) => {
     bridge.send({ type: 'setSpeed', speed: running });
     game.speed = running;
+    // (At super speed the sim's full-detail area is the chunks round the camera's only.)
+    renderer.setDetailTight(running >= TIGHT_SPEED);
   }, bridge.savedSpeed);
   /**
    * The catalog's pictures are drawn ahead of time in Build and Create, not in Live's frames
@@ -466,8 +587,6 @@ async function openSession(
   /** How soon each of the town's model files is wanted, by the lot in view and where the camera looks (`streamRanks`). */
   const fileRanks = (w: WorldStructure) => streamRanks(content, assets, w, viewPlot === null ? null : (w.plots[viewPlot] ?? null), watched);
   let autosaveMinutes = -1;
-  /** The performance overlay setting last applied (F3 opens and closes the overlay in between). */
-  let showFps: boolean | null = null;
   /**
    * The free will setting last sent: sent again only when it changes, not with every other setting (a debug `setAutonomy`
    * holds). A state the tests wrote (`?state=`) keeps its own free will as it opens (`check_states.rs`: off, so nobody
@@ -475,13 +594,22 @@ async function openSession(
    */
   let autonomy: boolean | null = params.has('state') ? settings.autonomy : null;
 
+  /** A speed for the game: the player's (with a blip for pausing, going again or a speed changed) or the game's own (`onStory`, silent). */
+  function chooseSpeed(to: number, byPlayer: boolean) {
+    // Time stands still in Build and Create.
+    if (game.mode !== 'live') return;
+    slowedFrom = null;
+    to = Math.max(0, Math.min(SUPER_SPEED, to));
+    // (The player's speed, also under a hold.)
+    const was = speed.chosen;
+    // (Under a menu: the speed it gives back.)
+    speed.choose(to);
+    if (byPlayer && to !== was) play(to === 0 ? 'pause' : was === 0 ? 'resume' : 'speed');
+  }
+
   const controls: GameControls = {
     setSpeed(to) {
-      // Time stands still in Build and Create.
-      if (game.mode !== 'live') return;
-      slowedFrom = null;
-      // (Under a menu: the speed it gives back.)
-      speed.choose(Math.max(0, Math.min(MAX_SPEED, to)));
+      chooseSpeed(to, true);
     },
     togglePause() {
       controls.setSpeed(game.speed === 0 ? speed.last : 0);
@@ -507,7 +635,7 @@ async function openSession(
       if (id !== null) {
         takeBack();
         const plot = game.sims.find((s) => s.id === id)?.plot;
-        if (plot != null && plot !== viewPlot) showPlot(plot);
+        if (plot != null && world && lotOf(world, plot) !== viewPlot) showPlot(plot);
       }
       // Letting go leaves the camera where it is: the lot under it becomes the focus as the
       // camera roams (`onFocusLot`), rather than a jump home before a "look here" flies off.
@@ -515,10 +643,13 @@ async function openSession(
     frameHouse() {
       takeBack();
       if (game.follow !== null) controls.follow(null);
-      const plot = world && homePlot() !== null ? world.plots[homePlot()!] : null;
-      if (!plot) return;
+      // (A flat's: its whole building, on the flat's storey.)
+      const home = homePlot();
+      const lot = homeLot();
+      const plot = world && lot !== null ? world.plots[lot] : null;
+      if (!plot || home === null) return;
       // (Drawn at once, not when the camera settles there.)
-      if (viewPlot !== plot.id) showPlot(plot.id, false);
+      showPlot(home, false);
       const [x0, z0, x1, z1] = plot.house ?? [plot.x, plot.z, plot.x + plot.w, plot.z + plot.d];
       renderer.setGameShot({ target: { x: (x0 + x1) / 2, z: (z0 + z1) / 2 }, beta: 0.72, radius: Math.min(60, Math.max(x1 - x0, z1 - z0) * 1.25 + 8), duration: liveSettings.reducedMotion ? 0 : 1.6 });
       // The shot lands, then the camera is the player's again.
@@ -611,13 +742,27 @@ async function openSession(
       // The view goes along with them (Esc lets go).
       if (game.mode === 'live' && who) {
         controls.follow(who.id);
-        const p = game.plots[plot];
+        const p = plotInfo(game, plot);
         toast(`${who.name} is on the way to ${p ? lotInSentence(p, game.households) : 'visit'}.`);
       }
     },
     goHome() {
       bridge.send({ type: 'goHome', sim: game.selected });
       game.townOpen = false;
+    },
+    lookInside(plot) {
+      if (plot === null) {
+        if (game.lookInside === null) return;
+        game.lookInside = null;
+        closeUp();
+        return;
+      }
+      if (game.mode !== 'live' || !world || !plotInfo(world, plot)) return;
+      takeBack();
+      if (game.follow !== null) controls.follow(null);
+      // (A flat: its building, on the flat's storey.)
+      game.lookInside = plot;
+      showPlot(plot, lotOf(world, plot) !== viewPlot);
     },
     lookAt(x, z) {
       // A flight across the world; the lot it settles on becomes the focus (`onFocusLot`).
@@ -629,6 +774,7 @@ async function openSession(
       bridge.send({ type: 'social', sim: game.selected, target, social });
       voices.playerConversation(game.selected, target);
       game.socialMenu = null;
+      play('choose');
     },
     phone(action, contact) {
       if (game.mode !== 'live') return;
@@ -638,21 +784,31 @@ async function openSession(
       if (game.mode !== 'live') return;
       bridge.send({ type: 'use', sim: game.selected, object: objectId, interaction });
       game.menu = null;
+      play('choose');
     },
     useItem(itemId, action) {
       if (game.mode !== 'live') return;
       bridge.send({ type: 'useItem', sim: game.selected, item: itemId, action });
       game.menu = null;
+      play('choose');
     },
     walkTo(sim, x, z) {
       if (game.mode !== 'live') return;
       bridge.send({ type: 'moveTo', sim, x, z });
       game.menu = null;
+      play('choose');
     },
     switchLamp(objectId) {
       if (game.mode !== 'live') return;
       bridge.send({ type: 'switchLamp', object: objectId, on: bridge.lampOff(objectId) });
       game.menu = null;
+      play('choose');
+    },
+    drawCurtains(objectId) {
+      if (game.mode !== 'live') return;
+      bridge.send({ type: 'drawCurtains', object: objectId, shut: !bridge.curtainShut(objectId) });
+      game.menu = null;
+      play('choose');
     },
     cancelAction(index) {
       bridge.send({ type: 'cancel', sim: game.selected, index });
@@ -682,6 +838,7 @@ async function openSession(
       if (mode !== 'live' && game.follow !== null) controls.follow(null);
       const fromLive = game.mode === 'live';
       buildBuy.cancel();
+      if (mode !== 'build') landMode.putAway();
       game.eyedropper = false;
       game.pickHint = null;
       game.mode = mode;
@@ -697,10 +854,10 @@ async function openSession(
         game.jobBoardOpen = false;
         game.plannerOpen = false;
       }
-      // Building happens at home, with the walls down so the floor plan is visible.
-      const home = buildBuy.home();
-      if (mode !== 'live' && home && viewPlot !== home.id) showPlot(home.id);
-      if (mode === 'build' && home) controls.setWallMode('down');
+      // Building happens at home (a flat's on its own storey), with the walls down so the floor plan is visible.
+      const home = homePlot();
+      if (mode !== 'live' && home !== null) showPlot(home, homeLot() !== viewPlot);
+      if (mode === 'build' && home !== null) controls.setWallMode('down');
       buildBuy.modeChanged();
     },
     setBuildTab(tab) {
@@ -709,7 +866,13 @@ async function openSession(
       controls.setMode('build');
       if (game.buildTab === tab) return;
       buildBuy.cancel();
+      if (game.buildTab === 'land') landMode.putAway();
       game.buildTab = tab;
+      // (The land surveyed the first time the tab comes up.)
+      if (tab === 'land') {
+        void landMode.ready();
+        landHook ??= installLandHook({ editor: () => landMode.current, surface: () => landMode.surface, ended: (patch) => landMode.commit(patch), refusal: () => landMode.lastRefusal, undo: () => landMode.undo(), redo: () => landMode.redo(), simWater: () => bridge.waterMask() });
+      }
       game.buildStart = null;
       buildBuy.clearPreviews();
       refreshRoomOverlay();
@@ -778,6 +941,8 @@ async function openSession(
       bridge.send({ type: 'repair', household: game.home, object: objectId });
     },
     undo() {
+      // (The Land tab's strokes have an undo of their own.)
+      if (landTab()) return void landMode.undo();
       // The step count follows a little later; don't send more undos than there are steps.
       if (game.mode !== 'build' || game.undoSteps <= 0) return;
       // (It may move or remove things: something carried goes back first.)
@@ -789,6 +954,7 @@ async function openSession(
       bridge.send({ type: 'undo', household: game.home });
     },
     redo() {
+      if (landTab()) return void landMode.redo();
       if (game.mode !== 'build' || game.redoSteps <= 0) return;
       buildBuy.dropOwned();
       game.redoSteps--;
@@ -796,6 +962,9 @@ async function openSession(
       game.buySelection = null;
       buildBuy.clearPreviews();
       bridge.send({ type: 'redo', household: game.home });
+    },
+    landReset() {
+      if (landTab()) void landMode.reset();
     },
     recolor(objectId, colors) {
       bridge.send({ type: 'recolor', household: game.home, object: objectId, colors: colorValues(colors) });
@@ -870,11 +1039,18 @@ async function openSession(
       }
     },
     setBuildTool(tool) {
+      // (In a flat what the simulation refuses isn't taken up: its roof, outside, yard and stairs are the building's.)
+      const refused = flatRefuses(tool, homePlot(), game);
+      if (refused) {
+        if (game.buildTool === tool) tool = 'wall';
+        else return toast(refused);
+      }
       const wasBuilding = game.mode === 'build';
       controls.setMode('build');
       // Changing tab or tool, or (re)entering the Stairs tool, drops what's in hand.
       const fromTab = game.buildTab;
       if (fromTab !== 'build' || tool !== game.buildTool || tool === 'stairs') buildBuy.cancel();
+      if (fromTab === 'land') landMode.putAway();
       game.buildTab = 'build';
       game.buildTool = tool;
       if (fromTab !== 'build') {
@@ -969,6 +1145,11 @@ async function openSession(
     const withLamps = (w: WorldStructure | null) =>
       w && { ...w, objects: w.objects.map((o) => (content.object(o.def)?.light ? { ...o, off: bridge.lampOff(o.id) } : o)) };
     Object.assign(window, { __controls: controls, __showPlot: showPlot, __world: () => withLamps(world), __send: (cmd: Command) => bridge.send(cmd), __items: () => itemsSeen });
+    // `__places()` and `__lookInside(name, storey?)`: the named places' lots, looked inside by name (dev only).
+    installPlaceHooks(controls, () => world);
+    // `__bench`: the benchmark's poses, hours, freeze, settle and counts on this page (`debug/bench.ts` `BenchApi`; put
+    // up from the main menu on, `App.svelte`), with the renderer this game draws with.
+    if (!BENCH && DEBUG_HOOKS) void import('../debug/bench').then((m) => m.installDebugBench(renderer));
     // `__sims()`: every resident as the newest snapshot shows them (where, pose, the object and use,
     // needs; `debug/sims.ts`), to wait on; `__content` the game's content (`__content.object(id)`).
     // `__addFunds(amount)`: money for the player's household. `__customise(id)`: the colour studio
@@ -1042,7 +1223,8 @@ async function openSession(
   services.previews.keep(true);
 
   // Goal ideas and wishes as they come up, to accept or decline.
-  const ideas = ideaToasts();
+  // (Their chime once the game is revealed: a wish toasted as the world arrives stays quiet behind the loading screen.)
+  const ideas = ideaToasts(() => revealed && game.mode === 'live');
   bridge.onError((message) => {
     if (disposed) return;
     toast(message);
@@ -1062,10 +1244,14 @@ async function openSession(
     // Updates carry changes only: lists are replaced when something in them changed, keeping
     // the objects of everything that didn't.
     const changed = mirror.apply(ui);
+    game.quiet = ui.quiet;
+    // Super speed by itself starts and ends on its own: the speed shown, and the one given back after a menu, follow it.
+    speed.follow(ui.speed);
+    if (ui.speed !== game.speed) renderer.setDetailTight(ui.speed >= TIGHT_SPEED);
+    game.speed = ui.speed;
     if (!changed) return;
     game.day = ui.day;
     game.minute = ui.minute;
-    game.speed = ui.speed;
     game.lifespan = ui.lifespan;
     game.playerMoves = ui.playerMoves;
     if (changed.sims) game.sims = changed.sims;
@@ -1090,7 +1276,9 @@ async function openSession(
     // The view stays home; it goes along to other lots only with a resident the player follows.
     const followed = game.follow === null ? null : game.sims.find((s) => s.id === game.follow);
     if (game.follow !== null && !followed) controls.follow(null);
-    else if (followed?.plot != null && followed.plot !== viewPlot) showPlot(followed.plot);
+    else if (followed?.plot != null && world && lotOf(world, followed.plot) !== viewPlot) showPlot(followed.plot);
+    // (Nobody followed: a lot the household has left closes up.)
+    closeUp();
     // New story events: the journal, the director, and the feed (only the first update's story is
     // history; a new game's is empty, and its first event is news).
     const events = ui.events ?? [];
@@ -1166,6 +1354,10 @@ async function openSession(
   });
   bridge.onLamps((off) => {
     if (!disposed) renderer.setLampsOff(off);
+  });
+  bridge.onCurtains((shut) => {
+    if (!disposed) renderer.setCurtainsShut(shut);
+    if (!disposed) worldSound.curtains(shut);
   });
   /**
    * Each resident's look as last made, by id: what it was made from (`key`), the look from their
@@ -1269,6 +1461,13 @@ async function openSession(
     game.former = w.former ?? [];
     game.households = w.households;
     game.plots = w.plots;
+    game.flats = w.flats ?? [];
+    // Where the home's things stand: a house's lot, a flat's rectangle on its storey's rows.
+    const homeFlat = mine?.plot == null ? undefined : flatOf(w, mine.plot);
+    const homeOn = homeFlat ? { x: homeFlat.x, z: homeFlat.z + storeyRow(w, homeFlat.storey), w: homeFlat.w, d: homeFlat.d } : mine?.plot == null ? undefined : w.plots[mine.plot];
+    const area = homeOn ? { x: homeOn.x, z: homeOn.z, w: homeOn.w, d: homeOn.d } : null;
+    const had = game.homeArea;
+    if (area?.x !== had?.x || area?.z !== had?.z || area?.w !== had?.w || area?.d !== had?.d) game.homeArea = area;
     // Portraits for the HUD, the household first (drawn once, cached by look); the game is
     // ready once the household's are.
     if (simsChanged || !portraits) {
@@ -1284,9 +1483,9 @@ async function openSession(
       // Nobody lives at home: nobody to give orders to.
       game.selected = first ?? -1;
       if (first !== undefined && liveSettings.directControl === 'always') controls.inspect(first);
-      // Start on the home lot; its geometry arrives in the next world message.
+      // Start on the home lot (a flat's building, on its storey); its geometry arrives in the next world message.
       const home = w.households.find((h) => h.player)?.plot;
-      if (home != null && w.plots[home]) return showPlot(home);
+      if (home != null && plotInfo(w, home)) return showPlot(home);
       // (No home: the whole town's walls and floors, which come once a view is asked for.)
       if (!w.meshes) return bridge.setView(null);
     } else if (!playerSims().includes(game.selected)) {
@@ -1317,7 +1516,10 @@ async function openSession(
       try {
         // (`?bench=bigworld`: the town tiled for the renderer, a big world: `debug/tileWorld.ts`.)
         if (benchBig) return await renderer.setWorld(await benchBig, benchView);
-        return await renderer.setWorld(BENCH && BENCH.tile > 1 ? tileWorld(w, BENCH.tile) : w, view);
+        await renderer.setWorld(BENCH && BENCH.tile > 1 ? tileWorld(w, BENCH.tile) : w, view);
+        // (A storey chosen before the renderer knew how many the world has, as a flat upstairs is shown on arriving, goes
+        // to it now: the renderer held the ground till then.)
+        renderer.setStorey(game.storey);
       } finally {
         perfEnd(buildSpan);
       }
@@ -1371,9 +1573,12 @@ async function openSession(
     if (news.length) game.feed = [...game.feed.filter((f) => now - f.at < FEED_MS), ...news.map((event) => ({ event, at: now }))].slice(-FEED_SIZE);
     // Big moments at home are worth seeing at normal speed.
     const big = fresh.find((e) => e.importance >= 2 && aboutUs(e));
+    // A chime for the household's milestones (a sad one for bad news).
+    if (big && revealed && game.mode === 'live') play(storyTone(big) === 'bad' ? 'notifyLow' : 'notify');
     if (big && liveSettings.autoSlow && game.mode === 'live' && game.speed >= 3) {
-      const from = game.speed;
-      controls.setSpeed(1);
+      // (Super speed wouldn't come back so soon after it: 10×.)
+      const from = Math.min(game.speed, 3);
+      chooseSpeed(1, false);
       slowedFrom = from;
       slowUntil = performance.now() + SLOW_MS;
       toast('Slowed down for a moment');
@@ -1383,12 +1588,22 @@ async function openSession(
   /**
    * Switches the view to a lot: the worker sends that lot's geometry, then the scene is rebuilt.
    * The camera moves to its middle, unless it is going along with someone the player follows.
+   * A flat is shown as its building (the lot in view), on the flat's storey.
    */
   function showPlot(plot: number, aim = true) {
-    const p = world?.plots[plot];
+    if (!world) return;
+    const lot = lotOf(world, plot);
+    const p = world.plots[lot];
     if (!p) return;
-    viewPlot = plot;
-    game.viewPlot = plot;
+    // (The storey stays a while, as one the player chose, rather than following a resident elsewhere in the building.)
+    const flat = flatOf(world, plot);
+    if (flat) {
+      storeyChosenAt = performance.now();
+      setStorey(flat.storey);
+    }
+    if (lot === viewPlot && !aim) return;
+    viewPlot = lot;
+    game.viewPlot = lot;
     if (aim && game.follow === null) renderer.focus(p.x + p.w / 2, p.z + p.d / 2);
     bridge.setView([p.x, p.z, p.x + p.w, p.z + p.d]);
   }
@@ -1448,6 +1663,14 @@ async function openSession(
     // (The bench's tiled big world: a copy's lot is the town's own, `debug/tileWorld.ts`.)
     const plot = BENCH && BENCH.tile > 1 && world ? lot % world.plots.length : lot;
     if (game.mode !== 'live' || game.follow !== null || director.active || !world?.plots[plot]) return false;
+    // (Settled on another lot: the one looked inside closes up.)
+    if (game.lookInside !== null && plot !== lotOf(world, game.lookInside)) game.lookInside = null;
+    // Another household's lot (a shop none of yours is in) stays a closed house: only the home, a lot one of the
+    // household is on, or one looked inside opens.
+    if (!mayOpenNow(plot)) {
+      closeUp();
+      return false;
+    }
     if (plot !== viewPlot) showPlot(plot, false);
     return true;
   });
@@ -1537,9 +1760,12 @@ async function openSession(
     // A lamp: its switch; a fire is lit and put out.
     const off = bridge.lampOff(objectId);
     if (def.light && def.light.switch !== false) items.unshift({ label: def.light.fire ? (off ? 'Light the fire' : 'Put out the fire') : off ? 'Turn on' : 'Turn off', index: -1 });
+    // Curtains (content `overWindow`): drawn or opened (`PieMenu`'s -2).
+    if (def.overWindow) items.unshift({ label: bridge.curtainShut(objectId) ? 'Open the curtains' : 'Draw the curtains', index: -2 });
     // Upgrades are bought in the catalog, not from here.
     if (items.length === 0) return;
     game.menu = { objectId, title: placement.quality ? `${def.name} ${'★'.repeat(placement.quality)}` : def.name, x, y, items };
+    play('menu');
   };
 
   /** Food or a dish: eat a serving, or clear it away (to the sink). */
@@ -1554,6 +1780,7 @@ async function openSession(
       { label: 'Clear away', index: 1 },
     ];
     game.menu = { objectId: -1, itemId, title: `${def.label}${it.state === 'spoiled' ? ' (gone off)' : servings}`, x, y, items };
+    play('menu');
   };
 
   let pointer: PointerInput | null = null;
@@ -1564,6 +1791,8 @@ async function openSession(
       game.socialMenu = null;
       game.townOpen = false;
       if (game.mode === 'create') return;
+      // (The Land tab's brush takes the press itself: `press`.)
+      if (landTab()) return;
       if (game.mode === 'build') {
         const hit = renderer.pick(x, y);
         const ground = hit.ground && inLot(hit.ground.x, hit.ground.z) ? hit.ground : null;
@@ -1582,6 +1811,7 @@ async function openSession(
       const sim = simAt(x, y);
       if (sim !== null && actor !== null && sim !== actor) {
         game.socialMenu = { target: sim, x, y, options: null };
+        play('menu');
         bridge.requestSocialOptions(actor, sim).then(
           (options) => {
             if (game.socialMenu?.target === sim) game.socialMenu = { ...game.socialMenu, options };
@@ -1600,12 +1830,24 @@ async function openSession(
       const hit = renderer.pick(x, y);
       if (hit.itemId != null) return openItemMenu(hit.itemId, x, y);
       if (hit.objectId !== null) return openMenu(hit.objectId, x, y);
+      // A house or a building past the lot in view: its card (what it is, who is inside) and its pin.
+      const building = world ? renderer.buildingAt(x, y) : null;
+      const chosen = building && world ? chosenOf(building, { places: townPlaces(world.meta, game.plots), plots: game.plots, flats: game.flats, households: game.households }) : null;
+      if (chosen) {
+        townHud.chosen = chosen;
+        return;
+      }
       // The floor (or the ground): a menu with "Walk here", as an object's has its uses.
       if (actor !== null && hit.ground && inLot(hit.ground.x, hit.ground.z)) {
         game.menu = { objectId: -1, ground: { x: hit.ground.x, z: hit.ground.z, sim: actor }, title: 'Here', x, y, items: [{ label: 'Walk here', index: 0 }] };
+        play('menu');
       } else if (!direct) controls.inspect(null);
     },
     hover(x, y) {
+      if (landTab()) {
+        renderer.setHoverTile(null);
+        return landMode.hover(x, y);
+      }
       const hit = renderer.pick(x, y);
       const g = hit.ground;
       renderer.setHoverTile(g && inLot(g.x, g.z) && !game.pauseMenu ? { x: Math.floor(g.x), z: Math.floor(g.z) } : null);
@@ -1614,21 +1856,25 @@ async function openSession(
     leave() {
       renderer.setHoverTile(null);
       buildBuy.clearPreviews();
+      landMode.leave();
     },
     // Wall and Remove tools: press, drag, release (see `BuildBuyInput.press`).
     press(x, y) {
       // The eyedropper picks with a plain click.
-      if (game.pauseMenu || game.mode !== 'build' || buildBuy.picking()) return false;
+      if (game.pauseMenu || game.mode !== 'build') return false;
+      if (landTab()) return landMode.press(x, y);
+      if (buildBuy.picking()) return false;
       const hit = renderer.pick(x, y);
       const g = hit.ground;
       return buildBuy.press(g && inLot(g.x, g.z) ? g : null, { x, y });
     },
     release(x, y, moved) {
+      if (landTab()) return landMode.release();
       const g = renderer.pick(x, y).ground;
       buildBuy.release(g && inLot(g.x, g.z) ? g : null, moved);
     },
-    cancel: () => buildBuy.cancelDrawing(),
-    abort: () => buildBuy.abortPress(),
+    cancel: () => (landTab() ? landMode.cancel() : buildBuy.cancelDrawing()),
+    abort: () => (landTab() ? void landMode.cancel() : buildBuy.abortPress()),
   });
 
   /** Puts what the eyedropper picked up in hand: a build tool with its look, or another object. */
@@ -1680,7 +1926,8 @@ async function openSession(
     if (route === 'escape') {
       if (game.townOpen) return void (game.townOpen = false);
       if (game.eyedropper) return controls.toggleEyedropper();
-      // Step back: drop what's in hand, then leave Build mode.
+      // Step back: drop what's in hand (a land stroke under way), then leave Build mode.
+      if (landTab() && landMode.cancel()) return;
       if (buildBuy.cancel()) return;
       if (game.mode !== 'live') return controls.setMode('live');
       if (game.menu || game.socialMenu) return controls.closeMenu();
@@ -1704,7 +1951,6 @@ async function openSession(
       case '2':
       case '3':
       case '4':
-      case '5':
         return controls.setSpeed(Number(e.key));
       case 'PageUp':
       case 'PageDown':
@@ -1727,6 +1973,11 @@ async function openSession(
         // Construct: Build mode's walls, rooms and paint (again: back to Live). (Not Ctrl/⌘+C: that copies, `routeKey`.)
         if (game.mode === 'build' && game.buildTab === 'build') return controls.setMode('live');
         return controls.setBuildTab('build');
+      case 'g':
+      case 'G':
+        // The ground: Build mode's Land tab (again: back to Live).
+        if (landTab()) return controls.setMode('live');
+        return controls.setBuildTab('land');
       case 'o':
       case 'O':
         // Our home: Build mode's Home tab (again: back to Live).
@@ -1797,10 +2048,20 @@ async function openSession(
     }
   };
 
+  // The gameplay benchmark (`tools/bench/gameplay.mjs`): the renderer's numbers on demand, with GPU
+  // time measured for the whole session (`?gpustats`, dev only; nothing is installed without it).
+  installGameplayStats(() => ({
+    ...renderer.stats(),
+    gpuPasses: renderer.gpuPasses(),
+    simMemoryBytes: bridge.threadStats?.memoryBytes ?? null,
+  }));
+
   const statsTimer = setInterval(() => {
-    // GPU timing costs a little, so it runs only while the overlay is open.
-    renderer.measureGpu(game.perfOpen);
-    if (!game.perfOpen) return;
+    // GPU timing costs a little, so it runs only while the overlay is open (or the benchmark asks).
+    renderer.measureGpu(game.perfOpen || GAMEPLAY_STATS);
+    // (A session prepared behind the menus leaves the overlay to their own numbers, `App.svelte`: both written, it
+    // flickered between theirs and this one's, its simulation thread there and gone twice a second.)
+    if (!game.perfOpen || app.screen !== 'game') return;
     game.stats = renderer.stats();
     game.threads = threadStats(game.stats, bridge.threadStats, voices.stats());
   }, STATS_INTERVAL_MS);
@@ -1822,7 +2083,7 @@ async function openSession(
           render: renderSample(s, liveSettings.resolution),
           main: { busy: +t.main.busy.toFixed(3), longTasks: t.main.longTasks, longestTaskMs: Math.round(t.main.longestTaskMs), heapMB: t.main.heapBytes === null ? null : Math.round(t.main.heapBytes / 2 ** 20) },
           sim: t.sim
-            ? { stepsPerS: Math.round(t.sim.stepsPerSecond), targetPerS: Math.round(t.sim.targetPerSecond), stepMs: +t.sim.stepMs.toFixed(3), stepMaxMs: +t.sim.stepMaxMs.toFixed(2), busy: +t.sim.busy.toFixed(3), wasmMB: Math.round(t.sim.memoryBytes / 2 ** 20) }
+            ? { stepsPerS: Math.round(t.sim.stepsPerSecond), targetPerS: Math.round(t.sim.targetPerSecond), ticksPerS: Math.round(t.sim.ticksPerSecond), stepMs: +t.sim.stepMs.toFixed(3), stepMaxMs: +t.sim.stepMaxMs.toFixed(2), busy: +t.sim.busy.toFixed(3), wasmMB: Math.round(t.sim.memoryBytes / 2 ** 20) }
             : null,
           residents: game.sims.length,
         });
@@ -1895,6 +2156,55 @@ async function openSession(
       // A save's picture is drawn into its own target: compile its shaders now, not at the first autosave.
       await perfTimeAsync('session: warm thumbnail', () => renderer.captureThumbnail(THUMBNAIL.width, THUMBNAIL.height));
     },
+    stepMode(ticks) {
+      if (ticks === null) {
+        if (!stepping) return;
+        stepping = null;
+        renderer.framesOnDemand(false);
+        bridge.pace(false);
+        bridge.send({ type: 'setAutoFast', enabled: liveSettings.skipQuietHours });
+        return;
+      }
+      if (!(Number.isInteger(ticks) && ticks > 0)) throw new Error(`stepMode: ${ticks} is no number of ticks`);
+      // (No camera watching on its own meanwhile: the benchmark holds it.)
+      if (game.watching) stopWatching();
+      if (stepping) {
+        // (A new object: a step under way with the old ticks draws nothing.)
+        if (stepping.ticks !== ticks) stepping = { ...stepping, ticks };
+        return;
+      }
+      // (No super speed in quiet hours meanwhile: it would run the steps' ticks by the wall clock.)
+      bridge.send({ type: 'setAutoFast', enabled: false });
+      // (Past every frame drawn before: whatever they held back by its rate is due by then.)
+      stepping = { ticks, frames: 0, from: fixedStart(), tick: 0 };
+      bridge.pace(true);
+      renderer.framesOnDemand(true);
+    },
+    async restartPlayback() {
+      if (!stepping || disposed) return;
+      await renderer.restartLife();
+      const again = () => {
+        if (!stepping) return;
+        stepping = { ...stepping, from: stepping.from + 1000 };
+        renderer.restartClocks();
+      };
+      again();
+      await session.step(true);
+      again();
+    },
+    async step(still = false) {
+      const s = stepping;
+      if (!s || disposed) return 0;
+      const ran = still ? 0 : await bridge.advance(s.ticks);
+      if (stepping !== s || disposed) return ran;
+      // (The frame's clock goes on by the ticks' time at normal speed, paused or not: what moves only for the eye, the
+      // wind and the clouds, moves by the same amount every frame.)
+      s.frames++;
+      if (!still) s.tick += s.ticks;
+      const at = s.from + Math.floor((s.tick * 1000) / bridge.layout.ticksPerSecond);
+      if (!renderer.drawFrame(at)) throw new Error("No frame was drawn (the game isn't on screen).");
+      return ran;
+    },
     reveal() {
       if (revealed) return;
       revealed = true;
@@ -1921,9 +2231,9 @@ async function openSession(
       // Nobody lives here yet, or there's no house (an empty lot): the game starts with
       // building (time stands still until Live).
       const home = homePlot();
-      if (!game.occupied || (home !== null && !game.plots[home]?.house)) {
+      if (!game.occupied || (home !== null && !plotInfo(game, home)?.house)) {
         // No house yet: the Build tab; a house nobody lives in: the catalog to furnish it.
-        if (home !== null && !game.plots[home]?.house) controls.setBuildTool(game.buildTool);
+        if (home !== null && !plotInfo(game, home)?.house) controls.setBuildTool(game.buildTool);
         else controls.setBuildTab('furnish');
       }
       // Time runs from here (at the speed chosen), unless something else holds it (a menu, the
@@ -1974,8 +2284,8 @@ async function openSession(
         reducedMotion: s.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches,
       });
       if (s.autonomy !== autonomy) bridge.send({ type: 'setAutonomy', enabled: (autonomy = s.autonomy) });
-      bridge.send({ type: 'setAutoFast', enabled: s.skipQuietHours });
-      if (s.showFps !== showFps) game.perfOpen = showFps = s.showFps;
+      // (Not in fixed-step playback: its frames are the ticks they ask for.)
+      bridge.send({ type: 'setAutoFast', enabled: s.skipQuietHours && !stepping });
       if (s.autosaveMinutes !== autosaveMinutes) {
         autosaveMinutes = s.autosaveMinutes;
         clearInterval(autosaveTimer);
@@ -1991,6 +2301,9 @@ async function openSession(
     },
     async dispose() {
       disposed = true;
+      // (The renderer is kept for the next game: back to drawing at the display's refreshes.)
+      if (stepping) renderer.framesOnDemand(false);
+      stepping = null;
       releaseInference();
       ideas.clear();
       clearInterval(statsTimer);
@@ -2022,6 +2335,8 @@ async function openSession(
       voices.dispose();
       worldSound.dispose();
       buildBuy.dispose();
+      landMode.dispose();
+      landHook?.();
       await building;
       renderer.clear();
       bridge.dispose();
@@ -2029,11 +2344,12 @@ async function openSession(
       townMap.source = {};
       renderer.onFocusLot(null);
       renderer.onWatch(null);
+      renderer.setDetailTight(false);
     },
   };
   session.applySettings(settings);
-  if (import.meta.env.DEV) {
-    // Test hook for automated browser checks; not present in production builds.
+  if (DEBUG_HOOKS) {
+    // Test hook for automated browser checks; not present in production builds (but the benchmark's).
     window.__osw = {
       simScreen(id: number) {
         const head = { x: 0, y: 0, z: 0 };
@@ -2050,7 +2366,12 @@ async function openSession(
         const out = { x: 0, y: 0 };
         return renderer.project(x, y, z, out) ? out : null;
       },
-      home: () => buildBuy.home(),
+      /** The player's home as the views have it (`plotInfo`: a flat its own rectangle and id) on its storey, whatever storey is in view. */
+      home() {
+        const plot = game.households.find((h) => h.player)?.plot;
+        const home = plotInfo(game, plot);
+        return home ? { ...home, storey: flatOf(game, plot!)?.storey ?? 0 } : null;
+      },
       /** Sim-clock minute of the newest snapshot (changes when one arrives). */
       snapshotMinute: () => bridge.latest()[bridge.layout.header.minute],
       renderer,
@@ -2060,13 +2381,15 @@ async function openSession(
       send: (command: Parameters<typeof bridge.send>[0]) => bridge.send(command),
       /** The world sounds heard on the last update (loops by residents and things, sounds played once). */
       sound: () => worldSound.playing(),
+      /** What the mix is doing (`mixNow`): the duck, the limiter, each bus's level and the music's share of its own. */
+      mix: () => mixNow(),
       /** What a use sounds like (`soundOf`), and what it plays as it ends: by object and use id; `anim` and `recipe` (an id) for a cooking step at it. */
       soundOf(object: string, use: string | null, anim?: string, recipe?: string) {
         const def = content.objectList.findIndex((o) => o.id === object);
         const it = def >= 0 && use !== null ? content.objectList[def].interactions.findIndex((i) => i.id === use) : -1;
         const tag = anim ?? (it >= 0 ? (content.objectList[def].interactions[it].anim ?? '') : '');
         const cooking = recipe === undefined ? 0 : content.recipes.findIndex((r) => r.id === recipe) + 1;
-        return { loop: soundOf(content, tag, def, it, cooking) ?? null, end: endSoundOf(content, def, it) ?? null, ambient: (def >= 0 && content.objectList[def].ambient) || null };
+        return { loop: soundOf(content, tag, def, it, cooking) ?? null, end: endSoundOf(content, tag, def, it) ?? null, ambient: (def >= 0 && content.objectList[def].ambient) || null };
       },
       save: (id: string) => session.save(id, id),
       autosave: () => autosave(),

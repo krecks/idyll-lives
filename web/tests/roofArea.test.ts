@@ -6,7 +6,7 @@
  */
 import { expect, test } from 'bun:test';
 import type { WallEdge, WorldStructure } from '../src/core/protocol';
-import { HousePlanner, type HousePlan } from '../src/render/shared/house';
+import { HousePlanner, houseScheme, type HousePlan } from '../src/render/shared/house';
 
 /** Rows a storey. */
 const DEPTH = 12;
@@ -46,16 +46,21 @@ function ring(): HousePlan {
   return plan;
 }
 
-/** The heights of the roof's faces looking up, over (x, z): one over a roof that is one surface. */
+/**
+ * The heights of the roof's slopes over (x, z): one over a roof that is one surface. Its slopes are its faces looking
+ * up in the roof's own colour (the lot's look's); the cap shingles along its ridges and hips and the flashings down
+ * its valleys lie a hair over them in tones of their own (`HOUSE_LOOK.roofCap`, `roofValley`), and are not the surface.
+ */
 function tops(plan: HousePlan, x: number, z: number): number[] {
   const roof = plan.parts.find((p) => p.name === 'roof');
   if (!roof) throw new Error('no roof');
-  const { pos, nor, idx } = roof.geo;
+  const { pos, nor, idx, col } = roof.geo;
   const at = (v: number) => [pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]];
+  const own = parseInt(houseScheme(0, 0).roof.slice(1), 16);
   const out: number[] = [];
   for (let t = 0; t < idx.length; t += 3) {
     const [a, b, c] = [idx[t], idx[t + 1], idx[t + 2]];
-    if (nor[a * 3 + 1] <= 0.5) continue;
+    if (nor[a * 3 + 1] <= 0.5 || ((col[a * 4] << 16) | (col[a * 4 + 1] << 8) | col[a * 4 + 2]) !== own) continue;
     const [p, q, r] = [at(a), at(b), at(c)];
     // Barycentric, in plan: is (x, z) inside this triangle's footprint?
     const d = (q[0] - p[0]) * (r[2] - p[2]) - (r[0] - p[0]) * (q[2] - p[2]);
@@ -120,6 +125,15 @@ test('a rim one tile wide is a ridge, not a flat shelf at the eaves', () => {
   expect(corner.length).toBe(1);
   expect(mid.length).toBeGreaterThan(0);
   expect(Math.min(...mid)).toBeGreaterThan(corner[0] + 0.2);
+});
+
+test('no slope of it comes down under its eaves (each eave\'s slope went on past the eave\'s own ends, down through the rooms)', () => {
+  const roof = ring().parts.find((p) => p.name === 'roof');
+  const { pos } = roof!.geo;
+  let low = Infinity;
+  for (let i = 1; i < pos.length; i += 3) low = Math.min(low, pos[i]);
+  // The top of the roof at its eave line: WALL_HEIGHT (2.8) less OVERHANG (0.4) at PITCH (34°), and ROOF_THICKNESS (0.14).
+  expect(low).toBeCloseTo(2.8 - 0.4 * Math.tan((34 * Math.PI) / 180) + 0.14, 4);
 });
 
 test('a plain rectangle keeps the classic roof (a handful of faces, not a tile at a time)', () => {

@@ -1,4 +1,4 @@
-//! The work taxi (`taxi.rs`): colleagues a long way from the way out share one in to work and home
+//! The work taxi (`taxi/`): colleagues a long way from the way out share one in to work and home
 //! again; those with a car seat or a bike, or a short way, don't take one; one not at the kerb is
 //! left; pupils go to school by one; a game saved mid-run goes on.
 

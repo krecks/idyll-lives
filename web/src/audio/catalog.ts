@@ -1,26 +1,21 @@
 /**
  * Every sound the game makes and the level it plays each at: what `world.ts` and `ui/sfx.ts` play by,
  * what `bun run sounds` (`tools/audio/listen.ts`) renders and what the tests hold to the mix
- * (`web/tests/sounds.test.ts`). No DOM or audio context here: a sound is samples made at a sample rate.
+ * (`web/tests/sounds.test.ts`). No DOM or audio context here: a sound is samples made at a sample rate
+ * (`synth.ts`: `everySound`'s `heard` needs it loaded).
  *
  * The level is a plain gain on the sound as made (the water's and the things' are made to an average
- * level each, `water.ts` `setLevel`; the others to a peak of 1). A sound of one channel goes through a
+ * level each, `crates/sound` `set_level`; the others to a peak of 1). A sound of one channel goes through a
  * stereo panner, which in the middle of the picture gives each side 0.71 of it: `heard` is what comes
  * out there, so one sound against another reads here as it does in the game.
  */
 
-import { songSamples, SPECIES } from './birdsong';
-import { BLIPS, blipSamples, type Blip } from './blips';
-import { MONO, ONCE_MONO, type MonoKind } from './mono';
-import { MUSIC, type MusicKind } from './music';
-import { OUTDOORS } from './outdoors';
-import { FOOTWEAR, stepSamples, SURFACES, type Footwear, type Surface } from './steps';
-import { MADE, ONCE_THINGS, type MadeKind } from './things';
-import { ONCE, type Stereo } from './water';
+import { BLIPS, FOOTWEAR, MONO, MUSIC, ONCE, ONCE_EVENTS, ONCE_HOME, ONCE_MONO, ONCE_THINGS, SPECIES, SURFACES, type Footwear, type MadeKind, type MusicKind, type Stereo, type Surface } from './kinds';
+import { blipSamples, makeSound, monoSamples, songSamples, stepSamples } from './synth';
 
-/** A sound played once (`ONCE`, `ONCE_THINGS`), not looped. */
-export type OnceKind = (typeof ONCE)[number] | (typeof ONCE_THINGS)[number];
-export const ONCE_KINDS: readonly string[] = [...ONCE, ...ONCE_THINGS];
+/** A sound played once (`ONCE`, `ONCE_THINGS`, `ONCE_HOME`, `ONCE_EVENTS`), not looped. */
+export type OnceKind = (typeof ONCE)[number] | (typeof ONCE_THINGS)[number] | (typeof ONCE_HOME)[number] | (typeof ONCE_EVENTS)[number];
+export const ONCE_KINDS: readonly string[] = [...ONCE, ...ONCE_THINGS, ...ONCE_HOME, ...ONCE_EVENTS];
 /** A sound that loops while something is in use (or runs by itself). */
 export type LoopKind = 'sizzle' | 'chop' | 'tv' | 'music' | 'drums' | MusicKind | Exclude<MadeKind, OnceKind>;
 /** A world sound: a loop, or one played once (as a use starts, when it's a use's sound). */
@@ -84,10 +79,23 @@ export const LOOPS: Record<LoopKind, LoopDef> = {
   cello: { level: 0.29 },
   punchBag: { level: 0.33 },
   smash: { level: 0.33 },
+  vacuum: { level: 0.22, drift: 0.02 },
+  mower: { level: 0.25, drift: 0.02 },
+  hose: { level: 0.17, drift: 0.03 },
+  wateringCan: { level: 0.115, drift: 0.03 },
+  kettle: { level: 0.28, drift: 0.03 },
+  saunaStove: { level: 0.29 },
+  sweep: { level: 0.24 },
+  mop: { level: 0.26 },
+  shears: { level: 0.235 },
+  iron: { level: 0.155 },
+  typing: { level: 0.22 },
+  cutlery: { level: 0.13 },
+  fireplaceElectric: { level: 0.115 },
 };
 
 /**
- * Which piece the music is (`music.ts`): a dance while someone dances; else a slow one from `evening` o'clock
+ * Which piece the music is (`crates/sound/src/music.rs` makes them): a dance while someone dances; else a slow one from `evening` o'clock
  * to `morning`, and a folk tune by day.
  */
 export const PLAYLIST = { evening: 20, morning: 6 };
@@ -99,7 +107,7 @@ export function pieceAt(hour: number, dancing: boolean): MusicKind {
 }
 
 /** Levels of the sounds played once. */
-export const ONCE_LEVEL: Record<OnceKind, number> = { flush: 0.3, fridgeDoor: 0.27, binLid: 0.29, vendSnack: 0.25, vendCan: 0.25, phoneBox: 0.23, hangUp: 0.23, ping: 0.21, toastPop: 0.27, pour: 0.21 };
+export const ONCE_LEVEL: Record<OnceKind, number> = { flush: 0.3, fridgeDoor: 0.27, binLid: 0.29, vendSnack: 0.25, vendCan: 0.25, phoneBox: 0.23, hangUp: 0.23, ping: 0.21, toastPop: 0.27, pour: 0.21, kettleOff: 0.295, doorOpen: 0.22, doorClose: 0.135, curtain: 0.067, carDoor: 0.34, carStart: 0.105, letterbox: 0.17, till: 0.107, drawer: 0.22 };
 
 /**
  * The outdoors: the bed of wind (its level at night, and how much the day adds), the crickets at night, the
@@ -134,7 +142,18 @@ export const STEPS = {
 };
 
 /**
- * The street and the weather (`outside.ts`, the loops of `outdoors.ts`).
+ * Things that happen (`events.ts`): doors and gates (`gate`: a gate's share of a door's level; at most `voices`
+ * within `within` s and never two closer than `apart` s; none past `farthest` of the camera's distance gain, nor
+ * above game speed `fastest`), curtains (`most` a change) and cars (heard from nearness `near` up, `perLook` a look).
+ */
+export const EVENTS = {
+  door: { gate: 0.6, voices: 3, within: 0.6, apart: 0.15, farthest: 0.35, fastest: 2 },
+  curtain: { most: 2 },
+  car: { near: 0.25, perLook: 2 },
+};
+
+/**
+ * The street and the weather (`outside.ts`, the loops of `crates/sound/src/outdoors.rs`).
  * - `car`: a car driving past: its engine's and its tyres' level right by the middle of the picture at `full` m/s
  *   on screen or more (a street's 32 km/h on the traffic's clock, four times as fast as real time: 35 m/s; stood at a light the engine idles at `idle` of that, the tyres are silent); how near it
  *   counts as (`reach` of the camera's distance, `least` m at least: half the level that far from where the
@@ -198,24 +217,34 @@ function scaled(s: Stereo, level: number): Stereo {
 /** A typical unseen bird of a species (`world.ts` `FLOCK`): the middle of its pitch range, a garden away. */
 const FLOCK_NEAR = 0.575;
 
+/** Who sounds the things happening that no content names (the rest are named by content). */
+const HAPPENS: Partial<Record<string, string>> = {
+  doorOpen: 'a resident opening a door or a gate',
+  doorClose: 'the door or gate falling shut behind them',
+  curtain: 'curtains drawn or opened',
+  carDoor: 'a car door shut (right by the middle of the picture)',
+  carStart: 'a parked car setting off',
+};
+
 /** Every sound the game makes, in the order `bun run sounds` lists them. */
 export function everySound(): Listed[] {
   const list: Listed[] = [];
   const once = new Set<string>([...ONCE_KINDS, ...ONCE_MONO]);
   const things = [...new Set<string>([...Object.keys(LOOPS), ...Object.keys(ONCE_LEVEL)])];
+  const of = (list: readonly string[], name: string) => list.includes(name);
   for (const name of things) {
     const level = name in LOOPS ? LOOPS[name as LoopKind].level : ONCE_LEVEL[name as OnceKind];
     // (`music` is one of the three pieces, listed by their own names.)
     if (name === 'music') continue;
-    if (name in MUSIC) {
+    if (of(MUSIC, name)) {
       const when: Record<MusicKind, string> = { musicFolk: 'by day', musicDance: 'while someone dances', musicSlow: `from ${PLAYLIST.evening} to ${PLAYLIST.morning} o'clock` };
-      list.push({ name, group: 'things', plays: 'loop', level, note: `the music ${when[name as MusicKind]} (\`music\`: a stereo, a radio, an instrument played), and where a thing names it`, heard: (rate) => scaled(MUSIC[name as MusicKind](rate), level) });
+      list.push({ name, group: 'things', plays: 'loop', level, note: `the music ${when[name as MusicKind]} (\`music\`: a stereo, a radio, an instrument played), and where a thing names it`, heard: (rate) => scaled(makeSound(name as MusicKind, rate) as Stereo, level) });
       continue;
     }
-    const heard = name in MONO ? (rate: number) => centred(MONO[name as MonoKind](rate), level) : (rate: number) => scaled(MADE[name as MadeKind](rate), level);
-    list.push({ name, group: 'things', plays: once.has(name) ? 'once' : 'loop', level, heard });
+    const heard = of(MONO, name) ? (rate: number) => centred(monoSamples(name as (typeof MONO)[number], rate), level) : (rate: number) => scaled(makeSound(name as MadeKind, rate) as Stereo, level);
+    list.push({ name, group: 'things', plays: once.has(name) ? 'once' : 'loop', level, who: HAPPENS[name], heard });
   }
-  list.push({ name: 'knock', group: 'things', plays: 'once', level: AMBIENCE.knock, who: 'a visitor at the door', heard: (rate) => centred(MONO.knock(rate), AMBIENCE.knock) });
+  list.push({ name: 'knock', group: 'things', plays: 'once', level: AMBIENCE.knock, who: 'a visitor at the door', heard: (rate) => centred(monoSamples('knock', rate), AMBIENCE.knock) });
   for (const surface of SURFACES) {
     for (const wear of FOOTWEAR) {
       const level = STEPS.level[surface][wear];
@@ -230,19 +259,19 @@ export function everySound(): Listed[] {
     level: OUTSIDE.car.engine,
     who: 'a car or the work taxi driving past',
     note: `a car passing right by at speed: its engine, and its tyres at ${OUTSIDE.car.tyres}; the game plays both higher the faster it goes`,
-    heard: (rate) => centred(mix(OUTDOORS.carEngine(rate).map((v) => v * OUTSIDE.car.engine), OUTDOORS.carTyres(rate).map((v) => v * OUTSIDE.car.tyres)), 1),
+    heard: (rate) => centred(mix((makeSound('carEngine', rate) as Float32Array).map((v) => v * OUTSIDE.car.engine), (makeSound('carTyres', rate) as Float32Array).map((v) => v * OUTSIDE.car.tyres)), 1),
   });
   const day = AMBIENCE.bed.night + AMBIENCE.bed.day;
-  list.push({ name: 'bed', group: 'ambience', plays: 'loop', level: day, note: `by day; ${AMBIENCE.bed.night} at night`, heard: (rate) => centred(MONO.bed(rate), day) });
-  list.push({ name: 'crickets', group: 'ambience', plays: 'loop', level: AMBIENCE.crickets, note: 'at night', heard: (rate) => centred(MONO.crickets(rate), AMBIENCE.crickets) });
-  list.push({ name: 'town', group: 'ambience', plays: 'loop', level: OUTSIDE.town.level, note: `from the full town view by day; ${OUTSIDE.town.night} of it at night, nothing from the play camera`, heard: (rate) => scaled(OUTDOORS.town(rate), OUTSIDE.town.level) });
-  list.push({ name: 'leaves', group: 'ambience', plays: 'loop', level: OUTSIDE.leaves.level, note: `at a full gust; ${OUTSIDE.leaves.calm} of it between gusts`, heard: (rate) => scaled(OUTDOORS.leaves(rate), OUTSIDE.leaves.level) });
+  list.push({ name: 'bed', group: 'ambience', plays: 'loop', level: day, note: `by day; ${AMBIENCE.bed.night} at night`, heard: (rate) => centred(monoSamples('bed', rate), day) });
+  list.push({ name: 'crickets', group: 'ambience', plays: 'loop', level: AMBIENCE.crickets, note: 'at night', heard: (rate) => centred(monoSamples('crickets', rate), AMBIENCE.crickets) });
+  list.push({ name: 'town', group: 'ambience', plays: 'loop', level: OUTSIDE.town.level, note: `from the full town view by day; ${OUTSIDE.town.night} of it at night, nothing from the play camera`, heard: (rate) => scaled(makeSound('town', rate) as Stereo, OUTSIDE.town.level) });
+  list.push({ name: 'leaves', group: 'ambience', plays: 'loop', level: OUTSIDE.leaves.level, note: `at a full gust; ${OUTSIDE.leaves.calm} of it between gusts`, heard: (rate) => scaled(makeSound('leaves', rate) as Stereo, OUTSIDE.leaves.level) });
   SPECIES.forEach((sp, i) => {
     const level = AMBIENCE.birds * sp.level * FLOCK_NEAR;
     const voice = { species: sp.name, seed: i, pitch: (sp.pitch[0] + sp.pitch[1]) / 2, pace: 1, near: FLOCK_NEAR };
     list.push({ name: `bird-${sp.name}`, group: 'ambience', plays: 'once', level, note: 'an unseen bird by day; one in view up to twice that', heard: (rate) => centred(songSamples(voice, 0, rate), level) });
   });
-  for (const name of Object.keys(BLIPS) as Blip[]) {
+  for (const name of BLIPS) {
     // (No panner: both sides get all of it.)
     list.push({ name: `ui-${name}`, group: 'interface', plays: 'once', level: EFFECTS_LEVEL, heard: (rate) => scaled({ left: blipSamples(name, rate), right: blipSamples(name, rate) }, EFFECTS_LEVEL) });
   }

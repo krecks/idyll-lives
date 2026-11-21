@@ -17,6 +17,7 @@
  *     --runs 3           decode runs (median, min, max)
  *     --no-lines         skip the game's five test lines
  *     --cold / --warm    only the first load / only the cached reload (default: both)
+ *     --cpu              the model on the processor (WASM) instead of the GPU
  *     --headed / --headless  with a window (the default: a timing run, like `devices.mjs`) or
  *                        without (still the real GPU)
  *     --left 2600        how far right the window goes, out of the way
@@ -45,6 +46,7 @@ const LEFT = Number(flag('left', 2600));
 const COLD = !has('warm');
 const WARM = !has('cold');
 const LINES = !has('no-lines');
+const DEVICE = has('cpu') ? 'cpu' : 'gpu';
 const OUT = String(flag('out', `${ROOT}bench-results/llm-${new Date().toISOString().replace(/[:.]/g, '-')}/`));
 
 async function playwright() {
@@ -96,6 +98,7 @@ const table = (report) => {
   const cached = report.lines.length ? report.cached : report.decode.runs[0];
   return [
     {
+      device: DEVICE,
       adapter: [report.adapter.vendor, report.adapter.architecture, report.adapter.device].filter(Boolean).join(' ') || 'none',
       isolated: report.isolated ? 'yes' : 'no',
       'load s': fmt(report.loadMs / 1000, 1),
@@ -139,7 +142,7 @@ try {
   }
   page.on('console', (m) => m.type() === 'error' && console.error(`page: ${m.text()}`));
   page.on('pageerror', (e) => console.error(`page error: ${e.message}`));
-  const options = { decodeTokens: TOKENS, decodeRuns: RUNS, lines: LINES };
+  const options = { decodeTokens: TOKENS, decodeRuns: RUNS, lines: LINES, device: DEVICE };
   const reports = {};
   if (COLD) {
     console.log('llm bench: cold (nothing cached)');
@@ -155,8 +158,8 @@ try {
   if (report) {
     for (const r of [reports.cold, reports.warm].filter(Boolean)) {
       console.log(`${r === reports.cold ? 'cold' : 'warm'} load progress: ${r.loadProgress.map((p) => `${fmt(p.atMs)}ms ${fmt((p.loaded / p.total) * 100)}%`).slice(-4).join(', ')}`);
-      for (const line of r.lines) console.log(`  ${line.name}: ${fmt(line.totalMs)} ms, ${fmt(line.tokPerS, 1)} tok/s, ${line.tokens} tokens, stop ${line.stop} — ${JSON.stringify(line.text)}`);
-      for (const d of r.decode.runs) console.log(`  ${d.name}: ${fmt(d.totalMs)} ms, ${fmt(d.tokPerS, 1)} tok/s, ${d.tokens} tokens, stop ${d.stop}`);
+      for (const line of [...r.lines, ...(r.sampled ?? [])]) console.log(`  ${line.name}: ${fmt(line.totalMs)} ms, ${fmt(line.tokPerS, 1)} tok/s, ${line.tokens} tokens, stop ${line.stop} — ${JSON.stringify(line.text)}`);
+      for (const d of r.decode.runs) console.log(`  ${d.name}: ${fmt(d.totalMs)} ms, ${fmt(d.tokPerS, 1)} tok/s, ${d.tokens} tokens, stop ${d.stop}, per token run/read/pick ${fmt(d.perToken.run, 2)} / ${fmt(d.perToken.read, 2)} / ${fmt(d.perToken.pick, 2)} ms`);
     }
     mkdirSync(OUT, { recursive: true });
     writeFileSync(`${OUT}report.json`, JSON.stringify({ startedAt: new Date().toISOString(), machine: state, options, ...reports }, null, 2));

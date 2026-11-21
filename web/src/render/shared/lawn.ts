@@ -12,8 +12,9 @@
  * - blue, bare earth: where feet wear the grass away (outside a door, at a gate, at a path's ends, under a
  *   swing, by a bench) and the soil round beds and trunks. The blades thin out over it and the ground
  *   takes the earth's colour.
- * - alpha, how rough: 0 on a plot, mown short and even; 255 on the land between and beyond the plots,
- *   where the grass grows long and in clumps; part of the way along a fence's foot, where no mower reaches.
+ * - alpha, how rough: 0 on a plot, mown short and even, and in a town's centre (`meta.centre`: its greens and
+ *   the grass round its paving are kept); 255 on the land between and beyond the plots, where the grass
+ *   grows long and in clumps; part of the way along a fence's foot, where no mower reaches.
  *
  * Drawn only: made from the world as it stands (plots, walls, doors, fences, paths, things), the same
  * town always the same lawn. The patches and stripes are made once a town (`base`); what stands on the
@@ -21,6 +22,7 @@
  */
 
 import { groundDepth, type WorldStructure } from '../../core/protocol';
+import { fillPoly } from '../../game/footprints';
 import { hash, valueNoise } from '../../game/noise';
 import { tuned } from '../tune';
 
@@ -84,14 +86,18 @@ const RING = { play: 0.6, seat: 0.55, bed: 0.3, trunk: 0.45 } as const;
 
 const [TONE, DRY, EARTH, ROUGH] = [0, 1, 2, 3];
 
-/** What `base` was made for, per map (the town's plots and seed), and the map before anything stood on it. */
-const bases = new WeakMap<Uint8Array, { key: string; base: Uint8Array }>();
+/** What `base` was made for, per map (the town's plots and seed, and each plot's rectangle), and the map before anything stood on it. */
+const bases = new WeakMap<Uint8Array, { key: string; size: string; rects: Set<string>; base: Uint8Array }>();
 
-/** The patches, the stripes and where the plots are: the map with nothing standing on it. */
-function baseMap(world: WorldStructure, tw: number, td: number): Uint8Array {
+/**
+ * The patches, the stripes and where the plots are: the map with nothing standing on it. `was`: the map made for
+ * another town of the same seed and size, its plots `rects` (step 2's town before an edit): only the tiles of the
+ * plots one has and the other hasn't are made again (a tile's look is its own noise and the plot it is on).
+ */
+function baseMap(world: WorldStructure, tw: number, td: number, was?: { rects: Set<string>; base: Uint8Array }): Uint8Array {
   const M = LAWN_MAP;
   const seed = world.meta?.seed ?? 1;
-  const base = new Uint8Array(tw * td * 4);
+  const base = was ? was.base.slice() : new Uint8Array(tw * td * 4);
   // Which plot a tile is on (0: none), and each plot's stripes: along x (1), along z (2) or none.
   const plot = new Uint16Array(tw * td);
   const stripes = [0];
@@ -107,15 +113,30 @@ function baseMap(world: WorldStructure, tw: number, td: number): Uint8Array {
     stripes.push(h < 0.42 ? 1 : h < 0.84 ? 2 : 0);
     for (let z = Math.max(0, p.z); z < Math.min(td, p.z + p.d); z++) plot.fill(k + 1, z * tw + Math.max(0, p.x), z * tw + Math.min(tw, p.x + p.w));
   });
+  // The centres' grass, kept as a plot's is (no stripes: nobody's).
+  const kept = new Uint8Array(tw * td);
+  for (const c of world.meta?.centre ?? []) fillPoly(c.poly, tw, td, (i) => (kept[i] = 1));
   const [a, b] = M.patch;
   const stripeWidth = Math.max(1, Math.round(M.stripeWidth));
-  for (let z = 0; z < td; z++) {
-    for (let x = 0; x < tw; x++) {
+  // (The tiles to make: every one, else those of the plots that came or went.)
+  let spans: [number, number, number, number][] = [[0, 0, tw, td]];
+  if (was) {
+    const now = new Set(world.plots.map(rectKey));
+    spans = [...now, ...was.rects]
+      .filter((k) => !(now.has(k) && was.rects.has(k)))
+      .map((k) => {
+        const [x, z, w, d] = k.split(',').map(Number);
+        return [Math.max(0, Math.floor(x)), Math.max(0, Math.floor(z)), Math.min(tw, Math.ceil(x + w)), Math.min(td, Math.ceil(z + d))];
+      });
+  }
+  for (const [x0, z0, x1, z1] of spans) for (let z = z0; z < z1; z++) {
+    for (let x = x0; x < x1; x++) {
       const o = (z * tw + x) * 4;
       // (The outermost tiles stay as the land beyond the town is: the texture's edge is read on past it.)
       const edge = x === 0 || z === 0 || x === tw - 1 || z === td - 1;
       const on = edge ? 0 : plot[z * tw + x];
-      const more = on ? 1 : M.roughPatch;
+      const mown = !edge && (on > 0 || kept[z * tw + x] > 0);
+      const more = mown ? 1 : M.roughPatch;
       // (Each noise turned its own way off the tiles' rows: a patch that lined up with the mown stripes read as a wider stripe.)
       const [px, pz] = [x + 0.5, z + 0.5];
       const [ax, az] = [px * 0.848 - pz * 0.53, px * 0.53 + pz * 0.848];
@@ -128,11 +149,14 @@ function baseMap(world: WorldStructure, tw: number, td: number): Uint8Array {
       if (way) tone += (Math.floor((way === 1 ? z : x) / stripeWidth) % 2 ? 1 : -1) * M.stripes * inFromEdge(x, z, on);
       base[o + TONE] = edge ? 128 : signed(tone);
       base[o + DRY] = edge ? 128 : signed(dry);
-      base[o + ROUGH] = on ? 0 : 255;
+      base[o + ROUGH] = mown ? 0 : 255;
     }
   }
   return base;
 }
+
+/** A plot's rectangle, as `lawnMap` keys its plots. */
+const rectKey = (p: { x: number; z: number; w: number; d: number }) => `${p.x},${p.z},${p.w},${p.d}`;
 
 /** -1..1 as a byte about 128. */
 function signed(v: number): number {
@@ -148,9 +172,14 @@ export function lawnMap(world: WorldStructure, bare: Uint8Array, into?: Uint8Arr
   const M = LAWN_MAP;
   const [tw, td] = [world.width, groundDepth(world)];
   const out = into && into.length === tw * td * 4 ? into : new Uint8Array(tw * td * 4);
-  const key = `${world.meta?.seed ?? 1}:${tw}x${td}:${world.plots.map((p) => `${p.x},${p.z},${p.w},${p.d}`).join(';')}`;
+  // (A centre moved makes the map afresh: only the plots' tiles are made again otherwise.)
+  const size = `${world.meta?.seed ?? 1}:${tw}x${td}:${JSON.stringify(world.meta?.centre?.map((c) => c.poly) ?? [])}`;
+  const key = `${size}:${world.plots.map(rectKey).join(';')}`;
   let made = bases.get(out);
-  if (!made || made.key !== key) bases.set(out, (made = { key, base: baseMap(world, tw, td) }));
+  if (!made || made.key !== key) {
+    const was = made && made.size === size ? made : undefined;
+    bases.set(out, (made = { key, size, rects: new Set(world.plots.map(rectKey)), base: baseMap(world, tw, td, was) }));
+  }
   out.set(made.base);
   // (Never the outermost tiles: they stay as the land beyond the town.)
   const inside = (x: number, z: number) => x > 0 && z > 0 && x < tw - 1 && z < td - 1;

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { host } from '../game/host';
+  import { app } from './app.svelte';
   import { saveDebugReport } from './debugReport';
   import { game } from './state.svelte';
 
@@ -6,7 +8,8 @@
   let saved = $state('');
 
   async function report() {
-    const path = await saveDebugReport(note.trim());
+    // Off the game (the main menu, New game's steps) a report without a game, as F8 there.
+    const path = app.screen === 'game' ? await saveDebugReport(note.trim()) : await saveDebugReport(note.trim(), (n) => host.basicReport(n));
     if (path) {
       saved = path;
       note = '';
@@ -25,7 +28,7 @@
       <div><span>CPU</span><b>{t.overall.busyCores.toFixed(2)} of {t.overall.cores || '?'} cores</b></div>
       {#if t.overall.memoryBytes !== null}<div><span>Memory</span><b>{mb(t.overall.memoryBytes)}</b></div>{/if}
     {/if}
-    <div><span>Shared memory</span><b>{game.sharedMemory ? 'on' : 'off'}</b></div>
+    {#if app.screen === 'game'}<div><span>Shared memory</span><b>{game.sharedMemory ? 'on' : 'off'}</b></div>{/if}
     {#if game.stats}
       {@const s = game.stats}
       <h4>Main thread</h4>
@@ -47,14 +50,17 @@
       {#if t?.main.heapBytes != null}<div><span>JS heap</span><b>{mb(t.main.heapBytes)}</b></div>{/if}
     {/if}
     {#if t}
-      <h4>Simulation thread</h4>
+      <!-- (Off the game no simulation runs.) -->
       {#if t.sim}
+        <h4>Simulation thread</h4>
         {@const m = t.sim}
         <div><span>Steps</span><b>{m.stepsPerSecond.toFixed(0)} / {m.targetPerSecond.toFixed(0)} per s</b></div>
+        <div><span>Ticks</span><b>{m.ticksPerSecond.toFixed(0)} per s</b></div>
         <div><span>Step</span><b>{m.stepMs.toFixed(2)} ms · max {m.stepMaxMs.toFixed(1)}</b></div>
         <div><span>Busy</span><b>{pct(m.busy)}</b></div>
         <div><span>WASM memory</span><b>{mb(m.memoryBytes)}</b></div>
-      {:else}
+      {:else if app.screen === 'game'}
+        <h4>Simulation thread</h4>
         <div><span>Waiting for report…</span></div>
       {/if}
       {@const v = t.voice}

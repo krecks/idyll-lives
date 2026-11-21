@@ -1,5 +1,5 @@
-// The lawn's map, engine-neutral (`render/shared/lawn.ts`): a plot mown and the land round it rough, the
-// town's outermost tiles as the land beyond it, the foot of a wall darker (more on its shaded side), bare
+// The lawn's map, engine-neutral (`render/shared/lawn.ts`): a plot and a town's centre mown and the land round
+// them rough, the town's outermost tiles as the land beyond it, the foot of a wall darker (more on its shaded side), bare
 // earth outside a door, at a path's end and under a swing, and the same town the same map twice.
 import { describe, expect, test } from 'bun:test';
 import type { WorldStructure } from '../src/core/protocol';
@@ -91,5 +91,24 @@ describe('the lawn’s map', () => {
     expect(again).toBe(b);
     expect(again).toEqual(lawnMap(town(), none));
     expect(again).not.toEqual(a);
+  });
+
+  test('into the same map with plots removed, added and moved (step 2’s edits): as a map made afresh', () => {
+    const plots = (list: [number, number, number, number][]): WorldStructure => ({ ...town(), plots: list.map(([x, z, w, d], id) => ({ id, name: `${id}`, x, z, w, d, public: false, entry: null, house: null })) });
+    const first = plots([[1, 1, 6, 5], [8, 1, 6, 5], [1, 7, 6, 6], [8, 7, 7, 6]]);
+    const map = lawnMap(first, none);
+    for (const next of [plots([[1, 1, 6, 5], [1, 7, 6, 6], [8, 7, 7, 6]]), plots([[1, 1, 6, 5], [9, 2, 5, 4], [1, 7, 6, 6], [8, 7, 7, 6]]), plots([[2, 1, 8, 6], [1, 7, 6, 6]]), first]) {
+      expect(lawnMap(next, none, map)).toEqual(lawnMap(next, none));
+    }
+  });
+  test('a town’s centre is kept short as a plot is; the land round it stays rough', () => {
+    const world = { ...town(), meta: { seed: 7, paths: [], centre: [{ area: 0, poly: [[0, 11], [0, 14], [16, 14], [16, 11]] }] } } as unknown as WorldStructure;
+    const map = lawnMap(world, none);
+    expect(at(map, 1, 12)[3]).toBe(0);
+    expect(at(map, 1, 9)[3]).toBe(255);
+    // (The town's outermost tiles are the land beyond it, centre or not.)
+    expect(at(map, 0, 12)[3]).toBe(255);
+    // Into a map made for the town without the centre: made afresh.
+    expect(lawnMap(world, none, lawnMap(town(), none))).toEqual(map);
   });
 });

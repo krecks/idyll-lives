@@ -84,6 +84,7 @@ fn things_two_tiles_wide_on_a_turned_lot_can_be_reached() {
             blocked: w.blocked(),
             stairs: w.stair_map(),
             kept_off: &[],
+            steps: None,
         };
         let start = (
             w.sims[0].pos[0].floor() as i32,
@@ -138,6 +139,7 @@ fn with_both_middle_tiles_taken_it_is_still_used_from_the_front() {
             blocked: &blocked,
             stairs: w.stair_map(),
             kept_off: &[],
+            steps: None,
         };
         assert_eq!(
             surface::approach_tiles(&w.content, &nav, o).collect::<Vec<_>>(),

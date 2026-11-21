@@ -1,15 +1,18 @@
 <script lang="ts">
   import { townView } from '../../render/shared/townView';
   import { settings } from '../../settings/settings.svelte';
-  import { clock, money, WEEKDAYS } from '../format';
+  import { money } from '../format';
   import { services } from '../services';
   import { game } from '../state.svelte';
   import { townMap } from '../townMap.svelte';
   import { layoutTags, type Box, type TagSpot } from '../../game/tagLayout';
   import { homesForSale, nameLabels, townPlaces } from './places';
+  import { lotOf } from '../../core/protocol';
+  import { plotInfo } from '../place';
   import { homeTag, householdTags, nameTags, nearestFew, peopleTags, mostSales, placesInView, placeTags, saleTags, tagRank, yourPeople, type TagWorld, type TownTag } from './tags';
   import { MINE_SEEN, mineFade, TAGS_FROM, tagFade } from './fade';
   import { townHud } from './townHud.svelte';
+  import { liveTagWorld } from './liveWorld';
 
   /**
    * The town tags: HTML labels over the canvas, each over the resident,
@@ -25,33 +28,13 @@
    */
   const meta = $derived(townMap.world?.meta ?? null);
   const places = $derived(townPlaces(meta, game.plots));
-  const placeOfPlot = $derived(new Map(places.flatMap((p, i) => (p.plot === undefined ? [] : [[p.plot, i] as [number, number]]))));
   const names = $derived(nameLabels(meta));
   const homePlot = $derived(game.households.find((h) => h.player)?.plot ?? null);
   const inTown = $derived(new Set(game.roster.map((s) => s.id)));
   const members = $derived(game.sims.filter((s) => inTown.has(s.id) && game.households[s.household]?.player));
   const memberIds = $derived(new Set(members.map((s) => s.id)));
-  const stages = services.content.lifeStages;
-  const time = (m: number) => clock(m, settings.clock24h);
 
-  const world = $derived.by((): TagWorld | null => {
-    if (!townHud.near || game.mode !== 'live') return null;
-    return {
-      sims: game.sims.filter((s) => inTown.has(s.id)),
-      roster: game.roster,
-      households: game.households,
-      plots: game.plots,
-      relationships: game.relationships,
-      places,
-      placeOfPlot,
-      minute: game.minute,
-      weekday: game.weekday,
-      time,
-      days: WEEKDAYS,
-      pupil: (stage) => !!stages.find((s) => s.id === stage)?.school,
-      areas: meta?.areas ?? [],
-    };
-  });
+  const world = $derived.by((): TagWorld | null => (!townHud.near || game.mode !== 'live' ? null : liveTagWorld(places, meta)));
   const people = $derived(world ? yourPeople(memberIds, world) : []);
   /** The household's residents away at no place the town has: the Today card lists them. */
   const household = $derived(world ? householdTags(members, world) : { tags: [], away: [] });
@@ -60,14 +43,15 @@
   });
 
   /** The homes for sale's tags (a Big town's hundreds): made again when the plots or households change, not each game minute. */
-  const sales = $derived(saleTags(homesForSale(game.plots, game.households, services.content.economy.homePrice), game.plots, money));
+  const sales = $derived(saleTags(homesForSale(game.plots, game.households, services.content.economy.homePrice, game.flats), game, money));
   const tags = $derived.by((): TownTag[] => {
     if (!world) return [];
     const f = townHud.filters;
     const out: TownTag[] = [];
     if (f.household) {
       out.push(...household.tags);
-      const home = homeTag(homePlot === null ? null : game.plots[homePlot], members, homePlot);
+      // (A flat's tag stands over its building.)
+      const home = homeTag(homePlot === null ? null : plotInfo(game, lotOf(game, homePlot)), members, homePlot);
       if (home) out.push(home);
     }
     // (Up to the blend the rest come in at, the household's own only.)

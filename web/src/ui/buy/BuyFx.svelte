@@ -4,6 +4,7 @@
   import { MoneyFloats, moneyChange } from '../moneyFloats.svelte';
   import { services } from '../services';
   import { game } from '../state.svelte';
+  import { costLabel, toolInfo } from '../land/landTools';
 
   /**
    * Build mode's pointer companions: a tag beside the cursor saying what a click will
@@ -25,6 +26,18 @@
   const tag = $derived.by((): { text: string; sub?: string; keys?: string; bad: boolean } | null => {
     if (game.mode !== 'build' || !onCanvas) return null;
     if (game.pickHint !== null) return { text: 'Pick up', sub: game.pickHint, bad: game.pickHint.startsWith('Nothing') };
+    if (game.buildTab === 'land') {
+      // The land brush: what the stroke under way costs so far, or what the brush does here.
+      const l = game.land;
+      if (!l.ready) return null;
+      const tool = toolInfo(game.landBrush.tool);
+      if (l.stroking) {
+        const c = costLabel(l.cost, game.creative, game.funds, money);
+        return { text: c.text, sub: tool.label, keys: 'Esc or right-click cancels', bad: c.bad };
+      }
+      if (l.refused) return { text: tool.label, sub: tool.group === 'water' && tool.id !== 'dry' ? 'Water keeps off lots and roads' : 'Lots and roads stay as they are', bad: true };
+      return null;
+    }
     const placing = game.placing;
     if (game.furnishing || (game.buildTool === 'stairs' && placing)) {
       if (!placing) return null;
@@ -84,14 +97,14 @@
     }
     if (tool === 'door' || tool === 'window') {
       const label = tool === 'door' ? 'Door' : 'Window';
-      if (!game.buildValid) return { text: label, sub: short ? `${money(cost - game.funds)} short` : 'Needs a full-height wall', bad: true };
+      if (!game.buildValid) return { text: label, sub: short ? `${money(cost - game.funds)} short` : (game.buildWhy ?? 'Needs a full-height wall'), bad: true };
       return cost > 0 ? { text: money(cost), sub: label, bad: false } : null;
     }
     const n = game.buildEdges;
     const room = game.buildRoom;
     const wallUp = tool === 'remove' && game.buildWallUp;
     const what = wallUp ? `Close up ${n === 1 ? 'the opening' : `${n} openings`}` : tool === 'remove' ? `Tear down ${n} m` : room ? `${room[0]} × ${room[1]} room · ${n} m` : `${n} m of ${tool === 'fence' ? 'fence' : 'wall'}`;
-    if (!game.buildValid) return { text: what, sub: short ? `${money(cost - game.funds)} short` : "Can't build here", bad: true };
+    if (!game.buildValid) return { text: what, sub: short ? `${money(cost - game.funds)} short` : (game.buildWhy ?? "Can't build here"), bad: true };
     if (!game.buildStart) {
       if (wallUp) return { text: cost > 0 ? money(cost) : 'Free', sub: 'Click to wall it up', bad: false };
       return cost > 0 ? { text: money(cost), sub: tool === 'remove' ? 'Drag to tear down' : tool === 'room' ? 'Drag out a room' : 'Drag to draw', bad: false } : null;
@@ -113,12 +126,13 @@
   // funds only change through buying, selling and building). With Reduce motion it stays put.
   const floats = new MoneyFloats<{ x: number; y: number }>(1400);
   const still = $derived(settings.reducedMotion || systemMotion.reduced);
-  $effect(() =>
+  // (Its sound is the edit's own: `place`, `sell`.)
+  $effect(() => {
     floats.note(game.funds, game.mode === 'build', () => {
       const k = settings.uiScale || 1;
       return onCanvas ? { x, y } : { x: window.innerWidth / k / 2, y: window.innerHeight / k / 2 };
-    }),
-  );
+    });
+  });
 </script>
 
 <svelte:window onpointermove={move} />

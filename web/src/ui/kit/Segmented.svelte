@@ -3,12 +3,15 @@
     value = $bindable(),
     options,
     label,
+    fill = false,
     onchange,
   }: {
     value: T;
     /** `disabled`: shown, not to be picked (arrow keys pass over it). */
     options: readonly { value: T; label: string; disabled?: boolean }[];
     label: string;
+    /** As wide as its parent, the buttons sharing the width (each at least its label's). */
+    fill?: boolean;
     /** Picked (by click or arrow keys). */
     onchange?: (value: T) => void;
   } = $props();
@@ -35,7 +38,7 @@
   }
 </script>
 
-<div class="segmented" role="radiogroup" aria-label={label} tabindex="-1" {onkeydown}>
+<div class="segmented" class:fill role="radiogroup" aria-label={label} tabindex="-1" {onkeydown}>
   {#each options as option, i (option.value)}
     <button
       role="radio"
@@ -57,6 +60,13 @@
     padding: 3px;
     border-radius: var(--radius-md);
     background: var(--hairline);
+  }
+  .fill {
+    display: flex;
+  }
+  .fill button {
+    flex: 1 1 auto;
+    padding: 0 8px;
   }
   button {
     height: 30px;

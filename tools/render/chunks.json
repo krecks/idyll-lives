@@ -718,7 +718,7 @@
       ]
     },
     {
-      "for": "render/pc/shaders/fog.ts: the game's haze (the eye's distance, the factor linearised).",
+      "for": "render/pc/shaders/fog.ts: the game's haze (the eye's distance, the factor linearised, the menus' land's veil by where a thing stands, to the sky behind it).",
       "anchors": [
         {
           "chunk": "common/frag/fog.js",
@@ -731,6 +731,12 @@
           "glsl": "fogFactor = exp(-depth * depth * fog_density * fog_density);",
           "wgsl": "return evaluateFogFactorExp2(depth, uniform.fog_density);",
           "who": "shaders/fog.ts: the exponential-squared factor"
+        },
+        {
+          "chunk": "common/frag/fog.js",
+          "glsl": "return mix(fog_color * dBlendModeFogFactor, color, getFogFactor());",
+          "wgsl": "return mix(uniform.fog_color * dBlendModeFogFactor, color, getFogFactor());",
+          "who": "shaders/fog.ts: the haze's colour mixed in (the veil's goes to the sky behind)"
         },
         {
           "chunk": "lit/frag/base.js",
@@ -760,6 +766,77 @@
           "glsl": "vec3 ret = specularity + (max(vec3(glossSq * specIntensity), specularity) - specularity) * fresnel;",
           "wgsl": "let ret: vec3f = specularity + (max(vec3f(glossSq * specIntensity), specularity) - specularity) * fresnel;",
           "who": "shaders/envBrdf.ts: PlayCanvas's Fresnel that never rises, replaced by the full Schlick term in the game's materials"
+        }
+      ]
+    },
+    {
+      "for": "render/pc/shaders/surface.ts, softLook.ts, materials.ts: the finishes' layers (cloth's sheen, a lacquer's clear coat) on PlayCanvas's own lobes, reflecting the room in a room.",
+      "anchors": [
+        {
+          "chunk": "lit/frag/reflectionSheen.js",
+          "glsl": "sReflection += calcReflection(worldNormal, 0.0) * saturate(DG);",
+          "wgsl": "sReflection = sReflection + (calcReflection(worldNormal, 0.0) * saturate(dg));",
+          "who": "shaders/surface.ts: the sheen's reflection of the sky, the room's in a room on a finish with layers"
+        },
+        {
+          "chunk": "lit/frag/reflectionCC.js",
+          "glsl": "ccReflection += calcReflection(reflDir, gloss);",
+          "wgsl": "ccReflection = ccReflection + calcReflection(reflDir, gloss);",
+          "who": "shaders/surface.ts: the clear coat's reflection of the sky, the room's in a room on a finish with layers"
+        },
+        {
+          "chunk": "lit/frag/lightSheen.js",
+          "glsl": "float D = sheenD(worldNormal, h, sheenGloss);",
+          "wgsl": "let D: f32 = sheenD(worldNormal, h, sheenGloss);",
+          "who": "materials.ts layer: the sheen term takes `sheenGloss` as its roughness (a finish's `sheenRoughness` as it is, not inverted)"
+        },
+        {
+          "chunk": "lit/frag/reflectionSheen.js",
+          "glsl": "void addReflectionSheen(vec3 worldNormal, vec3 viewDir, float gloss) {",
+          "wgsl": "fn addReflectionSheen(worldNormal: vec3f, viewDir: vec3f, gloss: f32) {",
+          "who": "shaders/surface.ts: the sheen's reflection in litArgs_worldNormal's room (its normal is that one)"
+        },
+        {
+          "chunk": "standard/frag/clearCoatGloss.js",
+          "glsl": "#ifdef STD_CLEARCOATGLOSS_INVERT\n\tccGlossiness = 1.0 - ccGlossiness;",
+          "wgsl": "#ifdef STD_CLEARCOATGLOSS_INVERT\n\tccGlossiness = 1.0 - ccGlossiness;",
+          "who": "materials.ts layer: a finish's `clearcoatRoughness` given as the coat's gloss, inverted (`clearCoatGlossInvert`)"
+        },
+        {
+          "chunk": "lit/frag/lighting/lightFunctionLight.js",
+          "glsl": "sSpecularLight += getLightSpecularSheen(",
+          "wgsl": "sSpecularLight = sSpecularLight + (getLightSpecularSheen(",
+          "who": "shaders/softLook.ts: the sun's highlight in the sheen in sSpecularLight, scaled in the combine (SPECULAR_UNITS)"
+        },
+        {
+          "chunk": "lit/frag/lighting/lightFunctionLight.js",
+          "glsl": "ccSpecularLight += lightspecularCC;",
+          "wgsl": "ccSpecularLight = ccSpecularLight + lightspecularCC;",
+          "who": "shaders/softLook.ts: the sun's highlight in the clear coat in ccSpecularLight, scaled in the combine"
+        },
+        {
+          "chunk": "lit/frag/clusteredLight.js",
+          "glsl": "sSpecularLight += getLightSpecularSheen(",
+          "wgsl": "sSpecularLight = sSpecularLight + getLightSpecularSheen(",
+          "who": "shaders/softLook.ts: the lamps' highlights in the sheen in sSpecularLight too"
+        },
+        {
+          "chunk": "lit/frag/clusteredLight.js",
+          "glsl": "ccSpecularLight += getLightSpecular(",
+          "wgsl": "ccSpecularLight = ccSpecularLight + getLightSpecular(",
+          "who": "shaders/softLook.ts: the lamps' highlights in the clear coat in ccSpecularLight too"
+        },
+        {
+          "chunk": "lit/frag/combine.js",
+          "glsl": "ret = ret * sheenScaling + (sSpecularLight + sReflection.rgb) * sheenSpecularity;",
+          "wgsl": "ret = ret * sheenScaling + (sSpecularLight + sReflection.rgb) * sheenSpecularity;",
+          "who": "shaders/softLook.ts: the sheen combined from sSpecularLight and sReflection (what the combine scales before the engine adds them)"
+        },
+        {
+          "chunk": "lit/frag/combine.js",
+          "glsl": "ret = ret * clearCoatScaling + (ccSpecularLight + ccReflection) * clearcoatSpecularity;",
+          "wgsl": "ret = ret * clearCoatScaling + (ccSpecularLight + ccReflection) * clearcoatSpecularity;",
+          "who": "shaders/softLook.ts: the clear coat combined from ccSpecularLight and ccReflection"
         }
       ]
     },
@@ -1096,6 +1173,31 @@
       ]
     },
     {
+      "for": "render/pc/impostors.ts: tree impostors (the bake's diag passes, the cards lit by their pictures' normals, occlusion and glossiness).",
+      "anchors": [
+        {
+          "file": "scene/shader-lib/glsl/chunks/standard/frag/stdFrontEnd.js",
+          "text": "litArgs_worldNormal = dNormalW;",
+          "who": "impostors.ts metalness slot: the frontend's normal is set before getMetalness, which then sets it again from the card's picture"
+        },
+        {
+          "file": "scene/shader-lib/glsl/chunks/standard/frag/stdFrontEnd.js",
+          "text": "litArgs_ao = dAo;",
+          "who": "diagView.ts GAME_DIAG_SURFACE: the bake reads the leaves' occlusion"
+        },
+        {
+          "file": "scene/shader-lib/glsl/chunks/standard/frag/stdFrontEnd.js",
+          "text": "litArgs_gloss = dGlossiness;",
+          "who": "diagView.ts GAME_DIAG_SURFACE: the bake reads the leaves' glossiness (inverted already)"
+        },
+        {
+          "file": "scene/shader-lib/glsl/chunks/standard/frag/diffuse.js",
+          "text": "dAlbedo *= saturate(vVertexColor.{STD_DIFFUSE_VERTEX_CHANNEL});",
+          "who": "nature.ts windCode GAME_IMPOSTOR: a card's tint in its vertex colour, clamped (IMPOSTOR_TINT_SCALE)"
+        }
+      ]
+    },
+    {
       "for": "render/pc/post.ts: contact shading (PlayCanvas's occlusion in the lighting, its depth pass without the plants).",
       "anchors": [
         {
@@ -1107,6 +1209,31 @@
           "file": "extras/render-passes/frame-pass-camera-frame.js",
           "text": "this.prePass = new RenderPassPrepass(",
           "who": "post.ts contactPasses: the frame's depth pass is a RenderPassPrepass (its execute is wrapped)"
+        },
+        {
+          "file": "extras/render-passes/render-pass-prepass.js",
+          "text": "this.camera = camera;",
+          "who": "post.ts contactPasses: the depth pass keeps the camera component it draws for (`setContact`: idle per camera)"
+        },
+        {
+          "file": "extras/render-passes/render-pass-prepass.js",
+          "text": "clearValue.r = farClip;",
+          "who": "post.ts setContact: an idle depth pass is cleared to all far, not left as the last frame drew it"
+        },
+        {
+          "file": "extras/render-passes/camera-frame.js",
+          "text": "ssaoPass.intensity = ssao.intensity;",
+          "who": "post.ts setContact: the frame's update hands its occlusion pass the strength, without making its passes again"
+        },
+        {
+          "file": "scene/shader-lib/wgsl/chunks/render-pass/frag/ssao.js",
+          "text": "if (uniform.uIntensity > 0.0) {",
+          "who": "post.ts setContact: at no strength the occlusion is plain white, the depth unread"
+        },
+        {
+          "file": "scene/shader-lib/glsl/chunks/render-pass/frag/ssao.js",
+          "text": "if (uIntensity > 0.0) {",
+          "who": "post.ts setContact: the same on WebGL2"
         },
         {
           "file": "extras/render-passes/render-pass-ssao.js",

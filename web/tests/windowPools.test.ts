@@ -1,7 +1,7 @@
 // `render/shared/gardenPools.ts` `windowPools`: where a lit room's windows throw its light on the garden (`bun test`).
 import { describe, expect, test } from 'bun:test';
 import type { Opening } from '../src/core/protocol';
-import { WINDOW_POOL, windowPools } from '../src/render/shared/gardenPools';
+import { backEdges, CURTAIN_LEAK, curtainsLetThrough, WINDOW_POOL, windowPools } from '../src/render/shared/gardenPools';
 
 /** A 10 × 10 lot with one room (2) from (3, 3) to (6, 6), and a second (3) beside it from (7, 3) to (8, 6). */
 function lot(openings: Opening[], depth = 10) {
@@ -52,5 +52,21 @@ describe('the light a lit room throws on the garden through its windows', () => 
     const pools = windowPools({ width, depth: 20, rooms, openings: [window('h', 4, 13)] }, (z) => z >= 10, 10, all);
     expect(pools[0]).toMatchObject({ x: 4.5, half: 'z-' });
     expect(pools[0].z).toBeCloseTo(3 - WINDOW_POOL.near, 9);
+  });
+
+  test('curtains drawn over a window keep most of its light in', () => {
+    // (Curtains hung in room 2 with their backs on the front wall, the line z = 3: over the first two of three windows.)
+    const hung = { x: 3, z: 3, w: 2, d: 1, rot: 0 };
+    expect(backEdges(hung)).toEqual(['h:3:3', 'h:4:3']);
+    expect(backEdges({ x: 3, z: 5, w: 1, d: 1, rot: 3 })).toEqual(['v:4:5']);
+    const curtains = new Map(backEdges(hung).map((e) => [e, 9]));
+    const [pool] = windowPools(lot([window('h', 3, 3), window('h', 4, 3), window('h', 5, 3)]), all, 0, all, (e) => curtains.get(e));
+    expect(pool.covers).toEqual([9, 9, -1]);
+    expect(curtainsLetThrough(pool, new Set())).toBe(1);
+    expect(curtainsLetThrough(pool, new Set([9]))).toBeCloseTo(1 - (2 / 3) * (1 - CURTAIN_LEAK), 9);
+    // (A window with none over it has nothing to keep in.)
+    const [bare] = windowPools(lot([window('h', 4, 3)]), all, 0, all, () => undefined);
+    expect(bare.covers).toBeUndefined();
+    expect(curtainsLetThrough(bare, new Set([9]))).toBe(1);
   });
 });

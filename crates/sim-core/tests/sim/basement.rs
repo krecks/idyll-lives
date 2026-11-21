@@ -1,7 +1,6 @@
 //! Basements: a storey below the ground, dug out by building walls down there, reached by
 //! stairs that stand in the basement and come up inside the house. Residents walk down to use
-//! what's there and back up, rooms down there are rooms, and saves keep it all (older saves
-//! grow a basement without anything moving).
+//! what's there and back up, rooms down there are rooms, and saves keep it all.
 
 use crate::common;
 
@@ -185,6 +184,7 @@ fn a_basement_room_is_a_room_even_under_the_garden() {
         blocked: w.blocked(),
         stairs: w.stair_map(),
         kept_off: &[],
+        steps: None,
     };
     assert!(!nav.tile_free(12, 4 + DOWN) && nav.tile_free(6, 6 + DOWN));
 }
@@ -258,6 +258,7 @@ fn stairs_down_start_inside_the_house() {
         blocked: w.blocked(),
         stairs: w.stair_map(),
         kept_off: &[],
+        steps: None,
     };
     assert!(
         !nav.tile_free(9, 4) && nav.tile_free(9, 2),
@@ -309,7 +310,7 @@ fn residents_walk_down_to_the_basement_and_back_up() {
 }
 
 #[test]
-fn saves_keep_the_basement_and_older_saves_grow_one() {
+fn saves_keep_the_basement() {
     let mut w = house();
     buy(&mut w, "chair", 5, 3 + DOWN, 0).unwrap();
     let saved = w.save_json();
@@ -322,28 +323,6 @@ fn saves_keep_the_basement_and_older_saves_grow_one() {
     assert_eq!(loaded.objects.len(), w.objects.len());
     assert_eq!(loaded.stair_map().stairs, w.stair_map().stairs);
     assert_eq!(loaded.save_json(), saved, "a round trip changes nothing");
-
-    // A game from before basements (v21: no `basement`), with a room upstairs: it grows one on
-    // the end and everything stays where it was.
-    let mut old = world_with(2, false);
-    build(&mut old, room(4, 2, 6, 6, true)).unwrap();
-    build(&mut old, room(4, 2 + UP, 6, 6, false)).unwrap();
-    buy(&mut old, "stairs", 9, 3, 0).unwrap();
-    let mut file: serde_json::Value = serde_json::from_str(&old.save_json()).unwrap();
-    assert!(file.get("basement").is_none());
-    file["version"] = 21.into();
-    let grown = World::from_save_json(&content(2, true), &file.to_string()).unwrap();
-    assert_eq!(
-        (grown.storeys, grown.lowest_storey(), grown.lot.depth),
-        (2, -1, 48)
-    );
-    assert_ne!(
-        grown.lot.room_at(6, 4 + UP),
-        OUTDOORS,
-        "the room upstairs stays upstairs"
-    );
-    assert_eq!(grown.stair_map().stairs, old.stair_map().stairs);
-    assert_eq!(grown.storey_of(4 + DOWN), -1);
 
     // Content that later allows a storey more: it goes on after the basement, which stays put.
     let taller = World::from_save_json(&content(3, true), &saved).unwrap();

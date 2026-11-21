@@ -12,6 +12,11 @@
 //! washing: a dryer, or a washing line in the garden that can be reached. The houses come turned
 //! to face a street on each side in turn, as towns lay their lots.
 //!
+//! Buildings of flats and the flats over places (`kind: "flats"`) are checked the same way, and
+//! each flat besides: reached from the street door, a toilet in a bathroom of its own, beds enough
+//! for its household. Places with real storeys above them (`kind: "place"`) too, but for the
+//! things only a home has (a bed, a fridge, a toilet, a meal).
+//!
 //! With `DUMP_STATES=1`, the first house with a basement is written to `debug-states/` as
 //! `generated-basement` (with a resident at the door), to open in the game with
 //! `?state=generated-basement`.
@@ -61,7 +66,7 @@ fn generated_houses_are_livable() {
     let config: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(dir.join("housegen.json")).unwrap()).unwrap();
     let mut failures = Vec::new();
-    let (mut dining, mut tops) = (0, 0);
+    let (mut dining, mut tops, mut homes) = (0, 0, 0);
     let (mut large, mut islands) = (0, 0);
     let (mut rooms, mut bright) = (0, 0);
     let (mut lights, mut most_lights) = (0, 0);
@@ -74,6 +79,7 @@ fn generated_houses_are_livable() {
             "{} {} facing {} ({})",
             h["size"], h["seed"], h["facing"], h["description"]
         );
+        let kind = h["kind"].as_str().unwrap_or("house");
         let w = match World::from_json(&content, &h["town"].to_string(), 1) {
             Ok(w) => w,
             Err(e) => {
@@ -81,6 +87,11 @@ fn generated_houses_are_livable() {
                 continue;
             }
         };
+        // A place's ground floor (under flats or storeys of its own) is laid out by hand and kept
+        // to the places' own rules: the house's rules for chairs and washing are for what was
+        // generated on it (the storeys above).
+        let generated =
+            |o: &sim_core::world::ObjectInstance| h["ground"] != "place" || w.storey_of(o.z) > 0;
         // Things on tops stand on one listed before them, never on a hob or a sink.
         common::check(&w);
         for o in w
@@ -161,7 +172,7 @@ fn generated_houses_are_livable() {
             room_of(&|d| d.id == "toilet"),
         );
         for (what, room) in [("bed", bed), ("fridge", fridge), ("toilet", toilet)] {
-            if room.is_none_or(|r| r == OUTDOORS) {
+            if kind != "place" && room.is_none_or(|r| r == OUTDOORS) {
                 failures.push(format!("{label}: no {what} indoors"));
             }
         }
@@ -175,10 +186,12 @@ fn generated_houses_are_livable() {
             .content
             .recipe_index("meal")
             .map(|r| &w.content.recipes[r]);
-        if meal.is_some_and(|r| !r.possible(stations)) {
+        if kind != "place" && meal.is_some_and(|r| !r.possible(stations)) {
             failures.push(format!("{label}: can't make a meal"));
         }
-        if bed.is_some() && (bed == toilet || bed == fridge) || fridge == toilet {
+        if kind != "place"
+            && (bed.is_some() && (bed == toilet || bed == fridge) || fridge == toilet)
+        {
             failures.push(format!(
                 "{label}: bedroom, kitchen and bathroom share a room"
             ));
@@ -190,13 +203,14 @@ fn generated_houses_are_livable() {
             blocked: w.blocked(),
             stairs: w.stair_map(),
             kept_off: &[],
+            steps: None,
         };
         let start = (entry[0].floor() as i32, entry[1].floor() as i32);
         let mut seated = 0;
         for o in &w.objects {
             let def = &w.content.objects[o.def];
             // Chairs are put round tables, facing them.
-            if def.seat_at != 0 {
+            if def.seat_at != 0 && generated(o) {
                 if surface::faced_table(&w.content, &w.objects, &nav, o.id).is_some() {
                     seated += 1;
                 } else {
@@ -221,6 +235,58 @@ fn generated_houses_are_livable() {
                 ));
             }
         }
+        // Each flat: reached from the street door, a toilet in a bathroom of its own, beds enough
+        // for its household (`need`: places to sleep).
+        for f in h["flats"].as_array().into_iter().flatten() {
+            let id = f["plot"].as_u64().unwrap() as u32;
+            let flat = &w.plots[id as usize];
+            let mine = |o: &&sim_core::world::ObjectInstance| w.plot_at(o.x, o.z) == Some(id);
+            let toilet = w.objects.iter().filter(mine).find(|o| {
+                w.content.objects[o.def].id.starts_with("toilet")
+                    && h["rooms"].as_array().into_iter().flatten().any(|r| {
+                        let [rx, rz, rw, rd] =
+                            ["x", "z", "w", "d"].map(|k| r[k].as_i64().unwrap() as i32);
+                        r["kind"] == "bathroom"
+                            && (rx..rx + rw).contains(&o.x)
+                            && (rz..rz + rd).contains(&o.z)
+                    })
+            });
+            if toilet.is_none() {
+                failures.push(format!(
+                    "{label}: {} has no toilet in a bathroom",
+                    flat.name
+                ));
+            }
+            let places: u32 = w
+                .objects
+                .iter()
+                .filter(mine)
+                .filter(|o| {
+                    let def = &w.content.objects[o.def];
+                    def.interactions.iter().any(|i| i.id == "sleep" && !i.spare)
+                })
+                .map(|o| u32::from(w.content.objects[o.def].slots.max(1)))
+                .sum();
+            let need = f["need"].as_u64().unwrap_or(0) as u32;
+            if places < need {
+                failures.push(format!(
+                    "{label}: {} has {places} places to sleep for {need}",
+                    flat.name
+                ));
+            }
+            let [ix, iz] = flat.home_point();
+            let door = flat.arrival_point();
+            let from = (door[0].floor() as i32, door[1].floor() as i32);
+            if nav
+                .find_path(from, (ix.floor() as i32, iz.floor() as i32))
+                .is_none()
+            {
+                failures.push(format!(
+                    "{label}: {} can't be reached from the street door",
+                    flat.name
+                ));
+            }
+        }
         // Every room can be walked into from the front door (upstairs and in the basement too).
         for r in h["rooms"].as_array().into_iter().flatten() {
             let kind = r["kind"].as_str().unwrap();
@@ -232,7 +298,7 @@ fn generated_houses_are_livable() {
         }
         // The basement: under the house, underground (no windows), stairs down from a room
         // everyone uses, its rooms lit.
-        bigger += usize::from(h["size"] != "small");
+        bigger += usize::from(kind == "house" && h["size"] != "small");
         // (The shipped content gives every lot a basement storey; the house says whether it has one.)
         if h["town"]["basement"] == true {
             basements += 1;
@@ -379,9 +445,12 @@ fn generated_houses_are_livable() {
                 }
             }
         }
-        dining += usize::from(seated >= 2);
+        // (The ratios below are the houses'.)
+        let house = kind == "house";
+        homes += usize::from(house);
+        dining += usize::from(house && seated >= 2);
         // An island: a counter or bar with two stools or more facing it.
-        if h["size"] == "large" {
+        if house && h["size"] == "large" {
             large += 1;
             let mut at = std::collections::HashMap::new();
             for o in &w.objects {
@@ -397,9 +466,10 @@ fn generated_houses_are_livable() {
             islands += usize::from(at.values().any(|&n| n >= 2));
         }
         tops += usize::from(
-            w.objects
-                .iter()
-                .any(|o| w.content.objects[o.def].layer == Layer::Surface),
+            house
+                && w.objects
+                    .iter()
+                    .any(|o| w.content.objects[o.def].layer == Layer::Surface),
         );
         // Washing washed has somewhere to dry: something that works on a washed load (a dryer, a
         // washing line outdoors; reached, as everything is, above).
@@ -407,6 +477,7 @@ fn generated_houses_are_livable() {
             |o: &sim_core::world::ObjectInstance| w.content.objects[o.def].interactions.iter();
         if w.objects
             .iter()
+            .filter(|o| generated(o))
             .any(|o| uses(o).any(|i| i.makes == Some(WorkOn::Washed)))
         {
             washers += 1;
@@ -444,11 +515,11 @@ fn generated_houses_are_livable() {
     }
     assert!(failures.is_empty());
     assert!(
-        dining * 10 >= houses.len() * 8,
+        dining * 10 >= homes * 8,
         "most houses have a table to sit at"
     );
     assert!(
-        tops * 10 >= houses.len() * 9,
+        tops * 10 >= homes * 9,
         "most houses have things on their tops"
     );
     // Over half do (30 to 43 of 60 in samples of other seeds); a third leaves room for reshuffles.

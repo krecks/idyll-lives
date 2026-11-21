@@ -69,7 +69,7 @@ export const DEFAULT_FADE = 0.25;
  * smaller than its tile (the herb planters, 0.4–0.46 m deep, are picked from as from a counter), or to
  * the part used: the toes at a basin or a sink's cabinet, the hands over the water; up to the toaster and
  * the blender on a counter, the chemistry bench pushed back on its tile, onto the dumbbell rack's mat, the
- * giving jar. (A thing stepped in to, `STEP_IN`, has its step instead.) Back from the statue, to look up at it. In beside the high chair, to feed the baby in it.
+ * giving jar, up to the ironing board. (A thing stepped in to, `STEP_IN`, has its step instead.) Back from the statue, to look up at it. In beside the high chair, to feed the baby in it.
  */
 export const STAND_BACK: Record<string, number> = {
   highChair: -0.5,
@@ -90,6 +90,7 @@ export const STAND_BACK: Record<string, number> = {
   dumbbells: -0.6,
   'kind.givingJar': -0.4,
   townStatue: 0.8,
+  ironingBoard: -0.3,
 };
 /**
  * Things hugged (the giant teddy, sitting on the floor): the hugger crouches down to it this far (m) from
@@ -169,6 +170,8 @@ export const STEP_IN: Record<string, StepIn> = {
   // Smelling its flowers knelt up against it too, leant in over the rim (clips/garden.ts `smellBed`), not crouched a
   // tile back: a use's own entry (`def:tag`, `stepInFor`).
   'flowerbed:smell': { by: [[0, ['smellBed'], { to: 0.78 }]] },
+  // Up to the lawnmower's handle (its grip 0.97 m in front of the middle), pushing it (`push`), not a pace short of it.
+  lawnMower: { by: [[0, ['push'], { to: 1.25 }]] },
   // Out on the court (2.5 m from the hoop's middle, a lane each for two), shooting (clips/shot.ts).
   'basketballHoop:exercise': { by: bySize(SHOT), lanes: [-0.45, 0.45] },
   // The streetball hoop's shot from its two places 2.2 m out, a pace apart (content `places`; clips/shot.ts).
@@ -413,7 +416,7 @@ export interface ActionAnim {
 }
 /**
  * A prop in the hand (G-70), drawn by `residents.ts` `writeHand` while the use goes on: a `tool.*` model
- * (tools/art/blender/families/held.py), held by its `grip`:
+ * (crates/art/things/src/held), held by its `grip`:
  * - `level`: upright, turned the way they face, `at` m from the palm along their right, up and ahead (given for the right
  *   hand, the left mirrored); `sip`: tipped to the lips as the hand comes up to the mouth (a cup);
  * - `hand`: in the hand's own frame (at rest, hanging at the side: +x the resident's right, +y up the arm, +z ahead),
@@ -478,6 +481,8 @@ export const PROPS = {
   cue: { key: 'tool.cue', grip: 'cue', at: [0, 0, 0.32], clips: POOL.map(({ clip }) => clip) },
   // The rest of G-70: the tools, the post box's card, the basketball.
   wateringCan: { key: 'tool.wateringCan', grip: 'level', at: [0, -0.262, 0] },
+  // Held by its handle's middle, 13.8 cm over its soleplate, the point ahead.
+  iron: { key: 'tool.iron', grip: 'level', at: [0, -0.138, 0] },
   secateurs: { key: 'tool.secateurs', grip: 'hand', at: [0, 0, 0], turn: [0, 0, 0] },
   paintbrush: { key: 'tool.paintbrush', grip: 'hand', at: [0, 0, 0], turn: [90, 0, 0] },
   chalk: { key: 'tool.chalk', grip: 'hand', at: [0, 0, 0], turn: [90, 0, 0] },
@@ -510,8 +515,10 @@ export const PROPS = {
  * (`ACTIONS[tag].prop`, by the plate), not carried: the baby's bottle, fed with the baby in the arms.
  */
 export const PROP_ITEMS = new Set(['babyBottle']);
-/** Watered from a can (`ACTIONS.water`, the house plant's `garden`): not what is misted (the terrarium, the bonsai's leaves). */
-const MISTED = new Set(['natureLover.mossTerrarium', 'loner.bonsaiBench']);
+/** The ironing board: ironed at with the iron in the hand (`ACTIONS.clean`). */
+const IRONING_BOARD = 'ironingBoard';
+/** Watered from a can (`ACTIONS.water`, the house plant's `garden`): not what is misted (the terrarium, the bonsai's leaves), nor the garden from the hose reel (its nozzle mimed). */
+const MISTED = new Set(['natureLover.mossTerrarium', 'loner.bonsaiBench', 'hoseReel']);
 /** Painted with a brush (`ACTIONS.paint`); the chalkboard with chalk, the whiteboard with a marker. */
 const BRUSHED = new Set(['easel', 'kidsEasel']);
 /** Children's desks and their little table: written and drawn at with a pencil (`ACTIONS.write`). */
@@ -549,6 +556,10 @@ const EATEN_WITH: Record<string, HandProp> = {
   iceCreamCone: PROPS.paddle,
   noodles: PROPS.chopsticks,
 };
+/** Whether `plate` (content `items`) is eaten with a fork: then eating sounds of cutlery (`audio/world.ts`). */
+export function eatenWithFork(plate: string): boolean {
+  return EATEN_WITH[plate] === PROPS.fork;
+}
 /**
  * What is eaten by hand at the table (content `items`), a bite of it in the right hand (`biteOf`): the rest of it stays
  * on the plate, as what is eaten with a fork does.
@@ -644,7 +655,8 @@ export const ACTIONS: Record<string, ActionAnim> = {
   nap: { hands: HANDS.open },
   sit: { hands: HANDS.open },
   // (At a fire on foot, warming the hands at it: `WARM_AT`.)
-  relax: { stand: (def) => (WARM_AT.has(def) ? WARM_HANDS : RELAX_STAND), hands: HANDS.open },
+  // (Beside the massage table, giving the massage: the hands at work on the one lying there.)
+  relax: { stand: (def) => (WARM_AT.has(def) ? WARM_HANDS : def === 'massageTable' ? ['interact', 'spell'] : RELAX_STAND), hands: HANDS.open },
   type: { stand: ['spell'], sit: 'sitHands', hands: HANDS.keys },
   write: {
     stand: ['interact', 'spell'],
@@ -659,7 +671,8 @@ export const ACTIONS: Record<string, ActionAnim> = {
     stand: (def) => (def === 'noticeBoard' || def === 'busStop' ? ['idle'] : ['lantern']),
     upper: 'lantern',
     hands: HANDS.hold,
-    prop: (def) => (def === 'foodie.cookbookLectern' ? null : PROPS.book),
+    // (The post read at the letterbox: a card in the hands.)
+    prop: (def) => (def === 'foodie.cookbookLectern' ? null : def === 'letterbox' ? PROPS.postcard : PROPS.book),
   },
   watch: { stand: ['foldArms', 'idle'], hands: HANDS.open },
   // Darts thrown and the table-tennis bat swung (mimed, closed hands: `clips/games.ts`); the pool table and the foosball
@@ -704,8 +717,18 @@ export const ACTIONS: Record<string, ActionAnim> = {
   sing: { stand: ['talk'], hands: HANDS.relaxed },
   clean: {
     stand: (def) =>
-      def.includes('Mop') || def.includes('Vacuum') ? ['push'] : def.includes('laundry') ? ['spell', 'interact', 'pickUp'] : DISHWASHERS.has(def) ? DISHWASHER_RACK : ['interact', 'spell'],
+      def.includes('Mop') || def.includes('Vacuum') || def === 'lawnMower'
+        ? ['push']
+        : def === IRONING_BOARD
+          ? ['stir']
+          : def.includes('laundry')
+            ? ['spell', 'interact', 'pickUp']
+            : DISHWASHERS.has(def)
+              ? DISHWASHER_RACK
+              : ['interact', 'spell'],
     hands: HANDS.hold,
+    // (Ironing: the iron in the hand, the board's own hidden meanwhile, its `iron_off`.)
+    prop: (def) => (def === IRONING_BOARD ? PROPS.iron : null),
   },
   // Gardening, by task (older content and packs: `garden`).
   water: { stand: ['water'], hands: HANDS.hold, prop: (def) => (MISTED.has(def) ? null : PROPS.wateringCan) },

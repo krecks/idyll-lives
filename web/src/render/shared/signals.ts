@@ -21,7 +21,7 @@ export const AMBER = 1;
 export const GREEN = 2;
 export type Lamp = typeof RED | typeof AMBER | typeof GREEN;
 
-/** The lenses top to bottom, as the model's lens materials are named (`lens_<name>`, tools/art/blender/families/street_furniture.py). */
+/** The lenses top to bottom, as the model's lens materials are named (`lens_<name>`, crates/art/outside/src/street_furniture). */
 export const SIGNAL_LAMPS = ['red', 'amber', 'green'] as const;
 
 /** Signal heads read at most (the snapshot's room, sim-core `snapshot::MAX_LIGHTS`, when the layout doesn't say). */
@@ -166,7 +166,7 @@ export interface PedestrianHead {
 const PED_FRONT = 0.26;
 const PED_LENSES = { dontWalk: 1.79, walk: 1.55 } as const;
 const PED_LENS = 0.1;
-/** The glow's colours, as the traffic head's lenses (tools/art/blender/families/street_furniture.py). */
+/** The glow's colours, as the traffic head's lenses (crates/art/outside/src/street_furniture). */
 const PED_RED = '#FF4A2E';
 const PED_GREEN = '#1FE58A';
 

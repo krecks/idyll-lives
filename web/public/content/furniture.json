@@ -1,5 +1,5 @@
 {
-  "$comment": "The 0.20 catalogue: furniture, lighting, decor, kids' and garden things for every room, from cheap to premium. Models are in assets/manifest.json and the packs it lists (tools/art/blender/families/). `layer` puts things on a wall, the ceiling or the floor's surface (rugs), where they take no floor space; `bunk` makes a bed's second slot the upper bunk. Feelings are prefixed `home.`.",
+  "$comment": "The 0.20 catalogue: furniture, lighting, decor, kids' and garden things for every room, from cheap to premium. Models are in assets/manifest.json and the packs it lists (crates/art). `layer` puts things on a wall, the ceiling or the floor's surface (rugs), where they take no floor space; `bunk` makes a bed's second slot the upper bunk. Feelings are prefixed `home.`.",
   "tags": [
     "toys"
   ],
@@ -125,6 +125,13 @@
           "energy": 1.1
         }
       }
+    },
+    {
+      "id": "home.sweetTreat",
+      "label": "Sweet treat",
+      "emotion": "happy",
+      "mood": 0.06,
+      "hours": 3
     },
     {
       "id": "home.filmNight",
@@ -976,6 +983,7 @@
           "id": "breakfast",
           "label": "Have breakfast at the island",
           "anim": "eat",
+          "sound": "cutlery",
           "seatNear": 3,
           "minutes": 20,
           "effects": {
@@ -1067,6 +1075,7 @@
           "id": "breakfast",
           "label": "Have breakfast",
           "anim": "eat",
+          "sound": "cutlery",
           "minutes": 20,
           "pose": "sit",
           "effects": {
@@ -1138,6 +1147,7 @@
           "id": "breakfast",
           "label": "Have breakfast",
           "anim": "eat",
+          "sound": "cutlery",
           "minutes": 20,
           "pose": "sit",
           "effects": {
@@ -1209,6 +1219,7 @@
           "id": "breakfast",
           "label": "Have breakfast",
           "anim": "eat",
+          "sound": "cutlery",
           "minutes": 20,
           "pose": "sit",
           "effects": {
@@ -1247,6 +1258,7 @@
           "id": "dinner",
           "label": "Linger over dinner",
           "anim": "eat",
+          "sound": "cutlery",
           "minutes": 40,
           "pose": "sit",
           "effects": {
@@ -2460,6 +2472,7 @@
           "label": "Pick an outfit",
           "changesOutfit": true,
           "anim": "clean",
+          "sound": "drawer",
           "minutes": 10,
           "effects": {
             "comfort": 0.05
@@ -2491,6 +2504,7 @@
           "label": "Pick an outfit",
           "changesOutfit": true,
           "anim": "clean",
+          "sound": "drawer",
           "minutes": 10,
           "effects": {
             "comfort": 0.05
@@ -3505,6 +3519,7 @@
           "id": "game",
           "label": "Play PC games",
           "anim": "play",
+          "sound": "arcade",
           "minutes": 60,
           "pose": "sit",
           "effects": {
@@ -5136,6 +5151,7 @@
           "id": "picnic",
           "label": "Have a picnic",
           "anim": "eat",
+          "sound": "cutlery",
           "minutes": 25,
           "pose": "sit",
           "effects": {

@@ -5,6 +5,8 @@
   import { game } from './state.svelte';
 
   const RADIUS = 96;
+  /** The item that draws or opens curtains (`game/session.ts`'s object menu; -1 is a lamp's switch). */
+  const CURTAINS = -2;
   const menu = $derived(game.menu);
   /** Who does it: the household member last looked at (or, on the floor, the one it walks). */
   const actor = $derived(game.sims.find((s) => s.id === (menu?.ground?.sim ?? game.selected)));
@@ -35,9 +37,11 @@
             ? services.controls.walkTo(menu.ground.sim, menu.ground.x, menu.ground.z)
             : menu.itemId !== undefined
               ? services.controls.useItem(menu.itemId, item.index === 0 ? 'eat' : 'clear')
-              : item.index < 0
-                ? services.controls.switchLamp(menu.objectId)
-                : services.controls.useObject(menu.objectId, item.index)}
+              : item.index === CURTAINS
+                ? services.controls.drawCurtains(menu.objectId)
+                : item.index < 0
+                  ? services.controls.switchLamp(menu.objectId)
+                  : services.controls.useObject(menu.objectId, item.index)}
       >
         {item.label}{#if item.cost !== undefined}<span class="cost tabular" class:short={poor}> · {money(item.cost)}</span>{/if}
       </button>

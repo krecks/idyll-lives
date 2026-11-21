@@ -5,8 +5,17 @@
 
 import type { TagKind } from './kinds';
 
-/** A tag the player clicked, kept open as a card: one of your people (visit or call), or a place. */
-export type Chosen = ({ kind: 'person'; sim: number; plot: number | null } | { kind: 'place'; place: number; plot: number | null }) & {
+/**
+ * A tag the player clicked, kept open as a card: one of your people (visit or call), or a place; or a building
+ * clicked in the play view (`chosen.ts` `chosenOf`): a place's, a building of flats (`flats`, its lot: the card lists
+ * its flats), or a lot's house (`home`).
+ */
+export type Chosen = (
+  | { kind: 'person'; sim: number; plot: number | null }
+  | { kind: 'place'; place: number; plot: number | null }
+  | { kind: 'flats'; plot: number }
+  | { kind: 'home'; plot: number }
+) & {
   /** The tag's words when it was clicked. */
   title: string;
   detail: string;

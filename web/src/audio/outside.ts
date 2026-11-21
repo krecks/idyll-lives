@@ -1,8 +1,10 @@
 /**
- * The street and the weather as the camera has them (the loops are made in `outdoors.ts`):
+ * The street and the weather as the camera has them (the loops are made in `crates/sound/src/outdoors.rs`):
  * - the cars driving near where the camera looks (the households' and the work taxi: the snapshot's car rows):
  *   each an engine and its tyres, higher and louder the faster it goes on screen, louder the nearer it passes
  *   the middle of the picture, left or right by where it is, the nearest few at once;
+ * - a car's door shut and a parked car setting off, near the middle of the picture (a row's open doors and
+ *   whether it is parked or driving, against the last look: `events.ts` `carEvents`), a couple a look;
  * - the town from above: a bed that comes in as the camera zooms out into the town view and is full at its
  *   full height;
  * - the wind in the leaves and the grass, by the gust rolling over the ground the camera looks at
@@ -16,9 +18,10 @@ import { townBlend } from '../render/shared/lens';
 import { townView } from '../render/shared/townView';
 import type { Renderer } from '../render/types';
 import { acoustics } from './acoustics';
-import { OUTSIDE } from './catalog';
-import type { WorkerKind } from './made';
-import { Placed, type Space } from './space';
+import { EVENTS, ONCE_LEVEL, OUTSIDE } from './catalog';
+import { carEvents } from './events';
+import type { WorkerKind } from './kinds';
+import { Placed, playOnce, type Place, type Space } from './space';
 
 /** Seconds for a loop here to fade to a new level. */
 const FADE = 0.4;
@@ -75,6 +78,10 @@ interface CarVoice {
   placed: Placed;
 }
 
+/** The sounds of a car's row changing (`carEvents`). */
+type CarEvent = 'carDoor' | 'carStart';
+const CAR_EVENTS: readonly CarEvent[] = ['carDoor', 'carStart'];
+
 /** A car as last looked at: where, when (the frames' clock, s) and how fast it went (m/s on screen, smoothed). */
 interface Seen {
   x: number;
@@ -89,25 +96,30 @@ export class Outside {
   private leaves: Bed | null = null;
   private readonly voices = new Map<number, CarVoice>();
   private readonly cars = new Map<number, Seen>();
+  /** Every car row as last looked at, by row: in sight or not (`shown`) and its open doors. */
+  private readonly rows = new Map<number, { shown: number; doors: number }>();
+  /** The car doors and starts heard so far. */
+  private events = 0;
   private readonly screen = { x: 0, y: 0 };
   private look = 0;
-  private said: { cars: { row: number; speed: number; near: number }[]; driving: number; town: number; leaves: number; gust: number } = { cars: [], driving: 0, town: 0, leaves: 0, gust: 0 };
+  private said: { cars: { row: number; speed: number; near: number }[]; driving: number; town: number; leaves: number; gust: number; events: number } = { cars: [], driving: 0, town: 0, leaves: 0, gust: 0, events: 0 };
 
   constructor(
     private readonly renderer: Renderer,
     private readonly made: Maker,
   ) {}
 
-  /** What was heard on the last look: the cars sounding (their speed, m/s on screen, and how near), how many drive, the town's and the leaves' level and the gust. */
+  /** What was heard on the last look: the cars sounding (their speed, m/s on screen, and how near), how many drive, the town's and the leaves' level and the gust; and the car doors and starts heard so far. */
   heard(): Outside['said'] {
     return this.said;
   }
 
   /**
    * A look (`frame`) at audio time `t`. `quiet`: nothing sounds (a hidden tab); `still`: no cars (the game is
-   * paused, or the town's map is up); `day`: 0 at night .. 1 by day.
+   * paused, or the town's map is up); `fast`: no car doors or starts (the game runs too fast for them); `day`: 0
+   * at night .. 1 by day. The car doors and starts heard on it.
    */
-  update(ac: AudioContext, out: AudioNode, around: Space, frame: FrameState, t: number, o: { quiet: boolean; still: boolean; day: number }): void {
+  update(ac: AudioContext, out: AudioNode, around: Space, frame: FrameState, t: number, o: { quiet: boolean; still: boolean; fast: boolean; day: number }): readonly CarEvent[] {
     const radius = acoustics.radius;
     const target = townView.target;
 
@@ -129,13 +141,37 @@ export class Outside {
     const count = c && layout.header.carCount !== undefined ? curr[layout.header.carCount] : 0;
     const now = frame.now / 1000;
     const near: { row: number; x: number; z: number; speed: number; near: number }[] = [];
+    const played: CarEvent[] = [];
+    const hears = !o.quiet && !o.still && !o.fast;
     let driving = 0;
-    for (let i = 0; c && i < count && !o.quiet && !o.still; i++) {
+    // (Every row each look, heard or not, so what changed is always since the look before.)
+    for (let i = 0; c && i < count; i++) {
       const at = (layout.carBase ?? 0) + i * (layout.carStride ?? 0);
-      if (curr[at + c.shown] !== 2) continue;
-      driving++;
+      const shown = curr[at + c.shown];
+      const doors = c.doors === undefined ? 0 : curr[at + c.doors];
+      const last = this.rows.get(i);
+      // (A work taxi stands at each stop with its engine running: it never starts.)
+      const taxi = c.kind !== undefined && curr[at + c.kind] === c.kinds?.taxi;
+      const happened = carEvents(last, shown, doors, taxi);
+      if (last) {
+        last.shown = shown;
+        last.doors = doors;
+      } else this.rows.set(i, { shown, doors });
       const x = curr[at + c.x];
       const z = curr[at + c.z];
+      const n = shown === 0 ? 0 : nearness(Math.hypot(x - target.x, z - target.z), radius);
+      if (n >= EVENTS.car.near) {
+        // A car that near may shut a door or set off any moment: its sounds made before they're wanted.
+        const made = CAR_EVENTS.map((kind) => this.made.sound(kind, ac.sampleRate));
+        CAR_EVENTS.forEach((kind, k) => {
+          const buffer = made[k];
+          if (!hears || !buffer || played.length >= EVENTS.car.perLook || !(kind === 'carDoor' ? happened.door : happened.start)) return;
+          playOnce(ac, around, buffer, ONCE_LEVEL[kind] * n, this.place(x, z));
+          played.push(kind);
+        });
+      }
+      if (shown !== 2 || o.quiet || o.still) continue;
+      driving++;
       let seen = this.cars.get(i);
       if (!seen) this.cars.set(i, (seen = { x, z, at: now, speed: 0, look }));
       const dt = now - seen.at;
@@ -147,9 +183,10 @@ export class Outside {
       seen.z = z;
       seen.at = now;
       seen.look = look;
-      const n = nearness(Math.hypot(x - target.x, z - target.z), radius);
       if (n >= OUTSIDE.car.drop) near.push({ row: i, x, z, speed: seen.speed, near: n });
     }
+    for (const row of this.rows.keys()) if (row >= count) this.rows.delete(row);
+    this.events += played.length;
     for (const [row, seen] of this.cars) if (seen.look !== look) this.cars.delete(row);
     near.sort((a, b) => b.near - a.near);
     near.length = Math.min(near.length, OUTSIDE.car.voices);
@@ -165,8 +202,7 @@ export class Outside {
     }
     for (const n of near) {
       if (!engine || !tyres) break;
-      const pan = this.renderer.project(n.x, 0.7, n.z, this.screen) ? Math.max(-1, Math.min(1, (this.screen.x / (window.innerWidth || 1)) * 2 - 1)) * 0.8 : 0;
-      const place = { pan: Number.isFinite(pan) ? pan : 0, muffle: acoustics.muffleAt(n.x, n.z) };
+      const place = this.place(n.x, n.z);
       let v = this.voices.get(n.row);
       if (!v) {
         const placed = new Placed(ac, around, place);
@@ -192,11 +228,24 @@ export class Outside {
       v.engine.playbackRate.setTargetAtTime(s.engineRate, t, 0.25);
       v.tyres.playbackRate.setTargetAtTime(s.tyresRate, t, 0.25);
     }
-    this.said = { cars: near.map((n) => ({ row: n.row, speed: n.speed, near: n.near })), driving, town, leaves, gust };
+    this.said = { cars: near.map((n) => ({ row: n.row, speed: n.speed, near: n.near })), driving, town, leaves, gust, events: this.events };
+    return played;
+  }
+
+  /** A car's place at town point (`x`, `z`): left or right by where it is on screen, behind a wall from a room in view; dry. */
+  private place(x: number, z: number): Place {
+    const pan = this.renderer.project(x, 0.7, z, this.screen) ? Math.max(-1, Math.min(1, (this.screen.x / (window.innerWidth || 1)) * 2 - 1)) * 0.8 : 0;
+    return { pan: Number.isFinite(pan) ? pan : 0, muffle: acoustics.muffleAt(x, z) };
+  }
+
+  /** Forgets the cars' rows as last looked at (nothing is heard for a while): the next look starts afresh, so nothing that happened meanwhile sounds late. */
+  forget(): void {
+    this.rows.clear();
   }
 
   /** Fades everything out (no looks for a while: the picture stopped). */
   hush(t: number): void {
+    this.forget();
     for (const b of [this.town, this.leaves]) b?.gain.gain.setTargetAtTime(0, t, FADE / 3);
     for (const v of this.voices.values()) {
       v.engineGain.gain.setTargetAtTime(0, t, FADE / 3);

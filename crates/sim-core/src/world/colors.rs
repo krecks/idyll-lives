@@ -1,6 +1,4 @@
 //! The colours a player gives an object’s parts.
-//!
-//! Split from `world.rs` (see `mod.rs`).
 
 use super::*;
 

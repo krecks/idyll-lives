@@ -18,7 +18,7 @@ export interface ModelClip {
 }
 
 /**
- * Samples per second of a clip's poses: twice the 30 a second the clips are keyed at (gamekit), so a part turning
+ * Samples per second of a clip's poses: twice the 30 a second the clips are keyed at (artkit), so a part turning
  * fast (a door swung open, 21° a key) shrinks at most 0.4 % between two samples blended (`clipPose`), where it
  * shrank 1.7 % at 30.
  */

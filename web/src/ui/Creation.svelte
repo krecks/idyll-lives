@@ -3,13 +3,14 @@
   import CreateHousehold from './screens/CreateHousehold.svelte';
   import { services } from './services';
   import { game } from './state.svelte';
+  import { plotInfo } from './place';
 
   /**
    * Create mode: the new game's Creation, for a home nobody lives in (an older save that built
    * first, or a household that's gone): a family moves in. The household creator covers the paused game.
    */
   const neighbours = game.households.filter((h) => !h.player).map((h) => h.name);
-  const address = game.plots[game.households.find((h) => h.player)?.plot ?? -1]?.name;
+  const address = plotInfo(game, game.households.find((h) => h.player)?.plot)?.name;
 
   function moveIn(household: HouseholdDraft) {
     services.controls.moveIn(household);

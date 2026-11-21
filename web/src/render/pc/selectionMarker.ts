@@ -14,7 +14,7 @@
 import * as pc from './engine';
 import { Instances } from './instancing';
 import { GAME_FRONT_FACE } from './materials';
-import { buildModel, disposeTemplate, onModelFileArrived, uploadData } from './models';
+import { buildModel, disposeTemplate, onModelFileArrived, readMesh, uploadData } from './models';
 import type { AssetRegistry } from '../../assets/registry';
 import { LOOK } from '../look';
 import { toLinear } from '../shared/math';
@@ -147,13 +147,11 @@ export class SelectionMarker {
     const outline: Instances[] = [];
     if (!this.destroyed) {
       for (const m of template.meshes) {
-        const n = m.mesh.vertexBuffer?.getNumVertices() ?? 0;
-        const positions = new Float32Array(n * 3);
-        const normals = new Float32Array(n * 3);
-        const indices: number[] = [];
-        m.mesh.getPositions(positions);
-        m.mesh.getNormals(normals);
-        m.mesh.getIndices(indices);
+        const read = readMesh(m.mesh);
+        if (!read) continue;
+        const { positions, indices } = read;
+        const n = positions.length / 3;
+        const normals = read.normals ?? new Float32Array(n * 3);
         // Smooth, pillowy shading: a hot core that blooms, brightest on the faces turned to the viewer, softly deeper towards the ray tips.
         const colors = new Float32Array(n * 4);
         for (let i = 0; i < n; i++) {
@@ -162,7 +160,7 @@ export class SelectionMarker {
           const k = ((0.7 + 0.3 * face) * (1.45 - 0.6 * Math.min(1, r / 0.16))) / HOT;
           colors.set([k, k, k, 1], i * 4);
         }
-        const tris = Uint32Array.from(indices);
+        const tris = indices;
         const body = uploadData(this.device, { positions, normals, colors, indices: tris });
         const hull = uploadData(this.device, { positions: positions.map((p, i) => p + normals[i] * OUTLINE), normals: normals.slice(), colors: new Float32Array(n * 4).fill(1), indices: tris.slice() });
         made.push(body, hull);

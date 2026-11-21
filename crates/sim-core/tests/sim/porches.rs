@@ -3,7 +3,7 @@
 //! for and sold back, undone and made again, kept in blueprints and saves, gone with its door,
 //! moved with its room; posts (a porch's and its own) that nobody walks through or puts a thing
 //! on, the way up to the door kept open, and platforms and canopies they walk under and across;
-//! and a town or a save from before porches keeping the ones that were drawn.
+//! and a town from before porches keeping the ones that were drawn.
 
 use serde_json::Value;
 use sim_core::command::{EdgeAxis, EdgeEdit, EdgeKind};
@@ -432,6 +432,7 @@ fn walk(w: &World, from: (i32, i32), to: (i32, i32)) -> Option<Vec<(i32, i32)>> 
         blocked: w.blocked(),
         stairs: w.stair_map(),
         kept_off: &[],
+        steps: None,
     }
     .find_path(from, to)
 }
@@ -518,8 +519,7 @@ fn a_porch_is_refused_onto_someone_or_where_its_posts_shut_the_door_off() {
 
 #[test]
 fn a_town_porch_with_a_thing_at_a_post_keeps_it_blocked() {
-    // A town whose porch has a chair at its post (as an older save's could have, its posts
-    // walked through then): the chair's tile stays blocked whether the porch stands or goes.
+    // A town whose porch has a chair at its post: the chair's tile stays blocked whether the porch stands or goes.
     let mut w = world();
     build_room(&mut w);
     buy_chair(&mut w, 4, 6).unwrap();
@@ -606,7 +606,7 @@ const OLD_TOWN: &str = r#"{"width":12,"depth":12,
     "meta":{"paths":[{"x":4,"z":6,"w":1,"d":6}]}}"#;
 
 #[test]
-fn a_town_or_a_save_from_before_porches_keeps_the_ones_it_had() {
+fn a_town_from_before_porches_keeps_the_ones_it_had() {
     let w = World::from_json(CONTENT, OLD_TOWN, 1).unwrap();
     assert_eq!(
         w.porches,
@@ -627,13 +627,10 @@ fn a_town_or_a_save_from_before_porches_keeps_the_ones_it_had() {
             .porches
             .is_empty()
     );
-    // A save from before porches (v38): worked out again.
-    let mut save: Value = serde_json::from_str(&w.save_json()).unwrap();
-    save["version"] = 38.into();
-    save.as_object_mut().unwrap().remove("porches");
-    let back = World::from_save_json(CONTENT, &save.to_string()).unwrap();
+    // Saved and loaded, the same porches.
+    let back = World::from_save_json(CONTENT, &w.save_json()).unwrap();
     assert_eq!(back.porches, w.porches);
-    // Its posts stand as it loads (worked out from the porches: nothing more saved).
+    // Their posts stand as it loads (worked out from the porches: nothing more saved).
     for (x, z) in [(3, 7), (5, 7)] {
         assert!(
             blocked(&w, x, z) && blocked(&back, x, z),
@@ -641,8 +638,4 @@ fn a_town_or_a_save_from_before_porches_keeps_the_ones_it_had() {
         );
     }
     assert!(!blocked(&back, 4, 7), "the path up to the door is open");
-    // From v39 on, no porches saved: none.
-    save["version"] = 39.into();
-    let back = World::from_save_json(CONTENT, &save.to_string()).unwrap();
-    assert!(back.porches.is_empty());
 }

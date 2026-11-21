@@ -27,17 +27,22 @@
  * something of its own changes.
  */
 
+import { benchDiag } from '../../debug/benchFlags';
 import * as pc from './engine';
 import { skyLighting, type SkyLighting } from './env';
 import { INSTANCE_COLOR_SEMANTIC, installGameChunks, patchEngineChunks, WALL_CUT_SEMANTIC } from './shaders/chunks';
 import { DIAG_VIEW_DEFINE } from './shaders/diagView';
-import { ROOM_LIGHT_ROOMS } from './shaders/roomLights';
+import { ROOM_LIGHT_ROOMS, WINDOWLESS_ROW } from './shaders/roomLights';
 import { softLookWanted } from './shaders/softLook';
 import { withBuild } from '../../assets/build';
 import { materialTextures, optimizedUrl, type AssetRegistry } from '../../assets/registry';
 import type { MaterialEntry } from '../../assets/types';
+import { settings } from '../../settings/settings.svelte';
+import { isGraphicsPreset, QUALITY } from '../quality';
 import type { RGB } from '../shared/environment';
+export { encodeFinish } from '../shared/geometry';
 import { WALL_HEIGHT } from '../shared/walls';
+import { tunedEntry } from '../tune';
 import type { Shading } from '../types';
 
 export { INSTANCE_COLOR_SEMANTIC, WALL_CUT_SEMANTIC } from './shaders/chunks';
@@ -131,33 +136,17 @@ export class DigState {
   under = false;
   readonly lit = new pc.Vec4(0, 0.1, 0.1, 0);
   /**
-   * Rooms without windows on the storey in view, as dark as the basement by day: `mask` has a
-   * byte per tile of `area` (x0, z0 in metres, then w, d in tiles; `WINDOWLESS_BITS`) in its
-   * corner, `band` the heights it reaches (y0, y1; nowhere while both are 0). One texture of a
-   * fixed size, never swapped.
+   * Rooms without windows on the storey in view, as dark as the basement by day: the lot's masks
+   * (`RoomLightState.mask`, shared: a texture unit fewer, WebGL2 has 16) have a byte per tile of
+   * `area` (x0, z0 in metres, then w, d in tiles; `WINDOWLESS_BITS`) in the red of their rows from
+   * `WINDOWLESS_ROW`, `band` the heights it reaches (y0, y1; nowhere while both are 0).
    */
-  readonly mask: pc.Texture;
   readonly area = new pc.Vec4(0, 0, 0, 0);
   readonly band = new pc.Vec4(0, 0, 0, 0);
-  /** What `mask` holds (uploaded only when that changes), and its bytes as uploaded. */
+  /** What the mask holds (uploaded only when that changes). */
   private shown: DarkTiles | null = null;
-  private readonly bytes = new Uint8Array(MASK_SIZE * MASK_SIZE);
 
-  constructor(device: pc.GraphicsDevice) {
-    // One byte per tile, read whole (no filtering between tiles, no mipmaps).
-    this.mask = new pc.Texture(device, {
-      name: 'windowlessMask',
-      width: MASK_SIZE,
-      height: MASK_SIZE,
-      format: pc.PIXELFORMAT_R8,
-      mipmaps: false,
-      minFilter: pc.FILTER_NEAREST,
-      magFilter: pc.FILTER_NEAREST,
-      addressU: pc.ADDRESS_CLAMP_TO_EDGE,
-      addressV: pc.ADDRESS_CLAMP_TO_EDGE,
-      levels: [this.bytes],
-    });
-  }
+  constructor(private readonly masks: RoomLightState) {}
 
   /**
    * Keeps daylight out of the tiles `dark` marks, or out of nowhere (null). Returns whether that
@@ -170,11 +159,13 @@ export class DigState {
     if (!dark) return changed;
     const was = this.shown;
     if (was !== dark && (!was || was.w !== dark.w || was.d !== dark.d || dark.tiles.some((t, i) => t !== was.tiles[i]))) {
-      this.bytes.fill(0);
-      for (let z = 0; z < Math.min(dark.d, MASK_SIZE); z++) this.bytes.set(dark.tiles.subarray(z * dark.w, z * dark.w + Math.min(dark.w, MASK_SIZE)), z * MASK_SIZE);
-      const level = this.mask.lock();
-      (level as Uint8Array).set(this.bytes);
-      this.mask.unlock();
+      const bytes = this.masks.bytes;
+      const base = WINDOWLESS_ROW * ROOM_MASK_W * 4;
+      bytes.fill(0, base);
+      for (let z = 0; z < Math.min(dark.d, MASK_SIZE); z++) {
+        for (let x = 0; x < Math.min(dark.w, MASK_SIZE); x++) bytes[base + (z * ROOM_MASK_W + x) * 4] = dark.tiles[z * dark.w + x];
+      }
+      this.masks.upload();
       this.shown = dark;
       changed = true;
     }
@@ -210,14 +201,16 @@ export const ROOM_SPLIT_DN = 0x4000;
 
 /** The room mask's size in texels: a lot is at most 256 tiles each way, and up to four storeys are shown. */
 const ROOM_MASK_W = 256;
-const ROOM_MASK_H = 256 * 4;
+const ROOM_MASK_H = WINDOWLESS_ROW;
 
 /**
  * Which room each tile of the lot in view is in, so lamps light only their own (the test is in the
  * lights' code, `shaders/roomLights.ts`): `mask` has four bytes per tile in its corner (the room,
  * low and high byte, and a split tile's half 1's, `RoomMask`), `area` the lot (x0, z0 in metres,
  * then w, d in tiles), `band` its storeys (the lowest, how many, the storey height, and 1 while
- * masking: nothing is masked at 0). Uniforms only: masking costs no shader of its own.
+ * masking: nothing is masked at 0). Uniforms only: masking costs no shader of its own. Below its
+ * storeys, from `WINDOWLESS_ROW`, the same texture holds the windowless rooms' mask (`DigState`):
+ * one texture unit for both.
  */
 export class RoomLightState {
   /** Masking is on (`lamps.ts`; `?roomlights=0` turns it off). */
@@ -225,7 +218,8 @@ export class RoomLightState {
   readonly mask: pc.Texture;
   readonly area = new pc.Vec4(0, 0, 0, 0);
   readonly band = new pc.Vec4(0, 0, WALL_HEIGHT, 0);
-  private readonly bytes = new Uint8Array(ROOM_MASK_W * ROOM_MASK_H * 4);
+  /** The texture's bytes as uploaded (the rooms' rows, then the windowless rooms', `DigState`). */
+  readonly bytes = new Uint8Array(ROOM_MASK_W * (ROOM_MASK_H + MASK_SIZE) * 4);
   private shown: RoomMask | null = null;
   /**
    * The light of each room of the mask, a texel per room at its number there (`ROOM_LIGHT_ROOMS` of them): r how far
@@ -250,9 +244,9 @@ export class RoomLightState {
       levels: [this.lightBytes.slice()],
     });
     this.mask = new pc.Texture(device, {
-      name: 'roomLightMask',
+      name: 'lotMasks',
       width: ROOM_MASK_W,
-      height: ROOM_MASK_H,
+      height: ROOM_MASK_H + MASK_SIZE,
       format: pc.PIXELFORMAT_RGBA8,
       mipmaps: false,
       minFilter: pc.FILTER_NEAREST,
@@ -301,7 +295,7 @@ export class RoomLightState {
     const w = Math.min(rooms.w, ROOM_MASK_W);
     const rows = Math.min(rooms.d * rooms.storeys, ROOM_MASK_H);
     const bytes = this.bytes;
-    bytes.fill(0);
+    bytes.fill(0, 0, ROOM_MASK_W * ROOM_MASK_H * 4);
     for (let z = 0; z < rows; z++) {
       for (let x = 0; x < w; x++) {
         const v = rooms.tiles[z * rooms.w + x];
@@ -313,12 +307,16 @@ export class RoomLightState {
         bytes[at + 3] = h >> 8;
       }
     }
-    const level = this.mask.lock();
-    (level as Uint8Array).set(bytes);
-    this.mask.unlock();
+    this.upload();
     this.area.set(rooms.x0, rooms.z0, w, rooms.d);
     this.band.set(rooms.storey, Math.min(rooms.storeys, Math.floor(ROOM_MASK_H / Math.max(1, rooms.d))), WALL_HEIGHT, 1);
     return true;
+  }
+
+  /** The texture sent up again from `bytes` (the rooms' rows or the windowless rooms' changed). */
+  upload(): void {
+    (this.mask.lock() as Uint8Array).set(this.bytes);
+    this.mask.unlock();
   }
 }
 
@@ -376,6 +374,7 @@ export class MaterialLibrary {
   private readonly lit = new Set<pc.StandardMaterial>();
   private readonly dug = new WeakSet<pc.Material>();
   private readonly instanced = new WeakMap<pc.StandardMaterial, pc.StandardMaterial>();
+  private readonly whiteTinted = new WeakMap<pc.StandardMaterial, pc.StandardMaterial>();
   /** Emissive glows as last set (linear), to pass on only changes one could see. */
   private readonly glows = new WeakMap<pc.StandardMaterial, pc.Color>();
   private shadowMaterials: [pc.StandardMaterial | null, pc.StandardMaterial | null] = [null, null];
@@ -384,6 +383,12 @@ export class MaterialLibrary {
   private readonly device: pc.GraphicsDevice;
   /** Anisotropic filtering of the surfaces' textures (the graphics preset's `anisotropy`; set before the first surface). */
   anisotropy = 8;
+  /**
+   * Whether the finishes' layers are drawn (cloth's sheen, a lacquer's clear coat: `layer`). The graphics
+   * preset's `finishLayers`: the player's (or `?quality=`'s) for the previews' and the dev pages'
+   * libraries, the renderer's own for the game's; set before the first finish.
+   */
+  finishLayers = finishLayersWanted();
   /** Wall cutaway state read by every `cutaway` material. */
   readonly wallCut = new WallCutState();
   /** The cut-out finishes made so far (and their copies), each with its entry's `cutout` (`setCutoutCoverage`). */
@@ -399,20 +404,22 @@ export class MaterialLibrary {
   private readonly skySky = new Float32Array(3);
   /** The lamps' light off a room's walls and floor at the room's full level (`setRoomBounce`). */
   private readonly roomBounce = new Float32Array(3);
+  /** A room's shares of the sky's ambient and of its fill by day, each in the room's tint (`setRoomDay`). */
+  private readonly roomDayAmbient = new Float32Array([1, 1, 1]);
+  private readonly roomDayFill = new Float32Array([1, 1, 1]);
   private readonly skyGround = new Float32Array(3);
   /** Where it comes from (PlayCanvas space, unit length). */
   private readonly skyDir = new Float32Array(3);
   /** The shader features' state as global uniforms (`pushUniforms`). */
   private readonly uniforms: { id: pc.ScopeId; value: Float32Array; fill: (out: Float32Array) => void }[];
-  private readonly mask: pc.ScopeId;
-  private readonly roomMask: pc.ScopeId;
+  private readonly lotMasks: pc.ScopeId;
   private readonly roomLight: pc.ScopeId;
 
   private constructor(readonly app: pc.AppBase) {
     const device = (this.device = app.graphicsDevice);
     patchEngineChunks(device);
-    this.dig = new DigState(device);
     this.rooms = new RoomLightState(device);
+    this.dig = new DigState(this.rooms);
     const scope = device.scope;
     this.setSkyDirection(SKY_FILL_DIRECTION);
     const dig = this.dig;
@@ -428,6 +435,8 @@ export class MaterialLibrary {
       ['game_hemiGround', 3, (o) => o.set(this.skyGround)],
       ['game_hemiDir', 3, (o) => o.set(this.skyDir)],
       ['game_roomBounce', 3, (o) => o.set(this.roomBounce)],
+      ['game_roomDayAmbient', 3, (o) => o.set(this.roomDayAmbient)],
+      ['game_roomDayFill', 3, (o) => o.set(this.roomDayFill)],
       ['game_wallCutLook', 4, vec4(cut.look)],
       ['game_wallCutParams', 4, vec4(cut.params)],
       ['game_wallHole', 4, vec4(cut.hole)],
@@ -458,8 +467,7 @@ export class MaterialLibrary {
       ['game_roomLightBand', 4, vec4(this.rooms.band)],
     ];
     this.uniforms = table.map(([name, size, fill]) => ({ id: scope.resolve(name), value: new Float32Array(size), fill }));
-    this.mask = scope.resolve('game_windowlessMask');
-    this.roomMask = scope.resolve('game_roomLightMask');
+    this.lotMasks = scope.resolve('game_lotMasks');
     this.roomLight = scope.resolve('game_roomLight');
     this.pushUniforms();
     // The state as it is now, before every frame (a few uniforms: cheaper than tracking changes, no allocations).
@@ -471,8 +479,7 @@ export class MaterialLibrary {
       u.fill(u.value);
       u.id.setValue(u.value);
     }
-    this.mask.setValue(this.dig.mask);
-    this.roomMask.setValue(this.rooms.mask);
+    this.lotMasks.setValue(this.rooms.mask);
     this.roomLight.setValue(this.rooms.light);
   }
 
@@ -565,17 +572,20 @@ export class MaterialLibrary {
   /**
    * `material` for instanced draws with a per-instance colour (`INSTANCE_COLOR_SEMANTIC`, see
    * `instancing.ts`): a copy, kept per material, that multiplies its albedo by the instance's colour
-   * (converted from sRGB where the material converts vertex colours).
+   * (converted from sRGB where the material converts vertex colours). `white`: only where the vertex colour is
+   * pure white (`GAME_TINT_WHITE`: a parked car's paint, `shared/cars.ts` `TINT_PAINT`), the rest as it is.
    */
-  instanceColored(material: pc.StandardMaterial): pc.StandardMaterial {
-    let copy = this.instanced.get(material);
+  instanceColored(material: pc.StandardMaterial, white = false): pc.StandardMaterial {
+    const copies = white ? this.whiteTinted : this.instanced;
+    let copy = copies.get(material);
     if (!copy) {
       copy = material.clone();
-      copy.name = `${material.name}|instanceColor`;
+      copy.name = `${material.name}|${white ? 'tintWhite' : 'instanceColor'}`;
       copy.setAttribute('game_instanceColor', INSTANCE_COLOR_SEMANTIC);
       copy.setDefine('GAME_INSTANCE_COLOR', '');
+      if (white) copy.setDefine('GAME_TINT_WHITE', '');
       copy.update();
-      this.instanced.set(material, copy);
+      copies.set(material, copy);
       if (this.lit.has(material)) this.lit.add(copy);
       const cutout = this.cutouts.get(material);
       if (cutout !== undefined) this.cutouts.set(copy, cutout);
@@ -583,6 +593,27 @@ export class MaterialLibrary {
     }
     return copy;
   }
+
+  /**
+   * `material` sinking into the land where the haze's veil takes it (`GAME_VEIL_SINK`, `shaders/fog.ts`): a copy, kept
+   * per material, as `instanceColored`'s.
+   */
+  veilSinking(material: pc.StandardMaterial): pc.StandardMaterial {
+    let copy = this.sinking.get(material);
+    if (!copy) {
+      copy = material.clone();
+      copy.name = `${material.name}|veilSink`;
+      copy.setDefine('GAME_VEIL_SINK', '');
+      copy.update();
+      this.sinking.set(material, copy);
+      if (this.lit.has(material)) this.lit.add(copy);
+      const cutout = this.cutouts.get(material);
+      if (cutout !== undefined) this.cutouts.set(copy, cutout);
+      this.reuseTextures(material, copy);
+    }
+    return copy;
+  }
+  private readonly sinking = new WeakMap<pc.StandardMaterial, pc.StandardMaterial>();
 
   /**
    * Lets go of a material made or adopted here that is going (the landscape's own: its grass, its
@@ -738,6 +769,15 @@ export class MaterialLibrary {
     r[2] = bounce.b;
   }
 
+  /**
+   * A room's shares of the sky's ambient and of its hemispheric fill, in the `tint` (linear) the sky's light takes in a
+   * room (`shared/roomLight.ts` `roomDay`; 1, 1 and white: the garden's).
+   */
+  setRoomDay(ambient: number, fill: number, tint: RGB): void {
+    this.roomDayAmbient.set([ambient * tint.r, ambient * tint.g, ambient * tint.b]);
+    this.roomDayFill.set([fill * tint.r, fill * tint.g, fill * tint.b]);
+  }
+
   /** Where the sky's fill comes from (game space; the game's is `SKY_FILL_DIRECTION`, the dev pages' straight up). */
   setSkyDirection(d: { x: number; y: number; z: number }): void {
     const len = Math.hypot(d.x, d.y, d.z);
@@ -786,6 +826,10 @@ export class MaterialLibrary {
   }
 
   private create(key: string, entry: MaterialEntry, options: SurfaceOptions): pc.StandardMaterial {
+    const asked = tunedEntry(key, entry);
+    // (A tuned texture is named from the entry's own file: `../floor_wood.calm/albedo.jpg`.)
+    if (asked !== entry && asked.texture && entry.texture && asked.texture !== entry.texture) asked.texture = new URL(asked.texture, entry.texture).href;
+    entry = asked;
     if (new URLSearchParams(location.search).has('profile')) console.log(`[material] create ${key} ${options.variant ?? ''}`);
     const mat = new pc.StandardMaterial();
     mat.name = options.variant ? `${key}|${options.variant}` : key;
@@ -836,6 +880,7 @@ export class MaterialLibrary {
     mat.glossInvert = true;
     mat.gloss = entry.roughness ?? (entry.arm ? 1 : 0.8);
     mat.metalness = entry.metallic ?? (entry.arm ? 1 : 0);
+    const layered = this.finishLayers && layer(mat, entry);
     if (entry.alpha !== undefined && entry.alpha < 1) {
       mat.opacity = entry.alpha;
       mat.blendType = pc.BLEND_NORMAL;
@@ -854,6 +899,7 @@ export class MaterialLibrary {
     if (options.vertexColors) mat.setDefine('GAME_SRGB_COLORS', '');
     if (options.planarUV) mat.setDefine('GAME_PLANAR_UV', '');
     if (this.cutouts.has(mat)) mat.setDefine('GAME_CUTOUT', '');
+    if (layered) mat.setDefine('GAME_FINISH_LAYERS', '');
     if (options.cutaway) this.cutaway(mat);
     if (options.pattern === 'stripes') mat.setDefine('GAME_PATTERN_STRIPES', '');
     if (options.pattern === 'whitewash') mat.setDefine('GAME_PATTERN_WHITEWASH', '');
@@ -917,6 +963,38 @@ export class MaterialLibrary {
 }
 
 /**
+ * The graphics preset's `finishLayers`: `?quality=`'s on the page, else the player's preset's (Medium's
+ * where there is none); `?diag=nolayers` leaves them out, to measure them.
+ */
+function finishLayersWanted(): boolean {
+  const asked = new URLSearchParams(globalThis.location?.search ?? '').get('quality');
+  const preset = isGraphicsPreset(asked) ? asked : settings.graphics;
+  return QUALITY[isGraphicsPreset(preset) ? preset : 'medium'].finishLayers && !benchDiag().has('nolayers');
+}
+
+/**
+ * A finish's layers on `mat`, PlayCanvas's own lobes (`shaders/surface.ts`, `GAME_FINISH_LAYERS`): cloth's
+ * sheen (`sheenColor`, `sheenRoughness`) and a clear coat (`clearcoat`, `clearcoatRoughness`). Whether it
+ * has one.
+ */
+function layer(mat: pc.StandardMaterial, entry: MaterialEntry): boolean {
+  const sheen = entry.sheenColor !== undefined && entry.sheenRoughness !== undefined;
+  const coat = (entry.clearcoat ?? 0) > 0;
+  if (sheen) {
+    mat.useSheen = true;
+    mat.sheen.fromString(entry.sheenColor!);
+    // PlayCanvas's sheen term takes `sheenGloss` as its roughness (`lightSheenPS` `sheenD`, `reflectionSheenPS`): as it is, not inverted.
+    mat.sheenGloss = entry.sheenRoughness!;
+  }
+  if (coat) {
+    mat.clearCoat = entry.clearcoat!;
+    mat.clearCoatGlossInvert = true;
+    mat.clearCoatGloss = entry.clearcoatRoughness ?? 0;
+  }
+  return sheen || coat;
+}
+
+/**
  * A cut-out finish's alpha test where alpha to coverage softens its edge: under an eighth, the alpha
  * covers none of four samples.
  */
@@ -972,12 +1050,6 @@ export function textureWithFallback(app: pc.AppBase, source: string, anisotropy?
       console.warn(`[render] texture ${copy} unavailable`, err);
       return null;
     });
-}
-
-/** Vertex-colour alpha for the plain finish: [0, 0.5) dielectric, [0.5, 1] metal; roughness scaled within. */
-export function encodeFinish(roughness: number, metallic: number): number {
-  const r = Math.min(0.999, Math.max(0, roughness)) * 0.5;
-  return metallic >= 0.5 ? 0.5 + r : r;
 }
 
 /** Whether a lighting value moved enough to pass on (see `LIGHT_CHANGE`). */

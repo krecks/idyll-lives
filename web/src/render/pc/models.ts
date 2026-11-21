@@ -44,6 +44,7 @@ import { entrySpace, namedFinish, tintInName, type BoneName, type MaterialOverri
 import { contactShape, type ContactShape } from '../shared/contactShadow';
 import { ModelFiles } from '../shared/modelFiles';
 import { deviceDestroyed } from './device';
+import { gpuOnly } from './meshes';
 import {
   computeNormals,
   copyData,
@@ -64,10 +65,12 @@ import {
   restNormals,
   restyledData,
   transformData,
+  type Floats,
   type MirrorFace,
   type VData,
 } from '../shared/modelParts';
 import { WALL_HALF, WALL_HEIGHT } from '../shared/walls';
+import { readAccessor, readIndices, type GltfAccessor } from '../shared/gltfAccessors';
 
 export type { BoneName, TintSlot } from '../shared/modelEntry';
 export { entrySpace } from '../shared/modelEntry';
@@ -320,7 +323,11 @@ class PartGroups {
   height = 0;
   bottom = Infinity;
 
-  constructor(private readonly app: pc.AppBase) {
+  /** `upload`: how a group's merged vertices become a mesh (a build from a file's: let go of on the CPU, `uploadModel`). */
+  constructor(
+    app: pc.AppBase,
+    private readonly upload: Upload = (data) => uploadData(app.graphicsDevice, data),
+  ) {
     this.lib = MaterialLibrary.for(app);
   }
 
@@ -360,7 +367,7 @@ class PartGroups {
       const suffix = finish === PLAIN ? '' : `@${finish.replace('material.finish.', '')}`;
       built.meshes.push({
         name: `${name}${tint ? `:${tint}` : ''}${bone ? `#${bone}` : ''}${suffix}`,
-        mesh: uploadData(this.app.graphicsDevice, mergeData(data)),
+        mesh: this.upload(mergeData(data)),
         material: finish === PLAIN ? this.lib.plainFinish() : this.lib.finish(finish),
       });
       built.tints.push(tint);
@@ -376,7 +383,8 @@ class PartGroups {
  */
 export function uploadData(device: pc.GraphicsDevice, data: VData): pc.Mesh {
   const count = data.positions.length / 3;
-  const indices = count > 65535 ? new Uint32Array(data.indices) : new Uint16Array(data.indices);
+  // (PlayCanvas copies them into its buffer: 32-bit ones are passed as they are.)
+  const indices = count > 65535 ? data.indices : new Uint16Array(data.indices);
   const mesh = new pc.Mesh(device);
   mesh.setPositions(data.positions);
   if (data.normals) mesh.setNormals(data.normals);
@@ -387,6 +395,74 @@ export function uploadData(device: pc.GraphicsDevice, data: VData): pc.Mesh {
   mesh.update(pc.PRIMITIVE_TRIANGLES);
   return mesh;
 }
+
+/** How a build's vertices become a mesh (`PartGroups`, `buildFromFile`): uploaded, or only noted (`readMesh`'s build again). */
+type Upload = (data: VData) => pc.Mesh;
+
+/**
+ * Where the vertices of a mesh that keeps no copy on the CPU come from again (`readMesh`): a model
+ * built from a file, its build run again without uploading. By mesh, so a reader holding only the
+ * mesh (an instanced draw's) finds them.
+ */
+const meshSources = new WeakMap<pc.Mesh, () => VData>();
+
+/**
+ * Uploads `data` and lets go of PlayCanvas's copy of it on the CPU (`gpuOnly`): a model's meshes are
+ * drawn as made. `source` makes the same vertices again, for the few that read them (`readMesh`).
+ */
+function uploadModel(device: pc.GraphicsDevice, data: VData, source: () => VData): pc.Mesh {
+  const mesh = gpuOnly(uploadData(device, data));
+  meshSources.set(mesh, source);
+  return mesh;
+}
+
+/** A mesh's vertices as uploaded (`readMesh`): 32-bit floats throughout, as the GPU has them. */
+export interface MeshVertices extends VData {
+  positions: Float32Array;
+  normals: Float32Array | null;
+  uvs: Float32Array | null;
+  colors: Float32Array | null;
+  tangents: Float32Array | null;
+}
+
+/** Floats as the GPU has them (a builder's 64-bit ones rounded to 32), copied: the reader may change them. */
+const f32 = (a: Floats | null | undefined): Float32Array | null => (a ? Float32Array.from(a) : null);
+
+/**
+ * The vertices of a model's mesh as they were uploaded (positions, normals, UVs, colours, tangents as
+ * 32-bit floats, as the GPU has them, and the triangles): from its build run again where the mesh
+ * keeps no copy on the CPU (`uploadModel`), else from the mesh's own copy. For the few that read a
+ * model's vertices (a resident's prop, the selection marker, the merged shadows, a table's tuck, the
+ * item stage's framing, the dev tools); null for a mesh with none.
+ */
+export function readMesh(mesh: pc.Mesh): MeshVertices | null {
+  const source = meshSources.get(mesh);
+  if (source) {
+    const d = source();
+    return { positions: f32(d.positions)!, normals: f32(d.normals), uvs: f32(d.uvs), colors: f32(d.colors), tangents: f32(d.tangents), indices: d.indices.slice() };
+  }
+  const n = mesh.vertexBuffer?.getNumVertices() ?? 0;
+  if (!n) return null;
+  const positions = new Float32Array(n * 3);
+  if (!mesh.getPositions(positions)) return null;
+  const normals = new Float32Array(n * 3);
+  const uvs = new Float32Array(n * 2);
+  const colors = new Float32Array(n * 4);
+  const tangents = new Float32Array(n * 4);
+  const indices: number[] = [];
+  mesh.getIndices(indices);
+  return {
+    positions,
+    normals: mesh.getNormals(normals) ? normals : null,
+    uvs: mesh.getUvs(0, uvs) ? uvs : null,
+    colors: mesh.getColors(colors) ? colors : null,
+    tangents: mesh.getVertexStream(pc.SEMANTIC_TANGENT, tangents) ? tangents : null,
+    indices: Uint32Array.from(indices),
+  };
+}
+
+/** The last build run again for `readMesh` (its uploads' vertices, in order), kept for the rest of the task: its other meshes are read next. */
+let readBack: { build: object; data: VData[] } | null = null;
 
 // ---- files --------------------------------------------------------------------------
 
@@ -491,6 +567,25 @@ export function fileImported(app: pc.AppBase, url: string): boolean {
   return appFiles.get(app)?.has(url) ?? false;
 }
 
+/** Bytes of a piece's vertex arrays. */
+function dataBytes(d: VData | undefined): number {
+  if (!d) return 0;
+  return [d.positions, d.normals, d.uvs, d.colors, d.tangents, d.indices].reduce((a, x) => a + (x?.byteLength ?? 0), 0);
+}
+
+/** The model files kept for `app` and the bytes of their decoded pieces and clips (the memory census). */
+export function modelFileCensus(app: pc.AppBase): { files: number; pieceBytes: number; clipBytes: number } {
+  let files = 0;
+  let pieceBytes = 0;
+  let clipBytes = 0;
+  for (const f of appFiles.get(app)?.each() ?? []) {
+    files++;
+    for (const p of f.pieces) pieceBytes += dataBytes(p.data) + dataBytes(p.full);
+    for (const clip of f.clips.values()) for (const t of clip.tracks) clipBytes += t.poses.byteLength;
+  }
+  return { files, pieceBytes, clipBytes };
+}
+
 /** Resolves once no model file is being imported for `app` (with its textures: a container loads with them). */
 export function modelFilesSettled(app: pc.AppBase): Promise<void> {
   return appFiles.get(app)?.settled() ?? Promise.resolve();
@@ -569,45 +664,6 @@ interface GltfPrimitive {
   material?: number;
   mode?: number;
 }
-interface GltfAccessor {
-  bufferView?: number;
-  byteOffset?: number;
-  componentType: number;
-  normalized?: boolean;
-  count: number;
-  type: string;
-  sparse?: unknown;
-}
-
-const COMPONENTS: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT2: 4, MAT3: 9, MAT4: 16 };
-const SIZES: Record<number, number> = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
-
-/** An accessor's values as floats (normalised integers to 0..1 or -1..1), with their count per element. */
-function readAccessor(file: Container, index: number): { values: Float32Array; components: number } {
-  const a = file.gltf.accessors![index];
-  const components = COMPONENTS[a.type];
-  const size = SIZES[a.componentType];
-  if (!components || !size) throw new Error(`accessor ${index}: unknown type ${a.type}/${a.componentType}`);
-  if (a.sparse) throw new Error(`accessor ${index}: sparse accessors aren't read`);
-  const values = new Float32Array(a.count * components);
-  if (a.bufferView === undefined) return { values, components };
-  const bytes = file.views[a.bufferView];
-  if (!bytes) throw new Error(`accessor ${index}: buffer view ${a.bufferView} wasn't loaded`);
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const stride = file.gltf.bufferViews?.[a.bufferView]?.byteStride ?? components * size;
-  const read: (at: number) => number = {
-    5120: (at: number) => (a.normalized ? Math.max(view.getInt8(at) / 127, -1) : view.getInt8(at)),
-    5121: (at: number) => (a.normalized ? view.getUint8(at) / 255 : view.getUint8(at)),
-    5122: (at: number) => (a.normalized ? Math.max(view.getInt16(at, true) / 32767, -1) : view.getInt16(at, true)),
-    5123: (at: number) => (a.normalized ? view.getUint16(at, true) / 65535 : view.getUint16(at, true)),
-    5125: (at: number) => view.getUint32(at, true),
-    5126: (at: number) => view.getFloat32(at, true),
-  }[a.componentType]!;
-  const base = a.byteOffset ?? 0;
-  for (let k = 0; k < a.count; k++) for (let c = 0; c < components; c++) values[k * components + c] = read(base + k * stride + c * size);
-  return { values, components };
-}
-
 /**
  * A file's node: its place (`position`, `rotationQuaternion`, `scaling`, which the clips set), its
  * parent (-1: the `__root__` node that takes glTF into left-handed space).
@@ -726,21 +782,24 @@ async function importFile(app: pc.AppBase, url: string, now: boolean): Promise<L
       for (let n = index; n >= 0; n = nodes[n].parent) names.push(nodes[n].name);
       names.push('__root__');
       const m = primitive.material;
+      const group = part >= 0 ? grownBy[part] : null;
+      // (A part grown from nothing reads the file's vertices again below: they're kept as read for it.)
+      const asRead = group ? copyData(raw) : null;
       const piece: FilePiece = {
-        // Bake the full hierarchy transform so instance matrices place the model directly.
-        data: transformData(copyData(raw), world(index)),
+        // Bake the full hierarchy transform so instance matrices place the model directly (into the
+        // arrays read for it: they're its own).
+        data: transformData(raw, world(index)),
         material: m === undefined ? null : (file.materials[m] ?? null),
         materialName: m === undefined ? '__GLTFLoader._default' : (gltf.materials?.[m]?.name ?? `material${m}`),
         part,
         nodes: names,
       };
-      const group = part >= 0 ? grownBy[part] : null;
-      if (group) {
+      if (group && asRead) {
         // Its normals at rest by the inverse transpose of its matrix (flattened, they lean towards the
         // grow axis): the game's instance matrix (the clip's pose) turns them back into the grown shape's.
-        restNormals(piece.data, raw.normals, world(index));
+        restNormals(piece.data, asRead.normals, world(index));
         atEnd(group);
-        piece.full = transformData(copyData(raw), world(index));
+        piece.full = transformData(asRead, world(index));
         atRest(group);
       }
       pieces.push(piece);
@@ -758,12 +817,17 @@ async function importFile(app: pc.AppBase, url: string, now: boolean): Promise<L
   return { pieces, parts, clips, named, hold: { users: 0, materials: [...new Set(pieces.flatMap((p) => (p.material ? [p.material] : [])))], textures: file.textures } };
 }
 
-/** A primitive's vertex arrays (positions, normals, UVs, RGBA colours, tangents, triangles) as the file has them. */
+/** A primitive's vertex arrays (positions, normals, UVs, RGBA colours, tangents, triangles) as the file has them: each its own (a build may change them). */
 function readPrimitive(file: Container, primitive: GltfPrimitive): VData {
   const at = primitive.attributes;
   const positions = readAccessor(file, at.POSITION).values;
   const count = positions.length / 3;
-  const indices = primitive.indices !== undefined ? Uint32Array.from(readAccessor(file, primitive.indices).values) : Uint32Array.from({ length: count }, (_, i) => i);
+  let indices: Uint32Array;
+  if (primitive.indices !== undefined) indices = readIndices(file, primitive.indices);
+  else {
+    indices = new Uint32Array(count);
+    for (let i = 0; i < count; i++) indices[i] = i;
+  }
   let normals = at.NORMAL !== undefined ? readAccessor(file, at.NORMAL).values : null;
   if (!normals) {
     normals = new Float32Array(positions.length);
@@ -979,16 +1043,38 @@ function fileMaterial(app: pc.AppBase, lib: MaterialLibrary, material: pc.Standa
 /** A template from a file read (`filesOf`); throws if the build fails, having let go of what it made. */
 function buildGltf(app: pc.AppBase, name: string, entry: ModelEntry, file: LoadedFile, footprint: [number, number], options: BuildOptions): ModelTemplate {
   const made: pc.Mesh[] = [];
+  // Each mesh's vertices come back from the build run again (the same file, entry and options make
+  // the same uploads in the same order), not from a copy kept on the CPU.
+  const build = {};
+  const again = (k: number) => (): VData => {
+    if (readBack?.build !== build) {
+      const data: VData[] = [];
+      buildFromFile(app, name, entry, file, footprint, options, [], (d) => {
+        data.push(d);
+        return NOT_UPLOADED;
+      });
+      readBack = { build, data };
+      setTimeout(() => {
+        if (readBack?.build === build) readBack = null;
+      }, 0);
+    }
+    return readBack.data[k];
+  };
+  const device = app.graphicsDevice;
+  const upload: Upload = (data) => uploadModel(device, data, again(made.length));
   try {
-    return buildFromFile(app, name, entry, file, footprint, options, made);
+    return buildFromFile(app, name, entry, file, footprint, options, made, upload);
   } catch (err) {
     for (const mesh of made) mesh.destroy();
     throw err;
   }
 }
 
-/** `buildGltf`'s build; what it uploads goes into `made`. */
-function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: LoadedFile, footprint: [number, number], { resize, contact, glowApart }: BuildOptions, made: pc.Mesh[]): ModelTemplate {
+/** A build run again only for its vertices (`readMesh`) uploads nothing: its meshes stand for none. */
+const NOT_UPLOADED = null as unknown as pc.Mesh;
+
+/** `buildGltf`'s build; `upload` makes each mesh (in the order `readMesh`'s run again counts on), and what it made goes into `made`. */
+function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: LoadedFile, footprint: [number, number], { resize, contact, glowApart }: BuildOptions, made: pc.Mesh[], uploadMesh: Upload): ModelTemplate {
   const extras = entry as ModelEntry & ModelExtras;
   const fit = extras.fit;
   const [ox, oy, oz] = entry.offset ?? [0, 0, 0];
@@ -997,9 +1083,8 @@ function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: L
   const overrides = extras.materials ?? {};
   const lib = MaterialLibrary.for(app);
   const overrideFor = (p: FilePiece): MaterialOverride | undefined => overrides[p.materialName] ?? namedFinish(p.materialName, lib) ?? overrides['*'];
-  const device = app.graphicsDevice;
-  const upload = (data: VData) => {
-    const mesh = uploadData(device, data);
+  const upload: Upload = (data) => {
+    const mesh = uploadMesh(data);
     made.push(mesh);
     return mesh;
   };
@@ -1026,7 +1111,7 @@ function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: L
   let bottom = Infinity;
   for (let part = -1; part < file.parts.length; part++) {
     const meshName = part < 0 ? name : `${name}|${file.parts[part].name}`;
-    const groups = new PartGroups(app);
+    const groups = new PartGroups(app, upload);
     // The file's own materials, a mesh per material (glTF files often split a model into several nodes).
     const kept = new Map<pc.StandardMaterial, VData[]>();
     pieces.forEach(({ source, data, full, part: of }, i) => {
@@ -1042,8 +1127,10 @@ function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: L
       }
       const material = fileMaterial(app, lib, source.material, ov);
       // (Baked into game space, `transformData` turned its winding round with its x: turned back, the
-      // builders' winding (`pushTri`), the file's front faces still in front for `GAME_FRONT_FACE`.)
-      const own = copyData(data);
+      // builders' winding (`pushTri`), the file's front faces still in front for `GAME_FRONT_FACE`.
+      // Only the triangles are copied: this build's vertices are its own already, and nothing
+      // changes them now; its mirrors and glows read its triangles as they were.)
+      const own = { ...data, indices: data.indices.slice() };
       flipFaces(own.indices);
       kept.set(material, [...(kept.get(material) ?? []), own]);
     });
@@ -1054,7 +1141,6 @@ function buildFromFile(app: pc.AppBase, name: string, entry: ModelEntry, file: L
     }
     const merged = [...kept].map(([material, list]): ModelMesh => ({ name: meshName, mesh: upload(mergeData(list)), material }));
     const restyled = groups.build(meshName);
-    made.push(...restyled.meshes.map((m) => m.mesh));
     // A part grown from nothing lies flat where it hides at rest: leaf flutter would lift it into view (nature).
     if (pieces.some((p) => p.part === part && p.full)) for (const mesh of restyled.meshes) mesh.windStill = true;
     meshes.push(...merged, ...restyled.meshes);

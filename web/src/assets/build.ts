@@ -15,8 +15,6 @@
  * they stay cached across releases in the workers' own caches.
  */
 
-/** This build's id; 'dev' outside Vite (tools/worlds/sample.ts runs the loaders in Node). */
-export const BUILD_ID = typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : 'dev';
 /** None outside Vite. */
 const QUERY = typeof __BUILD_ID__ === 'string' ? `v=${__BUILD_ID__}` : '';
 /** A content hash's query: what `vite.config.ts` (`dataHashes`) writes, and the service worker keeps across builds. */

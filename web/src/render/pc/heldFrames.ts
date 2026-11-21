@@ -19,12 +19,14 @@
  * or the game paused, no build running) and the preset allows; a frame something waits for
  * (`draw(true)`: `framesRendered`) is always drawn. Wind, the clouds' drift and the selection
  * marker's bob stand still while a frame is held (the renderer's clock for them stops, so they go on
- * from there). Per frame: no allocations.
+ * from there). But for what moves on its own in view (`motionMs`: the water flowing), a held view is drawn
+ * again every so often, and its clock goes on meanwhile. Per frame: no allocations.
  */
 
 import * as pc from './engine';
 import { onModelFileArrived } from './models';
 import { fogFrom } from './shaders/fog';
+import { frameNow } from '../shared/frameClock';
 
 /** Frames still drawn after a change before the view is held. */
 const SETTLE = 3;
@@ -38,6 +40,12 @@ export class HeldFrames {
   holding = false;
   /** After a change, frames are drawn for at least this long (ms) as well as `SETTLE` frames. */
   settleMs = 0;
+  /**
+   * Something in view moves on its own (the water): a view that would be held is drawn every this many ms (0: held
+   * as ever), and it isn't `holding` between (the clocks of what moves go on).
+   */
+  motionMs = 0;
+  private drawnAt = -Infinity;
   private left = SETTLE;
   private changedAt = -Infinity;
   private readonly last = new Float64Array(SAMPLES);
@@ -67,7 +75,7 @@ export class HeldFrames {
   /** Something in the view changed that `draw` can't see: the next frames are drawn. */
   changed(): void {
     this.left = SETTLE;
-    if (this.settleMs > 0) this.changedAt = performance.now();
+    if (this.settleMs > 0) this.changedAt = frameNow();
   }
 
   /**
@@ -76,9 +84,10 @@ export class HeldFrames {
    */
   draw(wanted = false): boolean {
     this.holding = false;
+    const now = frameNow();
     if (!this.enabled || !this.active) {
       this.left = SETTLE;
-      return true;
+      return this.drawn(now);
     }
     this.sample(this.now);
     if (!same(this.now, this.last)) {
@@ -87,12 +96,19 @@ export class HeldFrames {
     }
     if (this.left > 0) {
       this.left--;
-      return true;
+      return this.drawn(now);
     }
-    if (this.settleMs > 0 && performance.now() - this.changedAt < this.settleMs) return true;
-    if (wanted) return true;
+    if (this.settleMs > 0 && now - this.changedAt < this.settleMs) return this.drawn(now);
+    if (wanted) return this.drawn(now);
+    // (A frame or two of slack: at 60 Hz, every other frame for 30 a second.)
+    if (this.motionMs > 0) return now - this.drawnAt >= this.motionMs - 2 ? this.drawn(now) : false;
     this.holding = true;
     return false;
+  }
+
+  private drawn(now: number): true {
+    this.drawnAt = now;
+    return true;
   }
 
   /** The numbers whose change changes the view (see the file's header). */

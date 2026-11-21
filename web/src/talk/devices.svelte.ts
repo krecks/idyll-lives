@@ -1,8 +1,11 @@
 /**
  * The device test: whether the language model and the voices run fast enough and right on this
- * computer. Both run only on the GPU (WebGPU): the model as its 4-bit build (on the CPU it took
- * 5–7 s a line), the voices with Supertonic 3. They work in their own workers; the GPU also draws
- * the game, so the test watches the frames too. Without WebGPU nothing runs.
+ * computer. The model runs on the graphics card (WebGPU) or the processor (WASM), where the
+ * setting says (`llmDevice`: Auto takes the card, and the processor if the card is missing or the
+ * test finds it wanting); its 4-bit build is fast on the card and slow on the processor (2026-11-19,
+ * an M3 Pro: 2.4 tokens a second, 8–16 s a line, against 160 on the card). The voices run on their
+ * own device (Supertonic 3, `voice/service.svelte.ts`). They work in their own workers; the GPU also
+ * draws the game, so the test watches the frames too.
  *
  * It writes five lines (greedy, within the writer's limits and time, 1 to 5 sentences) and
  * speaks them a piece at a time as a game does, measuring load time, prompt and writing speed,
@@ -13,12 +16,13 @@
  * residents say hand-written lines; if even speech alone is too slow, voices are switched off
  * too (`applyReport`).
  *
- * Results are kept per model version, voice model and GPU (an M3 Pro, 2026-10-12: 0.5 s from
- * asking for a line to hearing it, speech made in a tenth of its length).
+ * Results are kept per model version, voice model, GPU and the device the model ran on (an M3 Pro
+ * on its GPU, 2026-10-12: 0.5 s from asking for a line to hearing it, speech made in a tenth of its
+ * length).
  */
 
 import { ensureLlm, generateText, MODEL, unloadLlm } from '../llm';
-import { hasWebGpu } from '../ml/ort';
+import { hasWebGpu, type OrtDevice } from '../ml/ort';
 import { whenModelsMayStart } from '../ml/schedule.svelte';
 import { settings } from '../settings/settings.svelte';
 import { toast } from '../ui/state.svelte';
@@ -68,6 +72,8 @@ export interface TestResult {
 export interface DeviceReport {
   model: string;
   gpu: string;
+  /** Where the model ran. */
+  device: OrtDevice;
   date: string;
   /** Frame times with nothing running, ms. */
   idleP50: number;
@@ -79,8 +85,9 @@ export interface DeviceReport {
   voicesOk: boolean;
 }
 
-/** Version 4: results are kept per language model, voice model and GPU; older results are dropped. */
-const KEY = 'littlelives.deviceTests.4';
+/** Version 5: results are kept per language model, voice model, GPU and device; version 4's were all on the GPU, older ones are dropped. */
+const KEY = 'littlelives.deviceTests.5';
+const GPU_ONLY_KEY = 'littlelives.deviceTests.4';
 const OLD_KEYS = ['littlelives.deviceTests', 'littlelives.deviceTests.2', 'littlelives.deviceTests.3'];
 /** A line must be written and spoken within this (the director gives a written line `MAX_WAIT_LLM_MS` in all). */
 const LINE_MS = WRITE_MS;
@@ -89,6 +96,18 @@ const SPEECH_MS = 3000;
 /** A line's speech must be made faster than it plays, so its next piece is ready in time. */
 const MAX_RTF = 1;
 const VOICE: VoiceParams = { style: 'M1', pitch: 1, depth: 1, speed: 1 };
+/**
+ * Said in place of a line that didn't pass (as the game says a hand-written one), one for each
+ * length asked (1 to 5 sentences), so speech is still timed on a line of the length asked: a word
+ * or two would make it look slower than it is (a clip's fixed cost over a short length).
+ */
+const STAND_INS = [
+  "I'm so hungry, I could eat a whole pizza by myself.",
+  'What a lovely garden. I should water the roses before it gets dark.',
+  "Dinner smells great tonight. I think I'll add a little more garlic. Tom will love it.",
+  'Long day at work. I just want to sit down for a minute. Maybe read a book. Then bed, I think.',
+  'Morning already? I barely slept. The coffee had better be strong. I have a meeting at nine. Wish me luck.',
+];
 
 export const deviceTest = $state({
   running: false,
@@ -99,20 +118,36 @@ export const deviceTest = $state({
   stopping: false,
   /** The GPU's name ('none' without one; '' until known: results are kept per GPU). */
   gpu: '',
-  /** Results by model version, voice model and GPU (`reportKey`). */
+  /** Results by model version, voice model, GPU and device (`reportKey`). */
   reports: readReports(),
   /** Stopped this session: not started again on its own. */
   stopped: false,
 });
 
-/** Where the result for this computer is kept: per model version, voice model and GPU. */
-export function reportKey(): string {
-  return `${MODEL.version}|${VOICE_MODEL_ID}|${deviceTest.gpu}`;
+/** Where the result for this computer on `device` is kept: per model version, voice model, GPU and device. */
+export function reportKey(device: OrtDevice): string {
+  return `${MODEL.version}|${VOICE_MODEL_ID}|${deviceTest.gpu}|${device}`;
 }
 
-/** The result on this computer, if it was tested. */
+/** The result on this computer with the model on `device`, if it was tested. */
+export function reportFor(device: OrtDevice): DeviceReport | null {
+  return deviceTest.reports[reportKey(device)] ?? null;
+}
+
+/**
+ * Where the model runs under the setting: the player's choice, or Auto's: the graphics card unless
+ * there is none with WebGPU or the test found it wanting, then the processor.
+ */
+export function llmDevice(): OrtDevice {
+  const mode = settings.llmDevice;
+  if (mode !== 'auto') return mode;
+  const gpu = reportFor('gpu');
+  return deviceTest.gpu === 'none' || (gpu !== null && !gpu.usable) ? 'cpu' : 'gpu';
+}
+
+/** The result on this computer where the model runs (`llmDevice`), if it was tested. */
 export function report(): DeviceReport | null {
-  return deviceTest.reports[reportKey()] ?? null;
+  return reportFor(llmDevice());
 }
 
 /** Whether the test found the model usable here. */
@@ -127,7 +162,9 @@ export function usableHere(): boolean {
  * Says so (appended to the reason, or ''); the test still runs (a later Firefox may be faster).
  * Not measured elsewhere: on other systems the computer may be the slow part.
  */
-export function browserHint(x: TestResult): string {
+export function browserHint(r: DeviceReport): string {
+  const x = r.result;
+  if (r.device !== 'gpu') return '';
   const firefoxOnMac = /\bFirefox\//.test(navigator.userAgent) && /\bMacintosh\b/.test(navigator.userAgent);
   return x.ran && x.ok && firefoxOnMac ? " Firefox's WebGPU is the slow part: Chrome, Edge or Safari run it in under a second a line." : '';
 }
@@ -135,6 +172,14 @@ export function browserHint(x: TestResult): string {
 function readReports(): Record<string, DeviceReport> {
   try {
     for (const key of OLD_KEYS) localStorage.removeItem(key);
+    const gpuOnly = localStorage.getItem(GPU_ONLY_KEY);
+    if (gpuOnly !== null) {
+      localStorage.removeItem(GPU_ONLY_KEY);
+      const old = JSON.parse(gpuOnly) as Record<string, DeviceReport>;
+      if (old && typeof old === 'object' && localStorage.getItem(KEY) === null) {
+        localStorage.setItem(KEY, JSON.stringify(Object.fromEntries(Object.entries(old).map(([k, r]) => [`${k}|gpu`, { ...r, device: 'gpu' }]))));
+      }
+    }
     const r = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, DeviceReport>;
     return r && typeof r === 'object' ? r : {};
   } catch {
@@ -205,8 +250,8 @@ async function watchFrames<T>(work: () => Promise<T>): Promise<{ value: T; frame
   }
 }
 
-/** Runs the test; null if it was stopped (`stopDeviceTest`). */
-export async function runDeviceTest(text: TalkText): Promise<DeviceReport | null> {
+/** Runs the test with the model on `device` (where it runs now if not given); null if it was stopped (`stopDeviceTest`). */
+export async function runDeviceTest(text: TalkText, device: OrtDevice = llmDevice()): Promise<DeviceReport | null> {
   if (deviceTest.running) throw new Error('the device test is already running');
   deviceTest.running = true;
   deviceTest.stopping = false;
@@ -232,7 +277,7 @@ export async function runDeviceTest(text: TalkText): Promise<DeviceReport | null
       deviceTest.progress = Math.min(1, stepsDone / steps);
     };
     const r: TestResult = { ran: false, loadMs: 0, prefillMs: 0, prefillCachedMs: 0, tokPerS: 0, writeMs: 0, speechMs: 0, lineMs: 0, speechRtf: 0, sentences: 0, cut: 0, frameP50: 0, frameP95: 0, nonFinite: false, clean: 0, written: 0, voiceOk: false, ok: false, lines: [] };
-    if (!(await hasWebGpu())) {
+    if (device === 'gpu' && !(await hasWebGpu())) {
       r.error = 'no WebGPU here';
     } else {
       try {
@@ -240,14 +285,14 @@ export async function runDeviceTest(text: TalkText): Promise<DeviceReport | null
         deviceTest.step = 'Starting the model';
         unloadLlm();
         const t0 = performance.now();
-        await ensureLlm();
+        await ensureLlm(device);
         r.loadMs = performance.now() - t0;
         // Warm-up: the first run of a session sets up its kernels.
         await generateText([{ role: 'user', content: 'Hi' }], { maxTokens: 2, temperature: 0 });
         await synthesize('Ready.', VOICE);
         check();
         advance(2);
-        deviceTest.step = 'Testing on the GPU';
+        deviceTest.step = device === 'gpu' ? 'Testing on the graphics card' : 'Testing on the processor';
         const prefill: number[] = [];
         const speed: number[] = [];
         const write: number[] = [];
@@ -277,7 +322,7 @@ export async function runDeviceTest(text: TalkText): Promise<DeviceReport | null
             // Spoken a piece at a time, as the voice director does: the first piece is heard once it's made.
             const s0 = performance.now();
             let samples = 0;
-            for (const [k, piece] of speechPieces(line ?? 'Hello there.').entries()) {
+            for (const [k, piece] of speechPieces(line ?? STAND_INS[Math.min(i, STAND_INS.length - 1)]).entries()) {
               const clip = await synthesize(piece, VOICE);
               if (k === 0) {
                 speech.push(performance.now() - s0);
@@ -308,6 +353,7 @@ export async function runDeviceTest(text: TalkText): Promise<DeviceReport | null
         return save({
           model: MODEL.version,
           gpu: deviceTest.gpu,
+          device,
           date: new Date().toISOString(),
           idleP50: median(idle),
           idleP95: percentile(idle, 0.95),
@@ -320,7 +366,7 @@ export async function runDeviceTest(text: TalkText): Promise<DeviceReport | null
         r.error = String(err instanceof Error ? err.message : err);
       }
     }
-    return save({ model: MODEL.version, gpu: deviceTest.gpu, date: new Date().toISOString(), idleP50: median(idle), idleP95: percentile(idle, 0.95), result: r, usable: false, voicesOk: false });
+    return save({ model: MODEL.version, gpu: deviceTest.gpu, device, date: new Date().toISOString(), idleP50: median(idle), idleP95: percentile(idle, 0.95), result: r, usable: false, voicesOk: false });
   } catch (err) {
     if (!(err instanceof Stopped)) throw err;
     deviceTest.stopped = true;
@@ -337,7 +383,7 @@ export async function runDeviceTest(text: TalkText): Promise<DeviceReport | null
 
 /** Keeps a report for this computer. */
 function save(r: DeviceReport): DeviceReport {
-  deviceTest.reports = { ...deviceTest.reports, [reportKey()]: r };
+  deviceTest.reports = { ...deviceTest.reports, [reportKey(r.device)]: r };
   try {
     localStorage.setItem(KEY, JSON.stringify(deviceTest.reports));
   } catch {
@@ -359,11 +405,12 @@ export function applyReport(r: DeviceReport): void {
   }
   if (!r.usable && settings.voiceWriter === 'llm') {
     settings.voiceWriter = 'lines';
-    const hint = browserHint(r.result);
+    const hint = browserHint(r);
+    const where = r.device === 'gpu' ? 'on the graphics card' : 'on the processor';
     toast(
-      r.result.ran
-        ? `${MODEL.label} doesn't run well enough here: residents say hand-written lines.${hint}`
-        : `${MODEL.label} needs a graphics card that supports WebGPU: residents say hand-written lines.`,
+      r.result.ran || r.device === 'cpu'
+        ? `${MODEL.label} doesn't run well enough ${where} here: residents say hand-written lines.${hint}`
+        : `${MODEL.label} on the graphics card needs WebGPU: residents say hand-written lines.`,
       hint ? 9000 : 7000,
     );
   }

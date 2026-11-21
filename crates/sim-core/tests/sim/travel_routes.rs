@@ -1,4 +1,4 @@
-//! Long walks in an open world go by road (`travel.rs`): a trip between two hamlets follows the
+//! Long walks in an open world go by road (`travel/`): a trip between two hamlets follows the
 //! country road, and its legs to and from the road keep out of other people's gardens.
 
 use crate::common;
@@ -154,6 +154,7 @@ fn short_trips_are_found_over_the_tiles_as_before() {
         blocked: w.blocked(),
         stairs: w.stair_map(),
         kept_off: &[],
+        steps: None,
     };
     // The same as A* would give (the way they set off may have been cut short by a step).
     let path = nav.find_path(tile, goal).expect("a way");

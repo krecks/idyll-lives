@@ -28,7 +28,7 @@ use super::{V3, repo_root, v3};
 /// columns rather than 4 (`hair::LOCK`), so the
 /// densest (`hair.layered`) comes to 7.3k and the rest to 2.1k-5.6k. It was 3k, which left the cap
 /// and the curtains' locks at 40 columns and 8-16 rows: plates, with a polyline for a hem (see
-/// `hair.rs`). At 5.2k the curtains still read as ribbons of six or nine, the width of a thumb at
+/// `hair/`). At 5.2k the curtains still read as ribbons of six or nine, the width of a thumb at
 /// arm's length; ten locks over four rows is the first count whose silhouette is a curve rather
 /// than a few straight edges. `layered` is the tallest of them, three flared tiers under a cap, so
 /// it sets the ceiling.

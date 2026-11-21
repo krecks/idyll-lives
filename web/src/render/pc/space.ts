@@ -29,3 +29,18 @@ export function toGame(v: pc.Vec3, out: { x: number; y: number; z: number }): { 
   out.z = -v.z;
   return out;
 }
+
+/**
+ * The datum: on a land the town follows, the viewed lot's pad (m, game space). The world root is
+ * lowered by it and the viewed lot's layers (`lotRoot`, under the root: its house, its things, its
+ * fences and paths, the tools' previews) raised by it, so the viewed lot stays at the engine's y = 0
+ * (picking's planes, the shaders' heights and the lot's camera need no change) and the rest of the
+ * world stands where it is, `datum` m lower. Engine heights are game heights less the datum; what the
+ * renderer hands out (`heightAt`, `simHead`, the camera's target) is in the engine's. 0: as ever.
+ */
+export function setDatum(root: pc.Entity, lotRoot: pc.Entity, datum: number): void {
+  const p = root.getLocalPosition();
+  root.setLocalPosition(p.x, -datum, p.z);
+  const q = lotRoot.getLocalPosition();
+  lotRoot.setLocalPosition(q.x, datum, q.z);
+}

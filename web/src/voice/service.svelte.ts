@@ -9,6 +9,7 @@ import { untrack } from 'svelte';
 import { hasWebGpu } from '../ml/ort';
 import { inferenceSlot, settle, whenModelsMayStart } from '../ml/schedule.svelte';
 import { settings } from '../settings/settings.svelte';
+import { LOW_MEMORY } from '../settings/lowMemory';
 import { SAMPLE_RATE, type FromVoiceWorker, type ToVoiceWorker, type VoiceDevice } from './protocol';
 import type { LineTiming } from './supertonic';
 import { parseVisemes, type VisemeTrack } from './visemes';
@@ -65,7 +66,7 @@ export interface VoiceThreadStats {
 // Before `voiceStatus`, which reads stored results with them.
 const BENCH_KEY = 'littlelives.voiceBench';
 /** The model, its voices and the runtime: a new id discards old speed-test results and cached clips. */
-export const MODEL_ID = 'supertonic-3@3cadd1e+fp16w+6steps/ort-web@1.31.1';
+export const MODEL_ID = 'supertonic-3@3cadd1e+nb8w+6steps/ort-web@1.31.1';
 
 export const voiceStatus = $state({
   state: 'off' as ModelState,
@@ -78,8 +79,12 @@ export const voiceStatus = $state({
   bench: readBench(),
 });
 
-/** The download, MB: the runtime's WebGPU build, our WASM and dictionary (about 30.2 MB), the model (87.1 MB: 8-bit weights, gzipped) and its voices and text files (3.2 MB). */
-export const DOWNLOAD_MB = 120.6;
+/**
+ * The download, MB: the runtime's WebGPU build, our WASM and dictionary (about 30.2 MB), the
+ * model (99.3 MB: 8-bit weights, the matrix ones with a scale per block of 32, gzipped) and its
+ * voices and text files (3.2 MB).
+ */
+export const DOWNLOAD_MB = 132.8;
 const BENCH_LINES = [
   'Hello there!',
   "I'm so hungry, I could eat a whole pizza by myself.",
@@ -469,8 +474,9 @@ $effect.root(() => {
       if (paused) return;
       if (mode !== 'auto') {
         manual = true;
-        // (Joins an engine already on that device.)
-        autoStart(mode);
+        // (Joins an engine already on that device.) Low on memory, one not yet started starts when a
+        // line wants it (`wantVoice`).
+        if (!LOW_MEMORY || voiceStatus.state !== 'off') autoStart(mode);
         return;
       }
       const wasManual = manual;
@@ -480,11 +486,22 @@ $effect.root(() => {
       // isn't picked again.
       if (wasManual || voiceStatus.state === 'off' || voiceStatus.state === 'error') {
         wantedDevice = null;
-        autoStart();
+        // (Low on memory, one not yet started starts when a line wants it: `wantVoice`.)
+        if (!LOW_MEMORY || voiceStatus.state !== 'off') autoStart();
       }
     });
   });
 });
+
+/**
+ * A line wants saying (the game's residents) and the engine isn't up: on a machine low on memory,
+ * where it doesn't load as the page boots, it starts now (once models may start), and the lines
+ * after this one are said once it's ready. Elsewhere it's already loading, or off for a reason.
+ */
+export function wantVoice(): void {
+  if (!LOW_MEMORY || !settings.voices || held || voiceStatus.state === 'loading' || voiceStatus.state === 'ready') return;
+  autoStart(settings.voiceDevice === 'auto' ? undefined : settings.voiceDevice);
+}
 
 /**
  * Auto's slow-machine step: stop the graphics-card engine and start the processor one. The caller

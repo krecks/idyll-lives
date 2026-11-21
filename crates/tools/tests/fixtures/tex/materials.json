@@ -10,7 +10,8 @@
     "normal": "normal.jpg",
     "arm": "arm.jpg",
     "uvScale": 0.5,
-    "normalStrength": 0.7
+    "normalStrength": 0.7,
+    "metallic": 0
   },
   "material.floor": {
     "type": "material",
@@ -18,7 +19,8 @@
     "texture": "textures/floor_laminate/albedo.jpg",
     "normal": "normal.jpg",
     "arm": "arm.jpg",
-    "uvScale": 0.55
+    "uvScale": 0.55,
+    "metallic": 0
   },
   "material.ground": {
     "type": "material",
@@ -29,6 +31,7 @@
     "uvScale": 0.5,
     "normalStrength": 0.8,
     "projection": "xz",
+    "metallic": 0,
     "sideColor": "#C9B391"
   },
   "material.road": {
@@ -38,7 +41,8 @@
     "normal": "normal.jpg",
     "arm": "arm.jpg",
     "uvScale": 0.2,
-    "projection": "xz"
+    "projection": "xz",
+    "metallic": 0
   },
   "material.path": {
     "type": "material",
@@ -47,7 +51,8 @@
     "normal": "normal.jpg",
     "arm": "arm.jpg",
     "uvScale": 0.7,
-    "projection": "xz"
+    "projection": "xz",
+    "metallic": 0
   },
   "material.soil": {
     "type": "material",
@@ -57,7 +62,8 @@
     "arm": "arm.jpg",
     "uvScale": 0.5,
     "projection": "xz",
-    "roughness": 1
+    "roughness": 1,
+    "metallic": 0
   },
   "material.furrow": {
     "type": "material",
@@ -67,7 +73,8 @@
     "arm": "arm.jpg",
     "uvScale": 0.5,
     "projection": "xz",
-    "roughness": 1
+    "roughness": 1,
+    "metallic": 0
   },
   "material.finish.matte": {
     "type": "material",
@@ -96,6 +103,38 @@
     "roughness": 0.1,
     "metallic": 1
   },
+  "material.finish.enamel": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "roughness": 0.18
+  },
+  "material.finish.ceramic": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "roughness": 0.1
+  },
+  "material.finish.plastic": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "roughness": 0.4
+  },
+  "material.finish.rubber": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "roughness": 0.9
+  },
+  "material.finish.brushed": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "roughness": 0.4,
+    "metallic": 1
+  },
+  "material.finish.iron": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "roughness": 0.65,
+    "metallic": 1
+  },
   "material.finish.fabric": {
     "type": "material",
     "color": "#FFFFFF",
@@ -104,7 +143,21 @@
     "arm": "arm.jpg",
     "uvScale": 2.5,
     "roughness": 1,
-    "metallic": 0
+    "metallic": 0,
+    "sheenColor": "#595959",
+    "sheenRoughness": 0.5
+  },
+  "material.finish.velvet": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/fabric_linen/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 2.5,
+    "roughness": 1,
+    "metallic": 0,
+    "sheenColor": "#A6A6A6",
+    "sheenRoughness": 0.55
   },
   "material.finish.leather": {
     "type": "material",
@@ -125,6 +178,18 @@
     "uvScale": 1.2,
     "roughness": 0.8,
     "metallic": 0
+  },
+  "material.finish.lacquer": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/wood_oak/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 1.2,
+    "roughness": 0.8,
+    "metallic": 0,
+    "clearcoat": 1,
+    "clearcoatRoughness": 0.1
   },
   "material.finish.bark": {
     "type": "material",
@@ -173,6 +238,7 @@
     "arm": "arm.jpg",
     "uvScale": 0.4,
     "roughness": 1,
+    "metallic": 0,
     "normalStrength": 1
   },
   "material.wall.brick": {
@@ -183,6 +249,7 @@
     "arm": "arm.jpg",
     "uvScale": 1.0,
     "roughness": 1,
+    "metallic": 0,
     "normalStrength": 1
   },
   "material.roof": {
@@ -193,6 +260,7 @@
     "arm": "arm.jpg",
     "uvScale": 0.667,
     "roughness": 1,
+    "metallic": 0,
     "normalStrength": 1
   },
   "material.wall.stone": {
@@ -203,6 +271,7 @@
     "arm": "arm.jpg",
     "uvScale": 0.667,
     "roughness": 1,
+    "metallic": 0,
     "normalStrength": 1
   },
   "material.floor.wood": {
@@ -213,6 +282,7 @@
     "arm": "arm.jpg",
     "uvScale": 0.53,
     "roughness": 1,
+    "metallic": 0,
     "normalStrength": 0.8
   },
   "material.floor.tile": {
@@ -223,6 +293,7 @@
     "arm": "arm.jpg",
     "uvScale": 0.5,
     "roughness": 0.7,
+    "metallic": 0,
     "normalStrength": 1
   },
   "material.floor.carpet": {
@@ -233,6 +304,7 @@
     "arm": "arm.jpg",
     "uvScale": 1.0,
     "roughness": 1,
+    "metallic": 0,
     "normalStrength": 0.8
   },
   "material.wall.interior": {
@@ -243,6 +315,7 @@
     "arm": "arm.jpg",
     "uvScale": 0.5,
     "roughness": 1,
+    "metallic": 0,
     "normalStrength": 0.5
   },
   "material.trim": {
@@ -253,6 +326,7 @@
     "arm": "arm.jpg",
     "uvScale": 1.0,
     "roughness": 1,
+    "metallic": 0,
     "normalStrength": 0.6
   },
   "material.finish.hair": {

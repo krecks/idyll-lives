@@ -1,6 +1,6 @@
 /**
  * The town view's buildings (`townView.ts`): every
- * backdrop building and every far lot's house as copies of a few unit meshes (a box of walls, and a
+ * far lot's house and building as copies of a few unit meshes (a box of walls, and a
  * gable, hip, flat or mansard roof), one instanced draw each, in one material (`GAME_TOWN_BUILDING`).
  *
  * Each copy carries its look beside its matrix (`TOWN_WALL`, `TOWN_ROOF`, `TOWN_INFO`):
@@ -86,8 +86,9 @@ function code(lang: Language): ShaderFeature['glsl'] {
 
   // The colour picked and toned (the vertex colour linear already: PlayCanvas converts it), and the
   // face's own metres: along it (x or z by its normal) and up from the floor.
+  // (Not in the shadow pass, which has no vertex colour: the menus' town casts shadows, `TownBuildings`' `castShadows`.)
   const vsEnd = `
-#ifdef GAME_TOWN_BUILDING
+#if defined(GAME_TOWN_BUILDING) && !defined(SHADOW_PASS)
 	{
 		${let_('tvc', v4)} = ${out('vVertexColor')};
 		${let_('tWall', v3)} = pow(max(game_townWall.rgb, ${v3}(0.0)), ${v3}(2.2));

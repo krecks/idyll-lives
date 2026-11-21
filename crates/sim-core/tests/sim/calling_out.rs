@@ -1,4 +1,4 @@
-//! Calling out with the shipped content (`conversation.rs`): a lonely resident calls a housemate
+//! Calling out with the shipped content (`conversation/`): a lonely resident calls a housemate
 //! a few metres off by name, the housemate turns to them, and the two meet halfway to talk.
 
 use crate::common;

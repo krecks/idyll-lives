@@ -1,0 +1,639 @@
+{
+  "$comment": "Fittings for the town's named places (the town hall, the school, the hotel, the fire station and the rest: houses.json `parks` of kind `place`), in the `community` buy category. Their models are built in crates/art/outside/src/civic (pack assets/packs/civic). Desks and counters with `staff` have someone behind them in their hours.",
+  "objects": [
+    {
+      "id": "receptionDesk",
+      "name": "Reception desk",
+      "model": "model.receptionDesk",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 900,
+      "category": "community",
+      "group": "shops",
+      "decor": 0.3,
+      "description": "A front desk with a bell, a computer and a rack of leaflets. Someone sits behind it in office hours.",
+      "staff": {
+        "at": [
+          0,
+          -0.85
+        ],
+        "hours": [
+          8,
+          18
+        ],
+        "uniform": "office"
+      },
+      "interactions": [
+        {
+          "id": "enquire",
+          "label": "Ask at the desk",
+          "selfServe": {
+            "label": "Read the leaflets",
+            "anim": "read"
+          },
+          "anim": "buy",
+          "minutes": 6,
+          "effects": {
+            "fun": 0.05,
+            "social": 0.05
+          },
+          "tags": [
+            "social"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hotelReception",
+      "name": "Hotel reception",
+      "model": "model.hotelReception",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 900,
+      "category": "community",
+      "group": "shops",
+      "decor": 0.3,
+      "description": "A polished desk with a bell, a guest book and the room keys on hooks behind it.",
+      "staff": {
+        "at": [
+          0,
+          -0.85
+        ],
+        "hours": [
+          7,
+          23
+        ],
+        "uniform": "suit"
+      },
+      "interactions": [
+        {
+          "id": "enquire",
+          "label": "Ask at the desk",
+          "selfServe": {
+            "label": "Read the leaflets",
+            "anim": "read"
+          },
+          "anim": "buy",
+          "minutes": 6,
+          "effects": {
+            "fun": 0.05,
+            "social": 0.05
+          },
+          "tags": [
+            "social"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dutyDesk",
+      "name": "Duty desk",
+      "model": "model.dutyDesk",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 900,
+      "category": "community",
+      "group": "shops",
+      "decor": 0.3,
+      "description": "A counter with a hatch and a log book, where the officer on duty takes enquiries.",
+      "staff": {
+        "at": [
+          0,
+          -0.85
+        ],
+        "hours": [
+          6,
+          22
+        ],
+        "uniform": "service"
+      },
+      "interactions": [
+        {
+          "id": "enquire",
+          "label": "Ask at the desk",
+          "selfServe": {
+            "label": "Read the leaflets",
+            "anim": "read"
+          },
+          "anim": "buy",
+          "minutes": 6,
+          "effects": {
+            "fun": 0.05,
+            "social": 0.05
+          },
+          "tags": [
+            "social"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tellerCounter",
+      "name": "Teller counter",
+      "model": "model.tellerCounter",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 1200,
+      "category": "community",
+      "group": "shops",
+      "decor": 0.3,
+      "description": "A counter behind glass where the teller counts out notes from 9:00 to 17:00.",
+      "staff": {
+        "at": [
+          0,
+          -0.85
+        ],
+        "hours": [
+          9,
+          17
+        ],
+        "uniform": "suit"
+      },
+      "interactions": [
+        {
+          "id": "teller",
+          "label": "See the teller",
+          "selfServe": {
+            "label": "Fill in a paying-in slip",
+            "anim": "write"
+          },
+          "anim": "buy",
+          "minutes": 6,
+          "effects": {
+            "comfort": 0.02
+          },
+          "tags": [
+            "errand"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "teacherDesk",
+      "name": "Teacher's desk",
+      "model": "model.teacherDesk",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 500,
+      "category": "community",
+      "group": "shops",
+      "decor": 0.2,
+      "description": "A desk at the front of the classroom, the register on it. The teacher stands behind it in school hours.",
+      "staff": {
+        "at": [
+          0,
+          -0.85
+        ],
+        "hours": [
+          8,
+          16
+        ],
+        "uniform": "teacher"
+      },
+      "interactions": []
+    },
+    {
+      "id": "lectern",
+      "name": "Lectern",
+      "model": "model.lectern",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 300,
+      "category": "community",
+      "group": "shops",
+      "decor": 0.4,
+      "description": "A carved wooden stand for the big book, at the front of the church.",
+      "staff": {
+        "at": [
+          0,
+          -0.85
+        ],
+        "hours": [
+          9,
+          18
+        ],
+        "uniform": "clergy"
+      },
+      "interactions": []
+    },
+    {
+      "id": "barCounter",
+      "name": "Bar counter",
+      "model": "model.barCounter",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 1400,
+      "category": "community",
+      "group": "food",
+      "slots": 2,
+      "decor": 0.4,
+      "description": "A long bar with pumps and a brass rail. Grown-ups only; the landlord pulls a pint from noon till late.",
+      "staff": {
+        "at": [
+          0,
+          -0.85
+        ],
+        "hours": [
+          12,
+          23
+        ],
+        "uniform": "bar"
+      },
+      "interactions": [
+        {
+          "id": "drink",
+          "label": "Have a drink at the bar",
+          "selfServe": {
+            "label": "Pour a drink",
+            "anim": "drink"
+          },
+          "anim": "buy",
+          "sound": "till",
+          "minutes": 30,
+          "stages": [
+            "youngAdult",
+            "adult",
+            "elder"
+          ],
+          "effects": {
+            "fun": 0.25,
+            "comfort": 0.15
+          },
+          "tags": [
+            "food",
+            "lounge"
+          ],
+          "cost": 6
+        }
+      ]
+    },
+    {
+      "id": "schoolDesk",
+      "name": "School desk",
+      "model": "model.schoolDesk",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 150,
+      "category": "community",
+      "group": "shops",
+      "description": "A small desk with a lid and an inkwell, for a pupil.",
+      "interactions": [
+        {
+          "id": "study",
+          "label": "Study at the desk",
+          "anim": "write",
+          "minutes": 45,
+          "pose": "sit",
+          "homework": 7,
+          "stages": [
+            "child",
+            "teen"
+          ],
+          "effects": {
+            "fun": -0.05
+          },
+          "tags": [
+            "study"
+          ],
+          "skills": {
+            "intelligence": 0.12,
+            "writing": 0.04
+          }
+        }
+      ]
+    },
+    {
+      "id": "pew",
+      "name": "Pew",
+      "model": "model.pew",
+      "footprint": [
+        3,
+        1
+      ],
+      "price": 600,
+      "category": "community",
+      "group": "shops",
+      "slots": 3,
+      "decor": 0.3,
+      "seat": {
+        "height": 0.45,
+        "forward": 0
+      },
+      "description": "A long wooden pew, worn smooth by a century of Sundays.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit in the pew",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.3
+          },
+          "tags": [
+            "lounge"
+          ]
+        },
+        {
+          "id": "reflect",
+          "label": "Sit and reflect",
+          "anim": "meditate",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.3,
+            "fun": 0.1
+          },
+          "tags": [
+            "rest"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "waitingBench",
+      "name": "Waiting-room bench",
+      "model": "model.waitingBench",
+      "footprint": [
+        3,
+        1
+      ],
+      "price": 450,
+      "category": "community",
+      "group": "shops",
+      "slots": 3,
+      "seat": {
+        "height": 0.45,
+        "forward": 0
+      },
+      "description": "Three joined seats along the wall of a waiting room, a pile of old magazines beside them.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit and wait",
+          "anim": "sit",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.25
+          },
+          "tags": [
+            "lounge"
+          ]
+        },
+        {
+          "id": "magazine",
+          "label": "Read an old magazine",
+          "anim": "read",
+          "minutes": 20,
+          "pose": "sit",
+          "effects": {
+            "fun": 0.1,
+            "comfort": 0.15
+          },
+          "tags": [
+            "reading"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "examCouch",
+      "name": "Examination couch",
+      "model": "model.examCouch",
+      "footprint": [
+        1,
+        2
+      ],
+      "price": 700,
+      "category": "community",
+      "group": "shops",
+      "description": "A padded couch with a paper sheet, in the consulting room.",
+      "seat": { "height": 0.45, "forward": -0.12, "legs": "out" },
+      "interactions": [
+        {
+          "id": "rest",
+          "label": "Lie back",
+          "anim": "relax",
+          "minutes": 15,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.2
+          },
+          "tags": [
+            "rest"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "clothesRack",
+      "name": "Clothes rail",
+      "model": "model.clothesRack",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 400,
+      "category": "community",
+      "group": "shops",
+      "decor": 0.3,
+      "description": "A rail of clothes on hangers, this season's colours at the front.",
+      "interactions": [
+        {
+          "id": "browse",
+          "label": "Browse the clothes",
+          "anim": "look",
+          "minutes": 15,
+          "effects": {
+            "fun": 0.15
+          },
+          "tags": [
+            "entertainment"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "plantTable",
+      "name": "Plant table",
+      "model": "model.plantTable",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 350,
+      "category": "community",
+      "group": "shops",
+      "decor": 0.4,
+      "description": "A slatted table of potted plants and seedlings for sale.",
+      "interactions": [
+        {
+          "id": "browse",
+          "label": "Look at the plants",
+          "anim": "smell",
+          "minutes": 15,
+          "effects": {
+            "fun": 0.1,
+            "environment": 0.1
+          },
+          "tags": [
+            "nature"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "atm",
+      "name": "Cash machine",
+      "model": "model.atm",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 2000,
+      "category": "community",
+      "group": "street",
+      "description": "A cash machine in the wall that tells you your balance, if you dare ask.",
+      "interactions": [
+        {
+          "id": "balance",
+          "label": "Check the balance",
+          "anim": "phoneScreen",
+          "minutes": 3,
+          "effects": {
+            "comfort": 0.01
+          },
+          "tags": [
+            "errand"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wallBars",
+      "name": "Wall bars",
+      "model": "model.wallBars",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 400,
+      "category": "community",
+      "group": "shops",
+      "layer": "wall",
+      "description": "A ladder of wooden bars fixed to the sports hall wall.",
+      "interactions": [
+        {
+          "id": "climb",
+          "label": "Climb the wall bars",
+          "anim": "exercise",
+          "minutes": 30,
+          "effects": {
+            "fun": 0.1,
+            "energy": -0.2,
+            "hygiene": -0.15
+          },
+          "tags": [
+            "training",
+            "fitness"
+          ],
+          "skills": {
+            "strength": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "id": "altar",
+      "name": "Altar",
+      "model": "model.altar",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 1200,
+      "category": "community",
+      "group": "shops",
+      "decor": 1,
+      "description": "A stone altar under a white cloth, two candlesticks on it.",
+      "interactions": []
+    },
+    {
+      "id": "lockerRow",
+      "name": "Lockers",
+      "model": "model.lockerRow",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 500,
+      "category": "community",
+      "group": "shops",
+      "description": "A row of steel lockers with name tags.",
+      "interactions": []
+    },
+    {
+      "id": "mannequin",
+      "name": "Mannequin",
+      "model": "model.mannequin",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 250,
+      "category": "community",
+      "group": "shops",
+      "decor": 0.4,
+      "description": "A shop dummy in this week's outfit.",
+      "interactions": []
+    },
+    {
+      "id": "luggageTrolley",
+      "name": "Luggage trolley",
+      "model": "model.luggageTrolley",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 300,
+      "category": "community",
+      "group": "shops",
+      "decor": 0.2,
+      "description": "A brass trolley for the guests' cases.",
+      "interactions": []
+    },
+    {
+      "id": "vaultDoor",
+      "name": "Vault door",
+      "model": "model.vaultDoor",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 5000,
+      "category": "community",
+      "group": "shops",
+      "layer": "wall",
+      "decor": 0.6,
+      "description": "A round steel door a foot thick, the wheel polished by the manager's hand.",
+      "interactions": []
+    }
+  ]
+}

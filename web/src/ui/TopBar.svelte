@@ -4,7 +4,9 @@
   import { settings, systemMotion } from '../settings/settings.svelte';
   import { MoneyFloats, moneyChange } from './moneyFloats.svelte';
   import { services } from './services';
+  import { play } from './sfx';
   import { game, nextWallMode } from './state.svelte';
+  import { SUPER_SPEED } from '../game/speed';
   import { dayBar } from './town/dayBar';
 
   const speeds = [
@@ -12,8 +14,7 @@
     { value: 1, icon: 'icon.ui.speed1', label: 'Normal speed (1)' },
     { value: 2, icon: 'icon.ui.speed2', label: 'Fast (2)' },
     { value: 3, icon: 'icon.ui.speed3', label: 'Faster (3)' },
-    { value: 4, icon: 'icon.ui.speed4', label: 'Time-lapse (4)' },
-    { value: 5, icon: 'icon.ui.speed5', label: 'Fastest (5)' },
+    { value: SUPER_SPEED, icon: 'icon.ui.speed4', label: 'Super speed (4): up to 30×, and up to 60× while everyone at home sleeps or is out' },
   ];
   const modes = [
     { id: 'live', icon: 'icon.ui.live', label: 'Live', title: 'Live (L): the household and the world, in motion' },
@@ -39,11 +40,15 @@
    */
   const floats = new MoneyFloats(1600, 3);
   const still = $derived(settings.reducedMotion || systemMotion.reduced);
-  $effect(() => floats.note(game.funds, game.mode === 'live' && !game.creative));
+  // (With a coin's sound for money in, a falling one for money out.)
+  $effect(() => {
+    const d = floats.note(game.funds, game.mode === 'live' && !game.creative);
+    if (d) play(d > 0 ? 'moneyIn' : 'moneyOut');
+  });
 
   /** The day from sunrise to sunset, under the clock and the speeds (`town/dayBar.ts`). */
   const day = $derived(dayBar(game.minute));
-  const speedLabel = $derived(game.mode !== 'live' ? 'Paused' : (speeds.find((s) => s.value === game.speed)?.label.replace(/ \(.*\)$/, '') ?? ''));
+  const speedLabel = $derived(game.mode !== 'live' ? 'Paused' : (speeds.find((s) => s.value === game.speed)?.label.replace(/ \(.*$/, '') ?? ''));
   const dayTitle = $derived(
     `${day.day ? 'Day' : 'Night'} · sunrise ${clock(day.sunrise, settings.clock24h)}, sunset ${clock(day.sunset, settings.clock24h)} · ${speedLabel}`,
   );

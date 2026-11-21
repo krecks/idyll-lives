@@ -1,5 +1,5 @@
 {
-  "$comment": "Catalogue 2: Toilets, baths, showers, sinks and bathroom bits. Separate pieces only. Models: assets/manifest.json and the packs it lists (tools/art/blender/families/).",
+  "$comment": "Catalogue 2: Toilets, baths, showers, sinks and bathroom bits. Separate pieces only. Models: assets/manifest.json and the packs it lists (crates/art).",
   "objects": [
     {
       "id": "toiletClassic",
@@ -359,6 +359,172 @@
             "chores",
             "cleaning"
           ]
+        }
+      ]
+    },
+    {
+      "id": "vacuumCleaner",
+      "name": "Upright vacuum cleaner",
+      "model": "model.vacuumCleaner",
+      "held": {
+        "part": "vacuum",
+        "grip": "pole"
+      },
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 180,
+      "category": "bathroom",
+      "group": "cleaning",
+      "description": "A bagless upright that stands in a corner till the floors need it. Vacuums a whole room at once, carpets and all: quicker and better than tidying up by hand.",
+      "interactions": [
+        {
+          "id": "vacuum",
+          "label": "Vacuum the floors",
+          "anim": "clean",
+          "sound": "vacuum",
+          "minutes": 25,
+          "pose": "stand",
+          "autonomous": true,
+          "cleans": {
+            "amount": 0.6
+          },
+          "effects": {
+            "comfort": 0.05,
+            "hygiene": -0.03
+          },
+          "tags": [
+            "chores",
+            "cleaning"
+          ],
+          "skills": {
+            "endurance": 0.04
+          }
+        }
+      ]
+    },
+    {
+      "id": "mopBucket",
+      "name": "Mop and bucket",
+      "model": "model.mopBucket",
+      "held": {
+        "part": "mop",
+        "grip": "pole"
+      },
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 35,
+      "category": "bathroom",
+      "group": "cleaning",
+      "description": "A cotton mop in a bucket with a wringer. Mops the hard floors of a whole room spotless, where cooking and bathing leave their mess: the kitchen, the bathroom, the hall. Not the carpet.",
+      "interactions": [
+        {
+          "id": "mop",
+          "label": "Mop the floors",
+          "anim": "clean",
+          "sound": "mop",
+          "minutes": 30,
+          "pose": "stand",
+          "autonomous": true,
+          "cleans": {
+            "amount": 0.9,
+            "hardFloors": true
+          },
+          "effects": {
+            "comfort": 0.05,
+            "hygiene": -0.05
+          },
+          "tags": [
+            "chores",
+            "cleaning"
+          ],
+          "skills": {
+            "strength": 0.04
+          }
+        }
+      ]
+    },
+    {
+      "id": "broomDustpan",
+      "name": "Broom and dustpan",
+      "model": "model.broomDustpan",
+      "held": {
+        "part": "broom",
+        "grip": "pole"
+      },
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 20,
+      "category": "bathroom",
+      "group": "cleaning",
+      "description": "A soft broom and a dustpan with its brush. A quick sweep round the worst of it, indoors on the hard floors or out on the patio and the path.",
+      "interactions": [
+        {
+          "id": "sweep",
+          "label": "Sweep up",
+          "anim": "clean",
+          "sound": "sweep",
+          "minutes": 12,
+          "pose": "stand",
+          "autonomous": true,
+          "cleans": {
+            "amount": 0.6,
+            "reach": 2,
+            "hardFloors": true,
+            "outdoors": true
+          },
+          "effects": {
+            "comfort": 0.03
+          },
+          "tags": [
+            "chores",
+            "cleaning"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ironingBoard",
+      "name": "Ironing board and iron",
+      "model": "model.ironingBoard",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 85,
+      "category": "bathroom",
+      "group": "laundry",
+      "description": "A folding board with a steam iron on its rest. Ironing the dry washing instead of folding it leaves pressed clothes: whoever dresses in them at home feels crisp and stays fresh longer. Deft hands iron better.",
+      "interactions": [
+        {
+          "id": "iron",
+          "label": "Iron the clothes",
+          "workOn": "dried",
+          "makes": "ironed",
+          "brings": "washingArmful",
+          "anim": "clean",
+          "sound": "iron",
+          "minutes": 30,
+          "pose": "stand",
+          "autonomous": true,
+          "effects": {
+            "comfort": 0.05,
+            "fun": 0.02
+          },
+          "tags": [
+            "chores",
+            "cleaning"
+          ],
+          "skills": {
+            "dexterity": 0.3,
+            "handiness": 0.05
+          },
+          "skill": "dexterity"
         }
       ]
     }

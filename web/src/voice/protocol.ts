@@ -9,8 +9,11 @@ export type VoiceDevice = OrtDevice;
 
 export type ToVoiceWorker =
   /** `base`: the app's base URL, where `voice/` lives. */
-  | { type: 'load'; base: string; language: string; device: VoiceDevice }
-  | { type: 'speak'; id: number; text: string; voice: VoiceParams };
+  /** `measure`: count the model's GPU buffers (the benchmark, `bench.ts`; the game doesn't). */
+  | { type: 'load'; base: string; language: string; device: VoiceDevice; measure?: boolean }
+  | { type: 'speak'; id: number; text: string; voice: VoiceParams }
+  /** The GPU buffers counted (`measure`): answered with `memory`. */
+  | { type: 'memory' };
 
 export type FromVoiceWorker =
   /** Download progress (bytes). */
@@ -22,6 +25,8 @@ export type FromVoiceWorker =
    * A line that failed (`id`), or the engine couldn't load or the worker failed. `restart`: the
    * engine broke while making a line (a WebAssembly trap); a new worker can take over.
    */
-  | { type: 'error'; id?: number; message: string; restart?: boolean };
+  | { type: 'error'; id?: number; message: string; restart?: boolean }
+  /** Bytes in GPU buffers now and at their peak (`measure`; 0 without it). */
+  | { type: 'memory'; gpuLive: number; gpuPeak: number };
 
 export const SAMPLE_RATE = 24_000;

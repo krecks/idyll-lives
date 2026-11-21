@@ -25,6 +25,7 @@
   import type { Wardrobe } from '../../render/types';
   import { careerTrack, jobTitle, savingsOf, topLevelAt, weeklyPay } from '../../game/wealth';
   import { money } from '../format';
+  import { stepLabel } from '../newGame';
   import { kinLabel } from '../relationship';
   import Segmented from '../kit/Segmented.svelte';
   import SimStage from '../kit/SimStage.svelte';
@@ -84,17 +85,17 @@
     .map((value) => ({ value, label: bondLabels[value] }));
 
   /**
-   * Step 3 of a new game by default (the draft in `app`, back to the neighbourhood, on to the
+   * Step 4 of a new game by default (the draft in `app`, back to the town's households, on to the
    * home). In a game, a family moving into the home: the caller says where back and next lead.
    */
   let {
-    eyebrow = 'Step 3 of 4 · Creation',
-    backLabel = 'Neighbourhood',
+    eyebrow = stepLabel(4),
+    backLabel = 'Households',
     nextLabel = 'Choose a home →',
     avoidNames = (app.town?.households ?? []).map((h) => h.household.name),
     draft = app.household,
     work = true,
-    onback = (h: HouseholdDraft) => ((app.household = h), (app.screen = 'neighbourhood')),
+    onback = (h: HouseholdDraft) => ((app.household = h), (app.screen = 'household')),
     onnext = (h: HouseholdDraft) => ((app.household = h), (app.screen = 'home')),
   }: {
     eyebrow?: string;

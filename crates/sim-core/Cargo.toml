@@ -6,6 +6,11 @@ version.workspace = true
 license.workspace = true
 
 [features]
+# Per-phase timing of `World::tick_once` (`src/profile.rs`): `cargo run --release --features profile
+# --example tickbench` and the big-world benchmark say where a tick's time goes. Off, every phase is
+# a call the optimiser removes. Native only: `std`'s clock panics on `wasm32-unknown-unknown`, and the browser build has
+# the worker's own step timings (`web/src/core/sim.worker.ts`) instead.
+profile = []
 # The simulation tests' long runs (two weeks of a town, a century, a day of rearranging...): left out
 # of a pull request's CI, run on a release tag and by hand (tools/ci-local.sh, SLOW_TESTS).
 slow-tests = []

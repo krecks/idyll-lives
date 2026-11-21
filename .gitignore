@@ -3,6 +3,7 @@ node_modules
 /web/dist
 /web/src/core/wasm-pkg
 /web/src/voice/wasm-pkg
+/web/src/audio/wasm-pkg
 /web/public/voice
 /web/public/llm
 .DS_Store
@@ -12,7 +13,9 @@ node_modules
 /dev-logs
 /web/.assets
 __pycache__
-/tools/art/blender/previews
+/tools/art/previews
 /web/.vite-cache
 # The town view's scenes (tools/bench/scene.mjs makes them: half a megabyte each, and they age with the save format)
 /web/public/bench/town-*.json.gz
+# Texture set variants for the look sheets (cargo tex synth floor_wood.pine): made when asked for; delete them before a production build
+/web/public/assets/textures/*.*/

@@ -1,6 +1,6 @@
 /**
- * Makes worlds and town files off the main thread (`townJobs.ts`): loads the game's content and
- * house templates itself once, then runs the jobs it is sent in turn.
+ * Makes lands, towns, worlds and town files off the main thread (`townJobs.ts` `TownJob`): loads
+ * the game's content and house templates itself once, then runs the jobs it is sent in turn.
  */
 
 import { Content } from '../content/content';
@@ -9,7 +9,7 @@ import { runTownJob, type FromTownWorker, type ToTownWorker } from './townJobs';
 
 interface WorkerScope {
   onmessage: ((e: MessageEvent<ToTownWorker>) => void) | null;
-  postMessage(message: FromTownWorker): void;
+  postMessage(message: FromTownWorker, transfer?: Transferable[]): void;
 }
 const scope = self as unknown as WorkerScope;
 
@@ -26,7 +26,10 @@ scope.onmessage = (e) => {
   ready.then(
     ({ content, templates }) => {
       try {
-        scope.postMessage({ id, answer: runTownJob(content, templates, job) });
+        const answer = runTownJob(content, templates, job, (note) => scope.postMessage({ id, note }));
+        // (A preview's rooms handed over, not copied: near a million tiles on a city.)
+        const rooms = 'preview' in answer ? answer.preview.rooms : null;
+        scope.postMessage({ id, answer }, rooms instanceof Uint16Array ? [rooms.buffer] : []);
       } catch (err) {
         scope.postMessage({ id, error: err instanceof Error ? err.message : String(err) });
       }

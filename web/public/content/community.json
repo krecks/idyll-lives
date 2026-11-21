@@ -1,5 +1,5 @@
 {
-  "$comment": "Town things: street furniture, playground, food carts and machines, and shop fittings for the public places in houses.json (parks, the market, the café and the shops), all in the `community` buy category. Models are in assets/manifest.json and the packs it lists (tools/art/blender/families/). Per-use `cost` is what a passer-by pays at a cart, a machine or a counter. Feelings are prefixed `community.`.",
+  "$comment": "Town things: street furniture, playground, food carts and machines, and shop fittings for the public places in houses.json (parks, the market, the café and the shops), all in the `community` buy category. Models are in assets/manifest.json and the packs it lists (crates/art). Per-use `cost` is what a passer-by pays at a cart, a machine or a counter. Feelings are prefixed `community.`.",
   "feelings": [
     {
       "id": "community.iceCream",
@@ -195,13 +195,15 @@
       "group": "street",
       "outdoors": true,
       "decor": 0.2,
-      "description": "A red pillar box. Post a card to a friend: it cheers both of you up a little.",
+      "description": "A red pillar box. Post a card to a friend: it cheers both of you up a little, and lands in their letterbox if they have one.",
       "interactions": [
         {
           "id": "post",
           "label": "Post a card to a friend",
           "anim": "write",
+          "endSound": "letterbox",
           "minutes": 6,
+          "letter": true,
           "effects": {
             "social": 0.08,
             "fun": 0.03
@@ -716,6 +718,7 @@
           "label": "Buy an ice cream",
           "selfServe": { "label": "Take an ice cream from the freezer", "anim": "fetch", "minutes": 2 },
           "anim": "buy",
+          "endSound": "till",
           "minutes": 5,
           "eat": {
             "item": "iceCreamCone",
@@ -755,6 +758,7 @@
           "label": "Buy a hot dog",
           "selfServe": { "label": "Help yourself to a hot dog", "anim": "fetch", "minutes": 2 },
           "anim": "buy",
+          "endSound": "till",
           "minutes": 5,
           "eat": {
             "item": "hotDog",
@@ -874,6 +878,7 @@
           "label": "Buy a piece of fruit",
           "selfServe": { "label": "Pick a piece of fruit", "anim": "fetch", "minutes": 1 },
           "anim": "buy",
+          "endSound": "till",
           "minutes": 5,
           "eat": {
             "item": "fruit",
@@ -910,8 +915,9 @@
         {
           "id": "treat",
           "label": "Buy a little something",
-          "selfServe": { "label": "Pick a little something and pay at the till", "anim": "idle" },
+          "selfServe": { "label": "Pick a little something and pay at the till", "anim": "idle", "endSound": "till" },
           "anim": "buy",
+          "endSound": "till",
           "minutes": 6,
           "effects": {
             "fun": 0.15,
@@ -946,6 +952,7 @@
           "label": "Buy a pastry",
           "selfServe": { "label": "Take a pastry from the case", "anim": "fetch", "minutes": 2 },
           "anim": "buy",
+          "endSound": "till",
           "minutes": 5,
           "eat": {
             "item": "pastry",
@@ -965,6 +972,7 @@
           "label": "Buy a slice of cake to take to a table",
           "selfServe": { "label": "Take a slice of cake to a table", "anim": "fetch", "minutes": 2 },
           "anim": "buy",
+          "endSound": "till",
           "minutes": 5,
           "autonomous": false,
           "tags": [
@@ -1109,6 +1117,7 @@
           "fetch": "takeCake",
           "label": "Have a slice of cake",
           "anim": "eat",
+          "sound": "cutlery",
           "holds": "cakeSlice",
           "minutes": 15,
           "pose": "sit",

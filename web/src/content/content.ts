@@ -59,9 +59,11 @@ export interface InteractionDef {
   /**
    * Sold by someone at the object (sim-core `staff.rs`): on a public lot whose post has a server, under `label`
    * and `anim` (ordered, handed over, paid for; greyed out outside the post's `staff.hours`); where nobody serves
-   * (a household's own cart), helping themselves under this label and animation.
+   * (a household's own cart), helping themselves under this label and animation. Done so, the interaction's own
+   * `sound` and `endSound` aren't heard (nobody serves or takes money); `endSound`: one played once as it ends
+   * instead (a shop counter's `till`: paid on the way out).
    */
-  selfServe?: { label: string; anim?: string };
+  selfServe?: { label: string; anim?: string; endSound?: string };
   /** What it `requires` is fetched first, with this interaction (by id) of what provides it on the plot: a coffee poured at the machine. */
   fetch?: string;
   /** Takes every slot of the object: only started with nobody else on it, and nobody else gets on while it lasts. */
@@ -104,8 +106,17 @@ export interface InteractionDef {
   loads?: boolean;
   /** Takes the load out of a machine once its run is done: only then; it's empty again as the use ends. */
   unloads?: boolean;
-  /** Leaves the household a load of washing to work on next, as the use ends (taken out washed, or dry): then on with it to what works on it. */
-  makes?: 'laundry' | 'washed' | 'dried';
+  /**
+   * Leaves the household a load of washing to work on next, as the use ends (taken out washed, or dry): then on with it to what works on it;
+   * `ironed`: pressed clothes, put on as residents change at home (content `laundry.pressed`).
+   */
+  makes?: 'laundry' | 'washed' | 'dried' | 'ironed';
+  /**
+   * Cleans the floor (a vacuum cleaner, a mop, a broom; sim-core `sweep.rs`): the tool is taken to the dirtiest floor at home it cleans and
+   * used there, and `amount` of dirt comes off every tile of that room within `reach` (0: all of it); `hardFloors` leaves a carpet,
+   * `outdoors` sweeps the garden too.
+   */
+  cleans?: { amount: number; reach?: number; hardFloors?: boolean; outdoors?: boolean };
   /** An item carried in the arms on the way to it (the basket of washing to the dryer): only shown, the snapshot's `held`. */
   brings?: string;
   /** An item held in the hands while it's done (a towel being folded): only shown, as `brings`. */
@@ -121,11 +132,11 @@ export interface InteractionDef {
   /**
    * What it sounds like while it lasts: a world sound by key (`audio/catalog.ts` `LOOPS`: `chop` for
    * a cheese board), or `none`; absent: by the object's `sounds`, else by `anim`. A sound played
-   * once (`audio/things.ts` `ONCE_THINGS`: `vendCan`) plays as it starts. Not for a `recipe`, whose
+   * once (`audio/kinds.ts` `ONCE_THINGS`, `ONCE_EVENTS`: `vendCan`, a drawer's `drawer`) plays as it starts. Not for a `recipe`, whose
    * steps sound by the station they're done at.
    */
   sound?: string;
-  /** A sound played once as it ends (`audio/water.ts` `ONCE`, `audio/things.ts` `ONCE_THINGS`: a toilet's `flush`, a microwave's `ping`). */
+  /** A sound played once as it ends (`audio/kinds.ts` `ONCE`, `ONCE_THINGS`, `ONCE_HOME`, `ONCE_EVENTS`: a toilet's `flush`, a microwave's `ping`, a kettle's `kettleOff`, a shop's `till`). */
   endSound?: string;
 }
 
@@ -257,9 +268,10 @@ export interface ObjectDef {
   provides?: string[];
   /**
    * Someone serves here on a public lot (sim-core `staff.rs`, `game/staff.ts`): where they stand, metres off the
-   * footprint's middle to its right and front (behind it: a negative front), and the hours it's open.
+   * footprint's middle to its right and front (behind it: a negative front), the hours it's open, and what they wear
+   * (`game/staff.ts` `UNIFORMS`; absent: a shop's apron).
    */
-  staff?: { at: [number, number]; hours: [number, number] };
+  staff?: { at: [number, number]; hours: [number, number]; uniform?: string };
   /**
    * Something to ride (sim-core `ride.rs`): a bike, sat on and pedalled, or an e-scooter, stood on; `speed` times
    * as fast as walking, by those of `stages` (absent: everyone), for ways longer than `minRide` m; `roadsOnly`:
@@ -545,6 +557,17 @@ export interface CareerGrade {
   label: string;
   payPerHour: number;
   skillLevel: number;
+  /** How old the car a job at this grade calls for is (absent: used; sim-core `cars/looks.rs`). */
+  carAge?: 'old' | 'used' | 'new';
+}
+
+/** A body households' cars come in (`careers.json` `carBodies`), in the renderer's order (`render/shared/cars.ts` `CARS`). */
+export interface CarBodyDef {
+  id: string;
+  /** For the story ("bought a new {car}"). */
+  label: string;
+  len: number;
+  wid: number;
 }
 
 export interface CareerCategory {
@@ -555,7 +578,9 @@ export interface CareerCategory {
   /** Pay against the grades' (sim-core `content.rs` `careers`); the tracks' shift, unless they have their own. */
   payFactor?: number;
   shift?: Shift;
-  tracks: { id: string; label: string; titles: string[]; payFactor?: number; shift?: Shift }[];
+  /** The car its jobs call for: a body (`carBodies` id) from each grade on (grade id → body); a track's own instead. */
+  car?: Record<string, string>;
+  tracks: { id: string; label: string; titles: string[]; payFactor?: number; shift?: Shift; car?: Record<string, string> }[];
 }
 
 export interface Economy {
@@ -683,6 +708,7 @@ interface ContentFile {
   socials: SocialDef[];
   careerCategories?: CareerCategory[];
   grades?: CareerGrade[];
+  carBodies?: CarBodyDef[];
   bondPresets: Record<string, unknown>;
   events: Record<string, string>;
   objects: ObjectDef[];
@@ -733,6 +759,8 @@ export class Content {
   readonly careerCategories: readonly CareerCategory[];
   /** The grades every career's titles are, in order. */
   readonly careerGrades: readonly CareerGrade[];
+  /** The bodies households' cars come in, in the renderer's order. */
+  readonly carBodies: readonly CarBodyDef[];
   /** The age residents retire at (their job becomes a pension). */
   readonly retireAt: number;
   readonly skills: readonly SkillDef[];
@@ -804,6 +832,7 @@ export class Content {
     this.socials = file.socials ?? [];
     this.careerCategories = file.careerCategories ?? [];
     this.careerGrades = file.grades ?? [];
+    this.carBodies = file.carBodies ?? [];
     this.retireAt = file.life?.retireAt ?? 65;
     this.skills = file.skills ?? [];
     this.objectColors = file.objectColors ?? [];
@@ -825,6 +854,8 @@ export class Content {
     this.windowTiles = file.roomRules?.windowTiles ?? 6;
     this.economy = { startingFunds: 0, currency: '$', ...file.economy };
     this.animations = [...new Set(file.animations ?? [])];
+    // (An object may leave out its interactions, as sim-core reads it: decor such as a field wall has none.)
+    for (const o of file.objects) o.interactions ??= [];
     this.shop = file.objects.filter((o) => o.price !== undefined);
     this.bondPresets = Object.keys(file.bondPresets ?? {});
     this.eventTexts = file.events ?? {};

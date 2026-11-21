@@ -1,21 +1,25 @@
 /**
- * The live 3D scene behind the menus: which town the overview shows (a showcase neighbourhood
- * on the main menu, the draft being edited during a new game), its camera shots, lot
- * highlights, labels pinned to lots and lot picking. Screens call this; it reaches the renderer
- * through the host (never the sim worker).
+ * The live 3D scene behind the new game's screens: which town the overview shows (the draft being
+ * edited), its camera shots, lot highlights, labels pinned to lots and lot picking, and the main
+ * menu's picture of it (`keepStill`; the menu itself shows no town). Screens call this; it reaches
+ * the renderer through the host (never the sim worker).
  */
 
 import { groundDepth, type WorldStructure } from '../core/protocol';
-import type { LotHighlight, Renderer, TownShot } from '../render/types';
+import type { LandCursor, LotHighlight, Renderer, TownBuildStep, TownGhosts, TownShot } from '../render/types';
+import { areaFocus, OVERVIEW_NEAREST } from '../render/shared/overviewCamera';
+import type { Land, LandRect } from './land';
+import type { UseLayer } from './uses';
 import { settings } from '../settings/settings.svelte';
 import { services } from '../ui/services';
 import { host } from './host';
-import { loadTemplates, populate, type NeighbourhoodDraft, type Templates } from './town';
-import { keepHouses, shareHouses, townJob } from './townJobs';
-import { loadShowcase, showcaseSeed } from './showcaseCache';
+import { loadTemplates, type NeighbourhoodDraft, type Templates } from './town';
+import { keepStill, type MenuStill } from './menuStill';
 import { previewWorld } from './townPreview';
 import { perfPhase, perfTime, perfTimeAsync } from '../debug/perf';
 import { layoutTags, type Box, type TagSpot } from './tagLayout';
+import { roadIndex } from './roads';
+import { sameContent } from '../core/sameContent';
 
 /** Golden hour on the title screen: low warm sun, long shadows, no lamps yet. */
 export const MENU_MINUTE = 18 * 60 + 20;
@@ -40,13 +44,25 @@ export type Shot =
   /** The whole neighbourhood from above, framed into `frame`. */
   | { kind: 'overview'; frame: Frame }
   /** One lot as the game will first show it, framed into `frame`. */
-  | { kind: 'lot'; plot: number; frame: Frame };
+  | { kind: 'lot'; plot: number; frame: Frame }
+  /** The whole land from above, framed into `frame` (the new game's land, town and home steps), with or without a town on it. */
+  | { kind: 'world'; frame: Frame }
+  /**
+   * One area (`OpenWorldDraft.areas` index: 0 the main town, then the villages) from above, framed into `frame`: its
+   * lots, or its box while it has none. An area the world doesn't have frames the whole land.
+   */
+  | { kind: 'area'; area: number; frame: Frame };
+
+/** How far either side of a point (CSS px) `MenuScene.scale` measures the land. */
+const SCALE_SPAN = 4;
 
 const NO_HIGHLIGHT: LotHighlight = { hover: null, selected: null, marked: [], outlines: false };
 
+/** The menu's picture at most this wide (pixels); as the screen is, if smaller. */
+const STILL_WIDTH = 1920;
+
 class MenuScene {
   private templates: Templates | null = null;
-  private showcaseMade: Promise<NeighbourhoodDraft> | null = null;
   private draft: NeighbourhoodDraft | null = null;
   /** The lot shown as the player's house (null: none). */
   private home: number | null = null;
@@ -56,7 +72,9 @@ class MenuScene {
   /** Previews made elsewhere (the town worker: `townJobs.ts`), by draft, with no home. */
   private readonly prepared = new WeakMap<NeighbourhoodDraft, WorldStructure>();
   private shotKey = '';
-  private wanted: { shot: Shot; duration: number } | null = null;
+  private wanted: { shot: Shot; duration: number; cut?: boolean } | null = null;
+  /** The highlight asked for last (put back after the menu's picture is taken). */
+  private lit: Partial<LotHighlight> = {};
   /** When the camera's glide to the current shot ends (performance.now() ms). */
   private glideEnd = 0;
   /** Tags of lots outside this screen area stay at its edge (pointing the way). */
@@ -72,6 +90,15 @@ class MenuScene {
   private readonly out = { x: 0, y: 0 };
   /** UI on top of the town that tags must keep clear of (buttons, hint bars). */
   private readonly obstacles = new Set<HTMLElement>();
+  /** The last scale `scale` found (m a CSS px). */
+  private lastScale = 1;
+  /** The painted uses shown (`setUses`), kept for a renderer made again. */
+  private uses: { layer: UseLayer; hatched: Uint8Array | null } | null = null;
+  /** How near the player's zoom comes in (`setNearest`), kept for a renderer made again. */
+  private nearest = OVERVIEW_NEAREST;
+  /** The draft and home the town on screen was built from, so the same town asked for again (a new draft object with
+   *  the same content, `sameContent`) is not built again. Null: nothing shown, or its land changed in place since. */
+  private built: { draft: NeighbourhoodDraft; home: number | null } | null = null;
   /** Lots whose tags win when tags compete for space. */
   private focusPlots: [number | null, number | null] = [null, null];
   private readonly sizes = new ResizeObserver((entries) => {
@@ -87,48 +114,23 @@ class MenuScene {
   });
 
   /**
-   * The main menu's neighbourhood (made once per visit to the page). Its land is laid out in the
-   * town worker (seconds for a big world: the page goes on meanwhile, the boot warming the portrait
-   * studio up), then peopled here (`populate`, on the page's dice, as before) and its preview made in
-   * the worker too (`prepare`d: `show` draws it as it comes).
-   */
-  showcaseDraft(): Promise<NeighbourhoodDraft> {
-    this.showcaseMade ??= this.makeShowcase().catch((err: unknown) => {
-      // (Asked for again, it is made again.)
-      this.showcaseMade = null;
-      throw err;
-    });
-    return this.showcaseMade;
-  }
-
-  private async makeShowcase(): Promise<NeighbourhoodDraft> {
-    perfPhase('menu: showcase draft');
-    // A returning visit: the same valley, its people and its preview, as the last visit left them
-    // (`showcaseCache.ts`). Read it back (a few dozen milliseconds), not laid out again.
-    const kept = await perfTimeAsync('menu: showcase kept', loadShowcase);
-    if (kept) {
-      shareHouses(kept.draft, kept.houses);
-      this.prepare(kept.draft, kept.preview);
-      return kept.draft;
-    }
-    const { content, assets } = services;
-    const seed = showcaseSeed();
-    const land = await perfTimeAsync('menu: showcase land', () => townJob(content, { kind: 'land', world: 'medium', seed }), `seed ${seed}`);
-    keepHouses(land);
-    const templates = (this.templates ??= await perfTimeAsync('menu: loadTemplates', loadTemplates));
-    const draft = perfTime('menu: populate', () => populate(content, assets, templates, land.draft));
-    const { preview } = await perfTimeAsync('menu: showcase preview', () => townJob(content, { kind: 'preview', town: draft, keep: true }));
-    this.prepare(draft, preview);
-    return draft;
-  }
-
-  /**
    * Shows a neighbourhood behind the menus (the renderer rebuilds it only when its layout
    * changed). Again after a game, too: starting one hides the overview. `home`: the lot the
-   * player will live on (the chosen home, the household's), drawn as the game will show it.
+   * player will live on (the chosen home, the household's), drawn as the game will show it: a house's
+   * lot (a flat's building is no house: it is shown with no home, in its own look).
+   * `onStep`: the parts of the town as they are built (none for a town already shown). `covered`: no
+   * town is in view meanwhile (a panel says how its making goes): it is built in longer slices.
    */
-  async show(draft: NeighbourhoodDraft, home: number | null = null): Promise<void> {
+  async show(draft: NeighbourhoodDraft, home: number | null = null, onStep?: (done: TownBuildStep) => void, covered = false): Promise<void> {
     if (draft === this.draft && home === this.home && this.live?.townShown) return;
+    // (The wizard's steps each hand over a fresh draft of the same town: the renderer rebuilds it
+    // only when its content changed, not when its object did.)
+    const built = this.built;
+    if (built && built.home === home && this.live?.townShown && sameContent(draft, built.draft)) {
+      this.draft = draft;
+      this.home = home;
+      return;
+    }
     this.draft = draft;
     this.home = home;
     perfPhase('menu: show town');
@@ -144,7 +146,51 @@ class MenuScene {
     this.attach(renderer);
     for (const [plot, label] of this.labels) this.anchor(plot, label);
     this.applyShot();
-    await perfTimeAsync('menu: showTown (renderer)', () => host.showTown(world, MENU_MINUTE, { ...settings }));
+    if (covered) renderer.setCovered(true);
+    try {
+      await perfTimeAsync('menu: showTown (renderer)', () => host.showTown(world, MENU_MINUTE, { ...settings }, onStep));
+      if (this.draft === draft && this.home === home) this.built = { draft, home };
+    } finally {
+      if (covered) renderer.setCovered(false);
+    }
+  }
+
+  /** Takes the town away (the main menu shows its picture). */
+  hide(): Promise<void> {
+    this.draft = null;
+    this.home = null;
+    this.built = null;
+    return host.hideTown();
+  }
+
+  /**
+   * Takes the main menu's picture of the town shown (its shot, at golden hour, no lot lit up) and
+   * keeps it (`menuStill.ts`). `glide`: the camera glides there and stays (the main menu, whose town
+   * goes once the picture is taken); else it cuts there and back, behind a loading screen (a new
+   * game starting). Null if no town is on screen or the picture couldn't be drawn.
+   */
+  async keepStill(glide: boolean): Promise<MenuStill | null> {
+    const renderer = this.live;
+    const draft = this.draft;
+    if (!renderer?.townShown || !draft || !this.world) return null;
+    const before = this.wanted;
+    const lit = this.lit;
+    this.highlight({}, !glide);
+    this.shoot({ kind: 'menu' }, glide ? 2.4 : 0, !glide);
+    if (glide) await this.settled();
+    // (The cut's light and pose, and the sun's map for them, are drawn by then.)
+    await renderer.framesRendered(2);
+    if (this.draft !== draft || !renderer.townShown) return null;
+    const scale = Math.min(1, STILL_WIDTH / Math.max(1, window.innerWidth * (window.devicePixelRatio || 1))) * (window.devicePixelRatio || 1);
+    const url = await perfTimeAsync('menu: still', () => renderer.captureThumbnail(window.innerWidth * scale, window.innerHeight * scale));
+    if (!glide && before && this.draft === draft) {
+      this.shoot(before.shot, 0, true);
+      this.highlight(lit, true);
+    }
+    if (!url) return null;
+    const picture = await (await fetch(url)).blob();
+    await keepStill(picture, draft.name);
+    return { url: URL.createObjectURL(picture), name: draft.name };
   }
 
   /** A draft's preview (`previewWorld` with no home), already made: `show` uses it. */
@@ -157,9 +203,9 @@ class MenuScene {
     return this.draft;
   }
 
-  /** Points the camera (applied once the town is shown); repeated identical shots are ignored. */
-  shoot(shot: Shot, duration = 1.6): void {
-    this.wanted = { shot, duration };
+  /** Points the camera (applied once the town is shown); repeated identical shots are ignored. `cut`: there at once, its light too. */
+  shoot(shot: Shot, duration = 1.6, cut = false): void {
+    this.wanted = { shot, duration, cut };
     this.applyShot();
   }
 
@@ -167,17 +213,23 @@ class MenuScene {
     const world = this.world;
     const renderer = this.live;
     if (!world || !renderer || !this.wanted) return;
-    const { shot, duration } = this.wanted;
-    this.bounds = shot.kind === 'overview' || shot.kind === 'lot' ? shot.frame : null;
+    const { shot, duration, cut } = this.wanted;
+    this.bounds = 'frame' in shot ? shot.frame : null;
     const townShot = this.townShot(shot, world, duration);
     // What the camera frames is the town as far as the tags go (see `positionLabels`); before the key
     // check, since a new world of the same size and shot can leave the key unchanged.
-    this.framed = shot.kind === 'overview' || shot.kind === 'lot' ? townShot.focus : null;
-    const key = `${JSON.stringify(shot)}|${world.width}x${groundDepth(world)}|${window.innerWidth}x${window.innerHeight}`;
+    this.framed = 'frame' in shot ? townShot.focus : null;
+    // (An area's shot is framed again when its box changes, a village moved or a town laid on a bare land; not for
+    // a lot more or less in it, which would take the player's pan away at every edit.)
+    const box = shot.kind === 'area' ? world.meta?.areas?.[shot.area] : undefined;
+    const area = box ? `|${box.x},${box.z},${box.w},${box.d}` : '';
+    const key = `${JSON.stringify(shot)}|${world.width}x${groundDepth(world)}${area}|${window.innerWidth}x${window.innerHeight}`;
     if (key === this.shotKey) return;
-    const first = this.shotKey === '';
+    const first = this.shotKey === '' || !!cut;
     this.shotKey = key;
     renderer.setTownShot(townShot, first);
+    // (A cut is once: the shot applied again later, for a new town or screen size, glides.)
+    if (cut) this.wanted = { shot, duration };
     this.glideEnd = performance.now() + (first ? 0 : (townShot.duration ?? 0) * 1000);
   }
 
@@ -188,9 +240,11 @@ class MenuScene {
     }
   }
 
-  highlight(h: Partial<LotHighlight>): void {
+  /** Lights lots up (`snap`: at once, not eased; for a picture). */
+  highlight(h: Partial<LotHighlight>, snap = false): void {
+    this.lit = h;
     this.focusPlots = [h.selected ?? null, h.hover ?? null];
-    this.live?.setLotHighlight({ ...NO_HIGHLIGHT, ...h });
+    this.live?.setLotHighlight({ ...NO_HIGHLIGHT, ...h }, snap);
   }
 
   /** Keeps lot tags clear of `el` (a button or bar over the town). Returns a detach function. */
@@ -199,9 +253,152 @@ class MenuScene {
     return () => this.obstacles.delete(el);
   }
 
-  /** Orbit / zoom from the player's drag and wheel on the town. */
-  nudge(dAlpha: number, zoom: number): void {
-    this.live?.nudgeTown(dAlpha, zoom);
+  /**
+   * The player's orbit (radians), zoom (a factor) and tilt (radians: more looks from lower down, within
+   * `TILT_MIN`–`TILT_MAX` in all) on top of the shot. The camera's drift and sway stop once the player moves it.
+   */
+  nudge(dAlpha: number, zoom: number, dBeta = 0): void {
+    this.live?.nudgeTown(dAlpha, zoom, dBeta);
+  }
+
+  /** The player's zoom by `zoom` (a factor) towards the land under screen point (`x`, `y`) (CSS pixels): it stays under the pointer. */
+  zoomAt(x: number, y: number, zoom: number): void {
+    this.live?.zoomTownAt(x, y, zoom);
+  }
+
+  /** The player's pan: the camera's target moved (`dx`, `dz`) m over the ground (kept over the land). */
+  pan(dx: number, dz: number): void {
+    this.live?.panTown(dx, dz);
+  }
+
+  /** The player's pan along the view: `right` m to the picture's right and `forward` m into it (kept over the land). */
+  panView(right: number, forward: number): void {
+    this.live?.panTownView(right, forward);
+  }
+
+  /** How far (m) the camera is from what it looks at (the keys pan by a share of it a second); 0 with no town shown. */
+  get distance(): number {
+    const r = this.live;
+    return r?.townShown ? r.townDistance : 0;
+  }
+
+  /**
+   * How near (m from what it looks at) the player's zoom comes in: `OVERVIEW_CLOSE` (10 m) in the new game's land,
+   * streets and build steps, `OVERVIEW_NEAREST` (50 m) elsewhere (`TownStage`'s `nearest`).
+   */
+  setNearest(metres: number): void {
+    this.nearest = metres;
+    this.live?.setTownNearest(metres);
+  }
+
+  /**
+   * The player's pan by a drag from screen point (`x0`, `y0`) to (`x1`, `y1`) (CSS pixels, a pointer's last and new
+   * place): the land under the pointer follows it, also from over the sky. For a middle-button or Space drag in any
+   * step, with or without a tool. The camera stays over the land.
+   */
+  drag(x0: number, y0: number, x1: number, y1: number): void {
+    this.live?.dragTown(x0, y0, x1, y1);
+  }
+
+  /** The player's orbit, zoom and pan let go: the camera glides back to the shot (`seconds`; 0 cuts). */
+  reframe(seconds = 1.2): void {
+    this.live?.reframeTown(seconds);
+  }
+
+  /** The preview of the town shown (its built land: `landEdit.ts` `builtOf`), once it is shown. */
+  get preview(): WorldStructure | null {
+    return this.live?.townShown ? this.world : null;
+  }
+
+  // ---- The land in view, for step 1's brushes (`Renderer.landOf` and the rest) ----------------
+
+  /** The town's land as a height field (a copy): its `meta.land`, or surveyed from the land as drawn (100–160 ms). */
+  landOf(): Promise<Land> {
+    const r = this.live;
+    if (!r?.townShown) return Promise.reject(new Error('no town is shown'));
+    return r.landOf();
+  }
+
+  /** The town drawn from `land` from now on (the brushes change it in place); null: from its landscape again. */
+  setLand(land: Land | null): void {
+    // (The town on screen is no longer the one its draft makes: shown again for any draft, `built`.)
+    this.built = null;
+    if (this.live?.townShown) this.live.setLand(land);
+  }
+
+  /** Samples of the land given to `setLand` changed: drawn again now, the rest once the stroke is `done`. */
+  landChanged(rect: LandRect, done: boolean): void {
+    this.built = null;
+    if (this.live?.townShown) this.live.landChanged(rect, done);
+  }
+
+  /** Where the land is under a screen point (CSS pixels; a town point and its height, m), if it is. */
+  landAt(x: number, y: number): { x: number; y: number; z: number } | null {
+    const r = this.live;
+    return r?.townShown ? r.pickLand(x, y) : null;
+  }
+
+  /** Shows the land brush's cursor (null hides it). */
+  brush(cursor: LandCursor | null): void {
+    if (this.live?.townShown || !cursor) this.live?.setLandBrush(cursor);
+  }
+
+  /**
+   * Step 2's edits drawn over the town (`TownGhosts`: streets being drawn, lots placed or to be removed, villages'
+   * boxes) until the town is built again with them; null: none. Cheap: every pointer move. They stay drawn while the
+   * town is built again (`show`) and over the new one: the editor takes them away once it shows what they were.
+   */
+  ghosts(g: TownGhosts | null): void {
+    this.live?.setTownGhosts(g);
+  }
+
+  /**
+   * Step 2's painted uses (`uses.ts`) drawn over the town; null: none. `hatched`: a byte per cell of `layer`, set
+   * where a zoned cell is too far from a street to be built on. Cheap enough for every stamp of a stroke.
+   */
+  setUses(layer: UseLayer | null, hatched?: Uint8Array | null): void {
+    this.uses = layer ? { layer, hatched: hatched ?? null } : null;
+    this.live?.setTownUses(layer, hatched);
+  }
+
+  /**
+   * How many m a CSS px is on the land at screen point (`x`, `y`) (CSS pixels), across the screen: from where the land
+   * is under the points `SCALE_SPAN` px either side of it. Where there is no land under them (the sky, say), the last
+   * scale found (1 m before any).
+   */
+  scale(x: number, y: number): number {
+    const [a, b] = [this.landAt(x - SCALE_SPAN, y), this.landAt(x + SCALE_SPAN, y)];
+    if (a && b) {
+      const m = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) / (2 * SCALE_SPAN);
+      if (m > 0 && Number.isFinite(m)) this.lastScale = m;
+    }
+    return this.lastScale;
+  }
+
+  /**
+   * The road under a screen point (CSS pixels), if any: its index in the town shown (`NeighbourhoodDraft.roads`, the
+   * preview's `meta.roads`) and how far along it (m) the point is. On a road's surface out to its sidewalks, or within
+   * `ROAD_PICK` m of a narrow one (a trail); of those, the one whose middle is nearest. As precise as `landAt`.
+   */
+  roadAt(x: number, y: number): { road: number; s: number } | null {
+    const at = this.landAt(x, y);
+    const roads = this.world?.meta?.roads;
+    if (!at || !roads?.length) return null;
+    const index = roadIndex(roads);
+    let reach = ROAD_PICK;
+    for (const r of roads) reach = Math.max(reach, r.width / 2);
+    let best: { road: number; s: number; dist: number } | null = null;
+    for (const [road, m] of index.around(at.x, at.z, reach)) {
+      if (m.dist > Math.max(roads[road].width / 2, ROAD_PICK) || (best && best.dist <= m.dist)) continue;
+      best = { road, s: m.s, dist: m.dist };
+    }
+    return best && { road: best.road, s: best.s };
+  }
+
+  /** Projects a town point onto the screen (CSS pixels); false when it is behind the camera. */
+  project(x: number, y: number, z: number, out: { x: number; y: number }): boolean {
+    const r = this.live;
+    return !!r?.townShown && r.project(x, y, z, out);
   }
 
   /** Plot under a screen point (CSS pixels), if any. */
@@ -285,6 +482,15 @@ class MenuScene {
         return { focus: plots, frame: { left: W * 0.36, top: H * 0.12, right: W * 0.99, bottom: H * 0.96 }, beta: 1.32, alpha: 0.55, zoom: 1.55, sway: 0.32, duration, minute: MENU_MINUTE };
       case 'create':
         return { focus: plots, frame: { left: W * 0.12, top: H * 0.1, right: W * 0.88, bottom: H * 0.98 }, beta: 1.3, alpha: 0.9, zoom: 1.8, sway: 0.25, duration, minute: CREATE_MINUTE };
+      case 'world':
+        // The whole land, from higher up than an area's shot (a map of it, the brushes' and the homes' ground), looking
+        // north: square to the picture, the land fills the stage and the landscape's ring is seen at its sides only.
+        // An area's shot looks the same way, so from one to the other the camera only comes down.
+        return { focus: { x: 0, z: 0, w: world.width, d: groundDepth(world) }, frame: shot.frame, beta: WORLD_BETA, alpha: MAP_ALPHA, zoom: 1, drift: 0, duration, minute: OVERVIEW_MINUTE };
+      case 'area': {
+        const focus = areaFocus(world, shot.area);
+        return { focus, frame: shot.frame, beta: AREA_BETA, alpha: MAP_ALPHA, zoom: 1, drift: 0, duration, minute: OVERVIEW_MINUTE };
+      }
       case 'overview':
         // Among mountains, lower: the peaks round the valley in the picture too.
         return world.meta?.world?.landscape.mountains
@@ -307,6 +513,8 @@ class MenuScene {
     this.live?.onTownFrame(null);
     this.renderer = new WeakRef(renderer);
     this.shotKey = '';
+    renderer.setTownNearest(this.nearest);
+    if (this.uses) renderer.setTownUses(this.uses.layer, this.uses.hatched);
     renderer.onTownFrame(this.positionLabels);
   }
 
@@ -380,6 +588,14 @@ class MenuScene {
   };
 }
 
+/** The whole land's and an area's way round (as the camera's alpha): looking north, as a map. */
+const MAP_ALPHA = -Math.PI / 2;
+/** The tilt of the whole land's shot (from straight down): steep, so the far side is not lost in the distance. */
+const WORLD_BETA = 0.62;
+/** The tilt of an area's shot: the overview's, a little steeper (a village's houses stand clear of each other). */
+const AREA_BETA = 0.74;
+/** A road narrower than twice this (a trail) is picked within this (m) of its middle (`roadAt`). */
+const ROAD_PICK = 1.5;
 /** Height of a tag's stem below its body (see TownStage). */
 const STEM = 10;
 /** How far (m) outside the town a shot frames a lot may be and still have its tag (a lot or two around it). */

@@ -1,5 +1,7 @@
 // First: errors are captured for debug reports from the start (see `debug/capture.ts`).
 import './debug/capture';
+// `?memtrace` (dev only): the page's large typed arrays by site, from as early as can be (`debug/memtrace.ts`).
+import './debug/memtrace';
 import '@fontsource-variable/inter';
 import './ui/theme.css';
 import { mount } from 'svelte';
@@ -13,7 +15,10 @@ import './talk';
 import { startModelsAfter } from './ml/schedule.svelte';
 import { app } from './ui/app.svelte';
 import { watchForDevLog } from './debug/devlogWatch.svelte';
+import { loadSynth } from './audio/synth';
 
+// The sounds' synthesis (`audio/synth.ts`, a small WebAssembly): from the start, so the first click has its blip.
+loadSynth().catch((err: unknown) => console.warn('The sounds could not load; the game is silent.', err));
 // The dev play log (dev server only, `debug/devlog.ts`).
 watchForDevLog();
 // No browser right-click menu over the game, except in text fields.

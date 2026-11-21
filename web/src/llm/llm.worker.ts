@@ -1,6 +1,6 @@
 /**
  * Language model worker: writes replies to chat messages, one at a time, off the main thread.
- * ONNX Runtime Web runs the model on the GPU (WebGPU); the tokenizer is
+ * ONNX Runtime Web runs the model on the GPU (WebGPU) or the processor (WASM); the tokenizer is
  * `@huggingface/tokenizers`; `generate.ts` writes each reply. Knows nothing about the game.
  *
  * Everything is self-hosted, fetched once and kept in the Cache API, so the next session starts
@@ -9,8 +9,9 @@
 
 import { Tokenizer } from '@huggingface/tokenizers';
 import { fetchOnce, forget, openCache, openRuntimeCache, prune } from '../ml/assets';
-import { configureOrt, importOrt, ORT_WASM, sessionOptions } from '../ml/ort';
+import { configureOrt, hasWebGpu, importOrt, ORT_WASM, sessionOptions, type OrtDevice } from '../ml/ort';
 import { formatChat, type ChatMessage } from './chat';
+import { forCpu } from './cpuGraph';
 import { generate, PrefixCache, type GenParams, type LlmEngine } from './generate';
 import type { ModelSpec } from './models';
 import type { FromLlmWorker, ToLlmWorker } from './protocol';
@@ -37,7 +38,7 @@ scope.onmessage = (e) => {
   const msg = e.data;
   if (msg.type === 'load') {
     if (!loading) {
-      loading = load(msg.base, msg.model).catch((err) => {
+      loading = load(msg.base, msg.model, msg.device).catch((err) => {
         loading = null;
         scope.postMessage({ type: 'error', message: String(err) });
         throw err;
@@ -71,9 +72,10 @@ async function write(id: number, messages: ChatMessage[], reply: string, lead: s
   }
 }
 
-/** Downloads (or takes from the cache) the runtime, tokenizer and model, and starts its session. */
-async function load(base: string, model: ModelSpec): Promise<void> {
+/** Downloads (or takes from the cache) the runtime, tokenizer and model, and starts its session on `device`. */
+async function load(base: string, model: ModelSpec, device: OrtDevice): Promise<void> {
   const start = performance.now();
+  if (device === 'gpu' && !(await hasWebGpu())) throw new Error('the language model needs a graphics card that supports WebGPU here');
   const dir = new URL(model.url, new URL(base, location.href)).href;
   const { graph, data } = model;
   // `built`: imported through Vite. In dev their URLs aren't hashed, so a rebuilt runtime would
@@ -104,15 +106,16 @@ async function load(base: string, model: ModelSpec): Promise<void> {
   void prune(runtime, [ORT_WASM.url]);
   const [ortWasm, tokenizerJson, tokenizerConfig, graphBytes, dataBytes] = bytes;
   const ort = await importOrt();
-  configureOrt(ort, ortWasm);
+  configureOrt(ort, ortWasm, device);
   const decode = (b: ArrayBuffer) => JSON.parse(new TextDecoder().decode(b)) as object;
   const tokenizer = new Tokenizer(decode(tokenizerJson), decode(tokenizerConfig));
-  const session = await ort.InferenceSession.create(new Uint8Array(graphBytes), {
-    ...sessionOptions(),
+  // (The processor needs one node of the graph rebuilt: `cpuGraph.ts`.)
+  const graphData = device === 'cpu' ? forCpu(new Uint8Array(graphBytes)) : new Uint8Array(graphBytes);
+  const session = await ort.InferenceSession.create(graphData, {
+    // On the GPU the model's state stays there between steps; only the logits come back.
+    ...sessionOptions(device, 'gpu-buffer'),
     // The weights file is named in the graph by its name alone (a packed one without its `z`).
     ...(data ? { externalData: [{ path: data[0].split('/').pop()!.replace(/(\.onnx_data)z$/, '$1'), data: new Uint8Array(dataBytes) }] } : {}),
-    // The model's state stays on the GPU between steps; only the logits come back.
-    preferredOutputLocation: 'gpu-buffer' as const,
   });
   // The session has its own copy of the weights.
   if (data) forget(dir + data[0]);

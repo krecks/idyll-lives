@@ -7,6 +7,7 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { sharpestTurn } from '../src/game/roads';
+import { CLASSIC } from './support/classicWorlds';
 
 const WEB = new URL('../', import.meta.url).pathname;
 
@@ -25,8 +26,9 @@ describe('country road bends', async () => {
   });
   const { Content } = await import('../src/content/content');
   const { objectInfos } = await import('../src/game/housegen');
-  const { generateWorld, useTownContent } = await import('../src/game/town');
-  const { COUNTRY_TURN } = await import('../src/game/macro');
+  const { useTownContent } = await import('../src/game/town');
+  const { generateFromSpec } = await import('../src/game/macro');
+  const { COUNTRY_TURN } = await import('../src/game/countryRouter');
   type Templates = import('../src/game/town').Templates;
   const content = await Content.load('http://localhost/content/base.json');
   useTownContent(content);
@@ -41,7 +43,7 @@ describe('country road bends', async () => {
     test(
       `big ${kind} ${seed} (${name}): no country road turns further than ${deg(COUNTRY_TURN)}° over 40 m (${road} did)`,
       () => {
-        const town = generateWorld(content, t, kind, seed);
+        const town = generateFromSpec(content, t, CLASSIC[kind], seed);
         expect(town.name).toBe(name);
         expect(town.roads.some((r) => r.name === road)).toBe(true);
         const sharp = town.roads.filter((r) => r.kind === 'country').flatMap((r) => {

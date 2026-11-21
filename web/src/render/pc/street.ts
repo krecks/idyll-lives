@@ -33,7 +33,8 @@ import type { AssetRegistry } from '../../assets/registry';
 import type { ModelEntry } from '../../assets/types';
 import type { FenceStyleDef } from '../../content/content';
 import type { WorldStructure } from '../../core/protocol';
-import type { TownLotHouse } from '../shared/townBuildings';
+import { litAt, type TownBuilding, type TownLotHouse } from '../shared/townBuildings';
+import { PANE_SETS, paneSetLit } from '../shared/buildingDress';
 import type { ViewRect } from '../types';
 import type { RGB } from '../shared/environment';
 import type { Geo, MeshData } from '../shared/geometry';
@@ -42,7 +43,11 @@ import type { StandIn } from '../shared/modelEntry';
 import { chunkAt, chunkCoords, distanceToRect, groupOf, LookedFrom, SUPERCHUNK } from '../shared/chunks';
 import { groupInstances } from '../shared/nature';
 import { castsShadow, FOLIAGE, instanceMatrix, NO_FOCUS, TownStreet, type ChunkPlan, type GroundLayer, type Inst, type ObjectLook } from '../shared/street';
+import { surfaceOf } from '../shared/landSurface';
+import type { BuiltSurface } from '../shared/builtSurface';
 import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
+import { LOW_MEMORY } from '../../settings/lowMemory';
+import { frameNow } from '../shared/frameClock';
 
 export interface StreetOptions {
   /** Layer ids of everything this street draws (default: the world layer). */
@@ -112,16 +117,35 @@ const FAR_CULL = 650;
  * tree is a few dozen pixels.
  */
 const FAR_MODELS = 100;
+/**
+ * A model no bigger than this (m: its height, width and depth) is a small thing (a garden chair, a grill, a bin): from the
+ * full town view (`setSmallHidden`) it is a pixel or two, and its draws (one per mesh and draw group, in the scene, the
+ * shadow map and the depth pass: about 1,100 of a whole town's 2,700) aren't drawn. Hedges, stretched along their run,
+ * stay, and the trees, the lamps and the buildings are bigger.
+ */
+const SMALL_PROP = 2.5;
 /** The cells' far versions and the far LOD's houses are chosen again once the camera's target has moved this far (m). */
 const REFRAME = 1;
 /** Plans kept per chunk (`planned`): the focus lot's chunks with it and without it, and one more. */
 const PLANS_KEPT = 3;
+/**
+ * Vertex arrays kept for the chunks not drawn (bytes): a chunk back in view costs only its group's
+ * meshes, as before, while its arrays last. Beyond this the least recently drawn go, and a chunk
+ * back in view after that is planned again, between frames (the bench tour's longest slice 24.5 ms).
+ * Less is kept on a machine low on memory (`LOW_MEMORY`).
+ */
+const DATA_KEPT = (LOW_MEMORY ? 8 : 24) * 1024 * 1024;
 
-/** A chunk as built: what is kept of its plan (`ChunkShape`), and each of its meshes' vertex arrays (by draw name), made once. */
+/** A chunk as built: what is kept of its plan (`ChunkShape`), and, while the budget lasts, each mesh's vertex arrays (by draw name). */
 interface BuiltChunk {
   key: string;
   shape: ChunkShape;
-  data: Map<string, MeshData>;
+  /** Its vertex arrays (null: let go while it was not drawn: made again when it is). */
+  data: Map<string, MeshData> | null;
+  /** What `data` holds (bytes; 0 with none). */
+  bytes: number;
+  /** When it was last drawn or made (`dataClock`): the oldest arrays go first. */
+  drawnAt: number;
 }
 
 /**
@@ -134,6 +158,7 @@ interface ChunkShape {
   parts: Omit<HousePart, 'geo'>[];
   ground: Omit<GroundLayer, 'geo'>[];
   homes: SilhouettePlan['homes'];
+  buildings: ChunkPlan['buildings'];
   lot: ChunkPlan['lot'];
   batches: ChunkPlan['batches'];
 }
@@ -144,6 +169,20 @@ interface Home {
   panes: Geo;
   up: boolean;
   group: number;
+}
+
+/** A lot's building's window glass, drawn closed (`ChunkPlan.buildings`): its sets, which of them are lit now (`litAt`), its group. */
+interface Lights {
+  t: TownBuilding;
+  panes: Geo[];
+  on: boolean[];
+  group: number;
+}
+
+/** A draw group built again (`Street.buildGroup`): put in place of the old, or dropped. */
+interface GroupSwap {
+  commit(): void;
+  discard(): void;
 }
 
 /** A draw group's meshes (one per material), and its lit and dark window glass. */
@@ -182,6 +221,12 @@ export class Street {
   /** The chunks to draw (null: every one the town has). */
   private wanted: ReadonlySet<number> | null = null;
   private readonly chunks = new Map<number, BuiltChunk>();
+  /** Counts the chunks drawn or made: the arrays kept for those not drawn go oldest first (`evictData`). */
+  private dataClock = 0;
+  /** Bench only: how many chunks' arrays were made again in the last build that made any, and the longest that took. */
+  private replans = 0;
+  private replanMs = 0;
+  private replanBuild = 0;
   /** Every chunk planned so far (drawn or not), by id, its last `PLANS_KEPT` plans, newest first: a chunk streamed in again (or planned again for a focus lot just left) with the same key is taken from here. */
   private readonly planned = new Map<number, BuiltChunk[]>();
   /** Draw groups whose chunks changed, waiting for their meshes. */
@@ -209,6 +254,9 @@ export class Street {
   private readonly glow: RGB = { r: 1, g: 0.8, b: 0.5 };
   /** Neighbours' houses (wall box, grid lines) and their window glass, lit while someone is `up` in there. */
   private homes: Home[] = [];
+  /** The lots' buildings' window glass over every chunk drawn (those drawn closed), lit by the hour (`setTime`), and the hour it was last lit for. */
+  private lights: Lights[] = [];
+  private lightsAt = { minute: 12 * 60, weekday: 0, key: -1 };
   private boxes: (readonly [number, number, number, number])[] = [];
   private windowsDrawn = 0;
   private windowsDue = false;
@@ -232,6 +280,8 @@ export class Street {
   private poolsLit = false;
   /** The town view draws the far LOD's houses (`setTownView`): the street's own far groups are hidden meanwhile. */
   private townView = false;
+  /** The small things' draws (`SMALL_PROP`), under one entity: hidden all at once (`setSmallHidden`). */
+  private readonly smallRoot: pc.Entity;
 
   constructor(
     private readonly app: pc.AppBase,
@@ -255,6 +305,8 @@ export class Street {
     parent.addChild(this.root);
     this.lotRoot = new pc.Entity('streetLot');
     this.root.addChild(this.lotRoot);
+    this.smallRoot = new pc.Entity('streetSmall');
+    this.root.addChild(this.smallRoot);
     // Streetlights' glass: unlit, its colour by the time of day (`setNight`). (Its colours, and the
     // pools' and the lenses' strengths, are sRGB as PlayCanvas takes them, as they were tuned;
     // clamped to 1.)
@@ -319,10 +371,33 @@ export class Street {
     const mode = view ? 'game' : 'town';
     const layoutKey = TownStreet.layoutKey(world, mode);
     const span = perfStart('street: plan');
+    let layoutMs = 0;
+    let handed = '';
     if (!this.town || layoutKey !== this.layoutKey) {
-      this.dropChunks();
+      const t0 = performance.now();
+      // (Another layout keeps the chunks built: each is planned again only where its key, what it is planned from,
+      // changed. Not for the other mode's street, planned otherwise.)
+      if (this.town?.mode !== mode) this.dropChunks();
+      this.prepared = false;
       const entry = (k: string) => (this.assets.has(k, 'model') ? (this.assets.get(k, 'model') as ModelEntry) : undefined);
-      this.town = new TownStreet(this.house.planner, world, { has: (k) => this.assets.has(k, 'model'), entry, lived: this.lived, look: this.look, ground: this.ground, fenceStyles: this.fenceStyles }, mode);
+      // (Its land's surface solved first, the frames given a turn, then the layout, the street's own and the kerbs
+      // a part at a time: none of it in one long stall.)
+      surfaceOf(world);
+      layoutMs += performance.now() - t0;
+      await pace?.();
+      if (stale()) return;
+      const t1 = performance.now();
+      // (The town before handing on what this one plans just as it did: its street's own, the kerbs of the rows an edit
+      // left alone. The town view's only: a game's street is laid out again for a garage built, and keeps its chunks.)
+      const previous = mode === 'town' && this.town?.mode === 'town' ? this.town : null;
+      const town = new TownStreet(this.house.planner, world, { has: (k) => this.assets.has(k, 'model'), entry, lived: this.lived, look: this.look, ground: this.ground, fenceStyles: this.fenceStyles }, mode, previous);
+      layoutMs += performance.now() - t1;
+      await pace?.();
+      if (stale()) return;
+      await town.prepare(pace);
+      if (stale()) return;
+      if (previous) handed = `, handed on: ${town.handedOn.statics ? 'its own' : 'not its own'}, ${town.handedOn.kerbs} kerbs`;
+      this.town = town;
       this.layoutKey = layoutKey;
       this.townWorld = world;
     } else if (world !== this.townWorld) {
@@ -336,7 +411,8 @@ export class Street {
     const wanted = this.wanted ? all.filter((id) => this.wanted!.has(id)) : all;
     const dirty = this.dirtyGroups;
     const wantedSet = new Set(wanted);
-    // Chunks no longer drawn go (their vertex arrays are kept: streamed in again, they cost only their group's meshes).
+    // Chunks no longer drawn go (their vertex arrays are kept while the budget lasts: streamed in again, they cost
+    // only their group's meshes; past it the oldest go, `evictData`).
     for (const id of [...this.chunks.keys()]) {
       if (wantedSet.has(id)) continue;
       this.chunks.delete(id);
@@ -347,48 +423,101 @@ export class Street {
       // (The last few plans of each chunk kept: back on a lot the camera just left, its chunks are planned already.)
       const kept = this.planned.get(id) ?? [];
       const at = kept.findIndex((k) => k.key === key);
-      const built = at >= 0 ? kept[at] : (() => {
+      let built = at >= 0 ? kept[at] : undefined;
+      if (!built) {
         const plan = town.chunk(id, focus);
-        return { key, shape: shapeOf(plan), data: chunkData(plan) };
-      })();
+        built = { key, shape: shapeOf(plan), data: null, bytes: 0, drawnAt: 0 };
+        this.takeData(built, plan);
+      } else {
+        if (built.data) built.drawnAt = ++this.dataClock;
+        // (Its vertex arrays went while it was not drawn: planned again.)
+        else {
+          const t0 = performance.now();
+          const plan = town.chunk(id, focus);
+          // (The same plan almost always: its shape refreshed with the arrays if the gather changed under the memo.
+          // Its key stays the one `chunkKey` gives, as a fresh plan's does, or the next build would plan it again.)
+          if (plan.key !== key) built.shape = shapeOf(plan);
+          this.takeData(built, plan);
+          // (Counted for the last build that made any: a build that made none leaves the numbers to read.)
+          if (this.replanBuild !== build) {
+            this.replanBuild = build;
+            this.replans = 0;
+            this.replanMs = 0;
+          }
+          this.replans++;
+          this.replanMs = Math.max(this.replanMs, performance.now() - t0);
+        }
+      }
       if (at !== 0) this.planned.set(id, [built, ...kept.filter((k) => k !== built)].slice(0, PLANS_KEPT));
       return built;
     };
+    let [keyMs, planMs] = [0, 0];
     for (const id of wanted) {
+      const t0 = performance.now();
       const key = town.chunkKey(id, focus);
-      if (this.chunks.get(id)?.key !== key) {
+      const t1 = performance.now();
+      keyMs += t1 - t0;
+      const drawn = this.chunks.get(id);
+      if (drawn?.key !== key) {
         this.chunks.set(id, planOf(id, key));
+        planMs += performance.now() - t1;
         dirty.add(groupOf(id));
         planned++;
-      }
+      } else drawn.drawnAt = ++this.dataClock;
       await pace?.();
       if (stale()) return;
     }
-    // Streaming: every other chunk planned now too (at load, between frames), so the camera
-    // roaming later only merges and uploads them.
+    // Streaming: every other chunk planned now too (at load, between frames), so the camera roaming later only
+    // merges and uploads them. The farthest from the chunks drawn first: the arrays past `DATA_KEPT` go least
+    // recently made first, so those kept are the nearest, the first the camera reaches; one whose arrays went is
+    // planned again when it comes back. (Let go of as they pile up, not at the end: the load never holds them all.)
     if (this.wanted && !this.prepared) {
-      for (const id of all) {
-        if (wantedSet.has(id)) continue;
-        planOf(id, town.chunkKey(id, focus));
+      let [cx, cz] = [0, 0];
+      for (const id of wanted) {
+        const [x, z] = chunkCoords(id);
+        cx += x / wanted.length;
+        cz += z / wanted.length;
+      }
+      const away = (id: number) => {
+        const [x, z] = chunkCoords(id);
+        return Math.hypot(x - cx, z - cz);
+      };
+      const rest = all.filter((id) => !wantedSet.has(id)).sort((a, b) => away(b) - away(a));
+      let made = 0;
+      for (const id of rest) {
+        const b = planOf(id, town.chunkKey(id, focus));
+        made += b.bytes;
+        if (made > DATA_KEPT) {
+          this.evictData();
+          made = 0;
+        }
         await pace?.();
         if (stale()) return;
       }
       this.prepared = true;
     }
+    this.evictData();
     // (The plots' and fences' planned parts are kept for the chunks drawn: what a focus moving next
-    // door or a thing moved plans again. Every other chunk keeps its vertex arrays alone.)
+    // door or a thing moved plans again. Every other chunk keeps its shape and, while the budget lasts, its arrays.)
     town.keepUnits(this.wanted ? wantedSet : null, focus);
-    perfEnd(span);
+    perfEnd(span, `layout ${Math.round(layoutMs)}, keys ${Math.round(keyMs)}, ${planned} of ${wanted.length} chunks planned ${Math.round(planMs)}${handed}`);
     if (planned || dirty.size) this.instancesDue = true;
 
     const meshesSpan = perfStart('street: meshes');
-    // (A group left by a build a newer one stopped stays dirty for that one.)
+    // (A group left by a build a newer one stopped stays dirty for that one. The groups built are put in place of the
+    // old together once all are built: another town shows whole, not a group at a time.)
     const rebuilt = dirty.size > 0;
+    const groups = dirty.size;
+    const swaps: GroupSwap[] = [];
     for (const g of [...dirty]) {
-      await this.buildGroup(g, pace, stale);
-      if (stale()) return;
-      dirty.delete(g);
+      swaps.push(await this.buildGroup(g, pace, stale));
+      if (stale()) {
+        for (const s of swaps) s.discard();
+        return;
+      }
     }
+    for (const s of swaps) s.commit();
+    for (const g of [...dirty]) dirty.delete(g);
     // The focus lot's garage and porch (apart: they go with the lot's ground).
     const focusChunk = town.focusChunk(focus);
     const lotPlan = focusChunk !== null ? this.chunks.get(focusChunk) : undefined;
@@ -434,7 +563,7 @@ export class Street {
     }
     if (rebuilt) this.gatherHomes();
     this.buildFar(town, all, focus);
-    perfEnd(meshesSpan);
+    perfEnd(meshesSpan, `${groups} groups`);
 
     if (!this.instancesDue) return;
     this.instancesDue = false;
@@ -510,6 +639,12 @@ export class Street {
   }
 
   /** Lets go of everything (the street's models too). */
+  /** The viewed lot's own (`lotRoot`: its garage and porch, planned at its 0) stands at its pad (m, game space; 0: as ever). */
+  setLotY(y: number): void {
+    const p = this.lotRoot.getLocalPosition();
+    if (p.y !== y) this.lotRoot.setLocalPosition(p.x, y, p.z);
+  }
+
   destroy(): void {
     this.clear();
     this.destroyed = true;
@@ -523,9 +658,28 @@ export class Street {
     this.poolTexture.destroy();
   }
 
-  /** What is drawn now: chunks in detail, draw groups, far groups (for the bench). */
-  stats(): { chunks: number; groups: number; far: number; streamed: boolean } {
-    return { chunks: this.chunks.size, groups: this.groups.size, far: [...this.farGroups.values()].filter((g) => g.entity?.enabled).length, streamed: this.wanted !== null };
+  /** What is drawn now: chunks in detail, draw groups, far groups, the vertex arrays kept (for the bench). */
+  stats(): { chunks: number; groups: number; far: number; streamed: boolean; dataMB: number; spareMB: number; replanned: number; replanMs: number } {
+    let data = 0;
+    let spareBytes = 0;
+    for (const [id, list] of this.planned) {
+      const drawn = this.chunks.get(id);
+      for (const b of list) {
+        if (!b.data) continue;
+        data += b.bytes;
+        if (b !== drawn) spareBytes += b.bytes;
+      }
+    }
+    return {
+      chunks: this.chunks.size,
+      groups: this.groups.size,
+      far: [...this.farGroups.values()].filter((g) => g.entity?.enabled).length,
+      streamed: this.wanted !== null,
+      dataMB: data / 1048576,
+      spareMB: spareBytes / 1048576,
+      replanned: this.replans,
+      replanMs: this.replanMs,
+    };
   }
 
   /** Shows or hides the viewed lot's own (its garage and porch): it stands on the lot's ground, hidden while its basement is in view. */
@@ -562,8 +716,46 @@ export class Street {
       const g = this.groups.get(h.group);
       if (g) g.windowsDue = true;
     }
-    if (!this.windowsDue || performance.now() - this.windowsDrawn < WINDOWS_EVERY_MS) return false;
-    this.windowsDrawn = performance.now();
+    return this.flushWindows();
+  }
+
+  /**
+   * The hour (`minute` of the day, on `weekday`, 0 Monday): the lots' buildings drawn closed, their windows lit as the town view lights
+   * them (`litAt`: a place's while it is open, a home's by the hour), a set of panes at a time (`paneSetLit`). Looked at
+   * once a game minute; redrawn as `setUp` redraws, at most once a second. By day (not `night`: the lamps are out) every
+   * pane is in the lit glass, as the neighbours' are. True when they were.
+   */
+  setTime(minute: number, weekday: number, night: boolean): boolean {
+    const key = night ? Math.floor(minute) * 7 + weekday : -2;
+    if (key === this.lightsAt.key) return this.windowsDue ? this.flushWindows() : false;
+    this.lightsAt = { minute, weekday, key };
+    for (const l of this.lights) this.light(l);
+    return this.flushWindows();
+  }
+
+  /**
+   * A building's sets of panes lit as the hour has them (a place with flats over it: its own sets by its hours, its
+   * flats' after them by the hour, `BuildingDress.panes`); its group's windows to be drawn again if that changed.
+   */
+  private light(l: Lights): void {
+    const { minute, weekday, key } = this.lightsAt;
+    const apart = l.panes.length > PANE_SETS;
+    const share = key === -2 ? 1 : litAt(l.t, minute, weekday, apart ? 'place' : undefined);
+    const flats = key === -2 || !apart ? share : litAt(l.t, minute, weekday, 'flats');
+    for (let k = 0; k < l.panes.length; k++) {
+      const on = paneSetLit(k % PANE_SETS, k < PANE_SETS ? share : flats);
+      if (l.on[k] === on) continue;
+      l.on[k] = on;
+      this.windowsDue = true;
+      const g = this.groups.get(l.group);
+      if (g) g.windowsDue = true;
+    }
+  }
+
+  /** The groups' window glass drawn again where it changed, at most once a second (`WINDOWS_EVERY_MS`); true when it was. */
+  private flushWindows(): boolean {
+    if (!this.windowsDue || frameNow() - this.windowsDrawn < WINDOWS_EVERY_MS) return false;
+    this.windowsDrawn = frameNow();
     this.windowsDue = false;
     for (const [id, g] of this.groups) if (g.windowsDue) this.drawWindows(id, g);
     return true;
@@ -631,26 +823,45 @@ export class Street {
     this.framedAt.forget();
   }
 
+  /** The small things (`SMALL_PROP`) hidden (`hidden`: from the full town view) or drawn. */
+  setSmallHidden(hidden: boolean): void {
+    if (this.smallRoot.enabled === !hidden) return;
+    this.smallRoot.enabled = !hidden;
+  }
+
   /**
    * The lots' houses the far LOD draws, each with the chunk it is in and how it looks (the town view's,
-   * `townView.ts` `lotBuilding`); the focus lot's left out. Made again only when the town or the focus changes.
+   * `townView.ts` `lotBuilding`), each on its pad; the focus lot's left out. Made again only when the town, the focus
+   * or the land under them (its pads) changes.
    */
   townHouses(): readonly TownLotHouse[] {
     const town = this.town;
     if (!town) return [];
-    const key = `${this.layoutKey}|${this.focus}`;
+    // (The land shaped under the town moves its pads: `surfaceMoves`.)
+    // (A named place's lot as its look has it: `dressKey`.)
+    const key = `${this.layoutKey}|${this.focus}|${town.surfaceMoves}|${town.dressKey}`;
     if (this.townHousesOf?.key !== key) {
       const planner = this.house.planner;
-      const list = town.townHouses(this.focus).map(({ chunk, plot }): TownLotHouse => ({ id: plot.id, chunk, storeys: plot.storeys ?? 1, ...planner.farLook({ x: plot.x, z: plot.z, house: plot.house!, roof: plot.roof, storeys: plot.storeys }) }));
+      const list = town.townHouses(this.focus).map(({ chunk, plot, pad, cover, dress }): TownLotHouse => ({ id: plot.id, chunk, storeys: plot.storeys ?? 1, pad, ...planner.farLook({ x: plot.x, z: plot.z, house: plot.house!, roof: plot.roof, storeys: plot.storeys, cover }), ...(dress ? { look: dress.look, ...(dress.hours ? { hours: dress.hours } : {}), ...(dress.flats ? { flats: true } : {}) } : {}) }));
       this.townHousesOf = { key, list };
     }
     return this.townHousesOf.list;
   }
   private townHousesOf: { key: string; list: TownLotHouse[] } | null = null;
 
+  /** The land under the town moved: the street stands on `surface` (the game's landscape's) and plans again the chunks that moved, at the next `build` (`TownStreet.landMoved`). */
+  landMoved(surface: BuiltSurface): boolean {
+    return this.town?.landMoved(surface) ?? false;
+  }
+
   /** Whether chunk `id` is drawn in full (streamed in, or every chunk is), so the far LOD leaves its houses out. */
   chunkDrawn(id: number): boolean {
     return !this.wanted || this.wanted.has(id);
+  }
+
+  /** The chunks drawn in full (null: all of them), as last given (`setChunks`): a new set whenever that changes. */
+  get drawnChunks(): ReadonlySet<number> | null {
+    return this.wanted;
   }
 
   /** The chunks drawn in full (null: all), as a key: what the town view's far lots were last chosen by. */
@@ -717,26 +928,37 @@ export class Street {
     out.set('streetLamps', { material: () => this.glowMat, colors: false, cast: false, receive: true });
     out.set('streetLightPools', { material: () => this.poolMat, colors: false, cast: false, receive: false, alphaIndex: 5 });
     out.set('streetShadows', { material: () => this.lib.contactShadow(false), colors: true, cast: false, receive: true });
-    // The ground layers as the lot draws its own: double-sided, in the house's lamps' light.
-    for (const g of shape.ground) out.set(g.name, { material: () => (g.paint ? this.lib.roadPaint() : this.lib.surface(g.material, { doubleSided: true, vertexColors: !!g.toned })), colors: !!g.paint || !!g.toned, cast: false, receive: true, lit: true });
+    // The ground layers as the lot draws its own: double-sided, in the house's lamps' light; one draw for those alike.
+    for (const g of shape.ground) out.set(groundDraw(g), { material: () => (g.paint ? this.lib.roadPaint() : this.lib.surface(g.material, { doubleSided: true, vertexColors: !!g.toned })), colors: !!g.paint || !!g.toned, cast: false, receive: true, lit: true });
     return out;
   }
 
-  /** A draw group's meshes again, from its chunks' vertex arrays (one mesh a material), and its window glass. */
-  private async buildGroup(id: number, pace?: () => Promise<void>, stale?: () => boolean): Promise<void> {
+  /**
+   * A draw group's meshes again, from its chunks' vertex arrays (one mesh a material), built hidden between frames:
+   * `commit` puts them in place of the old (its window glass is drawn again with the homes), `discard` drops them.
+   */
+  private async buildGroup(id: number, pace?: () => Promise<void>, stale?: () => boolean): Promise<GroupSwap> {
     const members = [...this.chunks.entries()].filter(([c]) => groupOf(c) === id).sort(([a], [b]) => a - b);
-    let g = this.groups.get(id);
     if (!members.length) {
-      if (g) for (const e of [...g.meshes, ...g.windows.map((w) => w.entity)]) e.destroy();
-      this.groups.delete(id);
-      return;
+      return {
+        commit: () => {
+          const g = this.groups.get(id);
+          if (g) for (const e of [...g.meshes, ...g.windows.map((w) => w.entity)]) e.destroy();
+          this.groups.delete(id);
+        },
+        discard: () => {},
+      };
+    }
+    // (Drawn chunks keep their vertex arrays: `evictData` lets go only of the ones not drawn.)
+    if (import.meta.env.DEV) {
+      for (const [, c] of members) if (!c.data) throw new Error(`street: chunk ${c.key} is drawn without its vertex arrays`);
     }
     // The new meshes built hidden, a material at a time between frames, then put in place of the old at once.
     const fresh: pc.Entity[] = [];
     const draws = new Map<string, Draw>();
     for (const [, c] of members) for (const [k, d] of this.draws(c.shape)) if (!draws.has(k)) draws.set(k, d);
     for (const [name, d] of draws) {
-      const data = concatMeshData(members.map(([, c]) => c.data.get(name)).filter((m) => m !== undefined));
+      const data = concatMeshData(members.map(([, c]) => c.data?.get(name)).filter((m) => m !== undefined));
       if (!data) continue;
       let entity: pc.Entity | null = null;
       if (d.part) entity = this.house.drawData(d.part, data, this.root);
@@ -751,18 +973,22 @@ export class Street {
       entity.enabled = false;
       fresh.push(entity);
       await pace?.();
-      if (stale?.()) {
-        for (const e of fresh) e.destroy();
-        return;
-      }
+      if (stale?.()) break;
     }
-    g = this.groups.get(id);
-    if (g) for (const e of g.meshes) e.destroy();
-    else this.groups.set(id, (g = { meshes: [], windows: [], windowsDue: false }));
-    for (const e of fresh) e.enabled = true;
-    g.meshes = fresh;
-    g.windowsDue = true;
-    this.showPools(fresh);
+    return {
+      commit: () => {
+        let g = this.groups.get(id);
+        if (g) for (const e of g.meshes) e.destroy();
+        else this.groups.set(id, (g = { meshes: [], windows: [], windowsDue: false }));
+        for (const e of fresh) e.enabled = true;
+        g.meshes = fresh;
+        g.windowsDue = true;
+        this.showPools(fresh);
+      },
+      discard: () => {
+        for (const e of fresh) e.destroy();
+      },
+    };
   }
 
   /** The neighbours' houses whose glass glows, over every chunk drawn (who was up stays so: the lights don't flick on for a frame). */
@@ -776,8 +1002,18 @@ export class Street {
     }
     this.homes = homes;
     this.boxes = homes.map((h) => h.box);
+    // The lots' buildings drawn closed lit as the hour has them (each building's sets as they were, if it was drawn before).
+    const was = new Map(this.lights.map((l) => [l.t, l.on]));
+    this.lights = [];
+    for (const id of [...this.chunks.keys()].sort((a, b) => a - b)) {
+      for (const { t, panes } of this.chunks.get(id)!.shape.buildings) {
+        const l: Lights = { t, panes, on: was.get(t) ?? new Array<boolean>(panes.length).fill(false), group: groupOf(id) };
+        this.light(l);
+        this.lights.push(l);
+      }
+    }
     for (const [gid, g] of this.groups) if (g.windowsDue) this.drawWindows(gid, g);
-    this.windowsDrawn = performance.now();
+    this.windowsDrawn = frameNow();
   }
 
   /** A group's neighbours' glass again: those with someone up in one mesh, glowing; the rest in another, dark. */
@@ -786,13 +1022,51 @@ export class Street {
     g.windows = [];
     g.windowsDue = false;
     const mine = this.homes.filter((h) => h.group === id);
+    const lights = this.lights.filter((l) => l.group === id);
     for (const lit of [true, false]) {
       const panes = mine.filter((h) => h.up === lit).map((h) => h.panes);
+      for (const l of lights) for (let k = 0; k < l.panes.length; k++) if (l.on[k] === lit && !l.panes[k].empty) panes.push(l.panes[k]);
       const m = panes.length ? this.house.neighbourWindows(panes, lit, this.root) : null;
       if (!m) continue;
       this.dress(m.entity, false);
       g.windows.push(m);
     }
+  }
+
+  /** The vertex arrays of `plan` into `b` (the newest kept: the least recently drawn go first). */
+  private takeData(b: BuiltChunk, plan: ChunkPlan): void {
+    b.data = chunkData(plan);
+    b.bytes = dataBytes(b.data);
+    b.drawnAt = ++this.dataClock;
+  }
+
+  /**
+   * Lets go of the vertex arrays of the chunks not drawn, least recently drawn first, beyond
+   * `DATA_KEPT`: the drawn chunks' are always kept. A chunk back in view after its arrays went is
+   * planned again, between frames.
+   */
+  private evictData(): void {
+    const spare = this.spareChunks();
+    let total = 0;
+    for (const b of spare) total += b.bytes;
+    if (total <= DATA_KEPT) return;
+    spare.sort((a, b) => a.drawnAt - b.drawnAt);
+    for (const b of spare) {
+      if (total <= DATA_KEPT) break;
+      total -= b.bytes;
+      b.data = null;
+      b.bytes = 0;
+    }
+  }
+
+  /** The chunks not drawn that still hold their vertex arrays: what `evictData` may let go. */
+  private spareChunks(): BuiltChunk[] {
+    const drawn = new Set<BuiltChunk>(this.chunks.values());
+    const spare: BuiltChunk[] = [];
+    for (const list of this.planned.values()) {
+      for (const b of list) if (b.data && !drawn.has(b)) spare.push(b);
+    }
+    return spare;
   }
 
   /** Forgets every chunk built, its groups' meshes and the focus lot's own. */
@@ -814,6 +1088,7 @@ export class Street {
     this.lotPorches = [];
     this.lotKey = '';
     this.homes = [];
+    this.lights = [];
     this.boxes = [];
     this.instancesDue = true;
   }
@@ -880,6 +1155,8 @@ export class Street {
     if (this.destroyed) return;
     const far = farT && farT.meshes.length ? farT : null;
     if (far) split = split.map(() => true);
+    // (A small thing's draws under `smallRoot`, hidden from the full town view.)
+    const parent = !flat && propSize(t, footprint) <= SMALL_PROP ? this.smallRoot : this.root;
     let p = this.placed.get(key);
     if (p && p.template !== t) {
       // Built again (a file came): the old draws go now (the new ones take their place), the old template once the build is done (`disposeStale`).
@@ -896,12 +1173,12 @@ export class Street {
     if (!p) {
       p = { template: t, far, draws: [], cells: new Map(), glows: [] };
       this.placed.set(key, p);
-      for (const m of t.meshes) p.draws.push(this.draw(m, m.material, cast));
+      for (const m of t.meshes) p.draws.push(this.draw(m, m.material, cast, parent));
       for (const { mesh } of t.glows ?? []) {
         // (Every lens glows alike: the street's copy of their material carries the strength.)
         const material = (mesh.material as pc.StandardMaterial).clone();
         material.update();
-        p.glows.push({ draw: this.draw(mesh, material, false), material });
+        p.glows.push({ draw: this.draw(mesh, material, false, parent), material });
       }
     }
     p.far = far;
@@ -943,10 +1220,10 @@ export class Street {
         });
         t.meshes.forEach((m, i) => {
           if (!split[i]) return;
-          const d = (c.near[i] ??= this.draw(m, m.material, cast));
+          const d = (c.near[i] ??= this.draw(m, m.material, cast, parent));
           fill(d, indices);
         });
-        if (far && !c.far.length) c.far = far.meshes.map((m) => this.draw(m, m.material, cast));
+        if (far && !c.far.length) c.far = far.meshes.map((m) => this.draw(m, m.material, cast, parent));
         for (const d of c.far) fill(d, indices);
         showCell(c);
       }
@@ -958,13 +1235,19 @@ export class Street {
     this.templates.hideStale(key);
   }
 
-  private draw(m: ModelMesh, material: pc.Material, cast: boolean): Instances {
-    const d = new Instances(this.device, this.root, m.mesh, material, { name: m.name, castShadows: cast && this.shadows, ...(this.layers ? { layers: this.layers } : {}) });
+  private draw(m: ModelMesh, material: pc.Material, cast: boolean, parent = this.root): Instances {
+    const d = new Instances(this.device, parent, m.mesh, material, { name: m.name, castShadows: cast && this.shadows, ...(this.layers ? { layers: this.layers } : {}) });
     // (Foliage sways in the wind, `nature.ts`: a part grown from nothing without fluttering.)
     windStill(d.meshInstance, m);
     this.lib.excludeFromLights([], [d.meshInstance]);
     return d;
   }
+}
+
+/** A model's size (m): the largest of its height, width and depth (its outline's, else its footprint's). */
+function propSize(t: ModelTemplate, footprint: readonly [number, number]): number {
+  const o = t.outline;
+  return Math.max(t.height, o ? o.maxX - o.minX : footprint[0], o ? o.maxZ - o.minZ : footprint[1]);
 }
 
 /** The template cache's key of a model's far version (the street's draw groups far off, `FAR_MODELS`). */
@@ -989,9 +1272,17 @@ function shapeOf(plan: ChunkPlan): ChunkShape {
     parts: plan.silhouettes.parts.map(({ geo: _, ...part }) => part),
     ground: plan.ground.map(({ geo: _, ...layer }) => layer),
     homes: plan.silhouettes.homes,
+    buildings: plan.buildings,
     lot: plan.lot,
     batches: plan.batches,
   };
+}
+
+/** The bytes a chunk's vertex arrays hold. */
+function dataBytes(data: Map<string, MeshData>): number {
+  let bytes = 0;
+  for (const m of data.values()) bytes += m.positions.byteLength + m.normals.byteLength + m.uvs.byteLength + m.indices.byteLength + (m.colors?.byteLength ?? 0) + (m.cut?.byteLength ?? 0);
+  return bytes;
 }
 
 /** A chunk's meshes as vertex arrays, by draw name (the house parts with their cutaway attribute). */
@@ -1006,8 +1297,27 @@ function chunkData(plan: ChunkPlan): Map<string, MeshData> {
   put('streetLamps', plan.glow, false);
   put('streetLightPools', plan.pools, false);
   put('streetShadows', plan.shadows, true);
-  for (const g of plan.ground) put(g.name, g.geo, !!g.paint || !!g.toned);
+  // (The ground layers that look alike as one mesh, `groundDraw`.)
+  const ground = new Map<string, MeshData[]>();
+  for (const g of plan.ground) {
+    if (g.geo.empty) continue;
+    const key = groundDraw(g);
+    const data = g.geo.meshData({ colors: !!g.paint || !!g.toned });
+    const list = ground.get(key);
+    if (list) list.push(data);
+    else ground.set(key, [data]);
+  }
+  for (const [key, list] of ground) out.set(key, concatMeshData(list)!);
   return out;
+}
+
+/**
+ * The draw a ground layer goes into: one for each look (its material, and whether it is toned or the road's paint), so
+ * the layers that look alike (the road and the car parks' aprons, the garden paths, the yards and the trails, the road's
+ * markings and the bays' lines) are one draw in a group, not one each.
+ */
+function groundDraw(g: Omit<GroundLayer, 'geo'>): string {
+  return g.paint ? 'groundPaint' : `ground:${g.material}${g.toned ? ':toned' : ''}`;
 }
 
 /** Vertex arrays one after the other as one mesh's (null: nothing). */

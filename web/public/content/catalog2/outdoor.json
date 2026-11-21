@@ -1,5 +1,5 @@
 {
-  "$comment": "Catalogue 2: Patio tables and chairs, garden benches, sheds, beds and garden decor. Separate pieces only. Models: assets/manifest.json and the packs it lists (tools/art/blender/families/).",
+  "$comment": "Catalogue 2: Patio tables and chairs, garden benches, sheds, beds and garden decor. Separate pieces only. Models: assets/manifest.json and the packs it lists (crates/art).",
   "objects": [
     {
       "id": "patioTableRound",
@@ -709,6 +709,278 @@
       "decor": 0.4,
       "description": "Four flat stones across the lawn.",
       "interactions": []
+    },
+    {
+      "id": "jetty",
+      "name": "Jetty",
+      "model": "model.waterEdge.jetty",
+      "footprint": [
+        2,
+        4
+      ],
+      "price": 650,
+      "category": "outdoor",
+      "group": "waterside",
+      "outdoors": true,
+      "decor": 0.3,
+      "description": "A plank jetty on timber posts, with a mooring bollard at each corner of its far end.",
+      "interactions": []
+    },
+    {
+      "id": "rowingBoat",
+      "name": "Rowing boat",
+      "model": "model.waterEdge.rowingBoat",
+      "footprint": [
+        2,
+        3
+      ],
+      "price": 420,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "waterside",
+      "outdoors": true,
+      "decor": 0.4,
+      "description": "A painted rowing boat with two seats and a pair of oars.",
+      "interactions": []
+    },
+    {
+      "id": "reeds",
+      "name": "Reeds",
+      "model": "model.waterEdge.reeds",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 45,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "waterside",
+      "outdoors": true,
+      "decor": 0.4,
+      "description": "A clump of reeds and bulrushes for the water's edge.",
+      "interactions": []
+    },
+    {
+      "id": "beachHut",
+      "name": "Beach hut",
+      "model": "model.waterEdge.beachHut",
+      "footprint": [
+        2,
+        2
+      ],
+      "price": 780,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "waterside",
+      "outdoors": true,
+      "decor": 0.4,
+      "description": "A striped beach hut on timber skids, its door under the gable between two little windows.",
+      "interactions": []
+    },
+    {
+      "id": "waterBench",
+      "name": "Water's edge bench",
+      "model": "model.waterEdge.bench",
+      "footprint": [
+        2,
+        1
+      ],
+      "price": 260,
+      "category": "outdoor",
+      "group": "waterside",
+      "slots": 2,
+      "outdoors": true,
+      "seat": {
+        "height": 0.475,
+        "forward": 0.02
+      },
+      "description": "A slatted bench with a brass plaque, its back to the land so you look out over the water.",
+      "interactions": [
+        {
+          "id": "sit",
+          "label": "Sit and watch the water",
+          "anim": "sit",
+          "minutes": 30,
+          "pose": "sit",
+          "effects": {
+            "comfort": 0.35,
+            "fun": 0.05
+          },
+          "tags": [
+            "lounge",
+            "outdoors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "letterbox",
+      "name": "Letterbox on a post",
+      "model": "model.letterbox",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 95,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "yard",
+      "outdoors": true,
+      "decor": 0.1,
+      "description": "The household's own letterbox on a post: the post comes every morning, a letter showing in its slot. Someone fetches it and reads it over; now and then there's a letter from a friend, and letters written at home reach friends who have a letterbox too.",
+      "interactions": [
+        {
+          "id": "fetchPost",
+          "label": "Fetch the post",
+          "anim": "read",
+          "sound": "letterbox",
+          "minutes": 8,
+          "when": "open",
+          "leaves": "closed",
+          "post": true,
+          "effects": {
+            "fun": 0.1
+          },
+          "tags": [
+            "chores",
+            "outdoors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hoseReel",
+      "name": "Garden hose reel",
+      "model": "model.hoseReel",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 85,
+      "category": "outdoor",
+      "freeRotation": true,
+      "group": "yard",
+      "outdoors": true,
+      "grows": {
+        "days": 0.5,
+        "fallow": 0,
+        "boughtRipe": true,
+        "notRipe": "the garden was watered not long ago"
+      },
+      "description": "Forty metres of green hose on a reel cart. Watering the garden with it brings every growing crop on the lot on at once, quicker than a can plant by plant; the garden wants it again half a day later.",
+      "interactions": [
+        {
+          "id": "waterGarden",
+          "label": "Water the garden",
+          "anim": "water",
+          "sound": "hose",
+          "minutes": 15,
+          "when": "ripe",
+          "leaves": "picked",
+          "waters": 0.05,
+          "effects": {
+            "fun": 0.08
+          },
+          "tags": [
+            "chores",
+            "nature",
+            "garden",
+            "outdoors"
+          ],
+          "skills": {
+            "gardening": 0.05
+          }
+        }
+      ]
+    },
+    {
+      "id": "lawnMower",
+      "name": "Push lawnmower",
+      "model": "model.lawnMower",
+      "footprint": [
+        1,
+        2
+      ],
+      "price": 240,
+      "category": "outdoor",
+      "group": "yard",
+      "outdoors": true,
+      "grows": {
+        "days": 3,
+        "fallow": 0,
+        "boughtRipe": true,
+        "notRipe": "the grass hasn't grown back yet"
+      },
+      "description": "A petrol push mower, ready to mow the lawn at once; after a mow the grass wants cutting again in three days. A freshly mown lawn leaves whoever mowed it pleased for two days, and Nature lovers like the job.",
+      "interactions": [
+        {
+          "id": "mow",
+          "label": "Mow the lawn",
+          "anim": "clean",
+          "sound": "mower",
+          "minutes": 30,
+          "when": "ripe",
+          "leaves": "picked",
+          "lasts": true,
+          "effects": {
+            "fun": 0.12
+          },
+          "tags": [
+            "chores",
+            "garden",
+            "outdoors"
+          ],
+          "skills": {
+            "gardening": 0.05
+          },
+          "feeling": "garden.neatLawn"
+        }
+      ]
     }
-  ]
+  ],
+  "feelings": [
+    {
+      "id": "garden.neatLawn",
+      "label": "Neat lawn",
+      "emotion": "happy",
+      "mood": 0.05,
+      "hours": 48
+    }
+  ],
+  "voice": {
+    "en": {
+      "object": {
+        "letterbox": {
+          "interactions": {
+            "fetchPost": [
+              "Anything for me?",
+              "Bills, bills... ooh, a postcard!",
+              "The post's here.",
+              "Who writes letters these days? Someone!"
+            ]
+          }
+        },
+        "hoseReel": {
+          "interactions": {
+            "waterGarden": [
+              "A good soak for everyone.",
+              "There you go, plants.",
+              "Mind your feet!",
+              "The whole garden in one go."
+            ]
+          }
+        },
+        "lawnMower": {
+          "interactions": {
+            "mow": [
+              "Nice neat stripes.",
+              "That smell of cut grass!",
+              "Up and down, up and down.",
+              "The lawn looks great."
+            ]
+          }
+        }
+      }
+    }
+  }
 }

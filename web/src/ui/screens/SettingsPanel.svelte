@@ -24,7 +24,7 @@
   import { voiceFor } from '../../voice/voices';
   import { downloadMb, llmStatus, MODEL } from '../../llm';
   import { hasWebGpu } from '../../ml/ort';
-  import { browserHint, deviceTest, report, sampleLine, stopDeviceTest, testDevices } from '../../talk';
+  import { browserHint, deviceTest, llmDevice, report, sampleLine, stopDeviceTest, testDevices } from '../../talk';
 
   // This game's lifespan (sent to the simulation when picked).
   let lifespan = $state<Lifespan>(game.lifespan);
@@ -42,7 +42,7 @@
   async function loadPasted() {
     stateError = '';
     try {
-      app.start({ kind: 'load', saveId: await loadState(pasted.trim()) });
+      app.start({ kind: 'load', saveId: (await loadState(pasted.trim())).saveId });
       pasted = '';
     } catch (err) {
       stateError = err instanceof Error ? err.message : String(err);
@@ -63,8 +63,8 @@
     { id: 'gameplay', label: 'Gameplay', icon: 'icon.ui.live', keys: ['autonomy', 'autosaveMinutes'] },
     { id: 'camera', label: 'Camera & time', icon: 'icon.ui.watch', keys: ['directorDelay', 'directorPace', 'hideHudWhileWatching', 'autoSlow', 'skipQuietHours', 'pauseOnBlur'] },
     { id: 'interface', label: 'Interface', icon: 'icon.ui.display', keys: ['uiScale', 'clock24h', 'reducedMotion', 'showFps'] },
-    { id: 'audio', label: 'Audio', icon: 'icon.ui.audio', keys: ['masterVolume', 'sound', 'worldSound', 'worldVolume', 'muteInBackground'] },
-    { id: 'voices', label: 'Voices', icon: 'icon.ui.voice', keys: ['voices', 'voiceDevice', 'voiceVolume', 'voiceWriter', 'subtitles'] },
+    { id: 'audio', label: 'Audio', icon: 'icon.ui.audio', keys: ['masterVolume', 'sound', 'effectsVolume', 'worldSound', 'worldVolume', 'musicVolume', 'muteInBackground'] },
+    { id: 'voices', label: 'Voices', icon: 'icon.ui.voice', keys: ['voices', 'voiceDevice', 'voiceVolume', 'voiceWriter', 'llmDevice', 'subtitles'] },
     { id: 'controls', label: 'Controls', icon: 'icon.ui.move', keys: ['directControl', 'cameraSensitivity'] },
   ] as const satisfies readonly { id: string; label: string; icon: string; keys: readonly (keyof Settings)[] }[];
   type Page = (typeof pages)[number]['id'];
@@ -141,21 +141,32 @@
   const downloading = $derived(llmStatus.state === 'loading');
   /** What loading shows: the download, then starting the model (the files are in). */
   const loadLabel = $derived(llmStatus.progress < 1 ? `Downloading ${MODEL.label}` : `Starting ${MODEL.label}`);
+  /** Where the model runs: where it is loaded, else where the setting and the device test put it. */
+  const llmOn = $derived(llmStatus.state === 'off' ? llmDevice() : llmStatus.device);
   const llmText = $derived.by(() => {
     if (llmStatus.state === 'error') return `Couldn't load it: ${llmStatus.error}`;
-    return `${MODEL.label}, on this computer's graphics card: about ${Math.round(downloadMb(MODEL))} MB, downloaded once.`;
+    if (llmOn === 'gpu' && !gpuAvailable) return 'No WebGPU here: choose Auto or Processor for the model.';
+    return `${MODEL.label}, on ${DEVICE_NAME[llmOn]}: about ${Math.round(downloadMb(MODEL))} MB, downloaded once.`;
   });
+  const LLM_DEVICE_HINT = {
+    auto: 'Auto uses the graphics card, and steps down to the processor if it is missing or too slow.',
+    gpu: 'The graphics card writes a line in under a second.',
+    cpu: 'The processor takes several seconds a line: on most computers too long for residents to say it.',
+  };
+  const ON_DEVICE = { gpu: 'On the graphics card', cpu: 'On the processor' };
   const deviceText = $derived.by(() => {
     if (deviceTest.running) return deviceTest.step || 'Testing…';
     const r = report();
     if (!r && deviceTest.stopped) return 'Test stopped. Until it has run, residents say hand-written lines.';
-    if (!r) return gpuAvailable ? 'Not tested here yet: it tests itself when chosen.' : 'No WebGPU here: the model needs it, so residents say hand-written lines.';
+    if (!r) return 'Not tested here yet: it tests itself when chosen.';
     const x = r.result;
     if (!r.usable) {
-      const why = x.ran ? `${(x.lineMs / 1000).toFixed(1)} s a line${x.ok ? '' : ' (wrong text)'}.` : "It couldn't load.";
-      return `Doesn't run well enough here, so residents say hand-written lines. ${why}${browserHint(x)}`;
+      // (Lines cut short at the writer's time limit don't pass as lines: too slow, not wrong.)
+      const fault = x.ok ? '' : x.cut * 2 >= x.written ? ', most cut short' : ' (wrong text)';
+      const why = x.ran ? `${(x.lineMs / 1000).toFixed(1)} s a line${fault}.` : x.error === 'no WebGPU here' ? 'No WebGPU here.' : "It couldn't load.";
+      return `${ON_DEVICE[r.device]} it doesn't run well enough here, so residents say hand-written lines. ${why}${browserHint(r)}`;
     }
-    return `Runs on the GPU: ${(x.lineMs / 1000).toFixed(2)} s from asking for a line to hearing it.`;
+    return `${ON_DEVICE[r.device]}: ${(x.lineMs / 1000).toFixed(2)} s from asking for a line to hearing it.`;
   });
   let writing = $state(false);
   let written = $state('');
@@ -200,7 +211,8 @@
       title: 'Time',
       keys: [
         [['Space'], 'Pause / resume'],
-        [['1', '–', '5'], 'Game speed'],
+        [['1', '–', '3'], 'Game speed'],
+        [['4'], 'Super speed (30×; 60× in quiet hours)'],
         [['0'], 'Pause'],
       ],
     },
@@ -432,8 +444,8 @@
         <SettingRow title="Slow down for big moments" hint="A first kiss, a new job or a fight at home plays at normal speed.">
           <Toggle label="Slow down for big moments" bind:checked={settings.autoSlow} />
         </SettingRow>
-        <SettingRow title="Skip quiet hours" hint="Time-lapse while everyone at home sleeps or is at work.">
-          <Toggle label="Skip quiet hours" bind:checked={settings.skipQuietHours} />
+        <SettingRow title="Super speed when quiet" hint="Super speed by itself while everyone at home sleeps or is out." details="Back to your speed when someone wakes or comes home.">
+          <Toggle label="Super speed when quiet" bind:checked={settings.skipQuietHours} />
         </SettingRow>
         <SettingRow title="Pause when the window loses focus" hint="Time stands still while you're in another window, and goes on when you're back.">
           <Toggle label="Pause when the window loses focus" bind:checked={settings.pauseOnBlur} />
@@ -491,8 +503,12 @@
           <input class="slider" type="range" min="0" max="1" step="0.05" aria-label="Master volume" bind:value={settings.masterVolume} />
           <output>{percent(settings.masterVolume)}</output>
         </SettingRow>
-        <SettingRow title="Sound effects" hint="Little sounds when you buy, build and place things.">
+        <SettingRow title="Sound effects" hint="Little sounds for menus, the clock, money, buying and building.">
           <Toggle label="Sound effects" bind:checked={settings.sound} />
+        </SettingRow>
+        <SettingRow title="Effects volume" disabled={!settings.sound}>
+          <input class="slider" type="range" min="0" max="1" step="0.05" aria-label="Effects volume" bind:value={settings.effectsVolume} disabled={!settings.sound} />
+          <output>{percent(settings.effectsVolume)}</output>
         </SettingRow>
         <SettingRow title="Sounds of the world" hint="Birds by day, crickets at night, a pan sizzling, the TV.">
           <Toggle label="Sounds of the world" bind:checked={settings.worldSound} />
@@ -500,6 +516,10 @@
         <SettingRow title="World volume" disabled={!settings.worldSound}>
           <input class="slider" type="range" min="0" max="1" step="0.05" aria-label="World volume" bind:value={settings.worldVolume} disabled={!settings.worldSound} />
           <output>{percent(settings.worldVolume)}</output>
+        </SettingRow>
+        <SettingRow title="Music volume" hint="The stereo, the radio, dancing and instruments playing a tune. At 0 no music plays." disabled={!settings.worldSound}>
+          <input class="slider" type="range" min="0" max="1" step="0.05" aria-label="Music volume" bind:value={settings.musicVolume} disabled={!settings.worldSound} />
+          <output>{percent(settings.musicVolume)}</output>
         </SettingRow>
         <SettingRow title="Mute in background" hint="Silent while you're in another window." details="Sound always stops while the game's tab is hidden.">
           <Toggle label="Mute in background" bind:checked={settings.muteInBackground} />
@@ -576,6 +596,21 @@
         {#if settings.voiceWriter === 'llm'}
           <section>
             <h3>Language model</h3>
+            <SettingRow
+              title="Runs on"
+              hint={LLM_DEVICE_HINT[settings.llmDevice]}
+              details="The graphics card is many times faster; Auto only moves to the processor when the card is missing or the test finds it too slow."
+            >
+              <Segmented
+                label="Language model runs on"
+                bind:value={settings.llmDevice}
+                options={[
+                  { value: 'auto', label: 'Auto' },
+                  { value: 'gpu', label: 'Graphics card' },
+                  { value: 'cpu', label: 'Processor' },
+                ]}
+              />
+            </SettingRow>
             <SettingRow title="Model" hint={llmText} details="{MODEL.about} Licence: {MODEL.licence}.">
               {#if downloading && !deviceTest.running}
                 <Busy label={loadLabel} progress={llmStatus.progress < 1 ? llmStatus.progress : null} />

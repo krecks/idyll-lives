@@ -1,14 +1,17 @@
 <script lang="ts">
   /**
-   * Fallback backdrop behind the menus: a golden-hour landscape in CSS + inline SVG (no images,
-   * no JS work). Hidden while the live 3D scene renders behind the menu (`app.liveBackdrop`).
-   * Only `transform` is animated, so it stays on the compositor.
+   * Backdrop behind the menus: a golden-hour landscape in CSS + inline SVG (no JS work), and over
+   * it, on the main menu, its picture of the last world made (`still`, `menuStill.ts`), faded in once
+   * loaded. Hidden while the live 3D scene renders behind the menu (`app.liveBackdrop`). Only
+   * `transform` and `opacity` are animated, so it stays on the compositor.
    */
   import { app } from '../app.svelte';
 
-  /** `always`: shown even over the live scene (loading screens). */
-  let { always = false }: { always?: boolean } = $props();
+  /** `always`: shown even over the live scene (loading screens). `still`: the picture's URL. */
+  let { always = false, still }: { always?: boolean; still?: string } = $props();
   const live = $derived((app as { liveBackdrop?: boolean }).liveBackdrop ?? false);
+  /** The picture shown has loaded (one decoded already shows at once). */
+  let loaded = $state<string | null>(null);
 </script>
 
 {#if always || !live}
@@ -50,6 +53,12 @@
     </svg>
     <div class="haze"></div>
     <div class="vignette"></div>
+    <!-- (Over the vignette: the picture as the live town looked.) -->
+    {#if still}
+      {#key still}
+        <img class="still" class:loaded={loaded === still} src={still} alt="" onload={() => (loaded = still)} />
+      {/key}
+    {/if}
   </div>
 {/if}
 
@@ -131,6 +140,20 @@
     position: absolute;
     inset: 40% 0 0 0;
     background: linear-gradient(180deg, rgba(241, 214, 180, 0) 0%, rgba(241, 214, 180, 0.28) 30%, rgba(241, 214, 180, 0) 60%);
+  }
+  /* The town right of the menu panel, as it was taken: the left is cut first on a narrower screen. */
+  .still {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 70% 50%;
+    opacity: 0;
+    transition: opacity 400ms var(--ease);
+  }
+  .still.loaded {
+    opacity: 1;
   }
   .vignette {
     position: absolute;

@@ -98,6 +98,7 @@
           "id": "shoot",
           "label": "Shoot hoops",
           "anim": "exercise",
+          "sound": "basketball",
           "minutes": 40,
           "pose": "stand",
           "autonomous": true,
@@ -166,7 +167,7 @@
       "model": "model.energetic.recoveryPod",
       "footprint": [1, 2],
       "price": 3200,
-      "category": "fitness",
+      "category": "wellness",
       "slots": 1,
       "description": "A padded lounger under a tinted canopy with compression and cool air ($8 running cost a session). Restores comfort and a little energy, and leaves residents Fully recovered: they sleep deeper and train harder for hours.",
       "interactions": [

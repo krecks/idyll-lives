@@ -1,0 +1,31 @@
+# The M1 estimate (tools/m1/README.md): `m3` is the container as it is on the dev machine, `m1` the
+# same under a CPU quota (a share of one core's time each 10 ms period: 0.72 by default, the M1's
+# single-core speed against the M3 Pro's) and 8 GB of memory. The repo is mounted read-only, with
+# bench-results writable; the cargo target and registry live in named volumes.
+x-bench: &bench
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: idyll-lives-m1:latest
+  platform: linux/arm64
+  working_dir: /repo
+  environment:
+    CARGO_TARGET_DIR: /target
+  volumes:
+    - ../..:/repo:ro
+    - ../../bench-results:/repo/bench-results
+    - target:/target
+    - registry:/usr/local/cargo/registry
+
+services:
+  m3:
+    <<: *bench
+  m1:
+    <<: *bench
+    mem_limit: 8g
+    cpu_period: 10000
+    cpu_quota: ${M1_QUOTA:-7200}
+
+volumes:
+  target: {}
+  registry: {}

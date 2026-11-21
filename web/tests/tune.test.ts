@@ -1,6 +1,6 @@
 // `render/tune.ts`: the dev server's `?tune=` (`bun test`).
 import { describe, expect, test } from 'bun:test';
-import { applyTune, parseTune, tuned } from '../src/render/tune';
+import { applyEntryTune, applyTune, parseTune, tuned, tunedEntry } from '../src/render/tune';
 
 /** `fn`'s result and what it said on the console's warnings. */
 function warned<T>(fn: () => T): [T, number] {
@@ -47,8 +47,21 @@ describe('tune', () => {
     expect(warned(() => applyTune('key.7', { hour: 7, sky: 0.12 }, parseTune('key.7.5.sky:0.2')).sky)).toEqual([0.12, 1]);
   });
 
+  test("a manifest entry is tuned by its key and one of its own fields", () => {
+    const wood = { type: 'material', color: '#FFFFFF', texture: 'textures/floor_wood/albedo.jpg', uvScale: 0.53 };
+    const tune = parseTune('material.floor.wood.color:D9C8B4;material.floor.wood.uvScale:0.36;material.floor.wood.texture:../floor_wood.calm/albedo.jpg;material.floor.wood.sheen:1');
+    // (A field the entry hasn't is nobody's, and said of nobody: a longer key's entry reads so from a shorter key.)
+    const [out, said] = warned(() => applyEntryTune('material.floor.wood', wood, tune));
+    expect(out).toEqual({ type: 'material', color: '#D9C8B4', texture: '../floor_wood.calm/albedo.jpg', uvScale: 0.36 });
+    expect(said).toBe(0);
+    expect(wood.color).toBe('#FFFFFF');
+    const floor = { type: 'material', color: '#FFFFFF' };
+    expect(warned(() => applyEntryTune('material.floor', floor, tune))).toEqual([floor, 0]);
+  });
+
   test('nothing is tuned outside the dev server', () => {
     const base = { tip: 1.35 };
     expect(tuned('lawn', base)).toBe(base);
+    expect(tunedEntry('material.floor.wood', base)).toBe(base);
   });
 });

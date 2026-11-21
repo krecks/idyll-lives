@@ -22,7 +22,7 @@
 
 import type { Content, ObjectDef } from '../content/content';
 import { colorValues } from '../ui/buy/catalog';
-import { colorsKey, groundDepth, storeyOfRow, storeyRow, type StoreyLayout, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type GarageInfo, type ObjectPlacement, type PartColors, type PlotInfo, type PorchInfo, type PorchPieceInfo, type WorldStructure } from '../core/protocol';
+import { colorsKey, flatOf, groundDepth, storeyOfRow, storeyRow, type FlatInfo, type StoreyLayout, MAX_HEAD, MAX_OFFSET, MAX_SHORTER, MAX_SIZE, MAX_TALLER, MIN_DOOR_HEAD, MIN_SIZE, MIN_WINDOW, objectCentre, type Command, type EdgeEdit, type FacePaint, type FloorPaint, type GarageInfo, type ObjectPlacement, type PartColors, type PlotInfo, type PorchInfo, type PorchPieceInfo, type WorldStructure } from '../core/protocol';
 import type { BuildEffect, ObjectResize, Renderer, ResizeHandle } from '../render/types';
 import type { Sound } from '../ui/sfx';
 import { game, type BuildTool } from '../ui/state.svelte';
@@ -30,6 +30,7 @@ import { approachTile, covers, facedTable, fitOnTop, frontTile, overhangEdges, o
 import { edgeInGarage, freeGarage, garageFits, garageTiles, onGarage, type GaragePlan, type GarageSite } from './garage';
 import { covers as pieceCovers, innerEdges, PIECE_NAME, pieceBoxes, pieceFits, piecePlan, piecePrice, pieceTiles as pieceTilesOf, porchAt, porchBoxes, porchPostTiles, porchTiles, type PorchSite, type PreviewBox } from './porch';
 import { drivewayGarage } from '../render/shared/street';
+import { FLAT_WALLS } from './flatBuild';
 
 type Point = { x: number; z: number };
 /** A wall face to paint; `half` for a half wall (the preview's height). */
@@ -83,7 +84,7 @@ const DIAGONAL_SLOPE = Math.tan(Math.PI / 8);
 /** Resize arrows sit this far (m) outside the edge they move, and the height arrow this far above the top. */
 const HANDLE_OUT = 0.3;
 /**
- * Whether things can be resized in Buy mode (the arrows). Off for now: a Blender model's moving parts
+ * Whether things can be resized in Buy mode (the arrows). Off for now: a model's moving parts
  * (a fridge's doors, a wall bed) don't follow a resize well. It comes back for the objects it suits.
  * Things resized before keep their size, and "Reset size" still takes them back to their own.
  */
@@ -311,12 +312,39 @@ export class BuildBuyInput {
 
   /**
    * The player's home plot, where everything in Build mode happens: on the storey in
-   * view, in its rows of the lot (the renderer lifts them to that storey).
+   * view, in its rows of the lot (the renderer lifts them to that storey). A flat is its
+   * rectangle on its own storey, and nothing on another.
    */
   home(): PlotInfo | null {
     const plot = game.households.find((h) => h.player)?.plot;
-    const p = plot == null ? null : (game.plots[plot] ?? null);
+    if (plot == null) return null;
+    const flat = flatOf(game, plot);
+    if (flat) {
+      if (game.storey !== flat.storey) return null;
+      const lot = game.plots[flat.of];
+      return { id: flat.id, name: flat.name, x: flat.x, z: flat.z + storeyRow(this.layout, flat.storey), w: flat.w, d: flat.d, public: false, entry: lot?.entry ?? null, house: null };
+    }
+    const p = game.plots[plot] ?? null;
     return p && game.storey !== 0 ? { ...p, z: p.z + storeyRow(this.layout, game.storey) } : p;
+  }
+
+  /** The home's flat, if the household lives in one. */
+  private homeFlat(): FlatInfo | undefined {
+    const plot = game.households.find((h) => h.player)?.plot;
+    return plot == null ? undefined : flatOf(game, plot);
+  }
+
+  /**
+   * Whether walls, doors and windows may go on `edges` at home: on its lot, and in a flat between two of its own tiles
+   * (its outer walls are the building's). Says why not in a flat (`game.buildWhy`).
+   */
+  private edgesBuildable(edges: EdgeEdit[]): boolean {
+    if (!this.edgesOnHome(edges)) return false;
+    const home = this.home();
+    if (!home || !this.homeFlat()) return true;
+    const inside = edges.every((e) => (e.axis === 'h' ? e.z > home.z && e.z < home.z + home.d : e.axis === 'v' ? e.x > home.x && e.x < home.x + home.w : true));
+    if (!inside) game.buildWhy = FLAT_WALLS;
+    return inside;
   }
 
   /** Called when the mode changes: shows the grid and clears old previews. */
@@ -341,6 +369,7 @@ export class BuildBuyInput {
     game.buildWallUp = false;
     game.buildEdges = 0;
     game.buildValid = true;
+    game.buildWhy = null;
     game.buildRoom = null;
     game.placeValid = true;
     game.placeHint = null;
@@ -1431,7 +1460,8 @@ export class BuildBuyInput {
       const state = this.edgeState(e);
       return (state === 'wall' && !this.lookOf(e).form) || state === sel.kind;
     });
-    d.valid = fits && this.edgesOnHome(edits) && game.affords(game.creative ? 0 : this.cost(edits));
+    game.buildWhy = null;
+    d.valid = fits && this.edgesBuildable(edits) && game.affords(game.creative ? 0 : this.cost(edits));
     game.buildCost = game.creative ? 0 : this.cost(edits);
     game.buildValid = d.valid;
     this.preview.setEdgePreview(this.runEdges(now).map((e) => ({ ...e, kind: sel.kind, style: sel.style, ...(now.sized ? { sill: sel.kind === 'window' ? now.sill : undefined, head: now.head } : {}) })), d.valid);
@@ -1919,7 +1949,8 @@ export class BuildBuyInput {
     const garaged = edges.some((e) => e.kind !== 'open' && (this.world?.garages ?? []).some((g) => edgeInGarage(g, e.axis, e.x, e.z)));
     // (Nor through a porch or a porch piece.)
     const porched = edges.some((e) => e.kind !== 'open' && this.edgeInPorch(e.axis, e.x, e.z));
-    const valid = inWall && !garaged && !porched && this.edgesOnHome(edges) && this.diagonalsFit(edges) && game.affords(game.buildCost);
+    game.buildWhy = null;
+    const valid = inWall && !garaged && !porched && this.edgesBuildable(edges) && this.diagonalsFit(edges) && game.affords(game.buildCost);
     this.preview.setEdgePreview(edges, valid);
     game.buildEdges = edges.length;
     game.buildValid = valid;

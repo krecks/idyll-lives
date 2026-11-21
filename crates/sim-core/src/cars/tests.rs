@@ -426,7 +426,9 @@ fn a_car_waits_for_someone_in_its_way_who_then_steps_aside() {
     w.cars[0].driver = Some(0);
     w.cars[0].aboard = vec![0];
     w.sims[0].away_until = Some(w.tick + 100_000);
-    // ...and Bo stands right in front of it (it faces the street).
+    // ...and Bo stands right in front of it (it faces the street), no shift of his to set off
+    // for in the while (`life::early`: he'd be off a little before it).
+    w.sims[1].job = None;
     w.sims[1].pos = [34.0, 6.5];
     for _ in 0..secs(1.0) {
         w.tick_once();
@@ -644,8 +646,8 @@ fn no_trip_parks_on_a_driveway() {
             "sims":[{{"name":"D","household":0,"x":83.5,"z":17.5}}],
             "drives":[{{"plot":0,"x":90,"z":8.5,"front":1,"street":30,"road":0,"s":89.5}}],
             "cars":[{{"plot":0,"x":90,"z":11.25,"yaw":0,"street":30,"len":4.6,"wid":1.88,"body":2,"paint":0}}],
-            "parking":[{{"x":91.0,"z":20.0,"rot":0,"area":0}},{{"x":93.0,"z":25.0,"rot":0,"area":0}},
-                       {{"x":140.0,"z":24.0,"rot":0,"area":0}}]}}"#,
+            "parking":[{{"x":91.0,"z":20.0,"yaw":3.1416,"area":0}},{{"x":93.0,"z":25.0,"yaw":3.1416,"area":0}},
+                       {{"x":140.0,"z":24.0,"yaw":3.1416,"area":0}}]}}"#,
         road.join(",")
     );
     let w = World::from_json(CONTENT, &town, 1).unwrap();
@@ -871,6 +873,153 @@ fn a_car_at_country_speed_cannot_skip_a_junction_box() {
         t += 1.0;
     }
     assert!(asked);
+}
+
+/// (Station Cross, the real town's city of seed base 0: a car held up on a country road turned round
+/// in a driveway's mouth behind it. Every pose of the turn was looked at against the car parked up
+/// the driveway but the first, the deepest in the mouth; it backed in to that one, stood nose to
+/// tail with the parked car and waited for it for good, and the riders on the verge behind it
+/// with it.) With a car parked a little nearer the deepest pose than cars keep apart, the mouth is
+/// no place to turn round; parked further up, it is.
+#[test]
+fn no_car_turns_round_in_a_mouth_with_a_car_parked_up_against_its_turn() {
+    let road: Vec<String> = (0..=199).map(|x| format!("[{x}.5,30]")).collect();
+    let town = format!(
+        r#"{{"width":200,"depth":60,
+            "exits":[{{"x":0.5,"z":30,"kind":"road"}},{{"x":199.5,"z":30,"kind":"road"}}],
+            "roads":[{{"points":[{}],"width":7,"kind":"street","ends":["out","out"]}}],
+            "plots":[{{"name":"H","x":78,"z":8,"w":16,"d":18,"entry":[83.5,25.5]}}],
+            "drives":[{{"plot":0,"x":90,"z":8.5,"front":1,"street":30,"road":0,"s":89.5}}],
+            "households":[],"objects":[],"sims":[],"cars":[]}}"#,
+        road.join(",")
+    );
+    let mut w = World::from_json(CONTENT, &town, 1).unwrap();
+    w.cars.push(car([0.0, 0.0], 0.0, 30.0));
+    // (It came east along the street, past the mouth.)
+    let ways: Vec<Route> = [TIGHT_LANE, -TIGHT_LANE]
+        .into_iter()
+        .map(|lane| {
+            let mut legs = Legs::default();
+            for k in 0..=50 {
+                legs.push_lane([20.0 + k as f32 * 2.0, 30.0 + lane], 5.0, 0.0, LANE);
+            }
+            legs.timed(true, true)
+        })
+        .collect();
+    let (route, m) = ways
+        .iter()
+        .find_map(|r| mouth_behind(&w, 0, r, 0.0, r.ticks() - 1.0, &|_| true).map(|(_, m)| (r, m)))
+        .expect("a mouth to turn round in");
+    let t = route.ticks() - 1.0;
+    let bay = mouth_turn(&m, &w.travel, w.cars[0].len).expect("a turn in it");
+    let mut into = Legs::default();
+    bay.leave(&mut into, m.go);
+    let deep = into.pts[0].0;
+    // (A car 4.6 m long parked up the driveway, `gap` from the deepest pose's end.)
+    let parked = |gap: f32| Rect {
+        at: [
+            deep[0] - m.way[0] * (w.cars[0].len / 2.0 + 2.3 + gap),
+            deep[1] - m.way[1] * (w.cars[0].len / 2.0 + 2.3 + gap),
+        ],
+        yaw: m.way[0].atan2(m.way[1]),
+        half: [2.3, 0.94],
+    };
+    let clear_of = |b: Rect| {
+        move |r: &Rect| {
+            crate::travel::dist(b.at, r.at) > b.half[0] + r.half[0] + GAP + 0.5 || b.gap(r) >= GAP
+        }
+    };
+    assert!(
+        mouth_behind(&w, 0, route, 0.0, t, &clear_of(parked(GAP / 3.0))).is_none(),
+        "a car parked up against the deepest pose"
+    );
+    assert!(
+        mouth_behind(&w, 0, route, 0.0, t, &clear_of(parked(GAP * 2.0))).is_some(),
+        "one parked clear of it"
+    );
+}
+
+/// (Skerry Island, the real town's island of seed base 0: a work taxi held up in a morning queue
+/// turned round, and as it backed up along the street a car came up behind it, into the ground
+/// it backed over. Each waited for the other: the one behind could back up no further, a car
+/// behind it, and the taxi would turn round no second time. They stood there the rest of the day,
+/// and the riders behind them with them.) A car backing up as it turns round, one come up behind
+/// it that waits for it, and one behind that: none of them can turn round, so the one turning
+/// round gives it up where it stands and drives on.
+#[test]
+fn one_turning_round_held_up_by_one_come_up_behind_it_gives_the_turn_up() {
+    let road: Vec<String> = (0..=199).map(|x| format!("[{x}.5,30]")).collect();
+    let town = format!(
+        r#"{{"width":200,"depth":60,
+            "exits":[{{"x":0.5,"z":30,"kind":"road"}},{{"x":199.5,"z":30,"kind":"road"}}],
+            "roads":[{{"points":[{}],"width":7,"kind":"street","ends":["out","out"]}}],
+            "plots":[],"households":[],"objects":[],"sims":[],"cars":[]}}"#,
+        road.join(",")
+    );
+    let mut w = World::from_json(CONTENT, &town, 1).unwrap();
+    // (Each on its way east along the street's lane.)
+    let mut legs = Legs::default();
+    for k in 0..=80 {
+        legs.push_lane([20.0 + k as f32 * 2.0, 30.0 + TIGHT_LANE], 5.0, 0.0, LANE);
+    }
+    let had = legs.timed(true, true);
+    let at = |x: f32| had.points.iter().find(|p| p.0[0] >= x).unwrap().2;
+    let rp = w.travel.graph.near([100.0, 30.0], ROAD_REACH, 1, Mode::Car)[0];
+    // The turning one: held up at x 100, backing up towards x 70, a few metres back already.
+    let mut a = car([20.0, 10.0], 0.0, 30.0);
+    let d = Detour {
+        home: false,
+        from: at(100.0),
+        back: at(70.0),
+        avoid: rp.edge,
+        same: false,
+        mouth: None,
+    };
+    let turned = a
+        .detoured(&w.exits, &w.travel, false, &d, &had)
+        .expect("a way on");
+    a.route = Some((false, turned));
+    a.detour = Some(d);
+    a.progress = 4.0;
+    // The one behind it, in the ground it backs over, and one behind that one.
+    let mut b = car([24.0, 10.0], 0.0, 30.0);
+    b.route = Some((false, had.clone()));
+    b.progress = at(90.0);
+    let mut c = car([28.0, 10.0], 0.0, 30.0);
+    c.route = Some((false, had.clone()));
+    c.progress = at(84.5);
+    for k in [&mut a, &mut b, &mut c] {
+        k.state = CarState::Leaving;
+        let (p, yaw, _) = k.route.as_ref().unwrap().1.at(k.progress);
+        k.shown = Some((p, yaw, true, 0));
+        k.stall = (k.progress, 0);
+    }
+    assert!(
+        a.route.as_ref().unwrap().1.at(a.progress + 1.0).2,
+        "backing up"
+    );
+    a.waits_for = Some(car_first(1));
+    b.waits_for = Some(car_first(0));
+    c.waits_for = Some(car_first(1));
+    w.cars = vec![a, b, c];
+    w.tick = UNJAM_TICKS * 4;
+    let was = w.cars[0].shown.unwrap().0;
+    unjam(&mut w);
+    let a = &w.cars[0];
+    assert!(
+        !a.route.as_ref().unwrap().1.at(a.progress + 1.0).2,
+        "it gave the turn round up"
+    );
+    assert!(a.waits_for.is_none(), "and waits for nobody");
+    let (p, ..) = a.route.as_ref().unwrap().1.at(a.progress);
+    assert!(
+        crate::travel::dist(p, was) < 0.1,
+        "from where it stands ({p:?}, was {was:?})"
+    );
+    // On from there, east, the way it faces, to the way out there: not back towards where it
+    // turned round to.
+    let ahead = a.route.as_ref().unwrap().1.at(a.progress + 20.0).0;
+    assert!(ahead[0] > p[0] + 1.0, "on east ({ahead:?} from {p:?})");
 }
 
 /// (Eaglescar, world 231441 of seed base 16: a car turned round where the way it came ran a
@@ -1195,5 +1344,123 @@ fn a_car_faces_the_way_it_goes_round_a_corner() {
         worst.to_degrees() < 4.0,
         "its nose {}° off the way it goes",
         worst.to_degrees()
+    );
+}
+
+/// A rider and a car waiting for each other (Otter Weir, seed base 0: a car turning at a junction,
+/// its tail swinging out a tick on, waited for a cyclist beside it by name, `Car::on_foot`; their
+/// way ran through where the car stood, so they waited for it in turn). Stepped out of its way,
+/// the cyclist rode straight back towards it, into the ground it would turn through, and the two
+/// waited for each other for good, 27 residents on their bikes behind them for over two hours.
+/// Someone a car waits for by name doesn't come back into that ground (where it would be a tick
+/// on, `Car::next`), though they may step out of it, or on across it from inside it.
+#[test]
+fn rider_and_car_waiting_on_them_never_come_back_into_its_turn() {
+    let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+    let body = Body {
+        ahead: 1.2,
+        behind: 0.6,
+        side: 0.3,
+        yaw: 0.0,
+    };
+    let c = [30.0f32, 6.0];
+    // Turning tight: a tick on turned 1.1 rad further, its tail swinging out.
+    let (now, next) = (-0.4f32, 0.7f32);
+    let car = &mut w.cars[0];
+    car.state = CarState::Leaving;
+    car.shown = Some((c, now, true, 0));
+    car.next = Some((c, next));
+    car.on_foot = vec![1];
+    let (len, wid) = (car.len, car.wid);
+    // Beside its tail as it will be: a metre behind its middle, just out of its ground there.
+    let (h, n) = ([next.sin(), next.cos()], [next.cos(), -next.sin()]);
+    let across = -(wid / 2.0 + 1.2 + 0.1);
+    let at = [c[0] - h[0] + n[0] * across, c[1] - h[1] + n[1] * across];
+    let step = |d: f32| [at[0] + n[0] * d, at[1] + n[1] * d];
+    // (Nowhere near its body as it stands now: a step towards it was taken before.)
+    assert!(!walks_into(c, now, len, wid, 0.0, body, at, step(0.1)));
+    assert_eq!(
+        in_the_way(&w.cars, 1, body, at, step(0.1)),
+        Some(0),
+        "back towards its turn: they wait"
+    );
+    assert_eq!(
+        in_the_way(&w.cars, 1, body, at, step(-0.1)),
+        None,
+        "out of its way: on they go"
+    );
+    // Inside its ground, crossing it: on they go too.
+    let inside = [c[0] - h[0] * 3.0, c[1] - h[1] * 3.0];
+    let across_it = [inside[0] + n[0] * 0.1, inside[1] + n[1] * 0.1];
+    assert_eq!(in_the_way(&w.cars, 1, body, inside, across_it), None);
+    // One it doesn't wait for by name keeps clear as ever (`walks_into`, it and a tick on).
+    w.cars[0].on_foot.clear();
+    assert_eq!(in_the_way(&w.cars, 1, body, at, step(-0.1)), None);
+}
+
+/// A car standing a moment, held up by nobody (its claim just granted, say), goes on: it pulls
+/// over for one coming the other way only as far as it can go on with, as on the move. (A taxi
+/// let through stood at the start of its claim beside one standing the other way, pulled over
+/// as far as it had room where it stood, more than it had on its way a tick on; it had to pull
+/// back in first, couldn't beside that one, and waited for it to pass; that one waited for the
+/// car behind the first, which waited for the first, for good, Clover Acres.)
+#[test]
+fn a_car_held_up_by_nobody_pulls_over_only_as_far_as_it_goes_on_with() {
+    let town = TOWN.replace(
+        r#""cars":[{"plot":0"#,
+        r#""cars":[{"plot":0,"x":30.0,"z":3.0,"yaw":0.0,"street":9.5,"len":4.4,"wid":1.8,"body":1,"paint":1},{"plot":0"#,
+    );
+    let mut w = World::from_json(CONTENT, &town, 1).unwrap();
+    // Car 0 east along z = 9.5, its room running out a little ahead; car 1 coming west beside
+    // it, standing, their bodies 0.2 m apart.
+    let lane = |from: f32, to: f32, z: f32, room: &dyn Fn(f32) -> f32| {
+        let mut legs = Legs::default();
+        let n = ((to - from).abs() / 2.0) as i32;
+        for k in 0..=n {
+            let x = from + (to - from).signum() * 2.0 * k as f32;
+            legs.push_lane([x, z], 5.0, room(x), LANE);
+        }
+        let mut r = legs.timed(true, true);
+        r.claim(4.4, 1.8, None);
+        r
+    };
+    let mine = lane(10.0, 50.0, 9.5, &|x| if x < 31.0 { 0.215 } else { 0.0 });
+    let t = mine.points.iter().find(|p| p.0[0] >= 29.0).unwrap().2;
+    let (p, yaw, _) = mine.at(t);
+    let right = shifted([0.0, 0.0], yaw, 1.0);
+    let theirs = lane(50.0, 10.0, 9.5 - right[1] * 2.0, &|_| 0.0);
+    let u = theirs
+        .points
+        .iter()
+        .find(|q| q.0[0] <= p[0] + 1.0)
+        .unwrap()
+        .2;
+    let (q, qyaw, _) = theirs.at(u);
+    for (c, route, at, (pos, facing)) in [(0, mine, t, (p, yaw)), (1, theirs, u, (q, qyaw))] {
+        let car = &mut w.cars[c];
+        car.state = if c == 0 {
+            CarState::Leaving
+        } else {
+            CarState::Arriving
+        };
+        car.route = Some((c == 1, route));
+        car.progress = at;
+        car.shown = Some((pos, facing, true, 0));
+    }
+    let room_on = route_room(&w.cars[0], t + 1.0);
+    assert!(room_on < 0.01 && w.cars[0].route.as_ref().unwrap().1.room_here(t) > 0.2);
+    let others = vehicles(&w.cars, Some(0));
+    pull_over(&mut w, 0, &others, false, None);
+    assert!(
+        w.cars[0].shift <= room_on + 1e-4,
+        "pulled over {:.3} m, with {room_on:.3} m to go on with",
+        w.cars[0].shift
+    );
+    // (Held up by that one, it pulls over for it as far as it has room where it stands.)
+    let others = vehicles(&w.cars, Some(0));
+    pull_over(&mut w, 0, &others, false, Some(car_first(1)));
+    assert!(
+        w.cars[0].shift > 0.0,
+        "held up, it pulls over to let that one by"
     );
 }

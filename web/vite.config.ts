@@ -110,7 +110,7 @@ function modelWatch(): Plugin {
 
 /**
  * Dev server endpoints for debug reports (see src/debug/report.ts):
- * POST /__debug/report writes report.json, save.txt and screenshot.jpg into a new folder;
+ * POST /__debug/report writes report.json, save.txt, screenshot.jpg and newgame.json (a report taken in New game) into a new folder;
  * GET /__debug/reports/<name>/<file> reads them back (`?debugReport=<name>` loads one);
  * GET /__debug/states/<name> reads a game state the tests wrote (`?state=<name>` loads one);
  * POST /__debug/bench writes a benchmark's result to `bench-results/`;
@@ -144,10 +144,11 @@ function debugReports(): Plugin {
         try {
           const chunks: Buffer[] = [];
           for await (const chunk of req) chunks.push(chunk as Buffer);
-          const { report, save, screenshot } = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
+          const { report, save, screenshot, newGame } = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
             report: { createdAt: string; note: string };
             save: string | null;
             screenshot: string | null;
+            newGame?: string | null;
           };
           const slug = report.note.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
           const name = report.createdAt.replace(/\.\d+Z$/, '').replace(/[:T]/g, '-') + (slug ? `-${slug}` : '');
@@ -157,6 +158,8 @@ function debugReports(): Plugin {
           // No save when the game had stopped (or none ran): the report alone.
           if (save !== null) await writeFile(join(dir, 'save.txt'), save);
           if (screenshot) await writeFile(join(dir, 'screenshot.jpg'), Buffer.from(screenshot.slice(screenshot.indexOf(',') + 1), 'base64'));
+          // (New game's state: `?debugReport=<name>` opens New game again at its step.)
+          if (typeof newGame === 'string') await writeFile(join(dir, 'newgame.json'), newGame);
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ path: `debug-reports/${name}` }));
           server.config.logger.info(`[debug] report saved to debug-reports/${name}`, { timestamp: true });
@@ -196,7 +199,7 @@ function debugReports(): Plugin {
       });
       server.middlewares.use('/__debug/reports/', async (req, res) => {
         const [name, file] = decodeURIComponent((req.url ?? '').split('?')[0]).replace(/^\//, '').split('/');
-        if (!name || !file || name.includes('..') || !['report.json', 'save.txt', 'screenshot.jpg'].includes(file)) {
+        if (!name || !file || name.includes('..') || !['report.json', 'save.txt', 'screenshot.jpg', 'newgame.json'].includes(file)) {
           return void ((res.statusCode = 404), res.end());
         }
         try {
@@ -277,7 +280,7 @@ function runTool(args: string[]): string[] {
 }
 
 /**
- * The release WebAssembly: once the build has written the simulation's and the voice's wasm, they
+ * The release WebAssembly: once the build has written the simulation's, the sounds' and the voice's wasm, they
  * are optimised and stripped by binaryen's wasm-opt (`cargo wasm-opt`: -O3, no name or producers
  * sections; about a minute the first time, then cached). The dev server, and `bun run wasm` behind
  * it, keep them as built.
@@ -294,7 +297,7 @@ function releaseWasm(): Plugin {
     },
     async closeBundle() {
       const dir = join(outDir, 'assets');
-      const files = (await readdir(dir)).filter((f) => /^(sim|voice)_wasm_bg-[\w-]+\.wasm$/.test(f));
+      const files = (await readdir(dir)).filter((f) => /^(sim|voice|sound)_wasm_bg-[\w-]+\.wasm$/.test(f));
       if (!files.some((f) => f.startsWith('sim_'))) throw new Error(`release-wasm: no sim_wasm_bg-*.wasm in ${dir}`);
       for (const line of runTool(['wasm-opt', ...files.map((f) => join(dir, f))])) log(line);
     },
@@ -478,6 +481,34 @@ function isolationWorker(): Plugin {
   };
 }
 
+/**
+ * A build made for the benchmark (`VITE_BENCH=1`, `tools/bench/lib/build.mjs`): the debug hooks a bench needs kept
+ * (`src/debug/hooks.ts`), and only what a bench page loads: `public/` copied without the voice and language models
+ * (`benchPublic`; 290 MB a bench never asks for) and no licence file.
+ */
+const BENCH_BUILD = process.env.VITE_BENCH === '1';
+/** The folders of public/ a build for the benchmark leaves out. */
+const BENCH_LEFT_OUT = new Set(['llm', 'voice']);
+
+/** `public/` into the build without `BENCH_LEFT_OUT` (before the plugins that read the copied files at closeBundle). */
+function benchPublic(): Plugin {
+  let outDir = '';
+  let publicDir = '';
+  return {
+    name: 'bench-public',
+    apply: 'build',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+      publicDir = config.publicDir;
+    },
+    async writeBundle() {
+      for (const entry of await readdir(publicDir)) {
+        if (!BENCH_LEFT_OUT.has(entry)) await cp(join(publicDir, entry), join(outDir, entry), { recursive: true, dereference: true });
+      }
+    },
+  };
+}
+
 /** The npm packages whose code the bundles hold (the page's and the workers'), by directory. */
 const bundledPackages = new Set<string>();
 
@@ -533,7 +564,7 @@ The game itself is free software under the GNU General Public License v3.0 or la
 }
 
 export default defineConfig({
-  plugins: [svelte(), debugReports(), modelWatch(), earlyEnvironment(), optimizedAssets(), minifiedManifests(), dataBundle(), isolationWorker(), releaseWasm(), collectPackages(), thirdPartyLicenses()],
+  plugins: [svelte(), debugReports(), modelWatch(), earlyEnvironment(), ...(BENCH_BUILD ? [benchPublic()] : []), optimizedAssets(), minifiedManifests(), dataBundle(), isolationWorker(), releaseWasm(), collectPackages(), ...(BENCH_BUILD ? [] : [thirdPartyLicenses()])],
   // The game's version (one number for web and Rust; `cargo release-version <x.y.z>` bumps it).
   define: { __APP_VERSION__: JSON.stringify(pkg.version), __APP_COMMIT__: JSON.stringify(COMMIT), __BUILD_ID__: JSON.stringify(BUILD_ID) },
   server: { headers: crossOriginIsolation, ...(linkedModules ? { fs: { allow: [searchForWorkspaceRoot(process.cwd()), linkedModules] } } : {}) },
@@ -548,6 +579,7 @@ export default defineConfig({
   // if one grows past that.
   build: {
     target: 'es2022',
+    copyPublicDir: !BENCH_BUILD,
     chunkSizeWarningLimit: 2000,
     rolldownOptions: { output: { codeSplitting: { groups: [{ name: 'playcanvas', test: /[\\/]node_modules[\\/]playcanvas[\\/]/ }] } } },
   },

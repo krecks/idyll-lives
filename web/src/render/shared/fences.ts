@@ -58,18 +58,18 @@ export interface FencePlan {
 
 /**
  * Writes all fences and gates (null when there are none). `hedgeBoxes`: hedges as plain green boxes
- * too (Build mode's previews, which have no hedge model to hand). `wallAt`: see `writeFences`.
+ * too (Build mode's previews, which have no hedge model to hand). `wallAt`, `ground`: see `writeFences`.
  */
 export function planFences(
   fences: readonly FenceEdge[],
   styles: readonly FenceStyleDef[],
-  { hedgeBoxes = false, wallAt }: { hedgeBoxes?: boolean; wallAt?: (x: number, z: number) => boolean } = {},
+  { hedgeBoxes = false, wallAt, ground }: { hedgeBoxes?: boolean; wallAt?: (x: number, z: number) => boolean; ground?: (x: number, z: number) => number } = {},
 ): FencePlan | null {
   if (!fences.length) return null;
   const p = new Painter(new Geo());
   const gates: GateLeaf[] = [];
   const hedges: Inst[] = [];
-  writeFences(p, fences, styles, { gates, hedges, hedgeBoxes, wallAt });
+  writeFences(p, fences, styles, { gates, hedges, hedgeBoxes, wallAt, ground });
   return { geo: p.geo, gates, hedges };
 }
 
@@ -92,8 +92,11 @@ export function writeFences(
     postsFrom?: readonly FenceEdge[];
     postHere?: (x: number, z: number) => boolean;
     wallAt?: (x: number, z: number) => boolean;
+    /** On a land the town follows: the ground (m) a fence stands on at a point (its lot's pad, the higher of two on their shared edge), taken at an edge's middle and at a post. None: 0. */
+    ground?: (x: number, z: number) => number;
   },
 ): void {
+  const ground = out.ground;
   const styleOf = (f: FenceEdge) => styles[f.style ?? 0] ?? styles[0] ?? FALLBACK;
   // Posts where fences meet or end: once per grid corner, in the tallest style there.
   const posts = new Map<string, { x: number; z: number; style: FenceStyleDef; gate: boolean }>();
@@ -111,11 +114,13 @@ export function writeFences(
   for (const f of fences) {
     const style = styleOf(f);
     // Local frame: +x along the edge (0..1), +z across it.
-    p.at(f.x, f.z, f.axis === 'h' ? 0 : -Math.PI / 2);
+    const y = ground ? (f.axis === 'h' ? ground(f.x + 0.5, f.z) : ground(f.x, f.z + 0.5)) : 0;
+    p.at(f.x, f.z, f.axis === 'h' ? 0 : -Math.PI / 2, y);
     if (f.kind !== 'gate') {
       if (style.kind !== 'hedge') panel(p, style);
       else {
-        out.hedges.push(hedgeOf(f, gateCorners));
+        const h = hedgeOf(f, gateCorners);
+        out.hedges.push(y ? [h[0], h[1], h[2], h[3], h[4], y] : h);
         if (out.hedgeBoxes) p.paint(style.color, 0.9, 0).box(0, 0, -0.38, 1, height(style), 0.38, 'ny');
       }
       continue;
@@ -144,7 +149,7 @@ export function writeFences(
     if ((post.style.kind === 'stone' || post.style.kind === 'hedge') && !post.gate) continue;
     // (Against a wall: the wall holds it; a post there would stand in the wall, its faces flickering in the wall's.)
     if (out.wallAt?.(post.x, post.z)) continue;
-    p.at(post.x, post.z, 0);
+    p.at(post.x, post.z, 0, ground ? ground(post.x, post.z) : 0);
     postAt(p, post.style.kind === 'hedge' ? HEDGE_GATE : post.style, post.gate);
   }
 }

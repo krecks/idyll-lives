@@ -13,7 +13,10 @@
  * - reading a prompt: the game's first line (nothing cached) and the next one (the shared and
  *   persona parts cached), in ms and cached share;
  * - writing: tokens a second over `decodeTokens`, `decodeRuns` times (median, min, max);
- * - the game's five test lines end to end, from asking to finished text.
+ * - the game's five test lines end to end, from asking to finished text, written greedily and
+ *   sampled as the game samples them (its temperature, a fixed seed each), so two builds can be
+ *   compared word for word;
+ * - per written token: running the model, getting its logits back, and choosing (`GenResult.steps`).
  *
  * Loaded only by `llm-bench.html`; the game never imports this.
  */
@@ -39,6 +42,8 @@ export interface PerfSample {
   totalMs: number;
   stop: GenResult['stop'];
   text: string;
+  /** Per written token, ms: running the model, getting the logits back, choosing (`GenResult.steps`). */
+  perToken: GenResult['steps'];
 }
 
 export interface PerfReport {
@@ -56,8 +61,9 @@ export interface PerfReport {
   cached: PerfSample;
   /** Repeated long writes: every run, the median, the fastest and the slowest. */
   decode: { runs: PerfSample[]; tokPerS: number; minTokPerS: number; maxTokPerS: number; prefillMs: number };
-  /** The game's five test lines. */
+  /** The game's five test lines, greedy, and sampled at the game's temperature with fixed seeds. */
   lines: PerfSample[];
+  sampled: PerfSample[];
 }
 
 export interface PerfOptions {
@@ -67,6 +73,8 @@ export interface PerfOptions {
   decodeRuns?: number;
   /** Also run the game's five test lines (default true). */
   lines?: boolean;
+  /** Where the model runs (default the GPU). */
+  device?: 'gpu' | 'cpu';
 }
 
 declare global {
@@ -130,6 +138,7 @@ function sample(name: string, g: GenResult, totalMs: number): PerfSample {
     totalMs,
     stop: g.stop,
     text: g.text,
+    perToken: Object.fromEntries(Object.entries(g.steps).map(([k, v]) => [k, g.ids.length ? v / g.ids.length : 0])) as GenResult['steps'],
   };
 }
 
@@ -169,7 +178,7 @@ export async function perf(options: PerfOptions = {}): Promise<PerfReport> {
     }
   };
   const load = new Promise<number>((resolve, reject) => (ready = { resolve, reject }));
-  worker.postMessage({ type: 'load', base: import.meta.env.BASE_URL, model: MODEL } satisfies ToLlmWorker);
+  worker.postMessage({ type: 'load', base: import.meta.env.BASE_URL, model: MODEL, device: options.device ?? 'gpu' } satisfies ToLlmWorker);
   const loadMs = await load;
 
   /** One reply through the worker, timed end to end. */
@@ -200,6 +209,15 @@ export async function perf(options: PerfOptions = {}): Promise<PerfReport> {
       }
     }
 
+    const sampled: PerfSample[] = [];
+    if (options.lines !== false) {
+      for (const [i, { built, sentences }] of asks.entries()) {
+        const run = await ask(built.messages, { seed: 1000 + i, maxTokens: LINE_TOKENS, stopAt: LINE_STOPS, sentences }, built.reply, built.lead);
+        run.name = `sampled ${i + 1} (${sentences} sentence${sentences > 1 ? 's' : ''})`;
+        sampled.push(run);
+      }
+    }
+
     const decode: PerfSample[] = [];
     for (let i = 0; i < decodeRuns; i++) {
       const run = await ask(LONG, { temperature: 0, maxTokens: decodeTokens, stopAtNewline: false, stopAt: [] });
@@ -208,7 +226,7 @@ export async function perf(options: PerfOptions = {}): Promise<PerfReport> {
     }
     const speeds = decode.map((r) => r.tokPerS);
 
-    const fallback = (name: string): PerfSample => sample(name, { text: '', ids: [], promptTokens: 0, cachedTokens: 0, prefillMs: 0, decodeMs: 0, stop: 'length', nonFinite: false }, 0);
+    const fallback = (name: string): PerfSample => sample(name, { text: '', ids: [], promptTokens: 0, cachedTokens: 0, prefillMs: 0, decodeMs: 0, stop: 'length', nonFinite: false, steps: { run: 0, read: 0, pick: 0 } }, 0);
     return {
       adapter,
       isolated: crossOriginIsolated,
@@ -221,6 +239,7 @@ export async function perf(options: PerfOptions = {}): Promise<PerfReport> {
       cached: lines[1] ?? fallback('line 2'),
       decode: { runs: decode, tokPerS: median(speeds), minTokPerS: Math.min(...speeds), maxTokPerS: Math.max(...speeds), prefillMs: median(decode.map((r) => r.prefillMs)) },
       lines,
+      sampled,
     };
   } finally {
     worker.terminate();

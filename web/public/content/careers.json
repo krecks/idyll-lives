@@ -1,16 +1,27 @@
 {
   "$comment": "Career catalog: 25 categories x 4 tracks x 10 grades (A-J) = 1000 positions. Grade sets pay per hour and required skill level; track skill weights scale the requirement (required = round(grade.skillLevel * weight)); a track's payFactor sets its pay at grade J relative to the category rate (entry grades all pay the category rate, so senior pay separates the tracks).",
   "grades": [
-    { "id": "A", "label": "Entry", "payPerHour": 12, "skillLevel": 0 },
-    { "id": "B", "label": "Junior", "payPerHour": 14, "skillLevel": 1 },
-    { "id": "C", "label": "Associate", "payPerHour": 17, "skillLevel": 2 },
+    { "id": "A", "label": "Entry", "payPerHour": 12, "skillLevel": 0, "carAge": "old" },
+    { "id": "B", "label": "Junior", "payPerHour": 14, "skillLevel": 1, "carAge": "old" },
+    { "id": "C", "label": "Associate", "payPerHour": 17, "skillLevel": 2, "carAge": "old" },
     { "id": "D", "label": "Professional", "payPerHour": 20, "skillLevel": 3 },
     { "id": "E", "label": "Experienced", "payPerHour": 24, "skillLevel": 4 },
     { "id": "F", "label": "Senior", "payPerHour": 29, "skillLevel": 5 },
     { "id": "G", "label": "Lead", "payPerHour": 35, "skillLevel": 6 },
-    { "id": "H", "label": "Manager", "payPerHour": 42, "skillLevel": 7 },
-    { "id": "I", "label": "Director", "payPerHour": 50, "skillLevel": 8 },
-    { "id": "J", "label": "Top of the field", "payPerHour": 60, "skillLevel": 10 }
+    { "id": "H", "label": "Manager", "payPerHour": 42, "skillLevel": 7, "carAge": "new" },
+    { "id": "I", "label": "Director", "payPerHour": 50, "skillLevel": 8, "carAge": "new" },
+    { "id": "J", "label": "Top of the field", "payPerHour": 60, "skillLevel": 10, "carAge": "new" }
+  ],
+  "$carBodies": "The bodies households' cars come in, in the renderer's order (web/src/render/shared/cars.ts CARS: a body is an index into it, saved with the car): length and width in metres, which parking and driving go by. A field's (or a track's) car names one from each grade on; the grade's carAge says how old it is (absent: used). A household's car is the one its best earner's job calls for (crates/sim-core/src/cars/looks.rs).",
+  "carBodies": [
+    { "id": "saloon", "label": "saloon", "len": 4.4, "wid": 1.78 },
+    { "id": "hatchback", "label": "hatchback", "len": 4.0, "wid": 1.74 },
+    { "id": "suv", "label": "SUV", "len": 4.6, "wid": 1.88 },
+    { "id": "estate", "label": "estate car", "len": 4.6, "wid": 1.8 },
+    { "id": "van", "label": "van", "len": 5.0, "wid": 1.98 },
+    { "id": "pickup", "label": "pickup", "len": 5.2, "wid": 1.86 },
+    { "id": "offRoader", "label": "off-roader", "len": 4.6, "wid": 1.9 },
+    { "id": "executive", "label": "executive saloon", "len": 4.9, "wid": 1.86 }
   ],
   "careerCategories": [
     {
@@ -21,6 +32,7 @@
       "payFactor": 0.95,
       "shift": { "start": 9, "hours": 8, "days": [0, 1, 2, 3, 4] },
       "workEffects": { "hunger": -0.2, "energy": -0.15, "fun": -0.05, "social": 0.15 },
+      "car": { "A": "hatchback", "F": "saloon" },
       "tracks": [
         {
           "id": "journalism.print",
@@ -35,6 +47,7 @@
           "skills": { "charisma": 1, "writing": 0.6, "perception": 0.3 },
           "payFactor": 0.87,
           "shift": { "start": 5, "hours": 8, "days": [0, 1, 2, 3, 4] },
+          "car": { "A": "hatchback", "F": "saloon", "I": "executive" },
           "titles": ["Newsroom Runner", "Production Assistant", "Field Producer", "Correspondent", "Chief Correspondent", "Weekend Anchor", "Morning Anchor", "Evening News Anchor", "News Director", "Prime-Time Network Anchor"]
         },
         {
@@ -42,6 +55,7 @@
           "label": "Photojournalism",
           "skills": { "perception": 1, "creativity": 0.6, "endurance": 0.3 },
           "payFactor": 0.82,
+          "car": { "A": "hatchback", "E": "estate" },
           "titles": ["Photo Desk Assistant", "Freelance Stringer", "Staff Photographer", "News Photographer", "Feature Photographer", "Conflict Photographer", "Photo Editor", "Director of Photography", "Head of Visual Journalism", "Award-Winning Photojournalist"]
         },
         {
@@ -61,12 +75,14 @@
       "payFactor": 1.0,
       "shift": { "start": 7, "hours": 9, "days": [0, 1, 2, 3, 4] },
       "workEffects": { "hunger": -0.25, "energy": -0.175, "hygiene": -0.15, "social": 0.1 },
+      "car": { "A": "saloon", "H": "executive" },
       "tracks": [
         {
           "id": "detective.patrol",
           "label": "Patrol & Investigation",
           "skills": { "perception": 1, "strength": 0.6, "charisma": 0.3 },
           "payFactor": 0.98,
+          "car": { "A": "hatchback", "D": "saloon" },
           "titles": ["Police Cadet", "Patrol Officer", "Police Constable", "Detective", "Detective Sergeant", "Detective Inspector", "Detective Chief Inspector", "Superintendent", "Deputy Chief of Police", "Chief of Police"]
         },
         {
@@ -101,6 +117,7 @@
       "payFactor": 0.95,
       "shift": { "start": 8, "hours": 12, "days": [0, 2, 4, 6] },
       "workEffects": { "hunger": -0.35, "energy": -0.225, "hygiene": -0.4, "fun": 0.05, "social": 0.1 },
+      "car": { "A": "hatchback", "D": "pickup", "H": "suv" },
       "tracks": [
         {
           "id": "firefighter.firefighting",
@@ -114,6 +131,7 @@
           "label": "Paramedic",
           "skills": { "dexterity": 1, "intelligence": 0.6, "endurance": 0.4 },
           "payFactor": 0.88,
+          "car": { "A": "hatchback", "E": "estate" },
           "titles": ["First Aid Volunteer", "Emergency Medical Responder", "Emergency Medical Technician", "Advanced EMT", "Paramedic", "Critical Care Paramedic", "Flight Paramedic", "EMS Supervisor", "EMS Operations Chief", "Director of Emergency Medical Services"]
         },
         {
@@ -141,6 +159,7 @@
       "payFactor": 0.9,
       "shift": { "start": 11, "hours": 6, "days": [0, 1, 2, 3, 4, 5] },
       "workEffects": { "hunger": -0.15, "energy": -0.1, "comfort": 0.05, "fun": 0.2, "social": 0.2 },
+      "car": { "A": "hatchback", "E": "suv", "H": "executive" },
       "tracks": [
         {
           "id": "influencer.lifestyle",
@@ -181,6 +200,7 @@
       "payFactor": 1.25,
       "shift": { "start": 9, "hours": 8, "days": [0, 1, 2, 3, 4] },
       "workEffects": { "hunger": -0.2, "energy": -0.15, "comfort": -0.05, "fun": -0.1, "social": -0.05 },
+      "car": { "A": "hatchback", "E": "saloon", "H": "executive" },
       "tracks": [
         {
           "id": "it.software",
@@ -194,6 +214,7 @@
           "label": "IT Support & Networks",
           "skills": { "handiness": 1, "technology": 0.7, "charisma": 0.3 },
           "payFactor": 0.62,
+          "car": { "A": "hatchback", "F": "saloon" },
           "titles": ["Helpdesk Intern", "Helpdesk Technician", "Desktop Support Specialist", "Network Technician", "Systems Administrator", "Network Engineer", "Infrastructure Lead", "IT Manager", "Head of IT Operations", "Chief Information Officer"]
         },
         {
@@ -220,6 +241,7 @@
       "payFactor": 1.1,
       "shift": { "start": 10, "hours": 9, "days": [0, 1, 2, 3, 4] },
       "workEffects": { "hunger": -0.25, "energy": -0.175, "fun": 0.15, "social": 0.15 },
+      "car": { "A": "hatchback", "E": "saloon", "H": "executive" },
       "tracks": [
         {
           "id": "tv.acting",
@@ -240,6 +262,7 @@
           "label": "Camera & Production",
           "skills": { "dexterity": 1, "technology": 0.6, "perception": 0.4 },
           "payFactor": 1.05,
+          "car": { "A": "hatchback", "D": "estate", "H": "suv" },
           "titles": ["Grip Trainee", "Camera Loader", "Focus Puller", "Camera Operator", "Steadicam Operator", "Camera Supervisor", "Second Unit Cinematographer", "Director of Photography", "Head of Cinematography", "Chief Cinematographer"]
         },
         {
@@ -260,6 +283,7 @@
       "payFactor": 1.05,
       "shift": { "start": 7.5, "hours": 8, "days": [0, 1, 2, 3, 4] },
       "workEffects": { "hunger": -0.3, "energy": -0.175, "hygiene": -0.3, "fun": 0.05 },
+      "car": { "A": "van", "H": "pickup" },
       "tracks": [
         {
           "id": "mechanics.car",
@@ -273,6 +297,7 @@
           "label": "Mechanical Engineering",
           "skills": { "intelligence": 1, "handiness": 0.6, "technology": 0.4 },
           "payFactor": 1.0,
+          "car": { "A": "hatchback", "E": "saloon", "H": "suv" },
           "titles": ["Engineering Intern", "Drafting Technician", "Graduate Engineer", "Mechanical Engineer", "Design Engineer", "Senior Mechanical Engineer", "Lead Engineer", "Engineering Manager", "Director of Engineering", "Chief Engineer"]
         },
         {
@@ -287,6 +312,7 @@
           "label": "Aerospace",
           "skills": { "intelligence": 1, "technology": 0.7, "dexterity": 0.3 },
           "payFactor": 1.21,
+          "car": { "A": "hatchback", "E": "saloon", "H": "executive" },
           "titles": ["Hangar Assistant", "Aircraft Maintenance Trainee", "Avionics Technician", "Aerospace Engineer", "Propulsion Engineer", "Flight Systems Engineer", "Spacecraft Design Lead", "Aerospace Program Manager", "Director of Space Programs", "Chief Aerospace Engineer"]
         }
       ]
@@ -299,6 +325,7 @@
       "payFactor": 1.3,
       "shift": { "start": 8.5, "hours": 9, "days": [0, 1, 2, 3, 4] },
       "workEffects": { "hunger": -0.2, "energy": -0.175, "comfort": 0.05, "fun": -0.15, "social": 0.05 },
+      "car": { "A": "saloon", "G": "executive" },
       "tracks": [
         {
           "id": "finance.banking",
@@ -340,6 +367,7 @@
       "payFactor": 1.3,
       "shift": { "start": 7, "hours": 9, "days": [0, 1, 2, 3, 4] },
       "workEffects": { "hunger": -0.25, "energy": -0.2, "hygiene": -0.15, "fun": -0.05, "social": 0.1 },
+      "car": { "A": "hatchback", "E": "saloon", "H": "executive" },
       "tracks": [
         {
           "id": "medicine.general",
@@ -361,6 +389,7 @@
           "skills": { "endurance": 1, "charisma": 0.6, "dexterity": 0.3 },
           "payFactor": 0.5,
           "shift": { "start": 6, "hours": 12, "days": [0, 2, 4] },
+          "car": { "A": "hatchback", "F": "estate" },
           "titles": ["Care Assistant", "Student Nurse", "Licensed Practical Nurse", "Registered Nurse", "Charge Nurse", "Clinical Nurse Specialist", "Nurse Practitioner", "Nurse Manager", "Director of Nursing", "Chief Nursing Officer"]
         },
         {
@@ -369,6 +398,7 @@
           "skills": { "perception": 1, "intelligence": 0.6, "charisma": 0.4 },
           "payFactor": 0.54,
           "shift": { "start": 10, "hours": 8, "days": [0, 1, 2, 3, 4] },
+          "car": { "A": "hatchback", "E": "estate", "H": "saloon" },
           "titles": ["Research Assistant", "Psychology Graduate", "Assistant Psychologist", "Counselor", "Licensed Therapist", "Clinical Psychologist", "Consultant Psychologist", "Head of Psychology", "Director of Mental Health Services", "Eminent Psychologist"]
         }
       ]
@@ -381,6 +411,7 @@
       "payFactor": 0.9,
       "shift": { "start": 15, "hours": 9, "days": [1, 2, 3, 4, 5] },
       "workEffects": { "hunger": 0.1, "energy": -0.2, "hygiene": -0.3, "comfort": -0.1, "social": 0.05 },
+      "car": { "A": "hatchback", "E": "estate" },
       "tracks": [
         {
           "id": "culinary.chef",
@@ -423,6 +454,7 @@
       "payFactor": 0.85,
       "shift": { "start": 10, "hours": 7, "days": [0, 1, 2, 3, 4] },
       "workEffects": { "hunger": -0.2, "energy": -0.1, "comfort": 0.05, "fun": 0.2, "social": -0.05 },
+      "car": { "A": "hatchback", "F": "estate" },
       "tracks": [
         {
           "id": "arts.painting",
@@ -443,6 +475,7 @@
           "label": "Sculpture & Crafts",
           "skills": { "handiness": 1, "creativity": 0.7, "strength": 0.3 },
           "payFactor": 0.9,
+          "car": { "A": "estate", "F": "van" },
           "titles": ["Workshop Assistant", "Craft Apprentice", "Woodcarver", "Ceramicist", "Sculptor", "Studio Sculptor", "Public Art Sculptor", "Studio Master", "Monument Sculptor", "Master Sculptor"]
         },
         {
@@ -462,6 +495,7 @@
       "payFactor": 0.95,
       "shift": { "start": 14, "hours": 6, "days": [1, 2, 3, 4, 5] },
       "workEffects": { "hunger": -0.2, "energy": -0.125, "fun": 0.3, "social": 0.15 },
+      "car": { "A": "estate", "H": "executive" },
       "tracks": [
         {
           "id": "music.performance",
@@ -469,6 +503,7 @@
           "skills": { "charisma": 1, "creativity": 0.6, "dexterity": 0.4 },
           "payFactor": 1.07,
           "shift": { "start": 19, "hours": 5, "days": [2, 3, 4, 5, 6] },
+          "car": { "A": "van", "F": "estate", "I": "executive" },
           "titles": ["Busker", "Open-Mic Performer", "Bar Band Musician", "Touring Musician", "Opening Act", "Indie Hit Maker", "Headline Act", "Arena Rock Star", "Hall of Fame Inductee", "Global Superstar"]
         },
         {
@@ -503,6 +538,7 @@
       "payFactor": 0.95,
       "shift": { "start": 8, "hours": 8, "days": [0, 1, 2, 3, 4] },
       "workEffects": { "hunger": -0.2, "energy": -0.175, "fun": 0.05, "social": 0.2 },
+      "car": { "A": "saloon", "F": "estate" },
       "tracks": [
         {
           "id": "education.primary",
@@ -524,6 +560,7 @@
           "skills": { "writing": 1, "intelligence": 0.8 },
           "payFactor": 1.12,
           "shift": { "start": 10, "hours": 7, "days": [0, 1, 2, 3, 4] },
+          "car": { "A": "hatchback", "E": "estate", "H": "saloon" },
           "titles": ["Graduate Teaching Assistant", "Doctoral Researcher", "Postdoctoral Fellow", "Lecturer", "Senior Lecturer", "Associate Professor", "Professor", "Department Chair", "Dean of Faculty", "University Chancellor"]
         },
         {
@@ -543,6 +580,7 @@
       "payFactor": 1.15,
       "shift": { "start": 9, "hours": 8, "days": [0, 1, 2, 3, 4] },
       "workEffects": { "hunger": -0.25, "energy": -0.15, "hygiene": -0.05, "fun": 0.05, "social": -0.05 },
+      "car": { "A": "hatchback", "E": "estate", "H": "saloon" },
       "tracks": [
         {
           "id": "science.biology",
@@ -571,6 +609,7 @@
           "skills": { "endurance": 1, "perception": 0.7, "intelligence": 0.4 },
           "payFactor": 0.78,
           "shift": { "start": 6, "hours": 10, "days": [0, 1, 2, 3, 4, 5] },
+          "car": { "A": "estate", "E": "offRoader" },
           "titles": ["Field Volunteer", "Field Assistant", "Field Technician", "Field Researcher", "Expedition Scientist", "Senior Field Scientist", "Expedition Leader", "Research Station Chief", "Director of Field Research", "Legendary Explorer"]
         }
       ]
@@ -583,6 +622,7 @@
       "payFactor": 1.3,
       "shift": { "start": 9, "hours": 9, "days": [0, 1, 2, 3, 4] },
       "workEffects": { "hunger": -0.2, "energy": -0.175, "comfort": 0.05, "fun": -0.15, "social": 0.1 },
+      "car": { "A": "saloon", "G": "executive" },
       "tracks": [
         {
           "id": "law.corporate",
@@ -622,6 +662,7 @@
       "payFactor": 0.8,
       "shift": { "start": 10, "hours": 8, "days": [1, 2, 3, 4, 5] },
       "workEffects": { "hunger": -0.2, "energy": -0.15, "comfort": -0.1, "fun": -0.05, "social": 0.15 },
+      "car": { "A": "hatchback", "H": "saloon" },
       "tracks": [
         {
           "id": "retail.store",
@@ -651,6 +692,7 @@
           "skills": { "strength": 1, "endurance": 0.7 },
           "payFactor": 0.8,
           "shift": { "start": 6, "hours": 8, "days": [0, 1, 2, 3, 4, 5] },
+          "car": { "A": "van", "H": "suv" },
           "titles": ["Warehouse Picker", "Order Packer", "Forklift Operator", "Inventory Controller", "Warehouse Team Leader", "Shift Manager", "Warehouse Manager", "Distribution Center Manager", "Head of Logistics", "Supply Chain Director"]
         }
       ]
@@ -663,6 +705,7 @@
       "payFactor": 1.0,
       "shift": { "start": 7, "hours": 8, "days": [0, 1, 2, 3, 4] },
       "workEffects": { "hunger": -0.35, "energy": -0.2, "hygiene": -0.35, "comfort": -0.1, "social": 0.05 },
+      "car": { "A": "van", "F": "pickup" },
       "tracks": [
         {
           "id": "trades.carpentry",
@@ -691,6 +734,7 @@
           "skills": { "creativity": 1, "intelligence": 0.6, "technology": 0.3 },
           "payFactor": 1.38,
           "shift": { "start": 9, "hours": 8, "days": [0, 1, 2, 3, 4] },
+          "car": { "A": "hatchback", "E": "saloon", "H": "executive" },
           "titles": ["Architecture Intern", "CAD Drafter", "Architectural Assistant", "Project Architect", "Licensed Architect", "Senior Architect", "Lead Architect", "Associate Principal", "Principal Architect", "Starchitect"]
         }
       ]
@@ -703,6 +747,7 @@
       "payFactor": 1.0,
       "shift": { "start": 8, "hours": 6, "days": [0, 1, 2, 3, 4, 5] },
       "workEffects": { "hunger": -0.4, "energy": -0.225, "hygiene": -0.4, "fun": 0.2, "social": 0.1 },
+      "car": { "A": "hatchback", "E": "suv", "H": "executive" },
       "tracks": [
         {
           "id": "sports.athlete",
@@ -732,6 +777,7 @@
           "skills": { "dexterity": 1, "intelligence": 0.6, "strength": 0.3 },
           "payFactor": 1.44,
           "shift": { "start": 9, "hours": 8, "days": [0, 1, 2, 3, 4] },
+          "car": { "A": "hatchback", "F": "estate" },
           "titles": ["Sports Massage Trainee", "Massage Therapist", "Athletic Trainer", "Physiotherapist", "Sports Physiotherapist", "Rehabilitation Specialist", "Head Physio", "Club Medical Director", "Head of Sports Medicine", "Olympic Team Physiotherapist"]
         }
       ]
@@ -744,6 +790,7 @@
       "payFactor": 1.0,
       "shift": { "start": 6, "hours": 10, "days": [0, 1, 2, 3, 4] },
       "workEffects": { "hunger": -0.4, "energy": -0.225, "hygiene": -0.35, "fun": -0.1, "social": 0.1 },
+      "car": { "A": "offRoader" },
       "tracks": [
         {
           "id": "military.army",
@@ -772,6 +819,7 @@
           "skills": { "intelligence": 1, "perception": 0.7, "technology": 0.3 },
           "payFactor": 1.0,
           "shift": { "start": 8, "hours": 9, "days": [0, 1, 2, 3, 4] },
+          "car": { "A": "hatchback", "E": "saloon", "H": "executive" },
           "titles": ["Intelligence Recruit", "Signals Operator", "Intelligence Analyst", "Cryptanalyst", "Field Intelligence Officer", "Counterintelligence Officer", "Intelligence Section Chief", "Head of Station", "Director of Military Intelligence", "Spymaster"]
         }
       ]
@@ -784,6 +832,7 @@
       "payFactor": 1.05,
       "shift": { "start": 9, "hours": 9, "days": [0, 1, 2, 3, 4] },
       "workEffects": { "hunger": -0.2, "energy": -0.15, "fun": -0.05, "social": 0.25 },
+      "car": { "A": "saloon", "H": "executive" },
       "tracks": [
         {
           "id": "politics.elected",
@@ -811,6 +860,7 @@
           "label": "Campaign Strategy",
           "skills": { "business": 1, "perception": 0.6, "charisma": 0.3 },
           "payFactor": 1.14,
+          "car": { "A": "hatchback", "F": "saloon" },
           "titles": ["Phone Bank Volunteer", "Field Organizer", "Press Assistant", "Speechwriter", "Communications Director", "Deputy Campaign Manager", "Campaign Manager", "Chief Strategist", "Chief of Staff", "Political Kingmaker"]
         }
       ]
@@ -823,12 +873,14 @@
       "payFactor": 1.05,
       "shift": { "start": 6, "hours": 9, "days": [0, 1, 2, 3, 4, 5] },
       "workEffects": { "hunger": -0.3, "energy": -0.175, "comfort": -0.15, "fun": -0.05 },
+      "car": { "A": "saloon" },
       "tracks": [
         {
           "id": "transport.pilot",
           "label": "Airline Pilot",
           "skills": { "dexterity": 1, "perception": 0.7, "technology": 0.3 },
           "payFactor": 1.71,
+          "car": { "A": "hatchback", "E": "saloon", "H": "executive" },
           "titles": ["Flight School Student", "Flight Instructor", "Charter Pilot", "Regional First Officer", "First Officer", "Senior First Officer", "Captain", "Training Captain", "Chief Pilot", "Director of Flight Operations"]
         },
         {
@@ -844,6 +896,7 @@
           "skills": { "endurance": 1, "perception": 0.6 },
           "payFactor": 0.54,
           "shift": { "start": 5, "hours": 10, "days": [0, 1, 2, 3, 4] },
+          "car": { "A": "van" },
           "titles": ["Delivery Rider", "Courier", "Van Driver", "Taxi Driver", "Truck Driver", "Long-Haul Trucker", "Fleet Supervisor", "Transport Manager", "Logistics Director", "Trucking Company Owner"]
         },
         {
@@ -864,6 +917,7 @@
       "payFactor": 0.85,
       "shift": { "start": 6, "hours": 9, "days": [0, 1, 2, 3, 4, 5] },
       "workEffects": { "hunger": -0.35, "energy": -0.2, "hygiene": -0.35, "comfort": -0.05, "fun": 0.1 },
+      "car": { "A": "pickup" },
       "tracks": [
         {
           "id": "nature.farming",
@@ -878,6 +932,7 @@
           "skills": { "perception": 1, "endurance": 0.6 },
           "payFactor": 1.11,
           "shift": { "start": 8, "hours": 8, "days": [2, 3, 4, 5, 6] },
+          "car": { "A": "offRoader" },
           "titles": ["Trail Volunteer", "Seasonal Ranger", "Park Ranger", "Wildlife Officer", "Senior Ranger", "Conservation Officer", "District Ranger", "Park Superintendent", "Regional Parks Director", "National Parks Chief"]
         },
         {
@@ -886,6 +941,7 @@
           "skills": { "gardening": 1, "creativity": 0.5, "endurance": 0.3 },
           "payFactor": 0.67,
           "shift": { "start": 7, "hours": 8, "days": [0, 1, 2, 3, 4] },
+          "car": { "A": "van", "G": "pickup" },
           "titles": ["Garden Helper", "Groundskeeper", "Gardener", "Horticulturist", "Landscape Gardener", "Head Gardener", "Landscape Designer", "Estate Gardens Manager", "Botanical Garden Director", "Celebrated Garden Designer"]
         },
         {
@@ -894,6 +950,7 @@
           "skills": { "dexterity": 1, "intelligence": 0.7 },
           "payFactor": 1.6,
           "shift": { "start": 8, "hours": 9, "days": [0, 1, 2, 3, 4] },
+          "car": { "A": "estate", "F": "suv" },
           "titles": ["Kennel Assistant", "Animal Care Assistant", "Veterinary Nurse", "Veterinary Technician", "Veterinary Intern", "Veterinarian", "Veterinary Surgeon", "Practice Owner", "Zoo Chief Veterinarian", "Head of Veterinary Medicine"]
         }
       ]
@@ -906,6 +963,7 @@
       "payFactor": 0.85,
       "shift": { "start": 12, "hours": 8, "days": [2, 3, 4, 5, 6] },
       "workEffects": { "hunger": -0.25, "energy": -0.175, "comfort": -0.1, "fun": 0.05, "social": 0.2 },
+      "car": { "A": "hatchback", "F": "saloon" },
       "tracks": [
         {
           "id": "hospitality.hotel",
@@ -920,6 +978,7 @@
           "skills": { "charisma": 1, "endurance": 0.5, "perception": 0.3 },
           "payFactor": 0.78,
           "shift": { "start": 9, "hours": 8, "days": [3, 4, 5, 6] },
+          "car": { "A": "hatchback", "E": "van" },
           "titles": ["Tour Assistant", "Walking Tour Guide", "Museum Guide", "Licensed Tour Guide", "Multilingual Guide", "Expedition Guide", "Tour Leader", "Tour Operations Manager", "Tour Company Director", "Travel Company Founder"]
         },
         {
@@ -927,6 +986,7 @@
           "label": "Event Planning",
           "skills": { "creativity": 1, "business": 0.6, "charisma": 0.3 },
           "payFactor": 1.17,
+          "car": { "A": "hatchback", "E": "estate" },
           "titles": ["Event Assistant", "Event Coordinator", "Wedding Planner", "Event Planner", "Senior Event Planner", "Event Manager", "Festival Producer", "Head of Events", "Events Agency Director", "Celebrity Event Mogul"]
         },
         {
@@ -947,6 +1007,7 @@
       "payFactor": 0.95,
       "shift": { "start": 10, "hours": 8, "days": [1, 2, 3, 4, 5] },
       "workEffects": { "hunger": -0.2, "energy": -0.125, "hygiene": 0.05, "fun": 0.1, "social": 0.15 },
+      "car": { "A": "hatchback", "E": "saloon", "H": "executive" },
       "tracks": [
         {
           "id": "fashion.design",
@@ -986,6 +1047,7 @@
       "payFactor": 1.15,
       "shift": { "start": 9, "hours": 8, "days": [0, 1, 2, 3, 4] },
       "workEffects": { "hunger": -0.2, "energy": -0.15, "fun": -0.1, "social": 0.15 },
+      "car": { "A": "hatchback", "D": "saloon", "H": "executive" },
       "tracks": [
         {
           "id": "business.marketing",
@@ -1007,6 +1069,7 @@
           "skills": { "business": 1, "charisma": 0.6, "creativity": 0.3 },
           "payFactor": 1.53,
           "shift": { "start": 8, "hours": 10, "days": [0, 1, 2, 3, 4, 5] },
+          "car": { "A": "hatchback", "E": "suv", "H": "executive" },
           "titles": ["Side Hustler", "Market Stall Trader", "Small Business Owner", "Startup Founder", "Funded Founder", "Scale-Up CEO", "Serial Entrepreneur", "Unicorn Founder", "Venture Capitalist", "Business Tycoon"]
         },
         {

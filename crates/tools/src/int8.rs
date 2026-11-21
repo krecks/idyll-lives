@@ -35,7 +35,7 @@ pub struct Int8 {
 }
 
 /// A `TensorProto`'s dims.
-fn dims(buf: &[u8]) -> Result<Vec<u64>, String> {
+pub(crate) fn dims(buf: &[u8]) -> Result<Vec<u64>, String> {
     let mut out = Vec::new();
     for f in fields(buf)? {
         match (f.number, f.wire) {

@@ -300,3 +300,113 @@ fn an_outings_stay_counts_from_when_they_get_there() {
          ({hours:.0} asked for)"
     );
 }
+
+/// The other hamlet's park (`two_hamlets`'s second), as a plot index.
+fn far_park(w: &World, h: &common::hamlets::Hamlets) -> u32 {
+    w.plots
+        .iter()
+        .position(|p| p.public && h.plots[1].contains(&(p.id as usize)))
+        .expect("a park in the other hamlet") as u32
+}
+
+/// Sent to a place that shuts before they could get there (its hours, `Plot::open_for`, and the
+/// way they'd go, about an hour by the taxi), they're told so; to one with no hours, off they go.
+#[test]
+fn a_visit_to_a_place_shutting_before_they_could_get_there_is_refused() {
+    let content = common::content();
+    let h = two_hamlets(&content, 31);
+    let mut w = World::from_json(&content, &h.town, 31).expect("the hamlets load");
+    let park = far_park(&w, &h);
+    let sim = w
+        .sims
+        .iter()
+        .position(|s| w.households[s.household as usize].player && s.adult(&w.content))
+        .expect("a grown-up of the player's");
+    let now = clock::minute_of_day(w.tick) as u16;
+    let close = now + 20;
+    w.plots[park as usize].hours = Some(sim_core::world::PlotHours {
+        open: 0,
+        close,
+        days: 0b1111111,
+    });
+    let err = w
+        .apply(sim_core::Command::Visit {
+            sim: sim as u32,
+            plot: park,
+        })
+        .unwrap_err()
+        .to_string();
+    assert_eq!(
+        err,
+        format!(
+            "{} closes at {:02}:{:02}, before {} could get there",
+            w.plots[park as usize].name,
+            close / 60,
+            close % 60,
+            w.sims[sim].name
+        )
+    );
+    w.plots[park as usize].hours = None;
+    w.apply(sim_core::Command::Visit {
+        sim: sim as u32,
+        plot: park,
+    })
+    .expect("off to a place with no hours");
+}
+
+#[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
+fn nobody_sets_out_for_a_closed_place_and_those_there_go_home_as_it_shuts() {
+    // The hamlets with cars and parking (`an_outing_by_car_in_reach_...`), the other's park open
+    // 9:00 to 16:00: those who go on an outing there get there while it's open, and are gone by
+    // last orders after it shuts.
+    let content = common::content();
+    let h = two_hamlets_with_parking(&content, 31);
+    let mut w = World::from_json(&content, &with_cars(&h), 31).expect("the hamlets load");
+    let park = far_park(&w, &h);
+    let (open, close) = (9 * 60, 16 * 60);
+    w.plots[park as usize].hours = Some(sim_core::world::PlotHours {
+        open,
+        close,
+        days: 0b1111111,
+    });
+    let late = f32::from(close) + sim_core::staff::LAST_ORDERS * 60.0 + 15.0;
+    let end = w.tick + 3 * 24 * 60 * TICKS_PER_MINUTE;
+    let mut there = std::collections::BTreeSet::new();
+    let (mut arrivals, mut shut_arrivals, mut stayed_late) = (Vec::new(), Vec::new(), Vec::new());
+    while w.tick < end {
+        w.tick_once();
+        let minute = clock::minute_of_day(w.tick);
+        for (i, s) in w.sims.iter().enumerate() {
+            let (x, z) = s.tile();
+            let at = s.here()
+                && s.visiting.is_some_and(|v| v.plot == park)
+                && w.plot_at(x, z) == Some(park);
+            if at && !there.contains(&i) {
+                arrivals.push((clock::day(w.tick), minute as u32, i));
+                if !w.plots[park as usize].open_at_tick(w.tick) {
+                    shut_arrivals.push((clock::day(w.tick), minute as u32, i));
+                }
+            }
+            if at && minute >= late {
+                stayed_late.push((clock::day(w.tick), minute as u32, i));
+            }
+            if at {
+                there.insert(i);
+            } else {
+                there.remove(&i);
+            }
+        }
+    }
+    eprintln!("got to the park (day, minute, resident): {arrivals:?}");
+    assert!(!arrivals.is_empty(), "nobody went to the park");
+    assert!(
+        shut_arrivals.is_empty(),
+        "got there while it was shut (day, minute, resident): {shut_arrivals:?}"
+    );
+    stayed_late.dedup_by_key(|k| (k.0, k.2));
+    assert!(
+        stayed_late.is_empty(),
+        "still there well after it shut (day, minute, resident): {stayed_late:?}"
+    );
+}

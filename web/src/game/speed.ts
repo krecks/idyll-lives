@@ -11,12 +11,23 @@
  */
 export type SpeedHold = 'loading' | 'menu' | 'build';
 
+/**
+ * Super speed (sim-core `clock::SUPER_SPEED`): as fast as the machine goes, up to 30×, and up to 60× while
+ * the household is all asleep or out. With the setting the simulation goes to it on its own as the household
+ * falls quiet, and back to the speed before it as that ends; picked by the player, it stays.
+ */
+export const SUPER_SPEED = 4;
+/** How long after a speed is sent the simulation's views may still be from before it (ms). */
+const SETTLE_MS = 300;
+
 export class GameSpeed {
   /** The speed the player chose (0: paused). */
   chosen: number;
   /** The last speed above 0 (Space resumes at it). */
   last: number;
   private readonly holds = new Set<SpeedHold>(['loading']);
+  /** When a speed was last sent (ms, performance clock). */
+  private sentAt = -Infinity;
 
   /**
    * `send`: runs the simulation at a speed (and shows it), each time that changes. Loading holds
@@ -43,6 +54,20 @@ export class GameSpeed {
     this.changed(was);
   }
 
+  /**
+   * The simulation changed speed on its own (`speed`, from its UI view): super speed by itself started as
+   * the household fell quiet, or ended as someone woke or came home. The player's speed follows it without
+   * sending it back; under a hold, the speed given back stays as it was (the simulation leaves super
+   * speed itself if it isn't quiet then). Only super speed's comings and goings, and not just after a
+   * speed was sent: any other difference is a view from before the player's last pick. `now`: ms.
+   */
+  follow(speed: number, now = performance.now()): void {
+    if (this.holds.size || speed === this.chosen || now - this.sentAt < SETTLE_MS) return;
+    if (speed !== SUPER_SPEED && this.chosen !== SUPER_SPEED) return;
+    this.chosen = speed;
+    if (speed > 0) this.last = speed;
+  }
+
   /** Holds time still for `reason` (`on`), or lets go of it. */
   hold(reason: SpeedHold, on: boolean): void {
     const was = this.running;
@@ -52,6 +77,8 @@ export class GameSpeed {
   }
 
   private changed(was: number): void {
-    if (this.running !== was) this.send(this.running);
+    if (this.running === was) return;
+    this.sentAt = performance.now();
+    this.send(this.running);
   }
 }

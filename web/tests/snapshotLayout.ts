@@ -6,7 +6,7 @@
  * fails here rather than reading the wrong floats.
  */
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SnapshotLayout } from '../src/core/snapshot';
 
@@ -14,13 +14,38 @@ const SIM = join(import.meta.dir, '../../crates/sim-core/src');
 const source = (file: string) => readFileSync(join(SIM, file), 'utf8');
 export const SNAPSHOT_RS = source('snapshot.rs');
 
-/** A `pub const NAME: ty = value;` of `src` (in `pub mod module`, when given), as a number. */
-export function constant(name: string, module?: string, src = SNAPSHOT_RS): number {
-  const from = module ? src.indexOf(`pub mod ${module} {`) : 0;
-  if (from < 0) throw new Error(`no module ${module}`);
-  const m = new RegExp(`pub const ${name}: \\w+ = ([0-9._]+);`).exec(src.slice(from));
-  if (!m) throw new Error(`no ${module ? `${module}::` : ''}${name}`);
-  return Number(m[1].replace(/_/g, ''));
+/** Every `.rs` file under sim-core's `src/` (its path there, `/`-separated), read once. */
+const SOURCES = (readdirSync(SIM, { recursive: true }) as string[])
+  .filter((f) => f.endsWith('.rs'))
+  .map((f) => ({ file: f.split('\\').join('/'), src: source(f) }));
+
+/**
+ * The value of sim-core's constant `name` as its source writes it (the text between `=` and `;`), wherever it is
+ * declared under `src/`, so a test names only the constant, not its file. A const of that name of any visibility
+ * counts; where more than one module declares one, the test says which with `file` (its path under `src/`). None, or
+ * more than one, fails, so a const of the same name added elsewhere can't quietly become the one a test reads.
+ */
+export function rustConst(name: string, file?: string): string {
+  const found = SOURCES.filter((s) => !file || s.file === file).flatMap((s) =>
+    [...s.src.matchAll(new RegExp(`^\\s*(?:pub(?:\\([^)]*\\))? )?const ${name}: [^=]+= ([^;]+);`, 'gm'))].map((m) => m[1].trim()),
+  );
+  if (found.length !== 1) throw new Error(`${found.length ? 'more than one' : 'no'} const ${name} in sim-core${file ? `'s ${file}` : ''}`);
+  return found[0];
+}
+
+/** sim-core's constant `name` (`rustConst`, in `file` where given; in snapshot.rs's `pub mod module`, when given), as a number. */
+export function constant(name: string, module?: string, file?: string): number {
+  let value: string;
+  if (module) {
+    const from = SNAPSHOT_RS.indexOf(`pub mod ${module} {`);
+    if (from < 0) throw new Error(`no module ${module}`);
+    const m = new RegExp(`pub const ${name}: \\w+ = ([0-9._]+);`).exec(SNAPSHOT_RS.slice(from));
+    if (!m) throw new Error(`no ${module}::${name}`);
+    value = m[1];
+  } else value = rustConst(name, file);
+  const n = Number(value.replace(/_/g, ''));
+  if (Number.isNaN(n)) throw new Error(`const ${name} is not a number: ${value}`);
+  return n;
 }
 
 /**
@@ -28,9 +53,9 @@ export function constant(name: string, module?: string, src = SNAPSHOT_RS): numb
  * snapshots out in time (a snapshot every 1 / `TICKS_PER_SECOND` s) and the layouts they write them in keep to these,
  * so they go on holding whatever sim-core makes them.
  */
-export const TICKS_PER_SECOND = constant('TICKS_PER_SECOND', undefined, source('lib.rs'));
-export const TICKS_PER_MINUTE = constant('TICKS_PER_MINUTE', undefined, source('lib.rs'));
-export const DRIVE_SCALE = constant('DRIVE_SCALE', undefined, source('lib.rs'));
+export const TICKS_PER_SECOND = constant('TICKS_PER_SECOND');
+export const TICKS_PER_MINUTE = constant('TICKS_PER_MINUTE');
+export const DRIVE_SCALE = constant('DRIVE_SCALE');
 /** A layout's `ticksPerSecond`, `ticksPerMinute` and `driveScale`, as the sim's. */
 export const TICK_RATES = { ticksPerSecond: TICKS_PER_SECOND, ticksPerMinute: TICKS_PER_MINUTE, driveScale: DRIVE_SCALE };
 
@@ -43,9 +68,9 @@ export const BASES = {
 
 const HEADER_LEN = constant('HEADER_LEN');
 const SIM_STRIDE = constant('SIM_STRIDE');
-const MAX_SIMS = constant('MAX_SIMS', undefined, source('world/mod.rs'));
-const MAX_STAFF = constant('MAX_STAFF', undefined, source('staff.rs'));
-const MAX_CARS = constant('MAX_CARS', undefined, source('cars/mod.rs'));
+const MAX_SIMS = constant('MAX_SIMS');
+const MAX_STAFF = constant('MAX_STAFF');
+const MAX_CARS = constant('MAX_CARS');
 const CAR_STRIDE = constant('CAR_STRIDE');
 const LIGHT_STRIDE = constant('LIGHT_STRIDE');
 const MAX_LIGHTS = constant('MAX_LIGHTS');
@@ -58,6 +83,7 @@ export const LAYOUT = {
   headerLen: HEADER_LEN,
   simStride: SIM_STRIDE,
   maxSims: MAX_SIMS,
+  maxStaff: MAX_STAFF,
   ...TICK_RATES,
   header: {
     tick: constant('TICK', 'header'),

@@ -1,15 +1,65 @@
 /** Top-level navigation: which screen is shown, and which modal is open on top of it. */
 
 import type { GameKind, Lifespan } from '../core/protocol';
+import type { TownHistory } from '../game/edit/history';
 import type { HouseholdDraft } from '../game/household';
+import type { MenuStill } from '../game/menuStill';
+import type { Proposal } from '../game/townJobs';
+import type { Pt } from '../game/roads';
 import type { StartRequest } from '../game/session';
 import { EMPTY_LOT, withLot, type NeighbourhoodDraft } from '../game/town';
+import { moveInRequest, peopleSeedOf, type Chosen } from './newGame';
+import { homeKey, sameHome, type HomeRef } from './homes';
 
 /**
- * New game: world → neighbourhood (choose a household) → household (Creation) → home → game; or
- * world → neighbourhood → play (take over a household that already lives there) → game.
+ * New game, in five steps (`newGame.ts` `STEPS`): land (step 1) → streets and zones (step 2, `streets`:
+ * the layout, the streets laid out and the land zoned) → build (step 3, `town`: the town built from the
+ * layout, to tweak) → household (step 4: choose one of the town's, or make your own in Creation,
+ * `create`) → home (step 5, on the whole world: a household of the town's has its own home chosen, and
+ * may move) → game.
  */
-export type Screen = 'menu' | 'world' | 'neighbourhood' | 'create' | 'home' | 'play' | 'game';
+export type Screen = 'menu' | 'land' | 'streets' | 'town' | 'household' | 'create' | 'home' | 'game';
+
+/** A step's draft and the key of what it was made from (`newGame.ts` `landKey`, `townKey`): a later step whose key no longer matches is made again. */
+export interface Keyed {
+  draft: NeighbourhoodDraft;
+  key: string;
+}
+
+/** Step 1's land: no town on it yet. `waterKept`: its water is as generated (the town laid on it may use its plan's river and coast). */
+export interface MadeLand extends Keyed {
+  waterKept: boolean;
+}
+
+/**
+ * Step 3's built town, nobody living there yet: `draft` is the town settled from the player's edits (the
+ * town the next steps read). `edited`: tweaked by hand (the editor's tools): what builds it again
+ * asks first. Once edited, the editor keeps its `plan` (the draft its edits made, which `draft` is
+ * settled from: ahead of it until edits pause) and its undo `history` here, so going back and forth
+ * through the steps keeps them.
+ */
+export interface LaidTown extends Keyed {
+  edited: boolean;
+  plan?: NeighbourhoodDraft;
+  history?: TownHistory;
+  /** What in `draft` is over a slope limit (the town job's, then each settle's `marks`): step 2's next settle's `before`. */
+  marks?: readonly string[];
+}
+
+/**
+ * Step 2's layout: the proposal it started from (`townJobs.ts` `Proposal`), the layout settled from the player's
+ * edits (`draft`: its streets on the land, keyed by what the proposal was made from, `newGame.ts` `townKey`), and,
+ * once edited (what proposes again asks first), the plan the edits made, their undo `history` and the settle's
+ * `marks`, as `LaidTown` keeps them for the town. Build makes the town from `newGame.ts` `layoutPlan`.
+ */
+export interface Layout extends Keyed {
+  proposal: Proposal;
+  edited: boolean;
+  plan?: NeighbourhoodDraft;
+  history?: TownHistory;
+  marks?: readonly string[];
+}
+
 export type Overlay = 'settings' | 'load' | 'credits' | null;
 /** A loading step and the overall progress, 0..1. */
 export interface Progress {
@@ -39,24 +89,52 @@ class AppState {
   crash = $state.raw<Crash | null>(null);
   /** A file of this version couldn't be fetched (most likely a new version was published meanwhile): a banner offers to reload. */
   newVersion = $state(false);
-  /** Drafts kept while moving back and forth through the new-game steps: the world (nobody living there yet), then the town with its neighbours. */
-  world = $state.raw<NeighbourhoodDraft | null>(null);
+  // What the new game's steps made, kept while the player goes back and forth through them. Each is
+  // made again only when what it was made from changed (its key): a land shaped or chosen again
+  // lays the town again; a town laid again is lived in again; a household made in Creation is kept.
+
+  /** The world's code as chosen so far: step 1's place, land and seed, step 2's town, villages and town seed. Null until step 1 opens. */
+  code = $state.raw<Chosen | null>(null);
+  /** Step 1's land (with the player's shaping). */
+  land = $state.raw<MadeLand | null>(null);
+  /** Where the player moved the town (its box's middle, m; step 2's "Move the town"); null: where the land has it. */
+  site = $state.raw<Pt | null>(null);
+  /** The town's name as typed or rolled in steps 2 and 3; null: the one it was laid with. */
+  townName = $state<string | null>(null);
+  /** Step 2's layout (`Layout`). */
+  layout = $state.raw<Layout | null>(null);
+  /** Step 3's build's own seed ("Build again" rolls another; 0 until then): in the built town's key, not in the world's code. */
+  buildSeed = $state(0);
+  /** Step 3's built town (nobody living there yet). */
+  world = $state.raw<LaidTown | null>(null);
+  /** Step 4's town with its neighbours, and what it was filled from: step 3's town and the people's seed (`newGame.ts` `peopleKey`). */
   town = $state.raw<NeighbourhoodDraft | null>(null);
+  townOf = '';
+  /** The households step 3 offers (their homes, in order); empty until step 3 offers a sample of the town's. */
+  offer = $state.raw<readonly HomeRef[]>([]);
+  /** How many times step 3's "Show others" was pressed for `offer` (`newGame.ts` `offerPage`). */
+  offerPage = $state(0);
   household = $state.raw<HouseholdDraft | null>(null);
   /** Living (the residents earn the money) or Creative (building is free). */
   mode = $state<GameKind>('living');
   /** How fast residents age (the new game's choice). */
   lifespan = $state<Lifespan>('normal');
-  /** The home is an empty lot (its house cleared away) rather than the house as it stands. */
+  /** The home is an empty lot (its house cleared away) rather than the house as it stands (never a flat). */
   emptyLot = $state(false);
-  /** House picked on the home screen (prepared in the background). */
-  homeSlot = $state<number | null>(null);
-  /** Home of the neighbour household picked to play (prepared in the background). */
-  playSlot = $state<number | null>(null);
+  /** The home picked on the home screen, a house's lot or a flat (prepared in the background). */
+  home = $state.raw<HomeRef | null>(null);
+  /**
+   * The household chosen in step 3 from those living in town, by its home (step 4 opens on that
+   * home); null: the player's own from Creation (`household`). It wins over `household`: a
+   * household made in Creation is kept while the player looks through the town's.
+   */
+  play = $state.raw<HomeRef | null>(null);
   /** A live 3D scene is rendering behind the menus. */
   liveBackdrop = $state(false);
+  /** The main menu's picture (the last world made, `menuStill.ts`); null: the painted backdrop only. */
+  menuStill = $state.raw<MenuStill | null>(null);
   /**
-   * Start-up: everything the menus need is loaded first (game data, renderer, the menu's town)
+   * Start-up: everything the menus need is loaded first (game data, renderer, the menu's picture)
    * behind a loading screen; the menu shows after (and prepares the latest save behind it).
    */
   booting = $state(true);
@@ -65,35 +143,62 @@ class AppState {
   loading = $state.raw<Progress | null>(null);
 
   newGame(): void {
+    this.code = null;
+    this.land = null;
+    this.site = null;
+    this.townName = null;
+    this.layout = null;
+    this.buildSeed = 0;
     this.world = null;
     this.town = null;
+    this.townOf = '';
+    this.offer = [];
+    this.offerPage = 0;
     this.household = null;
-    this.playSlot = null;
+    this.play = null;
+    this.home = null;
     this.emptyLot = false;
-    this.screen = 'world';
+    this.screen = 'land';
   }
 
-  /** The town as the home screen shows it: the chosen lot cleared when starting on an empty lot. */
-  homeTown(slot: number): NeighbourhoodDraft | null {
+  /** The player's own work that the world's code doesn't carry: the layout edited, the built town tweaked or built again. */
+  get beyondCode(): boolean {
+    return !!this.layout?.edited || !!this.world?.edited || this.buildSeed !== 0;
+  }
+
+  /** The seed the town's people come from (the code's own, else drawn from the town's); undefined before step 1. */
+  get peopleSeed(): number | undefined {
+    return this.code ? peopleSeedOf(this.code) : undefined;
+  }
+
+  /** The town as the home screen shows it: the chosen lot cleared when starting on an empty lot (a house's: a flat is never one). */
+  homeTown(home: HomeRef): NeighbourhoodDraft | null {
     const town = this.town;
     if (!town) return null;
-    return this.emptyLot ? withLot(town, slot, EMPTY_LOT) : town;
+    return this.emptyLot && home.flat === undefined ? withLot(town, home.slot, EMPTY_LOT) : town;
   }
 
-  /** The new game the home screen starts on `slot` (also prepared in the background). */
-  homeRequest(slot: number): StartRequest | null {
-    const town = this.homeTown(slot);
-    const household = this.household;
-    if (!town || !household) return null;
-    return { kind: 'new', town, household, slot, mode: this.mode, lifespan: this.lifespan };
+  /** The home of the town's household chosen to play (`play`), while one still lives there; null: the household is Creation's. */
+  get residentHome(): HomeRef | null {
+    const home = this.play;
+    return home && !!this.town?.households.some((h) => sameHome(h, home)) ? home : null;
   }
 
-  /** The new game that takes over the household already living on `slot` (also prepared in the background). */
-  playRequest(slot: number): StartRequest | null {
+  /** The household moving in: the town's chosen in step 3, else the one made in Creation. */
+  get mover(): HouseholdDraft | null {
+    const from = this.residentHome;
+    return from === null ? this.household : (this.town?.households.find((h) => homeKey(h) === homeKey(from))?.household ?? null);
+  }
+
+  /**
+   * The new game Move in starts in `home` (`newGame.ts` `moveInRequest`): the household taking over
+   * its own home, or moving into this one (a house's lot, or a flat); the rest of the homes for sale filled on the way in.
+   */
+  homeRequest(home: HomeRef): StartRequest | null {
     const town = this.town;
-    const household = town?.households.find((h) => h.slot === slot)?.household;
+    const household = this.mover;
     if (!town || !household) return null;
-    return { kind: 'new', town, household, slot, existing: true, mode: this.mode, lifespan: this.lifespan };
+    return moveInRequest({ town, ...home, household, from: this.residentHome, emptyLot: this.emptyLot, mode: this.mode, lifespan: this.lifespan, ...(this.code ? { peopleSeed: peopleSeedOf(this.code) } : {}) });
   }
 
   start(request: StartRequest): void {
@@ -107,6 +212,13 @@ class AppState {
     this.overlay = null;
     this.request = null;
     this.screen = 'menu';
+  }
+
+  /** The main menu's picture from now on (the one it replaces let go once the menu has swapped it). */
+  setStill(still: MenuStill): void {
+    const old = this.menuStill;
+    this.menuStill = still;
+    if (old?.url.startsWith('blob:') && old.url !== still.url) setTimeout(() => URL.revokeObjectURL(old.url), 2000);
   }
 
   /** Shows the crash screen (unless it already shows for an earlier reason). */

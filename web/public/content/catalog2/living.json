@@ -1,5 +1,5 @@
 {
-  "$comment": "Catalogue 2: Sectional sofa pieces, sofas, chairs, coffee and side tables, shelves. Separate pieces only. Models: assets/manifest.json and the packs it lists (tools/art/blender/families/).",
+  "$comment": "Catalogue 2: Sectional sofa pieces, sofas, chairs, coffee and side tables, shelves. Separate pieces only. Models: assets/manifest.json and the packs it lists (crates/art).",
   "objects": [
     {
       "id": "sectionalMiddle",
@@ -1103,6 +1103,7 @@
           "id": "relax",
           "label": "Warm up by the fire",
           "anim": "relax",
+          "sound": "fireplaceElectric",
           "minutes": 30,
           "pose": "sit",
           "effects": {

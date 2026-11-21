@@ -739,7 +739,7 @@ fn the_renderer_tables_are_read_from_its_source() {
 fn the_shipped_content_reads() {
     let paths = Paths::repo();
     let objects = review::objects(Path::new(&paths.content)).unwrap();
-    assert_eq!(objects.len(), 556);
+    assert_eq!(objects.len(), 608);
     let by = |id: &str| objects.iter().find(|o| o.id == id).unwrap();
     let sofa = by("sofaBed");
     assert_eq!(
@@ -805,8 +805,8 @@ fn the_shipped_content_reads() {
     .unwrap();
     assert_eq!(sounds.get("shower").map(String::as_str), Some("shower"));
     let (text, files, _) = review::uses(&objects, &motions, &actions, &sounds, None);
-    assert!(text.contains("| **all** | 556 |"), "{text}");
-    assert_eq!(files.len(), 15);
+    assert!(text.contains("| **all** | 608 |"), "{text}");
+    assert_eq!(files.len(), 16);
 
     // The gate CI runs (`cargo review uses --check`): no use the renderer can't play, no `motions` key
     // no use answers to, no open without its clip. A missing use is the review's to weigh, not the gate's.

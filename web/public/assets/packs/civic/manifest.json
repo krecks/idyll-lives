@@ -1,0 +1,811 @@
+{
+  "$comment": "The fittings for the town's named places (crates/art/outside/src/civic, built by cargo art; content/civic.json): front desks and counters, the church's pews, lectern and altar, the pub's bar, school desks, the waiting room's bench, the couch, shop rails and the rest. Listed in the base manifest's packs. Nothing moves.",
+  "version": 1,
+  "entries": {
+    "model.receptionDesk": {
+      "type": "model",
+      "url": "../../models/civic/receptionDesk.glb",
+      "materials": {
+        "acrylic": {
+          "finish": "material.finish.gloss"
+        },
+        "bell": {
+          "finish": "material.finish.chrome"
+        },
+        "desk": {
+          "finish": "material.finish.satin"
+        },
+        "frame": {
+          "finish": "material.finish.metal"
+        },
+        "keys": {
+          "finish": "material.finish.satin"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "leaflet1": {
+          "finish": "material.finish.gloss"
+        },
+        "leaflet2": {
+          "finish": "material.finish.gloss"
+        },
+        "leaflet3": {
+          "finish": "material.finish.gloss"
+        },
+        "leaflet4": {
+          "finish": "material.finish.gloss"
+        },
+        "monitor": {
+          "finish": "material.finish.satin"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "plinth": {
+          "finish": "material.finish.satin"
+        },
+        "pot": {
+          "finish": "material.finish.gloss"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "desk",
+          "label": "Desk"
+        },
+        {
+          "material": "oak",
+          "label": "Ledge"
+        }
+      ]
+    },
+    "model.hotelReception": {
+      "type": "model",
+      "url": "../../models/civic/hotelReception.glb",
+      "materials": {
+        "bell": {
+          "finish": "material.finish.chrome"
+        },
+        "book": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "fob": {
+          "finish": "material.finish.satin"
+        },
+        "frame": {
+          "finish": "material.finish.metal"
+        },
+        "keys": {
+          "finish": "material.finish.satin"
+        },
+        "marble": {
+          "finish": "material.finish.gloss",
+          "roughness": 0.28
+        },
+        "monitor": {
+          "finish": "material.finish.satin"
+        },
+        "page": {
+          "finish": "material.finish.matte"
+        },
+        "plinth": {
+          "finish": "material.finish.satin"
+        },
+        "shade": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFD9A0"
+        },
+        "walnut": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "walnut",
+          "label": "Desk"
+        },
+        {
+          "material": "marble",
+          "label": "Top"
+        }
+      ]
+    },
+    "model.dutyDesk": {
+      "type": "model",
+      "url": "../../models/civic/dutyDesk.glb",
+      "materials": {
+        "counter": {
+          "finish": "material.finish.satin"
+        },
+        "frame": {
+          "finish": "material.finish.metal"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "keys": {
+          "finish": "material.finish.satin"
+        },
+        "label": {
+          "finish": "material.finish.matte"
+        },
+        "laminate": {
+          "finish": "material.finish.satin"
+        },
+        "monitor": {
+          "finish": "material.finish.satin"
+        },
+        "page": {
+          "finish": "material.finish.matte"
+        },
+        "plinth": {
+          "finish": "material.finish.satin"
+        },
+        "police": {
+          "finish": "material.finish.gloss"
+        },
+        "radio": {
+          "finish": "material.finish.satin"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "paint": [
+        {
+          "material": "counter",
+          "label": "Counter"
+        },
+        {
+          "material": "laminate",
+          "label": "Top"
+        }
+      ]
+    },
+    "model.tellerCounter": {
+      "type": "model",
+      "url": "../../models/civic/tellerCounter.glb",
+      "materials": {
+        "coin": {
+          "finish": "material.finish.metal"
+        },
+        "frame": {
+          "finish": "material.finish.metal"
+        },
+        "glass": {
+          "finish": "material.finish.glass"
+        },
+        "keys": {
+          "finish": "material.finish.satin"
+        },
+        "laminate": {
+          "finish": "material.finish.satin"
+        },
+        "monitor": {
+          "finish": "material.finish.satin"
+        },
+        "note": {
+          "finish": "material.finish.matte"
+        },
+        "plinth": {
+          "finish": "material.finish.satin"
+        },
+        "screen": {
+          "finish": "material.finish.gloss"
+        },
+        "slot": {
+          "finish": "material.finish.matte"
+        },
+        "teller": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "teller",
+          "label": "Counter"
+        },
+        {
+          "material": "laminate",
+          "label": "Worktop"
+        }
+      ]
+    },
+    "model.teacherDesk": {
+      "type": "model",
+      "url": "../../models/civic/teacherDesk.glb",
+      "materials": {
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "leaflet1": {
+          "finish": "material.finish.gloss"
+        },
+        "leaflet2": {
+          "finish": "material.finish.gloss"
+        },
+        "leaflet3": {
+          "finish": "material.finish.gloss"
+        },
+        "leaflet4": {
+          "finish": "material.finish.gloss"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "page": {
+          "finish": "material.finish.matte"
+        },
+        "plinth": {
+          "finish": "material.finish.satin"
+        },
+        "pot": {
+          "finish": "material.finish.gloss"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "walnut": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Desk"
+        }
+      ]
+    },
+    "model.lectern": {
+      "type": "model",
+      "url": "../../models/civic/lectern.glb",
+      "materials": {
+        "book": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "fob": {
+          "finish": "material.finish.satin"
+        },
+        "page": {
+          "finish": "material.finish.matte"
+        },
+        "pew_oak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "pew_oak",
+          "label": "Wood"
+        }
+      ]
+    },
+    "model.barCounter": {
+      "type": "model",
+      "url": "../../models/civic/barCounter.glb",
+      "materials": {
+        "acrylic": {
+          "finish": "material.finish.gloss"
+        },
+        "beer": {
+          "finish": "material.finish.gloss"
+        },
+        "bell": {
+          "finish": "material.finish.chrome"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "clip1": {
+          "finish": "material.finish.gloss"
+        },
+        "clip2": {
+          "finish": "material.finish.gloss"
+        },
+        "clip3": {
+          "finish": "material.finish.gloss"
+        },
+        "froth": {
+          "finish": "material.finish.matte"
+        },
+        "handle": {
+          "finish": "material.finish.gloss"
+        },
+        "leaf": {
+          "finish": "material.finish.satin"
+        },
+        "mag1": {
+          "finish": "material.finish.gloss"
+        },
+        "mahogany": {
+          "finish": "material.finish.wood"
+        },
+        "plinth": {
+          "finish": "material.finish.satin"
+        },
+        "towel": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "mahogany",
+          "label": "Bar"
+        },
+        {
+          "material": "brass",
+          "label": "Rail"
+        }
+      ]
+    },
+    "model.schoolDesk": {
+      "type": "model",
+      "url": "../../models/civic/schoolDesk.glb",
+      "materials": {
+        "ink": {
+          "finish": "material.finish.gloss"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "leaflet1": {
+          "finish": "material.finish.gloss"
+        },
+        "page": {
+          "finish": "material.finish.matte"
+        },
+        "pine": {
+          "finish": "material.finish.wood"
+        },
+        "pot": {
+          "finish": "material.finish.gloss"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "pine",
+          "label": "Wood"
+        },
+        {
+          "material": "iron",
+          "label": "Frame"
+        }
+      ]
+    },
+    "model.pew": {
+      "type": "model",
+      "url": "../../models/civic/pew.glb",
+      "materials": {
+        "book": {
+          "finish": "material.finish.satin"
+        },
+        "mag1": {
+          "finish": "material.finish.gloss"
+        },
+        "page": {
+          "finish": "material.finish.matte"
+        },
+        "pew_oak": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "pew_oak",
+          "label": "Wood"
+        }
+      ]
+    },
+    "model.waitingBench": {
+      "type": "model",
+      "url": "../../models/civic/waitingBench.glb",
+      "materials": {
+        "laminate": {
+          "finish": "material.finish.satin"
+        },
+        "mag1": {
+          "finish": "material.finish.gloss"
+        },
+        "mag2": {
+          "finish": "material.finish.gloss"
+        },
+        "mag3": {
+          "finish": "material.finish.gloss"
+        },
+        "mag4": {
+          "finish": "material.finish.gloss"
+        },
+        "radio": {
+          "finish": "material.finish.satin"
+        },
+        "shell": {
+          "finish": "material.finish.satin"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "shell",
+          "label": "Seats"
+        },
+        {
+          "material": "steel",
+          "label": "Frame"
+        }
+      ]
+    },
+    "model.examCouch": {
+      "type": "model",
+      "url": "../../models/civic/examCouch.glb",
+      "materials": {
+        "paper": {
+          "finish": "material.finish.matte"
+        },
+        "radio": {
+          "finish": "material.finish.satin"
+        },
+        "vinyl": {
+          "finish": "material.finish.satin"
+        },
+        "white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "vinyl",
+          "label": "Pad"
+        },
+        {
+          "material": "white",
+          "label": "Frame"
+        }
+      ]
+    },
+    "model.clothesRack": {
+      "type": "model",
+      "url": "../../models/civic/clothesRack.glb",
+      "materials": {
+        "bell": {
+          "finish": "material.finish.chrome"
+        },
+        "cloth1": {
+          "finish": "material.finish.fabric"
+        },
+        "cloth2": {
+          "finish": "material.finish.fabric"
+        },
+        "cloth3": {
+          "finish": "material.finish.fabric"
+        },
+        "cloth4": {
+          "finish": "material.finish.fabric"
+        },
+        "cloth5": {
+          "finish": "material.finish.fabric"
+        },
+        "cloth6": {
+          "finish": "material.finish.fabric"
+        },
+        "radio": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "bell",
+          "label": "Rail"
+        }
+      ]
+    },
+    "model.plantTable": {
+      "type": "model",
+      "url": "../../models/civic/plantTable.glb",
+      "materials": {
+        "bloom1": {
+          "finish": "material.finish.gloss"
+        },
+        "bloom2": {
+          "finish": "material.finish.gloss"
+        },
+        "bloom3": {
+          "finish": "material.finish.gloss"
+        },
+        "foliage": {
+          "finish": "material.finish.foliage"
+        },
+        "galv": {
+          "finish": "material.finish.metal"
+        },
+        "label": {
+          "finish": "material.finish.matte"
+        },
+        "slat": {
+          "finish": "material.finish.wood"
+        },
+        "soil": {
+          "finish": "material.finish.matte"
+        },
+        "terracotta": {
+          "finish": "material.finish.satin"
+        },
+        "tray": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "slat",
+          "label": "Slats"
+        },
+        {
+          "material": "terracotta",
+          "label": "Pots"
+        }
+      ],
+      "far": "../../models/civic/plantTable.far.glb"
+    },
+    "model.atm": {
+      "type": "model",
+      "url": "../../models/civic/atm.glb",
+      "materials": {
+        "atm": {
+          "finish": "material.finish.satin"
+        },
+        "atm_screen": {
+          "finish": "material.finish.gloss",
+          "glow": "#9FD3FF"
+        },
+        "fascia": {
+          "finish": "material.finish.satin"
+        },
+        "keys": {
+          "finish": "material.finish.satin"
+        },
+        "leaflet2": {
+          "finish": "material.finish.gloss"
+        },
+        "leaflet3": {
+          "finish": "material.finish.gloss"
+        },
+        "leaflet4": {
+          "finish": "material.finish.gloss"
+        },
+        "plinth": {
+          "finish": "material.finish.satin"
+        },
+        "sign": {
+          "finish": "material.finish.gloss",
+          "glow": "#BFF5D0"
+        },
+        "slot": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "atm",
+          "label": "Cabinet"
+        },
+        {
+          "material": "fascia",
+          "label": "Fascia"
+        }
+      ]
+    },
+    "model.wallBars": {
+      "type": "model",
+      "url": "../../models/civic/wallBars.glb",
+      "materials": {
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Wood"
+        }
+      ]
+    },
+    "model.altar": {
+      "type": "model",
+      "url": "../../models/civic/altar.glb",
+      "materials": {
+        "book": {
+          "finish": "material.finish.satin"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "candle": {
+          "finish": "material.finish.satin"
+        },
+        "flame": {
+          "finish": "material.finish.gloss",
+          "glow": "#FFC070"
+        },
+        "frontal": {
+          "finish": "material.finish.fabric"
+        },
+        "linen": {
+          "finish": "material.finish.fabric"
+        },
+        "page": {
+          "finish": "material.finish.matte"
+        },
+        "stone": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "stone",
+          "label": "Stone"
+        },
+        {
+          "material": "frontal",
+          "label": "Frontal"
+        }
+      ]
+    },
+    "model.lockerRow": {
+      "type": "model",
+      "url": "../../models/civic/lockerRow.glb",
+      "materials": {
+        "bell": {
+          "finish": "material.finish.chrome"
+        },
+        "frame": {
+          "finish": "material.finish.metal"
+        },
+        "label": {
+          "finish": "material.finish.matte"
+        },
+        "locker": {
+          "finish": "material.finish.satin"
+        },
+        "plinth": {
+          "finish": "material.finish.satin"
+        },
+        "slot": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "locker",
+          "label": "Doors"
+        },
+        {
+          "material": "frame",
+          "label": "Frame"
+        }
+      ]
+    },
+    "model.mannequin": {
+      "type": "model",
+      "url": "../../models/civic/mannequin.glb",
+      "materials": {
+        "bell": {
+          "finish": "material.finish.chrome"
+        },
+        "cloth1": {
+          "finish": "material.finish.fabric"
+        },
+        "cloth2": {
+          "finish": "material.finish.fabric"
+        },
+        "cloth4": {
+          "finish": "material.finish.fabric"
+        },
+        "dummy": {
+          "finish": "material.finish.gloss"
+        },
+        "radio": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "cloth1",
+          "label": "Jacket"
+        },
+        {
+          "material": "cloth2",
+          "label": "Trousers"
+        },
+        {
+          "material": "dummy",
+          "label": "Dummy"
+        }
+      ]
+    },
+    "model.luggageTrolley": {
+      "type": "model",
+      "url": "../../models/civic/luggageTrolley.glb",
+      "materials": {
+        "bell": {
+          "finish": "material.finish.chrome"
+        },
+        "brass": {
+          "finish": "material.finish.metal"
+        },
+        "carpet": {
+          "finish": "material.finish.fabric"
+        },
+        "case1": {
+          "finish": "material.finish.satin"
+        },
+        "case2": {
+          "finish": "material.finish.satin"
+        },
+        "radio": {
+          "finish": "material.finish.satin"
+        },
+        "rubber": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "paint": [
+        {
+          "material": "brass",
+          "label": "Frame"
+        },
+        {
+          "material": "carpet",
+          "label": "Carpet"
+        }
+      ]
+    },
+    "model.vaultDoor": {
+      "type": "model",
+      "url": "../../models/civic/vaultDoor.glb",
+      "materials": {
+        "bell": {
+          "finish": "material.finish.chrome"
+        },
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "leaflet4": {
+          "finish": "material.finish.gloss"
+        },
+        "vault": {
+          "finish": "material.finish.metal"
+        },
+        "vault_dark": {
+          "finish": "material.finish.metal"
+        }
+      },
+      "paint": [
+        {
+          "material": "vault",
+          "label": "Door"
+        },
+        {
+          "material": "vault_dark",
+          "label": "Frame"
+        }
+      ]
+    }
+  }
+}

@@ -39,8 +39,9 @@ fn start() {
     }));
 }
 
-/// Oldest save version `sim_core::save` still reads (it migrates everything from 1 on).
-const OLDEST_SAVE_VERSION: u64 = 1;
+/// Oldest save version the game opens (`sim_core::save::OLDEST_SAVE_VERSION`), as the version read
+/// from the start of a file is.
+const OLDEST_SAVE_VERSION: u64 = sim_core::save::OLDEST_SAVE_VERSION as u64;
 
 /// Why a save can't be opened. The menu keeps one from a newer version, and one this version
 /// failed to load (a later version may open it), and skips them; it removes one that is too old
@@ -81,8 +82,34 @@ impl LoadError {
     }
 }
 
-/// Loads a save; when that fails, works out whether (and how) the save is to blame.
+/// The version a save says it is, read off its start (a save's `version` comes first), so a save
+/// too old to open is known without reading the rest. None: it doesn't start so.
+fn version_of(save_json: &str) -> Option<u64> {
+    let rest = save_json
+        .trim_start()
+        .strip_prefix('{')?
+        .trim_start()
+        .strip_prefix("\"version\"")?
+        .trim_start()
+        .strip_prefix(':')?
+        .trim_start();
+    let digits = rest
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(rest.len());
+    rest[..digits].parse().ok()
+}
+
+/// Loads a save; when that fails, works out whether (and how) the save is to blame. One older
+/// than the game opens (`OLDEST_SAVE_VERSION`) is refused as too old before it is read.
 fn load_save(content_json: &str, save_json: &str) -> Result<World, LoadError> {
+    if let Some(v) = version_of(save_json).filter(|&v| v < OLDEST_SAVE_VERSION) {
+        return Err(LoadError {
+            problem: Some(SaveProblem::TooOld),
+            message: format!(
+                "save version {v} is older than this game opens ({OLDEST_SAVE_VERSION})"
+            ),
+        });
+    }
     World::from_save_json(content_json, save_json).map_err(|e| LoadError {
         problem: save_problem(content_json, save_json, &e.0),
         message: e.0,
@@ -169,9 +196,28 @@ impl Game {
         panic!("{why}");
     }
 
-    /// Runs one real-time step and refreshes the snapshot.
+    /// Runs one real-time step and refreshes the snapshot (at super speed, all of its most
+    /// ticks while it stays quiet at home).
     pub fn advance(&mut self) {
         self.world.advance();
+        snapshot::write(&self.world, &mut self.snapshot);
+    }
+
+    /// Starts a real-time step (`World::start_step`): the speed's ticks, or at super speed
+    /// none yet (`advance_more`). The ticks it ran. The snapshot waits for `end_step`.
+    pub fn start_step(&mut self) -> u32 {
+        self.world.start_step()
+    }
+
+    /// One more tick of a super-speed step (`World::advance_more`), while the worker has time
+    /// for it: whether it ran (not at super speed, no longer quiet at home, or the step's most
+    /// run: no).
+    pub fn advance_more(&mut self) -> bool {
+        self.world.advance_more()
+    }
+
+    /// Ends a step begun with `start_step`: refreshes the snapshot.
+    pub fn end_step(&mut self) {
         snapshot::write(&self.world, &mut self.snapshot);
     }
 
@@ -212,6 +258,12 @@ impl Game {
     /// Social interactions `actor` can start with `target`, with success chances (JSON).
     pub fn social_options(&self, actor: u32, target: u32) -> String {
         view::social_options_json(&self.world, actor as usize, target as usize)
+    }
+
+    /// The water mask as it is now (JSON: `{"water": rle, "width", "depth"}`; see
+    /// `World::water_mask`): what Build mode's Land tab lays its strokes' water over.
+    pub fn water_mask(&self) -> String {
+        self.world.water_mask_json()
     }
 
     /// The household's home as a blueprint (JSON; see `sim_core::blueprint`).
@@ -347,6 +399,17 @@ impl Game {
         self.world.lights_version()
     }
 
+    /// The curtains drawn shut (JSON array of object ids; see `sim_core::curtains`).
+    pub fn curtains_shut(&self) -> String {
+        serde_json::to_string(&sim_core::curtains::shut(&self.world))
+            .unwrap_or_else(|_| "[]".into())
+    }
+
+    /// Bumped whenever curtains are drawn or opened (see `curtainsShut`).
+    pub fn curtains_version(&self) -> u32 {
+        self.world.curtains_version()
+    }
+
     /// Changes whenever the lot (walls, floors, fences...) does; see `World::lot_version`.
     pub fn lot_version(&self) -> u32 {
         self.world.lot_version()
@@ -467,7 +530,8 @@ mod tests {
         sim_core::merge_content(&base, &parts).unwrap()
     }
 
-    /// Saves written by released builds: 0.1.0 (version 17) and the live site's d7c506e (19).
+    /// Saves written by released builds: 0.1.0 (version 17) and the live site's d7c506e (19). The
+    /// game no longer opens them.
     fn old_save(name: &str) -> String {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests/saves")
@@ -482,27 +546,35 @@ mod tests {
             .problem
     }
 
+    /// A save as this version writes it: `sim_core`'s town of day 5 (its `tests/saves`), loaded and
+    /// saved again.
+    fn current_save(content: &str) -> String {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../sim-core/tests/saves/live_day5.json");
+        World::from_save_json(content, &std::fs::read_to_string(path).unwrap())
+            .unwrap_or_else(|e| panic!("live_day5.json: {}", e.0))
+            .save_json()
+    }
+
     #[test]
-    fn old_releases_saves_load() {
+    fn old_releases_saves_are_too_old() {
         let content = content();
         for name in ["v0.1.0-day5.json", "d7c506e-day5.json"] {
-            let world = load_save(&content, &old_save(name))
-                .unwrap_or_else(|e| panic!("{name}: {}", e.message));
-            assert!(
-                world.sims.len() > 10,
-                "{name}: {} residents",
-                world.sims.len()
-            );
+            let err = load_save(&content, &old_save(name)).err().expect("refused");
+            assert_eq!(err.kind(), "tooOld", "{name}: {}", err.message);
         }
+        let world = load_save(&content, &current_save(&content))
+            .unwrap_or_else(|e| panic!("{}", e.message));
+        assert!(world.sims.len() > 10, "{} residents", world.sims.len());
     }
 
     #[test]
     fn unloadable_saves_say_why() {
         let content = content();
-        let good = old_save("v0.1.0-day5.json");
-        assert!(good.starts_with("{\"version\":17,"));
-        let with_version =
-            |v: &str| good.replacen("\"version\":17", &format!("\"version\":{v}"), 1);
+        let good = current_save(&content);
+        let now = format!("\"version\":{SAVE_VERSION}");
+        assert!(good.starts_with(&format!("{{{now},")));
+        let with_version = |v: &str| good.replacen(&now, &format!("\"version\":{v}"), 1);
         assert_eq!(
             problem(&content, &with_version("999")),
             Some(SaveProblem::TooNew)
@@ -523,7 +595,7 @@ mod tests {
         assert_eq!(problem(&content, ""), Some(SaveProblem::Corrupt));
         assert_eq!(problem(&content, &good[..5000]), Some(SaveProblem::Corrupt));
         assert_eq!(
-            problem(&content, "{\"version\":17}"),
+            problem(&content, &format!("{{{now}}}")),
             Some(SaveProblem::Corrupt)
         );
         assert_eq!(

@@ -1,8 +1,9 @@
 /** Reactive UI state. Written by the game layer at ~10 Hz, read by components. */
 
-import type { Catalog, FormerResident, HouseholdInfo, Lifespan, ObjectPlacement, PartColors, PlotInfo, RelationshipView, RoomView, Routine, SimInfo, SimView, SocialEvent, SocialOption } from '../core/protocol';
+import type { Catalog, FlatInfo, FormerResident, HouseholdInfo, Lifespan, ObjectPlacement, PartColors, PlotInfo, RelationshipView, RoomView, Routine, SimInfo, SimView, SocialEvent, SocialOption } from '../core/protocol';
 import type { ThreadStats } from '../debug/threads';
 import type { RenderStats, WallMode } from '../render/types';
+import { NO_LAND, startBrush, type BrushState, type LandState } from './land/landTools';
 
 export interface MenuState {
   objectId: number;
@@ -21,8 +22,11 @@ export interface MenuState {
 /** Live: play. Build: furnish, build and look after the home. Create: a family moving into an empty home (the new game's Creation, for a home left empty). */
 export type GameMode = 'live' | 'build' | 'create';
 export type BuildTool = 'wall' | 'room' | 'fence' | 'gate' | 'paint' | 'floor' | 'door' | 'window' | 'stairs' | 'garage' | 'porch' | 'roof' | 'remove' | 'move' | 'blueprint';
-/** Build mode's tabs: Furnish (the catalog: place, move, resize, upgrade, sell), Build (the house itself) and Home (how its rooms are doing). */
-export type BuildTab = 'furnish' | 'build' | 'home';
+/**
+ * Build mode's tabs: Furnish (the catalog: place, move, resize, upgrade, sell), Build (the house
+ * itself), Home (how its rooms are doing) and Land (shaping the world's land).
+ */
+export type BuildTab = 'furnish' | 'build' | 'home' | 'land';
 
 /** What Build mode puts up: wall covering (0: automatic, else wall covering + 1) and form, door and window style. */
 export interface BuildLook {
@@ -96,6 +100,8 @@ class GameState {
   day = $state(1);
   minute = $state(480);
   speed = $state(1);
+  /** Whether it is quiet at home (the household all asleep or out: `UiUpdate.quiet`): super speed runs up to 60× then, else up to 30×. */
+  quiet = $state(false);
   /** How fast residents age in this game. */
   lifespan = $state<Lifespan>('normal');
   /** Whether the player's residents move on their own in this game. */
@@ -116,6 +122,13 @@ class GameState {
   former = $state.raw<FormerResident[]>([]);
   households = $state.raw<HouseholdInfo[]>([]);
   plots = $state.raw<PlotInfo[]>([]);
+  /** The flats (each a plot of its own inside a ground lot, `WorldStructure.flats`): a household's `plot` may be one. */
+  flats = $state.raw<FlatInfo[]>([]);
+  /**
+   * The player's home where its things stand, in lot tiles: a house's lot (on the ground's rows), a flat's rectangle on
+   * its storey's rows; null without a home.
+   */
+  homeArea = $state.raw<{ x: number; z: number; w: number; d: number } | null>(null);
   /** Pairs with a resident in `sims` that has details, both ways (as `sims`, unchanged pairs keep their objects). */
   relationships = $state.raw<RelationshipView[]>([]);
   socialMenu = $state.raw<SocialMenuState | null>(null);
@@ -158,6 +171,11 @@ class GameState {
   /** Build mode's tab, and the Build tab's tool (both kept between visits). */
   buildTab = $state<BuildTab>('furnish');
   buildTool = $state<BuildTool>('wall');
+  /** Build mode's Land tab: the brush in hand (kept between visits), and how the land's shaping stands. */
+  landBrush = $state<BrushState>(startBrush());
+  land = $state.raw<LandState>(NO_LAND);
+  /** A mountain's ghost while it is dragged out (SVG path data, screen pixels). */
+  landGhost = $state('');
   /** The looks Build mode's tools use (kept between visits). */
   buildLook = $state<BuildLook>({ cover: 0, floor: 1, form: 0, door: 0, window: 0, fence: 0, stair: 0 });
   /** Paint tool: wall faces under the preview, and whether Shift (a whole room) is held. */
@@ -180,6 +198,8 @@ class GameState {
   /** Wall edges the build preview changes, and whether it can be built (for the cursor tag). */
   buildEdges = $state(0);
   buildValid = $state(true);
+  /** Why the build edit in hand can't go there, in the simulation's words, when it says more than "can't build here" (a flat's outer walls). */
+  buildWhy = $state<string | null>(null);
   /** The Room tool's rectangle in tiles while one is drawn. */
   buildRoom = $state.raw<[number, number] | null>(null);
   /** Whether the object in hand fits where the pointer is. */
@@ -207,6 +227,8 @@ class GameState {
   jobBoardOpen = $state(false);
   /** Plot currently shown. */
   viewPlot = $state<number | null>(null);
+  /** A lot not the household's shown open all the same, by the building card's "Look inside" (null: none). */
+  lookInside = $state<number | null>(null);
   /** Who acts on orders (a member of the player's household). */
   selected = $state(0);
   /** Resident whose panel is open (anyone; orders only for the player's household); null: just watching. */
@@ -270,6 +292,8 @@ class GameState {
     this.former = [];
     this.households = [];
     this.plots = [];
+    this.flats = [];
+    this.homeArea = null;
     this.relationships = [];
     this.socialMenu = null;
     this.feed = [];
@@ -277,6 +301,7 @@ class GameState {
     this.pauseMenu = false;
     this.townOpen = false;
     this.viewPlot = null;
+    this.lookInside = null;
     this.stats = null;
     this.threads = null;
     this.selected = 0;
@@ -295,6 +320,8 @@ class GameState {
     this.buySelection = null;
     this.buildTab = 'furnish';
     this.buildTool = 'wall';
+    this.land = NO_LAND;
+    this.landGhost = '';
     this.buildStart = null;
     this.eyedropper = false;
     this.pickHint = null;

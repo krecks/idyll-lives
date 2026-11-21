@@ -6,7 +6,7 @@ use crate::common;
 use std::collections::HashSet;
 
 use common::buy;
-use serde_json::{Value, json};
+use serde_json::Value;
 use sim_core::world::TaskKind;
 use sim_core::{Command, World};
 
@@ -160,12 +160,11 @@ fn a_queued_order_still_names_the_same_object_after_an_edit_and_a_reload() {
 }
 
 #[test]
-fn an_old_save_without_ids_gets_them_on_load() {
+fn things_saved_without_ids_get_them_on_load() {
     let mut w = world();
     let a = buy(&mut w, "chair", 2, 2);
     let b = buy(&mut w, "table", 4, 2);
     let mut save: Value = serde_json::from_str(&w.save_json()).unwrap();
-    save["version"] = json!(28);
     for o in save["objects"].as_array_mut().unwrap() {
         o.as_object_mut().unwrap().remove("id");
     }

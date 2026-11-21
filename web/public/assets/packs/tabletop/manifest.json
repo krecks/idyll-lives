@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built tabletop things (tools/art/blender/families/tabletop.py). Listed in the base manifest's packs. The materials map onto the game's finishes, so each costs one draw call (the see-through ones and the parts kept for a use to come one more, the alarm clock's two hands two more).",
+  "$comment": "The tabletop things (crates/art/things/src/tabletop, built by cargo art). Listed in the base manifest's packs. The materials map onto the game's finishes, so each costs one draw call (the see-through ones and the parts kept for a use to come one more, the alarm clock's two hands two more).",
   "version": 1,
   "entries": {
     "model.kettle": {
@@ -1301,6 +1301,41 @@
       "paint": [
         {
           "material": "vase",
+          "label": "Body"
+        }
+      ]
+    },
+    "model.iceCreamMaker": {
+      "type": "model",
+      "url": "../../models/tabletop/iceCreamMaker.glb",
+      "materials": {
+        "chrome": {
+          "finish": "material.finish.chrome"
+        },
+        "dark": {
+          "finish": "material.finish.satin"
+        },
+        "glass_pale": {
+          "finish": "material.finish.gloss"
+        },
+        "ice_cream_maker": {
+          "finish": "material.finish.metal"
+        },
+        "icecream": {
+          "finish": "material.finish.satin"
+        },
+        "red": {
+          "finish": "material.finish.gloss"
+        }
+      },
+      "motions": {
+        "loops": {
+          "churn": "whirr"
+        }
+      },
+      "paint": [
+        {
+          "material": "ice_cream_maker",
           "label": "Body"
         }
       ]

@@ -52,7 +52,7 @@ function town(turn: boolean): WorldStructure {
 const options = { has: () => true, entry: () => undefined, lived: false };
 
 /** Vertex positions (x, z) of a mesh, sorted, rounded to the centimetre. */
-const points = (pos: number[], turn: boolean) => {
+const points = (pos: ArrayLike<number>, turn: boolean) => {
   const out: string[] = [];
   for (let i = 0; i < pos.length; i += 3) {
     // Turned back: the town's (x, z) from (-z, x).

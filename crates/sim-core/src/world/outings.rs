@@ -1,6 +1,4 @@
 //! Trips and outings: when to go, how long for, and the way out of town.
-//!
-//! Split from `world.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -10,15 +8,30 @@ pub fn wrap_angle(a: f32) -> f32 {
 }
 
 /// What `sim` may use where they are: on the plot they're a guest at, else at home and the
-/// public things (within `autonomy.reach` in an open-world town).
+/// public things (within `autonomy.reach` in an open-world town). Nothing of a place shut now
+/// (its hours, `Plot::open_at`): its guests go home (`life::end_visit_if_due`), and those going
+/// by leave it be.
 pub(crate) fn usable_here<'a>(sim: &Sim, ctx: &Ctx<'a>) -> std::borrow::Cow<'a, [u32]> {
+    let shut = |plot: u32| {
+        ctx.plots
+            .get(plot as usize)
+            .is_some_and(|p| p.hours.is_some() && !p.open_at(ctx.day, ctx.minute))
+    };
     match sim.visiting {
+        Some(visit) if shut(visit.plot) => std::borrow::Cow::Borrowed(&[]),
         Some(visit) => std::borrow::Cow::Borrowed(ctx.index.on(visit.plot)),
-        None => ctx.index.usable_near(
-            ctx.households[sim.household as usize].plot,
-            sim.pos,
-            ctx.content.autonomy.reach,
-        ),
+        None => {
+            let mut near = ctx.index.usable_near(
+                ctx.households[sim.household as usize].plot,
+                sim.pos,
+                ctx.content.autonomy.reach,
+            );
+            let closed = |o: &u32| ctx.object_plot[*o as usize].is_some_and(shut);
+            if near.iter().any(closed) {
+                near.to_mut().retain(|o| !closed(o));
+            }
+            near
+        }
     }
 }
 
@@ -223,14 +236,32 @@ pub(crate) fn park_walk(
 /// (A baby, or a child, home all day is no host: counted, a guest stayed on with the baby once
 /// the one grown-up left for work.)
 pub(crate) fn hosts_about_till(ctx: &Ctx, h: u32) -> u64 {
-    ctx.briefs
+    // (Only the household's: `Ctx::members`.)
+    let till = ctx
+        .members
+        .of(h)
         .iter()
-        .enumerate()
-        .filter(|(_, b)| b.household == h && b.here && !b.away && b.adult)
-        .filter_map(|(j, _)| ctx.others.get(j))
+        .map(|&j| j as usize)
+        .filter(|&j| {
+            let b = &ctx.briefs[j];
+            b.household == h && b.here && !b.away && b.adult
+        })
+        .filter_map(|j| ctx.others.get(j))
         .map(|s| leaves_for_work(s, ctx).unwrap_or(u64::MAX))
         .max()
-        .unwrap_or(0)
+        .unwrap_or(0);
+    debug_assert_eq!(
+        till,
+        ctx.briefs
+            .iter()
+            .enumerate()
+            .filter(|(_, b)| b.household == h && b.here && !b.away && b.adult)
+            .filter_map(|(j, _)| ctx.others.get(j))
+            .map(|s| leaves_for_work(s, ctx).unwrap_or(u64::MAX))
+            .max()
+            .unwrap_or(0)
+    );
+    till
 }
 
 /// Whether a visit `eta` minutes away is one to make at `hour`, with `free` minutes before
@@ -456,7 +487,8 @@ pub(crate) fn no_bike_out(sim: &Sim) -> bool {
 
 /// The way out of town `sim` takes on foot: the quickest (`travel::Travel::eta`).
 pub(crate) fn exit_on_foot(ctx: &Ctx, sim: &Sim) -> Option<[f32; 2]> {
-    // From home, the way their commute was timed by (on foot).
+    // From home (a flat's building too: its hall, its yard), the way their commute was timed by
+    // (on foot).
     let home = ctx
         .households
         .get(sim.household as usize)
@@ -467,7 +499,7 @@ pub(crate) fn exit_on_foot(ctx: &Ctx, sim: &Sim) -> Option<[f32; 2]> {
         && ctx
             .briefs
             .get(sim.id as usize)
-            .is_some_and(|b| b.plot.is_none() || b.plot == home)
+            .is_some_and(|b| b.plot.is_none() || b.at_home(ctx.plots, home))
     {
         return Some(exit);
     }
@@ -536,6 +568,23 @@ pub(crate) fn held_object(kind: TaskKind) -> Option<u32> {
     }
 }
 
+/// The objects `sim` holds a place at, in id order: what they're doing holds (`held_object`)
+/// and what a talk from the seat over paused. Those are the only objects with `sim` among their
+/// users, so this finds what a scan of every object in town for them would, without the scan.
+pub(crate) fn held_by<'a>(
+    sim: &Sim,
+    objects: &'a [ObjectInstance],
+) -> impl Iterator<Item = &'a ObjectInstance> + 'a {
+    let mut held =
+        [&sim.current, &sim.paused].map(|a| a.as_ref().and_then(|a| held_object(a.task.kind)));
+    held.sort_unstable();
+    let id = sim.id;
+    held.into_iter()
+        .flatten()
+        .filter_map(|o| objects.get(o as usize))
+        .filter(move |o| o.users().any(|u| u == id))
+}
+
 /// A free crib at home for a baby (one with no other baby in it): they're put straight in.
 pub(crate) fn crib_for(sim: &mut Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> Option<Task> {
     let home = ctx.households[sim.household as usize].plot?;
@@ -584,5 +633,5 @@ pub(crate) fn could_conceive(ctx: &Ctx, a: usize, b: usize) -> bool {
         && y.household == x.household
         && ctx.households[h].expecting.is_none()
         && members < ctx.content.rules.max_household
-        && ctx.briefs.iter().filter(|s| s.here).count() < MAX_SIMS
+        && ctx.room_in_town
 }

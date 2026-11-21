@@ -94,6 +94,18 @@ describe('the ground’s shade', () => {
     expect(updateGroundShade(town([tree]), N, map).changed).toEqual([]);
   });
 
+  test('a house, its fence and its things gone together (a lot removed in step 2): made again round them alone, the same bytes as made whole', () => {
+    const chair = { id: 1, def: 'chairGarden', x: 2, z: 11, w: 1, d: 1, rot: 0 };
+    const tree = { id: 2, def: 'garden.maple', x: 13, z: 2, w: 2, d: 2, rot: 0 };
+    const whole = town([chair, tree]);
+    const map = groundShade(whole, N);
+    // (Walls first in the list, the fence and the chair after: gone from three places.)
+    const gone = { ...whole, walls: whole.walls.filter((e) => e.x < 6), rooms: whole.rooms.map(() => 0), fences: [], objects: [tree] as WorldStructure['objects'] };
+    const { changed } = updateGroundShade(gone, N, map);
+    expect(changed).not.toBeNull();
+    expect(Buffer.from(map).equals(Buffer.from(groundShade(gone, N)))).toBe(true);
+  });
+
   test('made again into the same bytes', () => {
     const first = groundShade(town(), N);
     const copy = first.slice();

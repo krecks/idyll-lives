@@ -3,8 +3,8 @@
  * generator laid out, `game/macro.ts`) as the landscape reads them: each kind rasterised once, at
  * load, on a `ZONE_CELL` m grid over the world, as a signed distance to its edge (m; above 0
  * inside), so the land's height, its colours and what grows on it can follow the zones with soft
- * edges. Past the world's edge a zone carries on as at the edge (a sea along one side goes on to the
- * horizon). Engine-neutral.
+ * edges. Past the world's edge the water carries on as at the edge (a sea along one side goes on to the
+ * horizon); the other kinds are the land's mirrored across its edge (`edge`). Engine-neutral.
  */
 
 import type { WorldZone } from '../../core/protocol';
@@ -25,20 +25,32 @@ export function shareAt(edge: number, soft: number): number {
   return t * t * (3 - 2 * t);
 }
 
+/** `v` past either end of [0, `size`] mirrored back across that end (once: the land past the edge is narrower than the world). */
+function mirror(v: number, size: number): number {
+  return v < 0 ? -v : v > size ? 2 * size - v : v;
+}
+
 export class ZoneField {
   private readonly gw: number;
   private readonly gd: number;
   /** Each kind's signed distance at the cells' middles (m, above 0 inside); missing: no zone of it. */
   private readonly fields = new Map<ZoneKind, Float32Array>();
 
+  /**
+   * `masks`: kinds drawn from a grid of cells instead of `zones`' outlines (the land's cover, `game/land.ts`:
+   * `gw` × `gd` cells of `ZONE_CELL` m, 1 inside), each `setMask`'s way; the outlines of those kinds are left out.
+   */
   constructor(
     zones: readonly WorldZone[],
     private readonly w: number,
     private readonly d: number,
+    masks?: ReadonlyMap<ZoneKind, Uint8Array>,
   ) {
     this.gw = Math.max(1, Math.ceil(w / ZONE_CELL));
     this.gd = Math.max(1, Math.ceil(d / ZONE_CELL));
+    for (const [kind, mask] of masks ?? []) this.setMask(kind, mask);
     for (const [kind, list] of Map.groupBy(zones, (z) => z.kind)) {
+      if (masks?.has(kind)) continue;
       const polys = list.map((z) => z.poly);
       const inside = this.rasterise(polys);
       if (!inside.some((v) => v)) continue;
@@ -49,6 +61,39 @@ export class ZoneField {
     }
   }
 
+  /** The grid's cells across and down (`ZONE_CELL` m each, from the world's corner). */
+  get size(): [number, number] {
+    return [this.gw, this.gd];
+  }
+
+  /**
+   * The zones of `kind` from a grid of cells (`size`, row-major; not 0: inside) rather than outlines: its signed
+   * distance (two chamfer passes each way, from the cells' middles), evened out as the farmland's outline is
+   * (`EVEN_CELLS`): the grid's steps would show along every slanted edge. An empty mask: no zone of it.
+   */
+  setMask(kind: ZoneKind, mask: Uint8Array): void {
+    const inside = mask.length === this.gw * this.gd ? mask : new Uint8Array(this.gw * this.gd);
+    if (!inside.some((v) => v)) {
+      this.fields.delete(kind);
+      return;
+    }
+    this.fields.set(kind, this.evened(this.signedDistance(inside), EVEN_CELLS));
+  }
+
+  /** The box (m: x0, z0, x1, z1) round the cells inside the zones of `kind`, or null without any. */
+  extent(kind: ZoneKind): [number, number, number, number] | null {
+    const f = this.fields.get(kind);
+    if (!f) return null;
+    let [i0, j0, i1, j1] = [Infinity, Infinity, -Infinity, -Infinity];
+    for (let j = 0; j < this.gd; j++) {
+      for (let i = 0; i < this.gw; i++) {
+        if (f[j * this.gw + i] <= 0) continue;
+        [i0, j0, i1, j1] = [Math.min(i0, i), Math.min(j0, j), Math.max(i1, i), Math.max(j1, j)];
+      }
+    }
+    return i0 === Infinity ? null : [i0 * ZONE_CELL, j0 * ZONE_CELL, (i1 + 1) * ZONE_CELL, (j1 + 1) * ZONE_CELL];
+  }
+
   /** Whether the world has a zone of `kind`. */
   has(kind: ZoneKind): boolean {
     return this.fields.has(kind);
@@ -56,15 +101,19 @@ export class ZoneField {
 
   /**
    * Metres inside the zones of `kind` at (x, z) (below 0: outside, that far from the nearest), read
-   * between the cells' middles; -Infinity without any. Outside the world, the edge's, carried on
-   * outward: deeper in a zone that reaches the edge, further from one that doesn't.
+   * between the cells' middles; -Infinity without any. Outside the world: the water's at the edge,
+   * carried on outward (deeper in water that reaches the edge, further from water that doesn't); the
+   * other kinds' at the point mirrored back across the edge, so a meadow or a wood the edge cuts ends
+   * past it as it began inside, not as a stripe drawn straight out to the horizon.
    */
   edge(kind: ZoneKind, x: number, z: number): number {
     const f = this.fields.get(kind);
     if (!f) return -Infinity;
-    const cx = Math.min(this.w, Math.max(0, x));
-    const cz = Math.min(this.d, Math.max(0, z));
-    const out = Math.hypot(x - cx, z - cz);
+    const carried = kind === 'water';
+    const [mx, mz] = carried ? [x, z] : [mirror(x, this.w), mirror(z, this.d)];
+    const cx = Math.min(this.w, Math.max(0, mx));
+    const cz = Math.min(this.d, Math.max(0, mz));
+    const out = carried ? Math.hypot(x - cx, z - cz) : 0;
     const gx = Math.min(this.gw - 1, Math.max(0, cx / ZONE_CELL - 0.5));
     const gz = Math.min(this.gd - 1, Math.max(0, cz / ZONE_CELL - 0.5));
     const x0 = Math.floor(gx);

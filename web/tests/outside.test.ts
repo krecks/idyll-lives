@@ -1,82 +1,9 @@
-// The street and the weather (`audio/outdoors.ts`, `audio/outside.ts`): the loops are what they say (an engine's
-// hum on its firing's tone, a town's low rumble, bright leaves) and the same every time; a car is louder and higher
-// the faster and the nearer it passes; the town's bed comes only with the town view; the leaves follow the gust.
+// The street and the weather (`audio/outside.ts`; its loops are made in Rust, `crates/sound/src/outdoors.rs`, and
+// tested there): a car is louder and higher the faster and the nearer it passes; the town's bed comes only with the town view; the leaves follow the gust.
 import { describe, expect, test } from 'bun:test';
 import { OUTSIDE } from '../src/audio/catalog';
-import { OUTDOORS } from '../src/audio/outdoors';
 import { carSound, leavesLevel, nearness, townLevel } from '../src/audio/outside';
-import type { Stereo } from '../src/audio/water';
 import { DEFAULT_ORBIT, RADIUS_LIMITS, TOWN_FROM, TOWN_FULL, TOWN_MAX } from '../src/render/shared/lens';
-
-const RATE = 48000;
-
-/** How bright a sound is: the root mean square of its sample-to-sample change over that of its samples, as a frequency (Hz). */
-function brightness(d: Float32Array): number {
-  let change = 0;
-  let level = 0;
-  for (let i = 1; i < d.length; i++) {
-    change += (d[i] - d[i - 1]) ** 2;
-    level += d[i] ** 2;
-  }
-  return (Math.sqrt(change / level) * RATE) / (2 * Math.PI);
-}
-
-/** How much of `d` is a tone at `hz` (the size of its part at that frequency, per sample). */
-function tone(d: Float32Array, hz: number): number {
-  let re = 0;
-  let im = 0;
-  for (let i = 0; i < d.length; i++) {
-    re += d[i] * Math.cos((2 * Math.PI * hz * i) / RATE);
-    im += d[i] * Math.sin((2 * Math.PI * hz * i) / RATE);
-  }
-  return Math.hypot(re, im) / d.length;
-}
-
-describe('the loops', () => {
-  const engine = OUTDOORS.carEngine(RATE);
-  const tyres = OUTDOORS.carTyres(RATE);
-  const town = OUTDOORS.town(RATE) as Stereo;
-  const leaves = OUTDOORS.leaves(RATE) as Stereo;
-
-  test('the same every time, whole and under full scale', () => {
-    expect(OUTDOORS.carEngine(RATE)).toEqual(engine);
-    expect((OUTDOORS.leaves(RATE) as Stereo).right).toEqual(leaves.right);
-    for (const d of [engine, tyres, town.left, town.right, leaves.left, leaves.right]) {
-      let peak = 0;
-      let sum = 0;
-      for (const v of d) {
-        peak = Math.max(peak, Math.abs(v));
-        sum += v * v;
-      }
-      expect(Number.isFinite(sum)).toBe(true);
-      expect(peak).toBeLessThanOrEqual(1);
-      expect(Math.sqrt(sum / d.length)).toBeGreaterThan(0.1);
-    }
-  });
-
-  test('an engine hums on its firing\'s tone and its overtones, a low sound', () => {
-    // 55 Hz and its multiples stand out of what lies between them.
-    for (const k of [1, 2, 3]) expect(tone(engine, 55 * k)).toBeGreaterThan(8 * tone(engine, 55 * k + 27));
-    expect(brightness(engine)).toBeLessThan(700);
-    // Whole turns in the loop: it meets itself at the seam.
-    expect(Math.abs(engine[0] - engine[engine.length - 1])).toBeLessThan(0.02);
-  });
-
-  test('tyres hiss, a town rumbles, leaves are bright; what is all round differs side to side', () => {
-    expect(brightness(tyres)).toBeGreaterThan(1500);
-    expect(brightness(town.left)).toBeLessThan(700);
-    expect(brightness(leaves.left)).toBeGreaterThan(3500);
-    for (const s of [town, leaves]) {
-      let cross = 0;
-      let own = 0;
-      for (let i = 0; i < s.left.length; i++) {
-        cross += s.left[i] * s.right[i];
-        own += s.left[i] ** 2;
-      }
-      expect(Math.abs(cross / own)).toBeLessThan(0.2);
-    }
-  });
-});
 
 describe('a car passing', () => {
   test('stood at a light it idles; the faster it goes the louder and higher, to its full speed', () => {

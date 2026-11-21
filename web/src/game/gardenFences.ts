@@ -110,6 +110,21 @@ export function townFences(input: FenceInput): TownFence[] {
       }
     }
   }
+  // Paths and driveways the same way (a city's thousand of them, asked of at every edge), each
+  // driveway in the cells within its door room and a metre of it (`besideDrive` asks one cell).
+  const file = (into: Map<string, Rect[]>, r: Rect, m: number) => {
+    for (let cx = Math.floor((r.x - m) / 4); cx <= Math.floor((r.x + r.w + m) / 4); cx++) {
+      for (let cz = Math.floor((r.z - m) / 4); cz <= Math.floor((r.z + r.d + m) / 4); cz++) {
+        const list = into.get(`${cx}:${cz}`);
+        if (list) list.push(r);
+        else into.set(`${cx}:${cz}`, [r]);
+      }
+    }
+  };
+  const pathCells = new Map<string, Rect[]>();
+  for (const r of input.paths) file(pathCells, r, 0);
+  const driveCells = new Map<string, Rect[]>();
+  for (const { drive } of input.plots) if (drive) file(driveCells, drive, DOOR_ROOM + 1);
   /** Whether a thing stands across thin box `r` round an edge (on both sides of it), or beside it and residents use it. */
   const blockedNear = (r: Rect, axis: 'h' | 'v') => {
     const across = (b: Rect) => (axis === 'h' ? b.z < r.z + 0.05 && b.z + b.d > r.z + r.d - 0.05 : b.x < r.x + 0.05 && b.x + b.w > r.x + r.w - 0.05);
@@ -125,12 +140,13 @@ export function townFences(input: FenceInput): TownFence[] {
     const thin: Rect = axis === 'h' ? { x: x + 0.05, z: z - 0.1, w: 0.9, d: 0.2 } : { x: x - 0.1, z: z + 0.05, w: 0.2, d: 0.9 };
     if (blockedNear(thin, axis)) return false;
     const across = (r: Rect) => (axis === 'h' ? r.x < x + 1 && r.x + r.w > x && r.z < z - 0.01 && r.z + r.d > z + 0.01 : r.z < z + 1 && r.z + r.d > z && r.x < x - 0.01 && r.x + r.w > x + 0.01);
-    return !input.paths.some(across) && !besideDrive(axis, x, z);
+    const [x1, z1] = axis === 'h' ? [x + 1, z] : [x, z + 1];
+    for (let cx = Math.floor(x / 4); cx <= Math.floor(x1 / 4); cx++) for (let cz = Math.floor(z / 4); cz <= Math.floor(z1 / 4); cz++) if (pathCells.get(`${cx}:${cz}`)?.some(across)) return false;
+    return !besideDrive(axis, x, z);
   };
   /** Whether unit edge (axis, x, z) runs along a driveway's side within `DOOR_ROOM` of it: the car parked on it opens its doors there. */
   const besideDrive = (axis: 'h' | 'v', x: number, z: number) =>
-    input.plots.some(({ drive: r }) => {
-      if (!r) return false;
+    !!driveCells.get(`${Math.floor(x / 4)}:${Math.floor(z / 4)}`)?.some((r) => {
       // (Along its length: a driveway runs from the street into the plot, its longer way.)
       if (axis === 'v') return r.d >= r.w && z < r.z + r.d && z + 1 > r.z && (x <= r.x ? r.x - x : x - (r.x + r.w)) <= DOOR_ROOM;
       return r.w > r.d && x < r.x + r.w && x + 1 > r.x && (z <= r.z ? r.z - z : z - (r.z + r.d)) <= DOOR_ROOM;
@@ -195,8 +211,8 @@ export function townFences(input: FenceInput): TownFence[] {
         for (let z = Math.floor(z0); z < z1; z++) for (let x = Math.floor(x0); x < x1; x++) if (input.onRoad?.(x + 0.5, z + 0.5)) return false;
         return true;
       };
-      // (Never over another plot.)
-      const free = (g: Rect) => input.plots.every((o) => o === a || !overlaps(g, o.rect, -0.01));
+      // (Never over another plot, nor over the gap another garden has grown over already: two would fence a tile in between them.)
+      const free = (g: Rect) => input.plots.every((o) => o === a || !overlaps(g, grown.get(o) ?? o.rect, -0.01));
       if (gapX > 0.01 && gapX <= NARROW_GAP && along(r.z, r.z + r.d, q.z, q.z + q.d) > 3 && clear(r.x + r.w, Math.max(r.z, q.z), q.x, Math.min(r.z + r.d, q.z + q.d)) && free({ ...r, w: q.x - r.x })) r.w = q.x - r.x;
       else if (gapZ > 0.01 && gapZ <= NARROW_GAP && along(r.x, r.x + r.w, q.x, q.x + q.w) > 3 && clear(Math.max(r.x, q.x), r.z + r.d, Math.min(r.x + r.w, q.x + q.w), q.z) && free({ ...r, d: q.z - r.z })) r.d = q.z - r.z;
     }
@@ -327,10 +343,11 @@ export function townFences(input: FenceInput): TownFence[] {
 }
 
 /**
- * Pockets of land on no plot that the fences of gardens round them shut in (a narrow gap between
- * gardens that couldn't go to either; a big world's lots, kept off its junctions and bends, leave
- * wider ones): each goes to a garden beside it, the fences between them taken away. (On a grid one
- * tile bigger all round than the fences reach: the open land round the town is one region there.)
+ * Pockets of land on no plot that the fences of gardens round them, and the houses on those
+ * gardens, shut in (a narrow gap between gardens that couldn't go to either; a big world's lots,
+ * kept off its junctions and bends, leave wider ones): each goes to a garden beside it, the fences
+ * between them taken away. (On a grid one tile bigger all round than the fences reach: the open
+ * land round the town is one region there.)
  */
 function joinPockets(out: Map<string, TownFence>, plots: readonly FencePlot[], fields: readonly Rect[]): void {
   if (!out.size) return;
@@ -345,6 +362,14 @@ function joinPockets(out: Map<string, TownFence>, plots: readonly FencePlot[], f
   };
   for (const f of fields) mark(f, -1);
   plots.forEach(({ rect: r }, k) => mark(r, k + 1));
+  // The houses' walls' boxes: no way through (a pocket behind a row of houses is shut in by them as
+  // by the fences between their gardens).
+  const solid = new Uint8Array(W * D);
+  for (const { house } of plots) {
+    if (!house) continue;
+    const [x0, z0, x1, z1] = house;
+    for (let z = Math.max(0, z0); z < Math.min(D - 1, z1); z++) for (let x = Math.max(0, x0); x < Math.min(W - 1, x1); x++) solid[(z + 1) * W + x + 1] = 1;
+  }
   // Fences (not gates) by edge: `h` (x, z) between tiles (x, z - 1) and (x, z); `v` (x, z) between (x - 1, z) and (x, z).
   const h = new Uint8Array(W * D);
   const v = new Uint8Array(W * D);
@@ -359,23 +384,37 @@ function joinPockets(out: Map<string, TownFence>, plots: readonly FencePlot[], f
   };
   const label = new Int32Array(W * D).fill(-1);
   const regions: { first: number; plot: boolean; open: boolean }[] = [];
-  const stack: number[] = [];
+  // (The regions found as `look` would find them, written out: this runs over every tile of a big world.)
+  const stack = new Int32Array(W * D);
   for (let s = 0; s < W * D; s++) {
-    if (label[s] >= 0) continue;
+    if (label[s] >= 0 || solid[s]) continue;
     const id = regions.length;
     const region = { first: s, plot: false, open: false };
     regions.push(region);
     label[s] = id;
-    stack.push(s);
-    while (stack.length) {
-      const i = stack.pop()!;
-      region.plot ||= !!onPlot[i];
-      region.open ||= i % W === 0 || i < W;
-      look(i, (j, fenced) => {
-        if (fenced || label[j] >= 0) return;
-        label[j] = id;
-        stack.push(j);
-      });
+    let top = 0;
+    stack[top++] = s;
+    while (top) {
+      const i = stack[--top];
+      if (onPlot[i]) region.plot = true;
+      const x = i % W;
+      if (x === 0 || i < W) region.open = true;
+      if (x > 0 && !v[i] && label[i - 1] < 0 && !solid[i - 1]) {
+        label[i - 1] = id;
+        stack[top++] = i - 1;
+      }
+      if (x < W - 1 && !v[i + 1] && label[i + 1] < 0 && !solid[i + 1]) {
+        label[i + 1] = id;
+        stack[top++] = i + 1;
+      }
+      if (i >= W && !h[i] && label[i - W] < 0 && !solid[i - W]) {
+        label[i - W] = id;
+        stack[top++] = i - W;
+      }
+      if (i + W < W * D && !h[i + W] && label[i + W] < 0 && !solid[i + W]) {
+        label[i + W] = id;
+        stack[top++] = i + W;
+      }
     }
   }
   regions.forEach((r, id) => {

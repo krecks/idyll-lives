@@ -1,6 +1,6 @@
 /**
  * The traffic lights in the game on PlayCanvas (sim-core `traffic.rs`): a pole with its three-lamp
- * head (`model.trafficLight`, tools/art/blender/families/street_furniture.py) at each signal head
+ * head (`model.trafficLight`, crates/art/outside/src/street_furniture) at each signal head
  * the snapshot has (`SnapshotLayout.light`, read by `shared/signals.ts`), standing where its row
  * says, its head turned to the traffic coming in; hidden outside the chunks streamed in and far off
  * (`setView`), as the cars are.
@@ -131,6 +131,13 @@ export class Signals {
   }
 
   /** The chunks streamed in (null: the whole town) and the camera's target (x, z): heads outside them, or further than `FAR`, aren't drawn. */
+  /** The ground the poles stand on (game space, m: `BuiltSurface.at` on a land the town follows), or 0 everywhere (null). */
+  setGround(ground: ((x: number, z: number) => number) | null): void {
+    this.ground = ground;
+    this.due = true;
+  }
+  private ground: ((x: number, z: number) => number) | null = null;
+
   setView(chunks: ReadonlySet<number> | null, x: number, z: number): void {
     const moved = !(Math.hypot(x - this.eyeX, z - this.eyeZ) < REFRAME);
     if (chunks === this.chunks && !moved) return;
@@ -252,7 +259,7 @@ export class Signals {
       if (this.chunks && !this.chunks.has(chunkAt(x, z))) continue;
       const dist = looked ? Math.hypot(x - this.eyeX, z - this.eyeZ) : 0;
       if (dist > FAR) continue;
-      compose(1, 1, 1, quatYawPitchRoll(rows.yaw[k], 0, 0, q), x, 0, z, m);
+      compose(1, 1, 1, quatYawPitchRoll(rows.yaw[k], 0, 0, q), x, this.ground ? this.ground(x, z) : 0, z, m);
       if (far && dist > FAR_MODELS) {
         if (moved) for (const draw of d.farBody) draw.setMatrix(away, m);
         away++;

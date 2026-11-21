@@ -1,5 +1,5 @@
 {
-  "$comment": "Catalogue 2: Counters (tops at 0.95 m, prep stations), islands and bars, cooking appliances and kitchen storage. Separate pieces only. Models: assets/manifest.json and the packs it lists (tools/art/blender/families/).",
+  "$comment": "Catalogue 2: Counters (tops at 0.95 m, prep stations), islands and bars, cooking appliances and kitchen storage. Separate pieces only. Models: assets/manifest.json and the packs it lists (crates/art).",
   "objects": [
     {
       "id": "counterEnd",
@@ -373,6 +373,7 @@
           "id": "breakfast",
           "label": "Have breakfast at the island",
           "anim": "eat",
+          "sound": "cutlery",
           "seatNear": 3,
           "minutes": 20,
           "effects": {
@@ -428,6 +429,7 @@
           "id": "breakfast",
           "label": "Have breakfast at the island",
           "anim": "eat",
+          "sound": "cutlery",
           "seatNear": 3,
           "minutes": 20,
           "effects": {
@@ -1092,6 +1094,7 @@
           "label": "Sort the recycling",
           "workOn": "dishes",
           "anim": "clean",
+          "sound": "binLid",
           "minutes": 4,
           "effects": {
             "comfort": 0.03

@@ -3,7 +3,8 @@
  *
  * - Vertex tweaks. Vertex colours are authored in sRGB: PlayCanvas converts them itself
  *   (`vertexColorGamma`), and `GAME_SRGB_COLORS` does the same for a per-instance colour
- *   (`GAME_INSTANCE_COLOR`: the `INSTANCE_COLOR_SEMANTIC` stream, multiplied into the albedo). A
+ *   (`GAME_INSTANCE_COLOR`: the `INSTANCE_COLOR_SEMANTIC` stream, multiplied into the albedo; with
+ *   `GAME_TINT_WHITE` only where the vertex colour is pure white, a parked car's paint, `shared/cars.ts`). A
  *   glow's strength per instance (`GAME_GLOW_TINT`, `models.ts` `glowByInstance`) multiplies the
  *   same stream into its (unlit, emissive) vertex colour, linearised as the glow's is.
  *   Planar UVs (`GAME_PLANAR_UV`) are the local XZ position in metres, for flat meshes built
@@ -16,14 +17,24 @@
  *   (`encodeFinish`), so a model with five untextured finishes is one draw call; and metals don't
  *   reflect the ground: a reflection that would go down goes as far up instead, flattened towards
  *   the horizon (`SKY_FOR_GROUND`), and the low sky stands in for the room the game has no map of.
+ * - A finish's layers (`GAME_FINISH_LAYERS`, `materials.ts` `layer`): cloth's sheen and a lacquer's clear
+ *   coat are PlayCanvas's own lobes (`useSheen`, `clearCoat`), whose reflections read the sky wherever
+ *   the surface is (`reflectionSheenPS`, `reflectionCCPS`). In a room of the lot in view they reflect
+ *   the room instead, as the surface under them does (`envBrdf.ts` `ROOM`): a unit of its picture
+ *   here, given the room's light in `combineColor` (`softLook.ts`), which also brings the lights'
+ *   highlights in the layers to the look's strength.
  */
 
-import type { ShaderFeature } from './chunks';
+import type { Language, ShaderFeature } from './chunks';
+import { ROOM } from './envBrdf';
+import { OUT } from './roomLights';
 
 /** How much darker (linear albedo) wallpaper's darker stripes are. */
 const STRIPE_DEPTH = '0.12';
 /** How far up a metal's reflection goes for one that would go down (1: as far up as it went down). */
 const SKY_FOR_GROUND = '0.3';
+/** Under this a vertex colour's channel isn't white (`GAME_TINT_WHITE`): 255 is 1, 254 under it. */
+const WHITE = '0.998';
 /** The plain finish where a mesh has no vertex colours: matte (`encodeFinish(0.75, 0)`). */
 const MATTE = '0.375';
 
@@ -43,6 +54,9 @@ export const VERTEX_TWEAKS: ShaderFeature = {
 	vGameTint = game_instanceColor;
 	#ifdef GAME_SRGB_COLORS
 		vGameTint.rgb = pow(max(vGameTint.rgb, vec3(0.0)), vec3(2.2));
+	#endif
+	#if defined(GAME_TINT_WHITE) && defined(VERTEX_COLOR)
+		if (min(vVertexColor.r, min(vVertexColor.g, vVertexColor.b)) < ${WHITE}) vGameTint = vec4(1.0);
 	#endif
 #endif
 #if defined(GAME_GLOW_TINT) && defined(VERTEX_COLOR)
@@ -70,6 +84,11 @@ export const VERTEX_TWEAKS: ShaderFeature = {
 	output.vGameTint = game_instanceColor;
 	#ifdef GAME_SRGB_COLORS
 		output.vGameTint = vec4f(pow(max(game_instanceColor.rgb, vec3f(0.0)), vec3f(2.2)), game_instanceColor.a);
+	#endif
+	#if defined(GAME_TINT_WHITE) && defined(VERTEX_COLOR)
+		if (min(output.vVertexColor.r, min(output.vVertexColor.g, output.vVertexColor.b)) < ${WHITE}) {
+			output.vGameTint = vec4f(1.0);
+		}
 	#endif
 #endif
 #if defined(GAME_GLOW_TINT) && defined(VERTEX_COLOR)
@@ -182,3 +201,58 @@ export const PLAIN_FINISH: ShaderFeature = {
 #endif`,
   },
 };
+
+/** The lines of PlayCanvas's sheen and clear coat reflections replaced (also in `tools/render/chunks.json`). */
+export const FINISH_LAYER_ANCHORS = {
+  glsl: {
+    reflectionSheenPS: 'sReflection += calcReflection(worldNormal, 0.0) * saturate(DG);',
+    reflectionCCPS: 'ccReflection += calcReflection(reflDir, gloss);',
+  },
+  wgsl: {
+    reflectionSheenPS: 'sReflection = sReflection + (calcReflection(worldNormal, 0.0) * saturate(dg));',
+    reflectionCCPS: 'ccReflection = ccReflection + calcReflection(reflDir, gloss);',
+  },
+} as const;
+
+/**
+ * The replaced lines on a finish with layers: in a room a unit of the room's picture, the sheen the room all
+ * round, the coat its walls over its floor. (The sky's is read either way: WGSL reads no texture under a
+ * branch on the fragment's room.)
+ */
+const LAYER_ROOM: Record<Language, Record<keyof (typeof FINISH_LAYER_ANCHORS)['glsl'], string>> = {
+  glsl: {
+    reflectionSheenPS: `vec3 gameSky = calcReflection(worldNormal, 0.0);
+		sReflection += (gameRoomHere > 1.5 ? vec3(1.0) : gameSky) * saturate(DG);`,
+    reflectionCCPS: `vec3 gameSky = calcReflection(reflDir, gloss);
+		ccReflection += gameRoomHere > 1.5 ? vec3(mix(${ROOM.floor}, 1.0, smoothstep(-${ROOM.turn}, ${ROOM.turn}, reflDir.y))) : gameSky;`,
+  },
+  wgsl: {
+    reflectionSheenPS: `let gameSky = calcReflection(worldNormal, 0.0);
+		sReflection = sReflection + select(gameSky, vec3f(1.0), gameRoomHere > 1.5) * saturate(dg);`,
+    reflectionCCPS: `let gameSky = calcReflection(reflDir, gloss);
+		ccReflection = ccReflection + select(gameSky, vec3f(mix(${ROOM.floor}, 1.0, smoothstep(-${ROOM.turn}, ${ROOM.turn}, reflDir.y))), gameRoomHere > 1.5);`,
+  },
+};
+
+type Replace = (code: string, name: string, anchor: string, replacement: string) => string;
+
+/**
+ * The game's `reflectionSheenPS` or `reflectionCCPS` from the engine's (`engine`, in `lang`): on a finish
+ * with layers (`GAME_FINISH_LAYERS`) the room's picture in a room, the sky's elsewhere and on every other material.
+ */
+export function finishLayerReflection(engine: string, name: keyof (typeof FINISH_LAYER_ANCHORS)['glsl'], lang: Language, replaceOnce: Replace): string {
+  const anchor = FINISH_LAYER_ANCHORS[lang][name];
+  const room = lang === 'glsl' ? `if (gameRoomHere < 0.0) gameRoomHere = gameRoomOf(vPositionW + litArgs_worldNormal * ${OUT});` : `if (gameRoomHere < 0.0) { gameRoomHere = gameRoomOf(vPositionW + litArgs_worldNormal * ${OUT}); }`;
+  return replaceOnce(
+    engine,
+    name,
+    anchor,
+    `
+	#ifdef GAME_FINISH_LAYERS
+		${room}
+		${LAYER_ROOM[lang][name]}
+	#else
+		${anchor}
+	#endif`,
+  );
+}

@@ -52,6 +52,8 @@ export interface GameControls {
   goHome(): void;
   /** The camera goes to look at a world point (the town map's "look here"). */
   lookAt(x: number, z: number): void;
+  /** Shows another household's lot (or a public one) open, its rooms and things, until the camera settles elsewhere; null closes it up again. */
+  lookInside(plot: number | null): void;
   /** The selected Sim starts social interaction `social` with `target`. */
   socialize(target: number, social: number): void;
   /** The selected Sim uses their phone: `action` (content `phone.actions` index), with `contact` or on their own. */
@@ -63,6 +65,8 @@ export interface GameControls {
   walkTo(sim: number, x: number, z: number): void;
   /** Switches a lamp on if it's off, off if it's on (at once: nobody walks over). */
   switchLamp(objectId: number): void;
+  /** Draws curtains shut if they're open, opens them if they're drawn (at once: nobody walks over). */
+  drawCurtains(objectId: number): void;
   cancelAction(index: number): void;
   setWallMode(mode: WallMode): void;
   closeMenu(): void;
@@ -87,6 +91,8 @@ export interface GameControls {
   undo(): void;
   /** Build mode: makes the last undone edit again (Ctrl/⌘+Shift+Z, Ctrl+Y). */
   redo(): void;
+  /** Build mode's Land tab: the land put back as it was before it was shaped here (undone as one stroke). */
+  landReset(): void;
   /** Gives something at home its parts' colours, all at once (none: as made). Free; effects stay the same. */
   recolor(objectId: number, colors: PartColors | undefined): void;
   /** Gives the new purchase in hand its parts' colours (none: as made). */

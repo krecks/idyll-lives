@@ -283,7 +283,7 @@ fn come_home(w: &mut World, c: usize) {
 
 /// How far two of `w`'s cars' bodies overlap at most where they're drawn, one of them on the move
 /// (m; 0 or less: apart), and which.
-fn cars_overlap(w: &World) -> (f32, usize, usize) {
+pub(crate) fn cars_overlap(w: &World) -> (f32, usize, usize) {
     overlap_where(w, |_| true)
 }
 
@@ -421,7 +421,7 @@ fn two_cars_meeting_on_a_7_m_street_pass_each_other_in_their_lanes() {
     );
 }
 
-// ---- Taking turns where ways cross (`traffic.rs`) --------------------------------------------
+// ---- Taking turns where ways cross (`traffic/`) --------------------------------------------
 
 /// A house in `roads_town`: its plot (x, z, w, d), and its driveway's inner end (x, z), the way it
 /// runs to its road (+1/-1 along z, or along x: `along_x`), the road it meets (`roads` index) and
@@ -1484,6 +1484,7 @@ fn a_lit_junction_keeps_those_on_foot_off_its_box_but_never_cuts_ground_off() {
         blocked: w.blocked(),
         stairs: w.stair_map(),
         kept_off: &[],
+        steps: None,
     };
     assert!(
         nav.find_path((x0, z0), (150, 150)).is_some(),

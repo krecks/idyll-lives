@@ -175,6 +175,7 @@ fn reached(w: &World, o: usize, from: (i32, i32)) -> bool {
         blocked: w.blocked(),
         stairs: w.stair_map(),
         kept_off: &[],
+        steps: None,
     };
     surface::use_tiles(&w.content, &w.objects, &nav, &w.objects[o])
         .into_iter()

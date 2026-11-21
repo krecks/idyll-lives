@@ -4,7 +4,8 @@
  * the street and area names. Pure: the tag layer (`TownTags.svelte`) gives it the game's views.
  */
 
-import type { PlotInfo, RoadPlan, TownArea, TownPlace, WorldMeta } from '../../core/protocol';
+import type { FlatInfo, PlotInfo, RoadPlan, TownArea, TownPlace, WorldMeta } from '../../core/protocol';
+import { FLAT_FLOOR, flatLandShare, landAndBuilt, roundPrice } from '../../game/price';
 
 type Rates = { perTile: number; perFloorTile: number; round: number; sizeRef?: number; sizePremium?: number };
 
@@ -77,9 +78,28 @@ export function openText(state: OpenState, weekday: number, time: (minute: numbe
   return `closed · opens ${day}${time(state.opens.minute)}`;
 }
 
-/** A home for sale: its lot, what it costs and how big it is. */
+/**
+ * The hours lot `plot` keeps: the simulation's (`PlotInfo.hours`, what a visit there is held to), else those of the
+ * place on it (the town file's); undefined for no lot, or one that keeps none.
+ */
+export function lotHours(plot: number | null | undefined, plots: readonly Pick<PlotInfo, 'hours'>[], places: readonly Pick<TownPlace, 'plot' | 'hours'>[]): TownPlace['hours'] | undefined {
+  if (plot == null) return undefined;
+  return plots[plot]?.hours ?? places.find((p) => p.plot === plot)?.hours;
+}
+
+/** Why nobody can visit a place with `hours` at `minute` of `weekday`: "Closed · opens 08:00", "Closed · opens Mon 08:00"; null while it's open. */
+export function closedWhy(hours: TownPlace['hours'] | undefined, minute: number, weekday: number, time: (minute: number) => string, days: readonly string[]): string | null {
+  const state = openState(hours, minute, weekday);
+  if (state.open) return null;
+  const text = openText(state, weekday, time, days);
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** A home for sale: its lot (or its flat), what it costs and how big it is. */
 export interface HomeForSale {
   plot: number;
+  /** A flat (`plot` its id): one storey of a building of flats, or over a place. */
+  flat?: true;
   /** The land and the house as built (the furniture comes on top): `game/price.ts` without the things in it. */
   price: number;
   /** Floor (m², every storey), 0 for an empty lot. */
@@ -91,25 +111,33 @@ export interface HomeForSale {
 }
 
 /**
- * The homes nobody lives in (private lots no household has), priced as `game/price.ts` prices a home from what the
- * views carry: the land by its size and the house by its floor (the walls' box, every storey). The things in it
- * aren't in the views, so the price is a "from".
+ * The homes nobody lives in (private lots no household has, and flats), priced as `game/price.ts` prices a home from
+ * what the views carry: the land by its size and the house by its floor (the walls' box, every storey); a flat its
+ * share of its building's land (the lot shared evenly by its flats, and the place under them over a place) and its
+ * own floor at a flat's rate (`FLAT_FLOOR`): flats are the cheapest homes. A building of
+ * flats is no home itself. The things in it aren't in the views, so the price is a "from".
  */
-export function homesForSale(plots: readonly PlotInfo[], households: readonly { plot: number | null }[], rates: Rates | undefined): HomeForSale[] {
+export function homesForSale(plots: readonly PlotInfo[], households: readonly { plot: number | null }[], rates: Rates | undefined, flats: readonly FlatInfo[] = []): HomeForSale[] {
   const taken = new Set(households.map((h) => h.plot));
+  const priced = (tiles: number, floor: number, share: number) => {
+    if (!rates) return 0;
+    const { land, built } = landAndBuilt(rates, tiles, floor, share);
+    return roundPrice(rates, land + built);
+  };
+  const flatsOf = new Map<number, number>();
+  for (const f of flats) flatsOf.set(f.of, (flatsOf.get(f.of) ?? 0) + 1);
   const out: HomeForSale[] = [];
   for (const p of plots) {
-    if (p.public || taken.has(p.id)) continue;
+    if (p.public || p.kind === 'flats' || flatsOf.has(p.id) || taken.has(p.id)) continue;
     const storeys = p.house ? (p.storeys ?? 1) : 0;
     const floor = p.house ? (p.house[2] - p.house[0]) * (p.house[3] - p.house[1]) * storeys : 0;
-    let price = 0;
-    if (rates) {
-      const land = rates.perTile * p.w * p.d;
-      const built = rates.perFloorTile * floor * (floor / (rates.sizeRef ?? 100)) ** (rates.sizePremium ?? 0);
-      const step = Math.max(1, rates.round);
-      price = Math.round((land + built) / step) * step;
-    }
-    out.push({ plot: p.id, price, floor, storeys, w: p.w, d: p.d });
+    out.push({ plot: p.id, price: priced(p.w * p.d, floor, 1), floor, storeys, w: p.w, d: p.d });
+  }
+  for (const f of flats) {
+    const lot = plots[f.of];
+    if (taken.has(f.id) || !lot) continue;
+    const floor = f.w * f.d;
+    out.push({ plot: f.id, flat: true, price: priced(flatLandShare(lot.w * lot.d, flatsOf.get(f.of) ?? 1, lot.public), floor, FLAT_FLOOR), floor, storeys: 1, w: f.w, d: f.d });
   }
   return out;
 }

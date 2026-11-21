@@ -1,6 +1,4 @@
 //! Loading and saving cars, and the parking spots trips use.
-//!
-//! Split from `cars.rs` (see `mod.rs`).
 
 use super::*;
 
@@ -12,6 +10,16 @@ impl World {
         self.car_tiles
             .iter()
             .map(|&i| self.lot.tile_xz(i))
+            .collect()
+    }
+
+    /// The public parking bays (`OpenWorld::parking`, by index) a car parked in would stand by a
+    /// driveway's mouth or on the driveway (`Travel::by_a_mouth`): no trip parks there. A guard
+    /// for older towns and hand-made ones; a generated town lays none so (`parking.ts` keeps its
+    /// car parks `MOUTH_CLEAR` and `DRIVE_CLEAR` off every driveway).
+    pub fn bays_by_a_mouth(&self) -> Vec<usize> {
+        (self.travel.by_a_mouth.iter().enumerate())
+            .filter_map(|(k, &by)| by.then_some(k))
             .collect()
     }
 }
@@ -57,6 +65,11 @@ pub(crate) fn load(w: &mut World, saved: &[Car], drives: &[Drive], garages: &[Ga
             .trip
             .filter(|t| t.driver < sims && (t.plot as usize) < w.plots.len());
         car.riders.retain(|&o| o < sims);
+        let bodies = w.content.car_bodies.len();
+        car.want = car.want.filter(|n| usize::from(n.body) < bodies);
+        if let Some(n) = car.want.as_mut() {
+            n.by = n.by.filter(|&o| o < sims);
+        }
         if car.trip.is_none() {
             car.riders.clear();
         }
@@ -70,7 +83,8 @@ pub(crate) fn load(w: &mut World, saved: &[Car], drives: &[Drive], garages: &[Ga
 }
 
 /// Builds the town's cars from its file: each goes to the household living on its plot (none
-/// there: no car), owned by its grown-ups.
+/// there: no car), owned by its grown-ups, and is the car its best earner's job calls for
+/// (`fit_town`; the file's body where nobody works).
 pub(crate) fn from_file(w: &mut World, raw: &[CarRaw], drives: &[Drive], garages: &[Garage]) {
     w.drives = drives.to_vec();
     w.garages = garages.to_vec();
@@ -89,6 +103,8 @@ pub(crate) fn from_file(w: &mut World, raw: &[CarRaw], drives: &[Drive], garages
         })
         .take(MAX_CARS)
         .collect();
+    // (Each the car its household's best earner's job calls for: `looks.rs`.)
+    fit_town(w);
     settle_all(w);
 }
 
@@ -138,13 +154,28 @@ pub(crate) fn settle_all(w: &mut World) {
 
 // ---- Trips by car (`Trip`) ---------------------------------------------------------------
 
-/// How near a driveway's mouth (where it meets its road) the middle of a car parked out on a trip
-/// may not be (m: a car's length and the swing of one turning in or out by it).
-pub(crate) const MOUTH_CLEAR: f32 = 7.0;
+/// How near a driveway's mouth (where it meets its road, on the road's middle line) the middle of
+/// a car parked out on a trip may not be (m: a car's length and the swing of one turning in or out
+/// by it). The web's `parking.ts` lays its bays as far off (its `MOUTH_CLEAR`, held to this by a
+/// test).
+pub const MOUTH_CLEAR: f32 = 7.0;
 
 /// How near a driveway (the line from its inner end to its mouth) the middle of a car parked out
 /// on a trip may not be (m: half of each of two cars side by side, the gap between them and some).
-pub(crate) const DRIVE_CLEAR: f32 = 2.5;
+/// Mirrored in `parking.ts` as `MOUTH_CLEAR` is.
+pub const DRIVE_CLEAR: f32 = 2.5;
+
+/// A public parking bay as a town lays it (`parking.ts`): 3 m along the road by 6 m deep, side by
+/// side 3 m apart in a car park's row (m). A car parked in one stands at its middle facing its yaw
+/// (nose in), as the town file gives them (`park_spot`): its tiles and the stands at its doors
+/// keep to the grid a 3 by 6 m reservation always had.
+pub const BAY_WIDE: f32 = 3.0;
+pub const BAY_DEEP: f32 = 6.0;
+
+/// The lines painted round a bay, across and along it (m, about its middle): every car body
+/// (`Content::car_bodies`: the longest 5.2 m, the widest just under 2) parked in it stands inside
+/// them.
+pub const BAY_LINES: [f32; 2] = [2.8, 5.6];
 
 /// How far `p` is from the segment `a`..`b` (m).
 pub(crate) fn to_segment(p: [f32; 2], a: [f32; 2], b: [f32; 2]) -> f32 {
@@ -191,8 +222,8 @@ pub(crate) fn parking_for(
 }
 
 /// Where a car parked at public parking spot `k` (`OpenWorld::parking`) stands, which way it
-/// faces and whether it's a bay off the road (nose in, facing away from it: `parking_bay`; else
-/// as the spot, on the road).
+/// faces (the bay's own `yaw`, nose in) and whether it's a bay off the road (`parking_bay`; else
+/// on the road, pulled into along it).
 pub(crate) fn parked_at(travel: &Travel, k: usize) -> Option<([f32; 2], f32, bool)> {
     match travel.parked.get(k) {
         Some(&spot) => spot,
@@ -200,15 +231,16 @@ pub(crate) fn parked_at(travel: &Travel, k: usize) -> Option<([f32; 2], f32, boo
     }
 }
 
-/// `parked_at` worked out (`Travel::parked` keeps it).
+/// `parked_at` worked out (`Travel::parked` keeps it): the bay's pose as the town file gives it,
+/// which is the one the renderer draws.
 pub(crate) fn park_spot(travel: &Travel, k: usize) -> Option<([f32; 2], f32, bool)> {
     let p = travel.file.parking.get(k)?;
     let at = [p.x, p.z];
-    at.iter().all(|v| v.is_finite()).then_some(())?;
-    Some(match parking_bay(travel, at) {
-        Some((_, _, [x, z])) => (at, (0.0 - x).atan2(0.0 - z), true),
-        None => (at, p.rot, false),
-    })
+    [p.x, p.z, p.yaw]
+        .iter()
+        .all(|v| v.is_finite())
+        .then_some(())?;
+    Some((at, p.yaw, parking_bay(travel, at).is_some()))
 }
 
 /// Whether there's public parking near `door` for a trip by car (`TRIP_PARK_REACH`), taken or not.

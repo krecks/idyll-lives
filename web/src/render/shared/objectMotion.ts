@@ -8,14 +8,16 @@
  * long when the use ends (a phone box's door letting the caller out). A loop (`loops`: a
  * rocking chair) goes round from rest to rest while the use lasts, then finishes its round. An
  * object that is open (the sim's `open`: a wall bed folded down) holds its `motions.open` clip
- * open as long as it stays so, and its `motions.night` clip (curtains drawn) from dusk to dawn,
- * whoever is asleep (a thing it lights, the candles' flames, only while its room's lights are on: `setUnlit`). A machine
+ * open as long as it stays so, and its `motions.night` clip (a coop's hatch shut) from dusk to dawn,
+ * whoever is asleep (a thing it lights, the candles' flames, only while its room's lights are on: `setUnlit`);
+ * curtains (content `overWindow`) hold theirs (drawn) while the sim has them drawn shut (`setCurtainsShut`), not by the clock. A machine
  * running on its own (the sim's `running`: a washer loaded, nobody at it) goes round its `motions.running` clip as a use's
  * loop does, finishing its round once it stops. A crop's `motions.growth` clip is held where its growth stage is, moving on
  * to the next stage at the clip's own pace. An ambient clip (`idle`: a ceiling fan, a fountain's water) goes
  * round all the time (a lamp's only while it's switched on: the fan's blades with its light), but
  * only within `ambientRange` of the camera (none on Low), without the shadows being redrawn for it.
- * A fire (content `light.fire`) holds its uses' clips (its flames) open while it burns at night. A clock's hands (`clock`) show the game's time, set each game
+ * A fire (content `light.fire`) holds its uses' clips (its flames) open while it burns at night, and
+ * its `burn` clip goes round (the flames' lean and sway). A clock's hands (`clock`) show the game's time, set each game
  * minute (each five on Low) within `CLOCK_RANGE` of the camera or the ambient range. A part moved by
  * several clips at once takes all their poses (`partPose`: a record spinning as it swings up; a use's clip
  * on top of a crop's growth stage, the veggie bed's plants rustling as tall as they have grown). Each
@@ -28,7 +30,7 @@
  * (its slots), and the moving parts' poses at rest.
  */
 
-import { PLAYBACK_RATE, QUIET_SPEED } from './gameSpeed';
+import { playbackRate } from './gameSpeed';
 import { invert, multiply } from './math';
 import { partPose, type ModelClip } from './modelClips';
 import type { Motions } from './modelEntry';
@@ -142,6 +144,8 @@ export interface MovingObject<D> {
   lamp?: boolean;
   /** A fire (content `light.fire`): these clips (its flames, its uses') are held open while it burns at night. */
   burns?: readonly string[];
+  /** Curtains (content `overWindow`): their `night` clip is held while they're drawn shut (`setCurtainsShut`), not from dusk to dawn. */
+  curtain?: boolean;
 }
 
 /** Metres from the camera within which clocks show the time, at least (Low has no ambient range). */
@@ -173,10 +177,11 @@ interface ClipState {
   progress?: number;
   /**
    * Opens and closes (a use's, or held open), goes round while used (`loops`), plays from rest to rest
-   * every so often while used (`repeat`), goes round always (`idle`), is held where a crop's stage
-   * (`growth`) or the game's time (`clock`) has it, or where the use has got to (`over`).
+   * every so often while used (`repeat`), goes round always (`idle`), goes round while a fire burns
+   * (`burn`), is held where a crop's stage (`growth`) or the game's time (`clock`) has it, or where
+   * the use has got to (`over`).
    */
-  kind: 'use' | 'loop' | 'repeat' | 'idle' | 'growth' | 'clock' | 'over';
+  kind: 'use' | 'loop' | 'repeat' | 'idle' | 'growth' | 'clock' | 'over' | 'burn';
 }
 
 /** A clip a use wants this frame. */
@@ -225,14 +230,27 @@ export class ObjectMotion<D> {
   /** The game's minute of the day, as the last frame had it. */
   private minute = 0;
 
+  /** Fixed-step playback: the clips' clock back to 0, so the same frames move the same. */
+  restartClock(): void {
+    this.clock = 0;
+    this.lastNow = 0;
+    this.clockFrames = 0;
+  }
+
   /** Night (the lamps are lit): `motions.night` clips are held open. Null until the lighting first says. */
   private night: boolean | null = null;
   /** The night clips go straight to where the lighting has them (the first lighting of a world), without playing. */
   private snapNight = false;
   /** Lamps and fires switched off (`setLampsOff`). */
   private lampsOff: ReadonlySet<number> = new Set();
+  /** Curtains drawn shut (`setCurtainsShut`); null until the sim first says. */
+  private curtainsShut: ReadonlySet<number> | null = null;
+  /** The curtains go straight to where the sim has them (the first word of it), without playing. */
+  private snapCurtains = false;
   /** Whether an object's glow is out with its room's lights (`setUnlit`): a night clip that lights it (candles) stays shut. */
   private unlit: (id: number) => boolean = () => false;
+  /** Reduce motion (the settings'): a fire's flames hold still. */
+  reducedMotion = false;
 
   /**
    * The lamps' level (the lighting's `lamps`, 0 by day to 1 at night): night clips close from about
@@ -253,6 +271,12 @@ export class ObjectMotion<D> {
   /** The lamps (and fires) switched off, by object id (the sim's `lampsOff`): a fan's blades stop, a fire's flames die down. */
   setLampsOff(off: ReadonlySet<number>): void {
     this.lampsOff = off;
+  }
+
+  /** The curtains drawn shut, by object id (the sim's `curtainsShut`): drawn while they are, played as they're drawn or opened. */
+  setCurtainsShut(shut: ReadonlySet<number>): void {
+    if (this.curtainsShut === null) this.snapCurtains = true;
+    this.curtainsShut = shut;
   }
 
   /**
@@ -293,6 +317,12 @@ export class ObjectMotion<D> {
   /** Object `id`'s model clips (dev tools: `RendererDebugHooks.objectMotions`). */
   motionsOf(id: number): Motions | null {
     return this.objects.get(id)?.motions ?? null;
+  }
+
+  /** Whether fire `id`'s flames are going round (`burn`: lit, at night, near the camera, motion not reduced): its glow flickers with them. */
+  burning(id: number): boolean {
+    const burn = this.objects.get(id)?.motions.burn;
+    return burn !== undefined && !this.reducedMotion && !!this.states.get(id)?.has(burn);
   }
 
   /** The objects of a newly built world; those still mid-clip are posed again. */
@@ -359,11 +389,11 @@ export class ObjectMotion<D> {
     return clip ? { name: name!, clip, at: (GROWTH_TIMES[o.stage!] ?? 0) * clip.duration } : undefined;
   }
 
-  /** The clips `o` holds open now: its `open` one while open, its `night` one at night, a fire's flames while it burns at night. */
+  /** The clips `o` holds open now: its `open` one while open, its `night` one at night (curtains' while drawn), a fire's flames while it burns at night. */
   private held(o: MovingObject<D>, held: string[] = []): string[] {
     held.length = 0;
     if (o.open && o.motions.open) held.push(o.motions.open);
-    if (this.night && o.motions.night && !this.unlit(o.id)) held.push(o.motions.night);
+    if (o.motions.night && (o.curtain ? !!this.curtainsShut?.has(o.id) : this.night && !this.unlit(o.id))) held.push(o.motions.night);
     if (this.night && o.burns && !this.lampsOff.has(o.id)) held.push(...o.burns);
     return held;
   }
@@ -377,11 +407,7 @@ export class ObjectMotion<D> {
     const result = this.result;
     result.moved = result.ambient = false;
     if (!this.objects.size) return result;
-    const speed = curr[layout.header.speed] | 0;
-    const quiet = layout.header.calm !== undefined && curr[layout.header.calm] > 0;
-    const gameSpeed = quiet ? Math.max(speed, QUIET_SPEED) : speed;
-    if (gameSpeed === 0) dt = 0;
-    dt *= Math.min(PLAYBACK_RATE[gameSpeed] ?? 1, 2.5);
+    dt *= Math.min(playbackRate(curr, layout.header), 2.5);
     this.clock += dt;
 
     this.findUses(frame, actionTags);
@@ -397,19 +423,25 @@ export class ObjectMotion<D> {
       const held = this.held(o, this.heldNow);
       // (A lamp's, a fan's blades, only while it's switched on.)
       const idle = o.motions.idle !== undefined && reach > 0 && !(o.lamp && this.lampsOff.has(id)) && this.distance2(o, eye) < reach ? o.motions.idle : undefined;
+      // A fire's flames flicker: their `burn` clip goes round while it burns at night, near the camera as an idle clip
+      // (not with Reduce motion: dropped, the flames go back to rest).
+      const burning = o.motions.burn !== undefined && this.night && !this.reducedMotion && !this.lampsOff.has(id) && reach > 0 && this.distance2(o, eye) < reach ? o.motions.burn : undefined;
       let clips = this.states.get(id);
       const growth = this.growth(o);
-      if ((wanted || held.length || idle || growth) && !clips) this.states.set(id, (clips = new Map()));
+      if ((wanted || held.length || idle || growth || burning) && !clips) this.states.set(id, (clips = new Map()));
       if (!clips) continue;
       for (const name of held) {
         const clip = o.motion.clips.get(name);
         if (clip && !clips.has(name)) clips.set(name, { clip, time: 0, use: '', until: Infinity, start: 0, kind: 'use' });
       }
-      // The first lighting of a world: night clips as it is, without playing.
-      const snap = this.snapNight && o.motions.night !== undefined ? o.motions.night : undefined;
+      // The first lighting of a world: night clips as it is, without playing (curtains as the sim first says).
+      const snap = o.motions.night !== undefined && (o.curtain ? this.snapCurtains : this.snapNight) ? o.motions.night : undefined;
       if (growth && !clips.has(growth.name)) clips.set(growth.name, { clip: growth.clip, time: growth.at, use: '', until: Infinity, start: 0, kind: 'growth' });
       const idleClip = idle ? o.motion.clips.get(idle) : undefined;
       if (idle && idleClip && !clips.has(idle)) clips.set(idle, { clip: idleClip, time: 0, use: '', until: Infinity, start: 0, kind: 'idle' });
+      // (Each fire on a beat of its own: its id offsets where its flames are in their round.)
+      const burningClip = burning ? o.motion.clips.get(burning) : undefined;
+      if (burning && burningClip && !clips.has(burning)) clips.set(burning, { clip: burningClip, time: (id * 0.37) % burningClip.duration, use: '', until: Infinity, start: 0, kind: 'burn' });
       let changed = false;
       let drifted = false;
       if (wanted) for (const [name, want] of wanted) {
@@ -431,9 +463,9 @@ export class ObjectMotion<D> {
       for (const [name, state] of clips) {
         const d = state.clip.duration;
         if (state.kind === 'clock') continue;
-        if (state.kind === 'idle') {
-          // Round and round near the camera; at rest further off.
-          if (name !== idle) {
+        if (state.kind === 'idle' || state.kind === 'burn') {
+          // Round and round near the camera (a fire's flames while it burns); at rest further off (put out, still grown).
+          if (name !== (state.kind === 'idle' ? idle : burning)) {
             clips.delete(name);
             drifted = true;
           } else if (dt && d > 0) {
@@ -518,6 +550,7 @@ export class ObjectMotion<D> {
       if (!clips.size) this.states.delete(id);
     }
     this.snapNight = false;
+    this.snapCurtains = false;
     if (this.clocks.length && this.setClocks(eye, written)) ambient = true;
     // Each buffer written goes up once, however many of its instances moved; culled by where the parts
     // are now (an open door reaches out of the closed model's box). Ambient clips stay about where they

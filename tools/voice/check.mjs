@@ -32,9 +32,9 @@ const CHILD = { style: 'F1', pitch: 1.3, depth: 1.08, speed: 1.04 };
  * Supertonic's output for `LINES` as `ARLO`, then line 2 as `CHILD` (SHA-256, first 12 hex
  * digits). Update them only on purpose (a new model, noise, steps, shaping or phonemizer rule).
  */
-// (0.7.0: the graphs' weights in 8-bit integers. Since then every line is brought to one loudness as its last
-// step, `crates/voice/src/dsp.rs` `level`: the same samples times one gain a clip.)
-const GOLDEN = ['f965a7337ad2', 'ada055d23716', 'ecc5ab617fe6', '29f86036e1ad'];
+// (0.8.3: the matrix weights read in 8 bits by `MatMulNBits`, a scale per block of 32, `crates/tools/src/nbits.rs`;
+// every line brought to one loudness as its last step, `crates/voice/src/dsp.rs` `level`.)
+const GOLDEN = ['f9ec54c85ba9', '4eff218932c5', '454ef4ab922f', '573822a4f37d'];
 
 const hash = (a) => createHash('sha256').update(Buffer.from(a.buffer, a.byteOffset, a.byteLength)).digest('hex').slice(0, 12);
 const same = (a, b) => a.length === b.length && Buffer.from(a.buffer, a.byteOffset, a.byteLength).equals(Buffer.from(b.buffer, b.byteOffset, b.byteLength));

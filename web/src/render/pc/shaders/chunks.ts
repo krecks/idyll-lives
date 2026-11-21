@@ -25,11 +25,13 @@
  * - `albedo`, `opacity`, `metalness`, `gloss`, `reflDir`, `emissive`: after `getAlbedo`, `getOpacity`,
  *   `getMetalness`, `getGlossiness`, `getReflDir`, `getEmission` (`diffusePS`, `opacityPS`,
  *   `metalnessPS`, `glossPS`, `reflDirPS`, `emissivePS`).
- * - `combine`: `combineColor` (`combinePS`): the engine's is `combineColorEngine`.
+ * - `combine`: `combineColor` (`combinePS`): the engine's is `combineColorEngine`. One feature returns from it (the
+ *   soft look, last); one before it may only change the light it combines (the water's sun highlight).
  * - `end`: replaces `endPS` (the colour, fog, tone mapping and gamma) where its defines say so.
  * - `fogPS`: the game's haze in its materials (`fog.ts`); `reflectionEnvPS`, `reflectionEnvHQPS`:
  *   the sky's reflection rising at a slant, and `fresnelSchlickPS`: the full Schlick term for the
- *   lights' highlights (`envBrdf.ts`); `normalMapPS`: normal maps at the game's strength (`bump.ts`).
+ *   lights' highlights (`envBrdf.ts`); `normalMapPS`: normal maps at the game's strength (`bump.ts`);
+ *   `reflectionSheenPS`, `reflectionCCPS`: a finish's layers reflecting the room (`surface.ts`).
  *
  * Features run in the order of their priority, lowest first. Engine-wide patches
  * (`patchEngineChunks`, once per device) put the game's light where no per-material chunk reaches:
@@ -54,11 +56,12 @@ import { CUTOUT } from './cutout';
 import { DIAG_VIEW } from './diagView';
 import { gameNormalMap } from './bump';
 import { gameFresnel, gameReflection } from './envBrdf';
-import { gameFog, setFogFrom } from './fog';
+import { gameFog, setFogFrom, setLandVeil, setSky, VEIL_SINK } from './fog';
 import { CONTACT_DIRECT, SOFT_LOOK } from './softLook';
 import { ROOM_LIGHT_CODE, ROOM_LIGHT_ROOMS, ROOM_LIGHTS } from './roomLights';
-import { PATTERN, PLAIN_FINISH, VERTEX_TWEAKS } from './surface';
+import { FINISH_LAYER_ANCHORS, finishLayerReflection, PATTERN, PLAIN_FINISH, VERTEX_TWEAKS } from './surface';
 import { UNDERGROUND } from './underground';
+import { IMPOSTOR_COLUMNS, IMPOSTOR_ROWS } from './impostorLayout';
 
 export type Language = 'glsl' | 'wgsl';
 
@@ -95,7 +98,7 @@ export interface FeatureCode {
   gloss?: string;
   reflDir?: string;
   emissive?: string;
-  /** The body of `combineColor` (one feature at most: the soft look). */
+  /** The body of `combineColor` (one feature returns from it: the soft look; one before it may change the light it combines: the water). */
   combine?: string;
   /** `endPS`'s replacement where the feature's defines are set (one feature at most: the diag view). */
   end?: { when: string; code: string };
@@ -137,7 +140,7 @@ fn gamePos(p: vec3f) -> vec3f { return vec3f(p.x, p.y, -p.z); }
   },
 };
 
-const features: ShaderFeature[] = [COMMON, VERTEX_TWEAKS, PATTERN, CUTOUT, ROOM_LIGHTS, CUTAWAY, UNDERGROUND, PLAIN_FINISH, SOFT_LOOK, DIAG_VIEW].sort((a, b) => a.priority - b.priority);
+const features: ShaderFeature[] = [COMMON, VERTEX_TWEAKS, PATTERN, CUTOUT, ROOM_LIGHTS, CUTAWAY, UNDERGROUND, PLAIN_FINISH, VEIL_SINK, SOFT_LOOK, DIAG_VIEW].sort((a, b) => a.priority - b.priority);
 
 /**
  * Adds a feature (wind, blankets). Before the first material is made: the chunks
@@ -238,8 +241,11 @@ export function gameChunks(device: pc.GraphicsDevice): Record<Language, Record<s
   let chunks = cache.get(device);
   if (!chunks) {
     cache.set(device, (chunks = { glsl: build(device, 'glsl'), wgsl: build(device, 'wgsl') }));
-    // (The haze from the eye until the renderer says otherwise: the gallery and the previews never do.)
+    // (The haze from the eye, and no land's veil, until the renderer says otherwise: the gallery and the previews never do.)
     setFogFrom(device, 0);
+    setLandVeil(device, 0, 0, 0, 0, 1, 0, 1);
+    // (And a sky for it to read, until a sky's own: `nature.ts` `Sky`.)
+    if (!device.scope.resolve('game_skyLow').value) setSky(device, null);
   }
   return chunks;
 }
@@ -286,6 +292,8 @@ function build(device: pc.GraphicsDevice, lang: Language): Record<string, string
   out.fresnelSchlickPS = gameFresnel(engineChunk(device, lang, 'fresnelSchlickPS'), lang, replaceOnce);
   // Normal maps at the game's strength (`bump.ts`).
   out.normalMapPS = gameNormalMap(engineChunk(device, lang, 'normalMapPS'), lang, replaceOnce);
+  // A finish's sheen and clear coat reflecting the room, in a room (`surface.ts`).
+  for (const chunk of Object.keys(FINISH_LAYER_ANCHORS[lang]) as (keyof (typeof FINISH_LAYER_ANCHORS)['glsl'])[]) out[chunk] = finishLayerReflection(engineChunk(device, lang, chunk), chunk, lang, replaceOnce);
 
   // The lamps' falloff, the game's own (`roomLights.ts`): the engine's functions renamed, ours in their place.
   for (const chunk of ['falloffInvSquaredPS', 'spotPS'] as const) {
@@ -312,8 +320,9 @@ const INSTANCE_NORMAL: Record<Language, string> = {
 };
 
 /**
- * `uv0VS` for planar UVs (`GAME_PLANAR_UV`: the local XZ in metres) and atlas tiles (`GAME_ATLAS_TILE`:
- * the mesh's uv into its copy's tile, `game_atlasTile` at `ATLAS_TILE_SEMANTIC`); the engine's otherwise.
+ * `uv0VS` for planar UVs (`GAME_PLANAR_UV`: the local XZ in metres), atlas tiles (`GAME_ATLAS_TILE`:
+ * the mesh's uv into its copy's tile, `game_atlasTile` at `ATLAS_TILE_SEMANTIC`) and tree impostors' cards
+ * (`GAME_IMPOSTOR`, `impostors.ts`: the picture the eye sees, `IMPOSTOR_COLUMNS` × `IMPOSTOR_ROWS` of them); the engine's otherwise.
  */
 const UV0_GLSL = `
 #ifdef NINESLICED
@@ -335,6 +344,16 @@ const UV0_GLSL = `
 	attribute vec4 game_atlasTile;
 	vec2 getUv0() {
 		return game_atlasTile.xy + vertex_texCoord0 * game_atlasTile.zw;
+	}
+#elif defined(GAME_IMPOSTOR) && defined(INSTANCING)
+	// A tree's card (impostors.ts): the side before the eye's, at the lower height (the pixels blend in the next side and the higher height).
+	vec2 getUv0() {
+		vec3 impAx = normalize(instance_line1.xyz);
+		vec3 impAz = normalize(instance_line3.xyz);
+		vec3 impF = normalize(game_eye - (instance_line4.xyz + vec3(0.0, game_impostor.y * length(instance_line2.xyz), 0.0)));
+		float impK = floor(atan(dot(impF, impAz), dot(impF, impAx)) / 6.2831853 * ${float(IMPOSTOR_COLUMNS)}) + ${float(IMPOSTOR_COLUMNS)};
+		float impCol = impK - floor(impK / ${float(IMPOSTOR_COLUMNS)}) * ${float(IMPOSTOR_COLUMNS)};
+		return vec2((impCol + vertex_texCoord0.x) / ${float(IMPOSTOR_COLUMNS)}, vertex_texCoord0.y / ${float(IMPOSTOR_ROWS)});
 	}
 #else
 	vec2 getUv0() {
@@ -364,6 +383,16 @@ const UV0_WGSL = `
 	fn getUv0() -> vec2f {
 		return game_atlasTile.xy + vertex_texCoord0 * game_atlasTile.zw;
 	}
+#elif defined(GAME_IMPOSTOR) && defined(INSTANCING)
+	// A tree's card (impostors.ts): the side before the eye's, at the lower height (the pixels blend in the next side and the higher height).
+	fn getUv0() -> vec2f {
+		let impAx = normalize(instance_line1.xyz);
+		let impAz = normalize(instance_line3.xyz);
+		let impF = normalize(uniform.game_eye - (instance_line4.xyz + vec3f(0.0, uniform.game_impostor.y * length(instance_line2.xyz), 0.0)));
+		let impK = floor(atan2(dot(impF, impAz), dot(impF, impAx)) / 6.2831853 * ${float(IMPOSTOR_COLUMNS)}) + ${float(IMPOSTOR_COLUMNS)};
+		let impCol = impK - floor(impK / ${float(IMPOSTOR_COLUMNS)}) * ${float(IMPOSTOR_COLUMNS)};
+		return vec2f((impCol + vertex_texCoord0.x) / ${float(IMPOSTOR_COLUMNS)}, vertex_texCoord0.y / ${float(IMPOSTOR_ROWS)});
+	}
 #else
 	fn getUv0() -> vec2f {
 		return vertex_texCoord0;
@@ -385,15 +414,19 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 		// In a room with its lamps on by night the eye is set to them: the sky's light, which comes in through the
 		// windows only, is a share of its fill and of its ambient there (and of the moon's, the \`sun\` patch), and the
 		// lamps' light comes off the walls and the floor from every side (\`RoomLightState.light\`, a texel per room:
-		// r the bounce, a the sky's share). The room is the one whose light the fragment has (\`gameRoomLitAt\`,
+		// r the bounce, a the sky's share). By day a room's shares of the ambient and of the fill are \`game_roomDayAmbient\`'s
+		// and \`game_roomDayFill\`'s (\`shared/roomLight.ts\` \`roomDay\`: 1 unless tuned). The room is the one whose light the fragment has (\`gameRoomLitAt\`,
 		// \`roomLights.ts\`: what is inside an outside wall has the wall's room's).
+		// (Not out of doors, \`GAME_OUTDOORS\`: the ground is in no room, and reads neither texture.)
+		#ifndef GAME_OUTDOORS
 		float gameLit = gameRoomLitAt(vPositionW, litArgs_worldNormal);
 		if (gameLit > 1.5 && gameLit < ${ROOM_LIGHT_ROOMS}.0) {
 			vec4 gameRoom = texelFetch(game_roomLight, ivec2(int(gameLit + 0.5), 0), 0);
 			gameRoomSky = gameRoom.a;
-			gameAmbient *= gameRoomSky;
-			dDiffuseLight = dDiffuseLight * gameRoomSky + game_roomBounce * gameRoom.r;
+			gameAmbient *= gameRoomSky * game_roomDayAmbient;
+			dDiffuseLight = dDiffuseLight * (gameRoomSky * game_roomDayFill) + game_roomBounce * gameRoom.r;
 		}
+		#endif
 		#ifdef LIT_SSAO
 			gameContact = texture2DLod(ssaoTexture, gl_FragCoord.xy * ssaoTextureSizeInv, 0.0).r;
 			dDiffuseLight *= gameContact / mix(1.0, gameContact, ${CONTACT_DIRECT});
@@ -417,13 +450,15 @@ const ENGINE_PATCHES: Record<Language, { backend: string; sun: string }> = {
 	#if defined(GAME_LOOK) && defined(LIT_NEEDS_NORMAL)
 		gameAmbient = dDiffuseLight;
 		dDiffuseLight = gameHemi(litArgs_worldNormal);
+		#ifndef GAME_OUTDOORS
 		let gameLit = gameRoomLitAt(vPositionW, litArgs_worldNormal);
 		if (gameLit > 1.5 && gameLit < ${ROOM_LIGHT_ROOMS}.0) {
 			let gameRoom = textureLoad(game_roomLight, vec2<i32>(i32(gameLit + 0.5), 0), 0);
 			gameRoomSky = gameRoom.a;
-			gameAmbient = gameAmbient * gameRoomSky;
-			dDiffuseLight = dDiffuseLight * gameRoomSky + uniform.game_roomBounce * gameRoom.r;
+			gameAmbient = gameAmbient * (gameRoomSky * uniform.game_roomDayAmbient);
+			dDiffuseLight = dDiffuseLight * (gameRoomSky * uniform.game_roomDayFill) + uniform.game_roomBounce * gameRoom.r;
 		}
+		#endif
 		#ifdef LIT_SSAO
 			gameContact = textureSampleLevel(ssaoTexture, ssaoTextureSampler, pcPosition.xy * uniform.ssaoTextureSizeInv, 0.0).r;
 			dDiffuseLight = dDiffuseLight * (gameContact / mix(1.0, gameContact, ${CONTACT_DIRECT}));

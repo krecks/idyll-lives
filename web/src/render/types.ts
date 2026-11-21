@@ -8,6 +8,8 @@ import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
 import type { ItemPlacement, PartColors, WorldStructure } from '../core/protocol';
 import type { Appearance } from '../game/household';
+import type { Land, LandRect } from '../game/land';
+import type { UseKind, UseLayer } from '../game/uses';
 import type { Resolution } from './shared/resolution';
 import type { VisemeTrack } from '../voice/visemes';
 
@@ -41,7 +43,7 @@ export function birdActivity(hour: number): number {
 /** A garden bird as the renderer draws it (`Renderer.birds`). */
 export interface SeenBird {
   id: number;
-  /** Its song (`audio/birdsong.ts` species name). */
+  /** Its song (`audio/kinds.ts` `SPECIES` name). */
   song: string;
   x: number;
   y: number;
@@ -50,6 +52,14 @@ export interface SeenBird {
   perched: boolean;
   /** Metres from the camera. */
   distance: number;
+}
+
+/** A door or a gate that opened or fell shut (`Renderer.doorSounds`): the doorway's middle in tiles (`row` in lot rows, the storey in it). */
+export interface DoorSound {
+  x: number;
+  row: number;
+  shut: boolean;
+  gate: boolean;
 }
 
 /** A resident's stride as the renderer draws it (`Renderer.simStride`). */
@@ -94,6 +104,35 @@ export interface RenderStats {
   gpuMs: number | null;
   /** Main-thread time posing the residents per frame, smoothed (ms). */
   residentsMs: number;
+  /** GPU memory the device holds; null when it can't say (before the app exists). */
+  vram: RenderVram | null;
+}
+
+/**
+ * Where the renderer's bytes are (`Renderer.memoryCensus`, the gameplay benchmark's): what PlayCanvas
+ * keeps on the CPU of what is on the GPU, the model files' decoded pieces, and the scene's geometry by
+ * owner. Bytes throughout.
+ */
+export interface MemoryCensus {
+  /** Every buffer the device holds, by kind: its CPU copy (`storage`), its GPU size, how many let their copy go. */
+  storage: Record<string, { count: number; bytes: number; released: number; gpuBytes: number }>;
+  /** Textures' levels kept on the CPU as typed arrays, and how many textures keep any. */
+  textureLevels: number;
+  texturesWithLevels: number;
+  /** The model files read and kept (`ModelFiles`): their pieces' vertices, and how many files. */
+  modelFiles: { files: number; pieceBytes: number; clipBytes: number };
+  /** The scene's vertex and index buffers by who draws them (entity names three levels under the root), and those nothing draws. */
+  owners: Record<string, { meshes: number; gpuBytes: number; cpuBytes: number }>;
+}
+
+/** GPU memory the renderer holds, bytes (PlayCanvas's own counters, `app.stats.vram`). */
+export interface RenderVram {
+  /** Textures: the assets' and the render targets' (shadow maps, the mirror, post). */
+  tex: number;
+  /** Vertex and index buffers. */
+  geom: number;
+  /** Everything the device holds: textures, geometry, uniform and storage buffers. */
+  total: number;
 }
 
 /** Benchmark hooks around every drawn frame (`debug/bench.ts`). */
@@ -125,6 +164,11 @@ export interface FrameCounts {
   gpuMs: number;
   /** Posing the residents (`RenderStats.residentsMs`). */
   residentsMs: number;
+  /**
+   * The sun's map drawn so far (`SunShadows.draws`, read in place): with the still casters' picture drawn again
+   * (`whole`), over it with only what moves (`moving`), and why the picture was drawn again, by the check that failed.
+   */
+  sunShadows: { readonly whole: number; readonly moving: number; readonly why: Readonly<Record<string, number>> };
 }
 
 /** A render pass of a frame (benchmark reports: pixels × samples × bytes is the memory traffic it causes). */
@@ -299,6 +343,9 @@ export interface PaintPreviewFace {
   half: boolean;
 }
 
+/** A part of the menus' town built (`showTown`): the ground, the woods and lawns, the town's own (its street and lots), the grass. */
+export type TownBuildStep = 'hills' | 'woods' | 'town' | 'grass';
+
 /** A camera shot of the town overview (menus). */
 export interface TownShot {
   /** World rectangle (metres) to keep in view. */
@@ -345,8 +392,28 @@ export interface LotHighlight {
   selected: number | null;
   /** Lots drawn as available (e.g. for sale). */
   marked: readonly number[];
+  /** Of those, the ones the household can't afford, drawn as a faint stone ring (none: every marked lot alike). */
+  dear?: readonly number[];
   /** Faint outlines around every lot. */
   outlines: boolean;
+}
+
+/**
+ * A street's ghost's tone: new, where it may not go, a bridge stretch, a new street drawn as the road it will be
+ * (`laid`), the road picked (`pick`, outlined only), the road a street being drawn will join (`join`).
+ */
+export type GhostRoadTone = 'new' | 'bad' | 'bridge' | 'laid' | 'pick' | 'join';
+
+/**
+ * Step 2's edits shown over the town before the town is built again with them: streets being
+ * drawn or just drawn (`roads`: their middle lines and widths; `bad` where they may not go, a
+ * `bridge` stretch over water), lots (`new` placed, `bad` where one may not go, `gone` to be
+ * removed, the building on it dimmed) and villages' boxes, all in world metres.
+ */
+export interface TownGhosts {
+  roads: { points: [number, number][]; width: number; tone: GhostRoadTone }[];
+  lots: { x: number; z: number; w: number; d: number; tone: 'new' | 'bad' | 'gone' }[];
+  boxes: { x: number; z: number; w: number; d: number; tone: 'new' | 'bad' }[];
 }
 
 export interface RoomOverlayTile {
@@ -360,8 +427,11 @@ export type RenderFailure = 'frames' | 'device';
 
 /** A clip playing on a placed object's moving parts (`RendererDebugHooks.objectClips`). */
 export interface ObjectClipInfo {
-  /** How it plays: opened by a use, round while used, every so often, always, by growth stage, by the clock, along a use. */
-  kind: 'use' | 'loop' | 'repeat' | 'idle' | 'growth' | 'clock' | 'over';
+  /**
+   * How it plays: opened by a use, round while used, every so often, always, by growth stage, by the
+   * clock, along a use, or round while a fire burns.
+   */
+  kind: 'use' | 'loop' | 'repeat' | 'idle' | 'growth' | 'clock' | 'over' | 'burn';
   /** Seconds into it (0: at rest). */
   time: number;
   duration: number;
@@ -396,6 +466,22 @@ export interface RendererDebugHooks {
   keepRoof(on: boolean): void;
 }
 
+/**
+ * The land brush's cursor (`Renderer.setLandBrush`): two rings draped over the land round town point
+ * (`x`, `z`), `radius` m and (where the brush is at full strength) `inner` m, tinted by what it does.
+ */
+export interface LandCursor {
+  x: number;
+  z: number;
+  radius: number;
+  inner: number;
+  /** What the brush does: step 1's land brushes (`up` to `cover`), step 2's zone brush (a use, `uses.ts`, or `erase`), or `bad` where it can't. */
+  tone: 'up' | 'down' | 'water' | 'cover' | 'bad' | UseKind | 'erase';
+}
+
+/** What `Renderer.buildingAt` found: a lot's building (every building is a lot's). */
+export type BuildingHit = { kind: 'lot'; plot: number };
+
 export interface Renderer {
   init(canvas: HTMLCanvasElement): Promise<void>;
   /**
@@ -408,6 +494,8 @@ export interface Renderer {
   setItems(items: readonly ItemPlacement[]): void;
   /** The lamps switched off (object ids): no light, no glow (sim-core `lights.rs`). */
   setLampsOff(off: ReadonlySet<number>): void;
+  /** The curtains drawn shut (object ids): their `motions.night` clip held drawn, their windows' light kept in (sim-core `curtains.rs`). */
+  setCurtainsShut(shut: ReadonlySet<number>): void;
   /** Called every frame before drawing; must not allocate. */
   update(frame: FrameState): void;
   /**
@@ -422,6 +510,13 @@ export interface Renderer {
   texturesReady(): Promise<void>;
   /** Resolves once the street has built the chunks streamed in round the camera, or after `limitMs`. */
   streamSettled(limitMs: number): Promise<void>;
+  /**
+   * Benchmark: resolves once what the town streams in has come (`assets/stream.ts`), the street has built it
+   * (`streamSettled`) and nothing is being built (`building`), or after `limitMs` in all.
+   */
+  whenSettled(limitMs: number): Promise<void>;
+  /** Benchmark: what is being built now: 'world' (a world build, a focus lot), 'stream' (the street streaming), both ('world+stream') or '' (nothing). */
+  building(): string;
   /**
    * The loading screen covers the view (on) or no longer (off): world builds hold the main thread
    * longer between frames, which nobody sees (the warm-up's always do).
@@ -446,6 +541,12 @@ export interface Renderer {
   /** Canvas-relative CSS pixel coordinates. */
   pick(x: number, y: number): PickResult;
   /**
+   * The house or building the ray through canvas CSS pixel (`x`, `y`) meets first, other than the
+   * viewed lot's: a lot's house or building (`plot`; a flats building's lot, not a flat). Null when it
+   * meets none, or the viewed lot's ground first.
+   */
+  buildingAt(x: number, y: number): BuildingHit | null;
+  /**
    * Where the ray of the last `pick` meets the level `height` metres above the floor in view (a
    * table top), in the lot's rows like `PickResult.ground`; null if it doesn't.
    */
@@ -466,6 +567,8 @@ export interface Renderer {
   birds(): readonly SeenBird[];
   /** Bird `id` (`SeenBird.id`) sings for `seconds`: it lifts its head meanwhile. */
   birdSings(id: number, seconds: number): void;
+  /** The doors and gates that opened or fell shut since the last call, for the world's sound: kept and refilled, read it at once. */
+  doorSounds(): readonly DoorSound[];
   /** Centres the camera on a world point. */
   focus(x: number, z: number): void;
   /** Flies the camera to a world point, smoothly (the town map's "look here"; `shared/focus.ts` `Flight`). */
@@ -486,6 +589,8 @@ export interface Renderer {
   onFocusLot(listener: ((plot: number) => boolean) | null): void;
   /** The ground rectangle (tiles x0, z0, x1, z1) the camera streams in, for the sim's full-detail area (the worker's `setWatch`); called when it changes. */
   onWatch(listener: ((rect: [number, number, number, number]) => void) | null): void;
+  /** At super speed, the full-detail area `onWatch` reports is only the streamed chunks round the camera's, so the sim keeps up; off, all of them. */
+  setDetailTight(tight: boolean): void;
   setHoverTile(tile: { x: number; z: number } | null): void;
   setSelectedSim(id: number | null): void;
   setWallMode(mode: WallMode): void;
@@ -535,11 +640,39 @@ export interface Renderer {
    * previews and ground picks work on this storey's rows of the lot (see `WorldStructure.storeys`).
    */
   setStorey(storey: number): void;
+  /**
+   * Which flats of the building in view may be shown open (`game/openLots.ts` `mayOpen`, asked of each flat's plot
+   * id), and whether a place with flats over it may show its own ground floor (asked of the place's lot: by the lot
+   * alone, not by its flats); null: every one. A part that may not keeps a lid over it, and its things, its food and
+   * the residents in it are not drawn (a place's flats' stair hall is theirs, never lidded). Asked again a few times a
+   * second (someone of yours going in opens it).
+   */
+  setFlatsOpen(mayOpen: ((plot: number) => boolean) | null): void;
   /** Build/buy mode: plays a placement, upgrade, sale or construction effect (after `setWorld` showed the change). */
   buildEffect(fx: BuildEffect): void;
   stats(): RenderStats;
-  /** Benchmark: hooks around every drawn frame (null: none). */
-  setFrameProbe(probe: FrameProbe | null): void;
+  /** Benchmark: where the renderer's bytes are (a walk of the whole scene: on demand, never per frame). */
+  memoryCensus(): MemoryCensus | null;
+  /** Benchmark: hooks around every drawn frame, after those added before; the function takes them off again. */
+  addFrameProbe(probe: FrameProbe): () => void;
+  /**
+   * Fixed-step playback (benchmarks): frames are drawn only as `drawFrame` asks, each at the time it gives (the
+   * game's clock, not the wall's), as fast as they are asked for; false: at the display's refreshes again.
+   */
+  framesOnDemand(on: boolean): void;
+  /** Fixed-step playback: draws the next frame now, at `time` (ms). False when none was drawn (the loop stopped, a menu covers the view). */
+  drawFrame(time: number): boolean;
+  /**
+   * Fixed-step playback: the clocks of what moves only for the eye (the residents' and the things' clips, the birds, the
+   * wind, the clouds) from 0 again, and the playback's dice from their start (`framesOnDemand` does it as it turns on).
+   */
+  restartClocks(): void;
+  /**
+   * Fixed-step playback: the residents and the birds set up afresh from the world drawn, as a page's first build sets
+   * them up (what each resident was in the middle of, its clips and their times, goes; the clocks start again and the
+   * birds perch anew from the playback's own dice), so a run starts alike however the frames before it went.
+   */
+  restartLife(): Promise<void>;
   /** Measures GPU time (`RenderStats.gpuMs`) while the overlay or the benchmark asks for it. */
   measureGpu(on: boolean, who?: 'overlay' | 'bench'): void;
   /** Benchmark: per-pass GPU times (ms per frame, WebGPU only, while measured; empty otherwise); `reset` starts them over. */
@@ -548,6 +681,13 @@ export interface Renderer {
   benchInfo(): Record<string, unknown> & { passes: RenderPassInfo[] };
   /** Benchmark: the world last drawn (its town shown as the menus' for `cam=town`), or null. */
   benchWorld(): WorldStructure | null;
+  /**
+   * Benchmark: the light held at `hour` (as `?hour=`; null: the game's clock again), lit at once, the sun's map told if
+   * the sun turned. Resolves once the birds have settled for that hour (where they perch differs by night).
+   */
+  setFixedHour(hour: number | null): Promise<void>;
+  /** Benchmark: time stood still (as `?diag=freeze`: frames advance nothing, not the wind nor a fade) or going again. */
+  setFrozen(on: boolean): void;
   configure(options: LiveRenderOptions): void;
   /** Small JPEG data URL of the current view, or null if capture isn't possible. */
   captureThumbnail(width: number, height: number): Promise<string | null>;
@@ -599,24 +739,74 @@ export interface Renderer {
   /**
    * Menus: draws an overview of `world` (every lot as a dressed shell, no interiors or Sims) in
    * place of the game world, which stays loaded, hidden, and can keep building meanwhile.
-   * Lighting is fixed at `minute` of the day. Resolves once the overview is built.
+   * Lighting is fixed at `minute` of the day. Resolves once the overview is built; `onStep` is told
+   * each part of it built (in whatever order they end; none for a town already built).
    */
-  showTown(world: WorldStructure, minute: number): Promise<void>;
+  showTown(world: WorldStructure, minute: number, onStep?: (done: TownBuildStep) => void): Promise<void>;
   /**
    * Back to the game world (the overview and the town's landscape are let go a moment after, and
    * built again by the next `showTown`). With `glide` > 0 the camera
-   * first flies from the overview into the game's view (seconds); resolves when it is shown.
+   * first flies from the overview into the game's view (seconds); resolves when it is shown. With
+   * `letGo`, the town is let go of at once, and it resolves once it has been (a machine low on
+   * memory, before the game's world is built).
    */
-  hideTown(glide?: number): Promise<void>;
+  hideTown(glide?: number, letGo?: boolean): Promise<void>;
   /** Whether the overview is on screen. */
   readonly townShown: boolean;
   /** Overview camera: glides to (or with `cut`, jumps to) a shot. */
   setTownShot(shot: TownShot, cut?: boolean): void;
-  /** Overview camera: user orbit (radians) and zoom factor on top of the shot. */
-  nudgeTown(dAlpha: number, zoom: number): void;
-  setLotHighlight(highlight: LotHighlight): void;
+  /** Overview camera: user orbit (radians), zoom factor and tilt (radians, more is lower; 0.15–1.35 in all) on top of the shot. */
+  nudgeTown(dAlpha: number, zoom: number, dBeta?: number): void;
+  /** Overview camera: the player's zoom by `zoom` towards the land under canvas CSS pixel (`x`, `y`) (it stays under it). */
+  zoomTownAt(x: number, y: number, zoom: number): void;
+  /** Overview camera: the player's pan, the target moved (`dx`, `dz`) m over the ground on top of the shot; it stays over the land. */
+  panTown(dx: number, dz: number): void;
+  /** Overview camera: the player's pan along the view, `right` m to the picture's right and `forward` m into it. */
+  panTownView(right: number, forward: number): void;
+  /** Overview camera: how near (m from its target) the player's zoom comes in (`OVERVIEW_NEAREST` unless set). */
+  setTownNearest(metres: number): void;
+  /** Overview camera: how far (m) it is from its target now. */
+  readonly townDistance: number;
+  /**
+   * Overview camera: the player's pan by a drag from canvas CSS pixel (`x0`, `y0`) to (`x1`, `y1`): the land under
+   * the pointer follows it (over the sky, the level of the land in view does). Any button, any step, no tool needed.
+   */
+  dragTown(x0: number, y0: number, x1: number, y1: number): void;
+  /** Overview camera: the player's orbit, zoom and pan let go, back to the shot as framed (`seconds`, default 1.2; 0 cuts). */
+  reframeTown(seconds?: number): void;
+  /** Which lots glow; they ease to it, or (`snap`) are so from the next frame (a picture taken). */
+  setLotHighlight(highlight: LotHighlight, snap?: boolean): void;
+  /** Step 2's edits drawn over the town (`TownGhosts`) until the town is built again; null: none. */
+  setTownGhosts(ghosts: TownGhosts | null): void;
+  /**
+   * Step 2's painted uses (`uses.ts`) drawn over the town in their colours; null: none. `hatched`: a byte per cell
+   * of `layer` (row-major), set where the cell is zoned but too far from a street to be built on, drawn hatched.
+   */
+  setTownUses(layer: UseLayer | null, hatched?: Uint8Array | null): void;
   /** Runs each overview frame after the camera moved, before drawing (to pin labels); null removes it. */
   onTownFrame(fn: (() => void) | null): void;
+  /**
+   * The land of the world in view (the menus' town while it is shown, else the game's) as a height
+   * field: its `meta.land` if it has one, else surveyed from the land as drawn.
+   */
+  landOf(): Promise<Land>;
+  /** Draws the world's land from `land` (kept, and changed in place by the brushes) from now on; null: from its landscape again. */
+  setLand(land: Land | null): void;
+  /**
+   * The samples in `rect` of the land given to `setLand` changed: their ground and water drawn
+   * again now, and once the stroke is `done`, the rest (shading, grass, woods, zones) over frames.
+   */
+  landChanged(rect: LandRect, done: boolean): void;
+  /**
+   * At the end of an earth stroke on a land its town follows (the land given to `setLand`, changed in `rect`): the
+   * land settled under what is built (no road or lot cut or filled past its limits; `BuiltSurface.settleCuts`),
+   * changed in place; says the samples it changed besides (null: none, or no town on it).
+   */
+  settleLand?(rect: LandRect, before?: Int16Array): LandRect | null;
+  /** Where the ray through canvas CSS pixel (`x`, `y`) meets the land (a town point and its height, m), or null if it doesn't. */
+  pickLand(x: number, y: number): { x: number; y: number; z: number } | null;
+  /** Shows the land brush's cursor (null hides it). Cheap; call on every pointer move. */
+  setLandBrush(cursor: LandCursor | null): void;
   dispose(): void;
 }
 
@@ -737,5 +927,5 @@ export interface SimPreviews {
   wardrobe(gender: string): Promise<Wardrobe | null>;
 }
 
-/** How much higher each storey stands (the house's wall height, `house.ts` `WALL_HEIGHT`). */
+/** How much higher each storey stands (the house's wall height, `walls.ts` `WALL_HEIGHT`). */
 export const STOREY_HEIGHT = 2.8;

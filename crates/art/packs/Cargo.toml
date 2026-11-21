@@ -1,0 +1,14 @@
+[package]
+name = "art-packs"
+description = "The game's item models, generated: trait packs. One folder a family."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+artkit = { path = "../../artkit" }
+libm = "0.2"

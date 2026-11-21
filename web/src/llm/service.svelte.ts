@@ -1,17 +1,20 @@
 /**
- * The language model for the whole app: one worker with LFM2.5 350M on the GPU, started and
- * loaded by `ensureLlm` (when the game starts, if residents' lines are the model's), and a
- * status for settings screens. Replies are written one after another; each has a deadline
- * after which it's no longer wanted.
+ * The language model for the whole app: one worker with LFM2.5 350M on the GPU (WebGPU) or the
+ * processor (WASM), started and loaded by `ensureLlm` (when the game starts, if residents' lines
+ * are the model's), and a status for settings screens. The device is the caller's choice
+ * (`talk/devices.svelte.ts` decides it from the setting and the device test). Replies are written
+ * one after another; each has a deadline after which it's no longer wanted.
  *
  * Knows nothing about the game: callers pass chat messages and get text back (`talk/` writes
  * residents' lines with it).
  */
 
+import type { OrtDevice } from '../ml/ort';
 import { inferenceSlot, settle, whenModelsMayStart } from '../ml/schedule.svelte';
 import type { ChatMessage } from './chat';
 import type { GenParams, GenResult } from './generate';
 import { MODEL } from './models';
+import { LOW_MEMORY } from '../settings/lowMemory';
 import type { FromLlmWorker, ToLlmWorker } from './protocol';
 
 export type LlmState = 'off' | 'loading' | 'ready' | 'error';
@@ -28,6 +31,8 @@ export const llmStatus = $state({
   /** Download progress 0..1 while loading. */
   progress: 0,
   error: '',
+  /** Where it runs (or is loading, or last ran). */
+  device: 'gpu' as OrtDevice,
 });
 
 /** How the LLM worker is doing (for the debug overlay). */
@@ -51,7 +56,7 @@ export interface LlmStats {
 
 let worker: Worker | null = null;
 let nextId = 1;
-/** Replies being written, each with its turn on the graphics card (`ml/schedule.svelte.ts`) to give back. */
+/** Replies being written, each with its turn on the device (`ml/schedule.svelte.ts`) to give back. */
 const pending = new Map<number, { resolve: (r: GenResult | null) => void; reject: (e: Error) => void; free: () => void }>();
 /** Times the model was unloaded: a start still waiting for its turn is then void. */
 let stops = 0;
@@ -101,10 +106,13 @@ function onMessage(msg: FromLlmWorker): void {
 }
 
 /**
- * Starts the worker and the model's download if needed; resolves when it can write. A start
- * waits until models may start (`whenModelsMayStart`: the page has booted, no game is loading).
+ * Starts the worker and the model's download if needed, on `device` (the last one asked for if not
+ * given); resolves when it can write. A model on another device is stopped first. A start waits
+ * until models may start (`whenModelsMayStart`: the page has booted, no game is loading).
  */
-export async function ensureLlm(): Promise<void> {
+export async function ensureLlm(device: OrtDevice = llmStatus.device): Promise<void> {
+  if (worker && llmStatus.device !== device) unloadLlm();
+  llmStatus.device = device;
   if (llmStatus.state === 'ready' && worker) return;
   if (!worker) {
     const stopped = stops;
@@ -122,9 +130,18 @@ export async function ensureLlm(): Promise<void> {
     llmStatus.progress = 0;
     llmStatus.error = '';
     llmStatus.state = 'loading';
-    post({ type: 'load', base: import.meta.env.BASE_URL, model: MODEL });
+    post({ type: 'load', base: import.meta.env.BASE_URL, model: MODEL, device });
   }
   return new Promise((resolve, reject) => waiters.push({ resolve, reject }));
+}
+
+/**
+ * A line wants writing and the model isn't up: on a machine low on memory, where it doesn't load as
+ * the game starts (`talk/talk.svelte.ts`), it starts now on `device`; the lines after this one are
+ * written once it's ready.
+ */
+export function wantLlm(device: OrtDevice): void {
+  if (LOW_MEMORY && llmStatus.state === 'off') void ensureLlm(device).catch(() => {});
 }
 
 /** Whether a reply can be started now. */
@@ -145,11 +162,11 @@ export async function generateText(
   options: { reply?: string; lead?: string; deadline?: number; signal?: AbortSignal } = {},
 ): Promise<GenResult | null> {
   await ensureLlm();
-  // Its turn on the graphics card (never beside a line being spoken), unless the deadline passes
-  // or it is aborted first.
+  // Its turn on the device (on the graphics card never beside a line being spoken), unless the
+  // deadline passes or it is aborted first.
   const deadline = options.deadline ?? Number.MAX_SAFE_INTEGER;
   const waits = [options.signal, deadline < Number.MAX_SAFE_INTEGER ? AbortSignal.timeout(Math.max(0, deadline - Date.now())) : undefined];
-  const free = await inferenceSlot('gpu', AbortSignal.any(waits.filter((s) => s !== undefined)));
+  const free = await inferenceSlot(llmStatus.device, AbortSignal.any(waits.filter((s) => s !== undefined)));
   if (!free || options.signal?.aborted) {
     free?.();
     counters.skipped++;

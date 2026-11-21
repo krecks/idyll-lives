@@ -11,6 +11,7 @@ import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
 import { objectCentre, type WorldStructure } from '../core/protocol';
 import { game } from '../ui/state.svelte';
+import { plotInfo } from '../ui/place';
 import { friendLabel } from '../ui/relationship';
 import { goalText } from '../ui/story';
 import { thoughtId } from '../voice/lines';
@@ -198,7 +199,7 @@ function placeOf(text: TalkText, src: TalkSources, plot: number | null, househol
   }
   const host = game.households.find((h) => h.plot === plot);
   if (host) return w.visiting.replace('{subject}', `the ${host.name} home`);
-  const place = game.plots.find((p) => p.id === plot);
+  const place = plotInfo(game, plot);
   return place?.public ? `at ${place.name}` : w.out;
 }
 

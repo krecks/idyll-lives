@@ -1466,6 +1466,40 @@
         "Still missing one sock."
       ]
     },
+    "vacuumCleaner": {
+      "lines": [
+        "Time to hoover.",
+        "Look at all that dust!",
+        "Under the rug too.",
+        "Lift your feet, please!",
+        "Clean carpets, happy home."
+      ]
+    },
+    "mopBucket": {
+      "lines": [
+        "Mind the wet floor!",
+        "Mop, wring, repeat.",
+        "Sparkling tiles.",
+        "Don't walk here yet!"
+      ]
+    },
+    "broomDustpan": {
+      "lines": [
+        "A quick sweep.",
+        "Into the dustpan you go.",
+        "Swish, swish.",
+        "Crumbs everywhere!"
+      ]
+    },
+    "ironingBoard": {
+      "lines": [
+        "No more wrinkles.",
+        "Collars first.",
+        "Nice and crisp.",
+        "Careful, it's hot!",
+        "Pressed and ready."
+      ]
+    },
     "kidsBed": {
       "interactions": {
         "sleep": [

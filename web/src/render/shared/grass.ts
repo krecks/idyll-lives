@@ -22,7 +22,8 @@ import { groundDepth, type WorldStructure } from '../../core/protocol';
 import type { RGB } from './environment';
 import { lawnMap } from './lawn';
 import { updateGroundShade, type TexelRect } from './groundShade';
-import { bareTiles, fbm, lawnMask, smoothstep, splitHalf, WIND, type LawnMask } from './nature';
+import { bareTiles, lawnMask, splitHalf, WIND, type LawnMask } from './nature';
+import { fbm, smoothstep } from '../../game/noise';
 
 /** Blades a patch at full density (`GRASS.perPatch`), and the draws: each a step of √2 sparser (`GRASS.lods`). */
 const PER_PATCH = 448;
@@ -83,6 +84,8 @@ export interface GrassLand {
   /** The terrain's colour at a point of height `h` (sRGB, into `out`), and how much of it is lawn (0..1). */
   terrainColour(x: number, z: number, h: number, out: RGB): number;
   distanceToTown(x: number, z: number): number;
+  /** On a land the town follows: the pad (m) of the lot a point is in, or null outside every lot (none: no pads). */
+  padAt?(x: number, z: number): number | null;
 }
 
 /** The grass of a town (see the file's header). Game space; `x0`, `z0`: the corner of the colour texture and of the patches. */
@@ -110,6 +113,8 @@ export interface GrassField {
   patches: Uint8Array;
   /** Per patch: the ground's height at its corner (x0, z0 side) and its slope along x and z (3 floats). */
   ground: Float32Array;
+  /** On a land the town follows, per patch: 1 where it lies over a step (a lot's edge) its blades can't follow, none growing there (`settlePads`). */
+  uneven?: Uint8Array;
 }
 
 /** The grass of a town as the land grows it, `margin` m round it (the town's mask comes with `townGrass`, again whenever the lot changes). */
@@ -161,8 +166,121 @@ export async function grassField(world: WorldStructure, land: GrassLand, pace?: 
     }
   }
   const field: GrassField = { x0, z0, margin: m, w, d, colour, townW: 0, townD: 0, town: new Uint8Array(0), shade: new Uint8Array(0), lawn: new Uint8Array(0), pw, pd, patches: new Uint8Array(pw * pd), ground };
+  if (land.padAt) settlePads(field, land, 0, 0, pw - 1, pd - 1);
   townGrass(field, world);
   return field;
+}
+
+/** A patch over a step lies off the ground by more than this (m) somewhere: no blades grow on it. */
+export const UNEVEN = 0.06;
+
+/**
+ * On a land the town follows (`GrassLand.padAt`), the patches (i0..i1, j0..j1, inclusive): one whose middle is on a
+ * lot's pad level at the pad; one reaching over a lot's edge (its corners on another pad, or off it) marked uneven
+ * where its plane lies more than `UNEVEN` off the ground at any of nine points over it (`GrassField.uneven`).
+ */
+export function settlePads(field: GrassField, land: Pick<GrassLand, 'heightAt' | 'padAt'>, i0: number, j0: number, i1: number, j1: number): void {
+  const padAt = land.padAt;
+  if (!padAt) return;
+  const p = GRASS.patch;
+  const { pw, ground } = field;
+  const uneven = (field.uneven ??= new Uint8Array(pw * field.pd));
+  const SPOTS = [0.1, p / 2, p - 0.1];
+  for (let j = j0; j <= j1; j++) {
+    for (let i = i0; i <= i1; i++) {
+      const k = j * pw + i;
+      const [px, pz] = [field.x0 + i * p, field.z0 + j * p];
+      const mid = padAt(px + p / 2, pz + p / 2);
+      if (mid !== null) {
+        ground[k * 3] = mid;
+        ground[k * 3 + 1] = 0;
+        ground[k * 3 + 2] = 0;
+      }
+      uneven[k] = 0;
+      const same = (x: number, z: number) => padAt(x, z) === mid;
+      if (same(px, pz) && same(px + p, pz) && same(px, pz + p) && same(px + p, pz + p)) continue;
+      const [y0, sx, sz] = [ground[k * 3], ground[k * 3 + 1], ground[k * 3 + 2]];
+      for (const u of SPOTS) {
+        for (const v of SPOTS) {
+          if (Math.abs(land.heightAt(px + u, pz + v) - (y0 + sx * u + sz * v)) <= UNEVEN) continue;
+          uneven[k] = 1;
+          break;
+        }
+        if (uneven[k]) break;
+      }
+    }
+  }
+}
+
+/** The patches (`GrassField` indices, inclusive) whose corner lies within a box (m) or a patch from it. */
+function patchSpan(field: GrassField, x0: number, z0: number, x1: number, z1: number): [number, number, number, number] {
+  const p = GRASS.patch;
+  return [Math.max(0, Math.floor((x0 - field.x0) / p) - 1), Math.max(0, Math.floor((z0 - field.z0) / p) - 1), Math.min(field.pw - 1, Math.floor((x1 - field.x0) / p) + 1), Math.min(field.pd - 1, Math.floor((z1 - field.z0) / p) + 1)];
+}
+
+/**
+ * The land's height changed within a box (m; the brushes): the patches' heights and slopes there again (`ground`,
+ * as `grassField` makes them), and their neighbours' slopes, which lean on them.
+ */
+export function regroundGrass(field: GrassField, land: Pick<GrassLand, 'heightAt' | 'padAt'>, x0: number, z0: number, x1: number, z1: number): void {
+  const p = GRASS.patch;
+  const { pw, pd, ground } = field;
+  const [i0, j0, i1, j1] = patchSpan(field, x0, z0, x1, z1);
+  if (i1 < i0 || j1 < j0) return;
+  // (The middles of the patches round the box too: each slope reads its two neighbours.)
+  const [a0, b0, a1, b1] = [Math.max(0, i0 - 1), Math.max(0, j0 - 1), Math.min(pw - 1, i1 + 1), Math.min(pd - 1, j1 + 1)];
+  const w = a1 - a0 + 1;
+  const mid = new Float32Array(w * (b1 - b0 + 1));
+  for (let j = b0; j <= b1; j++) for (let i = a0; i <= a1; i++) mid[(j - b0) * w + i - a0] = land.heightAt(field.x0 + (i + 0.5) * p, field.z0 + (j + 0.5) * p);
+  // (A patch past the box's ring: its height as the field has it, its corner less its slopes.)
+  const at = (i: number, j: number) => {
+    const [ci, cj] = [Math.min(pw - 1, Math.max(0, i)), Math.min(pd - 1, Math.max(0, j))];
+    if (ci >= a0 && ci <= a1 && cj >= b0 && cj <= b1) return mid[(cj - b0) * w + ci - a0];
+    const k = (cj * pw + ci) * 3;
+    return ground[k] + (ground[k + 1] + ground[k + 2]) * (p / 2);
+  };
+  for (let j = j0; j <= j1; j++) {
+    for (let i = i0; i <= i1; i++) {
+      const sx = (at(i + 1, j) - at(i - 1, j)) / (p * (Math.min(pw - 1, i + 1) - Math.max(0, i - 1)));
+      const sz = (at(i, j + 1) - at(i, j - 1)) / (p * (Math.min(pd - 1, j + 1) - Math.max(0, j - 1)));
+      const k = (j * pw + i) * 3;
+      ground[k] = at(i, j) - (sx + sz) * (p / 2);
+      ground[k + 1] = sx;
+      ground[k + 2] = sz;
+    }
+  }
+  if (land.padAt) settlePads(field, land, i0, j0, i1, j1);
+}
+
+/**
+ * The land's colours and grassiness changed within a box (m; a stroke done): the colour texels there again (as
+ * `grassField` makes them) and which patches have any grass. Says the texels (inclusive), or null if none.
+ */
+export function recolourGrass(field: GrassField, land: GrassLand, x0: number, z0: number, x1: number, z1: number): [number, number, number, number] | null {
+  const { w, d, colour, margin: m } = field;
+  const [t0, s0, t1, s1] = [Math.max(0, Math.floor(x0 - field.x0)), Math.max(0, Math.floor(z0 - field.z0)), Math.min(w - 1, Math.ceil(x1 - field.x0)), Math.min(d - 1, Math.ceil(z1 - field.z0))];
+  if (t1 < t0 || s1 < s0) return null;
+  const tmp: RGB = { r: 0, g: 0, b: 0 };
+  for (let j = s0; j <= s1; j++) {
+    for (let i = t0; i <= t1; i++) {
+      const x = field.x0 + i + 0.5;
+      const z = field.z0 + j + 0.5;
+      const o = (j * w + i) * 4;
+      const edge = 1 - smoothstep(m * 0.7, m * 0.95, land.distanceToTown(x, z));
+      if (edge <= 0) {
+        colour.fill(0, o, o + 4);
+        continue;
+      }
+      const lawn = land.terrainColour(x, z, land.heightAt(x, z), tmp);
+      colour[o] = byte(tmp.r);
+      colour[o + 1] = byte(tmp.g);
+      colour[o + 2] = byte(tmp.b);
+      colour[o + 3] = byte(lawn * edge);
+    }
+  }
+  const [i0, j0, i1, j1] = patchSpan(field, x0, z0, x1, z1);
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) markPatch(field, i, j);
+  return [t0, s0, t1, s1];
 }
 
 /** 0..1 as a byte. */
@@ -299,6 +417,11 @@ export function grassAt(field: GrassField, x: number, z: number): number {
   return g;
 }
 
+/** Which patches have any grass, all of them again (the land's grass made again whole: `field.colour`). */
+export function markGrassPatches(field: GrassField): void {
+  markPatches(field, null);
+}
+
 /**
  * Marks the patches with any grass (`field.patches`): all of them, or (`tiles`) only those near the town tiles
  * marked there, whose mask changed.
@@ -355,6 +478,8 @@ function markPatch(field: GrassField, i: number, j: number): void {
     // (Part of a patch at the town's edge lies outside its mask: there, the land's grassiness counts.)
     if (!any && (px < 0 || pz < 0 || px + p > field.townW / n || pz + p > field.townD / n)) any = true;
   }
+  // (On a land the town follows, none over a lot's step: `settlePads`.)
+  if (field.uneven?.[j * field.pw + i]) any = false;
   field.patches[j * field.pw + i] = any ? 1 : 0;
 }
 

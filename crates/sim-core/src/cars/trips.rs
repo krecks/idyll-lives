@@ -1,12 +1,17 @@
 //! Trips out: who can drive, setting off, riding along and coming home.
-//!
-//! Split from `cars.rs` (see `mod.rs`).
 
 use super::*;
 
 /// `can_drive`, in a tick (from its `Ctx`).
 pub(crate) fn could_drive(ctx: &crate::world::Ctx, sim: &Sim) -> bool {
-    can_drive(ctx.travel, ctx.households, ctx.briefs, ctx.cars, sim)
+    can_drive(
+        ctx.travel,
+        ctx.households,
+        ctx.plots,
+        ctx.briefs,
+        ctx.cars,
+        sim,
+    )
 }
 
 /// Whether `sim` could drive somewhere now (`trip_car` without the place): an open-world town
@@ -15,6 +20,7 @@ pub(crate) fn could_drive(ctx: &crate::world::Ctx, sim: &Sim) -> bool {
 pub(crate) fn can_drive(
     travel: &Travel,
     households: &[crate::world::Household],
+    plots: &[Plot],
     briefs: &[crate::world::SimBrief],
     cars: &[Car],
     sim: &Sim,
@@ -26,7 +32,7 @@ pub(crate) fn can_drive(
         && sim.visiting.is_none()
         && briefs
             .get(sim.id as usize)
-            .is_some_and(|b| b.adult && b.plot == Some(home))
+            .is_some_and(|b| b.adult && b.at_home(plots, Some(home)))
         && cars.iter().any(|car| {
             car.household == sim.household
                 && car.plot == home
@@ -64,7 +70,7 @@ pub(crate) fn trip_car(
     }
     let me = ctx.briefs.get(sim.id as usize)?;
     let home = ctx.households.get(sim.household as usize)?.plot?;
-    if !me.adult || me.plot != Some(home) {
+    if !me.adult || !me.at_home(ctx.plots, Some(home)) {
         return None;
     }
     let door = ctx.plots.get(plot as usize)?.arrival_point();
@@ -111,6 +117,20 @@ pub(crate) fn driving(cars: &[Car], sim: u32) -> Option<u32> {
         .map(|c| c as u32)
 }
 
+/// Whether `sim` is out on a trip by car (`Trip`), there or back: its driver (from getting in till
+/// it's home), in it or come in it, or on their way to its door to ride along.
+pub(crate) fn on_trip(cars: &[Car], sim: &Sim) -> bool {
+    let me = sim.id;
+    sim.bound_for_car
+        .and_then(|c| cars.get(c as usize))
+        .is_some_and(|car| car.trip.is_some())
+        || cars.iter().any(|car| {
+            car.trip.is_some_and(|t| {
+                t.driver == me || car.aboard.contains(&me) || car.riders.contains(&me)
+            })
+        })
+}
+
 /// Whether car `c` is parked out on a trip `sim` drives.
 pub(crate) fn parked_out(cars: &[Car], c: u32, sim: u32) -> bool {
     cars.get(c as usize)
@@ -126,7 +146,7 @@ pub(crate) fn car_out_for(ctx: &crate::world::Ctx, sim: &Sim) -> Option<(u32, us
         .enumerate()
         .find(|(c, _)| parked_out(ctx.cars, *c as u32, sim.id))?;
     let trip = car.trip?;
-    let (d, stand) = car.posed(trip.at, trip.yaw).door(&ctx.nav, 0)?;
+    let (d, stand) = car.posed(trip.at, trip.yaw).door_in_bay(&ctx.nav, 0)?;
     Some((c as u32, d, stand))
 }
 
@@ -631,7 +651,8 @@ pub(crate) fn trip_ride(
             && !car.blocked
             && !car.aboard.contains(&sim.id)
     })?;
-    let near = me.plot == Some(home) || crate::travel::dist(sim.pos, car.spot) < CALL_REACH;
+    let near =
+        me.at_home(ctx.plots, Some(home)) || crate::travel::dist(sim.pos, car.spot) < CALL_REACH;
     let c = c as u32;
     // A seat of their own: after those in it and on their way to it.
     let seat = car.aboard.len()
@@ -680,7 +701,7 @@ pub(crate) fn ride_home_for(
     let seat = 1 + car.riders.iter().position(|&r| r == sim.id)?;
     let (d, stand) = car
         .posed(trip.at, trip.yaw)
-        .door(&ctx.nav, seat.min(SEATS - 1))?;
+        .door_in_bay(&ctx.nav, seat.min(SEATS - 1))?;
     Some((c as u32, seat, d, stand))
 }
 
@@ -741,6 +762,14 @@ pub(crate) fn park_out(w: &mut World, c: usize) {
         let (p, yaw, _) = route.at(route.ticks());
         (p, yaw)
     };
+    // (In a bay off the road it stands at the bay's own pose, the one drawn, where its way in
+    // ends: `bay_axis`.)
+    let (at, yaw) =
+        if crate::travel::dist(at, trip.at) < 0.05 && parking_bay(&w.travel, trip.at).is_some() {
+            (trip.at, trip.yaw)
+        } else {
+            (at, yaw)
+        };
     let car = &mut w.cars[c];
     car.state = CarState::Out;
     car.since = tick;
@@ -758,7 +787,7 @@ pub(crate) fn park_out(w: &mut World, c: usize) {
         .collect();
     w.cars[c].riders = riders.iter().map(|&(_, a)| a).collect();
     for (seat, a) in riders {
-        let door = posed.door(&w.nav(), seat).map(|(_, p)| p);
+        let door = posed.door_in_bay(&w.nav(), seat).map(|(_, p)| p);
         let sim = &mut w.sims[a as usize];
         sim.pos = door.unwrap_or(posed.door_at(own_door(seat)));
         sim.yaw = yaw;
@@ -771,7 +800,7 @@ pub(crate) fn park_out(w: &mut World, c: usize) {
     if !at_wheel {
         return;
     }
-    let door = posed.door(&w.nav(), 0).map(|(_, p)| p);
+    let door = posed.door_in_bay(&w.nav(), 0).map(|(_, p)| p);
     let sim = &mut w.sims[trip.driver as usize];
     sim.pos = door.unwrap_or(posed.door_at(0));
     sim.yaw = yaw;

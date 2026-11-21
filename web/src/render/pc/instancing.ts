@@ -24,6 +24,7 @@
  */
 
 import * as pc from './engine';
+import { castKeyOf, keyedDraws } from '../shared/parked';
 import { INSTANCE_COLOR_SEMANTIC } from './materials';
 
 /** A per-instance stream beside the matrix: the vertex attribute (semantic) a shader reads it from, and its floats. */
@@ -50,6 +51,12 @@ export interface InstancesOptions {
   capacity?: number;
   /** Culled by the box round its copies (default), or never (false). */
   cull?: boolean;
+  /**
+   * Its copies stand all over town (the parked cars and bikes): the sun's map takes it as the same while its copies
+   * that can cast into the map are (`castKey`, looked up in `keyedDraws`), not by its count and box, so one parked or
+   * driven off across town draws no picture of the still casters again.
+   */
+  castKeyed?: boolean;
 }
 
 /** Every draw of a mesh, by mesh (a template set aside hides its draws: `templateCache.ts`). */
@@ -79,6 +86,10 @@ export class Instances {
   private worldVer = -1;
   private readonly lo = new pc.Vec3();
   private readonly hi = new pc.Vec3();
+  /** Bumped by every write of a copy's matrix or of the count (`castKey` is worked out again after one). */
+  private writes = 0;
+  /** `castKey`'s last answer and what it was worked out for. */
+  private readonly keyed = { writes: -1, count: -1, ground: -1, reaches: null as ((x: number, z: number) => boolean) | null, key: 0 };
 
   constructor(
     private readonly device: pc.GraphicsDevice,
@@ -114,6 +125,7 @@ export class Instances {
     if (!draws) drawsOf.set(mesh, (draws = new Set()));
     draws.add(this);
     byEntity.set(this.entity, this);
+    if (options.castKeyed) keyedDraws.set(this.meshInstance, this);
     // The mesh is its owner's (a template's, a cache's): a draw holds it, never destroys it (a mesh
     // instance destroyed lets go of its mesh, and destroys it once nothing else holds it).
     mesh.incRefCount();
@@ -154,10 +166,12 @@ export class Instances {
   setCount(count: number): void {
     this.reserve(count);
     this.count = count;
+    this.writes++;
   }
 
   /** Copy `i`'s matrix (game space) from `m` at `offset`. */
   setMatrix(i: number, m: ArrayLike<number>, offset = 0): void {
+    this.writes++;
     const o = i * this.stride;
     for (let k = 0; k < 16; k++) this.data[o + k] = m[offset + k];
   }
@@ -170,6 +184,30 @@ export class Instances {
       return;
     }
     for (let i = 0; i < count; i++) this.setMatrix(i, matrices, i * 16);
+  }
+
+  /** The copies' matrices (game space), 16 floats each, as drawn (a tree's impostors take its woods square's: `impostors.ts`). */
+  matrices(): Float32Array {
+    const out = new Float32Array(this.count * 16);
+    for (let i = 0; i < this.count; i++) out.set(this.data.subarray(i * this.stride, i * this.stride + 16), i * 16);
+    return out;
+  }
+
+  /**
+   * The copies that stand where `reaches` says (the sun's map), where they stand and which way, as a number (0: none
+   * there): what the draw casts into the map, the same however many copies it has elsewhere (`SunShadows.castKey`).
+   * Kept until a copy's matrix or the count is written, or `ground` (the map's place, as its owner counts it) moves.
+   */
+  castKey(reaches: (x: number, z: number) => boolean, ground: number): number {
+    const k = this.keyed;
+    if (k.writes !== this.writes || k.count !== this.count || k.ground !== ground || k.reaches !== reaches) {
+      k.key = castKeyOf(this.data, this.count, this.stride, reaches);
+      k.writes = this.writes;
+      k.count = this.count;
+      k.ground = ground;
+      k.reaches = reaches;
+    }
+    return k.key;
   }
 
   /** Copy `i`'s values of `stream` (its `components` floats from `values` at `offset`). */
@@ -257,6 +295,7 @@ export class Instances {
     if (!this.buffer) return;
     drawsOf.get(this.mesh)?.delete(this);
     byEntity.delete(this.entity);
+    keyedDraws.delete(this.meshInstance);
     this.entity.destroy();
     this.mesh.decRefCount();
     this.buffer.destroy();

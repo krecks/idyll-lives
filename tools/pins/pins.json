@@ -3,17 +3,17 @@
     {
       "name": "living-town-meta",
       "file": "web/src/core/protocol.ts",
-      "sha256": "a59a98f4ecfa0d031d141011a94e5392bcf87a5811f8b9cc6ba8a8c33505b90d",
-      "by": "docs/cleanup",
-      "reason": "comments only: the pointer to a deleted design doc (docs/design/) is gone",
+      "sha256": "21f01292caa4428ccb37c943a0b7b2c8cf769eeff7a8c543c05c8864a7c755ae",
+      "by": "real-town-t1",
+      "reason": "owner's OK, real town: the backdrop goes (BackdropBuilding and WorldMeta.backdrop), every place a lot's (TownPlace.plot required), LotLook's roof spelled out",
       "region": "living-town-meta"
     },
     {
       "name": "living-town-types",
       "file": "web/src/core/protocol.ts",
-      "sha256": "c1e71709c5280f4b24533973e22a1fe743c5d4ba16ec33b374be864df1b6b3fa",
-      "by": "docs/cleanup",
-      "reason": "comments only: the pointer to a deleted design doc (docs/design/) is gone",
+      "sha256": "feff89eba0cde0204b16dcf3f9bf8ed0aaf14851cc619955f92f6d21151b0e76",
+      "by": "real-town-simp-render",
+      "reason": "simplify round: 'barn' dropped from BuildingUse, a use no lot's look has (no generator, sample or reader makes one since the backdrop went)",
       "region": "living-town-types"
     },
     {
@@ -42,9 +42,9 @@
     {
       "name": "HOUSE_LOOK",
       "file": "web/src/render/shared/house.ts",
-      "sha256": "bbf04ae2140d550a3c8f7eafddd4cd75ed5a1c004055b687c19f79b8c6a9ff48",
-      "by": "setup",
-      "reason": "setup: accepted before the living-town run (look jump)",
+      "sha256": "a6b0a5b18ebaaf1cc352ec4d87116842afd759cfdca93a12128101f3673cc466",
+      "by": "art-rust",
+      "reason": "house detail (W3): roofValley 0.8 added for the valley flashing of L/U roofs; no accepted value changed",
       "const": "HOUSE_LOOK"
     },
     {
@@ -58,23 +58,23 @@
     {
       "name": "sim-ai",
       "file": "crates/sim-core/src/ai.rs",
-      "sha256": "671a8f1d1ffa8785214c88de8737cfedd1fe3e294352ada62518f10afe2f9c7d",
-      "by": "setup",
-      "reason": "household behaviour: not this run's to change"
+      "sha256": "67c7f176c6113999cd96bd85cb17525dc42b7f03fbd1bd6aa6bacd7542860e44",
+      "by": "integrator",
+      "reason": "0.8.3 missing-items run: cleaning tools (sweep), the post at home, household cars (boughtCar/gotLetter events), nobody moves house at the wheel; reviewed, sim 819 and generated seeds 0-2 pass"
     },
     {
       "name": "sim-cooking",
-      "file": "crates/sim-core/src/cooking.rs",
-      "sha256": "1d82c57a3f54db44c0ef7b3c5ec7a6f0efde365e3b389ef3ba80cfab2eacbb17",
-      "by": "chore/rust-1.100",
-      "reason": "no behaviour change: the skills loop over the gains themselves, for clippy 1.100's needless_range_loop"
+      "file": "crates/sim-core/src/cooking/mod.rs",
+      "sha256": "d1b0db6e81a8d322ff91fca62ac1453dc4063ac1f19828a890ef0583a2584bf6",
+      "by": "refactor",
+      "reason": "behavior-preserving split of cooking.rs into cooking/ submodules"
     },
     {
       "name": "sim-social",
-      "file": "crates/sim-core/src/social.rs",
-      "sha256": "e6f7a26273e6060bd87cbfad481065b8aa3fc159fa6eab5f063d7b081a9e2f75",
-      "by": "setup",
-      "reason": "household behaviour: not this run's to change"
+      "file": "crates/sim-core/src/social/mod.rs",
+      "sha256": "5c0d5011b0ffc70ba00cc3eb89a752e7dd039b7b32a376bde6faec4b38989581",
+      "by": "refactor",
+      "reason": "split into social/ (mod, defs, parse, relationships, events); behaviour unchanged"
     },
     {
       "name": "sim-partners",
@@ -85,17 +85,17 @@
     },
     {
       "name": "sim-planner",
-      "file": "crates/sim-core/src/planner.rs",
-      "sha256": "42601b843ee9b66052a94abd7ff6d3e791bfef20b7aa631b41f8c12017b41f87",
+      "file": "crates/sim-core/src/planner/mod.rs",
+      "sha256": "c71571fdf286ceb3797dcf7c3b438c1d35ddbd0e8b814f50d9b79b3836d1516b",
       "by": "setup",
-      "reason": "household behaviour: not this run's to change"
+      "reason": "split into planner/ (mod, model, update, goals, purchases, factors, parse); behaviour unchanged"
     },
     {
       "name": "sim-lifecycle",
-      "file": "crates/sim-core/src/lifecycle.rs",
-      "sha256": "a8714a881d13c5eac474c117cc3e9b91f9c2baffadad0375e6864f999ed989d8",
-      "by": "docs/cleanup",
-      "reason": "comments only: the pointer to a deleted design doc (docs/design/) is gone"
+      "file": "crates/sim-core/src/lifecycle/mod.rs",
+      "sha256": "262e36f7ab0568938a361885b9ecee173f8204623526c632cfb61e49ff6884c4",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the glob of a part with nothing crate-visible left is private. Lifecycle's last accepted change stands (owner's choice, real-town code review: newcomers and movers ask World::is_home, so a lot with flats is nobody's home)."
     },
     {
       "name": "sim-hosting",
@@ -114,9 +114,9 @@
     {
       "name": "sim-privacy",
       "file": "crates/sim-core/src/privacy.rs",
-      "sha256": "74837017377b4c3770fe178fb79f0ed781c6b3a237f2e603f8630dc61954ce2e",
-      "by": "setup",
-      "reason": "household behaviour: not this run's to change"
+      "sha256": "d09c594b019256dde393cf655cd0d5f07394b43c70bec4d39aa9e4c09d751e14",
+      "by": "integrate-cleanup",
+      "reason": "code cleanup integrated with the real town"
     },
     {
       "name": "living-town-lens",
@@ -133,6 +133,146 @@
       "by": "setup",
       "reason": "the contract's shared town view state",
       "region": "living-town-view"
+    },
+    {
+      "name": "sim-planner-model",
+      "file": "crates/sim-core/src/planner/model.rs",
+      "sha256": "2990e932ac9f5952765cdbaa158c773a9860f4183ad4c6056267168d3f0d388e",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 2 items only its sibling files use narrowed from pub(crate) to pub(super). The planner's last accepted change stands (owner's choice, real-town code review: a thing a flat keeps outside it is not swapped in over its place by swap_in)."
+    },
+    {
+      "name": "sim-planner-update",
+      "file": "crates/sim-core/src/planner/update.rs",
+      "sha256": "edffd20501bc9f8f871fbd50eb596ccfe4b3825c084cec28bb479a861bd95e91",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone. The planner's last accepted change stands (owner's choice, real-town code review: a thing a flat keeps outside it is not swapped in over its place by swap_in)."
+    },
+    {
+      "name": "sim-planner-goals",
+      "file": "crates/sim-core/src/planner/goals.rs",
+      "sha256": "c5b5630f4374011006d2c0a5369a947c3e095b9a626108ab0cdf84527bedde65",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 2 items only its sibling files use narrowed from pub(crate) to pub(super). The planner's last accepted change stands (owner's choice, real-town code review: a thing a flat keeps outside it is not swapped in over its place by swap_in)."
+    },
+    {
+      "name": "sim-planner-purchases",
+      "file": "crates/sim-core/src/planner/purchases.rs",
+      "sha256": "bd0529c525feb2a37dce19fbebe18cb3859bcaae2dca512bd4a845d4e2df70ed",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone. The planner's last accepted change stands (owner's choice, real-town code review: a thing a flat keeps outside it is not swapped in over its place by swap_in)."
+    },
+    {
+      "name": "sim-planner-factors",
+      "file": "crates/sim-core/src/planner/factors.rs",
+      "sha256": "b52c5d71e60e757e5d3dd9b02ea533efb059eaa32cba410552de089053a60723",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone. The planner's last accepted change stands (owner's choice, real-town code review: a thing a flat keeps outside it is not swapped in over its place by swap_in)."
+    },
+    {
+      "name": "sim-planner-parse",
+      "file": "crates/sim-core/src/planner/parse.rs",
+      "sha256": "d31d34e228188173c75c80f053a8ba0b4a67d983aaead6518ccaf54fb75a8fe3",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone. The planner's last accepted change stands (owner's choice, real-town code review: a thing a flat keeps outside it is not swapped in over its place by swap_in)."
+    },
+    {
+      "name": "sim-social-defs",
+      "file": "crates/sim-core/src/social/defs.rs",
+      "sha256": "e25e8b1371c7f0931d7c2a22bcba4097d400e90bc91d4bff0758acf6c4ca03a5",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone. Social's last accepted change stands (0.8.3 missing-items run: cleaning tools, the post at home, household cars and their events, nobody moves house at the wheel)."
+    },
+    {
+      "name": "sim-social-parse",
+      "file": "crates/sim-core/src/social/parse.rs",
+      "sha256": "3000b6e5c346b2641410c29d598a0d72090da11f7b2893a20ec9a7a04efc6ce3",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone. Social's last accepted change stands (0.8.3 missing-items run: cleaning tools, the post at home, household cars and their events, nobody moves house at the wheel)."
+    },
+    {
+      "name": "sim-social-relationships",
+      "file": "crates/sim-core/src/social/relationships.rs",
+      "sha256": "d1907f240475e89c6a7e3efd1cbac67e8743412535dff1d897e73f3a895dd5d3",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone. Social's last accepted change stands (0.8.3 missing-items run: cleaning tools, the post at home, household cars and their events, nobody moves house at the wheel)."
+    },
+    {
+      "name": "sim-social-events",
+      "file": "crates/sim-core/src/social/events.rs",
+      "sha256": "5b869937133cf373f599e4de3dded32c416a7da9f614ddb8c32cbe6055f14f8e",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone. Social's last accepted change stands (0.8.3 missing-items run: cleaning tools, the post at home, household cars and their events, nobody moves house at the wheel)."
+    },
+    {
+      "name": "sim-lifecycle-moving",
+      "file": "crates/sim-core/src/lifecycle/moving.rs",
+      "sha256": "2f5c9f36151b188027207062a0ee5a61924fe1ba64ea9274258734598063bdeb",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 17 items only its sibling files use narrowed from pub(crate) to pub(super). Lifecycle's last accepted change stands (owner's choice, real-town code review: newcomers and movers ask World::is_home, so a lot with flats is nobody's home)."
+    },
+    {
+      "name": "sim-lifecycle-arrival",
+      "file": "crates/sim-core/src/lifecycle/arrival.rs",
+      "sha256": "9e43ea2b9fbf6b546a3775442584234be870659fbe34e7ed7f4b3e6ac127ef4c",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 4 items only its sibling files use narrowed from pub(crate) to pub(super). Lifecycle's last accepted change stands (owner's choice, real-town code review: newcomers and movers ask World::is_home, so a lot with flats is nobody's home)."
+    },
+    {
+      "name": "sim-lifecycle-babies",
+      "file": "crates/sim-core/src/lifecycle/babies.rs",
+      "sha256": "7dc8d0d73e4d76bfb35b86080d122707b66e441c7c91e3aafa5ad5e2bc2a1a3f",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone. Lifecycle's last accepted change stands (owner's choice, real-town code review: newcomers and movers ask World::is_home, so a lot with flats is nobody's home)."
+    },
+    {
+      "name": "sim-lifecycle-children",
+      "file": "crates/sim-core/src/lifecycle/children.rs",
+      "sha256": "d45836a4dbe384c43614430ef549acaccc76df3a3f4855d13a7a805ef2f95094",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 3 items only its sibling files use narrowed from pub(crate) to pub(super). Lifecycle's last accepted change stands (owner's choice, real-town code review: newcomers and movers ask World::is_home, so a lot with flats is nobody's home)."
+    },
+    {
+      "name": "sim-cooking-cook",
+      "file": "crates/sim-core/src/cooking/cook.rs",
+      "sha256": "57304696b929ee1caaebeb51a020b5c4e46ed2c93720a7501e0dbeb36152d528",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 19 items only its sibling files use narrowed from pub(crate) to pub(super). Cooking's last accepted change stands (owner's OK, real town: a flat's household is at home on its own storey for an invitation to eat and the food left at home)."
+    },
+    {
+      "name": "sim-cooking-dishes",
+      "file": "crates/sim-core/src/cooking/dishes.rs",
+      "sha256": "176ffd07172eafdec458356615cba59770f8595d3f5bedbea455ecfc5342fa56",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 4 items only its sibling files use narrowed from pub(crate) to pub(super). Cooking's last accepted change stands (owner's OK, real town: a flat's household is at home on its own storey for an invitation to eat and the food left at home)."
+    },
+    {
+      "name": "sim-cooking-eat",
+      "file": "crates/sim-core/src/cooking/eat.rs",
+      "sha256": "3fc763dc2be993f0300703592bce8f6899930c4b28ca5f2f2b0684f1e61fc451",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 6 items only its sibling files use narrowed from pub(crate) to pub(super). Cooking's last accepted change stands (owner's OK, real town: a flat's household is at home on its own storey for an invitation to eat and the food left at home)."
+    },
+    {
+      "name": "sim-cooking-household",
+      "file": "crates/sim-core/src/cooking/household.rs",
+      "sha256": "70a429dcc2d2f3e17b669068287dc36a5db86bb2a363dbca25911537cc564be9",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 3 items only its sibling files use narrowed from pub(crate) to pub(super). Cooking's last accepted change stands (owner's OK, real town: a flat's household is at home on its own storey for an invitation to eat and the food left at home)."
+    },
+    {
+      "name": "sim-cooking-serve",
+      "file": "crates/sim-core/src/cooking/serve.rs",
+      "sha256": "3e8161696e7ef848f6c89f3c41b357efdc6dad77d1553d7d57f031eaf20a3b79",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 6 items only its sibling files use narrowed from pub(crate) to pub(super). Cooking's last accepted change stands (owner's OK, real town: a flat's household is at home on its own storey for an invitation to eat and the food left at home)."
+    },
+    {
+      "name": "sim-cooking-step",
+      "file": "crates/sim-core/src/cooking/step.rs",
+      "sha256": "c681236d07f39ccb243545075dcd2e66de1066d73410fa671d82688435eddbf0",
+      "by": "simplify3",
+      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 2 items only its sibling files use narrowed from pub(crate) to pub(super). Cooking's last accepted change stands (owner's OK, real town: a flat's household is at home on its own storey for an invitation to eat and the food left at home)."
     }
   ]
 }

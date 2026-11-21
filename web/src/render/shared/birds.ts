@@ -51,8 +51,10 @@ import { birdActivity, type SeenBird, type ViewRect } from '../types';
 import { angleDelta as turn } from './angles';
 import { compose, multiply, quatYawPitchRoll, rotationX, rotationZ, scaling, transformNormal, transformPoint, translation, type Quat } from './math';
 import { entrySpace, placementVariation } from './modelEntry';
-import { bareTiles, hash, mulberry32, smoothstep, windDirection, type PlantPlacement } from './nature';
+import { bareTiles, windDirection, type PlantPlacement } from './nature';
+import { hash, mulberry32, smoothstep } from '../../game/noise';
 import { WALL_HEIGHT } from './walls';
+import { frameRandom } from './frameClock';
 
 export type BirdSpecies = 'blueTit' | 'chaffinch' | 'warbler' | 'blackbird' | 'collaredDove';
 
@@ -116,7 +118,7 @@ const GAIT: Record<'hop' | 'run' | 'walk', Gait> = {
 /** How a species looks and behaves. Times in the birds' seconds, distances in metres, angles in radians. */
 interface Species {
   id: BirdSpecies;
-  /** Its song (`audio/birdsong.ts` species). */
+  /** Its song (`audio/kinds.ts` `SPECIES` name). */
   song: string;
   /**
    * Drawn this much larger than life: at real size a tit is 5 px and a blackbird 10 px from the
@@ -198,9 +200,9 @@ export const BIRD_MODELS: readonly string[] = SPECIES.map((sp) => `model.bird.${
 
 /**
  * How much faster the birds' clock runs at each game speed (`PLAYBACK_RATE`'s index): they keep to the
- * game (still while it's paused) but don't go frantic in a time-lapse.
+ * game (still while it's paused) but don't go frantic at super speed.
  */
-const RATE = [0, 1, 1.25, 1.5, 1.75, 1.75];
+const RATE = [0, 1, 1.25, 1.5, 1.75];
 /** Longest step of the birds' clock in a frame (s). */
 const MAX_STEP = 0.1;
 /** Clearance kept over roofs and walls in flight (m), and round them (m). */
@@ -457,8 +459,8 @@ export interface BirdView<L extends BirdLook> {
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const between = (r: () => number, [a, b]: readonly [number, number]) => a + r() * (b - a);
-/** `Math.random`, looked up at each call (a test fixing it after this module loaded still fixes the birds). */
-const rnd = () => Math.random();
+/** `Math.random`, looked up at each call (a test fixing it after this module loaded still fixes the birds); fixed-step playback's own dice then (`frameRandom`). */
+const rnd = () => frameRandom();
 /** A number fixed by a place (to a tenth of a metre). */
 const placeHash = (x: number, z: number, salt: number) => hash(Math.round(x * 10), Math.round(z * 10), salt);
 /** Randoms from a seed in 0..1. */
@@ -508,6 +510,12 @@ export class Birds<L extends BirdLook = BirdLook> {
   private depth = 0;
   private clock = 0;
   private frame = 0;
+
+  /** Fixed-step playback: the birds' clock back to 0. */
+  restartClock(): void {
+    this.clock = 0;
+    this.frame = 0;
+  }
   /** Birds' seconds per real second now (`RATE`), and a slow-motion factor for checks (`?debug`'s `__birdTime`). */
   private rate = 1;
   timeScale = 1;

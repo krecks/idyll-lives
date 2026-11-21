@@ -1,4 +1,6 @@
 //! Rough per-tick timing for the shipped content: `cargo run --release --example tickbench`.
+//! With `--features profile` it also prints where a tick's time goes, phase by phase
+//! (`crates/sim-core/src/profile.rs`); that build's ticks are slower by the phases' own cost.
 
 use std::time::Instant;
 
@@ -40,14 +42,20 @@ fn main() {
         }
         let mut world = World::from_json(&c.to_string(), &lot.to_string(), 1).unwrap();
         let ticks = sim_core::clock::TICKS_PER_DAY as u32;
+        sim_core::profile::reset();
         let start = Instant::now();
         for _ in 0..ticks {
             world.tick_once();
         }
+        let elapsed = start.elapsed();
         let events = world.events.iter().count();
         println!(
             "{label}: {:?}/tick, {events} social events",
-            start.elapsed() / ticks
+            elapsed / ticks
         );
+        let report = sim_core::profile::report();
+        if !report.is_empty() {
+            print!("{report}");
+        }
     }
 }

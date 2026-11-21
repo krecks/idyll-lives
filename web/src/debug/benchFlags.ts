@@ -8,17 +8,29 @@
  * its shading (`render/pc/shaders/diagView.ts`), and `nosims` leaves the residents out: geometry
  * and colour compared without the lighting (the reference pictures for the PlayCanvas port). `linear` draws the lit colour as it is,
  * without tone mapping, exposure or grading: the light compared without the image processing. `notown` leaves the town view's
- * drawing out (`render/pc/townView.ts`: the backdrop, the far lots, crowns, movers, the ground's map), the far LOD as before it;
- * `notownwoods`, `notownground` and `notownbuildings` one part of it: the woods as before, no colour map, no buildings.
+ * drawing out (`render/pc/townView.ts`: the far lots, crowns, movers, the ground's map), the far LOD as before it;
+ * `notownwoods`, `notownground` and `notownbuildings` one part of it: the woods as before, no colour map, no buildings;
+ * `noimpostors` the far trees as themselves, not their impostors (`render/pc/impostors.ts`).
  * `wholeshadows` draws every caster into the sun's map every time, also when only the residents moved (`render/pc/sunShadows.ts`).
+ * `nowarm` leaves out the load's warm-up of a Big world's lots (`warmGameNow`: a few lots built and drawn so their
+ * pipelines are made before play): a page that counts draws or takes pictures loads sooner, its first frames slower.
+ *
+ * `?world=<place>` (and `?options=town:city,villages:many`, `game/worldOptions.ts`) works without
+ * `?bench` too: step 1 of a new game makes its first world there, with those options (`WORLD_FLAG`;
+ * the timing tools' worlds). `?bench=bigworld` draws a Big world of `big=<place>` (default the
+ * countryside), with `options=` as well. `?code=<world code>` (`game/worldCode.ts`; a bare number is
+ * the land's seed) does the same with the world's code, over `?world=` and `?options=` (`CODE_FLAG`).
+ * (`?seed=` is the simulation's own dice: `game/session.ts`.)
  */
 
+import type { WorldOptions } from '../core/protocol';
+import { parseOptions } from '../game/worldOptions';
 import { TOWN_MAX } from '../render/shared/lens';
 import { isResolution, type Resolution } from '../render/shared/resolution';
 
 export type BenchCamera = 'orbit' | 'wide' | 'build' | 'dusk' | 'mirror' | 'mirror-still' | 'roam' | 'street' | 'town' | 'over' | 'zoom';
 
-export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nowoods', 'nofarwoods', 'noflowers', 'nograss', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'noao', 'noclouds', 'freeze', 'albedo', 'normals', 'nosims', 'linear', 'shaders', 'notown', 'notownwoods', 'notownground', 'notownbuildings', 'wholeshadows'] as const;
+export const BENCH_DIAGS = ['noshadows', 'noaa', 'nonature', 'nowoods', 'nofarwoods', 'noflowers', 'nograss', 'nolamps', 'nomirrors', 'noglass', 'nonight', 'noao', 'noclouds', 'nolayers', 'noflow', 'freeze', 'albedo', 'normals', 'nosims', 'linear', 'shaders', 'notown', 'notownwoods', 'noimpostors', 'notownground', 'notownbuildings', 'wholeshadows', 'nowarm'] as const;
 export type BenchDiag = (typeof BENCH_DIAGS)[number];
 
 export interface BenchFlags {
@@ -26,8 +38,14 @@ export interface BenchFlags {
   scene: string;
   /** The scene's town laid out `tile × tile` times for the renderer, as a big world (`debug/tileWorld.ts`); 1: as it is. */
   tile: number;
-  /** A real Big world of this kind for the renderer (`debug/bigTown.ts`; `bench=bigworld`: `big=` or 'small'); null: the scene's town. */
+  /**
+   * A real Big world in this place for the renderer (`debug/bigTown.ts`; `bench=bigworld`: `big=`,
+   * else the countryside; a kind from before places, such as `dense`, is its place at its size); null:
+   * the scene's town.
+   */
   big: string | null;
+  /** That world's options (`options=town:city,villages:many`; the place's own where not given). */
+  options: Partial<WorldOptions>;
   /** `?quality=` (the presets in `render/quality.ts`; the renderer reads it itself). */
   quality: 'low' | 'medium' | 'high' | null;
   /** `?hour=`: the lighting held at that hour (the renderer reads it itself); null: the game's clock. */
@@ -91,7 +109,8 @@ function parse(): BenchFlags | null {
   return {
     scene,
     tile: num('tile', 1, 1, 6),
-    big: scene === 'bigworld' ? (params.get('big') ?? 'small') : params.get('big'),
+    big: scene === 'bigworld' ? (params.get('big') ?? 'country') : params.get('big'),
+    options: parseOptions(params.get('options')),
     quality: quality === 'low' || quality === 'medium' || quality === 'high' ? quality : null,
     hour: params.has('hour') && Number.isFinite(Number(params.get('hour'))) ? Number(params.get('hour')) : null,
     cam: camera,
@@ -100,7 +119,7 @@ function parse(): BenchFlags | null {
     warmup: num('warmup', 5, 0, 120),
     cap: num('cap', 0, 0, 1000),
     // Build mode stands still; the dusk run hurries through the evening; a frozen picture doesn't move.
-    speed: frozen || camera === 'build' ? 0 : num('speed', camera === 'dusk' ? 5 : 1, 0, 5),
+    speed: frozen || camera === 'build' ? 0 : num('speed', camera === 'dusk' ? 3 : 1, 0, 4),
     hud: params.get('hud') !== '0',
     summary: params.get('hud') !== '0' && params.get('hud') !== 'game',
     gpu: params.get('gpu') !== '0',
@@ -117,3 +136,17 @@ function parse(): BenchFlags | null {
 
 /** The benchmark asked for in the URL, or null (a normal game). */
 export const BENCH: BenchFlags | null = parse();
+
+/**
+ * `?world=<place>`: the place step 1 makes its first world in (a kind from before places, such as
+ * `dense`, is its place at its size), with `?options=` (the place's own where not given); null: the
+ * countryside, as a player gets it. Unknown options are left out.
+ */
+export const WORLD_FLAG: { kind: string; options: Partial<WorldOptions> } | null = params.has('world') ? { kind: params.get('world') ?? '', options: parseOptions(params.get('options')) } : null;
+
+/**
+ * `?code=`: the world's code step 1 of a new game opens with (`game/worldCode.ts` `readCode`: a
+ * whole code, or a bare number for the land's seed), as written; null: none. Read by step 1, which
+ * says nothing of a code it can't read and makes its own world.
+ */
+export const CODE_FLAG: string | null = params.get('code');

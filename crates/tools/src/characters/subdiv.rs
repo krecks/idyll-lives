@@ -6,7 +6,7 @@
 //!
 //! Level-1 vertices are ordered: the cage's vertex points, then edge points, then face points, so
 //! the first `n` of them are the cage's own vertices. Faces keep the cage's winding. (subdiv.py's
-//! `fit` had no callers and is not ported: body.rs solves for the cage itself.)
+//! `fit` had no callers and is not ported: body/ solves for the cage itself.)
 
 use std::collections::{BTreeSet, HashMap};
 

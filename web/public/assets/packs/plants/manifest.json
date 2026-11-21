@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built plants (tools/art/blender/families/plants.py): the G1 houseplants, G2 flowers, G3 shrubs and G4 edibles. Listed in the base manifest's packs. Leaves and stems are on the `foliage` finish, so the nature shader sways and tints them. The outdoor ones have a far version (`far`). Clips: the bonsai's sprig and the clipped shrubs' sprigs shrink away while they are trimmed, a rose and lavender stems while they are cut, a meadow flower and basil while they are picked; the crops grow from seedlings to ripe and lose their crop when harvested (`motions.growth`).",
+  "$comment": "The plants (crates/art/nature/src/plants, built by cargo art): the G1 houseplants, G2 flowers, G3 shrubs and G4 edibles. Listed in the base manifest's packs. Leaves and stems are on the `foliage` finish, so the nature shader sways and tints them. The outdoor ones have a far version (`far`). Clips: the bonsai's sprig and the clipped shrubs' sprigs shrink away while they are trimmed, a rose and lavender stems while they are cut, a meadow flower and basil while they are picked; the crops grow from seedlings to ripe and lose their crop when harvested (`motions.growth`).",
   "version": 1,
   "entries": {
     "model.plant": {
@@ -7,22 +7,22 @@
       "url": "../../models/plants/plant.glb",
       "materials": {
         "body": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.ceramic"
         },
         "leaf": {
-          "finish": "material.finish.foliage"
+          "finish": "material.finish.satin"
         },
         "leaf_dark": {
-          "finish": "material.finish.foliage"
+          "finish": "material.finish.satin"
         },
         "leaf_light": {
-          "finish": "material.finish.foliage"
+          "finish": "material.finish.satin"
         },
         "soil": {
           "finish": "material.finish.matte"
         },
         "stem": {
-          "finish": "material.finish.foliage"
+          "finish": "material.finish.satin"
         }
       },
       "paint": [
@@ -30,23 +30,26 @@
           "material": "body",
           "label": "Pot"
         }
-      ]
+      ],
+      "accept": {
+        "edges": "the rims of its leaf blades, drawn plain (satin): the gate leaves a leaf's rim unjudged on foliage"
+      }
     },
     "model.garden.monstera": {
       "type": "model",
       "url": "../../models/plants/monstera.glb",
       "materials": {
         "body": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.ceramic"
         },
         "leaf": {
-          "finish": "material.finish.foliage"
+          "finish": "material.finish.satin"
         },
         "leaf_dark": {
-          "finish": "material.finish.foliage"
+          "finish": "material.finish.satin"
         },
         "leaf_light": {
-          "finish": "material.finish.foliage"
+          "finish": "material.finish.satin"
         },
         "moss": {
           "finish": "material.finish.matte"
@@ -55,7 +58,7 @@
           "finish": "material.finish.matte"
         },
         "stem": {
-          "finish": "material.finish.foliage"
+          "finish": "material.finish.satin"
         }
       },
       "paint": [
@@ -73,16 +76,16 @@
           "finish": "material.finish.bark"
         },
         "body": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.ceramic"
         },
         "leaf": {
-          "finish": "material.finish.foliage"
+          "finish": "material.finish.satin"
         },
         "leaf_dark": {
-          "finish": "material.finish.foliage"
+          "finish": "material.finish.satin"
         },
         "leaf_light": {
-          "finish": "material.finish.foliage"
+          "finish": "material.finish.satin"
         },
         "soil": {
           "finish": "material.finish.matte"
@@ -93,7 +96,10 @@
           "material": "body",
           "label": "Pot"
         }
-      ]
+      ],
+      "accept": {
+        "edges": "the rims of its leaf blades, drawn plain (satin): the gate leaves a leaf's rim unjudged on foliage"
+      }
     },
     "model.garden.snakePlant": {
       "type": "model",
@@ -250,19 +256,19 @@
           "finish": "material.finish.satin"
         },
         "body": {
-          "finish": "material.finish.satin"
+          "finish": "material.finish.ceramic"
         },
         "flesh": {
           "finish": "material.finish.satin"
         },
         "leaf": {
-          "finish": "material.finish.foliage"
+          "finish": "material.finish.satin"
         },
         "soil": {
           "finish": "material.finish.matte"
         },
         "stem": {
-          "finish": "material.finish.foliage"
+          "finish": "material.finish.satin"
         },
         "wood": {
           "finish": "material.finish.wood"

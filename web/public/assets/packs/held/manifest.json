@@ -1,5 +1,5 @@
 {
-  "$comment": "Blender-built things residents carry and cook with (tools/art/blender/families/held.py): the models of content `items`, the props drawn on a station while cooking and those in the hands while a thing is used. Listed in the base manifest's packs. The materials map onto the game's finishes, so each costs one draw call (the wooden boards two).",
+  "$comment": "The things residents carry and cook with (crates/art/things/src/held, built by cargo art): the models of content `items`, the props drawn on a station while cooking and those in the hands while a thing is used. Listed in the base manifest's packs. The materials map onto the game's finishes, so each costs one draw call (the wooden boards two).",
   "version": 1,
   "entries": {
     "item.ingredients": {
@@ -1699,6 +1699,21 @@
         },
         "stalk": {
           "finish": "material.finish.matte"
+        },
+        "steel": {
+          "finish": "material.finish.metal"
+        }
+      }
+    },
+    "tool.iron": {
+      "type": "model",
+      "url": "../../models/held/iron.glb",
+      "materials": {
+        "iron_shell": {
+          "finish": "material.finish.plastic"
+        },
+        "iron_trim": {
+          "finish": "material.finish.plastic"
         },
         "steel": {
           "finish": "material.finish.metal"

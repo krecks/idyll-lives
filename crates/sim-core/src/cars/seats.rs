@@ -1,13 +1,11 @@
 //! Who takes which car, where they sit, and how they board.
-//!
-//! Split from `cars.rs` (see `mod.rs`).
 
 use super::*;
 
 /// The car `sim` would take to work (or school) now, and their seat in it (0: they drive): an
 /// owner 18 or older takes their household's car from home when it's parked there; anyone else in
 /// the household rides along when an owner is about to drive off in it (or on their way to). Not
-/// one booked on a work taxi (`taxi.rs`): it comes for them as planned.
+/// one booked on a work taxi (`taxi/`): it comes for them as planned.
 pub(crate) fn seat(
     cars: &[Car],
     briefs: &[SimBrief],
@@ -23,8 +21,8 @@ pub(crate) fn seat(
     if !sim.here() || me.baby || sim.taxi.is_some() {
         return None;
     }
-    if me.plot.is_none_or(|p| p == home)
-        && let Some(seat) = own_seat(cars, briefs, sim, me, home)
+    if (me.plot.is_none() || me.at_home(plots, Some(home)))
+        && let Some(seat) = own_seat(cars, briefs, plots, sim, me, home)
     {
         return Some(seat);
     }
@@ -75,13 +73,14 @@ pub(crate) fn riders(
 pub(crate) fn own_seat(
     cars: &[Car],
     briefs: &[SimBrief],
+    plots: &[Plot],
     sim: &Sim,
     me: &SimBrief,
     home: u32,
 ) -> Option<(u32, usize)> {
     cars.iter().enumerate().find_map(|(c, car)| {
         // At home, or still close by on the street.
-        let near = me.plot == Some(home)
+        let near = me.at_home(plots, Some(home))
             || (sim.pos[0] - car.spot[0]).hypot(sim.pos[1] - car.spot[1]) < CALL_REACH;
         // (Not one setting off on a trip: `trip_ride`.)
         if car.household != sim.household

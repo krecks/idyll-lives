@@ -1,5 +1,5 @@
 {
-  "$comment": "Catalogue 2: Small things that stand on tops (the `surface` layer): kitchenware, tableware, books, plants, ornaments, bath and desk things, toys. Separate pieces only. Models: assets/manifest.json and the packs it lists (tools/art/blender/families/).",
+  "$comment": "Catalogue 2: Small things that stand on tops (the `surface` layer): kitchenware, tableware, books, plants, ornaments, bath and desk things, toys. Separate pieces only. Models: assets/manifest.json and the packs it lists (crates/art).",
   "objects": [
     {
       "id": "kettle",
@@ -21,6 +21,8 @@
           "id": "tea",
           "label": "Make a cup of tea",
           "anim": "drink",
+          "sound": "kettle",
+          "endSound": "kettleOff",
           "minutes": 8,
           "effects": {
             "comfort": 0.12,
@@ -102,6 +104,43 @@
           "tags": [
             "food"
           ]
+        }
+      ]
+    },
+    {
+      "id": "iceCreamMaker",
+      "name": "Ice cream maker",
+      "model": "model.iceCreamMaker",
+      "footprint": [
+        1,
+        1
+      ],
+      "price": 80,
+      "category": "tabletop",
+      "group": "kitchenware",
+      "layer": "surface",
+      "decor": 0.3,
+      "radius": 0.13,
+      "description": "A countertop machine that churns a tub of ice cream. It stands on a table, counter, desk or shelf.",
+      "interactions": [
+        {
+          "id": "churn",
+          "label": "Churn a tub of ice cream",
+          "anim": "cook",
+          "sound": "mixer",
+          "minutes": 6,
+          "eat": {
+            "item": "iceCream",
+            "minutes": 8
+          },
+          "effects": {
+            "hunger": 0.18,
+            "fun": 0.22
+          },
+          "tags": [
+            "food"
+          ],
+          "feeling": "home.sweetTreat"
         }
       ]
     },
@@ -401,6 +440,7 @@
           "id": "tea",
           "label": "Pour a cup of tea",
           "anim": "drink",
+          "sound": "pour",
           "minutes": 20,
           "pose": "sit",
           "seatNear": 2,
@@ -476,6 +516,7 @@
             "elder"
           ],
           "anim": "drink",
+          "sound": "pour",
           "minutes": 10,
           "pose": "sit",
           "seatNear": 2,

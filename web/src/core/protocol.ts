@@ -17,13 +17,15 @@ export type Command =
   | { type: 'setNeed'; sim: number; need: string; value: number }
   | { type: 'setBond'; a: number; b: number; friendship?: number; romance?: number; chemistry?: number; partners?: boolean }
   | { type: 'adopt'; household: number; child: boolean }
-  /** "Skip quiet hours": time-lapse while the player's household sleeps or is at work. */
+  /** Super speed by itself: the game goes to super speed as the player's household all falls asleep or goes out, and back to the speed before it as that ends. */
   | { type: 'setAutoFast'; enabled: boolean }
   | { type: 'use'; sim: number; object: number; interaction: number }
   /** Eat a serving of food (an item), or clear it away to the sink. */
   | { type: 'useItem'; sim: number; item: number; action: 'eat' | 'clear' }
   /** A lamp switched on or off (sim-core `lights.rs`): at once, nobody walks over. */
   | { type: 'switchLamp'; object: number; on: boolean }
+  /** Curtains drawn shut or opened (sim-core `curtains.rs`): at once, nobody walks over. */
+  | { type: 'drawCurtains'; object: number; shut: boolean }
   | { type: 'moveTo'; sim: number; x: number; z: number }
   | { type: 'social'; sim: number; target: number; social: number }
   | { type: 'joinCareer'; sim: number; career: number; level: number }
@@ -87,7 +89,71 @@ export type Command =
   | { type: 'dismissSuggestion'; sim: number; index: number }
   /** Yes or no to what a resident asked to buy (a yes buys and places it). */
   | { type: 'acceptPurchase'; sim: number }
-  | { type: 'declinePurchase'; sim: number };
+  | { type: 'declinePurchase'; sim: number }
+  /**
+   * The land shaped (Build mode's Land tab): `cost` charged to the household (Living; free in
+   * Creative; negative: a refund, an undone stroke). `meta.land` merges into the world's
+   * `meta.land` tile by tile (`h` and `wl` by tile index, the rest replaced); `meta.zones`, when
+   * given, replaces the world's. `water`: the world's whole water mask (1 m tiles, `Rle`), when
+   * the stroke changed the water. Not a home edit: the land's own undo sends the reverse.
+   */
+  | { type: 'shapeLand'; household: number; cost: number; meta: ShapeLandMeta; water?: Rle };
+
+/**
+ * What a `shapeLand` command changes in the world's `meta`: the land's touched tiles, the zones derived from it, and
+ * the bridges its water made (`roads`: by road index, each road's whole list, `RoadPlan.bridges`; an empty one none).
+ */
+export interface ShapeLandMeta {
+  land?: Partial<Omit<LandFile, 'h' | 'wl' | 'flow'>> & { h?: Record<number, string>; wl?: Record<number, string>; flow?: Record<number, string> };
+  zones?: WorldZone[];
+  roads?: Record<number, { bridges: [number, number][] }>;
+}
+
+/**
+ * A `shapeLand` command, as `SimBridge.shapeLand` sends it (answered, unlike `send`'s commands).
+ * The first one of a world without `meta.land` carries the land's whole header (`cols` and `rows`
+ * at least); a tile it doesn't send is empty (flat at 0 and dry). A tile index past the land's, a
+ * cost over the household's funds (Living), and new water on a lot, on a road (its width with the
+ * sidewalks), on a resident or where something stands are refused whole, with the reason.
+ */
+export type ShapeLandCommand = Extract<Command, { type: 'shapeLand' }>;
+
+/**
+ * `meta` with a `shapeLand` stroke's `patch` merged in as the simulation merges it: `land.h`,
+ * `land.wl` and `land.flow` (once either has one) tile by tile, the land's other fields and `zones` replaced, a road's `bridges` replaced
+ * (none: taken away). A new object (and a new `land`, new `roads` and new road objects where they
+ * changed), `meta` left as it is; null with nothing to merge.
+ */
+export function mergeShapeLand(meta: WorldMeta | null, patch: ShapeLandMeta): WorldMeta | null {
+  if (!patch.land && !patch.zones && !patch.roads) return meta;
+  const out: WorldMeta = { ...(meta ?? {}) };
+  if (patch.land) {
+    const { h, wl, flow, ...header } = patch.land;
+    const land = { ...out.land, ...header } as LandFile;
+    const tiles = Math.ceil(land.cols / (land.tile ?? 64)) * Math.ceil(land.rows / (land.tile ?? 64));
+    const merged = (old: string[] | undefined, by: Record<number, string> | undefined) => {
+      const codes = Array.from({ length: tiles }, (_, t) => old?.[t] ?? '');
+      for (const [t, code] of Object.entries(by ?? {})) codes[Number(t)] = code;
+      return codes;
+    };
+    land.h = merged(out.land?.h, h);
+    land.wl = merged(out.land?.wl, wl);
+    if (out.land?.flow || flow) land.flow = merged(out.land?.flow, flow);
+    out.land = land;
+  }
+  if (patch.zones) out.zones = patch.zones;
+  if (patch.roads && out.roads) {
+    const roads = out.roads.slice();
+    for (const [i, { bridges }] of Object.entries(patch.roads)) {
+      const road = roads[Number(i)];
+      if (!road) continue;
+      const { bridges: _old, ...rest } = road;
+      roads[Number(i)] = bridges.length ? { ...rest, bridges } : rest;
+    }
+    out.roads = roads;
+  }
+  return out;
+}
 
 /** A routine block: an activity (content `activities` id) on weekdays (bit 0 = Monday) from `start` (minute of the day) for `minutes`. */
 export interface RoutineIn {
@@ -402,10 +468,41 @@ export interface RoadPlan {
   kind?: RoadKind;
   /** The area (`OpenWorldTownFields.areas` index) it belongs to; absent for ways between areas. */
   area?: number;
+  /** A bridge or a causeway: the arc lengths (m) along it where its deck over the water begins and ends. */
+  bridge?: [number, number];
+  /**
+   * Bridges the land's brushes made where water came across it (Build mode's Land tab: `game/landBridges.ts`), each
+   * as `bridge`, along the road as it is (not made straight nor split); the simulation keeps them
+   * (`Command::ShapeLand`'s `meta.roads`). A road's decks are both (`render/shared/roads.ts` `bridgeSpans`).
+   */
+  bridges?: [number, number][];
 }
 
 /** `street` (default) · `lane` · `country` (between areas) · `trail` (2 m, on foot only). */
 export type RoadKind = 'street' | 'lane' | 'country' | 'trail';
+
+/** How big a world's main town is: a hamlet, a village, a town or a city. */
+export type TownSize = 'hamlet' | 'village' | 'town' | 'city';
+
+/**
+ * How much land a new world has, both ways (`game/world.ts` `LAND_SIZE`): small, medium or large.
+ * The bigger towns and more villages need the bigger lands (`townFits`).
+ */
+export type LandSize = 'small' | 'medium' | 'large';
+
+/**
+ * What the player chose for a world besides its place (`game/world.ts` `WorldKind`): how big its
+ * main town is, how many villages round it, how hilly and how wooded its land, and (`size`) how
+ * much land it has (none: the place's own, or for another town and villages the smallest land they
+ * fit on: `world.ts` `optionsFor`, `sizeFor`).
+ */
+export interface WorldOptions {
+  town: TownSize;
+  villages: 'none' | 'few' | 'many';
+  hills: 'flat' | 'rolling' | 'hilly' | 'mountains';
+  woods: 'open' | 'some' | 'wooded';
+  size?: LandSize;
+}
 
 /** How big a world is: every world is a Big one (cosy and normal were dropped in 0.8.0; a save that still says so reads as `big`). */
 export type WorldSize = 'big';
@@ -441,8 +538,10 @@ export interface OpenWorldTownFields {
   areas?: TownArea[];
   exits?: TownExit[];
   terrain?: { water?: Rle; blocked?: Rle };
-  /** Public parking for car trips between areas. */
-  parking?: { x: number; z: number; rot: number; area: number }[];
+  /** Public parking: marked bays, each where a car parked in it stands (the simulation parks at exactly this pose). */
+  parking?: ParkingBay[];
+  /** The car parks the bays are grouped into (`ParkingBay.park`). */
+  carParks?: CarPark[];
 }
 
 export interface WorldMeta {
@@ -475,19 +574,61 @@ export interface WorldMeta {
   /** The areas (hamlets) as the generator laid them out, for the map and the camera. */
   areas?: TownArea[];
   // pin:living-town-meta begin
-  /** Living town: buildings nobody lives in that make a town dense. */
-  backdrop?: BackdropBuilding[];
-  /** Living town: the places the town tags name (backdrop places and public lots). */
+  /** Living town: the places the town tags name (each a lot's). */
   places?: TownPlace[];
-  /** Living town: each main town's centre, the square and the high street. */
-  centre?: { area: number; poly: [number, number][] }[];
+  /** Living town: each main town's centre, the square and the high street (`poly`, paved but for its lots and greens), and the square itself. */
+  centre?: { area: number; poly: [number, number][]; square?: [number, number][] }[];
+  /** Real town: paved ground the town lays besides its roads, paths and car parks (courts, yards), the one source near and far draw. */
+  paving?: PavedPiece[];
+  /** Living town: how the lots of the town's named places and flats buildings look from outside, by plot index (`PlotSlot.dress`). */
+  lotLooks?: Record<number, LotLook>;
   // pin:living-town-meta end
+  /**
+   * Big worlds: how high the land stands over the level the towns are built at, a grid of `cell` m
+   * squares (`cols` × `rows`, row-major from the world's corner), in decimetres (0 on the water).
+   * Missing in older saves: the land is drawn from the landscape alone.
+   */
+  relief?: { cell: number; cols: number; rows: number; h: number[] };
+  /**
+   * The land as a height field (`game/land.ts`), once there is one: shaped by the player, or
+   * surveyed for a new world. Missing: the land is drawn from `relief` and the landscape.
+   */
+  land?: LandFile;
+}
+
+/**
+ * The land as the town file and saves carry it (`game/land.ts` `encodeLand`): heights and water
+ * levels every `cell` m over `cols` × `rows` samples from the world's corner, cut into tiles of
+ * `tile` × `tile` samples (row-major, the last row and column of tiles cut short at the edge).
+ */
+export interface LandFile {
+  v: 1;
+  cell: 2;
+  cols: number;
+  rows: number;
+  tile: 64;
+  /**
+   * The heights (cm) by tile: each the base64 of zigzag varints of every sample less the one left
+   * of it (the first of a row less 0), a run of zeros as a 0x00 then the run's length.
+   */
+  h: string[];
+  /** The water levels (cm; `NONE` where dry) by tile, coded as `h`; '' for a tile with no water. */
+  wl: string[];
+  /**
+   * Which way a drawn river runs (`Land.flow`: 0 still, else an angle) by tile, coded as `h`; '' for a tile with
+   * none. Missing on a land no river was drawn on.
+   */
+  flow?: string[];
+  /** The cover every 4 m (row-major), run-length `[run, value, ...]`: 0 open, 1 woods, 2 meadow, 3 fields. */
+  cover: number[];
+  /** How the field was first filled: `drawn` from the land as the renderer drew it, `follow` with the town on its slopes. */
+  seeded: 'drawn' | 'follow';
 }
 
 // pin:living-town-types begin
 
-/** What a backdrop building is. */
-export type BackdropUse =
+/** What a building is, for how it looks closed (a lot's `LotLook`). */
+export type BuildingUse =
   | 'flats'
   | 'terrace'
   | 'house'
@@ -499,43 +640,93 @@ export type BackdropUse =
   | 'church'
   | 'hall'
   | 'workshop'
-  | 'farm'
-  | 'barn';
+  | 'farm';
 
-/** A building that makes a town dense without being a lot: drawn only, never simulated. */
-export interface BackdropBuilding {
-  /** Footprint corners, town metres, 4 to 8 points (most are rectangles), counter-clockwise seen from above: the signed area Σ(x·z′ − x′·z) is negative. */
-  poly: [number, number][];
-  /** Ground height of the footprint's lowest corner (m). */
-  y: number;
-  /** Storeys (1 to 6), 3 m each. */
-  storeys: number;
-  roof: 'gable' | 'hip' | 'flat' | 'mansard';
-  /** The ridge's direction for gable and mansard roofs (rad, 0 = along x): a turn around +y (y up), so it runs along (cos r, −sin r) in (x, z). */
-  ridge?: number;
-  use: BackdropUse;
-  /** A wall and roof colour pair: an index into the renderer's backdrop palette, taken modulo its length. */
-  look: number;
-  /** A place's building: its index into `WorldMeta.places`. */
-  place?: number;
-  /** The area (`TownArea` index) it stands in. */
-  area: number;
-}
-
-/** Somewhere the town tags name: a backdrop place or a public lot. */
+/** Somewhere the town tags name: a public lot. */
 export interface TownPlace {
   name: string;
   kind: 'shop' | 'cafe' | 'restaurant' | 'office' | 'school' | 'church' | 'park' | 'outdoor' | 'workshop' | 'farm';
   /** Where its tag stands (town metres). */
   x: number;
   z: number;
-  /** A public lot: its plot index. Absent: a backdrop place. */
-  plot?: number;
+  /** Its lot: the plot index. */
+  plot: number;
   /** Opening hours: minutes of the day [open, close) and the days (bit 0 = Monday). Absent: always open. */
   hours?: { open: number; close: number; days: number };
   /** Career categories (`JobView.category`) whose workers are shown as working here. */
   work?: string[];
   area: number;
+}
+
+/**
+ * How a named place's or a building of flats' lot (a town hall, a school, a shop on the high street:
+ * `game/placeLots.ts`) looks from outside, closed: its use, its storeys (3 m each, as many as it really
+ * has, at most the town's), its roof, and its wall and roof colour pair (an index into the renderer's
+ * palette, taken modulo its length).
+ */
+export interface LotLook {
+  use: BuildingUse;
+  storeys: number;
+  roof: 'gable' | 'hip' | 'flat' | 'mansard';
+  look: number;
+}
+
+/**
+ * A marked parking bay (`OpenWorldTownFields.parking`, `WorldStructure.parking`): its middle (m),
+ * the way a car parked in it faces (rad, as the simulation's yaw: nose in, away from the road), its
+ * area (`TownArea` index) and its car park (`carParks` index; absent: a bay on its own by the verge).
+ */
+export interface ParkingBay {
+  x: number;
+  z: number;
+  yaw: number;
+  area: number;
+  park?: number;
+}
+
+/**
+ * A car park: a row of nose-in bays off a straight stretch of street on one apron. Its asphalt (4
+ * corners, counter-clockwise seen from above), where its P sign stands (x, z and the way it faces,
+ * rad), the plot of the place it is by (`serves`), or that it is the square's (`square`).
+ */
+export interface CarPark {
+  area: number;
+  poly: [number, number][];
+  sign: [number, number, number];
+  serves?: number;
+  square?: true;
+}
+
+/**
+ * Paved ground the town lays besides its roads and paths (`WorldMeta.paving`): a centre's, a
+ * square, the open ground of a place's or a flats building's lot (`court`), a workshop's yard. A
+ * polygon in town metres, counter-clockwise seen from above; `plot`: the lot it is part of.
+ */
+export interface PavedPiece {
+  kind: 'centre' | 'square' | 'court' | 'yard';
+  poly: [number, number][];
+  plot?: number;
+}
+
+/** What a lot is (`PlotInfo.kind`, the town file's `plots[].kind`; a flat in the file is `flat`). */
+export type PlotKind = 'home' | 'farm' | 'public' | 'shop' | 'countryside' | 'flats';
+
+/**
+ * A flat (`WorldStructure.flats`): a plot of its own inside a building's lot (`of`: a flats lot,
+ * or a shop's, café's or restaurant's with flats over it), on one storey (`storey`). Its id follows
+ * the last ground lot's (at or past `plots.length`); its rectangle (`x`, `z`, `w`, `d`) is on the
+ * ground's rows, as a lot's; `door` is the landing tile before its own door, on its storey's rows.
+ */
+export interface FlatInfo {
+  id: number;
+  of: number;
+  storey: number;
+  x: number;
+  z: number;
+  w: number;
+  d: number;
+  name: string;
+  door: [number, number];
 }
 // pin:living-town-types end
 
@@ -545,8 +736,18 @@ export interface WorldLook {
   /** How big the world is (always `big` now). */
   size?: WorldSize;
   landscape: LandscapeParams;
+  /** What the player chose for the world besides its place (missing in older saves). */
+  options?: WorldOptions;
   /** Tilled fields on farm lots (town tiles): drawn as soil, fenced in. */
   fields?: { x: number; z: number; w: number; d: number }[];
+  /** The seed its town was laid from, where it differs from the land's (`game/worldCode.ts`). */
+  townSeed?: number;
+  /** The seed its people were drawn from (`game/people.ts` `peopleStreams`). */
+  peopleSeed?: number;
+  /** Its land was shaped by hand (step 1's brushes): the world code no longer makes it. */
+  shaped?: true;
+  /** Its town was edited by hand (step 2's tools): the world code no longer makes it. */
+  edited?: true;
 }
 
 /**
@@ -578,6 +779,14 @@ export interface LandscapeParams {
    * the town from there) and parted by a pass where the road leaves town.
    */
   mountains?: number;
+  /** The steepest the land rises from anything built (rise per m); missing: as steep as the hills make it. */
+  slope?: number;
+  /** Trees out on open land, times the usual (default 1). */
+  scatter?: number;
+  /** The share of the trees that are bushes (default: the usual share). */
+  scrub?: number;
+  /** How far the sand reaches from the shoreline (m; default 8). */
+  beach?: number;
 }
 
 export const DEFAULT_LANDSCAPE: LandscapeParams = {
@@ -595,6 +804,7 @@ export const DEFAULT_LANDSCAPE: LandscapeParams = {
 export interface HouseholdInfo {
   id: number;
   name: string;
+  /** Its home: a lot, or a flat (at or past `plots.length`: `flatOf`, `lotOf`). */
   plot: number | null;
   player: boolean;
 }
@@ -614,6 +824,29 @@ export interface PlotInfo {
   roof?: [number, number];
   /** Storeys the house on it has (absent: one). */
   storeys?: number;
+  /**
+   * The hours the place on it keeps (sim-core `world::PlotHours`, `Plot::open_at`): minutes of the day [open, close)
+   * and the days (bit 0 = Monday), a `close` at or before `open` running past midnight. Absent: always open.
+   */
+  hours?: { open: number; close: number; days: number };
+  /** What the lot is (the town file's `plots[].kind`). Absent: a town file without kinds. */
+  kind?: PlotKind;
+}
+
+/** What `lotOf` and `flatOf` read: the ground lots and the flats. */
+type LotsAndFlats = { plots: readonly PlotInfo[]; flats?: readonly FlatInfo[] };
+
+/** The flat plot id `plot` is (a household's or a resident's may be one), or undefined for a ground lot. */
+export function flatOf(world: LotsAndFlats, plot: number): FlatInfo | undefined {
+  if (plot < world.plots.length) return undefined;
+  const flats = world.flats ?? [];
+  const at = flats[plot - world.plots.length];
+  return at?.id === plot ? at : flats.find((f) => f.id === plot);
+}
+
+/** The ground lot plot id `plot` stands on: a flat's building, else the lot itself. */
+export function lotOf(world: LotsAndFlats, plot: number): number {
+  return flatOf(world, plot)?.of ?? plot;
 }
 
 /** Sent when walls or objects change (rare). */
@@ -662,6 +895,7 @@ export interface WorldStructure {
   sims: SimInfo[];
   former?: FormerResident[];
   households: HouseholdInfo[];
+  /** The ground lots, in slot order (ids index this list; `meta.facing`, `pads` and `lotLooks` too). Flats are in `flats`. */
   plots: PlotInfo[];
   exits: [number, number][];
   /** The room of each tile, row by row (`width × depth`; 0 outdoors): a `Uint16Array` from the simulation. */
@@ -714,6 +948,15 @@ export interface WorldStructure {
    * giving way (no heads). Absent: none.
    */
   junctions?: JunctionInfo[];
+  /**
+   * Public parking (sim-core `travel::Parking`): every marked bay, where a car parked in it stands
+   * and faces (the simulation parks at exactly this pose), in the town file's order. Absent: none.
+   */
+  parking?: ParkingBay[];
+  /** The car parks the bays are grouped into (`ParkingBay.park`), as the town file has them. Absent: none. */
+  carParks?: CarPark[];
+  /** The flats (each a plot of its own, ids after the last of `plots`), in id order. Absent: none. */
+  flats?: FlatInfo[];
 }
 
 /**
@@ -817,6 +1060,8 @@ export interface CarInfo {
   yaw: number;
   body: number;
   paint: number;
+  /** How old it is (`shared/cars.ts` `CarAge`: 0 old, 1 used, 2 new; absent: used). */
+  age?: number;
 }
 
 /** One of the town's servers (`WorldStructure.staff`). */
@@ -857,7 +1102,7 @@ export interface SimView {
   stage?: string | null;
   /** Retired: the weekly pension. */
   pension?: number;
-  /** Plot the Sim is on (null on the street or at work). */
+  /** Plot the Sim is on (null on the street or at work): a lot, or a flat (`flatOf`, `lotOf`). */
   plot: number | null;
   /** Minute of day they come back from work, if away. */
   awayUntil: number | null;
@@ -980,7 +1225,37 @@ export interface Catalog {
     upgradeSkillPerLevel: number;
     resale: number;
   };
-  build: { wall: number; door: number; window: number; remove: number; diagonalWall?: number; fence?: number; gate?: number; garage?: number; porch?: number; porchPost?: number; porchCanopy?: number; porchStep?: number };
+  build: {
+    wall: number;
+    door: number;
+    window: number;
+    remove: number;
+    diagonalWall?: number;
+    fence?: number;
+    gate?: number;
+    garage?: number;
+    porch?: number;
+    porchPost?: number;
+    porchCanopy?: number;
+    porchStep?: number;
+    /** Shaping the land (Build mode's Land tab; content `build.land`). */
+    land?: LandPrices;
+  };
+}
+
+/**
+ * What shaping the land costs (content `build.land`): `earth` a cubic metre raised or lowered by
+ * the brushes, `mountain` one by the peak, range and level tools (volume: Σ|Δh| × 4 m² over the
+ * 2 m samples); the rest a square metre, of water made and of cover planted or cleared.
+ */
+export interface LandPrices {
+  earth: number;
+  mountain: number;
+  water: number;
+  woods: number;
+  meadow: number;
+  fields: number;
+  clear: number;
 }
 
 export interface CareerEntry {
@@ -1052,7 +1327,10 @@ export interface UiUpdate {
   /** 0 = Monday. */
   weekday: number;
   minute: number;
+  /** 0 paused, 1 normal, 2 fast, 3 faster (10×), 4 super speed (`SUPER_SPEED`: up to 30×, up to 60× while `quiet`). */
   speed: number;
+  /** Whether it is quiet at home: everyone asleep or out, nothing notable there for an hour (sim-core `World::calm`); super speed runs up to 60× then. */
+  quiet: boolean;
   autonomy: boolean;
   /** How fast residents age. */
   lifespan: Lifespan;
@@ -1145,6 +1423,10 @@ export type ToWorker =
   | { type: 'events'; requestId: number }
   /** The household's home as a blueprint. */
   | { type: 'blueprint'; requestId: number; household: number }
+  /** The land shaped (`SimBridge.shapeLand`): answered with `shaped`, or `failed` with why it was refused. */
+  | { type: 'shapeLand'; requestId: number; command: ShapeLandCommand }
+  /** The water mask as it is now (`SimBridge.waterMask`): answered with `waterMask`. */
+  | { type: 'waterMask'; requestId: number }
   /** The resident whose panel is open (their details and relationships are sent too); null: none. */
   | { type: 'inspect'; sim: number | null }
   /** The next UI update sends everything. */
@@ -1154,13 +1436,22 @@ export type ToWorker =
   /** The camera's stream rectangle: the sim's full-detail area. */
   | { type: 'watch'; region: [number, number, number, number] | null }
   /** `?debug`'s `__crash`: the next step panics, an error nobody catches, or the worker hangs. */
-  | { type: 'debugCrash'; what: 'panic' | 'throw' | 'hang' };
+  | { type: 'debugCrash'; what: 'panic' | 'throw' | 'hang' }
+  /**
+   * Fixed-step playback (benchmarks, `SimBridge.pace`): `frames` stops the worker's own clock, and only `advance`
+   * runs ticks from then on; false starts its clock again.
+   */
+  | { type: 'pace'; frames: boolean }
+  /** Fixed-step playback: runs `ticks` ticks now, publishes what they changed, and answers with `advanced`. */
+  | { type: 'advance'; requestId: number; ticks: number };
 
 /** How the sim worker kept up over the last second (for the debug overlay). */
 export interface SimThreadStats {
   /** Steps run in the last second, and the rate the sim aims for. */
   stepsPerSecond: number;
   targetPerSecond: number;
+  /** Ticks run in the last second (at super speed, as many as fitted in the steps' time). */
+  ticksPerSecond: number;
   /** Time per step (advance, snapshot, UI view), average and worst, ms. */
   stepMs: number;
   stepMaxMs: number;
@@ -1187,12 +1478,18 @@ export type FromWorker =
   | { type: 'items'; items: ItemPlacement[] }
   /** The lamps switched off (object ids), whenever a lamp is switched or the objects change. */
   | { type: 'lamps'; off: number[] }
+  /** The curtains drawn shut (object ids), whenever some are drawn or opened or the objects change. */
+  | { type: 'curtains'; shut: number[] }
   | { type: 'ui'; ui: UiUpdate }
   | { type: 'saved'; requestId: number; data: string }
   | { type: 'socialOptions'; requestId: number; options: SocialOption[] }
   | { type: 'events'; requestId: number; events: SocialEvent[] }
   /** JSON, or null with `error`. */
   | { type: 'blueprint'; requestId: number; data: string | null; error?: string }
+  /** A `shapeLand` done (charged, and its meta and water changed). */
+  | { type: 'shaped'; requestId: number }
+  /** The water mask the simulation walks (1 m tiles over the ground, `width` × `depth`), as it is now. */
+  | { type: 'waterMask'; requestId: number; water: Rle; width: number; depth: number }
   /** Fallback transport when SharedArrayBuffer is unavailable. */
   | { type: 'snapshot'; data: Float32Array; step: number }
   /** About once a second. */
@@ -1202,7 +1499,9 @@ export type FromWorker =
   /** `fatal`: the simulation stopped for good (a trap, or a step that failed). `problem`: the game couldn't start because of its save. */
   | { type: 'error'; message: string; fatal: boolean; problem?: SaveProblem }
   /** A save `check`ed: `problem` null if it opens. */
-  | { type: 'checked'; problem: SaveProblem | null; message: string };
+  | { type: 'checked'; problem: SaveProblem | null; message: string }
+  /** An `advance` done, after the snapshot and what the ticks changed: the ticks it ran (fewer once the game is paused). */
+  | { type: 'advanced'; requestId: number; ticks: number };
 
 /**
  * The newest thing (highest object id) a resident in `snapshot` uses or walks to, -1 if none. Ids

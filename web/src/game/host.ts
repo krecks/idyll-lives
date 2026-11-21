@@ -10,26 +10,36 @@
 
 import type { WorldStructure } from '../core/protocol';
 import { PlayCanvasRenderer } from '../render/pc/PlayCanvasRenderer';
-import type { Renderer, RenderFailure } from '../render/types';
+import type { Renderer, RenderFailure, RenderStats, TownBuildStep } from '../render/types';
+import { threadStats, type ThreadStats } from '../debug/threads';
+import type { VoiceDirectorStats } from '../voice';
 import { qualityFromSettings, RESTART_KEYS, settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app, type Progress } from '../ui/app.svelte';
 import { perfTime, perfTimeAsync } from '../debug/perf';
 import { DEVLOG, devlog, devlogPause, renderSample, SAMPLE_MS } from '../debug/devlog';
+import { installMemoryCensus } from '../debug/gameplayStats';
+import { LOW_MEMORY } from '../settings/lowMemory';
 import { game, toast } from '../ui/state.svelte';
 import { basicReport, within } from '../debug/report';
+import { newGameReport } from '../debug/newGameReport';
 import { plainState } from '../debug/snapshot.svelte';
 import { webGpuFailed } from '../render/shared/gpu';
 import type { HouseholdDraft } from './household';
+import { landHash } from './land';
 import { loadGameData } from './gameData';
 import type { GameSession, StartRequest } from './session';
 
 function requestKey(r: StartRequest): string {
   if (r.kind === 'load') return `load:${r.saveId}`;
   const members = (h: HouseholdDraft) => h.members.map((m) => m.uid).join(',');
-  // The whole town counts: going back and changing the neighbours needs a new session.
-  const town = `${r.town.name}:${r.town.world?.kind ?? ''}:${r.town.seed}:${r.town.slots.map((s) => `${s.template}@${s.lot ?? 'medium'}`).join(',')}:${r.town.households.map((h) => `${h.slot}=${members(h.household)}`).join(';')}`;
-  // A household edited after its session was prepared (back to step 2) needs a new one too.
-  return `${r.existing ? 'play' : 'new'}:${r.mode ?? 'living'}:${r.lifespan ?? 'normal'}:${town}:${r.slot}:${JSON.stringify(r.household)}`;
+  // The whole town counts: going back and changing the neighbours (or the land, or the town laid on it) needs a new session.
+  // (A shaped land is another world: its fingerprint, `landHash`. The land's size and where the lots stand tell
+  // one town laid on a land from another: another town seed, or the town moved.)
+  const land = r.town.open?.land?.edited ? landHash(r.town.open.land) : '';
+  const town = `${r.town.name}:${r.town.world?.kind ?? ''}:${JSON.stringify(r.town.world?.options ?? null)}:${r.town.seed}:${r.town.width}x${r.town.depth}:${land}:${r.town.slots.map((s) => `${s.template}@${s.lot ?? 'medium'}@${s.x},${s.z}`).join(',')}:${r.town.households.map((h) => `${h.slot}${h.flat === undefined ? '' : `:${h.flat}`}=${members(h.household)}`).join(';')}`;
+  // A household edited after its session was prepared (back to step 2) needs a new one too. (The neighbours filled
+  // in on the way in come from the people seed: another seed, other neighbours.)
+  return `${r.existing ? 'play' : 'new'}:${r.mode ?? 'living'}:${r.lifespan ?? 'normal'}:${town}:${r.slot}${r.flat === undefined ? '' : `:${r.flat}`}:${r.fill ? `fill ${r.peopleSeed ?? '?'}` : ''}:${JSON.stringify(r.household)}`;
 }
 
 /** Seconds the camera takes to fly from the menu's view of a lot into the game. */
@@ -37,6 +47,8 @@ const FLY_IN = 1.3;
 const VEIL_MS = 260;
 /** The loading bar's share before the warm-up, for a session prepared without it (the warm-up comes once it's started). */
 const BEFORE_WARM = 0.9;
+/** The longest the menus' town is kept for its picture (`keepTownUntil`) on a machine low on memory before it goes anyway (ms). */
+const KEEP_TOWN_MS = 5000;
 
 /**
  * The session's code (`session.ts`, with Build mode's and the game's input): a script chunk of its
@@ -72,6 +84,8 @@ interface Entry {
   warming?: Promise<GameSession>;
   /** The session, once it exists. */
   instance?: GameSession;
+  /** The menus' town was let go of before the session's world was built (low on memory): the game fades in. */
+  townGone?: boolean;
 }
 
 class GameHost {
@@ -79,7 +93,7 @@ class GameHost {
   private canvas: HTMLCanvasElement;
   readonly overlay: HTMLDivElement;
   private readonly root: HTMLDivElement;
-  /** Fades the canvas out and in when the scene changes completely (menu town <-> a saved game). */
+  /** Fades the canvas out and in when the scene changes completely (the menus' town <-> a saved game). */
   private readonly veil: HTMLDivElement;
   private renderer: Promise<Renderer> | null = null;
   private rendererKey = '';
@@ -98,6 +112,8 @@ class GameHost {
   };
   /** A full-screen menu covers the view (see `cover`). */
   private covered = false;
+  /** What the menus' town is still wanted for once a game starts (its picture for the main menu, `keepTownUntil`). */
+  private townKept: Promise<unknown> = Promise.resolve();
 
   constructor() {
     // The dev play log (`debug/devlog.ts`): while only the menus use the renderer, what it draws every few
@@ -143,16 +159,16 @@ class GameHost {
 
   /**
    * Shows `world` as the town overview behind the menus. The renderer keeps drawing while it is
-   * shown; `app.liveBackdrop` turns true once it is on screen.
+   * shown; `app.liveBackdrop` turns true once it is on screen. `onStep`: its parts as they are built.
    */
-  async showTown(world: WorldStructure, minute: number, settings: Settings): Promise<void> {
-    // A game started meanwhile (e.g. Continue before the menu town finished loading): it owns the view.
+  async showTown(world: WorldStructure, minute: number, settings: Settings, onStep?: (done: TownBuildStep) => void): Promise<void> {
+    // A game started meanwhile (e.g. Play before the town finished building): it owns the view.
     if (this.current?.live) return;
     this.town = { world, minute };
     const renderer = await this.rendererNow(settings);
     if (this.town?.world !== world || this.current?.live) return;
     if (!renderer.townShown) renderer.configure(liveOptions(settings));
-    await renderer.showTown(world, minute);
+    await renderer.showTown(world, minute, onStep);
     if (this.current?.live) {
       // Too late: the game went live while the town was being built. Take it away again.
       this.town = null;
@@ -163,6 +179,21 @@ class GameHost {
     this.syncActive(renderer);
     await renderer.framesRendered(2);
     if (this.town?.world === world) app.liveBackdrop = true;
+  }
+
+  /**
+   * Takes the menus' town away (the main menu shows a picture): the renderer lets its overview and
+   * landscape go and draws nothing more behind the menus. Not while a game is live (it owns the view).
+   */
+  async hideTown(): Promise<void> {
+    if (this.current?.live) return;
+    this.town = null;
+    app.liveBackdrop = false;
+    const renderer = await this.renderer?.catch(() => null);
+    if (!renderer || this.town || this.current?.live) return;
+    if (renderer.townShown) await renderer.hideTown(0);
+    // (A town asked for meanwhile is shown again by its own `showTown`.)
+    if (!this.town) this.syncActive(renderer);
   }
 
   /** Live settings while only the menus use the renderer (a running game applies its own). */
@@ -207,6 +238,16 @@ class GameHost {
       // One session at a time on the shared renderer: a replaced one must finish clearing it first.
       await previous;
       if (this.current !== entry) throw new Error('Replaced by another game.');
+      // Low on memory: the menus' town goes while the loading screen covers it (its picture for the
+      // main menu taken first), before the game's world is built, so the two are never held at once.
+      if (LOW_MEMORY && entry.live && renderer.townShown) {
+        await Promise.race([this.townKept, new Promise((resolve) => setTimeout(resolve, KEEP_TOWN_MS))]);
+        if (this.current !== entry) throw new Error('Replaced by another game.');
+        await perfTimeAsync('host: let the town go', () => renderer.hideTown(0, true));
+        entry.townGone = true;
+        this.town = null;
+      }
+      this.syncActive(renderer);
       const { startSession } = await loadSessionCode();
       if (this.current !== entry) throw new Error('Replaced by another game.');
       return startSession(
@@ -248,16 +289,23 @@ class GameHost {
     const entry = this.current;
     if (entry) {
       entry.live = true;
+      void this.renderer?.then((r) => this.current === entry && this.syncActive(r), () => {});
       // Still loading (prepared behind the menus, or not at all): from now on, the loading screen says so.
       if (!entry.ready) app.loading = entry.progress;
     }
     const session = await perfTimeAsync('host: prepare (start)', () => pending);
+    // The menus' town went before the game was built (low on memory): it fades in from behind the
+    // veil, put up under the loading screen.
+    let veiled = !!entry?.townGone && !reducedMotion();
+    if (veiled) await this.setVeil(true);
     if (this.current === entry) app.loading = null;
     const renderer = await this.renderer;
-    if (!renderer || this.current !== entry) return session;
+    if (!renderer || this.current !== entry) {
+      if (veiled) void this.setVeil(false);
+      return session;
+    }
     this.played = session;
     renderer.setActive(true);
-    let veiled = false;
     if (renderer.townShown) {
       // The menus showed this very town (choosing a home or a household to play): fly into the lot. Otherwise fade.
       const meta = this.town?.world.meta;
@@ -279,6 +327,15 @@ class GameHost {
     return session;
   }
 
+  /**
+   * The menus' town is still wanted until `work` settles (its picture for the main menu being taken,
+   * behind the loading screen): on a machine low on memory, it's let go of before the game is built,
+   * but not before that.
+   */
+  keepTownUntil(work: Promise<unknown>): void {
+    this.townKept = work.catch(() => {});
+  }
+
   /** Ends the current session (if any); the renderer stays for the next one. */
   release(): void {
     const current = this.current;
@@ -297,6 +354,11 @@ class GameHost {
     game.reset();
   }
 
+  /** The game being played (made live by `start`), if any. */
+  get session(): GameSession | null {
+    return this.played;
+  }
+
   /** The game being played can still be saved (its simulation runs). */
   get canSave(): boolean {
     return !!this.played?.alive;
@@ -310,8 +372,17 @@ class GameHost {
     location.reload();
   }
 
-  /** A debug report without asking a game (none runs, or it stopped): the log, settings, interface state and a picture. */
+  /**
+   * A debug report without asking a game (none runs, or it stopped): the log, settings, interface
+   * state and a picture, and on a New game step its state (`newGameReport.ts`).
+   */
   async basicReport(note: string): Promise<string> {
+    let newGame: string | null = null;
+    try {
+      newGame = newGameReport(app);
+    } catch (err) {
+      console.warn('[debug] the new game part of the report failed', err);
+    }
     const renderer = await this.renderer?.catch(() => null);
     const scale = Math.min(window.devicePixelRatio || 1, 2);
     const picture = renderer?.captureThumbnail(Math.round(this.canvas.clientWidth * scale), Math.round(this.canvas.clientHeight * scale));
@@ -320,7 +391,25 @@ class GameHost {
       ui: { screen: app.screen, crash: app.crash, fatal: app.fatal, ...plainState(game, ['catalog', 'threads']) },
       renderer: renderer?.stats() ?? null,
       screenshot: picture ? await within(picture, 4000, null) : null,
+      newGame,
     });
+  }
+
+  /**
+   * The performance overlay's numbers off the game (F3 on the main menu, New game's steps; a game
+   * has its own): the renderer's, if there is one yet, and the threads' with no simulation and no
+   * one speaking.
+   */
+  async perfSample(): Promise<{ stats: RenderStats | null; threads: ThreadStats }> {
+    const renderer = await this.renderer?.catch(() => null);
+    const stats = renderer?.stats() ?? null;
+    const idle: VoiceDirectorStats = { speaking: 0, inFlight: 0, writing: 0, ahead: 0, spoken: 0, dropped: 0, language: liveSettings.voices ? 'paused' : 'off', writer: 'lines' };
+    return { stats, threads: threadStats(stats, null, idle) };
+  }
+
+  /** GPU time measured for the overlay off the game (it costs a little: only while the overlay is open). */
+  measureGpu(on: boolean): void {
+    void this.renderer?.then((r) => r.measureGpu(on)).catch(() => {});
   }
 
   /**
@@ -336,9 +425,14 @@ class GameHost {
   }
 
   /** Draws only while something is on screen: the game, or the menus' town. */
+  /**
+   * The renderer draws while something is shown (the game, the menus' town) or a game is being
+   * prepared (its builds and warm-up wait on frames; the main menu shows no town to keep it drawing).
+   */
   private syncActive(renderer: Renderer | undefined | null): void {
     if (!renderer) return;
-    renderer.setActive(!!this.current?.live || renderer.townShown);
+    const preparing = !!this.current && !this.current.ready;
+    renderer.setActive(!!this.current?.live || renderer.townShown || preparing);
   }
 
   private setVeil(on: boolean): Promise<void> {
@@ -362,6 +456,7 @@ class GameHost {
       // reset, "Graphics were reset") offers to save and reload.
       renderer.onFailure = this.onRendererFailure;
       await renderer.init(this.canvas);
+      installMemoryCensus(() => renderer.memoryCensus());
       devlog('renderer', { backend: renderer.stats().backend, preset: renderer.stats().preset, webGpuFailed: webGpuFailed() });
       renderer.hold(this.covered);
       if (webGpuFailed() && settings.renderer !== 'webgl' && !this.toldFallback) {

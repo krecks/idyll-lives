@@ -1,0 +1,128 @@
+{
+  "$comment": "Fields and lanes between villages (crates/art/outside/src/fields, built by cargo art fields): dry-stone walls, hedgerows, gates, stiles and fingerposts.",
+  "version": 1,
+  "entries": {
+    "model.fields.dryStoneWall": {
+      "type": "model",
+      "url": "../../models/fields/dryStoneWall.glb",
+      "materials": {
+        "lichen": {
+          "finish": "material.finish.matte"
+        },
+        "stone": {
+          "finish": "material.finish.matte"
+        },
+        "stone_dark": {
+          "finish": "material.finish.matte"
+        },
+        "stone_light": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "stone",
+          "label": "Stone"
+        }
+      ]
+    },
+    "model.fields.hedgerow": {
+      "type": "model",
+      "url": "../../models/fields/hedgerow.glb",
+      "materials": {
+        "leaf": {
+          "finish": "material.finish.foliage"
+        },
+        "leaf_light": {
+          "finish": "material.finish.foliage"
+        },
+        "stem": {
+          "finish": "material.finish.foliage"
+        },
+        "twig": {
+          "finish": "material.finish.foliage"
+        }
+      },
+      "paint": [
+        {
+          "material": "leaf",
+          "label": "Leaves"
+        }
+      ],
+      "perches": [
+        [0.266, 1.415, 0.187],
+        [-0.892, 1.39, 0.121],
+        [0.786, 1.295, -0.342],
+        [-0.22, 1.357, -0.273],
+        [0.726, 1.399, 0.189],
+        [-0.592, 1.233, 0.354],
+        [0.36, 1.393, -0.211],
+        [0.039, 1.383, -0.037]
+      ],
+      "habitat": "hedge"
+    },
+    "model.fields.gate": {
+      "type": "model",
+      "url": "../../models/fields/gate.glb",
+      "materials": {
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "oak": {
+          "finish": "material.finish.wood"
+        },
+        "oak_dark": {
+          "finish": "material.finish.wood"
+        }
+      },
+      "paint": [
+        {
+          "material": "oak",
+          "label": "Wood"
+        }
+      ]
+    },
+    "model.fields.stile": {
+      "type": "model",
+      "url": "../../models/fields/stile.glb",
+      "materials": {
+        "stone": {
+          "finish": "material.finish.matte"
+        },
+        "stone_dark": {
+          "finish": "material.finish.matte"
+        },
+        "stone_light": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "stone",
+          "label": "Stone"
+        }
+      ]
+    },
+    "model.fields.fingerpost": {
+      "type": "model",
+      "url": "../../models/fields/fingerpost.glb",
+      "materials": {
+        "iron": {
+          "finish": "material.finish.metal"
+        },
+        "paint": {
+          "finish": "material.finish.satin"
+        },
+        "stone": {
+          "finish": "material.finish.matte"
+        }
+      },
+      "paint": [
+        {
+          "material": "paint",
+          "label": "Paint"
+        }
+      ]
+    }
+  }
+}

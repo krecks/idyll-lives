@@ -1,7 +1,11 @@
 //! The gate over every shipped model (`cargo check-glb`): it passes, as it does today.
 
-use ll_tools::checkglb::{Paths, gate, known_keys, measures};
+use ll_tools::checkglb::baseline::{Baseline, Found};
+use ll_tools::checkglb::{
+    BatchCheck, COUNTED, Paths, gate, gate_with, known_keys, measures, update_baseline,
+};
 use ll_tools::review::{self, Reference};
+use std::collections::BTreeMap;
 
 #[test]
 fn every_shipped_model_passes_the_gate() {
@@ -49,6 +53,118 @@ fn the_known_keys_hold_every_checked_model() {
     for key in gate(&paths, &[]).checked {
         assert!(known.contains(&key), "{key}");
     }
+}
+
+/// The committed baseline is in the format `--update-baseline` writes, and holds only counted checks (the models'
+/// and the built world's) and, for those the gate runs, model keys a build may write.
+#[test]
+fn the_committed_baseline_is_in_its_format() {
+    let paths = Paths::repo();
+    let text = std::fs::read_to_string(&paths.baseline).unwrap();
+    let baseline = Baseline::parse(&text).unwrap();
+    assert_eq!(baseline.text(), text);
+    let known = known_keys(&paths).unwrap();
+    for check in baseline.checks() {
+        // (The built world's are by sample, held by `cargo check-glb --built`: tools/ci-local.sh `built`.)
+        if ll_tools::checkglb::built::CHECKS.contains(&check) {
+            continue;
+        }
+        assert!(COUNTED.contains(&check), "{check}");
+        // (`reference` is counted by `cargo review sizes`, by object.)
+        if check != "reference" {
+            for key in baseline.keys(check) {
+                assert!(known.contains(key), "{check}: {key}");
+            }
+        }
+    }
+}
+
+/// An example batch check, no rule of the gate's: two findings in every model.
+fn two_each(files: &[(String, String, Option<String>)]) -> Result<BTreeMap<String, Found>, String> {
+    Ok(files
+        .iter()
+        .map(|(key, _, _)| {
+            let text = vec!["one".to_string(), "two".to_string()];
+            (key.clone(), Found { count: 2, text })
+        })
+        .collect())
+}
+
+/// An example batch check that finds one in every model.
+fn one_each(files: &[(String, String, Option<String>)]) -> Result<BTreeMap<String, Found>, String> {
+    Ok(files
+        .iter()
+        .map(|(key, _, _)| {
+            (
+                key.clone(),
+                Found {
+                    count: 1,
+                    text: vec!["one".into()],
+                },
+            )
+        })
+        .collect())
+}
+
+/// An example batch check that can't run.
+fn broken(_: &[(String, String, Option<String>)]) -> Result<BTreeMap<String, Found>, String> {
+    Err("no validator here".into())
+}
+
+/// A counted check run over every file at once, through the public gate: strict for a model the baseline doesn't
+/// have, warnings at its count, stale under it until `update_baseline` lowers it.
+#[test]
+fn a_batch_check_is_judged_by_the_baseline() {
+    let dir = std::env::temp_dir().join(format!("ll-checkglb-baseline-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut paths = Paths::repo();
+    paths.baseline = dir
+        .join("gate-baseline.json")
+        .to_string_lossy()
+        .into_owned();
+    let keys = vec!["model.fridge".to_string()];
+    let two: &[(&'static str, BatchCheck)] = &[("validator", two_each)];
+    let r = gate_with(&paths, &keys, two);
+    assert_eq!(r.failed, 1);
+    assert!(
+        r.text.contains("\n       error: one\n       error: two\n"),
+        "{}",
+        r.text
+    );
+    assert_eq!(r.counts["validator"]["model.fridge"], 2);
+    std::fs::write(&paths.baseline, "{\"validator\": {\"model.fridge\": 2}}\n").unwrap();
+    let r = gate_with(&paths, &keys, two);
+    assert_eq!(r.failed, 0, "{}", r.text);
+    assert!(r.text.contains(
+        "\n       warning: validator: 2 found, as the baseline has (tools/art/gate-baseline.json)\n       warning: one\n"
+    ));
+    // Not run (plain `cargo check-glb`): the baseline's entry is kept, and nothing fails.
+    let r = gate(&paths, &keys);
+    assert_eq!(r.failed, 0, "{}", r.text);
+    assert!(!r.counts.contains_key("validator"));
+    assert!(update_baseline(&paths, &[], &[]).unwrap().is_empty());
+    // Fewer: stale until lowered.
+    let one: &[(&'static str, BatchCheck)] = &[("validator", one_each)];
+    assert_eq!(gate_with(&paths, &keys, one).failed, 1);
+    assert_eq!(
+        update_baseline(&paths, &keys, one).unwrap(),
+        ["validator: model.fridge 2 -> 1"]
+    );
+    assert_eq!(gate_with(&paths, &keys, one).failed, 0);
+    // More again: never raised.
+    assert_eq!(gate_with(&paths, &keys, two).failed, 1);
+    assert!(update_baseline(&paths, &keys, two).unwrap().is_empty());
+    // A check that can't run fails the gate, and counts nothing.
+    let r = gate_with(&paths, &keys, &[("validator", broken)]);
+    assert!(
+        r.text
+            .starts_with("FAIL validator\n       error: no validator here\n"),
+        "{}",
+        r.text
+    );
+    assert_eq!(r.failed, 1);
+    assert!(!r.counts.contains_key("validator"));
+    std::fs::remove_dir_all(&dir).unwrap();
 }
 
 /// The sofa bed (the plan's known case, "0.44 against 0.42 m"): its mattress is measured pulled out (`bed_out`),
@@ -156,8 +272,8 @@ fn every_object_is_measured() {
     );
 }
 
-/// The birds the renderer flies (`packs/birds`, families/birds.py) carry their sizes, and the trees, shrubs and hedges
-/// where they sit carry their perches (families/trees.py, plants.py): 12-30 a tree, 3-8 a shrub or hedge segment, each
+/// The birds the renderer flies (`packs/birds`, crates/art/things/src/birds) carry their sizes, and the trees, shrubs and hedges
+/// where they sit carry their perches (crates/art/nature/src/trees and plants): 12-30 a tree, 3-8 a shrub or hedge segment, each
 /// three numbers, and their `habitat`. The gate checks both against the files.
 #[test]
 fn the_birds_and_their_perches_are_in_the_packs() {

@@ -3,6 +3,7 @@
 //! the same pixels from the same files. Checked against Pillow 12.2 / libjpeg-turbo on arm64: byte-identical
 //! JPEGs; the bicubic and box-radius maths fuse multiply-adds as clang does there.
 
+use super::jpeg::Chroma;
 use std::path::Path;
 
 /// An 8-bit image: `ch` 1 (Pillow's "L") or 3 ("RGB"), rows top to bottom, channels interleaved.
@@ -428,9 +429,16 @@ impl Img {
         Img { px, ..self.clone() }
     }
 
-    /// Pillow's `save(path, 'JPEG', quality=q, optimize=...)`.
-    pub fn save_jpeg(&self, path: &Path, quality: u8, optimize: bool) -> Result<(), String> {
-        let bytes = super::jpeg::encode(&self.px, self.w, self.h, self.ch, quality, optimize);
+    /// Pillow's `save(path, 'JPEG', quality=q, optimize=..., subsampling=...)`.
+    pub fn save_jpeg(
+        &self,
+        path: &Path,
+        quality: u8,
+        optimize: bool,
+        chroma: Chroma,
+    ) -> Result<(), String> {
+        let bytes =
+            super::jpeg::encode(&self.px, self.w, self.h, self.ch, quality, optimize, chroma);
         std::fs::write(path, bytes).map_err(|e| format!("{}: {e}", path.display()))
     }
 }

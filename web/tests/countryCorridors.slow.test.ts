@@ -15,6 +15,7 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import type { RoadPlan } from '../src/core/protocol';
 import { sideBySide } from '../src/game/roads';
+import { CLASSIC } from './support/classicWorlds';
 
 const WEB = new URL('../', import.meta.url).pathname;
 /** How long a country road may run alongside another, a little apart, at most (m): where one joins another at a slant, or leaves a port beside a street's end. */
@@ -35,7 +36,8 @@ describe('country roads', async () => {
   });
   const { Content } = await import('../src/content/content');
   const { objectInfos } = await import('../src/game/housegen');
-  const { generateWorld, useTownContent } = await import('../src/game/town');
+  const { useTownContent } = await import('../src/game/town');
+  const { generateFromSpec } = await import('../src/game/macro');
   type Templates = import('../src/game/town').Templates;
   const content = await Content.load('http://localhost/content/base.json');
   useTownContent(content);
@@ -58,7 +60,7 @@ describe('country roads', async () => {
     test(
       `big ${kind} ${seed} (${name}): no country road runs alongside another a few metres off`,
       () => {
-        const town = generateWorld(content, t, kind, seed);
+        const town = generateFromSpec(content, t, CLASSIC[kind], seed);
         expect(town.name).toBe(name);
         expect(alongside(town.roads)).toEqual([]);
       },

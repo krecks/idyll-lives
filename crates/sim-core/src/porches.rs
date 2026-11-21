@@ -10,7 +10,7 @@
 //! post piece's), and the middle tile of either row stays open: the way up to the door is the
 //! porch's front, and building one that would shut anyone or anything off is refused. The town
 //! puts one over the front door of a house or a shop that the garden path meets (`LotFile::
-//! porches`; a file or a save from before porches has them worked out again, `guess`), and the
+//! porches`; a town file without them has them worked out, `guess`), and the
 //! player builds or takes one down on any outside door of their home for content `build.porch`,
 //! sold back for `objectRules.resale` of it as a garage is. The door goes, so does its porch (a
 //! wall or a window instead of it, the room round it moved: it goes with the room, `move_room`).
@@ -26,7 +26,7 @@
 //! garage. A room built round one, or a room moved onto one, isn't allowed through it: walls,
 //! fences and diagonals don't go through a porch or a piece (`porch_across`).
 //!
-//! Both are kept for undo (`home.rs`), in blueprints (`blueprint.rs`) and in saves (`save.rs`).
+//! Both are kept for undo (`home.rs`), in blueprints (`blueprint.rs`) and in saves (`save/`).
 
 use serde::{Deserialize, Serialize};
 
@@ -379,6 +379,7 @@ impl World {
         z: i32,
     ) -> Result<(), Error> {
         let (h, plot) = self.home_of(household)?;
+        self.not_a_flat(plot, "porch")?;
         if !self.edge_on_plot(plot, axis, x, z) {
             return Err(Error::new("a porch goes on your own home"));
         }
@@ -459,6 +460,7 @@ impl World {
         rot: u8,
     ) -> Result<(), Error> {
         let (h, plot) = self.home_of(household)?;
+        self.not_a_flat(plot, "porch")?;
         if rot > 3 {
             return Err(Error::new(format!(
                 "a piece faces one of four ways, not {rot}"
@@ -698,7 +700,7 @@ impl World {
         door && self.lot.in_bounds(fx, fz) && self.lot.room_at(fx, fz) == OUTDOORS
     }
 
-    /// The porches a town file or a save from before porches had drawn over its doors (the
+    /// The porches a town file without them had drawn over its doors (the
     /// renderer's old `porchDoors`): over each door on the ground storey in the outline of a
     /// house's walls (`view::house_bounds`) that the plot's garden path (its first path narrower
     /// than a driveway, `meta.paths`) comes up to, its middle within 0.6 m of the path's, on the
@@ -707,7 +709,8 @@ impl World {
         /// Paths narrower than this are garden paths (wider ones driveways: the renderer's `DRIVEWAY_MIN_WIDTH`).
         const GARDEN_PATH: f32 = 1.8;
         let mut out = Vec::new();
-        for (i, p) in self.plots.iter().enumerate() {
+        // (A flat has no front door of its own outdoors: its building's hall has it.)
+        for (i, p) in self.lots().iter().enumerate() {
             let Some([bx0, bz0, bx1, bz1]) =
                 crate::view::house_bounds(self, p.x, p.z, p.x + p.w, p.z + p.d)
             else {

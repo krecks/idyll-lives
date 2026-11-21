@@ -203,6 +203,16 @@ export interface QualitySettings {
    * orbit (M3 Pro, medians of 5, 2026-11-12), so Low has none. `?diag=noclouds` leaves them out.
    */
   cloudShadows: boolean;
+  /**
+   * The finishes' layers (`MaterialEntry.sheenColor`, `clearcoat`: cloth's sheen, a lacquer's clear coat),
+   * each a second lobe of light worked out wherever such a finish is drawn: once per light on it, and one
+   * more read of the sky's reflection. Medium on WebGPU with cloth's sheen on every fabric (M3 Pro, medians of 5,
+   * 2026-11-17, against `?diag=nolayers`, which leaves them out): within the runs' noise, the village orbit 3.28
+   * against 3.30 ms of GPU by day and 4.36 against 4.35 by night, the same from 6 m over the living room 2.31
+   * against 2.31 and 3.20 against 3.17. Not measured on an M1, nor a clear coat over much of the screen (no model
+   * is lacquered yet). Low draws those finishes without: velvet as the fabric, lacquer as the wood.
+   */
+  finishLayers: boolean;
 }
 
 /** A big world's distances on a preset (`QualitySettings.openWorld`). */
@@ -235,12 +245,11 @@ export interface RenderQuality extends QualitySettings {
 const OPEN_WORLD: OpenWorldQuality = { stream: 1, farCull: 650, woodsFar: 560, woodsCell: 256, flowersFar: 170, tiles: [200, 460], far: 2600 };
 
 export const QUALITY: Record<GraphicsPreset, QualitySettings> = {
-  low: { shadowMapSize: 1024, shadowRate: 15, msaaSamples: 1, webglMsaaSamples: 1, anisotropy: 4, clusteredLamps: false, lampShadows: 0, lampShadowRate: 15, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, grass: { radius: 45, density: 0.5, nearest: 1 }, woodsCell: 100, landscapeShadows: false, streetShadows: false, characterShadows: false, mergedObjectShadows: true, streetLod: 1, holdStillFrames: true, ambientRange: 0, birds: { count: 6, range: 18 }, residentRadius: 90, openWorld: { stream: 0.7, farCull: 450, woodsFar: 400, woodsCell: 128, flowersFar: 120, tiles: [150, 350], far: 1800 }, leanTargets: true, contactShading: false, cloudShadows: false },
-  medium: { shadowMapSize: 2048, shadowRate: 30, msaaSamples: 4, webglMsaaSamples: 4, anisotropy: 8, clusteredLamps: true, lampShadows: 2, lampShadowRate: 15, mirrors: 1, mirrorScale: 0.5, mirrorRate: 10, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 60, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 40, birds: { count: 24, range: 35 }, residentRadius: 140, openWorld: OPEN_WORLD, leanTargets: false, contactShading: true, cloudShadows: true },
-  high: { shadowMapSize: 4096, shadowRate: 30, msaaSamples: 4, webglMsaaSamples: 4, anisotropy: 8, clusteredLamps: true, lampShadows: 4, lampShadowRate: 30, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 90, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 60, birds: { count: 40, range: 50 }, residentRadius: 200, openWorld: OPEN_WORLD, leanTargets: false, contactShading: true, cloudShadows: true },
+  low: { shadowMapSize: 1024, shadowRate: 15, msaaSamples: 1, webglMsaaSamples: 1, anisotropy: 4, clusteredLamps: false, lampShadows: 0, lampShadowRate: 15, mirrors: 1, mirrorScale: 0.4, mirrorRate: 10, lightingStep: 10, lawnDensity: 0.5, grass: { radius: 45, density: 0.5, nearest: 1 }, woodsCell: 100, landscapeShadows: false, streetShadows: false, characterShadows: false, mergedObjectShadows: true, streetLod: 1, holdStillFrames: true, ambientRange: 0, birds: { count: 6, range: 18 }, residentRadius: 90, openWorld: { stream: 0.7, farCull: 450, woodsFar: 400, woodsCell: 128, flowersFar: 120, tiles: [150, 350], far: 1800 }, leanTargets: true, contactShading: false, cloudShadows: false, finishLayers: false },
+  medium: { shadowMapSize: 2048, shadowRate: 30, msaaSamples: 4, webglMsaaSamples: 4, anisotropy: 8, clusteredLamps: true, lampShadows: 2, lampShadowRate: 15, mirrors: 1, mirrorScale: 0.5, mirrorRate: 10, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 60, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 40, birds: { count: 24, range: 35 }, residentRadius: 140, openWorld: OPEN_WORLD, leanTargets: false, contactShading: true, cloudShadows: true, finishLayers: true },
+  high: { shadowMapSize: 4096, shadowRate: 30, msaaSamples: 4, webglMsaaSamples: 4, anisotropy: 8, clusteredLamps: true, lampShadows: 4, lampShadowRate: 30, mirrors: 2, mirrorScale: 0.75, mirrorRate: 0, lightingStep: 0.5, lawnDensity: 1, grass: { radius: 90, density: 1, nearest: 0 }, woodsCell: 0, landscapeShadows: true, streetShadows: true, characterShadows: true, mergedObjectShadows: false, streetLod: 0, holdStillFrames: true, ambientRange: 60, birds: { count: 40, range: 50 }, residentRadius: 200, openWorld: OPEN_WORLD, leanTargets: false, contactShading: true, cloudShadows: true, finishLayers: true },
 };
 
-export const GRAPHICS_PRESETS = Object.keys(QUALITY) as GraphicsPreset[];
 
 export function isGraphicsPreset(value: unknown): value is GraphicsPreset {
   return typeof value === 'string' && Object.hasOwn(QUALITY, value);

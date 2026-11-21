@@ -15,7 +15,8 @@ pub enum Command {
     SetSpeed {
         speed: u8,
     },
-    /// "Skip quiet hours": speed up while the player's household sleeps or is at work.
+    /// Super speed by itself: the game goes to super speed as the player's household falls
+    /// quiet (all asleep or out, `World::calm`), and back to the speed before it as that ends.
     SetAutoFast {
         enabled: bool,
     },
@@ -90,6 +91,11 @@ pub enum Command {
     SwitchLamp {
         object: u32,
         on: bool,
+    },
+    /// Draw curtains shut or open them (see `curtains.rs`): at once, nobody walks over.
+    DrawCurtains {
+        object: u32,
+        shut: bool,
     },
     /// Adds `amount` to a household's funds (a negative one takes money away, down to 0). For
     /// tests and long checks in the browser (`?debug`'s `__addFunds`); no menu sends it.
@@ -347,6 +353,20 @@ pub enum Command {
         dx: i32,
         dz: i32,
     },
+    /// Build mode's Land tab: the land shaped by a stroke (see `World::shape_land`). `cost` is
+    /// charged to the household (in Living; nothing in Creative), a negative one refunded (a
+    /// stroke undone). `meta` is what changes in the world's `meta`: `land`, its touched tiles
+    /// (`h` and `wl` by tile index) and any header fields, merged into `meta.land`; `zones`, all
+    /// of them, replacing `meta.zones`. `water`, when the stroke changed it: the world's whole
+    /// water mask (run-length, as the town file's `terrain.water`). Not a home edit: the land
+    /// keeps its own undo, which sends the reverse stroke.
+    ShapeLand {
+        household: u32,
+        cost: i64,
+        meta: serde_json::Value,
+        #[serde(default)]
+        water: Option<Vec<u32>>,
+    },
     /// New residents move into a household that has a home (an empty one, after building
     /// first): they arrive where `sims` stand (their `household` is ignored), with `bonds`
     /// between them (indices into `sims`). `name` renames the household.
@@ -477,6 +497,7 @@ impl Command {
     pub(crate) fn object_mut(&mut self) -> Option<&mut u32> {
         match self {
             Command::SwitchLamp { object, .. }
+            | Command::DrawCurtains { object, .. }
             | Command::Use { object, .. }
             | Command::Sell { object, .. }
             | Command::MoveObject { object, .. }

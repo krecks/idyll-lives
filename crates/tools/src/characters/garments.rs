@@ -1,4 +1,4 @@
-//! Garment vocabulary shared by the body's fields and the clothes (clothes.rs): the shell
+//! Garment vocabulary shared by the body's fields and the clothes (clothes/): the shell
 //! categories and flags written into a shell's fields, the sleeve parameter's scale, and the
 //! landmarks (heights on the base body) the cuts are made from.
 //!

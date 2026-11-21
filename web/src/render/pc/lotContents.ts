@@ -29,12 +29,12 @@ import { ItemLayer } from './items';
 import { shadowOnlyLayer } from './layers';
 import { MaterialLibrary } from './materials';
 import { ATLAS_TILE_SEMANTIC, installGameChunks } from './shaders/chunks';
-import { buildModel, disposeTemplate, glowByInstance, type MirrorSurface, type ModelTemplate } from './models';
+import { buildModel, disposeTemplate, glowByInstance, readMesh, type MirrorSurface, type ModelTemplate } from './models';
 import type { GrassPusher } from './grass';
 import { setDaylight } from './daylight';
 import { CloudShadows } from './cloudShadows';
 import { smoothstep } from '../../game/noise';
-import { installNature, Landscape, NATURE_DIAGS, setWind, Sky, windStill, type RoadBuilder } from './nature';
+import { installNature, Landscape, NATURE_DIAGS, restartWind, setWaterCalm, setWind, Sky, windStill, type NatureRebuild, type NatureStep, type RoadBuilder } from './nature';
 import { ObjectMotion, writeInstance, type MovingObject, type PopTarget } from './objectMotion';
 import { ObjectShadows, type ShadowSource } from './objectShadows';
 import { toGame } from './space';
@@ -72,6 +72,8 @@ export interface LotView {
   rowOf(k: number): number;
   /** Whether a ground point (tiles) is in the lot being viewed, `margin` round it. */
   inView(x: number, z: number, margin: number): boolean;
+  /** Whether a ground point (tiles) on storey `k` is in a flat that may not be shown open: what is in it isn't drawn. */
+  closed(x: number, z: number, k: number): boolean;
 }
 
 /** What the renderer does for the lot's contents. */
@@ -142,7 +144,7 @@ export interface MirrorInstance {
   index: number;
 }
 
-/** What glows of one model (its shades, a screen): the draw, each instance's room, lamp and object, and whether it's a screen. */
+/** What glows of one model (its shades, a screen, a fire's flames): the draw, each instance's room, lamp and object, and whether it's a screen. */
 interface Glow {
   draw: Instances;
   colors: Float32Array;
@@ -150,6 +152,41 @@ interface Glow {
   lamps: number[];
   ids: number[];
   screen: boolean;
+  /**
+   * A fire's flames (absent on anything else): their glow flickers about the level `applyGlow` gives
+   * it, which this keeps as each fire's base brightness.
+   */
+  base?: Float32Array;
+}
+
+/** A fire's flicker's three waves, in radians a second: a slow breath, a middle flutter and a fast crackle. */
+const BREATH = 2.1;
+const FLUTTER = 7.7;
+const CRACKLE = 17.3;
+
+/**
+ * A fire's flicker at `seconds`, about 0.86..1: a slow breath, a middle flutter and a fast crackle,
+ * each fire's own (its id shifts them apart). Never zero, so the flames keep glowing.
+ */
+function fireFlicker(id: number, seconds: number): number {
+  const breath = 0.5 * Math.sin(seconds * BREATH + id * 1.7);
+  const flutter = 0.3 * Math.sin(seconds * FLUTTER + id * 2.9);
+  const crackle = 0.2 * Math.sin(seconds * CRACKLE + id * 4.1);
+  return 0.93 + 0.07 * (breath + flutter + crackle);
+}
+
+/** Glow instance `i` at brightness `f` (its alpha 1); whether that changed it. */
+function setGlow(g: Glow, i: number, f: number): boolean {
+  if (g.colors[i * 4] === f && g.colors[i * 4 + 3] === 1) return false;
+  g.colors.fill(f, i * 4, i * 4 + 3);
+  g.colors[i * 4 + 3] = 1;
+  return true;
+}
+
+/** A glow's brightnesses to the GPU. */
+function uploadGlow(g: Glow): void {
+  g.draw.setAll(INSTANCE_COLOR, g.colors);
+  g.draw.update(false);
 }
 
 /** One model's draws: a draw per template mesh (and glow), and the buffers they draw from. */
@@ -239,6 +276,14 @@ export class LotContents {
   private readonly qTmp: Quat = [0, 0, 0, 1];
   private readonly eye = { x: 0, y: 0, z: 0 };
 
+  /**
+   * Where the viewed lot's things hang (their draws, lot-relative heights): the renderer's `lotRoot`, raised by the
+   * datum over the world root (`space.ts` `setDatum`); the root itself until it says.
+   */
+  objectsRoot: pc.Entity;
+  /** The datum (m): the world root is this much lower than game space (`space.ts` `setDatum`). */
+  datum = 0;
+
   constructor(
     private readonly app: pc.AppBase,
     private readonly root: pc.Entity,
@@ -250,6 +295,7 @@ export class LotContents {
     private readonly view: LotView,
     private readonly hooks: LotHooks,
   ) {
+    this.objectsRoot = root;
     this.lib = MaterialLibrary.for(app);
     // Wind sway and tint variation for the plant finishes (hooks them as the models load).
     installNature(app);
@@ -289,16 +335,44 @@ export class LotContents {
 
   /**
    * The landscape of `world` for a layer: shared with the other layer when it is the same town
-   * (seed and size), otherwise built; one no layer shows any more is destroyed.
+   * (seed and size), otherwise built; one no layer shows any more is destroyed. `onStep`: told as
+   * its parts are built (all at once for one built already).
    */
-  async useNature(layer: 'world' | 'town', world: WorldStructure, buildRoads?: RoadBuilder): Promise<NatureSet> {
+  async useNature(layer: 'world' | 'town', world: WorldStructure, buildRoads?: RoadBuilder, onStep?: (done: NatureStep) => void): Promise<NatureSet> {
     const key = Landscape.key(world);
     const ticket = ++this.natureTicket[layer];
     let set = this.natures.get(key);
+    // A landscape drawn from a height field already (the land shaped: `setLand`) is the one for its world once the
+    // world carries the field (`meta.land`, a stroke's), its zones derived from it: kept under the new key, not built again.
+    if (!set && world.meta?.land) {
+      const base = Landscape.baseKey(world);
+      const shaped = [...this.natures.values()].find((n) => n.key !== key && !!n.landscape.heightField && !!n.landscape.builtFor && Landscape.baseKey(n.landscape.builtFor) === base);
+      if (shaped) {
+        this.natures.delete(shaped.key);
+        shaped.key = key;
+        this.natures.set(key, (set = shaped));
+      }
+    }
+    // Another town on the same land as the one the overview shows (step 2's edits: a lot removed, a street drawn): its
+    // landscape taken on in place (`Landscape.relay`), only what changed drawn again; not one the game shows too.
+    let relaid: Promise<[number, number, number, number] | null> | null = null;
+    const shown = layer === 'town' ? this.natureIn.town : null;
+    if ((!set || set === shown) && shown && !shown.users.has('world') && shown.landscape.relayable(world) && !shown.landscape.sameLayout(world)) {
+      if (!set) {
+        this.natures.delete(shown.key);
+        shown.key = key;
+        this.natures.set(key, (set = shown));
+      }
+      const landscape = shown.landscape;
+      relaid = shown.ready.then(() => perfTimeAsync('nature: relay', () => landscape.relay(world, () => this.hooks.pace())));
+      shown.ready = relaid.then(() => {});
+    }
     if (!set) {
       const landscape = new Landscape(world, this.quality.lawnDensity, this.quality.streetLod, this.quality.woodsCell, this.quality.grass, this.quality.openWorld);
       const created: NatureSet = { key, landscape, draws: [], casters: [], only: new Map(), users: new Set(), pending: 0, ready: Promise.resolve(), refreshing: Promise.resolve() };
-      created.ready = landscape.build(this.app, this.root, this.deps.assets, world, () => this.hooks.pace(), buildRoads).then((nature) => {
+      // (A height field's water coming and going as the land is shaped: drawn as the rest of it.)
+      landscape.onDraws = (added, removed) => this.natureDrawsChanged(created, added, removed);
+      created.ready = landscape.build(this.app, this.root, this.deps.assets, world, () => this.hooks.pace(), buildRoads, onStep).then((nature) => {
         perfTime('nature: meshes', () => {
           created.draws = nature.draws;
           created.casters = nature.casters;
@@ -307,10 +381,16 @@ export class LotContents {
         });
       });
       this.natures.set(key, (set = created));
+    } else if (onStep) {
+      // (Built, or being built, for the other layer: its parts are told once it is.)
+      void set.ready.then(() => (['hills', 'woods', 'grass'] as const).forEach(onStep), () => {});
     }
     set.pending++;
     try {
       await set.ready;
+      // (Its woods and flowers grown again where the town changed, swapped in once built.)
+      const box = await relaid;
+      if (box) await this.regrowNature(set.landscape, box, () => this.natures.get(set.key) !== set, () => this.hooks.pace());
     } finally {
       set.pending--;
     }
@@ -402,6 +482,32 @@ export class LotContents {
     }
   }
 
+  /** Draws of a landscape come (switched off, as built) and gone (destroyed after) outside a build: shown as the rest of it. */
+  private natureDrawsChanged(set: NatureSet, added: pc.Entity[], removed: pc.Entity[]): void {
+    const gone = new Set(removed);
+    set.draws = [...set.draws.filter((e) => !gone.has(e)), ...added];
+    set.casters = set.casters.filter((e) => !gone.has(e));
+    for (const e of removed) set.only.delete(e);
+    for (const e of added) this.prepareNature(e);
+    if (this.natures.get(set.key) !== set) return;
+    this.showNature(set);
+    this.hooks.landscapeChanged?.();
+  }
+
+  /**
+   * `landscape`'s woods and flowers grown again where a box (m) reaches (all: null), its land shaped
+   * (`Landscape.regrow`): built between frames and unseen, then swapped in, as `rebuildNature` does. After any
+   * building again already under way. Resolves once swapped in (or not, the landscape gone).
+   */
+  regrowNature(landscape: Landscape, box: [number, number, number, number] | null, gone: () => boolean, pace: () => Promise<void>): Promise<void> {
+    const set = [...this.natures.values()].find((n) => n.landscape === landscape);
+    if (!set) return Promise.resolve();
+    set.refreshing = set.refreshing
+      .then(() => this.swapNature(set, () => set.landscape.regrow(this.deps.assets, box, pace), gone))
+      .catch((err) => console.error('[render] growing the landscape again on the shaped land failed', err));
+    return set.refreshing;
+  }
+
   /** A model file that failed has come: each landscape's plants built without it are built again (`rebuildNature`). */
   refreshNature(url: string, gone: () => boolean): void {
     for (const set of this.natures.values()) {
@@ -416,7 +522,12 @@ export class LotContents {
    * destroyed after. No world is built again for it. (PlayCanvas compiles a shader as it's first
    * drawn: nothing waits for the new draws' shaders before they are swapped in.)
    */
-  private async rebuildNature(set: NatureSet, url: string, gone: () => boolean): Promise<void> {
+  private rebuildNature(set: NatureSet, url: string, gone: () => boolean): Promise<void> {
+    return this.swapNature(set, () => set.landscape.rebuild(this.app, this.root, this.deps.assets, url, () => this.hooks.pace()), gone);
+  }
+
+  /** Plants of `set` built again (`make`) and swapped in once built (see `rebuildNature`). */
+  private async swapNature(set: NatureSet, make: () => Promise<NatureRebuild | null>, gone: () => boolean): Promise<void> {
     try {
       await set.ready;
     } catch {
@@ -425,7 +536,7 @@ export class LotContents {
     }
     const lost = () => gone() || this.natures.get(set.key) !== set;
     if (lost()) return;
-    const built = await set.landscape.rebuild(this.app, this.root, this.deps.assets, url, () => this.hooks.pace());
+    const built = await make();
     if (!built) return;
     if (lost()) {
       built.discard();
@@ -485,13 +596,24 @@ export class LotContents {
 
   /** How strongly the wind moves the plants (reduce motion: still), and whether the clouds drift. */
   setReducedMotion(on: boolean): void {
-    this.reducedMotion = on;
+    this.reducedMotion = this.motion.reducedMotion = on;
     setWind(this.app, on ? 0 : 1);
+    setWaterCalm(this.app, on);
+  }
+
+  /** Fixed-step playback: what moves by a clock of its own here (the things' clips, the clouds, the wind and the water) back to its start. */
+  restartClocks(): void {
+    this.motion.restartClock();
+    this.sky.restart();
+    this.cloudShadows?.restart();
+    restartWind(this.app);
   }
 
   /** Each frame, game or overview, once the camera is placed: the sky round it, the clouds' drift (`dt` ms), the grass in view. */
   frame(dt: number, held = false): void {
     const eye = toGame(this.camera.getPosition(), this.eye);
+    // (Game space: the engine's heights are the datum's lower.)
+    eye.y += this.datum;
     this.sky.follow(eye.x, eye.y, eye.z);
     if (!this.reducedMotion) this.sky.drift(dt);
     // (The clouds' shadows hold still with Reduce motion, and in the menus' town, whose picture is held while nothing in it moves.)
@@ -499,8 +621,8 @@ export class LotContents {
     const camera = this.camera.camera;
     if (!camera) return;
     const { world, town } = this.natureIn;
-    world?.landscape.grassFrame(eye, camera);
-    if (town && town !== world) town.landscape.grassFrame(eye, camera);
+    world?.landscape.grassFrame(eye, camera, this.datum);
+    if (town && town !== world) town.landscape.grassFrame(eye, camera, this.datum);
   }
 
   /** The residents pushing the game world's grass aside (the nearest the eye first). */
@@ -630,12 +752,12 @@ export class LotContents {
     d = {
       template,
       draws: template.meshes.map((m) => {
-        const draw = new Instances(device, this.root, m.mesh, m.material, { name: m.name, castShadows: true, receiveShadows: true });
+        const draw = new Instances(device, this.objectsRoot, m.mesh, m.material, { name: m.name, castShadows: true, receiveShadows: true });
         windStill(draw.meshInstance, m);
         return draw;
       }),
       // (Glows: unlit, added on top, their strength per instance in its colour: `applyGlow`.)
-      glows: (template.glows ?? []).map((g) => new Instances(device, this.root, g.mesh.mesh, glowByInstance(this.app, g.mesh.material), { name: g.mesh.name, streams: [INSTANCE_COLOR], castShadows: false, receiveShadows: false })),
+      glows: (template.glows ?? []).map((g) => new Instances(device, this.objectsRoot, g.mesh.mesh, glowByInstance(this.app, g.mesh.material), { name: g.mesh.name, streams: [INSTANCE_COLOR], castShadows: false, receiveShadows: false })),
     };
     this.modelDraws.set(key, d);
     return d;
@@ -655,7 +777,11 @@ export class LotContents {
     this.wallItemsHidden.clear();
     this.riddenHidden.clear();
     const down = (o: ObjectPlacement) => storey >= 0 && v.storeyOf(o.z) === -1 && !!this.deps.content.object(o.def)?.stairs;
-    const shown = world.objects.filter((o) => (storeyShown(v.storeyOf(o.z), storey) || down(o)) && v.inView(o.x + o.w / 2, o.z - v.rowOf(v.storeyOf(o.z)) + o.d / 2, 0));
+    const shown = world.objects.filter((o) => {
+      const k = v.storeyOf(o.z);
+      const [x, z] = [o.x + o.w / 2, o.z - v.rowOf(k) + o.d / 2];
+      return (storeyShown(k, storey) || down(o)) && v.inView(x, z, 0) && !v.closed(x, z, k);
+    });
     // One template per model and size (things the player resized get their own).
     const byModel = Map.groupBy(shown, (o) => `${o.def}|${this.objectModel(o)}${resizeKey(this.objectResize(o))}${colorsKey(this.objectColors(o))}`);
     const lists = [...byModel.values()];
@@ -732,10 +858,10 @@ export class LotContents {
           built: { template, motions },
         });
         if (motion && motions) {
-          // A lamp's fan turns while it's on; a fire's flames (its uses' clips) burn while it's lit.
+          // A lamp's fan turns while it's on; a fire's flames (its uses' clips) burn while it's lit; curtains are drawn as the sim has them.
           const light = def?.light;
           const burns = light?.fire ? [...new Set(Object.values(motions.uses).flatMap((clips) => clips.map((c) => c.clip)))] : undefined;
-          moving.push({ id: o.id, target: pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id), open: !!o.open, stage: o.growth, running: !!o.running, slotOf: slotOf(o, def), lamp: !!light && light.switch !== false, burns });
+          moving.push({ id: o.id, target: pop, motion, motions, interactions: (def?.interactions ?? []).map((it) => it.id), open: !!o.open, stage: o.growth, running: !!o.running, slotOf: slotOf(o, def), lamp: !!light && light.switch !== false, burns, curtain: !!def?.overWindow });
         }
         // Mirrors on a moving part (a mirror cabinet's door) follow that part's buffer.
         for (const [part, surfaces] of Map.groupBy(template.mirrors ?? [], (s) => s.part ?? -1)) {
@@ -778,7 +904,15 @@ export class LotContents {
         const roomOf = (o: ObjectPlacement) => world.rooms[Math.floor(o.z + o.d / 2) * W + Math.floor(o.x + o.w / 2)] ?? 0;
         // A lamp's shade glows with the lamp (switched on or off), anything else's with its room's lights.
         const light = this.deps.content.object(list[0].def)?.light;
-        glows.push({ draw, colors, rooms: list.map(roomOf), lamps: list.map((o) => (light && light.switch !== false ? o.id : -1)), ids: list.map((o) => o.id), screen: !!screen });
+        glows.push({
+          draw,
+          colors,
+          rooms: list.map(roomOf),
+          lamps: list.map((o) => (light && light.switch !== false ? o.id : -1)),
+          ids: list.map((o) => o.id),
+          screen: !!screen,
+          base: light?.fire ? new Float32Array(list.length) : undefined,
+        });
       });
     });
     this.movingPartsCast = partsCast;
@@ -826,7 +960,7 @@ export class LotContents {
     this.shadowDraw = null;
     if (!shown.length) return;
     const placed = new Map(this.placed.map((p) => [p.id, p]));
-    const draw = (this.shadowDraw = new Instances(this.app.graphicsDevice, this.root, contactBlob(this.app).mesh, this.shadowMaterial, { name: 'objectShadows', streams: [ATLAS_TILE], castShadows: false, receiveShadows: false, capacity: shown.length }));
+    const draw = (this.shadowDraw = new Instances(this.app.graphicsDevice, this.objectsRoot, contactBlob(this.app).mesh, this.shadowMaterial, { name: 'objectShadows', streams: [ATLAS_TILE], castShadows: false, receiveShadows: false, capacity: shown.length }));
     const matrices = new Float32Array(shown.length * 16);
     // Each shape's copies (each shape a tile of the atlas).
     const byShape = new Map<ContactShape, number[]>();
@@ -920,7 +1054,7 @@ export class LotContents {
         matrices.set(out, i * 16);
       });
       const draws = template.meshes.map((m) => {
-        const draw = new Instances(this.app.graphicsDevice, this.root, m.mesh, m.material, { name: `rest:${key}`, castShadows: true, receiveShadows: true, capacity: list.length });
+        const draw = new Instances(this.app.graphicsDevice, this.objectsRoot, m.mesh, m.material, { name: `rest:${key}`, castShadows: true, receiveShadows: true, capacity: list.length });
         draw.setMatrices(matrices, list.length);
         draw.update();
         return draw;
@@ -1068,7 +1202,7 @@ export class LotContents {
   showItems(): void {
     const v = this.view;
     const storey = v.storey();
-    this.items.show({ storey, storeyOf: (z) => v.storeyOf(z), shown: (k) => storeyShown(k, storey), groundZ: (z) => z - v.rowOf(v.storeyOf(z)), storeyHeight: WALL_HEIGHT, inView: (x, z) => v.inView(x, z, 0) });
+    this.items.show({ storey, storeyOf: (z) => v.storeyOf(z), shown: (k) => storeyShown(k, storey), groundZ: (z) => z - v.rowOf(v.storeyOf(z)), storeyHeight: WALL_HEIGHT, inView: (x, z, k) => v.inView(x, z, 0) && !v.closed(x, z, k) });
   }
 
   /** New items from the simulation. */
@@ -1080,6 +1214,11 @@ export class LotContents {
   setLampsOff(off: ReadonlySet<number>): void {
     this.lampsOff = off;
     this.motion.setLampsOff(off);
+  }
+
+  /** The curtains drawn shut, by object id: drawn (their `night` clip) while they are. */
+  setCurtainsShut(shut: ReadonlySet<number>): void {
+    this.motion.setCurtainsShut(shut);
   }
 
   /**
@@ -1176,13 +1315,12 @@ export class LotContents {
         const lamp = g.lamps[i];
         const lampOn = lamp >= 0 ? light.lampOn(lamp) : room ? light.roomOn(room) : 1;
         const f = (room && light.dimmed(room) ? 1 : light.level) * lampOn;
-        g.colors.fill(f, i * 4, i * 4 + 3);
-        g.colors[i * 4 + 3] = 1;
+        if (g.base) g.base[i] = f;
+        setGlow(g, i, f);
         lit ||= f > 0;
       });
       if (g.draw.destroyed) continue;
-      g.draw.setAll(INSTANCE_COLOR, g.colors);
-      g.draw.update(false);
+      uploadGlow(g);
       g.draw.enabled = lit;
     }
   }
@@ -1204,18 +1342,34 @@ export class LotContents {
         const flicker = this.reducedMotion ? 1 : 0.9 + 0.1 * (0.5 + 0.5 * Math.sin(t * 17.3 + id * 1.7)) * (0.6 + 0.4 * Math.sin(t * 41.1 + id * 2.3));
         f = Math.fround((0.55 + 0.45 * level) * flicker);
       }
-      if (g.colors[i * 4] === f) continue;
-      g.colors.fill(f, i * 4, i * 4 + 3);
-      g.colors[i * 4 + 3] = 1;
-      changed = true;
+      changed = setGlow(g, i, f) || changed;
     }
     if (g.draw.destroyed) return;
     // Uploaded only when a brightness changed; off (nobody watching) it isn't drawn at all.
-    if (changed) {
-      g.draw.setAll(INSTANCE_COLOR, g.colors);
-      g.draw.update(false);
-    }
+    if (changed) uploadGlow(g);
     if (g.draw.enabled !== on) g.draw.enabled = on;
+  }
+
+  /**
+   * Fires flicker: the flames' glow wavers a little about the level the lighting gives it, each fire
+   * on a beat of its own, so the warm light it seems to give changes over time, while its flames sway
+   * (`ObjectMotion.burning`: near the camera, not on Low, not with Reduce motion); otherwise it holds
+   * steady. `applyGlow` says whether they're drawn.
+   */
+  private animateFires(frame: FrameState): void {
+    const t = frame.now / 1000;
+    for (const g of this.glows) {
+      if (!g.base || g.draw.destroyed) continue;
+      let changed = false;
+      for (let i = 0; i < g.ids.length; i++) {
+        const base = g.base[i];
+        // (Only while its flames sway: near the camera, not on Low, not with Reduce motion.)
+        const f = base > 0 && this.motion.burning(g.ids[i]) ? Math.fround(base * fireFlicker(g.ids[i], t)) : base;
+        changed = setGlow(g, i, f) || changed;
+      }
+      // Uploaded only when a brightness changed.
+      if (changed) uploadGlow(g);
+    }
   }
 
   /** Which screens are on this frame: the objects residents are using (not just walking to). */
@@ -1249,6 +1403,7 @@ export class LotContents {
     const moved = this.motion.update(frame, frame.layout.actions ?? [], this.eye);
     if (moved.moved && this.movingPartsCast) this.hooks.partsMoved();
     this.animateScreens(frame);
+    this.animateFires(frame);
     return moved.moved;
   }
 
@@ -1268,8 +1423,8 @@ export class LotContents {
     const m = pop.matrices.subarray(pop.index * 16, pop.index * 16 + 16);
     const all: number[] = [];
     for (const draw of pop.meshes) {
-      const v: number[] = [];
-      if (!draw.mesh.getPositions(v)) continue;
+      const v = readMesh(draw.mesh)?.positions;
+      if (!v) continue;
       const step = 3 * Math.max(1, Math.floor(v.length / 3 / max));
       for (let i = 0; i < v.length; i += step) {
         const [x, y, z] = [v[i], v[i + 1], v[i + 2]];

@@ -47,6 +47,7 @@ const STREET = [
   'model.street.flowerTub',
   'model.street.sign',
   'model.street.taxiSign',
+  'model.street.parkingSign',
   'model.busStop',
   'model.street.pot',
   'model.street.pathLight',

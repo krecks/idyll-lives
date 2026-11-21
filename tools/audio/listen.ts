@@ -2,7 +2,7 @@
 /**
  * Renders every synthesised sound of the game to a WAV, with the numbers that can be measured and
  * the ones only a listener can judge: the sounds are made
- * in code (`web/src/audio/`: `water.ts`, `things.ts`, `mono.ts`, `birdsong.ts`, `blips.ts`), so they
+ * in code (`crates/sound`, in Rust; here through its WebAssembly: `bun run sound` first), so they
  * can be made here, off the browser, and listened to on any player. `bun run sounds` (from `web/`), or
  * `bun tools/audio/listen.ts [--out <folder>]`.
  *
@@ -15,6 +15,12 @@
  * (`web/src/audio/catalog.ts`, the list `web/tests/sounds.test.ts` measures too), so one sound
  * against another sounds as it does in the game.
  *
+ * `--against <folder>` (from the checkout, as `--out`; not the same folder): another render's `index.md` to hold
+ * this one to, read before anything is written. Every sound whose loudness moved by more than 0.25 LU (the old
+ * index has it to a tenth) or its centroid by more than 2 % is printed, old → new, and a move of more than 1.0 LU
+ * exits 1 (after the WAVs are written); a sound the old index lacks is listed as new, one it has that this render
+ * lacks as missing.
+ *
  * What a machine can say is here; whether a microwave sounds like a microwave is the ear's part.
  */
 
@@ -23,18 +29,41 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { everySound, GUARD, STEPS, type Group } from '../../web/src/audio/catalog';
 import { loudness as loudnessAt } from '../../web/src/audio/loudness';
 import { fft, spaced, type Hearing } from '../../web/src/audio/offline';
-import { OUTDOORS } from '../../web/src/audio/outdoors';
+import { ROOM_SIZES, ROOMS, STEP_VERSIONS, SURFACES, type Footwear, type Stereo, type Surface } from '../../web/src/audio/kinds';
 import { carSound, leavesLevel, nearness } from '../../web/src/audio/outside';
-import { ROOM_SIZES, ROOMS, roomResponse } from '../../web/src/audio/rooms';
-import { stepSamples, STEP_VERSIONS, SURFACES, type Footwear, type Surface } from '../../web/src/audio/steps';
-import { random } from '../../web/src/audio/water';
+import { random } from '../../web/src/audio/random';
+import { loadSynth, makeSound, roomResponse, stepSamples } from '../../web/src/audio/synth';
 
 const RATE = 48_000;
+// The sounds are made in Rust: its WebAssembly, built by `bun run sound` (from `web/`).
+await loadSynth(readFileSync(new URL('../../web/src/audio/wasm-pkg/sound_wasm_bg.wasm', import.meta.url)));
 /** The checkout. */
 const ROOT = resolve(import.meta.dir, '../..');
 /** Where the WAVs go: `--out <folder>` (from the checkout), else `bench-results/sounds`. */
-const named = process.argv.indexOf('--out') >= 0 ? process.argv[process.argv.indexOf('--out') + 1] : undefined;
-const OUT = named ? (isAbsolute(named) ? named : join(ROOT, named)) : join(ROOT, 'bench-results/sounds');
+const argument = (name: string) => (process.argv.indexOf(name) >= 0 ? process.argv[process.argv.indexOf(name) + 1] : undefined);
+const fromRoot = (p: string) => (isAbsolute(p) ? p : join(ROOT, p));
+const named = argument('--out');
+const OUT = named ? fromRoot(named) : join(ROOT, 'bench-results/sounds');
+/** Another render to hold this one to: `--against <folder>`. */
+const against = argument('--against');
+const AGAINST = against ? resolve(fromRoot(against)) : undefined;
+if (AGAINST && AGAINST === resolve(OUT)) {
+  console.error(`--against ${against} is where this render is written (--out): it would be held to itself`);
+  process.exit(2);
+}
+/** The sounds' rows of an `index.md` this tool wrote: each sound's loudness (LUFS; NaN for a silent one) and centroid (Hz). */
+function indexed(file: string): Map<string, { loud: number; centroid: number }> {
+  const found = new Map<string, { loud: number; centroid: number }>();
+  const lines = readFileSync(file, 'utf8').split('\n');
+  // (The first table only: the sounds; the ones after it are the same sounds heard from somewhere.)
+  for (let i = lines.findIndex((l) => l.startsWith('| sound |')) + 2; i > 1 && i < lines.length && lines[i].startsWith('|'); i++) {
+    const cells = lines[i].split('|').map((c) => c.trim());
+    found.set(cells[1].replaceAll('`', ''), { loud: Number(cells[8]), centroid: Number(cells[9]) });
+  }
+  return found;
+}
+/** The other render's sounds, read before this one writes anything. */
+const OLD = AGAINST ? indexed(join(AGAINST, 'index.md')) : undefined;
 
 /** A 16-bit stereo WAV of two channels of samples. */
 function wav(left: Float32Array, right: Float32Array): Buffer {
@@ -162,7 +191,7 @@ const sounds = everySound();
 const where = users();
 mkdirSync(OUT, { recursive: true });
 const rows: string[] = [];
-const heard: { name: string; group: Group; plays: string; loud: number }[] = [];
+const heard: { name: string; group: Group; plays: string; loud: number; centroid: number }[] = [];
 console.log(`${sounds.length} sounds, ${RATE} Hz\n`);
 for (const { name, group, plays, level, note, who: by, heard: make } of sounds) {
   // As the game plays it: at its level, in the middle of the picture.
@@ -176,7 +205,7 @@ for (const { name, group, plays, level, note, who: by, heard: make } of sounds) 
   const who = used.join(', ') || (by ?? WHO[group]) + (note ? ` (${note})` : '');
   const shown = String(Number(level.toFixed(4)));
   rows.push(`| \`${name}\` | ${group} | ${num(secs, 2)} | ${plays} | ${shown} | ${num(peak)} | ${num(rms)} | ${num(loud)} | ${num(c, 0)} | ${who} |`);
-  heard.push({ name, group, plays, loud });
+  heard.push({ name, group, plays, loud, centroid: c });
   console.log(
     `${name.padEnd(15)} ${group.padEnd(9)} ${num(secs, 2).padStart(5)} s  ${plays.padEnd(4)}  level ${shown.padEnd(6)}  peak ${num(peak).padStart(6)}  rms ${num(rms).padStart(6)} dBFS  ${num(loud).padStart(6)} LUFS  centroid ${num(c, 0).padStart(6)} Hz  ${who}`,
   );
@@ -259,8 +288,8 @@ function read(loop: Float32Array, at: number): number {
  * to right over `seconds`, as `outside.ts` plays it: its level by how near it is, its place by where it is.
  */
 function carPass(speed: number, aside: number, seconds: number): [Float32Array, Float32Array] {
-  const engine = OUTDOORS.carEngine(RATE);
-  const tyres = OUTDOORS.carTyres(RATE);
+  const engine = makeSound('carEngine', RATE) as Float32Array;
+  const tyres = makeSound('carTyres', RATE) as Float32Array;
   const left = new Float32Array(Math.round(seconds * RATE));
   const right = new Float32Array(left.length);
   const s = carSound(speed, 1);
@@ -278,7 +307,7 @@ function carPass(speed: number, aside: number, seconds: number): [Float32Array, 
 
 /** The wind in the leaves for `seconds` as gusts roll by (the gust rising and falling every few seconds), from the game's own zoom, outdoors. */
 function windy(seconds: number): [Float32Array, Float32Array] {
-  const loop = OUTDOORS.leaves(RATE);
+  const loop = makeSound('leaves', RATE) as Stereo;
   const left = new Float32Array(Math.round(seconds * RATE));
   const right = new Float32Array(left.length);
   for (let i = 0; i < left.length; i++) {
@@ -366,3 +395,34 @@ writeFileSync(
   ].join('\n'),
 );
 console.log(`\nwrote ${sounds.length} WAVs and index.md to ${OUT}`);
+
+if (OLD) {
+  const moved: string[] = [];
+  const added: string[] = [];
+  let worst = 0;
+  for (const h of heard) {
+    const was = OLD.get(h.name);
+    if (!was) {
+      added.push(h.name);
+      continue;
+    }
+    const silent = !Number.isFinite(h.loud);
+    const lu = !silent && Number.isFinite(was.loud) ? h.loud - was.loud : silent === !Number.isFinite(was.loud) ? 0 : Infinity;
+    const shift = was.centroid > 0 ? h.centroid / was.centroid - 1 : 0;
+    worst = Math.max(worst, Math.abs(lu));
+    if (Math.abs(lu) > 0.25 || Math.abs(shift) > 0.02) {
+      moved.push(
+        `${h.name.padEnd(15)} ${num(was.loud).padStart(6)} → ${num(h.loud, 2).padStart(6)} LUFS (${lu >= 0 ? '+' : ''}${num(lu, 2)})  centroid ${String(was.centroid).padStart(6)} → ${num(h.centroid, 0).padStart(6)} Hz (${shift >= 0 ? '+' : ''}${(shift * 100).toFixed(1)} %)${Math.abs(lu) > 1 ? '  OVER 1 LU' : ''}`,
+      );
+    }
+  }
+  const missing = [...OLD.keys()].filter((name) => !heard.some((h) => h.name === name));
+  console.log(`\nagainst ${AGAINST}: ${moved.length} moved by more than 0.25 LU or 2 % of their centroid`);
+  for (const line of moved) console.log(line);
+  if (added.length) console.log(`new (not in the old index): ${added.join(', ')}`);
+  if (missing.length) console.log(`missing (in the old index, not made here): ${missing.join(', ')}`);
+  if (worst > 1) {
+    console.error(`a sound moved by ${num(worst, 2)} LU, more than 1.0`);
+    process.exit(1);
+  }
+}

@@ -112,10 +112,17 @@ export class ParkedRides {
       const { turn, size } = placementVariation(this.assets.get(model, 'model')?.vary ?? 0, o.x, o.z);
       const yaw = (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180 + turn;
       const home = !viewed(o.x + o.w / 2, o.z + o.d / 2);
-      return [{ id: o.id, x: c.x, z: c.z, matrix: compose(size, size, size, quatYawPitchRoll(yaw, 0, 0, this.q), c.x, 0, c.z, new Float32Array(16)), look, home, size, turn }];
+      const y = this.ground ? this.ground(c.x, c.z) : 0;
+      return [{ id: o.id, x: c.x, z: c.z, matrix: compose(size, size, size, quatYawPitchRoll(yaw, 0, 0, this.q), c.x, y, c.z, new Float32Array(16)), look, home, size, turn }];
     });
     this.write();
   }
+
+  /** The ground they stand on (game space, m: `BuiltSurface.at` on a land the town follows: a lot's pad), or 0 everywhere (null); set before `build`. */
+  setGround(ground: ((x: number, z: number) => number) | null): void {
+    this.ground = ground;
+  }
+  private ground: ((x: number, z: number) => number) | null = null;
 
   /** Those ridden now (stable ids): not drawn where they stand. */
   hide(ids: ReadonlySet<number>): void {
@@ -169,7 +176,7 @@ export class ParkedRides {
       if (at) {
         const m = this.awayMatrices.get(p.id) ?? new Float32Array(16);
         this.awayMatrices.set(p.id, m);
-        matrix = compose(p.size, p.size, p.size, quatYawPitchRoll(at.yaw + p.turn, 0, 0, this.q), x, 0, z, m);
+        matrix = compose(p.size, p.size, p.size, quatYawPitchRoll(at.yaw + p.turn, 0, 0, this.q), x, this.ground ? this.ground(x, z) : 0, z, m);
       }
       const into = d <= NEAR ? near : far;
       const list = into.get(p.look);
@@ -199,7 +206,9 @@ export class ParkedRides {
     const [near, far] = await Promise.all([buildModel(this.app, `ride:${key}`, entry, footprint), buildModel(this.app, `ride:${key}:far`, entry, footprint, { far: true })]);
     const draws = (t: ModelTemplate) =>
       t.meshes.map((m) => {
-        const draw = new Instances(this.app.graphicsDevice, this.root, m.mesh, m.material, { name: m.name, castShadows: this.shadows, receiveShadows: true, capacity: 4 });
+        // (Keyed by its copies that cast into the sun's map: a bike ridden off across town draws no picture of the
+        // still casters again.)
+        const draw = new Instances(this.app.graphicsDevice, this.root, m.mesh, m.material, { name: m.name, castShadows: this.shadows, receiveShadows: true, capacity: 4, castKeyed: true });
         draw.enabled = false;
         return draw;
       });

@@ -6,9 +6,9 @@
 // lead now follows the game's rate, and the resident's hand goes out with the leaf, so the door opens
 // as the hand reaches the handle.)
 import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
 import { PLAYBACK_RATE } from '../src/render/shared/gameSpeed';
 import { DOOR_SWING, MOVER, PACE, doorLead, goingThrough } from '../src/render/shared/doors';
+import { rustConst } from './snapshotLayout';
 
 /**
  * Walkers at (x, z) heading for (wx, wz), as the renderer packs them: where they are, the point `ahead` m on
@@ -28,9 +28,8 @@ describe('doors', () => {
   const lead = doorLead(1);
 
   test('the pace is how fast sim-core walks them (`world::WALK_SPEED`, m a real second), and the residents step it', () => {
-    const sim = (file: string) => readFileSync(new URL(`../../crates/sim-core/src/${file}`, import.meta.url), 'utf8');
     // (A tick's worth of it, as residents.ts works out how far a walker gets between snapshots: PACE / ticksPerSecond.)
-    const walk = /const WALK_SPEED: f32 = ([\d.]+) \/ TICKS_PER_SECOND as f32;/.exec(sim('world/mod.rs'));
+    const walk = /^([\d.]+) \/ TICKS_PER_SECOND as f32$/.exec(rustConst('WALK_SPEED'));
     expect(walk).not.toBeNull();
     expect(PACE).toBe(Number(walk![1]));
   });
@@ -46,7 +45,7 @@ describe('doors', () => {
   });
 
   test('at every game speed the swing finishes before the walker arrives', () => {
-    for (const s of [1, 2, 3, 4, 5]) {
+    for (const s of [1, 2, 3, 4]) {
       const rate = PLAYBACK_RATE[s];
       const l = doorLead(rate);
       const arrive = l / (PACE * rate);

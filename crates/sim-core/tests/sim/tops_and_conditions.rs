@@ -181,6 +181,7 @@ fn with_the_front_taken_it_is_used_from_beside_the_top() {
             blocked: w.blocked(),
             stairs: w.stair_map(),
             kept_off: &[],
+            steps: None,
         },
     );
     assert_eq!(
@@ -465,7 +466,7 @@ fn the_laundry_is_washed_then_dried_and_piles_up_again() {
     let mut w = world();
     assert_eq!(
         w.households[0].laundry,
-        [1.0, 1.0, 0.0],
+        [1.0, 1.0, 0.0, 0.0],
         "a load dirty and one washed to start with"
     );
     // Fold the washed load...
@@ -493,7 +494,7 @@ fn the_laundry_is_washed_then_dried_and_piles_up_again() {
         "on to the dryer with it"
     );
     w.tick_once();
-    let [dirty, washed, _] = w.households[0].laundry;
+    let [dirty, washed, ..] = w.households[0].laundry;
     assert!(
         dirty < 0.1 && washed == 0.0,
         "washed and taken up to dry: {dirty}, {washed}"
@@ -513,25 +514,16 @@ fn the_laundry_is_washed_then_dried_and_piles_up_again() {
         w.households[0].laundry
     );
     order(&mut w, "washer", 0).unwrap();
-    // Saved and loaded, the washing waiting is kept; a save from before it starts with a load of each.
-    let saved = w.save_json();
-    let loaded = World::from_save_json(CONTENT, &saved).unwrap();
+    // Saved and loaded, the washing waiting is kept.
+    let loaded = World::from_save_json(CONTENT, &w.save_json()).unwrap();
     assert_eq!(loaded.households[0].laundry, w.households[0].laundry);
-    let mut old: serde_json::Value = serde_json::from_str(&saved).unwrap();
-    old["version"] = 29.into();
-    old["households"][0]
-        .as_object_mut()
-        .unwrap()
-        .remove("laundry");
-    let loaded = World::from_save_json(CONTENT, &old.to_string()).unwrap();
-    assert_eq!(loaded.households[0].laundry, [1.0, 1.0, 0.0]);
 }
 
 #[test]
 fn free_will_does_no_chore_with_nothing_to_work_on() {
     let mut w = world();
     w.autonomy = true;
-    w.households[0].laundry = [0.0, 0.0, 0.0];
+    w.households[0].laundry = [0.0; 4];
     w.sims[0].needs[..3].copy_from_slice(&[1.0, 1.0, 0.3]);
     for _ in 0..common::mins(240.0) {
         w.sims[0].needs[2] = w.sims[0].needs[2].min(0.3);
@@ -543,7 +535,7 @@ fn free_will_does_no_chore_with_nothing_to_work_on() {
         );
     }
     // With washing to do, she does it.
-    w.households[0].laundry = [2.0, 0.0, 0.0];
+    w.households[0].laundry = [2.0, 0.0, 0.0, 0.0];
     let mut washed = false;
     for _ in 0..common::mins(240.0) {
         w.sims[0].needs[2] = w.sims[0].needs[2].min(0.3);

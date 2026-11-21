@@ -22,6 +22,7 @@ describe('tree crowns', async () => {
   const { Content } = await import('../src/content/content');
   const { crownClear, objectInfos } = await import('../src/game/housegen');
   const { generateWorld, layoutTown, useTownContent } = await import('../src/game/town');
+  const { WORLD_KINDS } = await import('../src/game/world');
   type Templates = import('../src/game/town').Templates;
 
   const content = await Content.load('http://localhost/content/base.json');
@@ -43,7 +44,7 @@ describe('tree crowns', async () => {
 
   test("no town tree's crown grows into a house", () => {
     let trees = 0;
-    for (const kind of ['small', 'medium', 'dense', 'farm', 'seaside', 'mountain', 'lakeside', 'forest'] as const) {
+    for (const kind of WORLD_KINDS) {
       for (const seed of [11, 4242, 90210]) {
         const town = generateWorld(content, t, kind, seed);
         const layout = layoutTown(content, t, town, null);

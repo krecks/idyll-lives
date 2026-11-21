@@ -13,7 +13,7 @@
 //! of a cranium, cheeks-and-jaw, a muzzle and a chin ellipsoid, rounder on small children), and the
 //! features are offsets on the grid's vertices (`features`): the nose (bridge, tip, wings and base),
 //! the upper lip and philtrum and a soft brow. The ears are not the cage's: each is a piece of its
-//! own set into the head's side (ear.rs). body.rs draws the
+//! own set into the head's side (ear.rs). body/ draws the
 //! smooth head between the grid's vertices too (`onto_head`) and carves the eye sockets into every
 //! point of it (`sockets`): round each eyeball a shallow hollow its front stands out of, the lids over
 //! it. There is no mouth hole: the lips and the mouth plate sit on the face. The LOD keeps the 8 x 12
@@ -426,12 +426,12 @@ pub fn cast(f: &impl Fn(V3) -> f64, o: V3, d: V3) -> V3 {
     o + d * lo
 }
 
-/// The eye sockets carved into the drawn head (body.rs, on every point of the surface rather than on
+/// The eye sockets carved into the drawn head (body/, on every point of the surface rather than on
 /// the cage, so they are as fine as the surface is; `lod`: on the low-detail body's): round each eye
 /// the face goes softly down into a shallow hollow (`SOCKET`) the eye's front stands out of, deepest
 /// at its corners, and on down behind the eyeball (`SLOT`), so the eye shows between the lids right into
-/// their corners. The lids cover all of it (face.rs: they reach out to the face round it), and the skin
-/// is shaded and its shade baked as it is without it (body.rs, build.rs).
+/// their corners. The lids cover all of it (face/: they reach out to the face round it), and the skin
+/// is shaded and its shade baked as it is without it (body/, build.rs).
 pub fn sockets(family: &str, stage: &str, lod: bool, id: &Identity) -> impl Fn(V3) -> V3 {
     let pr = proportions(family, stage);
     let r = eye_radius(family, stage, &pr, id);
@@ -467,7 +467,7 @@ pub fn sockets(family: &str, stage: &str, lod: bool, id: &Identity) -> impl Fn(V
 }
 
 /// Where the ray from the head's middle through a point (model space, metres) leaves the smooth head
-/// (`head_shape`): what body.rs fits the drawn head to between the cage's vertices.
+/// (`head_shape`): what body/ fits the drawn head to between the cage's vertices.
 pub fn onto_head(family: &str, stage: &str, id: &Identity) -> impl Fn(V3) -> V3 {
     let pr = proportions(family, stage);
     let hh = pr.hh * pr.h;
@@ -772,7 +772,7 @@ pub struct HeadFrame {
     pub samples: Vec<V3>,
     pub normals: Vec<V3>,
     pub tris: Vec<[V3; 3]>,
-    /// Its triangles as they would be without the eye sockets (the face the lids lie on, face.rs).
+    /// Its triangles as they would be without the eye sockets (the face the lids lie on, face/).
     pub bare: Vec<[V3; 3]>,
     /// The samples' KD-tree, their typical spacing and lowest height (head.py's module caches).
     tree: KdTree,
@@ -834,7 +834,7 @@ impl HeadFrame {
         (-(d / FOLD_WIDTH).powi(2)).exp() * front
     }
 
-    /// This head with its samples moved (`tri`: body.rs `Surface::head_tri_ix` of its body; `dpos`, `dnor`:
+    /// This head with its samples moved (`tri`: body/ `Surface::head_tri_ix` of its body; `dpos`, `dnor`:
     /// per vertex sample, times `k`), the triangles' centre samples following: the head a face of its own
     /// deforms it into (identity.rs), for `sdf`. Everything else of the frame stays the shared head's.
     pub fn moved(&self, tri: &[[usize; 3]], dpos: &[V3], dnor: &[V3], k: f64) -> HeadFrame {

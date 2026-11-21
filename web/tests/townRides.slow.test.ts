@@ -31,6 +31,7 @@ describe('town rides', async () => {
   const { frontTile } = await import('../src/game/surfaces');
   const { porchPostTiles } = await import('../src/game/porch');
   type Templates = import('../src/game/town').Templates;
+  type WorldOptions = import('../src/core/protocol').WorldOptions;
 
   const content = await Content.load('http://localhost/content/base.json');
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json');
@@ -39,7 +40,9 @@ describe('town rides', async () => {
   const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
   const bikeDefs = new Set<string>(BIKES);
   const rides = new Set<string>([...Object.values(RIDES), ...bikeDefs]);
-  const towns = (['medium', 'dense', 'farm'] as const).flatMap((kind) => [4242, 77].map((seed) => ({ label: `${kind} big ${seed}`, town: populate(content, assets, t, generateWorld(content, t, kind, seed)) })));
+  // (The countryside's town and its city, and farmland.)
+  const kinds: [string, Partial<WorldOptions>][] = [['country', {}], ['country', { town: 'city' }], ['farm', {}]];
+  const towns = kinds.flatMap(([kind, options]) => [4242, 77].map((seed) => ({ label: `${kind}${options.town ? ` ${options.town}` : ''} ${seed}`, town: populate(content, assets, t, generateWorld(content, t, kind, seed, undefined, undefined, options)) })));
   const laid = towns.map(({ label, town }) => ({ label, town, layout: layoutTown(content, t, town, null) }));
   const size = (o: { def: string; rot: number }): [number, number] => {
     const [fw, fd] = content.object(o.def)?.footprint ?? [1, 1];

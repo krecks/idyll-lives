@@ -32,6 +32,8 @@ export interface Settings {
   reducedMotion: boolean;
   /** Interface sounds (buying, building, picking things up). */
   sound: boolean;
+  /** The interface sounds' volume, 0..1 (under `sound`). */
+  effectsVolume: number;
   /** Seconds without input before the camera starts watching on its own; 0: never. */
   directorDelay: number;
   /** How often the watching camera moves on: `calm` lingers, `lively` cuts sooner. */
@@ -40,7 +42,7 @@ export interface Settings {
   hideHudWhileWatching: boolean;
   /** Slow down to normal speed for big moments (a first kiss, a new job, a fight at home). */
   autoSlow: boolean;
-  /** Time-lapse while everyone at home sleeps or is at work. */
+  /** Super speed by itself while everyone at home sleeps or is out (the name is the setting's from before super speed). */
   skipQuietHours: boolean;
   /** The game pauses while another window has focus (and plays on when it's back). */
   pauseOnBlur: boolean;
@@ -65,12 +67,19 @@ export interface Settings {
    * in the browser, from who they are and what's going on (`talk/`; downloads the model).
    */
   voiceWriter: 'lines' | 'llm';
+  /**
+   * Where the language model runs: `auto` uses the graphics card and steps down to the processor
+   * when it is missing or the device test finds it too slow; `gpu` and `cpu` keep the player's choice.
+   */
+  llmDevice: 'auto' | 'cpu' | 'gpu';
   /** Spoken lines also show as text in the speech bubble. */
   subtitles: boolean;
   /** Birds, crickets, the wind, things in use at home, footsteps, cars passing and the town from above (audio/world.ts). */
   worldSound: boolean;
   /** 0..1. */
   worldVolume: number;
+  /** The music's volume (the stereo, the radio, dancing, instruments playing a tune), 0..1 (in the world's); 0: no music. */
+  musicVolume: number;
   /** Every sound, 0..1. */
   masterVolume: number;
   /** Silent while another window has focus (sound always stops while the tab is hidden). */
@@ -98,6 +107,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showFps: false,
   reducedMotion: false,
   sound: true,
+  effectsVolume: 1,
   directorDelay: 20,
   directorPace: 'calm',
   hideHudWhileWatching: false,
@@ -110,9 +120,11 @@ export const DEFAULT_SETTINGS: Settings = {
   voiceDevice: 'auto',
   voiceVolume: 0.8,
   voiceWriter: 'lines',
+  llmDevice: 'auto',
   subtitles: true,
   worldSound: true,
   worldVolume: 0.6,
+  musicVolume: 0.6,
   masterVolume: 1,
   muteInBackground: true,
   tipsSeen: [],
@@ -210,6 +222,8 @@ function sanitize(s: Record<string, unknown>): Settings {
   out.directorDelay = clampNumber(s.directorDelay, 0, 600, DEFAULT_SETTINGS.directorDelay);
   out.voiceVolume = clampNumber(s.voiceVolume, 0, 1, DEFAULT_SETTINGS.voiceVolume);
   out.worldVolume = clampNumber(s.worldVolume, 0, 1, DEFAULT_SETTINGS.worldVolume);
+  out.musicVolume = clampNumber(s.musicVolume, 0, 1, DEFAULT_SETTINGS.musicVolume);
+  out.effectsVolume = clampNumber(s.effectsVolume, 0, 1, DEFAULT_SETTINGS.effectsVolume);
   out.masterVolume = clampNumber(s.masterVolume, 0, 1, DEFAULT_SETTINGS.masterVolume);
   out.graphics = isGraphicsPreset(s.graphics) ? s.graphics : DEFAULT_SETTINGS.graphics;
   out.shading = oneOf(s.shading, ['soft', 'classic'] as const, DEFAULT_SETTINGS.shading);
@@ -221,6 +235,7 @@ function sanitize(s: Record<string, unknown>): Settings {
   out.voiceLanguage = oneOf(s.voiceLanguage, ['en'] as const, DEFAULT_SETTINGS.voiceLanguage);
   out.voiceDevice = oneOf(s.voiceDevice, ['auto', 'cpu', 'gpu'] as const, DEFAULT_SETTINGS.voiceDevice);
   out.voiceWriter = oneOf(s.voiceWriter, ['lines', 'llm'] as const, DEFAULT_SETTINGS.voiceWriter);
+  out.llmDevice = oneOf(s.llmDevice, ['auto', 'cpu', 'gpu'] as const, DEFAULT_SETTINGS.llmDevice);
   const tips = s.tipsSeen;
   out.tipsSeen = Array.isArray(tips) && tips.every((id: unknown): id is string => typeof id === 'string') ? tips : [];
   return out;

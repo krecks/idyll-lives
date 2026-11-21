@@ -15,7 +15,7 @@
 
 import type * as pc from './engine';
 import { Instances } from './instancing';
-import { buildModel, disposeTemplate, type ModelMesh, type ModelTemplate } from './models';
+import { buildModel, disposeTemplate, readMesh, type ModelMesh, type ModelTemplate } from './models';
 import { windSway } from './nature';
 import { TemplateCache } from './templateCache';
 import type { AssetRegistry } from '../../assets/registry';
@@ -174,7 +174,7 @@ export class GameBirds {
   }
 
   /**
-   * The birds a frame on, with the game's clock (`dt` ms; calm hours at speed 4), the hour of `minute`,
+   * The birds a frame on, with the game's clock (`dt` ms), the hour of `minute`,
    * the camera and the residents' heads (`count` of them, the ones drawn as `visible` says), and the seed they scatter.
    */
   update(state: FrameState, minute: number, dt: number, residents: { heads: Float32Array; visible: Uint8Array; seed: Float32Array; seedCount: number }, count: number): boolean {
@@ -182,12 +182,11 @@ export class GameBirds {
     if (this.town) return false;
     const { curr, layout } = state;
     const h = layout.header;
-    const calmHours = h.calm !== undefined && curr[h.calm] > 0;
     this.storey = this.host.storey();
     this.applyVisible();
     const f = this.frame;
     f.dt = dt / 1000;
-    f.speed = calmHours ? 4 : curr[h.speed] | 0;
+    f.speed = curr[h.speed] | 0;
     f.hour = (minute / 60) % 24;
     this.host.eye(this.eye);
     f.residents = residents.heads;
@@ -238,12 +237,12 @@ const NONE: readonly SeenBird[] = [];
 
 /** Every vertex of the meshes `entities` draw, in game space (the world root's mirror undone). */
 function eachVertex(entities: readonly pc.Entity[], fn: (x: number, y: number, z: number) => void): void {
-  const pos: number[] = [];
   for (const entity of entities) {
     const m = entity.getWorldTransform().data;
     for (const mi of entity.render?.meshInstances ?? []) {
-      pos.length = 0;
-      const n = mi.mesh?.getPositions(pos) ?? 0;
+      const pos = mi.mesh ? readMesh(mi.mesh)?.positions : null;
+      if (!pos) continue;
+      const n = pos.length / 3;
       for (let i = 0; i < n; i++) {
         const [x, y, z] = [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]];
         fn(x * m[0] + y * m[4] + z * m[8] + m[12], x * m[1] + y * m[5] + z * m[9] + m[13], -(x * m[2] + y * m[6] + z * m[10] + m[14]));

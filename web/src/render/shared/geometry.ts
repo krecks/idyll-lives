@@ -8,6 +8,15 @@
 
 export type V3 = readonly [number, number, number];
 
+/**
+ * Vertex-colour alpha for the plain finish: [0, 0.5) dielectric, [0.5, 1] metal; roughness scaled within. The
+ * surface shader decodes it (`pc/shaders/surface.ts`).
+ */
+export function encodeFinish(roughness: number, metallic: number): number {
+  const r = Math.min(0.999, Math.max(0, roughness)) * 0.5;
+  return metallic >= 0.5 ? 0.5 + r : r;
+}
+
 /** Custom vertex attribute: [mask A, kind, mask B, 0]; see `WallCutPlugin`. */
 export const WALL_CUT_KIND = 'wallCut';
 
@@ -35,13 +44,29 @@ export interface MeshData {
   vertexAlpha: boolean;
 }
 
+/** A colour channel (0..1, sRGB) as the byte uploaded for it (0..255): rounded, clamped, NaN as 0. */
+function byte(v: number): number {
+  return v <= 0 ? 0 : v >= 1 ? 255 : (v * 255 + 0.5) | 0;
+}
+
+/**
+ * Builds vertex arrays in typed arrays that grow as it goes (positions, normals and UVs in 64-bit
+ * floats, as the plain arrays it used to build in held them, so `meshData` rounds them to 32 bits
+ * the same; colours and the cutaway a byte a channel, as uploaded): a vertex is 72 bytes while it's
+ * built, not 128.
+ */
 export class Geo {
-  readonly pos: number[] = [];
-  readonly nor: number[] = [];
-  readonly uv: number[] = [];
-  readonly col: number[] = [];
-  readonly cut: number[] = [];
-  readonly idx: number[] = [];
+  private p = new Float64Array(0);
+  private n = new Float64Array(0);
+  private t = new Float64Array(0);
+  private c = new Uint8Array(0);
+  private k = new Uint8Array(0);
+  private i = new Uint32Array(0);
+  /** Vertices and triangle corners written. */
+  private nv = 0;
+  private ni = 0;
+  /** Some vertex's alpha is under 1 (the mesh then blends by vertex alpha, `MeshData.vertexAlpha`). */
+  private seeThrough = false;
   /** sRGB colour applied to added vertices. */
   r = 1;
   g = 1;
@@ -51,8 +76,54 @@ export class Geo {
   maskB: number = LOOK.All;
   kind: number = Cut.Keep;
 
+  /** Positions (3 a vertex), as written: a view, valid until the next vertex is added. */
+  get pos(): Float64Array {
+    return this.p.subarray(0, this.nv * 3);
+  }
+  /** Normals (3 a vertex), as `pos`. */
+  get nor(): Float64Array {
+    return this.n.subarray(0, this.nv * 3);
+  }
+  /** UVs (2 a vertex), as `pos`. */
+  get uv(): Float64Array {
+    return this.t.subarray(0, this.nv * 2);
+  }
+  /** Colours (RGBA, a byte a channel), as `pos`. */
+  get col(): Uint8Array {
+    return this.c.subarray(0, this.nv * 4);
+  }
+  /** The cutaway attribute (4 a vertex), as `pos`. */
+  get cut(): Uint8Array {
+    return this.k.subarray(0, this.nv * 4);
+  }
+  /** Triangles (3 corners each), as `pos`. */
+  get idx(): Uint32Array {
+    return this.i.subarray(0, this.ni);
+  }
+  get vertexCount(): number {
+    return this.nv;
+  }
   get empty(): boolean {
-    return this.idx.length === 0;
+    return this.ni === 0;
+  }
+
+  /**
+   * Room for `vertices` more vertices and `corners` more triangle corners: a full array is replaced by
+   * one half as big again (or as big as asked, if that's more), so a merge of a big geometry into an
+   * empty one makes it its own size at once.
+   */
+  private room(vertices: number, corners: number): void {
+    const nv = this.nv + vertices;
+    if (nv * 3 > this.p.length) {
+      const cap = Math.max(nv, Math.ceil((this.p.length / 3) * 1.5), 16);
+      this.p = grown(this.p, cap * 3, this.nv * 3);
+      this.n = grown(this.n, cap * 3, this.nv * 3);
+      this.t = grown(this.t, cap * 2, this.nv * 2);
+      this.c = grown(this.c, cap * 4, this.nv * 4);
+      this.k = grown(this.k, cap * 4, this.nv * 4);
+    }
+    const ni = this.ni + corners;
+    if (ni > this.i.length) this.i = grown(this.i, Math.max(ni, Math.ceil(this.i.length * 1.5), 48), this.ni);
   }
 
   color(hex: string, alpha = 1): this {
@@ -72,14 +143,44 @@ export class Geo {
     return this;
   }
 
+  /** A vertex in the colour and cutaway set now; its index. */
+  point(p: V3, n: V3, u: number, v: number): number {
+    return this.vertex(p, n, u, v);
+  }
+
+  /** A triangle of vertices already added, as given (`poly` winds its own by their normal). */
+  face(a: number, b: number, c: number): this {
+    this.room(0, 3);
+    const i = this.i;
+    i[this.ni++] = a;
+    i[this.ni++] = b;
+    i[this.ni++] = c;
+    return this;
+  }
+
   private vertex(p: V3, n: V3, u: number, v: number, alpha = this.a, tint?: V3): number {
-    this.pos.push(p[0], p[1], p[2]);
-    this.nor.push(n[0], n[1], n[2]);
-    this.uv.push(u, v);
-    if (tint) this.col.push(this.r * tint[0], this.g * tint[1], this.b * tint[2], alpha);
-    else this.col.push(this.r, this.g, this.b, alpha);
-    this.cut.push(this.maskA, this.kind, this.maskB, 0);
-    return this.pos.length / 3 - 1;
+    this.room(1, 0);
+    const at = this.nv++;
+    this.p[at * 3] = p[0];
+    this.p[at * 3 + 1] = p[1];
+    this.p[at * 3 + 2] = p[2];
+    this.n[at * 3] = n[0];
+    this.n[at * 3 + 1] = n[1];
+    this.n[at * 3 + 2] = n[2];
+    this.t[at * 2] = u;
+    this.t[at * 2 + 1] = v;
+    const c = this.c;
+    c[at * 4] = byte(tint ? this.r * tint[0] : this.r);
+    c[at * 4 + 1] = byte(tint ? this.g * tint[1] : this.g);
+    c[at * 4 + 2] = byte(tint ? this.b * tint[2] : this.b);
+    c[at * 4 + 3] = byte(alpha);
+    if (alpha < 1) this.seeThrough = true;
+    const k = this.k;
+    k[at * 4] = this.maskA;
+    k[at * 4 + 1] = this.kind;
+    k[at * 4 + 2] = this.maskB;
+    k[at * 4 + 3] = 0;
+    return at;
   }
 
   /**
@@ -98,30 +199,48 @@ export class Geo {
 
   /** Adds `other`'s geometry (with its cutaway data) in this geometry's colour. */
   append(other: Geo): this {
-    const base = this.pos.length / 3;
-    const n = other.pos.length / 3;
-    this.pos.push(...other.pos);
-    this.nor.push(...other.nor);
-    this.uv.push(...other.uv);
-    this.cut.push(...other.cut);
-    for (let i = 0; i < n; i++) this.col.push(this.r, this.g, this.b, this.a);
-    for (const i of other.idx) this.idx.push(base + i);
+    const base = this.nv;
+    const n = other.nv;
+    this.take(other, 0);
+    const r = byte(this.r);
+    const g = byte(this.g);
+    const b = byte(this.b);
+    const a = byte(this.a);
+    const c = this.c;
+    for (let v = base; v < base + n; v++) {
+      c[v * 4] = r;
+      c[v * 4 + 1] = g;
+      c[v * 4 + 2] = b;
+      c[v * 4 + 3] = a;
+    }
+    if (n && this.a < 1) this.seeThrough = true;
     return this;
   }
 
-  /** Adds `other`'s geometry as it is, its own colours and cutaway data (`append` paints it in this one's colour). */
-  merge(other: Geo): this {
-    const base = this.pos.length / 3;
-    const push = (to: number[], from: readonly number[]) => {
-      for (let i = 0; i < from.length; i++) to.push(from[i]);
-    };
-    push(this.pos, other.pos);
-    push(this.nor, other.nor);
-    push(this.uv, other.uv);
-    push(this.col, other.col);
-    push(this.cut, other.cut);
-    for (let i = 0; i < other.idx.length; i++) this.idx.push(base + other.idx[i]);
+  /** Adds `other`'s geometry as it is, its own colours and cutaway data (`append` paints it in this one's colour), `dy` m higher. */
+  merge(other: Geo, dy = 0): this {
+    const base = this.nv;
+    this.take(other, dy);
+    this.c.set(other.col, base * 4);
+    if (other.seeThrough) this.seeThrough = true;
     return this;
+  }
+
+  /** `other`'s vertices (`dy` m higher) and triangles after this one's, but for their colours (`append`, `merge`). */
+  private take(other: Geo, dy: number): void {
+    const base = this.nv;
+    const n = other.nv;
+    this.room(n, other.ni);
+    this.p.set(other.pos, base * 3);
+    if (dy) for (let i = base * 3 + 1; i < (base + n) * 3; i += 3) this.p[i] += dy;
+    this.n.set(other.nor, base * 3);
+    this.t.set(other.uv, base * 2);
+    this.k.set(other.cut, base * 4);
+    const from = other.i;
+    const to = this.i;
+    for (let i = 0; i < other.ni; i++) to[this.ni + i] = base + from[i];
+    this.nv += n;
+    this.ni += other.ni;
   }
 
   /** Axis-aligned box; `skip` lists faces to omit ('px', 'nx', 'py', 'ny', 'pz', 'nz'). */
@@ -140,7 +259,7 @@ export class Geo {
    * the normal.
    */
   private tri(a: number, b: number, c: number, n: V3): void {
-    const p = this.pos;
+    const p = this.p;
     const ax = p[a * 3] - p[b * 3];
     const ay = p[a * 3 + 1] - p[b * 3 + 1];
     const az = p[a * 3 + 2] - p[b * 3 + 2];
@@ -150,8 +269,34 @@ export class Geo {
     const fx = ay * cz - az * cy;
     const fy = az * cx - ax * cz;
     const fz = ax * cy - ay * cx;
-    if (fx * n[0] + fy * n[1] + fz * n[2] >= 0) this.idx.push(a, b, c);
-    else this.idx.push(a, c, b);
+    if (fx * n[0] + fy * n[1] + fz * n[2] >= 0) this.face(a, b, c);
+    else this.face(a, c, b);
+  }
+
+  /**
+   * Every vertex (and normal) turned so +x runs along (`ux`, `uz`) and +z along (−`uz`, `ux`) (a turn about +y: the
+   * winding stays), then moved by (`dx`, `dy`, `dz`): geometry built in a frame of its own put in place.
+   */
+  place(ux: number, uz: number, dx: number, dy: number, dz: number): this {
+    const p = this.p;
+    const n = this.n;
+    for (let i = 0; i < this.nv * 3; i += 3) {
+      const [x, z] = [p[i], p[i + 2]];
+      p[i] = x * ux - z * uz + dx;
+      p[i + 1] += dy;
+      p[i + 2] = x * uz + z * ux + dz;
+      const [nx, nz] = [n[i], n[i + 2]];
+      n[i] = nx * ux - nz * uz;
+      n[i + 2] = nx * uz + nz * ux;
+    }
+    return this;
+  }
+
+  /** Every vertex lifted onto the ground: `ground(x, z)` m added to its height (a decal laid flat at 0, draped over a land that slopes). */
+  drape(ground: (x: number, z: number) => number): this {
+    const p = this.p;
+    for (let i = 0; i < this.nv * 3; i += 3) p[i + 1] += ground(p[i], p[i + 2]);
+    return this;
   }
 
   /** The geometry's arrays, with its colours and its cutaway attribute if asked for. */
@@ -160,12 +305,19 @@ export class Geo {
       positions: new Float32Array(this.pos),
       normals: new Float32Array(this.nor),
       uvs: new Float32Array(this.uv),
-      indices: this.pos.length / 3 > 65535 ? new Uint32Array(this.idx) : new Uint16Array(this.idx),
-      colors: options.colors ? Uint8Array.from(this.col, (v) => Math.min(255, Math.max(0, Math.round(v * 255)))) : undefined,
-      cut: options.cut ? new Uint8Array(this.cut) : undefined,
-      vertexAlpha: !!options.colors && this.col.some((v, i) => i % 4 === 3 && v < 1),
+      indices: this.nv > 65535 ? this.idx.slice() : new Uint16Array(this.idx),
+      colors: options.colors ? this.col.slice() : undefined,
+      cut: options.cut ? this.cut.slice() : undefined,
+      vertexAlpha: !!options.colors && this.seeThrough,
     };
   }
+}
+
+/** `from`'s first `used` values in a new array `size` long (the rest 0). */
+function grown<T extends Float64Array | Uint8Array | Uint32Array>(from: T, size: number, used: number): T {
+  const to = new (from.constructor as new (n: number) => T)(size);
+  to.set(from.subarray(0, used));
+  return to;
 }
 
 /** Planar UVs in metres along the dominant normal axis (v points up on walls). */
