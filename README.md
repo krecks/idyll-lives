@@ -6,20 +6,20 @@ A home-building game with a living town, in the browser: you build and furnish a
 
 ## Screenshots
 
-![A household at home in Live mode: the Costas painting, tidying up and reading, with the household strip below](docs/screenshots/live.jpg)
+![A household at home in Live mode on a Saturday morning: the Mulders studying, reading in the rocker and tending the flowers, with the household strip below](docs/screenshots/live.jpg)
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/night.jpg" alt="The same home in the evening, its lamps lit"><br><em>Evening: residents switch the lamps on as they come in.</em></td>
-<td width="50%"><img src="docs/screenshots/build.jpg" alt="Build mode with the catalog open"><br><em>Build › Furnish: over 500 objects, every one generated in code.</em></td>
+<td width="50%"><img src="docs/screenshots/night.jpg" alt="The same home at night, its lamps lit"><br><em>Night: the lamps light their rooms, switched on by residents as they come in or by a click.</em></td>
+<td width="50%"><img src="docs/screenshots/build.jpg" alt="Build mode with the catalog open"><br><em>Build › Furnish: 608 objects, every one generated in code.</em></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/neighbourhood.jpg" alt="Choosing a household in a generated town"><br><em>A new game: a generated town and the households who live there.</em></td>
-<td><img src="docs/screenshots/creation.jpg" alt="Creating a resident"><br><em>Creation: make your own household, from babies to elders.</em></td>
+<td><img src="docs/screenshots/neighbourhood.jpg" alt="Step 4 of a new game: the town's households as cards, the chosen one's home lit in the generated town"><br><em>A new game: a generated town and the households who live there.</em></td>
+<td><img src="docs/screenshots/creation.jpg" alt="Creating a resident: the Look tab, with face sliders and hair"><br><em>Creation: make your own household, from babies to elders.</em></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/town.jpg" alt="The town from above: streets, homes, a park and shops"><br><em>The whole town keeps living while you look at one home.</em></td>
-<td><img src="docs/screenshots/menu.jpg" alt="The main menu over a town at golden hour"><br><em>The main menu.</em></td>
+<td><img src="docs/screenshots/town.jpg" alt="The town view over a main town: the square and the church, shops with flats over them, terraces and a car park with its bays"><br><em>The town view: every building a home, flats or a place to go, and the whole town keeps living while you look at one home.</em></td>
+<td><img src="docs/screenshots/menu.jpg" alt="The main menu over the last world made, at golden hour"><br><em>The main menu.</em></td>
 </tr>
 </table>
 
