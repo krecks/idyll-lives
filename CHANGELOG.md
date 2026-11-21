@@ -2,6 +2,10 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
+## Unreleased
+
+- **Floors in every home:** 17 new floor coverings in 12 new finishes, each with a texture of its own: oak and smoked oak parquet laid herringbone, black and white tiles, a white or sage hexagon mosaic, terrazzo, white marble, cork, green, ochre and blue linoleum, polished concrete, herringbone brick pavers, Victorian hall tiles, sisal matting (soft, as a carpet is to the mop) and oak or grey laminate. Every generated house and flat now comes with its floors laid, room by room by what the room is for (`housegen.json` `floorings`), the house's class weighing in: the entrance hall in hall tiles, chequers, terrazzo or stone and never in the living room's floor (it used to get the living room's oak boards), boards or parquet in the living room, tiles or lino in the kitchen, carpet in most bedrooms, a villa's hall in marble, a cottage's in flagstone. They are laid as the Floor tool lays a covering, so Build mode shows and replaces them, and a save keeps them as rectangles (a big world's floors about 190 KB; older saves still open, without them).
+
 ## 0.8.3 — 2026-11-21
 
 - **New game in five steps:** a new game goes Land, Streets & zones, Build, Household and Home. The land is made first, with no town on it; its streets and what goes where are laid out on it; the town is built from that; then you choose who to play and the home they live in. You can go back to any step, and a step keeps what it made until what it was made from changes (a household made in Creation is kept). No world is made before the main menu any more: the menu shows a picture of the last world made (a shipped one on a first visit), and New game makes a fresh world in step 1, a panel ticking off its steps. Measured headless against 0.8.2 when it was made: the menu comes up in 1.55 s instead of 5.7, going back to it is instant instead of 2.1 s, and New game has its world built in 4.9 s.
