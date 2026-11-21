@@ -4,7 +4,7 @@
 
 use crate::common;
 
-use sim_core::surface::{host_of, middle};
+use sim_core::surface::{Top, host_of, hosts_among, middle};
 use sim_core::{Command, World};
 
 const CONTENT: &str = r#"{
@@ -150,6 +150,39 @@ fn no_floor_no_crowding_no_hanging_over_the_edge() {
     .unwrap();
     assert!(host_of(&w.content, &w.objects, w.objects.last().unwrap()).is_some());
     common::check(&w);
+}
+
+#[test]
+fn what_each_thing_stands_on_is_found_the_same_for_all_at_once() {
+    // (As the seats and tops are worked out again, `surface::Links`: each thing looks only at
+    // the tops near it.) A turned table, a counter whose top is off its middle, a nightstand.
+    let mut w = world();
+    buy(&mut w, "table", 2, 2, 1, [0, 0]).unwrap();
+    buy(&mut w, "counter", 4, 1, 0, [0, 0]).unwrap();
+    buy(&mut w, "nightstand", 5, 3, 0, [0, 0]).unwrap();
+    buy(&mut w, "vase", 2, 2, 0, [10, -20]).unwrap();
+    buy(&mut w, "book", 2, 3, 0, [0, 20]).unwrap();
+    buy(&mut w, "book", 4, 1, 0, [0, -20]).unwrap();
+    buy(&mut w, "lamp", 5, 3, 0, [0, 0]).unwrap();
+    let tops: Vec<Top> = w
+        .objects
+        .iter()
+        .filter_map(|o| Top::of(&w.content, o))
+        .collect();
+    let all = hosts_among(&w.content, &w.objects, &tops);
+    for (o, &host) in w.objects.iter().zip(&all) {
+        assert_eq!(
+            host,
+            host_of(&w.content, &w.objects, o),
+            "what object {} stands on",
+            o.id
+        );
+    }
+    assert_eq!(
+        all.iter().flatten().count(),
+        4,
+        "the vase, the books and the lamp each on a top"
+    );
 }
 
 /// A table at (2, 2) facing +z with a vase and a book on it.

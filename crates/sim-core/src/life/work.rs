@@ -146,13 +146,7 @@ pub(super) fn report_skill_ups(w: &mut World, i: usize) {
 /// nothing is charged (nobody lives there yet, or it's the player's home in a Creative game). Bills grow with the value of
 /// everything the household owns and with how many live there.
 pub fn weekly_costs(w: &World, h: usize) -> Option<(i64, i64)> {
-    let rent = w.content.rent.as_ref()?;
-    let household = w.households.get(h)?;
-    if household.player && w.mode == GameMode::Creative {
-        return None;
-    }
-    let plot = household.plot?;
-    let p = &w.plots[plot as usize];
+    let plot = w.households.get(h)?.plot?;
     let home_value: i64 = w
         .objects
         .iter()
@@ -165,6 +159,42 @@ pub fn weekly_costs(w: &World, h: usize) -> Option<(i64, i64)> {
         .iter()
         .filter(|s| s.here() && s.household as usize == h)
         .count();
+    costs_of(w, h, home_value, residents)
+}
+
+/// `weekly_costs` of every household, by household: one pass over the town's objects and
+/// residents for them all, not one per household (the UI asks for every household's ten times
+/// a second; a town of hundreds of homes and tens of thousands of objects made that most of its
+/// update).
+pub fn weekly_costs_all(w: &World) -> Vec<Option<(i64, i64)>> {
+    let mut value = vec![0i64; w.plots.len()];
+    for (o, on) in w.objects.iter().zip(&w.object_plot) {
+        if let Some(v) = on.and_then(|p| value.get_mut(p as usize)) {
+            *v += o.value;
+        }
+    }
+    let mut residents = vec![0usize; w.households.len()];
+    for s in w.sims.iter().filter(|s| s.here()) {
+        if let Some(n) = residents.get_mut(s.household as usize) {
+            *n += 1;
+        }
+    }
+    (0..w.households.len())
+        .map(|h| {
+            let plot = w.households[h].plot?;
+            costs_of(w, h, value[plot as usize], residents[h])
+        })
+        .collect()
+}
+
+/// Household `h`'s weekly costs, given what its home holds is worth and how many live there.
+fn costs_of(w: &World, h: usize, home_value: i64, residents: usize) -> Option<(i64, i64)> {
+    let rent = w.content.rent.as_ref()?;
+    let household = &w.households[h];
+    if household.player && w.mode == GameMode::Creative {
+        return None;
+    }
+    let p = &w.plots[household.plot? as usize];
     if residents == 0 {
         return None;
     }
@@ -182,6 +212,8 @@ pub(super) fn charge_rent(w: &mut World, day: u32) {
     }
     let tick = w.tick;
     let due = clock::weekday(day) == rent.weekday;
+    // (Found before anyone pays: paying moves no object and nobody out.)
+    let costs = if due { weekly_costs_all(w) } else { Vec::new() };
     for h in 0..w.households.len() {
         let Some(member) = w
             .sims
@@ -200,7 +232,7 @@ pub(super) fn charge_rent(w: &mut World, day: u32) {
                 .sum();
             w.households[h].funds += pensions;
         }
-        if due && let Some((rent, bills)) = weekly_costs(w, h) {
+        if due && let Some((rent, bills)) = costs[h] {
             let amount = rent + bills;
             let household = &mut w.households[h];
             let kind = if household.funds >= amount {

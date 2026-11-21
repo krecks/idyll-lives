@@ -74,15 +74,17 @@ impl World {
     /// Front tiles and empty tiles of `plot` that can be reached, as `(tile index)` list.
     pub(crate) fn reach_signature(&self, plot: u32) -> (Vec<bool>, Vec<bool>) {
         let seen = self.reachable(plot);
+        // (Each object's plot first: those elsewhere in town are no concern, and aren't looked at.)
+        debug_assert_eq!(self.objects.len(), self.object_plot.len());
         let fronts = self
             .objects
             .iter()
-            .map(|o| {
-                let def = &self.content.objects[o.def];
+            .zip(&self.object_plot)
+            .map(|(o, &on)| {
                 // Nobody needs to reach a picture, a rug, a table nobody uses or what stands on a
                 // top; chairs pulled up to a table, from any side.
-                self.object_plot[o.id as usize] != Some(plot)
-                    || !def.reached()
+                on != Some(plot)
+                    || !self.content.objects[o.def].reached()
                     || self.approach_tiles(o).iter().any(|&(fx, fz)| {
                         self.lot.in_bounds(fx, fz) && seen[self.lot.tile_index(fx, fz)]
                     })

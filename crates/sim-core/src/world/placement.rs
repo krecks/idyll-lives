@@ -381,12 +381,16 @@ impl World {
 
     /// The objects whose tiles or overhang (`ObjectInstance::reach`) touch the tile rectangle
     /// `[x0, z0, x1, z1)`, in id order: all a fit there needs to look at (`check_fit_among`).
-    pub(crate) fn objects_reaching(&self, [x0, z0, x1, z1]: [i32; 4]) -> Vec<&ObjectInstance> {
+    pub(crate) fn objects_reaching(&self, rect: [i32; 4]) -> Vec<&ObjectInstance> {
+        let m = self.content.overhang_reach();
+        let [x0, z0, x1, z1] = rect;
         self.objects
             .iter()
             .filter(|o| {
-                let [a0, b0, a1, b1] = o.reach(&self.content);
-                a0 < x1 && x0 < a1 && b0 < z1 && z0 < b1
+                o.may_reach(rect, m) && {
+                    let [a0, b0, a1, b1] = o.reach(&self.content);
+                    a0 < x1 && x0 < a1 && b0 < z1 && z0 < b1
+                }
             })
             .collect()
     }
