@@ -206,8 +206,9 @@ impl UiSync {
 
         let mut households = List::default();
         self.households.resize(world.households.len(), 0);
+        let all_costs = life::weekly_costs_all(world);
         for (i, h) in world.households.iter().enumerate() {
-            let costs = life::weekly_costs(world, i);
+            let costs = all_costs[i];
             let view = FundsView {
                 id: h.id,
                 funds: h.funds,

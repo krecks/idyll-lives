@@ -413,7 +413,15 @@ impl World {
         }
         let obj = self.objects.remove(id as usize);
         self.object_plot.remove(id as usize);
-        for (i, o) in self.objects.iter_mut().enumerate() {
+        // (Those before it keep theirs: an object's id is its place in the list.)
+        debug_assert!(
+            self.objects
+                .iter()
+                .enumerate()
+                .take(id as usize)
+                .all(|(i, o)| o.id == i as u32)
+        );
+        for (i, o) in self.objects.iter_mut().enumerate().skip(id as usize) {
             o.id = i as u32;
         }
         // Its tiles are free again, but for what else takes them: the table under a lamp at head
@@ -428,7 +436,26 @@ impl World {
                     self.travel.ground_blocked(i) || self.car_tiles.binary_search(&i).is_ok();
             }
         }
-        for o in 0..self.objects.len() {
+        // (Only what reaches the freed tiles: its `reach` holds every tile it blocks, but for
+        // stairs, which block a storey up. A town has tens of thousands of objects, and a home
+        // finding room for a delivery takes things out again many times over.)
+        let [fx0, fz0, fx1, fz1] = freed.iter().fold(
+            [i32::MAX, i32::MAX, i32::MIN, i32::MIN],
+            |[x0, z0, x1, z1], &(x, z)| [x0.min(x), z0.min(z), x1.max(x + 1), z1.max(z + 1)],
+        );
+        let m = self.content.overhang_reach();
+        let near: Vec<usize> = (0..self.objects.len())
+            .filter(|&o| {
+                let other = &self.objects[o];
+                let reaches = || {
+                    let [a0, b0, a1, b1] = other.reach(&self.content);
+                    a0 < fx1 && fx0 < a1 && b0 < fz1 && fz0 < b1
+                };
+                (other.may_reach([fx0, fz0, fx1, fz1], m) && reaches())
+                    || self.content.objects[other.def].stairs
+            })
+            .collect();
+        for o in near {
             for (x, z) in self.blocking_tiles(&self.objects[o]) {
                 if freed.contains(&(x, z)) {
                     let i = self.tile_slot_mut(x, z);

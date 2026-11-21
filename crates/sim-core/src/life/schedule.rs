@@ -121,6 +121,9 @@ fn job_market(w: &mut World, day: u32) {
         return;
     }
     let tick = w.tick;
+    // (Every household's, found once when first needed: looking for work moves no object and
+    // nobody out.)
+    let mut costs = None;
     for i in 0..w.sims.len() {
         let h = w.sims[i].household as usize;
         if !w.households[h].free_will
@@ -160,7 +163,8 @@ fn job_market(w: &mut World, day: u32) {
         }
         // Short on money, or set on finding work (a goal): look harder.
         let funds = w.households[h].funds;
-        let weekly = weekly_costs(w, h).map_or(0, |(rent, bills)| rent + bills);
+        let weekly = costs.get_or_insert_with(|| weekly_costs_all(w))[h]
+            .map_or(0, |(rent, bills)| rent + bills);
         let (keen, category) = crate::planner::job_search(&w.content, &w.sims[i]);
         let chance = market.daily_chance * keen * if funds < weekly * 2 { 2.0 } else { 1.0 };
         if w.rng.next_f32() >= chance {

@@ -639,8 +639,9 @@ pub(crate) fn refresh(w: &mut World) {
         }
     }
     // (By room, each room's in the residents' order: those asking about a room look at its own,
-    // `in_room`; and whether each resident keeps one shut, `keeps_shut`.)
-    shut.sort_by_key(|s| s.room);
+    // `in_room`; and whether each resident keeps one shut, `keeps_shut`. One each, pushed in the
+    // residents' order: as a stable sort by room, without its copying.)
+    shut.sort_unstable_by_key(|s| (s.room, s.by));
     let mut shut_by = std::mem::take(&mut w.shut_by);
     shut_by.clear();
     shut_by.resize(w.sims.len(), false);

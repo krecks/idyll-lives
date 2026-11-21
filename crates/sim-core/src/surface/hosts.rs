@@ -53,6 +53,46 @@ pub fn host_at(content: &Content, objects: &[ObjectInstance], x: i32, z: i32) ->
     })
 }
 
+/// `host_among` for every object (by id) at once, of `tops` (in id order): each thing on a
+/// surface looks only at the tops near its middle, found by cell, not at every top in town (a
+/// town's thousands of things on its thousands of tables, counters and shelves made rebuilding
+/// `Links` take milliseconds). The same first top in id order as `host_among`: any top that
+/// covers a point is in that point's cell.
+pub fn hosts_among(
+    content: &Content,
+    objects: &[ObjectInstance],
+    tops: &[Top],
+) -> Vec<Option<u32>> {
+    const CELL: f32 = 4.0;
+    let cell = |v: f32| (v / CELL).floor() as i32;
+    let mut cells: std::collections::HashMap<(i32, i32), Vec<usize>> = Default::default();
+    for (k, t) in tops.iter().enumerate() {
+        // (What it covers is within its half-diagonal of its middle, however it's turned; a
+        // little more for rounding.)
+        let r = t.half[0].hypot(t.half[1]) + 0.01;
+        for cx in cell(t.centre[0] - r)..=cell(t.centre[0] + r) {
+            for cz in cell(t.centre[1] - r)..=cell(t.centre[1] + r) {
+                cells.entry((cx, cz)).or_default().push(k);
+            }
+        }
+    }
+    objects
+        .iter()
+        .map(|o| {
+            if content.objects[o.def].layer != Layer::Surface {
+                return None;
+            }
+            let p = middle(content, o);
+            cells
+                .get(&(cell(p[0]), cell(p[1])))?
+                .iter()
+                .map(|&k| &tops[k])
+                .find(|t| t.host != o.id && t.covers(p))
+                .map(|t| t.host)
+        })
+        .collect()
+}
+
 /// The object a thing on the `Surface` layer stands on (None for anything else, or a thing
 /// left with nothing under it).
 pub fn host_of(content: &Content, objects: &[ObjectInstance], obj: &ObjectInstance) -> Option<u32> {

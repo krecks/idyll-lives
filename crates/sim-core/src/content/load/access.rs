@@ -7,6 +7,17 @@ impl Content {
         self.object_index.get(id).copied()
     }
 
+    /// How far past its footprint any object reaches over (content `overhang`, in tiles, along
+    /// either axis however it's turned): for `ObjectInstance::may_reach`.
+    pub(crate) fn overhang_reach(&self) -> i32 {
+        self.objects
+            .iter()
+            .flat_map(|d| &d.overhang)
+            .map(|&(r, f)| r.abs().max(f.abs()))
+            .max()
+            .unwrap_or(0)
+    }
+
     pub fn recipe_index(&self, id: &str) -> Option<usize> {
         self.recipes.iter().position(|r| r.id == id)
     }

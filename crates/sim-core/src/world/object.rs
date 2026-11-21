@@ -560,6 +560,19 @@ impl ObjectInstance {
         r
     }
 
+    /// A quick first test for `reach` touching the tile rectangle `[x0, z0, x1, z1)`, with `m`
+    /// the longest overhang of any object (`Content::overhang_reach`): false only where its reach
+    /// can't, found from its own footprint, so the exact test, which looks up its kind, is left
+    /// for the few near (a town has tens of thousands of objects).
+    pub(crate) fn may_reach(&self, [x0, z0, x1, z1]: [i32; 4], m: i32) -> bool {
+        // (A turned overhang tile is off its corner by at most its larger offset, either way.)
+        let side = i32::from(self.footprint[0].max(self.footprint[1]));
+        self.x - m < x1
+            && x0 < self.x + side + m + 1
+            && self.z - m < z1
+            && z0 < self.z + side + m + 1
+    }
+
     /// Pairs of neighbouring tiles the arm to each `overhang_tiles` crosses (along the row, then
     /// the column): no wall may stand between them.
     pub(crate) fn overhang_edges(&self, content: &Content) -> Vec<((i32, i32), (i32, i32))> {

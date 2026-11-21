@@ -112,10 +112,7 @@ impl Links {
             }
         }
         let tops: Vec<Top> = objects.iter().filter_map(|o| Top::of(content, o)).collect();
-        let host: Vec<Option<u32>> = objects
-            .iter()
-            .map(|o| host_among(content, tops.iter().copied(), o))
-            .collect();
+        let host = hosts_among(content, objects, &tops);
         let base: Vec<(i32, i32)> = objects
             .iter()
             .map(|o| approach_tile(content, nav, o))
