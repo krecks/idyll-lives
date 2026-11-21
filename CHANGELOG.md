@@ -2,6 +2,10 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
+## Unreleased
+
+- **Big towns run lighter:** in a town of 743 residents, 362 households and 29,000 objects (a player's debug report, at 30× speed), the simulation's update of the UI took 8 ms ten times a second: each household's rent and bills went through every object in town. They are now found for every household in one pass, and the update takes 1.5 ms. Midnight's tick, when the town's babies are born and those growing up get new beds, took 82 ms and now takes 32 ms. Trying a delivered bed or crib at each spot no longer goes through every object in town to free its tiles again, nor works out each object's reach first, and the seats and tops are worked out again near each thing, not against every top in town. The same town as before, to the last bit (measured natively on the report's save over two game hours).
+
 ## 0.8.3 — 2026-11-21
 
 - **New game in five steps:** a new game goes Land, Streets & zones, Build, Household and Home. The land is made first, with no town on it; its streets and what goes where are laid out on it; the town is built from that; then you choose who to play and the home they live in. You can go back to any step, and a step keeps what it made until what it was made from changes (a household made in Creation is kept). No world is made before the main menu any more: the menu shows a picture of the last world made (a shipped one on a first visit), and New game makes a fresh world in step 1, a panel ticking off its steps. Measured headless against 0.8.2 when it was made: the menu comes up in 1.55 s instead of 5.7, going back to it is instant instead of 2.1 s, and New game has its world built in 4.9 s.
