@@ -11,6 +11,7 @@
  */
 
 import type { ObjectDef } from '../content/content';
+import * as pmath from './pmath';
 
 /** What these rules read of an object type. */
 export type Shape = Pick<ObjectDef, 'footprint' | 'layer' | 'surface' | 'radius' | 'approach' | 'seatAt'> & Partial<Pick<ObjectDef, 'interactions'>>;
@@ -97,7 +98,7 @@ export function topOf(content: Shapes, o: Placed): Top | null {
   const s = def?.surface;
   if (!s) return null;
   const a = (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180;
-  const [cos, sin] = [Math.cos(a), Math.sin(a)];
+  const [cos, sin] = [pmath.cos(a), pmath.sin(a)];
   const [mx, mz] = middleOf(content, o);
   // Resized, the top grows with the footprint (its margins stay) and rises with the height (sim-core `Top::of`).
   const kind = def.footprint ?? [1, 1];
@@ -157,7 +158,7 @@ export function fitOnTop(content: Shapes, objects: readonly Placed[], x: number,
   for (const o of objects) {
     if (skipped(o) || !onTop(content, o)) continue;
     const [ox, oz] = middleOf(content, o);
-    if (Math.hypot(ox - x, oz - z) < content.radius(content.object(o.def)) + radius - SLACK) return 'crowded';
+    if (pmath.hypot(ox - x, oz - z) < content.radius(content.object(o.def)) + radius - SLACK) return 'crowded';
   }
   return host;
 }
@@ -183,7 +184,7 @@ export function freeSpots(content: Shapes, objects: readonly Placed[], top: Top,
       const [lx, lz] = [ix * step, iz * step];
       const spot = spotAt(top.cx + lx * top.cos + lz * top.sin, top.cz - lx * top.sin + lz * top.cos);
       const [x, z] = [spot.x + 0.5 + spot.offset[0] / 100, spot.z + 0.5 + spot.offset[1] / 100];
-      if (isTop(fitOnTop(content, objects, x, z, radius), top)) found.push({ d: Math.hypot(lx, lz), spot });
+      if (isTop(fitOnTop(content, objects, x, z, radius), top)) found.push({ d: pmath.hypot(lx, lz), spot });
     }
   }
   return found.sort((a, b) => a.d - b.d).map((f) => f.spot);

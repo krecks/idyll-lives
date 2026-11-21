@@ -58,6 +58,7 @@ import {
 import { placeOf, specOf, type WorldSpec } from '../world';
 import type { Edited } from './edited';
 import { entriesOf, frontOf, groundOf, inCentre, townGround, type RoadSpot } from './ground';
+import * as pmath from '../pmath';
 
 type Rand = () => number;
 
@@ -206,7 +207,7 @@ function areaAt(draft: NeighbourhoodDraft, road: number, [x, z]: Pt): number {
   const areas = draft.open?.areas ?? [];
   let [best, far] = [0, Infinity];
   areas.forEach((a, i) => {
-    const d = Math.hypot(Math.max(a.x - x, 0, x - a.x - a.w), Math.max(a.z - z, 0, z - a.z - a.d));
+    const d = pmath.hypot(Math.max(a.x - x, 0, x - a.x - a.w), Math.max(a.z - z, 0, z - a.z - a.d));
     if (d < far) [best, far] = [i, d];
   });
   return best;
@@ -301,13 +302,13 @@ function trailInto(draft: NeighbourhoodDraft, t: Templates, s: PlotSlot, f: Fron
  */
 function ownTrail(draft: NeighbourhoodDraft, t: Templates, slot: number): number {
   const r = plotRect(t, draft.slots[slot]);
-  const off = (q: Rect, [x, z]: Pt) => Math.hypot(Math.max(q.x - x, 0, x - q.x - q.w), Math.max(q.z - z, 0, z - q.z - q.d));
+  const off = (q: Rect, [x, z]: Pt) => pmath.hypot(Math.max(q.x - x, 0, x - q.x - q.w), Math.max(q.z - z, 0, z - q.z - q.d));
   return draft.roads.findIndex((road, i) => {
     if (road.kind !== 'trail') return false;
     const end = road.points[road.points.length - 1];
     if (off(r, end) > 6) return false;
     if (draft.slots.some((s) => s.index !== slot && off(plotRect(t, s), end) <= 6)) return false;
-    return !draft.roads.some((o, j) => j !== i && [o.points[0], o.points[o.points.length - 1]].some(([x, z]) => Math.hypot(x - end[0], z - end[1]) < 3));
+    return !draft.roads.some((o, j) => j !== i && [o.points[0], o.points[o.points.length - 1]].some(([x, z]) => pmath.hypot(x - end[0], z - end[1]) < 3));
   });
 }
 

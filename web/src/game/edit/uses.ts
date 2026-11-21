@@ -14,6 +14,7 @@ import type { Pt, RoadPlan } from '../roads';
 import type { NeighbourhoodDraft } from '../town';
 import { packUses, unpackUses, USE_CELL, USE_CODE, useGrid, usesFor, type UseKind, type UseLayer } from '../uses';
 import type { Edited } from './edited';
+import * as pmath from '../pmath';
 
 /** A dab of the brush: its middle on the town (m) and how wide it paints (m). */
 export interface UseStamp {
@@ -58,13 +59,13 @@ function roadCells(roads: readonly RoadPlan[], cols: number, rows: number): Uint
     const span = Math.ceil(reach / USE_CELL) + 1;
     for (let k = 0; k + 1 < r.points.length; k++) {
       const [[ax, az], [bx, bz]] = [r.points[k], r.points[k + 1]];
-      const steps = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az)));
+      const steps = Math.max(1, Math.ceil(pmath.hypot(bx - ax, bz - az)));
       for (let j = 0; j <= steps; j++) {
         const [px, pz] = [ax + ((bx - ax) * j) / steps, az + ((bz - az) * j) / steps];
         const [ci, cj] = [Math.floor(px / USE_CELL), Math.floor(pz / USE_CELL)];
         for (let y = Math.max(0, cj - span); y <= Math.min(rows - 1, cj + span); y++) {
           for (let x = Math.max(0, ci - span); x <= Math.min(cols - 1, ci + span); x++) {
-            if (Math.hypot((x + 0.5) * USE_CELL - px, (y + 0.5) * USE_CELL - pz) <= reach) out[y * cols + x] = 1;
+            if (pmath.hypot((x + 0.5) * USE_CELL - px, (y + 0.5) * USE_CELL - pz) <= reach) out[y * cols + x] = 1;
           }
         }
       }
@@ -151,7 +152,7 @@ function toSegment([px, pz]: Pt, [ax, az]: Pt, [bx, bz]: Pt): number {
   const [dx, dz] = [bx - ax, bz - az];
   const l2 = dx * dx + dz * dz;
   const u = l2 > 0 ? Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / l2)) : 0;
-  return Math.hypot(px - ax - dx * u, pz - az - dz * u);
+  return pmath.hypot(px - ax - dx * u, pz - az - dz * u);
 }
 
 /**

@@ -21,6 +21,7 @@ import { deckTiles } from './macro';
 import { fbm, ridged, smoothstep } from './noise';
 import type { NeighbourhoodDraft } from './town';
 import { COURT, lengths, nearest, pointAt, RoadIndex, type Pt } from './roads';
+import * as pmath from './pmath';
 
 /** The steepest a town's or a village's ground is tilted (rise per m: `gentler`). */
 export const GENTLE_TILT = 0.06;
@@ -535,7 +536,7 @@ function blame(key: string, at: readonly Pt[], steps: readonly Map<string, reado
 function apart(a: readonly Pt[], b: readonly Pt[]): number {
   const thin = (p: readonly Pt[]) => (p.length > 16 ? p.filter((_, i) => i % 4 === 0 || i === p.length - 1) : p);
   let d = Infinity;
-  for (const [x, z] of thin(a)) for (const [u, v] of thin(b)) d = Math.min(d, Math.hypot(x - u, z - v));
+  for (const [x, z] of thin(a)) for (const [u, v] of thin(b)) d = Math.min(d, pmath.hypot(x - u, z - v));
   return d;
 }
 
@@ -1033,7 +1034,7 @@ function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array
     }
     const det = sxx * szz - sxz * sxz;
     let [bx, bz] = Math.abs(det) > 1e-9 ? [(sxh * szz - szh * sxz) / det, (szh * sxx - sxh * sxz) / det] : [sxx > 0 ? sxh / sxx : 0, szz > 0 ? szh / szz : 0];
-    const tilt = Math.hypot(bx, bz);
+    const tilt = pmath.hypot(bx, bz);
     if (tilt > GENTLE_TILT) [bx, bz] = [(bx * GENTLE_TILT) / tilt, (bz * GENTLE_TILT) / tilt];
     // (Tilted less, the plane through the land's mean again.)
     planes.push({ box, a: mean, bx, bz, cx, cz, town: !own });
@@ -1052,13 +1053,13 @@ function gentler(h: Float32Array, cols: number, rows: number, dist: Float32Array
     for (let j = j0; j <= j1; j++) {
       for (let i = i0; i <= i1; i++) {
         const [x, z] = [i * c, j * c];
-        const off = Math.hypot(Math.max(p.box.x0 - x, 0, x - p.box.x1), Math.max(p.box.z0 - z, 0, z - p.box.z1));
+        const off = pmath.hypot(Math.max(p.box.x0 - x, 0, x - p.box.x1), Math.max(p.box.z0 - z, 0, z - p.box.z1));
         const w = 1 - smoothstep(0, reach, off);
         if (w <= 0) continue;
         const k = j * cols + i;
         // (Each plane's say in the blend falls off far faster than its pull: in its own box, its own; a town's or a
         // village's over a lone lot's near it.)
-        const say = w ** 8 * (p.town ? TOWN_SAY : 1);
+        const say = pmath.pow(w, 8) * (p.town ? TOWN_SAY : 1);
         sum[k] += say * (p.a + p.bx * (x - p.cx) + p.bz * (z - p.cz));
         weight[k] += say;
         if (w > most[k]) most[k] = w;

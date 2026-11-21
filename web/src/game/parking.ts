@@ -11,6 +11,7 @@ import { flatsTemplate } from './flats';
 import { add, r2, rectFrom, tilesOf } from './footprints';
 import { leftOf, nearest, pointAt, RoadIndex, roadIndex, roadLengths, straightAround, type Pt, type RoadPlan } from './roads';
 import { boundsOf, houseDrive, houseTemplate, lineMeets, onLot, turnOnto, type Frontage, type Ground, type PlotSlot, type Rect, type Templates } from './town';
+import * as pmath from './pmath';
 
 // ---- The simulation's parking rules (sim-core `cars/parking.rs`, held to it by `web/tests/parkingRules.test.ts`) ----
 
@@ -65,12 +66,12 @@ export function carParkAt(roads: readonly RoadPlan[], f: Pick<Frontage, 'road' |
   const bays = Array.from({ length: n }, (_, k): ParkingBay => {
     const mid = add(add(p, t, BAY_WIDE * (k - (n - 1) / 2)), out, reach + BAY_DEEP / 2);
     const q = pointAt(road.points, nearest(road.points, mid[0], mid[1], ls).s, ls).p;
-    return { x: r2(mid[0]), z: r2(mid[1]), yaw: r4(Math.atan2(mid[0] - q[0], mid[1] - q[1])), area };
+    return { x: r2(mid[0]), z: r2(mid[1]), yaw: r4(pmath.atan2(mid[0] - q[0], mid[1] - q[1])), area };
   });
   const front = add(p, out, reach);
   const poly = rectFrom(front, t, out, BAY_WIDE * n, BAY_DEEP).map(([x, z]): [number, number] => [r2(x), r2(z)]);
   const sign = add(add(p, t, (BAY_WIDE * n) / 2 + 1), out, reach + 0.4);
-  const park: CarPark = { area, poly, sign: [r2(sign[0]), r2(sign[1]), r4(Math.atan2(-out[0], -out[1]))], ...also };
+  const park: CarPark = { area, poly, sign: [r2(sign[0]), r2(sign[1]), r4(pmath.atan2(-out[0], -out[1]))], ...also };
   return { park, bays, clear: rectFrom(front, t, out, BAY_WIDE * n + 2 * MOUTH_CLEAR, BAY_DEEP) };
 }
 
@@ -99,7 +100,7 @@ export function carParkFits(roads: readonly RoadPlan[], ground: Ground, f: Front
   // bays are tiles, and a row across the grid leaves its middle cars' doors none a driver can get to.)
   if (n > 2) {
     const { t } = pointAt(road.points, f.s, ls);
-    const a = Math.atan2(Math.abs(t[1]), Math.abs(t[0]));
+    const a = pmath.atan2(Math.abs(t[1]), Math.abs(t[0]));
     if (Math.min(a, Math.PI / 2 - a) > ROW_SLANT) return null;
   }
   for (const s of [f.s - half, f.s + half]) if (!offCorners({ ...f, s, p: pointAt(road.points, s, ls).p })) return null;
@@ -136,7 +137,7 @@ export function parkAlong(roads: readonly RoadPlan[], ground: Ground, frontage: 
 
 /** Of `frontage`, that on the streets near a main town's square (its middle `sq`; no country road), where its car park goes. */
 export function bySquare(roads: readonly RoadPlan[], frontage: readonly Frontage[], sq: Pt): Frontage[] {
-  return frontage.filter((f) => Math.hypot(f.p[0] - sq[0], f.p[1] - sq[1]) < SQUARE_REACH && roads[f.road].kind !== 'country');
+  return frontage.filter((f) => pmath.hypot(f.p[0] - sq[0], f.p[1] - sq[1]) < SQUARE_REACH && roads[f.road].kind !== 'country');
 }
 
 /** Of `frontage` (along a big place's road), that on the place's side of it near its lot `r` (`Frontage.far` from its middle), where its car park goes. */
@@ -176,7 +177,7 @@ export function carParkRect(p: Pick<CarPark, 'poly'>): Rect {
 
 /** The box (town tiles) a bay covers: its `BAY_WIDE` × `BAY_DEEP` turned to its yaw. */
 export function bayRect(b: Pick<ParkingBay, 'x' | 'z' | 'yaw'>): Rect {
-  const [ax, az] = [Math.abs(Math.sin(b.yaw)), Math.abs(Math.cos(b.yaw))];
+  const [ax, az] = [Math.abs(pmath.sin(b.yaw)), Math.abs(pmath.cos(b.yaw))];
   const hw = (BAY_WIDE * az + BAY_DEEP * ax) / 2;
   const hd = (BAY_WIDE * ax + BAY_DEEP * az) / 2;
   const [x0, z0] = [Math.floor(b.x - hw), Math.floor(b.z - hd)];
@@ -216,7 +217,7 @@ function offSegment([x, z]: Pt, [ax, az]: Pt, [bx, bz]: Pt): number {
   const [dx, dz] = [bx - ax, bz - az];
   const l2 = dx * dx + dz * dz;
   const k = l2 ? Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2)) : 0;
-  return Math.hypot(x - ax - dx * k, z - az - dz * k);
+  return pmath.hypot(x - ax - dx * k, z - az - dz * k);
 }
 
 /** Grid cells (m) the driveways are filed under for `clearOf`. */
@@ -247,7 +248,7 @@ function drivesNear(drives: readonly DriveLine[], x: number, z: number): readonl
  * `by_a_mouth`). Only the driveways filed near a bay are measured (`drivesNear`): one further off is clear of it.
  */
 export function clearOf(bays: readonly Pick<ParkingBay, 'x' | 'z'>[], drives: readonly DriveLine[]): boolean {
-  return bays.every((b) => drivesNear(drives, b.x, b.z).every((d) => Math.hypot(b.x - d.mouth[0], b.z - d.mouth[1]) >= MOUTH_CLEAR && offSegment([b.x, b.z], d.inner, d.mouth) >= DRIVE_CLEAR));
+  return bays.every((b) => drivesNear(drives, b.x, b.z).every((d) => pmath.hypot(b.x - d.mouth[0], b.z - d.mouth[1]) >= MOUTH_CLEAR && offSegment([b.x, b.z], d.inner, d.mouth) >= DRIVE_CLEAR));
 }
 
 /** Each list of roads' index for `nearestRoad`, and how many roads it was made for (made again once more are added). */

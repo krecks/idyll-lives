@@ -10,6 +10,7 @@
  */
 
 import type { RoadEnd, RoadPlan } from '../core/protocol';
+import * as pmath from './pmath';
 
 export type { RoadEnd, RoadPlan };
 type Rand = () => number;
@@ -40,7 +41,7 @@ export function curve(ctrl: readonly Pt[], step = 1, closed = false): Pt[] {
   const spans = closed ? n : n - 1;
   for (let i = 0; i < spans; i++) {
     const [p0, p1, p2, p3] = [at(i - 1), at(i), at(i + 1), at(i + 2)];
-    const k = Math.max(2, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / step));
+    const k = Math.max(2, Math.ceil(pmath.hypot(p2[0] - p1[0], p2[1] - p1[1]) / step));
     for (let j = 0; j < k; j++) {
       const t = j / k;
       const [t2, t3] = [t * t, t * t * t];
@@ -55,7 +56,7 @@ export function curve(ctrl: readonly Pt[], step = 1, closed = false): Pt[] {
 /** Arc length at each point of a polyline. */
 export function lengths(pts: readonly Pt[]): number[] {
   const out = [0];
-  for (let i = 1; i < pts.length; i++) out.push(out[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  for (let i = 1; i < pts.length; i++) out.push(out[i - 1] + pmath.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
   return out;
 }
 
@@ -70,7 +71,7 @@ export function roadLengths(road: Pick<RoadPlan, 'points'>): readonly number[] {
 /** The unit direction along a polyline at point `i`. */
 export function tangent(pts: readonly Pt[], i: number): Pt {
   const [a, b] = [pts[Math.max(0, i - 1)], pts[Math.min(pts.length - 1, i + 1)]];
-  const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+  const l = pmath.hypot(b[0] - a[0], b[1] - a[1]) || 1;
   return [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
 }
 
@@ -89,7 +90,7 @@ export function pointAt(pts: readonly Pt[], s: number, ls: readonly number[] = l
 /** Whether a polyline turns no more than `most` radians from `half` m before arc length `s` to `half` m after it (its directions there). */
 export function straightAround(pts: readonly Pt[], s: number, half: number, most: number, ls: readonly number[] = lengths(pts)): boolean {
   const [a, b] = [pointAt(pts, s - half, ls).t, pointAt(pts, s + half, ls).t];
-  return a[0] * b[0] + a[1] * b[1] >= Math.cos(most);
+  return a[0] * b[0] + a[1] * b[1] >= pmath.cos(most);
 }
 
 /**
@@ -159,7 +160,7 @@ function metres(pts: readonly Pt[]): Pt[] {
   const at: Pt[] = [];
   for (let i = 1; i < pts.length; i++) {
     const [a, b] = [pts[i - 1], pts[i]];
-    const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1])));
+    const n = Math.max(1, Math.ceil(pmath.hypot(b[0] - a[0], b[1] - a[1])));
     for (let k = 0; k < n; k++) at.push([lerp(a[0], b[0], k / n), lerp(a[1], b[1], k / n)]);
   }
   at.push(pts[pts.length - 1]);
@@ -211,11 +212,11 @@ function besideMask(A: readonly Pt[], ra: RoadPlan, rb: RoadPlan, same: number, 
       const [dx, dz] = [bx - ax, bz - az];
       const l2 = dx * dx + dz * dz || 1;
       const f = Math.max(0, Math.min(1, ((pt[0] - ax) * dx + (pt[1] - az) * dz) / l2));
-      const e = Math.hypot(pt[0] - ax - f * dx, pt[1] - az - f * dz);
+      const e = pmath.hypot(pt[0] - ax - f * dx, pt[1] - az - f * dz);
       if (e < d) [d, tx, tz, past] = [e, dx / Math.sqrt(l2), dz / Math.sqrt(l2), (f === 0 && s === 1) || (f === 1 && s === rb.points.length - 1)];
     }
     const [u, v] = [A[Math.max(0, k - 1)], A[Math.min(A.length - 1, k + 1)]];
-    const l = Math.hypot(v[0] - u[0], v[1] - u[1]) || 1;
+    const l = pmath.hypot(v[0] - u[0], v[1] - u[1]) || 1;
     const along = Math.abs(((v[0] - u[0]) * tx + (v[1] - u[1]) * tz) / l) > 0.9;
     return d > same && d < far && along && !past;
   });
@@ -245,7 +246,7 @@ export function sharpestTurn(pts: readonly Pt[], span = 20): { angle: number; s:
     const [p1, i1] = at(s, j);
     const [p2, i2] = at(s + span, k);
     [i, j, k] = [i0, i1, i2];
-    const turn = Math.abs(Math.atan2((p1[0] - p0[0]) * (p2[1] - p1[1]) - (p1[1] - p0[1]) * (p2[0] - p1[0]), (p1[0] - p0[0]) * (p2[0] - p1[0]) + (p1[1] - p0[1]) * (p2[1] - p1[1])));
+    const turn = Math.abs(pmath.atan2((p1[0] - p0[0]) * (p2[1] - p1[1]) - (p1[1] - p0[1]) * (p2[0] - p1[0]), (p1[0] - p0[0]) * (p2[0] - p1[0]) + (p1[1] - p0[1]) * (p2[1] - p1[1])));
     if (turn > best.angle) best = { angle: turn, s };
   }
   return best;
@@ -259,7 +260,7 @@ export function nearest(pts: readonly Pt[], x: number, z: number, ls?: readonly 
     const [dx, dz] = [bx - ax, bz - az];
     const l2 = dx * dx + dz * dz || 1;
     const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2));
-    const d = Math.hypot(x - (ax + dx * t), z - (az + dz * t));
+    const d = pmath.hypot(x - (ax + dx * t), z - (az + dz * t));
     if (d < dist) {
       // Left of the way along: (dx, dz) turned a quarter, as `leftOf`.
       const cross = (x - ax) * dz - (z - az) * dx;
@@ -268,7 +269,7 @@ export function nearest(pts: readonly Pt[], x: number, z: number, ls?: readonly 
   }
   // (The arc length to the nearest segment's start, summed as `lengths` sums it, only that far: most ask how far only.)
   let s = ls?.[at] ?? 0;
-  if (!ls) for (let i = 1; i <= at; i++) s += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  if (!ls) for (let i = 1; i <= at; i++) s += pmath.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
   return { dist, s: s + along, side };
 }
 
@@ -299,7 +300,7 @@ export function through(rand: Rand, box: Box, { along = 'x', at = 0.5, amp = 10,
 export function branch(parent: RoadPlan, s: number, side: 1 | -1, length: number, curl: number, { width = LANE_WIDTH, end = 'dead' as RoadEnd } = {}): RoadPlan {
   const { p, t } = pointAt(parent.points, s);
   const n = leftOf(t).map((v) => v * side) as Pt;
-  const turn = (a: number): Pt => [n[0] * Math.cos(a) - n[1] * Math.sin(a), n[0] * Math.sin(a) + n[1] * Math.cos(a)];
+  const turn = (a: number): Pt => [n[0] * pmath.cos(a) - n[1] * pmath.sin(a), n[0] * pmath.sin(a) + n[1] * pmath.cos(a)];
   const ctrl: Pt[] = [p];
   for (const k of [0.34, 0.67, 1]) {
     const d = turn(curl * k);
@@ -336,7 +337,7 @@ export function ring(rand: Rand, cx: number, cz: number, rx: number, rz: number,
   for (let i = 0; i < n; i++) {
     const a = turn + (i / n) * Math.PI * 2;
     const k = range(rand, 0.88, 1.08);
-    ctrl.push([cx + Math.cos(a) * rx * k, cz + Math.sin(a) * rz * k]);
+    ctrl.push([cx + pmath.cos(a) * rx * k, cz + pmath.sin(a) * rz * k]);
   }
   return { points: curve(ctrl, 1, true), width, ends: ['loop', 'loop'] };
 }
@@ -344,7 +345,7 @@ export function ring(rand: Rand, cx: number, cz: number, rx: number, rz: number,
 /** A roundabout: a small ring round (`cx`, `cz`), `r` m to the middle of its lane, a fountain in the middle. */
 export function roundabout(cx: number, cz: number, r: number, width = LANE_WIDTH): RoadPlan {
   const n = Math.max(12, Math.round((2 * Math.PI * r) / 1.5));
-  const ctrl: Pt[] = Array.from({ length: n }, (_, i): Pt => [cx + Math.cos((i / n) * Math.PI * 2) * r, cz + Math.sin((i / n) * Math.PI * 2) * r]);
+  const ctrl: Pt[] = Array.from({ length: n }, (_, i): Pt => [cx + pmath.cos((i / n) * Math.PI * 2) * r, cz + pmath.sin((i / n) * Math.PI * 2) * r]);
   return { points: curve(ctrl, 1, true), width, ends: ['loop', 'loop'], island: 'fountain' };
 }
 
@@ -360,7 +361,7 @@ export function crossing(a: RoadPlan, b: RoadPlan, within = 2): Pt | null {
 
 /** `road` with what lies within `r` m of `c` taken out: the pieces either side, joining what goes there. */
 export function cutAround(road: RoadPlan, c: Pt, r: number): RoadPlan[] {
-  const near = (p: Pt) => Math.hypot(p[0] - c[0], p[1] - c[1]) < r;
+  const near = (p: Pt) => pmath.hypot(p[0] - c[0], p[1] - c[1]) < r;
   const first = road.points.findIndex(near);
   if (first < 0) return [road];
   let last = first;
@@ -384,7 +385,7 @@ export function lane(ctrl: readonly Pt[], ends: [RoadEnd, RoadEnd], width = LANE
 export function evenly(pts: readonly Pt[], most: number): Pt[] {
   const out: Pt[] = pts.length ? [pts[0]] : [];
   for (let i = 1; i < pts.length; i++) {
-    const n = Math.ceil(Math.hypot(pts[i - 1][0] - pts[i][0], pts[i - 1][1] - pts[i][1]) / most);
+    const n = Math.ceil(pmath.hypot(pts[i - 1][0] - pts[i][0], pts[i - 1][1] - pts[i][1]) / most);
     for (let k = 1; k < n; k++) out.push([pts[i - 1][0] + ((pts[i][0] - pts[i - 1][0]) * k) / n, pts[i - 1][1] + ((pts[i][1] - pts[i - 1][1]) * k) / n]);
     out.push(pts[i]);
   }
@@ -415,14 +416,14 @@ export interface Fit {
 }
 
 const unit = (x: number, z: number): Pt => {
-  const l = Math.hypot(x, z) || 1;
+  const l = pmath.hypot(x, z) || 1;
   return [x / l, z / l];
 };
 /** `v` turned `a` radians. */
-const turned = ([x, z]: Pt, a: number): Pt => [x * Math.cos(a) - z * Math.sin(a), x * Math.sin(a) + z * Math.cos(a)];
+const turned = ([x, z]: Pt, a: number): Pt => [x * pmath.cos(a) - z * pmath.sin(a), x * pmath.sin(a) + z * pmath.cos(a)];
 const dot = (a: Pt, b: Pt) => a[0] * b[0] + a[1] * b[1];
 /** The signed angle from `a` to `b` (radians). */
-const angleTo = (a: Pt, b: Pt) => Math.atan2(a[0] * b[1] - a[1] * b[0], dot(a, b));
+const angleTo = (a: Pt, b: Pt) => pmath.atan2(a[0] * b[1] - a[1] * b[0], dot(a, b));
 
 /** The way a road leaves at its last point (a unit direction, from 3 m back). */
 export function endDir(pts: readonly Pt[]): Pt {
@@ -437,13 +438,13 @@ export function endDir(pts: readonly Pt[]): Pt {
  * directions): a cubic Bézier, as a `curve` (a point every metre or so).
  */
 export function connector(a: Pt, da: Pt, b: Pt, db: Pt): Pt[] {
-  const k = Math.hypot(b[0] - a[0], b[1] - a[1]) * 0.38;
+  const k = pmath.hypot(b[0] - a[0], b[1] - a[1]) * 0.38;
   const p1: Pt = [a[0] + da[0] * k, a[1] + da[1] * k];
   const p2: Pt = [b[0] - db[0] * k, b[1] - db[1] * k];
   const ctrl: Pt[] = [];
   for (let i = 0; i <= 6; i++) {
     const t = i / 6;
-    const [u0, u1, u2, u3] = [(1 - t) ** 3, 3 * (1 - t) ** 2 * t, 3 * (1 - t) * t * t, t ** 3];
+    const [u0, u1, u2, u3] = [pmath.pow(1 - t, 3), 3 * pmath.pow(1 - t, 2) * t, 3 * (1 - t) * t * t, pmath.pow(t, 3)];
     ctrl.push([u0 * a[0] + u1 * p1[0] + u2 * p2[0] + u3 * b[0], u0 * a[1] + u1 * p1[1] + u2 * p2[1] + u3 * b[1]]);
   }
   return curve(ctrl);
@@ -495,7 +496,7 @@ export function clearOf(pts: readonly Pt[], width: number, roads: readonly RoadP
       const free = clear * 1.8 + 1;
       if (near.dist < clear && !((r === from && s < free) || (r === to && u < free))) return false;
       // Alongside: beside the other (not beyond its end), running the same way.
-      if (s > 20 && u > 20 && near.dist < roads[r].width / 2 + apart && Math.abs(dot(t, near.t)) > Math.cos(MEET)) {
+      if (s > 20 && u > 20 && near.dist < roads[r].width / 2 + apart && Math.abs(dot(t, near.t)) > pmath.cos(MEET)) {
         const q = pointAt(roads[r].points, near.s).p;
         if (Math.abs(dot([x - q[0], z - q[1]], near.t)) < near.dist * 0.5) return false;
       }
@@ -527,7 +528,7 @@ function joinFor(roads: readonly RoadPlan[], index: RoadIndex, i: number, fit: F
   const cands: { T: Pt; a: Pt; to: number; dead: boolean; est: number }[] = [];
   const add = (T: Pt, a: Pt, to: number, dead: boolean) => {
     const v = unit(T[0] - E[0], T[1] - E[1]);
-    const L = Math.hypot(T[0] - E[0], T[1] - E[1]);
+    const L = pmath.hypot(T[0] - E[0], T[1] - E[1]);
     if (L < 8 || L > REACH || dot(v, d) < -0.3) return;
     // One bend: the way there between the way out and the way in.
     const [turn, first] = [angleTo(d, a), angleTo(d, v)];
@@ -563,7 +564,7 @@ function joinFor(roads: readonly RoadPlan[], index: RoadIndex, i: number, fit: F
     if (!c.dead) {
       // Square enough to the road it meets, with room there.
       const tq = pointAt(roads[c.to].points, index.along(c.to, c.T[0], c.T[1])).t;
-      if (Math.abs(Math.sin(angleTo(endDir(pts), tq))) < Math.sin(MEET)) continue;
+      if (Math.abs(pmath.sin(angleTo(endDir(pts), tq))) < pmath.sin(MEET)) continue;
       if (!roomAt(index, c.T, [c.to, i])) continue;
     }
     if (!clearOf(pts, r.width, roads, index, fit, i, c.to)) continue;
@@ -659,12 +660,12 @@ export function connect(laid: readonly RoadPlan[], fit: Fit, courts = 2): RoadPl
 function turnCorner(roads: readonly RoadPlan[], i: number, s: number): RoadPlan[] {
   const r = roads[i];
   const corner = pointAt(r.points, s).p;
-  const k = roads.findIndex((o, n) => n !== i && [o.points[0], o.points[o.points.length - 1]].some((p) => Math.hypot(p[0] - corner[0], p[1] - corner[1]) < Math.max(o.width, r.width) / 2 + 1.5));
+  const k = roads.findIndex((o, n) => n !== i && [o.points[0], o.points[o.points.length - 1]].some((p) => pmath.hypot(p[0] - corner[0], p[1] - corner[1]) < Math.max(o.width, r.width) / 2 + 1.5));
   if (k < 0) return roads.map((x, n) => (n === i ? { ...x, points: cutAt(x, s), ends: [x.ends[0], 'join'] } : x));
   const o = roads[k];
   const first = o.points[0];
   // The other road leading away from the corner.
-  const away = Math.hypot(first[0] - corner[0], first[1] - corner[1]) < Math.hypot(o.points[o.points.length - 1][0] - corner[0], o.points[o.points.length - 1][1] - corner[1]);
+  const away = pmath.hypot(first[0] - corner[0], first[1] - corner[1]) < pmath.hypot(o.points[o.points.length - 1][0] - corner[0], o.points[o.points.length - 1][1] - corner[1]);
   const on = away ? o.points : [...o.points].reverse();
   const onEnds: [RoadEnd, RoadEnd] = away ? o.ends : [o.ends[1], o.ends[0]];
   const before = cutAt(r, Math.max(1, s - 8));
@@ -701,7 +702,7 @@ export function crossStreet(roads: readonly RoadPlan[], index: RoadIndex, from: 
   const b = bends(pts);
   if (b.tight || Math.min(b.left, b.right) > 0.3) return null;
   const tp = pointAt(roads[from].points, index.along(from, p[0], p[1])).t;
-  if (Math.abs(Math.sin(angleTo(dir, tp))) < Math.sin(MEET) || Math.abs(Math.sin(angleTo(endDir(pts), tq))) < Math.sin(MEET)) return null;
+  if (Math.abs(pmath.sin(angleTo(dir, tp))) < pmath.sin(MEET) || Math.abs(pmath.sin(angleTo(endDir(pts), tq))) < pmath.sin(MEET)) return null;
   if (!roomAt(index, p, [from]) || !roomAt(index, T, [hit.road])) return null;
   if (!clearOf(pts, width, roads, index, fit, from, hit.road, STREETS_APART)) return null;
   return { points: pts, width, ends: ['join', 'join'] };
@@ -728,7 +729,7 @@ export function rasterRoads(roads: readonly RoadPlan[], w: number, d: number, re
           if (mask[z * w + x]) continue;
           const [px, pz] = [x + 0.5, z + 0.5];
           const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / l2));
-          if (Math.hypot(px - (ax + dx * t), pz - (az + dz * t)) < far) mask[z * w + x] = 1;
+          if (pmath.hypot(px - (ax + dx * t), pz - (az + dz * t)) < far) mask[z * w + x] = 1;
         }
       }
     }
@@ -773,7 +774,7 @@ export class RoadIndex {
             else this.cells.set(key, [id]);
           }
         }
-        s += Math.hypot(bx - ax, bz - az);
+        s += pmath.hypot(bx - ax, bz - az);
       }
     });
   }
@@ -840,7 +841,7 @@ export class RoadIndex {
       const had = out.get(road);
       if (dist > within || (had && had.dist <= dist)) return;
       const [[ax, az], [bx, bz]] = [this.roads[road].points[k], this.roads[road].points[k + 1]];
-      const l = Math.hypot(bx - ax, bz - az) || 1;
+      const l = pmath.hypot(bx - ax, bz - az) || 1;
       out.set(road, { dist, s, t: [(bx - ax) / l, (bz - az) / l] });
     });
     return out;
@@ -860,9 +861,9 @@ export class RoadIndex {
 /** How far (x, z) is from the segment `a` to `b`, how far along it (0..1) its nearest point is, and its length (1 if none): as `RoadIndex` measures a road. */
 function toSegment([ax, az]: Pt, [bx, bz]: Pt, x: number, z: number): [dist: number, t: number, l: number] {
   const [dx, dz] = [bx - ax, bz - az];
-  const l = Math.hypot(dx, dz) || 1;
+  const l = pmath.hypot(dx, dz) || 1;
   const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (l * l)));
-  return [Math.hypot(x - (ax + dx * t), z - (az + dz * t)), t, l];
+  return [pmath.hypot(x - (ax + dx * t), z - (az + dz * t)), t, l];
 }
 
 /** How far (x, z) is from `road`'s middle, as `RoadIndex` measures it (`nearest`), however far. */
@@ -991,7 +992,7 @@ export function roadEnds(roads: readonly RoadPlan[]): { x: number; z: number; dx
       .map((e) => {
         const pts = r.points;
         const [end, before] = e === 0 ? [pts[0], pts[1]] : [pts[pts.length - 1], pts[pts.length - 2]];
-        const l = Math.hypot(end[0] - before[0], end[1] - before[1]) || 1;
+        const l = pmath.hypot(end[0] - before[0], end[1] - before[1]) || 1;
         return { x: end[0], z: end[1], dx: (end[0] - before[0]) / l, dz: (end[1] - before[1]) / l };
       }),
   );

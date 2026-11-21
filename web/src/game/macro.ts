@@ -48,6 +48,7 @@ import { centroid, cropRoads, curve, evenly, inside, leftOf, lengths, nearest, p
 import { lotName, placeOfTemplate, placeUnit } from './placeLots';
 import { BIG_COURTS, boundsOf, COURTS, frontageOf, Ground, houseFor, joinUp, lotAt, LotPlacer, plotRect, reachesRoad, settleRoads, shuffled, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
 import { LAND_SIZE, LEGACY_KINDS, placeOf, specOf, streetNames, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind, type WorldSpec, type WorldStep } from './world';
+import * as pmath from './pmath';
 
 type Rand = () => number;
 
@@ -261,7 +262,7 @@ export function parkingFor(homes: number, main: boolean): number {
 }
 
 const range = (rand: Rand, lo: number, hi: number) => lo + (hi - lo) * rand();
-const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const dist = (a: Pt, b: Pt) => pmath.hypot(a[0] - b[0], a[1] - b[1]);
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
 /** Among a place's mountains, a hamlet's box no higher or lower than the area it joins by more than this share of a country road's climb (`countryRouter.ts` `COUNTRY_GRADE`) over the gap between them; and how much a metre of height counts against a site there (the valley floor first). */
@@ -425,7 +426,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   for (let i = 0; i < gw * gd && !shaped; i++) {
     const [x, z] = land.centre(i);
     let h = fbm(x / 230, z / 230, nseed, 4) * spec.hills * 2;
-    if (valley && spec.classic) h += massif * clamp01((Math.abs(z - valleyZ(x)) - MASSIF_FLAT) / MASSIF_RISE) ** 1.4;
+    if (valley && spec.classic) h += massif * pmath.pow(clamp01((Math.abs(z - valleyZ(x)) - MASSIF_FLAT) / MASSIF_RISE), 1.4);
     land.height[i] = h;
   }
   /**
@@ -448,7 +449,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     if (!valley || spec.classic || shaped) return;
     for (let i = 0; i < gw * gd; i++) {
       const [x, z] = land.centre(i);
-      land.height[i] += massif * clamp01(m(x, z)) ** 1.4 * (MASSIF_NEAR + (1 - MASSIF_NEAR) * clamp01(z / (0.6 * D)));
+      land.height[i] += massif * pmath.pow(clamp01(m(x, z)), 1.4) * (MASSIF_NEAR + (1 - MASSIF_NEAR) * clamp01(z / (0.6 * D)));
     }
   };
 
@@ -485,10 +486,10 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     }
     for (let i = 0; i < gw * gd && !shaped; i++) {
       const [x, z] = land.centre(i);
-      const r = ((x - lake[0]) / rx) ** 2 + ((z - lake[1]) / rz) ** 2;
+      const r = pmath.pow((x - lake[0]) / rx, 2) + pmath.pow((z - lake[1]) / rz, 2);
       if (r < 1 + (fbm(x / 90, z / 90, nseed + 6, 3) - 0.47) * 0.7) land.water[i] = 1;
     }
-    raise((x, z) => ((Math.hypot((x - lake[0]) / rx, (z - lake[1]) / rz) - 1.9) * Math.min(rx, rz)) / 200);
+    raise((x, z) => ((pmath.hypot((x - lake[0]) / rx, (z - lake[1]) / rz) - 1.9) * Math.min(rx, rz)) / 200);
   }
   if (plan?.lake) [lake[0], lake[1]] = [plan.lake.x, plan.lake.z];
   // An island (a place's): a rounded square with a ragged coast, the sea all round it to the world's edges; its mountains in its middle.
@@ -497,13 +498,13 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     const [ax, az] = [ISLAND * W, ISLAND * D];
     for (let k = 0; k < COAST_POINTS; k++) {
       const a = (k / COAST_POINTS) * Math.PI * 2;
-      const [c, s] = [Math.cos(a), Math.sin(a)];
-      const r0 = 1 / (Math.abs(c / ax) ** 3 + Math.abs(s / az) ** 3) ** (1 / 3);
+      const [c, s] = [pmath.cos(a), pmath.sin(a)];
+      const r0 = 1 / pmath.cbrt(pmath.pow(Math.abs(c / ax), 3) + pmath.pow(Math.abs(s / az), 3));
       const r = r0 * (1 + (fbm((W / 2 + c * r0) / 140, (D / 2 + s * r0) / 140, nseed + 23, 3) - 0.47) * 0.14);
       coast.push([round2(W / 2 + c * r), round2(D / 2 + s * r)]);
     }
     for (let i = 0; i < gw * gd && !shaped; i++) if (!inside(coast, ...land.centre(i))) land.water[i] = 1;
-    raise((x, z) => (0.75 - (Math.abs((x - W / 2) / ax) ** 3 + Math.abs((z - D / 2) / az) ** 3) ** (1 / 3)) / 0.45);
+    raise((x, z) => (0.75 - pmath.cbrt(pmath.pow(Math.abs((x - W / 2) / ax), 3) + pmath.pow(Math.abs((z - D / 2) / az), 3))) / 0.45);
   }
   if (spec.water === 'ponds') raise((x, z) => (Math.abs(z - valleyZ(x)) - MASSIF_FLAT) / MASSIF_RISE);
   /** The first dry z going from `from` towards `dir` across x0..x1 (the shore nearest the town). */
@@ -679,7 +680,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     });
     const det = sxx * szz - sxz * sxz;
     let [bx, bz] = Math.abs(det) > 1e-9 ? [(sxh * szz - szh * sxz) / det, (szh * sxx - sxh * sxz) / det] : [0, 0];
-    const tilt = Math.hypot(bx, bz);
+    const tilt = pmath.hypot(bx, bz);
     if (tilt > GENTLE_TILT) [bx, bz] = [(bx * GENTLE_TILT) / tilt, (bz * GENTLE_TILT) / tilt];
     return ([x, z]: Pt) => mean + bx * (x - cx) + bz * (z - cz);
   };
@@ -692,7 +693,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     const [az, bz] = axis(a.z, a.z + a.d, b.z, b.z + b.d);
     return [[ax, az], [bx, bz]];
   };
-  const rectGap = (a: Rect, b: Rect) => Math.hypot(Math.max(0, a.x - (b.x + b.w), b.x - (a.x + a.w)), Math.max(0, a.z - (b.z + b.d), b.z - (a.z + a.d)));
+  const rectGap = (a: Rect, b: Rect) => pmath.hypot(Math.max(0, a.x - (b.x + b.w), b.x - (a.x + a.w)), Math.max(0, a.z - (b.z + b.d), b.z - (a.z + a.d)));
   const candidates: Pt[] = Array.from({ length: 700 }, (): Pt => [range(rand, EDGE + 80, W - EDGE - 80), range(rand, EDGE + 60, D - EDGE - 60)]);
   /** Which quarter of the world a point is in: the hamlets go first to those without an area. */
   const quarter = (p: Pt) => (p[0] < W / 2 ? 0 : 1) + (p[1] < D / 2 ? 0 : 2);
@@ -857,7 +858,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const swing = (p: Pt, dir: Pt, toward: Pt) => {
     const l = dist(p, toward) || 1;
     const cos = (dir[0] * (toward[0] - p[0]) + dir[1] * (toward[1] - p[1])) / l;
-    return Math.max(0, Math.acos(Math.max(-1, Math.min(1, cos))) - SWING) * SWING_COST;
+    return Math.max(0, pmath.acos(Math.max(-1, Math.min(1, cos))) - SWING) * SWING_COST;
   };
   /**
    * Which of `list` (roads) pass within `R` m of a point round `rect` (to 40 m out): -1 none, the
@@ -931,7 +932,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       const at = nearest(pts, q[0], q[1], ls);
       if (at.dist > 2) continue;
       const { p, t } = pointAt(pts, at.s, ls);
-      const ok = Math.abs(t[0] * w.dir[0] + t[1] * w.dir[1]) <= Math.sin(SIDE_FACING) && straightAround(pts, at.s, 14, STRAIGHT_BEND, ls) && [-1, by].includes(apart(p)) && at.s > 20 && at.s < ls[ls.length - 1] - 20;
+      const ok = Math.abs(t[0] * w.dir[0] + t[1] * w.dir[1]) <= pmath.sin(SIDE_FACING) && straightAround(pts, at.s, 14, STRAIGHT_BEND, ls) && [-1, by].includes(apart(p)) && at.s > 20 && at.s < ls[ls.length - 1] - 20;
       return ok ? { p, len: dist(w.p, p) } : null;
     }
     return null;
@@ -947,7 +948,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     const l = dist(w.p, v.p);
     if (l < CELL || l > STRAIGHT_ON) return false;
     const u: Pt = [(v.p[0] - w.p[0]) / l, (v.p[1] - w.p[1]) / l];
-    if (u[0] * w.dir[0] + u[1] * w.dir[1] < Math.cos(HEAD_ON) || -(u[0] * v.dir[0] + u[1] * v.dir[1]) < Math.cos(HEAD_ON)) return false;
+    if (u[0] * w.dir[0] + u[1] * w.dir[1] < pmath.cos(HEAD_ON) || -(u[0] * v.dir[0] + u[1] * v.dir[1]) < pmath.cos(HEAD_ON)) return false;
     const index = new RoadIndex(roads);
     for (let d = 2; d < l - 1; d += 2) {
       const q: Pt = [w.p[0] + u[0] * d, w.p[1] + u[1] * d];
@@ -983,7 +984,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
         const left = leftOf(t);
         const k = left[0] * u[0] + left[1] * u[1] >= 0 ? 1 : -1;
         const n: Pt = [left[0] * k, left[1] * k];
-        if (n[0] * u[0] + n[1] * u[1] < Math.cos(SIDE_FACING)) continue;
+        if (n[0] * u[0] + n[1] * u[1] < pmath.cos(SIDE_FACING)) continue;
         if (![-1, ri].includes(apart(p))) continue;
         let reach = 0;
         for (let d = 4; d < 200; d += 4) {
@@ -1298,7 +1299,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     const { q, side } = best;
     const toward: Pt = [q.p[0] + FACING[side][0] * 400, q.p[1] + FACING[side][1] * 400];
     // (A T off a street facing the edge, if the port doesn't.)
-    const tee = q.dir[0] * FACING[side][0] + q.dir[1] * FACING[side][1] < Math.cos(SIDE_FACING) ? sideT(q.area, toward)[0] : undefined;
+    const tee = q.dir[0] * FACING[side][0] + q.dir[1] * FACING[side][1] < pmath.cos(SIDE_FACING) ? sideT(q.area, toward)[0] : undefined;
     const from: Way = tee ?? router.via(q, toward);
     const onEdge = (i: number) => [Math.floor(i / gw) === 0, i % gw === gw - 1, Math.floor(i / gw) === gd - 1, i % gw === 0][side];
     const ends = from.port ? [from.port.p, from.p] : [];
@@ -1381,12 +1382,12 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   if (river && spec.options) {
     let more = { none: 0, few: 1, many: 2 }[spec.options.villages];
     const index = new RoadIndex(roads);
-    const heading = (x: number) => Math.atan2(river.z(x + 4) - river.z(x - 4), 8);
+    const heading = (x: number) => pmath.atan2(river.z(x + 4) - river.z(x - 4), 8);
     const sites: { a: Pt; b: Pt; score: number }[] = [];
     for (let x = 80; x <= W - 80 && more > 0; x += 8) {
       if (Math.abs(heading(x - 24) - heading(x + 24)) > 0.2) continue;
       const slope = (river.z(x + 1) - river.z(x - 1)) / 2;
-      const l = Math.hypot(1, slope);
+      const l = pmath.hypot(1, slope);
       const back = river.half(x) / l + BRIDGE_IN;
       const a: Pt = [round2(x + (slope / l) * back), round2(river.z(x) - back / l)];
       const span = across(river, a, BRIDGE_IN + 4);
@@ -1598,7 +1599,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       const out = frontageOf(worldRoads, countryWays, plan.centre, dense).filter((f) => offRect(plan.rect, f.p) < TERRACE_SPILL && straight(worldRoads[f.road].points, f.s, roadLengths(worldRoads[f.road])) && gentleBy(f.p));
       terraceRows(t, lots, [homes, out], spec, dense);
       // (Its middle built up: the centre and the streets round it, `INNER` of the way out to its box's corners.)
-      const inner = (INNER * Math.hypot(plan.rect.w, plan.rect.d)) / 2;
+      const inner = (INNER * pmath.hypot(plan.rect.w, plan.rect.d)) / 2;
       densePass?.lay(dense, [0], (_, p) => dist(p, heart) < inner);
       fronts.set(a, homes.filter(offCorners));
       for (const u of lots.place(houses, fronts.get(a)!, [], plan.centre, a, true)) left.push({ u, from: a });
@@ -2213,7 +2214,7 @@ function dryLand(land: Cells): { nearest: (r: Rect, bounds: Bounds, by?: number)
     let far = Infinity;
     for (let z = bz0; z <= bz1; z += CELL) {
       for (let x = bx0; x <= bx1; x += CELL) {
-        const d = Math.hypot(x - r.x, z - r.z);
+        const d = pmath.hypot(x - r.x, z - r.z);
         if (d >= far || !holds({ x, z, w: r.w, d: r.d }, by)) continue;
         [best, far] = [[Math.round(x), Math.round(z)], d];
       }
@@ -2334,7 +2335,7 @@ function planned(spec: WorldSpec, seed: number): Planned {
     if (!valley) return;
     for (let i = 0; i < gw * gd; i++) {
       const [x, z] = land.centre(i);
-      land.height[i] += massif * clamp01(m(x, z)) ** 1.4 * (MASSIF_NEAR + (1 - MASSIF_NEAR) * clamp01(z / (0.6 * D)));
+      land.height[i] += massif * pmath.pow(clamp01(m(x, z)), 1.4) * (MASSIF_NEAR + (1 - MASSIF_NEAR) * clamp01(z / (0.6 * D)));
     }
   };
   const side: 'zmin' | 'zmax' = rand() < 0.5 ? 'zmin' : 'zmax';
@@ -2364,22 +2365,22 @@ function planned(spec: WorldSpec, seed: number): Planned {
     at[1] = side === 'zmin' ? Math.min(at[1], D - room) : Math.max(at[1], room);
     for (let i = 0; i < gw * gd; i++) {
       const [x, z] = land.centre(i);
-      if (((x - at[0]) / rx) ** 2 + ((z - at[1]) / rz) ** 2 < 1 + (fbm(x / 90, z / 90, nseed + 6, 3) - 0.47) * 0.7) land.water[i] = 1;
+      if (pmath.pow((x - at[0]) / rx, 2) + pmath.pow((z - at[1]) / rz, 2) < 1 + (fbm(x / 90, z / 90, nseed + 6, 3) - 0.47) * 0.7) land.water[i] = 1;
     }
-    raise((x, z) => ((Math.hypot((x - at[0]) / rx, (z - at[1]) / rz) - 1.9) * Math.min(rx, rz)) / 200);
+    raise((x, z) => ((pmath.hypot((x - at[0]) / rx, (z - at[1]) / rz) - 1.9) * Math.min(rx, rz)) / 200);
     lake = { x: round2(at[0]), z: round2(at[1]), rx: round2(rx), rz: round2(rz) };
   }
   if (spec.water === 'island') {
     const [ax, az] = [ISLAND * W, ISLAND * D];
     for (let k = 0; k < COAST_POINTS; k++) {
       const a = (k / COAST_POINTS) * Math.PI * 2;
-      const [c, s] = [Math.cos(a), Math.sin(a)];
-      const r0 = 1 / (Math.abs(c / ax) ** 3 + Math.abs(s / az) ** 3) ** (1 / 3);
+      const [c, s] = [pmath.cos(a), pmath.sin(a)];
+      const r0 = 1 / pmath.cbrt(pmath.pow(Math.abs(c / ax), 3) + pmath.pow(Math.abs(s / az), 3));
       const r = r0 * (1 + (fbm((W / 2 + c * r0) / 140, (D / 2 + s * r0) / 140, nseed + 23, 3) - 0.47) * 0.14);
       coast.push([round2(W / 2 + c * r), round2(D / 2 + s * r)]);
     }
     for (let i = 0; i < gw * gd; i++) if (!inside(coast, ...land.centre(i))) land.water[i] = 1;
-    raise((x, z) => (0.75 - (Math.abs((x - W / 2) / ax) ** 3 + Math.abs((z - D / 2) / az) ** 3) ** (1 / 3)) / 0.45);
+    raise((x, z) => (0.75 - pmath.cbrt(pmath.pow(Math.abs((x - W / 2) / ax), 3) + pmath.pow(Math.abs((z - D / 2) / az), 3))) / 0.45);
   }
   if (spec.water === 'ponds') raise((x, z) => (Math.abs(z - valleyZ(x)) - MASSIF_FLAT) / MASSIF_RISE);
   if (spec.water === 'river') {
@@ -2633,7 +2634,7 @@ function riverOf({ c, tilt, amp, k, reach }: NonNullable<LandPlan['river']>, W: 
   };
   const z = (x: number) => c + tilt * (x - W / 2) + (fbm(x / 260, k, nseed + 21, 3) - 0.5) * 2.5 * amp * calm(x);
   const width = (x: number) => RIVER_WIDTH[0] + (RIVER_WIDTH[1] - RIVER_WIDTH[0]) * Math.min(1, Math.max(0, fbm(x / 120, k + 3, nseed + 22, 2) * 1.6 - 0.3));
-  const half = (x: number) => (width(x) / 2) * Math.hypot(1, (z(x + 1) - z(x - 1)) / 2);
+  const half = (x: number) => (width(x) / 2) * pmath.hypot(1, (z(x + 1) - z(x - 1)) / 2);
   const xs: number[] = [];
   for (let x = -60; x <= W + 60; x += 4) xs.push(x);
   const poly = [...xs.map((x): Pt => [x, round2(z(x) - half(x))]), ...[...xs].reverse().map((x): Pt => [x, round2(z(x) + half(x))])];
@@ -2648,7 +2649,7 @@ function riverOf({ c, tilt, amp, k, reach }: NonNullable<LandPlan['river']>, W: 
 function across(river: River, p: Pt, max: number): { wet: [number, number]; far: Pt; dir: Pt } | null {
   const toward = river.z(p[0]) > p[1] ? 1 : -1;
   const t: Pt = [1, (river.z(p[0] + 4) - river.z(p[0] - 4)) / 8];
-  const l = Math.hypot(...t);
+  const l = pmath.hypot(...t);
   const n: Pt = [(-t[1] / l) * toward, (t[0] / l) * toward];
   let [first, last] = [-1, -1];
   for (let d = 0; d <= max + 80; d += 0.5) {
@@ -2707,7 +2708,7 @@ export function deckTiles(road: RoadPlan, span: readonly [number, number], W: nu
   for (let z = Math.max(0, Math.floor(Math.min(a[1], b[1]) - R)); z < Math.min(D, Math.ceil(Math.max(a[1], b[1]) + R)); z++) {
     for (let x = Math.max(0, Math.floor(Math.min(a[0], b[0]) - R)); x < Math.min(W, Math.ceil(Math.max(a[0], b[0]) + R)); x++) {
       const t = Math.max(0, Math.min(1, ((x + 0.5 - a[0]) * dx + (z + 0.5 - a[1]) * dz) / len2));
-      if (Math.hypot(x + 0.5 - a[0] - dx * t, z + 0.5 - a[1] - dz * t) <= R) each(z * W + x);
+      if (pmath.hypot(x + 0.5 - a[0] - dx * t, z + 0.5 - a[1] - dz * t) <= R) each(z * W + x);
     }
   }
 }
@@ -2922,7 +2923,7 @@ export function siteFor(place: PublicTemplate, plan: AreaPlan, land: Cells, grou
   for (let k = 0; k < 260; k++) {
     const angle = rand() * Math.PI * 2;
     const r = range(rand, 50, 140) + Math.max(plan.rect.w, plan.rect.d) * 0.3;
-    const c: Pt = [plan.centre[0] + Math.cos(angle) * r, plan.centre[1] + Math.sin(angle) * r];
+    const c: Pt = [plan.centre[0] + pmath.cos(angle) * r, plan.centre[1] + pmath.sin(angle) * r];
     if (offRect(plan.rect, c) > reach) continue;
     // From the area towards the place (its trail comes from there), or towards the water behind it.
     let n: Pt = [(c[0] - plan.centre[0]) / r, (c[1] - plan.centre[1]) / r];
@@ -2930,11 +2931,11 @@ export function siteFor(place: PublicTemplate, plan: AreaPlan, land: Cells, grou
     if (place.site === 'water') {
       let [sx, sz, hits] = [0, 0, 0];
       for (let a = 0; a < 16; a++) {
-        const [dx, dz] = [Math.cos((a / 16) * Math.PI * 2), Math.sin((a / 16) * Math.PI * 2)];
+        const [dx, dz] = [pmath.cos((a / 16) * Math.PI * 2), pmath.sin((a / 16) * Math.PI * 2)];
         if (wetAt(c[0] + dx * 16, c[1] + dz * 16)) [sx, sz, hits] = [sx + dx, sz + dz, hits + 1];
       }
       if (!hits || hits > 9) continue;
-      const l = Math.hypot(sx, sz) || 1;
+      const l = pmath.hypot(sx, sz) || 1;
       n = [sx / l, sz / l];
       score = -hits;
     } else if (place.site === 'hill') score = -land.at(c[0], c[1]) + land.slope(land.cell(c[0], c[1])) * 60;

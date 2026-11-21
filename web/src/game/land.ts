@@ -14,6 +14,7 @@
 
 import type { LandFile } from '../core/protocol';
 import { rle } from './landMasks';
+import * as pmath from './pmath';
 
 /** The height field's grain (m): the renderer's (its built cells, its finest ground quads). */
 export const LAND_CELL = 2;
@@ -74,7 +75,7 @@ export const FLOW_WAYS = 255;
 /** The code (`Land.flow`) of the way (`dx`, `dz`) (game space; any length but 0: 0, no way). */
 export function flowCode(dx: number, dz: number): number {
   if (!dx && !dz) return 0;
-  const turn = Math.atan2(dz, dx) / (2 * Math.PI);
+  const turn = pmath.atan2(dz, dx) / (2 * Math.PI);
   return 1 + (Math.round((turn - Math.floor(turn)) * FLOW_WAYS) % FLOW_WAYS);
 }
 
@@ -82,7 +83,7 @@ export function flowCode(dx: number, dz: number): number {
 export function flowOf(code: number): [number, number] | null {
   if (!code) return null;
   const a = ((code - 1) / FLOW_WAYS) * 2 * Math.PI;
-  return [Math.cos(a), Math.sin(a)];
+  return [pmath.cos(a), pmath.sin(a)];
 }
 
 /** `land.flow`, made (all still) if it had none. */

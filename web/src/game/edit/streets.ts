@@ -52,6 +52,7 @@ import type { Edited } from './edited';
 import { wholeParks, withoutBays } from './ground';
 import { fillStreet, removalRefused, removeLots } from './lots';
 import { withoutEmptyAreas } from './villages';
+import * as pmath from '../pmath';
 
 /**
  * A street being drawn: its points as the player set them, its kind, whether what is in its way is cleared (else it
@@ -104,7 +105,7 @@ const TRAIL_END = 6;
 
 const dot = (a: Pt, b: Pt) => a[0] * b[0] + a[1] * b[1];
 const unit = (x: number, z: number): Pt => {
-  const l = Math.hypot(x, z) || 1;
+  const l = pmath.hypot(x, z) || 1;
   return [x / l, z / l];
 };
 const lengthOf = (pts: readonly Pt[]) => lengths(pts)[pts.length - 1];
@@ -158,7 +159,7 @@ function networks(roads: readonly RoadPlan[], without: ReadonlySet<number>): Map
 }
 
 /** How far a point is from a rectangle (0 inside it). */
-const offRect = (r: Rect, x: number, z: number) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
+const offRect = (r: Rect, x: number, z: number) => pmath.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
 
 /** How far a point is from a polygon (0 inside it). */
 function offPoly(poly: readonly Pt[], x: number, z: number): number {
@@ -169,7 +170,7 @@ function offPoly(poly: readonly Pt[], x: number, z: number): number {
     const [dx, dz] = [bx - ax, bz - az];
     const l2 = dx * dx + dz * dz || 1;
     const f = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2));
-    best = Math.min(best, Math.hypot(x - ax - dx * f, z - az - dz * f));
+    best = Math.min(best, pmath.hypot(x - ax - dx * f, z - az - dz * f));
   }
   return best;
 }
@@ -294,7 +295,7 @@ export class Meeting {
       for (const e of [0, 1] as const) {
         if (road.ends[e] !== 'dead') continue;
         const q = e ? road.points[road.points.length - 1] : road.points[0];
-        const d = Math.hypot(q[0] - p[0], q[1] - p[1]);
+        const d = pmath.hypot(q[0] - p[0], q[1] - p[1]);
         if (d <= reach) take([q[0], q[1]], r, 'dead', d - SNAP);
       }
     }
@@ -317,7 +318,7 @@ export class Meeting {
       for (const e of [0, 1] as const) {
         if (r.ends[e] !== 'dead') continue;
         const q = e ? r.points[r.points.length - 1] : r.points[0];
-        const d = Math.hypot(q[0] - p[0], q[1] - p[1]);
+        const d = pmath.hypot(q[0] - p[0], q[1] - p[1]);
         if (d <= SNAP && d < near) [dead, near] = [{ kind: 'extend', road: k, end: e }, d];
       }
     }
@@ -391,12 +392,12 @@ export class Meeting {
     const into: Pt = [-n[0] * sgn, -n[1] * sgn];
     const v = endDir(line);
     const along = dot(v, tq);
-    const meet = Math.atan2(Math.max(0, dot(v, into)), Math.abs(along));
+    const meet = pmath.atan2(Math.max(0, dot(v, into)), Math.abs(along));
     let a = into;
     if (meet < Math.PI / 2 - SQUARE) {
       const k = Math.max(meet, MEET);
       const way = Math.sign(along) || 1;
-      a = unit(into[0] * Math.sin(k) + tq[0] * way * Math.cos(k), into[1] * Math.sin(k) + tq[1] * way * Math.cos(k));
+      a = unit(into[0] * pmath.sin(k) + tq[0] * way * pmath.cos(k), into[1] * pmath.sin(k) + tq[1] * way * pmath.cos(k));
     }
     // (Its last `STRAIGHT_IN` m straight along that way.)
     const near: Pt = [T[0] - a[0] * STRAIGHT_IN, T[1] - a[1] * STRAIGHT_IN];
@@ -512,7 +513,7 @@ export interface StreetLine {
 
 /** The line `points` make for a road `width` wide on a `W` × `D` m world (see the top of this file), or why there is none. */
 export function streetLine(points: readonly Pt[], W: number, D: number, width: number): StreetLine | string {
-  const raw = points.filter((p, i) => Number.isFinite(p[0]) && Number.isFinite(p[1]) && (i === 0 || Math.hypot(p[0] - points[i - 1][0], p[1] - points[i - 1][1]) > 0.5));
+  const raw = points.filter((p, i) => Number.isFinite(p[0]) && Number.isFinite(p[1]) && (i === 0 || pmath.hypot(p[0] - points[i - 1][0], p[1] - points[i - 1][1]) > 0.5));
   if (raw.length < 2) return 'a street is drawn with two points or more';
   const cut = cropRoads([{ points: toEdge(curve(evenly(rounded(simplify(raw, SIMPLIFY)), CTRL_APART)), W, D), width, ends: ['dead', 'dead'] }], 0, 0, W, D);
   if (cut.length !== 1) return cut.length ? 'it leaves the world other than by its end' : 'it is off the world';
@@ -618,7 +619,7 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
   // (Its bends with a little of the roads it carries on.)
   if (bends([...head.slice(-20, -1), ...part, ...foot.slice(1, 20)]).tight) return refused('it bends tighter than 9 m');
   for (const j of junctions) if (!roomAt(meet.index, j.at, [j.road], meet.skip)) return refused(`it meets ${named(j.road)} within ${ROOM} m of another junction`);
-  if (junctions.length === 2 && Math.hypot(junctions[0].at[0] - junctions[1].at[0], junctions[0].at[1] - junctions[1].at[1]) < ROOM) return refused(`its two junctions are within ${ROOM} m of each other`);
+  if (junctions.length === 2 && pmath.hypot(junctions[0].at[0] - junctions[1].at[0], junctions[0].at[1] - junctions[1].at[1]) < ROOM) return refused(`its two junctions are within ${ROOM} m of each other`);
   const fit: Fit = { box: { w: W, d: D }, margin: -0.5, greens: draft.greens };
   const apart = trail ? TRAIL_APART : undefined;
   if (!clearOf(part, width, roads, meet.index, fit, fromRoad, toRoad, apart, meet.skip)) {
@@ -773,7 +774,7 @@ export function cutTrails(roads: readonly RoadPlan[], made: readonly number[], o
     if (!cuts.length) return;
     // The pieces between the cuts, each end at a cut a join.
     const end = r.points[r.points.length - 1];
-    const atPlace = outdoor.some((q) => Math.hypot(Math.max(q.x - end[0], 0, end[0] - q.x - q.w), Math.max(q.z - end[1], 0, end[1] - q.z - q.d)) <= TRAIL_END);
+    const atPlace = outdoor.some((q) => pmath.hypot(Math.max(q.x - end[0], 0, end[0] - q.x - q.w), Math.max(q.z - end[1], 0, end[1] - q.z - q.d)) <= TRAIL_END);
     const bounds: [number, number][] = [];
     let from = 0;
     for (const c of cuts) {
@@ -863,7 +864,7 @@ export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number):
   // turning round in any of theirs. (Not every country road made a street: one taken up and drawn again would not be
   // a country road again.)
   const bridgeEnds = bridges.flatMap((i) => [roads[i].points[0], roads[i].points[roads[i].points.length - 1]]);
-  const atBridge = (r: RoadPlan) => r.ends.some((e, k) => e === 'dead' && bridgeEnds.some(([x, z]) => Math.hypot(x - r.points[k ? r.points.length - 1 : 0][0], z - r.points[k ? r.points.length - 1 : 0][1]) <= r.width / 2 + 1));
+  const atBridge = (r: RoadPlan) => r.ends.some((e, k) => e === 'dead' && bridgeEnds.some(([x, z]) => pmath.hypot(x - r.points[k ? r.points.length - 1 : 0][0], z - r.points[k ? r.points.length - 1 : 0][1]) <= r.width / 2 + 1));
   const streets: number[] = [];
   for (const i of left.ended) {
     const r = left.roads[i];

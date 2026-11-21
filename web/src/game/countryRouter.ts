@@ -16,6 +16,7 @@ import { simplify } from './landMasks';
 import { curve, evenly, leftOf, lengths, nearest, pointAt, RoadIndex, besideAny, sharpestTurn, tangent, type Pt } from './roads';
 import type { Rect } from './town';
 import type { WorldSpec } from './world';
+import * as pmath from './pmath';
 
 /** The land's cells (m). */
 export const CELL = 8;
@@ -97,7 +98,7 @@ export const FACING: readonly Pt[] = [
   [-1, 0],
 ];
 
-const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const dist = (a: Pt, b: Pt) => pmath.hypot(a[0] - b[0], a[1] - b[1]);
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
 /** The land as the generator reads it: per 8 m cell, its height (m), whether it is water, whether it is wooded. */
@@ -137,7 +138,7 @@ export class Cells {
   slope(i: number): number {
     const [x, z] = [i % this.gw, Math.floor(i / this.gw)];
     const h = (dx: number, dz: number) => this.height[Math.max(0, Math.min(this.gd - 1, z + dz)) * this.gw + Math.max(0, Math.min(this.gw - 1, x + dx))];
-    return Math.hypot(h(1, 0) - h(-1, 0), h(0, 1) - h(0, -1)) / (2 * CELL);
+    return pmath.hypot(h(1, 0) - h(-1, 0), h(0, 1) - h(0, -1)) / (2 * CELL);
   }
 
   /** Whether any cell within `r` m of (x, z) is water. */
@@ -273,11 +274,11 @@ const STEPS: readonly Pt[] = [
   [1, -1],
 ];
 /** The step nearest heading `d`. */
-const octant = ([x, z]: Pt) => (((Math.round(Math.atan2(z, x) / (Math.PI / 4)) % 8) + 8) % 8);
+const octant = ([x, z]: Pt) => (((Math.round(pmath.atan2(z, x) / (Math.PI / 4)) % 8) + 8) % 8);
 /** How nearly step `h` heads along `d` (a unit vector): the cosine between them. */
 export const along = (h: number, d: Pt) => (STEPS[h][0] * d[0] + STEPS[h][1] * d[1]) / STEP_LENGTHS[h];
 /** Each of `STEPS`' lengths. */
-const STEP_LENGTHS: readonly number[] = STEPS.map((s) => Math.hypot(...s));
+const STEP_LENGTHS: readonly number[] = STEPS.map((s) => pmath.hypot(...s));
 /** The turns `steer` tries from a state that came as `K`'s ways have it (by its last number): straight on first. */
 const TURNS: readonly (readonly number[])[] = [[0], [0], [0, -1], [0, 1], [0, 1, -1]];
 
@@ -375,7 +376,7 @@ function winding(pts: readonly Pt[], over: number): number {
   const heads: number[] = [];
   for (let s = 0; s + 10 <= L; s += 10) {
     const [a, b] = [pointAt(pts, s, ls).p, pointAt(pts, s + 10, ls).p];
-    let h = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    let h = pmath.atan2(b[1] - a[1], b[0] - a[0]);
     // (Unwrapped: each within half a turn of the last.)
     if (heads.length) h += Math.round((heads[heads.length - 1] - h) / (2 * Math.PI)) * 2 * Math.PI;
     heads.push(h);
@@ -655,7 +656,7 @@ export class CountryRouter {
       const c0 = land.centre(c);
       return (by.get(c) ?? []).filter((road) => {
         const { t } = pointAt(roads[road].points, nearest(roads[road].points, c0[0], c0[1]).s);
-        return Math.abs(((q[0] - p[0]) * t[0] + (q[1] - p[1]) * t[1]) / l) >= Math.cos(SHARED_ANGLE);
+        return Math.abs(((q[0] - p[0]) * t[0] + (q[1] - p[1]) * t[1]) / l) >= pmath.cos(SHARED_ANGLE);
       });
     });
     const runs: { from: number; to: number; roads: Set<number> }[] = [];
@@ -902,7 +903,7 @@ export class CountryRouter {
       const side = this.edgeOf(i);
       return side >= 0 && (h === undefined || along(h, FACING[side]) > 0.9);
     };
-    const inFront = (w: Way, p: Pt, angle: number) => w.dir[0] * (p[0] - w.p[0]) + w.dir[1] * (p[1] - w.p[1]) >= dist(p, w.p) * Math.cos(angle);
+    const inFront = (w: Way, p: Pt, angle: number) => w.dir[0] * (p[0] - w.p[0]) + w.dir[1] * (p[1] - w.p[1]) >= dist(p, w.p) * pmath.cos(angle);
     const banned = new Set<number>();
     const goal = (i: number, h?: number) => (banned.has(i) || !meets(i, h) ? -1 : inFront(q, land.centre(i), AHEAD) ? 0 : ASIDE);
     // (Into the other areas only by their ports.)

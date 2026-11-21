@@ -8,6 +8,8 @@
  * the handler can stop the camera from turning for that drag.
  */
 
+import * as pmath from './pmath';
+
 export interface PointerHandlers {
   click(x: number, y: number): void;
   hover(x: number, y: number): void;
@@ -100,7 +102,7 @@ export class PointerInput {
   private readonly onMove = (e: PointerEvent) => {
     // A second button pressed during a drag arrives as a move with `button` set (chorded).
     if (e.button === 2 && this.taken) this.cancelTaken();
-    if (e.buttons && Math.hypot(e.offsetX - this.downX, e.offsetY - this.downY) > DRAG_THRESHOLD) this.dragging = true;
+    if (e.buttons && pmath.hypot(e.offsetX - this.downX, e.offsetY - this.downY) > DRAG_THRESHOLD) this.dragging = true;
     this.hoverX = e.offsetX;
     this.hoverY = e.offsetY;
     if (!this.hoverQueued) {

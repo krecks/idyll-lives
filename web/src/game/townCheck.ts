@@ -32,6 +32,7 @@ import { unrle } from './landMasks';
 import { COURT, inside, lengths, nearest, pointAt, RoadIndex, roadMask, sharpestTurn, sideBySide, type Pt } from './roads';
 import { BIG_COURTS, COURTS, NEIGHBOUR_CAP, turner, type Facing } from './town';
 import type { Expected } from './world';
+import * as pmath from './pmath';
 
 type Rect = { x: number; z: number; w: number; d: number };
 type Exit = Pt | { x: number; z: number; kind: 'road' };
@@ -73,7 +74,7 @@ export type CheckedTown = {
 };
 const exitAt = (e: Exit): Pt => (Array.isArray(e) ? e : [e.x, e.z]);
 /** How far a point is from a rectangle (0 inside it). */
-const offRect = (r: Rect, x: number, z: number) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
+const offRect = (r: Rect, x: number, z: number) => pmath.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
 
 /** A square holds something if this much of it does (m²). */
 const HOLDS = 200;
@@ -253,7 +254,7 @@ function openProblems(town: CheckedTown, expect: Expected | undefined, river: bo
   const centres = areas.map((a): Pt => [a.x + a.w / 2, a.z + a.d / 2]);
   centres.forEach((c, i) =>
     centres.forEach((o, j) => {
-      const d = Math.hypot(c[0] - o[0], c[1] - o[1]);
+      const d = pmath.hypot(c[0] - o[0], c[1] - o[1]);
       if (j > i && d < AREA_APART) out.push(`${areas[i].name} and ${areas[j].name} ${d.toFixed(0)} m apart`);
     }),
   );
@@ -332,7 +333,7 @@ function bridgeProblems(town: CheckedTown, roads: readonly RoadPlan[], river: bo
 /** Which way a polyline heads at arc length `s` (radians). */
 const headingAt = (pts: readonly Pt[], s: number, ls: number[]) => {
   const { t } = pointAt(pts, s, ls);
-  return Math.atan2(t[1], t[0]);
+  return pmath.atan2(t[1], t[0]);
 };
 
 /** The places' kinds. */

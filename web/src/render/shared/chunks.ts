@@ -8,6 +8,8 @@
  * Engine-neutral: ids, rectangles and a small grid index of rectangles (`RectGrid`).
  */
 
+import * as pmath from '../../game/pmath';
+
 /** Side of a stream chunk (m). */
 export const CHUNK = 64;
 /** Side of a far-LOD superchunk, the street's draw group (m). */
@@ -32,7 +34,7 @@ export const groupOf = (id: number): number => {
 
 /** How far (m) a ground point (`x`, `z`) is from the rectangle from (`x0`, `z0`), `w` by `d` m (0 on it). */
 export function distanceToRect(x: number, z: number, x0: number, z0: number, w: number, d: number): number {
-  return Math.hypot(Math.max(x0 - x, 0, x - (x0 + w)), Math.max(z0 - z, 0, z - (z0 + d)));
+  return pmath.hypot(Math.max(x0 - x, 0, x - (x0 + w)), Math.max(z0 - z, 0, z - (z0 + d)));
 }
 
 /** A ground point last looked from (the camera's target), so a still camera costs nothing: `moved` once it has gone `by` m or more along x or z. */
