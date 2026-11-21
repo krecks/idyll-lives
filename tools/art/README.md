@@ -21,7 +21,7 @@ counted checks' findings each model may keep), `validate.ts` (the Khronos valida
 | `cargo check-glb --built <dir>` | The same gate over what the game builds as it runs ("The built world" below), from the samples `bun tools/built/dump.ts <dir>` writes there with the game's own generators |
 | `cargo review sizes\|uses [--check]` | Every buyable object's sizes and heights against its kind in `docs/review/reference.json` (a tree or plant against its species: height, crown, clear trunk, bark luminance, blossom and fruit hue, leaf-card tiles), and its uses, poses and motions (`crates/tools/src/review.rs`; `--md <dir>` writes every object, `--check` fails past the baseline) |
 | `cargo review colours\|facets\|edges\|texels [--all] [keys]` | Reports over every model: colours against real surfaces, round parts showing their flat sides, hard edges showing unbevelled, textured finishes laid too sparse, dense or stretched |
-| `cargo tex synth [set…]` | Generates every `albedo/normal/arm` texture set (21 sets: bark, brick, floors, foliage, grass, paving, roof, sidewalk, walls and wood) from tileable height fields; no downloads |
+| `cargo tex synth [set…]` | Generates every `albedo/normal/arm` texture set (32 sets: bark, brick, floors, foliage, grass, paving, roof, sidewalk, walls and wood; the floors are laminate, travertine tile, pine boards and the eleven coverings `floor_parquet`, `floor_checker`, `floor_hex`, `floor_terrazzo`, `floor_marble`, `floor_cork`, `floor_lino`, `floor_concrete`, `floor_pavers`, `floor_encaustic` and `floor_sisal`, each a `material.floor.<name>` in the manifest) from tileable height fields; no downloads |
 | `cargo tex synth floor_wood.<variant>` | A set's variant for a look sheet (`pine`: the boards before 2026-11-18, `calm`, `wide`, `oak`: `crates/tools/src/tex/synth/built.rs` `variants`), on the set's own tile and seed, into `textures/floor_wood.<variant>/`: made only when named, not in git; delete them before a production build (tools/bench/README.md, a room's look) |
 | `cargo tex materials` | Writes `materials.json` in the current directory: PBR material + environment entries (the finishes in glTF's terms; refused when one is outside the ranges of `crates/tools/src/pbr.rs`) |
 | `cargo tex clouds <out.png>` | Generates the procedural, tileable cloud layer (`textures/sky/clouds.png`) |
@@ -102,7 +102,7 @@ draws it (the game's z mirrored). `--update-baseline` lowers the sections; `--se
 none of. A new sample, or a change to a generator, that brings findings fails until they are fixed, or until its
 section is taken out and seeded again with the reason in the commit.
 
-Texture flow: `cargo tex synth` writes the 20 texture sets into `web/public/assets/textures/` and the sidewalk into
+Texture flow: `cargo tex synth` writes the 31 texture sets into `web/public/assets/textures/` and the sidewalk into
 `web/public/assets/street/sidewalk/` (fixed filenames and resolutions, so the manifest's material bindings stay the
 same). `cargo tex leafcards` draws the trees' leaf-card atlas; `cargo tex materials` writes the PBR material entries; `cargo tex clouds` regenerates the sky's cloud layer.
 All four are deterministic: the same source makes the same output. The tools' tests hold the committed sets, under the

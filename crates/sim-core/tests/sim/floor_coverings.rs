@@ -128,3 +128,76 @@ fn floor_coverings_survive_a_save_by_id() {
         "tile.white is now the first covering"
     );
 }
+
+#[test]
+fn a_town_file_lays_floors_by_id_and_a_save_keeps_them_as_rectangles() {
+    // A 3×2 room laid in oak, one tile of it tiled, and an id the content doesn't have.
+    let town = TOWN.replace(
+        r#""sims":"#,
+        r#""floors":[{"x":1,"z":1,"w":3,"d":2,"covering":"wood.oak"},{"x":2,"z":2,"covering":"tile.white"},
+                     {"x":6,"z":6,"w":2,"d":2,"covering":"marble.gone"}],"sims":"#,
+    );
+    let w = World::from_json(CONTENT, &town, 1).unwrap();
+    assert_eq!(w.lot.floor(1, 1), 1);
+    assert_eq!(w.lot.floor(3, 1), 1);
+    assert_eq!(
+        w.lot.floor(2, 2),
+        2,
+        "a later rectangle lays over an earlier one"
+    );
+    assert_eq!(w.lot.floor(1, 2), 1);
+    assert_eq!(
+        w.lot.floor(6, 6),
+        0,
+        "an unknown covering leaves the floor automatic"
+    );
+    assert_eq!(w.lot.floor(4, 1), 0);
+    let json = w.save_json();
+    let saved: serde_json::Value = serde_json::from_str(&json).unwrap();
+    // Row 1 is one run of oak; row 2 is oak, tile, oak: four rectangles, row 1's not joined to row 2's.
+    let floors = saved["lot"]["floors"].as_array().unwrap();
+    assert_eq!(floors.len(), 4, "{floors:?}");
+    assert_eq!(
+        floors[0],
+        serde_json::json!({"x":1,"z":1,"w":3,"covering":"wood.oak"})
+    );
+    let loaded = World::from_save_json(CONTENT, &json).unwrap();
+    for (x, z) in [(1, 1), (2, 1), (3, 1), (1, 2), (2, 2), (3, 2), (4, 1)] {
+        assert_eq!(loaded.lot.floor(x, z), w.lot.floor(x, z), "{x},{z}");
+    }
+}
+
+#[test]
+fn a_room_of_one_covering_saves_as_one_rectangle_and_old_tile_lists_still_load() {
+    let town = TOWN.replace(
+        r#""sims":"#,
+        r#""floors":[{"x":0,"z":0,"w":5,"d":4,"covering":"tile.white"}],"sims":"#,
+    );
+    let w = World::from_json(CONTENT, &town, 1).unwrap();
+    let saved: serde_json::Value = serde_json::from_str(&w.save_json()).unwrap();
+    assert_eq!(
+        saved["lot"]["floors"],
+        serde_json::json!([{"x":0,"z":0,"w":5,"d":4,"covering":"tile.white"}])
+    );
+    // A file from before rectangles lists each tile on its own.
+    let mut old = saved.clone();
+    old["lot"]["floors"] = serde_json::json!([{"x":1,"z":1,"covering":"wood.oak"},{"x":2,"z":1,"covering":"wood.oak"}]);
+    let loaded = World::from_save_json(CONTENT, &old.to_string()).unwrap();
+    assert_eq!(
+        (
+            loaded.lot.floor(1, 1),
+            loaded.lot.floor(2, 1),
+            loaded.lot.floor(3, 1)
+        ),
+        (1, 1, 0)
+    );
+}
+
+#[test]
+fn a_floor_off_the_town_is_refused() {
+    let town = TOWN.replace(
+        r#""sims":"#,
+        r#""floors":[{"x":14,"z":0,"w":3,"covering":"wood.oak"}],"sims":"#,
+    );
+    assert!(World::from_json(CONTENT, &town, 1).is_err());
+}

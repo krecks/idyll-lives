@@ -12,9 +12,28 @@ import { groundDepth, type WorldStructure } from '../core/protocol';
 import { ROOM_FURNITURE } from '../render/shared/house';
 import { roadTiles, townRoads } from '../render/shared/roads';
 import type { Surface } from './kinds';
+import type { FloorCoveringDef } from '../content/content';
 
 /** What a floor covering's finish (content `floorCoverings`) sounds like underfoot. */
-const FINISH: Record<string, Surface> = { wood: 'wood', whitewash: 'wood', tile: 'tile', carpet: 'carpet', stone: 'paving' };
+const FINISH: Record<FloorCoveringDef['finish'], Surface> = {
+  wood: 'wood',
+  whitewash: 'wood',
+  parquet: 'wood',
+  laminate: 'wood',
+  cork: 'wood',
+  tile: 'tile',
+  checker: 'tile',
+  hex: 'tile',
+  encaustic: 'tile',
+  marble: 'tile',
+  terrazzo: 'tile',
+  lino: 'tile',
+  carpet: 'carpet',
+  sisal: 'carpet',
+  stone: 'paving',
+  concrete: 'paving',
+  pavers: 'paving',
+};
 
 /** The floor a room gets by its furniture, as the house draws it (`HousePlanner.build`'s `kindOf`). */
 function roomFloor(defs: ReadonlySet<string> | undefined): Surface {
@@ -57,7 +76,7 @@ export class Ground {
     const i = tz * w.width + tx;
     const covering = this.laid!.get(i);
     const finish = covering ? this.finishes[covering - 1] : undefined;
-    if (finish && FINISH[finish]) return FINISH[finish];
+    if (finish && FINISH[finish as FloorCoveringDef['finish']]) return FINISH[finish as FloorCoveringDef['finish']];
     const room = w.rooms[i];
     if (room) return this.floors.get(room) ?? 'wood';
     // Outdoors on a storey above the ground: a deck.

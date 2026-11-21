@@ -7,15 +7,15 @@
 //! or, for the greyscale "detail" sets, the height run through [`super::grey_detail`], so the game's
 //! tint sets the hue and the mean lands where the old maps did.
 //!
-//! The built surfaces (masonry, paving, boards, shingles, plaster, asphalt) are in [`built`]: drawn
-//! in metres at the manifest's tile size, with their own roughness and multi-scale cavity AO
-//! ([`Surface`], [`HeightMap::cavity_ao`]) instead of the ones [`HeightMap::arm`] derives.
+//! The built surfaces (masonry, paving, boards, shingles, plaster, asphalt and the floor coverings) are in
+//! [`built`]: drawn in metres at the manifest's tile size, with their own roughness and multi-scale cavity
+//! AO ([`Surface`], [`HeightMap::cavity_ao`]) instead of the ones [`HeightMap::arm`] derives.
 //!
 //! The organic sets (lawn and field earth, foliage, bark, carpet, linen, wallpaper, painted wood and
 //! oak) are made in [`organic`] instead: sprites (blades, leaves, fibres) drawn into a z-buffered
 //! layer, with their own albedo tone, AO and roughness besides the height.
 //!
-//! The output keeps the filenames and sizes the game expects: the 20 texture sets under
+//! The output keeps the filenames and sizes the game expects: the 31 texture sets under
 //! `textures/<set>/`, the sidewalk under `street/sidewalk/`. Everything is original and CC0; there are
 //! no downloads and no Python.
 
@@ -464,7 +464,7 @@ const fn set_ao(
     }
 }
 
-pub const SETS: [Set; 21] = [
+pub const SETS: [Set; 32] = [
     set("bark", 512, 512, None, 0.010, (0.84, 0.20, 2.3)),
     set_ao("brick", 1024, 1024, None, 0.0041, (0.81, 0.12, 4.5), 0.945),
     set(
@@ -599,6 +599,31 @@ pub const SETS: [Set; 21] = [
         0.0003,
         (0.52, 0.20, 0.2),
     ),
+    set("floor_parquet", 1024, 1024, None, 0.0005, (0.42, 0.05, 0.1)),
+    set("floor_checker", 1024, 1024, None, 0.0008, (0.30, 0.05, 0.1)),
+    set("floor_hex", 1024, 512, None, 0.001, (0.25, 0.05, 0.1)),
+    set("floor_terrazzo", 1024, 512, None, 0.0005, (0.28, 0.05, 0.1)),
+    set("floor_marble", 1024, 1024, None, 0.0004, (0.14, 0.05, 0.1)),
+    set("floor_cork", 512, 512, None, 0.0008, (0.48, 0.05, 0.1)),
+    set("floor_lino", 1024, 512, None, 0.0002, (0.48, 0.05, 0.1)),
+    set(
+        "floor_concrete",
+        1024,
+        1024,
+        None,
+        0.0008,
+        (0.36, 0.05, 0.1),
+    ),
+    set("floor_pavers", 1024, 512, None, 0.0028, (0.82, 0.10, 0.2)),
+    set(
+        "floor_encaustic",
+        1024,
+        512,
+        None,
+        0.0008,
+        (0.55, 0.05, 0.1),
+    ),
+    set("floor_sisal", 512, 512, None, 0.0018, (0.86, 0.10, 0.3)),
     set_ao(
         "sidewalk",
         512,

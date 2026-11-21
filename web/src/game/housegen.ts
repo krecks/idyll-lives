@@ -37,10 +37,13 @@ import type { ObjectDef, SurfaceKind } from '../content/content';
 import { approachCandidates, covers, facedTable, freeSpots, frontTile, middleOf, overhangTiles, sizeOf, topOf, type Shape, type Shapes, type Top } from './surfaces';
 import type { Door, HouseTemplate, Placement, PlannedRoom, Wall } from './town';
 import { between, mulberry32 as random, pick } from './noise';
+import type { FlooringSpec } from './floorings';
 import * as pmath from './pmath';
 
 export interface HouseGenConfig {
   classes: Record<string, HouseClass>;
+  /** The floors a home has laid, by room kind (`floorings.ts`; absent: automatic floors everywhere). */
+  floorings?: FlooringSpec;
   /** Class weights per lot size. */
   lots: Record<string, Record<string, number>>;
   margins: { front: [number, number]; back: number; side: number };

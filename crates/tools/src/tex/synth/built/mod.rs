@@ -1,4 +1,6 @@
-//! The built surfaces: brick, stonework, tiles, pavers, boards, shingles, plaster, concrete and asphalt.
+//! The built surfaces: brick, stonework, tiles, pavers, boards, shingles, plaster, concrete and asphalt, and
+//! the floor coverings households lay (`floors.rs`: parquet, cork, lino, concrete, sisal; `tiles.rs`: chequer,
+//! hex mosaic, terrazzo, marble, brick pavers, Victorian geometric tiles).
 //!
 //! Each set is drawn in real units: the tile's size in metres comes from the manifest's `uvScale`
 //! (`TILE`), so a 9 mm mortar joint is 9 mm whatever the texture size. A generator returns height,
@@ -9,19 +11,23 @@
 
 use super::{HeightMap, Img, Noise, Surface, lerp, mix, mul, par_map, rgb, smoothstep, to_u8};
 mod brick;
+mod floors;
 mod leather;
 mod paving;
 mod plaster;
 mod roof;
 mod stone;
+mod tiles;
 mod wood;
 
 use brick::brick;
+use floors::{concrete, cork, lino, parquet, sisal};
 use leather::leather;
 use paving::{asphalt, floor_tile, hexpaving, sidewalk};
 use plaster::plaster;
 use roof::roof;
 use stone::stone;
+use tiles::{checker, encaustic, hex_mosaic, marble, pavers, terrazzo};
 use wood::{floor_wood, laminate, siding};
 
 /// The sets made here. `floor_wood.calm`: a set's variant ([`variants`]), drawn only when named.
@@ -41,6 +47,17 @@ pub fn generate(name: &str, n: &Noise, size: usize) -> Option<Surface> {
         "sidewalk" => sidewalk(n, size),
         "road_asphalt" => asphalt(n, size),
         "leather" => leather(n, size),
+        "floor_parquet" => parquet(n, size),
+        "floor_checker" => checker(n, size),
+        "floor_hex" => hex_mosaic(n, size),
+        "floor_terrazzo" => terrazzo(n, size),
+        "floor_marble" => marble(n, size),
+        "floor_cork" => cork(n, size),
+        "floor_lino" => lino(n, size),
+        "floor_concrete" => concrete(n, size),
+        "floor_pavers" => pavers(n, size),
+        "floor_encaustic" => encaustic(n, size),
+        "floor_sisal" => sisal(n, size),
         _ => return None,
     })
 }
@@ -398,6 +415,29 @@ const TILE_ROAD: f64 = 5.0;
 
 const TILE_LEATHER: f64 = 0.5;
 
+/// The floor coverings' tiles (m), each a whole number of its pattern's repeats.
+const TILE_PARQUET: f64 = 1.5;
+
+const TILE_CHECKER: f64 = 1.8;
+
+const TILE_HEX_MOSAIC: f64 = 1.5;
+
+const TILE_TERRAZZO: f64 = 2.0;
+
+const TILE_MARBLE: f64 = 2.4;
+
+const TILE_CORK: f64 = 1.2;
+
+const TILE_LINO: f64 = 2.0;
+
+const TILE_CONCRETE: f64 = 2.4;
+
+const TILE_PAVERS: f64 = 5.0 * PAVER.0 * std::f64::consts::SQRT_2;
+
+const TILE_ENCAUSTIC: f64 = 1.36;
+
+const TILE_SISAL: f64 = 1.0;
+
 /// A set's tile in metres (the size it is drawn at: 1 / the manifest's `uvScale`), or `None` for one not made here.
 #[cfg(test)]
 pub fn tile(name: &str) -> Option<f64> {
@@ -414,6 +454,17 @@ pub fn tile(name: &str) -> Option<f64> {
         "sidewalk" => TILE_SIDEWALK,
         "road_asphalt" => TILE_ROAD,
         "leather" => TILE_LEATHER,
+        "floor_parquet" => TILE_PARQUET,
+        "floor_checker" => TILE_CHECKER,
+        "floor_hex" => TILE_HEX_MOSAIC,
+        "floor_terrazzo" => TILE_TERRAZZO,
+        "floor_marble" => TILE_MARBLE,
+        "floor_cork" => TILE_CORK,
+        "floor_lino" => TILE_LINO,
+        "floor_concrete" => TILE_CONCRETE,
+        "floor_pavers" => TILE_PAVERS,
+        "floor_encaustic" => TILE_ENCAUSTIC,
+        "floor_sisal" => TILE_SISAL,
         _ => return None,
     })
 }
@@ -451,6 +502,65 @@ const LAMINATE_JOINTS: usize = 1;
 
 /// Sidewalk slabs along and across a tile.
 const SIDEWALK_SLABS: (i64, i64) = (3, 6);
+
+/// Parquet blocks (m, joints included): three herringbone repeats (a block's length times √2) along the tile,
+/// fifteen (its width times √2) up it.
+const PARQUET_BLOCK: (f64, f64) = (
+    TILE_PARQUET / (3.0 * std::f64::consts::SQRT_2),
+    TILE_PARQUET / (15.0 * std::f64::consts::SQRT_2),
+);
+
+/// Chequerboard squares across a tile (30 cm), and half the grout joint (m).
+const CHECKER_SQUARES: i64 = 6;
+
+const CHECKER_HALF_JOINT: f64 = 0.001;
+
+/// Mosaic hexagons across and rows of them on a tile (58 mm across the flats; rows must be even to wrap,
+/// 0.1 % stretched), and half the grout joint (m).
+const HEX_MOSAIC: (i64, i64) = (26, 30);
+
+const HEX_MOSAIC_HALF_JOINT: f64 = 0.00125;
+
+/// The terrazzo's bays between brass divider strips (m), and half a strip.
+const TERRAZZO_BAY: f64 = 1.0;
+
+const TERRAZZO_HALF_STRIP: f64 = 0.002;
+
+/// Marble slabs across a tile (60 cm), and half the hairline joint (m).
+const MARBLE_SLABS: i64 = 4;
+
+const MARBLE_HALF_JOINT: f64 = 0.0005;
+
+/// Cork tiles across a tile (30 cm), and half the butt joint (m).
+const CORK_TILES: i64 = 4;
+
+const CORK_HALF_JOINT: f64 = 0.0003;
+
+/// Concrete's saw cuts: every 1.2 m, half a cut 1.5 mm.
+const CONCRETE_JOINTS: f64 = 1.2;
+
+const CONCRETE_HALF_CUT: f64 = 0.0015;
+
+/// Brick pavers (m, joints included: 190 x 90 mm bricks) and half the mortar joint.
+const PAVER: (f64, f64) = (0.2, 0.1);
+
+const PAVER_HALF_JOINT: f64 = 0.005;
+
+/// The geometric hall tiles' square (m: two make the pattern's repeat), its stars' centre square's half,
+/// and half the joint between pieces.
+const ENCAUSTIC_CELL: f64 = 0.17;
+
+const ENCAUSTIC_CENTRE: f64 = 0.027;
+
+/// Half the dot where the ground's four small squares meet (m).
+const ENCAUSTIC_DOT: f64 = 0.013;
+
+const ENCAUSTIC_HALF_JOINT: f64 = 0.001;
+
+/// Sisal basketweave blocks across a tile (25 mm), and strands to a block.
+const SISAL_BLOCKS: i64 = 40;
+
+const SISAL_STRANDS: i64 = 4;
 
 /// The sizes of a set's pattern that real ones are held to (`docs/review/reference.json` `surfaces`, checked
 /// by `cargo review sizes`), as (name, size in UV units: a share of the tile); none for a set without one.
