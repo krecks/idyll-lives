@@ -242,14 +242,43 @@ pub(super) fn decode_looks(lot: &mut Lot, content: &Content, looks: &[LookSave])
     }
 }
 
+/// The lot's floor coverings as rectangles of one covering each: runs along each row, a run
+/// joined to the one just above it where that is as long and starts where it does (a room's
+/// floor is one rectangle, a town's thousands of tiles a few entries a room).
 pub(super) fn encode_floors(lot: &Lot, content: &Content) -> Vec<FloorSave> {
     let floors = &content.build.floors;
-    lot.floors()
-        .filter_map(|(x, z, c)| {
+    let mut tiles: Vec<(u16, u16, u8)> = lot.floors().collect();
+    tiles.sort_unstable_by_key(|&(x, z, _)| (z, x));
+    // Row runs, in row order: (x, z, w, covering).
+    let mut runs: Vec<(u16, u16, u16, u8)> = Vec::new();
+    for (x, z, c) in tiles {
+        match runs.last_mut() {
+            Some(r) if r.1 == z && r.0 + r.2 == x && r.3 == c => r.2 += 1,
+            _ => runs.push((x, z, 1, c)),
+        }
+    }
+    // Rectangles: each run grows the open one ending on the row above with its start, width and covering.
+    let mut rects: Vec<(u16, u16, u16, u16, u8)> = Vec::new();
+    let mut open: HashMap<(u16, u16, u8), usize> = HashMap::new();
+    for (x, z, w, c) in runs {
+        let key = (x, w, c);
+        match open.get(&key).copied() {
+            Some(i) if rects[i].1 + rects[i].3 == z => rects[i].3 += 1,
+            _ => {
+                open.insert(key, rects.len());
+                rects.push((x, z, w, 1, c));
+            }
+        }
+    }
+    rects
+        .into_iter()
+        .filter_map(|(x, z, w, d, c)| {
             let id = &floors.get(c.checked_sub(1)? as usize)?.id;
             Some(FloorSave {
                 x,
                 z,
+                w,
+                d,
                 covering: id.clone(),
             })
         })
@@ -260,11 +289,23 @@ pub(super) fn encode_floors(lot: &Lot, content: &Content) -> Vec<FloorSave> {
 pub(super) fn decode_floors(lot: &mut Lot, content: &Content, floors: &[FloorSave]) {
     let list = &content.build.floors;
     for f in floors {
-        if !lot.in_bounds(i32::from(f.x), i32::from(f.z)) {
+        let Some(i) = list.iter().position(|s| s.id == f.covering) else {
             continue;
-        }
-        if let Some(i) = list.iter().position(|s| s.id == f.covering) {
-            lot.set_floor(f.x, f.z, i as u8 + 1);
+        };
+        let Ok(covering) = u8::try_from(i + 1) else {
+            continue;
+        };
+        // (Rows and tiles in order: the first off the lot ends them, so a corrupt size costs nothing.)
+        for z in f.z..f.z.saturating_add(f.d) {
+            if !lot.in_bounds(i32::from(f.x), i32::from(z)) {
+                break;
+            }
+            for x in f.x..f.x.saturating_add(f.w) {
+                if !lot.in_bounds(i32::from(x), i32::from(z)) {
+                    break;
+                }
+                lot.set_floor(x, z, covering);
+            }
         }
     }
 }

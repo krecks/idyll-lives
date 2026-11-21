@@ -170,7 +170,7 @@ enum Tint {
 fn tint(set: &Set) -> Tint {
     match set.name {
         _ if set.grey.is_some() => Tint::Grey,
-        "floor_tile" => Tint::Covering,
+        "floor_tile" | "floor_hex" | "floor_lino" => Tint::Covering,
         _ => Tint::Own,
     }
 }
@@ -188,9 +188,10 @@ fn roughness_class(set: &Set) -> (&'static str, [f64; 2]) {
     const POLISHED: (&str, [f64; 2]) = ("polished", [0.1, 0.6]);
     match set.name {
         "foliage" | "grass_lush" => LEAF,
-        "floor_laminate" | "floor_wood" | "leather" | "painted_wood" | "siding_wood"
-        | "wood_oak" => COATED,
-        "floor_tile" => POLISHED,
+        "floor_laminate" | "floor_wood" | "floor_parquet" | "floor_cork" | "floor_lino"
+        | "leather" | "painted_wood" | "siding_wood" | "wood_oak" => COATED,
+        "floor_tile" | "floor_checker" | "floor_hex" | "floor_terrazzo" | "floor_marble"
+        | "floor_concrete" | "floor_encaustic" => POLISHED,
         _ => ROUGH,
     }
 }

@@ -1245,6 +1245,136 @@
       "metallic": 0,
       "normalStrength": 0.8
     },
+    "material.floor.laminate": {
+      "type": "material",
+      "color": "#FFFFFF",
+      "texture": "textures/floor_laminate/albedo.jpg",
+      "normal": "normal.jpg",
+      "arm": "arm.jpg",
+      "uvScale": 0.55,
+      "metallic": 0
+    },
+    "material.floor.parquet": {
+      "type": "material",
+      "color": "#FFFFFF",
+      "texture": "textures/floor_parquet/albedo.jpg",
+      "normal": "normal.jpg",
+      "arm": "arm.jpg",
+      "uvScale": 0.6667,
+      "roughness": 1,
+      "metallic": 0,
+      "normalStrength": 0.8
+    },
+    "material.floor.checker": {
+      "type": "material",
+      "color": "#FFFFFF",
+      "texture": "textures/floor_checker/albedo.jpg",
+      "normal": "normal.jpg",
+      "arm": "arm.jpg",
+      "uvScale": 0.5556,
+      "roughness": 1,
+      "metallic": 0,
+      "normalStrength": 1
+    },
+    "material.floor.hex": {
+      "type": "material",
+      "color": "#FFFFFF",
+      "texture": "textures/floor_hex/albedo.jpg",
+      "normal": "normal.jpg",
+      "arm": "arm.jpg",
+      "uvScale": 0.6667,
+      "roughness": 1,
+      "metallic": 0,
+      "normalStrength": 1
+    },
+    "material.floor.terrazzo": {
+      "type": "material",
+      "color": "#FFFFFF",
+      "texture": "textures/floor_terrazzo/albedo.jpg",
+      "normal": "normal.jpg",
+      "arm": "arm.jpg",
+      "uvScale": 0.5,
+      "roughness": 1,
+      "metallic": 0,
+      "normalStrength": 1
+    },
+    "material.floor.marble": {
+      "type": "material",
+      "color": "#FFFFFF",
+      "texture": "textures/floor_marble/albedo.jpg",
+      "normal": "normal.jpg",
+      "arm": "arm.jpg",
+      "uvScale": 0.4167,
+      "roughness": 1,
+      "metallic": 0,
+      "normalStrength": 1
+    },
+    "material.floor.cork": {
+      "type": "material",
+      "color": "#FFFFFF",
+      "texture": "textures/floor_cork/albedo.jpg",
+      "normal": "normal.jpg",
+      "arm": "arm.jpg",
+      "uvScale": 0.8333,
+      "roughness": 1,
+      "metallic": 0,
+      "normalStrength": 1
+    },
+    "material.floor.lino": {
+      "type": "material",
+      "color": "#FFFFFF",
+      "texture": "textures/floor_lino/albedo.jpg",
+      "normal": "normal.jpg",
+      "arm": "arm.jpg",
+      "uvScale": 0.5,
+      "roughness": 1,
+      "metallic": 0,
+      "normalStrength": 1
+    },
+    "material.floor.concrete": {
+      "type": "material",
+      "color": "#FFFFFF",
+      "texture": "textures/floor_concrete/albedo.jpg",
+      "normal": "normal.jpg",
+      "arm": "arm.jpg",
+      "uvScale": 0.4167,
+      "roughness": 1,
+      "metallic": 0,
+      "normalStrength": 1
+    },
+    "material.floor.pavers": {
+      "type": "material",
+      "color": "#FFFFFF",
+      "texture": "textures/floor_pavers/albedo.jpg",
+      "normal": "normal.jpg",
+      "arm": "arm.jpg",
+      "uvScale": 0.7071,
+      "roughness": 1,
+      "metallic": 0,
+      "normalStrength": 1
+    },
+    "material.floor.encaustic": {
+      "type": "material",
+      "color": "#FFFFFF",
+      "texture": "textures/floor_encaustic/albedo.jpg",
+      "normal": "normal.jpg",
+      "arm": "arm.jpg",
+      "uvScale": 0.7353,
+      "roughness": 1,
+      "metallic": 0,
+      "normalStrength": 1
+    },
+    "material.floor.sisal": {
+      "type": "material",
+      "color": "#FFFFFF",
+      "texture": "textures/floor_sisal/albedo.jpg",
+      "normal": "normal.jpg",
+      "arm": "arm.jpg",
+      "uvScale": 1.0,
+      "roughness": 1,
+      "metallic": 0,
+      "normalStrength": 1
+    },
     "material.wall.interior": {
       "type": "material",
       "color": "#FFFFFF",

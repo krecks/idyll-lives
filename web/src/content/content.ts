@@ -512,11 +512,14 @@ export interface FenceStyleDef {
   price?: number;
 }
 
+/** The finishes a floor covering may have: each a texture of its own (`render/shared/house.ts` `FLOOR_MATERIALS`). */
+export const FLOOR_FINISHES = ['wood', 'whitewash', 'tile', 'carpet', 'stone', 'parquet', 'checker', 'hex', 'terrazzo', 'marble', 'cork', 'lino', 'concrete', 'pavers', 'encaustic', 'sisal', 'laminate'] as const;
+
 /** A floor covering (Build mode's Floor tool): a finish (texture) tinted with a colour. Price per tile. */
 export interface FloorCoveringDef {
   id: string;
   label: string;
-  finish: 'wood' | 'whitewash' | 'tile' | 'carpet' | 'stone';
+  finish: (typeof FLOOR_FINISHES)[number];
   color: string;
   price?: number;
 }

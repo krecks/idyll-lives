@@ -70,7 +70,7 @@ describe('the built world as dumped', async () => {
     const s = by.get('house.finishes')!;
     for (const finish of new Set(content.wallCoverings.map((c) => c.finish))) expect([finish, triangles(part(s, `walls-${finish}`)) > 0]).toEqual([finish, true]);
     const floors: Record<string, string> = { wood: 'floors', whitewash: 'floorsWhitewashed', tile: 'floorsTiled', carpet: 'floorsCarpet', stone: 'floorsStone' };
-    for (const finish of new Set(content.floorCoverings.map((c) => c.finish))) expect([finish, triangles(part(s, floors[finish])) > 0]).toEqual([finish, true]);
+    for (const finish of new Set(content.floorCoverings.map((c) => c.finish))) expect([finish, triangles(part(s, floors[finish] ?? `floors-${finish}`)) > 0]).toEqual([finish, true]);
     // Painted leaves, an oak one, glazed ones; clear glass in the windows.
     const leaves = part(s, 'doorLeaf');
     expect(leaves.some((m) => m.material === 'material.trim')).toBe(true);

@@ -140,6 +140,28 @@ pub(crate) fn place_serves(
     best
 }
 
+/// What home already has (`place_serves` of the home) counts this much toward an outing: a little
+/// draw out for what home does as well, so a bored resident still goes out now and then.
+pub(crate) const OUTING_HOME_SHARE: f32 = 0.5;
+
+/// What draws `sim` out to a place that `serves` each need so much, with `home` serving it so much
+/// at home: what the place has beyond home in full, what home has too at `OUTING_HOME_SHARE`, and
+/// nothing for the `essentials` (bit per need) seen to at home (a night's sleep, a meal, the
+/// toilet, a wash: a sofa to sleep on is no reason to go to an office).
+pub(crate) fn outing_pull(
+    serves: &[f32; MAX_NEEDS],
+    home: &[f32; MAX_NEEDS],
+    essentials: u32,
+) -> [f32; MAX_NEEDS] {
+    std::array::from_fn(|n| {
+        if essentials & (1 << n) != 0 {
+            0.0
+        } else {
+            (serves[n] - home[n]).max(0.0) + OUTING_HOME_SHARE * serves[n].min(home[n]).max(0.0)
+        }
+    })
+}
+
 /// Whether `sim`'s needs last `minutes` out (the way to a visit or an outing and
 /// `visits.leastMinutes` there): none of them would be below `life::LOW_NEED` by then, and so send
 /// them home, that the place has nothing for (`serves`, `place_serves`).
@@ -634,4 +656,33 @@ pub(crate) fn could_conceive(ctx: &Ctx, a: usize, b: usize) -> bool {
         && ctx.households[h].expecting.is_none()
         && members < ctx.content.rules.max_household
         && ctx.room_in_town
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn needs(v: &[f32]) -> [f32; MAX_NEEDS] {
+        std::array::from_fn(|n| v.get(n).copied().unwrap_or(0.0))
+    }
+
+    #[test]
+    fn an_outing_draws_for_what_home_lacks_and_a_little_for_what_it_has() {
+        // Needs 0..3: energy (an essential home has), comfort, fun, social.
+        let place = needs(&[0.7, 0.75, 0.5, 0.2]);
+        let home = needs(&[0.7, 0.75, 0.6, 0.0]);
+        let pull = outing_pull(&place, &home, 0b1);
+        assert_eq!(pull[0], 0.0, "no going out to sleep on its sofa");
+        assert!(
+            (pull[1] - 0.75 * OUTING_HOME_SHARE).abs() < 1e-6,
+            "as good as home: half"
+        );
+        assert!(
+            (pull[2] - 0.5 * OUTING_HOME_SHARE).abs() < 1e-6,
+            "worse than home: half of it"
+        );
+        assert!((pull[3] - 0.2).abs() < 1e-6, "what home hasn't: in full");
+        let bare = outing_pull(&place, &[0.0; MAX_NEEDS], 0);
+        assert_eq!(bare, place, "with nothing at home, all of it");
+    }
 }

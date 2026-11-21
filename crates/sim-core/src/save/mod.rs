@@ -356,18 +356,15 @@ pub struct LotSave {
     /// Walls that don't look plain (absent in older saves).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub looks: Vec<LookSave>,
-    /// Tiles with a floor covering (absent in older saves).
+    /// Tiles with a floor covering (absent in older saves): rectangles of tiles with one covering,
+    /// `w` × `d` from `(x, z)` (absent: one tile, as files before them have each tile).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub floors: Vec<FloorSave>,
 }
 
-/// A tile's floor covering, by content id (unknown ids load as the automatic floor).
-#[derive(Debug, Serialize, Deserialize)]
-pub struct FloorSave {
-    pub x: u16,
-    pub z: u16,
-    pub covering: String,
-}
+/// Tiles with a floor covering, by content id (unknown ids load as the automatic floor): a
+/// rectangle of them, as a town file lays them (`lot::FloorRaw`).
+pub type FloorSave = crate::lot::FloorRaw;
 
 /// A wall's look, by content id so it survives content changes (unknown ids load as the
 /// default look). `at`: `h`, `v` or `d` (the diagonal across tile `x, z`).

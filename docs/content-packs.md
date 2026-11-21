@@ -475,7 +475,7 @@ Build mode's looks are top-level arrays, appended like objects, so a pack can ad
 | Field | Meaning |
 |---|---|
 | `price` | Wall covering: per wall face covered. Floor covering: per floor tile. Door / window: per door or window (replacing one with another style costs the new style's price). |
-| `finish` | Wall covering texture: `plaster`, `wallpaper`, `siding`, `brick`, `wood`, `stone` or `tile`; floor covering: `wood`, `tile`, `carpet` (soft: what a mop or a broom leaves, `cleans`) or `stone`. `color` tints it (wood is a neutral grain: give it its colour). |
+| `finish` | Wall covering texture: `plaster`, `wallpaper`, `siding`, `brick`, `wood`, `stone` or `tile`; floor covering: `wood`, `whitewash`, `tile`, `carpet` (soft: what a mop or a broom leaves, `cleans`), `stone`, `parquet` (herringbone oak), `checker` (black and white tiles), `hex` (a white hexagon mosaic), `terrazzo`, `marble`, `cork`, `lino` (sheet linoleum), `concrete` (polished), `pavers` (herringbone brick), `encaustic` (Victorian hall tiles), `sisal` (woven matting, soft like a carpet) or `laminate`. `color` tints it (wood, parquet, hex, lino, cork and sisal are light and neutral: give them their colour; checker, terrazzo, marble, concrete, pavers and encaustic have their own, white keeps them). |
 | `leaf`, `color` | Door: `panel` (painted; without `color`, front doors take the house's accent colour), `oak`, `halfGlass` or `glass` (`color` paints the frame). |
 | `panes`, `sill`, `head`, `inset`, `shutters` | Window: glazing bars (`cross`, `grid`, `bar`, `transom`, `none`), opening bottom and top (m, walls are 2.8 m), wall left either side of the glazing (m, of the 1 m edge), shutters outside (`true`, `false`, or `"house"`: if the house's style has them). |
 

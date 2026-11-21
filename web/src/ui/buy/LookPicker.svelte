@@ -90,6 +90,18 @@
     tile: '#F2F2F0',
     carpet: '#E4DDD2',
     stone: '#A39C90',
+    parquet: '#C8A47A',
+    checker: '#8A8886',
+    hex: '#E6E6E2',
+    terrazzo: '#D8CFC0',
+    marble: '#E8E6E2',
+    cork: '#B88C5E',
+    lino: '#EAE6DC',
+    concrete: '#9C9C98',
+    pavers: '#A4563E',
+    encaustic: '#9A5A44',
+    sisal: '#C8B286',
+    laminate: '#C4A27C',
   };
   const floorSwatch = (c: FloorCoveringDef) => `--c:${multiply(FLOOR_BASE[c.finish], c.color)}`;
 

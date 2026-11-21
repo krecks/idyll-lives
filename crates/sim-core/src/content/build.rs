@@ -158,7 +158,7 @@ impl Default for LandPrices {
 pub struct BuildStyle {
     pub id: String,
     pub price: i64,
-    /// A soft floor (a floor covering whose `finish` is `carpet`): what a mop or a broom leaves
+    /// A soft floor (a floor covering whose `finish` is `carpet` or `sisal`): what a mop or a broom leaves
     /// (`Sweep::hard`).
     pub soft: bool,
 }

@@ -462,16 +462,15 @@ function worldOf(plan: Plan, ox: number): WorldStructure {
     const look: [number, number] = [cover(of[0]), cover(of[1])];
     return { axis: g.axis, x: ox + g.x, z: g.z + rows(0), kind: g.kind, rooms: of, ...(look[0] || look[1] ? { faces: look } : {}), ...(plan.each && g.kind !== 'wall' ? { style: (i + 3) % (g.kind === 'door' ? base.doorStyles.length : base.windowStyles.length) } : {}) };
   });
-  // A floor covering a room on a plan with `each`: every third of them, which takes in each finish.
-  const floorOf = new Map<number, number>();
+  // On a plan with `each`, every finish of floor covering: the first covering of each, in turn tile by tile
+  // over the rooms (there are more finishes than rooms).
   const laid: [number, number, number][] = [];
   if (plan.each) {
+    const firsts = [...new Set(floorCoverings.map((c) => c.finish))].map((f) => floorCoverings.findIndex((c) => c.finish === f));
+    let k = 0;
     for (let z = 0; z < D; z++) {
       for (let x = 0; x < W; x++) {
-        const r = room(x, z);
-        if (!r) continue;
-        if (!floorOf.has(r)) floorOf.set(r, (floorOf.size * 3) % floorCoverings.length);
-        laid.push([x, z, floorOf.get(r)! + 1]);
+        if (room(x, z)) laid.push([x, z, firsts[k++ % firsts.length] + 1]);
       }
     }
   }
