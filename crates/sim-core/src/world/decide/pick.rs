@@ -8,9 +8,10 @@ use crate::social::{self, Prefer};
 use crate::world::{
     Access, Choice, Ctx, Goer, MIN_AUTONOMY_SCORE, OUTING_K, ObjectInstance, Sim, Task, TaskKind,
     UNWANTED_MEAL, access, affordable, before_dawn, breaks_off, could_conceive, exhausted,
-    free_before_work, getting_up, guest_may, has_bed, home_needs, hosts_about_till, lasts,
-    leave_today, leisure_way, outing_fits, place_serves, quality_boost, reach, requirements_met,
-    runs_out, training_interest, unfit, upper_barred, urgent_needs, usable_here, visit_fits,
+    free_before_work, getting_up, guest_may, has_bed, home_first, home_needs, hosts_about_till,
+    lasts, leave_today, leisure_way, outing_fits, outing_pull, place_serves, quality_boost, reach,
+    requirements_met, runs_out, training_interest, unfit, upper_barred, urgent_needs, usable_here,
+    visit_fits,
 };
 use crate::{MINUTES_PER_TICK, TICKS_PER_MINUTE, ai};
 
@@ -110,12 +111,31 @@ pub(crate) fn pick_autonomous(
     let minding = crate::life::minding_baby(sim, ctx);
     let own = ctx.households[sim.household as usize].plot;
     let stranded = short & !fillable & content.autonomy.urgent;
+    // Home first: the essentials home has something free for (a bed, a snack, the toilet, a
+    // wash) are seen to at home, not at the hotel or the café down the road (`home_first`).
+    let away = |o: u32| {
+        ctx.object_plot[o as usize]
+            .is_some_and(|p| !crate::world::at_home(ctx.plots, own, p, false))
+    };
+    let homed = if sim.visiting.is_none() && usable.iter().any(|&o| away(o)) {
+        home_first(sim, ctx, objects, walk_per_minute)
+    } else {
+        0
+    };
+    // (A bed elsewhere is no bed for them then.)
+    let home_beds: Vec<u32>;
+    let beds: &[u32] = match rhythm.rest_need {
+        Some(n) if homed & (1 << n) != 0 => {
+            home_beds = usable.iter().copied().filter(|&o| !away(o)).collect();
+            &home_beds
+        }
+        _ => usable,
+    };
     // A spare bed's night (a sofa bed's, the sofa's) only for someone with no other bed free; a
     // couple's bed kept for the couple only for someone with nowhere else at all.
-    let bedded = has_bed(sim, ctx, objects, usable, false);
+    let bedded = has_bed(sim, ctx, objects, beds, false);
     let elsewhere = std::cell::OnceCell::new();
-    let elsewhere =
-        || *elsewhere.get_or_init(|| bedded || has_bed(sim, ctx, objects, usable, true));
+    let elsewhere = || *elsewhere.get_or_init(|| bedded || has_bed(sim, ctx, objects, beds, true));
     crate::profile::end("pick_autonomous/setup", part);
     part = crate::profile::start();
     for obj in usable
@@ -197,6 +217,7 @@ pub(crate) fn pick_autonomous(
             // Dining at a table only with a table to dine at.
             // (Nor one that takes the whole thing while someone else is on it.)
             if inter.baby
+                || (inter.fills() & homed != 0 && away(obj.id))
                 || (inter.spare && bedded)
                 || (inter.tags & rhythm.sleep_tags != 0
                     && crate::privacy::kept_for_couple(ctx, objects, sim, obj)
@@ -798,11 +819,16 @@ pub(crate) fn pick_autonomous(
             }
         }
 
-        // An outing: a public place out of reach, for the best it has, the less the longer the
-        // way (`OUTING_K`): only one the way to takes `outingMinutes` at most, with time for there
-        // and back and an hour there before work or school and before `outingHomeBy`
-        // (`outing_fits`).
+        // An outing: a public place out of reach, for what it has that home hasn't (and a little
+        // for what home has too; never for the essentials home sees to: `outing_pull`), the less
+        // the longer the way (`OUTING_K`): only one the way to takes `outingMinutes` at most, with
+        // time for there and back and an hour there before work or school and before
+        // `outingHomeBy` (`outing_fits`).
         let reach = content.autonomy.reach;
+        let at_home = own.map_or([0.0; MAX_NEEDS], |h| {
+            place_serves(ctx, objects, sim, h, false)
+        });
+        let essentials = content.autonomy.urgent & fillable;
         // The least the way to a place could take, the fastest way they might go (on a bike of
         // theirs, by car or the taxi, along the straight line: `Travel::eta_at_least`): one past
         // `visits.outingMinutes` even so is one `outing_fits` would leave out, and its way isn't
@@ -876,7 +902,8 @@ pub(crate) fn pick_autonomous(
             if !lasts(content, sim, &best, eta + visits.least_minutes) {
                 continue;
             }
-            let score = ai::score_felt(needs, &felt, &best, 0.0) * feel(visits.tags)
+            let pull = outing_pull(&best, &at_home, essentials);
+            let score = ai::score_felt(needs, &felt, &pull, 0.0) * feel(visits.tags)
                 / (1.0 + OUTING_K * eta);
             if score > MIN_AUTONOMY_SCORE {
                 candidates.push((score, Choice::Outing(p.id)));
