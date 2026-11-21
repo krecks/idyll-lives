@@ -41,11 +41,16 @@ impl Lot {
     }
 
     pub fn from_file(file: &LotFile) -> Result<Self, Error> {
-        Self::from_file_styled(file, &[])
+        Self::from_file_styled(file, &[], &[])
     }
 
-    /// `from_file`, its fences' styles found among `fence_styles` (the content's fence style ids).
-    pub fn from_file_styled(file: &LotFile, fence_styles: &[&str]) -> Result<Self, Error> {
+    /// `from_file`, its fences' styles found among `fence_styles` (the content's fence style ids)
+    /// and its floors' coverings among `floor_ids` (the content's floor covering ids).
+    pub fn from_file_styled(
+        file: &LotFile,
+        fence_styles: &[&str],
+        floor_ids: &[&str],
+    ) -> Result<Self, Error> {
         let (w, d) = (file.width as usize, file.depth as usize);
         if w == 0 || d == 0 || w > MAX_SIDE || d > MAX_SIDE {
             return Err(Error::new(format!(
@@ -146,8 +151,38 @@ impl Lot {
                 );
             }
         }
+        lot.lay_floors(&file.floors, floor_ids)?;
         lot.compute_rooms();
         Ok(lot)
+    }
+
+    /// Lays floor coverings (`FloorRaw` rectangles) by their ids among `floor_ids` (index + 1 is
+    /// the covering); an unknown id leaves its tiles automatic, a rectangle off the lot is an error.
+    pub fn lay_floors(&mut self, floors: &[FloorRaw], floor_ids: &[&str]) -> Result<(), Error> {
+        for f in floors {
+            let (x1, z1) = (
+                usize::from(f.x) + usize::from(f.w),
+                usize::from(f.z) + usize::from(f.d),
+            );
+            if f.w == 0 || f.d == 0 || x1 > self.width || z1 > self.depth {
+                return Err(Error::new(format!(
+                    "floor {},{} {}x{} is out of bounds",
+                    f.x, f.z, f.w, f.d
+                )));
+            }
+            let Some(i) = floor_ids.iter().position(|id| *id == f.covering) else {
+                continue;
+            };
+            let Ok(covering) = u8::try_from(i + 1) else {
+                continue;
+            };
+            for z in f.z..f.z + f.d {
+                for x in f.x..f.x + f.w {
+                    self.set_floor(x, z, covering);
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Rebuilds a lot from saved edge arrays (row-major, as `h_edge` / `v_edge` number them:

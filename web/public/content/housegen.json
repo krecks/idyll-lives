@@ -468,6 +468,61 @@
     "kidsOnly": { "categories": ["kids"], "groups": ["toys"] }
   },
 
+  "$floorings": "The floors a household's home has laid (game/floorings.ts): a covering (base.json floorCoverings id) for each room by its kind, drawn by weight; 'below' a basement's rooms, 'classes' a house class's own weights (by its label) in place of 'rooms', 'ownBedroom' how often a bedroom after the first gets one of its own. The entrance hall is never laid like the living room. A kind not listed keeps the automatic floor.",
+  "floorings": {
+    "ownBedroom": 0.35,
+    "rooms": {
+      "entry": { "encaustic.hall": 4, "checker.classic": 3, "terrazzo.cream": 2, "stone.flag": 2, "tile.terracotta": 2, "tile.slate": 1, "pavers.brick": 1, "marble.white": 1 },
+      "living": { "wood.oak": 4, "parquet.oak": 3, "wood.honey": 2, "laminate.oak": 2, "wood.walnut": 1, "parquet.smoked": 1, "wood.whitewashed": 1, "carpet.oatmeal": 1 },
+      "dining": { "parquet.oak": 3, "wood.oak": 3, "wood.walnut": 1, "parquet.smoked": 1, "terrazzo.cream": 1 },
+      "kitchen": { "tile.sand": 2, "tile.terracotta": 2, "checker.classic": 2, "lino.green": 1, "lino.ochre": 1, "lino.blue": 1, "tile.slate": 1, "concrete.polished": 1, "cork.natural": 1, "terrazzo.cream": 1 },
+      "bathroom": { "tile.white": 3, "hex.white": 3, "hex.sage": 1, "checker.classic": 1, "marble.white": 1, "tile.slate": 1, "terrazzo.cream": 1 },
+      "washroom": { "tile.white": 2, "hex.white": 2, "tile.slate": 1 },
+      "bedroom": { "carpet.oatmeal": 3, "carpet.sage": 2, "carpet.blue": 2, "carpet.rose": 1, "wood.oak": 2, "wood.honey": 1, "sisal.natural": 1, "laminate.oak": 1 },
+      "study": { "wood.walnut": 2, "parquet.oak": 2, "sisal.natural": 2, "cork.natural": 1, "carpet.oatmeal": 1 },
+      "playroom": { "cork.natural": 2, "lino.blue": 1, "lino.green": 1, "carpet.blue": 1, "laminate.oak": 1 },
+      "laundry": { "lino.ochre": 1, "tile.white": 1, "tile.slate": 1, "concrete.polished": 1 },
+      "hobby": { "cork.natural": 1, "laminate.grey": 1, "concrete.polished": 1 },
+      "gym": { "cork.natural": 1, "laminate.grey": 1, "concrete.polished": 1 },
+      "games": { "laminate.oak": 1, "carpet.blue": 1, "parquet.smoked": 1 },
+      "workshop": { "concrete.polished": 1 },
+      "storage": { "concrete.polished": 1 },
+      "hall": { "carpet.oatmeal": 2, "sisal.natural": 2, "wood.oak": 2, "parquet.oak": 1 }
+    },
+    "below": {
+      "hall": { "concrete.polished": 2, "laminate.grey": 1, "tile.slate": 1 },
+      "games": { "laminate.grey": 1, "carpet.blue": 1, "concrete.polished": 1 },
+      "laundry": { "concrete.polished": 2, "tile.slate": 1 }
+    },
+    "classes": {
+      "villa": {
+        "entry": { "marble.white": 4, "checker.classic": 3, "terrazzo.cream": 2, "encaustic.hall": 2 },
+        "living": { "parquet.oak": 4, "parquet.smoked": 2, "wood.walnut": 2 },
+        "dining": { "parquet.oak": 3, "parquet.smoked": 2, "marble.white": 1 },
+        "bathroom": { "marble.white": 3, "hex.white": 2, "checker.classic": 1 }
+      },
+      "cottage": {
+        "entry": { "stone.flag": 4, "tile.terracotta": 3, "pavers.brick": 2, "encaustic.hall": 1 },
+        "kitchen": { "tile.terracotta": 3, "stone.flag": 2, "pavers.brick": 1, "lino.ochre": 1 },
+        "living": { "wood.honey": 3, "wood.oak": 2, "wood.whitewashed": 2 }
+      },
+      "bungalow": {
+        "entry": { "tile.terracotta": 2, "checker.classic": 2, "tile.slate": 2, "encaustic.hall": 1, "pavers.brick": 1 }
+      },
+      "terraced house": {
+        "entry": { "encaustic.hall": 5, "checker.classic": 2, "tile.terracotta": 1 }
+      },
+      "town house": {
+        "entry": { "encaustic.hall": 4, "checker.classic": 3, "terrazzo.cream": 1, "marble.white": 1 }
+      },
+      "flat": {
+        "entry": { "terrazzo.cream": 2, "checker.classic": 2, "tile.slate": 1, "concrete.polished": 1, "hex.white": 1 },
+        "living": { "laminate.oak": 3, "laminate.grey": 2, "parquet.oak": 2, "wood.oak": 2, "concrete.polished": 1 },
+        "kitchen": { "lino.green": 1, "lino.blue": 1, "tile.sand": 1, "concrete.polished": 1, "checker.classic": 1, "terrazzo.cream": 1 }
+      }
+    }
+  },
+
   "$names": "House names: one word from each list.",
   "names": {
     "first": ["Birch", "Linden", "Rowan", "Hazel", "Juniper", "Alder", "Clover", "Meadow", "Brook", "Ivy", "Heather", "Holly", "Elder", "Laurel", "Briar", "Fern", "Sorrel", "Thistle"],

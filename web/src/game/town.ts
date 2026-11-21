@@ -31,6 +31,8 @@ import { flatName, flatsInId, flatsTemplate, placeFloors, type FlatsTemplate, ty
 import { rectPoly } from './footprints';
 import { clearOf, type DriveLine } from './parking';
 import * as pmath from './pmath';
+import { floorPicker, laidFloors, type LaidFloor } from './floorings';
+import { mulberry32 } from './noise';
 
 /** The households moved to `people.ts`; still here for those that import them from the town. */
 export { NEIGHBOUR_CAP, populate, rehouse } from './people';
@@ -443,12 +445,13 @@ export function onLot(t: Templates, h: HouseTemplate, s: Pick<PlotSlot, 'lot' | 
     const [w, d] = o.rot % 2 === 0 ? [fw, fd] : [fd, fw];
     return o.x >= 0 && o.z >= 0 && o.x + w <= width && o.z + d <= depth;
   };
-  const move = <T extends { walls: Wall[]; doors: Door[]; windows?: Door[]; objects: Placement[] }>(f: T): T => ({
+  const move = <T extends { walls: Wall[]; doors: Door[]; windows?: Door[]; objects: Placement[]; rooms?: PlannedRoom[] }>(f: T): T => ({
     ...f,
     walls: f.walls.map(([x0, z0, x1, z1]) => [x0 + dx, z0, x1 + dx, z1]),
     doors: f.doors.map((d) => ({ ...d, x: d.x + dx })),
     windows: f.windows?.map((d) => ({ ...d, x: d.x + dx })),
     objects: f.objects.map((o) => ({ ...o, x: o.x + dx })).filter(inside),
+    ...(f.rooms ? { rooms: f.rooms.map((r) => ({ ...r, x: r.x + dx })) } : {}),
   });
   return { ...move(h), spawns: h.spawns.map(([x, z]) => [x + dx, z]), upper: h.upper && move(h.upper), basement: h.basement && move(h.basement) };
 }
@@ -1138,6 +1141,8 @@ export interface TownLayout {
   flats: { id: number; name: string; of: number; unit: number; storey: number; rect: Rect; door: [number, number]; inside: [number, number]; entry: [number, number] }[];
   /** Each lot's walls' box on the ground storey (town tiles), where it has walls: what is built on it (`paving`, `gardenFences.ts`). */
   built: (Rect | null)[];
+  /** The floors the homes have laid (`floorings.ts`): rectangles of tiles in one covering, town tiles on their storey's rows. */
+  floors: LaidFloor[];
 }
 
 /**
@@ -1164,6 +1169,24 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
   const placeAll = (s: PlotSlot, list: Placement[], lift = 0) => {
     const turn = turnOnto(t, s);
     for (const o of list) objects.push(turn.place(o, footprint, lift));
+  };
+  const floors: LaidFloor[] = [];
+  const coverings = new Set(content.floorCoverings.map((c) => c.id));
+  /**
+   * A home's floors (`floorings.ts`): its storeys' rooms (plot coordinates), each `lift` rows up (`below`: the
+   * basement's), laid by one picker for the home (`salt`: a flat's own among its building's).
+   */
+  const lay = (s: PlotSlot, cls: string | undefined, storeys: { rooms?: PlannedRoom[]; lift: number; below?: boolean }[], salt = 0) => {
+    const spec = t.gen?.floorings;
+    if (!spec) return;
+    const pick = floorPicker(spec, cls, coverings, mulberry32((hash(s.x, s.z, 177 + salt) * 2 ** 32) >>> 0));
+    const turn = turnOnto(t, s);
+    for (const { rooms, lift, below } of storeys) {
+      for (const f of laidFloors(rooms, pick, below)) {
+        const r = turn.rect(f);
+        floors.push({ x: Math.round(r.x), z: Math.round(r.z) + lift, w: Math.round(r.w), d: Math.round(r.d), covering: f.covering });
+      }
+    }
   };
   /** Walls, doors and windows of a layout (a house or a shop), `lift` rows up. */
   const shell = (s: PlotSlot, f: { walls?: Wall[]; doors?: Door[]; windows?: Door[] }, lift = 0) => {
@@ -1270,10 +1293,11 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
         shell(s, q, k * town.depth);
         placeAll(s, q.objects, k * town.depth);
       });
-      for (const u of f.units) {
+      f.units.forEach((u, k) => {
         shell(s, u.layout, u.storey * town.depth);
         placeAll(s, u.layout.objects, u.storey * town.depth);
-      }
+        lay(s, u.layout.class, [{ rooms: u.layout.rooms, lift: u.storey * town.depth }], 1 + k);
+      });
       for (const o of f.outside) objects.push({ ...turn.place(o, footprint), ...(o.unit === undefined ? {} : { plot: first + o.unit }) });
       // (Its paths: a flats building's at once; over a place, after the place's own, so the first garden path on the
       // lot is still the place's, to its own front door, as the porch over it is worked out: sim-core `guess_porches`.)
@@ -1362,6 +1386,11 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
       placeAll(s, h.basement.objects, storeys * town.depth);
       basement = true;
     }
+    lay(s, h.class, [
+      { rooms: h.rooms, lift: 0 },
+      { rooms: h.upper?.rooms, lift: town.depth },
+      { rooms: h.basement?.rooms, lift: storeys * town.depth, below: true },
+    ]);
     // A garden path from the front door to the street, and a porch over the door.
     if (h.doors[0]) {
       pathTo(s, h.doors[0]);
@@ -1431,7 +1460,7 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     return b && { x: b[0], z: b[1], w: b[2] - b[0], d: b[3] - b[1] };
   });
   const fences = gardenFencesOf(content, town, { walls, objects, paths, fields, garages, plots }, driveOf, roomFor, built, barns);
-  return { walls, doors, windows, objects, paths, fields, garages, porches, drives, cars, plots, facing: town.slots.map((s) => s.facing), storeys, basement, fences, flats, built };
+  return { walls, doors, windows, objects, paths, fields, garages, porches, drives, cars, plots, facing: town.slots.map((s) => s.facing), storeys, basement, fences, flats, built, floors };
 }
 
 /**
@@ -1689,7 +1718,7 @@ export function assembleTown(
   { existing = false, flat: playerFlat, mode = 'living', lifespan = 'normal' }: AssembleOptions = {},
   rand: Rand = Math.random,
 ): string {
-  const { walls, doors, windows, objects, paths, fields, garages, porches, drives, cars, plots, facing, storeys, basement, fences, flats, built } = layoutTown(content, t, town, playerSlot, existing ? undefined : player, playerFlat);
+  const { walls, doors, windows, objects, paths, fields, garages, porches, drives, cars, plots, facing, storeys, basement, fences, flats, built, floors } = layoutTown(content, t, town, playerSlot, existing ? undefined : player, playerFlat);
   const footprint = (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
 
   if (existing && !town.households.some((h) => h.slot === playerSlot && h.flat === playerFlat)) throw new Error('Nobody lives in that house.');
@@ -1773,6 +1802,7 @@ export function assembleTown(
     doors,
     windows,
     fences: fenceRuns(fences),
+    floors,
     objects,
     plots: filed,
     households,

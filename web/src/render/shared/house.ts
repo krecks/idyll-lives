@@ -33,7 +33,7 @@
  * shadows) and the renderer uploads it (`pc/house.ts`), in this order.
  */
 
-import type { DoorStyleDef, FloorCoveringDef, LightAim, RoofColorDef, RoofStyleDef, WallCoveringDef, WindowStyleDef } from '../../content/content';
+import { FLOOR_FINISHES, type DoorStyleDef, type FloorCoveringDef, type LightAim, type RoofColorDef, type RoofStyleDef, type WallCoveringDef, type WindowStyleDef } from '../../content/content';
 import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalWall, type Opening, type PorchInfo, type PorchPieceInfo, type WallEdge, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
 import { Cut, facing, Geo, LOOK, planarUV, type V3 } from './geometry';
@@ -117,14 +117,21 @@ const FINISH_MATERIALS: Record<WallCoveringDef['finish'], string> = {
   tile: HOUSE_MATERIALS.floorTile,
 };
 
-/** The surface of each floor-covering finish. */
+/**
+ * The surface of each floor-covering finish: the first five share the house's own surfaces, the rest have a
+ * texture set each (`cargo tex synth`: `textures/floor_<finish>`, manifest `material.floor.<finish>`).
+ */
 const FLOOR_MATERIALS: Record<FloorCoveringDef['finish'], string> = {
+  ...(Object.fromEntries(FLOOR_FINISHES.map((f) => [f, `material.floor.${f}`])) as Record<FloorCoveringDef['finish'], string>),
   wood: HOUSE_MATERIALS.floorWood,
   whitewash: HOUSE_MATERIALS.floorWood,
   tile: HOUSE_MATERIALS.floorTile,
   carpet: HOUSE_MATERIALS.floorCarpet,
   stone: HOUSE_MATERIALS.stone,
 };
+
+/** The names of the floor meshes of the first finishes (the rest: `floors-<finish>`). */
+const FLOOR_PARTS: Partial<Record<FloorCoveringDef['finish'], string>> = { wood: 'floors', whitewash: 'floorsWhitewashed', tile: 'floorsTiled', carpet: 'floorsCarpet', stone: 'floorsStone' };
 
 /** The finishes drawn with a pattern over their surface (wall and floor finishes alike). */
 const FINISH_PATTERNS: Partial<Record<WallCoveringDef['finish'] | FloorCoveringDef['finish'], SurfacePattern>> = { wallpaper: 'stripes', whitewash: 'whitewash' };
@@ -1611,15 +1618,13 @@ export class HousePlanner {
     }
 
     // ---- floors: the covering laid in Build mode, else by room kind -----------------
-    const wood = new Geo();
-    const tile = new Geo();
-    const carpet = new Geo();
-    const stoneFloor = new Geo();
-    const whitewash = new Geo();
+    // (A mesh a finish, made only for the finishes this house has.)
+    const FINISH = {} as Partial<Record<FloorCoveringDef['finish'], Geo>>;
+    const geoOf = (finish: FloorCoveringDef['finish']) => (FINISH[finish] ??= new Geo());
+    const [wood, tile, carpet] = [geoOf('wood'), geoOf('tile'), geoOf('carpet')];
     const carpetTint = pick(CARPET, sx, sz, 21);
     const laid = new Map<number, number>();
     for (const [x, z, c] of world.floors ?? []) laid.set(z * W + x, c);
-    const FINISH = { wood, whitewash, tile, carpet, stone: stoneFloor };
     /**
      * A floor's tone at a point (`HOUSE_LOOK`): darker at the foot of the walls, where less light reaches
      * it and nobody walks, lighter out in the room, palest in and before a doorway, where feet wear it, and
@@ -1663,7 +1668,7 @@ export class HousePlanner {
         const covering = laid.get(z * W + x);
         const def = covering ? this.looks.floors[covering - 1] : undefined;
         const floorOf = (r: number) => {
-          if (def) return FINISH[def.finish].color(def.color);
+          if (def) return geoOf(def.finish).color(def.color);
           const kind = kinds.get(r) ?? 'living';
           return kind === 'bath' || kind === 'kitchen' ? tile.color(kind === 'bath' ? '#F4F4F2' : '#E6DCCB') : kind === 'bedroom' ? carpet.color(carpetTint) : wood.color(FLOOR.boards);
         };
@@ -1921,11 +1926,7 @@ export class HousePlanner {
     for (const [room, geo] of glassByRoom) part(geo, 'windows', { kind: 'glass', room });
     // (A preview's walls stand on the shadows of the walls they stand in for.)
     if (!storey.preview) part(ao, 'contactShadows', { kind: 'contactShadow' }, { cut: true });
-    add(wood, 'floors', M.floorWood, { cut: false });
-    add(whitewash, 'floorsWhitewashed', M.floorWood, { cut: false, pattern: 'whitewash' });
-    add(tile, 'floorsTiled', M.floorTile, { cut: false });
-    add(carpet, 'floorsCarpet', M.floorCarpet, { cut: false });
-    add(stoneFloor, 'floorsStone', M.stone, { cut: false });
+    for (const [finish, geo] of Object.entries(FINISH) as [FloorCoveringDef['finish'], Geo][]) add(geo, FLOOR_PARTS[finish] ?? `floors-${finish}`, FLOOR_MATERIALS[finish], { cut: false, pattern: FINISH_PATTERNS[finish] });
     add(railings, 'railings', M.trim, { cut: false, cast: true });
     add(roof, 'roof', M.roof, { cut: false, cast: true, roof: true });
     add(roofTrim, 'roofTrim', M.trim, { cut: false, cast: true, roof: true });

@@ -16,7 +16,7 @@
 
 use std::collections::{BTreeMap, VecDeque};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::Error;
 use crate::path::join;
@@ -188,6 +188,10 @@ pub struct LotFile {
     /// wall): runs along grid lines, as walls are given.
     #[serde(default)]
     pub fences: Vec<FenceRaw>,
+    /// Floor coverings the town laid (optional): rectangles of tiles on any storey's rows, by
+    /// content id (`floorCoverings`; an unknown id leaves its tiles to the automatic floor).
+    #[serde(default)]
+    pub floors: Vec<FloorRaw>,
     #[serde(default)]
     pub objects: Vec<PlacementRaw>,
     #[serde(default)]
@@ -309,6 +313,27 @@ pub struct FenceRaw {
     /// A gate: walked through.
     #[serde(default)]
     pub gate: bool,
+}
+
+/// A rectangle of tiles with a floor covering: `w` × `d` tiles from `(x, z)` (one tile when
+/// absent), by its `floorCoverings` id. A town file lays them so; a save keeps them so too.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FloorRaw {
+    pub x: u16,
+    pub z: u16,
+    #[serde(default = "one", skip_serializing_if = "is_one")]
+    pub w: u16,
+    #[serde(default = "one", skip_serializing_if = "is_one")]
+    pub d: u16,
+    pub covering: String,
+}
+
+fn one() -> u16 {
+    1
+}
+
+fn is_one(v: &u16) -> bool {
+    *v == 1
 }
 
 /// A door or window on the wall edge at `(x, z)` (see `Axis`).

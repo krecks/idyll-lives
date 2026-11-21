@@ -44,7 +44,7 @@ pub(super) fn build_styles(raw: &[BuildStyleRaw], what: &str) -> Result<Vec<Buil
         out.push(BuildStyle {
             id: r.id.clone(),
             price: r.price,
-            soft: r.finish.as_deref() == Some("carpet"),
+            soft: matches!(r.finish.as_deref(), Some("carpet" | "sisal")),
         });
     }
     Ok(out)
