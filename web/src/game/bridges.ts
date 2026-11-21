@@ -26,6 +26,7 @@ import { bends, connector, lengths, nearest, pointAt, type Pt } from './roads';
 /** The generator's bridge limits (`macro.ts`): its longest deck, how far before the bank it runs straight, how far past the water its deck reaches. */
 export { BRIDGE_IN, BRIDGE_SPAN, DECK_PAST };
 import type { Rect } from './town';
+import * as pmath from './pmath';
 
 /** The longest deck of a street the player draws over the water (m); the generator's are `BRIDGE_SPAN` at most. */
 export const DRAWN_SPAN = 70;
@@ -53,7 +54,7 @@ const STEP = 0.25;
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
 const unit = (x: number, z: number): Pt => {
-  const l = Math.hypot(x, z) || 1;
+  const l = pmath.hypot(x, z) || 1;
   return [x / l, z / l];
 };
 
@@ -70,7 +71,7 @@ export function wetSpans(points: readonly Pt[], wet: Uint8Array, W: number, D: n
   let s0 = 0;
   for (let i = 0; i + 1 < points.length; i++) {
     const [a, b] = [points[i], points[i + 1]];
-    const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const l = pmath.hypot(b[0] - a[0], b[1] - a[1]);
     const n = Math.max(1, Math.ceil(l / STEP));
     for (let k = i === 0 ? 0 : 1; k <= n; k++) {
       const f = k / n;
@@ -106,14 +107,14 @@ function between(pts: readonly Pt[], a: number, b: number, ls = lengths(pts)): P
 }
 
 /** How far a point is from a rectangle (0 inside it). */
-const offRect = (r: Rect, x: number, z: number) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
+const offRect = (r: Rect, x: number, z: number) => pmath.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
 
 /** How far `p` is from the segment `a`–`b`, and how far along it (0..1) the nearest point is. */
 function toSegment(p: Pt, a: Pt, b: Pt): { dist: number; f: number } {
   const [dx, dz] = [b[0] - a[0], b[1] - a[1]];
   const l2 = dx * dx + dz * dz || 1;
   const f = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / l2));
-  return { dist: Math.hypot(p[0] - a[0] - dx * f, p[1] - a[1] - dz * f), f };
+  return { dist: pmath.hypot(p[0] - a[0] - dx * f, p[1] - a[1] - dz * f), f };
 }
 
 /**
@@ -169,7 +170,7 @@ function blockedOn(points: readonly Pt[], stretch: readonly Pt[], a: number, b: 
     if (p.x > box[2] + half + 1 || p.x + p.w < box[0] - half - 1 || p.z > box[3] + half + 1 || p.z + p.d < box[1] - half - 1) continue;
     for (let i = 0; i + 1 < stretch.length; i++) {
       const [u, v] = [stretch[i], stretch[i + 1]];
-      const n = Math.max(1, Math.ceil(Math.hypot(v[0] - u[0], v[1] - u[1])));
+      const n = Math.max(1, Math.ceil(pmath.hypot(v[0] - u[0], v[1] - u[1])));
       for (let k = 0; k <= n; k++) if (offRect(p, u[0] + ((v[0] - u[0]) * k) / n, u[1] + ((v[1] - u[1]) * k) / n) < half + 1) return 'a lot stands where the bridge would be';
     }
   }
@@ -178,7 +179,7 @@ function blockedOn(points: readonly Pt[], stretch: readonly Pt[], a: number, b: 
 
 /** A polyline with points every metre or so from `a` to `b`. */
 function straight(a: Pt, b: Pt): Pt[] {
-  const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1])));
+  const n = Math.max(1, Math.ceil(pmath.hypot(b[0] - a[0], b[1] - a[1])));
   return Array.from({ length: n + 1 }, (_, k): Pt => [a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]);
 }
 
@@ -342,7 +343,7 @@ export interface WaterWay {
 
 /** `v` turned by `deg` degrees. */
 const turned = (v: Pt, deg: number): Pt => {
-  const [c, s] = [Math.cos((deg * Math.PI) / 180), Math.sin((deg * Math.PI) / 180)];
+  const [c, s] = [pmath.cos((deg * Math.PI) / 180), pmath.sin((deg * Math.PI) / 180)];
   return [v[0] * c - v[1] * s, v[0] * s + v[1] * c];
 };
 
@@ -399,8 +400,8 @@ export function bridgeFits(points: readonly Pt[], span: readonly [number, number
     const first = fitOf(w0 + BRIDGE_IN, w1 + BRIDGE_IN);
     if (!first) continue;
     const fit = withDeck(first, (f, more) => {
-      const e0 = Math.hypot(f.pa[0] - mid[0], f.pa[1] - mid[1]) + more[0];
-      const e1 = Math.hypot(f.pb[0] - mid[0], f.pb[1] - mid[1]) + more[1];
+      const e0 = pmath.hypot(f.pa[0] - mid[0], f.pa[1] - mid[1]) + more[0];
+      const e1 = pmath.hypot(f.pb[0] - mid[0], f.pb[1] - mid[1]) + more[1];
       return fitOf(e0, e1);
     });
     if (!out.some((o) => near(o.pa, fit.pa) && near(o.pb, fit.pb))) out.push(fit);
@@ -427,7 +428,7 @@ export function bridgeFits(points: readonly Pt[], span: readonly [number, number
 /** A drawn bridge's straight is carried on this far (m) at a time where its deck would reach further over a dip, `GROW_ROUNDS` times at most. */
 const GROW_ON = 8;
 const GROW_ROUNDS = 4;
-const near = (p: Pt, q: Pt) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 0.05;
+const near = (p: Pt, q: Pt) => pmath.hypot(p[0] - q[0], p[1] - q[1]) < 0.05;
 
 /** What `crossWater` lays: the fit chosen, and the road it makes (see `piecesOf`). */
 export interface Crossed {

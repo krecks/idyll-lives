@@ -20,6 +20,7 @@ import { flatPrice, homePrice } from './price';
 import { flatsTemplate } from './flats';
 import { flatsIdOf, houseTemplate, shuffled, type NeighbourhoodDraft, type PlotSlot, type Templates } from './town';
 import { savingsOf } from './wealth';
+import * as pmath from './pmath';
 
 type Rand = () => number;
 
@@ -371,7 +372,7 @@ export function fillPlan(
   };
   const player = playerSlot === undefined ? undefined : town.slots[playerSlot];
   const from: [number, number] = player ? [player.x, player.z] : middle(0);
-  const far = (h: Home, [x, z]: [number, number]) => Math.hypot(h.slot.x - x, h.slot.z - z);
+  const far = (h: Home, [x, z]: [number, number]) => pmath.hypot(h.slot.x - x, h.slot.z - z);
   const areaOf = (h: Home) => h.slot.area ?? 0;
   const street = new Set(player ? homes.filter((h) => areaOf(h) === (player.area ?? 0) && far(h, from) <= STREET_NEAR) : []);
   const villageFirst = new Set<Home>();
@@ -506,7 +507,7 @@ export function neighbourBonds(
   const near = new Float64Array(H * H);
   for (let i = 0; i < H; i++) {
     for (let j = i + 1; j < H; j++) {
-      const w = TIES_NEAR / (TIES_NEAR + Math.hypot(homes[i][0] - homes[j][0], homes[i][1] - homes[j][1]));
+      const w = TIES_NEAR / (TIES_NEAR + pmath.hypot(homes[i][0] - homes[j][0], homes[i][1] - homes[j][1]));
       near[i * H + j] = near[j * H + i] = w;
     }
   }

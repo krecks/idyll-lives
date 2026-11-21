@@ -13,6 +13,7 @@ import type { Content, WorldNames } from '../content/content';
 import { DEFAULT_LANDSCAPE, type LandSize, type LandscapeParams, type TownSize, type WorldOptions } from '../core/protocol';
 import type { GardenSize } from './housegen';
 import { branch, centroid, clearOf, crossing, crossStreet, cutAround, inside, lane, leftOf, lengths, loop, nearest, pointAt, range, ring, roadDistance, RoadIndex, roomAt, roundabout, through, type Box, type Pt, type RoadPlan } from './roads';
+import * as pmath from './pmath';
 
 export type { LandSize, TownSize, WorldOptions };
 
@@ -214,7 +215,7 @@ const lengthOf = (r: RoadPlan) => lengths(r.points).at(-1)!;
  */
 function toward(parent: RoadPlan, s: number, side: 1 | -1, length: number, curl: number, target: Pt): RoadPlan {
   const lanes = [branch(parent, s, side, length, curl), branch(parent, s, side, length, -curl)];
-  const gap = (r: RoadPlan) => Math.hypot(r.points[r.points.length - 1][0] - target[0], r.points[r.points.length - 1][1] - target[1]);
+  const gap = (r: RoadPlan) => pmath.hypot(r.points[r.points.length - 1][0] - target[0], r.points[r.points.length - 1][1] - target[1]);
   return gap(lanes[0]) <= gap(lanes[1]) ? lanes[0] : lanes[1];
 }
 
@@ -408,7 +409,7 @@ export function extend(rand: Rand, roads: readonly RoadPlan[], box: Box, count: 
     const sd = parent.lots ?? side(rand);
     const n0 = leftOf(t);
     const a = range(rand, -0.3, 0.3);
-    const dir: Pt = [(n0[0] * Math.cos(a) - n0[1] * Math.sin(a)) * sd, (n0[0] * Math.sin(a) + n0[1] * Math.cos(a)) * sd];
+    const dir: Pt = [(n0[0] * pmath.cos(a) - n0[1] * pmath.sin(a)) * sd, (n0[0] * pmath.sin(a) + n0[1] * pmath.cos(a)) * sd];
     const street = crossStreet(out, index, from, p, dir, fit, 110 * scale);
     if (!street) continue;
     out.push(street);
@@ -451,7 +452,7 @@ export function fill(rand: Rand, roads: readonly RoadPlan[], box: Box, count: nu
     measured = out.length;
     let best: { p: Pt; d: number } | null = null;
     for (const { x, z, d } of points) {
-      if (tried.some((t) => Math.hypot(t[0] - x, t[1] - z) < 40) || greens.some((g) => inside(g, x, z)) || d <= EMPTY) continue;
+      if (tried.some((t) => pmath.hypot(t[0] - x, t[1] - z) < 40) || greens.some((g) => inside(g, x, z)) || d <= EMPTY) continue;
       if (!best || d > best.d) best = { p: [x, z], d };
     }
     if (!best) break;

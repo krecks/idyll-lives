@@ -11,6 +11,7 @@ import type { Content } from '../content/content';
 import { flatOf, groundDepth, lotOf, storeyOfRow, type SocialEvent, type WorldStructure } from '../core/protocol';
 import type { SnapshotLayout } from '../core/snapshot';
 import type { GameShot, WallMode } from '../render/types';
+import * as pmath from './pmath';
 
 export type DirectorPace = 'calm' | 'lively';
 
@@ -223,7 +224,7 @@ export class Director {
     if (sims.length > 1) {
       const [ax, az] = pos(sims[0]);
       const [bx, bz] = pos(sims[1]);
-      alpha = Math.atan2(bz - az, bx - ax) + Math.PI / 2;
+      alpha = pmath.atan2(bz - az, bx - ax) + Math.PI / 2;
     }
     return { key, priority, sims, walls: 'cutaway', shot: { follow: sims, alpha, beta: 0.98, radius, drift: 0.015, duration: 2.6 } };
   }

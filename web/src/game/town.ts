@@ -30,6 +30,7 @@ import { defaultResidentsMost, neighbourBonds } from './people';
 import { flatName, flatsInId, flatsTemplate, placeFloors, type FlatsTemplate, type PlaceFloors } from './flats';
 import { rectPoly } from './footprints';
 import { clearOf, type DriveLine } from './parking';
+import * as pmath from './pmath';
 
 /** The households moved to `people.ts`; still here for those that import them from the town. */
 export { NEIGHBOUR_CAP, populate, rehouse } from './people';
@@ -785,7 +786,7 @@ export function frontageOf(roads: readonly RoadPlan[], which: readonly number[] 
       road.points
         .map((p, i): Frontage => {
           const n = leftOf(tangent(road.points, i)).map((v) => v * side) as Pt;
-          return { road: r, s: ls[i], side, p, n, far: Math.hypot(p[0] - centre[0], p[1] - centre[1]) + rand() * 10 };
+          return { road: r, s: ls[i], side, p, n, far: pmath.hypot(p[0] - centre[0], p[1] - centre[1]) + rand() * 10 };
         })
         // Not where it joins another road, nor right at its ends.
         .filter((f) => f.s > 4 && f.s < ls[ls.length - 1] - 4),
@@ -1864,7 +1865,7 @@ export function segmentWay(pts: readonly Pt[], s: number): Pt {
   let i = 1;
   while (i < pts.length - 1 && ls[i] <= s) i++;
   const [a, b] = [pts[i - 1], pts[i]];
-  const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+  const l = pmath.hypot(b[0] - a[0], b[1] - a[1]) || 1;
   return [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
 }
 

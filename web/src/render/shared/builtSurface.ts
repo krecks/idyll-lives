@@ -44,6 +44,7 @@ import { LAND_CELL, NONE, heightAt, type Land, type LandRect } from '../../game/
 import { bridgeSpans, lengths, nearest, pointAt, RoadIndex } from '../../game/roads';
 import { CHUNK, chunkAt, chunksIn } from './chunks';
 import { carriageway, CROSSWALK, KERB_RETURN, planJunctions, type JunctionPlan } from './junctions';
+import * as pmath from '../../game/pmath';
 
 /** The steepest each kind of way climbs (rise per m); a trail's is a measure only (it lies on the land). */
 export const GRADE: Record<RoadKind, number> = { street: 0.08, lane: 0.08, country: 0.12, trail: 0.22 };
@@ -619,7 +620,7 @@ export class BuiltSurface {
     const parent = found.map((_, i) => i);
     const root = (i: number): number => (parent[i] === i ? i : (parent[i] = root(parent[i])));
     for (let a = 0; a < found.length; a++) {
-      for (let b = a + 1; b < found.length; b++) if (Math.hypot(found[a].x - found[b].x, found[a].z - found[b].z) <= NODE_MERGE) parent[root(b)] = root(a);
+      for (let b = a + 1; b < found.length; b++) if (pmath.hypot(found[a].x - found[b].x, found[a].z - found[b].z) <= NODE_MERGE) parent[root(b)] = root(a);
     }
     const groups = new Map<number, (typeof found)[number][]>();
     found.forEach((f, i) => {
@@ -642,7 +643,7 @@ export class BuiltSurface {
     }
     // The sim's junctions: their arms held as far as the renderer draws their pads.
     for (const j of this.junctions) {
-      let node = raw.find((n) => Math.hypot(n.x - j.x, n.z - j.z) <= PLAN_MATCH);
+      let node = raw.find((n) => pmath.hypot(n.x - j.x, n.z - j.z) <= PLAN_MATCH);
       if (!node) {
         const atts = [...new Set(j.arms.map((a) => a.road))].filter((r) => roads[r]?.points.length >= 2).map((r): [number, number] => [r, nearest(roads[r].points, j.x, j.z, lens[r]).s]);
         raw.push((node = { x: j.x, z: j.z, atts, reach: new Map() }));
@@ -690,7 +691,7 @@ export class BuiltSurface {
           const t = ((q0[0] - p0[0]) * ez - (q0[1] - p0[1]) * ex) / det;
           const u = ((q0[0] - p0[0]) * dz - (q0[1] - p0[1]) * dx) / det;
           if (t < 0 || t > 1 || u < 0 || u > 1) continue;
-          const [s1, s2] = [sa + t * Math.hypot(dx, dz), sb + u * Math.hypot(ex, ez)];
+          const [s1, s2] = [sa + t * pmath.hypot(dx, dz), sb + u * pmath.hypot(ex, ez)];
           const [L1, L2] = [this.lens[ra].at(-1)!, this.lens[rb].at(-1)!];
           // (A road's end on another is a join, found already.)
           if (s1 < END_NEAR || s1 > L1 - END_NEAR || s2 < END_NEAR || s2 > L2 - END_NEAR) continue;
@@ -723,7 +724,7 @@ export class BuiltSurface {
       if (hold) {
         // Out past the far side of the other roads and their crosswalks (as far as the sim's own reaches, if further).
         const half = Math.max(0, ...atts.filter((o) => o !== a && o.car).map((o) => carriageway(roads[o.road]) / 2));
-        const off = Math.hypot(p.x[at >= 0 ? at : below] - x, p.z[at >= 0 ? at : below] - z);
+        const off = pmath.hypot(p.x[at >= 0 ? at : below] - x, p.z[at >= 0 ? at : below] - z);
         const reach = Math.max(0, Math.max(half + KERB_RETURN + CROSSWALK, planned.get(a.road) ?? 0) - off);
         const fwd = a.through || at === 0;
         const back = a.through || at === n - 1;
@@ -767,7 +768,7 @@ export class BuiltSurface {
           const hump = Math.min(HUMP_MOST, HUMP * (span[1] - span[0]));
           for (let i = 0; i < n; i++) {
             if (p.s[i] < span[0] || p.s[i] > span[1]) continue;
-            p.floor[i] = level + BRIDGE_CLEAR + hump * Math.sin((Math.PI * (p.s[i] - span[0])) / (span[1] - span[0]));
+            p.floor[i] = level + BRIDGE_CLEAR + hump * pmath.sin((Math.PI * (p.s[i] - span[0])) / (span[1] - span[0]));
           }
         }
       }
@@ -1024,7 +1025,7 @@ export class BuiltSurface {
         for (let i = i0; i <= i1; i++) {
           const at = j * cols + i;
           if (boxed[at] || kind[at] || wet(land, at)) continue;
-          const d = Math.hypot(Math.max(p.x - i * c, 0, i * c - p.x - p.w), Math.max(p.z - j * c, 0, j * c - p.z - p.d));
+          const d = pmath.hypot(Math.max(p.x - i * c, 0, i * c - p.x - p.w), Math.max(p.z - j * c, 0, j * c - p.z - p.d));
           if (d < skirt[at] - 1e-6 || (d <= skirt[at] + 1e-6 && pads[n] > skirtY[at])) {
             skirt[at] = d;
             skirtY[at] = pads[n];

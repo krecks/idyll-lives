@@ -7,6 +7,7 @@
 
 import type { CareerCategory, Content } from '../content/content';
 import type { SimDraft } from './household';
+import * as pmath from './pmath';
 
 type Rand = () => number;
 type Track = CareerCategory['tracks'][number];
@@ -71,7 +72,7 @@ export function jobFor(content: Content, age: number, rand: Rand): SimDraft['job
   if (top < 0 || !tracks.length) return undefined;
   const track = tracks[Math.min(tracks.length - 1, Math.floor(rand() * tracks.length))];
   // Most climb part of the way: a few reach the top their years allow, some stay near the bottom.
-  const level = Math.max(0, top - Math.floor(rand() ** 1.5 * (top + 1)));
+  const level = Math.max(0, top - Math.floor(pmath.pow(rand(), 1.5) * (top + 1)));
   return { career: track.id, level: Math.min(level, track.titles.length - 1) };
 }
 

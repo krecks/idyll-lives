@@ -9,6 +9,7 @@
 import type { Cells } from './countryRouter';
 import type { Pt } from './roads';
 import type { Rect } from './town';
+import * as pmath from './pmath';
 
 /** The generator's cells (m), as `countryRouter.ts` `CELL`. */
 const CELL = 8;
@@ -96,7 +97,7 @@ export function dryPieces(land: Pick<Cells, 'gw' | 'gd' | 'water'>): DryPieces {
     let best: { at: Pt; d: number } | null = null;
     for (let z = bz0; z <= bz1; z += CELL) {
       for (let x = bx0; x <= bx1; x += CELL) {
-        const d = Math.hypot(x - r.x, z - r.z);
+        const d = pmath.hypot(x - r.x, z - r.z);
         if (d >= far || !holds(id, { x, z, w: r.w, d: r.d }, by)) continue;
         best = { at: [Math.round(x), Math.round(z)], d };
         far = d;
@@ -163,7 +164,7 @@ export function bridgeSites(wet: Uint8Array, W: number, D: number, most = 40, la
         [sx, sz, n] = [sx + dx, sz + dz, n + 1];
       }
     }
-    const l = Math.hypot(sx, sz);
+    const l = pmath.hypot(sx, sz);
     return n && l > 1e-6 ? [sx / l, sz / l] : null;
   };
   /** How far from `p` along `d` the water ends (m: the first dry point), within `max`; -1 if it doesn't (or leaves the world). */
@@ -181,7 +182,7 @@ export function bridgeSites(wet: Uint8Array, W: number, D: number, most = 40, la
   };
   const sites: BridgeSite[] = [];
   const seen = new Set<string>();
-  const cos = Math.cos(PARALLEL);
+  const cos = pmath.cos(PARALLEL);
   // (Not by the world's edge: the water past it is not read, and its bank's way would lean.)
   for (let z = SEED / 2; z < D; z += SEED) {
     for (let x = SEED / 2; x < W; x += SEED) {
@@ -199,7 +200,7 @@ export function bridgeSites(wet: Uint8Array, W: number, D: number, most = 40, la
       if (!m || -(m[0] * n[0] + m[1] * n[1]) < cos) continue;
       // Square to both banks, through the water's middle.
       let u: Pt = [n[0] - m[0], n[1] - m[1]];
-      const l = Math.hypot(...u);
+      const l = pmath.hypot(...u);
       u = [u[0] / l, u[1] / l];
       if (u[0] < 0 || (u[0] === 0 && u[1] < 0)) u = [-u[0], -u[1]];
       const mid: Pt = [x + n[0] * (t0 + w / 2), z + n[1] * (t0 + w / 2)];

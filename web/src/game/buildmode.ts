@@ -79,7 +79,7 @@ type EdgeState = EdgeEdit['kind'];
 type Axis = EdgeEdit['axis'];
 
 /** A drag counts as diagonal within this angle of 45° (tan 22.5°: halfway to straight). */
-const DIAGONAL_SLOPE = Math.tan(Math.PI / 8);
+const DIAGONAL_SLOPE = Math.SQRT2 - 1;
 
 /** Resize arrows sit this far (m) outside the edge they move, and the height arrow this far above the top. */
 const HANDLE_OUT = 0.3;

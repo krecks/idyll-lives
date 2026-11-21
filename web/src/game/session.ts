@@ -68,6 +68,7 @@ import { GameSpeed, SUPER_SPEED } from './speed';
 import { perfEnd, perfPhase, perfStart, perfTime, perfTimeAsync } from '../debug/perf';
 import { UiMirror } from './uiUpdates';
 import { fixedStart } from '../render/shared/frameClock';
+import * as pmath from './pmath';
 
 declare global {
   interface Window {
@@ -1701,7 +1702,7 @@ async function openSession(
       const o = layout.headerLen + i * layout.simStride;
       // Where the body is drawn (on its storey; residents not drawn can't be clicked).
       const dist = renderer.simHead(i, head) && renderer.project(head.x, head.y - 0.8, head.z, screen)
-        ? Math.hypot(screen.x - px, screen.y - py)
+        ? pmath.hypot(screen.x - px, screen.y - py)
         : Infinity;
       if (dist < bestDist) {
         bestDist = dist;

@@ -6,6 +6,8 @@
  * renderer, which uploads them (`pc/meshes.ts` `meshFrom`).
  */
 
+import * as pmath from '../../game/pmath';
+
 export type V3 = readonly [number, number, number];
 
 /**
@@ -340,7 +342,7 @@ export function normalOf(a: V3, b: V3, c: V3): V3 {
   const x = uy * vz - uz * vy;
   const y = uz * vx - ux * vz;
   const z = ux * vy - uy * vx;
-  const len = Math.hypot(x, y, z) || 1;
+  const len = pmath.hypot(x, y, z) || 1;
   return [x / len, y / len, z / len];
 }
 

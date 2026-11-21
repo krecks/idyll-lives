@@ -18,6 +18,7 @@
 
 import { COVER, COVER_CELL, coverSpan, flowCode, flowOf, flowsOf, heightAt, LAND_CELL, NONE, SEA_CM, wetAt, type Land, type LandRect } from './land';
 import { ridged, smoothstep } from './noise';
+import * as pmath from './pmath';
 
 /**
  * A land tool. Shape: `raise`, `lower`, `smooth`, `flatten`. Water: `lake` (or the sea pushed
@@ -175,7 +176,7 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 /** A height or level (cm) kept within an Int16 and off `NONE`. */
 const cmOf = (v: number) => Math.max(-32767, Math.min(32767, Math.round(v)));
 /** The brush's falloff at `r` of radius `R`. */
-export const falloff = (r: number, R: number) => (r >= R ? 0 : (1 - (r / R) ** 2) ** 2);
+export const falloff = (r: number, R: number) => (r >= R ? 0 : pmath.pow(1 - pmath.pow(r / R, 2), 2));
 
 /** The union of two rectangles (either may be null). */
 export function unionRect(a: LandRect | null, b: LandRect | null): LandRect | null {
@@ -263,7 +264,7 @@ function shift(land: Land, x: number, z: number, R: number, s: number, dt: numbe
   let any = false;
   for (let j = rect.j0; j < rect.j1; j++) {
     for (let i = rect.i0; i < rect.i1; i++) {
-      const f = falloff(Math.hypot(i * LAND_CELL - x, j * LAND_CELL - z), R);
+      const f = falloff(pmath.hypot(i * LAND_CELL - x, j * LAND_CELL - z), R);
       if (f <= 0) continue;
       const fr = free(i, j);
       if (fr <= 0) continue;
@@ -310,7 +311,7 @@ function blend(land: Land, x: number, z: number, R: number, s: number, dt: numbe
   let any = false;
   for (let j = rect.j0; j < rect.j1; j++) {
     for (let i = rect.i0; i < rect.i1; i++) {
-      const f = falloff(Math.hypot(i * LAND_CELL - x, j * LAND_CELL - z), R);
+      const f = falloff(pmath.hypot(i * LAND_CELL - x, j * LAND_CELL - z), R);
       if (f <= 0) continue;
       const fr = free(i, j);
       if (fr <= 0) continue;
@@ -358,7 +359,7 @@ function water(land: Land, x: number, z: number, R: number, s: number, tool: 'la
     for (let j = rect.j0; j < rect.j1; j++) {
       for (let i = rect.i0; i < rect.i1; i++) {
         const k = j * cols + i;
-        if (wetBefore(k) && base.wl[k] < level && Math.hypot(i * LAND_CELL - x, j * LAND_CELL - z) <= R) level = base.wl[k];
+        if (wetBefore(k) && base.wl[k] < level && pmath.hypot(i * LAND_CELL - x, j * LAND_CELL - z) <= R) level = base.wl[k];
       }
     }
     if (level !== stroke.level) {
@@ -372,7 +373,7 @@ function water(land: Land, x: number, z: number, R: number, s: number, tool: 'la
   let any = false;
   for (let j = rect.j0; j < rect.j1; j++) {
     for (let i = rect.i0; i < rect.i1; i++) {
-      const r = Math.hypot(i * LAND_CELL - x, j * LAND_CELL - z);
+      const r = pmath.hypot(i * LAND_CELL - x, j * LAND_CELL - z);
       if (r > R + ring) continue;
       const fr = free(i, j);
       if (fr <= 0) continue;
@@ -441,7 +442,7 @@ function dragOf(stroke: StrokeState, x: number, z: number): [number, number] | n
   const path = stroke.path;
   const [bx, bz] = path[Math.max(0, path.length - 1 - RIVER_WAY_STAMPS)];
   const [dx, dz] = [x - bx, z - bz];
-  const length = Math.hypot(dx, dz);
+  const length = pmath.hypot(dx, dz);
   return length < LAND_CELL / 2 ? null : [dx / length, dz / length];
 }
 
@@ -471,7 +472,7 @@ function riverFlow(land: Land, x: number, z: number, R: number, stroke: StrokeSt
     for (let j = rect.j0; j < rect.j1; j++) {
       for (let i = rect.i0; i < rect.i1; i++) {
         const k = j * cols + i;
-        const r = Math.hypot(i * LAND_CELL - cx, j * LAND_CELL - cz);
+        const r = pmath.hypot(i * LAND_CELL - cx, j * LAND_CELL - cz);
         if (r > R || wl[k] === NONE || wl[k] <= h[k] || free(i, j) <= 0 || kept(k)) continue;
         let code: number;
         // (A way this stroke hasn't laid yet, the one there before it, is replaced whole: only the stroke's own blend.)
@@ -520,7 +521,7 @@ function dry(land: Land, x: number, z: number, R: number, free: Free): LandRect 
   for (let j = rect.j0; j < rect.j1; j++) {
     for (let i = rect.i0; i < rect.i1; i++) {
       const k = j * cols + i;
-      if (wl[k] === NONE || Math.hypot(i * LAND_CELL - x, j * LAND_CELL - z) > R) continue;
+      if (wl[k] === NONE || pmath.hypot(i * LAND_CELL - x, j * LAND_CELL - z) > R) continue;
       const fr = free(i, j);
       if (fr <= 0) continue;
       const top = wl[k] + DRY_OVER * 100;
@@ -551,7 +552,7 @@ function paint(land: Land, x: number, z: number, R: number, cover: number, strok
   for (let r = r0; r < r1; r++) {
     for (let c = c0; c < c1; c++) {
       const [cx, cz] = [(c + 0.5) * COVER_CELL, (r + 0.5) * COVER_CELL];
-      if ((c !== mc || r !== mr) && falloff(Math.hypot(cx - x, cz - z), R) <= 0.5) continue;
+      if ((c !== mc || r !== mr) && falloff(pmath.hypot(cx - x, cz - z), R) <= 0.5) continue;
       const [i, j] = [Math.min(land.cols - 1, Math.round(cx / LAND_CELL)), Math.min(land.rows - 1, Math.round(cz / LAND_CELL))];
       if (free(i, j) <= 0.5 || land.cover[r * cw + c] === cover) continue;
       land.cover[r * cw + c] = cover;
@@ -638,12 +639,12 @@ export function mountainOf(stroke: StrokeState): Mountain | null {
   const xs = line.map((p) => p[0]);
   const zs = line.map((p) => p[1]);
   const distance = (x: number, z: number) => {
-    let best = Math.hypot(x - line[0][0], z - line[0][1]);
+    let best = pmath.hypot(x - line[0][0], z - line[0][1]);
     for (let n = 1; n < line.length; n++) {
       const [[ax, az], [bx, bz]] = [line[n - 1], line[n]];
       const [dx, dz] = [bx - ax, bz - az];
       const t = clamp01(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1));
-      best = Math.min(best, Math.hypot(x - ax - dx * t, z - az - dz * t));
+      best = Math.min(best, pmath.hypot(x - ax - dx * t, z - az - dz * t));
     }
     return best;
   };
