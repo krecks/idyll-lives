@@ -398,3 +398,98 @@ fn two_nights_at_12_birch_road_nobody_sleeps_on_the_floor() {
         "the player is told Ravi has no bed"
     );
 }
+
+/// Home on the west, a public place (a hotel, say) on the east with a bed and a fridge of its own,
+/// and Idris standing in it, nearer its things than his own (F8 report 2026-11-21: he went to the
+/// Salmonbridge Hotel's bed at night, a few minutes' walk from his own at 20 Ferry Walk). `home`:
+/// what his home has.
+fn near_the_hotel(home: &str) -> World {
+    let town = format!(
+        r#"{{"width":44,"depth":12,
+        "plots":[{{"name":"20 Ferry Walk","x":0,"z":0,"w":14,"d":12,"entry":[7.5,11.5]}},
+                 {{"name":"The Hotel","x":30,"z":0,"w":14,"d":12,"public":true,"entry":[37.5,11.5]}}],
+        "households":[{{"name":"Ogunleye","plot":0,"player":true}}],
+        "objects":[{{"def":"bed","x":38,"z":1}},{{"def":"fridge","x":32,"z":1}}{home}],
+        "sims":[{{"name":"Idris","traits":["bookworm"],"x":36.5,"z":6.5}}]}}"#
+    );
+    World::from_json(&common::content(), &town, 3).unwrap()
+}
+
+/// The object `sim` sets off to use first from now (within `minutes`), if any.
+fn first_use(w: &mut World, sim: usize, minutes: u64) -> Option<u32> {
+    let mut used = None;
+    common::until(w, minutes, |w| {
+        used = w.sims[sim].current().and_then(|a| match a.task.kind {
+            TaskKind::Use { object, .. } => Some(object),
+            _ => None,
+        });
+        used.is_some()
+    });
+    used
+}
+
+/// `w` at `hour` on day 1 (a day without free will), everyone's needs full but `low` at `level`.
+fn at(w: &mut World, hour: f32, low: &str, level: f32) {
+    w.autonomy = false;
+    common::run_to(w, 1, hour);
+    w.autonomy = true;
+    let (n, low) = (w.content.needs.len(), need(w, low));
+    for s in &mut w.sims {
+        s.needs[..n].fill(1.0);
+        s.needs[low] = level;
+    }
+}
+
+const HOTEL_BED: u32 = 0;
+const HOTEL_FRIDGE: u32 = 1;
+const HOME_BED: u32 = 2;
+const AT_HOME: &str = r#",{"def":"bed","x":1,"z":1},{"def":"pantry","x":10,"z":1}"#;
+
+#[test]
+fn tired_near_the_hotel_he_goes_home_to_his_own_bed() {
+    let mut w = near_the_hotel(AT_HOME);
+    at(&mut w, 23.0, "energy", 0.3);
+    assert_eq!(
+        first_use(&mut w, 0, 60),
+        Some(HOME_BED),
+        "his own bed, not the hotel's"
+    );
+    let mut asleep = false;
+    while w.tick < clock::tick_at(2, 60.0).unwrap() && !asleep {
+        w.tick_once();
+        asleep = sleeping_in(&w, 0).is_some();
+    }
+    assert_eq!(sleeping_in(&w, 0), Some(HOME_BED), "asleep at home by one");
+}
+
+#[test]
+fn hungry_near_the_hotel_he_eats_from_his_own_pantry() {
+    let mut w = near_the_hotel(AT_HOME);
+    at(&mut w, 15.0, "hunger", 0.3);
+    let hunger = need(&w, "hunger");
+    let mut hotel = false;
+    common::until(&mut w, 90, |w| {
+        hotel |= w.sims[0].current().is_some_and(|a| match a.task.kind {
+            TaskKind::Use { object, .. } => object == HOTEL_FRIDGE,
+            TaskKind::Cook { station, .. } => station == Some(HOTEL_FRIDGE),
+            _ => false,
+        });
+        w.sims[0].needs[hunger] > 0.6
+    });
+    assert!(
+        !hotel,
+        "nothing from the hotel's fridge: his pantry at home"
+    );
+    assert!(
+        w.sims[0].needs[hunger] > 0.6,
+        "fed within the hour and a half"
+    );
+    assert!(w.sims[0].pos[0] < 14.0, "at home: {:?}", w.sims[0].pos);
+}
+
+#[test]
+fn with_no_bed_at_home_the_hotels_will_do() {
+    let mut w = near_the_hotel(r#",{"def":"fridge","x":10,"z":1}"#);
+    at(&mut w, 23.0, "energy", 0.3);
+    assert_eq!(first_use(&mut w, 0, 60), Some(HOTEL_BED));
+}

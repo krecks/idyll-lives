@@ -66,6 +66,34 @@ pub(crate) fn home_needs(
     found
 }
 
+/// The essentials (`AutonomyRules::urgent`, bit per need) `sim` sees to at home, not in a public
+/// place they're near (the hotel's bed, the café's snack): those home has something free for
+/// that would last the way home, on foot at `walk` m a minute (none to go, at home already).
+pub(crate) fn home_first(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance], walk: f32) -> u32 {
+    let content = ctx.content;
+    let Some(home) = ctx.households[sim.household as usize].plot else {
+        return 0;
+    };
+    let free = home_needs(sim, ctx, objects, content.autonomy.urgent, true);
+    if free == 0 {
+        return 0;
+    }
+    let minutes = if ctx.briefs[sim.id as usize].at_home(ctx.plots, Some(home)) {
+        0.0
+    } else {
+        ctx.nav
+            .stairs
+            .distance(sim.pos, ctx.plots[home as usize].arrival_point())
+            / walk
+    };
+    let none = [0.0; MAX_NEEDS];
+    (0..content.needs.len())
+        .map(|n| 1 << n)
+        .filter(|&bit| free & bit != 0)
+        .filter(|&bit| !runs_out(sim, content, bit, minutes, false, &none, &none, 0.0))
+        .fold(0, |m, bit| m | bit)
+}
+
 /// Essentials about to run out (`AutonomyRules::urgent`) that something at home they could use
 /// now fills (bit per need): residents see to them before anything else.
 pub(crate) fn urgent_needs(sim: &Sim, ctx: &Ctx, objects: &[ObjectInstance]) -> u32 {

@@ -2,6 +2,10 @@
 
 All notable changes to Idyll Lives. Versions follow [semantic versioning](https://semver.org); each release is a git tag `vX.Y.Z`.
 
+## Unreleased
+
+- **Home first:** residents sleep, eat, wash and use the toilet at home whenever home has something free for it. A tired resident near the hotel went to its bed rather than walk a few minutes home to his own (F8 report: Idris at the Salmonbridge Hotel), and a hungry one grabbed a snack nearby over the fridge at home; a public bed, snack or toilet nearby is now only for someone with nothing free at home, or whose need wouldn't last the way home. Outings weigh home too: a place draws residents out for what home hasn't got or does less well, half as much for what home has too, and never for sleeping, eating, the toilet or a wash (a well-furnished bookworm went to the Gazette's office to read and doze on its sofa). Out on an outing they still use the place's toilet and eat there.
+
 ## 0.8.3 — 2026-11-21
 
 - **New game in five steps:** a new game goes Land, Streets & zones, Build, Household and Home. The land is made first, with no town on it; its streets and what goes where are laid out on it; the town is built from that; then you choose who to play and the home they live in. You can go back to any step, and a step keeps what it made until what it was made from changes (a household made in Creation is kept). No world is made before the main menu any more: the menu shows a picture of the last world made (a shipped one on a first visit), and New game makes a fresh world in step 1, a panel ticking off its steps. Measured headless against 0.8.2 when it was made: the menu comes up in 1.55 s instead of 5.7, going back to it is instant instead of 2.1 s, and New game has its world built in 4.9 s.
