@@ -38,6 +38,26 @@ pub(crate) fn unjam(w: &mut World) {
     };
     // (Each car's ask looked up by key, not searched for: `waits_on_at`.)
     let asks = crate::traffic::asks_by_key(w);
+    // (Someone on foot holding up one it waits for, however far along: they step aside or cross
+    // in a moment, as in a ring (`held_round`). A taxi behind one passing a work taxi at the kerb,
+    // that one waiting for a car coming the other way, that one for a rider crossing to her taxi,
+    // was turned round, and those it turned round into jammed the town, Gannet Island.)
+    let on_foot_ahead = |k: u64| {
+        let mut seen = vec![k];
+        let mut i = 0;
+        while i < seen.len() && seen.len() < 16 {
+            for o in crate::traffic::waits_on_at(w, seen[i], &asks) {
+                if o < 1 << 63 {
+                    return true;
+                }
+                if !seen.contains(&o) {
+                    seen.push(o);
+                }
+            }
+            i += 1;
+        }
+        false
+    };
     for (c, car) in w.cars.iter().enumerate() {
         let by = crate::traffic::waits_on_at(w, car_first(c), &asks);
         let waiting = matches!(car.state, CarState::Leaving | CarState::Arriving)
@@ -46,7 +66,12 @@ pub(crate) fn unjam(w: &mut World) {
             && tick >= car.stall.1 + PASS_WAIT
             && car.shown.is_some_and(|s| s.2)
             && match car.pass_by {
-                Some(p) => car.progress <= p.from && by.iter().all(|&k| k >= 1 << 63 && still(k)),
+                Some(p) => {
+                    car.progress <= p.from
+                        && by
+                            .iter()
+                            .all(|&k| k >= 1 << 63 && still(k) && !on_foot_ahead(k))
+                }
                 None => by.iter().any(|&k| standing(k)),
             };
         let key = car_first(c);
