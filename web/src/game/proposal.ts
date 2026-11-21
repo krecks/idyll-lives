@@ -20,6 +20,7 @@ import { homesOn, plotRect, type Frontage, type NeighbourhoodDraft, type Rect, t
 import type { LaidTown, Proposal } from './townJobs';
 import { placeOf, specOf } from './world';
 import { layoutHash, NO_USE, packUses, unpackUses, USE_CELL, USE_CODE, useOfCode, type UseKind, type UseLayer } from './uses';
+import * as pmath from './pmath';
 
 /** How far behind the kerb a road's frontage is read for its use (m): the land a lot or a building fronting it stands on. */
 export const FRONT_PROBES = [6, 10, 14, 18] as const;
@@ -305,7 +306,7 @@ function areasOf(draft: NeighbourhoodDraft): Rect[] {
   return (draft.open?.areas ?? []).map((a) => ({ x: a.x, z: a.z, w: a.w, d: a.d }));
 }
 
-const offRect = (r: Rect, [x, z]: Pt) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
+const offRect = (r: Rect, [x, z]: Pt) => pmath.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
 
 /** The greens of `codes` with no frontage (every cell further than `SPOT_NEAR` from a road) of `SPOT_CELLS` or more, their middles within `SPOT_REACH` of an area's box. */
 function spotsOf(codes: Uint8Array, reach: Float32Array, cols: number, rows: number, areas: readonly Rect[]): GreenSpot[] {

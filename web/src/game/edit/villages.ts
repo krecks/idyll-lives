@@ -53,6 +53,7 @@ import type { Edited } from './edited';
 import { entriesOf, townGround, wholeParks, withoutBays } from './ground';
 import { bayRect, carParkRect, driveLines, vergeParking } from '../parking';
 import { removalRefused, removeLots, renumber, withLotPlace } from './lots';
+import * as pmath from '../pmath';
 
 /** Where a village is placed (its box's middle, m), whether its shape is turned across, and the seed its streets, lots and names are drawn from. */
 export interface VillageAt {
@@ -91,13 +92,13 @@ const BRIDGE_REACH = 12;
 
 const NOTHING: { lots: number[] } = { lots: [] };
 const r2 = (v: number) => Math.round(v * 100) / 100;
-const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const dist = (a: Pt, b: Pt) => pmath.hypot(a[0] - b[0], a[1] - b[1]);
 const middleOf = (r: Rect): Pt => [r.x + r.w / 2, r.z + r.d / 2];
 const rectOf = (a: TownArea): Rect => ({ x: a.x, z: a.z, w: a.w, d: a.d });
 const meets = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.z < b.z + b.d && b.z < a.z + a.d;
 const grow = (r: Rect, by: number): Rect => ({ x: r.x - by, z: r.z - by, w: r.w + 2 * by, d: r.d + 2 * by });
 const insideRect = (r: Rect, [x, z]: Pt) => x >= r.x && x <= r.x + r.w && z >= r.z && z <= r.z + r.d;
-const offRect = (r: Rect, [x, z]: Pt) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
+const offRect = (r: Rect, [x, z]: Pt) => pmath.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
 const middleOfPoly = (poly: readonly Pt[]): Pt => middleOf(boundsOf(poly));
 
 // ---- what a draft's world is ---------------------------------------------------------------------
@@ -368,7 +369,7 @@ function toNetwork(router: CountryRouter, q: Port, blocked: Uint8Array, others: 
   const portAt = new Map(others.map((x) => [land.cell(x.p[0] + x.dir[0] * 8, x.p[1] + x.dir[1] * 8), x]));
   if (!country.size && !portAt.size) return null;
   const from: Way = { p: q.p, dir: q.dir, port: q };
-  const inFront = (p: Pt) => q.dir[0] * (p[0] - q.p[0]) + q.dir[1] * (p[1] - q.p[1]) >= dist(p, q.p) * Math.cos(AHEAD);
+  const inFront = (p: Pt) => q.dir[0] * (p[0] - q.p[0]) + q.dir[1] * (p[1] - q.p[1]) >= dist(p, q.p) * pmath.cos(AHEAD);
   const banned = new Set<number>();
   // A country road met square to it (give or take an eighth of a turn), a port head on; what lies off to the side or behind the port costs more.
   const goal = (i: number, h?: number) => {

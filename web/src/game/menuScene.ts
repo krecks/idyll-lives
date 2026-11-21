@@ -20,6 +20,7 @@ import { perfPhase, perfTime, perfTimeAsync } from '../debug/perf';
 import { layoutTags, type Box, type TagSpot } from './tagLayout';
 import { roadIndex } from './roads';
 import { sameContent } from '../core/sameContent';
+import * as pmath from './pmath';
 
 /** Golden hour on the title screen: low warm sun, long shadows, no lamps yet. */
 export const MENU_MINUTE = 18 * 60 + 20;
@@ -369,7 +370,7 @@ class MenuScene {
   scale(x: number, y: number): number {
     const [a, b] = [this.landAt(x - SCALE_SPAN, y), this.landAt(x + SCALE_SPAN, y)];
     if (a && b) {
-      const m = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) / (2 * SCALE_SPAN);
+      const m = pmath.hypot(b.x - a.x, b.y - a.y, b.z - a.z) / (2 * SCALE_SPAN);
       if (m > 0 && Number.isFinite(m)) this.lastScale = m;
     }
     return this.lastScale;
@@ -448,7 +449,7 @@ class MenuScene {
     const p = world.plots[plot];
     const dx = p.entry ? p.entry[0] - (p.x + p.w / 2) : 0;
     const dz = p.entry ? p.entry[1] - (p.z + p.d / 2) : 1;
-    return Math.atan2(dz, dx) - Math.PI * 0.12;
+    return pmath.atan2(dz, dx) - Math.PI * 0.12;
   }
 
   private townShot(shot: Shot, world: WorldStructure, duration: number): TownShot {

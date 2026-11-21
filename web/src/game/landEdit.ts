@@ -17,6 +17,7 @@ import { outlines, rle, unrle } from './landMasks';
 import { deckTiles } from './macro';
 import { smoothstep } from './noise';
 import { bridgeSpans, inside } from './roads';
+import * as pmath from './pmath';
 
 /** Strokes kept to undo, and the most their old values may hold (bytes). */
 export const UNDO_STROKES = 32;
@@ -126,7 +127,7 @@ export class Protection {
           for (let i = i0; i <= i1; i++) {
             const [px, pz] = [i * c - ax, j * c - az];
             const t = Math.max(0, Math.min(1, (px * dx + pz * dz) / l2));
-            const d = Math.hypot(px - dx * t, pz - dz * t) - r.width / 2;
+            const d = pmath.hypot(px - dx * t, pz - dz * t) - r.width / 2;
             if (d <= ROAD_VERGE) dist[j * cols + i] = 0;
             if (d <= ROAD_SHORE) dry[j * cols + i] = 1;
           }
@@ -441,7 +442,7 @@ export class LandEditor {
     if (isPoint(stroke.brush)) return this.pointsTo(stroke, x, z);
     const spacing = Math.max(SPACING_MIN, stroke.brush.radius / 4);
     const [px, pz] = this.last;
-    const d = Math.hypot(x - px, z - pz);
+    const d = pmath.hypot(x - px, z - pz);
     if (d < spacing) {
       if (this.pending < HOLD_EVERY || (TOOL_KIND[stroke.brush.tool] !== 'earth' && stroke.brush.tool !== 'level')) return null;
       const rect = this.stampAt(px, pz, this.pending);

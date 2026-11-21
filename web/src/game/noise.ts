@@ -4,6 +4,8 @@
  * functions (`render/shared/nature.ts` imports them from here), so the world's generator and its drawing agree.
  */
 
+import * as pmath from './pmath';
+
 /** A small seeded generator (mulberry32): numbers 0..1, as `Math.random` gives them. */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
@@ -70,7 +72,7 @@ export function ridged(x: number, z: number, seed: number, octaves = 5): number 
   let freq = 1;
   let weight = 1;
   for (let i = 0; i < octaves; i++) {
-    const r = Math.pow(1 - Math.abs(valueNoise(x * freq, z * freq, seed + i * 31) * 2 - 1), 2) * weight;
+    const r = pmath.pow(1 - Math.abs(valueNoise(x * freq, z * freq, seed + i * 31) * 2 - 1), 2) * weight;
     sum += r * amp;
     // Detail mostly on the ridges, little in the valleys.
     weight = Math.min(1, r * 1.6);

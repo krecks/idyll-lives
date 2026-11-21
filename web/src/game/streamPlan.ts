@@ -12,6 +12,7 @@ import { withBuild, withoutBuild } from '../assets/build';
 import type { Content } from '../content/content';
 import type { WorldStructure } from '../core/protocol';
 import { BIRD_MODELS } from '../render/shared/birds';
+import * as pmath from './pmath';
 
 export interface Rect {
   x: number;
@@ -170,7 +171,7 @@ export function streamRanks(content: Content, assets: AssetRegistry, world: Pick
     let url = urls.get(o.def);
     if (url === undefined) urls.set(o.def, (url = modelUrl(assets, content.object(o.def)?.model ?? `model.${o.def}`)));
     if (!url) continue;
-    const d = Math.hypot(o.x - cx, o.z - cz) / 10_000;
+    const d = pmath.hypot(o.x - cx, o.z - cz) / 10_000;
     const rank = view && inView(o, view) ? 0 : watch && inView(o, watch) ? 1 + d : 2 + d;
     const k = keys.get(url) ?? keys.set(url, withoutBuild(url)).get(url)!;
     if (rank < (ranks.get(k) ?? Infinity)) ranks.set(k, rank);

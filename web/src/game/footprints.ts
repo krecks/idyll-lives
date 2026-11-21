@@ -7,6 +7,7 @@
 
 import { centroid, inside, lengths, pointAt, type RoadIndex, type Pt, type RoadPlan } from './roads';
 import type { Rect } from './town';
+import * as pmath from './pmath';
 
 /** A building's side runs within this (radians) of the way the road nearest it runs, or square to it. */
 export const FACING = (15 * Math.PI) / 180;
@@ -15,7 +16,7 @@ export const FACING = (15 * Math.PI) / 180;
 export const add = (a: Pt, b: Pt, k = 1): Pt => [a[0] + b[0] * k, a[1] + b[1] * k];
 /** A coordinate rounded to the centimetre, as the town file has it. */
 export const r2 = (v: number) => Math.round(v * 100) / 100;
-const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const dist = (a: Pt, b: Pt) => pmath.hypot(a[0] - b[0], a[1] - b[1]);
 
 /** Twice the signed area of a polygon (x·z' − x'·z summed): negative when it goes counter-clockwise seen from above. */
 export function signedArea2(poly: readonly Pt[]): number {
@@ -44,7 +45,7 @@ export function overlaps(a: readonly Pt[], b: readonly Pt[], slack = 0.05): bool
   for (const poly of [a, b]) {
     for (let i = 0; i < poly.length; i++) {
       const [p, q] = [poly[i], poly[(i + 1) % poly.length]];
-      const l = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1;
+      const l = pmath.hypot(q[0] - p[0], q[1] - p[1]) || 1;
       const ax: Pt = [-(q[1] - p[1]) / l, (q[0] - p[0]) / l];
       const span = (ps: readonly Pt[]) => {
         let [lo, hi] = [Infinity, -Infinity];
@@ -68,7 +69,7 @@ export function toOutline(poly: readonly Pt[], x: number, z: number): number {
     const [[ax, az], [bx, bz]] = [poly[i], poly[(i + 1) % poly.length]];
     const [dx, dz] = [bx - ax, bz - az];
     const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
-    best = Math.min(best, Math.hypot(x - ax - dx * t, z - az - dz * t));
+    best = Math.min(best, pmath.hypot(x - ax - dx * t, z - az - dz * t));
   }
   return best;
 }
@@ -125,9 +126,9 @@ export function facesRoad(poly: readonly Pt[], roads: readonly RoadPlan[], index
     const t: Pt = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
     return poly.some((p, k) => {
       const q = poly[(k + 1) % poly.length];
-      const e = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1;
+      const e = pmath.hypot(q[0] - p[0], q[1] - p[1]) || 1;
       const cos = Math.abs(((q[0] - p[0]) * t[0] + (q[1] - p[1]) * t[1]) / e);
-      return cos >= Math.cos(FACING) || cos <= Math.sin(FACING);
+      return cos >= pmath.cos(FACING) || cos <= pmath.sin(FACING);
     });
   };
   return near

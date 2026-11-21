@@ -12,6 +12,7 @@
 
 import type { Junction, RoadPlan, WorldStructure } from '../../core/protocol';
 import { lengths, nearest, pointAt, SIDEWALK, type Pt } from '../../game/roads';
+import * as pmath from '../../game/pmath';
 
 export type { Junction };
 
@@ -99,17 +100,17 @@ export function planJunctions(list: readonly Junction[], roads: readonly RoadPla
     if (j.roundabout || j.arms.length < 3) continue;
     const arms: ArmPlan[] = j.arms
       .map((a) => {
-        const l = Math.hypot(a.dir[0], a.dir[1]) || 1;
+        const l = pmath.hypot(a.dir[0], a.dir[1]) || 1;
         const { dir, off, room } = armLine(j, [a.dir[0] / l, a.dir[1] / l], roads[a.road]);
         const walks = hasSidewalks(roads[a.road]);
         return { road: a.road, dir, off, half: a.width / 2, walks, walkFrom: a.walkFrom, walkTo: a.walkTo, stop: a.stop, crosswalk: a.crosswalk ?? walks, lit: a.light !== null, reach: Math.min(a.walkTo, room), room };
       })
-      .sort((a, b) => Math.atan2(a.dir[1], a.dir[0]) - Math.atan2(b.dir[1], b.dir[0]));
+      .sort((a, b) => pmath.atan2(a.dir[1], a.dir[0]) - pmath.atan2(b.dir[1], b.dir[0]));
     const corners: CornerPlan[] = [];
     arms.forEach((A, a) => {
       const b = (a + 1) % arms.length;
       const B = arms[b];
-      let turn = Math.atan2(B.dir[1], B.dir[0]) - Math.atan2(A.dir[1], A.dir[0]);
+      let turn = pmath.atan2(B.dir[1], B.dir[0]) - pmath.atan2(A.dir[1], A.dir[0]);
       if (turn <= 0) turn += Math.PI * 2;
       if (turn < CORNER_LEAST || turn > CORNER_MOST) return;
       // The arc's middle: `KERB_RETURN` out from both kerbs, on the corner's side of each.
@@ -147,7 +148,7 @@ function armLine(j: Junction, dir: Pt, r: RoadPlan | undefined): { dir: Pt; off:
   const room = Math.max(OFF_AT, OFF_AT + (end || (k > 0 ? ls[ls.length - 1] - s : s)));
   if (dist > OFF_MOST) return { ...as, room: dist > OFF_AT ? Infinity : room };
   const way: Pt = [t[0] * k, t[1] * k];
-  if (way[0] * dir[0] + way[1] * dir[1] < Math.cos((30 * Math.PI) / 180)) return { ...as, room };
+  if (way[0] * dir[0] + way[1] * dir[1] < pmath.cos((30 * Math.PI) / 180)) return { ...as, room };
   const n = turnedOn(way);
   return { dir: way, off: (p[0] - j.x) * n[0] + (p[1] - j.z) * n[1], room };
 }
@@ -237,7 +238,7 @@ export class JunctionCuts {
           const along = dx * c.dir[0] + dz * c.dir[1];
           // (Anticlockwise of the way out: `turnedOn`.)
           const across = (-dx * c.dir[1] + dz * c.dir[0]) * c.side;
-          const out = Math.hypot(Math.max(0, -along, along - c.to), Math.max(0, -across, across - c.wide));
+          const out = pmath.hypot(Math.max(0, -along, along - c.to), Math.max(0, -across, across - c.wide));
           if (out <= r) return true;
         }
       }

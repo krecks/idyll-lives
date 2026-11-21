@@ -68,6 +68,7 @@ import { previewWorld } from './townPreview';
 import type { LaidTown, Proposal } from './townJobs';
 import { layoutHash, unpackUses, USE_CELL, USE_CODE, type UseKind } from './uses';
 import { placeOf, specOf, type SizeSpec, type WorldSpec } from './world';
+import * as pmath from './pmath';
 
 
 /** The build seed of the proposal's own town: an untouched layout built with it is the generator's town. "Build again" draws another. */
@@ -125,8 +126,8 @@ function mix(seed: number, ...words: (string | number)[]): number {
   return h >>> 0;
 }
 
-const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
-const offRect = (r: Rect, [x, z]: Pt) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
+const dist = (a: Pt, b: Pt) => pmath.hypot(a[0] - b[0], a[1] - b[1]);
+const offRect = (r: Rect, [x, z]: Pt) => pmath.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
 const middle = (a: Rect): Pt => [a.x + a.w / 2, a.z + a.d / 2];
 /** A thing's footprint (tiles) for the driveways' test: the content's (`parking.ts` `driveLines`). */
 const footprintIn = (content: Content) => (def: string): [number, number] => content.object(def)?.footprint ?? [1, 1];
@@ -492,7 +493,7 @@ function siteIn(place: PublicTemplate, cells: readonly number[], home: Pt, land:
     if (place.site === 'water') {
       let [sx, sz, hits] = [0, 0, 0];
       for (let a = 0; a < 16; a++) {
-        const [dx, dz] = [Math.cos((a / 16) * Math.PI * 2), Math.sin((a / 16) * Math.PI * 2)];
+        const [dx, dz] = [pmath.cos((a / 16) * Math.PI * 2), pmath.sin((a / 16) * Math.PI * 2)];
         if (wet(c[0] + dx * 16, c[1] + dz * 16)) [sx, sz, hits] = [sx + dx, sz + dz, hits + 1];
       }
       if (!hits || hits > 9) continue;
@@ -983,9 +984,9 @@ function infillSpots(codes: Uint8Array, cols: number, rows: number, built: reado
     }
     const [mi, mj] = [cells.reduce((s, k) => s + (k % cols), 0) / cells.length, cells.reduce((s, k) => s + Math.floor(k / cols), 0) / cells.length];
     const picked: [number, number][] = [];
-    for (const k of cells.sort((x, y) => Math.hypot((x % cols) - mi, Math.floor(x / cols) - mj) - Math.hypot((y % cols) - mi, Math.floor(y / cols) - mj) || x - y)) {
+    for (const k of cells.sort((x, y) => pmath.hypot((x % cols) - mi, Math.floor(x / cols) - mj) - pmath.hypot((y % cols) - mi, Math.floor(y / cols) - mj) || x - y)) {
       const [i, j] = [k % cols, Math.floor(k / cols)];
-      if (picked.some(([pi, pj]) => Math.hypot(pi - i, pj - j) < apart)) continue;
+      if (picked.some(([pi, pj]) => pmath.hypot(pi - i, pj - j) < apart)) continue;
       picked.push([i, j]);
       out.push([(i + 0.5) * USE_CELL, (j + 0.5) * USE_CELL]);
     }

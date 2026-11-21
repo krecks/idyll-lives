@@ -10,6 +10,7 @@
 import type { Content, Economy } from '../content/content';
 import { flatsTemplate, type FlatsTemplate } from './flats';
 import { houseTemplate, slotDims, type HouseTemplate, type PlotSlot, type Templates, type Wall } from './town';
+import * as pmath from './pmath';
 
 /** A home's price and what it's made of ($). */
 export interface PriceParts {
@@ -75,7 +76,7 @@ export function flatLandShare(lotTiles: number, flats: number, overPlace: boolea
  * against `sizeRef` tiles.
  */
 export function landAndBuilt(rates: LandRates, tiles: number, floor: number, share: number): { land: number; built: number } {
-  return { land: rates.perTile * tiles, built: share * rates.perFloorTile * floor * (floor / (rates.sizeRef ?? 100)) ** (rates.sizePremium ?? 0) };
+  return { land: rates.perTile * tiles, built: share * rates.perFloorTile * floor * pmath.pow(floor / (rates.sizeRef ?? 100), rates.sizePremium ?? 0) };
 }
 
 /** A price rounded to the rates' step (`round`). */

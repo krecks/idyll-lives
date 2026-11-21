@@ -40,6 +40,27 @@ export default ts.config(
       ],
     },
   },
+  // What lays out a town uses game/pmath.ts, not Math.sin, Math.hypot, `**` and the like: those differ in the last
+  // bits between machines and engines (Bun takes them from the system's libm), and a town must not.
+  {
+    files: ['src/game/**/*.ts', 'src/render/shared/builtSurface.ts', 'src/render/shared/junctions.ts', 'src/render/shared/chunks.ts', 'src/render/shared/geometry.ts'],
+    ignores: ['src/game/pmath.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        ...['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'sinh', 'cosh', 'tanh', 'asinh', 'acosh', 'atanh', 'exp', 'expm1', 'log', 'log1p', 'log2', 'log10', 'pow', 'hypot', 'cbrt'].map((property) => ({
+          object: 'Math',
+          property,
+          message: 'Not the same to the last bit on every machine and engine: use game/pmath.ts.',
+        })),
+      ],
+      'no-restricted-syntax': [
+        'error',
+        { selector: "BinaryExpression[operator='**']:not([left.value=2])", message: 'Not the same to the last bit on every engine: use pmath.pow.' },
+        { selector: "AssignmentExpression[operator='**=']", message: 'Not the same to the last bit on every engine: use pmath.pow.' },
+      ],
+    },
+  },
   { files: ['src/**/*.ts'], languageOptions: { parser: ts.parser } },
   { files: ['src/**/*.svelte', 'src/**/*.svelte.ts'], languageOptions: { parserOptions: { parser: ts.parser, svelteConfig } } },
 );

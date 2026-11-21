@@ -25,6 +25,7 @@ import { between } from './noise';
 import { draftAreaSize, HOURS, hoursFor, namerFor, type Namer, type ZoneKind } from './places';
 import { inside, leftOf, pointAt, RoadIndex, roadLengths, roadMeets, type Pt, type RoadPlan } from './roads';
 import { houseFor, lotAt, LotPlacer, plotRect, slotDims, type Frontage, type Ground, type NeighbourhoodDraft, type PlotSlot, type Rect, type Templates, type Unplaced } from './town';
+import * as pmath from './pmath';
 
 type Rand = () => number;
 
@@ -116,7 +117,7 @@ const FLATS_APART = 50;
 
 const range = (rand: Rand, lo: number, hi: number) => lo + (hi - lo) * rand();
 /** How far a point is from a box (0 inside it). */
-const offBox = (r: Rect, [x, z]: Pt) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
+const offBox = (r: Rect, [x, z]: Pt) => pmath.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
 
 /** The dense pass (see the top of this file). */
 export class DensePass {

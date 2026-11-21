@@ -37,6 +37,7 @@ import type { ObjectDef, SurfaceKind } from '../content/content';
 import { approachCandidates, covers, facedTable, freeSpots, frontTile, middleOf, overhangTiles, sizeOf, topOf, type Shape, type Shapes, type Top } from './surfaces';
 import type { Door, HouseTemplate, Placement, PlannedRoom, Wall } from './town';
 import { between, mulberry32 as random, pick } from './noise';
+import * as pmath from './pmath';
 
 export interface HouseGenConfig {
   classes: Record<string, HouseClass>;
@@ -333,7 +334,7 @@ export function crownClear(g: { edges: Map<string, string> }, x: number, z: numb
     const [axis, xs, zs] = e.split(':');
     const [ex, ez] = [Number(xs), Number(zs)];
     const [dx, dz] = axis === 'h' ? [x - Math.min(Math.max(x, ex), ex + 1), z - ez] : [x - ex, z - Math.min(Math.max(z, ez), ez + 1)];
-    if (Math.hypot(dx, dz) < crown) return false;
+    if (pmath.hypot(dx, dz) < crown) return false;
   }
   return true;
 }
@@ -533,10 +534,10 @@ function attemptHouse(
   const lists = two ? [ground, upstairs] : [ground];
   const floorOf = (kinds: Kind[], w = W, d = D) => (kinds === upstairs ? (w - 2) * (d - 1) : w * d);
   const most = (kinds: Kind[]) => kinds.reduce((n, k) => n + capArea(cfg, k), 0);
-  const least = (kinds: Kind[]) => kinds.reduce((n, k) => n + cfg.rooms[k].minSide ** 2, 0);
+  const least = (kinds: Kind[]) => kinds.reduce((n, k) => n + cfg.rooms[k].minSide * cfg.rooms[k].minSide, 0);
   const stretched = (kinds: Kind[]) => most(kinds) < floorOf(kinds) * ROOM_SLACK;
   const add = (kind: Kind, list: Kind[]) => {
-    if (stretched(list) && (kind === 'bathroom' || !list.includes(kind)) && (least(list) + cfg.rooms[kind].minSide ** 2) * LEAST_SLACK <= floorOf(list)) list.push(kind);
+    if (stretched(list) && (kind === 'bathroom' || !list.includes(kind)) && (least(list) + cfg.rooms[kind].minSide * cfg.rooms[kind].minSide) * LEAST_SLACK <= floorOf(list)) list.push(kind);
   };
   const chanceOf = (chance: number | Record<string, number>) => (typeof chance === 'number' ? chance : (chance[lotSize] ?? 0));
   const extras = (cfg.extras ?? []).filter((e) => cfg.rooms[e.kind] && bedrooms >= (e.minBedrooms ?? 0) && chanceOf(e.chance) > 0);
@@ -1691,7 +1692,7 @@ function tableSet(f: Floor, r: Room, info: ObjectInfos, rng: () => number, set: 
             const rots = [turned, turned + 2].filter((rot) => inside(r, ...frontTile(x, z, w, d, rot)));
             // Room for chairs and a way round them on every side; else as near the middle as can be.
             const gap = Math.min(x - r.x, z - r.z, r.x + r.w - x - w, r.z + r.d - z - d);
-            for (const rot of rots) spots.push({ x, z, rot, score: Math.min(gap, 2) * 4 - Math.hypot(x + w / 2 - cx, z + d / 2 - cz) + rng() });
+            for (const rot of rots) spots.push({ x, z, rot, score: Math.min(gap, 2) * 4 - pmath.hypot(x + w / 2 - cx, z + d / 2 - cz) + rng() });
           }
         }
       }
@@ -1926,7 +1927,7 @@ function mount(cfg: HouseGenConfig, info: ObjectInfos, f: Floor, r: Room, def: s
     }
     // Near the middle of the room (or of the share a light is for).
     const [cx, cz] = near ?? [r.x + (r.w - fw) / 2, r.z + (r.d - fd) / 2];
-    spots.sort((a, b) => Math.hypot(a[0] - cx, a[1] - cz) - Math.hypot(b[0] - cx, b[1] - cz));
+    spots.sort((a, b) => pmath.hypot(a[0] - cx, a[1] - cz) - pmath.hypot(b[0] - cx, b[1] - cz));
     for (const [x, z, rot] of spots) {
       const [w, d] = rot % 2 === 0 ? [fw, fd] : [fd, fw];
       if (!fits(x, z, w, d, rot)) continue;
@@ -2287,7 +2288,7 @@ function attemptFlat(cfg: HouseGenConfig, info: ObjectInfos, cls: HouseClass, fr
   const living = rng() < cls.living;
   const kinds: Kind[] = ['kitchen', ...(living ? ['living'] : []), ...Array<Kind>(bedrooms).fill('bedroom'), 'bathroom'];
   const most = () => kinds.reduce((n, k) => n + capArea(cfg, k), 0);
-  const least = (more: Kind[] = []) => [...kinds, ...more].reduce((n, k) => n + cfg.rooms[k].minSide ** 2, 0);
+  const least = (more: Kind[] = []) => [...kinds, ...more].reduce((n, k) => n + cfg.rooms[k].minSide * cfg.rooms[k].minSide, 0);
   const stretched = () => most() < floor * ROOM_SLACK;
   // A floor too small for its bedrooms: fewer of them.
   while (least() * LEAST_SLACK > floor && bedrooms > 1) {

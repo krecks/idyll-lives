@@ -7,11 +7,12 @@
 
 import type { Rle } from '../core/protocol';
 import { inside, type Pt } from './roads';
+import * as pmath from './pmath';
 
 /** The world generator's land cells (m): `outlines`' cells unless told otherwise. */
 const MACRO_CELL = 8;
 
-const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const dist = (a: Pt, b: Pt) => pmath.hypot(a[0] - b[0], a[1] - b[1]);
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
 /** A polyline with the points that hardly change its course taken out (Douglas-Peucker, `tol` m). */
@@ -23,7 +24,7 @@ export function simplify(pts: readonly Pt[], tol: number): Pt[] {
   while (stack.length) {
     const [a, b] = stack.pop()!;
     const [[ax, az], [bx, bz]] = [pts[a], pts[b]];
-    const l = Math.hypot(bx - ax, bz - az) || 1;
+    const l = pmath.hypot(bx - ax, bz - az) || 1;
     let [far, at] = [0, -1];
     for (let i = a + 1; i < b; i++) {
       const d = Math.abs((pts[i][0] - ax) * (bz - az) - (pts[i][1] - az) * (bx - ax)) / l;
