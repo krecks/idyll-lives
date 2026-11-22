@@ -80,6 +80,7 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
 - **Quiet at night:** while it is night for a resident (their planned sleep, else bedtime to waking), noisy things weigh far less: skill practice unless it's food, chores unless it's care. Lounging, reading and rest weigh a little more. This is set in content (`dayRhythm.nightQuiet`) and comes on top of the night's schedule.
 - **A shorter wait at the bathroom door:** someone waiting outside a room kept shut gives up after 50 game minutes instead of an hour. *Have breakfast* is now *Have a bite*, as it is offered at any hour.
 - **A memory soak:** `tools/bench/soak.sh` plays the gameplay baseline for 30 minutes with memory reads spread over it.
+- **No water in the basement:** on a lot standing higher than the sea (on hilly land), looking at the basement showed the dug-out lot full of water: the sea, drawn under all the land, was left in the pit. The water now goes with the ground over a basement in view, at any depth.
 
 ## 0.8.2 — 2026-11-15
 
