@@ -33,11 +33,45 @@ pub(crate) fn pick_autonomous(
     let felt = ai::felt(needs, &content.needs, &content.autonomy);
     let emotion = sim.emotion(content).map(|e| &content.emotions[e].mods);
     let schedule = content.schedule_at(ctx.hour);
+    // Night quiet: keep noisy chores and skill practice from winning over sleep or quiet
+    // leisure. Care (a baby) and food (a late meal) stay available; urgent needs still win
+    // through the usual look-ahead scoring.
+    let night_now = crate::world::is_night(sim, ctx);
+    // Only look the tags up when night actually applies: this is the autonomous pick's hot path.
+    let (training, chores, care, food, quiet) = if night_now {
+        let tag = |name: &str| {
+            content
+                .tags
+                .iter()
+                .position(|t| t == name)
+                .map_or(0, |i| 1u64 << i)
+        };
+        (
+            tag("training"),
+            tag("chores"),
+            tag("care"),
+            tag("food"),
+            tag("lounge") | tag("reading") | tag("rest"),
+        )
+    } else {
+        (0, 0, 0, 0, 0)
+    };
     // Traits, the current emotion and the time of day all bias what feels right.
     let feel = |tags: TagMask| {
-        sim.mods.preference(tags)
+        let mut f = sim.mods.preference(tags)
             * emotion.map_or(1.0, |m| m.preference(tags))
-            * schedule.preference(tags)
+            * schedule.preference(tags);
+        if night_now {
+            let noisy = (tags & training != 0 && tags & food == 0)
+                || (tags & chores != 0 && tags & care == 0);
+            if noisy {
+                f *= 0.1;
+            }
+            if tags & quiet != 0 {
+                f *= 1.25;
+            }
+        }
+        f
     };
     let me = sim.id as usize;
     let here = ctx.briefs[me].plot;
