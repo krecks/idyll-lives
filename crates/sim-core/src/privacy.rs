@@ -59,7 +59,7 @@ use std::sync::Arc;
 pub const LOOK: f32 = 0.9;
 
 /// Game minutes someone waits outside a room kept shut before giving up.
-pub const WAIT_MINUTES: f32 = 60.0;
+pub const WAIT_MINUTES: f32 = 50.0;
 
 /// A room kept shut (a lot room id) and the resident in it who keeps it so.
 #[derive(Debug, Clone, PartialEq)]

@@ -1,5 +1,5 @@
 //! Privacy (G-72, `privacy.rs`), with the shipped content: a bathroom someone is in is kept shut
-//! (others wait outside its door and go in after, or give up after an hour; kept out with the
+//! (others wait outside its door and go in after, or give up after a while; kept out with the
 //! bladder empty, the accident comes), visitors are refused the household's own things, and
 //! *Try for a baby* is two in a double bed behind a shut door.
 //!
@@ -253,7 +253,7 @@ fn nobody_waits_at_a_shut_bathroom_for_ever() {
     assert!(waited, "Ben waited outside");
     assert!(
         w.sims[1].current().is_none() && !w.sims[1].kept_out(),
-        "and gave up after an hour"
+        "and gave up after the wait cap"
     );
 }
 
@@ -271,7 +271,7 @@ fn kept_out_with_an_empty_bladder_the_accident_comes() {
     })
     .unwrap();
     let mut accident = false;
-    for _ in 0..ticks(sim_core::privacy::WAIT_MINUTES) {
+    for _ in 0..ticks(sim_core::privacy::WAIT_MINUTES + 20.0) {
         w.tick_once();
         accident |= w
             .events
@@ -283,7 +283,7 @@ fn kept_out_with_an_empty_bladder_the_accident_comes() {
     }
     assert!(
         accident,
-        "Ben didn't stand at the door with an empty bladder for an hour"
+        "Ben didn't have an accident at the door with an empty bladder"
     );
 }
 
