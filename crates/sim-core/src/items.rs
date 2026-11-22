@@ -131,6 +131,9 @@ pub struct Items {
     pub next_id: u32,
     /// Bumped when anything about them changes (views send them again).
     pub version: u32,
+    /// Servings promised to a Sim who is on their way to eat them (`(item, sim)`). Not saved:
+    /// a loaded world reserves again as its eaters start.
+    reserved: Vec<(u32, u32)>,
 }
 
 impl Items {
@@ -156,7 +159,39 @@ impl Items {
     pub fn remove(&mut self, id: u32) -> Option<ItemInstance> {
         let i = self.position(id)?;
         self.version = self.version.wrapping_add(1);
+        self.reserved.retain(|&(item, _)| item != id);
         Some(self.list.remove(i))
+    }
+
+    /// Who has promised themselves this serving, if anyone.
+    pub fn reserved_by(&self, id: u32) -> Option<u32> {
+        self.reserved
+            .iter()
+            .find(|&&(item, _)| item == id)
+            .map(|&(_, sim)| sim)
+    }
+
+    /// Promises `id` to `sim`. False if another Sim already has it.
+    pub fn reserve(&mut self, id: u32, sim: u32) -> bool {
+        match self.reserved_by(id) {
+            Some(by) => by == sim,
+            None => {
+                self.reserved.push((id, sim));
+                true
+            }
+        }
+    }
+
+    /// Gives up `sim`'s promise on `id` (the serving is in their hands, or gone).
+    pub fn release(&mut self, id: u32, sim: u32) {
+        self.reserved
+            .retain(|&(item, owner)| item != id || owner != sim);
+    }
+
+    /// Drops promises nobody is still on their way to eat. Called after a tick's steps, so a
+    /// task that ended or was replaced cannot keep a serving out of reach.
+    pub fn release_stale(&mut self, mut still_eating: impl FnMut(u32, u32) -> bool) {
+        self.reserved.retain(|&(item, sim)| still_eating(item, sim));
     }
 
     fn position(&self, id: u32) -> Option<usize> {
@@ -237,4 +272,45 @@ pub fn holders(content: &Content, objects: &[ObjectInstance], ats: &[ItemAt]) ->
             ItemAt::Floor { .. } => None,
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn serving() -> ItemInstance {
+        ItemInstance {
+            id: 0,
+            def: 0,
+            at: ItemAt::Floor {
+                x: 0,
+                z: 0,
+                offset: [0, 0],
+            },
+            servings: 1,
+            quality: 1.0,
+            made_at: 0,
+            household: 0,
+            spoiled: false,
+            recipe: Some(0),
+        }
+    }
+
+    #[test]
+    fn a_serving_is_promised_to_one_sim_at_a_time() {
+        let mut items = Items::default();
+        let first = items.add(serving());
+        let second = items.add(serving());
+        assert!(items.reserve(first, 1));
+        assert_eq!(items.reserved_by(first), Some(1));
+        assert!(items.reserve(first, 1), "the same sim may keep it");
+        assert!(!items.reserve(first, 2), "another sim may not take it");
+        assert!(items.reserve(second, 2));
+        items.release(first, 1);
+        assert!(items.reserve(first, 2));
+        items.remove(second);
+        assert_eq!(items.reserved_by(second), None);
+        items.release_stale(|_, _| false);
+        assert_eq!(items.reserved_by(first), None);
+    }
 }

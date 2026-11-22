@@ -409,6 +409,18 @@ impl World {
                 step_sim(sim, &ctx, objects, items, rng);
             }
         }
+        // A serving promised to someone who is still fetching or eating it stays theirs; a task
+        // that ended or was replaced must not keep it out of reach.
+        {
+            let (items, sims) = (&mut self.items, &self.sims);
+            items.release_stale(|item, sim| {
+                let eating = |a: &crate::world::Activity| {
+                    matches!(a.task.kind, TaskKind::Eat { item: Some(i), .. } if i == item)
+                };
+                sims.get(sim as usize)
+                    .is_some_and(|s| s.current.as_ref().is_some_and(eating) || s.paused.as_ref().is_some_and(eating))
+            });
+        }
         self.work = work;
         self.first = first;
         crate::profile::end("step_sim", steps_start);

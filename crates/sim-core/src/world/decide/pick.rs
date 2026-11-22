@@ -667,11 +667,9 @@ pub(crate) fn pick_autonomous(
             1.0
         };
         let mut best: Option<(f32, u32)> = None;
-        for it in items
-            .list
-            .iter()
-            .filter(|it| it.household == sim.household && it.edible())
-        {
+        for it in items.list.iter().filter(|it| {
+            it.household == sim.household && it.edible() && items.reserved_by(it.id).is_none()
+        }) {
             let Some(r) = it.recipe else { continue };
             let distance = ctx.nav.stairs.distance(it.at.centre(), sim.pos);
             let gains = content.recipes[r].effects.map(|g| g * it.quality);

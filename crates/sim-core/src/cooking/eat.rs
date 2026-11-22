@@ -270,18 +270,53 @@ pub(super) fn eat_next(
 ) {
     let content = ctx.content;
     let tags = content.cooking.eat_tags;
-    let TaskKind::Eat { item, stage, .. } = task.kind else {
+    let TaskKind::Eat {
+        item,
+        stage,
+        seat,
+        plate,
+    } = task.kind
+    else {
         return;
     };
     sim.current = None;
     if stage == 0 {
-        let Some(it) = item
+        let wanted = item
             .and_then(|i| items.get(i))
             .filter(|it| it.edible() && it.household == sim.household)
-        else {
+            .map(|it| it.id);
+        // Someone else promised themselves the serving first: take another of this household's
+        // free servings rather than walk to one that will be gone.
+        let item = wanted
+            .filter(|&id| items.reserved_by(id).is_none_or(|by| by == sim.id))
+            .or_else(|| {
+                items
+                    .list
+                    .iter()
+                    .find(|it| {
+                        it.edible()
+                            && it.household == sim.household
+                            && items.reserved_by(it.id).is_none()
+                    })
+                    .map(|it| it.id)
+            });
+        let Some(id) = item else { return };
+        if !items.reserve(id, sim.id) {
+            return;
+        }
+        let Some(at) = items.get(id).map(|it| it.at) else {
             return;
         };
-        walk_to_any(sim, task, ctx, &item_access(ctx, objects, &it.at), tags);
+        let task = Task {
+            kind: TaskKind::Eat {
+                item: Some(id),
+                seat,
+                plate,
+                stage: 0,
+            },
+            ..task
+        };
+        walk_to_any(sim, task, ctx, &item_access(ctx, objects, &at), tags);
         return;
     }
     if sim.held.is_none_or(|h| h.recipe.is_none()) {
@@ -339,6 +374,9 @@ pub(super) fn eat_next(
 /// Takes a serving of `id` into their hands (false: it's gone or spoilt).
 pub(super) fn take_serving(sim: &mut Sim, content: &Content, items: &mut Items, id: u32) -> bool {
     let household = sim.household;
+    if items.reserved_by(id).is_some_and(|by| by != sim.id) {
+        return false;
+    }
     let Some(it) = items
         .get_mut(id)
         .filter(|it| it.edible() && it.household == household)
@@ -367,5 +405,6 @@ pub(super) fn take_serving(sim: &mut Sim, content: &Content, items: &mut Items, 
             }
         }
     }
+    items.release(id, sim.id);
     true
 }
