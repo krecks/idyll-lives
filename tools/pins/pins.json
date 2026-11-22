@@ -114,9 +114,9 @@
     {
       "name": "sim-privacy",
       "file": "crates/sim-core/src/privacy.rs",
-      "sha256": "d09c594b019256dde393cf655cd0d5f07394b43c70bec4d39aa9e4c09d751e14",
-      "by": "integrate-cleanup",
-      "reason": "code cleanup integrated with the real town"
+      "sha256": "01571a9bc70cf9fcedd69d2d657ad4799065f9aaa8b1d6b7daa287005e095ee7",
+      "by": "playtest/design-proposals",
+      "reason": "PR #115, owner's OK: someone waiting outside a room kept shut gives up after 50 game minutes (WAIT_MINUTES, was 60)."
     },
     {
       "name": "living-town-lens",
@@ -249,9 +249,9 @@
     {
       "name": "sim-cooking-eat",
       "file": "crates/sim-core/src/cooking/eat.rs",
-      "sha256": "3fc763dc2be993f0300703592bce8f6899930c4b28ca5f2f2b0684f1e61fc451",
-      "by": "simplify3",
-      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 6 items only its sibling files use narrowed from pub(crate) to pub(super). Cooking's last accepted change stands (owner's OK, real town: a flat's household is at home on its own storey for an invitation to eat and the food left at home)."
+      "sha256": "57646460ffebed4687562388b3ca01a66c49614a1d81347120db6e07932b1409",
+      "by": "playtest/design-proposals",
+      "reason": "PR #115, owner's OK: a serving is promised to whoever sets off for it, counted per serving (Items::free_for); a resident choosing for themselves whose serving was promised away goes to the nearest free one, a player's order is never swapped; take_serving refuses a serving promised to others."
     },
     {
       "name": "sim-cooking-household",
@@ -270,9 +270,9 @@
     {
       "name": "sim-cooking-step",
       "file": "crates/sim-core/src/cooking/step.rs",
-      "sha256": "c681236d07f39ccb243545075dcd2e66de1066d73410fa671d82688435eddbf0",
-      "by": "simplify3",
-      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 2 items only its sibling files use narrowed from pub(crate) to pub(super). Cooking's last accepted change stands (owner's OK, real town: a flat's household is at home on its own storey for an invitation to eat and the food left at home)."
+      "sha256": "cba5e663c94f5d7b1318ea941fd62c2376c84b15d667cad7db769ff847dd47a6",
+      "by": "playtest/design-proposals",
+      "reason": "PR #115, owner's OK: comment only, on ending cleanly when the promised serving has gone before it is fetched."
     }
   ]
 }

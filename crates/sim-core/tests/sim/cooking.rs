@@ -912,6 +912,68 @@ fn the_player_can_have_a_resident_eat_or_clear_away_food() {
     assert!(w.items.get(pot).is_none(), "cleared away");
 }
 
+#[test]
+fn a_players_eat_order_keeps_to_the_serving_it_named() {
+    let mut w = world_with(KITCHEN, 3, false);
+    order(&mut w, 0, STOVE, "cook");
+    ticks(&mut w, 50.0);
+    let pot = w
+        .items
+        .list
+        .iter()
+        .find(|it| it.servings > 0)
+        .unwrap()
+        .clone();
+    w.items.get_mut(pot.id).unwrap().servings = 1;
+    let other = w.items.add(sim_core::items::ItemInstance {
+        servings: 1,
+        ..pot.clone()
+    });
+    for sim in [1, 2] {
+        w.sims[sim as usize].needs[0] = 0.3;
+        // Both orders are taken: nobody has set off for it yet.
+        w.apply(Command::UseItem {
+            sim,
+            item: pot.id,
+            action: sim_core::command::ItemAction::Eat,
+        })
+        .unwrap();
+    }
+    let walking = |w: &World, sim: usize, item: u32| {
+        w.sims[sim].current().is_some_and(
+            |a| matches!(a.task.kind, TaskKind::Eat { item: Some(i), stage: 0, .. } if i == item),
+        )
+    };
+    let mut first = false;
+    for _ in 0..common::mins(1.0) {
+        w.tick_once();
+        common::check(&w);
+        first |= walking(&w, 1, pot.id);
+        assert!(
+            !walking(&w, 2, other),
+            "the second order isn't swapped for the other serving"
+        );
+    }
+    assert!(first, "the first order went for the serving");
+    let err = w
+        .apply(Command::UseItem {
+            sim: 2,
+            item: pot.id,
+            action: sim_core::command::ItemAction::Eat,
+        })
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("someone else is having that"),
+        "{err}"
+    );
+    ticks(&mut w, 40.0);
+    assert_eq!(
+        w.items.get(other).map(|it| it.servings),
+        Some(1),
+        "nobody ate the serving they weren't told to"
+    );
+}
+
 /// Each step of a recipe ordered from `object`, as it starts: (step, station, minutes).
 fn step_minutes(w: &mut World, object: u32, id: &str) -> Vec<(u8, u32, u16)> {
     order(w, 0, object, id);

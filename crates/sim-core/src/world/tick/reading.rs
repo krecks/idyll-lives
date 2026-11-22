@@ -41,11 +41,13 @@ pub(crate) fn wake_hour(sim: &Sim, ctx: &Ctx) -> f32 {
 /// day rhythm.
 pub(crate) fn is_night(sim: &Sim, ctx: &Ctx) -> bool {
     let routines = &ctx.households[sim.household as usize].routines;
-    if let Some(night) =
-        crate::planner::planned_night(ctx.content, sim, routines, ctx.day, ctx.minute)
-    {
-        return night;
-    }
+    crate::planner::planned_night(ctx.content, sim, routines, ctx.day, ctx.minute)
+        .unwrap_or_else(|| rhythm_night(sim, ctx))
+}
+
+/// `is_night` without a planned sleep: the usual day rhythm (for a caller that has looked up
+/// `planner::planned_night` already).
+pub(crate) fn rhythm_night(sim: &Sim, ctx: &Ctx) -> bool {
     let rhythm = &ctx.content.day_rhythm;
     if ctx.hour >= rhythm.bed_hour {
         return true;

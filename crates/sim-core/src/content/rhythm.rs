@@ -30,6 +30,8 @@ pub struct DayRhythm {
     pub rest_need: Option<usize>,
     /// Interactions with any of these tags are naps (short, and not again too soon).
     pub nap_tags: TagMask,
+    /// What night quiet holds back and favours in the autonomous pick (`NightQuiet`).
+    pub night_quiet: NightQuiet,
     /// No nap for this long after the last one.
     pub nap_cooldown_hours: f32,
     /// Below this (in what a bed's sleep fills), daytime is no reason not to go to bed, and a
@@ -44,6 +46,33 @@ pub struct DayRhythm {
     /// A crying baby wakes a grown-up asleep at home (content `dayRhythm.babyWakes`; None:
     /// nobody wakes for them).
     pub baby_wakes: Option<BabyWakes>,
+}
+
+/// Night quiet (content `dayRhythm.nightQuiet`): at night (a Sim's own, `world::is_night`), what
+/// the autonomous pick holds back and favours, on top of the `schedule` window for the hour.
+#[derive(Debug, Clone, Default)]
+pub struct NightQuiet {
+    /// `(tag, unless)`: an interaction with `tag` and none of `unless` is noisy.
+    pub noisy: Vec<(TagMask, TagMask)>,
+    pub noisy_factor: f32,
+    /// Interactions with any of these tags are quiet.
+    pub quiet: TagMask,
+    pub quiet_factor: f32,
+}
+
+impl NightQuiet {
+    /// What night quiet makes of an interaction with `tags` (1: nothing).
+    pub fn factor(&self, tags: TagMask) -> f32 {
+        let noisy = self
+            .noisy
+            .iter()
+            .any(|&(tag, unless)| tags & tag != 0 && tags & unless == 0);
+        let mut f = if noisy { self.noisy_factor } else { 1.0 };
+        if tags & self.quiet != 0 {
+            f *= self.quiet_factor;
+        }
+        f
+    }
 }
 
 /// A baby crying for one of `needs` (bit per need; default: all but surroundings) below

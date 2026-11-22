@@ -191,6 +191,23 @@ pub(crate) struct DayRhythmRaw {
     pub(crate) ready_minutes: Option<f32>,
     pub(crate) work_breaks: Vec<WorkBreakRaw>,
     pub(crate) baby_wakes: Option<BabyWakesRaw>,
+    pub(crate) night_quiet: Option<NightQuietRaw>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub(crate) struct NightQuietRaw {
+    pub(crate) noisy: Vec<NoisyRaw>,
+    pub(crate) noisy_factor: Option<f32>,
+    pub(crate) quiet: Vec<String>,
+    pub(crate) quiet_factor: Option<f32>,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct NoisyRaw {
+    pub(crate) tag: String,
+    #[serde(default)]
+    pub(crate) unless: Vec<String>,
 }
 
 #[derive(Deserialize)]

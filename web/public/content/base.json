@@ -4471,6 +4471,15 @@
     ],
     "napCooldownHours": 4,
     "exhaustedBelow": 0.2,
+    "nightQuiet": {
+      "noisy": [
+        {"tag": "training", "unless": ["food"]},
+        {"tag": "chores", "unless": ["care"]}
+      ],
+      "noisyFactor": 0.1,
+      "quiet": ["lounge", "reading", "rest"],
+      "quietFactor": 1.25
+    },
     "habits": [
       {"at": "wake", "need": "bladder", "below": 0.95},
       {"at": "bed", "need": "bladder", "below": 0.9},

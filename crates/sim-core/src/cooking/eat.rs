@@ -275,13 +275,33 @@ pub(super) fn eat_next(
     };
     sim.current = None;
     if stage == 0 {
-        let Some(it) = item
+        // Others promised themselves every serving of it first: take the nearest of this
+        // household's free servings rather than walk to one that will be gone (not on the
+        // player's order: they said which, so it ends).
+        let wanted = item
             .and_then(|i| items.get(i))
-            .filter(|it| it.edible() && it.household == sim.household)
-        else {
+            .filter(|it| it.edible() && it.household == sim.household);
+        let promised_away = wanted.is_some_and(|it| !items.free_for(it.id, sim.id));
+        let nearest = || {
+            let distance = |it: &ItemInstance| ctx.nav.stairs.distance(it.at.centre(), sim.pos);
+            items
+                .free_servings(sim.household, sim.id)
+                .min_by(|a, b| distance(a).total_cmp(&distance(b)))
+        };
+        let chosen = match (promised_away, task.directed) {
+            (false, _) => wanted,
+            (true, false) => nearest(),
+            (true, true) => None,
+        };
+        let Some((id, at)) = chosen.map(|it| (it.id, it.at)) else {
             return;
         };
-        walk_to_any(sim, task, ctx, &item_access(ctx, objects, &it.at), tags);
+        items.reserve(id, sim.id);
+        let mut task = task;
+        if let TaskKind::Eat { item, .. } = &mut task.kind {
+            *item = Some(id);
+        }
+        walk_to_any(sim, task, ctx, &item_access(ctx, objects, &at), tags);
         return;
     }
     if sim.held.is_none_or(|h| h.recipe.is_none()) {
@@ -339,6 +359,9 @@ pub(super) fn eat_next(
 /// Takes a serving of `id` into their hands (false: it's gone or spoilt).
 pub(super) fn take_serving(sim: &mut Sim, content: &Content, items: &mut Items, id: u32) -> bool {
     let household = sim.household;
+    if !items.free_for(id, sim.id) {
+        return false;
+    }
     let Some(it) = items
         .get_mut(id)
         .filter(|it| it.edible() && it.household == household)
@@ -367,5 +390,6 @@ pub(super) fn take_serving(sim: &mut Sim, content: &Content, items: &mut Items, 
             }
         }
     }
+    items.release(id, sim.id);
     true
 }

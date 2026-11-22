@@ -112,6 +112,8 @@ pub(crate) fn arrive(sim: &mut Sim, ctx: &Ctx, objects: &mut [ObjectInstance], i
             ..
         } => {
             if !take_serving(sim, content, items, id) {
+                // The serving was promised to them when they set off for it; if it has gone
+                // (spoilt or cleared away) there is nothing to fetch, so end cleanly.
                 sim.current = None;
                 return;
             }
