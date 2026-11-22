@@ -371,7 +371,7 @@
         },
         {
           "id": "breakfast",
-          "label": "Have breakfast at the island",
+          "label": "Have a bite at the island",
           "anim": "eat",
           "sound": "cutlery",
           "seatNear": 3,
@@ -427,7 +427,7 @@
         },
         {
           "id": "breakfast",
-          "label": "Have breakfast at the island",
+          "label": "Have a bite at the island",
           "anim": "eat",
           "sound": "cutlery",
           "seatNear": 3,
