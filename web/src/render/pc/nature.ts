@@ -715,6 +715,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     const [i, j] = this.tileCorner(k);
     const { app, parent } = this.host;
     const entity = drawOf(app, parent, `pond${i},${j}`, mesh, this.waterMat(app));
+    entity.tags.add(WATER_TAG);
     this.ponds.set(k, entity);
     return [entity];
   }
@@ -1151,7 +1152,9 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     mesh.setUvs(0, [0, 1, 1, 1, 0, 0, 1, 0]);
     mesh.setIndices([3, 1, 0, 2, 3, 0]);
     mesh.update(pc.PRIMITIVE_TRIANGLES);
-    return drawOf(app, parent, 'water', mesh, this.waterMat(app));
+    const entity = drawOf(app, parent, 'water', mesh, this.waterMat(app));
+    entity.tags.add(WATER_TAG);
+    return entity;
   }
 
   /**
@@ -1626,6 +1629,9 @@ function padMasked(device: pc.GraphicsDevice, material: pc.StandardMaterial): vo
   material.setParameter('game_padArea', new Float32Array(4));
   material.update();
 }
+
+/** The tag of the landscape's water draws (the sea's sheet, a height field's ponds): dug away at any height over a basement in view. */
+export const WATER_TAG = 'water';
 
 /** An entity of `app` drawing `mesh` with `material`, switched off, under `parent`; it receives shadows and casts none. */
 function drawOf(app: pc.AppBase, parent: pc.Entity, name: string, mesh: pc.Mesh, material: pc.Material): pc.Entity {
