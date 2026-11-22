@@ -524,12 +524,8 @@ export function roadMeshes(
             walk.poly([Q(u0, back, WALK_Y), Q(u1, back, WALK_Y), Q(u1, walkIn, WALK_Y), Q(u0, walkIn, WALK_Y)], up, undefined, undefined, [slab(u0, back), slab(u1, back), slab(u1, walkIn), slab(u0, walkIn)]);
           }
           walk.color(LK.kerb);
-          strip(walk, t0, t1, edge, WALK_Y, back, WALK_Y, up);
-          strip(walk, t0, t1, walkIn, KERB_Y, kerb, KERB_Y, up);
-          // Kerb faces: the step up from the walk and the drop to the road; the walk's own edge.
-          strip(walk, t0, t1, walkIn, WALK_Y, walkIn, KERB_Y, out);
-          strip(walk, t0, t1, kerb, KERB_Y, kerb, ROAD_Y, inward);
-          strip(walk, t0, t1, edge, WALK_Y, edge, lip, out);
+          // The kerb, its step up from the walk and its drop to the road, the course at the walk's back and its edge.
+          kerbProfile((u0, y0, u1, y1, n) => strip(walk, t0, t1, kerb + u0 * side, y0, kerb + u1 * side, y1, n), inward, lip);
           // Gutter: the road darkens along the kerb.
           strip(shadows, t0, t1, kerb, ROAD_Y + 0.003, gutter, ROAD_Y + 0.003, up, LK.gutterShade);
         }
@@ -556,11 +552,8 @@ export function roadMeshes(
         const radial: V3 = [Math.cos(am), 0, Math.sin(am)];
         const LK = STREET_LOOK;
         walk.color(LK.walk).poly([at(a0, walkIn, WALK_Y), at(a0, edge - BACK_COURSE, WALK_Y), at(a1, edge - BACK_COURSE, WALK_Y), at(a1, walkIn, WALK_Y)], up);
-        walk.color(LK.kerb).poly([at(a0, edge - BACK_COURSE, WALK_Y), at(a0, edge, WALK_Y), at(a1, edge, WALK_Y), at(a1, edge - BACK_COURSE, WALK_Y)], up);
-        walk.poly([at(a0, kerb, KERB_Y), at(a0, walkIn, KERB_Y), at(a1, walkIn, KERB_Y), at(a1, kerb, KERB_Y)], up);
-        walk.poly([at(a0, kerb, ROAD_Y), at(a0, kerb, KERB_Y), at(a1, kerb, KERB_Y), at(a1, kerb, ROAD_Y)], [-radial[0], 0, -radial[2]]);
-        walk.poly([at(a0, walkIn, KERB_Y), at(a0, walkIn, WALK_Y), at(a1, walkIn, WALK_Y), at(a1, walkIn, KERB_Y)], radial);
-        walk.poly([at(a0, edge, lip), at(a1, edge, lip), at(a1, edge, WALK_Y), at(a0, edge, WALK_Y)], radial);
+        walk.color(LK.kerb);
+        kerbProfile((u0, y0, u1, y1, n) => walk.poly([at(a0, kerb + u0, y0), at(a1, kerb + u0, y0), at(a1, kerb + u1, y1), at(a0, kerb + u1, y1)], n), [-radial[0], 0, -radial[2]], lip);
         shadows.poly([at(a0, kerb, ROAD_Y + 0.003), at(a1, kerb, ROAD_Y + 0.003), at(a1, kerb - 0.4, ROAD_Y + 0.003), at(a0, kerb - 0.4, ROAD_Y + 0.003)], up, undefined, [LK.gutterShade, LK.gutterShade, 0, 0]);
       }
     }
@@ -578,6 +571,32 @@ export function roadMeshes(
 
 type Pt2 = readonly [number, number];
 const UP: V3 = [0, 1, 0];
+
+/** The kerb's arrises eased (m): its top's both edges and the sidewalk's outer one, as the street's boxes are (`EASE`). */
+const KERB_EASE = 0.004;
+
+/**
+ * A kerb and the back of its sidewalk, across: `u` m from the road's edge towards the walk, `y` up. Drawn by `strip`
+ * (a strip along the kerb between two such points, facing `n`), `toRoad` the way across to the road (level, a unit
+ * vector), `lip` the outer edge's foot. The kerb's face to the road, its top and its step down to the walk, the course
+ * of stones at the walk's back and the walk's outer edge, each arris that shows eased by `KERB_EASE` (a strip at 45°).
+ * The walk's own slabs are the caller's.
+ */
+function kerbProfile(strip: (u0: number, y0: number, u1: number, y1: number, n: V3) => void, toRoad: V3, lip: number): void {
+  const c = KERB_EASE;
+  const k = Math.SQRT1_2;
+  const toWalk: V3 = [-toRoad[0], 0, -toRoad[2]];
+  const lifted = (v: V3): V3 => [v[0] * k, k, v[2] * k];
+  const back = SIDEWALK - BACK_COURSE;
+  strip(0, ROAD_Y, 0, KERB_Y - c, toRoad);
+  strip(0, KERB_Y - c, c, KERB_Y, lifted(toRoad));
+  strip(c, KERB_Y, KERB - c, KERB_Y, UP);
+  strip(KERB - c, KERB_Y, KERB, KERB_Y - c, lifted(toWalk));
+  strip(KERB, KERB_Y - c, KERB, WALK_Y, toWalk);
+  strip(back, WALK_Y, SIDEWALK - c, WALK_Y, UP);
+  strip(SIDEWALK - c, WALK_Y, SIDEWALK, WALK_Y - c, lifted(toWalk));
+  strip(SIDEWALK, WALK_Y - c, SIDEWALK, lip, toWalk);
+}
 
 /** The points of an arc round `o` of radius `r` from the way `from` to the way `to` (unit vectors from `o`), the short way round, both ends included, a point every `step` radians at most. */
 function arc(o: Pt2, r: number, from: Pt2, to: Pt2, step = Math.PI / 16): [number, number][] {
@@ -648,22 +667,45 @@ function junctionCorner(j: JunctionPlan, c: CornerPlan, walk: Geo, shadows: Geo,
   const qq: [number, number] = [j.x + q[0], j.z + q[1]];
   const inner = arc(o, r - KERB, fb, fa);
   const at = (p: Pt2, y: number): V3 => [p[0], y + jy, p[1]];
-  // The sidewalk: fanned from the land's corner (it sees the whole arc).
-  walk.color(STREET_LOOK.walk).poly([at(qq, WALK_Y), at(pb, WALK_Y), ...inner.map((p) => at(p, WALK_Y)), at(pa, WALK_Y)], UP);
-  // Its outer edges.
-  walk.poly([at(pa, lip), at(qq, lip), at(qq, WALK_Y), at(pa, WALK_Y)], [...nv(turnedOn(A.dir))]);
-  walk.poly([at(qq, lip), at(pb, lip), at(pb, WALK_Y), at(qq, WALK_Y)], [...nv(turnedBack(B.dir))]);
-  // The kerb round the arc: its top, the drop to the road, the step up from the walk; the gutter.
+  // The sidewalk: fanned from the land's corner (it sees the whole arc), drawn back `KERB_EASE` from its outer edges
+  // (mitred at the land's corner) for their eased arrises.
+  const [na, nb] = [turnedOn(A.dir), turnedBack(B.dir)];
+  const e = KERB_EASE;
+  const miter = e / Math.max(0.2, 1 + na[0] * nb[0] + na[1] * nb[1]);
+  const [pa2, pb2]: Pt2[] = [
+    [pa[0] - na[0] * e, pa[1] - na[1] * e],
+    [pb[0] - nb[0] * e, pb[1] - nb[1] * e],
+  ];
+  const qq2: Pt2 = [qq[0] - (na[0] + nb[0]) * miter, qq[1] - (na[1] + nb[1]) * miter];
+  walk.color(STREET_LOOK.walk).poly([at(qq2, WALK_Y), at(pb2, WALK_Y), ...inner.map((p) => at(p, WALK_Y)), at(pa2, WALK_Y)], UP);
+  // Its outer edges, eased.
+  const k = Math.SQRT1_2;
+  walk.poly([at(pa2, WALK_Y), at(qq2, WALK_Y), at(qq, WALK_Y - e), at(pa, WALK_Y - e)], [na[0] * k, k, na[1] * k]);
+  walk.poly([at(qq2, WALK_Y), at(pb2, WALK_Y), at(pb, WALK_Y - e), at(qq, WALK_Y - e)], [nb[0] * k, k, nb[1] * k]);
+  walk.poly([at(pa, lip), at(qq, lip), at(qq, WALK_Y - e), at(pa, WALK_Y - e)], [...nv(na)]);
+  walk.poly([at(qq, lip), at(pb, lip), at(pb, WALK_Y - e), at(qq, WALK_Y - e)], [...nv(nb)]);
+  // The kerb round the arc: its top, the drop to the road, the step up from the walk (eased, `kerbProfile`, but for
+  // the walk's back, which is the corner's own); the gutter.
   const outer = arc(o, r, fb, fa);
   const gutter = arc(o, r + 0.4, fb, fa);
+  // (The arc at `u` m in from the road's edge, towards the corner's middle.)
+  const arcs = new Map<number, [number, number][]>();
+  const arcAt = (u: number) => arcs.get(u) ?? arcs.set(u, arc(o, r - u, fb, fa)).get(u)!;
   for (let k = 0; k + 1 < outer.length; k++) {
-    const [i0, i1, o0, o1, g0, g1] = [inner[k], inner[k + 1], outer[k], outer[k + 1], gutter[k], gutter[k + 1]];
+    const [o0, o1, g0, g1] = [outer[k], outer[k + 1], gutter[k], gutter[k + 1]];
     const m: Pt2 = [(o0[0] + o1[0]) / 2 - o[0], (o0[1] + o1[1]) / 2 - o[1]];
     const l = Math.hypot(m[0], m[1]) || 1;
     const radial: V3 = [m[0] / l, 0, m[1] / l];
-    walk.color(STREET_LOOK.kerb).poly([at(i0, KERB_Y), at(o0, KERB_Y), at(o1, KERB_Y), at(i1, KERB_Y)], UP);
-    walk.poly([at(o0, ROAD_Y), at(o0, KERB_Y), at(o1, KERB_Y), at(o1, ROAD_Y)], radial);
-    walk.poly([at(i0, KERB_Y), at(i0, WALK_Y), at(i1, WALK_Y), at(i1, KERB_Y)], [-radial[0], 0, -radial[2]]);
+    walk.color(STREET_LOOK.kerb);
+    kerbProfile(
+      (u0, y0, u1, y1, n) => {
+        if (u0 > KERB) return;
+        const [p, q] = [arcAt(u0), arcAt(u1)];
+        walk.poly([at(p[k], y0), at(p[k + 1], y0), at(q[k + 1], y1), at(q[k], y1)], n);
+      },
+      radial,
+      lip,
+    );
     shadows.poly([at(o0, ROAD_Y + 0.003), at(o1, ROAD_Y + 0.003), at(g1, ROAD_Y + 0.003), at(g0, ROAD_Y + 0.003)], UP, undefined, [STREET_LOOK.gutterShade, STREET_LOOK.gutterShade, 0, 0]);
   }
   // A short way on along each arm's sidewalk, under where it begins: no gap where its road bends
@@ -682,11 +724,8 @@ function junctionCorner(j: JunctionPlan, c: CornerPlan, walk: Geo, shadows: Geo,
     const inward: V3 = [-out[0], 0, -out[2]];
     // (With the course of kerb stones at its back, as the arm's sidewalk has.)
     walk.color(STREET_LOOK.walk).poly([P(t0, h + KERB, WALK_Y), P(t1, h + KERB, WALK_Y), P(t1, h + SIDEWALK - BACK_COURSE, WALK_Y), P(t0, h + SIDEWALK - BACK_COURSE, WALK_Y)], UP);
-    walk.color(STREET_LOOK.kerb).poly([P(t0, h + SIDEWALK - BACK_COURSE, WALK_Y), P(t1, h + SIDEWALK - BACK_COURSE, WALK_Y), P(t1, h + SIDEWALK, WALK_Y), P(t0, h + SIDEWALK, WALK_Y)], UP);
-    walk.poly([P(t0, h + SIDEWALK, lip), P(t1, h + SIDEWALK, lip), P(t1, h + SIDEWALK, WALK_Y), P(t0, h + SIDEWALK, WALK_Y)], out);
-    walk.poly([P(t0, h, KERB_Y), P(t1, h, KERB_Y), P(t1, h + KERB, KERB_Y), P(t0, h + KERB, KERB_Y)], UP);
-    walk.poly([P(t0, h, ROAD_Y), P(t1, h, ROAD_Y), P(t1, h, KERB_Y), P(t0, h, KERB_Y)], inward);
-    walk.poly([P(t0, h + KERB, WALK_Y), P(t1, h + KERB, WALK_Y), P(t1, h + KERB, KERB_Y), P(t0, h + KERB, KERB_Y)], out);
+    walk.color(STREET_LOOK.kerb);
+    kerbProfile((u0, y0, u1, y1, nn) => walk.poly([P(t0, h + u0, y0), P(t1, h + u0, y0), P(t1, h + u1, y1), P(t0, h + u1, y1)], nn), inward, lip);
     shadows.poly([P(t0, h, ROAD_Y + 0.003), P(t1, h, ROAD_Y + 0.003), P(t1, h - 0.4, ROAD_Y + 0.003), P(t0, h - 0.4, ROAD_Y + 0.003)], UP, undefined, [STREET_LOOK.gutterShade, STREET_LOOK.gutterShade, 0, 0]);
   }
 }

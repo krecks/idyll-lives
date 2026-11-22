@@ -100,10 +100,11 @@ type Side = 0 | 1 | 2 | 3;
 const SIDES: readonly Side[] = [0, 1, 2, 3];
 
 class Dresser {
-  readonly siding = new Geo();
-  readonly brick = new Geo();
-  readonly render = new Geo();
-  readonly stone = new Geo();
+  // (Its walls' corners and a tower's chamfered too: a 4 mm arris, as the trim's.)
+  readonly siding = new Geo().easing(EASE);
+  readonly brick = new Geo().easing(EASE);
+  readonly render = new Geo().easing(EASE);
+  readonly stone = new Geo().easing(EASE);
   // (The plinth and the trim chamfered as a model's boxes are: their arrises show at the play camera.)
   readonly plinth = new Geo().color('#D8D2C8').easing(EASE);
   readonly roof = new Geo();

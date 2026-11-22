@@ -95,8 +95,10 @@ names:
 
 The generators chamfer their boxes as the models' are where it counts: a `Geo` given `easing(EASE)` (4 mm) writes
 each `box` with only the edges `built.edges` would find (5 cm long or more, between faces 12 mm wide or more, on a
-piece 10 cm long or more, both faces drawn: `geometry.ts` `easedBox`); the fences, the street's props, the cars' boxes
-and the closed buildings' and neighbours' trim and plinth have it. The cars' bodies are eased by their own shapes
+piece 10 cm long or more, both faces drawn: `geometry.ts` `easedBox`); the fences (`writeFences` sets it, whoever draws
+them), the street's props, the cars' boxes, the closed buildings' walls, trim and plinth and the neighbours' trim and
+plinth have it. On such a mesh a round part's capped ends (`Painter.tube`) take a 45° shoulder where their rim would
+show; the kerbs are eased by their own profile (`roads.ts` `kerbProfile`). The cars' bodies are eased by their own shapes
 (`cars.ts`): the profile's corners over 55° cut in two, the sides drawn in from it all round, the greenhouse's
 pillars cut and its roof's edge eased, the tyres' shoulders rounded. A box's face that is never seen (a rail's end in its post, a
 jamb's top under its head, a board's back on its wall) is left out by `skip`, which keeps the cost down.

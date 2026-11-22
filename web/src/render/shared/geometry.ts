@@ -355,6 +355,15 @@ const BOX_FACES = [
   ['pz', 2, 1],
 ] as const;
 
+/** A face's corners in the order they are gone round (u, w), and the two sides of an axis. */
+const CORNERS = [
+  [-1, -1],
+  [1, -1],
+  [1, 1],
+  [-1, 1],
+] as const;
+const SIDES = [-1, 1] as const;
+
 /** What the gate counts of a box's edges (`cargo check-glb`'s `edges`): none between faces narrower than this (m)… */
 const EASED_LEAST = 0.012;
 /** …none shorter than this (m)… */
@@ -420,98 +429,110 @@ export function easedBox(
   const lo = [Math.min(x0, x1), Math.min(y0, y1), Math.min(z0, z1)];
   const hi = [Math.max(x0, x1), Math.max(y0, y1), Math.max(z0, z1)];
   const size = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
-  if (Math.max(...size) < EASED_PIECE) return false;
-  const drawn = (axis: number, side: number) => !skip.includes(BOX_FACES[axis * 2 + (side > 0 ? 1 : 0)][0]);
+  if (size[0] < EASED_PIECE && size[1] < EASED_PIECE && size[2] < EASED_PIECE) return false;
+  // (Which faces are drawn, by `BOX_FACES`' order: read once, a box is built in the street by the thousand.)
+  const shown = BOX_FACES.map(([name]) => !skip.includes(name));
+  const drawn = (axis: number, side: number) => shown[axis * 2 + (side > 0 ? 1 : 0)];
   // The edges along each axis are chamfered (where both their faces are drawn) if they would count.
   const along = [0, 1, 2].map((t) => size[t] >= EASED_EDGE && size[(t + 1) % 3] >= EASED_LEAST && size[(t + 2) % 3] >= EASED_LEAST);
-  if (!along.some(Boolean)) return false;
-  const c = Math.min(ease, Math.min(...size) * 0.45);
+  if (!along[0] && !along[1] && !along[2]) return false;
+  const c = Math.min(ease, Math.min(size[0], size[1], size[2]) * 0.45);
   const plane = (axis: number, side: number) => (side > 0 ? hi[axis] : lo[axis]);
   // Whether the edge between the faces (a, sa) and (b, sb) is chamfered.
   const cut = (a: number, sa: number, b: number, sb: number) => along[3 - a - b] && drawn(a, sa) && drawn(b, sb);
-  const at = (v: number[]): V3 => [v[0], v[1], v[2]];
-  const point = (axes: number[], values: number[]) => {
-    const v = [0, 0, 0];
-    axes.forEach((axis, i) => (v[axis] = values[i]));
-    return at(v);
+  // A point by its value on each of three axes, given in any order.
+  const point = (a: number, va: number, b: number, vb: number, t: number, vt: number): V3 => {
+    const v: [number, number, number] = [0, 0, 0];
+    v[a] = va;
+    v[b] = vb;
+    v[t] = vt;
+    return v;
   };
-  for (const [, axis, side] of BOX_FACES) {
-    if (!drawn(axis, side)) continue;
+  for (let f = 0; f < 6; f++) {
+    if (!shown[f]) continue;
+    const [axis, side] = [f >> 1, f & 1 ? 1 : -1];
     const [u, w] = [(axis + 1) % 3, (axis + 2) % 3];
-    const n = at([0, 1, 2].map((j) => (j === axis ? side : 0)));
+    const n = point(axis, side, u, 0, w, 0);
+    const at = plane(axis, side);
     const pts: V3[] = [];
+    // (Points on its sides besides its corners: then it may not be fanned from its first.)
+    let between = false;
     // Round its corners in order; a corner is come to along its side across u (w at -1, then u at +1, …).
-    for (const [su, sw] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
-      const [byU, byW] = [cut(axis, side, u, su), cut(axis, side, w, sw)];
-      const [pu, pw] = [plane(u, su) - (byU ? su * c : 0), plane(w, sw) - (byW ? sw * c : 0)];
-      const P = (a: number, b: number) => point([axis, u, w], [plane(axis, side), a, b]);
+    for (const [su, sw] of CORNERS) {
+      const byU = cut(axis, side, u, su);
+      const byW = cut(axis, side, w, sw);
+      const pu = plane(u, su) - (byU ? su * c : 0);
+      const pw = plane(w, sw) - (byW ? sw * c : 0);
       const across = cut(u, su, w, sw);
       if (!byU && !byW && across) {
         // (The chamfer along this face's normal ends here: the corner cut, in the order it is come to.)
-        const first = su === sw ? P(pu, pw - sw * c) : P(pu - su * c, pw);
-        const second = su === sw ? P(pu - su * c, pw) : P(pu, pw - sw * c);
-        pts.push(first, second);
+        if (su === sw) pts.push(point(axis, at, u, pu, w, pw - sw * c), point(axis, at, u, pu - su * c, w, pw));
+        else pts.push(point(axis, at, u, pu - su * c, w, pw), point(axis, at, u, pu, w, pw - sw * c));
         continue;
       }
       // Where a chamfer along one of its edges stops short of the corner (the one along its normal there meets it
       // in a patch), that edge has a point there too: no T-junction.
-      const onU = byU && !byW && across ? [P(pu, plane(w, sw) - sw * c)] : [];
-      const onW = byW && !byU && across ? [P(plane(u, su) - su * c, pw)] : [];
-      if (su === sw) pts.push(...onU, P(pu, pw), ...onW);
-      else pts.push(...onW, P(pu, pw), ...onU);
+      const onU = byU && !byW && across ? point(axis, at, u, pu, w, plane(w, sw) - sw * c) : null;
+      const onW = byW && !byU && across ? point(axis, at, u, plane(u, su) - su * c, w, pw) : null;
+      const [first, last] = su === sw ? [onU, onW] : [onW, onU];
+      if (first) pts.push(first);
+      pts.push(point(axis, at, u, pu, w, pw));
+      if (last) pts.push(last);
+      between ||= !!(onU || onW);
     }
-    emit(pts, n);
+    // (With only its corners, cut or not, it is convex with no three points in a line: a fan from its first.)
+    if (between) emit(pts, n);
+    else poly(pts, n);
   }
   const k = Math.SQRT1_2;
   for (let a = 0; a < 3; a++) {
     for (let b = a + 1; b < 3; b++) {
       const t = 3 - a - b;
-      for (const sa of [-1, 1]) {
-        for (const sb of [-1, 1]) {
+      for (const sa of SIDES) {
+        for (const sb of SIDES) {
           if (!cut(a, sa, b, sb)) continue;
           // From end to end, short of an end where the chamfers there meet it.
-          const end = (st: number) => plane(t, st) - (cut(t, st, a, sa) || cut(t, st, b, sb) ? st * c : 0);
-          const p = (onA: boolean, tv: number) =>
-            point([a, b, t], [onA ? plane(a, sa) : plane(a, sa) - sa * c, onA ? plane(b, sb) - sb * c : plane(b, sb), tv]);
-          const n = at([0, 1, 2].map((j) => (j === a ? sa * k : j === b ? sb * k : 0)));
-          poly([p(true, end(-1)), p(true, end(1)), p(false, end(1)), p(false, end(-1))], n);
+          const t0 = plane(t, -1) + (cut(t, -1, a, sa) || cut(t, -1, b, sb) ? c : 0);
+          const t1 = plane(t, 1) - (cut(t, 1, a, sa) || cut(t, 1, b, sb) ? c : 0);
+          const [onA, offA] = [plane(a, sa), plane(a, sa) - sa * c];
+          const [onB, offB] = [plane(b, sb), plane(b, sb) - sb * c];
+          const n = point(a, sa * k, b, sb * k, t, 0);
+          poly([point(a, onA, b, offB, t, t0), point(a, onA, b, offB, t, t1), point(a, offA, b, onB, t, t1), point(a, offA, b, onB, t, t0)], n);
         }
       }
     }
   }
   // The corners where two or three chamfers meet: the points round them, in order about the corner's diagonal.
   const r = 1 / Math.sqrt(3);
-  for (const sx of [-1, 1]) {
-    for (const sy of [-1, 1]) {
-      for (const sz of [-1, 1]) {
-        const s = [sx, sy, sz];
+  for (const sx of SIDES) {
+    for (const sy of SIDES) {
+      for (const sz of SIDES) {
         if (!drawn(0, sx) || !drawn(1, sy) || !drawn(2, sz)) continue;
-        const cuts = [0, 1, 2].filter((t) => cut((t + 1) % 3, s[(t + 1) % 3], (t + 2) % 3, s[(t + 2) % 3]));
+        const s = [sx, sy, sz];
+        const cuts: number[] = [];
+        for (let t = 0; t < 3; t++) if (cut((t + 1) % 3, s[(t + 1) % 3], (t + 2) % 3, s[(t + 2) % 3])) cuts.push(t);
         if (cuts.length < 2) continue;
+        const n: V3 = [sx * r, sy * r, sz * r];
         // On each face, its corner: drawn back from each of its chamfered edges there.
-        const pts = [0, 1, 2].map((axis) =>
-          at(
-            [0, 1, 2].map((j) => {
-              if (j === axis) return plane(j, s[j]);
-              return plane(j, s[j]) - (cut(axis, s[axis], j, s[j]) ? s[j] * c : 0);
-            }),
-          ),
-        );
+        const pts: V3[] = [0, 1, 2].map((axis) => {
+          const v: [number, number, number] = [0, 0, 0];
+          for (let j = 0; j < 3; j++) v[j] = j === axis ? plane(j, s[j]) : plane(j, s[j]) - (cut(axis, s[axis], j, s[j]) ? s[j] * c : 0);
+          return v;
+        });
+        // (Three chamfers: those three, a triangle.)
+        if (cuts.length === 3) {
+          poly(pts, n);
+          continue;
+        }
         // And where two chamfers meet off the faces: the strips' ends there.
         for (const t of cuts) {
           const [a, b] = [(t + 1) % 3, (t + 2) % 3];
-          for (const onA of [true, false]) {
-            const v = [0, 0, 0];
-            v[a] = onA ? plane(a, s[a]) : plane(a, s[a]) - s[a] * c;
-            v[b] = onA ? plane(b, s[b]) - s[b] * c : plane(b, s[b]);
-            v[t] = plane(t, s[t]) - s[t] * c;
-            pts.push(at(v));
-          }
+          const end = plane(t, s[t]) - s[t] * c;
+          pts.push(point(a, plane(a, s[a]), b, plane(b, s[b]) - s[b] * c, t, end), point(a, plane(a, s[a]) - s[a] * c, b, plane(b, s[b]), t, end));
         }
         const unique = pts.filter((p, i) => pts.findIndex((q) => q[0] === p[0] && q[1] === p[1] && q[2] === p[2]) === i);
         if (unique.length < 3) continue;
         const m = unique.reduce((acc, p) => [acc[0] + p[0], acc[1] + p[1], acc[2] + p[2]], [0, 0, 0]).map((v) => v / unique.length);
-        const n: V3 = [sx * r, sy * r, sz * r];
         // (Two directions square to the diagonal, to sort the points round it.)
         const e1 = [sy, -sx, 0];
         const e2 = [n[1] * e1[2] - n[2] * e1[1], n[2] * e1[0] - n[0] * e1[2], n[0] * e1[1] - n[1] * e1[0]];

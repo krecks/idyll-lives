@@ -219,6 +219,7 @@ export class Painter {
   tube(axis: 'x' | 'y' | 'z', a0: number, a1: number, cu: number, cv: number, r0: number, r1: number, seg: number, caps = true, from = 0, to = Math.PI * 2): this {
     const P = (a: number, u: number, v: number): V3 => (axis === 'x' ? [a, u, v] : axis === 'y' ? [u, a, v] : [u, v, a]);
     const full = to - from >= Math.PI * 2 - 1e-6;
+    if (this.geo.ease > 0 && caps && full && this.easedTube(axis, a0, a1, cu, cv, r0, r1, seg)) return this;
     const slope = (r0 - r1) / Math.max(1e-6, Math.abs(a1 - a0)) * Math.sign(a1 - a0);
     for (let i = 0; i < seg; i++) {
       const t0 = from + ((to - from) * i) / seg;
@@ -244,7 +245,43 @@ export class Painter {
     }
     return this;
   }
+
+  /**
+   * A whole tube with its caps (`tube`) on a mesh that eases (`Geo.easing`): each cap's rim the gate would find
+   * hard (its sides 5 cm or more round, it and the cap 12 mm or more across) drawn back to a 45° shoulder, as a
+   * box's edges are chamfered. False, nothing written, where no rim is.
+   */
+  private easedTube(axis: 'x' | 'y' | 'z', a0: number, a1: number, cu: number, cv: number, r0: number, r1: number, seg: number): boolean {
+    const ease = this.geo.ease;
+    const d = Math.sign(a1 - a0);
+    const length = Math.abs(a1 - a0);
+    const shows = (r: number) => r >= EASED_RIM && 2 * r * Math.sin(Math.PI / seg) >= 0.05 && length >= EASED_RIM;
+    const [e0, e1] = [r0, r1].map((r) => (shows(r) ? Math.min(ease, r * 0.3, length * 0.3) : 0));
+    if (!e0 && !e1) return false;
+    // (Its radius `a` along it.)
+    const at = (a: number) => r0 + ((r1 - r0) * (a - a0)) / (a1 - a0);
+    const [s0, s1] = [a0 + d * e0, a1 - d * e1];
+    // (Drawn plain from here on: the shoulders are what makes it eased.)
+    this.geo.easing(0);
+    if (e0) this.tube(axis, a0, s0, cu, cv, r0 - e0, at(s0), seg, false);
+    this.tube(axis, s0, s1, cu, cv, at(s0), at(s1), seg, false);
+    if (e1) this.tube(axis, s1, a1, cu, cv, at(s1), r1 - e1, seg, false);
+    this.geo.easing(ease);
+    const P = (a: number, u: number, v: number): V3 => (axis === 'x' ? [a, u, v] : axis === 'y' ? [u, a, v] : [u, v, a]);
+    for (const [a, r, n] of [[a0, r0 - e0, -d], [a1, r1 - e1, d]] as const) {
+      if (r <= 0.001) continue;
+      const ring = Array.from({ length: seg }, (_, i): V3 => {
+        const t = (Math.PI * 2 * i) / seg;
+        return P(a, cu + Math.cos(t) * r, cv + Math.sin(t) * r);
+      });
+      this.poly(ring, P(n, 0, 0));
+    }
+    return true;
+  }
 }
+
+/** A round part's rim shows hard (`cargo check-glb`'s edges) only where it and its cap are this wide or more (m). */
+const EASED_RIM = 0.012;
 
 // ---- street furniture -------------------------------------------------------------------
 

@@ -1,21 +1,12 @@
 {
   "built.edges": {
-    "building.cafe": 16,
-    "building.church": 28,
-    "building.farm": 16,
-    "building.flats": 4,
-    "building.hall": 8,
-    "building.office": 4,
-    "building.restaurant": 8,
-    "building.school": 16,
-    "building.shop": 4,
+    "building.cafe": 12,
+    "building.church": 20,
+    "building.farm": 12,
+    "building.hall": 4,
+    "building.restaurant": 4,
+    "building.school": 12,
     "building.workshop": 16,
-    "fence.hedge": 52,
-    "fence.iron": 916,
-    "fence.picket": 238,
-    "fence.rails": 226,
-    "fence.slats": 316,
-    "fence.stone": 266,
     "house.brick": 107,
     "house.corner": 133,
     "house.cottage": 130,
@@ -36,7 +27,7 @@
     "neighbour.ring": 8,
     "neighbour.two-storey": 17,
     "neighbour.wing": 12,
-    "street.block": 462
+    "street.block": 155
   },
   "built.farNear": {
     "buildingFar.church": 2,

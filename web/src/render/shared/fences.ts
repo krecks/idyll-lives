@@ -66,7 +66,7 @@ export function planFences(
   { hedgeBoxes = false, wallAt, ground }: { hedgeBoxes?: boolean; wallAt?: (x: number, z: number) => boolean; ground?: (x: number, z: number) => number } = {},
 ): FencePlan | null {
   if (!fences.length) return null;
-  const p = new Painter(new Geo().easing(EASE));
+  const p = new Painter(new Geo());
   const gates: GateLeaf[] = [];
   const hedges: Inst[] = [];
   writeFences(p, fences, styles, { gates, hedges, hedgeBoxes, wallAt, ground });
@@ -96,6 +96,14 @@ export function writeFences(
     ground?: (x: number, z: number) => number;
   },
 ): void {
+  // (Its boxes chamfered as the street's are, whoever draws it: `Geo.easing`, set back after.)
+  const was = p.geo.ease;
+  p.geo.easing(EASE);
+  writeAll(p, fences, styles, out);
+  p.geo.easing(was);
+}
+
+function writeAll(p: Painter, fences: readonly FenceEdge[], styles: readonly FenceStyleDef[], out: Parameters<typeof writeFences>[3]): void {
   const ground = out.ground;
   const styleOf = (f: FenceEdge) => styles[f.style ?? 0] ?? styles[0] ?? FALLBACK;
   // Posts where fences meet or end: once per grid corner, in the tallest style there.
