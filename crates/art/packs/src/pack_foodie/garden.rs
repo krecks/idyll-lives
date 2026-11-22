@@ -83,7 +83,8 @@ pub fn herb_garden() -> Vec<Obj> {
             h - 0.06,
             d - 0.05,
             (0, y0 + (h - 0.06) / 2.0, zc),
-            M.cedar_dark
+            M.cedar_dark,
+            bevel = 0 // (a liner, its edges inside the trough)
         );
         for px in [-w / 2.0 + 0.025, w / 2.0 - 0.025] {
             for pz in [z0 + 0.025, z1 - 0.025] {

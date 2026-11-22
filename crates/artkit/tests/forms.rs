@@ -133,7 +133,8 @@ fn joined() -> Obj {
         (0.4, 0.3, 0.2),
         at = (0.1, 0.2, 0.3),
         material = M.body,
-        rot = (0, 0, 25)
+        rot = (0, 0, 25),
+        bevel = 0
     );
     cylinder!(
         "c",
@@ -211,9 +212,10 @@ fn build(name: &str) -> Obj {
             (0.4, 0.3, 0.2),
             at = (0.1, 0.2, 0.3),
             material = M.body,
-            rot = (0, 0, 25)
+            rot = (0, 0, 25),
+            bevel = 0
         ),
-        "cube_smooth" => cube!("b", 0.4, material = M.body, smooth = true),
+        "cube_smooth" => cube!("b", 0.4, material = M.body, smooth = true, bevel = 0),
         "revolve" => revolve!(
             "r",
             &[
@@ -403,7 +405,8 @@ fn build(name: &str) -> Obj {
                     "door",
                     (0.4, 0.03, 0.8),
                     at = (0.1, -0.2, 0.5),
-                    material = M.body
+                    material = M.body,
+                    bevel = 0
                 );
                 cylinder!(
                     "knob",

@@ -107,13 +107,15 @@ fn the_calls_by_name_are_the_functions_with_their_options() {
         "lid",
         (0.4, 0.3, 0.02),
         at = (0, 0, 0.5),
-        material = BODY
+        material = BODY,
+        bevel = 0
     )];
     let base = [cube!(
         "base",
         (0.4, 0.3, 0.5),
         at = (0, 0, 0.25),
-        material = BODY
+        material = BODY,
+        bevel = 0
     )];
     let lid = join!(&lid, "lid", origin = (0, 0.15, 0.5));
     let base = join!(&base, "base");

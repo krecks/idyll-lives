@@ -145,11 +145,38 @@ options! {
     Boulder { at: P3 = P3::ZERO, material: Option<Mat> = None, scale: P3 = P3::ONE, rot: P3 = P3::ZERO, seed: f64 = 0.0, noise: f64 = 0.22, subdivisions: usize = 3, smooth: bool = true }
 }
 
+/// `bevel = AUTO_BEVEL` (what `cube!` and `fbox!` give a box that names no bevel): a chamfer of `AUTO_WIDTH` on a
+/// box whose edges the gate would find showing hard at the play camera (every side 12 mm or more, the longest 5 cm
+/// or more: `cargo check-glb`'s `edges`), none on a smaller one or in a far version. `bevel = 0` keeps a box sharp.
+pub const AUTO_BEVEL: f64 = -1.0;
+/// The chamfer `AUTO_BEVEL` gives (m): a pixel at the play camera, the width the families' own boxes take most.
+pub const AUTO_WIDTH: f64 = 0.004;
+
+/// The bevel `AUTO_BEVEL` comes to on a box of `size`: (width, segments).
+fn auto_bevel(size: P3) -> (f64, usize) {
+    let sides = [size.x.abs(), size.y.abs(), size.z.abs()];
+    let (least, most) = (
+        sides.iter().copied().fold(f64::INFINITY, f64::min),
+        sides.iter().copied().fold(0.0, f64::max),
+    );
+    if crate::far::is_low() || least < 0.012 || most < 0.05 {
+        (0.0, 1)
+    } else {
+        (AUTO_WIDTH, 1)
+    }
+}
+
 /// A box of `size` (x, y, z) or one number for all three.
 pub fn cube(name: impl AsRef<str>, size: impl Into<Size>, o: Cube) -> Obj {
     let obj = scene::add_primitive("Cube", name.as_ref(), cube_mesh());
-    scale_mesh(obj, size.into().0);
-    let bevel = (o.bevel, o.bevel_segments, EdgeOrder::Faces);
+    let size = size.into().0;
+    scale_mesh(obj, size);
+    let (width, segments) = if o.bevel == AUTO_BEVEL {
+        auto_bevel(size)
+    } else {
+        (o.bevel, o.bevel_segments)
+    };
+    let bevel = (width, segments, EdgeOrder::Faces);
     finish(obj, o.at, o.rot, o.material, o.smooth, bevel, SHARP)
 }
 

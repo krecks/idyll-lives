@@ -448,6 +448,9 @@ Playwright headless with full Chrome for Testing, at 1 % volume (`page.addInitSc
   flat; round things with few sides stay round (`shapes::round_angle`); a lathe keeps only turns over 70° sharp;
   spheres, rings and boulders are smooth all over. A `bevel` is smooth with hardened normals: the faces it joins
   stay flat, the edge rounds. `shapes::shade` and `bevel::bevel_edges` do the same to a mesh made by hand.
+- **Boxes come chamfered.** A `cube!` or `fbox!` that names no `bevel` takes a 4 mm chamfer (`shapes::AUTO_BEVEL`)
+  where the gate's `edges` would find its edges hard (every side 12 mm or more, the longest 5 cm or more), none in a
+  far version. `bevel = 0` keeps one sharp: a plate set in a frame, a liner whose edges hide inside something.
 - **`up` is the kernel's.** `fsweep!` maps the points to game axes but passes `up` (which way a profile's first
   side faces) as it is, in the kernel's axes: `up = (0, 1, 0)` on a path along game x flips a profile down.
 - **The bevel is lazy.** `bevel = ..` only asks: the part is rounded when it is joined or written. Until then its

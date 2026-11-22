@@ -9,7 +9,7 @@ macro_rules! cube {
         // (as Python: what is given by place first, then the options in the order written)
         let args = ($name, $size);
         #[allow(unused_mut)]
-        let mut o = $crate::shapes::Cube::default();
+        let mut o = $crate::shapes::Cube { bevel: $crate::shapes::AUTO_BEVEL, ..Default::default() };
         $(o.$k = $crate::Arg::arg($v);)*
         $crate::shapes::cube(args.0, args.1, o)
     }};

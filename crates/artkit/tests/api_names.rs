@@ -85,7 +85,13 @@ fn names_in_use_get_blenders_numbers_and_the_file_has_its_nodes_by_name() {
 
     // two taps' water, each joined as 'water' (the double sink)
     scene::reset();
-    cube!("body", (1.0, 0.5, 0.8), at = (0, 0, 0.4), material = BODY);
+    cube!(
+        "body",
+        (1.0, 0.5, 0.8),
+        at = (0, 0, 0.4),
+        material = BODY,
+        bevel = 0
+    );
     let body = join_all("body");
     let mut streams = Vec::new();
     for x in [-0.25, 0.25] {
@@ -136,7 +142,8 @@ fn names_in_use_get_blenders_numbers_and_the_file_has_its_nodes_by_name() {
             "rail",
             (0.02, 0.02, 0.3),
             at = (0.4, 0, 0.4),
-            material = BODY
+            material = BODY,
+            bevel = 0
         );
     });
     let platform = join(&top, "platform", None);
@@ -149,7 +156,13 @@ fn names_in_use_get_blenders_numbers_and_the_file_has_its_nodes_by_name() {
     for z in [0.5, 1.5] {
         let parts = new_parts(|| {
             soft_box!("duvet", (0.8, 0.4, 0.05), at = (0, 0, z), material = BODY);
-            cube!("hem", (0.8, 0.02, 0.02), at = (0, 0.2, z), material = BODY);
+            cube!(
+                "hem",
+                (0.8, 0.02, 0.02),
+                at = (0, 0.2, z),
+                material = BODY,
+                bevel = 0
+            );
         });
         flaps.push(join(&parts, "duvet_flap", None));
     }
@@ -160,17 +173,19 @@ fn names_in_use_get_blenders_numbers_and_the_file_has_its_nodes_by_name() {
 
     // parts under one name: primitives and built meshes, then one taken away and the name asked for again
     scene::reset();
-    let a: Vec<Obj> = (0..3).map(|_| cube!("leg", 0.1, material = BODY)).collect();
+    let a: Vec<Obj> = (0..3)
+        .map(|_| cube!("leg", 0.1, material = BODY, bevel = 0))
+        .collect();
     let b: Vec<Obj> = (0..3).map(|_| knob()).collect();
     same("parts made", names(&meshes()));
     a[1].remove();
     b[1].remove();
-    cube!("leg", 0.1, material = BODY);
+    cube!("leg", 0.1, material = BODY, bevel = 0);
     knob();
     same("parts again", names(&meshes()));
-    cube!("leg.001", 0.1, material = BODY);
-    cube!("leg.007", 0.1, material = BODY);
-    cube!("leg.007", 0.1, material = BODY);
+    cube!("leg.001", 0.1, material = BODY, bevel = 0);
+    cube!("leg.007", 0.1, material = BODY, bevel = 0);
+    cube!("leg.007", 0.1, material = BODY, bevel = 0);
     same("parts numbered", names(&meshes()));
     sphere!("ball", 0.1, material = BODY, segments = 8, rings = 4);
     sphere!("ball", 0.1, material = BODY, segments = 8, rings = 4);
@@ -214,7 +229,13 @@ fn names_in_use_get_blenders_numbers_and_the_file_has_its_nodes_by_name() {
 
     // a mirrored copy, and what it is called
     scene::reset();
-    let arm = cube!("arm", (0.1, 0.4, 0.1), at = (0.3, 0, 0.5), material = BODY);
+    let arm = cube!(
+        "arm",
+        (0.1, 0.4, 0.1),
+        at = (0.3, 0, 0.5),
+        material = BODY,
+        bevel = 0
+    );
     mirrored(arm, Axis::X, None);
     mirrored(arm, Axis::X, None);
     mirrored(arm, Axis::X, Some("arm"));
@@ -223,17 +244,35 @@ fn names_in_use_get_blenders_numbers_and_the_file_has_its_nodes_by_name() {
     // the file's nodes come by name, however the parts were made or given
     scene::reset();
     let zed = join(
-        &[cube!("z0", 0.1, at = (0, 0, 0.05), material = BODY)],
+        &[cube!(
+            "z0",
+            0.1,
+            at = (0, 0, 0.05),
+            material = BODY,
+            bevel = 0
+        )],
         "zed",
         None,
     );
     let alpha = join(
-        &[cube!("a0", 0.1, at = (0.3, 0, 0.05), material = BODY)],
+        &[cube!(
+            "a0",
+            0.1,
+            at = (0.3, 0, 0.05),
+            material = BODY,
+            bevel = 0
+        )],
         "alpha",
         None,
     );
     let mid = join(
-        &[cube!("m0", 0.1, at = (0.6, 0, 0.05), material = BODY)],
+        &[cube!(
+            "m0",
+            0.1,
+            at = (0.6, 0, 0.05),
+            material = BODY,
+            bevel = 0
+        )],
         "mid",
         None,
     );

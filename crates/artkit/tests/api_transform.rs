@@ -231,7 +231,8 @@ fn build(c: &mut Case) {
                 "c",
                 (0.2, 0.3, 0.4),
                 at = (0.5, -0.25, 0.75),
-                material = BODY
+                material = BODY,
+                bevel = 0
             );
             o.set_rotation_euler((0.3, -0.7, 1.9));
             o.set_scale((1.5, 0.5, 2.0));
@@ -249,7 +250,8 @@ fn build(c: &mut Case) {
                 "c",
                 (0.2, 0.3, 0.4),
                 at = (0.5, -0.25, 0.75),
-                material = BODY
+                material = BODY,
+                bevel = 0
             );
             o.set_rotation_mode(order_of(&name[6..]));
             o.set_rotation_euler((0.3, -0.7, 1.9));
@@ -352,7 +354,8 @@ fn build(c: &mut Case) {
                     (0.1, 0.2, 0.3),
                     at = (0.3, 0.1, 0.4),
                     material = BODY,
-                    rot = (10, 20, 30)
+                    rot = (10, 20, 30),
+                    bevel = 0
                 ),
                 cylinder!(
                     "p1",
@@ -392,14 +395,14 @@ fn build(c: &mut Case) {
                 * M4::diagonal(v3(1.5, 0.5, 2.0));
             r.set_matrix_world(m);
             c.state(r, "rod_set");
-            let o = cube!("c", (0.2, 0.3, 0.4), material = BODY);
+            let o = cube!("c", (0.2, 0.3, 0.4), material = BODY, bevel = 0);
             o.set_rotation_mode(RotationMode::YXZ);
             o.set_matrix_world(m);
             c.state(o, "yxz_set");
-            let e = cube!("e", (0.2, 0.3, 0.4), material = BODY);
+            let e = cube!("e", (0.2, 0.3, 0.4), material = BODY, bevel = 0);
             e.set_matrix_world(M4::diagonal(v3(-1, 1, 1)) * m);
             c.state(e, "mirrored_set");
-            let e2 = cube!("e2", (0.2, 0.3, 0.4), material = BODY);
+            let e2 = cube!("e2", (0.2, 0.3, 0.4), material = BODY, bevel = 0);
             e2.set_matrix_world(M4::IDENTITY);
             c.state(e2, "identity_set");
         }
@@ -409,7 +412,8 @@ fn build(c: &mut Case) {
                 "box",
                 (0.1, 0.1, 0.1),
                 at = (0.2, 0.2, 0.2),
-                material = BODY
+                material = BODY,
+                bevel = 0
             );
             let j = join(&[r, b], "j", None);
             c.state(j, "joined");
@@ -429,7 +433,8 @@ fn build(c: &mut Case) {
                 (0.2, 0.3, 0.4),
                 at = (0.5, -0.25, 0.75),
                 material = BODY,
-                rot = (10, 20, 30)
+                rot = (10, 20, 30),
+                bevel = 0
             );
             o.set_scale((1.2, 0.8, 1.1));
             set_origin(o, (0.1, 0.2, 0.3));
@@ -454,15 +459,27 @@ fn build(c: &mut Case) {
             );
             r2.set_rotation_mode(RotationMode::ZXY);
             c.state(r2, "q_zxy");
-            let o = cube!("c", (0.2, 0.3, 0.4), material = BODY, rot = (17, -40, 109));
+            let o = cube!(
+                "c",
+                (0.2, 0.3, 0.4),
+                material = BODY,
+                rot = (17, -40, 109),
+                bevel = 0
+            );
             o.set_rotation_mode(RotationMode::Quaternion);
             c.state(o, "xyz_q");
-            let o2 = cube!("c2", (0.2, 0.3, 0.4), material = BODY);
+            let o2 = cube!("c2", (0.2, 0.3, 0.4), material = BODY, bevel = 0);
             o2.set_rotation_mode(RotationMode::YXZ);
             o2.set_rotation_euler((0.3, -0.7, 1.9));
             o2.set_rotation_mode(RotationMode::Quaternion);
             c.state(o2, "yxz_q");
-            let o3 = cube!("c3", (0.2, 0.3, 0.4), material = BODY, rot = (17, -40, 109));
+            let o3 = cube!(
+                "c3",
+                (0.2, 0.3, 0.4),
+                material = BODY,
+                rot = (17, -40, 109),
+                bevel = 0
+            );
             o3.set_rotation_mode(RotationMode::ZYX);
             c.state(o3, "xyz_zyx");
         }
@@ -472,7 +489,8 @@ fn build(c: &mut Case) {
                 (0.6, 0.04, 1.0),
                 at = (0.1, -0.3, 0.6),
                 material = BODY,
-                rot = (0, 0, 25)
+                rot = (0, 0, 25),
+                bevel = 0
             );
             door.set_scale((1.0, 1.5, 1.0));
             let lever = cube!(
@@ -480,7 +498,8 @@ fn build(c: &mut Case) {
                 (0.1, 0.02, 0.03),
                 at = (0.3, -0.36, 0.7),
                 material = BODY,
-                rot = (15, 0, 40)
+                rot = (15, 0, 40),
+                bevel = 0
             );
             motion::attach(lever, door);
             c.state(door, "door");
@@ -497,7 +516,10 @@ fn build(c: &mut Case) {
             c.state(r, "rod");
             c.keys(r, "rod");
             let j = join(
-                &[a_rod("a"), cube!("b", (0.1, 0.1, 0.1), material = BODY)],
+                &[
+                    a_rod("a"),
+                    cube!("b", (0.1, 0.1, 0.1), material = BODY, bevel = 0),
+                ],
                 "j",
                 None,
             );

@@ -317,7 +317,7 @@ impl GameFrame {
             let z = at.2.f();
             let (z0, z1) = (self.depth(z - d / 2.0), self.depth(z + d / 2.0));
             let d = z1 - z0;
-            if o.bevel != 0.0 {
+            if o.bevel > 0.0 {
                 o.bevel = o.bevel.min(d * 0.45);
             }
             o.at = P3 {
@@ -436,7 +436,7 @@ macro_rules! fbox {
         // (as Python: what is given by place first, then the options in the order written)
         let args = (&$frame, $name, $w, $h, $d, $at, $material);
         #[allow(unused_mut)]
-        let mut o = $crate::shapes::Cube::default();
+        let mut o = $crate::shapes::Cube { bevel: $crate::shapes::AUTO_BEVEL, ..Default::default() };
         $(o.$k = $crate::Arg::arg($v);)*
         args.0.box_(args.1, $crate::forms::num(args.2), $crate::forms::num(args.3), $crate::forms::num(args.4), args.5, args.6, o)
     }};

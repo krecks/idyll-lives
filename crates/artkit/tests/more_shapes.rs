@@ -211,7 +211,8 @@ fn mirror_source(label: &str) -> Obj {
             (0.1, 0.4, 0.05),
             at = (0.3, 0.1, 0.5),
             material = body,
-            rot = (10, 0, 25)
+            rot = (10, 0, 25),
+            bevel = 0
         ),
         "cylinder" => cylinder!(
             "leg",

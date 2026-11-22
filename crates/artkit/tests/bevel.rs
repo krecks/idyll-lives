@@ -708,7 +708,8 @@ fn a_bevelled_plain_part_joined_first_leaves_the_others_their_texture() {
             0.6,
             0.3,
             (1, 0.3, 0),
-            Mat::new("body", "#B88A5A", "wood")
+            Mat::new("body", "#B88A5A", "wood"),
+            bevel = 0
         );
         let joined = artkit::parts::join(&[a, b], "j", None);
         joined.read(|o| {

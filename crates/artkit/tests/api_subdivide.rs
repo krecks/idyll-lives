@@ -92,7 +92,7 @@ fn a_boxs_edges_come_in_blenders_order() {
             .find(|m| m.name == "in" && m.what.starts_with(label))
             .unwrap();
         scene::reset();
-        let obj = fbox!(f, "glass", w, h, d, at, BODY);
+        let obj = fbox!(f, "glass", w, h, d, at, BODY, bevel = 0);
         let (got_v, got_f) = obj.read(|o| {
             let v: Vec<f32> = o.mesh.verts.iter().flat_map(|v| v.array()).collect();
             let f: Vec<Vec<u32>> = (0..o.mesh.faces.len())
