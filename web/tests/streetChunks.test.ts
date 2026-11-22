@@ -10,9 +10,9 @@ import type { ObjectPlacement, PlotInfo, WorldStructure } from '../src/core/prot
 import type { ChunkPlan } from '../src/render/shared/street';
 
 const LOTS = 12;
-/** The street of `town(objects)` drawn, hashed: as it was before land that slopes (see the test). Taken again when the neighbours' silhouettes change (last: their trim and plinth chamfered as the models' boxes are, the curtains and muntins flat on the glass). */
-const FLAT_STREET = 3842371675;
-const FLAT_STREET_FOCUS = 1653419817;
+/** The street of `town(objects)` drawn, hashed: as it was before land that slopes (see the test). Taken again when the neighbours' silhouettes or the parked cars change (last: the cars' bodies, greenhouses, boxes and tyres chamfered). */
+const FLAT_STREET = 3397794698;
+const FLAT_STREET_FOCUS = 3601386360;
 const LOT_W = 20;
 
 /** Lots along both sides of a road running along x at z = 23 (lots north z 0..20, south z 26..46). */
