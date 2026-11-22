@@ -563,6 +563,12 @@ better bed shortens a night a little. Naps (`napTags`) can't follow each other w
 daytime damping on sleep is lifted, naps count a quarter; and a nap is allowed again, on the
 sofa when no bed is free). On a work or school day the alarm goes off: a sleep ends
 `wakeBeforeWorkMinutes` before they leave, rested or not, and nobody goes back to bed then.
+`dayRhythm.nightQuiet` (without it, nights are as the `schedule` makes them) holds noisy things
+back and favours quiet ones while it is night for a resident (their own: planned sleep, else
+`bedHour` to their wake hour), on top of the `schedule` window for the hour: an interaction with
+a `noisy` rule's `tag` and none of its `unless` tags weighs `noisyFactor` (default 1), one with a
+`quiet` tag `quietFactor` (default 1). The base game: training unless food, and chores unless
+care, are noisy (0.1); lounging, reading and rest are quiet (1.25).
 `dayRhythm.babyWakes` (without it, nobody gets up for a baby) has a baby in their crib at home,
 crying for one of its `needs` (default: all but surroundings) under `below` (default 0.3) while
 every grown-up of the household at home is asleep, wake one of them: family first, then someone
@@ -1167,7 +1173,7 @@ keys share these objects. The rules:
 | `service` | `share` 0 or more, `waitMinutes` above 0, an `anim` the content has | |
 | Ids of an object's interactions, and of needs, emotions and feelings | unique | two with one id are ambiguous: a save reloaded the first of two interactions |
 | Friendship and romance in `bondPresets` | −100 to 100 | relationships are kept in that range |
-| Tags, animations and skills named in the day rhythm (`sleepTags`, `napTags`, …), room kinds, room dirt, cleaning, repairs (`objectRules.repair` skill and tags), accidents (`anim`, `tags`), social rules (`busyTags`, `guestTags`), cooking tag lists and activities | ones the content has | a typo used to be dropped silently and turn the feature off (nobody counted as asleep; repairs trained nothing) |
+| Tags, animations and skills named in the day rhythm (`sleepTags`, `napTags`, `nightQuiet`, …), room kinds, room dirt, cleaning, repairs (`objectRules.repair` skill and tags), accidents (`anim`, `tags`), social rules (`busyTags`, `guestTags`), cooking tag lists and activities | ones the content has | a typo used to be dropped silently and turn the feature off (nobody counted as asleep; repairs trained nothing) |
 | Times that become ticks: feelings' `hours`, interaction and social `minutes`, the commute, accident cooldowns and grace, the baby's quiet spell, cooking invitations and station waits | numbers (a value too large for a float, such as `1e39`, reads as infinity and is refused) | an infinite time overflowed the tick count |
 | A grade's `payPerHour` | 0 to 10000 | pay becomes shift pay and promotion bonuses; a huge one overflowed the sum |
 | `payFactor` (a career category's, a track's) | 0.25 to 3 | past that a track's pay no longer resembles its field |

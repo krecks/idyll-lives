@@ -270,52 +270,37 @@ pub(super) fn eat_next(
 ) {
     let content = ctx.content;
     let tags = content.cooking.eat_tags;
-    let TaskKind::Eat {
-        item,
-        stage,
-        seat,
-        plate,
-    } = task.kind
-    else {
+    let TaskKind::Eat { item, stage, .. } = task.kind else {
         return;
     };
     sim.current = None;
     if stage == 0 {
+        // Others promised themselves every serving of it first: take the nearest of this
+        // household's free servings rather than walk to one that will be gone (not on the
+        // player's order: they said which, so it ends).
         let wanted = item
             .and_then(|i| items.get(i))
-            .filter(|it| it.edible() && it.household == sim.household)
-            .map(|it| it.id);
-        // Someone else promised themselves the serving first: take another of this household's
-        // free servings rather than walk to one that will be gone.
-        let item = wanted
-            .filter(|&id| items.reserved_by(id).is_none_or(|by| by == sim.id))
-            .or_else(|| {
-                items
-                    .list
-                    .iter()
-                    .find(|it| {
-                        it.edible()
-                            && it.household == sim.household
-                            && items.reserved_by(it.id).is_none()
-                    })
-                    .map(|it| it.id)
-            });
-        let Some(id) = item else { return };
-        if !items.reserve(id, sim.id) {
+            .filter(|it| it.edible() && it.household == sim.household);
+        let promised_away = wanted.is_some_and(|it| !items.free_for(it.id, sim.id));
+        let nearest = || {
+            let distance = |it: &ItemInstance| ctx.nav.stairs.distance(it.at.centre(), sim.pos);
+            items
+                .free_servings(sim.household, sim.id)
+                .min_by(|a, b| distance(a).total_cmp(&distance(b)))
+        };
+        let chosen = match (promised_away, task.directed) {
+            (false, _) => wanted,
+            (true, false) => nearest(),
+            (true, true) => None,
+        };
+        let Some((id, at)) = chosen.map(|it| (it.id, it.at)) else {
             return;
+        };
+        items.reserve(id, sim.id);
+        let mut task = task;
+        if let TaskKind::Eat { item, .. } = &mut task.kind {
+            *item = Some(id);
         }
-        let Some(at) = items.get(id).map(|it| it.at) else {
-            return;
-        };
-        let task = Task {
-            kind: TaskKind::Eat {
-                item: Some(id),
-                seat,
-                plate,
-                stage: 0,
-            },
-            ..task
-        };
         walk_to_any(sim, task, ctx, &item_access(ctx, objects, &at), tags);
         return;
     }
@@ -374,7 +359,7 @@ pub(super) fn eat_next(
 /// Takes a serving of `id` into their hands (false: it's gone or spoilt).
 pub(super) fn take_serving(sim: &mut Sim, content: &Content, items: &mut Items, id: u32) -> bool {
     let household = sim.household;
-    if items.reserved_by(id).is_some_and(|by| by != sim.id) {
+    if !items.free_for(id, sim.id) {
         return false;
     }
     let Some(it) = items

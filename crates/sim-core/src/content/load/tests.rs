@@ -364,6 +364,13 @@ fn refuses_content_that_would_break_the_game() {
         "dayRhythm.napTags: unknown tag 'nap'",
     );
     refused(
+        &|c| {
+            c["dayRhythm"] =
+                json!({"nightQuiet": {"noisy": [{"tag": "chores", "unless": ["kare"]}]}})
+        },
+        "dayRhythm.nightQuiet: unknown tag 'kare'",
+    );
+    refused(
         &|c| c["roomKinds"] = json!([{"id": "den", "tags": ["screen"], "essentials": [["scren"]]}]),
         "room kind 'den': unknown tag 'scren'",
     );

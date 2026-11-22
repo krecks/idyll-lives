@@ -270,8 +270,22 @@ fn kept_out_with_an_empty_bladder_the_accident_comes() {
         interaction: interaction(&w, toilet, "use"),
     })
     .unwrap();
+    // Kept out, the accident comes after its grace (`step.rs`); once they give up waiting it
+    // never would (the toilet is only busy, and the content gives no crowded grace).
+    let wait = ticks(sim_core::privacy::WAIT_MINUTES);
+    let grace = w
+        .content
+        .accidents
+        .iter()
+        .find(|a| a.need == bladder)
+        .unwrap()
+        .grace_ticks;
+    assert!(
+        grace < wait,
+        "the accident has to come before they give up waiting"
+    );
     let mut accident = false;
-    for _ in 0..ticks(sim_core::privacy::WAIT_MINUTES + 20.0) {
+    for _ in 0..wait {
         w.tick_once();
         accident |= w
             .events

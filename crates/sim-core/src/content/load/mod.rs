@@ -734,6 +734,31 @@ impl Content {
             lie_in_hours: dr.lie_in_hours.unwrap_or(0.5),
             sleep_quality_bonus: dr.sleep_quality_bonus.unwrap_or(0.06),
             nap_tags: tag_mask(&dr.nap_tags, "dayRhythm.napTags")?,
+            night_quiet: match &dr.night_quiet {
+                None => NightQuiet::default(),
+                Some(q) => {
+                    let ctx = "dayRhythm.nightQuiet";
+                    let factor = |v: Option<f32>, name: &str| match v.unwrap_or(1.0) {
+                        v if v >= 0.0 && v.is_finite() => Ok(v),
+                        v => Err(Error::new(format!("{ctx}.{name} {v} must be a number ≥ 0"))),
+                    };
+                    NightQuiet {
+                        noisy: q
+                            .noisy
+                            .iter()
+                            .map(|n| {
+                                Ok((
+                                    tag_mask(std::slice::from_ref(&n.tag), ctx)?,
+                                    tag_mask(&n.unless, ctx)?,
+                                ))
+                            })
+                            .collect::<Result<_, Error>>()?,
+                        noisy_factor: factor(q.noisy_factor, "noisyFactor")?,
+                        quiet: tag_mask(&q.quiet, ctx)?,
+                        quiet_factor: factor(q.quiet_factor, "quietFactor")?,
+                    }
+                }
+            },
             nap_cooldown_hours: dr.nap_cooldown_hours.unwrap_or(4.0),
             exhausted_below: dr.exhausted_below.unwrap_or(0.2),
             habits: dr

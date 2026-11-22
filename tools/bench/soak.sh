@@ -1,10 +1,8 @@
 #!/bin/sh
-# A 30-minute memory soak: the gameplay baseline played at 1x, its per-second JS heap and
-# simMemoryBytes series in bench-results/gameplay-<time>/. Pass a shorter --secs for a smoke run.
+# A 30-minute memory soak: the gameplay baseline played once at 1x, its per-second JS heap and
+# simMemoryBytes series and collected reads spread over the half hour in
+# bench-results/gameplay-<time>/. Flags are passed through and win over the ones here
+# (gameplay.mjs reads the first), so `--secs 150 --reads 30,140` is a smoke run.
 set -eu
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-secs=${1:-1800}
-if [ "$#" -gt 0 ]; then
-    shift
-fi
-exec bun "$here/gameplay.mjs" --secs "$secs" "$@"
+exec bun "$here/gameplay.mjs" "$@" --secs 1800 --runs 1 --reads 60,600,1200,1740

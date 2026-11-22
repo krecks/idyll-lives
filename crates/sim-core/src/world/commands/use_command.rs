@@ -304,6 +304,9 @@ impl World {
                         "there's nothing left to eat"
                     }));
                 }
+                if !self.items.free_for(item, sim) {
+                    return Err(Error::new("someone else is having that"));
+                }
                 TaskKind::Eat {
                     item: Some(item),
                     seat: None,

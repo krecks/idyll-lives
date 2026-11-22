@@ -33,51 +33,22 @@ pub(crate) fn pick_autonomous(
     let felt = ai::felt(needs, &content.needs, &content.autonomy);
     let emotion = sim.emotion(content).map(|e| &content.emotions[e].mods);
     let schedule = content.schedule_at(ctx.hour);
-    // Night quiet: keep noisy chores and skill practice from winning over sleep or quiet
-    // leisure. Care (a baby) and food (a late meal) stay available; urgent needs still win
-    // through the usual look-ahead scoring.
-    let night_now = crate::world::is_night(sim, ctx);
-    // Only look the tags up when night actually applies: this is the autonomous pick's hot path.
-    let (training, chores, care, food, quiet) = if night_now {
-        let tag = |name: &str| {
-            content
-                .tags
-                .iter()
-                .position(|t| t == name)
-                .map_or(0, |i| 1u64 << i)
-        };
-        (
-            tag("training"),
-            tag("chores"),
-            tag("care"),
-            tag("food"),
-            tag("lounge") | tag("reading") | tag("rest"),
-        )
-    } else {
-        (0, 0, 0, 0, 0)
-    };
+    let routines = &ctx.households[sim.household as usize].routines;
+    let night = crate::planner::planned_night(content, sim, routines, ctx.day, ctx.minute);
+    // Night quiet (content `dayRhythm.nightQuiet`): noisy things held back, quiet ones favoured;
+    // urgent needs still win through the usual look-ahead scoring.
+    let night_now = night.unwrap_or_else(|| crate::world::rhythm_night(sim, ctx));
+    let quiet = &content.day_rhythm.night_quiet;
     // Traits, the current emotion and the time of day all bias what feels right.
     let feel = |tags: TagMask| {
-        let mut f = sim.mods.preference(tags)
+        sim.mods.preference(tags)
             * emotion.map_or(1.0, |m| m.preference(tags))
-            * schedule.preference(tags);
-        if night_now {
-            let noisy = (tags & training != 0 && tags & food == 0)
-                || (tags & chores != 0 && tags & care == 0);
-            if noisy {
-                f *= 0.1;
-            }
-            if tags & quiet != 0 {
-                f *= 1.25;
-            }
-        }
-        f
+            * schedule.preference(tags)
+            * if night_now { quiet.factor(tags) } else { 1.0 }
     };
     let me = sim.id as usize;
     let here = ctx.briefs[me].plot;
     let mut candidates: Vec<(f32, Choice)> = Vec::new();
-    let routines = &ctx.households[sim.household as usize].routines;
-    let night = crate::planner::planned_night(content, sim, routines, ctx.day, ctx.minute);
 
     let object_rules = &content.object_rules;
     let funds = ctx.households[sim.household as usize].funds - sim.pending_spend;
@@ -105,10 +76,7 @@ pub(crate) fn pick_autonomous(
     let usable: &[u32] = &usable;
     // Cooking: the stations they have (recipes need theirs), and whether food is ready.
     let stations = crate::cooking::station_mask(sim, ctx, objects);
-    let fresh = items
-        .list
-        .iter()
-        .any(|it| it.household == sim.household && it.edible());
+    let fresh = items.free_servings(sim.household, sim.id).next().is_some();
     // Needs about to run out (see `use_object`'s `drained`); the essentials among them that
     // home has something for; and all needs home has something for (what they look ahead to).
     let low = content.autonomy.urgent_below;
@@ -667,9 +635,7 @@ pub(crate) fn pick_autonomous(
             1.0
         };
         let mut best: Option<(f32, u32)> = None;
-        for it in items.list.iter().filter(|it| {
-            it.household == sim.household && it.edible() && items.reserved_by(it.id).is_none()
-        }) {
+        for it in items.free_servings(sim.household, sim.id) {
             let Some(r) = it.recipe else { continue };
             let distance = ctx.nav.stairs.distance(it.at.centre(), sim.pos);
             let gains = content.recipes[r].effects.map(|g| g * it.quality);
