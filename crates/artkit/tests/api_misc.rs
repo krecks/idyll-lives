@@ -34,14 +34,12 @@ fn fit_and_every_way_of_cutting_a_face_are_blenders() {
         let l = text.lines().find(|l| l.starts_with(start)).unwrap();
         l.split(' ').collect()
     };
-    // fit: by the matrix Blender has for the part (a part just made: none yet), each axis on its own
-    for label in ["made", "updated"] {
+    // fit: by the part's matrix as it stands, each axis on its own
+    {
+        let label = "updated";
         scene::reset();
         let o = pipe("a");
-        if label == "updated" {
-            o.set_scale((1.5, 1.0, 0.7));
-            scene::update();
-        }
+        o.set_scale((1.5, 1.0, 0.7));
         fit(o, 0.5, 0.3, 0.2);
         let w = line(&format!("fit {label} "));
         let at = |key: &str| w.iter().position(|x| *x == key).unwrap();

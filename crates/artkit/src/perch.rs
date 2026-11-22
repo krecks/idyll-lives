@@ -56,7 +56,6 @@ pub fn game() -> Vec<[f64; 3]> {
 /// face looks out (towards the line) and not down (its normal's z over `facing`) and nothing hangs over it
 /// within `headroom` metres (a clump above it, a tier's rim). Returns the perches.
 pub fn surface(aims: &[Aim], inset: f64, reach: f64, headroom: f64, facing: f64) -> Vec<V3> {
-    scene::update(); // (Blender works the scene out to cast rays at it)
     let rays = Rays::of_scene();
     let up = V3::Z;
     let mut out = Vec::new();
@@ -84,7 +83,6 @@ pub fn surface(aims: &[Aim], inset: f64, reach: f64, headroom: f64, facing: f64)
 /// `headroom` and not inside the leaves (the first face straight up from them doesn't face up: that is a clump's
 /// inside).
 pub fn bare(points: &[V3], headroom: f64) -> Vec<V3> {
-    scene::update();
     let rays = Rays::of_scene();
     let up = V3::Z;
     points

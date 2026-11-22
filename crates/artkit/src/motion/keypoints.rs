@@ -40,11 +40,9 @@ pub fn keys(obj: Obj, clip: &str, path: Path, index: usize, points: &[impl KeyPo
 /// moves every part on its own) and before the clips; both stay their own parts, so `obj` still costs its own draw.
 /// Its own clips turn it about its own origin, in `parent`'s frame.
 pub fn attach(obj: Obj, parent: Obj) -> Obj {
-    scene::update();
     let world = obj.matrix_world();
     obj.edit(|o| o.parent = Some(parent));
     // (its place, turn and scale taken apart from where it is in the parent's frame)
     obj.set_matrix_world(world);
-    scene::update();
     obj
 }
