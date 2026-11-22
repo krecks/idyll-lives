@@ -707,10 +707,13 @@ export class MaterialLibrary {
     material.update();
   }
 
-  /** Makes `meshInstance` (the landscape's ground, lawn, woods and rocks) follow `dig`. */
-  digInto(meshInstance: pc.MeshInstance): void {
+  /**
+   * Makes `meshInstance` (the landscape's ground, lawn, woods and rocks) follow `dig`; `whole` (its water) dug away
+   * at any height, not only above `below`.
+   */
+  digInto(meshInstance: pc.MeshInstance, whole = false): void {
     this.dig.meshes.add(meshInstance);
-    meshInstance.setParameter('game_digMesh', 1);
+    meshInstance.setParameter('game_digMesh', whole ? 2 : 1);
     const material = meshInstance.material;
     if (!(material instanceof pc.StandardMaterial) || this.dug.has(material)) return;
     this.dug.add(material);

@@ -18,7 +18,9 @@
  * - `GAME_DIG`: fragments of the landscape inside the dug-out rectangle (`game_digRect`, x0, z0,
  *   x1, z1) above `game_digSpan.y` are dropped while `game_digSpan.x` is on, for the meshes that
  *   ask for it (`game_digMesh`, a mesh instance parameter over the material's 0: the landscape's
- *   finishes are shared with every model's).
+ *   finishes are shared with every model's). At 2 (the water's) they're dropped there at any height:
+ *   the sea's sheet lies under the whole land, and on a lot above the sea (the world drawn lower by
+ *   its pad) it would show in the pit, the basement flooded.
  */
 
 import type { ShaderFeature } from './chunks';
@@ -67,7 +69,7 @@ export const CUTAWAY: ShaderFeature = {
 #if defined(GAME_DIG) && !defined(SHADOW_PASS)
 	{
 		vec3 digP = gamePos(vPositionW);
-		if (game_digMesh > 0.5 && game_digSpan.x > 0.5 && digP.y > game_digSpan.y && digP.x > game_digRect.x && digP.x < game_digRect.z && digP.z > game_digRect.y && digP.z < game_digRect.w) { discard; }
+		if (game_digMesh > 0.5 && game_digSpan.x > 0.5 && (digP.y > game_digSpan.y || game_digMesh > 1.5) && digP.x > game_digRect.x && digP.x < game_digRect.z && digP.z > game_digRect.y && digP.z < game_digRect.w) { discard; }
 	}
 #endif`,
   },
@@ -112,7 +114,7 @@ export const CUTAWAY: ShaderFeature = {
 #if defined(GAME_DIG) && !defined(SHADOW_PASS)
 	{
 		let digP = gamePos(vPositionW);
-		if (uniform.game_digMesh > 0.5 && uniform.game_digSpan.x > 0.5 && digP.y > uniform.game_digSpan.y && digP.x > uniform.game_digRect.x && digP.x < uniform.game_digRect.z && digP.z > uniform.game_digRect.y && digP.z < uniform.game_digRect.w) { discard; }
+		if (uniform.game_digMesh > 0.5 && uniform.game_digSpan.x > 0.5 && (digP.y > uniform.game_digSpan.y || uniform.game_digMesh > 1.5) && digP.x > uniform.game_digRect.x && digP.x < uniform.game_digRect.z && digP.z > uniform.game_digRect.y && digP.z < uniform.game_digRect.w) { discard; }
 	}
 #endif`,
   },
