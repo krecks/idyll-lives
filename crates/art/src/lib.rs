@@ -147,30 +147,47 @@ pub(crate) struct Built {
 /// Builds `models` of `family`, a thread a model (each has a scene of its own), as many at once as there are
 /// processors.
 pub(crate) fn build_all(family: &Family, ids: &[usize], finishes: &Finishes) -> Vec<Built> {
+    build_many(&[(family, ids)], finishes)
+        .pop()
+        .unwrap_or_default()
+}
+
+/// Builds the models of every family in `work` from one queue, so a slow model holds up no batch behind it: each
+/// model on a thread of its own (a fresh scene), as many at once as there are processors. Each family's models,
+/// in the order asked.
+pub(crate) fn build_many(work: &[(&Family, &[usize])], finishes: &Finishes) -> Vec<Vec<Built>> {
+    let jobs: Vec<(usize, usize)> = work
+        .iter()
+        .enumerate()
+        .flat_map(|(f, (_, ids))| (0..ids.len()).map(move |k| (f, k)))
+        .collect();
     let at_once = std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(4)
-        .max(1);
-    let mut out = Vec::with_capacity(ids.len());
-    for chunk in ids.chunks(at_once) {
-        let built: Vec<Built> = std::thread::scope(|s| {
-            let handles: Vec<_> = chunk
-                .iter()
-                .map(|&i| {
-                    let model = &family.models[i];
-                    s.spawn(move || {
-                        scene::set_finishes(finishes.clone());
-                        let output = build_model(family, model);
-                        (output, scene::take_log())
-                    })
-                })
-                .collect();
-            handles
-                .into_iter()
-                .zip(chunk)
-                .map(|(h, &i)| {
-                    let model = &family.models[i];
-                    let (output, log) = match h.join() {
+        .clamp(1, jobs.len().max(1));
+    let slots: Vec<Vec<std::sync::Mutex<Option<Built>>>> = work
+        .iter()
+        .map(|(_, ids)| ids.iter().map(|_| std::sync::Mutex::new(None)).collect())
+        .collect();
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    std::thread::scope(|workers| {
+        for _ in 0..at_once {
+            workers.spawn(|| {
+                while let Some(&(f, k)) =
+                    jobs.get(next.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+                {
+                    let (family, ids) = work[f];
+                    let model = &family.models[ids[k]];
+                    // (a thread a model: the scene, its finishes and its log are the thread's own)
+                    let joined = std::thread::scope(|s| {
+                        s.spawn(|| {
+                            scene::set_finishes(finishes.clone());
+                            let output = build_model(family, model);
+                            (output, scene::take_log())
+                        })
+                        .join()
+                    });
+                    let (output, log) = match joined {
                         Ok(r) => r,
                         // (a build that panicked said why on the way: an assertion of the kernel's or its own)
                         Err(p) => {
@@ -184,18 +201,29 @@ pub(crate) fn build_all(family: &Family, ids: &[usize], finishes: &Finishes) -> 
                             )
                         }
                     };
-                    Built {
+                    *slots[f][k].lock().unwrap_or_else(|e| e.into_inner()) = Some(Built {
                         key: family.key(model),
                         id: model.id,
                         output,
                         log,
-                    }
+                    });
+                }
+            });
+        }
+    });
+    slots
+        .into_iter()
+        .map(|family| {
+            family
+                .into_iter()
+                .map(|slot| {
+                    slot.into_inner()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .expect("every model was built")
                 })
                 .collect()
-        });
-        out.extend(built);
-    }
-    out
+        })
+        .collect()
 }
 
 /// A root laid out as the repo, with the manifests and centres.json a pack is written from copied in (those it
@@ -237,7 +265,63 @@ fn seeded(root: &str, repo: &Paths) -> Result<Paths, String> {
 
 /// Builds `family` as `options` say. The keys it built (for the gate), or what failed.
 pub fn run_family(repo: &Paths, family: &Family, options: &Options) -> Result<Vec<String>, String> {
-    let finishes = finishes(repo)?;
+    run_families(repo, &[family], options)
+        .pop()
+        .unwrap_or_else(|| Ok(Vec::new()))
+}
+
+/// What a family needs before its models are built: which of them, the finishes and the keys the game knows.
+struct Prepared {
+    ids: Vec<usize>,
+    known: BTreeSet<String>,
+}
+
+/// Builds `families` as `options` say, their models all from one queue (`build_many`), then writes or checks each
+/// family in turn. For each, the keys it built (for the gate), or what failed.
+pub fn run_families(
+    repo: &Paths,
+    families: &[&Family],
+    options: &Options,
+) -> Vec<Result<Vec<String>, String>> {
+    let finishes = match finishes(repo) {
+        Ok(f) => f,
+        Err(e) => return families.iter().map(|_| Err(e.clone())).collect(),
+    };
+    // A key the game wouldn't draw is a misspelt `key`: refused before any model is built or written.
+    let known =
+        build_keys(repo).map_err(|e| format!("cannot read the content or the manifests: {e}"));
+    let prepared: Vec<Result<Prepared, String>> = families
+        .iter()
+        .map(|family| {
+            let known = known.clone()?;
+            prepare(family, options, &finishes, known)
+        })
+        .collect();
+    let work: Vec<(&Family, &[usize])> = families
+        .iter()
+        .zip(&prepared)
+        .filter_map(|(family, p)| p.as_ref().ok().map(|p| (*family, p.ids.as_slice())))
+        .collect();
+    let mut built = build_many(&work, &finishes).into_iter();
+    families
+        .iter()
+        .zip(prepared)
+        .map(|(family, p)| {
+            let p = p?;
+            let built = built.next().unwrap_or_default();
+            finish(repo, family, options, &p, built)
+        })
+        .collect()
+}
+
+/// Whether `family` may be built as `options` say, and which of its models.
+fn prepare(
+    family: &Family,
+    options: &Options,
+    finishes: &Finishes,
+    known: BTreeSet<String>,
+) -> Result<Prepared, String> {
+    let finishes = finishes.clone();
     family
         .palette
         .check(&finishes)
@@ -260,9 +344,6 @@ pub fn run_family(repo: &Paths, family: &Family, options: &Options) -> Result<Ve
         }
         ids.retain(|&i| only.iter().any(|id| id == family.models[i].id));
     }
-    // A key the game wouldn't draw is a misspelt `key`: refused before any model is built or written.
-    let known =
-        build_keys(repo).map_err(|e| format!("cannot read the content or the manifests: {e}"))?;
     let mut unknown: Vec<String> = ids
         .iter()
         .map(|&i| &family.models[i])
@@ -278,7 +359,18 @@ pub fn run_family(repo: &Paths, family: &Family, options: &Options) -> Result<Ve
             unknown.join(", ")
         ));
     }
-    let built = build_all(family, &ids, &finishes);
+    Ok(Prepared { ids, known })
+}
+
+/// Writes (or `--check`s) what `family`'s build made: its files, its pack and its centres.
+fn finish(
+    repo: &Paths,
+    family: &Family,
+    options: &Options,
+    prepared: &Prepared,
+    built: Vec<Built>,
+) -> Result<Vec<String>, String> {
+    let (ids, known) = (&prepared.ids, &prepared.known);
     let mut failed = Vec::new();
     for b in &built {
         b.log.iter().for_each(|l| println!("{l}"));
@@ -353,7 +445,7 @@ pub fn run_family(repo: &Paths, family: &Family, options: &Options) -> Result<Ve
     };
     let keys: Vec<String> = built.iter().map(|b| b.key.clone()).collect();
     if options.check {
-        return check(repo, family, &result, &files(&repo.assets), &known).map(|()| Vec::new());
+        return check(repo, family, &result, &files(&repo.assets), known).map(|()| Vec::new());
     }
     let paths = match &options.out {
         Some(root) => seeded(root, repo)?,
@@ -365,7 +457,7 @@ pub fn run_family(repo: &Paths, family: &Family, options: &Options) -> Result<Ve
         }
         std::fs::write(&path, bytes).map_err(|e| format!("{path}: {e}"))?;
     }
-    take_build(&paths, &result, options.no_pack, &known)?
+    take_build(&paths, &result, options.no_pack, known)?
         .iter()
         .for_each(|l| println!("{l}"));
     // (Under another root there is no content for the gate to read the keys' objects from: it is run on the repo's.)
@@ -540,8 +632,11 @@ pub fn main(argv: &[String]) -> i32 {
             }
         }
     } else {
-        for family in families {
-            match run_family(&repo, family, &options) {
+        for (family, result) in families
+            .iter()
+            .zip(run_families(&repo, &families, &options))
+        {
+            match result {
                 Ok(built) => keys.extend(built),
                 Err(err) => {
                     println!("{err}");

@@ -73,7 +73,7 @@ cargo art kitchen --only fridge,freezer # some models (the pack keeps the others
 cargo art kitchen --preview [--sheet]   # pictures only, in tools/art/previews/kitchen/ (below)
 cargo art kitchen --out /tmp/art/k      # write under another root, laid out as the repo is; no gate
 cargo art kitchen --check               # build in memory, fail on any byte unlike the committed files
-cargo art --all --check                 # every family (CI's `art` step, about 40 s)
+cargo art --all --check                 # every family (CI's `art` step, about 10 s on twelve cores)
 cargo art kitchen --no-pack             # write the files, not the pack
 cargo art --centres                     # centres.json from every family's models, nothing built
 cargo art template --preview            # the template family (src/template.rs)
