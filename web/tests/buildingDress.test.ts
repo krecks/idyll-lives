@@ -135,7 +135,8 @@ describe('a building dressed', () => {
     // A canopy over the flats' door alone: its flat top (trim, 0.12 m thick) 1.5 m wider than the door.
     const trim = part(dressBuilding(cafe, 'cafe', [100, 80], [100, 55], [93, 55]).parts, 'silhouetteTrim')!;
     const top = 2.1 + 0.42;
-    const canopy = local(trim, cafe).filter(([, v, y]) => Math.abs(y - top) < 1e-6 && v > 5.5);
+    // (Over its thickness: its edges are chamfered, its top drawn back from them and its sides reaching.)
+    const canopy = local(trim, cafe).filter(([, v, y]) => y > top - 0.12 - 1e-6 && y < top + 1e-6 && v > 5.5);
     expect(canopy.length).toBeGreaterThan(0);
     expect(Math.min(...canopy.map(([u]) => u + 100))).toBeCloseTo(93 - 0.55 - 0.35, 5);
     expect(Math.max(...canopy.map(([u]) => u + 100))).toBeCloseTo(93 + 0.55 + 0.35, 5);

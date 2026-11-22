@@ -93,6 +93,12 @@ names:
 | `built.texels` | the models' `texels`, over each part on a textured material (a material projected from above has x and z for UVs) |
 | `built.farNear` | where a far version is off what it is the far version of: what its roofs cover by over 10 % or 1.5 m, its top by over 0.5 m, its roof's kind or its pitch by over 4°, a chimney on one of them only, most of its walls or of its roof another colour as drawn (the vertex colour times the material's and its texture's mean) by over 28 of 255 in a channel |
 
+The generators chamfer their boxes as the models' are where it counts: a `Geo` given `easing(EASE)` (4 mm) writes
+each `box` with only the edges `built.edges` would find (5 cm long or more, between faces 12 mm wide or more, on a
+piece 10 cm long or more, both faces drawn: `geometry.ts` `easedBox`); the fences, the street's props and the closed
+buildings' and neighbours' trim and plinth have it. A box's face that is never seen (a rail's end in its post, a
+jamb's top under its head, a board's back on its wall) is left out by `skip`, which keeps the cost down.
+
 Far versions are judged by `built.farNear` alone. `tools/ci-local.sh built` runs both commands (about 15 s);
 `--report` prints what was measured as tables (each sample's triangles and draw calls, where the edges are, how each
 material's texture is laid, each far version's look beside its near one's, and what the houses have of bevels,

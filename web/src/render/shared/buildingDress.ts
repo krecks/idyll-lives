@@ -22,7 +22,7 @@
  */
 
 import type { BuildingUse } from '../../core/protocol';
-import { Geo, facing, type V3 } from './geometry';
+import { EASE, Geo, facing, type V3 } from './geometry';
 import { addRoof, HOUSE_MATERIALS, type HousePart } from './house';
 import { EAVE, MANSARD_BREAK, MANSARD_IN, PARAPET, STOREY, type TownBuilding } from './townBuildings';
 
@@ -104,9 +104,10 @@ class Dresser {
   readonly brick = new Geo();
   readonly render = new Geo();
   readonly stone = new Geo();
-  readonly plinth = new Geo().color('#D8D2C8');
+  // (The plinth and the trim chamfered as a model's boxes are: their arrises show at the play camera.)
+  readonly plinth = new Geo().color('#D8D2C8').easing(EASE);
   readonly roof = new Geo();
-  readonly trim = new Geo().color(TRIM);
+  readonly trim = new Geo().color(TRIM).easing(EASE);
   readonly panes: Geo[];
   private paneCount = 0;
   /** The panes put now are the flats' over a place (the second `PANE_SETS` sets). */
@@ -133,9 +134,9 @@ class Dresser {
    * A box on side `s`: `a0`..`a1` along it, `y0`..`y1` up, `o0`..`o1` out from its outer face. Without its face against
    * the wall nor its underside (the camera looks down on it): four faces, not six.
    */
-  box(g: Geo, s: Side, a0: number, a1: number, y0: number, y1: number, o0: number, o1: number): void {
+  box(g: Geo, s: Side, a0: number, a1: number, y0: number, y1: number, o0: number, o1: number, more = ''): void {
     const { W, D } = this;
-    const skip = `ny ${['nz', 'pz', 'nx', 'px'][s]}`;
+    const skip = `ny ${['nz', 'pz', 'nx', 'px'][s]} ${more}`;
     if (s === 0) g.box(a0, y0, D + o0, a1, y1, D + o1, skip);
     else if (s === 1) g.box(a0, y0, -D - o1, a1, y1, -D - o0, skip);
     else if (s === 2) g.box(W + o0, y0, a0, W + o1, y1, a1, skip);
@@ -176,8 +177,9 @@ class Dresser {
     this.quad(t, s, g1 - 0.17, g1, sill + 0.04, head, 0.012);
     this.quad(t, s, g0, g1, head - 0.16, head, 0.014);
     t.color(TRIM);
-    this.box(t, s, g0 - f, g0, sill, head, 0, 0.04);
-    this.box(t, s, g1, g1 + f, sill, head, 0, 0.04);
+    // (The jambs stand on the sill and under the head.)
+    this.box(t, s, g0 - f, g0, sill, head, 0, 0.04, 'py');
+    this.box(t, s, g1, g1 + f, sill, head, 0, 0.04, 'py');
     this.box(t, s, g0 - f, g1 + f, head, head + f, 0, 0.04);
     this.box(t, s, g0 - f - 0.04, g1 + f + 0.04, sill - 0.06, sill, 0, 0.07);
     const mid = (g0 + g1) / 2;
@@ -197,8 +199,8 @@ class Dresser {
     const f = 0.06;
     this.pane(s, g0, g1, sill, head);
     const t = this.trim.color(TRIM);
-    this.box(t, s, g0 - f, g0, sill, head, 0, 0.035);
-    this.box(t, s, g1, g1 + f, sill, head, 0, 0.035);
+    this.box(t, s, g0 - f, g0, sill, head, 0, 0.035, 'py');
+    this.box(t, s, g1, g1 + f, sill, head, 0, 0.035, 'py');
     this.box(t, s, g0 - f, g1 + f, head, head + f, 0, 0.035);
     this.quad(t, s, a - 0.025, a + 0.025, sill, head, 0.025);
     this.box(this.plinth, s, g0 - f - 0.05, g1 + f + 0.05, sill - 0.08, sill, 0, 0.08);
@@ -210,8 +212,9 @@ class Dresser {
     const top = floor + 2.1;
     const [d0, d1] = [a - wide / 2, a + wide / 2];
     t.color(TRIM);
-    this.box(t, s, d0 - 0.08, d0, floor, top + 0.1, 0, 0.06);
-    this.box(t, s, d1, d1 + 0.08, floor, top + 0.1, 0, 0.06);
+    // (The jambs up into the head.)
+    this.box(t, s, d0 - 0.08, d0, floor, top + 0.1, 0, 0.06, 'py');
+    this.box(t, s, d1, d1 + 0.08, floor, top + 0.1, 0, 0.06, 'py');
     this.box(t, s, d0 - 0.1, d1 + 0.1, top, top + 0.14, 0, 0.07);
     t.color(colour);
     this.box(t, s, d0, d1, floor, top, 0, 0.045);

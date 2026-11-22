@@ -50,7 +50,7 @@ import type { ModelEntry } from '../../assets/types';
 import type { FenceStyleDef } from '../../content/content';
 import { groundDepth, objectCentre, storeyOfRow, storeyRow, type FenceEdge, type GarageInfo, type LotLook, type ObjectPlacement, type Opening, type PlotInfo, type RoadPlan, type TownPlace, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
-import { encodeFinish, Geo, type V3 } from './geometry';
+import { EASE, easedBox, encodeFinish, Geo, type V3 } from './geometry';
 import { CARS, CAR_PAINT, carAge, garageAt, garageFor, hash, paintCar, parkCar, pick, type CarAge, type CarBody } from './cars';
 import { chunkAt, chunkCoords, chunkId, distanceToRect, hashNumbers, hashString, RectGrid } from './chunks';
 import { canopyBack, type HousePart, type HousePlanner, type SilhouettePlan, type SilhouetteSpec } from './house';
@@ -193,6 +193,15 @@ export class Painter {
   }
 
   box(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, skip = ''): this {
+    const put = (pts: V3[], n: V3, cut?: readonly (readonly [number, number, number])[]) => {
+      if (!cut) return this.poly(pts, n);
+      this.geo.polyCut(
+        pts.map((q) => this.p(q[0], q[1], q[2])),
+        this.n(n[0], n[1], n[2]),
+        cut,
+      );
+    };
+    if (easedBox(x0, y0, z0, x1, y1, z1, skip, this.geo.ease, put)) return this;
     if (!skip.includes('py')) this.poly([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], [0, 1, 0]);
     if (!skip.includes('ny')) this.poly([[x0, y0, z0], [x0, y0, z1], [x1, y0, z1], [x1, y0, z0]], [0, -1, 0]);
     if (!skip.includes('nz')) this.poly([[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]], [0, 0, -1]);
@@ -453,7 +462,7 @@ class Parts {
     private readonly has: (key: string) => boolean,
     readonly ground?: (x: number, z: number) => number,
   ) {
-    this.props = new Painter(new Geo(), ground);
+    this.props = new Painter(new Geo().easing(EASE), ground);
     this.glow = new Painter(new Geo(), ground);
   }
   /** The contact shadows laid over the ground (`ground`), once all are written. */

@@ -36,7 +36,7 @@
 import { FLOOR_FINISHES, type DoorStyleDef, type FloorCoveringDef, type LightAim, type RoofColorDef, type RoofStyleDef, type WallCoveringDef, type WindowStyleDef } from '../../content/content';
 import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalWall, type Opening, type PorchInfo, type PorchPieceInfo, type WallEdge, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
-import { Cut, facing, Geo, LOOK, planarUV, type V3 } from './geometry';
+import { Cut, EASE, facing, Geo, LOOK, planarUV, type V3 } from './geometry';
 import { roadIndex, townRoads } from './roads';
 import { tuned } from '../tune';
 import { smoothstep, valueNoise } from '../../game/noise';
@@ -2086,9 +2086,10 @@ export class HousePlanner {
   silhouettes(houses: readonly SilhouetteSpec[], openings: readonly Opening[], layout: StoreyLayout | null = null): SilhouettePlan {
     const siding = new Geo();
     const brick = new Geo();
-    const stone = new Geo().color('#D8D2C8');
+    // (The plinth and the trim chamfered as a model's boxes are: their arrises show at the play camera.)
+    const stone = new Geo().color('#D8D2C8').easing(EASE);
     const roof = new Geo();
-    const trim = new Geo().color(TRIM);
+    const trim = new Geo().color(TRIM).easing(EASE);
     const glass = new Geo();
     const lamps: SilhouettePlan['lamps'] = [];
     const opened = new Set(openings.map((o) => `${o.axis}:${o.x}:${o.z}`));
@@ -2186,24 +2187,29 @@ export class HousePlanner {
         if (!side) continue;
         const { plane, n, a } = side;
         const P = (u: number, y: number, d: number): V3 => (o.axis === 'h' ? [u, y, plane + n[2] * d] : [plane + n[0] * d, y, u]);
-        const board = (u0: number, u1: number, y0: number, y1: number, out: number) => trim.box(...span(o.axis, plane, n, u0, u1, y0, y1, out));
+        // (Its back against the wall isn't drawn.)
+        const back = o.axis === 'h' ? (n[2] > 0 ? 'nz' : 'pz') : n[0] > 0 ? 'nx' : 'px';
+        const board = (u0: number, u1: number, y0: number, y1: number, out: number, skip = '') => trim.box(...span(o.axis, plane, n, u0, u1, y0, y1, out), `${back} ${skip}`);
+        // (What lies flat on the glass, as a lot's building has it: a quad.)
+        const flat = (u0: number, u1: number, y0: number, y1: number, out: number) => trim.poly([P(u0, y0, out), P(u1, y0, out), P(u1, y1, out), P(u0, y1, out)], n);
         if (o.kind === 'window') {
           const [g0, g1] = [a + WIN_INSET, a + 1 - WIN_INSET];
           const f = 0.07;
           panes.poly([P(g0, SILL, 0.006), P(g1, SILL, 0.006), P(g1, HEAD, 0.006), P(g0, HEAD, 0.006)], n);
           // Curtains drawn to the sides with a valance: dark against the glow at night.
           trim.color(curtain);
-          board(g0, g0 + 0.17, SILL + 0.04, HEAD, 0.012);
-          board(g1 - 0.17, g1, SILL + 0.04, HEAD, 0.012);
-          board(g0, g1, HEAD - 0.16, HEAD, 0.014);
+          flat(g0, g0 + 0.17, SILL + 0.04, HEAD, 0.012);
+          flat(g1 - 0.17, g1, SILL + 0.04, HEAD, 0.012);
+          flat(g0, g1, HEAD - 0.16, HEAD, 0.014);
           trim.color(TRIM);
-          board(g0 - f, g0, SILL, HEAD, 0.04);
-          board(g1, g1 + f, SILL, HEAD, 0.04);
-          board(g0 - f, g1 + f, HEAD, HEAD + f, 0.04);
-          board(g0 - f - 0.04, g1 + f + 0.04, SILL - 0.06, SILL, 0.07);
+          // (The jambs stand on the sill and under the head; no underside shows.)
+          board(g0 - f, g0, SILL, HEAD, 0.04, 'ny py');
+          board(g1, g1 + f, SILL, HEAD, 0.04, 'ny py');
+          board(g0 - f, g1 + f, HEAD, HEAD + f, 0.04, 'ny');
+          board(g0 - f - 0.04, g1 + f + 0.04, SILL - 0.06, SILL, 0.07, 'ny');
           const mid = (g0 + g1) / 2;
-          board(mid - 0.016, mid + 0.016, SILL, HEAD - 0.16, 0.024);
-          board(g0, g1, (SILL + HEAD) / 2 + 0.1, (SILL + HEAD) / 2 + 0.13, 0.024);
+          flat(mid - 0.016, mid + 0.016, SILL, HEAD - 0.16, 0.024);
+          flat(g0, g1, (SILL + HEAD) / 2 + 0.1, (SILL + HEAD) / 2 + 0.13, 0.024);
           if (s.shutters) {
             const step = (d: number) => (o.axis === 'h' ? `h:${o.x + d}:${o.z}` : `v:${o.x}:${o.z + d}`);
             trim.color(s.accent);
@@ -2212,11 +2218,12 @@ export class HousePlanner {
             trim.color(TRIM);
           }
         } else {
-          board(a + T - 0.06, a + T + 0.02, 0, DOOR_HEIGHT + 0.1, 0.05);
-          board(a + 1 - T - 0.02, a + 1 - T + 0.06, 0, DOOR_HEIGHT + 0.1, 0.05);
-          board(a + T - 0.08, a + 1 - T + 0.08, DOOR_HEIGHT, DOOR_HEIGHT + 0.14, 0.06);
+          // (The jambs on the ground and up into the head.)
+          board(a + T - 0.06, a + T + 0.02, 0, DOOR_HEIGHT + 0.1, 0.05, 'ny py');
+          board(a + 1 - T - 0.02, a + 1 - T + 0.06, 0, DOOR_HEIGHT + 0.1, 0.05, 'ny py');
+          board(a + T - 0.08, a + 1 - T + 0.08, DOOR_HEIGHT, DOOR_HEIGHT + 0.14, 0.06, 'ny');
           trim.color(s.accent);
-          board(a + T + 0.02, a + 1 - T - 0.02, 0, DOOR_HEIGHT, 0.03);
+          board(a + T + 0.02, a + 1 - T - 0.02, 0, DOOR_HEIGHT, 0.03, 'ny');
           // Raised panels on the leaf.
           trim.color(shade(s.accent, 1.12));
           board(a + T + 0.1, a + 0.5 - 0.04, 1.15, 1.95, 0.04);
