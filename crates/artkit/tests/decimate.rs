@@ -1,21 +1,14 @@
 //! `decimate::collapse` and `far::decimate`: what a collapse may not do (move a locked vertex, open a closed mesh,
 //! turn a face, smear a material), that it reaches its count and gives the same mesh twice; and the committed
-//! models whose far versions Blender's DECIMATE modifier made, decimated by the kernel and held to what
-//! `cargo check-glb --against` holds such a far version to (its `decimated` rule): the size, the floor, the count
-//! and how far the new surface is from the old far file's.
-//!
-//!   cargo test -p artkit --profile tools --test decimate -- --ignored --nocapture
-//!
-//! prints that for all 28 of them, each decimated from Blender's model and held against Blender's far version
-//! (git's ref/blender, whatever the working tree has by now), and writes each new far version to
-//! $DECIMATE_OUT/<family>/<id>.far.glb if set.
-
+//! models whose far versions are their model decimated, held to the rule `cargo check-glb --against` holds such
+//! a far version to with `decimated` in its accept list: the size, the floor, the count and how far the new
+//! surface is from the old far file's.
 use artkit::family::{Family, Model, build_model};
 use artkit::far::{self, Surface};
 use artkit::materials::{Finish, Finishes, Mat};
 use artkit::math::V3;
 use artkit::mesh::{Mesh, edge};
-use artkit::{decimate, glb, scene, shade};
+use artkit::{decimate, glb, scene};
 use std::collections::{BTreeMap, BTreeSet};
 
 type P = [f64; 3];
@@ -1158,24 +1151,6 @@ fn read(name: &str, far: bool) -> glb::Model {
     glb::read(&data).unwrap_or_else(|e| panic!("{path}: {e}"))
 }
 
-/// A model's file (`<family>/<id>`) or its far version's as Blender built it: the reference the port is held
-/// against (the revision ref/blender), whatever the working tree has by now.
-fn blenders(name: &str, far: bool) -> glb::Model {
-    let path = format!(
-        "ref/blender:web/public/assets/models/{name}{}.glb",
-        if far { ".far" } else { "" }
-    );
-    let out = std::process::Command::new("git")
-        .args(["-C", env!("CARGO_MANIFEST_DIR"), "show", &path])
-        .output()
-        .unwrap_or_else(|e| panic!("git show {path}: {e}"));
-    assert!(
-        out.status.success(),
-        "git show {path}: no such file or revision"
-    );
-    glb::read(&out.stdout).unwrap_or_else(|e| panic!("{path}: {e}"))
-}
-
 /// A model's file decimated as its far version is, and that measured against `old`, a far version of it.
 fn decimated(model: &glb::Model, old: &glb::Model, ratio: f64) -> (Mesh, Measured) {
     let old = triangles(old);
@@ -1239,8 +1214,7 @@ fn committed_models_decimated_pass_the_comparisons_rule() {
     }
 }
 
-/// The 28 models whose far versions Blender's DECIMATE modifier made (tools/art/port-accepted.json's
-/// `decimated`), each to a quarter as its family script asks.
+/// The 28 models whose far versions are their model decimated, each to a quarter as its family asks.
 const DECIMATED: [&str; 28] = [
     "farm/scarecrow",
     "garden_things/lampPost",
@@ -1272,38 +1246,6 @@ const DECIMATED: [&str; 28] = [
     "street_furniture/townStatue",
 ];
 
-/// The six whose new far version does not pass the rule against Blender's, and why: Blender's far file is not the
-/// model (two), has fewer triangles than the share it was asked for (three), or both (one).
-const UNLIKE_BLENDERS: [(&str, &str); 6] = [
-    (
-        "playground/pingPongTable",
-        "Blender's is 29 mm taller than its model and up to 191 mm off it (its top is gone but for the lines); \
-         the kernel's has the model's box, is 36 mm off it at most and has 284 triangles to Blender's 267",
-    ),
-    (
-        "shops/groceryShelf",
-        "a quarter of the model's triangles to Blender's 21.8 %: its export dropped the faces its decimation \
-         left back to back",
-    ),
-    (
-        "stalls/marketStall",
-        "a quarter of the model's triangles to Blender's 21.7 %, as the grocery shelf",
-    ),
-    (
-        "stalls/vendingSnack",
-        "a quarter of the model's triangles to Blender's 21.9 %, as the grocery shelf",
-    ),
-    (
-        "street_furniture/busStop",
-        "Blender's has lost its bench, half of each pane and its posts' feet: up to 386 mm off its model",
-    ),
-    (
-        "street_furniture/noticeBoard",
-        "its posts, frame and notes cannot be had in a quarter of their triangles without being squashed: 27.4 % \
-         of the model's to Blender's 22.2 %, whose cork board is gone",
-    ),
-];
-
 /// The gate's strict check of a far file (`cargo check-glb`: `flipped`), and the kernel's stricter one, on each
 /// of the 29 models with a decimated far version as its family's file has it now: the 28, and civic's plant table.
 #[test]
@@ -1313,47 +1255,4 @@ fn no_decimated_far_version_is_shaded_from_behind() {
         far::decimate(&mut mesh, 0.25, far::FEET, far::EDGE);
         assert_eq!(shaded_from_behind(&mesh), (0, 0), "{name}");
     }
-}
-
-#[test]
-#[ignore = "all 28 decimated far versions against Blender's (git's ref/blender): a table to read, and files to look at"]
-fn every_decimated_far_version() {
-    let out = std::env::var("DECIMATE_OUT").ok();
-    let finishes = plain();
-    scene::set_finishes(finishes.clone());
-    println!("{HEAD}");
-    let mut unlike = Vec::new();
-    for name in DECIMATED {
-        let started = std::time::Instant::now();
-        let (mesh, measured) = decimated(&blenders(name, false), &blenders(name, true), 0.25);
-        println!(
-            "{}  ({:.2} s)",
-            measured.row(name),
-            started.elapsed().as_secs_f64()
-        );
-        if !measured.passes() {
-            unlike.push(name);
-        }
-        // whatever Blender's is, the kernel's stands where its model does and is nowhere further from it than
-        // the rule lets two far versions be
-        assert_eq!(measured.floor, 0.0, "{name}");
-        assert!(measured.model_most <= 0.06, "{name}");
-        assert_eq!(measured.turned, 0, "{name}");
-        assert_no_slivers(&mesh, name);
-        assert_eq!(shaded_from_behind(&mesh), (0, 0), "{name}");
-        if let Some(out) = &out {
-            // as the runner writes a far version: one part, shaded by itself and the floor
-            scene::reset();
-            let id = name.split('/').next_back().unwrap();
-            let obj = scene::add(&format!("{id}_far"), mesh);
-            shade::bake_ao(&[obj], None, true);
-            let path = format!("{out}/{name}.far.glb");
-            std::fs::create_dir_all(std::path::Path::new(&path).parent().unwrap()).unwrap();
-            std::fs::write(&path, glb::write(&[obj], false, &finishes)).unwrap();
-        }
-    }
-    for (name, why) in UNLIKE_BLENDERS {
-        println!("{name}: {why}");
-    }
-    assert_eq!(unlike, UNLIKE_BLENDERS.map(|(name, _)| name));
 }

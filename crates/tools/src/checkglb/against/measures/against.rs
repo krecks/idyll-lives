@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::checkglb::against::{Class, found, json_differ, names};
-use crate::checkglb::py::{self, J, join};
+use crate::checkglb::py::{self, J};
 use crate::checkglb::{Furniture, Paths};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -73,11 +73,10 @@ pub fn against(opts: &Options) -> Result<Outcome, String> {
     }
 
     let defs = crate::checkglb::content(&tree)?;
-    let path = opts
-        .accepted
-        .clone()
-        .unwrap_or_else(|| join(&opts.root, "tools/art/port-accepted.json"));
-    let (accepted, mut errors) = accepted(&path);
+    let (accepted, mut errors) = match &opts.accepted {
+        Some(path) => accepted(path),
+        None => Default::default(),
+    };
     let context = Context {
         facts: crate::checkglb::content_objects(&defs)?,
         furniture: Furniture::read(&tree)?,
@@ -192,7 +191,7 @@ pub fn against(opts: &Options) -> Result<Outcome, String> {
         }
     }
 
-    // A line of port-accepted.json no row needs hides the next finding: an error, as the gate's `accept`.
+    // A line of the accept list no row needs hides the next finding: an error, as the gate's `accept`.
     for (name, metrics) in &context.accepted {
         let Some(row) = rows.iter().find(|r| r.name == *name) else {
             if whole {
@@ -239,7 +238,7 @@ pub fn against(opts: &Options) -> Result<Outcome, String> {
         }
     }
     for e in &errors {
-        text += &format!("error: port-accepted.json: {e}\n");
+        text += &format!("error: --accept: {e}\n");
     }
     let outcome = Outcome {
         rows,

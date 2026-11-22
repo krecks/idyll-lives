@@ -10,7 +10,7 @@ pub(super) struct Context {
     pub(super) new: Side,
     pub(super) facts: HashMap<String, Vec<Facts>>,
     pub(super) furniture: Furniture,
-    /// port-accepted.json: {row: {metric: why}}.
+    /// The accept list (`--accept`): {row: {metric: why}}.
     pub(super) accepted: BTreeMap<String, BTreeMap<String, String>>,
 }
 

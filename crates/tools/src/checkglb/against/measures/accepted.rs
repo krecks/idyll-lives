@@ -32,7 +32,7 @@ pub(super) fn rest_of(manifest: &J) -> J {
     out
 }
 
-/// port-accepted.json, {row: {metric: why}}, and what is wrong with it: a metric that is none, a reason left out.
+/// The accept list (`--accept <file>`), {row: {metric: why}}, and what is wrong with it: a metric that is none, a reason left out.
 pub(super) fn accepted(path: &str) -> (BTreeMap<String, BTreeMap<String, String>>, Vec<String>) {
     let (mut out, mut errors) = (BTreeMap::new(), Vec::new());
     let data = match std::fs::read(path) {

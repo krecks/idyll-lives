@@ -370,7 +370,7 @@ impl Context {
         out
     }
 
-    /// A row with what port-accepted.json accepts of it taken out of its findings, and its class.
+    /// A row with what the accept list accepts of it taken out of its findings, and its class.
     pub(super) fn classed(&self, mut row: Row, same: bool) -> Row {
         if let Some(accepted) = self.accepted.get(&row.name) {
             let (taken, left): (Vec<Finding>, Vec<Finding>) = std::mem::take(&mut row.findings)

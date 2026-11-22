@@ -672,7 +672,7 @@ impl Checkout {
         );
     }
 
-    /// This checkout's working tree against `old`'s, with `accepted` as port-accepted.json.
+    /// This checkout's working tree against `old`'s, with `accepted` as its accept list (`--accept`).
     fn against(&self, old: &Checkout, accepted: &str) -> Outcome {
         self.write("accepted.json", accepted.as_bytes());
         against(&Options {
@@ -929,7 +929,7 @@ fn what_is_accepted_passes_with_its_reason_and_what_need_not_be_is_an_error() {
         assert!(outcome.failed(), "{accepted}");
         assert!(
             outcome.errors.iter().any(|e| e.starts_with(error))
-                && outcome.text.contains("error: port-accepted.json: "),
+                && outcome.text.contains("error: --accept: "),
             "{accepted}: {:?}",
             outcome.errors
         );
@@ -1010,35 +1010,6 @@ fn a_decimated_far_version_is_held_to_its_own_rule() {
         "{:?}",
         outcome.errors
     );
-}
-
-/// The list in the repo names far versions the manifests have, each with its reason.
-#[test]
-fn the_repo_s_list_names_far_versions() {
-    let root = ll_tools::checkglb::repo_root();
-    let list: serde_json::Value = serde_json::from_slice(
-        &std::fs::read(format!("{root}/tools/art/port-accepted.json")).unwrap(),
-    )
-    .unwrap();
-    let report = ll_tools::checkglb::gate(&ll_tools::checkglb::Paths::repo(), &[]);
-    for (name, metrics) in list.as_object().unwrap() {
-        for (metric, why) in metrics.as_object().unwrap() {
-            assert!(!why.as_str().unwrap().trim().is_empty(), "{name}: {metric}");
-            if metric == "decimated" {
-                let key = name
-                    .strip_suffix(" far")
-                    .unwrap_or_else(|| panic!("{name}"));
-                let line = report
-                    .text
-                    .lines()
-                    .find(|l| l.split_whitespace().nth(1) == Some(key));
-                assert!(
-                    line.is_some_and(|l| l.contains("(far: ")),
-                    "{name} has no far version"
-                );
-            }
-        }
-    }
 }
 
 /// A build of some models (no manifest of its own) is compared in the working tree's place, for what it has.

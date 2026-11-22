@@ -3,7 +3,7 @@
 use super::*;
 use std::path::Path;
 
-/// `cargo check-glb --against <rev|dir> [keys… | --family <f>] [--dir <built>]`: the exit code.
+/// `cargo check-glb --against <rev|dir> [keys… | --family <f>] [--dir <built>] [--accept <file>]`: the exit code.
 pub fn main(args: &[String]) -> i32 {
     let root = crate::checkglb::repo_root();
     let mut opts = Options {
@@ -40,6 +40,7 @@ pub fn main(args: &[String]) -> i32 {
             }),
             "--dir" => value("a directory").map(|v| opts.new = Source::Dir(v)),
             "--family" => value("a family").map(|v| opts.family = Some(v)),
+            "--accept" => value("a file").map(|v| opts.accepted = Some(v)),
             key if key.starts_with("model.")
                 || key.starts_with("item.")
                 || key.starts_with("tool.") =>
@@ -48,7 +49,7 @@ pub fn main(args: &[String]) -> i32 {
                 Ok(())
             }
             other => Err(format!(
-                "{other}: --against takes keys (model., item., tool.), --family <f> and --dir <built>"
+                "{other}: --against takes keys (model., item., tool.), --family <f>, --dir <built> and --accept <file>"
             )),
         };
         if let Err(e) = taken {
