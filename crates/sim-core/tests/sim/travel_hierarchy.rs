@@ -1288,3 +1288,136 @@ fn motorway_cars_keep_further_back_the_faster_they_go() {
     assert!(fast > 100, "{fast} ticks behind another at speed");
     assert_eq!(w.traffic.guarded, 0);
 }
+
+// The junctions (S-TRAFFIC): the avenue's lit, the arms nobody comes in by without a phase.
+
+/// The junction (`Travel::signals`, `Travel::give_way`) at `p`, and whether it's lit.
+fn junction_at(w: &World, p: [f32; 2]) -> (&sim_core::traffic::Signal, bool) {
+    w.travel
+        .signals
+        .iter()
+        .map(|s| (s, true))
+        .chain(w.travel.give_way.iter().map(|s| (s, false)))
+        .find(|(s, _)| dist(s.at, p) < 1.0)
+        .unwrap_or_else(|| panic!("a junction at {p:?}"))
+}
+
+/// Where ramp `source` meets the street: its end away from the motorway's merges.
+fn ramp_t(g: &Graph, source: usize) -> [f32; 2] {
+    let r = &g.roads[road_of(g, source) as usize];
+    let merges: Vec<[f32; 2]> = g.merge_nodes().map(|n| g.nodes[n]).collect();
+    let near_merge = |p: [f32; 2]| {
+        merges
+            .iter()
+            .map(|&m| dist(m, p))
+            .fold(f32::INFINITY, f32::min)
+    };
+    let (a, b) = (r.at(0.0), r.at(r.len()));
+    if near_merge(a) > near_merge(b) { a } else { b }
+}
+
+#[test]
+fn avenue_junctions_are_lit_with_their_carriageways_width() {
+    let w = world();
+    let g = &w.travel.graph;
+    let avenue = road_of(g, AVENUE);
+    let z = AVENUE_Z as f32;
+    for x in [90.0, STREET_X as f32, 210.0] {
+        let (sig, lit) = junction_at(&w, [x, z]);
+        assert!(lit, "the avenue's junction at x {x} is lit");
+        let arms: Vec<_> = sig.arms.iter().filter(|a| a.road == avenue).collect();
+        assert_eq!(arms.len(), 2, "x {x}: the avenue through it");
+        for a in arms {
+            // (Kerb to kerb: 14 m less its sidewalks, the renderer's `carriageway`.)
+            assert!(
+                (2.0 * a.kerb - 11.3).abs() < 1e-3,
+                "x {x}: {} m",
+                2.0 * a.kerb
+            );
+            assert!(a.crosswalk && a.inbound(), "x {x}");
+        }
+        // (The two arms of the avenue go together; the cross road's another phase.)
+        assert!(sig.phases >= 2, "x {x}");
+    }
+    // The ramps' T's: lit, the ramp's arm no crosswalk; the street's crosswalks as any.
+    for ramp in [OFF_RAMP, ON_RAMP] {
+        let (sig, lit) = junction_at(&w, ramp_t(g, ramp));
+        assert!(lit, "ramp {ramp}'s T is lit");
+        let r = road_of(g, ramp);
+        for a in &sig.arms {
+            assert_eq!(
+                a.crosswalk,
+                a.road != r,
+                "ramp {ramp}: arm of road {}",
+                a.road
+            );
+        }
+        let ramp_arm = sig.arms.iter().find(|a| a.road == r).unwrap();
+        assert!(
+            (2.0 * ramp_arm.kerb - 5.0).abs() < 1e-3,
+            "a ramp has no sidewalks"
+        );
+    }
+}
+
+#[test]
+fn arms_cars_only_leave_by_have_no_phase() {
+    let w = world();
+    let g = &w.travel.graph;
+    // (Cars only leave the street's T up the on-ramp; they only come in down the off-ramp.)
+    for (ramp, leaves) in [(ON_RAMP, true), (OFF_RAMP, false)] {
+        let (sig, _) = junction_at(&w, ramp_t(g, ramp));
+        let r = road_of(g, ramp);
+        for a in &sig.arms {
+            let out_only = a.road == r && leaves;
+            assert_eq!(
+                !a.inbound(),
+                out_only,
+                "ramp {ramp}: arm of road {}",
+                a.road
+            );
+            if a.inbound() {
+                assert!(a.phase < sig.phases);
+            } else {
+                assert_eq!(a.phase, sim_core::traffic::NO_PHASE);
+            }
+        }
+        // (Every phase someone comes in on.)
+        for p in 0..sig.phases {
+            assert!(
+                sig.arms.iter().any(|a| a.phase == p),
+                "ramp {ramp}: phase {p}"
+            );
+        }
+    }
+    // The one-way loop's corner on its link: its west side only leaves it, its north side only
+    // comes in.
+    let (sig, _) = junction_at(&w, [300.0, 60.0]);
+    let (west, north) = (road_of(g, LOOP[0]), road_of(g, LOOP[3]));
+    for a in &sig.arms {
+        assert_eq!(a.inbound(), a.road != west, "arm of road {}", a.road);
+    }
+    assert!(sig.arms.iter().any(|a| a.road == north && a.inbound()));
+    // (Shown to the renderer: no head on the out-only arms.)
+    let view: Value = serde_json::from_str(&sim_core::view::structure_json(&w)).unwrap();
+    let junctions = view["junctions"].as_array().expect("junctions");
+    let at = |p: [f32; 2]| {
+        junctions
+            .iter()
+            .find(|j| {
+                dist(
+                    [
+                        j["x"].as_f64().unwrap() as f32,
+                        j["z"].as_f64().unwrap() as f32,
+                    ],
+                    p,
+                ) < 1.0
+            })
+            .expect("in the view")
+    };
+    let on = at(ramp_t(g, ON_RAMP));
+    for a in on["arms"].as_array().unwrap() {
+        let ramp = a["road"].as_u64() == Some(ON_RAMP as u64);
+        assert_eq!(a["light"].is_null(), ramp, "{a}");
+    }
+}

@@ -614,7 +614,8 @@ fn write_lights(world: &World, out: &mut [f32]) {
     let mut n = 0;
     for (k, (s, a, arm)) in heads.enumerate() {
         let o = &mut out[LIGHT_BASE + k * LIGHT_STRIDE..LIGHT_BASE + (k + 1) * LIGHT_STRIDE];
-        o[light::SHOWN] = 1.0;
+        // (No head on an arm cars only leave by: `traffic::NO_PHASE`.)
+        o[light::SHOWN] = if arm.inbound() { 1.0 } else { 0.0 };
         o[light::X] = arm.pole[0];
         o[light::Z] = arm.pole[1];
         o[light::YAW] = arm.yaw;

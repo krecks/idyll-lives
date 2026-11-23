@@ -166,7 +166,17 @@ pub struct SignalArm {
     pub span: [[f32; 2]; 2],
 }
 
+/// The phase (`SignalArm::phase`) of an arm whose cars only leave the junction (a one-way road or
+/// a ramp going away from it): nobody comes in by it, so it has no green of its own, no head
+/// shown and no stop line drawn (`phases_of`).
+pub const NO_PHASE: u8 = u8::MAX;
+
 impl SignalArm {
+    /// Whether cars come into the junction by it (not one whose cars only leave: `NO_PHASE`).
+    pub fn inbound(&self) -> bool {
+        self.phase != NO_PHASE
+    }
+
     /// Where `p` is by its crosswalk (`span`): how far out (m from the junction's middle, as
     /// `walk_from`, `stop`) and how far from its road's middle. A span too short to have a way
     /// (its road ends there): along `way` from `at`, the junction's middle.
@@ -377,10 +387,17 @@ fn box_edges(arms: &[ArmAt]) -> Vec<(f32, f32)> {
 /// further round from one of them (Canalside's j35: a country road 16° off the street and
 /// straighter on than the street's own way, took the street's arm's place in its phase, and the
 /// street's two arms were never green together). Each arm the phase it's in, numbered round in
-/// order (on a roundabout, an arm each), and how many.
+/// order (on a roundabout, an arm each), and how many; an arm whose cars only leave by it (a
+/// one-way road, a ramp going away) none (`NO_PHASE`), and no partner.
 fn phases_of(g: &Graph, arms: &[ArmAt], roundabout: bool) -> (Vec<u8>, u8) {
     let dot = |a: [f32; 2], b: [f32; 2]| a[0] * b[0] + a[1] * b[1];
     let n = arms.len();
+    // (An arm whose cars only leave by it, a one-way road or a ramp going away: no phase,
+    // `NO_PHASE`.)
+    let inbound = |i: usize| {
+        let (road, _, k, ..) = arms[i].2;
+        g.roads[road as usize].oneway.may_go(k < 0.0)
+    };
     let mut partner: Vec<Option<usize>> = vec![None; n];
     if !roundabout {
         let kind = |i: usize| g.roads[arms[i].2.0 as usize].kind;
@@ -395,6 +412,7 @@ fn phases_of(g: &Graph, arms: &[ArmAt], roundabout: bool) -> (Vec<u8>, u8) {
         };
         let mut pairs: Vec<(u8, f32, usize, usize)> = (0..n)
             .flat_map(|i| (i + 1..n).map(move |j| (i, j)))
+            .filter(|&(i, j)| inbound(i) && inbound(j))
             .map(|(i, j)| (rank(i, j), dot(arms[i].0, arms[j].0), i, j))
             .filter(|&(_, d, ..)| d < OPPOSITE)
             .collect();
@@ -413,7 +431,7 @@ fn phases_of(g: &Graph, arms: &[ArmAt], roundabout: bool) -> (Vec<u8>, u8) {
     let mut phase = vec![u8::MAX; n];
     let mut phases = 0u8;
     for i in 0..n {
-        if phase[i] != u8::MAX {
+        if phase[i] != u8::MAX || !inbound(i) {
             continue;
         }
         phase[i] = phases;
@@ -446,7 +464,8 @@ fn on_ring(ring: &[bool], arms: &[ArmAt]) -> bool {
 
 /// Whether a junction with `arms` (`arms_at`) on roads of `g` is lit (`Signal::lit`): on a
 /// roundabout's ring, `LIT_ARMS` arms or more (not all country roads'), or `LIT_MAIN_ARMS` of main
-/// roads'; a country road's arm counts as a main road's only with a street's there too. Where
+/// roads' (a street's, an avenue's, a ramp's); a country road's arm counts as a main road's only
+/// with one of those there too. Where
 /// only country roads meet, out in the open, it gives way: 151 of seed base 0's 408 lit junctions
 /// were country roads' T's and crossroads, their lights changing for the odd car (the owner's
 /// call, 2026-11-13).
@@ -457,7 +476,8 @@ fn lit_of(g: &Graph, arms: &[ArmAt], ring: &[bool]) -> bool {
             .filter(|a| g.roads[a.2.0 as usize].kind == k)
             .count()
     };
-    let streets = count(RoadKind::Street);
+    // (An avenue and a ramp are main roads, as a street: their junctions are lit.)
+    let streets = count(RoadKind::Street) + count(RoadKind::Avenue) + count(RoadKind::Ramp);
     let country = if streets > 0 {
         count(RoadKind::Country)
     } else {
@@ -510,7 +530,10 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
     let main = |a: &ArmAt| {
         matches!(
             kind(a),
-            crate::travel::RoadKind::Street | crate::travel::RoadKind::Country
+            crate::travel::RoadKind::Street
+                | crate::travel::RoadKind::Country
+                | crate::travel::RoadKind::Avenue
+                | crate::travel::RoadKind::Ramp
         )
     };
     let lit = lit_of(g, &arms, ring);
@@ -695,7 +718,8 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
                     && !joined
                     && match r.kind {
                         crate::travel::RoadKind::Street => lit || zebra(i),
-                        crate::travel::RoadKind::Lane => lit,
+                        crate::travel::RoadKind::Lane | crate::travel::RoadKind::Avenue => lit,
+                        // (Nobody on foot on a ramp, a motorway or a country road.)
                         _ => false,
                     },
             }
