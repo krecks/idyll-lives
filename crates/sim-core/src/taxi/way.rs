@@ -112,13 +112,8 @@ fn way_between(
 ) -> [Option<(f32, Vec<Piece>)>; 2] {
     use std::cmp::Reverse;
     let g = &travel.graph;
-    let speed = |road: u32| {
-        if g.roads[road as usize].kind == crate::travel::RoadKind::Country {
-            travel.country_speed
-        } else {
-            crate::travel::TOWN_SPEED
-        }
-    };
+    let speed =
+        |road: u32| crate::travel::kind_speed(g.roads[road as usize].kind, travel.country_speed);
     let slot = |d: f32| usize::from(d < 0.0);
     let mut best: [Option<(f32, Vec<Piece>)>; 2] = [None, None];
     let fe = g.edges[from.edge as usize];
@@ -284,14 +279,20 @@ pub(super) fn plan_way(
     kerbs: &[Kerb],
     way_out: [f32; 2],
 ) -> Option<Vec<Vec<Piece>>> {
-    use crate::travel::Mode;
     let g = &travel.graph;
-    let entry = *g
-        .near(way_in, crate::cars::ROAD_REACH, 1, Mode::Car)
-        .first()?;
-    let exit = *g
-        .near(way_out, crate::cars::ROAD_REACH, 1, Mode::Car)
-        .first()?;
+    // (Where it comes onto the roads and leaves them: the road nearest each way, or a motorway's
+    // carriageway ending there besides, the one going its way, `cars::exit_points`.)
+    let ends = |at: [f32; 2]| -> Vec<crate::travel::RoadPoint> {
+        crate::cars::exit_points(g, at)
+            .into_iter()
+            .map(|(p, _)| p)
+            .collect()
+    };
+    let entries = ends(way_in);
+    let exits = ends(way_out);
+    if entries.is_empty() || exits.is_empty() {
+        return None;
+    }
     let points: Vec<crate::travel::RoadPoint> = kerbs
         .iter()
         .map(|k| kerb_point(g, k))
@@ -303,7 +304,7 @@ pub(super) fn plan_way(
     for (k, &to) in points.iter().enumerate() {
         let mut here: [Best; 2] = [None, None];
         let starts: Vec<(f32, usize, crate::travel::RoadPoint, Option<f32>)> = if k == 0 {
-            vec![(0.0, 0, entry, None)]
+            entries.iter().map(|&e| (0.0, 0, e, None)).collect()
         } else {
             (0..2)
                 .filter_map(|i| {
@@ -337,7 +338,7 @@ pub(super) fn plan_way(
     // Out: from the last kerb (or straight through with none).
     let mut out: Option<(f32, usize, Vec<Piece>)> = None;
     let starts: Vec<(f32, usize, crate::travel::RoadPoint, Option<f32>)> = match table.last() {
-        None => vec![(0.0, 0, entry, None)],
+        None => entries.iter().map(|&e| (0.0, 0, e, None)).collect(),
         Some(last) => (0..2)
             .filter_map(|i| {
                 let c = last[i].as_ref()?.0;
@@ -351,8 +352,9 @@ pub(super) fn plan_way(
             .collect(),
     };
     for (c0, i0, from, dir) in starts {
-        for (c, pieces) in way_between(travel, net, from, dir, exit)
-            .into_iter()
+        for (c, pieces) in exits
+            .iter()
+            .flat_map(|&exit| way_between(travel, net, from, dir, exit))
             .flatten()
         {
             if out.as_ref().is_none_or(|b| c0 + c < b.0) {

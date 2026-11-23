@@ -1464,3 +1464,141 @@ fn a_car_held_up_by_nobody_pulls_over_only_as_far_as_it_goes_on_with() {
         "held up, it pulls over to let that one by"
     );
 }
+
+/// A road of `kind` through `pts` (a point every metre), `oneway` (`OneWay`).
+fn road_raw(
+    pts: &[[f32; 2]],
+    kind: crate::travel::RoadKind,
+    oneway: crate::travel::OneWay,
+) -> crate::travel::RoadRaw {
+    let mut points = vec![pts[0]];
+    for w in pts.windows(2) {
+        let n = crate::travel::dist(w[0], w[1]).ceil() as usize;
+        points.extend((1..=n).map(|i| {
+            let t = i as f32 / n as f32;
+            [
+                w[0][0] + (w[1][0] - w[0][0]) * t,
+                w[0][1] + (w[1][1] - w[0][1]) * t,
+            ]
+        }));
+    }
+    crate::travel::RoadRaw {
+        points,
+        width: if kind == crate::travel::RoadKind::Ramp {
+            5.0
+        } else {
+            7.0
+        },
+        kind,
+        area: None,
+        oneway,
+    }
+}
+
+fn travel_on(roads: Vec<crate::travel::RoadRaw>) -> Travel {
+    Travel::new(
+        crate::travel::OpenWorld {
+            roads,
+            ..Default::default()
+        },
+        &serde_json::json!({}),
+    )
+}
+
+/// A car leaving town by a motorway (its end of town further by road than the street's, nearer
+/// by time) drives the shorter way on beyond it: `MOTORWAY_OFF_MAP_TICKS` rather than
+/// `OFF_MAP_TICKS`.
+#[test]
+fn a_car_leaving_by_the_motorway_is_off_the_map_for_less() {
+    use crate::travel::{OneWay, RoadKind};
+    // A street north from its end of town to a ramp east onto a motorway's carriageway east.
+    let travel = travel_on(vec![
+        road_raw(
+            &[[50.0, 0.5], [50.0, 300.0]],
+            RoadKind::Street,
+            OneWay::Both,
+        ),
+        road_raw(
+            &[[50.0, 300.0], [80.0, 304.0]],
+            RoadKind::Ramp,
+            OneWay::Along,
+        ),
+        road_raw(
+            &[[80.0, 304.0], [199.5, 304.0]],
+            RoadKind::Motorway,
+            OneWay::Along,
+        ),
+    ]);
+    let exits = [[50.0, 0.5], [199.5, 304.0]];
+    // Its driveway onto the street, 285 m from the street's end of town, 170 m from the motorway's.
+    let mut c = car([45.0, 285.0], std::f32::consts::FRAC_PI_2, 285.0);
+    c.settle(&exits, Some(&travel));
+    let out = c.route(&exits, Some(&travel), false).clone();
+    let last = out.points.last().unwrap().0;
+    assert!(last[0] > 199.5, "out by the motorway: {last:?}");
+    assert!(out.by_motorway);
+    assert_eq!(c.off_map_ticks(), MOTORWAY_OFF_MAP_TICKS);
+    // Nearer the street's end of town, by the street, as ever.
+    let mut c = car([45.0, 8.0], std::f32::consts::FRAC_PI_2, 8.0);
+    c.settle(&exits, Some(&travel));
+    let last = c
+        .route(&exits, Some(&travel), false)
+        .points
+        .last()
+        .unwrap()
+        .0;
+    assert!(last[1] < 0.5, "out by the street: {last:?}");
+    assert_eq!(c.off_map_ticks(), OFF_MAP_TICKS);
+}
+
+/// Home round a one-way loop: the way in is a way of its own from the end of town to the
+/// driveway, round the loop the way it goes, not the way out turned round against it.
+#[test]
+fn home_round_a_one_way_loop_keeps_to_its_way() {
+    use crate::travel::{OneWay, RoadKind};
+    // A loop clockwise seen from above (+z north): east along the south side, north up the east
+    // side, west along the north side (its points running east), south down the west side; a
+    // two-way street east from its north-east corner to the end of town.
+    let travel = travel_on(vec![
+        road_raw(
+            &[[20.0, 20.0], [80.0, 20.0]],
+            RoadKind::Street,
+            OneWay::Along,
+        ),
+        road_raw(
+            &[[80.0, 20.0], [80.0, 60.0]],
+            RoadKind::Street,
+            OneWay::Along,
+        ),
+        road_raw(
+            &[[20.0, 60.0], [80.0, 60.0]],
+            RoadKind::Street,
+            OneWay::Against,
+        ),
+        road_raw(
+            &[[20.0, 60.0], [20.0, 20.0]],
+            RoadKind::Street,
+            OneWay::Along,
+        ),
+        road_raw(
+            &[[80.0, 60.0], [199.5, 60.0]],
+            RoadKind::Street,
+            OneWay::Both,
+        ),
+    ]);
+    let exits = [[199.5, 60.0]];
+    // Its driveway south of the south side.
+    let c = car([50.0, 10.0], 0.0, 20.0);
+    let by = |r: &Route, x: f32| {
+        r.points
+            .iter()
+            .any(|p| (p.0[0] - x).abs() < 4.0 && (p.0[1] - 40.0).abs() < 4.0)
+    };
+    let out = Route::on_roads(&c, &exits, &travel, false).expect("a way out");
+    assert!(by(&out, 80.0) && !by(&out, 20.0), "out up the east side");
+    let home = Route::on_roads(&c, &exits, &travel, true).expect("a way home");
+    assert!(
+        by(&home, 20.0) && !by(&home, 80.0),
+        "home down the west side"
+    );
+}

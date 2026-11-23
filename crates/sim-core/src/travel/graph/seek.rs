@@ -171,17 +171,20 @@ impl Graph {
     }
 
     /// Cost of `len` metres of a road of `kind` for `mode` (metres on foot, seconds of drive time by
-    /// car).
+    /// car, at its `kind_speed`).
     pub(super) fn cost(kind: RoadKind, len: f32, mode: Mode, country: f32) -> f32 {
         match mode {
             Mode::Foot => len,
-            Mode::Car => {
-                len / if kind == RoadKind::Country {
-                    country
-                } else {
-                    TOWN_SPEED
-                }
-            }
+            Mode::Car => len / kind_speed(kind, country),
         }
+    }
+
+    /// The fastest a car goes anywhere on the network (m a second of drive time), with country
+    /// roads' top speed `country`: the path search's estimate of the time left
+    /// (`search_by`'s `h`) is the straight line at it, never more than the drive takes. At least
+    /// `TOWN_SPEED` and `country`, as it was before the faster kinds, so a town without them
+    /// keeps its ways.
+    pub(super) fn top_speed(&self, country: f32) -> f32 {
+        country.max(TOWN_SPEED).max(self.fast)
     }
 }

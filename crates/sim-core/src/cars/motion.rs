@@ -29,6 +29,7 @@ impl Car {
             axis: None,
             no_way: false,
             out_ticks: 0.0,
+            by_motorway: false,
             progress: 0.0,
             trip: None,
             riders: Vec::new(),
@@ -182,6 +183,7 @@ impl Car {
             axis: self.axis,
             no_way: self.no_way,
             out_ticks: self.out_ticks,
+            by_motorway: self.by_motorway,
             progress: self.progress,
             trip: self.trip,
             riders: Vec::new(),
@@ -432,16 +434,28 @@ impl Car {
         let mut out = out;
         out.claim(self.len, self.wid, travel);
         self.out_ticks = out.ticks();
+        self.by_motorway = out.by_motorway;
         self.route = Some((false, out));
     }
 
-    /// Where its driveway meets the road (`meets`, else the nearest road it can drive on).
+    /// The drive between the end of town and work, each way (ticks): `OFF_MAP_TICKS`, or
+    /// `MOTORWAY_OFF_MAP_TICKS` for one that leaves town by a motorway.
+    pub(super) fn off_map_ticks(&self) -> u64 {
+        if self.by_motorway {
+            MOTORWAY_OFF_MAP_TICKS
+        } else {
+            OFF_MAP_TICKS
+        }
+    }
+
+    /// Where its driveway meets the road (`meets`, else the nearest road a car may come onto from
+    /// a driveway: `enterable_near`).
     pub(super) fn mouth(&self, travel: &Travel) -> Option<RoadPoint> {
         let g = &travel.graph;
         self.meets
             .and_then(|(road, s)| g.at_source(road, s))
-            .filter(|p| g.roads[p.road as usize].kind != crate::travel::RoadKind::Trail)
-            .or_else(|| g.near(self.spot, ROAD_REACH, 1, Mode::Car).first().copied())
+            .filter(|p| g.roads[p.road as usize].enterable())
+            .or_else(|| enterable_near(g, self.spot, ROAD_REACH))
     }
 
     /// Its route's claims worked out again (the junctions' lights settled: `traffic::settle`).
@@ -516,6 +530,23 @@ impl Car {
     }
 }
 
+/// The nearest point within `reach` of `p` on a road a car may come onto or leave other than at
+/// a junction (`Road::enterable`: from a driveway, a parking bay or a kerb), not a motorway or a
+/// ramp beside it; `Graph::near`'s nearest when that is one.
+pub fn enterable_near(g: &crate::travel::Graph, p: [f32; 2], reach: f32) -> Option<RoadPoint> {
+    let first = *g.near(p, reach, 1, Mode::Car).first()?;
+    if g.roads[first.road as usize].enterable() {
+        return Some(first);
+    }
+    g.near(p, reach, ENTERABLE_LOOK, Mode::Car)
+        .into_iter()
+        .find(|r| g.roads[r.road as usize].enterable())
+}
+
+/// How many roads near a point `enterable_near` looks at past a motorway's: its two
+/// carriageways and their ramps, and more.
+const ENTERABLE_LOOK: usize = 8;
+
 /// On `OVERSHOOT` past `b`, the way from `a` to `b`: where a drive out of town ends, off the map.
 pub(crate) fn extend_past(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
     let len = crate::travel::dist(a, b).max(1e-3);
@@ -526,7 +557,8 @@ pub(crate) fn extend_past(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
 }
 
 /// The top speed at each of `lane`'s points (m/s of drive time; `kind_at` the kind of road at
-/// each): `FAST` in the hamlets, `Travel::country_speed` on country roads, and `JUNCTION_SPEED`
+/// each): its kind's (`travel::kind_speed`: `FAST` on a street, `Travel::country_speed` on a
+/// country road, faster on an avenue, a ramp or a motorway, slower on a lane), and `JUNCTION_SPEED`
 /// through a junction (within `JUNCTION_REACH` of it, `junctions`) where the way turns there by
 /// more than `TURN_AT`. Straight through one it keeps its speed (its bends limit it,
 /// `Legs::timed`'s `SIDEWAYS`; the lights and the stop lines stop it, `traffic/`).
@@ -539,13 +571,7 @@ pub(crate) fn lane_tops(
     use crate::travel::dist;
     let n = lane.len();
     let mut tops: Vec<f32> = (0..n)
-        .map(|i| {
-            if kind_at(i) == crate::travel::RoadKind::Country {
-                travel.country_speed
-            } else {
-                FAST
-            }
-        })
+        .map(|i| crate::travel::kind_speed(kind_at(i), travel.country_speed))
         .collect();
     let heading = |a: usize, b: usize| {
         let (p, q) = (lane[a], lane[b]);

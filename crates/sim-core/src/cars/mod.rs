@@ -24,7 +24,7 @@
 //!   to the nearest end of town (`Route`), then it is **Away**.
 //! - Whoever finishes first waits at work for the others when they finish within
 //!   `RIDE_WAIT_TICKS` (a rider whose driver works later walks home, as without a car). The drive
-//!   back to town takes `OFF_MAP_TICKS`.
+//!   back to town takes `OFF_MAP_TICKS` (less by a motorway: `Car::off_map_ticks`).
 //! - **Arriving.** The car drives back in, nose first, and parks; its doors open and they get out
 //!   and walk to the house.
 //!
@@ -158,8 +158,10 @@ pub(crate) const PASS_TICKS: u32 = secs(3.0) as u32;
 const CLEAR_STEPS: usize = 6;
 /// How long someone done at work waits there for the others in their car.
 const RIDE_WAIT_TICKS: u64 = 60 * crate::TICKS_PER_MINUTE;
-/// The drive between the end of town and work, each way.
+/// The drive between the end of town and work, each way; shorter beyond the end of a motorway
+/// (`Car::off_map_ticks`).
 const OFF_MAP_TICKS: u64 = 10 * crate::TICKS_PER_MINUTE;
+const MOTORWAY_OFF_MAP_TICKS: u64 = 6 * crate::TICKS_PER_MINUTE;
 /// About how long the walk from the house to the car takes (for when to leave).
 const WALK_TO_CAR_TICKS: u64 = 3 * crate::TICKS_PER_MINUTE;
 /// The middle of a car's lane from the middle of the road (m): they drive on the right, clear of
@@ -307,6 +309,7 @@ pub use motion::*;
 pub(crate) use parking::*;
 pub use parking::{BAY_DEEP, BAY_LINES, BAY_WIDE, DRIVE_CLEAR, MOUTH_CLEAR};
 pub use parts::*;
+pub use route::way_out;
 pub(crate) use route::*;
 pub(crate) use seats::*;
 pub use state::*;

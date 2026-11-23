@@ -151,7 +151,8 @@ pub(super) fn bay_axis(yaw: f32, to_road: [f32; 2]) -> [f32; 2] {
 }
 
 /// A public parking spot at `at` as a bay off the road (one of a big world's, `macro.ts`: square
-/// to the road, off its verge): the point of the road it's nearest, the road's tangent there and
+/// to the road, off its verge): the point of the road it's nearest (one a car may leave and come
+/// onto there, `enterable_near`), the road's tangent there and
 /// the way from the spot to it. None: no road near, or the spot is on the road itself (pulled into
 /// along it).
 pub(crate) fn parking_bay(
@@ -159,7 +160,7 @@ pub(crate) fn parking_bay(
     at: [f32; 2],
 ) -> Option<([f32; 2], RoadPoint, [f32; 2])> {
     let g = &travel.graph;
-    let p = *g.near(at, ROAD_REACH, 1, Mode::Car).first()?;
+    let p = enterable_near(g, at, ROAD_REACH)?;
     let road = &g.roads[p.road as usize];
     let rp = g.point(p);
     let (dx, dz) = (rp[0] - at[0], rp[1] - at[1]);
