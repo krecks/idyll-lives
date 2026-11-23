@@ -20,6 +20,7 @@
   import { placeOfTemplate } from '../../game/placeLots';
   import { removeRoad, rename, whatGoes } from '../../game/edit/streets';
   import { removeVillage, villageGoes } from '../../game/edit/villages';
+  import type { RoadKind } from '../../core/protocol';
   import type { GardenSize } from '../../game/housegen';
   import { lengths, roadIndex } from '../../game/roads';
   import { generatedId, homesOn, slotDims, type LotSize } from '../../game/town';
@@ -42,7 +43,7 @@
     { value: 'roomy', label: 'Roomy' },
     { value: 'big', label: 'Big' },
   ];
-  const ROAD_KIND: Record<string, string> = { street: 'Street', lane: 'Lane', country: 'Country road', trail: 'Footpath' };
+  const ROAD_KIND: Record<RoadKind, string> = { street: 'Street', lane: 'Lane', country: 'Country road', trail: 'Footpath', avenue: 'Avenue', motorway: 'Motorway', ramp: 'Slip road' };
 
   // ---- a lot ----
   const lot = $derived(picked?.kind === 'lot' ? draft.slots[picked.slot] : undefined);

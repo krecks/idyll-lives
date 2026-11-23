@@ -11,6 +11,7 @@
  */
 
 import type { Junction, RoadPlan, WorldStructure } from '../../core/protocol';
+import { kindInfo } from '../../core/roadKinds';
 import { lengths, nearest, pointAt, SIDEWALK, type Pt } from '../../game/roads';
 import * as pmath from '../../game/pmath';
 
@@ -22,10 +23,10 @@ export const KERB_RETURN = 3;
 export const CROSSWALK = 3;
 export const STOP_PAST = 0.5;
 
-/** Whether a road has sidewalks (a town street or lane). */
-export const hasSidewalks = (r: RoadPlan | undefined) => !!r && r.kind !== 'country' && r.kind !== 'trail';
+/** Whether a road has sidewalks (a town street, lane or avenue: `ROAD_KIND`). */
+export const hasSidewalks = (r: RoadPlan | undefined) => !!r && kindInfo(r).sidewalk > 0;
 /** A road's carriageway, kerb to kerb (m): a country road has no sidewalks. */
-export const carriageway = (r: RoadPlan) => (hasSidewalks(r) ? r.width - 2 * SIDEWALK : r.width);
+export const carriageway = (r: RoadPlan) => r.width - 2 * kindInfo(r).sidewalk;
 
 /** A corner between two arms gets a kerb return only when they are this far apart, and no further (radians): straight on there's no corner, and a sliver of one would reach far out. */
 const CORNER_LEAST = (20 * Math.PI) / 180;

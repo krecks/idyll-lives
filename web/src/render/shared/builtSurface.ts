@@ -40,14 +40,15 @@
  */
 
 import type { JunctionInfo, RoadKind, RoadPlan } from '../../core/protocol';
+import { ROAD_KIND, ROAD_KINDS } from '../../core/roadKinds';
 import { LAND_CELL, NONE, heightAt, type Land, type LandRect } from '../../game/land';
 import { bridgeSpans, lengths, nearest, pointAt, RoadIndex } from '../../game/roads';
 import { CHUNK, chunkAt, chunksIn } from './chunks';
 import { carriageway, CROSSWALK, KERB_RETURN, planJunctions, type JunctionPlan } from './junctions';
 import * as pmath from '../../game/pmath';
 
-/** The steepest each kind of way climbs (rise per m); a trail's is a measure only (it lies on the land). */
-export const GRADE: Record<RoadKind, number> = { street: 0.08, lane: 0.08, country: 0.12, trail: 0.22 };
+/** The steepest each kind of way climbs (rise per m: `ROAD_KIND`'s `grade`); a trail's is a measure only (it lies on the land). */
+export const GRADE = Object.fromEntries(ROAD_KINDS.map((k) => [k, ROAD_KIND[k].grade])) as Record<RoadKind, number>;
 /** The tallest a lot's edge stands over the land beside it (m), the deepest a road or a lot is cut into the land or stands on it (m). */
 export const RETAIN_MAX = 1.5;
 export const CUT_MAX = 4;

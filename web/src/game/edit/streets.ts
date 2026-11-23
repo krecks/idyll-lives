@@ -38,13 +38,14 @@
 
 import type { Content } from '../../content/content';
 import type { RoadKind, RoadPlan } from '../../core/protocol';
+import { ROAD_KIND } from '../../core/roadKinds';
 import { bayRect, carParkRect } from '../parking';
 import { surfacePlots } from '../../render/shared/builtSurface';
 import { crossWater, DRAWN_SPAN, wetSpans, withBridge, withoutDeck } from '../bridges';
 import { CTRL_APART, ROAD_WIDTH } from '../countryRouter';
 import { rle, simplify, unrle } from '../landMasks';
 import { mulberry32 } from '../noise';
-import { BRIDGE_IN, TRAIL_WIDTH } from '../macro';
+import { BRIDGE_IN } from '../macro';
 import { bends, clearOf, connector, COURT, cropRoads, curve, endDir, evenly, inside, leftOf, lengths, MEET, nearest, pointAt, RoadIndex, ROOM, roomAt, trimJoins, type Fit, type Pt } from '../roads';
 import { plotRect, type NeighbourhoodDraft, type Rect, type Templates } from '../town';
 import { placeOf, specOf, streetNames } from '../world';
@@ -84,7 +85,7 @@ export { ROOM } from '../roads';
 export const TRAIL_APART = 6;
 /** A street drawn this near an area's box (m) is one of its streets. */
 const NEAR_AREA = 30;
-/** A drawn line is simplified to this (m), and has a point every `CTRL_APART` m (a country road's) before it is made a curve. Widths: `countryRouter.ts` `ROAD_WIDTH`, `macro.ts` `TRAIL_WIDTH`. */
+/** A drawn line is simplified to this (m), and has a point every `CTRL_APART` m (a country road's) before it is made a curve. Widths: `streetWidth`. */
 const SIMPLIFY = 5;
 /** How much of a drawn line (m) is turned to meet a road, or to carry on a dead end's way. */
 const APPROACH = 16;
@@ -587,8 +588,8 @@ export function streetCourse(meet: Meeting, shaped: StreetLine): StreetCourse | 
   return { start, end, junctions, part, head, foot, ends };
 }
 
-/** The width of a drawn road of `kind` (m): a footpath's, or every road's in a big world. */
-export const streetWidth = (kind: RoadKind) => (kind === 'trail' ? TRAIL_WIDTH : ROAD_WIDTH);
+/** The width of a drawn road of `kind` (m): a footpath's, or its kind's (`ROAD_KIND`) and no narrower than every road's in a big world. */
+export const streetWidth = (kind: RoadKind) => (kind === 'trail' ? ROAD_KIND.trail.width : Math.max(ROAD_KIND[kind].width, ROAD_WIDTH));
 
 /**
  * `draft` with the street `stroke` draws (see the top of this file), its homes (`stroke.fill`, a
