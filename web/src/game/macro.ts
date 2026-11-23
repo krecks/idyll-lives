@@ -33,6 +33,7 @@ import type { CarPark, LandSize, ParkingBay, Rle, TownArea, TownPlace, TownSize,
 import { distanceToRect } from '../render/shared/chunks';
 import { areaSize, civicTooBig, CIVIC, namerFor, ZONE, type ZoneKind } from './places';
 import { chooseCentre, densestCentre, type Centre } from './centre';
+import { oneWayPairs } from './oneway';
 import { tilesOf } from './footprints';
 import { designs, DensePass, NEAR_CORNER, pooled, raisePlaces, terraceUnits, townPlaces } from './dense';
 import { besidePlace, bySquare, clearOfDrives, driveLines, LOOSE_BEND, parkAlong, vergeParking, type CarParkLaid } from './parking';
@@ -1502,16 +1503,29 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     if (first < 0 || (first > 0 && r.ends[0] !== 'out') || (last < off.length - 1 && r.ends[1] !== 'out') || off.slice(first, last).includes(true)) failed.push(`${r.name ?? 'a road'} runs out over the edge of the world`);
   }
   const allGreens = plans.flatMap((p) => p.greens);
-  const ground = new Ground(W, D, worldRoads, allGreens);
-  // (A place's lots and buildings keep a strip of bank between them and the water: a way round behind the gardens.)
-  ground.block(spec.classic ? waterMask : grown(waterMask, W, D, SHORE_GAP));
+  const groundOn = (on: readonly RoadPlan[]) => {
+    const g = new Ground(W, D, on, allGreens);
+    // (A place's lots and buildings keep a strip of bank between them and the water: a way round behind the gardens.)
+    g.block(spec.classic ? waterMask : grown(waterMask, W, D, SHORE_GAP));
+    return g;
+  };
+  const tooSteep = (x: number, z: number) => !spec.classic && land.slope(land.cell(x, z)) > PLACE_STEEP;
+  // A town's or a city's one-way pairs (`oneway.ts`), round its dense middle (the high street's, as `chooseCentre`
+  // finds it below on the same roads), before any lot: none a way out of town (an end a country road goes on from).
+  if (mainSpec.oneway) {
+    const high = chooseCentre(worldRoads, plans[0].roads, plans[0].centre, groundOn([...worldRoads]), 0, tooSteep);
+    const middle = high ? pointAt(worldRoads[high.road].points, (high.s0 + high.s1) / 2).p : plans[0].centre;
+    const own = plans[0].roads.filter((i) => !plans[0].ports.some((p) => p.road === i));
+    oneWayPairs(worldRoads, own, middle, mainSpec.oneway).roads.forEach((r, i) => (worldRoads[i] = r));
+  }
+  const ground = groundOn(worldRoads);
   // The living town's own draws (the centre, the terraces, the dense pass), apart from the layout's:
   // the rest of the world is laid out as it was.
   const dense = mulberry32(((lay?.townSeed ?? seed) ^ 0x2545f491) >>> 0);
   // (The centre's buildings of flats from a stream of their own, so the rest is drawn as it was.)
   const centreFlats = mulberry32(((lay?.townSeed ?? seed) ^ 0x51ed270b) >>> 0);
   // The main town's centre: its high street and a square off it, kept clear of lots.
-  const centre = chooseCentre(worldRoads, plans[0].roads, plans[0].centre, ground, 0, (x, z) => !spec.classic && land.slope(land.cell(x, z)) > PLACE_STEEP);
+  const centre = chooseCentre(worldRoads, plans[0].roads, plans[0].centre, ground, 0, tooSteep);
   const inCentre = (f: Frontage) => !!centre && inside(centre.poly, f.p[0] + f.n[0] * 10, f.p[1] + f.n[1] * 10);
   const lots = new LotPlacer(content, t, ground, worldRoads, spec.gaps, rand, true);
   const names: (string | undefined)[] = worldRoads.map((r) => r.name);
