@@ -19,7 +19,13 @@ import { deriveJunctions } from '../../tests/fixtures/junctions';
 
 type Pt = [number, number];
 
-const follow = typeof location !== 'undefined' && new URLSearchParams(location.search).has('follow');
+const params = typeof location === 'undefined' ? new URLSearchParams() : new URLSearchParams(location.search);
+const follow = params.has('follow');
+/**
+ * `&plainRoads`: every road plain, two-way and on the ground, a motorway's carriageway and a ramp a country road, an
+ * avenue a street (the draws without what the new kinds add, to count against).
+ */
+const plain = params.has('plainRoads');
 
 /** How far round the fixture nothing of the world it is set in is kept (m). */
 const CLEAR = 60;
@@ -30,7 +36,7 @@ export function roadFixtureWorld(base: WorldStructure): WorldStructure {
   const [W, D] = [base.width, groundDepth(base)];
   const [ox, oz] = [Math.round(W - h.width - CLEAR), Math.round(D - h.depth - CLEAR)];
   const shift = ([x, z]: Pt): Pt => [x + ox, z + oz];
-  const roads: RoadPlan[] = h.roads.map((r) => ({ ...r, points: r.points.map(shift) }));
+  const roads: RoadPlan[] = h.roads.map((r) => ({ ...r, points: r.points.map(shift), ...(plain ? { kind: r.kind === 'motorway' || r.kind === 'ramp' ? ('country' as const) : ('street' as const), oneway: undefined, raised: undefined, bridge: undefined } : {}) }));
   const box = { x0: ox - CLEAR, z0: oz - CLEAR, x1: ox + h.width + CLEAR, z1: oz + h.depth + CLEAR };
   const clear = (pts: readonly Pt[]) => pts.every(([x, z]) => x < box.x0 || x > box.x1 || z < box.z0 || z > box.z1);
   const meta = base.meta!;

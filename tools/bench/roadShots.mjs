@@ -6,8 +6,9 @@
  * (`__bench.counts`) are printed and written to `counts.json` beside the pictures. On each renderer.
  *
  *   bun tools/bench/roadShots.mjs [--renderers webgpu,webgl] [--quality medium] [--port 5311 | --url <u>] [--out <dir>]
- *     [--only overpass,overview-400] [--follow]
+ *     [--only overpass,overview-400] [--follow] [--plain]
  *
+ * `--plain`: every road a plain street on the ground (`&plainRoads`), the draws to count the new kinds' against.
  * `--follow`: the fixture on a land the town follows (`&follow`: its built surface gives the decks' heights and the ground
  * under them); without it, a land drawn flat, where the decks climb on their own (`motorway.ts` `deckLevels`).
  *
@@ -26,7 +27,7 @@ const renderers = flag('renderers', 'webgpu,webgl').split(',');
 const quality = flag('quality', 'medium');
 const out = flag('out', 'bench-results/road-shots');
 const only = flag('only', null)?.split(',') ?? null;
-const follow = args.includes('--follow') ? '&follow' : '';
+const follow = (args.includes('--follow') ? '&follow' : '') + (args.includes('--plain') ? '&plainRoads' : '');
 mkdirSync(out, { recursive: true });
 
 // (Over the fixture's middle, `tx`/`tz` m off it: `roadFixture.ts`. `beta`: from straight down.)
@@ -56,17 +57,20 @@ try {
       await page.evaluate((x) => window.__bench.pose(x), p.pose);
       await page.evaluate(() => window.__bench.hour(13));
       await page.evaluate(() => window.__bench.settle({ limitMs: 90_000 }));
-      const file = join(out, `${p.name}-${renderer}${follow ? '-follow' : ''}.png`);
+      const file = join(out, `${p.name}-${renderer}${follow ? follow.replaceAll('&', '-') : ''}.png`);
       await page.screenshot({ path: file });
-      const c = await page.evaluate(() => window.__bench.counts(30));
-      counts[`${p.name}-${renderer}${follow ? '-follow' : ''}`] = c;
+      // (Counted at 1x, then frozen again for the next pose: a frozen page draws nothing new to count.)
+      await page.evaluate(() => window.__bench.freeze(false));
+      const c = await page.evaluate(() => window.__bench.counts(120));
+      await page.evaluate(() => window.__bench.freeze(true));
+      counts[`${p.name}-${renderer}${follow ? follow.replaceAll('&', '-') : ''}`] = c;
       console.log(`${p.name} ${renderer}: ${file}, draws ${c.mean?.draws ?? JSON.stringify(c).slice(0, 160)}`);
     }
     await done();
     await context.close();
   }
 } finally {
-  writeFileSync(join(out, `counts${follow ? '-follow' : ''}.json`), JSON.stringify(counts, null, 1));
+  writeFileSync(join(out, `counts${follow ? follow.replaceAll('&', '-') : ''}.json`), JSON.stringify(counts, null, 1));
   await browser.close();
   stop();
 }
