@@ -1554,7 +1554,6 @@ fn a_car_leaving_by_the_motorway_is_off_the_map_for_less() {
 /// Home round a one-way loop: the way in is a way of its own from the end of town to the
 /// driveway, round the loop the way it goes, not the way out turned round against it.
 #[test]
-#[ignore = "S-GRAPH: one-way edges in the path search"]
 fn home_round_a_one_way_loop_keeps_to_its_way() {
     use crate::travel::{OneWay, RoadKind};
     // A loop clockwise seen from above (+z north): east along the south side, north up the east

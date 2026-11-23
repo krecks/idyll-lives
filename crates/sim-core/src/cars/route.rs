@@ -856,7 +856,7 @@ const MOTORWAY_END: f32 = 2.0;
 /// carriageways ending there besides (both of them come near a way out; the path search takes
 /// only the one going out, `Graph::path`), each with what leaving by it saves (s of drive time:
 /// `MOTORWAY_SAVES` by a motorway).
-pub(super) fn exit_points(g: &crate::travel::Graph, x: [f32; 2]) -> Vec<(RoadPoint, f32)> {
+pub(crate) fn exit_points(g: &crate::travel::Graph, x: [f32; 2]) -> Vec<(RoadPoint, f32)> {
     use crate::travel::RoadKind;
     let Some(&first) = g.near(x, ROAD_REACH, 1, Mode::Car).first() else {
         return Vec::new();

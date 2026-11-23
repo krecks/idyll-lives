@@ -74,3 +74,81 @@ fn the_leisure_taxis_out_at_once_are_a_fleet_of_six() {
     taxis.runs.push(run(20, Some(4), true));
     assert!(taxis.fleet_out(), "{LEISURE_FLEET} out, there or back");
 }
+
+/// A taxi in and out by a motorway's end of town: the way in and the way out sit by both
+/// carriageways' ends, nearer the one going the other way; it comes in along the one coming in
+/// and leaves along the one going out (`plan_way`, `cars::exit_points`).
+#[test]
+fn a_taxi_comes_in_and_leaves_by_the_carriageway_going_its_way() {
+    use crate::travel::{OneWay, RoadKind, RoadRaw, Travel};
+    let line = |a: [f32; 2], b: [f32; 2]| -> Vec<[f32; 2]> {
+        let n = crate::travel::dist(a, b).ceil() as usize;
+        (0..=n)
+            .map(|i| {
+                let t = i as f32 / n as f32;
+                [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
+            })
+            .collect()
+    };
+    let road = |pts: Vec<[f32; 2]>, width: f32, kind: RoadKind, oneway: OneWay| RoadRaw {
+        points: pts,
+        width,
+        kind,
+        area: None,
+        oneway,
+    };
+    // Carriageways along z = 100 (east, coming in from x = 0.5) and z = 109 (west, going out);
+    // ramps between them and a street at x = 150 north of both.
+    let travel = Travel::new(
+        crate::travel::OpenWorld {
+            roads: vec![
+                road(
+                    line([0.5, 100.0], [299.5, 100.0]),
+                    9.0,
+                    RoadKind::Motorway,
+                    OneWay::Along,
+                ),
+                road(
+                    line([0.5, 109.0], [299.5, 109.0]),
+                    9.0,
+                    RoadKind::Motorway,
+                    OneWay::Against,
+                ),
+                road(
+                    line([60.0, 100.0], [150.0, 80.0]),
+                    5.0,
+                    RoadKind::Ramp,
+                    OneWay::Along,
+                ),
+                road(
+                    line([150.0, 130.0], [60.0, 109.0]),
+                    5.0,
+                    RoadKind::Ramp,
+                    OneWay::Along,
+                ),
+                road(
+                    line([150.0, 0.5], [150.0, 199.5]),
+                    7.0,
+                    RoadKind::Street,
+                    OneWay::Both,
+                ),
+            ],
+            ..Default::default()
+        },
+        &serde_json::json!({}),
+    );
+    let net = Net::new(&travel, &serde_json::json!({}), &[]);
+    let road_of = |p: &(u32, f32, f32)| travel.graph.roads[p.0 as usize].source;
+    // (The motorway's west end 2 m off the eastbound's end, 7 m off the westbound's.)
+    let end = [0.5, 102.0];
+    // In by it, out at the street's north end: along the eastbound, east.
+    let legs = plan_way(&travel, &net, end, &[], [150.0, 199.5]).expect("in by the motorway");
+    let first = legs.concat()[0];
+    assert_eq!(road_of(&first), 0, "in along the eastbound: {legs:?}");
+    assert!(first.2 > first.1, "east along it");
+    // In at the street's south end, out by it: along the westbound, west.
+    let legs = plan_way(&travel, &net, [150.0, 0.5], &[], end).expect("out by the motorway");
+    let last = *legs.concat().last().unwrap();
+    assert_eq!(road_of(&last), 1, "out along the westbound: {legs:?}");
+    assert!(last.2 < last.1, "west along it");
+}
