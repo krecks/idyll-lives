@@ -673,8 +673,9 @@ pub(crate) fn empty_drive_route(travel: &Travel, from: [f32; 2], to: [f32; 2]) -
     });
     let mut legs = Legs::default();
     for (i, &p) in lane.iter().enumerate() {
-        let (_, _, room, at) = here(p)?;
+        let (_, kind, room, at) = here(p)?;
         legs.push_lane(p, tops[i], room, at);
+        legs.mark_kind(kind);
         if let Some(m) = marks.as_ref() {
             legs.mark_last(m[laid_from.next(p)]);
         }

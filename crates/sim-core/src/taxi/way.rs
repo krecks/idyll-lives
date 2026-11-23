@@ -614,6 +614,7 @@ pub(super) fn lay_route(
                 let (room, meet) = crate::cars::meet(roads[i], offs[i], TAXI_WID);
                 let room = room - crate::cars::bend_out(&lane, k, TAXI_LEN);
                 out.push_lane(p, top, room.max(0.0), meet);
+                out.mark_kind(along[i].1);
                 if let Some(m) = mark {
                     out.mark_last(m);
                 }

@@ -44,6 +44,10 @@ pub(crate) struct Route {
     /// Where it merges off a ramp into a motorway's carriageway (ticks along it: at the merge),
     /// each a claim of its own (`MERGE_UP`, `MERGE_ON`).
     pub(crate) merges: Vec<f32>,
+    /// Where it's on an avenue, a motorway or a ramp (ticks along it, from and to, and which:
+    /// `travel::fast_kind`): there it speeds up and slows down as a car does (`Car::speed`).
+    /// Elsewhere on a street, a lane, a country road or off the roads (`kind_at`).
+    pub(crate) kinds: Vec<(f32, f32, crate::travel::RoadKind)>,
 }
 
 /// A car's way round a taxi standing at the kerb (`PassBy`) as laid on its route: the points
@@ -544,13 +548,14 @@ impl Route {
                 legs.line(from, p, false, JUNCTION_SPEED);
             }
             on = true;
-            let (_, _, room, at) = here(p);
+            let (_, kind, room, at) = here(p);
             legs.push_lane(
                 p,
                 tops[i],
                 (room - bend_out(&lane, i, car.len)).max(0.0),
                 at,
             );
+            legs.mark_kind(kind);
             if let Some(m) = mark {
                 legs.mark_last(m);
             }
@@ -613,6 +618,9 @@ impl Route {
             // (Pulled over as far as the way it came lets it, as it was: `pull_over`.)
             legs.push_back(had.at(t).0, had.room_here(t), had.lane_at(t));
             legs.mark_last((had.layer_at(t), false));
+            if let Some(k) = had.kind_at(t) {
+                legs.mark_kind(k);
+            }
             if t <= d.back {
                 break;
             }
@@ -632,6 +640,9 @@ impl Route {
                 legs.lane.push(had.lane.get(i).copied().unwrap_or(LANE));
                 let merge = had.merges.iter().any(|&m| (m - t).abs() < 1e-3);
                 legs.mark_last((had.layer_at(t), merge));
+                if let Some(k) = had.kind_at(t) {
+                    legs.mark_kind(k);
+                }
             }
             return Some(legs.timed(true, false));
         }
@@ -846,13 +857,14 @@ impl Route {
             {
                 break;
             }
-            let (_, _, room, at) = here(q);
+            let (_, kind, room, at) = here(q);
             legs.push_lane(
                 q,
                 tops[i],
                 (room - bend_out(&lane, i, car.len)).max(0.0),
                 at,
             );
+            legs.mark_kind(kind);
             if let Some(m) = mark {
                 legs.mark_last(m);
             }
@@ -942,6 +954,25 @@ impl Route {
             .iter()
             .find(|l| l.0 <= t && t <= l.1)
             .map_or(crate::travel::Layer::GROUND, |l| l.2)
+    }
+
+    /// The kind of road it's on `t` ticks along, of an avenue, a motorway and a ramp (`kinds`);
+    /// None: any other, or off the roads.
+    pub(crate) fn kind_at(&self, t: f32) -> Option<crate::travel::RoadKind> {
+        self.kinds
+            .iter()
+            .find(|k| k.0 <= t && t <= k.1)
+            .map(|k| k.2)
+    }
+
+    /// Whether it's on a motorway's carriageway or a ramp anywhere from `a` to `b` ticks along
+    /// (`kinds`): nobody backs up or turns round there (`turn_round`, `back_off`).
+    pub(crate) fn on_motorway(&self, a: f32, b: f32) -> bool {
+        use crate::travel::RoadKind;
+        let (a, b) = (a.min(b), a.max(b));
+        self.kinds
+            .iter()
+            .any(|k| matches!(k.2, RoadKind::Motorway | RoadKind::Ramp) && k.0 <= b && a <= k.1)
     }
 
     /// Where the car is `t` ticks in, which way it faces, and whether it's backing up.

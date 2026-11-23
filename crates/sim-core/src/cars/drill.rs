@@ -39,6 +39,20 @@ pub fn put(w: &mut World, c: usize, t: f32) {
     car.shown = Some((p, yaw, true, 0));
 }
 
+/// Car `c` standing `t` ticks along its way (a breakdown: `put` there, not on the move), as each
+/// tick of a drill leaves it till it's let go.
+pub fn hold(w: &mut World, c: usize, t: f32) {
+    put(w, c, t);
+    let car = &mut w.cars[c];
+    car.moved = false;
+}
+
+/// Whether car `c` has turned round (`unjam`: its way turned round, backing up along it or on
+/// from there).
+pub fn turned_round(w: &World, c: usize) -> bool {
+    w.cars[c].detour.is_some()
+}
+
 /// A tick of the drills' traffic: the claims (`traffic::begin`), then each car on its way a tick
 /// on (`drive_on`); one at its way's end is gone.
 pub fn step(w: &mut World) {

@@ -64,6 +64,12 @@ pub fn kind_speed(kind: RoadKind, country: f32) -> f32 {
         RoadKind::Motorway => MOTORWAY_SPEED,
     }
 }
+/// Whether cars on a road of `kind` speed up and slow down as cars do, each at a speed of its own
+/// (`cars::Car::speed`): an avenue, a motorway and a ramp. Every classic town's roads are none of
+/// them: there each car keeps to its way's timing as it always did.
+pub fn fast_kind(kind: RoadKind) -> bool {
+    matches!(kind, RoadKind::Avenue | RoadKind::Motorway | RoadKind::Ramp)
+}
 /// Game minutes in a minute of `Travel::eta` by car: a car's speeds are drive time (m a second of
 /// it), so the eta's minutes are a drive's seconds of drive time over 60, each `DRIVE_SCALE` times
 /// shorter than a real second, which is `GAME_MINUTES_PER_SECOND` of the game's minutes

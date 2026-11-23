@@ -483,6 +483,11 @@ pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static 
         return Err("no way");
     };
     let t = car.progress;
+    // (Never on a motorway's carriageway or a ramp: there it waits, as a driver would; held up
+    // for good out of the picture, it's put on, `unstick`.)
+    if route.on_motorway(t, t) {
+        return Err("on a motorway");
+    }
     let half = [car.len / 2.0, car.wid / 2.0];
     let body = |s: f32| {
         let (p, yaw, _) = route.at(s);
@@ -555,6 +560,11 @@ pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static 
     loop {
         let next = (s - 1.0).max(first);
         if next >= s {
+            break;
+        }
+        // (Nor back up onto a ramp or a motorway's carriageway.)
+        if route.on_motorway(next, s) {
+            why = if seen_box { "no room" } else { "on a motorway" };
             break;
         }
         let r = body(next);
@@ -706,8 +716,13 @@ pub(crate) fn mouth_behind(
 }
 
 /// Why none of a ring of cars could turn round (`unjam`), the most telling last: the one counted.
-pub(crate) const UNJAM_WHY: [&str; 4] =
-    ["turning round", "no room", "no junction behind", "no way"];
+pub(crate) const UNJAM_WHY: [&str; 5] = [
+    "turning round",
+    "no room",
+    "no junction behind",
+    "on a motorway",
+    "no way",
+];
 
 /// Longest a car turned round with no other way waits out of the way for those it was held up
 /// with to go on (ticks of drive time, `unjam`).

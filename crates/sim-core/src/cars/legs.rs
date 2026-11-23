@@ -82,6 +82,9 @@ pub(crate) struct Legs {
     /// Its points where it merges off a ramp into a motorway's carriageway, by index
     /// (`Route::merges`).
     pub(crate) merges: Vec<usize>,
+    /// Its points on an avenue, a motorway or a ramp, by index, and which (`Route::kinds`); every
+    /// other on a street, a lane, a country road or off the roads.
+    pub(crate) kinds: Vec<(usize, crate::travel::RoadKind)>,
 }
 
 impl Legs {
@@ -139,6 +142,17 @@ impl Legs {
         }
         if merge && self.merges.last() != Some(&i) {
             self.merges.push(i);
+        }
+    }
+
+    /// Its last point marked as on a road of `kind` (`Route::kinds`: only an avenue, a motorway
+    /// or a ramp is kept).
+    pub(crate) fn mark_kind(&mut self, kind: crate::travel::RoadKind) {
+        let Some(i) = self.pts.len().checked_sub(1) else {
+            return;
+        };
+        if crate::travel::fast_kind(kind) && self.kinds.last().is_none_or(|k| k.0 != i) {
+            self.kinds.push((i, kind));
         }
     }
 
@@ -288,6 +302,22 @@ impl Legs {
             .iter()
             .map(|&i| points[i.min(n - 1)].2)
             .collect();
+        // (Runs of points on one kind of road, from the first's tick to the last's; one run on to
+        // the next of another kind straight after it, up to its first: no stretch between them.)
+        let mut kinds: Vec<(f32, f32, crate::travel::RoadKind)> = Vec::new();
+        let mut last: Option<usize> = None;
+        for &(i, k) in &self.kinds {
+            let t = points[i.min(n - 1)].2;
+            match (last, kinds.last_mut()) {
+                (Some(j), Some(run)) if j + 1 == i && run.2 == k => run.1 = t,
+                (Some(j), Some(run)) if j + 1 == i => {
+                    run.1 = t;
+                    kinds.push((t, t, k));
+                }
+                _ => kinds.push((t, t, k)),
+            }
+            last = Some(i);
+        }
         Route {
             points,
             room: self.room,
@@ -302,6 +332,7 @@ impl Legs {
             by_motorway: false,
             layers,
             merges,
+            kinds,
         }
     }
 }
