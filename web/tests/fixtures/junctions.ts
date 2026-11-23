@@ -54,10 +54,12 @@ export function deriveJunctions(roads: readonly RoadPlan[]): Junction[] {
   roads.forEach((r, i) => {
     if (!drivable(r) || ring(r)) return;
     for (const e of [0, 1] as const) {
+      // (A ramp's end merging into the motorway is no junction: sim-core `merge_nodes`.)
+      if (r.ends[e] === 'merge') continue;
       const p = e === 0 ? r.points[0] : r.points[r.points.length - 1];
       const se = e === 0 ? 0 : lens[i][lens[i].length - 1];
       roads.forEach((o, q) => {
-        if (q === i || !drivable(o)) return;
+        if (q === i || !drivable(o) || passes(r, i, o, q)) return;
         const snap = Math.max(o.width, r.width) / 2 + 1;
         if (!boxNear(bounds[q], p, snap)) return;
         const { dist, s } = near(q, p[0], p[1]);
@@ -108,14 +110,15 @@ export function deriveJunctions(roads: readonly RoadPlan[]): Junction[] {
     if (ways.length < 3) continue;
     const roundabout = ways.some((w) => roads[w.road].island);
     ways.sort((a, b) => Math.atan2(a.dir[1], a.dir[0]) - Math.atan2(b.dir[1], b.dir[0]));
-    const kind = (road: number) => roads[road].kind ?? 'street';
+    // (An avenue counts as a street: a main road with sidewalks.)
+    const kind = (road: number) => (roads[road].kind === 'avenue' ? 'street' : (roads[road].kind ?? 'street'));
     const streets = ways.filter((w) => kind(w.road) === 'street').length;
     const country = streets > 0 ? ways.filter((w) => kind(w.road) === 'country').length : 0;
     const allCountry = ways.every((w) => kind(w.road) === 'country');
     const lit = roundabout || (ways.length >= LIT_ARMS && !allCountry) || streets + country >= LIT_MAIN_ARMS;
     found.push({ x, z, roundabout, lit, ways });
   }
-  const kind = (road: number) => roads[road].kind ?? 'street';
+  const kind = (road: number) => (roads[road].kind === 'avenue' ? 'street' : (roads[road].kind ?? 'street'));
   // (Along a road from `s` its way `k`: the next junction on it, and how far.)
   const next = (j: number, road: number, s: number, k: number) => {
     let best: { j: number; d: number } | null = null;
@@ -193,6 +196,9 @@ function boundsOf(pts: readonly Pt[]): [number, number, number, number] {
   return b;
 }
 
+/** Whether road `a` (index `i`) passes over or under road `b` (index `j`) without meeting it (`RoadPlan.crosses`). */
+const passes = (a: RoadPlan, i: number, b: RoadPlan, j: number) => !!a.crosses?.some((c) => c.road === j) || !!b.crosses?.some((c) => c.road === i);
+
 /** Whether `p` is within `m` m of a bounding box. */
 const boxNear = ([x0, z0, x1, z1]: readonly number[], p: Pt, m: number) => p[0] > x0 - m && p[0] < x1 + m && p[1] > z0 - m && p[1] < z1 + m;
 
@@ -220,7 +226,7 @@ function crossings(roads: readonly RoadPlan[], lens: readonly number[][]): { p: 
     for (let u = 0; u < list.length; u++) {
       for (let v = u + 1; v < list.length; v++) {
         const [[i, k], [j, l]] = [list[u], list[v]];
-        if (i === j) continue;
+        if (i === j || passes(roads[i], i, roads[j], j)) continue;
         const key = i < j ? `${i}:${k}:${j}:${l}` : `${j}:${l}:${i}:${k}`;
         if (seen.has(key)) continue;
         seen.add(key);

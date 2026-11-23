@@ -64,7 +64,10 @@
 //!
 //! **Among the traffic.** A car drives in its lane, `LANE` right of the road's middle where the
 //! road has room for two to pass clear of each other (a 7 m street, a country road), `TIGHT_LANE`
-//! on one too narrow for that (a 6 m lane) and in older towns (`lane_on`). It keeps behind one in
+//! on one too narrow for that (a 6 m lane) and in older towns (`lane_on`); on an avenue, a
+//! motorway, a ramp or a one-way road, its lane by `LaneLine` (`lanes.rs`: an avenue's inner lane
+//! only up to a left turn, the motorway's outer lane, a one-way road's middle; lanes changed in a
+//! junction's box, eased over `TAPER` m where a ramp merges or leaves). It keeps behind one in
 //! front of it going its way (`up_against`); of two tangled, the later keeps behind the earlier
 //! till they part (`Driving::free`). Coming into town it waits out of sight at the way in till the
 //! way in is clear of the one before it, the ground in front of it too, the one there longest first
@@ -288,6 +291,7 @@ mod bodies;
 mod driving;
 mod garages;
 mod lane;
+mod lanes;
 mod legs;
 mod looks;
 mod motion;
@@ -303,6 +307,7 @@ pub use bodies::*;
 pub(crate) use driving::*;
 pub(crate) use garages::*;
 pub(crate) use lane::*;
+pub(crate) use lanes::*;
 pub(crate) use legs::*;
 pub use looks::*;
 pub use motion::*;

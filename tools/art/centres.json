@@ -421,6 +421,7 @@
   "model.mirrorWall": [0.0, -0.385],
   "model.monitor": [0.0, 0.0],
   "model.mopBucket": [0.0, -0.23],
+  "model.motorwaySign": [0.0, -0.125],
   "model.mountainBike": [0.0, 0.0],
   "model.mugs": [0.0, 0.0],
   "model.natureLover.birdFeeder": [0.01, -0.05],

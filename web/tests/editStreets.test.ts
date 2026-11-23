@@ -6,12 +6,19 @@
 // tighter than 9 m; crosses a 30 m river on a straight bridge and is refused over 60 m; clears what
 // is in its way; is named apart from every name in town. A road removed takes what it leaves
 // joined to nothing, keeps one network, and gives the water under a bridge back. The Street tool's
-// magnet; a street or a lane asked for outside the town; the first street on bare land. `bun test`.
+// magnet; a street or a lane asked for outside the town; the first street on bare land. The road hierarchy: an avenue
+// keeps 14 m of road clear, a one-way street ends on roads and leaves every road reachable, a road's kind and way
+// changed on its card (`changeKind`), the motorway not crossed and removed whole, the Problems list's one-way and
+// junction lines. `bun test`.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import type { Content } from '../src/content/content';
 import type { RoadPlan } from '../src/core/protocol';
-import { drawStreet, madeKind, Meeting, removeRoad, rename, streetsBare, whatGoes } from '../src/game/edit/streets';
+import { changeKind, CROSS_MOTORWAY, CUT_OFF, drawStreet, madeKind, Meeting, ONE_WAY_ENDS, removeRoad, rename, streetsBare, whatGoes } from '../src/game/edit/streets';
+import { onewayOf } from '../src/core/roadKinds';
+import { cutOffRoads, stronglyConnected } from '../src/game/oneway';
+import { roadHierarchy, BRIDGE_STREET, LOOP, MOTORWAY_EAST, MOTORWAY_WEST, OFF_RAMP, ON_RAMP } from '../src/render/roadHierarchyFixture';
+import { roadWayIssues } from '../src/ui/townedit/problems';
 import type { Edited } from '../src/game/edit/edited';
 import { checkedTown, editedProblems } from '../src/game/edit/checked';
 import { DRAWN_SPAN } from '../src/game/bridges';
@@ -673,5 +680,147 @@ describe('a street drawn with homes along it, on a generated world', async () =>
     const bare = drawStreet(hamlet, templates, real, { points, kind: 'street', clear: true, fill: false, seed: 11 });
     if ('refused' in bare) throw new Error(bare.refused);
     expect(bare.draft.slots.length).toBe(hamlet.slots.length - cleared);
+  });
+});
+
+/** The road hierarchy's fixture (`roadHierarchyFixture.ts`) as a plan draft with no lots. */
+function hierarchy(roads = roadHierarchy().roads): NeighbourhoodDraft {
+  const { width, depth } = roadHierarchy();
+  return { name: 'Junction', width, depth, slots: [], roads, greens: [], households: [] } as unknown as NeighbourhoodDraft;
+}
+
+describe('avenues and one-way streets drawn', () => {
+  // (From the high street east of the lots up and west along z `z`, ending in the open past Mill Lane's dead end, 10 m short of it at z 140.)
+  const past = (z: number): Pt[] => [[240, MAIN_Z + 8], [240, z], [200, z], [100, z]];
+
+  test('an avenue is 14 m wide and keeps clear of a road a street may pass 10 m from (it meets it there)', () => {
+    const street = made(draw(town(), past(140))).draft.roads.at(-1)!;
+    expect(street.width).toBe(7);
+    // (It touches Mill Lane's dead end there, and would end on it, turned too tightly.)
+    expect(refusal(draw(town(), past(140), { kind: 'avenue' }))).not.toBe('');
+    const avenue = made(draw(town(), past(150), { kind: 'avenue' })).draft.roads.at(-1)!;
+    expect(avenue.kind).toBe('avenue');
+    expect(avenue.width).toBe(14);
+    expect(avenue.area).toBe(0);
+    // (Asked for out of town it stays one, with no area; by where it runs, a street in town.)
+    expect(madeKind(town(), line(390, 120, 390, 280), 'avenue', true)).toEqual({ kind: 'avenue' });
+    expect(madeKind(town(), line(390, 120, 390, 280), 'avenue')).toEqual({ kind: 'country' });
+  });
+
+  test('a one-way street goes the way it is drawn (or against it), and ends on a road at both ends', () => {
+    const route: Pt[] = [[300, MAIN_Z + 8], [300, 160], [340, 160], [376, 160]];
+    const oneWay = (oneway: 1 | -1, pts = route) => drawStreet(town(), t, content, { points: pts, kind: 'street', clear: true, fill: false, seed: 7, oneway });
+    for (const way of [1, -1] as const) {
+      const { draft } = made(oneWay(way));
+      const r = draft.roads.at(-1)!;
+      expect(r.ends).toEqual(['join', 'join']);
+      // (Its points run from the high street to Round Road, as drawn: cars go that way, or back.)
+      expect(r.points[0][1]).toBeLessThan(r.points.at(-1)![1]);
+      expect(onewayOf(r)).toBe(way);
+      expect(stronglyConnected(draft.roads)).toBe(true);
+    }
+    // Drawn the other way round, its points run as drawn and so does the way.
+    const back = made(oneWay(1, [...route].reverse())).draft.roads.at(-1)!;
+    expect(onewayOf(back)).toBe(back.points[0][0] > back.points.at(-1)![0] ? 1 : -1);
+    expect(refusal(oneWay(1, route.slice(0, 3)))).toBe(ONE_WAY_ENDS);
+  });
+
+  test('a street drawn into the motorway is refused; nothing snaps to it', () => {
+    const draft = hierarchy();
+    expect(refusal(draw(draft, [[250, 92], [250, 260]]))).toBe(CROSS_MOTORWAY);
+    expect(refusal(draw(draft, [[250, 92], [250, 260]], { kind: 'trail' }))).toBe(CROSS_MOTORWAY);
+    const meet = new Meeting(draft.roads, false, 7);
+    expect(meet.snap([250, 202]).kind).toBe('free');
+    expect(meet.joinable(MOTORWAY_EAST)).toBe(false);
+    expect(meet.joinable(OFF_RAMP)).toBe(false);
+  });
+});
+
+describe("a road's kind and way changed", () => {
+  test('made an avenue it clears the lots in its way, or is refused; the roads joining it begin at its new kerb; made a street again it narrows', () => {
+    expect(refusal(changeKind(town(), t, 0, 'avenue'))).toBe('7 lots are in its way');
+    const wide = made(changeKind(town(), t, 0, 'avenue', undefined, true));
+    const high = wide.draft.roads[0];
+    expect([high.kind, high.width, high.area]).toEqual(['avenue', 14, 0]);
+    expect(wide.cleared.lots).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    // Mill Lane and Round Road begin at its kerb, 7 m less the sidewalk off its middle.
+    for (const r of [1, 3]) expect(wide.draft.roads[r].points[0][1]).toBeCloseTo(MAIN_Z + 7 - 1.35, 1);
+    expect(oneNetwork(wide.draft.roads)).toBe(true);
+    const narrow = made(changeKind(wide.draft, t, 0, 'street')).draft;
+    expect(narrow.roads[0].width).toBe(7);
+    for (const r of [1, 3]) expect(narrow.roads[r].points[0][1]).toBeCloseTo(MAIN_Z + 3.5 - 1.35, 1);
+    expect(oneNetwork(narrow.roads)).toBe(true);
+    // A lane made a country road: no area.
+    const country = made(changeKind(town(), t, 1, 'country')).draft.roads[1];
+    expect([country.kind, country.area]).toEqual(['country', undefined]);
+  });
+
+  test('made wider where another road is too near, refused', () => {
+    const crowded = town();
+    crowded.roads.push({ points: line(LANE_X + 10, 112, LANE_X + 10, 150), width: 7, ends: ['dead', 'dead'], kind: 'lane', area: 0, name: 'Bell Lane' });
+    expect(refusal(changeKind(crowded, t, 1, 'avenue', undefined, true))).toContain('there is no room for Mill Lane to be 14 m wide');
+  });
+
+  test('one-way: refused with a dead end, or where it would cut homes off; flipped; never the motorway', () => {
+    expect(refusal(changeKind(town(), t, 1, 'lane', 1))).toBe(ONE_WAY_ENDS);
+    // (Round Road is the only way to Far Lane and back.)
+    expect(refusal(changeKind(town(), t, 3, 'country', 1))).toBe(CUT_OFF);
+    // The high street, out of the world both ways: one-way, the world beyond is the way round.
+    const one = made(changeKind(town(), t, 0, 'street', 1)).draft;
+    expect(one.roads[0].oneway).toBe(1);
+    const flipped = made(changeKind(one, t, 0, 'street', -1)).draft;
+    expect(flipped.roads[0].oneway).toBe(-1);
+    expect(made(changeKind(flipped, t, 0, 'street', 0)).draft.roads[0].oneway).toBeUndefined();
+    // The fixture's one-way loop: flipping one side cuts it off.
+    const loop = hierarchy();
+    expect(refusal(changeKind(loop, t, LOOP[0], 'street', -1))).toBe(CUT_OFF);
+    made(changeKind(loop, t, LOOP[0], 'avenue'));
+    for (const r of [MOTORWAY_EAST, ON_RAMP]) expect(refusal(changeKind(loop, t, r, 'street'))).toContain('the motorway stays as it is');
+    expect(refusal(changeKind(town(), t, 0, 'motorway'))).toBe('only the world lays a motorway');
+  });
+});
+
+describe('the motorway removed, and the Problems list', () => {
+  test('removing a carriageway or a ramp takes the motorway whole; the roads it crossed lie on the land', () => {
+    const draft = hierarchy();
+    for (const r of [MOTORWAY_WEST, OFF_RAMP]) {
+      const goes = whatGoes(draft, t, r);
+      if ('refused' in goes) throw new Error(goes.refused);
+      expect(goes.roads).toEqual(expect.arrayContaining([MOTORWAY_EAST, MOTORWAY_WEST, OFF_RAMP, ON_RAMP]));
+    }
+    const after = made(removeRoad(draft, t, MOTORWAY_EAST)).draft;
+    expect(after.roads.some((r) => r.kind === 'motorway' || r.kind === 'ramp')).toBe(false);
+    const street = after.roads.find((r) => r.name === 'Bridge Street')!;
+    expect(street.crosses).toBeUndefined();
+    expect(street.ends).toEqual(['join', 'out']);
+    expect(made(rename(draft, { kind: 'road', road: MOTORWAY_EAST }, 'The Westway')).draft.roads[MOTORWAY_EAST].name).toBe('The Westway');
+  });
+
+  test('another road removed, what the motorway crosses is numbered as the roads now are', () => {
+    const draft = hierarchy();
+    // (The one-way loop's link and the loop go: nothing else joins them.)
+    const after = made(removeRoad(draft, t, LOOP[0] - 1)).draft;
+    const east = after.roads.find((r) => r.name === 'Motorway East')!;
+    expect(east.crosses).toEqual([{ road: after.roads.findIndex((r) => r.name === 'Bridge Street'), s: draft.roads[MOTORWAY_EAST].crosses![0].s }]);
+  });
+
+  test('one-way streets leaving somewhere unreachable, and a ramp whose street is gone, block', () => {
+    const roads = roadHierarchy().roads;
+    expect(roadWayIssues(hierarchy(), t)).toEqual([]);
+    expect(cutOffRoads(roads)).toEqual([]);
+    const flipped = roads.map((r, i) => (i === LOOP[0] ? { ...r, oneway: -1 as const } : r));
+    expect(roadWayIssues(hierarchy(flipped), t).map((i) => i.text)).toEqual(['One-way streets leave 4 streets unreachable']);
+    const lost = roads.filter((_, i) => i !== BRIDGE_STREET);
+    expect(roadWayIssues(hierarchy(lost), t).map((i) => i.text)).toEqual(['The motorway junction lost its road']);
+  });
+
+  test('stronglyConnected: the fixture as laid; a one-way dead end; a crossroads joins the roads crossing', () => {
+    const roads = roadHierarchy().roads;
+    expect(stronglyConnected(roads)).toBe(true);
+    const deadEnd = [...roads, { points: line(210, 40, 240, 40), width: 7, ends: ['join', 'dead'], kind: 'street', oneway: 1, name: 'Cul' } as RoadPlan];
+    expect(stronglyConnected(deadEnd)).toBe(false);
+    expect(cutOffRoads(deadEnd)).toEqual([roads.length]);
+    // (Without crossroads West Cross and East Cross, dead ends across the avenue, would be roads of their own.)
+    expect(cutOffRoads(roads, true)).toEqual([]);
   });
 });

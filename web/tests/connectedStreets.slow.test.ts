@@ -103,7 +103,7 @@ describe('generated worlds are one network', async () => {
     const { net, joins } = networks(draft.roads);
     expect(new Set(net).size, `${tag}: networks`).toBe(1);
     // (Its one-way roads, a town's and a city's, cutting no place off: `oneway.ts`.)
-    expect(stronglyConnected(draft.roads), `${tag}: one-way roads cut a place off`).toBe(true);
+    expect(stronglyConnected(draft.roads, true), `${tag}: one-way roads cut a place off`).toBe(true);
     expect(draft.diagnostics?.roads ?? [], `${tag}: country roads with no way`).toEqual([]);
     return { town: draft, tag, joins };
   };

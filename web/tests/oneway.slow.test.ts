@@ -1,13 +1,13 @@
 // A town's and a city's one-way pairs and a city's avenue (`game/oneway.ts`, `world.ts` `mainTown`), over a sweep of
 // generated worlds, every place at each main town size: every lot can be driven to from the way out of town and back
-// (`stronglyConnected`, the town's check `townCheck.ts` alike); each one-way road a street of the main town, both its
+// (`cutOffRoads`, the town's check `townCheck.ts` alike); each one-way road a street of the main town, both its
 // ends joined, none where a country road goes on (a way out of town), and no more than the size's pairs; none in a
 // hamlet's or a village's main town. A city whose shape has a through road has it as an avenue, 14 m wide, out of
 // town (on to the country roads; on an island, one way out may end short); no other place has one.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import type { RoadPlan } from '../src/core/protocol';
-import { cutOff, roadGraph, stronglyConnected } from '../src/game/oneway';
+import { cutOffRoads } from '../src/game/oneway';
 
 const WEB = new URL('../', import.meta.url).pathname;
 const SEEDS = [7, 3141, 271828];
@@ -51,10 +51,10 @@ describe('one-way pairs and avenues in generated worlds', async () => {
             const town = generateWorld(content, t, kind, seed, undefined, undefined, { town: size });
             const tag = `${kind} ${size} ${seed}`;
             const roads = town.roads;
-            const g = roadGraph(roads);
-            // Every lot driven to and back: no place a car comes onto the roads cut off.
-            expect(cutOff(roads, g), `${tag}: cut off`).toEqual([]);
-            expect(stronglyConnected(roads, g), tag).toBe(true);
+            // Every lot driven to and back: no car road cut off, by the roads alone (as the simulation routes a trip
+            // in town) nor from the world beyond the ways out.
+            expect(cutOffRoads(roads, false, true), `${tag}: cut off in town`).toEqual([]);
+            expect(cutOffRoads(roads), `${tag}: cut off`).toEqual([]);
             const ways = roads.flatMap((r, i) => (r.oneway ? [i] : []));
             if (size === 'village') expect(ways, `${tag}: one-way roads`).toEqual([]);
             expect(ways.length, `${tag}: one-way roads`).toBeLessThanOrEqual(size === 'city' ? 6 : size === 'town' ? 4 : 0);

@@ -1,10 +1,10 @@
-// One-way roads never cut a place off (`game/oneway.ts`): the roads' network as the simulation joins them, each
-// one-way road gone along its way only, every place a car comes onto the roads reaching every other and back
-// (sim-core `Graph::strongly_connected`, on the same fixture: `travel_hierarchy.rs`
+// One-way roads never cut a place off (`game/oneway.ts`): the roads joined as the simulation joins them, each
+// one-way road gone along its way only, every car road reached from the world beyond the ways out and left for it
+// again (sim-core `Graph::strongly_connected` on the same fixture: `travel_hierarchy.rs`
 // `one_way_roads_keep_every_place_reachable`); and the generator's one-way pairs.
 import { describe, expect, test } from 'bun:test';
 import type { RoadPlan } from '../src/core/protocol';
-import { cutOff, oneWayPairs, roadGraph, stronglyConnected } from '../src/game/oneway';
+import { cutOffRoads, oneWayPairs, stronglyConnected } from '../src/game/oneway';
 import { LOOP, roadHierarchy } from '../src/render/roadHierarchyFixture';
 
 type Pt = [number, number];
@@ -34,7 +34,9 @@ describe('stronglyConnected', () => {
   test('the fixture: the one-way loop and the motorway keep every place reachable', () => {
     const { roads } = roadHierarchy();
     expect(stronglyConnected(roads)).toBe(true);
-    expect(cutOff(roads)).toEqual([]);
+    expect(cutOffRoads(roads)).toEqual([]);
+    // (By the roads alone too, as the simulation's own check has it: the motorway driven along, not asked about.)
+    expect(cutOffRoads(roads, false, true)).toEqual([]);
   });
 
   test("the fixture's loop with a side turned round: a corner cars come to and can't leave", () => {
@@ -42,21 +44,11 @@ describe('stronglyConnected', () => {
     const turned = roads.map((r, i) => (i === LOOP[3] ? { ...r, oneway: 1 as const } : r));
     expect(stronglyConnected(turned)).toBe(false);
     // (The loop's roads are what is cut off; the rest of the town is not.)
-    const cut = cutOff(turned);
+    const cut = cutOffRoads(turned);
     expect(cut.length).toBeGreaterThan(0);
     expect(cut.every((r) => (LOOP as readonly number[]).includes(r))).toBe(true);
     // Two-way again: all well.
     expect(stronglyConnected(roads.map((r, i) => (i === LOOP[3] ? { ...r, oneway: undefined } : r)))).toBe(true);
-  });
-
-  test("the fixture's graph: the motorway meets nothing it passes over; the crosses meet the avenue", () => {
-    const { roads } = roadHierarchy();
-    const g = roadGraph(roads);
-    // No node on a carriageway but its ends and the ramps' merges.
-    const onMotorway = g.nodes.filter((_, n) => g.adj[n].some((e) => roads[g.edges[e].road].kind === 'motorway'));
-    expect(onMotorway.length).toBe(4 + 2);
-    // Each cross street crosses the avenue: a node of four stretches.
-    expect(g.adj.filter((list) => list.length === 4).length).toBeGreaterThanOrEqual(2);
   });
 
   test('without a one-way road it holds', () => {
@@ -66,7 +58,7 @@ describe('stronglyConnected', () => {
   test('a one-way road out of a dead end cuts it off', () => {
     const roads = [...ladder(), street([100, 50], [100, 90], ['join', 'dead'], -1)];
     expect(stronglyConnected(roads)).toBe(false);
-    expect(cutOff(roads)).toContain(6);
+    expect(cutOffRoads(roads)).toContain(6);
   });
 
   test('a pair of one-way streets either way round the ladder holds; the same way does not', () => {
@@ -75,28 +67,29 @@ describe('stronglyConnected', () => {
     expect(stronglyConnected(pair(-1, 1))).toBe(true);
     // (Both the same way: the first rung and the street round the end still go both ways, so it holds.)
     expect(stronglyConnected(pair(1, 1))).toBe(true);
-    // Every rung and the end one-way north: nothing comes back south.
+    // Every rung and the end one-way north: back south only by the world beyond (out by the north street, in by the
+    // south one), so it holds; the north street one-way east besides, nothing leaves it.
     const north = ladder().map((r, i) => (i >= 2 ? { ...r, oneway: 1 as const } : r));
-    expect(stronglyConnected(north)).toBe(false);
+    expect(stronglyConnected(north)).toBe(true);
+    // (By the roads alone, as the simulation routes a trip in town: not.)
+    expect(stronglyConnected(north, true)).toBe(false);
+    expect(stronglyConnected(north.map((r, i) => (i === 1 ? { ...r, oneway: 1 as const } : r)))).toBe(false);
   });
 
-  test('two networks: each on its own', () => {
+  test('a second network with no way out is cut off', () => {
     const far = [street([500, 0], [600, 0], ['dead', 'join']), street([600, 0], [600, 60], ['join', 'dead'], 1)];
     expect(stronglyConnected([...ladder(), ...far])).toBe(false);
-    // (Only the one-way road's far end is cut off: its own road is all that meets it.)
-    expect(cutOff([...ladder(), ...far])).toEqual([7]);
+    // (A network with no way out is off on its own, whichever way its roads go.)
+    expect(cutOffRoads([...ladder(), ...far])).toEqual([6, 7]);
+    expect(cutOffRoads([...ladder(), ...far], true)).toEqual([6, 7]);
   });
 
   test('a road crossing another part way along meets it there', () => {
-    // (A one-way road across the ladder's long streets, out of town north and south: cars drive north along it, and
-    // come back south by the ladder's end; its ends out of town reached and left.)
-    const across = street([120, -40], [120, 90], ['out', 'out'], 1);
-    const g = roadGraph([...ladder(), across]);
-    const at = (x: number, z: number) => g.nodes.findIndex(([nx, nz]) => Math.hypot(nx - x, nz - z) < 1);
-    expect(at(120, 0)).toBeGreaterThanOrEqual(0);
-    expect(at(120, 50)).toBeGreaterThanOrEqual(0);
-    // The south end is a way in only, the north a way out only: each can't be driven to and from the other.
-    expect(stronglyConnected([...ladder(), across])).toBe(false);
+    // (Across the ladder's long streets, a dead end either side: reached only where it crosses them.)
+    const across = street([120, -40], [120, 90], ['dead', 'dead']);
+    expect(cutOffRoads([...ladder(), across], true)).toEqual([]);
+    // One-way north: its north end can't be left.
+    expect(stronglyConnected([...ladder(), { ...across, oneway: 1 }])).toBe(false);
   });
 });
 
@@ -114,7 +107,7 @@ describe('oneWayPairs', () => {
     expect(out[2].oneway).toBeDefined();
     expect(out[3].oneway).toBe((-out[2].oneway!) as 1 | -1);
     expect(out[0].oneway).toBeUndefined();
-    expect(stronglyConnected(out)).toBe(true);
+    expect(stronglyConnected(out, true)).toBe(true);
   });
 
   test('a pair turned against each other, their points running opposite ways: opposite ways still', () => {

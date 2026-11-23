@@ -1602,3 +1602,148 @@ fn home_round_a_one_way_loop_keeps_to_its_way() {
         "home down the west side"
     );
 }
+
+/// Each kind's lanes (`lane_off`), right of its middle line the way a car goes: a street's and a
+/// lane's as ever; an avenue's two each way between its median and its kerbs; a one-way street's
+/// and a ramp's down the middle; a motorway carriageway's out from its pair, whichever way its
+/// points run.
+#[test]
+fn each_kind_has_its_lanes() {
+    use crate::travel::{Graph, OneWay, RoadKind};
+    let mut avenue = road_raw(
+        &[[0.0, 100.0], [100.0, 100.0]],
+        RoadKind::Avenue,
+        OneWay::Both,
+    );
+    avenue.width = 14.0;
+    let mut lane = road_raw(
+        &[[0.0, 120.0], [100.0, 120.0]],
+        RoadKind::Lane,
+        OneWay::Both,
+    );
+    lane.width = 6.0;
+    let mut east = road_raw(
+        &[[0.0, 0.0], [100.0, 0.0]],
+        RoadKind::Motorway,
+        OneWay::Along,
+    );
+    let mut west = road_raw(
+        &[[0.0, 9.0], [100.0, 9.0]],
+        RoadKind::Motorway,
+        OneWay::Against,
+    );
+    east.width = 9.0;
+    west.width = 9.0;
+    let g = Graph::build(&[
+        road_raw(
+            &[[0.0, 50.0], [100.0, 50.0]],
+            RoadKind::Street,
+            OneWay::Both,
+        ),
+        lane,
+        avenue,
+        road_raw(
+            &[[0.0, 140.0], [100.0, 140.0]],
+            RoadKind::Street,
+            OneWay::Against,
+        ),
+        road_raw(
+            &[[0.0, 160.0], [100.0, 160.0]],
+            RoadKind::Ramp,
+            OneWay::Along,
+        ),
+        east,
+        west,
+    ]);
+    let near = |a: f32, b: f32| (a - b).abs() < 1e-4;
+    for along in [true, false] {
+        assert!(near(lane_off(&g, 0, 0, along), LANE));
+        assert!(near(lane_off(&g, 1, 0, along), TIGHT_LANE));
+        // (Its median's half and its two lanes' 2.175 m: the kerbs 5.65 m out.)
+        assert!(near(lane_off(&g, 2, 0, along), 1.3 + 2.175 * 1.5));
+        assert!(near(lane_off(&g, 2, 1, along), 1.3 + 2.175 * 0.5));
+        assert!(near(lane_off(&g, 2, 5, along), 1.3 + 2.175 * 0.5));
+        assert!(near(lane_off(&g, 3, 0, along), 0.0));
+        assert!(near(lane_off(&g, 4, 0, along), 0.0));
+    }
+    // (The eastbound's pair on its right going east, the +z side: its outer lane left of its
+    // middle, its inner right; the westbound's, going west, its pair on its right as well.)
+    assert_eq!(g.inside[5], -1);
+    assert_eq!(g.inside[6], 1);
+    assert!(near(lane_off(&g, 5, 0, true), -1.3));
+    assert!(near(lane_off(&g, 5, 1, true), 2.2));
+    assert!(near(lane_off(&g, 6, 0, false), -1.3));
+    assert!(near(lane_off(&g, 6, 1, false), 2.2));
+    // (Into a driveway or out of one: `TIGHT_LANE` on a street, the outer lane on an avenue, the
+    // middle of a one-way street.)
+    assert!(near(kerb_lane(&g.roads[0]), TIGHT_LANE));
+    assert!(near(kerb_lane(&g.roads[2]), 1.3 + 2.175 * 1.5));
+    assert!(near(kerb_lane(&g.roads[3]), 0.0));
+}
+
+/// A way along roads cars always drove (two-way streets and lanes) is laid as it always was: its
+/// own points, each `lane_on` right of its road's middle.
+#[test]
+fn a_classic_way_keeps_its_points_and_lanes() {
+    use crate::travel::{Graph, OneWay, RoadKind};
+    let mut lane = road_raw(&[[50.0, 0.0], [50.0, 60.0]], RoadKind::Lane, OneWay::Both);
+    lane.width = 6.0;
+    let g = Graph::build(&[
+        road_raw(&[[0.0, 0.0], [50.0, 0.0]], RoadKind::Street, OneWay::Both),
+        lane,
+    ]);
+    let a = g.nearest([5.0, 0.0], 5.0, Mode::Car).unwrap();
+    let b = g.nearest([50.0, 55.0], 5.0, Mode::Car).unwrap();
+    let path = g.path(a, b, Mode::Car, 16.0).unwrap();
+    let pts: Vec<[f32; 2]> = path.pts.iter().map(|p| p.0).collect();
+    let line = LaneLine::new(&g, pts.clone(), path.roads.clone());
+    assert_eq!(line.pts, pts);
+    let offs: Vec<f32> = path.pts.iter().map(|p| lane_on(p.1, p.2)).collect();
+    assert_eq!(line.offs, offs);
+    assert!(line.nearest([5.0, 1.0]).is_none());
+}
+
+/// Off a motorway's carriageway by a ramp (a merge: no box), a car's lane eases from the
+/// carriageway's outer lane to the ramp's middle over `TAPER` m of the ramp, never in a step.
+#[test]
+fn a_ramp_eases_out_of_the_carriageways_lane() {
+    use crate::travel::{Graph, OneWay, RoadKind};
+    let mut east = road_raw(
+        &[[0.0, 0.0], [200.0, 0.0]],
+        RoadKind::Motorway,
+        OneWay::Along,
+    );
+    east.width = 9.0;
+    let ramp = road_raw(
+        &[[50.0, 0.0], [70.0, 6.0], [150.0, 6.0]],
+        RoadKind::Ramp,
+        OneWay::Along,
+    );
+    let g = Graph::build(&[east, ramp]);
+    assert_eq!(g.merge_nodes().count(), 1);
+    let a = g.nearest([5.0, 0.0], 5.0, Mode::Car).unwrap();
+    let b = g.nearest([140.0, 6.0], 5.0, Mode::Car).unwrap();
+    let path = g.path(a, b, Mode::Car, 16.0).unwrap();
+    let pts: Vec<[f32; 2]> = path.pts.iter().map(|p| p.0).collect();
+    let line = LaneLine::new(&g, pts, path.roads.clone());
+    let outer = lane_off(&g, 0, 0, true);
+    assert!(outer.abs() > 1.0);
+    let mut s = 0.0;
+    for k in 1..line.pts.len() {
+        let step = crate::travel::dist(line.pts[k - 1], line.pts[k]);
+        s += step;
+        let (was, now) = (line.offs[k - 1], line.offs[k]);
+        assert!(
+            (now - was).abs() <= outer.abs() / TAPER * step + 1e-3,
+            "a step at {:?}: {was} to {now}",
+            line.pts[k]
+        );
+        // (On the carriageway in its lane; along the ramp past the taper, in its middle.)
+        if line.pts[k][0] < 49.0 {
+            assert!((now - outer).abs() < 1e-4, "{:?}: {now}", line.pts[k]);
+        }
+        if s > 50.0 + TAPER + 1.0 {
+            assert!(now.abs() < 1e-4, "{:?}: {now}", line.pts[k]);
+        }
+    }
+}

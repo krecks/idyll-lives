@@ -3,15 +3,17 @@
  * from the roads for a test's bare structure (`fixtures/junctions.ts`), or taken from the
  * simulation's `WorldStructure.junctions`; each one's pad of asphalt with a kerb return round each
  * corner, the sidewalk turning the corner, where the roads' own sidewalks stop for it (and for a
- * country road's mouth), and the stop lines and crosswalks on its arms.
+ * country road's mouth), and the stop lines and crosswalks on its arms: across every lane coming in, a one-way
+ * road's whole width or none, an avenue's to its median; an avenue's 14 m arms' pads and kerb returns.
  */
 import { describe, expect, test } from 'bun:test';
 import type { Junction, RoadPlan, WorldStructure } from '../src/core/protocol';
 import { SIDEWALK, trimJoins } from '../src/game/roads';
 import { Geo } from '../src/render/shared/geometry';
-import { CROSSWALK, JunctionCuts, junctionsOf, KERB_RETURN, planJunctions, STOP_PAST, type JunctionPlan } from '../src/render/shared/junctions';
+import { carriageway, CROSSWALK, JunctionCuts, junctionsOf, KERB_RETURN, planJunctions, STOP_PAST, type JunctionPlan } from '../src/render/shared/junctions';
 import { Kerb, MARK_Y, roadIndex, roadMeshes, ROAD_Y, WALK_Y, walkStops } from '../src/render/shared/roads';
 import { deriveJunctions, plansOf } from './fixtures/junctions';
+import * as F from '../src/render/roadHierarchyFixture';
 
 const line = (x0: number, z0: number, x1: number, z1: number, n: number): [number, number][] => Array.from({ length: n + 1 }, (_, i) => [x0 + ((x1 - x0) * i) / n, z0 + ((z1 - z0) * i) / n]);
 /** A street along x at z = 50; a lane off it to the south (+z), begun at its kerb (`trimJoins`). */
@@ -266,5 +268,82 @@ describe('road markings', () => {
     // The east arm (+x): those coming in drive west on its north (-z) half.
     expect(covered(marks, 50 + 12 - 0.15, 50 - HALF / 2)).toBe(true);
     expect(covered(marks, 50 + derived[0].arms[0].stop - 0.15, 50 - HALF / 2)).toBe(false);
+  });
+});
+
+describe("stop lines across every lane coming in; an avenue's junctions", () => {
+  const h = F.roadHierarchy();
+  const plans = plansOf(h.roads);
+  /** The vertices of a mesh, as (x, y, z). */
+  const points = (g: Geo) => Array.from({ length: g.pos.length / 3 }, (_, i): [number, number, number] => [g.pos[i * 3], g.pos[i * 3 + 1], g.pos[i * 3 + 2]]);
+  /** The paint `roadMeshes` lays at the junction of `roads` within `dx` m across x and `dz` across z of (x, z). */
+  const paintNear = (roads: RoadPlan[], x: number, z: number, dx: number, dz: number) => {
+    const marks = new Geo();
+    roadMeshes(roads, null, 0, { marks }, 'surface', plansOf(roads));
+    return points(marks).filter(([px, , pz]) => Math.abs(px - x) <= dx && Math.abs(pz - z) <= dz);
+  };
+
+  test("an arm's flow: a one-way road coming in, going out, or a two-way one; an avenue's median", () => {
+    const street: RoadPlan = { points: line(0, 50, 100, 50, 100), width: 7, ends: ['out', 'out'], kind: 'street' };
+    for (const [oneway, flow] of [
+      [undefined, 0],
+      [1, 1],
+      [-1, -1],
+    ] as const) {
+      // (A one-way street from the north ending on the street: its points run in to the junction.)
+      const side: RoadPlan = { points: line(50, 0, 50, 50, 50), width: 7, ends: ['out', 'join'], kind: 'street', ...(oneway ? { oneway } : {}) };
+      const [j] = plansOf([street, side]);
+      const arm = j.arms.find((a) => a.road === 1)!;
+      expect(arm.flow).toBe(flow);
+      expect(arm.median).toBe(0);
+    }
+    const avenue = plans.find((j) => j.arms.some((a) => a.road === F.AVENUE))!;
+    expect(avenue.arms.filter((a) => a.road === F.AVENUE).map((a) => a.median)).toEqual([2.6, 2.6]);
+  });
+
+  test("a one-way road's stop line reaches kerb to kerb; none where its cars go out", () => {
+    const street: RoadPlan = { points: line(0, 50, 100, 50, 100), width: 7, ends: ['out', 'out'], kind: 'street' };
+    const cross = (oneway?: 1 | -1): RoadPlan[] => [street, { points: line(50, 0, 50, 100, 100), width: 7, ends: ['out', 'out'], kind: 'street', ...(oneway ? { oneway } : {}) }];
+    // (The northern arm's stop line, across x at the arm's stop: its cars come in going +z where it runs along its points.)
+    const [j] = plansOf(cross());
+    const north = j.arms.find((a) => a.road === 1 && a.dir[1] < 0)!;
+    const at = (roads: RoadPlan[]) => paintNear(roads, 50, 50 - north.stop + 0.15, 3.5, 0.2).map(([x]) => x - 50);
+    const half = carriageway(street) / 2;
+    // Two-way: its cars coming in keep right, its west half (their right going south, +z, is -x).
+    const two = at(cross());
+    expect(Math.min(...two)).toBeLessThan(-half + 0.3);
+    expect(Math.max(...two)).toBeLessThan(0.6);
+    // One-way coming in from the north: the whole width.
+    const inward = at(cross(1));
+    expect(Math.min(...inward)).toBeLessThan(-half + 0.3);
+    expect(Math.max(...inward)).toBeGreaterThan(half - 0.3);
+    // One-way going out to the north: none on that arm.
+    expect(at(cross(-1)).length).toBe(0);
+  });
+
+  test("an avenue's stops at its median", () => {
+    const j = plans.find((p) => p.arms.some((a) => a.road === F.AVENUE) && Math.abs(p.x - 90) < 1)!;
+    const west = j.arms.find((a) => a.road === F.AVENUE && a.dir[0] < 0)!;
+    expect(west.lit).toBe(true);
+    const paint = paintNear(h.roads, j.x - west.stop + 0.15, j.z, 0.2, 7);
+    const zs = paint.map(([, , z]) => z - j.z);
+    // (Coming in going +x, its right is +z: the stop line from the kerb to the median.)
+    expect(Math.max(...zs)).toBeGreaterThan(carriageway(h.roads[F.AVENUE]) / 2 - 0.4);
+    expect(Math.min(...zs)).toBeGreaterThanOrEqual(1.3 - 1e-6);
+  });
+
+  test("an avenue's 14 m arms: its pad reaches across them, a kerb return at each corner, the sidewalks turning them", () => {
+    const j = plans.find((p) => p.arms.some((a) => a.road === F.AVENUE) && Math.abs(p.x - 90) < 1)!;
+    expect(j.arms.length).toBe(4);
+    expect(j.corners.length).toBe(4);
+    for (const c of j.corners) expect(c.walk).toBe(true);
+    const half = carriageway(h.roads[F.AVENUE]) / 2;
+    for (const A of j.arms.filter((a) => a.road === F.AVENUE)) expect(A.half).toBeCloseTo(half, 6);
+    const surface = new Geo();
+    roadMeshes(h.roads, null, 0, { surface }, 'surface', plans);
+    const pad = flat(surface, ROAD_Y);
+    // (Across the avenue's carriageway on its arms, out to the crosswalk.)
+    const west = j.arms.find((a) => a.road === F.AVENUE && a.dir[0] < 0)!;
+    for (const across of [-half + 0.2, 0, half - 0.2]) expect(covered(pad, j.x - west.walkFrom, j.z + across)).toBe(true);
   });
 });

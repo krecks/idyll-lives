@@ -685,6 +685,285 @@ fn no_mouth_parking_or_kerb_on_a_motorway_or_a_ramp() {
     assert_eq!(g.roads[r.road as usize].source, BRIDGE_STREET as u32);
 }
 
+// The lanes (S-LANES): where on each road a car drives.
+
+/// Where a car is and which way it faces each tick of an empty drive from `a` to `b`
+/// (`cars::empty_drive`).
+fn poses(w: &World, a: [f32; 2], b: [f32; 2]) -> Vec<([f32; 2], f32)> {
+    sim_core::cars::empty_drive(&w.travel, a, b).expect("a way")
+}
+
+/// An avenue's lanes, right of its middle line the way a car goes (m): its median's half and its
+/// carriageway's two lanes (`roadKinds.ts`: 14 m, 1.35 m sidewalks, a 2.6 m median).
+const AVENUE_INNER: f32 = 1.3 + 2.175 * 0.5;
+const AVENUE_OUTER: f32 = 1.3 + 2.175 * 1.5;
+/// A motorway carriageway's outer lane (m from its middle line, away from its pair: `motorway.ts`
+/// `MOTORWAY`, 0.55 in from its inside edge, two 3.5 m lanes, its 9 m width's half).
+const MOTORWAY_OUTER: f32 = 0.55 + 3.5 * 1.5 - 4.5;
+
+/// Whether `p` is in a junction's box (`Graph::boxes`), or a car's half length (2.5 m) off one.
+fn boxed(g: &Graph, p: [f32; 2]) -> bool {
+    g.boxes.iter().any(|(b, r)| dist(*b, p) < r + 2.5)
+}
+
+/// The poses of `drive` with `x` between `x0` and `x1`, out of the junctions' boxes.
+fn between(g: &Graph, drive: &[([f32; 2], f32)], x0: f32, x1: f32) -> Vec<[f32; 2]> {
+    let out: Vec<[f32; 2]> = drive
+        .iter()
+        .map(|d| d.0)
+        .filter(|p| p[0] > x0 && p[0] < x1 && !boxed(g, *p))
+        .collect();
+    assert!(out.len() > 5, "{x0} to {x1}: {} poses", out.len());
+    out
+}
+
+#[test]
+fn avenue_cars_keep_to_the_outer_lane_each_way() {
+    let w = world();
+    let g = &w.travel.graph;
+    let z = AVENUE_Z as f32;
+    // (East, its right the +z side; west, the -z side; straight along it past both cross
+    // streets.)
+    for (a, b, side) in [([10.0, z], [290.0, z], 1.0), ([290.0, z], [10.0, z], -1.0)] {
+        let drive = poses(&w, a, b);
+        for p in between(g, &drive, 20.0, 280.0) {
+            let off = (p[1] - z) * side;
+            assert!(
+                (off - AVENUE_OUTER).abs() < 0.05,
+                "{a:?} to {b:?}: at {p:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn avenue_left_turners_take_the_inner_lane() {
+    let w = world();
+    let g = &w.travel.graph;
+    let z = AVENUE_Z as f32;
+    // East, turning left (north, -z) into the east cross street: the inner lane from Bridge
+    // Street's T on (x 140), the outer before it (straight on at the west cross street and the T);
+    // in the cross street's lane after.
+    let left = poses(&w, [10.0, z], [210.0, 50.0]);
+    for p in between(g, &left, 20.0, 125.0) {
+        assert!((p[1] - z - AVENUE_OUTER).abs() < 0.05, "before: {p:?}");
+    }
+    for p in between(g, &left, 155.0, 195.0) {
+        assert!(
+            (p[1] - z - AVENUE_INNER).abs() < 0.05,
+            "the stretch it turns left at the end of: {p:?}"
+        );
+    }
+    let north: Vec<[f32; 2]> = left
+        .iter()
+        .map(|d| d.0)
+        .filter(|p| p[1] < 70.0 && p[1] > 50.0 && !boxed(g, *p))
+        .collect();
+    assert!(!north.is_empty());
+    for p in north {
+        assert!(
+            (p[0] - 210.0 - 1.05).abs() < 0.05,
+            "up the cross street: {p:?}"
+        );
+    }
+    // East, turning right (south) into it: the outer lane all along.
+    let right = poses(&w, [10.0, z], [210.0, 110.0]);
+    for p in between(g, &right, 20.0, 195.0) {
+        assert!(
+            (p[1] - z - AVENUE_OUTER).abs() < 0.05,
+            "turning right: {p:?}"
+        );
+    }
+    // West, turning left (south, +z) into the west cross street: the inner lane from the T on.
+    let west = poses(&w, [290.0, z], [90.0, 110.0]);
+    for p in between(g, &west, 155.0, 280.0) {
+        assert!((z - p[1] - AVENUE_OUTER).abs() < 0.05, "before: {p:?}");
+    }
+    for p in between(g, &west, 105.0, 125.0) {
+        assert!(
+            (z - p[1] - AVENUE_INNER).abs() < 0.05,
+            "turning left at its end: {p:?}"
+        );
+    }
+}
+
+#[test]
+fn avenue_cars_change_lanes_only_in_a_box() {
+    let w = world();
+    let g = &w.travel.graph;
+    let z = AVENUE_Z as f32;
+    // Every way along the avenue, onto it and off it at the cross streets, either way: out of the
+    // junctions' boxes, always in one lane or the other (but for the start of a turn's curve, a
+    // few cm), so no two going the same way cross each other's lanes there.
+    let ends = [
+        [10.0, z],
+        [290.0, z],
+        [90.0, 50.0],
+        [90.0, 110.0],
+        [210.0, 50.0],
+        [210.0, 110.0],
+    ];
+    let mut on_avenue = 0;
+    for &a in &ends {
+        for &b in &ends {
+            if a == b || a[0] == b[0] {
+                continue;
+            }
+            for (p, _) in poses(&w, a, b) {
+                if (p[1] - z).abs() > 7.0 || p[0] < 15.0 || p[0] > 285.0 || boxed(g, p) {
+                    continue;
+                }
+                let off = (p[1] - z).abs();
+                let in_lane = [AVENUE_INNER, AVENUE_OUTER]
+                    .iter()
+                    .any(|l| (off - l).abs() < 0.1);
+                assert!(in_lane, "{a:?} to {b:?}: between lanes at {p:?}");
+                on_avenue += 1;
+            }
+        }
+    }
+    assert!(on_avenue > 1000, "{on_avenue} poses on the avenue");
+}
+
+#[test]
+fn one_way_loop_cars_go_its_way_down_its_middle() {
+    let w = world();
+    let g = &w.travel.graph;
+    // Round the block from the west side back to it, the long way (one-way).
+    let drive = poses(&w, [300.0, 30.0], [300.0, 50.0]);
+    let (mut south, mut east, mut north) = (0, 0, 0);
+    for k in 1..drive.len() {
+        let (p, q) = (drive[k - 1].0, drive[k].0);
+        if boxed(g, q) || dist(p, q) < 1e-3 {
+            continue;
+        }
+        let corner = |x: f32, z: f32| dist(q, [x, z]) < 8.0;
+        if corner(300.0, 20.0) || corner(360.0, 20.0) || corner(360.0, 60.0) || corner(300.0, 60.0)
+        {
+            continue;
+        }
+        // (Each side its way, its middle line under the car.)
+        if (q[1] - 20.0).abs() < 3.0 {
+            assert!(
+                q[0] > p[0] && (q[1] - 20.0).abs() < 0.05,
+                "the south side: {q:?}"
+            );
+            south += 1;
+        } else if (q[0] - 360.0).abs() < 3.0 {
+            assert!(
+                q[1] > p[1] && (q[0] - 360.0).abs() < 0.05,
+                "the east side: {q:?}"
+            );
+            east += 1;
+        } else if (q[1] - 60.0).abs() < 3.0 {
+            assert!(
+                q[0] < p[0] && (q[1] - 60.0).abs() < 0.05,
+                "the north side: {q:?}"
+            );
+            north += 1;
+        }
+    }
+    assert!(
+        south > 10 && east > 10 && north > 10,
+        "{south} {east} {north}"
+    );
+}
+
+#[test]
+fn motorway_cars_keep_to_the_outer_lane_of_their_carriageway() {
+    let w = world();
+    let g = &w.travel.graph;
+    // (Each carriageway's outer lane away from the other: the eastbound's north of its middle,
+    // the westbound's south.)
+    let (east, west) = (EAST_Z as f32, WEST_Z as f32);
+    let along = poses(&w, [30.0, east], [470.0, east]);
+    for p in between(g, &along, 40.0, 460.0) {
+        assert!(
+            (p[1] - (east - MOTORWAY_OUTER)).abs() < 0.05,
+            "eastbound: {p:?}"
+        );
+    }
+    let back = poses(&w, [470.0, west], [30.0, west]);
+    for p in between(g, &back, 40.0, 460.0) {
+        assert!(
+            (p[1] - (west + MOTORWAY_OUTER)).abs() < 0.05,
+            "westbound: {p:?}"
+        );
+    }
+}
+
+/// How far right of the town file's road `source`'s middle line (the way its points run) `p` is
+/// (m).
+fn right_of(g: &Graph, source: usize, p: [f32; 2]) -> f32 {
+    let road = &g.roads[road_of(g, source) as usize];
+    let (s, _) = road.project(p);
+    let (q, t) = (road.at(s), road.tangent(s));
+    (p[0] - q[0]) * -t[1] + (p[1] - q[1]) * t[0]
+}
+
+/// The most a drive moves across its road's middle line a metre along it (m), with `x` between
+/// `x0` and `x1`: the road `source_at(x)`'s.
+fn sideways(
+    g: &Graph,
+    drive: &[([f32; 2], f32)],
+    x0: f32,
+    x1: f32,
+    source_at: impl Fn(f32) -> usize,
+) -> f32 {
+    let mut most = 0.0f32;
+    for k in 1..drive.len() {
+        let (p, q) = (drive[k - 1].0, drive[k].0);
+        let step = dist(p, q);
+        let (a, b) = (source_at(p[0]), source_at(q[0]));
+        if step < 0.05 || a != b || q[0] < x0 || q[0] > x1 || p[0] < x0 || p[0] > x1 {
+            continue;
+        }
+        let across = (right_of(g, b, q) - right_of(g, a, p)).abs();
+        most = most.max(across / step);
+    }
+    most
+}
+
+#[test]
+fn ramps_ease_into_the_carriageways_lane_and_out_of_it() {
+    let w = world();
+    let g = &w.travel.graph;
+    let (east, west) = (EAST_Z as f32, WEST_Z as f32);
+    // Onto the westbound by the on-ramp: eased into its outer lane by the merge, then in it.
+    let on = poses(&w, [STREET_X as f32, 260.0], [3.0, west]);
+    let merged: Vec<[f32; 2]> = on.iter().map(|d| d.0).filter(|p| p[0] < 18.0).collect();
+    assert!(merged.len() > 5);
+    for p in merged {
+        assert!(
+            (p[1] - (west + MOTORWAY_OUTER)).abs() < 0.05,
+            "merged: {p:?}"
+        );
+    }
+    // Off the eastbound by the off-ramp: out of its outer lane along the ramp, down its middle
+    // past the taper.
+    let off = poses(&w, [3.0, east], [STREET_X as f32, 120.0]);
+    let ramp: Vec<[f32; 2]> = off
+        .iter()
+        .map(|d| d.0)
+        .filter(|p| p[0] > 60.0 && p[0] < 100.0)
+        .collect();
+    assert!(ramp.len() > 5);
+    for p in ramp {
+        assert!(right_of(g, OFF_RAMP, p).abs() < 0.05, "on the ramp: {p:?}");
+    }
+    // (No step across: never more than 0.2 m across its road a metre along it about the merge
+    // and the diverge, the ramp's bends rounded and all; a step from the ramp's middle to the
+    // lane there, with no taper, moved it 0.8 m a metre at the merge and 0.36 at the diverge.)
+    let on_most = sideways(g, &on, 5.0, 60.0, |x| {
+        if x < 20.0 { MOTORWAY_WEST } else { ON_RAMP }
+    });
+    let off_most = sideways(g, &off, 5.0, 60.0, |x| {
+        if x < 20.0 { MOTORWAY_EAST } else { OFF_RAMP }
+    });
+    assert!(on_most < 0.2, "on-ramp: {on_most} m a metre");
+    assert!(off_most < 0.2, "off-ramp: {off_most} m a metre");
+}
+
 #[test]
 #[ignore = "S-TRAFFIC: cars on the deck and under it don't interact"]
 fn nobody_stops_under_the_bridge() {}

@@ -11,8 +11,8 @@ pub(crate) struct Route {
     /// At each point, how far right of its lane a car can pull over there to pass one coming the
     /// other way (m, `pull_room`; none off the lanes, turning or backing).
     pub(super) room: Vec<f32>,
-    /// At each point, how far right of the road's middle its lane is (m, `lane_on`; off the lanes,
-    /// `LANE`).
+    /// At each point, how far right of the road's middle its lane is (m, `lane_on`, `LaneLine`;
+    /// off the lanes, `LANE`; where nobody comes the other way in the road, `NO_ONCOMING`).
     pub(super) lane: Vec<f32>,
     /// How far it can pull over to pass one coming the other way (m, `room`), ticks along it, as
     /// its claims have it.
@@ -301,7 +301,7 @@ impl Route {
     /// beyond it), past it (`OVERSHOOT`), or (`home`) back in from there, nose first: the way out
     /// turned round where every road along it is two-way, else a way of its own in from there.
     /// The driveway's part as `legacy` lays it out, in the frame of the road at the driveway's
-    /// mouth; the lanes right of the roads' middle lines (`lane_on`); each road's top speed
+    /// mouth; the lanes right of the roads' middle lines (`LaneLine`); each road's top speed
     /// (`lane_tops`), slower at junctions. Sampled more where it bends (`ROUTE_TOLERANCE`). None:
     /// no road near, or no way out by road.
     pub(super) fn on_roads(
@@ -323,8 +323,7 @@ impl Route {
         let out = |to: RoadPoint| g.path_by(m, to, Mode::Car, speed, Way::default());
         let back = |to: RoadPoint| {
             let mut path = g.path_by(to, m, Mode::Car, speed, Way::default())?;
-            path.pts.reverse();
-            path.edges.reverse();
+            path.reverse();
             Some(path)
         };
         let turns_round = |path: Option<&RoadPath>| path.is_some_and(|p| two_way(g, p));
@@ -364,20 +363,24 @@ impl Route {
         // The lane: right of the middle line, on past the exit (to the parking spot's side of
         // the road on a trip).
         let mut centre: Vec<[f32; 2]> = path.pts.iter().map(|p| p.0).collect();
-        let mut offs: Vec<f32> = path.pts.iter().map(|p| lane_on(p.1, p.2)).collect();
+        let mut on = path.roads.clone();
         if park.is_none() {
             centre.push(extend_past(
                 centre[centre.len() - 2],
                 centre[centre.len() - 1],
             ));
-            offs.push(offs[offs.len() - 1]);
+            on.push(on[on.len() - 1]);
         }
         if home {
             centre.reverse();
-            offs.reverse();
+            on.reverse();
+            for o in &mut on {
+                o.1 = !o.1;
+            }
         }
+        let lanes = LaneLine::new(g, centre, on);
         let lane = round_corners(&crate::travel::thin_with(
-            &offset_right_by(&centre, &offs),
+            &lanes.line(),
             ROUTE_STEP,
             ROUTE_TOLERANCE,
         ));
@@ -385,14 +388,27 @@ impl Route {
             return None;
         }
         let junctions: Vec<[f32; 2]> = g.junctions().collect();
-        // (The road at `p`: its width and kind, those of the path's point nearest it.)
+        // (The road at `p`: its width and kind, those of the path's point nearest it; how far a
+        // car can pull over there and where its lane is, `LaneLine::point`.)
         let near_path = crate::travel::NearestPoint::new(path.pts.iter().map(|x| x.0).collect());
         let road_at = |p: [f32; 2]| {
             near_path
                 .nearest(p)
                 .map_or((7.0, RoadKind::Street), |i| (path.pts[i].1, path.pts[i].2))
         };
-        let tops = lane_tops(&lane, travel, &junctions, |i| road_at(lane[i]).1);
+        let here = |p: [f32; 2]| match lanes.nearest(p) {
+            Some(i) => lanes.point(g, i, car.wid),
+            None => {
+                let (width, kind) = road_at(p);
+                (
+                    width,
+                    kind,
+                    pull_room(width, kind, car.wid),
+                    lane_on(width, kind),
+                )
+            }
+        };
+        let tops = lane_tops(&lane, travel, &junctions, |i| here(lane[i]).1);
         // A trip's parking bay off the road (`parking_bay`), turned into nose first and backed
         // out of as a driveway is, and which way along the road it goes there (from the lane's
         // nearer end); a spot on the road itself is pulled into and out of straight.
@@ -468,12 +484,12 @@ impl Route {
                 legs.line(from, p, false, JUNCTION_SPEED);
             }
             on = true;
-            let (width, kind) = road_at(p);
+            let (_, _, room, at) = here(p);
             legs.push_lane(
                 p,
                 tops[i],
-                (pull_room(width, kind, car.wid) - bend_out(&lane, i, car.len)).max(0.0),
-                lane_on(width, kind),
+                (room - bend_out(&lane, i, car.len)).max(0.0),
+                at,
             );
             // (Out of a driveway, a bay or a spot on the road: its mouth, up to the lane.)
             if first && (start.is_some() || park.is_some() && home) {
@@ -647,17 +663,18 @@ impl Route {
             return None;
         }
         let mut centre: Vec<[f32; 2]> = path.pts.iter().map(|p| p.0).collect();
-        let mut offs: Vec<f32> = path.pts.iter().map(|p| lane_on(p.1, p.2)).collect();
+        let mut on = path.roads.clone();
         let home = home && !taxi;
         if !home && park.is_none() {
             centre.push(extend_past(
                 centre[centre.len() - 2],
                 centre[centre.len() - 1],
             ));
-            offs.push(offs[offs.len() - 1]);
+            on.push(on[on.len() - 1]);
         }
+        let lanes = LaneLine::new(g, centre, on);
         let lane = round_corners(&crate::travel::thin_with(
-            &offset_right_by(&centre, &offs),
+            &lanes.line(),
             ROUTE_STEP,
             ROUTE_TOLERANCE,
         ));
@@ -671,7 +688,19 @@ impl Route {
                 .nearest(q)
                 .map_or((7.0, RoadKind::Street), |i| (path.pts[i].1, path.pts[i].2))
         };
-        let tops = lane_tops(&lane, travel, &junctions, |i| road_at(lane[i]).1);
+        let here = |q: [f32; 2]| match lanes.nearest(q) {
+            Some(i) => lanes.point(g, i, car.wid),
+            None => {
+                let (width, kind) = road_at(q);
+                (
+                    width,
+                    kind,
+                    pull_room(width, kind, car.wid),
+                    lane_on(width, kind),
+                )
+            }
+        };
+        let tops = lane_tops(&lane, travel, &junctions, |i| here(lane[i]).1);
         // Off the lane at the end: into its driveway, coming from the side the way comes in
         // from; or into its trip's parking bay.
         let into = if home {
@@ -735,12 +764,12 @@ impl Route {
             {
                 break;
             }
-            let (width, kind) = road_at(q);
+            let (_, _, room, at) = here(q);
             legs.push_lane(
                 q,
                 tops[i],
-                (pull_room(width, kind, car.wid) - bend_out(&lane, i, car.len)).max(0.0),
-                lane_on(width, kind),
+                (room - bend_out(&lane, i, car.len)).max(0.0),
+                at,
             );
         }
         let lane_end = legs.len().saturating_sub(1);
