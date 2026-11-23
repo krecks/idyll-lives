@@ -2,11 +2,12 @@
 // reach, two dead ends facing each other become one lane, and every generated world (each kind,
 // a few seeds) is one road network as the sim joins its roads (an end within half the
 // wider road's width and a metre of the other's middle; sim-core `travel.rs` `Graph::build`),
-// with no more courts than its areas may keep, none reaching more than `COURT` m once its land is
+// its one-way roads cutting no place off (`oneway.ts` `stronglyConnected`; a city's too), with no more courts than its areas may keep, none reaching more than `COURT` m once its land is
 // settled under it as a new game's is (`landFollow.ts` `settleLand` cuts a longer one back).
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import type { RoadPlan } from '../src/core/protocol';
+import { stronglyConnected } from '../src/game/oneway';
 import { connect, COURT, lengths, nearest, type Pt } from '../src/game/roads';
 
 const WEB = new URL('../', import.meta.url).pathname;
@@ -95,16 +96,24 @@ describe('generated worlds are one network', async () => {
   const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
   const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
 
+  /** A world of `kind` (its place's own options but `town`) as a new game makes it, its land settled under it, checked. */
+  const check = (kind: string, seed: number, town?: 'city') => {
+    const draft = settleLand(generateWorld(content, t, kind, seed, undefined, undefined, town ? { town } : undefined), (d) => previewWorld(content, t, d, null)).draft;
+    const tag = `${kind} ${town ?? ''} ${seed}`;
+    const { net, joins } = networks(draft.roads);
+    expect(new Set(net).size, `${tag}: networks`).toBe(1);
+    // (Its one-way roads, a town's and a city's, cutting no place off: `oneway.ts`.)
+    expect(stronglyConnected(draft.roads), `${tag}: one-way roads cut a place off`).toBe(true);
+    expect(draft.diagnostics?.roads ?? [], `${tag}: country roads with no way`).toEqual([]);
+    return { town: draft, tag, joins };
+  };
+
   test(
     'big worlds',
     () => {
       for (const kind of WORLD_KINDS) {
         for (const seed of [7, 3141, 271828]) {
-          const town = settleLand(generateWorld(content, t, kind, seed), (d) => previewWorld(content, t, d, null)).draft;
-          const tag = `${kind} ${seed}`;
-          const { net, joins } = networks(town.roads);
-          expect(new Set(net).size, `${tag}: networks`).toBe(1);
-          expect(town.diagnostics?.roads ?? [], `${tag}: country roads with no way`).toEqual([]);
+          const { town, tag, joins } = check(kind, seed);
           const courts = new Map<number, number>();
           town.roads.forEach((r, i) => {
             if (r.kind === 'trail') return;
@@ -119,6 +128,14 @@ describe('generated worlds are one network', async () => {
           for (const [area, n] of courts) expect(n, `${tag}: courts in area ${area}`).toBeLessThanOrEqual(area === 0 ? BIG_COURTS : COURTS);
         }
       }
+    },
+    240_000,
+  );
+
+  test(
+    'cities: their avenue and their one-way pairs joined up',
+    () => {
+      for (const kind of WORLD_KINDS) check(kind, 7, 'city');
     },
     240_000,
   );
