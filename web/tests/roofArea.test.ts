@@ -141,6 +141,7 @@ test('a plain rectangle keeps the classic roof (a handful of faces, not a tile a
   const plan = new HousePlanner().build(world, { x: 0, z: DEPTH, w: W, d: DEPTH }, { upper: true, covered: () => false });
   if (!plan) throw new Error('no house');
   const roof = plan.parts.find((p) => p.name === 'roof');
-  // (16 for its slopes and the like, 16 more for the cap shingles up its four hips: `HIP_CAP`.)
-  expect(roof!.geo.idx.length / 3).toBeLessThan(40);
+  // (16 for its slopes and the like, 16 more for the cap shingles up its four hips (`HIP_CAP`), 20 more for its ridge
+  // cap's eased arrises.)
+  expect(roof!.geo.idx.length / 3).toBeLessThan(60);
 });

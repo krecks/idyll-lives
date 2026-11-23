@@ -50,7 +50,7 @@ import type { ModelEntry } from '../../assets/types';
 import type { FenceStyleDef } from '../../content/content';
 import { groundDepth, objectCentre, storeyOfRow, storeyRow, type FenceEdge, type GarageInfo, type LotLook, type ObjectPlacement, type Opening, type PlotInfo, type RoadPlan, type TownPlace, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
-import { EASE, easedBox, encodeFinish, Geo, type V3 } from './geometry';
+import { EASE, easedBox, encodeFinish, facing, Geo, type V3 } from './geometry';
 import { CARS, CAR_PAINT, carAge, garageAt, garageFor, hash, paintCar, parkCar, pick, type CarAge, type CarBody } from './cars';
 import { chunkAt, chunkCoords, chunkId, distanceToRect, hashNumbers, hashString, RectGrid } from './chunks';
 import { canopyBack, type HousePart, type HousePlanner, type SilhouettePlan, type SilhouetteSpec } from './house';
@@ -219,7 +219,7 @@ export class Painter {
   tube(axis: 'x' | 'y' | 'z', a0: number, a1: number, cu: number, cv: number, r0: number, r1: number, seg: number, caps = true, from = 0, to = Math.PI * 2): this {
     const P = (a: number, u: number, v: number): V3 => (axis === 'x' ? [a, u, v] : axis === 'y' ? [u, a, v] : [u, v, a]);
     const full = to - from >= Math.PI * 2 - 1e-6;
-    if (this.geo.ease > 0 && caps && full && this.easedTube(axis, a0, a1, cu, cv, r0, r1, seg)) return this;
+    if (this.geo.ease > 0 && caps && this.easedTube(axis, a0, a1, cu, cv, r0, r1, seg, from, to)) return this;
     const slope = (r0 - r1) / Math.max(1e-6, Math.abs(a1 - a0)) * Math.sign(a1 - a0);
     for (let i = 0; i < seg; i++) {
       const t0 = from + ((to - from) * i) / seg;
@@ -251,11 +251,13 @@ export class Painter {
    * hard (its sides 5 cm or more round, it and the cap 12 mm or more across) drawn back to a 45° shoulder, as a
    * box's edges are chamfered. False, nothing written, where no rim is.
    */
-  private easedTube(axis: 'x' | 'y' | 'z', a0: number, a1: number, cu: number, cv: number, r0: number, r1: number, seg: number): boolean {
+  private easedTube(axis: 'x' | 'y' | 'z', a0: number, a1: number, cu: number, cv: number, r0: number, r1: number, seg: number, from = 0, to = Math.PI * 2): boolean {
     const ease = this.geo.ease;
     const d = Math.sign(a1 - a0);
     const length = Math.abs(a1 - a0);
-    const shows = (r: number) => r >= EASED_RIM && 2 * r * Math.sin(Math.PI / seg) >= 0.05 && length >= EASED_RIM;
+    const full = to - from >= Math.PI * 2 - 1e-6;
+    // (A part-round one, a half pipe's ends: its rim shows as one arris round, however short each of its sides.)
+    const shows = (r: number) => r >= EASED_RIM && length >= EASED_RIM && (full ? 2 * r * Math.sin(Math.PI / seg) >= 0.05 : r * (to - from) >= 0.05);
     const [e0, e1] = [r0, r1].map((r) => (shows(r) ? Math.min(ease, r * 0.3, length * 0.3) : 0));
     if (!e0 && !e1) return false;
     // (Its radius `a` along it.)
@@ -263,17 +265,19 @@ export class Painter {
     const [s0, s1] = [a0 + d * e0, a1 - d * e1];
     // (Drawn plain from here on: the shoulders are what makes it eased.)
     this.geo.easing(0);
-    if (e0) this.tube(axis, a0, s0, cu, cv, r0 - e0, at(s0), seg, false);
-    this.tube(axis, s0, s1, cu, cv, at(s0), at(s1), seg, false);
-    if (e1) this.tube(axis, s1, a1, cu, cv, at(s1), r1 - e1, seg, false);
+    if (e0) this.tube(axis, a0, s0, cu, cv, r0 - e0, at(s0), seg, false, from, to);
+    this.tube(axis, s0, s1, cu, cv, at(s0), at(s1), seg, false, from, to);
+    if (e1) this.tube(axis, s1, a1, cu, cv, at(s1), r1 - e1, seg, false, from, to);
     this.geo.easing(ease);
     const P = (a: number, u: number, v: number): V3 => (axis === 'x' ? [a, u, v] : axis === 'y' ? [u, a, v] : [u, v, a]);
     for (const [a, r, n] of [[a0, r0 - e0, -d], [a1, r1 - e1, d]] as const) {
       if (r <= 0.001) continue;
-      const ring = Array.from({ length: seg }, (_, i): V3 => {
-        const t = (Math.PI * 2 * i) / seg;
-        return P(a, cu + Math.cos(t) * r, cv + Math.sin(t) * r);
-      });
+      // (Round as the tube's own rings are; a part-round one's a slice from its middle.)
+      const ring: V3[] = full ? [] : [P(a, cu, cv)];
+      for (let i = 0; i < (full ? seg : seg + 1); i++) {
+        const t = from + ((to - from) * i) / seg;
+        ring.push(P(a, cu + Math.cos(t) * r, cv + Math.sin(t) * r));
+      }
       this.poly(ring, P(n, 0, 0));
     }
     return true;
@@ -2320,29 +2324,91 @@ function nose(p: Painter, side: number, half: number, at: number, down: number =
   const [y0, y1, drop] = [down, B.top + B.parapet - B.coping, B.noseDrop];
   const w = B.noseWide / 2;
   const [x0, x1] = [side * half, side * (half + B.nose)];
-  const l = Math.hypot(B.nose, w);
   p.paint(BRIDGE_STONE, 0.9);
-  // Its two faces, out from the deck's side and along it either way (`Geo.poly` winds each to its normal).
-  for (const s of [-1, 1]) {
-    p.poly(
-      [
-        [x0, y0, at + s * w],
-        [x1, y0, at],
-        [x1, y1 - drop, at],
-        [x0, y1, at + s * w],
-      ],
-      [(side * w) / l, 0, (s * B.nose) / l],
-    );
+  // Out from the deck's side to its point and back, its top falling `drop` to the point; its point cut and its two
+  // faces' arrises eased (`easedPrism`), as the street's boxes are. (Round as `Geo.poly` winds it: any way.)
+  const outline: [number, number][] = [
+    [x0, at - w],
+    [x1, at],
+    [x0, at + w],
+  ];
+  const top = (x: number) => y1 - (drop * (x - x0)) / (x1 - x0);
+  easedPrism(p, outline, y0, top, [true, true, false], [false, true, false]);
+}
+
+/** How far a cut corner of an eased prism is cut back along each side (m): a pier's point, blunted. */
+const PRISM_CUT = 0.03;
+
+/**
+ * An upright prism over the convex `outline` (x, z, round it either way) from `y0` up to `top(x, z)`, its top a plane:
+ * side `i` (from point `i` to the next) eased at its top where `eased[i]` (its face stops `EASE` short, a strip up to
+ * the top drawn in from it), corner `i` cut across `PRISM_CUT` back where `cut[i]` (its arris eased the other way).
+ * No bottom. Drawn by `p` in its paint.
+ */
+function easedPrism(p: Painter, outline: readonly [number, number][], y0: number, top: (x: number, z: number) => number, eased: readonly boolean[], cut: readonly boolean[]): void {
+  const c = EASE;
+  // The corners cut: each a short side of its own, eased if either side beside it is.
+  const pts: [number, number][] = [];
+  const easedSide: boolean[] = [];
+  const n = outline.length;
+  for (let i = 0; i < n; i++) {
+    const [prev, at, next] = [outline[(i + n - 1) % n], outline[i], outline[(i + 1) % n]];
+    if (!cut[i]) {
+      pts.push(at);
+      easedSide.push(eased[i]);
+      continue;
+    }
+    const toward = (q: readonly [number, number]): [number, number] => {
+      const [dx, dz] = [q[0] - at[0], q[1] - at[1]];
+      const l = Math.sqrt(dx * dx + dz * dz) || 1;
+      return [at[0] + (dx / l) * PRISM_CUT, at[1] + (dz / l) * PRISM_CUT];
+    };
+    pts.push(toward(prev), toward(next));
+    easedSide.push(eased[(i + n - 1) % n] || eased[i], eased[i]);
   }
-  const up = Math.hypot(drop, B.nose);
-  p.poly(
-    [
-      [x0, y1, at - w],
-      [x0, y1, at + w],
-      [x1, y1 - drop, at],
-    ],
-    [(side * drop) / up, B.nose / up, 0],
-  );
+  const m = pts.length;
+  // Which way is out: the outline's winding.
+  let area = 0;
+  for (let i = 0; i < m; i++) area += pts[i][0] * pts[(i + 1) % m][1] - pts[(i + 1) % m][0] * pts[i][1];
+  const turn = area > 0 ? -1 : 1;
+  const outOf = (i: number): [number, number] => {
+    const [a, b] = [pts[i], pts[(i + 1) % m]];
+    const [dx, dz] = [b[0] - a[0], b[1] - a[1]];
+    const l = Math.sqrt(dx * dx + dz * dz) || 1;
+    return [(turn * dz) / l, (-turn * dx) / l];
+  };
+  // The top drawn in `c` from each eased side (the lines either side of a corner, met).
+  const inner = pts.map((at, i): [number, number] => {
+    const j = (i + m - 1) % m;
+    const [na, nb] = [outOf(j), outOf(i)];
+    const [da, db] = [easedSide[j] ? c : 0, easedSide[i] ? c : 0];
+    // Solve (q - at) · na = -da, (q - at) · nb = -db.
+    const det = na[0] * nb[1] - na[1] * nb[0];
+    if (Math.abs(det) < 1e-9) return [at[0] - na[0] * Math.max(da, db), at[1] - na[1] * Math.max(da, db)];
+    const [ra, rb] = [-da, -db];
+    return [at[0] + (ra * nb[1] - rb * na[1]) / det, at[1] + (rb * na[0] - ra * nb[0]) / det];
+  });
+  const P = (q: readonly [number, number], y: number): V3 => [q[0], y, q[1]];
+  for (let i = 0; i < m; i++) {
+    const k = (i + 1) % m;
+    const [a, b] = [pts[i], pts[k]];
+    const [o0, o1] = outOf(i);
+    const sink = (q: readonly [number, number], s: number) => top(q[0], q[1]) - (s ? c : 0);
+    // The face, up to where its top's chamfer begins (or the top, if not eased), and at a corner where an eased side
+    // meets one that is not, the triangle up to the top between them.
+    const ea = easedSide[i] || easedSide[(i + m - 1) % m];
+    const eb = easedSide[i] || easedSide[k];
+    p.poly([P(a, y0), P(b, y0), P(b, sink(b, eb ? 1 : 0)), P(a, sink(a, ea ? 1 : 0))], [o0, 0, o1]);
+    if (!easedSide[i]) {
+      if (ea) p.poly([P(a, sink(a, 1)), P(a, top(a[0], a[1])), P(inner[i], top(inner[i][0], inner[i][1]))], [o0, 0, o1]);
+      if (eb) p.poly([P(b, sink(b, 1)), P(inner[k], top(inner[k][0], inner[k][1])), P(b, top(b[0], b[1]))], [o0, 0, o1]);
+      continue;
+    }
+    const q: V3[] = [P(a, sink(a, 1)), P(b, sink(b, 1)), P(inner[k], top(inner[k][0], inner[k][1])), P(inner[i], top(inner[i][0], inner[i][1]))];
+    p.poly(q, facing(q[0], q[1], q[2], [o0, 1, o1]));
+  }
+  const cap = inner.map((q) => P(q, top(q[0], q[1])));
+  p.poly(cap, facing(cap[0], cap[1], cap[2], [0, 1, 0]));
 }
 
 /** A parked car on a driveway, its contact shadow. */

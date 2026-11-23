@@ -3,10 +3,11 @@
  * its walls at full height in every wall mode, the sun coming in through windows and doorways.
  *
  * - `GAME_WALLCUT`: wall vertices drop in the vertex shader. Per vertex `game_wallCut` (the
- *   `WALL_CUT_SEMANTIC` stream, `Geo`'s `cut`) = [mask A, kind, mask B, 0]: the vertex is cut when
+ *   `WALL_CUT_SEMANTIC` stream, `Geo`'s `cut`) = [mask A, kind, mask B, sink]: the vertex is cut when
  *   the camera looks along a direction set in both masks (`game_wallCutLook`, the `LOOK` bits of
  *   `shared/geometry.ts`), or all walls are down (`game_wallCutParams.x`); kind 1 clamps it to the
- *   stub height (`.y`, in the mesh's own space: a storey's), kind 2 hides it (window frames and
+ *   stub height (`.y`, in the mesh's own space: a storey's) less its sink (mm: an eased wall top's faces and its
+ *   chamfer's foot, `Geo.sinkUnder`), kind 2 hides it (window frames and
  *   panes, the wall above and beside an opening, door leaves): every vertex of it goes to one
  *   point, so its triangles have no area and nothing is drawn. (Lowering it below the floor hid it
  *   under the ground only on the ground storey: an upper storey's came down into the rooms below,
@@ -40,7 +41,7 @@ export const CUTAWAY: ShaderFeature = {
 		float cutB = step(0.5, dot(floor(fract(game_wallCut.z / vec4(2.0, 4.0, 8.0, 16.0)) * 2.0), game_wallCutLook));
 		if (max(game_wallCutParams.x, cutA * cutB) > 0.5) {
 			if (game_wallCut.y > 1.5) { localPos = vec3(0.0, -2.0, 0.0); }
-			else if (game_wallCut.y > 0.5) { localPos.y = min(localPos.y, game_wallCutParams.y); }
+			else if (game_wallCut.y > 0.5) { localPos.y = min(localPos.y, game_wallCutParams.y - game_wallCut.w * 0.001); }
 		}
 	}
 #endif`,
@@ -85,7 +86,7 @@ export const CUTAWAY: ShaderFeature = {
 		let cutB = step(0.5, dot(floor(fract(game_wallCut.z / vec4f(2.0, 4.0, 8.0, 16.0)) * 2.0), uniform.game_wallCutLook));
 		if (max(uniform.game_wallCutParams.x, cutA * cutB) > 0.5) {
 			if (game_wallCut.y > 1.5) { localPos = vec3f(0.0, -2.0, 0.0); }
-			else if (game_wallCut.y > 0.5) { localPos.y = min(localPos.y, uniform.game_wallCutParams.y); }
+			else if (game_wallCut.y > 0.5) { localPos.y = min(localPos.y, uniform.game_wallCutParams.y - game_wallCut.w * 0.001); }
 		}
 	}
 #endif`,

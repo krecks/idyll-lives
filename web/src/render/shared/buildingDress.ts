@@ -532,11 +532,18 @@ function mansard(roof: Geo, trim: Geo, W: number, D: number, top: number, rise: 
   const yb = top + MANSARD_BREAK * rise;
   const yt = top + rise;
   const r = 0.2 * 0.6 * 2 * W;
+  // (The steep slopes' corners cut across `k`, so none stands square: the moulding at the break covers where the cut
+  // meets the low hip's corner.)
+  const k = EASE;
   for (const s of [-1, 1]) {
-    const qz: V3[] = [[-ex, top, s * ez], [ex, top, s * ez], [bx, yb, s * bz], [-bx, yb, s * bz]];
+    const qz: V3[] = [[-ex + k, top, s * ez], [ex - k, top, s * ez], [bx - k, yb, s * bz], [-bx + k, yb, s * bz]];
     roof.poly(qz, facing(qz[0], qz[1], qz[2], [0, 0.4, s]));
-    const qx: V3[] = [[s * ex, top, -ez], [s * ex, top, ez], [s * bx, yb, bz], [s * bx, yb, -bz]];
+    const qx: V3[] = [[s * ex, top, -ez + k], [s * ex, top, ez - k], [s * bx, yb, bz - k], [s * bx, yb, -bz + k]];
     roof.poly(qx, facing(qx[0], qx[1], qx[2], [s, 0.4, 0]));
+    for (const t of [-1, 1]) {
+      const qc: V3[] = [[s * (ex - k), top, t * ez], [s * ex, top, t * (ez - k)], [s * bx, yb, t * (bz - k)], [s * (bx - k), yb, t * bz]];
+      roof.poly(qc, facing(qc[0], qc[1], qc[2], [s, 0.4, t]));
+    }
     const q: V3[] = [[-bx, yb, s * bz], [bx, yb, s * bz], [r, yt, 0], [-r, yt, 0]];
     roof.poly(q, facing(q[0], q[1], q[2], [0, 1, s]));
     const e: V3[] = [[s * bx, yb, -bz], [s * bx, yb, bz], [s * r, yt, 0]];
@@ -548,12 +555,20 @@ function mansard(roof: Geo, trim: Geo, W: number, D: number, top: number, rise: 
   trim.box(-bx - 0.05, yb - 0.04, -bz - 0.05, bx + 0.05, yb + 0.06, bz + 0.05, 'ny');
 }
 
-/** A spire: a square pyramid `half` m to a side's half round (`cx`, `cz`) from `y0` up to `y1`. */
+/**
+ * A broach spire: an eight-sided pyramid on the square `half` m to a side's half round (`cx`, `cz`), from `y0` up to
+ * `y1`, its flats on the square's sides (a square one's hips turned square; an eight-sided one's turn half as much).
+ */
 function spire(roof: Geo, cx: number, cz: number, half: number, y0: number, y1: number): void {
   const tip: V3 = [cx, y1, cz];
-  const c: V3[] = [[cx - half, y0, cz - half], [cx + half, y0, cz - half], [cx + half, y0, cz + half], [cx - half, y0, cz + half]];
-  for (let i = 0; i < 4; i++) {
-    const [a, b] = [c[i], c[(i + 1) % 4]];
+  // (Its corners on the circle round the octagon whose flats are `half` out.)
+  const r = half / Math.cos(Math.PI / 8);
+  const c: V3[] = Array.from({ length: 8 }, (_, i) => {
+    const t = Math.PI / 8 + (i * Math.PI) / 4;
+    return [cx + Math.cos(t) * r, y0, cz + Math.sin(t) * r];
+  });
+  for (let i = 0; i < 8; i++) {
+    const [a, b] = [c[i], c[(i + 1) % 8]];
     const mid: V3 = [(a[0] + b[0]) / 2 - cx, 0.5, (a[2] + b[2]) / 2 - cz];
     roof.poly([a, b, tip], facing(a, b, tip, mid));
   }

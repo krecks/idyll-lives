@@ -79,6 +79,9 @@ export class Geo {
   kind: number = Cut.Keep;
   /** The chamfer (m) `box` gives a box's edges (`easedBox`); 0: sharp. */
   ease = 0;
+  /** Vertices below this height (m) sink `sinkBy` under the stub where their wall is cut (`sinkUnder`); null: none. */
+  private sinkTop: number | null = null;
+  private sinkBy = 0;
 
   /** Positions (3 a vertex), as written: a view, valid until the next vertex is added. */
   get pos(): Float64Array {
@@ -139,6 +142,17 @@ export class Geo {
     return this;
   }
 
+  /**
+   * Vertices after this lower than `top` (m) clamp `by` m under the stub where their wall is cut (the cutaway
+   * attribute's fourth byte, in millimetres: `shaders/cutaway.ts`), those at `top` to the stub itself: so a wall's
+   * eased top (its faces stopping `by` short of it, a chamfer up to its cap) keeps its chamfer cut. Null: none.
+   */
+  sinkUnder(top: number | null, by = 0): this {
+    this.sinkTop = top;
+    this.sinkBy = by;
+    return this;
+  }
+
   /** Boxes after this chamfered `c` m on their edges (`easedBox`; 0: sharp), as a model's are. */
   easing(c: number): this {
     this.ease = c;
@@ -189,7 +203,7 @@ export class Geo {
     k[at * 4] = this.maskA;
     k[at * 4 + 1] = this.kind;
     k[at * 4 + 2] = this.maskB;
-    k[at * 4 + 3] = 0;
+    k[at * 4 + 3] = this.sinkTop !== null && p[1] < this.sinkTop - 1e-6 ? Math.round(this.sinkBy * 1000) : 0;
     return at;
   }
 
@@ -390,6 +404,8 @@ export function easedBox(
   skip: string,
   ease: number,
   poly: (pts: V3[], n: V3, cut?: readonly (readonly [number, number, number])[]) => void,
+  // (False: every edge between two drawn faces, whether the gate would count it or not: a wall's top, `house.ts` `easedTop`.)
+  counted = true,
 ): boolean {
   if (ease <= 0) return false;
   // A convex polygon: as a fan from the first point it can be fanned from without a triangle of no area (points in
@@ -429,12 +445,12 @@ export function easedBox(
   const lo = [Math.min(x0, x1), Math.min(y0, y1), Math.min(z0, z1)];
   const hi = [Math.max(x0, x1), Math.max(y0, y1), Math.max(z0, z1)];
   const size = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
-  if (size[0] < EASED_PIECE && size[1] < EASED_PIECE && size[2] < EASED_PIECE) return false;
+  if (counted && size[0] < EASED_PIECE && size[1] < EASED_PIECE && size[2] < EASED_PIECE) return false;
   // (Which faces are drawn, by `BOX_FACES`' order: read once, a box is built in the street by the thousand.)
   const shown = BOX_FACES.map(([name]) => !skip.includes(name));
   const drawn = (axis: number, side: number) => shown[axis * 2 + (side > 0 ? 1 : 0)];
   // The edges along each axis are chamfered (where both their faces are drawn) if they would count.
-  const along = [0, 1, 2].map((t) => size[t] >= EASED_EDGE && size[(t + 1) % 3] >= EASED_LEAST && size[(t + 2) % 3] >= EASED_LEAST);
+  const along = [0, 1, 2].map((t) => !counted || (size[t] >= EASED_EDGE && size[(t + 1) % 3] >= EASED_LEAST && size[(t + 2) % 3] >= EASED_LEAST));
   if (!along[0] && !along[1] && !along[2]) return false;
   const c = Math.min(ease, Math.min(size[0], size[1], size[2]) * 0.45);
   const plane = (axis: number, side: number) => (side > 0 ? hi[axis] : lo[axis]);

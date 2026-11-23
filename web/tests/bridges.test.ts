@@ -68,8 +68,11 @@ describe("a bridge's stone", async () => {
     const { min, max, at } = bounds(geo.pos);
     const half = 3.5 + BRIDGE.apron;
     // Noses jut out past the deck's sides.
-    expect(min[0]).toBeCloseTo(100 - half - BRIDGE.nose, 5);
-    expect(max[0]).toBeCloseTo(100 + half + BRIDGE.nose, 5);
+    // (To within its point's cut: blunted, `easedPrism`.)
+    expect(min[0]).toBeGreaterThan(100 - half - BRIDGE.nose - 1e-6);
+    expect(min[0]).toBeLessThan(100 - half - BRIDGE.nose + 0.03);
+    expect(max[0]).toBeLessThan(100 + half + BRIDGE.nose + 1e-6);
+    expect(max[0]).toBeGreaterThan(100 + half + BRIDGE.nose - 0.03);
     expect(min[1]).toBeCloseTo(BRIDGE.under, 5);
     expect(BRIDGE.under).toBeLessThan(WATER_Y);
     // The end posts are the highest; the parapets 0.9 m over the deck.
@@ -84,9 +87,10 @@ describe("a bridge's stone", async () => {
     expect(new Set(deckTop)).toEqual(new Set([BRIDGE.top]));
     expect(BRIDGE.top).toBeLessThan(ROAD_Y);
     expect(BRIDGE.top).toBeGreaterThan(0);
-    // Noses at the three piers between the pieces (none at the banks), each side.
-    const tips = at.filter(([x]) => Math.abs(x - 100) > half + BRIDGE.nose - 0.01);
-    expect([...new Set(tips.map((p) => `${p[0]}:${p[2]}`))].sort()).toEqual(['105.5', '94.5'].flatMap((x) => [192.5, 185, 177.5].map((z) => `${Number(x) + (x === '105.5' ? 0.9 : -0.9)}:${z}`)).sort());
+    // Noses at the three piers between the pieces (none at the banks), each side. (Their points blunted a few
+    // centimetres across: each to the decimetre.)
+    const tips = at.filter(([x]) => Math.abs(x - 100) > half + BRIDGE.nose - 0.05);
+    expect([...new Set(tips.map((p) => `${p[0].toFixed(1)}:${p[2].toFixed(1)}`))].sort()).toEqual(['105.5', '94.5'].flatMap((x) => [192.5, 185, 177.5].map((z) => `${(Number(x) + (x === '105.5' ? 0.9 : -0.9)).toFixed(1)}:${z.toFixed(1)}`)).sort());
   });
 
   test("on a land the town follows, the deck is cut where the road takes its heights: its top follows the road's, never over it", () => {
@@ -144,8 +148,11 @@ describe("a bridge's stone", async () => {
     const bent = draw(arc);
     const { at } = bounds(bent.pos);
     const half = 3.5 + BRIDGE.apron;
-    const tips = new Set(at.filter(([x, , z]) => Math.abs(Math.hypot(x, z) - 60) > half + BRIDGE.nose - 0.05).map(([x, , z]) => `${x.toFixed(3)}:${z.toFixed(3)}`));
-    expect(tips.size).toBe(8);
+    // (A nose's point is blunted, a few centimetres across: its points within a decimetre of each other, one tip.)
+    const far = at.filter(([x, , z]) => Math.abs(Math.hypot(x, z) - 60) > half + BRIDGE.nose - 0.05);
+    const tips: [number, number][] = [];
+    for (const [x, , z] of far) if (!tips.some(([tx, tz]) => Math.hypot(tx - x, tz - z) < 0.1)) tips.push([x, z]);
+    expect(tips.length).toBe(8);
     for (const [x, , z] of at) expect(Math.abs(Math.hypot(x, z) - 60)).toBeLessThan(half + BRIDGE.nose + 0.3);
   });
 

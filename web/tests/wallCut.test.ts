@@ -104,8 +104,9 @@ test("what lies flat on a cut wall is in the cut wall's tone: the tops of a door
     const { pos, col, cut, idx } = part.geo;
     for (let t = 0; t < idx.length; t += 3) {
       const vs = [idx[t], idx[t + 1], idx[t + 2]];
-      // Every vertex clamped from above the stub: flat at the stub's height once cut.
-      if (vs.some((v) => cut[v * 4 + 1] !== Cut.Clamp || pos[v * 3 + 1] < WALL_STUB)) continue;
+      // Every vertex clamped from above the stub: flat at the stub's height once cut. (Not one that sinks under it, an
+      // eased top's chamfer's foot: a chamfer stays one, cut, `Geo.sinkUnder`.)
+      if (vs.some((v) => cut[v * 4 + 1] !== Cut.Clamp || cut[v * 4 + 3] > 0 || pos[v * 3 + 1] < WALL_STUB)) continue;
       const [a, b, c] = vs.map((v) => [pos[v * 3], pos[v * 3 + 2]]);
       if (Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) < 1e-6) continue;
       if (hex(col, vs[0]) === HOUSE_LOOK.cap.toUpperCase()) caps++;
@@ -127,7 +128,8 @@ test("a door's side board stops at the face of a wall that meets the door's wall
       const [x, y, z] = [pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]];
       // The side boards on the two faces of the doorway's wall, above the skirting.
       const off = Math.abs(x - MEETS.x);
-      if (cut[v * 4 + 1] !== Cut.Clamp || off < T - 1e-6 || off > T + 0.03 || y < 0.2 || z > MEETS.z + 0.5) continue;
+      // (Not the wall's own top, a post's eased cap drawn in from its faces: `easedTop`.)
+      if (cut[v * 4 + 1] !== Cut.Clamp || off < T - 1e-6 || off > T + 0.03 || y < 0.2 || y > WALL_HEIGHT - 0.01 || z > MEETS.z + 0.5) continue;
       if (Math.abs(z - MEETS.z) < T - 1e-6) inside.push(`${hex(col, v)} ${x.toFixed(3)}, ${y.toFixed(2)}, ${z.toFixed(3)}`);
       else if (z > MEETS.z) boards++;
     }
@@ -147,8 +149,9 @@ test("nothing but a wall's own top lies in the plane of its top: no board inside
     const { pos, col } = part.geo;
     for (let v = 0; v < pos.length / 3; v++) {
       const [x, y, z] = [pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]];
-      // Along the back wall (the wall on row `z0`), strictly inside its thickness, at its top.
-      if (y < WALL_HEIGHT - 0.0005 || Math.abs(z - z0) > T - 1e-6 || x < 2 + T || x > 8 - T) continue;
+      // Along the back wall (the wall on row `z0`), strictly inside its thickness, at its top: inside its eased edge,
+      // which a frieze's top reaches in to and meets (`face`'s `eased`), not over it.
+      if (y < WALL_HEIGHT - 0.0005 || Math.abs(z - z0) > T - 0.004 - 1e-6 || x < 2 + T || x > 8 - T) continue;
       if (hex(col, v) !== HOUSE_LOOK.cap.toUpperCase()) inside.push(`${hex(col, v)} ${x.toFixed(3)}, ${y.toFixed(3)}, ${z.toFixed(3)}`);
     }
   }

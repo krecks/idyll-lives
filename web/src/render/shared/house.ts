@@ -36,7 +36,7 @@
 import { FLOOR_FINISHES, type DoorStyleDef, type FloorCoveringDef, type LightAim, type RoofColorDef, type RoofStyleDef, type WallCoveringDef, type WindowStyleDef } from '../../content/content';
 import { objectCentre, storeyOfRow, storeyRow, type StoreyLayout, type DiagonalWall, type Opening, type PorchInfo, type PorchPieceInfo, type WallEdge, type WorldStructure } from '../../core/protocol';
 import type { ViewRect } from '../types';
-import { Cut, EASE, facing, Geo, LOOK, planarUV, type V3 } from './geometry';
+import { Cut, EASE, easedBox, facing, Geo, LOOK, planarUV, type V3 } from './geometry';
 import { roadIndex, townRoads } from './roads';
 import { tuned } from '../tune';
 import { smoothstep, valueNoise } from '../../game/noise';
@@ -1065,9 +1065,12 @@ export class HousePlanner {
      * wall, `y0` to `y1` high. `n` is the outward normal; `r` the room that face looks into;
      * `key` names it in `surfaces`. `butt`: its ends (`a0`, `a1`) where the face goes on in its plane past them (a
      * wall's at its posts, a post's at a wall it joins): its frieze's and its baseboard's ends there aren't drawn.
+     * `eased`: its surface stops that far short of `y1`, where its top's chamfer begins (`easedTop`); a frieze there
+     * reaches in over the chamfer, so a standing wall shows no groove under it.
      */
-    const face = (axis: 'h' | 'v', plane: number, a0: number, a1: number, y0: number, y1: number, n: V3, r: number, cover = 0, key?: string, butt = '') => {
+    const face = (axis: 'h' | 'v', plane: number, a0: number, a1: number, y0: number, y1: number, n: V3, r: number, cover = 0, key?: string, butt = '', eased = 0) => {
       const P = (a: number, y: number): V3 => (axis === 'h' ? [a, y, plane] : [plane, y, a]);
+      const yt = y1 - eased;
       // (A board's end that butts nothing shows: its arris is eased as its top's is.)
       const free = `${butt.includes('a0') ? '' : 'a0'} ${butt.includes('a1') ? '' : 'a1'}`;
       // The room's corners along this face: the nodes either end of its tile where a wall meets it on the room's side.
@@ -1092,28 +1095,29 @@ export class HousePlanner {
           else stone.poly([P(a0, y0), P(a1, y0), P(a1, Math.min(plinth, y1)), P(a0, Math.min(plinth, y1))], n);
         }
         const yb = Math.max(y0, plinth);
-        if (y1 > yb) (own ?? ext).poly([P(a0, yb), P(a1, yb), P(a1, y1), P(a0, y1)], n);
-        mark(yb, y1);
+        if (yt > yb) (own ?? ext).poly([P(a0, yb), P(a1, yb), P(a1, yt), P(a0, yt)], n);
+        mark(yb, yt);
         if (y1 >= H - 0.01) {
           const k = trim.kind;
           trim.kind = Cut.Hide;
           // (No higher than the face: a post's face towards a wall it joins stops a hair under that wall's top, and
           // its frieze, at the wall's full height, lay in the top's own plane and showed through it as light ticks.)
-          board(trim, layOn(axis, plane, n), a0, a1, H - 0.2, Math.min(H, y1), 0.025, `y1 ${free}`, `y0 ${butt}`);
+          const L = layOn(axis, plane, n);
+          board(trim, eased ? (a, y, d) => L(a, y, d - eased) : L, a0, a1, H - 0.2, Math.min(H, y1), 0.025 + eased, `y1 ${free}`, `y0 ${butt}`);
           trim.kind = k;
         }
         if (y0 < 0.01) ao.poly([Q(a0, 0.012, 0), Q(a1, 0.012, 0), Q(a1, 0.012, 0.45), Q(a0, 0.012, 0.45)], [0, 1, 0], undefined, [0.32, 0.32, 0, 0]);
         return;
       }
-      mark(y0, y1);
-      if (own) wall(own, y0, y1);
+      mark(y0, yt);
+      if (own) wall(own, y0, yt);
       else {
         const tint = roomWall(r);
         const bath = kinds.get(r) === 'bath';
         // Bathrooms are tiled up to 1.25 m (only the part of this face below that).
-        const split = bath ? Math.min(Math.max(1.25, y0), y1) : y0;
+        const split = bath ? Math.min(Math.max(1.25, y0), yt) : y0;
         if (split > y0) wall(wainscot.color('#F4F4F2'), y0, split);
-        if (y1 > split) wall(int.color(tint), split, y1);
+        if (yt > split) wall(int.color(tint), split, yt);
       }
       if (y0 < 0.01) {
         // (The baseboard: its top's arris eased, the face on the floor not drawn.)
@@ -1143,15 +1147,19 @@ export class HousePlanner {
       const a0 = s0 ?? (axis === 'h' ? x : z) + T;
       const a1 = s1 ?? (axis === 'h' ? x : z) + 1 - T;
       const [c0, c1] = lookOf(axis, x, z).faces ?? [0, 0];
+      // (Its top eased: its faces stop short of it and sink with it where it is cut, `easedTop`.)
+      const eased = cap ? CHAMFER : 0;
+      if (cap) for (const g of wallGeos) g.sinkUnder(y1, CHAMFER);
       if (axis === 'h') {
-        face('h', z - T, a0, a1, y0, y1, [0, 0, -1], roomP(x + 0.5, z - 0.25), c0, `h:${x}:${z}:0`, 'a0 a1');
-        face('h', z + T, a0, a1, y0, y1, [0, 0, 1], roomP(x + 0.5, z + 0.25), c1, `h:${x}:${z}:1`, 'a0 a1');
-        if (cap) capped(y1, () => trim.box(a0, y1 - 0.001, z - T, a1, y1, z + T, 'ny nx px nz pz'));
+        face('h', z - T, a0, a1, y0, y1, [0, 0, -1], roomP(x + 0.5, z - 0.25), c0, `h:${x}:${z}:0`, 'a0 a1', eased);
+        face('h', z + T, a0, a1, y0, y1, [0, 0, 1], roomP(x + 0.5, z + 0.25), c1, `h:${x}:${z}:1`, 'a0 a1', eased);
+        if (cap) capped(y1, () => easedTop(trim, a0, z - T, a1, z + T, y1, 'nx px'));
       } else {
-        face('v', x - T, a0, a1, y0, y1, [-1, 0, 0], roomP(x - 0.25, z + 0.5), c0, `v:${x}:${z}:0`, 'a0 a1');
-        face('v', x + T, a0, a1, y0, y1, [1, 0, 0], roomP(x + 0.25, z + 0.5), c1, `v:${x}:${z}:1`, 'a0 a1');
-        if (cap) capped(y1, () => trim.box(x - T, y1 - 0.001, a0, x + T, y1, a1, 'ny nx px nz pz'));
+        face('v', x - T, a0, a1, y0, y1, [-1, 0, 0], roomP(x - 0.25, z + 0.5), c0, `v:${x}:${z}:0`, 'a0 a1', eased);
+        face('v', x + T, a0, a1, y0, y1, [1, 0, 0], roomP(x + 0.25, z + 0.5), c1, `v:${x}:${z}:1`, 'a0 a1', eased);
+        if (cap) capped(y1, () => easedTop(trim, x - T, a0, x + T, a1, y1, 'nz pz'));
       }
+      for (const g of wallGeos) g.sinkUnder(null);
     };
 
     /**
@@ -1319,9 +1327,12 @@ export class HousePlanner {
         if (vd) maskV &= edgeMask('v', x, z - 1);
         if (vu) maskV &= edgeMask('v', x, z);
         for (const g of wallGeos) g.cutting(Cut.Clamp, maskH, maskV);
-        // As tall as the tallest wall it joins (a run of half walls has half posts).
+        // As tall as the tallest wall it joins (a run of half walls has half posts). Its top eased on its free sides (an
+        // outer corner, a wall's end), where its faces stop short of it; against a wall or a doorway it runs on.
         const top = Math.max(heightOf('h', x - 1, z), heightOf('h', x, z), heightOf('v', x, z - 1), heightOf('v', x, z));
-        capped(top, () => trim.box(x - T, top - 0.001, z - T, x + T, top, z + T, 'ny nx px nz pz'));
+        for (const g of wallGeos) g.sinkUnder(top, CHAMFER);
+        const joined = `${hr ? 'px' : ''} ${hl ? 'nx' : ''} ${vu ? 'pz' : ''} ${vd ? 'nz' : ''}`;
+        capped(top, () => easedTop(trim, x - T, z - T, x + T, z + T, top, joined));
         // Faces towards a door are jambs. Faces towards a wall sit inside it while it stands and
         // close its end when that wall is cut but the post is not.
         // `ra`, `rb`: the rooms of the two quadrants on that side of the corner.
@@ -1358,15 +1369,16 @@ export class HousePlanner {
           const e0 = e ? INSIDE : 0;
           // (Its frieze and baseboard butt those of the walls in its plane: a wall along x by its faces towards z, and so on.)
           const [before, after] = axis === 'h' ? [hl, hr] : [vd, vu];
-          face(axis, plane, a0 + e0, a1 - e0, 0, top - e0, n, ra === 0 || rb === 0 ? 0 : ra, cover, from && from.join(':'), `${before ? 'a0' : ''} ${after ? 'a1' : ''}`);
+          face(axis, plane, a0 + e0, a1 - e0, 0, top - e0, n, ra === 0 || rb === 0 ? 0 : ra, cover, from && from.join(':'), `${before ? 'a0' : ''} ${after ? 'a1' : ''}`, e ? 0 : CHAMFER);
         };
         const q = (dx: number, dz: number) => roomP(x + dx * 0.25, z + dz * 0.25);
         side('px', hr, [1, 0, 0], q(1, -1), q(1, 1));
         side('nx', hl, [-1, 0, 0], q(-1, -1), q(-1, 1));
         side('pz', vu, [0, 0, 1], q(-1, 1), q(1, 1));
         side('nz', vd, [0, 0, -1], q(-1, -1), q(1, -1));
+        for (const g of wallGeos) g.sinkUnder(null);
         // Corner boards where an outside corner turns.
-        this.cornerBoards(x, z, { hl, hr, vd, vu }, roomP, trim);
+        this.cornerBoards(x, z, { hl, hr, vd, vu }, roomP, trim, maskH, maskV);
       }
     }
 
@@ -1387,8 +1399,10 @@ export class HousePlanner {
      * side `sign`, `a0..a1` along it, into room `r` (exterior cladding outdoors, wallpaper inside);
      * `key` names it in `surfaces`.
      */
-    const faceG = (f: WallFrame, a0: number, a1: number, y0: number, y1: number, dOff: number, sign: number, r: number, cover = 0, key?: string) => {
+    const faceG = (f: WallFrame, a0: number, a1: number, y0: number, y1: number, dOff: number, sign: number, r: number, cover = 0, key?: string, eased = 0) => {
       const own = coverGeo(cover);
+      // (Its surface stops `eased` short of its top, where the top's chamfer begins: `face`'s.)
+      const yt = y1 - eased;
       const mark = (y0: number, y1: number) => {
         if (key && y1 > y0) f.face(surface(surfaces.faces, key), a0, a1, y0, y1, dOff + sign * PROUD, sign);
       };
@@ -1398,37 +1412,38 @@ export class HousePlanner {
       };
       if (r === 0) {
         if (y0 < plinth) {
-          const ledge = 0.03;
+          // (Its ledge a board of stone on the face, its upper arris eased, as a straight wall's: `face`.)
           f.face(stone, a0, a1, y0, Math.min(plinth, y1), dOff, sign);
-          stone.poly([f.at(a0, plinth, dOff), f.at(a1, plinth, dOff), f.at(a1, plinth, dOff + sign * ledge), f.at(a0, plinth, dOff + sign * ledge)], [0, 1, 0]);
-          f.face(stone, a0, a1, y0, plinth, dOff + sign * ledge, sign);
+          // (Its ends eased too: at a mitred post's corner one meets the next side's, turned.)
+          if (plinth < y1) board(stone, (a, y, o) => f.at(a, y, dOff + sign * o), a0, a1, y0, plinth, 0.03, 'y1 a0 a1', 'y0');
         }
         const yb = Math.max(y0, plinth);
-        if (y1 > yb) f.face(own ?? ext, a0, a1, yb, y1, dOff, sign);
-        mark(yb, y1);
+        if (yt > yb) f.face(own ?? ext, a0, a1, yb, yt, dOff, sign);
+        mark(yb, yt);
         if (y1 >= H - 0.01) {
           const k = trim.kind;
           trim.kind = Cut.Hide;
-          board(trim, (a, y, o) => f.at(a, y, dOff + sign * o), a0, a1, H - 0.2, H, 0.025, 'y1', 'y0');
+          // (Its ends eased too: at a mitred post's corner one meets the next side's, turned.)
+          board(trim, (a, y, o) => f.at(a, y, dOff + sign * (o - eased)), a0, a1, H - 0.2, H, 0.025 + eased, 'y1 a0 a1', 'y0');
           trim.kind = k;
         }
         if (y0 < 0.01) ground(0.012, 0, 0.45, [0.32, 0.32, 0, 0]);
         return;
       }
-      mark(y0, y1);
+      mark(y0, yt);
       // (Toned as a straight wall's face is, but for the corners.)
       const wall = (g: Geo, ya: number, yb: number) =>
         tonedFace(g, (a, y) => f.at(a, y, dOff), a0, a1, ya, yb, f.normal(sign), (a, y) => wallTone(y, 9, f.at(a, 0, dOff)[0], f.at(a, 0, dOff)[2]), false, (p) => [f.u(p), p[1]]);
-      if (own) wall(own, y0, y1);
+      if (own) wall(own, y0, yt);
       else {
         const tint = roomWall(r);
         const bath = kinds.get(r) === 'bath';
-        const split = bath ? Math.min(Math.max(1.25, y0), y1) : y0;
+        const split = bath ? Math.min(Math.max(1.25, y0), yt) : y0;
         if (split > y0) wall(wainscot.color('#F4F4F2'), y0, split);
-        if (y1 > split) wall(int.color(tint), split, y1);
+        if (yt > split) wall(int.color(tint), split, yt);
       }
       if (y0 < 0.01) {
-        board(trim, (a, y, o) => f.at(a, y, dOff + sign * o), a0, a1, 0, 0.1, 0.014, 'y1', 'y0');
+        board(trim, (a, y, o) => f.at(a, y, dOff + sign * o), a0, a1, 0, 0.1, 0.014, 'y1 a0 a1', 'y0');
         ground(0.013, 0.014, 0.34, [0.3, 0.3, 0, 0]);
       }
     };
@@ -1436,9 +1451,13 @@ export class HousePlanner {
     const diagSegment = (f: WallFrame, d: DiagonalWall, y0: number, y1: number, kind: number, a0: number, a1: number, cap = true) => {
       const mask = diagMask(d);
       for (const g of wallGeos) g.cutting(kind, mask);
-      faceG(f, a0, a1, y0, y1, -T, -1, d.rooms[0], d.faces?.[0], `${d.axis}:${d.x}:${d.z}:0`);
-      faceG(f, a0, a1, y0, y1, T, 1, d.rooms[1], d.faces?.[1], `${d.axis}:${d.x}:${d.z}:1`);
-      if (cap) capped(y1, () => trim.poly([f.at(a0, y1, -T), f.at(a1, y1, -T), f.at(a1, y1, T), f.at(a0, y1, T)], [0, 1, 0]));
+      // (Its top eased as a straight wall's is, in its own frame: `segment`.)
+      const eased = cap ? CHAMFER : 0;
+      if (cap) for (const g of wallGeos) g.sinkUnder(y1, CHAMFER);
+      faceG(f, a0, a1, y0, y1, -T, -1, d.rooms[0], d.faces?.[0], `${d.axis}:${d.x}:${d.z}:0`, eased);
+      faceG(f, a0, a1, y0, y1, T, 1, d.rooms[1], d.faces?.[1], `${d.axis}:${d.x}:${d.z}:1`, eased);
+      if (cap) capped(y1, () => easedTop(trim, a0, -T, a1, T, y1, 'nx px', (a, y, o) => f.at(a, y, o)));
+      for (const g of wallGeos) g.sinkUnder(null);
     };
     /** Whether a diagonal run continues as a plain wall past one end (room for a shutter). */
     const plainDiagEnd = (d: DiagonalWall, end: 0 | 1) => {
@@ -1486,7 +1505,7 @@ export class HousePlanner {
           board(trim, L, g0 - fr, g0, sill, head, 0.035, 'a0 a1', 'y0 y1', undefined, true);
           board(trim, L, g1, g1 + fr, sill, head, 0.035, 'a0 a1', 'y0 y1', undefined, true);
           board(trim, L, g0 - fr, g1 + fr, head, head + fr, 0.035, 'a0 a1 y1', '', undefined, true);
-          board(trim, L, g0 - fr - 0.04, g1 + fr + 0.04, sill - 0.05, sill, outside ? 0.07 : 0.05, 'a0 a1 y1', '', undefined, true);
+          easedBoard(trim, L, g0 - fr - 0.04, g1 + fr + 0.04, sill - 0.05, sill, outside ? 0.07 : 0.05);
           if (outside && (win.shutters === 'house' ? scheme.shutters : win.shutters)) {
             trim.color(scheme.accent);
             if (g0 - fr - 0.36 >= a0 || plainDiagEnd(d, 0)) board(trim, L, g0 - fr - 0.36, g0 - fr - 0.02, sill - 0.02, head + 0.04, 0.03, 'a0 a1 y1');
@@ -1585,10 +1604,19 @@ export class HousePlanner {
         }
         while (outline.length > 1 && Math.hypot(outline[0][0] - outline[outline.length - 1][0], outline[0][1] - outline[outline.length - 1][1]) < 1e-5) outline.pop();
         const top = Math.max(...walls.map((w) => w.height));
+        // Its top eased on its free sides (those not across a wall's end), as a straight post's is: their faces stop
+        // short of it and sink with it where it is cut, a chamfer up to its cap drawn in from them.
+        const sideEnd = (k: number) => {
+          const [p0, p1] = [outline[k], outline[(k + 1) % outline.length]];
+          const [mx, mz] = [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2];
+          return walls.find((w) => Math.hypot(mx - x - w.dir[0] * T, mz - z - w.dir[1] * T) < 1e-4);
+        };
+        const free = outline.map((_, k) => !sideEnd(k));
+        for (const g of wallGeos) g.sinkUnder(top, CHAMFER);
+        capped(top, () => easedOutlineTop(trim, outline, [x, z], top, free));
         for (let k = 0; k < outline.length; k++) {
           const p0 = outline[k];
           const p1 = outline[(k + 1) % outline.length];
-          capped(top, () => trim.poly([[x, top, z], [p0[0], top, p0[1]], [p1[0], top, p1[1]]], [0, 1, 0]));
           // Frames run along +x (or +z) so textures line up with the walls they continue.
           const flip = p1[0] < p0[0] - 1e-9 || (Math.abs(p1[0] - p0[0]) <= 1e-9 && p1[1] < p0[1]);
           const f = flip ? new WallFrame(p1[0], p1[1], p0[0], p0[1]) : new WallFrame(p0[0], p0[1], p1[0], p1[1]);
@@ -1612,8 +1640,9 @@ export class HousePlanner {
             const rb = roomP(x + ux * (T + 0.15) + uz * 0.2, z + uz * (T + 0.15) - ux * 0.2);
             r = ra === 0 || rb === 0 ? 0 : ra;
           } else r = roomP(mx + (ox / ol) * 0.2, mz + (oz / ol) * 0.2);
-          faceG(f, 0, f.length, 0, top, 0, sign, r);
+          faceG(f, 0, f.length, 0, top, 0, sign, r, 0, undefined, free[k] ? CHAMFER : 0);
         }
+        for (const g of wallGeos) g.sinkUnder(null);
       }
     }
 
@@ -2634,7 +2663,7 @@ export class HousePlanner {
       board(trim, L, a0 - f, a0, sill, head, out, 'a0 a1', 'y0 y1', undefined, true);
       board(trim, L, a1, a1 + f, sill, head, out, 'a0 a1', 'y0 y1', undefined, true);
       board(trim, L, a0 - f, a1 + f, head, head + f, out, 'a0 a1 y1', '', undefined, true);
-      board(trim, L, a0 - f - 0.04, a1 + f + 0.04, sill - 0.05, sill, outside ? 0.07 : 0.05, 'a0 a1 y1', '', undefined, true);
+      easedBoard(trim, L, a0 - f - 0.04, a1 + f + 0.04, sill - 0.05, sill, outside ? 0.07 : 0.05);
       if (outside && (win.shutters === 'house' ? scheme.shutters : win.shutters)) {
         trim.color(scheme.accent);
         if (shutters[0]) board(trim, L, a0 - f - 0.36, a0 - f - 0.02, sill - 0.02, head + 0.04, 0.03, 'a0 a1 y1');
@@ -2650,6 +2679,8 @@ export class HousePlanner {
     e: { hl?: EdgeKind; hr?: EdgeKind; vd?: EdgeKind; vu?: EdgeKind },
     roomP: (px: number, pz: number) => number,
     trim: Geo,
+    maskH: number,
+    maskV: number,
   ): void {
     // An outside corner: exactly one h and one v edge meet and the outer quadrant is outdoors.
     const h = e.hl ? -1 : e.hr ? 1 : 0;
@@ -2663,7 +2694,8 @@ export class HousePlanner {
     const d = 0.024;
     const xa = x + sx * T;
     const za = z + sz * T;
-    trim.cutting(Cut.Clamp, LOOK.All, LOOK.All);
+    // (Cut as its post is: it stands while the post does, over the post's corner, and drops with it.)
+    trim.cutting(Cut.Clamp, maskH, maskV);
     trim.color(TRIM);
     // Board on the face whose normal is along x, and one on the face along z, which runs on past the corner over the
     // first's edge: the corner's arris is its, eased as its other one and the first's far one are.
@@ -2679,8 +2711,107 @@ export class HousePlanner {
  */
 function cutBoard(trim: Geo, L: Lay, a0: number, a1: number, y0: number, y1: number, out: number, chamfer: string, skip = ''): void {
   // (A board too narrow to ease is square: a casing's sliver beside a wall it meets. Its back is drawn: it lies over
-  // the arris of its wall's corner or of its doorway.)
-  board(trim, L, a0, a1, y0, y1, out, a1 - a0 < 0.03 ? '' : chamfer, `y0 ${skip}`, HOUSE_LOOK.cap, true);
+  // the arris of its wall's corner or of its doorway. Its top's arris eased too, and sinking with it where it is cut,
+  // so the top it shows then is a wall's eased top, as the wall's own beside it is: `easedTop`.)
+  trim.sinkUnder(y1, CHAMFER);
+  board(trim, L, a0, a1, y0, y1, out, a1 - a0 < 0.03 ? '' : `${chamfer} y1`, `y0 ${skip}`, HOUSE_LOOK.cap, true);
+  trim.sinkUnder(null);
+}
+
+/**
+ * The top of a mitred post round `outline` (x, z, about `centre`) at `top`: its free sides' (`free[k]`: side `k`, from
+ * point `k` to the next) arrises eased `CHAMFER` (a strip down to where their faces stop), the cap drawn in from them
+ * (each corner where the lines drawn in meet), fanned from `centre` as the post's cap was; where a free side meets one
+ * that is not, the triangle up to the top on the other's plane closes it.
+ */
+function easedOutlineTop(g: Geo, outline: readonly (readonly [number, number])[], centre: readonly [number, number], top: number, free: readonly boolean[]): void {
+  const c = CHAMFER;
+  const m = outline.length;
+  // Out of side `k`: the side's normal away from the centre.
+  const outOf = (k: number): [number, number] => {
+    const [a, b] = [outline[k], outline[(k + 1) % m]];
+    const [dx, dz] = [b[0] - a[0], b[1] - a[1]];
+    const l = Math.hypot(dx, dz) || 1;
+    const [nx, nz] = [dz / l, -dx / l];
+    // (Turned away from the centre: the outline may run round it either way.)
+    return nx * ((a[0] + b[0]) / 2 - centre[0]) + nz * ((a[1] + b[1]) / 2 - centre[1]) < 0 ? [-nx, -nz] : [nx, nz];
+  };
+  const inner = outline.map((at, k): [number, number] => {
+    const j = (k + m - 1) % m;
+    const [na, nb] = [outOf(j), outOf(k)];
+    const [da, db] = [free[j] ? c : 0, free[k] ? c : 0];
+    const det = na[0] * nb[1] - na[1] * nb[0];
+    if (Math.abs(det) < 1e-9) return [at[0] - na[0] * Math.max(da, db), at[1] - na[1] * Math.max(da, db)];
+    return [at[0] + (-da * nb[1] + db * na[1]) / det, at[1] + (-db * na[0] + da * nb[0]) / det];
+  });
+  const k2 = Math.SQRT1_2;
+  for (let k = 0; k < m; k++) {
+    const n = (k + 1) % m;
+    const [a, b] = [outline[k], outline[n]];
+    const [ox, oz] = outOf(k);
+    if (free[k]) {
+      g.poly([[a[0], top - c, a[1]], [b[0], top - c, b[1]], [inner[n][0], top, inner[n][1]], [inner[k][0], top, inner[k][1]]], [ox * k2, k2, oz * k2]);
+    } else {
+      // (Up to the top beside a free side's chamfer, on this side's own plane.)
+      if (free[(k + m - 1) % m]) g.poly([[a[0], top - c, a[1]], [inner[k][0], top, inner[k][1]], [a[0], top, a[1]]], [ox, 0, oz]);
+      if (free[n]) g.poly([[b[0], top - c, b[1]], [b[0], top, b[1]], [inner[n][0], top, inner[n][1]]], [ox, 0, oz]);
+    }
+    g.poly([[centre[0], top, centre[1]], [inner[k][0], top, inner[k][1]], [inner[n][0], top, inner[n][1]]], [0, 1, 0]);
+  }
+}
+
+/**
+ * A deep board on a wall (a sill) as `board` lays one (`L`, `a0`..`a1` along, `y0`..`y1` up, `out` from the face), but
+ * a box with every edge the gate would count eased (`easedBox`): its ends' arrises too, which a sill's depth shows.
+ */
+function easedBoard(g: Geo, L: Lay, a0: number, a1: number, y0: number, y1: number, out: number): void {
+  const o = L(0, 0, 0);
+  const way = (v: V3): V3 => {
+    const p = L(v[0], v[1], v[2]);
+    return [p[0] - o[0], p[1] - o[1], p[2] - o[2]];
+  };
+  const drawn = easedBox(a0, y0, 0, a1, y1, out, '', CHAMFER, (pts, n, cut) => {
+    const q = pts.map((p) => L(p[0], p[1], p[2]));
+    if (cut) g.polyCut(q, way(n), cut);
+    else g.poly(q, way(n));
+  });
+  if (!drawn) board(g, L, a0, a1, y0, y1, out, 'a0 a1 y1', '', undefined, true);
+}
+
+/**
+ * The top of a wall, a post or a pier from (`x0`, `z0`) to (`x1`, `z1`) at `top`: its cap and, on each side not in
+ * `skip` (one a wall runs on past, `nx px nz pz`), a chamfer `CHAMFER` down to where that side's face stops (`face`'s
+ * `eased`), with a patch where two meet at a corner: `easedBox`'s, of a thin box there, but for its sides (the faces
+ * are the wall's own). Drawn in `g` as it is set (its tone, its cut, its sink).
+ */
+function easedTop(g: Geo, x0: number, z0: number, x1: number, z1: number, top: number, skip: string, L?: Lay): void {
+  // (In `L`'s frame, x along and z out, if it has one: a diagonal wall's; its ways turned as its points are.)
+  const o = L?.(0, 0, 0);
+  const put = (p: V3): V3 => (L ? L(p[0], p[1], p[2]) : p);
+  const way = (v: V3): V3 => {
+    if (!L || !o) return v;
+    const p = L(v[0], v[1], v[2]);
+    return [p[0] - o[0], p[1] - o[1], p[2] - o[2]];
+  };
+  // (Every edge of it eased, short or long: its faces stop short of it all round.)
+  const drawn = easedBox(
+    x0,
+    top - 0.02,
+    z0,
+    x1,
+    top,
+    z1,
+    `ny ${skip}`,
+    CHAMFER,
+    (pts, n, cut) => {
+      if (n[1] < 1e-6) return;
+      const q = pts.map(put);
+      if (cut) g.polyCut(q, way(n), cut);
+      else g.poly(q, way(n));
+    },
+    false,
+  );
+  if (!drawn) g.poly([put([x0, top, z0]), put([x1, top, z0]), put([x1, top, z1]), put([x0, top, z1])], [0, 1, 0]);
 }
 
 /**
@@ -2951,8 +3082,12 @@ function addRoofShaped(
 function addFlatRoof(rect: { x0: number; z0: number; x1: number; z1: number }, roof: Geo, trim: Geo, base = WALL_HEIGHT): void {
   const o = 0.16;
   const [a0, b0, a1, b1] = [rect.x0 - T - o, rect.z0 - T - o, rect.x1 + T + o, rect.z1 + T + o];
-  roof.box(a0 + 0.02, base, b0 + 0.02, a1 - 0.02, base + 0.16, b1 - 0.02, 'ny');
-  trim.box(a0, base - 0.04, b0, a1, base + 0.2, b1, 'py');
+  // (Their arrises eased, as the street's boxes are: `Geo.easing`.)
+  const [wr, wt] = [roof.ease, trim.ease];
+  roof.easing(EASE).box(a0 + 0.02, base, b0 + 0.02, a1 - 0.02, base + 0.16, b1 - 0.02, 'ny');
+  trim.easing(EASE).box(a0, base - 0.04, b0, a1, base + 0.2, b1, 'py');
+  roof.easing(wr);
+  trim.easing(wt);
 }
 
 /**
@@ -2997,9 +3132,12 @@ export function addRoof(
   const up: V3 = [0, 1, 0];
   const down: V3 = [0, -1, 0];
 
+  // (A gable's verges eased: the slopes' tops stop `CHAMFER` short of the rake boards, a strip at 45° between.)
+  const verge = hip ? 0 : CHAMFER;
+  const inA = (a: number) => (a <= ea0 + 1e-9 ? a + verge : a >= ea1 - 1e-9 ? a - verge : a);
   /** Adds a roof plane (top in shingles, underside as soffit), lifted by `dy`. */
   const plane = (pts: [number, number, number][], uvs: [number, number][], out: V3) => {
-    const top = pts.map(([a, y, b]) => P(a, y + th, b));
+    const top = pts.map(([a, y, b]) => P(inA(a), y + th, b));
     const bottom = pts.map(([a, y, b]) => P(a, y, b));
     // First, second and last corner: on a pyramid (square hip) the two ridge corners coincide.
     const nt = facing(top[0], top[1], top[top.length - 1], [out[0], 1, out[2]]);
@@ -3015,14 +3153,31 @@ export function addRoof(
   // The two long slopes (quads; trapezoids for a hip roof). UV: u along the eave, v up-slope.
   plane([[ea0, ye, eb0], [ea1, ye, eb0], [ra1, yr, bc], [ra0, yr, bc]], [[ea0, 0], [ea1, 0], [ra1, vr], [ra0, vr]], sideB0);
   plane([[ea0, ye, eb1], [ra0, yr, bc], [ra1, yr, bc], [ea1, ye, eb1]], [[ea0, 0], [ra0, vr], [ra1, vr], [ea1, 0]], sideB1);
-  // Fascia boards along the eaves.
-  trim.poly([P(ea0, ye, eb0), P(ea1, ye, eb0), P(ea1, ye + th, eb0), P(ea0, ye + th, eb0)], sideB0);
-  trim.poly([P(ea0, ye, eb1), P(ea0, ye + th, eb1), P(ea1, ye + th, eb1), P(ea1, ye, eb1)], sideB1);
+  // Fascia boards along the eaves, short of the corners by `cc`: each corner cut across, a face at 45° between the
+  // boards that meet there (a hip's fascias, or a fascia and a gable's rake board), so no corner stands square.
+  const cc = CHAMFER;
+  const cp = cc * pitch;
+  trim.poly([P(ea0 + cc, ye, eb0), P(ea1 - cc, ye, eb0), P(ea1 - cc, ye + th, eb0), P(ea0 + cc, ye + th, eb0)], sideB0);
+  trim.poly([P(ea0 + cc, ye, eb1), P(ea0 + cc, ye + th, eb1), P(ea1 - cc, ye + th, eb1), P(ea1 - cc, ye, eb1)], sideB1);
+  for (const [a, sa] of [[ea0, 1], [ea1, -1]] as const) {
+    for (const [eb, sb] of [[eb0, 1], [eb1, -1]] as const) {
+      // (A gable's rake board starts up its slope, `cp` higher; a hip's fascia at the eave's height.)
+      const [lift, top] = hip ? [0, th] : [cp, th - verge];
+      const q: V3[] = [P(a + sa * cc, ye, eb), P(a, ye + lift, eb + sb * cc), P(a, ye + lift + top, eb + sb * cc), P(a + sa * cc, ye + th, eb)];
+      const out: V3 = w(-sa, -sb);
+      trim.poly(q, facing(q[0], q[1], q[2], out));
+      // (Over it, between the fascia's top, the slope's and the rake's: a gable's only, a hip's slopes reach over.)
+      if (!hip) {
+        const t: V3[] = [P(a + sa * cc, ye + th, eb), P(a + sa * cc, ye + th + cp, eb + sb * cc), P(a, ye + cp + th - verge, eb + sb * cc)];
+        roof.poly(t, facing(t[0], t[1], t[2], [out[0], 1, out[2]]));
+      }
+    }
+  }
   if (hip) {
     plane([[ea0, ye, eb0], [ra0, yr, bc], [ea0, ye, eb1]], [[eb0, 0], [bc, vr], [eb1, 0]], sideA0);
     plane([[ea1, ye, eb0], [ea1, ye, eb1], [ra1, yr, bc]], [[eb0, 0], [eb1, 0], [bc, vr]], sideA1);
-    trim.poly([P(ea0, ye, eb0), P(ea0, ye, eb1), P(ea0, ye + th, eb1), P(ea0, ye + th, eb0)], sideA0);
-    trim.poly([P(ea1, ye, eb0), P(ea1, ye + th, eb0), P(ea1, ye + th, eb1), P(ea1, ye, eb1)], sideA1);
+    trim.poly([P(ea0, ye, eb0 + cc), P(ea0, ye, eb1 - cc), P(ea0, ye + th, eb1 - cc), P(ea0, ye + th, eb0 + cc)], sideA0);
+    trim.poly([P(ea1, ye, eb0 + cc), P(ea1, ye + th, eb0 + cc), P(ea1, ye + th, eb1 - cc), P(ea1, ye, eb1 - cc)], sideA1);
     // Hip caps: a course of cap shingles up each hip, a little darker as the ridge's is (`HOUSE_LOOK.roofCap`),
     // standing a little proud of the two slopes it covers the joint of (a hip was a bare seam between two tones).
     const [r, g, b] = [roof.r, roof.g, roof.b];
@@ -3058,10 +3213,20 @@ export function addRoof(
     roof.g = g;
     roof.b = b;
   } else {
-    // Rake boards along the sloped edges and closed gable triangles on the wall planes.
+    // Rake boards along the sloped edges (their tops `verge` under the slopes', eased up to them: in the roof's
+    // tone, as the slope it finishes) and closed gable triangles on the wall planes.
     for (const [a, side] of [[ea0, sideA0], [ea1, sideA1]] as const) {
-      trim.poly([P(a, ye, eb0), P(a, yr, bc), P(a, yr + th, bc), P(a, ye + th, eb0)], side);
-      trim.poly([P(a, ye, eb1), P(a, ye + th, eb1), P(a, yr + th, bc), P(a, yr, bc)], side);
+      const v = verge;
+      const ai = a === ea0 ? a + v : a - v;
+      // (From `cc` up the slope: the eave's corner is cut across, above.)
+      const [b0, b1] = [eb0 + cc, eb1 - cc];
+      trim.poly([P(a, ye + cp, b0), P(a, yr, bc), P(a, yr + th - v, bc), P(a, ye + cp + th - v, b0)], side);
+      trim.poly([P(a, ye + cp, b1), P(a, ye + cp + th - v, b1), P(a, yr + th - v, bc), P(a, yr, bc)], side);
+      for (const eb of [b0, b1]) {
+        const q: V3[] = [P(a, ye + cp + th - v, eb), P(a, yr + th - v, bc), P(ai, yr + th, bc), P(ai, ye + cp + th, eb)];
+        // (Its normal its own, out over the gable and up: between the rake's face and the slope's.)
+        roof.poly(q, facing(q[0], q[1], q[2], [side[0], 1, side[2]]));
+      }
     }
     for (const [a, side] of [[A0, sideA0], [A1, sideA1]] as const) {
       gables.poly([P(a, H, B0), P(a, H, B1), P(a, yr, bc)], side);
@@ -3077,7 +3242,10 @@ export function addRoof(
     roof.r *= HOUSE_LOOK.roofCap;
     roof.g *= HOUSE_LOOK.roofCap;
     roof.b *= HOUSE_LOOK.roofCap;
-    roof.box(Math.min(c0[0], c1[0]), c0[1] - 0.02, Math.min(c0[2], c1[2]), Math.max(c0[0], c1[0]), c1[1], Math.max(c0[2], c1[2]), 'ny');
+    // (Its arrises eased, as the street's boxes are: `Geo.easing`.)
+    const was = roof.ease;
+    roof.easing(EASE).box(Math.min(c0[0], c1[0]), c0[1] - 0.02, Math.min(c0[2], c1[2]), Math.max(c0[0], c1[0]), c1[1], Math.max(c0[2], c1[2]), 'ny');
+    roof.easing(was);
     roof.r = r;
     roof.g = g;
     roof.b = b;

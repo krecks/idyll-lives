@@ -53,7 +53,8 @@ pub(super) fn cut_away(
             let top = p.storey as f64 * index.storey + index.stub;
             for (i, at) in mesh.positions.iter_mut().enumerate() {
                 if cut(i) && p.cut[i][1] == 1 {
-                    at[1] = at[1].min(top);
+                    // (Less its sink, mm: an eased wall top's faces and its chamfer's foot, `Geo.sinkUnder`.)
+                    at[1] = at[1].min(top - p.cut[i][3] as f64 / 1000.0);
                 }
             }
             mesh.triangles.retain(|t| {
