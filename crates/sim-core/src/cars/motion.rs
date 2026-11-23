@@ -677,7 +677,7 @@ pub(crate) fn empty_drive_route(travel: &Travel, from: [f32; 2], to: [f32; 2]) -
         legs.push_lane(p, tops[i], room, at);
         legs.mark_kind(kind);
         if let Some(m) = marks.as_ref() {
-            legs.mark_last(m[laid_from.next(p)]);
+            legs.mark_last(laid_from.mark(m, p));
         }
     }
     Some(legs.timed(true, true))

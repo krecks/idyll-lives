@@ -586,7 +586,7 @@ pub(super) fn lay_route(
             let mut laid_from = crate::cars::Along::new(&full);
             for (i, &p) in lane.iter().enumerate() {
                 let top = tops[i];
-                let mark = marks.as_ref().map(|m| m[laid_from.next(p)]);
+                let mark = marks.as_ref().map(|m| laid_from.mark(m, p));
                 if !on
                     && let Some((bay, d, at, taken, _)) = &leaving
                     && bay.near(p, *at, *taken, *d)

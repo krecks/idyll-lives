@@ -528,7 +528,7 @@ impl Route {
             (w[0] * b.t[0] + w[1] * b.t[1]) * d > 0.7
         };
         for (i, &p) in lane.iter().enumerate() {
-            let mark = marks.as_ref().map(|m| m[laid_from.next(p)]);
+            let mark = marks.as_ref().map(|m| laid_from.mark(m, p));
             if !on
                 && let Some((b, d, at, taken)) = start
                 && b.near(p, at, taken, d)
@@ -847,7 +847,7 @@ impl Route {
             .unwrap_or(lane.len() - 1);
         legs.line(from, lane[join], false, JUNCTION_SPEED);
         for (i, &q) in lane.iter().enumerate() {
-            let mark = marks.as_ref().map(|m| m[laid_from.next(q)]);
+            let mark = marks.as_ref().map(|m| laid_from.mark(m, q));
             if i < join {
                 continue;
             }

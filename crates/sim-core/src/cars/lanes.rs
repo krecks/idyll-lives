@@ -356,11 +356,31 @@ const ALONG_LOOK: usize = 64;
 pub(crate) struct Along<'a> {
     line: &'a [[f32; 2]],
     at: usize,
+    /// The line's points up to here are marked on the lane already (`mark`).
+    marked: usize,
 }
 
 impl<'a> Along<'a> {
     pub(crate) fn new(line: &'a [[f32; 2]]) -> Self {
-        Along { line, at: 0 }
+        Along {
+            line,
+            at: 0,
+            marked: 0,
+        }
+    }
+
+    /// The marks (`way_marks`) of the lane's next point `p`: the level of the line's point it was
+    /// laid from (`next`), and whether it merges there or at a point of the line since the last's
+    /// (a ramp meeting its carriageway at a shallow angle: thinning the lane left out its point).
+    pub(crate) fn mark(
+        &mut self,
+        marks: &[(crate::travel::Layer, bool)],
+        p: [f32; 2],
+    ) -> (crate::travel::Layer, bool) {
+        let i = self.next(p);
+        let merge = marks[self.marked.min(i)..=i].iter().any(|m| m.1);
+        self.marked = i + 1;
+        (marks[i].0, merge)
     }
 
     /// The line's point the lane's next point `p` was laid from (`Along`).
