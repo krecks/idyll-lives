@@ -330,6 +330,7 @@ impl Graph {
                             width: d,
                             kind: RoadKind::Street,
                             area: None,
+                            oneway: OneWay::Both,
                         })
                     })
                     .collect()

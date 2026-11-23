@@ -10,6 +10,8 @@ pub struct Road {
     pub width: f32,
     pub kind: RoadKind,
     pub area: Option<u32>,
+    /// Which way cars may go along it (`RoadRaw::oneway`).
+    pub oneway: OneWay,
     /// Its index in the town file's `roads` (`drives[].road` refers to it).
     pub source: u32,
 }
@@ -46,6 +48,7 @@ impl Road {
             },
             kind: raw.kind,
             area: raw.area,
+            oneway: raw.oneway,
             source: source as u32,
         })
     }
@@ -117,12 +120,20 @@ impl Road {
         out
     }
 
-    pub(super) fn walkable(&self) -> bool {
-        true
+    /// Whether people walk along it: not on a motorway or a ramp.
+    pub fn walkable(&self) -> bool {
+        !matches!(self.kind, RoadKind::Motorway | RoadKind::Ramp)
     }
 
-    pub(crate) fn drivable(&self) -> bool {
+    /// Whether cars drive along it: not on a trail.
+    pub fn drivable(&self) -> bool {
         self.kind != RoadKind::Trail
+    }
+
+    /// Whether a car may come onto it or leave it other than at a junction (from a driveway, a
+    /// parking bay or a kerb): a road for cars but a motorway or a ramp.
+    pub fn enterable(&self) -> bool {
+        self.drivable() && !matches!(self.kind, RoadKind::Motorway | RoadKind::Ramp)
     }
 }
 

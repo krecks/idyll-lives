@@ -120,7 +120,11 @@ impl Graph {
             let far2 = limit * limit * 1.001 + 1e-3;
             for &(r, i) in &self.cells[cz * self.cols + cx] {
                 let road = &self.roads[r as usize];
-                if mode == Mode::Car && !road.drivable() || !road.walkable() {
+                let allowed = match mode {
+                    Mode::Foot => road.walkable(),
+                    Mode::Car => road.drivable(),
+                };
+                if !allowed {
                     continue;
                 }
                 // (`Road::project_segment`, step by step.)
