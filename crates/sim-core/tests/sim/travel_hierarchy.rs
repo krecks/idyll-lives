@@ -16,7 +16,7 @@
 
 use serde_json::{Value, json};
 use sim_core::World;
-use sim_core::travel::{OneWay, RoadKind, RoadRaw};
+use sim_core::travel::{Edge, Graph, Mode, OneWay, RoadKind, RoadPath, RoadPoint, RoadRaw, dist};
 
 use crate::common;
 
@@ -288,13 +288,289 @@ fn a_two_way_road_saves_without_a_way() {
 
 // What the hierarchy's streams test on this fixture (stage 1 and 2 of the plan).
 
-#[test]
-#[ignore = "S-GRAPH: no junction where the motorway crosses a road"]
-fn motorway_crossing_makes_no_node() {}
+/// The network road of the town file's road `source`.
+fn road_of(g: &Graph, source: usize) -> u32 {
+    g.roads
+        .iter()
+        .position(|r| r.source == source as u32)
+        .expect("in the network") as u32
+}
+
+/// The place on road `source` nearest `p`.
+fn on(g: &Graph, source: usize, p: [f32; 2]) -> RoadPoint {
+    let (s, _) = g.roads[road_of(g, source) as usize].project(p);
+    g.at_source(source as u32, s).expect("in the network")
+}
+
+/// The stretches of network road `road`, in order along it.
+fn edges_of(g: &Graph, road: u32) -> Vec<Edge> {
+    g.edges.iter().filter(|e| e.road == road).copied().collect()
+}
+
+/// The way by car from `a` to `b` (`Graph::path`), if any.
+fn drive(g: &Graph, a: RoadPoint, b: RoadPoint) -> Option<RoadPath> {
+    g.path(a, b, Mode::Car, 16.0)
+}
 
 #[test]
-#[ignore = "S-GRAPH: one-way edges"]
-fn oneway_loop_paths_differ() {}
+fn motorway_crossing_makes_no_node() {
+    let w = world();
+    let g = &w.travel.graph;
+    // (Nothing where the street runs under either carriageway: no node, no box.)
+    for z in [EAST_Z, WEST_Z] {
+        let under = [STREET_X as f32, z as f32];
+        for n in &g.nodes {
+            assert!(dist(*n, under) > 20.0, "a node at {n:?} by {under:?}");
+        }
+        for (b, r) in &g.boxes {
+            assert!(dist(*b, under) > *r + 10.0, "a box at {b:?} by {under:?}");
+        }
+    }
+    // (Each carriageway split only where its ramp joins it.)
+    for side in [MOTORWAY_EAST, MOTORWAY_WEST] {
+        assert_eq!(edges_of(g, road_of(g, side)).len(), 2, "road {side}");
+    }
+    // (The street goes on under it, unbroken but for the ramps' T's.)
+    let street = road_of(g, BRIDGE_STREET);
+    let along: Vec<f32> = edges_of(g, street).iter().map(|e| e.s1).collect();
+    let s = |z: f64| (z - AVENUE_Z) as f32;
+    assert_eq!(along.len(), 3, "{along:?}");
+    assert!((along[0] - s(EAST_Z - 25.0)).abs() < 0.5, "{along:?}");
+    assert!((along[1] - s(WEST_Z + 25.0)).abs() < 0.5, "{along:?}");
+    // (Walking or driving under it: straight along the street.)
+    let (a, b) = (
+        on(g, BRIDGE_STREET, [140.0, 150.0]),
+        on(g, BRIDGE_STREET, [140.0, 260.0]),
+    );
+    for mode in [Mode::Foot, Mode::Car] {
+        let path = g.path(a, b, mode, 16.0).expect("a way under it");
+        assert!((path.len - 110.0).abs() < 0.5, "{mode:?}: {} m", path.len);
+        assert!(path.pts.iter().all(|p| p.2 == RoadKind::Street), "{mode:?}");
+    }
+    // (Under its deck, off the street: nobody stands in a carriageway there.)
+    for p in [[150.0, EAST_Z as f32], [170.0, WEST_Z as f32 + 1.0]] {
+        assert!(!w.travel.on_carriageway(p, 0.0), "{p:?}");
+    }
+    assert!(w.travel.on_carriageway([140.0, EAST_Z as f32], 0.0));
+}
+
+#[test]
+fn oneway_loop_paths_differ() {
+    let w = world();
+    let g = &w.travel.graph;
+    let (west, east) = (LOOP[0], LOOP[2]);
+    let a = on(g, west, [300.0, 40.0]);
+    let b = on(g, east, [360.0, 40.0]);
+    let there = drive(g, a, b).expect("a way round");
+    let back = drive(g, b, a).expect("a way back");
+    // (There by the south side, back by the north: each its way round.)
+    let by = |p: &RoadPath, z: f32| p.pts.iter().any(|q| (q.0[1] - z).abs() < 0.01);
+    assert!(by(&there, 20.0) && !by(&there, 60.0), "{:?}", there.pts);
+    assert!(by(&back, 60.0) && !by(&back, 20.0), "{:?}", back.pts);
+    // (Back along the west side, the way it goes: round the block; on foot, straight.)
+    let (up, down) = (on(g, west, [300.0, 50.0]), on(g, west, [300.0, 30.0]));
+    let ahead = drive(g, up, down).expect("ahead");
+    assert!((ahead.len - 20.0).abs() < 0.5, "{} m", ahead.len);
+    let round = drive(g, down, up).expect("round the block");
+    assert!((round.len - 180.0).abs() < 0.5, "{} m", round.len);
+    let walk = g.path(down, up, Mode::Foot, 16.0).expect("on foot");
+    assert!((walk.len - 20.0).abs() < 0.5, "{} m", walk.len);
+    // (Each stretch of the loop driven its way: z falling on the west side, x falling on the
+    // north.)
+    let side = |p: [f32; 2], x: f32| (p[0] - x).abs() < 0.01;
+    for path in [&there, &back, &round] {
+        for w in path.pts.windows(2) {
+            let (p, q) = (w[0].0, w[1].0);
+            if side(p, 300.0) && side(q, 300.0) && p[1] <= 60.0 && q[1] <= 60.0 {
+                assert!(q[1] <= p[1], "north on the west side: {p:?} to {q:?}");
+            }
+            if (p[1] - 60.0).abs() < 0.01 && (q[1] - 60.0).abs() < 0.01 {
+                assert!(q[0] <= p[0], "east on the north side: {p:?} to {q:?}");
+            }
+        }
+    }
+}
+
+#[test]
+fn a_merge_has_no_box_and_no_lights() {
+    let w = world();
+    let g = &w.travel.graph;
+    let merges: Vec<[f32; 2]> = g.merge_nodes().map(|n| g.nodes[n]).collect();
+    assert_eq!(merges, vec![[20.0, EAST_Z as f32], [20.0, WEST_Z as f32]]);
+    let junctions: Vec<[f32; 2]> = g.junctions().collect();
+    for m in &merges {
+        assert!(!junctions.contains(m), "{m:?} a junction");
+        for (b, r) in &g.boxes {
+            assert!(dist(*b, *m) > *r + 5.0, "a box at {b:?} by {m:?}");
+        }
+        for s in w.travel.signals.iter().chain(&w.travel.give_way) {
+            assert!(dist(s.at, *m) > 20.0, "a junction's signal at {:?}", s.at);
+        }
+    }
+    // (The ramps' other ends are T's on the street, junctions as any.)
+    for z in [EAST_Z - 25.0, WEST_Z + 25.0] {
+        let t = [STREET_X as f32, z as f32];
+        assert!(junctions.iter().any(|j| dist(*j, t) < 0.5), "{t:?}");
+        assert!(g.boxes.iter().any(|(b, _)| dist(*b, t) < 0.5), "{t:?}");
+    }
+}
+
+#[test]
+fn walkers_keep_off_the_motorway_and_its_ramps() {
+    let w = world();
+    let g = &w.travel.graph;
+    let car_only = |k: RoadKind| matches!(k, RoadKind::Motorway | RoadKind::Ramp);
+    for p in [
+        [20.0, EAST_Z as f32],
+        [60.0, WEST_Z as f32 + 7.0],
+        [100.0, EAST_Z as f32 - 7.0],
+        [300.0, 204.0],
+    ] {
+        for rp in g.near(p, 60.0, 4, Mode::Foot) {
+            assert!(!car_only(g.roads[rp.road as usize].kind), "{p:?}: {rp:?}");
+        }
+    }
+    let starts = [[140.0, 300.0], [60.0, 80.0], [300.0, 40.0], [90.0, 110.0]];
+    for &a in &starts {
+        for &b in &starts {
+            let (Some(a), Some(b)) = (
+                g.nearest(a, 20.0, Mode::Foot),
+                g.nearest(b, 20.0, Mode::Foot),
+            ) else {
+                panic!("no road on foot near {a:?} or {b:?}");
+            };
+            let path = g.path(a, b, Mode::Foot, 16.0).expect("a way on foot");
+            assert!(path.pts.iter().all(|p| !car_only(p.2)), "{a:?} to {b:?}");
+        }
+    }
+    // (Nor can they set off along one.)
+    let ramp = on(g, OFF_RAMP, [80.0, EAST_Z as f32 - 7.0]);
+    let street = on(g, BRIDGE_STREET, [140.0, 120.0]);
+    assert!(g.path(ramp, street, Mode::Foot, 16.0).is_none());
+    assert!(g.path(ramp, street, Mode::Car, 16.0).is_some());
+}
+
+#[test]
+fn town_to_the_motorway_by_its_ramps_their_way() {
+    let w = world();
+    let g = &w.travel.graph;
+    let town = on(g, AVENUE, [60.0, AVENUE_Z as f32]);
+    let x0 = MOTORWAY_X0 as f32 + 1.0;
+    let x1 = MOTORWAY_X1 as f32 - 1.0;
+    // Out west: up the street, the on-ramp, and west on the westbound carriageway.
+    let out = drive(g, town, on(g, MOTORWAY_WEST, [x0, WEST_Z as f32])).expect("a way out");
+    let kinds: Vec<RoadKind> = out.pts.iter().map(|p| p.2).collect();
+    let ramp_at = kinds
+        .iter()
+        .position(|&k| k == RoadKind::Ramp)
+        .expect("by a ramp");
+    let motorway_at = kinds
+        .iter()
+        .position(|&k| k == RoadKind::Motorway)
+        .expect("onto the motorway");
+    assert!(ramp_at < motorway_at, "{kinds:?}");
+    assert!(
+        kinds[motorway_at..]
+            .iter()
+            .all(|&k| k == RoadKind::Motorway)
+    );
+    let on_ramp = &out.pts[ramp_at..motorway_at];
+    assert!(
+        on_ramp.iter().all(|p| p.0[1] > WEST_Z as f32 - 0.01),
+        "the on-ramp: {on_ramp:?}"
+    );
+    for w in out.pts[motorway_at..].windows(2) {
+        assert!(w[1].0[0] <= w[0].0[0], "east on the westbound: {w:?}");
+        assert!((w[1].0[1] - WEST_Z as f32).abs() < 0.01, "{w:?}");
+    }
+    // In from the west: the eastbound carriageway, off by the off-ramp and down the street.
+    let back = drive(g, on(g, MOTORWAY_EAST, [x0, EAST_Z as f32]), town).expect("a way in");
+    let kinds: Vec<RoadKind> = back.pts.iter().map(|p| p.2).collect();
+    let ramp_at = kinds
+        .iter()
+        .position(|&k| k == RoadKind::Ramp)
+        .expect("by a ramp");
+    assert!(kinds[..ramp_at].iter().all(|&k| k == RoadKind::Motorway));
+    assert!(
+        back.pts[..ramp_at]
+            .windows(2)
+            .all(|w| w[1].0[0] >= w[0].0[0])
+    );
+    // Never against a carriageway's way: not onto the westbound where cars come onto it from the
+    // east, nor the eastbound at all from town (no ramp onto it).
+    assert!(drive(g, town, on(g, MOTORWAY_WEST, [x1, WEST_Z as f32])).is_none());
+    assert!(drive(g, town, on(g, MOTORWAY_EAST, [x1, EAST_Z as f32])).is_none());
+    // (Westbound, no way off before its end: the half-diamond's off-ramp is the eastbound's.)
+    let (west_in, west_out) = (
+        on(g, MOTORWAY_WEST, [x1, WEST_Z as f32]),
+        on(g, MOTORWAY_WEST, [x0, WEST_Z as f32]),
+    );
+    assert!(drive(g, west_in, town).is_none());
+    let through = drive(g, west_in, west_out).expect("along it");
+    assert!((through.len - (x1 - x0)).abs() < 0.5, "{} m", through.len);
+    assert!(drive(g, west_out, west_in).is_none());
+}
+
+#[test]
+fn one_way_roads_keep_every_place_reachable() {
+    let w = world();
+    let g = &w.travel.graph;
+    assert!(g.strongly_connected());
+    // (The loop's north side turned round: a corner cars come to and can't leave.)
+    let mut roads = w.travel.file.roads.clone();
+    roads[LOOP[3]].oneway = OneWay::Along;
+    assert!(!Graph::build(&roads).strongly_connected());
+    // (Or two-way: all well again.)
+    roads[LOOP[3]].oneway = OneWay::Both;
+    assert!(Graph::build(&roads).strongly_connected());
+}
+
+/// A classic world's network (no motorway, no one-way roads) as it was before the hierarchy:
+/// its nodes, edges, junctions and boxes, and a fingerprint of every node and edge.
+#[test]
+fn a_classic_world_makes_the_same_graph() {
+    let content = common::content();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/saves");
+    let mut worlds = Vec::new();
+    for name in ["v042_village.json", "v035_normal.json", "v036_hamlets.json"] {
+        let json = std::fs::read_to_string(dir.join(name)).unwrap();
+        worlds.push((name, World::from_save_json(&content, &json).unwrap()));
+    }
+    let (town, _) = common::hamlets::grid(&content, 5, 256, 6, 40, true);
+    worlds.push(("grid", World::from_json(&content, &town, 5).unwrap()));
+    // (Each: nodes, edges, junctions, boxes, lit junctions, the fingerprint; as on main.)
+    let before: [(usize, usize, usize, usize, usize, u64); 4] = [
+        (4, 2, 0, 0, 0, 0xb6fea3534c334e4c),
+        (14, 19, 12, 76, 12, 0x1492edd1b0b9cb6d),
+        (4, 3, 0, 0, 0, 0xc5f5c621679c4e11),
+        (6, 5, 0, 0, 0, 0xcf5cab4b527fadaa),
+    ];
+    for ((name, w), want) in worlds.iter().zip(before) {
+        let g = &w.travel.graph;
+        let mut h: u64 = 0xcbf29ce484222325;
+        let mut mix = |v: u32| h = (h ^ v as u64).wrapping_mul(0x100000001b3);
+        for n in &g.nodes {
+            mix(n[0].to_bits());
+            mix(n[1].to_bits());
+        }
+        for e in &g.edges {
+            for v in [e.road, e.a, e.b, e.s0.to_bits(), e.s1.to_bits()] {
+                mix(v);
+            }
+        }
+        let got = (
+            g.nodes.len(),
+            g.edges.len(),
+            g.junctions().count(),
+            g.boxes.len(),
+            w.travel.signals.len(),
+            h,
+        );
+        assert_eq!(got, want, "{name}: {got:#x?}");
+        assert_eq!(g.merge_nodes().count(), 0, "{name}");
+        assert!(g.strongly_connected(), "{name}");
+    }
+}
 
 /// The fixture with the motorway's carriageways and ramps (`motorway`, two-way) or the avenue
 /// (`avenue`) of another kind: the same roads at another speed.
@@ -316,7 +592,7 @@ fn rekinded(motorway: Option<&str>, avenue: Option<&str>) -> World {
 }
 
 /// Ticks of an empty drive from `a` to `b` in `w` (`cars::empty_drive_ticks`).
-fn drive(w: &World, a: [f32; 2], b: [f32; 2]) -> f32 {
+fn drive_ticks(w: &World, a: [f32; 2], b: [f32; 2]) -> f32 {
     sim_core::cars::empty_drive_ticks(&w.travel, a, b).expect("a way")
 }
 
@@ -324,8 +600,8 @@ fn drive(w: &World, a: [f32; 2], b: [f32; 2]) -> f32 {
 fn motorway_is_faster() {
     // Along the eastbound carriageway, over the street and the river, most of the world across.
     let (a, b) = ([30.0, EAST_Z as f32], [470.0, EAST_Z as f32]);
-    let motorway = drive(&world(), a, b);
-    let street = drive(&rekinded(Some("street"), None), a, b);
+    let motorway = drive_ticks(&world(), a, b);
+    let street = drive_ticks(&rekinded(Some("street"), None), a, b);
     assert!(
         motorway < 0.6 * street,
         "{motorway} ticks by the motorway, {street} by a street"
@@ -342,9 +618,9 @@ fn motorway_is_faster() {
 fn the_avenue_is_faster_than_a_street() {
     // Its length, past both cross streets (straight through their junctions at its speed).
     let (a, b) = ([10.0, AVENUE_Z as f32], [290.0, AVENUE_Z as f32]);
-    let avenue = drive(&world(), a, b);
-    let street = drive(&rekinded(None, Some("street")), a, b);
-    let lane = drive(&rekinded(None, Some("lane")), a, b);
+    let avenue = drive_ticks(&world(), a, b);
+    let street = drive_ticks(&rekinded(None, Some("street")), a, b);
+    let lane = drive_ticks(&rekinded(None, Some("lane")), a, b);
     assert!(
         avenue < 0.85 * street,
         "{avenue} ticks on the avenue, {street} on a street"
