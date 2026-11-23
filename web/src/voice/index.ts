@@ -21,19 +21,19 @@
 import type { Content } from '../content/content';
 import type { FrameState } from '../core/bridge';
 import type { SimThreadStats, WorldStructure } from '../core/protocol';
-import { llmReady, llmStats, llmStatus, unloadLlm, wantLlm } from '../llm';
+import { llmReady, llmStats, llmStatus, unloadLlm } from '../llm';
 import { heldSince, inferenceHeld } from '../ml/schedule.svelte';
 import { acoustics } from '../audio/acoustics';
 import type { Place } from '../audio/space';
 import type { Renderer } from '../render/types';
 import { settings } from '../settings/settings.svelte';
-import { deviceTest, llmDevice, llmWrites, LlmWriter, loadTalk, WRITE_MS } from '../talk';
+import { deviceTest, llmWrites, LlmWriter, loadTalk, WRITE_MS } from '../talk';
 import { game, toast } from '../ui/state.svelte';
 import { BusyShare } from './busyShare';
 import { fill, loadLines, Lines, speechPieces, type Line } from './lines';
 import { playClip, updateVoiceVolume, type Playing } from './player';
 import { SAMPLE_RATE } from './protocol';
-import { hasClip, pauseVoice, resumeVoice, speak, stepDownVoice, voiceReady, voiceStatus, voiceThreadStats, wantVoice, type Clip } from './service.svelte';
+import { hasClip, pauseVoice, resumeVoice, speak, stepDownVoice, voiceReady, voiceStatus, voiceThreadStats, type Clip } from './service.svelte';
 import type { VisemeTrack } from './visemes';
 import { voiceFor, withTone, type VoiceParams } from './voices';
 import { scripted, type LineRequest } from './writer';
@@ -543,11 +543,8 @@ export class VoiceDirector {
       if (line) this.say(id, req.row, line, req.partner, thought, now, requested, MAX_WAIT_MS);
       return;
     }
-    // Nothing is written while the model loads: the moment passes (low on memory, the first starts it).
-    if (!llmReady()) {
-      wantLlm(llmDevice());
-      return;
-    }
+    // Nothing is written while the model loads: the moment passes.
+    if (!llmReady()) return;
     this.writing.get(id)?.abort();
     this.writing.delete(id);
     if (this.writing.size >= MAX_WRITING) {
@@ -587,11 +584,8 @@ export class VoiceDirector {
     // A line said before plays at once, even while the engine is unloaded.
     const cached = pieces.every((p) => hasClip(p, voice));
     if (!cached) {
-      // Nothing new is said while the engine loads: the moment passes (low on memory, the first starts it).
-      if (!voiceReady()) {
-        wantVoice();
-        return;
-      }
+      // Nothing new is said while the engine loads: the moment passes.
+      if (!voiceReady()) return;
       if (this.inFlight >= MAX_IN_FLIGHT) {
         this.dropped++;
         return;
@@ -671,10 +665,7 @@ export class VoiceDirector {
   private make(id: number, line: Line): void {
     const spoken = this.spokenAs(id, line, -1);
     if (!spoken || this.inFlight >= MAX_IN_FLIGHT) return;
-    if (!voiceReady()) {
-      wantVoice();
-      return;
-    }
+    if (!voiceReady()) return;
     const { voice, pieces } = spoken;
     if (pieces.every((p) => hasClip(p, voice))) return;
     this.inFlight++;

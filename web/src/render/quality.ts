@@ -209,8 +209,8 @@ export interface QualitySettings {
    * more read of the sky's reflection. Medium on WebGPU with cloth's sheen on every fabric (M3 Pro, medians of 5,
    * 2026-11-17, against `?diag=nolayers`, which leaves them out): within the runs' noise, the village orbit 3.28
    * against 3.30 ms of GPU by day and 4.36 against 4.35 by night, the same from 6 m over the living room 2.31
-   * against 2.31 and 3.20 against 3.17. Not measured on an M1, nor a clear coat over much of the screen (no model
-   * is lacquered yet). Low draws those finishes without: velvet as the fabric, lacquer as the wood.
+   * against 2.31 and 3.20 against 3.17. Not measured with a clear coat over much of the screen (no model is lacquered
+   * yet). Low draws those finishes without: velvet as the fabric, lacquer as the wood.
    */
   finishLayers: boolean;
 }

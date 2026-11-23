@@ -433,7 +433,7 @@ describe("step 2's settle", async () => {
       const unmarked = performance.now() - t0;
       times.sort((a, b) => a - b);
       console.log(`${kind} city, many villages (${plan.slots.length} lots, ${plan.roads.length} roads, ${plan.open?.carParks?.length ?? 0} car parks): an edit settled in ${times[1].toFixed(0)} ms (M3), ${checked.toFixed(0)} ms with the checks, ${unmarked.toFixed(0)} ms with no marks yet`);
-      // (Generous: the plan's estimate is about 2 s on the M1.)
+      // (Generous.)
       expect(times[1]).toBeLessThan(3000);
     }
   }, 600_000);
