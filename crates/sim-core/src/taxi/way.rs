@@ -99,8 +99,9 @@ type Piece = (u32, f32, f32);
 
 /// The ways for a taxi from `from`, going `dir` along its road (+1: as `s` rises; both if
 /// `None`), to `to` along the roads, as a car drives them, turning round only in a dead end's
-/// turning circle (`Net::turn`): by the way it comes to `to` (+1, then -1), the cost (s) and the
-/// stretches driven, one after another. None: no such way.
+/// turning circle (`Net::turn`), one-way roads their way only (`Graph::may_go`): by the way it
+/// comes to `to` (+1, then -1), the cost (s) and the stretches driven, one after another. None: no
+/// such way.
 #[allow(clippy::type_complexity)]
 fn way_between(
     travel: &crate::travel::Travel,
@@ -122,11 +123,13 @@ fn way_between(
     let mut best: [Option<(f32, Vec<Piece>)>; 2] = [None, None];
     let fe = g.edges[from.edge as usize];
     let te = g.edges[to.edge as usize];
+    // (One-way roads their way only: +1 the way their points run.)
+    let goes = |road: u32, d: f32| g.roads[road as usize].oneway.may_go(d > 0.0);
     let dirs: Vec<f32> = dir.map_or(vec![1.0, -1.0], |d| vec![d]);
     // (Straight along the same stretch, ahead.)
     if from.edge == to.edge {
         for &d in &dirs {
-            if (to.s - from.s) * d >= -0.01 {
+            if (to.s - from.s) * d >= -0.01 && goes(from.road, d) {
                 best[slot(d)] = Some((
                     (to.s - from.s).abs() / speed(from.road),
                     vec![(from.road, from.s, to.s)],
@@ -141,6 +144,9 @@ fn way_between(
     let mut heap = std::collections::BinaryHeap::new();
     let key = |c: f32| (c * 1000.0) as u64;
     for &d in &dirs {
+        if !goes(fe.road, d) {
+            continue;
+        }
         let st = from.edge as usize * 2 + usize::from(d > 0.0);
         let c = if d > 0.0 {
             fe.s1 - from.s
@@ -183,6 +189,9 @@ fn way_between(
                 continue;
             }
             let edge = &g.edges[e as usize];
+            if !g.may_go(e, u as u32) {
+                continue;
+            }
             let extra = pass
                 + match (back, net.turn[u]) {
                     (false, _) => 0.0,
@@ -674,8 +683,8 @@ impl SideTurn {
 const SIDE_IN: f32 = 0.5;
 
 /// Whether a taxi come to junction node `u` along stretch `came` can turn round there, nose first
-/// into a side street square to its road (that road going on past it) and backing out the way it
-/// came, and where: None, it can't.
+/// into a side street square to its road (that road going on past it; not a ramp, and its way if
+/// one-way) and backing out the way it came, and where: None, it can't.
 fn side_turn(g: &crate::travel::Graph, net: &Net, u: u32, came: u32) -> Option<SideTurn> {
     let e_in = &g.edges[came as usize];
     let road = &g.roads[e_in.road as usize];
@@ -696,6 +705,10 @@ fn side_turn(g: &crate::travel::Graph, net: &Net, u: u32, came: u32) -> Option<S
             return None;
         }
         let side = &g.roads[arm.road as usize];
+        // (Not into a ramp, nor against a one-way street's way.)
+        if !side.enterable() || !g.may_go(e, u) {
+            return None;
+        }
         let depth = road.width / 2.0 + TAXI_LEN / 2.0 + SIDE_IN;
         if arm.len() < depth + TAXI_LEN {
             return None;

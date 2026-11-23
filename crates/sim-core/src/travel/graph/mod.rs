@@ -417,6 +417,69 @@ impl Graph {
         (0..self.nodes.len()).filter(|&n| self.is_merge(n))
     }
 
+    /// Whether a car may drive along stretch `edge` from its node `from` (the road's `OneWay`):
+    /// from its `a` end is the way its road's points run. A stretch from a node back to itself
+    /// goes the way its points run.
+    pub fn may_go(&self, edge: u32, from: u32) -> bool {
+        let e = &self.edges[edge as usize];
+        self.roads[e.road as usize].oneway.may_go(e.a == from)
+    }
+
+    /// Whether, in each network of roads for cars (`networks`, by roads for cars only), every node
+    /// a car can come onto the roads at (one on a road for cars other than the motorway and its
+    /// ramps, `Road::enterable`) can be driven to from every other, one-way roads gone along
+    /// their way only. True without any. A one-way road must never cut a home off.
+    pub fn strongly_connected(&self) -> bool {
+        let n = self.nodes.len();
+        let enterable: Vec<bool> = (0..n)
+            .map(|v| {
+                self.adj[v]
+                    .iter()
+                    .any(|&e| self.roads[self.edges[e as usize].road as usize].enterable())
+            })
+            .collect();
+        // (From `start` along roads for cars: either way (`any`), the way cars go, or the way
+        // back, against it.)
+        let reach = |start: usize, any: bool, back: bool| {
+            let mut seen = vec![false; n];
+            seen[start] = true;
+            let mut stack = vec![start];
+            while let Some(u) = stack.pop() {
+                for &e in &self.adj[u] {
+                    let edge = &self.edges[e as usize];
+                    if !self.roads[edge.road as usize].drivable() {
+                        continue;
+                    }
+                    let v = if edge.a as usize == u { edge.b } else { edge.a } as usize;
+                    // (Back: from `v` to `u` must be a way cars go.)
+                    let ok = any || self.may_go(e, if back { v } else { u } as u32);
+                    if ok && !seen[v] {
+                        seen[v] = true;
+                        stack.push(v);
+                    }
+                }
+            }
+            seen
+        };
+        let mut done = vec![false; n];
+        for start in 0..n {
+            if done[start] || !enterable[start] {
+                continue;
+            }
+            let network = reach(start, true, false);
+            let (ahead, back) = (reach(start, false, false), reach(start, false, true));
+            for v in 0..n {
+                if network[v] {
+                    done[v] = true;
+                    if enterable[v] && !(ahead[v] && back[v]) {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
+    }
+
     /// The place `s` m along the town file's road `source` (`drives[].road/s`), if it's in the
     /// network.
     pub fn at_source(&self, source: u32, s: f32) -> Option<RoadPoint> {
