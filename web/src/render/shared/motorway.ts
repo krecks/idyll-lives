@@ -27,7 +27,7 @@ import type { RoadLevels } from './roads';
 export const MOTORWAY = { inner: 0.55, lane: 3.5, base: 0.6, top: 0.2, high: 0.85, foot: 0.08, kink: 0.28, apart: 24, clear: 6.4 } as const;
 /** The barrier's concrete (a vertex colour in the plain finish: no material of its own). */
 export const BARRIER_CONCRETE = '#A8A59D';
-const BARRIER_FINISH = encodeFinish(0.92, 0);
+export const BARRIER_FINISH = encodeFinish(0.92, 0);
 /** How far apart along a carriageway the barrier's line is taken (m). */
 const BARRIER_STEP = 2;
 

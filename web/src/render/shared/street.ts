@@ -1997,7 +1997,12 @@ export class TownStreet {
       const deck = (s0: number, s1: number, solid = false) => {
         const h = heightsOf(s0);
         // (Its piers and abutments on the ground with every deck taken away: `BuiltSurface.groundUnder`.)
-        overpass(stretchOf(road, s0, s1), road.width, (x, z) => at(x, z).parts.props, h && { deck: h.deck, ground: h.under, stops: h.stops.filter((u) => u < s1 - s0) }, { ...inner, solid });
+        // (No pier on the roads it passes over: each its width and a margin either side, more where it crosses at a slant.)
+        const clear = (road.crosses ?? []).flatMap((c): [number, number][] => {
+          const half = ((all[c.road]?.width ?? 7) / 2 + 2) * 1.6;
+          return c.s > s0 && c.s < s1 ? [[c.s - s0 - half, c.s - s0 + half]] : [];
+        });
+        overpass(stretchOf(road, s0, s1), road.width, (x, z) => at(x, z).parts.props, h && { deck: h.deck, ground: h.under, stops: h.stops.filter((u) => u < s1 - s0) }, { ...inner, solid, clear });
       };
       for (const [s0, s1] of bridgeSpans(road)) {
         if (concrete) deck(s0, s1);
@@ -2412,14 +2417,14 @@ const OVERPASS_PARAPET = '#BCB9B1';
  * carriageway): no parapet there (the barrier between them stands on the deck), the slab reaching only `innerApron`
  * past the road's edge (half the verge between them: the two slabs meet). `solid`: a ramp up to a deck on a world with
  * no built surface to bank it (`motorway.ts` `deckLevels`): walls down its sides to the ground instead of what stands
- * under a deck.
+ * under a deck. `clear`: stretches along it (m from its start) where no pier stands (the roads it passes over).
  */
 export function overpass(
   deck: readonly (readonly [number, number])[],
   width: number,
   into: (x: number, z: number) => Painter,
   heights?: { deck: (u: number) => number; ground: (x: number, z: number) => number; stops?: readonly number[] },
-  options: { inner?: 1 | -1; innerApron?: number; solid?: boolean } = {},
+  options: { inner?: 1 | -1; innerApron?: number; solid?: boolean; clear?: readonly (readonly [number, number])[] } = {},
 ): void {
   const O = OVERPASS;
   const solid = !!options.solid;
@@ -2480,7 +2485,7 @@ export function overpass(
         // What stands under it down to the ground: a pier where a piece between two begins (not at the deck's start),
         // an abutment under each end.
         if (solid) continue;
-        if (k === 0 && cuts[c] > 1e-6) {
+        if (k === 0 && cuts[c] > 1e-6 && !options.clear?.some(([a, b]) => ls[i] + cuts[c] > a && ls[i] + cuts[c] < b)) {
           const at = -L / 2;
           const xs = width >= O.wide ? [-width / 4, width / 4] : [0];
           if (xs.every((x) => under(at, x) < -O.low)) {

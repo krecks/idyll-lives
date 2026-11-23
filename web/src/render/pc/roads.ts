@@ -12,6 +12,7 @@ import { drawMesh, meshFrom } from './meshes';
 import { LIFT, STEP, STRAIGHT, type CountryRoads, type Point } from '../shared/countryRoads';
 import { Geo, type V3 } from '../shared/geometry';
 import { asphaltVary, carriageway, tint, STREET_LOOK } from '../shared/paving';
+import { BARRIER_CONCRETE, BARRIER_FINISH, MOTORWAY } from '../shared/motorway';
 
 /** The stretches (`STEP` m each) over which a road out of town goes from the junction's even tone to its own wear. */
 const JOIN_FADE = 3;
@@ -54,7 +55,7 @@ export function drawRoads(app: pc.AppBase, roads: CountryRoads, parent: pc.Entit
     const xc = r.x + r.w / 2;
     for (let z = r.z + 1; z + 2.4 < r.z + r.d - 1; z += 5) quad(lines, [[xc - 0.06, y + 0.005, z], [xc + 0.06, y + 0.005, z], [xc + 0.06, y + 0.005, z + 2.4], [xc - 0.06, y + 0.005, z + 2.4]]);
   }
-  for (const road of roads.roads) {
+  for (const [ri, road] of roads.roads.entries()) {
     // Each point's sideways direction (across the road), from its neighbours.
     const side = road.map((_, i) => {
       const [ax, az] = road[Math.max(0, i - 1)];
@@ -84,9 +85,26 @@ export function drawRoads(app: pc.AppBase, roads: CountryRoads, parent: pc.Entit
       const y = LIFT + 0.006;
       quad(lines, [[ax + sx, ah + y, az + sz], [cx + sx, ch + y, cz + sz], [cx - sx, ch + y, cz - sz], [ax - sx, ah + y, az - sz]]);
     }
-    const sign = welcomeSign(app, roads.name, road, parent);
+    // (A motorway's carriageway: no sign of its own.)
+    const sign = roads.motorways.has(ri) ? null : welcomeSign(app, roads.name, road, parent);
     if (sign) out.push(sign);
   }
+  // The motorway's barrier between its carriageways, plainly: a concrete strip as high as the town's.
+  const barrier = new Geo().color(BARRIER_CONCRETE, BARRIER_FINISH);
+  for (const line of roads.barriers) {
+    for (let i = 0; i + 1 < line.length; i++) {
+      const [[ax, az, ah, w], [bx, bz, bh]] = [line[i], line[i + 1]];
+      const l = Math.hypot(bx - ax, bz - az) || 1;
+      const [sx, sz] = [(-(bz - az) / l) * (w / 2), ((bx - ax) / l) * (w / 2)];
+      const [tx, tz] = [sx * (MOTORWAY.top / MOTORWAY.base), sz * (MOTORWAY.top / MOTORWAY.base)];
+      const [ya, yb] = [ah + LIFT, bh + LIFT];
+      const [ha, hb] = [ya + MOTORWAY.high, yb + MOTORWAY.high];
+      for (const k of [1, -1]) quad(barrier, [[ax + sx * k, ya, az + sz * k], [bx + sx * k, yb, bz + sz * k], [bx + tx * k, hb, bz + tz * k], [ax + tx * k, ha, az + tz * k]]);
+      quad(barrier, [[ax + tx, ha, az + tz], [bx + tx, hb, bz + tz], [bx - tx, hb, bz - tz], [ax - tx, ha, az - tz]]);
+    }
+  }
+  const barrierMesh = meshFrom(device, barrier.meshData({ colors: true }));
+  if (barrierMesh) out.push(drawMesh(parent, 'countryBarriers', barrierMesh, lib.plainFinish()));
   const surfaceMesh = meshFrom(device, surface.meshData({ colors: true }));
   if (surfaceMesh) out.push(drawMesh(parent, 'countryRoads', surfaceMesh, lib.surface('material.road', { doubleSided: true, vertexColors: true })));
   const marks = meshFrom(device, lines.meshData({ colors: true }));

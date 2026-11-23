@@ -53,7 +53,7 @@ import { CTRL_APART, ROAD_WIDTH } from '../countryRouter';
 import { rle, simplify, unrle } from '../landMasks';
 import { mulberry32 } from '../noise';
 import { BRIDGE_IN } from '../macro';
-import { bends, clearOf, connector, COURT, cropRoads, curve, endDir, evenly, inside, leftOf, lengths, MEET, nearest, pointAt, RoadIndex, ROOM, roomAt, SIDEWALK, trimJoins, type Fit, type Pt } from '../roads';
+import { bends, clearOf, connector, COURT, cropRoads, curve, endDir, evenly, inside, leftOf, lengths, MEET, nearest, pointAt, RoadIndex, ROOM, roomAt, SIDEWALK, trimJoins, withCrosses, type Fit, type Pt } from '../roads';
 import { plotRect, type NeighbourhoodDraft, type Rect, type Templates } from '../town';
 import { placeOf, specOf, streetNames } from '../world';
 import type { Edited } from './edited';
@@ -620,22 +620,6 @@ function drawnWay(drawn: readonly Pt[], points: readonly Pt[]): 1 | -1 {
   const ls = lengths(points);
   const [a, b] = [drawn[0], drawn[drawn.length - 1]];
   return nearest(points, a[0], a[1], ls).s <= nearest(points, b[0], b[1], ls).s ? 1 : -1;
-}
-
-/**
- * `roads` (kept from a list by their old indices, `from`) with what each says it passes over or under (`crosses`)
- * numbered as they now are, those of roads gone left out.
- */
-function withCrosses(roads: RoadPlan[], from: readonly number[]): RoadPlan[] {
-  if (!roads.some((r) => r.crosses)) return roads;
-  const now = new Map(from.map((old, i) => [old, i]));
-  return roads.map((r) => {
-    if (!r.crosses) return r;
-    const crosses = r.crosses.flatMap((c) => (now.has(c.road) ? [{ ...c, road: now.get(c.road)! }] : []));
-    if (crosses.length === r.crosses.length && crosses.every((c, k) => c.road === r.crosses![k].road)) return r;
-    const { crosses: _gone, ...rest } = r;
-    return crosses.length ? { ...rest, crosses } : rest;
-  });
 }
 
 /**

@@ -1017,10 +1017,12 @@ export function inside(poly: readonly Pt[], x: number, z: number): boolean {
 
 /**
  * Roads cut to the town's rectangle (`w` × `d`, after it moved by `dx`, `dz`): a road's end
- * outside it now ends at its edge (`out`).
+ * outside it now ends at its edge (`out`); one wholly outside it gone (what the others pass over or under, `crosses`,
+ * numbered as they now are).
  */
 export function cropRoads(roads: readonly RoadPlan[], dx: number, dz: number, w: number, d: number): RoadPlan[] {
   const out: RoadPlan[] = [];
+  const from: number[] = [];
   const within = ([x, z]: Pt) => x >= 0 && z >= 0 && x <= w && z <= d;
   for (const r of roads) {
     const pts = r.points.map(([x, z]): Pt => [x + dx, z + dz]);
@@ -1049,9 +1051,12 @@ export function cropRoads(roads: readonly RoadPlan[], dx: number, dz: number, w:
     }
     // (A ring cut open has no middle left to stand anything in.)
     const { island: _, ...open } = r;
-    if (kept.length >= 2) out.push({ ...(ends[0] === r.ends[0] && ends[1] === r.ends[1] ? r : open), points: kept.map(([x, z]): Pt => [Math.round(x * 100) / 100, Math.round(z * 100) / 100]), ends });
+    if (kept.length >= 2) {
+      out.push({ ...(ends[0] === r.ends[0] && ends[1] === r.ends[1] ? r : open), points: kept.map(([x, z]): Pt => [Math.round(x * 100) / 100, Math.round(z * 100) / 100]), ends });
+      from.push(roads.indexOf(r));
+    }
   }
-  return out;
+  return withCrosses(out, from);
 }
 
 /** Where the roads lead out of town (their `out` ends), and the way out there (a unit direction). */
@@ -1118,4 +1123,20 @@ export function stretchOf(road: RoadPlan, s0: number, s1: number): [number, numb
   for (let i = 1; i < pts.length - 1; i++) if (ls[i] > s0 && ls[i] < s1) out.push([pts[i][0], pts[i][1]]);
   out.push(pointAt(pts, s1, ls).p);
   return out;
+}
+
+/**
+ * `roads` (kept from a list by their old indices, `from`) with what each says it passes over or under (`crosses`)
+ * numbered as they now are, those of roads gone left out.
+ */
+export function withCrosses(roads: RoadPlan[], from: readonly number[]): RoadPlan[] {
+  if (!roads.some((r) => r.crosses)) return roads;
+  const now = new Map(from.map((old, i) => [old, i]));
+  return roads.map((r) => {
+    if (!r.crosses) return r;
+    const crosses = r.crosses.flatMap((c) => (now.has(c.road) ? [{ ...c, road: now.get(c.road)! }] : []));
+    if (crosses.length === r.crosses.length && crosses.every((c, k) => c.road === r.crosses![k].road)) return r;
+    const { crosses: _gone, ...rest } = r;
+    return crosses.length ? { ...rest, crosses } : rest;
+  });
 }

@@ -208,7 +208,14 @@ fn livable_at_start(
         };
         let mut walks = Walks::new(&nav);
         let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
-        let exits: Vec<_> = w.exits.iter().map(|&e| tile(e)).collect();
+        // (The ways into town on foot: not a motorway's carriageway's end, which nobody walks.)
+        let g = &w.travel.graph;
+        let exits: Vec<_> = w
+            .exits
+            .iter()
+            .filter(|&&e| !g.near(e, 2.0, 1, sim_core::travel::Mode::Foot).is_empty())
+            .map(|&e| tile(e))
+            .collect();
         // Every lot from every way into town.
         for plot in &w.plots {
             let entry = tile(plot.arrival_point());

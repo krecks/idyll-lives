@@ -976,6 +976,11 @@ export class BuiltSurface {
     clear();
     this.pairUp();
     for (const p of solid) lift(p);
+    // (A deck lifted to its floor the last time, over a road below that rose since: the road either side raised to meet
+    // it within its grade, rather than a step up to it.)
+    profiles.forEach((p, r) => {
+      if (!this.draped(r) && (this.pairs[r] || this.overs.some((o) => o.road === r))) rampUp(p);
+    });
     for (const node of merges) this.join(node);
   }
 
@@ -1674,6 +1679,13 @@ function smooth(p: Profile, scratch: Float32Array): void {
     if (p.pin[i] || Math.abs(scratch[i - 1] - 2 * scratch[i] + scratch[i + 1]) <= BEND) continue;
     p.y[i] = (scratch[i - 1] + 2 * scratch[i] + scratch[i + 1]) / 4;
   }
+}
+
+/** A road raised where it is lower than its grade allows below its neighbours (never lowered): up to a deck lifted last. */
+function rampUp(p: Profile): void {
+  const { y, s, grade } = p;
+  for (let i = 1; i < y.length; i++) y[i] = Math.max(y[i], y[i - 1] - grade * (s[i] - s[i - 1]));
+  for (let i = y.length - 2; i >= 0; i--) y[i] = Math.max(y[i], y[i + 1] - grade * (s[i + 1] - s[i]));
 }
 
 /** A bridge's deck up to its floor. */

@@ -58,7 +58,7 @@ for (const [name, height] of LANDS) {
         const half = roads[street].width / 2 + 1;
         for (let s = o.s - half; s <= o.s + half; s += 0.5) expect(surface.roadY(o.over, s) - surface.roadY(street, o.sUnder)).toBeGreaterThanOrEqual(CROSS_CLEAR - 1e-3);
       }
-      for (const j of surface.junctionHeights) expect(Math.abs(j.x - F.STREET_X) < 6 && j.z > F.EAST_Z - 6 && j.z < F.WEST_Z + 6).toBe(false);
+      for (const j of surface.junctionHeights) expect(Math.abs(j.x - F.STREET_X) < 6 && j.z > F.WEST_Z - 6 && j.z < F.EAST_Z + 6).toBe(false);
     });
 
     test('the two carriageways at one height side by side', () => {
@@ -157,11 +157,11 @@ describe('the land the motorway keeps', () => {
     expect(keepOf(roads[F.MOTORWAY_EAST])).toBe(MOTORWAY_KEEP - 4.5);
     expect(keepOf(roads[F.BRIDGE_STREET])).toBe(0);
     for (const x of [60, 100, 135, 250, 400]) {
-      for (let z = F.EAST_Z - MOTORWAY_KEEP + 1; z <= F.WEST_Z + MOTORWAY_KEEP - 1; z++) expect(tile(mask, x, z)).toBe(1);
+      for (let z = F.WEST_Z - MOTORWAY_KEEP + 1; z <= F.EAST_Z + MOTORWAY_KEEP - 1; z++) expect(tile(mask, x, z)).toBe(1);
     }
     // (Past it, open, but where a ramp or the street is.)
-    expect(tile(mask, 250, F.EAST_Z - MOTORWAY_KEEP - 2)).toBe(0);
-    expect(tile(mask, 250, F.WEST_Z + MOTORWAY_KEEP + 2)).toBe(0);
+    expect(tile(mask, 250, F.WEST_Z - MOTORWAY_KEEP - 2)).toBe(0);
+    expect(tile(mask, 250, F.EAST_Z + MOTORWAY_KEEP + 2)).toBe(0);
   });
 
   test("a town's own streets keep only their edge, as before", () => {
@@ -177,7 +177,7 @@ describe('the land the motorway keeps', () => {
     const blocked = walkerBlocked(roads, W, D)!;
     expect(blocked).not.toBeNull();
     // (On a carriageway, and between the two.)
-    for (const z of [F.EAST_Z - 4, F.EAST_Z, (F.EAST_Z + F.WEST_Z) / 2, F.WEST_Z, F.WEST_Z + 4]) expect(tile(blocked, 100, z)).toBe(1);
+    for (const z of [F.WEST_Z - 4, F.WEST_Z, (F.EAST_Z + F.WEST_Z) / 2, F.EAST_Z, F.EAST_Z + 4]) expect(tile(blocked, 100, z)).toBe(1);
     // (Under its deck over the street: the street, and the land beside it.)
     const [r0, r1] = raisedSpans(roads[F.MOTORWAY_EAST])[0];
     for (const x of [F.STREET_X, F.STREET_X - 6, F.STREET_X + 8]) {
@@ -186,11 +186,11 @@ describe('the land the motorway keeps', () => {
       expect(tile(blocked, x, F.WEST_Z)).toBe(0);
     }
     // (On a ramp, but not where it meets the street.)
-    expect(tile(blocked, 80, F.EAST_Z - 7)).toBe(1);
-    expect(tile(blocked, F.STREET_X, F.EAST_Z - 25)).toBe(0);
-    expect(tile(blocked, F.STREET_X + 1, F.WEST_Z + 25)).toBe(0);
+    expect(tile(blocked, 80, F.EAST_Z + 7)).toBe(1);
+    expect(tile(blocked, F.STREET_X, F.EAST_Z + 25)).toBe(0);
+    expect(tile(blocked, F.STREET_X + 1, F.WEST_Z - 25)).toBe(0);
     // (Off it, open.)
-    expect(tile(blocked, 250, F.EAST_Z - 10)).toBe(0);
+    expect(tile(blocked, 250, F.WEST_Z - 10)).toBe(0);
     expect(tile(blocked, 250, F.AVENUE_Z)).toBe(0);
   });
 
