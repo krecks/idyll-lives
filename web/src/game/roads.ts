@@ -10,6 +10,7 @@
  */
 
 import type { RoadEnd, RoadPlan } from '../core/protocol';
+import { ROAD_KIND } from '../core/roadKinds';
 import * as pmath from './pmath';
 
 export type { RoadEnd, RoadPlan };
@@ -737,11 +738,80 @@ export function rasterRoads(roads: readonly RoadPlan[], w: number, d: number, re
   return mask;
 }
 
-/** Tiles of a `w` × `d` area within `clear` m of a road's edge (1), else 0: where no lot may lie. */
+/**
+ * How far (m) from a road's middle nothing else is laid, of the kinds that keep their land to themselves: a motorway's
+ * carriageway its embankment and verge (`MOTORWAY_KEEP`), a ramp its own (`RAMP_KEEP`); 0, every other kind (its
+ * edge is enough: `roadMask`'s `clear`).
+ */
+export const MOTORWAY_KEEP = 25;
+export const RAMP_KEEP = 10;
+
+/** How far (m) past a road's edge its kind keeps lots, woods and fields off (`MOTORWAY_KEEP`, `RAMP_KEEP`), 0 for most. */
+export function keepOf(r: Pick<RoadPlan, 'kind' | 'width'>): number {
+  const from = r.kind === 'motorway' ? MOTORWAY_KEEP : r.kind === 'ramp' ? RAMP_KEEP : 0;
+  return Math.max(0, from - r.width / 2);
+}
+
+/**
+ * Tiles of a `w` × `d` area within `clear` m of a road's edge (1), else 0: where no lot may lie. A motorway's or a ramp's
+ * reach is its kept land's (`keepOf`), deck and all: under an overpass the land is the road's below, not a lot's, and
+ * between a motorway's two carriageways nothing is laid.
+ */
 export function roadMask(roads: readonly RoadPlan[], w: number, d: number, clear = 0.5): Uint8Array {
   // (Any of the tile: a road's edge through its corner too.)
-  return rasterRoads(roads, w, d, (r) => r.width / 2 + clear, 0.7);
+  return rasterRoads(roads, w, d, (r) => r.width / 2 + Math.max(clear, keepOf(r)), 0.7);
 }
+
+/**
+ * Tiles of a `w` × `d` area (1) nobody on foot may stand on: a road no one walks along (a motorway's carriageway, a
+ * ramp: `ROAD_KIND.walkers`) where it lies on the land, out to its edge and `WALK_OFF_EDGE` past it, but not under its
+ * decks (`deckSpans`: the land there the road's below, or anyone's), nor where a ramp meets a road people walk along
+ * (the street at its end, and its sidewalks). Null where no road keeps walkers off: what the town file's
+ * `terrain.blocked` holds.
+ */
+export function walkerBlocked(roads: readonly RoadPlan[], w: number, d: number): Uint8Array | null {
+  const off = roads.filter((r) => r.points.length >= 2 && !ROAD_KIND[r.kind ?? 'street'].walkers);
+  if (!off.length) return null;
+  const mask = new Uint8Array(w * d);
+  const lay = (r: RoadPlan) => {
+    const decks = deckSpans(r);
+    const ls = lengths(r.points);
+    const far = r.width / 2 + WALK_OFF_EDGE;
+    for (let i = 0; i + 1 < r.points.length; i++) {
+      const [[ax, az], [bx, bz]] = [r.points[i], r.points[i + 1]];
+      const [dx, dz] = [bx - ax, bz - az];
+      const l2 = dx * dx + dz * dz || 1;
+      const [x0, x1] = [Math.max(0, Math.floor(Math.min(ax, bx) - far)), Math.min(w - 1, Math.ceil(Math.max(ax, bx) + far))];
+      const [z0, z1] = [Math.max(0, Math.floor(Math.min(az, bz) - far)), Math.min(d - 1, Math.ceil(Math.max(az, bz) + far))];
+      for (let z = z0; z <= z1; z++) {
+        for (let x = x0; x <= x1; x++) {
+          const [px, pz] = [x + 0.5, z + 0.5];
+          const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / l2));
+          if (pmath.hypot(px - (ax + dx * t), pz - (az + dz * t)) >= far) continue;
+          const s = ls[i] + t * (ls[i + 1] - ls[i]);
+          if (!decks.some(([s0, s1]) => s >= s0 && s <= s1)) mask[z * w + x] = 1;
+        }
+      }
+    }
+  };
+  // (The ramps first, the roads people walk along cleared from them where they meet; then the motorway, whole.)
+  const ramps = off.filter((r) => r.kind !== 'motorway');
+  ramps.forEach(lay);
+  if (ramps.length) {
+    const walked = rasterRoads(
+      roads.filter((r) => ROAD_KIND[r.kind ?? 'street'].walkers),
+      w,
+      d,
+      (r) => r.width / 2,
+    );
+    for (let i = 0; i < mask.length; i++) if (walked[i]) mask[i] = 0;
+  }
+  off.filter((r) => r.kind === 'motorway').forEach(lay);
+  return mask;
+}
+
+/** How far (m) past a road nobody walks along (`walkerBlocked`) the ground is kept from those on foot: its barrier's or its kerb's. */
+export const WALK_OFF_EDGE = 1;
 
 /** Grid cells (m) roads' segments are filed under, for `RoadIndex`'s questions. */
 const CELL = 8;
@@ -1010,10 +1080,29 @@ export function roadExits(roads: readonly RoadPlan[], w: number, d: number): Pt[
  */
 export function bridgeSpans(road: RoadPlan): [number, number][] {
   if (road.points.length < 2 || (!road.bridge && !road.bridges?.length)) return [];
+  return spansWithin(road, road.bridge ? [road.bridge, ...(road.bridges ?? [])] : road.bridges!);
+}
+
+/**
+ * A road's overpasses (`RoadPlan.raised`: decks over the land, over the roads it `crosses`), as `bridgeSpans` gives its
+ * decks over water: arc lengths (m), in order along it, kept within the road, a centimetre long at least.
+ */
+export function raisedSpans(road: RoadPlan): [number, number][] {
+  if (road.points.length < 2 || !road.raised?.length) return [];
+  return spansWithin(road, road.raised);
+}
+
+/** Every deck of a road, over water or over the land (`bridgeSpans` and `raisedSpans`), in order along it. */
+export function deckSpans(road: RoadPlan): [number, number][] {
+  if (!road.raised?.length) return bridgeSpans(road);
+  return [...bridgeSpans(road), ...raisedSpans(road)].sort((a, b) => a[0] - b[0]);
+}
+
+function spansWithin(road: RoadPlan, spans: readonly (readonly [number, number])[]): [number, number][] {
   const ls = lengths(road.points);
   const total = ls[ls.length - 1];
   const out: [number, number][] = [];
-  for (const span of road.bridge ? [road.bridge, ...(road.bridges ?? [])] : road.bridges!) {
+  for (const span of spans) {
     const s0 = Math.max(0, Math.min(total, Math.min(...span)));
     const s1 = Math.max(0, Math.min(total, Math.max(...span)));
     if (s1 - s0 >= 0.01) out.push([s0, s1]);
