@@ -526,7 +526,8 @@ pub(crate) fn extend_past(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
 }
 
 /// The top speed at each of `lane`'s points (m/s of drive time; `kind_at` the kind of road at
-/// each): `FAST` in the hamlets, `Travel::country_speed` on country roads, and `JUNCTION_SPEED`
+/// each): its kind's (`travel::kind_speed`: `FAST` on a street, `Travel::country_speed` on a
+/// country road, faster on an avenue, a ramp or a motorway, slower on a lane), and `JUNCTION_SPEED`
 /// through a junction (within `JUNCTION_REACH` of it, `junctions`) where the way turns there by
 /// more than `TURN_AT`. Straight through one it keeps its speed (its bends limit it,
 /// `Legs::timed`'s `SIDEWAYS`; the lights and the stop lines stop it, `traffic/`).
@@ -539,13 +540,7 @@ pub(crate) fn lane_tops(
     use crate::travel::dist;
     let n = lane.len();
     let mut tops: Vec<f32> = (0..n)
-        .map(|i| {
-            if kind_at(i) == crate::travel::RoadKind::Country {
-                travel.country_speed
-            } else {
-                FAST
-            }
-        })
+        .map(|i| crate::travel::kind_speed(kind_at(i), travel.country_speed))
         .collect();
     let heading = |a: usize, b: usize| {
         let (p, q) = (lane[a], lane[b]);

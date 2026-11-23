@@ -163,7 +163,7 @@ impl Graph {
         let extra = |e: u32| way.avoid.iter().find(|a| a.0 == e).map_or(0.0, |a| a.1);
         let top = match mode {
             Mode::Foot => 1.0,
-            Mode::Car => country.max(TOWN_SPEED),
+            Mode::Car => self.top_speed(country),
         };
         let h = |n: u32| {
             let d = dist(

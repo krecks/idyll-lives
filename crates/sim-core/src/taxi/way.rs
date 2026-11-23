@@ -111,13 +111,8 @@ fn way_between(
 ) -> [Option<(f32, Vec<Piece>)>; 2] {
     use std::cmp::Reverse;
     let g = &travel.graph;
-    let speed = |road: u32| {
-        if g.roads[road as usize].kind == crate::travel::RoadKind::Country {
-            travel.country_speed
-        } else {
-            crate::travel::TOWN_SPEED
-        }
-    };
+    let speed =
+        |road: u32| crate::travel::kind_speed(g.roads[road as usize].kind, travel.country_speed);
     let slot = |d: f32| usize::from(d < 0.0);
     let mut best: [Option<(f32, Vec<Piece>)>; 2] = [None, None];
     let fe = g.edges[from.edge as usize];

@@ -33,6 +33,9 @@ pub struct Graph {
     cells: Vec<Vec<(u32, u32)>>,
     cols: usize,
     rows: usize,
+    /// The top speed of its fastest road for cars but a country road (`kind_speed`; a country
+    /// road's comes with each search): `top_speed`.
+    fast: f32,
     /// Its junctions' boxes (`traffic::boxes`): their middles and how far round them they reach
     /// (m). Cars take turns driving through them (`traffic/`).
     pub boxes: Vec<([f32; 2], f32)>,
@@ -149,8 +152,14 @@ impl Graph {
             .enumerate()
             .filter_map(|(i, r)| Road::new(r, i))
             .collect();
+        let fast = roads
+            .iter()
+            .filter(|r| r.drivable() && r.kind != RoadKind::Country)
+            .map(|r| kind_speed(r.kind, 0.0))
+            .fold(0.0, f32::max);
         let mut g = Graph {
             roads,
+            fast,
             ..Default::default()
         };
         if g.roads.is_empty() {
