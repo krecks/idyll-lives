@@ -1510,10 +1510,11 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     return g;
   };
   const tooSteep = (x: number, z: number) => !spec.classic && land.slope(land.cell(x, z)) > PLACE_STEEP;
-  // A town's or a city's one-way pairs (`oneway.ts`), round its dense middle (the high street's, as `chooseCentre`
-  // finds it below on the same roads), before any lot: none a way out of town (an end a country road goes on from).
+  // A town's or a city's one-way pairs (`oneway.ts`), round its dense middle (its high street's, as `chooseCentre`
+  // finds it on the roads as they are), before any lot: none a way out of town (an end a country road goes on from).
+  let high: Centre | null = null;
   if (mainSpec.oneway) {
-    const high = chooseCentre(worldRoads, plans[0].roads, plans[0].centre, groundOn([...worldRoads]), 0, tooSteep);
+    high = chooseCentre(worldRoads, plans[0].roads, plans[0].centre, groundOn([...worldRoads]), 0, tooSteep);
     const middle = high ? pointAt(worldRoads[high.road].points, (high.s0 + high.s1) / 2).p : plans[0].centre;
     const own = plans[0].roads.filter((i) => !plans[0].ports.some((p) => p.road === i));
     oneWayPairs(worldRoads, own, middle, mainSpec.oneway).roads.forEach((r, i) => (worldRoads[i] = r));
@@ -1524,8 +1525,9 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const dense = mulberry32(((lay?.townSeed ?? seed) ^ 0x2545f491) >>> 0);
   // (The centre's buildings of flats from a stream of their own, so the rest is drawn as it was.)
   const centreFlats = mulberry32(((lay?.townSeed ?? seed) ^ 0x51ed270b) >>> 0);
-  // The main town's centre: its high street and a square off it, kept clear of lots.
-  const centre = chooseCentre(worldRoads, plans[0].roads, plans[0].centre, ground, 0, tooSteep);
+  // The main town's centre: its high street and a square off it, kept clear of lots (on the street the one-way pairs
+  // were laid round, a lane of a pair now a street).
+  const centre = chooseCentre(worldRoads, high ? [high.road] : plans[0].roads, plans[0].centre, ground, 0, tooSteep);
   const inCentre = (f: Frontage) => !!centre && inside(centre.poly, f.p[0] + f.n[0] * 10, f.p[1] + f.n[1] * 10);
   const lots = new LotPlacer(content, t, ground, worldRoads, spec.gaps, rand, true);
   const names: (string | undefined)[] = worldRoads.map((r) => r.name);
