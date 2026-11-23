@@ -11,7 +11,7 @@
  */
 
 import type { Junction, RoadPlan, WorldStructure } from '../../core/protocol';
-import { kindInfo } from '../../core/roadKinds';
+import { kindInfo, onewayOf } from '../../core/roadKinds';
 import { lengths, nearest, pointAt, SIDEWALK, type Pt } from '../../game/roads';
 import * as pmath from '../../game/pmath';
 
@@ -61,6 +61,10 @@ export interface ArmPlan {
   reach: number;
   /** How far out its road goes (m: a short one ends before its crosswalk, which then isn't drawn). */
   room: number;
+  /** Which way its cars go: 0 both ways, 1 only in (a one-way road coming to the junction), -1 only out. */
+  flow: 0 | 1 | -1;
+  /** The median down its road's middle (m; 0: none, `ROAD_KIND`). */
+  median: number;
 }
 
 /**
@@ -102,9 +106,14 @@ export function planJunctions(list: readonly Junction[], roads: readonly RoadPla
     const arms: ArmPlan[] = j.arms
       .map((a) => {
         const l = pmath.hypot(a.dir[0], a.dir[1]) || 1;
-        const { dir, off, room } = armLine(j, [a.dir[0] / l, a.dir[1] / l], roads[a.road]);
-        const walks = hasSidewalks(roads[a.road]);
-        return { road: a.road, dir, off, half: a.width / 2, walks, walkFrom: a.walkFrom, walkTo: a.walkTo, stop: a.stop, crosswalk: a.crosswalk ?? walks, lit: a.light !== null, reach: Math.min(a.walkTo, room), room };
+        const r = roads[a.road];
+        const { dir, off, room, out } = armLine(j, [a.dir[0] / l, a.dir[1] / l], r);
+        const walks = hasSidewalks(r);
+        // (A one-way road's cars go out along the arm where they go the way its points run out of the junction.)
+        const way = r ? onewayOf(r) : 0;
+        const flow: ArmPlan['flow'] = way === 0 ? 0 : way === out ? -1 : 1;
+        const median = r ? kindInfo(r).median : 0;
+        return { road: a.road, dir, off, half: a.width / 2, walks, walkFrom: a.walkFrom, walkTo: a.walkTo, stop: a.stop, crosswalk: a.crosswalk ?? walks, lit: a.light !== null, reach: Math.min(a.walkTo, room), room, flow, median };
       })
       .sort((a, b) => pmath.atan2(a.dir[1], a.dir[0]) - pmath.atan2(b.dir[1], b.dir[0]));
     const corners: CornerPlan[] = [];
@@ -134,10 +143,11 @@ export function planJunctions(list: readonly Junction[], roads: readonly RoadPla
 /**
  * An arm's line as its road runs `OFF_AT` m out along the way `dir` out of junction `j`: the way it
  * runs there, and how far to the anticlockwise side of the junction's middle (as given, no offset:
- * its road isn't there).
+ * its road isn't there); and `out`, whether its road's points run out of the junction along it (1) or
+ * in (-1).
  */
-function armLine(j: Junction, dir: Pt, r: RoadPlan | undefined): { dir: Pt; off: number; room: number } {
-  const as = { dir, off: 0, room: Infinity };
+function armLine(j: Junction, dir: Pt, r: RoadPlan | undefined): { dir: Pt; off: number; room: number; out: 1 | -1 } {
+  const as = { dir, off: 0, room: Infinity, out: 1 as 1 | -1 };
   if (!r || r.points.length < 2) return as;
   const [x, z] = [j.x + dir[0] * OFF_AT, j.z + dir[1] * OFF_AT];
   const ls = lengths(r.points);
@@ -147,11 +157,11 @@ function armLine(j: Junction, dir: Pt, r: RoadPlan | undefined): { dir: Pt; off:
   const k = t[0] * dir[0] + t[1] * dir[1] < 0 ? -1 : 1;
   // (How far on its road goes past there, the way out.)
   const room = Math.max(OFF_AT, OFF_AT + (end || (k > 0 ? ls[ls.length - 1] - s : s)));
-  if (dist > OFF_MOST) return { ...as, room: dist > OFF_AT ? Infinity : room };
+  if (dist > OFF_MOST) return { ...as, room: dist > OFF_AT ? Infinity : room, out: k };
   const way: Pt = [t[0] * k, t[1] * k];
-  if (way[0] * dir[0] + way[1] * dir[1] < pmath.cos((30 * Math.PI) / 180)) return { ...as, room };
+  if (way[0] * dir[0] + way[1] * dir[1] < pmath.cos((30 * Math.PI) / 180)) return { ...as, room, out: k };
   const n = turnedOn(way);
-  return { dir: way, off: (p[0] - j.x) * n[0] + (p[1] - j.z) * n[1], room };
+  return { dir: way, off: (p[0] - j.x) * n[0] + (p[1] - j.z) * n[1], room, out: k };
 }
 
 /**

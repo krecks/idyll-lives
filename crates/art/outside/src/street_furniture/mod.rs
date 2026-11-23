@@ -3,7 +3,9 @@
 //! (`model.busStop`), the post box (`model.postBox`), the notice board (`model.noticeBoard`), the phone box
 //! (`model.phoneBooth`), the town fountain (`model.fountainTown`) and the founder's statue (`model.townStatue`); and
 //! the traffic light (`model.trafficLight`), which isn't bought: the renderer stands one at each signal head of the
-//! sim's lit junctions (render/pc/signals.ts). Notes: NOTES.md.
+//! sim's lit junctions (render/pc/signals.ts); and the motorway's direction sign (`model.motorwaySign`), not bought
+//! either: the street stands it by the motorway's exits and ramps (render/shared/motorway.ts `signSpots`). Notes:
+//! NOTES.md.
 //!
 //! Each is built in game axes (`GameFrame`) where the game places it, at the content's heights (the bench's and
 //! the shelter's seats, the fountain's rim, the lamp's light), and each has a far version (a quarter): they stand on
@@ -18,6 +20,7 @@ mod boxes;
 pub(crate) mod common;
 mod fountains;
 mod lamps;
+mod motorway;
 mod phone;
 mod seats;
 mod statue;
@@ -44,6 +47,11 @@ pub fn family() -> Option<Family> {
                     .key("model.trafficLight")
                     .centre(0.0, 0.15)
                     .far_low()
+                    .code()),
+                mine(Model::new("motorwaySign", motorway::motorway_sign, (3.0, 3.9, 0.32))
+                    .key("model.motorwaySign")
+                    .centre(0.0, -0.125)
+                    .far_ratio(FAR)
                     .code()),
                 mine(Model::new("parkBench", seats::park_bench, (2.5, 0.907, 0.572))
                     .key("model.parkBench")
@@ -94,7 +102,8 @@ pub fn family() -> Option<Family> {
             "The street furniture (crates/art/outside/src/street_furniture, built by cargo art): the street lamp, the \
              park bench, the drinking fountain, the litter bin, the taxi rank's shelter, the post box, the notice \
              board, the phone box, the town fountain and the founder's statue; and the traffic light (not buyable: \
-             render/pc/signals.ts draws one at each signal head the sim has). Listed in the base manifest's packs. The \
+             render/pc/signals.ts draws one at each signal head the sim has) and the motorway's direction sign (not \
+             buyable: the street stands it by the motorway's exits and ramps). Listed in the base manifest's packs. The \
              materials map onto the game's finishes so a model costs one draw call per finish group. Each has a far \
              version for the town overview. The lamp's lantern, the phone box's signs and the taxi rank's sign glow at \
              night; the drinking fountain's water arcs for `drink` (`water_on`), the post box's flap swings in for \

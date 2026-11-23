@@ -48,3 +48,9 @@ export const kindOf = (r: Pick<RoadPlan, 'kind'>): RoadKind => r.kind ?? 'street
 
 /** What a road's kind is (`ROAD_KIND`). */
 export const kindInfo = (r: Pick<RoadPlan, 'kind'>): RoadKindInfo => ROAD_KIND[kindOf(r)];
+
+/**
+ * Which way cars go along a road: +1 the way its points run, -1 against them, 0 both ways. A kind that is one-way
+ * (`RoadKindInfo.oneway`: a motorway's carriageway, a ramp) without `RoadPlan.oneway` goes the way its points run.
+ */
+export const onewayOf = (r: Pick<RoadPlan, 'kind' | 'oneway'>): 1 | -1 | 0 => r.oneway ?? (kindInfo(r).oneway ? 1 : 0);
