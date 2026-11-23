@@ -975,6 +975,28 @@ impl Route {
             .any(|k| matches!(k.2, RoadKind::Motorway | RoadKind::Ramp) && k.0 <= b && a <= k.1)
     }
 
+    /// How far along it (ticks) a car `t` ticks along is `d` m further on (as far as its end).
+    pub(crate) fn ahead_by(&self, t: f32, d: f32) -> f32 {
+        let pts = &self.points;
+        let mut i = pts.partition_point(|q| q.2 <= t);
+        let (mut a, mut ta, mut left) = (self.at(t).0, t, d);
+        while i < pts.len() {
+            let q = pts[i];
+            let len = crate::travel::dist(a, q.0);
+            if len >= left {
+                return if len > 1e-6 {
+                    ta + (q.2 - ta) * left / len
+                } else {
+                    q.2
+                };
+            }
+            left -= len;
+            (a, ta) = (q.0, q.2);
+            i += 1;
+        }
+        self.ticks()
+    }
+
     /// Where the car is `t` ticks in, which way it faces, and whether it's backing up.
     pub(crate) fn at(&self, t: f32) -> ([f32; 2], f32, bool) {
         let pts = &self.points;

@@ -57,6 +57,7 @@ impl Car {
             let_by: None,
             avoided: Vec::new(),
             pass_by: None,
+            speed: None,
         }
     }
 
@@ -129,6 +130,7 @@ impl Car {
     /// pulled over for anyone.
     pub(super) fn unhold(&mut self) {
         self.moved = false;
+        self.speed = None;
         self.waits_for = None;
         self.on_foot.clear();
         self.waited = 0;
@@ -211,6 +213,7 @@ impl Car {
             let_by: None,
             avoided: Vec::new(),
             pass_by: None,
+            speed: None,
         }
     }
 
@@ -637,6 +640,17 @@ pub(crate) fn lane_tops(
 
 /// `empty_drive_ticks`'s drive, laid out.
 pub(crate) fn empty_drive_route(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Option<Route> {
+    empty_drive_route_to(travel, from, to, true)
+}
+
+/// `empty_drive_route`, standing at its end (`stop_end`) or going on past it at speed, as a car
+/// leaving town does.
+pub(crate) fn empty_drive_route_to(
+    travel: &Travel,
+    from: [f32; 2],
+    to: [f32; 2],
+    stop_end: bool,
+) -> Option<Route> {
     let g = &travel.graph;
     let a = *g.near(from, ROAD_REACH, 1, Mode::Car).first()?;
     let b = *g.near(to, ROAD_REACH, 1, Mode::Car).first()?;
@@ -680,7 +694,7 @@ pub(crate) fn empty_drive_route(travel: &Travel, from: [f32; 2], to: [f32; 2]) -
             legs.mark_last(laid_from.mark(m, p));
         }
     }
-    Some(legs.timed(true, true))
+    Some(legs.timed(true, stop_end))
 }
 
 /// How many ticks a car takes along the roads from the road nearest `from` to the road nearest

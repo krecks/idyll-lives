@@ -184,6 +184,11 @@ impl Traffic {
         (self.holds.len(), self.asks.len())
     }
 
+    /// Whether `key` holds claim `k` of its route tagged `route` (`Place`).
+    pub(crate) fn holds_part(&self, key: u64, route: u32, k: usize) -> bool {
+        self.holds(key, tag(route, k))
+    }
+
     /// Whether `key` holds a claim.
     pub fn holding(&self, key: u64) -> bool {
         self.holds.iter().any(|h| h.key == key)

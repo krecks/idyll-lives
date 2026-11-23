@@ -340,6 +340,12 @@ pub struct Car {
     /// (`pass_stands`), laid on its way; saved, so a game loaded part way round is the same.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pass_by: Option<PassBy>,
+    /// Its own speed on an avenue, a motorway or a ramp (m a second of drive time, `ease`): it
+    /// speeds up and slows down there as a driver would, at most `ACCEL` and `BRAKE_MOST`. None:
+    /// it keeps to its way's timing (every classic town's car, all the time), or is about to
+    /// (out of sight, or just put somewhere). Not saved: a game loaded, it's at its way's speed.
+    #[serde(skip)]
+    pub(crate) speed: Option<f32>,
 }
 
 pub(super) fn is_zero_f32(v: &f32) -> bool {

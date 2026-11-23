@@ -1,0 +1,230 @@
+//! A car's own speed on an avenue, a motorway or a ramp (`Car::speed`, `travel::fast_kind`).
+//!
+//! Everywhere else a car keeps to its way's timing (`Legs::timed`): a tick on along it, or none
+//! (held up: it stands at once). At a town's 9 m/s that's a step of 0.6 m; at the motorway's
+//! 30 m/s, 2 m, and a car stopping from there stood at once, and one stopped behind another crept
+//! up by turns, a tick on and a tick stood. There (and on from there till it's back at its way's
+//! speed) it has a speed of its own each tick and goes on as far along its way as that takes it:
+//! up to its way's speed, faster by `ACCEL` a second at most, and slower as it must, by `BRAKE`
+//! a second as it plans to and `BRAKE_MOST` at most, to stop, or to keep back, behind
+//!
+//! - the car in front of it on its way (its body on its way ahead, going its way: `Path::reach`),
+//!   as far back as it could stop if that one stopped as it does (`follow_ahead`'s ground and
+//!   `EASE_ROOM` more): at speed it keeps as far back as `follow_ahead` says, and coming up to one
+//!   standing it slows to a stop behind it;
+//! - the start of a merge's claim, or of one through lights not green for it, it doesn't hold: it
+//!   comes up to it at `CREEP` at least, and asks there (`Traffic::may_go`).
+//!
+//! Every rule that holds a car up still does, at once, as the last resort (`up_against`, the
+//! claims, `guard`); easing off as above, it seldom comes to that. Classic towns have none of these
+//! roads: their cars drive as they always did, tick for tick.
+
+use super::*;
+use crate::travel::dist;
+
+/// Slowing down as a car plans to (m/s² of drive time): as it speeds up (`ACCEL`).
+pub(crate) const BRAKE: f32 = 3.0;
+/// The hardest it slows down (m/s² of drive time), but held up at once by the last resort.
+pub(crate) const BRAKE_MOST: f32 = 6.0;
+/// The room it keeps past the ground in front of it it keeps clear (`follow_ahead`, m).
+const EASE_ROOM: f32 = 1.0;
+/// Coming up to the start of a claim it stops at (`EASE_STOPS`), at least this fast (m/s) till its
+/// nose is there and it asks.
+const CREEP: f32 = 1.5;
+/// Slower than this (m/s), it stands; and standing behind another, it sets off again once there's
+/// this much more room in front of it than it keeps (m).
+const STANDS: f32 = 0.05;
+const SET_OFF: f32 = 1.0;
+/// How far along its way it looks at most (m).
+const EASE_LOOK: f32 = 200.0;
+/// What `ease` says of a car's tick: how far on along its way (ticks), its speed after it (m/s),
+/// and the car it keeps back for (`car_first`'s key), standing.
+pub(crate) struct Eased {
+    pub step: f32,
+    pub speed: f32,
+    pub behind: Option<u64>,
+}
+
+/// How fast a car `t` ticks along `route` goes keeping to its timing (m/s of drive time).
+pub(crate) fn plan_speed(route: &Route, t: f32) -> f32 {
+    dist(route.at(t).0, route.at(t + 1.0).0) * DRIVE_TICKS_PER_SECOND
+}
+
+/// How fast car `car` goes now (m/s of drive time): its own speed, else its way's if it moved
+/// last tick.
+fn speed_of(car: &Car) -> f32 {
+    car.speed.unwrap_or_else(|| match (&car.route, car.moved) {
+        (Some((_, r)), true) => plan_speed(r, car.progress),
+        _ => 0.0,
+    })
+}
+
+/// A stretch of a car's way on from where it is: its steps, each from `a` to `b`, `d` m along
+/// from where it is at `a`, at ticks `ta` to `tb`.
+struct Path(Vec<Step>);
+
+/// A step of a `Path`: from and to, how far along it begins (m), and its ticks along the way.
+type Step = ([f32; 2], [f32; 2], f32, f32, f32);
+
+impl Path {
+    /// `route` from `t` ticks along, `look` m of it at most (as far as it drives on, not backing).
+    fn new(route: &Route, t: f32, look: f32) -> Path {
+        let pts = &route.points;
+        let mut i = pts.partition_point(|q| q.2 <= t);
+        let (mut a, mut ta, mut d) = (route.at(t).0, t, 0.0);
+        let mut out = Vec::new();
+        while i < pts.len() && d < look {
+            if i > 0 && pts[i - 1].3 {
+                break;
+            }
+            let q = pts[i];
+            out.push((a, q.0, d, ta, q.2));
+            d += dist(a, q.0);
+            (a, ta) = (q.0, q.2);
+            i += 1;
+        }
+        Path(out)
+    }
+
+    /// How far along it (m) it first comes within `near` of `p`, and the way it goes there (a
+    /// unit vector).
+    fn reach(&self, p: [f32; 2], near: f32) -> Option<(f32, [f32; 2])> {
+        self.0.iter().find_map(|&(a, b, d, ..)| {
+            let ab = [b[0] - a[0], b[1] - a[1]];
+            let len = ab[0].hypot(ab[1]);
+            if len < 1e-6 {
+                return (dist(a, p) < near).then_some((d, [0.0, 0.0]));
+            }
+            let u = [ab[0] / len, ab[1] / len];
+            let s = ((p[0] - a[0]) * u[0] + (p[1] - a[1]) * u[1]).clamp(0.0, len);
+            let q = [a[0] + u[0] * s, a[1] + u[1] * s];
+            (dist(q, p) < near).then_some((d + s, u))
+        })
+    }
+
+    /// The fastest a car may go where it begins to slow down to each step's speed by `BRAKE`
+    /// before it (m/s of drive time).
+    fn tops(&self) -> f32 {
+        self.0
+            .iter()
+            .filter(|s| s.4 > s.3 + 1e-6)
+            .map(|&(a, b, d, ta, tb)| {
+                let v = dist(a, b) / (tb - ta) * DRIVE_TICKS_PER_SECOND;
+                (v * v + 2.0 * BRAKE * d).sqrt()
+            })
+            .fold(f32::INFINITY, f32::min)
+    }
+
+    /// How far along it (m) it is `t` ticks along its way; None: further than it reaches.
+    fn at_tick(&self, t: f32) -> Option<f32> {
+        self.0.iter().find_map(|&(a, b, d, ta, tb)| {
+            (ta <= t && t <= tb).then(|| {
+                let k = if tb > ta { (t - ta) / (tb - ta) } else { 1.0 };
+                d + dist(a, b) * k
+            })
+        })
+    }
+}
+
+/// Car `c`, `t` ticks along its way (`home`: the way back), its own speed `carried` (`Car::speed`),
+/// on the move last tick or not (`moving`), with `others` on the road about it (`vehicles`): its
+/// tick at a speed of its own, on an avenue, a motorway or a ramp or till it's back at its way's
+/// speed from one (see the module notes). None: it keeps to its way's timing (not on one of those
+/// roads, or backing up).
+pub(crate) fn ease(
+    w: &World,
+    c: usize,
+    t: f32,
+    carried: Option<f32>,
+    moving: bool,
+    home: bool,
+    others: &[Driving],
+) -> Option<Eased> {
+    let car = &w.cars[c];
+    let route = car.route.as_ref().filter(|r| r.0 == home).map(|r| &r.1)?;
+    if route.at(t).2 || route.at(t + 1.0).2 {
+        return None;
+    }
+    let plan = plan_speed(route, t);
+    let v0 = carried.unwrap_or(if moving { plan } else { 0.0 });
+    // (Off those roads, at its way's speed again: on as its timing has it.)
+    if route.kind_at(t).is_none() && (carried.is_none() || v0 >= plan - 1e-3) {
+        return None;
+    }
+    let tick = 1.0 / DRIVE_TICKS_PER_SECOND;
+    let country = w.travel.country_speed;
+    let look = (v0 * v0 / (2.0 * BRAKE) + follow_ahead(v0, country) + 30.0).min(EASE_LOOK);
+    let path = Path::new(route, t, look);
+    let key = car_first(c);
+    let half = car.len / 2.0;
+    // (How fast it may go `gap` m behind one going `lead` m/s its way: to keep `room` back from
+    // it, slowing by `BRAKE` as that one would; nearer than that, slower than that one, to drop
+    // back. Standing, it sets off once there's `SET_OFF` more: not on and stopped by turns behind
+    // one still coming to a stop.)
+    let room =
+        follow_ahead(v0, country) + EASE_ROOM + v0 * tick + if v0 < STANDS { SET_OFF } else { 0.0 };
+    let safe = |gap: f32, lead: f32| (lead * lead + 2.0 * BRAKE * (gap - room)).max(0.0).sqrt();
+    // (No faster than its way's timing ahead, slowing as it does at `BRAKE` at most: its timing
+    // goes at a speed of its own between each two of its points, a step down from one to the next
+    // where it slows.)
+    let mut v = path.tops().min(v0 + ACCEL * tick);
+    let mut behind = None;
+    let stop = |d: f32| (2.0 * BRAKE * (d - v0 * tick).max(0.0)).sqrt();
+    let mut keep = |v: &mut f32, lim: f32, k: Option<u64>| {
+        if lim < *v {
+            *v = lim;
+            behind = k;
+        }
+    };
+    // The car in front of it on its way.
+    for o in others.iter().filter(|o| o.ahead > 0.0 && o.first != key) {
+        if dist(o.at, car.shown.map_or(o.at, |s| s.0)) > look + half + o.len {
+            continue;
+        }
+        let Some((d, way)) = path.reach(o.at, (car.wid + o.wid) / 2.0 + 0.1) else {
+            continue;
+        };
+        let (s, cos) = o.yaw.sin_cos();
+        let along = s * way[0] + cos * way[1];
+        if d < half || along < 0.0 {
+            continue;
+        }
+        let other = &w.cars[(o.first & !(1 << 63)) as usize];
+        keep(
+            &mut v,
+            safe(d - half - o.len / 2.0, speed_of(other) * along),
+            Some(o.first),
+        );
+    }
+    // The start of a claim it stops at, not holding it.
+    let tag = u32::from(home);
+    for (k, claim) in route.claims.iter().enumerate() {
+        if claim.from <= t + 1.0 || w.traffic.holds_part(key, tag, k) {
+            continue;
+        }
+        let Some(d) = path.at_tick(claim.from) else {
+            break;
+        };
+        if claim.merge || !w.traffic.green_through(claim, t) {
+            let lim = stop(d).max(CREEP);
+            keep(&mut v, lim, None);
+            break;
+        }
+    }
+    let v = v.max(v0 - BRAKE_MOST * tick).max(0.0);
+    let v = if v < STANDS { 0.0 } else { v };
+    // (As far on as that speed takes it in a tick, along its way's points: no further than its
+    // timing would.)
+    let step = if v <= 0.0 {
+        0.0
+    } else if plan < 0.3 || v >= plan {
+        1.0
+    } else {
+        (route.ahead_by(t, v * tick) - t).clamp(0.0, 1.0)
+    };
+    Some(Eased {
+        step,
+        speed: if step >= 1.0 { plan } else { v },
+        behind,
+    })
+}

@@ -13,7 +13,16 @@ const WID: f32 = 1.8;
 /// `empty_drive_ticks` lays it out, with its claims), `at` ticks along it already. Its index in
 /// `World::cars`; None: no way.
 pub fn add(w: &mut World, from: [f32; 2], to: [f32; 2], at: f32) -> Option<usize> {
-    let mut route = empty_drive_route(&w.travel, from, to)?;
+    add_to(w, from, to, at, true)
+}
+
+/// `add`, its way going on past its end at speed (out of town), not slowing to stand there.
+pub fn add_on(w: &mut World, from: [f32; 2], to: [f32; 2], at: f32) -> Option<usize> {
+    add_to(w, from, to, at, false)
+}
+
+fn add_to(w: &mut World, from: [f32; 2], to: [f32; 2], at: f32, stop_end: bool) -> Option<usize> {
+    let mut route = empty_drive_route_to(&w.travel, from, to, stop_end)?;
     route.claim(LEN, WID, Some(&w.travel));
     let at = at.clamp(0.0, route.ticks());
     let (p, yaw, _) = route.at(at);
@@ -45,6 +54,12 @@ pub fn hold(w: &mut World, c: usize, t: f32) {
     put(w, c, t);
     let car = &mut w.cars[c];
     car.moved = false;
+    car.speed = Some(0.0);
+}
+
+/// Whether car `c` goes at a speed of its own (`Car::speed`: on an avenue, a motorway or a ramp).
+pub fn eased(w: &World, c: usize) -> bool {
+    w.cars[c].speed.is_some()
 }
 
 /// Whether car `c` has turned round (`unjam`: its way turned round, backing up along it or on

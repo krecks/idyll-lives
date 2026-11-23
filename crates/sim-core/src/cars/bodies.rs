@@ -509,7 +509,8 @@ impl Body {
     }
 }
 
-/// Something driving (`d`, where it would be a tick on) a tick further along its way, unless
+/// Something driving (`d`, where it would be a tick on) a tick further along its way (`step` of
+/// one: at a speed of its own, `ease`), unless
 /// someone is in its way: it waits for them (`waited`, ticks). Someone standing there a while (a
 /// chat on the pavement) steps aside for it (`make_way`); someone with nowhere to step goes
 /// round to where they're out of its way, past `PASS_TICKS` (`clear_of`). It never drives
@@ -528,7 +529,7 @@ pub(crate) fn go_on(
     now: Driving,
     others: &[Driving],
     waited: &mut u32,
-    progress: &mut f32,
+    (progress, step): (&mut f32, f32),
     whom: &mut Vec<u32>,
 ) -> bool {
     let turn = d.yaw.sin_cos();
@@ -598,7 +599,7 @@ pub(crate) fn go_on(
         // counts, so they step aside for it in the end, `make_way`.)
         *waited = waited.saturating_sub(2);
         if !blocked {
-            *progress += 1.0;
+            *progress += step;
         }
     }
     blocked

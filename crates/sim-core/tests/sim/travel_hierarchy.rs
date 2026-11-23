@@ -1225,40 +1225,84 @@ fn merges_settle() {
     assert_eq!(w.traffic.claims_out(), (0, 0), "every claim let go");
 }
 
+/// How fast each of a drill's cars went over the last tick, and the tick before (m/s of drive
+/// time, by where it's shown: `Speeds::step`).
+struct Speeds {
+    at: Vec<Option<[f32; 2]>>,
+    now: Vec<Option<f32>>,
+}
+
+/// The most a car on its own speed (`cars::ease`) slows down, and speeds up, a second (m/s² of
+/// drive time: `BRAKE_MOST` and `ACCEL`, and a little for its way's turns between its points).
+const BRAKES_AT_MOST: f32 = 6.5;
+const SPEEDS_UP_AT_MOST: f32 = 3.5;
+
+impl Speeds {
+    fn new(w: &World, cars: &[usize]) -> Speeds {
+        Speeds {
+            at: cars.iter().map(|&c| w.cars[c].shown.map(|s| s.0)).collect(),
+            now: vec![None; cars.len()],
+        }
+    }
+
+    /// After a tick: each car's speed over it and the tick before (None: not on its way both).
+    fn step(&mut self, w: &World, cars: &[usize]) -> Vec<Option<(f32, f32)>> {
+        let mut out = Vec::with_capacity(cars.len());
+        for (i, &c) in cars.iter().enumerate() {
+            let at = w.cars[c].shown.map(|s| s.0);
+            let v = at
+                .zip(self.at[i])
+                .map(|(a, b)| dist(a, b) * sim_core::DRIVE_TICKS_PER_SECOND);
+            out.push(v.zip(self.now[i]));
+            (self.at[i], self.now[i]) = (at, v);
+        }
+        out
+    }
+}
+
+/// How hard a car went from `was` to `now` (m/s² of drive time: below 0, slowing down).
+fn accel((now, was): (f32, f32)) -> f32 {
+    (now - was) * sim_core::DRIVE_TICKS_PER_SECOND
+}
+
 #[test]
 fn motorway_cars_keep_further_back_the_faster_they_go() {
     // A car setting off from standing on the carriageway, and a string of cars coming up behind
-    // it already at speed: none runs into the one in front, and at speed each keeps well back.
+    // it already at speed: none runs into the one in front, each slows down no harder than a
+    // driver would, and at speed each keeps well back.
     let mut w = world();
     let g = w.travel.graph.clone();
     let side = MOTORWAY_EAST;
     let (a, b) = along(&g, side);
     let way = (b[0] - a[0]).signum();
-    let lead = drill::add(&mut w, [a[0] + way * 220.0, a[1]], b, 0.0).unwrap();
+    let lead = drill::add(&mut w, [a[0] + way * 300.0, a[1]], b, 0.0).unwrap();
     let mut cars = vec![lead];
-    for k in 0..6 {
+    for k in 0..4 {
         let c = drill::add(&mut w, a, b, 0.0).unwrap();
-        // (Each 30 m behind the one before as they come, the first 50 m short of the lead.)
-        let x = a[0] + way * (170.0 - 30.0 * k as f32);
+        // (Each 40 m behind the one before as they come, the first 160 m short of the lead: room
+        // to slow down for it as a driver would.)
+        let x = a[0] + way * (140.0 - 40.0 * k as f32);
         let t = tick_at(&w, c, [x, a[1]]);
         drill::put(&mut w, c, t);
         cars.push(c);
     }
     let mut fast = 0;
-    // (Each car's progress the last two ticks: on the move both, it's driving on at speed, not
-    // stopping and setting off again.)
-    let mut was: Vec<[f32; 2]> = cars.iter().map(|&c| [w.cars[c].progress; 2]).collect();
+    let mut speeds = Speeds::new(&w, &cars);
     for tick in 0..20_000 {
         drill::step(&mut w);
         assert_eq!(overlapping(&w, &cars), vec![], "tick {tick}");
-        for (i, &c) in cars.iter().enumerate() {
-            let car = &w.cars[c];
-            let (t, [t1, t2]) = (car.progress, was[i]);
-            was[i] = [t, t1];
-            let Some(me) = car.shown else { continue };
-            let speed = dist(drill::at(&w, c, t), drill::at(&w, c, t + 1.0))
-                * sim_core::DRIVE_TICKS_PER_SECOND;
-            if i == 0 || speed < 25.0 || !(t > t1 && t1 > t2) {
+        for (i, v) in speeds.step(&w, &cars).into_iter().enumerate() {
+            let c = cars[i];
+            let (Some(v), Some(me)) = (v, w.cars[c].shown) else {
+                continue;
+            };
+            assert!(
+                accel(v) > -BRAKES_AT_MOST && accel(v) < SPEEDS_UP_AT_MOST,
+                "tick {tick}: car {c} from {} to {} m/s",
+                v.1,
+                v.0
+            );
+            if i == 0 || v.0 < 25.0 {
                 continue;
             }
             // (The nearest car ahead of it on its way.)
@@ -1273,7 +1317,8 @@ fn motorway_cars_keep_further_back_the_faster_they_go() {
                 fast += 1;
                 assert!(
                     ahead > 20.0,
-                    "tick {tick}: car {c} at {speed} m/s {ahead} m behind"
+                    "tick {tick}: car {c} at {} m/s {ahead} m behind",
+                    v.0
                 );
             }
         }
@@ -1286,6 +1331,86 @@ fn motorway_cars_keep_further_back_the_faster_they_go() {
         "all through"
     );
     assert!(fast > 100, "{fast} ticks behind another at speed");
+    assert_eq!(w.traffic.guarded, 0);
+}
+
+#[test]
+fn motorway_cars_ease_to_a_stop_behind_one_standing_and_set_off_again() {
+    // One standing on the carriageway (broken down), and two coming up behind it at speed, 80 m
+    // apart: each slows down no harder than a driver would to a stop behind the one in front, and
+    // stands there, not stopping and going by turns; the one in front gone on, each sets off and
+    // speeds up again as a driver would, without stopping again.
+    let mut w = world();
+    let g = w.travel.graph.clone();
+    let side = MOTORWAY_EAST;
+    let (a, b) = along(&g, side);
+    let way = (b[0] - a[0]).signum();
+    let x = |d: f32| [a[0] + way * d, a[1]];
+    let stands = drill::add(&mut w, x(300.0), b, 0.0).unwrap();
+    let mut cars = vec![stands];
+    for d in [60.0, 0.0] {
+        let c = drill::add(&mut w, a, b, 0.0).unwrap();
+        let t = tick_at(&w, c, x(d));
+        drill::put(&mut w, c, t);
+        cars.push(c);
+    }
+    let held = drill::ticks(&w, stands).min(5.0);
+    drill::hold(&mut w, stands, held);
+    let mut speeds = Speeds::new(&w, &cars);
+    // (Each follower: whether it has stood yet, and set off again since.)
+    let mut stood = [false; 3];
+    let mut fast = [0.0f32; 3];
+    let release = 1500;
+    for tick in 0..20_000 {
+        drill::step(&mut w);
+        if tick < release {
+            drill::hold(&mut w, stands, held);
+        }
+        assert_eq!(overlapping(&w, &cars), vec![], "tick {tick}");
+        for (i, v) in speeds.step(&w, &cars).into_iter().enumerate().skip(1) {
+            let c = cars[i];
+            let Some(v) = v else { continue };
+            fast[i] = fast[i].max(v.0);
+            assert!(
+                accel(v) > -BRAKES_AT_MOST && accel(v) < SPEEDS_UP_AT_MOST,
+                "tick {tick}: car {c} from {} to {} m/s",
+                v.1,
+                v.0
+            );
+            if tick < release {
+                if v.0 < 1e-3 {
+                    stood[i] = true;
+                }
+                assert!(
+                    !(stood[i] && v.0 > 0.05),
+                    "tick {tick}: car {c} stood, and goes on at {} m/s",
+                    v.0
+                );
+            } else if tick > release + 60 {
+                assert!(v.0 > 0.0, "tick {tick}: car {c} stops again");
+            }
+        }
+        if tick == release - 1 {
+            // (Stood behind the one in front, a little more than the ground it keeps clear back.)
+            for i in 1..3 {
+                assert!(stood[i], "car {} stood", cars[i]);
+                assert!(fast[i] > 25.0, "car {} came at speed: {}", cars[i], fast[i]);
+                let (p, q) = (
+                    w.cars[cars[i]].shown.unwrap().0,
+                    w.cars[cars[i - 1]].shown.unwrap().0,
+                );
+                let gap = dist(p, q) - 4.4;
+                assert!(gap > 2.0 && gap < 6.0, "car {}: {gap} m behind", cars[i]);
+            }
+        }
+        if cars.iter().all(|&c| w.cars[c].shown.is_none()) {
+            break;
+        }
+    }
+    assert!(
+        cars.iter().all(|&c| w.cars[c].shown.is_none()),
+        "all through"
+    );
     assert_eq!(w.traffic.guarded, 0);
 }
 
