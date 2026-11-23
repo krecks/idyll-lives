@@ -1,8 +1,9 @@
 <script lang="ts">
   /**
    * The Street tool's card: what it draws (`streetChoice`). The kind, which is a street of the town
-   * or village it runs in or a country road outside them unless a street, a lane or a footpath is
-   * asked for (a street or a lane asked for stays one out of town, given an area when it is built);
+   * or village it runs in or a country road outside them unless a street, a lane, an avenue or a
+   * footpath is asked for (a street, a lane or an avenue asked for stays one out of town, given an
+   * area when it is built); whether it is one-way, and which way (arrows along it as it is drawn);
    * whether what is in its way is cleared (else the street is refused there); and what is put along
    * it: homes, the town's other buildings, both, or nothing; by where it runs unless chosen (both in
    * the main town, homes elsewhere). A street just drawn and split at its bridges lists its stretches,
@@ -10,6 +11,8 @@
    */
   import Segmented from '../kit/Segmented.svelte';
   import Toggle from '../kit/Toggle.svelte';
+  import { streetWidth } from '../../game/edit/streets';
+  import Icon from '../Icon.svelte';
   import { alongFor, streetChoice, type Along, type StreetKindChoice } from './streetChoice.svelte';
   import { drawnStretches } from './streetLive';
   import type { TownEditor } from './tools';
@@ -17,11 +20,15 @@
   const { editor }: { editor: TownEditor } = $props();
 
   const KINDS: readonly { value: StreetKindChoice; label: string }[] = [
+    { value: 'auto', label: 'Auto' },
     { value: 'street', label: 'Street' },
     { value: 'lane', label: 'Lane' },
-    { value: 'country', label: 'Country road' },
+    { value: 'avenue', label: 'Avenue' },
+    { value: 'country', label: 'Country' },
     { value: 'trail', label: 'Footpath' },
   ];
+  /** A lane is narrow only where its kind is narrower than a street (`streetWidth`). */
+  const narrowLane = streetWidth('lane') < streetWidth('street');
   const ALONG: readonly { value: Along; label: string }[] = [
     { value: 'homes', label: 'Homes' },
     { value: 'buildings', label: 'Town buildings' },
@@ -29,8 +36,6 @@
     { value: 'none', label: 'Nothing' },
   ];
 
-  /** `auto` shows as what the street under the pointer would be. */
-  const kind = $derived<StreetKindChoice>(streetChoice.kind === 'auto' ? (streetChoice.shown === 'country' ? 'country' : 'street') : streetChoice.kind);
   const trail = $derived(streetChoice.kind === 'trail');
   /** `auto` shows as what goes along a street where the pointer is (both in the main town, homes elsewhere). */
   const along = $derived(alongFor(streetChoice.along, streetChoice.shownArea));
@@ -53,21 +58,34 @@
   {/if}
   <div class="option">
     <span class="eyebrow sub">Kind</span>
-    <Segmented fill label="Kind of road" value={kind} options={KINDS} onchange={(v) => (streetChoice.kind = v)} />
+    <div class="kinds"><Segmented fill label="Kind of road" value={streetChoice.kind} options={KINDS} onchange={(v) => (streetChoice.kind = v)} /></div>
     <p class="hint">
       {#if streetChoice.kind === 'trail'}
         No cars and nothing along it; it does not cross the water.
       {:else if streetChoice.kind === 'lane'}
-        A narrow lane, in {editor.townName || 'the town'}, a village or out of them (given to the nearest when the town is built).
+        A {narrowLane ? 'narrow ' : ''}lane, {streetWidth('lane')} m wide, in {editor.townName || 'the town'}, a village or out of them (given to the nearest when the town is built).
       {:else if streetChoice.kind === 'street'}
-        A street, in {editor.townName || 'the town'}, a village or out of them (given to the nearest when the town is built).
-        <button class="link" onclick={() => (streetChoice.kind = 'auto')}>By where it runs</button>
+        A street, {streetWidth('street')} m wide, in {editor.townName || 'the town'}, a village or out of them (given to the nearest when the town is built).
+      {:else if streetChoice.kind === 'avenue'}
+        A main road, {streetWidth('avenue')} m wide: two lanes each way and trees down the middle. It keeps well clear of other roads.
+      {:else if streetChoice.kind === 'country'}
+        A country road, {streetWidth('country')} m wide, with no sidewalks.
       {:else}
-        A street in {editor.townName || 'the town'} or a village, a country road outside them.
-        {#if streetChoice.kind !== 'auto'}<button class="link" onclick={() => (streetChoice.kind = 'auto')}>By where it runs</button>{/if}
+        A street in {editor.townName || 'the town'} or a village, a country road outside them{streetChoice.shown === 'country' ? ' (a country road here)' : ''}.
       {/if}
     </p>
   </div>
+  {#if !trail}
+    <div class="row">
+      <span>One-way{#if streetChoice.oneway}<span class="sub-note"> ({streetChoice.flip ? 'against the way you draw it' : 'the way you draw it'})</span>{/if}</span>
+      <span class="way">
+        {#if streetChoice.oneway}
+          <button class="btn small ghost" title="Flip which way cars go" aria-label="Flip which way cars go" onclick={() => (streetChoice.flip = !streetChoice.flip)}><Icon name="icon.ui.rotate" size={14} /> Flip</button>
+        {/if}
+        <Toggle label="One-way" bind:checked={streetChoice.oneway} />
+      </span>
+    </div>
+  {/if}
   <label class="row">
     <span>Clear what's in the way{#if !streetChoice.clear}<span class="sub-note"> (else it is refused there)</span>{/if}</span>
     <Toggle label="Clear what's in the way" bind:checked={streetChoice.clear} />
@@ -108,6 +126,15 @@
   .option.off {
     opacity: 0.55;
     pointer-events: none;
+  }
+  .kinds :global(.segmented button) {
+    padding: 0 6px;
+    font-size: 12px;
+  }
+  .way {
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
   .choices {
     display: flex;
