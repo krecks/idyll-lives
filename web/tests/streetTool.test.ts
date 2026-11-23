@@ -7,7 +7,9 @@
 // the settle's to judge, through the town worker: `editSettle.slow.test.ts`; here only its forecast.) The tool
 // itself, driven as the town stage drives it: clicks, a freehand drag, Backspace, Esc and Enter, the
 // street drawn picked; the magnet; Enter carrying a street on to a road nearby; a street clearly too
-// steep refused up front, its climb measured as `measureLand` measures it; the hint on bare land. `bun test`.
+// steep refused up front, its climb measured as `measureLand` measures it; the hint on bare land. The road hierarchy: an
+// avenue's live checks, a one-way street drawn with arrows along it the way cars go (flipped on the card), the
+// motorway not crossed. `bun test`.
 import { afterAll, describe, expect, mock, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import type { Content } from '../src/content/content';
@@ -25,16 +27,19 @@ import type { Picked } from '../src/ui/townedit/pick';
 import type { TownEditor } from '../src/ui/townedit/tools';
 
 // (The card and its runes are the page's: the tool reads its choices from a plain object here.)
-const choice = { kind: 'auto' as string, clear: true, along: 'homes' as string, shown: 'street' as string, shownArea: -1, drawn: [] as { road: number; name: string }[] };
+const choice = { kind: 'auto' as string, oneway: false, flip: false, clear: true, along: 'homes' as string, shown: 'street' as string, shownArea: -1, drawn: [] as { road: number; name: string }[] };
 mock.module('../src/ui/townedit/StreetCard.svelte', () => ({ default: {} }));
 mock.module('../src/ui/townedit/streetChoice.svelte', () => ({
   streetChoice: choice,
   strokeKind: (k: string) => (k === 'auto' ? 'street' : k),
   alongFor: (a: string, area: number) => (a !== 'auto' ? a : area === 0 ? 'both' : 'homes'),
   fillsHomes: (a: string) => a === 'homes',
+  strokeWay: (c: { kind: string; oneway: boolean; flip: boolean }) => (c.oneway && c.kind !== 'trail' ? (c.flip ? -1 : 1) : undefined),
 }));
 const { climbOf, drawnStretches, liveStreet, runsOf, unfinished, verdictOf } = await import('../src/ui/townedit/streetLive');
-const { AUTO_JOIN, carryOn, FIRST_STREET, kindLine, pullAt, pullReach, StreetDrawing, startAt, streetGhosts, streetTool, stretchNear } = await import('../src/ui/townedit/streetTool');
+const { arrowGhosts, askOf, AUTO_JOIN, carryOn, FIRST_STREET, kindLine, lineWay, pullAt, pullReach, StreetDrawing, startAt, streetGhosts, streetTool, stretchNear } = await import('../src/ui/townedit/streetTool');
+const { CROSS_MOTORWAY, ONE_WAY_ENDS } = await import('../src/game/edit/streets');
+const { roadHierarchy } = await import('../src/render/roadHierarchyFixture');
 
 const W = 400;
 const D = 400;
@@ -734,5 +739,92 @@ describe('on a generated world', async () => {
     expect(agreed + left.length).toBe(400);
     expect(blocking).toEqual([]);
     expect(median).toBeLessThan(5);
+  });
+});
+
+describe('avenues, one-way streets and the motorway', () => {
+  test('an avenue: the live checks agree with drawStreet, 14 m wide', () => {
+    const draft = town();
+    const ok: Pt[] = [[240, MAIN_Z + 8], [240, 150], [200, 150], [100, 150]];
+    const live = liveStreet(draft, t, ok, 'avenue', true, true);
+    expect(live.why).toBeNull();
+    expect(live.width).toBe(14);
+    expect(live.kind).toBe('avenue');
+    const made = verdictOf(draft, t, content, ok, 'avenue', true, 7, true);
+    if ('refused' in made) throw new Error(made.refused);
+    expect(made.draft.roads.at(-1)!.width).toBe(14);
+    // (10 m past Mill Lane's dead end: a street passes, an avenue touches it.)
+    const near: Pt[] = [[240, MAIN_Z + 8], [240, 140], [200, 140], [100, 140]];
+    expect(liveStreet(draft, t, near, 'street', true, true).finishOn).toBe(-1);
+    expect(liveStreet(draft, t, near, 'avenue', true, true).finishOn).toBe(1);
+  });
+
+  test("the card's one-way and flip: the way asked; never a footpath's", () => {
+    try {
+      choice.oneway = true;
+      expect(askOf().oneway).toBe(1);
+      choice.flip = true;
+      expect(askOf().oneway).toBe(-1);
+      choice.kind = 'trail';
+      expect(askOf().oneway).toBeUndefined();
+    } finally {
+      [choice.oneway, choice.flip, choice.kind] = [false, false, 'auto'];
+    }
+    expect(askOf().oneway).toBeUndefined();
+  });
+
+  test('arrows along a one-way line, the way cars go', () => {
+    const l = line(0, 50, 100, 50);
+    expect(arrowGhosts(l, 0)).toEqual([]);
+    const ahead = arrowGhosts(l, 1);
+    expect(ahead.length).toBe(5);
+    // (Each a chevron: its tip, the middle point, ahead of its arms.)
+    for (const a of ahead) expect(a.points[1][0]).toBeGreaterThan(a.points[0][0]);
+    for (const a of arrowGhosts(l, -1)) expect(a.points[1][0]).toBeLessThan(a.points[0][0]);
+    expect(lineWay(l, 1, [100, 50])).toBe(-1);
+    expect(lineWay(l, -1, [0, 50])).toBe(-1);
+  });
+
+  test('a one-way street drawn: open till it ends on a road, arrows along it; drawn one-way the way the card says', () => {
+    choice.along = 'none';
+    for (const flip of [false, true]) {
+      const editor = fakeEditor(town());
+      const tool = streetTool.stage(editor);
+      [choice.oneway, choice.flip] = [true, flip];
+      try {
+        tool.down(300, MAIN_Z + 8);
+        tool.up();
+        tool.down(300, 160);
+        tool.up();
+        tool.hover(340, 160);
+        expect(editor.said.hints.at(-1)).toContain('A one-way street ends on a road at both ends');
+        const arrows = (editor.said.ghosts?.roads ?? []).filter((g) => g.width < 1);
+        expect(arrows.length).toBeGreaterThan(0);
+        // (Up from the high street, then east: the last arrow points east, or west flipped.)
+        const last = arrows.at(-1)!;
+        expect(Math.sign(last.points[1][0] - last.points[0][0])).toBe(flip ? -1 : 1);
+        // Enter here: a one-way street may not end in the open.
+        expect(tool.key!(key('Enter'))).toBe(true);
+        expect(editor.said.refusals.at(-1)).toBe(ONE_WAY_ENDS);
+        tool.down(376, 160);
+        tool.up();
+      } finally {
+        [choice.oneway, choice.flip] = [false, false];
+      }
+      const road = editor.draft.roads.at(-1)!;
+      expect(road.ends).toEqual(['join', 'join']);
+      expect(road.oneway).toBe(flip ? -1 : 1);
+      expect(road.points[0][1]).toBeLessThan(road.points.at(-1)![1]);
+    }
+    expect(unfinished(ONE_WAY_ENDS)).toBe(true);
+  });
+
+  test('a street drawn across the motorway: refused live, as drawStreet refuses it', () => {
+    const { width, depth, roads } = roadHierarchy();
+    const draft = { name: 'Junction', width, depth, slots: [], roads, greens: [], households: [] } as unknown as NeighbourhoodDraft;
+    const pts: Pt[] = [[250, 92], [250, 260]];
+    expect(liveStreet(draft, t, pts, 'street').why).toBe(CROSS_MOTORWAY);
+    expect(refusal(verdictOf(draft, t, content, pts, 'street', true, 7))).toBe(CROSS_MOTORWAY);
+    expect(startAt(draft, [250, 202], 'street')).toBeNull();
   });
 });

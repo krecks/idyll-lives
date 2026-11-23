@@ -30,7 +30,8 @@
  * town shown: the editor's own timings), and says them (`create: edit …`). Then the Street tool: a
  * street drawn by clicks across open land from one road to another (the frames and the editor's own
  * work per pointer move while its ghost follows the pointer, and `drawStreet`'s own time, the one
- * the tool asks once the pointer rests), one over the water on a bridge if the world has a crossing
+ * the tool asks once the pointer rests), a one-way street drawn with arrows along its ghost and then made an
+ * avenue from its card (what is in its way cleared), one over the water on a bridge if the world has a crossing
  * on screen, a refused tight bend, a stretch too steep if the land has one on screen, and a street
  * being drawn taken back a point (Backspace) and dropped (Esc).
  *
@@ -908,6 +909,34 @@ async function editSession(page, renderer, shootAs, setStep, step, parts) {
     const across = (await bench(() => window.__bench.stroke('join'))) ?? (await bench(() => window.__bench.stroke('join-any')));
     if (across) await draw(across, 'street');
     else fault(`${renderer} edit: no street from one road to another on screen to draw`);
+
+    // 9b. A one-way street (the card's One-way on): arrows along its ghost the way cars go; drawn, its card's Change
+    // kind and way, then made an avenue there (what is in its way cleared).
+    const oneWay = page.locator('.street-card [role="switch"][aria-label="One-way"]');
+    if (await oneWay.count()) {
+      await oneWay.click();
+      await page.waitForTimeout(100);
+      const way = (await bench(() => window.__bench.stroke('join'))) ?? (await bench(() => window.__bench.stroke('join-any')));
+      if (way) {
+        await draw(way, 'street-oneway');
+        const road = (await state()).selected;
+        const roadOf = () => (road?.kind === 'road' ? bench((r) => window.__townEditor.draft.roads[r], road.road) : null);
+        const picked = await roadOf();
+        if (!picked?.oneway) fault(`${renderer} edit one-way: drawn two-way (${JSON.stringify(picked?.oneway)})`);
+        const clear = page.locator('[role="switch"][aria-label="Clear what\'s in the way of it wider"]');
+        if (await clear.count()) await clear.click();
+        await page.locator('[role="radiogroup"][aria-label="Change its kind"] [role="radio"]', { hasText: /^Avenue$/ }).click();
+        await page.waitForTimeout(150);
+        const made = await roadOf();
+        console.log(`create: ${renderer} edit one-way: drawn one-way ${picked?.oneway}, then made ${made?.kind} ${made?.width} m wide, one-way ${made?.oneway}; ${(await state()).note ?? 'nothing refused'}`);
+        await shots('street-oneway-avenue');
+        await built('a one-way street made an avenue');
+        await shots('street-oneway-avenue-built');
+      } else console.log(`create: ${renderer} edit: no street for a one-way one on screen`);
+      await tool('street');
+      await page.locator('.street-card [role="switch"][aria-label="One-way"]').click();
+      await page.waitForTimeout(100);
+    }
 
     // 10. Over the water on a bridge (if the world has a crossing on screen).
     const over = await bench(() => window.__bench.stroke('bridge'));
