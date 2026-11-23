@@ -1,14 +1,19 @@
 /**
  * Roads as drawn (`render/shared/roads.ts`): a lane off a road and a dead end. The sidewalks stop
  * where the lane meets the road (none across either road), the dead end gets its turning circle,
- * and an older town's straight streets are roads of their own width.
+ * and an older town's straight streets are roads of their own width. An avenue's median, kerbed and grassed, cut
+ * at its junctions; the overview's decks and barrier (`townRoadMesh`), on the road hierarchy's fixture.
  */
 import { describe, expect, test } from 'bun:test';
 import type { RoadPlan, WorldStructure } from '../src/core/protocol';
-import { trimJoins } from '../src/game/roads';
-import { Kerb, RoadIndex, roadMeshes, roadTiles, SIDEWALK, townRoads, WALK_Y } from '../src/render/shared/roads';
+import { lengths, nearest, trimJoins } from '../src/game/roads';
+import { Kerb, KERB_Y, RoadIndex, roadMeshes, roadTiles, SIDEWALK, townRoadMesh, townRoads, WALK_Y } from '../src/render/shared/roads';
+import { Geo } from '../src/render/shared/geometry';
+import { junctionStretches } from '../src/render/shared/markings';
+import { MOTORWAY } from '../src/render/shared/motorway';
+import * as F from '../src/render/roadHierarchyFixture';
 import { JunctionCuts } from '../src/render/shared/junctions';
-import { plansOf } from './fixtures/junctions';
+import { deriveJunctions, plansOf } from './fixtures/junctions';
 
 const line = (x0: number, z0: number, x1: number, z1: number, n: number): [number, number][] => Array.from({ length: n + 1 }, (_, i) => [x0 + ((x1 - x0) * i) / n, z0 + ((z1 - z0) * i) / n]);
 /** A road along x at z = 50, and a lane off it to the south (+z) ending in a dead end: beginning at the road's kerb, as the town's lanes do (`trimJoins`). */
@@ -78,4 +83,66 @@ describe('roads as drawn', () => {
     expect(kerb.yaw(10)).toBeCloseTo(0);
     expect(kerb.at(10, 0)).toEqual([10, 12]);
   });
+});
+
+describe("an avenue's median", () => {
+  const h = F.roadHierarchy();
+  const plans = plansOf(h.roads);
+  const avenue = h.roads[F.AVENUE];
+  const drawn = () => {
+    const [walk, median] = [new Geo(), new Geo()];
+    roadMeshes(h.roads, null, 0, { walk, median }, 'sidewalks', plans);
+    return { walk, median };
+  };
+  const verts = (g: Geo) => Array.from({ length: g.pos.length / 3 }, (_, i): [number, number, number] => [g.pos[i * 3], g.pos[i * 3 + 1], g.pos[i * 3 + 2]]);
+
+  test('grass down its middle, as wide as the median less its kerbs, cut where its junctions are', () => {
+    const { median } = drawn();
+    const grass = verts(median);
+    expect(grass.length).toBeGreaterThan(0);
+    const cut = junctionStretches(avenue, plans, lengths(avenue.points));
+    for (const [x, y, z] of grass) {
+      expect(y).toBeCloseTo(WALK_Y, 6);
+      expect(Math.abs(z - F.AVENUE_Z)).toBeLessThanOrEqual(1.3 - 0.14 + 1e-6);
+      const s = nearest(avenue.points, x, z).s;
+      expect(cut.some(([a, b]) => s > a + 1e-3 && s < b - 1e-3)).toBe(false);
+    }
+    // (None on any other road.)
+    expect(grass.every(([, , z]) => Math.abs(z - F.AVENUE_Z) < 2)).toBe(true);
+  });
+
+  test("kerbs along both its sides, as high as the sidewalks' kerbs, and across its ends at a junction", () => {
+    const { walk } = drawn();
+    const kerbs = verts(walk).filter(([x, , z]) => Math.abs(z - F.AVENUE_Z) <= 1.3 + 1e-6 && x > 20 && x < 280);
+    expect(kerbs.some(([, , z]) => z > F.AVENUE_Z + 1.25)).toBe(true);
+    expect(kerbs.some(([, , z]) => z < F.AVENUE_Z - 1.25)).toBe(true);
+    expect(Math.max(...kerbs.map(([, y]) => y))).toBeCloseTo(KERB_Y, 6);
+    // Its nose at the junction at x = 90: a face across it, from the road up to the kerb's top.
+    const [[a]] = junctionStretches(avenue, plans).filter(([p, q]) => p < 89.5 && q > 89.5);
+    const nose = kerbs.filter(([x]) => Math.abs(x - (a + F.MOTORWAY_X0)) < 0.2);
+    expect(nose.some(([, , z]) => z < F.AVENUE_Z - 1) && nose.some(([, , z]) => z > F.AVENUE_Z + 1)).toBe(true);
+  });
+
+  test('no median without one in its kind, nor when only the surface is drawn', () => {
+    const median = new Geo();
+    roadMeshes(h.roads.filter((r) => r.kind !== 'avenue'), null, 0, { median }, 'sidewalks', plans);
+    expect(median.empty).toBe(true);
+    roadMeshes(h.roads, null, 0, { median }, 'surface', plans);
+    expect(median.empty).toBe(true);
+  });
+});
+
+test("the overview draws the decks and the barrier, plainly, with the markings", () => {
+  const h = F.roadHierarchy();
+  const world = { width: F.WIDTH, depth: F.DEPTH, plots: [], junctions: deriveJunctions(h.roads), meta: { roads: h.roads } } as unknown as WorldStructure;
+  const mesh = townRoadMesh(world);
+  expect(mesh.marks).not.toBeNull();
+  const ys: number[] = [];
+  for (let i = 1; i < mesh.marks!.positions.length; i += 3) ys.push(mesh.marks!.positions[i]);
+  // (The deck's parapet over the street; the markings at the road.)
+  expect(Math.max(...ys)).toBeGreaterThan(MOTORWAY.clear + 0.5);
+  // And the road climbs to the deck.
+  let top = 0;
+  for (let i = 1; i < mesh.surface.positions.length; i += 3) top = Math.max(top, mesh.surface.positions[i]);
+  expect(top).toBeCloseTo(MOTORWAY.clear + 0.012, 3);
 });
