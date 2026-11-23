@@ -42,7 +42,50 @@ pub struct Graph {
     /// Per road, a motorway carriageway's inside (`motorway_insides`): +1, the left of the way its
     /// points run; -1, the right; 0, not a motorway.
     pub(crate) inside: Vec<i8>,
+    /// Per road, a motorway carriageway's decks (`note_decks`): where it stands raised over the
+    /// land or on a bridge over the water (m along it, from and to; `RoadPlan.raised`,
+    /// `RoadPlan.bridge`, `RoadPlan.bridges`). Empty for every other road.
+    pub(crate) decks: Vec<Vec<[f32; 2]>>,
+    /// The merges (`is_merge`) whose carriageway is on a deck within `MERGE_ZONE` of them: there
+    /// those on the deck and those about it count as one level (`layer_at`).
+    decked_merges: Vec<[f32; 2]>,
 }
+
+/// Which level of the roads something is on (`Graph::layer_at`): the ground (every road, those
+/// on foot and on bikes, cars parked), a motorway's deck (its raised stretches and its bridges,
+/// over the roads and the water below), or both (about a merge on a deck: the ramp's cars and the
+/// carriageway's meet there). Two things on the roads are in each other's way only where their
+/// levels meet (`Layer::meets`): a car on the deck and a car or someone on foot under it never
+/// wait for each other.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Layer(u8);
+
+impl Layer {
+    pub const GROUND: Layer = Layer(1);
+    pub const DECK: Layer = Layer(2);
+    pub const BOTH: Layer = Layer(3);
+
+    /// Whether the two meet: something on one is in the way of something on the other.
+    pub fn meets(self, o: Layer) -> bool {
+        self.0 & o.0 != 0
+    }
+
+    /// Whether it meets the ground (those on foot, on bikes and parked are on it).
+    pub fn ground(self) -> bool {
+        self.meets(Layer::GROUND)
+    }
+}
+
+impl Default for Layer {
+    fn default() -> Self {
+        Layer::GROUND
+    }
+}
+
+/// How far from a merge on a deck (m) the ramp and the carriageway count as both levels
+/// (`Graph::layer_at`): the ramp's taper (`cars::TAPER`), its claim up the ramp and past the merge
+/// (`cars::MERGE_UP`, `cars::MERGE_ON`), and a car's length to spare.
+pub const MERGE_ZONE: f32 = 60.0;
 
 /// How far a motorway carriageway's pair may be from its edge (m: `motorway.ts` `MOTORWAY.apart`).
 const PAIR_APART: f32 = 24.0;
@@ -380,6 +423,7 @@ impl Graph {
             }
         }
         g.inside = motorway_insides(&g.roads);
+        g.decks = vec![Vec::new(); g.roads.len()];
         g.merge_junctions();
         g.index();
         g.boxes = crate::traffic::boxes(&g);
@@ -390,14 +434,18 @@ impl Graph {
     /// `meta.streets` (straight, along x).
     pub fn from_town(open: &OpenWorld, meta: &serde_json::Value) -> Self {
         if !open.roads.is_empty() {
-            return Self::build(&open.roads);
+            let mut g = Self::build(&open.roads);
+            g.note_decks(meta);
+            return g;
         }
         if let Some(roads) = meta.get("roads").and_then(|r| {
             serde_json::from_value::<Vec<RoadRaw>>(r.clone())
                 .ok()
                 .filter(|r| !r.is_empty())
         }) {
-            return Self::build(&roads);
+            let mut g = Self::build(&roads);
+            g.note_decks(meta);
+            return g;
         }
         let streets: Vec<RoadRaw> = meta
             .get("streets")
@@ -424,6 +472,82 @@ impl Graph {
 
     pub fn is_empty(&self) -> bool {
         self.edges.is_empty()
+    }
+
+    /// Each motorway carriageway's decks (`decks`) from the town's `meta.roads` (the same roads as
+    /// the town file's, in its order: `Road::source`), its `raised` stretches and its bridges, and
+    /// the merges on a deck (`decked_merges`). The sim's own roads (`RoadRaw`) leave them out, so
+    /// a town saves as it did; `meta` is saved whole.
+    pub(crate) fn note_decks(&mut self, meta: &serde_json::Value) {
+        let Some(list) = meta.get("roads").and_then(|r| r.as_array()) else {
+            return;
+        };
+        let span = |v: &serde_json::Value| -> Option<[f32; 2]> {
+            let a = v.as_array()?;
+            let (s0, s1) = (a.first()?.as_f64()? as f32, a.get(1)?.as_f64()? as f32);
+            (s0.is_finite() && s1.is_finite() && s1 > s0).then_some([s0, s1])
+        };
+        for (r, road) in self.roads.iter().enumerate() {
+            if road.kind != RoadKind::Motorway {
+                continue;
+            }
+            let Some(m) = list.get(road.source as usize) else {
+                continue;
+            };
+            if m.get("kind").and_then(|k| k.as_str()) != Some("motorway") {
+                continue;
+            }
+            let mut decks: Vec<[f32; 2]> = Vec::new();
+            for key in ["raised", "bridges"] {
+                if let Some(a) = m.get(key).and_then(|v| v.as_array()) {
+                    decks.extend(a.iter().filter_map(span));
+                }
+            }
+            decks.extend(m.get("bridge").and_then(span));
+            decks.sort_by(|a, b| a[0].total_cmp(&b[0]));
+            self.decks[r] = decks;
+        }
+        let decked: Vec<[f32; 2]> = self
+            .merge_nodes()
+            .filter(|&n| {
+                self.adj[n].iter().any(|&e| {
+                    let e = &self.edges[e as usize];
+                    let s = if e.a as usize == n { e.s0 } else { e.s1 };
+                    self.decks[e.road as usize]
+                        .iter()
+                        .any(|d| d[0] - MERGE_ZONE <= s && s <= d[1] + MERGE_ZONE)
+                })
+            })
+            .map(|n| self.nodes[n])
+            .collect();
+        self.decked_merges = decked;
+    }
+
+    /// Whether any road stands on a deck (`decks`): every level then the ground's but where one
+    /// does.
+    pub fn has_decks(&self) -> bool {
+        self.decks.iter().any(|d| !d.is_empty())
+    }
+
+    /// The level (`Layer`) of the place `s` m along road `road`: a motorway carriageway's deck
+    /// where it stands on one; about a merge on a deck (`MERGE_ZONE`), on the carriageway or its
+    /// ramp, both; else the ground.
+    pub fn layer_at(&self, road: u32, s: f32) -> Layer {
+        let Some(r) = self.roads.get(road as usize) else {
+            return Layer::GROUND;
+        };
+        if !matches!(r.kind, RoadKind::Motorway | RoadKind::Ramp) {
+            return Layer::GROUND;
+        }
+        let p = r.at(s);
+        if self.decked_merges.iter().any(|&m| dist(m, p) < MERGE_ZONE) {
+            return Layer::BOTH;
+        }
+        let decked = self
+            .decks
+            .get(road as usize)
+            .is_some_and(|d| d.iter().any(|d| d[0] <= s && s <= d[1]));
+        if decked { Layer::DECK } else { Layer::GROUND }
     }
 
     /// How many networks the roads make, none reaching another (0 without roads): a town whose

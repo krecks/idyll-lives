@@ -416,6 +416,17 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
                 || traffic.waits_for(k).contains(&key)
         })
         .collect();
+    // (Those turning round on another level than its own, `travel::Layer`: not in its way.)
+    let mine = cars[c].layer_on(t);
+    let off_level: Vec<u64> = traffic
+        .turning
+        .iter()
+        .map(|t| t.0)
+        .filter(|&k| {
+            cars.get((k & !(1 << 63)) as usize)
+                .is_some_and(|o| !o.layer().meets(mine))
+        })
+        .collect();
     let car = &mut cars[c];
     let shift = car.shift;
     // Where it would be a tick on, its body and the ground in front of it (behind it while it
@@ -434,6 +445,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
         AHEAD
     };
     let (ahead, behind) = if reverse { (0.0, back) } else { (AHEAD, 0.0) };
+    let layer = car.layer_on(t);
     let me = Driving {
         at,
         yaw,
@@ -442,6 +454,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
         ahead,
         behind,
         first: key,
+        layer,
     };
     let now = Driving {
         at: was,
@@ -466,7 +479,15 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
     // another, as `guard` keeps it; not kept by the claims of those it backs away from.)
     let turning = reverse && car.detour.is_some();
     if let Some(k) = traffic
-        .blocked(key, &body_now, &body_next, me.heading(), pass, in_drive)
+        .blocked(
+            key,
+            &body_now,
+            &body_next,
+            me.heading(),
+            pass,
+            in_drive,
+            layer,
+        )
         .filter(|_| !turning)
     {
         car.waits_for = Some(k);
@@ -511,6 +532,9 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
     // Nor, going the way it backs, on past it (`overtakes`): crept along beside the ground it backs
     // over, a car came out ahead of it into its way.
     if let Some(k) = traffic.turning.iter().find_map(|(k, path)| {
+        if off_level.contains(k) {
+            return None;
+        }
         let on = if waiting.contains(k) {
             path.iter()
                 .position(|r| path[0].overlap(r) <= 0.0)
@@ -557,7 +581,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
     }
     if progress > t {
         // (The last resort: never deeper into another car than it is.)
-        match guard(&body_now, &body_next, others.iter().chain(&standing)) {
+        match guard(&body_now, &body_next, layer, others.iter().chain(&standing)) {
             Some(k) => {
                 traffic.guarded += 1;
                 car.waits_for = Some(k);

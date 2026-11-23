@@ -329,10 +329,12 @@ pub(crate) fn turn_round_by(w: &mut World, c: usize, d: Detour) -> bool {
     let shift = car.shift;
     let half = [car.len / 2.0, car.wid / 2.0];
     let me = car_first(c);
+    // (Those on its level only: `travel::Layer`.)
+    let level = car.layer();
     let others: Vec<Rect> = cars
         .iter()
         .enumerate()
-        .filter(|&(o, k)| o != c && k.sight == Sight::Seen)
+        .filter(|&(o, k)| o != c && k.sight == Sight::Seen && k.layer().meets(level))
         .filter_map(|(_, k)| {
             k.shown.map(|s| Rect {
                 at: s.0,
@@ -490,11 +492,12 @@ pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static 
             half,
         }
     };
+    let level = car.layer();
     let others: Vec<Rect> = w
         .cars
         .iter()
         .enumerate()
-        .filter(|&(o, k)| o != c && k.sight == Sight::Seen)
+        .filter(|&(o, k)| o != c && k.sight == Sight::Seen && k.layer().meets(level))
         .filter_map(|(_, k)| {
             k.shown.map(|s| Rect {
                 at: s.0,

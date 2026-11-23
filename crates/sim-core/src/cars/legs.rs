@@ -76,6 +76,12 @@ pub(crate) struct Legs {
     pub(super) lane: Vec<f32>,
     /// Its mouths (`Route::mouths`), from point to point (None: to the end).
     pub(crate) mouths: Vec<(usize, Option<usize>)>,
+    /// Its points off the ground (`travel::Layer`: on a deck, or about a merge on one), by index;
+    /// every other on the ground (`Route::layers`).
+    pub(crate) layers: Vec<(usize, crate::travel::Layer)>,
+    /// Its points where it merges off a ramp into a motorway's carriageway, by index
+    /// (`Route::merges`).
+    pub(crate) merges: Vec<usize>,
 }
 
 impl Legs {
@@ -119,6 +125,20 @@ impl Legs {
         if self.pts.len() > n {
             *self.room.last_mut().expect("just pushed") = room;
             *self.lane.last_mut().expect("just pushed") = lane;
+        }
+    }
+
+    /// Its last point marked as on `layer` (none: on the ground), and as where it merges into a
+    /// motorway (`merge`).
+    pub(crate) fn mark_last(&mut self, (layer, merge): (crate::travel::Layer, bool)) {
+        let Some(i) = self.pts.len().checked_sub(1) else {
+            return;
+        };
+        if layer != crate::travel::Layer::GROUND && self.layers.last().is_none_or(|l| l.0 != i) {
+            self.layers.push((i, layer));
+        }
+        if merge && self.merges.last() != Some(&i) {
+            self.merges.push(i);
         }
     }
 
@@ -241,6 +261,22 @@ impl Legs {
             .iter()
             .map(|&(a, b)| (at(Some(a)), at(b)))
             .collect();
+        // (Runs of points on one level off the ground, from the first's tick to the last's.)
+        let mut layers: Vec<(f32, f32, crate::travel::Layer)> = Vec::new();
+        let mut last: Option<(usize, crate::travel::Layer)> = None;
+        for &(i, l) in &self.layers {
+            let t = points[i.min(n - 1)].2;
+            match layers.last_mut() {
+                Some(run) if last.is_some_and(|(j, k)| j + 1 == i && k == l) => run.1 = t,
+                _ => layers.push((t, t, l)),
+            }
+            last = Some((i, l));
+        }
+        let merges = self
+            .merges
+            .iter()
+            .map(|&i| points[i.min(n - 1)].2)
+            .collect();
         Route {
             points,
             room: self.room,
@@ -253,6 +289,8 @@ impl Legs {
             leg: None,
             stand_gen: 0,
             by_motorway: false,
+            layers,
+            merges,
         }
     }
 }

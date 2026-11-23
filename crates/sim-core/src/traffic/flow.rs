@@ -22,6 +22,8 @@ pub(crate) struct Mover {
     pub parked: bool,
     /// Whom it waited for last tick (`Driving::first`), if anyone.
     pub waits: Option<u64>,
+    /// Its level (`travel::Layer`): in the way only of claims on levels that meet it.
+    pub layer: crate::travel::Layer,
 }
 
 /// Where a vehicle is on its route, for its claims (`Traffic::begin`): its key, the tag of its

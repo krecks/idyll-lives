@@ -339,6 +339,28 @@ impl Car {
             })
     }
 
+    /// Its level now (`travel::Layer`), as `layer_on` has it `progress` ticks along its way.
+    pub(crate) fn layer(&self) -> crate::travel::Layer {
+        self.layer_on(self.progress)
+    }
+
+    /// Its level `t` ticks along its way (`Route::layer_at`): on the ground but on a motorway's
+    /// deck (or about a merge on one); parked, out or away, on the ground.
+    pub(crate) fn layer_on(&self, t: f32) -> crate::travel::Layer {
+        match self.route.as_ref() {
+            Some((home, r))
+                if self.taxi
+                    || matches!(
+                        (self.state, *home),
+                        (CarState::Leaving, false) | (CarState::Arriving, true)
+                    ) =>
+            {
+                r.layer_at(t)
+            }
+            _ => crate::travel::Layer::GROUND,
+        }
+    }
+
     /// Where its middle is, for the checks that pair it with another (`Near`): along its way, as
     /// `pull_want` has it (not as drawn: one waiting to come into town isn't, yet comes in this
     /// tick); else as it's drawn, or its spot.
@@ -624,11 +646,14 @@ fn empty_drive_route(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Option<Ro
     }
     let centre: Vec<[f32; 2]> = path.pts.iter().map(|p| p.0).collect();
     let lanes = LaneLine::new(g, centre, path.roads.clone());
+    let line = lanes.line();
     let lane = round_corners(&crate::travel::thin_with(
-        &lanes.line(),
+        &line,
         ROUTE_STEP,
         ROUTE_TOLERANCE,
     ));
+    let marks = way_marks(g, &lanes.pts, &lanes.on);
+    let mut laid_from = Along::new(&line);
     let junctions: Vec<[f32; 2]> = g.junctions().collect();
     let near_path = crate::travel::NearestPoint::new(path.pts.iter().map(|x| x.0).collect());
     let here = |p: [f32; 2]| match lanes.nearest(p) {
@@ -650,6 +675,9 @@ fn empty_drive_route(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Option<Ro
     for (i, &p) in lane.iter().enumerate() {
         let (_, _, room, at) = here(p)?;
         legs.push_lane(p, tops[i], room, at);
+        if let Some(m) = marks.as_ref() {
+            legs.mark_last(m[laid_from.next(p)]);
+        }
     }
     Some(legs.timed(true, true))
 }

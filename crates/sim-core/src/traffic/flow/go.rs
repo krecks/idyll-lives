@@ -85,7 +85,7 @@ impl Traffic {
     /// and `now` isn't (`counts`, even going its way: cutting in; not one right behind it,
     /// `behind`). Still in its driveway (`in_drive`: before its first claim, none held), `now` in
     /// the way too: it'd only come out deeper into it. Not holding one, nor on up to wait in the
-    /// way of a group asked for long ago (`OLD_ASK`).
+    /// way of a group asked for long ago (`OLD_ASK`). Only claims on its level (`layer`) count.
     pub(crate) fn blocked(
         &self,
         key: u64,
@@ -94,6 +94,7 @@ impl Traffic {
         way: [f32; 2],
         pass: f32,
         in_drive: bool,
+        layer: crate::travel::Layer,
     ) -> Option<u64> {
         let sample = |rect: &Rect| Sample {
             t: 0.0,
@@ -101,6 +102,7 @@ impl Traffic {
             rect: *rect,
             way,
             pass,
+            layer,
         };
         // (Kept `KEEP_SHORT` m short of it, its body a tick on taken that much longer in front: the
         // other has room to straighten up and pull over.)

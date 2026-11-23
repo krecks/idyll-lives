@@ -38,6 +38,12 @@ pub(crate) struct Route {
     pub(super) stand_gen: u64,
     /// It goes out of town (or comes in) by a motorway (`quickest_out`).
     pub(super) by_motorway: bool,
+    /// Where it's off the ground (ticks along it, from and to, and the level: `travel::Layer`):
+    /// on a motorway's deck, or about a merge on one. Elsewhere on the ground (`layer_at`).
+    pub(crate) layers: Vec<(f32, f32, crate::travel::Layer)>,
+    /// Where it merges off a ramp into a motorway's carriageway (ticks along it: at the merge),
+    /// each a claim of its own (`MERGE_UP`, `MERGE_ON`).
+    pub(crate) merges: Vec<f32>,
 }
 
 /// A car's way round a taxi standing at the kerb (`PassBy`) as laid on its route: the points
@@ -157,12 +163,29 @@ impl Route {
         if let Some(l) = &self.leg {
             more.push((l.pass.from, l.pass.to));
         }
-        self.claims = crate::traffic::claims(&trace, &pass, len, wid, boxes, &more);
+        // (Each pose's level: on a deck it goes by the junctions under it, their boxes, lights
+        // and zebras.)
+        let layers: Vec<crate::travel::Layer> = if self.layers.is_empty() {
+            Vec::new()
+        } else {
+            trace.iter().map(|s| self.layer_at(s.0)).collect()
+        };
+        self.claims = crate::traffic::claims(&trace, &pass, len, wid, boxes, &more, &layers);
         if let Some(t) = travel {
             crate::traffic::gate(&mut self.claims, &t.signals, &trace, len);
-            self.zebras = crate::traffic::zebra_stops(&trace, &t.give_way, len);
+            let ground: crate::traffic::Trace = if layers.is_empty() {
+                trace.clone()
+            } else {
+                trace
+                    .iter()
+                    .zip(&layers)
+                    .filter(|(_, l)| l.ground())
+                    .map(|(s, _)| *s)
+                    .collect()
+            };
+            self.zebras = crate::traffic::zebra_stops(&ground, &t.give_way, len);
             self.zebras
-                .extend(crate::traffic::side_zebra_stops(&trace, &t.signals, len));
+                .extend(crate::traffic::side_zebra_stops(&ground, &t.signals, len));
             self.zebras.sort_by(|a, b| a.at.total_cmp(&b.at));
         }
         self.pass = trace.iter().zip(&pass).map(|(s, &p)| (s.0, p)).collect();
@@ -379,11 +402,15 @@ impl Route {
             }
         }
         let lanes = LaneLine::new(g, centre, on);
+        let line = lanes.line();
         let lane = round_corners(&crate::travel::thin_with(
-            &lanes.line(),
+            &line,
             ROUTE_STEP,
             ROUTE_TOLERANCE,
         ));
+        // (Each lane point's level and merge, from the way's point it was laid from.)
+        let marks = way_marks(g, &lanes.pts, &lanes.on);
+        let mut laid_from = Along::new(&line);
         if lane.len() < 2 {
             return None;
         }
@@ -465,6 +492,7 @@ impl Route {
             (w[0] * b.t[0] + w[1] * b.t[1]) * d > 0.7
         };
         for (i, &p) in lane.iter().enumerate() {
+            let mark = marks.as_ref().map(|m| m[laid_from.next(p)]);
             if !on
                 && let Some((b, d, at, taken)) = start
                 && b.near(p, at, taken, d)
@@ -491,6 +519,9 @@ impl Route {
                 (room - bend_out(&lane, i, car.len)).max(0.0),
                 at,
             );
+            if let Some(m) = mark {
+                legs.mark_last(m);
+            }
             // (Out of a driveway, a bay or a spot on the road: its mouth, up to the lane.)
             if first && (start.is_some() || park.is_some() && home) {
                 let to = legs.len() - 1;
@@ -549,6 +580,7 @@ impl Route {
         loop {
             // (Pulled over as far as the way it came lets it, as it was: `pull_over`.)
             legs.push_back(had.at(t).0, had.room_here(t), had.lane_at(t));
+            legs.mark_last((had.layer_at(t), false));
             if t <= d.back {
                 break;
             }
@@ -566,6 +598,8 @@ impl Route {
                 legs.pts.push((q, rev, top));
                 legs.room.push(had.room.get(i).copied().unwrap_or(0.0));
                 legs.lane.push(had.lane.get(i).copied().unwrap_or(LANE));
+                let merge = had.merges.iter().any(|&m| (m - t).abs() < 1e-3);
+                legs.mark_last((had.layer_at(t), merge));
             }
             return Some(legs.timed(true, false));
         }
@@ -673,11 +707,15 @@ impl Route {
             on.push(on[on.len() - 1]);
         }
         let lanes = LaneLine::new(g, centre, on);
+        let line = lanes.line();
         let lane = round_corners(&crate::travel::thin_with(
-            &lanes.line(),
+            &line,
             ROUTE_STEP,
             ROUTE_TOLERANCE,
         ));
+        // (Each lane point's level and merge, from the way's point it was laid from.)
+        let marks = way_marks(g, &lanes.pts, &lanes.on);
+        let mut laid_from = Along::new(&line);
         if lane.len() < 2 {
             return None;
         }
@@ -757,7 +795,11 @@ impl Route {
             })
             .unwrap_or(lane.len() - 1);
         legs.line(from, lane[join], false, JUNCTION_SPEED);
-        for (i, &q) in lane.iter().enumerate().skip(join) {
+        for (i, &q) in lane.iter().enumerate() {
+            let mark = marks.as_ref().map(|m| m[laid_from.next(q)]);
+            if i < join {
+                continue;
+            }
             if let Some((b, d, (turn, at))) = &into
                 && b.near(q, *at, turn.taken, *d)
                 && along(b, i, -*d)
@@ -771,6 +813,9 @@ impl Route {
                 (room - bend_out(&lane, i, car.len)).max(0.0),
                 at,
             );
+            if let Some(m) = mark {
+                legs.mark_last(m);
+            }
         }
         let lane_end = legs.len().saturating_sub(1);
         match &into {
@@ -849,6 +894,14 @@ impl Route {
 
     pub(crate) fn ticks(&self) -> f32 {
         self.points.last().map_or(0.0, |p| p.2)
+    }
+
+    /// Its level `t` ticks along (`layers`: the ground but where it says).
+    pub(crate) fn layer_at(&self, t: f32) -> crate::travel::Layer {
+        self.layers
+            .iter()
+            .find(|l| l.0 <= t && t <= l.1)
+            .map_or(crate::travel::Layer::GROUND, |l| l.2)
     }
 
     /// Where the car is `t` ticks in, which way it faces, and whether it's backing up.

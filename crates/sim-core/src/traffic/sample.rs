@@ -1,6 +1,7 @@
 //! Where a moving thing will be, sampled along its route.
 
 use super::*;
+use crate::travel::Layer;
 
 /// A place along a route: when it's there (ticks along it), how far along it is (m), its body
 /// there, the way it goes (a unit vector: backwards, backing up), and how far it can pull over
@@ -12,6 +13,8 @@ pub(crate) struct Sample {
     pub rect: Rect,
     pub way: [f32; 2],
     pub pass: f32,
+    /// Its level (`travel::Layer`): only bodies on levels that meet conflict.
+    pub layer: Layer,
 }
 
 /// A lit junction (`Travel::signals`) and the phase of the arm a way comes in by (`Claim::gate`).
@@ -165,11 +168,14 @@ pub(crate) fn claims(
     wid: f32,
     zones: &[([f32; 2], f32)],
     more: &[(f32, f32)],
+    layers: &[Layer],
 ) -> Vec<Claim> {
     let n = trace.len();
     if n == 0 {
         return Vec::new();
     }
+    // (Each pose's level, `layers`; none given, the ground.)
+    let layer = |k: usize| layers.get(k).copied().unwrap_or(Layer::GROUND);
     let end = trace[n - 1].0;
     let body = |k: usize| {
         let (_, p, yaw, ..) = trace[k];
@@ -186,8 +192,10 @@ pub(crate) fn claims(
         .map(|(a, b)| (a, b, false))
         .collect();
     let r0 = len.hypot(wid) / 2.0;
-    let touching =
-        |k: usize, c: [f32; 2], r: f32| dist(trace[k].1, c) <= r + r0 && touches(&body(k), c, r);
+    // (A junction's box is on the ground: a car on a deck over one goes by it.)
+    let touching = |k: usize, c: [f32; 2], r: f32| {
+        dist(trace[k].1, c) <= r + r0 && touches(&body(k), c, r) && layer(k).ground()
+    };
     for &(c, r) in zones {
         spans.extend(
             runs(trace, |k| touching(k, c, r))
@@ -258,6 +266,7 @@ pub(crate) fn claims(
                         rect: body(k),
                         way: [s * k_way, c * k_way],
                         pass: pass.get(k).copied().unwrap_or(0.0),
+                        layer: layer(k),
                     }
                 })
                 .collect();

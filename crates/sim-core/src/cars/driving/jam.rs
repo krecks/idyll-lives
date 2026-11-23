@@ -118,9 +118,10 @@ pub(crate) fn back_off(w: &mut World, c: usize) -> bool {
     let way = [-next.yaw.sin(), -next.yaw.cos()];
     // (Back out of the claim of the one it's held up with, too: away from it is out of its way.)
     let partner = car.waits_for;
-    if guard(&now, &next, others.iter().chain(&standing)).is_some()
+    let layer = car.layer();
+    if guard(&now, &next, layer, others.iter().chain(&standing)).is_some()
         || w.traffic
-            .blocked(key, &now, &next, way, 0.0, false)
+            .blocked(key, &now, &next, way, 0.0, false, layer)
             .is_some_and(|k| Some(k) != partner)
     {
         return false;

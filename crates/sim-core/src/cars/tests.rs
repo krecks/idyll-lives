@@ -843,7 +843,7 @@ fn a_car_at_country_speed_cannot_skip_a_junction_box() {
     );
     assert!(SIGHT_STEP / crate::DRIVE_TICKS_PER_SECOND * speed < r);
     let pass = vec![0.0; trace.len()];
-    let claims = crate::traffic::claims(&trace, &pass, len, wid, &[(centre, r)], &[]);
+    let claims = crate::traffic::claims(&trace, &pass, len, wid, &[(centre, r)], &[], &[]);
     assert_eq!(claims.len(), 1, "the box's claim");
     let c = &claims[0];
     // (Whether its body `t` ticks along touches the box.)
@@ -1167,6 +1167,7 @@ fn pulling_back_in_beside_one_waiting_for_it_a_car_keeps_the_gap() {
         ahead: AHEAD,
         behind: 0.0,
         first: car_first(1),
+        layer: crate::travel::Layer::GROUND,
     }];
     let body = |shift: f32| Rect {
         at: shifted([0.0, 0.0], 0.0, shift),
@@ -1177,7 +1178,12 @@ fn pulling_back_in_beside_one_waiting_for_it_a_car_keeps_the_gap() {
     let mut held = None;
     while shift > 0.0 && held.is_none() {
         let to = (shift - PULL_RATE).max(0.0);
-        held = guard(&body(shift), &body(to), them.iter());
+        held = guard(
+            &body(shift),
+            &body(to),
+            crate::travel::Layer::GROUND,
+            them.iter(),
+        );
         if held.is_none() {
             shift = to;
         }
@@ -1193,7 +1199,15 @@ fn pulling_back_in_beside_one_waiting_for_it_a_car_keeps_the_gap() {
         at: [r.at[0], r.at[1] + 0.3],
         ..r
     };
-    assert_eq!(guard(&body(shift), &on(body(shift)), them.iter()), None);
+    assert_eq!(
+        guard(
+            &body(shift),
+            &on(body(shift)),
+            crate::travel::Layer::GROUND,
+            them.iter()
+        ),
+        None
+    );
 }
 
 /// The way along `pts`: the turn at each point between its steps (radians), and whether any

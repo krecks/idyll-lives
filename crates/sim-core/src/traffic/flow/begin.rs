@@ -172,6 +172,7 @@ impl Traffic {
                                 rect: m.rect,
                                 way: m.way,
                                 pass: m.pass,
+                                layer: m.layer,
                             };
                             next.iter().any(|c| {
                                 in_bounds(c, &m.rect)
@@ -268,6 +269,7 @@ impl Traffic {
                         rect: *r,
                         way: m.way,
                         pass: m.pass,
+                        layer: m.layer,
                     };
                     next.iter().any(|c| {
                         in_bounds(c, r)
