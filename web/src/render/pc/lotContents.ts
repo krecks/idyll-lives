@@ -34,7 +34,7 @@ import type { GrassPusher } from './grass';
 import { setDaylight } from './daylight';
 import { CloudShadows } from './cloudShadows';
 import { smoothstep } from '../../game/noise';
-import { installNature, Landscape, NATURE_DIAGS, restartWind, setWaterCalm, setWind, Sky, windStill, type NatureRebuild, type NatureStep, type RoadBuilder } from './nature';
+import { installNature, Landscape, NATURE_DIAGS, restartWind, setWaterCalm, setWind, Sky, WATER_TAG, windStill, type NatureRebuild, type NatureStep, type RoadBuilder } from './nature';
 import { ObjectMotion, writeInstance, type MovingObject, type PopTarget } from './objectMotion';
 import { ObjectShadows, type ShadowSource } from './objectShadows';
 import { toGame } from './space';
@@ -427,10 +427,11 @@ export class LotContents {
     return out;
   }
 
-  /** A landscape draw just built: switched off until shown (`showNature`), dug away over a basement in view. */
+  /** A landscape draw just built: switched off until shown (`showNature`), dug away over a basement in view (its water at any height). */
   private prepareNature(entity: pc.Entity): void {
     entity.enabled = false;
-    for (const r of entity.findComponents('render') as pc.RenderComponent[]) for (const mi of r.meshInstances) this.lib.digInto(mi);
+    const water = entity.tags.has(WATER_TAG);
+    for (const r of entity.findComponents('render') as pc.RenderComponent[]) for (const mi of r.meshInstances) this.lib.digInto(mi, water);
   }
 
   /**
