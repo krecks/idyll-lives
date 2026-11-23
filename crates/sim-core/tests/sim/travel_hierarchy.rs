@@ -964,10 +964,327 @@ fn ramps_ease_into_the_carriageways_lane_and_out_of_it() {
     assert!(off_most < 0.2, "off-ramp: {off_most} m a metre");
 }
 
-#[test]
-#[ignore = "S-TRAFFIC: cars on the deck and under it don't interact"]
-fn nobody_stops_under_the_bridge() {}
+// The traffic (S-TRAFFIC): the deck and the ground, following at speed, the merges.
+
+use sim_core::cars::drill;
+
+/// The fixture with its motorway's decks taken off it (`raised`, `bridge`): the same roads, the
+/// carriageways on the ground all along.
+fn without_decks() -> World {
+    let mut town: Value = serde_json::from_str(&hierarchy().town).unwrap();
+    for r in town["roads"].as_array_mut().unwrap() {
+        let r = r.as_object_mut().unwrap();
+        r.remove("raised");
+        r.remove("bridge");
+    }
+    town["meta"]["roads"] = town["roads"].clone();
+    World::from_json(&common::content(), &town.to_string(), 1).expect("the hierarchy loads")
+}
+
+/// Carriageway `source`'s middle line's z (its points run along x) and the way its cars go along x
+/// (+1, -1): as laid, whichever side it lies on.
+fn carriageway(g: &Graph, source: usize) -> (f32, f32) {
+    let r = &g.roads[road_of(g, source) as usize];
+    let way = match r.oneway {
+        OneWay::Against => -1.0,
+        _ => 1.0,
+    };
+    let (a, b) = (r.at(0.0), r.at(r.len()));
+    (r.at(r.len() / 2.0)[1], way * (b[0] - a[0]).signum())
+}
+
+/// A drive along carriageway `source` its way, from 30 m in from the end it comes in by to 5 m
+/// short of the other.
+fn along(g: &Graph, source: usize) -> ([f32; 2], [f32; 2]) {
+    let (z, way) = carriageway(g, source);
+    let (x0, x1) = (MOTORWAY_X0 as f32, MOTORWAY_X1 as f32);
+    if way > 0.0 {
+        ([x0 + 30.0, z], [x1 - 5.0, z])
+    } else {
+        ([x1 - 30.0, z], [x0 + 5.0, z])
+    }
+}
+
+/// The tick of drill car `c`'s way where it's nearest `p`.
+fn tick_at(w: &World, c: usize, p: [f32; 2]) -> f32 {
+    let n = drill::ticks(w, c).floor() as usize;
+    (0..=n)
+        .min_by(|&a, &b| {
+            dist(drill::at(w, c, a as f32), p).total_cmp(&dist(drill::at(w, c, b as f32), p))
+        })
+        .unwrap() as f32
+}
+
+/// Whether car `c` waits for another car (`Car::waits_for`: a car's key).
+fn waits_for_a_car(w: &World, c: usize) -> Option<usize> {
+    w.cars[c]
+        .waits_for
+        .filter(|&k| k >= 1 << 63)
+        .map(|k| (k & !(1 << 63)) as usize)
+}
+
+/// A street car up Bridge Street under both carriageways, and a car along each, each over the
+/// street `offset` ticks after the street car is under it: whether any car waited for another, and
+/// how near the street car's middle came to a motorway car's (m), and whether it was on a deck
+/// then.
+fn under_the_bridge(make: &dyn Fn() -> World, offset: f32) -> (bool, f32, bool) {
+    let mut w = make();
+    let g = w.travel.graph.clone();
+    let x = STREET_X as f32;
+    let (za, zb) = (
+        carriageway(&g, MOTORWAY_EAST).0,
+        carriageway(&g, MOTORWAY_WEST).0,
+    );
+    let (z0, z1) = (za.min(zb) - 90.0, za.max(zb) + 50.0);
+    let street = drill::add(&mut w, [x, z0], [x, z1], 0.0).expect("up the street");
+    let mut cars = vec![street];
+    const LEAD: f32 = 90.0;
+    for side in [MOTORWAY_EAST, MOTORWAY_WEST] {
+        let (z, _) = carriageway(&g, side);
+        let (a, b) = along(&g, side);
+        let c = drill::add(&mut w, a, b, 0.0).expect("along the carriageway");
+        let under = tick_at(&w, street, [x, z]);
+        let over = tick_at(&w, c, [x, z]);
+        // (Both there at the same tick: the street car `LEAD` ticks before it gets under, the
+        // motorway car `LEAD` before it's over it, `offset` later.)
+        drill::put(&mut w, c, (over - LEAD - offset).max(0.0));
+        cars.push(c);
+        // (The street car set off `LEAD` before it's under the first.)
+        if side == MOTORWAY_EAST {
+            drill::put(&mut w, street, (under - LEAD).max(0.0));
+        }
+    }
+    let mut waited = false;
+    let mut nearest = (f32::INFINITY, false);
+    for _ in 0..3000 {
+        drill::step(&mut w);
+        for &c in &cars {
+            waited |= waits_for_a_car(&w, c).is_some();
+        }
+        if let Some(s) = w.cars[street].shown {
+            for &c in &cars[1..] {
+                if let Some(m) = w.cars[c].shown {
+                    let d = dist(s.0, m.0);
+                    if d < nearest.0 {
+                        nearest = (d, drill::on_deck(&w, c));
+                    }
+                }
+            }
+        }
+        if cars.iter().all(|&c| w.cars[c].shown.is_none()) {
+            break;
+        }
+    }
+    assert!(
+        cars.iter().all(|&c| w.cars[c].shown.is_none()),
+        "all through"
+    );
+    (waited || w.traffic.guarded > 0, nearest.0, nearest.1)
+}
 
 #[test]
-#[ignore = "S-TRAFFIC: on-ramp merges wait for a gap"]
-fn merges_settle() {}
+fn nobody_stops_under_the_bridge() {
+    // On the deck over the street, the motorway's cars and the street's go by each other however
+    // they come: right over and under each other, nobody waits for anyone.
+    let mut met = false;
+    for offset in [-6.0, -3.0, 0.0, 3.0, 6.0] {
+        let (waited, nearest, deck) = under_the_bridge(&world, offset);
+        assert!(!waited, "offset {offset}: a car waited for another");
+        if nearest < 2.0 {
+            assert!(deck, "offset {offset}: over the street, on its deck");
+            met = true;
+        }
+    }
+    assert!(met, "right over each other at least once");
+    // (The same roads with the carriageways on the ground: they meet there, and wait.)
+    let held = [-6.0, -3.0, 0.0, 3.0, 6.0]
+        .iter()
+        .any(|&o| under_the_bridge(&without_decks, o).0);
+    assert!(held, "on the ground, one waits for the other");
+    // On foot under the deck: a car over them is no car in their way; on the ground it would be.
+    for (make, deck) in [
+        (&world as &dyn Fn() -> World, true),
+        (&without_decks, false),
+    ] {
+        let mut w = make();
+        let g = w.travel.graph.clone();
+        let (z, _) = carriageway(&g, MOTORWAY_EAST);
+        let (a, b) = along(&g, MOTORWAY_EAST);
+        let c = drill::add(&mut w, a, b, 0.0).unwrap();
+        let t = tick_at(&w, c, [STREET_X as f32, z]);
+        drill::put(&mut w, c, t);
+        drill::step(&mut w);
+        let p = w.cars[c].shown.expect("on its way").0;
+        assert_eq!(drill::on_deck(&w, c), deck);
+        let walk = drill::walks_into(&w, [p[0] - 0.6, p[1]], [p[0] + 0.6, p[1]]);
+        assert_eq!(walk.is_some(), !deck, "walking under it: {walk:?}");
+    }
+}
+
+/// Drill cars `cars` of `w` nearer each other than a body (their middles under 2.5 m apart, the
+/// widest car 1.9 m across): pairs on levels that meet, overlapping.
+fn overlapping(w: &World, cars: &[usize]) -> Vec<(usize, usize)> {
+    let mut out = Vec::new();
+    for (i, &a) in cars.iter().enumerate() {
+        for &b in &cars[i + 1..] {
+            if let (Some(p), Some(q)) = (w.cars[a].shown, w.cars[b].shown)
+                && dist(p.0, q.0) < 2.5
+            {
+                out.push((a, b));
+            }
+        }
+    }
+    out
+}
+
+/// The way on-ramp cars come to their ramp: from 50 m along Bridge Street beyond the ramp's T,
+/// away from the motorway, to the far end of the carriageway the ramp merges into. And that
+/// carriageway.
+fn up_the_on_ramp(g: &Graph) -> ([f32; 2], [f32; 2], usize) {
+    let ramp = &g.roads[road_of(g, ON_RAMP) as usize];
+    let (t, merge) = (ramp.at(0.0), ramp.at(ramp.len()));
+    let side = [MOTORWAY_EAST, MOTORWAY_WEST]
+        .into_iter()
+        .min_by(|&a, &b| {
+            let off = |s: usize| (carriageway(g, s).0 - merge[1]).abs();
+            off(a).total_cmp(&off(b))
+        })
+        .unwrap();
+    let away = (t[1] - merge[1]).signum();
+    let (_, to) = along(g, side);
+    ([t[0], t[1] + away * 50.0], to, side)
+}
+
+#[test]
+fn merges_settle() {
+    // Cars onto the motorway by the on-ramp, one every 3 s, into a stream along its carriageway,
+    // one every 2 s: each waits up the ramp for its gap, none stops a car on the carriageway
+    // before it's on it, nobody overlaps, all get through, and every claim is let go after.
+    let mut w = world();
+    let g = w.travel.graph.clone();
+    let (from, to, side) = up_the_on_ramp(&g);
+    let (a, b) = along(&g, side);
+    let (z, _) = carriageway(&g, side);
+    let mut ramp: Vec<usize> = Vec::new();
+    let mut through: Vec<usize> = Vec::new();
+    let mut waited_up_ramp = 0;
+    for tick in 0..30_000u32 {
+        let room = |w: &World, at: [f32; 2]| {
+            w.cars
+                .iter()
+                .all(|k| k.shown.is_none_or(|s| dist(s.0, at) > 8.0))
+        };
+        if tick < 1500 && tick % 45 == 0 && room(&w, from) {
+            let c = drill::add(&mut w, from, to, 0.0)
+                .unwrap_or_else(|| panic!("onto the motorway: {from:?} to {to:?}"));
+            assert_eq!(drill::merges(&w, c).len(), 1, "one merge");
+            ramp.push(c);
+        }
+        if tick < 1500 && tick % 30 == 0 && room(&w, a) {
+            through.push(drill::add(&mut w, a, b, 0.0).expect("along it"));
+        }
+        drill::step(&mut w);
+        let all: Vec<usize> = ramp.iter().chain(&through).copied().collect();
+        let o = overlapping(&w, &all);
+        assert_eq!(o, vec![], "tick {tick}");
+        // (On the carriageway, waiting only for one on it already: in its lane, or its taper.)
+        for &c in &through {
+            if let Some(k) = waits_for_a_car(&w, c).filter(|k| ramp.contains(k)) {
+                let p = w.cars[k].shown.expect("on its way").0;
+                assert!(
+                    (p[1] - z).abs() < 4.5 + 1.5,
+                    "tick {tick}: car {c} waits for {k} up the ramp at {p:?}"
+                );
+            }
+        }
+        for &c in &ramp {
+            let m = drill::merges(&w, c);
+            let t = w.cars[c].progress;
+            if w.cars[c].shown.is_some()
+                && !m.is_empty()
+                && t < m[0]
+                && w.traffic.waiting(sim_core::cars::car_key(c))
+            {
+                waited_up_ramp += 1;
+            }
+        }
+        if tick > 1500 && all.iter().all(|&c| w.cars[c].shown.is_none()) {
+            break;
+        }
+    }
+    let all: Vec<usize> = ramp.iter().chain(&through).copied().collect();
+    assert!(
+        all.iter().all(|&c| w.cars[c].shown.is_none()),
+        "all through"
+    );
+    assert!(waited_up_ramp > 0, "a gap waited for now and then");
+    assert_eq!(
+        w.traffic.guarded, 0,
+        "nobody kept out of another by the last resort"
+    );
+    assert_eq!(w.traffic.claims_out(), (0, 0), "every claim let go");
+}
+
+#[test]
+fn motorway_cars_keep_further_back_the_faster_they_go() {
+    // A car setting off from standing on the carriageway, and a string of cars coming up behind
+    // it already at speed: none runs into the one in front, and at speed each keeps well back.
+    let mut w = world();
+    let g = w.travel.graph.clone();
+    let side = MOTORWAY_EAST;
+    let (a, b) = along(&g, side);
+    let way = (b[0] - a[0]).signum();
+    let lead = drill::add(&mut w, [a[0] + way * 220.0, a[1]], b, 0.0).unwrap();
+    let mut cars = vec![lead];
+    for k in 0..6 {
+        let c = drill::add(&mut w, a, b, 0.0).unwrap();
+        // (Each 30 m behind the one before as they come, the first 50 m short of the lead.)
+        let x = a[0] + way * (170.0 - 30.0 * k as f32);
+        let t = tick_at(&w, c, [x, a[1]]);
+        drill::put(&mut w, c, t);
+        cars.push(c);
+    }
+    let mut fast = 0;
+    // (Each car's progress the last two ticks: on the move both, it's driving on at speed, not
+    // stopping and setting off again.)
+    let mut was: Vec<[f32; 2]> = cars.iter().map(|&c| [w.cars[c].progress; 2]).collect();
+    for tick in 0..20_000 {
+        drill::step(&mut w);
+        assert_eq!(overlapping(&w, &cars), vec![], "tick {tick}");
+        for (i, &c) in cars.iter().enumerate() {
+            let car = &w.cars[c];
+            let (t, [t1, t2]) = (car.progress, was[i]);
+            was[i] = [t, t1];
+            let Some(me) = car.shown else { continue };
+            let speed = dist(drill::at(&w, c, t), drill::at(&w, c, t + 1.0))
+                * sim_core::DRIVE_TICKS_PER_SECOND;
+            if i == 0 || speed < 25.0 || !(t > t1 && t1 > t2) {
+                continue;
+            }
+            // (The nearest car ahead of it on its way.)
+            let ahead = cars
+                .iter()
+                .filter(|&&o| o != c)
+                .filter_map(|&o| w.cars[o].shown)
+                .map(|o| (o.0[0] - me.0[0]) * way)
+                .filter(|&d| d > 0.0)
+                .fold(f32::INFINITY, f32::min);
+            if ahead < f32::INFINITY {
+                fast += 1;
+                assert!(
+                    ahead > 20.0,
+                    "tick {tick}: car {c} at {speed} m/s {ahead} m behind"
+                );
+            }
+        }
+        if cars.iter().all(|&c| w.cars[c].shown.is_none()) {
+            break;
+        }
+    }
+    assert!(
+        cars.iter().all(|&c| w.cars[c].shown.is_none()),
+        "all through"
+    );
+    assert!(fast > 100, "{fast} ticks behind another at speed");
+    assert_eq!(w.traffic.guarded, 0);
+}

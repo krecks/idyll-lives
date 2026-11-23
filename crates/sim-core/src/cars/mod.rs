@@ -288,6 +288,8 @@ const TRIP_PARK_REACH: f32 = 120.0;
 
 mod bay;
 mod bodies;
+#[doc(hidden)]
+pub mod drill;
 mod driving;
 mod garages;
 mod lane;

@@ -818,7 +818,20 @@ fn car(spot: [f32; 2], yaw: f32, street: f32) -> Car {
 /// the box's claim before its body is in it, whichever tick it gets there.
 #[test]
 fn a_car_at_country_speed_cannot_skip_a_junction_box() {
-    let speed = crate::travel::COUNTRY_SPEED;
+    cannot_skip_a_junction_box(crate::travel::COUNTRY_SPEED);
+}
+
+/// At the motorway's speed, 2 m a tick: no box skipped either (a motorway's road under a deck is
+/// another level, but a carriageway's merge and a ramp's T are the same as any).
+#[test]
+fn a_car_at_motorway_speed_cannot_skip_a_junction_box() {
+    cannot_skip_a_junction_box(crate::travel::MOTORWAY_SPEED);
+}
+
+/// A car along a straight way at `speed` (m/s of drive time) through the smallest junction's box:
+/// sampled finer than the box, coming into sight looked along finer than it (`sight_steps`), and
+/// into it only asking for its claim first.
+fn cannot_skip_a_junction_box(speed: f32) {
     assert!(
         speed / crate::DRIVE_TICKS_PER_SECOND > 1.0,
         "a metre a tick or more"
@@ -841,7 +854,14 @@ fn a_car_at_country_speed_cannot_skip_a_junction_box() {
         most < crate::traffic::SAMPLE + 0.5 && most < r,
         "{most} m between samples"
     );
-    assert!(SIGHT_STEP / crate::DRIVE_TICKS_PER_SECOND * speed < r);
+    let n = sight_steps(&route, 0.0, route.ticks());
+    let apart = (0..n)
+        .map(|i| {
+            let k = route.ticks() / n as f32;
+            crate::travel::dist(route.at(k * i as f32).0, route.at(k * (i + 1) as f32).0)
+        })
+        .fold(0.0f32, f32::max);
+    assert!(apart < r, "looked along every {apart} m coming into sight");
     let pass = vec![0.0; trace.len()];
     let claims = crate::traffic::claims(&trace, &pass, len, wid, &[(centre, r)], &[], &[]);
     assert_eq!(claims.len(), 1, "the box's claim");
