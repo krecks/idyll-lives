@@ -13,7 +13,8 @@
  * in the player's words. Blocking: what would leave the sim a town it can't run well, as the plan
  * has it: the roads not one network or no way out, a lot off its road, with no way to one, or on a
  * road or the water, a car park on a lot, a road or the water, a road over water with no deck, a country road's dead end past a court's length, a village with no
- * road (said "No road to Ashby"), fewer than two homes (houses and flats). The rest only warns (a career with nowhere to work, a village of few lots, a road with a
+ * road (said "No road to Ashby"), fewer than two homes (houses and flats), one-way streets that leave homes a car can't
+ * reach and come back from, a motorway ramp whose street end meets no road (`roadWayIssues`). The rest only warns (a career with nowhere to work, a village of few lots, a road with a
  * hairpin, a country road that comes to a dead end out in the country, as one that led to a village moved away may, a parking bay
  * off its car park). The checks of how the generator fills a town (the centre the densest) are left out: they hold for generated
  * towns, not edited ones.
@@ -21,7 +22,11 @@
 
 import type { Content } from '../../content/content';
 import type { RoadPlan } from '../../core/protocol';
-import { pointAt, lengths } from '../../game/roads';
+import { pointAt, lengths, RoadIndex } from '../../game/roads';
+import { kindInfo } from '../../core/roadKinds';
+import { entriesOf } from '../../game/edit/ground';
+import { cutOffRoads } from '../../game/oneway';
+import { count } from './words';
 import { areasFor } from '../../game/build';
 import { checkedTown } from '../../game/edit/checked';
 import { townProblems } from '../../game/townCheck';
@@ -174,6 +179,7 @@ export function townIssues(plan: NeighbourhoodDraft, t: Templates, content: Cont
     if ((BLOCKING.some((p) => p.test(line)) || longCountryCourt(line, draft)) && !had.has(issue.text)) out.blocking.push(issue);
     else out.warnings.push(issue);
   }
+  for (const issue of roadWayIssues(draft, t)) if (!had.has(issue.text)) out.blocking.push(issue);
   // (A layout's villages have no lots yet: their zones are built at Build.)
   for (const line of found.soft) if (!(layout && LAYOUT_LATER.some((p) => p.test(line)))) out.warnings.push(issueOf(line, draft, t));
   out.warnings.push(...countryDeadEnds(draft));
@@ -195,4 +201,42 @@ function countryDeadEnds(draft: NeighbourhoodDraft): Issue[] {
         })
       : [],
   );
+}
+
+/**
+ * What the one-way roads and the motorway's junction leave wrong (blocking): homes (on a layout, streets) a car can't
+ * get to and back from for one-way roads (`oneway.ts` `cutOffRoads`, less what is cut off whichever way the roads
+ * go: the checks' own networks say that), and a ramp whose end off the motorway meets no road (its street removed).
+ */
+export function roadWayIssues(draft: NeighbourhoodDraft, t: Templates): Issue[] {
+  const out: Issue[] = [];
+  const roads = draft.roads;
+  if (roads.some((r) => r.oneway || kindInfo(r).oneway)) {
+    const anyway = new Set(cutOffRoads(roads, true));
+    // (A ramp left leading nowhere is the junction's problem, below.)
+    const cut = new Set(cutOffRoads(roads).filter((i) => !anyway.has(i) && roads[i].kind !== 'ramp' && roads[i].kind !== 'motorway'));
+    if (cut.size) {
+      const spots = draft.slots.length ? entriesOf(draft, t) : [];
+      const homes = draft.slots.reduce((n, s, i) => n + (spots[i]?.road !== undefined && cut.has(spots[i].road) ? homesOn(s, { farms: true }) : 0), 0);
+      out.push({ text: `One-way streets leave ${homes ? count(homes, 'home') : count(cut.size, 'street')} unreachable`, at: middleOf(roads[[...cut][0]]) });
+    }
+  }
+  const ramps = roads.flatMap((r, i) => (r.kind === 'ramp' && r.points.length >= 2 ? [i] : []));
+  if (ramps.length) {
+    const index = new RoadIndex(roads);
+    const widest = Math.max(0, ...roads.map((r) => r.width));
+    for (const i of ramps) {
+      const r = roads[i];
+      const lost = r.ends.some((e, k) => {
+        if (e === 'merge' || e === 'out') return false;
+        const [x, z] = k ? r.points[r.points.length - 1] : r.points[0];
+        return ![...index.around(x, z, widest / 2 + 1)].some(([j, m]) => j !== i && roads[j].kind !== 'motorway' && roads[j].kind !== 'ramp' && kindInfo(roads[j]).lanesEachWay > 0 && m.dist <= Math.max(r.width, roads[j].width) / 2 + 1);
+      });
+      if (lost) {
+        out.push({ text: 'The motorway junction lost its road', at: middleOf(r) });
+        break;
+      }
+    }
+  }
+  return out;
 }

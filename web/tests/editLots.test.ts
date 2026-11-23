@@ -226,8 +226,10 @@ describe('lot edits', async () => {
     numberedInTurn(town, left);
     expect(moved.name).toMatch(new RegExp(` ${town.roads[road].name}$`));
     expect(homesOn(town, left).length).toBe(homesOn(hamlet, left).length - 1);
-    // Not onto another lot.
-    expect(lots.moveLot(lived, t, from.index, e[hamlet.slots.findIndex((s) => s !== from && s.kind === 'house')])).toEqual({ refused: 'There is no room for it here.' });
+    // Not onto another lot: refused at every other house's door, for want of room where nothing else forbids it.
+    const onto = hamlet.slots.filter((s) => s !== from && s.kind === 'house').map((s) => lots.moveLot(lived, t, from.index, e[s.index]));
+    expect(onto.every((v) => 'refused' in v)).toBe(true);
+    expect(onto.some((v) => 'refused' in v && v.refused === 'There is no room for it here.')).toBe(true);
   });
 
   test("the town's last home and last park are kept", () => {
@@ -300,30 +302,33 @@ describe('lot edits', async () => {
     expect(choices.some((c) => c.label === 'Church')).toBe(false);
     // The school's layout is on a much bigger lot than the hall's: by the square, it has no room there.
     expect(lots.swapCivic(grown, t, content, hall.index, school, 1)).toEqual({ refused: 'There is no room for the school here.' });
-    // The inn made a garage, a layout on a lot of another size: the inn taken up, the garage a lot of its own where it met its road.
+    // The inn made studios, a layout on a lot of another size: the inn taken up, the studios a lot of its own where it met its road.
+    // (A garage's yard has no room there: its neighbours are too near.)
     const inn = hamlet.slots.find((s) => s.template === 'inn')!;
     const innPlace = places.find((p) => p.plot === inn.index)!;
-    const garage = lots.CIVIC_PLACES.findIndex((c) => c.label === 'Garage');
+    const [garage, studios] = ['Garage', 'Studios'].map((label) => lots.CIVIC_PLACES.findIndex((c) => c.label === label));
     expect(lots.civicSwaps(grown, inn.index).some((c) => c.civic === garage)).toBe(true);
-    const toGarage = lots.swapCivic(grown, t, content, inn.index, garage, 1);
-    const town = made(toGarage);
-    expect(toGarage).toHaveProperty('cleared', { lots: [inn.index] });
+    expect(lots.swapCivic(grown, t, content, inn.index, garage, 1)).toEqual({ refused: 'There is no room for the garage here.' });
+    expect(lots.civicSwaps(grown, inn.index).some((c) => c.civic === studios)).toBe(true);
+    const toStudios = lots.swapCivic(grown, t, content, inn.index, studios, 1);
+    const town = made(toStudios);
+    expect(toStudios).toHaveProperty('cleared', { lots: [inn.index] });
     expect(town.slots.length).toBe(grown.slots.length);
     expect(town.slots.some((s) => s.template === 'inn')).toBe(false);
     const lot = town.slots.at(-1)!;
-    expect(lot).toMatchObject({ kind: 'shop', template: 'garage', area: 0, index: town.slots.length - 1 });
+    expect(lot).toMatchObject({ kind: 'shop', template: 'studios', area: 0, index: town.slots.length - 1 });
     expect(lot.dress).toBeDefined();
     expect(entriesOf(town, t).at(-1)!.road).toBe(entriesOf(grown, t)[inn.index].road);
     for (const s of town.slots.slice(0, -1)) if (s.kind !== 'house' || s.lot === 'farm') expect(overlap(plotRect(t, s), plotRect(t, lot))).toBe(false);
     const p = town.open!.places!.find((q) => q.plot === lot.index)!;
     expect(p.kind).toBe('workshop');
-    expect(p.name).toMatch(/'s Garage$/);
+    expect(p.name).toMatch(/ Studios$/);
     expect(lot.name).toBe(p.name);
     expect(town.open!.places!.filter((q) => q.plot === undefined)).toEqual([]);
     expect(town.open!.places!.some((q) => q.name === innPlace.name)).toBe(false);
     // (The careers the inn took on for the town, if any, go with it.)
     const extra = (innPlace.work ?? []).filter((w) => !lots.CIVIC_PLACES[lots.civicOfLot(inn)].work.includes(w));
-    expect(p.work!.slice(0, 2)).toEqual(['mechanics', 'transport']);
+    expect(p.work![0]).toBe('arts');
     for (const w of extra) expect(p.work).toContain(w);
     expect(p.work).not.toContain('music');
     const church = lots.CIVIC_PLACES.findIndex((c) => c.label === 'Church');

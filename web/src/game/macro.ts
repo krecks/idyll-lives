@@ -30,6 +30,7 @@
 
 import type { Content } from '../content/content';
 import type { CarPark, LandSize, ParkingBay, Rle, TownArea, TownPlace, TownSize, WorldMeta, WorldOptions, WorldZone } from '../core/protocol';
+import { ROAD_KIND } from '../core/roadKinds';
 import { distanceToRect } from '../render/shared/chunks';
 import { areaSize, civicTooBig, CIVIC, namerFor, ZONE, type ZoneKind } from './places';
 import { chooseCentre, densestCentre, type Centre } from './centre';
@@ -1914,8 +1915,8 @@ export interface Laying {
 
 /**
  * An area put on the world being laid (`laying`): its roads (`laid`, laid out in its own box
- * `local`) moved to (`x`, `z`) and turned across if `swap`, each at least `ROAD_WIDTH` wide, its
- * first a street and the rest lanes, all the area's; a road that led out of its box cut back to
+ * `local`) moved to (`x`, `z`) and turned across if `swap`, its first a street (at least a street's
+ * width, `ROAD_KIND`) and the rest lanes (a lane's width), all the area's; a road that led out of its box cut back to
  * `PORT_IN` m inside the world's edge and kept as one of its ways on (`ports`). Its roads are added
  * to `laying.roads` and it to `laying.plans` (its index is the number of areas before it).
  */
@@ -1941,7 +1942,8 @@ export function putArea(laying: Laying, areaName: string, laid: readonly RoadPla
     if (r.ends[1] === 'out') while (to - from > 2 && !inWorld(all[to - 1])) to--;
     if (r.ends[0] === 'out') while (to - from > 2 && !inWorld(all[from])) from++;
     const points = all.slice(from, to);
-    const road: RoadPlan = { ...r, points, width: Math.max(r.width, ROAD_WIDTH), kind: k === 0 ? 'street' : 'lane', area: index, ...(r.lots && swap ? { lots: (-r.lots) as 1 | -1 } : {}) };
+    const width = k === 0 ? Math.max(r.width, ROAD_KIND.street.width) : ROAD_KIND.lane.width;
+    const road: RoadPlan = { ...r, points, width, kind: k === 0 ? 'street' : 'lane', area: index, ...(r.lots && swap ? { lots: (-r.lots) as 1 | -1 } : {}) };
     const at = roads.push(road) - 1;
     plan.roads.push(at);
     for (const e of [0, 1] as const) {
