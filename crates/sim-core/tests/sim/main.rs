@@ -113,6 +113,7 @@ mod travel_bikes;
 mod travel_cars;
 mod travel_commutes;
 mod travel_countryside;
+mod travel_hierarchy;
 mod travel_outings;
 mod travel_passengers;
 mod travel_routes;
