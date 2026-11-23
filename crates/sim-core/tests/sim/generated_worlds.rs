@@ -1,7 +1,7 @@
 //! Generated worlds (web/src/game/world.ts and town.ts: farms, seaside, mountain, lakeside and
 //! forest worlds, every one a big one: cosy and normal were dropped in 0.8.0) checked by the
 //! simulation: each loads with no more residents than a town holds, its roads make one network (as
-//! the sim joins them), every lot can be reached from the ends of every street and back,
+//! the sim joins them) its one-way roads cut no place off of (`Graph::strongly_connected`), every lot can be reached from the ends of every street and back,
 //! everything outdoors that residents use (a farm's crops, a park's benches) can be reached, as
 //! can the houses' basements from their front doors and everything residents use in the houses
 //! (on lots facing either way), and the town keeps going for half a day: in a town with bikes at
@@ -184,12 +184,18 @@ fn livable_at_start(
             sim_core::snapshot::MAX_LIGHTS
         ));
     }
-    // The town's roads one network as the sim joins them.
-    let networks = Graph::from_town(&w.travel.file, &world["town"]["meta"]).networks();
+    // The town's roads one network as the sim joins them, its one-way roads cutting no place
+    // off: every place a car comes onto the roads driven to and back from every other (the
+    // generator's one-way pairs, `web/src/game/oneway.ts`).
+    let graph = Graph::from_town(&w.travel.file, &world["town"]["meta"]);
+    let networks = graph.networks();
     if networks != 1 {
         failures.push(format!(
             "{label}: the roads make {networks} networks, not one"
         ));
+    }
+    if !graph.strongly_connected() {
+        failures.push(format!("{label}: one-way roads cut a place off"));
     }
     let mut cellars = 0;
     {

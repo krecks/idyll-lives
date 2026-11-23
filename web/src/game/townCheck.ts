@@ -11,7 +11,7 @@
  * trail's end and near its area, no trail through a lot, no country road turning further than 70°
  * over 40 m (no hairpins: `COUNTRY_TURN`), none running alongside another road a few metres off for
  * more than `SIDE_BY_SIDE` m, areas apart, hamlets of four lots or more, residents within the cap,
- * every road named (no two alike); lots inside the world, apart from each other and off the roads,
+ * every road named (no two alike), no road nor lot one-way roads cut off from the way out (`oneWayProblems`); lots inside the world, apart from each other and off the roads,
  * each by its road (a park may stand on a green), the ways out on its edge. Over the water only
  * bridges and causeways, each over its deck (`bridge`) alone, straight and not too long; a river
  * world (`river`) has a bridge. And the living town's lots, parking, centre and places (`livingProblems`).
@@ -30,6 +30,7 @@ import { AREA_APART } from './macro';
 import { COUNTRY_TURN } from './countryRouter';
 import { unrle } from './landMasks';
 import { COURT, inside, lengths, nearest, pointAt, RoadIndex, roadMask, sharpestTurn, sideBySide, type Pt } from './roads';
+import { cutOff } from './oneway';
 import { BIG_COURTS, COURTS, NEIGHBOUR_CAP, turner, type Facing } from './town';
 import type { Expected } from './world';
 import * as pmath from './pmath';
@@ -156,6 +157,27 @@ function measureFill(town: CheckedTown, meadow: boolean): { built: number; empty
 }
 
 /**
+ * What one-way roads cut off (`oneway.ts` `cutOff`): each road a car can't be driven to from the way out of town and
+ * back out again, and each lot along one (its front's nearest road). None without a one-way road.
+ */
+function oneWayProblems(town: CheckedTown, roads: readonly RoadPlan[]): string[] {
+  if (!roads.some((r) => r.oneway)) return [];
+  const cut = new Set(cutOff(roads));
+  if (!cut.size) return [];
+  const out = [...cut].map((r) => `${roads[r].kind ?? 'street'} ${roads[r].name ?? r} can't be driven to and back out of town (its one-way roads)`);
+  const cars = roads.flatMap((r, i) => (r.kind !== 'trail' ? [i] : []));
+  town.plots.forEach((p, i) => {
+    if (p.kind === 'flat') return;
+    const f = (town.meta.facing?.[i] ?? 0) as Facing;
+    const [lw, ld] = f % 2 ? [p.d, p.w] : [p.w, p.d];
+    const [fx, fz] = turner(p.x, p.z, lw, ld, f).point([lw / 2, 0]);
+    const road = cars.reduce((best, r) => (nearest(roads[r].points, fx, fz).dist - roads[r].width / 2 < nearest(roads[best].points, fx, fz).dist - roads[best].width / 2 ? r : best), cars[0]);
+    if (cut.has(road)) out.push(`plot ${i} (${p.kind}) can't be driven to and back out of town`);
+  });
+  return out;
+}
+
+/**
  * What's wrong with how a town's roads join up, its areas, water, bridges, trails and names (the open-world checks), and
  * how filled it is (`expect`, if given). Not `generated` (a town edited by hand): a street's or a lane's dead end may
  * reach past a court (the sim turns round in any of theirs), and a deck may be `DRAWN_SPAN` m long.
@@ -188,6 +210,7 @@ function openProblems(town: CheckedTown, expect: Expected | undefined, river: bo
   // One network: every road (country roads and trails too) and every way out on it.
   const networks = new Set(roads.map((_, i) => find(i)));
   if (networks.size > 1) out.push(`the roads are ${networks.size} networks, not one`);
+  out.push(...oneWayProblems(town, roads));
   for (const e of town.exits) {
     const [x, z] = exitAt(e);
     if (roads.length && !roads.some((r) => nearest(r.points, x, z).dist <= r.width / 2 + 1.5)) out.push(`the way out at ${x}, ${z} is off the roads`);
