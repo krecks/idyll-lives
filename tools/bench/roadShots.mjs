@@ -12,9 +12,14 @@
  * `--follow`: the fixture on a land the town follows (`&follow`: its built surface gives the decks' heights and the ground
  * under them); without it, a land drawn flat, where the decks climb on their own (`motorway.ts` `deckLevels`).
  *
+ * `--big <place> --options town:city --spots <file>`: a generated Big world's motorway instead (`?bench=bigworld`, its
+ * town from seed 7): its junction and the overpass of the road under it from about 40 m, the junction from 250 m and the
+ * town from 783 m, where `tools/worlds/map.ts --seed 7 --options town=city --spots <file>` found them (the file's
+ * entry for that place).
+ *
  * Needs Playwright like render.mjs (`PLAYWRIGHT=<path to playwright/index.mjs>`).
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { benchContext, devServer, launch, openBench } from './lib/browser.mjs';
 
@@ -32,7 +37,20 @@ mkdirSync(out, { recursive: true });
 
 // (Over the fixture's middle, `tx`/`tz` m off it: `roadFixture.ts`. `beta`: from straight down.)
 const near = { cam: 'over', over: 'centre', radius: 40, beta: 1.05 };
-const POSES = [
+const big = flag('big', null);
+const bigOptions = flag('options', '');
+const spot = big ? JSON.parse(readFileSync(flag('spots', ''), 'utf8')).find((e) => e.kind === big) : null;
+if (big && !spot) throw new Error(`no spot for ${big} in the spots file`);
+const SPOT_POSES = spot
+  ? [
+      { name: 'junction', pose: { ...near, ...spot.junction, radius: 55, alpha: -2.2, beta: 1.05 } },
+      { name: 'overpass', pose: { ...near, ...spot.overpass, radius: 35, alpha: -1.2, beta: 1.25 } },
+      { name: 'overpass-under', pose: { ...near, ...spot.overpass, radius: 22, alpha: 0.4, beta: 1.38 } },
+      { name: 'junction-250', pose: { ...near, ...spot.junction, radius: 250, beta: 0.9 } },
+      { name: 'overview-783', pose: { cam: 'over', over: 'centre', radius: 783 } },
+    ]
+  : null;
+const POSES = SPOT_POSES ?? [
   { name: 'overpass', pose: { ...near, tx: -100, tz: 30, alpha: -2.2, beta: 1.2 } },
   { name: 'overpass-under', pose: { ...near, tx: -100, tz: 60, radius: 30, alpha: -1.0, beta: 1.32 } },
   { name: 'merge', pose: { ...near, tx: -190, tz: 40, alpha: -2.6 } },
@@ -44,7 +62,8 @@ const POSES = [
   { name: 'ramp-street', pose: { ...near, tx: -100, tz: 15, alpha: -2.6 } },
   { name: 'overview-400', pose: { cam: 'over', over: 'centre', radius: 400 } },
   { name: 'overview-783', pose: { cam: 'over', over: 'centre', radius: 783 } },
-].filter((p) => !only || only.includes(p.name));
+];
+const SHOTS = POSES.filter((p) => !only || only.includes(p.name));
 
 const { url: base, stop } = await devServer({ url: flag('url', null), port: Number(flag('port', '5311')) });
 const { browser } = await launch({ headless: true });
@@ -52,8 +71,8 @@ const counts = {};
 try {
   for (const renderer of renderers) {
     const context = await benchContext(browser);
-    const { page, done } = await openBench(context, base, `bench=bigworld&big=roads${follow}&quality=${quality}&renderer=${renderer}&res=1&hud=0&secs=0&warmup=6&diag=freeze&cam=over&over=centre&radius=400&hour=13`);
-    for (const p of POSES) {
+    const { page, done } = await openBench(context, base, `bench=bigworld&big=${big ?? 'roads'}${bigOptions ? `&options=${bigOptions}` : ''}${follow}&quality=${quality}&renderer=${renderer}&res=1&hud=0&secs=0&warmup=6&diag=freeze&cam=over&over=centre&radius=400&hour=13`);
+    for (const p of SHOTS) {
       await page.evaluate((x) => window.__bench.pose(x), p.pose);
       await page.evaluate(() => window.__bench.hour(13));
       await page.evaluate(() => window.__bench.settle({ limitMs: 90_000 }));
