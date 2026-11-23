@@ -8,11 +8,16 @@
  * two stops, driven both ways or, on a one-way road (`onewayOf`), its one way. A ring's ends are one stop. Every way
  * out of the world is one place, the world beyond it: a car leaves by one and comes back by another (the motorway's
  * carriageways only reach the town so).
+ *
+ * The generator gives a few pairs of streets in a town's or a city's dense middle opposite ways (`oneWayPairs`), each
+ * pair only if this still holds; the town's check (`townCheck.ts`), the editor's Street tool and its problems ask the
+ * same.
  */
 
 import type { RoadPlan } from '../core/protocol';
-import { kindInfo, onewayOf } from '../core/roadKinds';
-import { deckSpans, lengths, nearest, RoadIndex } from './roads';
+import { kindInfo, onewayOf, ROAD_KIND } from '../core/roadKinds';
+import * as pmath from './pmath';
+import { deckSpans, lengths, nearest, pointAt, RoadIndex, type Pt } from './roads';
 
 /** Two car roads cross on the level where a point of one comes this near the other's middle (m; their points about a metre apart). */
 const CROSS = 0.75;
@@ -20,17 +25,20 @@ const CROSS = 0.75;
 /** Whether road `r` passes over or under road `other` at `s` m along it rather than crossing it: it says so (`crosses`), or it is on a deck there. */
 const over = (r: RoadPlan, other: number, s: number) => !!r.crosses?.some((c) => c.road === other) || deckSpans(r).some(([a, b]) => s >= a && s <= b);
 
-/** Whether from every car road a car can reach every other and come back (see the top of this file). */
-export function stronglyConnected(roads: readonly RoadPlan[]): boolean {
-  return cutOffRoads(roads).length === 0;
+/** Whether from every car road a car can reach every other and come back (see the top of this file; `within`, as `cutOffRoads`). */
+export function stronglyConnected(roads: readonly RoadPlan[], within = false): boolean {
+  return cutOffRoads(roads, false, within).length === 0;
 }
 
 /**
  * The car roads (indices) a car can't both reach from the world beyond its ways out and get back from (with no way
  * out, from the first car road): some stretch of each one-way-only, or off on its own. `twoWay`: as if every road
- * were driven both ways (what is cut off by no one-way road).
+ * were driven both ways (what is cut off by no one-way road). `within`: by the roads alone, no way round through the
+ * world beyond (a trip in town keeps to its roads: the simulation's own check, sim-core `Graph::strongly_connected`),
+ * from the first road a car comes onto the roads by; the motorway and its ramps not asked about (no car comes onto
+ * the roads there), only driven along.
  */
-export function cutOffRoads(roads: readonly RoadPlan[], twoWay = false): number[] {
+export function cutOffRoads(roads: readonly RoadPlan[], twoWay = false, within = false): number[] {
   const cars = roads.flatMap((r, i) => (kindInfo(r).lanesEachWay > 0 && r.points.length >= 2 ? [i] : []));
   if (!cars.length) return [];
   const isCar = new Set(cars);
@@ -59,7 +67,7 @@ export function cutOffRoads(roads: readonly RoadPlan[], twoWay = false): number[
     const ends = [stopAt(i, 0), stopAt(i, L)];
     if (r.ends[0] === 'loop' || r.ends[1] === 'loop') join(ends[0], ends[1]);
     for (const e of [0, 1] as const) {
-      if (r.ends[e] === 'out') join(ends[e], 0);
+      if (r.ends[e] === 'out' && !within) join(ends[e], 0);
       const [x, z] = e ? r.points[r.points.length - 1] : r.points[0];
       for (const [j, m] of index.around(x, z, widest / 2 + 1)) {
         if (j === i || !isCar.has(j) || !meets(r, roads[j]) || m.dist > Math.max(r.width, roads[j].width) / 2 + 1) continue;
@@ -100,8 +108,11 @@ export function cutOffRoads(roads: readonly RoadPlan[], twoWay = false): number[
       if (way <= 0) edge(order[k + 1][1], order[k][1]);
     }
   }
-  const out = cars.some((i) => roads[i].ends.includes('out'));
-  const root = find(out ? 0 : ids[cars[0]][0]);
+  // (Within: the motorway and its ramps aren't asked about.)
+  const asked = within ? cars.filter((i) => roads[i].kind !== 'motorway' && roads[i].kind !== 'ramp') : cars;
+  if (!asked.length) return [];
+  const out = !within && cars.some((i) => roads[i].ends.includes('out'));
+  const root = find(out ? 0 : ids[asked[0]][0]);
   const reach = (from: number, ways: Map<number, number[]>) => {
     const seen = new Set([from]);
     const todo = [from];
@@ -109,5 +120,92 @@ export function cutOffRoads(roads: readonly RoadPlan[], twoWay = false): number[
     return seen;
   };
   const [ahead, behind] = [reach(root, next), reach(root, back)];
-  return cars.filter((i) => ids[i].some((id) => !ahead.has(find(id)) || !behind.has(find(id))));
+  return asked.filter((i) => ids[i].some((id) => !ahead.has(find(id)) || !behind.has(find(id))));
+}
+
+/** One-way pairs: their streets this far apart (m, middle to middle) along where they run side by side, … */
+const PAIR_APART: [number, number] = [30, 80];
+/** … side by side for this share of the shorter at least, and this long (m), … */
+const PAIR_ALONG = 0.6;
+const PAIR_LEAST = 40;
+/** … within this of each other's way (radians), … */
+const PAIR_TURN = (25 * Math.PI) / 180;
+/** … both reaching within this (m) of the town's dense middle (its high street's), … */
+const PAIR_REACH = 120;
+/** … neither shorter than this (m). */
+const PAIR_SHORTEST = 50;
+
+/** Whether road `r` may be made one-way: a town's street or lane, both its ends joined (no dead end, no way out, not a ring or a roundabout), on land (no bridge), long enough. */
+function oneWayable(r: RoadPlan): boolean {
+  const kind = r.kind ?? 'street';
+  if (kind !== 'street' && kind !== 'lane') return false;
+  if (r.ends[0] !== 'join' || r.ends[1] !== 'join' || r.island || r.bridge || r.bridges?.length || onewayOf(r)) return false;
+  const [a, b] = [r.points[0], r.points[r.points.length - 1]];
+  if (pmath.hypot(a[0] - b[0], a[1] - b[1]) < 0.5) return false;
+  return lengths(r.points).at(-1)! >= PAIR_SHORTEST;
+}
+
+/** How roads `a` and `b` run side by side: the length (m along `a`) where they are `PAIR_APART` apart and run the same way or opposite (`same`: the same way, by the most). */
+function alongside(a: RoadPlan, b: RoadPlan): { along: number; same: boolean } {
+  const ls = lengths(a.points);
+  const L = ls[ls.length - 1];
+  const lb = lengths(b.points);
+  let [along, dots] = [0, 0];
+  const step = 4;
+  for (let s = 0; s < L; s += step) {
+    const { p, t } = pointAt(a.points, s, ls);
+    const near = nearest(b.points, p[0], p[1], lb);
+    if (near.dist < PAIR_APART[0] || near.dist > PAIR_APART[1]) continue;
+    const tb = pointAt(b.points, near.s, lb).t;
+    const dot = t[0] * tb[0] + t[1] * tb[1];
+    if (Math.abs(dot) < pmath.cos(PAIR_TURN)) continue;
+    along += step;
+    dots += dot;
+  }
+  return { along, same: dots >= 0 };
+}
+
+/**
+ * A few pairs of streets in a town's dense middle (round `middle`) made one-way, each the other's way back: of the
+ * roads `own` (the main town's), streets and lanes both of whose ends join another road (`oneWayable`), side by side
+ * `PAIR_APART` m apart for most of the shorter, nearest the middle first; each pair (a lane of it made a street, as
+ * wide) only if it cuts nothing off (`cutOffRoads` `within`: every car road still driven to and back by the roads alone), first
+ * with the first of the two one-way along its points, else the other way round. `most` pairs at most. The roads with the
+ * pairs made (the same array if none), and the pairs (road indices).
+ */
+export function oneWayPairs(roads: readonly RoadPlan[], own: readonly number[], middle: Pt, most: number): { roads: RoadPlan[]; pairs: [number, number][] } {
+  const pairs: [number, number][] = [];
+  let out = roads as RoadPlan[];
+  if (most <= 0) return { roads: out, pairs };
+  const near = (r: RoadPlan) => nearest(r.points, middle[0], middle[1]).dist;
+  const ok = own.filter((i) => oneWayable(roads[i]) && near(roads[i]) <= PAIR_REACH);
+  const cands: { a: number; b: number; same: boolean; score: number }[] = [];
+  for (const [k, a] of ok.entries()) {
+    for (const b of ok.slice(k + 1)) {
+      const [ra, rb] = [roads[a], roads[b]];
+      const shorter = Math.min(lengths(ra.points).at(-1)!, lengths(rb.points).at(-1)!);
+      const { along, same } = alongside(ra, rb);
+      if (along < Math.max(PAIR_LEAST, shorter * PAIR_ALONG)) continue;
+      cands.push({ a, b, same, score: near(ra) + near(rb) });
+    }
+  }
+  cands.sort((x, y) => x.score - y.score || x.a - y.a || x.b - y.b);
+  const used = new Set<number>();
+  // (What is cut off already, whatever the pairs: nothing, in a town of one network.)
+  // (By the town's roads alone, as the simulation routes a trip in town: `within`.)
+  const had = new Set(cutOffRoads(roads, false, true));
+  for (const c of cands) {
+    if (pairs.length >= most) break;
+    if (used.has(c.a) || used.has(c.b)) continue;
+    const street = (r: RoadPlan): RoadPlan => ({ ...r, kind: 'street', width: Math.max(r.width, ROAD_KIND.street.width) });
+    for (const way of [1, -1] as const) {
+      const tried = out.map((r, i): RoadPlan => (i === c.a ? { ...street(r), oneway: way } : i === c.b ? { ...street(r), oneway: (c.same ? -way : way) as 1 | -1 } : r));
+      if (cutOffRoads(tried, false, true).some((i) => !had.has(i))) continue;
+      out = tried;
+      pairs.push([c.a, c.b]);
+      used.add(c.a).add(c.b);
+      break;
+    }
+  }
+  return { roads: out, pairs };
 }

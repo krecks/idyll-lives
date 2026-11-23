@@ -11,6 +11,7 @@
 
 import type { Content, WorldNames } from '../content/content';
 import { DEFAULT_LANDSCAPE, type LandSize, type LandscapeParams, type TownSize, type WorldOptions } from '../core/protocol';
+import { ROAD_KIND } from '../core/roadKinds';
 import type { GardenSize } from './housegen';
 import { branch, centroid, clearOf, crossing, crossStreet, cutAround, inside, lane, leftOf, lengths, loop, nearest, pointAt, range, ring, roadDistance, RoadIndex, roomAt, roundabout, through, type Box, type Pt, type RoadPlan } from './roads';
 import * as pmath from './pmath';
@@ -62,10 +63,21 @@ export interface SizeSpec {
   /** Public places besides the park, and farm lots, if not the world's (`LotMix`). */
   places?: [number, number];
   farms?: [number, number];
+  /** Its main through road an avenue (a city's: `Shape`'s `avenue`), laid so before anything else is laid off it. */
+  avenue?: boolean;
+  /** Pairs of streets in its dense middle made one-way at most (`oneway.ts` `oneWayPairs`; a town's and a city's). */
+  oneway?: number;
 }
 
-/** A town's roads laid out in `box` (`scale`: as `SizeSpec.scale`). */
-export type Shape = (rand: Rand, box: Box, scale?: number) => RoadLayout;
+/**
+ * A town's roads laid out in `box` (`scale`: as `SizeSpec.scale`). `avenue`: its main through road an avenue
+ * (`ROAD_KIND.avenue`, 14 m), the first of its roads, laid so before the streets off it (where a crossroads' cross
+ * road meets it, a crossroads with lights, not a roundabout); a shape with no through road (a clearing's ring) has none.
+ */
+export type Shape = (rand: Rand, box: Box, scale?: number, avenue?: boolean) => RoadLayout;
+
+/** Road `r` an avenue if `avenue` (as wide as one), else as it is. */
+const avenueIf = (r: RoadPlan, avenue = false): RoadPlan => (avenue ? { ...r, kind: 'avenue', width: ROAD_KIND.avenue.width } : r);
 
 /**
  * What a town's lots are (`town.ts` `wantedLots`, and `LotPlacer` for the gaps): how big its
@@ -220,8 +232,8 @@ function toward(parent: RoadPlan, s: number, side: 1 | -1, length: number, curl:
 }
 
 /** One winding high street, a back lane looping off it and back, a short lane off the other side. */
-export function highStreet(rand: Rand, box: Box, scale = 1): RoadLayout {
-  const main = through(rand, box, { amp: range(rand, 6, 11), bends: 2 });
+export function highStreet(rand: Rand, box: Box, scale = 1, avenue = false): RoadLayout {
+  const main = avenueIf(through(rand, box, { amp: range(rand, 6, 11), bends: 2 }), avenue);
   const L = lengthOf(main);
   const s = side(rand);
   const s0 = L * range(rand, 0.28, 0.4);
@@ -231,8 +243,8 @@ export function highStreet(rand: Rand, box: Box, scale = 1): RoadLayout {
 }
 
 /** A through road with a crescent round a green; lanes off it joined up into a back street and to the crescent. */
-export function crescentTown(rand: Rand, box: Box, scale = 1): RoadLayout {
-  const main = through(rand, box, { at: 0.55, amp: range(rand, 6, 10), bends: 2 });
+export function crescentTown(rand: Rand, box: Box, scale = 1, avenue = false): RoadLayout {
+  const main = avenueIf(through(rand, box, { at: 0.55, amp: range(rand, 6, 10), bends: 2 }), avenue);
   const L = lengthOf(main);
   const mid = L * range(rand, 0.42, 0.55);
   const s = side(rand);
@@ -259,14 +271,16 @@ export function crescentTown(rand: Rand, box: Box, scale = 1): RoadLayout {
 /**
  * A crossroads with a roundabout (a fountain in the middle) and a loose grid of blocks round it:
  * in three or four of its quarters a street from one road round to the other, and further out
- * lanes off each road for `connect` to join up.
+ * lanes off each road for `connect` to join up. A city's (`avenue`): its main road an avenue straight
+ * through, the cross road meeting it from either side (a crossroads with lights), no roundabout.
  */
-export function crossroads(rand: Rand, box: Box, scale = 1): RoadLayout {
-  const main = through(rand, box, { amp: range(rand, 4, 8), bends: 2 });
+export function crossroads(rand: Rand, box: Box, scale = 1, avenue = false): RoadLayout {
+  const main = avenueIf(through(rand, box, { amp: range(rand, 4, 8), bends: 2 }), avenue);
   const cross = through(rand, box, { along: 'z', amp: range(rand, 4, 8), bends: 2 });
   const at = crossing(main, cross) ?? ([box.w / 2, box.d / 2] as Pt);
   const R = 6.5;
-  const roads: RoadPlan[] = [...cutAround(main, at, R), ...cutAround(cross, at, R), roundabout(at[0], at[1], R)];
+  // (The cross road cut right by the avenue's middle: `settleRoads` takes it back to its kerb.)
+  const roads: RoadPlan[] = avenue ? [main, ...cutAround(cross, at, AVENUE_CUT)] : [...cutAround(main, at, R), ...cutAround(cross, at, R), roundabout(at[0], at[1], R)];
   const sm = nearest(main.points, at[0], at[1]).s;
   const sc = nearest(cross.points, at[0], at[1]).s;
   const quarters: [1 | -1, 1 | -1][] = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
@@ -296,6 +310,9 @@ export function crossroads(rand: Rand, box: Box, scale = 1): RoadLayout {
   return { roads, centre: at };
 }
 
+/** Where a road meets a city's avenue across it, it is cut this near (m) the avenue's middle (`crossroads`). */
+const AVENUE_CUT = 2;
+
 /** A long country lane winding through the fields, a fork off it leading out of town. */
 export function countryLane(rand: Rand, box: Box, _scale = 1): RoadLayout {
   const main = through(rand, box, { amp: range(rand, 14, 22), bends: 3, width: 6 });
@@ -308,9 +325,9 @@ export function countryLane(rand: Rand, box: Box, _scale = 1): RoadLayout {
  * A road along the water's side of town, `at` across the box from that edge, winding `amp` m:
  * its lots on its landward side only (`land`, +1: its left); the town's middle a little inland.
  */
-function waterfront(rand: Rand, box: Box, at: number, amp: [number, number]) {
+function waterfront(rand: Rand, box: Box, at: number, amp: [number, number], avenue = false) {
   const water = rand() < 0.5 ? 'zmin' : 'zmax';
-  const main = through(rand, box, { at: water === 'zmin' ? at : 1 - at, amp: range(rand, ...amp), bends: 2 });
+  const main = avenueIf(through(rand, box, { at: water === 'zmin' ? at : 1 - at, amp: range(rand, ...amp), bends: 2 }), avenue);
   // Inland: the left of a road along +x is towards smaller z.
   const land: 1 | -1 = water === 'zmin' ? -1 : 1;
   main.lots = land;
@@ -322,8 +339,8 @@ function waterfront(rand: Rand, box: Box, at: number, amp: [number, number]) {
  * A road along the shore (homes on its landward side only), a crescent up the hill at one end of
  * the village, two lanes climbing inland for `connect` to join into an upper street.
  */
-export function shoreRoad(rand: Rand, box: Box, scale = 1): RoadLayout {
-  const { main, water, land, centre, L } = waterfront(rand, box, 0.12, [3, 6]);
+export function shoreRoad(rand: Rand, box: Box, scale = 1, avenue = false): RoadLayout {
+  const { main, water, land, centre, L } = waterfront(rand, box, 0.12, [3, 6], avenue);
   const end = rand() < 0.5 ? 0.22 : 0.78;
   const crescent = loop(main, L * end - 22 * scale, L * end + 22 * scale, land, range(rand, 30, 38) * scale);
   const climbs = [0.5, 1 - end].map((at) => L * (at + range(rand, -0.04, 0.04)));
@@ -340,8 +357,8 @@ function inland(r: RoadPlan, s: number, land: 1 | -1, depth: number): Pt {
 }
 
 /** A lane winding up the valley in tight bends, tracks off it (round to it again where the land allows). */
-export function switchback(rand: Rand, box: Box, scale = 1): RoadLayout {
-  const main = through(rand, box, { amp: range(rand, 16, 24), bends: 3, width: 6 });
+export function switchback(rand: Rand, box: Box, scale = 1, avenue = false): RoadLayout {
+  const main = avenueIf(through(rand, box, { amp: range(rand, 16, 24), bends: 3, width: 6 }), avenue);
   const L = lengthOf(main);
   const tracks = [0.3, 0.6].map((at) => {
     const s = L * (at + range(rand, 0, 0.12));
@@ -355,8 +372,8 @@ export function switchback(rand: Rand, box: Box, scale = 1): RoadLayout {
  * A road round the lake's end of town (homes on its landward side), a crescent off it, and lanes
  * either side of it climbing inland for `connect` to join into an upper street over the crescent.
  */
-export function lakeRoad(rand: Rand, box: Box, scale = 1): RoadLayout {
-  const { main, water, land, centre, L } = waterfront(rand, box, 0.14, [5, 9]);
+export function lakeRoad(rand: Rand, box: Box, scale = 1, avenue = false): RoadLayout {
+  const { main, water, land, centre, L } = waterfront(rand, box, 0.14, [5, 9], avenue);
   const crescent = loop(main, L * 0.5 - 24 * scale, L * 0.5 + 24 * scale, land, range(rand, 34, 42) * scale);
   const up = inland(main, L * 0.5, land, 95 * scale);
   const lanes = [0.3, 0.7].map((at) => toward(main, L * (at + range(rand, -0.03, 0.03)), land, range(rand, 68, 80) * scale, range(rand, 0.25, 0.5), up));
@@ -1066,11 +1083,13 @@ const PLACES: Record<WorldKind, PlaceTable> = {
 /**
  * The main town of a place at town size `size`, from the classic world's at town size (`base`):
  * as it is at town size; else a box of the size's area in the same shape, the size's lots (the more
- * the bigger the place's own town), lanes and streets; farm lots `farms` if given.
+ * the bigger the place's own town), lanes and streets; farm lots `farms` if given. A city's main
+ * through road is an avenue; a town and a city have a few one-way pairs (`ONE_WAY_PAIRS`).
  */
 function mainTown(base: SizeSpec, size: TownSize, farms?: [number, number]): SizeSpec {
   const s = SIZES[size];
-  if (!s.area || !s.lots) return farms ? { ...base, farms } : base;
+  const roads = { ...(size === 'city' ? { avenue: true } : {}), ...(ONE_WAY_PAIRS[size] ? { oneway: ONE_WAY_PAIRS[size] } : {}) };
+  if (!s.area || !s.lots) return { ...base, ...roads, ...(farms ? { farms } : {}) };
   const w = Math.round(Math.sqrt((s.area * base.box.w) / base.box.d));
   const k = Math.max(0, Math.min(1, (base.lots - TOWN_LOTS[0]) / (TOWN_LOTS[1] - TOWN_LOTS[0])));
   return {
@@ -1081,8 +1100,12 @@ function mainTown(base: SizeSpec, size: TownSize, farms?: [number, number]): Siz
     fill: s.fill,
     places: s.places,
     ...(farms ?? base.farms ? { farms: farms ?? base.farms } : {}),
+    ...roads,
   };
 }
+
+/** Pairs of streets made one-way in a main town's dense middle, at most, by its size (`SizeSpec.oneway`): none in a hamlet or a village. */
+const ONE_WAY_PAIRS: Record<TownSize, number> = { hamlet: 0, village: 0, town: 2, city: 3 };
 
 /** Undefined options taken out (so they don't hide the place's own). */
 const given = (options: Partial<WorldOptions>) => Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)) as Partial<WorldOptions>;

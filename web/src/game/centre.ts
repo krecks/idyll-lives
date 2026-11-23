@@ -14,6 +14,8 @@ const HIGH_STREET = 180;
 const BAND = 32;
 /** The bands a centre's outline is tried at, widest first (`outline`): a narrower one where the wider crosses itself, or isn't the densest. */
 export const BANDS = [BAND, 24, 18, 12];
+/** What a city's avenue counts against being its high street (m, as nearer the middle): its through road, the shops on a street off it. */
+const AVENUE_HIGH_STREET = 400;
 /** A centre's side narrowed to its kerb (`narrowCentre`): the road's half-width and its pavement, about (m). */
 const KERB_BAND = 6;
 /** A main town's square (m along its street, m deep), the larger first. */
@@ -57,8 +59,8 @@ export function selfCrossing(poly: readonly Pt[]): boolean {
 }
 
 /**
- * A main town's centre (area `area`): its high street, the stretch of its street (else a lane)
- * nearest its middle, `HIGH_STREET` m long at most, and a square off it on the side towards the
+ * A main town's centre (area `area`): its high street, the stretch of its street (else a lane; a
+ * city's avenue last of all, its through road) nearest its middle, `HIGH_STREET` m long at most, and a square off it on the side towards the
  * middle if it has room there (else the other), the largest of `SQUARES` that fits on land
  * nothing takes yet (no road, green or water). Of the stretches, the one with the most land free to
  * build on round it counts for more (nothing on it, and not `steep`: a hillside its lots would be
@@ -93,7 +95,7 @@ export function chooseCentre(roads: readonly RoadPlan[], areaRoads: readonly num
         const [x, z] = [(i % ground.w) + 0.5, Math.floor(i / ground.w) + 0.5];
         if (!ground.takenAt(x, z) && !steep(x, z)) free++;
       });
-      const score = dist(p, middle) + (road.kind === 'lane' ? 40 : 0) + (1 - free / Math.max(1, all)) * 200 + (BAND - band) * 3;
+      const score = dist(p, middle) + (road.kind === 'lane' ? 40 : road.kind === 'avenue' ? AVENUE_HIGH_STREET : 0) + (1 - free / Math.max(1, all)) * 200 + (BAND - band) * 3;
       if (!best || score < best.score) best = { road: r, s0: mid - half, s1: mid + half, side: near.side, score };
     }
   }
