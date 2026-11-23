@@ -37,7 +37,7 @@ import { chooseCentre, densestCentre, type Centre } from './centre';
 import { tilesOf } from './footprints';
 import { designs, DensePass, NEAR_CORNER, pooled, raisePlaces, terraceUnits, townPlaces } from './dense';
 import { besidePlace, bySquare, clearOfDrives, driveLines, LOOSE_BEND, parkAlong, vergeParking, type CarParkLaid } from './parking';
-import { COVER, COVER_CELL, coverSpan, LAND_CELL, NONE, type Land as LandField } from './land';
+import { COVER, COVER_CELL, coverSpan, heightAt as landHeightAt, LAND_CELL, NONE, type Land as LandField } from './land';
 import { APRON, landZones, Protection, wetTiles, type BuiltLand } from './landEdit';
 import { bridgeSites, dryPieces, type Bounds } from './landPieces';
 import { GENTLE_TILT, seedBare, smoothHeights, type GentlePlane } from './landFollow';
@@ -45,7 +45,8 @@ import { outlines, rasterize, rle, simplify } from './landMasks';
 import { between, fbm, mulberry32 } from './noise';
 import type { UseLayer } from './uses';
 import { along, astar, CELL, Cells, clearOfBoxes, COUNTRY_GRADE, COUNTRY_WIDTH, CountryRouter, CTRL_APART, FACING, ROAD_WIDTH, ROUTE_GRADE, SIDE_COST, TRIES, type Port, type Way } from './countryRouter';
-import { centroid, cropRoads, curve, evenly, inside, keepOf, leftOf, lengths, nearest, pointAt, RoadIndex, roadIndex, roadLengths, roadMeets, straightAround, type Box, type Pt, type RoadPlan } from './roads';
+import { centroid, cropRoads, curve, evenly, inside, keepOf, leftOf, lengths, nearest, pointAt, rasterRoads, RoadIndex, roadIndex, roadLengths, roadMeets, straightAround, type Box, type Pt, type RoadPlan } from './roads';
+import { finishMotorway, gateEnds, routeMotorway, type MotorwayRoute } from './motorway';
 import { lotName, placeOfTemplate, placeUnit } from './placeLots';
 import { BIG_COURTS, boundsOf, COURTS, frontageOf, Ground, houseFor, joinUp, lotAt, LotPlacer, plotRect, reachesRoad, settleRoads, shuffled, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
 import { LAND_SIZE, LEGACY_KINDS, placeOf, specOf, streetNames, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind, type WorldSpec, type WorldStep } from './world';
@@ -141,6 +142,8 @@ export interface LayOptions {
   site?: Pt;
   waterKept?: boolean;
   plan?: LandPlan;
+  /** Why the world is laid with no motorway (it was routed, but found nowhere for its junction): laid again without it. */
+  noMotorway?: string;
 }
 
 /**
@@ -845,9 +848,20 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   if (missing > 0) plans[0].spec = { ...mainSpec, lots: mainSpec.lots + missing * spec.hamlet.lots[0] };
 
   step?.('land');
+  // ---- the motorway's course: edge to edge past the main town, where it fits (`motorway.ts`) ----
+  // (Its water at the metre, as the lots' mask has it below: the ponds come later, and keep off the roads.)
+  const motorWater = shaped ? (kept && planRiver ? rasterize([planRiver.poly], W, D) : kept && plan?.coast ? rasterize([islandSea(plan.coast, W, D)], W, D) : (wet1m ?? wetTiles(shaped, W, D))) : river ? rasterize([river.poly], W, D) : coast.length ? rasterize([islandSea(coast, W, D)], W, D) : rasterize(outlines(land.water, gw, gd, 2), W, D);
+  const motorWet = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < D && motorWater[Math.floor(z) * W + Math.floor(x)] === 1;
+  const motorRoute = lay?.noMotorway ? { failed: lay.noMotorway } : routeMotorway({ land, ...(shaped ? { height: (x: number, z: number) => landHeightAt(shaped, x, z) } : {}), areas: plans, roads, wet: motorWet, seed: lay?.townSeed ?? seed });
+  const motorway = 'failed' in motorRoute ? null : motorRoute;
+  /** Why the world has no motorway (`diagnostics.motorway`), if it has none. */
+  const noMotorway = 'failed' in motorRoute ? motorRoute.failed : '';
   // ---- country roads: between the areas (a tree of them and one more for a loop), and out ----
-  // (Routed over the land's cells, round the areas' boxes, sharing the roads laid as they go down: `countryRouter.ts`.)
-  const router = new CountryRouter(land, plans, roads, spec);
+  // (Routed over the land's cells, round the areas' boxes, sharing the roads laid as they go down, off the motorway but
+  // at its gates: `countryRouter.ts`.)
+  const router = new CountryRouter(land, plans, roads, spec, motorway?.blocked ?? new Uint8Array(gw * gd));
+  /** Whether a straight way at `q` would cross the motorway's land but by a gate. */
+  const offMotorway = (q: Pt) => !router.blocked[land.cell(q[0], q[1])];
   const { areaBlock, wetNear } = router;
   /** Whether the land within `SPILL_LOOK` m of `p` is gentle enough for a lot out along a country road (any, in a classic world). */
   const gentleBy = (p: Pt) => {
@@ -922,7 +936,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     for (let d = 2; d <= STRAIGHT_ON; d += 2) {
       const q: Pt = [w.p[0] + w.dir[0] * d, w.p[1] + w.dir[1] * d];
       const owner = areaBlock[land.cell(q[0], q[1])];
-      if (land.wet(q[0], q[1], 3) || (owner && owner !== b + 1 && owner !== (w.port?.area ?? -2) + 1)) return null;
+      if (land.wet(q[0], q[1], 3) || !offMotorway(q) || (owner && owner !== b + 1 && owner !== (w.port?.area ?? -2) + 1)) return null;
       const by = depth(q);
       if (by === -1) continue;
       // (The first of its roads it comes near is the one it meets, and nothing else on the way.)
@@ -954,7 +968,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     for (let d = 2; d < l - 1; d += 2) {
       const q: Pt = [w.p[0] + u[0] * d, w.p[1] + u[1] * d];
       const owner = areaBlock[land.cell(q[0], q[1])];
-      if (land.wet(q[0], q[1], 3) || (owner && owner !== a + 1 && owner !== b + 1)) return false;
+      if (land.wet(q[0], q[1], 3) || !offMotorway(q) || (owner && owner !== a + 1 && owner !== b + 1)) return false;
       // (Clear of every road but by its ends, where it meets the roads it leaves and comes to.)
       if (d > ROAD_WIDTH && d < l - ROAD_WIDTH && index.nearest(q[0], q[1], ROAD_WIDTH)) return false;
     }
@@ -1167,7 +1181,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       const index = new RoadIndex(roads);
       const open = (l: { a: Pt; b: Pt }, clear: number) => {
         const pts = evenly([l.a, l.b], 4);
-        return pts.every((q) => plans.every((plan) => offRect(plan.rect, q) >= clear) && !index.nearest(q[0], q[1], 12)) && crossings.every((c) => dist(mid(c), mid([l.a, l.b])) >= PIECE_BRIDGES_APART);
+        return pts.every((q) => plans.every((plan) => offRect(plan.rect, q) >= clear) && !index.nearest(q[0], q[1], 12) && offMotorway(q)) && crossings.every((c) => dist(mid(c), mid([l.a, l.b])) >= PIECE_BRIDGES_APART);
       };
       const all = oriented().sort((x, y) => x.score - y.score);
       if (!all.length) break;
@@ -1396,7 +1410,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       const b = span.far;
       const pts = evenly([a, b], 2);
       if ([a, b].some((p) => Math.min(p[0], p[1], W - p[0], D - p[1]) < 40 || land.wet(p[0], p[1], 2))) continue;
-      if (pts.some((p) => plans.some((plan) => offRect(plan.rect, p) < BRIDGE_CLEAR) || index.nearest(p[0], p[1], 12))) continue;
+      if (pts.some((p) => plans.some((plan) => offRect(plan.rect, p) < BRIDGE_CLEAR) || index.nearest(p[0], p[1], 12) || !offMotorway(p))) continue;
       const near = (p: Pt) => index.nearest(p[0], p[1], 300)?.dist ?? 300;
       sites.push({ a, b, score: near(a) + near(b) });
     }
@@ -1422,6 +1436,42 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       });
       more--;
     }
+  }
+  // ---- the motorway laid: raised over the roads under it, its junction a half-diamond on the nearest the town ----
+  if (motorway) {
+    const named = (wanted: string) => uniqueName(wanted, `${wanted} Old`);
+    let laid = finishMotorway(motorway, roads, motorWet, mainCentre, roads.length, named);
+    // (No road under it with room for its ramps: one from the town under it at its junction's gate, then on.)
+    if (!laid && junctionLink(motorway)) laid = finishMotorway(motorway, roads, motorWet, mainCentre, roads.length, named);
+    // (Nowhere for it: the world laid again without it, its country roads routed as if it never was.)
+    if (!laid) return generateFromSpec(content, t, spec, seed, name, step, shaped, { ...lay, noMotorway: 'No motorway: no road under it with room for its junction.' });
+    for (const [r, list] of laid.under) roads[r] = { ...roads[r], crosses: [...(roads[r].crosses ?? []), ...list] };
+    roads.push(...laid.roads);
+  }
+  /**
+   * A country road from the main town under the motorway at its junction's gate (`gateEnds`), then on from there to
+   * the nearest country road, a port nobody took or the edge of the world (`wayOn`; a dead end if none). Whether one
+   * was laid.
+   */
+  function junctionLink(route: MotorwayRoute): boolean {
+    const { far, dir } = gateEnds(route, mainCentre);
+    const goalCell = land.cell(far[0], far[1]);
+    const outs = waysOut(0, far).slice(0, WAYS);
+    if (!outs.length) return false;
+    const ends = outs.flatMap((w) => (w.port ? [w.port.p, w.p] : []));
+    const found = router.route(outs, (i, h) => (i === goalCell && (h === undefined || along(h, dir) > 0.9) ? 0 : -1), (i) => dist(land.centre(i), far) / CELL, dir, router.costs(ends));
+    if (!found) return false;
+    const from = outs[found.from];
+    const end: Way = { p: [round2(far[0]), round2(far[1])], dir: [-dir[0], -dir[1]] };
+    const name = () => uniqueName(`${plans[0].name} Road`, `${plans[0].name} Lane`);
+    const { laid: pieces, first } = router.course(router.road(from, found.cells, end, ['join', 'join'], ''), from, found.cells, end);
+    for (const road of pieces) roads.push({ ...router.settle(road), name: name() });
+    if (first && from.port) from.port.used = true;
+    // (On from its far end.)
+    const q: Port = { road: roads.length - 1, end: 1, area: -1, p: end.p, dir, used: false };
+    const on = wayOn(q, -1);
+    if (!on || !layOn(on, plans[0].name)) roads[q.road] = { ...roads[q.road], ends: [roads[q.road].ends[0], 'dead'] };
+    return true;
   }
   // Ports still nobody's (no way on from them): their roads end there.
   for (const plan of plans) {
@@ -1684,6 +1734,14 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
 
   // (A trail keeps off the water and the car parks.)
   const keepOff = waterMask.slice();
+  // (And the motorway and its ramps, their edges and a little more.)
+  const offMotor = rasterRoads(
+    worldRoads.filter((r) => r.kind === 'motorway' || r.kind === 'ramp'),
+    W,
+    D,
+    (r) => r.width / 2 + 3,
+  );
+  for (let i = 0; i < offMotor.length; i++) if (offMotor[i]) keepOff[i] = 1;
   for (const p of parks) tilesOf(p.park.poly, 0.5, (x, z) => {
     if (x >= 0 && z >= 0 && x < W && z < D) keepOff[z * W + x] = 1;
   });
@@ -1884,7 +1942,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       ...(lay?.townSeed !== undefined && lay.townSeed !== seed ? { townSeed: lay.townSeed } : {}),
       ...(shaped?.edited ? { shaped: true as const } : {}),
     },
-    diagnostics: { dropped: lots.dropped, ...(failed.length ? { roads: failed } : {}), ...(reachable && missing > 0 ? { villages: { left: missing, homes: missing * spec.hamlet.lots[0] } } : {}), ...(unreached.length ? { pieces: unreached } : {}) },
+    diagnostics: { dropped: lots.dropped, ...(failed.length ? { roads: failed } : {}), ...(reachable && missing > 0 ? { villages: { left: missing, homes: missing * spec.hamlet.lots[0] } } : {}), ...(unreached.length ? { pieces: unreached } : {}), ...(noMotorway ? { motorway: noMotorway } : {}) },
     open: {
       areas,
       zones,

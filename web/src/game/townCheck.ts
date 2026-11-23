@@ -13,7 +13,7 @@
  * more than `SIDE_BY_SIDE` m, areas apart, hamlets of four lots or more, residents within the cap,
  * every road named (no two alike); lots inside the world, apart from each other and off the roads,
  * each by its road (a park may stand on a green), the ways out on its edge. Over the water only
- * bridges and causeways, each over its deck (`bridge`) alone, straight and not too long; a river
+ * bridges and causeways, each over its deck (`bridge`) alone, straight (a motorway's as it bends) and not too long; a river
  * world (`river`) has a bridge. And the living town's lots, parking, centre and places (`livingProblems`).
  *
  * With `expect` (`world.ts` `expectations`), the world is filled and its homes as many as its place
@@ -28,6 +28,7 @@ import { centreDensity } from './centre';
 import { fillPoly, overlaps } from './footprints';
 import { AREA_APART } from './macro';
 import { COUNTRY_TURN } from './countryRouter';
+import { BEND_RADIUS } from './motorway';
 import { unrle } from './landMasks';
 import { COURT, inside, lengths, nearest, pointAt, RoadIndex, roadMask, sharpestTurn, sideBySide, type Pt } from './roads';
 import { BIG_COURTS, COURTS, NEIGHBOUR_CAP, turner, type Facing } from './town';
@@ -83,7 +84,7 @@ const SPAN = 45;
 /** A deck the player drew (a town checked as edited, not generated: `townProblems`' `generated`) may be this long (m: `bridges.ts` `DRAWN_SPAN`). */
 const DRAWN_SPAN = 70;
 const CAUSEWAY = 140;
-/** A bridge's deck runs straight: it turns no further than this (radians) end to end. */
+/** A bridge's deck runs straight: it turns no further than this (radians) end to end; a motorway's bends with it, no tighter than its `BEND_RADIUS`. */
 const DECK_TURN = 0.05;
 
 /**
@@ -325,7 +326,8 @@ function bridgeProblems(town: CheckedTown, roads: readonly RoadPlan[], river: bo
     const most = r.ends.includes('out') ? CAUSEWAY : span;
     if (s1 - s0 > most) out.push(`${name}'s deck is ${(s1 - s0).toFixed(0)} m long (${most} m at most)`);
     const turn = Math.abs(headingAt(r.points, s1, ls) - headingAt(r.points, s0, ls));
-    if (Math.min(turn, 2 * Math.PI - turn) > DECK_TURN) out.push(`${name}'s deck turns ${((turn * 180) / Math.PI).toFixed(0)}°`);
+    const bends = DECK_TURN + (r.kind === 'motorway' ? (s1 - s0) / BEND_RADIUS : 0);
+    if (Math.min(turn, 2 * Math.PI - turn) > bends) out.push(`${name}'s deck turns ${((turn * 180) / Math.PI).toFixed(0)}°`);
   }
   if (river && !roads.some((r) => r.bridge && !r.ends.includes('out'))) out.push('a river with no bridge over it');
   return out;

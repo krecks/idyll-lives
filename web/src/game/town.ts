@@ -243,6 +243,8 @@ export interface NeighbourhoodDraft {
     pieces?: string[];
     /** Lots, roads out and courts given up so the world's built land keeps within its slope limits (`landFollow.ts` `settleLand`). */
     slopes?: { lots: number; roads: number; courts: number };
+    /** Why the world has no motorway (`macro.ts`, `motorway.ts`): none of its courses fits, or nowhere for its junction. */
+    motorway?: string;
   };
 }
 
