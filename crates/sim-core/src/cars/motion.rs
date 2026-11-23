@@ -58,6 +58,7 @@ impl Car {
             avoided: Vec::new(),
             pass_by: None,
             speed: None,
+            merge_first: Vec::new(),
         }
     }
 
@@ -214,6 +215,7 @@ impl Car {
             avoided: Vec::new(),
             pass_by: None,
             speed: None,
+            merge_first: Vec::new(),
         }
     }
 
@@ -593,11 +595,27 @@ pub(crate) fn lane_tops(
     junctions: &[[f32; 2]],
     kind_at: impl Fn(usize) -> crate::travel::RoadKind,
 ) -> Vec<f32> {
-    use crate::travel::dist;
+    use crate::travel::{RoadKind, dist};
     let n = lane.len();
     let mut tops: Vec<f32> = (0..n)
         .map(|i| crate::travel::kind_speed(kind_at(i), travel.country_speed))
         .collect();
+    // (Up an on-ramp's last `MERGE_LANE` m before its carriageway, the carriageway's speed: it
+    // speeds up there to merge, as far as its bends let it, `Legs::timed`.)
+    let mut on_motorway: Option<usize> = None;
+    for i in (0..n).rev() {
+        match kind_at(i) {
+            RoadKind::Motorway => on_motorway = Some(i),
+            RoadKind::Ramp => {
+                if let Some(m) = on_motorway
+                    && dist(lane[i], lane[m]) < MERGE_LANE
+                {
+                    tops[i] = tops[i].max(tops[m]);
+                }
+            }
+            _ => on_motorway = None,
+        }
+    }
     let heading = |a: usize, b: usize| {
         let (p, q) = (lane[a], lane[b]);
         (q[0] - p[0]).atan2(q[1] - p[1])
@@ -637,6 +655,10 @@ pub(crate) fn lane_tops(
     }
     tops
 }
+
+/// How far up an on-ramp before it merges a car speeds up to the carriageway's speed (m,
+/// `lane_tops`): the claim's stretch up the ramp (`MERGE_UP`) and a little.
+const MERGE_LANE: f32 = MERGE_UP + 10.0;
 
 /// `empty_drive_ticks`'s drive, laid out.
 pub(crate) fn empty_drive_route(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Option<Route> {

@@ -57,11 +57,18 @@
 //! (`conflict`, `cars::vehicles`, the walkers' `cars::in_the_way`): nobody under a deck waits for
 //! a car on it, nor it for them; a junction's box, lights and zebras under a deck aren't the
 //! deck's. A car coming off a ramp onto a motorway's carriageway claims its merge (`Claim::merge`,
-//! from `cars::MERGE_UP` up the ramp to `cars::MERGE_ON` past it), granted by rule 3 only with
-//! the carriageway's traffic clear of it for some 4 s of drive (`LOOK_FAST`), going its way too;
+//! from `cars::MERGE_UP` up the ramp to `cars::MERGE_ON` past it), asked for as soon as it would
+//! begin to slow down to stop there (`cars::ask_ahead`), granted by rule 3 only with the
+//! carriageway's traffic clear of it for some 4 s of drive (`LOOK_FAST`), going its way too;
 //! those on the carriageway claim nothing and never keep clear of a merge's claim (`blocked`):
 //! they keep behind the car in front, the further back the faster they go
-//! (`cars::follow_ahead`), as anyone. Off a carriageway onto a ramp, nobody claims anything.
+//! (`cars::follow_ahead`), as anyone. One come within reach after the merge was granted, the two
+//! take turns as if both on the carriageway already (`cars::ease`): the one along it eases off
+//! behind the one merging, or, nearer than it could comfortably keep back, the one merging slows
+//! short of the taper to let it by, as each first works it out (`Car::merge_first`). Off a
+//! carriageway onto a ramp, nobody claims anything. Nobody held up on a carriageway or a ramp
+//! turns round or backs up there (`cars::unjam`, `cars::back_off`): it waits; held up for good
+//! out of the picture, it's put on (`cars::unstick`).
 //!
 //! Nothing here is saved but the lights (`Light`): the zones and the claims are worked out again
 //! with the routes, and a car found in a part it doesn't hold (a game just loaded) takes it as it

@@ -12,8 +12,13 @@
 //!   as far back as it could stop if that one stopped as it does (`follow_ahead`'s ground and
 //!   `EASE_ROOM` more): at speed it keeps as far back as `follow_ahead` says, and coming up to one
 //!   standing it slows to a stop behind it;
+//! - one about to merge onto its carriageway off a ramp, holding its merge's claim
+//!   (`traffic::Claim::merge`), as if it were already where it'll be along the carriageway: nearer
+//!   the merge than this one is, it's ahead of it (as a driver lets one in that was let in);
+//!   and the other way round, merging, those on the carriageway nearer the merge;
 //! - the start of a merge's claim, or of one through lights not green for it, it doesn't hold: it
-//!   comes up to it at `CREEP` at least, and asks there (`Traffic::may_go`).
+//!   comes up to it at `CREEP` at least, and asks there (`Traffic::may_go`; for a merge, as soon
+//!   as it would begin to slow down for it: `ask_ahead`, let in by then, it goes on at speed).
 //!
 //! Every rule that holds a car up still does, at once, as the last resort (`up_against`, the
 //! claims, `guard`); easing off as above, it seldom comes to that. Classic towns have none of these
@@ -37,12 +42,18 @@ const STANDS: f32 = 0.05;
 const SET_OFF: f32 = 1.0;
 /// How far along its way it looks at most (m).
 const EASE_LOOK: f32 = 200.0;
+/// How near its way passes a merge's point for it to come to it there (m).
+const MERGE_NEAR: f32 = 3.0;
+
 /// What `ease` says of a car's tick: how far on along its way (ticks), its speed after it (m/s),
 /// and the car it keeps back for (`car_first`'s key), standing.
 pub(crate) struct Eased {
     pub step: f32,
     pub speed: f32,
     pub behind: Option<u64>,
+    /// Which goes first at a merge, newly worked out (`merge_order`): the car merging, the key of
+    /// the one along the carriageway, and whether the one merging goes first (`Car::merge_first`).
+    pub decided: Vec<(usize, u64, bool)>,
 }
 
 /// How fast a car `t` ticks along `route` goes keeping to its timing (m/s of drive time).
@@ -126,6 +137,60 @@ impl Path {
     }
 }
 
+/// Where car `k` merges onto a motorway's carriageway next, still ahead of it: the point and the
+/// tick along its way (`Route::merges`).
+fn merge_at(k: &Car) -> Option<([f32; 2], f32)> {
+    let (_, r) = k.route.as_ref()?;
+    let m = *r.merges.iter().find(|&&m| m >= k.progress)?;
+    Some((r.at(m).0, m))
+}
+
+/// Of car `ramp` merging (holding its merge's claim) at `at` (its point and tick along its way:
+/// `merge_at`) and car `by` coming along the carriageway to it, each as far from it as `ramp` and
+/// `by` (m along their ways), and which goes first (`ramp_first`): the one merging, if `by` can
+/// keep back behind it from where it is, slowing by `BRAKE` at most (as if both on the carriageway
+/// already, `ease`), or if it couldn't stop short of the taper itself any more (`TAPER`,
+/// `BRAKE_MOST`); else `by`, the one merging slowing to let it by. Worked out once, as they first
+/// come to it, and kept (`Car::merge_first`, `new`): the same for both cars, and nobody changing
+/// their mind, both slowing for each other by turns. None: `by`'s way doesn't come to it.
+fn merge_order(w: &World, ramp: usize, by: usize, at: ([f32; 2], f32)) -> Option<MergeOrder> {
+    let (r, b) = (&w.cars[ramp], &w.cars[by]);
+    // (Not one merging there too, up the ramp behind it: that one keeps behind it as anyone.)
+    if merge_at(b).is_some_and(|(p, _)| dist(p, at.0) < MERGE_NEAR) {
+        return None;
+    }
+    let kept = r
+        .merge_first
+        .iter()
+        .find(|d| d.0 == car_first(by))
+        .map(|d| d.1);
+    let ramp_d = Path::new(&r.route.as_ref()?.1, r.progress, EASE_LOOK).at_tick(at.1)?;
+    let (by_d, _) =
+        Path::new(&b.route.as_ref()?.1, b.progress, EASE_LOOK).reach(at.0, MERGE_NEAR)?;
+    let (vr, vb) = (speed_of(r), speed_of(b));
+    let lens = (r.len + b.len) / 2.0;
+    let committed = ramp_d - TAPER - r.len / 2.0 < vr * vr / (2.0 * BRAKE_MOST) + EASE_ROOM;
+    let keeps_back = by_d - ramp_d
+        >= (vb * vb - vr * vr).max(0.0) / (2.0 * BRAKE)
+            + follow_ahead(vr, w.travel.country_speed)
+            + EASE_ROOM
+            + lens;
+    Some(MergeOrder {
+        ramp_first: kept.unwrap_or(committed || keeps_back),
+        new: kept.is_none(),
+        ramp: ramp_d,
+        by: by_d,
+    })
+}
+
+/// `merge_order`'s answer.
+struct MergeOrder {
+    ramp_first: bool,
+    new: bool,
+    ramp: f32,
+    by: f32,
+}
+
 /// Car `c`, `t` ticks along its way (`home`: the way back), its own speed `carried` (`Car::speed`),
 /// on the move last tick or not (`moving`), with `others` on the road about it (`vehicles`): its
 /// tick at a speed of its own, on an avenue, a motorway or a ramp or till it's back at its way's
@@ -169,7 +234,6 @@ pub(crate) fn ease(
     // where it slows.)
     let mut v = path.tops().min(v0 + ACCEL * tick);
     let mut behind = None;
-    let stop = |d: f32| (2.0 * BRAKE * (d - v0 * tick).max(0.0)).sqrt();
     let mut keep = |v: &mut f32, lim: f32, k: Option<u64>| {
         if lim < *v {
             *v = lim;
@@ -195,6 +259,72 @@ pub(crate) fn ease(
             safe(d - half - o.len / 2.0, speed_of(other) * along),
             Some(o.first),
         );
+    }
+    // A merge: the one merging and those coming along the carriageway, as if both on it
+    // already (`merge_order`).
+    let merging = w.traffic.merging();
+    let mut decided = Vec::new();
+    let stop = |d: f32| (2.0 * BRAKE * (d - v0 * tick).max(0.0)).sqrt();
+    if merging.contains(&key) {
+        if let Some((m, mt)) = merge_at(car) {
+            for o in others
+                .iter()
+                .filter(|o| o.ahead > 0.0 && !merging.contains(&o.first))
+            {
+                let k = (o.first & !(1 << 63)) as usize;
+                if dist(o.at, m) > EASE_LOOK {
+                    continue;
+                }
+                let Some(order) = merge_order(w, c, k, (m, mt)) else {
+                    continue;
+                };
+                if order.new {
+                    decided.push((c, o.first, order.ramp_first));
+                }
+                if order.ramp_first {
+                    continue;
+                }
+                let other = &w.cars[k];
+                // (That one first: behind it once it's ahead, short of the taper till then.)
+                let lim = if order.by < order.ramp {
+                    safe(
+                        order.ramp - order.by - half - other.len / 2.0,
+                        speed_of(other),
+                    )
+                } else {
+                    stop(order.ramp - TAPER - half)
+                };
+                keep(&mut v, lim, Some(o.first));
+            }
+        }
+    } else {
+        for &o in &merging {
+            let k = (o & !(1 << 63)) as usize;
+            let Some(at) = w.cars.get(k).and_then(merge_at) else {
+                continue;
+            };
+            if path.reach(at.0, MERGE_NEAR).is_none() {
+                continue;
+            }
+            let Some(order) = merge_order(w, k, c, at) else {
+                continue;
+            };
+            if order.new {
+                decided.push((k, key, order.ramp_first));
+            }
+            if !order.ramp_first {
+                continue;
+            }
+            let other = &w.cars[k];
+            keep(
+                &mut v,
+                safe(
+                    order.by - order.ramp - half - other.len / 2.0,
+                    speed_of(other),
+                ),
+                Some(o),
+            );
+        }
     }
     // The start of a claim it stops at, not holding it.
     let tag = u32::from(home);
@@ -226,5 +356,55 @@ pub(crate) fn ease(
         step,
         speed: if step >= 1.0 { plan } else { v },
         behind,
+        decided,
     })
 }
+
+/// Car `c`, `t` ticks along its way (`home`: the way back) at a speed of its own (`carried`, on the
+/// move last tick or not: `moving`), coming up to a merge's claim it doesn't hold
+/// (`traffic::Claim::merge`): it asks for it as soon as it would begin to slow down to stop at its
+/// start (`BRAKE`), not only there. Let in by then, it goes on onto the carriageway at its speed;
+/// else it slows down to stop there (`ease`), asking on.
+pub(crate) fn ask_ahead(
+    w: &mut World,
+    c: usize,
+    t: f32,
+    carried: Option<f32>,
+    moving: bool,
+    home: bool,
+) {
+    let World {
+        cars,
+        traffic,
+        tick,
+        ..
+    } = w;
+    let Some((h, route)) = cars[c].route.as_ref() else {
+        return;
+    };
+    if *h != home || route.merges.is_empty() {
+        return;
+    }
+    let v0 = carried.unwrap_or(if moving { plan_speed(route, t) } else { 0.0 });
+    let tick_s = 1.0 / DRIVE_TICKS_PER_SECOND;
+    let reach = v0 * v0 / (2.0 * BRAKE) + 2.0 * v0 * tick_s + ASK_AHEAD;
+    let key = car_first(c);
+    let tag = u32::from(home);
+    let Some(k) = route
+        .claims
+        .iter()
+        .position(|claim| claim.from > t + 1.0)
+        .filter(|&k| route.claims[k].merge && !traffic.holds_part(key, tag, k))
+    else {
+        return;
+    };
+    let from = route.claims[k].from;
+    let path = Path::new(route, t, reach);
+    if path.at_tick(from).is_some() {
+        traffic.may_go(*tick, key, tag, &route.claims, t, from + 1e-3);
+    }
+}
+
+/// How much further off than it would begin to slow down to stop at it a car asks for its merge
+/// (m, `ask_ahead`).
+const ASK_AHEAD: f32 = 5.0;

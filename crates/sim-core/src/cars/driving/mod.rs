@@ -397,8 +397,23 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
         return;
     }
     // (On an avenue, a motorway or a ramp, as far as its own speed takes it, `ease`; else a tick
-    // on, as its way's timing has it.)
+    // on, as its way's timing has it. Coming up to a merge, asking for it ahead.)
+    if carried.is_some() {
+        ask_ahead(w, c, t, carried, moving, home);
+    }
     let eased = ease(w, c, t, carried, moving, home, &others);
+    if let Some(e) = eased.as_ref() {
+        // (Which goes first at a merge, kept with the one merging till it's merged.)
+        for &(k, by, first) in &e.decided {
+            let list = &mut w.cars[k].merge_first;
+            if !list.iter().any(|d| d.0 == by) {
+                list.push((by, first));
+            }
+        }
+        if !w.cars[c].merge_first.is_empty() && !w.traffic.merging().contains(&key) {
+            w.cars[c].merge_first.clear();
+        }
+    }
     let step = eased.as_ref().map_or(1.0, |e| e.step);
     if let Some(e) = eased.as_ref().filter(|e| e.step <= 0.0) {
         let car = &mut w.cars[c];

@@ -346,6 +346,11 @@ pub struct Car {
     /// (out of sight, or just put somewhere). Not saved: a game loaded, it's at its way's speed.
     #[serde(skip)]
     pub(crate) speed: Option<f32>,
+    /// Merging onto a motorway's carriageway (holding its merge's claim), which goes first, it or
+    /// each car coming along the carriageway to it (`car_first`'s key; true: it), as first worked
+    /// out (`ease`'s `merge_order`): kept till it's merged. Not saved: worked out again.
+    #[serde(skip)]
+    pub(crate) merge_first: Vec<(u64, bool)>,
 }
 
 pub(super) fn is_zero_f32(v: &f32) -> bool {

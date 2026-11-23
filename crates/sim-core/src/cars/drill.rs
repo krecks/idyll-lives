@@ -57,6 +57,11 @@ pub fn hold(w: &mut World, c: usize, t: f32) {
     car.speed = Some(0.0);
 }
 
+/// Whether car `c` holds its merge's claim onto a motorway's carriageway (`traffic::Claim::merge`).
+pub fn merging(w: &World, c: usize) -> bool {
+    w.traffic.merging().contains(&car_first(c))
+}
+
 /// Whether car `c` goes at a speed of its own (`Car::speed`: on an avenue, a motorway or a ramp).
 pub fn eased(w: &World, c: usize) -> bool {
     w.cars[c].speed.is_some()

@@ -1671,6 +1671,111 @@ fn taxis_stand_on_an_avenue_on_the_riders_side() {
     assert_eq!(stands, 26);
 }
 
+/// A long straight carriageway along z = 100 (cars going east, a kilometre end to end) and an
+/// on-ramp onto it off a street from the north, merging at x = 450, its last 50 m straight
+/// beside it: where a car merging comes up to the carriageway's speed (the hierarchy's merges
+/// at its edge). And where through cars and those up the ramp go from and to.
+#[allow(clippy::type_complexity)]
+fn merge_world() -> (World, ([f32; 2], [f32; 2]), ([f32; 2], [f32; 2]), [f32; 2]) {
+    let roads = json!([
+        {"points": polyline(&[[0.5, 100.0], [999.5, 100.0]]), "width": 9, "ends": ["out", "out"],
+            "kind": "motorway", "oneway": 1, "name": "Motorway"},
+        {"points": polyline(&[[300.0, 199.5], [300.0, 140.0]]), "width": 7, "ends": ["out", "join"],
+            "kind": "street", "name": "Ramp Street"},
+        {"points": polyline(&[[300.0, 140.0], [320.0, 112.0], [400.0, 106.0], [450.0, 100.0]]),
+            "width": 5, "ends": ["join", "merge"], "kind": "ramp", "oneway": 1, "name": "On-ramp"},
+    ]);
+    let town = json!({
+        "width": 1000, "depth": 200, "size": "big",
+        "walls": [], "doors": [], "windows": [], "objects": [],
+        "plots": [], "households": [], "sims": [], "relationships": [],
+        "roads": roads, "meta": {"roads": roads},
+        "exits": [[0.5, 100.0], [999.5, 100.0], [300.0, 199.5]],
+    });
+    let w = World::from_json(&common::content(), &town.to_string(), 1).expect("it loads");
+    (
+        w,
+        ([40.0, 100.0], [990.0, 100.0]),
+        ([300.0, 190.0], [990.0, 100.0]),
+        [450.0, 100.0],
+    )
+}
+
+#[test]
+fn a_car_coming_late_eases_off_behind_one_merging() {
+    // A car up the on-ramp granted its merge with the carriageway clear, and one along the
+    // carriageway at speed coming within reach of the merge only after that, from further back
+    // to nearer the merge: whichever is nearer the merge goes first, the other easing off behind
+    // it, neither slowing down harder than a driver would nor stopping, nobody overlapping, and
+    // every claim let go after.
+    let mut firsts = [0; 2];
+    for back in [40.0f32, 70.0, 100.0, 130.0, 160.0, 200.0] {
+        let (mut w, (a, b), (from, to), merge) = merge_world();
+        let ramp = drill::add_on(&mut w, from, to, 0.0).expect("up the ramp");
+        assert_eq!(drill::merges(&w, ramp).len(), 1, "one merge");
+        // (On till it holds its merge.)
+        let mut ticks = 0;
+        while !drill::merging(&w, ramp) {
+            drill::step(&mut w);
+            ticks += 1;
+            assert!(ticks < 3000, "the merge granted");
+        }
+        let late = drill::add_on(&mut w, a, b, 0.0).expect("along the carriageway");
+        let t = tick_at(&w, late, [merge[0] - back, merge[1]]);
+        drill::put(&mut w, late, t);
+        let cars = [ramp, late];
+        let mut speeds = Speeds::new(&w, &cars);
+        let mut slowest = f32::INFINITY;
+        // (Which of them is past the merge first.)
+        let mut first = None;
+        for tick in 0..5000 {
+            let eased: Vec<bool> = cars.iter().map(|&c| drill::eased(&w, c)).collect();
+            drill::step(&mut w);
+            assert_eq!(overlapping(&w, &cars), vec![], "{back} m back, tick {tick}");
+            if first.is_none() {
+                first = (0..2).find(|&i| {
+                    w.cars[cars[i]]
+                        .shown
+                        .is_none_or(|s| s.0[0] > merge[0] + 5.0)
+                });
+            }
+            for (i, v) in speeds.step(&w, &cars).into_iter().enumerate() {
+                let Some(v) = v.filter(|_| eased[i]) else {
+                    continue;
+                };
+                assert!(
+                    accel(v) > -BRAKES_AT_MOST,
+                    "{back} m back, tick {tick}: car {} from {} to {} m/s",
+                    cars[i],
+                    v.1,
+                    v.0
+                );
+                if i == 1 {
+                    slowest = slowest.min(v.0);
+                }
+            }
+            assert_eq!(
+                waits_for_a_car(&w, late),
+                None,
+                "{back} m back, tick {tick}: the late one held up"
+            );
+            if cars.iter().all(|&c| w.cars[c].shown.is_none()) {
+                break;
+            }
+        }
+        assert!(
+            cars.iter().all(|&c| w.cars[c].shown.is_none()),
+            "{back} m back: all through"
+        );
+        firsts[first.expect("one first")] += 1;
+        assert!(slowest > 10.0, "{back} m back: slowed to {slowest} m/s");
+        assert_eq!(w.traffic.guarded, 0, "{back} m back");
+        assert_eq!(w.traffic.claims_out(), (0, 0), "{back} m back");
+    }
+    // (Near, the one coming along first; further back, the one merging.)
+    assert!(firsts[0] > 0 && firsts[1] > 0, "{firsts:?}");
+}
+
 #[test]
 fn nobody_turns_round_on_the_motorway_or_a_ramp() {
     // A car up the on-ramp 20 m from the street's junction, and one along each carriageway, each
