@@ -1439,6 +1439,11 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   }
   // ---- the motorway laid: raised over the roads under it, its junction a half-diamond on the nearest the town ----
   if (motorway) {
+    // (Country roads that found no way round it, where without it they would have: the world laid again without it.)
+    if (failed.length) {
+      const without = generateFromSpec(content, t, spec, seed, name, step, shaped, { ...lay, noMotorway: 'No motorway: the country roads would find no way round it.' });
+      if ((without.diagnostics?.roads?.length ?? 0) < failed.length) return without;
+    }
     const named = (wanted: string) => uniqueName(wanted, `${wanted} Old`);
     let laid = finishMotorway(motorway, roads, motorWet, mainCentre, roads.length, named);
     // (No road under it with room for its ramps: one from the town under it at its junction's gate, then on.)
