@@ -2,10 +2,12 @@
 
 use super::*;
 /// How a way is searched for (`Graph::path_by`): setting off only towards this node (an end of the
-/// start's edge), and these edges costing this much more each.
+/// start's edge), coming in only from this one (`arrive`: an end of the goal's edge), and these
+/// edges costing this much more each.
 #[derive(Debug, Clone, Default)]
 pub struct Way {
     pub toward: Option<u32>,
+    pub arrive: Option<u32>,
     pub avoid: Vec<(u32, f32)>,
 }
 

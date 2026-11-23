@@ -22,6 +22,8 @@ pub(crate) struct Mover {
     pub parked: bool,
     /// Whom it waited for last tick (`Driving::first`), if anyone.
     pub waits: Option<u64>,
+    /// Its level (`travel::Layer`): in the way only of claims on levels that meet it.
+    pub layer: crate::travel::Layer,
 }
 
 /// Where a vehicle is on its route, for its claims (`Traffic::begin`): its key, the tag of its
@@ -174,6 +176,12 @@ impl Traffic {
     /// Whether `key` holds its claim `tag`.
     pub(super) fn holds(&self, key: u64, tag: u32) -> bool {
         self.holds.iter().any(|h| h.key == key && h.tag == tag)
+    }
+
+    /// How many claims are held, and how many asks wait (the tests: all let go once the traffic's
+    /// gone by).
+    pub fn claims_out(&self) -> (usize, usize) {
+        (self.holds.len(), self.asks.len())
     }
 
     /// Whether `key` holds a claim.

@@ -67,7 +67,9 @@ pub(crate) fn gate(claims: &mut [Claim], signals: &[Signal], trace: &Trace, len:
         let arm_of = |&(_, i, at): &Near| {
             let sig = &signals[i];
             let d = [at[0] - sig.at[0], at[1] - sig.at[1]];
+            // (Of those cars come in by: not one they only leave by, `NO_PHASE`.)
             let arm = (0..sig.arms.len())
+                .filter(|&a| sig.arms[a].inbound())
                 .max_by(|&a, &b| {
                     let dot = |x: usize| sig.arms[x].way[0] * d[0] + sig.arms[x].way[1] * d[1];
                     dot(a).total_cmp(&dot(b))

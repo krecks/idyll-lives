@@ -264,7 +264,9 @@ pub(super) fn junction_views(world: &World) -> Vec<JunctionView> {
                         walk_to: a.walk_to,
                         stop: a.stop,
                         crosswalk: a.crosswalk,
-                        light: (s.lit && (row as usize) < crate::snapshot::MAX_LIGHTS)
+                        light: (s.lit
+                            && a.inbound()
+                            && (row as usize) < crate::snapshot::MAX_LIGHTS)
                             .then_some(row),
                     }
                 })

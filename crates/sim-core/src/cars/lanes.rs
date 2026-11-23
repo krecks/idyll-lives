@@ -320,6 +320,64 @@ impl LaneLine {
     }
 }
 
+/// What a way's middle-line points (`pts`, each on the road `on` says: `LaneLine`) are to the cars on
+/// it: each point's level (`Graph::layer_at`), and whether it's where the way merges off a ramp
+/// into a motorway's carriageway (its last point on the ramp: the merge). None where the network has
+/// neither decks nor merges: every point on the ground, no merge.
+pub(crate) fn way_marks(
+    g: &Graph,
+    pts: &[[f32; 2]],
+    on: &[(u32, bool)],
+) -> Option<Vec<(crate::travel::Layer, bool)>> {
+    if !g.has_decks() && g.merge_nodes().next().is_none() {
+        return None;
+    }
+    let kind = |i: usize| g.roads[on[i].0 as usize].kind;
+    Some(
+        (0..pts.len().min(on.len()))
+            .map(|i| {
+                let (s, _) = g.roads[on[i].0 as usize].project(pts[i]);
+                let merge = kind(i) == RoadKind::Ramp
+                    && on.get(i + 1).is_some()
+                    && kind(i + 1) == RoadKind::Motorway;
+                (g.layer_at(on[i].0, s), merge)
+            })
+            .collect(),
+    )
+}
+
+/// How far on along a line `Along` looks for the nearest of its points to the next (points).
+const ALONG_LOOK: usize = 64;
+
+/// A walk along a line's points (`line`), finding for each point of a lane laid from it (thinned,
+/// its corners rounded), in order, the line's point it was laid from: the nearest a little way on
+/// from the last found, never back. (Where a way passes the same place twice, under a deck and
+/// later on it, the nearest point alone could be either.)
+pub(crate) struct Along<'a> {
+    line: &'a [[f32; 2]],
+    at: usize,
+}
+
+impl<'a> Along<'a> {
+    pub(crate) fn new(line: &'a [[f32; 2]]) -> Self {
+        Along { line, at: 0 }
+    }
+
+    /// The line's point the lane's next point `p` was laid from (`Along`).
+    pub(crate) fn next(&mut self, p: [f32; 2]) -> usize {
+        let end = (self.at + ALONG_LOOK).min(self.line.len());
+        let mut best = (f32::INFINITY, self.at);
+        for (i, &q) in self.line.iter().enumerate().take(end).skip(self.at) {
+            let d = dist(q, p);
+            if d < best.0 {
+                best = (d, i);
+            }
+        }
+        self.at = best.1;
+        best.1
+    }
+}
+
 /// On `road`, a car `wid` m wide whose lane is `off` m right of its middle line: how far right of
 /// its lane it can pull over to pass one coming the other way (`pull_room`; none where nobody comes
 /// the other way in its lane, or the road isn't one cars always drove), and how far right of the

@@ -28,6 +28,7 @@ fn claim(points: &[[f32; 2]]) -> Claim {
                 rect: rect(points[k], yaw),
                 way: [yaw.sin(), yaw.cos()],
                 pass: 0.0,
+                layer: crate::travel::Layer::GROUND,
             }
         })
         .collect();
@@ -45,6 +46,7 @@ fn standing(key: u64, at: [f32; 2], yaw: f32) -> Mover {
         ahead: Vec::new(),
         parked: false,
         waits: None,
+        layer: crate::travel::Layer::GROUND,
     }
 }
 
@@ -223,7 +225,7 @@ fn a_group_through_lights_begins_with_the_nose_at_its_arms_stop_line() {
             (k as f32, [-1.05, z], 0.0, false, k as f32)
         })
         .collect();
-    let mut claims = claims(&trace, &[], 4.6, 1.9, &[([0.0, 0.0], 6.0)], &[]);
+    let mut claims = claims(&trace, &[], 4.6, 1.9, &[([0.0, 0.0], 6.0)], &[], &[]);
     let before = claims[0].from;
     gate(&mut claims, std::slice::from_ref(&sig), &trace, 4.6);
     assert_eq!(claims[0].gate, Some((0, 0)));
@@ -511,7 +513,15 @@ fn one_coming_up_to_wait_in_the_way_of_an_old_ask_stops_short() {
         // (Coming up, 3.4 m short of where it would wait, a tick on 2.9 m.)
         assert!(traffic.may_go(tick + 1, coming, 0, std::slice::from_ref(&mine), 5.0, 6.0));
         let (now, next) = (rect([0.0, -5.4], 0.0), rect([0.0, -4.9], 0.0));
-        stops.push(traffic.blocked(coming, &now, &next, [0.0, 1.0], 0.7, false));
+        stops.push(traffic.blocked(
+            coming,
+            &now,
+            &next,
+            [0.0, 1.0],
+            0.7,
+            false,
+            crate::travel::Layer::GROUND,
+        ));
     }
     assert_eq!(stops[0], None, "a young ask: on up to it");
     assert_eq!(
@@ -522,7 +532,15 @@ fn one_coming_up_to_wait_in_the_way_of_an_old_ask_stops_short() {
     // (Nearer than half that already, it came up before the ask was old: on.)
     let (now, next) = (rect([0.0, -3.4], 0.0), rect([0.0, -2.9], 0.0));
     assert_eq!(
-        traffic.blocked(coming, &now, &next, [0.0, 1.0], 0.7, false),
+        traffic.blocked(
+            coming,
+            &now,
+            &next,
+            [0.0, 1.0],
+            0.7,
+            false,
+            crate::travel::Layer::GROUND
+        ),
         None
     );
 }
