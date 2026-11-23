@@ -296,9 +296,118 @@ fn motorway_crossing_makes_no_node() {}
 #[ignore = "S-GRAPH: one-way edges"]
 fn oneway_loop_paths_differ() {}
 
+/// The fixture with the motorway's carriageways and ramps (`motorway`, two-way) or the avenue
+/// (`avenue`) of another kind: the same roads at another speed.
+fn rekinded(motorway: Option<&str>, avenue: Option<&str>) -> World {
+    let mut town: Value = serde_json::from_str(&hierarchy().town).unwrap();
+    for (i, r) in town["roads"].as_array_mut().unwrap().iter_mut().enumerate() {
+        let kind = match i {
+            MOTORWAY_EAST | MOTORWAY_WEST | OFF_RAMP | ON_RAMP => motorway,
+            AVENUE => avenue,
+            _ => None,
+        };
+        if let Some(kind) = kind {
+            r["kind"] = json!(kind);
+            r.as_object_mut().unwrap().remove("oneway");
+        }
+    }
+    town["meta"]["roads"] = town["roads"].clone();
+    World::from_json(&common::content(), &town.to_string(), 1).expect("the hierarchy loads")
+}
+
+/// Ticks of an empty drive from `a` to `b` in `w` (`cars::empty_drive_ticks`).
+fn drive(w: &World, a: [f32; 2], b: [f32; 2]) -> f32 {
+    sim_core::cars::empty_drive_ticks(&w.travel, a, b).expect("a way")
+}
+
 #[test]
-#[ignore = "S-SPEED: kind_speed in the costs and the lanes' tops"]
-fn motorway_is_faster() {}
+fn motorway_is_faster() {
+    // Along the eastbound carriageway, over the street and the river, most of the world across.
+    let (a, b) = ([30.0, EAST_Z as f32], [470.0, EAST_Z as f32]);
+    let motorway = drive(&world(), a, b);
+    let street = drive(&rekinded(Some("street"), None), a, b);
+    assert!(
+        motorway < 0.6 * street,
+        "{motorway} ticks by the motorway, {street} by a street"
+    );
+    // (Faster than the town's speed on average, from standing to standing.)
+    let secs = motorway / sim_core::DRIVE_TICKS_PER_SECOND;
+    assert!(
+        440.0 / secs > 1.5 * sim_core::travel::TOWN_SPEED,
+        "{secs} s of drive time"
+    );
+}
+
+#[test]
+fn the_avenue_is_faster_than_a_street() {
+    // Its length, past both cross streets (straight through their junctions at its speed).
+    let (a, b) = ([10.0, AVENUE_Z as f32], [290.0, AVENUE_Z as f32]);
+    let avenue = drive(&world(), a, b);
+    let street = drive(&rekinded(None, Some("street")), a, b);
+    let lane = drive(&rekinded(None, Some("lane")), a, b);
+    assert!(
+        avenue < 0.85 * street,
+        "{avenue} ticks on the avenue, {street} on a street"
+    );
+    assert!(
+        street < lane,
+        "{street} ticks on a street, {lane} on a lane"
+    );
+}
+
+/// Where a car whose driveway is at `at` leaves the fixture (`cars::way_out`).
+fn way_out(w: &World, at: [f32; 2]) -> ([f32; 2], bool) {
+    sim_core::cars::way_out(&w.travel, &w.exits, at).expect("a way out")
+}
+
+#[test]
+fn leaving_cars_take_the_motorway_when_it_is_nearer_by_time() {
+    let w = world();
+    // North of the motorway on the street: its end of town 70 m up the street, the motorway's
+    // west end 165 m off by the on-ramp (and what the motorway saves beyond town).
+    let (at, by) = way_out(&w, [STREET_X as f32 + 6.0, 250.0]);
+    assert!(by, "by the motorway: {at:?}");
+    assert!(at[0] < 1.0, "at its west end: {at:?}");
+    // On the avenue by its own end of town: the motorway is far further by time.
+    let (at, by) = way_out(&w, [30.0, AVENUE_Z as f32 - 10.0]);
+    assert!(!by, "{at:?}");
+    assert!(
+        at[0] < 1.0 && (at[1] - AVENUE_Z as f32).abs() < 1.0,
+        "by the avenue: {at:?}"
+    );
+}
+
+#[test]
+fn no_mouth_parking_or_kerb_on_a_motorway_or_a_ramp() {
+    let w = world();
+    let g = &w.travel.graph;
+    // (`cars::ROAD_REACH`.)
+    let reach = 30.0;
+    // (A driveway, a parking spot or a kerb anywhere about the motorway and its ramps: on the
+    // street under it or by it, else nowhere.)
+    let mut found = 0;
+    for x in (0..WIDTH).step_by(10) {
+        for z in (170..240).step_by(5) {
+            let p = [x as f32, z as f32];
+            if let Some(r) = sim_core::cars::enterable_near(g, p, reach) {
+                let road = &g.roads[r.road as usize];
+                assert!(
+                    road.enterable(),
+                    "{p:?}: road {} ({:?})",
+                    road.source,
+                    road.kind
+                );
+                found += 1;
+            }
+        }
+    }
+    assert!(found > 0, "the street by the motorway");
+    // On a carriageway far from any other road: none.
+    assert!(sim_core::cars::enterable_near(g, [60.0, EAST_Z as f32], reach).is_none());
+    // By the off-ramp's T: the street, not the ramp nearer.
+    let r = sim_core::cars::enterable_near(g, [132.0, EAST_Z as f32 - 22.0], reach).unwrap();
+    assert_eq!(g.roads[r.road as usize].source, BRIDGE_STREET as u32);
+}
 
 #[test]
 #[ignore = "S-TRAFFIC: cars on the deck and under it don't interact"]
