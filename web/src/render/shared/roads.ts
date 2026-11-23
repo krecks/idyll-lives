@@ -738,8 +738,9 @@ const nv = (v: Pt2): V3 => [v[0], 0, v[1]];
 /**
  * A junction's markings: on each arm with a crosswalk (`ArmPlan.crosswalk`, as the simulation
  * has them: a lit junction's streets' and lanes' arms, one giving way's street, on one of its two
- * arms), a zebra across its carriageway (`walkFrom`..`walkTo`) and a stop line across the half
- * coming in (traffic keeps to the right: the clockwise side of the way out) at `stop`; on a lit
+ * arms), a zebra across its carriageway (`walkFrom`..`walkTo`) and a stop line across every lane
+ * coming in at `stop`: a two-way road's half (traffic keeps to the right: the clockwise side of the
+ * way out; an avenue's to its median), a one-way road's whole width coming in, none going out; on a lit
  * junction's other arms (a country road's: no sidewalks to cross between), only the stop line; on
  * one giving way's, nothing (cars give way there by the claims, and stop only for those on a
  * zebra).
@@ -751,8 +752,10 @@ function junctionMarks(j: JunctionPlan, marks: Geo, jy = 0): void {
   j.arms.forEach((A, a) => {
     const half = A.half - MARK_IN;
     if (half <= 0.5) return;
-    // (Not past the end of a road that ends there.)
-    if ((A.crosswalk || A.lit) && A.stop <= A.room) rect(a, A.stop - STOP_LINE, A.stop, -half, 0);
+    // (Not past the end of a road that ends there.) Across every lane coming in: a two-way road's half (to its median,
+    // if it has one), a one-way road's whole carriageway coming in, none on one going out.
+    const lanes: [number, number] | null = A.flow === -1 ? null : A.flow === 1 ? [-half, half] : [-half, A.median > 0 ? -A.median / 2 : 0];
+    if ((A.crosswalk || A.lit) && A.stop <= A.room && lanes) rect(a, A.stop - STOP_LINE, A.stop, ...lanes);
     if (!A.crosswalk || A.walkTo - A.walkFrom < 1 || A.walkTo > A.room) return;
     // The stripes across the carriageway, as many as fit, the middle of the road between two or on one.
     const n = Math.max(1, Math.floor((2 * half + STRIPE_GAP) / (STRIPE + STRIPE_GAP)));
