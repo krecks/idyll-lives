@@ -69,7 +69,6 @@
  *     --heapprofile            V8's sampling heap profile (entry: allocated; steady: kept)
  *     --memtrace               large typed arrays by site (`?memtrace`)
  *     --no-dumps               no memory-infra dumps (they pause the processes for a moment)
- *     --lowmem                 the page as on an 8 GB machine (`?lowmem`)
  *     --voices                 the residents' voices on (the setting; off by default)
  *     --prod                   a production build made for the benchmark (`lib/build.mjs`: `VITE_BENCH=1`, kept in
  *                              bench-results/.dist and reused while web/ is the same), served by `vite preview`; its
@@ -123,8 +122,6 @@ const profileHeap = has('heapprofile');
 const memtrace = has('memtrace');
 /** Chrome's memory-infra dumps at the boundaries. */
 const dumps = !has('no-dumps');
-/** The page as on a machine of 8 GB or less (`?lowmem`). */
-const lowmem = has('lowmem');
 /** The residents' voices on (the player's setting, off by default). */
 const voices = has('voices');
 /** A production build (with the benchmark's hooks) rather than the dev server. */
@@ -154,7 +151,6 @@ if (has('help') || args.includes('-h')) {
   --heapprofile            sample the JS heap from New game (entry: allocated, steady: kept; top sites in the report)
   --memtrace               the page's typed arrays of 64 kB or more by site (?memtrace)
   --no-dumps               no memory-infra dumps at the boundaries
-  --lowmem                 the page as on an 8 GB machine (?lowmem)
   --voices                 the residents' voices on (the setting; off by default)
   --prod                   a production build with the benchmark's hooks (VITE_BENCH=1, lib/build.mjs), served by vite preview
   --headed                 in a window (default headless: the real GPU either way)
@@ -868,7 +864,7 @@ async function runOnce(n) {
     raw({ type: 'net', ...r, failed: e.errorText });
   });
 
-  const query = ['profile', 'gpustats', `quality=${preset}`, `hud=${hud}`, renderer === 'webgl' ? 'renderer=webgl' : '', memtrace ? 'memtrace' : '', lowmem ? 'lowmem' : '', ...worldQuery].filter(Boolean).join('&');
+  const query = ['profile', 'gpustats', `quality=${preset}`, `hud=${hud}`, renderer === 'webgl' ? 'renderer=webgl' : '', memtrace ? 'memtrace' : '', ...worldQuery].filter(Boolean).join('&');
   const url = `${base}/?${query}`;
   const menuUp = () => page.waitForFunction(() => !!document.querySelector('.main-menu, .menu') && !document.querySelector('.loading'), null, { timeout: startupTimeout * 1000, polling: 100 });
 
@@ -1622,7 +1618,7 @@ const environment = {
   serverMode,
   serverReadyMs: serverReadyAt - STARTED,
   runType: warm ? 'warm' : 'cold',
-  flags: { runs, secs, seed, code, world: made.world, options: made.query, home: homeKind, reads: readsAt, household: pick, preset, renderer, hud, warm, headed: has('headed'), startupTimeout, entryTimeout, steadyGrace, heapprofile: profileHeap, memtrace, dumps, lowmem, voices, prod },
+  flags: { runs, secs, seed, code, world: made.world, options: made.query, home: homeKind, reads: readsAt, household: pick, preset, renderer, hud, warm, headed: has('headed'), startupTimeout, entryTimeout, steadyGrace, heapprofile: profileHeap, memtrace, dumps, voices, prod },
 };
 
 // ---------------------------------------------------------------- the runs
@@ -1739,7 +1735,7 @@ const md = [
   '## Command',
   '',
   '```',
-  `bun tools/bench/gameplay.mjs --runs ${runs} --secs ${secs} --seed ${seed}${code ? ` --code ${code}` : ''}${made.world ? ` --world ${made.world}${made.query ? ` --options ${made.query.replaceAll(':', '=')}` : ''}` : ''} --home ${homeKind} --household ${pick} --reads ${readsFlag} --preset ${preset} --renderer ${renderer} --hud ${hud}${warm ? ' --warm' : ''}${has('headed') ? ' --headed' : ''}${profileHeap ? ' --heapprofile' : ''}${memtrace ? ' --memtrace' : ''}${dumps ? '' : ' --no-dumps'}${lowmem ? ' --lowmem' : ''}${voices ? ' --voices' : ''}${prod ? ' --prod' : ''}`,
+  `bun tools/bench/gameplay.mjs --runs ${runs} --secs ${secs} --seed ${seed}${code ? ` --code ${code}` : ''}${made.world ? ` --world ${made.world}${made.query ? ` --options ${made.query.replaceAll(':', '=')}` : ''}` : ''} --home ${homeKind} --household ${pick} --reads ${readsFlag} --preset ${preset} --renderer ${renderer} --hud ${hud}${warm ? ' --warm' : ''}${has('headed') ? ' --headed' : ''}${profileHeap ? ' --heapprofile' : ''}${memtrace ? ' --memtrace' : ''}${dumps ? '' : ' --no-dumps'}${voices ? ' --voices' : ''}${prod ? ' --prod' : ''}`,
   '```',
   '',
   `Expected runtime: ~${Math.round((secs + 40) * runs / 60)} min (${secs} s steady + ~40 s startup/entry/shutdown per run).`,

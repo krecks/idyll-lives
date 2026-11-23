@@ -1,7 +1,0 @@
-full 0 simtick: engine node rate 4100 worst_hour 2100 at 08 step_p99 31.20 ticks 108000 cpu_rate 4300
-full 0 simtick: engine node rate 4000 worst_hour 2000 at 09 step_p99 30.10 ticks 108000 cpu_rate 4200
-full 0 simtick: engine bun rate 3800 worst_hour 1900 at 08 step_p99 33.00 ticks 108000 cpu_rate 3950
-half 1 simtick: engine node rate 9100 worst_hour 5100 at 17 step_p99 12.25
-near 2 simtick: engine node rate 690 worst_hour 400 at 18 step_p99 80.05 ticks 108000 cpu_rate 695
-near 2 simtick: engine bun rate 650 worst_hour 380 at 18 step_p99 81.00 ticks 108000 cpu_rate 660
-garbage line

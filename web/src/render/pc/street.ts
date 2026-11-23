@@ -46,7 +46,6 @@ import { castsShadow, FOLIAGE, instanceMatrix, NO_FOCUS, TownStreet, type ChunkP
 import { surfaceOf } from '../shared/landSurface';
 import type { BuiltSurface } from '../shared/builtSurface';
 import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
-import { LOW_MEMORY } from '../../settings/lowMemory';
 import { frameNow } from '../shared/frameClock';
 
 export interface StreetOptions {
@@ -132,9 +131,8 @@ const PLANS_KEPT = 3;
  * Vertex arrays kept for the chunks not drawn (bytes): a chunk back in view costs only its group's
  * meshes, as before, while its arrays last. Beyond this the least recently drawn go, and a chunk
  * back in view after that is planned again, between frames (the bench tour's longest slice 24.5 ms).
- * Less is kept on a machine low on memory (`LOW_MEMORY`).
  */
-const DATA_KEPT = (LOW_MEMORY ? 8 : 24) * 1024 * 1024;
+const DATA_KEPT = 24 * 1024 * 1024;
 
 /** A chunk as built: what is kept of its plan (`ChunkShape`), and, while the budget lasts, each mesh's vertex arrays (by draw name). */
 interface BuiltChunk {

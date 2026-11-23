@@ -52,12 +52,10 @@
     // A new world's game: the main menu's picture of it is taken now, behind the loading screen
     // (`start` put it up; the town the menus showed is still there, under it, until the fly-in).
     if (app.request?.kind === 'new' && app.loading) {
-      const still = menuScene
+      void menuScene
         .keepStill(false)
         .then((still) => still && app.setStill(still))
         .catch((err: unknown) => console.warn('[menu] its picture failed', err));
-      // (Low on memory, the town goes before the game is built: once the picture is taken.)
-      host.keepTownUntil(still);
     }
     return () => {
       left = true;

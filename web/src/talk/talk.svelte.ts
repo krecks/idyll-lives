@@ -8,7 +8,6 @@
 import { untrack } from 'svelte';
 import { ensureLlm, llmStatus, unloadLlm } from '../llm';
 import { settings } from '../settings/settings.svelte';
-import { LOW_MEMORY } from '../settings/lowMemory';
 import { applyReport, deviceTest, llmDevice, report, reportFor, runDeviceTest, usableHere, type DeviceReport } from './devices.svelte';
 import { loadTalk } from './text';
 
@@ -59,10 +58,9 @@ $effect.root(() => {
     untrack(() => {
       if (running) return;
       if (chosen && !tested && !stopped) void testDevices(false).catch(() => {});
-      // On another device (the setting changed): there instead. (Low on memory, it loads when the
-      // first line wants it: `wantLlm`.)
+      // On another device (the setting changed): there instead.
       else if (writes && llmStatus.state !== 'off' && llmStatus.device !== device) void ensureLlm(device).catch(() => {});
-      else if (writes && llmStatus.state === 'off' && !LOW_MEMORY) void ensureLlm(device).catch(() => {});
+      else if (writes && llmStatus.state === 'off') void ensureLlm(device).catch(() => {});
       else if (!writes && llmStatus.state !== 'off') unloadLlm();
     });
   });

@@ -107,7 +107,7 @@ export const LOD_HEIGHT_PX = 1080;
  * in the clips' fists, below this projected size (px per 5 cm of face, as drawn) and back above the second.
  * Apart from the mesh's (`LOD_FAR_PX`): at a few pixels a pose a frame or two old and a fist don't show on
  * the full body any more than on the low-detail one, and posing every resident in the default view every
- * frame would cost the slowest machines (an 8 GB M1) what nobody sees.
+ * frame would cost what nobody sees.
  */
 export const POSE_FAR_PX = 6;
 export const POSE_NEAR_PX = 7;

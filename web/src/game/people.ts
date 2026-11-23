@@ -87,12 +87,9 @@ export function residentsMost(tier: FillTier = 'full'): number {
  * The tier each graphics preset fills the town at (`render/quality.ts` `GraphicsPreset`): full on all
  * of them. A preset gets a tier when the sim's wasm build, with the camera's 320-tile square in full
  * detail as the game streams it, keeps up with the fastest speed the player picks at any hour, 10×
- * (10 ticks a step, 600 ticks a second), on the slowest machine the preset is for. Measured on 2026-11-20 on an M3
- * Pro over a game day of the seaside, river and forest cities of the real town (`tools/m1/run.sh`'s way,
- * `tools/bench/simtick.mjs` under Node), the wasm's slowest city (the seaside) ran about 1,340 ticks a
- * second of CPU time in full; an M1, low and medium's floor, at 0.72 of that about 960 (830 to 1,040
- * between a fanless Air held at its sustained speed and one at its best), so even the M1 has room at
- * 10× with a full town.
+ * (10 ticks a step, 600 ticks a second). Measured on 2026-11-20 on an M3 Pro over a game day of the seaside,
+ * river and forest cities of the real town (`tools/bench/simtick.mjs` under Node), the wasm's slowest city (the
+ * seaside) ran about 1,340 ticks a second of CPU time in full, room to spare at 10× with a full town.
  * Super speed has no rate to keep up with: it runs as fast as the machine can, up to 30× (60× in quiet
  * hours).
  */

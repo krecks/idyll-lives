@@ -11,7 +11,7 @@
  * bench-results/tiers). `--watch 320`: the camera's square of that side round the player's home
  * is the full-detail area (`set_watch`, as the renderer reports it); without it, the view is the
  * player's lot (`set_view`), as the big-world benchmark's lot view. `--pkg`: another wasm-bindgen
- * output (the M1 estimate builds its own: `tools/m1/`). `--runs`: the world loaded again and run
+ * output. `--runs`: the world loaded again and run
  * again, the best kept.
  *
  * The content is merged as the game loads it (`web/src/content/content.ts` `mergeContent`): under

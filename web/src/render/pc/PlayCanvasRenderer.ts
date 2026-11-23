@@ -3463,7 +3463,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return run;
   }
 
-  async hideTown(glide = 0, letGo = false): Promise<void> {
+  async hideTown(glide = 0): Promise<void> {
     // Let a pending overview build finish first, so it can't switch back to the overview later.
     this.townTicket++;
     await this.townQueue;
@@ -3481,8 +3481,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       });
       this.flyingIn = false;
     }
-    if (this.townMode) this.leaveTown(letGo);
-    if (letGo) await this.townQueue;
+    if (this.townMode) this.leaveTown();
   }
 
   setTownShot(shot: TownShot, cut = false): void {
@@ -3821,8 +3820,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.lastLightMinute = -1;
   }
 
-  /** The game comes on screen again (the menus' town is let go a moment later, or at once with `letGo`: `releaseTown`). */
-  private leaveTown(letGo = false): void {
+  /** The game comes on screen again (the menus' town is let go a moment later: `releaseTown`). */
+  private leaveTown(): void {
     this.townMode = false;
     this.landHaze?.show(false);
     // (The game has no ghosts nor painted uses: drawn again over the town when it is shown again.)
@@ -3831,8 +3830,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     setDatum(this.root, this.lotRoot, this.datum);
     this.lot.datum = this.datum;
     const ticket = this.townTicket;
-    if (letGo) this.releaseTown(ticket);
-    else setTimeout(() => this.releaseTown(ticket), TOWN_RELEASE_MS);
+    setTimeout(() => this.releaseTown(ticket), TOWN_RELEASE_MS);
     this.shaderWatch.phase = 'game';
     this.birdLife.setTown(false);
     this.applyDig(); // (the basement and windowless rooms dark again.)

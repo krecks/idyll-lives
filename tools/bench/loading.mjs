@@ -49,8 +49,6 @@
  *     --out <dir>              default bench-results/loading-<time>/
  *     --shots                  also a picture of step 5 once its way on is enabled, and of the game 3 s
  *                              after the entry (in `--out`, per run and renderer)
- *     --lowmem                 the page as on an 8 GB machine (`?lowmem`: the menus' town let go of at the
- *                              loading screen, the game faded in)
  */
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -82,7 +80,6 @@ const again = has('again');
 const back = has('back');
 const create = has('create');
 const shots = has('shots');
-const lowmem = has('lowmem');
 /** The current visit's pictures' name: renderer, run and visit. */
 let shotName = '';
 const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[:T]/g, '-');
@@ -135,7 +132,7 @@ const browser = await chromium.launch({
   args: ['--enable-unsafe-webgpu', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'],
 });
 
-const query = ['profile', renderer === 'webgl' ? 'renderer=webgl' : '', lowmem ? 'lowmem' : '', ...worldQuery].filter(Boolean).join('&');
+const query = ['profile', renderer === 'webgl' ? 'renderer=webgl' : '', ...worldQuery].filter(Boolean).join('&');
 
 /** The page's long tasks (start and duration, ms), from its first script on. */
 function longTasks() {

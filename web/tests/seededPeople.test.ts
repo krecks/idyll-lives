@@ -336,8 +336,7 @@ describe('seeded people', async () => {
     expect(defaultResidentsMost(120)).toBe(240);
     expect(defaultResidentsMost(400)).toBe(400 + SIM_RESIDENTS - FILL_CAP);
     expect(defaultResidentsMost(760)).toBe(SIM_RESIDENTS);
-    // Every graphics preset fills the town in full (even an M1 keeps up with a full town at 10×:
-    // people.ts `TIER_FOR`), and so does a preset it does not know.
+    // Every graphics preset fills the town in full (people.ts `TIER_FOR`), and so does a preset it does not know.
     expect(['low', 'medium', 'high', undefined].map(tierFor)).toEqual(['full', 'full', 'full', 'full']);
   });
 
