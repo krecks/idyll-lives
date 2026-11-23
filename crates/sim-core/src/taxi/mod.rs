@@ -164,4 +164,5 @@ pub(crate) use leisure::*;
 pub use plan::*;
 pub(crate) use routes::*;
 pub use runs::*;
+pub(crate) use way::stand_for_door;
 use way::*;

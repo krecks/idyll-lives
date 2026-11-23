@@ -38,6 +38,9 @@ pub(super) const TURN_COST: f32 = 6.0;
 /// backing out).
 pub(super) const SIDE_COST: f32 = 12.0;
 pub(super) const FAR_SIDE: f32 = 8.0;
+/// Standing across an avenue's median from the house (s, `far_cost`): only with no way round to
+/// its own side.
+pub(super) const AVENUE_FAR_SIDE: f32 = 100_000.0;
 /// Runs coming into town by the same way are planned this far apart at least (ticks, `time_run`),
 /// one sooner by as much as `ENTRY_SHIFT` for it.
 pub(super) const ENTRY_GAP: u64 = 2 * TICKS_PER_MINUTE;

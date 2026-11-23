@@ -268,9 +268,25 @@ fn far_side(g: &crate::travel::Graph, kerb: &Kerb, d: f32) -> bool {
     (house[0] - c[0]) * right[0] + (house[1] - c[1]) * right[1] < 0.0
 }
 
+/// What standing at `kerb` come to going `d` costs on top of the drive (s, as `plan_way` weighs
+/// it): on the far side of the road from the house, `FAR_SIDE` (the rider crosses it); on an
+/// avenue, `AVENUE_FAR_SIDE`, never while there's a way from the house's side (round by the
+/// roads), as a household's car comes into its driveway there (`cars::kerbside_way`).
+fn far_cost(g: &crate::travel::Graph, kerb: &Kerb, d: f32) -> f32 {
+    if !far_side(g, kerb, d) {
+        return 0.0;
+    }
+    let road = &g.roads[kerb.road as usize];
+    if road.kind == crate::travel::RoadKind::Avenue && road.oneway.is_both() {
+        AVENUE_FAR_SIDE
+    } else {
+        FAR_SIDE
+    }
+}
+
 /// A taxi's way round town (`route`): from `way_in` to each of `kerbs` in turn and out at
 /// `way_out`, as a car drives (`way_between`), the way it comes to each kerb chosen for the
-/// quickest way on (`FAR_SIDE` on top for standing across the road from the house). The stretches
+/// quickest way on (`far_cost` on top for standing across the road from the house). The stretches
 /// driven, in legs: one up to each kerb, then out. None: no way.
 pub(super) fn plan_way(
     travel: &crate::travel::Travel,
@@ -318,13 +334,7 @@ pub(super) fn plan_way(
             for (i, way) in ways.into_iter().enumerate() {
                 let Some((c, pieces)) = way else { continue };
                 let d = if i == 0 { 1.0 } else { -1.0 };
-                let total = c0
-                    + c
-                    + if far_side(g, &kerbs[k], d) {
-                        FAR_SIDE
-                    } else {
-                        0.0
-                    };
+                let total = c0 + c + far_cost(g, &kerbs[k], d);
                 if here[i].as_ref().is_none_or(|b| total < b.0) {
                     here[i] = Some((total, i0, pieces));
                 }
@@ -829,4 +839,27 @@ fn u_turn(
     arc(legs, (0.0, 0.0), r, alpha, -alpha);
     // The swerve back in: round (xa, -ya) to the lane the other way.
     arc(legs, (xa, -ya), SWERVE, -beta, std::f32::consts::FRAC_PI_2);
+}
+
+/// A taxi in by `way_in` and out by `way_out` standing for a house whose front door is at `door`
+/// (no driveway: its way to the road nearest it a taxi may stop on, `home_way`): where it stands
+/// (`kerb_at`, as `plan_way` comes to it and `lay_route` lays its route there) and its yaw there.
+/// None: no stand or no way. (The tests: `cars::drill::taxi_stand`.)
+pub(crate) fn stand_for_door(
+    w: &World,
+    way_in: [f32; 2],
+    door: [f32; 2],
+    way_out: [f32; 2],
+) -> Option<([f32; 2], f32)> {
+    let g = &w.travel.graph;
+    let mouth = crate::cars::enterable_near(g, door, crate::cars::ROAD_REACH)?;
+    let p = g.point(mouth);
+    let l = crate::travel::dist(p, door).max(1e-3);
+    let axis = [(p[0] - door[0]) / l, (p[1] - door[1]) / l];
+    let kerb = kerb_at(&w.travel, &w.meta, (mouth, axis), &[], &[])?;
+    let net = Net::new(&w.travel, &w.meta, &[]);
+    let legs = plan_way(&w.travel, &net, way_in, &[kerb], way_out)?;
+    let (route, stops) = lay_route(&w.travel, &net, &legs)?;
+    let (at, yaw, _) = route.at(*stops.first()?);
+    Some((at, yaw))
 }

@@ -1509,3 +1509,39 @@ fn avenue_driveways_set_off_to_the_right_and_are_come_into_from_it() {
         }
     }
 }
+
+#[test]
+fn taxis_stand_on_an_avenue_on_the_riders_side() {
+    // A front door either side of the avenue: the taxi in by either way into town and out by
+    // either stands in the lanes on the door's side, never across the median from it (round by
+    // the roads to come at it from that side). (West of West Cross by the avenue's end of town
+    // only: nowhere to turn round between there and the end, the lanes on one side are only come
+    // to from the end, and those on the other only lead to it; from Bridge Street the taxi
+    // stands across the median as a last resort.)
+    let w = world();
+    let z = AVENUE_Z as f32;
+    let (end, street) = ([0.5, z], [STREET_X as f32, DEPTH as f32 - 0.5]);
+    let mut stands = 0;
+    for (x, ways) in [
+        (60.0, &[end][..]),
+        (115.0, &[end, street][..]),
+        (180.0, &[end, street][..]),
+        (250.0, &[end, street][..]),
+    ] {
+        for side in [1.0f32, -1.0] {
+            let door = [x, z + side * 10.0];
+            for &way_in in ways {
+                for &way_out in ways {
+                    let (at, _) = drill::taxi_stand(&w, way_in, door, way_out)
+                        .unwrap_or_else(|| panic!("door {door:?}: a stand"));
+                    stands += 1;
+                    assert!(
+                        (at[1] - z) * side > 1.3,
+                        "door {door:?}, in by {way_in:?}, out by {way_out:?}: stands at {at:?}"
+                    );
+                }
+            }
+        }
+    }
+    assert_eq!(stands, 26);
+}

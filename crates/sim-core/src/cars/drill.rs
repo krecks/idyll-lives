@@ -120,3 +120,14 @@ pub fn from_driveway(
             .collect(),
     )
 }
+
+/// A taxi in by `way_in` and out by `way_out` standing for a house whose front door is at `door`
+/// (no driveway): where it stands and its yaw there. None: no stand or no way.
+pub fn taxi_stand(
+    w: &World,
+    way_in: [f32; 2],
+    door: [f32; 2],
+    way_out: [f32; 2],
+) -> Option<([f32; 2], f32)> {
+    crate::taxi::stand_for_door(w, way_in, door, way_out)
+}
