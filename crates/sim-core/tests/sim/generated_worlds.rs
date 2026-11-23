@@ -536,7 +536,7 @@ const NO_WAY: f32 = 0.1;
 /// (Its body is about a metre either side: out of a driveway at a bend it may cut the edge.)
 const OFF_PAVING: f32 = 1.5;
 
-/// How far `at` is off the paving (m): from the nearest road's edge, a path (a driveway and its
+/// How far `at` is off the paving (m): from the nearest road's edge (the least of the few nearest), a path (a driveway and its
 /// way across the verge), the parking spot of the car's trip or a car park's apron (the town file's
 /// `carParks`), whichever is nearest. 0 off the map (past a way out of town).
 fn off_paving(
@@ -551,12 +551,13 @@ fn off_paving(
         return 0.0;
     }
     let g = &w.travel.graph;
+    // (The least of the few nearest roads': where a narrow lane meets a wide avenue at its kerb, a
+    // car on the avenue may be a hair nearer the lane's end than the avenue's middle.)
     let road = g
-        .near(at, 30.0, 1, sim_core::travel::Mode::Car)
-        .first()
-        .map_or(f32::INFINITY, |p| {
-            (p.off - g.roads[p.road as usize].width / 2.0).max(0.0)
-        });
+        .near(at, 30.0, 4, sim_core::travel::Mode::Car)
+        .iter()
+        .map(|p| (p.off - g.roads[p.road as usize].width / 2.0).max(0.0))
+        .fold(f32::INFINITY, f32::min);
     let path = paths
         .iter()
         .map(|&[x, z, pw, pd]| {
