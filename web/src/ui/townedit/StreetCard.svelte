@@ -8,6 +8,7 @@
    * the main town, homes elsewhere). A street just drawn and split at its bridges lists its stretches,
    * each picked by a click (the tool picks the one nearest where the street was finished).
    */
+  import { ROAD_KIND } from '../../core/roadKinds';
   import Segmented from '../kit/Segmented.svelte';
   import Toggle from '../kit/Toggle.svelte';
   import { alongFor, streetChoice, type Along, type StreetKindChoice } from './streetChoice.svelte';
@@ -58,7 +59,7 @@
       {#if streetChoice.kind === 'trail'}
         No cars and nothing along it; it does not cross the water.
       {:else if streetChoice.kind === 'lane'}
-        A narrow lane, in {editor.townName || 'the town'}, a village or out of them (given to the nearest when the town is built).
+        A narrow lane, {ROAD_KIND.lane.width} m to a street's {ROAD_KIND.street.width}: two cars meeting on it pull over to pass. In {editor.townName || 'the town'}, a village or out of them (given to the nearest when the town is built).
       {:else if streetChoice.kind === 'street'}
         A street, in {editor.townName || 'the town'}, a village or out of them (given to the nearest when the town is built).
         <button class="link" onclick={() => (streetChoice.kind = 'auto')}>By where it runs</button>
