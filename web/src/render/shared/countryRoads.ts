@@ -5,6 +5,9 @@
  * land to the horizon, levelled into the hills and kept off the water. An older town of several
  * streets also gets a side road at each end joining its streets, where the country road begins.
  *
+ * A motorway's carriageways (`RoadPlan.kind` `motorway`) go on straight past the edge side by side, as wide as in
+ * the town, a barrier between them (`barriers`), to the end of the land or its water: no sign, no wandering.
+ *
  * Visual only and outside the town (residents leave town where its roads do): the landscape
  * (`nature.ts`) levels the ground under the roads (`near`) and keeps trees off them.
  */
@@ -20,6 +23,10 @@ export const COUNTRY_WIDTH = 5;
 export const STEP = 4;
 /** Straight out of town for this many points before it starts to wind. */
 export const STRAIGHT = 5;
+/** A motorway's carriageway past the edge (m: `roadKinds.ts`' 9), how near its pair's end is at the edge, and its barrier's foot. */
+export const MOTORWAY_WIDTH = 9;
+const MOTORWAY_PAIR = 30;
+export const BARRIER_FOOT = 0.6;
 /** Road surface above the levelled ground (m). */
 export const LIFT = 0.06;
 /** How far the ground is graded to the road on either side, past its edge (m). */
@@ -65,6 +72,10 @@ export class CountryRoads {
   readonly roads: Point[][] = [];
   /** Side roads joining the ends of a town's streets (flat, on the apron round the town). */
   readonly links: Rect[] = [];
+  /** Which of `roads` are a motorway's carriageways going on past the edge. */
+  readonly motorways = new Set<number>();
+  /** The barrier between each two carriageways going on side by side: its line (its width the barrier's foot). */
+  readonly barriers: Point[][] = [];
   /** `near`'s last question and answer. */
   private readonly asked = [NaN, NaN];
   private answer: NearRoad | null = null;
@@ -84,9 +95,45 @@ export class CountryRoads {
       this.links.push({ x: -TOWN_WIDTH, z: first.z, w: TOWN_WIDTH, d: last.z + last.d - first.z });
       this.links.push({ x: land.w, z: first.z, w: TOWN_WIDTH, d: last.z + last.d - first.z });
     }
+    // (A motorway's ends: its carriageways' 'out' ends, within a carriageway's reach of each other at each edge.)
+    const motorEnds = (world.meta?.roads ?? []).filter((r) => r.kind === 'motorway' && r.points.length >= 2).flatMap((r) => [r.points[0], r.points[r.points.length - 1]]);
+    const isMotor = (e: { x: number; z: number }) => motorEnds.some(([x, z]) => Math.abs(x - e.x) < 0.01 && Math.abs(z - e.z) < 0.01);
     exits.forEach((e, k) => {
+      if (isMotor(e)) return;
       const road = this.lay(e.x + (several ? e.dx * TOWN_WIDTH : 0), e.z, e.dx, e.dz, k);
       this.roads.push(road);
+    });
+    const ends = exits.filter(isMotor);
+    for (const [k, e] of ends.entries()) {
+      const pair = ends.findIndex((o, j) => j > k && Math.hypot(o.x - e.x, o.z - e.z) < MOTORWAY_PAIR);
+      if (pair < 0) continue;
+      const [a, b] = [this.straight(e.x, e.z, e.dx, e.dz), this.straight(ends[pair].x, ends[pair].z, ends[pair].dx, ends[pair].dz)];
+      const n = Math.min(a.length, b.length);
+      if (n < 2) continue;
+      this.motorways.add(this.roads.push(a.slice(0, n)) - 1);
+      this.motorways.add(this.roads.push(b.slice(0, n)) - 1);
+      this.barriers.push(a.slice(0, n).map((p, i): Point => [(p[0] + b[i][0]) / 2, (p[1] + b[i][1]) / 2, (p[2] + b[i][2]) / 2, BARRIER_FOOT]));
+    }
+  }
+
+  /**
+   * A motorway's carriageway from (`x`, `z`) on out of town straight ahead (`ux`, `uz`), to the end of the land or
+   * up to its water: its surface the ground along it, smoothed (a little higher than a country road's, over the hills).
+   */
+  private straight(x: number, z: number, ux: number, uz: number): Point[] {
+    const land = this.land;
+    const flat: [number, number][] = [];
+    for (let i = 0; i < 400 && land.distanceToTown(x + ux * STEP * i, z + uz * STEP * i) < land.ring + 25; i++) {
+      const p: [number, number] = [x + ux * STEP * i, z + uz * STEP * i];
+      if (i > 2 && land.waterEdge(p[0], p[1]) > -8) break;
+      flat.push(p);
+    }
+    const raw = flat.map(([px, pz]) => land.ground(px, pz));
+    return flat.map(([px, pz], i): Point => {
+      let [sum, n] = [0, 0];
+      for (let k = Math.max(0, i - 6); k <= Math.min(raw.length - 1, i + 6); k++, n++) sum += raw[k];
+      const h = i < 2 ? (land.follows ? raw[i] : 0) : Math.max(land.follows ? -0.05 : 0.1, sum / n);
+      return [px, pz, h, MOTORWAY_WIDTH];
     });
   }
 
