@@ -223,9 +223,10 @@ describe("step 2's settle", async () => {
     // street, lying 11 m under the land (a river painted along a valley), a low shelf by it and its banks rising over
     // 3 m, ending in open land past it. Its deck reaches over the dip and onto the banks, the bridge's straight carried
     // on for it (`bridges.ts` `grownDeck`): with the deck over the water alone, the settle refuses it, the road dug
-    // 4.7 m into the bank. In country 11's village: country 7's has had no street with open land 150 m out of it
-    // since its main town was sized by its homes, 2026-11-20.)
-    const plan = laid('country', 11, { town: 'village', villages: 'few', size: 'medium' }).plan!;
+    // 4.7 m into the bank. In country 19's village: country 7's has had no street with open land 150 m out of it
+    // since its main town was sized by its homes, 2026-11-20, and country 11's first such street is refused so (a
+    // lane's, since lanes were made 6 m, 2026-11-23; as are most villages' of seeds 1 to 18, at 7 m too).)
+    const plan = laid('country', 19, { town: 'village', villages: 'few', size: 'medium' }).plan!;
     const [W, D] = [plan.width, plan.depth];
     const laidLand = plan.open!.land!;
     /** `plan` with the river painted 40 to 70 m from `p` along `dir` (an axis), across 160 m; and a trail from `q` (on a road) to its near bank and along it past `p`'s way. */

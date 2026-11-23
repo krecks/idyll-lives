@@ -241,6 +241,16 @@ describe('drawing a street', () => {
     expect(madeKind(draft, out, 'trail')).toEqual({ kind: 'trail' });
   });
 
+  test("a lane drawn is a lane's 6 m wide, a street 7 m, a lane made a country road out of town a country road's 7 m", () => {
+    const into: Pt[] = [[100, MAIN_Z + 3.5 + 9], [100, 140]];
+    expect(made(draw(town(), into, { kind: 'lane' })).draft.roads.at(-1)).toMatchObject({ kind: 'lane', area: 0, width: 6 });
+    expect(made(draw(town(), into)).draft.roads.at(-1)).toMatchObject({ kind: 'street', area: 0, width: 7 });
+    // (Not asked for, so made by where it runs; asked for, it stays a lane.)
+    const out: Pt[] = [[200, FAR_Z + 3.5 + 9], [200, D]];
+    expect(made(draw(town(), out, { kind: 'lane' })).draft.roads.at(-1)).toMatchObject({ kind: 'country', width: 7 });
+    expect(made(drawStreet(town(), t, content, { points: out, kind: 'lane', asked: true, clear: true, fill: false, seed: 7 })).draft.roads.at(-1)).toMatchObject({ kind: 'lane', width: 6 });
+  });
+
   test('with no road a car drives, the first street runs from the edge of the world to its edge', () => {
     const bare = { ...town(0), roads: [], slots: [] };
     expect(streetsBare(bare)).toBe(true);
