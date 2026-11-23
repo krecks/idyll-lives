@@ -38,6 +38,12 @@ pub(crate) struct Route {
     pub(super) stand_gen: u64,
     /// It goes out of town (or comes in) by a motorway (`quickest_out`).
     pub(super) by_motorway: bool,
+    /// Where it's off the ground (ticks along it, from and to, and the level: `travel::Layer`):
+    /// on a motorway's deck, or about a merge on one. Elsewhere on the ground (`layer_at`).
+    pub(crate) layers: Vec<(f32, f32, crate::travel::Layer)>,
+    /// Where it merges off a ramp into a motorway's carriageway (ticks along it: at the merge),
+    /// each a claim of its own (`MERGE_UP`, `MERGE_ON`).
+    pub(crate) merges: Vec<f32>,
 }
 
 /// A car's way round a taxi standing at the kerb (`PassBy`) as laid on its route: the points
@@ -157,12 +163,48 @@ impl Route {
         if let Some(l) = &self.leg {
             more.push((l.pass.from, l.pass.to));
         }
-        self.claims = crate::traffic::claims(&trace, &pass, len, wid, boxes, &more);
+        // (Each pose's level: on a deck it goes by the junctions under it, their boxes, lights
+        // and zebras.)
+        let layers: Vec<crate::travel::Layer> = if self.layers.is_empty() {
+            Vec::new()
+        } else {
+            trace.iter().map(|s| self.layer_at(s.0)).collect()
+        };
+        // (Onto a motorway off a ramp: from `MERGE_UP` up the ramp to `MERGE_ON` past the merge,
+        // a claim of its own, asked for with room in the carriageway's traffic, `traffic::Claim`'s
+        // `merge`.)
+        let merges: Vec<(f32, f32)> = self
+            .merges
+            .iter()
+            .filter_map(|&m| {
+                let n = trace.len();
+                let k = trace.partition_point(|s| s.0 < m).min(n.checked_sub(1)?);
+                let d = trace[k].4;
+                let from = trace[trace.partition_point(|s| s.4 < d - MERGE_UP).min(k)].0;
+                let to = trace[trace.partition_point(|s| s.4 <= d + MERGE_ON).min(n - 1)].0;
+                (to > from).then_some((from, to))
+            })
+            .collect();
+        more.extend(&merges);
+        self.claims = crate::traffic::claims(&trace, &pass, len, wid, boxes, &more, &layers);
+        for c in &mut self.claims {
+            c.merge = merges.iter().any(|&(a, b)| c.from < b && a < c.to);
+        }
         if let Some(t) = travel {
             crate::traffic::gate(&mut self.claims, &t.signals, &trace, len);
-            self.zebras = crate::traffic::zebra_stops(&trace, &t.give_way, len);
+            let ground: crate::traffic::Trace = if layers.is_empty() {
+                trace.clone()
+            } else {
+                trace
+                    .iter()
+                    .zip(&layers)
+                    .filter(|(_, l)| l.ground())
+                    .map(|(s, _)| *s)
+                    .collect()
+            };
+            self.zebras = crate::traffic::zebra_stops(&ground, &t.give_way, len);
             self.zebras
-                .extend(crate::traffic::side_zebra_stops(&trace, &t.signals, len));
+                .extend(crate::traffic::side_zebra_stops(&ground, &t.signals, len));
             self.zebras.sort_by(|a, b| a.at.total_cmp(&b.at));
         }
         self.pass = trace.iter().zip(&pass).map(|(s, &p)| (s.0, p)).collect();
@@ -320,13 +362,26 @@ impl Route {
         // below).
         let speed = travel.country_speed;
         let mut by_motorway = false;
-        let out = |to: RoadPoint| g.path_by(m, to, Mode::Car, speed, Way::default());
+        // (On an avenue, out of its driveway and its trip's bay to the right only, and into them
+        // from the right: `kerbside_way`.)
+        let side = kerbside_way(g, m, car.spot);
+        let bay_side = car
+            .trip
+            .and_then(|trip| kerbside_way(g, enterable_near(g, trip.at, ROAD_REACH)?, trip.at));
+        let out = |to: RoadPoint| {
+            let arrive = car.trip.and_then(|_| bay_side.map(|s| s.1));
+            kerbside_path(g, m, to, speed, side.map(|s| s.0), arrive)
+        };
         let back = |to: RoadPoint| {
-            let mut path = g.path_by(to, m, Mode::Car, speed, Way::default())?;
+            let toward = car.trip.and_then(|_| bay_side.map(|s| s.0));
+            let mut path = kerbside_path(g, to, m, speed, toward, side.map(|s| s.1))?;
             path.reverse();
             Some(path)
         };
-        let turns_round = |path: Option<&RoadPath>| path.is_some_and(|p| two_way(g, p));
+        // (Not on an avenue at either end: turned round, it'd come in across its median.)
+        let kerbside = side.is_some() || bay_side.is_some();
+        let turns_round =
+            |path: Option<&RoadPath>| !kerbside && path.is_some_and(|p| two_way(g, p));
         let (path, park) = match car.trip {
             Some(trip) => {
                 let p = enterable_near(g, trip.at, ROAD_REACH)?;
@@ -379,11 +434,15 @@ impl Route {
             }
         }
         let lanes = LaneLine::new(g, centre, on);
+        let line = lanes.line();
         let lane = round_corners(&crate::travel::thin_with(
-            &lanes.line(),
+            &line,
             ROUTE_STEP,
             ROUTE_TOLERANCE,
         ));
+        // (Each lane point's level and merge, from the way's point it was laid from.)
+        let marks = way_marks(g, &lanes.pts, &lanes.on);
+        let mut laid_from = Along::new(&line);
         if lane.len() < 2 {
             return None;
         }
@@ -465,6 +524,7 @@ impl Route {
             (w[0] * b.t[0] + w[1] * b.t[1]) * d > 0.7
         };
         for (i, &p) in lane.iter().enumerate() {
+            let mark = marks.as_ref().map(|m| m[laid_from.next(p)]);
             if !on
                 && let Some((b, d, at, taken)) = start
                 && b.near(p, at, taken, d)
@@ -491,6 +551,9 @@ impl Route {
                 (room - bend_out(&lane, i, car.len)).max(0.0),
                 at,
             );
+            if let Some(m) = mark {
+                legs.mark_last(m);
+            }
             // (Out of a driveway, a bay or a spot on the road: its mouth, up to the lane.)
             if first && (start.is_some() || park.is_some() && home) {
                 let to = legs.len() - 1;
@@ -549,6 +612,7 @@ impl Route {
         loop {
             // (Pulled over as far as the way it came lets it, as it was: `pull_over`.)
             legs.push_back(had.at(t).0, had.room_here(t), had.lane_at(t));
+            legs.mark_last((had.layer_at(t), false));
             if t <= d.back {
                 break;
             }
@@ -566,6 +630,8 @@ impl Route {
                 legs.pts.push((q, rev, top));
                 legs.room.push(had.room.get(i).copied().unwrap_or(0.0));
                 legs.lane.push(had.lane.get(i).copied().unwrap_or(LANE));
+                let merge = had.merges.iter().any(|&m| (m - t).abs() < 1e-3);
+                legs.mark_last((had.layer_at(t), merge));
             }
             return Some(legs.timed(true, false));
         }
@@ -608,6 +674,7 @@ impl Route {
         );
         let way = Way {
             toward: Some(toward),
+            arrive: None,
             avoid,
         };
         let speed = travel.country_speed;
@@ -619,14 +686,21 @@ impl Route {
             exits.to_vec()
         };
         let m = car.mouth(travel);
+        // (Into a driveway or a bay on an avenue from the right only, `kerbside_way`; else any
+        // way in.)
+        let arrive = |to: RoadPoint, spot: [f32; 2]| {
+            let into = Way {
+                arrive: kerbside_way(g, to, spot).map(|s| s.1),
+                ..way.clone()
+            };
+            g.path_by(rp, to, Mode::Car, speed, into)
+                .or_else(|| g.path_by(rp, to, Mode::Car, speed, way.clone()))
+        };
         let (path, park) = if home && !taxi {
-            (g.path_by(rp, m?, Mode::Car, speed, way)?, None)
+            (arrive(m?, car.spot)?, None)
         } else if let Some(trip) = car.trip.filter(|_| !taxi) {
             let to = enterable_near(g, trip.at, ROAD_REACH)?;
-            (
-                g.path_by(rp, to, Mode::Car, speed, way)?,
-                Some((trip.at, trip.yaw)),
-            )
+            (arrive(to, trip.at)?, Some((trip.at, trip.yaw)))
         } else {
             // (Weighed with what going along the stretches it keeps off costs it more, as the
             // search has it: by its cost alone it went back the way it turned round from, the way
@@ -673,11 +747,15 @@ impl Route {
             on.push(on[on.len() - 1]);
         }
         let lanes = LaneLine::new(g, centre, on);
+        let line = lanes.line();
         let lane = round_corners(&crate::travel::thin_with(
-            &lanes.line(),
+            &line,
             ROUTE_STEP,
             ROUTE_TOLERANCE,
         ));
+        // (Each lane point's level and merge, from the way's point it was laid from.)
+        let marks = way_marks(g, &lanes.pts, &lanes.on);
+        let mut laid_from = Along::new(&line);
         if lane.len() < 2 {
             return None;
         }
@@ -757,7 +835,11 @@ impl Route {
             })
             .unwrap_or(lane.len() - 1);
         legs.line(from, lane[join], false, JUNCTION_SPEED);
-        for (i, &q) in lane.iter().enumerate().skip(join) {
+        for (i, &q) in lane.iter().enumerate() {
+            let mark = marks.as_ref().map(|m| m[laid_from.next(q)]);
+            if i < join {
+                continue;
+            }
             if let Some((b, d, (turn, at))) = &into
                 && b.near(q, *at, turn.taken, *d)
                 && along(b, i, -*d)
@@ -771,6 +853,9 @@ impl Route {
                 (room - bend_out(&lane, i, car.len)).max(0.0),
                 at,
             );
+            if let Some(m) = mark {
+                legs.mark_last(m);
+            }
         }
         let lane_end = legs.len().saturating_sub(1);
         match &into {
@@ -851,6 +936,14 @@ impl Route {
         self.points.last().map_or(0.0, |p| p.2)
     }
 
+    /// Its level `t` ticks along (`layers`: the ground but where it says).
+    pub(crate) fn layer_at(&self, t: f32) -> crate::travel::Layer {
+        self.layers
+            .iter()
+            .find(|l| l.0 <= t && t <= l.1)
+            .map_or(crate::travel::Layer::GROUND, |l| l.2)
+    }
+
     /// Where the car is `t` ticks in, which way it faces, and whether it's backing up.
     pub(crate) fn at(&self, t: f32) -> ([f32; 2], f32, bool) {
         let pts = &self.points;
@@ -870,6 +963,12 @@ impl Route {
         (p, wrap_angle(a.1 + wrap_angle(b.1 - a.1) * k), a.3)
     }
 }
+
+/// A merge off a ramp onto a motorway's carriageway (`Route::merges`) is claimed from this far up
+/// the ramp (m: short of its taper, `TAPER`, where the car waits for its gap) to this far past the
+/// merge (m).
+pub(crate) const MERGE_UP: f32 = 40.0;
+pub(crate) const MERGE_ON: f32 = 20.0;
 
 /// What leaving town by a motorway saves, the drive beyond the end of town being shorter
 /// (`MOTORWAY_OFF_MAP_TICKS`): seconds of drive time, taken off the drive to a motorway's end of
@@ -945,9 +1044,54 @@ fn quickest_out(
 pub fn way_out(travel: &Travel, exits: &[[f32; 2]], at: [f32; 2]) -> Option<([f32; 2], bool)> {
     let g = &travel.graph;
     let m = enterable_near(g, at, ROAD_REACH)?;
-    let out = |to: RoadPoint| g.path_by(m, to, Mode::Car, travel.country_speed, Way::default());
+    let side = kerbside_way(g, m, at).map(|s| s.0);
+    let out = |to: RoadPoint| kerbside_path(g, m, to, travel.country_speed, side, None);
     let (path, by) = quickest_out(g, exits, out)?;
     Some((path.pts.last()?.0, by))
+}
+
+/// On an avenue (two lanes each way about a median), the way a car keeps its driveway or bay at
+/// `spot` on its right, `m` where that meets the road: the end of `m`'s stretch it sets off
+/// towards, turning right out of it into the near lanes, and the end it comes in from, turning
+/// right into it; neither across the median (one on the far side goes on to the next junction and
+/// comes back, `kerbside_path`). None on any other road: a two-way street's cars cross the
+/// oncoming lane as ever, a one-way road's go its way (`Graph::may_go`).
+pub(crate) fn kerbside_way(
+    g: &crate::travel::Graph,
+    m: RoadPoint,
+    spot: [f32; 2],
+) -> Option<(u32, u32)> {
+    let r = &g.roads[m.road as usize];
+    if r.kind != crate::travel::RoadKind::Avenue || !r.oneway.is_both() {
+        return None;
+    }
+    let (p, t) = (r.at(m.s), r.tangent(m.s));
+    let right = (spot[0] - p[0]) * -t[1] + (spot[1] - p[1]) * t[0];
+    let e = g.edges[m.edge as usize];
+    Some(if right >= 0.0 { (e.b, e.a) } else { (e.a, e.b) })
+}
+
+/// The way by car from `from` to `to`, setting off towards `toward` and coming in from `arrive`
+/// where given (`kerbside_way`): round by the next junction and back, as the roads have it. With
+/// no such way (an avenue's dead end), any way.
+fn kerbside_path(
+    g: &crate::travel::Graph,
+    from: RoadPoint,
+    to: RoadPoint,
+    speed: f32,
+    toward: Option<u32>,
+    arrive: Option<u32>,
+) -> Option<crate::travel::RoadPath> {
+    let any = || g.path_by(from, to, Mode::Car, speed, Way::default());
+    if toward.is_none() && arrive.is_none() {
+        return any();
+    }
+    let way = Way {
+        toward,
+        arrive,
+        ..Way::default()
+    };
+    g.path_by(from, to, Mode::Car, speed, way).or_else(any)
 }
 
 /// Whether a car may drive `path` back the way it goes: no road along it is one-way.

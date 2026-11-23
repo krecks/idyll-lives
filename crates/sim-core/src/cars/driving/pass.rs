@@ -9,13 +9,15 @@ use super::*;
 pub(crate) fn guard<'a>(
     now: &Rect,
     next: &Rect,
+    layer: crate::travel::Layer,
     them: impl Iterator<Item = &'a Driving>,
 ) -> Option<u64> {
     let near = |at: [f32; 2], len: f32| {
         crate::travel::dist(at, next.at) < (len + next.half[0] * 2.0) + AHEAD + GAP
     };
+    // (Those on its level only: `travel::Layer`.)
     them.into_iter()
-        .find(|o| near(o.at, o.len) && closes_in(now, next, &o.body()))
+        .find(|o| o.layer.meets(layer) && near(o.at, o.len) && closes_in(now, next, &o.body()))
         .map(|o| o.first)
 }
 
@@ -142,6 +144,7 @@ pub(crate) fn pull_over(
     if let Some(k) = guard(
         &body(car.shift),
         &body(shift),
+        car.layer(),
         others.iter().chain(&standing),
     ) {
         if shift < car.shift {
@@ -320,6 +323,7 @@ pub(crate) fn pull_want(
             || other.shown.is_none_or(|s| !s.2) && !standing_taxi
             || other.backing() && !after
             || other.sight != Sight::Seen
+            || !other.layer().meets(car.layer())
         {
             continue;
         }

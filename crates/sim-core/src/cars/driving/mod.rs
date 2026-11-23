@@ -416,6 +416,17 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
                 || traffic.waits_for(k).contains(&key)
         })
         .collect();
+    // (Those turning round on another level than its own, `travel::Layer`: not in its way.)
+    let mine = cars[c].layer_on(t);
+    let off_level: Vec<u64> = traffic
+        .turning
+        .iter()
+        .map(|t| t.0)
+        .filter(|&k| {
+            cars.get((k & !(1 << 63)) as usize)
+                .is_some_and(|o| !o.layer().meets(mine))
+        })
+        .collect();
     let car = &mut cars[c];
     let shift = car.shift;
     // Where it would be a tick on, its body and the ground in front of it (behind it while it
@@ -433,7 +444,19 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
     } else {
         AHEAD
     };
-    let (ahead, behind) = if reverse { (0.0, back) } else { (AHEAD, 0.0) };
+    // (On the move faster than on a country road (the motorway), it keeps further back from the
+    // one in front, the faster the further: `follow_ahead`.)
+    let speed = if moving {
+        crate::travel::dist(at, was) * DRIVE_TICKS_PER_SECOND
+    } else {
+        0.0
+    };
+    let (ahead, behind) = if reverse {
+        (0.0, back)
+    } else {
+        (follow_ahead(speed, travel.country_speed), 0.0)
+    };
+    let layer = car.layer_on(t);
     let me = Driving {
         at,
         yaw,
@@ -442,6 +465,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
         ahead,
         behind,
         first: key,
+        layer,
     };
     let now = Driving {
         at: was,
@@ -466,7 +490,15 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
     // another, as `guard` keeps it; not kept by the claims of those it backs away from.)
     let turning = reverse && car.detour.is_some();
     if let Some(k) = traffic
-        .blocked(key, &body_now, &body_next, me.heading(), pass, in_drive)
+        .blocked(
+            key,
+            &body_now,
+            &body_next,
+            me.heading(),
+            pass,
+            in_drive,
+            layer,
+        )
         .filter(|_| !turning)
     {
         car.waits_for = Some(k);
@@ -511,6 +543,9 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
     // Nor, going the way it backs, on past it (`overtakes`): crept along beside the ground it backs
     // over, a car came out ahead of it into its way.
     if let Some(k) = traffic.turning.iter().find_map(|(k, path)| {
+        if off_level.contains(k) {
+            return None;
+        }
         let on = if waiting.contains(k) {
             path.iter()
                 .position(|r| path[0].overlap(r) <= 0.0)
@@ -557,7 +592,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
     }
     if progress > t {
         // (The last resort: never deeper into another car than it is.)
-        match guard(&body_now, &body_next, others.iter().chain(&standing)) {
+        match guard(&body_now, &body_next, layer, others.iter().chain(&standing)) {
             Some(k) => {
                 traffic.guarded += 1;
                 car.waits_for = Some(k);
@@ -576,6 +611,22 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
         car.shown = Some((shifted(p, yaw, shift), yaw, true, 0));
     }
 }
+
+/// The ground a car going `speed` (m a second of drive time, `0`: standing or setting off) keeps
+/// clear in front of it (m): `AHEAD`, as ever, up to a country road's speed (`country`, and
+/// `FOLLOW_SLACK` more: every classic town's cars keep it as they always did); faster (the
+/// motorway), `FOLLOW` s of drive for each m/s over that more. At 30 m/s some 28 m: a car on the
+/// motorway keeps back as a driver would, and stops (as every car here does, at once) well short
+/// of one stopped in front; a tick's drive there is 2 m, so none comes into another between two
+/// looks.
+pub(crate) fn follow_ahead(speed: f32, country: f32) -> f32 {
+    AHEAD + FOLLOW * (speed - country - FOLLOW_SLACK).max(0.0)
+}
+
+/// `follow_ahead`'s seconds of drive kept back for each m/s over a country road's speed, and how
+/// far over it (m/s) that begins.
+pub(crate) const FOLLOW: f32 = 2.0;
+pub(crate) const FOLLOW_SLACK: f32 = 1.0;
 
 /// How long a car stands at a zebra's stop line for those stepping onto it at most, and for those
 /// on it (ticks of real time, as they walk: `zebra_yield`). A stream of them coming up to it, it

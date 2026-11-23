@@ -479,6 +479,7 @@ pub(super) fn lay_route(
                 on.push(on[n - 1]);
             }
             let lanes = crate::cars::LaneLine::new(g, centre, on);
+            let marks = crate::cars::way_marks(g, &lanes.pts, &lanes.on);
             let crate::cars::LaneLine {
                 pts: centre,
                 mut offs,
@@ -572,8 +573,10 @@ pub(super) fn lay_route(
             let tops =
                 crate::cars::lane_tops(&lane, travel, &junctions, |k| along[nearest(lane[k])].1);
             let mut on = false;
+            let mut laid_from = crate::cars::Along::new(&full);
             for (i, &p) in lane.iter().enumerate() {
                 let top = tops[i];
+                let mark = marks.as_ref().map(|m| m[laid_from.next(p)]);
                 if !on
                     && let Some((bay, d, at, taken, _)) = &leaving
                     && bay.near(p, *at, *taken, *d)
@@ -601,6 +604,9 @@ pub(super) fn lay_route(
                 let (room, meet) = crate::cars::meet(roads[i], offs[i], TAXI_WID);
                 let room = room - crate::cars::bend_out(&lane, k, TAXI_LEN);
                 out.push_lane(p, top, room.max(0.0), meet);
+                if let Some(m) = mark {
+                    out.mark_last(m);
+                }
             }
             // (The claim of the stand before, closed once there's way on to close it at.)
             if let Some(s) = stood.take() {

@@ -85,7 +85,8 @@ impl Traffic {
     /// and `now` isn't (`counts`, even going its way: cutting in; not one right behind it,
     /// `behind`). Still in its driveway (`in_drive`: before its first claim, none held), `now` in
     /// the way too: it'd only come out deeper into it. Not holding one, nor on up to wait in the
-    /// way of a group asked for long ago (`OLD_ASK`).
+    /// way of a group asked for long ago (`OLD_ASK`). Only claims on its level (`layer`) count.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn blocked(
         &self,
         key: u64,
@@ -94,6 +95,7 @@ impl Traffic {
         way: [f32; 2],
         pass: f32,
         in_drive: bool,
+        layer: crate::travel::Layer,
     ) -> Option<u64> {
         let sample = |rect: &Rect| Sample {
             t: 0.0,
@@ -101,6 +103,7 @@ impl Traffic {
             rect: *rect,
             way,
             pass,
+            layer,
         };
         // (Kept `KEEP_SHORT` m short of it, its body a tick on taken that much longer in front: the
         // other has room to straighten up and pull over.)
@@ -118,8 +121,10 @@ impl Traffic {
         let next = if holding { *next } else { long(next) };
         let (now, next) = (sample(now), sample(&next));
         for h in &self.holds {
-            // (Going by a standing taxi, out round it: not its claim where it stands.)
+            // (Going by a standing taxi, out round it: not its claim where it stands. Nor a
+            // merge's: it was granted with room in the traffic, which goes on.)
             if h.key == key
+                || h.claim.merge
                 || !in_bounds(&h.claim, &next.rect)
                 || self.passing.contains(&(key, h.key))
             {
@@ -162,6 +167,7 @@ impl Traffic {
         };
         let old = |a: &&Ask| {
             a.key != key
+                && !a.parts.iter().any(|(_, c)| c.merge)
                 && a.seen + 1 >= self.tick
                 && self.tick > a.tick + OLD_ASK
                 && self

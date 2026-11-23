@@ -138,7 +138,8 @@ impl Graph {
     }
 
     /// `search`, setting off from `from` only towards `way.toward` (a node at an end of its edge),
-    /// and each edge of `way.avoid` costing that much more. A car keeps to one-way roads' way
+    /// coming onto `to`'s only from `way.arrive`, and each edge of `way.avoid` costing that much
+    /// more. A car keeps to one-way roads' way
     /// (`Graph::may_go`) setting off, on the way and coming in.
     fn search_by<R>(
         &self,
@@ -174,9 +175,16 @@ impl Graph {
             Some(n) if n == fe.a => s <= from.s,
             _ => true,
         };
+        // (Coming in from `way.arrive` only: along the goal's stretch from that end.)
+        let comes = |s: f32| match way.arrive {
+            Some(n) if n == te.a && n != te.b => to.s >= s,
+            Some(n) if n == te.b && n != te.a => to.s <= s,
+            _ => true,
+        };
         if from.road == to.road
             && from.edge == to.edge
             && ahead(to.s)
+            && comes(from.s)
             && (to.s == from.s || goes(&fe, to.s > from.s))
         {
             return Some(found(&[(from.road, from.s, to.s)]));
@@ -239,7 +247,7 @@ impl Graph {
                 // Onto the goal's stretch from here.
                 for (end, len, forward) in [(te.a, to.s - te.s0, true), (te.b, te.s1 - to.s, false)]
                 {
-                    if end == u && goes(&te, forward) {
+                    if end == u && goes(&te, forward) && way.arrive.is_none_or(|n| n == end) {
                         let total = gu
                             + Self::cost(kind(&te), len.max(0.0), mode, country)
                             + extra(to.edge);
