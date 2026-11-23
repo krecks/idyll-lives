@@ -819,7 +819,7 @@ export function changeKind(draft: NeighbourhoodDraft, t: Templates, road: number
   const area = TOWN_KINDS.has(kind) ? (r.area ?? areaOf(draft, r.points)) : -1;
   const { area: _area, oneway: _way, ...plain } = r;
   const made: RoadPlan = { ...plain, kind, width, ...(area >= 0 ? { area } : {}), ...(way ? { oneway: way } : {}) };
-  let next = roads.map((o, j) => (j === road ? made : meets.has(j) ? atKerb(o, made) : o));
+  const next = roads.map((o, j) => (j === road ? made : meets.has(j) ? atKerb(o, made) : o));
   if (kind === 'country' && r.ends.includes('dead')) {
     const court = longestCourt(next, [road]);
     if (court && court.stub > COURT + 0.5) return refused(`a country road's dead end reaches ${COURT} m at most, and ${name} ends ${Math.round(court.stub)} m past the last road it meets`);

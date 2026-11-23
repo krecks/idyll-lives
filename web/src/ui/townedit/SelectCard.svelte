@@ -241,7 +241,7 @@
         <div class="option">
           <span class="eyebrow sub">Change kind</span>
           {#if !road.bridge}
-            <Segmented fill label="Kind of road" value={road.kind ?? 'street'} options={KIND_CHOICES} onchange={(k) => changeTo(k)} />
+            <Segmented fill label="Change its kind" value={road.kind ?? 'street'} options={KIND_CHOICES} onchange={(k) => changeTo(k)} />
           {/if}
           <div class="row">
             <Segmented label="Which way cars go" value={onewayOf(road) ? 'one' : 'two'} options={WAYS} onchange={(w) => changeTo(road.kind ?? 'street', w === 'one' ? 1 : 0)} />
@@ -251,8 +251,8 @@
           </div>
           {#if !road.bridge}
             <label class="toggle-row">
-              <span>Clear what's in the way{#if !clearWay}<span class="sub-note"> (else a wider road is refused there)</span>{/if}</span>
-              <Toggle label="Clear what's in the way" bind:checked={clearWay} />
+              <span>Clear what's in the way{#if !clearWay}{' '}<span class="sub-note">(else a wider road is refused there)</span>{/if}</span>
+              <Toggle label="Clear what's in the way of it wider" bind:checked={clearWay} />
             </label>
           {/if}
         </div>
