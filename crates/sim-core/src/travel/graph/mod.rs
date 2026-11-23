@@ -39,6 +39,48 @@ pub struct Graph {
     /// Its junctions' boxes (`traffic::boxes`): their middles and how far round them they reach
     /// (m). Cars take turns driving through them (`traffic/`).
     pub boxes: Vec<([f32; 2], f32)>,
+    /// Per road, a motorway carriageway's inside (`motorway_insides`): +1, the left of the way its
+    /// points run; -1, the right; 0, not a motorway.
+    pub(crate) inside: Vec<i8>,
+}
+
+/// How far a motorway carriageway's pair may be from its edge (m: `motorway.ts` `MOTORWAY.apart`).
+const PAIR_APART: f32 = 24.0;
+
+/// Each road's inside as a motorway carriageway (`Graph::inside`), as the renderer draws its lanes
+/// (`motorway.ts` `insideOf`): towards its pair, the other carriageway nearest it at its middle
+/// running alongside it (within `PAIR_APART` of its edge); with none, the left of the way its cars
+/// go, as they keep to the right. Its lanes run out from there, its shoulder outside them.
+fn motorway_insides(roads: &[Road]) -> Vec<i8> {
+    let ways: Vec<usize> = (0..roads.len())
+        .filter(|&i| roads[i].kind == RoadKind::Motorway)
+        .collect();
+    let mut out = vec![0i8; roads.len()];
+    for &i in &ways {
+        let a = &roads[i];
+        let mid = a.len() / 2.0;
+        let (p, t) = (a.at(mid), a.tangent(mid));
+        let mut best: Option<(f32, i8)> = None;
+        for &j in &ways {
+            let b = &roads[j];
+            if j == i {
+                continue;
+            }
+            let (s, d) = b.project(p);
+            if d > (a.width + b.width) / 2.0 + PAIR_APART || best.is_some_and(|x| d >= x.0) {
+                continue;
+            }
+            let (q, u) = (b.at(s), b.tangent(s));
+            if (u[0] * t[0] + u[1] * t[1]).abs() < 0.9 {
+                continue;
+            }
+            // (The left of the way along: (t.z, -t.x).)
+            let side = (q[0] - p[0]) * t[1] - (q[1] - p[1]) * t[0];
+            best = Some((d, if side >= 0.0 { 1 } else { -1 }));
+        }
+        out[i] = best.map_or(if a.oneway == OneWay::Against { -1 } else { 1 }, |b| b.1);
+    }
+    out
 }
 
 /// Whether a road of kind `end`'s end meeting a road of kind `along` part way along it joins it
@@ -143,12 +185,29 @@ impl Seeker for Near<'_> {
 pub struct RoadPath {
     /// (point, road width, kind) along the way, from the first road point to the last.
     pub pts: Vec<([f32; 2], f32, RoadKind)>,
+    /// At each of its points, the road it's on (by index in the network, `Graph::roads`) and
+    /// whether it goes along it the way the road's points run (a point where one stretch meets
+    /// the next, the one it comes in by).
+    pub roads: Vec<(u32, bool)>,
     /// The edges it goes along (`Graph::path_by` only).
     pub edges: Vec<u32>,
     /// Cost (seconds of drive time for cars, metres for walkers).
     pub cost: f32,
     /// Its length (m).
     pub len: f32,
+}
+
+impl RoadPath {
+    /// The same way driven the other way round: its points, roads and edges from the last to the
+    /// first (each road gone along the other way).
+    pub fn reverse(&mut self) {
+        self.pts.reverse();
+        self.edges.reverse();
+        self.roads.reverse();
+        for r in &mut self.roads {
+            r.1 = !r.1;
+        }
+    }
 }
 
 /// The way a trip along the roads sets off and the way it comes in: its first two points and its
@@ -320,6 +379,7 @@ impl Graph {
                 prev = Some((s, n));
             }
         }
+        g.inside = motorway_insides(&g.roads);
         g.merge_junctions();
         g.index();
         g.boxes = crate::traffic::boxes(&g);

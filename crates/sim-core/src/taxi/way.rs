@@ -385,7 +385,7 @@ pub(super) fn lay_route(
     net: &Net,
     legs: &[Vec<Piece>],
 ) -> Option<(crate::cars::Route, Vec<f32>)> {
-    use crate::cars::{Legs, kerb_of, lane_on, pull_room};
+    use crate::cars::{Legs, kerb_of, lane_on};
     use crate::travel::{RoadKind, dist};
     let g = &travel.graph;
     let junctions: Vec<[f32; 2]> = g.junctions().collect();
@@ -451,7 +451,7 @@ pub(super) fn lay_route(
                 first.1 += d * before;
             }
             let mut centre: Vec<[f32; 2]> = Vec::new();
-            let mut along: Vec<(f32, RoadKind)> = Vec::new();
+            let mut on: Vec<(u32, bool)> = Vec::new();
             for &(r, s0, s1) in run.iter() {
                 let road = &g.roads[r as usize];
                 for p in road.slice(s0, s1) {
@@ -459,15 +459,36 @@ pub(super) fn lay_route(
                         continue;
                     }
                     centre.push(p);
-                    along.push((road.width, road.kind));
+                    on.push((r, s1 >= s0));
                 }
             }
             if centre.len() < 2 {
                 // (A stand right where the last one was: it stands there again.)
                 continue;
             }
-            let mut offs: Vec<f32> = along.iter().map(|&(w, kind)| lane_on(w, kind)).collect();
             let first_run = k == 0 && j == 0;
+            let last_run = k == last_leg && j + 1 == n_runs;
+            // (In from off the map, and out of it at the end.)
+            if first_run {
+                centre.insert(0, crate::cars::extend_past(centre[1], centre[0]));
+                on.insert(0, on[0]);
+            }
+            if last_run {
+                let n = centre.len();
+                centre.push(crate::cars::extend_past(centre[n - 2], centre[n - 1]));
+                on.push(on[n - 1]);
+            }
+            let lanes = crate::cars::LaneLine::new(g, centre, on);
+            let crate::cars::LaneLine {
+                pts: centre,
+                mut offs,
+                on,
+                ..
+            } = lanes;
+            let roads: Vec<&crate::travel::Road> =
+                on.iter().map(|o| &g.roads[o.0 as usize]).collect();
+            let along: Vec<(f32, RoadKind)> = roads.iter().map(|r| (r.width, r.kind)).collect();
+            let lane_at = offs.clone();
             // (Eased to where it stands, clear of its kerb, and out again after; its body's
             // length by the stand already there, so it stands straight along its lane: eased
             // right up to it, it stood as much as 9 degrees across a country road's.)
@@ -484,13 +505,24 @@ pub(super) fn lay_route(
                         break;
                     }
                     let (w, kind) = along[i];
-                    let lane = lane_on(w, kind);
-                    let off = lane.min(kerb_of(w, kind) - TAXI_WID / 2.0 - KERB_KEEP);
-                    // (Two stands close along one road: whichever's nearer the kerb, so it keeps
-                    // to the kerb between them; else easing out of one undid easing into the
-                    // next, and it stood 30 degrees across its lane.)
-                    let eased = off + (lane - off) * ((gone - flat) / STAND_EASE).clamp(0.0, 1.0);
-                    offs[i] = offs[i].min(eased);
+                    let stand = kerb_of(w, kind) - TAXI_WID / 2.0 - KERB_KEEP;
+                    let ease = ((gone - flat) / STAND_EASE).clamp(0.0, 1.0);
+                    if crate::cars::classic(roads[i]) {
+                        let lane = lane_on(w, kind);
+                        let off = lane.min(stand);
+                        // (Two stands close along one road: whichever's nearer the kerb, so it
+                        // keeps to the kerb between them; else easing out of one undid easing
+                        // into the next, and it stood 30 degrees across its lane.)
+                        let eased = off + (lane - off) * ease;
+                        offs[i] = offs[i].min(eased);
+                    } else {
+                        // (Out of its lane to the kerb: a one-way road's middle, an avenue's
+                        // outer lane; whichever's nearer it, as above.)
+                        let eased = stand + (lane_at[i] - stand) * ease;
+                        if (eased - stand).abs() < (offs[i] - stand).abs() {
+                            offs[i] = eased;
+                        }
+                    }
                 }
             };
             if j + 1 == n_runs && k < last_leg {
@@ -498,18 +530,6 @@ pub(super) fn lay_route(
             }
             if j == 0 && k > 0 {
                 ease(&mut offs, &mut (0..centre.len()));
-            }
-            if first_run {
-                // (In from off the map.)
-                centre.insert(0, crate::cars::extend_past(centre[1], centre[0]));
-                offs.insert(0, offs[0]);
-                along.insert(0, along[0]);
-            }
-            if k == last_leg && j + 1 == n_runs {
-                let n = centre.len();
-                centre.push(crate::cars::extend_past(centre[n - 2], centre[n - 1]));
-                offs.push(offs[n - 1]);
-                along.push(along[n - 1]);
             }
             let full = crate::cars::offset_right_by(&centre, &offs);
             let mut lane = crate::travel::thin_with(
@@ -577,10 +597,10 @@ pub(super) fn lay_route(
                 on = true;
                 let k = i;
                 let i = nearest(p);
-                let (w, kind) = along[i];
                 // (Less on the outside of a bend to the left, where its corners stand out.)
-                let room = pull_room(w, kind, TAXI_WID) - crate::cars::bend_out(&lane, k, TAXI_LEN);
-                out.push_lane(p, top, room.max(0.0), offs[i]);
+                let (room, meet) = crate::cars::meet(roads[i], offs[i], TAXI_WID);
+                let room = room - crate::cars::bend_out(&lane, k, TAXI_LEN);
+                out.push_lane(p, top, room.max(0.0), meet);
             }
             // (The claim of the stand before, closed once there's way on to close it at.)
             if let Some(s) = stood.take() {

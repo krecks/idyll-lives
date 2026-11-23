@@ -19,7 +19,10 @@ impl Graph {
                 cost,
                 ..Default::default()
             };
-            self.each_point(pieces, |p| out.pts.push(p));
+            self.each_point(pieces, |p, on| {
+                out.pts.push(p);
+                out.roads.push(on);
+            });
             out
         })
     }
@@ -41,7 +44,10 @@ impl Graph {
                 cost,
                 ..Default::default()
             };
-            self.each_point(pieces, |p| out.pts.push(p));
+            self.each_point(pieces, |p, on| {
+                out.pts.push(p);
+                out.roads.push(on);
+            });
             out.edges = pieces
                 .iter()
                 .filter_map(|&(r, s0, s1)| self.edge_at(r, (s0 + s1) / 2.0))
@@ -62,7 +68,7 @@ impl Graph {
         self.search(from, to, mode, country, |pieces| {
             let (_, cost) = self.measure(pieces, mode, country);
             let (mut n, mut first, mut last) = (0, [[0.0; 2]; 2], [[0.0; 2]; 2]);
-            self.each_point(pieces, |(p, ..)| {
+            self.each_point(pieces, |(p, ..), _| {
                 if n < 2 {
                     first[n] = p;
                 }
@@ -74,8 +80,13 @@ impl Graph {
     }
 
     /// The points along the stretches of road `pieces`, one after another, as `path` has them
-    /// (one within 0.05 m of the one before left out), each with its road's width and kind.
-    fn each_point(&self, pieces: &[Piece], mut f: impl FnMut(([f32; 2], f32, RoadKind))) {
+    /// (one within 0.05 m of the one before left out), each with its road's width and kind, and
+    /// the road and whether it goes along it the way its points run (`RoadPath::roads`).
+    fn each_point(
+        &self,
+        pieces: &[Piece],
+        mut f: impl FnMut(([f32; 2], f32, RoadKind), (u32, bool)),
+    ) {
         let mut last: Option<[f32; 2]> = None;
         for &(r, s0, s1) in pieces {
             let road = &self.roads[r as usize];
@@ -84,7 +95,7 @@ impl Graph {
                     continue;
                 }
                 last = Some(p);
-                f((p, road.width, road.kind));
+                f((p, road.width, road.kind), (r, s1 >= s0));
             }
         }
     }

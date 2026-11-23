@@ -613,12 +613,8 @@ pub(crate) fn lane_tops(
     tops
 }
 
-/// How many ticks a car takes along the roads from the road nearest `from` to the road nearest
-/// `to` with them to itself (every light green, nobody in its way): in its lane, its corners
-/// rounded, slowing for junctions and bends as `Route::on_roads` lays a drive out, from standing
-/// to standing. None: no road near either, or no way between by road. (A world's drive across,
-/// timed: the tests.)
-pub fn empty_drive_ticks(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Option<f32> {
+/// `empty_drive_ticks`'s drive, laid out.
+fn empty_drive_route(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Option<Route> {
     let g = &travel.graph;
     let a = *g.near(from, ROAD_REACH, 1, Mode::Car).first()?;
     let b = *g.near(to, ROAD_REACH, 1, Mode::Car).first()?;
@@ -627,28 +623,57 @@ pub fn empty_drive_ticks(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Optio
         return None;
     }
     let centre: Vec<[f32; 2]> = path.pts.iter().map(|p| p.0).collect();
-    let offs: Vec<f32> = path.pts.iter().map(|p| lane_on(p.1, p.2)).collect();
+    let lanes = LaneLine::new(g, centre, path.roads.clone());
     let lane = round_corners(&crate::travel::thin_with(
-        &offset_right_by(&centre, &offs),
+        &lanes.line(),
         ROUTE_STEP,
         ROUTE_TOLERANCE,
     ));
     let junctions: Vec<[f32; 2]> = g.junctions().collect();
     let near_path = crate::travel::NearestPoint::new(path.pts.iter().map(|x| x.0).collect());
-    let road_at = |p: [f32; 2]| near_path.nearest(p).map(|i| (path.pts[i].1, path.pts[i].2));
+    let here = |p: [f32; 2]| match lanes.nearest(p) {
+        Some(i) => Some(lanes.point(g, i, 2.0 * CAR_HALF)),
+        None => near_path.nearest(p).map(|i| {
+            let (width, kind) = (path.pts[i].1, path.pts[i].2);
+            (
+                width,
+                kind,
+                pull_room(width, kind, 2.0 * CAR_HALF),
+                lane_on(width, kind),
+            )
+        }),
+    };
     let tops = lane_tops(&lane, travel, &junctions, |i| {
-        road_at(lane[i]).map_or(crate::travel::RoadKind::Street, |r| r.1)
+        here(lane[i]).map_or(crate::travel::RoadKind::Street, |r| r.1)
     });
     let mut legs = Legs::default();
     for (i, &p) in lane.iter().enumerate() {
-        let (width, kind) = road_at(p)?;
-        let top = tops[i];
-        legs.push_lane(
-            p,
-            top,
-            pull_room(width, kind, 2.0 * CAR_HALF),
-            lane_on(width, kind),
-        );
+        let (_, _, room, at) = here(p)?;
+        legs.push_lane(p, tops[i], room, at);
     }
-    Some(legs.timed(true, true).ticks())
+    Some(legs.timed(true, true))
+}
+
+/// How many ticks a car takes along the roads from the road nearest `from` to the road nearest
+/// `to` with them to itself (every light green, nobody in its way): in its lane, its corners
+/// rounded, slowing for junctions and bends as `Route::on_roads` lays a drive out, from standing
+/// to standing. None: no road near either, or no way between by road. (A world's drive across,
+/// timed: the tests.)
+pub fn empty_drive_ticks(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Option<f32> {
+    Some(empty_drive_route(travel, from, to)?.ticks())
+}
+
+/// `empty_drive_ticks`'s drive, where the car is and which way it faces each tick of it (the
+/// tests: which lane it keeps to).
+pub fn empty_drive(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Option<Vec<([f32; 2], f32)>> {
+    let route = empty_drive_route(travel, from, to)?;
+    let ticks = route.ticks().ceil() as usize;
+    Some(
+        (0..=ticks)
+            .map(|t| {
+                let (p, yaw, _) = route.at(t as f32);
+                (p, yaw)
+            })
+            .collect(),
+    )
 }

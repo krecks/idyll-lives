@@ -16,6 +16,8 @@ pub(crate) struct Bay {
     z0: f32,
     u: [f32; 2],
     kerb: f32,
+    /// How far right of the road's middle it turns onto its lane, or off it (`kerb_lane`).
+    lane: f32,
 }
 
 impl Bay {
@@ -54,6 +56,7 @@ impl Bay {
             z0,
             u,
             kerb: -s * kerb_off(road),
+            lane: kerb_lane(road),
         })
     }
 
@@ -97,7 +100,7 @@ impl Bay {
     /// away it backs out turning away from the way it goes (as `Route::legacy` does). Where the
     /// turn is along the road, and how much of the lane it takes up.
     pub(crate) fn leave(&self, legs: &mut Legs, d: f32) -> (f32, f32) {
-        let lane_out = d * TIGHT_LANE;
+        let lane_out = d * self.lane;
         let (at, room) = self.cross(lane_out);
         let room = room.min(self.past_kerb(lane_out));
         let facing = [self.yaw.sin(), self.yaw.cos()];
@@ -116,7 +119,7 @@ impl Bay {
 
     /// The turn into it from the lane, coming along it against `d`, and where it is along the road.
     pub(crate) fn entry(&self, d: f32) -> (Turn, f32) {
-        let lane_in = -d * TIGHT_LANE;
+        let lane_in = -d * self.lane;
         let (at, room) = self.cross(lane_in);
         let room = room.min(self.past_kerb(lane_in));
         (
@@ -187,7 +190,8 @@ pub(crate) fn kerb_of(width: f32, kind: crate::travel::RoadKind) -> f32 {
 /// kerbs: too narrow for two cars to pass either way, and not up on the kerb, as the kerbside
 /// furniture stands about 0.15 m in from it). It turns out of a driveway onto the road, and off it
 /// into one, `TIGHT_LANE` out as ever (`Bay`: a turn there at a bend in the road cuts the bend's
-/// edge the more the further out it ends), easing out to its lane on along the road.
+/// edge the more the further out it ends), easing out to its lane on along the road. (A two-way
+/// street, lane or country road's; an avenue's, a motorway's and a one-way road's: `lane_off`.)
 pub(crate) fn lane_on(width: f32, kind: crate::travel::RoadKind) -> f32 {
     if kerb_of(width, kind) - CAR_HALF - KERB_KEEP >= LANE {
         LANE
