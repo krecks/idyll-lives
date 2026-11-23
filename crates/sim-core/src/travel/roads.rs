@@ -175,7 +175,8 @@ const CROSS_RUN: f32 = 20.0;
 const CROSS_GAP: f32 = 4.0;
 
 /// Where two roads for cars (`Road::drivable`) cross, or their middle lines touch (`CROSS_NEAR`),
-/// away from either's ends (where `Graph::build` joins them already): the two roads, how far along
+/// neither of them a motorway (grade separated: it crosses on a bridge or under one), away from
+/// either's ends (where `Graph::build` joins them already): the two roads, how far along
 /// each, and the place (between the two nearest points), in order. A crossing, or a touch along a
 /// short stretch, is one place (`CROSS_RUN`); a road laid on another for longer meets it where
 /// they come together and where they part. A town file's roads should meet at their ends; a
@@ -207,8 +208,12 @@ pub(super) fn crossings(roads: &[Road]) -> Vec<(usize, usize, f32, f32, [f32; 2]
         for q in r + 1..roads.len() {
             let (a, b) = (&roads[r], &roads[q]);
             let (x, y) = (bounds[r], bounds[q]);
+            // (The motorway meets nothing it crosses: over it or under it, on its own level. Its
+            // ramps join it at their ends, `Graph::build`.)
             if !a.drivable()
                 || !b.drivable()
+                || a.kind == RoadKind::Motorway
+                || b.kind == RoadKind::Motorway
                 || x[2] + CROSS_NEAR < y[0]
                 || y[2] + CROSS_NEAR < x[0]
                 || x[3] + CROSS_NEAR < y[1]
