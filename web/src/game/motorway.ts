@@ -46,6 +46,8 @@ const BEND_SPAN = 25;
 export const TOWN_CLEAR = 50;
 export const HAMLET_CLEAR = 30;
 export const TOWN_REACH = 220;
+/** How far from the town's box its middle line is best passing (m): clear of the lots spilling out along the roads from it, near enough for the way to its junction. */
+const REACH_AIM = 150;
 /** How far its middle line keeps off the world's edges but the two it runs between (m). */
 export const SIDE_CLEAR = 40;
 /** How far its middle line keeps off the roads laid before it (bridges, causeways: m). */
@@ -385,7 +387,7 @@ function judge(middle: Pt[], line: Pt[], site: MotorwaySite): Course | Why {
   const heights = heightsAlong(middle, site);
   const made = profileOf(heights);
   if (!made) return 'grade';
-  return { middle, line, heights, score: (made.cut / ls[ls.length - 1]) * 20 + water * 0.4 + reach * 0.05 };
+  return { middle, line, heights, score: (made.cut / ls[ls.length - 1]) * 20 + water * 0.4 + Math.abs(reach - REACH_AIM) * 0.05 };
 }
 
 /** The courses it tries: `CANDIDATES` cubic curves from one edge to the opposite one, passing either side of the town, near and further off. */
