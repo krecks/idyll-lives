@@ -86,6 +86,7 @@ impl Traffic {
     /// `behind`). Still in its driveway (`in_drive`: before its first claim, none held), `now` in
     /// the way too: it'd only come out deeper into it. Not holding one, nor on up to wait in the
     /// way of a group asked for long ago (`OLD_ASK`). Only claims on its level (`layer`) count.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn blocked(
         &self,
         key: u64,

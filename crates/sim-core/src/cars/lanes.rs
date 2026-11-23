@@ -367,8 +367,8 @@ impl<'a> Along<'a> {
     pub(crate) fn next(&mut self, p: [f32; 2]) -> usize {
         let end = (self.at + ALONG_LOOK).min(self.line.len());
         let mut best = (f32::INFINITY, self.at);
-        for i in self.at..end {
-            let d = dist(self.line[i], p);
+        for (i, &q) in self.line.iter().enumerate().take(end).skip(self.at) {
+            let d = dist(q, p);
             if d < best.0 {
                 best = (d, i);
             }
