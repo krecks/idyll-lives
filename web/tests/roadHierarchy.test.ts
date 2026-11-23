@@ -37,7 +37,7 @@ describe('the road hierarchy fixture', () => {
 
   test('the motorway: two carriageways 9 m apart, over the street and the river', () => {
     const [east, west] = [h.roads[F.MOTORWAY_EAST], h.roads[F.MOTORWAY_WEST]];
-    expect(west.points[0][1] - east.points[0][1]).toBe(9);
+    expect(east.points[0][1] - west.points[0][1]).toBe(9);
     const street = h.roads[F.BRIDGE_STREET];
     for (const [i, m] of [east, west].entries()) {
       const { road, s } = m.crosses![0];
@@ -52,6 +52,27 @@ describe('the road hierarchy fixture', () => {
     }
   });
 
+  test('laid for traffic on the right: each carriageway the other on the left of the way its cars go, its ramp to its right', () => {
+    const middle = (r: RoadPlan) => pointAt(r.points, len(r) / 2);
+    for (const [ri, other, ramp] of [
+      [F.MOTORWAY_EAST, F.MOTORWAY_WEST, F.OFF_RAMP],
+      [F.MOTORWAY_WEST, F.MOTORWAY_EAST, F.ON_RAMP],
+    ] as const) {
+      const r = h.roads[ri];
+      const { p, t } = middle(r);
+      // (The way its cars go, and their left: (z, -x) of it.)
+      const go = [t[0] * r.oneway!, t[1] * r.oneway!];
+      const left = [go[1], -go[0]];
+      const q = middle(h.roads[other]).p;
+      expect((q[0] - p[0]) * left[0] + (q[1] - p[1]) * left[1]).toBeCloseTo(9, 6);
+      // (The ramp's middle, out beside it: to its right.)
+      const m = middle(h.roads[ramp]).p;
+      expect((m[0] - p[0]) * left[0] + (m[1] - p[1]) * left[1]).toBeLessThan(-4);
+    }
+    // Eastbound (+x) to the south (+z: north is -z).
+    expect(F.EAST_Z).toBeGreaterThan(F.WEST_Z);
+  });
+
   test('the half-diamond: ramps 110 to 140 m, merging at one end and meeting the street at the other', () => {
     const [off, on] = [h.roads[F.OFF_RAMP], h.roads[F.ON_RAMP]];
     expect(off.ends).toEqual(['merge', 'join']);
@@ -62,7 +83,7 @@ describe('the road hierarchy fixture', () => {
     }
     expect(off.points[0][1]).toBe(F.EAST_Z);
     expect(on.points.at(-1)![1]).toBe(F.WEST_Z);
-    expect(off.points.at(-1)).toEqual([F.STREET_X, F.EAST_Z - 25]);
-    expect(on.points[0]).toEqual([F.STREET_X, F.WEST_Z + 25]);
+    expect(off.points.at(-1)).toEqual([F.STREET_X, F.EAST_Z + 25]);
+    expect(on.points[0]).toEqual([F.STREET_X, F.WEST_Z - 25]);
   });
 });

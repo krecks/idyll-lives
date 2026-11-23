@@ -2,12 +2,14 @@
 //! world of every kind, `hierarchy()`, the same layout as the web's
 //! `web/src/render/roadHierarchyFixture.ts` (road for road, in the same order):
 //!
-//! - a motorway edge to edge along z = 200: two one-way carriageways 9 m apart (eastbound, its
-//!   points running east; westbound, its points running east too and one-way against them),
+//! - a motorway edge to edge along z = 200 to 209: two one-way carriageways 9 m apart, laid for
+//!   traffic on the right (eastbound the southern, z = 209, its points running east; westbound the
+//!   northern, z = 200, its points running east too and one-way against them: each has the other
+//!   on its left, and its ramps leave to its right),
 //!   raised over a street (`BRIDGE_STREET`, north from the avenue to the world's edge) without
 //!   meeting it, and on a bridge over a river;
-//! - a half-diamond west of the street: an off-ramp from the eastbound carriageway and an
-//!   on-ramp onto the westbound one, each merging into its carriageway at one end and meeting the
+//! - a half-diamond west of the street: an off-ramp from the eastbound carriageway (south of it)
+//!   and an on-ramp onto the westbound one (north of it), each merging into its carriageway at one end and meeting the
 //!   street at a T 25 m from the motorway at the other;
 //! - an avenue along z = 80 with two cross streets;
 //! - a one-way loop round a block, joined to the avenue's east end by a two-way street.
@@ -23,9 +25,10 @@ use crate::common;
 /// The world's size (m).
 pub const WIDTH: i64 = 480;
 pub const DEPTH: i64 = 320;
-/// The carriageways' middles (z): eastbound, westbound.
-pub const EAST_Z: f64 = 200.0;
-pub const WEST_Z: f64 = 209.0;
+/// The carriageways' middles (z): eastbound, westbound (north is -z: eastbound's right, +z, is
+/// the south).
+pub const EAST_Z: f64 = 209.0;
+pub const WEST_Z: f64 = 200.0;
 /// The carriageways' ends (x): `s` along either is `x - MOTORWAY_X0`.
 pub const MOTORWAY_X0: f64 = 0.5;
 pub const MOTORWAY_X1: f64 = 479.5;
@@ -130,18 +133,18 @@ pub fn hierarchy() -> Hierarchy {
         ramp(
             &[
                 [20.0, EAST_Z],
-                [40.0, EAST_Z - 7.0],
-                [110.0, EAST_Z - 7.0],
-                [STREET_X, EAST_Z - 25.0],
+                [40.0, EAST_Z + 7.0],
+                [110.0, EAST_Z + 7.0],
+                [STREET_X, EAST_Z + 25.0],
             ],
             ["merge", "join"],
             "Off-ramp",
         ),
         ramp(
             &[
-                [STREET_X, WEST_Z + 25.0],
-                [110.0, WEST_Z + 7.0],
-                [40.0, WEST_Z + 7.0],
+                [STREET_X, WEST_Z - 25.0],
+                [110.0, WEST_Z - 7.0],
+                [40.0, WEST_Z - 7.0],
                 [20.0, WEST_Z],
             ],
             ["join", "merge"],
@@ -230,7 +233,7 @@ fn the_hierarchy_loads_with_its_kinds_and_ways() {
     }
     // (The carriageways 9 m apart, the ramps 110 to 140 m long.)
     let mid = |i: usize| g.roads.iter().find(|r| r.source == i as u32).unwrap();
-    let apart = mid(MOTORWAY_WEST).at(100.0)[1] - mid(MOTORWAY_EAST).at(100.0)[1];
+    let apart = mid(MOTORWAY_EAST).at(100.0)[1] - mid(MOTORWAY_WEST).at(100.0)[1];
     assert!((apart - 9.0).abs() < 1e-3, "{apart} m apart");
     for ramp in [OFF_RAMP, ON_RAMP] {
         let len = mid(ramp).len();
@@ -335,8 +338,8 @@ fn motorway_crossing_makes_no_node() {
     let along: Vec<f32> = edges_of(g, street).iter().map(|e| e.s1).collect();
     let s = |z: f64| (z - AVENUE_Z) as f32;
     assert_eq!(along.len(), 3, "{along:?}");
-    assert!((along[0] - s(EAST_Z - 25.0)).abs() < 0.5, "{along:?}");
-    assert!((along[1] - s(WEST_Z + 25.0)).abs() < 0.5, "{along:?}");
+    assert!((along[0] - s(WEST_Z - 25.0)).abs() < 0.5, "{along:?}");
+    assert!((along[1] - s(EAST_Z + 25.0)).abs() < 0.5, "{along:?}");
     // (Walking or driving under it: straight along the street.)
     let (a, b) = (
         on(g, BRIDGE_STREET, [140.0, 150.0]),
@@ -408,7 +411,7 @@ fn a_merge_has_no_box_and_no_lights() {
         }
     }
     // (The ramps' other ends are T's on the street, junctions as any.)
-    for z in [EAST_Z - 25.0, WEST_Z + 25.0] {
+    for z in [EAST_Z + 25.0, WEST_Z - 25.0] {
         let t = [STREET_X as f32, z as f32];
         assert!(junctions.iter().any(|j| dist(*j, t) < 0.5), "{t:?}");
         assert!(g.boxes.iter().any(|(b, _)| dist(*b, t) < 0.5), "{t:?}");
@@ -422,8 +425,8 @@ fn walkers_keep_off_the_motorway_and_its_ramps() {
     let car_only = |k: RoadKind| matches!(k, RoadKind::Motorway | RoadKind::Ramp);
     for p in [
         [20.0, EAST_Z as f32],
-        [60.0, WEST_Z as f32 + 7.0],
-        [100.0, EAST_Z as f32 - 7.0],
+        [60.0, WEST_Z as f32 - 7.0],
+        [100.0, EAST_Z as f32 + 7.0],
         [300.0, 204.0],
     ] {
         for rp in g.near(p, 60.0, 4, Mode::Foot) {
@@ -444,7 +447,7 @@ fn walkers_keep_off_the_motorway_and_its_ramps() {
         }
     }
     // (Nor can they set off along one.)
-    let ramp = on(g, OFF_RAMP, [80.0, EAST_Z as f32 - 7.0]);
+    let ramp = on(g, OFF_RAMP, [80.0, EAST_Z as f32 + 7.0]);
     let street = on(g, BRIDGE_STREET, [140.0, 120.0]);
     assert!(g.path(ramp, street, Mode::Foot, 16.0).is_none());
     assert!(g.path(ramp, street, Mode::Car, 16.0).is_some());
@@ -476,7 +479,7 @@ fn town_to_the_motorway_by_its_ramps_their_way() {
     );
     let on_ramp = &out.pts[ramp_at..motorway_at];
     assert!(
-        on_ramp.iter().all(|p| p.0[1] > WEST_Z as f32 - 0.01),
+        on_ramp.iter().all(|p| p.0[1] < WEST_Z as f32 + 0.01),
         "the on-ramp: {on_ramp:?}"
     );
     for w in out.pts[motorway_at..].windows(2) {
@@ -870,23 +873,36 @@ fn one_way_loop_cars_go_its_way_down_its_middle() {
 }
 
 #[test]
+fn the_motorway_is_laid_for_traffic_on_the_right() {
+    let w = world();
+    let g = &w.travel.graph;
+    // (Each carriageway the other on the left of the way its cars go: the eastbound's points run
+    // its way, the westbound's against it; and its ramp on its right.)
+    let (east, west) = (EAST_Z as f32, WEST_Z as f32);
+    assert!((right_of(g, MOTORWAY_EAST, [250.0, west]) + 9.0).abs() < 1e-3);
+    assert!((right_of(g, MOTORWAY_WEST, [250.0, east]) - 9.0).abs() < 1e-3);
+    assert!(right_of(g, MOTORWAY_EAST, [80.0, east + 7.0]) > 6.0);
+    assert!(right_of(g, MOTORWAY_WEST, [80.0, west - 7.0]) < -6.0);
+}
+
+#[test]
 fn motorway_cars_keep_to_the_outer_lane_of_their_carriageway() {
     let w = world();
     let g = &w.travel.graph;
-    // (Each carriageway's outer lane away from the other: the eastbound's north of its middle,
-    // the westbound's south.)
+    // (Each carriageway's outer lane away from the other, on its right: the eastbound's south of
+    // its middle (+z), the westbound's north.)
     let (east, west) = (EAST_Z as f32, WEST_Z as f32);
     let along = poses(&w, [30.0, east], [470.0, east]);
     for p in between(g, &along, 40.0, 460.0) {
         assert!(
-            (p[1] - (east - MOTORWAY_OUTER)).abs() < 0.05,
+            (p[1] - (east + MOTORWAY_OUTER)).abs() < 0.05,
             "eastbound: {p:?}"
         );
     }
     let back = poses(&w, [470.0, west], [30.0, west]);
     for p in between(g, &back, 40.0, 460.0) {
         assert!(
-            (p[1] - (west + MOTORWAY_OUTER)).abs() < 0.05,
+            (p[1] - (west - MOTORWAY_OUTER)).abs() < 0.05,
             "westbound: {p:?}"
         );
     }
@@ -930,18 +946,18 @@ fn ramps_ease_into_the_carriageways_lane_and_out_of_it() {
     let g = &w.travel.graph;
     let (east, west) = (EAST_Z as f32, WEST_Z as f32);
     // Onto the westbound by the on-ramp: eased into its outer lane by the merge, then in it.
-    let on = poses(&w, [STREET_X as f32, 260.0], [3.0, west]);
+    let on = poses(&w, [STREET_X as f32, 140.0], [3.0, west]);
     let merged: Vec<[f32; 2]> = on.iter().map(|d| d.0).filter(|p| p[0] < 18.0).collect();
     assert!(merged.len() > 5);
     for p in merged {
         assert!(
-            (p[1] - (west + MOTORWAY_OUTER)).abs() < 0.05,
+            (p[1] - (west - MOTORWAY_OUTER)).abs() < 0.05,
             "merged: {p:?}"
         );
     }
     // Off the eastbound by the off-ramp: out of its outer lane along the ramp, down its middle
     // past the taper.
-    let off = poses(&w, [3.0, east], [STREET_X as f32, 120.0]);
+    let off = poses(&w, [3.0, east], [STREET_X as f32, 260.0]);
     let ramp: Vec<[f32; 2]> = off
         .iter()
         .map(|d| d.0)
