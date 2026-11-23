@@ -362,13 +362,26 @@ impl Route {
         // below).
         let speed = travel.country_speed;
         let mut by_motorway = false;
-        let out = |to: RoadPoint| g.path_by(m, to, Mode::Car, speed, Way::default());
+        // (On an avenue, out of its driveway and its trip's bay to the right only, and into them
+        // from the right: `kerbside_way`.)
+        let side = kerbside_way(g, m, car.spot);
+        let bay_side = car
+            .trip
+            .and_then(|trip| kerbside_way(g, enterable_near(g, trip.at, ROAD_REACH)?, trip.at));
+        let out = |to: RoadPoint| {
+            let arrive = car.trip.and_then(|_| bay_side.map(|s| s.1));
+            kerbside_path(g, m, to, speed, side.map(|s| s.0), arrive)
+        };
         let back = |to: RoadPoint| {
-            let mut path = g.path_by(to, m, Mode::Car, speed, Way::default())?;
+            let toward = car.trip.and_then(|_| bay_side.map(|s| s.0));
+            let mut path = kerbside_path(g, to, m, speed, toward, side.map(|s| s.1))?;
             path.reverse();
             Some(path)
         };
-        let turns_round = |path: Option<&RoadPath>| path.is_some_and(|p| two_way(g, p));
+        // (Not on an avenue at either end: turned round, it'd come in across its median.)
+        let kerbside = side.is_some() || bay_side.is_some();
+        let turns_round =
+            |path: Option<&RoadPath>| !kerbside && path.is_some_and(|p| two_way(g, p));
         let (path, park) = match car.trip {
             Some(trip) => {
                 let p = enterable_near(g, trip.at, ROAD_REACH)?;
@@ -661,6 +674,7 @@ impl Route {
         );
         let way = Way {
             toward: Some(toward),
+            arrive: None,
             avoid,
         };
         let speed = travel.country_speed;
@@ -672,14 +686,21 @@ impl Route {
             exits.to_vec()
         };
         let m = car.mouth(travel);
+        // (Into a driveway or a bay on an avenue from the right only, `kerbside_way`; else any
+        // way in.)
+        let arrive = |to: RoadPoint, spot: [f32; 2]| {
+            let into = Way {
+                arrive: kerbside_way(g, to, spot).map(|s| s.1),
+                ..way.clone()
+            };
+            g.path_by(rp, to, Mode::Car, speed, into)
+                .or_else(|| g.path_by(rp, to, Mode::Car, speed, way.clone()))
+        };
         let (path, park) = if home && !taxi {
-            (g.path_by(rp, m?, Mode::Car, speed, way)?, None)
+            (arrive(m?, car.spot)?, None)
         } else if let Some(trip) = car.trip.filter(|_| !taxi) {
             let to = enterable_near(g, trip.at, ROAD_REACH)?;
-            (
-                g.path_by(rp, to, Mode::Car, speed, way)?,
-                Some((trip.at, trip.yaw)),
-            )
+            (arrive(to, trip.at)?, Some((trip.at, trip.yaw)))
         } else {
             // (Weighed with what going along the stretches it keeps off costs it more, as the
             // search has it: by its cost alone it went back the way it turned round from, the way
@@ -1023,9 +1044,54 @@ fn quickest_out(
 pub fn way_out(travel: &Travel, exits: &[[f32; 2]], at: [f32; 2]) -> Option<([f32; 2], bool)> {
     let g = &travel.graph;
     let m = enterable_near(g, at, ROAD_REACH)?;
-    let out = |to: RoadPoint| g.path_by(m, to, Mode::Car, travel.country_speed, Way::default());
+    let side = kerbside_way(g, m, at).map(|s| s.0);
+    let out = |to: RoadPoint| kerbside_path(g, m, to, travel.country_speed, side, None);
     let (path, by) = quickest_out(g, exits, out)?;
     Some((path.pts.last()?.0, by))
+}
+
+/// On an avenue (two lanes each way about a median), the way a car keeps its driveway or bay at
+/// `spot` on its right, `m` where that meets the road: the end of `m`'s stretch it sets off
+/// towards, turning right out of it into the near lanes, and the end it comes in from, turning
+/// right into it; neither across the median (one on the far side goes on to the next junction and
+/// comes back, `kerbside_path`). None on any other road: a two-way street's cars cross the
+/// oncoming lane as ever, a one-way road's go its way (`Graph::may_go`).
+pub(crate) fn kerbside_way(
+    g: &crate::travel::Graph,
+    m: RoadPoint,
+    spot: [f32; 2],
+) -> Option<(u32, u32)> {
+    let r = &g.roads[m.road as usize];
+    if r.kind != crate::travel::RoadKind::Avenue || !r.oneway.is_both() {
+        return None;
+    }
+    let (p, t) = (r.at(m.s), r.tangent(m.s));
+    let right = (spot[0] - p[0]) * -t[1] + (spot[1] - p[1]) * t[0];
+    let e = g.edges[m.edge as usize];
+    Some(if right >= 0.0 { (e.b, e.a) } else { (e.a, e.b) })
+}
+
+/// The way by car from `from` to `to`, setting off towards `toward` and coming in from `arrive`
+/// where given (`kerbside_way`): round by the next junction and back, as the roads have it. With
+/// no such way (an avenue's dead end), any way.
+fn kerbside_path(
+    g: &crate::travel::Graph,
+    from: RoadPoint,
+    to: RoadPoint,
+    speed: f32,
+    toward: Option<u32>,
+    arrive: Option<u32>,
+) -> Option<crate::travel::RoadPath> {
+    let any = || g.path_by(from, to, Mode::Car, speed, Way::default());
+    if toward.is_none() && arrive.is_none() {
+        return any();
+    }
+    let way = Way {
+        toward,
+        arrive,
+        ..Way::default()
+    };
+    g.path_by(from, to, Mode::Car, speed, way).or_else(any)
 }
 
 /// Whether a car may drive `path` back the way it goes: no road along it is one-way.

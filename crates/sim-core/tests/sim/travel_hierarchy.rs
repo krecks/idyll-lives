@@ -1421,3 +1421,71 @@ fn arms_cars_only_leave_by_have_no_phase() {
         assert_eq!(a["light"].is_null(), ramp, "{a}");
     }
 }
+
+#[test]
+fn avenue_driveways_set_off_to_the_right_and_are_come_into_from_it() {
+    let w = world();
+    let z = AVENUE_Z as f32;
+    // A driveway either side of the avenue, 60 m from its end of town: each car sets off along
+    // the lanes on its own side (on the right of the way it goes), never across the median; on
+    // the +z side that's east (+x), away from that end, round by the roads; and home, it comes
+    // along those lanes into it.
+    for (side, east) in [(1.0f32, true), (-1.0, false)] {
+        let spot = [60.0, z + side * 12.0];
+        let facing = if side > 0.0 {
+            std::f32::consts::PI
+        } else {
+            0.0
+        };
+        for home in [false, true] {
+            let drive = drill::from_driveway(&w, spot, facing, home).expect("a way");
+            // (Its poses on the avenue's carriageway by the driveway, setting off from it (or,
+            // home, coming into it): till it's first 20 m off.)
+            let mut ends = drive.clone();
+            if home {
+                ends.reverse();
+            }
+            let near: Vec<([f32; 2], f32)> = ends
+                .iter()
+                .copied()
+                .take_while(|(p, _)| (p[0] - 60.0).abs() < 20.0)
+                .filter(|(p, _)| (p[1] - z).abs() < 5.6)
+                .collect();
+            assert!(near.len() > 3, "side {side} home {home}: on the avenue");
+            for (p, yaw) in &near {
+                assert!(
+                    (p[1] - z) * side > 1.3,
+                    "side {side} home {home}: across the median at {p:?}"
+                );
+                let going_east = yaw.sin() > 0.0;
+                assert_eq!(
+                    going_east, east,
+                    "side {side} home {home}: at {p:?} facing {yaw}"
+                );
+            }
+        }
+    }
+    // A driveway on the one-way loop's south side (cars go east there), from either side of it:
+    // out and home, along it its way only.
+    for side in [1.0f32, -1.0] {
+        let spot = [330.0, 20.0 + side * 10.0];
+        let facing = if side > 0.0 {
+            std::f32::consts::PI
+        } else {
+            0.0
+        };
+        for home in [false, true] {
+            let drive = drill::from_driveway(&w, spot, facing, home).expect("a way");
+            let on: Vec<f32> = drive
+                .iter()
+                .filter(|(p, _)| (p[1] - 20.0).abs() < 0.5 && (p[0] - 330.0).abs() < 20.0)
+                .map(|(_, yaw)| *yaw)
+                .collect();
+            assert!(!on.is_empty(), "side {side} home {home}");
+            assert!(
+                on.iter().all(|y| y.sin() > 0.5),
+                "side {side} home {home}: {on:?}"
+            );
+        }
+    }
+}

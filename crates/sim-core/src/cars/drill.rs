@@ -87,3 +87,36 @@ pub fn merges(w: &World, c: usize) -> Vec<f32> {
         .as_ref()
         .map_or(Vec::new(), |r| r.1.merges.clone())
 }
+
+/// The drive out of town (or, `home`, back in) of a car parked at `spot` facing `yaw` on a
+/// driveway square to the road nearest it (`Route::on_roads`): where it is and which way it faces
+/// each tick. None: no way.
+pub fn from_driveway(
+    w: &World,
+    spot: [f32; 2],
+    yaw: f32,
+    home: bool,
+) -> Option<Vec<([f32; 2], f32)>> {
+    let raw = CarRaw {
+        plot: u32::MAX,
+        x: spot[0],
+        z: spot[1],
+        yaw,
+        street: spot[1],
+        len: LEN,
+        wid: WID,
+        body: 0,
+        paint: 0,
+    };
+    let car = Car::from_raw(&raw, u32::MAX);
+    let route = Route::on_roads(&car, &w.exits, &w.travel, home)?;
+    let n = route.ticks().ceil() as usize;
+    Some(
+        (0..=n)
+            .map(|t| {
+                let (p, yaw, _) = route.at(t as f32);
+                (p, yaw)
+            })
+            .collect(),
+    )
+}
