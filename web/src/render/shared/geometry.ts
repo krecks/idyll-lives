@@ -277,9 +277,12 @@ export class Geo {
     this.ni += other.ni;
   }
 
-  /** Axis-aligned box; `skip` lists faces to omit ('px', 'nx', 'py', 'ny', 'pz', 'nz'). Chamfered by `ease`. */
-  box(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, skip = ''): this {
-    if (easedBox(x0, y0, z0, x1, y1, z1, skip, this.ease, (pts, n, cut) => (cut ? this.polyCut(pts, n, cut) : this.poly(pts, n)))) return this;
+  /**
+   * Axis-aligned box; `skip` lists faces to omit ('px', 'nx', 'py', 'ny', 'pz', 'nz'). Chamfered by `ease`: the edges the
+   * gate counts, or with `every`, all of them (a small piece that would be sharp, rounded as it is made).
+   */
+  box(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, skip = '', every = false): this {
+    if (easedBox(x0, y0, z0, x1, y1, z1, skip, this.ease, (pts, n, cut) => (cut ? this.polyCut(pts, n, cut) : this.poly(pts, n)), !every)) return this;
     if (!skip.includes('py')) this.poly([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], [0, 1, 0]);
     if (!skip.includes('ny')) this.poly([[x0, y0, z0], [x0, y0, z1], [x1, y0, z1], [x1, y0, z0]], [0, -1, 0]);
     if (!skip.includes('nz')) this.poly([[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]], [0, 0, -1]);

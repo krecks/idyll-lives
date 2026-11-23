@@ -132,8 +132,9 @@ test('no slope of it comes down under its eaves (each eave\'s slope went on past
   const { pos } = roof!.geo;
   let low = Infinity;
   for (let i = 1; i < pos.length; i += 3) low = Math.min(low, pos[i]);
-  // The top of the roof at its eave line: WALL_HEIGHT (2.8) less OVERHANG (0.4) at PITCH (34°), and ROOF_THICKNESS (0.14).
-  expect(low).toBeCloseTo(2.8 - 0.4 * Math.tan((34 * Math.PI) / 180) + 0.14, 4);
+  // The top of the roof at its eave line: WALL_HEIGHT (2.8) less OVERHANG (0.4) at PITCH (34°), and ROOF_THICKNESS (0.14),
+  // less the eaves' eased edge (`CHAMFER`, 4 mm) down to the fascias' tops.
+  expect(low).toBeCloseTo(2.8 - 0.4 * Math.tan((34 * Math.PI) / 180) + 0.14 - 0.004, 4);
 });
 
 test('a plain rectangle keeps the classic roof (a handful of faces, not a tile at a time)', () => {
@@ -142,6 +143,6 @@ test('a plain rectangle keeps the classic roof (a handful of faces, not a tile a
   if (!plan) throw new Error('no house');
   const roof = plan.parts.find((p) => p.name === 'roof');
   // (16 for its slopes and the like, 16 more for the cap shingles up its four hips (`HIP_CAP`), 20 more for its ridge
-  // cap's eased arrises.)
-  expect(roof!.geo.idx.length / 3).toBeLessThan(60);
+  // cap's eased arrises, 12 for its eaves' eased edge: a strip along each and a triangle over each corner cut across.)
+  expect(roof!.geo.idx.length / 3).toBeLessThan(70);
 });

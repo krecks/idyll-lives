@@ -7,7 +7,7 @@
  * right and z up (ascending `atan2(z, x)`).
  */
 
-import { type Geo, type V3 } from './geometry';
+import { easedBox, type Geo, type V3 } from './geometry';
 
 export type P2 = readonly [number, number];
 
@@ -106,8 +106,21 @@ export class WallFrame {
    * An oriented box: `a0..a1` along, `y0..y1` up, `d0..d1` across. `skip` lists faces to omit:
    * 'pa'/'na' (ends), 'pd'/'nd' (sides), 'py'/'ny' (top/bottom).
    */
-  box(g: Geo, a0: number, a1: number, y0: number, y1: number, d0: number, d1: number, skip = ''): void {
+  box(g: Geo, a0: number, a1: number, y0: number, y1: number, d0: number, d1: number, skip = '', every = false): void {
     const P = (a: number, y: number, d: number) => this.at(a, y, d);
+    // (Chamfered as `Geo.box` is where `g` eases, `every` edge or those the gate counts: `easedBox` in the frame, a
+    // along x and d along z.)
+    if (g.ease > 0) {
+      const named: Record<string, string> = { pa: 'px', na: 'nx', pd: 'pz', nd: 'nz', py: 'py', ny: 'ny' };
+      const local = skip.split(/\s+/).map((k) => named[k] ?? '').join(' ');
+      const way = (v: V3): V3 => [this.ux * v[0] + this.nx * v[2], v[1], this.uz * v[0] + this.nz * v[2]];
+      const drawn = easedBox(a0, y0, d0, a1, y1, d1, local, g.ease, (pts, n, cut) => {
+        const q = pts.map((p) => P(p[0], p[1], p[2]));
+        if (cut) g.polyCut(q, way(n), cut);
+        else g.poly(q, way(n));
+      }, !every);
+      if (drawn) return;
+    }
     const uv = (pts: V3[], along: boolean) => pts.map((p) => [along ? this.u(p) : p[0] * this.nx + p[2] * this.nz, p[1]] as [number, number]);
     if (!skip.includes('py')) g.poly([P(a0, y1, d0), P(a1, y1, d0), P(a1, y1, d1), P(a0, y1, d1)], [0, 1, 0]);
     if (!skip.includes('ny')) g.poly([P(a0, y0, d0), P(a1, y0, d0), P(a1, y0, d1), P(a0, y0, d1)], [0, -1, 0]);

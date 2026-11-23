@@ -1,12 +1,4 @@
 {
-  "built.edges": {
-    "house.corner": 6,
-    "house.finishes": 11,
-    "house.generated-tall": 6,
-    "house.ring": 4,
-    "house.two-storey": 4,
-    "house.wing": 11
-  },
   "built.farNear": {
     "buildingFar.church": 2,
     "buildingFar.farm": 1,

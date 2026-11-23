@@ -101,8 +101,11 @@ plinth have it. On such a mesh a round part's capped ends (`Painter.tube`) take 
 show; the kerbs are eased by their own profile (`roads.ts` `kerbProfile`). The house's walls, posts and the boards
 on them have eased tops (`house.ts` `easedTop`): their faces stop 4 mm short and carry a sink in the cutaway's fourth
 byte (`Geo.sinkUnder`), so where a wall is cut its faces clamp 4 mm under the stub and its chamfer survives the cut
-(the shader and `built/edge_gate.rs`'s `cut_away` both read it). Roofs ease their ridge caps, gable verges and eave
-corners; a spire has eight sides; a bridge's noses are eased prisms (`street.ts` `easedPrism`). The cars' bodies are eased by their own shapes
+(the shader and `built/edge_gate.rs`'s `cut_away` both read it). A post's outside corner indoors is cut across 4 mm
+(`tonedFace`'s `cut`), as is a mitred post's where its sides turn 60° or more; outdoors a corner board covers it, on
+every storey from that storey's plinth (none a storey up). Roofs, plain (`addRoof`) or over an area (`addRoofArea`),
+ease their ridge caps, gable verges and eaves (the slopes stop 4 mm in from the fascias, a strip down to their tops)
+and cut their eave corners across; a door's knob is eased all round; a spire has eight sides; a bridge's noses are eased prisms (`street.ts` `easedPrism`). The cars' bodies are eased by their own shapes
 (`cars.ts`): the profile's corners over 55° cut in two, the sides drawn in from it all round, the greenhouse's
 pillars cut and its roof's edge eased, the tyres' shoulders rounded. A box's face that is never seen (a rail's end in its post, a
 jamb's top under its head, a board's back on its wall) is left out by `skip`, which keeps the cost down.
