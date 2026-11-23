@@ -3,7 +3,8 @@
 //! town's streets) and greens, the lots (public ones blue, farms' fields yellow, outdoor places orange;
 //! a tick on the side they face), garden paths and driveways, the ground floor's walls, the things
 //! standing about and the ways out of town (red). A big world also shows its land (water, woods, hills,
-//! meadows, fields, orchards), its country roads and trails (dashed), and its areas' names; and the
+//! meadows, fields, orchards), its country roads and trails (dashed), and its areas' names; an
+//! avenue's median (green) and a one-way road's arrows (white, the way cars go); and the
 //! living town: each main town's centre (paved, dashed round), and the places the tags name (a blue
 //! dot at the door, with its name). An index.html shows them all
 //! on one page.
@@ -71,6 +72,56 @@ fn line(points: &J) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// An avenue's median (m, `roadKinds.ts` `ROAD_KIND.avenue.median`).
+const MEDIAN: f64 = 2.6;
+/// A one-way road's arrows: one every so far along it (m), the first half that in, each so long and wide (m).
+const ARROW_EVERY: f64 = 30.0;
+const ARROW_LONG: f64 = 5.0;
+const ARROW_WIDE: f64 = 3.2;
+
+/// Arrows along a one-way road's `points` the way cars go (`way`: +1 the way its points run, -1 against them).
+fn arrows(points: &J, way: f64) -> Vec<String> {
+    let pts: Vec<[f64; 2]> = points
+        .as_array()
+        .map(Vec::as_slice)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|p| Some([p.get(0)?.as_f64()?, p.get(1)?.as_f64()?]))
+        .collect();
+    let mut out = Vec::new();
+    let (mut walked, mut next) = (0.0, ARROW_EVERY / 2.0);
+    for w in pts.windows(2) {
+        let (dx, dz) = (w[1][0] - w[0][0], w[1][1] - w[0][1]);
+        let len = dx.hypot(dz);
+        if len <= 0.0 {
+            continue;
+        }
+        let (tx, tz) = (dx / len * way, dz / len * way);
+        while next <= walked + len {
+            let k = (next - walked) / len;
+            let (x, z) = (w[0][0] + dx * k, w[0][1] + dz * k);
+            let (h, s) = (ARROW_LONG / 2.0, ARROW_WIDE / 2.0);
+            let tip = (x + tx * h, z + tz * h);
+            let (bx, bz) = (x - tx * h, z - tz * h);
+            // (Across it: the way turned a quarter.)
+            let (lx, lz) = (tz * s, -tx * s);
+            let r = |v: f64| (v * 100.0).round() / 100.0;
+            out.push(format!(
+                "<polygon points=\"{},{} {},{} {},{}\" fill=\"#ffffff\"/>",
+                n(r(tip.0)),
+                n(r(tip.1)),
+                n(r(bx + lx)),
+                n(r(bz + lz)),
+                n(r(bx - lx)),
+                n(r(bz - lz))
+            ));
+            next += ARROW_EVERY;
+        }
+        walked += len;
+    }
+    out
 }
 
 fn zone_colour(kind: &str) -> &'static str {
@@ -202,6 +253,19 @@ pub fn svg(world: &J) -> String {
                 if text(r, "kind") == "country" { under } else { over },
                 n(num(r, "width") - less)
             ));
+        }
+    }
+    // An avenue's median down its middle (green); a one-way road's way (white arrows along it).
+    for r in roads.iter().filter(|r| text(r, "kind") == "avenue") {
+        parts.push(format!(
+            "<polyline points=\"{}\" fill=\"none\" stroke=\"#6f9a4a\" stroke-width=\"{}\" stroke-linejoin=\"round\"/>",
+            line(&r["points"]),
+            n(MEDIAN)
+        ));
+    }
+    for r in roads {
+        if let Some(way) = r.get("oneway").and_then(J::as_f64).filter(|w| *w != 0.0) {
+            parts.extend(arrows(&r["points"], way.signum()));
         }
     }
     for r in roads.iter().filter(trail) {
@@ -413,5 +477,27 @@ mod tests {
         assert!(svg.contains("stroke-dasharray=\"3.3333333333333335 2\" stroke-linecap=\"round\""));
         assert_eq!(svg.matches("fill=\"#2b5fa8\"").count(), 2);
         assert!(svg.ends_with(">big 7: Birch &amp; &lt;Co> (300×200 m)</text></svg>"));
+    }
+
+    #[test]
+    fn an_avenue_has_its_median_and_a_one_way_road_its_arrows() {
+        let world = json!({ "kind": "big", "seed": 7, "name": "Avenues", "town": {
+            "width": 300, "depth": 200, "plots": [], "exits": [],
+            "meta": { "roads": [
+                { "points": [[0, 50], [300, 50]], "width": 14, "kind": "avenue" },
+                { "points": [[0, 100], [100, 100]], "width": 7, "kind": "street", "oneway": -1 }
+            ] }
+        } });
+        let svg = svg(&world);
+        assert_eq!(
+            svg.matches("stroke=\"#6f9a4a\" stroke-width=\"2.6\"")
+                .count(),
+            1
+        );
+        // Three arrows along 100 m (at 15, 45 and 75 m), pointing back towards x = 0.
+        assert_eq!(svg.matches("fill=\"#ffffff\"").count(), 3);
+        assert!(
+            svg.contains("<polygon points=\"12.5,100 17.5,101.6 17.5,98.4\" fill=\"#ffffff\"/>")
+        );
     }
 }
