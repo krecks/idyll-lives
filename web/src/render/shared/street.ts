@@ -61,10 +61,10 @@ import { shownFences } from './shownFences';
 import { centroid, lengths, nearest as nearestOf, pointAt } from '../../game/roads';
 import { kindInfo } from '../../core/roadKinds';
 import { junctionStretches } from './markings';
-import { allBarriers, barrier, deckLevels, liftedStretches, motorwayPairs, raisedSpans, without } from './motorway';
+import { allBarriers, barrier, deckLevels, liftedStretches, MOTORWAY_SIGN, motorwayPairs, signSpots, without } from './motorway';
 import { pavedRects } from './paving';
 import { streetGround, streetGroundChunks, streetGroundKey } from './streetGround';
-import { bridgeSpans, Kerb, KERB, levelStops, ROAD_Y, roadIndex, roadMeshes, SIDEWALK, stretchOf, townRoads, WALK_Y, walkStops, type RoadIndex, type RoadLevels } from './roads';
+import { bridgeSpans, Kerb, KERB, levelStops, raisedSpans, ROAD_Y, roadIndex, roadMeshes, SIDEWALK, stretchOf, townRoads, WALK_Y, walkStops, type RoadIndex, type RoadLevels } from './roads';
 import { carriageway, hasSidewalks, JunctionCuts, junctionsOf, type JunctionPlan } from './junctions';
 import { Levels, levelsOf } from './landSurface';
 import type { BuiltSurface } from './builtSurface';
@@ -879,7 +879,7 @@ export class TownStreet {
     return (this.staticKey ??= `${this.kerbsKeyOf()}|${this.levelsKey()}`);
   }
 
-  /** The heights the street's own stands at: the roads' (`roadsSig`), the junctions', and the beds under the bridges (every 2 m). */
+  /** The heights the street's own stands at: the roads' (`roadsSig`), the junctions', and the beds and the ground under the decks (every 2 m). */
   private levelsKey(): string {
     const levels = this.levels;
     if (!levels) return '-';
@@ -890,6 +890,13 @@ export class TownStreet {
         for (let u = s0; u <= s1; u += 2) {
           const { p } = pointAt(road.points, u, ls);
           beds.push(Math.round(levels.surface.landAt(p[0], p[1]) * 1000));
+        }
+      }
+      for (const [s0, s1] of raisedSpans(road)) {
+        const ls = lengths(road.points);
+        for (let u = s0; u <= s1; u += 2) {
+          const { p } = pointAt(road.points, u, ls);
+          beds.push(Math.round(levels.groundUnder(p[0], p[1]) * 1000));
         }
       }
     }
@@ -1910,7 +1917,7 @@ export class TownStreet {
 
   /**
    * Sidewalks and kerbs, the road's surface (the game's) and its markings, the avenues' medians and their trees, the
-   * motorways' barriers, the fountains on roundabouts, the bridges and overpasses: by chunk, planned once.
+   * motorways' barriers and direction signs, the fountains on roundabouts, the bridges and overpasses: by chunk, planned once.
    */
   private staticParts(): Map<number, StaticPart> {
     if (this.statics) return this.statics;
@@ -1970,6 +1977,8 @@ export class TownStreet {
     for (const { a, b, runs } of allBarriers(all)) {
       for (const run of runs) barrier(props, run, (q) => (roadLevels ? (roadLevels.road(all[a], q.sa) + roadLevels.road(all[b], q.sb)) / 2 : 0) + ROAD_Y);
     }
+    // The motorway's direction signs by its exits and ramps (`signSpots`).
+    for (const spot of signSpots(all, roadLevels)) at(spot.x, spot.z).parts.put(MOTORWAY_SIGN, spot.x, spot.z, spot.yaw, 1, 1, spot.y);
     // Bridges and causeways: a stone deck under each span over the water, parapets along it (a country road that is
     // a bridge, and the bridges the land's brushes made on any road); a motorway's and a ramp's in concrete, as their
     // overpasses (`RoadPlan.raised`) are; on a world with no built surface, walls down the sides of the ramps up to
@@ -1981,19 +1990,20 @@ export class TownStreet {
       const heightsOf = (s0: number) => {
         if (!roadLevels) return undefined;
         const stops = levelStops(road).flatMap((s) => (s > s0 && s < s0 + 1e9 ? [s - s0] : []));
-        return { deck: (u: number) => roadLevels.road(road, s0 + u), bed: (x: number, z: number) => (levels ? levels.surface.landAt(x, z) : 0), stops };
+        return { deck: (u: number) => roadLevels.road(road, s0 + u), bed: (x: number, z: number) => (levels ? levels.surface.landAt(x, z) : 0), under: (x: number, z: number) => (levels ? levels.groundUnder(x, z) : 0), stops };
       };
       const pair = pairs.get(ri);
       const inner = pair && { inner: pair.side, innerApron: pairVerge(all, ri, pair.other) / 2 };
       const deck = (s0: number, s1: number, solid = false) => {
         const h = heightsOf(s0);
-        overpass(stretchOf(road, s0, s1), road.width, (x, z) => at(x, z).parts.props, h && { deck: h.deck, ground: h.bed, stops: h.stops.filter((u) => u < s1 - s0) }, { ...inner, solid });
+        // (Its piers and abutments on the ground with every deck taken away: `BuiltSurface.groundUnder`.)
+        overpass(stretchOf(road, s0, s1), road.width, (x, z) => at(x, z).parts.props, h && { deck: h.deck, ground: h.under, stops: h.stops.filter((u) => u < s1 - s0) }, { ...inner, solid });
       };
       for (const [s0, s1] of bridgeSpans(road)) {
         if (concrete) deck(s0, s1);
         else {
           const h = heightsOf(s0);
-          bridge(stretchOf(road, s0, s1), road.width, (x, z) => at(x, z).parts.props, h && { ...h, stops: h.stops.filter((u) => u < s1 - s0) });
+          bridge(stretchOf(road, s0, s1), road.width, (x, z) => at(x, z).parts.props, h && { deck: h.deck, bed: h.bed, stops: h.stops.filter((u) => u < s1 - s0) });
         }
       }
       const raised = raisedSpans(road);

@@ -7,7 +7,9 @@
 import { describe, expect, test } from 'bun:test';
 import type { RoadPlan } from '../src/core/protocol';
 import { Geo } from '../src/render/shared/geometry';
-import { allBarriers, barrier, deckLevels, insideOf, liftedStretches, MOTORWAY, motorwayPairs, raisedSpans, without } from '../src/render/shared/motorway';
+import { allBarriers, barrier, deckLevels, insideOf, liftedStretches, MOTORWAY, motorwayPairs, signSpots, without } from '../src/render/shared/motorway';
+import { nearest } from '../src/game/roads';
+import { raisedSpans } from '../src/render/shared/roads';
 import { OVERPASS, overpass, Painter } from '../src/render/shared/street';
 import * as F from '../src/render/roadHierarchyFixture';
 
@@ -165,5 +167,34 @@ describe('an overpass', () => {
     const under = ps.filter((p) => p[1] < 3 - 0.5);
     expect(under.length).toBeGreaterThan(0);
     for (const [, , z] of under) expect(Math.abs(z)).toBeGreaterThan(4.5 + OVERPASS.apron - OVERPASS.foot - 1e-6);
+  });
+});
+
+describe("the motorway's direction signs", () => {
+  test('in the off-ramp\'s gore and by the on-ramp at the street, off every road, facing the traffic coming', () => {
+    const spots = signSpots(h.roads);
+    expect(spots.length).toBe(2);
+    for (const p of spots) for (const r of h.roads) expect(nearest(r.points, p.x, p.z).dist).toBeGreaterThan(r.width / 2 + 0.5);
+    const [gore, entry] = spots;
+    // (The gore between the eastbound carriageway and the off-ramp, past where they part; its traffic going +x: the sign's face, its +z turned to (sin yaw, cos yaw), to -x.)
+    expect(gore.z).toBeLessThan(F.EAST_Z - 4.5);
+    expect(gore.x).toBeGreaterThan(110);
+    expect(gore.x).toBeLessThan(F.STREET_X);
+    expect(Math.sin(gore.yaw)).toBeLessThan(-0.5);
+    // (By the on-ramp's start at the street, its cars going -x: facing +x.)
+    expect(Math.hypot(entry.x - F.STREET_X, entry.z - (F.WEST_Z + 25))).toBeLessThan(15);
+    expect(Math.sin(entry.yaw)).toBeGreaterThan(0.5);
+  });
+
+  test('before an exit along its carriageway where it runs that far, outside its shoulder', () => {
+    // (The fixture's off-ramp moved 400 m on: the eastbound carriageway made long enough before it.)
+    const shift = (r: RoadPlan): RoadPlan => ({ ...r, points: r.points.map(([x, z]) => [x + 400, z]) });
+    const east: RoadPlan = { ...h.roads[F.MOTORWAY_EAST], points: line(0, F.EAST_Z, 900, F.EAST_Z, 900), raised: undefined, bridge: undefined, crosses: undefined };
+    const west: RoadPlan = { ...east, points: line(0, F.WEST_Z, 900, F.WEST_Z, 900), oneway: -1 };
+    const roads = [east, west, shift(h.roads[F.OFF_RAMP])];
+    const before = signSpots(roads).filter((p) => p.x < 420);
+    expect(before.map((p) => Math.round(420 - p.x)).sort((a, b) => a - b)).toEqual([150, 300]);
+    // (Outside: away from the westbound carriageway, at -z.)
+    for (const p of before) expect(p.z).toBeLessThan(F.EAST_Z - 4.5);
   });
 });

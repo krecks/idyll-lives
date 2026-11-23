@@ -10,9 +10,9 @@ import { carriageway, hasSidewalks, planJunctions } from '../shared/junctions';
 import { kindInfo } from '../../core/roadKinds';
 import { lengths } from '../../game/roads';
 import { junctionStretches } from '../shared/markings';
-import { allBarriers, raisedSpans, without } from '../shared/motorway';
+import { allBarriers, without } from '../shared/motorway';
 import { boxOf, clipRect, COURSE, courseCells, JOINT, LINE, PAVING_LOOK, TILE, townPaving, type TownPaving } from '../shared/townPaving';
-import { bridgeSpans, stretchOf } from '../shared/roads';
+import { bridgeSpans, raisedSpans, stretchOf } from '../shared/roads';
 import { BRIDGE, OVERPASS } from '../shared/street';
 
 /**

@@ -3,7 +3,8 @@
  * every new kind of road (`render/roadHierarchyFixture.ts`: the motorway's two carriageways over a street and a river,
  * its half-diamond's ramps, an avenue, a one-way loop) set down in the south-east of a flat countryside world with no
  * town (away from the bench village's home lot, which the game plays and draws where it is), on a land drawn flat
- * (no built surface: the decks climb on their own, `motorway.ts` `deckLevels`), the river's water with it, the
+ * (no built surface: the decks climb on their own, `motorway.ts` `deckLevels`; with `&follow`, on the land the town
+ * follows, its built surface solved for the fixture's roads giving them), the river's water with it, the
  * junctions worked out from the roads as the simulation joins them up (`tests/fixtures/junctions.ts`
  * `deriveJunctions`). Its area is the world's main town's, so the bench's town view is held over its middle (`over=centre`;
  * `tx`, `tz` move it: the overpass at `tx=-100&tz=44`, the avenue's junctions at `tx=-150&tz=-80` and `tx=-30&tz=-80`,
@@ -17,6 +18,8 @@ import { roadHierarchy } from '../render/roadHierarchyFixture';
 import { deriveJunctions } from '../../tests/fixtures/junctions';
 
 type Pt = [number, number];
+
+const follow = typeof location !== 'undefined' && new URLSearchParams(location.search).has('follow');
 
 /** How far round the fixture nothing of the world it is set in is kept (m). */
 const CLEAR = 60;
@@ -51,8 +54,8 @@ export function roadFixtureWorld(base: WorldStructure): WorldStructure {
       // (Its area the main town's, for the bench's camera: no centre, which would be paved.)
       areas: [{ name: 'The road hierarchy', kind: 'countryside', x: ox, z: oz, w: h.width, d: h.depth }],
       centre: [],
-      land: undefined,
-      relief: undefined,
+      // (On a land the town follows only with `&follow`: its built surface then gives the decks' heights.)
+      ...(follow ? {} : { land: undefined, relief: undefined }),
       zones: [...(meta.zones ?? []).filter((z) => clear(z.poly)), { kind: 'water', poly: h.river.map(shift) }],
       world: meta.world && { ...meta.world, fields: [] },
     },

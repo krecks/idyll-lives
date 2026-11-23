@@ -13,9 +13,9 @@
  */
 
 import type { RoadPlan, WorldStructure } from '../../core/protocol';
-import { bridgeSpans, rasterRoads, roadEnds, RoadIndex, roadIndex, SIDEWALK, stretchOf, trimJoins } from '../../game/roads';
+import { bridgeSpans, deckSpans, raisedSpans, rasterRoads, roadEnds, RoadIndex, roadIndex, SIDEWALK, stretchOf, trimJoins } from '../../game/roads';
 
-export { bridgeSpans, stretchOf };
+export { bridgeSpans, deckSpans, raisedSpans, stretchOf };
 import { Geo, type MeshData, type V3 } from './geometry';
 import { carriageway as kerbToKerb, hasSidewalks, JunctionCuts, junctionsOf, KERB_RETURN, offsetMeet, turnedBack, turnedOn, type CornerPlan, type JunctionPlan } from './junctions';
 import { asphaltVary, carriageway, repair, STREET_LOOK, tint } from './paving';
