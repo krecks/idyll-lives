@@ -455,7 +455,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
 
   // ---- the main town: its roads first (which side its water is on), then where it goes -------
   const mainSpec = spec.town;
-  const shape = spec.shape(rand, mainSpec.box, mainSpec.scale);
+  // (A city's main through road an avenue from the first: the streets and lots off it keep to its width.)
+  const shape = spec.shape(rand, mainSpec.box, mainSpec.scale, mainSpec.avenue);
   const joined = settleRoads(joinUp(rand, shape, mainSpec, BIG_COURTS), mainSpec.box);
   // (On a planned land, its water on the side the site has it: the town, as laid out, turned over if it was drawn the other way.)
   const facing = plan && siteAt ? (lay?.site ? sideOf(plan, siteAt, planRiver, D) : plan.side) : undefined;
@@ -579,6 +580,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const takenNames: string[] = [];
   const laying: Laying = { W, D, roads, plans };
   putArea(laying, name ?? rolledName, mainRoads, box, ox, oz, false, mainSpec, layout.greens ?? [], layout.centre ?? mainRoads[0].points[Math.floor(mainRoads[0].points.length / 2)]);
+  // (A city's avenue stays one: `putArea` makes its first road a street, the rest lanes.)
+  mainRoads.forEach((r, k) => r.kind === 'avenue' && (roads[plans[0].roads[k]].kind = 'avenue'));
 
   // ---- a river's town bridge, an island's causeways -------------------------------------------
   /** Bridges and causeways laid (their ends, for the hamlets to keep clear of). */
