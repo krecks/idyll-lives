@@ -99,8 +99,9 @@ type Piece = (u32, f32, f32);
 
 /// The ways for a taxi from `from`, going `dir` along its road (+1: as `s` rises; both if
 /// `None`), to `to` along the roads, as a car drives them, turning round only in a dead end's
-/// turning circle (`Net::turn`): by the way it comes to `to` (+1, then -1), the cost (s) and the
-/// stretches driven, one after another. None: no such way.
+/// turning circle (`Net::turn`), one-way roads their way only (`Graph::may_go`): by the way it
+/// comes to `to` (+1, then -1), the cost (s) and the stretches driven, one after another. None: no
+/// such way.
 #[allow(clippy::type_complexity)]
 fn way_between(
     travel: &crate::travel::Travel,
@@ -111,22 +112,19 @@ fn way_between(
 ) -> [Option<(f32, Vec<Piece>)>; 2] {
     use std::cmp::Reverse;
     let g = &travel.graph;
-    let speed = |road: u32| {
-        if g.roads[road as usize].kind == crate::travel::RoadKind::Country {
-            travel.country_speed
-        } else {
-            crate::travel::TOWN_SPEED
-        }
-    };
+    let speed =
+        |road: u32| crate::travel::kind_speed(g.roads[road as usize].kind, travel.country_speed);
     let slot = |d: f32| usize::from(d < 0.0);
     let mut best: [Option<(f32, Vec<Piece>)>; 2] = [None, None];
     let fe = g.edges[from.edge as usize];
     let te = g.edges[to.edge as usize];
+    // (One-way roads their way only: +1 the way their points run.)
+    let goes = |road: u32, d: f32| g.roads[road as usize].oneway.may_go(d > 0.0);
     let dirs: Vec<f32> = dir.map_or(vec![1.0, -1.0], |d| vec![d]);
     // (Straight along the same stretch, ahead.)
     if from.edge == to.edge {
         for &d in &dirs {
-            if (to.s - from.s) * d >= -0.01 {
+            if (to.s - from.s) * d >= -0.01 && goes(from.road, d) {
                 best[slot(d)] = Some((
                     (to.s - from.s).abs() / speed(from.road),
                     vec![(from.road, from.s, to.s)],
@@ -141,6 +139,9 @@ fn way_between(
     let mut heap = std::collections::BinaryHeap::new();
     let key = |c: f32| (c * 1000.0) as u64;
     for &d in &dirs {
+        if !goes(fe.road, d) {
+            continue;
+        }
         let st = from.edge as usize * 2 + usize::from(d > 0.0);
         let c = if d > 0.0 {
             fe.s1 - from.s
@@ -183,6 +184,9 @@ fn way_between(
                 continue;
             }
             let edge = &g.edges[e as usize];
+            if !g.may_go(e, u as u32) {
+                continue;
+            }
             let extra = pass
                 + match (back, net.turn[u]) {
                     (false, _) => 0.0,
@@ -275,14 +279,20 @@ pub(super) fn plan_way(
     kerbs: &[Kerb],
     way_out: [f32; 2],
 ) -> Option<Vec<Vec<Piece>>> {
-    use crate::travel::Mode;
     let g = &travel.graph;
-    let entry = *g
-        .near(way_in, crate::cars::ROAD_REACH, 1, Mode::Car)
-        .first()?;
-    let exit = *g
-        .near(way_out, crate::cars::ROAD_REACH, 1, Mode::Car)
-        .first()?;
+    // (Where it comes onto the roads and leaves them: the road nearest each way, or a motorway's
+    // carriageway ending there besides, the one going its way, `cars::exit_points`.)
+    let ends = |at: [f32; 2]| -> Vec<crate::travel::RoadPoint> {
+        crate::cars::exit_points(g, at)
+            .into_iter()
+            .map(|(p, _)| p)
+            .collect()
+    };
+    let entries = ends(way_in);
+    let exits = ends(way_out);
+    if entries.is_empty() || exits.is_empty() {
+        return None;
+    }
     let points: Vec<crate::travel::RoadPoint> = kerbs
         .iter()
         .map(|k| kerb_point(g, k))
@@ -294,7 +304,7 @@ pub(super) fn plan_way(
     for (k, &to) in points.iter().enumerate() {
         let mut here: [Best; 2] = [None, None];
         let starts: Vec<(f32, usize, crate::travel::RoadPoint, Option<f32>)> = if k == 0 {
-            vec![(0.0, 0, entry, None)]
+            entries.iter().map(|&e| (0.0, 0, e, None)).collect()
         } else {
             (0..2)
                 .filter_map(|i| {
@@ -328,7 +338,7 @@ pub(super) fn plan_way(
     // Out: from the last kerb (or straight through with none).
     let mut out: Option<(f32, usize, Vec<Piece>)> = None;
     let starts: Vec<(f32, usize, crate::travel::RoadPoint, Option<f32>)> = match table.last() {
-        None => vec![(0.0, 0, entry, None)],
+        None => entries.iter().map(|&e| (0.0, 0, e, None)).collect(),
         Some(last) => (0..2)
             .filter_map(|i| {
                 let c = last[i].as_ref()?.0;
@@ -342,8 +352,9 @@ pub(super) fn plan_way(
             .collect(),
     };
     for (c0, i0, from, dir) in starts {
-        for (c, pieces) in way_between(travel, net, from, dir, exit)
-            .into_iter()
+        for (c, pieces) in exits
+            .iter()
+            .flat_map(|&exit| way_between(travel, net, from, dir, exit))
             .flatten()
         {
             if out.as_ref().is_none_or(|b| c0 + c < b.0) {
@@ -674,8 +685,8 @@ impl SideTurn {
 const SIDE_IN: f32 = 0.5;
 
 /// Whether a taxi come to junction node `u` along stretch `came` can turn round there, nose first
-/// into a side street square to its road (that road going on past it) and backing out the way it
-/// came, and where: None, it can't.
+/// into a side street square to its road (that road going on past it; not a ramp, and its way if
+/// one-way) and backing out the way it came, and where: None, it can't.
 fn side_turn(g: &crate::travel::Graph, net: &Net, u: u32, came: u32) -> Option<SideTurn> {
     let e_in = &g.edges[came as usize];
     let road = &g.roads[e_in.road as usize];
@@ -696,6 +707,10 @@ fn side_turn(g: &crate::travel::Graph, net: &Net, u: u32, came: u32) -> Option<S
             return None;
         }
         let side = &g.roads[arm.road as usize];
+        // (Not into a ramp, nor against a one-way street's way.)
+        if !side.enterable() || !g.may_go(e, u) {
+            return None;
+        }
         let depth = road.width / 2.0 + TAXI_LEN / 2.0 + SIDE_IN;
         if arm.len() < depth + TAXI_LEN {
             return None;

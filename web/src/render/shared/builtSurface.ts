@@ -15,6 +15,11 @@
  *   junction, a trail or a road carried on, meets it at one height), and every bridge's deck lifted
  *   clear of its water. Last, the network is brought within its grades once more (the passes leave
  *   an arm between two junctions close together a little steep here and there).
+ *   A road that passes over another (`RoadPlan.crosses`, on a `raised` or `bridge` deck) meets it at
+ *   no junction: its deck is held `CROSS_CLEAR` over the road below as a bridge's over its water (a
+ *   floor, the grades either side ramping up to it: an embankment, cut or filled up to
+ *   `CUT_MAX_MOTORWAY`). A motorway's two carriageways side by side are kept at one height, and a
+ *   ramp merging into one (`merge`) takes its height there, no junction either.
  * - **Lots** are level pads. Each lot's way in (its driveway, else its path) meets its road at the
  *   *entry* (`entryY`), and its pad (`padY`) is within `ENTRY_MAX` of that: a short sloped drive or
  *   a step or two between them. Within that, a pad stands as near the middle of the land under it
@@ -33,16 +38,20 @@
  *   on from it, not over its edge or under it); beside a lot within `RETAIN_MAX` of the pad (the
  *   tallest a retaining edge stands).
  *   Under a deck carried on over dry land well past its water, it is drawn `DECK_UNDER` under the
- *   deck's road at least (stored as graded: `graded`). Water is left as it is.
+ *   deck's road at least (stored as graded: `graded`). An overpass's deck is not land at all: under it
+ *   the road below owns the ground, and the land beside that lies `DECK_UNDER` under the deck at least.
+ *   Water is left as it is.
  *
  * The world's grain is the land's (`LAND_CELL` m samples). `at(x, z)` is the surface anything stands
- * on: a lot's pad, a road's height across it, else the graded land between its samples.
+ * on: a lot's pad, a road's height across it (never an overpass's: what is under it), else the graded
+ * land between its samples. `groundUnder(x, z)` the same with every deck taken away, over water too;
+ * `roadY(road, s)` a road's own height, on its decks too (`onDeck`, `raisedAt`).
  */
 
 import type { JunctionInfo, RoadKind, RoadPlan } from '../../core/protocol';
 import { ROAD_KIND, ROAD_KINDS } from '../../core/roadKinds';
 import { LAND_CELL, NONE, heightAt, type Land, type LandRect } from '../../game/land';
-import { bridgeSpans, lengths, nearest, pointAt, RoadIndex } from '../../game/roads';
+import { bridgeSpans, deckSpans, lengths, nearest, pointAt, raisedSpans, RoadIndex } from '../../game/roads';
 import { CHUNK, chunkAt, chunksIn } from './chunks';
 import { carriageway, CROSSWALK, KERB_RETURN, planJunctions, type JunctionPlan } from './junctions';
 import * as pmath from '../../game/pmath';
@@ -66,6 +75,26 @@ export const CUT_MAX = 4;
 export const SKIRT_MOST = RETAIN_MAX - 0.05;
 /** Among mountains (a world whose Hills are `mountains`), a country road (a pass, a way out of the world) may be cut into the rock or stand over the land by this much (m). */
 export const CUT_MAX_MOUNTAIN_ROAD = 10;
+/** A motorway's carriageway and its ramps may be cut into the land or stand over it on an embankment by this much (m). */
+export const CUT_MAX_MOTORWAY = 8;
+
+/** The most a road of `kind` may be cut into the land or stand over it (m): `CUT_MAX`, a motorway's `CUT_MAX_MOTORWAY`, among `mountains` a country road's `CUT_MAX_MOUNTAIN_ROAD`. */
+export function cutMostOf(kind: RoadKind, mountains = false): number {
+  if (kind === 'motorway' || kind === 'ramp') return CUT_MAX_MOTORWAY;
+  return mountains && kind === 'country' ? CUT_MAX_MOUNTAIN_ROAD : CUT_MAX;
+}
+
+/**
+ * Where a road passes over another on a deck of its own (`RoadPlan.crosses`, an `s` inside its `raised` or `bridge`
+ * stretches), it stands at least this far (m) over the road below, surface to surface, all across the road below
+ * out to `CROSS_MARGIN` m past its edges.
+ */
+export const CROSS_CLEAR = 5;
+const CROSS_MARGIN = 1.5;
+/** A road over another is held clear of it this far (m) along itself either way of the crossing at most (the samples over the road below). */
+const CROSS_REACH = 40;
+/** A motorway's other carriageway is the one within this (m) of its middle: the two kept at one height side by side. */
+const PAIR_REACH = 16;
 /** The graded land under a road lies this far below it (m), so it never shows through on a bend. */
 export const ROAD_SINK = 0.06;
 /** A bridge's deck stands at least this far over its water (m). */
@@ -141,7 +170,7 @@ interface Profile {
   z: Float32Array;
   ground: Float32Array;
   y: Float32Array;
-  /** The lowest its height may be (a bridge's deck), -Infinity elsewhere. */
+  /** The lowest its height may be (a bridge's deck, an overpass clear of the road below), -Infinity elsewhere. */
   floor: Float32Array;
   /** Held by a junction (1): not smoothed, and its height the junction's. */
   pin: Uint8Array;
@@ -159,6 +188,8 @@ interface Attach {
   car: boolean;
   /** Whether it runs on through (else it ends here). */
   through: boolean;
+  /** Whether it ends here running into the other alongside (`merge`: a ramp's end on a motorway): it takes the other's height, and makes no junction. */
+  merge: boolean;
 }
 
 /** Where roads meet: a junction (three or more arms for cars: `hold`) or a join (a road carried on, a trail). */
@@ -177,6 +208,30 @@ export interface SurfaceJunction {
   z: number;
   y: number;
   arms: { road: number; from: number; to: number }[];
+}
+
+/** A road passing over another on a deck (`RoadPlan.crosses`): where, along each, and their heights there (`BuiltSurface.overpasses`). */
+export interface SurfaceCrossing {
+  /** The road on the deck, and how far along it (m) it crosses. */
+  over: number;
+  s: number;
+  /** The road below, and how far along it (m). */
+  under: number;
+  sUnder: number;
+  x: number;
+  z: number;
+  /** Their heights there (m): `yOver - yUnder` is at least `CROSS_CLEAR`. */
+  yOver: number;
+  yUnder: number;
+}
+
+/** A road held clear over another (`CROSS_CLEAR`): its samples over the road below, and where along that each is (m). */
+interface Over {
+  road: number;
+  under: number;
+  s: number;
+  sUnder: number;
+  samples: { i: number; s: number }[];
 }
 
 /** What a re-solve changed (`BuiltSurface.update`): the roads and pads whose heights moved, and the samples of the graded land that did (null: none). */
@@ -217,6 +272,16 @@ export class BuiltSurface {
   private apart = false;
   /** How many places each road is joined at (its nodes). */
   private readonly joins: number[];
+  /** Each road's overpasses (`raisedSpans`): not on the land, nor what anyone below stands on. */
+  private readonly raised: [number, number][][];
+  /** Each road's decks, over water and over the land (`deckSpans`). */
+  private readonly decks: [number, number][][];
+  /** The roads held clear over others (`CROSS_CLEAR`). */
+  private readonly overs: Over[];
+  /** Each motorway carriageway's other (the one beside it), and where along that each of its samples is beside it (m; NaN: none beside it); null for every other road. */
+  private readonly pairs: ({ road: number; s: Float32Array } | null)[];
+  /** Per sample, whether a motorway or a ramp is built there (cut or filled by `CUT_MAX_MOTORWAY` at most); null: no such road. */
+  private deep: Uint8Array | null = null;
 
   constructor(
     readonly land: Land,
@@ -230,7 +295,11 @@ export class BuiltSurface {
     this.index = new RoadIndex(roads);
     this.widest = Math.max(0, ...roads.map((r) => r.width));
     this.lens = roads.map((r) => lengths(r.points));
+    this.raised = roads.map((r) => raisedSpans(r));
+    this.decks = roads.map((r) => deckSpans(r));
     this.profiles = roads.map((r, i) => this.sampled(r, i));
+    this.overs = this.findOvers();
+    this.pairs = this.findPairs();
     this.nodes = this.findNodes();
     this.joins = roads.map(() => 0);
     for (const node of this.nodes) for (const r of new Set(node.atts.map((a) => a.road))) this.joins[r]++;
@@ -326,9 +395,52 @@ export class BuiltSurface {
     let best: { road: number; s: number; dist: number } | null = null;
     for (const [road, m] of this.index.around(x, z, this.widest / 2)) {
       if (m.dist > this.roads[road].width / 2 || (best && best.dist <= m.dist)) continue;
+      if (this.raised[road].length && within(this.raised[road], m.s)) continue;
       best = { road, s: m.s, dist: m.dist };
     }
     return best && { road: best.road, s: best.s };
+  }
+
+  /**
+   * Whether road `road` is on a deck `s` m along it: over water (`bridgeSpans`) or over the land, an overpass
+   * (`raisedSpans`). An overpass is not on the land: `roadAt` and `at` look past it to what is below.
+   */
+  onDeck(road: number, s: number): boolean {
+    const d = this.decks[road];
+    return !!d?.length && within(d, s);
+  }
+
+  /** Whether road `road` is on an overpass (`raisedSpans`, a deck over the land) `s` m along it. */
+  raisedAt(road: number, s: number): boolean {
+    const d = this.raised[road];
+    return !!d?.length && within(d, s);
+  }
+
+  /**
+   * The ground (m) at (`x`, `z`) with every deck taken away (over water and over the land alike): a lot's pad, a road's
+   * height where it lies on the land, else the graded land (under a deck, held down under it: `DECK_UNDER`). What a
+   * pier stands on, and what anyone below a bridge stands on.
+   */
+  groundUnder(x: number, z: number): number {
+    let pad = -Infinity;
+    for (const i of this.lotGrid.get(Math.floor(x / LOT_CELL) * 65536 + Math.floor(z / LOT_CELL)) ?? []) {
+      if (onPad(this.plots[i], x, z)) pad = Math.max(pad, this.pads[i]);
+    }
+    if (pad > -Infinity) return pad;
+    let best: { road: number; s: number; dist: number } | null = null;
+    for (const [road, m] of this.index.around(x, z, this.widest / 2)) {
+      if (m.dist > this.roads[road].width / 2 || (best && best.dist <= m.dist) || this.onDeck(road, m.s)) continue;
+      best = { road, s: m.s, dist: m.dist };
+    }
+    return best ? this.roadY(best.road, best.s) : this.landAt(x, z);
+  }
+
+  /** Every road passing over another on a deck (`RoadPlan.crosses`), and how high each stands there (at least `CROSS_CLEAR` apart). */
+  get overpasses(): SurfaceCrossing[] {
+    return this.overs.map((o) => {
+      const { p } = pointAt(this.roads[o.road].points, o.s, this.lens[o.road]);
+      return { over: o.road, s: o.s, under: o.under, sUnder: o.sUnder, x: p[0], z: p[1], yOver: this.roadY(o.road, o.s), yUnder: this.roadY(o.under, o.sUnder) };
+    });
   }
 
   /** The junctions (three or more ways for cars meeting), each at its one height. */
@@ -495,7 +607,7 @@ export class BuiltSurface {
           const k = j * cols + i;
           if (wet(land, k)) continue;
           // (Beside a lot: within a retaining edge of the land graded to its pad; elsewhere within a cut or a fill.)
-          let reach = CUT_MAX;
+          let reach = this.deep?.[k] ? CUT_MAX_MOTORWAY : CUT_MAX;
           if (!kind[k]) {
             for (let n = 0; n < 8 && reach > RETAIN_MAX; n++) {
               const [ni, nj] = [i + NEAR8[n][0], j + NEAR8[n][1]];
@@ -655,6 +767,69 @@ export class BuiltSurface {
     return raw.map((n) => ({ ...n, atts: n.atts.filter(([r]) => !this.draped(r)) })).filter((n) => n.atts.length >= 2).map((n) => this.nodeOf(n.x, n.z, n.atts, n.reach));
   }
 
+  /** Whether roads `a` and `b` pass over or under each other without meeting (either `crosses` the other). */
+  private passes(a: number, b: number): boolean {
+    const { roads } = this;
+    return !!roads[a].crosses?.some((c) => c.road === b) || !!roads[b].crosses?.some((c) => c.road === a);
+  }
+
+  /**
+   * The roads held clear over others: each `crosses` of a road where it is on a deck of its own (`raised` or `bridge`),
+   * with its samples within `CROSS_REACH` m of the crossing over the road below (out to `CROSS_MARGIN` past its edges),
+   * the one nearest the crossing always.
+   */
+  private findOvers(): Over[] {
+    const { roads, lens, profiles } = this;
+    const out: Over[] = [];
+    roads.forEach((r, road) => {
+      for (const c of r.crosses ?? []) {
+        const under = roads[c.road];
+        if (!under || c.road === road || under.points.length < 2 || !within(this.decks[road], c.s)) continue;
+        const p = profiles[road];
+        const { p: at } = pointAt(r.points, c.s, lens[road]);
+        const sUnder = nearest(under.points, at[0], at[1], lens[c.road]).s;
+        const samples: Over['samples'] = [];
+        let [closest, best] = [-1, Infinity];
+        for (let i = 0; i < p.y.length; i++) {
+          const off = Math.abs(p.s[i] - c.s);
+          if (off > CROSS_REACH) continue;
+          const m = nearest(under.points, p.x[i], p.z[i], lens[c.road]);
+          // (A sample's step past that too: the deck drawn between two samples clear of it.)
+          if (m.dist <= under.width / 2 + CROSS_MARGIN + PROFILE_STEP) samples.push({ i, s: m.s });
+          else if (off < best) [closest, best] = [i, off];
+        }
+        if (!samples.length && closest >= 0) samples.push({ i: closest, s: sUnder });
+        out.push({ road, under: c.road, s: c.s, sUnder, samples });
+      }
+    });
+    return out;
+  }
+
+  /** Each motorway carriageway's other, beside it within `PAIR_REACH` m (the motorway nearest its samples), and where along it each sample is beside it. */
+  private findPairs(): ({ road: number; s: Float32Array } | null)[] {
+    const { roads, profiles } = this;
+    if (roads.filter((r) => r.kind === 'motorway').length < 2) return roads.map(() => null);
+    return roads.map((r, a) => {
+      if (r.kind !== 'motorway') return null;
+      const p = profiles[a];
+      const votes = new Map<number, number>();
+      const near = Array.from(p.y, (_, i) => this.index.around(p.x[i], p.z[i], PAIR_REACH));
+      for (const found of near) {
+        let [best, dist] = [-1, PAIR_REACH];
+        for (const [b, m] of found) if (b !== a && roads[b].kind === 'motorway' && m.dist < dist) [best, dist] = [b, m.dist];
+        if (best >= 0) votes.set(best, (votes.get(best) ?? 0) + 1);
+      }
+      const b = [...votes].sort((x, y) => y[1] - x[1] || x[0] - y[0])[0]?.[0];
+      if (b === undefined) return null;
+      const at = new Float32Array(p.y.length).fill(NaN);
+      near.forEach((found, i) => {
+        const m = found.get(b);
+        if (m && m.dist < PAIR_REACH) at[i] = m.s;
+      });
+      return { road: b, s: at };
+    });
+  }
+
   /** Where two roads' middles cross away from their ends (each road's segments filed by 8 m cell). */
   private crossings(): { x: number; z: number; atts: [number, number][] }[] {
     const cells = new Map<number, [number, number, number][]>();
@@ -680,7 +855,7 @@ export class BuiltSurface {
         for (let b = a + 1; b < list.length; b++) {
           const [ra, ka, sa] = list[a];
           const [rb, kb, sb] = list[b];
-          if (ra === rb) continue;
+          if (ra === rb || this.passes(ra, rb)) continue;
           const key = ra < rb ? `${ra}:${ka}:${rb}:${kb}` : `${rb}:${kb}:${ra}:${ka}`;
           if (seen.has(key)) continue;
           seen.add(key);
@@ -711,9 +886,11 @@ export class BuiltSurface {
       const L = profiles[road].len;
       const ring = r.ends[0] === 'loop';
       const through = !ring && s >= END_NEAR && s <= L - END_NEAR;
-      return { road, s, from: -1, to: -1, car: r.kind !== 'trail', through };
+      const merge = !through && r.ends[s < END_NEAR ? 0 : 1] === 'merge';
+      return { road, s, from: -1, to: -1, car: r.kind !== 'trail', through, merge };
     });
-    const arms = atts.reduce((n, a) => n + (a.car ? (a.through ? 2 : 1) : 0), 0);
+    // (A ramp merging into its carriageway: no junction's arm.)
+    const arms = atts.reduce((n, a) => n + (a.car && !a.merge ? (a.through ? 2 : 1) : 0), 0);
     const hold = arms >= 3;
     for (const a of atts) {
       const p = profiles[a.road];
@@ -775,17 +952,74 @@ export class BuiltSurface {
       }
     });
     for (const node of this.nodes) for (const a of node.atts) if (a.from >= 0) profiles[a.road].pin.fill(1, a.from, a.to + 1);
+    // (The decks over water's floors, the overpasses' laid over them each pass from the roads below as they are then.)
+    const decks = this.overs.length ? profiles.map((p) => p.floor.slice()) : [];
+    const clear = () => {
+      if (this.overs.length) this.clearOver(decks);
+    };
+    const merges = this.nodes.filter((n) => n.atts.some((a) => a.merge));
+    clear();
     this.tiered();
     const scratch = new Float32Array(Math.max(0, ...profiles.map((p) => p.y.length)));
     const solid = profiles.filter((_, r) => !this.draped(r));
     for (let pass = 0; pass < PASSES; pass++) {
       for (const p of solid) settlePass(p, scratch);
+      clear();
+      this.pairUp();
       for (const node of this.nodes) this.join(node);
       for (const p of solid) lift(p);
     }
     // (The passes leave a junction's arm a little steep here and there, between two junctions close together: once more within the grades, as little as can be.)
     this.tiered();
     for (const p of solid) lift(p);
+    // (A motorway's carriageways side by side at one height, each ramp's end at its carriageway's.)
+    clear();
+    this.pairUp();
+    for (const p of solid) lift(p);
+    for (const node of merges) this.join(node);
+  }
+
+  /**
+   * Each road over another (`overs`) held `CROSS_CLEAR` over it where it passes over it (its floor there, over `decks`,
+   * the floors of its decks over water), a motorway's two carriageways held to the higher of their two.
+   */
+  private clearOver(decks: readonly Float32Array[]): void {
+    const { profiles } = this;
+    profiles.forEach((p, r) => {
+      if (this.pairs[r] || this.overs.some((o) => o.road === r)) p.floor.set(decks[r]);
+    });
+    for (const o of this.overs) {
+      const f = profiles[o.road].floor;
+      for (const { i, s } of o.samples) f[i] = Math.max(f[i], this.roadY(o.under, s) + CROSS_CLEAR);
+    }
+    // (Each carriageway's floor its other's too, where they run side by side.)
+    const was = profiles.map((p) => p.floor);
+    // (The higher of the two samples round it: a floor is not drawn down between them.)
+    const floorAt = (road: number, s: number) => {
+      const n = profiles[road].s.length;
+      const i = Math.max(0, Math.min(n - 1, Math.floor(s / PROFILE_STEP)));
+      return Math.max(was[road][i], was[road][Math.min(n - 1, i + 1)]);
+    };
+    const shared = this.pairs.map((pair, a) => {
+      if (!pair) return null;
+      const f = was[a].slice();
+      for (let i = 0; i < f.length; i++) if (!Number.isNaN(pair.s[i])) f[i] = Math.max(f[i], floorAt(pair.road, pair.s[i]));
+      return f;
+    });
+    shared.forEach((f, a) => f && profiles[a].floor.set(f));
+  }
+
+  /** A motorway's two carriageways at one height where they run side by side: each sample the mean of its own and its other's beside it. */
+  private pairUp(): void {
+    const { profiles, pairs } = this;
+    if (!pairs.some((p) => p)) return;
+    const next = pairs.map((pair, a) => {
+      if (!pair) return null;
+      const y = profiles[a].y.slice();
+      for (let i = 0; i < y.length; i++) if (!Number.isNaN(pair.s[i])) y[i] = (y[i] + this.roadY(pair.road, pair.s[i])) / 2;
+      return y;
+    });
+    next.forEach((y, a) => y && profiles[a].y.set(y));
   }
 
   /** Whether road `road` is a footpath (a trail): it lies on the land as it is, no grade, no junction, nothing graded to it. */
@@ -821,7 +1055,8 @@ export class BuiltSurface {
     this.withinGrades((r) => this.tier(r) === 1);
     // (Towns further apart in height than the country roads between them can climb: no town's streets dragged more
     // than `TOWN_GIVE` off their land for it; the country roads between them solved on their own after them.)
-    const town = (r: number) => this.roads[r].kind !== 'country' && !this.draped(r);
+    // (A motorway and its ramps are no town's streets: they climb over the roads below as they must.)
+    const town = (r: number) => !APART_KINDS.has(this.roads[r].kind ?? 'street') && !this.draped(r);
     if (profiles.some((p, r) => town(r) && p.y.some((y, i) => Math.abs(y - was[r][i]) > TOWN_GIVE))) {
       this.apart = true;
       profiles.forEach((p, r) => {
@@ -840,8 +1075,9 @@ export class BuiltSurface {
     const settle = (n: number, road: number) => {
       const node = nodes[n];
       let [sum, count] = [0, 0];
+      const merging = node.atts.some((a) => a.merge) && node.atts.some((a) => !a.merge && (road >= 0 ? a.road === road : this.tier(a.road) === 1));
       for (const a of node.atts) {
-        if (a.from < 0 || (road >= 0 ? a.road !== road : this.tier(a.road) !== 1)) continue;
+        if (a.from < 0 || (road >= 0 ? a.road !== road : this.tier(a.road) !== 1) || (merging && a.merge)) continue;
         for (let i = a.from; i <= a.to; i++) sum += profiles[a.road].y[i];
         count += a.to - a.from + 1;
       }
@@ -906,8 +1142,22 @@ export class BuiltSurface {
     const upper = envelope(start, edges, 1);
     hubOf(-1);
     const lower = envelope(start, edges, -1);
+    // (Where a road passes over another, no lower than its floors and the grades from them allow: a floor is not split
+    // halfway as a height is, the deck over the road below raised to it and the land either side ramped up to it.)
+    let floors: Float64Array | null = null;
+    if (this.overs.length) {
+      const least = new Float64Array(size).fill(-Infinity);
+      profiles.forEach((p, r) => {
+        for (let i = 0; i < p.y.length; i++) least[base[r] + i] = p.floor[i];
+      });
+      floors = envelope(least, edges, -1);
+    }
     profiles.forEach((p, r) => {
-      if (only(r)) for (let i = 0; i < p.y.length; i++) p.y[i] = (upper[base[r] + i] + lower[base[r] + i]) / 2;
+      if (!only(r)) return;
+      for (let i = 0; i < p.y.length; i++) {
+        const mid = (upper[base[r] + i] + lower[base[r] + i]) / 2;
+        p.y[i] = floors ? Math.max(mid, floors[base[r] + i]) : mid;
+      }
     });
   }
 
@@ -916,8 +1166,10 @@ export class BuiltSurface {
     const { profiles } = this;
     // (The town's streets set it where they meet it, else the country roads, else the trails.)
     const first = Math.min(...node.atts.map((a) => this.tier(a.road)));
+    // (A ramp's end merging into its carriageway takes the carriageway's height.)
+    const merging = node.atts.some((a) => a.merge) && node.atts.some((a) => !a.merge && this.tier(a.road) === first);
     let [sum, n] = [0, 0];
-    for (const a of node.atts.filter((o) => this.tier(o.road) === first)) {
+    for (const a of node.atts.filter((o) => this.tier(o.road) === first && !(merging && o.merge))) {
       if (a.from < 0) continue;
       const y = profiles[a.road].y;
       for (let i = a.from; i <= a.to; i++) sum += y[i];
@@ -936,7 +1188,11 @@ export class BuiltSurface {
     // (The least the land lies under a deck carried on over dry land: `DECK_UNDER`.)
     const ceiling = new Float32Array(cols * rows).fill(Infinity);
     const c = LAND_CELL;
-    // Roads, out to their sidewalks' edges (where two overlap, the one whose middle is nearer); a bridge's deck is not on the land.
+    // (Where a motorway or a ramp is built: cut or filled deeper, `CUT_MAX_MOTORWAY`.)
+    const deep = roads.some((r) => r.kind === 'motorway' || r.kind === 'ramp') ? new Uint8Array(cols * rows) : null;
+    this.deep = deep;
+    // Roads, out to their sidewalks' edges (where two overlap, the one whose middle is nearer); a bridge's deck is not on
+    // the land, nor an overpass's (the land under it the road's below, else held under it as under a bridge's dry reach).
     roads.forEach((r, road) => {
       if (this.draped(road)) return;
       const ls = this.lens[road];
@@ -944,6 +1200,8 @@ export class BuiltSurface {
       // (Beside it out to a cell's diagonal past its edge: every corner of a cell its edge crosses.)
       const reach = half + c * Math.SQRT2;
       const spans = bridgeSpans(r);
+      const raised = this.raised[road];
+      const motor = r.kind === 'motorway' || r.kind === 'ramp' ? 1 : 0;
       // Each deck's water along it: its dry reach past that is further than `DECK_DRY` m from it.
       const waters = spans.map((span): [number, number] => {
         let [from, to] = [Infinity, -Infinity];
@@ -976,6 +1234,15 @@ export class BuiltSurface {
             const oz = pz - dz * t;
             const d = Math.sqrt(ox * ox + oz * oz);
             const at = j * cols + i;
+            if (raised.length) {
+              // (Along its line past the segment's ends too: the land past an overpass's ends is under its deck, not
+              // the embankment's, the abutment square across the road.)
+              const s = ls[k] + (l2 > 0 ? (px * dx + pz * dz) / l2 : 0) * l;
+              if (within(raised, s)) {
+                if (d <= half + DECK_APRON) ceiling[at] = Math.min(ceiling[at], this.roadY(road, s) - DECK_UNDER);
+                continue;
+              }
+            }
             // (Under it; or beside it, at its height, the samples past its edge round the cells it crosses: the land
             // drawn between the samples meets it under its edge, not over it where the land beside stands higher (a
             // cut), and a narrow way's middle reads it back. Beside it, never in place of a road's own sample or a
@@ -998,6 +1265,7 @@ export class BuiltSurface {
             near[at] = d;
             builtY[at] = this.roadY(road, s);
             kind[at] = under ? 1 : BESIDE;
+            if (deep) deep[at] = motor;
           }
         }
       }
@@ -1121,6 +1389,15 @@ function cones(hi: Float32Array, lo: Float32Array, cols: number, rows: number, s
       }
     }
   }
+}
+
+/** The kinds solved apart from a town's streets (`tiered`): never held within `TOWN_GIVE` of their land. */
+const APART_KINDS: ReadonlySet<RoadKind> = new Set(['country', 'motorway', 'ramp']);
+
+/** Whether arc length `s` is within one of `spans` (in order along a road). */
+function within(spans: readonly (readonly [number, number])[], s: number): boolean {
+  for (const [s0, s1] of spans) if (s >= s0 && s <= s1) return true;
+  return false;
 }
 
 /** A sample beside a road (a corner of a cell its edge crosses): graded to the road's height, not sunk (`solveLand`). */

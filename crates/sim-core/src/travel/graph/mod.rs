@@ -33,9 +33,23 @@ pub struct Graph {
     cells: Vec<Vec<(u32, u32)>>,
     cols: usize,
     rows: usize,
+    /// The top speed of its fastest road for cars but a country road (`kind_speed`; a country
+    /// road's comes with each search): `top_speed`.
+    fast: f32,
     /// Its junctions' boxes (`traffic::boxes`): their middles and how far round them they reach
     /// (m). Cars take turns driving through them (`traffic/`).
     pub boxes: Vec<([f32; 2], f32)>,
+}
+
+/// Whether a road of kind `end`'s end meeting a road of kind `along` part way along it joins it
+/// there (`Graph::build`): not where either is a motorway (grade separated: one passes over the
+/// other), but a ramp's end on a motorway (where it merges into its carriageway, or leaves it).
+fn level_join(end: RoadKind, along: RoadKind) -> bool {
+    match (end, along) {
+        (RoadKind::Ramp, RoadKind::Motorway) | (RoadKind::Motorway, RoadKind::Motorway) => true,
+        (RoadKind::Motorway, _) | (_, RoadKind::Motorway) => false,
+        _ => true,
+    }
 }
 
 /// What `Graph::seek` shows the road segments near a point to.
@@ -149,8 +163,14 @@ impl Graph {
             .enumerate()
             .filter_map(|(i, r)| Road::new(r, i))
             .collect();
+        let fast = roads
+            .iter()
+            .filter(|r| r.drivable() && r.kind != RoadKind::Country)
+            .map(|r| kind_speed(r.kind, 0.0))
+            .fold(0.0, f32::max);
         let mut g = Graph {
             roads,
+            fast,
             ..Default::default()
         };
         if g.roads.is_empty() {
@@ -216,6 +236,9 @@ impl Graph {
                         continue;
                     }
                     let near_end = |s: f32| s < snap || s > other.len() - snap;
+                    if !near_end(s) && !level_join(g.roads[r].kind, other.kind) {
+                        continue;
+                    }
                     if near_end(s) {
                         let e = if s < other.len() / 2.0 {
                             ends[q][0]
@@ -375,13 +398,95 @@ impl Graph {
         self.adj.get(n).map_or(0, Vec::len)
     }
 
-    /// Where three or more stretches of road meet.
+    /// Where three or more stretches of road meet, but a motorway's merges (`is_merge`): no
+    /// lights, no box and no slowing down there.
     pub fn junctions(&self) -> impl Iterator<Item = [f32; 2]> + '_ {
-        self.adj
-            .iter()
-            .zip(&self.nodes)
-            .filter(|(a, _)| a.len() >= 3)
-            .map(|(_, &p)| p)
+        (0..self.nodes.len())
+            .filter(|&n| self.adj[n].len() >= 3 && !self.is_merge(n))
+            .map(|n| self.nodes[n])
+    }
+
+    /// Whether node `n` is where ramps join a motorway's carriageway: every stretch there a
+    /// motorway's or a ramp's, a motorway's among them, and three or more. Not a junction: no box,
+    /// no lights, nobody slowing for it.
+    pub fn is_merge(&self, n: usize) -> bool {
+        let Some(adj) = self.adj.get(n) else {
+            return false;
+        };
+        let kind = |&e: &u32| self.roads[self.edges[e as usize].road as usize].kind;
+        adj.len() >= 3
+            && adj
+                .iter()
+                .all(|e| matches!(kind(e), RoadKind::Motorway | RoadKind::Ramp))
+            && adj.iter().any(|e| kind(e) == RoadKind::Motorway)
+    }
+
+    /// The motorway's merges (`is_merge`), by node.
+    pub fn merge_nodes(&self) -> impl Iterator<Item = usize> + '_ {
+        (0..self.nodes.len()).filter(|&n| self.is_merge(n))
+    }
+
+    /// Whether a car may drive along stretch `edge` from its node `from` (the road's `OneWay`):
+    /// from its `a` end is the way its road's points run. A stretch from a node back to itself
+    /// goes the way its points run.
+    pub fn may_go(&self, edge: u32, from: u32) -> bool {
+        let e = &self.edges[edge as usize];
+        self.roads[e.road as usize].oneway.may_go(e.a == from)
+    }
+
+    /// Whether, in each network of roads for cars (`networks`, by roads for cars only), every node
+    /// a car can come onto the roads at (one on a road for cars other than the motorway and its
+    /// ramps, `Road::enterable`) can be driven to from every other, one-way roads gone along
+    /// their way only. True without any. A one-way road must never cut a home off.
+    pub fn strongly_connected(&self) -> bool {
+        let n = self.nodes.len();
+        let enterable: Vec<bool> = (0..n)
+            .map(|v| {
+                self.adj[v]
+                    .iter()
+                    .any(|&e| self.roads[self.edges[e as usize].road as usize].enterable())
+            })
+            .collect();
+        // (From `start` along roads for cars: either way (`any`), the way cars go, or the way
+        // back, against it.)
+        let reach = |start: usize, any: bool, back: bool| {
+            let mut seen = vec![false; n];
+            seen[start] = true;
+            let mut stack = vec![start];
+            while let Some(u) = stack.pop() {
+                for &e in &self.adj[u] {
+                    let edge = &self.edges[e as usize];
+                    if !self.roads[edge.road as usize].drivable() {
+                        continue;
+                    }
+                    let v = if edge.a as usize == u { edge.b } else { edge.a } as usize;
+                    // (Back: from `v` to `u` must be a way cars go.)
+                    let ok = any || self.may_go(e, if back { v } else { u } as u32);
+                    if ok && !seen[v] {
+                        seen[v] = true;
+                        stack.push(v);
+                    }
+                }
+            }
+            seen
+        };
+        let mut done = vec![false; n];
+        for start in 0..n {
+            if done[start] || !enterable[start] {
+                continue;
+            }
+            let network = reach(start, true, false);
+            let (ahead, back) = (reach(start, false, false), reach(start, false, true));
+            for v in 0..n {
+                if network[v] {
+                    done[v] = true;
+                    if enterable[v] && !(ahead[v] && back[v]) {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
     }
 
     /// The place `s` m along the town file's road `source` (`drives[].road/s`), if it's in the

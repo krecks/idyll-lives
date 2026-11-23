@@ -44,7 +44,7 @@ import { outlines, rasterize, rle, simplify } from './landMasks';
 import { between, fbm, mulberry32 } from './noise';
 import type { UseLayer } from './uses';
 import { along, astar, CELL, Cells, clearOfBoxes, COUNTRY_GRADE, COUNTRY_WIDTH, CountryRouter, CTRL_APART, FACING, ROAD_WIDTH, ROUTE_GRADE, SIDE_COST, TRIES, type Port, type Way } from './countryRouter';
-import { centroid, cropRoads, curve, evenly, inside, leftOf, lengths, nearest, pointAt, RoadIndex, roadIndex, roadLengths, roadMeets, straightAround, type Box, type Pt, type RoadPlan } from './roads';
+import { centroid, cropRoads, curve, evenly, inside, keepOf, leftOf, lengths, nearest, pointAt, RoadIndex, roadIndex, roadLengths, roadMeets, straightAround, type Box, type Pt, type RoadPlan } from './roads';
 import { lotName, placeOfTemplate, placeUnit } from './placeLots';
 import { BIG_COURTS, boundsOf, COURTS, frontageOf, Ground, houseFor, joinUp, lotAt, LotPlacer, plotRect, reachesRoad, settleRoads, shuffled, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
 import { LAND_SIZE, LEGACY_KINDS, placeOf, specOf, streetNames, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind, type WorldSpec, type WorldStep } from './world';
@@ -1797,7 +1797,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   for (const [a, plan] of plans.entries()) if (!spec.wildBoxes || (a === 0 && spec.wildBoxes === 'hamlets')) clearWoods(plan.rect, 10);
   for (const s of slots) clearWoods(rectOf(s), 4);
   for (const r of orchards) clearWoods(r, 4);
-  for (const road of worldRoads) for (let i = 0; i < road.points.length; i += 3) clearWoods({ x: road.points[i][0], z: road.points[i][1], w: 0, d: 0 }, road.width / 2 + 3);
+  // (A motorway's and a ramp's kept land, `keepOf`, wider: its embankment, no trees on it.)
+  for (const road of worldRoads) for (let i = 0; i < road.points.length; i += 3) clearWoods({ x: road.points[i][0], z: road.points[i][1], w: 0, d: 0 }, road.width / 2 + Math.max(3, keepOf(road)));
   const heights = [...land.height].sort((x, y) => x - y);
   const hillCut = heights[Math.floor(heights.length * (valley ? 0.62 : 0.82))];
   const hills = new Uint8Array(gw * gd);
@@ -1822,8 +1823,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   for (const road of worldRoads) {
     for (let i = 0; i < road.points.length; i += 3) {
       const at = { x: road.points[i][0], z: road.points[i][1], w: 0, d: 0 };
-      clearAround(fields, at, road.width / 2 + 2);
-      clearAround(meadow, at, road.width / 2 + 1);
+      clearAround(fields, at, road.width / 2 + Math.max(2, keepOf(road)));
+      clearAround(meadow, at, road.width / 2 + Math.max(1, keepOf(road)));
     }
   }
   for (const r of [...slots.map(rectOf), ...orchards, ...carParks.map((p) => boundsOf(p.poly))]) {

@@ -426,13 +426,15 @@ fn phases_of(g: &Graph, arms: &[ArmAt], roundabout: bool) -> (Vec<u8>, u8) {
 }
 
 /// Whether `p` is on a road's carriageway in `g` (within its kerb of its middle line and `margin`
-/// more): no signal pole stands there (`signal_at`).
+/// more), not the motorway's (a pole may stand under its deck): no signal pole stands there
+/// (`signal_at`).
 fn on_carriageway(g: &Graph, p: [f32; 2], margin: f32) -> bool {
     g.near(p, POLE_LOOK, 6, crate::travel::Mode::Car)
         .iter()
         .any(|rp| {
             let r = &g.roads[rp.road as usize];
-            rp.off < crate::cars::kerb_of(r.width, r.kind) + margin
+            r.kind != crate::travel::RoadKind::Motorway
+                && rp.off < crate::cars::kerb_of(r.width, r.kind) + margin
         })
 }
 
@@ -490,9 +492,13 @@ const ZEBRA_SQUEEZE: f32 = 1.5;
 /// lit one's on its streets' and lanes' arms, one giving way's on one of a street's two arms
 /// through it; the lanes meeting there are crossed as anywhere), and the phase its lights rest on
 /// (`Signal::rest`).
-/// `ring`: per road of `g`, whether it's a roundabout's. None: fewer than `SIGNAL_ARMS` arms.
+/// `ring`: per road of `g`, whether it's a roundabout's. None: fewer than `SIGNAL_ARMS` arms, or a
+/// motorway's merge (`Graph::is_merge`).
 pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
     let p = g.nodes[n];
+    if g.is_merge(n) {
+        return None;
+    }
     let arms = arms_at(g, n);
     if arms.len() < SIGNAL_ARMS {
         return None;
@@ -535,7 +541,7 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
         .iter()
         .enumerate()
         .map(|(i, &(_, _, (road, _, k, s0, s1), far, len))| {
-            if g.degree(far) < SIGNAL_ARMS {
+            if g.degree(far) < SIGNAL_ARMS || g.is_merge(far) {
                 return (len, false);
             }
             let there = arms_at(g, far);

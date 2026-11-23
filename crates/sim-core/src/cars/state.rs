@@ -229,6 +229,10 @@ pub struct Car {
     /// Ticks the drive out of town takes from where it parks (`settle`; not saved).
     #[serde(skip)]
     pub(super) out_ticks: f32,
+    /// Its drive out of town from where it parks leaves by a motorway (`settle`, not saved): the
+    /// drive on beyond it is shorter (`off_map_ticks`).
+    #[serde(skip)]
+    pub(super) by_motorway: bool,
     /// How far along its drive it is (ticks of its route: it stops for people in its way).
     #[serde(default, skip_serializing_if = "is_zero_f32")]
     pub progress: f32,

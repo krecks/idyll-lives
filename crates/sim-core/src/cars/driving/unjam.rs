@@ -611,7 +611,8 @@ pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static 
 }
 
 /// The nearest driveway's mouth behind car `c` (`t` ticks along `route`, clear back to `lo`) it can
-/// turn round in (`MouthTurn`): one its way came by, empty (`clear`, every pose backing into it
+/// turn round in (`MouthTurn`): one its way came by, on a two-way road (out of it it goes back the
+/// way it came), empty (`clear`, every pose backing into it
 /// and pulling out of it the other way), and where along its way it backs up to before backing
 /// into it.
 pub(crate) fn mouth_behind(
@@ -629,7 +630,11 @@ pub(crate) fn mouth_behind(
     let mut best: Option<(f32, f32, MouthTurn)> = None;
     for d in &w.drives {
         let Some(way) = d.way() else { continue };
-        let Some(p) = d.meets().and_then(|(r, s)| g.at_source(r, s)) else {
+        let Some(p) = d.meets().and_then(|(r, s)| g.at_source(r, s)).filter(|p| {
+            let road = &g.roads[p.road as usize];
+            // (Out of it the other way: not on a one-way road.)
+            road.enterable() && road.oneway.is_both()
+        }) else {
             continue;
         };
         let road = &g.roads[p.road as usize];

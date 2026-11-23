@@ -1,6 +1,7 @@
 //! A car's route: the legs of it and the samples along each.
 
 use super::*;
+use crate::travel::Way;
 
 /// A drive, sampled every `STEP` metres: where the car's middle is, which way it faces, and when
 /// it gets there (ticks from the start).
@@ -35,6 +36,8 @@ pub(crate) struct Route {
     pub(super) leg: Option<Leg>,
     /// The taxis standing it was last looked at against (`Traffic::stand_gen`; 0: never).
     pub(super) stand_gen: u64,
+    /// It goes out of town (or comes in) by a motorway (`quickest_out`).
+    pub(super) by_motorway: bool,
 }
 
 /// A car's way round a taxi standing at the kerb (`PassBy`) as laid on its route: the points
@@ -294,38 +297,53 @@ impl Route {
     }
 
     /// Out of the driveway onto the road it meets and along the roads to the way out of town
-    /// quickest by car, past it (`OVERSHOOT`), or (`home`) back in from there, nose first. The
-    /// driveway's part as `legacy` lays it out, in the frame of the road at the driveway's
-    /// mouth; the lanes right of the roads' middle lines (`lane_on`); `FAST` in the hamlets,
-    /// `Travel::country_speed` on country roads, slower at junctions. Sampled more where it
-    /// bends (`ROUTE_TOLERANCE`). None: no road near, or no way out by road.
+    /// quickest by car (`quickest_out`: a motorway's end of town counts what the motorway saves
+    /// beyond it), past it (`OVERSHOOT`), or (`home`) back in from there, nose first: the way out
+    /// turned round where every road along it is two-way, else a way of its own in from there.
+    /// The driveway's part as `legacy` lays it out, in the frame of the road at the driveway's
+    /// mouth; the lanes right of the roads' middle lines (`lane_on`); each road's top speed
+    /// (`lane_tops`), slower at junctions. Sampled more where it bends (`ROUTE_TOLERANCE`). None:
+    /// no road near, or no way out by road.
     pub(super) fn on_roads(
         car: &Car,
         exits: &[[f32; 2]],
         travel: &Travel,
         home: bool,
     ) -> Option<Route> {
-        use crate::travel::{RoadKind, dist};
+        use crate::travel::{RoadKind, RoadPath, dist};
         let g = &travel.graph;
         let m = car.mouth(travel)?;
         let mp = g.point(m);
-        // Where to: the parking spot of its trip, or the quickest way out by car.
+        // Where to: the parking spot of its trip, or the quickest way out by car. Home, the way
+        // there turned round where every road along it is two-way, else (one-way roads) a way of
+        // its own from there to the mouth; either one laid from the mouth on (and turned round
+        // below).
+        let speed = travel.country_speed;
+        let mut by_motorway = false;
+        let out = |to: RoadPoint| g.path_by(m, to, Mode::Car, speed, Way::default());
+        let back = |to: RoadPoint| {
+            let mut path = g.path_by(to, m, Mode::Car, speed, Way::default())?;
+            path.pts.reverse();
+            path.edges.reverse();
+            Some(path)
+        };
+        let turns_round = |path: Option<&RoadPath>| path.is_some_and(|p| two_way(g, p));
         let (path, park) = match car.trip {
             Some(trip) => {
-                let p = *g.near(trip.at, ROAD_REACH, 1, Mode::Car).first()?;
-                (
-                    g.path(m, p, Mode::Car, travel.country_speed)?,
-                    Some((trip.at, trip.yaw)),
-                )
+                let p = enterable_near(g, trip.at, ROAD_REACH)?;
+                let mut path = out(p);
+                if home && !turns_round(path.as_ref()) {
+                    path = back(p);
+                }
+                (path?, Some((trip.at, trip.yaw)))
             }
             None => {
-                let (_, path) = (0..exits.len())
-                    .filter_map(|i| {
-                        let e = *g.near(exits[i], ROAD_REACH, 1, Mode::Car).first()?;
-                        let path = g.path(m, e, Mode::Car, travel.country_speed)?;
-                        Some((i, path))
-                    })
-                    .min_by(|a, b| a.1.cost.total_cmp(&b.1.cost).then(a.0.cmp(&b.0)))?;
+                let mut path = quickest_out(g, exits, out);
+                if home && !turns_round(path.as_ref().map(|p| &p.0)) {
+                    path = quickest_out(g, exits, back);
+                }
+                let (path, by) = path?;
+                by_motorway = by;
                 (path, None)
             }
         };
@@ -484,7 +502,9 @@ impl Route {
             }
         }
         let trip = park.is_some();
-        Some(legs.timed(!home || trip, home || trip))
+        let mut route = legs.timed(!home || trip, home || trip);
+        route.by_motorway = by_motorway;
+        Some(route)
     }
 
     /// Its way turned round (`Detour`): back along the way it had (`on_roads`) from where it was
@@ -500,7 +520,7 @@ impl Route {
         d: &Detour,
         had: &Route,
     ) -> Option<Route> {
-        use crate::travel::{RoadKind, Way, dist};
+        use crate::travel::{RoadKind, dist};
         let g = &travel.graph;
         // (Into a driveway's mouth it may back from where it stands: `mouth_behind`.)
         let backs = d.back < d.from || d.mouth.is_some() && d.back <= d.from;
@@ -586,7 +606,7 @@ impl Route {
         let (path, park) = if home && !taxi {
             (g.path_by(rp, m?, Mode::Car, speed, way)?, None)
         } else if let Some(trip) = car.trip.filter(|_| !taxi) {
-            let to = *g.near(trip.at, ROAD_REACH, 1, Mode::Car).first()?;
+            let to = enterable_near(g, trip.at, ROAD_REACH)?;
             (
                 g.path_by(rp, to, Mode::Car, speed, way)?,
                 Some((trip.at, trip.yaw)),
@@ -604,12 +624,22 @@ impl Route {
                         .sum::<f32>()
             };
             ends.iter()
-                .filter_map(|&x| {
-                    let e = *g.near(x, ROAD_REACH, 1, Mode::Car).first()?;
-                    g.path_by(rp, e, Mode::Car, speed, way.clone())
+                .flat_map(|&x| {
+                    if taxi {
+                        g.near(x, ROAD_REACH, 1, Mode::Car)
+                            .into_iter()
+                            .map(|e| (e, 0.0))
+                            .collect()
+                    } else {
+                        exit_points(g, x)
+                    }
                 })
-                .min_by(|a, b| weight(a).total_cmp(&weight(b)))
-                .map(|p| (p, None))?
+                .filter_map(|(e, saves)| {
+                    let path = g.path_by(rp, e, Mode::Car, speed, way.clone())?;
+                    Some((weight(&path) - saves, path))
+                })
+                .min_by(|a, b| a.0.total_cmp(&b.0))
+                .map(|(_, p)| (p, None))?
         };
         // (Round where it was held up if there's another way; else the same way, once those it
         // backed up out of the way of have gone by.)
@@ -810,4 +840,90 @@ impl Route {
         ];
         (p, wrap_angle(a.1 + wrap_angle(b.1 - a.1) * k), a.3)
     }
+}
+
+/// What leaving town by a motorway saves, the drive beyond the end of town being shorter
+/// (`MOTORWAY_OFF_MAP_TICKS`): seconds of drive time, taken off the drive to a motorway's end of
+/// town when a car weighs its ways out (`quickest_out`).
+const MOTORWAY_SAVES: f32 =
+    (OFF_MAP_TICKS - MOTORWAY_OFF_MAP_TICKS) as f32 / DRIVE_TICKS_PER_SECOND;
+
+/// How near its end a motorway's point by a way out of town is (m): where a carriageway leaves
+/// town, not one passing by (`exit_points`).
+const MOTORWAY_END: f32 = 2.0;
+
+/// Where a car leaves town by the way out at `x`: the road nearest it, and a motorway's
+/// carriageways ending there besides (both of them come near a way out; the path search takes
+/// only the one going out, `Graph::path`), each with what leaving by it saves (s of drive time:
+/// `MOTORWAY_SAVES` by a motorway).
+pub(crate) fn exit_points(g: &crate::travel::Graph, x: [f32; 2]) -> Vec<(RoadPoint, f32)> {
+    use crate::travel::RoadKind;
+    let Some(&first) = g.near(x, ROAD_REACH, 1, Mode::Car).first() else {
+        return Vec::new();
+    };
+    let motorway_end = |p: &RoadPoint| {
+        let road = &g.roads[p.road as usize];
+        road.kind == RoadKind::Motorway && (p.s < MOTORWAY_END || p.s > road.len() - MOTORWAY_END)
+    };
+    let mut points = vec![first];
+    points.extend(
+        g.near(x, ROAD_REACH, EXIT_LOOK, Mode::Car)
+            .into_iter()
+            .filter(|p| p.road != first.road && motorway_end(p)),
+    );
+    points
+        .into_iter()
+        .map(|p| {
+            (
+                p,
+                if motorway_end(&p) {
+                    MOTORWAY_SAVES
+                } else {
+                    0.0
+                },
+            )
+        })
+        .collect()
+}
+
+/// How many roads near a way out `exit_points` looks at: a carriageway's two ends, and one more.
+const EXIT_LOOK: usize = 3;
+
+/// The quickest way out of town by `way` (from a car's mouth to each of `exits`' points,
+/// `exit_points`; the drive to a motorway's end of town less what the motorway saves), and whether
+/// it leaves by a motorway. The first way out of those as quick.
+fn quickest_out(
+    g: &crate::travel::Graph,
+    exits: &[[f32; 2]],
+    way: impl Fn(RoadPoint) -> Option<crate::travel::RoadPath>,
+) -> Option<(crate::travel::RoadPath, bool)> {
+    exits
+        .iter()
+        .enumerate()
+        .flat_map(|(i, &x)| exit_points(g, x).into_iter().map(move |p| (i, p)))
+        .filter_map(|(i, (e, saves))| {
+            let path = way(e)?;
+            Some((i, path.cost - saves, path, saves > 0.0))
+        })
+        .min_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)))
+        .map(|(_, _, path, by)| (path, by))
+}
+
+/// Where a car whose driveway is at `at` leaves town by `exits`, as `Route::on_roads` chooses
+/// (`quickest_out`, from the road a car may come onto there, `enterable_near`): the point of the
+/// road it leaves by nearest the way out, and whether that is a motorway. None: no road near, or
+/// no way out. (For the tests.)
+pub fn way_out(travel: &Travel, exits: &[[f32; 2]], at: [f32; 2]) -> Option<([f32; 2], bool)> {
+    let g = &travel.graph;
+    let m = enterable_near(g, at, ROAD_REACH)?;
+    let out = |to: RoadPoint| g.path_by(m, to, Mode::Car, travel.country_speed, Way::default());
+    let (path, by) = quickest_out(g, exits, out)?;
+    Some((path.pts.last()?.0, by))
+}
+
+/// Whether a car may drive `path` back the way it goes: no road along it is one-way.
+fn two_way(g: &crate::travel::Graph, path: &crate::travel::RoadPath) -> bool {
+    path.edges
+        .iter()
+        .all(|&e| g.roads[g.edges[e as usize].road as usize].oneway.is_both())
 }
