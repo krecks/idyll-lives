@@ -370,7 +370,7 @@ pub(crate) fn off_work(w: &mut World, i: usize) -> bool {
         return false;
     }
     car.done.push(me);
-    car.ready_at = car.ready_at.max(tick + OFF_MAP_TICKS);
+    car.ready_at = car.ready_at.max(tick + car.off_map_ticks());
     w.sims[i].away_until = Some(tick + 1);
     true
 }

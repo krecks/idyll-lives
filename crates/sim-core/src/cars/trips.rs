@@ -46,10 +46,7 @@ pub(crate) fn can_drive(
 /// Whether `car`'s driveway has a way by road to `at`.
 pub(crate) fn drives_to(car: &Car, travel: &Travel, at: [f32; 2]) -> bool {
     let g = &travel.graph;
-    let (Some(m), Some(&p)) = (
-        car.mouth(travel),
-        g.near(at, ROAD_REACH, 1, Mode::Car).first(),
-    ) else {
+    let (Some(m), Some(p)) = (car.mouth(travel), enterable_near(g, at, ROAD_REACH)) else {
         return false;
     };
     g.path(m, p, Mode::Car, travel.country_speed).is_some()

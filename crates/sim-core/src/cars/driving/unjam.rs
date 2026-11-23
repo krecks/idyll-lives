@@ -629,7 +629,11 @@ pub(crate) fn mouth_behind(
     let mut best: Option<(f32, f32, MouthTurn)> = None;
     for d in &w.drives {
         let Some(way) = d.way() else { continue };
-        let Some(p) = d.meets().and_then(|(r, s)| g.at_source(r, s)) else {
+        let Some(p) = d
+            .meets()
+            .and_then(|(r, s)| g.at_source(r, s))
+            .filter(|p| g.roads[p.road as usize].enterable())
+        else {
             continue;
         };
         let road = &g.roads[p.road as usize];

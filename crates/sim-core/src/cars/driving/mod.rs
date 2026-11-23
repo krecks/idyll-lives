@@ -179,7 +179,7 @@ pub(crate) fn update(w: &mut World) {
                     .iter()
                     .filter(|a| !car.done.contains(a))
                     .filter_map(|&a| w.sims[a as usize].away_until)
-                    .map(|u| u + OFF_MAP_TICKS)
+                    .map(|u| u + car.off_map_ticks())
                     .max()
                     .unwrap_or(tick)
                     .max(car.ready_at);

@@ -252,6 +252,7 @@ impl Legs {
             spans: Vec::new(),
             leg: None,
             stand_gen: 0,
+            by_motorway: false,
         }
     }
 }
