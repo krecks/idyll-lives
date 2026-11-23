@@ -19,8 +19,9 @@ import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roa
 import { compose, quatAxisAngle } from './math';
 import { fbm, hash, mulberry32, ridged, smoothstep, valueNoise } from '../../game/noise';
 import { tuned } from '../tune';
-import { shareAt, ZONE_CELL, ZoneField, type ZoneKind } from './zones';
+import { ZONE_CELL, ZoneField, type ZoneKind } from './zones';
 import { townPaving } from './townPaving';
+import { cropColour, HEDGE_LOOK, HEDGE_STEP, HEDGE_TREE_EVERY, HEDGE_WIDTH, MARGIN, paintFields, Patchwork, type FieldCanvas, type FieldPoint } from './farmland';
 
 /**
  * How far the landscape extends beyond the town (metres): towns of older code, and worlds (which
@@ -264,6 +265,9 @@ function hex(c: string): Rgb {
 }
 
 /** The colour `t` of the way from `a` to `b`, per channel (`out` may be `a`). */
+/** A crop's colour as `terrainColour` lays it (`cropColour`), set in turn. */
+const tmpCrop: Rgb = { r: 0, g: 0, b: 0 };
+
 function lerp(a: Rgb, b: Rgb, t: number, out: Rgb): void {
   out.r = a.r + (b.r - a.r) * t;
   out.g = a.g + (b.g - a.g) * t;
@@ -284,8 +288,7 @@ function terrainPalette(greens: readonly string[]) {
     rock: hex('#7A7064'),
     snow: hex('#F1F3F4'),
     alpine: hex('#8FA266'),
-    crops: ['#C9B45C', '#7E6142', '#7A9C44', '#B5A35A', '#6C8A3C'].map(hex),
-    furrow: hex('#5F4733'),
+    hedge: hex(HEDGE_LOOK.leaf),
   };
 }
 type TerrainPalette = ReturnType<typeof terrainPalette>;
@@ -1559,14 +1562,25 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const bare = smoothstep(0.66, 0.8, fbm(x * 0.09 + 13, z * 0.09 - 7, this.seed + 5, 3)) * (1 - smoothstep(2, 8, h));
     lerp(out, P.dirt, bare * 0.85, out);
     lawn *= 1 - bare;
-    // Farmland: a patchwork of fields (wheat, ploughed earth, green crops) round the town.
-    const cell = this.fieldCell(x, z);
-    if (cell) {
-      const crop = P.crops[Math.floor(cell.kind * P.crops.length)];
-      lerp(out, crop, cell.weight * 0.9, out);
-      // Ploughed and planted fields show their furrows.
-      if (crop !== P.crops[0]) lerp(out, P.furrow, cell.weight * 0.35 * Math.max(0, Math.sin(cell.v * Math.PI * 1.4)), out);
-      lawn *= 1 - cell.weight;
+    // Farmland: fields of wheat, rows, ploughed earth, stubble, hay and rapeseed in their hedges round the town, each
+    // its crop's colour as seen from afar (the colour maps draw its rows and edges: `farmland`). Only well inside a
+    // field: the ground's points are 2 m apart, and a crop's colour between them would run out over its grass margin.
+    const field = this.fieldPoint(x, z);
+    if (field) {
+      if (field.farmed) {
+        const crop = cropColour(field.crop);
+        if (crop) {
+          tmpCrop.r = crop[0];
+          tmpCrop.g = crop[1];
+          tmpCrop.b = crop[2];
+          lerp(out, tmpCrop, smoothstep(MARGIN + 2, MARGIN + 4, field.edge) * 0.95, out);
+          lawn *= 1 - smoothstep(MARGIN - 0.5, MARGIN + 0.5, field.edge);
+        }
+      }
+      // No lawn in a hedge, its ground the hedge's shade.
+      const hedge = 1 - smoothstep(HEDGE_WIDTH / 2, HEDGE_WIDTH / 2 + 2, field.hedge);
+      lerp(out, P.hedge, hedge * 0.5, out);
+      lawn *= 1 - hedge;
     }
     // Mountains: bare rock above the trees and on steep faces, snow on the tops.
     const top = this.peaks;
@@ -1604,67 +1618,125 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   }
 
   /**
-   * The farm field a point lies in (farm worlds, outside the town): the field's kind (0..1),
-   * how far across it the point is along the furrows (`v`, m), how strongly it shows (fading out
-   * with distance and up the hills) and whether the point is by a hedgerow at its edge. Null elsewhere.
+   * The farmland's patchwork (`farmland.ts`): a big world's fields where its field zones are (a height field's cover),
+   * an older town's in a ring round it. Null: no farmland. Made again when the land, its zones or what is built
+   * changed (which fields are farmed follows them).
    */
-  private fieldCell(x: number, z: number): { kind: number; v: number; weight: number; hedge: boolean } | null {
-    // (A big world's fields are its field zones: the patchwork in them only, wherever they are.)
+  protected patchwork(): Patchwork | null {
     const zones = this.zones;
-    const f = zones ? (zones.has('fields') ? (this.land.fields ?? { size: 34, angle: hash(3, 5, this.seed) * Math.PI }) : null) : this.land.fields;
-    if (!f) return null;
-    const dist = this.distanceToTown(x, z);
-    if (dist < APRON + 3) return null;
-    // (How far inside the field zones: their share here, and a hedgerow along their edge.)
-    const inside = zones ? zones.edge('fields', x, z) : 0;
-    const weight = (zones ? shareAt(inside, 4) : 1 - smoothstep(this.ring * 0.6, this.ring * 0.85, dist)) * smoothstep(APRON + 3, APRON + 6, dist);
-    if (weight <= 0) return null;
-    const c = Math.cos(f.angle);
-    const s = Math.sin(f.angle);
-    const u = (x * c + z * s) / f.size;
-    const v = (-x * s + z * c) / (f.size * 0.7);
-    const [cu, cv] = [Math.floor(u), Math.floor(v)];
-    // Some cells are left as meadow.
-    const kind = hash(cu, cv, this.seed + 77);
-    if (kind > 0.82) return null;
-    const edge = Math.min(u - cu, cu + 1 - u, v - cv, cv + 1 - v) * f.size * 0.7;
-    // (A hedgerow along the patchwork's lines, and along a big world's field zones' edges.)
-    return { kind: kind / 0.82, v: (v - cv) * f.size * 0.7, weight, hedge: edge < 1.6 || (!!zones && Math.abs(inside) < 1.2) };
+    const key = `${this.landVersion}`;
+    if (this.fieldsMade && this.fieldsMade.key === key && this.fieldsMade.zones === zones && this.fieldsMade.built === this.built) return this.fieldsMade.pw;
+    let pw: Patchwork | null = null;
+    // (A big world's fields are its field zones: the patchwork in them only, wherever they are.)
+    const grid = zones ? (zones.has('fields') ? (this.land.fields ?? { size: 34, angle: hash(3, 5, this.seed) * Math.PI }) : null) : this.land.fields;
+    if (grid) {
+      const wet = (x: number, z: number) => this.watered && this.waterEdge(x, z) > -this.beach;
+      const top = this.peaks;
+      pw = new Patchwork(grid, this.seed, (x, z) => {
+        // (Fields inside the world only: past its edge the land is the landscape's, drawn without the fields' map.)
+        if (wet(x, z) || (zones && (x < 0 || z < 0 || x > this.w || z > this.d))) return 'never';
+        // (No fields up a mountain past its trees.)
+        if (top && this.heightAt(x, z) > this.treeTop) return 'never';
+        const dist = this.distanceToTown(x, z);
+        if (dist < APRON + 3) return 'out';
+        if (zones) return zones.edge('fields', x, z) > 0 ? 'in' : 'out';
+        return dist < this.ring * 0.72 ? 'in' : 'out';
+      });
+    }
+    this.fieldsMade = { key, zones, built: this.built, pw };
+    return pw;
+  }
+  private fieldsMade: { key: string; zones: ZoneField | null; built: LandscapeLayout['built']; pw: Patchwork | null } | null = null;
+
+  /** Where (x, z) is in the farmland's patchwork (its field, whether farmed, how far from its edges and hedges); null: no farmland. */
+  private fieldPoint(x: number, z: number): FieldPoint | null {
+    return this.patchwork()?.at(x, z) ?? null;
   }
 
   /**
-   * A big world's farmland for the town view's colour map (`pc/groundTiles.ts`), as the terrain colours it
-   * (`terrainColour`, `fieldCell`): the patchwork's grid (cells `size` m along the direction `angle` and `across` m
-   * across it), each cell's colour (`crop`: sRGB into `out`, its furrows' share of it evened out; false for a cell
-   * left as meadow), and how strongly the fields show at a point (`weight`, 0..1: nothing off the field zones or
-   * by the town). Null: no farmland. The ground's own colours are a vertex apart, so from above a field's edge
-   * steps along the grid; the map draws each where it is.
+   * A big world's farmland for the ground's colour maps (`pc/groundTiles.ts`: the near ground's `FieldMap`, the town
+   * view's `TownGroundMap`): the box its fields reach (m) and how to paint them onto a canvas in world metres
+   * (`paintFields`: each field's crop in its rows inside its margin, its hedges). Null: no farmland.
    */
-  farmland(): { size: number; across: number; angle: number; crop(cu: number, cv: number, out: Rgb): boolean; weight(x: number, z: number): number; box?: [number, number, number, number] } | null {
+  farmland(): { box: [number, number, number, number]; paint(g: FieldCanvas): void } | null {
     const zones = this.zones;
     if (!zones?.has('fields')) return null;
+    const pw = this.patchwork();
+    if (!pw) return null;
     // (A height field's fields are its cover's: where they are, as the zones' outlines no longer say.)
-    const box = this.field ? zones.extent('fields') : null;
-    const f = this.land.fields ?? { size: 34, angle: hash(3, 5, this.seed) * Math.PI };
-    const P = (this.palette ??= terrainPalette(this.land.grass));
-    return {
-      size: f.size,
-      across: f.size * 0.7,
-      angle: f.angle,
-      ...(box ? { box } : {}),
-      crop: (cu, cv, out) => {
-        const kind = hash(cu, cv, this.seed + 77);
-        if (kind > 0.82) return false;
-        const crop = P.crops[Math.min(P.crops.length - 1, Math.floor((kind / 0.82) * P.crops.length))];
-        // (The furrows' sine over a field, on average: 0.35 × 1/π.)
-        lerp(crop, P.furrow, crop !== P.crops[0] ? 0.11 : 0, out);
-        return true;
-      },
-      weight: (x, z) => {
-        const dist = this.distanceToTown(x, z);
-        return dist < APRON + 3 ? 0 : shareAt(zones.edge('fields', x, z), 4) * smoothstep(APRON + 3, APRON + 6, dist) * 0.9;
-      },
+    let box = this.field ? zones.extent('fields') : null;
+    if (!box) {
+      let [x0, z0, x1, z1] = [Infinity, Infinity, -Infinity, -Infinity];
+      for (const zone of this.zoneList) {
+        if (zone.kind !== 'fields') continue;
+        for (const [x, z] of zone.poly) [x0, z0, x1, z1] = [Math.min(x0, x), Math.min(z0, z), Math.max(x1, x), Math.max(z1, z)];
+      }
+      if (x1 < x0) return null;
+      box = [x0, z0, x1, z1];
+    }
+    // (A field farmed reaches past the zones' edge by up to half of it.)
+    const pad = pw.grid.size * 1.2;
+    const reach: [number, number, number, number] = [box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad];
+    return { box: reach, paint: (g) => paintFields(g, pw, reach) };
+  }
+
+  /**
+   * The farmland's hedgerows and hay in a box (m): bushes close along each hedge's line, a tree in it here and there,
+   * and round bales in rows on the stubble; into `near` or `far` as the woods' (`plant`). Each from the field's or the
+   * hedge's own hash, so a box grows the same whichever squares are grown with it.
+   */
+  private farmPlants(box: readonly [number, number, number, number], near: Map<string, Float32Array[]>, far: Map<string, Float32Array[]>, plants: PlantPlacement[]): void {
+    const pw = this.patchwork();
+    if (!pw) return;
+    const inBox = (x: number, z: number) => x >= box[0] && x < box[2] && z >= box[1] && z < box[3];
+    const clear = (x: number, z: number) => {
+      if (this.distanceToTown(x, z) < APRON) return false;
+      if (this.watered && this.waterEdge(x, z) > -this.beach * 0.8) return false;
+      const road = this.roads.near(x, z);
+      return !road || road.dist >= road.width / 2 + 2.5;
     };
+    const put = (kind: string, x: number, z: number, scale: number, up: number, yaw: number) => {
+      const y = this.heightAt(x, z) - 0.05;
+      const close = !this.built && this.distanceToTown(x, z) < SHADOW_RANGE;
+      if (close) plants.push({ key: kind, x, y, z, sx: scale, sy: up, sz: scale, yaw });
+      const bucket = close ? near : far;
+      let list = bucket.get(kind);
+      if (!list) bucket.set(kind, (list = []));
+      list.push(placed(scale, up, scale, yaw, x, y, z));
+    };
+    for (const e of pw.edges(box)) {
+      if (!e.hedge) continue;
+      const len = Math.hypot(e.b[0] - e.a[0], e.b[1] - e.a[1]);
+      const n = Math.max(1, Math.round(len / HEDGE_STEP));
+      const key = Math.round(e.a[0] * 2) * 7919 + Math.round(e.b[0] * 2);
+      const lane = Math.round(e.a[1] * 2) + Math.round(e.b[1] * 2) * 131;
+      // A tree in the hedge every `HEDGE_TREE_EVERY` m or so, not at every one.
+      const treeAt = new Set<number>();
+      for (let k = 0; (k + 0.5) * HEDGE_TREE_EVERY < len; k++) if (hash(key + k, lane, this.seed + 709) < 0.55) treeAt.add(Math.min(n - 1, Math.floor(((k + 0.2 + 0.6 * hash(k, key, this.seed + 711)) * HEDGE_TREE_EVERY) / (len / n))));
+      for (let i = 0; i < n; i++) {
+        const h = hash(key + i * 3, lane, this.seed + 703);
+        const t = (i + 0.5 + (h - 0.5) * 0.4) / n;
+        const off = (hash(i, key + lane, this.seed + 705) - 0.5) * 0.6;
+        const [ux, uz] = [(e.b[0] - e.a[0]) / len, (e.b[1] - e.a[1]) / len];
+        const [x, z] = pw.xz(e.a[0] + (e.b[0] - e.a[0]) * t - uz * off, e.a[1] + (e.b[1] - e.a[1]) * t + ux * off);
+        if (!inBox(x, z) || !clear(x, z)) continue;
+        const yaw = h * Math.PI * 2;
+        if (treeAt.has(i)) {
+          const s = 0.85 + 0.4 * hash(i, key, this.seed + 713);
+          put(h < 0.5 ? 'model.tree' : h < 0.85 ? 'model.tree.maple' : 'model.tree.birch', x, z, s, s * (0.95 + 0.15 * h), yaw);
+        } else {
+          const s = 1.55 + 0.5 * hash(i, key, this.seed + 715);
+          put(h < 0.9 ? 'model.bush' : 'model.bush.small', x, z, s, s * (0.8 + 0.25 * h), yaw);
+        }
+      }
+    }
+    for (const f of pw.fields(box)) {
+      if (f.crop !== 'stubble') continue;
+      for (const [u, v, turn] of pw.bales(f)) {
+        const [x, z] = pw.xz(u, v);
+        if (inBox(x, z) && clear(x, z)) put('model.farm.hayBale', x, z, 1, 1, pw.grid.angle + turn);
+      }
+    }
   }
 
   /**
@@ -1701,6 +1773,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
           this.plant(x, z, rand, rules, 1, near, far, this.nearWoods);
         }
       }
+      this.farmPlants([x0, z0, x0 + size, z0 + size], near, far, this.nearWoods);
     }
     // A big world's orchards: fruit trees in rows across each (its own draws, so the woods above are as they were).
     // (With a height field, from a stream of their own: the woods' are the squares'.)
@@ -1744,9 +1817,16 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       density = wood * (0.6 + 0.3 * smoothstep(0.3, 0.6, forest)) + (1 - wood) * (0.12 + 0.08 * smoothstep(0.42, 0.7, forest)) * scatter;
       density *= 1 - 0.6 * this.zones.share('meadow', x, z, 6);
     }
-    // Fields are open, with hedgerows and the odd tree along their edges; nothing grows in the water or on the beach.
-    const cell = this.fieldCell(x, z);
-    if (cell) density = cell.hedge ? 0.55 : density * (1 - cell.weight);
+    // Fields are open, their hedges grown as hedges (`farmPlants`); a pasture keeps a tree or two. Nothing grows in the
+    // water or on the beach.
+    const field = this.fieldPoint(x, z);
+    if (field) {
+      if (field.hedge < HEDGE_WIDTH) return;
+      if (field.farmed) {
+        if (field.crop !== 'pasture') return;
+        density *= 0.15;
+      }
+    }
     if (this.watered && this.waterEdge(x, z) > -beach * 0.8) return;
     // Bare tops on mountains.
     if (top && this.heightAt(x, z) > treeline + forest * 10) return;
@@ -1761,8 +1841,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     const roll = rand();
     let kind: string;
     if (roll < 0.08) kind = 'model.rock';
-    // (A hedgerow mostly bushes.)
-    else if (roll < bushTo || (cell?.hedge && roll < 0.55)) kind = 'model.bush';
+    else if (roll < bushTo) kind = 'model.bush';
     else if (roll < smallTo) kind = 'model.bush.small';
     else if ((forest > 0.56 && rand() < Math.min(1, (0.62 * L.conifers) / 0.5)) || (L.conifers > 0.5 && rand() < (L.conifers - 0.5) * 1.6)) kind = rand() < 0.4 ? 'model.spruce' : 'model.pine';
     else if (grove > 0.55 - Math.max(0, L.birches - 0.5) * 0.3 && rand() < Math.min(1, (0.7 * L.birches) / 0.5)) kind = 'model.tree.birch';
@@ -1865,6 +1944,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
           this.plant(x, z, rand, rules, thin, near, far, plants);
         }
       }
+      // The farmland's hedges and hay in the square (as far as the landscape's).
+      this.farmPlants([Math.max(x0, bx * LAND_BLOCK), Math.max(z0, bz * LAND_BLOCK), Math.min(x0 + size, (bx + 1) * LAND_BLOCK), Math.min(z0 + size, (bz + 1) * LAND_BLOCK)], near, far, plants);
       for (const map of [blocks[b]?.near, blocks[b]?.far, near, far]) for (const key of map?.keys() ?? []) changed.add(key);
       blocks[b] = { near, far, plants };
     }
