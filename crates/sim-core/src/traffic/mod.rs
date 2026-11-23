@@ -51,6 +51,18 @@
 //! Should two bodies come to overlap anyway, a last-resort check keeps every car from moving
 //! deeper into another (`cars::guard`, counted in `Traffic::guarded`).
 //!
+//! **Levels and merges.** Every body and every claim's sample has a level (`travel::Layer`): the
+//! ground, or a motorway's deck over a road or the water (its carriageways and ramps one level
+//! with the deck, on it or off it). Only those on levels that meet are in each other's way
+//! (`conflict`, `cars::vehicles`, the walkers' `cars::in_the_way`): nobody under a deck waits for
+//! a car on it, nor it for them; a junction's box, lights and zebras under a deck aren't the
+//! deck's. A car coming off a ramp onto a motorway's carriageway claims its merge (`Claim::merge`,
+//! from `cars::MERGE_UP` up the ramp to `cars::MERGE_ON` past it), granted by rule 3 only with
+//! the carriageway's traffic clear of it for some 4 s of drive (`LOOK_FAST`), going its way too;
+//! those on the carriageway claim nothing and never keep clear of a merge's claim (`blocked`):
+//! they keep behind the car in front, the further back the faster they go
+//! (`cars::follow_ahead`), as anyone. Off a carriageway onto a ramp, nobody claims anything.
+//!
 //! Nothing here is saved but the lights (`Light`): the zones and the claims are worked out again
 //! with the routes, and a car found in a part it doesn't hold (a game just loaded) takes it as it
 //! goes on.
