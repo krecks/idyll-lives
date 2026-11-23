@@ -105,7 +105,7 @@ fn build(name: &str) -> Obj {
             );
         }
         "soft" => {
-            fbox!(f, "seat", 0.5, 0.3, 0.4, (0, 0.15, 0), BODY);
+            fbox!(f, "seat", 0.5, 0.3, 0.4, (0, 0.15, 0), BODY, bevel = 0);
             let o = SoftBox {
                 round: 0.02,
                 puff: Puff::Faces(0.006),
@@ -114,7 +114,7 @@ fn build(name: &str) -> Obj {
             f.soft("cushion", 0.4, 0.06, 0.3, (0, 0.33, 0), KEY, o);
         }
         "cyl" => {
-            fbox!(f, "seat", 0.5, 0.3, 0.4, (0, 0.15, 0), BODY);
+            fbox!(f, "seat", 0.5, 0.3, 0.4, (0, 0.15, 0), BODY, bevel = 0);
             fcyl!(f, "can", 0.05, 0.12, (0.1, 0.36, 0.05), KEY, verts = 16);
         }
         "laptop" => {
@@ -149,7 +149,8 @@ fn build(name: &str) -> Obj {
                     0.0006,
                     0.105,
                     (x, y + 0.0121, z - 0.04),
-                    PAD
+                    PAD,
+                    bevel = 0
                 );
                 for r in 0..5 {
                     fbox!(
@@ -159,7 +160,8 @@ fn build(name: &str) -> Obj {
                         0.0012,
                         0.013,
                         (x, y + 0.0126, z - 0.08 + 0.0168 * f64::from(r)),
-                        KEY
+                        KEY,
+                        bevel = 0
                     );
                 }
                 fbox!(
@@ -169,7 +171,8 @@ fn build(name: &str) -> Obj {
                     0.0006,
                     0.06,
                     (x, y + 0.0123, z + 0.06),
-                    PAD
+                    PAD,
+                    bevel = 0
                 );
                 let lid = new_parts(|| {
                     fbox!(
@@ -190,7 +193,8 @@ fn build(name: &str) -> Obj {
                         0.0008,
                         0.18,
                         (x, y + 0.0127, z + 0.005),
-                        PAD
+                        PAD,
+                        bevel = 0
                     );
                 });
                 turned(

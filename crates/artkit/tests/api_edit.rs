@@ -150,7 +150,7 @@ fn a_surface_is_made_a_shell_as_blenders_solidify_makes_it() {
     );
     // a box open at a corner: a shell grown outwards, evenly thick
     scene::reset();
-    let open = cube!("box", (0.4, 0.3, 0.2), material = BODY);
+    let open = cube!("box", (0.4, 0.3, 0.2), material = BODY, bevel = 0);
     delete_verts(open, |v| v.x > 0.0 && v.y > 0.0 && v.z > 0.0);
     same("box cornerless", open, of("a box", "cornerless"));
     solidify!(open, 0.02, offset = 1.0, use_even_offset = true);

@@ -7,7 +7,7 @@ use artkit::materials::Mat;
 use artkit::math::{M4, V3, v3};
 use artkit::noise::noise;
 use artkit::parts::{join_all, measure};
-use artkit::scene::{self, Obj};
+use artkit::scene::Obj;
 use artkit::{bisect_plane, boulder};
 
 /// Game (x, depth): the old part's middle.
@@ -15,13 +15,19 @@ pub const ROCK_CENTRE: (f64, f64) = (0.085, 0.01);
 /// The rock's lumps reach this far under the ground: it is cut flat there.
 pub const GROUND: f64 = -0.115;
 
-/// Cuts `obj` (in place) by the plane through `co` facing `no`, dropping what lies in front of it and closing
-/// the cut with a face of its own: a fracture, or the ground. The cut face is drawn flat. What is left is all
-/// triangles. The plane is the world's, by the part's matrix as Blender has it when it is cut (a part made and
-/// placed since the scene was last worked out is still where it was made, at the origin, unturned).
+/// Cuts `obj` (in place) by the world's plane through `co` facing `no`, dropping what lies in front of it and
+/// closing the cut with a face of its own: the ground. The cut face is drawn flat. What is left is all triangles.
 pub fn _cut(obj: Obj, co: impl Into<V3>, no: impl Into<V3>) -> Obj {
-    let (co, no): (V3, V3) = (co.into(), no.into());
-    let world = obj.matrix_world_seen();
+    cut_in(obj, obj.matrix_world(), co.into(), no.into())
+}
+
+/// `_cut` by a plane in the part's own frame, wherever it stands: a fracture across a stone.
+pub fn _cut_own(obj: Obj, co: impl Into<V3>, no: impl Into<V3>) -> Obj {
+    cut_in(obj, M4::IDENTITY, co.into(), no.into())
+}
+
+/// `_cut` by the plane through `co` facing `no` in the frame `world` takes the part's points into.
+fn cut_in(obj: Obj, world: M4, co: V3, no: V3) -> Obj {
     obj.edit(|o| o.mesh.transform(&world));
     let edges = bisect_plane!(obj, co, no, clear_outer = true);
     if !edges.is_empty() {
@@ -86,8 +92,7 @@ fn _stone(
                 .map(|v| v.dot(n))
                 .fold(f64::NEG_INFINITY, f64::max)
         });
-        // (the stone's matrix is still the one it was made with, at the origin, while these are cut)
-        _cut(o, o.matrix_world_seen() * (n * (reach - depth)), n);
+        _cut_own(o, n * (reach - depth), n);
     }
     o.edit(|p| {
         let highest = p
@@ -98,7 +103,6 @@ fn _stone(
             .fold(f32::NEG_INFINITY, f32::max);
         p.loc.z = (top - highest as f64) as f32;
     });
-    scene::update();
     _cut(o, (0, 0, GROUND), (0, 0, -1))
 }
 
@@ -214,6 +218,7 @@ pub fn rock() -> Vec<Obj> {
 mod tests {
     use super::*;
     use artkit::mesh::{Mesh, edge};
+    use artkit::scene;
     use std::collections::BTreeMap;
 
     /// How many faces run each side, by its two points.

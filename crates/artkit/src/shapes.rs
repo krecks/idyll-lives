@@ -145,17 +145,42 @@ options! {
     Boulder { at: P3 = P3::ZERO, material: Option<Mat> = None, scale: P3 = P3::ONE, rot: P3 = P3::ZERO, seed: f64 = 0.0, noise: f64 = 0.22, subdivisions: usize = 3, smooth: bool = true }
 }
 
+/// `bevel = AUTO_BEVEL` (what `cube!` and `fbox!` give a box that names no bevel): a chamfer of `AUTO_WIDTH` on a
+/// box whose edges the gate would find showing hard at the play camera (every side 12 mm or more, the longest 5 cm
+/// or more: `cargo check-glb`'s `edges`), none on a smaller one or in a far version. `bevel = 0` keeps a box sharp.
+pub const AUTO_BEVEL: f64 = -1.0;
+/// The chamfer `AUTO_BEVEL` gives (m): a pixel at the play camera, the width the families' own boxes take most.
+pub const AUTO_WIDTH: f64 = 0.004;
+
+/// The bevel `AUTO_BEVEL` comes to on a box of `size`: (width, segments).
+fn auto_bevel(size: P3) -> (f64, usize) {
+    let sides = [size.x.abs(), size.y.abs(), size.z.abs()];
+    let (least, most) = (
+        sides.iter().copied().fold(f64::INFINITY, f64::min),
+        sides.iter().copied().fold(0.0, f64::max),
+    );
+    if crate::far::is_low() || least < 0.012 || most < 0.05 {
+        (0.0, 1)
+    } else {
+        (AUTO_WIDTH, 1)
+    }
+}
+
 /// A box of `size` (x, y, z) or one number for all three.
 pub fn cube(name: impl AsRef<str>, size: impl Into<Size>, o: Cube) -> Obj {
-    scene::update(); // (an operator makes it: Blender works the scene out)
     let obj = scene::add_primitive("Cube", name.as_ref(), cube_mesh());
-    scale_mesh(obj, size.into().0);
-    let bevel = (o.bevel, o.bevel_segments, EdgeOrder::Faces);
+    let size = size.into().0;
+    scale_mesh(obj, size);
+    let (width, segments) = if o.bevel == AUTO_BEVEL {
+        auto_bevel(size)
+    } else {
+        (o.bevel, o.bevel_segments)
+    };
+    let bevel = (width, segments, EdgeOrder::Faces);
     finish(obj, o.at, o.rot, o.material, o.smooth, bevel, SHARP)
 }
 
 pub fn sphere(name: impl AsRef<str>, radius: f64, o: Sphere) -> Obj {
-    scene::update(); // (an operator makes it: Blender works the scene out)
     let obj = scene::add_primitive(
         "Sphere",
         name.as_ref(),
@@ -179,7 +204,6 @@ pub fn cone(name: impl AsRef<str>, r1: f64, r2: f64, depth: f64, o: Round) -> Ob
 
 /// A cylinder or a cone: the one mesh, named for the operator that made it.
 fn round(kind: &str, name: &str, r1: f64, r2: f64, depth: f64, o: Round) -> Obj {
-    scene::update(); // (an operator makes it: Blender works the scene out)
     let obj = scene::add_primitive(
         kind,
         name,
@@ -277,7 +301,6 @@ pub fn revolve(name: impl AsRef<str>, profile: &[(f64, f64)], o: Revolve) -> Obj
     let mut mesh = Mesh::from_pydata(verts, &faces);
     mesh.set_material(o.material);
     mesh.recalc_normals();
-    scene::update(); // (its normals are set right by operators: Blender works the scene out)
     let obj = scene::add(name.as_ref(), mesh);
     shade(obj, o.smooth, o.angle.max(round_angle(segments)));
     obj.edit(|p| p.uv = UvWay::Round);
@@ -288,7 +311,6 @@ pub fn revolve(name: impl AsRef<str>, profile: &[(f64, f64)], o: Revolve) -> Obj
 
 /// A ring lying in the xy plane.
 pub fn torus(name: impl AsRef<str>, major_radius: f64, minor_radius: f64, o: Torus) -> Obj {
-    scene::update(); // (an operator makes it: Blender works the scene out)
     let obj = scene::add_primitive(
         "Torus",
         name.as_ref(),
@@ -318,7 +340,6 @@ macro_rules! torus {
 
 /// A lumpy, deterministic boulder: an icosphere displaced by noise, bottom on z = 0.
 pub fn boulder(name: impl AsRef<str>, radius: f64, o: Boulder) -> Obj {
-    scene::update(); // (an operator makes it: Blender works the scene out)
     let obj = scene::add_primitive(
         "Icosphere",
         name.as_ref(),

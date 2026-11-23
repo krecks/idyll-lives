@@ -25,7 +25,7 @@ pub struct Options {
     pub keys: Vec<String>,
     /// Only the models of this folder of `models/` or `packs/` (case and underscores aside, `pack_` or not).
     pub family: Option<String>,
-    /// port-accepted.json (None: the checkout's tools/art/port-accepted.json).
+    /// `--accept <file>`: what is accepted, `{"<row>": {"<metric>": "<why>"}}` (None: nothing).
     pub accepted: Option<String>,
 }
 
@@ -36,7 +36,7 @@ pub struct Row {
     pub name: String,
     pub class: Class,
     pub findings: Vec<Finding>,
-    /// Findings port-accepted.json accepts, each with its reason.
+    /// Findings the accept list accepts, each with its reason.
     pub accepted: Vec<(Finding, String)>,
     /// What is worth saying of a row that passes (a perch that is off within its limit).
     pub notes: Vec<String>,
@@ -46,7 +46,7 @@ pub struct Row {
 /// What `against` found.
 pub struct Outcome {
     pub rows: Vec<Row>,
-    /// What is wrong with port-accepted.json.
+    /// What is wrong with the accept list.
     pub errors: Vec<String>,
     /// The report: a line a row that is not `same` (every row when keys or a family were named) and the counts.
     pub text: String,

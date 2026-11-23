@@ -327,7 +327,7 @@ jobs:
         run: tools/ci-local.sh built
 
       # Every family of item models built again in memory (crates/art) and held to the committed files, packs
-      # and centres byte for byte: a model changed in code and not rebuilt fails here (about 40 s).
+      # and centres byte for byte: a model changed in code and not rebuilt fails here (about 10 s on twelve cores).
       - name: Models rebuilt
         if: steps.passed.outputs.cache-hit != 'true'
         run: tools/ci-local.sh art

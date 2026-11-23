@@ -17,7 +17,7 @@
 
 import type { FenceStyleDef } from '../../content/content';
 import type { FenceEdge } from '../../core/protocol';
-import { Geo } from './geometry';
+import { EASE, Geo } from './geometry';
 import { hash } from './cars';
 import { Painter, type Inst } from './street';
 
@@ -96,6 +96,14 @@ export function writeFences(
     ground?: (x: number, z: number) => number;
   },
 ): void {
+  // (Its boxes chamfered as the street's are, whoever draws it: `Geo.easing`, set back after.)
+  const was = p.geo.ease;
+  p.geo.easing(EASE);
+  writeAll(p, fences, styles, out);
+  p.geo.easing(was);
+}
+
+function writeAll(p: Painter, fences: readonly FenceEdge[], styles: readonly FenceStyleDef[], out: Parameters<typeof writeFences>[3]): void {
   const ground = out.ground;
   const styleOf = (f: FenceEdge) => styles[f.style ?? 0] ?? styles[0] ?? FALLBACK;
   // Posts where fences meet or end: once per grid corner, in the tallest style there.
@@ -265,13 +273,16 @@ function postAt(p: Painter, s: FenceStyleDef, gate: boolean): void {
   if (s.kind === 'iron') p.box(-0.03, h, -0.03, 0.03, h + 0.07, 0.03, 'ny');
 }
 
+/** A panel's rails' and boards' ends, not drawn: they run from post to post, their ends in the posts (or in a wall, `wallAt`). */
+const ENDS = 'nx px';
+
 /** One metre of fence between two posts. */
 function panel(p: Painter, s: FenceStyleDef): void {
   const h = height(s);
   p.paint(s.color, rough[s.kind], s.kind === 'iron' ? 0.4 : 0);
   switch (s.kind) {
     case 'picket':
-      for (const y of [0.25 * h, 0.7 * h]) p.box(0, y, -0.03, 1, y + 0.06, -0.01, 'ny');
+      for (const y of [0.25 * h, 0.7 * h]) p.box(0, y, -0.03, 1, y + 0.06, -0.01, `ny ${ENDS}`);
       for (let x = 0.12; x < 0.95; x += 0.15) {
         for (const [z, n] of [[0.01, 1], [-0.01, -1]] as const) {
           p.poly([[x - 0.036, 0.05, z], [x + 0.036, 0.05, z], [x + 0.036, h * 0.86, z], [x, h * 0.94, z], [x - 0.036, h * 0.86, z]], [0, 0, n]);
@@ -279,16 +290,17 @@ function panel(p: Painter, s: FenceStyleDef): void {
       }
       return;
     case 'rails':
-      for (const y of [0.22, 0.52, 0.82]) p.box(0, y * h, -0.025, 1, y * h + 0.09, 0.025, 'ny');
+      for (const y of [0.22, 0.52, 0.82]) p.box(0, y * h, -0.025, 1, y * h + 0.09, 0.025, `ny ${ENDS}`);
       return;
     case 'slats':
-      for (let y = 0.06; y + 0.09 <= h; y += 0.12) p.box(0, y, -0.02, 1, y + 0.09, 0.02);
+      for (let y = 0.06; y + 0.09 <= h; y += 0.12) p.box(0, y, -0.02, 1, y + 0.09, 0.02, ENDS);
       return;
     case 'iron':
-      p.box(0, 0.1, -0.012, 1, 0.13, 0.012);
-      p.box(0, h - 0.12, -0.012, 1, h - 0.09, 0.012);
+      p.box(0, 0.1, -0.012, 1, 0.13, 0.012, ENDS);
+      p.box(0, h - 0.12, -0.012, 1, h - 0.09, 0.012, ENDS);
       for (let x = 0.1; x < 0.95; x += 0.1) {
-        p.box(x - 0.01, 0.02, -0.01, x + 0.01, h - 0.02, 0.01, 'ny');
+        // (Its top in its finial.)
+        p.box(x - 0.01, 0.02, -0.01, x + 0.01, h - 0.02, 0.01, 'ny py');
         p.box(x - 0.02, h - 0.02, -0.02, x + 0.02, h + 0.02, 0.02, 'ny');
       }
       return;

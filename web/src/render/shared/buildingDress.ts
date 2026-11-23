@@ -22,7 +22,7 @@
  */
 
 import type { BuildingUse } from '../../core/protocol';
-import { Geo, facing, type V3 } from './geometry';
+import { EASE, Geo, facing, type V3 } from './geometry';
 import { addRoof, HOUSE_MATERIALS, type HousePart } from './house';
 import { EAVE, MANSARD_BREAK, MANSARD_IN, PARAPET, STOREY, type TownBuilding } from './townBuildings';
 
@@ -100,13 +100,15 @@ type Side = 0 | 1 | 2 | 3;
 const SIDES: readonly Side[] = [0, 1, 2, 3];
 
 class Dresser {
-  readonly siding = new Geo();
-  readonly brick = new Geo();
-  readonly render = new Geo();
-  readonly stone = new Geo();
-  readonly plinth = new Geo().color('#D8D2C8');
+  // (Its walls' corners and a tower's chamfered too: a 4 mm arris, as the trim's.)
+  readonly siding = new Geo().easing(EASE);
+  readonly brick = new Geo().easing(EASE);
+  readonly render = new Geo().easing(EASE);
+  readonly stone = new Geo().easing(EASE);
+  // (The plinth and the trim chamfered as a model's boxes are: their arrises show at the play camera.)
+  readonly plinth = new Geo().color('#D8D2C8').easing(EASE);
   readonly roof = new Geo();
-  readonly trim = new Geo().color(TRIM);
+  readonly trim = new Geo().color(TRIM).easing(EASE);
   readonly panes: Geo[];
   private paneCount = 0;
   /** The panes put now are the flats' over a place (the second `PANE_SETS` sets). */
@@ -133,9 +135,9 @@ class Dresser {
    * A box on side `s`: `a0`..`a1` along it, `y0`..`y1` up, `o0`..`o1` out from its outer face. Without its face against
    * the wall nor its underside (the camera looks down on it): four faces, not six.
    */
-  box(g: Geo, s: Side, a0: number, a1: number, y0: number, y1: number, o0: number, o1: number): void {
+  box(g: Geo, s: Side, a0: number, a1: number, y0: number, y1: number, o0: number, o1: number, more = ''): void {
     const { W, D } = this;
-    const skip = `ny ${['nz', 'pz', 'nx', 'px'][s]}`;
+    const skip = `ny ${['nz', 'pz', 'nx', 'px'][s]} ${more}`;
     if (s === 0) g.box(a0, y0, D + o0, a1, y1, D + o1, skip);
     else if (s === 1) g.box(a0, y0, -D - o1, a1, y1, -D - o0, skip);
     else if (s === 2) g.box(W + o0, y0, a0, W + o1, y1, a1, skip);
@@ -176,8 +178,9 @@ class Dresser {
     this.quad(t, s, g1 - 0.17, g1, sill + 0.04, head, 0.012);
     this.quad(t, s, g0, g1, head - 0.16, head, 0.014);
     t.color(TRIM);
-    this.box(t, s, g0 - f, g0, sill, head, 0, 0.04);
-    this.box(t, s, g1, g1 + f, sill, head, 0, 0.04);
+    // (The jambs stand on the sill and under the head.)
+    this.box(t, s, g0 - f, g0, sill, head, 0, 0.04, 'py');
+    this.box(t, s, g1, g1 + f, sill, head, 0, 0.04, 'py');
     this.box(t, s, g0 - f, g1 + f, head, head + f, 0, 0.04);
     this.box(t, s, g0 - f - 0.04, g1 + f + 0.04, sill - 0.06, sill, 0, 0.07);
     const mid = (g0 + g1) / 2;
@@ -197,8 +200,8 @@ class Dresser {
     const f = 0.06;
     this.pane(s, g0, g1, sill, head);
     const t = this.trim.color(TRIM);
-    this.box(t, s, g0 - f, g0, sill, head, 0, 0.035);
-    this.box(t, s, g1, g1 + f, sill, head, 0, 0.035);
+    this.box(t, s, g0 - f, g0, sill, head, 0, 0.035, 'py');
+    this.box(t, s, g1, g1 + f, sill, head, 0, 0.035, 'py');
     this.box(t, s, g0 - f, g1 + f, head, head + f, 0, 0.035);
     this.quad(t, s, a - 0.025, a + 0.025, sill, head, 0.025);
     this.box(this.plinth, s, g0 - f - 0.05, g1 + f + 0.05, sill - 0.08, sill, 0, 0.08);
@@ -210,8 +213,9 @@ class Dresser {
     const top = floor + 2.1;
     const [d0, d1] = [a - wide / 2, a + wide / 2];
     t.color(TRIM);
-    this.box(t, s, d0 - 0.08, d0, floor, top + 0.1, 0, 0.06);
-    this.box(t, s, d1, d1 + 0.08, floor, top + 0.1, 0, 0.06);
+    // (The jambs up into the head.)
+    this.box(t, s, d0 - 0.08, d0, floor, top + 0.1, 0, 0.06, 'py');
+    this.box(t, s, d1, d1 + 0.08, floor, top + 0.1, 0, 0.06, 'py');
     this.box(t, s, d0 - 0.1, d1 + 0.1, top, top + 0.14, 0, 0.07);
     t.color(colour);
     this.box(t, s, d0, d1, floor, top, 0, 0.045);
@@ -528,11 +532,18 @@ function mansard(roof: Geo, trim: Geo, W: number, D: number, top: number, rise: 
   const yb = top + MANSARD_BREAK * rise;
   const yt = top + rise;
   const r = 0.2 * 0.6 * 2 * W;
+  // (The steep slopes' corners cut across `k`, so none stands square: the moulding at the break covers where the cut
+  // meets the low hip's corner.)
+  const k = EASE;
   for (const s of [-1, 1]) {
-    const qz: V3[] = [[-ex, top, s * ez], [ex, top, s * ez], [bx, yb, s * bz], [-bx, yb, s * bz]];
+    const qz: V3[] = [[-ex + k, top, s * ez], [ex - k, top, s * ez], [bx - k, yb, s * bz], [-bx + k, yb, s * bz]];
     roof.poly(qz, facing(qz[0], qz[1], qz[2], [0, 0.4, s]));
-    const qx: V3[] = [[s * ex, top, -ez], [s * ex, top, ez], [s * bx, yb, bz], [s * bx, yb, -bz]];
+    const qx: V3[] = [[s * ex, top, -ez + k], [s * ex, top, ez - k], [s * bx, yb, bz - k], [s * bx, yb, -bz + k]];
     roof.poly(qx, facing(qx[0], qx[1], qx[2], [s, 0.4, 0]));
+    for (const t of [-1, 1]) {
+      const qc: V3[] = [[s * (ex - k), top, t * ez], [s * ex, top, t * (ez - k)], [s * bx, yb, t * (bz - k)], [s * (bx - k), yb, t * bz]];
+      roof.poly(qc, facing(qc[0], qc[1], qc[2], [s, 0.4, t]));
+    }
     const q: V3[] = [[-bx, yb, s * bz], [bx, yb, s * bz], [r, yt, 0], [-r, yt, 0]];
     roof.poly(q, facing(q[0], q[1], q[2], [0, 1, s]));
     const e: V3[] = [[s * bx, yb, -bz], [s * bx, yb, bz], [s * r, yt, 0]];
@@ -544,12 +555,20 @@ function mansard(roof: Geo, trim: Geo, W: number, D: number, top: number, rise: 
   trim.box(-bx - 0.05, yb - 0.04, -bz - 0.05, bx + 0.05, yb + 0.06, bz + 0.05, 'ny');
 }
 
-/** A spire: a square pyramid `half` m to a side's half round (`cx`, `cz`) from `y0` up to `y1`. */
+/**
+ * A broach spire: an eight-sided pyramid on the square `half` m to a side's half round (`cx`, `cz`), from `y0` up to
+ * `y1`, its flats on the square's sides (a square one's hips turned square; an eight-sided one's turn half as much).
+ */
 function spire(roof: Geo, cx: number, cz: number, half: number, y0: number, y1: number): void {
   const tip: V3 = [cx, y1, cz];
-  const c: V3[] = [[cx - half, y0, cz - half], [cx + half, y0, cz - half], [cx + half, y0, cz + half], [cx - half, y0, cz + half]];
-  for (let i = 0; i < 4; i++) {
-    const [a, b] = [c[i], c[(i + 1) % 4]];
+  // (Its corners on the circle round the octagon whose flats are `half` out.)
+  const r = half / Math.cos(Math.PI / 8);
+  const c: V3[] = Array.from({ length: 8 }, (_, i) => {
+    const t = Math.PI / 8 + (i * Math.PI) / 4;
+    return [cx + Math.cos(t) * r, y0, cz + Math.sin(t) * r];
+  });
+  for (let i = 0; i < 8; i++) {
+    const [a, b] = [c[i], c[(i + 1) % 8]];
     const mid: V3 = [(a[0] + b[0]) / 2 - cx, 0.5, (a[2] + b[2]) / 2 - cz];
     roof.poly([a, b, tip], facing(a, b, tip, mid));
   }

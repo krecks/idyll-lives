@@ -77,6 +77,11 @@ export class Geo {
   maskA: number = LOOK.All;
   maskB: number = LOOK.All;
   kind: number = Cut.Keep;
+  /** The chamfer (m) `box` gives a box's edges (`easedBox`); 0: sharp. */
+  ease = 0;
+  /** Vertices below this height (m) sink `sinkBy` under the stub where their wall is cut (`sinkUnder`); null: none. */
+  private sinkTop: number | null = null;
+  private sinkBy = 0;
 
   /** Positions (3 a vertex), as written: a view, valid until the next vertex is added. */
   get pos(): Float64Array {
@@ -137,6 +142,23 @@ export class Geo {
     return this;
   }
 
+  /**
+   * Vertices after this lower than `top` (m) clamp `by` m under the stub where their wall is cut (the cutaway
+   * attribute's fourth byte, in millimetres: `shaders/cutaway.ts`), those at `top` to the stub itself: so a wall's
+   * eased top (its faces stopping `by` short of it, a chamfer up to its cap) keeps its chamfer cut. Null: none.
+   */
+  sinkUnder(top: number | null, by = 0): this {
+    this.sinkTop = top;
+    this.sinkBy = by;
+    return this;
+  }
+
+  /** Boxes after this chamfered `c` m on their edges (`easedBox`; 0: sharp), as a model's are. */
+  easing(c: number): this {
+    this.ease = c;
+    return this;
+  }
+
   /** Cutaway data for following vertices. */
   cutting(kind: number, maskA: number = LOOK.All, maskB: number = LOOK.All): this {
     this.kind = kind;
@@ -181,7 +203,7 @@ export class Geo {
     k[at * 4] = this.maskA;
     k[at * 4 + 1] = this.kind;
     k[at * 4 + 2] = this.maskB;
-    k[at * 4 + 3] = 0;
+    k[at * 4 + 3] = this.sinkTop !== null && p[1] < this.sinkTop - 1e-6 ? Math.round(this.sinkBy * 1000) : 0;
     return at;
   }
 
@@ -196,6 +218,16 @@ export class Geo {
       return this.vertex(p, n, u, v, alphas?.[i] ?? this.a, tints?.[i]);
     });
     for (let i = 1; i + 1 < ids.length; i++) this.tri(ids[0], ids[i], ids[i + 1], n);
+    return this;
+  }
+
+  /** A convex polygon as `poly` has it, but cut into the triangles `cut` (its points by index) instead of fanned from its first. */
+  polyCut(points: readonly V3[], n: V3, cut: readonly (readonly [number, number, number])[]): this {
+    const ids = points.map((p) => {
+      const [u, v] = planarUV(p, n);
+      return this.vertex(p, n, u, v);
+    });
+    for (const [a, b, c] of cut) this.tri(ids[a], ids[b], ids[c], n);
     return this;
   }
 
@@ -245,8 +277,12 @@ export class Geo {
     this.ni += other.ni;
   }
 
-  /** Axis-aligned box; `skip` lists faces to omit ('px', 'nx', 'py', 'ny', 'pz', 'nz'). */
-  box(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, skip = ''): this {
+  /**
+   * Axis-aligned box; `skip` lists faces to omit ('px', 'nx', 'py', 'ny', 'pz', 'nz'). Chamfered by `ease`: the edges the
+   * gate counts, or with `every`, all of them (a small piece that would be sharp, rounded as it is made).
+   */
+  box(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, skip = '', every = false): this {
+    if (easedBox(x0, y0, z0, x1, y1, z1, skip, this.ease, (pts, n, cut) => (cut ? this.polyCut(pts, n, cut) : this.poly(pts, n)), !every)) return this;
     if (!skip.includes('py')) this.poly([[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], [0, 1, 0]);
     if (!skip.includes('ny')) this.poly([[x0, y0, z0], [x0, y0, z1], [x1, y0, z1], [x1, y0, z0]], [0, -1, 0]);
     if (!skip.includes('nz')) this.poly([[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]], [0, 0, -1]);
@@ -323,6 +359,213 @@ function grown<T extends Float64Array | Uint8Array | Uint32Array>(from: T, size:
 }
 
 /** Planar UVs in metres along the dominant normal axis (v points up on walls). */
+/** The chamfer built boxes take where they show at the play camera (m): a pixel there, as a model's boxes have. */
+export const EASE = 0.004;
+
+/** A box's faces: name, axis, side. */
+const BOX_FACES = [
+  ['nx', 0, -1],
+  ['px', 0, 1],
+  ['ny', 1, -1],
+  ['py', 1, 1],
+  ['nz', 2, -1],
+  ['pz', 2, 1],
+] as const;
+
+/** A face's corners in the order they are gone round (u, w), and the two sides of an axis. */
+const CORNERS = [
+  [-1, -1],
+  [1, -1],
+  [1, 1],
+  [-1, 1],
+] as const;
+const SIDES = [-1, 1] as const;
+
+/** What the gate counts of a box's edges (`cargo check-glb`'s `edges`): none between faces narrower than this (m)… */
+const EASED_LEAST = 0.012;
+/** …none shorter than this (m)… */
+const EASED_EDGE = 0.05;
+/** …and none on a piece shorter than this (m). */
+const EASED_PIECE = 0.1;
+
+/**
+ * An axis-aligned box with its edges chamfered `ease` m (at most 0.45 of its thinnest side), as a model's boxes are
+ * (`cube!`'s `AUTO_BEVEL`), but only the edges the gate would find showing hard (`EASED_*`): 5 cm long or more, between
+ * two faces each 12 mm wide or more, on a piece 10 cm long or more, both faces drawn (an edge to a face in `skip`, on
+ * the ground or against a wall, stays sharp and its faces run to it). False where no edge is chamfered (nothing
+ * written: a plain box then). Each drawn face is drawn back from its chamfered edges; each chamfer is a flat strip at
+ * 45° with a normal of its own; where two or three chamfers meet at a corner, a patch closes it (a triangle, or two),
+ * and where one ends at a face, that face's corner is cut. Written through `poly`.
+ */
+export function easedBox(
+  x0: number,
+  y0: number,
+  z0: number,
+  x1: number,
+  y1: number,
+  z1: number,
+  skip: string,
+  ease: number,
+  poly: (pts: V3[], n: V3, cut?: readonly (readonly [number, number, number])[]) => void,
+  // (False: every edge between two drawn faces, whether the gate would count it or not: a wall's top, `house.ts` `easedTop`.)
+  counted = true,
+): boolean {
+  if (ease <= 0) return false;
+  // A convex polygon: as a fan from the first point it can be fanned from without a triangle of no area (points in
+  // a line along a side), else cut ear by ear, never across such a line.
+  const flat = (a: V3, b: V3, c: V3) => {
+    const [u, v] = [[b[0] - a[0], b[1] - a[1], b[2] - a[2]], [c[0] - a[0], c[1] - a[1], c[2] - a[2]]];
+    const [cx, cy, cz] = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    return cx * cx + cy * cy + cz * cz < 1e-24;
+  };
+  const emit = (pts: V3[], n: V3) => {
+    for (let r = 0; r < pts.length; r++) {
+      const turned = [...pts.slice(r), ...pts.slice(0, r)];
+      if (turned.slice(1, -1).every((p, i) => !flat(turned[0], p, turned[i + 2]))) return poly(turned, n);
+    }
+    // (By index, so the polygon's points are written once each whichever way the box lies.)
+    const rest = pts.map((_, i) => i);
+    const cut: [number, number, number][] = [];
+    // (An ear whose cut would run through another point, along a side, would leave a T-junction there.)
+    const through = (a: number, b: number) =>
+      rest.some((q) => {
+        if (q === a || q === b) return false;
+        const [A, B, Q] = [pts[a], pts[b], pts[q]];
+        return flat(A, B, Q) && (Q[0] - A[0]) * (Q[0] - B[0]) + (Q[1] - A[1]) * (Q[1] - B[1]) + (Q[2] - A[2]) * (Q[2] - B[2]) < 0;
+      });
+    while (rest.length > 3) {
+      const i = rest.findIndex((p, j) => {
+        const [a, b] = [rest[(j + rest.length - 1) % rest.length], rest[(j + 1) % rest.length]];
+        return !flat(pts[a], pts[p], pts[b]) && !through(a, b);
+      });
+      if (i < 0) break;
+      cut.push([rest[(i + rest.length - 1) % rest.length], rest[i], rest[(i + 1) % rest.length]]);
+      rest.splice(i, 1);
+    }
+    if (rest.length === 3 && !flat(pts[rest[0]], pts[rest[1]], pts[rest[2]])) cut.push([rest[0], rest[1], rest[2]]);
+    poly(pts, n, cut);
+  };
+  const lo = [Math.min(x0, x1), Math.min(y0, y1), Math.min(z0, z1)];
+  const hi = [Math.max(x0, x1), Math.max(y0, y1), Math.max(z0, z1)];
+  const size = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
+  if (counted && size[0] < EASED_PIECE && size[1] < EASED_PIECE && size[2] < EASED_PIECE) return false;
+  // (Which faces are drawn, by `BOX_FACES`' order: read once, a box is built in the street by the thousand.)
+  const shown = BOX_FACES.map(([name]) => !skip.includes(name));
+  const drawn = (axis: number, side: number) => shown[axis * 2 + (side > 0 ? 1 : 0)];
+  // The edges along each axis are chamfered (where both their faces are drawn) if they would count.
+  const along = [0, 1, 2].map((t) => !counted || (size[t] >= EASED_EDGE && size[(t + 1) % 3] >= EASED_LEAST && size[(t + 2) % 3] >= EASED_LEAST));
+  if (!along[0] && !along[1] && !along[2]) return false;
+  const c = Math.min(ease, Math.min(size[0], size[1], size[2]) * 0.45);
+  const plane = (axis: number, side: number) => (side > 0 ? hi[axis] : lo[axis]);
+  // Whether the edge between the faces (a, sa) and (b, sb) is chamfered.
+  const cut = (a: number, sa: number, b: number, sb: number) => along[3 - a - b] && drawn(a, sa) && drawn(b, sb);
+  // A point by its value on each of three axes, given in any order.
+  const point = (a: number, va: number, b: number, vb: number, t: number, vt: number): V3 => {
+    const v: [number, number, number] = [0, 0, 0];
+    v[a] = va;
+    v[b] = vb;
+    v[t] = vt;
+    return v;
+  };
+  for (let f = 0; f < 6; f++) {
+    if (!shown[f]) continue;
+    const [axis, side] = [f >> 1, f & 1 ? 1 : -1];
+    const [u, w] = [(axis + 1) % 3, (axis + 2) % 3];
+    const n = point(axis, side, u, 0, w, 0);
+    const at = plane(axis, side);
+    const pts: V3[] = [];
+    // (Points on its sides besides its corners: then it may not be fanned from its first.)
+    let between = false;
+    // Round its corners in order; a corner is come to along its side across u (w at -1, then u at +1, …).
+    for (const [su, sw] of CORNERS) {
+      const byU = cut(axis, side, u, su);
+      const byW = cut(axis, side, w, sw);
+      const pu = plane(u, su) - (byU ? su * c : 0);
+      const pw = plane(w, sw) - (byW ? sw * c : 0);
+      const across = cut(u, su, w, sw);
+      if (!byU && !byW && across) {
+        // (The chamfer along this face's normal ends here: the corner cut, in the order it is come to.)
+        if (su === sw) pts.push(point(axis, at, u, pu, w, pw - sw * c), point(axis, at, u, pu - su * c, w, pw));
+        else pts.push(point(axis, at, u, pu - su * c, w, pw), point(axis, at, u, pu, w, pw - sw * c));
+        continue;
+      }
+      // Where a chamfer along one of its edges stops short of the corner (the one along its normal there meets it
+      // in a patch), that edge has a point there too: no T-junction.
+      const onU = byU && !byW && across ? point(axis, at, u, pu, w, plane(w, sw) - sw * c) : null;
+      const onW = byW && !byU && across ? point(axis, at, u, plane(u, su) - su * c, w, pw) : null;
+      const [first, last] = su === sw ? [onU, onW] : [onW, onU];
+      if (first) pts.push(first);
+      pts.push(point(axis, at, u, pu, w, pw));
+      if (last) pts.push(last);
+      between ||= !!(onU || onW);
+    }
+    // (With only its corners, cut or not, it is convex with no three points in a line: a fan from its first.)
+    if (between) emit(pts, n);
+    else poly(pts, n);
+  }
+  const k = Math.SQRT1_2;
+  for (let a = 0; a < 3; a++) {
+    for (let b = a + 1; b < 3; b++) {
+      const t = 3 - a - b;
+      for (const sa of SIDES) {
+        for (const sb of SIDES) {
+          if (!cut(a, sa, b, sb)) continue;
+          // From end to end, short of an end where the chamfers there meet it.
+          const t0 = plane(t, -1) + (cut(t, -1, a, sa) || cut(t, -1, b, sb) ? c : 0);
+          const t1 = plane(t, 1) - (cut(t, 1, a, sa) || cut(t, 1, b, sb) ? c : 0);
+          const [onA, offA] = [plane(a, sa), plane(a, sa) - sa * c];
+          const [onB, offB] = [plane(b, sb), plane(b, sb) - sb * c];
+          const n = point(a, sa * k, b, sb * k, t, 0);
+          poly([point(a, onA, b, offB, t, t0), point(a, onA, b, offB, t, t1), point(a, offA, b, onB, t, t1), point(a, offA, b, onB, t, t0)], n);
+        }
+      }
+    }
+  }
+  // The corners where two or three chamfers meet: the points round them, in order about the corner's diagonal.
+  const r = 1 / Math.sqrt(3);
+  for (const sx of SIDES) {
+    for (const sy of SIDES) {
+      for (const sz of SIDES) {
+        if (!drawn(0, sx) || !drawn(1, sy) || !drawn(2, sz)) continue;
+        const s = [sx, sy, sz];
+        const cuts: number[] = [];
+        for (let t = 0; t < 3; t++) if (cut((t + 1) % 3, s[(t + 1) % 3], (t + 2) % 3, s[(t + 2) % 3])) cuts.push(t);
+        if (cuts.length < 2) continue;
+        const n: V3 = [sx * r, sy * r, sz * r];
+        // On each face, its corner: drawn back from each of its chamfered edges there.
+        const pts: V3[] = [0, 1, 2].map((axis) => {
+          const v: [number, number, number] = [0, 0, 0];
+          for (let j = 0; j < 3; j++) v[j] = j === axis ? plane(j, s[j]) : plane(j, s[j]) - (cut(axis, s[axis], j, s[j]) ? s[j] * c : 0);
+          return v;
+        });
+        // (Three chamfers: those three, a triangle.)
+        if (cuts.length === 3) {
+          poly(pts, n);
+          continue;
+        }
+        // And where two chamfers meet off the faces: the strips' ends there.
+        for (const t of cuts) {
+          const [a, b] = [(t + 1) % 3, (t + 2) % 3];
+          const end = plane(t, s[t]) - s[t] * c;
+          pts.push(point(a, plane(a, s[a]), b, plane(b, s[b]) - s[b] * c, t, end), point(a, plane(a, s[a]) - s[a] * c, b, plane(b, s[b]), t, end));
+        }
+        const unique = pts.filter((p, i) => pts.findIndex((q) => q[0] === p[0] && q[1] === p[1] && q[2] === p[2]) === i);
+        if (unique.length < 3) continue;
+        const m = unique.reduce((acc, p) => [acc[0] + p[0], acc[1] + p[1], acc[2] + p[2]], [0, 0, 0]).map((v) => v / unique.length);
+        // (Two directions square to the diagonal, to sort the points round it.)
+        const e1 = [sy, -sx, 0];
+        const e2 = [n[1] * e1[2] - n[2] * e1[1], n[2] * e1[0] - n[0] * e1[2], n[0] * e1[1] - n[1] * e1[0]];
+        const angle = (p: V3) => {
+          const d = [p[0] - m[0], p[1] - m[1], p[2] - m[2]];
+          return pmath.atan2(d[0] * e2[0] + d[1] * e2[1] + d[2] * e2[2], d[0] * e1[0] + d[1] * e1[1] + d[2] * e1[2]);
+        };
+        emit(unique.sort((p, q) => angle(p) - angle(q)), n);
+      }
+    }
+  }
+  return true;
+}
+
 export function planarUV(p: V3, n: V3): [number, number] {
   const ax = Math.abs(n[0]);
   const ay = Math.abs(n[1]);

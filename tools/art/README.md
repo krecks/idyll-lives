@@ -7,8 +7,7 @@ the models to [docs/design/objects.md](../../docs/design/objects.md). The result
 [crates/art/README.md](../../crates/art/README.md). Run everything from the repo root.
 
 This folder holds `centres.json` (where each model is centred at rest, for the gate), `gate-baseline.json` (the
-counted checks' findings each model may keep), `validate.ts` (the Khronos validator's runner), `port-accepted.json`
-(differences accepted by `check-glb --against`) and `previews/` (pictures, ignored by git).
+counted checks' findings each model may keep), `validate.ts` (the Khronos validator's runner) and `previews/` (pictures, ignored by git).
 
 | Command | Purpose |
 |---|---|
@@ -17,7 +16,7 @@ counted checks' findings each model may keep), `validate.ts` (the Khronos valida
 | `cargo check-glb --validate` | Also runs the Khronos glTF validator over each file and its far version (`validate.ts`, under Bun: `bun install` in `web/` first) |
 | `cargo check-glb --preview [--sheet]` | Also draws each file as read (`artkit`'s rasteriser) to `previews/<family>/rt_<name>.png`, with its clips, perches and far version |
 | `cargo check-glb --update-baseline` | First lowers `gate-baseline.json` to what the counted checks find (below) |
-| `cargo check-glb --against <rev\|dir> [keys… \| --family <f>] [--dir <built>]` | Whether a build of the models is the build of a git revision (or of a directory: a checkout, or an assets root) (`checkglb/against.rs`; it reads only the `.glb` files, the packs and `centres.json`, so it holds for any generator). Each model and far version of the working tree, or of `--dir`, is `same` (the same nodes, materials, triangles and clips to the bit, in whatever order the file has them), `near` (every metric within its limit: origins, clips sampled at 60 Hz, perches, the surfaces' distance both ways, normals, texture, baked shading, triangles, no new finding of the gate; the limits open the file) or `CHANGED`, printed with its metric, part, value, limit and worst point; exits 1 on any. One that is right as it is takes a line with its reason in `port-accepted.json` (`{"<key>": {"<metric>": "<why>"}}`, a far version's key `<key> far`); one that is not needed is an error. A decimated far version listed as `decimated` is held to a rule of its own (size within 2 %, on the model's floor, at most a tenth more triangles, within 6 cm). The tags `ref/blender`, `ref/blender-civic` and `ref/blender-all` are the last builds by the Blender scripts the Rust families replaced; `--against HEAD` shows what a change to a family or the kernel moved |
+| `cargo check-glb --against <rev\|dir> [keys… \| --family <f>] [--dir <built>] [--accept <file>]` | Whether a build of the models is the build of a git revision (or of a directory: a checkout, or an assets root) (`checkglb/against.rs`; it reads only the `.glb` files, the packs and `centres.json`, so it holds for any generator). Each model and far version of the working tree, or of `--dir`, is `same` (the same nodes, materials, triangles and clips to the bit, in whatever order the file has them), `near` (every metric within its limit: origins, clips sampled at 60 Hz, perches, the surfaces' distance both ways, normals, texture, baked shading, triangles, no new finding of the gate; the limits open the file) or `CHANGED`, printed with its metric, part, value, limit and worst point; exits 1 on any. `--against HEAD` shows what a change to a family or the kernel moved. One that is right as it is takes a line with its reason in a file given by `--accept` (`{"<key>": {"<metric>": "<why>"}}`, a far version's key `<key> far`; none by default); one that is not needed is an error. A far version listed there as `decimated` is held to a rule of its own (size within 2 %, on the model's floor, at most a tenth more triangles, within 6 cm). The tags `ref/blender`, `ref/blender-civic` and `ref/blender-all` are the last Blender builds, kept as history: the models have changed on purpose since |
 | `cargo check-glb --built <dir>` | The same gate over what the game builds as it runs ("The built world" below), from the samples `bun tools/built/dump.ts <dir>` writes there with the game's own generators |
 | `cargo review sizes\|uses [--check]` | Every buyable object's sizes and heights against its kind in `docs/review/reference.json` (a tree or plant against its species: height, crown, clear trunk, bark luminance, blossom and fruit hue, leaf-card tiles), and its uses, poses and motions (`crates/tools/src/review.rs`; `--md <dir>` writes every object, `--check` fails past the baseline) |
 | `cargo review colours\|facets\|edges\|texels [--all] [keys]` | Reports over every model: colours against real surfaces, round parts showing their flat sides, hard edges showing unbevelled, textured finishes laid too sparse, dense or stretched |
@@ -93,6 +92,23 @@ names:
 | `built.edges` | the models' `edges`. A house is judged as the play camera sees it: whole with its roof on (it shows from 15 m out), and nearer, a storey at a time without roofs, with its walls standing and with them cut away each of the eight ways the cutaway stands, each by the views that make it stand so; an edge counts once however many of those show it |
 | `built.texels` | the models' `texels`, over each part on a textured material (a material projected from above has x and z for UVs) |
 | `built.farNear` | where a far version is off what it is the far version of: what its roofs cover by over 10 % or 1.5 m, its top by over 0.5 m, its roof's kind or its pitch by over 4°, a chimney on one of them only, most of its walls or of its roof another colour as drawn (the vertex colour times the material's and its texture's mean) by over 28 of 255 in a channel |
+
+The generators chamfer their boxes as the models' are where it counts: a `Geo` given `easing(EASE)` (4 mm) writes
+each `box` with only the edges `built.edges` would find (5 cm long or more, between faces 12 mm wide or more, on a
+piece 10 cm long or more, both faces drawn: `geometry.ts` `easedBox`); the fences (`writeFences` sets it, whoever draws
+them), the street's props, the cars' boxes, the closed buildings' walls, trim and plinth and the neighbours' trim and
+plinth have it. On such a mesh a round part's capped ends (`Painter.tube`) take a 45° shoulder where their rim would
+show; the kerbs are eased by their own profile (`roads.ts` `kerbProfile`). The house's walls, posts and the boards
+on them have eased tops (`house.ts` `easedTop`): their faces stop 4 mm short and carry a sink in the cutaway's fourth
+byte (`Geo.sinkUnder`), so where a wall is cut its faces clamp 4 mm under the stub and its chamfer survives the cut
+(the shader and `built/edge_gate.rs`'s `cut_away` both read it). A post's outside corner indoors is cut across 4 mm
+(`tonedFace`'s `cut`), as is a mitred post's where its sides turn 60° or more; outdoors a corner board covers it, on
+every storey from that storey's plinth (none a storey up). Roofs, plain (`addRoof`) or over an area (`addRoofArea`),
+ease their ridge caps, gable verges and eaves (the slopes stop 4 mm in from the fascias, a strip down to their tops)
+and cut their eave corners across; a door's knob is eased all round; a spire has eight sides; a bridge's noses are eased prisms (`street.ts` `easedPrism`). The cars' bodies are eased by their own shapes
+(`cars.ts`): the profile's corners over 55° cut in two, the sides drawn in from it all round, the greenhouse's
+pillars cut and its roof's edge eased, the tyres' shoulders rounded. A box's face that is never seen (a rail's end in its post, a
+jamb's top under its head, a board's back on its wall) is left out by `skip`, which keeps the cost down.
 
 Far versions are judged by `built.farNear` alone. `tools/ci-local.sh built` runs both commands (about 15 s);
 `--report` prints what was measured as tables (each sample's triangles and draw calls, where the edges are, how each

@@ -1,11 +1,12 @@
-//! `cargo check-glb --against <rev|dir> [keys… | --family <f>] [--dir <built>]`: whether a build of the models is
-//! the build it is held against. The proof for moving the models' generator: it reads only `.glb` files, the packs
-//! and centres.json, and neither the generator that wrote the old files nor the one that wrote the new.
+//! `cargo check-glb --against <rev|dir> [keys… | --family <f>] [--dir <built>] [--accept <file>]`: whether a
+//! build of the models is the build it is held against: what a change to a family or the kernel moved. It reads
+//! only `.glb` files, the packs and centres.json, and neither the generator that wrote the old files nor the one
+//! that wrote the new.
 //!
-//!   cargo check-glb --against ref/blender                    every model of the working tree against that revision
+//!   cargo check-glb --against HEAD                           every model of the working tree against that revision
 //!   cargo check-glb --against HEAD model.fridge model.oak    only these keys
 //!   cargo check-glb --against HEAD --family trees            the models of models/trees/ or packs/trees/
-//!   cargo check-glb --against ref/blender --dir target/art   the files under target/art in place of the working tree's
+//!   cargo check-glb --against main --dir target/art          the files under target/art in place of the working tree's
 //!
 //! The old side is a git revision (its files read with `git cat-file`), or, if git knows no such revision, a
 //! directory; the new side is the working tree, or `--dir`. A directory is a checkout's root (it has
@@ -21,9 +22,9 @@
 //! - `CHANGED`: a row is not. Each is printed with its part, its value, its limit and the worst point (in the
 //!   part's own axes, which are glTF's: x is the game's -x), and the command exits 1.
 //!
-//! A row that is right as it is takes a line in tools/art/port-accepted.json, `{"<key>": {"<metric>": "<why>"}}`
+//! A row that is right as it is takes a line in an accept list, `--accept <file>`, `{"<key>": {"<metric>": "<why>"}}`
 //! (a far version's key is `<key> far`, a manifest's its path under the assets), and is then printed as
-//! `accepted`. As with the gate's `accept`, one that names no row, gives no reason or is not needed is an error.
+//! `accepted`; there is none by default. As with the gate's `accept`, one that names no row, gives no reason or is not needed is an error.
 //! But `decimated`, which says what a far version is (a decimation made it, which another build need not
 //! repeat): where the rows fail it, it is held to that rule in their place (`METRICS`); where they pass, it passes.
 /// A node's origin may be this far off (m): a tenth of a millimetre, a quarter of what f32 keeps at 3 m, so
@@ -108,7 +109,7 @@ pub const DECIMATED_TRIANGLES: f64 = 0.10;
 /// No point of it may be further than this from the old one's surface (m). Two Blender builds of one script
 /// were up to 55 mm apart (measured 2026-11-17, the ping-pong table's far version), so 60 mm.
 pub const DECIMATED_SURFACE: f64 = 0.06;
-/// What is compared, by the name a finding and a line of port-accepted.json have.
+/// What is compared, by the name a finding and a line of the accept list have.
 pub const METRICS: &[(&str, &str)] = &[
     ("file", "a file is missing or cannot be read"),
     (

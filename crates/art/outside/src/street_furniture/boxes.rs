@@ -346,7 +346,17 @@ pub fn post_box() -> Vec<Obj> {
             m.body,
             holes = [rounded_rect(0.136, 0.106, 0.006, 1)]
         );
-        fbox!(f, "times", 0.14, 0.11, 0.012, (0, 0.82, 0.205), m.paper);
+        // (sharp: a chamfer would draw it back from the frame's inner edge)
+        fbox!(
+            f,
+            "times",
+            0.14,
+            0.11,
+            0.012,
+            (0, 0.82, 0.205),
+            m.paper,
+            bevel = 0
+        );
         for k in 0..4 {
             fbox!(
                 f,

@@ -303,7 +303,7 @@ fn faces_are_painted_by_their_middles() {
     let boiler = kit::paint(boiler, CRUST, |c| (c.z as f64) < 0.025);
     same(&golden, "paint boiler", boiler);
     // a middle on the very edge of its test: a single read as a double, as Python reads `c.z`
-    let b = fbox!(F, "box", 0.2, 0.1, 0.3, (0, 0.05, 0), PORCELAIN);
+    let b = fbox!(F, "box", 0.2, 0.1, 0.3, (0, 0.05, 0), PORCELAIN, bevel = 0);
     let b = kit::paint(b, CRUST, |c| c.z as f64 >= 0.05 || c.x as f64 <= -0.1);
     same(&golden, "paint box", b);
     // a material the part has already is not added again

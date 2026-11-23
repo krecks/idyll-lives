@@ -104,7 +104,8 @@ fn build(case: &str, snap: &mut dyn FnMut(&str, Obj)) {
                     (0.2, 0.1, 0.3),
                     at = (0.3, -0.2, 0.4),
                     material = TOP,
-                    rot = (0, 0, 20)
+                    rot = (0, 0, 20),
+                    bevel = 0
                 );
                 pin(&f, "pin", -0.78, 0.4);
                 rail(&f);
@@ -120,7 +121,8 @@ fn build(case: &str, snap: &mut dyn FnMut(&str, Obj)) {
                     (0.2, 0.1, 0.3),
                     at = (0.3, -0.2, 0.4),
                     material = TOP,
-                    rot = (0, 0, 20)
+                    rot = (0, 0, 20),
+                    bevel = 0
                 );
                 cylinder!(
                     "post",

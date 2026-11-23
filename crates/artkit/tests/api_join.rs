@@ -67,7 +67,8 @@ fn parts_of(case: &str) -> (Vec<Obj>, &'static str) {
                     "a",
                     (0.2, 0.3, 0.4),
                     at = (0.5, -0.25, 0.75),
-                    material = BODY
+                    material = BODY,
+                    bevel = 0
                 ),
                 cylinder!(
                     "b",
@@ -98,7 +99,8 @@ fn parts_of(case: &str) -> (Vec<Obj>, &'static str) {
                     (0.2, 0.3, 0.4),
                     at = (0.5, -0.25, 0.75),
                     material = BODY,
-                    rot = (17, -40, 109)
+                    rot = (17, -40, 109),
+                    bevel = 0
                 ),
                 cylinder!(
                     "b",
@@ -114,7 +116,8 @@ fn parts_of(case: &str) -> (Vec<Obj>, &'static str) {
                     (0.1, 0.1, 0.1),
                     at = (0.2, 0.2, 0.2),
                     material = BODY,
-                    rot = (17, -40, 109)
+                    rot = (17, -40, 109),
+                    bevel = 0
                 ),
             ],
             "turned",
@@ -129,7 +132,13 @@ fn parts_of(case: &str) -> (Vec<Obj>, &'static str) {
                     material = BODY,
                     verts = 8
                 ),
-                cube!("b", (0.1, 0.1, 0.1), at = (0.2, 0.2, 0.2), material = BODY),
+                cube!(
+                    "b",
+                    (0.1, 0.1, 0.1),
+                    at = (0.2, 0.2, 0.2),
+                    material = BODY,
+                    bevel = 0
+                ),
                 rod!(
                     "c",
                     (0.1, 0.2, 0.3),
@@ -164,7 +173,8 @@ fn parts_of(case: &str) -> (Vec<Obj>, &'static str) {
                     (0.04, 0.002, 0.06),
                     at = (0.09, -0.02, 0.24),
                     material = BODY,
-                    rot = (0, 10, 25)
+                    rot = (0, 10, 25),
+                    bevel = 0
                 ),
             ];
             // plants.py's fit_to: every part's matrix scaled about the origin to the size wanted

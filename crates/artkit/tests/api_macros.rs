@@ -33,7 +33,8 @@ fn a_call_by_name_works_out_its_arguments_in_pythons_order() {
         at("size", (0.1, 0.2, 0.3)),
         at = at("at", (0, 0, 1)),
         material = at("material", BODY),
-        rot = at("rot", (0, 0, 30))
+        rot = at("rot", (0, 0, 30)),
+        bevel = 0
     );
     assert_eq!(seen(), ["name", "size", "at", "material", "rot"]);
     sphere!(

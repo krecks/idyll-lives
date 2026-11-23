@@ -11,7 +11,7 @@
 
 import type { SnapshotLayout } from '../../core/snapshot';
 import { wrapAngle } from './characters/rig';
-import { facing, type V3 } from './geometry';
+import { EASE, facing, type V3 } from './geometry';
 import type { Painter, Rect } from './street';
 
 /** Car paints. */
@@ -260,17 +260,95 @@ export function carDoor(body: CarBody, d: number): { side: 1 | -1; hinge: number
  * own to turn and steer (`paintWheel`, `wheelAt`: the game's cars). `age`: how old it looks (`CarAge`).
  */
 export function paintCar(p: Painter, body: CarBody, paint: string, apart = false, wheels = true, age: CarAge = 1): void {
-  const { wid, low } = body;
+  // (Its boxes, the bumpers, lights, plates and mirrors, chamfered as the street's are: `Geo.easing`.)
+  const was = p.geo.ease;
+  p.geo.easing(EASE);
+  bodyOf(p, body, paint, apart, wheels, age);
+  p.geo.easing(was);
+}
+
+/** Corners of a body's side profile that turn more than this (its cosine: 55°) are cut in two, each half turning under the 60° an edge shows hard at. */
+const PROFILE_TURN = 0.5736;
+/** How far back along each side a cut corner starts (m), at most a third of the shorter side. */
+const PROFILE_CUT = 0.06;
+/** How far in the body's sides are drawn from its profile, all round (m): the chamfer between them and its top, nose and tail is that wide in the profile's plane… */
+const SIDE_IN = 0.035;
+/** …and this wide across the car (m). */
+const TOP_IN = 0.045;
+
+/** `low` with its sharp corners cut (`PROFILE_TURN`), but the sills' (its first two points, on the underside). */
+function cutProfile(low: CarBody['low']): [number, number][] {
+  const out: [number, number][] = [];
+  const unit = (z: number, y: number): [number, number, number] => {
+    const l = Math.sqrt(z * z + y * y) || 1;
+    return [z / l, y / l, l];
+  };
+  for (let i = 0; i < low.length; i++) {
+    const [prev, at, next] = [low[(i + low.length - 1) % low.length], low[i], low[(i + 1) % low.length]];
+    const [az, ay, al] = unit(at[0] - prev[0], at[1] - prev[1]);
+    const [bz, by, bl] = unit(next[0] - at[0], next[1] - at[1]);
+    if (i < 2 || az * bz + ay * by > PROFILE_TURN) {
+      out.push([at[0], at[1]]);
+      continue;
+    }
+    const k = Math.min(PROFILE_CUT, al / 3, bl / 3);
+    out.push([at[0] - az * k, at[1] - ay * k], [at[0] + bz * k, at[1] + by * k]);
+  }
+  return out;
+}
+
+/** A convex, counter-clockwise profile drawn in `d` m all round, each side parallel to its own. */
+function insetProfile(low: readonly [number, number][], d: number): [number, number][] {
+  // (Each side's inward normal; a point moves along the two at its corner, as far as keeps both sides `d` in.)
+  const normal = (a: readonly [number, number], b: readonly [number, number]): [number, number] => {
+    const [dz, dy] = [b[0] - a[0], b[1] - a[1]];
+    const l = Math.sqrt(dz * dz + dy * dy) || 1;
+    return [-dy / l, dz / l];
+  };
+  return low.map((at, i) => {
+    const n1 = normal(low[(i + low.length - 1) % low.length], at);
+    const n2 = normal(at, low[(i + 1) % low.length]);
+    const k = d / Math.max(0.2, 1 + n1[0] * n2[0] + n1[1] * n2[1]);
+    return [at[0] + (n1[0] + n2[0]) * k, at[1] + (n1[1] + n2[1]) * k];
+  });
+}
+
+/** How far the greenhouse's corner pillars are cut back each way (m)… */
+const PILLAR_CUT = 0.04;
+/** …and how far its roof's edge is eased: the sides end this far under the roof, the roof this far in from them (m). No edge of it turns 60°. */
+const ROOF_EASE = 0.035;
+
+/**
+ * A body's greenhouse (`CarBody.cabin`) as `paintCar` and `paintDoor` draw it: at `v` of the way from the belt (0) to
+ * the roof (1), its half-width `x`, its front's and back's z and its height; and the side window on side `s`, `u` from
+ * its front (0, where the front pillar's cut ends) to its back (1), `v` from the belt to the sides' top (`top`).
+ */
+function greenhouseOf(body: CarBody) {
+  const hw = body.wid / 2;
+  const [br, bf, rr, rf, yb, yr] = body.cabin;
+  const [hb, hr] = [hw - 0.07, hw - (body.roofIn ?? 0.25)];
+  const top = 1 - ROOF_EASE / (yr - yb);
+  const x = (v: number) => hb + (hr - hb) * v;
+  const front = (v: number) => bf + (rf - bf) * v;
+  const back = (v: number) => br + (rr - br) * v;
+  const y = (v: number) => yb + (yr - yb) * v;
+  const side = (s: number, u: number, v: number): V3 => {
+    const w = v * top;
+    const [z0, z1] = [front(w) - PILLAR_CUT, back(w) + PILLAR_CUT];
+    return [s * x(w), y(w), z0 + (z1 - z0) * u];
+  };
+  return { top, x, front, back, y, side };
+}
+
+function bodyOf(p: Painter, body: CarBody, paint: string, apart: boolean, wheels: boolean, age: CarAge): void {
+  const wid = body.wid;
+  const low = cutProfile(body.low);
   const [colour, gloss] = aged(paint, age);
   const painted = () => p.paint(colour, gloss, 0);
   const hw = wid / 2;
-  const inner = hw - 0.045;
-  const [cz, cy] = [low.reduce((a, q) => a + q[0], 0) / low.length, low.reduce((a, q) => a + q[1], 0) / low.length];
-  const shrunk = low.map(([z, y]): [number, number] => {
-    const [dz, dy] = [cz - z, cy - y];
-    const l = Math.hypot(dz, dy) || 1;
-    return [z + (dz / l) * 0.035, y + (dy / l) * 0.035];
-  });
+  const inner = hw - TOP_IN;
+  // (Drawn in all round, so the chamfer between a side and the top, the nose or the tail is the same everywhere.)
+  const shrunk = insetProfile(low, SIDE_IN);
   painted();
   // Sides, chamfers and the perimeter.
   for (const side of [-1, 1]) {
@@ -291,11 +369,8 @@ export function paintCar(p: Painter, body: CarBody, paint: string, apart = false
     if (ny < -0.9) painted();
   }
   // Greenhouse: painted frame and roof, glass inset into it.
-  const [br, bf, rr, rf, yb, yr] = body.cabin;
-  const hb = hw - 0.07;
+  const [br, bf, , , yb, yr] = body.cabin;
   const hr = hw - (body.roofIn ?? 0.25);
-  const B = (x: number, z: number): V3 => [x, yb, z];
-  const R = (x: number, z: number): V3 => [x, yr, z];
   const [f1, r0] = body.doors ?? DOOR_SPLIT;
   const sideGlass = body.sideGlass ?? 1;
   const quad = (q: V3[], out: V3, glass: [number, number, number, number] | null, pillar: number | null = null) => {
@@ -320,12 +395,28 @@ export function paintCar(p: Painter, body: CarBody, paint: string, apart = false
       painted().poly([lift(at(mid - 0.025, 0)), lift(at(mid + 0.025, 0)), lift(at(mid + 0.025, 1)), lift(at(mid - 0.025, 1))], out);
     }
   };
-  const ws = facingOut([B(-hb, bf), B(hb, bf), R(hr, rf)], [0, 0.6, 1]);
-  quad([B(-hb, bf), B(hb, bf), R(hr, rf), R(-hr, rf)], ws, [0.05, 0.95, 0.06, 0.9]);
-  const rw = facingOut([B(hb, br), B(-hb, br), R(-hr, rr)], [0, 0.6, -1]);
-  quad([B(hb, br), B(-hb, br), R(-hr, rr), R(hr, rr)], rw, body.blindRear ? null : [0.06, 0.94, 0.1, 0.88]);
+  // The pillars at its corners cut back (`PILLAR_CUT`), its roof's edge eased (`ROOF_EASE`): at a level `v` of the way up,
+  // the corners round it from the windscreen's right one (`s` its side: +1 right, -1 left).
+  const gh = greenhouseOf(body);
+  const c = PILLAR_CUT;
+  const screen = (s: number, v: number): V3 => [s * (gh.x(v) - c), gh.y(v), gh.front(v)];
+  const sideFront = (s: number, v: number): V3 => [s * gh.x(v), gh.y(v), gh.front(v) - c];
+  const sideBack = (s: number, v: number): V3 => [s * gh.x(v), gh.y(v), gh.back(v) + c];
+  const rear = (s: number, v: number): V3 => [s * (gh.x(v) - c), gh.y(v), gh.back(v)];
+  const t = gh.top;
+  const ws = facingOut([screen(-1, 0), screen(1, 0), screen(1, t)], [0, 0.6, 1]);
+  quad([screen(-1, 0), screen(1, 0), screen(1, t), screen(-1, t)], ws, [0.05, 0.95, 0.06, 0.9]);
+  const rw = facingOut([rear(1, 0), rear(-1, 0), rear(-1, t)], [0, 0.6, -1]);
+  quad([rear(1, 0), rear(-1, 0), rear(-1, t), rear(1, t)], rw, body.blindRear ? null : [0.06, 0.94, 0.1, 0.88]);
+  for (const s of [-1, 1]) {
+    // The corner pillars, painted.
+    const a: V3[] = [screen(s, 0), sideFront(s, 0), sideFront(s, t), screen(s, t)];
+    painted().poly(a, facingOut(a, [s, 0.3, 1]));
+    const b: V3[] = [sideBack(s, 0), rear(s, 0), rear(s, t), sideBack(s, t)];
+    painted().poly(b, facingOut(b, [s, 0.3, -1]));
+  }
   for (const side of [-1, 1]) {
-    const q: V3[] = side > 0 ? [B(hb, bf), B(hb, br), R(hr, rr), R(hr, rf)] : [B(-hb, br), B(-hb, bf), R(-hr, rf), R(-hr, rr)];
+    const q: V3[] = side > 0 ? [gh.side(1, 0, 0), gh.side(1, 1, 0), gh.side(1, 1, 1), gh.side(1, 0, 1)] : [gh.side(-1, 1, 0), gh.side(-1, 0, 0), gh.side(-1, 0, 1), gh.side(-1, 1, 1)];
     if (!apart) {
       // (Glazed from the front as far as `sideGlass`: on the left side the quad runs back to front.)
       // (Its B-pillar between the doors, where the glass runs past it: mirrored on the left, where the quad runs back
@@ -343,8 +434,8 @@ export function paintCar(p: Painter, body: CarBody, paint: string, apart = false
     const back = body.doors?.[2] ?? DOOR_SPLIT[2];
     if (sideGlass < 1 && back < 1) {
       const at = (u: number, v: number): V3 => {
-        const z = bf + (br - bf) * u + (rf + (rr - rf) * u - (bf + (br - bf) * u)) * v;
-        return [side * (hb + (hr - hb) * v + 0.004), yb + (yr - yb) * v, z];
+        const [x, y, z] = gh.side(side, u, v);
+        return [x + side * 0.004, y, z];
       };
       painted().poly(side > 0 ? [at(back, 0), at(1, 0), at(1, 1), at(back, 1)] : [at(1, 0), at(back, 0), at(back, 1), at(1, 1)], n);
     }
@@ -357,14 +448,35 @@ export function paintCar(p: Painter, body: CarBody, paint: string, apart = false
       p.poly([[x, sill, hinge], [x, yb, hinge], [x, yb, rearBelt], [x, sill, rearLow]], [side, 0, 0]);
     }
   }
-  painted().poly([R(-hr, rr), R(hr, rr), R(hr, rf), R(-hr, rf)], [0, 1, 0]);
+  // The roof's eased edge, from the sides' top in to the roof, all round; the roof inside it.
+  const edge = [screen(1, t), sideFront(1, t), sideBack(1, t), rear(1, t), rear(-1, t), sideBack(-1, t), sideFront(-1, t), screen(-1, t)];
+  const e = ROOF_EASE;
+  const roof: V3[] = [
+    [gh.x(1) - e - c, yr, gh.front(1) - e],
+    [gh.x(1) - e, yr, gh.front(1) - e - c],
+    [gh.x(1) - e, yr, gh.back(1) + e + c],
+    [gh.x(1) - e - c, yr, gh.back(1) + e],
+    [-(gh.x(1) - e - c), yr, gh.back(1) + e],
+    [-(gh.x(1) - e), yr, gh.back(1) + e + c],
+    [-(gh.x(1) - e), yr, gh.front(1) - e - c],
+    [-(gh.x(1) - e - c), yr, gh.front(1) - e],
+  ];
+  painted();
+  for (let i = 0; i < edge.length; i++) {
+    const j = (i + 1) % edge.length;
+    const q: V3[] = [edge[i], edge[j], roof[j], roof[i]];
+    const mid = [(edge[i][0] + edge[j][0]) / 2, 0, (edge[i][2] + edge[j][2]) / 2 - (gh.front(1) + gh.back(1)) / 2];
+    const l = Math.sqrt(mid[0] * mid[0] + mid[2] * mid[2]) || 1;
+    p.poly(q, facingOut(q, [mid[0] / l, 1, mid[2] / l]));
+  }
+  p.poly(roof, [0, 1, 0]);
   // Wheels in dark arches, hubcaps.
   const r = body.wheelR;
   for (const wz of [body.wheelBase / 2, -body.wheelBase / 2]) {
     for (const side of [-1, 1]) {
       p.paint('#141517', 0.9, 0).tube('x', side * (hw + 0.002), side * (hw + 0.003), r, wz, r + 0.07, r + 0.07, 8, true, 0, Math.PI);
       if (!wheels) continue;
-      p.paint('#1A1A1C', 0.85, 0).tube('x', side * (hw - 0.22), side * (hw + 0.012), r, wz, r, r, 12);
+      tyre(p.paint('#1A1A1C', 0.85, 0), side * (hw - 0.22), side * (hw + 0.012), r, wz, r, TYRE_SHOULDER, TYRE_SHOULDER);
       p.paint('#B4B8BC', 0.3, 1).tube('x', side * (hw + 0.012), side * (hw + 0.02), r, wz, r * 0.6, r * 0.5, 10);
     }
   }
@@ -449,8 +561,8 @@ function extras(p: Painter, body: CarBody, zb: number, zf: number, yr: number, h
     // On the back door, at the belt's height: a tyre and its cover.
     const y = body.cabin[4] - 0.08;
     const r = body.wheelR * 0.92;
-    p.paint('#1A1A1C', 0.85, 0).tube('z', zb - 0.2, zb + 0.02, 0, y, r, r, 14);
-    p.paint('#2A2C2E', 0.6, 0).tube('z', zb - 0.215, zb - 0.2, 0, y, r * 0.62, r * 0.62, 12);
+    tyre(p.paint('#1A1A1C', 0.85, 0), zb + 0.02, zb - 0.2, 0, y, r, TYRE_SHOULDER, TYRE_SHOULDER, 14, 'z');
+    tyre(p.paint('#2A2C2E', 0.6, 0), zb - 0.2, zb - 0.215, 0, y, r * 0.62, 0.006, 0.006, 12, 'z');
   }
   if (body.rack) {
     // Two rails along the roof on feet, and three bars across.
@@ -496,6 +608,13 @@ const INK = '#16181A';
  * lettered front and back, so it's a taxi at a glance from any side.
  */
 export function paintTaxi(p: Painter, apart = false, wheels = true): void {
+  const was = p.geo.ease;
+  p.geo.easing(EASE);
+  taxiOf(p, apart, wheels);
+  p.geo.easing(was);
+}
+
+function taxiOf(p: Painter, apart: boolean, wheels: boolean): void {
   const body = CARS[TAXI_BODY];
   paintCar(p, body, TAXI_PAINT, apart, wheels);
   const hw = body.wid / 2;
@@ -623,7 +742,7 @@ export function carRowIsTaxi(snap: ArrayLike<number>, layout: SnapshotLayout, ro
  */
 export function paintDoor(p: Painter, body: CarBody, paint: string, d: number, age: CarAge = 1): void {
   const { side, hinge, rearBelt, rearLow, sill, u0, u1 } = carDoor(body, d);
-  const [br, bf, rr, rf, yb, yr] = body.cabin;
+  const yb = body.cabin[4];
   const [colour, gloss] = aged(paint, age);
   const hw = body.wid / 2;
   const out = 0.008;
@@ -634,12 +753,12 @@ export function paintDoor(p: Painter, body: CarBody, paint: string, d: number, a
   const panel: V3[] = [[X(hw), sill, Z(hinge)], [X(hw), yb, Z(hinge)], [X(hw), yb, Z(rearBelt)], [X(hw), sill, Z(rearLow)]];
   p.paint(colour, gloss, 0).poly(panel, n);
   p.paint(INSIDE, 0.9, 0).poly(panel.map(([x, y, z]): V3 => [x - side * 0.035, y, z]), [-side, 0, 0]);
-  // The window: the side window's part between `u0` and `u1`, sloping in to the roof (glazed as far back as the body's `sideGlass`).
-  const hb = hw - 0.07;
-  const hr = hw - (body.roofIn ?? 0.25);
+  // The window: the side window's part between `u0` and `u1`, sloping in to the roof (glazed as far back as the body's
+  // `sideGlass`), as the body's greenhouse has it (`greenhouseOf`: from behind the front pillar's cut to under the roof's eased edge).
+  const gh = greenhouseOf(body);
   const at = (u: number, v: number): V3 => {
-    const z = bf + (br - bf) * u + (rf + (rr - rf) * u - (bf + (br - bf) * u)) * v;
-    return [X(hb + (hr - hb) * v), yb + (yr - yb) * v, Z(z)];
+    const [x, y, z] = gh.side(1, u, v);
+    return [X(x), y, Z(z)];
   };
   const frame: V3[] = [at(u0, 0), at(u1, 0), at(u1, 1), at(u0, 1)];
   const fn = facingOut(frame, [side, 0.3, 0]);
@@ -702,8 +821,34 @@ export function carriedAlong(body: CarBody, from: CarPose, to: CarPose, x: numbe
  * about x through its hub at the origin: the tyre in from the hub's face (x 0, facing +x, out from
  * the car), a hubcap with five holes, so it can be seen to turn. The left wheels are turned round.
  */
+/** How far a tyre's shoulders are rounded off, across it and in from its tread (m): a tyre's, not a drum's edge. */
+const TYRE_SHOULDER = 0.03;
+/** A car's wheels are about this round (m): `paintWheel`'s, made a metre round, is scaled to its car's across y and z only. */
+const WHEEL_R = 0.32;
+
+/**
+ * A tyre along x from `a0` (in under the car) to `a1` (its face), its hub at (y, z) = (`cu`, `cv`), `r` round, its
+ * shoulders at both ends rounded off `across` along x and `inward` in from its tread: tread, shoulder and face each
+ * turn under the 60° an edge shows hard at.
+ */
+function tyre(p: Painter, a0: number, a1: number, cu: number, cv: number, r: number, across: number, inward: number, seg = 12, axis: 'x' | 'z' = 'x'): void {
+  const d = Math.sign(a1 - a0);
+  p.tube(axis, a0, a0 + d * across, cu, cv, r - inward, r, seg, false);
+  p.tube(axis, a0 + d * across, a1 - d * across, cu, cv, r, r, seg, false);
+  p.tube(axis, a1 - d * across, a1, cu, cv, r, r - inward, seg, false);
+  // (Its ends round as the tube's own rings are: the tube's two other axes, in x, y, z order.)
+  const at = (a: number, u: number, v: number): V3 => (axis === 'x' ? [a, u, v] : [u, v, a]);
+  for (const [a, n] of [[a0, -d], [a1, d]] as const) {
+    const ring = Array.from({ length: seg }, (_, i): V3 => {
+      const t = (Math.PI * 2 * i) / seg;
+      return at(a, cu + Math.cos(t) * (r - inward), cv + Math.sin(t) * (r - inward));
+    });
+    p.poly(ring, axis === 'x' ? [n, 0, 0] : [0, 0, n]);
+  }
+}
+
 export function paintWheel(p: Painter): void {
-  p.paint('#1A1A1C', 0.85, 0).tube('x', -0.232, 0, 0, 0, 1, 1, 12);
+  tyre(p.paint('#1A1A1C', 0.85, 0), -0.232, 0, 0, 0, 1, TYRE_SHOULDER, TYRE_SHOULDER / WHEEL_R);
   p.paint('#B4B8BC', 0.3, 1).tube('x', 0, 0.008, 0, 0, 0.6, 0.5, 10);
   p.paint('#2A2C2F', 0.6, 0);
   for (let k = 0; k < 5; k++) {

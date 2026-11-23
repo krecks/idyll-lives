@@ -106,5 +106,4 @@ cargo art civic --check    # the committed bytes, nothing written
 ## The port (2026-11-18)
 
 Built in Rust since 2026-11-18, proved against the last Blender build (`cargo check-glb --against ref/blender-civic
---family civic`). The plant table's far version is the kernel's decimation, held to the decimated far versions' rule
-(`tools/art/port-accepted.json`).
+--family civic`). The plant table's far version is the kernel's decimation.

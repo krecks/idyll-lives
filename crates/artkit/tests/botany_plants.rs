@@ -2410,7 +2410,8 @@ fn shrubs(name: &str, p: &Palette) -> Option<Ret> {
                 "box",
                 (0.3, 0.2, 0.1),
                 at = (0.1, -0.2, 0.05),
-                material = m("body")
+                material = m("body"),
+                bevel = 0
             );
             sphere!(
                 "pad",
@@ -2457,7 +2458,8 @@ fn shrubs(name: &str, p: &Palette) -> Option<Ret> {
                 "box",
                 (0.3, 0.2, 0.1),
                 at = (0.1, -0.2, 0.05),
-                material = m("body")
+                material = m("body"),
+                bevel = 0
             );
             let crown = new_parts(|| {
                 lump!(

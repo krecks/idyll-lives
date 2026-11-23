@@ -12,8 +12,14 @@ const WOOD: Mat = Mat::new("body", "#8A6A4E", "wood");
 const ROOF: Mat = Mat::new("roof", "#C0473A", "satin");
 
 fn thing(body: Mat) -> Vec<Obj> {
-    cube!("base", (0.4, 0.3, 0.2), material = body);
-    cube!("roof", (0.5, 0.4, 0.02), at = (0, 0, 0.11), material = ROOF);
+    cube!("base", (0.4, 0.3, 0.2), material = body, bevel = 0);
+    cube!(
+        "roof",
+        (0.5, 0.4, 0.02),
+        at = (0, 0, 0.11),
+        material = ROOF,
+        bevel = 0
+    );
     settle(&[join_all("thing")])
 }
 

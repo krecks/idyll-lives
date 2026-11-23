@@ -1,11 +1,11 @@
 //! What the garden decor is built from.
 
-use crate::ground::rock::{_cut, _lump};
+use crate::ground::rock::{_cut, _cut_own, _lump};
 use artkit::boulder;
 use artkit::bvh::Rays;
 use artkit::materials::Mat;
 use artkit::math::{M4, P3, PI, TAU, V3, cos, p3, radians, sin, v3};
-use artkit::scene::{self, Obj};
+use artkit::scene::Obj;
 
 /// Loft rings for a turned body whose rim is scalloped: `rows` (radius, height), each ring's radius waving by
 /// `depth` (a fraction) round `lobes` lobes, fading in from rows at or above `scallop_from` height.
@@ -115,8 +115,7 @@ pub fn _stone(
                 .map(|v| v.dot(n))
                 .fold(f64::NEG_INFINITY, f64::max)
         });
-        // (the stone's matrix is still the one it was made with, at the origin, while these are cut)
-        _cut(o, o.matrix_world_seen() * (n * (reach - depth)), n);
+        _cut_own(o, n * (reach - depth), n);
     }
     o.edit(|p| {
         let highest = p
@@ -127,7 +126,6 @@ pub fn _stone(
             .fold(f32::NEG_INFINITY, f32::max);
         p.loc.z = (top - highest as f64) as f32;
     });
-    scene::update();
     _cut(o, (0, 0, 0), (0, 0, -1))
 }
 

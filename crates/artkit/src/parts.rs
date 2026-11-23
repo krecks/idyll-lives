@@ -76,7 +76,6 @@ pub fn join(parts: &[Obj], name: &str, origin: Option<P3>) -> Obj {
     // (the part and its mesh take the name; one already in use, by a part or by the mesh of a part that is
     // gone, gets Blender's number after it)
     first.set_name(name).set_data_name(name);
-    scene::update(); // (the join's operators have worked the scene out)
     if let Some(origin) = origin {
         set_origin(first, origin);
     }
@@ -183,7 +182,7 @@ pub fn set_origin(obj: Obj, point: impl Into<P3>) -> Obj {
     let moved = world * M4::translation(local);
     obj.edit(|o| o.mesh.transform(&M4::translation(-local)));
     if obj.read(|o| o.unturned() && o.parent.is_none()) {
-        obj.edit(|o| (o.loc, o.seen) = (moved.location(), moved));
+        obj.edit(|o| o.loc = moved.location());
     } else {
         // (a turned or scaled part's matrix is taken apart again, as Blender takes `obj.matrix_world = ...`)
         obj.set_matrix_world(moved);
@@ -221,7 +220,6 @@ pub fn own(objs: &[Obj]) -> Vec<Obj> {
 
 /// (lo, hi): the Blender world bounds of `objs`, a bevel still to be given included.
 pub fn measure(objs: &[Obj]) -> ([f64; 3], [f64; 3]) {
-    scene::update(); // (Blender works the scene out to measure it)
     let (mut lo, mut hi) = ([f64::INFINITY; 3], [f64::NEG_INFINITY; 3]);
     for &o in objs {
         let points = if o.read(|p| p.bevel.is_some()) {
@@ -412,9 +410,8 @@ pub fn check_size(
 /// own, so it is only for third-party files; a model built here is made to its real size and checked with
 /// `check_size` (docs/design/objects.md, "Real size, uniform scale").
 pub fn fit(obj: Obj, w: f64, h: f64, d: f64) -> Obj {
-    // (where its points are by the matrix Blender has for it: the identity for a part just made)
-    let seen = obj.matrix_world_seen();
-    let ws: Vec<V3> = obj.read(|o| o.mesh.verts.iter().map(|&v| seen * v).collect());
+    let world = obj.matrix_world();
+    let ws: Vec<V3> = obj.read(|o| o.mesh.verts.iter().map(|&v| world * v).collect());
     let (mut mn, mut mx) = ([f64::INFINITY; 3], [f64::NEG_INFINITY; 3]);
     for p in &ws {
         for i in 0..3 {

@@ -155,7 +155,7 @@ fn parts_built_through_it_are_blenders() {
                 let (w, d, at) = (n(words[1]), n(words[3]), point(words[4]));
                 let name = format!("bar{}{}", at.0, at.2);
                 assert_eq!(format!("name {name}"), lines[i + 3]);
-                let b = fbox!(F, &name, w, 0.02, d, at, mat());
+                let b = fbox!(F, &name, w, 0.02, d, at, mat(), bevel = 0);
                 same(line, b, lines[i + 1], lines[i + 2]);
                 seen[0] += 1;
             }
@@ -169,7 +169,7 @@ fn parts_built_through_it_are_blenders() {
             "cube" => {
                 let (size, at) = (point(words[1]), point(words[2]));
                 // (Blender's axes: nothing is negated, and a point is one of floats)
-                let c = cube!("cube", size, at = at, material = mat());
+                let c = cube!("cube", size, at = at, material = mat(), bevel = 0);
                 same(line, c, lines[i + 1], lines[i + 2]);
                 seen[2] += 1;
             }

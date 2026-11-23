@@ -567,7 +567,8 @@ fn a_lofted_case_is_cut_as_the_script_cuts_it() {
         "mw_cut",
         (hi[0] as f64 * 2.0, hi[1] as f64 * 2.0, hi[2] as f64 * 2.0),
         at = (loc[0] as f64, loc[1] as f64, loc[2] as f64),
-        material = mats(cutter)[0]
+        material = mats(cutter)[0],
+        bevel = 0
     );
     kit::cut!(case, tool);
     let mesh = case.read(|o| o.mesh.clone());

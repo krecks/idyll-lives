@@ -92,7 +92,7 @@ step() {
     # packages), then held to the same rules, what they find today by tools/art/gate-baseline.json (about 12 s).
     built) "${bun_ci[@]}" tools/built/dump.ts target/built && cargo check-glb --built target/built ;;
     # Every family of item models built again in memory and held to the committed files, packs and centres, byte
-    # for byte (crates/art; about 40 s on top of the tools' build): a model changed in code and not rebuilt, or a
+    # for byte (crates/art; about 10 s on twelve cores on top of the tools' build): a model changed in code and not rebuilt, or a
     # build that gives other bytes on another machine, fails here.
     art) cargo art --all --check ;;
     types) (cd web && bun run wasm && bun run sound && bun run voice:wasm && "${bun_ci[@]}" run check && "${bun_ci[@]}" run lint) ;;

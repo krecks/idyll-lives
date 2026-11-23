@@ -41,8 +41,6 @@ pub struct Object {
     pub bevel: Option<crate::bevel::Pending>,
     /// Its clips, one track a name.
     pub tracks: Vec<Track>,
-    /// Its matrix in the world as Blender last worked it out (`Obj::matrix_world_seen`).
-    pub(crate) seen: M4,
     pub(crate) alive: bool,
 }
 
@@ -65,7 +63,6 @@ impl Object {
             uv: UvWay::Box,
             bevel: None,
             tracks: Vec::new(),
-            seen: M4::IDENTITY,
             alive: true,
         }
     }
@@ -173,21 +170,6 @@ pub fn reset() {
         s.perches.clear();
         s.low = false;
         s.centre = [0.0, 0.0];
-    });
-}
-
-/// `bpy.context.view_layer.update()`: every part's matrix in the world worked out from where it stands now, for
-/// `Obj::matrix_world_seen`. Blender does it whenever an operator runs, so the kernel's builders, `join`,
-/// `measure` (and `settle`, before it moves the parts), `jitter`, `attach` and the perches' rays do it where
-/// gamekit's did; a build calls it where its script called `view_layer.update()` or an operator of its own.
-pub fn update() {
-    with(|s| {
-        for i in 0..s.objects.len() {
-            if s.objects[i].alive {
-                let world = s.matrix_world(Obj(i as u32));
-                s.objects[i].seen = world;
-            }
-        }
     });
 }
 
@@ -449,8 +431,6 @@ impl Obj {
             None => m,
         };
         self.edit(|o| {
-            // (read back before the scene is worked out again, Blender's matrix is the one given)
-            o.seen = m;
             let (loc, quat, scale) =
                 crate::motion::decompose_quat(&local, o.quat.is_none().then_some(o.order));
             (o.loc, o.scale) = (loc, scale);
@@ -462,20 +442,9 @@ impl Obj {
         self
     }
 
-    /// The part's matrix in the world, from where it stands now. Blender's `obj.matrix_world` is this only once
-    /// the scene has been worked out again (`matrix_world_seen`); nearly every script reads it then.
+    /// The part's matrix in the world, from where it stands now.
     pub fn matrix_world(self) -> M4 {
         with(|s| s.matrix_world(self))
-    }
-
-    /// `obj.matrix_world` as Blender answers a script at this point: the part's matrix as of the last time the
-    /// scene was worked out (`scene::update`), not as its place, turn and scale are now. A part a builder has
-    /// just made and placed still has the identity (Blender places it after the operator that made it), one
-    /// moved since (`settle`, a place set by hand) the matrix from before, one given a matrix
-    /// (`set_matrix_world`) that matrix. ground.py reads it so: a stone's fractures are cut in the stone's own
-    /// frame, the plane too, before Blender knows where the stone stands.
-    pub fn matrix_world_seen(self) -> M4 {
-        self.read(|o| o.seen)
     }
 
     /// The part's points in the world, at rest (`obj.matrix_world @ v.co`).

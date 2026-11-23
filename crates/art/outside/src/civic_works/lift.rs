@@ -36,7 +36,7 @@ pub const CAR_ROOF: f64 = 1.47; // its roof, over its own ground
 /// a car's glasshouse leaning in to its roof (tumblehome).
 pub fn tapered(objs: &[Obj], y0: f64, y1: f64, k: f64) {
     for &o in objs {
-        let mw: M4 = o.matrix_world_seen();
+        let mw: M4 = o.matrix_world();
         let inv = mw.inverted().expect("a part's matrix inverts");
         o.edit(|part| {
             for v in part.mesh.verts.iter_mut() {

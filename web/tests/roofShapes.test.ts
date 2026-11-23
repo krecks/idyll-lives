@@ -15,8 +15,9 @@ import { WALL_HALF, WALL_HEIGHT } from '../src/render/shared/walls';
 const W = 16;
 const DEPTH = 16;
 const AT = 3;
-/** house.ts `OVERHANG`, `ROOF_THICKNESS`, `PITCH`, `FLAT_PITCH` and a flat roof's overhang. */
+/** house.ts `OVERHANG`, `ROOF_THICKNESS`, `PITCH`, `FLAT_PITCH` and a flat roof's overhang; `CHAMFER`, the eaves' eased edge. */
 const OVERHANG = 0.4;
+const CHAMFER = 0.004;
 const THICK = 0.14;
 const PITCH = Math.tan((34 * Math.PI) / 180);
 const FLAT = { pitch: 0.03, overhang: 0.12 };
@@ -140,11 +141,16 @@ for (const [name, style, pitch, overhang] of CASES) {
   /** The top of the roof at its eave line. */
   const eave = WALL_HEIGHT - overhang * pitch + THICK;
 
+  /** Whether a face is of the eaves' eased edge (the strip down to the fascia, a cut corner's triangle): within `CHAMFER` of the eave line, not a slope. */
+  const eased = (tri: [V3, V3, V3]) => tri.every((p) => inFrom(plan, out, p[0], p[2]) < CHAMFER + 1e-6);
+  const slopes = (roof: HousePart['geo']) => faces(roof).filter((t) => !eased(t));
+
   test(`${about}: no part of the roof is under its eaves`, () => {
     const { pos } = roofOf(plan, style);
     let low = Infinity;
     for (let i = 1; i < pos.length; i += 3) low = Math.min(low, pos[i]);
-    expect(low).toBeGreaterThan(eave - 1e-4);
+    // (But the eased edge, down to the fascias' tops, `CHAMFER` under it.)
+    expect(low).toBeGreaterThan(eave - CHAMFER - 1e-4);
   });
 
   test(`${about}: one surface over the plan and its overhang, as high as the pitch times the way in from the nearest eave`, () => {
@@ -176,7 +182,7 @@ for (const [name, style, pitch, overhang] of CASES) {
 
   test(`${about}: every slope has the pitch`, () => {
     const off: string[] = [];
-    for (const [p, q, r] of faces(roofOf(plan, style))) {
+    for (const [p, q, r] of slopes(roofOf(plan, style))) {
       const [ux, uy, uz, vx, vy, vz] = [q[0] - p[0], q[1] - p[1], q[2] - p[2], r[0] - p[0], r[1] - p[1], r[2] - p[2]];
       const n = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
       const rise = Math.hypot(n[0], n[2]) / Math.abs(n[1]);
@@ -188,7 +194,7 @@ for (const [name, style, pitch, overhang] of CASES) {
   test(`${about}: closed along its hips, valleys and ridges (every edge of a face is another's too, but along the eave line)`, () => {
     const key = (p: V3) => p.map((c) => Math.round(c * 1e4)).join(',');
     const edges = new Map<string, { count: number; a: V3; b: V3 }>();
-    for (const tri of faces(roofOf(plan, style))) {
+    for (const tri of slopes(roofOf(plan, style))) {
       for (let k = 0; k < 3; k++) {
         const [a, b] = [tri[k], tri[(k + 1) % 3]];
         const id = [key(a), key(b)].sort().join(' ');
@@ -201,7 +207,8 @@ for (const [name, style, pitch, overhang] of CASES) {
     let rim = 0;
     for (const { count, a, b } of edges.values()) {
       if (count === 2) continue;
-      const onEaves = count === 1 && [a, b].every((p) => Math.abs(p[1] - eave) < 1e-4 && Math.abs(inFrom(plan, out, p[0], p[2])) < 1e-4);
+      // (The slopes stop where the eaves' eased edge begins: `CHAMFER` in from the eave line and up the slope.)
+      const onEaves = count === 1 && [a, b].every((p) => Math.abs(p[1] - eave - pitch * CHAMFER) < 1e-4 && Math.abs(inFrom(plan, out, p[0], p[2]) - CHAMFER) < 1e-4);
       if (onEaves) rim++;
       else open.push(`${count} faces on ${a.map((c) => c.toFixed(2)).join(', ')} to ${b.map((c) => c.toFixed(2)).join(', ')}`);
     }
@@ -244,8 +251,11 @@ function turns(slopes: [V3, V3, V3][]): { at: V3; valley: boolean; along: V3 }[]
 
 for (const name of Object.keys(PLANS)) {
   test(`${name}: cap shingles lie along every ridge and hip and a flashing down every valley, a hair over the slopes`, () => {
-    const roof = roofOf(planOf(name));
-    const [slopes, caps] = [faces(roof), faces(roof, true)];
+    const [plan, out] = [planOf(name), WALL_HALF + OVERHANG];
+    const roof = roofOf(plan);
+    // (Its slopes, not the eaves' eased edge: `CHAMFER` in from the eave line.)
+    const slopes = faces(roof).filter((t) => !t.every((p) => inFrom(plan, out, p[0], p[2]) < CHAMFER + 1e-6));
+    const caps = faces(roof, true);
     expect(caps.length).toBeGreaterThan(0);
     const bare: string[] = [];
     let [ridges, valleys] = [0, 0];
