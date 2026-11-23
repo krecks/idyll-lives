@@ -302,10 +302,14 @@ fn touches(r: &Rect, c: [f32; 2], rad: f32) -> bool {
 
 /// The road network's junctions' boxes (`Graph::boxes`): each junction's middle, and how far round
 /// it its box reaches: as far out along its arms as two bodies in their lanes on any two of them
-/// are `ARMS_APART` apart (`BOX_LEAST` to `BOX_MOST`).
+/// are `ARMS_APART` apart (`BOX_LEAST` to `BOX_MOST`). None at a motorway's merges
+/// (`Graph::is_merge`).
 pub fn boxes(g: &Graph) -> Vec<([f32; 2], f32)> {
     let mut out = Vec::new();
     for (n, &p) in g.nodes.iter().enumerate() {
+        if g.is_merge(n) {
+            continue;
+        }
         let mut arms: Vec<[f32; 2]> = Vec::new();
         for e in g.edges.iter() {
             let road = &g.roads[e.road as usize];

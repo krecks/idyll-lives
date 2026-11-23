@@ -38,6 +38,17 @@ pub struct Graph {
     pub boxes: Vec<([f32; 2], f32)>,
 }
 
+/// Whether a road of kind `end`'s end meeting a road of kind `along` part way along it joins it
+/// there (`Graph::build`): not where either is a motorway (grade separated: one passes over the
+/// other), but a ramp's end on a motorway (where it merges into its carriageway, or leaves it).
+fn level_join(end: RoadKind, along: RoadKind) -> bool {
+    match (end, along) {
+        (RoadKind::Ramp, RoadKind::Motorway) | (RoadKind::Motorway, RoadKind::Motorway) => true,
+        (RoadKind::Motorway, _) | (_, RoadKind::Motorway) => false,
+        _ => true,
+    }
+}
+
 /// What `Graph::seek` shows the road segments near a point to.
 trait Seeker {
     /// A segment `d` m off, its nearest point `s` m along road `road`.
@@ -216,6 +227,9 @@ impl Graph {
                         continue;
                     }
                     let near_end = |s: f32| s < snap || s > other.len() - snap;
+                    if !near_end(s) && !level_join(g.roads[r].kind, other.kind) {
+                        continue;
+                    }
                     if near_end(s) {
                         let e = if s < other.len() / 2.0 {
                             ends[q][0]
@@ -375,13 +389,32 @@ impl Graph {
         self.adj.get(n).map_or(0, Vec::len)
     }
 
-    /// Where three or more stretches of road meet.
+    /// Where three or more stretches of road meet, but a motorway's merges (`is_merge`): no
+    /// lights, no box and no slowing down there.
     pub fn junctions(&self) -> impl Iterator<Item = [f32; 2]> + '_ {
-        self.adj
-            .iter()
-            .zip(&self.nodes)
-            .filter(|(a, _)| a.len() >= 3)
-            .map(|(_, &p)| p)
+        (0..self.nodes.len())
+            .filter(|&n| self.adj[n].len() >= 3 && !self.is_merge(n))
+            .map(|n| self.nodes[n])
+    }
+
+    /// Whether node `n` is where ramps join a motorway's carriageway: every stretch there a
+    /// motorway's or a ramp's, a motorway's among them, and three or more. Not a junction: no box,
+    /// no lights, nobody slowing for it.
+    pub fn is_merge(&self, n: usize) -> bool {
+        let Some(adj) = self.adj.get(n) else {
+            return false;
+        };
+        let kind = |&e: &u32| self.roads[self.edges[e as usize].road as usize].kind;
+        adj.len() >= 3
+            && adj
+                .iter()
+                .all(|e| matches!(kind(e), RoadKind::Motorway | RoadKind::Ramp))
+            && adj.iter().any(|e| kind(e) == RoadKind::Motorway)
+    }
+
+    /// The motorway's merges (`is_merge`), by node.
+    pub fn merge_nodes(&self) -> impl Iterator<Item = usize> + '_ {
+        (0..self.nodes.len()).filter(|&n| self.is_merge(n))
     }
 
     /// The place `s` m along the town file's road `source` (`drives[].road/s`), if it's in the
