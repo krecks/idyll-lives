@@ -1420,6 +1420,26 @@ fn arms_cars_only_leave_by_have_no_phase() {
         let ramp = a["road"].as_u64() == Some(ON_RAMP as u64);
         assert_eq!(a["light"].is_null(), ramp, "{a}");
     }
+    // (Nor a pole: the kerbside furniture isn't kept off a pole that isn't there.)
+    let poles: Vec<[f32; 2]> = view["lightPoles"]
+        .as_array()
+        .expect("poles")
+        .iter()
+        .map(|p| [p[0].as_f64().unwrap() as f32, p[1].as_f64().unwrap() as f32])
+        .collect();
+    let heads: usize = w
+        .travel
+        .signals
+        .iter()
+        .map(|s| s.arms.iter().filter(|a| a.inbound()).count())
+        .sum();
+    assert_eq!(poles.len(), heads, "a pole for each head");
+    let (sig, _) = junction_at(&w, ramp_t(g, ON_RAMP));
+    let ramp = road_of(g, ON_RAMP);
+    for a in &sig.arms {
+        let stands = poles.iter().any(|p| dist(*p, a.pole) < 1e-3);
+        assert_eq!(stands, a.road != ramp, "the pole of road {}'s arm", a.road);
+    }
 }
 
 #[test]

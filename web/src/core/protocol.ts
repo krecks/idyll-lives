@@ -952,7 +952,7 @@ export interface WorldStructure {
   pullOverStreets?: PullOverStreetInfo[];
   /**
    * Where the traffic lights' poles stand on the pavement and which way their heads face (x, z, yaw: sim-core `traffic::SignalArm`, in the snapshot's signal
-   * head rows' order): the kerbside furniture keeps clear of them. Absent: none.
+   * head rows' order, an arm cars only leave by left out: no head stands there): the kerbside furniture keeps clear of them. Absent: none.
    */
   lightPoles?: [number, number, number][];
   /**
