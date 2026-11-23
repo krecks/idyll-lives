@@ -444,7 +444,18 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
     } else {
         AHEAD
     };
-    let (ahead, behind) = if reverse { (0.0, back) } else { (AHEAD, 0.0) };
+    // (On the move faster than on a country road (the motorway), it keeps further back from the
+    // one in front, the faster the further: `follow_ahead`.)
+    let speed = if moving {
+        crate::travel::dist(at, was) * DRIVE_TICKS_PER_SECOND
+    } else {
+        0.0
+    };
+    let (ahead, behind) = if reverse {
+        (0.0, back)
+    } else {
+        (follow_ahead(speed, travel.country_speed), 0.0)
+    };
     let layer = car.layer_on(t);
     let me = Driving {
         at,
@@ -600,6 +611,22 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
         car.shown = Some((shifted(p, yaw, shift), yaw, true, 0));
     }
 }
+
+/// The ground a car going `speed` (m a second of drive time, `0`: standing or setting off) keeps
+/// clear in front of it (m): `AHEAD`, as ever, up to a country road's speed (`country`, and
+/// `FOLLOW_SLACK` more: every classic town's cars keep it as they always did); faster (the
+/// motorway), `FOLLOW` s of drive for each m/s over that more. At 30 m/s some 28 m: a car on the
+/// motorway keeps back as a driver would, and stops (as every car here does, at once) well short
+/// of one stopped in front; a tick's drive there is 2 m, so none comes into another between two
+/// looks.
+pub(crate) fn follow_ahead(speed: f32, country: f32) -> f32 {
+    AHEAD + FOLLOW * (speed - country - FOLLOW_SLACK).max(0.0)
+}
+
+/// `follow_ahead`'s seconds of drive kept back for each m/s over a country road's speed, and how
+/// far over it (m/s) that begins.
+pub(crate) const FOLLOW: f32 = 2.0;
+pub(crate) const FOLLOW_SLACK: f32 = 1.0;
 
 /// How long a car stands at a zebra's stop line for those stepping onto it at most, and for those
 /// on it (ticks of real time, as they walk: `zebra_yield`). A stream of them coming up to it, it

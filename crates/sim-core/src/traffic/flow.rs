@@ -178,6 +178,12 @@ impl Traffic {
         self.holds.iter().any(|h| h.key == key && h.tag == tag)
     }
 
+    /// How many claims are held, and how many asks wait (the tests: all let go once the traffic's
+    /// gone by).
+    pub fn claims_out(&self) -> (usize, usize) {
+        (self.holds.len(), self.asks.len())
+    }
+
     /// Whether `key` holds a claim.
     pub fn holding(&self, key: u64) -> bool {
         self.holds.iter().any(|h| h.key == key)

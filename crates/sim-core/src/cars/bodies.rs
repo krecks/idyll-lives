@@ -101,9 +101,21 @@ pub(crate) fn movers(
         {
             approaching.push(gate);
         }
+        // (Faster than on a country road, further ahead: `LOOK_FAST`.)
+        let fast = moved && {
+            let (a, b) = (route.at(t).0, route.at(t + 1.0).0);
+            crate::travel::dist(a, b) * DRIVE_TICKS_PER_SECOND
+                > travel.country_speed + crate::cars::FOLLOW_SLACK
+        };
+        let looks: &[f32] = if fast {
+            &crate::traffic::LOOK_FAST
+        } else {
+            &[]
+        };
         let ahead = if moved {
             crate::traffic::LOOK
                 .iter()
+                .chain(looks)
                 .filter(|&&dt| t + dt < route.ticks())
                 .map(|&dt| {
                     let (q, qy, _) = route.at(t + dt);

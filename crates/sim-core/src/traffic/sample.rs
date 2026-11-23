@@ -47,6 +47,10 @@ pub(crate) struct Claim {
     /// `gate`): granted, but no further on than that once the light's no longer green, its holder
     /// lets it go and waits for the next green (`Traffic::begin`).
     pub stop_at: f32,
+    /// A merge off a ramp onto a motorway (`cars::Route::merges`): asked for with room in the
+    /// carriageway's traffic, none of it on the move into it going its way either (`begin`, rule
+    /// 3: `LOOK_FAST`); those on the carriageway hold none and never wait for it (`blocked`).
+    pub merge: bool,
 }
 
 impl Claim {
@@ -76,6 +80,7 @@ impl Claim {
             gate2: None,
             stop2: f32::NEG_INFINITY,
             stop_at: f32::NEG_INFINITY,
+            merge: false,
         }
     }
 
@@ -114,16 +119,28 @@ pub(crate) type Trace = Vec<(f32, [f32; 2], f32, bool, f32)>;
 /// country road goes about a metre a tick) `trace` looks along a route for its poses.
 const TRACE_STEP: f32 = crate::drive_ticks(0.025);
 
+/// How far a route's poses are looked along a step at most (m, `trace`): at a country road's
+/// speed a step is 0.4 m.
+const TRACE_MOST: f32 = 0.5;
+
 /// `Trace` of a route `ticks` long whose pose `t` ticks along is `at(t)`.
 pub(crate) fn trace(at: impl Fn(f32) -> ([f32; 2], f32, bool), ticks: f32) -> Trace {
     let (p, yaw, back) = at(0.0);
     let mut out: Trace = vec![(0.0, p, yaw, back, 0.0)];
     let (mut last, mut along, mut since, mut turned) = (p, 0.0f32, 0.0f32, yaw);
     let mut t = 0.0f32;
+    // (Faster than `TRACE_MOST` a step (the motorway), finer steps: its poses no further apart
+    // than at a country road's speed.)
+    let mut step = TRACE_STEP;
     while t < ticks {
-        t = (t + TRACE_STEP).min(ticks);
+        t = (t + step).min(ticks);
         let (p, yaw, back) = at(t);
         let d = dist(last, p);
+        step = if d > TRACE_MOST {
+            TRACE_STEP * TRACE_MOST / d
+        } else {
+            TRACE_STEP
+        };
         along += d;
         since += d;
         last = p;

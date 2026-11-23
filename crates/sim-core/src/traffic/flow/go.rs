@@ -120,8 +120,10 @@ impl Traffic {
         let next = if holding { *next } else { long(next) };
         let (now, next) = (sample(now), sample(&next));
         for h in &self.holds {
-            // (Going by a standing taxi, out round it: not its claim where it stands.)
+            // (Going by a standing taxi, out round it: not its claim where it stands. Nor a
+            // merge's: it was granted with room in the traffic, which goes on.)
             if h.key == key
+                || h.claim.merge
                 || !in_bounds(&h.claim, &next.rect)
                 || self.passing.contains(&(key, h.key))
             {
@@ -164,6 +166,7 @@ impl Traffic {
         };
         let old = |a: &&Ask| {
             a.key != key
+                && !a.parts.iter().any(|(_, c)| c.merge)
                 && a.seen + 1 >= self.tick
                 && self.tick > a.tick + OLD_ASK
                 && self

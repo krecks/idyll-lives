@@ -80,6 +80,17 @@ pub(crate) const LOOK: [f32; 3] = [
     crate::drive_ticks(1.0),
     crate::drive_ticks(1.5),
 ];
+/// One on the move faster than on a country road (the motorway), looked further ahead along its
+/// way (`cars::movers`, ticks: two seconds of drive time to four): a car merging onto the
+/// carriageway asks for its gap with room in the traffic coming along it (`Claim::merge`), some
+/// 120 m at 30 m/s.
+pub(crate) const LOOK_FAST: [f32; 5] = [
+    crate::drive_ticks(2.0),
+    crate::drive_ticks(2.5),
+    crate::drive_ticks(3.0),
+    crate::drive_ticks(3.5),
+    crate::drive_ticks(4.0),
+];
 /// How far along its way a vehicle's ask is its own business with one right behind it (m,
 /// `behind`): that one can't get there first. Further on (its way round and back) it may.
 const NEAR_AHEAD: f32 = 40.0;

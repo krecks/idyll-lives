@@ -261,13 +261,24 @@ impl Legs {
             .iter()
             .map(|&(a, b)| (at(Some(a)), at(b)))
             .collect();
-        // (Runs of points on one level off the ground, from the first's tick to the last's.)
+        // (Runs of points on one level off the ground, from the first's tick to the last's; from
+        // one point to the next on another, both: no stretch between two runs on the ground, where
+        // one on the deck and one coming off it wouldn't meet.)
         let mut layers: Vec<(f32, f32, crate::travel::Layer)> = Vec::new();
         let mut last: Option<(usize, crate::travel::Layer)> = None;
         for &(i, l) in &self.layers {
             let t = points[i.min(n - 1)].2;
-            match layers.last_mut() {
-                Some(run) if last.is_some_and(|(j, k)| j + 1 == i && k == l) => run.1 = t,
+            match last {
+                Some((j, k)) if j + 1 == i && k == l => {
+                    if let Some(run) = layers.last_mut() {
+                        run.1 = t;
+                    }
+                }
+                Some((j, k)) if j + 1 == i => {
+                    let was = points[j.min(n - 1)].2;
+                    layers.push((was, t, k.and(l)));
+                    layers.push((t, t, l));
+                }
                 _ => layers.push((t, t, l)),
             }
             last = Some((i, l));

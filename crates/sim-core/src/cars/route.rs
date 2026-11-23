@@ -170,7 +170,26 @@ impl Route {
         } else {
             trace.iter().map(|s| self.layer_at(s.0)).collect()
         };
+        // (Onto a motorway off a ramp: from `MERGE_UP` up the ramp to `MERGE_ON` past the merge,
+        // a claim of its own, asked for with room in the carriageway's traffic, `traffic::Claim`'s
+        // `merge`.)
+        let merges: Vec<(f32, f32)> = self
+            .merges
+            .iter()
+            .filter_map(|&m| {
+                let n = trace.len();
+                let k = trace.partition_point(|s| s.0 < m).min(n.checked_sub(1)?);
+                let d = trace[k].4;
+                let from = trace[trace.partition_point(|s| s.4 < d - MERGE_UP).min(k)].0;
+                let to = trace[trace.partition_point(|s| s.4 <= d + MERGE_ON).min(n - 1)].0;
+                (to > from).then_some((from, to))
+            })
+            .collect();
+        more.extend(&merges);
         self.claims = crate::traffic::claims(&trace, &pass, len, wid, boxes, &more, &layers);
+        for c in &mut self.claims {
+            c.merge = merges.iter().any(|&(a, b)| c.from < b && a < c.to);
+        }
         if let Some(t) = travel {
             crate::traffic::gate(&mut self.claims, &t.signals, &trace, len);
             let ground: crate::traffic::Trace = if layers.is_empty() {
@@ -923,6 +942,12 @@ impl Route {
         (p, wrap_angle(a.1 + wrap_angle(b.1 - a.1) * k), a.3)
     }
 }
+
+/// A merge off a ramp onto a motorway's carriageway (`Route::merges`) is claimed from this far up
+/// the ramp (m: short of its taper, `TAPER`, where the car waits for its gap) to this far past the
+/// merge (m).
+pub(crate) const MERGE_UP: f32 = 40.0;
+pub(crate) const MERGE_ON: f32 = 20.0;
 
 /// What leaving town by a motorway saves, the drive beyond the end of town being shorter
 /// (`MOTORWAY_OFF_MAP_TICKS`): seconds of drive time, taken off the drive to a motorway's end of

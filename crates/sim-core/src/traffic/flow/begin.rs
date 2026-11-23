@@ -274,8 +274,9 @@ impl Traffic {
                     next.iter().any(|c| {
                         in_bounds(c, r)
                             && c.samples.iter().any(|s| {
-                                // (Its far side clear too: don't block the box.)
-                                conflict(s, &o, strict || s.t > c.to)
+                                // (Its far side clear too: don't block the box. Into a
+                                // merge, those coming along the carriageway its way too.)
+                                conflict(s, &o, strict || c.merge || s.t > c.to)
                             })
                     })
                 };

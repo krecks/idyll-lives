@@ -636,7 +636,7 @@ pub(crate) fn lane_tops(
 }
 
 /// `empty_drive_ticks`'s drive, laid out.
-fn empty_drive_route(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Option<Route> {
+pub(crate) fn empty_drive_route(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Option<Route> {
     let g = &travel.graph;
     let a = *g.near(from, ROAD_REACH, 1, Mode::Car).first()?;
     let b = *g.near(to, ROAD_REACH, 1, Mode::Car).first()?;
