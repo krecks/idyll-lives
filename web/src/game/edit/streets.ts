@@ -588,8 +588,8 @@ export function streetCourse(meet: Meeting, shaped: StreetLine): StreetCourse | 
   return { start, end, junctions, part, head, foot, ends };
 }
 
-/** The width of a drawn road of `kind` (m): a footpath's, or its kind's (`ROAD_KIND`) and no narrower than every road's in a big world. */
-export const streetWidth = (kind: RoadKind) => (kind === 'trail' ? ROAD_KIND.trail.width : Math.max(ROAD_KIND[kind].width, ROAD_WIDTH));
+/** The width of a drawn road of `kind` (m): its kind's (`ROAD_KIND`), a lane's narrower than a street's. */
+export const streetWidth = (kind: RoadKind) => ROAD_KIND[kind].width;
 
 /**
  * `draft` with the street `stroke` draws (see the top of this file), its homes (`stroke.fill`, a
@@ -639,7 +639,7 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
   const rand = mulberry32(stroke.seed);
   const areaName = kind.area === undefined ? undefined : draft.open?.areas[kind.area]?.name;
   const name = was?.name ?? freshNames(draft, content, rand, 1, taken, areaName)[0];
-  const road: RoadPlan = { ...(was ?? {}), points: made, width: was?.width ?? width, ends, ...kind, name };
+  const road: RoadPlan = { ...(was ?? {}), points: made, width: was?.width ?? streetWidth(kind.kind ?? 'street'), ends, ...kind, name };
   // (Where it begins at a road's kerb, not its middle; the roads it is made of left out.)
   const trimmed = trimJoins([...roads.filter((_, i) => i !== base && i !== merged), road]);
   const laid: RoadPlan = { ...road, points: trimmed[trimmed.length - 1].points.map(([x, z]): Pt => [Math.round(x * 100) / 100, Math.round(z * 100) / 100]) };

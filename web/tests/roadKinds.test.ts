@@ -17,10 +17,10 @@ describe('ROAD_KIND', () => {
     expect([ROAD_KIND.street.width, ROAD_KIND.lane.width, ROAD_KIND.country.width, ROAD_KIND.trail.width]).toEqual([MAIN_WIDTH, LANE_WIDTH, ROAD_WIDTH, TRAIL_WIDTH]);
     expect([ROAD_KIND.street.sidewalk, ROAD_KIND.lane.sidewalk, ROAD_KIND.country.sidewalk, ROAD_KIND.trail.sidewalk]).toEqual([SIDEWALK, SIDEWALK, 0, 0]);
     expect({ street: GRADE.street, lane: GRADE.lane, country: GRADE.country, trail: GRADE.trail }).toEqual({ street: 0.08, lane: 0.08, country: 0.12, trail: 0.22 });
-    // (A drawn lane is as wide as a street until lanes are made narrow.)
+    // (A drawn lane is a lane's 6 m, narrower than a street.)
     expect(ROAD_KINDS.filter((k) => ROAD_KIND[k].drawable).map((k) => [k, streetWidth(k)])).toEqual([
       ['street', 7],
-      ['lane', 7],
+      ['lane', 6],
       ['country', 7],
       ['trail', 2],
       ['avenue', 14],
