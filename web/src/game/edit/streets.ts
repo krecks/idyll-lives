@@ -607,8 +607,8 @@ export function streetCourse(meet: Meeting, shaped: StreetLine): StreetCourse | 
   return { start, end, junctions, part, head, foot, ends };
 }
 
-/** The width of a drawn road of `kind` (m): a footpath's, or its kind's (`ROAD_KIND`) and no narrower than every road's in a big world. */
-export const streetWidth = (kind: RoadKind) => (kind === 'trail' ? ROAD_KIND.trail.width : Math.max(ROAD_KIND[kind].width, ROAD_WIDTH));
+/** The width of a drawn road of `kind` (m): its kind's (`ROAD_KIND`), a lane's narrower than a street's. */
+export const streetWidth = (kind: RoadKind) => ROAD_KIND[kind].width;
 
 /** Why a one-way street is refused where it would leave somewhere a car can't get back from (`oneway.ts` `cutOffRoads`). */
 export const CUT_OFF = 'some homes could no longer be reached by car';
@@ -688,7 +688,7 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
   const name = was?.name ?? freshNames(draft, content, rand, 1, taken, areaName)[0];
   // (One-way the way it is drawn: its points may run the other way, from a dead end it carries on.)
   const oneWay = was || trail || !stroke.oneway ? null : ((stroke.oneway * drawnWay(stroke.points, made)) as 1 | -1);
-  const road: RoadPlan = { ...(was ?? {}), points: made, width: was?.width ?? width, ends, ...kind, name, ...(oneWay ? { oneway: oneWay } : {}) };
+  const road: RoadPlan = { ...(was ?? {}), points: made, width: was?.width ?? streetWidth(kind.kind ?? 'street'), ends, ...kind, name, ...(oneWay ? { oneway: oneWay } : {}) };
   if (onewayOf(road) && ends.includes('dead')) return refused(ONE_WAY_ENDS);
   // (Where it begins at a road's kerb, not its middle; the roads it is made of left out.)
   const trimmed = trimJoins([...roads.filter((_, i) => i !== base && i !== merged), road]);

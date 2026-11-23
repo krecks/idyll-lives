@@ -28,7 +28,6 @@
     { value: 'trail', label: 'Footpath' },
   ];
   /** A lane is narrow only where its kind is narrower than a street (`streetWidth`). */
-  const narrowLane = streetWidth('lane') < streetWidth('street');
   const ALONG: readonly { value: Along; label: string }[] = [
     { value: 'homes', label: 'Homes' },
     { value: 'buildings', label: 'Town buildings' },
@@ -63,7 +62,7 @@
       {#if streetChoice.kind === 'trail'}
         No cars and nothing along it; it does not cross the water.
       {:else if streetChoice.kind === 'lane'}
-        A {narrowLane ? 'narrow ' : ''}lane, {streetWidth('lane')} m wide, in {editor.townName || 'the town'}, a village or out of them (given to the nearest when the town is built).
+        A narrow lane, {streetWidth('lane')} m to a street's {streetWidth('street')}: two cars meeting on it pull over to pass. In {editor.townName || 'the town'}, a village or out of them (given to the nearest when the town is built).
       {:else if streetChoice.kind === 'street'}
         A street, {streetWidth('street')} m wide, in {editor.townName || 'the town'}, a village or out of them (given to the nearest when the town is built).
       {:else if streetChoice.kind === 'avenue'}
