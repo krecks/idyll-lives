@@ -588,8 +588,6 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const takenNames: string[] = [];
   const laying: Laying = { W, D, roads, plans };
   putArea(laying, name ?? rolledName, mainRoads, box, ox, oz, false, mainSpec, layout.greens ?? [], layout.centre ?? mainRoads[0].points[Math.floor(mainRoads[0].points.length / 2)]);
-  // (A city's avenue stays one: `putArea` makes its first road a street, the rest lanes.)
-  mainRoads.forEach((r, k) => r.kind === 'avenue' && (roads[plans[0].roads[k]].kind = 'avenue'));
 
   // ---- a river's town bridge, an island's causeways -------------------------------------------
   /** Bridges and causeways laid (their ends, for the hamlets to keep clear of). */
@@ -905,6 +903,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     const region = dry ? { holds: (r: Rect, by: number) => [...linked].some((id) => dry.holds(id, r, by)) } : null;
     return hamlets > 0 ? villagesFrom(0, hamlets, clear, region, rand.fork(), false) : 0;
   };
+  /** The roads that found no way before its course was chosen: the same on any course (`nextCourse`). */
+  const failedBefore = failed.length;
   const motorRoute = lay?.noMotorway ? { failed: lay.noMotorway } : routeMotorway({ ...motorSite, areas: plans, roads, room: villageRoom, skip: lay?.motorwaySkip });
   let motorway = 'failed' in motorRoute ? null : motorRoute;
   /** Why the world has no motorway (`diagnostics.motorway`), if it has none. */
@@ -1517,18 +1517,17 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   // ---- the motorway laid: raised over the roads under it, its junction a half-diamond on the nearest the town ----
   if (motorway) {
     // (Country roads that found no way round it, where on the next course or without it they would have: the world
-    // laid again so.)
+    // laid again so. Not for those that found none before its course was chosen: laid again, they find none again.)
     let other: NeighbourhoodDraft | null = null;
-    if (failed.length) {
-      other = generateFromSpec(content, t, spec, seed, name, step, shaped, nextCourse('No motorway: the country roads would find no way round it.'));
-      if ((other.diagnostics?.roads?.length ?? 0) < failed.length) return other;
-    }
+    const relaid = () => (other ??= generateFromSpec(content, t, spec, seed, name, step, shaped, nextCourse('No motorway: the country roads would find no way round it.')));
+    const relay = failed.length > 0;
+    if (failed.length > failedBefore && (relaid().diagnostics?.roads?.length ?? 0) < failed.length) return relaid();
     const named = (wanted: string) => uniqueName(wanted, `${wanted} Old`);
     let laid = finishMotorway(motorway, roads, motorWet, mainCentre, roads.length, named);
     // (No road under it with room for its ramps: one from the town under it at its junction's gate, then on.)
     if (!laid && junctionLink(motorway)) laid = finishMotorway(motorway, roads, motorWet, mainCentre, roads.length, named);
     // (Nowhere for it: the world laid again on the next course, else without it, its country roads routed as if it never was.)
-    if (!laid) return other ?? generateFromSpec(content, t, spec, seed, name, step, shaped, nextCourse('No motorway: no road under it with room for its junction.'));
+    if (!laid) return relay ? relaid() : generateFromSpec(content, t, spec, seed, name, step, shaped, nextCourse('No motorway: no road under it with room for its junction.'));
     for (const [r, list] of laid.under) roads[r] = { ...roads[r], crosses: [...(roads[r].crosses ?? []), ...list] };
     roads.push(...laid.roads);
   }
@@ -2114,7 +2113,8 @@ export function putArea(laying: Laying, areaName: string, laid: readonly RoadPla
     if (r.ends[0] === 'out') while (to - from > 2 && !inWorld(all[from])) from++;
     const points = all.slice(from, to);
     const width = k === 0 ? Math.max(r.width, ROAD_KIND.street.width) : ROAD_KIND.lane.width;
-    const road: RoadPlan = { ...r, points, width, kind: k === 0 ? 'street' : 'lane', area: index, ...(r.lots && swap ? { lots: (-r.lots) as 1 | -1 } : {}) };
+    // (A city's avenue stays one, as wide as it was laid.)
+    const road: RoadPlan = { ...r, points, width, kind: r.kind === 'avenue' ? 'avenue' : k === 0 ? 'street' : 'lane', area: index, ...(r.lots && swap ? { lots: (-r.lots) as 1 | -1 } : {}) };
     const at = roads.push(road) - 1;
     plan.roads.push(at);
     for (const e of [0, 1] as const) {
