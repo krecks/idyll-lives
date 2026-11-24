@@ -34,7 +34,7 @@
 
   let templates = $state.raw<Templates | null>(null);
   let town = $state.raw<NeighbourhoodDraft | null>(app.town);
-  /** The lot under the pointer (3D, a tag or a card), and the card chosen (its home: a house's lot or a flat): the camera goes to its area. */
+  /** The lot under the pointer (3D, a tag or a card), and the card chosen (its home: a house's lot or a flat): the camera glides in to its lot. */
   let hover = $state<number | null>(null);
   let focus = $state<HomeRef | null>(app.play !== null && app.offer.some((o) => sameHome(o, app.play)) ? app.play : null);
   let hoverOff = 0;
@@ -198,7 +198,7 @@
     app.screen = 'home';
   }
 
-  /** A card picked (again: let go): the camera goes to its area, its card into view. */
+  /** A card picked (again: let go): the camera glides in to its home, its card into view. */
   function select(home: HomeRef | null): void {
     focus = home !== null && !sameHome(home, focus) && offer.some((o) => sameHome(o, home)) ? home : null;
     if (focus === null) return;
@@ -215,12 +215,6 @@
     const at = here.findIndex((o) => sameHome(o, focus));
     select(here[at + 1] ?? focus);
   }
-
-  /** What the camera frames: the area of the household chosen, else the whole world. */
-  const shot = $derived.by((): 'world' | { area: number } => {
-    const s = focus === null ? undefined : town?.slots[focus.slot];
-    return s ? { area: s.area ?? 0 } : 'world';
-  });
 
   onMount(async () => {
     templates = await loadTemplates();
@@ -324,7 +318,7 @@
 {#snippet stage()}
   <div class="split">
     {#if town}
-      <TownStage {labels} {hover} selected={focus?.slot ?? null} focus={null} {shot} selectable={(p) => offeredLots.includes(p)} onhover={setHover} onselect={selectLot} />
+      <TownStage {labels} {hover} selected={focus?.slot ?? null} focus={focus?.slot ?? null} shot="world" selectable={(p) => offeredLots.includes(p)} onhover={setHover} onselect={selectLot} />
     {:else}
       <div></div>
     {/if}
