@@ -549,6 +549,11 @@ export class SunShadows {
     // SAFETY: both of PlayCanvas 2.23's devices copy a render target's depth with `copyRenderTarget(source, dest,
     // color, depth)` (WebGPU `copyTextureToTexture`, WebGL2 `blitFramebuffer`), outside a pass (`check:chunks`).
     (this.device as unknown as { copyRenderTarget(source: pc.RenderTarget, dest: pc.RenderTarget, color: boolean, depth: boolean): boolean }).copyRenderTarget(this.stillTarget!, map, false, true);
+    // SAFETY: PlayCanvas 2.23's WebGL2 `copyRenderTarget` binds the target before it back by hand
+    // (`gl.bindFramebuffer`), leaving the one it records as bound (`activeFramebuffer`, which `setFramebuffer` skips
+    // binding again) the map's: the sun's pass after it took the map as bound and drew what moves into whatever was
+    // (the canvas: "INVALID_ENUM: invalidateFramebuffer" at its end). Forgotten, the pass binds the map (`check:chunks`).
+    if (!this.device.isWebGPU) (this.device as unknown as { activeFramebuffer: unknown }).activeFramebuffer = undefined;
     this.copied = true;
     if (change) {
       this.draws.whole++;
