@@ -531,7 +531,7 @@ pub fn materials() -> J {
             surf(
                 "#E2D2C8",
                 "floor_pavers",
-                0.7071,
+                std::f64::consts::FRAC_1_SQRT_2,
                 &[("projection", s("xz")), ("metallic", i(0))],
             ),
         ),

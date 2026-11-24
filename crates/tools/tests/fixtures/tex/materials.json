@@ -90,7 +90,7 @@
     "texture": "textures/floor_pavers/albedo.jpg",
     "normal": "normal.jpg",
     "arm": "arm.jpg",
-    "uvScale": 0.7071,
+    "uvScale": 0.7071067811865476,
     "projection": "xz",
     "metallic": 0
   },
