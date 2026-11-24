@@ -371,14 +371,29 @@ pub(crate) fn way_marks(
         return None;
     }
     let kind = |i: usize| g.roads[on[i].0 as usize].kind;
+    // (How far along its road a point is: only on a road with decks, the one place its level
+    // depends on it (`Graph::layer_at`); found from the segment the point before was on, along
+    // the same road, `Road::project_from`, not by looking along the whole road for each point.)
+    let mut seg: Option<(u32, usize)> = None;
     Some(
         (0..pts.len().min(on.len()))
             .map(|i| {
-                let (s, _) = g.roads[on[i].0 as usize].project(pts[i]);
+                let r = on[i].0;
+                let road = &g.roads[r as usize];
+                let s = if g.decks.get(r as usize).is_none_or(|d| d.is_empty()) {
+                    0.0
+                } else {
+                    let (k, (s, _)) = match seg {
+                        Some((q, k)) if q == r => road.project_from(k, pts[i]),
+                        _ => road.project_on(pts[i]),
+                    };
+                    seg = Some((r, k));
+                    s
+                };
                 let merge = kind(i) == RoadKind::Ramp
                     && on.get(i + 1).is_some()
                     && kind(i + 1) == RoadKind::Motorway;
-                (g.layer_at(on[i].0, s), merge)
+                (g.layer_at(r, s), merge)
             })
             .collect(),
     )

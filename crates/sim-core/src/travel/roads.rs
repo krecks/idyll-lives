@@ -98,10 +98,35 @@ impl Road {
 
     /// The nearest point on it to `p`: how far along it is, and how far from `p`.
     pub fn project(&self, p: [f32; 2]) -> (f32, f32) {
+        self.project_on(p).1
+    }
+
+    /// `project`, and the segment it's on (the first of those as near).
+    pub(crate) fn project_on(&self, p: [f32; 2]) -> (usize, (f32, f32)) {
         (0..self.pts.len() - 1)
-            .map(|i| self.project_segment(i, p))
-            .min_by(|a, b| a.1.total_cmp(&b.1))
-            .unwrap_or((0.0, f32::INFINITY))
+            .map(|i| (i, self.project_segment(i, p)))
+            .min_by(|a, b| a.1.1.total_cmp(&b.1.1))
+            .unwrap_or((0, (0.0, f32::INFINITY)))
+    }
+
+    /// `project_on` for a point near segment `k`'s nearest to the one before it (the next along a
+    /// way on it): from segment `k` to the next while that's nearer `p` (or as near and earlier),
+    /// either way. What `project_on` gives where the road doesn't come back by `p` further along.
+    pub(crate) fn project_from(&self, k: usize, p: [f32; 2]) -> (usize, (f32, f32)) {
+        let last = self.pts.len() - 2;
+        let mut best = (k.min(last), self.project_segment(k.min(last), p));
+        loop {
+            let (k, (_, d)) = best;
+            let next = [k.checked_sub(1), (k < last).then_some(k + 1)]
+                .into_iter()
+                .flatten()
+                .map(|j| (j, self.project_segment(j, p)))
+                .find(|&(j, (_, dj))| dj < d || dj == d && j < k);
+            match next {
+                Some(n) => best = n,
+                None => return best,
+            }
+        }
     }
 
     /// Its middle line from `s0` to `s1` (either way round), ends included.
