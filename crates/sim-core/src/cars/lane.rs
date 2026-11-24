@@ -12,7 +12,7 @@ use super::*;
 
 /// The right of going `d` (a way along the ground, x z): a quarter turn clockwise seen from
 /// above. Going +x (east), -z (south). See the top of this file.
-pub(crate) fn right_of(d: [f32; 2]) -> [f32; 2] {
+pub fn right_of(d: [f32; 2]) -> [f32; 2] {
     [d[1], -d[0]]
 }
 

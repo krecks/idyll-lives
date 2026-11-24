@@ -1875,3 +1875,63 @@ fn nobody_turns_round_on_the_motorway_or_a_ramp() {
     }
     assert_eq!(w.traffic.unjams, 0);
 }
+
+/// Traffic keeps to the right as the game draws it (the owner's choice, 2026-11-24: German rules),
+/// pinned end to end with `web/tests/rightHand.test.ts`, which takes the same convention through
+/// the renderer's mirror and camera to the screen. The town's x runs east and its z north, a yaw
+/// clockwise from above: going +x, the right is -z (`cars::right_of`). A car going north up
+/// Bridge Street keeps east of its middle line, one coming south west of it; each lit junction's
+/// pole stands on the right of those coming in, its head facing them and its right side (+x as
+/// the model is made, where the pedestrians' head looks) towards the road.
+#[test]
+fn traffic_keeps_to_the_right_as_the_game_draws_it() {
+    use sim_core::cars::right_of;
+    assert_eq!(right_of([1.0, 0.0]), [0.0, -1.0]);
+    assert_eq!(right_of([0.0, 1.0]), [1.0, 0.0]);
+    // (Forward is (sin yaw, cos yaw): going +x, a yaw of a quarter turn clockwise.)
+    let yaw = std::f32::consts::FRAC_PI_2;
+    let r = right_of([yaw.sin(), yaw.cos()]);
+    assert!((r[0] - yaw.cos()).abs() < 1e-6 && (r[1] + yaw.sin()).abs() < 1e-6);
+    let w = world();
+    let g = &w.travel.graph;
+    let x = STREET_X as f32;
+    let lane = 1.05;
+    for (a, b, side) in [([x, 90.0], [x, 160.0], 1.0), ([x, 160.0], [x, 90.0], -1.0)] {
+        let drive = poses(&w, a, b);
+        let on: Vec<[f32; 2]> = drive
+            .iter()
+            .map(|d| d.0)
+            .filter(|p| p[1] > 100.0 && p[1] < 150.0 && !boxed(g, *p))
+            .collect();
+        assert!(on.len() > 10, "{a:?} to {b:?}");
+        for p in on {
+            assert!(
+                ((p[0] - x) * side - lane).abs() < 0.05,
+                "{a:?} to {b:?}: at {p:?}, not on its right"
+            );
+        }
+    }
+    let mut poles = 0;
+    for sig in &w.travel.signals {
+        for a in sig.arms.iter().filter(|a| a.inbound()) {
+            // (Coming in against the arm's way out: their right.)
+            let right = right_of([-a.way[0], -a.way[1]]);
+            let off = [a.pole[0] - sig.at[0], a.pole[1] - sig.at[1]];
+            assert!(
+                off[0] * right[0] + off[1] * right[1] > a.kerb,
+                "the pole at {:?} on the left of those coming in",
+                a.pole
+            );
+            // (The head's facing (sin, cos) out along the arm, at them; its +x (cos, -sin) back
+            // across the road.)
+            let (s, c) = a.yaw.sin_cos();
+            assert!(s * a.way[0] + c * a.way[1] > 0.9, "facing {}", a.yaw);
+            assert!(
+                c * right[0] - s * right[1] < -0.9,
+                "its right away from the road"
+            );
+            poles += 1;
+        }
+    }
+    assert!(poles >= 4, "{poles} poles");
+}
