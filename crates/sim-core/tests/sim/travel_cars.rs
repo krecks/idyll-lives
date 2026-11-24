@@ -1006,6 +1006,11 @@ fn crossroads(houses: &[House]) -> World {
 /// The crossroads (`crossroads`) with `walls` (the town file's: `[x0, z0, x1, z1]` along the
 /// tiles' edges).
 fn crossroads_walled(houses: &[House], walls: &str) -> World {
+    crossroads_in(CONTENT, houses, walls)
+}
+
+/// `crossroads_walled` with `content`.
+fn crossroads_in(content: &str, houses: &[House], walls: &str) -> World {
     let arm = |a: [f32; 2], b: [f32; 2], ends: &str| {
         format!(
             r#"{{"points":[{}],"width":7,"kind":"street","ends":{ends},"area":0}}"#,
@@ -1024,7 +1029,7 @@ fn crossroads_walled(houses: &[House], walls: &str) -> World {
         r#","size":"big","walls":{walls},"doors":[],"windows":[],"relationships":[],
         "areas":[{{"name":"Crossroads","kind":"hamlet","x":130,"z":130,"w":140,"d":140}}]"#
     );
-    town_of(CONTENT, &more, 400, 400, &roads, exits, houses)
+    town_of(content, &more, 400, 400, &roads, exits, houses)
 }
 
 /// A house by the crossroads' north arm (`z` below 200, west of it) or south arm (east of it),
@@ -3146,4 +3151,78 @@ fn at_super_speed_the_snapshot_has_the_way_each_car_went_tick_by_tick() {
         straight_worst > 2.0,
         "the straight line cut no corner: {straight_worst}"
     );
+}
+
+/// Undo puts the households' cars back first and the taxis after them (`World::restore`), so a
+/// car may come back at another place in `World::cars` (here a household's car taken for a taxi
+/// before the others): its way as drawn (`snapshot::car::TRAIL`) goes with it, so no car is
+/// drawn along another's way as time runs on.
+#[test]
+fn after_an_undo_no_car_is_drawn_along_another_cars_way() {
+    use sim_core::snapshot::{self, CAR_BASE, CAR_STRIDE, TRAIL_BASE, TRAIL_STRIDE, car, trail};
+    const LAMP: &str = r#"{
+        "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.01}],
+        "objects":[{"id":"lamp","name":"Lamp","price":30,"interactions":[]}],
+        "economy":{"startingFunds":500}}"#;
+    let houses = [
+        crossroads_house(170.0, true),
+        crossroads_house(230.0, false),
+        crossroads_house(178.0, true),
+        crossroads_house(222.0, false),
+    ];
+    let mut w = crossroads_in(LAMP, &houses, "[]");
+    w.speed = 4;
+    // (Every car by its paint, which is its own: where it was drawn tick by tick.)
+    let mut ways: std::collections::HashMap<u8, Vec<[f32; 2]>> = Default::default();
+    let step = |w: &mut World, ways: &mut std::collections::HashMap<u8, Vec<[f32; 2]>>| {
+        w.start_step();
+        while w.advance_more() {
+            for c in &w.cars {
+                if let Some(s) = c.shown {
+                    ways.entry(c.paint).or_default().push(s.0);
+                }
+            }
+        }
+    };
+    for _ in 0..20 {
+        keep_driving(&mut w);
+        step(&mut w, &mut ways);
+    }
+    let moving = |w: &World| {
+        w.cars
+            .iter()
+            .filter(|c| c.shown.is_some_and(|s| s.2))
+            .count()
+    };
+    assert!(moving(&w) >= 2, "too few cars on their way: {}", moving(&w));
+    // The first car a taxi, then an edit taken back: the others' cars come back before it.
+    w.cars[0].taxi = true;
+    let paints = |w: &World| w.cars.iter().map(|c| c.paint).collect::<Vec<_>>();
+    let before = paints(&w);
+    common::buy(&mut w, "lamp", 182, 164);
+    w.apply(sim_core::Command::Undo { household: 0 }).unwrap();
+    assert_ne!(paints(&w), before, "the cars in the same order");
+    let mut buf = vec![0.0f32; snapshot::CAPACITY];
+    let mut checked = 0;
+    for k in 0..4 {
+        if k > 0 {
+            step(&mut w, &mut ways);
+        }
+        snapshot::write(&w, &mut buf);
+        for (c, cr) in w.cars.iter().enumerate() {
+            let o = CAR_BASE + c * CAR_STRIDE;
+            let own = &ways[&cr.paint];
+            for i in 0..buf[o + car::TRAIL_LEN] as usize {
+                let a = TRAIL_BASE + (buf[o + car::TRAIL] as usize + i) * TRAIL_STRIDE;
+                let p = [buf[a + trail::X], buf[a + trail::Z]];
+                assert!(
+                    own.iter().any(|q| (q[0] - p[0]).hypot(q[1] - p[1]) < 1e-3),
+                    "step {k}: car {c} (paint {}) drawn through {p:?}, where it never was",
+                    cr.paint
+                );
+                checked += 1;
+            }
+        }
+    }
+    assert!(checked > 10, "too few points drawn: {checked}");
 }

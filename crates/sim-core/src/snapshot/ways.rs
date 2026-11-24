@@ -22,6 +22,10 @@ pub const TRAIL_POINTS: usize = 4096;
 pub const TRAIL_TOLERANCE: f32 = 0.08;
 /// How far from its middle (m) a car's yaw is judged by: about half a car's length.
 const YAW_LEVER: f32 = 2.0;
+/// How far (m) a car may be from where it was the tick before and its way go on: further, it was
+/// put there (no car drives so far in a tick: on a motorway some 2 m), and its way starts again
+/// there, not drawn sliding across from where it was.
+const TRAIL_JUMP: f32 = 10.0;
 
 /// A car's pose after a tick: the step it was in (`Trails::step`), the tick of that step (from
 /// 1), where its middle was and which way it faced.
@@ -40,7 +44,8 @@ pub struct Trails {
     step: u32,
     /// The ticks each of the steps before it ran, newest last: (step, ticks).
     ran: VecDeque<(u32, u32)>,
-    /// Per car (`World::cars` order): its poses, oldest first, one before the window at most.
+    /// Per car (`World::cars` order, `remap`ped as that changes): its poses, oldest first, one
+    /// before the window at most.
     cars: Vec<VecDeque<Point>>,
 }
 
@@ -76,6 +81,12 @@ impl Trails {
                 at,
                 yaw,
             };
+            if way
+                .back()
+                .is_some_and(|q| (q.at[0] - at[0]).hypot(q.at[1] - at[1]) > TRAIL_JUMP)
+            {
+                way.clear();
+            }
             // (Standing still: the run of the same pose is its first point and its last.)
             let n = way.len();
             if n >= 2 && same(&way[n - 1], &p) && same(&way[n - 2], &p) {
@@ -88,6 +99,21 @@ impl Trails {
                 way.pop_front();
             }
         }
+    }
+
+    /// `World::cars` put back in another order or as they were before (`World::restore`): car `c`
+    /// now is the one at `from(c)` before, its way going on; None: a car put back elsewhere, its
+    /// way starting again from where it is now.
+    pub(crate) fn remap(&mut self, n: usize, from: impl Fn(usize) -> Option<usize>) {
+        let mut old = std::mem::take(&mut self.cars);
+        self.cars = (0..n)
+            .map(|c| {
+                from(c)
+                    .and_then(|o| old.get_mut(o))
+                    .map(std::mem::take)
+                    .unwrap_or_default()
+            })
+            .collect();
     }
 
     /// When point `p` was, in steps from the end of the step under way (which ran `now` ticks):
@@ -293,6 +319,34 @@ mod tests {
         let t = trails_of(&[step]);
         assert_eq!(t.cars[0].len(), 2);
         assert_eq!(t.cars[0][1].tick, 50);
+    }
+
+    #[test]
+    fn a_car_put_elsewhere_starts_again() {
+        let mut t = Trails::default();
+        t.begin_step(0);
+        t.record(1, std::iter::once(Some(([0.0, 0.0], 0.0))));
+        t.record(2, std::iter::once(Some(([1.5, 0.0], 0.0))));
+        t.record(3, std::iter::once(Some(([40.0, 0.0], 0.0))));
+        assert_eq!(t.cars[0].len(), 1);
+        assert_eq!(t.cars[0][0].at, [40.0, 0.0]);
+    }
+
+    #[test]
+    fn remapped_ways_go_with_their_cars() {
+        let mut t = Trails::default();
+        t.begin_step(0);
+        let poses = [
+            Some(([0.0, 0.0], 0.0)),
+            Some(([100.0, 0.0], 0.0)),
+            Some(([0.0, 100.0], 0.0)),
+        ];
+        t.record(1, poses.into_iter());
+        // (The first put back elsewhere, the other two swapped.)
+        t.remap(3, |c| [None, Some(2), Some(1)][c]);
+        assert!(t.cars[0].is_empty());
+        assert_eq!(t.cars[1][0].at, [0.0, 100.0]);
+        assert_eq!(t.cars[2][0].at, [100.0, 0.0]);
     }
 
     #[test]
