@@ -71,11 +71,16 @@ fn speed_of(car: &Car) -> f32 {
 }
 
 /// A stretch of a car's way on from where it is: its steps, each from `a` to `b`, `d` m along
-/// from where it is at `a`, at ticks `ta` to `tb`.
+/// from where it is at `a`, at ticks `ta` to `tb`, at speed `v`.
 struct Path(Vec<Step>);
 
-/// A step of a `Path`: from and to, how far along it begins (m), and its ticks along the way.
-type Step = ([f32; 2], [f32; 2], f32, f32, f32);
+/// A step of a `Path`: from and to, how far along it begins (m), its ticks along the way, and how
+/// fast its way's timing goes there (m/s of drive time): the whole step between the way's two
+/// points it lies on, the first from where the car is (part of one) too. (Worked out from its own
+/// part of a step, a car standing a hair's breadth short of a point, its part of the step there of
+/// no length at all in f32 but some ticks long, had a speed of none there, and stood for good
+/// with nobody to wait for: a taxi turning off an avenue, the queue behind it, Oatcroft.)
+type Step = ([f32; 2], [f32; 2], f32, f32, f32, f32);
 
 impl Path {
     /// `route` from `t` ticks along, `look` m of it at most (as far as it drives on, not backing).
@@ -89,7 +94,17 @@ impl Path {
                 break;
             }
             let q = pts[i];
-            out.push((a, q.0, d, ta, q.2));
+            let (p, tp) = if i > 0 {
+                (pts[i - 1].0, pts[i - 1].2)
+            } else {
+                (a, ta)
+            };
+            let v = if q.2 > tp + 1e-6 {
+                dist(p, q.0) / (q.2 - tp) * DRIVE_TICKS_PER_SECOND
+            } else {
+                f32::INFINITY
+            };
+            out.push((a, q.0, d, ta, q.2, v));
             d += dist(a, q.0);
             (a, ta) = (q.0, q.2);
             i += 1;
@@ -119,16 +134,13 @@ impl Path {
         self.0
             .iter()
             .filter(|s| s.4 > s.3 + 1e-6)
-            .map(|&(a, b, d, ta, tb)| {
-                let v = dist(a, b) / (tb - ta) * DRIVE_TICKS_PER_SECOND;
-                (v * v + 2.0 * BRAKE * d).sqrt()
-            })
+            .map(|&(.., d, _, _, v)| (v * v + 2.0 * BRAKE * d).sqrt())
             .fold(f32::INFINITY, f32::min)
     }
 
     /// How far along it (m) it is `t` ticks along its way; None: further than it reaches.
     fn at_tick(&self, t: f32) -> Option<f32> {
-        self.0.iter().find_map(|&(a, b, d, ta, tb)| {
+        self.0.iter().find_map(|&(a, b, d, ta, tb, _)| {
             (ta <= t && t <= tb).then(|| {
                 let k = if tb > ta { (t - ta) / (tb - ta) } else { 1.0 };
                 d + dist(a, b) * k
