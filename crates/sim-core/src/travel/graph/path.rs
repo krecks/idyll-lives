@@ -19,7 +19,10 @@ impl Graph {
                 cost,
                 ..Default::default()
             };
-            self.each_point(pieces, |p| out.pts.push(p));
+            self.each_point(pieces, |p, on| {
+                out.pts.push(p);
+                out.roads.push(on);
+            });
             out
         })
     }
@@ -41,7 +44,10 @@ impl Graph {
                 cost,
                 ..Default::default()
             };
-            self.each_point(pieces, |p| out.pts.push(p));
+            self.each_point(pieces, |p, on| {
+                out.pts.push(p);
+                out.roads.push(on);
+            });
             out.edges = pieces
                 .iter()
                 .filter_map(|&(r, s0, s1)| self.edge_at(r, (s0 + s1) / 2.0))
@@ -62,7 +68,7 @@ impl Graph {
         self.search(from, to, mode, country, |pieces| {
             let (_, cost) = self.measure(pieces, mode, country);
             let (mut n, mut first, mut last) = (0, [[0.0; 2]; 2], [[0.0; 2]; 2]);
-            self.each_point(pieces, |(p, ..)| {
+            self.each_point(pieces, |(p, ..), _| {
                 if n < 2 {
                     first[n] = p;
                 }
@@ -74,8 +80,13 @@ impl Graph {
     }
 
     /// The points along the stretches of road `pieces`, one after another, as `path` has them
-    /// (one within 0.05 m of the one before left out), each with its road's width and kind.
-    fn each_point(&self, pieces: &[Piece], mut f: impl FnMut(([f32; 2], f32, RoadKind))) {
+    /// (one within 0.05 m of the one before left out), each with its road's width and kind, and
+    /// the road and whether it goes along it the way its points run (`RoadPath::roads`).
+    fn each_point(
+        &self,
+        pieces: &[Piece],
+        mut f: impl FnMut(([f32; 2], f32, RoadKind), (u32, bool)),
+    ) {
         let mut last: Option<[f32; 2]> = None;
         for &(r, s0, s1) in pieces {
             let road = &self.roads[r as usize];
@@ -84,7 +95,7 @@ impl Graph {
                     continue;
                 }
                 last = Some(p);
-                f((p, road.width, road.kind));
+                f((p, road.width, road.kind), (r, s1 >= s0));
             }
         }
     }
@@ -127,7 +138,9 @@ impl Graph {
     }
 
     /// `search`, setting off from `from` only towards `way.toward` (a node at an end of its edge),
-    /// and each edge of `way.avoid` costing that much more.
+    /// coming onto `to`'s only from `way.arrive`, and each edge of `way.avoid` costing that much
+    /// more. A car keeps to one-way roads' way
+    /// (`Graph::may_go`) setting off, on the way and coming in.
     fn search_by<R>(
         &self,
         from: RoadPoint,
@@ -150,6 +163,11 @@ impl Graph {
         if !allowed(&fe) || !allowed(&te) {
             return None;
         }
+        // (A car goes along a one-way road its way only, `forward` the way its points run;
+        // someone on foot either way.)
+        let goes = |e: &Edge, forward: bool| {
+            mode == Mode::Foot || self.roads[e.road as usize].oneway.may_go(forward)
+        };
         let kind = |e: &Edge| self.roads[e.road as usize].kind;
         // The same stretch of road: straight along it (the way it may set off).
         let ahead = |s: f32| match way.toward {
@@ -157,13 +175,24 @@ impl Graph {
             Some(n) if n == fe.a => s <= from.s,
             _ => true,
         };
-        if from.road == to.road && from.edge == to.edge && ahead(to.s) {
+        // (Coming in from `way.arrive` only: along the goal's stretch from that end.)
+        let comes = |s: f32| match way.arrive {
+            Some(n) if n == te.a && n != te.b => to.s >= s,
+            Some(n) if n == te.b && n != te.a => to.s <= s,
+            _ => true,
+        };
+        if from.road == to.road
+            && from.edge == to.edge
+            && ahead(to.s)
+            && comes(from.s)
+            && (to.s == from.s || goes(&fe, to.s > from.s))
+        {
             return Some(found(&[(from.road, from.s, to.s)]));
         }
         let extra = |e: u32| way.avoid.iter().find(|a| a.0 == e).map_or(0.0, |a| a.1);
         let top = match mode {
             Mode::Foot => 1.0,
-            Mode::Car => country.max(TOWN_SPEED),
+            Mode::Car => self.top_speed(country),
         };
         let h = |n: u32| {
             let d = dist(
@@ -195,8 +224,10 @@ impl Graph {
             };
             let key = |v: f32| (v * 1000.0) as u64;
             // Off the start's stretch at either end.
-            for (node, len) in [(fe.a, from.s - fe.s0), (fe.b, fe.s1 - from.s)] {
-                if way.toward.is_some_and(|n| n != node) {
+            for (node, len, forward) in
+                [(fe.a, from.s - fe.s0, false), (fe.b, fe.s1 - from.s, true)]
+            {
+                if way.toward.is_some_and(|n| n != node) || !goes(&fe, forward) {
                     continue;
                 }
                 let c = Self::cost(kind(&fe), len.max(0.0), mode, country) + extra(from.edge);
@@ -214,8 +245,9 @@ impl Graph {
                 }
                 let gu = g[u as usize];
                 // Onto the goal's stretch from here.
-                for (end, len) in [(te.a, to.s - te.s0), (te.b, te.s1 - to.s)] {
-                    if end == u {
+                for (end, len, forward) in [(te.a, to.s - te.s0, true), (te.b, te.s1 - to.s, false)]
+                {
+                    if end == u && goes(&te, forward) && way.arrive.is_none_or(|n| n == end) {
                         let total = gu
                             + Self::cost(kind(&te), len.max(0.0), mode, country)
                             + extra(to.edge);
@@ -229,7 +261,7 @@ impl Graph {
                         continue;
                     }
                     let edge = &self.edges[e as usize];
-                    if !allowed(edge) {
+                    if !allowed(edge) || !goes(edge, edge.a == u) {
                         continue;
                     }
                     let v = if edge.a == u { edge.b } else { edge.a };

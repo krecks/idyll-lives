@@ -174,6 +174,20 @@ describe('paving', () => {
     expect(worn.col.some((c) => c < 0.9 * 255)).toBe(true);
     expect(worn.idx.length).toBeGreaterThan(plain.idx.length);
   });
+
+  test("a motorway's carriageway and a ramp are worn from edge to edge, as a country road is: no kerbs, no repairs", () => {
+    for (const [kind, width] of [['motorway', 9], ['ramp', 5]] as const) {
+      const road = { points: [[0, 10], [80, 10]] as [number, number][], width, ends: ['out', 'out'] as ['out', 'out'], kind };
+      const half = kerbToKerb(road) / 2;
+      expect(half).toBe(width / 2);
+      const worn = roadMeshes([road], null, 0, {}, 'surface', undefined, () => half).surface;
+      // (Its edges the gutter's tone, kerb or none; nothing a hair over the road, where a repair would be.)
+      expect(Math.min(...worn.pos.filter((_, i) => i % 3 === 2))).toBeCloseTo(10 - half, 6);
+      expect(Math.max(...worn.pos.filter((_, i) => i % 3 === 1))).toBeCloseTo(0.012, 6);
+    }
+    // (A street's half carriageway as the street wears it, kerb to kerb: what it always was.)
+    expect(kerbToKerb({ points: [], width: 7, ends: ['out', 'out'] }) / 2).toBeCloseTo(7 / 2 - 1.35, 9);
+  });
 });
 
 describe('the town’s paving (`townPaving`)', () => {

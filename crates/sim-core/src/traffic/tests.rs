@@ -28,6 +28,7 @@ fn claim(points: &[[f32; 2]]) -> Claim {
                 rect: rect(points[k], yaw),
                 way: [yaw.sin(), yaw.cos()],
                 pass: 0.0,
+                layer: crate::travel::Layer::GROUND,
             }
         })
         .collect();
@@ -45,6 +46,7 @@ fn standing(key: u64, at: [f32; 2], yaw: f32) -> Mover {
         ahead: Vec::new(),
         parked: false,
         waits: None,
+        layer: crate::travel::Layer::GROUND,
     }
 }
 
@@ -223,7 +225,7 @@ fn a_group_through_lights_begins_with_the_nose_at_its_arms_stop_line() {
             (k as f32, [-1.05, z], 0.0, false, k as f32)
         })
         .collect();
-    let mut claims = claims(&trace, &[], 4.6, 1.9, &[([0.0, 0.0], 6.0)], &[]);
+    let mut claims = claims(&trace, &[], 4.6, 1.9, &[([0.0, 0.0], 6.0)], &[], &[]);
     let before = claims[0].from;
     gate(&mut claims, std::slice::from_ref(&sig), &trace, 4.6);
     assert_eq!(claims[0].gate, Some((0, 0)));
@@ -511,7 +513,15 @@ fn one_coming_up_to_wait_in_the_way_of_an_old_ask_stops_short() {
         // (Coming up, 3.4 m short of where it would wait, a tick on 2.9 m.)
         assert!(traffic.may_go(tick + 1, coming, 0, std::slice::from_ref(&mine), 5.0, 6.0));
         let (now, next) = (rect([0.0, -5.4], 0.0), rect([0.0, -4.9], 0.0));
-        stops.push(traffic.blocked(coming, &now, &next, [0.0, 1.0], 0.7, false));
+        stops.push(traffic.blocked(
+            coming,
+            &now,
+            &next,
+            [0.0, 1.0],
+            0.7,
+            false,
+            crate::travel::Layer::GROUND,
+        ));
     }
     assert_eq!(stops[0], None, "a young ask: on up to it");
     assert_eq!(
@@ -522,7 +532,15 @@ fn one_coming_up_to_wait_in_the_way_of_an_old_ask_stops_short() {
     // (Nearer than half that already, it came up before the ask was old: on.)
     let (now, next) = (rect([0.0, -3.4], 0.0), rect([0.0, -2.9], 0.0));
     assert_eq!(
-        traffic.blocked(coming, &now, &next, [0.0, 1.0], 0.7, false),
+        traffic.blocked(
+            coming,
+            &now,
+            &next,
+            [0.0, 1.0],
+            0.7,
+            false,
+            crate::travel::Layer::GROUND
+        ),
         None
     );
 }
@@ -575,4 +593,23 @@ fn one_isnt_let_into_a_stretch_whose_far_end_one_turning_round_still_backs_into(
         &[],
     );
     assert!(traffic.holding(coming));
+}
+
+#[test]
+fn one_backed_up_into_whats_left_of_anothers_claim_stands_in_its_way() {
+    // (Fernwood's: a car turning round on a 6 m lane backed up out of a junction's box and
+    // stopped at the far end of a taxi's claim through it, facing the taxi coming out of a
+    // three-point turn there: the car waited for the taxi's claim, the taxi for the car's body,
+    // for good. `cars::turn_round` backs on out of what's left of it.)
+    let (holder, turning) = (1 << 63 | 23, 1 << 63 | 24);
+    let stretch = claim(&[[0.0, 0.0], [0.0, 6.0], [0.0, 12.0]]);
+    let mut traffic = Traffic::default();
+    // (In it already, it takes it.)
+    assert!(traffic.may_go(1, holder, 0, std::slice::from_ref(&stretch), 10.5, 11.5));
+    let ground = crate::travel::Layer::GROUND;
+    // (Facing it at the stretch's far end; well past it; and its holder itself.)
+    let at = |z: f32| rect([0.0, z], std::f32::consts::PI);
+    assert_eq!(traffic.claimed(turning, &at(15.0), ground), Some(holder));
+    assert_eq!(traffic.claimed(turning, &at(22.0), ground), None);
+    assert_eq!(traffic.claimed(holder, &at(15.0), ground), None);
 }

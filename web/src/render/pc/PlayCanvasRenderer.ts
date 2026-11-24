@@ -110,6 +110,7 @@ import { FramePacer } from '../shared/pacing';
 import { standInOf } from '../shared/modelEntry';
 import { DEFAULT_RESOLUTION, renderScale, watchPixelRatio } from '../shared/resolution';
 import { fieldLayers } from '../shared/street';
+import { roadHeightsOf } from '../shared/roads';
 import { darkTiles, windowlessRooms, type DarkTiles, type Windowless } from '../shared/windowless';
 import type { FrameState } from '../../core/bridge';
 import { Pose } from '../../core/snapshot';
@@ -1592,12 +1593,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     });
     // (Kept to the chunks round the camera's: it moved to another.)
     if (!changed && this.detailTight && this.detailChunk !== `${Math.floor(o.target.x / CHUNK)},${Math.floor(o.target.z / CHUNK)}`) this.reportWatch();
+    // (The street's chunks built since: what stands on their roads shown in them.)
+    if (!changed && this.streamOn && this.street.shownChunks !== this.onRoadsIn) this.viewOnRoads(o.target.x, o.target.z);
     if (!changed) return;
     this.pictureChanged();
     if (this.streamOn && this.street.setChunks(this.roam.chunks)) this.streamStreet();
-    this.cars.setView(this.streamOn ? this.roam.chunks : null, o.target.x, o.target.z);
-    this.parkedRides.setView(this.streamOn ? this.roam.chunks : null, o.target.x, o.target.z);
-    this.signals.setView(this.streamOn ? this.roam.chunks : null, o.target.x, o.target.z);
+    this.viewOnRoads(o.target.x, o.target.z);
     this.reportWatch();
   }
 
@@ -1828,6 +1829,21 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const [a, b, c, e] = [rect[0] - DETAIL_MARGIN, rect[1] - DETAIL_MARGIN, rect[2] + DETAIL_MARGIN, rect[3] + DETAIL_MARGIN];
     this.characters.setDetailArea((x, z) => x >= a && z >= b && x <= c && z <= e);
   }
+
+  /**
+   * What stands on the roads but is drawn apart from the street (the traffic lights, the cars driving and parked) drawn
+   * in the chunks whose roads are drawn (`Street.shownChunks`; streaming: those the camera asks for come a build
+   * later), round the camera's target (`x`, `z`).
+   */
+  private viewOnRoads(x: number, z: number): void {
+    const chunks = this.streamOn ? this.street.shownChunks : null;
+    this.onRoadsIn = chunks;
+    this.cars.setView(chunks, x, z);
+    this.parkedRides.setView(chunks, x, z);
+    this.signals.setView(chunks, x, z);
+  }
+  /** The chunks `viewOnRoads` last gave. */
+  private onRoadsIn: ReadonlySet<number> | null = null;
 
   /** The street builds the chunks streamed in (between world builds; a world build builds them itself). */
   private streamStreet(): void {
@@ -2143,9 +2159,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha, fovH: 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect) }, performance.now(), () => null, () => false);
       this.street.setChunks(this.roam.chunks);
     } else this.street.setChunks(null);
-    this.cars.setView(this.streamOn ? this.roam.chunks : null, this.orbit.target.x, this.orbit.target.z);
-    this.parkedRides.setView(this.streamOn ? this.roam.chunks : null, this.orbit.target.x, this.orbit.target.z);
-    this.signals.setView(this.streamOn ? this.roam.chunks : null, this.orbit.target.x, this.orbit.target.z);
+    this.viewOnRoads(this.orbit.target.x, this.orbit.target.z);
     // (lotContents.ts: the landscape, with its country roads.)
     this.loadStep('Laying out the land', 0.05);
     await this.lot.buildNature(world, (roads, parent) => drawRoads(this.app, roads, parent));
@@ -3637,7 +3651,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.ghostDraw.setScale(this.townMetresPerPx());
     }
     const layer = this.lot.townLayer ?? pc.LAYERID_WORLD;
-    this.ghostDraw.set(ghosts, at ? groundOrWater(at.scape) : () => 0, layer, this.townWorld);
+    this.ghostDraw.set(ghosts, at ? groundOrWater(at.scape) : () => 0, layer, this.townWorld, at ? roadHeightsOf(at.world) : null);
     this.held?.changed();
   }
 

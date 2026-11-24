@@ -166,7 +166,17 @@ pub struct SignalArm {
     pub span: [[f32; 2]; 2],
 }
 
+/// The phase (`SignalArm::phase`) of an arm whose cars only leave the junction (a one-way road or
+/// a ramp going away from it): nobody comes in by it, so it has no green of its own, no head
+/// shown and no stop line drawn (`phases_of`).
+pub const NO_PHASE: u8 = u8::MAX;
+
 impl SignalArm {
+    /// Whether cars come into the junction by it (not one whose cars only leave: `NO_PHASE`).
+    pub fn inbound(&self) -> bool {
+        self.phase != NO_PHASE
+    }
+
     /// Where `p` is by its crosswalk (`span`): how far out (m from the junction's middle, as
     /// `walk_from`, `stop`) and how far from its road's middle. A span too short to have a way
     /// (its road ends there): along `way` from `at`, the junction's middle.
@@ -377,10 +387,16 @@ fn box_edges(arms: &[ArmAt]) -> Vec<(f32, f32)> {
 /// further round from one of them (Canalside's j35: a country road 16° off the street and
 /// straighter on than the street's own way, took the street's arm's place in its phase, and the
 /// street's two arms were never green together). Each arm the phase it's in, numbered round in
-/// order (on a roundabout, an arm each), and how many.
-fn phases_of(g: &Graph, arms: &[ArmAt], roundabout: bool) -> (Vec<u8>, u8) {
+/// order (on a roundabout, an arm each), and how many; an arm whose cars only leave by it (a
+/// one-way road, a ramp going away) none (`NO_PHASE` once it's a `SignalArm`), and no partner.
+fn phases_of(g: &Graph, arms: &[ArmAt], roundabout: bool) -> (Vec<Option<u8>>, u8) {
     let dot = |a: [f32; 2], b: [f32; 2]| a[0] * b[0] + a[1] * b[1];
     let n = arms.len();
+    // (An arm whose cars only leave by it, a one-way road or a ramp going away: no phase.)
+    let inbound = |i: usize| {
+        let (road, _, k, ..) = arms[i].2;
+        g.roads[road as usize].oneway.may_go(k < 0.0)
+    };
     let mut partner: Vec<Option<usize>> = vec![None; n];
     if !roundabout {
         let kind = |i: usize| g.roads[arms[i].2.0 as usize].kind;
@@ -395,6 +411,7 @@ fn phases_of(g: &Graph, arms: &[ArmAt], roundabout: bool) -> (Vec<u8>, u8) {
         };
         let mut pairs: Vec<(u8, f32, usize, usize)> = (0..n)
             .flat_map(|i| (i + 1..n).map(move |j| (i, j)))
+            .filter(|&(i, j)| inbound(i) && inbound(j))
             .map(|(i, j)| (rank(i, j), dot(arms[i].0, arms[j].0), i, j))
             .filter(|&(_, d, ..)| d < OPPOSITE)
             .collect();
@@ -410,15 +427,15 @@ fn phases_of(g: &Graph, arms: &[ArmAt], roundabout: bool) -> (Vec<u8>, u8) {
             }
         }
     }
-    let mut phase = vec![u8::MAX; n];
+    let mut phase: Vec<Option<u8>> = vec![None; n];
     let mut phases = 0u8;
     for i in 0..n {
-        if phase[i] != u8::MAX {
+        if phase[i].is_some() || !inbound(i) {
             continue;
         }
-        phase[i] = phases;
+        phase[i] = Some(phases);
         if let Some(j) = partner[i] {
-            phase[j] = phases;
+            phase[j] = Some(phases);
         }
         phases += 1;
     }
@@ -426,14 +443,11 @@ fn phases_of(g: &Graph, arms: &[ArmAt], roundabout: bool) -> (Vec<u8>, u8) {
 }
 
 /// Whether `p` is on a road's carriageway in `g` (within its kerb of its middle line and `margin`
-/// more): no signal pole stands there (`signal_at`).
+/// more), not the motorway's (a pole may stand under its deck: `Graph::carriageways_near`): no
+/// signal pole stands there (`signal_at`).
 fn on_carriageway(g: &Graph, p: [f32; 2], margin: f32) -> bool {
-    g.near(p, POLE_LOOK, 6, crate::travel::Mode::Car)
-        .iter()
-        .any(|rp| {
-            let r = &g.roads[rp.road as usize];
-            rp.off < crate::cars::kerb_of(r.width, r.kind) + margin
-        })
+    g.carriageways_near(p, POLE_LOOK, 6)
+        .any(|(off, kerb)| off < kerb + margin)
 }
 
 /// Whether a road of `ring` (per road of a graph: a roundabout's) is among `arms`'.
@@ -444,7 +458,8 @@ fn on_ring(ring: &[bool], arms: &[ArmAt]) -> bool {
 
 /// Whether a junction with `arms` (`arms_at`) on roads of `g` is lit (`Signal::lit`): on a
 /// roundabout's ring, `LIT_ARMS` arms or more (not all country roads'), or `LIT_MAIN_ARMS` of main
-/// roads'; a country road's arm counts as a main road's only with a street's there too. Where
+/// roads' (a street's, an avenue's, a ramp's); a country road's arm counts as a main road's only
+/// with one of those there too. Where
 /// only country roads meet, out in the open, it gives way: 151 of seed base 0's 408 lit junctions
 /// were country roads' T's and crossroads, their lights changing for the odd car (the owner's
 /// call, 2026-11-13).
@@ -455,7 +470,8 @@ fn lit_of(g: &Graph, arms: &[ArmAt], ring: &[bool]) -> bool {
             .filter(|a| g.roads[a.2.0 as usize].kind == k)
             .count()
     };
-    let streets = count(RoadKind::Street);
+    // (An avenue and a ramp are main roads, as a street: their junctions are lit.)
+    let streets = count(RoadKind::Street) + count(RoadKind::Avenue) + count(RoadKind::Ramp);
     let country = if streets > 0 {
         count(RoadKind::Country)
     } else {
@@ -490,9 +506,13 @@ const ZEBRA_SQUEEZE: f32 = 1.5;
 /// lit one's on its streets' and lanes' arms, one giving way's on one of a street's two arms
 /// through it; the lanes meeting there are crossed as anywhere), and the phase its lights rest on
 /// (`Signal::rest`).
-/// `ring`: per road of `g`, whether it's a roundabout's. None: fewer than `SIGNAL_ARMS` arms.
+/// `ring`: per road of `g`, whether it's a roundabout's. None: fewer than `SIGNAL_ARMS` arms, or a
+/// motorway's merge (`Graph::is_merge`).
 pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
     let p = g.nodes[n];
+    if g.is_merge(n) {
+        return None;
+    }
     let arms = arms_at(g, n);
     if arms.len() < SIGNAL_ARMS {
         return None;
@@ -504,7 +524,10 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
     let main = |a: &ArmAt| {
         matches!(
             kind(a),
-            crate::travel::RoadKind::Street | crate::travel::RoadKind::Country
+            crate::travel::RoadKind::Street
+                | crate::travel::RoadKind::Country
+                | crate::travel::RoadKind::Avenue
+                | crate::travel::RoadKind::Ramp
         )
     };
     let lit = lit_of(g, &arms, ring);
@@ -516,7 +539,7 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
         (0..phases)
             .map(|k| {
                 let score: u32 = (0..arms.len())
-                    .filter(|&i| phase[i] == k)
+                    .filter(|&i| phase[i] == Some(k))
                     .map(|i| if main(&arms[i]) { 2 } else { 1 })
                     .sum();
                 (score, k)
@@ -535,7 +558,7 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
         .iter()
         .enumerate()
         .map(|(i, &(_, _, (road, _, k, s0, s1), far, len))| {
-            if g.degree(far) < SIGNAL_ARMS {
+            if g.degree(far) < SIGNAL_ARMS || g.is_merge(far) {
                 return (len, false);
             }
             let there = arms_at(g, far);
@@ -657,7 +680,9 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
                 let at = on(out);
                 let t = r.tangent(at);
                 let o = [t[0] * k, t[1] * k];
-                let right = [o[1] * side, -o[0] * side];
+                // (The right of the way in, against the way out: `cars::right_of`.)
+                let rt = crate::cars::right_of([-o[0], -o[1]]);
+                let right = [rt[0] * side, rt[1] * side];
                 let m = r.at(at);
                 let d = kerb + POLE_KERB;
                 ([m[0] + right[0] * d, m[1] + right[1] * d], o)
@@ -678,7 +703,7 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
                 way,
                 pole,
                 yaw: out[0].atan2(out[1]),
-                phase: phase[i],
+                phase: phase[i].unwrap_or(NO_PHASE),
                 road,
                 kerb,
                 walk_from,
@@ -689,7 +714,8 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
                     && !joined
                     && match r.kind {
                         crate::travel::RoadKind::Street => lit || zebra(i),
-                        crate::travel::RoadKind::Lane => lit,
+                        crate::travel::RoadKind::Lane | crate::travel::RoadKind::Avenue => lit,
+                        // (Nobody on foot on a ramp, a motorway or a country road.)
                         _ => false,
                     },
             }

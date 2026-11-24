@@ -25,6 +25,7 @@
  */
 import type { Content } from '../../content/content';
 import type { RoadPlan } from '../../core/protocol';
+import { isSeparated, kindInfo } from '../../core/roadKinds';
 import { CUT_MAX, ENTRY_MAX, RETAIN_MAX } from '../../render/shared/builtSurface';
 import { CIVIC, civicChoices, civicLabel, civicTooBig, draftAreaSize, ZONE } from '../places';
 import { DensePass, raisePlaces } from '../dense';
@@ -124,14 +125,15 @@ export function areaOfRoad(draft: NeighbourhoodDraft, road: number): number {
   return areas.length && inBox[best] >= (n + 1) * INSIDE_SHARE ? best : -1;
 }
 
-/** Why nothing may be built along road `road` of `draft` at all (a footpath, a bridge, a country road out of every town and village), or null. */
+/** Why nothing may be built along road `road` of `draft` at all (a footpath, a bridge, the motorway, a road out of every town and village), or null. */
 export function notBuilt(draft: NeighbourhoodDraft, road: number): string | null {
   const r = draft.roads[road];
   if (!r) return 'there is no road there';
   const name = r.name ?? 'it';
   if (r.kind === 'trail') return 'nothing is built along a footpath';
+  if (isSeparated(r.kind)) return 'nothing is built along the motorway';
   if (r.bridge) return 'nothing is built on a bridge';
-  if (areaOfRoad(draft, road) < 0) return `${name} is a country road out of the town and its villages: nothing is built along it`;
+  if (areaOfRoad(draft, road) < 0) return `${name} is ${kindInfo(r).article} out of the town and its villages: nothing is built along it`;
   return null;
 }
 

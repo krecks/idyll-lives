@@ -9,8 +9,8 @@
  */
 
 import type { CareerCategory } from '../content/content';
-import { DEFAULT_LANDSCAPE, type RoadPlan, type TownPlace, type WorldStructure, type WorldZone } from '../core/protocol';
-import { BRIDGE_CLEAR, builtSurfaceOf, CUT_MAX, CUT_MAX_MOUNTAIN_ROAD, GRADE, profileOf, RETAIN_MAX, surfacePlots, type BuiltSurface, type SurfaceWorld } from '../render/shared/builtSurface';
+import { DEFAULT_LANDSCAPE, type RoadKind, type RoadPlan, type TownPlace, type WorldStructure, type WorldZone } from '../core/protocol';
+import { BRIDGE_CLEAR, builtSurfaceOf, CUT_MAX, cutMostOf, GRADE, profileOf, RETAIN_MAX, surfacePlots, type BuiltSurface, type SurfaceWorld } from '../render/shared/builtSurface';
 import { blankLand, COVER, COVER_CELL, coverSpan, heightAt, LAND_CELL, NONE, SEA_CM, type Land } from './land';
 import { HOURS, hoursFor } from './places';
 import { densestCentre, type Centre } from './centre';
@@ -20,7 +20,7 @@ import { rle, unrle } from './landMasks';
 import { deckTiles } from './macro';
 import { fbm, ridged, smoothstep } from './noise';
 import type { NeighbourhoodDraft } from './town';
-import { COURT, lengths, nearest, pointAt, RoadIndex, type Pt } from './roads';
+import { COURT, lengths, nearest, pointAt, RoadIndex, withCrosses, type Pt } from './roads';
 import * as pmath from './pmath';
 
 /** The steepest a town's or a village's ground is tilted (rise per m: `gentler`). */
@@ -117,7 +117,8 @@ export interface LandMeasure {
  * land stored: `builtSurfaceOf`), against `seeded` (the land before its town was graded in): no
  * road (not a trail, a footpath on the land as it lies) steeper than its kind's `GRADE` by more
  * than 1 %, or cut into the land or standing over it by more than `CUT_MAX` (a country road among
- * mountains `CUT_MAX_MOUNTAIN_ROAD`; not over a bridge's deck); no lot cut or filled by more than that; no lot's edge over the land or the pad beside it
+ * mountains `CUT_MAX_MOUNTAIN_ROAD`, a motorway or a ramp `CUT_MAX_MOTORWAY`: `cutMostOf`; not over a bridge's deck
+ * nor an overpass's); no lot cut or filled by more than that; no lot's edge over the land or the pad beside it
  * by more than `RETAIN_MAX` (land narrower than the land's grain between two pads is the other
  * pad's edge; between a pad and a road, a verge: listed, not checked); every bridge's deck
  * `BRIDGE_CLEAR` over its water. `margin` (m) the limits are kept within besides (the last resort's);
@@ -136,7 +137,7 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
   const [cutMost, edgeMost] = [CUT_MAX - margin, RETAIN_MAX + 0.01 - margin];
   // (Among mountains a country road, a pass, may be cut deeper into the rock.)
   const mountains = (world.meta?.world as { options?: { hills?: string } } | undefined)?.options?.hills === 'mountains';
-  const roadMost = (kind: string) => (mountains && kind === 'country' ? CUT_MAX_MOUNTAIN_ROAD : CUT_MAX);
+  const roadMost = (kind: RoadKind) => cutMostOf(kind, mountains);
   roads.forEach((r, i) => {
     const kind = r.kind ?? 'street';
     const { s, y } = surface.profile(i);
@@ -159,6 +160,7 @@ export function measureLand(world: FollowWorld, land: Land, seeded: Land, margin
         if (wet(land, at)) clear = Math.min(clear, y[k] - land.wl[at] / 100);
         continue;
       }
+      if (surface.raisedAt(i, s[k])) continue;
       if (!wet(seeded, at)) cut = Math.max(cut, Math.abs(y[k] - heightAt(seeded, p[0], p[1])));
     }
     slopes.cut.road = Math.max(slopes.cut.road, cut);
@@ -635,7 +637,11 @@ function giveUp(
     if (p.entry && gone.has(p.entry.road)) lots.add(n);
   });
   if (!eased && !gone.size && !lots.size && roads.every((r, i) => r === draft.roads[i] || r.points.length === draft.roads[i].points.length)) return null;
-  roads = roads.filter((_, i) => !gone.has(i));
+  // (What each passes over or under, numbered as the roads now are.)
+  roads = withCrosses(
+    roads.filter((_, i) => !gone.has(i)),
+    roads.flatMap((_, i) => (gone.has(i) ? [] : [i])),
+  );
   given.lots += lots.size;
   // The slots left, numbered again; the households, pads, places and car parks that name them with them (`edit/lots.ts`).
   const dropped = [...(draft.diagnostics?.dropped ?? []), ...draft.slots.filter((s) => lots.has(s.index)).map((s) => ({ name: s.name, kind: s.kind, ...(s.lot ? { lot: s.lot } : {}) }))];

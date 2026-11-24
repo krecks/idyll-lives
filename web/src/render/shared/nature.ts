@@ -596,7 +596,18 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   /** The country roads of `world` laid on this landscape. */
   private layRoads(world: WorldStructure): R {
     return this.makeRoads(
-      { seed: this.seed, w: this.w, d: this.d, ring: this.ring, ground: (x, z) => this.ground(x, z), waterEdge: (x, z) => this.waterEdge(x, z), distanceToTown: (x, z) => this.distanceToTown(x, z), follows: !!this.surface },
+      {
+        seed: this.seed,
+        w: this.w,
+        d: this.d,
+        ring: this.ring,
+        ground: (x, z) => this.ground(x, z),
+        waterEdge: (x, z) => this.waterEdge(x, z),
+        distanceToTown: (x, z) => this.distanceToTown(x, z),
+        follows: !!this.surface,
+        water: WATER_Y,
+        ...(this.surface ? { surface: (x: number, z: number) => this.surface?.at(x, z) ?? 0 } : {}),
+      },
       world,
       world.meta?.name ?? '',
     );

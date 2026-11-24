@@ -13,12 +13,15 @@
  */
 
 import type { RoadPlan, WorldStructure } from '../../core/protocol';
-import { bridgeSpans, rasterRoads, roadEnds, RoadIndex, roadIndex, SIDEWALK, stretchOf, trimJoins } from '../../game/roads';
+import { bridgeSpans, deckSpans, raisedSpans, rasterRoads, roadEnds, RoadIndex, roadIndex, SIDEWALK, stretchOf, trimJoins } from '../../game/roads';
 
-export { bridgeSpans, stretchOf };
+export { bridgeSpans, deckSpans, raisedSpans, stretchOf };
 import { Geo, type MeshData, type V3 } from './geometry';
-import { hasSidewalks, JunctionCuts, junctionsOf, KERB_RETURN, offsetMeet, turnedBack, turnedOn, type CornerPlan, type JunctionPlan } from './junctions';
+import { carriageway as kerbToKerb, hasSidewalks, JunctionCuts, junctionsOf, KERB_RETURN, offsetMeet, turnedBack, turnedOn, type CornerPlan, type JunctionPlan } from './junctions';
 import { asphaltVary, carriageway, repair, STREET_LOOK, tint } from './paving';
+import { isSeparated, kindInfo } from '../../core/roadKinds';
+import { junctionStretches, PAINT, PAINT_FINISH, roadMarkings } from './markings';
+import { deckLevels, lowDecks, without } from './motorway';
 import { valueNoise } from '../../game/noise';
 import { levelsOf } from './landSurface';
 
@@ -46,14 +49,34 @@ export interface RoadLevels {
   road(road: RoadPlan, s: number): number;
   junction(j: { x: number; z: number }): number;
 }
+/** Each world's `roadHeightsOf`, once. */
+const heightsOf = new WeakMap<WorldStructure, ((points: readonly (readonly [number, number])[]) => ((s: number) => number) | null) | null>();
+
+/**
+ * The surface heights of `world`'s roads, for something drawn along one of them (step 2's outline round the road picked,
+ * `townGhosts.ts`): for the line of a road the world has (the same points), its road's surface (m) `s` m along it, on
+ * its decks too; for any other line, null. Null: the world's roads are all at 0.
+ */
+export function roadHeightsOf(world: WorldStructure): ((points: readonly (readonly [number, number])[]) => ((s: number) => number) | null) | null {
+  if (heightsOf.has(world)) return heightsOf.get(world)!;
+  const roads = world.meta?.roads ?? [];
+  const levels = roads.length ? (levelsOf(world, roads) ?? deckLevels(roads)) : null;
+  const same = (r: RoadPlan, points: readonly (readonly [number, number])[]) => r.points.length === points.length && r.points.every(([x, z], i) => Math.abs(x - points[i][0]) < 0.01 && Math.abs(z - points[i][1]) < 0.01);
+  const out = levels
+    ? (points: readonly (readonly [number, number])[]) => {
+        const road = roads.find((r) => same(r, points));
+        return road ? (s: number) => levels.road(road, s) + ROAD_Y : null;
+      }
+    : null;
+  heightsOf.set(world, out);
+  return out;
+}
+
 /** Road markings (m): a stop line's width, a crosswalk's stripes and the gaps between them, and how far in from the kerbs they keep. */
 const STOP_LINE = 0.3;
 const STRIPE = 0.5;
 const STRIPE_GAP = 0.5;
 const MARK_IN = 0.15;
-/** The markings' paint: a vertex colour (worn white: no brighter than the sidewalks) with the plain finish's roughness in its alpha (`geometry.ts` `encodeFinish`: 0.7, not metal). */
-const PAINT = '#D6D6D0';
-const PAINT_FINISH = 0.35;
 /** The course of kerb stones along the back of a sidewalk, by the lots (m wide). */
 const BACK_COURSE = 0.12;
 /** How far a dead end's turning circle reaches past the lane's kerbs (m). */
@@ -80,8 +103,15 @@ export interface RoadMeshData {
  */
 export function townRoadMesh(world: WorldStructure): RoadMeshData {
   const roads = townRoads(world);
-  // (On a land the town follows, climbing with it: `landSurface.ts`.)
-  const { surface, marks } = roadMeshes(roads, null, 0, { marks: new Geo() }, 'surface', junctionsOf(world, roads), (ri) => roads[ri].width / 2 - SIDEWALK, levelsOf(world, roads));
+  // (On a land the town follows, climbing with it: `landSurface.ts`; elsewhere a road raised over another climbing to
+  // its deck on its own, `deckLevels`.)
+  const built = levelsOf(world, roads);
+  const levels = built ?? deckLevels(roads);
+  // (A motorway's carriageway and a ramp worn from edge to edge, as the street wears them.)
+  const worn = (ri: number) => (isSeparated(roads[ri].kind) ? kerbToKerb(roads[ri]) / 2 : roads[ri].width / 2 - SIDEWALK);
+  const { surface, marks } = roadMeshes(roads, null, 0, { marks: new Geo() }, 'surface', junctionsOf(world, roads), worn, levels);
+  // The overpasses and the motorways' barriers, plainly, in the markings' plain finish.
+  if (marks) lowDecks(marks, roads, levels, !built, bridgeSpans);
   return { surface: surface.meshData({ colors: true }), marks: marks && !marks.empty ? marks.meshData({ colors: true }) : null };
 }
 
@@ -356,12 +386,17 @@ function deadEnds(road: RoadPlan): [number, number, number][] {
   return out;
 }
 
-/** What is drawn of the roads: their surface, and the sidewalks and kerbs (vertex colours) with the gutters' shade; the markings (vertex colours: `PAINT`), if asked for. */
+/**
+ * What is drawn of the roads: their surface, and the sidewalks and kerbs (vertex colours) with the gutters' shade; the
+ * markings (vertex colours: `PAINT`), if asked for; an avenue's median's grass (`median`), if asked for (its kerbs are
+ * with the sidewalks').
+ */
 export interface RoadMeshes {
   surface: Geo;
   walk: Geo;
   shadows: Geo;
   marks?: Geo;
+  median?: Geo;
 }
 
 /** How far from another road a road's wear begins to even out (m). */
@@ -400,6 +435,9 @@ export function roadMeshes(
     const { frames, ys } = leveledFrames(road, levels);
     const half = road.width / 2;
     const ends = deadEnds(road);
+    // An avenue's median, kerbed, cut where its junctions are (`junctionStretches`).
+    const median = withSidewalks ? kindInfo(road).median : 0;
+    const medianCuts = median ? junctionStretches(road, junctions) : [];
     /** The road's height at frame `i`, `t` of the way on to the next (0 without levels). */
     const Y = (i: number, t = 0): number => (ys ? ys[i] + (t > 0 ? (ys[i + 1] - ys[i]) * t : 0) : 0);
     /** How far below the road the sidewalk's outer edge reaches. */
@@ -530,6 +568,7 @@ export function roadMeshes(
           strip(shadows, t0, t1, kerb, ROAD_Y + 0.003, gutter, ROAD_Y + 0.003, up, LK.gutterShade);
         }
       }
+      if (median) medianPiece(frames, i, median, medianCuts, Y, walk, shadows, into.median ?? null, lip);
     }
     // Turning circles: road to the kerb, the sidewalk round it but where the lane comes in.
     for (const [ex, ez, r] of ends) {
@@ -566,7 +605,54 @@ export function roadMeshes(
     if (withSidewalks) for (const c of j.corners) if (c.walk) junctionCorner(j, c, walk, shadows, jy, levels ? -WALK_LIP : 0);
     if (withSurface && into.marks) junctionMarks(j, into.marks, jy);
   }
-  return { surface, walk, shadows, ...(into.marks ? { marks: into.marks } : {}) };
+  // The lines along the roads: lanes, edges, a one-way road's arrows (`markings.ts`).
+  if (withSurface && into.marks) roadMarkings(roads, into.marks, junctions, levels, clip ? (x, z) => near(x, z) : undefined);
+  return { surface, walk, shadows, ...(into.marks ? { marks: into.marks } : {}), ...(into.median ? { median: into.median } : {}) };
+}
+
+/** An avenue's median's grass: its colour (a vertex colour toning the land's grass material, `material.ground`, as the land's own colour tones it). */
+const MEDIAN_GRASS = '#6A8640';
+
+/**
+ * Segment `i` (frames `i` to `i + 1`) of an avenue's median `wide` m across, but where `cuts` (arc lengths) are: a kerb
+ * along each side (`kerbProfile`'s kerb, its walk the median's grass), the grass between them (into `grass`; none:
+ * left out), a kerb's face across each end the median stops at, the gutters' shade.
+ */
+function medianPiece(frames: readonly Frame[], i: number, wide: number, cuts: readonly [number, number][], Y: (i: number, t?: number) => number, walk: Geo, shadows: Geo, grass: Geo | null, lip: number): void {
+  const [a, b] = [frames[i], frames[i + 1]];
+  const len = b.s - a.s;
+  if (len < 1e-6) return;
+  // The stretches of it the median runs (in t), cut where a junction is (each too short to draw left out below).
+  const runs = without([[0, 1]], cuts.map(([c0, c1]): [number, number] => [(c0 - a.s) / len, (c1 - a.s) / len]), 0);
+  const Q = (t: number, off: number, y: number): V3 => {
+    const [nx, nz] = [a.n[0] + (b.n[0] - a.n[0]) * t, a.n[1] + (b.n[1] - a.n[1]) * t];
+    const l = Math.hypot(nx, nz) || 1;
+    return [a.p[0] + (b.p[0] - a.p[0]) * t + (nx / l) * off, y + Y(i, t), a.p[1] + (b.p[1] - a.p[1]) * t + (nz / l) * off];
+  };
+  const m = wide / 2;
+  const up: V3 = [0, 1, 0];
+  for (const [t0, t1] of runs) {
+    if ((t1 - t0) * len < 0.05) continue;
+    grass?.color(MEDIAN_GRASS).poly([Q(t0, -m + KERB, WALK_Y), Q(t1, -m + KERB, WALK_Y), Q(t1, m - KERB, WALK_Y), Q(t0, m - KERB, WALK_Y)], up);
+    for (const side of [1, -1] as const) {
+      const out: V3 = [a.n[0] * side, 0, a.n[1] * side];
+      const l = Math.hypot(out[0], out[2]) || 1;
+      const toRoad: V3 = [out[0] / l, 0, out[2] / l];
+      walk.color(STREET_LOOK.kerb);
+      // (From its edge in towards the middle: the kerb, then down to the grass; not the sidewalk's back.)
+      kerbProfile((u0, y0, u1, y1, n) => walk.poly([Q(t0, (m - u0) * side, y0), Q(t1, (m - u0) * side, y0), Q(t1, (m - u1) * side, y1), Q(t0, (m - u1) * side, y1)], n), toRoad, lip, false);
+      shadows.poly([Q(t0, m * side, ROAD_Y + 0.003), Q(t1, m * side, ROAD_Y + 0.003), Q(t1, (m + 0.4) * side, ROAD_Y + 0.003), Q(t0, (m + 0.4) * side, ROAD_Y + 0.003)], up, undefined, [STREET_LOOK.gutterShade, STREET_LOOK.gutterShade, 0, 0]);
+    }
+    // Its nose where it stops for a junction: the kerb's face across.
+    const along: Pt = [b.p[0] - a.p[0], b.p[1] - a.p[1]];
+    const al = Math.hypot(along[0], along[1]) || 1;
+    for (const [t, k] of [[t0, -1], [t1, 1]] as const) {
+      if (t > 1e-6 && t < 1 - 1e-6) {
+        walk.color(STREET_LOOK.kerb).poly([Q(t, -m, ROAD_Y), Q(t, m, ROAD_Y), Q(t, m, KERB_Y), Q(t, -m, KERB_Y)], [(along[0] / al) * k, 0, (along[1] / al) * k]);
+        walk.poly([Q(t, -m, KERB_Y), Q(t, m, KERB_Y), Q(t - (k * KERB) / len, m, KERB_Y), Q(t - (k * KERB) / len, -m, KERB_Y)], up);
+      }
+    }
+  }
 }
 
 type Pt2 = readonly [number, number];
@@ -579,21 +665,22 @@ const KERB_EASE = 0.004;
  * A kerb and the back of its sidewalk, across: `u` m from the road's edge towards the walk, `y` up. Drawn by `strip`
  * (a strip along the kerb between two such points, facing `n`), `toRoad` the way across to the road (level, a unit
  * vector), `lip` the outer edge's foot. The kerb's face to the road, its top and its step down to the walk, the course
- * of stones at the walk's back and the walk's outer edge, each arris that shows eased by `KERB_EASE` (a strip at 45°).
- * The walk's own slabs are the caller's.
+ * of stones at the walk's back and the walk's outer edge (not with `back` false: a median's kerb), each arris that shows
+ * eased by `KERB_EASE` (a strip at 45°). The walk's own slabs are the caller's.
  */
-function kerbProfile(strip: (u0: number, y0: number, u1: number, y1: number, n: V3) => void, toRoad: V3, lip: number): void {
+function kerbProfile(strip: (u0: number, y0: number, u1: number, y1: number, n: V3) => void, toRoad: V3, lip: number, back = true): void {
   const c = KERB_EASE;
   const k = Math.SQRT1_2;
   const toWalk: V3 = [-toRoad[0], 0, -toRoad[2]];
   const lifted = (v: V3): V3 => [v[0] * k, k, v[2] * k];
-  const back = SIDEWALK - BACK_COURSE;
+  const backAt = SIDEWALK - BACK_COURSE;
   strip(0, ROAD_Y, 0, KERB_Y - c, toRoad);
   strip(0, KERB_Y - c, c, KERB_Y, lifted(toRoad));
   strip(c, KERB_Y, KERB - c, KERB_Y, UP);
   strip(KERB - c, KERB_Y, KERB, KERB_Y - c, lifted(toWalk));
   strip(KERB, KERB_Y - c, KERB, WALK_Y, toWalk);
-  strip(back, WALK_Y, SIDEWALK - c, WALK_Y, UP);
+  if (!back) return;
+  strip(backAt, WALK_Y, SIDEWALK - c, WALK_Y, UP);
   strip(SIDEWALK - c, WALK_Y, SIDEWALK, WALK_Y - c, lifted(toWalk));
   strip(SIDEWALK, WALK_Y - c, SIDEWALK, lip, toWalk);
 }
@@ -738,8 +825,9 @@ const nv = (v: Pt2): V3 => [v[0], 0, v[1]];
 /**
  * A junction's markings: on each arm with a crosswalk (`ArmPlan.crosswalk`, as the simulation
  * has them: a lit junction's streets' and lanes' arms, one giving way's street, on one of its two
- * arms), a zebra across its carriageway (`walkFrom`..`walkTo`) and a stop line across the half
- * coming in (traffic keeps to the right: the clockwise side of the way out) at `stop`; on a lit
+ * arms), a zebra across its carriageway (`walkFrom`..`walkTo`) and a stop line across every lane
+ * coming in at `stop`: a two-way road's half (traffic keeps to the right as the game shows it, sim-core
+ * `cars::right_of`: the anticlockwise side of the way out, `turnedOn`; an avenue's to its median), a one-way road's whole width coming in, none going out; on a lit
  * junction's other arms (a country road's: no sidewalks to cross between), only the stop line; on
  * one giving way's, nothing (cars give way there by the claims, and stop only for those on a
  * zebra).
@@ -751,8 +839,10 @@ function junctionMarks(j: JunctionPlan, marks: Geo, jy = 0): void {
   j.arms.forEach((A, a) => {
     const half = A.half - MARK_IN;
     if (half <= 0.5) return;
-    // (Not past the end of a road that ends there.)
-    if ((A.crosswalk || A.lit) && A.stop <= A.room) rect(a, A.stop - STOP_LINE, A.stop, -half, 0);
+    // (Not past the end of a road that ends there.) Across every lane coming in: a two-way road's half (to its median,
+    // if it has one), a one-way road's whole carriageway coming in, none on one going out.
+    const lanes: [number, number] | null = A.flow === -1 ? null : A.flow === 1 ? [-half, half] : [A.median > 0 ? A.median / 2 : 0, half];
+    if ((A.crosswalk || A.lit) && A.stop <= A.room && lanes) rect(a, A.stop - STOP_LINE, A.stop, ...lanes);
     if (!A.crosswalk || A.walkTo - A.walkFrom < 1 || A.walkTo > A.room) return;
     // The stripes across the carriageway, as many as fit, the middle of the road between two or on one.
     const n = Math.max(1, Math.floor((2 * half + STRIPE_GAP) / (STRIPE + STRIPE_GAP)));

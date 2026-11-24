@@ -18,7 +18,8 @@ import { fetchText } from '../content/content';
 import { householdBonds, householdSpawns, residentsOf, type HouseholdDraft, type SimSpawn } from './household';
 import { flatPrice, homePrice } from './price';
 import { crownClear, generateHouse, objectInfos, residentsKey, unitEdges, weighted, type Furnishing, type GardenSize, type HouseGenConfig, type ObjectInfos } from './housegen';
-import { connect, inside, leftOf, lengths, nearest, pointAt, roadExits, roadIndex, roadMask, tangent, trimJoins, type Box, type Pt, type RoadPlan } from './roads';
+import { connect, inside, leftOf, lengths, nearest, pointAt, roadExits, roadIndex, roadMask, tangent, trimJoins, walkerBlocked, type Box, type Pt, type RoadPlan } from './roads';
+import { rle } from './landMasks';
 import { householdFunds, savingsOf } from './wealth';
 import { extend, fill, LEGACY_KINDS, placeOf, specOf, type LotMix, type RoadLayout, type SizeSpec, type WorldStep } from './world';
 import { generateFromSpec, landDraft, layOn, type OpenWorldDraft } from './macro';
@@ -245,6 +246,8 @@ export interface NeighbourhoodDraft {
     pieces?: string[];
     /** Lots, roads out and courts given up so the world's built land keeps within its slope limits (`landFollow.ts` `settleLand`). */
     slopes?: { lots: number; roads: number; courts: number };
+    /** Why the world has no motorway (`macro.ts`, `motorway.ts`): none of its courses fits, or nowhere for its junction. */
+    motorway?: string;
   };
 }
 
@@ -1987,10 +1990,12 @@ function openWorldFields(t: Templates, town: NeighbourhoodDraft, drives: TownLay
   const used = [...new Set(kept.flatMap((b) => (b.park === undefined ? [] : [b.park])))].sort((a, b) => a - b);
   const parking = kept.map((b) => (b.park === undefined ? b : { ...b, park: used.indexOf(b.park) }));
   const carParks = used.map((k) => open.carParks![k]);
+  // (The motorway's ground where it lies on the land, and its ramps': nobody on foot there. Under its decks, open.)
+  const blocked = walkerBlocked(town.roads, town.width, town.depth);
   return {
     areas,
     exits,
-    file: { terrain: { water: open.water }, ...(parking.length ? { parking } : {}), ...(carParks.length ? { carParks } : {}), drives: filed, cars: parked },
+    file: { terrain: { water: open.water, ...(blocked ? { blocked: rle(blocked) } : {}) }, ...(parking.length ? { parking } : {}), ...(carParks.length ? { carParks } : {}), drives: filed, cars: parked },
     meta: { zones: open.zones, pads: open.pads, areas, ...(open.places ? { places: open.places } : {}), ...(open.centre ? { centre: open.centre } : {}), ...(paving.length ? { paving } : {}), ...(open.relief ? { relief: open.relief } : {}), ...(open.land && (open.land.edited || open.land.seeded === 'follow') ? { land: encodeLand(open.land) } : {}) },
   };
 }

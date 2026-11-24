@@ -92,12 +92,12 @@ fn a_corner_after_a_step_back_keeps_the_road_before_it() {
 fn bend_out_is_the_sagitta_on_the_outside_of_a_left_bend() {
     let (r, len) = (40.0f32, 4.7f32);
     // An arc round (0, 0) of radius `r`, a point every degree; `turn` +1 bends to the left of
-    // the way it runs (forward (sin, cos), right (-cos, sin): `shifted`).
+    // the way it runs (forward (sin, cos), right (cos, -sin): `right_of`).
     let arc = |turn: f32| -> Vec<[f32; 2]> {
         (0..=40)
             .map(|k| {
                 let a = (k as f32).to_radians();
-                [-r * a.cos() * turn, r * a.sin()]
+                [r * a.cos() * turn, r * a.sin()]
             })
             .collect()
     };
@@ -378,12 +378,12 @@ fn the_car_moves_house_with_its_household() {
 
 #[test]
 fn a_door_with_no_room_to_open_isnt_used() {
-    // The house's wall a metre from the car's left (driver's) side.
+    // The house's wall a metre from the car's left (driver's) side: facing +z, its -x side.
     let town = TOWN
-        .replace(r#""x":34.0,"z":3.0"#, r#""x":34.5,"z":3.0"#)
+        .replace(r#""x":34.0,"z":3.0"#, r#""x":33.5,"z":3.0"#)
         .replace(
             r#""sims":"#,
-            r#""walls":[[36,0,40,0],[40,0,40,6],[36,6,40,6],[36,0,36,6]],"sims":"#,
+            r#""walls":[[28,0,32,0],[28,0,28,6],[28,6,32,6],[32,0,32,6]],"sims":"#,
         );
     let w = World::from_json(CONTENT, &town, 1).unwrap();
     let (door, _) = w.cars[0].door(&w.nav(), 0).unwrap();
@@ -818,7 +818,20 @@ fn car(spot: [f32; 2], yaw: f32, street: f32) -> Car {
 /// the box's claim before its body is in it, whichever tick it gets there.
 #[test]
 fn a_car_at_country_speed_cannot_skip_a_junction_box() {
-    let speed = crate::travel::COUNTRY_SPEED;
+    cannot_skip_a_junction_box(crate::travel::COUNTRY_SPEED);
+}
+
+/// At the motorway's speed, 2 m a tick: no box skipped either (a motorway's road under a deck is
+/// another level, but a carriageway's merge and a ramp's T are the same as any).
+#[test]
+fn a_car_at_motorway_speed_cannot_skip_a_junction_box() {
+    cannot_skip_a_junction_box(crate::travel::MOTORWAY_SPEED);
+}
+
+/// A car along a straight way at `speed` (m/s of drive time) through the smallest junction's box:
+/// sampled finer than the box, coming into sight looked along finer than it (`sight_steps`), and
+/// into it only asking for its claim first.
+fn cannot_skip_a_junction_box(speed: f32) {
     assert!(
         speed / crate::DRIVE_TICKS_PER_SECOND > 1.0,
         "a metre a tick or more"
@@ -827,7 +840,7 @@ fn a_car_at_country_speed_cannot_skip_a_junction_box() {
     let (centre, r) = ([100.0, 0.0], 6.0);
     let mut legs = Legs::default();
     for k in 0..=50 {
-        legs.push_lane([k as f32 * 4.0, 0.0], speed, 0.0, LANE);
+        legs.push_lane([k as f32 * 4.0, 0.0], speed, 0.0, Some(LANE));
     }
     let route = legs.timed(false, false);
     let (len, wid) = (4.4, 1.8);
@@ -841,9 +854,16 @@ fn a_car_at_country_speed_cannot_skip_a_junction_box() {
         most < crate::traffic::SAMPLE + 0.5 && most < r,
         "{most} m between samples"
     );
-    assert!(SIGHT_STEP / crate::DRIVE_TICKS_PER_SECOND * speed < r);
+    let n = sight_steps(&route, 0.0, route.ticks());
+    let apart = (0..n)
+        .map(|i| {
+            let k = route.ticks() / n as f32;
+            crate::travel::dist(route.at(k * i as f32).0, route.at(k * (i + 1) as f32).0)
+        })
+        .fold(0.0f32, f32::max);
+    assert!(apart < r, "looked along every {apart} m coming into sight");
     let pass = vec![0.0; trace.len()];
-    let claims = crate::traffic::claims(&trace, &pass, len, wid, &[(centre, r)], &[]);
+    let claims = crate::traffic::claims(&trace, &pass, len, wid, &[(centre, r)], &[], &[]);
     assert_eq!(claims.len(), 1, "the box's claim");
     let c = &claims[0];
     // (Whether its body `t` ticks along touches the box.)
@@ -901,7 +921,7 @@ fn no_car_turns_round_in_a_mouth_with_a_car_parked_up_against_its_turn() {
         .map(|lane| {
             let mut legs = Legs::default();
             for k in 0..=50 {
-                legs.push_lane([20.0 + k as f32 * 2.0, 30.0 + lane], 5.0, 0.0, LANE);
+                legs.push_lane([20.0 + k as f32 * 2.0, 30.0 + lane], 5.0, 0.0, Some(LANE));
             }
             legs.timed(true, true)
         })
@@ -939,6 +959,43 @@ fn no_car_turns_round_in_a_mouth_with_a_car_parked_up_against_its_turn() {
     );
 }
 
+/// (Farm, the play-test's farm city: a taxi held up going south down a country lane turned round in
+/// a driveway's mouth on its left, backing across the other lane. A car came up that lane beside
+/// it and stood waiting for it to go; the taxi waited for that car to get out of its way, and that
+/// car could back up no further, into the junction behind it. They stood there for good, the
+/// lane, the junction and the motorway's off-ramp backed up behind them.) A car turns round only
+/// in a mouth on its own side of the road, its right: going east past a driveway on the south side
+/// it does; going west past it, the driveway on its left, it doesn't.
+#[test]
+fn a_car_turns_round_only_in_a_mouth_on_its_right() {
+    let road: Vec<String> = (0..=199).map(|x| format!("[{x}.5,30]")).collect();
+    let town = format!(
+        r#"{{"width":200,"depth":60,
+            "exits":[{{"x":0.5,"z":30,"kind":"road"}},{{"x":199.5,"z":30,"kind":"road"}}],
+            "roads":[{{"points":[{}],"width":7,"kind":"street","ends":["out","out"]}}],
+            "plots":[{{"name":"H","x":78,"z":8,"w":16,"d":18,"entry":[83.5,25.5]}}],
+            "drives":[{{"plot":0,"x":90,"z":8.5,"front":1,"street":30,"road":0,"s":89.5}}],
+            "households":[],"objects":[],"sims":[],"cars":[]}}"#,
+        road.join(",")
+    );
+    let mut w = World::from_json(CONTENT, &town, 1).unwrap();
+    w.cars.push(car([0.0, 0.0], 0.0, 30.0));
+    // (Past the mouth in its own lane, on its right: going east, the south side; west, the north.)
+    let way = |east: bool| {
+        let (x0, dx) = if east { (20.0, 2.0) } else { (160.0, -2.0f32) };
+        let right = right_of([dx.signum(), 0.0]);
+        let mut legs = Legs::default();
+        for k in 0..=50 {
+            let x = x0 + k as f32 * dx;
+            legs.push_lane([x, 30.0 + right[1] * TIGHT_LANE], 5.0, 0.0, Some(LANE));
+        }
+        legs.timed(true, true)
+    };
+    let found = |r: &Route| mouth_behind(&w, 0, r, 0.0, r.ticks() - 1.0, &|_| true).is_some();
+    assert!(found(&way(true)), "going east, the driveway on its right");
+    assert!(!found(&way(false)), "going west, the driveway on its left");
+}
+
 /// (Skerry Island, the real town's island of seed base 0: a work taxi held up in a morning queue
 /// turned round, and as it backed up along the street a car came up behind it, into the ground
 /// it backed over. Each waited for the other: the one behind could back up no further, a car
@@ -960,7 +1017,12 @@ fn one_turning_round_held_up_by_one_come_up_behind_it_gives_the_turn_up() {
     // (Each on its way east along the street's lane.)
     let mut legs = Legs::default();
     for k in 0..=80 {
-        legs.push_lane([20.0 + k as f32 * 2.0, 30.0 + TIGHT_LANE], 5.0, 0.0, LANE);
+        legs.push_lane(
+            [20.0 + k as f32 * 2.0, 30.0 + TIGHT_LANE],
+            5.0,
+            0.0,
+            Some(LANE),
+        );
     }
     let had = legs.timed(true, true);
     let at = |x: f32| had.points.iter().find(|p| p.0[0] >= x).unwrap().2;
@@ -1042,7 +1104,7 @@ fn a_car_turned_round_off_its_lane_drives_on_facing_the_way_it_goes() {
     let c = car([50.0, 10.0], 0.0, 30.0);
     let mut legs = Legs::default();
     for k in 0..=20 {
-        legs.push_lane([20.0 + k as f32 * 2.0, 30.0], 5.0, 0.0, LANE);
+        legs.push_lane([20.0 + k as f32 * 2.0, 30.0], 5.0, 0.0, Some(LANE));
     }
     let had = legs.timed(true, true);
     let at = |x: f32| had.points.iter().find(|p| p.0[0] >= x).unwrap().2;
@@ -1090,7 +1152,8 @@ fn pulls_out_and_drives_to_the_nearer_end() {
     let r = Route::new(&c, &exits, false);
     let last = r.points.last().unwrap().0;
     assert!(last[0] > 99.5, "drives to the east end: {last:?}");
-    assert!((last[1] - (20.0 + TIGHT_LANE)).abs() < 1e-3, "in its lane");
+    // (Heading east, its right is the south, -z: `right_of`.)
+    assert!((last[1] - (20.0 - TIGHT_LANE)).abs() < 1e-3, "in its lane");
     // Starts from the spot facing the street, ends heading east.
     assert!((r.points[0].0[0] - 70.0).abs() < 1e-3);
     assert!(r.points[0].1.abs() < 0.2);
@@ -1159,14 +1222,16 @@ fn pulling_back_in_beside_one_waiting_for_it_a_car_keeps_the_gap() {
     // one). In its lane its body would touch the other's: it stops short by the gap the cars
     // keep, waiting for that one.
     let (len, wid) = (4.6, 1.88);
+    // (Facing +z, its right is +x: `right_of`; the other on its left.)
     let them = [Driving {
-        at: [wid, 0.0],
+        at: [-wid, 0.0],
         yaw: std::f32::consts::PI,
         len,
         wid,
         ahead: AHEAD,
         behind: 0.0,
         first: car_first(1),
+        layer: crate::travel::Layer::GROUND,
     }];
     let body = |shift: f32| Rect {
         at: shifted([0.0, 0.0], 0.0, shift),
@@ -1177,7 +1242,12 @@ fn pulling_back_in_beside_one_waiting_for_it_a_car_keeps_the_gap() {
     let mut held = None;
     while shift > 0.0 && held.is_none() {
         let to = (shift - PULL_RATE).max(0.0);
-        held = guard(&body(shift), &body(to), them.iter());
+        held = guard(
+            &body(shift),
+            &body(to),
+            crate::travel::Layer::GROUND,
+            them.iter(),
+        );
         if held.is_none() {
             shift = to;
         }
@@ -1193,7 +1263,15 @@ fn pulling_back_in_beside_one_waiting_for_it_a_car_keeps_the_gap() {
         at: [r.at[0], r.at[1] + 0.3],
         ..r
     };
-    assert_eq!(guard(&body(shift), &on(body(shift)), them.iter()), None);
+    assert_eq!(
+        guard(
+            &body(shift),
+            &on(body(shift)),
+            crate::travel::Layer::GROUND,
+            them.iter()
+        ),
+        None
+    );
 }
 
 /// The way along `pts`: the turn at each point between its steps (radians), and whether any
@@ -1211,15 +1289,15 @@ fn turns(pts: &[[f32; 2]]) -> (f32, bool) {
 
 #[test]
 fn a_lane_turns_a_corner_on_an_arc() {
-    // Along x, then right (+z) at (12, 0): a street corner, a point every 4 m.
+    // Along x, then right (-z: `right_of`) at (12, 0): a street corner, a point every 4 m.
     let lane = [
         [0.0, 0.0],
         [4.0, 0.0],
         [8.0, 0.0],
         [12.0, 0.0],
-        [12.0, 4.0],
-        [12.0, 8.0],
-        [12.0, 12.0],
+        [12.0, -4.0],
+        [12.0, -8.0],
+        [12.0, -12.0],
     ];
     let round = round_corners(&lane);
     assert_eq!(round.first(), lane.first());
@@ -1300,7 +1378,7 @@ fn a_car_faces_along_its_lane_where_the_next_step_is_a_hair_across_it() {
         [0.0, 12.0],
         [0.0, 16.0],
     ] {
-        legs.push_lane(p, FAST, 0.0, LANE);
+        legs.push_lane(p, FAST, 0.0, Some(LANE));
     }
     let route = legs.timed(true, true);
     for &(at, yaw, ..) in &route.points[1..route.points.len() - 1] {
@@ -1325,7 +1403,7 @@ fn a_car_faces_the_way_it_goes_round_a_corner() {
     ]);
     let mut legs = Legs::default();
     for p in lane {
-        legs.push_lane(p, FAST, 0.0, LANE);
+        legs.push_lane(p, FAST, 0.0, Some(LANE));
     }
     let route = legs.timed(true, true);
     let mut was = route.at(0.0).0;
@@ -1418,7 +1496,7 @@ fn a_car_held_up_by_nobody_pulls_over_only_as_far_as_it_goes_on_with() {
         let n = ((to - from).abs() / 2.0) as i32;
         for k in 0..=n {
             let x = from + (to - from).signum() * 2.0 * k as f32;
-            legs.push_lane([x, z], 5.0, room(x), LANE);
+            legs.push_lane([x, z], 5.0, room(x), Some(LANE));
         }
         let mut r = legs.timed(true, true);
         r.claim(4.4, 1.8, None);
@@ -1463,4 +1541,322 @@ fn a_car_held_up_by_nobody_pulls_over_only_as_far_as_it_goes_on_with() {
         w.cars[0].shift > 0.0,
         "held up, it pulls over to let that one by"
     );
+}
+
+/// A road of `kind` through `pts` (a point every metre), `oneway` (`OneWay`).
+fn road_raw(
+    pts: &[[f32; 2]],
+    kind: crate::travel::RoadKind,
+    oneway: crate::travel::OneWay,
+) -> crate::travel::RoadRaw {
+    let mut points = vec![pts[0]];
+    for w in pts.windows(2) {
+        let n = crate::travel::dist(w[0], w[1]).ceil() as usize;
+        points.extend((1..=n).map(|i| {
+            let t = i as f32 / n as f32;
+            [
+                w[0][0] + (w[1][0] - w[0][0]) * t,
+                w[0][1] + (w[1][1] - w[0][1]) * t,
+            ]
+        }));
+    }
+    crate::travel::RoadRaw {
+        points,
+        width: if kind == crate::travel::RoadKind::Ramp {
+            5.0
+        } else {
+            7.0
+        },
+        kind,
+        area: None,
+        oneway,
+    }
+}
+
+fn travel_on(roads: Vec<crate::travel::RoadRaw>) -> Travel {
+    Travel::new(
+        crate::travel::OpenWorld {
+            roads,
+            ..Default::default()
+        },
+        &serde_json::json!({}),
+    )
+}
+
+/// A car leaving town by a motorway (its end of town further by road than the street's, nearer
+/// by time) drives the shorter way on beyond it: `MOTORWAY_OFF_MAP_TICKS` rather than
+/// `OFF_MAP_TICKS`.
+#[test]
+fn a_car_leaving_by_the_motorway_is_off_the_map_for_less() {
+    use crate::travel::{OneWay, RoadKind};
+    // A street north from its end of town to a ramp east onto a motorway's carriageway east.
+    let travel = travel_on(vec![
+        road_raw(
+            &[[50.0, 0.5], [50.0, 300.0]],
+            RoadKind::Street,
+            OneWay::Both,
+        ),
+        road_raw(
+            &[[50.0, 300.0], [80.0, 304.0]],
+            RoadKind::Ramp,
+            OneWay::Along,
+        ),
+        road_raw(
+            &[[80.0, 304.0], [199.5, 304.0]],
+            RoadKind::Motorway,
+            OneWay::Along,
+        ),
+    ]);
+    let exits = [[50.0, 0.5], [199.5, 304.0]];
+    // Its driveway onto the street, 285 m from the street's end of town, 170 m from the motorway's.
+    let mut c = car([45.0, 285.0], std::f32::consts::FRAC_PI_2, 285.0);
+    c.settle(&exits, Some(&travel));
+    let out = c.route(&exits, Some(&travel), false).clone();
+    let last = out.points.last().unwrap().0;
+    assert!(last[0] > 199.5, "out by the motorway: {last:?}");
+    assert!(out.by_motorway);
+    assert_eq!(c.off_map_ticks(), MOTORWAY_OFF_MAP_TICKS);
+    // Nearer the street's end of town, by the street, as ever.
+    let mut c = car([45.0, 8.0], std::f32::consts::FRAC_PI_2, 8.0);
+    c.settle(&exits, Some(&travel));
+    let last = c
+        .route(&exits, Some(&travel), false)
+        .points
+        .last()
+        .unwrap()
+        .0;
+    assert!(last[1] < 0.5, "out by the street: {last:?}");
+    assert_eq!(c.off_map_ticks(), OFF_MAP_TICKS);
+}
+
+/// Nobody on foot or on a bike leaves town by a motorway's end (its ground kept from them, no road
+/// they go along there), however much nearer it is in a straight line: their way out is the
+/// street's end. (Timed to the motorway's, as the straight line there, riders in Fernglade and
+/// Kingston found no way to it and stood on their bikes at home for hours.)
+#[test]
+fn nobody_on_foot_leaves_by_the_motorways_end() {
+    use crate::travel::{OneWay, RoadKind};
+    let travel = travel_on(vec![
+        road_raw(
+            &[[50.0, 0.5], [50.0, 300.0]],
+            RoadKind::Street,
+            OneWay::Both,
+        ),
+        road_raw(
+            &[[50.0, 300.0], [80.0, 304.0]],
+            RoadKind::Ramp,
+            OneWay::Along,
+        ),
+        road_raw(
+            &[[80.0, 304.0], [199.5, 304.0]],
+            RoadKind::Motorway,
+            OneWay::Along,
+        ),
+    ]);
+    let exits = [[50.0, 0.5], [199.5, 304.0]];
+    assert!(travel.exit_on_foot(exits[0]));
+    assert!(!travel.exit_on_foot(exits[1]));
+    // 285 m up the street from its end of town, 150 m from the motorway's in a straight line.
+    let at = [45.0, 285.0];
+    assert_eq!(crate::world::quickest_exit(&travel, &exits, at), Some(0));
+    assert_eq!(nearest_exit(&travel, &exits, at), Some(0));
+    // With no road there, a way out is left by on foot.
+    assert!(travel.exit_on_foot([400.0, 400.0]));
+}
+
+/// Home round a one-way loop: the way in is a way of its own from the end of town to the
+/// driveway, round the loop the way it goes, not the way out turned round against it.
+#[test]
+fn home_round_a_one_way_loop_keeps_to_its_way() {
+    use crate::travel::{OneWay, RoadKind};
+    // A loop clockwise seen from above (+z north): east along the south side, north up the east
+    // side, west along the north side (its points running east), south down the west side; a
+    // two-way street east from its north-east corner to the end of town.
+    let travel = travel_on(vec![
+        road_raw(
+            &[[20.0, 20.0], [80.0, 20.0]],
+            RoadKind::Street,
+            OneWay::Along,
+        ),
+        road_raw(
+            &[[80.0, 20.0], [80.0, 60.0]],
+            RoadKind::Street,
+            OneWay::Along,
+        ),
+        road_raw(
+            &[[20.0, 60.0], [80.0, 60.0]],
+            RoadKind::Street,
+            OneWay::Against,
+        ),
+        road_raw(
+            &[[20.0, 60.0], [20.0, 20.0]],
+            RoadKind::Street,
+            OneWay::Along,
+        ),
+        road_raw(
+            &[[80.0, 60.0], [199.5, 60.0]],
+            RoadKind::Street,
+            OneWay::Both,
+        ),
+    ]);
+    let exits = [[199.5, 60.0]];
+    // Its driveway south of the south side.
+    let c = car([50.0, 10.0], 0.0, 20.0);
+    let by = |r: &Route, x: f32| {
+        r.points
+            .iter()
+            .any(|p| (p.0[0] - x).abs() < 4.0 && (p.0[1] - 40.0).abs() < 4.0)
+    };
+    let out = Route::on_roads(&c, &exits, &travel, false).expect("a way out");
+    assert!(by(&out, 80.0) && !by(&out, 20.0), "out up the east side");
+    let home = Route::on_roads(&c, &exits, &travel, true).expect("a way home");
+    assert!(
+        by(&home, 20.0) && !by(&home, 80.0),
+        "home down the west side"
+    );
+}
+
+/// Each kind's lanes (`lane_off`), right of its middle line the way a car goes: a street's and a
+/// lane's as ever; an avenue's two each way between its median and its kerbs; a one-way street's
+/// and a ramp's down the middle; a motorway carriageway's out from its pair, whichever way its
+/// points run.
+#[test]
+fn each_kind_has_its_lanes() {
+    use crate::travel::{Graph, OneWay, RoadKind};
+    let mut avenue = road_raw(
+        &[[0.0, 100.0], [100.0, 100.0]],
+        RoadKind::Avenue,
+        OneWay::Both,
+    );
+    avenue.width = 14.0;
+    let mut lane = road_raw(
+        &[[0.0, 120.0], [100.0, 120.0]],
+        RoadKind::Lane,
+        OneWay::Both,
+    );
+    lane.width = 6.0;
+    let mut east = road_raw(
+        &[[0.0, 0.0], [100.0, 0.0]],
+        RoadKind::Motorway,
+        OneWay::Along,
+    );
+    let mut west = road_raw(
+        &[[0.0, 9.0], [100.0, 9.0]],
+        RoadKind::Motorway,
+        OneWay::Against,
+    );
+    east.width = 9.0;
+    west.width = 9.0;
+    let g = Graph::build(&[
+        road_raw(
+            &[[0.0, 50.0], [100.0, 50.0]],
+            RoadKind::Street,
+            OneWay::Both,
+        ),
+        lane,
+        avenue,
+        road_raw(
+            &[[0.0, 140.0], [100.0, 140.0]],
+            RoadKind::Street,
+            OneWay::Against,
+        ),
+        road_raw(
+            &[[0.0, 160.0], [100.0, 160.0]],
+            RoadKind::Ramp,
+            OneWay::Along,
+        ),
+        east,
+        west,
+    ]);
+    let near = |a: f32, b: f32| (a - b).abs() < 1e-4;
+    for along in [true, false] {
+        assert!(near(lane_off(&g, 0, 0, along), LANE));
+        assert!(near(lane_off(&g, 1, 0, along), TIGHT_LANE));
+        // (Its median's half and its two lanes' 2.175 m: the kerbs 5.65 m out.)
+        assert!(near(lane_off(&g, 2, 0, along), 1.3 + 2.175 * 1.5));
+        assert!(near(lane_off(&g, 2, 1, along), 1.3 + 2.175 * 0.5));
+        assert!(near(lane_off(&g, 2, 5, along), 1.3 + 2.175 * 0.5));
+        assert!(near(lane_off(&g, 3, 0, along), 0.0));
+        assert!(near(lane_off(&g, 4, 0, along), 0.0));
+    }
+    // (The eastbound's pair on its left going east, the +z side (its right is -z: `right_of`):
+    // its outer lane right of its middle, its inner left; the westbound's, going west, its pair on
+    // its left as well. Traffic on the right.)
+    assert_eq!(g.inside[5], 1);
+    assert_eq!(g.inside[6], -1);
+    assert!(near(lane_off(&g, 5, 0, true), 1.3));
+    assert!(near(lane_off(&g, 5, 1, true), -2.2));
+    assert!(near(lane_off(&g, 6, 0, false), 1.3));
+    assert!(near(lane_off(&g, 6, 1, false), -2.2));
+    // (Into a driveway or out of one: `TIGHT_LANE` on a street, the outer lane on an avenue, the
+    // middle of a one-way street.)
+    assert!(near(kerb_lane(&g.roads[0]), TIGHT_LANE));
+    assert!(near(kerb_lane(&g.roads[2]), 1.3 + 2.175 * 1.5));
+    assert!(near(kerb_lane(&g.roads[3]), 0.0));
+}
+
+/// A way along roads cars always drove (two-way streets and lanes) is laid as it always was: its
+/// own points, each `lane_on` right of its road's middle.
+#[test]
+fn a_classic_way_keeps_its_points_and_lanes() {
+    use crate::travel::{Graph, OneWay, RoadKind};
+    let mut lane = road_raw(&[[50.0, 0.0], [50.0, 60.0]], RoadKind::Lane, OneWay::Both);
+    lane.width = 6.0;
+    let g = Graph::build(&[
+        road_raw(&[[0.0, 0.0], [50.0, 0.0]], RoadKind::Street, OneWay::Both),
+        lane,
+    ]);
+    let a = g.nearest([5.0, 0.0], 5.0, Mode::Car).unwrap();
+    let b = g.nearest([50.0, 55.0], 5.0, Mode::Car).unwrap();
+    let path = g.path(a, b, Mode::Car, 16.0).unwrap();
+    let pts: Vec<[f32; 2]> = path.pts.iter().map(|p| p.0).collect();
+    let line = LaneLine::new(&g, pts.clone(), path.roads.clone());
+    assert_eq!(line.pts, pts);
+    let offs: Vec<f32> = path.pts.iter().map(|p| lane_on(p.1, p.2)).collect();
+    assert_eq!(line.offs, offs);
+}
+
+/// Off a motorway's carriageway by a ramp (a merge: no box), a car's lane eases from the
+/// carriageway's outer lane to the ramp's middle over `TAPER` m of the ramp, never in a step.
+#[test]
+fn a_ramp_eases_out_of_the_carriageways_lane() {
+    use crate::travel::{Graph, OneWay, RoadKind};
+    let mut east = road_raw(
+        &[[0.0, 0.0], [200.0, 0.0]],
+        RoadKind::Motorway,
+        OneWay::Along,
+    );
+    east.width = 9.0;
+    let ramp = road_raw(
+        &[[50.0, 0.0], [70.0, 6.0], [150.0, 6.0]],
+        RoadKind::Ramp,
+        OneWay::Along,
+    );
+    let g = Graph::build(&[east, ramp]);
+    assert_eq!(g.merge_nodes().count(), 1);
+    let a = g.nearest([5.0, 0.0], 5.0, Mode::Car).unwrap();
+    let b = g.nearest([140.0, 6.0], 5.0, Mode::Car).unwrap();
+    let path = g.path(a, b, Mode::Car, 16.0).unwrap();
+    let pts: Vec<[f32; 2]> = path.pts.iter().map(|p| p.0).collect();
+    let line = LaneLine::new(&g, pts, path.roads.clone());
+    let outer = lane_off(&g, 0, 0, true);
+    assert!(outer.abs() > 1.0);
+    let mut s = 0.0;
+    for k in 1..line.pts.len() {
+        let step = crate::travel::dist(line.pts[k - 1], line.pts[k]);
+        s += step;
+        let (was, now) = (line.offs[k - 1], line.offs[k]);
+        assert!(
+            (now - was).abs() <= outer.abs() / TAPER * step + 1e-3,
+            "a step at {:?}: {was} to {now}",
+            line.pts[k]
+        );
+        // (On the carriageway in its lane; along the ramp past the taper, in its middle.)
+        if line.pts[k][0] < 49.0 {
+            assert!((now - outer).abs() < 1e-4, "{:?}: {now}", line.pts[k]);
+        }
+        if s > 50.0 + TAPER + 1.0 {
+            assert!(now.abs() < 1e-4, "{:?}: {now}", line.pts[k]);
+        }
+    }
 }

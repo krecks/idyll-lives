@@ -190,12 +190,26 @@ impl World {
         self.porch_pieces = s.porch_pieces;
         // (The work taxis as they are now: the runs drive them, `taxi/`.)
         let taxis: Vec<crate::cars::Car> = self.cars.iter().filter(|c| c.taxi).cloned().collect();
+        let was: Vec<_> = self.cars.iter().map(|c| (c.taxi, pose(c))).collect();
         self.cars = s
             .cars
             .into_iter()
             .filter(|c| !c.taxi)
             .chain(taxis)
             .collect();
+        // (Each car's way as drawn goes with it: the taxis' to where they are now, after the
+        // households' cars; one of those put back elsewhere starts its way again.)
+        let homes = self.cars.len() - was.iter().filter(|w| w.0).count();
+        let taxis_were: Vec<usize> = (0..was.len()).filter(|&c| was[c].0).collect();
+        let cars = &self.cars;
+        self.trails
+            .remap(cars.len(), |c| match c.checked_sub(homes) {
+                Some(k) => taxis_were.get(k).copied(),
+                None => was
+                    .get(c)
+                    .is_some_and(|w| !w.0 && w.1 == pose(&cars[c]))
+                    .then_some(c),
+            });
         self.car_tiles = s.car_tiles;
         self.cars_parked = s.cars_parked;
         self.sync_tile_arrays();
@@ -211,4 +225,9 @@ impl World {
         self.rooms_layout_changed();
         self.rooms_things_changed_everywhere();
     }
+}
+
+/// Where car `c` is drawn and which way it faces (`Car::shown`).
+fn pose(c: &crate::cars::Car) -> Option<([f32; 2], f32)> {
+    c.shown.map(|s| (s.0, s.1))
 }

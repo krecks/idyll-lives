@@ -127,6 +127,33 @@ fn player_can_send_a_sim_to_visit_and_back() {
     assert!(w.sims[0].visiting.is_none());
 }
 
+#[test]
+fn setting_off_again_on_the_way_goes_on_with_the_visit_and_its_queued_goodbye() {
+    // Off to visit, their way home already queued for a need about to run out (`Visit::leaving`:
+    // withdrawn once it's seen to there), they set off again before they're there (on from the
+    // bike they walked over to at home): the visit goes on as it was. (Begun again, it forgot it
+    // was queued for the need, kept it queued when the need was seen to, and a guest let in at
+    // Gullmouth went home 20 minutes in.)
+    let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+    w.autonomy = false;
+    let visit = |directed| super::Transition::Visit { plot: 1, directed };
+    super::apply_transition(&mut w, 0, visit(false));
+    let v = w.sims[0].visiting.as_mut().expect("on their way");
+    v.leaving = true;
+    let before = *v;
+    w.tick += mins(5.0);
+    super::apply_transition(&mut w, 0, visit(false));
+    assert_eq!(w.sims[0].visiting, Some(before), "the same visit");
+    // (The player sends them on the way there: their visit is as long as one they ask for.)
+    super::apply_transition(&mut w, 0, visit(true));
+    let v = w.sims[0].visiting.expect("still on their way");
+    assert!(v.leaving, "still going for the need");
+    assert_eq!(
+        v.until,
+        w.tick + mins(w.content.visits.directed_hours * 60.0)
+    );
+}
+
 /// The test content with a job market: hired the day they look, let go after two misses.
 fn with_market() -> String {
     CONTENT.replace(

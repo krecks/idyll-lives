@@ -1,7 +1,8 @@
 /**
- * Step 2's street edits: a street, lane, country road or footpath drawn on the town (snapped to
- * the roads it starts and ends at, joining them in a T, bridged over water: `bridges.ts`), a road
- * removed with what stands on it, a road, place, village or the town renamed. Each keeps the
+ * Step 2's street edits: a street, lane, avenue, country road or footpath drawn on the town, one-way
+ * or not (snapped to the roads it starts and ends at, joining them in a T, bridged over water:
+ * `bridges.ts`), a road's kind or way changed (`changeKind`), a road removed with what stands on it
+ * (the motorway whole), a road, place, village or the town renamed. Each keeps the
  * generator's own rules (`roads.ts` `clearOf`, `roomAt`, `bends`).
  *
  * A drawn street:
@@ -14,9 +15,14 @@
  *   dead end of its own;
  * - ends at the first road it reaches (no crossroads: the player goes on from 14 m along), but a
  *   street runs across a footpath (`Meeting.crossable`), which it cuts (`cutTrails`);
- * - is a lane or a street of an area where it runs inside its box or within `NEAR_AREA` m of it,
- *   else a country road, unless the player asked for a street or a lane (`StreetStroke.asked`), which
- *   it then stays, its area given at the Build step; a footpath is a trail;
+ * - is a lane, an avenue or a street of an area where it runs inside its box or within `NEAR_AREA` m
+ *   of it, else a country road, unless the player asked for a street, a lane or an avenue
+ *   (`StreetStroke.asked`), which it then stays, its area given at the Build step; a footpath is a
+ *   trail; an avenue, 14 m wide, keeps that much further from other roads (`clearOf`, `Meeting.touch`);
+ * - one-way (`StreetStroke.oneway`), goes the way it is drawn or against it, ends on a road at both
+ *   ends, and is refused where it would leave somewhere a car can't reach and come back from
+ *   (`oneway.ts` `cutOffRoads`);
+ * - never meets nor crosses the motorway or its ramps (they are the generator's: `CROSS_MOTORWAY`);
  * - is refused, with the reason, where it bends tighter than 9 m, runs closer than 18 m alongside
  *   another road (`clearOf`), leaves the world other than by its end, meets a road within 14 m of
  *   another junction (`roomAt`), or joins no road;
@@ -38,16 +44,18 @@
 
 import type { Content } from '../../content/content';
 import type { RoadKind, RoadPlan } from '../../core/protocol';
+import { isSeparated, onewayOf, ROAD_KIND } from '../../core/roadKinds';
+import { cutOffRoads, newlyCutOff } from '../oneway';
 import { bayRect, carParkRect } from '../parking';
 import { surfacePlots } from '../../render/shared/builtSurface';
 import { crossWater, DRAWN_SPAN, wetSpans, withBridge, withoutDeck } from '../bridges';
 import { CTRL_APART, ROAD_WIDTH } from '../countryRouter';
 import { rle, simplify, unrle } from '../landMasks';
 import { mulberry32 } from '../noise';
-import { BRIDGE_IN, TRAIL_WIDTH } from '../macro';
-import { bends, clearOf, connector, COURT, cropRoads, curve, endDir, evenly, inside, leftOf, lengths, MEET, nearest, pointAt, RoadIndex, ROOM, roomAt, trimJoins, type Fit, type Pt } from '../roads';
+import { BRIDGE_IN } from '../macro';
+import { bends, clearOf, connector, COURT, cropRoads, curve, endDir, evenly, inside, leftOf, lengths, MEET, nearest, pointAt, RoadIndex, ROOM, roomAt, SIDEWALK, trimJoins, withCrosses, type Fit, type Pt } from '../roads';
 import { plotRect, type NeighbourhoodDraft, type Rect, type Templates } from '../town';
-import { placeOf, specOf, streetNames } from '../world';
+import { avenueName, placeOf, specOf, streetNames } from '../world';
 import type { Edited } from './edited';
 import { wholeParks, withoutBays } from './ground';
 import { fillStreet, removalRefused, removeLots } from './lots';
@@ -64,6 +72,8 @@ export interface StreetStroke {
   points: readonly Pt[];
   kind: RoadKind;
   asked?: boolean;
+  /** A one-way street: cars go the way it is drawn (+1) or against it (-1); absent: both ways. (A dead end it carries on keeps its own way.) */
+  oneway?: 1 | -1;
   clear: boolean;
   fill: boolean;
   seed: number;
@@ -84,7 +94,7 @@ export { ROOM } from '../roads';
 export const TRAIL_APART = 6;
 /** A street drawn this near an area's box (m) is one of its streets. */
 const NEAR_AREA = 30;
-/** A drawn line is simplified to this (m), and has a point every `CTRL_APART` m (a country road's) before it is made a curve. Widths: `countryRouter.ts` `ROAD_WIDTH`, `macro.ts` `TRAIL_WIDTH`. */
+/** A drawn line is simplified to this (m), and has a point every `CTRL_APART` m (a country road's) before it is made a curve. Widths: `streetWidth`. */
 const SIMPLIFY = 5;
 /** How much of a drawn line (m) is turned to meet a road, or to carry on a dead end's way. */
 const APPROACH = 16;
@@ -229,9 +239,15 @@ export const streetsBare = (draft: Pick<NeighbourhoodDraft, 'roads'>): boolean =
 export function madeKind(draft: NeighbourhoodDraft, line: readonly Pt[], kind: RoadKind, asked = false): Pick<RoadPlan, 'kind' | 'area'> {
   if (kind === 'trail') return { kind: 'trail' };
   const area = areaOf(draft, line);
-  if (area >= 0) return { kind: kind === 'lane' ? 'lane' : 'street', area };
-  return asked && (kind === 'street' || kind === 'lane') ? { kind } : { kind: 'country' };
+  if (area >= 0) return { kind: kind === 'lane' || kind === 'avenue' ? kind : 'street', area };
+  return asked && TOWN_KINDS.has(kind) ? { kind } : { kind: 'country' };
 }
+
+/** The kinds a street of a town or a village is (with an area, or given one at the Build step). */
+const TOWN_KINDS: ReadonlySet<RoadKind> = new Set(['street', 'lane', 'avenue']);
+
+/** Why a street drawn into the motorway is refused (crossing under an overpass may come later). */
+export const CROSS_MOTORWAY = "can't cross the motorway";
 
 /**
  * The town's roads as a drawn street meets them: what it may join (a car's road a car's road, a
@@ -252,7 +268,7 @@ export class Meeting {
 
   joinable(r: number): boolean {
     const road = this.roads[r];
-    return !road.island && (this.trail || road.kind !== 'trail');
+    return !road.island && !isSeparated(road.kind) && (this.trail || road.kind !== 'trail');
   }
 
   /** Whether the street runs across road `r` rather than meeting it: a footpath, for a street (`cutTrails` cuts it there). */
@@ -549,6 +565,7 @@ export function streetCourse(meet: Meeting, shaped: StreetLine): StreetCourse | 
   const hit = meet.contact(line, start.kind === 'join' || start.kind === 'extend' ? start.road : -1);
   let end: End;
   if (hit) {
+    if (isSeparated(roads[hit.road].kind)) return CROSS_MOTORWAY;
     if (!meet.joinable(hit.road)) return 'it runs into the roundabout';
     line = line.slice(0, hit.i + 1);
     const snapped = meet.snap(line[line.length - 1]);
@@ -587,8 +604,31 @@ export function streetCourse(meet: Meeting, shaped: StreetLine): StreetCourse | 
   return { start, end, junctions, part, head, foot, ends };
 }
 
-/** The width of a drawn road of `kind` (m): a footpath's, or every road's in a big world. */
-export const streetWidth = (kind: RoadKind) => (kind === 'trail' ? TRAIL_WIDTH : ROAD_WIDTH);
+/** The width of a drawn road of `kind` (m): its kind's (`ROAD_KIND`), a lane's narrower than a street's. */
+export const streetWidth = (kind: RoadKind) => ROAD_KIND[kind].width;
+
+/**
+ * What a draft's roads cut off before an edit (`oneway.ts` `cutOffRoads`), worked out once a draft: a street drawn
+ * asks it at every pause of the pointer and again as it is made. (A draft's roads are never changed in place.)
+ */
+const cutOff = new WeakMap<readonly RoadPlan[], number[]>();
+function cutOffBefore(roads: readonly RoadPlan[]): number[] {
+  let got = cutOff.get(roads);
+  if (!got) cutOff.set(roads, (got = cutOffRoads(roads)));
+  return got;
+}
+
+/** Why a one-way street is refused where it would leave somewhere a car can't get back from (`oneway.ts` `cutOffRoads`). */
+export const CUT_OFF = 'some homes could no longer be reached by car';
+/** Why a one-way street is refused with a dead end (no car could turn back out of it); while drawing, a street not finished yet (`streetLive.ts` `unfinished`). */
+export const ONE_WAY_ENDS = 'a one-way street ends on a road at both ends';
+
+/** Whether road `points` runs the way the player drew `drawn` (+1) or against it (-1): which of its ends the drawing began nearer. */
+function drawnWay(drawn: readonly Pt[], points: readonly Pt[]): 1 | -1 {
+  const ls = lengths(points);
+  const [a, b] = [drawn[0], drawn[drawn.length - 1]];
+  return nearest(points, a[0], a[1], ls).s <= nearest(points, b[0], b[1], ls).s ? 1 : -1;
+}
 
 /**
  * `draft` with the street `stroke` draws (see the top of this file), its homes (`stroke.fill`, a
@@ -637,8 +677,19 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
   const taken = namesIn(draft);
   const rand = mulberry32(stroke.seed);
   const areaName = kind.area === undefined ? undefined : draft.open?.areas[kind.area]?.name;
-  const name = was?.name ?? freshNames(draft, content, rand, 1, taken, areaName)[0];
-  const road: RoadPlan = { ...(was ?? {}), points: made, width: was?.width ?? width, ends, ...kind, name };
+  /** A fresh name for the road (an avenue's named as one, `avenueName`). */
+  const newName = () => {
+    const n = freshNames(draft, content, rand, 1, taken, areaName)[0];
+    if (kind.kind !== 'avenue') return n;
+    const a = avenueName(n, (x) => taken.has(x));
+    taken.add(a);
+    return a;
+  };
+  const name = was?.name ?? newName();
+  // (One-way the way it is drawn: its points may run the other way, from a dead end it carries on.)
+  const oneWay = was || trail || !stroke.oneway ? null : ((stroke.oneway * drawnWay(stroke.points, made)) as 1 | -1);
+  const road: RoadPlan = { ...(was ?? {}), points: made, width: was?.width ?? streetWidth(kind.kind ?? 'street'), ends, ...kind, name, ...(oneWay ? { oneway: oneWay } : {}) };
+  if (onewayOf(road) && ends.includes('dead')) return refused(ONE_WAY_ENDS);
   // (Where it begins at a road's kerb, not its middle; the roads it is made of left out.)
   const trimmed = trimJoins([...roads.filter((_, i) => i !== base && i !== merged), road]);
   const laid: RoadPlan = { ...road, points: trimmed[trimmed.length - 1].points.map(([x, z]): Pt => [Math.round(x * 100) / 100, Math.round(z * 100) / 100]) };
@@ -665,7 +716,7 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
       const r = next[at];
       const crossed = crossWater(r.points, r.ends, span, { wet, W, D, roads: others, plots, land: open.land, most: DRAWN_SPAN });
       if (typeof crossed === 'string') return refused(crossed);
-      const [after] = crossed.after ? freshNames(draft, content, rand, 1, taken, areaName) : [undefined];
+      const after = crossed.after ? newName() : undefined;
       const had = next.length;
       const bridged = withBridge(next, at, span, walk ?? wet, W, D, { bridge: bridgeName(name, taken), after }, crossed.fit);
       [next, walk] = [bridged.roads, bridged.walk];
@@ -678,7 +729,9 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
       if (pieces.length > 1 && bends(next[i].points).tight) return refused('it would turn onto its bridge tighter than 9 m');
     }
   }
-  if (merged >= 0) next = next.filter((_, i) => i !== merged);
+  // (Its bridges one-way with it: their decks run the way it does.)
+  if (oneWay) for (const i of pieces) if (next[i].oneway !== oneWay) next[i] = { ...next[i], oneway: oneWay };
+  if (merged >= 0) next = withCrosses(next.filter((_, i) => i !== merged), next.flatMap((_, i) => (i === merged ? [] : [i])));
   const fresh = pieces.map((i) => (merged >= 0 && i > merged ? i - 1 : i));
 
   // ---- a dead end anywhere: a street's or a lane's as it is (the sim turns round in any of theirs); a country road's past a court a street of no area (no taxi turns round in a country road) ----
@@ -692,6 +745,11 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
     }
   }
   if (!oneNetwork(next, new Set())) return refused('it joins none of the roads');
+  if (fresh.some((i) => onewayOf(next[i]))) {
+    // (What was cut off before, numbered as `next` numbers it: the dead end it merged is the road it carries on.)
+    const now = (i: number) => (merged < 0 ? i : i === merged ? (base > merged ? base - 1 : base) : i > merged ? i - 1 : i);
+    if (newlyCutOff(new Set(cutOffBefore(roads).map(now)), next).length) return refused(CUT_OFF);
+  }
 
   // ---- the footpaths it crosses, cut to meet it in a T either side (one it crosses on a bridge's deck passes under it) ----
   if (!trail) {
@@ -715,6 +773,165 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
     }
   }
   return { draft: drawn, cleared: { lots: way.lots }, made: fresh };
+}
+
+/** The kinds a road may be made on its card (`changeKind`): the car roads the Street tool draws. */
+export const CHANGE_KINDS: readonly RoadKind[] = ['street', 'lane', 'avenue', 'country'];
+
+/**
+ * `draft` with road `road` made a `kind` (`CHANGE_KINDS`), one-way (`oneway`: +1 the way its points run, -1 against
+ * them, 0 both ways; absent: as it is). Made wider (an avenue), it has to be clear of every road but those meeting
+ * or crossing it (`clearOf`), and the lots under it (within its width and `CORRIDOR` m) are cleared (`clear`) or it
+ * is refused; its car parks in the way go. Made narrower, it just narrows. Either way the roads that join it in a T
+ * begin at its new kerb. A street, a lane or an avenue is of the area it is in (or none: the Build step gives it
+ * one), a country road of none. Refused: on the motorway and its ramps, a footpath made a road or a road a footpath,
+ * a bridge made another kind, a road under the motorway made wider, a country road left a dead end past a court, a
+ * one-way road with a dead end, or one-way roads that leave somewhere a car can no longer get to and back from
+ * (`oneway.ts` `cutOffRoads`). Its way is its bridges' too, and theirs the street's beyond them (`streetPieces`: one
+ * street, as `drawStreet` lays it), each piece the way the road runs.
+ */
+export function changeKind(draft: NeighbourhoodDraft, t: Templates, road: number, kind: RoadKind, oneway?: 1 | -1 | 0, clear = false): Edited {
+  const roads = draft.roads;
+  const r = roads[road];
+  if (!r) return refused('there is no such road');
+  if (isSeparated(r.kind)) return refused('the motorway stays as it is: rename it or remove it');
+  if (!CHANGE_KINDS.includes(kind) && kind !== 'trail') return refused('only the world lays a motorway');
+  const was = r.kind ?? 'street';
+  const way = oneway === undefined ? (r.oneway ?? 0) : oneway;
+  if ((was === 'trail') !== (kind === 'trail')) return refused(was === 'trail' ? 'a footpath stays a footpath: draw a street instead' : 'a road stays a road: draw a footpath instead');
+  if (kind === 'trail' && way) return refused('a footpath has no one way');
+  if (kind === was && way === (r.oneway ?? 0)) return { draft, cleared: { lots: [] } };
+  if (r.bridge && kind !== was) return refused('a bridge stays as it is built');
+  // (Its bridges and the street beyond them, each piece one way with it.)
+  const pieces = way === (r.oneway ?? 0) ? [] : streetPieces(roads, road);
+  if (way && [r, ...pieces.map((p) => roads[p.road])].some((o) => o.ends.includes('dead'))) return refused(ONE_WAY_ENDS);
+  const width = r.bridge ? r.width : streetWidth(kind);
+  const wider = width > r.width + 0.01;
+  const name = r.name ?? 'it';
+  if (wider && r.crosses?.length) return refused(`${name} passes under the motorway, where it can't be made wider`);
+
+  // ---- the roads meeting it or crossing it (its own new width is theirs to begin at), and room to be wider ----
+  const own = new RoadIndex([r]);
+  const meets = new Set(roads.flatMap((o, j) => (j !== road && o.points.some(([x, z]) => own.distance(0, x, z, r.width / 2 + 1) <= r.width / 2 + 1) ? [j] : [])));
+  for (const [e, p] of [r.points[0], r.points[r.points.length - 1]].entries()) {
+    if (r.ends[e] !== 'join') continue;
+    const near = new RoadIndex(roads).nearest(p[0], p[1], ROAD_WIDTH);
+    if (near) meets.add(near.road);
+  }
+  if (wider) {
+    const fit: Fit = { box: { w: draft.width, d: draft.depth }, margin: -0.5, greens: draft.greens };
+    // (Only its new kerbs: it kept its roads apart as it was. Looked for as far off as the widest road's kerb comes.)
+    if (!clearOf(r.points, width, roads, new RoadIndex(roads), fit, -1, -1, width / 2 + 1, (j) => j === road || meets.has(j))) return refused(`there is no room for ${name} to be ${width} m wide: another road or a green is too near`);
+  }
+  const area = TOWN_KINDS.has(kind) ? (r.area ?? areaOf(draft, r.points)) : -1;
+  const { area: _area, oneway: _way, ...plain } = r;
+  const made: RoadPlan = { ...plain, kind, width, ...(area >= 0 ? { area } : {}), ...(way ? { oneway: way } : {}) };
+  const next = roads.map((o, j) => (j === road ? made : meets.has(j) ? atKerb(o, made) : o));
+  for (const { road: j, along } of pieces) {
+    const { oneway: _was, ...rest } = next[j];
+    next[j] = way ? { ...rest, oneway: (way * along) as 1 | -1 } : rest;
+  }
+  if (kind === 'country' && r.ends.includes('dead')) {
+    const court = longestCourt(next, [road]);
+    if (court && court.stub > COURT + 0.5) return refused(`a country road's dead end reaches ${COURT} m at most, and ${name} ends ${Math.round(court.stub)} m past the last road it meets`);
+  }
+  if (way !== (r.oneway ?? 0)) {
+    if (newlyCutOff(new Set(cutOffBefore(roads)), next).length) return refused(CUT_OFF);
+  }
+
+  // ---- what is in the way of it wider ----
+  const inWay = wider ? inTheWay(draft, t, [made]) : { lots: [], parking: [] };
+  if (!clear && inWay.lots.length) return refused(`${inWay.lots.length} lot${inWay.lots.length > 1 ? 's are' : ' is'} in its way`);
+  const gone = new Set(inWay.lots);
+  const kept = gone.size ? removalRefused(draft, gone) : null;
+  if (kept) return refused(`${kept.replace(/\.$/, '')}: it would be in the way`);
+  const open = draft.open;
+  return { draft: removeLots({ ...draft, roads: next, ...(open && inWay.parking.length ? { open: { ...open, ...withoutBays(open, inWay.parking) } } : {}) }, gone), cleared: { lots: inWay.lots } };
+}
+
+/**
+ * The other pieces of the street road `road` is a piece of, as `drawStreet` lays a street over the water (`withBridge`):
+ * the roads met end to end across a bridge (one of the two a bridge's), and on from them so, a piece at a time. Each
+ * with whether its points run the way `road`'s do (+1) or against them (-1).
+ */
+export function streetPieces(roads: readonly RoadPlan[], road: number): { road: number; along: 1 | -1 }[] {
+  const out: { road: number; along: 1 | -1 }[] = [];
+  const seen = new Set([road]);
+  const endOf = (o: RoadPlan, e: 0 | 1) => (e ? o.points[o.points.length - 1] : o.points[0]);
+  const walk = [{ road, along: 1 as 1 | -1 }];
+  for (let next = walk.pop(); next; next = walk.pop()) {
+    const a = roads[next.road];
+    for (const e of [0, 1] as const) {
+      if (a.ends[e] !== 'join') continue;
+      const p = endOf(a, e);
+      for (const [j, o] of roads.entries()) {
+        if (seen.has(j) || !(a.bridge || o.bridge) || isSeparated(o.kind) || o.kind === 'trail') continue;
+        const f = ([0, 1] as const).find((f) => o.ends[f] === 'join' && pmath.hypot(endOf(o, f)[0] - p[0], endOf(o, f)[1] - p[1]) < 1);
+        if (f === undefined) continue;
+        // (Its start at this one's end, or its end at this one's start: the same way.)
+        const piece = { road: j, along: (e !== f ? next.along : -next.along) as 1 | -1 };
+        seen.add(j);
+        out.push(piece);
+        walk.push(piece);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Road `o` with each end that joins road `to` in a T begun at its kerb again (as `roads.ts` `trimJoins` begins it):
+ * carried on along its way onto `to`'s middle, then cut back to its kerb (a footpath's to just inside its edge, as
+ * `cutTrails` cuts one).
+ */
+function atKerb(o: RoadPlan, to: RoadPlan): RoadPlan {
+  const index = new RoadIndex([to]);
+  const dist = ([x, z]: Pt) => index.distance(0, x, z, to.width + ROAD_WIDTH);
+  const kerb = o.kind === 'trail' ? to.width / 2 - TRAIL_IN : to.width / 2 - SIDEWALK;
+  const L = lengthOf(to.points);
+  let pts = o.points;
+  /** How much longer its start made it (m): what it keeps by arc length along it (decks, crossings) moves on by that. */
+  let shift = 0;
+  for (const e of [0, 1] as const) {
+    if (o.ends[e] !== 'join') continue;
+    const line = e ? [...pts] : reversed(pts);
+    const end = line[line.length - 1];
+    // (A T: by its middle, not end to end with it, as a bridge's pieces are.)
+    const s = index.along(0, end[0], end[1]);
+    if (!(dist(end) <= to.width / 2 + ROAD_WIDTH) || (to.ends[0] !== 'loop' && (s < 1 || s > L - 1))) continue;
+    // (On along its way to the middle, a point every half metre, while it nears it.)
+    const d = endDir(line);
+    let near = dist(end);
+    for (let k = 1; k <= 60 && near > 0.1; k++) {
+      const q: Pt = [end[0] + d[0] * k * 0.5, end[1] + d[1] * k * 0.5];
+      const n = dist(q);
+      if (!(n < near)) break;
+      line.push(q);
+      near = n;
+    }
+    while (line.length > 2 && dist(line[line.length - 2]) < kerb) line.pop();
+    if (dist(line[line.length - 1]) < kerb - 0.01) {
+      // (The kerb between its last two points: its end there.)
+      const [a, b] = [line[line.length - 2], line[line.length - 1]];
+      const [da, db] = [dist(a), dist(b)];
+      const f = da > db ? (da - kerb) / (da - db) : 1;
+      line[line.length - 1] = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+    }
+    const rounded = line.map(([x, z]): Pt => [Math.round(x * 100) / 100, Math.round(z * 100) / 100]);
+    if (!e) shift = lengthOf(rounded) - lengthOf(pts);
+    pts = e ? rounded : reversed(rounded);
+  }
+  if (pts === o.points) return o;
+  if (!shift) return { ...o, points: pts };
+  const by = ([a, b]: readonly [number, number]): [number, number] => [a + shift, b + shift];
+  return {
+    ...o,
+    points: pts,
+    ...(o.bridge ? { bridge: by(o.bridge) } : {}),
+    ...(o.bridges ? { bridges: o.bridges.map(by) } : {}),
+    ...(o.raised ? { raised: o.raised.map(by) } : {}),
+    ...(o.crosses ? { crosses: o.crosses.map((c) => ({ ...c, s: c.s + shift })) } : {}),
+  };
 }
 
 /** A line's wet stretches (`wetSpans`) as the crossings bridged: those closer than `ONE_CROSSING` m one. */
@@ -841,11 +1058,14 @@ export interface Goes {
 export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number): Goes | { refused: string } {
   const roads = draft.roads;
   if (!Number.isInteger(road) || road < 0 || road >= roads.length) return { refused: 'there is no such road' };
-  const nets = networks(roads, new Set([road]));
+  // (The motorway goes whole: both its carriageways and its ramps.)
+  const start = motorwayOf(roads, road);
+  const named = start.length > 1 ? 'the motorway' : (roads[road].name ?? 'it');
+  const nets = networks(roads, new Set(start));
   const leaves = new Set([...nets.entries()].filter(([i]) => roads[i].ends.includes('out')).map(([, n]) => n));
-  if (!leaves.size) return { refused: `without ${roads[road].name ?? 'it'} no road would lead out of the world` };
-  if (leaves.size > 1) return { refused: `without ${roads[road].name ?? 'it'} the roads would be cut in two` };
-  const gone = new Set([road, ...[...nets.entries()].filter(([, n]) => !leaves.has(n)).map(([i]) => i)]);
+  if (!leaves.size) return { refused: `without ${named} no road would lead out of the world` };
+  if (leaves.size > 1) return { refused: `without ${named} the roads would be cut in two` };
+  const gone = new Set([...start, ...[...nets.entries()].filter(([, n]) => !leaves.has(n)).map(([i]) => i)]);
   // A bridge it leaves ending in a dead end goes too, and so on (a bridge has a road on at each end).
   const bridges: number[] = [];
   let left = withoutRoads(roads, gone);
@@ -871,7 +1091,7 @@ export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number):
     if (r.kind !== 'country' || r.bridge) continue;
     const court = longestCourt(left.roads, [i]);
     if (!court || court.stub <= COURT + 0.5) continue;
-    if (!atBridge(r)) return { refused: `without ${roads[road].name ?? 'it'}, ${r.name ?? 'a road'} would end ${Math.round(court.stub)} m past the last road it meets (a dead end reaches ${COURT} m at most)` };
+    if (!atBridge(r)) return { refused: `without ${named}, ${r.name ?? 'a road'} would end ${Math.round(court.stub)} m past the last road it meets (a dead end reaches ${COURT} m at most)` };
     streets.push(left.from[i]);
   }
   const open = draft.open;
@@ -881,7 +1101,7 @@ export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number):
   const lots = draft.slots.filter((s, n) => (entries[n].entry && gone.has(entries[n].entry!.road)) || (s.kind === 'outdoor' && trailEnds.some(([x, z]) => offRect(rects[n], x, z) < TRAIL_END))).map((s) => s.index);
   // (The town keeps its last home and its last park, as a lot removed on its own does.)
   const kept = removalRefused(draft, new Set(lots));
-  if (kept) return { refused: `${kept.replace(/\.$/, '')}: without ${roads[road].name ?? 'it'} it would go` };
+  if (kept) return { refused: `${kept.replace(/\.$/, '')}: without ${named} it would go` };
   const index = new RoadIndex(roads);
   const bays = (open?.parking ?? []).flatMap((p, i) => {
     const near = index.nearest(p.x, p.z, ROAD_WIDTH / 2 + 6);
@@ -891,10 +1111,30 @@ export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number):
   return { roads: [...gone].sort((a, b) => a - b), bridges: bridges.sort((a, b) => a - b), streets: streets.sort((a, b) => a - b), lots, parking };
 }
 
-/** `roads` without those in `gone`; a join left with nothing to join is a dead end (`ended`: those roads, by their index in what is left; `from`: each road's index in `roads`). */
+/**
+ * The roads that go with road `road`: the motorway whole (its carriageways and its ramps) if it is one of them, else
+ * the road alone.
+ */
+export function motorwayOf(roads: readonly RoadPlan[], road: number): number[] {
+  return roads[road] && isSeparated(roads[road].kind) ? roads.flatMap((r, i) => (isSeparated(r.kind) ? [i] : [])) : [road];
+}
+
+/**
+ * `roads` without those in `gone`; a join left with nothing to join is a dead end (`ended`: those roads, by their index
+ * in what is left; `from`: each road's index in `roads`). What a road passes over or under (`crosses`) is numbered as
+ * the roads now are; one that passed over or under the motorway, gone, lies on the land (no `raised`).
+ */
 function withoutRoads(roads: readonly RoadPlan[], gone: ReadonlySet<number>): { roads: RoadPlan[]; ended: number[]; from: number[] } {
   const from = roads.flatMap((_, i) => (gone.has(i) ? [] : [i]));
-  const kept = from.map((i) => roads[i]);
+  const flat = new Set(from.filter((i) => roads[i].crosses?.some((c) => gone.has(c.road) && isSeparated(roads[c.road].kind))));
+  const kept = withCrosses(
+    from.map((i) => {
+      if (!flat.has(i)) return roads[i];
+      const { raised: _raised, ...rest } = roads[i];
+      return rest;
+    }),
+    from,
+  );
   const ended: number[] = [];
   const left = kept.map((r, i) => {
     const ends = r.ends.map((e, k) => {
@@ -947,9 +1187,35 @@ export function removeRoad(draft: NeighbourhoodDraft, t: Templates, road: number
 }
 
 /**
+ * The motorway's own name, as its card shows it: the words its carriageways' names begin with ("M36" of "M36 Eastbound"
+ * and "M36 Westbound"); one carriageway alone, its name without the way it goes. Empty if `roads` has no motorway.
+ */
+export function motorwayName(roads: readonly RoadPlan[]): string {
+  const names = roads.flatMap((r) => (r.kind === 'motorway' && r.name ? [r.name.split(' ')] : []));
+  if (!names.length) return '';
+  if (names.length === 1) return names[0].join(' ').replace(/ (North|South|East|West)bound$/, '');
+  let n = 0;
+  while (n < names[0].length && names.every((w) => w[n] === names[0][n])) n++;
+  return names[0].slice(0, n).join(' ');
+}
+
+/**
+ * `roads` with the motorway called `wanted`: each of its carriageways and ramps named `old` (its name, `motorwayName`)
+ * or beginning with it ("M36 Eastbound", "M36 Junction 12 Exit") called so with the rest of its name kept.
+ */
+function motorwayRenamed(roads: readonly RoadPlan[], old: string, wanted: string): RoadPlan[] {
+  return roads.map((r) => {
+    if (!isSeparated(r.kind) || !r.name || !old) return r;
+    if (r.name === old) return { ...r, name: wanted };
+    return r.name.startsWith(`${old} `) ? { ...r, name: `${wanted}${r.name.slice(old.length)}` } : r;
+  });
+}
+
+/**
  * `draft` with `what` called `name` (spaces tidied): a road's houses keep their numbers along it
- * with the new name; a place's public lot is called as it is; the main town (area 0) is the town.
- * Refused for no name, a name over 40 letters, or one another road, place, village or the town has.
+ * with the new name; a place's public lot is called as it is; the main town (area 0) is the town; the motorway (any
+ * of its carriageways or ramps) is named whole (`motorwayName`: M36 renamed M4, "M36 Eastbound" and "M36 Junction 12
+ * Exit" become "M4 Eastbound" and "M4 Junction 12 Exit"). Refused for no name, a name over 40 letters, or one another road, place, village or the town has.
  */
 export function rename(draft: NeighbourhoodDraft, what: Named, name: string): Edited {
   const wanted = name.trim().replace(/\s+/g, ' ');
@@ -961,6 +1227,16 @@ export function rename(draft: NeighbourhoodDraft, what: Named, name: string): Ed
   const town = what.kind === 'town' || (what.kind === 'area' && what.area === 0);
   const old = town ? draft.name : what.kind === 'road' ? draft.roads[what.road]?.name : what.kind === 'place' ? places[what.place]?.name : areas[(what as { area: number }).area]?.name;
   if (old === undefined && !(what.kind === 'road' && draft.roads[what.road])) return refused('there is nothing there to name');
+  const was = what.kind === 'road' && isSeparated(draft.roads[what.road].kind) ? motorwayName(draft.roads) : '';
+  if (was) {
+    // (The motorway is named whole: its carriageways and ramps keep the rest of their names, the way each goes.)
+    if (wanted === was) return { draft, cleared: { lots: [] } };
+    const roads = motorwayRenamed(draft.roads, was, wanted);
+    const others = new Set([draft.name, ...draft.roads.filter((r) => !isSeparated(r.kind)).map((r) => r.name ?? ''), ...(open?.places ?? []).map((p) => p.name), ...areas.map((a) => a.name)]);
+    const clash = [wanted, ...roads.filter((r) => isSeparated(r.kind)).map((r) => r.name ?? '')].find((n) => others.has(n));
+    if (clash) return refused(`${clash} is taken`);
+    return { draft: { ...draft, roads }, cleared: { lots: [] } };
+  }
   if (wanted === old) return { draft, cleared: { lots: [] } };
   const taken = namesIn(draft);
   if (taken.has(wanted)) return refused(`${wanted} is taken`);

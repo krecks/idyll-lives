@@ -10,6 +10,8 @@ pub struct Road {
     pub width: f32,
     pub kind: RoadKind,
     pub area: Option<u32>,
+    /// Which way cars may go along it (`RoadRaw::oneway`).
+    pub oneway: OneWay,
     /// Its index in the town file's `roads` (`drives[].road` refers to it).
     pub source: u32,
 }
@@ -46,6 +48,13 @@ impl Road {
             },
             kind: raw.kind,
             area: raw.area,
+            // (A carriageway or a ramp is one-way whatever it says: with none, the way its points run,
+            // as the town file reads it, `roadKinds.ts` `onewayOf`.)
+            oneway: if raw.oneway.is_both() && raw.kind.oneway_always() {
+                OneWay::Along
+            } else {
+                raw.oneway
+            },
             source: source as u32,
         })
     }
@@ -95,10 +104,35 @@ impl Road {
 
     /// The nearest point on it to `p`: how far along it is, and how far from `p`.
     pub fn project(&self, p: [f32; 2]) -> (f32, f32) {
+        self.project_on(p).1
+    }
+
+    /// `project`, and the segment it's on (the first of those as near).
+    pub(crate) fn project_on(&self, p: [f32; 2]) -> (usize, (f32, f32)) {
         (0..self.pts.len() - 1)
-            .map(|i| self.project_segment(i, p))
-            .min_by(|a, b| a.1.total_cmp(&b.1))
-            .unwrap_or((0.0, f32::INFINITY))
+            .map(|i| (i, self.project_segment(i, p)))
+            .min_by(|a, b| a.1.1.total_cmp(&b.1.1))
+            .unwrap_or((0, (0.0, f32::INFINITY)))
+    }
+
+    /// `project_on` for a point near segment `k`'s nearest to the one before it (the next along a
+    /// way on it): from segment `k` to the next while that's nearer `p` (or as near and earlier),
+    /// either way. What `project_on` gives where the road doesn't come back by `p` further along.
+    pub(crate) fn project_from(&self, k: usize, p: [f32; 2]) -> (usize, (f32, f32)) {
+        let last = self.pts.len() - 2;
+        let mut best = (k.min(last), self.project_segment(k.min(last), p));
+        loop {
+            let (k, (_, d)) = best;
+            let next = [k.checked_sub(1), (k < last).then_some(k + 1)]
+                .into_iter()
+                .flatten()
+                .map(|j| (j, self.project_segment(j, p)))
+                .find(|&(j, (_, dj))| dj < d || dj == d && j < k);
+            match next {
+                Some(n) => best = n,
+                None => return best,
+            }
+        }
     }
 
     /// Its middle line from `s0` to `s1` (either way round), ends included.
@@ -117,12 +151,20 @@ impl Road {
         out
     }
 
-    pub(super) fn walkable(&self) -> bool {
-        true
+    /// Whether people walk along it: not on a motorway or a ramp.
+    pub fn walkable(&self) -> bool {
+        !self.kind.separated()
     }
 
-    pub(crate) fn drivable(&self) -> bool {
+    /// Whether cars drive along it: not on a trail.
+    pub fn drivable(&self) -> bool {
         self.kind != RoadKind::Trail
+    }
+
+    /// Whether a car may come onto it or leave it other than at a junction (from a driveway, a
+    /// parking bay or a kerb): a road for cars but a motorway or a ramp.
+    pub fn enterable(&self) -> bool {
+        self.drivable() && !self.kind.separated()
     }
 }
 
@@ -164,7 +206,8 @@ const CROSS_RUN: f32 = 20.0;
 const CROSS_GAP: f32 = 4.0;
 
 /// Where two roads for cars (`Road::drivable`) cross, or their middle lines touch (`CROSS_NEAR`),
-/// away from either's ends (where `Graph::build` joins them already): the two roads, how far along
+/// neither of them a motorway (grade separated: it crosses on a bridge or under one), away from
+/// either's ends (where `Graph::build` joins them already): the two roads, how far along
 /// each, and the place (between the two nearest points), in order. A crossing, or a touch along a
 /// short stretch, is one place (`CROSS_RUN`); a road laid on another for longer meets it where
 /// they come together and where they part. A town file's roads should meet at their ends; a
@@ -196,8 +239,12 @@ pub(super) fn crossings(roads: &[Road]) -> Vec<(usize, usize, f32, f32, [f32; 2]
         for q in r + 1..roads.len() {
             let (a, b) = (&roads[r], &roads[q]);
             let (x, y) = (bounds[r], bounds[q]);
+            // (The motorway meets nothing it crosses: over it or under it, on its own level. Its
+            // ramps join it at their ends, `Graph::build`.)
             if !a.drivable()
                 || !b.drivable()
+                || a.kind == RoadKind::Motorway
+                || b.kind == RoadKind::Motorway
                 || x[2] + CROSS_NEAR < y[0]
                 || y[2] + CROSS_NEAR < x[0]
                 || x[3] + CROSS_NEAR < y[1]

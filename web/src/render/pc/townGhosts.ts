@@ -66,6 +66,11 @@ const VEIL = { rgb: [24, 27, 32], alpha: 0.55 } as const;
 
 /** Where the ghosts stand: the ground (m) at a town point (its water's top where it is wet). */
 export type Drape = (x: number, z: number) => number;
+/**
+ * The surface of the town's road along a ghost's line, if the town has that road (`shared/roads.ts` `roadHeightsOf`):
+ * its height `s` m along it. A road's ghost lies on it where it is higher than the ground (on a deck); else on the ground.
+ */
+export type RoadHeights = (points: readonly (readonly [number, number])[]) => ((s: number) => number) | null;
 
 /** A growing vertex and index buffer, written from the start on every call. */
 class Buffers {
@@ -227,9 +232,10 @@ export class TownGhostDraw {
 
   /**
    * Draws `ghosts` (null: none) draped over `drape`, on `layer`. `world`: the town shown, whose building on a lot to be
-   * removed is dimmed. Cheap: every pointer move.
+   * removed is dimmed. `heights`: its roads' surfaces, a road's ghost lying on its deck where it has one (the motorway
+   * picked: its outline was on the ground under its overpass, showing through it). Cheap: every pointer move.
    */
-  set(ghosts: TownGhosts | null, drape: Drape, layer: number, world: WorldStructure | null): void {
+  set(ghosts: TownGhosts | null, drape: Drape, layer: number, world: WorldStructure | null, heights?: RoadHeights | null): void {
     const empty = !ghosts || (!ghosts.roads.length && !ghosts.lots.length && !ghosts.boxes.length);
     if (empty) {
       this.entity.enabled = false;
@@ -242,7 +248,7 @@ export class TownGhostDraw {
       this.lot(lot, lot.tone, drape);
       if (lot.tone === 'gone' && world) this.veil(lot, drape, world);
     }
-    for (const road of ghosts.roads) this.road(road.points, road.width, road.tone, drape);
+    for (const road of ghosts.roads) this.road(road.points, road.width, road.tone, drape, heights?.(road.points) ?? null);
     const mesh = this.mesh;
     // (Past 65,535 vertices its indices need 32 bits: its buffers made again, larger, once.)
     if (buf.nv > 65535 && !this.wide) {
@@ -268,9 +274,10 @@ export class TownGhostDraw {
 
   /**
    * A band along `path` (resampled, with its `normals`) from `a` to `b` m across it (its left positive), `alpha`
-   * strong; `skip(i)`: leave out the piece from point `i` to the next (a dash's gap).
+   * strong; `skip(i)`: leave out the piece from point `i` to the next (a dash's gap). `ys`: at least this high (m) at
+   * each point, across it (a road's surface along it).
    */
-  private band(path: readonly [number, number][], ns: readonly [number, number][], a: number, b: number, rgb: readonly number[], alpha: number, drape: Drape, closed: boolean, skip?: (i: number) => boolean): void {
+  private band(path: readonly [number, number][], ns: readonly [number, number][], a: number, b: number, rgb: readonly number[], alpha: number, drape: Drape, closed: boolean, skip?: (i: number) => boolean, ys?: readonly number[]): void {
     const buf = this.buf;
     const n = path.length;
     buf.reserve(n * 2 + 2, n);
@@ -280,7 +287,7 @@ export class TownGhostDraw {
       const [nx, nz] = ns[i];
       for (const off of [a, b]) {
         const [px, pz] = [x + nx * off, z + nz * off];
-        buf.vertex(px, drape(px, pz) + LIFT, pz, rgb, alpha);
+        buf.vertex(px, Math.max(drape(px, pz), ys?.[i] ?? -Infinity) + LIFT, pz, rgb, alpha);
       }
     }
     const pieces = closed ? n : n - 1;
@@ -311,17 +318,20 @@ export class TownGhostDraw {
     }
   }
 
-  /** A street: its fill between two bright edges; a bridge's with planks across it too. */
-  private road(points: readonly (readonly [number, number])[], width: number, tone: GhostRoadTone, drape: Drape): void {
+  /** A street: its fill between two bright edges; a bridge's with planks across it too. `surfaceAt`: the town's road's surface `s` m along it, if it is one. */
+  private road(points: readonly (readonly [number, number])[], width: number, tone: GhostRoadTone, drape: Drape, surfaceAt: ((s: number) => number) | null): void {
     if (points.length < 2) return;
     const t = TONES[tone];
     const path = resample(points, STEP);
     const ns = normals(path, false);
     const half = this.least(width / 2, MIN_HALF_PX);
     const edge = Math.min(this.least(EDGE, MIN_LINE_PX), half / 2);
-    if (t.fill > 0) this.band(path, ns, -half + edge, half - edge, t.rgb, t.fill, drape, false);
-    this.band(path, ns, -half, -half + edge, t.rgb, t.edge, drape, false);
-    this.band(path, ns, half - edge, half, t.rgb, t.edge, drape, false);
+    // (On the road's surface where it is up off the ground: `resample` keeps the line's corners, so its length along it is the road's.)
+    let s = 0;
+    const ys = surfaceAt ? path.map((p, i) => surfaceAt((s += i ? Math.hypot(p[0] - path[i - 1][0], p[1] - path[i - 1][1]) : 0))) : undefined;
+    if (t.fill > 0) this.band(path, ns, -half + edge, half - edge, t.rgb, t.fill, drape, false, undefined, ys);
+    this.band(path, ns, -half, -half + edge, t.rgb, t.edge, drape, false, undefined, ys);
+    this.band(path, ns, half - edge, half, t.rgb, t.edge, drape, false, undefined, ys);
     if (tone !== 'bridge') return;
     // (Planks across the deck, one every `PLANK_EVERY` m along it.)
     const buf = this.buf;

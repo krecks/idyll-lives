@@ -25,32 +25,16 @@ pub(crate) fn side_offset(width: f32, kind: RoadKind) -> f32 {
     }
 }
 
-/// `pts` moved to the walkers' side (the right, looking the way they go).
+/// `pts` moved to the walkers' side (the right, looking the way they go, as the traffic keeps:
+/// `cars::offset_right_with`).
 pub(super) fn walk_side(pts: &[([f32; 2], f32, RoadKind)]) -> Vec<[f32; 2]> {
-    let n = pts.len();
-    (0..n)
-        .map(|i| {
-            let (a, b) = (pts[i.saturating_sub(1)].0, pts[(i + 1).min(n - 1)].0);
-            let (dx, dz) = (b[0] - a[0], b[1] - a[1]);
-            let d = dx.hypot(dz).max(1e-6);
-            let off = side_offset(pts[i].1, pts[i].2);
-            // Right of the way (dx, dz): (-dz, dx) in town coordinates (x right, z down the map).
-            [pts[i].0[0] - dz / d * off, pts[i].0[1] + dx / d * off]
-        })
-        .collect()
+    let line: Vec<[f32; 2]> = pts.iter().map(|p| p.0).collect();
+    crate::cars::offset_right_with(&line, |i| side_offset(pts[i].1, pts[i].2))
 }
 
 /// `pts` moved `off` m to the right (looking the way they run).
 pub fn offset_right(pts: &[[f32; 2]], off: f32) -> Vec<[f32; 2]> {
-    let n = pts.len();
-    (0..n)
-        .map(|i| {
-            let (a, b) = (pts[i.saturating_sub(1)], pts[(i + 1).min(n - 1)]);
-            let (dx, dz) = (b[0] - a[0], b[1] - a[1]);
-            let d = dx.hypot(dz).max(1e-6);
-            [pts[i][0] - dz / d * off, pts[i][1] + dx / d * off]
-        })
-        .collect()
+    crate::cars::offset_right_with(pts, |_| off)
 }
 
 /// A line of points about a metre apart, cut down to one every `THIN_STEP` m at most and at
@@ -105,6 +89,7 @@ pub fn dist(a: [f32; 2], b: [f32; 2]) -> f32 {
 /// all with `dist` gives (`min_by`: the lowest index on a tie), found through cells over them (a
 /// route laid asked for every lane point's nearest twice, a scan of 1,200 points each time, and
 /// was most of a big world's slowest ticks).
+#[derive(Debug, Clone)]
 pub(crate) struct NearestPoint {
     pts: Vec<[f32; 2]>,
     /// Where cell (0, 0) begins, and the cells' size (m).
@@ -117,6 +102,12 @@ pub(crate) struct NearestPoint {
     items: Vec<u32>,
     /// Too few points for cells to pay, or one not finite: every point scanned.
     pub(super) scan: bool,
+}
+
+impl Default for NearestPoint {
+    fn default() -> Self {
+        NearestPoint::new(Vec::new())
+    }
 }
 
 /// Fewer points than this are scanned.
