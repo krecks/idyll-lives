@@ -6,8 +6,8 @@
  * kind: the motorway's carriageways, its overpasses (`raised`) and bridges, its ramps, the roads under it.
  *
  * A line per world: whether it has a motorway (else why not: `diagnostics.motorway`), its crossings, its ramps'
- * lengths, and what is wrong with it (`motorway.ts` `motorwayProblems`, and any crossing not under a deck); then the
- * share of worlds with one, per place and per size.
+ * lengths, how many villages the world has, and what is wrong with it (`motorway.ts` `motorwayProblems`, and any crossing not under a deck); then the
+ * share of worlds with one (and their villages), per place and per size.
  *
  * `--seed n`: that seed alone (as the bench's big world, `?bench=bigworld`, makes its town from seed 7), `--options
  * town=city,villages=many`: those options over each size's. `--spots <file>`: per world with a motorway, where its
@@ -130,7 +130,7 @@ function judged(d: NeighbourhoodDraft): { fits: boolean; line: string; problems:
   return { fits: true, line: `motorway ${L.toFixed(0)} m, ${n} crossing${n === 1 ? '' : 's'}, ${ways[0].bridge ? 'a bridge, ' : ''}ramps ${ramps.join('/')} m`, problems };
 }
 
-const rows: { kind: string; size: string; fits: boolean }[] = [];
+const rows: { kind: string; size: string; fits: boolean; villages: number }[] = [];
 const allProblems: string[] = [];
 const runs: { kind: string; size: string; seed: number; make: () => NeighbourhoodDraft }[] = [];
 for (const kind of kinds) {
@@ -154,10 +154,12 @@ for (const { kind, size, seed, make } of runs) {
   const ms = performance.now() - t0;
   const { fits, line, problems } = judged(d);
   const tag = `${kind} ${size} ${seed}`;
-  console.log(`${tag}: ${line} (${d.width}×${d.depth} m, ${ms.toFixed(0)} ms)${problems.length ? `\n  ${problems.join('\n  ')}` : ''}`);
+  const villages = (d.open?.areas.length ?? 1) - 1;
+  const left = d.diagnostics?.villages?.left;
+  console.log(`${tag}: ${line}, ${villages} village${villages === 1 ? '' : 's'}${left ? ` (${left} short)` : ''} (${d.width}×${d.depth} m, ${ms.toFixed(0)} ms)${problems.length ? `\n  ${problems.join('\n  ')}` : ''}`);
   for (const p of problems) allProblems.push(`${tag}: ${p}`);
   for (const p of d.diagnostics?.roads ?? []) console.log(`  road fault: ${p}`);
-  rows.push({ kind, size, fits });
+  rows.push({ kind, size, fits, villages });
   if (spotsFile && fits) spots.push({ kind, size, seed, ...spotsOf(d) });
   if (maps) writeFileSync(`${out}/${kind.replace(/ /g, '-')}-${size}-${seed}.svg`, svg(d, `${tag}: ${line}`));
 }
@@ -179,7 +181,7 @@ function spotsOf(d: NeighbourhoodDraft): Record<string, unknown> {
   return { centre: [Math.round(cx), Math.round(cz)], junction: off(T), overpass: off(under) };
 }
 
-const share = (list: typeof rows) => `${list.filter((r) => r.fits).length}/${list.length}`;
+const share = (list: typeof rows) => `${list.filter((r) => r.fits).length}/${list.length}, villages ${list.reduce((n, r) => n + r.villages, 0)}`;
 console.log('\nMotorway fits, by place:');
 for (const k of new Set(rows.map((r) => r.kind))) console.log(`  ${k}: ${share(rows.filter((r) => r.kind === k))}`);
 console.log('By size:');
