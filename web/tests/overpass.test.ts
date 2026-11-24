@@ -5,12 +5,12 @@
  * decks: `roads.test.ts`.)
  */
 import { describe, expect, test } from 'bun:test';
-import type { RoadPlan } from '../src/core/protocol';
+import type { RoadPlan, WorldStructure } from '../src/core/protocol';
 import { Geo } from '../src/render/shared/geometry';
 import { allBarriers, barrier, deckLevels, insideOf, liftedStretches, MOTORWAY, motorwayPairs, signSpots, without } from '../src/render/shared/motorway';
 import { nearest } from '../src/game/roads';
-import { raisedSpans } from '../src/render/shared/roads';
-import { OVERPASS, overpass, Painter } from '../src/render/shared/street';
+import { raisedSpans, ROAD_Y, roadHeightsOf } from '../src/render/shared/roads';
+import { OVERPASS, overpass, Painter, pierStations } from '../src/render/shared/street';
 import * as F from '../src/render/roadHierarchyFixture';
 
 const h = F.roadHierarchy();
@@ -163,6 +163,43 @@ describe('an overpass', () => {
     expect(Math.max(...ps.filter((p) => p[1] > 4).map((p) => p[2]))).toBeCloseTo(4.5, 6);
   });
 
+  test('over a road: no pier on it, one each side of it instead', () => {
+    // (The farm world's overpass: 31 m, the road under it across its middle; its one pier, at 15.5 m, was on the road
+    // and left out, the deck running from bank to bank.)
+    const clear: [number, number][] = [[6.7, 24.3]];
+    expect(pierStations(31, 2, clear)).toEqual([6.7, 24.3]);
+    const feet = draw(31, 9, 6.4, { clear }).filter((p) => p[1] < 0 && p[0] > 2 && p[0] < 29);
+    const xs = [...new Set(feet.map((p) => Math.round(p[0])))];
+    expect(xs.some((x) => Math.abs(x - 6.7) < 1.2)).toBe(true);
+    expect(xs.some((x) => Math.abs(x - 24.3) < 1.2)).toBe(true);
+    for (const [x] of feet) expect(x < 6.7 + OVERPASS.cap || x > 24.3 - OVERPASS.cap).toBe(true);
+  });
+
+  test('its piers: evenly where nothing passes under, none at its ends or too near them', () => {
+    expect(pierStations(60, 3, [])).toEqual([20, 40]);
+    expect(pierStations(18, 1, [[5, 13]])).toEqual([]);
+    // (The road under it near an end: the pier on that side would stand at the end, left out; the other stands.)
+    expect(pierStations(40, 2, [[1, 21]])).toEqual([21]);
+    expect(pierStations(40, 2, [[17, 25]])).toEqual([17, 25]);
+    // (Two roads under it side by side: beside them, and between them where their clear stretches meet.)
+    expect(pierStations(60, 3, [[12, 21], [21, 30]])).toEqual([12, 21, 40]);
+  });
+
+  test('its slab closed under the road, for its shadow: a face looking up across its width, below the road', () => {
+    const g = new Geo();
+    const p = new Painter(g);
+    overpass(line(0, 0, 30, 0, 30), 9, () => p, { deck: () => 6.4, ground: () => 0 });
+    // (A face looking up below the road's surface, as wide as the slab, all along it.)
+    const lid: [number, number][] = [];
+    for (let k = 0; k < g.pos.length / 3; k++) {
+      const [y, ny] = [g.pos[k * 3 + 1], g.nor[k * 3 + 1]];
+      if (ny > 0.99 && y < 6.4 && y > 6.4 - OVERPASS.slab) lid.push([g.pos[k * 3], g.pos[k * 3 + 2]]);
+    }
+    expect(Math.min(...lid.map((q) => q[0]))).toBeCloseTo(0, 6);
+    expect(Math.max(...lid.map((q) => q[0]))).toBeCloseTo(30, 6);
+    expect(Math.max(...lid.map((q) => q[1])) - Math.min(...lid.map((q) => q[1]))).toBeCloseTo(9 + 2 * OVERPASS.apron, 6);
+  });
+
   test('a solid ramp: walls down its sides, no piers, no slab under it', () => {
     const ps = draw(40, 9, 3, { solid: true });
     const under = ps.filter((p) => p[1] < 3 - 0.5);
@@ -198,5 +235,26 @@ describe("the motorway's direction signs", () => {
     expect(before.map((p) => Math.round(420 - p.x)).sort((a, b) => a - b)).toEqual([150, 300]);
     // (Outside: away from the westbound carriageway, at -z.)
     for (const p of before) expect(p.z).toBeLessThan(F.EAST_Z - 4.5);
+  });
+});
+
+describe("step 2's outline round a road picked (`roadHeightsOf`)", () => {
+  const world = { width: 400, depth: 300, plots: [], meta: { roads: h.roads } } as unknown as WorldStructure;
+  const heights = roadHeightsOf(world)!;
+
+  test('on the motorway\'s deck over the street, not on the ground under it', () => {
+    const east = h.roads[F.MOTORWAY_EAST];
+    // (Its line as the editor has it: a copy of the road's points.)
+    const along = heights(east.points.map(([x, z]): [number, number] => [x, z]))!;
+    const [[a, b]] = raisedSpans(east);
+    expect(along((a + b) / 2)).toBeCloseTo(MOTORWAY.clear + ROAD_Y, 6);
+    expect(along(F.RIVER_X)).toBeCloseTo(ROAD_Y, 6);
+    // The street under it: on the ground.
+    expect(heights(h.roads[F.BRIDGE_STREET].points)!(F.EAST_Z - F.AVENUE_Z)).toBeCloseTo(ROAD_Y, 6);
+  });
+
+  test('a line the town has no road along: none', () => {
+    expect(heights(line(0, 0, 50, 0, 5))).toBeNull();
+    expect(roadHeightsOf({ ...world, meta: { roads: [] } } as unknown as WorldStructure)).toBeNull();
   });
 });

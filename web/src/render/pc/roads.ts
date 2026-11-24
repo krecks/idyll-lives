@@ -1,6 +1,7 @@
 /**
  * The roads that connect a town with the world outside, as PlayCanvas draws them: the road
- * surfaces, their centre lines and a "Welcome to …" sign by the way into town. Where they go (and
+ * surfaces, their centre lines and a "Welcome to …" sign by the way into town; a motorway's barrier, and its deck where
+ * it goes on over the water (plainly: a slab, a parapet on its outer edge, a pier now and then). Where they go (and
  * the side roads of a town of several streets) is `shared/countryRoads.ts`'s; the landscape
  * (`nature.ts`) levels the ground under them and hands them here (`Landscape.build`'s
  * `buildRoads`).
@@ -16,6 +17,12 @@ import { BARRIER_CONCRETE, BARRIER_FINISH, MOTORWAY } from '../shared/motorway';
 
 /** The stretches (`STEP` m each) over which a road out of town goes from the junction's even tone to its own wear. */
 const JOIN_FADE = 3;
+/**
+ * A motorway's deck over the water past the edge, plainly (m): its slab this deep under the road, reaching this far
+ * past its outer edge; a parapet there this high and wide; a pier every this many stretches (`STEP` m each), this wide,
+ * down into the bed under the water.
+ */
+const DECK = { slab: 1.1, apron: 0.5, parapet: 1.0, wall: 0.3, every: 6, pier: 1.2, sink: 0.5 } as const;
 
 /** The road surfaces, their centre lines and the welcome signs of `roads`, under `parent`. */
 export function drawRoads(app: pc.AppBase, roads: CountryRoads, parent: pc.Entity): pc.Entity[] {
@@ -101,6 +108,47 @@ export function drawRoads(app: pc.AppBase, roads: CountryRoads, parent: pc.Entit
       const [ha, hb] = [ya + MOTORWAY.high, yb + MOTORWAY.high];
       for (const k of [1, -1]) quad(barrier, [[ax + sx * k, ya, az + sz * k], [bx + sx * k, yb, bz + sz * k], [bx + tx * k, hb, bz + tz * k], [ax + tx * k, ha, az + tz * k]]);
       quad(barrier, [[ax + tx, ha, az + tz], [bx + tx, hb, bz + tz], [bx - tx, hb, bz - tz], [ax - tx, ha, az - tz]]);
+    }
+  }
+  // A motorway's deck over the water: its slab, its parapet on the outer edge, its piers (in the barrier's concrete).
+  for (const [ri, { on, bed }] of roads.decks) {
+    const road = roads.roads[ri];
+    const other = roads.roads[roads.pairs.get(ri) ?? -1];
+    for (let i = 0; i + 1 < road.length; i++) {
+      if (!on[i] && !on[i + 1]) continue;
+      const [[ax, az, ah, w], [bx, bz, bh]] = [road[i], road[i + 1]];
+      const l = Math.hypot(bx - ax, bz - az) || 1;
+      const [fx, fz] = [(bx - ax) / l, (bz - az) / l];
+      // (Across it, towards its outer edge: away from its pair.)
+      let [sx, sz] = [-fz, fx];
+      if (other?.[i] && (other[i][0] - ax) * sx + (other[i][1] - az) * sz > 0) [sx, sz] = [-sx, -sz];
+      // (A point `t` (0, 1) along the stretch, `off` m across it towards its outer edge, `y` over its road.)
+      const at = (t: 0 | 1, off: number, y: number): V3 => {
+        const [x, z, h] = t === 0 ? [ax, az, ah] : [bx, bz, bh];
+        return [x + sx * off, h + y, z + sz * off];
+      };
+      const [inner, outer, top] = [-w / 2, w / 2 + DECK.apron, LIFT - 0.004];
+      // The slab: its outer side, its underside (its inner side meets its pair's), its ends where the deck ends.
+      barrier.poly([at(0, outer, top), at(1, outer, top), at(1, outer, -DECK.slab), at(0, outer, -DECK.slab)], [sx, 0, sz]);
+      barrier.poly([at(0, outer, -DECK.slab), at(1, outer, -DECK.slab), at(1, inner, -DECK.slab), at(0, inner, -DECK.slab)], [0, -1, 0]);
+      for (const [t, end, k] of [[0, i > 0 && !on[i - 1], -1], [1, i + 2 < road.length && !on[i + 2], 1]] as const) {
+        if (end) barrier.poly([at(t, inner, top), at(t, outer, top), at(t, outer, -DECK.slab), at(t, inner, -DECK.slab)], [fx * k, 0, fz * k]);
+      }
+      // The parapet on its outer edge: its two faces and its top.
+      const wall = outer - DECK.wall;
+      barrier.poly([at(0, outer, top), at(1, outer, top), at(1, outer, DECK.parapet), at(0, outer, DECK.parapet)], [sx, 0, sz]);
+      barrier.poly([at(0, wall, top), at(1, wall, top), at(1, wall, DECK.parapet), at(0, wall, DECK.parapet)], [-sx, 0, -sz]);
+      barrier.poly([at(0, wall, DECK.parapet), at(1, wall, DECK.parapet), at(1, outer, DECK.parapet), at(0, outer, DECK.parapet)], [0, 1, 0]);
+      // Now and then a pier under the slab's middle, down into the bed.
+      const [y0, y1] = [bed[i] - DECK.sink, ah - DECK.slab];
+      if (i % DECK.every !== DECK.every / 2 || !on[i] || y1 <= y0) continue;
+      const mid = (inner + outer) / 2;
+      const [cx, cz, r] = [ax + sx * mid, az + sz * mid, DECK.pier / 2];
+      const c = (u: number, v: number, y: number): V3 => [cx + fx * u + sx * v, y, cz + fz * u + sz * v];
+      for (const [u, v, nu, nv] of [[r, 0, 1, 0], [-r, 0, -1, 0], [0, r, 0, 1], [0, -r, 0, -1]]) {
+        const [du, dv] = [nv * r, nu * r];
+        barrier.poly([c(u - du, v - dv, y1), c(u + du, v + dv, y1), c(u + du, v + dv, y0), c(u - du, v - dv, y0)], [fx * nu + sx * nv, 0, fz * nu + sz * nv]);
+      }
     }
   }
   const barrierMesh = meshFrom(device, barrier.meshData({ colors: true }));

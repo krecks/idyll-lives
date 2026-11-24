@@ -218,6 +218,8 @@ export class Street {
   private focus = NO_FOCUS;
   /** The chunks to draw (null: every one the town has). */
   private wanted: ReadonlySet<number> | null = null;
+  /** The chunks whose meshes are in place (null: every one the town has): `shownChunks`. */
+  private shown: ReadonlySet<number> | null = new Set();
   private readonly chunks = new Map<number, BuiltChunk>();
   /** Counts the chunks drawn or made: the arrays kept for those not drawn go oldest first (`evictData`). */
   private dataClock = 0;
@@ -406,7 +408,8 @@ export class Street {
     this.focus = view ? (world.plots.find((p) => p.x < view.x + view.w - 0.01 && p.x + p.w > view.x + 0.01 && p.z < view.z + view.d - 0.01 && p.z + p.d > view.z + 0.01)?.id ?? NO_FOCUS) : town.mode === 'town' ? (world.meta?.home ?? NO_FOCUS) : NO_FOCUS;
     const focus = this.focus;
     const all = town.chunkIds();
-    const wanted = this.wanted ? all.filter((id) => this.wanted!.has(id)) : all;
+    const asked = this.wanted;
+    const wanted = asked ? all.filter((id) => asked.has(id)) : all;
     const dirty = this.dirtyGroups;
     const wantedSet = new Set(wanted);
     // Chunks no longer drawn go (their vertex arrays are kept while the budget lasts: streamed in again, they cost
@@ -516,6 +519,10 @@ export class Street {
     }
     for (const s of swaps) s.commit();
     for (const g of [...dirty]) dirty.delete(g);
+    // (What stands on the roads drawn apart from the street, the traffic lights and the cars, waits for this: `shownChunks`.)
+    const shown = asked ? wantedSet : null;
+    const was = this.shown;
+    if (!(shown === was || (shown && was && shown.size === was.size && [...shown].every((id) => was.has(id))))) this.shown = shown;
     // The focus lot's garage and porch (apart: they go with the lot's ground).
     const focusChunk = town.focusChunk(focus);
     const lotPlan = focusChunk !== null ? this.chunks.get(focusChunk) : undefined;
@@ -857,6 +864,16 @@ export class Street {
     return !this.wanted || this.wanted.has(id);
   }
 
+  /**
+   * The chunks whose road, sidewalks and street furniture are drawn now (null: all of the town's; none before the first
+   * build): the last build's, once its meshes went in. A new set only when that changes. What stands on the roads but is
+   * drawn apart (the traffic lights, the cars) is shown in these, not in those asked for (`setChunks`): those come in a
+   * build later, and a camera jump showed the lights standing on the grass meanwhile.
+   */
+  get shownChunks(): ReadonlySet<number> | null {
+    return this.shown;
+  }
+
   /** The chunks drawn in full (null: all of them), as last given (`setChunks`): a new set whenever that changes. */
   get drawnChunks(): ReadonlySet<number> | null {
     return this.wanted;
@@ -1075,6 +1092,7 @@ export class Street {
     }
     this.groups.clear();
     this.chunks.clear();
+    this.shown = new Set();
     this.planned.clear();
     this.prepared = false;
     this.dirtyGroups.clear();

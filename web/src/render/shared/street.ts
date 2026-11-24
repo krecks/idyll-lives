@@ -2393,14 +2393,16 @@ export function bridge(
 }
 
 /**
- * An overpass's measures (m): its concrete slab `slab` deep under the road, reaching `apron` past the road's edges; its
+ * An overpass's measures (m): its concrete slab `slab` deep under the road, reaching `apron` past the road's edges, closed
+ * `lid` under the road's surface (out of sight, there for its shadow, clear of the road's own in the sun's map); its
  * parapet (a safety-shape barrier: a foot `foot` wide and `footHigh` high, then up to `parapet` over the road, `top`
- * wide) along each outer edge; a pier every `pier` m or a little less (`column` square columns, one under a deck
+ * wide) along each outer edge; a pier every `pier` m or a little less, beside a road it passes over rather than on it
+ * (`pierStations`; `column` square columns, one under a deck
  * narrower than `wide`, two under a wider one, on a cross-head `cap` along and `capDeep` deep), each `sink` into the
  * ground; an abutment `abutment` thick under each end that stands clear of it. Where the deck stands less than `low`
  * over the ground, nothing stands under it.
  */
-export const OVERPASS = { slab: 1.1, apron: 0.5, parapet: 1.0, foot: 0.5, footHigh: 0.3, top: 0.24, pier: 20, column: 1.1, cap: 1.2, capDeep: 0.8, sink: 0.4, abutment: 1.2, wide: 8, low: 2.4 } as const;
+export const OVERPASS = { slab: 1.1, lid: 0.3, apron: 0.5, parapet: 1.0, foot: 0.5, footHigh: 0.3, top: 0.24, pier: 20, column: 1.1, cap: 1.2, capDeep: 0.8, sink: 0.4, abutment: 1.2, wide: 8, low: 2.4 } as const;
 const OVERPASS_CONCRETE = '#ABA8A0';
 const OVERPASS_PARAPET = '#BCB9B1';
 
@@ -2417,7 +2419,8 @@ const OVERPASS_PARAPET = '#BCB9B1';
  * carriageway): no parapet there (the barrier between them stands on the deck), the slab reaching only `innerApron`
  * past the road's edge (half the verge between them: the two slabs meet). `solid`: a ramp up to a deck on a world with
  * no built surface to bank it (`motorway.ts` `deckLevels`): walls down its sides to the ground instead of what stands
- * under a deck. `clear`: stretches along it (m from its start) where no pier stands (the roads it passes over).
+ * under a deck. `clear`: stretches along it (m from its start) where no pier stands (the roads it passes over): one
+ * that would stands each side of them instead (`pierStations`).
  */
 export function overpass(
   deck: readonly (readonly [number, number])[],
@@ -2435,6 +2438,8 @@ export function overpass(
   if (total < 0.01) return;
   const n = Math.max(1, Math.ceil(total / O.pier - 1e-6));
   const P = total / n;
+  const piers = pierStations(total, n, options.clear ?? []);
+  const isPier = (u: number) => u > 1e-6 && piers.some((v) => Math.abs(v - u) < 1e-6);
   // (Local +x is the deck's left: `Painter.at` turns +z to (sin yaw, cos yaw), +x to (cos yaw, -sin yaw).)
   const reach = (side: 1 | -1) => width / 2 + (options.inner === side ? (options.innerApron ?? 0) : O.apron);
   const [left, right] = [reach(1), reach(-1)];
@@ -2444,9 +2449,12 @@ export function overpass(
     const len = ls[i + 1] - ls[i];
     const [dx, dz] = [(runs[i + 1][0] - runs[i][0]) / len, (runs[i + 1][1] - runs[i][1]) / len];
     const yaw = Math.atan2(dx, dz);
-    const cuts = [0];
-    for (let k = Math.floor(ls[i] / P + 1e-6) + 1; k * P < ls[i + 1] - 1e-6; k++) cuts.push(k * P - ls[i]);
-    cuts.push(len);
+    // (Cut every `P` m, the pieces no longer than that, and where a pier stands.)
+    const inner: number[] = [];
+    for (let k = Math.floor(ls[i] / P + 1e-6) + 1; k * P < ls[i + 1] - 1e-6; k++) inner.push(k * P - ls[i]);
+    for (const v of piers) if (v > ls[i] + 1e-6 && v < ls[i + 1] - 1e-6) inner.push(v - ls[i]);
+    inner.sort((a, b) => a - b);
+    const cuts = [0, ...inner.filter((u, k) => k === 0 || u - inner[k - 1] > 0.05), len];
     for (let c = 0; c + 1 < cuts.length; c++) {
       const bounds = [cuts[c], ...(heights?.stops ?? []).map((u) => u - ls[i]).filter((u) => u > cuts[c] + 0.05 && u < cuts[c + 1] - 0.05), cuts[c + 1]];
       for (let k = 0; k + 1 < bounds.length; k++) {
@@ -2463,7 +2471,12 @@ export function overpass(
           return groundAt(wx, wz) - ((ya + yb) / 2 + (at * (yb - ya)) / (L || 1));
         };
         // The slab (its top under the road's surface, which covers it); on a solid ramp, a wall down each outer side.
-        if (!solid) p.paint(OVERPASS_CONCRETE, 0.92).box(-right, -O.slab, -L / 2, left, ROAD_Y - 0.004, L / 2, `py${ends}`);
+        // (Its top: a lid `O.lid` under the road, unseen, for its shadow. Open, the sun's map saw only its sides, its
+        // underside facing away, culled: the shadow on the ground under it was its outline, zig-zagging over the banks.)
+        if (!solid) {
+          p.paint(OVERPASS_CONCRETE, 0.92).box(-right, -O.slab, -L / 2, left, ROAD_Y - 0.004, L / 2, `py${ends}`);
+          p.poly([[-right, -O.lid, -L / 2], [left, -O.lid, -L / 2], [left, -O.lid, L / 2], [-right, -O.lid, L / 2]], [0, 1, 0]);
+        }
         else {
           const foot = Math.min(under(-L / 2, 0), under(L / 2, 0)) - O.sink;
           for (const side of [-1, 1] as const) {
@@ -2482,10 +2495,10 @@ export function overpass(
           const [t0, t1] = span(0.06, 0.06 + O.top);
           p.box(t0, O.footHigh, -L / 2, t1, O.parapet, L / 2, `ny${ends}`);
         }
-        // What stands under it down to the ground: a pier where a piece between two begins (not at the deck's start),
-        // an abutment under each end.
+        // What stands under it down to the ground: a pier where a piece begins at one (`pierStations`), an abutment
+        // under each end.
         if (solid) continue;
-        if (k === 0 && cuts[c] > 1e-6 && !options.clear?.some(([a, b]) => ls[i] + cuts[c] > a && ls[i] + cuts[c] < b)) {
+        if (k === 0 && isPier(ls[i] + cuts[c])) {
           const at = -L / 2;
           const xs = width >= O.wide ? [-width / 4, width / 4] : [0];
           if (xs.every((x) => under(at, x) < -O.low)) {
@@ -2503,6 +2516,27 @@ export function overpass(
     }
   }
 }
+
+/**
+ * Where an overpass `total` m long stands on piers (m along it): every `total / n` m, none at its ends; one that falls on
+ * a road it passes over (`clear`: the stretches over them) stands beside that road instead, one each side of it (each
+ * where it is still clear of the others and `PIER_END` m in from the deck's ends). A deck over a road with nothing
+ * beside it ran from bank to bank unheld.
+ */
+export function pierStations(total: number, n: number, clear: readonly (readonly [number, number])[]): number[] {
+  const free = (u: number) => u >= PIER_END && u <= total - PIER_END && !clear.some(([a, b]) => u > a + 1e-6 && u < b - 1e-6);
+  const out: number[] = [];
+  for (let k = 1; k < n; k++) {
+    const u = (k * total) / n;
+    const over = clear.find(([a, b]) => u > a + 1e-6 && u < b - 1e-6);
+    if (!over) out.push(u);
+    else for (const v of over) if (free(v)) out.push(v);
+  }
+  out.sort((a, b) => a - b);
+  return out.filter((u, k) => k === 0 || u - out[k - 1] > OVERPASS.cap * 2);
+}
+/** A pier stands at least this far (m) in from either end of its deck. */
+const PIER_END = 2;
 
 /** A polyline with the points dropped where it runs on straight: each run's points within `most` m of the line from its start to its end. */
 function straightRuns(pts: readonly (readonly [number, number])[], most: number): [number, number][] {
