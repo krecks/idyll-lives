@@ -82,7 +82,7 @@
 
 <div class="detail">
   {#if !(def.icon && services.assets.has(def.icon, 'icon'))}
-    <Turntable {model} footprint={def.footprint ?? [1, 1]} {glyph} {colors} compact={!!owned} />
+    <Turntable {model} footprint={def.footprint ?? [1, 1]} {glyph} {colors} compact={!!owned} focus={inHand} />
   {/if}
   <div class="head">
     <div>

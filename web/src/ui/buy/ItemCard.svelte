@@ -8,7 +8,10 @@
   import { summarize } from './catalog';
   import Thumb from './Thumb.svelte';
 
-  /** One catalog tile: a 3D picture, name and price (what it's worth shows on pointing: `ItemHoverCard`). */
+  /**
+   * One catalog tile: the item's 3D picture filling it, its price small in a corner. The name and what it's worth
+   * show on pointing (`ItemHoverCard`), so scrolling the catalog is looking at the things themselves.
+   */
   let {
     def,
     model,
@@ -94,10 +97,7 @@
     {#if owned > 0}<span class="badge owned" aria-label="You have {owned}">×{owned}</span>{/if}
     {#if lovers.length}<span class="badge love" aria-label={lovesTitle}>♥</span>{/if}
     {#if active}<span class="hand">In hand</span>{/if}
-  </span>
-  <span class="text">
-    <span class="name">{def.name}</span>
-    <span class="price tabular">{game.creative ? 'Free' : money(def.price ?? 0)}</span>
+    <span class="price tabular" aria-hidden="true">{game.creative ? 'Free' : money(def.price ?? 0)}</span>
   </span>
 </button>
 
@@ -154,7 +154,7 @@
   }
   .picture {
     position: absolute;
-    inset: 5px 8px 2px;
+    inset: 4px;
     transition: transform 320ms var(--ease);
   }
   .card:hover .picture {
@@ -167,7 +167,6 @@
     height: 100%;
     color: hsl(var(--hue) 45% 45%);
   }
-
 
   .badge {
     position: absolute;
@@ -185,7 +184,6 @@
     font-weight: 700;
     color: var(--text-muted);
   }
-
 
   .badge.love {
     left: auto;
@@ -208,37 +206,21 @@
     white-space: nowrap;
   }
 
-
-
-
-
-
-
-
-  .text {
-    flex: none;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    padding: 3px 8px 4px;
-  }
-  .name {
-    font-weight: 650;
-    font-size: 11.5px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
+  /* The price: small, at the item's foot, out of the picture's way. */
   .price {
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    padding: 0 5px;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: 0 1px 2px rgba(24, 30, 50, 0.1);
     color: var(--good);
+    font-size: 10px;
     font-weight: 700;
-    font-size: 11.5px;
+    line-height: 16px;
+    white-space: nowrap;
   }
-
-
-
-
 
   @keyframes pop {
     40% {
