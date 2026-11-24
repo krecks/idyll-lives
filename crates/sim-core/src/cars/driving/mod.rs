@@ -315,7 +315,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
     let by = w.cars[c].backed_for.is_some_and(|k| {
         let me = &w.cars[c];
         w.cars
-            .get((k & !(1 << 63)) as usize)
+            .get(car_index(k))
             .and_then(|o| Some((o, o.shown.filter(|s| s.2)?)))
             .zip(me.shown)
             .is_some_and(|((o, s), m)| {
@@ -374,7 +374,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
                 .iter()
                 .copied()
                 .find(|&k| {
-                    cars.get((k & !(1 << 63)) as usize)
+                    cars.get(car_index(k))
                         .is_some_and(|o| o.waits_for == Some(key))
                         || traffic.waits_for(k).contains(&key)
                 })
@@ -410,7 +410,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
                 list.push((by, first));
             }
         }
-        if !w.cars[c].merge_first.is_empty() && !w.traffic.merging().contains(&key) {
+        if !w.cars[c].merge_first.is_empty() && !w.traffic.is_merging(key) {
             w.cars[c].merge_first.clear();
         }
     }
@@ -442,7 +442,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
         .iter()
         .map(|t| t.0)
         .filter(|&k| {
-            cars.get((k & !(1 << 63)) as usize)
+            cars.get(car_index(k))
                 .is_some_and(|o| o.waits_for == Some(key))
                 || traffic.waits_for(k).contains(&key)
         })
@@ -454,7 +454,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
         .iter()
         .map(|t| t.0)
         .filter(|&k| {
-            cars.get((k & !(1 << 63)) as usize)
+            cars.get(car_index(k))
                 .is_some_and(|o| !o.layer().meets(mine))
         })
         .collect();

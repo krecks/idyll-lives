@@ -28,7 +28,7 @@ impl Traffic {
                     }
                 }
                 self.asks.retain(|a| !a.parts.is_empty());
-                self.holds.push(Hold {
+                self.hold(Hold {
                     key,
                     tag,
                     claim: c.clone(),
