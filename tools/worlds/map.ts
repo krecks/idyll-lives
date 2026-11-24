@@ -3,7 +3,8 @@
  * each land size (`--sizes`, default all three), `n` worlds of each (seeds as `sample.ts` draws them), laid the way a new
  * game lays them (step 1's land, `landDraft`; step 2's town on it, `layOn`; `--sizes own`: the place's own size), and the classic worlds (`--classic`: their
  * kinds, seeds 11 and 22). Each map draws the water, the woods and fields, the areas' boxes, the lots and the roads by
- * kind: the motorway's carriageways, its overpasses (`raised`) and bridges, its ramps, the roads under it.
+ * kind: the motorway's carriageways, its overpasses (`raised`) and bridges, its ramps, the roads under it. North (game z)
+ * is up, as the game's 3D view has it from above: the ground is drawn in game coordinates under a flip in y.
  *
  * A line per world: whether it has a motorway (else why not: `diagnostics.motorway`), its crossings, its ramps'
  * lengths, how many villages the world has, and what is wrong with it (`motorway.ts` `motorwayProblems`, and any crossing not under a deck); then the
@@ -78,11 +79,15 @@ const KIND_STYLE: Record<string, [string, number]> = {
   trail: ['#b5a27a', 0.6],
 };
 
-/** One world's map. */
+/** One world's map, north up (the ground under `matrix(1 0 0 -1 0 D)`: z = 0 at the bottom, z = D at the top; the title upright above it). */
 function svg(d: NeighbourhoodDraft, title: string): string {
   const [W, D] = [d.width, d.depth];
   const poly = (pts: readonly [number, number][]) => pts.map(([x, z]) => `${x.toFixed(1)},${z.toFixed(1)}`).join(' ');
-  const parts: string[] = [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -30 ${W + 20} ${D + 40}" width="${Math.round((W + 20) * 1.1)}" height="${Math.round((D + 40) * 1.1)}">`, `<rect x="0" y="0" width="${W}" height="${D}" fill="#e9efdc"/>`];
+  const parts: string[] = [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -30 ${W + 20} ${D + 40}" width="${Math.round((W + 20) * 1.1)}" height="${Math.round((D + 40) * 1.1)}">`,
+    `<g transform="matrix(1 0 0 -1 0 ${D})">`,
+    `<rect x="0" y="0" width="${W}" height="${D}" fill="#e9efdc"/>`,
+  ];
   const fills: Record<string, string> = { water: '#9cc3e6', woods: '#9dbf8a', field: '#e6dca4', meadow: '#dbe8c4' };
   for (const z of d.open?.zones ?? []) if (fills[z.kind]) parts.push(`<polygon points="${poly(z.poly)}" fill="${fills[z.kind]}" fill-rule="evenodd" stroke="none"/>`);
   for (const a of d.open?.areas ?? []) parts.push(`<rect x="${a.x}" y="${a.z}" width="${a.w}" height="${a.d}" fill="none" stroke="#c88" stroke-dasharray="6 4"/>`);
@@ -106,7 +111,7 @@ function svg(d: NeighbourhoodDraft, title: string): string {
       parts.push(`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="none" stroke="#d22" stroke-width="1"/>`);
     }
   }
-  parts.push(`<text x="0" y="-12" font-family="sans-serif" font-size="14">${title.replace(/&/g, '&amp;')}</text>`, '</svg>');
+  parts.push('</g>', `<text x="0" y="-12" font-family="sans-serif" font-size="14">${title.replace(/&/g, '&amp;')}</text>`, '</svg>');
   return parts.join('\n');
 }
 
