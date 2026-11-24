@@ -47,6 +47,16 @@ const TOKSVIG = 8;
 const ALPHA_TEST = 0.4;
 /** How far (texels) a picture's edges are bled into the clear texels round them. */
 const BLEED = 4;
+/**
+ * How long a bake waits for its frame (ms). No frame comes while the browser's GPU process compiles (a machine's first
+ * game: most of a minute before the warm-up made its pipelines side by side, `parallelPipelines.ts`), so long.
+ */
+const FRAME_WAIT_MS = 30_000;
+/** How long the pictures' read-back may take once the frame is drawn (ms). */
+const READ_WAIT_MS = 10_000;
+/** A bake that failed is asked for again after this (ms), times the tries so far; given up after `BAKE_TRIES`. */
+const RETRY_MS = 20_000;
+const BAKE_TRIES = 3;
 
 const ROWS = IMPOSTOR_ROWS;
 /** What the bake draws, a band of rows each, from the top: the colour by day, by night, the normals, the occlusion and glossiness. */
@@ -250,6 +260,9 @@ interface Wanted {
 /** Every tree model's impostor, baked one at a time as the town view first wants each. */
 export class TreeImpostors {
   private readonly made = new Map<string, Impostor | 'baking' | 'failed'>();
+  /** Each model's failed bakes so far (`RETRY_MS`). */
+  private readonly tries = new Map<string, number>();
+  private readonly retries = new Set<ReturnType<typeof setTimeout>>();
   private readonly queue: Wanted[] = [];
   private busy = false;
   private destroyed = false;
@@ -260,7 +273,10 @@ export class TreeImpostors {
     private readonly onBaked: () => void,
   ) {}
 
-  /** `key`'s state: its impostor once baked, `'baking'` while its bake runs, `'failed'` if that gave up, `'missing'` until it is asked for. */
+  /**
+   * `key`'s state: its impostor once baked, `'baking'` while its bake runs, `'failed'` if that gave up (`'missing'`
+   * again `RETRY_MS` later, so the next ask bakes it again, until `BAKE_TRIES` have failed), `'missing'` until it is asked for.
+   */
   state(key: string): Impostor | 'baking' | 'failed' | 'missing' {
     return this.made.get(key) ?? 'missing';
   }
@@ -292,19 +308,39 @@ export class TreeImpostors {
         if (made) disposeImpostor(made);
         return;
       }
-      this.made.set(job.key, made ?? 'failed');
-      if (made) this.onBaked();
+      if (made) {
+        this.made.set(job.key, made);
+        this.onBaked();
+      } else this.failed(job.key);
     } catch (err) {
       console.warn(`[render] impostor of ${job.key} failed`, err);
-      this.made.set(job.key, 'failed');
+      this.failed(job.key);
     } finally {
       this.busy = false;
     }
     void this.next();
   }
 
+  /** `key`'s bake gave up: asked for again later (a frame withheld for long, a read-back lost), up to `BAKE_TRIES` in all. */
+  private failed(key: string): void {
+    this.made.set(key, 'failed');
+    const tries = (this.tries.get(key) ?? 0) + 1;
+    this.tries.set(key, tries);
+    if (tries >= BAKE_TRIES) {
+      console.warn(`[render] impostor of ${key}: given up after ${tries} tries (its woods drawn as trees)`);
+      return;
+    }
+    const retry = setTimeout(() => {
+      this.retries.delete(retry);
+      if (!this.destroyed && this.made.get(key) === 'failed') this.made.delete(key);
+    }, RETRY_MS * tries);
+    this.retries.add(retry);
+  }
+
   destroy(): void {
     this.destroyed = true;
+    for (const r of this.retries) clearTimeout(r);
+    this.retries.clear();
     this.queue.length = 0;
     for (const m of this.made.values()) if (typeof m === 'object') disposeImpostor(m);
     this.made.clear();
@@ -434,10 +470,12 @@ async function bake(app: pc.AppBase, key: string, template: ModelTemplate, paren
         }
       });
     });
-    // Drawn in the next frame drawn, read after it (as the save's picture, `thumbnail.ts`).
+    // Drawn in the next frame drawn, read once after it (as the save's picture, `thumbnail.ts`). Each wait has its
+    // own deadline and says which it was: no frame (`FRAME_WAIT_MS`), or the read-back (`READ_WAIT_MS`).
     const pixels = await new Promise<Uint8Array | null>((resolve) => {
       let armed = false;
-      const timer = setTimeout(() => finish(null, 'no frame was drawn within 5 s'), 5000);
+      let done = false;
+      let timer = setTimeout(() => finish(null, `no frame was drawn within ${FRAME_WAIT_MS / 1000} s`), FRAME_WAIT_MS);
       const prerender = () => {
         if (armed) return;
         armed = true;
@@ -446,13 +484,20 @@ async function bake(app: pc.AppBase, key: string, template: ModelTemplate, paren
       const postrender = () => {
         if (!armed) return;
         for (const c of cameras) c.enabled = false;
+        app.off('prerender', prerender);
+        app.off('postrender', postrender);
+        clearTimeout(timer);
+        timer = setTimeout(() => finish(null, `its read-back took over ${READ_WAIT_MS / 1000} s`), READ_WAIT_MS);
         const pending = color.read(0, 0, width, tall, { renderTarget: target }) as Promise<Uint8Array> | undefined;
         if (!pending) finish(null, 'the device cannot read the target back');
         else pending.then(finish, (err: unknown) => finish(null, `its read-back failed (${String(err)})`));
       };
       function finish(p: Uint8Array | null, why?: string) {
+        if (done) return;
+        done = true;
         if (why) console.warn(`[render] impostor of ${key}: ${why}`);
         clearTimeout(timer);
+        for (const c of cameras) c.enabled = false;
         app.off('prerender', prerender);
         app.off('postrender', postrender);
         resolve(p);
