@@ -14,10 +14,10 @@
  *   and encoded for the screen by then, so a byte a channel holds it as the canvas will; only what
  *   the contrast pushed past white is clamped a pass sooner). Half the bytes of two half-float
  *   targets, read and written every frame.
- * - Bloom on the lights (`BLOOM`): what is brighter once exposed than `BLOOM.white` (lamp glass, lit windows,
- *   porch lights) glows into what is round it, by PlayCanvas's bloom (its blurred bright part added before the
+ * - Bloom on the lights (`BLOOM`): what is brighter once exposed than `BLOOM.white` (street lamps' glass, lit
+ *   windows) glows into what is round it, by PlayCanvas's bloom (its blurred bright part added before the
  *   image processing; the threshold follows the exposure, as the scene is drawn before it). Its strength
- *   follows the night (`glow`): none by day, when sunlit whites would bloom and wash the picture out. The
+ *   follows the night (`glow`; full in the basement, which has no daylight): none by day. The
  *   passes run all day at no strength: turned off, PlayCanvas would make the frame's targets again at dusk.
  * - Contact shading on Medium and High (`QualitySettings.contactShading`, `CONTACT`): the scene's depth
  *   drawn once before the scene, an occlusion pass at half size from it, read by the lit shaders. The
@@ -63,11 +63,16 @@ export interface PostOptions {
 }
 
 /**
- * Bloom on the lights: `white` the exposed brightness it starts at (a sunlit white wall is about 0.8 once exposed, a
- * lamp's glass and a lit window above it), `intensity` how much of the blurred bright part is added at full night,
- * `blurLevel` how far it spreads. (`?tune=bloom.…` on the dev server.)
+ * Bloom on the lights: `white` the exposed brightness it starts at, `intensity` how much of the blurred bright part
+ * is added at full night, `blurLevel` how far it spreads. PlayCanvas's soft knee starts the bloom at half `white`,
+ * so that half is kept at a sunlit white wall's brightness: measured once exposed (the brightest colour channel,
+ * before the bloom; the bench village, 2026-11-24), sunlit walls at dusk came to 0.75–0.80 (0.86 at most at 19:00,
+ * when the night is 0.01) and a sunlit white fence at noon (the basement's view) to 0.95; a street lamp's glass at
+ * night to 1.79 and a lit window to 2.82, both above `white`. A garden, porch or room lamp's glass (0.5–1.1) hardly
+ * reaches the knee and doesn't visibly bloom. (`?tune=bloom.…` on the dev server. `white` 0.7 until 2026-11-24:
+ * sunlit walls bloomed at dusk.)
  */
-const BLOOM = tuned('bloom', { white: 0.7, intensity: 0.15, blurLevel: 16 });
+const BLOOM = tuned('bloom', { white: 1.6, intensity: 0.15, blurLevel: 16 });
 
 /** The bloom's strength by day: above none, so PlayCanvas keeps its passes (`PostProcessing.glow`). */
 const BLOOM_IDLE = 1e-6;
@@ -427,7 +432,7 @@ export class PostProcessing {
     return this.nightNow;
   }
 
-  /** How much the lights bloom, 0 (by day: none) .. 1 (at night, `BLOOM.intensity`): the time of day's night. */
+  /** How much the lights bloom, 0 (by day: none) .. 1 (at night, `BLOOM.intensity`): the time of day's night (the basement's view: 1). */
   set glow(share: number) {
     const s = Math.min(1, Math.max(0, share));
     if (s === this.glowNow) return;
