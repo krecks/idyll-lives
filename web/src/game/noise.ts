@@ -18,6 +18,19 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
+/** A `mulberry32` stream that can be forked: `fork()` gives a stream drawing what this one will draw next, this one going on as it was. */
+export function forkable(seed: number): (() => number) & { fork: () => () => number } {
+  let a = seed >>> 0;
+  const draw = () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  return Object.assign(draw, { fork: () => mulberry32(a) });
+}
+
 /** One of `list`, drawn from `rand`. */
 export function pick<T>(rand: () => number, list: readonly T[]): T {
   return list[Math.floor(rand() * list.length)];

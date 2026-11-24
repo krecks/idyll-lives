@@ -43,11 +43,11 @@ import { APRON, landZones, Protection, wetTiles, type BuiltLand } from './landEd
 import { bridgeSites, dryPieces, type Bounds } from './landPieces';
 import { GENTLE_TILT, seedBare, smoothHeights, type GentlePlane } from './landFollow';
 import { outlines, rasterize, rle, simplify } from './landMasks';
-import { between, fbm, mulberry32 } from './noise';
+import { between, fbm, forkable, mulberry32 } from './noise';
 import type { UseLayer } from './uses';
 import { along, astar, CELL, Cells, clearOfBoxes, COUNTRY_GRADE, COUNTRY_WIDTH, CountryRouter, CTRL_APART, FACING, ROAD_WIDTH, ROUTE_GRADE, SIDE_COST, TRIES, type Port, type Way } from './countryRouter';
 import { centroid, cropRoads, curve, evenly, inside, keepOf, leftOf, lengths, nearest, pointAt, rasterRoads, RoadIndex, roadIndex, roadLengths, roadMeets, straightAround, type Box, type Pt, type RoadPlan } from './roads';
-import { finishMotorway, gateEnds, routeMotorway, type MotorwayRoute } from './motorway';
+import { clearOfMotorway, finishMotorway, gateEnds, routeMotorway, withVillages, type MotorwayRoute } from './motorway';
 import { lotName, placeOfTemplate, placeUnit } from './placeLots';
 import { BIG_COURTS, boundsOf, COURTS, frontageOf, Ground, houseFor, joinUp, lotAt, LotPlacer, plotRect, reachesRoad, settleRoads, shuffled, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
 import { LAND_SIZE, LEGACY_KINDS, placeOf, specOf, streetNames, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind, type WorldSpec, type WorldStep } from './world';
@@ -145,6 +145,8 @@ export interface LayOptions {
   plan?: LandPlan;
   /** Why the world is laid with no motorway (it was routed, but found nowhere for its junction): laid again without it. */
   noMotorway?: string;
+  /** How many of the motorway's courses to pass over (`motorway.ts` `MotorwaySite.skip`): laid again on the next. */
+  motorwaySkip?: number;
 }
 
 /**
@@ -274,6 +276,8 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
 const REACHABLE = 0.7;
 /** What two areas' gentle ground may differ by besides, where their boxes come nearest (m): half the most a road may be cut into its land or stand over it (`builtSurface.ts` `CUT_MAX`) on either side. */
 const PLANE_SLACK = 2;
+/** How many of the motorway's courses a world is laid on at most (`nextCourse`): its junction finding no room, its country roads no way round, on the one before. */
+const MOTORWAY_COURSES = 2;
 const MOUNTAIN_LOW = 0.3;
 /** A road out of a place's world looks for the lowest of an edge this far (m) either way of straight out; a metre more than it may climb counts this much against that edge (m). */
 const EDGE_WINDOW = 200;
@@ -411,7 +415,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const plan = lay?.plan;
   /** The land's water as its plan has it: the plan's river is the town's to bridge, and the town may go on either bank. */
   const kept = !!(plan && lay?.waterKept);
-  const rand = mulberry32(lay?.townSeed ?? seed);
+  // (Forked to count the villages a course of the motorway leaves room for, as they will be drawn: `villageRoom`.)
+  const rand = forkable(lay?.townSeed ?? seed);
   const rolledName = worldName(content, spec.names, rand);
   const tagline = worldTagline(content, spec, rand);
   const rolledW = Math.round(range(rand, ...spec.world) / 64) * 64;
@@ -744,7 +749,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       if (id === undefined) break;
       tried.add(id);
       const ends = reaches(id).map((l) => ({ near: l.pieces[0] === id ? l.a : l.b, line: evenly([l.a, l.b], 4) }));
-      const site: HamletSite = { water: spec.water, boxes: plans.map((a) => a.rect), region: { holds: (r, by) => pieces.holds(id, r, by) }, crossings };
+      const site: HamletSite = { water: spec.water, boxes: plans.map((a) => a.rect), region: { holds: (r, by) => pieces.holds(id, r, by) }, crossings, clear: offRoute };
       const first = rand() < 0.35;
       let best = null as { p: Pt; swap: boolean; score: number } | null;
       for (const swap of [first, !first]) {
@@ -793,73 +798,134 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
     }
     return n;
   }
+  /**
+   * The villages from the `from`th to the `target`th: each where it's dry and flat (`hamletFits`, clear of what
+   * `clear` keeps them off, on `region`'s land), far enough from the other areas, near enough to one, the best site of
+   * `candidates` by how near `AREA_AIM` of the nearest area it is, how flat and low, in a quarter of the world with no
+   * area yet, and (the first) by the water; a little further and on steeper land where none is (`relax`). With
+   * `draw`'s draws, put on the world (`put`: the world's draws) or only counted (on a world of their own, with the
+   * world's draws forked: `villageRoom`). How many.
+   */
+  /**
+   * Per site of `candidates`, box and `relax`: what `hamletFits` finds with no other box down and nothing kept clear
+   * (the world's edges, the water, the bridges, its slope), and its box's `planeOf`, worked out once.
+   */
+  const siteFits = new Map<string, { rect: Rect; steep: number; plane: ((p: Pt) => number) | null } | null>();
+  /** `hamletFits` at site `at` of `candidates` (a land not cut into pieces), clear of `boxes` by `BOX_GAP` and as `clear` keeps it. */
+  function siteFit(at: number, [bw, bd]: readonly [number, number], relax: number, boxes: readonly Rect[], clear: ((r: Rect) => boolean) | undefined) {
+    const key = `${at} ${bw} ${bd} ${relax}`;
+    let fit = siteFits.get(key);
+    if (fit === undefined) {
+      const found = hamletFits(land, candidates[at], [bw, bd], { water: spec.water, boxes: [], crossings, relax });
+      fit = found && { ...found, plane: spec.classic ? null : planeOf(found.rect) };
+      siteFits.set(key, fit);
+    }
+    if (!fit) return null;
+    const { rect } = fit;
+    if (boxes.some((a) => rect.x < a.x + a.w + BOX_GAP && a.x < rect.x + rect.w + BOX_GAP && rect.z < a.z + a.d + BOX_GAP && a.z < rect.z + rect.d + BOX_GAP)) return null;
+    return !clear || clear(rect) ? fit : null;
+  }
+  function villagesFrom(from: number, target: number, clear: ((r: Rect) => boolean) | undefined, region: HamletSite['region'], draw: Rand, put: boolean): number {
+    const boxes = plans.map((a) => a.rect);
+    const centres = plans.map((a) => a.centre);
+    const names = plans.map((a) => a.name);
+    /** Where the villages only counted are put. */
+    const aside: Laying = { W, D, roads: [], plans: [] };
+    /** Each box's `planeOf` (the world's areas' kept in `planes`). */
+    const own: ((p: Pt) => number)[] = [];
+    const planeAt = (k: number) => (put ? (planes[k] ??= planeOf(boxes[k])) : (own[k] ??= planeOf(boxes[k])));
+    let count = 0;
+    for (let n = from, relax = 0; n < target; n++) {
+      const held = new Set(centres.map(quarter));
+      const swap = draw() < 0.35;
+      const hb = spec.hamlet.box;
+      const [bw, bd] = swap ? [hb.d, hb.w] : [hb.w, hb.d];
+      let best: { p: Pt; score: number } | null = null;
+      const site: HamletSite = { water: spec.water, boxes, region, crossings, relax, clear };
+      // (No room where it should be: a little further, on steeper land.)
+      for (let j = 0; j < candidates.length; j++) {
+        const at = relax ? candidates.length - 1 - j : j;
+        const p = candidates[at];
+        const near = Math.min(...centres.map((c) => dist(c, p)));
+        if (near < AREA_APART || near > AREA_REACH + relax * 90) continue;
+        // In the world, clear of the other areas' boxes, dry, not too steep (`hamletFits`; on a land not cut into
+        // pieces, what doesn't change as the villages go down worked out once: `siteFit`).
+        const fit = dry ? hamletFits(land, p, [bw, bd], site) : siteFit(at, [bw, bd], relax, boxes, clear);
+        if (!fit) continue;
+        const { rect, steep } = fit;
+        if (reachable) {
+          const joins = centres.reduce((a, c, k) => (dist(c, p) < dist(centres[a], p) ? k : a), 0);
+          if (Math.abs(boxHeight(rect) - boxHeight(boxes[joins])) > REACHABLE * COUNTRY_GRADE * rectGap(rect, boxes[joins])) continue;
+        }
+        // (Drawn for every site that fits so far: one the next rule turns away leaves the draws after it as they were.)
+        const jitter = draw() * 0.5;
+        // In a place's world (its towns follow its slopes), only where the gentle ground its town will
+        // be eased to meets every other area's within what a road between them can climb: the two
+        // at the boxes' nearest points no further apart than `REACHABLE` of a country road's climb
+        // over the gap between them, and `PLANE_SLACK` m. (Two boxes close together on a hillside,
+        // each eased to its own plane, meet in a cliff of eased land, and a street reaching from one
+        // into the other is cut deep into it.)
+        if (!spec.classic) {
+          const plane = (fit as { plane?: ((p: Pt) => number) | null }).plane ?? planeOf(rect);
+          const apart = boxes.some((o, k) => {
+            const [pa, pb] = facingPts(rect, o);
+            return Math.abs(plane(pa) - planeAt(k)(pb)) > REACHABLE * COUNTRY_GRADE * rectGap(rect, o) + PLANE_SLACK;
+          });
+          if (apart) continue;
+        }
+        let score = Math.abs(near - AREA_AIM) / 40 + steep * 40 + land.at(p[0], p[1]) * (reachable ? MOUNTAIN_LOW : valley ? 0.08 : 0.02) + (held.has(quarter(p)) ? 0 : -5);
+        // A fishing cove on the shore; a hamlet across the lake from the town.
+        if (n === 0 && spec.water === 'sea') score += land.wet(p[0], p[1], Math.max(bw, bd) / 2 + 70) ? -6 : 6;
+        if (n === 0 && river) score += bank(p) !== bank(mainCentre) ? -6 : 6;
+        if (n === 0 && spec.water === 'lake') score += ((p[0] - lake[0]) * (mainCentre[0] - lake[0]) + (p[1] - lake[1]) * (mainCentre[1] - lake[1]) < 0 ? -6 : 6) + (land.wet(p[0], p[1], Math.max(bw, bd) / 2 + 60) ? -3 : 3);
+        score += jitter;
+        if (!best || score < best.score) best = { p, score };
+      }
+      if (!best) {
+        if (relax++ < 1) n--;
+        continue;
+      }
+      const laid = putHamlet(put ? laying : aside, hamletOf(content, spec, draw, boxes.length - 1, names), Math.round(best.p[0] - bw / 2), Math.round(best.p[1] - bd / 2), swap);
+      boxes.push(laid.rect);
+      centres.push(laid.centre);
+      names.push(laid.name);
+      count++;
+    }
+    return count;
+  }
+
+  // ---- the motorway's course: edge to edge past the main town, where it fits (`motorway.ts`), before the villages ----
+  // (Its water at the metre, as the lots' mask has it below: the ponds come later, and keep off the roads.)
+  const motorWater = shaped ? (kept && planRiver ? rasterize([planRiver.poly], W, D) : kept && plan?.coast ? rasterize([islandSea(plan.coast, W, D)], W, D) : (wet1m ?? wetTiles(shaped, W, D))) : river ? rasterize([river.poly], W, D) : coast.length ? rasterize([islandSea(coast, W, D)], W, D) : rasterize(outlines(land.water, gw, gd, 2), W, D);
+  const motorWet = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < D && motorWater[Math.floor(z) * W + Math.floor(x)] === 1;
+  const motorSite = { land, ...(shaped ? { height: (x: number, z: number) => landHeightAt(shaped, x, z) } : {}), wet: motorWet, seed: lay?.townSeed ?? seed };
+  /**
+   * The room the villages would have beside a motorway kept clear as `clear` says: how many of them would be placed
+   * (`villagesFrom`, with the draws they will be put down with: as many as will be, on a land not cut into pieces).
+   */
+  const villageRoom = (clear: (r: Rect) => boolean): number => {
+    const region = dry ? { holds: (r: Rect, by: number) => [...linked].some((id) => dry.holds(id, r, by)) } : null;
+    return hamlets > 0 ? villagesFrom(0, hamlets, clear, region, rand.fork(), false) : 0;
+  };
+  const motorRoute = lay?.noMotorway ? { failed: lay.noMotorway } : routeMotorway({ ...motorSite, areas: plans, roads, room: villageRoom, skip: lay?.motorwaySkip });
+  let motorway = 'failed' in motorRoute ? null : motorRoute;
+  /** Why the world has no motorway (`diagnostics.motorway`), if it has none. */
+  const noMotorway = 'failed' in motorRoute ? motorRoute.failed : '';
+  /** The villages keep off it (`clearOfMotorway`). */
+  const offRoute = motorway ? (r: Rect) => clearOfMotorway(motorway!, r) : undefined;
+
   const placed = dry && spec.hamlets[1] > 0 ? villagePerPiece() : 0;
   /** The rest of the villages' land on a shaped land cut into pieces: any piece with an area on it. */
   const onLinked = dry ? { holds: (r: Rect, by: number) => [...linked].some((id) => dry.holds(id, r, by)) } : null;
-  for (let n = placed, relax = 0; n < (dry ? Math.max(hamlets, placed) : hamlets); n++) {
-    const held = new Set(plans.map((a) => quarter(a.centre)));
-    const swap = rand() < 0.35;
-    const hb = spec.hamlet.box;
-    const [bw, bd] = swap ? [hb.d, hb.w] : [hb.w, hb.d];
-    let best: { p: Pt; score: number } | null = null;
-    const site: HamletSite = { water: spec.water, boxes: plans.map((a) => a.rect), region: onLinked, crossings, relax };
-    // (No room where it should be: a little further, on steeper land.)
-    for (const p of relax ? [...candidates].reverse() : candidates) {
-      const near = Math.min(...plans.map((a) => dist(a.centre, p)));
-      if (near < AREA_APART || near > AREA_REACH + relax * 90) continue;
-      // In the world, clear of the other areas' boxes, dry, not too steep (`hamletFits`).
-      const fit = hamletFits(land, p, [bw, bd], site);
-      if (!fit) continue;
-      const { rect, steep } = fit;
-      if (reachable) {
-        const joins = plans.reduce((a, b) => (dist(b.centre, p) < dist(a.centre, p) ? b : a));
-        if (Math.abs(boxHeight(rect) - boxHeight(joins.rect)) > REACHABLE * COUNTRY_GRADE * rectGap(rect, joins.rect)) continue;
-      }
-      // (Drawn for every site that fits so far: one the next rule turns away leaves the draws after it as they were.)
-      const jitter = rand() * 0.5;
-      // In a place's world (its towns follow its slopes), only where the gentle ground its town will
-      // be eased to meets every other area's within what a road between them can climb: the two
-      // at the boxes' nearest points no further apart than `REACHABLE` of a country road's climb
-      // over the gap between them, and `PLANE_SLACK` m. (Two boxes close together on a hillside,
-      // each eased to its own plane, meet in a cliff of eased land, and a street reaching from one
-      // into the other is cut deep into it.)
-      if (!spec.classic) {
-        const own = planeOf(rect);
-        const apart = plans.some((o, k) => {
-          const [pa, pb] = facingPts(rect, o.rect);
-          return Math.abs(own(pa) - (planes[k] ??= planeOf(o.rect))(pb)) > REACHABLE * COUNTRY_GRADE * rectGap(rect, o.rect) + PLANE_SLACK;
-        });
-        if (apart) continue;
-      }
-      let score = Math.abs(near - AREA_AIM) / 40 + steep * 40 + land.at(p[0], p[1]) * (reachable ? MOUNTAIN_LOW : valley ? 0.08 : 0.02) + (held.has(quarter(p)) ? 0 : -5);
-      // A fishing cove on the shore; a hamlet across the lake from the town.
-      if (n === 0 && spec.water === 'sea') score += land.wet(p[0], p[1], Math.max(bw, bd) / 2 + 70) ? -6 : 6;
-      if (n === 0 && river) score += bank(p) !== bank(mainCentre) ? -6 : 6;
-      if (n === 0 && spec.water === 'lake') score += ((p[0] - lake[0]) * (mainCentre[0] - lake[0]) + (p[1] - lake[1]) * (mainCentre[1] - lake[1]) < 0 ? -6 : 6) + (land.wet(p[0], p[1], Math.max(bw, bd) / 2 + 60) ? -3 : 3);
-      score += jitter;
-      if (!best || score < best.score) best = { p, score };
-    }
-    if (!best) {
-      if (relax++ < 1) n--;
-      continue;
-    }
-    const hamlet = hamletOf(content, spec, rand, plans.length - 1, plans.map((a) => a.name));
-    putHamlet(laying, hamlet, Math.round(best.p[0] - bw / 2), Math.round(best.p[1] - bd / 2), swap);
-  }
+  villagesFrom(placed, dry ? Math.max(hamlets, placed) : hamlets, offRoute, onLinked, rand, true);
 
   // Fewer hamlets than the world has at least: their houses go to the others (the main town first; `LotPlacer` spills them on).
   const missing = spec.hamlets[0] - (plans.length - 1);
   if (missing > 0) plans[0].spec = { ...mainSpec, lots: mainSpec.lots + missing * spec.hamlet.lots[0] };
 
   step?.('land');
-  // ---- the motorway's course: edge to edge past the main town, where it fits (`motorway.ts`) ----
-  // (Its water at the metre, as the lots' mask has it below: the ponds come later, and keep off the roads.)
-  const motorWater = shaped ? (kept && planRiver ? rasterize([planRiver.poly], W, D) : kept && plan?.coast ? rasterize([islandSea(plan.coast, W, D)], W, D) : (wet1m ?? wetTiles(shaped, W, D))) : river ? rasterize([river.poly], W, D) : coast.length ? rasterize([islandSea(coast, W, D)], W, D) : rasterize(outlines(land.water, gw, gd, 2), W, D);
-  const motorWet = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < D && motorWater[Math.floor(z) * W + Math.floor(x)] === 1;
-  const motorRoute = lay?.noMotorway ? { failed: lay.noMotorway } : routeMotorway({ land, ...(shaped ? { height: (x: number, z: number) => landHeightAt(shaped, x, z) } : {}), areas: plans, roads, wet: motorWet, seed: lay?.townSeed ?? seed });
-  const motorway = 'failed' in motorRoute ? null : motorRoute;
-  /** Why the world has no motorway (`diagnostics.motorway`), if it has none. */
-  const noMotorway = 'failed' in motorRoute ? motorRoute.failed : '';
+  // (The motorway, its course chosen before the villages, its gates now they are down: by those across it.)
+  if (motorway) motorway = withVillages(motorway, { ...motorSite, areas: plans, roads });
   // ---- country roads: between the areas (a tree of them and one more for a loop), and out ----
   // (Routed over the land's cells, round the areas' boxes, sharing the roads laid as they go down, off the motorway but
   // at its gates: `countryRouter.ts`.)
@@ -917,6 +983,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   };
   /** Per area, `roadsNear` its own roads, and how many of the world's roads it has been told about. */
   const sideGrids = new Map<number, { roads: number; apart: ReturnType<typeof roadsNear>; depth: ReturnType<typeof roadsNear> }>();
+  /** Per area, the other areas' streets and lanes (`sideT`). */
+  const otherStreets: RoadIndex[] = [];
   /** Which of area `a`'s roads (and the country roads into it) pass within `SIDE_APART` and `SIDE_DEPTH` of a point. */
   const gridsOf = (a: number) => {
     const r = plans[a].rect;
@@ -982,11 +1050,13 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
    * A way out of area `a` towards `toward` by a T off one of its streets or lanes: where it runs
    * straight (and not by a junction), square to it on the side facing `toward` (within
    * `SIDE_FACING`), straight on across the area's land clear of its other roads, its lots' depth
-   * from them, and of the water. The nearest such to `toward` with the least to cross first, none
+   * from them, and of the water; not within `SIDE_APART` of another area's street (one coming up to
+   * it end to end: `continued`). The nearest such to `toward` with the least to cross first, none
    * two within `SIDE_APART` of each other.
    */
   const sideT = (a: number, toward: Pt): (Way & { score: number })[] => {
     const plan = plans[a];
+    const others = (otherStreets[a] ??= new RoadIndex(roads.filter((o) => o.area !== undefined && o.area !== a && o.kind !== 'trail' && o.kind !== 'country')));
     const r = plan.rect;
     const near = (p: Pt, m: number) => p[0] > r.x - m && p[1] > r.z - m && p[0] < r.x + r.w + m && p[1] < r.z + r.d + m;
     const { apart, depth } = gridsOf(a);
@@ -1004,7 +1074,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
         const k = left[0] * u[0] + left[1] * u[1] >= 0 ? 1 : -1;
         const n: Pt = [left[0] * k, left[1] * k];
         if (n[0] * u[0] + n[1] * u[1] < pmath.cos(SIDE_FACING)) continue;
-        if (![-1, ri].includes(apart(p))) continue;
+        if (![-1, ri].includes(apart(p)) || others.nearest(p[0], p[1], SIDE_APART)) continue;
         let reach = 0;
         for (let d = 4; d < 200; d += 4) {
           const q: Pt = [p[0] + n[0] * d, p[1] + n[1] * d];
@@ -1443,19 +1513,26 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   }
   // ---- the motorway laid: raised over the roads under it, its junction a half-diamond on the nearest the town ----
   if (motorway) {
-    // (Country roads that found no way round it, where without it they would have: the world laid again without it.)
+    // (Country roads that found no way round it, where on the next course or without it they would have: the world
+    // laid again so.)
+    let other: NeighbourhoodDraft | null = null;
     if (failed.length) {
-      const without = generateFromSpec(content, t, spec, seed, name, step, shaped, { ...lay, noMotorway: 'No motorway: the country roads would find no way round it.' });
-      if ((without.diagnostics?.roads?.length ?? 0) < failed.length) return without;
+      other = generateFromSpec(content, t, spec, seed, name, step, shaped, nextCourse('No motorway: the country roads would find no way round it.'));
+      if ((other.diagnostics?.roads?.length ?? 0) < failed.length) return other;
     }
     const named = (wanted: string) => uniqueName(wanted, `${wanted} Old`);
     let laid = finishMotorway(motorway, roads, motorWet, mainCentre, roads.length, named);
     // (No road under it with room for its ramps: one from the town under it at its junction's gate, then on.)
     if (!laid && junctionLink(motorway)) laid = finishMotorway(motorway, roads, motorWet, mainCentre, roads.length, named);
-    // (Nowhere for it: the world laid again without it, its country roads routed as if it never was.)
-    if (!laid) return generateFromSpec(content, t, spec, seed, name, step, shaped, { ...lay, noMotorway: 'No motorway: no road under it with room for its junction.' });
+    // (Nowhere for it: the world laid again on the next course, else without it, its country roads routed as if it never was.)
+    if (!laid) return other ?? generateFromSpec(content, t, spec, seed, name, step, shaped, nextCourse('No motorway: no road under it with room for its junction.'));
     for (const [r, list] of laid.under) roads[r] = { ...roads[r], crosses: [...(roads[r].crosses ?? []), ...list] };
     roads.push(...laid.roads);
+  }
+  /** How the world is laid again when its motorway won't do (why, `note`): on the next course (`MOTORWAY_COURSES` at most), else without one. */
+  function nextCourse(note: string): LayOptions {
+    const skip = (lay?.motorwaySkip ?? 0) + 1;
+    return skip < MOTORWAY_COURSES ? { ...lay, motorwaySkip: skip } : { ...lay, noMotorway: note };
   }
   /**
    * A country road from the main town under the motorway at its junction's gate (`gateEnds`), then on from there to
@@ -1783,7 +1860,8 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       if (!spot) continue;
       const slot = lots.put({ kind: 'outdoor', template: place.id, name: `${plan.name} ${place.name}`, lot: 'medium', w: spot.w, d: spot.d, area: a }, spot, null);
       const r = rectOf(slot);
-      pads[slot.index] = Math.round(land.at(r.x + r.w / 2, r.z + r.d / 2) * 10) / 10;
+      // (A pad a hair below 0 rounds to 0, not -0: the town's file and its report read it back the same.)
+      pads[slot.index] = Math.round(land.at(r.x + r.w / 2, r.z + r.d / 2) * 10) / 10 || 0;
       const trail = trailTo(slot, plan, worldRoads, slots, keepOff, land, t, W, D);
       // (No way to it: no place there, then. It is the last lot put down.)
       if (!trail) {
@@ -1945,7 +2023,12 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   let walkWater = waterMask;
   if (filed.some((r) => r.bridge)) {
     walkWater = waterMask.slice();
-    for (const r of filed) if (r.bridge) r.bridge = deckOf(r, waterMask, walkWater, W, D);
+    for (const r of filed) {
+      if (!r.bridge) continue;
+      // (A road with decks of its own over more than one water, the motorway's off an island at either end: as laid.)
+      if (r.bridges?.length) for (const span of [r.bridge, ...r.bridges]) deckTiles(r, span, W, D, (tile) => (walkWater[tile] = 0));
+      else r.bridge = deckOf(r, waterMask, walkWater, W, D);
+    }
   }
   step?.('homes');
   return {
@@ -2082,12 +2165,15 @@ export interface HamletSite {
   region?: { holds: (r: Rect, by: number) => boolean } | null;
   crossings?: readonly (readonly Pt[])[];
   relax?: number;
+  /** Whether a box keeps clear of what was laid before the villages (the motorway: `motorway.ts` `clearOfMotorway`); any, if not given. */
+  clear?: (r: Rect) => boolean;
 }
 
 /**
  * Whether a hamlet's box `bw` × `bd` round `p` may go there, as the generator tests a site: in the
- * world by `EDGE`, clear of the other areas' boxes by `BOX_GAP`, dry (on a land whose water was
- * changed, 24 m from any of it and on a piece of dry land it may go on: `site.region`), 50 m clear of the bridges and causeways, and no steeper than 0.35 anywhere
+ * world by `EDGE`, clear of the other areas' boxes by `BOX_GAP`, dry (a river's, an island's sea and a lake 24 m
+ * from its box, the homes along the lake's shore as the town's are; on a land whose water was
+ * changed, 24 m from any of it and on a piece of dry land it may go on: `site.region`), 50 m clear of the bridges and causeways, clear of the motorway (`site.clear`), and no steeper than 0.35 anywhere
  * in it (unless `site.relax`). Its box (whole metres) and its steepest slope; null if it may not.
  */
 export function hamletFits(land: Cells, p: Pt, [bw, bd]: readonly [number, number], site: HamletSite): { rect: Rect; steep: number } | null {
@@ -2097,9 +2183,10 @@ export function hamletFits(land: Cells, p: Pt, [bw, bd]: readonly [number, numbe
   if (rect.x < EDGE || rect.z < EDGE || rect.x + bw > W - EDGE || rect.z + bd > D - EDGE) return null;
   if (site.boxes.some((a) => rect.x < a.x + a.w + BOX_GAP && a.x < rect.x + rect.w + BOX_GAP && rect.z < a.z + a.d + BOX_GAP && a.z < rect.z + rect.d + BOX_GAP)) return null;
   // (On a land whose water was changed, its water is the land's own, a pond as much as a river: 24 m from the box.)
-  if (site.region ? land.wetNear(rect, 24) || !site.region.holds(rect, 24) : site.water === 'river' || site.water === 'island' ? land.wetNear(rect, 24) : land.wet(p[0], p[1], Math.max(bw, bd) / 2 + 30)) return null;
+  if (site.region ? land.wetNear(rect, 24) || !site.region.holds(rect, 24) : site.water === 'river' || site.water === 'island' || site.water === 'lake' ? land.wetNear(rect, 24) : land.wet(p[0], p[1], Math.max(bw, bd) / 2 + 30)) return null;
   // (Clear of the bridges and causeways.)
   if ((site.crossings ?? []).some(([a, b]) => evenly([a, b], 4).some((q) => offRect(rect, q) < 50))) return null;
+  if (site.clear && !site.clear(rect)) return null;
   let steep = 0;
   for (let z = rect.z; z < rect.z + bd; z += CELL * 2) for (let x = rect.x; x < rect.x + bw; x += CELL * 2) steep = Math.max(steep, land.slope(land.cell(x, z)));
   if (steep > 0.35 - relax * 0.1 && !relax) return null;
