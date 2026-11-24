@@ -41,7 +41,9 @@ impl World {
         if self.speed == SUPER_SPEED {
             return 0;
         }
-        let ticks = TICKS_PER_STEP[self.speed as usize];
+        // (`Command::SetSpeed` refuses a speed past the table's, but `World::speed` is a public
+        // field: a writer that sets one anyway must not index past it.)
+        let ticks = TICKS_PER_STEP[self.speed.min(SUPER_SPEED) as usize];
         for tick in 1..=ticks {
             self.tick_once();
             self.record_trails(tick);
@@ -87,7 +89,7 @@ impl World {
         if self.speed == SUPER_SPEED {
             self.step_ticks.max(1)
         } else {
-            TICKS_PER_STEP[self.speed as usize]
+            TICKS_PER_STEP[self.speed.min(SUPER_SPEED) as usize]
         }
     }
 

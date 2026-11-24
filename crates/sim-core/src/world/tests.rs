@@ -1,5 +1,5 @@
 use super::*;
-use crate::clock::{SUPER_BUSY, TICKS_PER_STEP};
+use crate::clock::{SUPER_BUSY, SUPER_SPEED, TICKS_PER_STEP};
 
 const CONTENT: &str = r#"{
         "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.1},
@@ -189,6 +189,17 @@ fn speed_controls_tick_rate() {
     w.apply(Command::SetSpeed { speed: 0 }).unwrap();
     w.apply(Command::SetSpeed { speed: SUPER_SPEED }).unwrap();
     assert_eq!(w.speed, SUPER_SPEED, "from a pause too");
+}
+
+#[test]
+fn a_speed_outside_the_table_steps_at_the_top_speed() {
+    let mut w = world();
+    // `Command::SetSpeed` refuses 5, but `World::speed` is a public field: a writer that sets one
+    // anyway must not index past `TICKS_PER_STEP`.
+    w.speed = 9;
+    w.advance();
+    assert_eq!(w.tick, TICKS_PER_STEP[SUPER_SPEED as usize] as u64);
+    assert_eq!(w.step_rate(), TICKS_PER_STEP[SUPER_SPEED as usize]);
 }
 
 /// The test content with its bed for sleeping.
