@@ -679,6 +679,14 @@ pub(crate) fn mouth_behind(
             continue;
         }
         let (_, yaw, _) = at(sm);
+        // (On its own side of the road only, its right (`right_of`): backing across the other
+        // lane into one on its left, it stood across the way of a car coming up that lane, that car
+        // waiting for it to go and it for that car, both for good, the town held up behind them,
+        // Hayfield Lane.)
+        let right = crate::cars::right_of([yaw.sin(), yaw.cos()]);
+        if -way[0] * right[0] - way[1] * right[1] <= 0.0 {
+            continue;
+        }
         let tan = road.tangent(p.s);
         let go = if tan[0] * yaw.sin() + tan[1] * yaw.cos() >= 0.0 {
             1.0
