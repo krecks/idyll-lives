@@ -29,17 +29,17 @@ describe("a motorway's two carriageways", () => {
     expect(pairs.get(F.MOTORWAY_EAST)?.other).toBe(F.MOTORWAY_WEST);
     expect(pairs.get(F.MOTORWAY_WEST)?.other).toBe(F.MOTORWAY_EAST);
     expect(pairs.size).toBe(2);
-    // (Both run along +x: their left is -z. The westbound lies at -z of the eastbound, traffic keeping right: each one's
-    // inside the left of the way its cars go.)
-    expect(insideOf(h.roads, F.MOTORWAY_EAST)).toBe(1);
-    expect(insideOf(h.roads, F.MOTORWAY_WEST)).toBe(-1);
+    // (Both run along +x: `insideOf`'s +1, (z, -x), is -z, their right as the game shows it. The westbound lies at +z of
+    // the eastbound, traffic keeping right (sim-core `cars::right_of`): each one's inside the left of the way its cars go.)
+    expect(insideOf(h.roads, F.MOTORWAY_EAST)).toBe(-1);
+    expect(insideOf(h.roads, F.MOTORWAY_WEST)).toBe(1);
   });
 
   test('a lone carriageway, or a two-way road, has its inside on the left of the way its cars go', () => {
     const lone: RoadPlan = { points: line(0, 0, 100, 0, 100), width: 9, ends: ['out', 'out'], kind: 'motorway', oneway: -1 };
     expect(motorwayPairs([lone]).size).toBe(0);
-    expect(insideOf([lone], 0)).toBe(-1);
-    expect(insideOf([{ ...lone, oneway: 1 }], 0)).toBe(1);
+    expect(insideOf([lone], 0)).toBe(1);
+    expect(insideOf([{ ...lone, oneway: 1 }], 0)).toBe(-1);
   });
 
   test('the barrier runs down the line between them, edge to edge, once', () => {
@@ -178,12 +178,13 @@ describe("the motorway's direction signs", () => {
     for (const p of spots) for (const r of h.roads) expect(nearest(r.points, p.x, p.z).dist).toBeGreaterThan(r.width / 2 + 0.5);
     const [gore, entry] = spots;
     // (The gore between the eastbound carriageway and the off-ramp, past where they part; its traffic going +x: the sign's face, its +z turned to (sin yaw, cos yaw), to -x.)
-    expect(gore.z).toBeGreaterThan(F.EAST_Z + 4.5);
+    // (Off the eastbound's right, -z: sim-core `cars::right_of`.)
+    expect(gore.z).toBeLessThan(F.EAST_Z - 4.5);
     expect(gore.x).toBeGreaterThan(110);
     expect(gore.x).toBeLessThan(F.STREET_X);
     expect(Math.sin(gore.yaw)).toBeLessThan(-0.5);
     // (By the on-ramp's start at the street, its cars going -x: facing +x.)
-    expect(Math.hypot(entry.x - F.STREET_X, entry.z - (F.WEST_Z - 25))).toBeLessThan(15);
+    expect(Math.hypot(entry.x - F.STREET_X, entry.z - (F.WEST_Z + 25))).toBeLessThan(15);
     expect(Math.sin(entry.yaw)).toBeGreaterThan(0.5);
   });
 
@@ -195,7 +196,7 @@ describe("the motorway's direction signs", () => {
     const roads = [east, west, shift(h.roads[F.OFF_RAMP])];
     const before = signSpots(roads).filter((p) => p.x < 420);
     expect(before.map((p) => Math.round(420 - p.x)).sort((a, b) => a - b)).toEqual([150, 300]);
-    // (Outside: away from the westbound carriageway, at +z.)
-    for (const p of before) expect(p.z).toBeGreaterThan(F.EAST_Z + 4.5);
+    // (Outside: away from the westbound carriageway, at -z.)
+    for (const p of before) expect(p.z).toBeLessThan(F.EAST_Z - 4.5);
   });
 });
