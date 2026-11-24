@@ -9,7 +9,7 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import type { RoadPlan } from '../src/core/protocol';
 import { Cells } from '../src/game/countryRouter';
-import { APART, BEND_RADIUS, carriageways, crossings, finishMotorway, HAMLET_CLEAR, motorwayProblems, profileOf, RAMP_LENGTH, routeMotorway, TOWN_CLEAR, TOWN_REACH, type MotorwayRoute } from '../src/game/motorway';
+import { APART, BEND_RADIUS, carriageways, clearOfMotorway, crossings, finishMotorway, HAMLET_CLEAR, motorwayProblems, profileOf, RAMP_LENGTH, routeMotorway, TOWN_CLEAR, TOWN_REACH, withVillages, type MotorwayRoute } from '../src/game/motorway';
 import { deckSpans, lengths, MEET, MOTORWAY_KEEP, nearest, pointAt, sharpestTurn, type Pt } from '../src/game/roads';
 
 const WEB = new URL('../', import.meta.url).pathname;
@@ -82,11 +82,46 @@ describe('its course', () => {
     expect(again.gates).toEqual(route.gates);
   });
 
-  test('none on an island, nor up a mountainside: a note why, not a fault', () => {
-    const island = routeMotorway(site(832, 832, () => 0, (x, z) => Math.hypot(x - 416, z - 416) > 330));
+  test('none on an island with a wide sea round it, nor up a mountainside: a note why, not a fault', () => {
+    const island = routeMotorway(site(832, 832, () => 0, (x, z) => Math.hypot(x - 416, z - 416) > 300));
     expect('failed' in island && island.failed).toMatch(/^No motorway: /);
     const steep = routeMotorway(site(832, 832, (x, z) => (x + z) * 0.2));
     expect('failed' in steep && steep.failed).toMatch(/climbs too steeply/);
+  });
+
+  test("on an island a strait off the world's edge: out over it on a bridge at either end", () => {
+    // (A rounded square of land 60 m in from every edge.)
+    const wet = (x: number, z: number) => Math.min(x, z, 832 - x, 832 - z) < 60;
+    const route = routeMotorway(site(832, 832, () => 0, wet)) as MotorwayRoute;
+    expect('failed' in route).toBe(false);
+    const { middle } = route;
+    expect(wet(...middle[0]) && wet(...middle.at(-1)!)).toBe(true);
+    // (Dry between, its gates on the land.)
+    expect(middle.slice(80, -80).every((p) => !wet(...p))).toBe(true);
+    for (const g of route.gates) expect(wet(...g.p)).toBe(false);
+  });
+
+  test('the villages after it keep clear of it, further by its junction; its gates chosen again by them', () => {
+    const { middle, gates } = route;
+    const ls = lengths(middle);
+    /** A village's 100 m square box, its middle `off` + 50 m from its middle line (on either side) at `s` along it. */
+    const box = (s: number, off: number, side = 1) => {
+      const { p, t } = pointAt(middle, s, ls);
+      const [cx, cz] = [p[0] - t[1] * (off + 50) * side, p[1] + t[0] * (off + 50) * side];
+      return { x: cx - 50, z: cz - 50, w: 100, d: 100 };
+    };
+    // (Away from its junction: `HAMLET_CLEAR` m off its outer edges; by it, further.)
+    const far = gates[0].s > ls.at(-1)! / 2 ? 120 : ls.at(-1)! - 120;
+    expect(clearOfMotorway(route, box(far, 10))).toBe(false);
+    expect(clearOfMotorway(route, box(far, HAMLET_CLEAR + APART + 15))).toBe(true);
+    expect(clearOfMotorway(route, box(gates[0].s, HAMLET_CLEAR + APART + 15))).toBe(false);
+    expect(clearOfMotorway(route, box(gates[0].s, 90))).toBe(true);
+    // (Its gates chosen again with villages down on either side of it: the junction's as it was, all of them clear of the boxes.)
+    const villages = [box(far, 60, 1), box(far, 60, -1)].map((rect) => ({ rect, centre: [rect.x + 50, rect.z + 50] as Pt }));
+    const again = withVillages(route, { ...s, areas: [...s.areas, ...villages] });
+    expect(again.gates[0]).toEqual(gates[0]);
+    expect(again.middle).toBe(route.middle);
+    for (const v of villages) expect(again.blocked[s.land.cell(v.centre[0], v.centre[1])]).toBe(0);
   });
 });
 
@@ -110,7 +145,7 @@ describe('its crossings and its junction', () => {
   const middle: Pt[] = Array.from({ length: W + 1 }, (_, i): Pt => [i, 400]);
   const ways = carriageways([[-20, 400], ...middle, [W + 20, 400]], W, W)!;
   const road: RoadPlan = { points: Array.from({ length: 601 }, (_, i): Pt => [420, 100 + i]), width: 7, ends: ['join', 'out'], kind: 'country', name: 'Under Road' };
-  const route: MotorwayRoute = { middle, ways, blocked: new Uint8Array(1), gates: [{ s: 420, p: [420, 400], across: [0, 1] }], name: 'M9', junction: 4 };
+  const route: MotorwayRoute = { middle, ways, blocked: new Uint8Array(1), gates: [{ s: 420, p: [420, 400], across: [0, 1] }], name: 'M9', junction: 4, heights: [] };
   const dry = () => false;
   const named = (n: string) => n;
   const laid = finishMotorway(route, [road], dry, [420, 200], 1, named)!;
