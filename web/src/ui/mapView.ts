@@ -3,6 +3,12 @@
  * drawn into its box as SVG does by default (`xMidYMid meet`): scaled to fit, the same scale both
  * ways, and centred, with bands to spare when the box isn't the view's shape. Clicks, the wheel and
  * label sizes go by the scale it's drawn at, not by the box's width.
+ *
+ * North up: the map shows the ground as the 3D view does from above (game space is x east, z north,
+ * and `render/pc/space.ts` mirrors the world in z for the engine, so there x is to the right and z
+ * up the screen). SVG's y runs down the page, so the map's y is −z: the ground is drawn in game
+ * coordinates under `GROUND` (a flip in y), and what must read upright (the names) is placed in the
+ * SVG's own coordinates (`mapY`) under `UPRIGHT`.
  */
 
 import { layoutTags, type Box as TagBox, type TagSpot } from '../game/tagLayout';
@@ -23,6 +29,20 @@ export interface Box {
   height: number;
 }
 
+/** The SVG's y of a ground point's `z` (m): north up the page. */
+export const mapY = (z: number): number => -z;
+
+/** The transform that draws game coordinates (x, z) north up: on the ground's layer. */
+export const GROUND = 'scale(1 -1)';
+
+/** The transform that sets a name upright again inside `GROUND`: its x and y are then the SVG's (`mapY`). */
+export const UPRIGHT = 'scale(1 -1)';
+
+/** The SVG's `viewBox` for the ground in view: x along, −z down (the view's north edge at its top). */
+export function viewBox(view: MapView): string {
+  return `${view.x} ${mapY(view.z + view.d)} ${view.w} ${view.d}`;
+}
+
 /** Pixels a metre the view is drawn at in a box `width` × `height` px. */
 export function mapScale(width: number, height: number, view: MapView): number {
   if (!(view.w > 0) || !(view.d > 0)) return 1;
@@ -30,12 +50,22 @@ export function mapScale(width: number, height: number, view: MapView): number {
   return s > 0 ? s : 1;
 }
 
-/** The point of the ground (m) at a point on screen (px). */
+/** Where the view is drawn in a box `width` × `height` px: its scale and its top left corner in the box (px). */
+function fit(width: number, height: number, view: MapView): { s: number; left: number; top: number } {
+  const s = mapScale(width, height, view);
+  return { s, left: (width - view.w * s) / 2, top: (height - view.d * s) / 2 };
+}
+
+/** The point of the ground (m) at a point on screen (px): its top the view's north edge. */
 export function screenToMap(clientX: number, clientY: number, box: Box, view: MapView): [number, number] {
-  const s = mapScale(box.width, box.height, view);
-  const left = box.left + (box.width - view.w * s) / 2;
-  const top = box.top + (box.height - view.d * s) / 2;
-  return [view.x + (clientX - left) / s, view.z + (clientY - top) / s];
+  const { s, left, top } = fit(box.width, box.height, view);
+  return [view.x + (clientX - box.left - left) / s, view.z + view.d - (clientY - box.top - top) / s];
+}
+
+/** The point on screen (px) of a point of the ground (m): `screenToMap` the other way. */
+export function mapToScreen(x: number, z: number, box: Box, view: MapView): [number, number] {
+  const { s, left, top } = fit(box.width, box.height, view);
+  return [box.left + left + (x - view.x) * s, box.top + top + (view.z + view.d - z) * s];
 }
 
 /**
@@ -55,7 +85,7 @@ export interface MapLabel<K> {
   wins?: number | null;
 }
 
-/** Where a name goes (m): its baseline's middle, and its second line's. */
+/** Where a name goes, in the SVG's coordinates (m: x, and y as `mapY` has it): its baseline's middle, and its second line's. */
 export interface PlacedLabel {
   x: number;
   y: number;
@@ -77,13 +107,11 @@ export function labelWidth(text: string, size: number): number {
  * names stay apart at any zoom.
  */
 export function layoutLabels<K>(labels: readonly MapLabel<K>[], width: number, height: number, view: MapView, blocks: readonly TagBox[] = []): Map<K, PlacedLabel> {
-  const s = mapScale(width, height, view);
-  const left = (width - view.w * s) / 2;
-  const top = (height - view.d * s) / 2;
+  const box = { left: 0, top: 0, width, height };
+  const { s, left, top } = fit(width, height, view);
   const spots: (TagSpot & { label: MapLabel<K> })[] = [];
   for (const label of labels) {
-    const px = left + (label.x - view.x) * s;
-    const py = top + (label.z - view.z) * s;
+    const [px, py] = mapToScreen(label.x, label.z, box, view);
     if (px < 0 || px > width || py < 0 || py > height) continue;
     // The box: the name's line (and the second's), centred on the point; its anchor is its foot.
     const h = label.size * 1.25 + (label.sub ? label.sub * 1.25 : 0);
@@ -103,7 +131,8 @@ export function layoutLabels<K>(labels: readonly MapLabel<K>[], width: number, h
     // (Inter's ascent is about 0.97 of its size: the baseline sits that far below the line's top.)
     const baseline = boxTop + size * 0.97;
     const subBaseline = boxTop + size * 1.25 + (sub ?? 0) * 0.97;
-    out.set(t.label.key, { x: view.x + (t.x - left) / s, y: view.z + (baseline - top) / s, subY: view.z + (subBaseline - top) / s });
+    const north = mapY(view.z + view.d);
+    out.set(t.label.key, { x: view.x + (t.x - left) / s, y: north + (baseline - top) / s, subY: north + (subBaseline - top) / s });
   }
   return out;
 }

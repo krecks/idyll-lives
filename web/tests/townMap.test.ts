@@ -1,20 +1,20 @@
 /**
- * The town map's view (`ui/mapView.ts`): a point on screen to the ground under it when the map
+ * The town map's view (`ui/mapView.ts`): north up as the 3D view has it, a point on screen to the ground under it when the map
  * fits a box of another shape (the "Bigger" map), its names kept apart, and the place pill's words (`ui/place.ts`): where a
  * resident is off to, on foot or riding.
  */
 import { describe, expect, test } from 'bun:test';
-import { labelWidth, layoutLabels, mapScale, screenToMap, type MapLabel } from '../src/ui/mapView';
+import { GROUND, labelWidth, layoutLabels, mapScale, mapToScreen, mapY, screenToMap, UPRIGHT, viewBox, type MapLabel } from '../src/ui/mapView';
 import { flatsIn, lotTitle, placeAt, plotInfo, rideText, tripText, wayText } from '../src/ui/place';
 
 describe('town map view', () => {
   const view = { x: -6, z: -6, w: 412, d: 212 };
 
-  test('a box the map’s shape: corners to corners', () => {
+  test('a box the map’s shape: corners to corners, the top left the north-west', () => {
     const box = { left: 100, top: 50, width: 824, height: 424 };
     expect(mapScale(box.width, box.height, view)).toBe(2);
-    expect(screenToMap(100, 50, box, view)).toEqual([-6, -6]);
-    expect(screenToMap(924, 474, box, view)).toEqual([406, 206]);
+    expect(screenToMap(100, 50, box, view)).toEqual([-6, 206]);
+    expect(screenToMap(924, 474, box, view)).toEqual([406, -6]);
     expect(screenToMap(512, 262, box, view)).toEqual([200, 100]);
   });
 
@@ -22,18 +22,54 @@ describe('town map view', () => {
     // 824 px wide, 700 px tall: drawn 824 × 424, centred (138 px bands).
     const box = { left: 0, top: 0, width: 824, height: 700 };
     expect(mapScale(box.width, box.height, view)).toBe(2);
-    expect(screenToMap(0, 138, box, view)).toEqual([-6, -6]);
+    expect(screenToMap(0, 138, box, view)).toEqual([-6, 206]);
     expect(screenToMap(412, 350, box, view)).toEqual([200, 100]);
-    // (The box's own height would have put this 68 m too far down.)
-    expect(screenToMap(824, 562, box, view)).toEqual([406, 206]);
+    // (The box's own height would have put this 68 m too far south.)
+    expect(screenToMap(824, 562, box, view)).toEqual([406, -6]);
   });
 
   test('a box wider than the map: bands at the sides, the scale from its height', () => {
     const box = { left: 0, top: 0, width: 1200, height: 424 };
     expect(mapScale(box.width, box.height, view)).toBe(2);
     const band = (1200 - 824) / 2;
-    expect(screenToMap(band, 0, box, view)).toEqual([-6, -6]);
+    expect(screenToMap(band, 0, box, view)).toEqual([-6, 206]);
     expect(screenToMap(600, 212, box, view)).toEqual([200, 100]);
+  });
+
+  test('north up, east to the right: as the 3D view from above (game z north, the engine’s mirrored)', () => {
+    const box = { left: 0, top: 0, width: 824, height: 424 };
+    const [, yNorth] = mapToScreen(200, 150, box, view);
+    const [, ySouth] = mapToScreen(200, 50, box, view);
+    const [xWest] = mapToScreen(50, 100, box, view);
+    const [xEast] = mapToScreen(150, 100, box, view);
+    expect(yNorth).toBeLessThan(ySouth);
+    expect(xWest).toBeLessThan(xEast);
+  });
+
+  test('picking: the ground drawn under GROUND in the viewBox is the ground the pointer finds there', () => {
+    // As SVG draws it: the viewBox fitted to the box (`xMidYMid meet`), the ground's layer flipped in y (`GROUND`), a name set upright in it.
+    expect(GROUND).toBe('scale(1 -1)');
+    expect(UPRIGHT).toBe('scale(1 -1)');
+    const [vx, vy, vw, vd] = viewBox(view).split(' ').map(Number);
+    expect([vx, vy, vw, vd]).toEqual([-6, -206, 412, 212]);
+    const boxes = [
+      { left: 100, top: 50, width: 824, height: 424 },
+      { left: 0, top: 0, width: 824, height: 700 },
+      { left: 30, top: 10, width: 1200, height: 424 },
+    ];
+    for (const box of boxes) {
+      const s = Math.min(box.width / vw, box.height / vd);
+      const drawn = (x: number, z: number) => [box.left + (box.width - vw * s) / 2 + (x - vx) * s, box.top + (box.height - vd * s) / 2 + (-z - vy) * s];
+      for (const [x, z] of [[0, 0], [400, 200], [123.5, 17.25], [-6, 206]]) {
+        const [sx, sy] = drawn(x, z);
+        const [mx, my] = mapToScreen(x, z, box, view);
+        expect(mx).toBeCloseTo(sx, 9);
+        expect(my).toBeCloseTo(sy, 9);
+        const [px, pz] = screenToMap(sx, sy, box, view);
+        expect(px).toBeCloseTo(x, 9);
+        expect(pz).toBeCloseTo(z, 9);
+      }
+    }
   });
 
   test('an empty box or view doesn’t divide by zero', () => {
@@ -69,8 +105,14 @@ describe('town map names', () => {
     const placed = layoutLabels([a, b], 400, 400, view);
     expect(placed.get('a')!.x).toBeCloseTo(100);
     expect(placed.get('b')!.x).toBeCloseTo(300);
-    // The line's baseline a little below the point, its middle on it (11 px: 1.25 × 11 high).
-    expect(placed.get('b')!.y).toBeCloseTo(300 - 11 * 0.625 + 11 * 0.97);
+    // The line's baseline a little below the point on the page, its middle on it (11 px: 1.25 × 11 high), in the SVG's y (−z).
+    expect(placed.get('b')!.y).toBeCloseTo(mapY(300) - 11 * 0.625 + 11 * 0.97);
+  });
+
+  test('a northern name above a southern one on the page', () => {
+    const placed = layoutLabels([label('north', 100, 350, 'Northby', 0), label('south', 300, 50, 'Southby', 0)], 400, 400, view);
+    expect(placed.get('north')!.y).toBeLessThan(placed.get('south')!.y);
+    expect(placed.get('north')!.y).toBeCloseTo(mapY(350) - 11 * 0.625 + 11 * 0.97);
   });
 
   test('a pile of names: none drawn over another, the household’s own always', () => {
@@ -92,10 +134,12 @@ describe('town map names', () => {
   });
 
   test('clear of the zoom buttons', () => {
+    // (The buttons in the box's bottom right corner, px; a lookout by the map's south-east corner, 15 m in from its south edge.)
     const buttons = { l: 326, t: 360, r: 400, b: 400 };
-    const placed = layoutLabels([label('lookout', 360, 385, 'Lookout', 1)], 400, 400, view, [buttons]);
+    const placed = layoutLabels([label('lookout', 360, 15, 'Lookout', 1)], 400, 400, view, [buttons]);
     const at = placed.get('lookout');
-    if (at) expect(apart(box(label('lookout', 0, 0, 'Lookout', 1), at), buttons)).toBe(true);
+    // (On the page: the SVG's y less the view's north edge's.)
+    if (at) expect(apart(box(label('lookout', 0, 0, 'Lookout', 1), { x: at.x, y: at.y - mapY(400) }), buttons)).toBe(true);
   });
 });
 
