@@ -11,7 +11,9 @@
 // driveways, gardenFences), and when a lane became a lane's 6 m (2026-11-23: every area road but its first, the
 // lots along it half a metre nearer its middle), and for the motorway (2026-11-23: one in every world where it fits,
 // edge to edge past the main town, the country roads crossing under it at its gates; in the others, the note why
-// not in their diagnostics). A change that moves one on purpose re-pins it here.
+// not in their diagnostics), and when the motorway went down before the villages (2026-11-24: its course chosen
+// with the main town alone, none costing a village; the villages kept clear of it, its gates chosen by them; no
+// side T where another area's street comes up end to end). A change that moves one on purpose re-pins it here.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -21,40 +23,40 @@ const WEB = new URL('../', import.meta.url).pathname;
 
 /** Each world: its kind, its seed, and the first 16 hex digits of its draft's SHA-256. */
 const GOLDEN: [ClassicKind, number, string][] = [
-  ['small', 11, '745c17cf0fc93efd'],
-  ['small', 22, '2ed86794329ed91f'],
-  ['medium', 11, '647dfdf8f6c117c7'],
-  ['medium', 22, '3bf4c8ed4309a2b2'],
-  ['dense', 11, '22c0fe2ea106fa6c'],
-  ['dense', 22, 'db10829a9218c13c'],
-  ['farm', 11, '9eb491d37063f6b6'],
-  ['farm', 22, '5a7abad0018483cb'],
-  ['seaside', 11, '1032b5602cf5bd69'],
-  ['seaside', 22, 'd02c6338ad3f1fec'],
-  ['mountain', 11, '16b8bd99ff146eb6'],
-  ['mountain', 22, '43de42b0f3edb49f'],
-  ['lakeside', 11, '5a21d6efeeb2e338'],
-  ['lakeside', 22, '56d2f4ce778e13ef'],
-  ['forest', 11, '5d32c183814ce21d'],
-  ['forest', 22, '236fe23988aac6b6'],
-  ['dense', 808114082, '708bd0464884a8a8'],
-  ['small', 199762, 'ff2bd176035ed1f0'],
-  ['forest', 223520, 'cca3d33f6c3611ca'],
-  ['medium', 104735, '92967efb1e0a8dfe'],
-  ['mountain', 231441, '37220e054cad2ece'],
-  ['lakeside', 239360, 'bcd3aeeaf364b180'],
-  ['farm', 271032, 'f7581f2346a18310'],
-  ['small', 278952, '764ce1233cc43de8'],
-  ['forest', 278953, '6ccc1381681c0e1d'],
-  ['forest', 425059, 'caf8a24d6c71e6fc'],
-  ['lakeside', 215603, '94e70241f1ebe00f'],
-  ['forest', 320330, 'c743cbe9459604ea'],
-  ['dense', 320329, '1aba4640fd3bb27c'],
-  ['seaside', 215602, '360b2019c057c708'],
-  ['forest', 104735, 'ffa802452775238c'],
-  ['forest', 112654, '77733808b2760704'],
-  ['lakeside', 225304, '1930a40a8ad7dfc3'],
-  ['small', 314192, 'aee40bd123c11592'],
+  ['small', 11, '935f849f8d210083'],
+  ['small', 22, '198a2962563c309b'],
+  ['medium', 11, '6c628ef9b9de4a81'],
+  ['medium', 22, '8b60a0e2273abce6'],
+  ['dense', 11, 'a86b065a4a241ee5'],
+  ['dense', 22, 'a1f12d810c0d21d6'],
+  ['farm', 11, '3d71714cfaed9283'],
+  ['farm', 22, '285c197fcc8c6cdf'],
+  ['seaside', 11, 'fc75918d0a7935a5'],
+  ['seaside', 22, '03c0921f639277b3'],
+  ['mountain', 11, 'dc32305f7d9571d4'],
+  ['mountain', 22, 'b348ade4a333fcea'],
+  ['lakeside', 11, 'd5c4daf4aa681807'],
+  ['lakeside', 22, '5cbd3cd998ace625'],
+  ['forest', 11, '7108db26efa7884a'],
+  ['forest', 22, '9d08c592c0abcaea'],
+  ['dense', 808114082, '554cd3b8fac06c75'],
+  ['small', 199762, '2bb56668555e71c5'],
+  ['forest', 223520, 'b2452fe4d7502993'],
+  ['medium', 104735, '5b4b40a57b63d198'],
+  ['mountain', 231441, '80e7d3702b01f75c'],
+  ['lakeside', 239360, 'ae4d4bc7cac4c5ce'],
+  ['farm', 271032, '33646024a240c17d'],
+  ['small', 278952, 'ff9c32b3436dac89'],
+  ['forest', 278953, '8c80a1791edd801f'],
+  ['forest', 425059, '34ecc934ed0002c8'],
+  ['lakeside', 215603, '9bdce2a77f948759'],
+  ['forest', 320330, '4e3fca3dfb104ed2'],
+  ['dense', 320329, 'a1ea14dad80e08bf'],
+  ['seaside', 215602, 'da6d5c4a0d2b3690'],
+  ['forest', 104735, 'b571e76878c569e6'],
+  ['forest', 112654, '0cb3d7a68c5c5dab'],
+  ['lakeside', 225304, 'ab0044b37f6da7ae'],
+  ['small', 314192, '0a00f97fe85b39d9'],
 ];
 
 describe('classic worlds', async () => {
