@@ -119,6 +119,37 @@ describe('game speed', () => {
     expect(sent).toEqual([2]);
   });
 
+  test('super speed picked while the simulation is at it by itself is sent, so it stays the player\'s', () => {
+    const { speed: s, sent } = speed();
+    s.choose(1);
+    s.hold('loading', false);
+    s.follow(4, performance.now() + 1000);
+    expect(s.chosen).toBe(4);
+    expect(sent).toEqual([1]);
+    s.choose(4);
+    expect(sent).toEqual([1, 4]);
+    // (Under a hold it waits, as any pick does; another speed picked again is not sent again.)
+    s.hold('menu', true);
+    s.choose(4);
+    expect(sent).toEqual([1, 4, 0]);
+    s.hold('menu', false);
+    s.choose(2);
+    s.choose(2);
+    expect(sent).toEqual([1, 4, 0, 4, 2]);
+  });
+
+  test("whose super speed it is: the player's pick, or the simulation's own", () => {
+    const { speed: s } = speed();
+    s.choose(2);
+    s.hold('loading', false);
+    s.follow(4, performance.now() + 1000);
+    expect(s.superPicked).toBe(false);
+    s.choose(4);
+    expect(s.superPicked).toBe(true);
+    s.choose(1);
+    expect(s.superPicked).toBe(false);
+  });
+
   test("only super speed's comings and goings are followed, and not under a hold", () => {
     const { speed: s } = speed();
     s.choose(3);

@@ -289,7 +289,6 @@
         </g>
         {#each plots as p (p.id)}
           {@const name = lotTitle(p, game.households, 'Empty')}
-          {@const at = labels.get(p.id)}
           <g
             class="plot"
             class:mine={p.id === homeLot}
@@ -311,17 +310,21 @@
             {#if p.house}
               <rect class="house" x={p.house[0]} y={p.house[1]} width={p.house[2] - p.house[0]} height={p.house[3] - p.house[1]} rx="0.5" />
             {/if}
-            <!-- Its name where there's room for it (`labels`). -->
-            {#if at}
-              <text x={at.x} y={at.y} font-size={px(11)} text-anchor="middle">{name}</text>
-              {#if homeCount(p.id) && p.w * ppm > 46}
-                <text class="count" x={at.x} y={at.subY} font-size={px(9)} text-anchor="middle">{homeCount(p.id)} here</text>
-              {/if}
-            {/if}
           </g>
         {/each}
         {#each dots as d, i (i)}
           <circle class="dot" class:mine={d.mine} cx={d.x} cy={d.z} r={px(d.mine ? 4 : 3)} />
+        {/each}
+        <!-- The lots' names where there's room for them (`labels`), over the lots and the residents with a halo: under
+             the dots and the next lots they lost letters ("Elmfield Orcha d"). -->
+        {#each plots as p (p.id)}
+          {@const at = labels.get(p.id)}
+          {#if at}
+            <text class="name" x={at.x} y={at.y} font-size={px(11)} stroke-width={px(2.5)} text-anchor="middle">{lotTitle(p, game.households, 'Empty')}</text>
+            {#if homeCount(p.id) && p.w * ppm > 46}
+              <text class="name count" x={at.x} y={at.subY} font-size={px(9)} stroke-width={px(2.5)} text-anchor="middle">{homeCount(p.id)} here</text>
+            {/if}
+          {/if}
         {/each}
         {#each areas as a, i (i)}
           {@const at = labels.get(`a${i}`)}
@@ -357,7 +360,8 @@
       <section class="details">
         <div class="title">
           <b>{household ? `The ${household.name}s` : plot.name}</b>
-          <span class="muted">{plot.name}</span>
+          <!-- (The lot's name under a household's; a place's own name once, not twice.) -->
+          {#if household}<span class="muted">{plot.name}</span>{/if}
         </div>
         {#if sale}
           <p class="sale muted">{saleText(sale)}</p>
@@ -613,6 +617,10 @@
   }
   .count {
     font-weight: 500;
+  }
+  .name {
+    stroke: rgba(255, 255, 255, 0.75);
+    paint-order: stroke;
   }
   .details {
     display: flex;

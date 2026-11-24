@@ -25,6 +25,8 @@ export class GameSpeed {
   chosen: number;
   /** The last speed above 0 (Space resumes at it). */
   last: number;
+  /** Whether the super speed running is the player's pick (`choose`), not the simulation's own (`follow`). */
+  superPicked = false;
   private readonly holds = new Set<SpeedHold>(['loading']);
   /** When a speed was last sent (ms, performance clock). */
   private sentAt = -Infinity;
@@ -46,12 +48,17 @@ export class GameSpeed {
     return this.holds.size ? 0 : this.chosen;
   }
 
-  /** The player's speed (applied at once, or when nothing holds time any more). */
+  /**
+   * The player's speed (applied at once, or when nothing holds time any more). Super speed picked while the
+   * simulation is at it by itself is sent all the same: from then on it is the player's, and stays when the
+   * household wakes (sim-core `apply_set_speed`; unsent, it dropped back to the speed before it).
+   */
   choose(speed: number): void {
     const was = this.running;
     this.chosen = speed;
     if (speed > 0) this.last = speed;
-    this.changed(was);
+    this.superPicked = speed === SUPER_SPEED;
+    this.changed(was, speed === SUPER_SPEED);
   }
 
   /**
@@ -66,6 +73,7 @@ export class GameSpeed {
     if (speed !== SUPER_SPEED && this.chosen !== SUPER_SPEED) return;
     this.chosen = speed;
     if (speed > 0) this.last = speed;
+    this.superPicked = false;
   }
 
   /** Holds time still for `reason` (`on`), or lets go of it. */
@@ -76,8 +84,9 @@ export class GameSpeed {
     this.changed(was);
   }
 
-  private changed(was: number): void {
-    if (this.running === was) return;
+  /** Sends the running speed if it changed from `was` (or `again`, unless something holds time). */
+  private changed(was: number, again = false): void {
+    if (this.running === was && !(again && !this.holds.size)) return;
     this.sentAt = performance.now();
     this.send(this.running);
   }

@@ -26,9 +26,9 @@
     if (game.townOpen) game.journalOpen = false;
   }
   const fundsTitle = $derived.by(() => {
-    if (game.creative) return 'Household funds · Creative game: building and buying are free, and your home pays no rent or bills.';
+    if (game.creative) return 'Household funds · Creative game: building and buying are free, and your home pays no rates or bills.';
     if (game.rent !== null && rent) {
-      return `Household funds · rent ${money(game.rent)} + bills ${money(game.bills ?? 0)} every ${WEEKDAYS[rent.weekday]} at ${clock(rent.hour * 60, settings.clock24h)}. Bills grow with the value of everything you own and with how many of you there are.`;
+      return `Household funds · rates ${money(game.rent)} + bills ${money(game.bills ?? 0)} every ${WEEKDAYS[rent.weekday]} at ${clock(rent.hour * 60, settings.clock24h)}. Bills grow with the value of everything you own and with how many of you there are.`;
     }
     return 'Household funds';
   });

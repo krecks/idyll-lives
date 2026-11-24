@@ -1577,8 +1577,9 @@ async function openSession(
     // A chime for the household's milestones (a sad one for bad news).
     if (big && revealed && game.mode === 'live') play(storyTone(big) === 'bad' ? 'notifyLow' : 'notify');
     if (big && liveSettings.autoSlow && game.mode === 'live' && game.speed >= 3) {
-      // (Super speed wouldn't come back so soon after it: 10×.)
-      const from = Math.min(game.speed, 3);
+      // (Super speed the player picked comes back after it; one the simulation went to by itself, not so soon
+      // after a big moment (the household isn't quiet): 10×.)
+      const from = game.speed >= SUPER_SPEED && speed.superPicked ? SUPER_SPEED : Math.min(game.speed, 3);
       chooseSpeed(1, false);
       slowedFrom = from;
       slowUntil = performance.now() + SLOW_MS;
@@ -1756,7 +1757,8 @@ async function openSession(
       if ((it.needsTable && !atTable) || !supplied(it.requires) || !offered(it.when) || it.conceive) return [];
       const opens = closedAt(it);
       const label = it.selfServe && !post ? it.selfServe.label : it.label;
-      return [{ label: opens === null ? label : `${label} (opens at ${clockTime(opens)})`, index, ...(it.cost ? { cost: it.cost } : {}), ...(content.mayUse(def, it, stage) && opens === null ? {} : { disabled: true }) }];
+      const cost = plot?.public ? (it.publicCost ?? it.cost) : it.cost;
+      return [{ label: opens === null ? label : `${label} (opens at ${clockTime(opens)})`, index, ...(cost ? { cost } : {}), ...(content.mayUse(def, it, stage) && opens === null ? {} : { disabled: true }) }];
     });
     // A lamp: its switch; a fire is lit and put out.
     const off = bridge.lampOff(objectId);
