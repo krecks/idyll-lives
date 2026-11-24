@@ -37,6 +37,8 @@ pub const ROAD_TRIP_TILES: f32 = 96.0;
 const ENTRIES: usize = 3;
 /// How far from a point a stretch of road may be to get on it there (m).
 const ENTRY_REACH: f32 = 64.0;
+/// How far from a way out of town the road it's the end of is (m): a road's end is at its way out.
+const EXIT_ROAD: f32 = 2.0;
 /// The longest step between waypoints along a road (m), and how far from the road's middle line
 /// a straight step between two of them may stray (m).
 const THIN_STEP: f32 = 6.0;

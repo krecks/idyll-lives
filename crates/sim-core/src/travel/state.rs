@@ -101,6 +101,14 @@ impl Travel {
         self.graph.nearest(p, ENTRY_REACH, mode)
     }
 
+    /// Whether those on foot or on a bike may leave town by the way out at `exit`: one at the end
+    /// of a road they go along, or of none. Not a motorway's carriageway's end: only a road for
+    /// cars there, which nobody walks or rides along (`Road::walkable`), its ground kept from them.
+    pub fn exit_on_foot(&self, exit: [f32; 2]) -> bool {
+        self.graph.nearest(exit, EXIT_ROAD, Mode::Foot).is_some()
+            || self.graph.nearest(exit, EXIT_ROAD, Mode::Car).is_none()
+    }
+
     /// Notes the plots' doors and where they get on the roads (`doors`), again only for a door
     /// that moved.
     pub(crate) fn note_doors(&mut self, plots: &[crate::world::Plot]) {
