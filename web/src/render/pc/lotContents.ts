@@ -179,8 +179,8 @@ function fireFlicker(id: number, seconds: number): number {
 }
 
 /**
- * Glow instance `i` at brightness `f` (linearised with the glow's colour) times `gain` (linear, past 1: its alpha, the
- * emission's own factor, `GAME_GLOW_TINT`); whether that changed it.
+ * Glow instance `i` at brightness `f` (linearised with the glow's colour) times `gain` (linear, 1 or more: its alpha,
+ * whose share past 1 is the emission's own factor, `GAME_GLOW_TINT`); whether that changed it.
  */
 function setGlow(g: Glow, i: number, f: number, gain = 1): boolean {
   if (g.colors[i * 4] === f && g.colors[i * 4 + 3] === gain) return false;

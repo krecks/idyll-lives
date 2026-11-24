@@ -6,9 +6,10 @@
  *   (`GAME_INSTANCE_COLOR`: the `INSTANCE_COLOR_SEMANTIC` stream, multiplied into the albedo; with
  *   `GAME_TINT_WHITE` only where the vertex colour is pure white, a parked car's paint, `shared/cars.ts`). A
  *   glow's strength per instance (`GAME_GLOW_TINT`, `models.ts` `glowByInstance`) multiplies the
- *   same stream into its (unlit, emissive) vertex colour, linearised as the glow's is, and its alpha
- *   into the emission after it (linear, past 1: PlayCanvas clamps the vertex colour to 1; a lamp's
- *   glass lit `LAMP_GLASS` times as bright, `lightUnits.ts`).
+ *   same stream into its (unlit, emissive) vertex colour, linearised as the glow's is; its alpha up
+ *   to 1 into the vertex colour's (the overview's lot highlights blend by it), and past 1 into the
+ *   emission after it (linear: PlayCanvas clamps the vertex colour to 1; a lamp's glass lit
+ *   `LAMP_GLASS` times as bright, `lightUnits.ts`).
  *   Planar UVs (`GAME_PLANAR_UV`) are the local XZ position in metres, for flat meshes built
  *   with 0..1 UVs such as roads (`uv0VS`, in `chunks.ts`).
  * - Patterns over a surface's texture: `GAME_PATTERN_STRIPES`, wallpaper's faint stripes 12.5 cm
@@ -63,10 +64,10 @@ export const VERTEX_TWEAKS: ShaderFeature = {
 	#endif
 #endif
 #if defined(GAME_GLOW_TINT) && defined(VERTEX_COLOR)
-	vVertexColor.rgb *= pow(max(game_instanceColor.rgb, vec3(0.0)), vec3(2.2));
+	vVertexColor *= vec4(pow(max(game_instanceColor.rgb, vec3(0.0)), vec3(2.2)), min(game_instanceColor.a, 1.0));
 #endif
 #if defined(GAME_GLOW_TINT) && !defined(GAME_INSTANCE_COLOR)
-	vGameGlow = game_instanceColor.a;
+	vGameGlow = max(game_instanceColor.a, 1.0);
 #endif`,
     psDecl: `
 #ifdef GAME_INSTANCE_COLOR
@@ -105,10 +106,10 @@ export const VERTEX_TWEAKS: ShaderFeature = {
 	#endif
 #endif
 #if defined(GAME_GLOW_TINT) && defined(VERTEX_COLOR)
-	output.vVertexColor = output.vVertexColor * vec4f(pow(max(game_instanceColor.rgb, vec3f(0.0)), vec3f(2.2)), 1.0);
+	output.vVertexColor = output.vVertexColor * vec4f(pow(max(game_instanceColor.rgb, vec3f(0.0)), vec3f(2.2)), min(game_instanceColor.a, 1.0));
 #endif
 #if defined(GAME_GLOW_TINT) && !defined(GAME_INSTANCE_COLOR)
-	output.vGameGlow = game_instanceColor.a;
+	output.vGameGlow = max(game_instanceColor.a, 1.0);
 #endif`,
     psDecl: `
 #ifdef GAME_INSTANCE_COLOR
