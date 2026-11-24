@@ -47,6 +47,7 @@ import { surfaceOf } from '../shared/landSurface';
 import type { BuiltSurface } from '../shared/builtSurface';
 import { perfEnd, perfStart, perfTimeAsync } from '../../debug/perf';
 import { frameNow } from '../shared/frameClock';
+import { LAMP_GLASS } from './lightUnits';
 
 export interface StreetOptions {
   /** Layer ids of everything this street draws (default: the world layer). */
@@ -768,8 +769,9 @@ export class Street {
     if (Math.abs(lamps - this.lamps) < 1e-3) return;
     this.lamps = lamps;
     const g = Math.min(1, Math.max(0, (lamps - 0.3) / 0.45));
-    // Pale glass by day, a warm glow at night.
+    // Pale glass by day, a warm glow at night (`LAMP_GLASS` times as bright, to bloom).
     this.glowMat.emissive.set(Math.min(1, 0.62 + g * 1.7), Math.min(1, 0.62 + g * 0.95), Math.min(1, 0.58 + g * 0.2));
+    this.glowMat.emissiveIntensity = 1 + (LAMP_GLASS - 1) * g;
     this.glowMat.update();
     this.poolMat.emissive.set(0.62 * g, 0.46 * g, 0.26 * g);
     this.poolMat.update();

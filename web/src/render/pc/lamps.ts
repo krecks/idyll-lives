@@ -237,9 +237,11 @@ export class Lamps {
     this.lib.rooms.enabled = params.get('roomlights') !== '0';
     this.glow = {
       level: 0,
+      dark: 1,
       lampOn: (id) => this.lampOn(id),
       roomOn: (room) => this.windowGlowOn.get(room) ?? 1,
-      dimmed: (room) => this.dimmed.has(room),
+      // (The basement in view: no daylight in any of its rooms, as the lights have it: `applyRoomLights`.)
+      dimmed: (room) => this.view.storey() < 0 || this.dimmed.has(room),
     };
   }
 
@@ -458,6 +460,8 @@ export class Lamps {
   /** The shades' glow (`LotContents.applyGlow`) and the garden's pools. */
   private applyGlow(): void {
     this.glow.level = this.glowLevel;
+    // (Where no daylight comes, a lamp's glass as bright to the eye as at night, as its light is: `applyRoomLights`.)
+    this.glow.dark = NIGHT_EXPOSURE / this.exposure;
     this.hooks.lot.applyGlow(this.glow);
     this.hooks.pools();
     this.onChanged?.();

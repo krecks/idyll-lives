@@ -14,7 +14,7 @@
  *   and encoded for the screen by then, so a byte a channel holds it as the canvas will; only what
  *   the contrast pushed past white is clamped a pass sooner). Half the bytes of two half-float
  *   targets, read and written every frame.
- * - Bloom on the lights (`BLOOM`): what is brighter once exposed than `BLOOM.white` (street lamps' glass, lit
+ * - Bloom on the lights (`BLOOM`): what is brighter once exposed than `BLOOM.white` (lamps' glass, lit
  *   windows) glows into what is round it, by PlayCanvas's bloom (its blurred bright part added before the
  *   image processing; the threshold follows the exposure, as the scene is drawn before it). Its strength
  *   follows the night (`glow`; full in the basement, which has no daylight): none by day. The
@@ -67,12 +67,14 @@ export interface PostOptions {
  * is added at full night, `blurLevel` how far it spreads. PlayCanvas's soft knee starts the bloom at half `white`,
  * so that half is kept at a sunlit white wall's brightness: measured once exposed (the brightest colour channel,
  * before the bloom; the bench village, 2026-11-24), sunlit walls at dusk came to 0.75–0.80 (0.86 at most at 19:00,
- * when the night is 0.01) and a sunlit white fence at noon (the basement's view) to 0.95; a street lamp's glass at
- * night to 1.79 and a lit window to 2.82, both above `white`. A garden, porch or room lamp's glass (0.5–1.1) hardly
- * reaches the knee and doesn't visibly bloom. (`?tune=bloom.…` on the dev server. `white` 0.7 until 2026-11-24:
- * sunlit walls bloomed at dusk.)
+ * when the night is 0.01) and a sunlit white fence at noon (the basement's view) to 0.95. What blooms is well above
+ * `white`: at night a lit lamp's glass about 3.0 (a room's, the basement's at any hour) and a streetlamp's 2.7, both
+ * `lightUnits.ts` `LAMP_GLASS` times as bright as they glow, and a lit window 2.8. `intensity` puts back the bloom the
+ * lights had before (with `white` 0.7 and `intensity` 0.15: added light, mean over the picture, a street's lamps 7.4
+ * of 255 then and 6.4 now, lit windows 10.1 and 10.2). (`?tune=bloom.…` on the dev server. `white` 0.7 and
+ * `intensity` 0.15 until 2026-11-24: sunlit walls bloomed at dusk.)
  */
-const BLOOM = tuned('bloom', { white: 1.6, intensity: 0.15, blurLevel: 16 });
+const BLOOM = tuned('bloom', { white: 1.6, intensity: 0.3, blurLevel: 16 });
 
 /** The bloom's strength by day: above none, so PlayCanvas keeps its passes (`PostProcessing.glow`). */
 const BLOOM_IDLE = 1e-6;
