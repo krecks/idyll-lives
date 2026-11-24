@@ -247,11 +247,21 @@ function cannot(line: Pt[], width: number, why: string): LiveStreet {
 }
 
 /**
- * The street drawn through `points` on `draft` as the live checks see it (see the top of this file):
- * of `kind` (as `drawStreet` takes it, `asked` too: `StreetStroke.asked`), clearing what is in its
- * way (`clear`) or not; one-way (`oneway`), it is open till it ends on a road at both ends.
+ * What a street drawn is asked to be (as `drawStreet` takes it, `StreetStroke`): its `kind` (`asked`: the card's own
+ * choice, `StreetStroke.asked`), clearing what is in its way (`clear`, the default) or not, and one-way (`oneway`).
  */
-export function liveStreet(draft: NeighbourhoodDraft, t: Templates, points: readonly Pt[], kind: StrokeKind, clear = true, asked = false, oneway?: 1 | -1): LiveStreet {
+export interface StreetOptions {
+  kind: StrokeKind;
+  clear?: boolean;
+  asked?: boolean;
+  oneway?: 1 | -1;
+}
+
+/**
+ * The street drawn through `points` on `draft` as the live checks see it (see the top of this file), asked as `ask`
+ * says; one-way, it is open till it ends on a road at both ends.
+ */
+export function liveStreet(draft: NeighbourhoodDraft, t: Templates, points: readonly Pt[], { kind, clear = true, asked = false, oneway }: StreetOptions): LiveStreet {
   const c = contextOf(draft, t);
   const trail = kind === 'trail';
   const width = streetWidth(kind);
@@ -408,8 +418,8 @@ export function climbOf(profile: { s: ArrayLike<number>; y: ArrayLike<number> },
   return { steepest, over };
 }
 
-/** `drawStreet`'s own verdict on the street drawn through `points` (no homes along it: what it would be, not what it fills). */
-export function verdictOf(draft: NeighbourhoodDraft, t: Templates, content: Parameters<typeof drawStreet>[2], points: readonly Pt[], kind: StrokeKind, clear: boolean, seed: number, asked = false, oneway?: 1 | -1): Edited {
+/** `drawStreet`'s own verdict on the street drawn through `points`, asked as `ask` says, its names from `seed` (no homes along it: what it would be, not what it fills). */
+export function verdictOf(draft: NeighbourhoodDraft, t: Templates, content: Parameters<typeof drawStreet>[2], points: readonly Pt[], { kind, clear = true, asked = false, oneway }: StreetOptions, seed: number): Edited {
   return drawStreet(draft, t, content, { points, kind, clear, fill: false, seed, asked, ...(oneway ? { oneway } : {}) });
 }
 

@@ -145,7 +145,7 @@ describe("step 2's settle", async () => {
     expect(where.at).toEqual(found.road.points);
     expect(where.width).toBe(found.road.width);
     // The Street tool's live checks saw it coming, in the settle's words.
-    const live = liveStreet(before, t, found.points, 'street');
+    const live = liveStreet(before, t, found.points, { kind: 'street' });
     expect(live.steep).toBe(true);
     expect(live.slope).toMatch(/^it would climb \d+ %, more than a \w+ may \(\d+ %\)$|^the ground under it would have to be dug out or built up [\d.]+ m \([\d.]+ m at most\)$/);
     console.log(`forecast: ${live.slope} (climb ${(live.climb * 100).toFixed(1)} %)`);
@@ -290,7 +290,7 @@ describe("step 2's settle", async () => {
           const trails = e.draft.roads.filter((q) => q.name?.startsWith('Ashmouth Fishing Jetty Trail'));
           expect(trails.length === 2 || (trails.length === 1 && trails[0] === painted.roads[painted.roads.length - 1])).toBe(true);
           // The live checks say as much.
-          const live = liveStreet(painted, t, points, 'street');
+          const live = liveStreet(painted, t, points, { kind: 'street' });
           expect(live.why).toBeNull();
           expect(live.open).toBeNull();
           expect(live.excess).toBe(false);

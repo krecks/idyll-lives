@@ -211,7 +211,7 @@ export function carryOn(draft: Parameters<typeof liveStreet>[0], t: Parameters<t
   if (near) tries.push(near.at);
   for (const end of tries) {
     const points = [...pts, end];
-    const live = liveStreet(draft, t, points, ask.kind, ask.clear, ask.asked, ask.oneway);
+    const live = liveStreet(draft, t, points, ask);
     if (!live.why && live.reached && live.finishOn >= 0 && !live.excess && !live.open) return { points, live };
   }
   return null;
@@ -335,7 +335,7 @@ export const streetTool: TownTool = {
       if (!p.pull || !s.drawing) return p;
       const pts = [...s.points, p.at];
       const key = keyOf(pts, ask);
-      const live = shown?.key === key ? shown.live : liveStreet(editor.draft, editor.t, pts, ask.kind, ask.clear, ask.asked, ask.oneway);
+      const live = shown?.key === key ? shown.live : liveStreet(editor.draft, editor.t, pts, ask);
       if (live.why) return { at: g, pull: null };
       if (shown?.key !== key) shown = { key, live, verdict: null };
       return p;
@@ -373,7 +373,7 @@ export const streetTool: TownTool = {
         return;
       }
       const key = keyOf(pts, ask);
-      if (shown?.key !== key) shown = { key, live: liveStreet(editor.draft, editor.t, pts, ask.kind, ask.clear, ask.asked, ask.oneway), verdict: null };
+      if (shown?.key !== key) shown = { key, live: liveStreet(editor.draft, editor.t, pts, ask), verdict: null };
       const { live, verdict } = shown;
       if (live.kind && live.kind !== 'trail') {
         streetChoice.shown = live.kind;
@@ -388,10 +388,10 @@ export const streetTool: TownTool = {
     /** `drawStreet`'s verdict on the line under the pointer, if the pointer is still where it rested. */
     const settle = (key: string, pts: Pt[], ask: StreetAsk) => {
       if (shown?.key !== key) return;
-      shown.verdict = verdictOf(editor.draft, editor.t, editor.content, pts, ask.kind, ask.clear, seed, ask.asked, ask.oneway);
+      shown.verdict = verdictOf(editor.draft, editor.t, editor.content, pts, ask, seed);
       // (What Enter would make of it: carried on to a road just ahead, if it may be, as `finish` carries it.)
       const on = shown.live.reached ? null : carryOn(editor.draft, editor.t, pts, ask, meetings);
-      const carried = on && verdictOf(editor.draft, editor.t, editor.content, on.points, ask.kind, ask.clear, seed, ask.asked, ask.oneway);
+      const carried = on && verdictOf(editor.draft, editor.t, editor.content, on.points, ask, seed);
       shown.carried = on && carried && 'draft' in carried ? { live: on.live, verdict: carried } : null;
       editor.preview(streetGhosts(editor, shown.live, shown.verdict, wayOf(ask)));
       editor.hint(lineOf(shown.live, shown.verdict, shown.carried));
@@ -432,7 +432,7 @@ export const streetTool: TownTool = {
         return false;
       }
       const ask = askOf();
-      let live = liveStreet(editor.draft, editor.t, pts, ask.kind, ask.clear, ask.asked, ask.oneway);
+      let live = liveStreet(editor.draft, editor.t, pts, ask);
       if (!asDeadEnd && !live.reached) return false;
       // (Ended short of a road: carried on to one nearby, if drawStreet takes it so; else ended where it is.)
       let edited: (Edited & { leftOut?: number }) | null = null;
