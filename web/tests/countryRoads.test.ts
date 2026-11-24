@@ -1,7 +1,7 @@
 /**
  * `CountryRoads.near` through its 8 m grid finds what a scan of every segment finds, ties and
  * misses alike. A motorway goes on past the edge, over the land and over the water; the roads out
- * past the edge keep off a river that runs on past it.
+ * past the edge keep off a river that runs on past it, and cross one that swings across their way.
  */
 import { describe, expect, test } from 'bun:test';
 import type { WorldStructure } from '../src/core/protocol';
@@ -69,6 +69,30 @@ describe('country roads', () => {
     // Each on its own side of it, never on top of the other.
     for (const [, z] of north) expect(z).toBeLessThan(190);
     for (const [, z] of south) expect(z).toBeGreaterThan(210);
+  });
+
+  test('a road crosses a river that swings across its way, not on along its bed', () => {
+    // A river 20 m wide out of the west edge at z = 200, swinging 80 m north within 80 m of it and
+    // on west along z = 120, in a valley: across the way of a road out west at z = 150.
+    const mid = (x: number) => 200 - 80 * Math.min(1, Math.max(0, -x / 80));
+    const wet = (x: number, z: number) => 10 - Math.abs(z - mid(x));
+    const out = { points: [[40, 150], [0, 150]], width: 7, ends: ['join', 'out'], kind: 'country' };
+    const world = { width: 400, depth: 400, meta: { roads: [out] } } as unknown as WorldStructure;
+    for (let seed = 1; seed <= 8; seed++) {
+      const land: RoadLand = {
+        seed,
+        w: 400,
+        d: 400,
+        ring: 260,
+        ground: (x, z) => Math.abs(z - mid(x)) * 0.4,
+        waterEdge: wet,
+        distanceToTown: (x, z) => Math.hypot(Math.max(-x, 0, x - 400), Math.max(-z, 0, z - 400)),
+      };
+      const [road] = new CountryRoads(land, world, 'Test').roads;
+      expect(road.at(-1)![0]).toBeLessThan(-200);
+      // Over it once, a few steps (it ran on along the bed for 54 of its 74 points).
+      expect(road.filter(([x, z]) => wet(x, z) > 0).length).toBeLessThanOrEqual(8);
+    }
   });
 });
 
