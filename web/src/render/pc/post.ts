@@ -63,6 +63,16 @@ export interface PostOptions {
 }
 
 /**
+ * Bloom on the lights: `white` the exposed brightness it starts at (a sunlit white wall is about 0.8 once exposed, a
+ * lamp's glass and a lit window above it), `intensity` how much of the blurred bright part is added at full night,
+ * `blurLevel` how far it spreads. (`?tune=bloom.…` on the dev server.)
+ */
+const BLOOM = tuned('bloom', { white: 0.7, intensity: 0.15, blurLevel: 16 });
+
+/** The bloom's strength by day: above none, so PlayCanvas keeps its passes (`PostProcessing.glow`). */
+const BLOOM_IDLE = 1e-6;
+
+/**
  * Contact shading: PlayCanvas's screen-space ambient occlusion, applied in the lighting (the lit shaders
  * read it; `shaders/softLook.ts` gives it to the sky's fill and a share of the lights). `radius` (m): how
  * far a thing shades what is beside it (short: at 0.8 m a room's corners darkened in bands and a bookcase
@@ -73,16 +83,6 @@ export interface PostOptions {
  * wide round them); `scale`: its size, of the picture's. (`?tune=contact.…` on the dev server. Radius 0.3 and
  * intensity 1 until 2026-11-18.)
  */
-/**
- * Bloom on the lights: `white` the exposed brightness it starts at (a sunlit white wall is about 0.8 once exposed, a
- * lamp's glass and a lit window above it), `intensity` how much of the blurred bright part is added at full night,
- * `blurLevel` how far it spreads. (`?tune=bloom.…` on the dev server.)
- */
-const BLOOM = tuned('bloom', { white: 0.7, intensity: 0.15, blurLevel: 16 });
-
-/** The bloom's strength by day: above none, so PlayCanvas keeps its passes (`PostProcessing.glow`). */
-const BLOOM_IDLE = 1e-6;
-
 const CONTACT = tuned('contact', { radius: 0.5, intensity: 1.5, power: 1, samples: 16, minAngle: 25, scale: 0.5 });
 
 /** What the image processing does (`shared/imageProcessing.ts`, ACES always). */
@@ -440,16 +440,18 @@ export class PostProcessing {
   }
 
   /** The bloom's threshold and strength on `frame`, for the exposure and the night now. */
-  private bloomOn(frame: pc.CameraFrame): void {
-    frame.bloom.threshold = BLOOM.white / Math.max(1e-4, this.exposureNow);
-    frame.bloom.intensity = Math.max(BLOOM_IDLE, BLOOM.intensity * this.glowNow);
+  private bloomOn(frame: pc.CameraFrame): boolean {
+    const threshold = BLOOM.white / Math.max(1e-4, this.exposureNow);
+    const intensity = Math.max(BLOOM_IDLE, BLOOM.intensity * this.glowNow);
+    if (frame.bloom.threshold === threshold && frame.bloom.intensity === intensity) return false;
+    frame.bloom.threshold = threshold;
+    frame.bloom.intensity = intensity;
+    return true;
   }
 
+  /** The bloom on every frame, updated only where it changed (`frame.update` does more than the bloom's uniforms). */
   private bloomed(): void {
-    for (const frame of this.frames) {
-      this.bloomOn(frame);
-      frame.update();
-    }
+    for (const frame of this.frames) if (this.bloomOn(frame)) frame.update();
   }
 
   /**
