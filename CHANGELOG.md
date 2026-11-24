@@ -11,6 +11,7 @@ All notable changes to Idyll Lives. Versions follow [semantic versioning](https:
 - **Shadows of what moves on WebGL2:** the sun's shadow pass drew the cars and residents into whatever framebuffer was bound before instead of its shadow map.
 - **Cars at super speed:** a car is drawn along the way it went between two snapshots instead of cutting across its turns.
 - **Four hold-ups in the generated worlds:** a guest setting off again on the way to a visit went home as soon as they got there (Gullmouth); two cars on a hamlet's only lane waited for each other for good while one turned round (Fernwood); a taxi turning off an avenue stood for good with the queue behind it (Oatcroft); and riders stood on their bikes at home for hours, set on leaving by the motorway (Fernglade, Kingston).
+- **Country roads beside a river:** past the world's edge a country road that met water turned towards the town's middle, so in a river world the roads out either side of a river running on past the edge turned into it and ran on along its bed, round each other (Ferrybridge, west edge). They turn to the drier side now, and a causeway's road out over the water goes straight on.
 - **Save format 43:** a save keeps each road's kind (an avenue, a motorway carriageway or a ramp), its way if it is one-way, and where it ends in a merge. It opens no older save: 0.8.3's are too old, and removed with a notice; 0.8.3 can't open the new ones.
 
 ## 0.8.3 — 2026-11-21

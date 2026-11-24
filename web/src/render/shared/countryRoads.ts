@@ -194,6 +194,8 @@ export class CountryRoads {
     const flat: [number, number][] = [];
     let a = 0;
     let bend = (rand() - 0.5) * 0.04;
+    // (Out over the water from its start: a causeway's way on, until it reaches land.)
+    let causeway = land.waterEdge(x, z) > 0;
     for (let i = 0; i < 220 && land.distanceToTown(x, z) < land.ring + 25; i++) {
       flat.push([x, z]);
       if (i >= STRAIGHT) {
@@ -204,8 +206,15 @@ export class CountryRoads {
         const ahead = (h: number) => land.ground(...step(h, 16));
         const lower = [a - 0.2, a + 0.2].filter((h) => Math.abs(h) <= 0.75).reduce((best, h) => (ahead(h) < ahead(best) - 0.8 ? h : best), a);
         a += (lower - a) * 0.6;
-        // Water ahead: turn back towards the town's side of it.
-        if (land.waterEdge(...step(a, 14)) > -10) a += ((land.w / 2 - x) * vx + (land.d / 2 - z) * vz > 0 ? 1 : -1) * 0.22;
+        // Water ahead: turn away from it, to the side drier ahead. (Not towards the town's middle: a
+        // river through it runs on past the edge, and a road out either side of it turned into it
+        // there and on along its bed, the two wound round each other.) A causeway's way on, out over
+        // the water from the edge, goes straight on while it is (only it: a road that came down into
+        // a river crossing its way went straight on along its bed).
+        const wet = (h: number) => land.waterEdge(...step(h, 14));
+        causeway &&= land.waterEdge(x, z) > 0;
+        if (causeway) a = 0;
+        else if (wet(a) > -10) a += (wet(a + 0.4) < wet(a - 0.4) ? 1 : -1) * 0.22;
       }
       [x, z] = step(a, STEP);
     }
