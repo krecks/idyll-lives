@@ -5,7 +5,7 @@ use super::common::own;
 use artkit::far::low;
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
-use artkit::math::radians;
+use artkit::math::{cosd, sind};
 use artkit::parts::join_all;
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
@@ -144,7 +144,7 @@ pub fn motorway_sign() -> Vec<Obj> {
             bevel = 0.0
         );
         // (An arrow up, leant 35° towards the reader's right, the game's -x: its shaft and its head, each convex.)
-        let (c, sn) = (radians(35.0).cos(), radians(35.0).sin());
+        let (c, sn) = (cosd(35.0), sind(35.0));
         let turn = |pts: &[(f64, f64)]| -> Vec<(f64, f64)> {
             pts.iter()
                 .map(|&(x, y)| (x * c - y * sn, x * sn + y * c))
