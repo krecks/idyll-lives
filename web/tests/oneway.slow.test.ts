@@ -54,7 +54,7 @@ describe('one-way pairs and avenues in generated worlds', async () => {
             const roads = town.roads;
             // Every lot driven to and back: no car road cut off, by the roads alone (as the simulation routes a trip
             // in town) nor from the world beyond the ways out.
-            expect(cutOffRoads(roads, false, true), `${tag}: cut off in town`).toEqual([]);
+            expect(cutOffRoads(roads, { within: true }), `${tag}: cut off in town`).toEqual([]);
             expect(cutOffRoads(roads), `${tag}: cut off`).toEqual([]);
             // (The motorway's carriageways and ramps are one-way too: theirs are the motorway's own tests, `motorway.test.ts` and `motorwayFit.slow.test.ts`.)
             const ways = roads.flatMap((r, i) => (r.oneway && !isSeparated(r.kind) ? [i] : []));

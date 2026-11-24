@@ -17,34 +17,85 @@
 import type { RoadPlan } from '../core/protocol';
 import { isSeparated, kindInfo, onewayOf, ROAD_KIND } from '../core/roadKinds';
 import * as pmath from './pmath';
-import { deckSpans, lengths, nearest, pointAt, RoadIndex, type Pt } from './roads';
+import { deckSpans, inSpans, lengths, nearest, passesOver, pointAt, RoadIndex, type Pt } from './roads';
 
 /** Two car roads cross on the level where a point of one comes this near the other's middle (m; their points about a metre apart). */
 const CROSS = 0.75;
 
-/** Whether road `r` passes over or under road `other` at `s` m along it rather than crossing it: it says so (`crosses`), or it is on a deck there. */
-const over = (r: RoadPlan, other: number, s: number) => !!r.crosses?.some((c) => c.road === other) || deckSpans(r).some(([a, b]) => s >= a && s <= b);
-
 /** Whether from every car road a car can reach every other and come back (see the top of this file; `within`, as `cutOffRoads`). */
 export function stronglyConnected(roads: readonly RoadPlan[], within = false): boolean {
-  return cutOffRoads(roads, false, within).length === 0;
+  return cutOffRoads(roads, { within }).length === 0;
+}
+
+/** What `cutOffRoads` asks: `within`, by the roads alone (see there); `index`, the roads' own (`RoadIndex`) if made already. */
+export interface CutOffAsk {
+  within?: boolean;
+  index?: RoadIndex;
 }
 
 /**
  * The car roads (indices) a car can't both reach from the world beyond its ways out and get back from (with no way
- * out, from the first car road): some stretch of each one-way-only, or off on its own. `twoWay`: as if every road
- * were driven both ways (what is cut off by no one-way road). `within`: by the roads alone, no way round through the
- * world beyond (a trip in town keeps to its roads: the simulation's own check, sim-core `Graph::strongly_connected`),
- * from the first road a car comes onto the roads by; the motorway and its ramps not asked about (no car comes onto
- * the roads there), only driven along.
+ * out, from the first car road): some stretch of each one-way-only, or off on its own. `within`: by the roads alone,
+ * no way round through the world beyond (a trip in town keeps to its roads: the simulation's own check, sim-core
+ * `Graph::strongly_connected`), from the first road a car comes onto the roads by; the motorway and its ramps not
+ * asked about (no car comes onto the roads there), only driven along.
  */
-export function cutOffRoads(roads: readonly RoadPlan[], twoWay = false, within = false): number[] {
+export function cutOffRoads(roads: readonly RoadPlan[], { within = false, index }: CutOffAsk = {}): number[] {
+  const net = networkOf(roads, within, index);
+  return net ? cutOff(net, onewayOf) : [];
+}
+
+/** What `cutOffRoads` gives as if every road were driven both ways: what is cut off by no one-way road. */
+export function cutOffAnyWay(roads: readonly RoadPlan[], { within = false, index }: CutOffAsk = {}): number[] {
+  const net = networkOf(roads, within, index);
+  return net ? cutOff(net, () => 0) : [];
+}
+
+/** What the one-way roads alone cut off (`cutOffRoads`, less what is cut off whichever way the roads go: `cutOffAnyWay`), the roads as a car sees them made once. */
+export function oneWayCut(roads: readonly RoadPlan[], { within = false, index }: CutOffAsk = {}): number[] {
+  const net = networkOf(roads, within, index);
+  if (!net) return [];
+  const anyway = new Set(cutOff(net, () => 0));
+  return cutOff(net, onewayOf).filter((i) => !anyway.has(i));
+}
+
+/** What `after` cuts off (`cutOffRoads`) that `before` doesn't (its cut off given, else worked out): by index, as `after` numbers its roads. */
+export function newlyCutOff(before: readonly RoadPlan[] | ReadonlySet<number>, after: readonly RoadPlan[], { within = false }: Pick<CutOffAsk, 'within'> = {}): number[] {
+  const had = 'has' in before ? before : new Set(cutOffRoads(before, { within }));
+  return cutOffRoads(after, { within }).filter((i) => !had.has(i));
+}
+
+/**
+ * The roads (indices, with where each comes nearest) end `e` of road `i` meets as the simulation joins them: an end
+ * within half the wider road's width and a metre of the other's middle. Looked for within `reach` m (`index` over
+ * `roads`).
+ */
+export function endMeets(roads: readonly RoadPlan[], index: RoadIndex, i: number, e: 0 | 1, reach: number): [number, { dist: number; s: number }][] {
+  const r = roads[i];
+  const [x, z] = e ? r.points[r.points.length - 1] : r.points[0];
+  return [...index.around(x, z, reach)].filter(([j, m]) => j !== i && m.dist <= Math.max(r.width, roads[j].width) / 2 + 1);
+}
+
+/** The roads as a car sees them (see the top of this file), before which way each is driven: the car roads, each one's stops and the stops made one place. */
+interface Network {
+  roads: readonly RoadPlan[];
+  within: boolean;
+  /** The car roads (indices), and per road its stops (arc lengths) and their ids (`find`: the place each is; 0, the world beyond). */
+  cars: number[];
+  stops: number[][];
+  ids: number[][];
+  find: (id: number) => number;
+}
+
+/** `roads` as a car sees them (`Network`; `within`: no way out joined to the world beyond, as `cutOffRoads`; `given`, their index if made); null with no car road. */
+function networkOf(roads: readonly RoadPlan[], within: boolean, given?: RoadIndex): Network | null {
   const cars = roads.flatMap((r, i) => (kindInfo(r).lanesEachWay > 0 && r.points.length >= 2 ? [i] : []));
-  if (!cars.length) return [];
+  if (!cars.length) return null;
   const isCar = new Set(cars);
-  const index = new RoadIndex(roads);
+  const index = given ?? new RoadIndex(roads);
   const widest = Math.max(0, ...cars.map((i) => roads[i].width));
   const lens = roads.map((r, i) => (isCar.has(i) ? lengths(r.points) : []));
+  const decks = roads.map((r, i) => (isCar.has(i) ? deckSpans(r) : []));
   // Each road's stops (arc lengths), and the stops one place (union-find over `node` ids). Node 0: the world beyond.
   const stops: number[][] = roads.map(() => []);
   const ids: number[][] = roads.map(() => []);
@@ -69,12 +120,13 @@ export function cutOffRoads(roads: readonly RoadPlan[], twoWay = false, within =
     for (const e of [0, 1] as const) {
       if (r.ends[e] === 'out' && !within) join(ends[e], 0);
       const [x, z] = e ? r.points[r.points.length - 1] : r.points[0];
-      for (const [j, m] of index.around(x, z, widest / 2 + 1)) {
-        if (j === i || !isCar.has(j) || !meets(r, roads[j]) || m.dist > Math.max(r.width, roads[j].width) / 2 + 1) continue;
+      for (const [j] of endMeets(roads, index, i, e, widest / 2 + 1)) {
+        if (!isCar.has(j) || !meets(r, roads[j])) continue;
         join(ends[e], stopAt(j, nearest(roads[j].points, x, z, lens[j]).s));
       }
     }
-    // (Where it crosses another car road on the level: a crossroads, at the point of it nearest the other's middle.)
+    // (Where it crosses another car road on the level: a crossroads, at the point of it nearest the other's middle;
+    // not where either passes over or under the other, `crosses`, or is on a deck.)
     let run: { j: number; s: number; t: number; dist: number } | null = null;
     const close = () => {
       if (run) join(stopAt(i, run.s), stopAt(run.j, run.t));
@@ -83,7 +135,7 @@ export function cutOffRoads(roads: readonly RoadPlan[], twoWay = false, within =
     r.points.forEach(([x, z], k) => {
       let hit: { j: number; s: number; t: number; dist: number } | null = null;
       for (const [j, m] of index.around(x, z, CROSS)) {
-        if (j <= i || !isCar.has(j) || m.dist > CROSS || !meets(r, roads[j]) || over(r, j, lens[i][k]) || over(roads[j], i, m.s)) continue;
+        if (j <= i || !isCar.has(j) || m.dist > CROSS || !meets(r, roads[j]) || passesOver(roads, i, j) || inSpans(decks[i], lens[i][k]) || inSpans(decks[j], m.s)) continue;
         if (!hit || m.dist < hit.dist) hit = { j, s: lens[i][k], t: m.s, dist: m.dist };
       }
       if (run && (!hit || hit.j !== run.j)) close();
@@ -91,6 +143,12 @@ export function cutOffRoads(roads: readonly RoadPlan[], twoWay = false, within =
     });
     close();
   }
+  return { roads, within, cars, stops, ids, find };
+}
+
+/** What network `net` cuts off (`cutOffRoads`), each car road driven the way `way` says (+1 along its points, -1 against them, 0 both). */
+function cutOff(net: Network, way: (r: RoadPlan) => 1 | -1 | 0): number[] {
+  const { roads, within, cars, stops, ids, find } = net;
   // The stretches between each road's stops, each way it is driven.
   const next = new Map<number, number[]>();
   const back = new Map<number, number[]>();
@@ -101,11 +159,11 @@ export function cutOffRoads(roads: readonly RoadPlan[], twoWay = false, within =
     (back.get(b) ?? back.set(b, []).get(b)!).push(a);
   };
   for (const i of cars) {
-    const way = twoWay ? 0 : onewayOf(roads[i]);
+    const w = way(roads[i]);
     const order = stops[i].map((s, k) => [s, ids[i][k]] as const).sort((a, b) => a[0] - b[0]);
     for (let k = 0; k + 1 < order.length; k++) {
-      if (way >= 0) edge(order[k][1], order[k + 1][1]);
-      if (way <= 0) edge(order[k + 1][1], order[k][1]);
+      if (w >= 0) edge(order[k][1], order[k + 1][1]);
+      if (w <= 0) edge(order[k + 1][1], order[k][1]);
     }
   }
   // (Within: the motorway and its ramps aren't asked about.)
@@ -191,16 +249,24 @@ export function oneWayPairs(roads: readonly RoadPlan[], own: readonly number[], 
   }
   cands.sort((x, y) => x.score - y.score || x.a - y.a || x.b - y.b);
   const used = new Set<number>();
+  // (By the town's roads alone, as the simulation routes a trip in town: `within`. The roads as a car sees them hang
+  // on their widths alone, not on which way each is driven: made once for each set of widths tried.)
+  const nets = new Map<string, Network | null>();
+  const cutOffIn = (tried: readonly RoadPlan[]) => {
+    const key = tried.map((r) => r.width).join();
+    let net = nets.get(key);
+    if (net === undefined) nets.set(key, (net = networkOf(tried, true)));
+    return net ? cutOff({ ...net, roads: tried }, onewayOf) : [];
+  };
   // (What is cut off already, whatever the pairs: nothing, in a town of one network.)
-  // (By the town's roads alone, as the simulation routes a trip in town: `within`.)
-  const had = new Set(cutOffRoads(roads, false, true));
+  const had = new Set(cutOffIn(roads));
   for (const c of cands) {
     if (pairs.length >= most) break;
     if (used.has(c.a) || used.has(c.b)) continue;
     const street = (r: RoadPlan): RoadPlan => ({ ...r, kind: 'street', width: Math.max(r.width, ROAD_KIND.street.width) });
     for (const way of [1, -1] as const) {
       const tried = out.map((r, i): RoadPlan => (i === c.a ? { ...street(r), oneway: way } : i === c.b ? { ...street(r), oneway: (c.same ? -way : way) as 1 | -1 } : r));
-      if (cutOffRoads(tried, false, true).some((i) => !had.has(i))) continue;
+      if (cutOffIn(tried).some((i) => !had.has(i))) continue;
       out = tried;
       pairs.push([c.a, c.b]);
       used.add(c.a).add(c.b);

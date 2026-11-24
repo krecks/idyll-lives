@@ -4,7 +4,7 @@
 // `one_way_roads_keep_every_place_reachable`); and the generator's one-way pairs.
 import { describe, expect, test } from 'bun:test';
 import type { RoadPlan } from '../src/core/protocol';
-import { cutOffRoads, oneWayPairs, stronglyConnected } from '../src/game/oneway';
+import { cutOffAnyWay, cutOffRoads, oneWayPairs, stronglyConnected } from '../src/game/oneway';
 import { LOOP, roadHierarchy } from '../src/render/roadHierarchyFixture';
 
 type Pt = [number, number];
@@ -36,7 +36,7 @@ describe('stronglyConnected', () => {
     expect(stronglyConnected(roads)).toBe(true);
     expect(cutOffRoads(roads)).toEqual([]);
     // (By the roads alone too, as the simulation's own check has it: the motorway driven along, not asked about.)
-    expect(cutOffRoads(roads, false, true)).toEqual([]);
+    expect(cutOffRoads(roads, { within: true })).toEqual([]);
   });
 
   test("the fixture's loop with a side turned round: a corner cars come to and can't leave", () => {
@@ -81,13 +81,13 @@ describe('stronglyConnected', () => {
     expect(stronglyConnected([...ladder(), ...far])).toBe(false);
     // (A network with no way out is off on its own, whichever way its roads go.)
     expect(cutOffRoads([...ladder(), ...far])).toEqual([6, 7]);
-    expect(cutOffRoads([...ladder(), ...far], true)).toEqual([6, 7]);
+    expect(cutOffAnyWay([...ladder(), ...far])).toEqual([6, 7]);
   });
 
   test('a road crossing another part way along meets it there', () => {
     // (Across the ladder's long streets, a dead end either side: reached only where it crosses them.)
     const across = street([120, -40], [120, 90], ['dead', 'dead']);
-    expect(cutOffRoads([...ladder(), across], true)).toEqual([]);
+    expect(cutOffAnyWay([...ladder(), across])).toEqual([]);
     // One-way north: its north end can't be left.
     expect(stronglyConnected([...ladder(), { ...across, oneway: 1 }])).toBe(false);
   });

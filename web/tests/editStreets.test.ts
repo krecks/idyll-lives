@@ -16,7 +16,7 @@ import type { Content } from '../src/content/content';
 import type { RoadPlan } from '../src/core/protocol';
 import { changeKind, CROSS_MOTORWAY, CUT_OFF, drawStreet, madeKind, Meeting, motorwayName, ONE_WAY_ENDS, removeRoad, rename, streetsBare, whatGoes } from '../src/game/edit/streets';
 import { onewayOf } from '../src/core/roadKinds';
-import { cutOffRoads, stronglyConnected } from '../src/game/oneway';
+import { cutOffAnyWay, cutOffRoads, stronglyConnected } from '../src/game/oneway';
 import { roadHierarchy, BRIDGE_STREET, LOOP, MOTORWAY_EAST, MOTORWAY_WEST, OFF_RAMP, ON_RAMP } from '../src/render/roadHierarchyFixture';
 import { roadWayIssues } from '../src/ui/townedit/problems';
 import type { Edited } from '../src/game/edit/edited';
@@ -862,6 +862,6 @@ describe('the motorway removed, and the Problems list', () => {
     expect(stronglyConnected(deadEnd)).toBe(false);
     expect(cutOffRoads(deadEnd)).toEqual([roads.length]);
     // (Without crossroads West Cross and East Cross, dead ends across the avenue, would be roads of their own.)
-    expect(cutOffRoads(roads, true)).toEqual([]);
+    expect(cutOffAnyWay(roads)).toEqual([]);
   });
 });

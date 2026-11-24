@@ -45,7 +45,7 @@
 import type { Content } from '../../content/content';
 import type { RoadKind, RoadPlan } from '../../core/protocol';
 import { isSeparated, onewayOf, ROAD_KIND } from '../../core/roadKinds';
-import { cutOffRoads } from '../oneway';
+import { cutOffRoads, newlyCutOff } from '../oneway';
 import { bayRect, carParkRect } from '../parking';
 import { surfacePlots } from '../../render/shared/builtSurface';
 import { crossWater, DRAWN_SPAN, wetSpans, withBridge, withoutDeck } from '../bridges';
@@ -607,6 +607,17 @@ export function streetCourse(meet: Meeting, shaped: StreetLine): StreetCourse | 
 /** The width of a drawn road of `kind` (m): its kind's (`ROAD_KIND`), a lane's narrower than a street's. */
 export const streetWidth = (kind: RoadKind) => ROAD_KIND[kind].width;
 
+/**
+ * What a draft's roads cut off before an edit (`oneway.ts` `cutOffRoads`), worked out once a draft: a street drawn
+ * asks it at every pause of the pointer and again as it is made. (A draft's roads are never changed in place.)
+ */
+const cutOff = new WeakMap<readonly RoadPlan[], number[]>();
+function cutOffBefore(roads: readonly RoadPlan[]): number[] {
+  let got = cutOff.get(roads);
+  if (!got) cutOff.set(roads, (got = cutOffRoads(roads)));
+  return got;
+}
+
 /** Why a one-way street is refused where it would leave somewhere a car can't get back from (`oneway.ts` `cutOffRoads`). */
 export const CUT_OFF = 'some homes could no longer be reached by car';
 /** Why a one-way street is refused with a dead end (no car could turn back out of it); while drawing, a street not finished yet (`streetLive.ts` `unfinished`). */
@@ -734,7 +745,7 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
     }
   }
   if (!oneNetwork(next, new Set())) return refused('it joins none of the roads');
-  if (fresh.some((i) => onewayOf(next[i])) && cutOffRoads(next).length > cutOffRoads(roads).length) return refused(CUT_OFF);
+  if (fresh.some((i) => onewayOf(next[i])) && cutOffRoads(next).length > cutOffBefore(roads).length) return refused(CUT_OFF);
 
   // ---- the footpaths it crosses, cut to meet it in a T either side (one it crosses on a bridge's deck passes under it) ----
   if (!trail) {
@@ -814,8 +825,7 @@ export function changeKind(draft: NeighbourhoodDraft, t: Templates, road: number
     if (court && court.stub > COURT + 0.5) return refused(`a country road's dead end reaches ${COURT} m at most, and ${name} ends ${Math.round(court.stub)} m past the last road it meets`);
   }
   if (way !== (r.oneway ?? 0)) {
-    const before = new Set(cutOffRoads(roads));
-    if (cutOffRoads(next).some((i) => !before.has(i))) return refused(CUT_OFF);
+    if (newlyCutOff(new Set(cutOffBefore(roads)), next).length) return refused(CUT_OFF);
   }
 
   // ---- what is in the way of it wider ----
