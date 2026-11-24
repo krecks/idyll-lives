@@ -74,7 +74,10 @@ pub(super) fn at_work(w: &mut World, i: usize) -> bool {
         return false;
     }
     sim.away_until = None;
-    households[sim.household as usize].funds += shift_pay(content, &job, &sim.skills);
+    // Saturating, as the promotion bonus below is: a content pack's pay can be near `i64::MAX`.
+    let pay = shift_pay(content, &job, &sim.skills);
+    let h = sim.household as usize;
+    households[h].funds = households[h].funds.saturating_add(pay);
     let rules = &content.career_rules;
     let fit = skill_fit(level, &sim.skills);
     // Still a job: it was there above, and nothing since takes it away.
