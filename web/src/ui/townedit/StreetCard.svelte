@@ -79,7 +79,7 @@
       <span>One-way{#if streetChoice.oneway}{' '}<span class="sub-note">({streetChoice.flip ? 'against the way you draw it' : 'the way you draw it'})</span>{/if}</span>
       <span class="way">
         {#if streetChoice.oneway}
-          <button class="btn small ghost" title="Flip which way cars go" aria-label="Flip which way cars go" onclick={() => (streetChoice.flip = !streetChoice.flip)}><Icon name="icon.ui.rotate" size={14} /> Flip</button>
+          <button class="btn small ghost" title="Flip which way cars go on the streets you draw" onclick={() => (streetChoice.flip = !streetChoice.flip)}><Icon name="icon.ui.rotate" size={14} /> Flip new streets</button>
         {/if}
         <Toggle label="One-way" bind:checked={streetChoice.oneway} />
       </span>

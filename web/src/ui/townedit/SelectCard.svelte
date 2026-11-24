@@ -246,7 +246,7 @@
           <div class="row">
             <Segmented label="Which way cars go" value={onewayOf(road) ? 'one' : 'two'} options={WAYS} onchange={(w) => changeTo(road.kind ?? 'street', w === 'one' ? 1 : 0)} />
             {#if road.oneway}
-              <button class="btn small ghost" title="Flip which way cars go" onclick={() => changeTo(road.kind ?? 'street', road.oneway === 1 ? -1 : 1)}><Icon name="icon.ui.rotate" size={14} /> Flip</button>
+              <button class="btn small ghost" title={`Flip which way cars go on ${road.name ?? 'it'}`} onclick={() => changeTo(road.kind ?? 'street', road.oneway === 1 ? -1 : 1)}><Icon name="icon.ui.rotate" size={14} /> Flip this street</button>
             {/if}
           </div>
           {#if !road.bridge}
