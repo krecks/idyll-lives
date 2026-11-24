@@ -122,7 +122,7 @@ impl Road {
 
     /// Whether people walk along it: not on a motorway or a ramp.
     pub fn walkable(&self) -> bool {
-        !matches!(self.kind, RoadKind::Motorway | RoadKind::Ramp)
+        !self.kind.separated()
     }
 
     /// Whether cars drive along it: not on a trail.
@@ -133,7 +133,7 @@ impl Road {
     /// Whether a car may come onto it or leave it other than at a junction (from a driveway, a
     /// parking bay or a kerb): a road for cars but a motorway or a ramp.
     pub fn enterable(&self) -> bool {
-        self.drivable() && !matches!(self.kind, RoadKind::Motorway | RoadKind::Ramp)
+        self.drivable() && !self.kind.separated()
     }
 }
 

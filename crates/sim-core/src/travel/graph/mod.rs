@@ -523,7 +523,7 @@ impl Graph {
         let Some(r) = self.roads.get(road as usize) else {
             return Layer::GROUND;
         };
-        if !matches!(r.kind, RoadKind::Motorway | RoadKind::Ramp) {
+        if !r.kind.separated() {
             return Layer::GROUND;
         }
         let decked = self
@@ -582,9 +582,7 @@ impl Graph {
         };
         let kind = |&e: &u32| self.roads[self.edges[e as usize].road as usize].kind;
         adj.len() >= 3
-            && adj
-                .iter()
-                .all(|e| matches!(kind(e), RoadKind::Motorway | RoadKind::Ramp))
+            && adj.iter().all(|e| kind(e).separated())
             && adj.iter().any(|e| kind(e) == RoadKind::Motorway)
     }
 

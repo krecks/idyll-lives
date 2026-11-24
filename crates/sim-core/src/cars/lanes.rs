@@ -60,16 +60,12 @@ pub(crate) fn lanes_each_way(kind: RoadKind) -> u8 {
 /// Whether `road` is one cars always drove: two-way, one lane each way (a street, a lane, a
 /// country road).
 pub(crate) fn classic(road: &Road) -> bool {
-    road.oneway.is_both()
-        && !matches!(
-            road.kind,
-            RoadKind::Avenue | RoadKind::Motorway | RoadKind::Ramp
-        )
+    road.oneway.is_both() && !road.kind.fast()
 }
 
 /// Whether one can come the other way along `road` in it: two-way, and not a ramp or a motorway.
 fn oncoming(road: &Road) -> bool {
-    road.oneway.is_both() && !matches!(road.kind, RoadKind::Motorway | RoadKind::Ramp)
+    road.oneway.is_both() && !road.kind.oneway_always()
 }
 
 /// Lane `idx` (0: the outer, kerbside one; 1: the next in) of network road `road` for a car going

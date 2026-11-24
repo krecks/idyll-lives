@@ -1,4 +1,4 @@
-//! A car's own speed on an avenue, a motorway or a ramp (`Car::speed`, `travel::fast_kind`).
+//! A car's own speed on an avenue, a motorway or a ramp (`Car::speed`, `RoadKind::fast`).
 //!
 //! Everywhere else a car keeps to its way's timing (`Legs::timed`): a tick on along it, or none
 //! (held up: it stands at once). At a town's 9 m/s that's a step of 0.6 m; at the motorway's

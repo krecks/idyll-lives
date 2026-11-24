@@ -151,7 +151,7 @@ impl Legs {
         let Some(i) = self.pts.len().checked_sub(1) else {
             return;
         };
-        if crate::travel::fast_kind(kind) && self.kinds.last().is_none_or(|k| k.0 != i) {
+        if kind.fast() && self.kinds.last().is_none_or(|k| k.0 != i) {
             self.kinds.push((i, kind));
         }
     }

@@ -45,7 +45,7 @@ pub(crate) struct Route {
     /// each a claim of its own (`MERGE_UP`, `MERGE_ON`).
     pub(crate) merges: Vec<f32>,
     /// Where it's on an avenue, a motorway or a ramp (ticks along it, from and to, and which:
-    /// `travel::fast_kind`): there it speeds up and slows down as a car does (`Car::speed`).
+    /// `RoadKind::fast`): there it speeds up and slows down as a car does (`Car::speed`).
     /// Elsewhere on a street, a lane, a country road or off the roads (`kind_at`).
     pub(crate) kinds: Vec<(f32, f32, crate::travel::RoadKind)>,
 }
@@ -968,11 +968,10 @@ impl Route {
     /// Whether it's on a motorway's carriageway or a ramp anywhere from `a` to `b` ticks along
     /// (`kinds`): nobody backs up or turns round there (`turn_round`, `back_off`).
     pub(crate) fn on_motorway(&self, a: f32, b: f32) -> bool {
-        use crate::travel::RoadKind;
         let (a, b) = (a.min(b), a.max(b));
         self.kinds
             .iter()
-            .any(|k| matches!(k.2, RoadKind::Motorway | RoadKind::Ramp) && k.0 <= b && a <= k.1)
+            .any(|k| k.2.separated() && k.0 <= b && a <= k.1)
     }
 
     /// How far along it (ticks) a car `t` ticks along is `d` m further on (as far as its end).
