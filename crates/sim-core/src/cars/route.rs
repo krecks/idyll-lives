@@ -1030,6 +1030,7 @@ fn quickest_out(
 /// (`quickest_out`, from the road a car may come onto there, `enterable_near`): the point of the
 /// road it leaves by nearest the way out, and whether that is a motorway. None: no road near, or
 /// no way out. (For the tests.)
+#[cfg(any(test, feature = "test-support"))]
 pub fn way_out(travel: &Travel, exits: &[[f32; 2]], at: [f32; 2]) -> Option<([f32; 2], bool)> {
     let g = &travel.graph;
     let m = enterable_near(g, at, ROAD_REACH)?;

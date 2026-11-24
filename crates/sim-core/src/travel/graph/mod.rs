@@ -640,6 +640,7 @@ impl Graph {
     /// a car can come onto the roads at (one on a road for cars other than the motorway and its
     /// ramps, `Road::enterable`) can be driven to from every other, one-way roads gone along
     /// their way only. True without any. A one-way road must never cut a home off.
+    #[cfg(any(test, feature = "test-support"))]
     pub fn strongly_connected(&self) -> bool {
         let n = self.nodes.len();
         let enterable: Vec<bool> = (0..n)
@@ -691,7 +692,6 @@ impl Graph {
         true
     }
 
-    /// The place `s` m along the town file's road `source` (`drives[].road/s`), if it's in the
     /// The carriageways near `p` (of the `n` roads for cars nearest it within `look` m, `near`),
     /// each as how far `p` is from its middle line and how far out its kerbs are (`cars::kerb_of`).
     /// Not the motorway's: up on its deck, or beside it behind its fences, nobody on foot stands
@@ -711,6 +711,7 @@ impl Graph {
             })
     }
 
+    /// The place `s` m along the town file's road `source` (`drives[].road/s`), if it's in the
     /// network.
     pub fn at_source(&self, source: u32, s: f32) -> Option<RoadPoint> {
         let road = self.roads.iter().position(|r| r.source == source)? as u32;

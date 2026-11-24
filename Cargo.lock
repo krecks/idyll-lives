@@ -878,6 +878,7 @@ version = "0.8.3"
 dependencies = [
  "serde",
  "serde_json",
+ "sim-core",
 ]
 
 [[package]]

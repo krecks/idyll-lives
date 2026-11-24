@@ -294,6 +294,7 @@ const TRIP_PARK_REACH: f32 = 120.0;
 mod bay;
 mod bodies;
 #[doc(hidden)]
+#[cfg(any(test, feature = "test-support"))]
 pub mod drill;
 mod driving;
 mod garages;
@@ -323,6 +324,7 @@ pub use motion::*;
 pub(crate) use parking::*;
 pub use parking::{BAY_DEEP, BAY_LINES, BAY_WIDE, DRIVE_CLEAR, MOUTH_CLEAR};
 pub use parts::*;
+#[cfg(any(test, feature = "test-support"))]
 pub use route::way_out;
 pub(crate) use route::*;
 pub(crate) use seats::*;

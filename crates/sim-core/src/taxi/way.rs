@@ -841,6 +841,7 @@ fn u_turn(
 /// (no driveway: its way to the road nearest it a taxi may stop on, `home_way`): where it stands
 /// (`kerb_at`, as `plan_way` comes to it and `lay_route` lays its route there) and its yaw there.
 /// None: no stand or no way. (The tests: `cars::drill::taxi_stand`.)
+#[cfg(any(test, feature = "test-support"))]
 pub(crate) fn stand_for_door(
     w: &World,
     way_in: [f32; 2],

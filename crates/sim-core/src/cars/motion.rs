@@ -660,12 +660,14 @@ pub(crate) fn lane_tops(
 const MERGE_LANE: f32 = MERGE_UP + 10.0;
 
 /// `empty_drive_ticks`'s drive, laid out.
+#[cfg(any(test, feature = "test-support"))]
 pub(crate) fn empty_drive_route(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Option<Route> {
     empty_drive_route_to(travel, from, to, true)
 }
 
 /// `empty_drive_route`, standing at its end (`stop_end`) or going on past it at speed, as a car
 /// leaving town does.
+#[cfg(any(test, feature = "test-support"))]
 pub(crate) fn empty_drive_route_to(
     travel: &Travel,
     from: [f32; 2],
@@ -694,12 +696,14 @@ pub(crate) fn empty_drive_route_to(
 /// rounded, slowing for junctions and bends as `Route::on_roads` lays a drive out, from standing
 /// to standing. None: no road near either, or no way between by road. (A world's drive across,
 /// timed: the tests.)
+#[cfg(any(test, feature = "test-support"))]
 pub fn empty_drive_ticks(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Option<f32> {
     Some(empty_drive_route(travel, from, to)?.ticks())
 }
 
 /// `empty_drive_ticks`'s drive, where the car is and which way it faces each tick of it (the
 /// tests: which lane it keeps to).
+#[cfg(any(test, feature = "test-support"))]
 pub fn empty_drive(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Option<Vec<([f32; 2], f32)>> {
     let route = empty_drive_route(travel, from, to)?;
     let ticks = route.ticks().ceil() as usize;
