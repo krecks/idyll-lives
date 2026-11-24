@@ -71,11 +71,16 @@ fn speed_of(car: &Car) -> f32 {
 }
 
 /// A stretch of a car's way on from where it is: its steps, each from `a` to `b`, `d` m along
-/// from where it is at `a`, at ticks `ta` to `tb`.
+/// from where it is at `a`, at ticks `ta` to `tb`, at speed `v`.
 struct Path(Vec<Step>);
 
-/// A step of a `Path`: from and to, how far along it begins (m), and its ticks along the way.
-type Step = ([f32; 2], [f32; 2], f32, f32, f32);
+/// A step of a `Path`: from and to, how far along it begins (m), its ticks along the way, and how
+/// fast its way's timing goes there (m/s of drive time): the whole step between the way's two
+/// points it lies on, the first from where the car is (part of one) too. (Worked out from its own
+/// part of a step, a car standing a hair's breadth short of a point, its part of the step there of
+/// no length at all in f32 but some ticks long, had a speed of none there, and stood for good
+/// with nobody to wait for: a taxi turning off an avenue, the queue behind it, Oatcroft.)
+type Step = ([f32; 2], [f32; 2], f32, f32, f32, f32);
 
 impl Path {
     /// `route` from `t` ticks along, `look` m of it at most (as far as it drives on, not backing).
@@ -89,7 +94,17 @@ impl Path {
                 break;
             }
             let q = pts[i];
-            out.push((a, q.0, d, ta, q.2));
+            let (p, tp) = if i > 0 {
+                (pts[i - 1].0, pts[i - 1].2)
+            } else {
+                (a, ta)
+            };
+            let v = if q.2 > tp + 1e-6 {
+                dist(p, q.0) / (q.2 - tp) * DRIVE_TICKS_PER_SECOND
+            } else {
+                f32::INFINITY
+            };
+            out.push((a, q.0, d, ta, q.2, v));
             d += dist(a, q.0);
             (a, ta) = (q.0, q.2);
             i += 1;
@@ -119,16 +134,13 @@ impl Path {
         self.0
             .iter()
             .filter(|s| s.4 > s.3 + 1e-6)
-            .map(|&(a, b, d, ta, tb)| {
-                let v = dist(a, b) / (tb - ta) * DRIVE_TICKS_PER_SECOND;
-                (v * v + 2.0 * BRAKE * d).sqrt()
-            })
+            .map(|&(.., d, _, _, v)| (v * v + 2.0 * BRAKE * d).sqrt())
             .fold(f32::INFINITY, f32::min)
     }
 
     /// How far along it (m) it is `t` ticks along its way; None: further than it reaches.
     fn at_tick(&self, t: f32) -> Option<f32> {
-        self.0.iter().find_map(|&(a, b, d, ta, tb)| {
+        self.0.iter().find_map(|&(a, b, d, ta, tb, _)| {
             (ta <= t && t <= tb).then(|| {
                 let k = if tb > ta { (t - ta) / (tb - ta) } else { 1.0 };
                 d + dist(a, b) * k
@@ -408,3 +420,49 @@ pub(crate) fn ask_ahead(
 /// How much further off than it would begin to slow down to stop at it a car asks for its merge
 /// (m, `ask_ahead`).
 const ASK_AHEAD: f32 = 5.0;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A car standing a hair's breadth short of a point of its way (where its part of the step
+    /// there is of no length in f32, but some ticks long) may still set off: the step goes at its
+    /// way's speed, as the whole of it does. (It had a speed of none, and a taxi turning off an
+    /// avenue stood there for good with nobody to wait for, the queue behind it too: Oatcroft.)
+    #[test]
+    fn a_car_a_hairs_breadth_short_of_a_point_sets_off() {
+        let route = Route {
+            points: vec![
+                ([506.4, 464.9], 0.0, 870.0, false),
+                ([507.020_1, 465.380_4], 0.8, 877.98, false),
+                ([507.071_9, 465.424_9], 0.9, 878.474_2, false),
+                ([507.130_7, 465.466], 1.0, 878.968_7, false),
+                ([507.193_3, 465.501_1], 1.1, 879.463_9, false),
+            ],
+            ..Default::default()
+        };
+        let b = route.points[2];
+        // (The latest tick short of it where it is, in f32, on it.)
+        let mut t = b.2;
+        let mut short = None;
+        for _ in 0..256 {
+            t = f32::from_bits(t.to_bits() - 1);
+            if route.at(t).0 != b.0 {
+                break;
+            }
+            short = Some(t);
+        }
+        let t = short.expect("a tick short of the point where the car is on it");
+        let path = Path::new(&route, t, 10.0);
+        assert!(
+            path.0[0].0 == path.0[0].1,
+            "its first step there is of no length"
+        );
+        let speed = plan_speed(&route, b.2);
+        assert!(
+            path.tops() >= speed * 0.9,
+            "it may go {} m/s there, not {speed}",
+            path.tops()
+        );
+    }
+}
