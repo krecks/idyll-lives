@@ -54,6 +54,46 @@
     "projection": "xz",
     "metallic": 0
   },
+  "material.path.concrete": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/path_concrete/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 0.5,
+    "projection": "xz",
+    "metallic": 0
+  },
+  "material.path.flagstone": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/path_flagstone/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 0.4167,
+    "projection": "xz",
+    "metallic": 0
+  },
+  "material.path.gravel": {
+    "type": "material",
+    "color": "#FFFFFF",
+    "texture": "textures/path_gravel/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 0.8333,
+    "projection": "xz",
+    "metallic": 0
+  },
+  "material.path.brick": {
+    "type": "material",
+    "color": "#E2D2C8",
+    "texture": "textures/floor_pavers/albedo.jpg",
+    "normal": "normal.jpg",
+    "arm": "arm.jpg",
+    "uvScale": 0.7071,
+    "projection": "xz",
+    "metallic": 0
+  },
   "material.soil": {
     "type": "material",
     "color": "#8A6646",

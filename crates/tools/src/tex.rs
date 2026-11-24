@@ -497,6 +497,44 @@ pub fn materials() -> J {
                 &[("projection", s("xz")), ("metallic", i(0))],
             ),
         ),
+        // A house's own front path and drive (`game/town.ts` `pathLooks`): concrete (its joints the path's own,
+        // `render/shared/paving.ts`), flagstones, gravel and brick pavers in herringbone (the floor's set).
+        (
+            "material.path.concrete",
+            surf(
+                "#FFFFFF",
+                "path_concrete",
+                0.5,
+                &[("projection", s("xz")), ("metallic", i(0))],
+            ),
+        ),
+        (
+            "material.path.flagstone",
+            surf(
+                "#FFFFFF",
+                "path_flagstone",
+                0.4167,
+                &[("projection", s("xz")), ("metallic", i(0))],
+            ),
+        ),
+        (
+            "material.path.gravel",
+            surf(
+                "#FFFFFF",
+                "path_gravel",
+                0.8333,
+                &[("projection", s("xz")), ("metallic", i(0))],
+            ),
+        ),
+        (
+            "material.path.brick",
+            surf(
+                "#E2D2C8",
+                "floor_pavers",
+                0.7071,
+                &[("projection", s("xz")), ("metallic", i(0))],
+            ),
+        ),
         // Farm fields (town.ts `farmstead`): tilled earth, the greyscale grain tinted; furrows darker.
         (
             "material.soil",

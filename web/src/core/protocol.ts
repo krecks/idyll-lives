@@ -553,7 +553,8 @@ export interface WorldMeta {
   roads?: RoadPlan[];
   /** Village greens and the like: grass the roads go round (polygons, town tiles). */
   greens?: [number, number][][];
-  paths?: { x: number; z: number; w: number; d: number }[];
+  /** Garden paths and drives (`look`: what each is laid in, `game/pathLooks.ts`; none: hexagonal pavers). */
+  paths?: { x: number; z: number; w: number; d: number; look?: string }[];
   /** Where each plot's street is (by plot index; `game/town.ts` `Facing`): 0 north, 1 west, 2 south, 3 east. Missing in older saves. */
   facing?: number[];
   seed?: number;
