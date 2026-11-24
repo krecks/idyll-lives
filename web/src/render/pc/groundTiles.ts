@@ -313,10 +313,13 @@ export class TownGroundMap {
     };
     barriers();
     // The overpasses last, over what they pass over: their concrete wider than their road, its asphalt, the barrier on them.
-    const decks = roads.flatMap((r) => (raisedSpans(r).length ? [{ r, spans: raisedSpans(r) }] : []));
-    for (const { r, spans } of decks) for (const piece of cut(r, spans)) stroke(piece, r.width + 2 * OVERPASS.apron, MAP.concrete);
-    for (const { r, spans } of decks) for (const piece of cut(r, spans)) stroke(piece, carriageway(r), MAP.asphalt);
-    if (decks.length) barriers((r, s) => raisedSpans(r).some(([a, b]) => s >= a && s <= b));
+    const decks = new Map(roads.flatMap((r) => {
+      const spans = raisedSpans(r);
+      return spans.length ? [[r, spans] as const] : [];
+    }));
+    for (const [r, spans] of decks) for (const piece of cut(r, spans)) stroke(piece, r.width + 2 * OVERPASS.apron, MAP.concrete);
+    for (const [r, spans] of decks) for (const piece of cut(r, spans)) stroke(piece, carriageway(r), MAP.asphalt);
+    if (decks.size) barriers((r, s) => !!decks.get(r)?.some(([a, b]) => s >= a && s <= b));
     g.lineCap = 'round';
     // Premultiplied (so the mips stay true at an edge), up to the GPU with its mips.
     const data = g.getImageData(0, 0, size, size).data;
