@@ -55,7 +55,7 @@ import { mulberry32 } from '../noise';
 import { BRIDGE_IN } from '../macro';
 import { bends, clearOf, connector, COURT, cropRoads, curve, endDir, evenly, inside, leftOf, lengths, MEET, nearest, pointAt, RoadIndex, ROOM, roomAt, SIDEWALK, trimJoins, withCrosses, type Fit, type Pt } from '../roads';
 import { plotRect, type NeighbourhoodDraft, type Rect, type Templates } from '../town';
-import { placeOf, specOf, streetNames } from '../world';
+import { avenueName, placeOf, specOf, streetNames } from '../world';
 import type { Edited } from './edited';
 import { wholeParks, withoutBays } from './ground';
 import { fillStreet, removalRefused, removeLots } from './lots';
@@ -669,7 +669,15 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
   const taken = namesIn(draft);
   const rand = mulberry32(stroke.seed);
   const areaName = kind.area === undefined ? undefined : draft.open?.areas[kind.area]?.name;
-  const name = was?.name ?? freshNames(draft, content, rand, 1, taken, areaName)[0];
+  /** A fresh name for the road (an avenue's named as one, `avenueName`). */
+  const newName = () => {
+    const n = freshNames(draft, content, rand, 1, taken, areaName)[0];
+    if (kind.kind !== 'avenue') return n;
+    const a = avenueName(n, (x) => taken.has(x));
+    taken.add(a);
+    return a;
+  };
+  const name = was?.name ?? newName();
   // (One-way the way it is drawn: its points may run the other way, from a dead end it carries on.)
   const oneWay = was || trail || !stroke.oneway ? null : ((stroke.oneway * drawnWay(stroke.points, made)) as 1 | -1);
   const road: RoadPlan = { ...(was ?? {}), points: made, width: was?.width ?? streetWidth(kind.kind ?? 'street'), ends, ...kind, name, ...(oneWay ? { oneway: oneWay } : {}) };
@@ -700,7 +708,7 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
       const r = next[at];
       const crossed = crossWater(r.points, r.ends, span, { wet, W, D, roads: others, plots, land: open.land, most: DRAWN_SPAN });
       if (typeof crossed === 'string') return refused(crossed);
-      const [after] = crossed.after ? freshNames(draft, content, rand, 1, taken, areaName) : [undefined];
+      const after = crossed.after ? newName() : undefined;
       const had = next.length;
       const bridged = withBridge(next, at, span, walk ?? wet, W, D, { bridge: bridgeName(name, taken), after }, crossed.fit);
       [next, walk] = [bridged.roads, bridged.walk];
@@ -1118,9 +1126,35 @@ export function removeRoad(draft: NeighbourhoodDraft, t: Templates, road: number
 }
 
 /**
+ * The motorway's own name, as its card shows it: the words its carriageways' names begin with ("M36" of "M36 Eastbound"
+ * and "M36 Westbound"); one carriageway alone, its name without the way it goes. Empty if `roads` has no motorway.
+ */
+export function motorwayName(roads: readonly RoadPlan[]): string {
+  const names = roads.flatMap((r) => (r.kind === 'motorway' && r.name ? [r.name.split(' ')] : []));
+  if (!names.length) return '';
+  if (names.length === 1) return names[0].join(' ').replace(/ (North|South|East|West)bound$/, '');
+  let n = 0;
+  while (n < names[0].length && names.every((w) => w[n] === names[0][n])) n++;
+  return names[0].slice(0, n).join(' ');
+}
+
+/**
+ * `roads` with the motorway called `wanted`: each of its carriageways and ramps named `old` (its name, `motorwayName`)
+ * or beginning with it ("M36 Eastbound", "M36 Junction 12 Exit") called so with the rest of its name kept.
+ */
+function motorwayRenamed(roads: readonly RoadPlan[], old: string, wanted: string): RoadPlan[] {
+  return roads.map((r) => {
+    if (!isMotorway(r) || !r.name || !old) return r;
+    if (r.name === old) return { ...r, name: wanted };
+    return r.name.startsWith(`${old} `) ? { ...r, name: `${wanted}${r.name.slice(old.length)}` } : r;
+  });
+}
+
+/**
  * `draft` with `what` called `name` (spaces tidied): a road's houses keep their numbers along it
- * with the new name; a place's public lot is called as it is; the main town (area 0) is the town.
- * Refused for no name, a name over 40 letters, or one another road, place, village or the town has.
+ * with the new name; a place's public lot is called as it is; the main town (area 0) is the town; the motorway (any
+ * of its carriageways or ramps) is named whole (`motorwayName`: M36 renamed M4, "M36 Eastbound" and "M36 Junction 12
+ * Exit" become "M4 Eastbound" and "M4 Junction 12 Exit"). Refused for no name, a name over 40 letters, or one another road, place, village or the town has.
  */
 export function rename(draft: NeighbourhoodDraft, what: Named, name: string): Edited {
   const wanted = name.trim().replace(/\s+/g, ' ');
@@ -1132,6 +1166,16 @@ export function rename(draft: NeighbourhoodDraft, what: Named, name: string): Ed
   const town = what.kind === 'town' || (what.kind === 'area' && what.area === 0);
   const old = town ? draft.name : what.kind === 'road' ? draft.roads[what.road]?.name : what.kind === 'place' ? places[what.place]?.name : areas[(what as { area: number }).area]?.name;
   if (old === undefined && !(what.kind === 'road' && draft.roads[what.road])) return refused('there is nothing there to name');
+  const was = what.kind === 'road' && isMotorway(draft.roads[what.road]) ? motorwayName(draft.roads) : '';
+  if (was) {
+    // (The motorway is named whole: its carriageways and ramps keep the rest of their names, the way each goes.)
+    if (wanted === was) return { draft, cleared: { lots: [] } };
+    const roads = motorwayRenamed(draft.roads, was, wanted);
+    const others = new Set([draft.name, ...draft.roads.filter((r) => !isMotorway(r)).map((r) => r.name ?? ''), ...(open?.places ?? []).map((p) => p.name), ...areas.map((a) => a.name)]);
+    const clash = [wanted, ...roads.filter(isMotorway).map((r) => r.name ?? '')].find((n) => others.has(n));
+    if (clash) return refused(`${clash} is taken`);
+    return { draft: { ...draft, roads }, cleared: { lots: [] } };
+  }
   if (wanted === old) return { draft, cleared: { lots: [] } };
   const taken = namesIn(draft);
   if (taken.has(wanted)) return refused(`${wanted} is taken`);

@@ -1266,6 +1266,28 @@ export function streetNames(content: Content, names: string, rand: Rand, count: 
   return out;
 }
 
+/** The words an avenue's name ends in. */
+export const AVENUE_WAYS: readonly string[] = ['Avenue', 'Boulevard', 'Way'];
+
+/**
+ * Street name `name` (`streetNames`) made an avenue's: its last word (before a ", Place") one of `AVENUE_WAYS`
+ * ("Foundry Street" an avenue is "Foundry Avenue"), which one by the name's own letters, not a roll (the town's other
+ * rolls stay as they were), the next if that one is `taken`. As it is if it ends in one already, if its last word is
+ * not a word ("Main Street 3"), or if every one is taken.
+ */
+export function avenueName(name: string, taken: (name: string) => boolean): string {
+  const [street, ...place] = name.split(', ');
+  const words = street.split(' ');
+  const last = words[words.length - 1];
+  if (words.length < 2 || AVENUE_WAYS.includes(last) || !/^[A-Z][a-z]+$/.test(last)) return name;
+  const start = [...street].reduce((n, c) => (n * 31 + c.charCodeAt(0)) % 9973, 7) % AVENUE_WAYS.length;
+  for (let k = 0; k < AVENUE_WAYS.length; k++) {
+    const made = [[...words.slice(0, -1), AVENUE_WAYS[(start + k) % AVENUE_WAYS.length]].join(' '), ...place].join(', ');
+    if (!taken(made)) return made;
+  }
+  return name;
+}
+
 /** Words in a tagline that say how big a place is, and the town sizes each fits. */
 const SIZE_WORDS: readonly [RegExp, readonly TownSize[]][] = [
   [/\b(hamlet|handful)\b/i, ['hamlet']],

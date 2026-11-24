@@ -161,6 +161,10 @@ describe('build-up', async () => {
     expect(road).toBeGreaterThanOrEqual(0);
     const e = buildUp(town, t, content, { road, mode: 'both', seed: 1 });
     expect('refused' in e && e.refused).toMatch(/country road out of the town and its villages/);
+    // (A road of another kind out of them says its own kind.)
+    const avenue = { ...town, roads: town.roads.map((r, i) => (i === road ? { ...r, kind: 'avenue' as const } : r)) };
+    const a = buildUp(avenue, t, content, { road, mode: 'both', seed: 1 });
+    expect('refused' in a && a.refused).toMatch(/is an avenue out of the town and its villages/);
   });
 
   test('the homes stay the same whichever mode', () => {

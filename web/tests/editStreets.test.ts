@@ -14,7 +14,7 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import type { Content } from '../src/content/content';
 import type { RoadPlan } from '../src/core/protocol';
-import { changeKind, CROSS_MOTORWAY, CUT_OFF, drawStreet, madeKind, Meeting, ONE_WAY_ENDS, removeRoad, rename, streetsBare, whatGoes } from '../src/game/edit/streets';
+import { changeKind, CROSS_MOTORWAY, CUT_OFF, drawStreet, madeKind, Meeting, motorwayName, ONE_WAY_ENDS, removeRoad, rename, streetsBare, whatGoes } from '../src/game/edit/streets';
 import { onewayOf } from '../src/core/roadKinds';
 import { cutOffRoads, stronglyConnected } from '../src/game/oneway';
 import { roadHierarchy, BRIDGE_STREET, LOOP, MOTORWAY_EAST, MOTORWAY_WEST, OFF_RAMP, ON_RAMP } from '../src/render/roadHierarchyFixture';
@@ -22,6 +22,7 @@ import { roadWayIssues } from '../src/ui/townedit/problems';
 import type { Edited } from '../src/game/edit/edited';
 import { checkedTown, editedProblems } from '../src/game/edit/checked';
 import { DRAWN_SPAN } from '../src/game/bridges';
+import { AVENUE_WAYS, avenueName } from '../src/game/world';
 import { deckTiles } from '../src/game/macro';
 import { blankLand, LAND_CELL } from '../src/game/land';
 import { wetTile, wetTiles } from '../src/game/landEdit';
@@ -700,6 +701,18 @@ function hierarchy(roads = roadHierarchy().roads): NeighbourhoodDraft {
 }
 
 describe('avenues and one-way streets drawn', () => {
+  test("an avenue's name ends as one; the rest of it, and one that does already, as they were", () => {
+    const none = () => false;
+    expect(avenueName('Foundry Street', none)).toMatch(/^Foundry (Avenue|Boulevard|Way)$/);
+    expect(avenueName('Foundry Street', none)).toBe(avenueName('Foundry Street', none));
+    expect(avenueName('Mill Lane, Ashby', none)).toMatch(/^Mill (Avenue|Boulevard|Way), Ashby$/);
+    for (const kept of ['Birch Avenue', 'Linden Way', 'Main Street 3', 'Broadway']) expect(avenueName(kept, none)).toBe(kept);
+    // (The next if the one it would be is taken; as it was if every one is.)
+    const first = avenueName('Foundry Street', none);
+    expect(avenueName('Foundry Street', (n) => n === first)).not.toBe(first);
+    expect(avenueName('Foundry Street', (n) => n.startsWith('Foundry '))).toBe('Foundry Street');
+  });
+
   // (From the high street east of the lots up and west along z `z`, ending in the open past Mill Lane's dead end, 10 m short of it at z 140.)
   const past = (z: number): Pt[] => [[240, MAIN_Z + 8], [240, z], [200, z], [100, z]];
 
@@ -712,6 +725,8 @@ describe('avenues and one-way streets drawn', () => {
     expect(avenue.kind).toBe('avenue');
     expect(avenue.width).toBe(14);
     expect(avenue.area).toBe(0);
+    // (Named as an avenue, the street's name drawn the same way otherwise.)
+    expect(avenue.name).toMatch(new RegExp(`^${street.name!.split(' ').slice(0, -1).join(' ')} (${AVENUE_WAYS.join('|')})$`));
     // (Asked for out of town it stays one, with no area; by where it runs, a street in town.)
     expect(madeKind(town(), line(390, 120, 390, 280), 'avenue', true)).toEqual({ kind: 'avenue' });
     expect(madeKind(town(), line(390, 120, 390, 280), 'avenue')).toEqual({ kind: 'country' });
@@ -803,7 +818,23 @@ describe('the motorway removed, and the Problems list', () => {
     const street = after.roads.find((r) => r.name === 'Bridge Street')!;
     expect(street.crosses).toBeUndefined();
     expect(street.ends).toEqual(['join', 'out']);
-    expect(made(rename(draft, { kind: 'road', road: MOTORWAY_EAST }, 'The Westway')).draft.roads[MOTORWAY_EAST].name).toBe('The Westway');
+  });
+
+  test('the motorway is named whole: its carriageways and ramps keep the way they go', () => {
+    const laid = ['M36 Eastbound', 'M36 Westbound', 'Bridge Street', 'M36 Junction 12 Exit', 'M36 Junction 12 Entry'];
+    const draft = hierarchy(roadHierarchy().roads.map((r, i) => (i < laid.length ? { ...r, name: laid[i] } : r)));
+    expect(motorwayName(draft.roads)).toBe('M36');
+    for (const picked of [MOTORWAY_WEST, ON_RAMP]) {
+      const after = made(rename(draft, { kind: 'road', road: picked }, ' M4 ')).draft;
+      expect(after.roads.slice(0, laid.length).map((r) => r.name)).toEqual(['M4 Eastbound', 'M4 Westbound', 'Bridge Street', 'M4 Junction 12 Exit', 'M4 Junction 12 Entry']);
+      expect(motorwayName(after.roads)).toBe('M4');
+    }
+    expect(made(rename(draft, { kind: 'road', road: MOTORWAY_EAST }, 'M36')).draft).toBe(draft);
+    expect(refusal(rename(draft, { kind: 'road', road: MOTORWAY_EAST }, 'Bridge Street'))).toBe('Bridge Street is taken');
+    // (Its carriageways named apart, as the fixture's: the words they share.)
+    expect(motorwayName(roadHierarchy().roads)).toBe('Motorway');
+    expect(made(rename(hierarchy(), { kind: 'road', road: OFF_RAMP }, 'The Westway')).draft.roads.slice(0, 2).map((r) => r.name)).toEqual(['The Westway East', 'The Westway West']);
+    expect(motorwayName([{ ...roadHierarchy().roads[MOTORWAY_EAST], name: 'M5 Northbound' }])).toBe('M5');
   });
 
   test('another road removed, what the motorway crosses is numbered as the roads now are', () => {

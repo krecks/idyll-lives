@@ -21,7 +21,7 @@
   import { entriesOf } from '../../game/edit/ground';
   import { storeysOfId } from '../../game/flats';
   import { placeOfTemplate } from '../../game/placeLots';
-  import { changeKind, CHANGE_KINDS, isMotorway, removeRoad, rename, whatGoes } from '../../game/edit/streets';
+  import { changeKind, CHANGE_KINDS, isMotorway, motorwayName, removeRoad, rename, whatGoes } from '../../game/edit/streets';
   import { onewayOf } from '../../core/roadKinds';
   import Toggle from '../kit/Toggle.svelte';
   import { removeVillage, villageGoes } from '../../game/edit/villages';
@@ -105,6 +105,8 @@
   const madeStreets = $derived(goes && !('refused' in goes) ? madeStreetsLine(draft, goes) : null);
   const roadLength = $derived(road ? Math.round(lengths(road.points).at(-1) ?? 0) : 0);
   const motorway = $derived(!!road && isMotorway(road));
+  /** The motorway's carriageways' names (its name and the way each goes). */
+  const carriageways = $derived(motorway ? draft.roads.flatMap((r) => (r.kind === 'motorway' && r.name ? [r.name] : [])) : []);
   const KIND_CHOICES = CHANGE_KINDS.map((k) => ({ value: k, label: k === 'country' ? 'Country' : ROAD_KIND[k] }));
   const WAYS: readonly { value: 'two' | 'one'; label: string }[] = [
     { value: 'two', label: 'Both ways' },
@@ -223,8 +225,9 @@
       </div>
     {:else if road && picked.kind === 'road'}
       <span class="eyebrow sub">{ROAD_KIND[road.kind ?? 'street'] ?? 'Road'}{road.bridge ? ', a bridge' : ''}{!motorway && road.oneway ? ', one-way' : ''} · {roadLength} m</span>
-      <RenameField label={motorway ? 'Motorway name' : 'Street name'} value={road.name ?? ''} onname={renamed({ kind: 'road', road: picked.road })} />
+      <RenameField label={motorway ? 'Motorway name' : 'Street name'} value={motorway ? motorwayName(draft.roads) || (road.name ?? '') : (road.name ?? '')} onname={renamed({ kind: 'road', road: picked.road })} />
       {#if motorway}
+        {#if carriageways.length}<p class="hint">Its carriageways: {listed(carriageways)}.</p>{/if}
         <div class="option">
           <span class="eyebrow sub">Remove it</span>
           {#if goes && 'refused' in goes}
@@ -246,7 +249,7 @@
           <div class="row">
             <Segmented label="Which way cars go" value={onewayOf(road) ? 'one' : 'two'} options={WAYS} onchange={(w) => changeTo(road.kind ?? 'street', w === 'one' ? 1 : 0)} />
             {#if road.oneway}
-              <button class="btn small ghost" title="Flip which way cars go" onclick={() => changeTo(road.kind ?? 'street', road.oneway === 1 ? -1 : 1)}><Icon name="icon.ui.rotate" size={14} /> Flip</button>
+              <button class="btn small ghost" title={`Flip which way cars go on ${road.name ?? 'it'}`} onclick={() => changeTo(road.kind ?? 'street', road.oneway === 1 ? -1 : 1)}><Icon name="icon.ui.rotate" size={14} /> Flip this street</button>
             {/if}
           </div>
           {#if !road.bridge}

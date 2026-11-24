@@ -50,7 +50,7 @@ import { centroid, cropRoads, curve, evenly, inside, keepOf, leftOf, lengths, ne
 import { clearOfMotorway, finishMotorway, gateEnds, routeMotorway, withVillages, type MotorwayRoute } from './motorway';
 import { lotName, placeOfTemplate, placeUnit } from './placeLots';
 import { BIG_COURTS, boundsOf, COURTS, frontageOf, Ground, houseFor, joinUp, lotAt, LotPlacer, plotRect, reachesRoad, settleRoads, shuffled, slotDims, turner, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
-import { LAND_SIZE, LEGACY_KINDS, placeOf, specOf, streetNames, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind, type WorldSpec, type WorldStep } from './world';
+import { avenueName, LAND_SIZE, LEGACY_KINDS, placeOf, specOf, streetNames, worldName, worldTagline, type RoadLayout, type SizeSpec, type WorldKind, type WorldSpec, type WorldStep } from './world';
 import * as pmath from './pmath';
 
 type Rand = () => number;
@@ -1770,6 +1770,10 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
       for (const u of laid.left) left.push({ u, from: a });
     }
     const streets = streetNames(content, spec.names, rand, plan.roads.length, [...takenNames, ...roadNames], plan.name);
+    // (An avenue named as one: "Foundry Avenue", not "Foundry Street".)
+    plan.roads.forEach((r, k) => {
+      if (worldRoads[r].kind === 'avenue') streets[k] = avenueName(streets[k], (n) => takenNames.includes(n) || roadNames.has(n) || streets.includes(n));
+    });
     takenNames.push(...streets);
     plan.roads.forEach((r, k) => (names[r] = streets[k]));
   }
