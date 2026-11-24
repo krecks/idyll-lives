@@ -137,9 +137,10 @@ fn motorway_insides(roads: &[Road]) -> Vec<i8> {
     out
 }
 
-/// Whether a road of kind `end`'s end meeting a road of kind `along` part way along it joins it
-/// there (`Graph::build`): not where either is a motorway (grade separated: one passes over the
-/// other), but a ramp's end on a motorway (where it merges into its carriageway, or leaves it).
+/// Whether a road of kind `end`'s end meeting a road of kind `along` (at its end or part way along
+/// it) joins it there (`Graph::build`): not where either is a motorway (grade separated: one passes
+/// over the other), but a ramp's end on a motorway (where it merges into its carriageway, or leaves
+/// it).
 fn level_join(end: RoadKind, along: RoadKind) -> bool {
     match (end, along) {
         (RoadKind::Ramp, RoadKind::Motorway) | (RoadKind::Motorway, RoadKind::Motorway) => true,
@@ -349,7 +350,9 @@ impl Graph {
                         continue;
                     }
                     let near_end = |s: f32| s < snap || s > other.len() - snap;
-                    if !near_end(s) && !level_join(g.roads[r].kind, other.kind) {
+                    // (Not even end to end: a road ending by a carriageway's end at the world's edge
+                    // isn't on the motorway's level either.)
+                    if !level_join(g.roads[r].kind, other.kind) {
                         continue;
                     }
                     if near_end(s) {
