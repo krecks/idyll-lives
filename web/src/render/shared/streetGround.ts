@@ -22,8 +22,9 @@ import type { BuiltSurface } from './builtSurface';
 import { Geo, type V3 } from './geometry';
 import { linearHex } from './math';
 import { lotsFilled } from './nature';
+import type { PathGround } from './paving';
 import type { ChunkPlan, GroundLayer } from './street';
-import { boxOf, clipBy, clipRect, COURSE, courseCells, LINE, PAVING_LOOK, TILE, townPaving, type BayDraw, type PavingDraw, type Poly, type Rect, type TownPaving } from './townPaving';
+import { clipRect, COURSE, courseCells, LINE, PAVING_LOOK, terrainPieces, TILE, townPaving, type BayDraw, type PavingDraw, type Poly, type Rect, type TownPaving } from './townPaving';
 
 /** What the near paving reads (as `townPaving.ts` `PavingWorld`), and the world's size. */
 export type StreetGroundWorld = Pick<WorldStructure, 'plots' | 'meta' | 'parking' | 'carParks' | 'width' | 'depth' | 'storeyDepth'>;
@@ -154,6 +155,12 @@ function terrainOf(surface: BuiltSurface, plots: number): Terrain {
   return terrain;
 }
 
+/** The ground the garden paths are laid on (`paving.ts` `pavedRects`): a lot's pad on a lot, else the terrain as drawn. */
+export function pathGround(surface: BuiltSurface, plots: number): PathGround {
+  const terrain = terrainOf(surface, plots);
+  return { pad: (x, z) => surface.padAt(x, z), terrain: (x, z) => terrain.at(x, z) };
+}
+
 /**
  * A flat convex piece (`poly`) of the paving into `g`, `y` over the ground, its vertices coloured by `tint`: on
  * the ground as drawn (`terrain`), cut into the parts in each of its triangles; on a flat town, as it is.
@@ -164,20 +171,7 @@ function lay(g: Geo, poly: [number, number][], y: number, tint: (x: number, z: n
     g.poly(poly.map(([x, z]) => [x, y, z] as V3), UP, undefined, undefined, poly.map(([x, z]) => tint(x, z)));
     return;
   }
-  const [x0, z0, x1, z1] = boxOf(poly);
-  const c = LAND_CELL;
-  for (let j = Math.floor(z0 / c); j * c < z1; j++) {
-    for (let i = Math.floor(x0 / c); i * c < x1; i++) {
-      const [a, b, d, e]: [number, number][] = [[i * c, j * c], [(i + 1) * c, j * c], [(i + 1) * c, (j + 1) * c], [i * c, (j + 1) * c]];
-      // (The square's two triangles, each wound the same way: what is left of each of its sides is in it.)
-      for (const tri of [[a, b, e], [b, d, e]] as [number, number][][]) {
-        let part = poly;
-        for (let k = 0; k < 3 && part.length >= 3; k++) part = clipBy(part, tri[k], tri[(k + 1) % 3]);
-        if (part.length < 3) continue;
-        g.poly(part.map(([x, z]) => [x, terrain.at(x, z) + y, z] as V3), UP, undefined, undefined, part.map(([x, z]) => tint(x, z)));
-      }
-    }
-  }
+  for (const part of terrainPieces(poly)) g.poly(part.map(([x, z]) => [x, terrain.at(x, z) + y, z] as V3), UP, undefined, undefined, part.map(([x, z]) => tint(x, z)));
 }
 
 /**

@@ -295,15 +295,20 @@ export class BuiltSurface {
 
   /** The surface (m) at (`x`, `z`): a lot's pad in a lot (the highest where two touch), a road's height on a road (its deck on a bridge), else the graded land. */
   at(x: number, z: number): number {
-    let pad = -Infinity;
-    for (const i of this.lotGrid.get(Math.floor(x / LOT_CELL) * 65536 + Math.floor(z / LOT_CELL)) ?? []) {
-      const p = this.plots[i];
-      if (onPad(p, x, z)) pad = Math.max(pad, this.pads[i]);
-    }
-    if (pad > -Infinity) return pad;
+    const pad = this.padAt(x, z);
+    if (pad !== null) return pad;
     const on = this.roadAt(x, z);
     if (on) return this.roadY(on.road, on.s);
     return this.landAt(x, z);
+  }
+
+  /** The pad (m) of the lot at (`x`, `z`), the highest where two touch; null: on no lot. */
+  padAt(x: number, z: number): number | null {
+    let pad = -Infinity;
+    for (const i of this.lotGrid.get(Math.floor(x / LOT_CELL) * 65536 + Math.floor(z / LOT_CELL)) ?? []) {
+      if (onPad(this.plots[i], x, z)) pad = Math.max(pad, this.pads[i]);
+    }
+    return pad > -Infinity ? pad : null;
   }
 
   /** The graded land (m) at (`x`, `z`), between the samples round it (under a road, `ROAD_SINK` below it; in a lot, its pad). */

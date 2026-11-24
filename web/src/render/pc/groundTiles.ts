@@ -8,6 +8,7 @@ import * as pc from './engine';
 import { groundDepth, type RoadPlan, type WorldStructure, type WorldZone } from '../../core/protocol';
 import { carriageway, hasSidewalks } from '../shared/junctions';
 import { boxOf, clipRect, COURSE, courseCells, JOINT, LINE, PAVING_LOOK, TILE, townPaving, type TownPaving } from '../shared/townPaving';
+import { PATH_LOOK, pathLook } from '../shared/paving';
 import { bridgeSpans, stretchOf } from '../shared/roads';
 import { BRIDGE } from '../shared/street';
 
@@ -57,7 +58,7 @@ const MAP = {
   pavement: '#C4C0B6',
   soil: '#6B4E37',
   furrow: '#5A412E',
-  path: '#A99C86',
+  path: PATH_LOOK.hex.map,
   paving: PAVING_LOOK.stone,
   joint: PAVING_LOOK.joint,
   yard: PAVING_LOOK.yard,
@@ -247,8 +248,10 @@ export class TownGroundMap {
       for (let k = 0.5; k < (along ? f.d : f.w); k += 1.2) (along ? g.fillRect(f.x, f.z + k, f.w, 0.45) : g.fillRect(f.x + k, f.z, 0.45, f.d));
     }
     // Paths, then the roads: their pavements (a road's width has them), then their carriageways, trails as paths.
-    g.fillStyle = MAP.path;
-    for (const p of meta.paths ?? []) g.fillRect(p.x, p.z, p.w, p.d);
+    for (const p of meta.paths ?? []) {
+      g.fillStyle = PATH_LOOK[pathLook(p.look)].map;
+      g.fillRect(p.x, p.z, p.w, p.d);
+    }
     const stroke = (r: RoadPlan, width: number, colour: string) => {
       g.strokeStyle = colour;
       g.lineWidth = width;

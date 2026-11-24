@@ -59,8 +59,8 @@ import { placementVariation, type StandIn } from './modelEntry';
 import { wallCorners, writeFences } from './fences';
 import { shownFences } from './shownFences';
 import { centroid, lengths, pointAt } from '../../game/roads';
-import { pavedRects } from './paving';
-import { streetGround, streetGroundChunks, streetGroundKey } from './streetGround';
+import { isPaths, layerName, pathLayers, pavedRects } from './paving';
+import { pathGround, streetGround, streetGroundChunks, streetGroundKey } from './streetGround';
 import { bridgeSpans, Kerb, KERB, levelStops, ROAD_Y, roadIndex, roadMeshes, SIDEWALK, stretchOf, townRoads, WALK_Y, walkStops, type RoadIndex } from './roads';
 import { JunctionCuts, junctionsOf, type JunctionPlan } from './junctions';
 import { Levels, levelsOf } from './landSurface';
@@ -348,10 +348,9 @@ export function fieldLayers(fields: Rect[] | undefined, prefix: string): [string
   if (!fields?.length) return [];
   const rows: Rect[] = [];
   for (const f of fields) for (let x = f.x + 1; x < f.x + f.w - 1; x += 2) rows.push({ x: x + 0.1, z: f.z + 0.5, w: 0.8, d: f.d - 1 });
-  const name = (n: string) => (prefix ? `${prefix}${n[0].toUpperCase()}${n.slice(1)}` : n);
   return [
-    [name('fields'), fields, 'material.soil', 0.013],
-    [name('furrows'), rows, 'material.furrow', 0.0135],
+    [layerName(prefix, 'fields'), fields, 'material.soil', 0.013],
+    [layerName(prefix, 'furrows'), rows, 'material.furrow', 0.0135],
   ];
 }
 
@@ -1270,7 +1269,7 @@ export class TownStreet {
 
   /** The ground layers' rectangles (the game's): garden paths, fields and their furrows; name, rectangles, material, height. */
   private groundRects(): [string, Rect[], string, number][] {
-    return (this.ground ??= [['paths', this.paths, 'material.path', 0.014], ...fieldLayers(this.fields, '')]);
+    return (this.ground ??= [...pathLayers(this.paths, ''), ...fieldLayers(this.fields, '')]);
   }
   private ground: [string, Rect[], string, number][] | null = null;
 
@@ -2096,15 +2095,18 @@ export class TownStreet {
       if (trail && !trail.empty) out.push({ name: 'trails', material: 'material.path', geo: trail, toned: true });
       const marks = this.staticParts().get(id)?.marks;
       if (marks && !marks.empty) out.push({ name: 'roadMarks', material: 'paint', geo: marks, paint: true });
-      const all = new Map(this.groundRects().map(([name, rects]) => [name, rects]));
+      const surface = this.levels?.surface;
+      const laidOn = surface ? pathGround(surface, this.world.plots.length) : null;
       for (const [name, list, material, y] of layers) {
         const geo = new Geo();
-        const toned = name === 'paths';
-        if (toned) pavedRects(geo, list, all.get(name)!, y);
-        else for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
-        // (On a land the town follows, laid over the ground: a path on its lot's pad, across the verge from it to
-        // its road's height where it meets it, a field on its farm's pad.)
-        if (this.groundAt) geo.drape(this.groundAt);
+        const toned = isPaths(name, '');
+        // (On a land the town follows, laid on the ground: a path on its lot's pad, across the verge on the terrain as
+        // drawn (`pathGround`); a field on its farm's pad. Its sides where another path goes on, of any look, not the lawn's.)
+        if (toned) pavedRects(geo, list, this.paths, y, laidOn);
+        else {
+          for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+          if (this.groundAt) geo.drape(this.groundAt);
+        }
         out.push({ name, material, geo, toned });
       }
       return out;

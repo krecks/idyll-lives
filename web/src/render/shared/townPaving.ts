@@ -19,6 +19,7 @@
 
 import type { PavedPiece, RoadPlan, WorldStructure } from '../../core/protocol';
 import { ccw, signedArea2, toOutline } from '../../game/footprints';
+import { LAND_CELL } from '../../game/land';
 import { centroid, rasterRoads } from '../../game/roads';
 import { carriageway } from './junctions';
 
@@ -405,6 +406,30 @@ export function clipBy(poly: readonly (readonly [number, number])[], a: readonly
     if (sp >= 0 !== sq >= 0) {
       const t = sp / (sp - sq);
       out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]);
+    }
+  }
+  return out;
+}
+
+/**
+ * `poly` (convex) cut into its parts in each of the triangles the ground tiles draw the land as (`streetGround.ts`
+ * `terrainOf`: each `LAND_CELL` square split from its corner at (x + cell, z) to (x, z + cell)), so each part lies
+ * flat on the ground under it.
+ */
+export function terrainPieces(poly: readonly (readonly [number, number])[]): Poly[] {
+  if (poly.length < 3) return [];
+  const [x0, z0, x1, z1] = boxOf(poly);
+  const c = LAND_CELL;
+  const out: Poly[] = [];
+  for (let j = Math.floor(z0 / c); j * c < z1; j++) {
+    for (let i = Math.floor(x0 / c); i * c < x1; i++) {
+      const [a, b, d, e]: [number, number][] = [[i * c, j * c], [(i + 1) * c, j * c], [(i + 1) * c, (j + 1) * c], [i * c, (j + 1) * c]];
+      // (The square's two triangles, each wound the same way: what is left of each of its sides is in it.)
+      for (const tri of [[a, b, e], [b, d, e]] as [number, number][][]) {
+        let part = clipBy(poly, tri[0], tri[1]);
+        for (let k = 1; k < 3 && part.length >= 3; k++) part = clipBy(part, tri[k], tri[(k + 1) % 3]);
+        if (part.length >= 3) out.push(part);
+      }
     }
   }
   return out;
