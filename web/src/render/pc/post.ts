@@ -14,13 +14,18 @@
  *   and encoded for the screen by then, so a byte a channel holds it as the canvas will; only what
  *   the contrast pushed past white is clamped a pass sooner). Half the bytes of two half-float
  *   targets, read and written every frame.
+ * - Bloom on the lights (`BLOOM`): what is brighter once exposed than `BLOOM.white` (lamp glass, lit windows,
+ *   porch lights) glows into what is round it, by PlayCanvas's bloom (its blurred bright part added before the
+ *   image processing; the threshold follows the exposure, as the scene is drawn before it). Its strength
+ *   follows the night (`glow`): none by day, when sunlit whites would bloom and wash the picture out. The
+ *   passes run all day at no strength: turned off, PlayCanvas would make the frame's targets again at dusk.
  * - Contact shading on Medium and High (`QualitySettings.contactShading`, `CONTACT`): the scene's depth
  *   drawn once before the scene, an occlusion pass at half size from it, read by the lit shaders. The
  *   town view fades it out (`setContact`); fully out, the depth isn't drawn.
  * - `?diag=albedo|normals` and `?diag=linear` leave the image processing and the grade out (the
  *   colour itself, encoded for the screen); without them only Low's FXAA is left, so Medium and High
  *   draw straight onto the canvas there. `?diag=noaa`: no multisampling, no FXAA; `?diag=nonight`:
- *   no grade; `?diag=noao`: no contact shading.
+ *   no grade; `?diag=noao`: no contact shading; `?diag=nobloom`: no bloom.
  *
  * The drawing size is the canvas's (`shared/resolution.ts`, `applyResolution`), all passes at full
  * size. Live changes (the exposure each lighting step, the night's amount, the look) are uniform
@@ -53,6 +58,8 @@ export interface PostOptions {
   lean?: boolean;
   /** Contact shading (`QualitySettings.contactShading`; `CONTACT`). */
   contact?: boolean;
+  /** Bloom on the lights (`BLOOM`). */
+  bloom?: boolean;
 }
 
 /**
@@ -66,6 +73,16 @@ export interface PostOptions {
  * wide round them); `scale`: its size, of the picture's. (`?tune=contact.…` on the dev server. Radius 0.3 and
  * intensity 1 until 2026-11-18.)
  */
+/**
+ * Bloom on the lights: `white` the exposed brightness it starts at (a sunlit white wall is about 0.8 once exposed, a
+ * lamp's glass and a lit window above it), `intensity` how much of the blurred bright part is added at full night,
+ * `blurLevel` how far it spreads. (`?tune=bloom.…` on the dev server.)
+ */
+const BLOOM = tuned('bloom', { white: 0.7, intensity: 0.15, blurLevel: 16 });
+
+/** The bloom's strength by day: above none, so PlayCanvas keeps its passes (`PostProcessing.glow`). */
+const BLOOM_IDLE = 1e-6;
+
 const CONTACT = tuned('contact', { radius: 0.5, intensity: 1.5, power: 1, samples: 16, minAngle: 25, scale: 0.5 });
 
 /** What the image processing does (`shared/imageProcessing.ts`, ACES always). */
@@ -162,6 +179,7 @@ export function gamePostOptions(samples: number, diag: ReadonlySet<string>, colo
     fxaa: aa && samples <= 1,
     imageProcessing,
     night: imageProcessing && !diag.has('nonight'),
+    bloom: imageProcessing && !diag.has('nobloom'),
     lean,
     contact: contact && imageProcessing && !diag.has('noao'),
   };
@@ -271,6 +289,9 @@ export class PostProcessing {
   private exposureNow = 1;
   private nightNow = 0;
   private contactNow = 1;
+  private glowNow = 0;
+  /** Every frame of the chain (the game camera's and `attach`'s), whose bloom follows the exposure and the night. */
+  private readonly frames = new Set<pc.CameraFrame>();
   private readonly onResize = (width: number, height: number) => this.resized(width, height);
 
   constructor(
@@ -322,6 +343,7 @@ export class PostProcessing {
     this.setLook(PLAIN_LOOK);
     this.exposure = 1;
     this.night = 0;
+    this.glow = 0;
     this.ids.nightTint.setValue(this.tint);
     device.on('resizecanvas', this.onResize);
     this.resized(device.width, device.height);
@@ -339,6 +361,11 @@ export class PostProcessing {
       frame.ssao.type = pc.SSAOTYPE_LIGHTING;
       frame.ssao.blurEnabled = true;
       Object.assign(frame.ssao, CONTACT);
+    }
+    if (this.options.bloom) {
+      frame.bloom.blurLevel = BLOOM.blurLevel;
+      this.bloomOn(frame);
+      this.frames.add(frame);
     }
     frame.update();
     return frame;
@@ -370,6 +397,7 @@ export class PostProcessing {
     return {
       resize: (width, height) => source?.resize(width, height),
       destroy: () => {
+        this.frames.delete(frame);
         frame.destroy();
         fxaa?.destroy();
         source?.destroyTextureBuffers();
@@ -382,6 +410,7 @@ export class PostProcessing {
   set exposure(value: number) {
     this.exposureNow = value;
     this.ids.exposure.setValue(value);
+    this.bloomed();
   }
 
   get exposure(): number {
@@ -396,6 +425,31 @@ export class PostProcessing {
 
   get night(): number {
     return this.nightNow;
+  }
+
+  /** How much the lights bloom, 0 (by day: none) .. 1 (at night, `BLOOM.intensity`): the time of day's night. */
+  set glow(share: number) {
+    const s = Math.min(1, Math.max(0, share));
+    if (s === this.glowNow) return;
+    this.glowNow = s;
+    this.bloomed();
+  }
+
+  get glow(): number {
+    return this.glowNow;
+  }
+
+  /** The bloom's threshold and strength on `frame`, for the exposure and the night now. */
+  private bloomOn(frame: pc.CameraFrame): void {
+    frame.bloom.threshold = BLOOM.white / Math.max(1e-4, this.exposureNow);
+    frame.bloom.intensity = Math.max(BLOOM_IDLE, BLOOM.intensity * this.glowNow);
+  }
+
+  private bloomed(): void {
+    for (const frame of this.frames) {
+      this.bloomOn(frame);
+      frame.update();
+    }
   }
 
   /**
@@ -448,6 +502,7 @@ export class PostProcessing {
 
   destroy(): void {
     this.device.off('resizecanvas', this.onResize);
+    this.frames.clear();
     this.frame?.destroy();
     this.fxaa?.destroy();
     if (this.fxaaTarget) {
