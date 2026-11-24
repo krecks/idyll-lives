@@ -1585,6 +1585,41 @@ fn a_car_leaving_by_the_motorway_is_off_the_map_for_less() {
     assert_eq!(c.off_map_ticks(), OFF_MAP_TICKS);
 }
 
+/// Nobody on foot or on a bike leaves town by a motorway's end (its ground kept from them, no road
+/// they go along there), however much nearer it is in a straight line: their way out is the
+/// street's end. (Timed to the motorway's, as the straight line there, riders in Fernglade and
+/// Kingston found no way to it and stood on their bikes at home for hours.)
+#[test]
+fn nobody_on_foot_leaves_by_the_motorways_end() {
+    use crate::travel::{OneWay, RoadKind};
+    let travel = travel_on(vec![
+        road_raw(
+            &[[50.0, 0.5], [50.0, 300.0]],
+            RoadKind::Street,
+            OneWay::Both,
+        ),
+        road_raw(
+            &[[50.0, 300.0], [80.0, 304.0]],
+            RoadKind::Ramp,
+            OneWay::Along,
+        ),
+        road_raw(
+            &[[80.0, 304.0], [199.5, 304.0]],
+            RoadKind::Motorway,
+            OneWay::Along,
+        ),
+    ]);
+    let exits = [[50.0, 0.5], [199.5, 304.0]];
+    assert!(travel.exit_on_foot(exits[0]));
+    assert!(!travel.exit_on_foot(exits[1]));
+    // 285 m up the street from its end of town, 150 m from the motorway's in a straight line.
+    let at = [45.0, 285.0];
+    assert_eq!(crate::world::quickest_exit(&travel, &exits, at), Some(0));
+    assert_eq!(nearest_exit(&travel, &exits, at), Some(0));
+    // With no road there, a way out is left by on foot.
+    assert!(travel.exit_on_foot([400.0, 400.0]));
+}
+
 /// Home round a one-way loop: the way in is a way of its own from the end of town to the
 /// driveway, round the loop the way it goes, not the way out turned round against it.
 #[test]
