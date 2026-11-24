@@ -9,8 +9,8 @@
  *   tighter than `BEND_RADIUS`, over the water at most once, `WATER_ANGLE` or squarer to it and `WATER_MOST` m at most,
  *   and with a profile within its grade (`MOTORWAY_GRADE`) cut or filled no more than `CUT` (`profileOf`), standing
  *   `OVER` m over the land at each crossing. Scored by its cut and fill, its water and how far it passes from the town.
- *   Its middle line is offset into two one-way `motorway` carriageways `APART` m apart, laid for traffic on the right
- *   (`carriageways`: each has the other on the left of the way its cars go). The country roads (`CountryRouter`) may
+ *   Its middle line is offset into two one-way `motorway` carriageways `APART` m apart, laid for traffic on the right as
+ *   the game shows it (`carriageways`: each has the other on the left of the way its cars go, sim-core `cars::right_of`). The country roads (`CountryRouter`) may
  *   not cross it (`blocked`, `BAND` m either side of its middle line) but at 1 to 3 gates square to it (`gates`), the
  *   first the nearest the main town (`junction`, kept clear wider and longer for its ramps).
  * - **`finishMotorway`**, once the country roads are laid: where they pass under it (`crossings`) its carriageways are
@@ -127,7 +127,11 @@ export interface Gate {
 export interface MotorwayRoute {
   /** Its middle line, a point every metre or so, from one edge of the world to the other. */
   middle: Pt[];
-  /** Its carriageways: the first's cars go the way the middle line runs (to its right), the second's against it (to its left). */
+  /**
+   * Its carriageways: the first's cars go the way the middle line runs, the second's against it. The first is off the
+   * middle line to the right of its way as the game shows it: `rightOf`'s other side, as `rightOf` is the right on the
+   * town map, which draws z down the page (the game's view is that mirrored, `render/pc/space.ts`).
+   */
   ways: [RoadPlan, RoadPlan];
   /** Per land cell (`Cells`), 1 where a country road may not go. */
   blocked: Uint8Array;
@@ -441,7 +445,8 @@ function namesOf(seed: number): { name: string; junction: number } {
 /** Its carriageways off middle line `middle` (running on past the world's edges), cut to the world: see `MotorwayRoute.ways`. */
 export function carriageways(middle: readonly Pt[], W: number, D: number): [RoadPlan, RoadPlan] | null {
   const ways = ([1, -1] as const).map((side) => {
-    const pts = clipTo(offset(middle, (side * APART) / 2), W, D);
+    // (Traffic on the right as the game shows it: the first off the middle line to `rightOf`'s other side.)
+    const pts = clipTo(offset(middle, (-side * APART) / 2), W, D);
     return pts && pts.length >= 2 ? { points: pts.map(([x, z]): Pt => [round2(x), round2(z)]), width: WIDTH, ends: ['out', 'out'], kind: 'motorway', oneway: side } satisfies RoadPlan : null;
   });
   return ways[0] && ways[1] ? [ways[0], ways[1]] : null;
@@ -811,7 +816,8 @@ export function halfDiamond(route: MotorwayRoute, c: Crossing, roads: readonly R
     const offWay = side < 0 ? 0 : 1;
     const ramps: RoadPlan[] = [];
     for (const k of [offWay, 1 - offWay]) {
-      const lane = k === 0 ? 1 : -1;
+      // (The first carriageway off the middle line to `rightOf`'s other side: `carriageways`.)
+      const lane = k === 0 ? -1 : 1;
       const ramp = rampOf(middle, lm, c, side, lane, under, lu);
       if (!ramp) break;
       const pts = k === offWay ? ramp : [...ramp].reverse();
@@ -843,8 +849,9 @@ export function halfDiamond(route: MotorwayRoute, c: Crossing, roads: readonly R
 }
 
 /**
- * A ramp's points from its merge to its T (`halfDiamond`): on the carriageway `lane` of the middle line (+1: its right,
- * the first carriageway; -1: the second), out to that one's right, `side` along from crossing `c`; null if the road
+ * A ramp's points from its merge to its T (`halfDiamond`): on the carriageway `lane` of the middle line (+1: `rightOf`
+ * it, the second carriageway; -1: the first), out beyond it (its cars' right as the game shows it), `side` along from
+ * crossing `c`; null if the road
  * under it doesn't run on `RAMP_T` m past the carriageway there, or meets the ramp too slantingly.
  */
 function rampOf(middle: readonly Pt[], lm: readonly number[], c: Crossing, side: -1 | 1, lane: 1 | -1, under: RoadPlan, lu: readonly number[]): Pt[] | null {
@@ -911,7 +918,8 @@ export function motorwayProblems(roads: readonly RoadPlan[]): string[] {
   if (!ways.length) return out;
   if (ways.length !== 2) out.push(`${ways.length} carriageways`);
   if (ramps.length !== 2) out.push(`${ramps.length} ramps`);
-  // Traffic on the right: each carriageway's other on the left of the way its cars go; each ramp to its right.
+  // Traffic on the right as the game shows it (sim-core `cars::right_of`: going (x, z), its right (z, -x), `rightOf`'s
+  // other side): each carriageway's other on the left of the way its cars go; each ramp to its right.
   for (const i of ways) {
     const r = roads[i];
     const ls = lengths(r.points);
@@ -921,7 +929,7 @@ export function motorwayProblems(roads: readonly RoadPlan[]): string[] {
     if (other === undefined) continue;
     const q = nearest(roads[other].points, p[0], p[1]);
     const qp = pointAt(roads[other].points, q.s).p;
-    const left = (qp[0] - p[0]) * go[1] - (qp[1] - p[1]) * go[0];
+    const left = (qp[1] - p[1]) * go[0] - (qp[0] - p[0]) * go[1];
     if (left <= 0) out.push(`${r.name}: the other carriageway on its right`);
   }
   for (const i of ramps) {
@@ -944,7 +952,7 @@ export function motorwayProblems(roads: readonly RoadPlan[]): string[] {
     const go: Pt = [t[0] * (w.oneway ?? 1), t[1] * (w.oneway ?? 1)];
     const mid = pointAt(r.points, lengths(r.points).at(-1)! / 2).p;
     const q = pointAt(w.points, nearest(w.points, mid[0], mid[1]).s).p;
-    if ((mid[0] - q[0]) * go[1] - (mid[1] - q[1]) * go[0] >= 0) out.push(`${r.name}: on its carriageway's left`);
+    if ((mid[0] - q[0]) * go[1] - (mid[1] - q[1]) * go[0] <= 0) out.push(`${r.name}: on its carriageway's left`);
     // (Off a carriageway it leaves it, onto one it joins it, the way its cars go.)
     const rt = pointAt(r.points, e === 0 ? 1 : lengths(r.points).at(-1)! - 1).t;
     if (rt[0] * go[0] + rt[1] * go[1] < 0.5) out.push(`${r.name}: against its carriageway's way`);
