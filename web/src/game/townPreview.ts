@@ -154,3 +154,12 @@ export function previewWorld(content: Content, t: Templates, town: Neighbourhood
     cars: layout.cars.map(({ plot, x, z, yaw, body, paint }) => ({ plot, x, z, yaw, body, paint })),
   };
 }
+
+/** The main town's centre in `world`: its square once the world has one (`meta.centre`), else the middle of its area, else the world's (as the bench's town view finds it). */
+export function townCentre(world: WorldStructure): [number, number, number] {
+  const main = world.meta?.areas?.[0];
+  const square = world.meta?.centre?.find((c) => c.area === 0) ?? world.meta?.centre?.[0];
+  const mid = (pts: [number, number][]): [number, number] => [pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length];
+  const [cx, cz] = square?.poly.length ? mid(square.poly) : main ? [main.x + main.w / 2, main.z + main.d / 2] : [world.width / 2, world.depth / 2];
+  return [cx, 0, cz];
+}
