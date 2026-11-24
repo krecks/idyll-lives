@@ -5,15 +5,15 @@
   import ItemCard from './buy/ItemCard.svelte';
   import ItemDetail from './buy/ItemDetail.svelte';
   import ItemHoverCard from './buy/ItemHoverCard.svelte';
-  import { loversOf, paintable, summarize } from './buy/catalog';
+  import { loversOf, summarize } from './buy/catalog';
   import { services } from './services';
   import { play } from './sfx';
   import { game } from './state.svelte';
 
   /**
    * Build mode's Furnish tab: the furniture catalog in the dock. A row of categories over a grid
-   * of items; what an item is worth shows on pointing. The owned object picked on the lot gets a
-   * card of its own above the dock.
+   * of item pictures with their prices; the name and what an item is worth show on pointing. The
+   * item in hand and the owned object picked on the lot get a card of their own above the dock.
    */
   const content = services.content;
   const ALL = '';
@@ -89,7 +89,11 @@
 
   const folded = $derived(!!game.placing && !over);
   const selected = $derived(game.buySelection === null ? null : (game.objects.find((o) => o.id === game.buySelection) ?? null));
-  /** Something already owned, in hand, else the owned object picked on the lot: its card recolours, upgrades or sells it; a new purchase in hand that takes a colour, its colour. */
+  /**
+   * Something already owned, in hand, else the owned object picked on the lot: its card recolours, upgrades or sells it.
+   * A new purchase in hand gets its card too, the item up front to look at (and its colour, if it takes one), while the
+   * catalog folds away until the pointer comes back to the dock.
+   */
   const moving = $derived.by(() => {
     const placing = game.placing;
     if (!placing || placing.objectId == null) return null;
@@ -100,7 +104,7 @@
     const def = obj && content.object(obj.def);
     if (obj && def) return { def, owned: obj };
     const buying = game.placing?.objectId === null ? content.object(game.placing.def) : undefined;
-    return buying && paintable(services.assets, buying) ? { def: buying, owned: null } : null;
+    return buying ? { def: buying, owned: null } : null;
   });
 
   /** The category row scrolls sideways when the dock is narrow; only then does its edge fade. */
@@ -350,7 +354,7 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
     grid-auto-rows: 96px;
     gap: 8px;
     overflow-y: auto;

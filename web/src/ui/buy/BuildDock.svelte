@@ -10,7 +10,7 @@
    * Build mode's dock at the foot of the screen: one frame for each tab (Furnish, Construct, Home, Land),
    * so the tabs and the actions beside them never move. The tab's own header shares the top line;
    * its body sits below. While something is in hand the body folds away to the header line;
-   * pointing at that line opens it again.
+   * pointing back at the dock (anywhere on it, its edges too) opens it again.
    */
   let {
     label,
@@ -31,12 +31,19 @@
     /** A first-use tip, shown above the dock until dismissed. */
     tip?: Snippet;
     tipId?: string;
-    /** The pointer came to the header line (and stays on the dock): the body is open while placing. */
+    /** The pointer came back to the dock (and stays on it): the body is open while placing. */
     over?: boolean;
     style?: string;
   } = $props();
 
   const folded = $derived(!!game.placing && !over);
+  /**
+   * What floats over the lot is the dock's child too, but pointing at it (turning the item in hand) leaves the dock
+   * folded. Coming onto the dock itself, from the lot or from those cards, opens it; moving about on it doesn't, so an
+   * item just picked folds the catalog away under the pointer.
+   */
+  let aboveEl = $state<HTMLElement>();
+  let onDock = false;
   /** On the Land tab Undo and Redo are the land's strokes' (their own stack). */
   const land = $derived(game.buildTab === 'land');
   const canUndo = $derived(land ? game.land.canUndo && !game.land.busy : game.undoSteps > 0);
@@ -49,7 +56,15 @@
   aria-label={label}
   data-dock
   {style}
+  onpointerover={(e) => {
+    if (e.target instanceof Node && aboveEl?.contains(e.target)) onDock = false;
+    else if (!onDock) {
+      onDock = true;
+      over = true;
+    }
+  }}
   onpointerleave={(e) => {
+    onDock = false;
     if (!e.currentTarget.contains(document.activeElement)) over = false;
   }}
   onfocusin={() => (over = true)}
@@ -58,12 +73,11 @@
     if (!(next instanceof Node) || !e.currentTarget.contains(next)) over = false;
   }}
 >
-  <div class="above">
+  <div class="above" bind:this={aboveEl}>
     {#if tip && tipId}<FirstTip id={tipId}>{@render tip()}</FirstTip>{/if}
     {@render above?.()}
   </div>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <header onpointerenter={() => (over = true)}>
+  <header>
     <BuildTabs />
     <div class="head">{@render head?.()}</div>
     <div class="actions">
@@ -120,6 +134,15 @@
   .dock.folded {
     gap: 0;
   }
+  /* The gap under the dock, down to the window's edge, is the dock's too: going back to the bottom opens it. */
+  .dock::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: var(--edge);
+  }
   header {
     display: flex;
     align-items: center;
@@ -161,7 +184,7 @@
     display: inline-flex;
     transform: scaleX(-1);
   }
-  /* While something is in hand, the body folds away unless the pointer comes back to the header. */
+  /* While something is in hand, the body folds away unless the pointer comes back to the dock. */
   .drawer {
     display: grid;
     grid-template-rows: 1fr;

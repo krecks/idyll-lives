@@ -34,6 +34,7 @@ import { clearOf, type DriveLine } from './parking';
 import * as pmath from './pmath';
 import { floorPicker, laidFloors, type LaidFloor } from './floorings';
 import { mulberry32 } from './noise';
+import { pathLooks } from './pathLooks';
 
 /** The households moved to `people.ts`; still here for those that import them from the town. */
 export { NEIGHBOUR_CAP, populate, rehouse } from './people';
@@ -196,6 +197,8 @@ export interface Rect {
   z: number;
   w: number;
   d: number;
+  /** A path's: what it is laid in (a `PathLook`, `pathLooks.ts`; none: hexagonal pavers). */
+  look?: string;
 }
 
 export interface NeighbourhoodDraft {
@@ -1198,18 +1201,23 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     doors.push(...(f.doors ?? []).map((d) => turn.edge(d, lift)));
     windows.push(...(f.windows ?? []).map((d) => turn.edge(d, lift)));
   };
+  /** Path `r` (plot `s`'s coordinates) onto the town, with its look where it has one (none: no key, as the town file always had them). */
+  const layPath = (s: PlotSlot, r: Rect) => {
+    const at = turnOnto(t, s).rect(r);
+    paths.push(r.look ? { ...at, look: r.look } : at);
+  };
   /**
    * A path's way on from the front of plot `s` to its road, across the verge (`r`: its stretch on the
    * plot, plot coordinates): as far as the sidewalk, longer where the plot stands back from a bend
    * (`reach` m at most: a driveway's goes further, for the car to get to the road, but not across
    * another lot). To the first road it comes to, or to `onto` (a driveway's: the road its car
-   * drives onto, across a trail on the way). Whether it got there.
+   * drives onto, across a trail on the way). Whether it got there. Laid as `r` is (`look`).
    */
   const roads = roadIndex(town.roads);
   const verge = (s: PlotSlot, r: Rect, reach = 12, onto?: number): boolean => {
     const turn = turnOnto(t, s);
     const k = vergeReach(turn, r.x + r.w / 2, reach, plots, s.index, onto === undefined ? (x, z) => roads.onRoad(x, z) : (x, z) => roads.distance(onto, x, z) < town.roads[onto].width / 2);
-    if (k !== null) paths.push(turn.rect({ x: r.x, z: -k, w: r.w, d: k }));
+    if (k !== null) layPath(s, { ...r, z: -k, d: k });
     return k !== null;
   };
   const porches: PorchInfo[] = [];
@@ -1219,9 +1227,9 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
     if (p) porches.push(p);
   };
   /** A garden path from a front door (plot coordinates) to the street, and on across the verge (as far as a lot set back on a bend needs: `PATH_REACH`). */
-  const pathTo = (s: PlotSlot, front: Door) => {
-    const r = { x: front.x, z: 0, w: 1, d: front.z };
-    paths.push(turnOnto(t, s).rect(r));
+  const pathTo = (s: PlotSlot, front: Door, look?: string) => {
+    const r = { x: front.x, z: 0, w: 1, d: front.z, look };
+    layPath(s, r);
     verge(s, r, PATH_REACH);
   };
   const living = new Map(town.households.flatMap((h) => (h.flat === undefined ? [[h.slot, h.household] as const] : [])));
@@ -1394,9 +1402,10 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
       { rooms: h.upper?.rooms, lift: town.depth },
       { rooms: h.basement?.rooms, lift: storeys * town.depth, below: true },
     ]);
-    // A garden path from the front door to the street, and a porch over the door.
+    // A garden path from the front door to the street, and a porch over the door; each house its own paving.
+    const looks = pathLooks(t.gen?.paving, h.class, mulberry32((hash(s.x, s.z, 193) * 2 ** 32) >>> 0));
     if (h.doors[0]) {
-      pathTo(s, h.doors[0]);
+      pathTo(s, h.doors[0], looks?.path);
       porchOver(s, h, h.doors[0]);
     }
     // A driveway beside the house, crossing the verge to the road: on the side whose line meets
@@ -1417,15 +1426,17 @@ export function layoutTown(content: Content, t: Templates, town: NeighbourhoodDr
       rides(false, []);
       continue;
     }
-    paths.push(turnOnto(t, s).rect(drive));
-    driveOf.set(s.index, turnOnto(t, s).rect(drive));
+    const laidDrive = { ...drive, look: looks?.drive };
+    layPath(s, laidDrive);
+    const driveOnTown = turn.rect(drive);
+    driveOf.set(s.index, driveOnTown);
     // (Its way across the verge to the road it meets squarely; else to the first road it comes
     // to, as a garden path's, and no car: it would have no way out.)
     const square = side.meets?.square ? side.meets : null;
-    const reaches = square ? verge(s, drive, DRIVE_REACH, square.road) : (verge(s, drive, DRIVE_REACH), false);
+    const reaches = square ? verge(s, laidDrive, DRIVE_REACH, square.road) : (verge(s, laidDrive, DRIVE_REACH), false);
     drives.push({ plot: s.index, inner: turn.point([drive.x + drive.w / 2, drive.d]), street: turn.point([drive.x + drive.w / 2, 0]), facing: s.facing, meets: side.meets });
     // The household's car on it (the player's always), where it gets onto the road.
-    const car = reaches && (living.has(s.index) || s.index === playerSlot) ? houseCar(plotRect(t, s), s.facing, turnOnto(t, s).rect(drive), s.index === playerSlot) : null;
+    const car = reaches && (living.has(s.index) || s.index === playerSlot) ? houseCar(plotRect(t, s), s.facing, driveOnTown, s.index === playerSlot) : null;
     if (car) cars.push({ plot: s.index, ...car });
     // A garage at its inner end, clear of what's in the garden (as the street draws it): laid out
     // as the plot is (its street at z = 0), at the plot's place on the town (so each plot decides

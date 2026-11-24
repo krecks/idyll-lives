@@ -94,7 +94,7 @@ import { withoutCloudShadows } from './cloudShadows';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
 import { playbackRate } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
-import { pavedRects } from '../shared/paving';
+import { isPaths, pathLayers, pavedRects } from '../shared/paving';
 import { pavingLayers } from '../shared/streetGround';
 import { GrassPush } from '../shared/grass';
 import { idleMoment } from '../shared/idle';
@@ -2326,8 +2326,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * street's, chunk by chunk: `pc/street.ts`.)
    */
   private buildStreets(world: WorldStructure): void {
+    const paths = world.meta?.paths ?? [];
     const layers: [string, { x: number; z: number; w: number; d: number }[] | undefined, string, number][] = [
-      ['paths', world.meta?.paths, 'material.path', 0.014],
+      ...pathLayers(paths, ''),
       ...fieldLayers(world.meta?.world?.fields, ''),
     ];
     const v = this.view;
@@ -2338,8 +2339,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       if (!list.length) continue;
       const geo = new Geo();
       // Paving toned by vertex (darker and mossy at its sides: `shared/paving.ts`), as the street's.
-      const toned = name === 'paths';
-      if (toned) pavedRects(geo, list, all ?? list, y);
+      const toned = isPaths(name, '');
+      if (toned) pavedRects(geo, list, paths, y);
       else for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
       const mesh = meshFrom(this.device, geo.meshData({ colors: toned }));
       if (mesh) this.lotEntities.push({ entity: drawMesh(this.lotRoot, name, mesh, toned ? this.lib.surface(material, { doubleSided: true, vertexColors: true }) : this.lotMaterial(material)), storey: 0 });
