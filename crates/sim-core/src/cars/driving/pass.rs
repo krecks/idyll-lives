@@ -584,7 +584,7 @@ pub(crate) fn leg_past(w: &World, c: usize, home: bool, o: usize, taxi: &Rect) -
             .total_cmp(&crate::travel::dist(route.at(ts[b]).0, taxi.at))
     })?;
     let (pc, yc, _) = route.at(ts[kc]);
-    let lat = (taxi.at[0] - pc[0]) * yc.cos() - (taxi.at[1] - pc[1]) * yc.sin();
+    let lat = dot2(sub2(taxi.at, pc), right_of([yc.sin(), yc.cos()]));
     if lat.abs() > 1.2 {
         return None;
     }

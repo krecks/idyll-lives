@@ -63,6 +63,11 @@ pub(crate) fn shifted(p: [f32; 2], yaw: f32, shift: f32) -> [f32; 2] {
 
 /// `pts` moved `offs[i]` m to the right (looking the way they run), each its own.
 pub(crate) fn offset_right_by(pts: &[[f32; 2]], offs: &[f32]) -> Vec<[f32; 2]> {
+    offset_right_with(pts, |i| offs[i])
+}
+
+/// `pts` moved `off(i)` m to the right (looking the way they run: `right_of`), each its own.
+pub(crate) fn offset_right_with(pts: &[[f32; 2]], off: impl Fn(usize) -> f32) -> Vec<[f32; 2]> {
     let n = pts.len();
     (0..n)
         .map(|i| {
@@ -70,7 +75,8 @@ pub(crate) fn offset_right_by(pts: &[[f32; 2]], offs: &[f32]) -> Vec<[f32; 2]> {
             let (dx, dz) = (b[0] - a[0], b[1] - a[1]);
             let d = dx.hypot(dz).max(1e-6);
             let r = right_of([dx / d, dz / d]);
-            [pts[i][0] + r[0] * offs[i], pts[i][1] + r[1] * offs[i]]
+            let off = off(i);
+            [pts[i][0] + r[0] * off, pts[i][1] + r[1] * off]
         })
         .collect()
 }

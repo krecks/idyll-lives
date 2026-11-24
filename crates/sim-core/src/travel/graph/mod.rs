@@ -127,8 +127,9 @@ fn motorway_insides(roads: &[Road]) -> Vec<i8> {
             if (u[0] * t[0] + u[1] * t[1]).abs() < 0.9 {
                 continue;
             }
-            // (The left of the way along: (-t.z, t.x), against `cars::right_of`.)
-            let side = (q[1] - p[1]) * t[0] - (q[0] - p[0]) * t[1];
+            // (The left of the way along: against `cars::right_of`.)
+            let right = crate::cars::right_of(t);
+            let side = -((q[0] - p[0]) * right[0] + (q[1] - p[1]) * right[1]);
             best = Some((d, if side >= 0.0 { 1 } else { -1 }));
         }
         out[i] = best.map_or(if a.oneway == OneWay::Against { -1 } else { 1 }, |b| b.1);
