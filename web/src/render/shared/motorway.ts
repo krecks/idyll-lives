@@ -13,7 +13,7 @@
 
 import type { RoadPlan } from '../../core/protocol';
 import { kindInfo, onewayOf } from '../../core/roadKinds';
-import { lengths, nearest, pointAt, raisedSpans, RoadIndex, type Pt } from '../../game/roads';
+import { leftOf, lengths, nearest, pointAt, raisedSpans, RoadIndex, type Pt } from '../../game/roads';
 import { encodeFinish, type Geo, type V3 } from './geometry';
 import type { RoadLevels } from './roads';
 
@@ -28,16 +28,32 @@ export const MOTORWAY = { inner: 0.55, lane: 3.5, base: 0.6, top: 0.2, high: 0.8
 /** The barrier's concrete (a vertex colour in the plain finish: no material of its own). */
 export const BARRIER_CONCRETE = '#A8A59D';
 export const BARRIER_FINISH = encodeFinish(0.92, 0);
+/**
+ * An overpass's measures (m, `street.ts` `overpass`): its concrete slab `slab` deep under the road, reaching `apron` past the road's edges, closed
+ * `lid` under the road's surface (out of sight, there for its shadow, clear of the road's own in the sun's map); its
+ * parapet (a safety-shape barrier: a foot `foot` wide and `footHigh` high, then up to `parapet` over the road, `top`
+ * wide) along each outer edge; a pier every `pier` m or a little less, beside a road it passes over rather than on it
+ * (`street.ts` `pierStations`; `column` square columns, one under a deck
+ * narrower than `wide`, two under a wider one, on a cross-head `cap` along and `capDeep` deep), each `sink` into the
+ * ground; an abutment `abutment` thick under each end that stands clear of it. Where the deck stands less than `low`
+ * over the ground, nothing stands under it.
+ */
+export const OVERPASS = { slab: 1.1, lid: 0.3, apron: 0.5, parapet: 1.0, foot: 0.5, footHigh: 0.3, top: 0.24, pier: 20, column: 1.1, cap: 1.2, capDeep: 0.8, sink: 0.4, abutment: 1.2, wide: 8, low: 2.4 } as const;
+/** Its concrete (and the overview's plain decks', `lowDecks`). */
+export const OVERPASS_CONCRETE = '#ABA8A0';
+
 /** How far apart along a carriageway the barrier's line is taken (m). */
 const BARRIER_STEP = 2;
 
 /**
- * A carriageway's pair: the other one's index, and its side (+1: towards (t.z, -t.x) of the way its points run, as
- * `markings.ts` `Lane.off`: its left on the town map, its right as the game shows it).
+ * A carriageway's pair: the other one's index, its side (+1: towards (t.z, -t.x) of the way its points run, as
+ * `markings.ts` `Lane.off`: its left on the town map, its right as the game shows it), and the verge between their edges
+ * at this one's middle (m).
  */
 export interface MotorwayPair {
   other: number;
   side: 1 | -1;
+  verge: number;
 }
 
 const pairsOf = new WeakMap<readonly RoadPlan[], Map<number, MotorwayPair>>();
@@ -65,9 +81,9 @@ export function motorwayPairs(roads: readonly RoadPlan[]): Map<number, MotorwayP
       if (Math.abs(q.t[0] * t[0] + q.t[1] * t[1]) < 0.9) continue;
       // (Towards (t.z, -t.x): `MotorwayPair.side`.)
       const side = (q.p[0] - p[0]) * t[1] - (q.p[1] - p[1]) * t[0] >= 0 ? 1 : -1;
-      best = { other: j, side, d: near.dist };
+      best = { other: j, side, verge: Math.max(0, near.dist - (a.width + b.width) / 2), d: near.dist };
     }
-    if (best) out.set(i, { other: best.other, side: best.side });
+    if (best) out.set(i, { other: best.other, side: best.side, verge: best.verge });
   }
   pairsOf.set(roads, out);
   return out;
@@ -277,11 +293,20 @@ export function liftedStretches(road: RoadPlan, levels: RoadLevels): [number, nu
   return out;
 }
 
-/** `stretches` less `cut` (both arc lengths, in order). */
-export function without(stretches: readonly [number, number][], cut: readonly [number, number][]): [number, number][] {
+/** `stretches` less `cut` (both arc lengths, in order), each left longer than `least`. */
+export function without(stretches: readonly [number, number][], cut: readonly [number, number][], least = 0.05): [number, number][] {
   let out = stretches.map(([a, b]): [number, number] => [a, b]);
   for (const [c0, c1] of cut) out = out.flatMap(([a, b]): [number, number][] => (c1 <= a || c0 >= b ? [[a, b]] : [...(c0 > a ? [[a, c0] as [number, number]] : []), ...(c1 < b ? [[c1, b] as [number, number]] : [])]));
-  return out.filter(([a, b]) => b - a > 0.05);
+  return out.filter(([a, b]) => b - a > least);
+}
+
+/**
+ * The point `off` m to the side of `p` on a road going `t` there (+: towards (t.z, -t.x), `leftOf`: its left on the town
+ * map, its right as the game shows it; as `Lane.off` and `MotorwayPair.side`).
+ */
+export function aside(p: Pt, t: Pt, off: number): Pt {
+  const l = leftOf(t);
+  return [p[0] + l[0] * off, p[1] + l[1] * off];
 }
 
 /** A road's points by arc length, its way along and its left there: walked forward (`at`), back only from the start. */
@@ -305,19 +330,18 @@ export class Walk {
   }
 }
 
-/** An overpass's measures as the overview draws them (m: `street.ts` `OVERPASS`, which this module can't import): the slab's depth, the parapet's height. */
-const LOW_DECK = { slab: 1.1, parapet: 1.0, step: 4 } as const;
-const LOW_CONCRETE = '#ABA8A0';
+/** How long the overview's deck pieces are at most (m). */
+const LOW_DECK_STEP = 4;
 
 /**
  * The overview's decks (the overpasses, `RoadPlan.raised`, and a motorway's or a ramp's bridges) and the barriers
  * between the motorways' carriageways, plainly, into `g` (vertex colours in the plain finish): a deck's two sides from
  * its parapet's top down to under its slab, its parapets' faces to the road and its underside; on a world with no built
- * surface (`levels` from `deckLevels`, `solid`), a ramp up to one walled down to the ground.
+ * surface (`levels` from `deckLevels`, `solid`), a ramp up to one walled down to the ground. Their slab and parapet as
+ * deep and as high as an overpass's (`OVERPASS`).
  */
 export function lowDecks(g: Geo, roads: readonly RoadPlan[], levels: RoadLevels | null, solid: boolean, spansOf: (r: RoadPlan) => [number, number][]): void {
-  const finish = encodeFinish(0.92, 0);
-  g.color(LOW_CONCRETE, finish);
+  g.color(OVERPASS_CONCRETE, BARRIER_FINISH);
   const pairs = motorwayPairs(roads);
   roads.forEach((road, ri) => {
     if (road.points.length < 2) return;
@@ -333,21 +357,24 @@ export function lowDecks(g: Geo, roads: readonly RoadPlan[], levels: RoadLevels 
     const half = road.width / 2;
     for (const [list, down] of [[open, false], [walled, true]] as const) {
       for (const [s0, s1] of list) {
-        const n = Math.max(1, Math.ceil((s1 - s0) / LOW_DECK.step));
+        const n = Math.max(1, Math.ceil((s1 - s0) / LOW_DECK_STEP));
         for (let k = 0; k < n; k++) {
           const [a, b] = [s0 + ((s1 - s0) * k) / n, s0 + ((s1 - s0) * (k + 1)) / n];
           const [pa, pb] = [walk.at(a), walk.at(b)];
           const [ya, yb] = [Y(a), Y(b)];
-          const P = (q: { p: Pt; t: Pt }, off: number, y: number): V3 => [q.p[0] + q.t[1] * off, y, q.p[1] - q.t[0] * off];
+          const P = (q: { p: Pt; t: Pt }, off: number, y: number): V3 => {
+            const [x, z] = aside(q.p, q.t, off);
+            return [x, y, z];
+          };
           for (const side of [1, -1] as const) {
             if (side === inner) continue;
             const o = side * half;
             const out: V3 = [pa.t[1] * side, 0, -pa.t[0] * side];
-            const [ba, bb] = down ? [0, 0] : [ya - LOW_DECK.slab, yb - LOW_DECK.slab];
-            g.poly([P(pa, o, ba), P(pb, o, bb), P(pb, o, yb + LOW_DECK.parapet), P(pa, o, ya + LOW_DECK.parapet)], out);
-            g.poly([P(pa, o, ya + LOW_DECK.parapet), P(pb, o, yb + LOW_DECK.parapet), P(pb, o, yb), P(pa, o, ya)], [-out[0], 0, -out[2]]);
+            const [ba, bb] = down ? [0, 0] : [ya - OVERPASS.slab, yb - OVERPASS.slab];
+            g.poly([P(pa, o, ba), P(pb, o, bb), P(pb, o, yb + OVERPASS.parapet), P(pa, o, ya + OVERPASS.parapet)], out);
+            g.poly([P(pa, o, ya + OVERPASS.parapet), P(pb, o, yb + OVERPASS.parapet), P(pb, o, yb), P(pa, o, ya)], [-out[0], 0, -out[2]]);
           }
-          if (!down) g.poly([P(pa, half, ya - LOW_DECK.slab), P(pa, -half, ya - LOW_DECK.slab), P(pb, -half, yb - LOW_DECK.slab), P(pb, half, yb - LOW_DECK.slab)], [0, -1, 0]);
+          if (!down) g.poly([P(pa, half, ya - OVERPASS.slab), P(pa, -half, ya - OVERPASS.slab), P(pb, -half, yb - OVERPASS.slab), P(pb, half, yb - OVERPASS.slab)], [0, -1, 0]);
         }
       }
     }
@@ -372,6 +399,17 @@ export interface SignSpot {
   y: number;
 }
 
+/** A sign's place, its height still to come: on road `on[k][0]` at `on[k][1]` m along it (two: at their mean height). */
+interface SignPlace {
+  x: number;
+  z: number;
+  yaw: number;
+  on: readonly (readonly [RoadPlan, number])[];
+}
+
+/** Each set of roads' signs' places (`signPlaces`), once: the heights alone move with the land. */
+const signsOf = new WeakMap<readonly RoadPlan[], SignPlace[]>();
+
 /**
  * Where the motorway's direction signs stand among `roads`, at their heights (`levels`; none: 0): for each off-ramp
  * (a ramp leaving its carriageway at its merging end), beside the carriageway `SIGN_BEFORE` m before the exit where it
@@ -379,9 +417,18 @@ export interface SignSpot {
  * the street where it begins, on its right. Each faces the traffic coming to it.
  */
 export function signSpots(roads: readonly RoadPlan[], levels?: RoadLevels | null): SignSpot[] {
-  const out: SignSpot[] = [];
-  const Y = (r: RoadPlan, s: number) => (levels ? levels.road(r, s) : 0);
+  let places = signsOf.get(roads);
+  if (!places) signsOf.set(roads, (places = signPlaces(roads)));
+  const Y = ([r, s]: readonly [RoadPlan, number]) => (levels ? levels.road(r, s) : 0);
+  return places.map(({ x, z, yaw, on }) => ({ x, z, yaw, y: on.length > 1 ? (Y(on[0]) + Y(on[1])) / 2 : Y(on[0]) }));
+}
+
+/** Where `signSpots`' signs stand, and on what. */
+function signPlaces(roads: readonly RoadPlan[]): SignPlace[] {
+  const out: SignPlace[] = [];
   const facing = (t: Pt, way: number) => Math.atan2(-t[0] * way, -t[1] * way);
+  // (Each carriageway's index, for the gore: built when first asked.)
+  const indexes = new Map<RoadPlan, RoadIndex>();
   roads.forEach((ramp) => {
     if (ramp.kind !== 'ramp' || ramp.points.length < 2) return;
     const e = ramp.ends[0] === 'merge' ? 0 : ramp.ends[1] === 'merge' ? 1 : -1;
@@ -403,20 +450,25 @@ export function signSpots(roads: readonly RoadPlan[], levels?: RoadLevels | null
         const s = at - before * cWay;
         if (s < 0 || s > cls[cls.length - 1]) continue;
         const { p, t } = pointAt(c.points, s, cls);
-        const off = outside * (c.width / 2 + SIGN_OUT);
-        out.push({ x: p[0] + t[1] * off, z: p[1] - t[0] * off, yaw: facing(t, cWay), y: Y(c, s) });
+        const [x, z] = aside(p, t, outside * (c.width / 2 + SIGN_OUT));
+        out.push({ x, z, yaw: facing(t, cWay), on: [[c, s]] });
       }
       // In the gore: the first place along the ramp it has parted from the carriageway far enough, midway between.
+      let index = indexes.get(c);
+      if (!index) indexes.set(c, (index = new RoadIndex([c])));
+      const apart = (c.width + ramp.width) / 2 + SIGN_GORE;
       for (let k = 1; k * 2 < total; k++) {
         const s = e === 0 ? k * 2 : total - k * 2;
         const { p, t } = pointAt(ramp.points, s, ls);
+        // (Plainly too near, by the index: a millimetre short of far enough, so the measure below never decides otherwise.)
+        if (index.distance(0, p[0], p[1], apart - 1e-3) < Infinity) continue;
         const near = nearest(c.points, p[0], p[1], cls);
         const gap = near.dist - (c.width + ramp.width) / 2;
         if (gap < SIGN_GORE) continue;
         const q = pointAt(c.points, near.s, cls).p;
         // (Midway across the gap, out from both roads' middles: their edges half the gap away each.)
         const f = (ramp.width / 2 + gap / 2) / (near.dist || 1);
-        out.push({ x: p[0] + (q[0] - p[0]) * f, z: p[1] + (q[1] - p[1]) * f, yaw: facing(t, way), y: (Y(ramp, s) + Y(c, near.s)) / 2 });
+        out.push({ x: p[0] + (q[0] - p[0]) * f, z: p[1] + (q[1] - p[1]) * f, yaw: facing(t, way), on: [[ramp, s], [c, near.s]] });
         break;
       }
     }
@@ -426,8 +478,8 @@ export function signSpots(roads: readonly RoadPlan[], levels?: RoadLevels | null
       const s = e === 0 ? total - SIGN_RAMP_IN : SIGN_RAMP_IN;
       if (s <= 0 || s >= total) return;
       const { p, t } = pointAt(ramp.points, s, ls);
-      const off = way * (ramp.width / 2 + SIGN_OUT);
-      out.push({ x: p[0] + t[1] * off, z: p[1] - t[0] * off, yaw: facing(t, way), y: Y(ramp, s) });
+      const [x, z] = aside(p, t, way * (ramp.width / 2 + SIGN_OUT));
+      out.push({ x, z, yaw: facing(t, way), on: [[ramp, s]] });
     }
   });
   return out;

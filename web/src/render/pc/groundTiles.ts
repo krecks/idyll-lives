@@ -10,10 +10,10 @@ import { carriageway, hasSidewalks, planJunctions } from '../shared/junctions';
 import { kindInfo } from '../../core/roadKinds';
 import { lengths } from '../../game/roads';
 import { junctionStretches } from '../shared/markings';
-import { allBarriers, without } from '../shared/motorway';
+import { allBarriers, OVERPASS, without } from '../shared/motorway';
 import { boxOf, clipRect, COURSE, courseCells, JOINT, LINE, PAVING_LOOK, TILE, townPaving, type TownPaving } from '../shared/townPaving';
 import { bridgeSpans, raisedSpans, stretchOf } from '../shared/roads';
-import { BRIDGE, OVERPASS } from '../shared/street';
+import { BRIDGE } from '../shared/street';
 
 /**
  * A ground tile as `terrainTiles` builds it: its draw, its meshes by level (the finest only while it is near enough to
@@ -313,10 +313,13 @@ export class TownGroundMap {
     };
     barriers();
     // The overpasses last, over what they pass over: their concrete wider than their road, its asphalt, the barrier on them.
-    const decks = roads.flatMap((r) => (raisedSpans(r).length ? [{ r, spans: raisedSpans(r) }] : []));
-    for (const { r, spans } of decks) for (const piece of cut(r, spans)) stroke(piece, r.width + 2 * OVERPASS.apron, MAP.concrete);
-    for (const { r, spans } of decks) for (const piece of cut(r, spans)) stroke(piece, carriageway(r), MAP.asphalt);
-    if (decks.length) barriers((r, s) => raisedSpans(r).some(([a, b]) => s >= a && s <= b));
+    const decks = new Map(roads.flatMap((r) => {
+      const spans = raisedSpans(r);
+      return spans.length ? [[r, spans] as const] : [];
+    }));
+    for (const [r, spans] of decks) for (const piece of cut(r, spans)) stroke(piece, r.width + 2 * OVERPASS.apron, MAP.concrete);
+    for (const [r, spans] of decks) for (const piece of cut(r, spans)) stroke(piece, carriageway(r), MAP.asphalt);
+    if (decks.size) barriers((r, s) => !!decks.get(r)?.some(([a, b]) => s >= a && s <= b));
     g.lineCap = 'round';
     // Premultiplied (so the mips stay true at an edge), up to the GPU with its mips.
     const data = g.getImageData(0, 0, size, size).data;

@@ -7,10 +7,10 @@
 import { describe, expect, test } from 'bun:test';
 import type { RoadPlan, WorldStructure } from '../src/core/protocol';
 import { Geo } from '../src/render/shared/geometry';
-import { allBarriers, barrier, deckLevels, insideOf, liftedStretches, MOTORWAY, motorwayPairs, signSpots, without } from '../src/render/shared/motorway';
+import { allBarriers, barrier, deckLevels, insideOf, liftedStretches, MOTORWAY, motorwayPairs, OVERPASS, signSpots, without } from '../src/render/shared/motorway';
 import { nearest } from '../src/game/roads';
 import { raisedSpans, ROAD_Y, roadHeightsOf } from '../src/render/shared/roads';
-import { OVERPASS, overpass, Painter, pierStations } from '../src/render/shared/street';
+import { overpass, Painter, pierStations } from '../src/render/shared/street';
 import * as F from '../src/render/roadHierarchyFixture';
 
 const h = F.roadHierarchy();
