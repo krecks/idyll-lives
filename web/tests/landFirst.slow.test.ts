@@ -177,7 +177,9 @@ describe('the land first, then the town', async () => {
   test('a river cross with no villages: the town alone, no bridge; a city too big for any quarter is told so', () => {
     const alone = townOn(crossed(landOf('heath', 5, { size: 'large', town: 'village', villages: 'none' })), { waterKept: false }).draft;
     expect(alone.open!.areas.length).toBe(1);
-    expect(alone.roads.some((r) => r.bridge && r.bridge[1] > r.bridge[0])).toBe(false);
+    // (The motorway bridges the river where it crosses it, as it does any: the town's roads don't.)
+    const motorway = (r: RoadPlan) => r.kind === 'motorway' || r.kind === 'ramp';
+    expect(alone.roads.filter((r) => !motorway(r) && r.bridge && r.bridge[1] > r.bridge[0]).map((r) => r.name)).toEqual([]);
     expect(faults(alone)).toEqual([]);
     const city = crossed(landOf('heath', 5, { size: 'medium', town: 'city', villages: 'few' }));
     expect(() => townOn(city, { waterKept: false })).toThrow(/^There is no dry land big enough for the town: it needs \d+ × \d+ m in one piece\.$/);
