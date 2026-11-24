@@ -92,7 +92,7 @@ pub struct Traffic {
     pub(super) tick: u64,
     pub(super) holds: Vec<Hold>,
     /// The keys of those holding a merge's claim (`Claim::merge`), each once, sorted: kept with
-    /// `holds` as it changes (`merge_held`, `merges_let_go`), and asked for by every car on a
+    /// `holds` as it changes (`hold`, `merges_let_go`), and asked for by every car on a
     /// motorway every tick (`cars::ease`).
     pub(super) merging: Vec<u64>,
     pub(super) asks: Vec<Ask>,
