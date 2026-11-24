@@ -959,6 +959,43 @@ fn no_car_turns_round_in_a_mouth_with_a_car_parked_up_against_its_turn() {
     );
 }
 
+/// (Farm, the play-test's farm city: a taxi held up going south down a country lane turned round in
+/// a driveway's mouth on its left, backing across the other lane. A car came up that lane beside
+/// it and stood waiting for it to go; the taxi waited for that car to get out of its way, and that
+/// car could back up no further, into the junction behind it. They stood there for good, the
+/// lane, the junction and the motorway's off-ramp backed up behind them.) A car turns round only
+/// in a mouth on its own side of the road, its right: going east past a driveway on the south side
+/// it does; going west past it, the driveway on its left, it doesn't.
+#[test]
+fn a_car_turns_round_only_in_a_mouth_on_its_right() {
+    let road: Vec<String> = (0..=199).map(|x| format!("[{x}.5,30]")).collect();
+    let town = format!(
+        r#"{{"width":200,"depth":60,
+            "exits":[{{"x":0.5,"z":30,"kind":"road"}},{{"x":199.5,"z":30,"kind":"road"}}],
+            "roads":[{{"points":[{}],"width":7,"kind":"street","ends":["out","out"]}}],
+            "plots":[{{"name":"H","x":78,"z":8,"w":16,"d":18,"entry":[83.5,25.5]}}],
+            "drives":[{{"plot":0,"x":90,"z":8.5,"front":1,"street":30,"road":0,"s":89.5}}],
+            "households":[],"objects":[],"sims":[],"cars":[]}}"#,
+        road.join(",")
+    );
+    let mut w = World::from_json(CONTENT, &town, 1).unwrap();
+    w.cars.push(car([0.0, 0.0], 0.0, 30.0));
+    // (Past the mouth in its own lane, on its right: going east, the south side; west, the north.)
+    let way = |east: bool| {
+        let (x0, dx) = if east { (20.0, 2.0) } else { (160.0, -2.0f32) };
+        let right = right_of([dx.signum(), 0.0]);
+        let mut legs = Legs::default();
+        for k in 0..=50 {
+            let x = x0 + k as f32 * dx;
+            legs.push_lane([x, 30.0 + right[1] * TIGHT_LANE], 5.0, 0.0, LANE);
+        }
+        legs.timed(true, true)
+    };
+    let found = |r: &Route| mouth_behind(&w, 0, r, 0.0, r.ticks() - 1.0, &|_| true).is_some();
+    assert!(found(&way(true)), "going east, the driveway on its right");
+    assert!(!found(&way(false)), "going west, the driveway on its left");
+}
+
 /// (Skerry Island, the real town's island of seed base 0: a work taxi held up in a morning queue
 /// turned round, and as it backed up along the street a car came up behind it, into the ground
 /// it backed over. Each waited for the other: the one behind could back up no further, a car
