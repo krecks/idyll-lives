@@ -11,9 +11,11 @@
 // driveways, gardenFences), and when a lane became a lane's 6 m (2026-11-23: every area road but its first, the
 // lots along it half a metre nearer its middle), and for the motorway (2026-11-23: one in every world where it fits,
 // edge to edge past the main town, the country roads crossing under it at its gates; in the others, the note why
-// not in their diagnostics), and when the motorway went down before the villages (2026-11-24: its course chosen
-// with the main town alone, none costing a village; the villages kept clear of it, its gates chosen by them; no
-// side T where another area's street comes up end to end). A change that moves one on purpose re-pins it here.
+// not in their diagnostics), for traffic on the right as the game shows it (2026-11-24: each motorway's
+// carriageways on the other sides of its middle line, its ramps with them), and when the motorway went down before
+// the villages (2026-11-24: its course chosen with the main town alone, none costing a village; the villages kept
+// clear of it, its gates chosen by them; no side T where another area's street comes up end to end). A change that
+// moves one on purpose re-pins it here.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';

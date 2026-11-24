@@ -3,9 +3,9 @@
 //! `web/src/render/roadHierarchyFixture.ts` (road for road, in the same order):
 //!
 //! - a motorway edge to edge along z = 200 to 209: two one-way carriageways 9 m apart, laid for
-//!   traffic on the right (eastbound the southern, z = 209, its points running east; westbound the
-//!   northern, z = 200, its points running east too and one-way against them: each has the other
-//!   on its left, and its ramps leave to its right),
+//!   traffic on the right as the game draws it (`cars::right_of`: z north; eastbound the southern,
+//!   z = 200, its points running east; westbound the northern, z = 209, its points running east too
+//!   and one-way against them: each has the other on its left, and its ramps leave to its right),
 //!   raised over a street (`BRIDGE_STREET`, north from the avenue to the world's edge) without
 //!   meeting it, and on a bridge over a river;
 //! - a half-diamond west of the street: an off-ramp from the eastbound carriageway (south of it)
@@ -25,10 +25,10 @@ use crate::common;
 /// The world's size (m).
 pub const WIDTH: i64 = 480;
 pub const DEPTH: i64 = 320;
-/// The carriageways' middles (z): eastbound, westbound (north is -z: eastbound's right, +z, is
-/// the south).
-pub const EAST_Z: f64 = 209.0;
-pub const WEST_Z: f64 = 200.0;
+/// The carriageways' middles (z): eastbound, westbound (north is +z: eastbound's right, -z, is
+/// the south; `cars::right_of`).
+pub const EAST_Z: f64 = 200.0;
+pub const WEST_Z: f64 = 209.0;
 /// The carriageways' ends (x): `s` along either is `x - MOTORWAY_X0`.
 pub const MOTORWAY_X0: f64 = 0.5;
 pub const MOTORWAY_X1: f64 = 479.5;
@@ -133,18 +133,18 @@ pub fn hierarchy() -> Hierarchy {
         ramp(
             &[
                 [20.0, EAST_Z],
-                [40.0, EAST_Z + 7.0],
-                [110.0, EAST_Z + 7.0],
-                [STREET_X, EAST_Z + 25.0],
+                [40.0, EAST_Z - 7.0],
+                [110.0, EAST_Z - 7.0],
+                [STREET_X, EAST_Z - 25.0],
             ],
             ["merge", "join"],
             "Off-ramp",
         ),
         ramp(
             &[
-                [STREET_X, WEST_Z - 25.0],
-                [110.0, WEST_Z - 7.0],
-                [40.0, WEST_Z - 7.0],
+                [STREET_X, WEST_Z + 25.0],
+                [110.0, WEST_Z + 7.0],
+                [40.0, WEST_Z + 7.0],
                 [20.0, WEST_Z],
             ],
             ["join", "merge"],
@@ -233,7 +233,7 @@ fn the_hierarchy_loads_with_its_kinds_and_ways() {
     }
     // (The carriageways 9 m apart, the ramps 110 to 140 m long.)
     let mid = |i: usize| g.roads.iter().find(|r| r.source == i as u32).unwrap();
-    let apart = mid(MOTORWAY_EAST).at(100.0)[1] - mid(MOTORWAY_WEST).at(100.0)[1];
+    let apart = mid(MOTORWAY_WEST).at(100.0)[1] - mid(MOTORWAY_EAST).at(100.0)[1];
     assert!((apart - 9.0).abs() < 1e-3, "{apart} m apart");
     for ramp in [OFF_RAMP, ON_RAMP] {
         let len = mid(ramp).len();
@@ -338,8 +338,8 @@ fn motorway_crossing_makes_no_node() {
     let along: Vec<f32> = edges_of(g, street).iter().map(|e| e.s1).collect();
     let s = |z: f64| (z - AVENUE_Z) as f32;
     assert_eq!(along.len(), 3, "{along:?}");
-    assert!((along[0] - s(WEST_Z - 25.0)).abs() < 0.5, "{along:?}");
-    assert!((along[1] - s(EAST_Z + 25.0)).abs() < 0.5, "{along:?}");
+    assert!((along[0] - s(EAST_Z - 25.0)).abs() < 0.5, "{along:?}");
+    assert!((along[1] - s(WEST_Z + 25.0)).abs() < 0.5, "{along:?}");
     // (Walking or driving under it: straight along the street.)
     let (a, b) = (
         on(g, BRIDGE_STREET, [140.0, 150.0]),
@@ -411,7 +411,7 @@ fn a_merge_has_no_box_and_no_lights() {
         }
     }
     // (The ramps' other ends are T's on the street, junctions as any.)
-    for z in [EAST_Z + 25.0, WEST_Z - 25.0] {
+    for z in [EAST_Z - 25.0, WEST_Z + 25.0] {
         let t = [STREET_X as f32, z as f32];
         assert!(junctions.iter().any(|j| dist(*j, t) < 0.5), "{t:?}");
         assert!(g.boxes.iter().any(|(b, _)| dist(*b, t) < 0.5), "{t:?}");
@@ -425,8 +425,8 @@ fn walkers_keep_off_the_motorway_and_its_ramps() {
     let car_only = |k: RoadKind| matches!(k, RoadKind::Motorway | RoadKind::Ramp);
     for p in [
         [20.0, EAST_Z as f32],
-        [60.0, WEST_Z as f32 - 7.0],
-        [100.0, EAST_Z as f32 + 7.0],
+        [60.0, WEST_Z as f32 + 7.0],
+        [100.0, EAST_Z as f32 - 7.0],
         [300.0, 204.0],
     ] {
         for rp in g.near(p, 60.0, 4, Mode::Foot) {
@@ -447,7 +447,7 @@ fn walkers_keep_off_the_motorway_and_its_ramps() {
         }
     }
     // (Nor can they set off along one.)
-    let ramp = on(g, OFF_RAMP, [80.0, EAST_Z as f32 + 7.0]);
+    let ramp = on(g, OFF_RAMP, [80.0, EAST_Z as f32 - 7.0]);
     let street = on(g, BRIDGE_STREET, [140.0, 120.0]);
     assert!(g.path(ramp, street, Mode::Foot, 16.0).is_none());
     assert!(g.path(ramp, street, Mode::Car, 16.0).is_some());
@@ -479,7 +479,7 @@ fn town_to_the_motorway_by_its_ramps_their_way() {
     );
     let on_ramp = &out.pts[ramp_at..motorway_at];
     assert!(
-        on_ramp.iter().all(|p| p.0[1] < WEST_Z as f32 + 0.01),
+        on_ramp.iter().all(|p| p.0[1] > WEST_Z as f32 - 0.01),
         "the on-ramp: {on_ramp:?}"
     );
     for w in out.pts[motorway_at..].windows(2) {
@@ -725,9 +725,9 @@ fn avenue_cars_keep_to_the_outer_lane_each_way() {
     let w = world();
     let g = &w.travel.graph;
     let z = AVENUE_Z as f32;
-    // (East, its right the +z side; west, the -z side; straight along it past both cross
-    // streets.)
-    for (a, b, side) in [([10.0, z], [290.0, z], 1.0), ([290.0, z], [10.0, z], -1.0)] {
+    // (East, its right the -z side; west, the +z side (`cars::right_of`); straight along it past
+    // both cross streets.)
+    for (a, b, side) in [([10.0, z], [290.0, z], -1.0), ([290.0, z], [10.0, z], 1.0)] {
         let drive = poses(&w, a, b);
         for p in between(g, &drive, 20.0, 280.0) {
             let off = (p[1] - z) * side;
@@ -744,23 +744,23 @@ fn avenue_left_turners_take_the_inner_lane() {
     let w = world();
     let g = &w.travel.graph;
     let z = AVENUE_Z as f32;
-    // East, turning left (north, -z) into the east cross street: the inner lane from Bridge
+    // East, turning left (north, +z) into the east cross street: the inner lane from Bridge
     // Street's T on (x 140), the outer before it (straight on at the west cross street and the T);
     // in the cross street's lane after.
-    let left = poses(&w, [10.0, z], [210.0, 50.0]);
+    let left = poses(&w, [10.0, z], [210.0, 110.0]);
     for p in between(g, &left, 20.0, 125.0) {
-        assert!((p[1] - z - AVENUE_OUTER).abs() < 0.05, "before: {p:?}");
+        assert!((z - p[1] - AVENUE_OUTER).abs() < 0.05, "before: {p:?}");
     }
     for p in between(g, &left, 155.0, 195.0) {
         assert!(
-            (p[1] - z - AVENUE_INNER).abs() < 0.05,
+            (z - p[1] - AVENUE_INNER).abs() < 0.05,
             "the stretch it turns left at the end of: {p:?}"
         );
     }
     let north: Vec<[f32; 2]> = left
         .iter()
         .map(|d| d.0)
-        .filter(|p| p[1] < 70.0 && p[1] > 50.0 && !boxed(g, *p))
+        .filter(|p| p[1] > 90.0 && p[1] < 110.0 && !boxed(g, *p))
         .collect();
     assert!(!north.is_empty());
     for p in north {
@@ -769,22 +769,22 @@ fn avenue_left_turners_take_the_inner_lane() {
             "up the cross street: {p:?}"
         );
     }
-    // East, turning right (south) into it: the outer lane all along.
-    let right = poses(&w, [10.0, z], [210.0, 110.0]);
+    // East, turning right (south, -z) into it: the outer lane all along.
+    let right = poses(&w, [10.0, z], [210.0, 50.0]);
     for p in between(g, &right, 20.0, 195.0) {
         assert!(
-            (p[1] - z - AVENUE_OUTER).abs() < 0.05,
+            (z - p[1] - AVENUE_OUTER).abs() < 0.05,
             "turning right: {p:?}"
         );
     }
-    // West, turning left (south, +z) into the west cross street: the inner lane from the T on.
-    let west = poses(&w, [290.0, z], [90.0, 110.0]);
+    // West, turning left (south, -z) into the west cross street: the inner lane from the T on.
+    let west = poses(&w, [290.0, z], [90.0, 50.0]);
     for p in between(g, &west, 155.0, 280.0) {
-        assert!((z - p[1] - AVENUE_OUTER).abs() < 0.05, "before: {p:?}");
+        assert!((p[1] - z - AVENUE_OUTER).abs() < 0.05, "before: {p:?}");
     }
     for p in between(g, &west, 105.0, 125.0) {
         assert!(
-            (z - p[1] - AVENUE_INNER).abs() < 0.05,
+            (p[1] - z - AVENUE_INNER).abs() < 0.05,
             "turning left at its end: {p:?}"
         );
     }
@@ -881,8 +881,8 @@ fn the_motorway_is_laid_for_traffic_on_the_right() {
     let (east, west) = (EAST_Z as f32, WEST_Z as f32);
     assert!((right_of(g, MOTORWAY_EAST, [250.0, west]) + 9.0).abs() < 1e-3);
     assert!((right_of(g, MOTORWAY_WEST, [250.0, east]) - 9.0).abs() < 1e-3);
-    assert!(right_of(g, MOTORWAY_EAST, [80.0, east + 7.0]) > 6.0);
-    assert!(right_of(g, MOTORWAY_WEST, [80.0, west - 7.0]) < -6.0);
+    assert!(right_of(g, MOTORWAY_EAST, [80.0, east - 7.0]) > 6.0);
+    assert!(right_of(g, MOTORWAY_WEST, [80.0, west + 7.0]) < -6.0);
 }
 
 #[test]
@@ -890,31 +890,31 @@ fn motorway_cars_keep_to_the_outer_lane_of_their_carriageway() {
     let w = world();
     let g = &w.travel.graph;
     // (Each carriageway's outer lane away from the other, on its right: the eastbound's south of
-    // its middle (+z), the westbound's north.)
+    // its middle (-z), the westbound's north.)
     let (east, west) = (EAST_Z as f32, WEST_Z as f32);
     let along = poses(&w, [30.0, east], [470.0, east]);
     for p in between(g, &along, 40.0, 460.0) {
         assert!(
-            (p[1] - (east + MOTORWAY_OUTER)).abs() < 0.05,
+            (p[1] - (east - MOTORWAY_OUTER)).abs() < 0.05,
             "eastbound: {p:?}"
         );
     }
     let back = poses(&w, [470.0, west], [30.0, west]);
     for p in between(g, &back, 40.0, 460.0) {
         assert!(
-            (p[1] - (west - MOTORWAY_OUTER)).abs() < 0.05,
+            (p[1] - (west + MOTORWAY_OUTER)).abs() < 0.05,
             "westbound: {p:?}"
         );
     }
 }
 
 /// How far right of the town file's road `source`'s middle line (the way its points run) `p` is
-/// (m).
+/// (m: `cars::right_of`, (t.z, -t.x)).
 fn right_of(g: &Graph, source: usize, p: [f32; 2]) -> f32 {
     let road = &g.roads[road_of(g, source) as usize];
     let (s, _) = road.project(p);
     let (q, t) = (road.at(s), road.tangent(s));
-    (p[0] - q[0]) * -t[1] + (p[1] - q[1]) * t[0]
+    (p[0] - q[0]) * t[1] - (p[1] - q[1]) * t[0]
 }
 
 /// The most a drive moves across its road's middle line a metre along it (m), with `x` between
@@ -951,7 +951,7 @@ fn ramps_ease_into_the_carriageways_lane_and_out_of_it() {
     assert!(merged.len() > 5);
     for p in merged {
         assert!(
-            (p[1] - (west - MOTORWAY_OUTER)).abs() < 0.05,
+            (p[1] - (west + MOTORWAY_OUTER)).abs() < 0.05,
             "merged: {p:?}"
         );
     }
@@ -1589,9 +1589,9 @@ fn avenue_driveways_set_off_to_the_right_and_are_come_into_from_it() {
     let z = AVENUE_Z as f32;
     // A driveway either side of the avenue, 60 m from its end of town: each car sets off along
     // the lanes on its own side (on the right of the way it goes), never across the median; on
-    // the +z side that's east (+x), away from that end, round by the roads; and home, it comes
+    // the -z side that's east (+x), away from that end, round by the roads; and home, it comes
     // along those lanes into it.
-    for (side, east) in [(1.0f32, true), (-1.0, false)] {
+    for (side, east) in [(-1.0f32, true), (1.0, false)] {
         let spot = [60.0, z + side * 12.0];
         let facing = if side > 0.0 {
             std::f32::consts::PI
@@ -1688,7 +1688,7 @@ fn taxis_stand_on_an_avenue_on_the_riders_side() {
 }
 
 /// A long straight carriageway along z = 100 (cars going east, a kilometre end to end) and an
-/// on-ramp onto it off a street from the north, merging at x = 450, its last 50 m straight
+/// on-ramp onto it off a street from the south (its right: `cars::right_of`), merging at x = 450, its last 50 m straight
 /// beside it: where a car merging comes up to the carriageway's speed (the hierarchy's merges
 /// at its edge). And where through cars and those up the ramp go from and to.
 #[allow(clippy::type_complexity)]
@@ -1696,9 +1696,9 @@ fn merge_world() -> (World, ([f32; 2], [f32; 2]), ([f32; 2], [f32; 2]), [f32; 2]
     let roads = json!([
         {"points": polyline(&[[0.5, 100.0], [999.5, 100.0]]), "width": 9, "ends": ["out", "out"],
             "kind": "motorway", "oneway": 1, "name": "Motorway"},
-        {"points": polyline(&[[300.0, 199.5], [300.0, 140.0]]), "width": 7, "ends": ["out", "join"],
+        {"points": polyline(&[[300.0, 0.5], [300.0, 60.0]]), "width": 7, "ends": ["out", "join"],
             "kind": "street", "name": "Ramp Street"},
-        {"points": polyline(&[[300.0, 140.0], [320.0, 112.0], [400.0, 106.0], [450.0, 100.0]]),
+        {"points": polyline(&[[300.0, 60.0], [320.0, 88.0], [400.0, 94.0], [450.0, 100.0]]),
             "width": 5, "ends": ["join", "merge"], "kind": "ramp", "oneway": 1, "name": "On-ramp"},
     ]);
     let town = json!({
@@ -1706,13 +1706,13 @@ fn merge_world() -> (World, ([f32; 2], [f32; 2]), ([f32; 2], [f32; 2]), [f32; 2]
         "walls": [], "doors": [], "windows": [], "objects": [],
         "plots": [], "households": [], "sims": [], "relationships": [],
         "roads": roads, "meta": {"roads": roads},
-        "exits": [[0.5, 100.0], [999.5, 100.0], [300.0, 199.5]],
+        "exits": [[0.5, 100.0], [999.5, 100.0], [300.0, 0.5]],
     });
     let w = World::from_json(&common::content(), &town.to_string(), 1).expect("it loads");
     (
         w,
         ([40.0, 100.0], [990.0, 100.0]),
-        ([300.0, 190.0], [990.0, 100.0]),
+        ([300.0, 10.0], [990.0, 100.0]),
         [450.0, 100.0],
     )
 }
@@ -1874,4 +1874,64 @@ fn nobody_turns_round_on_the_motorway_or_a_ramp() {
         assert!(*s > 1000, "car {} stood {s} ticks", pairs[i].1);
     }
     assert_eq!(w.traffic.unjams, 0);
+}
+
+/// Traffic keeps to the right as the game draws it (the owner's choice, 2026-11-24: German rules),
+/// pinned end to end with `web/tests/rightHand.test.ts`, which takes the same convention through
+/// the renderer's mirror and camera to the screen. The town's x runs east and its z north, a yaw
+/// clockwise from above: going +x, the right is -z (`cars::right_of`). A car going north up
+/// Bridge Street keeps east of its middle line, one coming south west of it; each lit junction's
+/// pole stands on the right of those coming in, its head facing them and its right side (+x as
+/// the model is made, where the pedestrians' head looks) towards the road.
+#[test]
+fn traffic_keeps_to_the_right_as_the_game_draws_it() {
+    use sim_core::cars::right_of;
+    assert_eq!(right_of([1.0, 0.0]), [0.0, -1.0]);
+    assert_eq!(right_of([0.0, 1.0]), [1.0, 0.0]);
+    // (Forward is (sin yaw, cos yaw): going +x, a yaw of a quarter turn clockwise.)
+    let yaw = std::f32::consts::FRAC_PI_2;
+    let r = right_of([yaw.sin(), yaw.cos()]);
+    assert!((r[0] - yaw.cos()).abs() < 1e-6 && (r[1] + yaw.sin()).abs() < 1e-6);
+    let w = world();
+    let g = &w.travel.graph;
+    let x = STREET_X as f32;
+    let lane = 1.05;
+    for (a, b, side) in [([x, 90.0], [x, 160.0], 1.0), ([x, 160.0], [x, 90.0], -1.0)] {
+        let drive = poses(&w, a, b);
+        let on: Vec<[f32; 2]> = drive
+            .iter()
+            .map(|d| d.0)
+            .filter(|p| p[1] > 100.0 && p[1] < 150.0 && !boxed(g, *p))
+            .collect();
+        assert!(on.len() > 10, "{a:?} to {b:?}");
+        for p in on {
+            assert!(
+                ((p[0] - x) * side - lane).abs() < 0.05,
+                "{a:?} to {b:?}: at {p:?}, not on its right"
+            );
+        }
+    }
+    let mut poles = 0;
+    for sig in &w.travel.signals {
+        for a in sig.arms.iter().filter(|a| a.inbound()) {
+            // (Coming in against the arm's way out: their right.)
+            let right = right_of([-a.way[0], -a.way[1]]);
+            let off = [a.pole[0] - sig.at[0], a.pole[1] - sig.at[1]];
+            assert!(
+                off[0] * right[0] + off[1] * right[1] > a.kerb,
+                "the pole at {:?} on the left of those coming in",
+                a.pole
+            );
+            // (The head's facing (sin, cos) out along the arm, at them; its +x (cos, -sin) back
+            // across the road.)
+            let (s, c) = a.yaw.sin_cos();
+            assert!(s * a.way[0] + c * a.way[1] > 0.9, "facing {}", a.yaw);
+            assert!(
+                c * right[0] - s * right[1] < -0.9,
+                "its right away from the road"
+            );
+            poles += 1;
+        }
+    }
+    assert!(poles >= 4, "{poles} poles");
 }

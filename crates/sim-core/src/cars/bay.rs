@@ -32,7 +32,8 @@ impl Bay {
         s_at: f32,
     ) -> Option<Bay> {
         let t = road.tangent(s_at);
-        let n = [-t[1], t[0]];
+        // (Its normal the road's right: `right_of`.)
+        let n = right_of(t);
         let (dx, dz) = (spot[0] - mp[0], spot[1] - mp[1]);
         let (x0, z0) = (dx * t[0] + dz * t[1], dx * n[0] + dz * n[1]);
         let s = if z0 <= 0.0 { 1.0 } else { -1.0 };

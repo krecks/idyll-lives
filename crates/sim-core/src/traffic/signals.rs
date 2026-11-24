@@ -686,7 +686,9 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
                 let at = on(out);
                 let t = r.tangent(at);
                 let o = [t[0] * k, t[1] * k];
-                let right = [o[1] * side, -o[0] * side];
+                // (The right of the way in, against the way out: `cars::right_of`.)
+                let rt = crate::cars::right_of([-o[0], -o[1]]);
+                let right = [rt[0] * side, rt[1] * side];
                 let m = r.at(at);
                 let d = kerb + POLE_KERB;
                 ([m[0] + right[0] * d, m[1] + right[1] * d], o)

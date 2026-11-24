@@ -41,13 +41,17 @@ const STEP = 2;
 /** How far a ramp's edge line keeps in from its edge (m). */
 const RAMP_EDGE = 0.35;
 
-/** A lane: its middle (m from the road's middle, + its left, looking along its points) and the way its cars go (+1: along its points). */
+/**
+ * A lane: its middle (m from the road's middle, + towards (t.z, -t.x) of the way its points run: its left on the town map,
+ * which draws z down the page, so its right as the game shows it, `render/pc/space.ts`) and the way its cars go (+1: along
+ * its points).
+ */
 export interface Lane {
   off: number;
   way: 1 | -1;
 }
 
-/** A road's lines across (m from its middle, + its left): its lanes, the dashed lines between lanes going the same way, its solid edge lines. */
+/** A road's lines across (m from its middle, + as `Lane.off`): its lanes, the dashed lines between lanes going the same way, its solid edge lines. */
 export interface LaneLayout {
   lanes: Lane[];
   dividers: number[];
@@ -74,8 +78,9 @@ export function laneLayout(roads: readonly RoadPlan[], ri: number): LaneLayout |
       const lanes: Lane[] = [];
       const dividers: number[] = [];
       for (let k = 0; k < info.lanesEachWay; k++) {
-        // (Going along its points on its right, -; against them on its left.)
-        lanes.push({ off: -(m + w * (k + 0.5)), way: 1 }, { off: m + w * (k + 0.5), way: -1 });
+        // (Traffic on the right as the game shows it (sim-core `cars::right_of`): going along its points, +; against
+        // them, -.)
+        lanes.push({ off: m + w * (k + 0.5), way: 1 }, { off: -(m + w * (k + 0.5)), way: -1 });
         if (k > 0) dividers.push(-(m + w * k), m + w * k);
       }
       return { lanes, dividers, edges: [], dash: 'town' };
@@ -186,7 +191,7 @@ export function roadMarkings(roads: readonly RoadPlan[], marks: Geo, junctions: 
 }
 
 /**
- * An arrow pointing along a lane, drawn by `at(u, v)`: `u` m along the way it points from its middle, `v` m to its right.
+ * An arrow pointing along a lane, drawn by `at(u, v)`: `u` m along the way it points from its middle, `v` m across it (either way: it is symmetric).
  * Its shaft, then its head.
  */
 function arrow(marks: Geo, at: (u: number, v: number) => V3, up: V3): void {

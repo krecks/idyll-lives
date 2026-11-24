@@ -313,6 +313,8 @@ pub use bay::*;
 pub use bodies::*;
 pub(crate) use driving::*;
 pub(crate) use garages::*;
+/// The right of a way along the ground (see `lane.rs`): the one convention of the traffic's sides.
+pub use lane::right_of;
 pub(crate) use lane::*;
 pub(crate) use lanes::*;
 pub(crate) use legs::*;

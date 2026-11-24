@@ -907,9 +907,9 @@ impl Route {
             .unwrap_or([0.0, car.street]);
         let d = if exit[0] >= x0 { 1.0 } else { -1.0 };
         let end_x = exit[0] + d * OVERSHOOT;
-        // Drive on the right: heading +x, that's the +z side.
-        let lane_out = car.street + d * TIGHT_LANE;
-        let lane_in = car.street - d * TIGHT_LANE;
+        // Drive on the right: heading +x, that's the -z side (`right_of`).
+        let lane_out = car.street - d * TIGHT_LANE;
+        let lane_in = car.street + d * TIGHT_LANE;
         let mut legs = Legs::default();
         if home {
             let r = TURN.min((lane_in - z0).abs()).max(0.5);
@@ -1119,7 +1119,8 @@ pub(crate) fn kerbside_way(
         return None;
     }
     let (p, t) = (r.at(m.s), r.tangent(m.s));
-    let right = (spot[0] - p[0]) * -t[1] + (spot[1] - p[1]) * t[0];
+    let r = right_of(t);
+    let right = (spot[0] - p[0]) * r[0] + (spot[1] - p[1]) * r[1];
     let e = g.edges[m.edge as usize];
     Some(if right >= 0.0 { (e.b, e.a) } else { (e.a, e.b) })
 }
