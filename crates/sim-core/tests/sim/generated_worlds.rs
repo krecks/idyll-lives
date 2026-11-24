@@ -1,7 +1,7 @@
 //! Generated worlds (web/src/game/world.ts and town.ts: farms, seaside, mountain, lakeside and
 //! forest worlds, every one a big one: cosy and normal were dropped in 0.8.0) checked by the
 //! simulation: each loads with no more residents than a town holds, its roads make one network (as
-//! the sim joins them), every lot can be reached from the ends of every street and back,
+//! the sim joins them) its one-way roads cut no place off of (`Graph::strongly_connected`), every lot can be reached from the ends of every street and back,
 //! everything outdoors that residents use (a farm's crops, a park's benches) can be reached, as
 //! can the houses' basements from their front doors and everything residents use in the houses
 //! (on lots facing either way), and the town keeps going for half a day: in a town with bikes at
@@ -184,12 +184,18 @@ fn livable_at_start(
             sim_core::snapshot::MAX_LIGHTS
         ));
     }
-    // The town's roads one network as the sim joins them.
-    let networks = Graph::from_town(&w.travel.file, &world["town"]["meta"]).networks();
+    // The town's roads one network as the sim joins them, its one-way roads cutting no place
+    // off: every place a car comes onto the roads driven to and back from every other (the
+    // generator's one-way pairs, `web/src/game/oneway.ts`).
+    let graph = Graph::from_town(&w.travel.file, &world["town"]["meta"]);
+    let networks = graph.networks();
     if networks != 1 {
         failures.push(format!(
             "{label}: the roads make {networks} networks, not one"
         ));
+    }
+    if !graph.strongly_connected() {
+        failures.push(format!("{label}: one-way roads cut a place off"));
     }
     let mut cellars = 0;
     {
@@ -202,7 +208,14 @@ fn livable_at_start(
         };
         let mut walks = Walks::new(&nav);
         let tile = |p: [f32; 2]| (p[0].floor() as i32, p[1].floor() as i32);
-        let exits: Vec<_> = w.exits.iter().map(|&e| tile(e)).collect();
+        // (The ways into town on foot: not a motorway's carriageway's end, which nobody walks.)
+        let g = &w.travel.graph;
+        let exits: Vec<_> = w
+            .exits
+            .iter()
+            .filter(|&&e| !g.near(e, 2.0, 1, sim_core::travel::Mode::Foot).is_empty())
+            .map(|&e| tile(e))
+            .collect();
         // Every lot from every way into town.
         for plot in &w.plots {
             let entry = tile(plot.arrival_point());
@@ -530,7 +543,7 @@ const NO_WAY: f32 = 0.1;
 /// (Its body is about a metre either side: out of a driveway at a bend it may cut the edge.)
 const OFF_PAVING: f32 = 1.5;
 
-/// How far `at` is off the paving (m): from the nearest road's edge, a path (a driveway and its
+/// How far `at` is off the paving (m): from the nearest road's edge (the least of the few nearest), a path (a driveway and its
 /// way across the verge), the parking spot of the car's trip or a car park's apron (the town file's
 /// `carParks`), whichever is nearest. 0 off the map (past a way out of town).
 fn off_paving(
@@ -545,12 +558,13 @@ fn off_paving(
         return 0.0;
     }
     let g = &w.travel.graph;
+    // (The least of the few nearest roads': where a narrow lane meets a wide avenue at its kerb, a
+    // car on the avenue may be a hair nearer the lane's end than the avenue's middle.)
     let road = g
-        .near(at, 30.0, 1, sim_core::travel::Mode::Car)
-        .first()
-        .map_or(f32::INFINITY, |p| {
-            (p.off - g.roads[p.road as usize].width / 2.0).max(0.0)
-        });
+        .near(at, 30.0, 4, sim_core::travel::Mode::Car)
+        .iter()
+        .map(|p| (p.off - g.roads[p.road as usize].width / 2.0).max(0.0))
+        .fold(f32::INFINITY, f32::min);
     let path = paths
         .iter()
         .map(|&[x, z, pw, pd]| {
@@ -1636,6 +1650,8 @@ fn generated_worlds_cars_keep_to_the_roads() {
 /// Otterpool). At real speeds they took two to five game hours.
 const ACROSS_MINUTES: f32 = 32.0;
 const ACROSS_MOST: f32 = 60.0;
+/// How many of the roads' ends furthest south and furthest west a drive across is tried between, the furthest first.
+const ACROSS_TRIES: usize = 6;
 
 #[test]
 #[ignore]
@@ -1661,16 +1677,29 @@ fn generated_worlds_are_driven_across_in_about_half_an_hour() {
             .copied()
             .filter(|&p| !g.near(p, 1.0, 1, Mode::Car).is_empty())
             .collect();
-        let south = nodes.iter().copied().max_by(|a, b| a[1].total_cmp(&b[1]));
-        let west = nodes.iter().copied().min_by(|a, b| a[0].total_cmp(&b[0]));
-        let (Some(south), Some(west)) = (south, west) else {
+        let mut souths = nodes.clone();
+        souths.sort_by(|a, b| b[1].total_cmp(&a[1]));
+        let mut wests = nodes;
+        wests.sort_by(|a, b| a[0].total_cmp(&b[0]));
+        let (Some(&south), Some(&west)) = (souths.first(), wests.first()) else {
             return Err(format!("{label}: no roads"));
         };
         // (The road furthest south furthest west too: no way across to time.)
         if south == west {
             return Ok(None);
         }
-        let Some(ticks) = sim_core::cars::empty_drive_ticks(&w.travel, south, west) else {
+        // (A one-way road's end may lead nowhere from it or come from nowhere to it, a motorway's carriageway out
+        // of the world or in: the next furthest south or west, `ACROSS_TRIES` of each at most.)
+        let found = souths.iter().take(ACROSS_TRIES).find_map(|&s| {
+            wests.iter().take(ACROSS_TRIES).find_map(|&w2| {
+                (s != w2)
+                    .then(|| {
+                        sim_core::cars::empty_drive_ticks(&w.travel, s, w2).map(|t| (s, w2, t))
+                    })
+                    .flatten()
+            })
+        });
+        let Some((south, west, ticks)) = found else {
             return Err(format!(
                 "{label}: no way by road from {south:?} to {west:?}"
             ));

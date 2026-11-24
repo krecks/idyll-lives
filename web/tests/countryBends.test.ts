@@ -3,7 +3,9 @@
 // way (a street's end, a T) at a slant takes a longer straight lead into it, so the bend comes
 // further out where it has room (`macro.ts` `countryRoad`), and one relaxed to keep within it is
 // measured as filed, to the centimetre (`unkink`). From the big worlds whose roads turned 73-74°
-// just before the street they came into: Elder Green (seed base 12) and Hollyshaw (seed base 15).
+// just before the street they came into: Elder Green (seed base 12) and Hollyshaw (seed base 15); since the
+// motorway went down before the villages (2026-11-24) their villages and roads are others, each named by its
+// country road that turns the most.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { sharpestTurn } from '../src/game/roads';
@@ -37,11 +39,11 @@ describe('country road bends', async () => {
   const deg = (a: number) => Math.round((a * 180) / Math.PI);
 
   for (const [kind, seed, name, road] of [
-    ['small', 199762, 'Elder Green', 'Primrose End Road'],
-    ['forest', 223520, 'Hollyshaw', 'Bluebellhurst Lane'],
+    ['small', 199762, 'Elder Green', 'Robinwick Lane'],
+    ['forest', 223520, 'Hollyshaw', 'Hollyshaw Lane'],
   ] as const) {
     test(
-      `big ${kind} ${seed} (${name}): no country road turns further than ${deg(COUNTRY_TURN)}° over 40 m (${road} did)`,
+      `big ${kind} ${seed} (${name}): no country road turns further than ${deg(COUNTRY_TURN)}° over 40 m (${road} turns the most)`,
       () => {
         const town = generateFromSpec(content, t, CLASSIC[kind], seed);
         expect(town.name).toBe(name);

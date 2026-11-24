@@ -9,13 +9,15 @@ use super::*;
 pub(crate) fn guard<'a>(
     now: &Rect,
     next: &Rect,
+    layer: crate::travel::Layer,
     them: impl Iterator<Item = &'a Driving>,
 ) -> Option<u64> {
     let near = |at: [f32; 2], len: f32| {
         crate::travel::dist(at, next.at) < (len + next.half[0] * 2.0) + AHEAD + GAP
     };
+    // (Those on its level only: `travel::Layer`.)
     them.into_iter()
-        .find(|o| near(o.at, o.len) && closes_in(now, next, &o.body()))
+        .find(|o| o.layer.meets(layer) && near(o.at, o.len) && closes_in(now, next, &o.body()))
         .map(|o| o.first)
 }
 
@@ -69,7 +71,7 @@ pub(crate) fn pull_over(
         })
     };
     let backed = |k: u64| {
-        w.cars.get((k & !(1 << 63)) as usize).is_some_and(|o| {
+        w.cars.get(car_index(k)).is_some_and(|o| {
             o.jam.1 > 0
                 && body(o)
                     .zip(body(&w.cars[c]))
@@ -80,7 +82,7 @@ pub(crate) fn pull_over(
     let waits_me = |k: u64| {
         (w.traffic.waits_for(k).contains(&me)
             || w.cars
-                .get((k & !(1 << 63)) as usize)
+                .get(car_index(k))
                 .is_some_and(|o| o.waits_for == Some(me)))
             && !after(k)
     };
@@ -119,7 +121,7 @@ pub(crate) fn pull_over(
     let waits_for_me = |o: &Driving| {
         w.traffic.waits_for(o.first).contains(&key)
             || w.cars
-                .get((o.first & !(1 << 63)) as usize)
+                .get(car_index(o.first))
                 .is_some_and(|x| x.waits_for == Some(key))
     };
     if shift < car.shift
@@ -142,6 +144,7 @@ pub(crate) fn pull_over(
     if let Some(k) = guard(
         &body(car.shift),
         &body(shift),
+        car.layer(),
         others.iter().chain(&standing),
     ) {
         if shift < car.shift {
@@ -307,6 +310,7 @@ pub(crate) fn pull_want(
     // (Those near enough to be passing it: checking every car in town pairs every one with every
     // other, `Near`.)
     let reach = w.cars_near.reach(car);
+    let level = car.layer();
     for o in w.cars_near.near(at, reach, w.cars.len()) {
         let other = &w.cars[o];
         // (Standing, waiting for that one (`after`: its turn after it too), it pulls over as far as
@@ -320,6 +324,7 @@ pub(crate) fn pull_want(
             || other.shown.is_none_or(|s| !s.2) && !standing_taxi
             || other.backing() && !after
             || other.sight != Sight::Seen
+            || !other.layer().meets(level)
         {
             continue;
         }
@@ -580,7 +585,7 @@ pub(crate) fn leg_past(w: &World, c: usize, home: bool, o: usize, taxi: &Rect) -
             .total_cmp(&crate::travel::dist(route.at(ts[b]).0, taxi.at))
     })?;
     let (pc, yc, _) = route.at(ts[kc]);
-    let lat = (taxi.at[0] - pc[0]) * -yc.cos() + (taxi.at[1] - pc[1]) * yc.sin();
+    let lat = dot2(sub2(taxi.at, pc), right_of([yc.sin(), yc.cos()]));
     if lat.abs() > 1.2 {
         return None;
     }
@@ -670,7 +675,7 @@ pub(crate) fn leg_past(w: &World, c: usize, home: bool, o: usize, taxi: &Rect) -
 /// doesn't go by it so.
 pub(crate) fn span_by(route: &Route, t: f32, len: f32, taxi: &Rect) -> Option<(f32, f32)> {
     let u = [taxi.yaw.sin(), taxi.yaw.cos()];
-    let n = [-taxi.yaw.cos(), taxi.yaw.sin()];
+    let n = right_of(u);
     let reach = taxi.half[0] + len + PASS_ENDS + PASS_EASE + 1.0;
     let end = route.ticks().min(t + PASS_LOOK);
     let mut s = t + 1.0;
@@ -720,7 +725,7 @@ pub(crate) fn held_round(
                 ok = false;
                 continue;
             }
-            let o = (o & !(1 << 63)) as usize;
+            let o = car_index(o);
             if ring.contains(&o) {
                 continue;
             }

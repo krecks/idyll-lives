@@ -33,7 +33,7 @@
 import type { RoadKind, RoadPlan } from '../../core/protocol';
 import { bridgeStretch, crossWater, DRAWN_SPAN, wetSpans } from '../../game/bridges';
 import type { Edited } from '../../game/edit/edited';
-import { crossingsOf, drawStreet, madeKind, Meeting, ROOM, streetCourse, streetLine, streetWidth, TRAIL_APART, type End, type StreetLine } from '../../game/edit/streets';
+import { crossingsOf, drawStreet, madeKind, Meeting, ONE_WAY_ENDS, ROOM, streetCourse, streetLine, streetWidth, TRAIL_APART, type End, type StreetLine } from '../../game/edit/streets';
 import { heightAt, NONE, type Land } from '../../game/land';
 import { overWords, smoothHeights } from '../../game/landFollow';
 import { unrle } from '../../game/landMasks';
@@ -98,7 +98,8 @@ interface Context {
   land: Land | null;
   mountains: boolean;
   plots: Rect[];
-  meetings: Map<boolean, Meeting>;
+  /** The town's roads as a street of each width meets them (`meetingOf`). */
+  meetings: Map<number, Meeting>;
 }
 
 const contexts = new WeakMap<NeighbourhoodDraft, Context>();
@@ -152,14 +153,18 @@ export function warmLive(draft: NeighbourhoodDraft, t: Templates): void {
   contextOf(draft, t);
 }
 
-function meetingOf(c: Context, trail: boolean): Meeting {
-  let m = c.meetings.get(trail);
-  if (!m) c.meetings.set(trail, (m = new Meeting(c.draft.roads, trail, streetWidth(trail ? 'trail' : 'street'))));
+/** The town's roads as a street of `kind` meets them (a footpath's, or a road's of its width: an avenue keeps further off). */
+function meetingOf(c: Context, kind: RoadKind): Meeting {
+  const trail = kind === 'trail';
+  const width = streetWidth(kind);
+  const key = trail ? -1 : width;
+  let m = c.meetings.get(key);
+  if (!m) c.meetings.set(key, (m = new Meeting(c.draft.roads, trail, width)));
   return m;
 }
 
-/** A `drawStreet` refusal of a street that is not finished rather than one that may not be: it reaches no road yet, or its dead end is longer than a court. */
-export const unfinished = (why: string) => /^it joins none of the roads$|past the last road it meets|^a bridge needs a road on at each end/.test(why);
+/** A `drawStreet` refusal of a street that is not finished rather than one that may not be: it reaches no road yet, its dead end is longer than a court, or it is one-way with an end on no road yet. */
+export const unfinished = (why: string) => /^it joins none of the roads$|past the last road it meets|^a bridge needs a road on at each end/.test(why) || why === ONE_WAY_ENDS;
 
 /** Stretches merged where they meet or overlap (of one tone), and clamped to `[0, L]`. */
 function merged(list: readonly Stretch[], L: number): Stretch[] {
@@ -242,18 +247,28 @@ function cannot(line: Pt[], width: number, why: string): LiveStreet {
 }
 
 /**
- * The street drawn through `points` on `draft` as the live checks see it (see the top of this file):
- * of `kind` (as `drawStreet` takes it, `asked` too: `StreetStroke.asked`), clearing what is in its
- * way (`clear`) or not.
+ * What a street drawn is asked to be (as `drawStreet` takes it, `StreetStroke`): its `kind` (`asked`: the card's own
+ * choice, `StreetStroke.asked`), clearing what is in its way (`clear`, the default) or not, and one-way (`oneway`).
  */
-export function liveStreet(draft: NeighbourhoodDraft, t: Templates, points: readonly Pt[], kind: StrokeKind, clear = true, asked = false): LiveStreet {
+export interface StreetOptions {
+  kind: StrokeKind;
+  clear?: boolean;
+  asked?: boolean;
+  oneway?: 1 | -1;
+}
+
+/**
+ * The street drawn through `points` on `draft` as the live checks see it (see the top of this file), asked as `ask`
+ * says; one-way, it is open till it ends on a road at both ends.
+ */
+export function liveStreet(draft: NeighbourhoodDraft, t: Templates, points: readonly Pt[], { kind, clear = true, asked = false, oneway }: StreetOptions): LiveStreet {
   const c = contextOf(draft, t);
   const trail = kind === 'trail';
   const width = streetWidth(kind);
   const [W, D] = [draft.width, draft.depth];
   const shaped: StreetLine | string = streetLine(points, W, D, width);
   if (typeof shaped === 'string') return cannot(points.map(([x, z]): Pt => [x, z]), width, shaped);
-  const meet = meetingOf(c, trail);
+  const meet = meetingOf(c, kind);
   const course = streetCourse(meet, shaped);
   if (typeof course === 'string') return cannot(shaped.points, width, course);
   const roads = draft.roads;
@@ -375,6 +390,7 @@ export function liveStreet(draft: NeighbourhoodDraft, t: Templates, points: read
   let open: string | null = null;
   if (!onRoad(start) && !onRoad(end)) open = 'it joins no road yet: start or end it on one';
   else if (bridgeOpen) open = bridgeOpen;
+  else if (oneway && !trail && (!onRoad(start) || !onRoad(end))) open = ONE_WAY_ENDS;
   // (Its far end is the one nearest the last point drawn: a dead end it carries on is its start, whichever end the player drew it from.)
   const last = points[points.length - 1];
   const far = near(last) === 0 ? start : end;
@@ -402,9 +418,9 @@ export function climbOf(profile: { s: ArrayLike<number>; y: ArrayLike<number> },
   return { steepest, over };
 }
 
-/** `drawStreet`'s own verdict on the street drawn through `points` (no homes along it: what it would be, not what it fills). */
-export function verdictOf(draft: NeighbourhoodDraft, t: Templates, content: Parameters<typeof drawStreet>[2], points: readonly Pt[], kind: StrokeKind, clear: boolean, seed: number, asked = false): Edited {
-  return drawStreet(draft, t, content, { points, kind, clear, fill: false, seed, asked });
+/** `drawStreet`'s own verdict on the street drawn through `points`, asked as `ask` says, its names from `seed` (no homes along it: what it would be, not what it fills). */
+export function verdictOf(draft: NeighbourhoodDraft, t: Templates, content: Parameters<typeof drawStreet>[2], points: readonly Pt[], { kind, clear = true, asked = false, oneway }: StreetOptions, seed: number): Edited {
+  return drawStreet(draft, t, content, { points, kind, clear, fill: false, seed, asked, ...(oneway ? { oneway } : {}) });
 }
 
 /** The roads a street drawn on `before` made (`after.made`: its own pieces, not the footpaths it cut), else those `after.draft` has that `before` hasn't (by the road itself: the edits keep the roads they leave as they were). */

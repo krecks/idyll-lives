@@ -67,6 +67,16 @@
           "file": "platform/graphics/webgl/webgl-graphics-device.js",
           "text": "copyRenderTarget(source, dest, color, depth) {",
           "who": "sunShadows.ts: the picture's depth copied into the map (WebGL2)"
+        },
+        {
+          "file": "platform/graphics/webgl/webgl-graphics-device.js",
+          "text": "gl.bindFramebuffer(gl.FRAMEBUFFER, prevRt ? prevRt.impl._glFrameBuffer : null);",
+          "who": "sunShadows.ts: the copy binds the target before it back by hand, its record of what is bound left the map's (forgotten after it)"
+        },
+        {
+          "file": "platform/graphics/webgl/webgl-graphics-device.js",
+          "text": "if (this.activeFramebuffer !== fb) {",
+          "who": "sunShadows.ts: setFramebuffer binds only a framebuffer other than the one recorded (none recorded: it binds)"
         }
       ]
     },

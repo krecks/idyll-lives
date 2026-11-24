@@ -5,10 +5,13 @@
    *   storeys, remove it with them; a public place: another of its size; a civic place's lot: another
    *   civic place the area hasn't got (`lots.ts` `swapCivic`); a place with flats over it says so; any
    *   lot: remove it;
-   * - a street: rename it, remove it (what goes with it listed first), build it up with homes, the
+   * - a street: rename it, change its kind (a street, a lane, an avenue or a country road: `streets.ts` `changeKind`,
+   *   clearing what is in the way of it wider if asked) and make it one-way or two-way, or flip its way; remove it (what
+   *   goes with it listed first), build it up with homes, the
    *   town's other buildings or both (`buildup.ts`: both in the main town, homes elsewhere, unless
    *   chosen; each press another seed), what fronts it listed (homes, flats, places, car parks), or
    *   clear the town's buildings fronting it;
+   * - the motorway (a carriageway or a ramp picked): rename it, or remove it whole (both carriageways and the ramps);
    * - a village: rename it, move it (the Village tool taken in hand for it), remove it (what goes with
    *   it listed first);
    * - the main town: rename it (step 2's own name field, the two kept as one).
@@ -18,8 +21,11 @@
   import { entriesOf } from '../../game/edit/ground';
   import { storeysOfId } from '../../game/flats';
   import { placeOfTemplate } from '../../game/placeLots';
-  import { removeRoad, rename, whatGoes } from '../../game/edit/streets';
+  import { changeKind, CHANGE_KINDS, motorwayName, removeRoad, rename, whatGoes } from '../../game/edit/streets';
+  import { isSeparated, onewayOf, ROAD_KIND } from '../../core/roadKinds';
+  import Toggle from '../kit/Toggle.svelte';
   import { removeVillage, villageGoes } from '../../game/edit/villages';
+  import type { RoadKind } from '../../core/protocol';
   import type { GardenSize } from '../../game/housegen';
   import { lengths, roadIndex } from '../../game/roads';
   import { generatedId, homesOn, slotDims, type LotSize } from '../../game/town';
@@ -42,7 +48,6 @@
     { value: 'roomy', label: 'Roomy' },
     { value: 'big', label: 'Big' },
   ];
-  const ROAD_KIND: Record<string, string> = { street: 'Street', lane: 'Lane', country: 'Country road', trail: 'Footpath' };
 
   // ---- a lot ----
   const lot = $derived(picked?.kind === 'lot' ? draft.slots[picked.slot] : undefined);
@@ -94,9 +99,25 @@
   // ---- a road ----
   const road = $derived(picked?.kind === 'road' ? draft.roads[picked.road] : undefined);
   const goes = $derived(picked?.kind === 'road' ? whatGoes(draft, t, picked.road) : null);
-  const goesLines = $derived(goes && !('refused' in goes) && picked?.kind === 'road' ? whatGoesLine(draft, goes, picked.road) : []);
+  /** (The motorway's own carriageways and ramps are the motorway: not listed as roads going with it.) */
+  const goesLines = $derived(goes && !('refused' in goes) && picked?.kind === 'road' ? whatGoesLine(draft, { ...goes, roads: goes.roads.filter((r) => !isSeparated(draft.roads[r].kind)) }, picked.road) : []);
   const madeStreets = $derived(goes && !('refused' in goes) ? madeStreetsLine(draft, goes) : null);
   const roadLength = $derived(road ? Math.round(lengths(road.points).at(-1) ?? 0) : 0);
+  const motorway = $derived(!!road && isSeparated(road.kind));
+  /** The motorway's carriageways' names (its name and the way each goes). */
+  const carriageways = $derived(motorway ? draft.roads.flatMap((r) => (r.kind === 'motorway' && r.name ? [r.name] : [])) : []);
+  const KIND_CHOICES = CHANGE_KINDS.map((k) => ({ value: k, label: k === 'country' ? 'Country' : ROAD_KIND[k].label }));
+  const WAYS: readonly { value: 'two' | 'one'; label: string }[] = [
+    { value: 'two', label: 'Both ways' },
+    { value: 'one', label: 'One-way' },
+  ];
+  /** Whether what is in the way of the road made wider is cleared (else it is refused). */
+  let clearWay = $state(false);
+  /** The road made `kind`, one-way or not (`oneway`: absent, as it is). */
+  function changeTo(kind: RoadKind, oneway?: 1 | -1 | 0) {
+    if (picked?.kind !== 'road' || !road) return;
+    editor.apply(changeKind(draft, t, picked.road, kind, oneway, clearWay));
+  }
   const BUILD: readonly { value: BuildMode; label: string }[] = [
     { value: 'homes', label: 'Homes' },
     { value: 'buildings', label: 'Town buildings' },
@@ -202,8 +223,42 @@
         <button class="btn small danger-soft" title={lotFlats ? `Removes ${lot.name} and ${lotFlats}` : undefined} onclick={() => editor.apply(removeLotsEdit(draft, new Set([picked.slot])))}><Icon name="icon.ui.trash" size={14} /> Remove</button>
       </div>
     {:else if road && picked.kind === 'road'}
-      <span class="eyebrow sub">{ROAD_KIND[road.kind ?? 'street'] ?? 'Road'}{road.bridge ? ', a bridge' : ''} · {roadLength} m</span>
-      <RenameField label="Street name" value={road.name ?? ''} onname={renamed({ kind: 'road', road: picked.road })} />
+      <span class="eyebrow sub">{ROAD_KIND[road.kind ?? 'street']?.label ?? 'Road'}{road.bridge ? ', a bridge' : ''}{!motorway && road.oneway ? ', one-way' : ''} · {roadLength} m</span>
+      <RenameField label={motorway ? 'Motorway name' : 'Street name'} value={motorway ? motorwayName(draft.roads) || (road.name ?? '') : (road.name ?? '')} onname={renamed({ kind: 'road', road: picked.road })} />
+      {#if motorway}
+        {#if carriageways.length}<p class="hint">Its carriageways: {listed(carriageways)}.</p>{/if}
+        <div class="option">
+          <span class="eyebrow sub">Remove it</span>
+          {#if goes && 'refused' in goes}
+            <p class="hint warn">{sentence(goes.refused)}</p>
+          {:else}
+            <p class="hint">Both carriageways and the slip roads go{goesLines.length ? `, and with them ${listed(goesLines)}` : ''}; the roads it crossed lie on the land.</p>
+          {/if}
+          <div class="row">
+            <button class="btn small danger-soft" disabled={!goes || 'refused' in goes} onclick={() => editor.apply(removeRoad(draft, t, picked.road)) && editor.select(null)}><Icon name="icon.ui.trash" size={14} /> Remove motorway</button>
+          </div>
+        </div>
+      {:else}
+      {#if road.kind !== 'trail'}
+        <div class="option">
+          <span class="eyebrow sub">Change kind</span>
+          {#if !road.bridge}
+            <Segmented fill label="Change its kind" value={road.kind ?? 'street'} options={KIND_CHOICES} onchange={(k) => changeTo(k)} />
+          {/if}
+          <div class="row">
+            <Segmented label="Which way cars go" value={onewayOf(road) ? 'one' : 'two'} options={WAYS} onchange={(w) => changeTo(road.kind ?? 'street', w === 'one' ? 1 : 0)} />
+            {#if road.oneway}
+              <button class="btn small ghost" title={`Flip which way cars go on ${road.name ?? 'it'}`} onclick={() => changeTo(road.kind ?? 'street', road.oneway === 1 ? -1 : 1)}><Icon name="icon.ui.rotate" size={14} /> Flip this street</button>
+            {/if}
+          </div>
+          {#if !road.bridge}
+            <label class="toggle-row">
+              <span>Clear what's in the way{#if !clearWay}{' '}<span class="sub-note">(else a wider road is refused there)</span>{/if}</span>
+              <Toggle label="Clear what's in the way of it wider" bind:checked={clearWay} />
+            </label>
+          {/if}
+        </div>
+      {/if}
       <div class="option">
         <span class="eyebrow sub">Remove it</span>
         {#if goes && 'refused' in goes}
@@ -215,7 +270,10 @@
           <button class="btn small danger-soft" disabled={!goes || 'refused' in goes} onclick={() => editor.apply(removeRoad(draft, t, picked.road))}><Icon name="icon.ui.trash" size={14} /> Remove {road.name ?? 'it'}</button>
         </div>
       </div>
-      {#if editor.step === 'layout'}
+      {/if}
+      {#if motorway}
+        <!-- (Nothing is built along the motorway.) -->
+      {:else if editor.step === 'layout'}
         <p class="hint">Zone its sides with the Zones tool: Build puts homes, shops and parks along it.</p>
       {:else}
       <div class="option">
@@ -324,5 +382,18 @@
   }
   .danger-soft {
     color: var(--bad);
+  }
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .sub-note {
+    font-weight: 500;
+    color: var(--text-muted);
   }
 </style>

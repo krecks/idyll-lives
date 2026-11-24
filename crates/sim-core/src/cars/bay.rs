@@ -16,6 +16,8 @@ pub(crate) struct Bay {
     z0: f32,
     u: [f32; 2],
     kerb: f32,
+    /// How far right of the road's middle it turns onto its lane, or off it (`kerb_lane`).
+    lane: f32,
 }
 
 impl Bay {
@@ -30,7 +32,8 @@ impl Bay {
         s_at: f32,
     ) -> Option<Bay> {
         let t = road.tangent(s_at);
-        let n = [-t[1], t[0]];
+        // (Its normal the road's right: `right_of`.)
+        let n = right_of(t);
         let (dx, dz) = (spot[0] - mp[0], spot[1] - mp[1]);
         let (x0, z0) = (dx * t[0] + dz * t[1], dx * n[0] + dz * n[1]);
         let s = if z0 <= 0.0 { 1.0 } else { -1.0 };
@@ -54,6 +57,7 @@ impl Bay {
             z0,
             u,
             kerb: -s * kerb_off(road),
+            lane: kerb_lane(road),
         })
     }
 
@@ -97,7 +101,7 @@ impl Bay {
     /// away it backs out turning away from the way it goes (as `Route::legacy` does). Where the
     /// turn is along the road, and how much of the lane it takes up.
     pub(crate) fn leave(&self, legs: &mut Legs, d: f32) -> (f32, f32) {
-        let lane_out = d * TIGHT_LANE;
+        let lane_out = d * self.lane;
         let (at, room) = self.cross(lane_out);
         let room = room.min(self.past_kerb(lane_out));
         let facing = [self.yaw.sin(), self.yaw.cos()];
@@ -116,7 +120,7 @@ impl Bay {
 
     /// The turn into it from the lane, coming along it against `d`, and where it is along the road.
     pub(crate) fn entry(&self, d: f32) -> (Turn, f32) {
-        let lane_in = -d * TIGHT_LANE;
+        let lane_in = -d * self.lane;
         let (at, room) = self.cross(lane_in);
         let room = room.min(self.past_kerb(lane_in));
         (
@@ -151,7 +155,8 @@ pub(super) fn bay_axis(yaw: f32, to_road: [f32; 2]) -> [f32; 2] {
 }
 
 /// A public parking spot at `at` as a bay off the road (one of a big world's, `macro.ts`: square
-/// to the road, off its verge): the point of the road it's nearest, the road's tangent there and
+/// to the road, off its verge): the point of the road it's nearest (one a car may leave and come
+/// onto there, `enterable_near`), the road's tangent there and
 /// the way from the spot to it. None: no road near, or the spot is on the road itself (pulled into
 /// along it).
 pub(crate) fn parking_bay(
@@ -159,7 +164,7 @@ pub(crate) fn parking_bay(
     at: [f32; 2],
 ) -> Option<([f32; 2], RoadPoint, [f32; 2])> {
     let g = &travel.graph;
-    let p = *g.near(at, ROAD_REACH, 1, Mode::Car).first()?;
+    let p = enterable_near(g, at, ROAD_REACH)?;
     let road = &g.roads[p.road as usize];
     let rp = g.point(p);
     let (dx, dz) = (rp[0] - at[0], rp[1] - at[1]);
@@ -175,9 +180,11 @@ pub(super) fn kerb_off(road: &crate::travel::Road) -> f32 {
 
 /// `kerb_off` for a road `width` m wide of `kind`.
 pub(crate) fn kerb_of(width: f32, kind: crate::travel::RoadKind) -> f32 {
-    match kind {
-        crate::travel::RoadKind::Country | crate::travel::RoadKind::Trail => width / 2.0,
-        _ => (width / 2.0 - SIDEWALK).max(TIGHT_LANE + 0.5),
+    if kind.has_sidewalk() {
+        (width / 2.0 - SIDEWALK).max(TIGHT_LANE + 0.5)
+    } else {
+        // (No sidewalks: a country road's verge, a motorway's or a ramp's shoulder, are its own.)
+        width / 2.0
     }
 }
 
@@ -186,7 +193,8 @@ pub(crate) fn kerb_of(width: f32, kind: crate::travel::RoadKind) -> f32 {
 /// kerbs: too narrow for two cars to pass either way, and not up on the kerb, as the kerbside
 /// furniture stands about 0.15 m in from it). It turns out of a driveway onto the road, and off it
 /// into one, `TIGHT_LANE` out as ever (`Bay`: a turn there at a bend in the road cuts the bend's
-/// edge the more the further out it ends), easing out to its lane on along the road.
+/// edge the more the further out it ends), easing out to its lane on along the road. (A two-way
+/// street, lane or country road's; an avenue's, a motorway's and a one-way road's: `lane_off`.)
 pub(crate) fn lane_on(width: f32, kind: crate::travel::RoadKind) -> f32 {
     if kerb_of(width, kind) - CAR_HALF - KERB_KEEP >= LANE {
         LANE
@@ -211,12 +219,11 @@ pub fn kerbside(width: f32, kind: crate::travel::RoadKind) -> f32 {
 /// town file's road (`meta.roads` index) and how far in from its edges the furniture may reach (m),
 /// by road: for the renderer's street dressing (the world's structure, `pullOverStreets`).
 pub fn pull_over_streets(travel: &Travel) -> Vec<(u32, f32)> {
-    use crate::travel::RoadKind;
     let mut out: Vec<(u32, f32)> = travel
         .graph
         .roads
         .iter()
-        .filter(|r| !matches!(r.kind, RoadKind::Country | RoadKind::Trail))
+        .filter(|r| r.kind.has_sidewalk())
         .filter_map(|r| {
             let keep = kerbside(r.width, r.kind);
             (keep < KERBSIDE).then_some((r.source, keep))
@@ -231,10 +238,10 @@ pub fn pull_over_streets(travel: &Travel) -> Vec<(u32, f32)> {
 /// of `kind` (m, `PULL_MOST` at most): to `PULL_EDGE` short of the kerbside furniture
 /// (`kerbside`), or of a country road's edge. On a 6 m lane two cars pulled over pass each other.
 pub(crate) fn pull_room(width: f32, kind: crate::travel::RoadKind, wid: f32) -> f32 {
-    use crate::travel::RoadKind;
-    let edge = match kind {
-        RoadKind::Country | RoadKind::Trail => width / 2.0,
-        _ => width / 2.0 - kerbside(width, kind),
+    let edge = if kind.has_sidewalk() {
+        width / 2.0 - kerbside(width, kind)
+    } else {
+        width / 2.0
     } - PULL_EDGE;
     (edge - wid / 2.0 - lane_on(width, kind)).clamp(0.0, PULL_MOST)
 }

@@ -59,14 +59,14 @@ fn town_with(width: u32, houses: &[House], bend: impl Fn(f32) -> f32, more: &[St
     town_of(false, width, houses, bend, more)
 }
 
-/// `town`, its street going on past 600 m to the east edge of a 1 km world, then 150 m south and
+/// `town`, its street going on past 600 m to the east edge of a 1 km world (10 m wider), then 150 m north and
 /// all the way back west, its way out at that end: over 2 km out, a bike's ride of over an hour
 /// and a half (`BIKE_MOST`) on the traffic's clock.
 fn town_long(width: u32, houses: &[House]) -> World {
     town_of(true, width, houses, |_| 0.0, &[])
 }
 
-/// The street's turn south and back west (`town_long`): how far south (m).
+/// The street's turn north (+z) and back west (`town_long`): how far north (m).
 const LONG_BACK: f32 = 150.0;
 
 /// `town_with`, or (`long`) `town_long`.
@@ -146,10 +146,13 @@ fn town_of(
     }
     let more: String = more.iter().map(|r| format!(",{r}")).collect();
     let json = format!(
-        r#"{{"width":{east},"depth":{},"size":"normal",
+        r#"{{"width":{},"depth":{},"size":"normal",
         "exits":[{{"x":{},"z":{},"kind":"road"}}],
         "roads":[{road}{more}],"meta":{{"roads":[{road}{more}]}},
         "plots":[{}],"households":[{}],"objects":[{}],"sims":[{}],"drives":[{}],"cars":[{}]}}"#,
+        // (A long town a little wider than its street: going north up its east end, those on foot
+        // keep to the right of the way, east of it, `cars::right_of`.)
+        if long { east + 10 } else { east },
         if long { 220 } else { 80 },
         way_out[0],
         way_out[1],
@@ -700,21 +703,22 @@ fn one_coming_the_other_way_waits_its_turn_short_of_a_taxi_standing_at_the_kerb(
     );
 }
 
-/// A's taxi comes in from the way out (east) along a 7 m street to A's kerb (south of the street,
-/// in its lane coming in): two neighbours west of A come home right behind it (up behind it as it
+/// A's taxi comes in from the way out (east) along a 7 m street to A's kerb (north of the street,
+/// in its lane coming in: the right of the way, `cars::right_of`), the neighbours south of it: two
+/// neighbours west of A come home right behind it (up behind it as it
 /// stands: out round it), and two drive off east as it stands there (meeting them alongside it).
 /// Each tick (no two cars ever overlapping) `each` sees the world and the neighbours' cars, and may
 /// stop it (true); else till all are through. Whether anyone went out round the taxi
 /// (`Car::pass_by`) and was alongside it.
 fn cars_round_a_standing_taxi(mut each: impl FnMut(&World, &[usize]) -> bool) -> bool {
     let driver = |n: &str| format!(r#"{{"name":"{n}","age":40,"traits":["cheerful"]}}"#);
-    let mut a = house(300, &[&worker("A")]);
-    a.south = true;
+    let a = house(300, &[&worker("A")]);
     let mut houses = vec![a];
     for (k, x) in [100, 160, 40, 250].into_iter().enumerate() {
         let d = driver(&format!("D{k}"));
         let mut h = house(x, &[&d]);
         h.car = true;
+        h.south = true;
         houses.push(h);
     }
     let mut w = town(7, &houses);

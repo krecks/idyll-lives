@@ -5,6 +5,8 @@
  * (`previewWorld`). The simulation can't hold one yet (towns over 256 m), so the game plays the
  * bench scene's village while the renderer draws this; nothing of it goes in git.
  *
+ * `big=roads`: the road hierarchy's fixture set in a flat countryside instead (`roadFixture.ts`).
+ *
  * The bench keeps its own focus lot in it (`benchFocus`): the lot the roaming camera settles on is
  * drawn in full straight away (the simulation, playing the village, has no view to send for it).
  */
@@ -24,6 +26,11 @@ import { perfTimeAsync } from './perf';
  * given), seed fixed: the same town every run.
  */
 export async function benchBigWorld(content: Content, assets: AssetRegistry, kind: string, options: Partial<WorldOptions> = BENCH?.options ?? {}): Promise<WorldStructure> {
+  // (`big=roads`: the road hierarchy's fixture in a flat countryside with no town: `roadFixture.ts`.)
+  if (kind === 'roads') {
+    const base = await benchBigWorld(content, assets, 'country', { town: 'hamlet', villages: 'none', hills: 'flat', woods: 'open', ...options });
+    return (await import('./roadFixture')).roadFixtureWorld(base);
+  }
   return perfTimeAsync('bench: big world', async () => {
     const t = await loadTemplates();
     let laid = generateWorld(content, t, kind, 7, undefined, undefined, options);

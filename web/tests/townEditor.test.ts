@@ -414,7 +414,7 @@ describe('the Problems list and picking, on a generated town', async () => {
   const { randomHousehold } = await import('../src/game/household');
   const { mulberry32 } = await import('../src/game/noise');
   const { townProblems } = await import('../src/game/townCheck');
-  const { assembleTown, generateWorld, plotRect, useTownContent, vacantSlots } = await import('../src/game/town');
+  const { assembleTown, generateWorld, homesOn, plotRect, useTownContent, vacantSlots } = await import('../src/game/town');
   const { removeLotsEdit } = await import('../src/game/edit/lots');
   const { removeRoad } = await import('../src/game/edit/streets');
   const { checkedTown, townIssues } = await import('../src/ui/townedit/problems');
@@ -461,6 +461,19 @@ describe('the Problems list and picking, on a generated town', async () => {
     expect(hamlet.open!.areas.length).toBeGreaterThan(1);
     expect(all(townIssues(bare, t, content))).toContainEqual(expect.stringMatching(/has 0 lots/));
     expect(all(townIssues(layout, t, content))).not.toContainEqual(expect.stringMatching(/ lots$|workers work/));
+  });
+
+  test('a street made one-way that leaves its homes unreachable blocks the way on, with how many', async () => {
+    const { entriesOf } = await import('../src/game/edit/ground');
+    const spots = entriesOf(hamlet, t);
+    // (A street with homes on it and a dead end: one-way, nobody gets back out of it.)
+    const road = hamlet.roads.findIndex((r, i) => r.kind !== 'trail' && r.ends.includes('dead') && spots.some((s) => s?.road === i));
+    expect(road).toBeGreaterThanOrEqual(0);
+    const homes = hamlet.slots.reduce((n, s, i) => n + (spots[i]?.road === road ? homesOn(s, { farms: true }) : 0), 0);
+    const oneWay = { ...hamlet, roads: hamlet.roads.map((r, i) => (i === road ? { ...r, oneway: 1 as const } : r)) };
+    const blocking = townIssues(oneWay, t, content).blocking.map((i) => i.text);
+    expect(blocking).toContainEqual(expect.stringMatching(/^One-way streets leave \d+ homes? unreachable$/));
+    expect(Number(/leave (\d+)/.exec(blocking.find((b) => b.startsWith('One-way'))!)![1])).toBeGreaterThanOrEqual(homes);
   });
 
   test('the laid town blocks nothing; a lot moved onto a road blocks the way on, named, with where it is', () => {

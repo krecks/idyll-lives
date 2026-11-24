@@ -1,6 +1,7 @@
 //! Where a moving thing will be, sampled along its route.
 
 use super::*;
+use crate::travel::Layer;
 
 /// A place along a route: when it's there (ticks along it), how far along it is (m), its body
 /// there, the way it goes (a unit vector: backwards, backing up), and how far it can pull over
@@ -12,6 +13,8 @@ pub(crate) struct Sample {
     pub rect: Rect,
     pub way: [f32; 2],
     pub pass: f32,
+    /// Its level (`travel::Layer`): only bodies on levels that meet conflict.
+    pub layer: Layer,
 }
 
 /// A lit junction (`Travel::signals`) and the phase of the arm a way comes in by (`Claim::gate`).
@@ -44,6 +47,10 @@ pub(crate) struct Claim {
     /// `gate`): granted, but no further on than that once the light's no longer green, its holder
     /// lets it go and waits for the next green (`Traffic::begin`).
     pub stop_at: f32,
+    /// A merge off a ramp onto a motorway (`cars::Route::merges`): asked for with room in the
+    /// carriageway's traffic, none of it on the move into it going its way either (`begin`, rule
+    /// 3: `LOOK_FAST`); those on the carriageway hold none and never wait for it (`blocked`).
+    pub merge: bool,
 }
 
 impl Claim {
@@ -73,6 +80,7 @@ impl Claim {
             gate2: None,
             stop2: f32::NEG_INFINITY,
             stop_at: f32::NEG_INFINITY,
+            merge: false,
         }
     }
 
@@ -111,16 +119,28 @@ pub(crate) type Trace = Vec<(f32, [f32; 2], f32, bool, f32)>;
 /// country road goes about a metre a tick) `trace` looks along a route for its poses.
 const TRACE_STEP: f32 = crate::drive_ticks(0.025);
 
+/// How far a route's poses are looked along a step at most (m, `trace`): at a country road's
+/// speed a step is 0.4 m.
+const TRACE_MOST: f32 = 0.5;
+
 /// `Trace` of a route `ticks` long whose pose `t` ticks along is `at(t)`.
 pub(crate) fn trace(at: impl Fn(f32) -> ([f32; 2], f32, bool), ticks: f32) -> Trace {
     let (p, yaw, back) = at(0.0);
     let mut out: Trace = vec![(0.0, p, yaw, back, 0.0)];
     let (mut last, mut along, mut since, mut turned) = (p, 0.0f32, 0.0f32, yaw);
     let mut t = 0.0f32;
+    // (Faster than `TRACE_MOST` a step (the motorway), finer steps: its poses no further apart
+    // than at a country road's speed.)
+    let mut step = TRACE_STEP;
     while t < ticks {
-        t = (t + TRACE_STEP).min(ticks);
+        t = (t + step).min(ticks);
         let (p, yaw, back) = at(t);
         let d = dist(last, p);
+        step = if d > TRACE_MOST {
+            TRACE_STEP * TRACE_MOST / d
+        } else {
+            TRACE_STEP
+        };
         along += d;
         since += d;
         last = p;
@@ -165,11 +185,14 @@ pub(crate) fn claims(
     wid: f32,
     zones: &[([f32; 2], f32)],
     more: &[(f32, f32)],
+    layers: &[Layer],
 ) -> Vec<Claim> {
     let n = trace.len();
     if n == 0 {
         return Vec::new();
     }
+    // (Each pose's level, `layers`; none given, the ground.)
+    let layer = |k: usize| layers.get(k).copied().unwrap_or(Layer::GROUND);
     let end = trace[n - 1].0;
     let body = |k: usize| {
         let (_, p, yaw, ..) = trace[k];
@@ -186,8 +209,10 @@ pub(crate) fn claims(
         .map(|(a, b)| (a, b, false))
         .collect();
     let r0 = len.hypot(wid) / 2.0;
-    let touching =
-        |k: usize, c: [f32; 2], r: f32| dist(trace[k].1, c) <= r + r0 && touches(&body(k), c, r);
+    // (A junction's box is on the ground: a car on a deck over one goes by it.)
+    let touching = |k: usize, c: [f32; 2], r: f32| {
+        dist(trace[k].1, c) <= r + r0 && touches(&body(k), c, r) && layer(k).ground()
+    };
     for &(c, r) in zones {
         spans.extend(
             runs(trace, |k| touching(k, c, r))
@@ -258,6 +283,7 @@ pub(crate) fn claims(
                         rect: body(k),
                         way: [s * k_way, c * k_way],
                         pass: pass.get(k).copied().unwrap_or(0.0),
+                        layer: layer(k),
                     }
                 })
                 .collect();
@@ -302,10 +328,14 @@ fn touches(r: &Rect, c: [f32; 2], rad: f32) -> bool {
 
 /// The road network's junctions' boxes (`Graph::boxes`): each junction's middle, and how far round
 /// it its box reaches: as far out along its arms as two bodies in their lanes on any two of them
-/// are `ARMS_APART` apart (`BOX_LEAST` to `BOX_MOST`).
+/// are `ARMS_APART` apart (`BOX_LEAST` to `BOX_MOST`). None at a motorway's merges
+/// (`Graph::is_merge`).
 pub fn boxes(g: &Graph) -> Vec<([f32; 2], f32)> {
     let mut out = Vec::new();
     for (n, &p) in g.nodes.iter().enumerate() {
+        if g.is_merge(n) {
+            continue;
+        }
         let mut arms: Vec<[f32; 2]> = Vec::new();
         for e in g.edges.iter() {
             let road = &g.roads[e.road as usize];

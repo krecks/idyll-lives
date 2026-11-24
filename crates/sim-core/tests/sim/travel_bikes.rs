@@ -367,26 +367,28 @@ fn lane_town(rider_x: i32, car_x: i32) -> World {
         r#"{{"points":[{}],"width":6,"kind":"lane","ends":["dead","out"]}}"#,
         road.join(",")
     );
-    let (cx, inner) = (car_x as f32 + 1.5, 39.5);
+    // (The houses south of the lane, -z: the side its cars and riders going east keep to,
+    // `cars::right_of`.)
+    let (cx, inner) = (car_x as f32 + 1.5, 20.5);
     let json = format!(
         r#"{{"width":500,"depth":60,"size":"normal",
         "exits":[{{"x":499.5,"z":{LANE},"kind":"road"}}],
         "roads":[{road}],"meta":{{"roads":[{road}]}},
-        "plots":[{{"name":"Riders","x":{rider_x},"z":34,"w":20,"d":16,"entry":[{re}.5,34.5]}},
-                 {{"name":"Drivers","x":{car_x},"z":34,"w":20,"d":16,"entry":[{ce}.5,34.5]}}],
+        "plots":[{{"name":"Riders","x":{rider_x},"z":10,"w":20,"d":16,"entry":[{re}.5,25.5]}},
+                 {{"name":"Drivers","x":{car_x},"z":10,"w":20,"d":16,"entry":[{ce}.5,25.5]}}],
         "households":[{{"name":"Riders","plot":0,"player":true}},{{"name":"Drivers","plot":1}}],
-        "objects":[{{"def":"bike","x":{bx},"z":40,"rot":0}}],
-        "sims":[{{"name":"R","household":0,"job":{{"career":"office"}},"x":{rs}.5,"z":44.5}},
-                {{"name":"D","household":1,"x":{cs}.5,"z":44.5}}],
-        "drives":[{{"plot":1,"x":{cx},"z":{inner},"front":-1,"street":{LANE}}}],
+        "objects":[{{"def":"bike","x":{bx},"z":19,"rot":0}}],
+        "sims":[{{"name":"R","household":0,"job":{{"career":"office"}},"x":{rs}.5,"z":15.5}},
+                {{"name":"D","household":1,"x":{cs}.5,"z":15.5}}],
+        "drives":[{{"plot":1,"x":{cx},"z":{inner},"front":1,"street":{LANE}}}],
         "cars":[{{"plot":1,"x":{cx},"z":{spot},"yaw":{yaw},"street":{LANE},"len":4.4,"wid":1.8,"body":1,"paint":2}}]}}"#,
         re = rider_x + 10,
         ce = car_x + 10,
         bx = rider_x + 12,
         rs = rider_x + 5,
         cs = car_x + 10,
-        spot = inner - 0.45 - 2.2,
-        yaw = std::f32::consts::PI,
+        spot = inner + 0.45 + 2.2,
+        yaw = 0.0,
     );
     let mut w = World::from_json(&lane_content(), &json, 5).unwrap();
     w.autonomy = false;
@@ -434,7 +436,7 @@ fn a_rider_on_a_narrow_lane_keeps_clear_of_a_car_passing_them() {
     // R rides east along the lane to the way out; D's car, west of them, overtakes.
     let mut w = lane_town(140, 110);
     let end = clock::tick_at(2, 12.0 * 60.0).unwrap();
-    while !(w.sims[0].riding.is_some() && w.sims[0].pos[1] < 34.0) {
+    while !(w.sims[0].riding.is_some() && w.sims[0].pos[1] > 26.0) {
         w.tick_once();
         assert!(w.tick < end, "never rode out onto the lane");
     }
@@ -463,7 +465,7 @@ fn a_rider_heading_at_a_cars_side_stops_with_the_front_wheel_outside_it() {
     let end = clock::tick_at(2, 12.0 * 60.0).unwrap();
     let car_x = w.cars[0].spot[0];
     while !(w.sims[0].riding.is_some()
-        && w.sims[0].pos[1] < 34.0
+        && w.sims[0].pos[1] > 26.0
         && w.sims[0].pos[0] > car_x - 13.0)
     {
         w.tick_once();
@@ -565,7 +567,7 @@ fn a_rider_and_car_at_a_driveway_never_wait_for_each_other_for_good() {
                 } else {
                     s.yaw.sin() > 0.0
                 };
-                s.riding.is_some() && s.away_until.is_none() && s.pos[1] < 34.0 && towards && x <= d
+                s.riding.is_some() && s.away_until.is_none() && s.pos[1] > 26.0 && towards && x <= d
             };
             while !at(&w) {
                 w.tick_once();

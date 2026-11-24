@@ -43,16 +43,16 @@ pub(crate) fn can_drive(
         })
 }
 
-/// Whether `car`'s driveway has a way by road to `at`.
+/// Whether `car`'s driveway has a way by road to `at` and back (one-way roads).
 pub(crate) fn drives_to(car: &Car, travel: &Travel, at: [f32; 2]) -> bool {
     let g = &travel.graph;
-    let (Some(m), Some(&p)) = (
-        car.mouth(travel),
-        g.near(at, ROAD_REACH, 1, Mode::Car).first(),
-    ) else {
+    let (Some(m), Some(p)) = (car.mouth(travel), enterable_near(g, at, ROAD_REACH)) else {
         return false;
     };
-    g.path(m, p, Mode::Car, travel.country_speed).is_some()
+    let speed = travel.country_speed;
+    // (Back too only where a one-way road could make it another way: `Graph::has_oneway`.)
+    g.path_cost(m, p, Mode::Car, speed).is_some()
+        && (!g.has_oneway() || g.path_cost(p, m, Mode::Car, speed).is_some())
 }
 
 /// The car `sim` drives to plot `plot` in an open-world town, and the door they get in by and

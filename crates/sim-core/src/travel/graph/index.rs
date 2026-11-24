@@ -8,7 +8,8 @@ impl Graph {
     /// crossroads, not two T's, each with its lights in the middle of the other. The node goes
     /// to their middle with every arm of them; the stretches between them go, the road's
     /// stretches either side meeting half way between (its geometry as it was). Not on a
-    /// roundabout's ring (a road whose ends are one node: its entries stay apart).
+    /// roundabout's ring (a road whose ends are one node: its entries stay apart), nor at a
+    /// motorway's merges (`Graph::is_merge`).
     pub(super) fn merge_junctions(&mut self) {
         let n = self.nodes.len();
         let car = |g: &Graph, e: &Edge| g.roads[e.road as usize].drivable();
@@ -23,6 +24,7 @@ impl Graph {
                 .count()
                 >= 3
                 && g.adj[v].iter().all(|&e| !ring(g, g.edges[e as usize].road))
+                && !g.is_merge(v)
         };
         fn find(parent: &mut [usize], mut i: usize) -> usize {
             while parent[i] != i {

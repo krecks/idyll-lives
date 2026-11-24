@@ -6,6 +6,7 @@ fn road(points: &[[f32; 2]], width: f32, kind: RoadKind) -> RoadRaw {
         width,
         kind,
         area: None,
+        oneway: OneWay::Both,
     }
 }
 
@@ -412,4 +413,23 @@ fn rle_masks() {
     let m = t.mask(5, 3);
     let set: Vec<usize> = (0..15).filter(|&i| m[i]).collect();
     assert_eq!(set, [3, 4, 14]);
+}
+
+#[test]
+fn each_kind_has_its_top_speed() {
+    let country = 17.0;
+    let speeds = [
+        (RoadKind::Lane, LANE_SPEED),
+        (RoadKind::Street, TOWN_SPEED),
+        (RoadKind::Avenue, AVENUE_SPEED),
+        (RoadKind::Ramp, RAMP_SPEED),
+        (RoadKind::Country, country),
+        (RoadKind::Motorway, MOTORWAY_SPEED),
+    ];
+    for w in speeds.windows(2) {
+        assert!(w[0].1 < w[1].1, "{:?} not slower than {:?}", w[0].0, w[1].0);
+    }
+    for (kind, top) in speeds {
+        assert_eq!(kind_speed(kind, country), top, "{kind:?}");
+    }
 }

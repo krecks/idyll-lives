@@ -183,8 +183,8 @@ pub(super) struct StructureView<'a> {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(super) pull_over_streets: Vec<PullOverStreetView>,
     /// Where the traffic lights' poles stand and which way their heads face (`traffic::SignalArm`:
-    /// x, z and yaw, in their snapshot rows' order): the kerbside furniture keeps clear of them;
-    /// left out when there are none.
+    /// x, z and yaw, in their snapshot rows' order, those of arms cars only leave by left out:
+    /// no head, no pole): the kerbside furniture keeps clear of them; left out when there are none.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub light_poles: Vec<[f32; 3]>,
     /// Every junction where `traffic::SIGNAL_ARMS` roads for cars or more meet (`traffic::Signal`),
@@ -264,7 +264,9 @@ pub(super) fn junction_views(world: &World) -> Vec<JunctionView> {
                         walk_to: a.walk_to,
                         stop: a.stop,
                         crosswalk: a.crosswalk,
-                        light: (s.lit && (row as usize) < crate::snapshot::MAX_LIGHTS)
+                        light: (s.lit
+                            && a.inbound()
+                            && (row as usize) < crate::snapshot::MAX_LIGHTS)
                             .then_some(row),
                     }
                 })
@@ -273,13 +275,19 @@ pub(super) fn junction_views(world: &World) -> Vec<JunctionView> {
         .collect()
 }
 
-/// `StructureView::light_poles`.
+/// `StructureView::light_poles`: the poles that stand, one by each arm cars come in by (an arm
+/// cars only leave by has no head, `SignalArm::inbound`, nor a pole: the kerb there is free).
 pub(super) fn light_pole_views(world: &World) -> Vec<[f32; 3]> {
     world
         .travel
         .signals
         .iter()
-        .flat_map(|s| s.arms.iter().map(|a| [a.pole[0], a.pole[1], a.yaw]))
+        .flat_map(|s| {
+            s.arms
+                .iter()
+                .filter(|a| a.inbound())
+                .map(|a| [a.pole[0], a.pole[1], a.yaw])
+        })
         .take(crate::snapshot::MAX_LIGHTS)
         .collect()
 }

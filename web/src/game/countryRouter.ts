@@ -12,8 +12,9 @@
  */
 
 import type { RoadPlan } from '../core/protocol';
+import { isSeparated } from '../core/roadKinds';
 import { simplify } from './landMasks';
-import { curve, evenly, leftOf, lengths, nearest, pointAt, RoadIndex, besideAny, sharpestTurn, tangent, type Pt } from './roads';
+import { curve, dist, evenly, leftOf, lengths, nearest, pointAt, RoadIndex, besideAny, round2, sharpestTurn, tangent, type Pt } from './roads';
 import type { Rect } from './town';
 import type { WorldSpec } from './world';
 import * as pmath from './pmath';
@@ -98,9 +99,6 @@ export const FACING: readonly Pt[] = [
   [-1, 0],
 ];
 
-const dist = (a: Pt, b: Pt) => pmath.hypot(a[0] - b[0], a[1] - b[1]);
-const round2 = (v: number) => Math.round(v * 100) / 100;
-
 /** The land as the generator reads it: per 8 m cell, its height (m), whether it is water, whether it is wooded. */
 export class Cells {
   readonly gw: number;
@@ -132,6 +130,29 @@ export class Cells {
 
   at(x: number, z: number): number {
     return this.height[this.cell(x, z)];
+  }
+
+  /** The land's height at (x, z) (m), between its cells' middles. */
+  heightAt(x: number, z: number): number {
+    const { gw, gd } = this;
+    const fx = Math.max(0, Math.min(gw - 1, x / CELL - 0.5));
+    const fz = Math.max(0, Math.min(gd - 1, z / CELL - 0.5));
+    const [x0, z0] = [Math.floor(fx), Math.floor(fz)];
+    const [x1, z1] = [Math.min(gw - 1, x0 + 1), Math.min(gd - 1, z0 + 1)];
+    const [u, v] = [fx - x0, fz - z0];
+    const h = (cx: number, cz: number) => this.height[cz * gw + cx];
+    return (h(x0, z0) * (1 - u) + h(x1, z0) * u) * (1 - v) + (h(x0, z1) * (1 - u) + h(x1, z1) * u) * v;
+  }
+
+  /** Each cell whose middle is within `r` m of `p` (and that `keep` keeps, given) set in `out` (1, per cell). */
+  mark(out: Uint8Array, p: Pt, r: number, keep?: (c: Pt) => boolean): void {
+    const { gw, gd } = this;
+    for (let cz = Math.max(0, Math.floor((p[1] - r) / CELL)); cz <= Math.min(gd - 1, Math.floor((p[1] + r) / CELL)); cz++) {
+      for (let cx = Math.max(0, Math.floor((p[0] - r) / CELL)); cx <= Math.min(gw - 1, Math.floor((p[0] + r) / CELL)); cx++) {
+        const c: Pt = [(cx + 0.5) * CELL, (cz + 0.5) * CELL];
+        if (pmath.hypot(c[0] - p[0], c[1] - p[1]) <= r && (!keep || keep(c))) out[cz * gw + cx] = 1;
+      }
+    }
   }
 
   /** How steep the land is at a cell (rise per metre). */
@@ -386,6 +407,16 @@ function winding(pts: readonly Pt[], over: number): number {
   return most;
 }
 
+/** How far from a motorway's carriageway or a ramp's middle a country road keeps where the generator gave no gates (m: `CountryRouter.blocked`). */
+const MOTORWAY_OFF = 16;
+
+/** The cells within `MOTORWAY_OFF` m of a motorway's carriageway or a ramp among `roads` (1), else 0. */
+function motorwayCells(cells: Cells, roads: readonly RoadPlan[]): Uint8Array {
+  const out = new Uint8Array(cells.gw * cells.gd);
+  for (const r of roads) if (isSeparated(r.kind)) for (const p of evenly(r.points, 4)) cells.mark(out, p, MOTORWAY_OFF);
+  return out;
+}
+
 /** Whether `p` is clear of every area's box by more than `by` m. */
 export const clearOfBoxes = (areas: readonly { rect: Rect }[], p: Pt, by: number) =>
   areas.every((a) => p[0] < a.rect.x - by || p[1] < a.rect.z - by || p[0] > a.rect.x + a.rect.w + by || p[1] > a.rect.z + a.rect.d + by);
@@ -448,6 +479,12 @@ export class CountryRouter {
   readonly rim: Uint8Array;
   /** The cells that are water or touch it. */
   readonly wetNear: Uint8Array;
+  /**
+   * The cells a country road may not go through: the motorway's (`motorway.ts` `MotorwayRoute.blocked`, but at its
+   * gates); given none, every cell within `MOTORWAY_OFF` m of a motorway's carriageway or a ramp among the roads (a
+   * village placed by hand: nothing crosses the motorway but under the overpasses the generator laid).
+   */
+  readonly blocked: Uint8Array;
   /** The ports left without a way on because every way on was too steep (`tooSteep`). */
   readonly steepOn = new Set<Port>();
   private readonly climb: number;
@@ -463,13 +500,15 @@ export class CountryRouter {
    * A router over `cells` (the land as it stands: its woods and water read as they are when it
    * routes), keeping out of `areas`' boxes but by their ways in and out, sharing `roads` (read
    * afresh each time: the caller adds the roads it lays to the same list), as `spec`'s world has it
-   * (a classic world's or a place's; how much height counts against a cell).
+   * (a classic world's or a place's; how much height counts against a cell), off the motorway but at its gates
+   * (`blocked`).
    */
   constructor(
     readonly cells: Cells,
     readonly areas: readonly { rect: Rect }[],
     readonly roads: readonly RoadPlan[],
     readonly spec: Pick<WorldSpec, 'classic' | 'climb'>,
+    blocked?: Uint8Array,
   ) {
     const { gw, gd } = cells;
     this.areaBlock = new Uint8Array(gw * gd);
@@ -484,6 +523,7 @@ export class CountryRouter {
     for (let i = 0; i < gw * gd; i++) if (i % gw < 2 || i % gw >= gw - 2 || i < gw * 2 || i >= gw * (gd - 2)) this.rim[i] = 1;
     this.wetNear = new Uint8Array(gw * gd);
     for (let i = 0; i < gw * gd; i++) if (cells.water[i]) for (const d of [0, -1, 1, -gw, gw, -gw - 1, -gw + 1, gw - 1, gw + 1]) if (i + d >= 0 && i + d < gw * gd) this.wetNear[i + d] = 1;
+    this.blocked = blocked ?? motorwayCells(cells, roads);
     this.rise = spec.classic
       ? undefined
       : (a, b) => {
@@ -494,9 +534,9 @@ export class CountryRouter {
 
   /** What a cell costs a country road (Infinity where it may not go: on or by the water, in an area but within 26 m of `ends`, its ways in and out). */
   cost(ends: readonly Pt[]): (i: number) => number {
-    const { cells: land, areaBlock, wetNear, rim, climb } = this;
+    const { cells: land, areaBlock, wetNear, rim, climb, blocked } = this;
     return (i: number) => {
-      if (wetNear[i]) return Infinity;
+      if (wetNear[i] || blocked[i]) return Infinity;
       if (areaBlock[i]) {
         const c = land.centre(i);
         if (!ends.some((e) => dist(c, e) < 26)) return Infinity;
@@ -509,9 +549,9 @@ export class CountryRouter {
 
   /** As `cost`, but along the water's edge too (not over it), and less put off by the slope: for when that finds no way. */
   relaxed(ends: readonly Pt[]): (i: number) => number {
-    const { cells: land, wetNear } = this;
+    const { cells: land, wetNear, blocked } = this;
     const strict = this.cost(ends);
-    return (i: number) => (land.water[i] ? Infinity : wetNear[i] ? 30 + land.slope(i) * 15 : Math.min(strict(i), 1 + land.slope(i) * 15 + land.woods[i] * 0.3));
+    return (i: number) => (land.water[i] || blocked[i] ? Infinity : wetNear[i] ? 30 + land.slope(i) * 15 : Math.min(strict(i), 1 + land.slope(i) * 15 + land.woods[i] * 0.3));
   }
 
   /** `cost` and `relaxed` for a road whose ways in and out are `ends`. */
@@ -632,7 +672,7 @@ export class CountryRouter {
     const by = new Map<number, number[]>();
     const R = SHARED_REACH;
     roads.forEach((r, i) => {
-      if (r.kind === 'trail' || own.has(i)) return;
+      if (r.kind === 'trail' || isSeparated(r.kind) || own.has(i)) return;
       // (Each cell it passes over once; off the world, none.)
       const under = new Set(r.points.map(([x, z]) => (x < 0 || z < 0 || x >= W || z >= D ? -1 : Math.floor(z / CELL) * gw + Math.floor(x / CELL))));
       under.delete(-1);
@@ -762,7 +802,8 @@ export class CountryRouter {
    * end within half the wider one's width and a metre of the other's middle), join `p` to `q`.
    */
   joins(extra: readonly RoadPlan[], p: Pt, q: Pt): boolean {
-    const all = [...this.roads, ...extra].filter((r) => r.kind !== 'trail');
+    // (Not the motorway: nothing joins it but its ramps.)
+    const all = [...this.roads, ...extra].filter((r) => r.kind !== 'trail' && !isSeparated(r.kind));
     const index = new RoadIndex(all);
     const parent = all.map((_, i) => i);
     const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));

@@ -32,7 +32,7 @@ const lotSig = (t: Templates, s: PlotSlot) => {
   return `${r.x},${r.z},${r.w},${r.d}|${s.facing}|${s.kind}|${s.template}`;
 };
 const boxSig = (b: Box) => `${b.x},${b.z},${b.w},${b.d}`;
-const roadSig = (r: RoadPlan) => `${r.width}|${r.bridge?.join(',') ?? ''}|${r.points.map(([x, z]) => `${x.toFixed(2)},${z.toFixed(2)}`).join(';')}`;
+const roadSig = (r: RoadPlan) => `${r.width}|${r.kind ?? 'street'}|${r.oneway ?? 0}|${r.bridge?.join(',') ?? ''}|${r.points.map(([x, z]) => `${x.toFixed(2)},${z.toFixed(2)}`).join(';')}`;
 
 /**
  * What `plan` changed from `shown` (the town on screen), as ghosts: null if nothing it shows changed

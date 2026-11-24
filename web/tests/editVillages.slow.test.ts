@@ -215,21 +215,24 @@ describe("step 2's villages", async () => {
     const d0 = placed.draft;
     const road = d0.roads.findIndex((r) => r.kind === 'country' && r.name?.startsWith(`${name} `));
     const ls = lengths(d0.roads[road].points);
+    // (Not where the village moves to: a home there stands in its way.)
     let withHome: NeighbourhoodDraft | null = null;
+    let moved: Edited | null = null;
     for (let s = 20; s < ls[ls.length - 1] - 20 && !withHome; s += 6) {
       for (const side of [1, -1] as const) {
         const e = addLot(d0, t, content, { road, s, side }, { kind: 'house', size: 'medium' }, 9);
-        if ('draft' in e) {
-          withHome = e.draft;
-          break;
-        }
+        if (!('draft' in e)) continue;
+        moved = moveVillage(e.draft, t, a, shift[0], shift[1]);
+        if ('refused' in moved && moved.refused === 'a lot stands there') continue;
+        withHome = e.draft;
+        break;
       }
     }
-    if (!withHome) {
+    if (!withHome || !moved) {
       console.log('no home fits along the road to the village: the stub left unproven here');
       return;
     }
-    const e = moveVillage(withHome, t, a, shift[0], shift[1]);
+    const e = moved;
     if ('refused' in e) throw new Error(e.refused);
     expect(e.notes?.some((n) => n.includes(`ending where ${name} was: homes stand on it`))).toBe(true);
     // (The old road kept, a dead end now, and the Problems list says so.)
@@ -273,11 +276,29 @@ describe("step 2's villages", async () => {
     noDangling(e.draft);
   });
 
+  /**
+   * A generated world's first village that may go (`villageGoes`), one with areas after it first (their indexes then
+   * numbered again): one whose road another area's street goes on into, with homes along it past a dead end's length,
+   * is refused (coast 3's Lindenwick and Wrenby, since the motorway went down before the villages: School Lane would end
+   * 79 m past the last road it meets).
+   */
+  const going = (d: NeighbourhoodDraft): number => {
+    const n = d.open!.areas.length;
+    const why: string[] = [];
+    for (const i of [...Array.from({ length: n - 2 }, (_, i) => i + 1), n - 1]) {
+      const goes = villageGoes(d, t, i);
+      if (!('refused' in goes)) return i;
+      why.push(`${d.open!.areas[i].name}: ${goes.refused}`);
+    }
+    throw new Error(`no village may go: ${why.join('; ')}`);
+  };
+
   test('a generated village removed: the area indexes on everything else numbered again', () => {
-    const coast = laid('coast', 3, { town: 'village', villages: 'few', size: 'large' });
+    const coast = laid('coast', 5, { town: 'village', villages: 'few', size: 'large' });
     const areas = coast.open!.areas;
     expect(areas.length).toBeGreaterThan(2);
-    const k = 1;
+    const k = going(coast);
+    expect(k).toBeLessThan(areas.length - 1);
     const goes = villageGoes(coast, t, k);
     if ('refused' in goes) throw new Error(goes.refused);
     const e = done(removeVillage(coast, t, k));
@@ -404,7 +425,7 @@ describe("step 2's villages", async () => {
   };
 
   test("a village removed: another village's street left a long dead end where its road met it is cut back to a court, or refused with homes past one", () => {
-    const { coast, k, d0, home } = longLane();
+    const { coast, k, d0, home } = longLane(going(longLane().coast));
     const e = done(removeVillage(d0, t, k));
     const left = e.draft.roads.find((r) => r.name === 'Test Lane')!;
     expect(e.draft.roads.some((r) => r.name === 'Test Road')).toBe(false);

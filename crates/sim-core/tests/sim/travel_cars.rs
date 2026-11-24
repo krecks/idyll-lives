@@ -1006,6 +1006,11 @@ fn crossroads(houses: &[House]) -> World {
 /// The crossroads (`crossroads`) with `walls` (the town file's: `[x0, z0, x1, z1]` along the
 /// tiles' edges).
 fn crossroads_walled(houses: &[House], walls: &str) -> World {
+    crossroads_in(CONTENT, houses, walls)
+}
+
+/// `crossroads_walled` with `content`.
+fn crossroads_in(content: &str, houses: &[House], walls: &str) -> World {
     let arm = |a: [f32; 2], b: [f32; 2], ends: &str| {
         format!(
             r#"{{"points":[{}],"width":7,"kind":"street","ends":{ends},"area":0}}"#,
@@ -1024,7 +1029,7 @@ fn crossroads_walled(houses: &[House], walls: &str) -> World {
         r#","size":"big","walls":{walls},"doors":[],"windows":[],"relationships":[],
         "areas":[{{"name":"Crossroads","kind":"hamlet","x":130,"z":130,"w":140,"d":140}}]"#
     );
-    town_of(CONTENT, &more, 400, 400, &roads, exits, houses)
+    town_of(content, &more, 400, 400, &roads, exits, houses)
 }
 
 /// A house by the crossroads' north arm (`z` below 200, west of it) or south arm (east of it),
@@ -1593,9 +1598,10 @@ fn a_side_roads_crosswalk_is_walked_on_the_main_roads_green_and_cars_turning_in_
     // by name. No car drives in over the north arm's stop line, nor out over its crosswalk, while
     // they're on it; and both get where they're going, time and again. (Someone walking along the
     // street's pavement past a lit T stopped every arm for the walk.)
+    // (The car's house east of the north arm, on its right going out: `cars::right_of`.)
     let mut w = crossroads(&[
-        crossroads_house(150.0, true),
-        crossroads_house(230.0, false),
+        crossroads_house(150.0, false),
+        crossroads_house(230.0, true),
     ]);
     common::run_to(&mut w, 2, 7.0);
     let sig = w.travel.signals[0].clone();
@@ -1605,7 +1611,7 @@ fn a_side_roads_crosswalk_is_walked_on_the_main_roads_green_and_cars_turning_in_
     assert_eq!(sig.opens_with(north), Some(sig.rest));
     let (west, east) = across_north(&w);
     let walker = 1u32;
-    w.sims[walker as usize].pos = west;
+    w.sims[walker as usize].pos = east;
     let mut buf = vec![0.0f32; snapshot::CAPACITY];
     // (The car's nose out along the north arm, coming in or going out, and the walker on its
     // crosswalk.)
@@ -2585,15 +2591,16 @@ fn a_lit_junction_rests_on_its_main_roads_green_and_its_walk_is_over_once_nobody
 /// The crossroads (`crossroads`) with four houses up either dead-end arm, their cars always coming
 /// and going (`keep_driving`): they hold each other up there by turns.
 fn crowded_crossroads() -> World {
+    // (Each house on the right of its cars going out to the junction: `cars::right_of`.)
     crossroads(&[
-        crossroads_house(150.0, true),
-        crossroads_house(160.0, true),
-        crossroads_house(170.0, true),
-        crossroads_house(180.0, true),
-        crossroads_house(220.0, false),
-        crossroads_house(230.0, false),
-        crossroads_house(240.0, false),
-        crossroads_house(250.0, false),
+        crossroads_house(150.0, false),
+        crossroads_house(160.0, false),
+        crossroads_house(170.0, false),
+        crossroads_house(180.0, false),
+        crossroads_house(220.0, true),
+        crossroads_house(230.0, true),
+        crossroads_house(240.0, true),
+        crossroads_house(250.0, true),
     ])
 }
 
@@ -3030,4 +3037,192 @@ fn a_knot_of_a_country_road_leaving_a_street_at_a_slant_by_another_junction_is_l
     }
     // (The other arms keep theirs.)
     assert!(west.crosswalk && arm(tee, [1.0, 0.0]).crosswalk);
+}
+
+/// At super speed a step runs up to 60 ticks: the snapshot has each car's way through them
+/// (`snapshot::car::TRAIL`), so the renderer draws it where it was tick by tick (within
+/// `TRAIL_TOLERANCE`), round the crossroads' turns, not on the straight line across them.
+#[test]
+fn at_super_speed_the_snapshot_has_the_way_each_car_went_tick_by_tick() {
+    use sim_core::snapshot::{
+        self, CAR_BASE, CAR_STRIDE, TRAIL_BASE, TRAIL_MOST, TRAIL_STEPS, TRAIL_STRIDE,
+        TRAIL_TOLERANCE, car, trail,
+    };
+    let mut w = busy_crossroads();
+    w.speed = 4;
+    let mut buf = vec![0.0f32; snapshot::CAPACITY];
+    let (mut checked, mut turning, mut worst, mut straight_worst) = (0, 0, 0.0f32, 0.0f32);
+    let mut before: Vec<Option<[f32; 2]>> = vec![None; w.cars.len()];
+    for _ in 0..240 {
+        keep_driving(&mut w);
+        w.start_step();
+        // (Each car's pose after each tick of the step, as the renderer would want it.)
+        let mut ticks: Vec<Vec<Option<[f32; 3]>>> = Vec::new();
+        while w.advance_more() {
+            let poses = w
+                .cars
+                .iter()
+                .map(|c| c.shown.filter(|s| s.2).map(|s| [s.0[0], s.0[1], s.1]));
+            ticks.push(poses.collect());
+        }
+        snapshot::write(&w, &mut buf);
+        let n = ticks.len() as f32;
+        for c in 0..w.cars.len() {
+            let o = CAR_BASE + c * CAR_STRIDE;
+            let shown = buf[o + car::SHOWN] == 2.0 && ticks.iter().all(|t| t[c].is_some());
+            let was = std::mem::replace(
+                &mut before[c],
+                shown.then(|| [buf[o + car::X], buf[o + car::Z]]),
+            );
+            if !shown {
+                continue;
+            }
+            let len = buf[o + car::TRAIL_LEN] as usize;
+            let mut way: Vec<[f32; 4]> = (0..len)
+                .map(|i| {
+                    let a = TRAIL_BASE + (buf[o + car::TRAIL] as usize + i) * TRAIL_STRIDE;
+                    [
+                        buf[a + trail::T],
+                        buf[a + trail::X],
+                        buf[a + trail::Z],
+                        buf[a + trail::YAW],
+                    ]
+                })
+                .collect();
+            way.push([0.0, buf[o + car::X], buf[o + car::Z], buf[o + car::YAW]]);
+            assert!(
+                way.windows(2).all(|p| p[0][0] < p[1][0]),
+                "car {c}'s way goes back in time: {way:?}"
+            );
+            // (Its points from the last steps kept, and one before them: where it stood since, or came from.)
+            assert!(
+                way.len() < 3 || way[1][0] > -(TRAIL_STEPS as f32) - 1.0,
+                "car {c}'s way is too old: {way:?}"
+            );
+            if len >= TRAIL_MOST {
+                continue;
+            }
+            let at = |t: f32| {
+                let j = way.iter().position(|p| p[0] >= t).unwrap();
+                let (a, b) = (way[j.max(1) - 1], way[j]);
+                let k = if b[0] > a[0] {
+                    ((t - a[0]) / (b[0] - a[0])).clamp(0.0, 1.0)
+                } else {
+                    1.0
+                };
+                [a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k]
+            };
+            for (j, tick) in ticks.iter().enumerate() {
+                let t = -1.0 + (j as f32 + 1.0) / n;
+                let p = tick[c].unwrap();
+                if t < way[0][0] {
+                    continue;
+                }
+                let q = at(t);
+                worst = worst.max((q[0] - p[0]).hypot(q[1] - p[1]));
+                // (The straight line from the snapshot before, as it was drawn.)
+                if let Some(b) = was {
+                    let k = (t + 1.0).clamp(0.0, 1.0);
+                    let s = [
+                        b[0] + (buf[o + car::X] - b[0]) * k,
+                        b[1] + (buf[o + car::Z] - b[1]) * k,
+                    ];
+                    straight_worst = straight_worst.max((s[0] - p[0]).hypot(s[1] - p[1]));
+                }
+            }
+            checked += 1;
+            if (ticks[0][c].unwrap()[2] - buf[o + car::YAW]).abs() > 0.5 {
+                turning += 1;
+            }
+        }
+    }
+    eprintln!(
+        "{checked} cars' steps checked, {turning} turning: {worst:.3} m off at most (on the straight line {straight_worst:.1} m)"
+    );
+    assert!(
+        checked > 100 && turning > 5,
+        "too few drives: {checked}, {turning} turning"
+    );
+    assert!(
+        worst <= TRAIL_TOLERANCE + 1e-3,
+        "drawn {worst} m off where the car was"
+    );
+    assert!(
+        straight_worst > 2.0,
+        "the straight line cut no corner: {straight_worst}"
+    );
+}
+
+/// Undo puts the households' cars back first and the taxis after them (`World::restore`), so a
+/// car may come back at another place in `World::cars` (here a household's car taken for a taxi
+/// before the others): its way as drawn (`snapshot::car::TRAIL`) goes with it, so no car is
+/// drawn along another's way as time runs on.
+#[test]
+fn after_an_undo_no_car_is_drawn_along_another_cars_way() {
+    use sim_core::snapshot::{self, CAR_BASE, CAR_STRIDE, TRAIL_BASE, TRAIL_STRIDE, car, trail};
+    const LAMP: &str = r#"{
+        "needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.01}],
+        "objects":[{"id":"lamp","name":"Lamp","price":30,"interactions":[]}],
+        "economy":{"startingFunds":500}}"#;
+    let houses = [
+        crossroads_house(170.0, true),
+        crossroads_house(230.0, false),
+        crossroads_house(178.0, true),
+        crossroads_house(222.0, false),
+    ];
+    let mut w = crossroads_in(LAMP, &houses, "[]");
+    w.speed = 4;
+    // (Every car by its paint, which is its own: where it was drawn tick by tick.)
+    let mut ways: std::collections::HashMap<u8, Vec<[f32; 2]>> = Default::default();
+    let step = |w: &mut World, ways: &mut std::collections::HashMap<u8, Vec<[f32; 2]>>| {
+        w.start_step();
+        while w.advance_more() {
+            for c in &w.cars {
+                if let Some(s) = c.shown {
+                    ways.entry(c.paint).or_default().push(s.0);
+                }
+            }
+        }
+    };
+    for _ in 0..20 {
+        keep_driving(&mut w);
+        step(&mut w, &mut ways);
+    }
+    let moving = |w: &World| {
+        w.cars
+            .iter()
+            .filter(|c| c.shown.is_some_and(|s| s.2))
+            .count()
+    };
+    assert!(moving(&w) >= 2, "too few cars on their way: {}", moving(&w));
+    // The first car a taxi, then an edit taken back: the others' cars come back before it.
+    w.cars[0].taxi = true;
+    let paints = |w: &World| w.cars.iter().map(|c| c.paint).collect::<Vec<_>>();
+    let before = paints(&w);
+    common::buy(&mut w, "lamp", 182, 164);
+    w.apply(sim_core::Command::Undo { household: 0 }).unwrap();
+    assert_ne!(paints(&w), before, "the cars in the same order");
+    let mut buf = vec![0.0f32; snapshot::CAPACITY];
+    let mut checked = 0;
+    for k in 0..4 {
+        if k > 0 {
+            step(&mut w, &mut ways);
+        }
+        snapshot::write(&w, &mut buf);
+        for (c, cr) in w.cars.iter().enumerate() {
+            let o = CAR_BASE + c * CAR_STRIDE;
+            let own = &ways[&cr.paint];
+            for i in 0..buf[o + car::TRAIL_LEN] as usize {
+                let a = TRAIL_BASE + (buf[o + car::TRAIL] as usize + i) * TRAIL_STRIDE;
+                let p = [buf[a + trail::X], buf[a + trail::Z]];
+                assert!(
+                    own.iter().any(|q| (q[0] - p[0]).hypot(q[1] - p[1]) < 1e-3),
+                    "step {k}: car {c} (paint {}) drawn through {p:?}, where it never was",
+                    cr.paint
+                );
+                checked += 1;
+            }
+        }
+    }
+    assert!(checked > 10, "too few points drawn: {checked}");
 }

@@ -24,7 +24,7 @@
 //!   to the nearest end of town (`Route`), then it is **Away**.
 //! - Whoever finishes first waits at work for the others when they finish within
 //!   `RIDE_WAIT_TICKS` (a rider whose driver works later walks home, as without a car). The drive
-//!   back to town takes `OFF_MAP_TICKS`.
+//!   back to town takes `OFF_MAP_TICKS` (less by a motorway: `Car::off_map_ticks`).
 //! - **Arriving.** The car drives back in, nose first, and parks; its doors open and they get out
 //!   and walk to the house.
 //!
@@ -64,13 +64,21 @@
 //!
 //! **Among the traffic.** A car drives in its lane, `LANE` right of the road's middle where the
 //! road has room for two to pass clear of each other (a 7 m street, a country road), `TIGHT_LANE`
-//! on one too narrow for that (a 6 m lane) and in older towns (`lane_on`). It keeps behind one in
+//! on one too narrow for that (a 6 m lane) and in older towns (`lane_on`); on an avenue, a
+//! motorway, a ramp or a one-way road, its lane by `LaneLine` (`lanes.rs`: an avenue's inner lane
+//! only up to a left turn, the motorway's outer lane, a one-way road's middle; lanes changed in a
+//! junction's box, eased over `TAPER` m where a ramp merges or leaves). It keeps behind one in
 //! front of it going its way (`up_against`); of two tangled, the later keeps behind the earlier
 //! till they part (`Driving::free`). Coming into town it waits out of sight at the way in till the
 //! way in is clear of the one before it, the ground in front of it too, the one there longest first
 //! (`room_to_come_in`): those coming home at the same time come in one after another, not on top
 //! of each other. A trip's car parks only in a spot no other car is parked at or on its way to
-//! (`parking_for`).
+//! (`parking_for`). On an avenue, a motorway or a ramp (`RoadKind::fast`) it goes at a speed of
+//! its own (`Car::speed`, `ease`): it speeds up and slows down as a driver would, `ACCEL` and
+//! `BRAKE` (`BRAKE_MOST` at most), keeps back from the one in front the further the faster it
+//! goes, slows to a stop behind one standing and to a red light or a merge it's waiting for, and
+//! takes turns with one merging; elsewhere (every classic town) it keeps to its way's timing, a
+//! tick on or none, as ever.
 //!
 //! Where its way crosses or meets another's, it takes turns with the other cars (`traffic/`):
 //! into a junction's box, across a lane out of its driveway or a bay (or into one), and round a 6 m
@@ -158,8 +166,10 @@ pub(crate) const PASS_TICKS: u32 = secs(3.0) as u32;
 const CLEAR_STEPS: usize = 6;
 /// How long someone done at work waits there for the others in their car.
 const RIDE_WAIT_TICKS: u64 = 60 * crate::TICKS_PER_MINUTE;
-/// The drive between the end of town and work, each way.
+/// The drive between the end of town and work, each way; shorter beyond the end of a motorway
+/// (`Car::off_map_ticks`).
 const OFF_MAP_TICKS: u64 = 10 * crate::TICKS_PER_MINUTE;
+const MOTORWAY_OFF_MAP_TICKS: u64 = 6 * crate::TICKS_PER_MINUTE;
 /// About how long the walk from the house to the car takes (for when to leave).
 const WALK_TO_CAR_TICKS: u64 = 3 * crate::TICKS_PER_MINUTE;
 /// The middle of a car's lane from the middle of the road (m): they drive on the right, clear of
@@ -283,9 +293,13 @@ const TRIP_PARK_REACH: f32 = 120.0;
 
 mod bay;
 mod bodies;
+#[doc(hidden)]
+#[cfg(any(test, feature = "test-support"))]
+pub mod drill;
 mod driving;
 mod garages;
 mod lane;
+mod lanes;
 mod legs;
 mod looks;
 mod motion;
@@ -300,13 +314,18 @@ pub use bay::*;
 pub use bodies::*;
 pub(crate) use driving::*;
 pub(crate) use garages::*;
+/// The right of a way along the ground (see `lane.rs`): the one convention of the traffic's sides.
+pub use lane::right_of;
 pub(crate) use lane::*;
+pub(crate) use lanes::*;
 pub(crate) use legs::*;
 pub use looks::*;
 pub use motion::*;
 pub(crate) use parking::*;
 pub use parking::{BAY_DEEP, BAY_LINES, BAY_WIDE, DRIVE_CLEAR, MOUTH_CLEAR};
 pub use parts::*;
+#[cfg(any(test, feature = "test-support"))]
+pub use route::way_out;
 pub(crate) use route::*;
 pub(crate) use seats::*;
 pub use state::*;

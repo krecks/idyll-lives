@@ -42,9 +42,10 @@ describe('a car’s doors as drawn', () => {
           // (The gap to the next car, 3 m apart, less the two halves.)
           expect(reach(body, d, deg)).toBeLessThan(3 - CARS[body].wid);
         }
-        // At the row's end (the next car on its +x side), the doors on its other side open wide.
+        // At the row's end (the next car on its +x side, its right: the left doors, 0 and 2, on -x), the doors on its
+        // other side open wide.
         const end = cars[0];
-        expect([0, 1, 2, 3].map((d) => doorSwing(CARS[body], d, end, cars) === DOOR_OPEN)).toEqual([false, true, false, true]);
+        expect([0, 1, 2, 3].map((d) => doorSwing(CARS[body], d, end, cars) === DOOR_OPEN)).toEqual([true, false, true, false]);
       }
     }
   });

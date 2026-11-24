@@ -161,6 +161,10 @@ describe('build-up', async () => {
     expect(road).toBeGreaterThanOrEqual(0);
     const e = buildUp(town, t, content, { road, mode: 'both', seed: 1 });
     expect('refused' in e && e.refused).toMatch(/country road out of the town and its villages/);
+    // (A road of another kind out of them says its own kind.)
+    const avenue = { ...town, roads: town.roads.map((r, i) => (i === road ? { ...r, kind: 'avenue' as const } : r)) };
+    const a = buildUp(avenue, t, content, { road, mode: 'both', seed: 1 });
+    expect('refused' in a && a.refused).toMatch(/is an avenue out of the town and its villages/);
   });
 
   test('the homes stay the same whichever mode', () => {
@@ -221,11 +225,12 @@ describe('build-up', async () => {
     const without = removeLots(town, new Set([church]));
     expect(civicChoices(town, 0).some((c) => c.index === 1)).toBe(false);
     expect(civicOffered(without, 0).filter((c) => c.civic === 1).length).toBe(1);
-    // Where it stood (the town is built up close: elsewhere it may not fit), the spot found to the metre.
+    // About where it stood (the town is built up close: elsewhere it may not fit), the spot found to the metre
+    // (the Lot tool's fit, not the generator's, may want it a few metres along: 7 m with 6 m lanes).
     const door = town.open!.places!.find((p) => p.plot === church)!;
     const near = new RoadIndex(without.roads).nearest(door.x, door.z, 60)!;
     let put: NeighbourhoodDraft | null = null;
-    for (let s = Math.floor(near.s) - 3; s <= near.s + 3 && !put; s++) {
+    for (let s = Math.floor(near.s) - 10; s <= near.s + 10 && !put; s++) {
       for (const side of [1, -1] as const) {
         const e = addCivic(without, t, content, { civic: 1, road: near.road, s, side, seed: 4 });
         if ('draft' in e) {

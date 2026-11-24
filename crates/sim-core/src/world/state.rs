@@ -224,6 +224,7 @@ impl World {
             was_calm: false,
             auto_super: false,
             step_ticks: 0,
+            trails: Default::default(),
             autonomy: true,
             lifespan: Default::default(),
             player_moves: true,

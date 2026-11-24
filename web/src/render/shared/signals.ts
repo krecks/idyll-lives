@@ -151,7 +151,8 @@ export function walkOf(state: number, states: States): boolean {
 /**
  * A pole's pedestrians' head (local to the pole as `model.trafficLight`: its axis the origin, its
  * traffic head facing +z): a small housing on the pole below the traffic head, facing across the
- * road (-x: the pole stands on the kerb to the right of those coming in), two lenses one over the
+ * road (+x: the pole stands on the kerb to the right of those coming in, sim-core `cars::right_of`, so
+ * the road is to the pole's right as its head faces them), two lenses one over the
  * other, and the figures that glow on them: don't walk (red, standing) above, walk (green,
  * striding) below. The housing in the plain finish (vertex alpha: its roughness and metalness), the
  * figures in the glow's colours.
@@ -162,7 +163,7 @@ export interface PedestrianHead {
   walk: Geo;
 }
 
-/** The pedestrians' head's front (m out from the pole's axis, towards -x), its lenses' middles (m up) and half their size. */
+/** The pedestrians' head's front (m out from the pole's axis, towards +x), its lenses' middles (m up) and half their size. */
 const PED_FRONT = 0.26;
 const PED_LENSES = { dontWalk: 1.79, walk: 1.55 } as const;
 const PED_LENS = 0.1;
@@ -178,13 +179,13 @@ export function pedestrianHead(): PedestrianHead {
   const housing = new Geo();
   // The housing (cast iron, as the pole: metal) on a bracket round the pole; the dark backs of the lenses.
   housing.color('#2B302E', 0.75);
-  housing.box(-0.08, 1.71, -0.03, -0.03, 1.75, 0.03);
-  housing.box(-0.08, 1.47, -0.03, -0.03, 1.51, 0.03);
-  housing.box(-PED_FRONT + 0.005, 1.42, -0.13, -0.08, 1.92, 0.13);
+  housing.box(0.03, 1.71, -0.03, 0.08, 1.75, 0.03);
+  housing.box(0.03, 1.47, -0.03, 0.08, 1.51, 0.03);
+  housing.box(0.08, 1.42, -0.13, PED_FRONT - 0.005, 1.92, 0.13);
   // Visors over each lens, open below.
-  for (const y of Object.values(PED_LENSES)) housing.box(-PED_FRONT - 0.09, y + PED_LENS + 0.005, -0.12, -PED_FRONT + 0.005, y + PED_LENS + 0.02, 0.12);
+  for (const y of Object.values(PED_LENSES)) housing.box(PED_FRONT - 0.005, y + PED_LENS + 0.005, -0.12, PED_FRONT + 0.09, y + PED_LENS + 0.02, 0.12);
   housing.color('#171A19', 0.45);
-  for (const y of Object.values(PED_LENSES)) housing.poly(lens(y, 0), [-1, 0, 0]);
+  for (const y of Object.values(PED_LENSES)) housing.poly(lens(y, 0), [1, 0, 0]);
   // The figures, a little in front of their lens: standing (a hand's stop), striding.
   const dontWalk = new Geo().color(PED_RED);
   figure(dontWalk, PED_LENSES.dontWalk, false);
@@ -196,7 +197,7 @@ export function pedestrianHead(): PedestrianHead {
 
 /** A lens's square at height `y`, `out` m in front of the housing. */
 function lens(y: number, out: number): V3[] {
-  const x = -PED_FRONT - out;
+  const x = PED_FRONT + out;
   return [
     [x, y - PED_LENS, -PED_LENS],
     [x, y - PED_LENS, PED_LENS],
@@ -207,8 +208,8 @@ function lens(y: number, out: number): V3[] {
 
 /** A little figure on the lens at height `y` (its across is z, its up y): standing still, or striding. */
 function figure(g: Geo, y: number, striding: boolean): void {
-  const x = -PED_FRONT - 0.004;
-  const n: V3 = [-1, 0, 0];
+  const x = PED_FRONT + 0.004;
+  const n: V3 = [1, 0, 0];
   /** A quad from (z0, y0)–(z1, y0) at its foot to (z2, y1)–(z3, y1) at its top. */
   const quad = (z0: number, z1: number, y0: number, z2: number, z3: number, y1: number) =>
     g.poly([[x, y + y0, z0], [x, y + y0, z1], [x, y + y1, z3], [x, y + y1, z2]], n);

@@ -229,6 +229,10 @@ pub struct Car {
     /// Ticks the drive out of town takes from where it parks (`settle`; not saved).
     #[serde(skip)]
     pub(super) out_ticks: f32,
+    /// Its drive out of town from where it parks leaves by a motorway (`settle`, not saved): the
+    /// drive on beyond it is shorter (`off_map_ticks`).
+    #[serde(skip)]
+    pub(super) by_motorway: bool,
     /// How far along its drive it is (ticks of its route: it stops for people in its way).
     #[serde(default, skip_serializing_if = "is_zero_f32")]
     pub progress: f32,
@@ -336,6 +340,17 @@ pub struct Car {
     /// (`pass_stands`), laid on its way; saved, so a game loaded part way round is the same.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pass_by: Option<PassBy>,
+    /// Its own speed on an avenue, a motorway or a ramp (m a second of drive time, `ease`): it
+    /// speeds up and slows down there as a driver would, at most `ACCEL` and `BRAKE_MOST`. None:
+    /// it keeps to its way's timing (every classic town's car, all the time), or is about to
+    /// (out of sight, or just put somewhere). Not saved: a game loaded, it's at its way's speed.
+    #[serde(skip)]
+    pub(crate) speed: Option<f32>,
+    /// Merging onto a motorway's carriageway (holding its merge's claim), which goes first, it or
+    /// each car coming along the carriageway to it (`car_first`'s key; true: it), as first worked
+    /// out (`ease`'s `merge_order`): kept till it's merged. Not saved: worked out again.
+    #[serde(skip)]
+    pub(crate) merge_first: Vec<(u64, bool)>,
 }
 
 pub(super) fn is_zero_f32(v: &f32) -> bool {

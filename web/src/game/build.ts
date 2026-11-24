@@ -936,7 +936,7 @@ export function layOutUses(base: Proposal | null, plan: NeighbourhoodDraft, t: T
   for (const s of added) {
     if (s.kind !== 'outdoor' || !open.land) continue;
     const r = plotRect(t, s);
-    pads[s.index] = Math.round(heightAt(open.land, r.x + r.w / 2, r.z + r.d / 2) * 10) / 10;
+    pads[s.index] = Math.round(heightAt(open.land, r.x + r.w / 2, r.z + r.d / 2) * 10) / 10 || 0;
   }
   const firstNew = draft.slots.length;
   draft = { ...draft, roads, slots: [...draft.slots, ...added], open: { ...draft.open!, pads } };

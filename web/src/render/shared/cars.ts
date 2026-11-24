@@ -184,7 +184,10 @@ export function carPaintColour(paint: string, age: CarAge): string {
   return aged(paint, age)[0];
 }
 
-/** Doors (as sim-core `cars::DOORS`): 0 front left (the driver's, on the car's +x side), 1 front right, 2 back left, 3 back right. */
+/**
+ * Doors (as sim-core `cars::DOORS`): 0 front left (the driver's, on the car's -x side: its left as the game shows it, for
+ * traffic on the right, sim-core `cars::right_of`), 1 front right, 2 back left, 3 back right.
+ */
 export const DOORS = 4;
 /**
  * How wide a door opens (degrees), wide open; the room (m) beside a car's side it needs for that (sim-core
@@ -245,7 +248,8 @@ const INSIDE = '#26282B';
 export function carDoor(body: CarBody, d: number): { side: 1 | -1; hinge: number; rearBelt: number; rearLow: number; sill: number; u0: number; u1: number } {
   const [br, bf] = body.cabin;
   const [f1, r0, r1] = body.doors ?? DOOR_SPLIT;
-  const side = d % 2 === 0 ? 1 : -1;
+  // (The left doors on -x: facing +z, the car's right is +x.)
+  const side = d % 2 === 0 ? -1 : 1;
   const at = (u: number) => bf + (br - bf) * u;
   const arch = body.wheelR + 0.1;
   const sill = Math.max(...body.low.slice(0, 2).map((q) => q[1])) + 0.1;

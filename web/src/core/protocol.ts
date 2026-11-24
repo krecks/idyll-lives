@@ -451,8 +451,11 @@ export interface FormerResident {
 /** Event references with this bit name a former resident (sim-core `social::FORMER`). */
 export const FORMER = 2 ** 31;
 
-/** What is at the end of a road: the way out of town, a dead end (a turning circle), another road it joins, or itself (a ring). */
-export type RoadEnd = 'out' | 'dead' | 'join' | 'loop';
+/**
+ * What is at the end of a road: the way out of town, a dead end (a turning circle), another road it joins, itself (a
+ * ring), or another road it runs into alongside, lane to lane (`merge`: a ramp's end on the motorway).
+ */
+export type RoadEnd = 'out' | 'dead' | 'join' | 'loop' | 'merge';
 
 /** A town's road (`game/roads.ts`): its middle, a point about every metre (town tiles); its width with the sidewalks. */
 export interface RoadPlan {
@@ -476,10 +479,20 @@ export interface RoadPlan {
    * (`Command::ShapeLand`'s `meta.roads`). A road's decks are both (`render/shared/roads.ts` `bridgeSpans`).
    */
   bridges?: [number, number][];
+  /** A one-way road: cars go only along it (+1, the way its points run) or only against it (-1); absent: both ways. */
+  oneway?: 1 | -1;
+  /** Where it stands raised over the land on an overpass (not over water: `bridge`): arc lengths (m) along it, each start and end. */
+  raised?: [number, number][];
+  /** The roads it passes over or under without meeting them (the motorway's crossings): each road's index, and the arc length (m) along this one where it crosses. */
+  crosses?: { road: number; s: number }[];
 }
 
-/** `street` (default) · `lane` · `country` (between areas) · `trail` (2 m, on foot only). */
-export type RoadKind = 'street' | 'lane' | 'country' | 'trail';
+/**
+ * `street` (default) · `lane` (narrow) · `country` (between areas) · `trail` (2 m, on foot only) · `avenue` (two lanes each
+ * way about a median) · `motorway` (one carriageway, one-way: a motorway is two) · `ramp` (one lane, one-way, onto
+ * the motorway or off it). Their widths and what each has: `roadKinds.ts` `ROAD_KIND`.
+ */
+export type RoadKind = 'street' | 'lane' | 'country' | 'trail' | 'avenue' | 'motorway' | 'ramp';
 
 /** How big a world's main town is: a hamlet, a village, a town or a city. */
 export type TownSize = 'hamlet' | 'village' | 'town' | 'city';
@@ -940,7 +953,7 @@ export interface WorldStructure {
   pullOverStreets?: PullOverStreetInfo[];
   /**
    * Where the traffic lights' poles stand on the pavement and which way their heads face (x, z, yaw: sim-core `traffic::SignalArm`, in the snapshot's signal
-   * head rows' order): the kerbside furniture keeps clear of them. Absent: none.
+   * head rows' order, an arm cars only leave by left out: no head stands there): the kerbside furniture keeps clear of them. Absent: none.
    */
   lightPoles?: [number, number, number][];
   /**
