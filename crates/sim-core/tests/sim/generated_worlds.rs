@@ -1650,6 +1650,8 @@ fn generated_worlds_cars_keep_to_the_roads() {
 /// Otterpool). At real speeds they took two to five game hours.
 const ACROSS_MINUTES: f32 = 32.0;
 const ACROSS_MOST: f32 = 60.0;
+/// How many of the roads' ends furthest south and furthest west a drive across is tried between, the furthest first.
+const ACROSS_TRIES: usize = 6;
 
 #[test]
 #[ignore]
@@ -1675,16 +1677,29 @@ fn generated_worlds_are_driven_across_in_about_half_an_hour() {
             .copied()
             .filter(|&p| !g.near(p, 1.0, 1, Mode::Car).is_empty())
             .collect();
-        let south = nodes.iter().copied().max_by(|a, b| a[1].total_cmp(&b[1]));
-        let west = nodes.iter().copied().min_by(|a, b| a[0].total_cmp(&b[0]));
-        let (Some(south), Some(west)) = (south, west) else {
+        let mut souths = nodes.clone();
+        souths.sort_by(|a, b| b[1].total_cmp(&a[1]));
+        let mut wests = nodes;
+        wests.sort_by(|a, b| a[0].total_cmp(&b[0]));
+        let (Some(&south), Some(&west)) = (souths.first(), wests.first()) else {
             return Err(format!("{label}: no roads"));
         };
         // (The road furthest south furthest west too: no way across to time.)
         if south == west {
             return Ok(None);
         }
-        let Some(ticks) = sim_core::cars::empty_drive_ticks(&w.travel, south, west) else {
+        // (A one-way road's end may lead nowhere from it or come from nowhere to it, a motorway's carriageway out
+        // of the world or in: the next furthest south or west, `ACROSS_TRIES` of each at most.)
+        let found = souths.iter().take(ACROSS_TRIES).find_map(|&s| {
+            wests.iter().take(ACROSS_TRIES).find_map(|&w2| {
+                (s != w2)
+                    .then(|| {
+                        sim_core::cars::empty_drive_ticks(&w.travel, s, w2).map(|t| (s, w2, t))
+                    })
+                    .flatten()
+            })
+        });
+        let Some((south, west, ticks)) = found else {
             return Err(format!(
                 "{label}: no way by road from {south:?} to {west:?}"
             ));

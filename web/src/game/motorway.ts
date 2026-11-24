@@ -3,14 +3,20 @@
  * crosses and on a bridge over its water, with one half-diamond junction to the town. The generator lays it in two
  * goes (`macro.ts` `generateFromSpec`):
  *
- * - **`routeMotorway`**, after the villages and before the country roads: the best of `CANDIDATES` cubic curves from
- *   one edge of the world to the opposite one (either way across), passing the main town `TOWN_CLEAR` m off its box at
- *   least and `TOWN_REACH` m at most, `HAMLET_CLEAR` m off the villages', clear of the roads laid already, bending no
- *   tighter than `BEND_RADIUS`, over the water at most once, `WATER_ANGLE` or squarer to it and `WATER_MOST` m at most,
- *   and with a profile within its grade (`MOTORWAY_GRADE`) cut or filled no more than `CUT` (`profileOf`), standing
- *   `OVER` m over the land at each crossing. Scored by its cut and fill, its water and how far it passes from the town.
+ * - **`routeMotorway`**, after the main town (and a river's bridge, an island's causeways) and before the villages:
+ *   the best of `CANDIDATES` cubic curves from one edge of the world to the opposite one (either way across), passing
+ *   the main town `TOWN_CLEAR` m off its box at least and `TOWN_REACH` m at most, `HAMLET_CLEAR` m off any village's
+ *   given, clear of the roads laid already, bending no tighter than `BEND_RADIUS`, over the water at most once between
+ *   its ends, `WATER_ANGLE` or squarer to it and `WATER_MOST` m at most (and at an end off an island's coast to the
+ *   world's edge, `WATER_END` m at most), and with a profile within its grade (`MOTORWAY_GRADE`) cut or filled no more
+ *   than `CUT` (`profileOf`), standing `OVER` m over the land at each crossing. Scored by its cut and fill, its water
+ *   and how far it passes from the town; of the best that fit, the one leaving the villages the most room, none
+ *   costing the world a village (`MotorwaySite.room`, `VILLAGES_LOST`). The villages then keep `HAMLET_CLEAR` m off
+ *   it, further by its junction (`clearOfMotorway`), and once they are down its gates are chosen again by them
+ *   (`withVillages`).
  *   Its middle line is offset into two one-way `motorway` carriageways `APART` m apart, laid for traffic on the right as
- *   the game shows it (`carriageways`: each has the other on the left of the way its cars go, sim-core `cars::right_of`). The country roads (`CountryRouter`) may
+ *   the game shows it (`carriageways`: each has the other on the left of the way its cars go, sim-core `cars::right_of`).
+ *   The country roads (`CountryRouter`) may
  *   not cross it (`blocked`, `BAND` m either side of its middle line) but at 1 to 3 gates square to it (`gates`), the
  *   first the nearest the main town (`junction`, kept clear wider and longer for its ramps).
  * - **`finishMotorway`**, once the country roads are laid: where they pass under it (`crossings`) its carriageways are
@@ -19,8 +25,8 @@
  *   other, both on one side of the road under it, each about 125 m, merging into its carriageway at one end and meeting
  *   the road under it in a T `RAMP_T` m out from the carriageway at the other.
  *
- * A world it doesn't fit (too small, an island, mountains) has none: `failed` says why, and the world is laid as it
- * was. All its maths is `pmath`'s (the same towns on every engine).
+ * A world it doesn't fit (mountains, an island whose roads leave no room for its junction, a small world it would
+ * cost a village) has none: `failed` says why, and the world is laid as it was. All its maths is `pmath`'s (the same towns on every engine).
  */
 
 import type { RoadPlan } from '../core/protocol';
@@ -50,12 +56,16 @@ export const TOWN_REACH = 220;
 const REACH_AIM = 150;
 /** How far its middle line keeps off the world's edges but the two it runs between (m). */
 export const SIDE_CLEAR = 40;
+/** Its courses along an edge of the world (`candidates`) this far in from `SIDE_CLEAR` and `TOWN_REACH` (m: room for the road under its junction to go on beyond it, `gatesOf`). */
+const EDGE_IN = 40;
 /** How far its middle line keeps off the roads laid before it (bridges, causeways: m). */
 const ROAD_CLEAR = 40;
 /** Its water: crossed this square or squarer (radians), each crossing this long at most (m), crossings at most. */
 export const WATER_ANGLE = Math.PI / 3;
 const WATER_MOST = 100;
 const WATER_CROSSINGS = 1;
+/** At an end, off the coast to the world's edge (an island's sea), this long at most (m). */
+const WATER_END = 90;
 /** Its deck over the water reaches this far past the banks (m). */
 const DECK_PAST = 8;
 /** The grade it is routed within (a little within its kind's, `ROAD_KIND.motorway.grade`), and the most it is cut or filled (m, within `CUT_MAX_MOTORWAY`). */
@@ -75,6 +85,8 @@ const BAND = 20;
 /** About the junction's gate, wider and longer: no road but the one under it within `JUNCTION_BAND` m of the middle line for `JUNCTION_REACH` m either way. */
 const JUNCTION_BAND = 36;
 const JUNCTION_REACH = 150;
+/** A village's box keeps this far off the middle line about the junction's gate (m: its ramps, their T and a village's gap). */
+const JUNCTION_CLEAR = JUNCTION_BAND + 24;
 /** No cell within this of an area's box is kept from the country roads (its ways out go on from there). */
 const AREA_OPEN = 24;
 /** Gates: at most this many, this far apart along it (m), this far from its ends and from its water (m), crossed within `GATE_SQUARE` (radians) of square. */
@@ -107,6 +119,9 @@ const RAMP_TS = [RAMP_T, RAMP_T + 7, RAMP_T + 14];
 const TEE_APART = 25;
 /** A ramp's length (m): within these. */
 export const RAMP_LENGTH: [number, number] = [110, 140];
+/** How many courses that fit are tried for the villages' room at most (`MotorwaySite.room`), and how many fewer villages than none would it may leave room for. */
+const VILLAGES_LOST = 0;
+const ROOM_TRIES = 6;
 /** The draws its course and names come from (apart from the world's). */
 const MOTOR = 0x6d6f746f;
 
@@ -140,6 +155,8 @@ export interface MotorwayRoute {
   /** Its base name (`M5`), and its junction's number. */
   name: string;
   junction: number;
+  /** Its profile's samples along its middle line (every `STEP` m, NaN over its water): where a gate may lift it over a road (`withVillages`). */
+  heights: number[];
 }
 
 /** A road crossing the motorway's middle line: which, how far along it (m) and along the middle line (m), and how square (radians from along). */
@@ -230,8 +247,17 @@ function clipTo(pts: readonly Pt[], W: number, D: number, inset = 0.5): Pt[] | n
     return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
   };
   const out = pts.slice(first, last + 1);
-  if (first > 0) out.unshift(edge(pts[first], pts[first - 1]));
-  if (last < pts.length - 1) out.push(edge(pts[last], pts[last + 1]));
+  // (A point inside within half a metre of the edge gives way to the point on it: no stub of a step at an end.)
+  if (first > 0) {
+    const e = edge(pts[first], pts[first - 1]);
+    if (out.length > 2 && dist(e, out[0]) < 0.5) out[0] = e;
+    else out.unshift(e);
+  }
+  if (last < pts.length - 1) {
+    const e = edge(pts[last], pts[last + 1]);
+    if (out.length > 2 && dist(e, out[out.length - 1]) < 0.5) out[out.length - 1] = e;
+    else out.push(e);
+  }
   return out;
 }
 
@@ -303,7 +329,16 @@ export interface MotorwaySite {
   roads: readonly RoadPlan[];
   wet: (x: number, z: number) => boolean;
   seed: number;
+  /**
+   * How many villages would find room with the motorway's land kept clear as `clear` says (the generator's own count,
+   * before it places them): of the courses that fit, none leaving room for more than `VILLAGES_LOST` fewer than none
+   * would; the best leaving as many as none would is taken, else the best leaving the most. None given: the best course.
+   */
+  room?: (clear: (r: Rect) => boolean) => number;
+  /** How many of the courses it would take to pass over (the generator's: those it found no room for the junction on, or the country roads no way round). */
+  skip?: number;
 }
+
 
 /** A course tried: its middle line, its score (lower better), and its profile's samples. */
 interface Course {
@@ -315,11 +350,12 @@ interface Course {
 }
 
 /** Why a course is turned away, as `failed` lists the most common. */
-type Why = 'edge' | 'side' | 'bend' | 'town' | 'far' | 'village' | 'road' | 'water' | 'grade' | 'gate';
+type Why = 'edge' | 'side' | 'bend' | 'town' | 'far' | 'village' | 'road' | 'water' | 'grade' | 'gate' | 'room';
 const WHY: Record<Why, string> = {
   edge: 'runs out of the world and back',
   side: `runs within ${SIDE_CLEAR} m of the world's edge`,
   gate: 'has no place a road from the town could climb to and pass under it',
+  room: VILLAGES_LOST ? `leaves room for more than ${VILLAGES_LOST} fewer villages` : 'leaves room for fewer villages',
   bend: `bends tighter than ${BEND_RADIUS} m`,
   town: `comes within ${TOWN_CLEAR} m of the town`,
   far: `passes further than ${TOWN_REACH} m from the town`,
@@ -372,14 +408,16 @@ function judge(middle: Pt[], line: Pt[], site: MotorwaySite): Course | Why {
     const index = new RoadIndex(others);
     for (let i = 0; i < middle.length; i += 4) if (index.nearest(middle[i][0], middle[i][1], ROAD_CLEAR)) return 'road';
   }
-  // Its water: once at most, square enough, not too long, not at an end.
+  // Its water: once at most between its ends, square enough, not too long; and at an end, off the coast to the
+  // world's edge (an island's), `WATER_END` m at most.
   const ls = lengths(middle);
   const runs = wetRuns(middle, wet, ls);
-  if (runs.length > WATER_CROSSINGS) return 'water';
+  const atEnd = (i0: number, i1: number) => i0 === 0 || i1 === middle.length - 1;
+  if (runs.filter(([, , i0, i1]) => !atEnd(i0, i1)).length > WATER_CROSSINGS) return 'water';
   let water = 0;
   for (const [s0, s1, i0, i1] of runs) {
     const along = s1 - s0 + 1;
-    if (along > WATER_MOST || i0 === 0 || i1 === middle.length - 1) return 'water';
+    if (along > (atEnd(i0, i1) ? WATER_END : WATER_MOST) || (i0 === 0 && i1 === middle.length - 1)) return 'water';
     // (How far the water runs square across it there: a river crossed at `θ` from along it runs `along · tan θ` across.)
     const { p, t } = pointAt(middle, (s0 + s1) / 2, ls);
     const n = rightOf(t);
@@ -394,7 +432,11 @@ function judge(middle: Pt[], line: Pt[], site: MotorwaySite): Course | Why {
   return { middle, line, heights, score: (made.cut / ls[ls.length - 1]) * 20 + water * 0.4 + Math.abs(reach - REACH_AIM) * 0.05 };
 }
 
-/** The courses it tries: `CANDIDATES` cubic curves from one edge to the opposite one, passing either side of the town, near and further off. */
+/**
+ * The courses it tries: `CANDIDATES` cubic curves from one edge to the opposite one, passing either side of the town,
+ * near and further off; and straight along each edge `EDGE_IN` m in from where it may pass (`SIDE_CLEAR`), or from
+ * as far off the town as it may pass (`TOWN_REACH`) if that is nearer.
+ */
 function candidates(site: MotorwaySite): Pt[][] {
   const { land, areas, seed } = site;
   const [W, D] = [land.W, land.D];
@@ -433,7 +475,24 @@ function candidates(site: MotorwaySite): Pt[][] {
       }
     }
   }
-  return out.slice(0, CANDIDATES);
+  // And straight along the edges past the town as far off it as it may pass (where the villages could go between).
+  const drawn = out.slice(0, CANDIDATES);
+  for (const across of [0, 1] as const) {
+    const [L, S] = across === 0 ? [W, D] : [D, W];
+    const [lo, hi] = across === 0 ? [main.z, main.z + main.d] : [main.x, main.x + main.w];
+    for (const side of [-1, 1]) {
+      const pass = side < 0 ? Math.max(SIDE_CLEAR + EDGE_IN, lo - TOWN_REACH + EDGE_IN) : Math.min(S - SIDE_CLEAR - EDGE_IN, hi + TOWN_REACH - EDGE_IN);
+      if ((side < 0 ? lo - pass : pass - hi) < TOWN_CLEAR + OUTER + 6) continue;
+      const ctrl: Pt[] = [
+        [-OUT, pass],
+        [L * 0.36, pass],
+        [L * 0.64, pass],
+        [L + OUT, pass],
+      ];
+      drawn.push(bezier(across === 0 ? ctrl : ctrl.map(([x, z]): Pt => [z, x])));
+    }
+  }
+  return drawn;
 }
 
 /** The base names a motorway may have (`M` and a number), and its junctions' numbers. */
@@ -460,31 +519,109 @@ export function routeMotorway(site: MotorwaySite): MotorwayRoute | { failed: str
   const { land } = site;
   const [W, D] = [land.W, land.D];
   const why = new Map<Why, number>();
-  const fit: Course[] = [];
-  for (const line of candidates(site)) {
-    const middle = clipTo(line, W, D, 0);
-    const judged = middle ? judge(middle, line, site) : 'edge';
-    if (typeof judged === 'string') why.set(judged, (why.get(judged) ?? 0) + 1);
-    else fit.push(judged);
-  }
-  // (The best first, with a gate a road from the town could climb to: `gatesOf`.)
-  fit.sort((a, b) => a.score - b.score);
-  for (const best of fit) {
-    const gates = gatesOf(best, site);
-    if (!gates.length) {
-      why.set('gate', (why.get('gate') ?? 0) + 1);
-      continue;
+  const judgeAll = (lines: readonly Pt[][]) => {
+    const fit: Course[] = [];
+    for (const line of lines) {
+      const middle = clipTo(line, W, D, 0);
+      const judged = middle ? judge(middle, line, site) : 'edge';
+      if (typeof judged === 'string') why.set(judged, (why.get(judged) ?? 0) + 1);
+      else fit.push(judged);
     }
-    const ways = carriageways(best.line, W, D);
-    if (!ways) continue;
-    return { middle: best.middle, ways, blocked: blockedOf(best.middle, gates, land, site.areas), gates, ...namesOf(site.seed) };
+    return fit;
+  };
+  /** The room the villages would have with none (`MotorwaySite.room`). */
+  const full = site.room?.(() => true) ?? 0;
+  /**
+   * Of courses `fit`, the best first with a gate a road from the town could climb to (`gatesOf`), the first
+   * `ROOM_TRIES` of those, the most room they leave the villages first (the better of two leaving as much); the
+   * first `want` of them (no more worked out than that needs), and the room each leaves.
+   */
+  const ranked = (fit: Course[], want: number): { route: MotorwayRoute; room: number }[] => {
+    fit.sort((a, b) => a.score - b.score);
+    const out: { route: MotorwayRoute; room: number }[] = [];
+    let tries = 0;
+    for (const best of fit) {
+      const gates = gatesOf(best, site);
+      if (!gates.length) {
+        why.set('gate', (why.get('gate') ?? 0) + 1);
+        continue;
+      }
+      const ways = carriageways(best.line, W, D);
+      if (!ways) continue;
+      const route: MotorwayRoute = { middle: best.middle, ways, blocked: blockedOf(best.middle, gates, land, site.areas), gates, ...namesOf(site.seed), heights: best.heights };
+      const room = site.room ? site.room((r) => clearOfMotorway(route, r)) : full;
+      tries++;
+      // (Not where it leaves the villages too little room.)
+      if (room < full - VILLAGES_LOST) why.set('room', (why.get('room') ?? 0) + 1);
+      else out.push({ route, room });
+      // (One leaving as much room as none would: none after it is put before it.)
+      if ((want === 1 && room >= full) || tries >= ROOM_TRIES) break;
+    }
+    return out.sort((a, b) => b.room - a.room);
+  };
+  // (Passed over to the next: only one leaving as many villages room as the first.)
+  const skip = site.skip ?? 0;
+  const all = ranked(judgeAll(candidates(site)), skip + 1);
+  const route = all[skip];
+  if (route && route.room >= all[0].room) return route.route;
+  if (skip > 0) return { failed: 'No motorway: no course tried leaves its junction room and the country roads a way round it.' };
+  // (Why: the villages' room if a course that fits was turned away for it, else what turned the most away.)
+  const most = why.has('room') ? (['room', 1] as const) : [...why.entries()].sort((a, b) => b[1] - a[1])[0];
+  return { failed: `No motorway: ${most?.[0] === 'room' ? 'every course that fits' : 'every course tried'} ${most ? WHY[most[0]] : 'fails'}.` };
+}
+
+/**
+ * Route `route`, chosen before the villages, once they are down (`site.areas`, the main town's first): its gates
+ * chosen again (the junction's as it was, then by the villages across it from the town and along its longest
+ * stretches) and the cells the country roads keep off with them.
+ */
+export function withVillages(route: MotorwayRoute, site: MotorwaySite): MotorwayRoute {
+  const gates = gatesOf(route, site);
+  if (!gates.length) return route;
+  return { ...route, gates, blocked: blockedOf(route.middle, gates, site.land, site.areas) };
+}
+
+/**
+ * Whether a village's box `rect` keeps clear of route `route` (as the generator places the villages after it):
+ * `HAMLET_CLEAR` m off its carriageways' outer edges, and `JUNCTION_CLEAR` m off its middle line by its junction's
+ * gate, where its ramps and the road under it go.
+ */
+export function clearOfMotorway(route: Pick<MotorwayRoute, 'middle' | 'gates'>, rect: Rect): boolean {
+  const { middle, gates } = route;
+  const junction = gates[0]?.s ?? -Infinity;
+  const { ls, boxes } = chunksOf(middle);
+  const reach = Math.max(HAMLET_CLEAR + OUTER, JUNCTION_CLEAR);
+  for (const [i0, i1, x0, z0, x1, z1] of boxes) {
+    // (A stretch whose box lies further off than either keeps: none of its points nearer.)
+    if (x0 - reach > rect.x + rect.w || rect.x - reach > x1 || z0 - reach > rect.z + rect.d || rect.z - reach > z1) continue;
+    for (let i = i0; i <= i1; i++) {
+      const off = offRect(rect, middle[i]);
+      if (off < HAMLET_CLEAR + OUTER || (off < JUNCTION_CLEAR && Math.abs(ls[i] - junction) <= JUNCTION_REACH)) return false;
+    }
   }
-  const most = [...why.entries()].sort((a, b) => b[1] - a[1])[0];
-  return { failed: `No motorway: every course tried ${most ? WHY[most[0]] : 'fails'}.` };
+  return true;
+}
+
+/** A middle line's lengths, and its stretches of `CHUNK` points with their boxes (first and last point, x and z least and most), worked out once. */
+const chunked = new WeakMap<readonly Pt[], { ls: number[]; boxes: [number, number, number, number, number, number][] }>();
+const CHUNK = 32;
+function chunksOf(middle: readonly Pt[]) {
+  let got = chunked.get(middle);
+  if (!got) {
+    const boxes: [number, number, number, number, number, number][] = [];
+    for (let i0 = 0; i0 < middle.length; i0 += CHUNK) {
+      const i1 = Math.min(middle.length - 1, i0 + CHUNK - 1);
+      const pts = middle.slice(i0, i1 + 1);
+      boxes.push([i0, i1, Math.min(...pts.map((p) => p[0])), Math.min(...pts.map((p) => p[1])), Math.max(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[1]))]);
+    }
+    got = { ls: lengths(middle), boxes };
+    chunked.set(middle, got);
+  }
+  return got;
 }
 
 /** The gates on course `c` (see `MotorwayRoute.gates`): the junction's nearest the main town first; none if it has no room for one. */
-function gatesOf(c: Course, site: MotorwaySite): Gate[] {
+function gatesOf(c: Pick<Course, 'middle' | 'heights'>, site: MotorwaySite): Gate[] {
   const { middle, heights } = c;
   const ls = lengths(middle);
   const L = ls[ls.length - 1];

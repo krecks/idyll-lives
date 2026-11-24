@@ -11,9 +11,11 @@
 // driveways, gardenFences), and when a lane became a lane's 6 m (2026-11-23: every area road but its first, the
 // lots along it half a metre nearer its middle), and for the motorway (2026-11-23: one in every world where it fits,
 // edge to edge past the main town, the country roads crossing under it at its gates; in the others, the note why
-// not in their diagnostics), and for traffic on the right as the game shows it (2026-11-24: each motorway's
-// carriageways on the other sides of its middle line, its ramps with them). A change that moves one on purpose
-// re-pins it here.
+// not in their diagnostics), for traffic on the right as the game shows it (2026-11-24: each motorway's
+// carriageways on the other sides of its middle line, its ramps with them), and when the motorway went down before
+// the villages (2026-11-24: its course chosen with the main town alone, none costing a village; the villages kept
+// clear of it, its gates chosen by them; no side T where another area's street comes up end to end). A change that
+// moves one on purpose re-pins it here.
 import { afterAll, describe, expect, test } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -23,40 +25,40 @@ const WEB = new URL('../', import.meta.url).pathname;
 
 /** Each world: its kind, its seed, and the first 16 hex digits of its draft's SHA-256. */
 const GOLDEN: [ClassicKind, number, string][] = [
-  ['small', 11, '93df4323760d2619'],
-  ['small', 22, '2ed86794329ed91f'],
-  ['medium', 11, 'b83a866c67c569e5'],
-  ['medium', 22, '3bf4c8ed4309a2b2'],
-  ['dense', 11, '22c0fe2ea106fa6c'],
-  ['dense', 22, '55f04793ce33813d'],
-  ['farm', 11, '9eb491d37063f6b6'],
-  ['farm', 22, '5a7abad0018483cb'],
-  ['seaside', 11, '7864295262d20929'],
-  ['seaside', 22, 'd02c6338ad3f1fec'],
-  ['mountain', 11, '16b8bd99ff146eb6'],
-  ['mountain', 22, '43de42b0f3edb49f'],
-  ['lakeside', 11, '5a21d6efeeb2e338'],
-  ['lakeside', 22, '56d2f4ce778e13ef'],
-  ['forest', 11, '76a8ebe6e0940013'],
-  ['forest', 22, 'e3d0a96c266c18a3'],
-  ['dense', 808114082, '12805b57a1b311ee'],
-  ['small', 199762, 'ff2bd176035ed1f0'],
-  ['forest', 223520, 'd20689f685de74e7'],
-  ['medium', 104735, '92967efb1e0a8dfe'],
-  ['mountain', 231441, '37220e054cad2ece'],
-  ['lakeside', 239360, 'bcd3aeeaf364b180'],
-  ['farm', 271032, 'f7581f2346a18310'],
-  ['small', 278952, '764ce1233cc43de8'],
-  ['forest', 278953, 'f1c1b2f67ee5cf5c'],
-  ['forest', 425059, 'caf8a24d6c71e6fc'],
-  ['lakeside', 215603, '94e70241f1ebe00f'],
-  ['forest', 320330, '31f5d72234db5f2f'],
-  ['dense', 320329, '9a65de94c0f54f6b'],
-  ['seaside', 215602, '360b2019c057c708'],
-  ['forest', 104735, '253f9bd018698ad3'],
-  ['forest', 112654, '77733808b2760704'],
-  ['lakeside', 225304, '1930a40a8ad7dfc3'],
-  ['small', 314192, 'aee40bd123c11592'],
+  ['small', 11, '2de6c61cc58adf2a'],
+  ['small', 22, '255fa39af75324bf'],
+  ['medium', 11, '8b77091ff4bda579'],
+  ['medium', 22, 'c3669338a079a020'],
+  ['dense', 11, '3ec66cbcfd48d8b3'],
+  ['dense', 22, 'faebfddfea11b946'],
+  ['farm', 11, '49e250a64c3718c2'],
+  ['farm', 22, 'bdf52d545ef7e437'],
+  ['seaside', 11, 'dc69a4c9014a3901'],
+  ['seaside', 22, '03c0921f639277b3'],
+  ['mountain', 11, 'dc32305f7d9571d4'],
+  ['mountain', 22, 'b348ade4a333fcea'],
+  ['lakeside', 11, 'd5c4daf4aa681807'],
+  ['lakeside', 22, '5cbd3cd998ace625'],
+  ['forest', 11, 'f4a4bfc88eb436af'],
+  ['forest', 22, '9d08c592c0abcaea'],
+  ['dense', 808114082, 'dd783ca5f3d08ff4'],
+  ['small', 199762, '0516a7c532fe552e'],
+  ['forest', 223520, 'bc73b2b01df43dc6'],
+  ['medium', 104735, '8049088dd9c8b35d'],
+  ['mountain', 231441, '80e7d3702b01f75c'],
+  ['lakeside', 239360, '0848a3a4e2d5a5fa'],
+  ['farm', 271032, '33646024a240c17d'],
+  ['small', 278952, 'ff9c32b3436dac89'],
+  ['forest', 278953, 'c58b4632c2ca186e'],
+  ['forest', 425059, '34ecc934ed0002c8'],
+  ['lakeside', 215603, 'ec5f12f2262e124c'],
+  ['forest', 320330, '4e3fca3dfb104ed2'],
+  ['dense', 320329, '52a6678b4258d415'],
+  ['seaside', 215602, 'da6d5c4a0d2b3690'],
+  ['forest', 104735, '6e566519b20124c9'],
+  ['forest', 112654, 'a58bf354c84601a3'],
+  ['lakeside', 225304, 'ab0044b37f6da7ae'],
+  ['small', 314192, '0a00f97fe85b39d9'],
 ];
 
 describe('classic worlds', async () => {

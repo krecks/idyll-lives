@@ -30,7 +30,7 @@ import { AREA_APART } from './macro';
 import { COUNTRY_TURN } from './countryRouter';
 import { BEND_RADIUS } from './motorway';
 import { unrle } from './landMasks';
-import { COURT, inside, lengths, nearest, pointAt, RoadIndex, roadMask, sharpestTurn, sideBySide, type Pt } from './roads';
+import { COURT, inside, lengths, nearest, pointAt, RoadIndex, roadEnds, roadMask, sharpestTurn, sideBySide, type Pt } from './roads';
 import { kindInfo, onewayOf } from '../core/roadKinds';
 import { cutOffRoads } from './oneway';
 import { BIG_COURTS, COURTS, NEIGHBOUR_CAP, turner, type Facing } from './town';
@@ -344,19 +344,23 @@ function bridgeProblems(town: CheckedTown, roads: readonly RoadPlan[], river: bo
       if (at) out.push(`${name} runs over the water at ${at[0].toFixed(0)}, ${at[1].toFixed(0)} with no bridge`);
       continue;
     }
-    const [s0, s1] = r.bridge;
-    if (!(s0 >= 0 && s1 > s0 && s1 <= ls[ls.length - 1] + 0.01)) {
-      out.push(`${name}'s deck runs ${s0} to ${s1} m along it (${ls[ls.length - 1].toFixed(0)} m long)`);
+    // (Its decks: its own, and a motorway's more over other water: off an island, one at either end.)
+    const decks = [r.bridge, ...(r.kind === 'motorway' ? (r.bridges ?? []) : [])];
+    const bad = decks.find(([s0, s1]) => !(s0 >= 0 && s1 > s0 && s1 <= ls[ls.length - 1] + 0.01));
+    if (bad) {
+      out.push(`${name}'s deck runs ${bad[0]} to ${bad[1]} m along it (${ls[ls.length - 1].toFixed(0)} m long)`);
       continue;
     }
-    const off = r.points.findIndex(([x, z], k) => wet(x, z) && (ls[k] < s0 || ls[k] > s1));
+    const off = r.points.findIndex(([x, z], k) => wet(x, z) && decks.every(([s0, s1]) => ls[k] < s0 || ls[k] > s1));
     if (off >= 0) out.push(`${name} runs over the water off its deck at ${r.points[off][0].toFixed(0)}, ${r.points[off][1].toFixed(0)}`);
-    if (!r.points.some(([x, z], k) => ls[k] >= s0 && ls[k] <= s1 && (wet(x, z) || !!town.landWet?.(x, z)))) out.push(`${name}'s deck is over no water`);
-    const most = r.ends.includes('out') ? CAUSEWAY : span;
-    if (s1 - s0 > most) out.push(`${name}'s deck is ${(s1 - s0).toFixed(0)} m long (${most} m at most)`);
-    const turn = Math.abs(headingAt(r.points, s1, ls) - headingAt(r.points, s0, ls));
-    const bends = DECK_TURN + (r.kind === 'motorway' ? (s1 - s0) / BEND_RADIUS : 0);
-    if (Math.min(turn, 2 * Math.PI - turn) > bends) out.push(`${name}'s deck turns ${((turn * 180) / Math.PI).toFixed(0)}°`);
+    for (const [s0, s1] of decks) {
+      if (!r.points.some(([x, z], k) => ls[k] >= s0 && ls[k] <= s1 && (wet(x, z) || !!town.landWet?.(x, z)))) out.push(`${name}'s deck is over no water`);
+      const most = r.ends.includes('out') ? CAUSEWAY : span;
+      if (s1 - s0 > most) out.push(`${name}'s deck is ${(s1 - s0).toFixed(0)} m long (${most} m at most)`);
+      const turn = Math.abs(headingAt(r.points, s1, ls) - headingAt(r.points, s0, ls));
+      const bends = DECK_TURN + (r.kind === 'motorway' ? (s1 - s0) / BEND_RADIUS : 0);
+      if (Math.min(turn, 2 * Math.PI - turn) > bends) out.push(`${name}'s deck turns ${((turn * 180) / Math.PI).toFixed(0)}°`);
+    }
   }
   if (river && !roads.some((r) => r.bridge && !r.ends.includes('out'))) out.push('a river with no bridge over it');
   return out;
@@ -547,7 +551,9 @@ function layoutProblems(town: CheckedTown, expect: Expected | undefined, river: 
   for (const { a, b, length, at } of sideBySide(all, SIDE_BY_SIDE, 'country')) out.push(`${all[a].name} runs alongside ${all[b].name} a few metres off for ${length} m by ${at.map(Math.round).join(', ')}`);
   for (const [x, z] of town.exits.map(exitAt)) if (Math.min(x, z, town.width - x, town.depth - z) > 1) out.push(`a way out of town at ${x}, ${z}, not on its edge`);
   if (!town.exits.length) out.push('no way out of town');
-  if (expect?.exits && (town.exits.length < expect.exits[0] || town.exits.length > expect.exits[1])) out.push(`${town.exits.length} ways out of the world (${expect.exits[0]} to ${expect.exits[1]} wanted)`);
+  // (The motorway's ends aside: its own ways out, past the world's, not the island's causeways.)
+  const exits = town.exits.length - roadEnds(all.filter((r) => r.kind === 'motorway')).length;
+  if (expect?.exits && (exits < expect.exits[0] || exits > expect.exits[1])) out.push(`${exits} ways out of the world (${expect.exits[0]} to ${expect.exits[1]} wanted)`);
   return out;
 }
 
