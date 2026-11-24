@@ -75,7 +75,8 @@ const MAP = {
 
 /** What the maps ask of the land: a big world's farmland, its box and how to paint it (`LandscapeLayout.farmland`). */
 export interface TownGroundLand {
-  farmland(): { box: [number, number, number, number]; paint(g: FieldCanvas): void } | null;
+  /** `key`: which of its fields are farmed, as a hash (the near ground's map is made again only when it changes). */
+  farmland(): { box: [number, number, number, number]; key: string; paint(g: FieldCanvas): void } | null;
   /** Counts the changes of a land drawn from a height field (its cover moves the farmland): the map is made again for a new one. */
   readonly landVersion?: number;
 }
@@ -241,7 +242,7 @@ export function fieldGround(device: pc.GraphicsDevice, material: pc.StandardMate
  * a metre, at most `MAP_MAX` a side), each field's crop in its rows inside its grass margin and its hedges
  * (`farmland.ts` `paintFields`), none on the roads, their verges or the lots; laid over the ground tiles' colour
  * (`shaders/fieldGround.ts`) but in the town view, whose own map has them (`TownGroundMap`). Made again for another
- * town or land (`bake`).
+ * town or when other fields are farmed (`bake`: not for every stroke of the brushes).
  */
 export class FieldMap {
   private texture: pc.Texture | null = null;
@@ -253,7 +254,7 @@ export class FieldMap {
   /** Makes the map for `world` on `land` (nothing again for the same; none without farmland or a 2D canvas). Says whether it changed. */
   bake(world: WorldStructure, land: TownGroundLand): boolean {
     const farmland = typeof OffscreenCanvas === 'undefined' ? null : land.farmland();
-    const key = farmland ? `${world.meta?.seed ?? 0}|${groundVersion(world)}|${land.landVersion ?? 0}|${farmland.box.join(',')}` : '';
+    const key = farmland ? `${world.meta?.seed ?? 0}|${groundVersion(world)}|${farmland.key}|${farmland.box.join(',')}` : '';
     if (key === this.key) return false;
     this.key = key;
     this.texture?.destroy();

@@ -757,9 +757,11 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     // (A river drawn out to the edge, or away from it: the valley past the edge came, went or moved with it.)
     const valleys = this.valleysMoved(exits);
     if (valleys) [box[0], box[1], box[2], box[3]] = [Math.min(box[0], valleys[0]), Math.min(box[1], valleys[1]), Math.max(box[2], valleys[2]), Math.max(box[3], valleys[3])];
-    // (The fields the stroke reached are farmed whole or not at all, each up to two of the patchwork's sizes long: theirs too.)
-    const fields = this.patchwork()?.grid.size ?? 0;
-    if (fields) [box[0], box[1], box[2], box[3]] = [box[0] - 2 * fields, box[1] - 2 * fields, box[2] + 2 * fields, box[3] + 2 * fields];
+    // (The fields the stroke reached are farmed whole or not at all, each up to two of the patchwork's sizes long and
+    // 0.8 deep, turned: up to 2.16 sizes across in x or z; and their hedges' shade 3.1 m past their edges.)
+    const size = this.patchwork()?.grid.size ?? 0;
+    const fields = size ? 2.16 * size + 3.1 : 0;
+    if (fields) [box[0], box[1], box[2], box[3]] = [box[0] - fields, box[1] - fields, box[2] + fields, box[3] + fields];
     perfTime('land: flow', () => this.flowMap?.changed(changed, true));
     for (const k of this.tilesIn(box)) {
       await pace?.();

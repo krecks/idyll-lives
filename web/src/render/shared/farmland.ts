@@ -73,7 +73,8 @@ export interface FieldPoint {
 
 /**
  * What decides a field is farmed, asked at points across it (a 3 × 3 grid and its middle): `'in'` the farmland,
- * `'out'` of it, or `'never'` (water, the town: no field there whatever the rest).
+ * `'out'` of it (the town's apron too: a field may reach a road or a lot, which its maps leave clear), or `'never'`
+ * (water, a mountain past its trees: no field there whatever the rest).
  */
 export type FieldTest = (x: number, z: number) => 'in' | 'out' | 'never';
 
@@ -94,7 +95,7 @@ export class Patchwork {
 
   constructor(
     readonly grid: FieldGrid,
-    private readonly seed: number,
+    readonly seed: number,
     private readonly test: FieldTest,
   ) {
     this.depth = grid.size * 0.8;
@@ -145,7 +146,7 @@ export class Patchwork {
     return cropOf(hash(col, row, this.seed + 77));
   }
 
-  /** Whether a field is farmed: the farmland under most of it and its middle, and no water or town anywhere on it. */
+  /** Whether a field is farmed: the farmland under most of it and its middle, and no water or mountain top at any of its points asked. */
   included(row: number, col: number): boolean {
     const key = (row + 50_000) * 100_000 + col + 50_000;
     let known = this.farmed.get(key);
@@ -338,8 +339,8 @@ export function paintFields(g: FieldCanvas, pw: Patchwork, box: readonly [number
     g.fillRect(x0, z0, w, d);
     // Broad patches, a little riper or thinner: a few soft blots.
     for (let k = 0; k < 3; k++) {
-      const h = hash(f.col * 7 + k, f.row, 613);
-      const [px, pz, r] = [x0 + w * hash(k, f.col, f.row + 617), z0 + d * hash(f.row, k, f.col + 619), 6 + 10 * h];
+      const h = hash(f.col * 7 + k, f.row, pw.seed + 613);
+      const [px, pz, r] = [x0 + w * hash(k, f.col, pw.seed + f.row + 617), z0 + d * hash(f.row, k, pw.seed + f.col + 619), 6 + 10 * h];
       const blot = g.createRadialGradient(px, pz, 0, px, pz, r);
       blot.addColorStop(0, look.patch);
       blot.addColorStop(1, `${look.patch}00`);
@@ -362,6 +363,7 @@ export function paintFields(g: FieldCanvas, pw: Patchwork, box: readonly [number
   }
   // The hedges: a dark band, its shaded side darker.
   g.lineCap = 'round';
+  const hedges = pw.edges(box).filter((e) => e.hedge);
   for (const [colour, width] of [
     [HEDGE_LOOK.shade, HEDGE_WIDTH],
     [HEDGE_LOOK.leaf, HEDGE_WIDTH * 0.62],
@@ -369,8 +371,7 @@ export function paintFields(g: FieldCanvas, pw: Patchwork, box: readonly [number
     g.strokeStyle = colour;
     g.lineWidth = width;
     g.beginPath();
-    for (const e of pw.edges(box)) {
-      if (!e.hedge) continue;
+    for (const e of hedges) {
       g.moveTo(e.a[0], e.a[1]);
       g.lineTo(e.b[0], e.b[1]);
     }

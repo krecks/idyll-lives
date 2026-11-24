@@ -1647,7 +1647,7 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    * view's `TownGroundMap`): the box its fields reach (m) and how to paint them onto a canvas in world metres
    * (`paintFields`: each field's crop in its rows inside its margin, its hedges). Null: no farmland.
    */
-  farmland(): { box: [number, number, number, number]; paint(g: FieldCanvas): void } | null {
+  farmland(): { box: [number, number, number, number]; key: string; paint(g: FieldCanvas): void } | null {
     const zones = this.zones;
     if (!zones?.has('fields')) return null;
     const pw = this.patchwork();
@@ -1658,7 +1658,11 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     // (A field farmed reaches past the zones' edge by up to half of it.)
     const pad = pw.grid.size * 1.2;
     const reach: [number, number, number, number] = [box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad];
-    return { box: reach, paint: (g) => paintFields(g, pw, reach) };
+    // (Which fields are farmed, as a hash: a stroke that farms none more or fewer leaves the maps as they were.)
+    const fields = pw.fields(reach);
+    let h = 0x811c9dc5;
+    for (const f of fields) h = Math.imul(Math.imul(h ^ f.row, 16_777_619) ^ f.col, 16_777_619);
+    return { box: reach, key: `${fields.length}:${h >>> 0}`, paint: (g) => paintFields(g, pw, reach) };
   }
 
   /**
