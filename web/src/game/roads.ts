@@ -31,6 +31,10 @@ export interface Box {
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+/** How far apart two points are (m). */
+export const dist = (a: Pt, b: Pt) => pmath.hypot(a[0] - b[0], a[1] - b[1]);
+/** `v` to the centimetre, as the roads' points are kept. */
+export const round2 = (v: number) => Math.round(v * 100) / 100;
 /** `lo..hi`, evenly. */
 export const range = (rand: Rand, lo: number, hi: number) => lerp(lo, hi, rand());
 
@@ -69,23 +73,61 @@ export function roadLengths(road: Pick<RoadPlan, 'points'>): readonly number[] {
   return ls;
 }
 
-/** The unit direction along a polyline at point `i`. */
-export function tangent(pts: readonly Pt[], i: number): Pt {
-  const [a, b] = [pts[Math.max(0, i - 1)], pts[Math.min(pts.length - 1, i + 1)]];
+/** The unit direction along a polyline at point `i` (over `span` points either side). */
+export function tangent(pts: readonly Pt[], i: number, span = 1): Pt {
+  const [a, b] = [pts[Math.max(0, i - span)], pts[Math.min(pts.length - 1, i + span)]];
   const l = pmath.hypot(b[0] - a[0], b[1] - a[1]) || 1;
   return [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
 }
 
 /** The left of a direction (x, z): a quarter turn, as seen from above with z down the page. */
 export const leftOf = ([x, z]: Pt): Pt => [z, -x];
+/** The right of a direction (x, z) as seen from above with z down the page and north up (`leftOf` turned over). */
+export const rightOf = ([x, z]: Pt): Pt => [-z, x];
 
 /** The point at arc length `s` along a polyline, and the direction there. */
 export function pointAt(pts: readonly Pt[], s: number, ls: readonly number[] = lengths(pts)): { p: Pt; t: Pt; i: number } {
-  let i = 0;
-  while (i < ls.length - 2 && ls[i + 1] < s) i++;
-  const f = Math.max(0, Math.min(1, (s - ls[i]) / (ls[i + 1] - ls[i] || 1)));
+  const i = segmentAt(ls, s);
+  const f = fractionAt(ls, i, s);
   const [a, b] = [pts[i], pts[i + 1] ?? pts[i]];
   return { p: [lerp(a[0], b[0], f), lerp(a[1], b[1], f)], t: tangent(pts, f < 0.5 ? i : i + 1), i };
+}
+
+/**
+ * The segment (its first point) arc length `s` lies on, of arc lengths `ls`: the first whose end is as far as `s`
+ * (else the last). Halved down from the whole; walked on from segment `from` (no further back than `s`) if given.
+ */
+const segmentAt = (ls: readonly number[], s: number, from?: number) => {
+  if (from !== undefined) {
+    let i = from;
+    while (i < ls.length - 2 && ls[i + 1] < s) i++;
+    return i;
+  }
+  let [lo, hi] = [0, Math.max(0, ls.length - 2)];
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (ls[mid + 1] < s) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+};
+/** How far along segment `i` arc length `s` is (0..1). */
+const fractionAt = (ls: readonly number[], i: number, s: number) => Math.max(0, Math.min(1, (s - ls[i]) / (ls[i + 1] - ls[i] || 1)));
+
+/** A polyline evenly `step` m apart or so (`pointAt` at every step from its start to its end, both kept), walked once. */
+export function resample(pts: readonly Pt[], step: number, ls: readonly number[] = lengths(pts)): Pt[] {
+  const L = ls[ls.length - 1];
+  const n = Math.max(1, Math.round(L / step));
+  const out: Pt[] = [];
+  let i = 0;
+  for (let k = 0; k <= n; k++) {
+    const s = (L * k) / n;
+    i = segmentAt(ls, s, i);
+    const f = fractionAt(ls, i, s);
+    const [a, b] = [pts[i], pts[i + 1] ?? pts[i]];
+    out.push([lerp(a[0], b[0], f), lerp(a[1], b[1], f)]);
+  }
+  return out;
 }
 
 /** Whether a polyline turns no more than `most` radians from `half` m before arc length `s` to `half` m after it (its directions there). */
@@ -169,17 +211,19 @@ function metres(pts: readonly Pt[]): Pt[] {
 }
 
 /** A polyline's segments (by their end's index, from 1) filed by the `SEG_CELL` m cells their bounds cover. */
-type SegmentGrid = Map<number, number[]>;
-const SEG_CELL = 16;
-function segmentGrid(pts: readonly Pt[]): SegmentGrid {
+export type SegmentGrid = Map<number, number[]>;
+export const SEG_CELL = 16;
+/** A `SegmentGrid`'s key for cell (`cx`, `cz`). */
+export const gridKey = (cx: number, cz: number) => cx * 65536 + cz;
+export function segmentGrid(pts: readonly Pt[]): SegmentGrid {
   const grid: SegmentGrid = new Map();
   for (let s = 1; s < pts.length; s++) {
     const [[ax, az], [bx, bz]] = [pts[s - 1], pts[s]];
     for (let cz = Math.floor(Math.min(az, bz) / SEG_CELL); cz <= Math.floor(Math.max(az, bz) / SEG_CELL); cz++) {
       for (let cx = Math.floor(Math.min(ax, bx) / SEG_CELL); cx <= Math.floor(Math.max(ax, bx) / SEG_CELL); cx++) {
-        const list = grid.get(cx * 65536 + cz);
+        const list = grid.get(gridKey(cx, cz));
         if (list) list.push(s);
-        else grid.set(cx * 65536 + cz, [s]);
+        else grid.set(gridKey(cx, cz), [s]);
       }
     }
   }
@@ -202,7 +246,7 @@ function besideMask(A: readonly Pt[], ra: RoadPlan, rb: RoadPlan, same: number, 
     if (grid) {
       const near = new Set<number>();
       for (let cz = Math.floor((pt[1] - far) / SEG_CELL); cz <= Math.floor((pt[1] + far) / SEG_CELL); cz++) {
-        for (let cx = Math.floor((pt[0] - far) / SEG_CELL); cx <= Math.floor((pt[0] + far) / SEG_CELL); cx++) for (const s of grid.get(cx * 65536 + cz) ?? []) near.add(s);
+        for (let cx = Math.floor((pt[0] - far) / SEG_CELL); cx <= Math.floor((pt[0] + far) / SEG_CELL); cx++) for (const s of grid.get(gridKey(cx, cz)) ?? []) near.add(s);
       }
       // (None within reach: not alongside, whichever is nearest.)
       if (!near.size) return false;
@@ -272,6 +316,63 @@ export function nearest(pts: readonly Pt[], x: number, z: number, ls?: readonly 
   let s = ls?.[at] ?? 0;
   if (!ls) for (let i = 1; i <= at; i++) s += pmath.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
   return { dist, s: s + along, side };
+}
+
+/** A long polyline's segments in runs of `NEAR_RUN`, each with its bounds (`nearestOn`). */
+const NEAR_RUN = 16;
+const nearRuns = new WeakMap<readonly Pt[], Float64Array>();
+
+/**
+ * `nearest` for a long polyline (`pts`, its arc lengths `ls`) asked many times: the same answer, looking only at
+ * the runs of its segments whose bounds come nearer than the nearest found yet.
+ */
+export function nearestOn(pts: readonly Pt[], ls: readonly number[], x: number, z: number): { dist: number; s: number; side: 1 | -1 } {
+  const n = pts.length - 1;
+  let boxes = nearRuns.get(pts);
+  if (!boxes) {
+    boxes = new Float64Array(Math.ceil(Math.max(0, n) / NEAR_RUN) * 4);
+    for (let r = 0; r * NEAR_RUN < n; r++) {
+      let [x0, z0, x1, z1] = [Infinity, Infinity, -Infinity, -Infinity];
+      for (let i = r * NEAR_RUN; i <= Math.min(n, (r + 1) * NEAR_RUN); i++) [x0, z0, x1, z1] = [Math.min(x0, pts[i][0]), Math.min(z0, pts[i][1]), Math.max(x1, pts[i][0]), Math.max(z1, pts[i][1])];
+      boxes.set([x0, z0, x1, z1], r * 4);
+    }
+    nearRuns.set(pts, boxes);
+  }
+  let [dist, at, along, side] = [Infinity, 0, 0, 1 as 1 | -1];
+  for (let r = 0; r * NEAR_RUN < n; r++) {
+    // (A run whose bounds lie further off than the nearest yet has nothing nearer: past it, with a hair to spare.)
+    const off = pmath.hypot(Math.max(boxes[r * 4] - x, 0, x - boxes[r * 4 + 2]), Math.max(boxes[r * 4 + 1] - z, 0, z - boxes[r * 4 + 3]));
+    if (off > dist + 1e-6) continue;
+    for (let i = r * NEAR_RUN; i < Math.min(n, (r + 1) * NEAR_RUN); i++) {
+      const [[ax, az], [bx, bz]] = [pts[i], pts[i + 1]];
+      const [dx, dz] = [bx - ax, bz - az];
+      const l2 = dx * dx + dz * dz || 1;
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2));
+      const d = pmath.hypot(x - (ax + dx * t), z - (az + dz * t));
+      if (d < dist) {
+        const cross = (x - ax) * dz - (z - az) * dx;
+        [dist, at, along, side] = [d, i, t * Math.sqrt(l2), cross >= 0 ? 1 : -1];
+      }
+    }
+  }
+  return { dist, s: ls[at] + along, side };
+}
+
+/**
+ * Where segment `p`→`q` crosses segment `a`→`b`: how far along each (0..1, either may be outside: the lines' crossing);
+ * null if they run side by side.
+ */
+export function segmentCross(p: Pt, q: Pt, a: Pt, b: Pt): { t: number; u: number } | null {
+  const [ux, uz, vx, vz] = [q[0] - p[0], q[1] - p[1], b[0] - a[0], b[1] - a[1]];
+  const den = ux * vz - uz * vx;
+  if (Math.abs(den) < 1e-12) return null;
+  return { t: ((a[0] - p[0]) * vz - (a[1] - p[1]) * vx) / den, u: ((a[0] - p[0]) * uz - (a[1] - p[1]) * ux) / den };
+}
+
+/** How square segments `p`→`q` and `a`→`b` are to each other (radians from along, 0..π/2). */
+export function segmentAngle(p: Pt, q: Pt, a: Pt, b: Pt): number {
+  const [ux, uz, vx, vz] = [q[0] - p[0], q[1] - p[1], b[0] - a[0], b[1] - a[1]];
+  return pmath.acos(Math.min(1, Math.abs(ux * vx + uz * vz) / ((pmath.hypot(ux, uz) || 1) * (pmath.hypot(vx, vz) || 1))));
 }
 
 // ---- shapes ------------------------------------------------------------------------------
@@ -713,12 +814,14 @@ export function crossStreet(roads: readonly RoadPlan[], index: RoadIndex, from: 
 
 /**
  * Tiles of a `w` × `d` area (1, else 0) that roads reach: those whose middle is within `reach(road)`
- * of a road's middle (plus `slack`: within it, any of the tile).
+ * of a road's middle (plus `slack`: within it, any of the tile). `along`: per road, whether a tile
+ * reached at arc length `s` along it counts (all of them, none given). `mask`: the tiles set already
+ * (set more in it).
  */
-export function rasterRoads(roads: readonly RoadPlan[], w: number, d: number, reach: (r: RoadPlan) => number, slack = 0): Uint8Array {
-  const mask = new Uint8Array(w * d);
+export function rasterRoads(roads: readonly RoadPlan[], w: number, d: number, reach: (r: RoadPlan) => number, slack = 0, along?: (r: RoadPlan) => (s: number) => boolean, mask: Uint8Array = new Uint8Array(w * d)): Uint8Array {
   for (const r of roads) {
     const far = reach(r) + slack;
+    const [counts, ls] = along ? [along(r), lengths(r.points)] : [null, null];
     for (let i = 0; i + 1 < r.points.length; i++) {
       const [[ax, az], [bx, bz]] = [r.points[i], r.points[i + 1]];
       const [dx, dz] = [bx - ax, bz - az];
@@ -730,7 +833,7 @@ export function rasterRoads(roads: readonly RoadPlan[], w: number, d: number, re
           if (mask[z * w + x]) continue;
           const [px, pz] = [x + 0.5, z + 0.5];
           const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / l2));
-          if (pmath.hypot(px - (ax + dx * t), pz - (az + dz * t)) < far) mask[z * w + x] = 1;
+          if (pmath.hypot(px - (ax + dx * t), pz - (az + dz * t)) < far && (!counts || counts(ls![i] + t * (ls![i + 1] - ls![i])))) mask[z * w + x] = 1;
         }
       }
     }
@@ -766,31 +869,23 @@ export function roadMask(roads: readonly RoadPlan[], w: number, d: number, clear
 export function walkerBlocked(roads: readonly RoadPlan[], w: number, d: number): Uint8Array | null {
   const off = roads.filter((r) => r.points.length >= 2 && isSeparated(r.kind));
   if (!off.length) return null;
-  const mask = new Uint8Array(w * d);
-  const lay = (r: RoadPlan) => {
-    const decks = deckSpans(r);
-    const ls = lengths(r.points);
-    const far = r.width / 2 + WALK_OFF_EDGE;
-    for (let i = 0; i + 1 < r.points.length; i++) {
-      const [[ax, az], [bx, bz]] = [r.points[i], r.points[i + 1]];
-      const [dx, dz] = [bx - ax, bz - az];
-      const l2 = dx * dx + dz * dz || 1;
-      const [x0, x1] = [Math.max(0, Math.floor(Math.min(ax, bx) - far)), Math.min(w - 1, Math.ceil(Math.max(ax, bx) + far))];
-      const [z0, z1] = [Math.max(0, Math.floor(Math.min(az, bz) - far)), Math.min(d - 1, Math.ceil(Math.max(az, bz) + far))];
-      for (let z = z0; z <= z1; z++) {
-        for (let x = x0; x <= x1; x++) {
-          const [px, pz] = [x + 0.5, z + 0.5];
-          const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / l2));
-          if (pmath.hypot(px - (ax + dx * t), pz - (az + dz * t)) >= far) continue;
-          const s = ls[i] + t * (ls[i + 1] - ls[i]);
-          if (!decks.some(([s0, s1]) => s >= s0 && s <= s1)) mask[z * w + x] = 1;
-        }
-      }
-    }
-  };
+  // (Out to its edge and past it, not under its decks.)
+  const lay = (list: readonly RoadPlan[], mask?: Uint8Array) =>
+    rasterRoads(
+      list,
+      w,
+      d,
+      (r) => r.width / 2 + WALK_OFF_EDGE,
+      0,
+      (r) => {
+        const decks = deckSpans(r);
+        return (s) => !inSpans(decks, s);
+      },
+      mask,
+    );
   // (The ramps first, the roads people walk along cleared from them where they meet; then the motorway, whole.)
   const ramps = off.filter((r) => r.kind !== 'motorway');
-  ramps.forEach(lay);
+  const mask = lay(ramps);
   if (ramps.length) {
     const walked = rasterRoads(
       roads.filter((r) => !isSeparated(r.kind)),
@@ -800,8 +895,10 @@ export function walkerBlocked(roads: readonly RoadPlan[], w: number, d: number):
     );
     for (let i = 0; i < mask.length; i++) if (walked[i]) mask[i] = 0;
   }
-  off.filter((r) => r.kind === 'motorway').forEach(lay);
-  return mask;
+  return lay(
+    off.filter((r) => r.kind === 'motorway'),
+    mask,
+  );
 }
 
 /** How far (m) past a road nobody walks along (`walkerBlocked`) the ground is kept from those on foot: its barrier's or its kerb's. */
@@ -1096,6 +1193,27 @@ export function deckSpans(road: RoadPlan): [number, number][] {
   if (!road.raised?.length) return bridgeSpans(road);
   return [...bridgeSpans(road), ...raisedSpans(road)].sort((a, b) => a[0] - b[0]);
 }
+
+/** Whether arc length `s` lies within one of `spans` (`[s0, s1]`), or within `margin` m of one. */
+export function inSpans(spans: readonly (readonly [number, number])[], s: number, margin = 0): boolean {
+  for (const [s0, s1] of spans) if (s >= s0 - margin && s <= s1 + margin) return true;
+  return false;
+}
+
+/** Spans (`[s0, s1]`) in order along a road, those closer than `gap` m made one. */
+export function mergeSpans(spans: readonly (readonly [number, number])[], gap: number): [number, number][] {
+  const sorted = [...spans].sort((a, b) => a[0] - b[0]);
+  const out: [number, number][] = [];
+  for (const [a, b] of sorted) {
+    const last = out[out.length - 1];
+    if (last && a - last[1] < gap) last[1] = Math.max(last[1], b);
+    else out.push([a, b]);
+  }
+  return out;
+}
+
+/** Whether roads `a` and `b` pass over or under each other rather than meeting: either says so in its `crosses`. */
+export const passesOver = (roads: readonly RoadPlan[], a: number, b: number): boolean => !!roads[a].crosses?.some((c) => c.road === b) || !!roads[b].crosses?.some((c) => c.road === a);
 
 function spansWithin(road: RoadPlan, spans: readonly (readonly [number, number])[]): [number, number][] {
   const ls = lengths(road.points);
