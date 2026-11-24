@@ -14,10 +14,10 @@
  *   and encoded for the screen by then, so a byte a channel holds it as the canvas will; only what
  *   the contrast pushed past white is clamped a pass sooner). Half the bytes of two half-float
  *   targets, read and written every frame.
- * - Bloom on the lights (`BLOOM`): what is brighter once exposed than `BLOOM.white` (lamp glass, lit windows,
- *   porch lights) glows into what is round it, by PlayCanvas's bloom (its blurred bright part added before the
+ * - Bloom on the lights (`BLOOM`): what is brighter once exposed than `BLOOM.white` (lamps' glass, lit
+ *   windows) glows into what is round it, by PlayCanvas's bloom (its blurred bright part added before the
  *   image processing; the threshold follows the exposure, as the scene is drawn before it). Its strength
- *   follows the night (`glow`): none by day, when sunlit whites would bloom and wash the picture out. The
+ *   follows the night (`glow`; full in the basement, which has no daylight): none by day. The
  *   passes run all day at no strength: turned off, PlayCanvas would make the frame's targets again at dusk.
  * - Contact shading on Medium and High (`QualitySettings.contactShading`, `CONTACT`): the scene's depth
  *   drawn once before the scene, an occlusion pass at half size from it, read by the lit shaders. The
@@ -63,6 +63,23 @@ export interface PostOptions {
 }
 
 /**
+ * Bloom on the lights: `white` the exposed brightness it starts at, `intensity` how much of the blurred bright part
+ * is added at full night, `blurLevel` how far it spreads. PlayCanvas's soft knee starts the bloom at half `white`,
+ * so that half is kept at a sunlit white wall's brightness: measured once exposed (the brightest colour channel,
+ * before the bloom; the bench village, 2026-11-24), sunlit walls at dusk came to 0.75–0.80 (0.86 at most at 19:00,
+ * when the night is 0.01) and a sunlit white fence at noon (the basement's view) to 0.95. What blooms is well above
+ * `white`: at night a lit lamp's glass about 3.0 (a room's, the basement's at any hour) and a streetlamp's 2.7, both
+ * `lightUnits.ts` `LAMP_GLASS` times as bright as they glow, and a lit window 2.8. `intensity` puts back the bloom the
+ * lights had before (with `white` 0.7 and `intensity` 0.15: added light, mean over the picture, a street's lamps 7.4
+ * of 255 then and 6.4 now, lit windows 10.1 and 10.2). (`?tune=bloom.…` on the dev server. `white` 0.7 and
+ * `intensity` 0.15 until 2026-11-24: sunlit walls bloomed at dusk.)
+ */
+const BLOOM = tuned('bloom', { white: 1.6, intensity: 0.3, blurLevel: 16 });
+
+/** The bloom's strength by day: above none, so PlayCanvas keeps its passes (`PostProcessing.glow`). */
+const BLOOM_IDLE = 1e-6;
+
+/**
  * Contact shading: PlayCanvas's screen-space ambient occlusion, applied in the lighting (the lit shaders
  * read it; `shaders/softLook.ts` gives it to the sky's fill and a share of the lights). `radius` (m): how
  * far a thing shades what is beside it (short: at 0.8 m a room's corners darkened in bands and a bookcase
@@ -73,16 +90,6 @@ export interface PostOptions {
  * wide round them); `scale`: its size, of the picture's. (`?tune=contact.…` on the dev server. Radius 0.3 and
  * intensity 1 until 2026-11-18.)
  */
-/**
- * Bloom on the lights: `white` the exposed brightness it starts at (a sunlit white wall is about 0.8 once exposed, a
- * lamp's glass and a lit window above it), `intensity` how much of the blurred bright part is added at full night,
- * `blurLevel` how far it spreads. (`?tune=bloom.…` on the dev server.)
- */
-const BLOOM = tuned('bloom', { white: 0.7, intensity: 0.15, blurLevel: 16 });
-
-/** The bloom's strength by day: above none, so PlayCanvas keeps its passes (`PostProcessing.glow`). */
-const BLOOM_IDLE = 1e-6;
-
 const CONTACT = tuned('contact', { radius: 0.5, intensity: 1.5, power: 1, samples: 16, minAngle: 25, scale: 0.5 });
 
 /** What the image processing does (`shared/imageProcessing.ts`, ACES always). */
@@ -427,7 +434,7 @@ export class PostProcessing {
     return this.nightNow;
   }
 
-  /** How much the lights bloom, 0 (by day: none) .. 1 (at night, `BLOOM.intensity`): the time of day's night. */
+  /** How much the lights bloom, 0 (by day: none) .. 1 (at night, `BLOOM.intensity`): the time of day's night (the basement's view: 1). */
   set glow(share: number) {
     const s = Math.min(1, Math.max(0, share));
     if (s === this.glowNow) return;
@@ -440,16 +447,18 @@ export class PostProcessing {
   }
 
   /** The bloom's threshold and strength on `frame`, for the exposure and the night now. */
-  private bloomOn(frame: pc.CameraFrame): void {
-    frame.bloom.threshold = BLOOM.white / Math.max(1e-4, this.exposureNow);
-    frame.bloom.intensity = Math.max(BLOOM_IDLE, BLOOM.intensity * this.glowNow);
+  private bloomOn(frame: pc.CameraFrame): boolean {
+    const threshold = BLOOM.white / Math.max(1e-4, this.exposureNow);
+    const intensity = Math.max(BLOOM_IDLE, BLOOM.intensity * this.glowNow);
+    if (frame.bloom.threshold === threshold && frame.bloom.intensity === intensity) return false;
+    frame.bloom.threshold = threshold;
+    frame.bloom.intensity = intensity;
+    return true;
   }
 
+  /** The bloom on every frame, updated only where it changed (`frame.update` does more than the bloom's uniforms). */
   private bloomed(): void {
-    for (const frame of this.frames) {
-      this.bloomOn(frame);
-      frame.update();
-    }
+    for (const frame of this.frames) if (this.bloomOn(frame)) frame.update();
   }
 
   /**

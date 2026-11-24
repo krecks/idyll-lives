@@ -56,6 +56,7 @@ import type { TableRoom } from '../shared/tableTuck';
 import { WALL_HEIGHT } from '../shared/walls';
 import type { RenderQuality } from '../quality';
 import { resizeKey, type ObjectBackgroundClips, type ObjectClipInfo, type ObjectResize, type RendererDeps } from '../types';
+import { LAMP_GLASS } from './lightUnits';
 
 /** Radius of the sky dome (m): inside the camera's far plane. */
 const SKY_RADIUS = 700;
@@ -152,6 +153,8 @@ interface Glow {
   lamps: number[];
   ids: number[];
   screen: boolean;
+  /** A light fitting's glass (a shade, a bulb, a lens; not a fire's flames, a screen or a candle): lit `LAMP_GLASS` times as bright. */
+  glass: boolean;
   /**
    * A fire's flames (absent on anything else): their glow flickers about the level `applyGlow` gives
    * it, which this keeps as each fire's base brightness.
@@ -175,11 +178,14 @@ function fireFlicker(id: number, seconds: number): number {
   return 0.93 + 0.07 * (breath + flutter + crackle);
 }
 
-/** Glow instance `i` at brightness `f` (its alpha 1); whether that changed it. */
-function setGlow(g: Glow, i: number, f: number): boolean {
-  if (g.colors[i * 4] === f && g.colors[i * 4 + 3] === 1) return false;
+/**
+ * Glow instance `i` at brightness `f` (linearised with the glow's colour) times `gain` (linear, past 1: its alpha, the
+ * emission's own factor, `GAME_GLOW_TINT`); whether that changed it.
+ */
+function setGlow(g: Glow, i: number, f: number, gain = 1): boolean {
+  if (g.colors[i * 4] === f && g.colors[i * 4 + 3] === gain) return false;
   g.colors.fill(f, i * 4, i * 4 + 3);
-  g.colors[i * 4 + 3] = 1;
+  g.colors[i * 4 + 3] = gain;
   return true;
 }
 
@@ -201,11 +207,16 @@ interface ModelDraws {
 export interface GlowLight {
   /** How far the shades glow (0 by day .. 1 at night). */
   level: number;
+  /**
+   * A light fitting's glass where no daylight comes (`dimmed`: a room without windows, the basement), as bright to the
+   * eye as at night: the night's exposure over the exposure now (1 at night, more by day; linear).
+   */
+  dark: number;
   /** A lamp's level as it fades on or off (1: on). */
   lampOn(id: number): number;
   /** A room's lights as they go out (1: on). */
   roomOn(room: number): number;
-  /** A room without windows (its shades glow by day too). */
+  /** A room no daylight comes into (without windows, or in the basement): its shades glow by day too. */
   dimmed(room: number): boolean;
 }
 
@@ -258,7 +269,7 @@ export class LotContents {
   /** The moving parts' draws that cast (`movingCasters`). */
   private movingCasterDraws: Instances[] = [];
   private glows: Glow[] = [];
-  private glowLight: GlowLight = { level: 0, lampOn: (id) => (this.lampsOff.has(id) ? 0 : 1), roomOn: () => 1, dimmed: () => false };
+  private glowLight: GlowLight = { level: 0, dark: 1, lampOn: (id) => (this.lampsOff.has(id) ? 0 : 1), roomOn: () => 1, dimmed: () => false };
   /** The objects residents use this frame (screens are lit by it) and when that was. */
   private readonly screenOn = new Set<number>();
   private screenTime = 0;
@@ -912,6 +923,7 @@ export class LotContents {
           lamps: list.map((o) => (light && light.switch !== false ? o.id : -1)),
           ids: list.map((o) => o.id),
           screen: !!screen,
+          glass: !!light && !light.fire && !screen,
           base: light?.fire ? new Float32Array(list.length) : undefined,
         });
       });
@@ -1315,9 +1327,11 @@ export class LotContents {
       g.rooms.forEach((room, i) => {
         const lamp = g.lamps[i];
         const lampOn = lamp >= 0 ? light.lampOn(lamp) : room ? light.roomOn(room) : 1;
-        const f = (room && light.dimmed(room) ? 1 : light.level) * lampOn;
+        const dark = !!room && light.dimmed(room);
+        const f = (dark ? 1 : light.level) * lampOn;
         if (g.base) g.base[i] = f;
-        setGlow(g, i, f);
+        // (A light fitting's glass `LAMP_GLASS` times as bright, and where no daylight comes as bright to the eye as at night.)
+        setGlow(g, i, f, g.glass ? LAMP_GLASS * (dark ? light.dark : 1) : 1);
         lit ||= f > 0;
       });
       if (g.draw.destroyed) continue;

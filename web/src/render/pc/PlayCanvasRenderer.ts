@@ -2576,13 +2576,15 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * The share of daylight under the ground and in rooms without windows (`DigState.lit`), at the
    * last lighting update: the basement's while it is in view (its fill), else the windowless
    * rooms' (the only ones that read it then: `darkTiles` marks none from the basement). With the
-   * basement in view the moonlight grade is softened too (`BASEMENT_NIGHT_GRADE`): no moon down there.
+   * basement in view the moonlight grade is softened too (`BASEMENT_NIGHT_GRADE`): no moon down there; and the bloom
+   * is full at any hour (`PostProcessing.glow`): no daylight down there either.
    */
   private applyUnderLight(): void {
     const l = this.lighting;
     if (this.post) {
-      this.post.night = l.night * LOOK.nightGrade * (this.storey < 0 && !this.townMode ? BASEMENT_NIGHT_GRADE : 1);
-      this.post.glow = l.night;
+      const basement = this.storey < 0 && !this.townMode;
+      this.post.night = l.night * LOOK.nightGrade * (basement ? BASEMENT_NIGHT_GRADE : 1);
+      this.post.glow = basement ? 1 : l.night;
     }
     const under = this.storey < 0;
     const [sky, env, most] = under ? [BASEMENT_SKY * (NOON_SKY_LUMA / skyLuma(l)), BASEMENT_ENV, BASEMENT_NIGHT_GAIN] : [WINDOWLESS_SKY, WINDOWLESS_ENV, 1];
