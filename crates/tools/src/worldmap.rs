@@ -7,7 +7,8 @@
 //! avenue's median (green) and a one-way road's arrows (white, the way cars go); and the
 //! living town: each main town's centre (paved, dashed round), and the places the tags name (a blue
 //! dot at the door, with its name). An index.html shows them all
-//! on one page.
+//! on one page. North (game z) is up, as the game's 3D view has it from above: the ground is drawn
+//! in game coordinates under a flip in y (`ground_transform`), the names upright over it (`y = depth - z`).
 //!
 //! `cargo world-map worlds.json out-dir [more.json ...]`
 
@@ -136,6 +137,11 @@ fn zone_colour(kind: &str) -> &'static str {
     }
 }
 
+/// The transform the ground is drawn under: game (x, z) to the SVG's (x, depth - z), north up.
+fn ground_transform(depth: f64) -> String {
+    format!("matrix(1 0 0 -1 0 {})", n(depth))
+}
+
 /// One world's map as an SVG.
 pub fn svg(world: &J) -> String {
     let (kind, name, town) = (text(world, "kind"), text(world, "name"), &world["town"]);
@@ -160,6 +166,9 @@ pub fn svg(world: &J) -> String {
     let places = list(meta, "places");
     let areas = list(meta, "areas");
     let mut parts: Vec<String> = Vec::new();
+    // The names, upright over the ground: the SVG's y of a game z (north up).
+    let mut labels: Vec<String> = Vec::new();
+    let fy = |z: f64| depth - z;
     parts.push(format!(
         "<rect width=\"{}\" height=\"{}\" fill=\"#9fc27a\"/>",
         n(width),
@@ -315,10 +324,10 @@ pub fn svg(world: &J) -> String {
         ));
     }
     for p in places {
-        parts.push(format!(
+        labels.push(format!(
             "<text x=\"{}\" y=\"{}\" font-size=\"{}\" text-anchor=\"middle\" font-family=\"sans-serif\" fill=\"#2a1c12\" stroke=\"#fff\" stroke-width=\"{}\" paint-order=\"stroke\">{}</text>",
             n(num(p, "x")),
-            n(num(p, "z") - px(4.0)),
+            n(fy(num(p, "z")) - px(4.0)),
             n(px(7.0)),
             n(px(1.5)),
             esc(text(p, "name"))
@@ -346,27 +355,27 @@ pub fn svg(world: &J) -> String {
             n(px(5.0).max(1.5))
         ));
     }
-    // Outdoor places' and areas' names.
+    // Outdoor places' names (above their lots' northern edge) and areas'.
     for p in plots.iter().filter(|p| text(p, "kind") == "countryside") {
-        parts.push(format!(
+        labels.push(format!(
             "<text x=\"{}\" y=\"{}\" font-size=\"{}\" text-anchor=\"middle\" font-family=\"sans-serif\" fill=\"#5a3a12\">{}</text>",
             n(num(p, "x") + num(p, "w") / 2.0),
-            n(num(p, "z") - px(4.0)),
+            n(fy(num(p, "z") + num(p, "d")) - px(4.0)),
             n(px(11.0)),
             esc(text(p, "name"))
         ));
     }
     for a in areas {
-        parts.push(format!(
+        labels.push(format!(
             "<text x=\"{}\" y=\"{}\" font-size=\"{}\" font-weight=\"700\" text-anchor=\"middle\" font-family=\"sans-serif\" fill=\"#1d2230\" stroke=\"#fff\" stroke-width=\"{}\" paint-order=\"stroke\">{}</text>",
             n(num(a, "x") + num(a, "w") / 2.0),
-            n(num(a, "z") + num(a, "d") / 2.0),
+            n(fy(num(a, "z") + num(a, "d") / 2.0)),
             n(px(18.0)),
             n(px(3.0)),
             esc(text(a, "name"))
         ));
     }
-    parts.push(format!(
+    labels.push(format!(
         "<text x=\"{}\" y=\"{}\" font-size=\"{}\" font-family=\"sans-serif\">{kind} {seed}: {} ({}×{} m)</text>",
         n(px(8.0)),
         n(px(22.0)),
@@ -376,12 +385,14 @@ pub fn svg(world: &J) -> String {
         n(depth)
     ));
     format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {} {}\" width=\"{}\" height=\"{}\">{}</svg>",
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {} {}\" width=\"{}\" height=\"{}\"><g transform=\"{}\">{}</g>{}</svg>",
         n(width),
         n(depth),
         n((width * SCALE).round()),
         n((depth * SCALE).round()),
-        parts.concat()
+        ground_transform(depth),
+        parts.concat(),
+        labels.concat()
     )
 }
 
@@ -467,7 +478,8 @@ mod tests {
             }
         } });
         let svg = svg(&world);
-        assert!(svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 300 200\" width=\"450\" height=\"300\"><rect width=\"300\" height=\"200\" fill=\"#9fc27a\"/>"));
+        // The ground north up: game z flipped (z = 0 at the bottom).
+        assert!(svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 300 200\" width=\"450\" height=\"300\"><g transform=\"matrix(1 0 0 -1 0 200)\"><rect width=\"300\" height=\"200\" fill=\"#9fc27a\"/>"));
         // The land in its order (a hill under the water), the lot's tick on the side it faces, one wall and one thing (the ground floor's).
         assert!(svg.find("fill=\"#b7c48a\"").unwrap() < svg.find("fill=\"#7fb2d9\"").unwrap());
         assert!(svg.contains("<circle cx=\"16\" cy=\"29\" r=\"0.9\" fill=\"#4d6b33\"/>"));
@@ -476,6 +488,12 @@ mod tests {
         assert!(svg.contains("stroke-width=\"6.3\" stroke-linejoin=\"round\""));
         assert!(svg.contains("stroke-dasharray=\"3.3333333333333335 2\" stroke-linecap=\"round\""));
         assert_eq!(svg.matches("fill=\"#2b5fa8\"").count(), 2);
+        // The names upright, outside the flip, at y = depth - z: the bakery's (z 30) 4 px above its dot on the page,
+        // the pond's above its lot's northern edge (z 26).
+        let (ground, names) = svg.split_once("</g>").unwrap();
+        assert!(!ground.contains("<text"));
+        assert!(names.contains(&format!("<text x=\"12\" y=\"{}\" ", 170.0 - px(4.0))));
+        assert!(names.contains(&format!("<text x=\"43\" y=\"{}\" ", 174.0 - px(4.0))));
         assert!(svg.ends_with(">big 7: Birch &amp; &lt;Co> (300×200 m)</text></svg>"));
     }
 
@@ -498,6 +516,15 @@ mod tests {
         assert_eq!(svg.matches("fill=\"#ffffff\"").count(), 3);
         assert!(
             svg.contains("<polygon points=\"12.5,100 17.5,101.6 17.5,98.4\" fill=\"#ffffff\"/>")
+        );
+        // (In game coordinates, under the ground's flip: they turn north up with the roads.)
+        assert_eq!(
+            svg.split_once("</g>")
+                .unwrap()
+                .0
+                .matches("fill=\"#ffffff\"")
+                .count(),
+            3
         );
     }
 }
