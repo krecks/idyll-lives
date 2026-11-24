@@ -14,7 +14,7 @@ pub const SIM_STRIDE: usize = 36;
 /// server's.
 pub const CAR_BASE: usize = HEADER_LEN + (MAX_SIMS + crate::staff::MAX_STAFF) * SIM_STRIDE;
 /// Floats per car.
-pub const CAR_STRIDE: usize = 6;
+pub const CAR_STRIDE: usize = 8;
 /// The traffic lights' rows (`header::LIGHT_COUNT`, `light`), after the cars': one per signal
 /// head, `MAX_LIGHTS` at most.
 pub const LIGHT_BASE: usize = CAR_BASE + crate::cars::MAX_CARS * CAR_STRIDE;
@@ -22,9 +22,13 @@ pub const LIGHT_BASE: usize = CAR_BASE + crate::cars::MAX_CARS * CAR_STRIDE;
 pub const LIGHT_STRIDE: usize = 5;
 /// Signal heads the snapshot has room for.
 pub const MAX_LIGHTS: usize = 512;
+/// The cars' ways (`car::TRAIL`), after the traffic lights': `TRAIL_POINTS` points at most, each
+/// `TRAIL_STRIDE` floats (`trail`).
+pub const TRAIL_BASE: usize = LIGHT_BASE + MAX_LIGHTS * LIGHT_STRIDE;
+pub const TRAIL_STRIDE: usize = 4;
 /// The residents' rows, then the town's servers' (`header::STAFF_COUNT`, `staff.rs`), in the same
-/// layout; then the cars', and the traffic lights'.
-pub const CAPACITY: usize = LIGHT_BASE + MAX_LIGHTS * LIGHT_STRIDE;
+/// layout; then the cars', the traffic lights' and the cars' ways.
+pub const CAPACITY: usize = TRAIL_BASE + TRAIL_POINTS * TRAIL_STRIDE;
 
 pub mod header {
     /// Tick counter modulo 2^24 (exact in f32); only used to detect change.
@@ -95,6 +99,22 @@ pub mod car {
     /// `KIND`'s values.
     pub const HOUSEHOLD: f32 = 0.0;
     pub const TAXI: f32 = 1.0;
+    /// The way it went into this snapshot over the last steps (`ways.rs`): `TRAIL_LEN` points
+    /// from point `TRAIL` of the ways (`TRAIL_BASE`), oldest first, each laid out as `trail`; its
+    /// pose in this snapshot (`X`, `Z`, `YAW`) is the way's end. At a faster speed, where a step
+    /// runs many ticks, the renderer draws the car along them, not on the straight line from the
+    /// snapshot before. None while it isn't shown, or stood still all along.
+    pub const TRAIL: usize = 6;
+    pub const TRAIL_LEN: usize = 7;
+}
+
+/// A point of a car's way (`car::TRAIL`): when (`T`, in real steps before the snapshot: -1 is
+/// the end of the step before it, below 0 always), where its middle was and which way it faced.
+pub mod trail {
+    pub const T: usize = 0;
+    pub const X: usize = 1;
+    pub const Z: usize = 2;
+    pub const YAW: usize = 3;
 }
 
 pub mod sim {
@@ -211,6 +231,8 @@ const _: () = assert!(
         && header::CAR_COUNT < HEADER_LEN
         && header::LIGHT_COUNT < HEADER_LEN
         && car::KIND < CAR_STRIDE
+        && car::TRAIL_LEN < CAR_STRIDE
+        && trail::YAW < TRAIL_STRIDE
         && light::STATE < LIGHT_STRIDE
 );
 
@@ -245,7 +267,10 @@ impl Doing {
     }
 }
 
+mod ways;
 mod write;
+pub(crate) use ways::Trails;
+pub use ways::{TRAIL_MOST, TRAIL_POINTS, TRAIL_STEPS, TRAIL_TOLERANCE};
 pub(crate) use write::doing;
 pub use write::write;
 
@@ -294,7 +319,11 @@ pub fn layout_json(content: &Content) -> String {
     layout["header"]["carCount"] = header::CAR_COUNT.into();
     layout["carBase"] = CAR_BASE.into();
     layout["carStride"] = CAR_STRIDE.into();
-    layout["car"] = serde_json::json!({ "shown": car::SHOWN, "x": car::X, "z": car::Z, "yaw": car::YAW, "doors": car::DOORS, "kind": car::KIND, "kinds": { "household": car::HOUSEHOLD, "taxi": car::TAXI } });
+    layout["car"] = serde_json::json!({ "shown": car::SHOWN, "x": car::X, "z": car::Z, "yaw": car::YAW, "doors": car::DOORS, "kind": car::KIND, "kinds": { "household": car::HOUSEHOLD, "taxi": car::TAXI }, "trail": car::TRAIL, "trailLen": car::TRAIL_LEN });
+    layout["trailBase"] = TRAIL_BASE.into();
+    layout["trailStride"] = TRAIL_STRIDE.into();
+    layout["trail"] =
+        serde_json::json!({ "t": trail::T, "x": trail::X, "z": trail::Z, "yaw": trail::YAW });
     layout["header"]["lightCount"] = header::LIGHT_COUNT.into();
     layout["lightBase"] = LIGHT_BASE.into();
     layout["lightStride"] = LIGHT_STRIDE.into();

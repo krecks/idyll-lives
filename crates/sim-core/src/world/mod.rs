@@ -575,6 +575,9 @@ pub struct World {
     pub(crate) was_calm: bool,
     /// Ticks the last step ran (the snapshot's `RATE` at super speed).
     pub(crate) step_ticks: u32,
+    /// The cars' poses tick by tick over the last few steps, for the snapshot (`car::TRAIL`).
+    /// Not saved.
+    pub(crate) trails: crate::snapshot::Trails,
     /// Master switch for "free will" in the whole town (each household also has its own,
     /// `Household::free_will`). Off is mainly for tests.
     pub autonomy: bool,
