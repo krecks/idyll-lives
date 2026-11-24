@@ -14,18 +14,7 @@ pub fn hidden(cars: &[Car]) -> Vec<bool> {
     if !out.contains(&true) {
         return out;
     }
-    let body = |c: &Car| {
-        c.shown.map(|s| {
-            (
-                Rect {
-                    at: s.0,
-                    yaw: s.1,
-                    half: [c.len / 2.0, c.wid / 2.0],
-                },
-                c.layer(),
-            )
-        })
-    };
+    let body = |c: &Car| c.shown_rect().map(|r| (r, c.layer()));
     // (Out of sight by where their middles are, along x: a car seen need only look at those whose
     // middles are near enough along x to touch it, `reach` apart at most. That's the same test as
     // looking at every one of them, without the pair of every car in town.)
@@ -102,11 +91,7 @@ pub(crate) fn movers(
             approaching.push(gate);
         }
         // (Faster than on a country road, further ahead: `LOOK_FAST`.)
-        let fast = moved && {
-            let (a, b) = (route.at(t).0, route.at(t + 1.0).0);
-            crate::travel::dist(a, b) * DRIVE_TICKS_PER_SECOND
-                > travel.country_speed + crate::cars::FOLLOW_SLACK
-        };
+        let fast = moved && plan_speed(route, t) > travel.country_speed + FOLLOW_SLACK;
         let looks: &[f32] = if fast {
             &crate::traffic::LOOK_FAST
         } else {
@@ -610,16 +595,6 @@ pub(crate) fn go_on(
 /// Every car driving by, as `walks_into` keeps clear of them (its body and the ground just in front
 /// of it), but car `car`.
 pub(crate) fn vehicles(cars: &[Car], car: Option<usize>) -> Vec<Driving> {
-    let at = |(at, yaw): ([f32; 2], f32), k: &Car, first: u64| Driving {
-        at,
-        yaw,
-        len: k.len,
-        wid: k.wid,
-        ahead: AHEAD,
-        behind: 0.0,
-        first,
-        layer: k.layer(),
-    };
     // (For one in sight, those in sight: `sight`; one out of sight keeps out of nobody's way.)
     if car.is_some_and(|c| cars[c].sight != Sight::Seen) {
         return Vec::new();
@@ -627,21 +602,36 @@ pub(crate) fn vehicles(cars: &[Car], car: Option<usize>) -> Vec<Driving> {
     // (Those on its level (`travel::Layer`): on a motorway's deck, nobody under it; for those on
     // foot or on a bike, those on the ground.)
     let level = car.map_or(crate::travel::Layer::GROUND, |c| cars[c].layer());
-    let cars = cars.iter().enumerate().filter_map(|(c, k)| match k.shown {
-        Some((p, yaw, true, _))
-            if Some(c) != car
-                && (car.is_none() || k.sight == Sight::Seen)
-                && k.layer().meets(level) =>
-        {
-            let mut d = at((p, yaw), k, car_first(c));
-            if k.backing() {
-                (d.ahead, d.behind) = (0.0, AHEAD);
+    cars.iter()
+        .enumerate()
+        .filter_map(|(c, k)| {
+            let Some((at, yaw, true, _)) = k.shown else {
+                return None;
+            };
+            if Some(c) == car || (car.is_some() && k.sight != Sight::Seen) {
+                return None;
             }
-            Some(d)
-        }
-        _ => None,
-    });
-    cars.collect()
+            let layer = k.layer();
+            if !layer.meets(level) {
+                return None;
+            }
+            let (ahead, behind) = if k.backing() {
+                (0.0, AHEAD)
+            } else {
+                (AHEAD, 0.0)
+            };
+            Some(Driving {
+                at,
+                yaw,
+                len: k.len,
+                wid: k.wid,
+                ahead,
+                behind,
+                first: car_first(c),
+                layer,
+            })
+        })
+        .collect()
 }
 
 /// Every car parked where it can be seen (at home, out on a trip): as `vehicles` has those on the
@@ -670,6 +660,22 @@ pub fn car_key(c: usize) -> u64 {
 /// Car `c`'s `Driving::first` (its top bit set, as ever).
 pub(crate) fn car_first(c: usize) -> u64 {
     (1 << 63) | c as u64
+}
+
+/// The car whose `car_first` key `k` is (its index in `World::cars`).
+pub(crate) fn car_index(k: u64) -> usize {
+    (k & !(1 << 63)) as usize
+}
+
+impl Car {
+    /// Its body as drawn (`Car::shown`); None: not drawn.
+    pub(crate) fn shown_rect(&self) -> Option<Rect> {
+        self.shown.map(|s| Rect {
+            at: s.0,
+            yaw: s.1,
+            half: [self.len / 2.0, self.wid / 2.0],
+        })
+    }
 }
 
 /// Whether `body` at `p` is out of the way of all of `them` (`vehicles`): somewhere to step aside

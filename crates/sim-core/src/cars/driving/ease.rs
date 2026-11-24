@@ -61,26 +61,43 @@ pub(crate) fn plan_speed(route: &Route, t: f32) -> f32 {
     dist(route.at(t).0, route.at(t + 1.0).0) * DRIVE_TICKS_PER_SECOND
 }
 
-/// How fast car `car` goes now (m/s of drive time): its own speed, else its way's if it moved
-/// last tick.
+/// How fast a car goes now (m/s of drive time): its own speed (`carried`), else its way's
+/// (`plan`) if it moved last tick (`moving`), else none.
+fn speed_now(carried: Option<f32>, moving: bool, plan: impl FnOnce() -> f32) -> f32 {
+    carried.unwrap_or_else(|| if moving { plan() } else { 0.0 })
+}
+
+/// How fast car `car` goes now (m/s of drive time): `speed_now`.
 fn speed_of(car: &Car) -> f32 {
-    car.speed.unwrap_or_else(|| match (&car.route, car.moved) {
-        (Some((_, r)), true) => plan_speed(r, car.progress),
-        _ => 0.0,
+    speed_now(car.speed, car.moved, || {
+        car.route
+            .as_ref()
+            .map_or(0.0, |(_, r)| plan_speed(r, car.progress))
     })
 }
 
-/// A stretch of a car's way on from where it is: its steps, each from `a` to `b`, `d` m along
-/// from where it is at `a`, at ticks `ta` to `tb`, at speed `v`.
+/// A stretch of a car's way on from where it is: its steps.
 struct Path(Vec<Step>);
 
-/// A step of a `Path`: from and to, how far along it begins (m), its ticks along the way, and how
-/// fast its way's timing goes there (m/s of drive time): the whole step between the way's two
-/// points it lies on, the first from where the car is (part of one) too. (Worked out from its own
-/// part of a step, a car standing a hair's breadth short of a point, its part of the step there of
-/// no length at all in f32 but some ticks long, had a speed of none there, and stood for good
-/// with nobody to wait for: a taxi turning off an avenue, the queue behind it, Oatcroft.)
-type Step = ([f32; 2], [f32; 2], f32, f32, f32, f32);
+/// A step of a `Path`.
+#[derive(Clone, Copy)]
+struct Step {
+    /// From and to.
+    a: [f32; 2],
+    b: [f32; 2],
+    /// How far along the path it begins (m).
+    d: f32,
+    /// Its ticks along the way, at `a` and at `b`.
+    ta: f32,
+    tb: f32,
+    /// How fast its way's timing goes there (m/s of drive time): the whole step between the way's
+    /// two points it lies on, the first from where the car is (part of one) too. (Worked out from
+    /// its own part of a step, a car standing a hair's breadth short of a point, its part of the
+    /// step there of no length at all in f32 but some ticks long, had a speed of none there, and
+    /// stood for good with nobody to wait for: a taxi turning off an avenue, the queue behind it,
+    /// Oatcroft.)
+    v: f32,
+}
 
 impl Path {
     /// `route` from `t` ticks along, `look` m of it at most (as far as it drives on, not backing).
@@ -104,7 +121,14 @@ impl Path {
             } else {
                 f32::INFINITY
             };
-            out.push((a, q.0, d, ta, q.2, v));
+            out.push(Step {
+                a,
+                b: q.0,
+                d,
+                ta,
+                tb: q.2,
+                v,
+            });
             d += dist(a, q.0);
             (a, ta) = (q.0, q.2);
             i += 1;
@@ -115,7 +139,7 @@ impl Path {
     /// How far along it (m) it first comes within `near` of `p`, and the way it goes there (a
     /// unit vector).
     fn reach(&self, p: [f32; 2], near: f32) -> Option<(f32, [f32; 2])> {
-        self.0.iter().find_map(|&(a, b, d, ..)| {
+        self.0.iter().find_map(|&Step { a, b, d, .. }| {
             let ab = [b[0] - a[0], b[1] - a[1]];
             let len = ab[0].hypot(ab[1]);
             if len < 1e-6 {
@@ -133,19 +157,23 @@ impl Path {
     fn tops(&self) -> f32 {
         self.0
             .iter()
-            .filter(|s| s.4 > s.3 + 1e-6)
-            .map(|&(.., d, _, _, v)| (v * v + 2.0 * BRAKE * d).sqrt())
+            .filter(|s| s.tb > s.ta + 1e-6)
+            .map(|s| (s.v * s.v + 2.0 * BRAKE * s.d).sqrt())
             .fold(f32::INFINITY, f32::min)
     }
 
     /// How far along it (m) it is `t` ticks along its way; None: further than it reaches.
     fn at_tick(&self, t: f32) -> Option<f32> {
-        self.0.iter().find_map(|&(a, b, d, ta, tb, _)| {
-            (ta <= t && t <= tb).then(|| {
-                let k = if tb > ta { (t - ta) / (tb - ta) } else { 1.0 };
-                d + dist(a, b) * k
-            })
-        })
+        self.0.iter().find_map(
+            |&Step {
+                 a, b, d, ta, tb, ..
+             }| {
+                (ta <= t && t <= tb).then(|| {
+                    let k = if tb > ta { (t - ta) / (tb - ta) } else { 1.0 };
+                    d + dist(a, b) * k
+                })
+            },
+        )
     }
 }
 
@@ -165,7 +193,16 @@ fn merge_at(k: &Car) -> Option<([f32; 2], f32)> {
 /// `BRAKE_MOST`); else `by`, the one merging slowing to let it by. Worked out once, as they first
 /// come to it, and kept (`Car::merge_first`, `new`): the same for both cars, and nobody changing
 /// their mind, both slowing for each other by turns. None: `by`'s way doesn't come to it.
-fn merge_order(w: &World, ramp: usize, by: usize, at: ([f32; 2], f32)) -> Option<MergeOrder> {
+/// `ramp_d` and `by_d` say how far each is from it along its way (`ahead`: `Path::at_tick` and
+/// `Path::reach`), asked only once it's worth knowing.
+fn merge_order(
+    w: &World,
+    ramp: usize,
+    by: usize,
+    at: ([f32; 2], f32),
+    ramp_d: impl FnOnce() -> Option<f32>,
+    by_d: impl FnOnce() -> Option<f32>,
+) -> Option<MergeOrder> {
     let (r, b) = (&w.cars[ramp], &w.cars[by]);
     // (Not one merging there too, up the ramp behind it: that one keeps behind it as anyone.)
     if merge_at(b).is_some_and(|(p, _)| dist(p, at.0) < MERGE_NEAR) {
@@ -176,9 +213,8 @@ fn merge_order(w: &World, ramp: usize, by: usize, at: ([f32; 2], f32)) -> Option
         .iter()
         .find(|d| d.0 == car_first(by))
         .map(|d| d.1);
-    let ramp_d = Path::new(&r.route.as_ref()?.1, r.progress, EASE_LOOK).at_tick(at.1)?;
-    let (by_d, _) =
-        Path::new(&b.route.as_ref()?.1, b.progress, EASE_LOOK).reach(at.0, MERGE_NEAR)?;
+    let ramp_d = ramp_d()?;
+    let by_d = by_d()?;
     let (vr, vb) = (speed_of(r), speed_of(b));
     let lens = (r.len + b.len) / 2.0;
     let committed = ramp_d - TAPER - r.len / 2.0 < vr * vr / (2.0 * BRAKE_MOST) + EASE_ROOM;
@@ -193,6 +229,11 @@ fn merge_order(w: &World, ramp: usize, by: usize, at: ([f32; 2], f32)) -> Option
         ramp: ramp_d,
         by: by_d,
     })
+}
+
+/// Car `car`'s way as far on as `merge_order` looks along it.
+fn ahead(car: &Car) -> Option<Path> {
+    Some(Path::new(&car.route.as_ref()?.1, car.progress, EASE_LOOK))
 }
 
 /// `merge_order`'s answer.
@@ -219,13 +260,18 @@ pub(crate) fn ease(
 ) -> Option<Eased> {
     let car = &w.cars[c];
     let route = car.route.as_ref().filter(|r| r.0 == home).map(|r| &r.1)?;
+    // (Off those roads at its way's speed, as in every classic town: on as its timing has it.)
+    let kind = route.kind_at(t);
+    if kind.is_none() && carried.is_none() {
+        return None;
+    }
     if route.at(t).2 || route.at(t + 1.0).2 {
         return None;
     }
     let plan = plan_speed(route, t);
-    let v0 = carried.unwrap_or(if moving { plan } else { 0.0 });
-    // (Off those roads, at its way's speed again: on as its timing has it.)
-    if route.kind_at(t).is_none() && (carried.is_none() || v0 >= plan - 1e-3) {
+    let v0 = speed_now(carried, moving, || plan);
+    // (Off them, back at its way's speed: the same.)
+    if kind.is_none() && v0 >= plan - 1e-3 {
         return None;
     }
     let tick = 1.0 / DRIVE_TICKS_PER_SECOND;
@@ -265,7 +311,7 @@ pub(crate) fn ease(
         if d < half || along < 0.0 {
             continue;
         }
-        let other = &w.cars[(o.first & !(1 << 63)) as usize];
+        let other = &w.cars[car_index(o.first)];
         keep(
             &mut v,
             safe(d - half - o.len / 2.0, speed_of(other) * along),
@@ -273,69 +319,74 @@ pub(crate) fn ease(
         );
     }
     // A merge: the one merging and those coming along the carriageway, as if both on it
-    // already (`merge_order`).
+    // already (`merge_order`): merging, those along it; else those merging ahead on its way.
     let merging = w.traffic.merging();
     let mut decided = Vec::new();
     let stop = |d: f32| (2.0 * BRAKE * (d - v0 * tick).max(0.0)).sqrt();
-    if merging.contains(&key) {
-        if let Some((m, mt)) = merge_at(car) {
+    // (Its own way as far as `merge_order` looks, worked out once.)
+    let mut mine: Option<Path> = None;
+    // (This one merging at `at` (`me_ramp`), or coming along the carriageway to it, and car `k`
+    // the other: which goes first, and that one first, how fast this one may go.)
+    let mut pair = |me_ramp: bool, k: usize, at: ([f32; 2], f32)| -> Option<f32> {
+        let mine = &*mine.get_or_insert_with(|| Path::new(route, car.progress, EASE_LOOK));
+        let theirs = || ahead(&w.cars[k]);
+        let reach = |p: &Path| Some(p.reach(at.0, MERGE_NEAR)?.0);
+        let (ramp, by) = if me_ramp { (c, k) } else { (k, c) };
+        let order = if me_ramp {
+            merge_order(w, ramp, by, at, || mine.at_tick(at.1), || reach(&theirs()?))
+        } else {
+            merge_order(w, ramp, by, at, || theirs()?.at_tick(at.1), || reach(mine))
+        }?;
+        if order.new {
+            decided.push((ramp, car_first(by), order.ramp_first));
+        }
+        // (This one first: nobody to keep back for.)
+        if order.ramp_first == me_ramp {
+            return None;
+        }
+        let other = &w.cars[k];
+        Some(if !me_ramp {
+            safe(
+                order.by - order.ramp - half - other.len / 2.0,
+                speed_of(other),
+            )
+        } else if order.by < order.ramp {
+            // (That one first: behind it once it's ahead, short of the taper till then.)
+            safe(
+                order.ramp - order.by - half - other.len / 2.0,
+                speed_of(other),
+            )
+        } else {
+            stop(order.ramp - TAPER - half)
+        })
+    };
+    let is_merging = |k: u64| merging.binary_search(&k).is_ok();
+    if is_merging(key) {
+        if let Some(at) = merge_at(car) {
             for o in others
                 .iter()
-                .filter(|o| o.ahead > 0.0 && !merging.contains(&o.first))
+                .filter(|o| o.ahead > 0.0 && !is_merging(o.first))
             {
-                let k = (o.first & !(1 << 63)) as usize;
-                if dist(o.at, m) > EASE_LOOK {
+                if dist(o.at, at.0) > EASE_LOOK {
                     continue;
                 }
-                let Some(order) = merge_order(w, c, k, (m, mt)) else {
-                    continue;
-                };
-                if order.new {
-                    decided.push((c, o.first, order.ramp_first));
+                if let Some(lim) = pair(true, car_index(o.first), at) {
+                    keep(&mut v, lim, Some(o.first));
                 }
-                if order.ramp_first {
-                    continue;
-                }
-                let other = &w.cars[k];
-                // (That one first: behind it once it's ahead, short of the taper till then.)
-                let lim = if order.by < order.ramp {
-                    safe(
-                        order.ramp - order.by - half - other.len / 2.0,
-                        speed_of(other),
-                    )
-                } else {
-                    stop(order.ramp - TAPER - half)
-                };
-                keep(&mut v, lim, Some(o.first));
             }
         }
     } else {
-        for &o in &merging {
-            let k = (o & !(1 << 63)) as usize;
+        for &o in merging {
+            let k = car_index(o);
             let Some(at) = w.cars.get(k).and_then(merge_at) else {
                 continue;
             };
             if path.reach(at.0, MERGE_NEAR).is_none() {
                 continue;
             }
-            let Some(order) = merge_order(w, k, c, at) else {
-                continue;
-            };
-            if order.new {
-                decided.push((k, key, order.ramp_first));
+            if let Some(lim) = pair(false, k, at) {
+                keep(&mut v, lim, Some(o));
             }
-            if !order.ramp_first {
-                continue;
-            }
-            let other = &w.cars[k];
-            keep(
-                &mut v,
-                safe(
-                    order.by - order.ramp - half - other.len / 2.0,
-                    speed_of(other),
-                ),
-                Some(o),
-            );
         }
     }
     // The start of a claim it stops at, not holding it.
@@ -397,7 +448,7 @@ pub(crate) fn ask_ahead(
     if *h != home || route.merges.is_empty() {
         return;
     }
-    let v0 = carried.unwrap_or(if moving { plan_speed(route, t) } else { 0.0 });
+    let v0 = speed_now(carried, moving, || plan_speed(route, t));
     let tick_s = 1.0 / DRIVE_TICKS_PER_SECOND;
     let reach = v0 * v0 / (2.0 * BRAKE) + 2.0 * v0 * tick_s + ASK_AHEAD;
     let key = car_first(c);
@@ -455,7 +506,7 @@ mod tests {
         let t = short.expect("a tick short of the point where the car is on it");
         let path = Path::new(&route, t, 10.0);
         assert!(
-            path.0[0].0 == path.0[0].1,
+            path.0[0].a == path.0[0].b,
             "its first step there is of no length"
         );
         let speed = plan_speed(&route, b.2);
