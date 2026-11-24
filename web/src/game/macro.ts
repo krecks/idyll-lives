@@ -30,7 +30,7 @@
 
 import type { Content } from '../content/content';
 import type { CarPark, LandSize, ParkingBay, Rle, TownArea, TownPlace, TownSize, WorldMeta, WorldOptions, WorldZone } from '../core/protocol';
-import { ROAD_KIND } from '../core/roadKinds';
+import { isSeparated, ROAD_KIND } from '../core/roadKinds';
 import { distanceToRect } from '../render/shared/chunks';
 import { areaSize, civicTooBig, CIVIC, namerFor, ZONE, type ZoneKind } from './places';
 import { chooseCentre, densestCentre, type Centre } from './centre';
@@ -1846,7 +1846,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const keepOff = waterMask.slice();
   // (And the motorway and its ramps, their edges and a little more.)
   const offMotor = rasterRoads(
-    worldRoads.filter((r) => r.kind === 'motorway' || r.kind === 'ramp'),
+    worldRoads.filter((r) => isSeparated(r.kind)),
     W,
     D,
     (r) => r.width / 2 + 3,

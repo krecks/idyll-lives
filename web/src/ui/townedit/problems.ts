@@ -23,7 +23,7 @@
 import type { Content } from '../../content/content';
 import type { RoadPlan } from '../../core/protocol';
 import { pointAt, lengths, RoadIndex } from '../../game/roads';
-import { kindInfo } from '../../core/roadKinds';
+import { isSeparated, kindInfo, onewayOf } from '../../core/roadKinds';
 import { entriesOf } from '../../game/edit/ground';
 import { cutOffRoads } from '../../game/oneway';
 import { count } from './words';
@@ -211,10 +211,10 @@ function countryDeadEnds(draft: NeighbourhoodDraft): Issue[] {
 export function roadWayIssues(draft: NeighbourhoodDraft, t: Templates): Issue[] {
   const out: Issue[] = [];
   const roads = draft.roads;
-  if (roads.some((r) => r.oneway || kindInfo(r).oneway)) {
+  if (roads.some((r) => onewayOf(r))) {
     const anyway = new Set(cutOffRoads(roads, true));
     // (A ramp left leading nowhere is the junction's problem, below.)
-    const cut = new Set(cutOffRoads(roads).filter((i) => !anyway.has(i) && roads[i].kind !== 'ramp' && roads[i].kind !== 'motorway'));
+    const cut = new Set(cutOffRoads(roads).filter((i) => !anyway.has(i) && !isSeparated(roads[i].kind)));
     if (cut.size) {
       const spots = draft.slots.length ? entriesOf(draft, t) : [];
       const homes = draft.slots.reduce((n, s, i) => n + (spots[i]?.road !== undefined && cut.has(spots[i].road) ? homesOn(s, { farms: true }) : 0), 0);
@@ -230,7 +230,7 @@ export function roadWayIssues(draft: NeighbourhoodDraft, t: Templates): Issue[] 
       const lost = r.ends.some((e, k) => {
         if (e === 'merge' || e === 'out') return false;
         const [x, z] = k ? r.points[r.points.length - 1] : r.points[0];
-        return ![...index.around(x, z, widest / 2 + 1)].some(([j, m]) => j !== i && roads[j].kind !== 'motorway' && roads[j].kind !== 'ramp' && kindInfo(roads[j]).lanesEachWay > 0 && m.dist <= Math.max(r.width, roads[j].width) / 2 + 1);
+        return ![...index.around(x, z, widest / 2 + 1)].some(([j, m]) => j !== i && !isSeparated(roads[j].kind) && kindInfo(roads[j]).lanesEachWay > 0 && m.dist <= Math.max(r.width, roads[j].width) / 2 + 1);
       });
       if (lost) {
         out.push({ text: 'The motorway junction lost its road', at: middleOf(r) });

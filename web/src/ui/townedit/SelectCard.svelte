@@ -21,8 +21,8 @@
   import { entriesOf } from '../../game/edit/ground';
   import { storeysOfId } from '../../game/flats';
   import { placeOfTemplate } from '../../game/placeLots';
-  import { changeKind, CHANGE_KINDS, isMotorway, motorwayName, removeRoad, rename, whatGoes } from '../../game/edit/streets';
-  import { onewayOf } from '../../core/roadKinds';
+  import { changeKind, CHANGE_KINDS, motorwayName, removeRoad, rename, whatGoes } from '../../game/edit/streets';
+  import { isSeparated, onewayOf, ROAD_KIND } from '../../core/roadKinds';
   import Toggle from '../kit/Toggle.svelte';
   import { removeVillage, villageGoes } from '../../game/edit/villages';
   import type { RoadKind } from '../../core/protocol';
@@ -48,7 +48,6 @@
     { value: 'roomy', label: 'Roomy' },
     { value: 'big', label: 'Big' },
   ];
-  const ROAD_KIND: Record<RoadKind, string> = { street: 'Street', lane: 'Lane', country: 'Country road', trail: 'Footpath', avenue: 'Avenue', motorway: 'Motorway', ramp: 'Slip road' };
 
   // ---- a lot ----
   const lot = $derived(picked?.kind === 'lot' ? draft.slots[picked.slot] : undefined);
@@ -101,13 +100,13 @@
   const road = $derived(picked?.kind === 'road' ? draft.roads[picked.road] : undefined);
   const goes = $derived(picked?.kind === 'road' ? whatGoes(draft, t, picked.road) : null);
   /** (The motorway's own carriageways and ramps are the motorway: not listed as roads going with it.) */
-  const goesLines = $derived(goes && !('refused' in goes) && picked?.kind === 'road' ? whatGoesLine(draft, { ...goes, roads: goes.roads.filter((r) => !isMotorway(draft.roads[r])) }, picked.road) : []);
+  const goesLines = $derived(goes && !('refused' in goes) && picked?.kind === 'road' ? whatGoesLine(draft, { ...goes, roads: goes.roads.filter((r) => !isSeparated(draft.roads[r].kind)) }, picked.road) : []);
   const madeStreets = $derived(goes && !('refused' in goes) ? madeStreetsLine(draft, goes) : null);
   const roadLength = $derived(road ? Math.round(lengths(road.points).at(-1) ?? 0) : 0);
-  const motorway = $derived(!!road && isMotorway(road));
+  const motorway = $derived(!!road && isSeparated(road.kind));
   /** The motorway's carriageways' names (its name and the way each goes). */
   const carriageways = $derived(motorway ? draft.roads.flatMap((r) => (r.kind === 'motorway' && r.name ? [r.name] : [])) : []);
-  const KIND_CHOICES = CHANGE_KINDS.map((k) => ({ value: k, label: k === 'country' ? 'Country' : ROAD_KIND[k] }));
+  const KIND_CHOICES = CHANGE_KINDS.map((k) => ({ value: k, label: k === 'country' ? 'Country' : ROAD_KIND[k].label }));
   const WAYS: readonly { value: 'two' | 'one'; label: string }[] = [
     { value: 'two', label: 'Both ways' },
     { value: 'one', label: 'One-way' },
@@ -224,7 +223,7 @@
         <button class="btn small danger-soft" title={lotFlats ? `Removes ${lot.name} and ${lotFlats}` : undefined} onclick={() => editor.apply(removeLotsEdit(draft, new Set([picked.slot])))}><Icon name="icon.ui.trash" size={14} /> Remove</button>
       </div>
     {:else if road && picked.kind === 'road'}
-      <span class="eyebrow sub">{ROAD_KIND[road.kind ?? 'street'] ?? 'Road'}{road.bridge ? ', a bridge' : ''}{!motorway && road.oneway ? ', one-way' : ''} · {roadLength} m</span>
+      <span class="eyebrow sub">{ROAD_KIND[road.kind ?? 'street']?.label ?? 'Road'}{road.bridge ? ', a bridge' : ''}{!motorway && road.oneway ? ', one-way' : ''} · {roadLength} m</span>
       <RenameField label={motorway ? 'Motorway name' : 'Street name'} value={motorway ? motorwayName(draft.roads) || (road.name ?? '') : (road.name ?? '')} onname={renamed({ kind: 'road', road: picked.road })} />
       {#if motorway}
         {#if carriageways.length}<p class="hint">Its carriageways: {listed(carriageways)}.</p>{/if}

@@ -6,7 +6,7 @@
 // `bun test tests/roadHierarchySurface.test.ts`.
 import { describe, expect, test } from 'bun:test';
 import type { RoadPlan } from '../src/core/protocol';
-import { ROAD_KIND } from '../src/core/roadKinds';
+import { isSeparated, ROAD_KIND } from '../src/core/roadKinds';
 import { blankLand, heightAt, LAND_CELL, type Land } from '../src/game/land';
 import { deckSpans, keepOf, lengths, MOTORWAY_KEEP, pointAt, raisedSpans, roadMask, walkerBlocked } from '../src/game/roads';
 import { BuiltSurface, CROSS_CLEAR, CUT_MAX_MOTORWAY, cutMostOf, DECK_UNDER, GRADE } from '../src/render/shared/builtSurface';
@@ -165,7 +165,7 @@ describe('the land the motorway keeps', () => {
   });
 
   test("a town's own streets keep only their edge, as before", () => {
-    const streets = roads.filter((r) => r.kind !== 'motorway' && r.kind !== 'ramp');
+    const streets = roads.filter((r) => !isSeparated(r.kind));
     const plain = (r: RoadPlan) => r.width / 2 + 0.5;
     const keep = roadMask(streets, W, D);
     // (West Cross, x = 90: its edge and the clearance, no more.)
@@ -195,6 +195,6 @@ describe('the land the motorway keeps', () => {
   });
 
   test('no motorway, nothing kept from walkers', () => {
-    expect(walkerBlocked(roads.filter((r) => r.kind !== 'motorway' && r.kind !== 'ramp'), W, D)).toBeNull();
+    expect(walkerBlocked(roads.filter((r) => !isSeparated(r.kind)), W, D)).toBeNull();
   });
 });

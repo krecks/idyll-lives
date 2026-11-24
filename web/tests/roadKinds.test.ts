@@ -18,7 +18,7 @@ describe('ROAD_KIND', () => {
     expect([ROAD_KIND.street.sidewalk, ROAD_KIND.lane.sidewalk, ROAD_KIND.country.sidewalk, ROAD_KIND.trail.sidewalk]).toEqual([SIDEWALK, SIDEWALK, 0, 0]);
     expect({ street: GRADE.street, lane: GRADE.lane, country: GRADE.country, trail: GRADE.trail }).toEqual({ street: 0.08, lane: 0.08, country: 0.12, trail: 0.22 });
     // (A drawn lane is a lane's 6 m, narrower than a street.)
-    expect(ROAD_KINDS.filter((k) => ROAD_KIND[k].drawable).map((k) => [k, streetWidth(k)])).toEqual([
+    expect(ROAD_KINDS.filter((k) => !ROAD_KIND[k].separated).map((k) => [k, streetWidth(k)])).toEqual([
       ['street', 7],
       ['lane', 6],
       ['country', 7],
@@ -42,11 +42,11 @@ describe('ROAD_KIND', () => {
   test('the new kinds', () => {
     const { avenue, motorway, ramp } = ROAD_KIND;
     // An avenue: two lanes each way about its median, between sidewalks.
-    expect([avenue.width, avenue.median, avenue.lanesEachWay, avenue.oneway, avenue.walkers]).toEqual([14, 2.6, 2, false, true]);
+    expect([avenue.width, avenue.median, avenue.lanesEachWay, avenue.separated]).toEqual([14, 2.6, 2, false]);
     // A motorway's carriageway: two 3.5 m lanes and a shoulder, one-way, cars only.
     expect(motorway.width).toBeGreaterThanOrEqual(2 * 3.5 + 1);
-    expect([motorway.lanesEachWay, motorway.oneway, motorway.walkers, motorway.drawable, motorway.sidewalk]).toEqual([2, true, false, false, 0]);
-    expect([ramp.width, ramp.lanesEachWay, ramp.oneway, ramp.walkers, ramp.drawable]).toEqual([5, 1, true, false, false]);
+    expect([motorway.lanesEachWay, motorway.separated, motorway.sidewalk]).toEqual([2, true, 0]);
+    expect([ramp.width, ramp.lanesEachWay, ramp.separated]).toEqual([5, 1, true]);
     expect(kindInfo({})).toBe(ROAD_KIND.street);
   });
 });

@@ -20,7 +20,7 @@
  * The tool's state, apart from the editor (`StreetDrawing`), is plain: the tests drive it.
  */
 
-import { onewayOf } from '../../core/roadKinds';
+import { onewayOf, ROAD_KIND } from '../../core/roadKinds';
 import type { Edited } from '../../game/edit/edited';
 import { builtAlong } from '../../game/edit/buildup';
 import { drawStreet, Meeting, SNAP, streetsBare, streetWidth, type Magnet } from '../../game/edit/streets';
@@ -274,7 +274,10 @@ type Carried = { live: LiveStreet; verdict: Edited };
  */
 export function kindLine(draft: Parameters<typeof liveStreet>[0], live: LiveStreet, verdict: Edited | null = null): string {
   const area = live.area >= 0 ? draft.open?.areas[live.area]?.name : undefined;
-  let what = live.kind === 'trail' ? 'A footpath' : live.kind === 'country' ? 'A country road' : `${live.kind === 'avenue' ? 'An avenue' : `A ${live.kind === 'lane' ? 'lane' : 'street'}`}${area ? ` of ${area}` : ''}`;
+  // (A town's kinds of an area; with none yet, a street.)
+  const kind = live.kind ?? 'street';
+  const { article } = ROAD_KIND[kind];
+  let what = `${article.charAt(0).toUpperCase()}${article.slice(1)}${kind === 'trail' || kind === 'country' || !area ? '' : ` of ${area}`}`;
   const bridges = live.bridges.length ? ` with ${live.bridges.length === 1 ? `a ${live.bridges[0]} m bridge` : `${live.bridges.length} bridges`}` : '';
   let then = '';
   if (live.kind === 'country' && verdict && 'draft' in verdict) {

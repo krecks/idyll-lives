@@ -15,7 +15,7 @@
  */
 
 import type { RoadPlan } from '../core/protocol';
-import { kindInfo, onewayOf, ROAD_KIND } from '../core/roadKinds';
+import { isSeparated, kindInfo, onewayOf, ROAD_KIND } from '../core/roadKinds';
 import * as pmath from './pmath';
 import { deckSpans, lengths, nearest, pointAt, RoadIndex, type Pt } from './roads';
 
@@ -109,7 +109,7 @@ export function cutOffRoads(roads: readonly RoadPlan[], twoWay = false, within =
     }
   }
   // (Within: the motorway and its ramps aren't asked about.)
-  const asked = within ? cars.filter((i) => roads[i].kind !== 'motorway' && roads[i].kind !== 'ramp') : cars;
+  const asked = within ? cars.filter((i) => !isSeparated(roads[i].kind)) : cars;
   if (!asked.length) return [];
   const out = !within && cars.some((i) => roads[i].ends.includes('out'));
   const root = find(out ? 0 : ids[asked[0]][0]);

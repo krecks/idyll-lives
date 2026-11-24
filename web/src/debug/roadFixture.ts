@@ -14,6 +14,7 @@
  */
 
 import { groundDepth, type RoadPlan, type WorldStructure } from '../core/protocol';
+import { isSeparated } from '../core/roadKinds';
 import { roadHierarchy } from '../render/roadHierarchyFixture';
 import { deriveJunctions } from '../../tests/fixtures/junctions';
 
@@ -36,7 +37,7 @@ export function roadFixtureWorld(base: WorldStructure): WorldStructure {
   const [W, D] = [base.width, groundDepth(base)];
   const [ox, oz] = [Math.round(W - h.width - CLEAR), Math.round(D - h.depth - CLEAR)];
   const shift = ([x, z]: Pt): Pt => [x + ox, z + oz];
-  const roads: RoadPlan[] = h.roads.map((r) => ({ ...r, points: r.points.map(shift), ...(plain ? { kind: r.kind === 'motorway' || r.kind === 'ramp' ? ('country' as const) : ('street' as const), oneway: undefined, raised: undefined, bridge: undefined } : {}) }));
+  const roads: RoadPlan[] = h.roads.map((r) => ({ ...r, points: r.points.map(shift), ...(plain ? { kind: isSeparated(r.kind) ? ('country' as const) : ('street' as const), oneway: undefined, raised: undefined, bridge: undefined } : {}) }));
   const box = { x0: ox - CLEAR, z0: oz - CLEAR, x1: ox + h.width + CLEAR, z1: oz + h.depth + CLEAR };
   const clear = (pts: readonly Pt[]) => pts.every(([x, z]) => x < box.x0 || x > box.x1 || z < box.z0 || z > box.z1);
   const meta = base.meta!;

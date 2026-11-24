@@ -12,6 +12,7 @@
  */
 
 import type { RoadPlan } from '../core/protocol';
+import { isSeparated } from '../core/roadKinds';
 import { simplify } from './landMasks';
 import { curve, evenly, leftOf, lengths, nearest, pointAt, RoadIndex, besideAny, sharpestTurn, tangent, type Pt } from './roads';
 import type { Rect } from './town';
@@ -394,7 +395,7 @@ function motorwayCells(cells: Cells, roads: readonly RoadPlan[]): Uint8Array {
   const { gw, gd } = cells;
   const out = new Uint8Array(gw * gd);
   for (const r of roads) {
-    if (r.kind !== 'motorway' && r.kind !== 'ramp') continue;
+    if (!isSeparated(r.kind)) continue;
     for (const p of evenly(r.points, 4)) {
       const R = MOTORWAY_OFF + CELL / 2;
       for (let cz = Math.max(0, Math.floor((p[1] - R) / CELL)); cz <= Math.min(gd - 1, Math.floor((p[1] + R) / CELL)); cz++) {
@@ -662,7 +663,7 @@ export class CountryRouter {
     const by = new Map<number, number[]>();
     const R = SHARED_REACH;
     roads.forEach((r, i) => {
-      if (r.kind === 'trail' || r.kind === 'motorway' || r.kind === 'ramp' || own.has(i)) return;
+      if (r.kind === 'trail' || isSeparated(r.kind) || own.has(i)) return;
       // (Each cell it passes over once; off the world, none.)
       const under = new Set(r.points.map(([x, z]) => (x < 0 || z < 0 || x >= W || z >= D ? -1 : Math.floor(z / CELL) * gw + Math.floor(x / CELL))));
       under.delete(-1);
@@ -793,7 +794,7 @@ export class CountryRouter {
    */
   joins(extra: readonly RoadPlan[], p: Pt, q: Pt): boolean {
     // (Not the motorway: nothing joins it but its ramps.)
-    const all = [...this.roads, ...extra].filter((r) => r.kind !== 'trail' && r.kind !== 'motorway' && r.kind !== 'ramp');
+    const all = [...this.roads, ...extra].filter((r) => r.kind !== 'trail' && !isSeparated(r.kind));
     const index = new RoadIndex(all);
     const parent = all.map((_, i) => i);
     const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));

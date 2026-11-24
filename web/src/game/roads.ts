@@ -10,7 +10,7 @@
  */
 
 import type { RoadEnd, RoadPlan } from '../core/protocol';
-import { ROAD_KIND } from '../core/roadKinds';
+import { isSeparated, kindInfo, ROAD_KIND } from '../core/roadKinds';
 import * as pmath from './pmath';
 
 export type { RoadEnd, RoadPlan };
@@ -738,18 +738,12 @@ export function rasterRoads(roads: readonly RoadPlan[], w: number, d: number, re
   return mask;
 }
 
-/**
- * How far (m) from a road's middle nothing else is laid, of the kinds that keep their land to themselves: a motorway's
- * carriageway its embankment and verge (`MOTORWAY_KEEP`), a ramp its own (`RAMP_KEEP`); 0, every other kind (its
- * edge is enough: `roadMask`'s `clear`).
- */
-export const MOTORWAY_KEEP = 25;
-export const RAMP_KEEP = 10;
+/** How far (m) from a motorway's carriageway's middle nothing else is laid: its embankment and verge (`RoadKindInfo.keep`). */
+export const MOTORWAY_KEEP = ROAD_KIND.motorway.keep;
 
-/** How far (m) past a road's edge its kind keeps lots, woods and fields off (`MOTORWAY_KEEP`, `RAMP_KEEP`), 0 for most. */
+/** How far (m) past a road's edge its kind keeps lots, woods and fields off (`RoadKindInfo.keep`), 0 for most (its edge is enough: `roadMask`'s `clear`). */
 export function keepOf(r: Pick<RoadPlan, 'kind' | 'width'>): number {
-  const from = r.kind === 'motorway' ? MOTORWAY_KEEP : r.kind === 'ramp' ? RAMP_KEEP : 0;
-  return Math.max(0, from - r.width / 2);
+  return Math.max(0, kindInfo(r).keep - r.width / 2);
 }
 
 /**
@@ -764,13 +758,13 @@ export function roadMask(roads: readonly RoadPlan[], w: number, d: number, clear
 
 /**
  * Tiles of a `w` × `d` area (1) nobody on foot may stand on: a road no one walks along (a motorway's carriageway, a
- * ramp: `ROAD_KIND.walkers`) where it lies on the land, out to its edge and `WALK_OFF_EDGE` past it, but not under its
+ * ramp: `isSeparated`) where it lies on the land, out to its edge and `WALK_OFF_EDGE` past it, but not under its
  * decks (`deckSpans`: the land there the road's below, or anyone's), nor where a ramp meets a road people walk along
  * (the street at its end, and its sidewalks). Null where no road keeps walkers off: what the town file's
  * `terrain.blocked` holds.
  */
 export function walkerBlocked(roads: readonly RoadPlan[], w: number, d: number): Uint8Array | null {
-  const off = roads.filter((r) => r.points.length >= 2 && !ROAD_KIND[r.kind ?? 'street'].walkers);
+  const off = roads.filter((r) => r.points.length >= 2 && isSeparated(r.kind));
   if (!off.length) return null;
   const mask = new Uint8Array(w * d);
   const lay = (r: RoadPlan) => {
@@ -799,7 +793,7 @@ export function walkerBlocked(roads: readonly RoadPlan[], w: number, d: number):
   ramps.forEach(lay);
   if (ramps.length) {
     const walked = rasterRoads(
-      roads.filter((r) => ROAD_KIND[r.kind ?? 'street'].walkers),
+      roads.filter((r) => !isSeparated(r.kind)),
       w,
       d,
       (r) => r.width / 2,

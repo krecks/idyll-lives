@@ -30,7 +30,7 @@
  */
 
 import type { RoadPlan } from '../core/protocol';
-import { ROAD_KIND } from '../core/roadKinds';
+import { isSeparated, ROAD_KIND } from '../core/roadKinds';
 import { CUT_MAX_MOTORWAY } from '../render/shared/builtSurface';
 import { CELL, type Cells } from './countryRouter';
 import { curve, lengths, MEET, nearest, pointAt, RoadIndex, sharpestTurn, type Pt } from './roads';
@@ -783,7 +783,7 @@ export function crossings(middle: readonly Pt[], roads: readonly RoadPlan[]): Cr
   const lm = lengths(middle);
   const out: Crossing[] = [];
   roads.forEach((r, ri) => {
-    if (r.kind === 'motorway' || r.kind === 'ramp' || r.kind === 'trail') return;
+    if (isSeparated(r.kind) || r.kind === 'trail') return;
     const lr = lengths(r.points);
     for (let j = 0; j + 1 < r.points.length; j++) {
       const [p, q] = [r.points[j], r.points[j + 1]];
