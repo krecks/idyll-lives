@@ -48,7 +48,13 @@ impl Road {
             },
             kind: raw.kind,
             area: raw.area,
-            oneway: raw.oneway,
+            // (A carriageway or a ramp is one-way whatever it says: with none, the way its points run,
+            // as the town file reads it, `roadKinds.ts` `onewayOf`.)
+            oneway: if raw.oneway.is_both() && raw.kind.oneway_always() {
+                OneWay::Along
+            } else {
+                raw.oneway
+            },
             source: source as u32,
         })
     }
