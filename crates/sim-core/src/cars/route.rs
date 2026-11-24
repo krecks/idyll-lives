@@ -40,14 +40,14 @@ pub(crate) struct Route {
     pub(super) by_motorway: bool,
     /// Where it's off the ground (ticks along it, from and to, and the level: `travel::Layer`):
     /// on a motorway's deck, or about a merge on one. Elsewhere on the ground (`layer_at`).
-    pub(crate) layers: Vec<(f32, f32, crate::travel::Layer)>,
+    pub(crate) layers: Runs<crate::travel::Layer>,
     /// Where it merges off a ramp into a motorway's carriageway (ticks along it: at the merge),
     /// each a claim of its own (`MERGE_UP`, `MERGE_ON`).
     pub(crate) merges: Vec<f32>,
     /// Where it's on an avenue, a motorway or a ramp (ticks along it, from and to, and which:
     /// `RoadKind::fast`): there it speeds up and slows down as a car does (`Car::speed`).
     /// Elsewhere on a street, a lane, a country road or off the roads (`kind_at`).
-    pub(crate) kinds: Vec<(f32, f32, crate::travel::RoadKind)>,
+    pub(crate) kinds: Runs<crate::travel::RoadKind>,
 }
 
 /// A car's way round a taxi standing at the kerb (`PassBy`) as laid on its route: the points
@@ -888,28 +888,19 @@ impl Route {
 
     /// Its level `t` ticks along (`layers`: the ground but where it says).
     pub(crate) fn layer_at(&self, t: f32) -> crate::travel::Layer {
-        self.layers
-            .iter()
-            .find(|l| l.0 <= t && t <= l.1)
-            .map_or(crate::travel::Layer::GROUND, |l| l.2)
+        self.layers.at(t).unwrap_or(crate::travel::Layer::GROUND)
     }
 
     /// The kind of road it's on `t` ticks along, of an avenue, a motorway and a ramp (`kinds`);
     /// None: any other, or off the roads.
     pub(crate) fn kind_at(&self, t: f32) -> Option<crate::travel::RoadKind> {
-        self.kinds
-            .iter()
-            .find(|k| k.0 <= t && t <= k.1)
-            .map(|k| k.2)
+        self.kinds.at(t)
     }
 
     /// Whether it's on a motorway's carriageway or a ramp anywhere from `a` to `b` ticks along
     /// (`kinds`): nobody backs up or turns round there (`turn_round`, `back_off`).
     pub(crate) fn on_motorway(&self, a: f32, b: f32) -> bool {
-        let (a, b) = (a.min(b), a.max(b));
-        self.kinds
-            .iter()
-            .any(|k| k.2.separated() && k.0 <= b && a <= k.1)
+        self.kinds.any(a.min(b), a.max(b), |k| k.separated())
     }
 
     /// How far along it (ticks) a car `t` ticks along is `d` m further on (as far as its end).
