@@ -28,6 +28,20 @@ export const MOTORWAY = { inner: 0.55, lane: 3.5, base: 0.6, top: 0.2, high: 0.8
 /** The barrier's concrete (a vertex colour in the plain finish: no material of its own). */
 export const BARRIER_CONCRETE = '#A8A59D';
 export const BARRIER_FINISH = encodeFinish(0.92, 0);
+/**
+ * An overpass's measures (m, `street.ts` `overpass`): its concrete slab `slab` deep under the road, reaching `apron` past the road's edges, closed
+ * `lid` under the road's surface (out of sight, there for its shadow, clear of the road's own in the sun's map); its
+ * parapet (a safety-shape barrier: a foot `foot` wide and `footHigh` high, then up to `parapet` over the road, `top`
+ * wide) along each outer edge; a pier every `pier` m or a little less, beside a road it passes over rather than on it
+ * (`street.ts` `pierStations`; `column` square columns, one under a deck
+ * narrower than `wide`, two under a wider one, on a cross-head `cap` along and `capDeep` deep), each `sink` into the
+ * ground; an abutment `abutment` thick under each end that stands clear of it. Where the deck stands less than `low`
+ * over the ground, nothing stands under it.
+ */
+export const OVERPASS = { slab: 1.1, lid: 0.3, apron: 0.5, parapet: 1.0, foot: 0.5, footHigh: 0.3, top: 0.24, pier: 20, column: 1.1, cap: 1.2, capDeep: 0.8, sink: 0.4, abutment: 1.2, wide: 8, low: 2.4 } as const;
+/** Its concrete (and the overview's plain decks', `lowDecks`). */
+export const OVERPASS_CONCRETE = '#ABA8A0';
+
 /** How far apart along a carriageway the barrier's line is taken (m). */
 const BARRIER_STEP = 2;
 
@@ -305,19 +319,18 @@ export class Walk {
   }
 }
 
-/** An overpass's measures as the overview draws them (m: `street.ts` `OVERPASS`, which this module can't import): the slab's depth, the parapet's height. */
-const LOW_DECK = { slab: 1.1, parapet: 1.0, step: 4 } as const;
-const LOW_CONCRETE = '#ABA8A0';
+/** How long the overview's deck pieces are at most (m). */
+const LOW_DECK_STEP = 4;
 
 /**
  * The overview's decks (the overpasses, `RoadPlan.raised`, and a motorway's or a ramp's bridges) and the barriers
  * between the motorways' carriageways, plainly, into `g` (vertex colours in the plain finish): a deck's two sides from
  * its parapet's top down to under its slab, its parapets' faces to the road and its underside; on a world with no built
- * surface (`levels` from `deckLevels`, `solid`), a ramp up to one walled down to the ground.
+ * surface (`levels` from `deckLevels`, `solid`), a ramp up to one walled down to the ground. Their slab and parapet as
+ * deep and as high as an overpass's (`OVERPASS`).
  */
 export function lowDecks(g: Geo, roads: readonly RoadPlan[], levels: RoadLevels | null, solid: boolean, spansOf: (r: RoadPlan) => [number, number][]): void {
-  const finish = encodeFinish(0.92, 0);
-  g.color(LOW_CONCRETE, finish);
+  g.color(OVERPASS_CONCRETE, BARRIER_FINISH);
   const pairs = motorwayPairs(roads);
   roads.forEach((road, ri) => {
     if (road.points.length < 2) return;
@@ -333,7 +346,7 @@ export function lowDecks(g: Geo, roads: readonly RoadPlan[], levels: RoadLevels 
     const half = road.width / 2;
     for (const [list, down] of [[open, false], [walled, true]] as const) {
       for (const [s0, s1] of list) {
-        const n = Math.max(1, Math.ceil((s1 - s0) / LOW_DECK.step));
+        const n = Math.max(1, Math.ceil((s1 - s0) / LOW_DECK_STEP));
         for (let k = 0; k < n; k++) {
           const [a, b] = [s0 + ((s1 - s0) * k) / n, s0 + ((s1 - s0) * (k + 1)) / n];
           const [pa, pb] = [walk.at(a), walk.at(b)];
@@ -343,11 +356,11 @@ export function lowDecks(g: Geo, roads: readonly RoadPlan[], levels: RoadLevels 
             if (side === inner) continue;
             const o = side * half;
             const out: V3 = [pa.t[1] * side, 0, -pa.t[0] * side];
-            const [ba, bb] = down ? [0, 0] : [ya - LOW_DECK.slab, yb - LOW_DECK.slab];
-            g.poly([P(pa, o, ba), P(pb, o, bb), P(pb, o, yb + LOW_DECK.parapet), P(pa, o, ya + LOW_DECK.parapet)], out);
-            g.poly([P(pa, o, ya + LOW_DECK.parapet), P(pb, o, yb + LOW_DECK.parapet), P(pb, o, yb), P(pa, o, ya)], [-out[0], 0, -out[2]]);
+            const [ba, bb] = down ? [0, 0] : [ya - OVERPASS.slab, yb - OVERPASS.slab];
+            g.poly([P(pa, o, ba), P(pb, o, bb), P(pb, o, yb + OVERPASS.parapet), P(pa, o, ya + OVERPASS.parapet)], out);
+            g.poly([P(pa, o, ya + OVERPASS.parapet), P(pb, o, yb + OVERPASS.parapet), P(pb, o, yb), P(pa, o, ya)], [-out[0], 0, -out[2]]);
           }
-          if (!down) g.poly([P(pa, half, ya - LOW_DECK.slab), P(pa, -half, ya - LOW_DECK.slab), P(pb, -half, yb - LOW_DECK.slab), P(pb, half, yb - LOW_DECK.slab)], [0, -1, 0]);
+          if (!down) g.poly([P(pa, half, ya - OVERPASS.slab), P(pa, -half, ya - OVERPASS.slab), P(pb, -half, yb - OVERPASS.slab), P(pb, half, yb - OVERPASS.slab)], [0, -1, 0]);
         }
       }
     }

@@ -61,7 +61,7 @@ import { shownFences } from './shownFences';
 import { centroid, lengths, nearest as nearestOf, pointAt } from '../../game/roads';
 import { kindInfo } from '../../core/roadKinds';
 import { junctionStretches } from './markings';
-import { allBarriers, barrier, deckLevels, liftedStretches, MOTORWAY_SIGN, motorwayPairs, signSpots, without } from './motorway';
+import { allBarriers, barrier, deckLevels, liftedStretches, MOTORWAY_SIGN, motorwayPairs, OVERPASS, OVERPASS_CONCRETE, signSpots, without } from './motorway';
 import { pavedRects } from './paving';
 import { streetGround, streetGroundChunks, streetGroundKey } from './streetGround';
 import { bridgeSpans, Kerb, KERB, levelStops, raisedSpans, ROAD_Y, roadIndex, roadMeshes, SIDEWALK, stretchOf, townRoads, WALK_Y, walkStops, type RoadIndex, type RoadLevels } from './roads';
@@ -669,12 +669,12 @@ interface StaticPart {
 
 /**
  * An avenue's median: its trees (a model the woods have), how far apart and how far from a junction's pad; its grass's
- * material (the land's, a detail texture its vertex colour tones: `roads.ts` `MEDIAN_GRASS`).
+ * material (the land's, a detail texture toned by its vertex colour, `roads.ts` `MEDIAN_GRASS`).
  */
 const MEDIAN_TREE = 'model.tree.maple';
 const MEDIAN_TREE_EVERY = 12;
 const MEDIAN_TREE_CLEAR = 5;
-const MEDIAN_GRASS = 'material.ground';
+const MEDIAN_MATERIAL = 'material.ground';
 
 /** The verge between carriageway `a` of `roads` and its pair `b` (m: how far apart their edges are at `a`'s middle). */
 function pairVerge(roads: readonly RoadPlan[], a: number, b: number): number {
@@ -2189,7 +2189,7 @@ export class TownStreet {
       if (marks && !marks.empty) out.push({ name: 'roadMarks', material: 'paint', geo: marks, paint: true });
       // (An avenue's median's grass: the land's grass material.)
       const median = this.staticParts().get(id)?.median;
-      if (median && !median.empty) out.push({ name: 'medians', material: MEDIAN_GRASS, geo: median, toned: true });
+      if (median && !median.empty) out.push({ name: 'medians', material: MEDIAN_MATERIAL, geo: median, toned: true });
       const all = new Map(this.groundRects().map(([name, rects]) => [name, rects]));
       for (const [name, list, material, y] of layers) {
         const geo = new Geo();
@@ -2392,18 +2392,6 @@ export function bridge(
   }
 }
 
-/**
- * An overpass's measures (m): its concrete slab `slab` deep under the road, reaching `apron` past the road's edges, closed
- * `lid` under the road's surface (out of sight, there for its shadow, clear of the road's own in the sun's map); its
- * parapet (a safety-shape barrier: a foot `foot` wide and `footHigh` high, then up to `parapet` over the road, `top`
- * wide) along each outer edge; a pier every `pier` m or a little less, beside a road it passes over rather than on it
- * (`pierStations`; `column` square columns, one under a deck
- * narrower than `wide`, two under a wider one, on a cross-head `cap` along and `capDeep` deep), each `sink` into the
- * ground; an abutment `abutment` thick under each end that stands clear of it. Where the deck stands less than `low`
- * over the ground, nothing stands under it.
- */
-export const OVERPASS = { slab: 1.1, lid: 0.3, apron: 0.5, parapet: 1.0, foot: 0.5, footHigh: 0.3, top: 0.24, pier: 20, column: 1.1, cap: 1.2, capDeep: 0.8, sink: 0.4, abutment: 1.2, wide: 8, low: 2.4 } as const;
-const OVERPASS_CONCRETE = '#ABA8A0';
 const OVERPASS_PARAPET = '#BCB9B1';
 
 /**

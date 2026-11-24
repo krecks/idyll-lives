@@ -10,10 +10,10 @@ import { carriageway, hasSidewalks, planJunctions } from '../shared/junctions';
 import { kindInfo } from '../../core/roadKinds';
 import { lengths } from '../../game/roads';
 import { junctionStretches } from '../shared/markings';
-import { allBarriers, without } from '../shared/motorway';
+import { allBarriers, OVERPASS, without } from '../shared/motorway';
 import { boxOf, clipRect, COURSE, courseCells, JOINT, LINE, PAVING_LOOK, TILE, townPaving, type TownPaving } from '../shared/townPaving';
 import { bridgeSpans, raisedSpans, stretchOf } from '../shared/roads';
-import { BRIDGE, OVERPASS } from '../shared/street';
+import { BRIDGE } from '../shared/street';
 
 /**
  * A ground tile as `terrainTiles` builds it: its draw, its meshes by level (the finest only while it is near enough to

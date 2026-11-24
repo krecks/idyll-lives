@@ -13,16 +13,16 @@ import { drawMesh, meshFrom } from './meshes';
 import { LIFT, STEP, STRAIGHT, type CountryRoads, type Point } from '../shared/countryRoads';
 import { Geo, type V3 } from '../shared/geometry';
 import { asphaltVary, carriageway, tint, STREET_LOOK } from '../shared/paving';
-import { BARRIER_CONCRETE, BARRIER_FINISH, MOTORWAY } from '../shared/motorway';
+import { BARRIER_CONCRETE, BARRIER_FINISH, MOTORWAY, OVERPASS } from '../shared/motorway';
 
 /** The stretches (`STEP` m each) over which a road out of town goes from the junction's even tone to its own wear. */
 const JOIN_FADE = 3;
 /**
  * A motorway's deck over the water past the edge, plainly (m): its slab this deep under the road, reaching this far
- * past its outer edge; a parapet there this high and wide; a pier every this many stretches (`STEP` m each), this wide,
+ * past its outer edge, a parapet there this high (the overpass's: `OVERPASS`) and this wide; a pier every this many stretches (`STEP` m each), this wide,
  * down into the bed under the water.
  */
-const DECK = { slab: 1.1, apron: 0.5, parapet: 1.0, wall: 0.3, every: 6, pier: 1.2, sink: 0.5 } as const;
+const DECK = { slab: OVERPASS.slab, apron: OVERPASS.apron, parapet: OVERPASS.parapet, wall: 0.3, every: 6, pier: 1.2, sink: 0.5 } as const;
 
 /** The road surfaces, their centre lines and the welcome signs of `roads`, under `parent`. */
 export function drawRoads(app: pc.AppBase, roads: CountryRoads, parent: pc.Entity): pc.Entity[] {

@@ -22,12 +22,15 @@ import type { RoadLevels } from './roads';
 
 /** How high the markings lie over the road (m: `roads.ts` `MARK_Y`, which this module can't import without a cycle). */
 const MARK_UP = 0.016;
-/** The paint (`roads.ts` `PAINT`, `PAINT_FINISH`): worn white, the plain finish's roughness. */
-const PAINT = '#D6D6D0';
-const PAINT_FINISH = encodeFinish(0.7, 0);
+/**
+ * The markings' paint (these lines', and the junctions' stop lines and zebras: `roads.ts` `junctionMarks`): a vertex colour
+ * (worn white: no brighter than the sidewalks) with the plain finish's roughness in its alpha (`geometry.ts` `encodeFinish`).
+ */
+export const PAINT = '#D6D6D0';
+export const PAINT_FINISH = encodeFinish(0.7, 0);
 /** A line's width (m): a dashed lane line, a solid edge line. */
-export const DASH_WIDE = 0.15;
-export const EDGE_WIDE = 0.2;
+const DASH_WIDE = 0.15;
+const EDGE_WIDE = 0.2;
 /** Dashes (m): a town road's and a motorway's, each its dash and the gap after it. */
 const DASH = { town: [3, 6], motorway: [6, 12] } as const;
 /** How far apart a one-way road's arrows are (m), a motorway's, and how far past a junction the first is. */
