@@ -49,6 +49,29 @@ export interface RoadLevels {
   road(road: RoadPlan, s: number): number;
   junction(j: { x: number; z: number }): number;
 }
+/** Each world's `roadHeightsOf`, once. */
+const heightsOf = new WeakMap<WorldStructure, ((points: readonly (readonly [number, number])[]) => ((s: number) => number) | null) | null>();
+
+/**
+ * The surface heights of `world`'s roads, for something drawn along one of them (step 2's outline round the road picked,
+ * `townGhosts.ts`): for the line of a road the world has (the same points), its road's surface (m) `s` m along it, on
+ * its decks too; for any other line, null. Null: the world's roads are all at 0.
+ */
+export function roadHeightsOf(world: WorldStructure): ((points: readonly (readonly [number, number])[]) => ((s: number) => number) | null) | null {
+  if (heightsOf.has(world)) return heightsOf.get(world)!;
+  const roads = world.meta?.roads ?? [];
+  const levels = roads.length ? (levelsOf(world, roads) ?? deckLevels(roads)) : null;
+  const same = (r: RoadPlan, points: readonly (readonly [number, number])[]) => r.points.length === points.length && r.points.every(([x, z], i) => Math.abs(x - points[i][0]) < 0.01 && Math.abs(z - points[i][1]) < 0.01);
+  const out = levels
+    ? (points: readonly (readonly [number, number])[]) => {
+        const road = roads.find((r) => same(r, points));
+        return road ? (s: number) => levels.road(road, s) + ROAD_Y : null;
+      }
+    : null;
+  heightsOf.set(world, out);
+  return out;
+}
+
 /** Road markings (m): a stop line's width, a crosswalk's stripes and the gaps between them, and how far in from the kerbs they keep. */
 const STOP_LINE = 0.3;
 const STRIPE = 0.5;

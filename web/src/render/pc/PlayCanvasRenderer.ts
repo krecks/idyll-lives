@@ -109,6 +109,7 @@ import { FramePacer } from '../shared/pacing';
 import { standInOf } from '../shared/modelEntry';
 import { DEFAULT_RESOLUTION, renderScale, watchPixelRatio } from '../shared/resolution';
 import { fieldLayers } from '../shared/street';
+import { roadHeightsOf } from '../shared/roads';
 import { darkTiles, windowlessRooms, type DarkTiles, type Windowless } from '../shared/windowless';
 import type { FrameState } from '../../core/bridge';
 import { Pose } from '../../core/snapshot';
@@ -3624,7 +3625,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.ghostDraw.setScale(this.townMetresPerPx());
     }
     const layer = this.lot.townLayer ?? pc.LAYERID_WORLD;
-    this.ghostDraw.set(ghosts, at ? groundOrWater(at.scape) : () => 0, layer, this.townWorld);
+    this.ghostDraw.set(ghosts, at ? groundOrWater(at.scape) : () => 0, layer, this.townWorld, at ? roadHeightsOf(at.world) : null);
     this.held?.changed();
   }
 
