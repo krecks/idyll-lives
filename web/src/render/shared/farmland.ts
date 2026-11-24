@@ -1,9 +1,11 @@
 /**
  * A world's farmland as fields: the patchwork laid out in rows of fields (`Patchwork`: each row its own fields'
  * length and shifted along, so no two rows line up), what each field grows and which way its rows run, which fields
- * are farmed (`included`: those the farmland covers, as the landscape asks), the hedges and the grass margins between
- * them; and how they look from above (`paintFields`, into the ground's colour maps: `pc/groundTiles.ts`). The
- * landscape grows the hedges' bushes and trees and the hay bales from the same fields (`nature.ts` `farmPlants`).
+ * are farmed (`included`: those the farmland covers most of, as the landscape asks), where the farmland's own edge or
+ * the dry land's cuts one (`cut`: a hedge along the farmland's, a grass margin along the dry land's), the hedges and
+ * the grass margins between them; and how they look from above (`paintFields`, into the ground's colour map:
+ * `pc/groundTiles.ts`). The landscape grows the hedges' bushes and trees and the hay bales from the same fields
+ * (`nature.ts` `farmPlants`).
  */
 
 import { hash } from '../../game/noise';
@@ -52,11 +54,15 @@ export interface Field {
   across: boolean;
 }
 
-/** A field boundary's stretch (the patchwork's frame, m), and whether a hedge grows along it. */
+/**
+ * A field boundary's stretch (the patchwork's frame, m), and whether a hedge grows along it. `contour`: a piece of the
+ * farmland's own edge through a field it cuts (a hedge, a metre or two long: `cut`), not one of the patchwork's lines.
+ */
 export interface FieldEdge {
   a: readonly [number, number];
   b: readonly [number, number];
   hedge: boolean;
+  contour?: boolean;
 }
 
 /** Where a point is in the patchwork: its field (farmed or not), how far along and across it, and how far from its nearest edge and nearest hedge (m). */
@@ -72,19 +78,46 @@ export interface FieldPoint {
 }
 
 /**
- * What decides a field is farmed, asked at points across it (a 3 × 3 grid and its middle): `'in'` the farmland,
- * `'out'` of it (the town's apron too: a field may reach a road or a lot, which its maps leave clear), or `'never'`
- * (water, a mountain past its trees: no field there whatever the rest).
+ * What decides a field is farmed, asked at points across it (a 4 × 4 grid): `'in'` the farmland, `'out'` of it (the
+ * town's apron too: a field may reach a road or a lot, which its map leaves clear; water and the world's edge, which
+ * `FieldClip` cuts it at), or `'never'` (a mountain past its trees: no field there whatever the rest).
  */
 export type FieldTest = (x: number, z: number) => 'in' | 'out' | 'never';
 
-/** At least this many of a field's nine points in the farmland for it to be farmed, its middle one of them. */
-const FARMED_FROM = 5;
+/**
+ * Where the fields stop at (x, z), as the landscape asks (`Patchwork`'s clip): metres inside the farmland's own edge
+ * (a hedge along it) and metres inside the dry land (past the beach and the world's edge: a grass margin along it),
+ * each below 0 outside.
+ */
+export type FieldClip = (x: number, z: number) => readonly [edge: number, dry: number];
+
+/**
+ * A field's points asked across it and along it (`included`), and the share of them in the farmland for it to be
+ * farmed: half of it or more (cut at the farmland's edge, its crop is all inside it).
+ */
+const SAMPLES = 4;
+const FARMED_SHARE = 0.5;
+
+/** The grid a cut field is cut along (m, at most): its map's texels are half a metre, its ground's points 2 m apart. */
+const CUT_STEP = 2;
+
+/**
+ * A field the farmland's edge or the dry land's runs through (`Patchwork.cut`), in the patchwork's frame: where its
+ * crop is, the cells of its grid inside its margin from those edges (each polygon's u, v flat, all wound the same
+ * way: their union is its crop), and the hedge along the farmland's edge through it, in pieces.
+ */
+export interface FieldCut {
+  crop: number[][];
+  hedge: [readonly [number, number], readonly [number, number]][];
+  /** Its clip as asked, hashed: the map is made again when it changes. */
+  key: number;
+}
 
 /**
  * The patchwork: rows `depth` m deep across the grid's angle, each cut into fields of its own length (1.15 to 2 times
- * the grid's size) from its own shift. Fields are farmed whole (`included`): their edges are straight lines, wherever
- * the farmland's own edge runs.
+ * the grid's size) from its own shift. A field is farmed when the farmland covers most of it (`included`); its edges
+ * are the patchwork's straight lines, but where the farmland's own edge or the dry land's runs through it, which cut
+ * it there (`clip`, `cut`).
  */
 export class Patchwork {
   readonly depth: number;
@@ -92,11 +125,14 @@ export class Patchwork {
   private readonly s: number;
   private readonly rows = new Map<number, { len: number; shift: number }>();
   private readonly farmed = new Map<number, boolean>();
+  private readonly cuts = new Map<number, FieldCut | null>();
+  private readonly kept = new Map<string, [number, number][]>();
 
   constructor(
     readonly grid: FieldGrid,
     readonly seed: number,
     private readonly test: FieldTest,
+    private readonly clip: FieldClip | null = null,
   ) {
     this.depth = grid.size * 0.8;
     this.c = Math.cos(grid.angle);
@@ -146,30 +182,122 @@ export class Patchwork {
     return cropOf(hash(col, row, this.seed + 77));
   }
 
-  /** Whether a field is farmed: the farmland under most of it and its middle, and no water or mountain top at any of its points asked. */
+  /** Whether a field is farmed: the farmland under half of it or more (`FARMED_SHARE` of its points asked), and no mountain top at any of them. */
   included(row: number, col: number): boolean {
-    const key = (row + 50_000) * 100_000 + col + 50_000;
+    const key = fieldKey(row, col);
     let known = this.farmed.get(key);
     if (known === undefined) {
       const f = this.field(row, col);
       let inside = 0;
       let never = false;
-      let middle = false;
-      for (const a of [0.12, 0.5, 0.88]) {
-        for (const b of [0.12, 0.5, 0.88]) {
-          const [x, z] = this.xz(f.u0 + f.len * a, f.v0 + f.depth * b);
-          const t = this.test(x, z);
+      for (let i = 0; i < SAMPLES && !never; i++) {
+        for (let j = 0; j < SAMPLES; j++) {
+          const t = this.test(...this.xz(f.u0 + (f.len * (i + 0.5)) / SAMPLES, f.v0 + (f.depth * (j + 0.5)) / SAMPLES));
           if (t === 'never') never = true;
-          else if (t === 'in') {
-            inside++;
-            if (a === 0.5 && b === 0.5) middle = true;
-          }
+          else if (t === 'in') inside++;
         }
       }
-      known = !never && middle && inside >= FARMED_FROM;
+      known = !never && inside >= FARMED_SHARE * SAMPLES * SAMPLES;
       this.farmed.set(key, known);
     }
     return known;
+  }
+
+  /**
+   * Where the farmland's edge or the dry land's cuts a field (`FieldCut`), asked on a grid of at most `CUT_STEP` m
+   * over it; null where neither comes within its margin (its crop the whole of it inside that), as every field without
+   * a clip.
+   */
+  cut(f: Field): FieldCut | null {
+    const clip = this.clip;
+    if (!clip) return null;
+    const key = fieldKey(f.row, f.col);
+    const known = this.cuts.get(key);
+    if (known !== undefined) return known;
+    const nu = Math.ceil(f.len / CUT_STEP);
+    const nv = Math.ceil(f.depth / CUT_STEP);
+    const [su, sv] = [f.len / nu, f.depth / nv];
+    const edge = new Float32Array((nu + 1) * (nv + 1));
+    const dry = new Float32Array(edge.length);
+    let whole = true;
+    let h = 0x811c9dc5;
+    for (let j = 0; j <= nv; j++) {
+      for (let i = 0; i <= nu; i++) {
+        const k = j * (nu + 1) + i;
+        [edge[k], dry[k]] = clip(...this.xz(f.u0 + i * su, f.v0 + j * sv));
+        if (Math.min(edge[k], dry[k]) < MARGIN) whole = false;
+        h = Math.imul(Math.imul(h ^ Math.round(edge[k] * 4), 16_777_619) ^ Math.round(dry[k] * 4), 16_777_619);
+      }
+    }
+    let cut: FieldCut | null = null;
+    if (!whole) {
+      cut = { crop: [], hedge: [], key: h >>> 0 };
+      const at = (i: number, j: number) => j * (nu + 1) + i;
+      for (let j = 0; j < nv; j++) {
+        for (let i = 0; i < nu; i++) {
+          // (The cell's corners in turn round it: its u, v and the node's index.)
+          const corners = [at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)];
+          const u = [i, i + 1, i + 1, i].map((n) => f.u0 + n * su);
+          const v = [j, j, j + 1, j + 1].map((n) => f.v0 + n * sv);
+          const crop = cellInside(u, v, corners.map((c) => Math.min(edge[c], dry[c]) - MARGIN));
+          if (crop) cut.crop.push(crop);
+          // (The hedge along the farmland's own edge, not along the dry land's: where the cell is dry; and not beside one
+          // of the field's own hedges, a second one along it.)
+          if (corners.reduce((sum, c) => sum + dry[c], 0) / 4 > 0.5) {
+            for (const piece of cellEdges(u, v, corners.map((c) => edge[c]))) if (!this.besideHedge(f, (piece[0][0] + piece[1][0]) / 2, (piece[0][1] + piece[1][1]) / 2)) cut.hedge.push(piece);
+          }
+        }
+      }
+    }
+    this.cuts.set(key, cut);
+    return cut;
+  }
+
+  /** Whether (u, v) in field `f` is within a hedge's width of one of its sides that has a hedge, and the hedge runs there (`reaches`). */
+  private besideHedge(f: Field, u: number, v: number): boolean {
+    const [lu, lv] = [u - f.u0, v - f.v0];
+    const near = HEDGE_WIDTH;
+    if (lu < near && this.hedgeBefore(f.row, f.col) && this.reaches(f.u0, v)) return true;
+    if (f.len - lu < near && this.hedgeBefore(f.row, f.col + 1) && this.reaches(f.u0 + f.len, v)) return true;
+    if (lv < near && this.hedgeUnder(f.row, this.colAt(f.row - 1, u), f.col) && this.reaches(u, f.v0)) return true;
+    return f.depth - lv < near && this.hedgeUnder(f.row + 1, f.col, this.colAt(f.row + 1, u)) && this.reaches(u, f.v0 + f.depth);
+  }
+
+  /** `cut` of field (row, col), the `Field` made only the first time. */
+  private cutOf(row: number, col: number): FieldCut | null {
+    const known = this.cuts.get(fieldKey(row, col));
+    return known !== undefined ? known : this.cut(this.field(row, col));
+  }
+
+  /** Whether the clip lets a field's boundary run on at (u, v): up to a metre past the farmland's edge (its hedge meets the one along that), short of the dry land's by half the margin. */
+  private reaches(u: number, v: number): boolean {
+    if (!this.clip) return true;
+    const [e, d] = this.clip(...this.xz(u, v));
+    return e > -1 && d > MARGIN / 2;
+  }
+
+  /** The pieces of a straight boundary from `a` to `b` (the patchwork's frame) the clip lets run (`reaches`), asked every metre or so along it. */
+  private along(a: readonly [number, number], b: readonly [number, number]): [readonly [number, number], readonly [number, number]][] {
+    if (!this.clip) return [[a, b]];
+    const id = `${a[0]},${a[1]},${b[0]},${b[1]}`;
+    let runs = this.kept.get(id);
+    if (!runs) {
+      runs = [];
+      const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1])));
+      let from = -1;
+      for (let k = 0; k <= n; k++) {
+        const ok = this.reaches(a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n);
+        if (ok && from < 0) from = k;
+        if ((!ok || k === n) && from >= 0) {
+          const to = ok ? k : k - 1;
+          if (to > from) runs.push([from / n, to / n]);
+          from = -1;
+        }
+      }
+      this.kept.set(id, runs);
+    }
+    const p = (t: number) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t] as const;
+    return runs.map(([t0, t1]) => [p(t0), p(t1)]);
   }
 
   /** The hedge along the start of field (row, col), between it and the one before it in its row. */
@@ -186,7 +314,11 @@ export class Patchwork {
     return hash(below * 31 + above, row, this.seed + 401) < (a && b ? 0.45 : 0.85);
   }
 
-  /** Where (x, z) is in the patchwork (its field, farmed or not, and how far from its edges and hedges). */
+  /**
+   * Where (x, z) is in the patchwork (its field, farmed or not, and how far from its edges and hedges): farmed only
+   * inside the clip, its edge the nearer of its field's and the clip's, the hedge along the farmland's edge through
+   * its field one of its hedges.
+   */
   at(x: number, z: number): FieldPoint {
     const [u, v] = this.uv(x, z);
     const row = Math.floor(v / this.depth);
@@ -194,13 +326,22 @@ export class Patchwork {
     const { len, shift } = this.row(row);
     const col = Math.floor((u - shift) / len);
     const [lu, lv] = [u - shift - col * len, v - row * this.depth];
-    const edge = Math.min(lu, len - lu, lv, this.depth - lv);
+    let edge = Math.min(lu, len - lu, lv, this.depth - lv);
+    let farmed = this.included(row, col);
     let hedge = Infinity;
-    if (this.hedgeBefore(row, col)) hedge = Math.min(hedge, lu);
-    if (this.hedgeBefore(row, col + 1)) hedge = Math.min(hedge, len - lu);
-    if (this.hedgeUnder(row, this.colAt(row - 1, u), col)) hedge = Math.min(hedge, lv);
-    if (this.hedgeUnder(row + 1, col, this.colAt(row + 1, u))) hedge = Math.min(hedge, this.depth - lv);
-    return { row, col, farmed: this.included(row, col), crop: this.crop(row, col), edge, hedge };
+    const [e, d] = this.clip ? this.clip(x, z) : [Infinity, Infinity];
+    if (e > -1 && d > MARGIN / 2) {
+      if (this.hedgeBefore(row, col)) hedge = Math.min(hedge, lu);
+      if (this.hedgeBefore(row, col + 1)) hedge = Math.min(hedge, len - lu);
+      if (this.hedgeUnder(row, this.colAt(row - 1, u), col)) hedge = Math.min(hedge, lv);
+      if (this.hedgeUnder(row + 1, col, this.colAt(row + 1, u))) hedge = Math.min(hedge, this.depth - lv);
+    }
+    if (farmed && this.clip) {
+      edge = Math.min(edge, e, d);
+      if (this.cutOf(row, col)?.hedge.length && d > 0.5) hedge = Math.min(hedge, Math.abs(e));
+      farmed = Math.min(e, d) > 0;
+    }
+    return { row, col, farmed, crop: this.crop(row, col), edge, hedge };
   }
 
   /** The patchwork's frame's box round a world box (x0, z0, x1, z1). */
@@ -221,7 +362,8 @@ export class Patchwork {
 
   /**
    * The edges of the farmed fields reaching into a world box: each field's start in its row, and each row's near
-   * edge in stretches between the fields either side of it (the rows' fields don't line up), with their hedges.
+   * edge in stretches between the fields either side of it (the rows' fields don't line up), with their hedges, as far
+   * as the clip lets them run (`along`); and the farmland's own edge through the fields it cuts (`contour`).
    */
   edges(box: readonly [number, number, number, number]): FieldEdge[] {
     const [u0, v0, u1, v1] = this.uvBox(box);
@@ -233,7 +375,8 @@ export class Patchwork {
         for (let col = this.colAt(row, u0); col <= this.colAt(row, u1) + 1; col++) {
           if (!this.included(row, col - 1) && !this.included(row, col)) continue;
           const u = this.field(row, col).u0;
-          out.push({ a: [u, v], b: [u, v + this.depth], hedge: this.hedgeBefore(row, col) });
+          const hedge = this.hedgeBefore(row, col);
+          for (const [a, b] of this.along([u, v], [u, v + this.depth])) out.push({ a, b, hedge });
         }
       }
       // (The row's near edge, cut wherever a field of either row starts: the same stretches whatever the box.)
@@ -246,13 +389,16 @@ export class Patchwork {
         const mid = (at[k] + at[k + 1]) / 2;
         const [below, above] = [this.colAt(row - 1, mid), this.colAt(row, mid)];
         if (!this.included(row - 1, below) && !this.included(row, above)) continue;
-        out.push({ a: [at[k], v], b: [at[k + 1], v], hedge: this.hedgeUnder(row, below, above) });
+        const hedge = this.hedgeUnder(row, below, above);
+        for (const [a, b] of this.along([at[k], v], [at[k + 1], v])) out.push({ a, b, hedge });
       }
     }
+    // (The farmland's own edge through the fields it cuts.)
+    for (const f of this.fields(box)) for (const [a, b] of this.cut(f)?.hedge ?? []) out.push({ a, b, hedge: true, contour: true });
     return out;
   }
 
-  /** The hay bales of a stubble field (the patchwork's frame, m; and each one's turn along its rows): in rows, a few missing. */
+  /** The hay bales of a stubble field (the patchwork's frame, m; and each one's turn along its rows): in rows, a few missing, none past its crop's edge where the clip cuts it. */
   bales(f: Field): [number, number, number][] {
     const out: [number, number, number][] = [];
     const inset = MARGIN + 3;
@@ -264,11 +410,53 @@ export class Patchwork {
         const a = inset + k * BALE_STEP + (h - 0.5) * 3;
         const b = inset + r * BALE_ROWS + (hash(k, r, this.seed + f.col + 509) - 0.5) * 2;
         const [lu, lv] = f.across ? [b, a] : [a, b];
+        if (this.clip && Math.min(...this.clip(...this.xz(f.u0 + lu, f.v0 + lv))) < inset) continue;
         out.push([f.u0 + lu, f.v0 + lv, (f.across ? Math.PI / 2 : 0) + (h - 0.5) * 0.6]);
       }
     }
     return out;
   }
+}
+
+/** A field's key among the patchwork's (its row and its place in it). */
+function fieldKey(row: number, col: number): number {
+  return (row + 50_000) * 100_000 + col + 50_000;
+}
+
+/**
+ * The part of a cell at or above 0 (`w` at its corners `u`, `v` in turn round it; between them as a straight line
+ * across each side): a polygon (u, v flat) wound as its corners are, or null with none of it. Two corners across
+ * from each other alone above 0: one polygon joining them.
+ */
+function cellInside(u: readonly number[], v: readonly number[], w: readonly number[]): number[] | null {
+  const out: number[] = [];
+  for (let k = 0; k < 4; k++) {
+    const n = (k + 1) % 4;
+    if (w[k] >= 0) out.push(u[k], v[k]);
+    if (w[k] >= 0 !== w[n] >= 0) {
+      const t = w[k] / (w[k] - w[n]);
+      out.push(u[k] + (u[n] - u[k]) * t, v[k] + (v[n] - v[k]) * t);
+    }
+  }
+  return out.length >= 6 ? out : null;
+}
+
+/** Where the line `w` = 0 runs across a cell (as `cellInside` has it): its pieces, none or one or two. */
+function cellEdges(u: readonly number[], v: readonly number[], w: readonly number[]): [readonly [number, number], readonly [number, number]][] {
+  const start = w.findIndex((x) => x >= 0);
+  if (start < 0) return [];
+  const cross: (readonly [number, number])[] = [];
+  for (let s = 0; s < 4; s++) {
+    const k = (start + s) % 4;
+    const n = (k + 1) % 4;
+    if (w[k] >= 0 !== w[n] >= 0) {
+      const t = w[k] / (w[k] - w[n]);
+      cross.push([u[k] + (u[n] - u[k]) * t, v[k] + (v[n] - v[k]) * t]);
+    }
+  }
+  const out: [readonly [number, number], readonly [number, number]][] = [];
+  for (let k = 0; k + 1 < cross.length; k += 2) out.push([cross[k], cross[k + 1]]);
+  return out;
 }
 
 /** The crop for a hash 0..1, by `CROPS`' shares. */
@@ -320,8 +508,9 @@ export type FieldCanvas = Pick<
 
 /**
  * The farmed fields reaching into a world box onto `g` (its transform the world's metres; the patchwork's turn is
- * added here): each field's crop inside its grass margin, its rows, tramlines and broad patches, then the hedges
- * along the edges that have them. The margins and pasture are left clear: the land's lawn shows there.
+ * added here): each field's crop inside its grass margin (from the farmland's edge and the dry land's too, where they
+ * cut it), its rows, tramlines and broad patches, then the hedges along the edges that have them. The margins and
+ * pasture are left clear: the land's lawn shows there.
  */
 export function paintFields(g: FieldCanvas, pw: Patchwork, box: readonly [number, number, number, number]): void {
   g.save();
@@ -335,6 +524,20 @@ export function paintFields(g: FieldCanvas, pw: Patchwork, box: readonly [number
     g.beginPath();
     g.rect(x0, z0, w, d);
     g.clip();
+    // (Where the farmland's edge or the dry land's cuts it: its crop inside its margin from them.)
+    const cut = pw.cut(f);
+    if (cut) {
+      if (!cut.crop.length) {
+        g.restore();
+        continue;
+      }
+      g.beginPath();
+      for (const p of cut.crop) {
+        g.moveTo(p[0], p[1]);
+        for (let k = 2; k < p.length; k += 2) g.lineTo(p[k], p[k + 1]);
+      }
+      g.clip();
+    }
     g.fillStyle = look.base;
     g.fillRect(x0, z0, w, d);
     // Broad patches, a little riper or thinner: a few soft blots.

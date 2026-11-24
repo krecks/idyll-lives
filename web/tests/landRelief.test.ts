@@ -60,9 +60,10 @@ describe('a world without relief draws as it did', () => {
   // (Taken on the code before relief: `ground`, `terrainColour`, `woods` and `lawns` unchanged for such worlds. Taken
   // again when the zones past the edge were mirrored rather than carried straight out: the same inside the world. Taken
   // again when the farmland became whole fields in hedges: its colours, no woods on it, its hedges' bushes and trees,
-  // and hay bales on the stubble.)
+  // and hay bales on the stubble. Taken again when the fields were cut at the farmland's edge and the dry land's, farmed
+  // from half in, and no crop's colour on what is built or a road's verge: the country's colours and woods.)
   const GOLDEN = {
-    country: {"heights":"cc4631e9","colours":"122b4e4","woods":{"far:model.bush":"1311:bad2e84b","far:model.bush.small":"542:9086949e","far:model.farm.hayBale":"13:2a5f984a","far:model.pine":"491:88290570","far:model.rock":"679:6f860a79","far:model.spruce":"343:a5ab8f02","far:model.tree":"3120:58b5a013","far:model.tree.birch":"281:1839acf0","far:model.tree.fruit":"28:afaa0365","far:model.tree.maple":"1725:bb6d8737"},"lawns":"4b71cdc7"},
+    country: {"heights":"cc4631e9","colours":"6f62ea28","woods":{"far:model.bush":"1201:71e33ff6","far:model.bush.small":"487:52bbe0d0","far:model.farm.hayBale":"7:205a2dea","far:model.pine":"488:68c582b7","far:model.rock":"656:10660c70","far:model.spruce":"335:f54922f5","far:model.tree":"3171:3020b443","far:model.tree.birch":"261:209f8e7e","far:model.tree.fruit":"28:4c72c889","far:model.tree.maple":"1736:8d54ba9b"},"lawns":"4b71cdc7"},
     mountain: {"heights":"99aa25fc","colours":"63b95b90","woods":{"far:model.bush":"359:63a80636","far:model.bush.small":"200:d758ce5a","far:model.pine":"1045:6a45873b","far:model.rock":"271:28fb031c","far:model.spruce":"629:f7a4db69","far:model.tree":"399:353b5678","far:model.tree.birch":"36:d9a2a06e","far:model.tree.fruit":"28:220213d6","far:model.tree.maple":"214:8aa06b91"}},
     classic: {"heights":"f391c28a","colours":"8c5a0ae9","woods":{"near:model.bush":"2:c5faa332","near:model.bush.small":"5:6bb28f64","near:model.spruce":"1:b1c81838","near:model.tree":"11:ae55fa60","near:model.tree.birch":"3:5440220c","near:model.tree.maple":"8:e7c6ae","far:model.bush":"205:852147cf","far:model.bush.small":"105:f84ed439","far:model.pine":"251:e78b8c23","far:model.rock":"155:2ae41767","far:model.spruce":"153:89be27b5","far:model.tree":"560:e6daf014","far:model.tree.birch":"54:461e762d","far:model.tree.maple":"313:d3e19b5e"}},
   };

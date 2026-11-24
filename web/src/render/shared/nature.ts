@@ -21,7 +21,7 @@ import { fbm, hash, mulberry32, ridged, smoothstep, valueNoise } from '../../gam
 import { tuned } from '../tune';
 import { ZONE_CELL, ZoneField, type ZoneKind } from './zones';
 import { townPaving } from './townPaving';
-import { CROP_LOOK, cropColour, HEDGE_LOOK, HEDGE_STEP, HEDGE_TREE_EVERY, HEDGE_WIDTH, MARGIN, paintFields, Patchwork, type Crop, type FieldCanvas, type FieldPoint } from './farmland';
+import { CROP_LOOK, cropColour, HEDGE_LOOK, HEDGE_STEP, HEDGE_TREE_EVERY, HEDGE_WIDTH, MARGIN, paintFields, Patchwork, type Crop, type FieldCanvas, type FieldClip, type FieldPoint } from './farmland';
 
 /**
  * How far the landscape extends beyond the town (metres): towns of older code, and worlds (which
@@ -190,6 +190,12 @@ const EDGE_MOUNTAINS: [number, number] = [10, 150];
 const TUFT_DRAWS = 4;
 /** No lawn this close to a road's edge (m): the grass's blades lean, and would reach over it. */
 const LAWN_CLEAR = 0.6;
+/**
+ * How far past what the town builds (`distanceToTown`: its lots, its roads with a verge) the ground's own colour
+ * begins a field's crop or a hedge's shade (m, fading in over 2 more), and past a country road's edge (1 m more): the
+ * farmland's map leaves those clear (`pc/groundTiles.ts` `paintFarmland`), and the crop would show there flat.
+ */
+const FIELD_CLEAR = 0.5;
 /** Height of the sea or a lake (m); the shore is where the land meets it. */
 export const WATER_Y = -0.35;
 /**
@@ -1561,13 +1567,15 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     // field: the ground's points are 2 m apart, and a crop's colour between them would run out over its grass margin.
     const field = this.fieldPoint(x, z);
     if (field) {
+      // (None on what is built, a road and its verge, as the map leaves them clear: `FIELD_CLEAR`.)
+      const clear = smoothstep(FIELD_CLEAR, FIELD_CLEAR + 2, this.distanceToTown(x, z)) * (road ? smoothstep(road.width / 2 + FIELD_CLEAR + 1, road.width / 2 + FIELD_CLEAR + 3, road.dist) : 1);
       const crop = field.farmed ? P.crops[field.crop] : undefined;
       if (crop) {
-        lerp(out, crop, smoothstep(MARGIN + 2, MARGIN + 4, field.edge) * 0.95, out);
-        lawn *= 1 - smoothstep(MARGIN - 0.5, MARGIN + 0.5, field.edge);
+        lerp(out, crop, smoothstep(MARGIN + 2, MARGIN + 4, field.edge) * 0.95 * clear, out);
+        lawn *= 1 - smoothstep(MARGIN - 0.5, MARGIN + 0.5, field.edge) * clear;
       }
       // No lawn in a hedge, its ground the hedge's shade.
-      const hedge = 1 - smoothstep(HEDGE_WIDTH / 2, HEDGE_WIDTH / 2 + 2, field.hedge);
+      const hedge = (1 - smoothstep(HEDGE_WIDTH / 2, HEDGE_WIDTH / 2 + 2, field.hedge)) * clear;
       lerp(out, P.hedge, hedge * 0.5, out);
       lawn *= 1 - hedge;
     }
@@ -1619,18 +1627,27 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     // (A big world's fields are its field zones: the patchwork in them only, wherever they are.)
     const grid = zones ? (zones.has('fields') ? (this.land.fields ?? { size: 34, angle: hash(3, 5, this.seed) * Math.PI }) : null) : this.land.fields;
     if (grid) {
-      const wet = (x: number, z: number) => this.watered && this.waterEdge(x, z) > -this.beach;
       const top = this.peaks;
-      pw = new Patchwork(grid, this.seed, (x, z) => {
-        // (Fields inside the world only: past its edge the land is the landscape's, drawn without the fields' map.)
-        if (wet(x, z) || (zones && (x < 0 || z < 0 || x > this.w || z > this.d))) return 'never';
-        // (No fields up a mountain past its trees.)
-        if (top && this.heightAt(x, z) > this.treeTop) return 'never';
-        const dist = this.distanceToTown(x, z);
-        if (dist < APRON + 3) return 'out';
-        if (zones) return zones.edge('fields', x, z) > 0 ? 'in' : 'out';
-        return dist < this.ring * 0.72 ? 'in' : 'out';
-      });
+      // Where the fields stop: the farmland's own edge (a big world's field zones), and the dry land's: the beach, and
+      // the world's edge (past it the land is the landscape's, drawn without the fields' map).
+      const clip: FieldClip = (x, z) => {
+        let dry = this.watered ? -this.waterEdge(x, z) - this.beach : Infinity;
+        if (zones) dry = Math.min(dry, x, z, this.w - x, this.d - z);
+        return [zones ? zones.edge('fields', x, z) : Infinity, dry];
+      };
+      pw = new Patchwork(
+        grid,
+        this.seed,
+        (x, z) => {
+          // (No fields up a mountain past its trees.)
+          if (top && this.heightAt(x, z) > this.treeTop) return 'never';
+          const [edge, dry] = clip(x, z);
+          if (dry <= 0 || this.distanceToTown(x, z) < APRON + 3) return 'out';
+          if (zones) return edge > 0 ? 'in' : 'out';
+          return this.distanceToTown(x, z) < this.ring * 0.72 ? 'in' : 'out';
+        },
+        clip,
+      );
     }
     this.fieldsMade = { landVersion: this.landVersion, zones, built: this.built, pw };
     return pw;
@@ -1658,10 +1675,11 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     // (A field farmed reaches past the zones' edge by up to half of it.)
     const pad = pw.grid.size * 1.2;
     const reach: [number, number, number, number] = [box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad];
-    // (Which fields are farmed, as a hash: a stroke that farms none more or fewer leaves the maps as they were.)
+    // (Which fields are farmed and where the farmland's edges cut them, as a hash: a stroke that changes neither leaves
+    // the map as it was.)
     const fields = pw.fields(reach);
     let h = 0x811c9dc5;
-    for (const f of fields) h = Math.imul(Math.imul(h ^ f.row, 16_777_619) ^ f.col, 16_777_619);
+    for (const f of fields) h = Math.imul(Math.imul(Math.imul(h ^ f.row, 16_777_619) ^ f.col, 16_777_619) ^ (pw.cut(f)?.key ?? 0), 16_777_619);
     return { box: reach, key: `${fields.length}:${h >>> 0}`, paint: (g) => paintFields(g, pw, reach) };
   }
 
@@ -1685,6 +1703,19 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     for (const e of pw.edges(box)) {
       if (!e.hedge) continue;
       const len = Math.hypot(e.b[0] - e.a[0], e.b[1] - e.a[1]);
+      if (e.contour) {
+        // The farmland's own edge, a metre or two at a time: a bush for each `HEDGE_STEP` of it on average, a tree in
+        // it as often as along a straight one.
+        const key = Math.round(e.a[0] * 4) * 7919 + Math.round(e.a[1] * 4);
+        const h = hash(key, Math.round(e.b[0] * 4) + Math.round(e.b[1] * 4) * 131, this.seed + 721);
+        if (h * HEDGE_STEP >= len) continue;
+        const [x, z] = pw.xz((e.a[0] + e.b[0]) / 2, (e.a[1] + e.b[1]) / 2);
+        if (!inBox(x, z) || !clear(x, z)) continue;
+        const s = 1.55 + 0.5 * hash(key, 3, this.seed + 715);
+        if (hash(key, 5, this.seed + 709) < (0.55 * HEDGE_STEP) / HEDGE_TREE_EVERY) put(h < 0.25 ? 'model.tree.maple' : 'model.tree', x, z, 0.85 + 0.4 * h, 0.9 + 0.3 * h, h * Math.PI * 2);
+        else put(h < 0.9 ? 'model.bush' : 'model.bush.small', x, z, s, s * (0.8 + 0.25 * h), h * Math.PI * 2);
+        continue;
+      }
       const n = Math.max(1, Math.round(len / HEDGE_STEP));
       const key = Math.round(e.a[0] * 2) * 7919 + Math.round(e.b[0] * 2);
       const lane = Math.round(e.a[1] * 2) + Math.round(e.b[1] * 2) * 131;

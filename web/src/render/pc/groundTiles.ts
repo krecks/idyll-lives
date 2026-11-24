@@ -73,12 +73,10 @@ const MAP = {
   concrete: '#AFACA4',
 } as const;
 
-/** What the maps ask of the land: a big world's farmland, its box and how to paint it (`LandscapeLayout.farmland`). */
+/** What the farmland's map asks of the land: a big world's farmland, its box and how to paint it (`LandscapeLayout.farmland`). */
 export interface TownGroundLand {
-  /** `key`: which of its fields are farmed, as a hash (the near ground's map is made again only when it changes). */
+  /** `key`: which of its fields are farmed and where its edges cut them, as a hash (the map is made again only when it changes). */
   farmland(): { box: [number, number, number, number]; key: string; paint(g: FieldCanvas): void } | null;
-  /** Counts the changes of a land drawn from a height field (its cover moves the farmland): the map is made again for a new one. */
-  readonly landVersion?: number;
 }
 
 /**
@@ -186,8 +184,8 @@ const FIELD_VERGE = 2.5;
 const FIELD_LOT = 1;
 
 /**
- * A big world's farmland onto a map (`g` in world metres), under whatever is drawn after it: its fields
- * (`LandscapeLayout.farmland`), then none of them on the roads and their verges or on the lots.
+ * A big world's farmland onto a map (`g` in world metres): its fields (`LandscapeLayout.farmland`), then none of them
+ * on the roads and their verges, on the lots (their gardens stay theirs) or on the greens.
  */
 function paintFarmland(g: OffscreenCanvasRenderingContext2D, farmland: NonNullable<ReturnType<TownGroundLand['farmland']>>, world: WorldStructure): void {
   g.save();
@@ -198,6 +196,11 @@ function paintFarmland(g: OffscreenCanvasRenderingContext2D, farmland: NonNullab
   g.lineCap = 'round';
   g.lineJoin = 'round';
   for (const p of world.plots) g.fillRect(p.x - FIELD_LOT, p.z - FIELD_LOT, p.w + 2 * FIELD_LOT, p.d + 2 * FIELD_LOT);
+  for (const green of world.meta?.greens ?? []) {
+    g.beginPath();
+    green.forEach(([x, z], i) => (i ? g.lineTo(x, z) : g.moveTo(x, z)));
+    g.fill();
+  }
   for (const r of world.meta?.roads ?? []) {
     g.lineWidth = r.width + 2 * FIELD_VERGE;
     g.beginPath();
@@ -238,11 +241,11 @@ export function fieldGround(device: pc.GraphicsDevice, material: pc.StandardMate
 }
 
 /**
- * A big world's farmland as the near ground draws it: a colour map over the box its fields reach (`MAP_PER_M` texels
+ * A big world's farmland as the ground draws it: a colour map over the box its fields reach (`MAP_PER_M` texels
  * a metre, at most `MAP_MAX` a side), each field's crop in its rows inside its grass margin and its hedges
- * (`farmland.ts` `paintFields`), none on the roads, their verges or the lots; laid over the ground tiles' colour
- * (`shaders/fieldGround.ts`) but in the town view, whose own map has them (`TownGroundMap`). Made again for another
- * town or when other fields are farmed (`bake`: not for every stroke of the brushes).
+ * (`farmland.ts` `paintFields`), none on the roads, their verges, the lots or the greens; laid over the ground tiles'
+ * colour (`shaders/fieldGround.ts`), near and in the town view alike (its map, `TownGroundMap`, over it). Made again
+ * for another town or when other fields are farmed or cut (`bake`: not for every stroke of the brushes).
  */
 export class FieldMap {
   private texture: pc.Texture | null = null;
@@ -295,10 +298,10 @@ export class FieldMap {
 /**
  * The ground's colour map at altitude: what the town lays on its land (streets and pavements, the junctions'
  * pads, an avenue's green median, a motorway's barrier, its overpasses over what they cross, its paving as the street lays it near (`townPaving`: the centre, courts and yards, car parks and their
- * bays), its farm fields and paths, a big world's farmland as its ground
- * has it) over the whole world in one texture, baked once per town (`bake`; again only for another town), and laid over the ground tiles' colour by the town
+ * bays), its farm fields and paths) over the whole world in one texture, baked once per town (`bake`; again only for another town), and laid over the ground tiles' colour by the town
  * view's blend (`shaders/townGround.ts`). The tiles' material takes its define only while the blend is over 0
- * (`apply`): up to `TOWN_FROM` the ground draws with the shader it always had.
+ * (`apply`): up to `TOWN_FROM` the ground draws with the shader it always had. Not a big world's farmland: its own
+ * map (`FieldMap`) draws it under this one at every distance, so it doesn't fade out and in again with the blend.
  */
 export class TownGroundMap {
   private texture: pc.Texture | null = null;
@@ -310,15 +313,12 @@ export class TownGroundMap {
 
   constructor(private readonly device: pc.GraphicsDevice) {}
 
-  /**
-   * Bakes the map for `world` (nothing again for the same town; nothing without a 2D canvas: the tests' engine).
-   * `land`: the landscape, for a big world's farmland.
-   */
-  bake(world: WorldStructure, land: TownGroundLand | null = null): void {
+  /** Bakes the map for `world` (nothing again for the same town; nothing without a 2D canvas: the tests' engine). */
+  bake(world: WorldStructure): void {
     const meta = world.meta;
     const W = world.width;
     const D = groundDepth(world);
-    const key = `${meta?.seed ?? 0}|${W}x${D}|${groundVersion(world)}|${land ? 1 : 0}|${land?.landVersion ?? 0}`;
+    const key = `${meta?.seed ?? 0}|${W}x${D}|${groundVersion(world)}`;
     if (key === this.key || typeof OffscreenCanvas === 'undefined' || !meta) return;
     this.key = key;
     this.version++;
@@ -328,28 +328,11 @@ export class TownGroundMap {
     const canvas = new OffscreenCanvas(size, size);
     const g = canvas.getContext('2d', { willReadFrequently: true })!;
     g.setTransform(sx, 0, 0, sz, 0, 0);
-    // A big world's farmland first, under everything: its fields, as the near ground has them (`FieldMap`).
-    const farmland = land?.farmland();
-    if (farmland) paintFarmland(g, farmland, world);
     g.lineCap = 'round';
     g.lineJoin = 'round';
-    const poly = (p: readonly (readonly [number, number])[]) => {
-      g.beginPath();
-      p.forEach(([x, z], i) => (i ? g.lineTo(x, z) : g.moveTo(x, z)));
-      g.closePath();
-    };
     const roads = meta.roads ?? [];
     // (No water: the water's sheet over the ground draws it, inside the world as past its edge. Painted here, a sea
     // reaching past the edge stepped from one blue to another along it.)
-    // None of the farmland on the lots (their gardens stay theirs) or the greens.
-    g.globalCompositeOperation = 'destination-out';
-    g.fillStyle = '#000';
-    for (const p of world.plots) g.fillRect(p.x, p.z, p.w, p.d);
-    for (const green of meta.greens ?? []) {
-      poly(green);
-      g.fill();
-    }
-    g.globalCompositeOperation = 'source-over';
     // The town's paving (`townPaving`: the centre's stone in courses, the courts and yards, the car parks and their
     // bays), as the street lays it near.
     paintPaving(g, townPaving(world), W, D);
