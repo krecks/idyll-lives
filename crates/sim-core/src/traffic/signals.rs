@@ -388,12 +388,11 @@ fn box_edges(arms: &[ArmAt]) -> Vec<(f32, f32)> {
 /// straighter on than the street's own way, took the street's arm's place in its phase, and the
 /// street's two arms were never green together). Each arm the phase it's in, numbered round in
 /// order (on a roundabout, an arm each), and how many; an arm whose cars only leave by it (a
-/// one-way road, a ramp going away) none (`NO_PHASE`), and no partner.
-fn phases_of(g: &Graph, arms: &[ArmAt], roundabout: bool) -> (Vec<u8>, u8) {
+/// one-way road, a ramp going away) none (`NO_PHASE` once it's a `SignalArm`), and no partner.
+fn phases_of(g: &Graph, arms: &[ArmAt], roundabout: bool) -> (Vec<Option<u8>>, u8) {
     let dot = |a: [f32; 2], b: [f32; 2]| a[0] * b[0] + a[1] * b[1];
     let n = arms.len();
-    // (An arm whose cars only leave by it, a one-way road or a ramp going away: no phase,
-    // `NO_PHASE`.)
+    // (An arm whose cars only leave by it, a one-way road or a ramp going away: no phase.)
     let inbound = |i: usize| {
         let (road, _, k, ..) = arms[i].2;
         g.roads[road as usize].oneway.may_go(k < 0.0)
@@ -428,15 +427,15 @@ fn phases_of(g: &Graph, arms: &[ArmAt], roundabout: bool) -> (Vec<u8>, u8) {
             }
         }
     }
-    let mut phase = vec![u8::MAX; n];
+    let mut phase: Vec<Option<u8>> = vec![None; n];
     let mut phases = 0u8;
     for i in 0..n {
-        if phase[i] != u8::MAX || !inbound(i) {
+        if phase[i].is_some() || !inbound(i) {
             continue;
         }
-        phase[i] = phases;
+        phase[i] = Some(phases);
         if let Some(j) = partner[i] {
-            phase[j] = phases;
+            phase[j] = Some(phases);
         }
         phases += 1;
     }
@@ -444,16 +443,11 @@ fn phases_of(g: &Graph, arms: &[ArmAt], roundabout: bool) -> (Vec<u8>, u8) {
 }
 
 /// Whether `p` is on a road's carriageway in `g` (within its kerb of its middle line and `margin`
-/// more), not the motorway's (a pole may stand under its deck): no signal pole stands there
-/// (`signal_at`).
+/// more), not the motorway's (a pole may stand under its deck: `Graph::carriageways_near`): no
+/// signal pole stands there (`signal_at`).
 fn on_carriageway(g: &Graph, p: [f32; 2], margin: f32) -> bool {
-    g.near(p, POLE_LOOK, 6, crate::travel::Mode::Car)
-        .iter()
-        .any(|rp| {
-            let r = &g.roads[rp.road as usize];
-            r.kind != crate::travel::RoadKind::Motorway
-                && rp.off < crate::cars::kerb_of(r.width, r.kind) + margin
-        })
+    g.carriageways_near(p, POLE_LOOK, 6)
+        .any(|(off, kerb)| off < kerb + margin)
 }
 
 /// Whether a road of `ring` (per road of a graph: a roundabout's) is among `arms`'.
@@ -545,7 +539,7 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
         (0..phases)
             .map(|k| {
                 let score: u32 = (0..arms.len())
-                    .filter(|&i| phase[i] == k)
+                    .filter(|&i| phase[i] == Some(k))
                     .map(|i| if main(&arms[i]) { 2 } else { 1 })
                     .sum();
                 (score, k)
@@ -709,7 +703,7 @@ pub(crate) fn signal_at(g: &Graph, n: usize, ring: &[bool]) -> Option<Signal> {
                 way,
                 pole,
                 yaw: out[0].atan2(out[1]),
-                phase: phase[i],
+                phase: phase[i].unwrap_or(NO_PHASE),
                 road,
                 kerb,
                 walk_from,

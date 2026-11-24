@@ -47,6 +47,15 @@ pub struct Graph {
     /// land or on a bridge over the water (m along it, from and to; `RoadPlan.raised`,
     /// `RoadPlan.bridge`, `RoadPlan.bridges`). Empty for every other road.
     pub(crate) decks: Vec<Vec<[f32; 2]>>,
+    /// Its junctions' middles (`junctions`), worked out once with it, and their nearest
+    /// (`junction_near`).
+    junctions: Vec<[f32; 2]>,
+    junction_index: NearestPoint,
+    /// Whether any node is a motorway's merge (`merge_nodes`).
+    merges: bool,
+    /// Whether any road is one-way (`OneWay`): else a way by car from one place to another is
+    /// one back too (`has_oneway`).
+    oneway: bool,
 }
 
 /// Which level of the roads something is on (`Graph::layer_at`): the ground (every road, those on
@@ -118,8 +127,9 @@ fn motorway_insides(roads: &[Road]) -> Vec<i8> {
             if (u[0] * t[0] + u[1] * t[1]).abs() < 0.9 {
                 continue;
             }
-            // (The left of the way along: (-t.z, t.x), against `cars::right_of`.)
-            let side = (q[1] - p[1]) * t[0] - (q[0] - p[0]) * t[1];
+            // (The left of the way along: against `cars::right_of`.)
+            let right = crate::cars::right_of(t);
+            let side = -((q[0] - p[0]) * right[0] + (q[1] - p[1]) * right[1]);
             best = Some((d, if side >= 0.0 { 1 } else { -1 }));
         }
         out[i] = best.map_or(if a.oneway == OneWay::Against { -1 } else { 1 }, |b| b.1);
@@ -426,6 +436,14 @@ impl Graph {
         g.inside = motorway_insides(&g.roads);
         g.decks = vec![Vec::new(); g.roads.len()];
         g.merge_junctions();
+        g.junctions = (0..g.nodes.len())
+            .filter(|&n| g.adj[n].len() >= 3 && !g.is_merge(n))
+            .map(|n| g.nodes[n])
+            .collect();
+        g.junction_index = NearestPoint::new(g.junctions.clone());
+        let merges = g.merge_nodes().next().is_some();
+        g.merges = merges;
+        g.oneway = g.roads.iter().any(|r| !r.oneway.is_both());
         g.index();
         g.boxes = crate::traffic::boxes(&g);
         g
@@ -523,7 +541,7 @@ impl Graph {
         let Some(r) = self.roads.get(road as usize) else {
             return Layer::GROUND;
         };
-        if !matches!(r.kind, RoadKind::Motorway | RoadKind::Ramp) {
+        if !r.kind.separated() {
             return Layer::GROUND;
         }
         let decked = self
@@ -568,9 +586,28 @@ impl Graph {
     /// Where three or more stretches of road meet, but a motorway's merges (`is_merge`): no
     /// lights, no box and no slowing down there.
     pub fn junctions(&self) -> impl Iterator<Item = [f32; 2]> + '_ {
-        (0..self.nodes.len())
-            .filter(|&n| self.adj[n].len() >= 3 && !self.is_merge(n))
-            .map(|n| self.nodes[n])
+        self.junctions.iter().copied()
+    }
+
+    /// `junctions`, as a list.
+    pub(crate) fn junction_points(&self) -> &[[f32; 2]] {
+        &self.junctions
+    }
+
+    /// The junction (`junctions`) nearest `p`. None: no junctions.
+    pub(crate) fn junction_near(&self, p: [f32; 2]) -> Option<[f32; 2]> {
+        self.junction_index.nearest(p).map(|j| self.junctions[j])
+    }
+
+    /// Whether any node is a motorway's merge (`merge_nodes`).
+    pub(crate) fn has_merges(&self) -> bool {
+        self.merges
+    }
+
+    /// Whether any road is one-way (`OneWay`). Without one, wherever a car can drive from one
+    /// place it can drive back from too (`path`).
+    pub(crate) fn has_oneway(&self) -> bool {
+        self.oneway
     }
 
     /// Whether node `n` is where ramps join a motorway's carriageway: every stretch there a
@@ -582,9 +619,7 @@ impl Graph {
         };
         let kind = |&e: &u32| self.roads[self.edges[e as usize].road as usize].kind;
         adj.len() >= 3
-            && adj
-                .iter()
-                .all(|e| matches!(kind(e), RoadKind::Motorway | RoadKind::Ramp))
+            && adj.iter().all(|e| kind(e).separated())
             && adj.iter().any(|e| kind(e) == RoadKind::Motorway)
     }
 
@@ -605,6 +640,7 @@ impl Graph {
     /// a car can come onto the roads at (one on a road for cars other than the motorway and its
     /// ramps, `Road::enterable`) can be driven to from every other, one-way roads gone along
     /// their way only. True without any. A one-way road must never cut a home off.
+    #[cfg(any(test, feature = "test-support"))]
     pub fn strongly_connected(&self) -> bool {
         let n = self.nodes.len();
         let enterable: Vec<bool> = (0..n)
@@ -654,6 +690,25 @@ impl Graph {
             }
         }
         true
+    }
+
+    /// The carriageways near `p` (of the `n` roads for cars nearest it within `look` m, `near`),
+    /// each as how far `p` is from its middle line and how far out its kerbs are (`cars::kerb_of`).
+    /// Not the motorway's: up on its deck, or beside it behind its fences, nobody on foot stands
+    /// in it and no pole stands in its way (`Travel::on_carriageway`, `traffic::signal_at`).
+    pub(crate) fn carriageways_near(
+        &self,
+        p: [f32; 2],
+        look: f32,
+        n: usize,
+    ) -> impl Iterator<Item = (f32, f32)> + '_ {
+        self.near(p, look, n, Mode::Car)
+            .into_iter()
+            .filter_map(move |rp| {
+                let road = &self.roads[rp.road as usize];
+                (road.kind != RoadKind::Motorway)
+                    .then(|| (rp.off, crate::cars::kerb_of(road.width, road.kind)))
+            })
     }
 
     /// The place `s` m along the town file's road `source` (`drives[].road/s`), if it's in the

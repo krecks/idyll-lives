@@ -399,7 +399,6 @@ pub(super) fn lay_route(
     use crate::cars::{Legs, kerb_of, lane_on};
     use crate::travel::{RoadKind, dist};
     let g = &travel.graph;
-    let junctions: Vec<[f32; 2]> = g.junctions().collect();
     let mut out = Legs::default();
     let mut at_stops = Vec::new();
     // (A stand's claim: from the point where it stands, `KERB_CLAIM` past its body either way.)
@@ -581,8 +580,7 @@ pub(super) fn lay_route(
                 let (turn, at) = bay.entry(d);
                 Some((bay, d, turn, at))
             });
-            let tops =
-                crate::cars::lane_tops(&lane, travel, &junctions, |k| along[nearest(lane[k])].1);
+            let tops = crate::cars::lane_tops(&lane, travel, |k| along[nearest(lane[k])].1);
             let mut on = false;
             let mut laid_from = crate::cars::Along::new(&full);
             for (i, &p) in lane.iter().enumerate() {
@@ -614,11 +612,7 @@ pub(super) fn lay_route(
                 // (Less on the outside of a bend to the left, where its corners stand out.)
                 let (room, meet) = crate::cars::meet(roads[i], offs[i], TAXI_WID);
                 let room = room - crate::cars::bend_out(&lane, k, TAXI_LEN);
-                out.push_lane(p, top, room.max(0.0), meet);
-                out.mark_kind(along[i].1);
-                if let Some(m) = mark {
-                    out.mark_last(m);
-                }
+                out.push_marked(p, top, room.max(0.0), meet, along[i].1, mark);
             }
             // (The claim of the stand before, closed once there's way on to close it at.)
             if let Some(s) = stood.take() {
@@ -847,6 +841,7 @@ fn u_turn(
 /// (no driveway: its way to the road nearest it a taxi may stop on, `home_way`): where it stands
 /// (`kerb_at`, as `plan_way` comes to it and `lay_route` lays its route there) and its yaw there.
 /// None: no stand or no way. (The tests: `cars::drill::taxi_stand`.)
+#[cfg(any(test, feature = "test-support"))]
 pub(crate) fn stand_for_door(
     w: &World,
     way_in: [f32; 2],

@@ -73,18 +73,94 @@ pub(crate) struct Legs {
     /// At each point, how far a car can pull over there (`Route::room`), and its lane
     /// (`Route::lane`).
     pub(super) room: Vec<f32>,
-    pub(super) lane: Vec<f32>,
+    pub(super) lane: Vec<Option<f32>>,
     /// Its mouths (`Route::mouths`), from point to point (None: to the end).
     pub(crate) mouths: Vec<(usize, Option<usize>)>,
-    /// Its points off the ground (`travel::Layer`: on a deck, or about a merge on one), by index;
-    /// every other on the ground (`Route::layers`).
-    pub(crate) layers: Vec<(usize, crate::travel::Layer)>,
-    /// Its points where it merges off a ramp into a motorway's carriageway, by index
-    /// (`Route::merges`).
-    pub(crate) merges: Vec<usize>,
-    /// Its points on an avenue, a motorway or a ramp, by index, and which (`Route::kinds`); every
-    /// other on a street, a lane, a country road or off the roads.
-    pub(crate) kinds: Vec<(usize, crate::travel::RoadKind)>,
+    /// Its points off the ground (`travel::Layer`: on a deck, or about a merge on one); every
+    /// other on the ground (`Route::layers`).
+    pub(crate) layers: Marks<crate::travel::Layer>,
+    /// Its points where it merges off a ramp into a motorway's carriageway (`Route::merges`).
+    pub(crate) merges: Marks<()>,
+    /// Its points on an avenue, a motorway or a ramp, and which (`Route::kinds`); every other on
+    /// a street, a lane, a country road or off the roads.
+    pub(crate) kinds: Marks<crate::travel::RoadKind>,
+}
+
+/// Points of a route as it's laid out (`Legs`), by index, each marked with a value (once).
+#[derive(Debug, Clone)]
+pub(crate) struct Marks<T>(Vec<(usize, T)>);
+
+impl<T> Default for Marks<T> {
+    fn default() -> Self {
+        Marks(Vec::new())
+    }
+}
+
+impl<T: Copy + PartialEq> Marks<T> {
+    /// Point `i` marked `v`, unless it's marked already (the last marked).
+    fn mark(&mut self, i: usize, v: T) {
+        if self.0.last().is_none_or(|m| m.0 != i) {
+            self.0.push((i, v));
+        }
+    }
+
+    /// The marked points as runs along the route (`Runs`), point `i` `tick(i)` ticks along it:
+    /// each run of points one after another with one value, from the first's tick to the last's.
+    /// Where one point's value is followed straight away by another's, `seam` lays what's between
+    /// them (the runs so far, the ticks of the two points, and their values) before the next run
+    /// begins.
+    fn runs(
+        &self,
+        tick: impl Fn(usize) -> f32,
+        seam: impl Fn(&mut Vec<(f32, f32, T)>, f32, f32, T, T),
+    ) -> Runs<T> {
+        let mut runs: Vec<(f32, f32, T)> = Vec::new();
+        let mut last: Option<(usize, T)> = None;
+        for &(i, v) in &self.0 {
+            let t = tick(i);
+            match last {
+                Some((j, k)) if j + 1 == i && k == v => {
+                    if let Some(run) = runs.last_mut() {
+                        run.1 = t;
+                    }
+                }
+                Some((j, k)) if j + 1 == i => {
+                    seam(&mut runs, tick(j), t, k, v);
+                    runs.push((t, t, v));
+                }
+                _ => runs.push((t, t, v)),
+            }
+            last = Some((i, v));
+        }
+        Runs(runs)
+    }
+}
+
+/// Stretches of a route with a value of their own (ticks along it, from and to, and the value), in
+/// order: `Route::layers`, `Route::kinds`. Elsewhere none.
+#[derive(Debug, Clone)]
+pub(crate) struct Runs<T>(Vec<(f32, f32, T)>);
+
+impl<T> Default for Runs<T> {
+    fn default() -> Self {
+        Runs(Vec::new())
+    }
+}
+
+impl<T: Copy> Runs<T> {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// The value `t` ticks along (the first run there). None: no run there.
+    pub(crate) fn at(&self, t: f32) -> Option<T> {
+        self.0.iter().find(|r| r.0 <= t && t <= r.1).map(|r| r.2)
+    }
+
+    /// Whether a run whose value is `keep` is anywhere from `a` to `b` ticks along (`a <= b`).
+    pub(crate) fn any(&self, a: f32, b: f32, keep: impl Fn(T) -> bool) -> bool {
+        self.0.iter().any(|r| keep(r.2) && r.0 <= b && a <= r.1)
+    }
 }
 
 impl Legs {
@@ -106,12 +182,12 @@ impl Legs {
         }
         self.pts.push((p, reverse, top));
         self.room.push(0.0);
-        self.lane.push(LANE);
+        self.lane.push(Some(LANE));
     }
 
     /// `push` (driving on) of a lane's point `lane` m right of the road's middle, where a car can
     /// pull over `room` m (`Route::room`, `Route::lane`).
-    pub(crate) fn push_lane(&mut self, p: [f32; 2], top: f32, room: f32, lane: f32) {
+    pub(crate) fn push_lane(&mut self, p: [f32; 2], top: f32, room: f32, lane: Option<f32>) {
         let n = self.pts.len();
         self.push(p, false, top);
         if self.pts.len() > n {
@@ -120,9 +196,27 @@ impl Legs {
         }
     }
 
+    /// `push_lane`, marked as on a road of `kind` (`mark_kind`) and with its marks (`mark_last`:
+    /// `LaneLine::laid`) where it has them.
+    pub(crate) fn push_marked(
+        &mut self,
+        p: [f32; 2],
+        top: f32,
+        room: f32,
+        lane: Option<f32>,
+        kind: crate::travel::RoadKind,
+        mark: Option<(crate::travel::Layer, bool)>,
+    ) {
+        self.push_lane(p, top, room, lane);
+        self.mark_kind(kind);
+        if let Some(m) = mark {
+            self.mark_last(m);
+        }
+    }
+
     /// `push` of a point it backs up to (at `SLOW`), on a lane where a car can pull over `room`
     /// m, `lane` m right of the road's middle (`Route::room`, `Route::lane`).
-    pub(crate) fn push_back(&mut self, p: [f32; 2], room: f32, lane: f32) {
+    pub(crate) fn push_back(&mut self, p: [f32; 2], room: f32, lane: Option<f32>) {
         let n = self.pts.len();
         self.push(p, true, SLOW);
         if self.pts.len() > n {
@@ -137,11 +231,11 @@ impl Legs {
         let Some(i) = self.pts.len().checked_sub(1) else {
             return;
         };
-        if layer != crate::travel::Layer::GROUND && self.layers.last().is_none_or(|l| l.0 != i) {
-            self.layers.push((i, layer));
+        if layer != crate::travel::Layer::GROUND {
+            self.layers.mark(i, layer);
         }
-        if merge && self.merges.last() != Some(&i) {
-            self.merges.push(i);
+        if merge {
+            self.merges.mark(i, ());
         }
     }
 
@@ -151,8 +245,8 @@ impl Legs {
         let Some(i) = self.pts.len().checked_sub(1) else {
             return;
         };
-        if crate::travel::fast_kind(kind) && self.kinds.last().is_none_or(|k| k.0 != i) {
-            self.kinds.push((i, kind));
+        if kind.fast() {
+            self.kinds.mark(i, kind);
         }
     }
 
@@ -275,49 +369,21 @@ impl Legs {
             .iter()
             .map(|&(a, b)| (at(Some(a)), at(b)))
             .collect();
-        // (Runs of points on one level off the ground, from the first's tick to the last's; from
-        // one point to the next on another, both: no stretch between two runs on the ground, where
-        // one on the deck and one coming off it wouldn't meet.)
-        let mut layers: Vec<(f32, f32, crate::travel::Layer)> = Vec::new();
-        let mut last: Option<(usize, crate::travel::Layer)> = None;
-        for &(i, l) in &self.layers {
-            let t = points[i.min(n - 1)].2;
-            match last {
-                Some((j, k)) if j + 1 == i && k == l => {
-                    if let Some(run) = layers.last_mut() {
-                        run.1 = t;
-                    }
-                }
-                Some((j, k)) if j + 1 == i => {
-                    let was = points[j.min(n - 1)].2;
-                    layers.push((was, t, k.and(l)));
-                    layers.push((t, t, l));
-                }
-                _ => layers.push((t, t, l)),
+        let tick = |i: usize| points[i.min(n - 1)].2;
+        // (Runs of points on one level off the ground; from one point to the next on another,
+        // both: no stretch between two runs on the ground, where one on the deck and one coming
+        // off it wouldn't meet.)
+        let layers = self.layers.runs(tick, |runs, was, t, a, b| {
+            runs.push((was, t, a.and(b)));
+        });
+        let merges = self.merges.0.iter().map(|&(i, _)| tick(i)).collect();
+        // (Runs of points on one kind of road; one run on to the next of another kind straight
+        // after it, up to its first: no stretch between them.)
+        let kinds = self.kinds.runs(tick, |runs, _, t, _, _| {
+            if let Some(run) = runs.last_mut() {
+                run.1 = t;
             }
-            last = Some((i, l));
-        }
-        let merges = self
-            .merges
-            .iter()
-            .map(|&i| points[i.min(n - 1)].2)
-            .collect();
-        // (Runs of points on one kind of road, from the first's tick to the last's; one run on to
-        // the next of another kind straight after it, up to its first: no stretch between them.)
-        let mut kinds: Vec<(f32, f32, crate::travel::RoadKind)> = Vec::new();
-        let mut last: Option<usize> = None;
-        for &(i, k) in &self.kinds {
-            let t = points[i.min(n - 1)].2;
-            match (last, kinds.last_mut()) {
-                (Some(j), Some(run)) if j + 1 == i && run.2 == k => run.1 = t,
-                (Some(j), Some(run)) if j + 1 == i => {
-                    run.1 = t;
-                    kinds.push((t, t, k));
-                }
-                _ => kinds.push((t, t, k)),
-            }
-            last = Some(i);
-        }
+        });
         Route {
             points,
             room: self.room,

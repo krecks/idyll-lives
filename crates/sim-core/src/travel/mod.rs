@@ -66,12 +66,6 @@ pub fn kind_speed(kind: RoadKind, country: f32) -> f32 {
         RoadKind::Motorway => MOTORWAY_SPEED,
     }
 }
-/// Whether cars on a road of `kind` speed up and slow down as cars do, each at a speed of its own
-/// (`cars::Car::speed`): an avenue, a motorway and a ramp. Every classic town's roads are none of
-/// them: there each car keeps to its way's timing as it always did.
-pub fn fast_kind(kind: RoadKind) -> bool {
-    matches!(kind, RoadKind::Avenue | RoadKind::Motorway | RoadKind::Ramp)
-}
 /// Game minutes in a minute of `Travel::eta` by car: a car's speeds are drive time (m a second of
 /// it), so the eta's minutes are a drive's seconds of drive time over 60, each `DRIVE_SCALE` times
 /// shorter than a real second, which is `GAME_MINUTES_PER_SECOND` of the game's minutes
@@ -97,6 +91,39 @@ pub enum RoadKind {
     Motorway,
     /// One lane onto the motorway or off it (one-way): cars only.
     Ramp,
+}
+
+impl RoadKind {
+    /// Whether it's the motorway's, grade separated: a carriageway or a ramp (`roadKinds.ts`
+    /// `walkers: false`). Nobody on foot is on it, no car comes onto it but at its ends (no
+    /// driveway, bay or kerb: `Road::enterable`), and it has a level of its own
+    /// (`Graph::layer_at`).
+    pub fn separated(self) -> bool {
+        matches!(self, RoadKind::Motorway | RoadKind::Ramp)
+    }
+
+    /// Whether cars go only one way along it, whatever its `OneWay` says (`roadKinds.ts`
+    /// `oneway`): a motorway's carriageway, a ramp. Nobody comes the other way there.
+    pub fn oneway_always(self) -> bool {
+        matches!(self, RoadKind::Motorway | RoadKind::Ramp)
+    }
+
+    /// Whether its width takes in sidewalks (`roadKinds.ts` `sidewalk`): a street's, a lane's, an
+    /// avenue's. Not a country road (its verge), a trail, nor the motorway (its shoulders): their
+    /// kerbs are their edges (`cars::kerb_of`).
+    pub fn has_sidewalk(self) -> bool {
+        !matches!(
+            self,
+            RoadKind::Country | RoadKind::Trail | RoadKind::Motorway | RoadKind::Ramp
+        )
+    }
+
+    /// Whether cars on it speed up and slow down as cars do, each at a speed of its own
+    /// (`cars::Car::speed`): an avenue, a motorway and a ramp. Every classic town's roads are none
+    /// of them: there each car keeps to its way's timing as it always did.
+    pub fn fast(self) -> bool {
+        matches!(self, RoadKind::Avenue | RoadKind::Motorway | RoadKind::Ramp)
+    }
 }
 
 /// Which way cars may go along a road (`RoadPlan.oneway`): both ways, or one way only, along its
