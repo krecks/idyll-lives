@@ -34,8 +34,8 @@ pub(super) fn walk_side(pts: &[([f32; 2], f32, RoadKind)]) -> Vec<[f32; 2]> {
             let (dx, dz) = (b[0] - a[0], b[1] - a[1]);
             let d = dx.hypot(dz).max(1e-6);
             let off = side_offset(pts[i].1, pts[i].2);
-            // Right of the way (dx, dz): (-dz, dx) in town coordinates (x right, z down the map).
-            [pts[i].0[0] - dz / d * off, pts[i].0[1] + dx / d * off]
+            // Right of the way (dx, dz): (dz, -dx), as the traffic keeps (`cars::right_of`).
+            [pts[i].0[0] + dz / d * off, pts[i].0[1] - dx / d * off]
         })
         .collect()
 }
@@ -48,7 +48,7 @@ pub fn offset_right(pts: &[[f32; 2]], off: f32) -> Vec<[f32; 2]> {
             let (a, b) = (pts[i.saturating_sub(1)], pts[(i + 1).min(n - 1)]);
             let (dx, dz) = (b[0] - a[0], b[1] - a[1]);
             let d = dx.hypot(dz).max(1e-6);
-            [pts[i][0] - dz / d * off, pts[i][1] + dx / d * off]
+            [pts[i][0] + dz / d * off, pts[i][1] - dx / d * off]
         })
         .collect()
 }

@@ -1593,9 +1593,10 @@ fn a_side_roads_crosswalk_is_walked_on_the_main_roads_green_and_cars_turning_in_
     // by name. No car drives in over the north arm's stop line, nor out over its crosswalk, while
     // they're on it; and both get where they're going, time and again. (Someone walking along the
     // street's pavement past a lit T stopped every arm for the walk.)
+    // (The car's house east of the north arm, on its right going out: `cars::right_of`.)
     let mut w = crossroads(&[
-        crossroads_house(150.0, true),
-        crossroads_house(230.0, false),
+        crossroads_house(150.0, false),
+        crossroads_house(230.0, true),
     ]);
     common::run_to(&mut w, 2, 7.0);
     let sig = w.travel.signals[0].clone();
@@ -1605,7 +1606,7 @@ fn a_side_roads_crosswalk_is_walked_on_the_main_roads_green_and_cars_turning_in_
     assert_eq!(sig.opens_with(north), Some(sig.rest));
     let (west, east) = across_north(&w);
     let walker = 1u32;
-    w.sims[walker as usize].pos = west;
+    w.sims[walker as usize].pos = east;
     let mut buf = vec![0.0f32; snapshot::CAPACITY];
     // (The car's nose out along the north arm, coming in or going out, and the walker on its
     // crosswalk.)
@@ -2585,15 +2586,16 @@ fn a_lit_junction_rests_on_its_main_roads_green_and_its_walk_is_over_once_nobody
 /// The crossroads (`crossroads`) with four houses up either dead-end arm, their cars always coming
 /// and going (`keep_driving`): they hold each other up there by turns.
 fn crowded_crossroads() -> World {
+    // (Each house on the right of its cars going out to the junction: `cars::right_of`.)
     crossroads(&[
-        crossroads_house(150.0, true),
-        crossroads_house(160.0, true),
-        crossroads_house(170.0, true),
-        crossroads_house(180.0, true),
-        crossroads_house(220.0, false),
-        crossroads_house(230.0, false),
-        crossroads_house(240.0, false),
-        crossroads_house(250.0, false),
+        crossroads_house(150.0, false),
+        crossroads_house(160.0, false),
+        crossroads_house(170.0, false),
+        crossroads_house(180.0, false),
+        crossroads_house(220.0, true),
+        crossroads_house(230.0, true),
+        crossroads_house(240.0, true),
+        crossroads_house(250.0, true),
     ])
 }
 
