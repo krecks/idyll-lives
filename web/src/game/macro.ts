@@ -2013,8 +2013,7 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   // A shaped land: graded and cleared under what is built, the town's farmland on it, its water and cover the zones (the hills and orchards still the layout's).
   let laid: LandField | undefined;
   if (shaped) {
-    laid = settleTown(shaped, { width: W, depth: D, plots: [...slots.map(rectOf), ...orchards], roads: worldRoads });
-    townCover(laid, land, { wild, fields, areas: areaBlock });
+    laid = settleTown(shaped, { width: W, depth: D, plots: [...slots.map(rectOf), ...orchards], roads: worldRoads }, (out) => townCover(out, land, { wild, fields, areas: areaBlock }));
     const own = keptWater.length ? [...keptWater.map((poly): WorldZone => ({ kind: 'water', poly })), ...landZones(laid, { cover: true })] : landZones(laid);
     zones = (['water', 'hill', 'fields', 'meadow', 'woods', 'orchard'] as const).flatMap((kind) => (kind === 'hill' || kind === 'orchard' ? zones : own).filter((z) => z.kind === kind));
   }
@@ -2413,12 +2412,13 @@ const GRADE_BANK = 25;
 /**
  * A shaped land with a town laid on it (`generateFromSpec`'s `shaped`): a copy, flat at 0 under
  * what is built and rising back to its own height round it (as the renderer draws a world's
- * land round its towns), but never below a bank over the water beside it; and its cover open
- * within 2 m of anything built. Marked `edited`. A land whose town follows its slopes (`seeded`
+ * land round its towns), but never below a bank over the water beside it; and its cover (`cover`
+ * first: the town's, `townCover`) open within 2 m of anything built, last, as an edit's settle opens
+ * it (`landFollow.ts` `openUnderBuilt`: no farmland put back beside a road). Marked `edited`. A land whose town follows its slopes (`seeded`
  * `'follow'`) keeps its heights (the town is graded into it afterwards: `landFollow.ts`
  * `withLand`) and stays `edited` only if it was (shaped by the player).
  */
-function settleTown(field: LandField, built: BuiltLand): LandField {
+function settleTown(field: LandField, built: BuiltLand, cover?: (out: LandField) => void): LandField {
   const { cols, rows } = field;
   const out: LandField = { ...field, h: field.h.slice(), wl: field.wl.slice(), cover: field.cover.slice(), edited: field.seeded === 'follow' ? field.edited : true };
   const guard = new Protection(cols, rows, built);
@@ -2440,6 +2440,7 @@ function settleTown(field: LandField, built: BuiltLand): LandField {
       if (top > out.h[k]) out.h[k] = Math.min(field.h[k], top);
     }
   }
+  cover?.(out);
   const cw = coverSpan(cols);
   const c = COVER_CELL / LAND_CELL;
   for (let r = 0; r < coverSpan(rows); r++) for (let q = 0; q < cw; q++) if (guard.dist[Math.min(rows - 1, r * c + 1) * cols + Math.min(cols - 1, q * c + 1)] <= 2) out.cover[r * cw + q] = COVER.open;
