@@ -6,7 +6,9 @@
  * streets also gets a side road at each end joining its streets, where the country road begins.
  *
  * A motorway's carriageways (`RoadPlan.kind` `motorway`) go on straight past the edge side by side, as wide as in
- * the town, a barrier between them (`barriers`), to the end of the land or its water: no sign, no wandering.
+ * the town, a barrier between them (`barriers`), to the end of the land: no sign, no wandering. Over water they go on
+ * on a low deck (`decks`), as the town's bridge does: an island's motorway, on a bridge at the world's edge, ended
+ * there in the sea.
  *
  * Visual only and outside the town (residents leave town where its roads do): the landscape
  * (`nature.ts`) levels the ground under the roads (`near`) and keeps trees off them.
@@ -27,6 +29,11 @@ export const STRAIGHT = 5;
 export const MOTORWAY_WIDTH = 9;
 const MOTORWAY_PAIR = 30;
 export const BARRIER_FOOT = 0.6;
+/** A motorway's deck over the water past the edge: its road this far over the water's top (m), and from where it is (m: the town's bridge at the edge) it comes down to that over this far (m). */
+export const DECK_OVER = 1.6;
+const DECK_EASE = 60;
+/** A motorway past the edge is on a deck where the water is nearer than this (m: `RoadLand.waterEdge` above minus this). */
+const DECK_SHORE = 4;
 /** Road surface above the levelled ground (m). */
 export const LIFT = 0.06;
 /** How far the ground is graded to the road on either side, past its edge (m). */
@@ -54,6 +61,10 @@ export interface RoadLand {
   distanceToTown(x: number, z: number): number;
   /** The town's built land follows the land's slopes (`LandscapeLayout.surface`): a road leaves town at the land's height there, not at 0. */
   follows?: boolean;
+  /** The water's top (m: `nature.ts` `WATER_Y`; none: -0.35). */
+  water?: number;
+  /** On a land the town follows, what stands in it at a point (`BuiltSurface.at`: a road's height there): where a motorway leaving town on its bridge is. */
+  surface?(x: number, z: number): number;
 }
 
 /** A point on a road: where it is, the road's surface height there and its width. */
@@ -76,6 +87,13 @@ export class CountryRoads {
   readonly motorways = new Set<number>();
   /** The barrier between each two carriageways going on side by side: its line (its width the barrier's foot). */
   readonly barriers: Point[][] = [];
+  /** Each motorway carriageway's other (`roads` indices, both ways). */
+  readonly pairs = new Map<number, number>();
+  /**
+   * A motorway carriageway's deck over the water (by `roads` index): at each of its points whether it is on it, and the
+   * ground there (the bed its piers stand on).
+   */
+  readonly decks = new Map<number, { on: boolean[]; bed: number[] }>();
   /** `near`'s last question and answer. */
   private readonly asked = [NaN, NaN];
   private answer: NearRoad | null = null;
@@ -108,33 +126,54 @@ export class CountryRoads {
       const pair = ends.findIndex((o, j) => j > k && Math.hypot(o.x - e.x, o.z - e.z) < MOTORWAY_PAIR);
       if (pair < 0) continue;
       const [a, b] = [this.straight(e.x, e.z, e.dx, e.dz), this.straight(ends[pair].x, ends[pair].z, ends[pair].dx, ends[pair].dz)];
-      const n = Math.min(a.length, b.length);
+      const n = Math.min(a.road.length, b.road.length);
       if (n < 2) continue;
-      this.motorways.add(this.roads.push(a.slice(0, n)) - 1);
-      this.motorways.add(this.roads.push(b.slice(0, n)) - 1);
-      this.barriers.push(a.slice(0, n).map((p, i): Point => [(p[0] + b[i][0]) / 2, (p[1] + b[i][1]) / 2, (p[2] + b[i][2]) / 2, BARRIER_FOOT]));
+      // (Both on a deck where either is: side by side, at one height there.)
+      const on = a.on.slice(0, n).map((w, i) => w || b.on[i]);
+      const [ia, ib] = [this.roads.push(a.road.slice(0, n)) - 1, this.roads.push(b.road.slice(0, n)) - 1];
+      for (const [r, other, c] of [[ia, ib, a], [ib, ia, b]] as const) {
+        this.motorways.add(r);
+        this.pairs.set(r, other);
+        if (on.some((w) => w)) this.decks.set(r, { on, bed: c.bed.slice(0, n) });
+      }
+      for (let i = 0; i < n; i++) {
+        if (!on[i]) continue;
+        const h = Math.max(this.roads[ia][i][2], this.roads[ib][i][2]);
+        this.roads[ia][i][2] = this.roads[ib][i][2] = h;
+      }
+      const [ra, rb] = [this.roads[ia], this.roads[ib]];
+      this.barriers.push(ra.map((p, i): Point => [(p[0] + rb[i][0]) / 2, (p[1] + rb[i][1]) / 2, (p[2] + rb[i][2]) / 2, BARRIER_FOOT]));
     }
   }
 
   /**
-   * A motorway's carriageway from (`x`, `z`) on out of town straight ahead (`ux`, `uz`), to the end of the land or
-   * up to its water: its surface the ground along it, smoothed (a little higher than a country road's, over the hills).
+   * A motorway's carriageway from (`x`, `z`) on out of town straight ahead (`ux`, `uz`), to the end of the land: its
+   * surface the ground along it, smoothed (a little higher than a country road's, over the hills); over the water (and
+   * `DECK_SHORE` m up its banks) on a deck (`on`) `DECK_OVER` m over it, coming down to that from the town's bridge where
+   * it leaves town on one. `bed`: the ground at each point.
    */
-  private straight(x: number, z: number, ux: number, uz: number): Point[] {
+  private straight(x: number, z: number, ux: number, uz: number): { road: Point[]; on: boolean[]; bed: number[] } {
     const land = this.land;
     const flat: [number, number][] = [];
-    for (let i = 0; i < 400 && land.distanceToTown(x + ux * STEP * i, z + uz * STEP * i) < land.ring + 25; i++) {
-      const p: [number, number] = [x + ux * STEP * i, z + uz * STEP * i];
-      if (i > 2 && land.waterEdge(p[0], p[1]) > -8) break;
-      flat.push(p);
-    }
-    const raw = flat.map(([px, pz]) => land.ground(px, pz));
-    return flat.map(([px, pz], i): Point => {
+    for (let i = 0; i < 400 && land.distanceToTown(x + ux * STEP * i, z + uz * STEP * i) < land.ring + 25; i++) flat.push([x + ux * STEP * i, z + uz * STEP * i]);
+    const bed = flat.map(([px, pz]) => land.ground(px, pz));
+    const on = flat.map(([px, pz]) => land.waterEdge(px, pz) > -DECK_SHORE);
+    const deck = (land.water ?? -0.35) + DECK_OVER;
+    const raw = bed.map((g, i) => (on[i] ? deck : g));
+    // (Leaving town on its bridge: from the bridge's height there.)
+    const from = on[0] && land.surface ? land.surface(x, z) : null;
+    const road = flat.map(([px, pz], i): Point => {
       let [sum, n] = [0, 0];
       for (let k = Math.max(0, i - 6); k <= Math.min(raw.length - 1, i + 6); k++, n++) sum += raw[k];
-      const h = i < 2 ? (land.follows ? raw[i] : 0) : Math.max(land.follows ? -0.05 : 0.1, sum / n);
+      let h = i < 2 ? (land.follows ? raw[i] : 0) : Math.max(land.follows ? -0.05 : 0.1, sum / n);
+      if (from !== null) {
+        const t = Math.min(1, (i * STEP) / DECK_EASE);
+        h = from + (Math.max(h, deck) - from) * t * t * (3 - 2 * t);
+      }
+      else if (on[i]) h = Math.max(h, deck);
       return [px, pz, h, MOTORWAY_WIDTH];
     });
+    return { road, on, bed };
   }
 
   /**
@@ -185,7 +224,7 @@ export class CountryRoads {
     return this.links.some((r) => x > r.x - margin && x < r.x + r.w + margin && z > r.z - margin && z < r.z + r.d + margin);
   }
 
-  /** The road nearest a point within its width and verge (null: none that close). */
+  /** The road nearest a point within its width and verge (null: none that close; a motorway's deck over the water: not one). */
   near(x: number, z: number): NearRoad | null {
     // (Asked twice at a point in a row, by the land's height and its colour: answered once.)
     if (x === this.asked[0] && z === this.asked[1]) return this.answer;
@@ -204,7 +243,10 @@ export class CountryRoads {
     if (this.grid) return this.grid;
     const grid = new Map<number, number[]>();
     this.roads.forEach((road, r) => {
+      const deck = this.decks.get(r)?.on;
       for (let i = 0; i + 1 < road.length; i++) {
+        // (Not under a deck over the water: the land there isn't levelled up to it.)
+        if (deck?.[i] && deck[i + 1]) continue;
         const [ax, az, , aw] = road[i];
         const [bx, bz, , bw] = road[i + 1];
         const m = Math.max(aw, bw) / 2 + ROAD_VERGE;
