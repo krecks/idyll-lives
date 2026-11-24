@@ -297,6 +297,32 @@ fn a_child_takes_on_no_grown_ups_goal() {
 }
 
 #[test]
+fn a_childs_grown_up_goals_from_before_are_let_go_of() {
+    // (An older save's: goals were kept to grown-ups only from 2026-11-24.)
+    let mut w = town(16);
+    homebody(&mut w);
+    add_goal(&mut w, json!({"def": "love"})).expect("a grown-up's goal");
+    add_goal(
+        &mut w,
+        json!({"def": "skill", "skill": "cooking", "target": 3}),
+    )
+    .expect("a skill");
+    w.sims[0].age = 9.0;
+    run_to(&mut w, 2, 8.0);
+    let ids: Vec<&str> = w.sims[0]
+        .planner
+        .goals
+        .iter()
+        .map(|g| w.content.goals[g.def].id.as_str())
+        .collect();
+    assert_eq!(
+        ids,
+        ["skill"],
+        "the grown-up's goal let go of at the day's review, the skill kept"
+    );
+}
+
+#[test]
 #[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
 fn a_childs_own_ideas_are_for_a_child() {
     let mut w = town(15);

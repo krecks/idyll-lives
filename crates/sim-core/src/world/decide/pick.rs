@@ -375,7 +375,8 @@ pub(crate) fn pick_autonomous(
                 ) / (1.0 + distance * 0.08);
             }
             // The plan: a block's activity is the favourite (even with full needs); goals.
-            let (plan, floor) = crate::planner::object_factor(content, sim, inter, night);
+            let (plan, floor) =
+                crate::planner::object_factor(content, sim, inter, inter.cost_at(public), night);
             let mut s = s.max(floor) * feel(inter.tags) * plan * place;
             if unwanted {
                 s *= UNWANTED_MEAL;

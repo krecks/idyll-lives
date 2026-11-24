@@ -157,6 +157,14 @@ pub(super) fn check_goals(w: &mut World, i: usize) {
 /// Once a day: progress history, and maybe a new goal suggested from their traits (the
 /// neighbours, who have no player, take theirs on straight away).
 pub(super) fn review_goals(w: &mut World, i: usize, day: u32) {
+    // A child's grown-ups' goals, from before they were kept to grown-ups (an older save's): let go of.
+    if !w.sims[i].adult(&w.content) {
+        let defs = &w.content.goals;
+        let p = &mut w.sims[i].planner;
+        p.goals.retain(|g| for_their_age(defs[g.def].kind, false));
+        p.suggestions
+            .retain(|g| for_their_age(defs[g.def].kind, false));
+    }
     for k in 0..w.sims[i].planner.goals.len() {
         let g = w.sims[i].planner.goals[k];
         let p = progress(w, i, &g);
