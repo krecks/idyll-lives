@@ -6,7 +6,8 @@ use crate::common;
 use common::run_to;
 
 use serde_json::json;
-use sim_core::planner::{self, Outcome, Reason};
+
+use sim_core::planner::{self, GoalKind, Outcome, Reason};
 use sim_core::social::EventKind;
 use sim_core::{Command, World};
 
@@ -272,6 +273,53 @@ fn residents_suggest_goals_and_neighbours_take_theirs_on() {
         w.sims[1..].iter().any(|s| !s.planner.goals.is_empty()),
         "neighbours have goals of their own"
     );
+}
+
+#[test]
+fn a_child_takes_on_no_grown_ups_goal() {
+    // (A child was offered "Find love" and "Get a job".)
+    let mut w = town(14);
+    homebody(&mut w);
+    w.sims[0].age = 9.0;
+    for goal in [
+        json!({"def": "getJob"}),
+        json!({"def": "love"}),
+        json!({"def": "savings", "target": 5000}),
+    ] {
+        let err = add_goal(&mut w, goal.clone()).expect_err("a grown-up's goal");
+        assert!(err.to_string().contains("too young"), "{goal}: {err}");
+    }
+    add_goal(
+        &mut w,
+        json!({"def": "skill", "skill": "cooking", "target": 3}),
+    )
+    .expect("a skill is for any age");
+}
+
+#[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
+fn a_childs_own_ideas_are_for_a_child() {
+    let mut w = town(15);
+    homebody(&mut w);
+    w.sims[0].age = 9.0;
+    run_to(&mut w, 15, 8.0);
+    let content = &w.content;
+    let planner = &w.sims[0].planner;
+    for g in planner.goals.iter().chain(&planner.suggestions) {
+        let kind = content.goals[g.def].kind;
+        assert!(
+            !matches!(
+                kind,
+                GoalKind::HasJob
+                    | GoalKind::JobLevel
+                    | GoalKind::Promoted
+                    | GoalKind::Partner
+                    | GoalKind::Funds
+            ),
+            "a child's idea: {}",
+            content.goals[g.def].id
+        );
+    }
 }
 
 #[test]

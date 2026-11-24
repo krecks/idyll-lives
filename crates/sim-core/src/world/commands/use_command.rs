@@ -260,10 +260,17 @@ impl World {
             )));
         }
         let household = s.household as usize;
-        if !affordable(inter.cost, self.households[household].funds) {
+        let public = self
+            .object_plot
+            .get(object as usize)
+            .copied()
+            .flatten()
+            .is_some_and(|p| self.plots[p as usize].public);
+        let cost = inter.cost_at(public);
+        if !affordable(cost, self.households[household].funds) {
             return Err(Error::new(format!(
                 "not enough money: {} costs {}",
-                inter.label, inter.cost
+                inter.label, cost
             )));
         }
         // Something in a public place or at someone else's: not leaving a baby home alone.

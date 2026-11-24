@@ -847,6 +847,17 @@ impl<'a> Others<'a> {
 }
 
 impl Ctx<'_> {
+    /// What a use of `inter` at object `object` costs there (`Interaction::cost_at`: on a public lot, its `publicCost`).
+    pub(crate) fn cost_of(&self, object: u32, inter: &crate::content::Interaction) -> i64 {
+        let public = self
+            .object_plot
+            .get(object as usize)
+            .copied()
+            .flatten()
+            .is_some_and(|p| self.plots[p as usize].public);
+        inter.cost_at(public)
+    }
+
     /// Whether someone serves at object `object`: a sold use's minutes are then the ordering, the
     /// hand-over and the paying (`Interaction::minutes_where`).
     pub(crate) fn served(&self, object: u32) -> bool {

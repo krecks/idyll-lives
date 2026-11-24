@@ -166,6 +166,38 @@ fn children_go_to_school_on_school_days() {
 }
 
 #[test]
+fn a_school_day_does_what_its_effects_say() {
+    // (Without them, a day at school was a day without company: a child's social ran out mid-week.)
+    let town = r#"{"width":10,"depth":10,
+        "plots":[{"name":"Home","x":0,"z":0,"w":10,"d":10,"entry":[5.5,9.5]}],
+        "households":[{"name":"Player","plot":0,"player":true}],
+        "objects":[], "exits":[[5.5,9.9]],
+        "sims":[{"name":"Ada","x":4.5,"z":3.5,"age":35},{"name":"Kit","x":5.5,"z":3.5,"age":9}]}"#;
+    let fun_after_school = |content: &str| {
+        let mut w = World::from_json(content, town, 1).unwrap();
+        w.autonomy = false;
+        // Monday: from setting off to school (08:00) until home (15:00), Kit's fun is left to school alone.
+        let home = sim_core::clock::tick_at(sim_core::clock::day(w.tick), 15.5 * 60.0).unwrap();
+        let mut was_away = false;
+        while w.tick < home {
+            w.tick_once();
+            was_away |= w.sims[1].away_until.is_some();
+        }
+        assert!(was_away, "Kit went to school");
+        w.sims[1].needs[0]
+    };
+    let plain = fun_after_school(SCHOOL);
+    let fun = fun_after_school(&SCHOOL.replace(
+        r#""skills":{"intelligence":1}}"#,
+        r#""skills":{"intelligence":1},"effects":{"fun":0.5}}"#,
+    ));
+    assert!(
+        fun > plain + 0.25,
+        "a school day's fun: {fun} against {plain} without it"
+    );
+}
+
+#[test]
 fn teens_grow_up_into_young_adults() {
     use sim_core::social::EventKind;
     let content = SCHOOL

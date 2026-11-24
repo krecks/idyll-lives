@@ -4,7 +4,7 @@ use super::*;
 use crate::social;
 use crate::world::{
     Access, Ctx, MIN_AUTONOMY_SCORE, OUTFITS, ObjectInstance, Sim, TaskKind, access, before_dawn,
-    getting_up, practise, quality_boost, training_interest,
+    getting_up, practise, quality_boost, too_tired_to_get_up, training_interest,
 };
 
 /// One tick of using an object (`minutes` long: more when catching up on a turn, see
@@ -83,7 +83,10 @@ pub(crate) fn use_object(
         // alarm goes off in time to get ready, rested or not.
         let rested = rhythm.rest_need.is_none_or(|n| sim.needs[n] >= 0.999);
         let longest = f32::from(content.planner.max_sleep_minutes);
-        wakes || elapsed >= longest || (rested && !before_dawn(sim, ctx)) || getting_up(sim, ctx)
+        wakes
+            || elapsed >= longest
+            || (rested && !before_dawn(sim, ctx))
+            || (getting_up(sim, ctx) && !too_tired_to_get_up(sim, content))
     } else {
         // Workouts and other draining activities stop before they empty the needs they cost.
         // Planned activities go on for their time even once the needs they fill are full.

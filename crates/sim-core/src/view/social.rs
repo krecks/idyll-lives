@@ -187,7 +187,7 @@ pub(super) fn actions(world: &World, s: &Sim) -> Vec<ActionView> {
         });
     } else {
         actions.extend(s.current().map(|a| {
-            let mut view = task_view(world, &a.task, Some(&a.phase), s.held);
+            let mut view = task_view(world, s, &a.task, Some(&a.phase), s.held);
             // A game for two: who with ("Shoot pool · Bo"; `partners.rs`).
             if let Some((o, i, _)) = s.game {
                 view.target = world
@@ -199,7 +199,7 @@ pub(super) fn actions(world: &World, s: &Sim) -> Vec<ActionView> {
             view
         }));
     }
-    actions.extend(s.queue().map(|t| task_view(world, t, None, None)));
+    actions.extend(s.queue().map(|t| task_view(world, s, t, None, None)));
     actions
 }
 

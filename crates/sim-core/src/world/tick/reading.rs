@@ -87,6 +87,19 @@ pub(crate) fn getting_up(sim: &Sim, ctx: &Ctx) -> bool {
     leave_today(sim, ctx).is_some_and(|leave| leave <= ctx.tick + early)
 }
 
+/// Asleep and still this tired (what a night's sleep fills below twice `exhaustedBelow`) when the
+/// alarm goes, they sleep through the time to get ready: leaving for work wakes them (`life::schedule`'s
+/// `set_off`). (And worn out, `exhausted`, they go back to bed then: the two apart, so nobody is up
+/// and down at the line.) Up at the alarm, a worker on an early shift went in on a fifth of their
+/// energy, and one still up in the small hours stayed up till then, down to nothing (2026-11-23: 1 %
+/// before a 05:00 shift).
+pub(crate) fn too_tired_to_get_up(sim: &Sim, content: &Content) -> bool {
+    let rhythm = &content.day_rhythm;
+    rhythm
+        .rest_need
+        .is_some_and(|n| sim.needs[n] < rhythm.exhausted_below * 2.0)
+}
+
 /// The middle of the night: a rested sleeper stays in bed until a little before they'd get up.
 pub(crate) fn before_dawn(sim: &Sim, ctx: &Ctx) -> bool {
     is_night(sim, ctx) && {

@@ -119,14 +119,15 @@ fn cook(w: &mut World, recipe: &str, minutes: u32) -> Vec<String> {
     carried
 }
 
-/// Cooks `recipe` for `minutes` in a fresh world: the last thing the resident carries is `dish`, and `left` (the
-/// dish, or what is left of it) ends up on the table `on` asks about.
+/// Cooks `recipe` for `minutes` in a fresh world: the resident carries `dish` (the last thing they carry, or the one
+/// before their own serving of it: the cook the player sent has some), and `left` (the dish, or what is left of it)
+/// ends up on the table `on` asks about.
 fn carried_out(recipe: &str, minutes: u32, dish: &str, left: &str, on: fn(&World, &str) -> bool) {
     let mut w = world();
     let carried = cook(&mut w, recipe, minutes);
-    assert_eq!(
-        carried.last().map(String::as_str),
-        Some(dish),
+    let dish_at = carried.iter().rposition(|c| c == dish);
+    assert!(
+        dish_at.is_some_and(|i| i + 2 >= carried.len()),
         "carried the {dish}: {carried:?}"
     );
     assert!(on(&w, left), "the {left} is at {}", where_is(&w, left));

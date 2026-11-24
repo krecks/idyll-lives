@@ -371,6 +371,7 @@
         },
         {
           "id": "breakfast",
+          "publicCost": 9,
           "label": "Have a bite at the island",
           "anim": "eat",
           "sound": "cutlery",
@@ -427,6 +428,7 @@
         },
         {
           "id": "breakfast",
+          "publicCost": 9,
           "label": "Have a bite at the island",
           "anim": "eat",
           "sound": "cutlery",
@@ -462,6 +464,7 @@
       "interactions": [
         {
           "id": "snack",
+          "publicCost": 4,
           "label": "Grab a snack",
           "anim": "fetch",
           "minutes": 2,
@@ -721,6 +724,7 @@
       "interactions": [
         {
           "id": "snack",
+          "publicCost": 4,
           "label": "Grab a snack",
           "anim": "fetch",
           "minutes": 2,
@@ -737,6 +741,7 @@
         },
         {
           "id": "frozenTreat",
+          "publicCost": 4,
           "label": "Get some ice cream",
           "anim": "fetch",
           "minutes": 2,
@@ -789,6 +794,7 @@
         },
         {
           "id": "coldDrink",
+          "publicCost": 3,
           "label": "Pour a cold drink",
           "anim": "drink",
           "sound": "fridgeDoor",
@@ -826,6 +832,7 @@
       "interactions": [
         {
           "id": "snack",
+          "publicCost": 4,
           "label": "Grab a snack",
           "anim": "fetch",
           "minutes": 2,
@@ -858,6 +865,7 @@
         },
         {
           "id": "coldDrink",
+          "publicCost": 3,
           "label": "Pour a cold drink",
           "anim": "drink",
           "sound": "fridgeDoor",
@@ -895,6 +903,7 @@
       "interactions": [
         {
           "id": "snack",
+          "publicCost": 4,
           "label": "Grab a snack",
           "anim": "fetch",
           "minutes": 2,
@@ -927,6 +936,7 @@
         },
         {
           "id": "coldDrink",
+          "publicCost": 3,
           "label": "Pour a cold drink",
           "anim": "drink",
           "sound": "fridgeDoor",

@@ -97,6 +97,10 @@ pub struct SchoolRules {
     pub hours: f32,
     pub days: u8,
     pub skills: Vec<(usize, f32)>,
+    /// What a school day does to each need, over its `hours` (content `effects`, as a career's
+    /// `workEffects`): the company of the class, a game at break. Without it a child's social ran
+    /// down to nothing by the middle of each week.
+    pub effects: [f32; MAX_NEEDS],
     /// Grade points (0..100) for a day at school, and up to `mood` more (or less) by how they
     /// felt; `missed` off for a day not there. New pupils start at `start_grade`.
     pub attend: f32,

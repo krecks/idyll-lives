@@ -1446,3 +1446,37 @@ fn two_at_the_table_talk_over_the_meal_and_eat_up_after() {
         );
     }
 }
+
+/// Whether resident 0 sat down to eat within `minutes` of being sent to cook a meal at the stove, their hunger
+/// held at `hunger` while they cook.
+fn cooks_and_eats(hunger: f32, minutes: f32) -> bool {
+    let mut w = world_with(KITCHEN, 1, false);
+    order(&mut w, 0, STOVE, "cook");
+    (0..common::mins(minutes)).any(|_| {
+        if cooking(&w, 0) {
+            w.sims[0].needs[0] = hunger;
+        }
+        w.tick_once();
+        common::check(&w);
+        w.sims[0]
+            .current()
+            .is_some_and(|a| matches!(a.task.kind, TaskKind::Eat { .. }))
+    })
+}
+
+#[test]
+fn a_cook_sent_to_make_a_meal_a_quarter_hungry_has_some_of_it() {
+    // (A meal that fills hunger whole was wanted only below half: the cook left it to go off.)
+    assert!(
+        cooks_and_eats(0.74, 120.0),
+        "a quarter hungry, the cook eats what they made"
+    );
+    assert!(
+        cooks_and_eats(0.85, 120.0),
+        "sent to cook, with a little room: some too"
+    );
+    assert!(
+        !cooks_and_eats(0.97, 120.0),
+        "full: the meal is left for later"
+    );
+}

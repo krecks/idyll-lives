@@ -41,8 +41,12 @@ pub(super) fn at_work(w: &mut World, i: usize) -> bool {
     let minutes = sim.minutes();
     let Some(job) = sim.job.clone() else {
         take_breaks(sim, content, None);
-        // At school: a little of the school's skills, then home.
+        // At school: a little of the school's skills and what a day there does (`effects`), then home.
         if let Some(school) = &content.life.school {
+            let per_tick = minutes / (school.hours * 60.0);
+            for n in 0..MAX_NEEDS.min(content.needs.len()) {
+                sim.needs[n] = (sim.needs[n] + school.effects[n] * per_tick).clamp(0.0, 1.0);
+            }
             for &(skill, weight) in &school.skills {
                 practise(
                     sim,
