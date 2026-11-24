@@ -420,3 +420,49 @@ pub(crate) fn ask_ahead(
 /// How much further off than it would begin to slow down to stop at it a car asks for its merge
 /// (m, `ask_ahead`).
 const ASK_AHEAD: f32 = 5.0;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A car standing a hair's breadth short of a point of its way (where its part of the step
+    /// there is of no length in f32, but some ticks long) may still set off: the step goes at its
+    /// way's speed, as the whole of it does. (It had a speed of none, and a taxi turning off an
+    /// avenue stood there for good with nobody to wait for, the queue behind it too: Oatcroft.)
+    #[test]
+    fn a_car_a_hairs_breadth_short_of_a_point_sets_off() {
+        let route = Route {
+            points: vec![
+                ([506.4, 464.9], 0.0, 870.0, false),
+                ([507.020_1, 465.380_4], 0.8, 877.98, false),
+                ([507.071_9, 465.424_9], 0.9, 878.474_2, false),
+                ([507.130_7, 465.466], 1.0, 878.968_7, false),
+                ([507.193_3, 465.501_1], 1.1, 879.463_9, false),
+            ],
+            ..Default::default()
+        };
+        let b = route.points[2];
+        // (The latest tick short of it where it is, in f32, on it.)
+        let mut t = b.2;
+        let mut short = None;
+        for _ in 0..256 {
+            t = f32::from_bits(t.to_bits() - 1);
+            if route.at(t).0 != b.0 {
+                break;
+            }
+            short = Some(t);
+        }
+        let t = short.expect("a tick short of the point where the car is on it");
+        let path = Path::new(&route, t, 10.0);
+        assert!(
+            path.0[0].0 == path.0[0].1,
+            "its first step there is of no length"
+        );
+        let speed = plan_speed(&route, b.2);
+        assert!(
+            path.tops() >= speed * 0.9,
+            "it may go {} m/s there, not {speed}",
+            path.tops()
+        );
+    }
+}
