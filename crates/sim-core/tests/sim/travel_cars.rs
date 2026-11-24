@@ -3033,3 +3033,117 @@ fn a_knot_of_a_country_road_leaving_a_street_at_a_slant_by_another_junction_is_l
     // (The other arms keep theirs.)
     assert!(west.crosswalk && arm(tee, [1.0, 0.0]).crosswalk);
 }
+
+/// At super speed a step runs up to 60 ticks: the snapshot has each car's way through them
+/// (`snapshot::car::TRAIL`), so the renderer draws it where it was tick by tick (within
+/// `TRAIL_TOLERANCE`), round the crossroads' turns, not on the straight line across them.
+#[test]
+fn at_super_speed_the_snapshot_has_the_way_each_car_went_tick_by_tick() {
+    use sim_core::snapshot::{
+        self, CAR_BASE, CAR_STRIDE, TRAIL_BASE, TRAIL_MOST, TRAIL_STEPS, TRAIL_STRIDE,
+        TRAIL_TOLERANCE, car, trail,
+    };
+    let mut w = busy_crossroads();
+    w.speed = 4;
+    let mut buf = vec![0.0f32; snapshot::CAPACITY];
+    let (mut checked, mut turning, mut worst, mut straight_worst) = (0, 0, 0.0f32, 0.0f32);
+    let mut before: Vec<Option<[f32; 2]>> = vec![None; w.cars.len()];
+    for _ in 0..240 {
+        keep_driving(&mut w);
+        w.start_step();
+        // (Each car's pose after each tick of the step, as the renderer would want it.)
+        let mut ticks: Vec<Vec<Option<[f32; 3]>>> = Vec::new();
+        while w.advance_more() {
+            let poses = w
+                .cars
+                .iter()
+                .map(|c| c.shown.filter(|s| s.2).map(|s| [s.0[0], s.0[1], s.1]));
+            ticks.push(poses.collect());
+        }
+        snapshot::write(&w, &mut buf);
+        let n = ticks.len() as f32;
+        for c in 0..w.cars.len() {
+            let o = CAR_BASE + c * CAR_STRIDE;
+            let shown = buf[o + car::SHOWN] == 2.0 && ticks.iter().all(|t| t[c].is_some());
+            let was = std::mem::replace(
+                &mut before[c],
+                shown.then(|| [buf[o + car::X], buf[o + car::Z]]),
+            );
+            if !shown {
+                continue;
+            }
+            let len = buf[o + car::TRAIL_LEN] as usize;
+            let mut way: Vec<[f32; 4]> = (0..len)
+                .map(|i| {
+                    let a = TRAIL_BASE + (buf[o + car::TRAIL] as usize + i) * TRAIL_STRIDE;
+                    [
+                        buf[a + trail::T],
+                        buf[a + trail::X],
+                        buf[a + trail::Z],
+                        buf[a + trail::YAW],
+                    ]
+                })
+                .collect();
+            way.push([0.0, buf[o + car::X], buf[o + car::Z], buf[o + car::YAW]]);
+            assert!(
+                way.windows(2).all(|p| p[0][0] < p[1][0]),
+                "car {c}'s way goes back in time: {way:?}"
+            );
+            // (Its points from the last steps kept, and one before them: where it stood since, or came from.)
+            assert!(
+                way.len() < 3 || way[1][0] > -(TRAIL_STEPS as f32) - 1.0,
+                "car {c}'s way is too old: {way:?}"
+            );
+            if len >= TRAIL_MOST {
+                continue;
+            }
+            let at = |t: f32| {
+                let j = way.iter().position(|p| p[0] >= t).unwrap();
+                let (a, b) = (way[j.max(1) - 1], way[j]);
+                let k = if b[0] > a[0] {
+                    ((t - a[0]) / (b[0] - a[0])).clamp(0.0, 1.0)
+                } else {
+                    1.0
+                };
+                [a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k]
+            };
+            for (j, tick) in ticks.iter().enumerate() {
+                let t = -1.0 + (j as f32 + 1.0) / n;
+                let p = tick[c].unwrap();
+                if t < way[0][0] {
+                    continue;
+                }
+                let q = at(t);
+                worst = worst.max((q[0] - p[0]).hypot(q[1] - p[1]));
+                // (The straight line from the snapshot before, as it was drawn.)
+                if let Some(b) = was {
+                    let k = (t + 1.0).clamp(0.0, 1.0);
+                    let s = [
+                        b[0] + (buf[o + car::X] - b[0]) * k,
+                        b[1] + (buf[o + car::Z] - b[1]) * k,
+                    ];
+                    straight_worst = straight_worst.max((s[0] - p[0]).hypot(s[1] - p[1]));
+                }
+            }
+            checked += 1;
+            if (ticks[0][c].unwrap()[2] - buf[o + car::YAW]).abs() > 0.5 {
+                turning += 1;
+            }
+        }
+    }
+    eprintln!(
+        "{checked} cars' steps checked, {turning} turning: {worst:.3} m off at most (on the straight line {straight_worst:.1} m)"
+    );
+    assert!(
+        checked > 100 && turning > 5,
+        "too few drives: {checked}, {turning} turning"
+    );
+    assert!(
+        worst <= TRAIL_TOLERANCE + 1e-3,
+        "drawn {worst} m off where the car was"
+    );
+    assert!(
+        straight_worst > 2.0,
+        "the straight line cut no corner: {straight_worst}"
+    );
+}

@@ -643,9 +643,13 @@ fn in_hidden_car(world: &World, hidden: &[bool], s: &crate::world::Sim) -> bool 
 fn write_cars(world: &World, hidden: &[bool], out: &mut [f32]) {
     let cars = &world.cars[..world.cars.len().min(crate::cars::MAX_CARS)];
     out[header::CAR_COUNT] = cars.len() as f32;
+    // (The ways' pool, filled car by car.)
+    let mut way = [[0.0; TRAIL_STRIDE]; TRAIL_MOST];
+    let mut used = 0;
     for (k, c) in cars.iter().enumerate() {
         let o = &mut out[CAR_BASE + k * CAR_STRIDE..CAR_BASE + (k + 1) * CAR_STRIDE];
         o[car::KIND] = if c.taxi { car::TAXI } else { car::HOUSEHOLD };
+        o[car::TRAIL_LEN] = 0.0;
         // (Out of sight, driving through the others, or on top of one that is: not drawn,
         // `cars::hidden`.)
         let Some((p, yaw, moving, doors)) = c.shown.filter(|_| !hidden[k]) else {
@@ -657,6 +661,15 @@ fn write_cars(world: &World, hidden: &[bool], out: &mut [f32]) {
         o[car::Z] = p[1];
         o[car::YAW] = yaw;
         o[car::DOORS] = f32::from(doors);
+        let room = (TRAIL_POINTS - used).min(TRAIL_MOST);
+        let n = world.trails.write(k, world.step_ticks, &mut way[..room]);
+        o[car::TRAIL] = used as f32;
+        o[car::TRAIL_LEN] = n as f32;
+        for (i, w) in way[..n].iter().enumerate() {
+            let at = TRAIL_BASE + (used + i) * TRAIL_STRIDE;
+            out[at..at + TRAIL_STRIDE].copy_from_slice(w);
+        }
+        used += n;
     }
 }
 

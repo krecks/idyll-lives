@@ -63,7 +63,8 @@ export const TICK_RATES = { ticksPerSecond: TICKS_PER_SECOND, ticksPerMinute: TI
 export const BASES = {
   car: 'pub const CAR_BASE: usize = HEADER_LEN + (MAX_SIMS + crate::staff::MAX_STAFF) * SIM_STRIDE;',
   light: 'pub const LIGHT_BASE: usize = CAR_BASE + crate::cars::MAX_CARS * CAR_STRIDE;',
-  capacity: 'pub const CAPACITY: usize = LIGHT_BASE + MAX_LIGHTS * LIGHT_STRIDE;',
+  trail: 'pub const TRAIL_BASE: usize = LIGHT_BASE + MAX_LIGHTS * LIGHT_STRIDE;',
+  capacity: 'pub const CAPACITY: usize = TRAIL_BASE + TRAIL_POINTS * TRAIL_STRIDE;',
 };
 
 const HEADER_LEN = constant('HEADER_LEN');
@@ -74,12 +75,15 @@ const MAX_CARS = constant('MAX_CARS');
 const CAR_STRIDE = constant('CAR_STRIDE');
 const LIGHT_STRIDE = constant('LIGHT_STRIDE');
 const MAX_LIGHTS = constant('MAX_LIGHTS');
+const TRAIL_STRIDE = constant('TRAIL_STRIDE');
+const TRAIL_POINTS = constant('TRAIL_POINTS');
 const CAR_BASE = HEADER_LEN + (MAX_SIMS + MAX_STAFF) * SIM_STRIDE;
 const LIGHT_BASE = CAR_BASE + MAX_CARS * CAR_STRIDE;
+const TRAIL_BASE = LIGHT_BASE + MAX_LIGHTS * LIGHT_STRIDE;
 
 /** The layout's car and light parts (and the header's counts), as `layout_json` has them. */
 export const LAYOUT = {
-  capacity: LIGHT_BASE + MAX_LIGHTS * LIGHT_STRIDE,
+  capacity: TRAIL_BASE + TRAIL_POINTS * TRAIL_STRIDE,
   headerLen: HEADER_LEN,
   simStride: SIM_STRIDE,
   maxSims: MAX_SIMS,
@@ -106,7 +110,13 @@ export const LAYOUT = {
     doors: constant('DOORS', 'car'),
     kind: constant('KIND', 'car'),
     kinds: { household: constant('HOUSEHOLD', 'car'), taxi: constant('TAXI', 'car') },
+    trail: constant('TRAIL', 'car'),
+    trailLen: constant('TRAIL_LEN', 'car'),
   },
+  trailBase: TRAIL_BASE,
+  trailStride: TRAIL_STRIDE,
+  maxTrailPoints: TRAIL_POINTS,
+  trail: { t: constant('T', 'trail'), x: constant('X', 'trail'), z: constant('Z', 'trail'), yaw: constant('YAW', 'trail') },
   lightBase: LIGHT_BASE,
   lightStride: LIGHT_STRIDE,
   maxLights: MAX_LIGHTS,
