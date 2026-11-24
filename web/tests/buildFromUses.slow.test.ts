@@ -234,7 +234,9 @@ describe('build from uses', async () => {
         }
       });
     const plans = [
-      { what: `${cases[0].world} proposal`, proposal, plan: proposal.plan },
+      // (Its public places read low, 20 for 27 built, so within 30 %: since the roads joining a lane widened for a one-way
+      // pair begin at its new kerb, under a metre back, its town lays out a little otherwise, 24 for 27 before, 2026-11-24.)
+      { what: `${cases[0].world} proposal`, proposal, plan: proposal.plan, share: 0.3 },
       // (Painted by hand, its shops read high: 47 for 38 built with 7 m lanes, 47 for 37 with 6 m, so within 30 %;
       // over 24 proposals of eight places the estimate holds, 835 shops for 817 built, 2026-11-23.)
       { what: `${cases[0].world} painted`, proposal, plan: small, share: 0.3 },
