@@ -27,7 +27,7 @@ import { daylightByDefault } from './daylight';
 import * as pc from './engine';
 import { withoutContact } from './post';
 import { Grass, grassGround, type GrassPusher } from './grass';
-import { disposeTiles, type GroundTile } from './groundTiles';
+import { disposeTiles, fieldGround, FieldMap, type GroundTile } from './groundTiles';
 import { IMPOSTOR, impostorCards, setImpostorEye, TreeImpostors, type Impostor } from './impostors';
 import { Instances } from './instancing';
 import { gpuOnly, meshFrom } from './meshes';
@@ -35,6 +35,7 @@ import { GAME_FRONT_FACE, MaterialLibrary, textureWithFallback } from './materia
 import { buildModel, disposeTemplate, type ModelMesh, type ModelTemplate } from './models';
 import { codeFor, float, registerShaderFeature, type ShaderFeature } from './shaders/chunks';
 import { setSky } from './shaders/fog';
+import './shaders/fieldGround';
 import { domeColour, SKY_SEGMENTS, type DomeSky } from '../shared/skyMap';
 import type { AssetRegistry } from '../../assets/registry';
 import type { WorldStructure } from '../../core/protocol';
@@ -123,6 +124,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   private waterMaterial: { material: pc.StandardMaterial; lib: MaterialLibrary } | null = null;
   /** The water's flow map (`pc/water.ts`), made with its material (none: `?diag=noflow`). */
   private flowMap: WaterFlowMap | null = null;
+  /** A big world's farmland as its ground tiles draw it near (`FieldMap`), made with its tiles. */
+  private fieldMap: FieldMap | null = null;
 
   /** The land in the render data worker while `build` runs: the terrain's shading and the grass field are made there. */
   private offThread: OffThreadLand | null = null;
@@ -204,6 +207,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     const grass = (this.grass = new Grass(app, parent, field, this.grassQuality));
     onStep?.('grass');
     grass.onGround([...grounds, ...pads.slabs].map((g) => g.render!.meshInstances[0]));
+    perfTime('nature: fields', () => this.layFields());
     const built = gather(this.batches);
     return { draws: [...draws, ...built.draws, ...grass.draws.map((d) => d.entity)], casters: built.casters, only: built.only };
   }
@@ -266,6 +270,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     this.others = [...this.others.filter((e) => !gone.has(e)), ...fresh];
     this.drawsChanged(fresh, old);
     this.grass?.onGround([...this.grounds, ...pads.slabs].map((g) => g.render!.meshInstances[0]));
+    perfTime('nature: fields', () => this.layFields());
     if (!changed) return null;
     const box = this.landBox(changed.rect, LAND_DONE_PAD);
     const tiles = this.tilesIn(box);
@@ -362,6 +367,8 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     }
     this.flowMap?.destroy();
     this.flowMap = null;
+    this.fieldMap?.dispose();
+    this.fieldMap = null;
     this.grass?.dispose();
     this.grass = null;
     this.batches = [];
@@ -750,6 +757,11 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
     // (A river drawn out to the edge, or away from it: the valley past the edge came, went or moved with it.)
     const valleys = this.valleysMoved(exits);
     if (valleys) [box[0], box[1], box[2], box[3]] = [Math.min(box[0], valleys[0]), Math.min(box[1], valleys[1]), Math.max(box[2], valleys[2]), Math.max(box[3], valleys[3])];
+    // (The fields the stroke reached are farmed or not, and cut, a whole field at once, each up to two of the patchwork's sizes long and
+    // 0.8 deep, turned: up to 2.16 sizes across in x or z; and their hedges' shade 3.1 m past their edges.)
+    const size = this.patchwork()?.grid.size ?? 0;
+    const fields = size ? 2.16 * size + 3.1 : 0;
+    if (fields) [box[0], box[1], box[2], box[3]] = [box[0] - fields, box[1] - fields, box[2] + fields, box[3] + fields];
     perfTime('land: flow', () => this.flowMap?.changed(changed, true));
     for (const k of this.tilesIn(box)) {
       await pace?.();
@@ -785,7 +797,16 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       perfTime('land: grass ground', () => regroundGrass(grass, this, box[0], box[1], box[2], box[3]));
       perfTime('land: grass upload', () => this.grass?.landChanged(true));
     }
+    perfTime('land: fields', () => this.layFields());
     return box;
+  }
+
+  /** A big world's farmland's map made again for its world and land as they are now (`FieldMap.bake`: nothing if neither changed), on its ground tiles. */
+  private layFields(): void {
+    if (!this.host || !this.world || !this.built || !this.tiles.length) return;
+    const map = (this.fieldMap ??= new FieldMap(this.host.app.graphicsDevice));
+    map.bake(this.world, this);
+    map.lay(this.tiles.map((t) => t.mi));
   }
 
   /** The pads and the country roads drawn again, whole, on the surface as it is now (the land moved them: `landDone`). */
@@ -842,6 +863,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       }
       this.pondsIn([...this.tiles.keys()]);
       this.sheetAsNeeded();
+      this.layFields();
       const grass = this.grass?.grassField;
       if (grass) {
         const made = await grassLand;
@@ -1227,6 +1249,7 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
   private groundMaterial(app: pc.AppBase): pc.StandardMaterial {
     const material = MaterialLibrary.for(app).surface('material.ground', { vertexColors: true, variant: this.surface ? 'grassPads' : 'grass' });
     grassGround(app.graphicsDevice, material);
+    fieldGround(app.graphicsDevice, material);
     if (this.surface) padMasked(app.graphicsDevice, material);
     return material;
   }

@@ -5,7 +5,7 @@
  */
 
 import * as pc from './engine';
-import { groundDepth, type RoadPlan, type WorldStructure, type WorldZone } from '../../core/protocol';
+import { groundDepth, type RoadPlan, type WorldStructure } from '../../core/protocol';
 import { carriageway, hasSidewalks, planJunctions } from '../shared/junctions';
 import { kindInfo } from '../../core/roadKinds';
 import { lengths } from '../../game/roads';
@@ -15,6 +15,7 @@ import { boxOf, clipRect, COURSE, courseCells, JOINT, LINE, PAVING_LOOK, TILE, t
 import { PATH_LOOK, pathLook } from '../shared/paving';
 import { bridgeSpans, raisedSpans, stretchOf } from '../shared/roads';
 import { BRIDGE } from '../shared/street';
+import type { FieldCanvas } from '../shared/farmland';
 
 /**
  * A ground tile as `terrainTiles` builds it: its draw, its meshes by level (the finest only while it is near enough to
@@ -72,11 +73,10 @@ const MAP = {
   concrete: '#AFACA4',
 } as const;
 
-/** What the map asks of the land: a big world's farmland as the terrain colours it (`LandscapeLayout.farmland`). */
+/** What the farmland's map asks of the land: a big world's farmland, its box and how to paint it (`LandscapeLayout.farmland`). */
 export interface TownGroundLand {
-  farmland(): { size: number; across: number; angle: number; crop(cu: number, cv: number, out: { r: number; g: number; b: number }): boolean; weight(x: number, z: number): number; box?: [number, number, number, number] } | null;
-  /** Counts the changes of a land drawn from a height field (its cover moves the farmland): the map is made again for a new one. */
-  readonly landVersion?: number;
+  /** `key`: which of its fields are farmed and where its edges cut them, as a hash (the map is made again only when it changes). */
+  farmland(): { box: [number, number, number, number]; key: string; paint(g: FieldCanvas): void } | null;
 }
 
 /**
@@ -179,17 +179,129 @@ export function paintPaving(g: PavingCanvas, paving: TownPaving, W: number, D: n
   g.stroke();
 }
 
-/** How far apart (m) the farmland's strength is asked (drawn smoothed between), and how far round the field zones (their soft edge). */
-const FIELD_MASK = 4;
-const FIELD_SOFT = 8;
+/** How far either side of a road (past its width) and round a lot (m) the farmland stops: the verge, the lot's edge. */
+const FIELD_VERGE = 2.5;
+const FIELD_LOT = 1;
+
+/**
+ * A big world's farmland onto a map (`g` in world metres): its fields (`LandscapeLayout.farmland`), then none of them
+ * on the roads and their verges, on the lots (their gardens stay theirs) or on the greens.
+ */
+function paintFarmland(g: OffscreenCanvasRenderingContext2D, farmland: NonNullable<ReturnType<TownGroundLand['farmland']>>, world: WorldStructure): void {
+  g.save();
+  farmland.paint(g);
+  g.globalCompositeOperation = 'destination-out';
+  g.fillStyle = '#000';
+  g.strokeStyle = '#000';
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  for (const p of world.plots) g.fillRect(p.x - FIELD_LOT, p.z - FIELD_LOT, p.w + 2 * FIELD_LOT, p.d + 2 * FIELD_LOT);
+  for (const green of world.meta?.greens ?? []) {
+    g.beginPath();
+    green.forEach(([x, z], i) => (i ? g.lineTo(x, z) : g.moveTo(x, z)));
+    g.fill();
+  }
+  for (const r of world.meta?.roads ?? []) {
+    g.lineWidth = r.width + 2 * FIELD_VERGE;
+    g.beginPath();
+    r.points.forEach(([x, z], i) => (i ? g.lineTo(x, z) : g.moveTo(x, z)));
+    g.stroke();
+  }
+  g.restore();
+}
+
+/** A canvas's pixels premultiplied by their alpha (in place): a map's mips stay true at an edge. */
+function premultiplied(data: Uint8ClampedArray): Uint8Array {
+  for (let i = 0; i < data.length; i += 4) {
+    const a = data[i + 3] / 255;
+    data[i] = Math.round(data[i] * a);
+    data[i + 1] = Math.round(data[i + 1] * a);
+    data[i + 2] = Math.round(data[i + 2] * a);
+  }
+  return new Uint8Array(data.buffer);
+}
+
+/** A map of no farmland (nothing in it), for the ground's materials until a landscape's own is made; the materials given it. */
+const noFields = new WeakMap<pc.GraphicsDevice, pc.Texture>();
+const fielded = new WeakSet<pc.StandardMaterial>();
+
+/**
+ * The ground's material takes the farmland's map (`shaders/fieldGround.ts`): its define, and no fields until a
+ * landscape gives its tiles their own (`FieldMap.lay`, on each draw: two landscapes may share the material).
+ */
+export function fieldGround(device: pc.GraphicsDevice, material: pc.StandardMaterial): void {
+  if (fielded.has(material)) return;
+  fielded.add(material);
+  let none = noFields.get(device);
+  if (!none) noFields.set(device, (none = new pc.Texture(device, { name: 'noFields', width: 1, height: 1, format: pc.PIXELFORMAT_RGBA8, mipmaps: false, levels: [new Uint8Array(4)] })));
+  material.setDefine('GAME_FIELD_MAP', '');
+  material.setParameter('game_fieldMap', none);
+  material.setParameter('game_fieldArea', new Float32Array([0, 0, 0, 0]));
+  material.update();
+}
+
+/**
+ * A big world's farmland as the ground draws it: a colour map over the box its fields reach (`MAP_PER_M` texels
+ * a metre, at most `MAP_MAX` a side), each field's crop in its rows inside its grass margin and its hedges
+ * (`farmland.ts` `paintFields`), none on the roads, their verges, the lots or the greens; laid over the ground tiles'
+ * colour (`shaders/fieldGround.ts`), near and in the town view alike (its map, `TownGroundMap`, over it). Made again
+ * for another town or when other fields are farmed or cut (`bake`: not for every stroke of the brushes).
+ */
+export class FieldMap {
+  private texture: pc.Texture | null = null;
+  private key = '';
+  private readonly area = new Float32Array(4);
+
+  constructor(private readonly device: pc.GraphicsDevice) {}
+
+  /** Makes the map for `world` on `land` (nothing again for the same; none without farmland or a 2D canvas). Says whether it changed. */
+  bake(world: WorldStructure, land: TownGroundLand): boolean {
+    const farmland = typeof OffscreenCanvas === 'undefined' ? null : land.farmland();
+    const key = farmland ? `${world.meta?.seed ?? 0}|${groundVersion(world)}|${farmland.key}|${farmland.box.join(',')}` : '';
+    if (key === this.key) return false;
+    this.key = key;
+    this.texture?.destroy();
+    this.texture = null;
+    this.area.fill(0);
+    if (!farmland) return true;
+    const [x0, z0, x1, z1] = farmland.box;
+    const w = Math.max(1, Math.min(MAP_MAX, Math.ceil((x1 - x0) * MAP_PER_M)));
+    const h = Math.max(1, Math.min(MAP_MAX, Math.ceil((z1 - z0) * MAP_PER_M)));
+    const canvas = new OffscreenCanvas(w, h);
+    const g = canvas.getContext('2d', { willReadFrequently: true })!;
+    const [sx, sz] = [w / (x1 - x0), h / (z1 - z0)];
+    g.setTransform(sx, 0, 0, sz, -x0 * sx, -z0 * sz);
+    paintFarmland(g, farmland, world);
+    const data = premultiplied(g.getImageData(0, 0, w, h).data);
+    this.texture = new pc.Texture(this.device, { name: 'fieldMap', width: w, height: h, format: pc.PIXELFORMAT_RGBA8, mipmaps: true, anisotropy: 8, minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR, magFilter: pc.FILTER_LINEAR, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [data] });
+    this.area.set([x0, z0, 1 / (x1 - x0), 1 / (z1 - z0)]);
+    return true;
+  }
+
+  /** The map on these draws (the ground tiles'), or none. */
+  lay(draws: Iterable<pc.MeshInstance>): void {
+    const map = this.texture ?? noFields.get(this.device);
+    if (!map) return;
+    for (const mi of draws) {
+      mi.setParameter('game_fieldMap', map);
+      mi.setParameter('game_fieldArea', this.area);
+    }
+  }
+
+  dispose(): void {
+    this.texture?.destroy();
+    this.texture = null;
+    this.key = '';
+  }
+}
 
 /**
  * The ground's colour map at altitude: what the town lays on its land (streets and pavements, the junctions'
  * pads, an avenue's green median, a motorway's barrier, its overpasses over what they cross, its paving as the street lays it near (`townPaving`: the centre, courts and yards, car parks and their
- * bays), its farm fields and paths, a big world's farmland as its ground
- * has it) over the whole world in one texture, baked once per town (`bake`; again only for another town), and laid over the ground tiles' colour by the town
+ * bays), its farm fields and paths) over the whole world in one texture, baked once per town (`bake`; again only for another town), and laid over the ground tiles' colour by the town
  * view's blend (`shaders/townGround.ts`). The tiles' material takes its define only while the blend is over 0
- * (`apply`): up to `TOWN_FROM` the ground draws with the shader it always had.
+ * (`apply`): up to `TOWN_FROM` the ground draws with the shader it always had. Not a big world's farmland: its own
+ * map (`FieldMap`) draws it under this one at every distance, so it doesn't fade out and in again with the blend.
  */
 export class TownGroundMap {
   private texture: pc.Texture | null = null;
@@ -201,15 +313,12 @@ export class TownGroundMap {
 
   constructor(private readonly device: pc.GraphicsDevice) {}
 
-  /**
-   * Bakes the map for `world` (nothing again for the same town; nothing without a 2D canvas: the tests' engine).
-   * `land`: the landscape, for a big world's farmland.
-   */
-  bake(world: WorldStructure, land: TownGroundLand | null = null): void {
+  /** Bakes the map for `world` (nothing again for the same town; nothing without a 2D canvas: the tests' engine). */
+  bake(world: WorldStructure): void {
     const meta = world.meta;
     const W = world.width;
     const D = groundDepth(world);
-    const key = `${meta?.seed ?? 0}|${W}x${D}|${groundVersion(world)}|${land ? 1 : 0}|${land?.landVersion ?? 0}`;
+    const key = `${meta?.seed ?? 0}|${W}x${D}|${groundVersion(world)}`;
     if (key === this.key || typeof OffscreenCanvas === 'undefined' || !meta) return;
     this.key = key;
     this.version++;
@@ -218,29 +327,12 @@ export class TownGroundMap {
     const sz = size / D;
     const canvas = new OffscreenCanvas(size, size);
     const g = canvas.getContext('2d', { willReadFrequently: true })!;
-    // A big world's farmland first, under everything: the patchwork its ground has, each field's edge where it is.
-    const farmland = land?.farmland();
-    if (farmland && (meta.zones || farmland.box)) this.farmland(g, size, sx, sz, meta.zones ?? [], farmland);
     g.setTransform(sx, 0, 0, sz, 0, 0);
     g.lineCap = 'round';
     g.lineJoin = 'round';
-    const poly = (p: readonly (readonly [number, number])[]) => {
-      g.beginPath();
-      p.forEach(([x, z], i) => (i ? g.lineTo(x, z) : g.moveTo(x, z)));
-      g.closePath();
-    };
     const roads = meta.roads ?? [];
     // (No water: the water's sheet over the ground draws it, inside the world as past its edge. Painted here, a sea
     // reaching past the edge stepped from one blue to another along it.)
-    // None of the farmland on the lots (their gardens stay theirs) or the greens.
-    g.globalCompositeOperation = 'destination-out';
-    g.fillStyle = '#000';
-    for (const p of world.plots) g.fillRect(p.x, p.z, p.w, p.d);
-    for (const green of meta.greens ?? []) {
-      poly(green);
-      g.fill();
-    }
-    g.globalCompositeOperation = 'source-over';
     // The town's paving (`townPaving`: the centre's stone in courses, the courts and yards, the car parks and their
     // bays), as the street lays it near.
     paintPaving(g, townPaving(world), W, D);
@@ -325,82 +417,11 @@ export class TownGroundMap {
     if (decks.size) barriers((r, s) => !!decks.get(r)?.some(([a, b]) => s >= a && s <= b));
     g.lineCap = 'round';
     // Premultiplied (so the mips stay true at an edge), up to the GPU with its mips.
-    const data = g.getImageData(0, 0, size, size).data;
-    for (let i = 0; i < data.length; i += 4) {
-      const a = data[i + 3] / 255;
-      data[i] = Math.round(data[i] * a);
-      data[i + 1] = Math.round(data[i + 1] * a);
-      data[i + 2] = Math.round(data[i + 2] * a);
-    }
+    const data = premultiplied(g.getImageData(0, 0, size, size).data);
     this.texture?.destroy();
-    const texture = new pc.Texture(this.device, { name: 'townGroundMap', width: size, height: size, format: pc.PIXELFORMAT_RGBA8, mipmaps: true, minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR, magFilter: pc.FILTER_LINEAR, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [new Uint8Array(data.buffer)] });
+    const texture = new pc.Texture(this.device, { name: 'townGroundMap', width: size, height: size, format: pc.PIXELFORMAT_RGBA8, mipmaps: true, minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR, magFilter: pc.FILTER_LINEAR, addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE, levels: [data] });
     this.texture = texture;
     this.area.set([0, 0, 1 / W, 1 / D]);
-  }
-
-  /**
-   * A big world's farmland into the map (before anything else is drawn): the patchwork cell by cell, each a
-   * rectangle in its crop's colour (the canvas draws its edges where they are), shown as strongly as the terrain
-   * shows it (`land.weight`, asked `FIELD_MASK` m apart and smoothed between: the fields fade out at their zones'
-   * edges and by the town).
-   */
-  private farmland(g: OffscreenCanvasRenderingContext2D, size: number, sx: number, sz: number, zones: readonly WorldZone[], land: NonNullable<ReturnType<TownGroundLand['farmland']>>): void {
-    // (Round the field zones; a land drawn from a height field says where its fields are, `box`.)
-    let [x0, z0, x1, z1] = land.box ?? [Infinity, Infinity, -Infinity, -Infinity];
-    if (!land.box) {
-      for (const zone of zones) {
-        if (zone.kind !== 'fields') continue;
-        for (const [x, z] of zone.poly) [x0, z0, x1, z1] = [Math.min(x0, x), Math.min(z0, z), Math.max(x1, x), Math.max(z1, z)];
-      }
-    }
-    const i0 = Math.max(0, Math.floor((x0 - FIELD_SOFT) * sx));
-    const j0 = Math.max(0, Math.floor((z0 - FIELD_SOFT) * sz));
-    const i1 = Math.min(size, Math.ceil((x1 + FIELD_SOFT) * sx));
-    const j1 = Math.min(size, Math.ceil((z1 + FIELD_SOFT) * sz));
-    if (i1 <= i0 || j1 <= j0) return;
-    const [w, h] = [i1 - i0, j1 - j0];
-    // (The box in metres, as the texels have it.)
-    [x0, z0, x1, z1] = [i0 / sx, j0 / sz, i1 / sx, j1 / sz];
-    const region = new OffscreenCanvas(w, h);
-    const r = region.getContext('2d')!;
-    r.setTransform(sx, 0, 0, sz, -i0, -j0);
-    const [c, s] = [Math.cos(land.angle), Math.sin(land.angle)];
-    const us = [x0 * c + z0 * s, x1 * c + z0 * s, x1 * c + z1 * s, x0 * c + z1 * s].map((u) => u / land.size);
-    const vs = [-x0 * s + z0 * c, -x1 * s + z0 * c, -x1 * s + z1 * c, -x0 * s + z1 * c].map((v) => v / land.across);
-    const at = (u: number, v: number) => [u * land.size * c - v * land.across * s, u * land.size * s + v * land.across * c] as const;
-    // (Each cell a touch over its lines: no seam between two.)
-    const [eu, ev] = [0.25 / land.size, 0.25 / land.across];
-    const col = { r: 0, g: 0, b: 0 };
-    for (let cu = Math.floor(Math.min(...us)); cu <= Math.floor(Math.max(...us)); cu++) {
-      for (let cv = Math.floor(Math.min(...vs)); cv <= Math.floor(Math.max(...vs)); cv++) {
-        if (!land.crop(cu, cv, col)) continue;
-        r.fillStyle = `rgb(${Math.round(col.r * 255)}, ${Math.round(col.g * 255)}, ${Math.round(col.b * 255)})`;
-        r.beginPath();
-        [at(cu - eu, cv - ev), at(cu + 1 + eu, cv - ev), at(cu + 1 + eu, cv + 1 + ev), at(cu - eu, cv + 1 + ev)].forEach(([x, z], k) => (k ? r.lineTo(x, z) : r.moveTo(x, z)));
-        r.closePath();
-        r.fill();
-      }
-    }
-    // How strongly it shows: a small picture of the strength, drawn over the patchwork smoothed (what it keeps of it).
-    const mw = Math.ceil((x1 - x0) / FIELD_MASK) + 1;
-    const mh = Math.ceil((z1 - z0) / FIELD_MASK) + 1;
-    const mask = new OffscreenCanvas(mw, mh);
-    const m = mask.getContext('2d')!;
-    const img = m.createImageData(mw, mh);
-    for (let j = 0; j < mh; j++) {
-      for (let i = 0; i < mw; i++) {
-        const o = (j * mw + i) * 4;
-        img.data[o] = img.data[o + 1] = img.data[o + 2] = 255;
-        img.data[o + 3] = Math.round(Math.min(1, Math.max(0, land.weight(x0 + (i + 0.5) * FIELD_MASK, z0 + (j + 0.5) * FIELD_MASK))) * 255);
-      }
-    }
-    m.putImageData(img, 0, 0);
-    r.setTransform(1, 0, 0, 1, 0, 0);
-    r.globalCompositeOperation = 'destination-in';
-    r.imageSmoothingEnabled = true;
-    r.imageSmoothingQuality = 'high';
-    r.drawImage(mask, 0, 0, mw, mh, 0, 0, mw * FIELD_MASK * sx, mh * FIELD_MASK * sz);
-    g.drawImage(region, i0, j0);
   }
 
   /** Whether it is laid over the ground now. */

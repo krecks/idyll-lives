@@ -1612,8 +1612,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * chosen again on the next frame.
    */
   private buildTownView(world: WorldStructure): void {
-    const land = this.lot.landscape;
-    this.townGround.bake(world, land ?? null);
+    this.townGround.bake(world);
     this.townLotsBy = { chunks: null, houses: null, up: '' };
   }
 
@@ -1631,13 +1630,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.post?.setContact(1 - blend);
     this.townBuildings.show(this.diag.has('notownbuildings') ? 0 : Math.min(1, blend / TOWN_FADE));
     // (The ground tiles' materials asked for only while the map is, or is to be, on them. In with the buildings: what
-    // they stand on is in it, and the farmland's edges, which step along the ground's grid without it.)
+    // they stand on is in it. The farmland isn't: its own map draws it at every distance, `FieldMap`.)
     const mapped = this.diag.has('notownground') ? 0 : Math.min(1, blend / TOWN_FADE);
-    // (The land shaped since it was made: `landMapped`; made again by its land's version.)
-    if (mapped > 0 && this.townGroundStale && this.builtWorld) {
-      this.townGroundStale = false;
-      this.townGround.bake(this.builtWorld, this.lot.landscape);
-    }
     if (mapped > 0 || this.townGround.active) this.townGround.apply(this.lot.landscape?.groundMaterials() ?? [], mapped);
     // (The lots' buildings the street draws closed, their windows lit by the hour.)
     if (this.street.setTime(this.lastMinute, this.lastWeekday, this.lampsLevel > 0)) this.pictureChanged();
@@ -3700,12 +3694,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     return this.landQueue;
   }
 
-  /**
-   * The game world's ground map at altitude to be made again (its farmland follows the land's cover: `TownGroundMap`),
-   * the next time the town view draws it; the menus' land's haze and curtain fitted to the land as it now is.
-   */
+  /** The menus' land's haze and curtain fitted to the land as it now is. */
   private landMapped(scape: Landscape): void {
-    if (scape === this.lot.landscape) this.townGroundStale = true;
     if (scape === this.lot.landscapeOf('town')) this.hazeLand(scape);
   }
 
@@ -3716,7 +3706,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private hazeLand(scape: Landscape): void {
     this.landHaze?.set(this.townReach, (x, z) => scape.heightAt(x, z), townLayer(this.app).id, `${landscapeId(scape)}|${scape.landVersion}`);
   }
-  private townGroundStale = false;
 
   landOf(): Promise<Land> {
     const at = this.landInView();
