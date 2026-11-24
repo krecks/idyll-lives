@@ -17,7 +17,7 @@ import { kindInfo, kindOf, onewayOf } from '../../core/roadKinds';
 import { lengths, nearest, RoadIndex } from '../../game/roads';
 import { encodeFinish, type Geo, type V3 } from './geometry';
 import { carriageway, type JunctionPlan } from './junctions';
-import { insideOf, MOTORWAY, Walk } from './motorway';
+import { aside, insideOf, MOTORWAY, Walk } from './motorway';
 import type { RoadLevels } from './roads';
 
 /** How high the markings lie over the road (m: `roads.ts` `MARK_Y`, which this module can't import without a cycle). */
@@ -153,7 +153,8 @@ export function roadMarkings(roads: readonly RoadPlan[], marks: Geo, junctions: 
     const Y = (s: number) => (levels ? levels.road(road, s) : 0) + MARK_UP;
     const point = (s: number, off: number): V3 => {
       const { p, t } = walk.at(s);
-      return [p[0] + t[1] * off, Y(s), p[1] - t[0] * off];
+      const [x, z] = aside(p, t, off);
+      return [x, Y(s), z];
     };
     marks.color(PAINT, PAINT_FINISH);
     /** A line `wide` across at `off` from `s0` to `s1`, in pieces, none in a junction nor in the gore. */

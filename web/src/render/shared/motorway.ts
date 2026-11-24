@@ -13,7 +13,7 @@
 
 import type { RoadPlan } from '../../core/protocol';
 import { kindInfo, onewayOf } from '../../core/roadKinds';
-import { lengths, nearest, pointAt, raisedSpans, RoadIndex, type Pt } from '../../game/roads';
+import { leftOf, lengths, nearest, pointAt, raisedSpans, RoadIndex, type Pt } from '../../game/roads';
 import { encodeFinish, type Geo, type V3 } from './geometry';
 import type { RoadLevels } from './roads';
 
@@ -300,6 +300,15 @@ export function without(stretches: readonly [number, number][], cut: readonly [n
   return out.filter(([a, b]) => b - a > least);
 }
 
+/**
+ * The point `off` m to the side of `p` on a road going `t` there (+: towards (t.z, -t.x), `leftOf`: its left on the town
+ * map, its right as the game shows it; as `Lane.off` and `MotorwayPair.side`).
+ */
+export function aside(p: Pt, t: Pt, off: number): Pt {
+  const l = leftOf(t);
+  return [p[0] + l[0] * off, p[1] + l[1] * off];
+}
+
 /** A road's points by arc length, its way along and its left there: walked forward (`at`), back only from the start. */
 export class Walk {
   private i = 0;
@@ -353,7 +362,10 @@ export function lowDecks(g: Geo, roads: readonly RoadPlan[], levels: RoadLevels 
           const [a, b] = [s0 + ((s1 - s0) * k) / n, s0 + ((s1 - s0) * (k + 1)) / n];
           const [pa, pb] = [walk.at(a), walk.at(b)];
           const [ya, yb] = [Y(a), Y(b)];
-          const P = (q: { p: Pt; t: Pt }, off: number, y: number): V3 => [q.p[0] + q.t[1] * off, y, q.p[1] - q.t[0] * off];
+          const P = (q: { p: Pt; t: Pt }, off: number, y: number): V3 => {
+            const [x, z] = aside(q.p, q.t, off);
+            return [x, y, z];
+          };
           for (const side of [1, -1] as const) {
             if (side === inner) continue;
             const o = side * half;
@@ -418,8 +430,8 @@ export function signSpots(roads: readonly RoadPlan[], levels?: RoadLevels | null
         const s = at - before * cWay;
         if (s < 0 || s > cls[cls.length - 1]) continue;
         const { p, t } = pointAt(c.points, s, cls);
-        const off = outside * (c.width / 2 + SIGN_OUT);
-        out.push({ x: p[0] + t[1] * off, z: p[1] - t[0] * off, yaw: facing(t, cWay), y: Y(c, s) });
+        const [x, z] = aside(p, t, outside * (c.width / 2 + SIGN_OUT));
+        out.push({ x, z, yaw: facing(t, cWay), y: Y(c, s) });
       }
       // In the gore: the first place along the ramp it has parted from the carriageway far enough, midway between.
       for (let k = 1; k * 2 < total; k++) {
@@ -441,8 +453,8 @@ export function signSpots(roads: readonly RoadPlan[], levels?: RoadLevels | null
       const s = e === 0 ? total - SIGN_RAMP_IN : SIGN_RAMP_IN;
       if (s <= 0 || s >= total) return;
       const { p, t } = pointAt(ramp.points, s, ls);
-      const off = way * (ramp.width / 2 + SIGN_OUT);
-      out.push({ x: p[0] + t[1] * off, z: p[1] - t[0] * off, yaw: facing(t, way), y: Y(ramp, s) });
+      const [x, z] = aside(p, t, way * (ramp.width / 2 + SIGN_OUT));
+      out.push({ x, z, yaw: facing(t, way), y: Y(ramp, s) });
     }
   });
   return out;
