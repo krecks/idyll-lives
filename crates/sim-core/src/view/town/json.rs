@@ -156,14 +156,18 @@ pub fn items_json(world: &World) -> String {
             state: "fresh",
             household,
         });
+    // (What each stands on or in, in one pass over the objects: one pass for each item was most
+    // of a super-speed step in a big town, `items::holders`.)
+    let ats: Vec<crate::items::ItemAt> = world.items.list.iter().map(|it| it.at).collect();
+    let holders = crate::items::holders(content, &world.objects, &ats);
     let items: Vec<ItemView> = world
         .items
         .list
         .iter()
-        .map(|it| {
+        .zip(holders)
+        .map(|(it, holder)| {
             let [x, z] = it.at.centre();
-            let holder = crate::items::holder(content, &world.objects, &it.at)
-                .map(|o| &world.objects[o as usize]);
+            let holder = holder.map(|o| &world.objects[o as usize]);
             let y = match it.at {
                 crate::items::ItemAt::Surface { .. } => holder
                     .and_then(|o| content.objects[o.def].surface)
