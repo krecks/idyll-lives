@@ -594,3 +594,22 @@ fn one_isnt_let_into_a_stretch_whose_far_end_one_turning_round_still_backs_into(
     );
     assert!(traffic.holding(coming));
 }
+
+#[test]
+fn one_backed_up_into_whats_left_of_anothers_claim_stands_in_its_way() {
+    // (Fernwood's: a car turning round on a 6 m lane backed up out of a junction's box and
+    // stopped at the far end of a taxi's claim through it, facing the taxi coming out of a
+    // three-point turn there: the car waited for the taxi's claim, the taxi for the car's body,
+    // for good. `cars::turn_round` backs on out of what's left of it.)
+    let (holder, turning) = (1 << 63 | 23, 1 << 63 | 24);
+    let stretch = claim(&[[0.0, 0.0], [0.0, 6.0], [0.0, 12.0]]);
+    let mut traffic = Traffic::default();
+    // (In it already, it takes it.)
+    assert!(traffic.may_go(1, holder, 0, std::slice::from_ref(&stretch), 10.5, 11.5));
+    let ground = crate::travel::Layer::GROUND;
+    // (Facing it at the stretch's far end; well past it; and its holder itself.)
+    let at = |z: f32| rect([0.0, z], std::f32::consts::PI);
+    assert_eq!(traffic.claimed(turning, &at(15.0), ground), Some(holder));
+    assert_eq!(traffic.claimed(turning, &at(22.0), ground), None);
+    assert_eq!(traffic.claimed(holder, &at(15.0), ground), None);
+}

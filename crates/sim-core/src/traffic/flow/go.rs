@@ -208,4 +208,25 @@ impl Traffic {
             .find(|a| into(a, &stop) && !into(a, &short))
             .map(|a| a.key)
     }
+
+    /// Whose claim a body `at` on `layer`, backed up there (`cars::turn_round`), would stand in the
+    /// way of: what's left of a claim another than `key` holds (not a merge's) anywhere near it
+    /// (`conflict`, backing: nobody passes it). Stopped there to wait for its claim on, it'd wait
+    /// for that one's, and that one, kept from going on past it, would never let it go.
+    pub(crate) fn claimed(&self, key: u64, at: &Rect, layer: crate::travel::Layer) -> Option<u64> {
+        // (Going the way its back faces: backing.)
+        let me = Sample {
+            t: 0.0,
+            d: 0.0,
+            rect: *at,
+            way: [-at.yaw.sin(), -at.yaw.cos()],
+            pass: 0.0,
+            layer,
+        };
+        self.holds
+            .iter()
+            .filter(|h| h.key != key && !h.claim.merge && in_bounds(&h.claim, at))
+            .find(|h| h.claim.rest(h.at).iter().any(|o| conflict(&me, o, true)))
+            .map(|h| h.key)
+    }
 }
