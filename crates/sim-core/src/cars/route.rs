@@ -200,15 +200,18 @@ impl Route {
         }
         if let Some(t) = travel {
             crate::traffic::gate(&mut self.claims, &t.signals, &trace, len);
-            let ground: crate::traffic::Trace = if layers.is_empty() {
-                trace.clone()
+            // (Its poses on the ground: every one, but where it's off it.)
+            let ground: std::borrow::Cow<crate::traffic::Trace> = if layers.is_empty() {
+                std::borrow::Cow::Borrowed(&trace)
             } else {
-                trace
-                    .iter()
-                    .zip(&layers)
-                    .filter(|(_, l)| l.ground())
-                    .map(|(s, _)| *s)
-                    .collect()
+                std::borrow::Cow::Owned(
+                    trace
+                        .iter()
+                        .zip(&layers)
+                        .filter(|(_, l)| l.ground())
+                        .map(|(s, _)| *s)
+                        .collect(),
+                )
             };
             self.zebras = crate::traffic::zebra_stops(&ground, &t.give_way, len);
             self.zebras
