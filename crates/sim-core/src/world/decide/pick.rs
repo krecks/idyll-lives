@@ -70,7 +70,7 @@ pub(crate) fn pick_autonomous(
     // Nor back to bed rested, unless it's the middle of the night (it would end at once), nor
     // once the alarm's gone off for work or school.
     let rested = (!before_dawn(sim, ctx) && rhythm.rest_need.is_some_and(|n| needs[n] >= 0.95))
-        || getting_up(sim, ctx);
+        || getting_up(sim, ctx, false);
     // Only what they may use: at home and in public places, or where they're a guest.
     let usable = usable_here(sim, ctx);
     let usable: &[u32] = &usable;
@@ -146,6 +146,7 @@ pub(crate) fn pick_autonomous(
         .filter(|o| o.has_free_slot(content.objects[o.def].slots))
     {
         let plot = ctx.object_plot[obj.id as usize];
+        let public = plot.is_some_and(|p| ctx.plots[p as usize].public);
         let allowed = access(ctx, sim, plot);
         // (Off the home plot: a public place or the street.)
         let outing = || {
@@ -283,7 +284,7 @@ pub(crate) fn pick_autonomous(
                 || (napped && !exhausted && inter.tags & rhythm.nap_tags != 0)
                 || (allowed == Access::Guest
                     && !guest_may(content, &content.objects[obj.def], inter))
-                || !affordable(inter.cost, funds)
+                || !affordable(inter.cost_at(public), funds)
             {
                 continue;
             }
@@ -374,7 +375,8 @@ pub(crate) fn pick_autonomous(
                 ) / (1.0 + distance * 0.08);
             }
             // The plan: a block's activity is the favourite (even with full needs); goals.
-            let (plan, floor) = crate::planner::object_factor(content, sim, inter, night);
+            let (plan, floor) =
+                crate::planner::object_factor(content, sim, inter, inter.cost_at(public), night);
             let mut s = s.max(floor) * feel(inter.tags) * plan * place;
             if unwanted {
                 s *= UNWANTED_MEAL;

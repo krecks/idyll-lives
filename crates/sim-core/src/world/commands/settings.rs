@@ -220,6 +220,11 @@ impl World {
     ) -> Result<(), Error> {
         let day = crate::clock::day(self.tick);
         let goal = crate::planner::goal_from(&self.content, &goal, self.sim(sim)?, day)?;
+        let s = &self.sims[sim as usize];
+        if !crate::planner::for_their_age(self.content.goals[goal.def].kind, s.adult(&self.content))
+        {
+            return Err(Error::new(format!("{} is too young for that", s.name)));
+        }
         if crate::planner::progress(self, sim as usize, &goal) >= 1.0 {
             return Err(Error::new(format!(
                 "{} is there already",

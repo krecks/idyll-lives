@@ -149,8 +149,12 @@
 //! (`objects[].plot`: a flat's letterbox in the hall); public parking is marked bays, each saying
 //! the way a car parked in it faces (`openWorld.parking[].yaw`) and the car park it is one of
 //! (`park`), and the car parks are kept for the renderer as the town file had them
-//! (`openWorld.carParks`). No file older than this opens (`OLDEST_SAVE_VERSION`: the game says
-//! it is too old and removes it); none is migrated.
+//! (`openWorld.carParks`).
+//! 43 = the road hierarchy: a road may be an avenue, one of a motorway's carriageways or a ramp
+//! (`openWorld.roads[].kind`: `avenue`, `motorway`, `ramp`) and one-way (`oneway`: 1 along its
+//! points, -1 against them; left out when two-way), and a road's end may merge into another
+//! (`meta.roads[].ends`: `merge`). A town without them saves as it did. No file older than this
+//! opens (`OLDEST_SAVE_VERSION`: the game says it is too old and removes it); none is migrated.
 //! A town holds up to 256 servers (`staff::MAX_STAFF`, 128 before); nothing of them is saved.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -174,10 +178,10 @@ mod pack;
 mod read;
 mod write;
 
-pub const SAVE_VERSION: u32 = 42;
+pub const SAVE_VERSION: u32 = 43;
 /// The oldest save version this build opens: older files are refused, none migrated (until 1.0 a
 /// change of format leaves the saves before it behind).
-pub const OLDEST_SAVE_VERSION: u32 = 42;
+pub const OLDEST_SAVE_VERSION: u32 = 43;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -5,7 +5,9 @@
 // lines are shared between bays side by side, a car park has its P sign.
 import { describe, expect, test } from 'bun:test';
 import { Geo } from '../src/render/shared/geometry';
-import { carriageway, pavedRects, repair, STREET_LOOK } from '../src/render/shared/paving';
+import { carriageway, isPaths, pathLayers, pavedRects, repair, STREET_LOOK, type PathGround } from '../src/render/shared/paving';
+import { pathLooks, type PavingSpec } from '../src/game/pathLooks';
+import { mulberry32 } from '../src/game/noise';
 import { roadMeshes } from '../src/render/shared/roads';
 import { carriageway as kerbToKerb } from '../src/render/shared/junctions';
 import { BAY, LINE, townPaving, type Rect } from '../src/render/shared/townPaving';
@@ -55,6 +57,86 @@ describe('paving', () => {
     expect(redAt(g, 2.25, 3)).toBeLessThan(redAt(g, 1.5, 3));
   });
 
+  test('off a lot a path lies on the terrain as drawn, each piece within one of its triangles; on a lot, on its pad', () => {
+    // A land that creases: heights at the 2 m samples, the terrain's triangles split from (x + 2, z) to (x, z + 2).
+    const h = (i: number, j: number) => ((i * 7 + j * 13) % 5) * 0.11;
+    const terrain = (x: number, z: number) => {
+      const [i, j] = [Math.floor(x / 2), Math.floor(z / 2)];
+      const [u, v] = [x / 2 - i, z / 2 - j];
+      if (u + v <= 1) return h(i, j) + (h(i + 1, j) - h(i, j)) * u + (h(i, j + 1) - h(i, j)) * v;
+      return h(i + 1, j + 1) + (h(i, j + 1) - h(i + 1, j + 1)) * (1 - u) + (h(i + 1, j) - h(i + 1, j + 1)) * (1 - v);
+    };
+    const lot = { x: 0, z: 6, w: 8, d: 8 };
+    const ground: PathGround = { pad: (x, z) => (x >= lot.x && x <= lot.x + lot.w && z >= lot.z && z <= lot.z + lot.d ? 1.25 : null), terrain };
+    const [onLot, verge] = [{ x: 2.5, z: 6, w: 3, d: 5 }, { x: 2.5, z: 0.7, w: 3, d: 5.3 }];
+    const g = new Geo();
+    pavedRects(g, [onLot, verge], [onLot, verge], 0.014, ground);
+    const { pos, idx } = g;
+    let [laid, flat] = [0, 0];
+    for (let t = 0; t < idx.length; t += 3) {
+      const c = [0, 1, 2].map((k) => idx[t + k] * 3);
+      const [x, y, z] = [0, 1, 2].map((a) => c.reduce((n, i) => n + pos[i + a], 0) / 3);
+      if (z > lot.z + 0.01) {
+        expect(y).toBeCloseTo(1.264, 5);
+        flat++;
+      } else {
+        // (Its middle where the terrain is: a triangle across a crease would stand off it there.)
+        expect(y).toBeCloseTo(terrain(x, z) + 0.014, 5);
+        laid++;
+      }
+    }
+    expect(laid).toBeGreaterThan(0);
+    expect(flat).toBeGreaterThan(0);
+  });
+
+  test('a concrete path has joints across it, its slabs alike; a drive longer slabs', () => {
+    const path = { x: 0, z: 0, w: 1, d: 6, look: 'concrete' };
+    const g = new Geo();
+    pavedRects(g, [path], [path], 0.014);
+    // Five slabs of 1.2 m: dark at 1.2 m along it, not between (0.45 of its light, 0.7 of its vertex colour).
+    expect(redAt(g, 0.5, 1.2)).toBeLessThan(redAt(g, 0.5, 1.8) * 0.8);
+    expect(redAt(g, 0.5, 2.4)).toBeLessThan(redAt(g, 0.5, 1.8) * 0.8);
+    const drive = { x: 0, z: 0, w: 6, d: 3, look: 'concrete' };
+    const d = new Geo();
+    pavedRects(d, [drive], [drive], 0.014);
+    expect(redAt(d, 3, 1.5)).toBeLessThan(redAt(d, 2, 1.5) * 0.8);
+    // The hexagonal pavers have none.
+    const plain = new Geo();
+    pavedRects(plain, [{ ...path, look: undefined }], [path], 0.014);
+    expect(redAt(plain, 0.5, 1.2)).toBeGreaterThan(redAt(plain, 0.5, 1.8) * 0.85);
+  });
+
+  test("paths are drawn by their look's material; one without a look (or an unknown one) as the pavers", () => {
+    const layers = pathLayers([{ x: 0, z: 0, w: 1, d: 3 }, { x: 0, z: 0, w: 1, d: 3, look: 'brick' }, { x: 0, z: 0, w: 3, d: 6, look: 'asphalt' }, { x: 0, z: 0, w: 1, d: 3, look: 'marble' }], '');
+    expect(layers.map(([name, rects, material]) => [name, rects.length, material])).toEqual([
+      ['paths', 2, 'material.path'],
+      ['paths.brick', 1, 'material.path.brick'],
+      ['paths.asphalt', 1, 'material.road'],
+    ]);
+    // The town view's, named after its prefix as its fields are.
+    const town = pathLayers([{ x: 0, z: 0, w: 1, d: 3, look: 'constructor' }, { x: 0, z: 0, w: 1, d: 3, look: 'brick' }], 'town');
+    expect(town.map(([name]) => name)).toEqual(['townPaths', 'townPaths.brick']);
+    expect(town.every(([name]) => isPaths(name, 'town'))).toBe(true);
+    expect(isPaths('townFields', 'town')).toBe(false);
+    expect(isPaths('paths.brick', '')).toBe(true);
+  });
+
+  test("each house's path and drive are drawn by its class, the drive now and then laid as the path", () => {
+    const spec: PavingSpec = { match: 0.5, path: { default: { concrete: 1 }, cottage: { flagstone: 1, gravel: 1 } }, drive: { default: { asphalt: 1 }, cottage: { gravel: 1, concrete: 1 } } };
+    const rand = mulberry32(7);
+    const seen = new Set<string>();
+    for (let k = 0; k < 200; k++) {
+      const looks = pathLooks(spec, 'cottage', rand)!;
+      expect(['flagstone', 'gravel']).toContain(looks.path);
+      expect(['gravel', 'concrete']).toContain(looks.drive);
+      seen.add(`${looks.path}/${looks.drive}`);
+    }
+    // Every pair a cottage may have, a flagstone path with a gravel drive and a gravel one with gravel.
+    expect(seen.size).toBe(4);
+    expect(pathLooks(spec, 'villa', rand)).toEqual({ path: 'concrete', drive: 'asphalt' });
+    expect(pathLooks(undefined, 'villa', rand)).toBeNull();
+  });
+
   test('a carriageway is pale where wheels run and darkest along its kerbs, the same on both sides', () => {
     for (const half of [1.65, 3, 4]) {
       const { at, tone } = carriageway(half);
@@ -91,6 +173,20 @@ describe('paving', () => {
     expect(plain.col.every((c) => c === 255)).toBe(true);
     expect(worn.col.some((c) => c < 0.9 * 255)).toBe(true);
     expect(worn.idx.length).toBeGreaterThan(plain.idx.length);
+  });
+
+  test("a motorway's carriageway and a ramp are worn from edge to edge, as a country road is: no kerbs, no repairs", () => {
+    for (const [kind, width] of [['motorway', 9], ['ramp', 5]] as const) {
+      const road = { points: [[0, 10], [80, 10]] as [number, number][], width, ends: ['out', 'out'] as ['out', 'out'], kind };
+      const half = kerbToKerb(road) / 2;
+      expect(half).toBe(width / 2);
+      const worn = roadMeshes([road], null, 0, {}, 'surface', undefined, () => half).surface;
+      // (Its edges the gutter's tone, kerb or none; nothing a hair over the road, where a repair would be.)
+      expect(Math.min(...worn.pos.filter((_, i) => i % 3 === 2))).toBeCloseTo(10 - half, 6);
+      expect(Math.max(...worn.pos.filter((_, i) => i % 3 === 1))).toBeCloseTo(0.012, 6);
+    }
+    // (A street's half carriageway as the street wears it, kerb to kerb: what it always was.)
+    expect(kerbToKerb({ points: [], width: 7, ends: ['out', 'out'] }) / 2).toBeCloseTo(7 / 2 - 1.35, 9);
   });
 });
 

@@ -123,6 +123,7 @@ Rebuilt in detail on 2026-10-22 with the forms and the kit, each at most half it
 | `model.fountainTown` | 2.96 × 2.47 × 2.96 m | 5,452 (5,784) | 1,232 | 3 | Stone |
 | `model.townStatue` | 1.80 × 3.39 × 1.80 m | 3,410 (2,476) | 820 | 1 | Statue |
 | `model.trafficLight` | 0.52 × 3.10 × 0.56 m | 2,684 (new) | 800 | 1 (+1 lit lens) | — |
+| `model.motorwaySign` | 3.00 × 3.90 × 0.32 m | 1,548 (new) | 386 | 1 | — |
 
 Draws are counted as `check-glb` does, each moving part apart: the bench (iron, wood), the shelter (frame, wood,
 glass), the drinking fountain and the post box (body, the moving part), the notice board (plain, wood), the town
@@ -153,6 +154,19 @@ head reaches forward); its head faces +z, towards the traffic coming in.
   (`BuildOptions.glowApart`) and draws each colour's as one instanced draw of the heads showing it: only the lamp
   the snapshot shows is lit, by day as at night (brighter as the lamps come up). The rest stay dark glass.
 - Far version: its own build at low detail (`.far_low()`): fewer segments, no flutes, flat hoods.
+
+## The motorway sign (`model.motorwaySign`)
+
+Built 2026-11-23 for the road hierarchy. Not buyable and in no content (`.code()`): the street stands it by the
+motorway (render/shared/motorway.ts `signSpots`: before an exit, in its gore, where a ramp leaves the street), its face
+(+z) to the traffic coming. Its origin is between its feet, not centred (`settle!(centre = false)`, `.centre(0.0,
+-0.125)`: the panel stands in front of the posts).
+
+- Two galvanised posts (`body`, metal) on bevelled concrete feet, capped, two rails across behind the panel.
+- The panel, 3.0 × 1.6 m, its foot 2.3 m up: a galvanised back, its face `sign_blue` in a `sign_white` border, a
+  place's name as two white bars, the motorway's number in a white shield, an arrow up and off to the reader's right
+  (the game's -x: seen from the front, +x is on the left). Satin, not lit: one draw.
+- Far version: a quarter (`.far_ratio(FAR)`).
 
 ## Rebuild
 

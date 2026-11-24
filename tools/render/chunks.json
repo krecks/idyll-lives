@@ -67,6 +67,16 @@
           "file": "platform/graphics/webgl/webgl-graphics-device.js",
           "text": "copyRenderTarget(source, dest, color, depth) {",
           "who": "sunShadows.ts: the picture's depth copied into the map (WebGL2)"
+        },
+        {
+          "file": "platform/graphics/webgl/webgl-graphics-device.js",
+          "text": "gl.bindFramebuffer(gl.FRAMEBUFFER, prevRt ? prevRt.impl._glFrameBuffer : null);",
+          "who": "sunShadows.ts: the copy binds the target before it back by hand, its record of what is bound left the map's (forgotten after it)"
+        },
+        {
+          "file": "platform/graphics/webgl/webgl-graphics-device.js",
+          "text": "if (this.activeFramebuffer !== fb) {",
+          "who": "sunShadows.ts: setFramebuffer binds only a framebuffer other than the one recorded (none recorded: it binds)"
         }
       ]
     },
@@ -1294,6 +1304,41 @@
           "file": "platform/graphics/webgl/webgl-buffer.js",
           "text": "gl.bufferData(target, storage, glUsage);",
           "who": "meshes.ts gpuOnly: WebGL2 copies the storage as it is uploaded (unlock), so it can go after"
+        }
+      ]
+    },
+    {
+      "for": "render/pc/parallelPipelines.ts: the warm-up's pipelines made side by side (WebGPU), draws with a stand-in left out until they are made.",
+      "anchors": [
+        {
+          "file": "platform/graphics/webgpu/webgpu-graphics-device.js",
+          "text": "renderPipeline = new WebgpuRenderPipeline(this);",
+          "who": "parallelPipelines.ts: the device's render pipeline cache"
+        },
+        {
+          "file": "platform/graphics/webgpu/webgpu-render-pipeline.js",
+          "text": "cacheEntry.pipeline = this.create(",
+          "who": "parallelPipelines.ts: a cache miss made by `create`, wrapped on the cache"
+        },
+        {
+          "file": "platform/graphics/webgpu/webgpu-render-pipeline.js",
+          "text": "const pipeline = wgpu.createRenderPipeline(desc);",
+          "who": "parallelPipelines.ts: `create` makes it through the GPUDevice (its descriptor taken there)"
+        },
+        {
+          "file": "platform/graphics/webgpu/webgpu-render-pipeline.js",
+          "text": "this.cache.set(hash, cacheEntries);",
+          "who": "parallelPipelines.ts: entries `{ pipeline }` kept in `cache`, swapped there once made"
+        },
+        {
+          "file": "platform/graphics/webgpu/webgpu-graphics-device.js",
+          "text": "passEncoder.setPipeline(pipeline);",
+          "who": "parallelPipelines.ts: the stand-in reaches the pass encoder only through setPipeline"
+        },
+        {
+          "file": "platform/graphics/webgpu/webgpu-graphics-device.js",
+          "text": "if (this.pipeline !== pipeline) {",
+          "who": "parallelPipelines.ts: the device's current pipeline (`pipeline`), cleared if it is a stand-in"
         }
       ]
     }

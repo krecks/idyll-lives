@@ -385,6 +385,7 @@ impl Content {
                             .filter(|&&d| d < 7)
                             .fold(0, |m, d| m | (1 << d)),
                         skills,
+                        effects: need_array(&sc.effects, "life.school")?,
                         attend: g.attend.unwrap_or(1.0),
                         mood: g.mood.unwrap_or(3.0),
                         missed: g.missed.unwrap_or(5.0),

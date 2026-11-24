@@ -96,7 +96,8 @@ pub(crate) fn back_off(w: &mut World, c: usize) -> bool {
     // again (`drive_on`), with no jam rule of its own: it'd neither back up nor say it can't, and
     // the other would wait for it for good. It can back up no further: the other does.)
     let turned = car.detour.is_some() && route.at(t).2;
-    if to >= t || route.at(to).2 != route.at(t).2 || turned {
+    // (Never on a motorway's carriageway or a ramp, nor back onto one: `Route::on_motorway`.)
+    if to >= t || route.at(to).2 != route.at(t).2 || turned || route.on_motorway(to, t) {
         return false;
     }
     let body = |t: f32| {
@@ -118,9 +119,10 @@ pub(crate) fn back_off(w: &mut World, c: usize) -> bool {
     let way = [-next.yaw.sin(), -next.yaw.cos()];
     // (Back out of the claim of the one it's held up with, too: away from it is out of its way.)
     let partner = car.waits_for;
-    if guard(&now, &next, others.iter().chain(&standing)).is_some()
+    let layer = car.layer();
+    if guard(&now, &next, layer, others.iter().chain(&standing)).is_some()
         || w.traffic
-            .blocked(key, &now, &next, way, 0.0, false)
+            .blocked(key, &now, &next, way, 0.0, false, layer)
             .is_some_and(|k| Some(k) != partner)
     {
         return false;

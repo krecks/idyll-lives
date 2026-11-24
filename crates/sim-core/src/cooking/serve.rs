@@ -431,7 +431,12 @@ pub(super) fn served(
     let Some(recipe) = items.get(id).and_then(|it| it.recipe) else {
         return;
     };
-    if hungry_for(sim, ctx.content, &ctx.content.recipes[recipe]) {
+    if cook_has_some(
+        sim,
+        ctx.content,
+        &ctx.content.recipes[recipe],
+        task.directed,
+    ) {
         let eat = Task {
             kind: TaskKind::Eat {
                 item: Some(id),

@@ -8,14 +8,63 @@
  */
 
 import { hash, smoothstep, valueNoise } from '../../game/noise';
+import type { PathLook } from '../../game/pathLooks';
 import { tuned } from '../tune';
 import type { Geo, V3 } from './geometry';
+import { terrainPieces } from './townPaving';
 
 interface Rect {
   x: number;
   z: number;
   w: number;
   d: number;
+  /** A garden path's or drive's: what it is laid in (`game/pathLooks.ts`; none: hexagonal pavers). */
+  look?: string;
+}
+
+/**
+ * How each look of a garden path or drive is drawn (`game/pathLooks.ts`): its material, and its colour on the town
+ * view's map (sRGB, `pc/groundTiles.ts`), its texture's mean as the paving's tones leave it (`pavedRects`). An asphalt
+ * drive is the road's in both.
+ */
+export const PATH_LOOK: Record<PathLook, { material: string; map: string }> = {
+  hex: { material: 'material.path', map: '#A99C86' },
+  concrete: { material: 'material.path.concrete', map: '#97938A' },
+  brick: { material: 'material.path.brick', map: '#834D3D' },
+  flagstone: { material: 'material.path.flagstone', map: '#938D80' },
+  gravel: { material: 'material.path.gravel', map: '#A89B88' },
+  asphalt: { material: 'material.road', map: '#55544F' },
+};
+
+/** The look a path is drawn in: its own, or (none, or one this game doesn't know: a save's are plain strings) the hexagonal pavers. */
+export const pathLook = (look: string | undefined): PathLook => (look && Object.hasOwn(PATH_LOOK, look) ? (look as PathLook) : 'hex');
+
+/** How high garden paths lie over the ground (m). */
+const PATH_Y = 0.014;
+
+/** Ground layer `n`'s mesh name, after `prefix` (`town`: `townPaths`; none: `n`). */
+export const layerName = (prefix: string, n: string): string => (prefix ? `${prefix}${n[0].toUpperCase()}${n.slice(1)}` : n);
+
+/**
+ * Garden paths and drives as ground layers, one for each material they are laid in: its name (`paths` for the
+ * hexagonal pavers, as ever, `paths.<look>` for the others, after `prefix`: `layerName`), its rectangles, its material
+ * and its height.
+ */
+export function pathLayers<R extends Rect>(rects: readonly R[], prefix: string): [string, R[], string, number][] {
+  const by = new Map<PathLook, R[]>();
+  for (const r of rects) {
+    const look = pathLook(r.look);
+    const list = by.get(look);
+    if (list) list.push(r);
+    else by.set(look, [r]);
+  }
+  return [...by].map(([look, list]) => [layerName(prefix, look === 'hex' ? 'paths' : `paths.${look}`), list, PATH_LOOK[look].material, PATH_Y]);
+}
+
+/** Whether ground layer `name` is garden paths (`pathLayers`, after `prefix`). */
+export function isPaths(name: string, prefix: string): boolean {
+  const paths = layerName(prefix, 'paths');
+  return name === paths || name.startsWith(`${paths}.`);
 }
 
 /** `?tune=street.…` on the dev server. */
@@ -55,6 +104,13 @@ export const STREET_LOOK = tuned('street', {
 /** Paths at least this wide are drives (`game/town.ts` `DRIVEWAY_MIN_WIDTH`), and half the width of a wheel's track on one (m). */
 const DRIVE = 1.8;
 const TRACK = 0.3;
+/**
+ * A concrete path's slabs: about this long along it (a path's, a drive's, m), and the joint cut between two (half its
+ * width, and half the width it fades over, m: wider than a real one's centimetre, which is under a pixel from the
+ * play camera) and its tone. Drawn here, square to the path's run, where its texture,
+ * laid by world position, could not.
+ */
+const SLAB = { path: 1.2, drive: 3, half: 0.01, soft: 0.03, tone: 0.45 };
 
 /** A tone (linear), in a colour (linear multipliers), as a vertex colour's multiplier (sRGB). */
 export function tint(lin: number, colour: readonly number[] = [1, 1, 1]): V3 {
@@ -63,10 +119,22 @@ export function tint(lin: number, colour: readonly number[] = [1, 1, 1]): V3 {
 }
 
 /**
- * Garden paths and drives (`rects`, `y` up) into `g`: each a grid of quads, darker and mossy at the sides
- * the lawn is on (not where another of `all` goes on), lighter and darker in patches along it.
+ * The ground garden paths are laid on where the town follows its land: a lot's pad on a lot (null: on none), else the
+ * terrain as its tiles draw it (`streetGround.ts` `pathGround`).
  */
-export function pavedRects(g: Geo, rects: readonly Rect[], all: readonly Rect[], y: number): void {
+export interface PathGround {
+  pad(x: number, z: number): number | null;
+  terrain(x: number, z: number): number;
+}
+
+/**
+ * Garden paths and drives (`rects`, `y` up) into `g`: each a grid of quads, darker and mossy at the sides
+ * the lawn is on (not where another of `all` goes on), lighter and darker in patches along it. On `ground`: one
+ * on a lot at its pad; one off it (across the verge to its road) cut into the terrain's triangles and laid on
+ * each, so it is as flat as the lawn beside it (laid on the land between its corners, `BuiltSurface.at`, the
+ * lawn came up through a drive in patches where the land creases).
+ */
+export function pavedRects(g: Geo, rects: readonly Rect[], all: readonly Rect[], y: number, ground?: PathGround | null): void {
   const L = STREET_LOOK;
   const paved = (x: number, z: number) => all.some((r) => x > r.x && x < r.x + r.w && z > r.z && z < r.z + r.d);
   const stations = (from: number, len: number, lo: boolean, hi: boolean): number[] => {
@@ -87,28 +155,45 @@ export function pavedRects(g: Geo, rects: readonly Rect[], all: readonly Rect[],
     const sides = { x0: x0 && !alongX, x1: x1 && !alongX, z0: z0 && !alongZ, z1: z1 && !alongZ };
     // A drive (a path a car fits on): darker where its wheels run, along it, 0.75 m either side of its middle.
     const drive = Math.min(r.w, r.d) >= DRIVE;
-    const across = r.d >= r.w ? r.w : r.d;
+    const runsZ = r.d >= r.w;
+    const [across, along] = runsZ ? [r.w, r.d] : [r.d, r.w];
     const tracks = drive ? [-0.75, 0.75].map((t) => across / 2 + t) : [];
     const marks = tracks.flatMap((t) => [t - TRACK, t, t + TRACK]).filter((m) => m > 0.05 && m < across - 0.05);
     const merge = (list: number[], extra: number[]) => [...list, ...extra.filter((m) => list.every((o) => Math.abs(o - m) > 0.08))].sort((a, b) => a - b);
-    const xs = r.d >= r.w ? merge(stations(r.x, r.w, sides.x0, sides.x1), marks) : stations(r.x, r.w, sides.x0, sides.x1);
-    const zs = r.d >= r.w ? stations(r.z, r.d, sides.z0, sides.z1) : merge(stations(r.z, r.d, sides.z0, sides.z1), marks);
+    // A concrete one's joints across it, its slabs alike: what the stations along it leave room for.
+    const cuts = r.look === 'concrete' ? slabJoints(along, drive ? SLAB.drive : SLAB.path) : [];
+    const cut = (list: number[]) =>
+      cuts.length ? [...list.filter((o) => cuts.every((j) => Math.abs(o - j) > SLAB.soft + 0.01)), ...cuts.flatMap((j) => [j - SLAB.soft, j - SLAB.half, j + SLAB.half, j + SLAB.soft])].sort((a, b) => a - b) : list;
+    const [xs0, zs0] = [stations(r.x, r.w, sides.x0, sides.x1), stations(r.z, r.d, sides.z0, sides.z1)];
+    const [xs, zs] = runsZ ? [merge(xs0, marks), cut(zs0)] : [cut(xs0), merge(zs0, marks)];
     const tone = (u: number, v: number): V3 => {
       const edge = Math.min(sides.x0 ? u : 9, sides.x1 ? r.w - u : 9, sides.z0 ? v : 9, sides.z1 ? r.d - v : 9);
       const e = 1 - smoothstep(0, L.pathReach, edge);
       const vary = (valueNoise((r.x + u) / 2.1, (r.z + v) / 2.1, 431) - 0.5) * 2 * L.pathVary;
-      const c = r.d >= r.w ? u : v;
+      const [c, a] = runsZ ? [u, v] : [v, u];
       const wheel = Math.max(0, ...tracks.map((t) => 1 - smoothstep(0, TRACK, Math.abs(c - t))));
-      const lin = (1 - L.pathVary + vary) * (1 - (1 - L.pathEdge) * e) * (1 - L.driveTrack * wheel);
+      let joint = 0;
+      for (const j of cuts) joint = Math.max(joint, 1 - smoothstep(SLAB.half, SLAB.soft, Math.abs(a - j)));
+      const lin = (1 - L.pathVary + vary) * (1 - (1 - L.pathEdge) * e) * (1 - L.driveTrack * wheel) * (1 - (1 - SLAB.tone) * joint);
       return tint(lin, L.pathEdgeTint.map((c) => 1 + (c - 1) * e));
     };
+    const put = (c: readonly (readonly [number, number])[], at: (x: number, z: number) => number) =>
+      g.poly(c.map(([u, v]) => [r.x + u, y + at(r.x + u, r.z + v), r.z + v] as V3), [0, 1, 0], c.map(([u, v]) => [u / r.w, v / r.d] as [number, number]), undefined, c.map(([u, v]) => tone(u, v)));
+    const pad = ground ? ground.pad(r.x + r.w / 2, r.z + r.d / 2) : 0;
     for (let j = 0; j + 1 < zs.length; j++) {
       for (let i = 0; i + 1 < xs.length; i++) {
         const c: [number, number][] = [[xs[i], zs[j]], [xs[i + 1], zs[j]], [xs[i + 1], zs[j + 1]], [xs[i], zs[j + 1]]];
-        g.poly(c.map(([u, v]) => [r.x + u, y, r.z + v] as V3), [0, 1, 0], c.map(([u, v]) => [u / r.w, v / r.d] as [number, number]), undefined, c.map(([u, v]) => tone(u, v)));
+        if (pad !== null) put(c, () => pad);
+        else if (ground) for (const part of terrainPieces(c.map(([u, v]) => [r.x + u, r.z + v]))) put(part.map(([x, z]) => [x - r.x, z - r.z]), ground.terrain);
       }
     }
   }
+}
+
+/** Where the joints go along a concrete path `len` m long, its slabs about `slab` m and all alike (none: one slab). */
+function slabJoints(len: number, slab: number): number[] {
+  const n = Math.max(1, Math.round(len / slab));
+  return Array.from({ length: n - 1 }, (_, k) => ((k + 1) * len) / n);
 }
 
 /**

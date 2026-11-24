@@ -6,7 +6,9 @@
  *   (`GAME_INSTANCE_COLOR`: the `INSTANCE_COLOR_SEMANTIC` stream, multiplied into the albedo; with
  *   `GAME_TINT_WHITE` only where the vertex colour is pure white, a parked car's paint, `shared/cars.ts`). A
  *   glow's strength per instance (`GAME_GLOW_TINT`, `models.ts` `glowByInstance`) multiplies the
- *   same stream into its (unlit, emissive) vertex colour, linearised as the glow's is.
+ *   same stream into its (unlit, emissive) vertex colour, linearised as the glow's is, and its alpha
+ *   into the emission after it (linear, past 1: PlayCanvas clamps the vertex colour to 1; a lamp's
+ *   glass lit `LAMP_GLASS` times as bright, `lightUnits.ts`).
  *   Planar UVs (`GAME_PLANAR_UV`) are the local XZ position in metres, for flat meshes built
  *   with 0..1 UVs such as roads (`uv0VS`, in `chunks.ts`).
  * - Patterns over a surface's texture: `GAME_PATTERN_STRIPES`, wallpaper's faint stripes 12.5 cm
@@ -48,6 +50,7 @@ export const VERTEX_TWEAKS: ShaderFeature = {
 	varying vec4 vGameTint;
 #elif defined(GAME_GLOW_TINT)
 	attribute vec4 game_instanceColor;
+	varying float vGameGlow;
 #endif`,
     vsEnd: `
 #ifdef GAME_INSTANCE_COLOR
@@ -60,15 +63,24 @@ export const VERTEX_TWEAKS: ShaderFeature = {
 	#endif
 #endif
 #if defined(GAME_GLOW_TINT) && defined(VERTEX_COLOR)
-	vVertexColor *= vec4(pow(max(game_instanceColor.rgb, vec3(0.0)), vec3(2.2)), game_instanceColor.a);
+	vVertexColor.rgb *= pow(max(game_instanceColor.rgb, vec3(0.0)), vec3(2.2));
+#endif
+#if defined(GAME_GLOW_TINT) && !defined(GAME_INSTANCE_COLOR)
+	vGameGlow = game_instanceColor.a;
 #endif`,
     psDecl: `
 #ifdef GAME_INSTANCE_COLOR
 	varying vec4 vGameTint;
+#elif defined(GAME_GLOW_TINT)
+	varying float vGameGlow;
 #endif`,
     albedo: `
 #ifdef GAME_INSTANCE_COLOR
 	dAlbedo *= vGameTint.rgb;
+#endif`,
+    emissive: `
+#if defined(GAME_GLOW_TINT) && !defined(GAME_INSTANCE_COLOR)
+	dEmission *= vGameGlow;
 #endif`,
   },
   wgsl: {
@@ -78,6 +90,7 @@ export const VERTEX_TWEAKS: ShaderFeature = {
 	varying vGameTint: vec4f;
 #elif defined(GAME_GLOW_TINT)
 	attribute game_instanceColor: vec4f;
+	varying vGameGlow: f32;
 #endif`,
     vsEnd: `
 #ifdef GAME_INSTANCE_COLOR
@@ -92,15 +105,24 @@ export const VERTEX_TWEAKS: ShaderFeature = {
 	#endif
 #endif
 #if defined(GAME_GLOW_TINT) && defined(VERTEX_COLOR)
-	output.vVertexColor = output.vVertexColor * vec4f(pow(max(game_instanceColor.rgb, vec3f(0.0)), vec3f(2.2)), game_instanceColor.a);
+	output.vVertexColor = output.vVertexColor * vec4f(pow(max(game_instanceColor.rgb, vec3f(0.0)), vec3f(2.2)), 1.0);
+#endif
+#if defined(GAME_GLOW_TINT) && !defined(GAME_INSTANCE_COLOR)
+	output.vGameGlow = game_instanceColor.a;
 #endif`,
     psDecl: `
 #ifdef GAME_INSTANCE_COLOR
 	varying vGameTint: vec4f;
+#elif defined(GAME_GLOW_TINT)
+	varying vGameGlow: f32;
 #endif`,
     albedo: `
 #ifdef GAME_INSTANCE_COLOR
 	dAlbedo = dAlbedo * vGameTint.rgb;
+#endif`,
+    emissive: `
+#if defined(GAME_GLOW_TINT) && !defined(GAME_INSTANCE_COLOR)
+	dEmission = dEmission * vGameGlow;
 #endif`,
   },
 };

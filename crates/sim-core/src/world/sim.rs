@@ -448,6 +448,11 @@ impl Sim {
         content.life.adult(self.age)
     }
 
+    /// The school they go to when they set off for the day: a pupil's (no job, and the content has school).
+    pub fn school<'a>(&self, content: &'a Content) -> Option<&'a crate::content::SchoolRules> {
+        content.life.school.as_ref().filter(|_| self.job.is_none())
+    }
+
     /// Still in town (not dead or moved away).
     pub fn here(&self) -> bool {
         self.gone.is_none()

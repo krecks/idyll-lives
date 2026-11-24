@@ -6,16 +6,25 @@
 
 import * as pmath from './pmath';
 
+/** What mulberry32 adds to its state at each draw (`STEP`), and the number 0..1 a state draws (`mixed`). */
+const STEP = 0x6d2b79f5;
+function mixed(a: number): number {
+  let t = a;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
 /** A small seeded generator (mulberry32): numbers 0..1, as `Math.random` gives them. */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+  return () => mixed((a = (a + STEP) >>> 0));
+}
+
+/** A `mulberry32` stream that can be forked: `fork()` gives a stream drawing what this one will draw next, this one going on as it was. */
+export function forkable(seed: number): (() => number) & { fork: () => () => number } {
+  let a = seed >>> 0;
+  return Object.assign(() => mixed((a = (a + STEP) >>> 0)), { fork: () => mulberry32(a) });
 }
 
 /** One of `list`, drawn from `rand`. */

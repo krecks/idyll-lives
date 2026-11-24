@@ -6,6 +6,7 @@ use crate::common;
 use common::run_to;
 
 use serde_json::json;
+
 use sim_core::planner::{self, Outcome, Reason};
 use sim_core::social::EventKind;
 use sim_core::{Command, World};
@@ -272,6 +273,71 @@ fn residents_suggest_goals_and_neighbours_take_theirs_on() {
         w.sims[1..].iter().any(|s| !s.planner.goals.is_empty()),
         "neighbours have goals of their own"
     );
+}
+
+#[test]
+fn a_child_takes_on_no_grown_ups_goal() {
+    // (A child was offered "Find love" and "Get a job".)
+    let mut w = town(14);
+    homebody(&mut w);
+    w.sims[0].age = 9.0;
+    for goal in [
+        json!({"def": "getJob"}),
+        json!({"def": "love"}),
+        json!({"def": "savings", "target": 5000}),
+    ] {
+        let err = add_goal(&mut w, goal.clone()).expect_err("a grown-up's goal");
+        assert!(err.to_string().contains("too young"), "{goal}: {err}");
+    }
+    add_goal(
+        &mut w,
+        json!({"def": "skill", "skill": "cooking", "target": 3}),
+    )
+    .expect("a skill is for any age");
+}
+
+#[test]
+fn a_childs_grown_up_goals_from_before_are_let_go_of() {
+    // (An older save's: goals were kept to grown-ups only from 2026-11-24.)
+    let mut w = town(16);
+    homebody(&mut w);
+    add_goal(&mut w, json!({"def": "love"})).expect("a grown-up's goal");
+    add_goal(
+        &mut w,
+        json!({"def": "skill", "skill": "cooking", "target": 3}),
+    )
+    .expect("a skill");
+    w.sims[0].age = 9.0;
+    run_to(&mut w, 2, 8.0);
+    let ids: Vec<&str> = w.sims[0]
+        .planner
+        .goals
+        .iter()
+        .map(|g| w.content.goals[g.def].id.as_str())
+        .collect();
+    assert_eq!(
+        ids,
+        ["skill"],
+        "the grown-up's goal let go of at the day's review, the skill kept"
+    );
+}
+
+#[test]
+#[cfg_attr(not(feature = "slow-tests"), ignore = "slow: --features slow-tests")]
+fn a_childs_own_ideas_are_for_a_child() {
+    let mut w = town(15);
+    homebody(&mut w);
+    w.sims[0].age = 9.0;
+    run_to(&mut w, 15, 8.0);
+    let content = &w.content;
+    let plan = &w.sims[0].planner;
+    for g in plan.goals.iter().chain(&plan.suggestions) {
+        assert!(
+            planner::for_their_age(content.goals[g.def].kind, false),
+            "a child's idea: {}",
+            content.goals[g.def].id
+        );
+    }
 }
 
 #[test]

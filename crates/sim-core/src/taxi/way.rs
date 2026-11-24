@@ -99,8 +99,9 @@ type Piece = (u32, f32, f32);
 
 /// The ways for a taxi from `from`, going `dir` along its road (+1: as `s` rises; both if
 /// `None`), to `to` along the roads, as a car drives them, turning round only in a dead end's
-/// turning circle (`Net::turn`): by the way it comes to `to` (+1, then -1), the cost (s) and the
-/// stretches driven, one after another. None: no such way.
+/// turning circle (`Net::turn`), one-way roads their way only (`Graph::may_go`): by the way it
+/// comes to `to` (+1, then -1), the cost (s) and the stretches driven, one after another. None: no
+/// such way.
 #[allow(clippy::type_complexity)]
 fn way_between(
     travel: &crate::travel::Travel,
@@ -111,22 +112,19 @@ fn way_between(
 ) -> [Option<(f32, Vec<Piece>)>; 2] {
     use std::cmp::Reverse;
     let g = &travel.graph;
-    let speed = |road: u32| {
-        if g.roads[road as usize].kind == crate::travel::RoadKind::Country {
-            travel.country_speed
-        } else {
-            crate::travel::TOWN_SPEED
-        }
-    };
+    let speed =
+        |road: u32| crate::travel::kind_speed(g.roads[road as usize].kind, travel.country_speed);
     let slot = |d: f32| usize::from(d < 0.0);
     let mut best: [Option<(f32, Vec<Piece>)>; 2] = [None, None];
     let fe = g.edges[from.edge as usize];
     let te = g.edges[to.edge as usize];
+    // (One-way roads their way only: +1 the way their points run.)
+    let goes = |road: u32, d: f32| g.roads[road as usize].oneway.may_go(d > 0.0);
     let dirs: Vec<f32> = dir.map_or(vec![1.0, -1.0], |d| vec![d]);
     // (Straight along the same stretch, ahead.)
     if from.edge == to.edge {
         for &d in &dirs {
-            if (to.s - from.s) * d >= -0.01 {
+            if (to.s - from.s) * d >= -0.01 && goes(from.road, d) {
                 best[slot(d)] = Some((
                     (to.s - from.s).abs() / speed(from.road),
                     vec![(from.road, from.s, to.s)],
@@ -141,6 +139,9 @@ fn way_between(
     let mut heap = std::collections::BinaryHeap::new();
     let key = |c: f32| (c * 1000.0) as u64;
     for &d in &dirs {
+        if !goes(fe.road, d) {
+            continue;
+        }
         let st = from.edge as usize * 2 + usize::from(d > 0.0);
         let c = if d > 0.0 {
             fe.s1 - from.s
@@ -183,6 +184,9 @@ fn way_between(
                 continue;
             }
             let edge = &g.edges[e as usize];
+            if !g.may_go(e, u as u32) {
+                continue;
+            }
             let extra = pass
                 + match (back, net.turn[u]) {
                     (false, _) => 0.0,
@@ -258,15 +262,32 @@ fn kerb_point(g: &crate::travel::Graph, kerb: &Kerb) -> Option<crate::travel::Ro
 fn far_side(g: &crate::travel::Graph, kerb: &Kerb, d: f32) -> bool {
     let road = &g.roads[kerb.road as usize];
     let (c, t) = (road.at(kerb.s), road.tangent(kerb.s));
-    let right = [-t[1] * d, t[0] * d];
+    let r = crate::cars::right_of(t);
+    let right = [r[0] * d, r[1] * d];
     let m = g.point(kerb.mouth);
     let house = [m[0] - kerb.axis[0], m[1] - kerb.axis[1]];
     (house[0] - c[0]) * right[0] + (house[1] - c[1]) * right[1] < 0.0
 }
 
+/// What standing at `kerb` come to going `d` costs on top of the drive (s, as `plan_way` weighs
+/// it): on the far side of the road from the house, `FAR_SIDE` (the rider crosses it); on an
+/// avenue, `AVENUE_FAR_SIDE`, never while there's a way from the house's side (round by the
+/// roads), as a household's car comes into its driveway there (`cars::kerbside_way`).
+fn far_cost(g: &crate::travel::Graph, kerb: &Kerb, d: f32) -> f32 {
+    if !far_side(g, kerb, d) {
+        return 0.0;
+    }
+    let road = &g.roads[kerb.road as usize];
+    if road.kind == crate::travel::RoadKind::Avenue && road.oneway.is_both() {
+        AVENUE_FAR_SIDE
+    } else {
+        FAR_SIDE
+    }
+}
+
 /// A taxi's way round town (`route`): from `way_in` to each of `kerbs` in turn and out at
 /// `way_out`, as a car drives (`way_between`), the way it comes to each kerb chosen for the
-/// quickest way on (`FAR_SIDE` on top for standing across the road from the house). The stretches
+/// quickest way on (`far_cost` on top for standing across the road from the house). The stretches
 /// driven, in legs: one up to each kerb, then out. None: no way.
 pub(super) fn plan_way(
     travel: &crate::travel::Travel,
@@ -275,14 +296,20 @@ pub(super) fn plan_way(
     kerbs: &[Kerb],
     way_out: [f32; 2],
 ) -> Option<Vec<Vec<Piece>>> {
-    use crate::travel::Mode;
     let g = &travel.graph;
-    let entry = *g
-        .near(way_in, crate::cars::ROAD_REACH, 1, Mode::Car)
-        .first()?;
-    let exit = *g
-        .near(way_out, crate::cars::ROAD_REACH, 1, Mode::Car)
-        .first()?;
+    // (Where it comes onto the roads and leaves them: the road nearest each way, or a motorway's
+    // carriageway ending there besides, the one going its way, `cars::exit_points`.)
+    let ends = |at: [f32; 2]| -> Vec<crate::travel::RoadPoint> {
+        crate::cars::exit_points(g, at)
+            .into_iter()
+            .map(|(p, _)| p)
+            .collect()
+    };
+    let entries = ends(way_in);
+    let exits = ends(way_out);
+    if entries.is_empty() || exits.is_empty() {
+        return None;
+    }
     let points: Vec<crate::travel::RoadPoint> = kerbs
         .iter()
         .map(|k| kerb_point(g, k))
@@ -294,7 +321,7 @@ pub(super) fn plan_way(
     for (k, &to) in points.iter().enumerate() {
         let mut here: [Best; 2] = [None, None];
         let starts: Vec<(f32, usize, crate::travel::RoadPoint, Option<f32>)> = if k == 0 {
-            vec![(0.0, 0, entry, None)]
+            entries.iter().map(|&e| (0.0, 0, e, None)).collect()
         } else {
             (0..2)
                 .filter_map(|i| {
@@ -308,13 +335,7 @@ pub(super) fn plan_way(
             for (i, way) in ways.into_iter().enumerate() {
                 let Some((c, pieces)) = way else { continue };
                 let d = if i == 0 { 1.0 } else { -1.0 };
-                let total = c0
-                    + c
-                    + if far_side(g, &kerbs[k], d) {
-                        FAR_SIDE
-                    } else {
-                        0.0
-                    };
+                let total = c0 + c + far_cost(g, &kerbs[k], d);
                 if here[i].as_ref().is_none_or(|b| total < b.0) {
                     here[i] = Some((total, i0, pieces));
                 }
@@ -328,7 +349,7 @@ pub(super) fn plan_way(
     // Out: from the last kerb (or straight through with none).
     let mut out: Option<(f32, usize, Vec<Piece>)> = None;
     let starts: Vec<(f32, usize, crate::travel::RoadPoint, Option<f32>)> = match table.last() {
-        None => vec![(0.0, 0, entry, None)],
+        None => entries.iter().map(|&e| (0.0, 0, e, None)).collect(),
         Some(last) => (0..2)
             .filter_map(|i| {
                 let c = last[i].as_ref()?.0;
@@ -342,8 +363,9 @@ pub(super) fn plan_way(
             .collect(),
     };
     for (c0, i0, from, dir) in starts {
-        for (c, pieces) in way_between(travel, net, from, dir, exit)
-            .into_iter()
+        for (c, pieces) in exits
+            .iter()
+            .flat_map(|&exit| way_between(travel, net, from, dir, exit))
             .flatten()
         {
             if out.as_ref().is_none_or(|b| c0 + c < b.0) {
@@ -374,10 +396,9 @@ pub(super) fn lay_route(
     net: &Net,
     legs: &[Vec<Piece>],
 ) -> Option<(crate::cars::Route, Vec<f32>)> {
-    use crate::cars::{Legs, kerb_of, lane_on, pull_room};
+    use crate::cars::{Legs, kerb_of, lane_on};
     use crate::travel::{RoadKind, dist};
     let g = &travel.graph;
-    let junctions: Vec<[f32; 2]> = g.junctions().collect();
     let mut out = Legs::default();
     let mut at_stops = Vec::new();
     // (A stand's claim: from the point where it stands, `KERB_CLAIM` past its body either way.)
@@ -440,7 +461,7 @@ pub(super) fn lay_route(
                 first.1 += d * before;
             }
             let mut centre: Vec<[f32; 2]> = Vec::new();
-            let mut along: Vec<(f32, RoadKind)> = Vec::new();
+            let mut on: Vec<(u32, bool)> = Vec::new();
             for &(r, s0, s1) in run.iter() {
                 let road = &g.roads[r as usize];
                 for p in road.slice(s0, s1) {
@@ -448,15 +469,37 @@ pub(super) fn lay_route(
                         continue;
                     }
                     centre.push(p);
-                    along.push((road.width, road.kind));
+                    on.push((r, s1 >= s0));
                 }
             }
             if centre.len() < 2 {
                 // (A stand right where the last one was: it stands there again.)
                 continue;
             }
-            let mut offs: Vec<f32> = along.iter().map(|&(w, kind)| lane_on(w, kind)).collect();
             let first_run = k == 0 && j == 0;
+            let last_run = k == last_leg && j + 1 == n_runs;
+            // (In from off the map, and out of it at the end.)
+            if first_run {
+                centre.insert(0, crate::cars::extend_past(centre[1], centre[0]));
+                on.insert(0, on[0]);
+            }
+            if last_run {
+                let n = centre.len();
+                centre.push(crate::cars::extend_past(centre[n - 2], centre[n - 1]));
+                on.push(on[n - 1]);
+            }
+            let lanes = crate::cars::LaneLine::new(g, centre, on);
+            let marks = crate::cars::way_marks(g, &lanes.pts, &lanes.on);
+            let crate::cars::LaneLine {
+                pts: centre,
+                mut offs,
+                on,
+                ..
+            } = lanes;
+            let roads: Vec<&crate::travel::Road> =
+                on.iter().map(|o| &g.roads[o.0 as usize]).collect();
+            let along: Vec<(f32, RoadKind)> = roads.iter().map(|r| (r.width, r.kind)).collect();
+            let lane_at = offs.clone();
             // (Eased to where it stands, clear of its kerb, and out again after; its body's
             // length by the stand already there, so it stands straight along its lane: eased
             // right up to it, it stood as much as 9 degrees across a country road's.)
@@ -473,13 +516,24 @@ pub(super) fn lay_route(
                         break;
                     }
                     let (w, kind) = along[i];
-                    let lane = lane_on(w, kind);
-                    let off = lane.min(kerb_of(w, kind) - TAXI_WID / 2.0 - KERB_KEEP);
-                    // (Two stands close along one road: whichever's nearer the kerb, so it keeps
-                    // to the kerb between them; else easing out of one undid easing into the
-                    // next, and it stood 30 degrees across its lane.)
-                    let eased = off + (lane - off) * ((gone - flat) / STAND_EASE).clamp(0.0, 1.0);
-                    offs[i] = offs[i].min(eased);
+                    let stand = kerb_of(w, kind) - TAXI_WID / 2.0 - KERB_KEEP;
+                    let ease = ((gone - flat) / STAND_EASE).clamp(0.0, 1.0);
+                    if crate::cars::classic(roads[i]) {
+                        let lane = lane_on(w, kind);
+                        let off = lane.min(stand);
+                        // (Two stands close along one road: whichever's nearer the kerb, so it
+                        // keeps to the kerb between them; else easing out of one undid easing
+                        // into the next, and it stood 30 degrees across its lane.)
+                        let eased = off + (lane - off) * ease;
+                        offs[i] = offs[i].min(eased);
+                    } else {
+                        // (Out of its lane to the kerb: a one-way road's middle, an avenue's
+                        // outer lane; whichever's nearer it, as above.)
+                        let eased = stand + (lane_at[i] - stand) * ease;
+                        if (eased - stand).abs() < (offs[i] - stand).abs() {
+                            offs[i] = eased;
+                        }
+                    }
                 }
             };
             if j + 1 == n_runs && k < last_leg {
@@ -487,18 +541,6 @@ pub(super) fn lay_route(
             }
             if j == 0 && k > 0 {
                 ease(&mut offs, &mut (0..centre.len()));
-            }
-            if first_run {
-                // (In from off the map.)
-                centre.insert(0, crate::cars::extend_past(centre[1], centre[0]));
-                offs.insert(0, offs[0]);
-                along.insert(0, along[0]);
-            }
-            if k == last_leg && j + 1 == n_runs {
-                let n = centre.len();
-                centre.push(crate::cars::extend_past(centre[n - 2], centre[n - 1]));
-                offs.push(offs[n - 1]);
-                along.push(along[n - 1]);
             }
             let full = crate::cars::offset_right_by(&centre, &offs);
             let mut lane = crate::travel::thin_with(
@@ -538,11 +580,12 @@ pub(super) fn lay_route(
                 let (turn, at) = bay.entry(d);
                 Some((bay, d, turn, at))
             });
-            let tops =
-                crate::cars::lane_tops(&lane, travel, &junctions, |k| along[nearest(lane[k])].1);
+            let tops = crate::cars::lane_tops(&lane, travel, |k| along[nearest(lane[k])].1);
             let mut on = false;
+            let mut laid_from = crate::cars::Along::new(&full);
             for (i, &p) in lane.iter().enumerate() {
                 let top = tops[i];
+                let mark = marks.as_ref().map(|m| laid_from.mark(m, p));
                 if !on
                     && let Some((bay, d, at, taken, _)) = &leaving
                     && bay.near(p, *at, *taken, *d)
@@ -566,10 +609,10 @@ pub(super) fn lay_route(
                 on = true;
                 let k = i;
                 let i = nearest(p);
-                let (w, kind) = along[i];
                 // (Less on the outside of a bend to the left, where its corners stand out.)
-                let room = pull_room(w, kind, TAXI_WID) - crate::cars::bend_out(&lane, k, TAXI_LEN);
-                out.push_lane(p, top, room.max(0.0), offs[i]);
+                let (room, meet) = crate::cars::meet(roads[i], offs[i], TAXI_WID);
+                let room = room - crate::cars::bend_out(&lane, k, TAXI_LEN);
+                out.push_marked(p, top, room.max(0.0), meet, along[i].1, mark);
             }
             // (The claim of the stand before, closed once there's way on to close it at.)
             if let Some(s) = stood.take() {
@@ -674,8 +717,8 @@ impl SideTurn {
 const SIDE_IN: f32 = 0.5;
 
 /// Whether a taxi come to junction node `u` along stretch `came` can turn round there, nose first
-/// into a side street square to its road (that road going on past it) and backing out the way it
-/// came, and where: None, it can't.
+/// into a side street square to its road (that road going on past it; not a ramp, and its way if
+/// one-way) and backing out the way it came, and where: None, it can't.
 fn side_turn(g: &crate::travel::Graph, net: &Net, u: u32, came: u32) -> Option<SideTurn> {
     let e_in = &g.edges[came as usize];
     let road = &g.roads[e_in.road as usize];
@@ -696,6 +739,10 @@ fn side_turn(g: &crate::travel::Graph, net: &Net, u: u32, came: u32) -> Option<S
             return None;
         }
         let side = &g.roads[arm.road as usize];
+        // (Not into a ramp, nor against a one-way street's way.)
+        if !side.enterable() || !g.may_go(e, u) {
+            return None;
+        }
         let depth = road.width / 2.0 + TAXI_LEN / 2.0 + SIDE_IN;
         if arm.len() < depth + TAXI_LEN {
             return None;
@@ -759,7 +806,7 @@ fn u_turn(
     kind: crate::travel::RoadKind,
 ) {
     let (r, lane, before) = u_turn_radii(width, kind);
-    let right = [-t[1], t[0]];
+    let right = crate::cars::right_of(t);
     // (x along the way it comes, y to its right; the dead end's middle at 0.)
     let world = |x: f32, y: f32| {
         [
@@ -788,4 +835,28 @@ fn u_turn(
     arc(legs, (0.0, 0.0), r, alpha, -alpha);
     // The swerve back in: round (xa, -ya) to the lane the other way.
     arc(legs, (xa, -ya), SWERVE, -beta, std::f32::consts::FRAC_PI_2);
+}
+
+/// A taxi in by `way_in` and out by `way_out` standing for a house whose front door is at `door`
+/// (no driveway: its way to the road nearest it a taxi may stop on, `home_way`): where it stands
+/// (`kerb_at`, as `plan_way` comes to it and `lay_route` lays its route there) and its yaw there.
+/// None: no stand or no way. (The tests: `cars::drill::taxi_stand`.)
+#[cfg(any(test, feature = "test-support"))]
+pub(crate) fn stand_for_door(
+    w: &World,
+    way_in: [f32; 2],
+    door: [f32; 2],
+    way_out: [f32; 2],
+) -> Option<([f32; 2], f32)> {
+    let g = &w.travel.graph;
+    let mouth = crate::cars::enterable_near(g, door, crate::cars::ROAD_REACH)?;
+    let p = g.point(mouth);
+    let l = crate::travel::dist(p, door).max(1e-3);
+    let axis = [(p[0] - door[0]) / l, (p[1] - door[1]) / l];
+    let kerb = kerb_at(&w.travel, &w.meta, (mouth, axis), &[], &[])?;
+    let net = Net::new(&w.travel, &w.meta, &[]);
+    let legs = plan_way(&w.travel, &net, way_in, &[kerb], way_out)?;
+    let (route, stops) = lay_route(&w.travel, &net, &legs)?;
+    let (at, yaw, _) = route.at(*stops.first()?);
+    Some((at, yaw))
 }

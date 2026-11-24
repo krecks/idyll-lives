@@ -67,6 +67,7 @@ impl Traffic {
         self.holds.retain(|h| {
             h.at > h.claim.stop_at + 1e-3 || green(h.claim.gate) && green(h.claim.gate2)
         });
+        self.merges_let_go();
         let holds = &self.holds;
         self.asks.retain(|a| {
             let going = holds
@@ -122,7 +123,7 @@ impl Traffic {
             let Some(first) = next[0].samples.first() else {
                 let (tag, claim) = self.asks[i].parts.remove(0);
                 let key = self.asks[i].key;
-                self.holds.push(Hold {
+                self.hold(Hold {
                     key,
                     tag,
                     at: claim.from,
@@ -172,6 +173,7 @@ impl Traffic {
                                 rect: m.rect,
                                 way: m.way,
                                 pass: m.pass,
+                                layer: m.layer,
                             };
                             next.iter().any(|c| {
                                 in_bounds(c, &m.rect)
@@ -268,12 +270,14 @@ impl Traffic {
                         rect: *r,
                         way: m.way,
                         pass: m.pass,
+                        layer: m.layer,
                     };
                     next.iter().any(|c| {
                         in_bounds(c, r)
                             && c.samples.iter().any(|s| {
-                                // (Its far side clear too: don't block the box.)
-                                conflict(s, &o, strict || s.t > c.to)
+                                // (Its far side clear too: don't block the box. Into a
+                                // merge, those coming along the carriageway its way too.)
+                                conflict(s, &o, strict || c.merge || s.t > c.to)
                             })
                     })
                 };
@@ -313,7 +317,7 @@ impl Traffic {
                 // (Held from now: the asks after it this tick see it held.)
                 let key = self.asks[i].key;
                 for (tag, claim) in std::mem::take(&mut self.asks[i].parts) {
-                    self.holds.push(Hold {
+                    self.hold(Hold {
                         key,
                         tag,
                         at: claim.from,

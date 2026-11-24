@@ -16,7 +16,7 @@ import type { VoiceDirectorStats } from '../voice';
 import { qualityFromSettings, RESTART_KEYS, settings as liveSettings, type Settings } from '../settings/settings.svelte';
 import { app, type Progress } from '../ui/app.svelte';
 import { perfTime, perfTimeAsync } from '../debug/perf';
-import { DEVLOG, devlog, devlogPause, renderSample, SAMPLE_MS } from '../debug/devlog';
+import { DEVLOG, devlog, devlogCover, renderSample, SAMPLE_MS } from '../debug/devlog';
 import { installMemoryCensus } from '../debug/gameplayStats';
 import { game, toast } from '../ui/state.svelte';
 import { basicReport, within } from '../debug/report';
@@ -392,7 +392,7 @@ class GameHost {
     if (on === this.covered) return;
     this.covered = on;
     // (The dev play log: the gap this makes between frames isn't a stall.)
-    devlogPause();
+    devlogCover(on);
     void this.renderer?.then((r) => r.hold(on)).catch(() => {});
   }
 

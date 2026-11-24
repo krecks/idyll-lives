@@ -34,7 +34,7 @@ import type { RGB } from '../shared/environment';
 import { Geo, type V3 } from '../shared/geometry';
 import { compose, quatYawPitchRoll, type Quat } from '../shared/math';
 import { placementVariation, standInOf } from '../shared/modelEntry';
-import { pavedRects } from '../shared/paving';
+import { isPaths, pathLayers, pavedRects } from '../shared/paving';
 import { pavingLayers } from '../shared/streetGround';
 import { townRoadMesh, type RoadMeshData } from '../shared/roads';
 import { looksKey, roadKey, townKey } from '../shared/overviewKeys';
@@ -449,8 +449,9 @@ export class TownOverview {
         out.set('townMarks', { key: roadsKey, entity });
       }
     }
+    const paths = world.meta?.paths ?? [];
     const layers: [string, { x: number; z: number; w: number; d: number }[] | undefined, string, number][] = [
-      ['townPaths', world.meta?.paths, 'material.path', 0.014],
+      ...pathLayers(paths, 'town'),
       ...fieldLayers(world.meta?.world?.fields, 'town'),
     ];
     for (const [name, rects, material, y] of layers) {
@@ -460,8 +461,8 @@ export class TownOverview {
       await pace?.();
       const g = new Geo();
       // (Paving toned as the game's is.)
-      const toned = name === 'townPaths';
-      if (toned) pavedRects(g, rects, rects, y);
+      const toned = isPaths(name, 'town');
+      if (toned) pavedRects(g, rects, paths, y);
       else for (const r of rects) g.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0]);
       const mesh = meshFrom(this.device, g.meshData({ colors: toned }));
       if (!mesh) continue;

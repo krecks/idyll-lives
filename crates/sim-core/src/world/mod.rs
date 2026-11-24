@@ -575,6 +575,9 @@ pub struct World {
     pub(crate) was_calm: bool,
     /// Ticks the last step ran (the snapshot's `RATE` at super speed).
     pub(crate) step_ticks: u32,
+    /// The cars' poses tick by tick over the last few steps, for the snapshot (`car::TRAIL`).
+    /// Not saved.
+    pub(crate) trails: crate::snapshot::Trails,
     /// Master switch for "free will" in the whole town (each household also has its own,
     /// `Household::free_will`). Off is mainly for tests.
     pub autonomy: bool,
@@ -846,7 +849,21 @@ impl<'a> Others<'a> {
     }
 }
 
+/// Whether object `object` stands on a public lot (what it costs there: `Interaction::cost_at`).
+pub(crate) fn on_public_lot(object_plot: &[Option<u32>], plots: &[Plot], object: u32) -> bool {
+    object_plot
+        .get(object as usize)
+        .copied()
+        .flatten()
+        .is_some_and(|p| plots[p as usize].public)
+}
+
 impl Ctx<'_> {
+    /// What a use of `inter` at object `object` costs there (`Interaction::cost_at`: on a public lot, its `publicCost`).
+    pub(crate) fn cost_of(&self, object: u32, inter: &crate::content::Interaction) -> i64 {
+        inter.cost_at(on_public_lot(self.object_plot, self.plots, object))
+    }
+
     /// Whether someone serves at object `object`: a sold use's minutes are then the ordering, the
     /// hand-over and the paying (`Interaction::minutes_where`).
     pub(crate) fn served(&self, object: u32) -> bool {

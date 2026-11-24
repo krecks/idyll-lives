@@ -48,6 +48,7 @@ import { buildModel, fileImported, importAhead, modelFileCensus, modelFilesSettl
 import { memoryCensus } from './memoryCensus';
 import { GameBirds } from './birds';
 import { colorBytes, depthBytes, DrawCounts, GpuTiming, ShaderWatch, type PassKind } from './gpuTiming';
+import { ParallelPipelines } from './parallelPipelines';
 import { SamplerCheck } from './samplerCheck';
 import { steadyShaderKeys } from './shaderKeys';
 import { natureDecor, windGust, windStill } from './nature';
@@ -93,7 +94,7 @@ import { withoutCloudShadows } from './cloudShadows';
 import { createLighting, lightingAt, type Lighting, type RGB } from '../shared/environment';
 import { playbackRate } from '../shared/gameSpeed';
 import { Geo } from '../shared/geometry';
-import { pavedRects } from '../shared/paving';
+import { isPaths, pathLayers, pavedRects } from '../shared/paving';
 import { pavingLayers } from '../shared/streetGround';
 import { GrassPush } from '../shared/grass';
 import { idleMoment } from '../shared/idle';
@@ -109,6 +110,7 @@ import { FramePacer } from '../shared/pacing';
 import { standInOf } from '../shared/modelEntry';
 import { DEFAULT_RESOLUTION, renderScale, watchPixelRatio } from '../shared/resolution';
 import { fieldLayers } from '../shared/street';
+import { roadHeightsOf } from '../shared/roads';
 import { darkTiles, windowlessRooms, type DarkTiles, type Windowless } from '../shared/windowless';
 import type { FrameState } from '../../core/bridge';
 import { Pose } from '../../core/snapshot';
@@ -829,6 +831,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private gpuTiming!: GpuTiming;
   private drawCounts!: DrawCounts;
   private shaderWatch!: ShaderWatch;
+  /** The warm-up's pipelines made side by side (`warmDraw`). */
+  private parallelPipelines!: ParallelPipelines;
   /** In dev, WebGL2's texture units each program uses (`samplerCheck.ts`; `window.__samplers()`). */
   private samplerCheck: SamplerCheck | null = null;
   /** The warm-up's frame, drawn next (`warmGame`). */
@@ -875,6 +879,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     steadyShaderKeys();
     // Before anything compiles: every shader and pipeline is counted (`?diag=shaders` logs them).
     this.shaderWatch = new ShaderWatch(this.device, this.diag.has('shaders'));
+    this.parallelPipelines = new ParallelPipelines(this.device);
     if (import.meta.env.DEV) {
       const check = (this.samplerCheck = new SamplerCheck(this.device));
       (window as unknown as { __samplers?: () => unknown }).__samplers = () => check.report();
@@ -1262,6 +1267,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const probes = this.probes;
     let updated = start;
     if (probes.length) this.drawCounts.reset();
+    // (This frame's draws only: those made between frames, a held frame's reflections or a save's picture, went into
+    // the next one's count, F3 showing 1,483 where the frames drew about 1,000.)
+    this.device._drawCallsPerFrame = 0;
     try {
       for (const probe of probes) probe.before(start);
       this.onFrame?.(this.pacer.frameTime || performance.now());
@@ -1585,12 +1593,12 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     });
     // (Kept to the chunks round the camera's: it moved to another.)
     if (!changed && this.detailTight && this.detailChunk !== `${Math.floor(o.target.x / CHUNK)},${Math.floor(o.target.z / CHUNK)}`) this.reportWatch();
+    // (The street's chunks built since: what stands on their roads shown in them.)
+    if (!changed && this.streamOn && this.street.shownChunks !== this.onRoadsIn) this.viewOnRoads(o.target.x, o.target.z);
     if (!changed) return;
     this.pictureChanged();
     if (this.streamOn && this.street.setChunks(this.roam.chunks)) this.streamStreet();
-    this.cars.setView(this.streamOn ? this.roam.chunks : null, o.target.x, o.target.z);
-    this.parkedRides.setView(this.streamOn ? this.roam.chunks : null, o.target.x, o.target.z);
-    this.signals.setView(this.streamOn ? this.roam.chunks : null, o.target.x, o.target.z);
+    this.viewOnRoads(o.target.x, o.target.z);
     this.reportWatch();
   }
 
@@ -1821,6 +1829,21 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const [a, b, c, e] = [rect[0] - DETAIL_MARGIN, rect[1] - DETAIL_MARGIN, rect[2] + DETAIL_MARGIN, rect[3] + DETAIL_MARGIN];
     this.characters.setDetailArea((x, z) => x >= a && z >= b && x <= c && z <= e);
   }
+
+  /**
+   * What stands on the roads but is drawn apart from the street (the traffic lights, the cars driving and parked) drawn
+   * in the chunks whose roads are drawn (`Street.shownChunks`; streaming: those the camera asks for come a build
+   * later), round the camera's target (`x`, `z`).
+   */
+  private viewOnRoads(x: number, z: number): void {
+    const chunks = this.streamOn ? this.street.shownChunks : null;
+    this.onRoadsIn = chunks;
+    this.cars.setView(chunks, x, z);
+    this.parkedRides.setView(chunks, x, z);
+    this.signals.setView(chunks, x, z);
+  }
+  /** The chunks `viewOnRoads` last gave. */
+  private onRoadsIn: ReadonlySet<number> | null = null;
 
   /** The street builds the chunks streamed in (between world builds; a world build builds them itself). */
   private streamStreet(): void {
@@ -2136,9 +2159,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.roam.update({ x: o.target.x, z: o.target.z, radius: o.radius, alpha, fovH: 2 * Math.atan(Math.tan(LENS.fov / 2) * aspect) }, performance.now(), () => null, () => false);
       this.street.setChunks(this.roam.chunks);
     } else this.street.setChunks(null);
-    this.cars.setView(this.streamOn ? this.roam.chunks : null, this.orbit.target.x, this.orbit.target.z);
-    this.parkedRides.setView(this.streamOn ? this.roam.chunks : null, this.orbit.target.x, this.orbit.target.z);
-    this.signals.setView(this.streamOn ? this.roam.chunks : null, this.orbit.target.x, this.orbit.target.z);
+    this.viewOnRoads(this.orbit.target.x, this.orbit.target.z);
     // (lotContents.ts: the landscape, with its country roads.)
     this.loadStep('Laying out the land', 0.05);
     await this.lot.buildNature(world, (roads, parent) => drawRoads(this.app, roads, parent));
@@ -2305,8 +2326,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * street's, chunk by chunk: `pc/street.ts`.)
    */
   private buildStreets(world: WorldStructure): void {
+    const paths = world.meta?.paths ?? [];
     const layers: [string, { x: number; z: number; w: number; d: number }[] | undefined, string, number][] = [
-      ['paths', world.meta?.paths, 'material.path', 0.014],
+      ...pathLayers(paths, ''),
       ...fieldLayers(world.meta?.world?.fields, ''),
     ];
     const v = this.view;
@@ -2317,8 +2339,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       if (!list.length) continue;
       const geo = new Geo();
       // Paving toned by vertex (darker and mossy at its sides: `shared/paving.ts`), as the street's.
-      const toned = name === 'paths';
-      if (toned) pavedRects(geo, list, all ?? list, y);
+      const toned = isPaths(name, '');
+      if (toned) pavedRects(geo, list, paths, y);
       else for (const r of list) geo.poly([[r.x, y, r.z], [r.x + r.w, y, r.z], [r.x + r.w, y, r.z + r.d], [r.x, y, r.z + r.d]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
       const mesh = meshFrom(this.device, geo.meshData({ colors: toned }));
       if (mesh) this.lotEntities.push({ entity: drawMesh(this.lotRoot, name, mesh, toned ? this.lib.surface(material, { doubleSided: true, vertexColors: true }) : this.lotMaterial(material)), storey: 0 });
@@ -2554,11 +2576,16 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    * The share of daylight under the ground and in rooms without windows (`DigState.lit`), at the
    * last lighting update: the basement's while it is in view (its fill), else the windowless
    * rooms' (the only ones that read it then: `darkTiles` marks none from the basement). With the
-   * basement in view the moonlight grade is softened too (`BASEMENT_NIGHT_GRADE`): no moon down there.
+   * basement in view the moonlight grade is softened too (`BASEMENT_NIGHT_GRADE`): no moon down there; and the bloom
+   * is full at any hour (`PostProcessing.glow`): no daylight down there either.
    */
   private applyUnderLight(): void {
     const l = this.lighting;
-    if (this.post) this.post.night = l.night * LOOK.nightGrade * (this.storey < 0 && !this.townMode ? BASEMENT_NIGHT_GRADE : 1);
+    if (this.post) {
+      const basement = this.storey < 0 && !this.townMode;
+      this.post.night = l.night * LOOK.nightGrade * (basement ? BASEMENT_NIGHT_GRADE : 1);
+      this.post.glow = basement ? 1 : l.night;
+    }
     const under = this.storey < 0;
     const [sky, env, most] = under ? [BASEMENT_SKY * (NOON_SKY_LUMA / skyLuma(l)), BASEMENT_ENV, BASEMENT_NIGHT_GAIN] : [WINDOWLESS_SKY, WINDOWLESS_ENV, 1];
     const seen = Math.max(l.exposure, 1e-3);
@@ -3140,6 +3167,21 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
   }
 
+  /**
+   * One frame of the warm-up (`warmFrame`'s), its new pipelines made side by side (`parallelPipelines.ts`: a
+   * machine's first game compiles them all, and in turn that was most of a minute), then drawn again in full if
+   * any were; how many were.
+   */
+  private async warmDraw(): Promise<number> {
+    this.warmNext = true;
+    const made = await this.parallelPipelines.frame(() => this.framesRendered(1));
+    if (made && !this.disposed) {
+      this.warmNext = true;
+      await this.framesRendered(1);
+    }
+    return made;
+  }
+
   private async warmGameNow(frame: FrameState): Promise<void> {
     this.shaderWatch.phase = 'warm-up';
     this.loadListener?.('Warming up', 0.65);
@@ -3153,10 +3195,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         this.lastLightMinute = -1;
       }
     }
-    this.warmNext = true;
     const t0 = performance.now();
-    await this.framesRendered(1);
-    this.shaderWatch.note(`warm-up frame done in ${Math.round(performance.now() - t0)} ms`);
+    const made = await perfTimeAsync('warm: frame', () => this.warmDraw());
+    this.shaderWatch.note(`warm-up frame done in ${Math.round(performance.now() - t0)} ms (${made} pipelines made side by side)`);
     // The woods' impostors baked and their cards drawn once now, not at the town view's first look (`nature.ts`).
     const landscape = this.lot.landscape;
     if (landscape && !this.disposed) {
@@ -3180,9 +3221,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         this.loadListener?.(`Warming up (lot ${i + 1} of ${lots.length})`, 0.75 + (0.25 * i) / lots.length);
         const span = perfStart(`warm: lot ${i + 1} of ${lots.length}`);
         await this.setWorld(world, lot);
-        this.warmNext = true;
-        await this.framesRendered(1);
-        perfEnd(span, `${gains[i]} new kinds`);
+        const made = await this.warmDraw();
+        perfEnd(span, `${gains[i]} new kinds, ${made} pipelines`);
       }
       await perfTimeAsync('warm: home again', () => this.setWorld(this.lastWorld ?? world, home));
       this.shaderWatch.note(`warm-up lots done in ${Math.round(performance.now() - t0)} ms`);
@@ -3611,7 +3651,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
       this.ghostDraw.setScale(this.townMetresPerPx());
     }
     const layer = this.lot.townLayer ?? pc.LAYERID_WORLD;
-    this.ghostDraw.set(ghosts, at ? groundOrWater(at.scape) : () => 0, layer, this.townWorld);
+    this.ghostDraw.set(ghosts, at ? groundOrWater(at.scape) : () => 0, layer, this.townWorld, at ? roadHeightsOf(at.world) : null);
     this.held?.changed();
   }
 

@@ -14,7 +14,14 @@ profile = []
 # The simulation tests' long runs (two weeks of a town, a century, a day of rearranging...): left out
 # of a pull request's CI, run on a release tag and by hand (tools/ci-local.sh, SLOW_TESTS).
 slow-tests = []
+# What only the tests use (`cars::drill`, the empty drive, a car's way out, a taxi's stand, the
+# traffic's claims out, whether the roads are strongly connected): left out of the game's build,
+# on for the tests (this crate's own dev-dependency on itself below).
+test-support = []
 
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+sim-core = { path = ".", features = ["test-support"] }

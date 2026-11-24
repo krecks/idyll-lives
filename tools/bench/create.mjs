@@ -30,7 +30,8 @@
  * town shown: the editor's own timings), and says them (`create: edit …`). Then the Street tool: a
  * street drawn by clicks across open land from one road to another (the frames and the editor's own
  * work per pointer move while its ghost follows the pointer, and `drawStreet`'s own time, the one
- * the tool asks once the pointer rests), one over the water on a bridge if the world has a crossing
+ * the tool asks once the pointer rests), a one-way street drawn with arrows along its ghost and then made an
+ * avenue from its card (what is in its way cleared), one over the water on a bridge if the world has a crossing
  * on screen, a refused tight bend, a stretch too steep if the land has one on screen, and a street
  * being drawn taken back a point (Backspace) and dropped (Esc).
  *
@@ -189,7 +190,7 @@ function overlaps() {
  */
 function benchHelpers() {
   return (async () => {
-    const [{ app }, { menuScene }, lots, streets, town, pickMod, live, buildup, villages, layoutApi, uses] = await Promise.all([
+    const [{ app }, { menuScene }, lots, streets, town, pickMod, live, buildup, villages, layoutApi, uses, streetTool] = await Promise.all([
       import('/src/ui/app.svelte.ts'),
       import('/src/game/menuScene.ts'),
       import('/src/game/edit/lots.ts'),
@@ -201,6 +202,7 @@ function benchHelpers() {
       import('/src/game/edit/villages.ts'),
       import('/src/ui/townedit/layoutApi.ts'),
       import('/src/game/uses.ts'),
+      import('/src/ui/townedit/streetTool.ts'),
     ]);
     const t = await town.loadTemplates();
     const ed = () => window.__townEditor;
@@ -299,6 +301,24 @@ function benchHelpers() {
         const red = (v) => v.stretches.filter((x) => x.tone === 'bad').reduce((a, x) => a + x.to - x.from, 0);
         const order = d.roads.map((r, i) => i).sort((a, b) => ((d.roads[a].area ?? 9) === 0 ? 0 : 1) - ((d.roads[b].area ?? 9) === 0 ? 0 : 1));
         const add = (p, v, k) => [p[0] + v[0] * k, p[1] + v[1] * k];
+        /**
+         * The points the Street tool takes from clicks at `screens`, its magnet pulling them as it does (`pullAt`: the
+         * first always, a later one where the street through it is not refused); null where it would pull a later one
+         * (onto a road: the street would end there, short of the bend tried) or two clicks would make a double click.
+         */
+        const asClicked = (screens) => {
+          const pts = [];
+          for (const [k, p] of screens.entries()) {
+            if (k && Math.hypot(p.x - screens[k - 1].x, p.y - screens[k - 1].y) < 10) return null;
+            const [g, a, b] = [ed().ground(p.x, p.y), ed().ground(p.x - 4, p.y), ed().ground(p.x + 4, p.y)];
+            if (!g || !a || !b) return null;
+            const perPx = ed().scale?.(p.x, p.y) ?? Math.hypot(b.x - a.x, b.z - a.z) / 8;
+            const pull = streetTool.pullAt(d, [g.x, g.z], streetTool.pullReach(perPx), 'street', k ? pts[0] : undefined);
+            if (k && pull.pull && !live.liveStreet(d, t, [...pts, pull.at], 'street', true).why) return null;
+            pts.push(k ? [g.x, g.z] : pull.at);
+          }
+          return pts;
+        };
         /** The live street through `pts` if it is what is wanted (`drawStreet`'s own time on it, `ms`, for a street drawn), else null. */
         const judge = (pts) => {
           const v = live.liveStreet(d, t, pts, 'street', true);
@@ -330,7 +350,9 @@ function benchHelpers() {
               const n = [-tq[1] * side, tq[0] * side];
               const from = add(p, n, r.width / 2 + 3);
               const lens = what === 'steep' ? [30, 40, 60, 90, 120, 160, 200] : [60, 90, 120, 160, 200, 260, 320];
-              const tries = what === 'tight' ? [[from, add(from, n, 34), add(add(from, n, 34), tq, 9), add(from, n, 50)]] : lens.map((len) => [from, add(from, n, len)]);
+              // (A tight bend: out square to the road, a step 9 m aside and back in line 16 m on; out far enough for the
+              // magnet to leave its points where they are clicked, `asClicked`.)
+              const tries = what === 'tight' ? [34, 50, 70, 90].map((out) => [from, add(from, n, out), add(add(from, n, out), tq, 9), add(from, n, out + 16)]) : lens.map((len) => [from, add(from, n, len)]);
               for (const tried of tries) {
                 const v = judge(tried);
                 if (!v) continue;
@@ -347,11 +369,14 @@ function benchHelpers() {
                 }
                 const screens = clicks.map((g) => screen(g[0], g[1]));
                 if (screens.some((x) => !x)) continue;
-                const back = screens.map((p) => {
-                  const g = ed().ground(p.x, p.y);
-                  return [g.x, g.z];
-                });
-                const w = judge(back);
+                const back =
+                  what === 'tight'
+                    ? asClicked(screens)
+                    : screens.map((p) => {
+                        const g = ed().ground(p.x, p.y);
+                        return [g.x, g.z];
+                      });
+                const w = back && judge(back);
                 if (!w) continue;
                 if (what === 'steep') {
                   found.push({ red: red(w), road: r.name, ground: back, screens, slope: w.slope, reached: w.reached });
@@ -869,6 +894,11 @@ async function editSession(page, renderer, shootAs, setStep, step, parts) {
         },
         [a, b],
       );
+    /** The Street tool taken again: a street half drawn dropped. */
+    const anew = async () => {
+      await tool('select');
+      await tool('street');
+    };
     const clickAt = async (p) => {
       await page.mouse.move(p.x, p.y, { steps: 6 });
       await page.waitForTimeout(60);
@@ -909,12 +939,43 @@ async function editSession(page, renderer, shootAs, setStep, step, parts) {
     if (across) await draw(across, 'street');
     else fault(`${renderer} edit: no street from one road to another on screen to draw`);
 
+    // 9b. A one-way street (the card's One-way on): arrows along its ghost the way cars go; drawn, its card's Change
+    // kind and way, then made an avenue there (what is in its way cleared).
+    const oneWay = page.locator('.street-card [role="switch"][aria-label="One-way"]');
+    if (await oneWay.count()) {
+      await oneWay.click();
+      await page.waitForTimeout(100);
+      const way = (await bench(() => window.__bench.stroke('join'))) ?? (await bench(() => window.__bench.stroke('join-any')));
+      if (way) {
+        await draw(way, 'street-oneway');
+        const road = (await state()).selected;
+        const roadOf = () => (road?.kind === 'road' ? bench((r) => window.__townEditor.draft.roads[r], road.road) : null);
+        const picked = await roadOf();
+        if (!picked?.oneway) fault(`${renderer} edit one-way: drawn two-way (${JSON.stringify(picked?.oneway)})`);
+        const clear = page.locator('[role="switch"][aria-label="Clear what\'s in the way of it wider"]');
+        if (await clear.count()) await clear.click();
+        await page.locator('[role="radiogroup"][aria-label="Change its kind"] [role="radio"]', { hasText: /^Avenue$/ }).click();
+        await page.waitForTimeout(150);
+        const made = await roadOf();
+        console.log(`create: ${renderer} edit one-way: drawn one-way ${picked?.oneway}, then made ${made?.kind} ${made?.width} m wide, one-way ${made?.oneway}; ${(await state()).note ?? 'nothing refused'}`);
+        await shots('street-oneway-avenue');
+        await built('a one-way street made an avenue');
+        await shots('street-oneway-avenue-built');
+      } else console.log(`create: ${renderer} edit: no street for a one-way one on screen`);
+      await tool('street');
+      await page.locator('.street-card [role="switch"][aria-label="One-way"]').click();
+      await page.waitForTimeout(100);
+    }
+
     // 10. Over the water on a bridge (if the world has a crossing on screen).
     const over = await bench(() => window.__bench.stroke('bridge'));
     if (over) await draw(over, 'street-bridge');
     else console.log(`create: ${renderer} edit: no crossing of the water on screen for a bridge`);
 
-    // 11. A tight bend: red where it bends, why under the tools; Enter refuses it; Esc drops it.
+    // 11. A tight bend: red where it bends, why under the tools; Enter refuses it; Esc drops it. (From a street tool
+    // with nothing half drawn: a street above that its clicks ended early, on a road the magnet pulled one onto, leaves
+    // its last click a street begun, which the bend's clicks would carry on.)
+    await anew();
     const tight = await bench(() => window.__bench.stroke('tight'));
     if (tight) {
       const had = (await state()).roads;
@@ -986,6 +1047,7 @@ async function editSession(page, renderer, shootAs, setStep, step, parts) {
     if (!steep) console.log(`create: ${renderer} edit: no (more) streets too steep out in the country on screen`);
 
     // 13. Backspace takes the last point back; Esc drops the street (and a second Esc puts the tool down).
+    await anew();
     const again = (await bench(() => window.__bench.stroke('tight'))) ?? (await bench(() => window.__bench.stroke('join')));
     if (again) {
       for (const p of again.screens.slice(0, 3)) await clickAt(p);

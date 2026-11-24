@@ -103,14 +103,15 @@ describe('signal-head rows', () => {
     for (const g of [housing, walk, dontWalk]) {
       expect(g.empty).toBe(false);
       for (let i = 0; i < g.pos.length; i += 3) {
-        // To the -x side of the pole (towards the road's middle), under the traffic head (its board from 1.97 m up).
-        expect(g.pos[i]).toBeLessThanOrEqual(0);
+        // To the +x side of the pole (towards the road's middle: the pole on the right of those coming in, its head facing
+        // them, sim-core `cars::right_of`), under the traffic head (its board from 1.97 m up).
+        expect(g.pos[i]).toBeGreaterThanOrEqual(0);
         expect(g.pos[i + 1]).toBeGreaterThan(1.3);
         expect(g.pos[i + 1]).toBeLessThan(1.96);
       }
     }
-    // The figures face -x, don't walk above walk.
-    for (const g of [walk, dontWalk]) for (let i = 0; i < g.nor.length; i += 3) expect(g.nor[i]).toBe(-1);
+    // The figures face +x, don't walk above walk.
+    for (const g of [walk, dontWalk]) for (let i = 0; i < g.nor.length; i += 3) expect(g.nor[i]).toBe(1);
     const top = (g: typeof walk) => Math.max(...g.pos.filter((_, i) => i % 3 === 1));
     expect(top(dontWalk)).toBeGreaterThan(top(walk));
   });

@@ -8,7 +8,8 @@
   }
 </script>
 
-<div class="toasts" aria-live="polite">
+<!-- (Off Live, the dock fills the bottom: the toasts go under the top bar, not over the catalog.) -->
+<div class="toasts" class:top={game.mode !== 'live'} aria-live="polite">
   {#each game.toasts as t (t.id)}
     {#if t.actions}
       <div class="toast ask" role="group" aria-label={t.text}>
@@ -35,6 +36,10 @@
     gap: 8px;
     align-items: center;
     pointer-events: none;
+  }
+  .toasts.top {
+    bottom: auto;
+    top: calc(var(--top) + 8px);
   }
   .toast {
     padding: 10px 16px;

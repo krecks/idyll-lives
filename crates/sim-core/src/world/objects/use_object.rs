@@ -83,7 +83,10 @@ pub(crate) fn use_object(
         // alarm goes off in time to get ready, rested or not.
         let rested = rhythm.rest_need.is_none_or(|n| sim.needs[n] >= 0.999);
         let longest = f32::from(content.planner.max_sleep_minutes);
-        wakes || elapsed >= longest || (rested && !before_dawn(sim, ctx)) || getting_up(sim, ctx)
+        wakes
+            || elapsed >= longest
+            || (rested && !before_dawn(sim, ctx))
+            || getting_up(sim, ctx, true)
     } else {
         // Workouts and other draining activities stop before they empty the needs they cost.
         // Planned activities go on for their time even once the needs they fill are full.

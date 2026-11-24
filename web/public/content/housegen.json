@@ -523,6 +523,27 @@
     }
   },
 
+  "$paving": "What each house's front path and drive are made of (game/pathLooks.ts): 'path' and 'drive' are looks by weight for a house class (by its label; 'default' for one not listed): hex (pavers), concrete, brick (herringbone), flagstone, gravel, asphalt (a drive's only). 'match': how often the drive is laid as the path is, where the drive may be.",
+  "paving": {
+    "match": 0.3,
+    "path": {
+      "default": { "concrete": 4, "brick": 2, "flagstone": 2, "hex": 1 },
+      "cottage": { "flagstone": 4, "gravel": 2, "brick": 2, "concrete": 1 },
+      "bungalow": { "concrete": 4, "flagstone": 2, "brick": 1, "gravel": 1 },
+      "terraced house": { "concrete": 3, "brick": 3, "hex": 2 },
+      "town house": { "brick": 3, "concrete": 2, "flagstone": 2, "hex": 1 },
+      "villa": { "flagstone": 3, "brick": 3, "gravel": 1 }
+    },
+    "drive": {
+      "default": { "concrete": 4, "asphalt": 3, "gravel": 2, "brick": 1 },
+      "cottage": { "gravel": 4, "concrete": 1, "asphalt": 1 },
+      "bungalow": { "concrete": 4, "asphalt": 3, "gravel": 1 },
+      "terraced house": { "concrete": 3, "asphalt": 3, "brick": 1 },
+      "town house": { "concrete": 2, "brick": 2, "asphalt": 2 },
+      "villa": { "gravel": 3, "brick": 3, "concrete": 1 }
+    }
+  },
+
   "$names": "House names: one word from each list.",
   "names": {
     "first": ["Birch", "Linden", "Rowan", "Hazel", "Juniper", "Alder", "Clover", "Meadow", "Brook", "Ivy", "Heather", "Holly", "Elder", "Laurel", "Briar", "Fern", "Sorrel", "Thistle"],

@@ -2,10 +2,12 @@
 
 use super::*;
 /// How a way is searched for (`Graph::path_by`): setting off only towards this node (an end of the
-/// start's edge), and these edges costing this much more each.
+/// start's edge), coming in only from this one (`arrive`: an end of the goal's edge), and these
+/// edges costing this much more each.
 #[derive(Debug, Clone, Default)]
 pub struct Way {
     pub toward: Option<u32>,
+    pub arrive: Option<u32>,
     pub avoid: Vec<(u32, f32)>,
 }
 
@@ -99,6 +101,14 @@ impl Travel {
         self.graph.nearest(p, ENTRY_REACH, mode)
     }
 
+    /// Whether those on foot or on a bike may leave town by the way out at `exit`: one at the end
+    /// of a road they go along, or of none. Not a motorway's carriageway's end: only a road for
+    /// cars there, which nobody walks or rides along (`Road::walkable`), its ground kept from them.
+    pub fn exit_on_foot(&self, exit: [f32; 2]) -> bool {
+        self.graph.nearest(exit, EXIT_ROAD, Mode::Foot).is_some()
+            || self.graph.nearest(exit, EXIT_ROAD, Mode::Car).is_none()
+    }
+
     /// Notes the plots' doors and where they get on the roads (`doors`), again only for a door
     /// that moved.
     pub(crate) fn note_doors(&mut self, plots: &[crate::world::Plot]) {
@@ -129,15 +139,12 @@ impl Travel {
     }
 
     /// Whether `p` is in a road's carriageway, between the kerbs of one for cars (a country
-    /// road's, its edges), `margin` m in from them at least.
+    /// road's, its edges), `margin` m in from them at least (`Graph::carriageways_near`: not the
+    /// motorway's).
     pub fn on_carriageway(&self, p: [f32; 2], margin: f32) -> bool {
         self.graph
-            .near(p, CARRIAGEWAY_LOOK, 4, Mode::Car)
-            .iter()
-            .any(|rp| {
-                let road = &self.graph.roads[rp.road as usize];
-                rp.off <= crate::cars::kerb_of(road.width, road.kind) - margin
-            })
+            .carriageways_near(p, CARRIAGEWAY_LOOK, 4)
+            .any(|(off, kerb)| off <= kerb - margin)
     }
 
     /// The area a point is in, if any.

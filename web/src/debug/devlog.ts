@@ -71,7 +71,20 @@ let pausedUntil = 0;
  * (nothing is drawn then), opened or closed within the last second. Such gaps aren't stalls.
  */
 export function devlogPaused(): boolean {
-  return performance.now() < pausedUntil;
+  return covered || performance.now() < pausedUntil;
+}
+
+/** Whether a full-screen menu covers the view (`devlogCover`). */
+let covered = false;
+
+/**
+ * A full-screen menu covers the view (`on`), or no longer does: while it does, no gap between frames is a stall
+ * (the game draws only what's asked of it, a save's picture: one under the pause menu logged a 134 s stall), nor is
+ * the first after it (`devlogPause`).
+ */
+export function devlogCover(on: boolean): void {
+  covered = on;
+  devlogPause();
 }
 
 /** A menu opened or closed, or the tab hidden or shown: the next frame's gap isn't a stall (`devlogPaused`). */

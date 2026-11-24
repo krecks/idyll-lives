@@ -1,10 +1,11 @@
 /**
  * `CountryRoads.near` through its 8 m grid finds what a scan of every segment finds, ties and
- * misses alike; the roads out past the edge keep off a river that runs on past it.
+ * misses alike. A motorway goes on past the edge, over the land and over the water; the roads out
+ * past the edge keep off a river that runs on past it.
  */
 import { describe, expect, test } from 'bun:test';
 import type { WorldStructure } from '../src/core/protocol';
-import { CountryRoads, ROAD_VERGE, type NearRoad, type Point, type RoadLand } from '../src/render/shared/countryRoads';
+import { CountryRoads, DECK_OVER, MOTORWAY_WIDTH, ROAD_VERGE, STEP, type NearRoad, type Point, type RoadLand } from '../src/render/shared/countryRoads';
 
 function scan(roads: Point[][], x: number, z: number): NearRoad | null {
   let best: NearRoad | null = null;
@@ -68,5 +69,64 @@ describe('country roads', () => {
     // Each on its own side of it, never on top of the other.
     for (const [, z] of north) expect(z).toBeLessThan(190);
     for (const [, z] of south) expect(z).toBeGreaterThan(210);
+  });
+});
+
+describe("a motorway past the world's edge", () => {
+  // (A town 200 m square, its motorway's two carriageways along z = 100 and 109 from edge to edge, on a bridge at the
+  // west edge; past it the sea, 3 m deep, past the east edge the land.)
+  const WATER = -0.35;
+  const line = (z: number, oneway: 1 | -1) => ({ points: Array.from({ length: 21 }, (_, i): [number, number] => [i * 10, z]), width: MOTORWAY_WIDTH, ends: ['out', 'out'], kind: 'motorway', oneway });
+  const world = { width: 200, depth: 200, meta: { roads: [line(100, 1), line(109, -1)] } } as unknown as WorldStructure;
+  const outside = (x: number, z: number) => Math.max(0, -x, x - 200, -z, z - 200);
+  const land = (bridge: number | null): RoadLand => ({
+    seed: 1,
+    w: 200,
+    d: 200,
+    ring: 300,
+    ground: (x) => (x < 1 ? -3 : 0.5),
+    waterEdge: (x) => (x < 1 ? 1 - x : -100),
+    distanceToTown: outside,
+    follows: true,
+    water: WATER,
+    ...(bridge === null ? {} : { surface: () => bridge }),
+  });
+
+  test('goes on over the water on a deck, its carriageways side by side, to the end of the land', () => {
+    const roads = new CountryRoads(land(4), world, 'Test');
+    const west = [...roads.motorways].filter((r) => roads.roads[r][0][0] < 1);
+    expect(west.length).toBe(2);
+    for (const r of west) {
+      const road = roads.roads[r];
+      // (Out to the land's end, not stopped at the shore.)
+      expect(road.at(-1)![0]).toBeLessThan(-280);
+      const deck = roads.decks.get(r)!;
+      expect(deck.on.every((w) => w)).toBe(true);
+      // From the bridge's height at the edge, down to a low deck over the water, never under it.
+      expect(road[0][2]).toBeCloseTo(4, 6);
+      for (const p of road) expect(p[2]).toBeGreaterThanOrEqual(WATER + DECK_OVER - 1e-6);
+      expect(road.at(-1)![2]).toBeCloseTo(WATER + DECK_OVER, 6);
+      expect(deck.bed.every((b) => b === -3)).toBe(true);
+      // Its pair beside it, at one height.
+      const other = roads.roads[roads.pairs.get(r)!];
+      road.forEach((p, i) => expect(p[2]).toBeCloseTo(other[i][2], 6));
+    }
+    expect(roads.barriers.some((b) => b[0][0] < 1 && b.at(-1)![0] < -280)).toBe(true);
+    // The sea floor under it isn't raised to it (no levelling under a deck: `near` finds no road there).
+    expect(roads.near(-100, 104.5)).toBeNull();
+    // Over the land past the east edge it lies on the land, levelled into it.
+    const east = [...roads.motorways].filter((r) => roads.roads[r][0][0] > 199);
+    expect(east.length).toBe(2);
+    for (const r of east) expect(roads.decks.has(r)).toBe(false);
+    expect(roads.near(260, 100)?.h).toBeCloseTo(0.5, 6);
+  });
+
+  test('no bridge height to start from (no surface): a low deck all the way', () => {
+    const roads = new CountryRoads(land(null), world, 'Test');
+    for (const r of [...roads.motorways].filter((r) => roads.roads[r][0][0] < 1)) {
+      const road = roads.roads[r];
+      expect(road.length).toBeGreaterThan(280 / STEP);
+      for (const p of road.slice(1)) expect(p[2]).toBeGreaterThanOrEqual(WATER + DECK_OVER - 1e-6);
+    }
   });
 });

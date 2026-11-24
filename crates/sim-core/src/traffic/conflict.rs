@@ -83,6 +83,10 @@ pub(super) fn overlaps(a: (&Claim, &[Sample]), b: (&Claim, &[Sample])) -> bool {
 /// other only where pulling over as far as both can there (`Sample::pass`) leaves less than
 /// `PASS_GAP` between them.
 pub(crate) fn conflict(a: &Sample, b: &Sample, strict: bool) -> bool {
+    // (On levels that don't meet, one over the other: `travel::Layer`.)
+    if !a.layer.meets(b.layer) {
+        return false;
+    }
     // (Backing up, it follows nobody, nor passes anyone: going the way it faces, it's going on.)
     let back = |s: &Sample| s.way[0] * s.rect.yaw.sin() + s.way[1] * s.rect.yaw.cos() < 0.0;
     let backing = back(a) || back(b);

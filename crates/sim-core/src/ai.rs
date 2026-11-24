@@ -183,6 +183,7 @@ mod tests {
             requires: 0,
             skill_gain: [0.0; crate::content::MAX_SKILLS],
             cost: 0,
+            public_cost: None,
             skill: None,
             feeling: None,
             feeling_min_skill: 0.0,

@@ -54,3 +54,13 @@ export const ENV_UNITS = 1.05;
  * don't move). A string: it goes into the shaders.
  */
 export const SPECULAR_UNITS = '2.8';
+
+/**
+ * A light fitting's glowing glass lit at night (a lamp's shade, bulb or lens: a model's `glow`, `LotContents.applyGlow`;
+ * the street's lamp glass, `street.ts`): this many times the colour it glows in (linear), so it clears the bloom's
+ * threshold (`post.ts` `BLOOM.white`) with margin. At 1 a room lamp's lit glass came to about 2.1 once exposed at night
+ * and a streetlamp's to 1.79, hardly above the threshold's 1.6, so they barely bloomed. Only lit: a lamp switched off,
+ * or by day out of doors, is as it was (where no daylight comes, the basement and rooms without windows, a lamp's glass
+ * is as bright to the eye by day as at night).
+ */
+export const LAMP_GLASS = 1.5;

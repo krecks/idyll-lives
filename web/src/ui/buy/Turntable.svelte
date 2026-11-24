@@ -14,6 +14,7 @@
     glyph,
     colors,
     compact = false,
+    focus = false,
   }: {
     model: string;
     footprint: [number, number];
@@ -22,6 +23,8 @@
     colors?: PartColors;
     /** A shorter stage (owned things: their upgrade and sell buttons come first). */
     compact?: boolean;
+    /** A taller stage (the item just picked in the catalog, in hand: the thing to look at). */
+    focus?: boolean;
   } = $props();
 
   const FRAMES = 24;
@@ -88,6 +91,7 @@
 <div
   class="turntable"
   class:compact
+  class:focus
   class:ready={!!frames}
   class:loading={!frames && !failed}
   role="img"
@@ -120,6 +124,9 @@
   }
   .compact {
     aspect-ratio: 2.6;
+  }
+  .focus {
+    aspect-ratio: 1.15;
   }
   .ready {
     cursor: grab;

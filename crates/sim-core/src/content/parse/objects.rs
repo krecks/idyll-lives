@@ -261,6 +261,8 @@ pub(crate) struct InteractionRaw {
     #[serde(default)]
     pub(crate) cost: i64,
     #[serde(default)]
+    pub(crate) public_cost: Option<i64>,
+    #[serde(default)]
     pub(crate) skill: Option<String>,
     #[serde(default)]
     #[serde(alias = "moodlet")] // key before the moodlet → feeling rename

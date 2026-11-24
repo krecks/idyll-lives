@@ -38,12 +38,15 @@ import { approachCandidates, covers, facedTable, freeSpots, frontTile, middleOf,
 import type { Door, HouseTemplate, Placement, PlannedRoom, Wall } from './town';
 import { between, mulberry32 as random, pick } from './noise';
 import type { FlooringSpec } from './floorings';
+import type { PavingSpec } from './pathLooks';
 import * as pmath from './pmath';
 
 export interface HouseGenConfig {
   classes: Record<string, HouseClass>;
   /** The floors a home has laid, by room kind (`floorings.ts`; absent: automatic floors everywhere). */
   floorings?: FlooringSpec;
+  /** What each house's front path and drive are made of, by its class (`pathLooks.ts`; absent: hexagonal pavers). */
+  paving?: PavingSpec;
   /** Class weights per lot size. */
   lots: Record<string, Record<string, number>>;
   margins: { front: [number, number]; back: number; side: number };
