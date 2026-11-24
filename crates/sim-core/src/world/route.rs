@@ -568,7 +568,7 @@ pub(crate) fn progress(
                     Some(crate::staff::Hold::Wait) => return,
                     // (Not served: the money paid on arrival back.)
                     Some(crate::staff::Hold::GiveUp) => {
-                        sim.pending_spend -= inter.cost.max(0);
+                        sim.pending_spend -= ctx.cost_of(object, inter).max(0);
                         return end_activity(sim, content, objects);
                     }
                 }

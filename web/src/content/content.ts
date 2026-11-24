@@ -42,6 +42,8 @@ export interface InteractionDef {
   skills?: Record<string, number>;
   /** Money charged from household funds each time it's used. */
   cost?: number;
+  /** What it costs instead on a public lot (a home kitchen's food at a restaurant; sim-core `Interaction::cost_at`). */
+  publicCost?: number;
   /** Skill that makes this interaction better (bigger need gains per level). */
   skill?: string;
   /** Feeling granted when finished (if the Sim has at least `feelingMinSkill` in `skill`). */

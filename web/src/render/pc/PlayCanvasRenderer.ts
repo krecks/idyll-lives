@@ -48,6 +48,7 @@ import { buildModel, fileImported, importAhead, modelFileCensus, modelFilesSettl
 import { memoryCensus } from './memoryCensus';
 import { GameBirds } from './birds';
 import { colorBytes, depthBytes, DrawCounts, GpuTiming, ShaderWatch, type PassKind } from './gpuTiming';
+import { ParallelPipelines } from './parallelPipelines';
 import { SamplerCheck } from './samplerCheck';
 import { steadyShaderKeys } from './shaderKeys';
 import { natureDecor, windGust, windStill } from './nature';
@@ -830,6 +831,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
   private gpuTiming!: GpuTiming;
   private drawCounts!: DrawCounts;
   private shaderWatch!: ShaderWatch;
+  /** The warm-up's pipelines made side by side (`warmDraw`). */
+  private parallelPipelines!: ParallelPipelines;
   /** In dev, WebGL2's texture units each program uses (`samplerCheck.ts`; `window.__samplers()`). */
   private samplerCheck: SamplerCheck | null = null;
   /** The warm-up's frame, drawn next (`warmGame`). */
@@ -876,6 +879,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     steadyShaderKeys();
     // Before anything compiles: every shader and pipeline is counted (`?diag=shaders` logs them).
     this.shaderWatch = new ShaderWatch(this.device, this.diag.has('shaders'));
+    this.parallelPipelines = new ParallelPipelines(this.device);
     if (import.meta.env.DEV) {
       const check = (this.samplerCheck = new SamplerCheck(this.device));
       (window as unknown as { __samplers?: () => unknown }).__samplers = () => check.report();
@@ -1263,6 +1267,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const probes = this.probes;
     let updated = start;
     if (probes.length) this.drawCounts.reset();
+    // (This frame's draws only: those made between frames, a held frame's reflections or a save's picture, went into
+    // the next one's count, F3 showing 1,483 where the frames drew about 1,000.)
+    this.device._drawCallsPerFrame = 0;
     try {
       for (const probe of probes) probe.before(start);
       this.onFrame?.(this.pacer.frameTime || performance.now());
@@ -2572,7 +2579,10 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
    */
   private applyUnderLight(): void {
     const l = this.lighting;
-    if (this.post) this.post.night = l.night * LOOK.nightGrade * (this.storey < 0 && !this.townMode ? BASEMENT_NIGHT_GRADE : 1);
+    if (this.post) {
+      this.post.night = l.night * LOOK.nightGrade * (this.storey < 0 && !this.townMode ? BASEMENT_NIGHT_GRADE : 1);
+      this.post.glow = l.night;
+    }
     const under = this.storey < 0;
     const [sky, env, most] = under ? [BASEMENT_SKY * (NOON_SKY_LUMA / skyLuma(l)), BASEMENT_ENV, BASEMENT_NIGHT_GAIN] : [WINDOWLESS_SKY, WINDOWLESS_ENV, 1];
     const seen = Math.max(l.exposure, 1e-3);
@@ -3154,6 +3164,21 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     }
   }
 
+  /**
+   * One frame of the warm-up (`warmFrame`'s), its new pipelines made side by side (`parallelPipelines.ts`: a
+   * machine's first game compiles them all, and in turn that was most of a minute), then drawn again in full if
+   * any were; how many were.
+   */
+  private async warmDraw(): Promise<number> {
+    this.warmNext = true;
+    const made = await this.parallelPipelines.frame(() => this.framesRendered(1));
+    if (made && !this.disposed) {
+      this.warmNext = true;
+      await this.framesRendered(1);
+    }
+    return made;
+  }
+
   private async warmGameNow(frame: FrameState): Promise<void> {
     this.shaderWatch.phase = 'warm-up';
     this.loadListener?.('Warming up', 0.65);
@@ -3167,10 +3192,9 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         this.lastLightMinute = -1;
       }
     }
-    this.warmNext = true;
     const t0 = performance.now();
-    await this.framesRendered(1);
-    this.shaderWatch.note(`warm-up frame done in ${Math.round(performance.now() - t0)} ms`);
+    const made = await perfTimeAsync('warm: frame', () => this.warmDraw());
+    this.shaderWatch.note(`warm-up frame done in ${Math.round(performance.now() - t0)} ms (${made} pipelines made side by side)`);
     // The woods' impostors baked and their cards drawn once now, not at the town view's first look (`nature.ts`).
     const landscape = this.lot.landscape;
     if (landscape && !this.disposed) {
@@ -3194,9 +3218,8 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
         this.loadListener?.(`Warming up (lot ${i + 1} of ${lots.length})`, 0.75 + (0.25 * i) / lots.length);
         const span = perfStart(`warm: lot ${i + 1} of ${lots.length}`);
         await this.setWorld(world, lot);
-        this.warmNext = true;
-        await this.framesRendered(1);
-        perfEnd(span, `${gains[i]} new kinds`);
+        const made = await this.warmDraw();
+        perfEnd(span, `${gains[i]} new kinds, ${made} pipelines`);
       }
       await perfTimeAsync('warm: home again', () => this.setWorld(this.lastWorld ?? world, home));
       this.shaderWatch.note(`warm-up lots done in ${Math.round(performance.now() - t0)} ms`);

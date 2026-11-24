@@ -561,6 +561,44 @@ fn minutes(w: &mut World, n: u32) {
 }
 
 #[test]
+fn a_snack_from_a_restaurants_fridge_is_paid_for() {
+    // (Its kitchen is furnished as a home's, where a snack is free: there it costs `publicCost`.)
+    let (mut w, restaurant) = town_beside("restaurant");
+    w.autonomy = false;
+    let hunger = w
+        .content
+        .needs
+        .iter()
+        .position(|n| n.id == "hunger")
+        .unwrap();
+    w.sims[0].needs[hunger] = 0.3;
+    let fridge = object(&w, "fridgeFrenchDoor");
+    let at = &w.objects[fridge as usize];
+    assert_eq!(w.plot_at(at.x, at.z), Some(restaurant));
+    let snack = interaction(&w, fridge, "snack");
+    let def = &w.content.objects[w.objects[fridge as usize].def].interactions[snack];
+    assert_eq!(
+        (def.cost, def.public_cost),
+        (0, Some(4)),
+        "free at home, four dollars at a place"
+    );
+    let funds = w.households[0].funds;
+    w.apply(Command::Use {
+        sim: 0,
+        object: fridge,
+        interaction: snack,
+    })
+    .unwrap();
+    minutes(&mut w, 60);
+    assert!(
+        w.sims[0].needs[hunger] > 0.4,
+        "had the snack: hunger {}",
+        w.sims[0].needs[hunger]
+    );
+    assert_eq!(w.households[0].funds, funds - 4, "and paid for it");
+}
+
+#[test]
 fn residents_buy_a_snack_and_sit_on_a_bench_at_the_market() {
     let (mut w, market) = market_town();
     w.autonomy = false;

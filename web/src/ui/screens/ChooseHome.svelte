@@ -499,7 +499,7 @@
           <dl>
             {#if dims}
               <dt>{flat ? 'Flat' : 'Lot'}</dt>
-              <dd>{dims.width} × {dims.depth} m{economy.rent ? ` · rent ${money(economy.rent.base + Math.round(economy.rent.perTile * dims.width * dims.depth))} a week` : ''}</dd>
+              <dd>{dims.width} × {dims.depth} m{economy.rent ? ` · rates ${money(economy.rent.base + Math.round(economy.rent.perTile * dims.width * dims.depth))} a week` : ''}</dd>
             {/if}
             {#if flat}
               <dt>Bedrooms</dt>

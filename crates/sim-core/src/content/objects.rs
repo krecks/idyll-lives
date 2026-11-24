@@ -72,6 +72,9 @@ pub struct Interaction {
     pub skill_gain: [f32; MAX_SKILLS],
     /// Dollars charged from the Sim's household when the Sim starts using the object.
     pub cost: i64,
+    /// What it costs instead on a public lot (content `publicCost`): a home kitchen's food is free at
+    /// home and a meal's price at a restaurant, whose kitchen is furnished as a home's (`cost_at`).
+    pub public_cost: Option<i64>,
     /// Skill that makes this interaction better: need and skill gains scale with its level.
     pub skill: Option<usize>,
     /// Feeling granted on finishing (after at least half the duration)...
@@ -351,6 +354,15 @@ pub struct Yield {
 }
 
 impl Interaction {
+    /// What a use costs where the object stands: `public_cost` on a public lot, else `cost`.
+    pub fn cost_at(&self, public: bool) -> i64 {
+        if public {
+            self.public_cost.unwrap_or(self.cost)
+        } else {
+            self.cost
+        }
+    }
+
     /// Whether this looks after a baby lying in the object.
     pub fn cares(&self) -> bool {
         self.care.iter().any(|&g| g > 0.0)

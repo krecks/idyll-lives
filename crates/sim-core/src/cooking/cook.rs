@@ -90,9 +90,27 @@ pub(crate) fn hungry_housemates(sim: &Sim, ctx: &Ctx, r: &RecipeDef) -> usize {
         .count()
 }
 
-/// Whether a serving of `r` would do them good (at least half of it).
+/// Room for this much of a need (or half a serving's worth, if less) and a serving does them good.
+/// (Half a serving's worth alone: a meal that fills hunger whole was wanted only below half, so a
+/// cook a quarter hungry left their own dinner to go off and had a snack later.)
+const ROOM_FOR_A_SERVING: f32 = 0.25;
+/// A cook the player sent to make a meal has some if they have this much room for it.
+const ROOM_FOR_THEIR_OWN: f32 = 0.1;
+
+/// Whether a serving of `r` would do them good (`ROOM_FOR_A_SERVING`).
 pub(crate) fn hungry_for(sim: &Sim, content: &Content, r: &RecipeDef) -> bool {
-    (0..content.needs.len()).any(|n| r.effects[n] > 0.1 && sim.needs[n] + r.effects[n] * 0.5 <= 1.0)
+    room_for(sim, content, r, ROOM_FOR_A_SERVING)
+}
+
+/// Whether the cook of a meal the player asked for has some of it: if a serving would do them
+/// good, or they have a little room for it (`ROOM_FOR_THEIR_OWN`).
+pub(crate) fn cook_has_some(sim: &Sim, content: &Content, r: &RecipeDef, directed: bool) -> bool {
+    hungry_for(sim, content, r) || (directed && room_for(sim, content, r, ROOM_FOR_THEIR_OWN))
+}
+
+fn room_for(sim: &Sim, content: &Content, r: &RecipeDef, most: f32) -> bool {
+    (0..content.needs.len())
+        .any(|n| r.effects[n] > 0.1 && 1.0 - sim.needs[n] >= (r.effects[n] * 0.5).min(most))
 }
 
 /// The recipe of what they're eating (or on their way to eat).

@@ -58,9 +58,9 @@
     {
       "name": "sim-ai",
       "file": "crates/sim-core/src/ai.rs",
-      "sha256": "67c7f176c6113999cd96bd85cb17525dc42b7f03fbd1bd6aa6bacd7542860e44",
-      "by": "integrator",
-      "reason": "0.8.3 missing-items run: cleaning tools (sweep), the post at home, household cars (boughtCar/gotLetter events), nobody moves house at the wheel; reviewed, sim 819 and generated seeds 0-2 pass"
+      "sha256": "3cd5e1c88e91a95f6118fa9db38891922713cb052405081e2b626b22690526f2",
+      "by": "playtest/2026-11-23",
+      "reason": "PR #120: the test fixture's Interaction gains public_cost: None (the new publicCost field, a home kitchen's food priced on a public lot, B8); no behaviour change in ai.rs."
     },
     {
       "name": "sim-cooking",
@@ -151,9 +151,9 @@
     {
       "name": "sim-planner-goals",
       "file": "crates/sim-core/src/planner/goals.rs",
-      "sha256": "c5b5630f4374011006d2c0a5369a947c3e095b9a626108ab0cdf84527bedde65",
-      "by": "simplify3",
-      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 2 items only its sibling files use narrowed from pub(crate) to pub(super). The planner's last accepted change stands (owner's choice, real-town code review: a thing a flat keeps outside it is not swapped in over its place by swap_in)."
+      "sha256": "9112929a0dfd035a8ffac9de27e451c8207bf9bd532b84abedc8e38b0f84d503",
+      "by": "playtest/2026-11-23 review",
+      "reason": "PR review follow-up: review_goals lets go of a child's grown-ups' goals and suggestions (for_their_age), which an older save can hold from before they were kept to grown-ups. Test: planner.rs a_childs_grown_up_goals_from_before_are_let_go_of; grid_identity unchanged."
     },
     {
       "name": "sim-planner-purchases",
@@ -165,9 +165,9 @@
     {
       "name": "sim-planner-factors",
       "file": "crates/sim-core/src/planner/factors.rs",
-      "sha256": "b52c5d71e60e757e5d3dd9b02ea533efb059eaa32cba410552de089053a60723",
-      "by": "simplify3",
-      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone. The planner's last accepted change stands (owner's choice, real-town code review: a thing a flat keeps outside it is not swapped in over its place by swap_in)."
+      "sha256": "c6cde554489b3684efe84d2672aff791adb478244cee8a8bcec45fe95033db59",
+      "by": "playtest/2026-11-23 review",
+      "reason": "PR review follow-up: object_factor takes what the use costs where the object stands (cost_at: a home kitchen's snack is bought on a public lot) instead of reading inter.cost, so saving up weighs against a restaurant's $4 snack. Unit test: saving_up_weighs_against_what_a_use_costs_where_it_stands; grid_identity unchanged."
     },
     {
       "name": "sim-planner-parse",
@@ -235,9 +235,9 @@
     {
       "name": "sim-cooking-cook",
       "file": "crates/sim-core/src/cooking/cook.rs",
-      "sha256": "57304696b929ee1caaebeb51a020b5c4e46ed2c93720a7501e0dbeb36152d528",
-      "by": "simplify3",
-      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 19 items only its sibling files use narrowed from pub(crate) to pub(super). Cooking's last accepted change stands (owner's OK, real town: a flat's household is at home on its own storey for an invitation to eat and the food left at home)."
+      "sha256": "4f8bf20fb7234d470fd99dbad20b23fdd248a2d4ee5791b33a15b571edef2256",
+      "by": "playtest/2026-11-23 simplify",
+      "reason": "PR #120 simplify, behaviour unchanged: hungry_for's doc cut to one line (ROOM_FOR_A_SERVING's says it). The last accepted change stands: a cook has some of the meal they made (B2)."
     },
     {
       "name": "sim-cooking-dishes",
@@ -263,9 +263,9 @@
     {
       "name": "sim-cooking-serve",
       "file": "crates/sim-core/src/cooking/serve.rs",
-      "sha256": "3e8161696e7ef848f6c89f3c41b357efdc6dad77d1553d7d57f031eaf20a3b79",
-      "by": "simplify3",
-      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 6 items only its sibling files use narrowed from pub(crate) to pub(super). Cooking's last accepted change stands (owner's OK, real town: a flat's household is at home on its own storey for an invitation to eat and the food left at home)."
+      "sha256": "03ab4bb69a9a7ce9c1a9235915da256253a17ff7abb11746c1dd158d2899119d",
+      "by": "playtest/2026-11-23",
+      "reason": "PR #120, owner's request: served() asks cook_has_some (with the task's directed flag) instead of hungry_for, so the cook of a meal the player ordered eats it (B2). Tests as sim-cooking-cook's."
     },
     {
       "name": "sim-cooking-step",

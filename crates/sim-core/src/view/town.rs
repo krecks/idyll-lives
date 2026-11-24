@@ -107,7 +107,7 @@ pub(super) fn ride_view(world: &World, s: &Sim) -> Option<RideView> {
     let task = s.current().map(|a| a.task.kind);
     let home = matches!(task, Some(TaskKind::GoHome));
     let out = matches!(task, Some(TaskKind::Visit { .. }));
-    let school = world.content.life.school.is_some() && s.job.is_none();
+    let school = s.school(&world.content).is_some();
     let to = match (home, out, school) {
         (true, ..) => "home",
         (false, true, _) => "out",

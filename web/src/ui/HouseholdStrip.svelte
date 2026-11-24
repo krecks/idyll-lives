@@ -19,7 +19,8 @@
   function where(s: SimView): string {
     const way = wayText(s, home, game, game.households, (m) => clock(m, settings.clock24h));
     if (way) return way;
-    if (s.awayUntil !== null) return `At work · back ${clock(s.awayUntil, settings.clock24h)}`;
+    // (A pupil is at school: no job, as sim-core's own "At school" goes by.)
+    if (s.awayUntil !== null) return `${s.job === null && services.content.school ? 'At school' : 'At work'} · back ${clock(s.awayUntil, settings.clock24h)}`;
     if (s.visiting !== null) return `Visiting ${plotInfo(game, s.visiting)?.name ?? 'friends'}`;
     if (s.plot === home) return 'Home';
     return s.plot === null ? 'Out and about' : `At ${plotInfo(game, s.plot)?.name ?? 'a friend’s'}`;

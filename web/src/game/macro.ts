@@ -1151,8 +1151,13 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const roadNames = new Set<string>();
   // (The bridges and causeways laid already have theirs.)
   for (const r of roads) if (r.bridge && r.name) roadNames.add(r.name);
+  // (A road's name, then its lane's, then the street's other words before a number: "Elmfield Lane 21" read as an
+  // address on the home card.)
+  const MORE_STREETS = ['Way', 'Close', 'Row', 'Drive'];
   const uniqueName = (base: string, alt: string) => {
-    const pick = !roadNames.has(base) ? base : !roadNames.has(alt) ? alt : `${alt} ${roadNames.size}`;
+    const stem = base.endsWith(' Road') ? base.slice(0, -' Road'.length) : null;
+    const more = stem === null ? [] : MORE_STREETS.map((w) => `${stem} ${w}`);
+    const pick = [base, alt, ...more].find((n) => !roadNames.has(n)) ?? `${alt} ${roadNames.size}`;
     roadNames.add(pick);
     return pick;
   };

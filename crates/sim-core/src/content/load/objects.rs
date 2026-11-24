@@ -300,6 +300,7 @@ pub(super) fn parse<'a, 'r>(load: &mut Ctx<'a, 'r>) -> Result<Parsed, Error> {
                 cost: recipe.map_or(it.cost, |r| {
                     load.recipes[r].cost(load.recipes[r].servings[0])
                 }),
+                public_cost: it.public_cost,
                 skill,
                 feeling,
                 feeling_min_skill: it.feeling_min_skill,
