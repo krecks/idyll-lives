@@ -17,7 +17,7 @@
 import type { RoadPlan } from '../core/protocol';
 import { isSeparated, kindInfo, onewayOf, ROAD_KIND } from '../core/roadKinds';
 import * as pmath from './pmath';
-import { deckSpans, inSpans, lengths, nearest, passesOver, pointAt, RoadIndex, type Pt } from './roads';
+import { clearOf, deckSpans, inSpans, lengths, nearest, passesOver, pointAt, RoadIndex, SIDEWALK, type Pt } from './roads';
 
 /** Two car roads cross on the level where a point of one comes this near the other's middle (m; their points about a metre apart). */
 const CROSS = 0.75;
@@ -224,10 +224,57 @@ function alongside(a: RoadPlan, b: RoadPlan): { along: number; same: boolean } {
 }
 
 /**
+ * `roads` with road `i` made wider than its `was` m: each road joining it in a T begun at its new kerb again (as `roads.ts`
+ * `trimJoins` begins one; what it keeps by arc length, its decks and crossings, moved with its start); null where it is
+ * no longer clear of the roads but those meeting or crossing it (`clearOf`, its new kerbs only, as `edit/streets.ts`
+ * `changeKind` asks).
+ */
+function widenedOn(roads: readonly RoadPlan[], i: number, was: number): RoadPlan[] | null {
+  const r = roads[i];
+  const own = new RoadIndex([r]);
+  const all = new RoadIndex(roads);
+  const L = lengths(r.points).at(-1)!;
+  const reach = was / 2 + 1;
+  const meets = new Set(roads.flatMap((o, j) => (j !== i && o.points.some(([x, z]) => own.distance(0, x, z, reach) <= reach) ? [j] : [])));
+  for (const [x, z] of [r.points[0], r.points[r.points.length - 1]]) for (const j of all.around(x, z, ROAD_KIND.street.width).keys()) meets.add(j);
+  const anywhere = { box: { w: Infinity, d: Infinity }, margin: -Infinity };
+  if (!clearOf(r.points, r.width, roads, all, anywhere, -1, -1, r.width / 2 + 1, (j) => j === i || meets.has(j))) return null;
+  const kerb = r.width / 2 - SIDEWALK;
+  const off = ([x, z]: Pt) => own.distance(0, x, z, kerb + 1);
+  return roads.map((o, j) => {
+    if (j === i || !meets.has(j)) return o;
+    let pts = o.points;
+    let shift = 0;
+    for (const e of [0, 1] as const) {
+      const end = e ? pts[pts.length - 1] : pts[0];
+      // (A T: by its middle, not end to end with it, and short of its new kerb.)
+      const s = own.along(0, end[0], end[1]);
+      if (o.ends[e] !== 'join' || !(off(end) < kerb) || s < 1 || s > L - 1) continue;
+      const line = e ? [...pts].reverse() : pts;
+      const k = line.findIndex((p) => !(off(p) < kerb));
+      if (k < 0 || line.length - k < 2) continue;
+      const kept = line.slice(k);
+      if (!e) shift = lengths(kept).at(-1)! - lengths(pts).at(-1)!;
+      pts = e ? kept.reverse() : kept;
+    }
+    if (pts === o.points) return o;
+    const by = ([a, b]: readonly [number, number]): [number, number] => [a + shift, b + shift];
+    return {
+      ...o,
+      points: pts,
+      ...(shift && o.bridge ? { bridge: by(o.bridge) } : {}),
+      ...(shift && o.bridges ? { bridges: o.bridges.map(by) } : {}),
+      ...(shift && o.raised ? { raised: o.raised.map(by) } : {}),
+      ...(shift && o.crosses ? { crosses: o.crosses.map((c) => ({ ...c, s: c.s + shift })) } : {}),
+    };
+  });
+}
+
+/**
  * A few pairs of streets in a town's dense middle (round `middle`) made one-way, each the other's way back: of the
  * roads `own` (the main town's), streets and lanes both of whose ends join another road (`oneWayable`), side by side
  * `PAIR_APART` m apart for most of the shorter, nearest the middle first; each pair (a lane of it made a street, as
- * wide) only if it cuts nothing off (`cutOffRoads` `within`: every car road still driven to and back by the roads alone), first
+ * wide, the roads joining it begun at its new kerb: only where it is still clear of the rest, `widenedOn`) only if it cuts nothing off (`cutOffRoads` `within`: every car road still driven to and back by the roads alone), first
  * with the first of the two one-way along its points, else the other way round. `most` pairs at most. The roads with the
  * pairs made (the same array if none), and the pairs (road indices).
  */
@@ -264,8 +311,12 @@ export function oneWayPairs(roads: readonly RoadPlan[], own: readonly number[], 
     if (pairs.length >= most) break;
     if (used.has(c.a) || used.has(c.b)) continue;
     const street = (r: RoadPlan): RoadPlan => ({ ...r, kind: 'street', width: Math.max(r.width, ROAD_KIND.street.width) });
+    // (A lane of it made as wide as a street: the roads joining it begin at its new kerb, and it is clear of the rest.)
+    let widened: RoadPlan[] | null = out.map((r, i) => (i === c.a || i === c.b ? street(r) : r));
+    for (const i of [c.a, c.b]) if (widened && widened[i].width > out[i].width) widened = widenedOn(widened, i, out[i].width);
+    if (!widened) continue;
     for (const way of [1, -1] as const) {
-      const tried = out.map((r, i): RoadPlan => (i === c.a ? { ...street(r), oneway: way } : i === c.b ? { ...street(r), oneway: (c.same ? -way : way) as 1 | -1 } : r));
+      const tried = widened.map((r, i): RoadPlan => (i === c.a ? { ...r, oneway: way } : i === c.b ? { ...r, oneway: (c.same ? -way : way) as 1 | -1 } : r));
       if (cutOffIn(tried).some((i) => !had.has(i))) continue;
       out = tried;
       pairs.push([c.a, c.b]);

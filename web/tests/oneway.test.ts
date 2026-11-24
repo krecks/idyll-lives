@@ -135,4 +135,23 @@ describe('oneWayPairs', () => {
     expect(out[2]).toMatchObject({ kind: 'street', width: 7 });
     expect(out[3]).toMatchObject({ kind: 'street', width: 7 });
   });
+
+  test('a lane widened for a pair: the roads joining it begin at its new kerb; with a road too near, no pair', () => {
+    const lane = (a: Pt, b: Pt): RoadPlan => ({ ...street(a, b), kind: 'lane', width: 6 });
+    const base = [street([0, 0], [300, 0], ['out', 'out']), street([0, 160], [300, 160], ['out', 'out']), lane([100, 0], [100, 160]), lane([150, 0], [150, 160])];
+    // (A side street off the lane at x 100, begun at its kerb as a lane: 3 m less the sidewalk off its middle.)
+    const side: RoadPlan = { ...street([101.65, 80], [125, 80], ['join', 'dead']), raised: [[10, 12]], crosses: [{ road: 0, s: 11 }] };
+    const { roads: out, pairs } = oneWayPairs([...base, side], [0, 1, 2, 3, 4], [125, 80], 1);
+    expect(pairs).toEqual([[2, 3]]);
+    const start = out[4].points[0][0];
+    expect(start).toBeGreaterThanOrEqual(100 + 3.5 - 1.35);
+    expect(start).toBeLessThan(100 + 3.5);
+    // (What it keeps by arc length moved with its start.)
+    const shift = start - 101.65;
+    expect(out[4].raised![0][0]).toBeCloseTo(10 - shift, 1);
+    expect(out[4].crosses![0].s).toBeCloseTo(11 - shift, 1);
+    // A street alongside the lane 7.8 m off: clear of the lane, not of a street there.
+    const near = street([107.8, 40], [107.8, 120], ['dead', 'dead']);
+    expect(oneWayPairs([...base, near], [0, 1, 2, 3, 4], [125, 80], 1).pairs).toEqual([]);
+  });
 });
