@@ -849,6 +849,8 @@ function atKerb(o: RoadPlan, to: RoadPlan): RoadPlan {
   const kerb = o.kind === 'trail' ? to.width / 2 - TRAIL_IN : to.width / 2 - SIDEWALK;
   const L = lengthOf(to.points);
   let pts = o.points;
+  /** How much longer its start made it (m): what it keeps by arc length along it (decks, crossings) moves on by that. */
+  let shift = 0;
   for (const e of [0, 1] as const) {
     if (o.ends[e] !== 'join') continue;
     const line = e ? [...pts] : reversed(pts);
@@ -875,9 +877,20 @@ function atKerb(o: RoadPlan, to: RoadPlan): RoadPlan {
       line[line.length - 1] = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
     }
     const rounded = line.map(([x, z]): Pt => [Math.round(x * 100) / 100, Math.round(z * 100) / 100]);
+    if (!e) shift = lengthOf(rounded) - lengthOf(pts);
     pts = e ? rounded : reversed(rounded);
   }
-  return pts === o.points ? o : { ...o, points: pts };
+  if (pts === o.points) return o;
+  if (!shift) return { ...o, points: pts };
+  const by = ([a, b]: readonly [number, number]): [number, number] => [a + shift, b + shift];
+  return {
+    ...o,
+    points: pts,
+    ...(o.bridge ? { bridge: by(o.bridge) } : {}),
+    ...(o.bridges ? { bridges: o.bridges.map(by) } : {}),
+    ...(o.raised ? { raised: o.raised.map(by) } : {}),
+    ...(o.crosses ? { crosses: o.crosses.map((c) => ({ ...c, s: c.s + shift })) } : {}),
+  };
 }
 
 /** A line's wet stretches (`wetSpans`) as the crossings bridged: those closer than `ONE_CROSSING` m one. */
