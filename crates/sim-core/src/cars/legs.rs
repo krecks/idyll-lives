@@ -73,7 +73,7 @@ pub(crate) struct Legs {
     /// At each point, how far a car can pull over there (`Route::room`), and its lane
     /// (`Route::lane`).
     pub(super) room: Vec<f32>,
-    pub(super) lane: Vec<f32>,
+    pub(super) lane: Vec<Option<f32>>,
     /// Its mouths (`Route::mouths`), from point to point (None: to the end).
     pub(crate) mouths: Vec<(usize, Option<usize>)>,
     /// Its points off the ground (`travel::Layer`: on a deck, or about a merge on one); every
@@ -182,12 +182,12 @@ impl Legs {
         }
         self.pts.push((p, reverse, top));
         self.room.push(0.0);
-        self.lane.push(LANE);
+        self.lane.push(Some(LANE));
     }
 
     /// `push` (driving on) of a lane's point `lane` m right of the road's middle, where a car can
     /// pull over `room` m (`Route::room`, `Route::lane`).
-    pub(crate) fn push_lane(&mut self, p: [f32; 2], top: f32, room: f32, lane: f32) {
+    pub(crate) fn push_lane(&mut self, p: [f32; 2], top: f32, room: f32, lane: Option<f32>) {
         let n = self.pts.len();
         self.push(p, false, top);
         if self.pts.len() > n {
@@ -203,7 +203,7 @@ impl Legs {
         p: [f32; 2],
         top: f32,
         room: f32,
-        lane: f32,
+        lane: Option<f32>,
         kind: crate::travel::RoadKind,
         mark: Option<(crate::travel::Layer, bool)>,
     ) {
@@ -216,7 +216,7 @@ impl Legs {
 
     /// `push` of a point it backs up to (at `SLOW`), on a lane where a car can pull over `room`
     /// m, `lane` m right of the road's middle (`Route::room`, `Route::lane`).
-    pub(crate) fn push_back(&mut self, p: [f32; 2], room: f32, lane: f32) {
+    pub(crate) fn push_back(&mut self, p: [f32; 2], room: f32, lane: Option<f32>) {
         let n = self.pts.len();
         self.push(p, true, SLOW);
         if self.pts.len() > n {

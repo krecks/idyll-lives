@@ -45,9 +45,6 @@ const LEFT_AT: f32 = TURN_AT;
 /// steps.
 const BOX_LOOK: f32 = 20.0;
 const BOX_STEP: f32 = 0.5;
-/// `Route::lane` on a road where nobody comes the other way in it (one-way: a ramp, a motorway's
-/// carriageway, a one-way street): no lane coming the other way for it to reach over.
-pub(crate) const NO_ONCOMING: f32 = 50.0;
 
 /// How many lanes a road of `kind` has each way (`roadKinds.ts` `lanesEachWay`).
 pub(crate) fn lanes_each_way(kind: RoadKind) -> u8 {
@@ -334,12 +331,13 @@ impl LaneLine {
 
 /// What a point of a car's lane is to it (`LaneLine::point`): the kind of road it's on, how far
 /// right of its lane it can pull over there to pass one coming the other way, and how far right of
-/// the road's middle its lane is as one coming the other way meets it (`meet`).
+/// the road's middle its lane is as one coming the other way meets it (`meet`; None: nobody comes
+/// the other way there).
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Here {
     pub(crate) kind: RoadKind,
     pub(crate) room: f32,
-    pub(crate) lane: f32,
+    pub(crate) lane: Option<f32>,
 }
 
 /// A way's lane laid out for a car to drive (`LaneLine::laid`).
@@ -441,14 +439,13 @@ impl<'a> Along<'a> {
 /// On `road`, a car `wid` m wide whose lane is `off` m right of its middle line: how far right of
 /// its lane it can pull over to pass one coming the other way (`pull_room`; none where nobody comes
 /// the other way in its lane, or the road isn't one cars always drove), and how far right of the
-/// road's middle its lane is as one coming the other way meets it (`Route::lane`: `off`, or
-/// `NO_ONCOMING`).
-pub(crate) fn meet(road: &Road, off: f32, wid: f32) -> (f32, f32) {
+/// road's middle its lane is as one coming the other way meets it (`Route::lane`: `off`; None
+/// where nobody comes the other way in it: one-way, a ramp, a motorway's carriageway).
+pub(crate) fn meet(road: &Road, off: f32, wid: f32) -> (f32, Option<f32>) {
     let room = if classic(road) {
         pull_room(road.width, road.kind, wid)
     } else {
         0.0
     };
-    let lane = if oncoming(road) { off } else { NO_ONCOMING };
-    (room, lane)
+    (room, oncoming(road).then_some(off))
 }

@@ -840,7 +840,7 @@ fn cannot_skip_a_junction_box(speed: f32) {
     let (centre, r) = ([100.0, 0.0], 6.0);
     let mut legs = Legs::default();
     for k in 0..=50 {
-        legs.push_lane([k as f32 * 4.0, 0.0], speed, 0.0, LANE);
+        legs.push_lane([k as f32 * 4.0, 0.0], speed, 0.0, Some(LANE));
     }
     let route = legs.timed(false, false);
     let (len, wid) = (4.4, 1.8);
@@ -921,7 +921,7 @@ fn no_car_turns_round_in_a_mouth_with_a_car_parked_up_against_its_turn() {
         .map(|lane| {
             let mut legs = Legs::default();
             for k in 0..=50 {
-                legs.push_lane([20.0 + k as f32 * 2.0, 30.0 + lane], 5.0, 0.0, LANE);
+                legs.push_lane([20.0 + k as f32 * 2.0, 30.0 + lane], 5.0, 0.0, Some(LANE));
             }
             legs.timed(true, true)
         })
@@ -987,7 +987,7 @@ fn a_car_turns_round_only_in_a_mouth_on_its_right() {
         let mut legs = Legs::default();
         for k in 0..=50 {
             let x = x0 + k as f32 * dx;
-            legs.push_lane([x, 30.0 + right[1] * TIGHT_LANE], 5.0, 0.0, LANE);
+            legs.push_lane([x, 30.0 + right[1] * TIGHT_LANE], 5.0, 0.0, Some(LANE));
         }
         legs.timed(true, true)
     };
@@ -1017,7 +1017,12 @@ fn one_turning_round_held_up_by_one_come_up_behind_it_gives_the_turn_up() {
     // (Each on its way east along the street's lane.)
     let mut legs = Legs::default();
     for k in 0..=80 {
-        legs.push_lane([20.0 + k as f32 * 2.0, 30.0 + TIGHT_LANE], 5.0, 0.0, LANE);
+        legs.push_lane(
+            [20.0 + k as f32 * 2.0, 30.0 + TIGHT_LANE],
+            5.0,
+            0.0,
+            Some(LANE),
+        );
     }
     let had = legs.timed(true, true);
     let at = |x: f32| had.points.iter().find(|p| p.0[0] >= x).unwrap().2;
@@ -1099,7 +1104,7 @@ fn a_car_turned_round_off_its_lane_drives_on_facing_the_way_it_goes() {
     let c = car([50.0, 10.0], 0.0, 30.0);
     let mut legs = Legs::default();
     for k in 0..=20 {
-        legs.push_lane([20.0 + k as f32 * 2.0, 30.0], 5.0, 0.0, LANE);
+        legs.push_lane([20.0 + k as f32 * 2.0, 30.0], 5.0, 0.0, Some(LANE));
     }
     let had = legs.timed(true, true);
     let at = |x: f32| had.points.iter().find(|p| p.0[0] >= x).unwrap().2;
@@ -1373,7 +1378,7 @@ fn a_car_faces_along_its_lane_where_the_next_step_is_a_hair_across_it() {
         [0.0, 12.0],
         [0.0, 16.0],
     ] {
-        legs.push_lane(p, FAST, 0.0, LANE);
+        legs.push_lane(p, FAST, 0.0, Some(LANE));
     }
     let route = legs.timed(true, true);
     for &(at, yaw, ..) in &route.points[1..route.points.len() - 1] {
@@ -1398,7 +1403,7 @@ fn a_car_faces_the_way_it_goes_round_a_corner() {
     ]);
     let mut legs = Legs::default();
     for p in lane {
-        legs.push_lane(p, FAST, 0.0, LANE);
+        legs.push_lane(p, FAST, 0.0, Some(LANE));
     }
     let route = legs.timed(true, true);
     let mut was = route.at(0.0).0;
@@ -1491,7 +1496,7 @@ fn a_car_held_up_by_nobody_pulls_over_only_as_far_as_it_goes_on_with() {
         let n = ((to - from).abs() / 2.0) as i32;
         for k in 0..=n {
             let x = from + (to - from).signum() * 2.0 * k as f32;
-            legs.push_lane([x, z], 5.0, room(x), LANE);
+            legs.push_lane([x, z], 5.0, room(x), Some(LANE));
         }
         let mut r = legs.timed(true, true);
         r.claim(4.4, 1.8, None);

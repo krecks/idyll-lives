@@ -12,8 +12,8 @@ pub(crate) struct Route {
     /// other way (m, `pull_room`; none off the lanes, turning or backing).
     pub(super) room: Vec<f32>,
     /// At each point, how far right of the road's middle its lane is (m, `lane_on`, `LaneLine`;
-    /// off the lanes, `LANE`; where nobody comes the other way in the road, `NO_ONCOMING`).
-    pub(super) lane: Vec<f32>,
+    /// off the lanes, `LANE`). None where nobody comes the other way in the road (`meet`).
+    pub(super) lane: Vec<Option<f32>>,
     /// How far it can pull over to pass one coming the other way (m, `room`), ticks along it, as
     /// its claims have it.
     pub(super) pass: Vec<(f32, f32)>,
@@ -60,7 +60,7 @@ pub(super) struct Leg {
     laid: usize,
     points: Vec<([f32; 2], f32, f32, bool)>,
     pub(super) room: Vec<f32>,
-    pub(super) lane: Vec<f32>,
+    pub(super) lane: Vec<Option<f32>>,
 }
 
 impl Route {
@@ -102,7 +102,11 @@ impl Route {
         let swing = crate::traffic::swings(&trace, len);
         let over: Vec<f32> = trace
             .iter()
-            .map(|s| wid - 2.0 * self.lane_at(s.0))
+            // (None coming the other way: nobody to overlap.)
+            .map(|s| {
+                self.lane_at(s.0)
+                    .map_or(f32::NEG_INFINITY, |l| wid - 2.0 * l)
+            })
             .collect();
         // (A mouth from where its body first comes onto the road out of the driveway or the bay,
         // and to where it's off it into one: backing down a driveway or parking in it, it's in
@@ -311,14 +315,14 @@ impl Route {
     }
 
     /// How far right of the road's middle its lane is `t` ticks along (m: the more of the two
-    /// points either side).
-    fn lane_at(&self, t: f32) -> f32 {
+    /// points either side). None: nobody comes the other way at either.
+    fn lane_at(&self, t: f32) -> Option<f32> {
         let pts = &self.points;
         if pts.len() < 2 || self.lane.len() != pts.len() {
-            return LANE;
+            return Some(LANE);
         }
         let i = pts.partition_point(|p| p.2 <= t).clamp(1, pts.len() - 1);
-        self.lane[i - 1].max(self.lane[i])
+        Some(self.lane[i - 1]?.max(self.lane[i]?))
     }
 
     /// How far right of its lane a car can pull over `t` ticks along (m: the less of the two
@@ -605,7 +609,8 @@ impl Route {
                 });
                 legs.pts.push((q, rev, top));
                 legs.room.push(had.room.get(i).copied().unwrap_or(0.0));
-                legs.lane.push(had.lane.get(i).copied().unwrap_or(LANE));
+                legs.lane
+                    .push(had.lane.get(i).copied().unwrap_or(Some(LANE)));
                 let merge = had.merges.iter().any(|&m| (m - t).abs() < 1e-3);
                 legs.mark_last((had.layer_at(t), merge));
                 if let Some(k) = had.kind_at(t) {
