@@ -12,7 +12,7 @@
  */
 
 import type { RoadPlan } from '../../core/protocol';
-import { kindInfo, onewayOf } from '../../core/roadKinds';
+import { isSeparated, kindInfo, onewayOf } from '../../core/roadKinds';
 import { leftOf, lengths, nearest, pointAt, raisedSpans, RoadIndex, type Pt } from '../../game/roads';
 import { encodeFinish, type Geo, type V3 } from './geometry';
 import type { RoadLevels } from './roads';
@@ -346,7 +346,7 @@ export function lowDecks(g: Geo, roads: readonly RoadPlan[], levels: RoadLevels 
   roads.forEach((road, ri) => {
     if (road.points.length < 2) return;
     const raised = raisedSpans(road);
-    const concrete = road.kind === 'motorway' || road.kind === 'ramp';
+    const concrete = isSeparated(road.kind);
     const open = [...raised, ...(concrete ? spansOf(road) : [])];
     const walled = solid && levels ? without(liftedStretches(road, levels), open) : [];
     if (!open.length && !walled.length) return;

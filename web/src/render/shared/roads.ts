@@ -19,7 +19,7 @@ export { bridgeSpans, deckSpans, raisedSpans, stretchOf };
 import { Geo, type MeshData, type V3 } from './geometry';
 import { carriageway as kerbToKerb, hasSidewalks, JunctionCuts, junctionsOf, KERB_RETURN, offsetMeet, turnedBack, turnedOn, type CornerPlan, type JunctionPlan } from './junctions';
 import { asphaltVary, carriageway, repair, STREET_LOOK, tint } from './paving';
-import { kindInfo } from '../../core/roadKinds';
+import { isSeparated, kindInfo } from '../../core/roadKinds';
 import { junctionStretches, PAINT, PAINT_FINISH, roadMarkings } from './markings';
 import { deckLevels, lowDecks, without } from './motorway';
 import { valueNoise } from '../../game/noise';
@@ -108,7 +108,7 @@ export function townRoadMesh(world: WorldStructure): RoadMeshData {
   const built = levelsOf(world, roads);
   const levels = built ?? deckLevels(roads);
   // (A motorway's carriageway and a ramp worn from edge to edge, as the street wears them.)
-  const worn = (ri: number) => (roads[ri].kind === 'motorway' || roads[ri].kind === 'ramp' ? kerbToKerb(roads[ri]) / 2 : roads[ri].width / 2 - SIDEWALK);
+  const worn = (ri: number) => (isSeparated(roads[ri].kind) ? kerbToKerb(roads[ri]) / 2 : roads[ri].width / 2 - SIDEWALK);
   const { surface, marks } = roadMeshes(roads, null, 0, { marks: new Geo() }, 'surface', junctionsOf(world, roads), worn, levels);
   // The overpasses and the motorways' barriers, plainly, in the markings' plain finish.
   if (marks) lowDecks(marks, roads, levels, !built, bridgeSpans);

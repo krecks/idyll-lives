@@ -59,7 +59,7 @@ import { placementVariation, type StandIn } from './modelEntry';
 import { wallCorners, writeFences } from './fences';
 import { shownFences } from './shownFences';
 import { centroid, lengths, pointAt } from '../../game/roads';
-import { kindInfo } from '../../core/roadKinds';
+import { isSeparated, kindInfo } from '../../core/roadKinds';
 import { junctionStretches } from './markings';
 import { allBarriers, barrier, deckLevels, liftedStretches, MOTORWAY_SIGN, motorwayPairs, OVERPASS, OVERPASS_CONCRETE, signSpots, without } from './motorway';
 import { pavedRects } from './paving';
@@ -1984,7 +1984,7 @@ export class TownStreet {
     // them (`deckLevels`).
     const pairs = motorwayPairs(all);
     all.forEach((road, ri) => {
-      const concrete = road.kind === 'motorway' || road.kind === 'ramp';
+      const concrete = isSeparated(road.kind);
       // (On a land the town follows, its deck as the road climbs over it, its piers down to the bed or the ground.)
       const heightsOf = (s0: number) => {
         if (!roadLevels) return undefined;

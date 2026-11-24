@@ -49,7 +49,7 @@
  */
 
 import type { JunctionInfo, RoadKind, RoadPlan } from '../../core/protocol';
-import { ROAD_KIND, ROAD_KINDS } from '../../core/roadKinds';
+import { isSeparated, ROAD_KIND, ROAD_KINDS } from '../../core/roadKinds';
 import { LAND_CELL, NONE, heightAt, type Land, type LandRect } from '../../game/land';
 import { bridgeSpans, deckSpans, lengths, nearest, pointAt, raisedSpans, RoadIndex } from '../../game/roads';
 import { CHUNK, chunkAt, chunksIn } from './chunks';
@@ -80,7 +80,7 @@ export const CUT_MAX_MOTORWAY = 8;
 
 /** The most a road of `kind` may be cut into the land or stand over it (m): `CUT_MAX`, a motorway's `CUT_MAX_MOTORWAY`, among `mountains` a country road's `CUT_MAX_MOUNTAIN_ROAD`. */
 export function cutMostOf(kind: RoadKind, mountains = false): number {
-  if (kind === 'motorway' || kind === 'ramp') return CUT_MAX_MOTORWAY;
+  if (isSeparated(kind)) return CUT_MAX_MOTORWAY;
   return mountains && kind === 'country' ? CUT_MAX_MOUNTAIN_ROAD : CUT_MAX;
 }
 
@@ -1194,7 +1194,7 @@ export class BuiltSurface {
     const ceiling = new Float32Array(cols * rows).fill(Infinity);
     const c = LAND_CELL;
     // (Where a motorway or a ramp is built: cut or filled deeper, `CUT_MAX_MOTORWAY`.)
-    const deep = roads.some((r) => r.kind === 'motorway' || r.kind === 'ramp') ? new Uint8Array(cols * rows) : null;
+    const deep = roads.some((r) => isSeparated(r.kind)) ? new Uint8Array(cols * rows) : null;
     this.deep = deep;
     // Roads, out to their sidewalks' edges (where two overlap, the one whose middle is nearer); a bridge's deck is not on
     // the land, nor an overpass's (the land under it the road's below, else held under it as under a bridge's dry reach).
@@ -1206,7 +1206,7 @@ export class BuiltSurface {
       const reach = half + c * Math.SQRT2;
       const spans = bridgeSpans(r);
       const raised = this.raised[road];
-      const motor = r.kind === 'motorway' || r.kind === 'ramp' ? 1 : 0;
+      const motor = isSeparated(r.kind) ? 1 : 0;
       // Each deck's water along it: its dry reach past that is further than `DECK_DRY` m from it.
       const waters = spans.map((span): [number, number] => {
         let [from, to] = [Infinity, -Infinity];

@@ -13,7 +13,7 @@
  */
 
 import type { RoadPlan } from '../../core/protocol';
-import { kindInfo, kindOf, onewayOf } from '../../core/roadKinds';
+import { isSeparated, kindInfo, kindOf, onewayOf } from '../../core/roadKinds';
 import { lengths, nearest, RoadIndex } from '../../game/roads';
 import { encodeFinish, type Geo, type V3 } from './geometry';
 import { carriageway, type JunctionPlan } from './junctions';
@@ -166,7 +166,7 @@ export function roadMarkings(roads: readonly RoadPlan[], marks: Geo, junctions: 
     const walk = new Walk(road.points, ls);
     const kind = kindOf(road);
     // (A motorway's lines break where a ramp runs on it, a ramp's where it runs on the motorway: the gore between them.)
-    const g = kind === 'motorway' || kind === 'ramp' ? gores(roads) : null;
+    const g = isSeparated(kind) ? gores(roads) : null;
     const gore = (x: number, z: number) => (kind === 'motorway' ? g!.ramps.onRoad(x, z, -0.2) : kind === 'ramp' ? g!.motorways.onRoad(x, z, -0.1) : false);
     const Y = (s: number) => (levels ? levels.road(road, s) : 0) + MARK_UP;
     const point = (s: number, off: number): V3 => {
