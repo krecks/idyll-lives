@@ -5,7 +5,7 @@
  */
 
 import * as pc from './engine';
-import { groundDepth, type RoadPlan, type WorldStructure, type WorldZone } from '../../core/protocol';
+import { groundDepth, type RoadPlan, type WorldStructure } from '../../core/protocol';
 import { carriageway, hasSidewalks, planJunctions } from '../shared/junctions';
 import { kindInfo } from '../../core/roadKinds';
 import { lengths } from '../../game/roads';
