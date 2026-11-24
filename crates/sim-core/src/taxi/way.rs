@@ -399,7 +399,6 @@ pub(super) fn lay_route(
     use crate::cars::{Legs, kerb_of, lane_on};
     use crate::travel::{RoadKind, dist};
     let g = &travel.graph;
-    let junctions: Vec<[f32; 2]> = g.junctions().collect();
     let mut out = Legs::default();
     let mut at_stops = Vec::new();
     // (A stand's claim: from the point where it stands, `KERB_CLAIM` past its body either way.)
@@ -581,8 +580,7 @@ pub(super) fn lay_route(
                 let (turn, at) = bay.entry(d);
                 Some((bay, d, turn, at))
             });
-            let tops =
-                crate::cars::lane_tops(&lane, travel, &junctions, |k| along[nearest(lane[k])].1);
+            let tops = crate::cars::lane_tops(&lane, travel, |k| along[nearest(lane[k])].1);
             let mut on = false;
             let mut laid_from = crate::cars::Along::new(&full);
             for (i, &p) in lane.iter().enumerate() {

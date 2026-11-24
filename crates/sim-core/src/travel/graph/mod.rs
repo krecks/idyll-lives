@@ -47,6 +47,15 @@ pub struct Graph {
     /// land or on a bridge over the water (m along it, from and to; `RoadPlan.raised`,
     /// `RoadPlan.bridge`, `RoadPlan.bridges`). Empty for every other road.
     pub(crate) decks: Vec<Vec<[f32; 2]>>,
+    /// Its junctions' middles (`junctions`), worked out once with it, and their nearest
+    /// (`junction_near`).
+    junctions: Vec<[f32; 2]>,
+    junction_index: NearestPoint,
+    /// Whether any node is a motorway's merge (`merge_nodes`).
+    merges: bool,
+    /// Whether any road is one-way (`OneWay`): else a way by car from one place to another is
+    /// one back too (`has_oneway`).
+    oneway: bool,
 }
 
 /// Which level of the roads something is on (`Graph::layer_at`): the ground (every road, those on
@@ -426,6 +435,14 @@ impl Graph {
         g.inside = motorway_insides(&g.roads);
         g.decks = vec![Vec::new(); g.roads.len()];
         g.merge_junctions();
+        g.junctions = (0..g.nodes.len())
+            .filter(|&n| g.adj[n].len() >= 3 && !g.is_merge(n))
+            .map(|n| g.nodes[n])
+            .collect();
+        g.junction_index = NearestPoint::new(g.junctions.clone());
+        let merges = g.merge_nodes().next().is_some();
+        g.merges = merges;
+        g.oneway = g.roads.iter().any(|r| !r.oneway.is_both());
         g.index();
         g.boxes = crate::traffic::boxes(&g);
         g
@@ -568,9 +585,28 @@ impl Graph {
     /// Where three or more stretches of road meet, but a motorway's merges (`is_merge`): no
     /// lights, no box and no slowing down there.
     pub fn junctions(&self) -> impl Iterator<Item = [f32; 2]> + '_ {
-        (0..self.nodes.len())
-            .filter(|&n| self.adj[n].len() >= 3 && !self.is_merge(n))
-            .map(|n| self.nodes[n])
+        self.junctions.iter().copied()
+    }
+
+    /// `junctions`, as a list.
+    pub(crate) fn junction_points(&self) -> &[[f32; 2]] {
+        &self.junctions
+    }
+
+    /// The junction (`junctions`) nearest `p`. None: no junctions.
+    pub(crate) fn junction_near(&self, p: [f32; 2]) -> Option<[f32; 2]> {
+        self.junction_index.nearest(p).map(|j| self.junctions[j])
+    }
+
+    /// Whether any node is a motorway's merge (`merge_nodes`).
+    pub(crate) fn has_merges(&self) -> bool {
+        self.merges
+    }
+
+    /// Whether any road is one-way (`OneWay`). Without one, wherever a car can drive from one
+    /// place it can drive back from too (`path`).
+    pub(crate) fn has_oneway(&self) -> bool {
+        self.oneway
     }
 
     /// Whether node `n` is where ramps join a motorway's carriageway: every stretch there a

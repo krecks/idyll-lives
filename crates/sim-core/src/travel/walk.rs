@@ -105,6 +105,7 @@ pub fn dist(a: [f32; 2], b: [f32; 2]) -> f32 {
 /// all with `dist` gives (`min_by`: the lowest index on a tie), found through cells over them (a
 /// route laid asked for every lane point's nearest twice, a scan of 1,200 points each time, and
 /// was most of a big world's slowest ticks).
+#[derive(Debug, Clone)]
 pub(crate) struct NearestPoint {
     pts: Vec<[f32; 2]>,
     /// Where cell (0, 0) begins, and the cells' size (m).
@@ -117,6 +118,12 @@ pub(crate) struct NearestPoint {
     items: Vec<u32>,
     /// Too few points for cells to pay, or one not finite: every point scanned.
     pub(super) scan: bool,
+}
+
+impl Default for NearestPoint {
+    fn default() -> Self {
+        NearestPoint::new(Vec::new())
+    }
 }
 
 /// Fewer points than this are scanned.

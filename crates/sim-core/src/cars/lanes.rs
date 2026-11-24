@@ -171,9 +171,7 @@ impl LaneLine {
             turned(unit2(a, p), unit2(p, b))
         };
         // Its points at a junction's middle.
-        let junctions = NearestPoint::new(g.junctions().collect());
-        let js: Vec<[f32; 2]> = g.junctions().collect();
-        let at_junction = |p: [f32; 2]| junctions.nearest(p).is_some_and(|j| dist(js[j], p) < 0.5);
+        let at_junction = |p: [f32; 2]| g.junction_near(p).is_some_and(|j| dist(j, p) < 0.5);
         // Each point's lane: the outer, but on an avenue's stretch at whose end it turns left.
         let mut base = vec![0.0f32; n];
         let mut left_ahead: Option<u32> = None;
@@ -325,7 +323,7 @@ pub(crate) fn way_marks(
     pts: &[[f32; 2]],
     on: &[(u32, bool)],
 ) -> Option<Vec<(crate::travel::Layer, bool)>> {
-    if !g.has_decks() && g.merge_nodes().next().is_none() {
+    if !g.has_decks() && !g.has_merges() {
         return None;
     }
     let kind = |i: usize| g.roads[on[i].0 as usize].kind;

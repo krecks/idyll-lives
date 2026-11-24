@@ -586,13 +586,12 @@ pub(crate) fn extend_past(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
 /// The top speed at each of `lane`'s points (m/s of drive time; `kind_at` the kind of road at
 /// each): its kind's (`travel::kind_speed`: `FAST` on a street, `Travel::country_speed` on a
 /// country road, faster on an avenue, a ramp or a motorway, slower on a lane), and `JUNCTION_SPEED`
-/// through a junction (within `JUNCTION_REACH` of it, `junctions`) where the way turns there by
-/// more than `TURN_AT`. Straight through one it keeps its speed (its bends limit it,
+/// through a junction (within `JUNCTION_REACH` of it, `Graph::junctions`) where the way turns
+/// there by more than `TURN_AT`. Straight through one it keeps its speed (its bends limit it,
 /// `Legs::timed`'s `SIDEWAYS`; the lights and the stop lines stop it, `traffic/`).
 pub(crate) fn lane_tops(
     lane: &[[f32; 2]],
     travel: &Travel,
-    junctions: &[[f32; 2]],
     kind_at: impl Fn(usize) -> crate::travel::RoadKind,
 ) -> Vec<f32> {
     use crate::travel::{RoadKind, dist};
@@ -620,7 +619,7 @@ pub(crate) fn lane_tops(
         let (p, q) = (lane[a], lane[b]);
         (q[0] - p[0]).atan2(q[1] - p[1])
     };
-    for &j in junctions {
+    for &j in travel.graph.junction_points() {
         // (Each pass by it: the points within reach, one run after another.)
         let mut i = 0;
         while i < n {
@@ -690,7 +689,6 @@ pub(crate) fn empty_drive_route_to(
     ));
     let marks = way_marks(g, &lanes.pts, &lanes.on);
     let mut laid_from = Along::new(&line);
-    let junctions: Vec<[f32; 2]> = g.junctions().collect();
     let near_path = crate::travel::NearestPoint::new(path.pts.iter().map(|x| x.0).collect());
     let here = |p: [f32; 2]| match lanes.nearest(p) {
         Some(i) => Some(lanes.point(g, i, 2.0 * CAR_HALF)),
@@ -704,7 +702,7 @@ pub(crate) fn empty_drive_route_to(
             )
         }),
     };
-    let tops = lane_tops(&lane, travel, &junctions, |i| {
+    let tops = lane_tops(&lane, travel, |i| {
         here(lane[i]).map_or(crate::travel::RoadKind::Street, |r| r.1)
     });
     let mut legs = Legs::default();

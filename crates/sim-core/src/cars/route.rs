@@ -450,7 +450,6 @@ impl Route {
         if lane.len() < 2 {
             return None;
         }
-        let junctions: Vec<[f32; 2]> = g.junctions().collect();
         // (The road at `p`: its width and kind, those of the path's point nearest it; how far a
         // car can pull over there and where its lane is, `LaneLine::point`.)
         let near_path = crate::travel::NearestPoint::new(path.pts.iter().map(|x| x.0).collect());
@@ -471,7 +470,7 @@ impl Route {
                 )
             }
         };
-        let tops = lane_tops(&lane, travel, &junctions, |i| here(lane[i]).1);
+        let tops = lane_tops(&lane, travel, |i| here(lane[i]).1);
         // A trip's parking bay off the road (`parking_bay`), turned into nose first and backed
         // out of as a driveway is, and which way along the road it goes there (from the lane's
         // nearer end); a spot on the road itself is pulled into and out of straight.
@@ -770,7 +769,6 @@ impl Route {
         if lane.len() < 2 {
             return None;
         }
-        let junctions: Vec<[f32; 2]> = g.junctions().collect();
         let near_path = crate::travel::NearestPoint::new(path.pts.iter().map(|x| x.0).collect());
         let road_at = |q: [f32; 2]| {
             near_path
@@ -789,7 +787,7 @@ impl Route {
                 )
             }
         };
-        let tops = lane_tops(&lane, travel, &junctions, |i| here(lane[i]).1);
+        let tops = lane_tops(&lane, travel, |i| here(lane[i]).1);
         // Off the lane at the end: into its driveway, coming from the side the way comes in
         // from; or into its trip's parking bay.
         let into = if home {
