@@ -58,9 +58,9 @@
     {
       "name": "sim-ai",
       "file": "crates/sim-core/src/ai.rs",
-      "sha256": "67c7f176c6113999cd96bd85cb17525dc42b7f03fbd1bd6aa6bacd7542860e44",
-      "by": "integrator",
-      "reason": "0.8.3 missing-items run: cleaning tools (sweep), the post at home, household cars (boughtCar/gotLetter events), nobody moves house at the wheel; reviewed, sim 819 and generated seeds 0-2 pass"
+      "sha256": "3cd5e1c88e91a95f6118fa9db38891922713cb052405081e2b626b22690526f2",
+      "by": "playtest/2026-11-23",
+      "reason": "PR #120: the test fixture's Interaction gains public_cost: None (the new publicCost field, a home kitchen's food priced on a public lot, B8); no behaviour change in ai.rs."
     },
     {
       "name": "sim-cooking",
@@ -151,9 +151,9 @@
     {
       "name": "sim-planner-goals",
       "file": "crates/sim-core/src/planner/goals.rs",
-      "sha256": "c5b5630f4374011006d2c0a5369a947c3e095b9a626108ab0cdf84527bedde65",
-      "by": "simplify3",
-      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 2 items only its sibling files use narrowed from pub(crate) to pub(super). The planner's last accepted change stands (owner's choice, real-town code review: a thing a flat keeps outside it is not swapped in over its place by swap_in)."
+      "sha256": "edadaa39c7997ecb08cb773808b1fcd1415525ef344a892568318050912d2458",
+      "by": "playtest/2026-11-23",
+      "reason": "PR #120, owner's request: for_their_age keeps job, promotion, partner and savings goals to grown-ups (a child was offered Find love and Get a job, B3), in suggestions and AddGoal. Tests: planner.rs a_child_takes_on_no_grown_ups_goal, a_childs_own_ideas_are_for_a_child (slow)."
     },
     {
       "name": "sim-planner-purchases",
@@ -235,9 +235,9 @@
     {
       "name": "sim-cooking-cook",
       "file": "crates/sim-core/src/cooking/cook.rs",
-      "sha256": "57304696b929ee1caaebeb51a020b5c4e46ed2c93720a7501e0dbeb36152d528",
-      "by": "simplify3",
-      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 19 items only its sibling files use narrowed from pub(crate) to pub(super). Cooking's last accepted change stands (owner's OK, real town: a flat's household is at home on its own storey for an invitation to eat and the food left at home)."
+      "sha256": "db3c7ab1ce0b11d59786f0a3b09d8a613429f004705b0215242dddea95b5d997",
+      "by": "playtest/2026-11-23",
+      "reason": "PR #120, owner's request: hungry_for takes room for half a serving or a quarter of the need (a meal was wanted only below half hunger, B2), and cook_has_some lets a cook the player sent have some with 10 % room. Tests: cooking.rs a_cook_sent_to_make_a_meal_a_quarter_hungry_has_some_of_it; sim 832 and slow 876 pass."
     },
     {
       "name": "sim-cooking-dishes",
@@ -263,9 +263,9 @@
     {
       "name": "sim-cooking-serve",
       "file": "crates/sim-core/src/cooking/serve.rs",
-      "sha256": "3e8161696e7ef848f6c89f3c41b357efdc6dad77d1553d7d57f031eaf20a3b79",
-      "by": "simplify3",
-      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone; 6 items only its sibling files use narrowed from pub(crate) to pub(super). Cooking's last accepted change stands (owner's OK, real town: a flat's household is at home on its own storey for an invitation to eat and the food left at home)."
+      "sha256": "03ab4bb69a9a7ce9c1a9235915da256253a17ff7abb11746c1dd158d2899119d",
+      "by": "playtest/2026-11-23",
+      "reason": "PR #120, owner's request: served() asks cook_has_some (with the task's directed flag) instead of hungry_for, so the cook of a meal the player ordered eats it (B2). Tests as sim-cooking-cook's."
     },
     {
       "name": "sim-cooking-step",
