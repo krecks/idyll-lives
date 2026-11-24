@@ -241,7 +241,7 @@ export class Lamps {
       lampOn: (id) => this.lampOn(id),
       roomOn: (room) => this.windowGlowOn.get(room) ?? 1,
       // (The basement in view: no daylight in any of its rooms, as the lights have it: `applyRoomLights`.)
-      dimmed: (room) => this.view.storey() < 0 || this.dimmed.has(room),
+      dimmed: (room) => (this.view.storey() < 0 && !this.view.town()) || this.dimmed.has(room),
     };
   }
 
@@ -435,7 +435,7 @@ export class Lamps {
     this.shadows?.frame(dt, targetX, targetZ);
     const switched = this.fadeLamps(dt);
     if (this.fadeRoomLights(dt) && (this.lampsLevel > 0 || this.view.storey() < 0 || this.dimmed.size > 0)) this.applyRoomLights();
-    if ((this.fadeWindowGlow(dt) || switched) && (this.lampsLevel > 0 || this.dimmed.size > 0)) {
+    if ((this.fadeWindowGlow(dt) || switched) && (this.lampsLevel > 0 || this.view.storey() < 0 || this.dimmed.size > 0)) {
       this.hooks.house.setWindowGlow(this.windowGlowOn);
       this.applyGlow();
     }
