@@ -46,7 +46,7 @@
 import { paintSlots } from '../../../assets/paint';
 import type { AssetRegistry } from '../../../assets/registry';
 import type { Content, ItemDef } from '../../../content/content';
-import type { FrameState } from '../../../core/bridge';
+import { maxAlpha, type FrameState } from '../../../core/bridge';
 import { type ObjectPlacement, type PartColors, type SimInfo, type WorldStructure, colorsKey, objectCentre, storeyShown } from '../../../core/protocol';
 import { gameMinutesPerSecond, Pose } from '../../../core/snapshot';
 import { PACE } from '../doors';
@@ -1782,6 +1782,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     // `world::WALK_SPEED` a tick, times the fastest walkers' factors and some slack.
     const stride = (PACE / layout.ticksPerSecond) * WALK_FASTEST * WALK_SLACK * Math.max(playRate, playbackRate(prev, layout.header)) * frame.steps;
     const reach = Math.max(SNAP_DISTANCE, stride);
+    // How far on past the newest snapshot a walker or a rider goes while the next is late: as far as `alpha` goes at
+    // normal speed, that share of a step's ticks at a faster one (as the cars: `carWay.ts`), not most of a step on, at
+    // super speed a rider's 15 m, past the turn they took.
+    const walkAlpha = Math.min(alpha, 1 + (maxAlpha(1000 / layout.ticksPerSecond) - 1) / Math.max(1, playRate));
     const animRate = this.debugRate ?? Math.min(playRate, 2.5);
     // Paused (the pause button, Buy and Build mode, menus): everyone freezes mid-motion, walk
     // cycles, breathing, blinks and glances included.
@@ -1884,10 +1888,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
         // (Further than they could have gone: caught up, hidden a moment and drawn where they are, not jumping.)
         if (step >= far && this.detail && this.visible[i]) this.revealAt[i] = now + REVEAL_MS;
         if (step < far) {
-          tx = prev[o + k.x] + (cx - prev[o + k.x]) * alpha;
-          tz = pz + (cz - pz) * alpha;
-          if (k.height !== undefined) th = prev[o + k.height] + (ch - prev[o + k.height]) * alpha;
-          tyaw = lerpAngle(prev[o + k.yaw], tyaw, alpha);
+          tx = prev[o + k.x] + (cx - prev[o + k.x]) * walkAlpha;
+          tz = pz + (cz - pz) * walkAlpha;
+          if (k.height !== undefined) th = prev[o + k.height] + (ch - prev[o + k.height]) * walkAlpha;
+          tyaw = lerpAngle(prev[o + k.yaw], tyaw, walkAlpha);
         }
         this.glideK[i] = 1;
       } else {
