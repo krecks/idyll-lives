@@ -462,7 +462,8 @@ pub(crate) fn turned_round(w: &mut World, c: usize, d: Detour) {
 
 /// How far car `c` can back up along the way it came (m) clear of every other car (`GAP`), and
 /// where it would turn round (`Detour`): out of the last junction's box it came through, along the
-/// stretch before it, within that room. Err: why it can't.
+/// stretch before it, within that room, and out of what's left of any claim another holds
+/// (`Traffic::claimed`). Err: why it can't.
 pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static str> {
     let car = &w.cars[c];
     // (A work taxi with its stops still ahead backs up out of the way only, and goes on its way.)
@@ -543,6 +544,12 @@ pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static 
             },
         ))
     };
+    // (Whether, stopped backing up `s` ticks along, it would stand in what's left of a claim
+    // another holds, there to wait for its own claim on: that one, kept from going on past it,
+    // would never let it go, and they'd wait for each other for good (a 6 m lane's turn round
+    // stopped nose to nose with a taxi on its way out of a three-point turn, Fernwood).)
+    let key = car_first(c);
+    let claimed = |s: f32| w.traffic.claimed(key, &body(s), level).is_some();
     // Back along the way it came, while that's clear: out of the last junction's box it came
     // through and on a little (`TURN_PAST`), where it turns into another way; or, short of one, the
     // furthest place back where the road is wide enough for one to pass it pulled over
@@ -573,14 +580,15 @@ pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static 
             seen_box = true;
         }
         boxed = inside;
-        if !inside && room > car.len + TURN_PAST && route.room_at(s) >= PASS_ROOM {
+        if !inside && room > car.len + TURN_PAST && route.room_at(s) >= PASS_ROOM && !claimed(s) {
             wide = Some((s, room));
         }
-        // (Out of the box it came through, and on a little: there it turns.)
+        // (Out of the box it came through, and on a little: there it turns. Not where it would
+        // stand in what's left of another's claim: on back till it's out of it.)
         if seen_box && !inside {
             let mut back = s;
             let mut more = 0.0;
-            while more < TURN_PAST {
+            while more < TURN_PAST || (claimed(back) && room + more <= TURN_ROOM) {
                 let n = (back - 1.0).max(first);
                 if n >= back || !clear(&body(n)) {
                     break;
@@ -588,7 +596,11 @@ pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static 
                 more += crate::travel::dist(body(back).at, body(n).at);
                 back = n;
             }
-            return turn(back, room + more);
+            if !claimed(back) {
+                return turn(back, room + more);
+            }
+            why = "no room";
+            break;
         }
     }
     // Short of a junction, a driveway's mouth it came by within that clear room (not a taxi on
