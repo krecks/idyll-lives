@@ -14,7 +14,7 @@
 import type { RoadPlan } from '../core/protocol';
 import { isSeparated } from '../core/roadKinds';
 import { simplify } from './landMasks';
-import { curve, evenly, leftOf, lengths, nearest, pointAt, RoadIndex, besideAny, sharpestTurn, tangent, type Pt } from './roads';
+import { curve, dist, evenly, leftOf, lengths, nearest, pointAt, RoadIndex, besideAny, round2, sharpestTurn, tangent, type Pt } from './roads';
 import type { Rect } from './town';
 import type { WorldSpec } from './world';
 import * as pmath from './pmath';
@@ -99,9 +99,6 @@ export const FACING: readonly Pt[] = [
   [-1, 0],
 ];
 
-const dist = (a: Pt, b: Pt) => pmath.hypot(a[0] - b[0], a[1] - b[1]);
-const round2 = (v: number) => Math.round(v * 100) / 100;
-
 /** The land as the generator reads it: per 8 m cell, its height (m), whether it is water, whether it is wooded. */
 export class Cells {
   readonly gw: number;
@@ -133,6 +130,29 @@ export class Cells {
 
   at(x: number, z: number): number {
     return this.height[this.cell(x, z)];
+  }
+
+  /** The land's height at (x, z) (m), between its cells' middles. */
+  heightAt(x: number, z: number): number {
+    const { gw, gd } = this;
+    const fx = Math.max(0, Math.min(gw - 1, x / CELL - 0.5));
+    const fz = Math.max(0, Math.min(gd - 1, z / CELL - 0.5));
+    const [x0, z0] = [Math.floor(fx), Math.floor(fz)];
+    const [x1, z1] = [Math.min(gw - 1, x0 + 1), Math.min(gd - 1, z0 + 1)];
+    const [u, v] = [fx - x0, fz - z0];
+    const h = (cx: number, cz: number) => this.height[cz * gw + cx];
+    return (h(x0, z0) * (1 - u) + h(x1, z0) * u) * (1 - v) + (h(x0, z1) * (1 - u) + h(x1, z1) * u) * v;
+  }
+
+  /** Each cell whose middle is within `r` m of `p` (and that `keep` keeps, given) set in `out` (1, per cell). */
+  mark(out: Uint8Array, p: Pt, r: number, keep?: (c: Pt) => boolean): void {
+    const { gw, gd } = this;
+    for (let cz = Math.max(0, Math.floor((p[1] - r) / CELL)); cz <= Math.min(gd - 1, Math.floor((p[1] + r) / CELL)); cz++) {
+      for (let cx = Math.max(0, Math.floor((p[0] - r) / CELL)); cx <= Math.min(gw - 1, Math.floor((p[0] + r) / CELL)); cx++) {
+        const c: Pt = [(cx + 0.5) * CELL, (cz + 0.5) * CELL];
+        if (pmath.hypot(c[0] - p[0], c[1] - p[1]) <= r && (!keep || keep(c))) out[cz * gw + cx] = 1;
+      }
+    }
   }
 
   /** How steep the land is at a cell (rise per metre). */
@@ -392,19 +412,8 @@ const MOTORWAY_OFF = 16;
 
 /** The cells within `MOTORWAY_OFF` m of a motorway's carriageway or a ramp among `roads` (1), else 0. */
 function motorwayCells(cells: Cells, roads: readonly RoadPlan[]): Uint8Array {
-  const { gw, gd } = cells;
-  const out = new Uint8Array(gw * gd);
-  for (const r of roads) {
-    if (!isSeparated(r.kind)) continue;
-    for (const p of evenly(r.points, 4)) {
-      const R = MOTORWAY_OFF + CELL / 2;
-      for (let cz = Math.max(0, Math.floor((p[1] - R) / CELL)); cz <= Math.min(gd - 1, Math.floor((p[1] + R) / CELL)); cz++) {
-        for (let cx = Math.max(0, Math.floor((p[0] - R) / CELL)); cx <= Math.min(gw - 1, Math.floor((p[0] + R) / CELL)); cx++) {
-          if (pmath.hypot((cx + 0.5) * CELL - p[0], (cz + 0.5) * CELL - p[1]) <= MOTORWAY_OFF) out[cz * gw + cx] = 1;
-        }
-      }
-    }
-  }
+  const out = new Uint8Array(cells.gw * cells.gd);
+  for (const r of roads) if (isSeparated(r.kind)) for (const p of evenly(r.points, 4)) cells.mark(out, p, MOTORWAY_OFF);
   return out;
 }
 
