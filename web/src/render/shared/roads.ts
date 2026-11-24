@@ -21,7 +21,7 @@ import { carriageway as kerbToKerb, hasSidewalks, JunctionCuts, junctionsOf, KER
 import { asphaltVary, carriageway, repair, STREET_LOOK, tint } from './paving';
 import { kindInfo } from '../../core/roadKinds';
 import { junctionStretches, PAINT, PAINT_FINISH, roadMarkings } from './markings';
-import { deckLevels, lowDecks } from './motorway';
+import { deckLevels, lowDecks, without } from './motorway';
 import { valueNoise } from '../../game/noise';
 import { levelsOf } from './landSurface';
 
@@ -622,12 +622,8 @@ function medianPiece(frames: readonly Frame[], i: number, wide: number, cuts: re
   const [a, b] = [frames[i], frames[i + 1]];
   const len = b.s - a.s;
   if (len < 1e-6) return;
-  // The stretches of it the median runs (in t), cut where a junction is.
-  let runs: [number, number][] = [[0, 1]];
-  for (const [c0, c1] of cuts) {
-    const [u0, u1] = [(c0 - a.s) / len, (c1 - a.s) / len];
-    runs = runs.flatMap(([t0, t1]): [number, number][] => (u1 <= t0 || u0 >= t1 ? [[t0, t1]] : [...(u0 > t0 ? [[t0, u0] as [number, number]] : []), ...(u1 < t1 ? [[u1, t1] as [number, number]] : [])]));
-  }
+  // The stretches of it the median runs (in t), cut where a junction is (each too short to draw left out below).
+  const runs = without([[0, 1]], cuts.map(([c0, c1]): [number, number] => [(c0 - a.s) / len, (c1 - a.s) / len]), 0);
   const Q = (t: number, off: number, y: number): V3 => {
     const [nx, nz] = [a.n[0] + (b.n[0] - a.n[0]) * t, a.n[1] + (b.n[1] - a.n[1]) * t];
     const l = Math.hypot(nx, nz) || 1;

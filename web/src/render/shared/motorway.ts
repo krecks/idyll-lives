@@ -291,11 +291,11 @@ export function liftedStretches(road: RoadPlan, levels: RoadLevels): [number, nu
   return out;
 }
 
-/** `stretches` less `cut` (both arc lengths, in order). */
-export function without(stretches: readonly [number, number][], cut: readonly [number, number][]): [number, number][] {
+/** `stretches` less `cut` (both arc lengths, in order), each left longer than `least`. */
+export function without(stretches: readonly [number, number][], cut: readonly [number, number][], least = 0.05): [number, number][] {
   let out = stretches.map(([a, b]): [number, number] => [a, b]);
   for (const [c0, c1] of cut) out = out.flatMap(([a, b]): [number, number][] => (c1 <= a || c0 >= b ? [[a, b]] : [...(c0 > a ? [[a, c0] as [number, number]] : []), ...(c1 < b ? [[c1, b] as [number, number]] : [])]));
-  return out.filter(([a, b]) => b - a > 0.05);
+  return out.filter(([a, b]) => b - a > least);
 }
 
 /** A road's points by arc length, its way along and its left there: walked forward (`at`), back only from the start. */
