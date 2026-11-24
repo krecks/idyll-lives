@@ -76,14 +76,15 @@
   </div>
   {#if !trail}
     <div class="row">
-      <span>One-way{#if streetChoice.oneway}{' '}<span class="sub-note">({streetChoice.flip ? 'against the way you draw it' : 'the way you draw it'})</span>{/if}</span>
-      <span class="way">
-        {#if streetChoice.oneway}
-          <button class="btn small ghost" title="Flip which way cars go on the streets you draw" onclick={() => (streetChoice.flip = !streetChoice.flip)}><Icon name="icon.ui.rotate" size={14} /> Flip new streets</button>
-        {/if}
-        <Toggle label="One-way" bind:checked={streetChoice.oneway} />
-      </span>
+      <span>One-way</span>
+      <Toggle label="One-way" bind:checked={streetChoice.oneway} />
     </div>
+    {#if streetChoice.oneway}
+      <div class="row way">
+        <span class="sub-note">{streetChoice.flip ? 'Against the way you draw it' : 'The way you draw it'}</span>
+        <button class="btn small ghost" title="Flip which way cars go on the streets you draw" onclick={() => (streetChoice.flip = !streetChoice.flip)}><Icon name="icon.ui.rotate" size={14} /> Flip new streets</button>
+      </div>
+    {/if}
   {/if}
   <label class="row">
     <span>Clear what's in the way{#if !streetChoice.clear}<span class="sub-note"> (else it is refused there)</span>{/if}</span>
@@ -131,9 +132,7 @@
     font-size: 12px;
   }
   .way {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    margin-top: -6px;
   }
   .choices {
     display: flex;
