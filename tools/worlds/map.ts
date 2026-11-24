@@ -84,7 +84,7 @@ function svg(d: NeighbourhoodDraft, title: string): string {
   const poly = (pts: readonly [number, number][]) => pts.map(([x, z]) => `${x.toFixed(1)},${z.toFixed(1)}`).join(' ');
   const parts: string[] = [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -30 ${W + 20} ${D + 40}" width="${Math.round((W + 20) * 1.1)}" height="${Math.round((D + 40) * 1.1)}">`, `<rect x="0" y="0" width="${W}" height="${D}" fill="#e9efdc"/>`];
   const fills: Record<string, string> = { water: '#9cc3e6', woods: '#9dbf8a', field: '#e6dca4', meadow: '#dbe8c4' };
-  for (const z of d.open?.zones ?? []) if (fills[z.kind]) parts.push(`<polygon points="${poly(z.poly)}" fill="${fills[z.kind]}" stroke="none"/>`);
+  for (const z of d.open?.zones ?? []) if (fills[z.kind]) parts.push(`<polygon points="${poly(z.poly)}" fill="${fills[z.kind]}" fill-rule="evenodd" stroke="none"/>`);
   for (const a of d.open?.areas ?? []) parts.push(`<rect x="${a.x}" y="${a.z}" width="${a.w}" height="${a.d}" fill="none" stroke="#c88" stroke-dasharray="6 4"/>`);
   for (const s of d.slots) {
     const r = plotRect(templates, s);
