@@ -276,15 +276,11 @@ export class FieldMap {
 
   /** The map on these draws (the ground tiles'), or none. */
   lay(draws: Iterable<pc.MeshInstance>): void {
-    const none = noFields.get(this.device);
+    const map = this.texture ?? noFields.get(this.device);
+    if (!map) return;
     for (const mi of draws) {
-      if (this.texture) {
-        mi.setParameter('game_fieldMap', this.texture);
-        mi.setParameter('game_fieldArea', this.area);
-      } else if (none) {
-        mi.setParameter('game_fieldMap', none);
-        mi.setParameter('game_fieldArea', this.area);
-      }
+      mi.setParameter('game_fieldMap', map);
+      mi.setParameter('game_fieldArea', this.area);
     }
   }
 

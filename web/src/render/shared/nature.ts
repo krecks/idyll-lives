@@ -21,7 +21,7 @@ import { fbm, hash, mulberry32, ridged, smoothstep, valueNoise } from '../../gam
 import { tuned } from '../tune';
 import { ZONE_CELL, ZoneField, type ZoneKind } from './zones';
 import { townPaving } from './townPaving';
-import { cropColour, HEDGE_LOOK, HEDGE_STEP, HEDGE_TREE_EVERY, HEDGE_WIDTH, MARGIN, paintFields, Patchwork, type FieldCanvas, type FieldPoint } from './farmland';
+import { CROP_LOOK, cropColour, HEDGE_LOOK, HEDGE_STEP, HEDGE_TREE_EVERY, HEDGE_WIDTH, MARGIN, paintFields, Patchwork, type Crop, type FieldCanvas, type FieldPoint } from './farmland';
 
 /**
  * How far the landscape extends beyond the town (metres): towns of older code, and worlds (which
@@ -263,9 +263,6 @@ function hex(c: string): Rgb {
 }
 
 /** The colour `t` of the way from `a` to `b`, per channel (`out` may be `a`). */
-/** A crop's colour as `terrainColour` lays it (`cropColour`), set in turn. */
-const tmpCrop: Rgb = { r: 0, g: 0, b: 0 };
-
 function lerp(a: Rgb, b: Rgb, t: number, out: Rgb): void {
   out.r = a.r + (b.r - a.r) * t;
   out.g = a.g + (b.g - a.g) * t;
@@ -287,6 +284,13 @@ function terrainPalette(greens: readonly string[]) {
     snow: hex('#F1F3F4'),
     alpine: hex('#8FA266'),
     hedge: hex(HEDGE_LOOK.leaf),
+    /** Each crop's colour from afar (`cropColour`); none for pasture (the lawn shows). */
+    crops: Object.fromEntries(
+      (Object.keys(CROP_LOOK) as Exclude<Crop, 'pasture'>[]).map((c) => {
+        const [r, g, b] = cropColour(c)!;
+        return [c, { r, g, b }];
+      }),
+    ) as Partial<Record<Crop, Rgb>>,
   };
 }
 type TerrainPalette = ReturnType<typeof terrainPalette>;
@@ -296,6 +300,15 @@ type TerrainPalette = ReturnType<typeof terrainPalette>;
 /** A placement's matrix: scaled, turned `yaw` about up, at (x, y, z) (`compose`, `math.ts`). */
 function placed(sx: number, sy: number, sz: number, yaw: number, x: number, y: number, z: number): Float32Array {
   return compose(sx, sy, sz, quatAxisAngle(0, 1, 0, yaw), x, y, z, new Float32Array(16)) as Float32Array;
+}
+
+/** A plant into `near` (`close`: a full model, and its placement in `plants`) or `far`, by its kind. */
+function putPlant(kind: string, x: number, y: number, z: number, scale: number, up: number, yaw: number, close: boolean, near: Map<string, Float32Array[]>, far: Map<string, Float32Array[]>, plants: PlantPlacement[]): void {
+  if (close) plants.push({ key: kind, x, y, z, sx: scale, sy: up, sz: scale, yaw });
+  const bucket = close ? near : far;
+  let list = bucket.get(kind);
+  if (!list) bucket.set(kind, (list = []));
+  list.push(placed(scale, up, scale, yaw, x, y, z));
 }
 
 function scatter(x: number, z: number, rand: () => number, scale: number, y = 0): Float32Array {
@@ -1548,15 +1561,10 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     // field: the ground's points are 2 m apart, and a crop's colour between them would run out over its grass margin.
     const field = this.fieldPoint(x, z);
     if (field) {
-      if (field.farmed) {
-        const crop = cropColour(field.crop);
-        if (crop) {
-          tmpCrop.r = crop[0];
-          tmpCrop.g = crop[1];
-          tmpCrop.b = crop[2];
-          lerp(out, tmpCrop, smoothstep(MARGIN + 2, MARGIN + 4, field.edge) * 0.95, out);
-          lawn *= 1 - smoothstep(MARGIN - 0.5, MARGIN + 0.5, field.edge);
-        }
+      const crop = field.farmed ? P.crops[field.crop] : undefined;
+      if (crop) {
+        lerp(out, crop, smoothstep(MARGIN + 2, MARGIN + 4, field.edge) * 0.95, out);
+        lawn *= 1 - smoothstep(MARGIN - 0.5, MARGIN + 0.5, field.edge);
       }
       // No lawn in a hedge, its ground the hedge's shade.
       const hedge = 1 - smoothstep(HEDGE_WIDTH / 2, HEDGE_WIDTH / 2 + 2, field.hedge);
@@ -1605,8 +1613,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    */
   protected patchwork(): Patchwork | null {
     const zones = this.zones;
-    const key = `${this.landVersion}`;
-    if (this.fieldsMade && this.fieldsMade.key === key && this.fieldsMade.zones === zones && this.fieldsMade.built === this.built) return this.fieldsMade.pw;
+    const made = this.fieldsMade;
+    if (made && made.landVersion === this.landVersion && made.zones === zones && made.built === this.built) return made.pw;
     let pw: Patchwork | null = null;
     // (A big world's fields are its field zones: the patchwork in them only, wherever they are.)
     const grid = zones ? (zones.has('fields') ? (this.land.fields ?? { size: 34, angle: hash(3, 5, this.seed) * Math.PI }) : null) : this.land.fields;
@@ -1624,10 +1632,10 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
         return dist < this.ring * 0.72 ? 'in' : 'out';
       });
     }
-    this.fieldsMade = { key, zones, built: this.built, pw };
+    this.fieldsMade = { landVersion: this.landVersion, zones, built: this.built, pw };
     return pw;
   }
-  private fieldsMade: { key: string; zones: ZoneField | null; built: LandscapeLayout['built']; pw: Patchwork | null } | null = null;
+  private fieldsMade: { landVersion: number; zones: ZoneField | null; built: LandscapeLayout['built']; pw: Patchwork | null } | null = null;
 
   /** Where (x, z) is in the farmland's patchwork (its field, whether farmed, how far from its edges and hedges); null: no farmland. */
   private fieldPoint(x: number, z: number): FieldPoint | null {
@@ -1644,17 +1652,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     if (!zones?.has('fields')) return null;
     const pw = this.patchwork();
     if (!pw) return null;
-    // (A height field's fields are its cover's: where they are, as the zones' outlines no longer say.)
-    let box = this.field ? zones.extent('fields') : null;
-    if (!box) {
-      let [x0, z0, x1, z1] = [Infinity, Infinity, -Infinity, -Infinity];
-      for (const zone of this.zoneList) {
-        if (zone.kind !== 'fields') continue;
-        for (const [x, z] of zone.poly) [x0, z0, x1, z1] = [Math.min(x0, x), Math.min(z0, z), Math.max(x1, x), Math.max(z1, z)];
-      }
-      if (x1 < x0) return null;
-      box = [x0, z0, x1, z1];
-    }
+    // (Where the field zones are as laid: a height field's cover moves them past their outlines.)
+    const box = zones.extent('fields');
+    if (!box) return null;
     // (A field farmed reaches past the zones' edge by up to half of it.)
     const pad = pw.grid.size * 1.2;
     const reach: [number, number, number, number] = [box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad];
@@ -1676,15 +1676,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
       const road = this.roads.near(x, z);
       return !road || road.dist >= road.width / 2 + 2.5;
     };
-    const put = (kind: string, x: number, z: number, scale: number, up: number, yaw: number) => {
-      const y = this.heightAt(x, z) - 0.05;
-      const close = !this.built && this.distanceToTown(x, z) < SHADOW_RANGE;
-      if (close) plants.push({ key: kind, x, y, z, sx: scale, sy: up, sz: scale, yaw });
-      const bucket = close ? near : far;
-      let list = bucket.get(kind);
-      if (!list) bucket.set(kind, (list = []));
-      list.push(placed(scale, up, scale, yaw, x, y, z));
-    };
+    const put = (kind: string, x: number, z: number, scale: number, up: number, yaw: number) =>
+      putPlant(kind, x, this.heightAt(x, z) - 0.05, z, scale, up, yaw, !this.built && this.distanceToTown(x, z) < SHADOW_RANGE, near, far, plants);
     for (const e of pw.edges(box)) {
       if (!e.hedge) continue;
       const len = Math.hypot(e.b[0] - e.a[0], e.b[1] - e.a[1]);
@@ -1832,16 +1825,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
     // (Drawn in this order, as ever: the same woods from the same seed.)
     const up = scale * (0.9 + rand() * 0.25);
     const yaw = rand() * Math.PI * 2;
-    const y = this.heightAt(x, z) - 0.05;
-    const m = placed(scale, up, scale, yaw, x, y, z);
     // (A big world's: all far versions, none casting. Its roads and trails run everywhere, and every tree
     // along them would be a full model in the sun's shadows.)
-    const close = !this.built && dist < SHADOW_RANGE && kind !== 'model.rock';
-    if (close) plants.push({ key: kind, x, y, z, sx: scale, sy: up, sz: scale, yaw });
-    const bucket = close ? near : far;
-    let list = bucket.get(kind);
-    if (!list) bucket.set(kind, (list = []));
-    list.push(m);
+    putPlant(kind, x, this.heightAt(x, z) - 0.05, z, scale, up, yaw, !this.built && dist < SHADOW_RANGE && kind !== 'model.rock', near, far, plants);
   }
 
   /** A big world's orchards into `far`: fruit trees in rows across each, by the draws of `draw`. */

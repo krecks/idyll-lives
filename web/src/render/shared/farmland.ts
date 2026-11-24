@@ -137,8 +137,12 @@ export class Patchwork {
   /** A field by its row and place in it. */
   field(row: number, col: number): Field {
     const { len, shift } = this.row(row);
-    const crop = cropOf(hash(col, row, this.seed + 77));
-    return { row, col, u0: shift + col * len, v0: row * this.depth, len, depth: this.depth, crop, across: hash(col, row, this.seed + 78) < 0.3 };
+    return { row, col, u0: shift + col * len, v0: row * this.depth, len, depth: this.depth, crop: this.crop(row, col), across: hash(col, row, this.seed + 78) < 0.3 };
+  }
+
+  /** What a field grows. */
+  private crop(row: number, col: number): Crop {
+    return cropOf(hash(col, row, this.seed + 77));
   }
 
   /** Whether a field is farmed: the farmland under most of it and its middle, and no water or town anywhere on it. */
@@ -185,16 +189,17 @@ export class Patchwork {
   at(x: number, z: number): FieldPoint {
     const [u, v] = this.uv(x, z);
     const row = Math.floor(v / this.depth);
-    const col = this.colAt(row, u);
-    const f = this.field(row, col);
-    const [lu, lv] = [u - f.u0, v - f.v0];
-    const edge = Math.min(lu, f.len - lu, lv, f.depth - lv);
+    // (Asked at every ground point: no `Field` made for it.)
+    const { len, shift } = this.row(row);
+    const col = Math.floor((u - shift) / len);
+    const [lu, lv] = [u - shift - col * len, v - row * this.depth];
+    const edge = Math.min(lu, len - lu, lv, this.depth - lv);
     let hedge = Infinity;
     if (this.hedgeBefore(row, col)) hedge = Math.min(hedge, lu);
-    if (this.hedgeBefore(row, col + 1)) hedge = Math.min(hedge, f.len - lu);
+    if (this.hedgeBefore(row, col + 1)) hedge = Math.min(hedge, len - lu);
     if (this.hedgeUnder(row, this.colAt(row - 1, u), col)) hedge = Math.min(hedge, lv);
-    if (this.hedgeUnder(row + 1, col, this.colAt(row + 1, u))) hedge = Math.min(hedge, f.depth - lv);
-    return { row, col, farmed: this.included(row, col), crop: f.crop, edge, hedge };
+    if (this.hedgeUnder(row + 1, col, this.colAt(row + 1, u))) hedge = Math.min(hedge, this.depth - lv);
+    return { row, col, farmed: this.included(row, col), crop: this.crop(row, col), edge, hedge };
   }
 
   /** The patchwork's frame's box round a world box (x0, z0, x1, z1). */
