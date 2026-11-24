@@ -645,6 +645,7 @@ fn write_cars(world: &World, hidden: &[bool], out: &mut [f32]) {
     out[header::CAR_COUNT] = cars.len() as f32;
     // (The ways' pool, filled car by car.)
     let mut way = [[0.0; TRAIL_STRIDE]; TRAIL_MOST];
+    let mut points = Vec::new();
     let mut used = 0;
     for (k, c) in cars.iter().enumerate() {
         let o = &mut out[CAR_BASE + k * CAR_STRIDE..CAR_BASE + (k + 1) * CAR_STRIDE];
@@ -662,7 +663,9 @@ fn write_cars(world: &World, hidden: &[bool], out: &mut [f32]) {
         o[car::YAW] = yaw;
         o[car::DOORS] = f32::from(doors);
         let room = (TRAIL_POINTS - used).min(TRAIL_MOST);
-        let n = world.trails.write(k, world.step_ticks, &mut way[..room]);
+        let n = world
+            .trails
+            .write(k, world.step_ticks, &mut way[..room], &mut points);
         o[car::TRAIL] = used as f32;
         o[car::TRAIL_LEN] = n as f32;
         for (i, w) in way[..n].iter().enumerate() {

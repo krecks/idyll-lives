@@ -96,7 +96,9 @@ impl Trails {
         let ticks = if p.step == self.step {
             now
         } else {
-            self.ran.iter().find(|r| r.0 == p.step)?.1
+            // (`ran` holds one step after another, oldest first.)
+            let back = p.step.checked_sub(self.ran.front()?.0)?;
+            self.ran.get(back as usize).filter(|r| r.0 == p.step)?.1
         };
         let into = if ticks == 0 {
             1.0
@@ -109,24 +111,31 @@ impl Trails {
     /// Car `c`'s way into the snapshot (the step under way having run `now` ticks): as few of its
     /// poses as draw it within `TRAIL_TOLERANCE` of all of them (`TRAIL_MOST` at most), oldest
     /// first, each `[t, x, z, yaw]` with `t` in steps before the snapshot (below 0; the snapshot's
-    /// own pose, at 0, is the car's row), into `out`. How many. (Nothing allocated: it's written
-    /// every step.)
-    pub(crate) fn write(&self, c: usize, now: u32, out: &mut [[f32; 4]]) -> usize {
+    /// own pose, at 0, is the car's row), into `out`. How many. (Nothing allocated but `points`
+    /// grown, kept by the caller for every car: it's written every step.)
+    pub(crate) fn write(
+        &self,
+        c: usize,
+        now: u32,
+        out: &mut [[f32; 4]],
+        points: &mut Vec<[f32; 4]>,
+    ) -> usize {
         let Some(way) = self.cars.get(c) else {
             return 0;
         };
-        // (Its points from the steps kept: all but one before them, where it stood since.)
-        let at = |i: usize| {
-            self.when(&way[i], now)
-                .map(|t| [t, way[i].at[0], way[i].at[1], way[i].yaw])
-        };
-        let first = (0..way.len())
-            .find(|&i| at(i).is_some())
+        // (Its points from the steps kept: all but one before them, where it stood since. Each
+        // worked out once: `simplify` looks at most of them several times.)
+        let at = |p: &Point| self.when(p, now).map(|t| [t, p.at[0], p.at[1], p.yaw]);
+        let first = way
+            .iter()
+            .position(|p| at(p).is_some())
             .unwrap_or(way.len());
-        let point = |i: usize| at(first + i).unwrap_or_default();
+        points.clear();
+        points.extend(way.iter().skip(first).map(|p| at(p).unwrap_or_default()));
+        let point = |i: usize| points[i];
         let mut kept = [0; TRAIL_MOST + 1];
         let most = out.len().min(TRAIL_MOST) + 1;
-        let mut n = simplify(way.len() - first, point, &mut kept[..most]);
+        let mut n = simplify(points.len(), point, &mut kept[..most]);
         // (The last is the snapshot's pose when it's at 0: the car's row has it.)
         if n > 0 && point(kept[n - 1])[0] >= 0.0 {
             n -= 1;
@@ -144,8 +153,9 @@ fn same(a: &Point, b: &Point) -> bool {
 }
 
 /// How far `p` (`[t, x, z, yaw]`) is from where the straight way from `a` to `b` has it at its
-/// time (m; its yaw's turn at `YAW_LEVER`).
-fn off(a: &[f32; 4], b: &[f32; 4], p: &[f32; 4]) -> f32 {
+/// time (m; its yaw's turn at `YAW_LEVER`). `turn`: how far it turns from `a` to `b`
+/// (`wrap_angle`), the same for every `p` between them.
+fn off(a: &[f32; 4], b: &[f32; 4], turn: f32, p: &[f32; 4]) -> f32 {
     let k = if b[0] > a[0] {
         ((p[0] - a[0]) / (b[0] - a[0])).clamp(0.0, 1.0)
     } else {
@@ -153,7 +163,6 @@ fn off(a: &[f32; 4], b: &[f32; 4], p: &[f32; 4]) -> f32 {
     };
     let x = a[1] + (b[1] - a[1]) * k;
     let z = a[2] + (b[2] - a[2]) * k;
-    let turn = crate::world::wrap_angle(b[3] - a[3]);
     let yaw = crate::world::wrap_angle(p[3] - (a[3] + turn * k));
     (p[1] - x).hypot(p[2] - z) + yaw.abs() * YAW_LEVER
 }
@@ -171,8 +180,9 @@ pub(crate) fn simplify(n: usize, point: impl Fn(usize) -> [f32; 4], kept: &mut [
     // The point furthest off the straight way between `a` and `b`, and how far.
     let worst = |a: usize, b: usize| -> (usize, f32) {
         let (pa, pb) = (point(a), point(b));
+        let turn = crate::world::wrap_angle(pb[3] - pa[3]);
         (a + 1..b)
-            .map(|i| (i, off(&pa, &pb, &point(i))))
+            .map(|i| (i, off(&pa, &pb, turn, &point(i))))
             .fold((a, 0.0), |m, x| if x.1 > m.1 { x } else { m })
     };
     // Each stretch between two kept points (`kept[s]`, `kept[s + 1]`): its worst point.
@@ -223,7 +233,7 @@ mod tests {
         let t = trails_of(&[step]);
         let mut out = [[0.0; 4]; TRAIL_MOST];
         // (Its first tick only: the last is the row's.)
-        assert_eq!(t.write(0, 60, &mut out), 1);
+        assert_eq!(t.write(0, 60, &mut out, &mut Vec::new()), 1);
         assert!((out[0][0] - (-1.0 + 1.0 / 60.0)).abs() < 1e-6);
     }
 
@@ -234,7 +244,7 @@ mod tests {
         step.extend((0..20).map(|k| ([k as f32, 20.0], std::f32::consts::FRAC_PI_2)));
         let t = trails_of(&[step.clone()]);
         let mut out = [[0.0; 4]; TRAIL_MOST];
-        let n = t.write(0, 40, &mut out);
+        let n = t.write(0, 40, &mut out, &mut Vec::new());
         assert!(n >= 2, "{n}");
         // Every tick's pose is within the tolerance of the drawn way.
         for (k, &(at, _)) in step.iter().enumerate() {
