@@ -1,6 +1,20 @@
 //! Lanes: bending, rounding corners and gentle bends.
+//!
+//! **Which side is right.** The town's x runs east and its z north, a yaw turning clockwise seen
+//! from above (`Car::yaw`: forward is (sin, cos)): a left-handed frame, as the renderer draws it
+//! (`web/src/render/pc/space.ts`). So the right of going (x, z) is (z, -x) (`right_of`): going
+//! east, the south. Traffic keeps to the right as the game shows it (German rules): every right
+//! and left of the traffic (`shifted`, `offset_right_by`, `bend_out`, `turned`, the bays', the
+//! kerbs', the taxis', the walkers', `Graph::inside`) is this one. (The town map draws z down the
+//! page, a mirror of the game's view: there, it looks the other way round.)
 
 use super::*;
+
+/// The right of going `d` (a way along the ground, x z): a quarter turn clockwise seen from
+/// above. Going +x (east), -z (south). See the top of this file.
+pub fn right_of(d: [f32; 2]) -> [f32; 2] {
+    [d[1], -d[0]]
+}
 
 /// How far past `lane`'s own line at its point `i` the right side of a body `len` m long standing
 /// along it there reaches (m), on the outside of a bend to the left: the sagitta of the chord its
@@ -37,14 +51,14 @@ pub(crate) fn bend_out(lane: &[[f32; 2]], i: usize, len: f32) -> f32 {
     if l < 1e-3 {
         return 0.0;
     }
-    // (Right of the way it runs, as `shifted`: (-z, x).)
-    (dot2(sub2(p, a), [-d[1], d[0]]) / l).max(0.0)
+    // (Right of the way it runs, as `shifted`: `right_of`.)
+    (dot2(sub2(p, a), right_of(d)) / l).max(0.0)
 }
 
 /// `p`, facing `yaw`, `shift` m to its right.
 pub(crate) fn shifted(p: [f32; 2], yaw: f32, shift: f32) -> [f32; 2] {
-    // (Forward is (sin, cos); its right (-cos, sin).)
-    [p[0] - yaw.cos() * shift, p[1] + yaw.sin() * shift]
+    // (Forward is (sin, cos); its right (cos, -sin): `right_of`.)
+    [p[0] + yaw.cos() * shift, p[1] - yaw.sin() * shift]
 }
 
 /// `pts` moved `offs[i]` m to the right (looking the way they run), each its own.
@@ -55,7 +69,8 @@ pub(crate) fn offset_right_by(pts: &[[f32; 2]], offs: &[f32]) -> Vec<[f32; 2]> {
             let (a, b) = (pts[i.saturating_sub(1)], pts[(i + 1).min(n - 1)]);
             let (dx, dz) = (b[0] - a[0], b[1] - a[1]);
             let d = dx.hypot(dz).max(1e-6);
-            [pts[i][0] - dz / d * offs[i], pts[i][1] + dx / d * offs[i]]
+            let r = right_of([dx / d, dz / d]);
+            [pts[i][0] + r[0] * offs[i], pts[i][1] + r[1] * offs[i]]
         })
         .collect()
 }
@@ -91,10 +106,10 @@ pub(super) fn unit2(a: [f32; 2], b: [f32; 2]) -> [f32; 2] {
     [(b[0] - a[0]) / l, (b[1] - a[1]) / l]
 }
 
-/// How far going `b` is turned from going `a` (radians, + to the right: the town's x runs right
-/// and z down).
+/// How far going `b` is turned from going `a` (radians, + to the right, clockwise seen from above:
+/// `right_of`).
 pub(super) fn turned(a: [f32; 2], b: [f32; 2]) -> f32 {
-    cross2(a, b).atan2(dot2(a, b))
+    (-cross2(a, b)).atan2(dot2(a, b))
 }
 
 /// How far `p` is off the line through `c` going `d`.
@@ -105,17 +120,16 @@ fn off_line(p: [f32; 2], c: [f32; 2], d: [f32; 2]) -> f32 {
 /// An arc of radius `r` from `from` going `din`, turning `theta` (`turned`): a point every
 /// `ARC_STEP` of it, its ends too, onto `out`.
 fn arc_onto(out: &mut Vec<[f32; 2]>, from: [f32; 2], din: [f32; 2], theta: f32, r: f32) {
-    // (About its middle, towards the inside of the turn square to the way in.)
-    let inside = if theta > 0.0 {
-        [-din[1], din[0]]
-    } else {
-        [din[1], -din[0]]
-    };
+    // (About its middle, towards the inside of the turn square to the way in: right of it on a
+    // turn to the right.)
+    let rt = right_of(din);
+    let inside = if theta > 0.0 { rt } else { [-rt[0], -rt[1]] };
     let centre = [from[0] + inside[0] * r, from[1] + inside[1] * r];
     let v = sub2(from, centre);
     let k = (theta.abs() / ARC_STEP).ceil().max(1.0) as usize;
     for s in 0..=k {
-        let (sn, cs) = (theta * s as f32 / k as f32).sin_cos();
+        // (Turned from x towards z, the other way round from `turned`'s.)
+        let (sn, cs) = (-theta * s as f32 / k as f32).sin_cos();
         let p = [
             centre[0] + v[0] * cs - v[1] * sn,
             centre[1] + v[0] * sn + v[1] * cs,

@@ -262,7 +262,8 @@ fn kerb_point(g: &crate::travel::Graph, kerb: &Kerb) -> Option<crate::travel::Ro
 fn far_side(g: &crate::travel::Graph, kerb: &Kerb, d: f32) -> bool {
     let road = &g.roads[kerb.road as usize];
     let (c, t) = (road.at(kerb.s), road.tangent(kerb.s));
-    let right = [-t[1] * d, t[0] * d];
+    let r = crate::cars::right_of(t);
+    let right = [r[0] * d, r[1] * d];
     let m = g.point(kerb.mouth);
     let house = [m[0] - kerb.axis[0], m[1] - kerb.axis[1]];
     (house[0] - c[0]) * right[0] + (house[1] - c[1]) * right[1] < 0.0
@@ -811,7 +812,7 @@ fn u_turn(
     kind: crate::travel::RoadKind,
 ) {
     let (r, lane, before) = u_turn_radii(width, kind);
-    let right = [-t[1], t[0]];
+    let right = crate::cars::right_of(t);
     // (x along the way it comes, y to its right; the dead end's middle at 0.)
     let world = |x: f32, y: f32| {
         [

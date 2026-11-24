@@ -178,8 +178,9 @@ fn a_far_away_change_does_not_reroute() {
         z: target[1],
     })
     .unwrap();
-    // Some way along it.
-    for _ in 0..common::secs(20.0) {
+    // Some way along it (walking on the street's near side, the right of their way: short of the
+    // last house on its far side).
+    for _ in 0..common::secs(15.0) {
         w.tick_once();
     }
     let next = |w: &World| match w.sims[i].current().map(|a| &a.phase) {

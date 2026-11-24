@@ -2,8 +2,8 @@
  * The road hierarchy's fixture: a small world of every kind of road, the same layout as the simulation's
  * (`crates/sim-core/tests/sim/travel_hierarchy.rs` `hierarchy()`), road for road in the same order:
  *
- * - a motorway edge to edge along z = 200 to 209: two one-way carriageways 9 m apart, laid for traffic on the right
- *   (eastbound the southern, z = 209, its points running east; westbound the northern, z = 200, its points running east
+ * - a motorway edge to edge along z = 200 to 209: two one-way carriageways 9 m apart, laid for traffic on the right as
+ *   the game draws it (z north; eastbound the southern, z = 200, its points running east; westbound the northern, z = 209, its points running east
  *   too and one-way against them: each has the other on its left, and its ramps leave to its right), `raised` over a street (`BRIDGE_STREET`,
  *   north from the avenue to the world's edge) that it `crosses` without meeting, and a `bridge` over a river;
  * - a half-diamond west of the street: an off-ramp from the eastbound carriageway (south of it) and an on-ramp onto
@@ -21,9 +21,9 @@ type Pt = [number, number];
 /** The world's size (m). */
 export const WIDTH = 480;
 export const DEPTH = 320;
-/** The carriageways' middles (z): eastbound, westbound (north is -z: eastbound's right, +z, is the south). */
-export const EAST_Z = 209;
-export const WEST_Z = 200;
+/** The carriageways' middles (z): eastbound, westbound (north is +z: eastbound's right, -z, is the south). */
+export const EAST_Z = 200;
+export const WEST_Z = 209;
 /** The carriageways' ends (x): `s` along either is `x - MOTORWAY_X0`. */
 export const MOTORWAY_X0 = 0.5;
 export const MOTORWAY_X1 = 479.5;
@@ -111,18 +111,18 @@ export function roadHierarchy(): { width: number; depth: number; roads: RoadPlan
     ramp(
       [
         [20, EAST_Z],
-        [40, EAST_Z + 7],
-        [110, EAST_Z + 7],
-        [STREET_X, EAST_Z + 25],
+        [40, EAST_Z - 7],
+        [110, EAST_Z - 7],
+        [STREET_X, EAST_Z - 25],
       ],
       ['merge', 'join'],
       'Off-ramp',
     ),
     ramp(
       [
-        [STREET_X, WEST_Z - 25],
-        [110, WEST_Z - 7],
-        [40, WEST_Z - 7],
+        [STREET_X, WEST_Z + 25],
+        [110, WEST_Z + 7],
+        [40, WEST_Z + 7],
         [20, WEST_Z],
       ],
       ['join', 'merge'],

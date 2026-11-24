@@ -50,11 +50,11 @@ describe("each kind's lanes and lines", () => {
     const avenue = h.roads[F.AVENUE];
     const half = carriageway(avenue) / 2;
     expect(lay.lanes.length).toBe(4);
-    // (Cars going along its points keep right: its right, -; those coming back on its left.)
+    // (Cars going along its points keep right as the game shows it, + (`Lane.off`); those coming back on its left.)
     for (const l of lay.lanes) {
       expect(Math.abs(l.off)).toBeGreaterThan(1.3);
       expect(Math.abs(l.off)).toBeLessThan(half);
-      expect(Math.sign(l.off)).toBe(-l.way);
+      expect(Math.sign(l.off)).toBe(l.way);
     }
     expect(lay.dividers.length).toBe(2);
     for (const d of lay.dividers) expect(Math.abs(d)).toBeCloseTo((1.3 + half) / 2, 9);
@@ -66,7 +66,7 @@ describe("each kind's lanes and lines", () => {
     for (const ri of [F.MOTORWAY_EAST, F.MOTORWAY_WEST]) {
       const lay = laneLayout(h.roads, ri)!;
       const road = h.roads[ri];
-      // (The pair's middle, from this one's: its left is (z, -x) of the way along, here -z.)
+      // (The pair's middle, from this one's: `Lane.off`'s + is (z, -x) of the way along, here -z.)
       const towards = ri === F.MOTORWAY_EAST ? F.WEST_Z - F.EAST_Z : F.EAST_Z - F.WEST_Z;
       const inside = -Math.sign(towards);
       expect(lay.lanes.length).toBe(2);

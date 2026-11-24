@@ -92,12 +92,12 @@ fn a_corner_after_a_step_back_keeps_the_road_before_it() {
 fn bend_out_is_the_sagitta_on_the_outside_of_a_left_bend() {
     let (r, len) = (40.0f32, 4.7f32);
     // An arc round (0, 0) of radius `r`, a point every degree; `turn` +1 bends to the left of
-    // the way it runs (forward (sin, cos), right (-cos, sin): `shifted`).
+    // the way it runs (forward (sin, cos), right (cos, -sin): `right_of`).
     let arc = |turn: f32| -> Vec<[f32; 2]> {
         (0..=40)
             .map(|k| {
                 let a = (k as f32).to_radians();
-                [-r * a.cos() * turn, r * a.sin()]
+                [r * a.cos() * turn, r * a.sin()]
             })
             .collect()
     };
@@ -378,12 +378,12 @@ fn the_car_moves_house_with_its_household() {
 
 #[test]
 fn a_door_with_no_room_to_open_isnt_used() {
-    // The house's wall a metre from the car's left (driver's) side.
+    // The house's wall a metre from the car's left (driver's) side: facing +z, its -x side.
     let town = TOWN
-        .replace(r#""x":34.0,"z":3.0"#, r#""x":34.5,"z":3.0"#)
+        .replace(r#""x":34.0,"z":3.0"#, r#""x":33.5,"z":3.0"#)
         .replace(
             r#""sims":"#,
-            r#""walls":[[36,0,40,0],[40,0,40,6],[36,6,40,6],[36,0,36,6]],"sims":"#,
+            r#""walls":[[28,0,32,0],[28,0,28,6],[28,6,32,6],[32,0,32,6]],"sims":"#,
         );
     let w = World::from_json(CONTENT, &town, 1).unwrap();
     let (door, _) = w.cars[0].door(&w.nav(), 0).unwrap();
@@ -1110,7 +1110,8 @@ fn pulls_out_and_drives_to_the_nearer_end() {
     let r = Route::new(&c, &exits, false);
     let last = r.points.last().unwrap().0;
     assert!(last[0] > 99.5, "drives to the east end: {last:?}");
-    assert!((last[1] - (20.0 + TIGHT_LANE)).abs() < 1e-3, "in its lane");
+    // (Heading east, its right is the south, -z: `right_of`.)
+    assert!((last[1] - (20.0 - TIGHT_LANE)).abs() < 1e-3, "in its lane");
     // Starts from the spot facing the street, ends heading east.
     assert!((r.points[0].0[0] - 70.0).abs() < 1e-3);
     assert!(r.points[0].1.abs() < 0.2);
@@ -1179,8 +1180,9 @@ fn pulling_back_in_beside_one_waiting_for_it_a_car_keeps_the_gap() {
     // one). In its lane its body would touch the other's: it stops short by the gap the cars
     // keep, waiting for that one.
     let (len, wid) = (4.6, 1.88);
+    // (Facing +z, its right is +x: `right_of`; the other on its left.)
     let them = [Driving {
-        at: [wid, 0.0],
+        at: [-wid, 0.0],
         yaw: std::f32::consts::PI,
         len,
         wid,
@@ -1245,15 +1247,15 @@ fn turns(pts: &[[f32; 2]]) -> (f32, bool) {
 
 #[test]
 fn a_lane_turns_a_corner_on_an_arc() {
-    // Along x, then right (+z) at (12, 0): a street corner, a point every 4 m.
+    // Along x, then right (-z: `right_of`) at (12, 0): a street corner, a point every 4 m.
     let lane = [
         [0.0, 0.0],
         [4.0, 0.0],
         [8.0, 0.0],
         [12.0, 0.0],
-        [12.0, 4.0],
-        [12.0, 8.0],
-        [12.0, 12.0],
+        [12.0, -4.0],
+        [12.0, -8.0],
+        [12.0, -12.0],
     ];
     let round = round_corners(&lane);
     assert_eq!(round.first(), lane.first());
@@ -1735,14 +1737,15 @@ fn each_kind_has_its_lanes() {
         assert!(near(lane_off(&g, 3, 0, along), 0.0));
         assert!(near(lane_off(&g, 4, 0, along), 0.0));
     }
-    // (The eastbound's pair on its right going east, the +z side: its outer lane left of its
-    // middle, its inner right; the westbound's, going west, its pair on its right as well.)
-    assert_eq!(g.inside[5], -1);
-    assert_eq!(g.inside[6], 1);
-    assert!(near(lane_off(&g, 5, 0, true), -1.3));
-    assert!(near(lane_off(&g, 5, 1, true), 2.2));
-    assert!(near(lane_off(&g, 6, 0, false), -1.3));
-    assert!(near(lane_off(&g, 6, 1, false), 2.2));
+    // (The eastbound's pair on its left going east, the +z side (its right is -z: `right_of`):
+    // its outer lane right of its middle, its inner left; the westbound's, going west, its pair on
+    // its left as well. Traffic on the right.)
+    assert_eq!(g.inside[5], 1);
+    assert_eq!(g.inside[6], -1);
+    assert!(near(lane_off(&g, 5, 0, true), 1.3));
+    assert!(near(lane_off(&g, 5, 1, true), -2.2));
+    assert!(near(lane_off(&g, 6, 0, false), 1.3));
+    assert!(near(lane_off(&g, 6, 1, false), -2.2));
     // (Into a driveway or out of one: `TIGHT_LANE` on a street, the outer lane on an avenue, the
     // middle of a one-way street.)
     assert!(near(kerb_lane(&g.roads[0]), TIGHT_LANE));

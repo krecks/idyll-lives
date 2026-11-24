@@ -31,7 +31,10 @@ export const BARRIER_FINISH = encodeFinish(0.92, 0);
 /** How far apart along a carriageway the barrier's line is taken (m). */
 const BARRIER_STEP = 2;
 
-/** A carriageway's pair: the other one's index, and its side (+1: this one's left, looking along its points). */
+/**
+ * A carriageway's pair: the other one's index, and its side (+1: towards (t.z, -t.x) of the way its points run, as
+ * `markings.ts` `Lane.off`: its left on the town map, its right as the game shows it).
+ */
 export interface MotorwayPair {
   other: number;
   side: 1 | -1;
@@ -60,7 +63,7 @@ export function motorwayPairs(roads: readonly RoadPlan[]): Map<number, MotorwayP
       if (near.dist > (a.width + b.width) / 2 + MOTORWAY.apart || (best && near.dist >= best.d)) continue;
       const q = pointAt(b.points, near.s);
       if (Math.abs(q.t[0] * t[0] + q.t[1] * t[1]) < 0.9) continue;
-      // (The left of the way along: (t.z, -t.x).)
+      // (Towards (t.z, -t.x): `MotorwayPair.side`.)
       const side = (q.p[0] - p[0]) * t[1] - (q.p[1] - p[1]) * t[0] >= 0 ? 1 : -1;
       best = { other: j, side, d: near.dist };
     }
@@ -71,13 +74,14 @@ export function motorwayPairs(roads: readonly RoadPlan[]): Map<number, MotorwayP
 }
 
 /**
- * Road `ri`'s inside (+1: its left, looking along its points; -1: its right): towards its pair, if it has one; else, its
- * cars keeping to the right, the left of the way they go (a two-way road: its left).
+ * Road `ri`'s inside (+1: towards (t.z, -t.x) of the way its points run, as `MotorwayPair.side`; -1: the other side):
+ * towards its pair, if it has one; else, its cars keeping to the right as the game shows it, the left of the way they
+ * go (sim-core `Graph::inside`, of the opposite sign: its +1 is the game's left of the way its points run).
  */
 export function insideOf(roads: readonly RoadPlan[], ri: number): 1 | -1 {
   const pair = motorwayPairs(roads).get(ri);
   if (pair) return pair.side;
-  return onewayOf(roads[ri]) < 0 ? -1 : 1;
+  return onewayOf(roads[ri]) < 0 ? 1 : -1;
 }
 
 /** A point on the line between two carriageways: where, how far along each (m), and the verge between their edges (m). */
@@ -417,11 +421,12 @@ export function signSpots(roads: readonly RoadPlan[], levels?: RoadLevels | null
       }
     }
     if (!leaves) {
-      // By the street where it begins: on its right, a little way in.
+      // By the street where it begins: on its right as the game shows it ((t.z, -t.x) going along its points), a
+      // little way in.
       const s = e === 0 ? total - SIGN_RAMP_IN : SIGN_RAMP_IN;
       if (s <= 0 || s >= total) return;
       const { p, t } = pointAt(ramp.points, s, ls);
-      const off = -way * (ramp.width / 2 + SIGN_OUT);
+      const off = way * (ramp.width / 2 + SIGN_OUT);
       out.push({ x: p[0] + t[1] * off, z: p[1] - t[0] * off, yaw: facing(t, way), y: Y(ramp, s) });
     }
   });

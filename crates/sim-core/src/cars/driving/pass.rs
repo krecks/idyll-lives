@@ -584,7 +584,7 @@ pub(crate) fn leg_past(w: &World, c: usize, home: bool, o: usize, taxi: &Rect) -
             .total_cmp(&crate::travel::dist(route.at(ts[b]).0, taxi.at))
     })?;
     let (pc, yc, _) = route.at(ts[kc]);
-    let lat = (taxi.at[0] - pc[0]) * -yc.cos() + (taxi.at[1] - pc[1]) * yc.sin();
+    let lat = (taxi.at[0] - pc[0]) * yc.cos() - (taxi.at[1] - pc[1]) * yc.sin();
     if lat.abs() > 1.2 {
         return None;
     }
@@ -674,7 +674,7 @@ pub(crate) fn leg_past(w: &World, c: usize, home: bool, o: usize, taxi: &Rect) -
 /// doesn't go by it so.
 pub(crate) fn span_by(route: &Route, t: f32, len: f32, taxi: &Rect) -> Option<(f32, f32)> {
     let u = [taxi.yaw.sin(), taxi.yaw.cos()];
-    let n = [-taxi.yaw.cos(), taxi.yaw.sin()];
+    let n = right_of(u);
     let reach = taxi.half[0] + len + PASS_ENDS + PASS_EASE + 1.0;
     let end = route.ticks().min(t + PASS_LOOK);
     let mut s = t + 1.0;

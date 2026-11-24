@@ -40,7 +40,8 @@ pub struct Graph {
     /// (m). Cars take turns driving through them (`traffic/`).
     pub boxes: Vec<([f32; 2], f32)>,
     /// Per road, a motorway carriageway's inside (`motorway_insides`): +1, the left of the way its
-    /// points run; -1, the right; 0, not a motorway.
+    /// points run (`cars::right_of`'s other side); -1, the right; 0, not a motorway. (The
+    /// renderer's `insideOf` counts the other way round: its left is the town map's.)
     pub(crate) inside: Vec<i8>,
     /// Per road, a motorway carriageway's decks (`note_decks`): where it stands raised over the
     /// land or on a bridge over the water (m along it, from and to; `RoadPlan.raised`,
@@ -90,8 +91,8 @@ impl Default for Layer {
 /// How far a motorway carriageway's pair may be from its edge (m: `motorway.ts` `MOTORWAY.apart`).
 const PAIR_APART: f32 = 24.0;
 
-/// Each road's inside as a motorway carriageway (`Graph::inside`), as the renderer draws its lanes
-/// (`motorway.ts` `insideOf`): towards its pair, the other carriageway nearest it at its middle
+/// Each road's inside as a motorway carriageway (`Graph::inside`), where the renderer draws its
+/// lanes from (`motorway.ts` `insideOf`, of the opposite sign): towards its pair, the other carriageway nearest it at its middle
 /// running alongside it (within `PAIR_APART` of its edge); with none, the left of the way its cars
 /// go, as they keep to the right. Its lanes run out from there, its shoulder outside them.
 fn motorway_insides(roads: &[Road]) -> Vec<i8> {
@@ -117,8 +118,8 @@ fn motorway_insides(roads: &[Road]) -> Vec<i8> {
             if (u[0] * t[0] + u[1] * t[1]).abs() < 0.9 {
                 continue;
             }
-            // (The left of the way along: (t.z, -t.x).)
-            let side = (q[0] - p[0]) * t[1] - (q[1] - p[1]) * t[0];
+            // (The left of the way along: (-t.z, t.x), against `cars::right_of`.)
+            let side = (q[1] - p[1]) * t[0] - (q[0] - p[0]) * t[1];
             best = Some((d, if side >= 0.0 { 1 } else { -1 }));
         }
         out[i] = best.map_or(if a.oneway == OneWay::Against { -1 } else { 1 }, |b| b.1);
