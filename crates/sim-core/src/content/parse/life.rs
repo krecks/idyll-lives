@@ -77,6 +77,8 @@ pub(crate) struct SchoolRaw {
     #[serde(default)]
     pub(crate) skills: HashMap<String, f32>,
     #[serde(default)]
+    pub(crate) effects: HashMap<String, f32>,
+    #[serde(default)]
     pub(crate) grades: GradesRaw,
 }
 

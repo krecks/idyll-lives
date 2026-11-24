@@ -14,35 +14,32 @@ pub fn hidden(cars: &[Car]) -> Vec<bool> {
     if !out.contains(&true) {
         return out;
     }
-    let body = |c: &Car| {
-        c.shown.map(|s| Rect {
-            at: s.0,
-            yaw: s.1,
-            half: [c.len / 2.0, c.wid / 2.0],
-        })
-    };
+    let body = |c: &Car| c.shown_rect().map(|r| (r, c.layer()));
     // (Out of sight by where their middles are, along x: a car seen need only look at those whose
     // middles are near enough along x to touch it, `reach` apart at most. That's the same test as
     // looking at every one of them, without the pair of every car in town.)
-    let mut out_of_sight: Vec<Rect> = cars
+    let mut out_of_sight: Vec<(Rect, crate::travel::Layer)> = cars
         .iter()
         .filter(|c| c.sight != Sight::Seen)
         .filter_map(body)
         .collect();
-    out_of_sight.sort_by(|a, b| a.at[0].total_cmp(&b.at[0]));
-    let reach = out_of_sight.iter().map(|o| o.half[0]).fold(0.0, f32::max);
+    out_of_sight.sort_by(|a, b| a.0.at[0].total_cmp(&b.0.at[0]));
+    let reach = out_of_sight.iter().map(|o| o.0.half[0]).fold(0.0, f32::max);
     for (k, car) in cars.iter().enumerate() {
         if out[k] {
             continue;
         }
-        let Some(r) = body(car) else {
+        let Some((r, level)) = body(car) else {
             continue;
         };
         let most = reach + r.half[0] + 0.5;
-        out[k] = along_x(&out_of_sight, |o| o.at[0], r.at[0], most)
+        // (Not one on another level: a car on the deck over one out of sight under it.)
+        out[k] = along_x(&out_of_sight, |o| o.0.at[0], r.at[0], most)
             .iter()
-            .any(|o| {
-                crate::travel::dist(o.at, r.at) < o.half[0] + r.half[0] + 0.5 && o.gap(&r) < TOUCH
+            .any(|(o, l)| {
+                l.meets(level)
+                    && crate::travel::dist(o.at, r.at) < o.half[0] + r.half[0] + 0.5
+                    && o.gap(&r) < TOUCH
             });
     }
     out
@@ -93,9 +90,17 @@ pub(crate) fn movers(
         {
             approaching.push(gate);
         }
+        // (Faster than on a country road, further ahead: `LOOK_FAST`.)
+        let fast = moved && plan_speed(route, t) > travel.country_speed + FOLLOW_SLACK;
+        let looks: &[f32] = if fast {
+            &crate::traffic::LOOK_FAST
+        } else {
+            &[]
+        };
         let ahead = if moved {
             crate::traffic::LOOK
                 .iter()
+                .chain(looks)
                 .filter(|&&dt| t + dt < route.ticks())
                 .map(|&dt| {
                     let (q, qy, _) = route.at(t + dt);
@@ -129,6 +134,7 @@ pub(crate) fn movers(
             ahead,
             parked,
             waits: car.waits_for,
+            layer: car.layer_on(t),
         });
     }
 }
@@ -163,6 +169,7 @@ pub(crate) fn room_to_come_in(w: &mut World, c: usize, others: &[Driving]) -> bo
         ahead: AHEAD,
         behind: 0.0,
         first: car_first(c),
+        layer: cars[c].layer_on(1.0),
     };
     let (body, front) = (me.body(), me.front());
     !before
@@ -170,6 +177,7 @@ pub(crate) fn room_to_come_in(w: &mut World, c: usize, others: &[Driving]) -> bo
             .iter()
             .copied()
             .chain(parked(cars))
+            .filter(|o| o.layer.meets(me.layer))
             .all(|o| o.body().gap(&body) >= GAP && o.body().overlap(&front) <= 0.0)
 }
 
@@ -185,6 +193,8 @@ pub(crate) struct Driving {
     pub ahead: f32,
     pub behind: f32,
     pub first: u64,
+    /// Its level (`travel::Layer`): only those on levels that meet are in each other's way.
+    pub layer: crate::travel::Layer,
 }
 
 impl Driving {
@@ -337,7 +347,7 @@ pub(crate) fn against<'a>(d: &'a Driving, them: &'a [Driving]) -> impl Iterator<
         .filter(move |(_, o)| {
             let way = o.heading();
             let cos = heading[0] * way[0] + heading[1] * way[1];
-            if backing || cos < ONCOMING || !o.free(d) {
+            if backing || cos < ONCOMING || !o.free(d) || !o.layer.meets(d.layer) {
                 return false;
             }
             let reach = d.len + d.ahead.max(d.behind) + o.len;
@@ -377,7 +387,9 @@ pub(crate) fn passing(
     }
     let u = [ahead[0] - theirs[0], ahead[1] - theirs[1]];
     let n = u[0].hypot(u[1]).max(1e-6);
-    let (u, left) = ([u[0] / n, u[1] / n], [u[1] / n, -u[0] / n]);
+    let u = [u[0] / n, u[1] / n];
+    let right = right_of(u);
+    let left = [-right[0], -right[1]];
     let d = [b.0[0] - a.0[0], b.0[1] - a.0[1]];
     let (along, apart) = (d[0] * u[0] + d[1] * u[1], d[0] * left[0] + d[1] * left[1]);
     // (How far each reaches across that way, turned as it is; and moves, pulling over to its
@@ -484,7 +496,8 @@ impl Body {
     }
 }
 
-/// Something driving (`d`, where it would be a tick on) a tick further along its way, unless
+/// Something driving (`d`, where it would be a tick on) a tick further along its way (`step` of
+/// one: at a speed of its own, `ease`), unless
 /// someone is in its way: it waits for them (`waited`, ticks). Someone standing there a while (a
 /// chat on the pavement) steps aside for it (`make_way`); someone with nowhere to step goes
 /// round to where they're out of its way, past `PASS_TICKS` (`clear_of`). It never drives
@@ -503,7 +516,7 @@ pub(crate) fn go_on(
     now: Driving,
     others: &[Driving],
     waited: &mut u32,
-    progress: &mut f32,
+    (progress, step): (&mut f32, f32),
     whom: &mut Vec<u32>,
 ) -> bool {
     let turn = d.yaw.sin_cos();
@@ -512,7 +525,9 @@ pub(crate) fn go_on(
     // longest bike, is in its way.)
     let reach = d.len / 2.0 + d.ahead.max(d.behind) + d.wid / 2.0 + BESIDE + 2.0;
     let mut waiting = false;
-    for s in sims.iter_mut() {
+    // (On a motorway's deck, nobody on foot or on a bike is on its level: `travel::Layer`.)
+    let on_ground = d.layer.ground();
+    for s in sims.iter_mut().filter(|_| on_ground) {
         let (dx, dz) = (s.pos[0] - d.at[0], s.pos[1] - d.at[1]);
         if dx * dx + dz * dz >= reach * reach || !s.here() || s.away_until.is_some() {
             continue;
@@ -571,7 +586,7 @@ pub(crate) fn go_on(
         // counts, so they step aside for it in the end, `make_way`.)
         *waited = waited.saturating_sub(2);
         if !blocked {
-            *progress += 1.0;
+            *progress += step;
         }
     }
     blocked
@@ -580,30 +595,43 @@ pub(crate) fn go_on(
 /// Every car driving by, as `walks_into` keeps clear of them (its body and the ground just in front
 /// of it), but car `car`.
 pub(crate) fn vehicles(cars: &[Car], car: Option<usize>) -> Vec<Driving> {
-    let at = |(at, yaw): ([f32; 2], f32), len: f32, wid: f32, first: u64| Driving {
-        at,
-        yaw,
-        len,
-        wid,
-        ahead: AHEAD,
-        behind: 0.0,
-        first,
-    };
     // (For one in sight, those in sight: `sight`; one out of sight keeps out of nobody's way.)
     if car.is_some_and(|c| cars[c].sight != Sight::Seen) {
         return Vec::new();
     }
-    let cars = cars.iter().enumerate().filter_map(|(c, k)| match k.shown {
-        Some((p, yaw, true, _)) if Some(c) != car && (car.is_none() || k.sight == Sight::Seen) => {
-            let mut d = at((p, yaw), k.len, k.wid, car_first(c));
-            if k.backing() {
-                (d.ahead, d.behind) = (0.0, AHEAD);
+    // (Those on its level (`travel::Layer`): on a motorway's deck, nobody under it; for those on
+    // foot or on a bike, those on the ground.)
+    let level = car.map_or(crate::travel::Layer::GROUND, |c| cars[c].layer());
+    cars.iter()
+        .enumerate()
+        .filter_map(|(c, k)| {
+            let Some((at, yaw, true, _)) = k.shown else {
+                return None;
+            };
+            if Some(c) == car || (car.is_some() && k.sight != Sight::Seen) {
+                return None;
             }
-            Some(d)
-        }
-        _ => None,
-    });
-    cars.collect()
+            let layer = k.layer();
+            if !layer.meets(level) {
+                return None;
+            }
+            let (ahead, behind) = if k.backing() {
+                (0.0, AHEAD)
+            } else {
+                (AHEAD, 0.0)
+            };
+            Some(Driving {
+                at,
+                yaw,
+                len: k.len,
+                wid: k.wid,
+                ahead,
+                behind,
+                first: car_first(c),
+                layer,
+            })
+        })
+        .collect()
 }
 
 /// Every car parked where it can be seen (at home, out on a trip): as `vehicles` has those on the
@@ -619,6 +647,7 @@ pub(crate) fn parked(cars: &[Car]) -> impl Iterator<Item = Driving> + '_ {
             ahead: AHEAD,
             behind: 0.0,
             first: car_first(c),
+            layer: crate::travel::Layer::GROUND,
         }),
         _ => None,
     })
@@ -631,6 +660,22 @@ pub fn car_key(c: usize) -> u64 {
 /// Car `c`'s `Driving::first` (its top bit set, as ever).
 pub(crate) fn car_first(c: usize) -> u64 {
     (1 << 63) | c as u64
+}
+
+/// The car whose `car_first` key `k` is (its index in `World::cars`).
+pub(crate) fn car_index(k: u64) -> usize {
+    (k & !(1 << 63)) as usize
+}
+
+impl Car {
+    /// Its body as drawn (`Car::shown`); None: not drawn.
+    pub(crate) fn shown_rect(&self) -> Option<Rect> {
+        self.shown.map(|s| Rect {
+            at: s.0,
+            yaw: s.1,
+            half: [self.len / 2.0, self.wid / 2.0],
+        })
+    }
 }
 
 /// Whether `body` at `p` is out of the way of all of `them` (`vehicles`): somewhere to step aside
@@ -823,6 +868,7 @@ pub(crate) fn in_the_way(
     // they're going, as it waits; those not yet in it wait for it, so it gets its gap.)
     let holds_up = |car: &Car| {
         car.waited > 0
+            && car.layer().ground()
             && car.shown.is_some_and(|(at, yaw, on, _)| {
                 on && in_way_of(at, yaw, car.len, car.wid, body, from)
             })
@@ -835,6 +881,10 @@ pub(crate) fn in_the_way(
         let Some((at, yaw, true, _)) = car.shown else {
             return false;
         };
+        // (On a motorway's deck over them: not on their level, `travel::Layer`.)
+        if !car.layer().ground() {
+            return false;
+        }
         // (One it waits for by name (`Car::on_foot`), out of the ground it waits for them to
         // clear, doesn't come back into it: where it would be a tick on, and the ground it keeps
         // clear in front of it or behind it there (`Car::next_ground`). Inside it, crossing it,
@@ -883,10 +933,11 @@ pub(crate) fn in_the_way(
 /// (`traffic::kerb_stop`) the two waited for each other for good.
 pub(crate) fn holding_up(cars: &[Car], id: u32, body: Body, pos: [f32; 2]) -> bool {
     cars.iter().any(|car| {
-        car.shown.is_some_and(|(at, yaw, on, _)| {
-            on && (car.on_foot.contains(&id)
-                || car.waited > 0 && in_way_of(at, yaw, car.len, car.wid, body, pos))
-        })
+        car.layer().ground()
+            && car.shown.is_some_and(|(at, yaw, on, _)| {
+                on && (car.on_foot.contains(&id)
+                    || car.waited > 0 && in_way_of(at, yaw, car.len, car.wid, body, pos))
+            })
     })
 }
 

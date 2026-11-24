@@ -49,12 +49,15 @@ palette! { SF:
     lens_red = ("#4A1714", gloss, glow("#FF4A2E")),
     lens_amber = ("#4A3812", gloss, glow("#FFB21E")),
     lens_green = ("#103A2C", gloss, glow("#1FE58A")),
+    // the motorway sign's face: its blue and its white (satin: the sheen of a reflective sheet, not lit)
+    sign_blue = ("#1D4F9C", satin),
+    sign_white = ("#F1F1EC", satin),
     // each model's own, last (`own` sets it)
     body = ("#2B302E", metal),
 }
 
 /// Each model's `body`: (id, colour, finish).
-pub const BODIES: [(&str, &str, &str); 11] = [
+pub const BODIES: [(&str, &str, &str); 12] = [
     ("streetLamp", "#2B302E", "metal"),
     ("trafficLight", "#2B302E", "metal"),
     ("parkBench", "#2F3A33", "metal"),
@@ -66,6 +69,7 @@ pub const BODIES: [(&str, &str, &str); 11] = [
     ("phoneBooth", "#B8322B", "gloss"),
     ("fountainTown", "#C9C2B4", "matte"),
     ("townStatue", "#5E7F6E", "metal"),
+    ("motorwaySign", "#9CA2A6", "metal"),
 ];
 
 /// The palette of model `id`: the shared colours and its own `body`.

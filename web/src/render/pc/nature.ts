@@ -1062,8 +1062,10 @@ export class Landscape extends LandscapeLayout<CountryRoads> {
       const parent = c.draws[0].entity.parent as pc.Entity | null;
       return template && parent ? { template, parent } : null;
     };
-    // (Each bake takes two frames; a model whose bake never gets its frame gives up after five seconds, `impostors.ts`.)
-    for (let frames = 0; frames < WARM_FRAMES; frames++) {
+    // (Each bake takes two frames. A model whose bake doesn't get its frame waits for it, `impostors.ts`: the
+    // warm-up waits `WARM_IMPOSTORS_MS` at most, and what is still baking then is baked in play.)
+    const until = performance.now() + WARM_IMPOSTORS_MS;
+    for (let frames = 0; frames < WARM_FRAMES && performance.now() < until; frames++) {
       let baking = false;
       for (const c of this.woodsCells) {
         const w = wanted(c);
@@ -1678,6 +1680,8 @@ function uploadLawn(layer: LawnLayer<Instances>): void {
  */
 /** Frames the warm-up draws at most for the impostors' bakes (`Landscape.warmImpostors`: two a model). */
 const WARM_FRAMES = 60;
+/** How long the warm-up waits for the impostors' bakes at most (ms; `Landscape.warmImpostors`). */
+const WARM_IMPOSTORS_MS = 20_000;
 
 /** A woods square's trees of one model (`Landscape.frameImpostors`): their draws, their middle (game space) and reach, their impostors' cards once made. */
 interface WoodsCell {

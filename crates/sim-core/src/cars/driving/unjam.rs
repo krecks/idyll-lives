@@ -28,12 +28,12 @@ pub(crate) fn unjam(w: &mut World) {
     // car parked there. Waiting its turn behind those coming the other way, it gets it.)
     let standing = |k: u64| {
         w.cars
-            .get((k & !(1 << 63)) as usize)
+            .get(car_index(k))
             .is_some_and(|x| x.taxi && x.standing)
     };
     let still = |k: u64| {
         w.cars
-            .get((k & !(1 << 63)) as usize)
+            .get(car_index(k))
             .is_some_and(|x| x.standing || tick >= x.stall.1 + PASS_WAIT)
     };
     // (Each car's ask looked up by key, not searched for: `waits_on_at`.)
@@ -329,17 +329,13 @@ pub(crate) fn turn_round_by(w: &mut World, c: usize, d: Detour) -> bool {
     let shift = car.shift;
     let half = [car.len / 2.0, car.wid / 2.0];
     let me = car_first(c);
+    // (Those on its level only: `travel::Layer`.)
+    let level = car.layer();
     let others: Vec<Rect> = cars
         .iter()
         .enumerate()
         .filter(|&(o, k)| o != c && k.sight == Sight::Seen)
-        .filter_map(|(_, k)| {
-            k.shown.map(|s| Rect {
-                at: s.0,
-                yaw: s.1,
-                half: [k.len / 2.0, k.wid / 2.0],
-            })
-        })
+        .filter_map(|(_, k)| k.shown_rect().filter(|_| k.layer().meets(level)))
         .chain(
             traffic
                 .turning
@@ -460,7 +456,8 @@ pub(crate) fn turned_round(w: &mut World, c: usize, d: Detour) {
 
 /// How far car `c` can back up along the way it came (m) clear of every other car (`GAP`), and
 /// where it would turn round (`Detour`): out of the last junction's box it came through, along the
-/// stretch before it, within that room. Err: why it can't.
+/// stretch before it, within that room, and out of what's left of any claim another holds
+/// (`Traffic::claimed`). Err: why it can't.
 pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static str> {
     let car = &w.cars[c];
     // (A work taxi with its stops still ahead backs up out of the way only, and goes on its way.)
@@ -481,6 +478,11 @@ pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static 
         return Err("no way");
     };
     let t = car.progress;
+    // (Never on a motorway's carriageway or a ramp: there it waits, as a driver would; held up
+    // for good out of the picture, it's put on, `unstick`.)
+    if route.on_motorway(t, t) {
+        return Err("on a motorway");
+    }
     let half = [car.len / 2.0, car.wid / 2.0];
     let body = |s: f32| {
         let (p, yaw, _) = route.at(s);
@@ -490,18 +492,13 @@ pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static 
             half,
         }
     };
+    let level = car.layer();
     let others: Vec<Rect> = w
         .cars
         .iter()
         .enumerate()
         .filter(|&(o, k)| o != c && k.sight == Sight::Seen)
-        .filter_map(|(_, k)| {
-            k.shown.map(|s| Rect {
-                at: s.0,
-                yaw: s.1,
-                half: [k.len / 2.0, k.wid / 2.0],
-            })
-        })
+        .filter_map(|(_, k)| k.shown_rect().filter(|_| k.layer().meets(level)))
         .collect();
     let clear = |r: &Rect| {
         others.iter().all(|b| {
@@ -540,6 +537,12 @@ pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static 
             },
         ))
     };
+    // (Whether, stopped backing up `s` ticks along, it would stand in what's left of a claim
+    // another holds, there to wait for its own claim on: that one, kept from going on past it,
+    // would never let it go, and they'd wait for each other for good (a 6 m lane's turn round
+    // stopped nose to nose with a taxi on its way out of a three-point turn, Fernwood).)
+    let key = car_first(c);
+    let claimed = |s: f32| w.traffic.claimed(key, &body(s), level).is_some();
     // Back along the way it came, while that's clear: out of the last junction's box it came
     // through and on a little (`TURN_PAST`), where it turns into another way; or, short of one, the
     // furthest place back where the road is wide enough for one to pass it pulled over
@@ -552,6 +555,11 @@ pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static 
     loop {
         let next = (s - 1.0).max(first);
         if next >= s {
+            break;
+        }
+        // (Nor back up onto a ramp or a motorway's carriageway.)
+        if route.on_motorway(next, s) {
+            why = if seen_box { "no room" } else { "on a motorway" };
             break;
         }
         let r = body(next);
@@ -570,14 +578,15 @@ pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static 
             seen_box = true;
         }
         boxed = inside;
-        if !inside && room > car.len + TURN_PAST && route.room_at(s) >= PASS_ROOM {
+        if !inside && room > car.len + TURN_PAST && route.room_at(s) >= PASS_ROOM && !claimed(s) {
             wide = Some((s, room));
         }
-        // (Out of the box it came through, and on a little: there it turns.)
+        // (Out of the box it came through, and on a little: there it turns. Not where it would
+        // stand in what's left of another's claim: on back till it's out of it.)
         if seen_box && !inside {
             let mut back = s;
             let mut more = 0.0;
-            while more < TURN_PAST {
+            while more < TURN_PAST || (claimed(back) && room + more <= TURN_ROOM) {
                 let n = (back - 1.0).max(first);
                 if n >= back || !clear(&body(n)) {
                     break;
@@ -585,7 +594,11 @@ pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static 
                 more += crate::travel::dist(body(back).at, body(n).at);
                 back = n;
             }
-            return turn(back, room + more);
+            if !claimed(back) {
+                return turn(back, room + more);
+            }
+            why = "no room";
+            break;
         }
     }
     // Short of a junction, a driveway's mouth it came by within that clear room (not a taxi on
@@ -611,7 +624,8 @@ pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static 
 }
 
 /// The nearest driveway's mouth behind car `c` (`t` ticks along `route`, clear back to `lo`) it can
-/// turn round in (`MouthTurn`): one its way came by, empty (`clear`, every pose backing into it
+/// turn round in (`MouthTurn`): one its way came by, on a two-way road (out of it it goes back the
+/// way it came), empty (`clear`, every pose backing into it
 /// and pulling out of it the other way), and where along its way it backs up to before backing
 /// into it.
 pub(crate) fn mouth_behind(
@@ -629,7 +643,11 @@ pub(crate) fn mouth_behind(
     let mut best: Option<(f32, f32, MouthTurn)> = None;
     for d in &w.drives {
         let Some(way) = d.way() else { continue };
-        let Some(p) = d.meets().and_then(|(r, s)| g.at_source(r, s)) else {
+        let Some(p) = d.meets().and_then(|(r, s)| g.at_source(r, s)).filter(|p| {
+            let road = &g.roads[p.road as usize];
+            // (Out of it the other way: not on a one-way road.)
+            road.enterable() && road.oneway.is_both()
+        }) else {
             continue;
         };
         let road = &g.roads[p.road as usize];
@@ -649,6 +667,14 @@ pub(crate) fn mouth_behind(
             continue;
         }
         let (_, yaw, _) = at(sm);
+        // (On its own side of the road only, its right (`right_of`): backing across the other
+        // lane into one on its left, it stood across the way of a car coming up that lane, that car
+        // waiting for it to go and it for that car, both for good, the town held up behind them,
+        // Hayfield Lane.)
+        let right = crate::cars::right_of([yaw.sin(), yaw.cos()]);
+        if -way[0] * right[0] - way[1] * right[1] <= 0.0 {
+            continue;
+        }
         let tan = road.tangent(p.s);
         let go = if tan[0] * yaw.sin() + tan[1] * yaw.cos() >= 0.0 {
             1.0
@@ -698,8 +724,13 @@ pub(crate) fn mouth_behind(
 }
 
 /// Why none of a ring of cars could turn round (`unjam`), the most telling last: the one counted.
-pub(crate) const UNJAM_WHY: [&str; 4] =
-    ["turning round", "no room", "no junction behind", "no way"];
+pub(crate) const UNJAM_WHY: [&str; 5] = [
+    "turning round",
+    "no room",
+    "no junction behind",
+    "on a motorway",
+    "no way",
+];
 
 /// Longest a car turned round with no other way waits out of the way for those it was held up
 /// with to go on (ticks of drive time, `unjam`).

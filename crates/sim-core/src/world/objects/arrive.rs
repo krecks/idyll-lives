@@ -53,7 +53,7 @@ pub(crate) fn arrive(
             end_activity(sim, content, objects);
             return;
         }
-        let cost = inter.cost;
+        let cost = ctx.cost_of(object, inter);
         let funds = ctx.households[sim.household as usize].funds - sim.pending_spend;
         if !affordable(cost, funds) {
             end_activity(sim, content, objects);

@@ -63,7 +63,16 @@ export interface SnapshotLayout {
    * (bit `d` for door `d`, `shared/cars.ts` `DOORS`); what it is (`kind`, one of `kinds`: a household's car, its look in the
    * structure's `cars`, or a work taxi, the renderer's own look; missing in older layouts: all households').
    */
-  car?: { shown: number; x: number; z: number; yaw: number; doors?: number; kind?: number; kinds?: { household: number; taxi: number } };
+  car?: { shown: number; x: number; z: number; yaw: number; doors?: number; kind?: number; kinds?: { household: number; taxi: number }; trail?: number; trailLen?: number };
+  /**
+   * The cars' ways (sim-core `snapshot::car::TRAIL`): car row's `trailLen` points from its `trail`th, `trailStride` floats
+   * each from `trailBase`, oldest first, laid out as `trail`: when (`t`, in steps before the snapshot, below 0), where
+   * its middle was and which way it faced, as few of its poses tick by tick over the last steps as draw it along them
+   * (`render/shared/carWay.ts`). Missing in older layouts: the straight line from the snapshot before.
+   */
+  trailBase?: number;
+  trailStride?: number;
+  trail?: { t: number; x: number; z: number; yaw: number };
   /** Where the signal heads' rows start, floats per head, and how many there's room for (missing in older layouts). */
   lightBase?: number;
   lightStride?: number;

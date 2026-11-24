@@ -6,7 +6,7 @@
   import { services } from './services';
   import { game } from './state.svelte';
   import { townMap } from './townMap.svelte';
-  import { layoutLabels, mapScale, screenToMap, type MapLabel } from './mapView';
+  import { GROUND, layoutLabels, mapScale, screenToMap, UPRIGHT, viewBox, type MapLabel } from './mapView';
   import { flatsIn, lotTitle, plotInfo, wayText } from './place';
   import { lotOf } from '../core/protocol';
   import { settings } from '../settings/settings.svelte';
@@ -17,7 +17,8 @@
    * wheel or + and −, 1 to 12 times), its labels the same size on screen at any zoom; a big world's
    * land, country roads, trails (dashed), hamlets and outdoor places are on it too, and residents as
    * dots. "Look here" (or a double-click) takes the camera to the lot or place picked. The lots take
-   * the keyboard too: Tab to one, Enter picks it, Enter again looks there.
+   * the keyboard too: Tab to one, Enter picks it, Enter again looks there. North is up, as the 3D view
+   * has it from above (`mapView.ts`).
    */
   const plots = $derived(game.plots);
   const meta = $derived(townMap.world?.meta ?? null);
@@ -55,7 +56,14 @@
     const hh = game.households.find((h) => h.plot === id);
     return hh ? `The ${hh.name}s` : 'For sale';
   };
-  const homeCount = (plotId: number) => game.sims.filter((s) => s.plot === plotId).length;
+  /** How many residents are on each lot (one pass over them, not one a label). */
+  const here = $derived.by(() => {
+    const n = new Map<number, number>();
+    for (const s of game.sims) if (s.plot !== null) n.set(s.plot, (n.get(s.plot) ?? 0) + 1);
+    return n;
+  });
+  /** Each lot's name on the map (`lotTitle`), worked out once for its label, its button and its tag. */
+  const titles = $derived(new Map(plots.map((p) => [p.id, lotTitle(p, game.households, 'Empty')])));
 
   // ---- the view: zoom 1..12 round its middle (m); the map's width on screen (px) ----
   let zoom = $state(1);
@@ -73,8 +81,10 @@
   const cz = $derived(clampTo(mid?.[1] ?? depth / 2, viewD, fullD));
   const x0 = $derived(cx - viewW / 2);
   const z0 = $derived(cz - viewD / 2);
+  /** The ground in view (m): the map's viewBox, north up (`mapView.ts`). */
+  const view = $derived({ x: x0, z: z0, w: viewW, d: viewD });
   /** Screen pixels a metre: a size in pixels divided by this stays that size whatever the zoom. */
-  const ppm = $derived(mapScale(screenW, screenH, { x: x0, z: z0, w: viewW, d: viewD }));
+  const ppm = $derived(mapScale(screenW, screenH, view));
   const px = (n: number) => n / ppm;
   // ---- layers, worked out once per town ----
   const ZONE_ORDER = ['meadow', 'fields', 'hill', 'woods', 'orchard', 'water'];
@@ -97,13 +107,19 @@
       const roomy = p.w * ppm > 46;
       if (!roomy && !spots.has(p.id)) continue;
       const wins = p.id === homeLot ? 0 : p.id === pickedLot ? 1 : null;
-      list.push({ key: p.id, x: p.x + p.w / 2, z: p.z + p.d / 2, text: lotTitle(p, game.households, 'Empty'), size: 11, sub: roomy ? 9 : undefined, rank: spots.has(p.id) ? 1 : 2, wins });
+      list.push({ key: p.id, x: p.x + p.w / 2, z: p.z + p.d / 2, text: titles.get(p.id) ?? 'Empty', size: 11, sub: roomy ? 9 : undefined, rank: spots.has(p.id) ? 1 : 2, wins });
     }
     areas.forEach((a, i) => list.push({ key: `a${i}`, x: a.x + a.w / 2, z: a.z + a.d / 2, text: a.name, size: 14, rank: 0 }));
     // (Clear of the zoom buttons in the corner: two of 30 px, and "Whole town" zoomed in.)
     const zoomBox = { l: screenW - (zoom > 1 ? 160 : 74), t: screenH - 40, r: screenW, b: screenH };
-    return layoutLabels(list, screenW, screenH, { x: x0, z: z0, w: viewW, d: viewD }, [zoomBox]);
+    return layoutLabels(list, screenW, screenH, view, [zoomBox]);
   });
+
+  /** The lots with a name laid out on screen, and where (drawn after the residents, `labels`). */
+  const named = $derived(plots.flatMap((p) => {
+    const at = labels.get(p.id);
+    return at ? [{ p, at }] : [];
+  }));
 
   // ---- live: residents twice a second while open; the camera every frame (it flies) ----
   let dots = $state.raw<{ x: number; z: number; mine: boolean }[]>([]);
@@ -132,8 +148,8 @@
   let drag = $state.raw<{ x: number; y: number; cx: number; cz: number; moved: boolean } | null>(null);
   /** Whether the last pointer press was a drag (then it isn't a click). */
   let dragged = false;
-  /** Where on the map the pointer is (m): the map fits its box, with bands to spare when the box isn't its shape. */
-  const at = (e: MouseEvent): [number, number] => screenToMap(e.clientX, e.clientY, svg!.getBoundingClientRect(), { x: x0, z: z0, w: viewW, d: viewD });
+  /** Where on the map the pointer is (m): the map fits its box, with bands to spare when the box isn't its shape, north up. */
+  const at = (e: MouseEvent): [number, number] => screenToMap(e.clientX, e.clientY, svg!.getBoundingClientRect(), view);
   /** Zooms by `factor` round `[mx, mz]` (m), which stays where it is on screen. */
   function zoomBy(factor: number, mx = cx, mz = cz) {
     const next = Math.max(1, Math.min(12, zoom * factor));
@@ -159,8 +175,9 @@
       drag = { ...drag, moved: true };
     }
     const r = svg?.getBoundingClientRect();
-    const scale = 1 / mapScale(r?.width || screenW, r?.height || screenH, { x: x0, z: z0, w: viewW, d: viewD });
-    mid = [drag.cx - dx * scale, drag.cz - dy * scale];
+    const scale = 1 / mapScale(r?.width || screenW, r?.height || screenH, view);
+    // (The ground goes with the pointer: down the page is south, so the middle goes north.)
+    mid = [drag.cx - dx * scale, drag.cz + dy * scale];
   }
   function onpointerup() {
     dragged = !!drag?.moved;
@@ -250,7 +267,7 @@
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <svg
         bind:this={svg}
-        viewBox="{x0} {z0} {viewW} {viewD}"
+        viewBox={viewBox(view)}
         class="map"
         class:dragging={drag?.moved}
         {onwheel}
@@ -259,82 +276,85 @@
         {onpointerup}
         onpointercancel={onpointerup}
       >
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <rect
-          x={-MARGIN}
-          y={-MARGIN}
-          width={fullW}
-          height={fullD}
-          fill="#B9D7A2"
-          onclick={pickPoint}
-          ondblclick={(e) => {
-            pickPoint(e);
-            lookHere();
-          }}
-        />
-        <g class="land">
-          {#each zones as z, i (i)}
-            <path class="zone {z.kind}" d={z.d} fill-rule="evenodd" />
-          {/each}
-          {#each greens as g, i (i)}
-            <polygon class="green" points={g} />
-          {/each}
-          {#each roads as r, i (i)}
-            {#if r.kind === 'trail'}
-              <polyline class="trail" points={r.points} stroke-width={Math.max(r.width * 0.6, px(1.6))} stroke-dasharray="{px(5)} {px(3)}" />
-            {:else}
-              <polyline class="road {r.kind}" points={r.points} stroke-width={r.width} />
-            {/if}
-          {/each}
-        </g>
-        {#each plots as p (p.id)}
-          {@const name = lotTitle(p, game.households, 'Empty')}
-          {@const at = labels.get(p.id)}
-          <g
-            class="plot"
-            class:mine={p.id === homeLot}
-            class:picked={p.id === pickedLot}
-            class:viewing={p.id === game.viewPlot}
-            class:spot={spots.has(p.id)}
-            role="button"
-            tabindex="0"
-            aria-label="{name}{p.public || name === 'Empty' ? '' : `, ${p.name}`}"
-            aria-pressed={p.id === pickedLot}
-            onclick={() => pickPlot(p.id)}
-            ondblclick={() => {
-              pickPlot(p.id);
+        <!-- The ground in game coordinates, north up (`GROUND`); the names set upright in it (`UPRIGHT`). -->
+        <g transform={GROUND}>
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <rect
+            x={-MARGIN}
+            y={-MARGIN}
+            width={fullW}
+            height={fullD}
+            fill="#B9D7A2"
+            onclick={pickPoint}
+            ondblclick={(e) => {
+              pickPoint(e);
               lookHere();
             }}
-            onkeydown={(e) => lotKey(e, p.id)}
-          >
-            <rect class="lot" x={p.x + 0.5} y={p.z + 0.5} width={p.w - 1} height={p.d - 1} rx="1" />
-            {#if p.house}
-              <rect class="house" x={p.house[0]} y={p.house[1]} width={p.house[2] - p.house[0]} height={p.house[3] - p.house[1]} rx="0.5" />
-            {/if}
-            <!-- Its name where there's room for it (`labels`). -->
-            {#if at}
-              <text x={at.x} y={at.y} font-size={px(11)} text-anchor="middle">{name}</text>
-              {#if homeCount(p.id) && p.w * ppm > 46}
-                <text class="count" x={at.x} y={at.subY} font-size={px(9)} text-anchor="middle">{homeCount(p.id)} here</text>
+          />
+          <g class="land">
+            {#each zones as z, i (i)}
+              <path class="zone {z.kind}" d={z.d} fill-rule="evenodd" />
+            {/each}
+            {#each greens as g, i (i)}
+              <polygon class="green" points={g} />
+            {/each}
+            {#each roads as r, i (i)}
+              {#if r.kind === 'trail'}
+                <polyline class="trail" points={r.points} stroke-width={Math.max(r.width * 0.6, px(1.6))} stroke-dasharray="{px(5)} {px(3)}" />
+              {:else}
+                <polyline class="road {r.kind}" points={r.points} stroke-width={r.width} />
               {/if}
-            {/if}
+            {/each}
           </g>
-        {/each}
-        {#each dots as d, i (i)}
-          <circle class="dot" class:mine={d.mine} cx={d.x} cy={d.z} r={px(d.mine ? 4 : 3)} />
-        {/each}
-        {#each areas as a, i (i)}
-          {@const at = labels.get(`a${i}`)}
-          {#if at}
-            <text class="area" x={at.x} y={at.y} font-size={px(14)} stroke-width={px(3)} text-anchor="middle">{a.name}</text>
+          {#each plots as p (p.id)}
+            {@const name = titles.get(p.id) ?? 'Empty'}
+            <g
+              class="plot"
+              class:mine={p.id === homeLot}
+              class:picked={p.id === pickedLot}
+              class:viewing={p.id === game.viewPlot}
+              class:spot={spots.has(p.id)}
+              role="button"
+              tabindex="0"
+              aria-label="{name}{p.public || name === 'Empty' ? '' : `, ${p.name}`}"
+              aria-pressed={p.id === pickedLot}
+              onclick={() => pickPlot(p.id)}
+              ondblclick={() => {
+                pickPlot(p.id);
+                lookHere();
+              }}
+              onkeydown={(e) => lotKey(e, p.id)}
+            >
+              <rect class="lot" x={p.x + 0.5} y={p.z + 0.5} width={p.w - 1} height={p.d - 1} rx="1" />
+              {#if p.house}
+                <rect class="house" x={p.house[0]} y={p.house[1]} width={p.house[2] - p.house[0]} height={p.house[3] - p.house[1]} rx="0.5" />
+              {/if}
+            </g>
+          {/each}
+          {#each dots as d, i (i)}
+            <circle class="dot" class:mine={d.mine} cx={d.x} cy={d.z} r={px(d.mine ? 4 : 3)} />
+          {/each}
+          <!-- The lots' names where there's room for them (`labels`), over the lots and the residents with a halo: under
+               the dots and the next lots they lost letters ("Elmfield Orcha d"). -->
+          {#each named as { p, at } (p.id)}
+            <text class="name" transform={UPRIGHT} x={at.x} y={at.y} font-size={px(11)} stroke-width={px(2.5)} text-anchor="middle">{titles.get(p.id)}</text>
+            {#if here.get(p.id) && p.w * ppm > 46}
+              <text class="name count" transform={UPRIGHT} x={at.x} y={at.subY} font-size={px(9)} stroke-width={px(2.5)} text-anchor="middle">{here.get(p.id)} here</text>
+            {/if}
+          {/each}
+          {#each areas as a, i (i)}
+            {@const at = labels.get(`a${i}`)}
+            {#if at}
+              <text class="area" transform={UPRIGHT} x={at.x} y={at.y} font-size={px(14)} stroke-width={px(3)} text-anchor="middle">{a.name}</text>
+            {/if}
+          {/each}
+          {#if camera}
+            <circle class="camera" cx={camera[0]} cy={camera[1]} r={px(7)} stroke-width={px(2)} />
           {/if}
-        {/each}
-        {#if camera}
-          <circle class="camera" cx={camera[0]} cy={camera[1]} r={px(7)} stroke-width={px(2)} />
-        {/if}
-        {#if target}
-          <circle class="target" cx={target[0]} cy={target[1]} r={px(5)} stroke-width={px(2)} />
-        {/if}
+          {#if target}
+            <circle class="target" cx={target[0]} cy={target[1]} r={px(5)} stroke-width={px(2)} />
+          {/if}
+        </g>
       </svg>
       <div class="zoom" role="group" aria-label="Zoom">
         {#if zoom > 1}
@@ -357,7 +377,8 @@
       <section class="details">
         <div class="title">
           <b>{household ? `The ${household.name}s` : plot.name}</b>
-          <span class="muted">{plot.name}</span>
+          <!-- (The lot's name under a household's; a place's own name once, not twice.) -->
+          {#if household}<span class="muted">{plot.name}</span>{/if}
         </div>
         {#if sale}
           <p class="sale muted">{saleText(sale)}</p>
@@ -613,6 +634,10 @@
   }
   .count {
     font-weight: 500;
+  }
+  .name {
+    stroke: rgba(255, 255, 255, 0.75);
+    paint-order: stroke;
   }
   .details {
     display: flex;

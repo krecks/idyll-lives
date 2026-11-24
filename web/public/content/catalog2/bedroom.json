@@ -293,6 +293,7 @@
       "interactions": [
         {
           "id": "snack",
+          "publicCost": 4,
           "label": "Grab a snack from the drawer",
           "anim": "fetch",
           "sound": "drawer",

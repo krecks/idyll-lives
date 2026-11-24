@@ -261,13 +261,18 @@ pub(super) fn apply_transition(w: &mut World, i: usize, transition: Transition) 
         // At the way out of town (or, with no way out, where they are).
         Transition::Work => start_shift(w, i, still_to_go(w, 0)),
         Transition::Visit { plot, directed } => {
-            // On their way again to the place they're visiting, there already (a walk across it
-            // set off again after a pause, `world::decide`): the visit goes on as it was, not
-            // begun again (nor told again).
-            if w.sims[i]
-                .visiting
-                .is_some_and(|v| v.plot == plot && v.arrived > 0)
-            {
+            // On their way again to the place they're visiting: there already (a walk across it
+            // set off again after a pause, `world::decide`), or not yet (on from the bike they
+            // walked over to at home, `ride.rs`): the visit goes on as it was, not begun again
+            // (nor told again), its goodbye queued for a need about to run out still withdrawn
+            // once that's seen to there (`Visit::leaving`; begun again, it stayed queued, and a
+            // guest let in went home 20 minutes in with the need long seen to). Sent there by the
+            // player on the way, it's as long as a visit they ask for (`directedHours`).
+            let directed_until = tick + ticks(w.content.visits.directed_hours * 60.0);
+            if let Some(v) = w.sims[i].visiting.as_mut().filter(|v| v.plot == plot) {
+                if directed && v.arrived == 0 {
+                    v.until = v.until.max(directed_until);
+                }
                 return;
             }
             begin_visit(w, i, plot, directed);

@@ -13,7 +13,7 @@ import { DEFAULT_LANDSCAPE, groundDepth, type LandFile, type LandscapeParams, ty
 import { COVER, COVER_CELL, decodeLand, heightAt as landHeight, LAND_CELL, NONE, SEA_CM, type Land, type LandRect } from '../../game/land';
 import { carriedWetEdgeAt, coverAt, EDGE_POND, seaRims, edgeWater, edgeWaterAt, EXIT_MOST, landExits, landTop, landWater, ROUND_CELL, roundedWater, seaWays, VALLEY_BANK, VALLEY_IN, valleyCap, waterGridAt, waterMetres, wetDistance, wetEdgeAt, type LandExit, type WaterGrid } from './landBake';
 import { CountryRoads, ROAD_VERGE, type RoadLand } from './countryRoads';
-import { onPad, SKIRT_MOST, type BuiltSurface, type SurfaceChange } from './builtSurface';
+import { SKIRT_MOST, type BuiltSurface, type SurfaceChange } from './builtSurface';
 import { junctionKey, shareSurface, surfaceOf } from './landSurface';
 import { roadIndex, roadTiles, townExits, townRoads, type TownExit } from './roads';
 import { compose, quatAxisAngle } from './math';
@@ -66,8 +66,6 @@ const LAND_EDGE_FADE = 60;
  */
 const END_BANK = 0.25;
 const END_REACH = 20;
-/** Lots are filed for `padAt` by cells this wide (m). */
-const PAD_CELL = 16;
 
 /**
  * `values` (a `cols` × `rows` grid of `LAND_CELL` m samples) at (`x`, `z`) on the triangles the terrain draws them
@@ -601,7 +599,18 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
   /** The country roads of `world` laid on this landscape. */
   private layRoads(world: WorldStructure): R {
     return this.makeRoads(
-      { seed: this.seed, w: this.w, d: this.d, ring: this.ring, ground: (x, z) => this.ground(x, z), waterEdge: (x, z) => this.waterEdge(x, z), distanceToTown: (x, z) => this.distanceToTown(x, z), follows: !!this.surface },
+      {
+        seed: this.seed,
+        w: this.w,
+        d: this.d,
+        ring: this.ring,
+        ground: (x, z) => this.ground(x, z),
+        waterEdge: (x, z) => this.waterEdge(x, z),
+        distanceToTown: (x, z) => this.distanceToTown(x, z),
+        follows: !!this.surface,
+        water: WATER_Y,
+        ...(this.surface ? { surface: (x: number, z: number) => this.surface?.at(x, z) ?? 0 } : {}),
+      },
       world,
       world.meta?.name ?? '',
     );
@@ -1216,36 +1225,8 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
    */
   get padAt(): ((x: number, z: number) => number | null) | undefined {
     const surface = this.surface;
-    if (!surface) return undefined;
-    if (this.padsFor !== surface) {
-      this.padsFor = surface;
-      const grid = new Map<number, number[]>();
-      for (let i = 0; i < surface.plots.length; i++) {
-        const p = surface.plots[i];
-        for (let cz = Math.floor(p.z / PAD_CELL); cz <= Math.floor((p.z + p.d) / PAD_CELL); cz++) {
-          for (let cx = Math.floor(p.x / PAD_CELL); cx <= Math.floor((p.x + p.w) / PAD_CELL); cx++) {
-            const key = cx * 65536 + cz;
-            const list = grid.get(key);
-            if (list) list.push(i);
-            else grid.set(key, [i]);
-          }
-        }
-      }
-      this.padLookup = (x, z) => {
-        let best: number | null = null;
-        for (const i of grid.get(Math.floor(x / PAD_CELL) * 65536 + Math.floor(z / PAD_CELL)) ?? []) {
-          const p = surface.plots[i];
-          if (!onPad(p, x, z)) continue;
-          const y = surface.padY(i);
-          if (best === null || y > best) best = y;
-        }
-        return best;
-      };
-    }
-    return this.padLookup!;
+    return surface ? (x, z) => surface.padAt(x, z) : undefined;
   }
-  private padsFor: BuiltSurface | null = null;
-  private padLookup: ((x: number, z: number) => number | null) | null = null;
 
   /** `heightAt` while a stroke goes on: the field where it changed, the surface elsewhere. */
   private staleAt(x: number, z: number): number {
@@ -1256,9 +1237,9 @@ export class LandscapeLayout<R extends CountryRoads = CountryRoads> {
 
   /** On a land its town follows, what stands at (`x`, `z`): a lot's pad (the highest where two touch), a road's height, else the land as the terrain draws it (`fieldAt`). */
   private builtAt(x: number, z: number): number {
-    const pad = this.padAt!(x, z);
-    if (pad !== null) return pad;
     const s = this.surface!;
+    const pad = s.padAt(x, z);
+    if (pad !== null) return pad;
     const on = s.roadAt(x, z);
     return on ? s.roadY(on.road, on.s) : this.fieldAt(x, z);
   }

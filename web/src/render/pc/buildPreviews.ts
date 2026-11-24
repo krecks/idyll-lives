@@ -668,8 +668,9 @@ export class BuildPreviews {
 
   /**
    * The tile grid (a canvas texture of 128 px: white lines on transparent, the tile's edge
-   * 3 px wide at full strength, the half-tile line 2 px at 0.55, the quarters 2 px at 0.3), repeated
-   * once per tile with mipmaps, 4× anisotropic; drawn at 0.45 in a pale blue-white.
+   * 2 px wide at full strength, the half-tile line 2 px at 0.55, the quarters 2 px at 0.3), repeated
+   * once per tile with mipmaps, 4× anisotropic; drawn at 0.22 in a pale blue-white:
+   * faint enough that the rooms being built, not the grid, hold the eye.
    */
   private makeGrid(): GridDraw {
     const size = 128;
@@ -686,8 +687,8 @@ export class BuildPreviews {
     ctx.fillRect(0, 64, size, 2);
     ctx.fillRect(64, 0, 2, size);
     ctx.fillStyle = 'rgba(255,255,255,1)';
-    ctx.fillRect(0, 0, size, 3);
-    ctx.fillRect(0, 0, 3, size);
+    ctx.fillRect(0, 0, size, 2);
+    ctx.fillRect(0, 0, 2, size);
     const pixels = ctx.getImageData(0, 0, size, size).data;
     const texture = new pc.Texture(this.device, {
       name: 'buildGrid',
@@ -716,7 +717,7 @@ export class BuildPreviews {
     material.emissiveMap = texture;
     material.opacityMap = texture;
     material.opacityMapChannel = 'a';
-    material.opacity = 0.45;
+    material.opacity = 0.22;
     material.blendType = pc.BLEND_NORMAL;
     material.depthWrite = false;
     // A polygon offset factor of -4: drawn over the floors and the lawn it lies on.

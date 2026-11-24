@@ -103,6 +103,17 @@ export class Levels {
   at(x: number, z: number): number {
     return this.surface.at(x, z);
   }
+
+  /** The ground (m) at (`x`, `z`) with every deck taken away (`BuiltSurface.groundUnder`): what a pier or an abutment stands on. */
+  groundUnder(x: number, z: number): number {
+    return this.surface.groundUnder(x, z);
+  }
+
+  /** Whether `road` is on a deck (over water, or an overpass) `s` m along it (`BuiltSurface.onDeck`); a road not among the world's: no. */
+  onDeck(road: RoadPlan, s: number): boolean {
+    const i = this.index.get(road);
+    return i !== undefined && this.surface.onDeck(i, s);
+  }
 }
 
 /** The levels of `world`'s surface over its roads (null: none, the world stands at 0). */

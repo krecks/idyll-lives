@@ -102,7 +102,8 @@
   const flats = $derived(figure((d) => d.slots.filter((s) => s.kind === 'flats').length));
   const places = $derived(figure((d) => d.slots.filter((s) => s.kind !== 'house' && s.kind !== 'flats').length));
   const carParks = $derived(figure((d) => d.open?.carParks?.length ?? 0));
-  const roadCount = $derived(figure((d) => d.roads.length));
+  // (Roads as step 2 counts them: the trails out to the countryside's spots aren't roads.)
+  const roadCount = $derived(figure((d) => d.roads.filter((r) => r.kind !== 'trail').length));
   const villages = $derived(figure((d) => Math.max(0, (d.open?.areas.length ?? 1) - 1)));
   /** The town in a line: homes, its size, land, how many residents it holds. */
   const summary = $derived(plan ? worldLine({ homes, villages, width: plan.width, depth: plan.depth, town: code.town, cap: NEIGHBOUR_CAP }) : '');
@@ -332,7 +333,8 @@
     <span><b>{homes}</b> homes</span>
     {#if flats}<span><b>{flats}</b> {flats === 1 ? 'building' : 'buildings'} of flats</span>{/if}
     {#if farms}<span><b>{farms}</b> {farms === 1 ? 'farm' : 'farms'}</span>{/if}
-    <span><b>{places}</b> public {places === 1 ? 'place' : 'places'}</span>
+    <!-- (Shops, the civic places, parks and the countryside's spots: step 2's "public" is the civic ones alone.) -->
+    <span><b>{places}</b> {places === 1 ? 'place' : 'places'} to go</span>
     {#if carParks}<span><b>{carParks}</b> {carParks === 1 ? 'car park' : 'car parks'}</span>{/if}
     {#if villages}<span><b>{villages}</b> {villages === 1 ? 'village' : 'villages'}</span>{/if}
   {/if}

@@ -22,7 +22,7 @@
  * - `res=1080` that resolution (720, 1080, 1440, 2160; `res=1` every line the window has); `res=auto` (default) the player's setting.
  * - `secs=20` measured after `warmup=5`; `cap=0` frames per second at most (0: every frame shown).
  * - `hud=0` hides the interface; `gpu=0` doesn't time the GPU; `label=…` is kept with the result.
- * - `diag=noshadows,noaa,nonature,nolamps,nomirrors,noglass,nonight,noao,noclouds,nolayers,noflow,freeze`: features
+ * - `diag=noshadows,noaa,nonature,nolamps,nomirrors,noglass,nonight,noao,nobloom,noclouds,nolayers,noflow,freeze`: features
  *   left out (to measure what each costs; `nowoods`, `nofarwoods`, `noflowers` and `nograss` leave out
  *   one part of the nature; `noflow` draws the water still and plain, as before it flowed); `freeze` stops
  *   time for screenshots (`at=<s>` along the path);
@@ -44,7 +44,8 @@ import { game } from '../ui/state.svelte';
 import { plotInfo } from '../ui/place';
 import { BENCH, type BenchCamera, type BenchFlags } from './benchFlags';
 import { gpuInfo } from './report';
-import { benchState, benchTime, SETTLE_LIMIT_MS, sleep, START_ALPHA, sunDraws, sunSince, townCentre, type Loaded, type RunPose, type StepRun, type SunDraws } from './benchTime';
+import { benchState, benchTime, SETTLE_LIMIT_MS, sleep, START_ALPHA, sunDraws, sunSince, type Loaded, type RunPose, type StepRun, type SunDraws } from './benchTime';
+import { townCentre } from '../game/townPreview';
 
 /** Camera paths: distance, height angle and seconds per turn round the home lot. */
 const PATHS = {

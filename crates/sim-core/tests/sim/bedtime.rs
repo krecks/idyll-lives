@@ -493,3 +493,43 @@ fn with_no_bed_at_home_the_hotels_will_do() {
     at(&mut w, 23.0, "energy", 0.3);
     assert_eq!(first_use(&mut w, 0, 60), Some(HOTEL_BED));
 }
+
+#[test]
+fn worn_out_before_an_early_shift_she_sleeps_until_she_must_leave() {
+    // (Up at the alarm whatever her energy, a worker on a 05:00 shift went in on next to none:
+    // 1 % on 2026-11-23. Still tired at the alarm, the time to get ready is slept through.)
+    let town = r#"{"width":16,"depth":12,
+        "plots":[{"name":"Home","x":0,"z":0,"w":16,"d":12,"entry":[14.5,6.5]}],
+        "households":[{"name":"Lozano","plot":0,"player":true}],
+        "objects":[{"def":"bed","x":1,"z":1},{"def":"fridge","x":10,"z":1},{"def":"toilet","x":6,"z":1}],
+        "exits":[[15.5,6.5]],
+        "sims":[{"name":"Ada","traits":["bookworm"],"x":7.5,"z":6.5,"age":35,"job":{"career":"journalism.broadcast","level":0}}]}"#;
+    let mut w = World::from_json(&common::content(), town, 3).unwrap();
+    // Tuesday 02:40, her shift at 05:00, worn out.
+    w.autonomy = false;
+    common::run_to(&mut w, 2, 2.67);
+    w.autonomy = true;
+    let n = w.content.needs.len();
+    w.sims[0].needs[..n].fill(0.8);
+    let energy = need(&w, "energy");
+    w.sims[0].needs[energy] = 0.15;
+    let mut slept_at_the_alarm = false;
+    let mut left_on = None;
+    while w.tick < clock::tick_at(2, 5.0 * 60.0).unwrap() && left_on.is_none() {
+        w.tick_once();
+        // (Her alarm goes 75 minutes before she leaves, before 03:00.)
+        slept_at_the_alarm |= clock::hour(w.tick) > 3.5 && sleeping_in(&w, 0) == Some(0);
+        if w.sims[0]
+            .current()
+            .is_some_and(|a| matches!(a.task.kind, TaskKind::Work))
+        {
+            left_on = Some(w.sims[0].needs[energy]);
+        }
+    }
+    assert!(slept_at_the_alarm, "still asleep after her alarm");
+    let left_on = left_on.expect("she went to work");
+    assert!(
+        left_on > 0.25,
+        "and went in rested a little: energy {left_on}"
+    );
+}

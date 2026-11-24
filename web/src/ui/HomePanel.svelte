@@ -86,8 +86,8 @@
         <span class="overall"><span class="total tabular" style="--c:{color(overall)}">{Math.round(overall * 100)}</span>The house as a whole</span>
       {/if}
       <span class="costs muted">
-        {#if game.creative}Creative · no rent or bills{:else if game.rent !== null}
-          Rent {money(game.rent)} + bills {money(game.bills ?? 0)} every {rent ? `${WEEKDAYS[rent.weekday]} at ${clock(rent.hour * 60, settings.clock24h)}` : 'week'}
+        {#if game.creative}Creative · no rates or bills{:else if game.rent !== null}
+          Rates {money(game.rent)} + bills {money(game.bills ?? 0)} every {rent ? `${WEEKDAYS[rent.weekday]} at ${clock(rent.hour * 60, settings.clock24h)}` : 'week'}
         {/if}
       </span>
     {/snippet}

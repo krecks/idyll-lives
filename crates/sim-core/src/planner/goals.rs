@@ -64,6 +64,21 @@ pub fn progress(w: &World, i: usize, g: &Goal) -> f32 {
     p.clamp(0.0, 1.0)
 }
 
+/// Whether a goal of `kind` is for someone of their age (`adult`: a stage that may work and fall in
+/// love, `content::LifeStage::adult`): a job, a partner and the household's money are grown-ups'
+/// (a child was offered "Find love" and "Get a job").
+pub fn for_their_age(kind: GoalKind, adult: bool) -> bool {
+    adult
+        || !matches!(
+            kind,
+            GoalKind::HasJob
+                | GoalKind::JobLevel
+                | GoalKind::Promoted
+                | GoalKind::Partner
+                | GoalKind::Funds
+        )
+}
+
 /// Skill levels a career goal takes (the next level's for a promotion; every level's up to the
 /// target for a job level, in their current job), highest per skill.
 pub fn goal_skills(content: &Content, sim: &Sim, g: &Goal) -> Vec<(usize, f32)> {
@@ -142,6 +157,14 @@ pub(super) fn check_goals(w: &mut World, i: usize) {
 /// Once a day: progress history, and maybe a new goal suggested from their traits (the
 /// neighbours, who have no player, take theirs on straight away).
 pub(super) fn review_goals(w: &mut World, i: usize, day: u32) {
+    // A child's grown-ups' goals, from before they were kept to grown-ups (an older save's): let go of.
+    if !w.sims[i].adult(&w.content) {
+        let defs = &w.content.goals;
+        let p = &mut w.sims[i].planner;
+        p.goals.retain(|g| for_their_age(defs[g.def].kind, false));
+        p.suggestions
+            .retain(|g| for_their_age(defs[g.def].kind, false));
+    }
     for k in 0..w.sims[i].planner.goals.len() {
         let g = w.sims[i].planner.goals[k];
         let p = progress(w, i, &g);
@@ -232,8 +255,12 @@ fn suggest(w: &mut World, i: usize, day: u32) -> Option<Goal> {
             let key = |s: usize| sim.mods.skill_gain[s] * 2.0 + sim.skills[s] * 0.1;
             key(a).total_cmp(&key(b))
         });
+    let adult = sim.adult(content);
     let mut options: Vec<(f32, Goal)> = Vec::new();
     for (d, def) in content.goals.iter().enumerate() {
+        if !for_their_age(def.kind, adult) {
+            continue;
+        }
         let make = |skill: Option<usize>, target: f32, start: f32| Goal {
             def: d,
             skill,

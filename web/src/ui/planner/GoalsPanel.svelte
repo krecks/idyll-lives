@@ -22,6 +22,10 @@
   let target = $state(5);
   let object = $state('');
   const picked = $derived(content.goals.find((g) => g.id === def));
+  /** The goals for their age: a job, a partner and the household's money are grown-ups' (sim-core `for_their_age`). */
+  const GROWN_UP_GOALS = new Set(['hasJob', 'jobLevel', 'promoted', 'partner', 'funds']);
+  const adult = $derived(sim.age === undefined || content.isAdult(sim.age));
+  const goalsForThem = $derived(adult ? content.goals : content.goals.filter((g) => !GROWN_UP_GOALS.has(g.kind)));
   /** What can be wanted: everything for sale that can be used, by catalog category. */
   const wantable = $derived.by(() => {
     const out = new Map<string, { id: string; name: string; price: number }[]>();
@@ -189,7 +193,7 @@
       <div class="add">
         <select bind:value={def} aria-label="New goal">
           <option value="">Add a goal…</option>
-          {#each content.goals as g (g.id)}<option value={g.id}>{g.label.replace('{skill}', 'a skill').replace('{n}', 'N').replace('{category}', 'a field').replace('$N', 'money').replace('a {object}', 'something')}</option>{/each}
+          {#each goalsForThem as g (g.id)}<option value={g.id}>{g.label.replace('{skill}', 'a skill').replace('{n}', 'N').replace('{category}', 'a field').replace('$N', 'money').replace('a {object}', 'something')}</option>{/each}
         </select>
         {#if picked}
           <div class="params">

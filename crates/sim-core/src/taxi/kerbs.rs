@@ -38,6 +38,9 @@ pub(super) const TURN_COST: f32 = 6.0;
 /// backing out).
 pub(super) const SIDE_COST: f32 = 12.0;
 pub(super) const FAR_SIDE: f32 = 8.0;
+/// Standing across an avenue's median from the house (s, `far_cost`): only with no way round to
+/// its own side.
+pub(super) const AVENUE_FAR_SIDE: f32 = 100_000.0;
 /// Runs coming into town by the same way are planned this far apart at least (ticks, `time_run`),
 /// one sooner by as much as `ENTRY_SHIFT` for it.
 pub(super) const ENTRY_GAP: u64 = 2 * TICKS_PER_MINUTE;
@@ -78,8 +81,9 @@ fn drive_axis(d: &crate::cars::Drive) -> Option<[f32; 2]> {
 }
 
 /// Where the house on `plot` meets the road its riders wait by and the way to it from the house
-/// (a unit vector): its driveway's mouth, else (no driveway) the road nearest its front door,
-/// where its front path comes out.
+/// (a unit vector): its driveway's mouth, else (no driveway, or one onto a motorway or a ramp) the
+/// road nearest its front door a taxi may stop on (`cars::enterable_near`), where its front path
+/// comes out.
 pub(super) fn home_way(w: &World, plot: u32) -> Option<(crate::travel::RoadPoint, [f32; 2])> {
     let g = &w.travel.graph;
     if let Some(d) = w.drives.iter().find(|d| d.plot == plot)
@@ -88,13 +92,12 @@ pub(super) fn home_way(w: &World, plot: u32) -> Option<(crate::travel::RoadPoint
             .road
             .zip(d.s.filter(|s| s.is_finite()))
             .and_then(|(r, s)| g.at_source(r, s))
+            .filter(|p| g.roads[p.road as usize].enterable())
     {
         return Some((mouth, axis));
     }
     let door = w.plots.get(plot as usize)?.arrival_point();
-    let mouth = *g
-        .near(door, crate::cars::ROAD_REACH, 1, crate::travel::Mode::Car)
-        .first()?;
+    let mouth = crate::cars::enterable_near(g, door, crate::cars::ROAD_REACH)?;
     let p = g.point(mouth);
     let l = crate::travel::dist(p, door).max(1e-3);
     Some((mouth, [(p[0] - door[0]) / l, (p[1] - door[1]) / l]))

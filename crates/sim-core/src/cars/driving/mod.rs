@@ -2,11 +2,13 @@
 
 use super::*;
 
+mod ease;
 mod jam;
 mod pass;
 mod sight;
 mod unjam;
 
+pub(crate) use ease::*;
 pub(crate) use jam::*;
 pub(crate) use pass::*;
 pub(crate) use sight::*;
@@ -179,7 +181,7 @@ pub(crate) fn update(w: &mut World) {
                     .iter()
                     .filter(|a| !car.done.contains(a))
                     .filter_map(|&a| w.sims[a as usize].away_until)
-                    .map(|u| u + OFF_MAP_TICKS)
+                    .map(|u| u + car.off_map_ticks())
                     .max()
                     .unwrap_or(tick)
                     .max(car.ready_at);
@@ -214,7 +216,8 @@ pub(crate) fn route_ticks(w: &mut World, c: usize, home: bool) -> f32 {
     cars[c].route(exits, Some(travel), home).ticks()
 }
 
-/// A tick further along its drive, unless someone is in its way: it waits for them (`go_on`).
+/// A tick further along its drive (on an avenue, a motorway or a ramp, as far as its own speed
+/// takes it: `ease`), unless someone is in its way: it waits for them (`go_on`).
 /// Someone at something (a bench, a letterbox) is beside its way at most, nothing stands on a
 /// street or a driveway: it doesn't wait for them. Coming into town, it waits out of sight at the
 /// way in till the way in is clear of the one before it (`room_to_come_in`), the one there longest
@@ -238,6 +241,9 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
     }
     let t = w.cars[c].progress;
     let moving = std::mem::take(&mut w.cars[c].moved);
+    // (At a speed of its own (`ease`): standing, unless it goes on below.)
+    let carried = w.cars[c].speed;
+    w.cars[c].speed = carried.map(|_| 0.0);
     // Held up for good, nose to nose with one waiting for it (`JAM_TICKS`), it backs up a little
     // out of its way (`back_off`).
     let key = car_first(c);
@@ -309,7 +315,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
     let by = w.cars[c].backed_for.is_some_and(|k| {
         let me = &w.cars[c];
         w.cars
-            .get((k & !(1 << 63)) as usize)
+            .get(car_index(k))
             .and_then(|o| Some((o, o.shown.filter(|s| s.2)?)))
             .zip(me.shown)
             .is_some_and(|((o, s), m)| {
@@ -368,7 +374,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
                 .iter()
                 .copied()
                 .find(|&k| {
-                    cars.get((k & !(1 << 63)) as usize)
+                    cars.get(car_index(k))
                         .is_some_and(|o| o.waits_for == Some(key))
                         || traffic.waits_for(k).contains(&key)
                 })
@@ -388,6 +394,31 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
         {
             w.cars[c].waits_for = w.cars[c].pulled_for;
         }
+        return;
+    }
+    // (On an avenue, a motorway or a ramp, as far as its own speed takes it, `ease`; else a tick
+    // on, as its way's timing has it. Coming up to a merge, asking for it ahead.)
+    if carried.is_some() {
+        ask_ahead(w, c, t, carried, moving, home);
+    }
+    let eased = ease(w, c, t, carried, moving, home, &others);
+    if let Some(e) = eased.as_ref() {
+        // (Which goes first at a merge, kept with the one merging till it's merged.)
+        for &(k, by, first) in &e.decided {
+            let list = &mut w.cars[k].merge_first;
+            if !list.iter().any(|d| d.0 == by) {
+                list.push((by, first));
+            }
+        }
+        if !w.cars[c].merge_first.is_empty() && !w.traffic.is_merging(key) {
+            w.cars[c].merge_first.clear();
+        }
+    }
+    let step = eased.as_ref().map_or(1.0, |e| e.step);
+    if let Some(e) = eased.as_ref().filter(|e| e.step <= 0.0) {
+        let car = &mut w.cars[c];
+        car.speed = Some(0.0);
+        car.waits_for = e.behind.or(car.waits_for);
         return;
     }
     let standing: Vec<Driving> = parked(&w.cars).collect();
@@ -411,9 +442,20 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
         .iter()
         .map(|t| t.0)
         .filter(|&k| {
-            cars.get((k & !(1 << 63)) as usize)
+            cars.get(car_index(k))
                 .is_some_and(|o| o.waits_for == Some(key))
                 || traffic.waits_for(k).contains(&key)
+        })
+        .collect();
+    // (Those turning round on another level than its own, `travel::Layer`: not in its way.)
+    let mine = cars[c].layer_on(t);
+    let off_level: Vec<u64> = traffic
+        .turning
+        .iter()
+        .map(|t| t.0)
+        .filter(|&k| {
+            cars.get(car_index(k))
+                .is_some_and(|o| !o.layer().meets(mine))
         })
         .collect();
     let car = &mut cars[c];
@@ -422,7 +464,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
     // backs up): not round its tail, as people may follow it close (on their way the same way),
     // but all along its sides, as its tail swings out on a turn.
     let route = car.route(exits, Some(travel), home);
-    let ((at, yaw, reverse), (was, was_yaw, _)) = (route.at(t + 1.0), route.at(t));
+    let ((at, yaw, reverse), (was, was_yaw, _)) = (route.at(t + step), route.at(t));
     let (at, was) = (shifted(at, yaw, shift), shifted(was, was_yaw, shift));
     let ticks = route.ticks();
     let first_claim = route.claims.first().map(|c| c.from);
@@ -433,7 +475,23 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
     } else {
         AHEAD
     };
-    let (ahead, behind) = if reverse { (0.0, back) } else { (AHEAD, 0.0) };
+    // (On the move faster than on a country road, it keeps further back from the one in front,
+    // the faster the further: `follow_ahead`; at a speed of its own (`ease`), slowing down to.)
+    let speed = match &eased {
+        Some(e) => e.speed,
+        None if moving => crate::travel::dist(at, was) * DRIVE_TICKS_PER_SECOND,
+        None => 0.0,
+    };
+    // (At a speed of its own, it keeps back as it slows down, `ease`: here only `AHEAD`, the last
+    // resort.)
+    let (ahead, behind) = if reverse {
+        (0.0, back)
+    } else if eased.is_some() {
+        (AHEAD, 0.0)
+    } else {
+        (follow_ahead(speed, travel.country_speed), 0.0)
+    };
+    let layer = car.layer_on(t);
     let me = Driving {
         at,
         yaw,
@@ -442,6 +500,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
         ahead,
         behind,
         first: key,
+        layer,
     };
     let now = Driving {
         at: was,
@@ -466,7 +525,15 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
     // another, as `guard` keeps it; not kept by the claims of those it backs away from.)
     let turning = reverse && car.detour.is_some();
     if let Some(k) = traffic
-        .blocked(key, &body_now, &body_next, me.heading(), pass, in_drive)
+        .blocked(
+            key,
+            &body_now,
+            &body_next,
+            me.heading(),
+            pass,
+            in_drive,
+            layer,
+        )
         .filter(|_| !turning)
     {
         car.waits_for = Some(k);
@@ -511,6 +578,9 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
     // Nor, going the way it backs, on past it (`overtakes`): crept along beside the ground it backs
     // over, a car came out ahead of it into its way.
     if let Some(k) = traffic.turning.iter().find_map(|(k, path)| {
+        if off_level.contains(k) {
+            return None;
+        }
         let on = if waiting.contains(k) {
             path.iter()
                 .position(|r| path[0].overlap(r) <= 0.0)
@@ -549,7 +619,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
         now,
         &others,
         &mut car.waited,
-        &mut progress,
+        (&mut progress, step),
         &mut car.on_foot,
     );
     if held_up {
@@ -557,7 +627,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
     }
     if progress > t {
         // (The last resort: never deeper into another car than it is.)
-        match guard(&body_now, &body_next, others.iter().chain(&standing)) {
+        match guard(&body_now, &body_next, layer, others.iter().chain(&standing)) {
             Some(k) => {
                 traffic.guarded += 1;
                 car.waits_for = Some(k);
@@ -565,6 +635,7 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
             None => {
                 car.progress = progress;
                 car.moved = true;
+                car.speed = eased.as_ref().map(|e| e.speed);
             }
         }
     }
@@ -576,6 +647,22 @@ pub(crate) fn drive_on(w: &mut World, c: usize) {
         car.shown = Some((shifted(p, yaw, shift), yaw, true, 0));
     }
 }
+
+/// The ground a car going `speed` (m a second of drive time, `0`: standing or setting off) keeps
+/// clear in front of it (m): `AHEAD`, as ever, up to a country road's speed (`country`, and
+/// `FOLLOW_SLACK` more: every classic town's cars keep it as they always did); faster (the
+/// motorway), `FOLLOW` s of drive for each m/s over that more. At 30 m/s some 28 m: a car on the
+/// motorway keeps that far back from the one in front as a driver would, and slows down to stop
+/// behind one stopped (`ease`, at a speed of its own there; held up at once only `AHEAD` short of
+/// another, the last resort).
+pub(crate) fn follow_ahead(speed: f32, country: f32) -> f32 {
+    AHEAD + FOLLOW * (speed - country - FOLLOW_SLACK).max(0.0)
+}
+
+/// `follow_ahead`'s seconds of drive kept back for each m/s over a country road's speed, and how
+/// far over it (m/s) that begins.
+pub(crate) const FOLLOW: f32 = 2.0;
+pub(crate) const FOLLOW_SLACK: f32 = 1.0;
 
 /// How long a car stands at a zebra's stop line for those stepping onto it at most, and for those
 /// on it (ticks of real time, as they walk: `zebra_yield`). A stream of them coming up to it, it
@@ -690,6 +777,12 @@ pub(crate) fn stand_taxi(w: &mut World, c: usize) {
     let car = &mut w.cars[c];
     car.standing = true;
     car.waits_for = None;
+    // (Standing on an avenue, it sets off from standing, `ease`.)
+    let fast = car
+        .route
+        .as_ref()
+        .is_some_and(|(_, r)| r.kind_at(t).is_some());
+    car.speed = (fast || car.speed.is_some()).then_some(0.0);
     // (Where it stands, for its doors and seats: `Car::door`, `getting`.)
     if let Some((_, route)) = car.route.as_ref() {
         let (p, yaw, _) = route.at(car.progress);

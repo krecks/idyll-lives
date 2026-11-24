@@ -370,14 +370,14 @@ pub(crate) fn off_work(w: &mut World, i: usize) -> bool {
         return false;
     }
     car.done.push(me);
-    car.ready_at = car.ready_at.max(tick + OFF_MAP_TICKS);
+    car.ready_at = car.ready_at.max(tick + car.off_map_ticks());
     w.sims[i].away_until = Some(tick + 1);
     true
 }
 
 /// `i` stands at the town's exit nearest them (out of sight).
 pub(crate) fn to_exit(w: &mut World, i: usize) {
-    if let Some(k) = nearest_exit(&w.exits, w.sims[i].pos) {
+    if let Some(k) = nearest_exit(&w.travel, &w.exits, w.sims[i].pos) {
         w.sims[i].pos = w.exits[k];
     }
 }

@@ -464,7 +464,7 @@ const fn set_ao(
     }
 }
 
-pub const SETS: [Set; 32] = [
+pub const SETS: [Set; 35] = [
     set("bark", 512, 512, None, 0.010, (0.84, 0.20, 2.3)),
     set_ao("brick", 1024, 1024, None, 0.0041, (0.81, 0.12, 4.5), 0.945),
     set(
@@ -541,6 +541,9 @@ pub const SETS: [Set; 32] = [
         0.0014,
         (0.90, 0.12, 0.2),
     ),
+    set("path_concrete", 1024, 1024, None, 0.0012, (0.88, 0.06, 0.2)),
+    set("path_flagstone", 1024, 1024, None, 0.006, (0.84, 0.10, 0.3)),
+    set("path_gravel", 1024, 1024, None, 0.003, (0.82, 0.12, 0.4)),
     set_ao(
         "road_asphalt",
         1024,

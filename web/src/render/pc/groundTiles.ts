@@ -5,10 +5,15 @@
  */
 
 import * as pc from './engine';
-import { groundDepth, type RoadPlan, type WorldStructure } from '../../core/protocol';
-import { carriageway, hasSidewalks } from '../shared/junctions';
+import { groundDepth, type RoadPlan, type WorldStructure, type WorldZone } from '../../core/protocol';
+import { carriageway, hasSidewalks, planJunctions } from '../shared/junctions';
+import { kindInfo } from '../../core/roadKinds';
+import { lengths } from '../../game/roads';
+import { junctionStretches } from '../shared/markings';
+import { allBarriers, OVERPASS, without } from '../shared/motorway';
 import { boxOf, clipRect, COURSE, courseCells, JOINT, LINE, PAVING_LOOK, TILE, townPaving, type TownPaving } from '../shared/townPaving';
-import { bridgeSpans, stretchOf } from '../shared/roads';
+import { PATH_LOOK, pathLook } from '../shared/paving';
+import { bridgeSpans, raisedSpans, stretchOf } from '../shared/roads';
 import { BRIDGE } from '../shared/street';
 import type { FieldCanvas } from '../shared/farmland';
 
@@ -58,12 +63,14 @@ const MAP = {
   pavement: '#C4C0B6',
   soil: '#6B4E37',
   furrow: '#5A412E',
-  path: '#A99C86',
+  path: PATH_LOOK.hex.map,
   paving: PAVING_LOOK.stone,
   joint: PAVING_LOOK.joint,
   yard: PAVING_LOOK.yard,
   carpark: PAVING_LOOK.asphalt,
   line: PAVING_LOOK.line,
+  median: '#66783F',
+  concrete: '#AFACA4',
 } as const;
 
 /** What the maps ask of the land: a big world's farmland, its box and how to paint it (`LandscapeLayout.farmland`). */
@@ -290,7 +297,7 @@ export class FieldMap {
 
 /**
  * The ground's colour map at altitude: what the town lays on its land (streets and pavements, the junctions'
- * pads, its paving as the street lays it near (`townPaving`: the centre, courts and yards, car parks and their
+ * pads, an avenue's green median, a motorway's barrier, its overpasses over what they cross, its paving as the street lays it near (`townPaving`: the centre, courts and yards, car parks and their
  * bays), its farm fields and paths, a big world's farmland as its ground
  * has it) over the whole world in one texture, baked once per town (`bake`; again only for another town), and laid over the ground tiles' colour by the town
  * view's blend (`shaders/townGround.ts`). The tiles' material takes its define only while the blend is over 0
@@ -359,8 +366,10 @@ export class TownGroundMap {
       for (let k = 0.5; k < (along ? f.d : f.w); k += 1.2) (along ? g.fillRect(f.x, f.z + k, f.w, 0.45) : g.fillRect(f.x + k, f.z, 0.45, f.d));
     }
     // Paths, then the roads: their pavements (a road's width has them), then their carriageways, trails as paths.
-    g.fillStyle = MAP.path;
-    for (const p of meta.paths ?? []) g.fillRect(p.x, p.z, p.w, p.d);
+    for (const p of meta.paths ?? []) {
+      g.fillStyle = PATH_LOOK[pathLook(p.look)].map;
+      g.fillRect(p.x, p.z, p.w, p.d);
+    }
     const stroke = (r: RoadPlan, width: number, colour: string) => {
       g.strokeStyle = colour;
       g.lineWidth = width;
@@ -387,6 +396,46 @@ export class TownGroundMap {
       g.arc(j.x, j.z, half + 1, 0, Math.PI * 2);
       g.fill();
     }
+    // The avenues' medians, green, cut at their junctions; the motorways' barriers.
+    g.lineCap = 'butt';
+    const plans = planJunctions(world.junctions ?? [], roads);
+    const cut = (r: RoadPlan, list: readonly [number, number][]) => list.map(([a, b]) => ({ ...r, points: stretchOf(r, a, b) }));
+    for (const r of roads) {
+      const m = kindInfo(r).median;
+      if (!m || r.points.length < 2) continue;
+      const total = lengths(r.points).at(-1)!;
+      for (const piece of cut(r, without([[0, total]], junctionStretches(r, plans)))) stroke(piece, m, MAP.median);
+    }
+    const barriers = (only?: (r: RoadPlan, s: number) => boolean) => {
+      for (const { a, runs } of allBarriers(roads)) {
+        for (const run of runs) {
+          g.strokeStyle = MAP.concrete;
+          g.lineWidth = 0.6;
+          g.beginPath();
+          let on = false;
+          for (const p of run) {
+            if (only && !only(roads[a], p.sa)) {
+              on = false;
+              continue;
+            }
+            if (on) g.lineTo(p.x, p.z);
+            else g.moveTo(p.x, p.z);
+            on = true;
+          }
+          g.stroke();
+        }
+      }
+    };
+    barriers();
+    // The overpasses last, over what they pass over: their concrete wider than their road, its asphalt, the barrier on them.
+    const decks = new Map(roads.flatMap((r) => {
+      const spans = raisedSpans(r);
+      return spans.length ? [[r, spans] as const] : [];
+    }));
+    for (const [r, spans] of decks) for (const piece of cut(r, spans)) stroke(piece, r.width + 2 * OVERPASS.apron, MAP.concrete);
+    for (const [r, spans] of decks) for (const piece of cut(r, spans)) stroke(piece, carriageway(r), MAP.asphalt);
+    if (decks.size) barriers((r, s) => !!decks.get(r)?.some(([a, b]) => s >= a && s <= b));
+    g.lineCap = 'round';
     // Premultiplied (so the mips stay true at an edge), up to the GPU with its mips.
     const data = premultiplied(g.getImageData(0, 0, size, size).data);
     this.texture?.destroy();

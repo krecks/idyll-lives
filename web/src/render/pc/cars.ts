@@ -1,8 +1,8 @@
 /**
  * Households' cars and the work taxis in the game on PlayCanvas (sim-core `cars.rs`, `taxi.rs`):
  * parked on their driveways, and driving off to work and back, placed every frame where the sim's snapshot says it is
- * (`SnapshotLayout.car`), between two snapshots (and on past the newest while it drives, as the
- * residents go: `FrameState.alpha`); hidden while it's out of town or its parking spot has been
+ * (`SnapshotLayout.car`), between two snapshots along the way it went (`carWay.ts`; and a little on past the newest
+ * while it drives, as the residents go: `FrameState.alpha`); hidden while it's out of town or its parking spot has been
  * built over, while it stands on the viewed lot with its basement in view (`hideOn`: the lot's
  * ground is hidden then), and while it's outside the chunks streamed in or far off (`setView`).
  *
@@ -25,11 +25,11 @@ import * as pc from './engine';
 import { INSTANCE_COLOR, type Instances } from './instancing';
 import { drawMesh } from './meshes';
 import { LIFT, rollWheels, Vehicles } from './vehicles';
-import type { FrameState } from '../../core/bridge';
+import { maxAlpha, type FrameState } from '../../core/bridge';
 import type { Seat } from '../shared/characters/seats';
 import type { WorldStructure } from '../../core/protocol';
 import { CARS, CAR_PAINT, TAXI_PAINT, TINT_PAINT, carAge, carDoor, carPaintColour, carriedAlong, carRowIsTaxi, DOOR_OPEN, DOORS, doorSwing, inCar, paintCar, paintDoor, paintTaxi, paintTaxiDoor, TAXI_BODY, wheelAt, type CarAge, type CarAt, type CarBody, type CarPose } from '../shared/cars';
-import { lerpAngle } from '../shared/characters/rig';
+import { NO_WAY, poseOnWay, wayOf, type Way, type WayPose } from '../shared/carWay';
 import { DOOR_SWING, ease } from '../shared/doors';
 import { Geo } from '../shared/geometry';
 import { playbackRate } from '../shared/gameSpeed';
@@ -148,6 +148,9 @@ export class Cars extends Vehicles {
   /** The frame the cars were last placed for (`pose`: the residents riding in them ask first). */
   private posedAt = NaN;
   private posedCurr: Float32Array | null = null;
+  /** Scratch for `pose`: a car's way in the newest snapshot, and where the one before had it. */
+  private readonly way: Way = { ...NO_WAY };
+  private readonly from: WayPose = { x: 0, z: 0, yaw: 0 };
 
   constructor(app: pc.AppBase, parent: pc.Entity, shadows: boolean) {
     super(app, parent, shadows, 'cars');
@@ -292,7 +295,7 @@ export class Cars extends Vehicles {
 
   /** Where each car is drawn this frame (between the last two snapshots), once a frame: the residents riding in them ask before `update`. */
   private pose(frame: FrameState): void {
-    const { prev, curr, alpha, layout, now } = frame;
+    const { prev, curr, alpha, steps, layout, now } = frame;
     if (now === this.posedAt && curr === this.posedCurr) return;
     this.posedAt = now;
     this.posedCurr = curr;
@@ -303,6 +306,12 @@ export class Cars extends Vehicles {
     if (base === undefined || stride === undefined || !f) return;
     const count = layout.header.carCount === undefined ? 0 : curr[layout.header.carCount];
     const before = layout.header.carCount === undefined ? 0 : prev[layout.header.carCount];
+    // (How far past the newest snapshot a car may go, in steps: as far as `alpha` goes at normal speed, that share of a
+    // step's ticks at a faster one.)
+    const ahead = ((maxAlpha(1000 / layout.ticksPerSecond) - 1) * steps) / Math.max(1, playbackRate(curr, layout.header));
+    const from = this.from;
+    // (Where this frame is, in steps from the newest snapshot: from -`steps`, the one before, to past 0 while it's late.)
+    const r = (alpha - 1) * steps;
     // A taxi's row come (after the households' and the taxis' before it): drawn as the taxi from now on.
     for (; this.scanned < count; this.scanned++) {
       const row = this.scanned;
@@ -319,14 +328,27 @@ export class Cars extends Vehicles {
       at.shown = row < count && carRowIsTaxi(curr, layout, row) === taxi ? curr[o + f.shown] : 0;
       if (!at.shown) continue;
       const was = row < before ? prev[o + f.shown] : 0;
-      // Driving in both, on past the newest snapshot while the next is late (as far as the residents
-      // go: the bridge's `MAX_EXTRAPOLATION`), or it would stall and then jump; parking, not past its spot.
-      const k = !was ? 1 : at.shown === 2 && was === 2 ? Math.max(0, alpha) : Math.min(1, Math.max(0, alpha));
       const [cx, cz, cyaw] = [curr[o + f.x], curr[o + f.z], curr[o + f.yaw]];
-      at.x = prev[o + f.x] + (cx - prev[o + f.x]) * k;
-      at.z = prev[o + f.z] + (cz - prev[o + f.z]) * k;
-      at.yaw = lerpAngle(prev[o + f.yaw], cyaw, k);
       [snap.x, snap.z, snap.yaw] = [cx, cz, cyaw];
+      const way = wayOf(curr, layout, o, this.way);
+      if (!was) {
+        // Come into sight since the snapshot before: from where it did (its way's start; not yet, not drawn), else there.
+        const t0 = way.n ? way.snap[way.at + way.fields.t] : 0;
+        if (r < t0) at.shown = 0;
+        else if (!way.n) [at.x, at.z, at.yaw] = [cx, cz, cyaw];
+        else {
+          [from.x, from.z, from.yaw] = [way.snap[way.at + way.fields.x], way.snap[way.at + way.fields.z], way.snap[way.at + way.fields.yaw]];
+          poseOnWay(from, snap, way, -t0, r, 0, at);
+        }
+        if (!at.shown) continue;
+      } else {
+        // Along the way it went since the snapshot before (`carWay.ts`). Driving in both, on past the newest while the
+        // next is late (as the residents go: the bridge's `MAX_EXTRAPOLATION_MS`), or it would stall and then jump; but
+        // no further than it drives in that time at normal speed (a tick's worth, at super speed some 0.8 m, not the
+        // step's 50), never into the bend ahead or the car in front. Parking, not past its spot.
+        [from.x, from.z, from.yaw] = [prev[o + f.x], prev[o + f.z], prev[o + f.yaw]];
+        poseOnWay(from, snap, way, steps, r, at.shown === 2 && was === 2 ? ahead : 0, at);
+      }
       snap.driving = at.shown === 2 || was === 2;
       if (snap.driving) this.driving.push(this.cars[i]);
     }

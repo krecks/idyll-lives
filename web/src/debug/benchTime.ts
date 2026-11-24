@@ -21,9 +21,9 @@
  * real-time bench, `bench.ts`).
  */
 
-import type { WorldStructure } from '../core/protocol';
 import { within } from '../core/async';
 import { host } from '../game/host';
+import { townCentre } from '../game/townPreview';
 import type { GameSession } from '../game/session';
 import { deleteSave } from '../persistence/saves';
 import type { CameraPose, FrameCounts, Renderer } from '../render/types';
@@ -71,14 +71,6 @@ export function sunSince(end: SunDraws, start: SunDraws): SunDraws {
   return { whole: end.whole - start.whole, moving: end.moving - start.moving, why: since(end.why, start.why), by: since(end.by, start.by) };
 }
 
-/** The main town's centre in `world`: its square once the world has one (`meta.centre`), else the middle of its area, else the world's. */
-export function townCentre(world: WorldStructure): [number, number, number] {
-  const main = world.meta?.areas?.[0];
-  const square = world.meta?.centre?.find((c) => c.area === 0) ?? world.meta?.centre?.[0];
-  const mid = (pts: [number, number][]): [number, number] => [pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length];
-  const [cx, cz] = square?.poly.length ? mid(square.poly) : main ? [main.x + main.w / 2, main.z + main.d / 2] : [world.width / 2, world.depth / 2];
-  return [cx, 0, cz];
-}
 
 /**
  * The benchmark's state `name` in `public/bench/` (`<name>.json.gz`: a whole town's save is half a megabyte of JSON,

@@ -22,6 +22,8 @@ pub(crate) struct Mover {
     pub parked: bool,
     /// Whom it waited for last tick (`Driving::first`), if anyone.
     pub waits: Option<u64>,
+    /// Its level (`travel::Layer`): in the way only of claims on levels that meet it.
+    pub layer: crate::travel::Layer,
 }
 
 /// Where a vehicle is on its route, for its claims (`Traffic::begin`): its key, the tag of its
@@ -89,6 +91,10 @@ pub struct Traffic {
     /// The tick (`begin`).
     pub(super) tick: u64,
     pub(super) holds: Vec<Hold>,
+    /// The keys of those holding a merge's claim (`Claim::merge`), each once, sorted: kept with
+    /// `holds` as it changes (`hold`, `merges_let_go`), and asked for by every car on a
+    /// motorway every tick (`cars::ease`).
+    pub(super) merging: Vec<u64>,
     pub(super) asks: Vec<Ask>,
     /// Each lit junction's lights (`Travel::signals`): the arm whose turn it is, how far through
     /// it (`Light`), and since when.
@@ -176,6 +182,61 @@ impl Traffic {
         self.holds.iter().any(|h| h.key == key && h.tag == tag)
     }
 
+    /// How many claims are held, and how many asks wait (the tests: all let go once the traffic's
+    /// gone by).
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn claims_out(&self) -> (usize, usize) {
+        (self.holds.len(), self.asks.len())
+    }
+
+    /// Whether `key` holds claim `k` of its route tagged `route` (`Place`).
+    pub(crate) fn holds_part(&self, key: u64, route: u32, k: usize) -> bool {
+        self.holds(key, tag(route, k))
+    }
+
+    /// Those holding a merge's claim (`Claim::merge`), each once, sorted.
+    pub(crate) fn merging(&self) -> &[u64] {
+        debug_assert_eq!(self.merging, self.merging_now());
+        &self.merging
+    }
+
+    /// Whether `key` holds a merge's claim (`merging`).
+    pub(crate) fn is_merging(&self, key: u64) -> bool {
+        self.merging().binary_search(&key).is_ok()
+    }
+
+    /// `merging` from `holds` as they are.
+    fn merging_now(&self) -> Vec<u64> {
+        let mut out: Vec<u64> = self
+            .holds
+            .iter()
+            .filter(|h| h.claim.merge)
+            .map(|h| h.key)
+            .collect();
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
+
+    /// `hold` held from now (`holds`), and `merging` with it.
+    pub(super) fn hold(&mut self, hold: Hold) {
+        if hold.claim.merge
+            && let Err(k) = self.merging.binary_search(&hold.key)
+        {
+            self.merging.insert(k, hold.key);
+        }
+        self.holds.push(hold);
+    }
+
+    /// Some of `holds` let go: `merging` again (none held before, none let go).
+    pub(super) fn merges_let_go(&mut self) {
+        if !self.merging.is_empty() {
+            let holds = &self.holds;
+            self.merging
+                .retain(|&k| holds.iter().any(|h| h.key == k && h.claim.merge));
+        }
+    }
+
     /// Whether `key` holds a claim.
     pub fn holding(&self, key: u64) -> bool {
         self.holds.iter().any(|h| h.key == key)
@@ -203,6 +264,7 @@ impl Traffic {
     pub(crate) fn stand(&mut self, key: u64, t: f32) {
         self.holds
             .retain(|h| h.key != key || h.claim.from <= t + 1e-3 && t < h.claim.to);
+        self.merges_let_go();
         self.asks.retain(|a| a.key != key);
         self.starts.retain(|s| s.0 != key);
         for a in &mut self.asks {
@@ -228,7 +290,7 @@ impl Traffic {
         };
         for (k, c) in claims.iter().enumerate() {
             if c.group == group && t < c.to {
-                self.holds.push(Hold {
+                self.hold(Hold {
                     key,
                     tag: tag(route, k),
                     claim: c.clone(),
@@ -242,6 +304,7 @@ impl Traffic {
     /// waits for it.
     pub(crate) fn forget(&mut self, key: u64) {
         self.holds.retain(|h| h.key != key);
+        self.merges_let_go();
         self.asks.retain(|a| a.key != key);
         self.starts.retain(|s| s.0 != key);
         for a in &mut self.asks {

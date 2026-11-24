@@ -1,6 +1,6 @@
 /**
- * The Street tool: draws a street, lane, country road or footpath (`streets.ts` `drawStreet`), as
- * its card (`streetChoice`) asks. Clicks set its points, or a drag draws it freehand. The pointer is
+ * The Street tool: draws a street, lane, avenue, country road or footpath (`streets.ts` `drawStreet`), one-way or
+ * not, as its card (`streetChoice`) asks. Clicks set its points, or a drag draws it freehand. The pointer is
  * pulled to a road, a dead end or the world's edge within `PULL_PX` CSS px (`Meeting.magnet`, 10 to
  * 40 m; once a street is begun, only where the street would not be refused there). It is drawn as soon as it reaches a road (or the world's edge); Enter or a double click
  * ends it where it is (Enter: where the pointer rests, as the hint says), carried on to a road within `AUTO_JOIN` m ahead (or nearby) if it may be
@@ -13,13 +13,14 @@
  * As the pointer moves, the street it would make is drawn as a ghost (`streetLive.ts`): blue where
  * it may go, its bridges pale, red where it may not (or is too steep) with why under the tools, a
  * mark where it would join a road, and the road it would finish on green ("Joins Mill Lane — click
- * to finish"). Once the pointer rests (`REST` ms), `drawStreet` itself is asked, which also says
+ * to finish"); a one-way street, arrows along it the way cars will go (`arrowGhosts`). Once the pointer rests (`REST` ms), `drawStreet` itself is asked, which also says
  * what is in its way (greyed) and anything the live checks leave to it. A street clearly too steep
  * (`LiveStreet.excess`) is refused when ended, not left to the settle.
  *
  * The tool's state, apart from the editor (`StreetDrawing`), is plain: the tests drive it.
  */
 
+import { onewayOf, ROAD_KIND } from '../../core/roadKinds';
 import type { Edited } from '../../game/edit/edited';
 import { builtAlong } from '../../game/edit/buildup';
 import { drawStreet, Meeting, SNAP, streetsBare, streetWidth, type Magnet } from '../../game/edit/streets';
@@ -27,7 +28,7 @@ import { lengths, nearest, pointAt, type Pt } from '../../game/roads';
 import type { TownGhosts } from '../../render/types';
 import { lotBox, roadGhost } from './ghosts';
 import StreetCard from './StreetCard.svelte';
-import { alongFor, fillsHomes, streetChoice, strokeKind, type Along } from './streetChoice.svelte';
+import { alongFor, fillsHomes, streetChoice, strokeKind, strokeWay, type Along } from './streetChoice.svelte';
 import { liveStreet, newRoads, runsOf, unfinished, verdictOf, warmLive, type LiveStreet, type StrokeKind } from './streetLive';
 import type { TownEditor, TownTool } from './tools';
 import { sentence } from './words';
@@ -65,10 +66,15 @@ export interface StreetAsk {
   clear: boolean;
   /** What goes along it, as the card asks (`auto`: by where it runs, `alongFor`). */
   along: Along;
+  /** One-way (`StreetStroke.oneway`): +1 the way it is drawn, -1 against it. */
+  oneway?: 1 | -1;
 }
 
 /** What the card asks for now. */
-export const askOf = (): StreetAsk => ({ kind: strokeKind(streetChoice.kind), asked: streetChoice.kind !== 'auto', clear: streetChoice.clear, along: streetChoice.along });
+export const askOf = (): StreetAsk => {
+  const oneway = strokeWay(streetChoice);
+  return { kind: strokeKind(streetChoice.kind), asked: streetChoice.kind !== 'auto', clear: streetChoice.clear, along: streetChoice.along, ...(oneway ? { oneway } : {}) };
+};
 
 /**
  * A street being drawn: the points set, and where the pointer is (the line's last point while it
@@ -110,8 +116,40 @@ const mark = (at: Pt, ok: boolean) => ({ x: at[0] - MARK / 2, z: at[1] - MARK / 
 /** The town's roads as a street of `kind` meets them (kept per road list in `meetings`). */
 function meetingOf(draft: Pick<Parameters<typeof liveStreet>[0], 'roads'>, kind: StrokeKind, meetings: WeakMap<object, Meeting>): Meeting {
   let meet = meetings.get(draft.roads);
-  if (!meet || meet.trail !== (kind === 'trail')) meetings.set(draft.roads, (meet = new Meeting(draft.roads, kind === 'trail', streetWidth(kind))));
+  if (!meet || meet.trail !== (kind === 'trail') || meet.width !== streetWidth(kind)) meetings.set(draft.roads, (meet = new Meeting(draft.roads, kind === 'trail', streetWidth(kind))));
   return meet;
+}
+
+/** A one-way street's arrows are this far apart along it (m), the first half that in; each this long and this wide (m). */
+const ARROW_EVERY = 18;
+const ARROW_LENGTH = 3.2;
+const ARROW_WIDE = 2.4;
+
+/**
+ * Arrows along `line` the way cars go (`way`: +1 the way its points run, -1 against them), each a chevron of two
+ * strokes as ghost ribbons; none for a two-way street.
+ */
+export function arrowGhosts(line: readonly Pt[], way: 1 | -1 | 0, tone: TownGhosts['roads'][number]['tone'] = 'join'): TownGhosts['roads'] {
+  if (!way || line.length < 2) return [];
+  const ls = lengths(line);
+  const L = ls[ls.length - 1];
+  const out: TownGhosts['roads'] = [];
+  const n = Math.max(1, Math.floor(L / ARROW_EVERY));
+  for (let k = 0; k < n; k++) {
+    const { p, t } = pointAt(line, (L * (k + 0.5)) / n, ls);
+    const [dx, dz] = [t[0] * way, t[1] * way];
+    const tip: Pt = [p[0] + (dx * ARROW_LENGTH) / 2, p[1] + (dz * ARROW_LENGTH) / 2];
+    const back: Pt = [p[0] - (dx * ARROW_LENGTH) / 2, p[1] - (dz * ARROW_LENGTH) / 2];
+    const side: Pt = [-dz * (ARROW_WIDE / 2), dx * (ARROW_WIDE / 2)];
+    out.push({ points: [[back[0] + side[0], back[1] + side[1]], tip, [back[0] - side[0], back[1] - side[1]]], width: 0.7, tone });
+  }
+  return out;
+}
+
+/** Which way cars go along `line` for a street one-way `way` the way it was drawn from `from` (its first point): +1 the way `line` runs, -1 against it. */
+export function lineWay(line: readonly Pt[], way: 1 | -1, from: Pt): 1 | -1 {
+  const [a, b] = [line[0], line[line.length - 1]];
+  return Math.hypot(a[0] - from[0], a[1] - from[1]) <= Math.hypot(b[0] - from[0], b[1] - from[1]) ? way : ((-way) as 1 | -1);
 }
 
 /** Where a street started at `p` would begin: on a road (a T, at its nearest point) or carrying on its dead end; null: in the open. */
@@ -152,7 +190,7 @@ export const pullReach = (perPx: number) => Math.max(PULL_LEAST, Math.min(PULL_M
  * last stretch's way first, else to the nearest point of a road (or a dead end) that near its last point; each only
  * if the live checks pass it, finished on that road (`liveStreet`). Null: neither may be.
  */
-export function carryOn(draft: Parameters<typeof liveStreet>[0], t: Parameters<typeof liveStreet>[1], pts: readonly Pt[], ask: Pick<StreetAsk, 'kind' | 'asked' | 'clear'>, meetings = new WeakMap<object, Meeting>()): { points: Pt[]; live: LiveStreet } | null {
+export function carryOn(draft: Parameters<typeof liveStreet>[0], t: Parameters<typeof liveStreet>[1], pts: readonly Pt[], ask: Pick<StreetAsk, 'kind' | 'asked' | 'clear' | 'oneway'>, meetings = new WeakMap<object, Meeting>()): { points: Pt[]; live: LiveStreet } | null {
   if (pts.length < 2) return null;
   const meet = meetingOf(draft, ask.kind, meetings);
   const [a, b] = [pts[pts.length - 2], pts[pts.length - 1]];
@@ -173,7 +211,7 @@ export function carryOn(draft: Parameters<typeof liveStreet>[0], t: Parameters<t
   if (near) tries.push(near.at);
   for (const end of tries) {
     const points = [...pts, end];
-    const live = liveStreet(draft, t, points, ask.kind, ask.clear, ask.asked);
+    const live = liveStreet(draft, t, points, ask);
     if (!live.why && live.reached && live.finishOn >= 0 && !live.excess && !live.open) return { points, live };
   }
   return null;
@@ -196,8 +234,12 @@ export function stretchNear(draft: Pick<Parameters<typeof liveStreet>[0], 'roads
   return best?.road;
 }
 
-/** The ghosts of a live street: its line in runs (new, bridge, red), its joins' marks; and, from `drawStreet`'s verdict when it is in, the roads it makes and what it clears. */
-export function streetGhosts(editor: Pick<TownEditor, 'draft' | 't'>, live: LiveStreet, verdict: Edited | null): Partial<TownGhosts> {
+/**
+ * The ghosts of a live street: its line in runs (new, bridge, red), its joins' marks; and, from `drawStreet`'s verdict
+ * when it is in, the roads it makes and what it clears. One-way (`oneway`: the way it is drawn, from its first point
+ * `from`), arrows along it.
+ */
+export function streetGhosts(editor: Pick<TownEditor, 'draft' | 't'>, live: LiveStreet, verdict: Edited | null, oneway?: { way: 1 | -1; from: Pt }): Partial<TownGhosts> {
   const draft = editor.draft;
   const ghosts: TownGhosts = { roads: [], lots: [], boxes: [] };
   const refused = verdict && 'refused' in verdict && !unfinished(verdict.refused);
@@ -207,10 +249,12 @@ export function streetGhosts(editor: Pick<TownEditor, 'draft' | 't'>, live: Live
   if (made && !live.slope) {
     // What it makes, as `drawStreet` makes it (cut at the kerbs, split at its bridges).
     for (const i of newRoads(draft, made)) ghosts.roads.push(roadGhost(made.draft.roads[i], 'new'));
+    for (const i of newRoads(draft, made)) ghosts.roads.push(...arrowGhosts(made.draft.roads[i].points, onewayOf(made.draft.roads[i])));
   } else {
     // (The line as the live checks have it: where it is refused, or looks too steep, red.)
     const whole = refused && !live.why ? [{ from: 0, to: Infinity, tone: 'bad' as const }] : live.stretches;
     for (const run of runsOf(live.line, whole)) ghosts.roads.push({ points: run.points, width: live.width, tone: run.tone });
+    if (oneway && live.line.length > 1) ghosts.roads.push(...arrowGhosts(live.line, lineWay(live.line, oneway.way, oneway.from)));
   }
   // What it clears out of its way.
   if (made) {
@@ -230,7 +274,10 @@ type Carried = { live: LiveStreet; verdict: Edited };
  */
 export function kindLine(draft: Parameters<typeof liveStreet>[0], live: LiveStreet, verdict: Edited | null = null): string {
   const area = live.area >= 0 ? draft.open?.areas[live.area]?.name : undefined;
-  let what = live.kind === 'trail' ? 'A footpath' : live.kind === 'country' ? 'A country road' : `A ${live.kind === 'lane' ? 'lane' : 'street'}${area ? ` of ${area}` : ''}`;
+  // (A town's kinds of an area; with none yet, a street.)
+  const kind = live.kind ?? 'street';
+  const { article } = ROAD_KIND[kind];
+  let what = `${article.charAt(0).toUpperCase()}${article.slice(1)}${kind === 'trail' || kind === 'country' || !area ? '' : ` of ${area}`}`;
   const bridges = live.bridges.length ? ` with ${live.bridges.length === 1 ? `a ${live.bridges[0]} m bridge` : `${live.bridges.length} bridges`}` : '';
   let then = '';
   if (live.kind === 'country' && verdict && 'draft' in verdict) {
@@ -247,7 +294,7 @@ export const streetTool: TownTool = {
   id: 'street',
   label: 'Street',
   icon: 'icon.ui.blueprint',
-  does: 'Draw a street, a lane, a country road or a footpath: click points or drag, and end it on a road.',
+  does: 'Draw a street, a lane, an avenue, a country road or a footpath: click points or drag, and end it on a road.',
   stage(editor: TownEditor) {
     const s = new StreetDrawing();
     /** A press under way: where, and whether it became a drag. */
@@ -265,7 +312,7 @@ export const streetTool: TownTool = {
     // (What the live checks keep of the town made ahead of the first move, not on it.)
     setTimeout(() => warmLive(editor.draft, editor.t), 0);
 
-    const keyOf = (pts: readonly Pt[], ask: StreetAsk) => `${ask.kind}|${ask.asked}|${ask.clear}|${editor.version}|${pts.map(([x, z]) => `${x.toFixed(1)},${z.toFixed(1)}`).join(';')}`;
+    const keyOf = (pts: readonly Pt[], ask: StreetAsk) => `${ask.kind}|${ask.asked}|${ask.clear}|${ask.oneway ?? 0}|${editor.version}|${pts.map(([x, z]) => `${x.toFixed(1)},${z.toFixed(1)}`).join(';')}`;
 
     /** How many m a CSS px is on the ground at (`x`, `y`): the editor's own measure if it has one (`menuScene.scale`), else the ground either side of the point; the last found where there is none. */
     const scaleAt = (x: number, y: number): number => {
@@ -288,11 +335,14 @@ export const streetTool: TownTool = {
       if (!p.pull || !s.drawing) return p;
       const pts = [...s.points, p.at];
       const key = keyOf(pts, ask);
-      const live = shown?.key === key ? shown.live : liveStreet(editor.draft, editor.t, pts, ask.kind, ask.clear, ask.asked);
+      const live = shown?.key === key ? shown.live : liveStreet(editor.draft, editor.t, pts, ask);
       if (live.why) return { at: g, pull: null };
       if (shown?.key !== key) shown = { key, live, verdict: null };
       return p;
     };
+
+    /** A one-way street's way as drawn, from its first point, for its arrows. */
+    const wayOf = (ask: StreetAsk) => (ask.oneway && s.points.length ? { way: ask.oneway, from: s.points[0] } : undefined);
 
     /** The ghosts and the line under the tools for the street as it stands (`verdict`: `drawStreet`'s, once the pointer rested). */
     const show = () => {
@@ -323,13 +373,13 @@ export const streetTool: TownTool = {
         return;
       }
       const key = keyOf(pts, ask);
-      if (shown?.key !== key) shown = { key, live: liveStreet(editor.draft, editor.t, pts, ask.kind, ask.clear, ask.asked), verdict: null };
+      if (shown?.key !== key) shown = { key, live: liveStreet(editor.draft, editor.t, pts, ask), verdict: null };
       const { live, verdict } = shown;
       if (live.kind && live.kind !== 'trail') {
         streetChoice.shown = live.kind;
         streetChoice.shownArea = live.area;
       }
-      editor.preview(streetGhosts(editor, live, verdict));
+      editor.preview(streetGhosts(editor, live, verdict, wayOf(ask)));
       editor.hint(lineOf(live, verdict, shown.carried));
       // (`drawStreet` itself once the pointer rests: too slow for every move on a big town.)
       if (!verdict && !live.why) rest = setTimeout(() => settle(key, pts, ask), REST);
@@ -338,12 +388,12 @@ export const streetTool: TownTool = {
     /** `drawStreet`'s verdict on the line under the pointer, if the pointer is still where it rested. */
     const settle = (key: string, pts: Pt[], ask: StreetAsk) => {
       if (shown?.key !== key) return;
-      shown.verdict = verdictOf(editor.draft, editor.t, editor.content, pts, ask.kind, ask.clear, seed, ask.asked);
+      shown.verdict = verdictOf(editor.draft, editor.t, editor.content, pts, ask, seed);
       // (What Enter would make of it: carried on to a road just ahead, if it may be, as `finish` carries it.)
       const on = shown.live.reached ? null : carryOn(editor.draft, editor.t, pts, ask, meetings);
-      const carried = on && verdictOf(editor.draft, editor.t, editor.content, on.points, ask.kind, ask.clear, seed, ask.asked);
+      const carried = on && verdictOf(editor.draft, editor.t, editor.content, on.points, ask, seed);
       shown.carried = on && carried && 'draft' in carried ? { live: on.live, verdict: carried } : null;
-      editor.preview(streetGhosts(editor, shown.live, shown.verdict));
+      editor.preview(streetGhosts(editor, shown.live, shown.verdict, wayOf(ask)));
       editor.hint(lineOf(shown.live, shown.verdict, shown.carried));
     };
 
@@ -382,7 +432,7 @@ export const streetTool: TownTool = {
         return false;
       }
       const ask = askOf();
-      let live = liveStreet(editor.draft, editor.t, pts, ask.kind, ask.clear, ask.asked);
+      let live = liveStreet(editor.draft, editor.t, pts, ask);
       if (!asDeadEnd && !live.reached) return false;
       // (Ended short of a road: carried on to one nearby, if drawStreet takes it so; else ended where it is.)
       let edited: (Edited & { leftOut?: number }) | null = null;
@@ -421,7 +471,7 @@ export const streetTool: TownTool = {
       // (In step 2 nothing goes along a street: its zones decide what Build puts there.)
       const along = editor.step === 'layout' ? 'none' : asked;
       const before = editor.draft;
-      const e = drawStreet(before, editor.t, editor.content, { points: pts, kind: ask.kind, asked: ask.asked, clear: ask.clear, fill: fillsHomes(along), seed });
+      const e = drawStreet(before, editor.t, editor.content, { points: pts, kind: ask.kind, asked: ask.asked, clear: ask.clear, fill: fillsHomes(along), seed, ...(ask.oneway ? { oneway: ask.oneway } : {}) });
       return along === 'buildings' || along === 'both' ? builtAlong(before, e, editor.t, editor.content, along, seed) : e;
     };
 

@@ -23,6 +23,7 @@ impl World {
     /// speed as the household falls quiet, and drops back to the speed chosen before it once it
     /// isn't quiet at home (a super speed the player picked stays). The ticks it ran.
     pub fn start_step(&mut self) -> u32 {
+        self.trails.begin_step(self.step_ticks);
         self.step_ticks = 0;
         if self.speed == 0 {
             return 0;
@@ -41,8 +42,9 @@ impl World {
             return 0;
         }
         let ticks = TICKS_PER_STEP[self.speed as usize];
-        for _ in 0..ticks {
+        for tick in 1..=ticks {
             self.tick_once();
+            self.record_trails(tick);
         }
         self.step_ticks = ticks;
         ticks
@@ -64,7 +66,20 @@ impl World {
         }
         self.tick_once();
         self.step_ticks += 1;
+        self.record_trails(self.step_ticks);
         true
+    }
+
+    /// The cars' poses after tick `tick` of the step under way, for their trails (`car::TRAIL`):
+    /// those out of sight have none (they aren't drawn: `cars::hidden`), so a car's way starts
+    /// where it came into sight.
+    fn record_trails(&mut self, tick: u32) {
+        let shown = self.cars.iter().map(|c| {
+            c.shown
+                .filter(|_| c.sight == crate::cars::Sight::Seen)
+                .map(|s| (s.0, s.1))
+        });
+        self.trails.record(tick, shown);
     }
 
     /// Ticks a real step runs now: the speed's, or at super speed what its last step ran.

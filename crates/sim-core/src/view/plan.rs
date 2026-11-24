@@ -390,6 +390,7 @@ fn requirements<'a>(
 /// One of a resident's actions (`held`: what they carry, for the current one).
 pub(super) fn task_view(
     world: &World,
+    sim: &crate::world::Sim,
     task: &Task,
     phase: Option<&Phase>,
     held: Option<crate::items::Held>,
@@ -439,6 +440,10 @@ pub(super) fn task_view(
                 directed: task.directed,
                 active: phase.is_some(),
             };
+        }
+        // (A pupil's is school: Lena's said "Go to work" all week, `view::social`'s "At school" after it.)
+        TaskKind::Work if sim.school(content).is_some() => {
+            ("Go to school".to_owned(), None, None, 1.0)
         }
         TaskKind::Work => ("Go to work".to_owned(), None, None, 1.0),
         TaskKind::Visit { plot } => (format!("Visit {}", host_name(world, plot)), None, None, 1.0),

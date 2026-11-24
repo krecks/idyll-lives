@@ -37,7 +37,7 @@ pub(crate) fn waits_on_at(w: &World, key: u64, ix: &[(u64, u32)]) -> Vec<u64> {
 
 /// `waits_on` with car `key`'s ask, the first of its in `Traffic::asks` (None: none).
 fn waits_on_by(w: &World, key: u64, ask: Option<usize>) -> Vec<u64> {
-    let car = w.cars.get((key & !(1 << 63)) as usize);
+    let car = w.cars.get(crate::cars::car_index(key));
     let mut out: Vec<u64> = car.and_then(|c| c.waits_for).into_iter().collect();
     // (Those on foot or on a bike in its way: their resident ids, no vehicle's key.)
     out.extend(
@@ -60,7 +60,7 @@ pub fn at_red(w: &World, key: u64) -> bool {
 
 /// How far along its way car `key` is (ticks); none, not on its way. For checks, with `waits_on`.
 pub fn on_its_way(w: &World, key: u64) -> Option<f32> {
-    let car = w.cars.get((key & !(1 << 63)) as usize)?;
+    let car = w.cars.get(crate::cars::car_index(key))?;
     matches!(
         car.state,
         crate::cars::CarState::Leaving | crate::cars::CarState::Arriving

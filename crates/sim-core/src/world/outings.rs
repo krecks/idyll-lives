@@ -530,7 +530,9 @@ pub(crate) fn exit_on_foot(ctx: &Ctx, sim: &Sim) -> Option<[f32; 2]> {
 }
 
 /// The exit (an index into `exits`) quickest to get to on foot from `pos` (over the ground,
-/// `StairMap::ground_pos`).
+/// `StairMap::ground_pos`), of those left by on foot or on a bike (`Travel::exit_on_foot`: not a
+/// motorway's end; timed to one, as the straight line there with no road to walk along, a rider
+/// set off for it, found no way and stood on the bike at home for hours).
 pub(crate) fn quickest_exit(
     travel: &crate::travel::Travel,
     exits: &[[f32; 2]],
@@ -540,7 +542,7 @@ pub(crate) fn quickest_exit(
     // Nearest first by the straight line, which no way along the roads beats: past the first
     // whose straight line takes longer than the quickest found, none can be quicker.
     let mut order: Vec<(f32, usize)> = (0..exits.len())
-        .filter(|&i| exits[i].iter().all(|v| v.is_finite()))
+        .filter(|&i| exits[i].iter().all(|v| v.is_finite()) && travel.exit_on_foot(exits[i]))
         .map(|i| (travel.eta_at_least(pos, exits[i], mode, 1.5), i))
         .collect();
     order.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
@@ -567,11 +569,15 @@ pub(crate) fn quickest_exit(
 }
 
 /// The town's way out (an index into `World::exits`) nearest `pos` in a straight line, if it has
-/// any.
-pub(crate) fn nearest_exit(exits: &[[f32; 2]], pos: [f32; 2]) -> Option<usize> {
+/// any, of those left by on foot (`Travel::exit_on_foot`).
+pub(crate) fn nearest_exit(
+    travel: &crate::travel::Travel,
+    exits: &[[f32; 2]],
+    pos: [f32; 2],
+) -> Option<usize> {
     let d = |i: usize| (exits[i][0] - pos[0]).hypot(exits[i][1] - pos[1]);
     (0..exits.len())
-        .filter(|&i| exits[i].iter().all(|v| v.is_finite()))
+        .filter(|&i| exits[i].iter().all(|v| v.is_finite()) && travel.exit_on_foot(exits[i]))
         .min_by(|&a, &b| d(a).total_cmp(&d(b)))
 }
 

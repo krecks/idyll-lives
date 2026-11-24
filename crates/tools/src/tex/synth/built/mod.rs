@@ -12,6 +12,7 @@
 use super::{HeightMap, Img, Noise, Surface, lerp, mix, mul, par_map, rgb, smoothstep, to_u8};
 mod brick;
 mod floors;
+mod garden;
 mod leather;
 mod paving;
 mod plaster;
@@ -22,6 +23,7 @@ mod wood;
 
 use brick::brick;
 use floors::{concrete, cork, lino, parquet, sisal};
+use garden::{flagstone, gravel, walk_concrete};
 use leather::leather;
 use paving::{asphalt, floor_tile, hexpaving, sidewalk};
 use plaster::plaster;
@@ -39,6 +41,9 @@ pub fn generate(name: &str, n: &Noise, size: usize) -> Option<Surface> {
         "stone_foundation" => stone(n, size),
         "floor_tile" => floor_tile(n, size),
         "path_hexpaving" => hexpaving(n, size),
+        "path_concrete" => walk_concrete(n, size),
+        "path_flagstone" => flagstone(n, size),
+        "path_gravel" => gravel(n, size),
         "floor_wood" => floor_wood(n, size, &boards(variant)),
         "floor_laminate" => laminate(n, size),
         "siding_wood" => siding(n, size),
@@ -422,6 +427,18 @@ const TILE_CHECKER: f64 = 1.8;
 
 const TILE_HEX_MOSAIC: f64 = 1.5;
 
+/// The garden paths' and drives' own (`garden.rs`): broom-finished concrete, flagstones and pea gravel (m).
+const TILE_WALK: f64 = 2.0;
+
+const TILE_FLAGSTONE: f64 = 2.4;
+
+const TILE_GRAVEL: f64 = 1.2;
+
+/// Flagstones across a tile (about 48 cm each), and gravel stones' cells across one (15 mm).
+const FLAGSTONE_CELLS: i64 = 5;
+
+const GRAVEL_CELLS: i64 = 80;
+
 const TILE_TERRAZZO: f64 = 2.0;
 
 const TILE_MARBLE: f64 = 2.4;
@@ -446,6 +463,9 @@ pub fn tile(name: &str) -> Option<f64> {
         "stone_foundation" => TILE_STONE,
         "floor_tile" => TILE_FLOOR_TILE,
         "path_hexpaving" => TILE_HEX,
+        "path_concrete" => TILE_WALK,
+        "path_flagstone" => TILE_FLAGSTONE,
+        "path_gravel" => TILE_GRAVEL,
         "floor_wood" => TILE_FLOOR_WOOD,
         "floor_laminate" => TILE_LAMINATE,
         "siding_wood" => TILE_SIDING,

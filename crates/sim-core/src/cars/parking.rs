@@ -125,7 +125,11 @@ pub(crate) fn settle_all(w: &mut World) {
         .iter()
         .filter_map(|d| {
             let (road, s) = d.meets()?;
-            let mouth = travel.graph.point(travel.graph.at_source(road, s)?);
+            let g = &travel.graph;
+            let mouth = g.point(
+                g.at_source(road, s)
+                    .filter(|p| g.roads[p.road as usize].enterable())?,
+            );
             Some(([d.x, d.z], mouth))
         })
         .collect();

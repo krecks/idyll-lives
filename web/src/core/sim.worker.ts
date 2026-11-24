@@ -44,6 +44,27 @@ const MAX_BACKLOG_MS = 50;
  * so the game answers the player at once however slow the machine.
  */
 const SUPER_SHARE = 0.8;
+/**
+ * A timer set from a timer's callback waits at least this long (ms; browsers clamp nested timers), so a super-speed
+ * step that is due, or nearly, goes at once (`soon`) rather than idling for it: chained timers left the worker idle a
+ * quarter of the time at super speed (2026-11-24: 45 steps a second of 17 ms each, busy 0.77).
+ */
+const TIMER_FLOOR_MS = 4;
+
+/** Runs `f` as the next task, without a timer's least wait (a message to itself; messages from the main thread are tasks too, and get their turn). */
+const soon = (() => {
+  const channel = new MessageChannel();
+  let next: (() => void) | null = null;
+  channel.port1.onmessage = () => {
+    const f = next;
+    next = null;
+    f?.();
+  };
+  return (f: () => void) => {
+    next = f;
+    channel.port2.postMessage(0);
+  };
+})();
 
 let game: Game | null = null;
 let memory: WebAssembly.Memory;
@@ -263,6 +284,8 @@ function runLoop(stepMs: number): void {
   let busyMs = 0;
   let maxMs = 0;
   const superMs = stepMs * SUPER_SHARE;
+  /** Whether the last step ran super speed's ticks. */
+  let superStep = false;
   const step = () => {
     if (stopped) return;
     // (Fixed-step playback: `advance` runs the ticks; the clock only waits to go on again, and says once a second
@@ -286,7 +309,9 @@ function runLoop(stepMs: number): void {
       // The speed's ticks; at super speed as many as fit in the step's share of time (none
       // when it isn't super speed, or no longer quiet at home).
       ticks += g.start_step();
+      const before = ticks;
       while (performance.now() - start < superMs && g.advance_more()) ticks++;
+      superStep = ticks > before;
       g.end_step();
       simSteps++;
       publish();
@@ -323,7 +348,11 @@ function runLoop(stepMs: number): void {
     next += stepMs;
     // (Steps due by now run at once: those of at most MAX_BACKLOG_MS.)
     next = Math.max(next, now - MAX_BACKLOG_MS);
-    setTimeout(step, Math.max(0, next - now));
+    // (At super speed a step's ticks are what the time allows: the next goes at once rather than wait out a timer's
+    // floor. At the other speeds the timer keeps the game to its speed's real time.)
+    const delay = Math.max(0, next - now);
+    if (delay === 0 || (superStep && delay < TIMER_FLOOR_MS)) soon(step);
+    else setTimeout(step, delay);
   };
   setTimeout(step, stepMs);
 }

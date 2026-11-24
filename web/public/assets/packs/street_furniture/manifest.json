@@ -1,5 +1,5 @@
 {
-  "$comment": "The street furniture (crates/art/outside/src/street_furniture, built by cargo art): the street lamp, the park bench, the drinking fountain, the litter bin, the taxi rank's shelter, the post box, the notice board, the phone box, the town fountain and the founder's statue; and the traffic light (not buyable: render/pc/signals.ts draws one at each signal head the sim has). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each has a far version for the town overview. The lamp's lantern, the phone box's signs and the taxi rank's sign glow at night; the drinking fountain's water arcs for `drink` (`water_on`), the post box's flap swings in for `post` (`flap`), the phone box's door opens for `call` (`door_open`) and the town fountain's water runs near the camera (`water_run`, ambient).",
+  "$comment": "The street furniture (crates/art/outside/src/street_furniture, built by cargo art): the street lamp, the park bench, the drinking fountain, the litter bin, the taxi rank's shelter, the post box, the notice board, the phone box, the town fountain and the founder's statue; and the traffic light (not buyable: render/pc/signals.ts draws one at each signal head the sim has) and the motorway's direction sign (not buyable: the street stands it by the motorway's exits and ramps). Listed in the base manifest's packs. The materials map onto the game's finishes so a model costs one draw call per finish group. Each has a far version for the town overview. The lamp's lantern, the phone box's signs and the taxi rank's sign glow at night; the drinking fountain's water arcs for `drink` (`water_on`), the post box's flap swings in for `post` (`flap`), the phone box's door opens for `call` (`door_open`) and the town fountain's water runs near the camera (`water_run`, ambient).",
   "version": 1,
   "entries": {
     "model.streetLamp": {
@@ -339,6 +339,25 @@
         }
       },
       "far": "../../models/street_furniture/trafficLight.far.glb"
+    },
+    "model.motorwaySign": {
+      "type": "model",
+      "url": "../../models/street_furniture/motorwaySign.glb",
+      "materials": {
+        "body": {
+          "finish": "material.finish.metal"
+        },
+        "granite": {
+          "finish": "material.finish.matte"
+        },
+        "sign_blue": {
+          "finish": "material.finish.satin"
+        },
+        "sign_white": {
+          "finish": "material.finish.satin"
+        }
+      },
+      "far": "../../models/street_furniture/motorwaySign.far.glb"
     }
   }
 }
