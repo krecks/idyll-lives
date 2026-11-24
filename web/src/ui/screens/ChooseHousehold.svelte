@@ -280,7 +280,7 @@
             { value: 'creative', label: 'Creative' },
           ]}
         />
-        <p class="hint">{app.mode === 'creative' ? 'Building is free. No rent or bills at home.' : 'Your residents earn the money to build with.'}</p>
+        <p class="hint">{app.mode === 'creative' ? 'Building is free. No rates or bills at home.' : 'Your residents earn the money to build with.'}</p>
       </div>
       <div class="option">
         <span class="eyebrow sub">Lifespan</span>

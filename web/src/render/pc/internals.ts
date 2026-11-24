@@ -70,3 +70,26 @@ export function deviceDriverInfo(device: pc.GraphicsDevice): DriverInfo {
   // SAFETY: WebGPU keeps the adapter in `gpuAdapter`, private in the engine's types (PlayCanvas 2.23, pinned).
   return { gpuAdapter: (device as unknown as { gpuAdapter?: { info?: AdapterInfo } }).gpuAdapter };
 }
+
+/** PlayCanvas 2.23's WebGPU render pipeline cache (`WebgpuRenderPipeline`): `get` makes a miss with `create`. */
+export interface RenderPipelineCache {
+  create(...args: unknown[]): unknown;
+  cache: Map<number, { pipeline: unknown }[]>;
+}
+
+/** What a WebGPU device keeps of its own: the `GPUDevice`, the pipeline cache, the pipeline set last. */
+export interface WebgpuDeviceParts {
+  wgpu: GPUDevice;
+  renderPipeline: RenderPipelineCache;
+  pipeline: unknown;
+}
+
+/** `device`'s WebGPU parts, or null on WebGL2 (or a device without them). */
+export function webgpuParts(device: pc.GraphicsDevice): WebgpuDeviceParts | null {
+  // SAFETY: on WebGPU, PlayCanvas 2.23's device keeps its `GPUDevice` in `wgpu`, its pipeline cache in `renderPipeline`
+  // (`get` → `create` on a miss → `wgpu.createRenderPipeline(desc)`) and the pipeline set last in `pipeline`
+  // (tools/render/chunks.json).
+  const d = device as unknown as Partial<WebgpuDeviceParts> & { isWebGPU: boolean };
+  return d.isWebGPU && d.wgpu && d.renderPipeline?.cache ? (d as WebgpuDeviceParts) : null;
+}
+
