@@ -698,6 +698,12 @@ export class TownStreet {
   private levels: Levels | null;
   /** Every road of the town as laid out (what `levels` finds them by). */
   private readonly allRoads: RoadPlan[];
+  /**
+   * The roads with a surface drawn: `roads`, then the country roads. One array for the street's life, so what is worked
+   * out once per set of roads (the motorway's pairs, its gores, its signs: `motorway.ts`, `markings.ts`) is when the land
+   * moves (`landMoved`) too.
+   */
+  private readonly surfaced: RoadPlan[];
   /** Each plot's index among the world's (its pad's, `BuiltSurface.padY`), by id. */
   private readonly plotIndex = new Map<number, number>();
   private readonly cuts: JunctionCuts;
@@ -784,6 +790,7 @@ export class TownStreet {
     this.cuts = JunctionCuts.of(this.junctions);
     this.levels = levelsOf(world, all);
     this.allRoads = all;
+    this.surfaced = [...this.roads, ...this.ways.country];
     world.plots.forEach((p, i) => this.plotIndex.set(p.id, i));
     this.paths = world.meta?.paths ?? [];
     this.fields = world.meta?.world?.fields ?? [];
@@ -876,7 +883,7 @@ export class TownStreet {
     const levels = this.levels;
     if (!levels) return '-';
     const beds: number[] = [];
-    for (const road of [...this.roads, ...this.ways.country]) {
+    for (const road of this.surfaced) {
       for (const [s0, s1] of bridgeSpans(road)) {
         const ls = lengths(road.points);
         for (let u = s0; u <= s1; u += 2) {
@@ -1044,7 +1051,7 @@ export class TownStreet {
 
   /** How many bridge decks the street draws (every road's spans, `bridgeSpans`): for the benches. */
   bridgeCount(): number {
-    return [...this.roads, ...this.ways.country].reduce((n, r) => n + bridgeSpans(r).length, 0);
+    return this.surfaced.reduce((n, r) => n + bridgeSpans(r).length, 0);
   }
 
   /** Takes the world's things, houses and rooms as they are now (the layout stays: see `layoutKey`). */
@@ -1930,7 +1937,7 @@ export class TownStreet {
     const roadLevels: RoadLevels | null = levels ?? deckLevels(this.allRoads);
     const median = new RoutedGeo((x, z) => at(x, z).median);
     roadMeshes(this.walkStops.roads, null, 0, { walk, shadows, ...(this.options.ground ? { median } : {}) }, 'sidewalks', this.junctions, undefined, roadLevels);
-    const all = [...this.roads, ...this.ways.country];
+    const all = this.surfaced;
     if (this.options.ground) {
       // (Worn between the kerbs; a road without them, from edge to edge.)
       const [road, marks] = [new RoutedGeo((x, z) => at(x, z).road), new RoutedGeo((x, z) => at(x, z).marks)];

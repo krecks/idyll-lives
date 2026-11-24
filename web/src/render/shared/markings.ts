@@ -104,15 +104,33 @@ export function laneLayout(roads: readonly RoadPlan[], ri: number): LaneLayout |
   }
 }
 
+/** Each set of junctions' stretches of each road (`junctionStretches`): a road's points are never changed in place. */
+const stretchesOf = new WeakMap<readonly JunctionPlan[], WeakMap<RoadPlan, readonly [number, number][]>>();
+
 /**
  * The stretches of `road` (arc lengths, m, each start and end) its junctions cover: round each junction on it (its
- * middle within its half width of the road's), out along its arms as far as their pads and stop lines reach.
+ * middle within its half width of the road's), out along its arms as far as their pads and stop lines reach. Once per
+ * road and set of junctions.
  */
-export function junctionStretches(road: RoadPlan, junctions: readonly JunctionPlan[], ls: readonly number[] = lengths(road.points)): [number, number][] {
+export function junctionStretches(road: RoadPlan, junctions: readonly JunctionPlan[], ls?: readonly number[]): readonly [number, number][] {
+  let byRoad = stretchesOf.get(junctions);
+  if (!byRoad) stretchesOf.set(junctions, (byRoad = new WeakMap()));
+  let had = byRoad.get(road);
+  if (!had) byRoad.set(road, (had = stretchesAt(road, junctions, ls ?? lengths(road.points))));
+  return had;
+}
+
+function stretchesAt(road: RoadPlan, junctions: readonly JunctionPlan[], ls: readonly number[]): [number, number][] {
   const out: [number, number][] = [];
+  const most = road.width / 2 + 0.5;
+  // (Only the junctions near its box are measured: a metre to spare.)
+  let [x0, z0, x1, z1] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const [x, z] of road.points) [x0, z0, x1, z1] = [Math.min(x0, x), Math.min(z0, z), Math.max(x1, x), Math.max(z1, z)];
+  const [bx0, bz0, bx1, bz1] = [x0 - most - 1, z0 - most - 1, x1 + most + 1, z1 + most + 1];
   for (const j of junctions) {
+    if (j.x < bx0 || j.x > bx1 || j.z < bz0 || j.z > bz1) continue;
     const near = nearest(road.points, j.x, j.z, ls);
-    if (near.dist > road.width / 2 + 0.5) continue;
+    if (near.dist > most) continue;
     let reach = 0;
     for (const A of j.arms) reach = Math.max(reach, A.reach, Math.min(A.stop, A.room));
     out.push([near.s - reach - 0.3, near.s + reach + 0.3]);

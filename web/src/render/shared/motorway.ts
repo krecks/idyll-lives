@@ -399,6 +399,17 @@ export interface SignSpot {
   y: number;
 }
 
+/** A sign's place, its height still to come: on road `on[k][0]` at `on[k][1]` m along it (two: at their mean height). */
+interface SignPlace {
+  x: number;
+  z: number;
+  yaw: number;
+  on: readonly (readonly [RoadPlan, number])[];
+}
+
+/** Each set of roads' signs' places (`signPlaces`), once: the heights alone move with the land. */
+const signsOf = new WeakMap<readonly RoadPlan[], SignPlace[]>();
+
 /**
  * Where the motorway's direction signs stand among `roads`, at their heights (`levels`; none: 0): for each off-ramp
  * (a ramp leaving its carriageway at its merging end), beside the carriageway `SIGN_BEFORE` m before the exit where it
@@ -406,9 +417,18 @@ export interface SignSpot {
  * the street where it begins, on its right. Each faces the traffic coming to it.
  */
 export function signSpots(roads: readonly RoadPlan[], levels?: RoadLevels | null): SignSpot[] {
-  const out: SignSpot[] = [];
-  const Y = (r: RoadPlan, s: number) => (levels ? levels.road(r, s) : 0);
+  let places = signsOf.get(roads);
+  if (!places) signsOf.set(roads, (places = signPlaces(roads)));
+  const Y = ([r, s]: readonly [RoadPlan, number]) => (levels ? levels.road(r, s) : 0);
+  return places.map(({ x, z, yaw, on }) => ({ x, z, yaw, y: on.length > 1 ? (Y(on[0]) + Y(on[1])) / 2 : Y(on[0]) }));
+}
+
+/** Where `signSpots`' signs stand, and on what. */
+function signPlaces(roads: readonly RoadPlan[]): SignPlace[] {
+  const out: SignPlace[] = [];
   const facing = (t: Pt, way: number) => Math.atan2(-t[0] * way, -t[1] * way);
+  // (Each carriageway's index, for the gore: built when first asked.)
+  const indexes = new Map<RoadPlan, RoadIndex>();
   roads.forEach((ramp) => {
     if (ramp.kind !== 'ramp' || ramp.points.length < 2) return;
     const e = ramp.ends[0] === 'merge' ? 0 : ramp.ends[1] === 'merge' ? 1 : -1;
@@ -431,19 +451,24 @@ export function signSpots(roads: readonly RoadPlan[], levels?: RoadLevels | null
         if (s < 0 || s > cls[cls.length - 1]) continue;
         const { p, t } = pointAt(c.points, s, cls);
         const [x, z] = aside(p, t, outside * (c.width / 2 + SIGN_OUT));
-        out.push({ x, z, yaw: facing(t, cWay), y: Y(c, s) });
+        out.push({ x, z, yaw: facing(t, cWay), on: [[c, s]] });
       }
       // In the gore: the first place along the ramp it has parted from the carriageway far enough, midway between.
+      let index = indexes.get(c);
+      if (!index) indexes.set(c, (index = new RoadIndex([c])));
+      const apart = (c.width + ramp.width) / 2 + SIGN_GORE;
       for (let k = 1; k * 2 < total; k++) {
         const s = e === 0 ? k * 2 : total - k * 2;
         const { p, t } = pointAt(ramp.points, s, ls);
+        // (Plainly too near, by the index: a millimetre short of far enough, so the measure below never decides otherwise.)
+        if (index.distance(0, p[0], p[1], apart - 1e-3) < Infinity) continue;
         const near = nearest(c.points, p[0], p[1], cls);
         const gap = near.dist - (c.width + ramp.width) / 2;
         if (gap < SIGN_GORE) continue;
         const q = pointAt(c.points, near.s, cls).p;
         // (Midway across the gap, out from both roads' middles: their edges half the gap away each.)
         const f = (ramp.width / 2 + gap / 2) / (near.dist || 1);
-        out.push({ x: p[0] + (q[0] - p[0]) * f, z: p[1] + (q[1] - p[1]) * f, yaw: facing(t, way), y: (Y(ramp, s) + Y(c, near.s)) / 2 });
+        out.push({ x: p[0] + (q[0] - p[0]) * f, z: p[1] + (q[1] - p[1]) * f, yaw: facing(t, way), on: [[ramp, s], [c, near.s]] });
         break;
       }
     }
@@ -454,7 +479,7 @@ export function signSpots(roads: readonly RoadPlan[], levels?: RoadLevels | null
       if (s <= 0 || s >= total) return;
       const { p, t } = pointAt(ramp.points, s, ls);
       const [x, z] = aside(p, t, way * (ramp.width / 2 + SIGN_OUT));
-      out.push({ x, z, yaw: facing(t, way), y: Y(ramp, s) });
+      out.push({ x, z, yaw: facing(t, way), on: [[ramp, s]] });
     }
   });
   return out;
