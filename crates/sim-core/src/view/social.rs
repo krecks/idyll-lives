@@ -122,7 +122,7 @@ pub(super) fn actions(world: &World, s: &Sim) -> Vec<ActionView> {
     let mut actions = Vec::new();
     if let Some(until) = s.away_until {
         let left = until.saturating_sub(world.tick) as f32 * MINUTES_PER_TICK;
-        let school = content.life.school.as_ref().filter(|_| s.job.is_none());
+        let school = s.school(content);
         let total = s
             .job
             .as_ref()

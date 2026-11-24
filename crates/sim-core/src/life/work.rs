@@ -40,22 +40,14 @@ pub(super) fn at_work(w: &mut World, i: usize) -> bool {
     }
     let minutes = sim.minutes();
     let Some(job) = sim.job.clone() else {
+        // At school: what a day there does (`effects`), a little of the school's skills, then home.
+        let school = content.life.school.as_ref();
+        if let Some(school) = school {
+            day_effects(sim, content, &school.effects, school.hours, minutes);
+        }
         take_breaks(sim, content, None);
-        // At school: a little of the school's skills and what a day there does (`effects`), then home.
-        if let Some(school) = &content.life.school {
-            let per_tick = minutes / (school.hours * 60.0);
-            for n in 0..MAX_NEEDS.min(content.needs.len()) {
-                sim.needs[n] = (sim.needs[n] + school.effects[n] * per_tick).clamp(0.0, 1.0);
-            }
-            for &(skill, weight) in &school.skills {
-                practise(
-                    sim,
-                    content,
-                    skill,
-                    content.skill_rules.work_gain_per_hour * weight,
-                    minutes,
-                );
-            }
+        if let Some(school) = school {
+            day_skills(sim, content, &school.skills, minutes);
         }
         if sim.away_until.is_some_and(|until| tick < until) {
             return false;
@@ -71,24 +63,13 @@ pub(super) fn at_work(w: &mut World, i: usize) -> bool {
     };
     let career = &content.careers[job.career];
     let level = &career.levels[job.level];
-    let per_tick = minutes / (level.hours * 60.0);
-    for n in 0..MAX_NEEDS.min(content.needs.len()) {
-        sim.needs[n] = (sim.needs[n] + career.work_effects[n] * per_tick).clamp(0.0, 1.0);
-    }
+    day_effects(sim, content, &career.work_effects, level.hours, minutes);
     take_breaks(
         sim,
         content,
         Some(&mut households[sim.household as usize].funds),
     );
-    for &(skill, weight) in &career.skills {
-        practise(
-            sim,
-            content,
-            skill,
-            content.skill_rules.work_gain_per_hour * weight,
-            minutes,
-        );
-    }
+    day_skills(sim, content, &career.skills, minutes);
     if sim.away_until.is_some_and(|until| tick < until) {
         return false;
     }
@@ -261,5 +242,32 @@ pub(super) fn charge_rent(w: &mut World, day: u32) {
                 social::add_feeling(&mut s.feelings, m, &content.feelings, tick);
             }
         }
+    }
+}
+
+/// This tick's share of what a shift or a school day does to each need (`effects` over its `hours`).
+fn day_effects(
+    sim: &mut Sim,
+    content: &Content,
+    effects: &[f32; MAX_NEEDS],
+    hours: f32,
+    minutes: f32,
+) {
+    let per_tick = minutes / (hours * 60.0);
+    for n in 0..MAX_NEEDS.min(content.needs.len()) {
+        sim.needs[n] = (sim.needs[n] + effects[n] * per_tick).clamp(0.0, 1.0);
+    }
+}
+
+/// This tick's practice of what a shift or a school day trains (skill, weight).
+fn day_skills(sim: &mut Sim, content: &Content, skills: &[(usize, f32)], minutes: f32) {
+    for &(skill, weight) in skills {
+        practise(
+            sim,
+            content,
+            skill,
+            content.skill_rules.work_gain_per_hour * weight,
+            minutes,
+        );
     }
 }

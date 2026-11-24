@@ -55,7 +55,14 @@
     const hh = game.households.find((h) => h.plot === id);
     return hh ? `The ${hh.name}s` : 'For sale';
   };
-  const homeCount = (plotId: number) => game.sims.filter((s) => s.plot === plotId).length;
+  /** How many residents are on each lot (one pass over them, not one a label). */
+  const here = $derived.by(() => {
+    const n = new Map<number, number>();
+    for (const s of game.sims) if (s.plot !== null) n.set(s.plot, (n.get(s.plot) ?? 0) + 1);
+    return n;
+  });
+  /** Each lot's name on the map (`lotTitle`), worked out once for its label, its button and its tag. */
+  const titles = $derived(new Map(plots.map((p) => [p.id, lotTitle(p, game.households, 'Empty')])));
 
   // ---- the view: zoom 1..12 round its middle (m); the map's width on screen (px) ----
   let zoom = $state(1);
@@ -97,13 +104,19 @@
       const roomy = p.w * ppm > 46;
       if (!roomy && !spots.has(p.id)) continue;
       const wins = p.id === homeLot ? 0 : p.id === pickedLot ? 1 : null;
-      list.push({ key: p.id, x: p.x + p.w / 2, z: p.z + p.d / 2, text: lotTitle(p, game.households, 'Empty'), size: 11, sub: roomy ? 9 : undefined, rank: spots.has(p.id) ? 1 : 2, wins });
+      list.push({ key: p.id, x: p.x + p.w / 2, z: p.z + p.d / 2, text: titles.get(p.id) ?? 'Empty', size: 11, sub: roomy ? 9 : undefined, rank: spots.has(p.id) ? 1 : 2, wins });
     }
     areas.forEach((a, i) => list.push({ key: `a${i}`, x: a.x + a.w / 2, z: a.z + a.d / 2, text: a.name, size: 14, rank: 0 }));
     // (Clear of the zoom buttons in the corner: two of 30 px, and "Whole town" zoomed in.)
     const zoomBox = { l: screenW - (zoom > 1 ? 160 : 74), t: screenH - 40, r: screenW, b: screenH };
     return layoutLabels(list, screenW, screenH, { x: x0, z: z0, w: viewW, d: viewD }, [zoomBox]);
   });
+
+  /** The lots with a name laid out on screen, and where (drawn after the residents, `labels`). */
+  const named = $derived(plots.flatMap((p) => {
+    const at = labels.get(p.id);
+    return at ? [{ p, at }] : [];
+  }));
 
   // ---- live: residents twice a second while open; the camera every frame (it flies) ----
   let dots = $state.raw<{ x: number; z: number; mine: boolean }[]>([]);
@@ -288,7 +301,7 @@
           {/each}
         </g>
         {#each plots as p (p.id)}
-          {@const name = lotTitle(p, game.households, 'Empty')}
+          {@const name = titles.get(p.id) ?? 'Empty'}
           <g
             class="plot"
             class:mine={p.id === homeLot}
@@ -317,13 +330,10 @@
         {/each}
         <!-- The lots' names where there's room for them (`labels`), over the lots and the residents with a halo: under
              the dots and the next lots they lost letters ("Elmfield Orcha d"). -->
-        {#each plots as p (p.id)}
-          {@const at = labels.get(p.id)}
-          {#if at}
-            <text class="name" x={at.x} y={at.y} font-size={px(11)} stroke-width={px(2.5)} text-anchor="middle">{lotTitle(p, game.households, 'Empty')}</text>
-            {#if homeCount(p.id) && p.w * ppm > 46}
-              <text class="name count" x={at.x} y={at.subY} font-size={px(9)} stroke-width={px(2.5)} text-anchor="middle">{homeCount(p.id)} here</text>
-            {/if}
+        {#each named as { p, at } (p.id)}
+          <text class="name" x={at.x} y={at.y} font-size={px(11)} stroke-width={px(2.5)} text-anchor="middle">{titles.get(p.id)}</text>
+          {#if here.get(p.id) && p.w * ppm > 46}
+            <text class="name count" x={at.x} y={at.subY} font-size={px(9)} stroke-width={px(2.5)} text-anchor="middle">{here.get(p.id)} here</text>
           {/if}
         {/each}
         {#each areas as a, i (i)}

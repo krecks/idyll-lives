@@ -442,7 +442,7 @@ pub(super) fn task_view(
             };
         }
         // (A pupil's is school: Lena's said "Go to work" all week, `view::social`'s "At school" after it.)
-        TaskKind::Work if sim.job.is_none() && content.life.school.is_some() => {
+        TaskKind::Work if sim.school(content).is_some() => {
             ("Go to school".to_owned(), None, None, 1.0)
         }
         TaskKind::Work => ("Go to work".to_owned(), None, None, 1.0),

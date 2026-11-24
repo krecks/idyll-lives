@@ -14,40 +14,28 @@
  */
 
 import type * as pc from './engine';
-
-/** PlayCanvas 2.23's render pipeline cache (`WebgpuRenderPipeline`, `device.renderPipeline`; pinned, `check:chunks`). */
-interface PipelineCache {
-  create(...args: unknown[]): unknown;
-  cache: Map<number, { pipeline: unknown }[]>;
-}
+import { webgpuParts, type WebgpuDeviceParts } from './internals';
 
 /** The pass encoder's methods a stand-in must not reach (it is not a GPU object). */
 const DRAWS = ['draw', 'drawIndexed', 'drawIndirect', 'drawIndexedIndirect'] as const;
 
 export class ParallelPipelines {
-  private readonly gpu: GPUDevice | null;
-  private readonly pipelines: PipelineCache | null;
-  /** The device's current pipeline (`WebgpuGraphicsDevice.pipeline`), set again by the draw that changes it. */
-  private readonly current: { pipeline: unknown };
+  /** The device's WebGPU parts, if it has them and the browser makes pipelines asynchronously. */
+  private readonly device: WebgpuDeviceParts | null;
 
   constructor(device: pc.GraphicsDevice) {
-    // SAFETY: on WebGPU, PlayCanvas 2.23's device keeps its `GPUDevice` in `wgpu` and its pipeline cache in
-    // `renderPipeline` (`get` → `create` on a miss → `wgpu.createRenderPipeline(desc)`; tools/render/chunks.json).
-    const d = device as unknown as { isWebGPU: boolean; wgpu?: GPUDevice; renderPipeline?: PipelineCache; pipeline: unknown };
-    this.current = d;
-    const usable = d.isWebGPU && !!d.wgpu && typeof d.wgpu.createRenderPipelineAsync === 'function' && !!d.renderPipeline?.cache;
-    this.gpu = usable ? d.wgpu! : null;
-    this.pipelines = usable ? d.renderPipeline! : null;
+    const d = webgpuParts(device);
+    this.device = d && typeof d.wgpu.createRenderPipelineAsync === 'function' ? d : null;
   }
 
   /** Draws a frame (`draw` resolves once it is drawn) with its new pipelines made side by side; how many it made. */
   async frame(draw: () => Promise<void>): Promise<number> {
-    const gpu = this.gpu;
-    const cache = this.pipelines;
-    if (!gpu || !cache) {
+    const device = this.device;
+    if (!device) {
       await draw();
       return 0;
     }
+    const { wgpu: gpu, renderPipeline: cache } = device;
     const standIns = new WeakSet<object>();
     const made = new Map<object, GPURenderPipeline>();
     const jobs: Promise<void>[] = [];
@@ -62,12 +50,14 @@ export class ParallelPipelines {
         desc = d;
         return standIn;
       };
+      let result: unknown;
       try {
-        create.apply(cache, args);
+        result = create.apply(cache, args);
       } finally {
         delete (g as { createRenderPipeline?: unknown }).createRenderPipeline;
       }
-      if (!desc) return create.apply(cache, args);
+      // (Not made through the device: what `create` gave back as it is.)
+      if (!desc) return result;
       const asked: GPURenderPipelineDescriptor = desc;
       standIns.add(standIn);
       jobs.push(
@@ -95,7 +85,7 @@ export class ParallelPipelines {
         }
       }
       // (The device's current pipeline may be a stand-in: the next draw asks the cache again.)
-      if (standIns.has(this.current.pipeline as object)) this.current.pipeline = null;
+      if (standIns.has(device.pipeline as object)) device.pipeline = null;
     } finally {
       undoDraws();
     }

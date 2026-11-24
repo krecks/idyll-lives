@@ -846,16 +846,19 @@ impl<'a> Others<'a> {
     }
 }
 
+/// Whether object `object` stands on a public lot (what it costs there: `Interaction::cost_at`).
+pub(crate) fn on_public_lot(object_plot: &[Option<u32>], plots: &[Plot], object: u32) -> bool {
+    object_plot
+        .get(object as usize)
+        .copied()
+        .flatten()
+        .is_some_and(|p| plots[p as usize].public)
+}
+
 impl Ctx<'_> {
     /// What a use of `inter` at object `object` costs there (`Interaction::cost_at`: on a public lot, its `publicCost`).
     pub(crate) fn cost_of(&self, object: u32, inter: &crate::content::Interaction) -> i64 {
-        let public = self
-            .object_plot
-            .get(object as usize)
-            .copied()
-            .flatten()
-            .is_some_and(|p| self.plots[p as usize].public);
-        inter.cost_at(public)
+        inter.cost_at(on_public_lot(self.object_plot, self.plots, object))
     }
 
     /// Whether someone serves at object `object`: a sold use's minutes are then the ordering, the

@@ -97,8 +97,7 @@ const ROOM_FOR_A_SERVING: f32 = 0.25;
 /// A cook the player sent to make a meal has some if they have this much room for it.
 const ROOM_FOR_THEIR_OWN: f32 = 0.1;
 
-/// Whether a serving of `r` would do them good: room for half of it, or for a quarter of a need
-/// it fills (`ROOM_FOR_A_SERVING`), whichever is less.
+/// Whether a serving of `r` would do them good (`ROOM_FOR_A_SERVING`).
 pub(crate) fn hungry_for(sim: &Sim, content: &Content, r: &RecipeDef) -> bool {
     room_for(sim, content, r, ROOM_FOR_A_SERVING)
 }

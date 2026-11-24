@@ -64,12 +64,10 @@ pub fn progress(w: &World, i: usize, g: &Goal) -> f32 {
     p.clamp(0.0, 1.0)
 }
 
-/// Skill levels a career goal takes (the next level's for a promotion; every level's up to the
-/// target for a job level, in their current job), highest per skill.
 /// Whether a goal of `kind` is for someone of their age (`adult`: a stage that may work and fall in
 /// love, `content::LifeStage::adult`): a job, a partner and the household's money are grown-ups'
 /// (a child was offered "Find love" and "Get a job").
-pub(crate) fn for_their_age(kind: GoalKind, adult: bool) -> bool {
+pub fn for_their_age(kind: GoalKind, adult: bool) -> bool {
     adult
         || !matches!(
             kind,
@@ -81,6 +79,8 @@ pub(crate) fn for_their_age(kind: GoalKind, adult: bool) -> bool {
         )
 }
 
+/// Skill levels a career goal takes (the next level's for a promotion; every level's up to the
+/// target for a job level, in their current job), highest per skill.
 pub fn goal_skills(content: &Content, sim: &Sim, g: &Goal) -> Vec<(usize, f32)> {
     let Some(job) = &sim.job else {
         return Vec::new();

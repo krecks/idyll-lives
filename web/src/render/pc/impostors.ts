@@ -481,11 +481,15 @@ async function bake(app: pc.AppBase, key: string, template: ModelTemplate, paren
         armed = true;
         for (const c of cameras) c.enabled = true;
       };
-      const postrender = () => {
-        if (!armed) return;
+      /** The cameras off and the frame's hooks gone (once the frame is drawn, or the bake gives up). */
+      const unhook = () => {
         for (const c of cameras) c.enabled = false;
         app.off('prerender', prerender);
         app.off('postrender', postrender);
+      };
+      const postrender = () => {
+        if (!armed) return;
+        unhook();
         clearTimeout(timer);
         timer = setTimeout(() => finish(null, `its read-back took over ${READ_WAIT_MS / 1000} s`), READ_WAIT_MS);
         const pending = color.read(0, 0, width, tall, { renderTarget: target }) as Promise<Uint8Array> | undefined;
@@ -497,9 +501,7 @@ async function bake(app: pc.AppBase, key: string, template: ModelTemplate, paren
         done = true;
         if (why) console.warn(`[render] impostor of ${key}: ${why}`);
         clearTimeout(timer);
-        for (const c of cameras) c.enabled = false;
-        app.off('prerender', prerender);
-        app.off('postrender', postrender);
+        unhook();
         resolve(p);
       }
       app.on('prerender', prerender);

@@ -151,9 +151,9 @@
     {
       "name": "sim-planner-goals",
       "file": "crates/sim-core/src/planner/goals.rs",
-      "sha256": "edadaa39c7997ecb08cb773808b1fcd1415525ef344a892568318050912d2458",
-      "by": "playtest/2026-11-23",
-      "reason": "PR #120, owner's request: for_their_age keeps job, promotion, partner and savings goals to grown-ups (a child was offered Find love and Get a job, B3), in suggestions and AddGoal. Tests: planner.rs a_child_takes_on_no_grown_ups_goal, a_childs_own_ideas_are_for_a_child (slow)."
+      "sha256": "401f00d2124a19b337dd8a32cf85df43147c74a027c9e9f009a9c2225dfdcff3",
+      "by": "playtest/2026-11-23 simplify",
+      "reason": "PR #120 simplify, behaviour unchanged: for_their_age moved above goal_skills's doc comment (it had taken it) and made pub, so the planner test asks it instead of repeating the grown-ups' goal kinds. The last accepted change stands: grown-ups' goals kept to grown-ups (B3)."
     },
     {
       "name": "sim-planner-purchases",
@@ -235,9 +235,9 @@
     {
       "name": "sim-cooking-cook",
       "file": "crates/sim-core/src/cooking/cook.rs",
-      "sha256": "db3c7ab1ce0b11d59786f0a3b09d8a613429f004705b0215242dddea95b5d997",
-      "by": "playtest/2026-11-23",
-      "reason": "PR #120, owner's request: hungry_for takes room for half a serving or a quarter of the need (a meal was wanted only below half hunger, B2), and cook_has_some lets a cook the player sent have some with 10 % room. Tests: cooking.rs a_cook_sent_to_make_a_meal_a_quarter_hungry_has_some_of_it; sim 832 and slow 876 pass."
+      "sha256": "4f8bf20fb7234d470fd99dbad20b23fdd248a2d4ee5791b33a15b571edef2256",
+      "by": "playtest/2026-11-23 simplify",
+      "reason": "PR #120 simplify, behaviour unchanged: hungry_for's doc cut to one line (ROOM_FOR_A_SERVING's says it). The last accepted change stands: a cook has some of the meal they made (B2)."
     },
     {
       "name": "sim-cooking-dishes",

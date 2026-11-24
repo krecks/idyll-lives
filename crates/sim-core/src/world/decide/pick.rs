@@ -70,7 +70,7 @@ pub(crate) fn pick_autonomous(
     // Nor back to bed rested, unless it's the middle of the night (it would end at once), nor
     // once the alarm's gone off for work or school.
     let rested = (!before_dawn(sim, ctx) && rhythm.rest_need.is_some_and(|n| needs[n] >= 0.95))
-        || (getting_up(sim, ctx) && !exhausted);
+        || getting_up(sim, ctx, false);
     // Only what they may use: at home and in public places, or where they're a guest.
     let usable = usable_here(sim, ctx);
     let usable: &[u32] = &usable;
@@ -146,6 +146,7 @@ pub(crate) fn pick_autonomous(
         .filter(|o| o.has_free_slot(content.objects[o.def].slots))
     {
         let plot = ctx.object_plot[obj.id as usize];
+        let public = plot.is_some_and(|p| ctx.plots[p as usize].public);
         let allowed = access(ctx, sim, plot);
         // (Off the home plot: a public place or the street.)
         let outing = || {
@@ -283,7 +284,7 @@ pub(crate) fn pick_autonomous(
                 || (napped && !exhausted && inter.tags & rhythm.nap_tags != 0)
                 || (allowed == Access::Guest
                     && !guest_may(content, &content.objects[obj.def], inter))
-                || !affordable(ctx.cost_of(obj.id, inter), funds)
+                || !affordable(inter.cost_at(public), funds)
             {
                 continue;
             }

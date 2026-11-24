@@ -260,13 +260,11 @@ impl World {
             )));
         }
         let household = s.household as usize;
-        let public = self
-            .object_plot
-            .get(object as usize)
-            .copied()
-            .flatten()
-            .is_some_and(|p| self.plots[p as usize].public);
-        let cost = inter.cost_at(public);
+        let cost = inter.cost_at(crate::world::on_public_lot(
+            &self.object_plot,
+            &self.plots,
+            object,
+        ));
         if !affordable(cost, self.households[household].funds) {
             return Err(Error::new(format!(
                 "not enough money: {} costs {}",

@@ -148,6 +148,10 @@ describe('game speed', () => {
     expect(s.superPicked).toBe(true);
     s.choose(1);
     expect(s.superPicked).toBe(false);
+    // (A game saved at super speed: sent as play starts, so the player's.)
+    const saved = speed(4);
+    saved.speed.hold('loading', false);
+    expect(saved.speed.superPicked).toBe(true);
   });
 
   test("only super speed's comings and goings are followed, and not under a hold", () => {

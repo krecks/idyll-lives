@@ -25,7 +25,10 @@ export class GameSpeed {
   chosen: number;
   /** The last speed above 0 (Space resumes at it). */
   last: number;
-  /** Whether the super speed running is the player's pick (`choose`), not the simulation's own (`follow`). */
+  /**
+   * Whether super speed is the player's: the last speed sent was it (sim-core's `apply_set_speed` makes any sent
+   * speed the player's), not one the simulation went to by itself (`follow`).
+   */
   superPicked = false;
   private readonly holds = new Set<SpeedHold>(['loading']);
   /** When a speed was last sent (ms, performance clock). */
@@ -57,8 +60,7 @@ export class GameSpeed {
     const was = this.running;
     this.chosen = speed;
     if (speed > 0) this.last = speed;
-    this.superPicked = speed === SUPER_SPEED;
-    this.changed(was, speed === SUPER_SPEED);
+    this.changed(was, speed === SUPER_SPEED && !this.holds.size);
   }
 
   /**
@@ -84,10 +86,11 @@ export class GameSpeed {
     this.changed(was);
   }
 
-  /** Sends the running speed if it changed from `was` (or `again`, unless something holds time). */
-  private changed(was: number, again = false): void {
-    if (this.running === was && !(again && !this.holds.size)) return;
+  /** Sends the running speed if it changed from `was`, or anyway (`force`). */
+  private changed(was: number, force = false): void {
+    if (!force && this.running === was) return;
     this.sentAt = performance.now();
+    if (this.running > 0) this.superPicked = this.running === SUPER_SPEED;
     this.send(this.running);
   }
 }
