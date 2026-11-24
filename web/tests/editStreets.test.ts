@@ -14,7 +14,7 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import type { Content } from '../src/content/content';
 import type { RoadPlan } from '../src/core/protocol';
-import { changeKind, CROSS_MOTORWAY, CUT_OFF, drawStreet, madeKind, Meeting, ONE_WAY_ENDS, removeRoad, rename, streetsBare, whatGoes } from '../src/game/edit/streets';
+import { changeKind, CROSS_MOTORWAY, CUT_OFF, drawStreet, madeKind, Meeting, motorwayName, ONE_WAY_ENDS, removeRoad, rename, streetsBare, whatGoes } from '../src/game/edit/streets';
 import { onewayOf } from '../src/core/roadKinds';
 import { cutOffRoads, stronglyConnected } from '../src/game/oneway';
 import { roadHierarchy, BRIDGE_STREET, LOOP, MOTORWAY_EAST, MOTORWAY_WEST, OFF_RAMP, ON_RAMP } from '../src/render/roadHierarchyFixture';
@@ -803,7 +803,23 @@ describe('the motorway removed, and the Problems list', () => {
     const street = after.roads.find((r) => r.name === 'Bridge Street')!;
     expect(street.crosses).toBeUndefined();
     expect(street.ends).toEqual(['join', 'out']);
-    expect(made(rename(draft, { kind: 'road', road: MOTORWAY_EAST }, 'The Westway')).draft.roads[MOTORWAY_EAST].name).toBe('The Westway');
+  });
+
+  test('the motorway is named whole: its carriageways and ramps keep the way they go', () => {
+    const laid = ['M36 Eastbound', 'M36 Westbound', 'Bridge Street', 'M36 Junction 12 Exit', 'M36 Junction 12 Entry'];
+    const draft = hierarchy(roadHierarchy().roads.map((r, i) => (i < laid.length ? { ...r, name: laid[i] } : r)));
+    expect(motorwayName(draft.roads)).toBe('M36');
+    for (const picked of [MOTORWAY_WEST, ON_RAMP]) {
+      const after = made(rename(draft, { kind: 'road', road: picked }, ' M4 ')).draft;
+      expect(after.roads.slice(0, laid.length).map((r) => r.name)).toEqual(['M4 Eastbound', 'M4 Westbound', 'Bridge Street', 'M4 Junction 12 Exit', 'M4 Junction 12 Entry']);
+      expect(motorwayName(after.roads)).toBe('M4');
+    }
+    expect(made(rename(draft, { kind: 'road', road: MOTORWAY_EAST }, 'M36')).draft).toBe(draft);
+    expect(refusal(rename(draft, { kind: 'road', road: MOTORWAY_EAST }, 'Bridge Street'))).toBe('Bridge Street is taken');
+    // (Its carriageways named apart, as the fixture's: the words they share.)
+    expect(motorwayName(roadHierarchy().roads)).toBe('Motorway');
+    expect(made(rename(hierarchy(), { kind: 'road', road: OFF_RAMP }, 'The Westway')).draft.roads.slice(0, 2).map((r) => r.name)).toEqual(['The Westway East', 'The Westway West']);
+    expect(motorwayName([{ ...roadHierarchy().roads[MOTORWAY_EAST], name: 'M5 Northbound' }])).toBe('M5');
   });
 
   test('another road removed, what the motorway crosses is numbered as the roads now are', () => {
