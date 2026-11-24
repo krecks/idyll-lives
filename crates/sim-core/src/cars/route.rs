@@ -356,7 +356,7 @@ impl Route {
         travel: &Travel,
         home: bool,
     ) -> Option<Route> {
-        use crate::travel::{RoadKind, RoadPath, dist};
+        use crate::travel::{RoadPath, dist};
         let g = &travel.graph;
         let m = car.mouth(travel)?;
         let mp = g.point(m);
@@ -437,40 +437,12 @@ impl Route {
                 o.1 = !o.1;
             }
         }
-        let lanes = LaneLine::new(g, centre, on);
-        let line = lanes.line();
-        let lane = round_corners(&crate::travel::thin_with(
-            &line,
-            ROUTE_STEP,
-            ROUTE_TOLERANCE,
-        ));
-        // (Each lane point's level and merge, from the way's point it was laid from.)
-        let marks = way_marks(g, &lanes.pts, &lanes.on);
-        let mut laid_from = Along::new(&line);
+        let laid = LaneLine::new(g, centre, on).laid(g, car.wid);
+        let lane = &laid.lane;
         if lane.len() < 2 {
             return None;
         }
-        // (The road at `p`: its width and kind, those of the path's point nearest it; how far a
-        // car can pull over there and where its lane is, `LaneLine::point`.)
-        let near_path = crate::travel::NearestPoint::new(path.pts.iter().map(|x| x.0).collect());
-        let road_at = |p: [f32; 2]| {
-            near_path
-                .nearest(p)
-                .map_or((7.0, RoadKind::Street), |i| (path.pts[i].1, path.pts[i].2))
-        };
-        let here = |p: [f32; 2]| match lanes.nearest(p) {
-            Some(i) => lanes.point(g, i, car.wid),
-            None => {
-                let (width, kind) = road_at(p);
-                (
-                    width,
-                    kind,
-                    pull_room(width, kind, car.wid),
-                    lane_on(width, kind),
-                )
-            }
-        };
-        let tops = lane_tops(&lane, travel, |i| here(lane[i]).1);
+        let tops = lane_tops(lane, travel, |i| laid.here[i].kind);
         // A trip's parking bay off the road (`parking_bay`), turned into nose first and backed
         // out of as a driveway is, and which way along the road it goes there (from the lane's
         // nearer end); a spot on the road itself is pulled into and out of straight.
@@ -527,7 +499,6 @@ impl Route {
             (w[0] * b.t[0] + w[1] * b.t[1]) * d > 0.7
         };
         for (i, &p) in lane.iter().enumerate() {
-            let mark = marks.as_ref().map(|m| laid_from.mark(m, p));
             if !on
                 && let Some((b, d, at, taken)) = start
                 && b.near(p, at, taken, d)
@@ -547,17 +518,15 @@ impl Route {
                 legs.line(from, p, false, JUNCTION_SPEED);
             }
             on = true;
-            let (_, kind, room, at) = here(p);
-            legs.push_lane(
+            let here = laid.here[i];
+            legs.push_marked(
                 p,
                 tops[i],
-                (room - bend_out(&lane, i, car.len)).max(0.0),
-                at,
+                (here.room - bend_out(lane, i, car.len)).max(0.0),
+                here.lane,
+                here.kind,
+                laid.mark(i),
             );
-            legs.mark_kind(kind);
-            if let Some(m) = mark {
-                legs.mark_last(m);
-            }
             // (Out of a driveway, a bay or a spot on the road: its mouth, up to the lane.)
             if first && (start.is_some() || park.is_some() && home) {
                 let to = legs.len() - 1;
@@ -603,7 +572,7 @@ impl Route {
         d: &Detour,
         had: &Route,
     ) -> Option<Route> {
-        use crate::travel::{RoadKind, dist};
+        use crate::travel::dist;
         let g = &travel.graph;
         // (Into a driveway's mouth it may back from where it stands: `mouth_behind`.)
         let backs = d.back < d.from || d.mouth.is_some() && d.back <= d.from;
@@ -756,38 +725,12 @@ impl Route {
             ));
             on.push(on[on.len() - 1]);
         }
-        let lanes = LaneLine::new(g, centre, on);
-        let line = lanes.line();
-        let lane = round_corners(&crate::travel::thin_with(
-            &line,
-            ROUTE_STEP,
-            ROUTE_TOLERANCE,
-        ));
-        // (Each lane point's level and merge, from the way's point it was laid from.)
-        let marks = way_marks(g, &lanes.pts, &lanes.on);
-        let mut laid_from = Along::new(&line);
+        let laid = LaneLine::new(g, centre, on).laid(g, car.wid);
+        let lane = &laid.lane;
         if lane.len() < 2 {
             return None;
         }
-        let near_path = crate::travel::NearestPoint::new(path.pts.iter().map(|x| x.0).collect());
-        let road_at = |q: [f32; 2]| {
-            near_path
-                .nearest(q)
-                .map_or((7.0, RoadKind::Street), |i| (path.pts[i].1, path.pts[i].2))
-        };
-        let here = |q: [f32; 2]| match lanes.nearest(q) {
-            Some(i) => lanes.point(g, i, car.wid),
-            None => {
-                let (width, kind) = road_at(q);
-                (
-                    width,
-                    kind,
-                    pull_room(width, kind, car.wid),
-                    lane_on(width, kind),
-                )
-            }
-        };
-        let tops = lane_tops(&lane, travel, |i| here(lane[i]).1);
+        let tops = lane_tops(lane, travel, |i| laid.here[i].kind);
         // Off the lane at the end: into its driveway, coming from the side the way comes in
         // from; or into its trip's parking bay.
         let into = if home {
@@ -845,7 +788,6 @@ impl Route {
             .unwrap_or(lane.len() - 1);
         legs.line(from, lane[join], false, JUNCTION_SPEED);
         for (i, &q) in lane.iter().enumerate() {
-            let mark = marks.as_ref().map(|m| laid_from.mark(m, q));
             if i < join {
                 continue;
             }
@@ -855,17 +797,15 @@ impl Route {
             {
                 break;
             }
-            let (_, kind, room, at) = here(q);
-            legs.push_lane(
+            let here = laid.here[i];
+            legs.push_marked(
                 q,
                 tops[i],
-                (room - bend_out(&lane, i, car.len)).max(0.0),
-                at,
+                (here.room - bend_out(lane, i, car.len)).max(0.0),
+                here.lane,
+                here.kind,
+                laid.mark(i),
             );
-            legs.mark_kind(kind);
-            if let Some(m) = mark {
-                legs.mark_last(m);
-            }
         }
         let lane_end = legs.len().saturating_sub(1);
         match &into {

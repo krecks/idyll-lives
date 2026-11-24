@@ -680,39 +680,11 @@ pub(crate) fn empty_drive_route_to(
         return None;
     }
     let centre: Vec<[f32; 2]> = path.pts.iter().map(|p| p.0).collect();
-    let lanes = LaneLine::new(g, centre, path.roads.clone());
-    let line = lanes.line();
-    let lane = round_corners(&crate::travel::thin_with(
-        &line,
-        ROUTE_STEP,
-        ROUTE_TOLERANCE,
-    ));
-    let marks = way_marks(g, &lanes.pts, &lanes.on);
-    let mut laid_from = Along::new(&line);
-    let near_path = crate::travel::NearestPoint::new(path.pts.iter().map(|x| x.0).collect());
-    let here = |p: [f32; 2]| match lanes.nearest(p) {
-        Some(i) => Some(lanes.point(g, i, 2.0 * CAR_HALF)),
-        None => near_path.nearest(p).map(|i| {
-            let (width, kind) = (path.pts[i].1, path.pts[i].2);
-            (
-                width,
-                kind,
-                pull_room(width, kind, 2.0 * CAR_HALF),
-                lane_on(width, kind),
-            )
-        }),
-    };
-    let tops = lane_tops(&lane, travel, |i| {
-        here(lane[i]).map_or(crate::travel::RoadKind::Street, |r| r.1)
-    });
+    let laid = LaneLine::new(g, centre, path.roads).laid(g, 2.0 * CAR_HALF);
+    let tops = lane_tops(&laid.lane, travel, |i| laid.here[i].kind);
     let mut legs = Legs::default();
-    for (i, &p) in lane.iter().enumerate() {
-        let (_, kind, room, at) = here(p)?;
-        legs.push_lane(p, tops[i], room, at);
-        legs.mark_kind(kind);
-        if let Some(m) = marks.as_ref() {
-            legs.mark_last(laid_from.mark(m, p));
-        }
+    for (i, (&p, here)) in laid.lane.iter().zip(&laid.here).enumerate() {
+        legs.push_marked(p, tops[i], here.room, here.lane, here.kind, laid.mark(i));
     }
     Some(legs.timed(true, stop_end))
 }

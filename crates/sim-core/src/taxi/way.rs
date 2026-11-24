@@ -612,11 +612,7 @@ pub(super) fn lay_route(
                 // (Less on the outside of a bend to the left, where its corners stand out.)
                 let (room, meet) = crate::cars::meet(roads[i], offs[i], TAXI_WID);
                 let room = room - crate::cars::bend_out(&lane, k, TAXI_LEN);
-                out.push_lane(p, top, room.max(0.0), meet);
-                out.mark_kind(along[i].1);
-                if let Some(m) = mark {
-                    out.mark_last(m);
-                }
+                out.push_marked(p, top, room.max(0.0), meet, along[i].1, mark);
             }
             // (The claim of the stand before, closed once there's way on to close it at.)
             if let Some(s) = stood.take() {

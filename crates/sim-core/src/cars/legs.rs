@@ -120,6 +120,24 @@ impl Legs {
         }
     }
 
+    /// `push_lane`, marked as on a road of `kind` (`mark_kind`) and with its marks (`mark_last`:
+    /// `LaneLine::laid`) where it has them.
+    pub(crate) fn push_marked(
+        &mut self,
+        p: [f32; 2],
+        top: f32,
+        room: f32,
+        lane: f32,
+        kind: crate::travel::RoadKind,
+        mark: Option<(crate::travel::Layer, bool)>,
+    ) {
+        self.push_lane(p, top, room, lane);
+        self.mark_kind(kind);
+        if let Some(m) = mark {
+            self.mark_last(m);
+        }
+    }
+
     /// `push` of a point it backs up to (at `SLOW`), on a lane where a car can pull over `room`
     /// m, `lane` m right of the road's middle (`Route::room`, `Route::lane`).
     pub(crate) fn push_back(&mut self, p: [f32; 2], room: f32, lane: f32) {

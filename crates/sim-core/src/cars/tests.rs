@@ -1809,7 +1809,6 @@ fn a_classic_way_keeps_its_points_and_lanes() {
     assert_eq!(line.pts, pts);
     let offs: Vec<f32> = path.pts.iter().map(|p| lane_on(p.1, p.2)).collect();
     assert_eq!(line.offs, offs);
-    assert!(line.nearest([5.0, 1.0]).is_none());
 }
 
 /// Off a motorway's carriageway by a ramp (a merge: no box), a car's lane eases from the
