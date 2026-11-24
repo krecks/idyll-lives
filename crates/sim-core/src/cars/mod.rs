@@ -73,7 +73,12 @@
 //! way in is clear of the one before it, the ground in front of it too, the one there longest first
 //! (`room_to_come_in`): those coming home at the same time come in one after another, not on top
 //! of each other. A trip's car parks only in a spot no other car is parked at or on its way to
-//! (`parking_for`).
+//! (`parking_for`). On an avenue, a motorway or a ramp (`travel::fast_kind`) it goes at a speed of
+//! its own (`Car::speed`, `ease`): it speeds up and slows down as a driver would, `ACCEL` and
+//! `BRAKE` (`BRAKE_MOST` at most), keeps back from the one in front the further the faster it
+//! goes, slows to a stop behind one standing and to a red light or a merge it's waiting for, and
+//! takes turns with one merging; elsewhere (every classic town) it keeps to its way's timing, a
+//! tick on or none, as ever.
 //!
 //! Where its way crosses or meets another's, it takes turns with the other cars (`traffic/`):
 //! into a junction's box, across a lane out of its driveway or a bay (or into one), and round a 6 m

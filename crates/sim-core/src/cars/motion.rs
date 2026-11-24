@@ -57,6 +57,8 @@ impl Car {
             let_by: None,
             avoided: Vec::new(),
             pass_by: None,
+            speed: None,
+            merge_first: Vec::new(),
         }
     }
 
@@ -129,6 +131,7 @@ impl Car {
     /// pulled over for anyone.
     pub(super) fn unhold(&mut self) {
         self.moved = false;
+        self.speed = None;
         self.waits_for = None;
         self.on_foot.clear();
         self.waited = 0;
@@ -211,6 +214,8 @@ impl Car {
             let_by: None,
             avoided: Vec::new(),
             pass_by: None,
+            speed: None,
+            merge_first: Vec::new(),
         }
     }
 
@@ -590,11 +595,27 @@ pub(crate) fn lane_tops(
     junctions: &[[f32; 2]],
     kind_at: impl Fn(usize) -> crate::travel::RoadKind,
 ) -> Vec<f32> {
-    use crate::travel::dist;
+    use crate::travel::{RoadKind, dist};
     let n = lane.len();
     let mut tops: Vec<f32> = (0..n)
         .map(|i| crate::travel::kind_speed(kind_at(i), travel.country_speed))
         .collect();
+    // (Up an on-ramp's last `MERGE_LANE` m before its carriageway, the carriageway's speed: it
+    // speeds up there to merge, as far as its bends let it, `Legs::timed`.)
+    let mut on_motorway: Option<usize> = None;
+    for i in (0..n).rev() {
+        match kind_at(i) {
+            RoadKind::Motorway => on_motorway = Some(i),
+            RoadKind::Ramp => {
+                if let Some(m) = on_motorway
+                    && dist(lane[i], lane[m]) < MERGE_LANE
+                {
+                    tops[i] = tops[i].max(tops[m]);
+                }
+            }
+            _ => on_motorway = None,
+        }
+    }
     let heading = |a: usize, b: usize| {
         let (p, q) = (lane[a], lane[b]);
         (q[0] - p[0]).atan2(q[1] - p[1])
@@ -635,8 +656,23 @@ pub(crate) fn lane_tops(
     tops
 }
 
+/// How far up an on-ramp before it merges a car speeds up to the carriageway's speed (m,
+/// `lane_tops`): the claim's stretch up the ramp (`MERGE_UP`) and a little.
+const MERGE_LANE: f32 = MERGE_UP + 10.0;
+
 /// `empty_drive_ticks`'s drive, laid out.
 pub(crate) fn empty_drive_route(travel: &Travel, from: [f32; 2], to: [f32; 2]) -> Option<Route> {
+    empty_drive_route_to(travel, from, to, true)
+}
+
+/// `empty_drive_route`, standing at its end (`stop_end`) or going on past it at speed, as a car
+/// leaving town does.
+pub(crate) fn empty_drive_route_to(
+    travel: &Travel,
+    from: [f32; 2],
+    to: [f32; 2],
+    stop_end: bool,
+) -> Option<Route> {
     let g = &travel.graph;
     let a = *g.near(from, ROAD_REACH, 1, Mode::Car).first()?;
     let b = *g.near(to, ROAD_REACH, 1, Mode::Car).first()?;
@@ -673,13 +709,14 @@ pub(crate) fn empty_drive_route(travel: &Travel, from: [f32; 2], to: [f32; 2]) -
     });
     let mut legs = Legs::default();
     for (i, &p) in lane.iter().enumerate() {
-        let (_, _, room, at) = here(p)?;
+        let (_, kind, room, at) = here(p)?;
         legs.push_lane(p, tops[i], room, at);
+        legs.mark_kind(kind);
         if let Some(m) = marks.as_ref() {
-            legs.mark_last(m[laid_from.next(p)]);
+            legs.mark_last(laid_from.mark(m, p));
         }
     }
-    Some(legs.timed(true, true))
+    Some(legs.timed(true, stop_end))
 }
 
 /// How many ticks a car takes along the roads from the road nearest `from` to the road nearest
