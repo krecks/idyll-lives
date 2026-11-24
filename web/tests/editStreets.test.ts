@@ -750,6 +750,23 @@ describe('avenues and one-way streets drawn', () => {
     expect(refusal(oneWay(1, route.slice(0, 3)))).toBe(ONE_WAY_ENDS);
   });
 
+  test('a one-way street is judged by which roads it cuts off, not how many: reconnecting a trap, it may; cut off itself, it may not', () => {
+    // A one-way lane north off the high street into a road with no other way out: both cut off already.
+    const trapped = town();
+    trapped.roads.push(
+      { points: line(250, MAIN_Z + 2.15, 250, 160), width: 7, ends: ['join', 'join'], kind: 'lane', area: 0, name: 'Trap Lane', oneway: 1 },
+      { points: line(180, 160, 330, 160), width: 7, ends: ['dead', 'dead'], kind: 'street', area: 0, name: 'Pound Road' },
+    );
+    const [trap, pound] = [trapped.roads.length - 2, trapped.roads.length - 1];
+    expect(cutOffRoads(trapped.roads)).toEqual(expect.arrayContaining([trap, pound]));
+    const oneWay = (pts: Pt[]) => drawStreet(trapped, t, content, { points: pts, kind: 'street', clear: true, fill: false, seed: 7, oneway: 1 });
+    // Back out of it, south to the high street: everything reached and left again.
+    const out = made(oneWay(line(300, 160, 300, MAIN_Z + 3.5 + 1)));
+    expect(cutOffRoads(out.draft.roads)).toEqual([]);
+    // Into it from the high street: the trap stays one, and the new street is in it too.
+    expect(refusal(oneWay(line(210, MAIN_Z + 3.5 + 1, 210, 160)))).toBe(CUT_OFF);
+  });
+
   test('a street drawn into the motorway is refused; nothing snaps to it', () => {
     const draft = hierarchy();
     expect(refusal(draw(draft, [[250, 92], [250, 260]]))).toBe(CROSS_MOTORWAY);

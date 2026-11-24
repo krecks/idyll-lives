@@ -745,7 +745,11 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
     }
   }
   if (!oneNetwork(next, new Set())) return refused('it joins none of the roads');
-  if (fresh.some((i) => onewayOf(next[i])) && cutOffRoads(next).length > cutOffBefore(roads).length) return refused(CUT_OFF);
+  if (fresh.some((i) => onewayOf(next[i]))) {
+    // (What was cut off before, numbered as `next` numbers it: the dead end it merged is the road it carries on.)
+    const now = (i: number) => (merged < 0 ? i : i === merged ? (base > merged ? base - 1 : base) : i > merged ? i - 1 : i);
+    if (newlyCutOff(new Set(cutOffBefore(roads).map(now)), next).length) return refused(CUT_OFF);
+  }
 
   // ---- the footpaths it crosses, cut to meet it in a T either side (one it crosses on a bridge's deck passes under it) ----
   if (!trail) {
