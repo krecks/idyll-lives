@@ -444,16 +444,11 @@ fn phases_of(g: &Graph, arms: &[ArmAt], roundabout: bool) -> (Vec<u8>, u8) {
 }
 
 /// Whether `p` is on a road's carriageway in `g` (within its kerb of its middle line and `margin`
-/// more), not the motorway's (a pole may stand under its deck): no signal pole stands there
-/// (`signal_at`).
+/// more), not the motorway's (a pole may stand under its deck: `Graph::carriageways_near`): no
+/// signal pole stands there (`signal_at`).
 fn on_carriageway(g: &Graph, p: [f32; 2], margin: f32) -> bool {
-    g.near(p, POLE_LOOK, 6, crate::travel::Mode::Car)
-        .iter()
-        .any(|rp| {
-            let r = &g.roads[rp.road as usize];
-            r.kind != crate::travel::RoadKind::Motorway
-                && rp.off < crate::cars::kerb_of(r.width, r.kind) + margin
-        })
+    g.carriageways_near(p, POLE_LOOK, 6)
+        .any(|(off, kerb)| off < kerb + margin)
 }
 
 /// Whether a road of `ring` (per road of a graph: a roundabout's) is among `arms`'.

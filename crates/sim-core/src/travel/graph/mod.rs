@@ -692,6 +692,25 @@ impl Graph {
     }
 
     /// The place `s` m along the town file's road `source` (`drives[].road/s`), if it's in the
+    /// The carriageways near `p` (of the `n` roads for cars nearest it within `look` m, `near`),
+    /// each as how far `p` is from its middle line and how far out its kerbs are (`cars::kerb_of`).
+    /// Not the motorway's: up on its deck, or beside it behind its fences, nobody on foot stands
+    /// in it and no pole stands in its way (`Travel::on_carriageway`, `traffic::signal_at`).
+    pub(crate) fn carriageways_near(
+        &self,
+        p: [f32; 2],
+        look: f32,
+        n: usize,
+    ) -> impl Iterator<Item = (f32, f32)> + '_ {
+        self.near(p, look, n, Mode::Car)
+            .into_iter()
+            .filter_map(move |rp| {
+                let road = &self.roads[rp.road as usize];
+                (road.kind != RoadKind::Motorway)
+                    .then(|| (rp.off, crate::cars::kerb_of(road.width, road.kind)))
+            })
+    }
+
     /// network.
     pub fn at_source(&self, source: u32, s: f32) -> Option<RoadPoint> {
         let road = self.roads.iter().position(|r| r.source == source)? as u32;

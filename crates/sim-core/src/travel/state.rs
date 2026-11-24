@@ -139,17 +139,12 @@ impl Travel {
     }
 
     /// Whether `p` is in a road's carriageway, between the kerbs of one for cars (a country
-    /// road's, its edges), `margin` m in from them at least. Not the motorway's: up on its deck,
-    /// or beside it behind its fences, nobody on foot stands in it.
+    /// road's, its edges), `margin` m in from them at least (`Graph::carriageways_near`: not the
+    /// motorway's).
     pub fn on_carriageway(&self, p: [f32; 2], margin: f32) -> bool {
         self.graph
-            .near(p, CARRIAGEWAY_LOOK, 4, Mode::Car)
-            .iter()
-            .any(|rp| {
-                let road = &self.graph.roads[rp.road as usize];
-                road.kind != RoadKind::Motorway
-                    && rp.off <= crate::cars::kerb_of(road.width, road.kind) - margin
-            })
+            .carriageways_near(p, CARRIAGEWAY_LOOK, 4)
+            .any(|(off, kerb)| off <= kerb - margin)
     }
 
     /// The area a point is in, if any.
