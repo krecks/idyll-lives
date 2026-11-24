@@ -1153,8 +1153,8 @@ function motorwayRenamed(roads: readonly RoadPlan[], old: string, wanted: string
 /**
  * `draft` with `what` called `name` (spaces tidied): a road's houses keep their numbers along it
  * with the new name; a place's public lot is called as it is; the main town (area 0) is the town; the motorway (any
- * of its carriageways or ramps) is named whole (`motorwayName`: "M36" makes "M36 Eastbound" and "M36 Junction 12 Exit"
- * "M4 Eastbound" and "M4 Junction 12 Exit"). Refused for no name, a name over 40 letters, or one another road, place, village or the town has.
+ * of its carriageways or ramps) is named whole (`motorwayName`: M36 renamed M4, "M36 Eastbound" and "M36 Junction 12
+ * Exit" become "M4 Eastbound" and "M4 Junction 12 Exit"). Refused for no name, a name over 40 letters, or one another road, place, village or the town has.
  */
 export function rename(draft: NeighbourhoodDraft, what: Named, name: string): Edited {
   const wanted = name.trim().replace(/\s+/g, ' ');
