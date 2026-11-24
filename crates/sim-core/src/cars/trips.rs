@@ -50,7 +50,9 @@ pub(crate) fn drives_to(car: &Car, travel: &Travel, at: [f32; 2]) -> bool {
         return false;
     };
     let speed = travel.country_speed;
-    g.path_cost(m, p, Mode::Car, speed).is_some() && g.path_cost(p, m, Mode::Car, speed).is_some()
+    // (Back too only where a one-way road could make it another way: `Graph::has_oneway`.)
+    g.path_cost(m, p, Mode::Car, speed).is_some()
+        && (!g.has_oneway() || g.path_cost(p, m, Mode::Car, speed).is_some())
 }
 
 /// The car `sim` drives to plot `plot` in an open-world town, and the door they get in by and

@@ -387,7 +387,9 @@ pub(crate) fn passing(
     }
     let u = [ahead[0] - theirs[0], ahead[1] - theirs[1]];
     let n = u[0].hypot(u[1]).max(1e-6);
-    let (u, left) = ([u[0] / n, u[1] / n], [-u[1] / n, u[0] / n]);
+    let u = [u[0] / n, u[1] / n];
+    let right = right_of(u);
+    let left = [-right[0], -right[1]];
     let d = [b.0[0] - a.0[0], b.0[1] - a.0[1]];
     let (along, apart) = (d[0] * u[0] + d[1] * u[1], d[0] * left[0] + d[1] * left[1]);
     // (How far each reaches across that way, turned as it is; and moves, pulling over to its

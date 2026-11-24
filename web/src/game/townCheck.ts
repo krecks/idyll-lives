@@ -32,7 +32,7 @@ import { BEND_RADIUS } from './motorway';
 import { unrle } from './landMasks';
 import { COURT, inside, lengths, nearest, pointAt, RoadIndex, roadEnds, roadMask, sharpestTurn, sideBySide, type Pt } from './roads';
 import { kindInfo, onewayOf } from '../core/roadKinds';
-import { cutOffRoads } from './oneway';
+import { oneWayCut } from './oneway';
 import { BIG_COURTS, COURTS, NEIGHBOUR_CAP, turner, type Facing } from './town';
 import type { Expected } from './world';
 import * as pmath from './pmath';
@@ -159,15 +159,14 @@ function measureFill(town: CheckedTown, meadow: boolean): { built: number; empty
 }
 
 /**
- * What one-way roads cut off (`oneway.ts` `cutOffRoads`, less what is cut off whichever way the roads go: the networks'
+ * What one-way roads cut off (`oneway.ts` `oneWayCut`: `cutOffRoads`, less what is cut off whichever way the roads go: the networks'
  * check says that): each road a car can't drive to from the way out of town and back out again, and each lot along
  * one (its front's nearest car road). None without a one-way road.
  */
 function oneWayProblems(town: CheckedTown, roads: readonly RoadPlan[]): string[] {
   if (!roads.some((r) => onewayOf(r))) return [];
   // (By the roads alone, as the simulation routes a trip in town: `within`.)
-  const anyway = new Set(cutOffRoads(roads, true, true));
-  const cut = new Set(cutOffRoads(roads, false, true).filter((i) => !anyway.has(i)));
+  const cut = new Set(oneWayCut(roads, { within: true }));
   if (!cut.size) return [];
   const out = [...cut].map((r) => `${roads[r].kind ?? 'street'} ${roads[r].name ?? r} can't be driven to and back out of town (its one-way roads)`);
   const cars = roads.flatMap((r, i) => (kindInfo(r).lanesEachWay > 0 ? [i] : []));

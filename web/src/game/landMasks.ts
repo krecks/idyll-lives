@@ -6,14 +6,12 @@
  */
 
 import type { Rle } from '../core/protocol';
-import { inside, type Pt } from './roads';
+import { dist, inside, round2, type Pt } from './roads';
 import * as pmath from './pmath';
 
 /** The world generator's land cells (m): `outlines`' cells unless told otherwise. */
 const MACRO_CELL = 8;
 
-const dist = (a: Pt, b: Pt) => pmath.hypot(a[0] - b[0], a[1] - b[1]);
-const round2 = (v: number) => Math.round(v * 100) / 100;
 
 /** A polyline with the points that hardly change its course taken out (Douglas-Peucker, `tol` m). */
 export function simplify(pts: readonly Pt[], tol: number): Pt[] {

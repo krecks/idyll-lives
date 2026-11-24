@@ -16,6 +16,8 @@
 
 import type { WorldStructure } from '../../core/protocol';
 import { townExits } from './roads';
+import { ROAD_KIND } from '../../core/roadKinds';
+import { MOTORWAY } from './motorway';
 import { mulberry32 } from '../../game/noise';
 
 /** Road widths (m): as wide as the town's streets where they leave it, narrower out in the country. */
@@ -25,10 +27,10 @@ export const COUNTRY_WIDTH = 5;
 export const STEP = 4;
 /** Straight out of town for this many points before it starts to wind. */
 export const STRAIGHT = 5;
-/** A motorway's carriageway past the edge (m: `roadKinds.ts`' 9), how near its pair's end is at the edge, and its barrier's foot. */
-export const MOTORWAY_WIDTH = 9;
+/** A motorway's carriageway past the edge (m: as in the town), how near its pair's end is at the edge, and its barrier's foot. */
+export const MOTORWAY_WIDTH = ROAD_KIND.motorway.width;
 const MOTORWAY_PAIR = 30;
-export const BARRIER_FOOT = 0.6;
+const BARRIER_FOOT = MOTORWAY.base;
 /** A motorway's deck over the water past the edge: its road this far over the water's top (m), and from where it is (m: the town's bridge at the edge) it comes down to that over this far (m). */
 export const DECK_OVER = 1.6;
 const DECK_EASE = 60;

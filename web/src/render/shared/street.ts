@@ -58,10 +58,10 @@ import { compose, quatYawPitchRoll, type Quat } from './math';
 import { placementVariation, type StandIn } from './modelEntry';
 import { wallCorners, writeFences } from './fences';
 import { shownFences } from './shownFences';
-import { centroid, lengths, nearest as nearestOf, pointAt } from '../../game/roads';
-import { kindInfo } from '../../core/roadKinds';
+import { centroid, lengths, pointAt } from '../../game/roads';
+import { isSeparated, kindInfo } from '../../core/roadKinds';
 import { junctionStretches } from './markings';
-import { allBarriers, barrier, deckLevels, liftedStretches, MOTORWAY_SIGN, motorwayPairs, signSpots, without } from './motorway';
+import { allBarriers, barrier, deckLevels, liftedStretches, MOTORWAY_SIGN, motorwayPairs, OVERPASS, OVERPASS_CONCRETE, signSpots, without } from './motorway';
 import { pavedRects } from './paving';
 import { streetGround, streetGroundChunks, streetGroundKey } from './streetGround';
 import { bridgeSpans, Kerb, KERB, levelStops, raisedSpans, ROAD_Y, roadIndex, roadMeshes, SIDEWALK, stretchOf, townRoads, WALK_Y, walkStops, type RoadIndex, type RoadLevels } from './roads';
@@ -669,20 +669,12 @@ interface StaticPart {
 
 /**
  * An avenue's median: its trees (a model the woods have), how far apart and how far from a junction's pad; its grass's
- * material (the land's, a detail texture its vertex colour tones: `roads.ts` `MEDIAN_GRASS`).
+ * material (the land's, a detail texture toned by its vertex colour, `roads.ts` `MEDIAN_GRASS`).
  */
 const MEDIAN_TREE = 'model.tree.maple';
 const MEDIAN_TREE_EVERY = 12;
 const MEDIAN_TREE_CLEAR = 5;
-const MEDIAN_GRASS = 'material.ground';
-
-/** The verge between carriageway `a` of `roads` and its pair `b` (m: how far apart their edges are at `a`'s middle). */
-function pairVerge(roads: readonly RoadPlan[], a: number, b: number): number {
-  const [ra, rb] = [roads[a], roads[b]];
-  const ls = lengths(ra.points);
-  const { p } = pointAt(ra.points, ls[ls.length - 1] / 2, ls);
-  return Math.max(0, nearestOf(rb.points, p[0], p[1]).dist - (ra.width + rb.width) / 2);
-}
+const MEDIAN_MATERIAL = 'material.ground';
 
 export class TownStreet {
   readonly plots: PlotLayout[];
@@ -706,6 +698,12 @@ export class TownStreet {
   private levels: Levels | null;
   /** Every road of the town as laid out (what `levels` finds them by). */
   private readonly allRoads: RoadPlan[];
+  /**
+   * The roads with a surface drawn: `roads`, then the country roads. One array for the street's life, so what is worked
+   * out once per set of roads (the motorway's pairs, its gores, its signs: `motorway.ts`, `markings.ts`) is when the land
+   * moves (`landMoved`) too.
+   */
+  private readonly surfaced: RoadPlan[];
   /** Each plot's index among the world's (its pad's, `BuiltSurface.padY`), by id. */
   private readonly plotIndex = new Map<number, number>();
   private readonly cuts: JunctionCuts;
@@ -792,6 +790,7 @@ export class TownStreet {
     this.cuts = JunctionCuts.of(this.junctions);
     this.levels = levelsOf(world, all);
     this.allRoads = all;
+    this.surfaced = [...this.roads, ...this.ways.country];
     world.plots.forEach((p, i) => this.plotIndex.set(p.id, i));
     this.paths = world.meta?.paths ?? [];
     this.fields = world.meta?.world?.fields ?? [];
@@ -884,7 +883,7 @@ export class TownStreet {
     const levels = this.levels;
     if (!levels) return '-';
     const beds: number[] = [];
-    for (const road of [...this.roads, ...this.ways.country]) {
+    for (const road of this.surfaced) {
       for (const [s0, s1] of bridgeSpans(road)) {
         const ls = lengths(road.points);
         for (let u = s0; u <= s1; u += 2) {
@@ -1052,7 +1051,7 @@ export class TownStreet {
 
   /** How many bridge decks the street draws (every road's spans, `bridgeSpans`): for the benches. */
   bridgeCount(): number {
-    return [...this.roads, ...this.ways.country].reduce((n, r) => n + bridgeSpans(r).length, 0);
+    return this.surfaced.reduce((n, r) => n + bridgeSpans(r).length, 0);
   }
 
   /** Takes the world's things, houses and rooms as they are now (the layout stays: see `layoutKey`). */
@@ -1938,7 +1937,7 @@ export class TownStreet {
     const roadLevels: RoadLevels | null = levels ?? deckLevels(this.allRoads);
     const median = new RoutedGeo((x, z) => at(x, z).median);
     roadMeshes(this.walkStops.roads, null, 0, { walk, shadows, ...(this.options.ground ? { median } : {}) }, 'sidewalks', this.junctions, undefined, roadLevels);
-    const all = [...this.roads, ...this.ways.country];
+    const all = this.surfaced;
     if (this.options.ground) {
       // (Worn between the kerbs; a road without them, from edge to edge.)
       const [road, marks] = [new RoutedGeo((x, z) => at(x, z).road), new RoutedGeo((x, z) => at(x, z).marks)];
@@ -1985,7 +1984,7 @@ export class TownStreet {
     // them (`deckLevels`).
     const pairs = motorwayPairs(all);
     all.forEach((road, ri) => {
-      const concrete = road.kind === 'motorway' || road.kind === 'ramp';
+      const concrete = isSeparated(road.kind);
       // (On a land the town follows, its deck as the road climbs over it, its piers down to the bed or the ground.)
       const heightsOf = (s0: number) => {
         if (!roadLevels) return undefined;
@@ -1993,7 +1992,7 @@ export class TownStreet {
         return { deck: (u: number) => roadLevels.road(road, s0 + u), bed: (x: number, z: number) => (levels ? levels.surface.landAt(x, z) : 0), under: (x: number, z: number) => (levels ? levels.groundUnder(x, z) : 0), stops };
       };
       const pair = pairs.get(ri);
-      const inner = pair && { inner: pair.side, innerApron: pairVerge(all, ri, pair.other) / 2 };
+      const inner = pair && { inner: pair.side, innerApron: pair.verge / 2 };
       const deck = (s0: number, s1: number, solid = false) => {
         const h = heightsOf(s0);
         // (Its piers and abutments on the ground with every deck taken away: `BuiltSurface.groundUnder`.)
@@ -2189,7 +2188,7 @@ export class TownStreet {
       if (marks && !marks.empty) out.push({ name: 'roadMarks', material: 'paint', geo: marks, paint: true });
       // (An avenue's median's grass: the land's grass material.)
       const median = this.staticParts().get(id)?.median;
-      if (median && !median.empty) out.push({ name: 'medians', material: MEDIAN_GRASS, geo: median, toned: true });
+      if (median && !median.empty) out.push({ name: 'medians', material: MEDIAN_MATERIAL, geo: median, toned: true });
       const all = new Map(this.groundRects().map(([name, rects]) => [name, rects]));
       for (const [name, list, material, y] of layers) {
         const geo = new Geo();
@@ -2323,87 +2322,36 @@ export function bridge(
 ): void {
   const B = BRIDGE;
   const half = width / 2 + B.apron;
-  const runs = straightRuns(deck, 0.03);
-  const ls = [0];
-  for (let i = 1; i < runs.length; i++) ls.push(ls[i - 1] + Math.hypot(runs[i][0] - runs[i - 1][0], runs[i][1] - runs[i - 1][1]));
-  const total = ls[ls.length - 1];
-  if (total < 0.01) return;
-  const n = Math.max(1, Math.ceil(total / B.pier - 1e-6));
-  const P = total / n;
-  const dirOf = (i: number): [number, number] => {
-    const l = ls[i + 1] - ls[i];
-    return [(runs[i + 1][0] - runs[i][0]) / l, (runs[i + 1][1] - runs[i][1]) / l];
-  };
-  // (How far a run's pieces reach past its end round the bend into the next: the gap on the bend's outside, half each.)
-  const past = (i: number): number => {
-    if (i <= 0 || i >= runs.length - 1) return 0;
-    const [a, b] = [dirOf(i - 1), dirOf(i)];
-    const turn = Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1])));
-    return half * Math.tan(Math.min(turn, 1) / 2) + 0.01;
-  };
-  for (let i = 0; i + 1 < runs.length; i++) {
-    const len = ls[i + 1] - ls[i];
-    const [dx, dz] = dirOf(i);
-    // (Local +z along the deck: `Painter.at` turns +z to (sin yaw, cos yaw).)
-    const yaw = Math.atan2(dx, dz);
-    // The run cut where the piers stand.
-    const cuts = [0];
-    for (let k = Math.floor(ls[i] / P + 1e-6) + 1; k * P < ls[i + 1] - 1e-6; k++) cuts.push(k * P - ls[i]);
-    cuts.push(len);
-    for (let c = 0; c + 1 < cuts.length; c++) {
-      const [from, to] = [cuts[c] - (c === 0 ? past(i) : 0), cuts[c + 1] + (c + 2 === cuts.length ? past(i + 1) : 0)];
-      // (Cut again where the road's surface takes its heights, on a land the town follows.)
-      const bounds = [from, ...(heights?.stops ?? []).map((u) => u - ls[i]).filter((u) => u > from + 0.05 && u < to - 0.05), to];
-      for (let k = 0; k + 1 < bounds.length; k++) {
-        const [u0, u1] = [bounds[k], bounds[k + 1]];
-        const L = u1 - u0;
-        const [mx, mz] = [runs[i][0] + dx * (u0 + L / 2), runs[i][1] + dz * (u0 + L / 2)];
-        // (Climbing with the road: at its height at the piece's middle, sheared to its heights at its ends.)
-        const [ya, yb] = heights ? [heights.deck(ls[i] + u0), heights.deck(ls[i] + u1)] : [0, 0];
-        const p = into(mx, mz).at(mx, mz, yaw, (ya + yb) / 2, L > 0 ? (yb - ya) / L : 0);
-        const [first, last] = [i === 0 && c === 0 && k === 0, i + 2 === runs.length && c + 2 === cuts.length && k + 2 === bounds.length];
-        // The deck (no underside: it is under the water), closed at the bridge's two ends.
-        const ends = `${first ? '' : 'nz'}${last ? '' : 'pz'}`;
-        p.paint(BRIDGE_STONE, 0.9).box(-half, B.under, -L / 2, half, B.top, L / 2, `ny${ends}`);
-        for (const side of [-1, 1]) {
-          const [o0, o1] = side < 0 ? [-half, -half + B.wall] : [half - B.wall, half];
-          p.paint(BRIDGE_STONE, 0.9).box(o0, B.top, -L / 2, o1, B.top + B.parapet - B.coping, L / 2, `ny${ends}`);
-          p.paint(BRIDGE_COPING, 0.8).box(o0 - 0.05, B.top + B.parapet - B.coping, -L / 2, o1 + 0.05, B.top + B.parapet, L / 2, ends);
-          // A post at each end of the parapet.
-          for (const [end, at] of [[first, -L / 2], [last, L / 2]] as const) {
-            if (!end) continue;
-            const x = side * (half - B.post / 2);
-            p.paint(BRIDGE_COPING, 0.85).box(x - B.post / 2, B.top, at - B.post / 2, x + B.post / 2, B.top + B.postUp, at + B.post / 2, 'ny');
-          }
-          // A pier's nose where the piece between two piers begins (not at the bridge's start: its abutment is on the
-          // bank), down to the bed under it on a land the town follows.
-          if (k === 0 && cuts[c] > 1e-6) {
-            const at = cuts[c] - u0 - L / 2;
-            let down: number = BRIDGE.under;
-            if (heights) {
-              const [nx, nz] = [mx + dx * at + dz * side * (half + BRIDGE.nose / 2), mz + dz * at - dx * side * (half + BRIDGE.nose / 2)];
-              down = Math.min(BRIDGE.under, heights.bed(nx, nz) - PIER_SINK - ((ya + yb) / 2 + (at * (yb - ya)) / (L || 1)));
-            }
-            nose(p, side, half, at, down);
-          }
+  deckPieces(deck, B.pier, into, heights?.deck, heights?.stops, ({ p, L, mx, mz, dx, dz, ya, yb, first, last, opens, cut, u0 }) => {
+    // The deck (no underside: it is under the water), closed at the bridge's two ends.
+    const ends = `${first ? '' : 'nz'}${last ? '' : 'pz'}`;
+    p.paint(BRIDGE_STONE, 0.9).box(-half, B.under, -L / 2, half, B.top, L / 2, `ny${ends}`);
+    for (const side of [-1, 1]) {
+      const [o0, o1] = side < 0 ? [-half, -half + B.wall] : [half - B.wall, half];
+      p.paint(BRIDGE_STONE, 0.9).box(o0, B.top, -L / 2, o1, B.top + B.parapet - B.coping, L / 2, `ny${ends}`);
+      p.paint(BRIDGE_COPING, 0.8).box(o0 - 0.05, B.top + B.parapet - B.coping, -L / 2, o1 + 0.05, B.top + B.parapet, L / 2, ends);
+      // A post at each end of the parapet.
+      for (const [end, at] of [[first, -L / 2], [last, L / 2]] as const) {
+        if (!end) continue;
+        const x = side * (half - B.post / 2);
+        p.paint(BRIDGE_COPING, 0.85).box(x - B.post / 2, B.top, at - B.post / 2, x + B.post / 2, B.top + B.postUp, at + B.post / 2, 'ny');
+      }
+      // A pier's nose where the piece between two piers begins (not at the bridge's start: its abutment is on the
+      // bank), down to the bed under it on a land the town follows.
+      if (opens && cut > 1e-6) {
+        const at = cut - u0 - L / 2;
+        let down: number = BRIDGE.under;
+        if (heights) {
+          const [nx, nz] = [mx + dx * at + dz * side * (half + BRIDGE.nose / 2), mz + dz * at - dx * side * (half + BRIDGE.nose / 2)];
+          down = Math.min(BRIDGE.under, heights.bed(nx, nz) - PIER_SINK - ((ya + yb) / 2 + (at * (yb - ya)) / (L || 1)));
         }
+        nose(p, side, half, at, down);
       }
     }
-  }
+  }, { bend: half });
 }
 
-/**
- * An overpass's measures (m): its concrete slab `slab` deep under the road, reaching `apron` past the road's edges, closed
- * `lid` under the road's surface (out of sight, there for its shadow, clear of the road's own in the sun's map); its
- * parapet (a safety-shape barrier: a foot `foot` wide and `footHigh` high, then up to `parapet` over the road, `top`
- * wide) along each outer edge; a pier every `pier` m or a little less, beside a road it passes over rather than on it
- * (`pierStations`; `column` square columns, one under a deck
- * narrower than `wide`, two under a wider one, on a cross-head `cap` along and `capDeep` deep), each `sink` into the
- * ground; an abutment `abutment` thick under each end that stands clear of it. Where the deck stands less than `low`
- * over the ground, nothing stands under it.
- */
-export const OVERPASS = { slab: 1.1, lid: 0.3, apron: 0.5, parapet: 1.0, foot: 0.5, footHigh: 0.3, top: 0.24, pier: 20, column: 1.1, cap: 1.2, capDeep: 0.8, sink: 0.4, abutment: 1.2, wide: 8, low: 2.4 } as const;
-const OVERPASS_CONCRETE = '#ABA8A0';
+/** An overpass's parapet's concrete. */
 const OVERPASS_PARAPET = '#BCB9B1';
 
 /**
@@ -2431,90 +2379,63 @@ export function overpass(
 ): void {
   const O = OVERPASS;
   const solid = !!options.solid;
-  const runs = straightRuns(deck, 0.03);
-  const ls = [0];
-  for (let i = 1; i < runs.length; i++) ls.push(ls[i - 1] + Math.hypot(runs[i][0] - runs[i - 1][0], runs[i][1] - runs[i - 1][1]));
-  const total = ls[ls.length - 1];
-  if (total < 0.01) return;
-  const n = Math.max(1, Math.ceil(total / O.pier - 1e-6));
-  const P = total / n;
-  const piers = pierStations(total, n, options.clear ?? []);
+  // (Where its piers stand, once its length is known: `pierStations`.)
+  let piers: readonly number[] = [];
   const isPier = (u: number) => u > 1e-6 && piers.some((v) => Math.abs(v - u) < 1e-6);
   // (Local +x is the deck's left: `Painter.at` turns +z to (sin yaw, cos yaw), +x to (cos yaw, -sin yaw).)
   const reach = (side: 1 | -1) => width / 2 + (options.inner === side ? (options.innerApron ?? 0) : O.apron);
   const [left, right] = [reach(1), reach(-1)];
-  const deckY = (u: number) => (heights ? heights.deck(u) : 0);
   const groundAt = (x: number, z: number) => (heights ? heights.ground(x, z) : 0);
-  for (let i = 0; i + 1 < runs.length; i++) {
-    const len = ls[i + 1] - ls[i];
-    const [dx, dz] = [(runs[i + 1][0] - runs[i][0]) / len, (runs[i + 1][1] - runs[i][1]) / len];
-    const yaw = Math.atan2(dx, dz);
-    // (Cut every `P` m, the pieces no longer than that, and where a pier stands.)
-    const inner: number[] = [];
-    for (let k = Math.floor(ls[i] / P + 1e-6) + 1; k * P < ls[i + 1] - 1e-6; k++) inner.push(k * P - ls[i]);
-    for (const v of piers) if (v > ls[i] + 1e-6 && v < ls[i + 1] - 1e-6) inner.push(v - ls[i]);
-    inner.sort((a, b) => a - b);
-    const cuts = [0, ...inner.filter((u, k) => k === 0 || u - inner[k - 1] > 0.05), len];
-    for (let c = 0; c + 1 < cuts.length; c++) {
-      const bounds = [cuts[c], ...(heights?.stops ?? []).map((u) => u - ls[i]).filter((u) => u > cuts[c] + 0.05 && u < cuts[c + 1] - 0.05), cuts[c + 1]];
-      for (let k = 0; k + 1 < bounds.length; k++) {
-        const [u0, u1] = [bounds[k], bounds[k + 1]];
-        const L = u1 - u0;
-        const [mx, mz] = [runs[i][0] + dx * (u0 + L / 2), runs[i][1] + dz * (u0 + L / 2)];
-        const [ya, yb] = [deckY(ls[i] + u0), deckY(ls[i] + u1)];
-        const p = into(mx, mz).at(mx, mz, yaw, (ya + yb) / 2, L > 0 ? (yb - ya) / L : 0);
-        const [first, last] = [i === 0 && c === 0 && k === 0, i + 2 === runs.length && c + 2 === cuts.length && k + 2 === bounds.length];
-        const ends = `${first ? '' : 'nz'}${last ? '' : 'pz'}`;
-        // (`under`: the ground `at` m along the piece and `x` across, from the deck's road.)
-        const under = (at: number, x: number) => {
-          const [wx, wz] = [mx + dx * at + dz * x, mz + dz * at - dx * x];
-          return groundAt(wx, wz) - ((ya + yb) / 2 + (at * (yb - ya)) / (L || 1));
-        };
-        // The slab (its top under the road's surface, which covers it); on a solid ramp, a wall down each outer side.
-        // (Its top: a lid `O.lid` under the road, unseen, for its shadow. Open, the sun's map saw only its sides, its
-        // underside facing away, culled: the shadow on the ground under it was its outline, zig-zagging over the banks.)
-        if (!solid) {
-          p.paint(OVERPASS_CONCRETE, 0.92).box(-right, -O.slab, -L / 2, left, ROAD_Y - 0.004, L / 2, `py${ends}`);
-          p.poly([[-right, -O.lid, -L / 2], [left, -O.lid, -L / 2], [left, -O.lid, L / 2], [-right, -O.lid, L / 2]], [0, 1, 0]);
-        }
-        else {
-          const foot = Math.min(under(-L / 2, 0), under(L / 2, 0)) - O.sink;
-          for (const side of [-1, 1] as const) {
-            if (options.inner === side) continue;
-            const [w0, w1] = side > 0 ? [left - O.foot, left] : [-right, -right + O.foot];
-            p.paint(OVERPASS_CONCRETE, 0.92).box(w0, foot, -L / 2, w1, ROAD_Y - 0.004, L / 2, `pyny${ends}`);
-          }
-        }
-        // The parapets, on its outer edges: a foot, the face above it.
-        for (const side of [-1, 1] as const) {
-          if (options.inner === side) continue;
-          const edge = side > 0 ? left : right;
-          const span = (a: number, b: number): [number, number] => (side > 0 ? [edge - b, edge - a] : [-edge + a, -edge + b]);
-          const [f0, f1] = span(0, O.foot);
-          p.paint(OVERPASS_PARAPET, 0.9).box(f0, ROAD_Y - 0.004, -L / 2, f1, O.footHigh, L / 2, `ny${ends}`);
-          const [t0, t1] = span(0.06, 0.06 + O.top);
-          p.box(t0, O.footHigh, -L / 2, t1, O.parapet, L / 2, `ny${ends}`);
-        }
-        // What stands under it down to the ground: a pier where a piece begins at one (`pierStations`), an abutment
-        // under each end.
-        if (solid) continue;
-        if (k === 0 && isPier(ls[i] + cuts[c])) {
-          const at = -L / 2;
-          const xs = width >= O.wide ? [-width / 4, width / 4] : [0];
-          if (xs.every((x) => under(at, x) < -O.low)) {
-            p.paint(OVERPASS_CONCRETE, 0.92).box(-right + 0.3, -O.slab - O.capDeep, at - O.cap / 2, left - 0.3, -O.slab, at + O.cap / 2, 'py');
-            for (const x of xs) p.box(x - O.column / 2, under(at, x) - O.sink, at - O.column / 2, x + O.column / 2, -O.slab - O.capDeep, at + O.column / 2, 'py');
-          }
-        }
-        for (const [end, at, s] of [[first, -L / 2, 1], [last, L / 2, -1]] as const) {
-          if (!end || Math.max(under(at, -right), under(at, left)) > -O.low) continue;
-          const foot = Math.min(under(at, -right), under(at, 0), under(at, left)) - O.sink;
-          const [z0, z1] = s > 0 ? [at, at + O.abutment] : [at - O.abutment, at];
-          p.paint(OVERPASS_CONCRETE, 0.92).box(-right, foot, z0, left, -O.slab, z1, 'py');
-        }
+  deckPieces(deck, O.pier, into, heights?.deck, heights?.stops, ({ p, L, mx, mz, dx, dz, ya, yb, first, last, opens, cut, run }) => {
+    const ends = `${first ? '' : 'nz'}${last ? '' : 'pz'}`;
+    // (`under`: the ground `at` m along the piece and `x` across, from the deck's road.)
+    const under = (at: number, x: number) => {
+      const [wx, wz] = [mx + dx * at + dz * x, mz + dz * at - dx * x];
+      return groundAt(wx, wz) - ((ya + yb) / 2 + (at * (yb - ya)) / (L || 1));
+    };
+    // The slab (its top under the road's surface, which covers it); on a solid ramp, a wall down each outer side.
+    // (Its top: a lid `O.lid` under the road, unseen, for its shadow. Open, the sun's map saw only its sides, its
+    // underside facing away, culled: the shadow on the ground under it was its outline, zig-zagging over the banks.)
+    if (!solid) {
+      p.paint(OVERPASS_CONCRETE, 0.92).box(-right, -O.slab, -L / 2, left, ROAD_Y - 0.004, L / 2, `py${ends}`);
+      p.poly([[-right, -O.lid, -L / 2], [left, -O.lid, -L / 2], [left, -O.lid, L / 2], [-right, -O.lid, L / 2]], [0, 1, 0]);
+    }
+    else {
+      const foot = Math.min(under(-L / 2, 0), under(L / 2, 0)) - O.sink;
+      for (const side of [-1, 1] as const) {
+        if (options.inner === side) continue;
+        const [w0, w1] = side > 0 ? [left - O.foot, left] : [-right, -right + O.foot];
+        p.paint(OVERPASS_CONCRETE, 0.92).box(w0, foot, -L / 2, w1, ROAD_Y - 0.004, L / 2, `pyny${ends}`);
       }
     }
-  }
+    // The parapets, on its outer edges: a foot, the face above it.
+    for (const side of [-1, 1] as const) {
+      if (options.inner === side) continue;
+      const edge = side > 0 ? left : right;
+      const span = (a: number, b: number): [number, number] => (side > 0 ? [edge - b, edge - a] : [-edge + a, -edge + b]);
+      const [f0, f1] = span(0, O.foot);
+      p.paint(OVERPASS_PARAPET, 0.9).box(f0, ROAD_Y - 0.004, -L / 2, f1, O.footHigh, L / 2, `ny${ends}`);
+      const [t0, t1] = span(0.06, 0.06 + O.top);
+      p.box(t0, O.footHigh, -L / 2, t1, O.parapet, L / 2, `ny${ends}`);
+    }
+    // What stands under it down to the ground: a pier where a piece begins at one (`pierStations`), an abutment
+    // under each end.
+    if (solid) return;
+    if (opens && isPier(run + cut)) {
+      const at = -L / 2;
+      const xs = width >= O.wide ? [-width / 4, width / 4] : [0];
+      if (xs.every((x) => under(at, x) < -O.low)) {
+        p.paint(OVERPASS_CONCRETE, 0.92).box(-right + 0.3, -O.slab - O.capDeep, at - O.cap / 2, left - 0.3, -O.slab, at + O.cap / 2, 'py');
+        for (const x of xs) p.box(x - O.column / 2, under(at, x) - O.sink, at - O.column / 2, x + O.column / 2, -O.slab - O.capDeep, at + O.column / 2, 'py');
+      }
+    }
+    for (const [end, at, s] of [[first, -L / 2, 1], [last, L / 2, -1]] as const) {
+      if (!end || Math.max(under(at, -right), under(at, left)) > -O.low) continue;
+      const foot = Math.min(under(at, -right), under(at, 0), under(at, left)) - O.sink;
+      const [z0, z1] = s > 0 ? [at, at + O.abutment] : [at - O.abutment, at];
+      p.paint(OVERPASS_CONCRETE, 0.92).box(-right, foot, z0, left, -O.slab, z1, 'py');
+    }
+  }, { piers: (total, n) => (piers = pierStations(total, n, options.clear ?? [])) });
 }
 
 /**
@@ -2537,6 +2458,97 @@ export function pierStations(total: number, n: number, clear: readonly (readonly
 }
 /** A pier stands at least this far (m) in from either end of its deck. */
 const PIER_END = 2;
+
+/** A piece of a deck as `deckPieces` walks it. */
+interface DeckPiece {
+  /** Its painter: at its middle, at the road's height there, sheared to the road's heights at its ends. */
+  p: Painter;
+  /** Its length (m), its middle, the way along it (a unit), the road's heights at its ends (m). */
+  L: number;
+  mx: number;
+  mz: number;
+  dx: number;
+  dz: number;
+  ya: number;
+  yb: number;
+  /** Whether it is the deck's first piece, its last. */
+  first: boolean;
+  last: boolean;
+  /**
+   * Whether it is the first piece of its cut (from a pier, or a run's start, to the next), where along its straight run
+   * that cut begins (m), where along the deck its run begins (m) and where along its run the piece itself begins (m:
+   * before the cut's start, round a bend).
+   */
+  opens: boolean;
+  cut: number;
+  run: number;
+  u0: number;
+}
+
+/**
+ * A deck along `deck` (its middle line) in pieces, each to `piece` with the painter `into` gives for where it is: a
+ * straight run at a time (a generated road's points are a metre apart), each run cut every `every` m or a little less
+ * (the deck's length shared out evenly), where `piers` stand (given the deck's length and how many lengths of `every`
+ * it is shared into), and where the road's surface takes its heights (`stops`, m along the deck: `levelStops`). Each
+ * piece climbs with the road (`deckY`, m along the deck; none: at 0). `bend`: how far out from its middle the deck
+ * reaches, its runs' pieces reaching a little past their ends round a bend to close the gap on its outside (0: not).
+ */
+function deckPieces(
+  deck: readonly (readonly [number, number])[],
+  every: number,
+  into: (x: number, z: number) => Painter,
+  deckY: ((u: number) => number) | undefined,
+  stops: readonly number[] | undefined,
+  piece: (q: DeckPiece) => void,
+  { piers, bend = 0 }: { piers?: (total: number, n: number) => readonly number[]; bend?: number } = {},
+): void {
+  const runs = straightRuns(deck, 0.03);
+  const ls = [0];
+  for (let i = 1; i < runs.length; i++) ls.push(ls[i - 1] + Math.hypot(runs[i][0] - runs[i - 1][0], runs[i][1] - runs[i - 1][1]));
+  const total = ls[ls.length - 1];
+  if (total < 0.01) return;
+  const n = Math.max(1, Math.ceil(total / every - 1e-6));
+  const P = total / n;
+  const stations = piers?.(total, n) ?? [];
+  const dirOf = (i: number): [number, number] => {
+    const l = ls[i + 1] - ls[i];
+    return [(runs[i + 1][0] - runs[i][0]) / l, (runs[i + 1][1] - runs[i][1]) / l];
+  };
+  // (How far a run's pieces reach past its end round the bend into the next: the gap on the bend's outside, half each.)
+  const past = (i: number): number => {
+    if (!bend || i <= 0 || i >= runs.length - 1) return 0;
+    const [a, b] = [dirOf(i - 1), dirOf(i)];
+    const turn = Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1])));
+    return bend * Math.tan(Math.min(turn, 1) / 2) + 0.01;
+  };
+  for (let i = 0; i + 1 < runs.length; i++) {
+    const len = ls[i + 1] - ls[i];
+    const [dx, dz] = dirOf(i);
+    // (Local +z along the deck: `Painter.at` turns +z to (sin yaw, cos yaw).)
+    const yaw = Math.atan2(dx, dz);
+    // (Cut every `P` m, the pieces no longer than that, and where a pier stands.)
+    const inner: number[] = [];
+    for (let k = Math.floor(ls[i] / P + 1e-6) + 1; k * P < ls[i + 1] - 1e-6; k++) inner.push(k * P - ls[i]);
+    for (const v of stations) if (v > ls[i] + 1e-6 && v < ls[i + 1] - 1e-6) inner.push(v - ls[i]);
+    inner.sort((a, b) => a - b);
+    const cuts = [0, ...inner.filter((u, k) => k === 0 || u - inner[k - 1] > 0.05), len];
+    for (let c = 0; c + 1 < cuts.length; c++) {
+      const [from, to] = [cuts[c] - (c === 0 ? past(i) : 0), cuts[c + 1] + (c + 2 === cuts.length ? past(i + 1) : 0)];
+      // (Cut again where the road's surface takes its heights, on a land the town follows.)
+      const bounds = [from, ...(stops ?? []).map((u) => u - ls[i]).filter((u) => u > from + 0.05 && u < to - 0.05), to];
+      for (let k = 0; k + 1 < bounds.length; k++) {
+        const [u0, u1] = [bounds[k], bounds[k + 1]];
+        const L = u1 - u0;
+        const [mx, mz] = [runs[i][0] + dx * (u0 + L / 2), runs[i][1] + dz * (u0 + L / 2)];
+        // (Climbing with the road: at its height at the piece's middle, sheared to its heights at its ends.)
+        const [ya, yb] = deckY ? [deckY(ls[i] + u0), deckY(ls[i] + u1)] : [0, 0];
+        const p = into(mx, mz).at(mx, mz, yaw, (ya + yb) / 2, L > 0 ? (yb - ya) / L : 0);
+        const [first, last] = [i === 0 && c === 0 && k === 0, i + 2 === runs.length && c + 2 === cuts.length && k + 2 === bounds.length];
+        piece({ p, L, mx, mz, dx, dz, ya, yb, first, last, opens: k === 0, cut: cuts[c], run: ls[i], u0 });
+      }
+    }
+  }
+}
 
 /** A polyline with the points dropped where it runs on straight: each run's points within `most` m of the line from its start to its end. */
 function straightRuns(pts: readonly (readonly [number, number])[], most: number): [number, number][] {

@@ -44,8 +44,8 @@
 
 import type { Content } from '../../content/content';
 import type { RoadKind, RoadPlan } from '../../core/protocol';
-import { onewayOf, ROAD_KIND } from '../../core/roadKinds';
-import { cutOffRoads } from '../oneway';
+import { isSeparated, onewayOf, ROAD_KIND } from '../../core/roadKinds';
+import { cutOffRoads, newlyCutOff } from '../oneway';
 import { bayRect, carParkRect } from '../parking';
 import { surfacePlots } from '../../render/shared/builtSurface';
 import { crossWater, DRAWN_SPAN, wetSpans, withBridge, withoutDeck } from '../bridges';
@@ -246,9 +246,6 @@ export function madeKind(draft: NeighbourhoodDraft, line: readonly Pt[], kind: R
 /** The kinds a street of a town or a village is (with an area, or given one at the Build step). */
 const TOWN_KINDS: ReadonlySet<RoadKind> = new Set(['street', 'lane', 'avenue']);
 
-/** Whether a road is the motorway's: a carriageway or a ramp (the generator's alone: `ROAD_KIND.drawable`). */
-export const isMotorway = (r: Pick<RoadPlan, 'kind'>) => r.kind === 'motorway' || r.kind === 'ramp';
-
 /** Why a street drawn into the motorway is refused (crossing under an overpass may come later). */
 export const CROSS_MOTORWAY = "can't cross the motorway";
 
@@ -271,7 +268,7 @@ export class Meeting {
 
   joinable(r: number): boolean {
     const road = this.roads[r];
-    return !road.island && !isMotorway(road) && (this.trail || road.kind !== 'trail');
+    return !road.island && !isSeparated(road.kind) && (this.trail || road.kind !== 'trail');
   }
 
   /** Whether the street runs across road `r` rather than meeting it: a footpath, for a street (`cutTrails` cuts it there). */
@@ -568,7 +565,7 @@ export function streetCourse(meet: Meeting, shaped: StreetLine): StreetCourse | 
   const hit = meet.contact(line, start.kind === 'join' || start.kind === 'extend' ? start.road : -1);
   let end: End;
   if (hit) {
-    if (isMotorway(roads[hit.road])) return CROSS_MOTORWAY;
+    if (isSeparated(roads[hit.road].kind)) return CROSS_MOTORWAY;
     if (!meet.joinable(hit.road)) return 'it runs into the roundabout';
     line = line.slice(0, hit.i + 1);
     const snapped = meet.snap(line[line.length - 1]);
@@ -609,6 +606,17 @@ export function streetCourse(meet: Meeting, shaped: StreetLine): StreetCourse | 
 
 /** The width of a drawn road of `kind` (m): its kind's (`ROAD_KIND`), a lane's narrower than a street's. */
 export const streetWidth = (kind: RoadKind) => ROAD_KIND[kind].width;
+
+/**
+ * What a draft's roads cut off before an edit (`oneway.ts` `cutOffRoads`), worked out once a draft: a street drawn
+ * asks it at every pause of the pointer and again as it is made. (A draft's roads are never changed in place.)
+ */
+const cutOff = new WeakMap<readonly RoadPlan[], number[]>();
+function cutOffBefore(roads: readonly RoadPlan[]): number[] {
+  let got = cutOff.get(roads);
+  if (!got) cutOff.set(roads, (got = cutOffRoads(roads)));
+  return got;
+}
 
 /** Why a one-way street is refused where it would leave somewhere a car can't get back from (`oneway.ts` `cutOffRoads`). */
 export const CUT_OFF = 'some homes could no longer be reached by car';
@@ -737,7 +745,7 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
     }
   }
   if (!oneNetwork(next, new Set())) return refused('it joins none of the roads');
-  if (fresh.some((i) => onewayOf(next[i])) && cutOffRoads(next).length > cutOffRoads(roads).length) return refused(CUT_OFF);
+  if (fresh.some((i) => onewayOf(next[i])) && cutOffRoads(next).length > cutOffBefore(roads).length) return refused(CUT_OFF);
 
   // ---- the footpaths it crosses, cut to meet it in a T either side (one it crosses on a bridge's deck passes under it) ----
   if (!trail) {
@@ -781,7 +789,7 @@ export function changeKind(draft: NeighbourhoodDraft, t: Templates, road: number
   const roads = draft.roads;
   const r = roads[road];
   if (!r) return refused('there is no such road');
-  if (isMotorway(r)) return refused('the motorway stays as it is: rename it or remove it');
+  if (isSeparated(r.kind)) return refused('the motorway stays as it is: rename it or remove it');
   if (!CHANGE_KINDS.includes(kind) && kind !== 'trail') return refused('only the world lays a motorway');
   const was = r.kind ?? 'street';
   const way = oneway === undefined ? (r.oneway ?? 0) : oneway;
@@ -817,8 +825,7 @@ export function changeKind(draft: NeighbourhoodDraft, t: Templates, road: number
     if (court && court.stub > COURT + 0.5) return refused(`a country road's dead end reaches ${COURT} m at most, and ${name} ends ${Math.round(court.stub)} m past the last road it meets`);
   }
   if (way !== (r.oneway ?? 0)) {
-    const before = new Set(cutOffRoads(roads));
-    if (cutOffRoads(next).some((i) => !before.has(i))) return refused(CUT_OFF);
+    if (newlyCutOff(new Set(cutOffBefore(roads)), next).length) return refused(CUT_OFF);
   }
 
   // ---- what is in the way of it wider ----
@@ -1055,7 +1062,7 @@ export function whatGoes(draft: NeighbourhoodDraft, t: Templates, road: number):
  * the road alone.
  */
 export function motorwayOf(roads: readonly RoadPlan[], road: number): number[] {
-  return roads[road] && isMotorway(roads[road]) ? roads.flatMap((r, i) => (isMotorway(r) ? [i] : [])) : [road];
+  return roads[road] && isSeparated(roads[road].kind) ? roads.flatMap((r, i) => (isSeparated(r.kind) ? [i] : [])) : [road];
 }
 
 /**
@@ -1065,7 +1072,7 @@ export function motorwayOf(roads: readonly RoadPlan[], road: number): number[] {
  */
 function withoutRoads(roads: readonly RoadPlan[], gone: ReadonlySet<number>): { roads: RoadPlan[]; ended: number[]; from: number[] } {
   const from = roads.flatMap((_, i) => (gone.has(i) ? [] : [i]));
-  const flat = new Set(from.filter((i) => roads[i].crosses?.some((c) => gone.has(c.road) && isMotorway(roads[c.road]))));
+  const flat = new Set(from.filter((i) => roads[i].crosses?.some((c) => gone.has(c.road) && isSeparated(roads[c.road].kind))));
   const kept = withCrosses(
     from.map((i) => {
       if (!flat.has(i)) return roads[i];
@@ -1144,7 +1151,7 @@ export function motorwayName(roads: readonly RoadPlan[]): string {
  */
 function motorwayRenamed(roads: readonly RoadPlan[], old: string, wanted: string): RoadPlan[] {
   return roads.map((r) => {
-    if (!isMotorway(r) || !r.name || !old) return r;
+    if (!isSeparated(r.kind) || !r.name || !old) return r;
     if (r.name === old) return { ...r, name: wanted };
     return r.name.startsWith(`${old} `) ? { ...r, name: `${wanted}${r.name.slice(old.length)}` } : r;
   });
@@ -1166,13 +1173,13 @@ export function rename(draft: NeighbourhoodDraft, what: Named, name: string): Ed
   const town = what.kind === 'town' || (what.kind === 'area' && what.area === 0);
   const old = town ? draft.name : what.kind === 'road' ? draft.roads[what.road]?.name : what.kind === 'place' ? places[what.place]?.name : areas[(what as { area: number }).area]?.name;
   if (old === undefined && !(what.kind === 'road' && draft.roads[what.road])) return refused('there is nothing there to name');
-  const was = what.kind === 'road' && isMotorway(draft.roads[what.road]) ? motorwayName(draft.roads) : '';
+  const was = what.kind === 'road' && isSeparated(draft.roads[what.road].kind) ? motorwayName(draft.roads) : '';
   if (was) {
     // (The motorway is named whole: its carriageways and ramps keep the rest of their names, the way each goes.)
     if (wanted === was) return { draft, cleared: { lots: [] } };
     const roads = motorwayRenamed(draft.roads, was, wanted);
-    const others = new Set([draft.name, ...draft.roads.filter((r) => !isMotorway(r)).map((r) => r.name ?? ''), ...(open?.places ?? []).map((p) => p.name), ...areas.map((a) => a.name)]);
-    const clash = [wanted, ...roads.filter(isMotorway).map((r) => r.name ?? '')].find((n) => others.has(n));
+    const others = new Set([draft.name, ...draft.roads.filter((r) => !isSeparated(r.kind)).map((r) => r.name ?? ''), ...(open?.places ?? []).map((p) => p.name), ...areas.map((a) => a.name)]);
+    const clash = [wanted, ...roads.filter((r) => isSeparated(r.kind)).map((r) => r.name ?? '')].find((n) => others.has(n));
     if (clash) return refused(`${clash} is taken`);
     return { draft: { ...draft, roads }, cleared: { lots: [] } };
   }

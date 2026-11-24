@@ -184,6 +184,7 @@ impl Traffic {
 
     /// How many claims are held, and how many asks wait (the tests: all let go once the traffic's
     /// gone by).
+    #[cfg(any(test, feature = "test-support"))]
     pub fn claims_out(&self) -> (usize, usize) {
         (self.holds.len(), self.asks.len())
     }

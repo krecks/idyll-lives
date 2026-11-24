@@ -111,8 +111,9 @@ pub(crate) fn along_x<T>(sorted: &[T], x_of: impl Fn(&T) -> f32, x: f32, reach: 
 /// `spot` facing `yaw`.
 pub(super) fn local_at(spot: [f32; 2], yaw: f32, along: f32, left: f32) -> [f32; 2] {
     let (s, c) = yaw.sin_cos();
+    let right = right_of([s, c]);
     [
-        spot[0] + s * along - c * left,
-        spot[1] + c * along + s * left,
+        spot[0] + s * along - right[0] * left,
+        spot[1] + c * along - right[1] * left,
     ]
 }

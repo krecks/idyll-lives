@@ -23,9 +23,9 @@
 import type { Content } from '../../content/content';
 import type { RoadPlan } from '../../core/protocol';
 import { pointAt, lengths, RoadIndex } from '../../game/roads';
-import { kindInfo } from '../../core/roadKinds';
+import { isSeparated, kindInfo, onewayOf } from '../../core/roadKinds';
 import { entriesOf } from '../../game/edit/ground';
-import { cutOffRoads } from '../../game/oneway';
+import { endMeets, oneWayCut } from '../../game/oneway';
 import { count } from './words';
 import { areasFor } from '../../game/build';
 import { checkedTown } from '../../game/edit/checked';
@@ -205,16 +205,17 @@ function countryDeadEnds(draft: NeighbourhoodDraft): Issue[] {
 
 /**
  * What the one-way roads and the motorway's junction leave wrong (blocking): homes (on a layout, streets) a car can't
- * get to and back from for one-way roads (`oneway.ts` `cutOffRoads`, less what is cut off whichever way the roads
+ * get to and back from for one-way roads (`oneway.ts` `oneWayCut`: `cutOffRoads`, less what is cut off whichever way the roads
  * go: the checks' own networks say that), and a ramp whose end off the motorway meets no road (its street removed).
  */
 export function roadWayIssues(draft: NeighbourhoodDraft, t: Templates): Issue[] {
   const out: Issue[] = [];
   const roads = draft.roads;
-  if (roads.some((r) => r.oneway || kindInfo(r).oneway)) {
-    const anyway = new Set(cutOffRoads(roads, true));
+  // (One index of the roads for both.)
+  let index: RoadIndex | undefined;
+  if (roads.some((r) => onewayOf(r))) {
     // (A ramp left leading nowhere is the junction's problem, below.)
-    const cut = new Set(cutOffRoads(roads).filter((i) => !anyway.has(i) && roads[i].kind !== 'ramp' && roads[i].kind !== 'motorway'));
+    const cut = new Set(oneWayCut(roads, { index: (index ??= new RoadIndex(roads)) }).filter((i) => !isSeparated(roads[i].kind)));
     if (cut.size) {
       const spots = draft.slots.length ? entriesOf(draft, t) : [];
       const homes = draft.slots.reduce((n, s, i) => n + (spots[i]?.road !== undefined && cut.has(spots[i].road) ? homesOn(s, { farms: true }) : 0), 0);
@@ -223,15 +224,11 @@ export function roadWayIssues(draft: NeighbourhoodDraft, t: Templates): Issue[] 
   }
   const ramps = roads.flatMap((r, i) => (r.kind === 'ramp' && r.points.length >= 2 ? [i] : []));
   if (ramps.length) {
-    const index = new RoadIndex(roads);
+    const near = (index ??= new RoadIndex(roads));
     const widest = Math.max(0, ...roads.map((r) => r.width));
     for (const i of ramps) {
       const r = roads[i];
-      const lost = r.ends.some((e, k) => {
-        if (e === 'merge' || e === 'out') return false;
-        const [x, z] = k ? r.points[r.points.length - 1] : r.points[0];
-        return ![...index.around(x, z, widest / 2 + 1)].some(([j, m]) => j !== i && roads[j].kind !== 'motorway' && roads[j].kind !== 'ramp' && kindInfo(roads[j]).lanesEachWay > 0 && m.dist <= Math.max(r.width, roads[j].width) / 2 + 1);
-      });
+      const lost = r.ends.some((e, k) => e !== 'merge' && e !== 'out' && !endMeets(roads, near, i, k as 0 | 1, widest / 2 + 1).some(([j]) => !isSeparated(roads[j].kind) && kindInfo(roads[j]).lanesEachWay > 0));
       if (lost) {
         out.push({ text: 'The motorway junction lost its road', at: middleOf(r) });
         break;

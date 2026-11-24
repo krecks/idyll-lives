@@ -180,13 +180,11 @@ pub(super) fn kerb_off(road: &crate::travel::Road) -> f32 {
 
 /// `kerb_off` for a road `width` m wide of `kind`.
 pub(crate) fn kerb_of(width: f32, kind: crate::travel::RoadKind) -> f32 {
-    match kind {
+    if kind.has_sidewalk() {
+        (width / 2.0 - SIDEWALK).max(TIGHT_LANE + 0.5)
+    } else {
         // (No sidewalks: a country road's verge, a motorway's or a ramp's shoulder, are its own.)
-        crate::travel::RoadKind::Country
-        | crate::travel::RoadKind::Trail
-        | crate::travel::RoadKind::Motorway
-        | crate::travel::RoadKind::Ramp => width / 2.0,
-        _ => (width / 2.0 - SIDEWALK).max(TIGHT_LANE + 0.5),
+        width / 2.0
     }
 }
 
@@ -221,12 +219,11 @@ pub fn kerbside(width: f32, kind: crate::travel::RoadKind) -> f32 {
 /// town file's road (`meta.roads` index) and how far in from its edges the furniture may reach (m),
 /// by road: for the renderer's street dressing (the world's structure, `pullOverStreets`).
 pub fn pull_over_streets(travel: &Travel) -> Vec<(u32, f32)> {
-    use crate::travel::RoadKind;
     let mut out: Vec<(u32, f32)> = travel
         .graph
         .roads
         .iter()
-        .filter(|r| !matches!(r.kind, RoadKind::Country | RoadKind::Trail))
+        .filter(|r| r.kind.has_sidewalk())
         .filter_map(|r| {
             let keep = kerbside(r.width, r.kind);
             (keep < KERBSIDE).then_some((r.source, keep))
@@ -241,10 +238,10 @@ pub fn pull_over_streets(travel: &Travel) -> Vec<(u32, f32)> {
 /// of `kind` (m, `PULL_MOST` at most): to `PULL_EDGE` short of the kerbside furniture
 /// (`kerbside`), or of a country road's edge. On a 6 m lane two cars pulled over pass each other.
 pub(crate) fn pull_room(width: f32, kind: crate::travel::RoadKind, wid: f32) -> f32 {
-    use crate::travel::RoadKind;
-    let edge = match kind {
-        RoadKind::Country | RoadKind::Trail => width / 2.0,
-        _ => width / 2.0 - kerbside(width, kind),
+    let edge = if kind.has_sidewalk() {
+        width / 2.0 - kerbside(width, kind)
+    } else {
+        width / 2.0
     } - PULL_EDGE;
     (edge - wid / 2.0 - lane_on(width, kind)).clamp(0.0, PULL_MOST)
 }

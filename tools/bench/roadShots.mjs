@@ -21,7 +21,7 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { benchContext, devServer, launch, openBench } from './lib/browser.mjs';
+import { benchContext, devServer, launch, openBench, step } from './lib/browser.mjs';
 
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
@@ -63,7 +63,9 @@ const POSES = SPOT_POSES ?? [
   { name: 'overview-400', pose: { cam: 'over', over: 'centre', radius: 400 } },
   { name: 'overview-783', pose: { cam: 'over', over: 'centre', radius: 783 } },
 ];
-const SHOTS = POSES.filter((p) => !only || only.includes(p.name));
+// (All at 13:00: the page opens at it.)
+const SHOTS = POSES.filter((p) => !only || only.includes(p.name)).map((p) => ({ ...p, hour: 13 }));
+const tag = follow ? follow.replaceAll('&', '-') : '';
 
 const { url: base, stop } = await devServer({ url: flag('url', null), port: Number(flag('port', '5311')) });
 const { browser } = await launch({ headless: true });
@@ -72,24 +74,29 @@ try {
   for (const renderer of renderers) {
     const context = await benchContext(browser);
     const { page, done } = await openBench(context, base, `bench=bigworld&big=${big ?? 'roads'}${bigOptions ? `&options=${bigOptions}` : ''}${follow}&quality=${quality}&renderer=${renderer}&res=1&hud=0&secs=0&warmup=6&diag=freeze&cam=over&over=centre&radius=400&hour=13`);
-    for (const p of SHOTS) {
-      await page.evaluate((x) => window.__bench.pose(x), p.pose);
-      await page.evaluate(() => window.__bench.hour(13));
-      await page.evaluate(() => window.__bench.settle({ limitMs: 90_000 }));
-      const file = join(out, `${p.name}-${renderer}${follow ? follow.replaceAll('&', '-') : ''}.png`);
-      await page.screenshot({ path: file });
-      // (Counted at 1x, then frozen again for the next pose: a frozen page draws nothing new to count.)
-      await page.evaluate(() => window.__bench.freeze(false));
-      const c = await page.evaluate(() => window.__bench.counts(120));
-      await page.evaluate(() => window.__bench.freeze(true));
-      counts[`${p.name}-${renderer}${follow ? follow.replaceAll('&', '-') : ''}`] = c;
-      console.log(`${p.name} ${renderer}: ${file}, draws ${c.mean?.draws ?? JSON.stringify(c).slice(0, 160)}`);
-    }
+    // (Back to 13:00 before each pose: counting lets the clock run.)
+    const noon = () => page.evaluate(() => window.__bench.hour(13));
+    await step(
+      page,
+      SHOTS,
+      async (page, p) => {
+        const file = join(out, `${p.name}-${renderer}${tag}.png`);
+        await page.screenshot({ path: file });
+        // (Counted at 1x, then frozen again for the next pose: a frozen page draws nothing new to count.)
+        await page.evaluate(() => window.__bench.freeze(false));
+        const c = await page.evaluate(() => window.__bench.counts(120));
+        await page.evaluate(() => window.__bench.freeze(true));
+        counts[`${p.name}-${renderer}${tag}`] = c;
+        console.log(`${p.name} ${renderer}: ${file}, draws ${c.mean?.draws ?? JSON.stringify(c).slice(0, 160)}`);
+        await noon();
+      },
+      { limitMs: 90_000, before: noon },
+    );
     await done();
     await context.close();
   }
 } finally {
-  writeFileSync(join(out, `counts${follow ? follow.replaceAll('&', '-') : ''}.json`), JSON.stringify(counts, null, 1));
+  writeFileSync(join(out, `counts${tag}.json`), JSON.stringify(counts, null, 1));
   await browser.close();
   stop();
 }

@@ -13,21 +13,24 @@
  */
 
 import type { RoadPlan } from '../../core/protocol';
-import { kindInfo, kindOf, onewayOf } from '../../core/roadKinds';
+import { isSeparated, kindInfo, kindOf, onewayOf } from '../../core/roadKinds';
 import { lengths, nearest, RoadIndex } from '../../game/roads';
 import { encodeFinish, type Geo, type V3 } from './geometry';
 import { carriageway, type JunctionPlan } from './junctions';
-import { insideOf, MOTORWAY, Walk } from './motorway';
+import { aside, insideOf, MOTORWAY, Walk } from './motorway';
 import type { RoadLevels } from './roads';
 
 /** How high the markings lie over the road (m: `roads.ts` `MARK_Y`, which this module can't import without a cycle). */
 const MARK_UP = 0.016;
-/** The paint (`roads.ts` `PAINT`, `PAINT_FINISH`): worn white, the plain finish's roughness. */
-const PAINT = '#D6D6D0';
-const PAINT_FINISH = encodeFinish(0.7, 0);
+/**
+ * The markings' paint (these lines', and the junctions' stop lines and zebras: `roads.ts` `junctionMarks`): a vertex colour
+ * (worn white: no brighter than the sidewalks) with the plain finish's roughness in its alpha (`geometry.ts` `encodeFinish`).
+ */
+export const PAINT = '#D6D6D0';
+export const PAINT_FINISH = encodeFinish(0.7, 0);
 /** A line's width (m): a dashed lane line, a solid edge line. */
-export const DASH_WIDE = 0.15;
-export const EDGE_WIDE = 0.2;
+const DASH_WIDE = 0.15;
+const EDGE_WIDE = 0.2;
 /** Dashes (m): a town road's and a motorway's, each its dash and the gap after it. */
 const DASH = { town: [3, 6], motorway: [6, 12] } as const;
 /** How far apart a one-way road's arrows are (m), a motorway's, and how far past a junction the first is. */
@@ -101,15 +104,33 @@ export function laneLayout(roads: readonly RoadPlan[], ri: number): LaneLayout |
   }
 }
 
+/** Each set of junctions' stretches of each road (`junctionStretches`): a road's points are never changed in place. */
+const stretchesOf = new WeakMap<readonly JunctionPlan[], WeakMap<RoadPlan, readonly [number, number][]>>();
+
 /**
  * The stretches of `road` (arc lengths, m, each start and end) its junctions cover: round each junction on it (its
- * middle within its half width of the road's), out along its arms as far as their pads and stop lines reach.
+ * middle within its half width of the road's), out along its arms as far as their pads and stop lines reach. Once per
+ * road and set of junctions.
  */
-export function junctionStretches(road: RoadPlan, junctions: readonly JunctionPlan[], ls: readonly number[] = lengths(road.points)): [number, number][] {
+export function junctionStretches(road: RoadPlan, junctions: readonly JunctionPlan[], ls?: readonly number[]): readonly [number, number][] {
+  let byRoad = stretchesOf.get(junctions);
+  if (!byRoad) stretchesOf.set(junctions, (byRoad = new WeakMap()));
+  let had = byRoad.get(road);
+  if (!had) byRoad.set(road, (had = stretchesAt(road, junctions, ls ?? lengths(road.points))));
+  return had;
+}
+
+function stretchesAt(road: RoadPlan, junctions: readonly JunctionPlan[], ls: readonly number[]): [number, number][] {
   const out: [number, number][] = [];
+  const most = road.width / 2 + 0.5;
+  // (Only the junctions near its box are measured: a metre to spare.)
+  let [x0, z0, x1, z1] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const [x, z] of road.points) [x0, z0, x1, z1] = [Math.min(x0, x), Math.min(z0, z), Math.max(x1, x), Math.max(z1, z)];
+  const [bx0, bz0, bx1, bz1] = [x0 - most - 1, z0 - most - 1, x1 + most + 1, z1 + most + 1];
   for (const j of junctions) {
+    if (j.x < bx0 || j.x > bx1 || j.z < bz0 || j.z > bz1) continue;
     const near = nearest(road.points, j.x, j.z, ls);
-    if (near.dist > road.width / 2 + 0.5) continue;
+    if (near.dist > most) continue;
     let reach = 0;
     for (const A of j.arms) reach = Math.max(reach, A.reach, Math.min(A.stop, A.room));
     out.push([near.s - reach - 0.3, near.s + reach + 0.3]);
@@ -145,12 +166,13 @@ export function roadMarkings(roads: readonly RoadPlan[], marks: Geo, junctions: 
     const walk = new Walk(road.points, ls);
     const kind = kindOf(road);
     // (A motorway's lines break where a ramp runs on it, a ramp's where it runs on the motorway: the gore between them.)
-    const g = kind === 'motorway' || kind === 'ramp' ? gores(roads) : null;
+    const g = isSeparated(kind) ? gores(roads) : null;
     const gore = (x: number, z: number) => (kind === 'motorway' ? g!.ramps.onRoad(x, z, -0.2) : kind === 'ramp' ? g!.motorways.onRoad(x, z, -0.1) : false);
     const Y = (s: number) => (levels ? levels.road(road, s) : 0) + MARK_UP;
     const point = (s: number, off: number): V3 => {
       const { p, t } = walk.at(s);
-      return [p[0] + t[1] * off, Y(s), p[1] - t[0] * off];
+      const [x, z] = aside(p, t, off);
+      return [x, Y(s), z];
     };
     marks.color(PAINT, PAINT_FINISH);
     /** A line `wide` across at `off` from `s0` to `s1`, in pieces, none in a junction nor in the gore. */

@@ -7,6 +7,7 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import type { RoadPlan } from '../src/core/protocol';
+import { isSeparated } from '../src/core/roadKinds';
 import { nearest } from '../src/game/roads';
 
 const WEB = new URL('../', import.meta.url).pathname;
@@ -178,7 +179,7 @@ describe('the land first, then the town', async () => {
     const alone = townOn(crossed(landOf('heath', 5, { size: 'large', town: 'village', villages: 'none' })), { waterKept: false }).draft;
     expect(alone.open!.areas.length).toBe(1);
     // (The motorway bridges the river where it crosses it, as it does any: the town's roads don't.)
-    const motorway = (r: RoadPlan) => r.kind === 'motorway' || r.kind === 'ramp';
+    const motorway = (r: RoadPlan) => isSeparated(r.kind);
     expect(alone.roads.filter((r) => !motorway(r) && r.bridge && r.bridge[1] > r.bridge[0]).map((r) => r.name)).toEqual([]);
     expect(faults(alone)).toEqual([]);
     const city = crossed(landOf('heath', 5, { size: 'medium', town: 'city', villages: 'few' }));

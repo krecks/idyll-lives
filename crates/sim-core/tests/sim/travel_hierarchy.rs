@@ -226,7 +226,7 @@ fn the_hierarchy_loads_with_its_kinds_and_ways() {
             "road {}",
             r.source
         );
-        let car_only = matches!(r.kind, RoadKind::Motorway | RoadKind::Ramp);
+        let car_only = r.kind.separated();
         assert_eq!(r.walkable(), !car_only, "road {}", r.source);
         assert!(r.drivable(), "road {}", r.source);
         assert_eq!(r.enterable(), !car_only, "road {}", r.source);
@@ -422,7 +422,7 @@ fn a_merge_has_no_box_and_no_lights() {
 fn walkers_keep_off_the_motorway_and_its_ramps() {
     let w = world();
     let g = &w.travel.graph;
-    let car_only = |k: RoadKind| matches!(k, RoadKind::Motorway | RoadKind::Ramp);
+    let car_only = |k: RoadKind| k.separated();
     for p in [
         [20.0, EAST_Z as f32],
         [60.0, WEST_Z as f32 + 7.0],

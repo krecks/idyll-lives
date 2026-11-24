@@ -11,7 +11,7 @@
  *   world's edge, `WATER_END` m at most), and with a profile within its grade (`MOTORWAY_GRADE`) cut or filled no more
  *   than `CUT` (`profileOf`), standing `OVER` m over the land at each crossing. Scored by its cut and fill, its water
  *   and how far it passes from the town; of the best that fit, the one leaving the villages the most room, none
- *   costing the world a village (`MotorwaySite.room`, `VILLAGES_LOST`). The villages then keep `HAMLET_CLEAR` m off
+ *   costing the world a village (`MotorwaySite.room`). The villages then keep `HAMLET_CLEAR` m off
  *   it, further by its junction (`clearOfMotorway`), and once they are down its gates are chosen again by them
  *   (`withVillages`).
  *   Its middle line is offset into two one-way `motorway` carriageways `APART` m apart, laid for traffic on the right as
@@ -30,10 +30,10 @@
  */
 
 import type { RoadPlan } from '../core/protocol';
-import { ROAD_KIND } from '../core/roadKinds';
+import { isSeparated, ROAD_KIND } from '../core/roadKinds';
 import { CUT_MAX_MOTORWAY } from '../render/shared/builtSurface';
 import { CELL, type Cells } from './countryRouter';
-import { curve, lengths, MEET, nearest, pointAt, RoadIndex, sharpestTurn, type Pt } from './roads';
+import { curve, dist, lengths, MEET, mergeSpans, nearest, nearestOn, pointAt, resample, rightOf, RoadIndex, round2, segmentAngle, gridKey, segmentCross, segmentGrid, SEG_CELL, sharpestTurn, tangent, type Pt } from './roads';
 import { mulberry32 } from './noise';
 import type { Rect } from './town';
 import * as pmath from './pmath';
@@ -119,17 +119,12 @@ const RAMP_TS = [RAMP_T, RAMP_T + 7, RAMP_T + 14];
 const TEE_APART = 25;
 /** A ramp's length (m): within these. */
 export const RAMP_LENGTH: [number, number] = [110, 140];
-/** How many courses that fit are tried for the villages' room at most (`MotorwaySite.room`), and how many fewer villages than none would it may leave room for. */
-const VILLAGES_LOST = 0;
+/** How many courses that fit are tried for the villages' room at most (`MotorwaySite.room`). */
 const ROOM_TRIES = 6;
 /** The draws its course and names come from (apart from the world's). */
 const MOTOR = 0x6d6f746f;
 
-const dist = (a: Pt, b: Pt) => pmath.hypot(a[0] - b[0], a[1] - b[1]);
-const round2 = (v: number) => Math.round(v * 100) / 100;
 const offRect = (r: Rect, [x, z]: Pt) => pmath.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
-/** The right of a direction (x, z), as seen from above with z down the page and north up (`leftOf` turned over). */
-const rightOf = ([x, z]: Pt): Pt => [-z, x];
 
 /** A gate the country roads cross the motorway by: where along its middle line (m), there, and the way across (a unit step of the land's cells). */
 export interface Gate {
@@ -167,16 +162,8 @@ export interface Crossing {
   angle: number;
 }
 
-/** The land's height at (x, z) (m), between its cells' middles. */
-function heightAt(land: Cells, x: number, z: number): number {
-  const fx = Math.max(0, Math.min(land.gw - 1, x / CELL - 0.5));
-  const fz = Math.max(0, Math.min(land.gd - 1, z / CELL - 0.5));
-  const [x0, z0] = [Math.floor(fx), Math.floor(fz)];
-  const [x1, z1] = [Math.min(land.gw - 1, x0 + 1), Math.min(land.gd - 1, z0 + 1)];
-  const [u, v] = [fx - x0, fz - z0];
-  const h = (cx: number, cz: number) => land.height[cz * land.gw + cx];
-  return (h(x0, z0) * (1 - u) + h(x1, z0) * u) * (1 - v) + (h(x0, z1) * (1 - u) + h(x1, z1) * u) * v;
-}
+/** The land's height at (x, z) as `site` has it seeded (its own, else its cells', between their middles). */
+const heightOf = (site: MotorwaySite) => site.height ?? ((x: number, z: number) => site.land.heightAt(x, z));
 
 /** A cubic Bézier through `p` (its four points), a point about every metre. */
 function bezier([a, b, c, d]: readonly Pt[]): Pt[] {
@@ -192,33 +179,10 @@ function bezier([a, b, c, d]: readonly Pt[]): Pt[] {
   return resample(fine, 1);
 }
 
-/** A polyline with a point every `step` m (its last point kept). */
-function resample(pts: readonly Pt[], step: number): Pt[] {
-  const ls = lengths(pts);
-  const L = ls[ls.length - 1];
-  const n = Math.max(1, Math.round(L / step));
-  const out: Pt[] = [];
-  let i = 0;
-  for (let k = 0; k <= n; k++) {
-    const s = (L * k) / n;
-    while (i < ls.length - 2 && ls[i + 1] < s) i++;
-    const f = Math.max(0, Math.min(1, (s - ls[i]) / (ls[i + 1] - ls[i] || 1)));
-    out.push([pts[i][0] + (pts[i + 1][0] - pts[i][0]) * f, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * f]);
-  }
-  return out;
-}
-
-/** The direction along a polyline at point `i` (over its points either side). */
-function dirAt(pts: readonly Pt[], i: number): Pt {
-  const [a, b] = [pts[Math.max(0, i - 2)], pts[Math.min(pts.length - 1, i + 2)]];
-  const l = dist(a, b) || 1;
-  return [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
-}
-
-/** `pts` moved `by` m to its right (the way its points run), each point square off it. */
+/** `pts` moved `by` m to its right (the way its points run), each point square off it (its way over two points either side). */
 function offset(pts: readonly Pt[], by: number): Pt[] {
   return pts.map((p, i) => {
-    const r = rightOf(dirAt(pts, i));
+    const r = rightOf(tangent(pts, i, 2));
     return [p[0] + r[0] * by, p[1] + r[1] * by];
   });
 }
@@ -331,8 +295,8 @@ export interface MotorwaySite {
   seed: number;
   /**
    * How many villages would find room with the motorway's land kept clear as `clear` says (the generator's own count,
-   * before it places them): of the courses that fit, none leaving room for more than `VILLAGES_LOST` fewer than none
-   * would; the best leaving as many as none would is taken, else the best leaving the most. None given: the best course.
+   * before it places them): of the courses that fit, none leaving room for fewer than none would; the best leaving as
+   * many as none would is taken. None given: the best course.
    */
   room?: (clear: (r: Rect) => boolean) => number;
   /** How many of the courses it would take to pass over (the generator's: those it found no room for the junction on, or the country roads no way round). */
@@ -355,7 +319,7 @@ const WHY: Record<Why, string> = {
   edge: 'runs out of the world and back',
   side: `runs within ${SIDE_CLEAR} m of the world's edge`,
   gate: 'has no place a road from the town could climb to and pass under it',
-  room: VILLAGES_LOST ? `leaves room for more than ${VILLAGES_LOST} fewer villages` : 'leaves room for fewer villages',
+  room: 'leaves room for fewer villages',
   bend: `bends tighter than ${BEND_RADIUS} m`,
   town: `comes within ${TOWN_CLEAR} m of the town`,
   far: `passes further than ${TOWN_REACH} m from the town`,
@@ -365,22 +329,15 @@ const WHY: Record<Why, string> = {
   grade: `climbs too steeply for its ${Math.round(ROAD_KIND.motorway.grade * 100)} % within ${CUT_MAX_MOTORWAY} m of cut and fill`,
 };
 
-/** The heights its profile reads along `middle`, every `STEP` m (NaN over the water). */
-function heightsAlong(middle: readonly Pt[], site: MotorwaySite): number[] {
-  const ls = lengths(middle);
-  const L = ls[ls.length - 1];
-  const n = Math.max(1, Math.round(L / STEP));
-  const out: number[] = [];
-  for (let k = 0; k <= n; k++) {
-    const { p } = pointAt(middle, (L * k) / n, ls);
-    out.push(site.wet(p[0], p[1]) ? NaN : (site.height ?? ((x, z) => heightAt(site.land, x, z)))(p[0], p[1]));
-  }
-  return out;
+/** The heights its profile reads along `middle` (its arc lengths `ls`), every `STEP` m (NaN over the water). */
+function heightsAlong(middle: readonly Pt[], site: MotorwaySite, ls: readonly number[]): number[] {
+  const h = heightOf(site);
+  return resample(middle, STEP, ls).map(([x, z]) => (site.wet(x, z) ? NaN : h(x, z)));
 }
 
-/** Course `middle` judged (see the top of this file): its score, or why it doesn't do. */
-function judge(middle: Pt[], line: Pt[], site: MotorwaySite): Course | Why {
-  const { land, areas, roads, wet } = site;
+/** Course `middle` judged (see the top of this file): its score, or why it doesn't do. `index`: the roads laid already (not trails), if any. */
+function judge(middle: Pt[], line: Pt[], site: MotorwaySite, index: RoadIndex | null): Course | Why {
+  const { land, areas, wet } = site;
   const [W, D] = [land.W, land.D];
   const [a, b] = [edgeOf(middle[0], W, D), edgeOf(middle[middle.length - 1], W, D)];
   if (a < 0 || b < 0 || (a + 2) % 4 !== b) return 'edge';
@@ -403,14 +360,10 @@ function judge(middle: Pt[], line: Pt[], site: MotorwaySite): Course | Why {
     if (areas.some((v, k) => k > 0 && offRect(v.rect, p) < HAMLET_CLEAR + OUTER)) return 'village';
   }
   if (reach > TOWN_REACH) return 'far';
-  const others = roads.filter((r) => r.kind !== 'trail');
-  if (others.length) {
-    const index = new RoadIndex(others);
-    for (let i = 0; i < middle.length; i += 4) if (index.nearest(middle[i][0], middle[i][1], ROAD_CLEAR)) return 'road';
-  }
+  if (index) for (let i = 0; i < middle.length; i += 4) if (index.nearest(middle[i][0], middle[i][1], ROAD_CLEAR)) return 'road';
   // Its water: once at most between its ends, square enough, not too long; and at an end, off the coast to the
   // world's edge (an island's), `WATER_END` m at most.
-  const ls = lengths(middle);
+  const ls = lm;
   const runs = wetRuns(middle, wet, ls);
   const atEnd = (i0: number, i1: number) => i0 === 0 || i1 === middle.length - 1;
   if (runs.filter(([, , i0, i1]) => !atEnd(i0, i1)).length > WATER_CROSSINGS) return 'water';
@@ -426,7 +379,7 @@ function judge(middle: Pt[], line: Pt[], site: MotorwaySite): Course | Why {
     if (across < along * pmath.sin(WATER_ANGLE) / pmath.cos(WATER_ANGLE)) return 'water';
     water += along;
   }
-  const heights = heightsAlong(middle, site);
+  const heights = heightsAlong(middle, site, ls);
   const made = profileOf(heights);
   if (!made) return 'grade';
   return { middle, line, heights, score: (made.cut / ls[ls.length - 1]) * 20 + water * 0.4 + Math.abs(reach - REACH_AIM) * 0.05 };
@@ -444,15 +397,29 @@ function candidates(site: MotorwaySite): Pt[][] {
   const main = areas[0].rect;
   const out: Pt[][] = [];
   const OUT = 60;
+  /**
+   * The world along axis `across` (0: along x, west to east, passing north or south of the town; 1: along z, north to
+   * south, west or east of it): its length and breadth, the town's box across it, a box's span across it, and a curve
+   * through control points given along it.
+   */
+  const frame = (across: 0 | 1) => ({
+    L: across === 0 ? W : D,
+    S: across === 0 ? D : W,
+    lo: across === 0 ? main.z : main.x,
+    hi: across === 0 ? main.z + main.d : main.x + main.w,
+    span: (r: Rect): [number, number] => (across === 0 ? [r.z, r.d] : [r.x, r.w]),
+    lay: (ctrl: Pt[]) => bezier(across === 0 ? ctrl : ctrl.map(([x, z]): Pt => [z, x])),
+  });
   for (const across of [0, 1] as const) {
-    // (Along x, west to east: passing north or south of the town; along z, north to south: west or east of it.)
-    const [L, S] = across === 0 ? [W, D] : [D, W];
-    const [lo, hi] = across === 0 ? [main.z, main.z + main.d] : [main.x, main.x + main.w];
+    const { L, S, lo, hi, span, lay } = frame(across);
     for (const side of [-1, 1]) {
       // (Where a line straight along that side of the town would pass clear of the villages: those offsets first.)
       const clear = (off: number) => {
         const at = side < 0 ? lo - off : hi + off;
-        return areas.every((v, k) => k === 0 || (across === 0 ? v.rect.z - at > HAMLET_CLEAR + OUTER + 10 || at - v.rect.z - v.rect.d > HAMLET_CLEAR + OUTER + 10 : v.rect.x - at > HAMLET_CLEAR + OUTER + 10 || at - v.rect.x - v.rect.w > HAMLET_CLEAR + OUTER + 10));
+        return areas.every((v, k) => {
+          const [a, w] = span(v.rect);
+          return k === 0 || a - at > HAMLET_CLEAR + OUTER + 10 || at - a - w > HAMLET_CLEAR + OUTER + 10;
+        });
       };
       const open: number[] = [];
       for (let off = TOWN_CLEAR + OUTER + 6; off <= TOWN_REACH - 10; off += 10) if (clear(off)) open.push(off);
@@ -464,13 +431,14 @@ function candidates(site: MotorwaySite): Pt[][] {
           const [e0, e1] = [Math.max(40, Math.min(S - 40, tilt())), Math.max(40, Math.min(S - 40, tilt()))];
           if (pass < 40 || pass > S - 40) continue;
           const k = 0.35;
-          const ctrl: Pt[] = [
-            [-OUT, e0],
-            [L * 0.36, pass + (e0 - pass) * k],
-            [L * 0.64, pass + (e1 - pass) * k],
-            [L + OUT, e1],
-          ];
-          out.push(bezier(across === 0 ? ctrl : ctrl.map(([x, z]): Pt => [z, x])));
+          out.push(
+            lay([
+              [-OUT, e0],
+              [L * 0.36, pass + (e0 - pass) * k],
+              [L * 0.64, pass + (e1 - pass) * k],
+              [L + OUT, e1],
+            ]),
+          );
         }
       }
     }
@@ -478,18 +446,18 @@ function candidates(site: MotorwaySite): Pt[][] {
   // And straight along the edges past the town as far off it as it may pass (where the villages could go between).
   const drawn = out.slice(0, CANDIDATES);
   for (const across of [0, 1] as const) {
-    const [L, S] = across === 0 ? [W, D] : [D, W];
-    const [lo, hi] = across === 0 ? [main.z, main.z + main.d] : [main.x, main.x + main.w];
+    const { L, S, lo, hi, lay } = frame(across);
     for (const side of [-1, 1]) {
       const pass = side < 0 ? Math.max(SIDE_CLEAR + EDGE_IN, lo - TOWN_REACH + EDGE_IN) : Math.min(S - SIDE_CLEAR - EDGE_IN, hi + TOWN_REACH - EDGE_IN);
       if ((side < 0 ? lo - pass : pass - hi) < TOWN_CLEAR + OUTER + 6) continue;
-      const ctrl: Pt[] = [
-        [-OUT, pass],
-        [L * 0.36, pass],
-        [L * 0.64, pass],
-        [L + OUT, pass],
-      ];
-      drawn.push(bezier(across === 0 ? ctrl : ctrl.map(([x, z]): Pt => [z, x])));
+      drawn.push(
+        lay([
+          [-OUT, pass],
+          [L * 0.36, pass],
+          [L * 0.64, pass],
+          [L + OUT, pass],
+        ]),
+      );
     }
   }
   return drawn;
@@ -521,9 +489,12 @@ export function routeMotorway(site: MotorwaySite): MotorwayRoute | { failed: str
   const why = new Map<Why, number>();
   const judgeAll = (lines: readonly Pt[][]) => {
     const fit: Course[] = [];
+    // (The roads laid already, not trails, as every course is judged against them.)
+    const others = site.roads.filter((r) => r.kind !== 'trail');
+    const index = others.length ? new RoadIndex(others) : null;
     for (const line of lines) {
       const middle = clipTo(line, W, D, 0);
-      const judged = middle ? judge(middle, line, site) : 'edge';
+      const judged = middle ? judge(middle, line, site, index) : 'edge';
       if (typeof judged === 'string') why.set(judged, (why.get(judged) ?? 0) + 1);
       else fit.push(judged);
     }
@@ -552,7 +523,7 @@ export function routeMotorway(site: MotorwaySite): MotorwayRoute | { failed: str
       const room = site.room ? site.room((r) => clearOfMotorway(route, r)) : full;
       tries++;
       // (Not where it leaves the villages too little room.)
-      if (room < full - VILLAGES_LOST) why.set('room', (why.get('room') ?? 0) + 1);
+      if (room < full) why.set('room', (why.get('room') ?? 0) + 1);
       else out.push({ route, room });
       // (One leaving as much room as none would: none after it is put before it.)
       if ((want === 1 && room >= full) || tries >= ROOM_TRIES) break;
@@ -627,14 +598,18 @@ function gatesOf(c: Pick<Course, 'middle' | 'heights'>, site: MotorwaySite): Gat
   const L = ls[ls.length - 1];
   const runs = wetRuns(middle, site.wet, ls);
   const town = site.areas[0].centre;
-  /** The octant step nearest square across at `s`, and how far off square it is. */
+  /** The octant step nearest square across at `s`, and how far off square it is (worked out once a spot). */
+  const squares = new Map<number, { across: Pt; off: number }>();
   const squareAt = (s: number): { across: Pt; off: number } => {
+    const had = squares.get(s);
+    if (had) return had;
     const { t } = pointAt(middle, s, ls);
     const n = rightOf(t);
     const k = Math.round(pmath.atan2(n[1], n[0]) / (Math.PI / 4));
     const a = (k * Math.PI) / 4;
     const across: Pt = [Math.round(pmath.cos(a)), Math.round(pmath.sin(a))];
     const off = pmath.acos(Math.min(1, Math.abs(n[0] * across[0] + n[1] * across[1]) / pmath.hypot(across[0], across[1])));
+    squares.set(s, { across, off });
     return { across, off };
   };
   const chosen: Gate[] = [];
@@ -646,26 +621,31 @@ function gatesOf(c: Pick<Course, 'middle' | 'heights'>, site: MotorwaySite): Gat
     for (let k = k0 - 3; k <= k0 + 3; k++) if (k >= 0 && k < heights.length) at.set(k, OVER);
     return profileOf(heights, at) ? at : null;
   };
-  const ok = (s: number, apart: number) =>
-    s >= GATE_END &&
-    s <= L - GATE_END &&
-    runs.every(([s0, s1]) => s < s0 - GATE_WATER || s > s1 + GATE_WATER) &&
-    chosen.every((g) => Math.abs(g.s - s) >= apart) &&
-    squareAt(s).off <= GATE_SQUARE &&
-    // (Its way across in the world, out past where the country roads keep off.)
-    [-1, 1].every((k) => {
+  /** Whether a gate may go at `s` whatever the gates chosen: within its ends, off its water, square enough, and across it in the world and dry (worked out once a spot). */
+  const fits = new Map<number, boolean>();
+  const fitsAt = (s: number) => {
+    let got = fits.get(s);
+    if (got !== undefined) return got;
+    got = s >= GATE_END && s <= L - GATE_END && runs.every(([s0, s1]) => s < s0 - GATE_WATER || s > s1 + GATE_WATER) && squareAt(s).off <= GATE_SQUARE;
+    if (got) {
       const { p, t } = pointAt(middle, s, ls);
       const n = rightOf(t);
-      const q: Pt = [p[0] + n[0] * k * (JUNCTION_BAND + CELL * 4), p[1] + n[1] * k * (JUNCTION_BAND + CELL * 4)];
-      return q[0] > 8 && q[1] > 8 && q[0] < site.land.W - 8 && q[1] < site.land.D - 8;
-    }) &&
-    // (Dry across it, out past where the country roads keep off.)
-    [-1, 1].every((k) => {
-      const { p, t } = pointAt(middle, s, ls);
-      const n = rightOf(t);
-      for (let d = 0; d <= JUNCTION_BAND + CELL; d += 4) if (site.wet(p[0] + n[0] * d * k, p[1] + n[1] * d * k)) return false;
-      return true;
-    });
+      got =
+        // (Its way across in the world, out past where the country roads keep off.)
+        [-1, 1].every((k) => {
+          const q: Pt = [p[0] + n[0] * k * (JUNCTION_BAND + CELL * 4), p[1] + n[1] * k * (JUNCTION_BAND + CELL * 4)];
+          return q[0] > 8 && q[1] > 8 && q[0] < site.land.W - 8 && q[1] < site.land.D - 8;
+        }) &&
+        // (Dry across it, out past where the country roads keep off.)
+        [-1, 1].every((k) => {
+          for (let d = 0; d <= JUNCTION_BAND + CELL; d += 4) if (site.wet(p[0] + n[0] * d * k, p[1] + n[1] * d * k)) return false;
+          return true;
+        });
+    }
+    fits.set(s, got);
+    return got;
+  };
+  const ok = (s: number, apart: number) => chosen.every((g) => Math.abs(g.s - s) >= apart) && fitsAt(s);
   /** The best gate within `GATE_LOOK` m of `want` (the squarest, then the nearest), if one may go there. */
   const place = (want: number, apart: number, allow: (s: number) => boolean = () => true): Gate | null => {
     let pick: { s: number; score: number; lift: Map<number, number> } | null = null;
@@ -688,7 +668,7 @@ function gatesOf(c: Pick<Course, 'middle' | 'heights'>, site: MotorwaySite): Gat
   const reach = (s: number) => {
     const p = pointAt(middle, s, ls).p;
     const q: Pt = [Math.max(box.x, Math.min(box.x + box.w, p[0])), Math.max(box.z, Math.min(box.z + box.d, p[1]))];
-    const h = site.height ?? ((x: number, z: number) => heightAt(site.land, x, z));
+    const h = heightOf(site);
     return Math.abs(h(p[0], p[1]) - h(q[0], q[1])) <= REACHABLE * COUNTRY_GRADE * dist(p, q);
   };
   const byTown = ls.map((s, i) => ({ s, d: dist(middle[i], town) })).filter((_, i) => i % 8 === 0).sort((a, b) => a.d - b.d || a.s - b.s);
@@ -723,17 +703,10 @@ function gatesOf(c: Pick<Course, 'middle' | 'heights'>, site: MotorwaySite): Gat
 function blockedOf(middle: readonly Pt[], gates: readonly Gate[], land: Cells, areas: readonly { rect: Rect }[]): Uint8Array {
   const { gw, gd } = land;
   const out = new Uint8Array(gw * gd);
-  const ls = lengths(middle);
+  const { ls } = chunksOf(middle);
   const junction = gates[0];
-  const mark = (p: Pt, r: number, v: number) => {
-    for (let cz = Math.max(0, Math.floor((p[1] - r) / CELL)); cz <= Math.min(gd - 1, Math.floor((p[1] + r) / CELL)); cz++) {
-      for (let cx = Math.max(0, Math.floor((p[0] - r) / CELL)); cx <= Math.min(gw - 1, Math.floor((p[0] + r) / CELL)); cx++) {
-        const c: Pt = [(cx + 0.5) * CELL, (cz + 0.5) * CELL];
-        if (pmath.hypot(c[0] - p[0], c[1] - p[1]) <= r && areas.every((a) => offRect(a.rect, c) >= AREA_OPEN)) out[cz * gw + cx] = v;
-      }
-    }
-  };
-  for (let i = 0; i < middle.length; i += 2) mark(middle[i], Math.abs(ls[i] - junction.s) <= JUNCTION_REACH ? JUNCTION_BAND : BAND, 1);
+  const open = (c: Pt) => areas.every((a) => offRect(a.rect, c) >= AREA_OPEN);
+  for (let i = 0; i < middle.length; i += 2) land.mark(out, middle[i], Math.abs(ls[i] - junction.s) <= JUNCTION_REACH ? JUNCTION_BAND : BAND, open);
   for (const [k, g] of gates.entries()) {
     const reach = (k === 0 ? JUNCTION_BAND : BAND) + CELL * 2;
     const [cx, cz] = [Math.floor(g.p[0] / CELL), Math.floor(g.p[1] / CELL)];
@@ -767,61 +740,32 @@ export function gateEnds(route: MotorwayRoute, town: Pt): { near: Pt; far: Pt; d
 
 /** Where each road of `roads` (not a motorway's, a ramp or a trail) crosses middle line `middle`, in the roads' order. */
 export function crossings(middle: readonly Pt[], roads: readonly RoadPlan[]): Crossing[] {
-  const G = 16;
-  const grid = new Map<number, number[]>();
-  for (let k = 0; k + 1 < middle.length; k++) {
-    const [a, b] = [middle[k], middle[k + 1]];
-    for (let cz = Math.floor(Math.min(a[1], b[1]) / G); cz <= Math.floor(Math.max(a[1], b[1]) / G); cz++) {
-      for (let cx = Math.floor(Math.min(a[0], b[0]) / G); cx <= Math.floor(Math.max(a[0], b[0]) / G); cx++) {
-        const key = (cx + 1000) * 4096 + cz + 1000;
-        const list = grid.get(key);
-        if (list) list.push(k);
-        else grid.set(key, [k]);
-      }
-    }
-  }
-  const lm = lengths(middle);
+  // (The middle line's segments filed by cell: by their end's index, `segmentGrid`.)
+  const grid = segmentGrid(middle);
+  const { ls: lm } = chunksOf(middle);
   const out: Crossing[] = [];
   roads.forEach((r, ri) => {
-    if (r.kind === 'motorway' || r.kind === 'ramp' || r.kind === 'trail') return;
+    if (isSeparated(r.kind) || r.kind === 'trail') return;
     const lr = lengths(r.points);
     for (let j = 0; j + 1 < r.points.length; j++) {
       const [p, q] = [r.points[j], r.points[j + 1]];
       const seen = new Set<number>();
-      for (let cz = Math.floor(Math.min(p[1], q[1]) / G); cz <= Math.floor(Math.max(p[1], q[1]) / G); cz++) {
-        for (let cx = Math.floor(Math.min(p[0], q[0]) / G); cx <= Math.floor(Math.max(p[0], q[0]) / G); cx++) {
-          for (const k of grid.get((cx + 1000) * 4096 + cz + 1000) ?? []) {
+      for (let cz = Math.floor(Math.min(p[1], q[1]) / SEG_CELL); cz <= Math.floor(Math.max(p[1], q[1]) / SEG_CELL); cz++) {
+        for (let cx = Math.floor(Math.min(p[0], q[0]) / SEG_CELL); cx <= Math.floor(Math.max(p[0], q[0]) / SEG_CELL); cx++) {
+          for (const e of grid.get(gridKey(cx, cz)) ?? []) {
+            const k = e - 1;
             if (seen.has(k)) continue;
             seen.add(k);
             const [a, b] = [middle[k], middle[k + 1]];
-            const [ux, uz, vx, vz] = [q[0] - p[0], q[1] - p[1], b[0] - a[0], b[1] - a[1]];
-            const den = ux * vz - uz * vx;
-            if (Math.abs(den) < 1e-12) continue;
-            const t = ((a[0] - p[0]) * vz - (a[1] - p[1]) * vx) / den;
-            const u = ((a[0] - p[0]) * uz - (a[1] - p[1]) * ux) / den;
-            if (t < 0 || t >= 1 || u < 0 || u >= 1) continue;
-            const lu = pmath.hypot(ux, uz) || 1;
-            const lv = pmath.hypot(vx, vz) || 1;
-            const angle = pmath.acos(Math.min(1, Math.abs(ux * vx + uz * vz) / (lu * lv)));
-            out.push({ road: ri, s: lr[j] + t * (lr[j + 1] - lr[j]), m: lm[k] + u * (lm[k + 1] - lm[k]), angle });
+            const hit = segmentCross(p, q, a, b);
+            if (!hit || hit.t < 0 || hit.t >= 1 || hit.u < 0 || hit.u >= 1) continue;
+            out.push({ road: ri, s: lr[j] + hit.t * (lr[j + 1] - lr[j]), m: lm[k] + hit.u * (lm[k + 1] - lm[k]), angle: segmentAngle(p, q, a, b) });
           }
         }
       }
     }
   });
   return out.sort((x, y) => x.road - y.road || x.s - y.s);
-}
-
-/** Spans (`[s0, s1]`, in order) with those closer than `gap` m made one. */
-function merged(spans: readonly [number, number][], gap: number): [number, number][] {
-  const sorted = [...spans].sort((a, b) => a[0] - b[0]);
-  const out: [number, number][] = [];
-  for (const [a, b] of sorted) {
-    const last = out[out.length - 1];
-    if (last && a - last[1] < gap) last[1] = Math.max(last[1], b);
-    else out.push([a, b]);
-  }
-  return out;
 }
 
 /** The motorway as laid (`finishMotorway`): its roads (two carriageways, then its ramps), and what each road it crosses gets in its `crosses`. */
@@ -842,7 +786,10 @@ export interface MotorwayLaid {
  */
 export function finishMotorway(route: MotorwayRoute, roads: readonly RoadPlan[], wet: (x: number, z: number) => boolean, town: Pt, base: number, name: (wanted: string) => string): MotorwayLaid | null {
   const found = crossings(route.middle, roads);
-  const byTown = [...found].sort((a, b) => dist(pointAt(route.middle, a.m).p, town) - dist(pointAt(route.middle, b.m).p, town) || a.road - b.road);
+  // (Each crossing's distance from the town worked out once.)
+  const { ls: lm } = chunksOf(route.middle);
+  const far = new Map(found.map((c) => [c, dist(pointAt(route.middle, c.m, lm).p, town)]));
+  const byTown = [...found].sort((a, b) => far.get(a)! - far.get(b)! || a.road - b.road);
   const index = new RoadIndex(roads);
   for (const c of byTown) {
     if (roads[c.road].kind === 'trail' || c.angle < CROSS_ANGLE) continue;
@@ -898,7 +845,7 @@ function decked(way: RoadPlan, found: readonly Crossing[], roads: readonly RoadP
     spans.push([Math.max(0, hit.s - half), Math.min(L, hit.s + half)]);
   }
   const out: RoadPlan = { ...way };
-  const raised = merged(spans, MERGE_SPANS).map(([a, b]): [number, number] => [round2(a), round2(b)]);
+  const raised = mergeSpans(spans, MERGE_SPANS).map(([a, b]): [number, number] => [round2(a), round2(b)]);
   if (raised.length) out.raised = raised;
   const runs = wetRuns(way.points, wet, ls);
   if (runs.length) {
@@ -910,27 +857,39 @@ function decked(way: RoadPlan, found: readonly Crossing[], roads: readonly RoadP
   return { road: out, crosses: crosses.map(({ road, under }) => ({ road, under })) };
 }
 
-/** Where polyline `a` crosses polyline `b` first: along each (m), and how square (radians from along). */
+/**
+ * Where polyline `a` crosses polyline `b` first (the first of `a`'s segments that does, the first of `b`'s on it):
+ * along each (m), and how square (radians from along). `a`'s segments are looked up by cell (`segmentGrid`, made
+ * once a line), only those whose bounds meet the segment of `b`'s tried.
+ */
 function crossOne(a: readonly Pt[], b: readonly Pt[]): { s: number; u: number; angle: number } | null {
-  const [la, lb] = [lengths(a), lengths(b)];
-  for (let i = 0; i + 1 < a.length; i++) {
-    const [p, q] = [a[i], a[i + 1]];
-    const [minX, maxX, minZ, maxZ] = [Math.min(p[0], q[0]), Math.max(p[0], q[0]), Math.min(p[1], q[1]), Math.max(p[1], q[1])];
-    for (let j = 0; j + 1 < b.length; j++) {
-      const [c, d] = [b[j], b[j + 1]];
-      if (Math.max(c[0], d[0]) < minX || Math.min(c[0], d[0]) > maxX || Math.max(c[1], d[1]) < minZ || Math.min(c[1], d[1]) > maxZ) continue;
-      const [ux, uz, vx, vz] = [q[0] - p[0], q[1] - p[1], d[0] - c[0], d[1] - c[1]];
-      const den = ux * vz - uz * vx;
-      if (Math.abs(den) < 1e-12) continue;
-      const t = ((c[0] - p[0]) * vz - (c[1] - p[1]) * vx) / den;
-      const u = ((c[0] - p[0]) * uz - (c[1] - p[1]) * ux) / den;
-      if (t < 0 || t > 1 || u < 0 || u > 1) continue;
-      const angle = pmath.acos(Math.min(1, Math.abs(ux * vx + uz * vz) / ((pmath.hypot(ux, uz) || 1) * (pmath.hypot(vx, vz) || 1))));
-      return { s: la[i] + t * (la[i + 1] - la[i]), u: lb[j] + u * (lb[j + 1] - lb[j]), angle };
+  let grid = grids.get(a);
+  if (!grid) grids.set(a, (grid = segmentGrid(a)));
+  let best: { i: number; j: number; t: number; u: number } | null = null;
+  for (let j = 0; j + 1 < b.length; j++) {
+    const [c, d] = [b[j], b[j + 1]];
+    const tried = new Set<number>();
+    for (let cz = Math.floor(Math.min(c[1], d[1]) / SEG_CELL); cz <= Math.floor(Math.max(c[1], d[1]) / SEG_CELL); cz++) {
+      for (let cx = Math.floor(Math.min(c[0], d[0]) / SEG_CELL); cx <= Math.floor(Math.max(c[0], d[0]) / SEG_CELL); cx++) {
+        for (const e of grid.get(gridKey(cx, cz)) ?? []) {
+          const i = e - 1;
+          if (tried.has(i) || (best && i >= best.i)) continue;
+          tried.add(i);
+          const [p, q] = [a[i], a[i + 1]];
+          if (Math.max(c[0], d[0]) < Math.min(p[0], q[0]) || Math.min(c[0], d[0]) > Math.max(p[0], q[0]) || Math.max(c[1], d[1]) < Math.min(p[1], q[1]) || Math.min(c[1], d[1]) > Math.max(p[1], q[1])) continue;
+          const hit = segmentCross(p, q, c, d);
+          if (!hit || hit.t < 0 || hit.t > 1 || hit.u < 0 || hit.u > 1) continue;
+          best = { i, j, t: hit.t, u: hit.u };
+        }
+      }
     }
   }
-  return null;
+  if (!best) return null;
+  const { i, j, t, u } = best;
+  const [la, lb] = [lengths(a), lengths(b)];
+  return { s: la[i] + t * (la[i + 1] - la[i]), u: lb[j] + u * (lb[j + 1] - lb[j]), angle: segmentAngle(a[i], a[i + 1], b[j], b[j + 1]) };
 }
+const grids = new WeakMap<readonly Pt[], ReturnType<typeof segmentGrid>>();
 
 /**
  * The half-diamond at crossing `c` (a road under the motorway): an off-ramp from one carriageway and an on-ramp onto
@@ -942,7 +901,7 @@ function crossOne(a: readonly Pt[], b: readonly Pt[]): { s: number; u: number; a
  */
 export function halfDiamond(route: MotorwayRoute, c: Crossing, roads: readonly RoadPlan[], index: RoadIndex, found: readonly Crossing[], wet: (x: number, z: number) => boolean): { off: RoadPlan; on: RoadPlan; side: -1 | 1 } | null {
   const { middle } = route;
-  const lm = lengths(middle);
+  const { ls: lm } = chunksOf(middle);
   const L = lm[lm.length - 1];
   const under = roads[c.road];
   const lu = lengths(under.points);
@@ -1002,7 +961,7 @@ function rampOf(middle: readonly Pt[], lm: readonly number[], c: Crossing, side:
   /** How far across the middle line (m, + its right) and along from the crossing (on `side`) the road under it is at `s` along it. */
   const off = (s: number) => {
     const { p } = pointAt(under.points, s, lu);
-    const m = nearest(middle, p[0], p[1], lm);
+    const m = nearestOn(middle, lm, p[0], p[1]);
     const { p: q, t } = pointAt(middle, m.s, lm);
     const r = rightOf(t);
     return { across: (p[0] - q[0]) * r[0] + (p[1] - q[1]) * r[1], along: (m.s - c.m) * side };
@@ -1073,19 +1032,18 @@ export function motorwayProblems(roads: readonly RoadPlan[]): string[] {
     const r = roads[i];
     // (Never across a carriageway: under the other's deck it would be on the motorway's level in the simulation.)
     for (const j of ways) if (crossOne(r.points.slice(3, -3), roads[j].points)) out.push(`${r.name} crosses ${roads[j].name}`);
-    const e = r.ends.indexOf('merge');
-    if (e < 0) {
+    const merge = mergeOf(roads, r);
+    if (!merge) {
       out.push(`${r.name}: no merge`);
       continue;
     }
-    const m = e === 0 ? r.points[0] : r.points[r.points.length - 1];
-    const way = ways.map((j) => ({ j, n: nearest(roads[j].points, m[0], m[1]) })).sort((a, b) => a.n.dist - b.n.dist)[0];
-    if (!way || way.n.dist > roads[way.j].width / 2) {
+    const { end: e, way } = merge;
+    if (!way || way.dist > roads[way.road].width / 2) {
       out.push(`${r.name}: its merge off its carriageway`);
       continue;
     }
-    const w = roads[way.j];
-    const { t } = pointAt(w.points, way.n.s);
+    const w = roads[way.road];
+    const { t } = pointAt(w.points, way.s);
     const go: Pt = [t[0] * (w.oneway ?? 1), t[1] * (w.oneway ?? 1)];
     const mid = pointAt(r.points, lengths(r.points).at(-1)! / 2).p;
     const q = pointAt(w.points, nearest(w.points, mid[0], mid[1]).s).p;
@@ -1095,4 +1053,22 @@ export function motorwayProblems(roads: readonly RoadPlan[]): string[] {
     if (rt[0] * go[0] + rt[1] * go[1] < 0.5) out.push(`${r.name}: against its carriageway's way`);
   }
   return out;
+}
+
+/**
+ * Where ramp `ramp` merges with the motorway (`roads` its carriageways among them): which of its ends (its first
+ * `merge` end), there, and the carriageway nearest there (its index, how far its middle is and where along it, m;
+ * none without a carriageway). Null: no end of it merges.
+ */
+export function mergeOf(roads: readonly RoadPlan[], ramp: RoadPlan): { end: 0 | 1; at: Pt; way?: { road: number; dist: number; s: number } } | null {
+  const e = ramp.ends.indexOf('merge');
+  if (e < 0) return null;
+  const at = e === 0 ? ramp.points[0] : ramp.points[ramp.points.length - 1];
+  let way: { road: number; dist: number; s: number } | undefined;
+  roads.forEach((r, j) => {
+    if (r.kind !== 'motorway') return;
+    const n = nearest(r.points, at[0], at[1]);
+    if (!way || n.dist < way.dist) way = { road: j, dist: n.dist, s: n.s };
+  });
+  return { end: e as 0 | 1, at, way };
 }

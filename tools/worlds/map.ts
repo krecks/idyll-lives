@@ -13,7 +13,7 @@
  * `--seed n`: that seed alone (as the bench's big world, `?bench=bigworld`, makes its town from seed 7), `--options
  * town=city,villages=many`: those options over each size's. `--spots <file>`: per world with a motorway, where its
  * junction's ramps meet the road under it and where that road passes under it, as offsets (m) from the main town's
- * middle as the bench's town view finds it (`debug/benchTime.ts` `townCentre`): `tools/bench/roadShots.mjs --spots`.
+ * middle as the bench's town view finds it (`game/townPreview.ts` `townCentre`): `tools/bench/roadShots.mjs --spots`.
  *
  * Run: bun tools/worlds/map.ts <out dir> [worlds per place and size] [--kinds farm,river] [--sizes small,large] [--classic] [--seed-base n] [--seed n] [--options town=city] [--spots file] [--no-maps]
  */
@@ -39,7 +39,7 @@ const { generateFromSpec, landDraft, layOn } = await import('../../web/src/game/
 const { CLASSIC, WORLD_KINDS } = await import('../../web/src/game/world.ts');
 const { motorwayProblems } = await import('../../web/src/game/motorway.ts');
 const { deckSpans, lengths, pointAt } = await import('../../web/src/game/roads.ts');
-const { previewWorld } = await import('../../web/src/game/townPreview.ts');
+const { previewWorld, townCentre } = await import('../../web/src/game/townPreview.ts');
 type LandSize = 'small' | 'medium' | 'large';
 
 const content = await Content.load(new URL('content/base.json', root).href);
@@ -172,11 +172,7 @@ if (spotsFile) writeFileSync(spotsFile, JSON.stringify(spots, null, 1));
 
 /** Where world `d`'s junction and its overpass are, from its main town's middle (`townCentre` of the world drawn). */
 function spotsOf(d: NeighbourhoodDraft): Record<string, unknown> {
-  const world = previewWorld(content, templates, d, null);
-  const square = world.meta?.centre?.find((c) => c.area === 0) ?? world.meta?.centre?.[0];
-  const main = world.meta?.areas?.[0];
-  const mid = (pts: [number, number][]) => [pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length];
-  const [cx, cz] = square?.poly.length ? mid(square.poly) : main ? [main.x + main.w / 2, main.z + main.d / 2] : [d.width / 2, d.depth / 2];
+  const [cx, , cz] = townCentre(previewWorld(content, templates, d, null));
   const ramp = d.roads.find((r) => r.kind === 'ramp')!;
   const T = ramp.ends[0] === 'join' ? ramp.points[0] : ramp.points[ramp.points.length - 1];
   const way = d.roads.find((r) => r.kind === 'motorway')!;

@@ -45,9 +45,6 @@ const LEFT_AT: f32 = TURN_AT;
 /// steps.
 const BOX_LOOK: f32 = 20.0;
 const BOX_STEP: f32 = 0.5;
-/// `Route::lane` on a road where nobody comes the other way in it (one-way: a ramp, a motorway's
-/// carriageway, a one-way street): no lane coming the other way for it to reach over.
-pub(crate) const NO_ONCOMING: f32 = 50.0;
 
 /// How many lanes a road of `kind` has each way (`roadKinds.ts` `lanesEachWay`).
 pub(crate) fn lanes_each_way(kind: RoadKind) -> u8 {
@@ -60,16 +57,12 @@ pub(crate) fn lanes_each_way(kind: RoadKind) -> u8 {
 /// Whether `road` is one cars always drove: two-way, one lane each way (a street, a lane, a
 /// country road).
 pub(crate) fn classic(road: &Road) -> bool {
-    road.oneway.is_both()
-        && !matches!(
-            road.kind,
-            RoadKind::Avenue | RoadKind::Motorway | RoadKind::Ramp
-        )
+    road.oneway.is_both() && !road.kind.fast()
 }
 
 /// Whether one can come the other way along `road` in it: two-way, and not a ramp or a motorway.
 fn oncoming(road: &Road) -> bool {
-    road.oneway.is_both() && !matches!(road.kind, RoadKind::Motorway | RoadKind::Ramp)
+    road.oneway.is_both() && !road.kind.oneway_always()
 }
 
 /// Lane `idx` (0: the outer, kerbside one; 1: the next in) of network road `road` for a car going
@@ -128,9 +121,8 @@ pub(crate) struct LaneLine {
     /// At each point, its road and whether the car goes along it the way its points run
     /// (`RoadPath::roads`).
     pub(crate) on: Vec<(u32, bool)>,
-    /// Its points' nearest. None where every road along it is one cars always drove (`classic`):
-    /// its points the way's own and its lanes `lane_on`'s, all as they always were.
-    near: Option<NearestPoint>,
+    /// Its points' nearest (`nearest`).
+    near: NearestPoint,
     /// Its points where it turns from one lane into another (`SWITCH`): its lane's corner there
     /// where the lane in meets the lane out (`line`).
     corners: Vec<usize>,
@@ -147,10 +139,10 @@ impl LaneLine {
                 .map(|i| lane_on(road(i).width, road(i).kind))
                 .collect();
             return LaneLine {
+                near: NearestPoint::new(pts.clone()),
                 pts,
                 offs,
                 on,
-                near: None,
                 corners: Vec::new(),
             };
         }
@@ -175,9 +167,7 @@ impl LaneLine {
             turned(unit2(a, p), unit2(p, b))
         };
         // Its points at a junction's middle.
-        let junctions = NearestPoint::new(g.junctions().collect());
-        let js: Vec<[f32; 2]> = g.junctions().collect();
-        let at_junction = |p: [f32; 2]| junctions.nearest(p).is_some_and(|j| dist(js[j], p) < 0.5);
+        let at_junction = |p: [f32; 2]| g.junction_near(p).is_some_and(|j| dist(j, p) < 0.5);
         // Each point's lane: the outer, but on an avenue's stretch at whose end it turns left.
         let mut base = vec![0.0f32; n];
         let mut left_ahead: Option<u32> = None;
@@ -247,7 +237,7 @@ impl LaneLine {
             pts: Vec::with_capacity(n + cuts.len()),
             offs: Vec::with_capacity(n + cuts.len()),
             on: Vec::with_capacity(n + cuts.len()),
-            near: None,
+            near: NearestPoint::default(),
             corners: Vec::with_capacity(turns.len()),
         };
         let mut c = 0;
@@ -271,7 +261,7 @@ impl LaneLine {
             out.offs.push(off_at(s[k], base[k]));
             out.on.push(on[k]);
         }
-        out.near = Some(NearestPoint::new(out.pts.clone()));
+        out.near = NearestPoint::new(out.pts.clone());
         out
     }
 
@@ -305,18 +295,66 @@ impl LaneLine {
         out
     }
 
-    /// Its point nearest `p` (one of its lane's points), if it isn't `classic` (whose callers look
-    /// along the way's own points, as they always did).
-    pub(crate) fn nearest(&self, p: [f32; 2]) -> Option<usize> {
-        self.near.as_ref()?.nearest(p)
-    }
-
-    /// At its point `i`: the road's width and kind, and `meet`'s room and lane for a car `wid` m
-    /// wide in its lane there.
-    pub(crate) fn point(&self, g: &Graph, i: usize, wid: f32) -> (f32, RoadKind, f32, f32) {
+    /// What its point `i` is to a car `wid` m wide in its lane there (`Here`).
+    fn point(&self, g: &Graph, i: usize, wid: f32) -> Here {
         let road = &g.roads[self.on[i].0 as usize];
         let (room, lane) = meet(road, self.offs[i], wid);
-        (road.width, road.kind, room, lane)
+        Here {
+            kind: road.kind,
+            room,
+            lane,
+        }
+    }
+
+    /// Its lane laid out for a car `wid` m wide to drive (`Laid`): its line (`line`) thinned
+    /// (`ROUTE_STEP`, `ROUTE_TOLERANCE`), its corners rounded (`round_corners`); at each of that
+    /// lane's points, what the way's point nearest it is to the car (`point`), and the marks
+    /// (`way_marks`) of the point it was laid from (`Along`).
+    pub(crate) fn laid(&self, g: &Graph, wid: f32) -> Laid {
+        let line = self.line();
+        let lane = round_corners(&crate::travel::thin_with(
+            &line,
+            ROUTE_STEP,
+            ROUTE_TOLERANCE,
+        ));
+        let here = lane
+            .iter()
+            .map(|&p| self.point(g, self.near.nearest(p).unwrap_or(0), wid))
+            .collect();
+        let marks = way_marks(g, &self.pts, &self.on).map(|marks| {
+            let mut from = Along::new(&line);
+            lane.iter().map(|&p| from.mark(&marks, p)).collect()
+        });
+        Laid { lane, here, marks }
+    }
+}
+
+/// What a point of a car's lane is to it (`LaneLine::point`): the kind of road it's on, how far
+/// right of its lane it can pull over there to pass one coming the other way, and how far right of
+/// the road's middle its lane is as one coming the other way meets it (`meet`; None: nobody comes
+/// the other way there).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Here {
+    pub(crate) kind: RoadKind,
+    pub(crate) room: f32,
+    pub(crate) lane: Option<f32>,
+}
+
+/// A way's lane laid out for a car to drive (`LaneLine::laid`).
+pub(crate) struct Laid {
+    /// The lane's points, in the order the car drives them.
+    pub(crate) lane: Vec<[f32; 2]>,
+    /// At each, what it is to the car (`Here`).
+    pub(crate) here: Vec<Here>,
+    /// At each, its level and whether it merges there (`Along::mark`). None where the network
+    /// has neither decks nor merges (`way_marks`).
+    pub(crate) marks: Option<Vec<(crate::travel::Layer, bool)>>,
+}
+
+impl Laid {
+    /// The marks of its point `i`, if it has them (`marks`).
+    pub(crate) fn mark(&self, i: usize) -> Option<(crate::travel::Layer, bool)> {
+        self.marks.as_ref().map(|m| m[i])
     }
 }
 
@@ -329,18 +367,33 @@ pub(crate) fn way_marks(
     pts: &[[f32; 2]],
     on: &[(u32, bool)],
 ) -> Option<Vec<(crate::travel::Layer, bool)>> {
-    if !g.has_decks() && g.merge_nodes().next().is_none() {
+    if !g.has_decks() && !g.has_merges() {
         return None;
     }
     let kind = |i: usize| g.roads[on[i].0 as usize].kind;
+    // (How far along its road a point is: only on a road with decks, the one place its level
+    // depends on it (`Graph::layer_at`); found from the segment the point before was on, along
+    // the same road, `Road::project_from`, not by looking along the whole road for each point.)
+    let mut seg: Option<(u32, usize)> = None;
     Some(
         (0..pts.len().min(on.len()))
             .map(|i| {
-                let (s, _) = g.roads[on[i].0 as usize].project(pts[i]);
+                let r = on[i].0;
+                let road = &g.roads[r as usize];
+                let s = if g.decks.get(r as usize).is_none_or(|d| d.is_empty()) {
+                    0.0
+                } else {
+                    let (k, (s, _)) = match seg {
+                        Some((q, k)) if q == r => road.project_from(k, pts[i]),
+                        _ => road.project_on(pts[i]),
+                    };
+                    seg = Some((r, k));
+                    s
+                };
                 let merge = kind(i) == RoadKind::Ramp
                     && on.get(i + 1).is_some()
                     && kind(i + 1) == RoadKind::Motorway;
-                (g.layer_at(on[i].0, s), merge)
+                (g.layer_at(r, s), merge)
             })
             .collect(),
     )
@@ -401,14 +454,13 @@ impl<'a> Along<'a> {
 /// On `road`, a car `wid` m wide whose lane is `off` m right of its middle line: how far right of
 /// its lane it can pull over to pass one coming the other way (`pull_room`; none where nobody comes
 /// the other way in its lane, or the road isn't one cars always drove), and how far right of the
-/// road's middle its lane is as one coming the other way meets it (`Route::lane`: `off`, or
-/// `NO_ONCOMING`).
-pub(crate) fn meet(road: &Road, off: f32, wid: f32) -> (f32, f32) {
+/// road's middle its lane is as one coming the other way meets it (`Route::lane`: `off`; None
+/// where nobody comes the other way in it: one-way, a ramp, a motorway's carriageway).
+pub(crate) fn meet(road: &Road, off: f32, wid: f32) -> (f32, Option<f32>) {
     let room = if classic(road) {
         pull_room(road.width, road.kind, wid)
     } else {
         0.0
     };
-    let lane = if oncoming(road) { off } else { NO_ONCOMING };
-    (room, lane)
+    (room, oncoming(road).then_some(off))
 }
