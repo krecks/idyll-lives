@@ -1935,3 +1935,151 @@ fn traffic_keeps_to_the_right_as_the_game_draws_it() {
     }
     assert!(poles >= 4, "{poles} poles");
 }
+
+/// Whether two cars' bodies (`shown` poses, `[len, wid]`) overlap, seen from above.
+fn bodies_overlap(a: ([f32; 2], f32), sa: [f32; 2], b: ([f32; 2], f32), sb: [f32; 2]) -> bool {
+    let corners = |(p, yaw): ([f32; 2], f32), [len, wid]: [f32; 2]| {
+        let (f, r) = (
+            [yaw.sin(), yaw.cos()],
+            sim_core::cars::right_of([yaw.sin(), yaw.cos()]),
+        );
+        [(1.0, 1.0), (1.0, -1.0), (-1.0, -1.0), (-1.0, 1.0)].map(|(i, j)| {
+            [
+                p[0] + f[0] * i * len / 2.0 + r[0] * j * wid / 2.0,
+                p[1] + f[1] * i * len / 2.0 + r[1] * j * wid / 2.0,
+            ]
+        })
+    };
+    let (ca, cb) = (corners(a, sa), corners(b, sb));
+    // (Apart along some side's normal: they don't overlap.)
+    let apart = |c: &[[f32; 2]; 4]| {
+        (0..4).any(|i| {
+            let (p, q) = (c[i], c[(i + 1) % 4]);
+            let n = [p[1] - q[1], q[0] - p[0]];
+            let on = |k: &[[f32; 2]; 4]| k.map(|v| v[0] * n[0] + v[1] * n[1]);
+            let (x, y) = (on(&ca), on(&cb));
+            let (x0, x1) = (
+                x.iter().copied().fold(f32::MAX, f32::min),
+                x.iter().copied().fold(f32::MIN, f32::max),
+            );
+            let (y0, y1) = (
+                y.iter().copied().fold(f32::MAX, f32::min),
+                y.iter().copied().fold(f32::MIN, f32::max),
+            );
+            x1 < y0 || y1 < x0
+        })
+    };
+    !apart(&ca) && !apart(&cb)
+}
+
+/// Traffic through the half-diamond with the camera on it (`World::set_watch`, the watch `watch`):
+/// off the eastbound by the off-ramp and either way along Bridge Street from its T, up and down
+/// the street to the on-ramp and onto the westbound, and along the street past both ramps' Ts
+/// either way, a car of each about every 3 s for 50 s. Each tick, of the cars drawn (in sight, not
+/// left out of the picture: `cars::hidden`, and in the watch): the pairs on levels that meet whose
+/// bodies overlap, and the street's cars not on their right out of the junctions' boxes (of how
+/// many looked at). And whether every car got through.
+fn half_diamond_on_camera(watch: [i32; 4]) -> (Vec<String>, Vec<String>, usize, bool) {
+    let mut w = world();
+    w.set_watch(Some(watch));
+    let (x, east, west) = (STREET_X as f32, EAST_Z as f32, WEST_Z as f32);
+    let g = w.travel.graph.clone();
+    let streams: [([f32; 2], [f32; 2]); 6] = [
+        ([3.0, east], [x, 300.0]),
+        ([3.0, east], [x, 95.0]),
+        ([x, 140.0], [3.0, west]),
+        ([x, 300.0], [3.0, west]),
+        ([x, 300.0], [x, 95.0]),
+        ([x, 95.0], [x, 300.0]),
+    ];
+    let inside = |p: [f32; 2]| {
+        p[0] >= watch[0] as f32
+            && p[0] < watch[2] as f32
+            && p[1] >= watch[1] as f32
+            && p[1] < watch[3] as f32
+    };
+    let mut cars: Vec<usize> = Vec::new();
+    let (mut overlaps, mut left, mut looked) = (Vec::new(), Vec::new(), 0);
+    for tick in 0..12_000u32 {
+        for (k, &(from, to)) in streams.iter().enumerate() {
+            let room = w
+                .cars
+                .iter()
+                .all(|c| c.shown.is_none_or(|s| dist(s.0, from) > 9.0));
+            if tick < 3000 && tick % 180 == k as u32 * 30 && room {
+                cars.push(drill::add(&mut w, from, to, 0.0).expect("a way"));
+            }
+        }
+        drill::step(&mut w);
+        let hidden = sim_core::cars::hidden(&w.cars);
+        let drawn: Vec<usize> = cars
+            .iter()
+            .copied()
+            .filter(|&c| !hidden[c] && w.cars[c].shown.is_some_and(|s| inside(s.0)))
+            .collect();
+        for (i, &a) in drawn.iter().enumerate() {
+            let (sa, ca) = (w.cars[a].shown.unwrap(), &w.cars[a]);
+            for &b in &drawn[i + 1..] {
+                let (sb, cb) = (w.cars[b].shown.unwrap(), &w.cars[b]);
+                if drill::on_deck(&w, a) == drill::on_deck(&w, b)
+                    && bodies_overlap(
+                        (sa.0, sa.1),
+                        [ca.len, ca.wid],
+                        (sb.0, sb.1),
+                        [cb.len, cb.wid],
+                    )
+                {
+                    overlaps.push(format!(
+                        "tick {tick}: cars {a} at {:?} and {b} at {:?}",
+                        sa.0, sb.0
+                    ));
+                }
+            }
+            // (Along the street, out of the boxes: on its right, `cars::right_of`, going north +x.)
+            let (p, yaw) = (sa.0, sa.1);
+            if (p[0] - x).abs() < 3.5
+                && p[1] > 100.0
+                && yaw.sin().abs() < 0.1
+                && !boxed(&g, p)
+                && !drill::on_deck(&w, a)
+            {
+                let side = (p[0] - x) * yaw.cos().signum();
+                looked += 1;
+                if side < 0.5 {
+                    left.push(format!(
+                        "tick {tick}: car {a} at {p:?} facing {yaw:.2}, {side:.2} m right"
+                    ));
+                }
+            }
+        }
+        if tick > 3000 && cars.iter().all(|&c| w.cars[c].shown.is_none()) {
+            break;
+        }
+    }
+    let through = cars.len() >= 40 && cars.iter().all(|&c| w.cars[c].shown.is_none());
+    (overlaps, left, looked, through)
+}
+
+#[test]
+fn the_half_diamond_on_camera_never_overlaps_and_keeps_right() {
+    // (The play-test's farm city at super speed: cars one on another queueing at the off-ramp's T,
+    // and opposite ways at the on-ramp's mouth, and on the left of the lanes by the Ts. The sim's
+    // never were: the renderer drew them so, a step of 30 to 60 ticks lerped along its chord and
+    // carried on past the newest. The sim's own, with the camera there, never may be.)
+    // The camera on the half-diamond and the street, and with its edge across both ramps, cars
+    // coming into sight on them.
+    for watch in [[0, 140, 220, 300], [90, 150, 220, 300]] {
+        let (overlaps, left, looked, through) = half_diamond_on_camera(watch);
+        assert!(
+            looked > 500,
+            "watch {watch:?}: {looked} on the street looked at"
+        );
+        assert_eq!(
+            overlaps,
+            Vec::<String>::new(),
+            "watch {watch:?}: overlapping"
+        );
+        assert_eq!(left, Vec::<String>::new(), "watch {watch:?}: on the left");
+        assert!(through, "watch {watch:?}: all through");
+    }
+}
