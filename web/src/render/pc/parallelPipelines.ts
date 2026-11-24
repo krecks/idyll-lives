@@ -77,17 +77,21 @@ export class ParallelPipelines {
         if (ownCreate) cache.create = create;
         else delete (cache as { create?: unknown }).create;
       }
-      await Promise.all(jobs);
-      for (const entries of cache.cache.values()) {
-        for (const e of entries) {
-          const p = made.get(e.pipeline as object);
-          if (p) e.pipeline = p;
-        }
-      }
-      // (The device's current pipeline may be a stand-in: the next draw asks the cache again.)
-      if (standIns.has(device.pipeline as object)) device.pipeline = null;
     } finally {
-      undoDraws();
+      // (Even if the frame failed: no stand-in may stay in the cache once its draws are let through again.)
+      try {
+        await Promise.all(jobs);
+        for (const entries of cache.cache.values()) {
+          for (const e of entries) {
+            const p = made.get(e.pipeline as object);
+            if (p) e.pipeline = p;
+          }
+        }
+        // (The device's current pipeline may be a stand-in: the next draw asks the cache again.)
+        if (standIns.has(device.pipeline as object)) device.pipeline = null;
+      } finally {
+        undoDraws();
+      }
     }
     return jobs.length;
   }

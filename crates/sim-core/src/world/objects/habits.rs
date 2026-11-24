@@ -16,6 +16,8 @@ pub(crate) fn habit(
 ) -> Option<Task> {
     let content = ctx.content;
     let funds = ctx.households[sim.household as usize].funds - sim.pending_spend;
+    // (What a use costs on `plot`: a home kitchen's snack is bought on a public lot, `cost_at`.)
+    let public = plot.is_some_and(|p| ctx.plots[p as usize].public);
     // (The lowest first, for its habit.)
     let mut due: Vec<&crate::content::Habit> = content
         .day_rhythm
@@ -32,7 +34,7 @@ pub(crate) fn habit(
                 && !i.baby
                 && !i.needs_table
                 && i.recipe.is_none()
-                && affordable(i.cost, funds)
+                && affordable(i.cost_at(public), funds)
         })
     })
 }
