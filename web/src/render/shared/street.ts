@@ -58,7 +58,7 @@ import { compose, quatYawPitchRoll, type Quat } from './math';
 import { placementVariation, type StandIn } from './modelEntry';
 import { wallCorners, writeFences } from './fences';
 import { shownFences } from './shownFences';
-import { centroid, lengths, nearest as nearestOf, pointAt } from '../../game/roads';
+import { centroid, lengths, pointAt } from '../../game/roads';
 import { kindInfo } from '../../core/roadKinds';
 import { junctionStretches } from './markings';
 import { allBarriers, barrier, deckLevels, liftedStretches, MOTORWAY_SIGN, motorwayPairs, OVERPASS, OVERPASS_CONCRETE, signSpots, without } from './motorway';
@@ -675,14 +675,6 @@ const MEDIAN_TREE = 'model.tree.maple';
 const MEDIAN_TREE_EVERY = 12;
 const MEDIAN_TREE_CLEAR = 5;
 const MEDIAN_MATERIAL = 'material.ground';
-
-/** The verge between carriageway `a` of `roads` and its pair `b` (m: how far apart their edges are at `a`'s middle). */
-function pairVerge(roads: readonly RoadPlan[], a: number, b: number): number {
-  const [ra, rb] = [roads[a], roads[b]];
-  const ls = lengths(ra.points);
-  const { p } = pointAt(ra.points, ls[ls.length - 1] / 2, ls);
-  return Math.max(0, nearestOf(rb.points, p[0], p[1]).dist - (ra.width + rb.width) / 2);
-}
 
 export class TownStreet {
   readonly plots: PlotLayout[];
@@ -1993,7 +1985,7 @@ export class TownStreet {
         return { deck: (u: number) => roadLevels.road(road, s0 + u), bed: (x: number, z: number) => (levels ? levels.surface.landAt(x, z) : 0), under: (x: number, z: number) => (levels ? levels.groundUnder(x, z) : 0), stops };
       };
       const pair = pairs.get(ri);
-      const inner = pair && { inner: pair.side, innerApron: pairVerge(all, ri, pair.other) / 2 };
+      const inner = pair && { inner: pair.side, innerApron: pair.verge / 2 };
       const deck = (s0: number, s1: number, solid = false) => {
         const h = heightsOf(s0);
         // (Its piers and abutments on the ground with every deck taken away: `BuiltSurface.groundUnder`.)

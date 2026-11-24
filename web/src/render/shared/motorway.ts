@@ -46,12 +46,14 @@ export const OVERPASS_CONCRETE = '#ABA8A0';
 const BARRIER_STEP = 2;
 
 /**
- * A carriageway's pair: the other one's index, and its side (+1: towards (t.z, -t.x) of the way its points run, as
- * `markings.ts` `Lane.off`: its left on the town map, its right as the game shows it).
+ * A carriageway's pair: the other one's index, its side (+1: towards (t.z, -t.x) of the way its points run, as
+ * `markings.ts` `Lane.off`: its left on the town map, its right as the game shows it), and the verge between their edges
+ * at this one's middle (m).
  */
 export interface MotorwayPair {
   other: number;
   side: 1 | -1;
+  verge: number;
 }
 
 const pairsOf = new WeakMap<readonly RoadPlan[], Map<number, MotorwayPair>>();
@@ -79,9 +81,9 @@ export function motorwayPairs(roads: readonly RoadPlan[]): Map<number, MotorwayP
       if (Math.abs(q.t[0] * t[0] + q.t[1] * t[1]) < 0.9) continue;
       // (Towards (t.z, -t.x): `MotorwayPair.side`.)
       const side = (q.p[0] - p[0]) * t[1] - (q.p[1] - p[1]) * t[0] >= 0 ? 1 : -1;
-      best = { other: j, side, d: near.dist };
+      best = { other: j, side, verge: Math.max(0, near.dist - (a.width + b.width) / 2), d: near.dist };
     }
-    if (best) out.set(i, { other: best.other, side: best.side });
+    if (best) out.set(i, { other: best.other, side: best.side, verge: best.verge });
   }
   pairsOf.set(roads, out);
   return out;
