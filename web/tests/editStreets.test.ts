@@ -822,6 +822,43 @@ describe("a road's kind and way changed", () => {
   });
 });
 
+describe("a bridged street's way changed on its card", () => {
+  test('one-way, flipped or two-way from any of its pieces: its bridge and the street beyond go with it', () => {
+    const before = town(30);
+    const { draft } = made(draw(before, [[120, MAIN_Z + 6], [120, FAR_Z - 6]]));
+    const pieces = draft.roads.flatMap((_, i) => (i >= before.roads.length ? [i] : []));
+    expect(pieces).toHaveLength(3);
+    const deck = pieces.find((i) => draft.roads[i].bridge)!;
+    /** Which way cars go along each piece, northwards (+1: towards the far lane) or southwards. */
+    const north = (d: NeighbourhoodDraft) =>
+      pieces.map((i) => {
+        const r = d.roads[i];
+        const dz = r.points.at(-1)![1] - r.points[0][1];
+        return onewayOf(r) * Math.sign(dz) || 0;
+      });
+    // (The far piece's points turned round: its way is still the street's.)
+    const turned: NeighbourhoodDraft = { ...draft, roads: draft.roads.map((r, i) => (i === pieces[2] ? { ...r, points: [...r.points].reverse(), ends: [r.ends[1], r.ends[0]] } : r)) };
+    for (const start of [draft, turned]) {
+      const one = made(changeKind(start, t, pieces[0], 'street', 1)).draft;
+      const way = north(one)[0];
+      expect(way).not.toBe(0);
+      expect(north(one)).toEqual([way, way, way]);
+      expect(cutOffRoads(one.roads)).toEqual([]);
+      // Flipped from its bridge: the whole street the other way.
+      const flipped = made(changeKind(one, t, deck, 'country', (-onewayOf(one.roads[deck])) as 1 | -1)).draft;
+      expect(north(flipped)).toEqual([-way, -way, -way]);
+      // Two-way again from the far piece.
+      const both = made(changeKind(flipped, t, pieces[2], flipped.roads[pieces[2]].kind ?? 'street', 0)).draft;
+      expect(north(both)).toEqual([0, 0, 0]);
+    }
+    // A bridged street ending in a dead end beyond its bridge: no one-way, whichever piece is picked.
+    const dead = made(draw(before, [[120, MAIN_Z + 6], [120, 260]])).draft;
+    const near = dead.roads.length - 3;
+    expect(dead.roads.some((r) => r.ends.includes('dead'))).toBe(true);
+    expect(refusal(changeKind(dead, t, near, 'street', 1))).toBe(ONE_WAY_ENDS);
+  });
+});
+
 describe('the motorway removed, and the Problems list', () => {
   test('removing a carriageway or a ramp takes the motorway whole; the roads it crossed lie on the land', () => {
     const draft = hierarchy();

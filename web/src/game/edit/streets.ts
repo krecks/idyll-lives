@@ -787,7 +787,8 @@ export const CHANGE_KINDS: readonly RoadKind[] = ['street', 'lane', 'avenue', 'c
  * one), a country road of none. Refused: on the motorway and its ramps, a footpath made a road or a road a footpath,
  * a bridge made another kind, a road under the motorway made wider, a country road left a dead end past a court, a
  * one-way road with a dead end, or one-way roads that leave somewhere a car can no longer get to and back from
- * (`oneway.ts` `cutOffRoads`).
+ * (`oneway.ts` `cutOffRoads`). Its way is its bridges' too, and theirs the street's beyond them (`streetPieces`: one
+ * street, as `drawStreet` lays it), each piece the way the road runs.
  */
 export function changeKind(draft: NeighbourhoodDraft, t: Templates, road: number, kind: RoadKind, oneway?: 1 | -1 | 0, clear = false): Edited {
   const roads = draft.roads;
@@ -801,7 +802,9 @@ export function changeKind(draft: NeighbourhoodDraft, t: Templates, road: number
   if (kind === 'trail' && way) return refused('a footpath has no one way');
   if (kind === was && way === (r.oneway ?? 0)) return { draft, cleared: { lots: [] } };
   if (r.bridge && kind !== was) return refused('a bridge stays as it is built');
-  if (way && r.ends.includes('dead')) return refused(ONE_WAY_ENDS);
+  // (Its bridges and the street beyond them, each piece one way with it.)
+  const pieces = way === (r.oneway ?? 0) ? [] : streetPieces(roads, road);
+  if (way && [r, ...pieces.map((p) => roads[p.road])].some((o) => o.ends.includes('dead'))) return refused(ONE_WAY_ENDS);
   const width = r.bridge ? r.width : streetWidth(kind);
   const wider = width > r.width + 0.01;
   const name = r.name ?? 'it';
@@ -824,6 +827,10 @@ export function changeKind(draft: NeighbourhoodDraft, t: Templates, road: number
   const { area: _area, oneway: _way, ...plain } = r;
   const made: RoadPlan = { ...plain, kind, width, ...(area >= 0 ? { area } : {}), ...(way ? { oneway: way } : {}) };
   const next = roads.map((o, j) => (j === road ? made : meets.has(j) ? atKerb(o, made) : o));
+  for (const { road: j, along } of pieces) {
+    const { oneway: _was, ...rest } = next[j];
+    next[j] = way ? { ...rest, oneway: (way * along) as 1 | -1 } : rest;
+  }
   if (kind === 'country' && r.ends.includes('dead')) {
     const court = longestCourt(next, [road]);
     if (court && court.stub > COURT + 0.5) return refused(`a country road's dead end reaches ${COURT} m at most, and ${name} ends ${Math.round(court.stub)} m past the last road it meets`);
@@ -840,6 +847,36 @@ export function changeKind(draft: NeighbourhoodDraft, t: Templates, road: number
   if (kept) return refused(`${kept.replace(/\.$/, '')}: it would be in the way`);
   const open = draft.open;
   return { draft: removeLots({ ...draft, roads: next, ...(open && inWay.parking.length ? { open: { ...open, ...withoutBays(open, inWay.parking) } } : {}) }, gone), cleared: { lots: inWay.lots } };
+}
+
+/**
+ * The other pieces of the street road `road` is a piece of, as `drawStreet` lays a street over the water (`withBridge`):
+ * the roads met end to end across a bridge (one of the two a bridge's), and on from them so, a piece at a time. Each
+ * with whether its points run the way `road`'s do (+1) or against them (-1).
+ */
+export function streetPieces(roads: readonly RoadPlan[], road: number): { road: number; along: 1 | -1 }[] {
+  const out: { road: number; along: 1 | -1 }[] = [];
+  const seen = new Set([road]);
+  const endOf = (o: RoadPlan, e: 0 | 1) => (e ? o.points[o.points.length - 1] : o.points[0]);
+  const walk = [{ road, along: 1 as 1 | -1 }];
+  for (let next = walk.pop(); next; next = walk.pop()) {
+    const a = roads[next.road];
+    for (const e of [0, 1] as const) {
+      if (a.ends[e] !== 'join') continue;
+      const p = endOf(a, e);
+      for (const [j, o] of roads.entries()) {
+        if (seen.has(j) || !(a.bridge || o.bridge) || isSeparated(o.kind) || o.kind === 'trail') continue;
+        const f = ([0, 1] as const).find((f) => o.ends[f] === 'join' && pmath.hypot(endOf(o, f)[0] - p[0], endOf(o, f)[1] - p[1]) < 1);
+        if (f === undefined) continue;
+        // (Its start at this one's end, or its end at this one's start: the same way.)
+        const piece = { road: j, along: (e !== f ? next.along : -next.along) as 1 | -1 };
+        seen.add(j);
+        out.push(piece);
+        walk.push(piece);
+      }
+    }
+  }
+  return out;
 }
 
 /**
