@@ -55,7 +55,7 @@ import { mulberry32 } from '../noise';
 import { BRIDGE_IN } from '../macro';
 import { bends, clearOf, connector, COURT, cropRoads, curve, endDir, evenly, inside, leftOf, lengths, MEET, nearest, pointAt, RoadIndex, ROOM, roomAt, SIDEWALK, trimJoins, withCrosses, type Fit, type Pt } from '../roads';
 import { plotRect, type NeighbourhoodDraft, type Rect, type Templates } from '../town';
-import { placeOf, specOf, streetNames } from '../world';
+import { avenueName, placeOf, specOf, streetNames } from '../world';
 import type { Edited } from './edited';
 import { wholeParks, withoutBays } from './ground';
 import { fillStreet, removalRefused, removeLots } from './lots';
@@ -669,7 +669,15 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
   const taken = namesIn(draft);
   const rand = mulberry32(stroke.seed);
   const areaName = kind.area === undefined ? undefined : draft.open?.areas[kind.area]?.name;
-  const name = was?.name ?? freshNames(draft, content, rand, 1, taken, areaName)[0];
+  /** A fresh name for the road (an avenue's named as one, `avenueName`). */
+  const newName = () => {
+    const n = freshNames(draft, content, rand, 1, taken, areaName)[0];
+    if (kind.kind !== 'avenue') return n;
+    const a = avenueName(n, (x) => taken.has(x));
+    taken.add(a);
+    return a;
+  };
+  const name = was?.name ?? newName();
   // (One-way the way it is drawn: its points may run the other way, from a dead end it carries on.)
   const oneWay = was || trail || !stroke.oneway ? null : ((stroke.oneway * drawnWay(stroke.points, made)) as 1 | -1);
   const road: RoadPlan = { ...(was ?? {}), points: made, width: was?.width ?? streetWidth(kind.kind ?? 'street'), ends, ...kind, name, ...(oneWay ? { oneway: oneWay } : {}) };
@@ -700,7 +708,7 @@ export function drawStreet(draft: NeighbourhoodDraft, t: Templates, content: Con
       const r = next[at];
       const crossed = crossWater(r.points, r.ends, span, { wet, W, D, roads: others, plots, land: open.land, most: DRAWN_SPAN });
       if (typeof crossed === 'string') return refused(crossed);
-      const [after] = crossed.after ? freshNames(draft, content, rand, 1, taken, areaName) : [undefined];
+      const after = crossed.after ? newName() : undefined;
       const had = next.length;
       const bridged = withBridge(next, at, span, walk ?? wet, W, D, { bridge: bridgeName(name, taken), after }, crossed.fit);
       [next, walk] = [bridged.roads, bridged.walk];

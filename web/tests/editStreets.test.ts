@@ -22,6 +22,7 @@ import { roadWayIssues } from '../src/ui/townedit/problems';
 import type { Edited } from '../src/game/edit/edited';
 import { checkedTown, editedProblems } from '../src/game/edit/checked';
 import { DRAWN_SPAN } from '../src/game/bridges';
+import { AVENUE_WAYS, avenueName } from '../src/game/world';
 import { deckTiles } from '../src/game/macro';
 import { blankLand, LAND_CELL } from '../src/game/land';
 import { wetTile, wetTiles } from '../src/game/landEdit';
@@ -700,6 +701,18 @@ function hierarchy(roads = roadHierarchy().roads): NeighbourhoodDraft {
 }
 
 describe('avenues and one-way streets drawn', () => {
+  test("an avenue's name ends as one; the rest of it, and one that does already, as they were", () => {
+    const none = () => false;
+    expect(avenueName('Foundry Street', none)).toMatch(/^Foundry (Avenue|Boulevard|Way)$/);
+    expect(avenueName('Foundry Street', none)).toBe(avenueName('Foundry Street', none));
+    expect(avenueName('Mill Lane, Ashby', none)).toMatch(/^Mill (Avenue|Boulevard|Way), Ashby$/);
+    for (const kept of ['Birch Avenue', 'Linden Way', 'Main Street 3', 'Broadway']) expect(avenueName(kept, none)).toBe(kept);
+    // (The next if the one it would be is taken; as it was if every one is.)
+    const first = avenueName('Foundry Street', none);
+    expect(avenueName('Foundry Street', (n) => n === first)).not.toBe(first);
+    expect(avenueName('Foundry Street', (n) => n.startsWith('Foundry '))).toBe('Foundry Street');
+  });
+
   // (From the high street east of the lots up and west along z `z`, ending in the open past Mill Lane's dead end, 10 m short of it at z 140.)
   const past = (z: number): Pt[] => [[240, MAIN_Z + 8], [240, z], [200, z], [100, z]];
 
@@ -712,6 +725,8 @@ describe('avenues and one-way streets drawn', () => {
     expect(avenue.kind).toBe('avenue');
     expect(avenue.width).toBe(14);
     expect(avenue.area).toBe(0);
+    // (Named as an avenue, the street's name drawn the same way otherwise.)
+    expect(avenue.name).toMatch(new RegExp(`^${street.name!.split(' ').slice(0, -1).join(' ')} (${AVENUE_WAYS.join('|')})$`));
     // (Asked for out of town it stays one, with no area; by where it runs, a street in town.)
     expect(madeKind(town(), line(390, 120, 390, 280), 'avenue', true)).toEqual({ kind: 'avenue' });
     expect(madeKind(town(), line(390, 120, 390, 280), 'avenue')).toEqual({ kind: 'country' });
