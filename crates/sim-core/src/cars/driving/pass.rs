@@ -71,7 +71,7 @@ pub(crate) fn pull_over(
         })
     };
     let backed = |k: u64| {
-        w.cars.get((k & !(1 << 63)) as usize).is_some_and(|o| {
+        w.cars.get(car_index(k)).is_some_and(|o| {
             o.jam.1 > 0
                 && body(o)
                     .zip(body(&w.cars[c]))
@@ -82,7 +82,7 @@ pub(crate) fn pull_over(
     let waits_me = |k: u64| {
         (w.traffic.waits_for(k).contains(&me)
             || w.cars
-                .get((k & !(1 << 63)) as usize)
+                .get(car_index(k))
                 .is_some_and(|o| o.waits_for == Some(me)))
             && !after(k)
     };
@@ -121,7 +121,7 @@ pub(crate) fn pull_over(
     let waits_for_me = |o: &Driving| {
         w.traffic.waits_for(o.first).contains(&key)
             || w.cars
-                .get((o.first & !(1 << 63)) as usize)
+                .get(car_index(o.first))
                 .is_some_and(|x| x.waits_for == Some(key))
     };
     if shift < car.shift
@@ -310,6 +310,7 @@ pub(crate) fn pull_want(
     // (Those near enough to be passing it: checking every car in town pairs every one with every
     // other, `Near`.)
     let reach = w.cars_near.reach(car);
+    let level = car.layer();
     for o in w.cars_near.near(at, reach, w.cars.len()) {
         let other = &w.cars[o];
         // (Standing, waiting for that one (`after`: its turn after it too), it pulls over as far as
@@ -323,7 +324,7 @@ pub(crate) fn pull_want(
             || other.shown.is_none_or(|s| !s.2) && !standing_taxi
             || other.backing() && !after
             || other.sight != Sight::Seen
-            || !other.layer().meets(car.layer())
+            || !other.layer().meets(level)
         {
             continue;
         }
@@ -724,7 +725,7 @@ pub(crate) fn held_round(
                 ok = false;
                 continue;
             }
-            let o = (o & !(1 << 63)) as usize;
+            let o = car_index(o);
             if ring.contains(&o) {
                 continue;
             }

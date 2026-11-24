@@ -28,12 +28,12 @@ pub(crate) fn unjam(w: &mut World) {
     // car parked there. Waiting its turn behind those coming the other way, it gets it.)
     let standing = |k: u64| {
         w.cars
-            .get((k & !(1 << 63)) as usize)
+            .get(car_index(k))
             .is_some_and(|x| x.taxi && x.standing)
     };
     let still = |k: u64| {
         w.cars
-            .get((k & !(1 << 63)) as usize)
+            .get(car_index(k))
             .is_some_and(|x| x.standing || tick >= x.stall.1 + PASS_WAIT)
     };
     // (Each car's ask looked up by key, not searched for: `waits_on_at`.)
@@ -334,14 +334,8 @@ pub(crate) fn turn_round_by(w: &mut World, c: usize, d: Detour) -> bool {
     let others: Vec<Rect> = cars
         .iter()
         .enumerate()
-        .filter(|&(o, k)| o != c && k.sight == Sight::Seen && k.layer().meets(level))
-        .filter_map(|(_, k)| {
-            k.shown.map(|s| Rect {
-                at: s.0,
-                yaw: s.1,
-                half: [k.len / 2.0, k.wid / 2.0],
-            })
-        })
+        .filter(|&(o, k)| o != c && k.sight == Sight::Seen)
+        .filter_map(|(_, k)| k.shown_rect().filter(|_| k.layer().meets(level)))
         .chain(
             traffic
                 .turning
@@ -503,14 +497,8 @@ pub(crate) fn turn_round(w: &World, c: usize) -> Result<(f32, Detour), &'static 
         .cars
         .iter()
         .enumerate()
-        .filter(|&(o, k)| o != c && k.sight == Sight::Seen && k.layer().meets(level))
-        .filter_map(|(_, k)| {
-            k.shown.map(|s| Rect {
-                at: s.0,
-                yaw: s.1,
-                half: [k.len / 2.0, k.wid / 2.0],
-            })
-        })
+        .filter(|&(o, k)| o != c && k.sight == Sight::Seen)
+        .filter_map(|(_, k)| k.shown_rect().filter(|_| k.layer().meets(level)))
         .collect();
     let clear = |r: &Rect| {
         others.iter().all(|b| {
