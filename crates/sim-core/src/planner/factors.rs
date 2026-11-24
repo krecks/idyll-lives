@@ -24,11 +24,14 @@ fn scaled(full: f32, strength: f32) -> f32 {
 }
 
 /// Multiplier for an object interaction while planning: (factor, floor score). `night` is
-/// `planned_night` (residents who plan their sleep don't go to bed outside it unless exhausted).
+/// `planned_night` (residents who plan their sleep don't go to bed outside it unless exhausted);
+/// `cost`, what the use costs where the object stands (`Interaction::cost_at`: a home kitchen's
+/// snack is bought on a public lot, and saving up weighs against it there).
 pub(crate) fn object_factor(
     content: &Content,
     sim: &Sim,
     inter: &Interaction,
+    cost: i64,
     night: Option<bool>,
 ) -> (f32, f32) {
     let mut factor = 1.0;
@@ -39,7 +42,7 @@ pub(crate) fn object_factor(
             return (0.0, 0.0);
         }
     }
-    if inter.cost > 0 {
+    if cost > 0 {
         factor *= scaled(
             0.3,
             kind_strength(content, sim, &[GoalKind::Funds, GoalKind::Own]),
@@ -211,3 +214,43 @@ pub(crate) fn job_search(content: &Content, sim: &Sim) -> (f32, Option<usize>) {
 }
 
 // ---- Commands -----------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::World;
+
+    #[test]
+    fn saving_up_weighs_against_what_a_use_costs_where_it_stands() {
+        // (A home kitchen's snack, free at home and bought on a public lot: the price there counts.)
+        let content = r#"{"needs":[{"id":"hunger","label":"Hunger","decayPerHour":0.02}],
+            "goals":[{"id":"savings","label":"Save $N","kind":"funds"}],
+            "objects":[{"id":"fridge","name":"Fridge","interactions":[
+                {"id":"snack","label":"Snack","minutes":2,"effects":{"hunger":0.3},"publicCost":4}]}],
+            "economy":{"startingFunds":500}}"#;
+        let town = r#"{"width":10,"depth":10,"plots":[{"name":"Home","x":0,"z":0,"w":10,"d":10}],
+            "households":[{"name":"H","plot":0,"player":true}],
+            "objects":[{"def":"fridge","x":1,"z":1,"rot":0}],
+            "sims":[{"name":"Ada","x":5.5,"z":5.5}]}"#;
+        let mut w = World::from_json(content, town, 1).unwrap();
+        w.sims[0].planner.goals.push(Goal {
+            def: 0,
+            skill: None,
+            category: None,
+            object: None,
+            target: 1000.0,
+            since_day: 1,
+            start: 0.0,
+            progress: 0.0,
+            history: [0.0; 3],
+        });
+        let inter = &w.content.objects[0].interactions[0];
+        let (home, _) = object_factor(&w.content, &w.sims[0], inter, inter.cost_at(false), None);
+        let (out, _) = object_factor(&w.content, &w.sims[0], inter, inter.cost_at(true), None);
+        assert_eq!(home, 1.0, "free at home: nothing to weigh");
+        assert!(
+            out < 1.0,
+            "bought at a place, saving up weighs against it: {out}"
+        );
+    }
+}

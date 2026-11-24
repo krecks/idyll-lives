@@ -151,9 +151,9 @@
     {
       "name": "sim-planner-goals",
       "file": "crates/sim-core/src/planner/goals.rs",
-      "sha256": "401f00d2124a19b337dd8a32cf85df43147c74a027c9e9f009a9c2225dfdcff3",
-      "by": "playtest/2026-11-23 simplify",
-      "reason": "PR #120 simplify, behaviour unchanged: for_their_age moved above goal_skills's doc comment (it had taken it) and made pub, so the planner test asks it instead of repeating the grown-ups' goal kinds. The last accepted change stands: grown-ups' goals kept to grown-ups (B3)."
+      "sha256": "9112929a0dfd035a8ffac9de27e451c8207bf9bd532b84abedc8e38b0f84d503",
+      "by": "playtest/2026-11-23 review",
+      "reason": "PR review follow-up: review_goals lets go of a child's grown-ups' goals and suggestions (for_their_age), which an older save can hold from before they were kept to grown-ups. Test: planner.rs a_childs_grown_up_goals_from_before_are_let_go_of; grid_identity unchanged."
     },
     {
       "name": "sim-planner-purchases",
@@ -165,9 +165,9 @@
     {
       "name": "sim-planner-factors",
       "file": "crates/sim-core/src/planner/factors.rs",
-      "sha256": "b52c5d71e60e757e5d3dd9b02ea533efb059eaa32cba410552de089053a60723",
-      "by": "simplify3",
-      "reason": "simplify3, behaviour unchanged: the module split's \"Split from\" header line gone. The planner's last accepted change stands (owner's choice, real-town code review: a thing a flat keeps outside it is not swapped in over its place by swap_in)."
+      "sha256": "c6cde554489b3684efe84d2672aff791adb478244cee8a8bcec45fe95033db59",
+      "by": "playtest/2026-11-23 review",
+      "reason": "PR review follow-up: object_factor takes what the use costs where the object stands (cost_at: a home kitchen's snack is bought on a public lot) instead of reading inter.cost, so saving up weighs against a restaurant's $4 snack. Unit test: saving_up_weighs_against_what_a_use_costs_where_it_stands; grid_identity unchanged."
     },
     {
       "name": "sim-planner-parse",
