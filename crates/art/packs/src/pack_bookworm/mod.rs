@@ -32,7 +32,7 @@ pub fn family() -> Family {
                     ("fabric", "Fabric"),
                     ("cushion", "Cushions"),
                 ]),
-            Model::new("libraryWall", rooms::library_wall, (1.88, 2.34, 0.82))
+            Model::new("libraryWall", rooms::library_wall, (1.88, 2.34, 0.429))
                 .key("model.bookworm.libraryWall")
                 .centre(0.0, -0.02)
                 .motions(json!({"uses": {"research": "ladder", "browse": "ladder"}}))
@@ -47,7 +47,7 @@ pub fn family() -> Family {
                 .centre(0.0, -0.184)
                 .motions(json!({"uses": {"brew": "pour"}, "hold": 1.5}))
                 .paint(&[("honey", "Wood"), ("linen", "Fabric"), ("brass", "Frame")]),
-            Model::new("firesideLounge", fire::fireside_lounge, (1.7, 2.8, 1.85))
+            Model::new("firesideLounge", fire::fireside_lounge, (0.6, 2.8, 0.6))
                 .key("model.bookworm.firesideLounge")
                 .centre(0.0, -0.005)
                 .motions(json!({"uses": {"readByFire": "flames", "readAloud": "flames"}}))

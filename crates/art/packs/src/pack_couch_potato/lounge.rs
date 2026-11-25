@@ -5,7 +5,7 @@ use crate::ease::{EASE, ease_ends, eased};
 use artkit::forms::rounded_rect;
 use artkit::math::{Axis, P3, PI, cos, cosd, radians, sin, sind};
 use artkit::motion::{Ease, Spin, spin};
-use artkit::parts::{aside, hinged, join, new_parts, numbered};
+use artkit::parts::{ASIDE, aside, hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{
@@ -861,6 +861,8 @@ pub fn fitness_game() -> Vec<Obj> {
             material = M.tv_white,
             segments = 10
         );
+    });
+    let floor = new_parts(|| {
         soft!(
             f,
             "mat",
@@ -982,6 +984,8 @@ pub fn fitness_game() -> Vec<Obj> {
         );
     });
     join(&still, "body", Some(P3::ZERO));
+    // the step mat and the kettlebell on the floor in front of it: drawn with it, not the stand's own size
+    aside(&floor, "floor");
     // The balance board on its rocker, on the mat: `board` tilts it 10° to one side.
     let board = new_parts(|| {
         fextrude!(
@@ -1018,7 +1022,11 @@ pub fn fitness_game() -> Vec<Obj> {
         );
         fbox!(f, "board_mount", 0.08, 0.02, 0.07, (0, 0.082, 0.2), M.grip);
     });
-    let board = hinged(join(&board, "board", None), f.at(0, 0.012, 0.2));
+    // (set aside too: it rocks on the mat in front of the stand)
+    let board = hinged(
+        join(&board, &format!("board{ASIDE}"), None),
+        f.at(0, 0.012, 0.2),
+    );
     let objs = settle!(centre = false);
     swing!(board, "board", 10.0, seconds = 0.8, axis = Axis::Y);
     objs

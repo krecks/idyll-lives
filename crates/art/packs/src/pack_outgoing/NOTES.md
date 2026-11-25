@@ -108,6 +108,8 @@ Every hard edge the gate found (47) is gone, and the photo wall's legs no longer
 - **Photo wall:** the frame moulding's back corners cut and its inner chamfer under 60°; the legs' bevel in two
   segments (one laid the wood as lines on two corners).
 
-Held in `cargo review sizes`: the party bar's and the video-call corner's table height is their tap lever's and their
-ring light's, each a moving part on the counter or desk (1.52, 1.28 m); the photo wall is a free-standing board on
-legs, which the wall pinboard's kind (6 cm deep) can't be, and no kind is one.
+What stands on the party bar's counter (the beer tower over its drip tray, the drinks, the limes) is `aside` (`on_top`),
+and so is the tap's lever, a moving part (`lever_aside`, still pulled by `tap`): the bar's height as a table is its
+counter's. The video-call corner's ring light stand is `aside` (`stand`) and its ring a moving one (`ring_aside`, still
+swung by `ring_light`): it measures 0.84 × 0.99 × 0.77 m, the desk and chair. No draw call more (2026-11-25). The photo
+wall is a free-standing board on legs, which the wall pinboard's kind (6 cm deep) can't be.

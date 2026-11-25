@@ -5,7 +5,7 @@ use crate::ease::ease_ends;
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3};
-use artkit::parts::{aside, hinged, join, new_parts};
+use artkit::parts::{ASIDE, aside, hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{
@@ -453,11 +453,15 @@ pub fn party_bar() -> Vec<Obj> {
     let still = new_parts(|| {
         _back_bar(f);
         _counter(f);
-        _bar_top(f);
+    });
+    // the beer tower, the drinks and the limes on the counter: drawn on it, not the bar's own size
+    let on_top = new_parts(|| _bar_top(f));
+    let stools = new_parts(|| {
         _stool(f, "stool_l", -0.5, 0.28, 0.74);
         _stool(f, "stool_r", 0.5, 0.28, 0.74);
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    join(&[still, stools].concat(), "body", Some(P3::from((0, 0, 0))));
+    aside(&on_top, "on_top");
     // The tap's lever: a tall turned handle on the faucet, its origin on the pivot: `tap` pulls it towards the front.
     let lever = new_parts(|| {
         revolve!(
@@ -478,7 +482,11 @@ pub fn party_bar() -> Vec<Obj> {
             segments = 12
         );
     });
-    let lever = hinged(join(&lever, "lever", None), f.at(TAP.0, TAP.1, TAP.2));
+    // (set aside too: the tower's handle)
+    let lever = hinged(
+        join(&lever, &format!("lever{ASIDE}"), None),
+        f.at(TAP.0, TAP.1, TAP.2),
+    );
     let objs = settle!(centre = false);
     swing!(lever, "tap", 40.0, seconds = 0.5, axis = Axis::X);
     objs

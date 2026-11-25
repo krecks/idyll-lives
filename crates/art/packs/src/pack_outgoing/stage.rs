@@ -6,7 +6,7 @@ use artkit::forms::rect;
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, cosd, sind};
-use artkit::parts::{hinged, join, new_parts, turn};
+use artkit::parts::{ASIDE, aside, hinged, join, new_parts, turn};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
 use artkit::{fbox, fcyl, fsphere, fsweep, leaf, loft, revolve, settle, slide, soft, swing, torus};
@@ -406,6 +406,8 @@ pub fn video_call_nook() -> Vec<Obj> {
             segments = 10,
             rings = 6
         );
+    });
+    let stand = new_parts(|| {
         // the ring light's stand: a weighted foot, a pole and the yoke the ring turns in
         revolve!(
             "ring_foot",
@@ -446,6 +448,8 @@ pub fn video_call_nook() -> Vec<Obj> {
             verts = 6,
             round = 1
         );
+    });
+    let rest = new_parts(|| {
         // a mug, a notebook with a pen, a little plant
         revolve!(
             "mug",
@@ -600,7 +604,9 @@ pub fn video_call_nook() -> Vec<Obj> {
             );
         }
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    join(&[still, rest].concat(), "body", Some(P3::from((0, 0, 0))));
+    // the ring light's stand on the desk: drawn on it, not the desk's own size
+    aside(&stand, "stand");
     // The ring and its phone clip, built facing the caller, pivoting on the yoke: tipped back to rest, then
     // `ring_light` swings it up to face them.
     let ring = new_parts(|| {
@@ -674,7 +680,8 @@ pub fn video_call_nook() -> Vec<Obj> {
             );
         }
     });
-    let ring = hinged(join(&ring, "ring", None), f.at(x, y, z));
+    // (set aside too: the ring on its stand)
+    let ring = hinged(join(&ring, &format!("ring{ASIDE}"), None), f.at(x, y, z));
     turn(ring, RING_TILT, Axis::X);
     let objs = settle!(centre = false);
     swing!(

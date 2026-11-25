@@ -278,6 +278,8 @@ pub fn fireside_lounge() -> Vec<Obj> {
             verts = 24,
             scale = (1, 0.7, 1)
         );
+    });
+    let hearth = new_parts(|| {
         // the hearth stone, the iron fire basket on its legs with logs, the hood on its flue right over them
         fcyl!(
             f,
@@ -432,6 +434,8 @@ pub fn fireside_lounge() -> Vec<Obj> {
             bevel = 0.005,
             bevel_segments = 1
         );
+    });
+    let lounge = new_parts(|| {
         // the chairs, a tripod table with books and tea between them, a low bookcase behind
         wing_chair(f, -0.5, 0.0);
         wing_chair(f, 0.5, 0.0);
@@ -595,7 +599,10 @@ pub fn fireside_lounge() -> Vec<Obj> {
             );
         }
     });
-    join(&still, "body", Some(P3::ZERO));
+    join(&hearth, "body", Some(P3::ZERO));
+    // the rug, the chairs, their table, the bookcase and the log basket: the lounge round the fire, drawn with it
+    // but not the fireplace's own size
+    aside(&[still, lounge].concat(), "lounge");
     // The fire: tongues of flame on the logs, joined with their origin on the grate and built flat, so
     // `flames` grows them up while residents read by it.
     let fire = new_parts(|| {

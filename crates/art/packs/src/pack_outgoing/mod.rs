@@ -57,7 +57,7 @@ pub fn family() -> Family {
             Model::new(
                 "videoCallNook",
                 stage::video_call_nook,
-                (0.84, 1.283, 0.768),
+                (0.84, 0.989, 0.768),
             )
             .key("model.outgoing.videoCallNook")
             .centre(0.0, 0.081)

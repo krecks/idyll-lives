@@ -145,13 +145,16 @@ The bookworm pack models (`models/pack_bookworm/readingNook.glb`, `libraryWall.g
 `teaTrolley.glb`, `firesideLounge.glb`, `bedsideStack.glb`, override pack `packs/pack_bookworm/manifest.json`) are
 built by `crates/art/packs/src/pack_bookworm` on `artkit` and exported as `.glb` (glTF,
 original, CC0). Each moves one part while it is used: the nook's cushion sinks, the ladder rolls, the bureau's flap
-drops, the teapot pours, the fire grows and the top book opens. Their edges are eased to the gate's 4 mm (2026-11-25).
+drops, the teapot pours, the fire grows and the top book opens. Their edges are eased to the gate's 4 mm (2026-11-25). The
+library wall and the fireside lounge are measured as the shelves and the hearth, the ladder and the lounge round the
+fire drawn with them (2026-11-25).
 
 The outgoing pack models (`models/pack_outgoing/partyBar.glb`, `conversationSectional.glb`, `karaokeStage.glb`,
 `videoCallNook.glb`, `danceFloor.glb`, `photoWall.glb`, override pack `packs/pack_outgoing/manifest.json`) are built by
 `crates/art/packs/src/pack_outgoing` on `artkit` and exported as `.glb` (glTF, original, CC0).
 Each moves while it is used: the bar's tap lever pulls, the sectional's cushions sink, the mics rise, the ring light
-swings up, the dance floor's tiles pulse and a new photo grows.
+swings up, the dance floor's tiles pulse and a new photo grows. The bar and the video-call desk are measured as the
+pieces, the beer tower and the ring light drawn on them (2026-11-25).
 
 The romantic pack models (`models/pack_romantic/candlelitTable.glb`, `heartTub.glb`, `vanity.glb`, `gramophone.glb`,
 `letterBureau.glb`, `roseArbourSwing.glb`, override pack `packs/pack_romantic/manifest.json`) are built by
@@ -188,7 +191,8 @@ The loner pack models (`models/pack_loner/quietPod.glb`, `shortwaveRadio.glb`, `
 `bonsaiBench.glb`, `soloSauna.glb`, `deliveryHatch.glb`, override pack `packs/pack_loner/manifest.json`) are built
 by `crates/art/packs/src/pack_loner` on `artkit` and exported as `.glb` (glTF, original, CC0).
 Each moves a part while it is used: the pod's hood swings over, the radio's dial turns and its antenna rises, a
-patch of the puzzle is laid, a twig of the bonsai is trimmed, the sauna's door opens and the delivery hatch opens. Their edges are eased to the gate's 4 mm (2026-11-25).
+patch of the puzzle is laid, a twig of the bonsai is trimmed, the sauna's door opens and the delivery hatch opens. Their edges are eased to the gate's 4 mm (2026-11-25). The radio desk and the bonsai bench are measured as the
+pieces, the radio set and the bonsai drawn on them (2026-11-25).
 
 The nature lover pack models (`models/pack_natureLover/veggieBed.glb`, `pottingBench.glb`, `birdFeeder.glb`,
 `gardenHammock.glb`, `cedarShower.glb`, `mossTerrarium.glb`, `glasshouse.glb`, override pack
@@ -224,6 +228,7 @@ The couch potato pack models (`models/pack_couchPotato/cinemaWall.glb`, `gameCon
 by `crates/art/packs/src/pack_couch_potato` on `artkit` and exported as `.glb` (glTF, original,
 CC0). The cinema's curtains are drawn apart, the console's disc tray slides out, the recliner reclines, the fridge
 door swings, the balance board tilts and the lava lamp's wax rises while it is used, and drifts round all the time.
+The workout game is measured as its stand, the mat and the balance board drawn in front of it (2026-11-25).
 
 The energetic pack models (`models/pack_energetic/boulderingWall.glb`, `spinBike.glb`, `trampoline.glb`,
 `streetballHoop.glb`, `powerBlender.glb`, `contrastShower.glb`, `recoveryPod.glb`, override pack
@@ -250,7 +255,8 @@ The lazy pack models (`models/pack_lazy/snoozecloudBed.glb`, `napPod.glb`, `quil
 `vibePlate.glb`, `smartHub.glb`, override pack `packs/pack_lazy/manifest.json`) are built by `crates/art/packs/src/pack_lazy` on `artkit` and exported as `.glb` (glTF, original, CC0). Each moves while
 it is used: the bed's head section rises, the pod's hood swings over, the quilt's edge lifts, a locker door opens, the
 plate's deck shakes and the tablet tilts up. Their hard edges eased to the play camera's pixel, the nap pod's
-bevels at the kernel's Blender angles (2026-11-25).
+bevels at the kernel's Blender angles (2026-11-25). The quilt table is measured as the table, its poufs and what is
+on it drawn with it (2026-11-25).
 
 The laundry models (`models/laundry/laundryWasher.glb`, `laundryDryer.glb`, `towelRail.glb`, `towelLadder.glb`,
 `laundryBasket.glb`, `bathMat.glb`, the cleaning things `vacuumCleaner.glb`, `mopBucket.glb`, `broomDustpan.glb` and
