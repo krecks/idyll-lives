@@ -254,7 +254,7 @@ pub fn draped_towel(
         material,
         profile = rounded_rect(w, t, t * 0.45, 2),
         up = (1, 0, 0),
-        resolution = 2
+        resolution = 4
     );
 }
 

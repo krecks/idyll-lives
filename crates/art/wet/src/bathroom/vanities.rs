@@ -324,7 +324,8 @@ pub fn sink_console() -> Vec<Obj> {
                 Ring::from((0.765, 0.29, 0.22, 7.0)),
                 Ring::from((0.77, 0.297, 0.227, 7.0)),
                 Ring::from((0.87, 0.3, 0.23, 7.0)),
-                Ring::from((0.88, 0.296, 0.226, 7.0)),
+                Ring::from((0.877, 0.2985, 0.2285, 7.0)), // its top edge eased
+                Ring::from((0.88, 0.2945, 0.2245, 7.0)),
                 Ring::from((0.88, 0.25, 0.168, 5.0, 0.168, bz - z)),
                 Ring::from((0.875, 0.245, 0.163, 5.0, 0.163, bz - z)),
                 Ring::from((0.83, 0.225, 0.145, 4.0, 0.145, bz - z)),
@@ -416,7 +417,7 @@ pub fn sink_console() -> Vec<Obj> {
             M.fabric,
             profile = rounded_rect(0.4, 0.012, 0.005, 2),
             up = (1, 0, 0),
-            resolution = 2
+            resolution = 4
         );
         spout = gooseneck(
             &f,
