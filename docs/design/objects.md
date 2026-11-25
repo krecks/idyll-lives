@@ -481,8 +481,8 @@ are the examples; `hinged`, `turn`, `swing!` and `slide!` do the work.
   origin (its farthest vertex, as it shows), and a floor model or moving part lower than the floor
   drawn over it (not a held `tool.*`); each against every content object that draws the model. Warnings:
   a part turning over 12° in 1/60 s (the game's samples blended that far apart shrink it), a use's clip over
-  3 s, a loop that ends turned or moved (right if it looks the same), over 3 draws or the triangle target, a
-  texture of its own. Functional heights (warnings
+  3 s, a loop that ends turned (right if it looks the same; one that ends a part moved at an even speed, a belt's slats, passes if over half of the part lands where some of it was, else fails), draw calls over the aim ("Draw calls", above) or
+  the triangle target, a texture of its own. Functional heights (warnings
   too): the model's top straight down at the seat (furniture.json `seats`, else content `seat`, else
   `defaultSeat` for one sat on; `fwd` forward, at each slot), the top (content `surface` at its `at`) and
   the mattress (furniture.json `bunks`, `beds`, else `defaultBed` for one lain on; held open by
