@@ -32,6 +32,29 @@ pub fn eased(profile: &[(f64, f64)], r: f64) -> Vec<(f64, f64)> {
     out
 }
 
+/// A closed profile (u, v) with each corner that turns 60° or more rounded to about `r`, as `eased` does, its first
+/// and last corners too and those at its lowest v (a moulding's back on the wall shows from the side).
+pub fn eased_loop(profile: &[(f64, f64)], r: f64) -> Vec<(f64, f64)> {
+    let n = profile.len();
+    let mut out = Vec::new();
+    for i in 0..n {
+        let (a, p, c) = (profile[(i + n - 1) % n], profile[i], profile[(i + 1) % n]);
+        let (d1, d2) = ((p.0 - a.0, p.1 - a.1), (c.0 - p.0, c.1 - p.1));
+        let turn = artkit::math::degrees(artkit::math::atan2(
+            d1.0 * d2.1 - d1.1 * d2.0,
+            d1.0 * d2.0 + d1.1 * d2.1,
+        ))
+        .abs();
+        if turn < 60.0 {
+            out.push(p);
+            continue;
+        }
+        let steps = (turn / 50.0).ceil() as usize;
+        out.extend(artkit::kit::fillet(&[a, p, c], r, steps)[1..=steps + 1].iter());
+    }
+    out
+}
+
 /// A closed outline (u, v) moved `d` in all round, each corner along its bisector: the face of a chamfer at an end
 /// of a body lofted through it.
 pub fn inset(outline: &[(f64, f64)], d: f64) -> Vec<(f64, f64)> {
@@ -106,6 +129,17 @@ mod inset_tests {
         // wound the other way round, the same
         let rev: Vec<_> = sq.iter().rev().copied().collect();
         assert!((super::inset(&rev, 0.1)[0].0 - 0.1).abs() < 1e-12);
+    }
+}
+
+#[cfg(test)]
+mod eased_loop_tests {
+    #[test]
+    fn eased_loop_rounds_every_square_corner() {
+        let sq = [(0.0, 0.0), (0.0, 0.01), (0.02, 0.01), (0.02, 0.0)];
+        let out = super::eased_loop(&sq, 0.003);
+        assert_eq!(out.len(), 4 * 3); // each 90° corner in two steps, three points
+        assert!(!out.contains(&(0.0, 0.0)));
     }
 }
 
