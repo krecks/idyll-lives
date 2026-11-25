@@ -73,7 +73,7 @@ import { type Hands, palmAt, placeFrame, placeHand, placeProp } from './props';
 import { rimOf } from './clips/shot';
 import { FACE_PARTS, LOD_FAR_PX, LOD_HEIGHT_PX, LOD_NEAR_PX, MORPH_PX, POSE_FAR_PX, POSE_NEAR_PX, type PartMesh, Range, YOUNG_STAGES, detailOf, shellBit, skinChunks, wispsOf } from './parts';
 import { type Additive, type Placement, PoseScratch, addLocal, addRotation, blendInto, makeAdditive, resetAdditive, rotate, sampleClip, skin } from './pose';
-import { BABBLE, compose, type Frame, type Player, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, freezePlayer, gettingIn, lerpAngle, lieBack, lieCentre, multiply, player, ramp, rotationOf, setFrame, shoulderDrop, smooth, speaking, splitKey, unit, wrapAngle } from './rig';
+import { BABBLE, type Frame, type Player, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, freezePlayer, gettingIn, lerpAngle, lieBack, lieCentre, player, ramp, rotationOf, setFrame, shoulderDrop, smooth, speaking, splitKey, unit, wrapAngle } from './rig';
 import { type LegSide, SEAT_FIT, feetDown, legTurn, perch, seatSize } from './seatFit';
 import { BATH_WEAR, BEDS, BENCH_HIP, BENCH_KNEE, BLANKET_BEDS, BLANKET_MEET, BUNKS, type Bed, CLIP_HEIGHT, CURLED_BEDS, DEFAULT_BED, DEFAULT_SEAT, FEET_UP, FOOTSTOOLS, LEGS_OUT_DROP, LIE_CENTRE, LIE_ENTRY, type LegFit, NO_FEET_UP, ON_FLOOR, PEDAL, type PlacedObject, QUILT_COLOUR, QUILT_PART, REST_BACK, RISING, SEATS, SIDE_BEDS, SIDE_IN, SIT_CLIPS, SIT_FLEX, SIT_FROM, SLING, type Seat, type SeatFit, TUCK, floorSit, seatOf, slingTop } from './seats';
 import { AIM, Anim, EMBRACE, KISS_FIT, REFUSED, gesturesOf } from './socials';
@@ -87,6 +87,7 @@ import { WALL_HEIGHT } from '../walls';
 import { MOST_CADENCE, MOUNT_SECONDS, MOUNTS, type Mount, mountNodes } from './vehicles';
 import type { ResidentProp, ResidentView } from './view';
 import { clamp, hashInt, lerp } from '../../../game/noise';
+import { compose, multiply, type Mat4, type Quat } from '../math';
 
 export { PLAYBACK_RATE, SUPER_SPEED } from '../gameSpeed';
 
@@ -133,6 +134,16 @@ const STATION_ALONG_MAX = 1.2;
 const STATION_ALONG_SHARED = 0.7;
 /** How far (m) in from the ends of a station's top a tool placed in front of the cook stays (`toolSpot`). */
 const TOOL_END_MARGIN = 0.2;
+
+const QUAT: Quat = [0, 0, 0, 1];
+/** (`x`, `y`, `z`, `w`) in one quaternion kept for it, for `compose` (none made a frame). */
+function quat(x: number, y: number, z: number, w: number): Quat {
+  QUAT[0] = x;
+  QUAT[1] = y;
+  QUAT[2] = z;
+  QUAT[3] = w;
+  return QUAT;
+}
 
 /** How far (m) to `station`'s right of its middle Sim `rig` stands (in its own frame): the half of it they cook at. */
 function stationSide(rig: SimRig, station: PlacedObject): number {
@@ -231,7 +242,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** The placed footstools (`PlacedObject.footstool`). */
   private footstools: PlacedObject[] = [];
   /** Where an object's moving seat has its riders now (`ObjectMotion.ride`): world space, from rest. */
-  private rideOf: ((objectId: number) => ArrayLike<number> | null) | null = null;
+  private rideOf: ((objectId: number) => Readonly<Mat4> | null) | null = null;
   /** The seat of a car someone sits in at (x, z), getting in or out (`setCarSeat`). */
   private carSeatAt: ((x: number, z: number) => Seat | null) | null = null;
   /** Where someone the newest snapshot has sat at (x, z), facing `yaw`, sits in a car driving as it's drawn this frame (`setCarRide`). */
@@ -1363,7 +1374,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const z = lerp(park ? park.z : obj.cz, rig.z - fz * m.seat[0], e);
     const yaw = lerpAngle(park ? park.yaw : ride.yaw, rig.yaw - Math.PI / 2, e);
     const [base, turn, out] = this.mountM;
-    compose(1, 1, 1, 0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2), x, rig.floorY * e, z, base);
+    compose(1, 1, 1, quat(0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)), x, rig.floorY * e, z, base);
     const nodes = ride.keys.length;
     for (let k = 0; k < nodes; k++) {
       const key = ride.keys[k];
@@ -1378,7 +1389,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const angle = wheel ? -this.wheelTurn[i] / wheel.r : w === m.wheels.length && m.cranks ? -(m.cranks.rest + this.crankTurn[i]) : 0;
       if (angle) {
         // (Off its pivot, turned, back onto it, then the model's place: the node's x, y, z at rest are its pivot's.)
-        compose(1, 1, 1, 0, 0, Math.sin(angle / 2), Math.cos(angle / 2), 0, 0, 0, turn);
+        compose(1, 1, 1, quat(0, 0, Math.sin(angle / 2), Math.cos(angle / 2)), 0, 0, 0, turn);
         const [px, py, pz] = [pivot[12], pivot[13], pivot[14]];
         // turn' = T(-p) · R · T(p): R's rotation, translation p - R p.
         turn[12] = px - (turn[0] * px + turn[4] * py + turn[8] * pz);
@@ -3240,11 +3251,11 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   }
 
   /** Moves this frame's placement (`place`) by `ride`, a seat's move from rest in world space. */
-  private riding(ride: ArrayLike<number>): void {
+  private riding(ride: Readonly<Mat4>): void {
     const pl = this.place;
     const m = this.rideM;
-    // (The ported `compose`, `multiply` and `rotationOf` of `rig.ts`, step for step in the same float32 matrices.)
-    compose(1, 1, 1, pl.qx, pl.qy, pl.qz, pl.qw, pl.x, pl.y, pl.z, m);
+    // (Babylon's maths ported, `math.ts`'s `compose` and `multiply` and the rig's `rotationOf`, step for step in the same float32 matrices.)
+    compose(1, 1, 1, quat(pl.qx, pl.qy, pl.qz, pl.qw), pl.x, pl.y, pl.z, m);
     multiply(m, ride, m);
     rotationOf(m, pl);
     pl.x = m[12];
@@ -3432,7 +3443,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   }
 
   /** Where residents sitting or lying on an object are carried by its moving seat (`ObjectMotion.ride`). */
-  setRide(rideOf: ((objectId: number) => ArrayLike<number> | null) | null): void {
+  setRide(rideOf: ((objectId: number) => Readonly<Mat4> | null) | null): void {
     this.rideOf = rideOf;
   }
 

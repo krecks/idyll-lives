@@ -6,13 +6,13 @@
 // moved out of the Babylon renderer (Stage 7), where a side-by-side run against the Babylon version before the
 // move showed no difference in any frame (bench-results/stage7b/equal.ts).
 //
-// Also: the Babylon matrix maths the residents' code carries (`rig.ts`) against Babylon's own, number for number
+// Also: the Babylon matrix maths the residents' code uses (`math.ts`, `rig.ts`) against Babylon's own, number for number
 // (fixtures recorded from Babylon 9.30 for the inputs recorded with them, `fixtures/babylon/residents.json`, made
 // by `fixtures/record-babylon.ts`, which needs a Babylon reference checkout to run again).
 import { describe, expect, test } from 'bun:test';
 import { readFileSync, existsSync } from 'node:fs';
 import { simFields } from '../src/core/snapshot';
-import { quatYawPitchRoll } from '../src/render/shared/math';
+import { compose, multiply, quatYawPitchRoll } from '../src/render/shared/math';
 import { fixture, numbers as recorded, type Numbers } from './fixtures/babylon';
 
 const WEB = new URL('../', import.meta.url).pathname;
@@ -32,7 +32,7 @@ function hash(a: ArrayLike<number> | null | undefined, from = 0, to = a?.length 
   return (h >>> 0).toString(16);
 }
 
-describe('Babylon matrix maths in rig.ts', async () => {
+describe("Babylon matrix maths the residents' code uses", async () => {
   const rig = await import('../src/render/shared/characters/rig');
   const B = fixture<{
     cases: number;
@@ -49,9 +49,9 @@ describe('Babylon matrix maths in rig.ts', async () => {
       const [qx, qy, qz, qw] = nth(q, n, 4);
       const [tx, ty, tz] = nth(t, n, 3);
       const ours = new Float32Array(16);
-      rig.compose(1, 1, 1, qx, qy, qz, qw, tx, ty, tz, ours);
+      compose(1, 1, 1, [qx, qy, qz, qw], tx, ty, tz, ours);
       expect(bits(ours)).toEqual(nth(composed, n, 16));
-      rig.multiply(ours, nth(ride, n, 16), ours);
+      multiply(ours, nth(ride, n, 16), ours);
       expect(bits(ours)).toEqual(nth(multiplied, n, 16));
       const out = { qx: 0, qy: 0, qz: 0, qw: 1 };
       rig.rotationOf(ours, out);
@@ -84,7 +84,6 @@ describe('residents', async () => {
   const { TemplateCache } = await import('../src/render/shared/templateCache');
   const { Pose } = await import('../src/core/snapshot');
   const { slotPlace } = await import('../src/render/shared/objectMotion');
-  const rig = await import('../src/render/shared/characters/rig');
   type View = import('../src/render/shared/characters/view').ResidentView<Part, Quilt, Prop>;
   type ResidentProp = import('../src/render/shared/characters/view').ResidentProp;
   type SnapshotLayout = import('../src/core/snapshot').SnapshotLayout;
@@ -348,7 +347,7 @@ describe('residents', async () => {
         if (objects[id]?.def !== 'rockingHorse') return null;
         // (As Babylon's `Matrix.Compose`, number for number: see the rig's maths above.)
         quatYawPitchRoll(0, 0.2 * Math.sin(t * 3), 0, rock);
-        rig.compose(1, 1, 1, rock[0], rock[1], rock[2], rock[3], 0, 0.03, 0, ride);
+        compose(1, 1, 1, rock, 0, 0.03, 0, ride);
         return ride;
       });
       characters.setSun(() => ({ x: -0.45, z: -0.35 }));
