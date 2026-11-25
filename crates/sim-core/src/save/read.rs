@@ -231,22 +231,39 @@ impl World {
             }
         }
         world.next_object_id = world.next_object_id.max(save.next_object_id.unwrap_or(0));
-        for s in &save.sims {
-            let spawn = SimSpawn {
+        // Genders, traits and perks the content no longer has are dropped (an unknown gender is
+        // the first one's; with no genders in the content any is kept).
+        let content = &world.content;
+        let gender =
+            |g: &String| content.genders.is_empty() || content.genders.iter().any(|d| &d.id == g);
+        let known = |ids: &[String], list: &[&String]| -> Vec<String> {
+            ids.iter().filter(|id| list.contains(id)).cloned().collect()
+        };
+        let traits: Vec<&String> = content.traits.iter().map(|d| &d.id).collect();
+        let perks: Vec<&String> = content.perks.iter().map(|d| &d.id).collect();
+        let spawns: Vec<SimSpawn> = save
+            .sims
+            .iter()
+            .map(|s| SimSpawn {
                 name: s.name.clone(),
-                gender: s.gender.clone(),
-                attracted_to: s.attracted_to.clone(),
+                gender: s.gender.clone().filter(|g| gender(g)),
+                attracted_to: s
+                    .attracted_to
+                    .as_ref()
+                    .map(|a| a.iter().filter(|g| gender(g)).cloned().collect()),
                 household: s.household,
                 job: None,
                 appearance: s.appearance.clone(),
-                traits: s.traits.clone(),
-                perks: s.perks.clone(),
+                traits: known(&s.traits, &traits),
+                perks: known(&s.perks, &perks),
                 age: s.age.filter(|a| a.is_finite()),
                 skills: Default::default(),
                 x: s.pos[0],
                 z: s.pos[1],
-            };
-            world.spawn_sim(&spawn)?;
+            })
+            .collect();
+        for spawn in &spawns {
+            world.spawn_any(spawn, false)?;
         }
         let n = world.sims.len();
         if let Some(h) = world.households.iter().find(|h| {

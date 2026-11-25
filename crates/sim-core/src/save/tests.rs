@@ -148,6 +148,27 @@ pub(super) fn drops_objects_missing_from_content() {
     assert_eq!(loaded.objects.len(), 1);
 }
 
+/// A trait, perk or gender gone from the content is dropped on load, not the whole game: the
+/// resident keeps what is still there, even fewer traits than a new one may have.
+#[test]
+pub(super) fn traits_gone_from_the_content_are_dropped_on_load() {
+    let content = CONTENT.replacen(r#""needs":"#, r#""rules":{"minTraits":1},"needs":"#, 1);
+    let json = edited(|s| {
+        s["sims"][0]["traits"] = serde_json::json!(["lazy", "renamed"]);
+        s["sims"][0]["perks"] = serde_json::json!(["gone"]);
+        s["sims"][0]["attractedTo"] = serde_json::json!(["male", "robot"]);
+        s["sims"][1]["gender"] = "robot".into();
+        s["sims"][1]["traits"] = serde_json::json!(["renamed"]);
+    });
+    let loaded = World::from_save_json(&content, &json).unwrap();
+    assert_eq!(loaded.sims[0].traits, ["lazy"]);
+    assert!(loaded.sims[0].perks.is_empty());
+    assert_eq!(loaded.sims[0].attracted_to, ["male"]);
+    assert!((loaded.sims[0].mods.walk_speed - 0.8).abs() < 1e-6);
+    assert_eq!(loaded.sims[1].gender, "female", "the first gender");
+    assert!(loaded.sims[1].traits.is_empty());
+}
+
 #[test]
 pub(super) fn the_speed_and_the_one_under_super_speed_load() {
     // A file without the speed super speed drops back to: normal under super speed, else the

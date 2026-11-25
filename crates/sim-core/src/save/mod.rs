@@ -1,6 +1,6 @@
 //! Save games: a versioned, content-independent snapshot of the world.
 //!
-//! Objects, traits, perks, needs, interactions, feelings and careers are stored by id
+//! Objects, genders, traits, perks, needs, interactions, feelings and careers are stored by id
 //! (not index), so saves survive content changes; anything that no longer exists is
 //! dropped on load. In-progress activities restart from the beginning on load.
 //!
