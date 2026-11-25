@@ -408,10 +408,16 @@ fn run(input: &str, dir: &str, more: &[&str]) -> Result<usize, String> {
     let dir = Path::new(dir);
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let mut cards = String::new();
+    let mut files = std::collections::BTreeSet::new();
     for world in &worlds {
         let (kind, name, town) = (text(world, "kind"), text(world, "name"), &world["town"]);
         let seed = n(num(world, "seed"));
         let file = format!("{kind}-{seed}.svg");
+        if !files.insert(file.clone()) {
+            return Err(format!(
+                "two worlds are {kind} {seed}: each kind and seed once"
+            ));
+        }
         std::fs::write(dir.join(&file), svg(world)).map_err(|e| format!("{file}: {e}"))?;
         cards.push_str(&format!(
             "<figure><a href=\"{file}\"><img src=\"{file}\" loading=\"lazy\" alt=\"{}\"></a><figcaption>{kind} {seed}: {}, {}×{} m, {} plots</figcaption></figure>",
