@@ -1645,7 +1645,7 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     const up = this.townUp;
     const land = this.lot.landscape;
     const ground = (x: number, z: number) => land?.heightAt(x, z) ?? 0;
-    this.townBuildings.setLots(houses.filter((h) => !this.street.chunkDrawn(h.chunk)).map((h) => lotBuilding(h, ground, up.has(h.id))));
+    this.townBuildings.setLots(houses.filter((h) => !this.street.chunkDrawn(h.chunk)).flatMap((h) => lotBuilding(h, ground, up.has(h.id))));
   }
 
   /**

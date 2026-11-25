@@ -7,12 +7,13 @@
 
 import type { BuildingUse, LotLook, TownPlace } from '../../core/protocol';
 import { Geo, facing, type V3 } from './geometry';
+import { asDrawn, HOUSE_MATERIALS, type FarPart } from './house';
 
 /** Window styles: none (no windows), a house's, a shop's (a shopfront on the ground floor), flats' and offices' (closer bays). */
 export const TOWN_STYLE = { none: 0, house: 1, shop: 2, flats: 3 } as const;
 
-/** The roofs the unit meshes have, in their draws' order. */
-export const ROOFS = ['gable', 'hip', 'flat', 'mansard'] as const;
+/** The roofs the unit meshes have, in their draws' order (a spire: a church's tower's, `towerOf`). */
+export const ROOFS = ['gable', 'hip', 'flat', 'mansard', 'spire'] as const;
 export type RoofKind = (typeof ROOFS)[number];
 
 /** A storey (m), as the contract has it. */
@@ -132,9 +133,13 @@ export interface TownBuilding {
   base: number;
   top: number;
   rise: number;
-  /** sRGB, 0..1. */
+  /** sRGB, 0..1: as its walls and roof show from far off (their textures' and materials' tone in: `asDrawn`). */
   wall: [number, number, number];
   roofColor: [number, number, number];
+  /** A lot's building closed (`lotLookBuilding`): the colours painted on its textured walls and roof near (`dressBuilding`). */
+  paint?: { wall: [number, number, number]; roof: [number, number, number] };
+  /** A church: a tower with a spire stands at an end of it (`churchTower`, `towerOf`). */
+  church?: boolean;
   /** Its floor's height (m): the walls under it are its plinth. */
   floor: number;
   style: number;
@@ -167,8 +172,8 @@ export interface TownLotHouse {
   wall: string;
   roof: string;
   shape: 'gable' | 'hip' | 'flat';
-  /** Its roof's rise over the walls (m). */
-  rise: number;
+  /** Its boxes as its far versions stand them, each with its roof (an L, a storey on part of the one under it, its garage). */
+  parts: readonly FarPart[];
   /** Its lot's pad (m): the level its floor stands at (`TownStreet.padOf`; 0 on flat land). */
   pad: number;
   /**
@@ -184,6 +189,9 @@ const hex = (h: string): [number, number, number] => {
   const v = parseInt(h.slice(1), 16);
   return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255];
 };
+
+/** sRGB 0..1 as a hex colour. */
+const hexOf = (c: readonly number[]) => `#${c.map((v) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0')).join('')}`;
 
 /** A number from 0 to 1 for integers `a`, `b` (stable: a building's variation). */
 function hash2(a: number, b: number): number {
@@ -208,6 +216,55 @@ function footprintSeed(poly: readonly (readonly [number, number])[]): number {
   let h = 0x811c9dc5;
   for (const [x, z] of poly) h = Math.imul(Math.imul(h ^ Math.round(x * 100), 16777619) ^ Math.round(z * 100), 16777619);
   return (h >>> 0) % 1_000_003;
+}
+
+/** A number from 0 to 1 for `a`, `b`, `c` (stable: a building's dressing, `buildingDress.ts`). */
+export function h(a: number, b: number, c = 0): number {
+  let x = Math.imul((a | 0) ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul((b | 0) + 0x632be5ab, 0xc2b2ae35) ^ Math.imul((c | 0) + 0x27d4eb2f, 0x165667b1);
+  x = Math.imul(x ^ (x >>> 15), 0x2c1b3c6d);
+  x ^= x >>> 13;
+  return (x >>> 0) / 4294967296;
+}
+
+/** `c` (sRGB 0..1) mixed `t` of the way to white. */
+const paler = (c: readonly number[], t: number) => hexOf(c.map((v) => v + (1 - v) * t));
+
+/** A wall of the palette that reads as brick: red-brown, darkish. */
+function brickish(c: readonly number[]): boolean {
+  const lum = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+  return c[0] - c[2] > 0.3 && lum < 0.6;
+}
+
+/**
+ * A lot's building's walls as dressed near (`dressBuilding`), its palette's `wall` (sRGB 0..1) painted on them: a
+ * church's stone, brick where the palette's wall is, boards on a farmhouse and a workshop, render on the rest.
+ */
+export function wallFinish(use: BuildingUse, wall: readonly number[]): { finish: 'stone' | 'brick' | 'siding' | 'plaster'; colour: string } {
+  if (use === 'church') return { finish: 'stone', colour: paler(wall, 0.35) };
+  if (brickish(wall)) return { finish: 'brick', colour: paler(wall, 0.82) };
+  return { finish: use === 'farm' || use === 'workshop' ? 'siding' : 'plaster', colour: hexOf(wall) };
+}
+
+/**
+ * A church's tower (`t` the church), in its own frame: at its −x end (`end` -1) or its +x end (1; none: the end its
+ * seed picks), from `x0` along it, `tw` square; its top, and its spire's tip (m).
+ */
+export function churchTower(t: TownBuilding, end?: -1 | 1): { x0: number; tw: number; top: number; tip: number } {
+  const [W, D] = [t.w / 2, t.d / 2];
+  const tw = Math.min(2 * D * 0.55, 4.2, 2 * W * 0.4);
+  const top = t.top + t.rise + 3.5;
+  return { x0: (end ?? (h(t.seed, 29) < 0.5 ? -1 : 1)) < 0 ? -W : W - tw, tw, top, tip: top + tw * 1.6 };
+}
+
+/**
+ * Church `t`'s tower far off: a box of its walls on its floor, the spire's unit roof on it (the town view's, the far
+ * LOD's). At the end its seed picks: the town view doesn't know where its door is (near, `dressBuilding` stands it over
+ * a door on an end).
+ */
+export function towerOf(t: TownBuilding): TownBuilding {
+  const { x0, tw, top, tip } = churchTower(t);
+  const along = x0 + tw / 2;
+  return { ...t, roof: 'spire', cx: t.cx + t.ux * along, cz: t.cz + t.uz * along, w: tw, d: tw, top, rise: tip - top, style: TOWN_STYLE.none, lit: 0, church: false };
 }
 
 // ---- a lot's building, closed ------------------------------------------------------------------
@@ -270,6 +327,9 @@ export function lotLookBuilding(
   }
   const [style, lit] = STYLE[look.use] ?? STYLE.house;
   const home = HOMES.has(look.use);
+  // (Its colours as painted near, and as they show on its textured walls and roof from far off.)
+  const paint = { wall: vary(hex(wallHex), t, s), roof: vary(roofColor, s, t, 0.1) };
+  const walls = wallFinish(look.use, paint.wall);
   return {
     roof,
     cx,
@@ -281,8 +341,10 @@ export function lotLookBuilding(
     base,
     top,
     rise,
-    wall: vary(hex(wallHex), t, s),
-    roofColor: vary(roofColor, s, t, 0.1),
+    wall: hex(asDrawn(walls.colour, HOUSE_MATERIALS[walls.finish])),
+    roofColor: hex(asDrawn(hexOf(paint.roof), HOUSE_MATERIALS.roof)),
+    paint,
+    ...(look.use === 'church' ? { church: true } : {}),
     floor,
     style,
     lit,
@@ -293,9 +355,6 @@ export function lotLookBuilding(
     accent: hash2(index * 17 + 3, look.look),
   };
 }
-
-/** sRGB 0..1 as a hex colour. */
-const hexOf = (c: readonly number[]) => `#${c.map((v) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0')).join('')}`;
 
 /**
  * Building `t` as a plain box and its roof into `geo`, in its colours (the street's far LOD of a lot with a look,
@@ -311,6 +370,13 @@ export function farBuilding(geo: Geo, t: TownBuilding): void {
   if (t.roof === 'flat') {
     g.color(wall, FINISH).box(-W, top, -D, W, top + rise, D, 'ny py');
     g.color(roof, FINISH).poly([[-W, top + rise, -D], [W, top + rise, -D], [W, top + rise, D], [-W, top + rise, D]], [0, 1, 0]);
+  } else if (t.roof === 'spire') {
+    const [ex, ez] = [W + EAVE * t.w, D + EAVE * t.d];
+    g.color(roof, FINISH);
+    for (const [a, b] of [[[-ex, -ez], [ex, -ez]], [[ex, -ez], [ex, ez]], [[ex, ez], [-ex, ez]], [[-ex, ez], [-ex, -ez]]]) {
+      const q: V3[] = [[a[0], top, a[1]], [b[0], top, b[1]], [0, top + rise, 0]];
+      g.poly(q, facing(q[0], q[1], q[2], [a[0] + b[0], 1, a[1] + b[1]]));
+    }
   } else {
     const [ex, ez] = [W + EAVE * t.w, D + EAVE * t.d];
     // (A gable's ridge the whole length, its ends walls; a hip's and a mansard's short, four slopes to it.)
@@ -331,45 +397,50 @@ export function farBuilding(geo: Geo, t: TownBuilding): void {
     }
   }
   geo.merge(g.place(t.ux, t.uz, t.cx, 0, t.cz));
+  if (t.church) farBuilding(geo, towerOf(t));
 }
 
 /** The share of a lot's house's windows lit at night while someone is up in it. */
 const LOT_LIT = 0.5;
 
 /**
- * A far lot's house as drawn: its walls' box on its lot's pad, from under the lowest corner's ground (`ground`), the
- * street's far LOD's look. `up`: someone is up in it (its windows glow at night only then, as the neighbours' near the
- * camera do).
+ * A far lot's house as drawn: each of its parts (`TownLotHouse.parts`: its boxes and its garage) on its lot's pad, from
+ * under the lowest corner's ground (`ground`) where it stands on the ground, the street's far LOD's look; a lot with a
+ * look as its look has it (`lotLookBuilding`, a church's tower beside it). `up`: someone is up in it (its windows glow
+ * at night only then, as the neighbours' near the camera do).
  */
-export function lotBuilding(h: TownLotHouse, ground: (x: number, z: number) => number, up = true): TownBuilding {
-  // (A lot with a look as its look has it, lit by its hours or as homes: `lotLookBuilding`.)
-  if (h.look) return { ...lotLookBuilding(h.box, h.look, h.storeys, h.pad, ground, h.hours, h.flats), chunk: h.chunk };
-  const [x0, z0, x1, z1] = h.box;
-  const along = x1 - x0 >= z1 - z0;
-  const [w, d] = along ? [x1 - x0, z1 - z0] : [z1 - z0, x1 - x0];
-  const cx = (x0 + x1) / 2;
-  const cz = (z0 + z1) / 2;
-  const lowest = Math.min(ground(x0, z0), ground(x1, z0), ground(x0, z1), ground(x1, z1));
-  const top = h.pad + h.storeys * STOREY;
-  return {
-    roof: h.shape,
-    cx,
-    cz,
-    ux: along ? 1 : 0,
-    uz: along ? 0 : 1,
-    w,
-    d,
-    base: Math.min(h.pad, lowest) - SINK,
-    top,
-    rise: h.shape === 'flat' ? 0.25 : h.rise,
-    wall: hex(h.wall),
-    roofColor: hex(h.roof),
-    floor: h.pad,
-    style: TOWN_STYLE.house,
-    lit: up ? LOT_LIT : 0,
-    seed: hash2(h.id, 11),
-    accent: 0,
-  };
+export function lotBuilding(h: TownLotHouse, ground: (x: number, z: number) => number, up = true): TownBuilding[] {
+  if (h.look) {
+    const t: TownBuilding = { ...lotLookBuilding(h.box, h.look, h.storeys, h.pad, ground, h.hours, h.flats), chunk: h.chunk };
+    return t.church ? [t, towerOf(t)] : [t];
+  }
+  return h.parts.map((p) => {
+    const [x0, z0, x1, z1] = p.box;
+    const along = x1 - x0 >= z1 - z0;
+    const [w, d] = along ? [x1 - x0, z1 - z0] : [z1 - z0, x1 - x0];
+    const lowest = Math.min(ground(x0, z0), ground(x1, z0), ground(x1, z1), ground(x0, z1));
+    const floor = h.pad + p.from;
+    return {
+      roof: h.shape,
+      cx: (x0 + x1) / 2,
+      cz: (z0 + z1) / 2,
+      ux: along ? 1 : 0,
+      uz: along ? 0 : 1,
+      w,
+      d,
+      base: p.from > 0 ? floor : Math.min(h.pad, lowest) - SINK,
+      top: h.pad + p.to,
+      rise: h.shape === 'flat' ? 0.25 : p.rise,
+      wall: hex(p.wall ?? h.wall),
+      roofColor: hex(h.roof),
+      floor,
+      // (A garage has no windows.)
+      style: p.wall ? TOWN_STYLE.none : TOWN_STYLE.house,
+      lit: up && !p.wall ? LOT_LIT : 0,
+      seed: hash2(h.id, 11),
+      accent: 0,
+    };
+  });
 }
 
 // ---- the unit meshes ------------------------------------------------------------------------
@@ -382,7 +453,7 @@ export const FINISH = 0.4;
 export const EAVE = 0.035;
 /** A hip's ridge end and a mansard's break, a share of the side in from the eaves. */
 const HIP_RIDGE = 0.2;
-export const MANSARD_IN = 0.13;
+export const MANSARD_IN = 0.08;
 export const MANSARD_BREAK = 0.72;
 
 /**
@@ -449,6 +520,12 @@ export function unitMeshes(): Record<'walls' | RoofKind, Geo> {
     const r: V3[] = [[s * b, y, -b], [s * b, y, b], [s * HIP_RIDGE * 0.6, 1, 0]];
     mansard.poly(r, facing(r[0], r[1], r[2], [s, 1, 0]));
   }
-  return { walls, gable, hip, flat, mansard };
+  // A spire: four slopes to a point.
+  const spire = new Geo().color(part(false), FINISH);
+  for (const [a, b] of [[[-e, -e], [e, -e]], [[e, -e], [e, e]], [[e, e], [-e, e]], [[-e, e], [-e, -e]]]) {
+    const q: V3[] = [[a[0], 0, a[1]], [b[0], 0, b[1]], [0, 1, 0]];
+    spire.poly(q, facing(q[0], q[1], q[2], [a[0] + b[0], 1, a[1] + b[1]]));
+  }
+  return { walls, gable, hip, flat, mansard, spire };
 }
 
