@@ -132,7 +132,8 @@ pub fn optimize(path: &Path, names: bool) -> Result<Optimized, String> {
 }
 
 /// binaryen's `bin/wasm-opt` is a Node script: run it as one, or as the shell would (its shebang),
-/// or with bun if Node isn't installed.
+/// or with bun if Node isn't installed. Only a runner that can't be started is passed over: wasm-opt
+/// failing is an error at once.
 fn run_wasm_opt(script: &Path, flags: &[String], input: &Path, out: &Path) -> Result<(), String> {
     let mut errors = Vec::new();
     for runner in [Some("node"), Some("bun"), None] {
@@ -147,14 +148,16 @@ fn run_wasm_opt(script: &Path, flags: &[String], input: &Path, out: &Path) -> Re
         let result = cmd.args(flags).arg(input).arg("-o").arg(out).output();
         match result {
             Ok(o) if o.status.success() => return Ok(()),
-            Ok(o) => errors.push(format!(
-                "{}: {}",
-                runner.unwrap_or("wasm-opt"),
-                String::from_utf8_lossy(&o.stderr).trim()
-            )),
+            Ok(o) => {
+                let _ = std::fs::remove_file(out);
+                return Err(format!(
+                    "wasm-opt failed ({}: {})",
+                    runner.unwrap_or("wasm-opt"),
+                    String::from_utf8_lossy(&o.stderr).trim()
+                ));
+            }
             Err(e) => errors.push(format!("{}: {e}", runner.unwrap_or("wasm-opt"))),
         }
-        let _ = std::fs::remove_file(out);
     }
     Err(format!("wasm-opt failed ({})", errors.join("; ")))
 }
@@ -165,7 +168,7 @@ fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
     path.with_file_name(name)
 }
 
-/// `sim_wasm_bg-1a2b3c4d.wasm` and `sim_wasm_bg.wasm` are both `sim_wasm_bg`.
+/// `sim_wasm_bg-1a2b3c4d.wasm`, `sim_wasm_bg-DwMs-lqg.wasm` and `sim_wasm_bg.wasm` are all `sim_wasm_bg`.
 fn strip_hash(path: &Path) -> String {
     let file = path
         .file_name()
@@ -173,13 +176,17 @@ fn strip_hash(path: &Path) -> String {
         .to_string_lossy()
         .into_owned();
     let stem = file.strip_suffix(".wasm").unwrap_or(&file);
-    match stem.rsplit_once('-') {
-        Some((base, hash))
-            if hash.len() == 8 && hash.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') =>
-        {
-            base.to_string()
-        }
-        _ => stem.to_string(),
+    // The hash is 8 characters of base64url, so it may hold a `-` itself.
+    let n = stem.len();
+    if n > 9
+        && stem.as_bytes()[n - 9] == b'-'
+        && stem[n - 8..]
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
+    {
+        stem[..n - 9].to_string()
+    } else {
+        stem.to_string()
     }
 }
 
@@ -245,6 +252,10 @@ mod tests {
         assert_eq!(
             strip_hash(Path::new("voice_wasm_bg-deadbeef.wasm")),
             "voice_wasm_bg"
+        );
+        assert_eq!(
+            strip_hash(Path::new("dist/assets/sim_wasm_bg-DwMs-lqg.wasm")),
+            "sim_wasm_bg"
         );
     }
 
