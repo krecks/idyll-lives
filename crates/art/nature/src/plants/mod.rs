@@ -12,7 +12,6 @@ use artkit::family::{Family, Model};
 use artkit::json;
 
 mod boxes;
-pub mod common;
 mod edibles;
 mod flowers;
 mod grasses;
