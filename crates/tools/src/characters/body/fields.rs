@@ -178,7 +178,8 @@ pub fn body_fields_and_tone(
     }
     if n > k {
         // The pieces after the skin (the lids and lips, then the ears, which are the last: the low-detail
-        // body's, or the whole ones): head fields (the ears no scalp); the nearest skin's tone.
+        // body's, or the whole ones): head fields (the ears no scalp); their tone
+        // is set after the bake (build.rs `build_family`), from the skin they lie on.
         let extra = &mesh.pos[k..];
         let ears = 2 * if lod {
             super::ear::LOD_VERTS
@@ -200,11 +201,7 @@ pub fn body_fields_and_tone(
             p,
             head,
         ));
-        let tree = KdTree::new(pos);
-        for q in extra {
-            let t = tone[tree.nearest(q)];
-            tone.push(t);
-        }
+        tone.resize(n, [0.0; 4]);
     }
     (f, tone)
 }

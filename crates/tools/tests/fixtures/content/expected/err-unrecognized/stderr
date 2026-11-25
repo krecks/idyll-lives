@@ -1,4 +1,0 @@
-usage: content [-h] [--group GROUP] [--label LABEL] [--to TO] [--dry-run]
-               [--content CONTENT] [--plan PLAN]
-               {list,in,out} [ids ...]
-content: error: unrecognized arguments: b

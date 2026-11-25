@@ -36,7 +36,6 @@ use nalgebra::{DMatrix, DVector, Dyn, LU};
 use super::cage::{Cage, Per, RingTags, Tags, Weights, se, turn, unit};
 use super::head::{HeadFrame, head_cage, onto_head, sockets, youth};
 use super::identity::Identity;
-use super::kdtree::KdTree;
 use super::meshops::smooth_normals;
 use super::np::{clip, lstsq, mean, mean_rows, radians, sign, smoothstep, unique};
 use super::rig::{BASE_STAGE, NB, b, joints, maturity, proportions};

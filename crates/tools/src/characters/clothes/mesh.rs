@@ -76,17 +76,3 @@ pub(super) fn follow(pos: &[V3], s: &super::body::Surface) -> Vec<Dense> {
         })
         .collect()
 }
-
-/// Quads of a grid of points (rows along the strip's length).
-pub(super) fn strip(rows: &[Vec<V3>], closed: bool) -> (Vec<V3>, Vec<usize>) {
-    let (r, c) = (rows.len(), rows[0].len());
-    let mut idx = Vec::new();
-    let cols = if closed { c } else { c - 1 };
-    for i in 0..r - 1 {
-        for j in 0..cols {
-            let (a, bb) = (i * c + j, i * c + (j + 1) % c);
-            idx.extend([a, bb, bb + c, a, bb + c, a + c]);
-        }
-    }
-    (rows.iter().flatten().copied().collect(), idx)
-}

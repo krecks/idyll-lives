@@ -244,8 +244,8 @@ pub(super) fn skirt_shell(
                     + v3(0.0, 0.012 * k, 0.0)
             })
             .collect();
-        let (mut pos, mut idx) = strip(&g, true);
-        let (hp, hi) = strip(&[g[rows - 1].clone(), hem_in], true);
+        let (mut pos, mut idx) = grid(&g, true);
+        let (hp, hi) = grid(&[g[rows - 1].clone(), hem_in], true);
         pos.extend(hp);
         idx.extend(hi.iter().map(|&i| i + rows * segs));
         (pos, idx)

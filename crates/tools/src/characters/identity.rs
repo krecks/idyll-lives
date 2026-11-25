@@ -183,19 +183,6 @@ pub struct Channel {
     pub lids: usize,
 }
 
-impl Channel {
-    /// The largest move (m).
-    pub fn reach(&self) -> f64 {
-        self.parts
-            .iter()
-            .map(|p| &p.1)
-            .chain([&self.skin.0])
-            .flatten()
-            .map(|d| d.norm())
-            .fold(0.0, f64::max)
-    }
-}
-
 static CHANNELS: Cache<String, Vec<Channel>> = Cache::new();
 
 /// The identity channels of a family (`contract::IDENTITY` order).
