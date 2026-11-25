@@ -184,6 +184,21 @@ pub(super) fn bounds(gltf: &J, pose: &Pose, skip: &HashSet<usize>) -> R<(Bounds,
     Ok(((lo, hi), parts))
 }
 
+/// The deepest point of the model (glTF z, the game's depth), its parts where `pose` puts them: its vertices, so a
+/// part built turned (a telescope's tube) reaches only as far as its mesh, not its box's corners; where the
+/// positions can't be read here (compressed), its boxes' corners.
+fn back(g: &Glb, pose: &Pose) -> R<f64> {
+    let mut back = f64::INFINITY;
+    for p in node_matrices(&g.gltf, Some(pose), None)? {
+        for prim in primitives(&g.gltf, &p.mesh)? {
+            for v in positions(g, prim)? {
+                back = back.min(applied(&p.m, &v)[2]);
+            }
+        }
+    }
+    Ok(back)
+}
+
 /// How far the model reaches from its origin across the floor (m), its parts where `pose` puts them (`grown`:
 /// as it shows): its farthest vertex's hypot(x, depth) (a round tray reaches its radius, a square one its
 /// corners), or where the positions can't be read here (compressed), its boxes' farthest corner.
@@ -561,15 +576,21 @@ pub(super) fn content_warnings(
             _ => &J::Null,
         };
         let mut deepest: Vec<(String, String, f64)> = Vec::new();
-        for (clip, by, p) in opened(g, motions, pose)? {
-            let back = (bounds(&g.gltf, &p, &HashSet::new())?.0.0[2] * scale).f();
+        let opened = opened(g, motions, pose)?;
+        let rest = if opened.is_empty() {
+            0.0
+        } else {
+            back(g, pose)? * scale.f()
+        };
+        for (clip, by, p) in opened {
+            let back = back(g, &p)? * scale.f();
             match deepest.iter_mut().find(|d| d.0 == clip) {
                 Some(d) => d.2 = d.2.min(back),
                 None => deepest.push((clip, by, back)),
             }
         }
         for (clip, by, back) in deepest {
-            if back < face - 0.01 && back < slo[2].f() - 0.001 {
+            if back < face - 0.01 && back < rest - 0.001 {
                 warnings.push(strict(
                     "opened",
                     format!(
