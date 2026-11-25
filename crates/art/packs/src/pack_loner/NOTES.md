@@ -100,3 +100,13 @@ cargo art pack_loner --preview  # previews/pack_loner/<id>.png, <id>@<clip>.png
 ## The soft forms pass (2026-11-13)
 
 The quiet pod's seat and back cushion are `resting`. Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 5 models changed shape: `bonsaiBench`, `deliveryHatch`, `puzzleTable`, `quietPod`, `shortwaveRadio`; 22,914 to 23,074 triangles.
+
+## Gate to zero (2026-11-25)
+
+Every hard edge the gate's `edges` found is eased (13 → 0): the chairs' crest rails' ends and the pod's wing edges'
+ends (`ease_ends`), the bonsai pot's rim (`eased`), the hatch frame's inner arris. The bonsai's leaf pads have their
+scale baked into their meshes before their UVs are made, so the foliage is laid at its own size (it was 3,578 px a
+metre and stretched on 18 %: `texels`). The hatch's mat is `aside` (drawn, not the hatch's own size): it measures
+0.84 × 1.95 × 0.50 m. The sauna keeps 4 draw calls (the door's glass is its own); the bonsai bench (its trimmed twig
+is a moving part at 1.2 m) and the radio desk (its antenna's inner section, a moving part, stands to 1.33 m at rest)
+stay over their kinds' heights.

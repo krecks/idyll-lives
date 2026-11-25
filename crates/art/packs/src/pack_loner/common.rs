@@ -1,5 +1,6 @@
 //! What the loner pack is built from: its palette, a spindle chair, a desk, a mug and a book.
 
+use crate::ease::ease_ends;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit;
 use artkit::materials::Mat;
@@ -150,7 +151,7 @@ pub fn _chair(f: &GameFrame, z: f64, wood: Mat, pad: Mat, verts: usize) {
             )
         })
         .collect();
-    fsweep!(
+    let crest = fsweep!(
         f,
         numbered("chair_crest"),
         &crest,
@@ -160,6 +161,7 @@ pub fn _chair(f: &GameFrame, z: f64, wood: Mat, pad: Mat, verts: usize) {
         up = (0, 0, 1),
         resolution = 2
     );
+    ease_ends(crest);
     for x in [-0.09, 0.0, 0.09] {
         kit::tube!(
             f,

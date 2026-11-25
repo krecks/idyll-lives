@@ -5,7 +5,7 @@ use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit;
 use artkit::math::P3;
 use artkit::motion::Ease;
-use artkit::parts::{hinged, join, new_parts, numbered};
+use artkit::parts::{aside, hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{boulder, fbox, fcyl, fextrude, fsweep, jitter, settle, soft, swing, torus};
@@ -535,7 +535,8 @@ pub fn delivery_hatch() -> Vec<Obj> {
                 (-0.03, 0.0),
                 (-0.03, 0.006),
                 (-0.012, 0.012),
-                (0.0, 0.012),
+                (-0.004, 0.012), // (its inner arris chamfered 4 mm)
+                (0.0, 0.008),
                 (0.0, 0.0)
             ],
             M.slate,
@@ -804,7 +805,7 @@ pub fn delivery_hatch() -> Vec<Obj> {
                 verts = 8
             );
         }
-        // the parcel drawer with its pull and letter slot, the mat
+        // the parcel drawer with its pull and letter slot
         fbox!(
             f,
             "drawer",
@@ -848,6 +849,10 @@ pub fn delivery_hatch() -> Vec<Obj> {
             bevel = 0.002,
             bevel_segments = 1
         );
+    });
+    join(&still, "body", Some(P3::from((0, 0, 0))));
+    // the mat before it: drawn with it, not the hatch's own size
+    let mat = new_parts(|| {
         soft!(
             f,
             "mat",
@@ -880,7 +885,7 @@ pub fn delivery_hatch() -> Vec<Obj> {
             closed = true
         );
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    aside(&mat, "mat");
     // The hatch door, hinged on its right edge: a steel door with its window framed, a bar pull; `hatch` swings it open.
     let door = new_parts(|| {
         fbox!(
