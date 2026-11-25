@@ -36,12 +36,12 @@ whole prune (the game brings it back after). It is the model's fourth draw call 
 | `model.plant` | 0.77 × 0.83 × 0.79 m | 1,884 | 1 |
 | `model.garden.monstera` | 0.78 × 0.91 × 0.79 m | 1,576 | 1 |
 | `model.garden.fiddleFig` | 0.53 × 1.63 × 0.53 m | 2,080 | 2 |
-| `model.garden.snakePlant` | 0.34 × 0.91 × 0.32 m | 1,452 | 2 |
+| `model.garden.snakePlant` | 0.40 × 1.29 × 0.41 m | 1,452 | 2 |
 | `model.garden.cacti` | 0.57 × 0.52 × 0.47 m | 1,940 | 1 |
 | `model.garden.succulents` | 0.62 × 0.17 × 0.62 m | 1,980 | 1 |
-| `model.garden.bostonFern` | 0.73 × 0.98 × 0.79 m | 1,968 | 3 |
-| `model.garden.palm` | 0.77 × 0.89 × 0.69 m | 1,926 | 2 |
-| `model.garden.orchid` | 0.43 × 1.20 × 0.38 m | 1,554 | 2 |
+| `model.garden.bostonFern` | 0.73 × 1.13 × 0.75 m | 1,968 | 3 |
+| `model.garden.palm` | 0.77 × 0.91 × 0.69 m | 1,926 | 2 |
+| `model.garden.orchid` | 0.43 × 1.23 × 0.38 m | 1,554 | 2 |
 | `model.garden.bonsai` | 0.62 × 1.35 × 0.41 m | 3,144 | 4 |
 
 `check-glb`: 10 models, 0 failed; warnings: the bonsai's four draw calls. Khronos validator: 0 errors, 0 warnings
@@ -78,12 +78,12 @@ the old part's pot narrowed to the model's 40 cm on 2026-10-15).
 | `model.flowerbed` | 0.94 × 0.48 × 0.94 m | 1,872 | 3 |
 | `model.garden.tulips` | 0.84 × 0.62 × 0.84 m | 1,858 | 2 |
 | `model.garden.daffodils` | 0.84 × 0.49 × 0.84 m | 1,938 | 2 |
-| `model.garden.daisies` | 0.84 × 0.38 × 0.84 m | 1,954 | 2 |
+| `model.garden.daisies` | 0.84 × 0.15 × 0.84 m | 1,954 | 2 |
 | `model.garden.sunflowers` | 0.84 × 2.11 × 0.91 m | 2,880 | 2 |
 | `model.garden.poppies` | 0.84 × 0.66 × 0.84 m | 1,840 | 2 |
-| `model.garden.marigolds` | 0.88 × 0.34 × 0.84 m | 1,924 | 2 |
+| `model.garden.marigolds` | 0.88 × 0.33 × 0.84 m | 1,924 | 2 |
 | `model.garden.pansies` | 0.84 × 0.26 × 0.84 m | 1,874 | 2 |
-| `model.garden.lilies` | 0.84 × 0.94 × 0.87 m | 1,932 | 2 |
+| `model.garden.lilies` | 0.84 × 1.08 × 0.87 m | 1,932 | 2 |
 | `model.garden.lupins` | 0.84 × 0.99 × 0.84 m | 1,886 | 2 |
 | `model.garden.forgetMeNots` | 0.87 × 0.28 × 0.84 m | 1,660 | 2 |
 | `model.garden.cosmos` | 0.89 × 0.88 × 0.84 m | 1,940 | 2 |
@@ -143,12 +143,12 @@ metre): from the play camera, above, its top was a ruled strip; the triangles, t
 | `model.garden.topiaryCone` | 0.64 × 1.80 × 0.66 m | 1,864 | 660 | 3 |
 | `model.garden.hedge` | 1.55 × 1.17 × 0.92 m | 1,908 | 458 | 2 |
 | `model.garden.hydrangea` | 1.20 × 0.96 × 1.18 m | 3,536 | 940 | 1 |
-| `model.garden.rosebush` | 0.77 × 0.90 × 0.72 m | 1,866 | 576 | 3 |
+| `model.garden.rosebush` | 0.76 × 1.05 × 0.73 m | 1,866 | 576 | 3 |
 | `model.garden.azalea` | 1.16 × 1.01 × 1.15 m | 3,932 | 1,324 | 2 |
-| `model.garden.lavender` | 0.61 × 0.87 × 0.63 m | 1,984 | 228 | 3 |
+| `model.garden.lavender` | 0.49 × 0.56 × 0.55 m | 1,984 | 228 | 3 |
 | `model.garden.fern` | 0.79 × 0.48 × 0.93 m | 1,976 | 616 | 1 |
 | `model.garden.grass` | 1.22 × 1.21 × 1.28 m | 1,962 | 506 | 2 |
-| `model.garden.hosta` | 0.62 × 0.84 × 0.68 m | 1,966 | 666 | 2 |
+| `model.garden.hosta` | 0.62 × 0.39 × 0.68 m | 1,966 | 666 | 2 |
 
 `check-glb`: the family's 36 models, 0 failed; its one warning is the bonsai's 4 draw calls. (The grass's and
 hosta's old parts were widened to their models on 2026-10-15: they were 13 % and 11 % narrower.)
@@ -174,7 +174,7 @@ the planter (plain, to stay within three draw calls), the soil mound, straw or p
 | `model.garden.vegPatch` | 0.92 × 0.40 × 0.92 m | 1,934 | 756 | 3 |
 | `model.garden.tomatoes` | 0.80 × 1.19 × 0.80 m | 3,750 | 816 | 3 |
 | `model.garden.strawberries` | 0.88 × 0.21 × 0.88 m | 1,964 | 640 | 3 |
-| `model.garden.herbs` | 0.84 × 1.01 × 0.46 m | 1,960 | 680 | 3 |
+| `model.garden.herbs` | 0.84 × 0.98 × 0.46 m | 1,960 | 680 | 3 |
 | `model.garden.pumpkins` | 1.11 × 0.27 × 0.95 m | 1,822 | 642 | 3 |
 
 `check-glb`: 5 models, 0 failed, no warnings. Khronos validator: 0 errors, 0 warnings. Each stage checked in
@@ -295,3 +295,18 @@ play camera too, and as leaves plain. Colours as they were (already dark); one d
 behind it, which plain shows from behind as a whole pale blade), the parlour palm and the fern on its stand (fine
 fronds: plain, they came out paler and faceted, not clearer), and the lumpy crowns (the hanging plant, the bonsai, the
 plant table's pots: plain, a lump reads as a green balloon; the dapple is what makes it leaves).
+
+## True to their species (2026-11-25)
+
+`cargo review sizes` holds each plant to its kind in docs/review/reference.json; these now stand within it: the
+lilies flower at 1.02 m (Asiatic lilies, 1-1.5; their stems a fifth taller) and their pink is a rose-red (the kind's
+hues are orange, red and yellow), the pansies' wine one a red (350°); the daisies are the description's carpet of
+lawn daisies (Bellis perennis, 8-15 cm): flowering 9 cm up on smaller heads over smaller rosettes; the rose bush's canes
+a fifth taller (1.05 m; English shrub roses 1-1.5); the lavender's spikes half as long (0.56 m; English lavender
+0.3-0.6); the hosta's scapes just over its leaves (0.39 m; a medium hosta 0.3-0.5); the snake plant's swords 1.65x
+(1.05 m of plant; 1-1.5); the Boston fern's fronds longer and weeping past the pot, its young ones upright (0.60 m;
+0.6-0.9); the orchid's spike 3 cm taller (0.47 m; 0.46-0.61); the palm and the marigolds a hair taller and lower, the
+herb planter 3 cm lower (under the planter kind's 0.99). The cosmos's kind lists the yellow of its disc beside its
+pink and white rays. Left outside: the potted plant (`model.plant`, a bushy young arrowhead plant 0.52 m of plant and
+0.79 m across against the kind's climbing 0.9-1.8 m and 0.3-0.6 m: a redesign), and the bonsai, measured with its
+stand against the tabletop kind.
