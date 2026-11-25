@@ -10,7 +10,7 @@ export type VoiceDevice = OrtDevice;
 export type ToVoiceWorker =
   /** `base`: the app's base URL, where `voice/` lives. */
   /** `measure`: count the model's GPU buffers (the benchmark, `bench.ts`; the game doesn't). */
-  | { type: 'load'; base: string; language: string; device: VoiceDevice; measure?: boolean }
+  | { type: 'load'; base: string; device: VoiceDevice; measure?: boolean }
   | { type: 'speak'; id: number; text: string; voice: VoiceParams }
   /** The GPU buffers counted (`measure`): answered with `memory`. */
   | { type: 'memory' };

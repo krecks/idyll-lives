@@ -6,7 +6,7 @@
  * to it (`voiceSpeaking`).
  */
 
-import { audioContext, bus, onHide, space, updateVolumes, voiceSpeaking } from '../audio/mixer';
+import { audioContext, bus, onHide, space, voiceSpeaking } from '../audio/mixer';
 import { Placed, type Place } from '../audio/space';
 import { SAMPLE_RATE } from './protocol';
 
@@ -71,9 +71,4 @@ export function playClip(samples: Float32Array, place: Place = { pan: 0 }): Play
     ended,
     startTime,
   };
-}
-
-/** Applies a changed "Voice volume" right away. */
-export function updateVoiceVolume(): void {
-  updateVolumes();
 }
