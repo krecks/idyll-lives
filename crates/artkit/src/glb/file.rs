@@ -34,7 +34,8 @@ impl File {
             return i;
         }
         let view = self.view(&bytes, target);
-        let range = if bounds {
+        // (no bounds for no values: they'd be written as Infinity, which isn't JSON)
+        let range = if bounds && !values.is_empty() {
             let (mut lo, mut hi) = (vec![f32::INFINITY; per], vec![f32::NEG_INFINITY; per]);
             for v in values.chunks(per) {
                 for i in 0..per {

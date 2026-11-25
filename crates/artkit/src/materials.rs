@@ -128,12 +128,6 @@ impl Mat {
         self
     }
 
-    /// The same material in another colour.
-    pub fn colour(mut self, hex: &str) -> Mat {
-        self.colour = rgb_of(hex);
-        self
-    }
-
     /// Linear RGB, 0..1.
     pub fn linear(self) -> [f64; 3] {
         [

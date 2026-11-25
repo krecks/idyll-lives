@@ -2,8 +2,8 @@
 
 use super::*;
 
-/// Writes `model` as a .glb laid out as `write` lays one out, so that a file `write` made, read, is written again to
-/// the same bytes. The clips' keys go into the buffer a node at a time, its clips in the order `Node::clips` gives
+/// Writes `model` as a .glb (`write` makes its files so), so that a file `write` made, read, is written again to the
+/// same bytes. The clips' keys go into the buffer a node at a time, its clips in the order `Node::clips` gives
 /// (then the model's), its channels by what they move; each clip lists its channels in its own order.
 pub fn encode(model: &Model) -> Vec<u8> {
     let mut file = File::default();
