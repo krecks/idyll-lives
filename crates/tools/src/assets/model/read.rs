@@ -20,7 +20,7 @@ pub fn read(data: &[u8]) -> Result<Model, String> {
         let mut m = local(&nodes[i]);
         while parent[i] != usize::MAX {
             i = parent[i];
-            m = chain(&local(&nodes[i]), &m);
+            m = artkit::glb::compose(&local(&nodes[i]), &m);
         }
         m
     };
