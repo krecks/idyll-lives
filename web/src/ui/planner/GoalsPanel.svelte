@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import type { GoalStep, GoalView, SimView } from '../../core/protocol';
   import Icon from '../Icon.svelte';
   import { money } from '../format';
@@ -36,13 +37,19 @@
     }
     return [...out];
   });
+  // (Of the resident, not of each update to them: what was typed stays until the resident or the goal changes.)
+  const simId = $derived(sim.id);
   $effect(() => {
     // A sensible default target for the kind of goal picked.
     const kind = picked?.kind;
-    if (kind === 'skill') target = Math.min(10, Math.floor(sim.skills[content.skills.findIndex((s) => s.id === skill)] ?? 0) + 2);
-    else if (kind === 'friends') target = 3;
-    else if (kind === 'funds') target = 5000;
-    else if (kind === 'jobLevel') target = Math.min(10, (sim.job?.level ?? 0) + 3);
+    const at = content.skills.findIndex((s) => s.id === skill);
+    void simId;
+    untrack(() => {
+      if (kind === 'skill') target = Math.min(10, Math.floor(sim.skills[at] ?? 0) + 2);
+      else if (kind === 'friends') target = 3;
+      else if (kind === 'funds') target = 5000;
+      else if (kind === 'jobLevel') target = Math.min(10, (sim.job?.level ?? 0) + 3);
+    });
   });
 
   function add() {
