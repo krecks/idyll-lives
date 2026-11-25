@@ -357,7 +357,7 @@ pub fn craft_table() -> Vec<Obj> {
             M.tape_gold,
             bevel = 0.004
         );
-        stool(&f, -0.25, 0.48, 0.19, M.craft_metal, M.craft_top, 0.0);
+        stool(&f, -0.25, 0.478, 0.19, M.craft_metal, M.craft_top, 0.0); // (its top just under 0.48 m once stood on the floor)
     });
     join(&still, "body", Some(P3::ZERO));
     let c = new_parts(|| {

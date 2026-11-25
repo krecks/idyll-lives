@@ -6,8 +6,8 @@ use artkit::forms::{Plane, by, rounded_rect, smooth_outline};
 use artkit::json::float_repr;
 use artkit::kit::{Pull, fillet, pull};
 use artkit::materials::Mat;
-use artkit::math::{Axis, PI, TAU, cos, cosd, radians, sin, sind};
-use artkit::parts::{hinged, join, new_parts};
+use artkit::math::{Axis, PI, TAU, V3, cos, cosd, radians, sin, sind};
+use artkit::parts::{hinged, join, new_parts, turn};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
 use artkit::{
@@ -562,6 +562,12 @@ pub fn stand_mixer() -> Vec<Obj> {
         );
     });
     let beater = join!(&parts, "beater", origin = (-0.07, 0, 0.232)); // about its shaft
+    // built side on, then turned a quarter so its head points to the front over the bowl, as one stands on a
+    // counter: 20 cm across, 30 deep (each part about the middle)
+    for o in meshes() {
+        turn(o, 90.0, Axis::Z);
+        o.edit(|p| p.loc = V3::new(-p.loc.y, p.loc.x, p.loc.z));
+    }
     settle!();
     spin!(beater, "beat", turns = 1, seconds = 0.75, axis = Axis::Z);
     meshes()
@@ -571,10 +577,10 @@ fn _mixer_body() {
     turned!(
         "base",
         &[
-            (0.15, 0.085, 0.0),
-            (0.15, 0.085, 0.028),
-            (0.146, 0.081, 0.037), // its top edge rounded over
-            (0.138, 0.074, 0.04)
+            (0.15, 0.1, 0.0),
+            (0.15, 0.1, 0.028),
+            (0.146, 0.096, 0.037), // its top edge rounded over
+            (0.138, 0.089, 0.04)
         ],
         M.mixer,
         verts = 16,

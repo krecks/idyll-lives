@@ -595,7 +595,7 @@ pub fn monitor() -> Vec<Obj> {
         "keyboard",
         &rounded_rect(0.38, 0.12, 0.008, 2),
         0.012,
-        (0, -0.12, 0.006),
+        (0, -0.114, 0.006), // (the set under 33 cm deep)
         M.monitor,
         plane = Plane::XY,
         bevel = 0.003
@@ -607,7 +607,7 @@ pub fn monitor() -> Vec<Obj> {
                 (0.021, 0.02, 0.006),
                 (
                     -0.153 + k as f64 * 0.0255,
-                    -0.152 + row as f64 * 0.024,
+                    -0.146 + row as f64 * 0.024,
                     0.015
                 ),
                 M.keys
@@ -624,7 +624,7 @@ pub fn monitor() -> Vec<Obj> {
         box_!(
             format!("key4_{}", float_repr(x)),
             (w, 0.018, 0.006),
-            (x, -0.176, 0.015),
+            (x, -0.165, 0.015), // (on the board, not over its front edge)
             M.keys
         );
     }
@@ -638,10 +638,10 @@ pub fn monitor() -> Vec<Obj> {
             (0.0, 0.0, 0.031)
         ],
         M.monitor,
-        at = (0.25, -0.12, 0),
+        at = (0.25, -0.114, 0),
         verts = 12
     );
-    box_!("wheel", (0.004, 0.01, 0.004), (0.25, -0.139, 0.029), M.keys);
+    box_!("wheel", (0.004, 0.01, 0.004), (0.25, -0.133, 0.029), M.keys);
     done("monitor", true)
 }
 

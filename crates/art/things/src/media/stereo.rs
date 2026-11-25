@@ -635,10 +635,12 @@ pub fn boombox() -> Vec<Obj> {
         fsweep!(
             F,
             "aerial",
+            // folded down along the top behind the handle, as one is when nobody tunes it (a boombox on its crate
+            // is at most 0.75 m)
             &[
-                (0.22, y0 + 0.275, z - 0.05),
-                (0.25, y0 + 0.4, z - 0.065),
-                (0.28, y0 + 0.52, z - 0.08)
+                (0.22, y0 + 0.28, z - 0.05),
+                (0.08, y0 + 0.288, z - 0.056),
+                (-0.06, y0 + 0.294, z - 0.062)
             ],
             0.005,
             M.boombox_trim,
@@ -659,7 +661,7 @@ pub fn boombox() -> Vec<Obj> {
             F,
             "aerial_tip",
             0.007,
-            (0.28, y0 + 0.52, z - 0.08),
+            (-0.06, y0 + 0.294, z - 0.062),
             M.boombox_trim,
             segments = 8,
             rings = 5

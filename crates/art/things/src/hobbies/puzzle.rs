@@ -253,7 +253,7 @@ pub fn puzzle_table() -> Vec<Obj> {
             (0.365, 0.793, 0.345),
             M.hill
         );
-        stool(&f, -0.25, 0.48, 0.18, M.chair_wood, M.chair_wood, 0.0);
+        stool(&f, -0.25, 0.478, 0.18, M.chair_wood, M.chair_wood, 0.0); // (its top just under 0.48 m once stood on the floor)
     });
     join(&still, "body", Some(P3::ZERO));
     let p = new_parts(|| {

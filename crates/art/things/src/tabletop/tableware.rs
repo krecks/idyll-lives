@@ -732,9 +732,9 @@ pub fn candlesticks() -> Vec<Obj> {
             turned!(
                 format!("stick{i}"),
                 &[
-                    (0.0346, 0.0),
-                    (0.0346, 0.006),
-                    (0.024, 0.016),
+                    (0.04, 0.0), // a foot 8 cm across, a candlestick's least
+                    (0.04, 0.006),
+                    (0.026, 0.016),
                     (0.009, 0.03),
                     (0.008, h * 0.45),
                     (0.016, h * 0.5),

@@ -202,7 +202,7 @@ pub fn family() -> Family {
             // the tub twisting on its collar for as long as it churns
             t("iceCreamMaker", "model.iceCreamMaker", ice_cream_maker, (0.237, 0.403, 0.224), &[("ice_cream_maker", BODY)])
                 .motions(motions(r#"{"loops": {"churn": "whirr"}}"#)),
-            t("standMixer", "model.standMixer", stand_mixer, (0.3, 0.356, 0.17), &[("mixer", BODY)])
+            t("standMixer", "model.standMixer", stand_mixer, (0.2, 0.356, 0.3), &[("mixer", BODY)])
                 .motions(motions(r#"{"loops": {"bake": "beat"}}"#)),
             // the coffee running into the cup, then stopped while it's drunk
             t("espressoMachineSmall", "model.espressoMachineSmall", espresso_machine_small, (0.231, 0.31, 0.391), &[("espresso", BODY)])
@@ -221,7 +221,7 @@ pub fn family() -> Family {
             t("teapotSet", "model.teapotSet", teapot_set, (0.4, 0.167, 0.26), &[("teapot", BODY), ("tray", "Tray")]),
             t("mugs", "model.mugs", mugs, (0.216, 0.09, 0.212), &[("mug_a", "Mug 1"), ("mug_b", "Mug 2"), ("mug_c", "Mug 3")]),
             t("wineGlasses", "model.wineGlasses", wine_glasses, (0.214, 0.301, 0.197), &[("bottle", BODY)]),
-            t("candlesticks", "model.candlesticks", candlesticks, (0.168, 0.328, 0.066), &[("brass", BODY), ("candle", "Candles")])
+            t("candlesticks", "model.candlesticks", candlesticks, (0.18, 0.33, 0.076), &[("brass", BODY), ("candle", "Candles")])
                 .motions(motions(r#"{"night": "lit"}"#)),
             // TT3 books and small plants
             t("bookStack", "model.bookStack", book_stack, (0.25, 0.133, 0.196),
@@ -257,7 +257,7 @@ pub fn family() -> Family {
             // open while it is used (browse, code, write, homework)
             t("laptopClosed", "model.laptopClosed", laptop_closed, (0.32, 0.0205, 0.223), &[("laptop", BODY)])
                 .motions(motions(r#"{"uses": {"type": "lid_open"}}"#)),
-            t("monitor", "model.monitor", monitor, (0.542, 0.46, 0.335), &[("monitor", BODY)]),
+            t("monitor", "model.monitor", monitor, (0.543, 0.46, 0.324), &[("monitor", BODY)]),
             t("stuffedToy", "model.stuffedToy", stuffed_toy, (0.197, 0.282, 0.192), &[("bear", BODY)]),
             t("toyBlocks", "model.toyBlocks", toy_blocks, (0.222, 0.2, 0.171),
                 &[("block_a", "Block 1"), ("block_b", "Block 2"), ("block_c", "Block 3")]),
