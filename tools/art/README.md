@@ -54,7 +54,7 @@ runs it again in `ll-tools`' tests: the tree has 0 errors.
 | `materials` | materials unmapped, double-sided, see-through (BLEND), glowing by day, or with UVs nothing reads |
 | `far` | a far version isn't the full model's size |
 | `edges` | hard edges of 5 cm or more show unbevelled at the play camera (a pixel there is 4 mm): convex, turning 60° or more, split in the file (a bevel with hardened normals passes, and a chamfer), both faces 12 mm or more wide, on a piece of 10 cm or more; not an underside, on the floor, covered by another part or seen from none of the camera's views; not leaves, bark, glass or what glows, a far version or a held `tool.*` (`crates/tools/src/edges/`; `cargo review edges <key>` lists a model's with where they are). Counted against the baseline (below) |
-| `texels` | a material on a textured finish (not the leaf cards) is laid outside 200 to 1600 px a metre (the play camera shows 250), stretched over 2× on more than 5 % of its area, or has UVs of no area on more than 1 % of it; not a far version (`crates/tools/src/texels.rs`; `cargo review texels` gives each finish as the models wear it). Counted against the baseline |
+| `texels` | a material on a textured finish (not the leaf cards) is laid outside 200 to 1600 px a metre (the play camera shows 250), stretched over 2× on more than 5 % of its area, or has UVs of no area on more than 1 % of it; each part as built (one shrunk at rest that a clip grows back, washing flattened on a line or bedding folded into a sofa bed, at its grown size); not a far version (`crates/tools/src/texels.rs`; `cargo review texels` gives each finish as the models wear it). Counted against the baseline |
 | `validator`, `reference`, `pbr` | counted against the baseline; `validator` with `--validate` (errors, warnings and unused objects but the finishes' UVs: `checkglb/validate.rs`), the others names kept for checks not in the gate yet |
 
 **Accepting one.** A model that is right as it is takes `accept` in its pack entry: `{"<name>": "<why>"}`, set on its
@@ -72,10 +72,15 @@ entry: it only lowers counts and takes keys out, never raises or adds, so the fi
 section is strict for every model. An entry that `accept`s a counted check takes its findings instead, and the
 file may keep none for it. `reference` is `cargo review sizes --check`'s, by object id (its own `--update-baseline`).
 
-**Warnings** are what only an eye can judge, and the budgets' aims: a loop that ends turned (a fan a quarter round)
-or moved at an even speed (a belt's slats: right if it looks the same), a part turning over 12° in 1/60 s, a use's
-clip over 3 s, over 3 draw calls or the triangle target, a far version over half the full model's triangles, a
-texture of its own, and the functional heights against the content (`docs/design/objects.md`). Read each one.
+**Warnings** are what only an eye can judge, and the budgets' aims: a loop that ends turned (a fan a quarter round),
+a part turning over 12° in 1/60 s, a use's clip over 3 s, draw calls over the aim (3 for the still model, one more
+for each part a clip moves and a second where that part has glass, one for the still body's glass, one for metal
+hardware where that is all of the still body's plain group; a pack entry's `draws` where it says more) or the triangle
+target, a far version over half the full model's triangles, a texture of its own, and the functional heights against
+the content (`docs/design/objects.md`: a mattress lain on `across` is probed `fwd` along it at the slots' depth, as
+`residents.ts` `bedFwd` lays the sleeper; a place stood at, `pose: "stand"`, is no seat or mattress). Read each one.
+A loop that ends a part moved at an even speed (G.scroll: a belt's slats) passes if over half of the part lands
+where some of it was (one slat on: all but the end slats), and fails if not (a jump).
 
 ## The built world
 

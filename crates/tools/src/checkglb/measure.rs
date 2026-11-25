@@ -145,6 +145,47 @@ pub(super) fn draws_allowed(entry: &J) -> Result<usize, String> {
     }
 }
 
+/// The finishes furniture hardware takes (docs/design/objects.md, "Hardware is metal").
+const METALS: [&str; 4] = [
+    "material.finish.metal",
+    "material.finish.chrome",
+    "material.finish.brushed",
+    "material.finish.iron",
+];
+
+/// The draw calls a model aims for at most (docs/design/objects.md, "Budgets"), from its draws `groups` (part:
+/// None the still body, finish group): `DRAWS.0` for the still model, one more for each part a clip moves (and a
+/// second where that part has glass), one for the still body's glass, and one for metal hardware where that is
+/// all the still body's plain group is (`still_plain`: the finishes in it); `declared`, a pack entry's `draws`,
+/// where it says more.
+pub(super) fn draws_aimed(
+    groups: &BTreeSet<(Option<usize>, String)>,
+    glass: &dyn Fn(&str) -> bool,
+    still_plain: &BTreeSet<String>,
+    declared: Option<usize>,
+) -> usize {
+    let parts: BTreeSet<Option<usize>> = groups.iter().map(|(p, _)| *p).collect();
+    let mut extra = 0;
+    for part in parts {
+        let of: Vec<&String> = groups
+            .iter()
+            .filter(|(p, _)| *p == part)
+            .map(|(_, f)| f)
+            .collect();
+        let glassed = usize::from(of.iter().any(|f| glass(f)));
+        extra += match part {
+            Some(_) => of.len().min(1 + glassed),
+            None => {
+                let hardware = of.iter().any(|f| *f == "plain")
+                    && !still_plain.is_empty()
+                    && still_plain.iter().all(|f| METALS.contains(&f.as_str()));
+                glassed + usize::from(hardware)
+            }
+        };
+    }
+    (DRAWS.0 + extra).max(declared.unwrap_or(0))
+}
+
 /// Reads and measures a model file of the manifests (`path`) with its entry: its size at rest, times `scale`.
 pub(super) fn model(entry: &J, path: &str) -> R<Model> {
     let file = parse_glb(&std::fs::read(path).map_err(|e| py::os_error(&e, path))?)?;

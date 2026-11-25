@@ -49,9 +49,5 @@
     "wallBed": 1,
     "weightBench": 1,
     "yogaMat": 2
-  },
-  "texels": {
-    "model.clothesline": 9,
-    "model.sofaBed": 3
   }
 }

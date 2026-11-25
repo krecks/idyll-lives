@@ -435,6 +435,8 @@ fn check_file(
     let (mut lo, mut hi) = ([inf; 3], [ninf; 3]);
     let mut tris = 0i64;
     let mut groups: BTreeSet<(Option<usize>, String)> = BTreeSet::new();
+    // The finishes in the still body's plain group (`draws_aimed`: metal hardware alone).
+    let mut still_plain: BTreeSet<String> = BTreeSet::new();
     // Per problem, the materials that have it.
     let mut flags: HashMap<&str, BTreeSet<String>> = HashMap::new();
     // Draw calls: one per finish group, the still body's and each moving part's apart.
@@ -533,14 +535,11 @@ fn check_file(
                         repr_str(&name)
                     ));
                 }
-                groups.insert((
-                    p.part,
-                    if fin.plain.get(&f) == Some(&true) {
-                        "plain".into()
-                    } else {
-                        f
-                    },
-                ));
+                let plain = fin.plain.get(&f) == Some(&true);
+                if plain && p.part.is_none() {
+                    still_plain.insert(f.clone());
+                }
+                groups.insert((p.part, if plain { "plain".into() } else { f }));
                 continue;
             }
             groups.insert((p.part, format!("file:{name}")));
@@ -808,12 +807,17 @@ fn check_file(
             groups.len(),
             most_draws
         ));
-    } else if groups.len() > DRAWS.0 {
-        warnings.push(format!(
-            "{} draw calls, aim for {} at most",
-            groups.len(),
-            DRAWS.0
-        ));
+    } else {
+        let declared = entry.get("draws").map(|_| most_draws);
+        let see_through = |f: &str| fin.see_through(Some(&J::Str(f.into())));
+        let aim = draws_aimed(&groups, &see_through, &still_plain, declared);
+        if groups.len() > aim {
+            warnings.push(format!(
+                "{} draw calls, aim for {aim} at most ({} for the still model, one more for each moving part, its glass and metal hardware alone on a still body)",
+                groups.len(),
+                DRAWS.0
+            ));
+        }
     }
     for (i, img) in gltf
         .get("images")

@@ -94,7 +94,10 @@ instances, so these costs are per kind of object in view, plus the triangles of 
 
 - **Things placed many times** (garden plants, park and street props, anything the town has dozens
   of) aim for half the target: the town overview draws every lot's outdoor objects at full detail.
-- **Draw calls:** one per finish group (below). Aim for 1–3, at most 4. Each also draws once more
+- **Draw calls:** one per finish group (below). Aim for 1–3 for the still model, at most 4 in all. Each part
+  a clip moves is a draw more (a second where it has glass), and so are the still body's glass and metal
+  hardware where that is all of the still body's plain group ("Hardware is metal"): the gate aims for those
+  over the 3. Each also draws once more
   in the sun's shadow map, which in live play is redrawn every frame while residents are in view
   (on Low a still part shares the lot's one merged shadow draw). Map every material to a finish: six garden models took 30 draws unmapped, 9 mapped.
   A model whose moving parts can't fit in four says so in its pack entry, `"draws": 5`
