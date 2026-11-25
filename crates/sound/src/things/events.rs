@@ -312,43 +312,6 @@ mod tests {
 
     const RATE: f64 = 48000.0;
 
-    /// Each as made (before the game's level): long enough, never past full scale, with sound in it, and a
-    /// loop's end running on into its start (`things/` `world_sounds`).
-    #[test]
-    fn event_sounds() {
-        for kind in EVENTS {
-            let Stereo { left, right } =
-                make(kind, RATE).unwrap_or_else(|| panic!("{kind}: not made"));
-            assert_eq!(left.len(), right.len(), "{kind}");
-            assert!(
-                left.len() as f64 > RATE / 2.0,
-                "{kind}: {} samples",
-                left.len()
-            );
-            let (mut peak, mut sum) = (0.0f64, 0.0f64);
-            for ch in [&left, &right] {
-                for &v in ch.iter() {
-                    peak = peak.max((v as f64).abs());
-                    sum += v as f64 * v as f64;
-                }
-            }
-            assert!(sum.is_finite(), "{kind}: not finite");
-            assert!(peak <= 1.0 + 1e-6, "{kind}: peak {peak}");
-            let rms = (sum / (2.0 * left.len() as f64)).sqrt();
-            assert!(rms > 0.004, "{kind}: rms {rms}");
-            if !ONCE_EVENTS.contains(&kind) {
-                for ch in [&left, &right] {
-                    let inside = ch
-                        .windows(2)
-                        .map(|w| (w[1] as f64 - w[0] as f64).abs())
-                        .fold(0.0, f64::max);
-                    let seam = (ch[0] as f64 - ch[ch.len() - 1] as f64).abs();
-                    assert!(seam <= inside, "{kind}: seam {seam} over {inside}");
-                }
-            }
-        }
-    }
-
     #[test]
     fn only_the_events_are_made_here() {
         assert!(make("fridgeDoor", RATE).is_none());

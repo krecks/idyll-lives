@@ -169,19 +169,9 @@ pub fn leaves(rate: f64) -> Stereo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dsp::check::brightness;
 
     const RATE: f64 = 48000.0;
-
-    /// How bright a sound is: the root mean square of its sample-to-sample change over that of its samples, as
-    /// a frequency (Hz).
-    fn brightness(d: &[f32]) -> f64 {
-        let (mut change, mut level) = (0.0, 0.0);
-        for i in 1..d.len() {
-            change += (d[i] as f64 - d[i - 1] as f64).powi(2);
-            level += (d[i] as f64).powi(2);
-        }
-        (change / level).sqrt() * RATE / (2.0 * PI)
-    }
 
     /// How much of `d` is a tone at `hz` (the size of its part at that frequency, per sample).
     fn tone(d: &[f32], hz: f64) -> f64 {
@@ -244,7 +234,7 @@ mod tests {
         for k in [1.0, 2.0, 3.0] {
             assert!(tone(engine, 55.0 * k) > 8.0 * tone(engine, 55.0 * k + 27.0));
         }
-        assert!(brightness(engine) < 700.0);
+        assert!(brightness(engine, RATE) < 700.0);
         // Whole turns in the loop: it meets itself at the seam.
         assert!((engine[0] - engine[engine.len() - 1]).abs() < 0.02);
     }
@@ -252,9 +242,9 @@ mod tests {
     #[test]
     fn tyres_hiss_a_town_rumbles_leaves_are_bright_what_is_all_round_differs_side_to_side() {
         let l = loops();
-        assert!(brightness(&l.tyres) > 1500.0);
-        assert!(brightness(&l.town.left) < 700.0);
-        assert!(brightness(&l.leaves.left) > 3500.0);
+        assert!(brightness(&l.tyres, RATE) > 1500.0);
+        assert!(brightness(&l.town.left, RATE) < 700.0);
+        assert!(brightness(&l.leaves.left, RATE) > 3500.0);
         for s in [&l.town, &l.leaves] {
             let (mut cross, mut own) = (0.0, 0.0);
             for (&a, &b) in s.left.iter().zip(&s.right) {

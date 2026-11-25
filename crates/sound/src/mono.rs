@@ -353,18 +353,10 @@ fn knock(rate: f64) -> Vec<f32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dsp::check::steps;
     use crate::dsp::m::FRAC_1_SQRT_2;
 
     const RATE: f64 = 48000.0;
-
-    /// The biggest step between neighbouring samples, and the step from the last sample round to the first.
-    fn steps(ch: &[f32]) -> (f64, f64) {
-        let inside = ch
-            .windows(2)
-            .map(|w| (w[1] as f64 - w[0] as f64).abs())
-            .fold(0.0, max);
-        (inside, (ch[0] as f64 - ch[ch.len() - 1] as f64).abs())
-    }
 
     #[test]
     fn the_sounds_of_one_channel_are_the_same_every_time() {
