@@ -10,7 +10,8 @@
 
 import { clip, cycle, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { bump, hangArms, stand, TAU } from './idle';
-import { armIK, smooth, wrist, type ArmOptions } from './ik';
+import { armIK, wrist, type ArmOptions } from './ik';
+import { smooth } from '../../../../game/noise';
 
 /** Hands on a counter top: height and reach (reference skeleton, model space). */
 const COUNTER_Y = 1.0;

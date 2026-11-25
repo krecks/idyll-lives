@@ -5,7 +5,8 @@
  */
 
 import { clip, cycle, type ClipDef, type PoseSpec, type Vec } from './dsl';
-import { armIK, elbow, footIK, hang, pointOn, ramp, smooth, wrist } from './ik';
+import { armIK, elbow, footIK, hang, pointOn, ramp, wrist } from './ik';
+import { smooth } from '../../../../game/noise';
 
 export const TAU = Math.PI * 2;
 

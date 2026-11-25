@@ -30,7 +30,8 @@ import type { Seat } from '../shared/characters/seats';
 import type { WorldStructure } from '../../core/protocol';
 import { CARS, CAR_PAINT, TAXI_PAINT, TINT_PAINT, carAge, carDoor, carPaintColour, carriedAlong, carRowIsTaxi, DOOR_OPEN, DOORS, doorSwing, inCar, paintCar, paintDoor, paintTaxi, paintTaxiDoor, TAXI_BODY, wheelAt, type CarAge, type CarAt, type CarBody, type CarPose } from '../shared/cars';
 import { NO_WAY, poseOnWay, wayOf, type Way, type WayPose } from '../shared/carWay';
-import { DOOR_SWING, ease } from '../shared/doors';
+import { DOOR_SWING } from '../shared/doors';
+import { smooth } from '../../game/noise';
 import { Geo } from '../shared/geometry';
 import { playbackRate } from '../shared/gameSpeed';
 import { compose, quatYawPitchRoll } from '../shared/math';
@@ -483,7 +484,7 @@ export class Cars extends Vehicles {
     // (Nose up: turned back about x.)
     own.tilt.setLocalEulerAngles((-(car.pitch + stand.pitch) * 180) / Math.PI, 0, 0);
     // The rear edge swings out (`paintDoor`).
-    for (let d = 0; d < DOORS; d++) own.doors[d].setLocalEulerAngles(0, -car.sides[d] * car.swing[d] * ease(car.open[d]), 0);
+    for (let d = 0; d < DOORS; d++) own.doors[d].setLocalEulerAngles(0, -car.sides[d] * car.swing[d] * smooth(car.open[d]), 0);
     const shut = !car.ajar;
     if (own.whole.enabled !== shut) {
       own.whole.enabled = shut;

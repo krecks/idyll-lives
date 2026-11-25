@@ -7,8 +7,8 @@
 import { BEDS, type PlacedObject } from './seats';
 import { CHANGE, CRADLE, CUDDLE } from './actions';
 import { addRotation, qmul, rotate, type Additive, type Placement } from './pose';
-import { lieBack, smooth, type SimRig } from './rig';
-import { clamp, lerp } from '../../../game/noise';
+import { lieBack, type SimRig } from './rig';
+import { clamp, lerp, smooth } from '../../../game/noise';
 
 /**
  * A baby on the crib's changing pad (`CHANGE`): their placement as in the cot (as posed), moved to the

@@ -25,6 +25,7 @@
 import * as pc from './engine';
 import { curtain, VEIL_EDGE, VEIL_NEAR, veilAt, veilRect, type VeilRect } from '../shared/landVeil';
 import { WATER_Y } from '../shared/nature';
+import { smoothstep } from '../../game/noise';
 import { landVeilTold, setLandVeil, skyFog } from './shaders/fog';
 
 /** The camera's distance (m) the veil fades in over. */
@@ -96,8 +97,7 @@ export class LandHaze {
   show(radius: number | false, ex = NaN, ez = NaN): void {
     if (radius === false) return this.hold(false);
     const r = this.rect;
-    const t = Math.min(1, Math.max(0, (radius - SHOW_FROM) / (SHOW_FULL - SHOW_FROM)));
-    this.hold(Math.max(t * t * (3 - 2 * t), r && Number.isFinite(ex) && Number.isFinite(ez) ? veilAt(r, ex, ez) : 0), true);
+    this.hold(Math.max(smoothstep(SHOW_FROM, SHOW_FULL, radius), r && Number.isFinite(ex) && Number.isFinite(ez) ? veilAt(r, ex, ez) : 0), true);
   }
 
   /**

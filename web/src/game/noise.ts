@@ -92,11 +92,6 @@ export function ridged(x: number, z: number, seed: number, octaves = 5): number 
   return Math.min(1, sum / 0.9);
 }
 
-export const smoothstep = (a: number, b: number, x: number) => {
-  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-};
-
 /** `v` held within `lo`..`hi`. */
 export function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
@@ -104,6 +99,14 @@ export function clamp(v: number, lo: number, hi: number): number {
 
 /** `v` held within 0..1. */
 export const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+
+/** Smoothstep of `t` held within 0..1: eases in and out. */
+export const smooth = (t: number) => {
+  const c = clamp01(t);
+  return c * c * (3 - 2 * c);
+};
+
+export const smoothstep = (a: number, b: number, x: number) => smooth((x - a) / (b - a));
 
 /** From `a` to `b` by `t`. */
 export function lerp(a: number, b: number, t: number): number {

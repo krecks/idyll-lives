@@ -9,7 +9,8 @@
 import { cycle, type ClipDef, type PoseSpec, type Rot, type Vec } from './dsl';
 import { arms, body, moved, track, type Body, type Key } from './games';
 import { TAU } from './idle';
-import { addV, smooth, wrist } from './ik';
+import { addV, wrist } from './ik';
+import { smooth } from '../../../../game/noise';
 import { sizes, type Fit, type Size } from './street';
 
 /** On the knees and the tops of the feet (as the yoga's table): the ankles, the feet's turn, the knees' way. */

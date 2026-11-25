@@ -8,7 +8,8 @@
 
 import { cycle, reference, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { breathe, bump, TAU } from './idle';
-import { armIK, footIK, lerpV, pointOn, ramp, smooth, wrist } from './ik';
+import { armIK, footIK, lerpV, pointOn, ramp, wrist } from './ik';
+import { smooth } from '../../../../game/noise';
 
 /** Where a user stands and how big they are: their share of the reference body's size, the feet's distance from the object's middle, the ground's height there (m). */
 export interface Fit {

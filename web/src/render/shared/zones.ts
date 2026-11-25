@@ -8,6 +8,7 @@
  */
 
 import type { WorldZone } from '../../core/protocol';
+import { smooth } from '../../game/noise';
 
 /** The grid's cells (m). */
 export const ZONE_CELL = 4;
@@ -21,8 +22,7 @@ export type ZoneKind = WorldZone['kind'];
 /** `ZoneField.share` from what `ZoneField.edge` gave there (metres inside the zones): 0..1, over a soft edge `soft` m each side. */
 export function shareAt(edge: number, soft: number): number {
   if (edge === -Infinity) return 0;
-  const t = Math.min(1, Math.max(0, (edge + soft) / (2 * soft)));
-  return t * t * (3 - 2 * t);
+  return smooth((edge + soft) / (2 * soft));
 }
 
 /** `v` past either end of [0, `size`] mirrored back across that end (once: the land past the edge is narrower than the world). */

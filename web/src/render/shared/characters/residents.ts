@@ -73,7 +73,7 @@ import { type Hands, palmAt, placeFrame, placeHand, placeProp } from './props';
 import { rimOf } from './clips/shot';
 import { FACE_PARTS, LOD_FAR_PX, LOD_HEIGHT_PX, LOD_NEAR_PX, MORPH_PX, POSE_FAR_PX, POSE_NEAR_PX, type PartMesh, Range, YOUNG_STAGES, detailOf, shellBit, skinChunks, wispsOf } from './parts';
 import { type Additive, type Placement, PoseScratch, addLocal, addRotation, blendInto, makeAdditive, resetAdditive, rotate, sampleClip, skin } from './pose';
-import { BABBLE, type Frame, type Player, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, freezePlayer, gettingIn, lerpAngle, lieBack, lieCentre, player, ramp, rotationOf, setFrame, shoulderDrop, smooth, speaking, splitKey, unit, wrapAngle } from './rig';
+import { BABBLE, type Frame, type Player, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, freezePlayer, gettingIn, lerpAngle, lieBack, lieCentre, player, ramp, rotationOf, setFrame, shoulderDrop, speaking, splitKey, unit, wrapAngle } from './rig';
 import { type LegSide, SEAT_FIT, feetDown, legTurn, perch, seatSize } from './seatFit';
 import { BATH_WEAR, BEDS, BENCH_HIP, BENCH_KNEE, BLANKET_BEDS, BLANKET_MEET, BUNKS, type Bed, CLIP_HEIGHT, CURLED_BEDS, DEFAULT_BED, DEFAULT_SEAT, FEET_UP, FOOTSTOOLS, LEGS_OUT_DROP, LIE_CENTRE, LIE_ENTRY, type LegFit, NO_FEET_UP, ON_FLOOR, PEDAL, type PlacedObject, QUILT_COLOUR, QUILT_PART, REST_BACK, RISING, SEATS, SIDE_BEDS, SIDE_IN, SIT_CLIPS, SIT_FLEX, SIT_FROM, SLING, type Seat, type SeatFit, TUCK, floorSit, seatOf, slingTop } from './seats';
 import { AIM, Anim, EMBRACE, KISS_FIT, REFUSED, gesturesOf } from './socials';
@@ -86,7 +86,7 @@ import type { TemplateCache } from '../templateCache';
 import { WALL_HEIGHT } from '../walls';
 import { MOST_CADENCE, MOUNT_SECONDS, MOUNTS, type Mount, mountNodes } from './vehicles';
 import type { ResidentProp, ResidentView } from './view';
-import { clamp, hashInt, lerp } from '../../../game/noise';
+import { clamp, hashInt, lerp, smooth } from '../../../game/noise';
 import { compose, multiply, type Mat4, type Quat } from '../math';
 
 export { PLAYBACK_RATE, SUPER_SPEED } from '../gameSpeed';

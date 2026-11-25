@@ -12,7 +12,8 @@
 
 import { cycle, type ClipDef, type PoseSpec, type Rot, type Vec } from './dsl';
 import { breathe, hangArms, TAU } from './idle';
-import { addV, armIK, footIK, lerpV, norm, pointOn, smooth, sub, wrist, type ArmOptions } from './ik';
+import { addV, armIK, footIK, lerpV, norm, pointOn, sub, wrist, type ArmOptions } from './ik';
+import { smooth } from '../../../../game/noise';
 import { climbClip, sizes, SHARES_172, type Fit, type Size } from './street';
 
 // --- tracks: values keyed in time ---------------------------------------------------------------
