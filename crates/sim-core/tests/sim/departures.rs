@@ -92,7 +92,7 @@ fn a_resident_who_leaves_stops_everything() {
     let structure: serde_json::Value =
         serde_json::from_str(&sim_core::view::structure_json(&w)).unwrap();
     assert_eq!(structure["sims"][0]["gone"]["why"], "movedAway");
-    let mut snap = vec![0.0; 4096];
+    let mut snap = vec![0.0; sim_core::snapshot::CAPACITY];
     sim_core::snapshot::write(&w, &mut snap);
     use sim_core::snapshot::{HEADER_LEN, SIM_STRIDE, sim};
     assert_eq!(snap[HEADER_LEN + sim::AWAY], 1.0, "their row is hidden");

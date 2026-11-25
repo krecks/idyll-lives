@@ -113,6 +113,11 @@ pub(crate) struct RoomTiles {
     stale: Vec<bool>,
     /// Handles no room has.
     free: Vec<u32>,
+    /// `rescore_things`'s working lists, kept here so a rescore allocates nothing: rooms by lot
+    /// id, rooms by plot, and the things each room holds.
+    by_id: Vec<usize>,
+    by_plot: Vec<usize>,
+    things: Vec<score::Things>,
 }
 
 /// What `RoomTiles::summary` gives: per room its tiles (weights as bits) and the tiles taking its
@@ -149,6 +154,9 @@ impl RoomTiles {
             of_tile,
             stale,
             free: Vec::new(),
+            by_id: Vec::new(),
+            by_plot: Vec::new(),
+            things: Vec::new(),
         }
     }
 

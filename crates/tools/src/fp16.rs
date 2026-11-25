@@ -31,16 +31,20 @@ pub(crate) struct Field<'a> {
 
 fn varint(buf: &[u8], at: &mut usize) -> Result<u64, String> {
     let mut value: u64 = 0;
-    let mut scale: u64 = 1;
-    loop {
+    for shift in 0..10 {
         let b = *buf.get(*at).ok_or("protobuf: truncated varint")?;
         *at += 1;
-        value = value.wrapping_add((b & 0x7f) as u64 * scale);
+        // Protobuf caps a varint at ten bytes, and the tenth carries only the 64th bit: anything
+        // past that is a value no `u64` holds, and wrapping it silently would accept it.
+        if shift == 9 && b > 1 {
+            return Err("protobuf: varint overflows 64 bits".into());
+        }
+        value |= ((b & 0x7f) as u64) << (shift * 7);
         if b < 0x80 {
             return Ok(value);
         }
-        scale = scale.wrapping_mul(128);
     }
+    Err("protobuf: varint runs past ten bytes".into())
 }
 
 fn encode_varint(value: u64) -> Vec<u8> {
@@ -81,11 +85,13 @@ pub(crate) fn fields(buf: &[u8]) -> Result<Vec<Field<'_>>, String> {
             }
             2 => {
                 let len = varint(buf, &mut at)? as usize;
-                if at + len > buf.len() {
-                    return Err("protobuf: truncated bytes field".into());
-                }
-                let p = &buf[at..at + len];
-                at += len;
+                // `at + len` overflows for a length near `u64::MAX`: checked, it is a short buffer.
+                let end = at
+                    .checked_add(len)
+                    .filter(|&end| end <= buf.len())
+                    .ok_or("protobuf: truncated bytes field")?;
+                let p = &buf[at..end];
+                at = end;
                 (0, p)
             }
             other => return Err(format!("protobuf: wire type {other} not supported")),
@@ -349,6 +355,26 @@ mod tests {
             assert_eq!(varint(&bytes, &mut at).unwrap(), v);
             assert_eq!(at, bytes.len());
         }
+    }
+
+    #[test]
+    fn a_varint_past_ten_bytes_is_refused() {
+        // Every byte says "one more": the varint never ends.
+        let bytes = [0xffu8; 10];
+        let mut at = 0;
+        assert!(varint(&bytes, &mut at).is_err(), "an error, not a panic");
+        // Ten bytes whose last carries more than the 64th bit name a value no `u64` holds.
+        let bytes = [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f];
+        let mut at = 0;
+        assert!(varint(&bytes, &mut at).is_err(), "an error, not a panic");
+    }
+
+    #[test]
+    fn a_length_past_the_buffer_is_refused() {
+        // Field 2, wire type 2, then a length of `u64::MAX`: `at + len` would wrap.
+        let mut bytes = vec![0x12];
+        bytes.extend_from_slice(&encode_varint(u64::MAX));
+        assert!(fields(&bytes).is_err(), "an error, not a panic");
     }
 
     /// A graph with one initializer of `n` float32 values called `w`, and one node.

@@ -287,6 +287,36 @@ pub(super) fn damaged_saves_are_refused_on_loading() {
     assert!(World::from_save_json(CONTENT, &json).is_ok());
 }
 
+/// Two items saved with one id, or a next id with no room left, are refused: one item would be
+/// lost without a word, or the next one added would have no id to take.
+#[test]
+pub(super) fn bad_item_ids_are_refused() {
+    let item = |id: u32| serde_json::json!({"id": id, "def": "x", "at": "floor", "x": 1, "z": 1, "quality": 1.0, "madeAt": 0, "household": 0});
+    // (An item the content doesn't know is dropped: give the content one.)
+    let content = CONTENT.replacen(
+        r#""needs":"#,
+        r#""items":[{"id":"x","label":"X","model":"x"}],"needs":"#,
+        1,
+    );
+    let json = edited(|s| s["items"] = serde_json::json!([item(3), item(3)]));
+    let err = World::from_save_json(&content, &json)
+        .err()
+        .map(|e| e.to_string());
+    assert_eq!(err.as_deref(), Some("corrupt save: two items share an id"));
+    for next in [crate::setup::PARCEL_IDS, u32::MAX] {
+        let json = edited(|s| s["nextItem"] = next.into());
+        let err = World::from_save_json(CONTENT, &json)
+            .err()
+            .map(|e| e.to_string());
+        assert_eq!(
+            err.as_deref(),
+            Some("corrupt save: the next item id is out of range")
+        );
+    }
+    let json = edited(|s| s["nextItem"] = (crate::setup::PARCEL_IDS - 1).into());
+    assert!(World::from_save_json(CONTENT, &json).is_ok());
+}
+
 /// Numbers out of range in a save (here written as 1e39, which reads as infinity) are brought
 /// back in: a facing, friendship and romance (±100), a nap or a visit's end.
 #[test]

@@ -10,9 +10,18 @@ pub(crate) const MOVED_MOST: u32 = drive_secs(15.0) as u32;
 /// driving through the others), and any on top of one of those or touching it (`TOUCH`: at the
 /// seen area's edge, out of the picture, so no two cars are ever drawn on top of each other).
 pub fn hidden(cars: &[Car]) -> Vec<bool> {
-    let mut out: Vec<bool> = cars.iter().map(|c| c.sight != Sight::Seen).collect();
+    let mut out = Vec::new();
+    hidden_into(cars, &mut out);
+    out
+}
+
+/// `hidden`, into `out` (cleared first): the caller's buffer, so a frame that writes the snapshot
+/// more than once a tick allocates nothing for it.
+pub fn hidden_into(cars: &[Car], out: &mut Vec<bool>) {
+    out.clear();
+    out.extend(cars.iter().map(|c| c.sight != Sight::Seen));
     if !out.contains(&true) {
-        return out;
+        return;
     }
     let body = |c: &Car| c.shown_rect().map(|r| (r, c.layer()));
     // (Out of sight by where their middles are, along x: a car seen need only look at those whose
@@ -42,7 +51,6 @@ pub fn hidden(cars: &[Car]) -> Vec<bool> {
                     && o.gap(&r) < TOUCH
             });
     }
-    out
 }
 
 /// The cars on the road this tick, for the claims (`traffic::begin`): those driving (`places`:

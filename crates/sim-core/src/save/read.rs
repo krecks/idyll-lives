@@ -577,7 +577,11 @@ impl World {
             })
             .collect();
         world.items.list.sort_by_key(|it| it.id);
-        world.items.list.dedup_by_key(|it| it.id);
+        // (Two with one id would lose one here without a word: a save from elsewhere may have
+        // them.)
+        if world.items.list.windows(2).any(|w| w[0].id == w[1].id) {
+            return Err(Error::new("corrupt save: two items share an id"));
+        }
         let after_last = match world.items.list.last() {
             Some(it) => it
                 .id
@@ -585,7 +589,13 @@ impl World {
                 .ok_or_else(|| Error::new("corrupt save: an item id is out of range"))?,
             None => 0,
         };
-        world.items.next_id = save.next_item.max(after_last);
+        // (`Items::add` counts up from this, and ids from `PARCEL_IDS` up are the view's parcels:
+        // a real item there would be drawn as one, and the top of the range would overflow.)
+        let next_id = save.next_item.max(after_last);
+        if next_id >= crate::setup::PARCEL_IDS {
+            return Err(Error::new("corrupt save: the next item id is out of range"));
+        }
+        world.items.next_id = next_id;
         for s in &save.setups {
             let object = world.content.object_index(&s.object);
             let Some(h) = world.households.get_mut(s.household as usize) else {
@@ -595,7 +605,8 @@ impl World {
                 Some(object) if (s.sim as usize) < world.sims.len() => world.setups.push(
                     crate::setup::Setup::new(s.household, s.sim, object, s.since, s.paid),
                 ),
-                // (Gone from the content: the money back.)
+                // (Gone from the content, or a sim the save doesn't have: the money back. It was
+                // paid at the purchase and the object is only placed when the setup is done.)
                 _ => h.funds += s.paid,
             }
         }

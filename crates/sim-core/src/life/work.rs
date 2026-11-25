@@ -63,18 +63,18 @@ pub(super) fn at_work(w: &mut World, i: usize) -> bool {
     };
     let career = &content.careers[job.career];
     let level = &career.levels[job.level];
+    // Their household, once: it's read for the breaks, the pay and the bonus below.
+    let h = sim.household as usize;
     day_effects(sim, content, &career.work_effects, level.hours, minutes);
-    take_breaks(
-        sim,
-        content,
-        Some(&mut households[sim.household as usize].funds),
-    );
+    take_breaks(sim, content, Some(&mut households[h].funds));
     day_skills(sim, content, &career.skills, minutes);
     if sim.away_until.is_some_and(|until| tick < until) {
         return false;
     }
     sim.away_until = None;
-    households[sim.household as usize].funds += shift_pay(content, &job, &sim.skills);
+    // Saturating, as the promotion bonus below is: a content pack's pay can be near `i64::MAX`.
+    let pay = shift_pay(content, &job, &sim.skills);
+    households[h].funds = households[h].funds.saturating_add(pay);
     let rules = &content.career_rules;
     let fit = skill_fit(level, &sim.skills);
     // Still a job: it was there above, and nothing since takes it away.
@@ -95,7 +95,7 @@ pub(super) fn at_work(w: &mut World, i: usize) -> bool {
         // Saturating: a content pack's pay can be near `i64::MAX`, and a promotion must not panic.
         let shifts_a_week = next.days.count_ones().max(1) as i64;
         let bonus = next.pay.saturating_mul(shifts_a_week).saturating_add(1) / 2;
-        households[sim.household as usize].funds += bonus;
+        households[h].funds = households[h].funds.saturating_add(bonus);
         job.level += 1;
         job.performance = 0.0;
         sim.planner.recheck = true;

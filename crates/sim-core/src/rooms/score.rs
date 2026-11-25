@@ -1,7 +1,7 @@
 use super::*;
 
 /// What the things standing in a room (or a garden) give it.
-#[derive(Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub(super) struct Things {
     decor: f32,
     lamps: u16,
@@ -113,8 +113,14 @@ pub(crate) fn rescore_things(
         .map(|r| r.id as usize)
         .max()
         .unwrap_or(0);
-    let mut by_id = vec![usize::MAX; most + 1];
-    let mut by_plot = vec![usize::MAX; w.plots.len()];
+    // (The working lists are the tiles' scratch: a busy lot rescores on every object change, so
+    // they're taken out, refilled and put back rather than allocated each time.)
+    let mut by_id = std::mem::take(&mut tiles.by_id);
+    by_id.clear();
+    by_id.resize(most + 1, usize::MAX);
+    let mut by_plot = std::mem::take(&mut tiles.by_plot);
+    by_plot.clear();
+    by_plot.resize(w.plots.len(), usize::MAX);
     for (k, r) in rooms.iter().enumerate() {
         match (r.garden, r.plot) {
             (true, Some(p)) => {
@@ -128,7 +134,9 @@ pub(crate) fn rescore_things(
     }
     // (Only the gardens picked need the plot of what stands outdoors.)
     let any_garden = only.is_none() || by_plot.iter().any(|&k| picked(k));
-    let mut things = vec![Things::default(); rooms.len()];
+    let mut things = std::mem::take(&mut tiles.things);
+    things.clear();
+    things.resize(rooms.len(), Things::default());
     for o in &w.objects {
         let r = if lot.in_bounds(o.x, o.z) {
             lot.room_at(o.x, o.z)
@@ -176,6 +184,9 @@ pub(crate) fn rescore_things(
     } else {
         tiles.stale.fill(false);
     }
+    tiles.by_id = by_id;
+    tiles.by_plot = by_plot;
+    tiles.things = things;
 }
 
 /// Weighted overall score (content `roomRules.weights`).

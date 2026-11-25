@@ -463,6 +463,20 @@ fn shown_held(world: &World, s: &crate::world::Sim) -> Option<usize> {
 
 /// Writes the snapshot into `out`, which must hold at least `CAPACITY` floats.
 pub fn write(world: &World, out: &mut [f32]) {
+    let mut hidden = Vec::new();
+    write_with(world, out, &mut hidden);
+}
+
+/// `write`, with the list of cars that aren't drawn (`cars::hidden`) kept by the caller: a frame
+/// that writes the snapshot more than once a tick allocates nothing for it.
+pub fn write_with(world: &World, out: &mut [f32], hidden: &mut Vec<bool>) {
+    // The contract above, said out loud: the writes below index `HEADER_LEN + i * SIM_STRIDE`, so a
+    // short buffer would panic deep in a slice with "range end index ... out of range" and no clue.
+    debug_assert!(
+        out.len() >= CAPACITY,
+        "the snapshot buffer holds CAPACITY floats ({CAPACITY}), not {}",
+        out.len()
+    );
     out[header::TICK] = (world.tick % (1 << 24)) as f32;
     out[header::DAY] = clock::day(world.tick) as f32;
     out[header::MINUTE] = clock::minute_of_day(world.tick);
@@ -479,7 +493,8 @@ pub fn write(world: &World, out: &mut [f32]) {
     out[header::ITEMS_VERSION] = (world.items.version % (1 << 24)) as f32;
     let staff = &world.staff.servers[..world.staff.servers.len().min(crate::staff::MAX_STAFF)];
     out[header::STAFF_COUNT] = staff.len() as f32;
-    let hidden = crate::cars::hidden(&world.cars);
+    crate::cars::hidden_into(&world.cars, hidden);
+    let hidden: &[bool] = hidden;
     for (i, s) in world.sims.iter().enumerate() {
         let o = &mut out[HEADER_LEN + i * SIM_STRIDE..HEADER_LEN + (i + 1) * SIM_STRIDE];
         o[sim::ID] = s.id as f32;
@@ -495,7 +510,7 @@ pub fn write(world: &World, out: &mut [f32]) {
         o[sim::EMOTION] = s.emotion(&world.content).map_or(0.0, |e| e as f32 + 1.0);
         o[sim::ROLE] = 0.0;
         o[sim::AWAY] =
-            (s.away_until.is_some() || !s.here() || in_hidden_car(world, &hidden, s)) as u8 as f32;
+            (s.away_until.is_some() || !s.here() || in_hidden_car(world, hidden, s)) as u8 as f32;
         let doing = doing(world, s);
         o[sim::OBJECT] = doing.object;
         o[sim::ACTION] = doing.action;
@@ -598,7 +613,7 @@ pub fn write(world: &World, out: &mut [f32]) {
         }
     }
     write_staff(world, out);
-    write_cars(world, &hidden, out);
+    write_cars(world, hidden, out);
     write_lights(world, out);
 }
 

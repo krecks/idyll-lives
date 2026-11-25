@@ -50,12 +50,10 @@ pub(crate) fn trail_step(
     walk: f32,
 ) -> Option<([f32; 2], f32)> {
     let g = &travel.graph;
-    let road = g
-        .roads
+    let road = travel
+        .trails
         .iter()
-        .enumerate()
-        .filter(|(_, r)| r.kind == crate::travel::RoadKind::Trail)
-        .map(|(i, r)| (i, r.project(at)))
+        .map(|&i| (i as usize, g.roads[i as usize].project_on(at).1))
         .filter(|(_, (_, d))| *d <= TRAIL_REACH)
         .min_by(|a, b| a.1.1.total_cmp(&b.1.1).then(a.0.cmp(&b.0)))
         .map(|(i, (s0, _))| (&g.roads[i], s0))?;

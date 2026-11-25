@@ -148,6 +148,9 @@ fn save_problem(content_json: &str, save_json: &str, error: &str) -> Option<Save
 pub struct Game {
     world: World,
     snapshot: Box<[f32]>,
+    /// Which cars aren't drawn, as of the last `snapshot::write_with`: kept so a frame's writes
+    /// allocate nothing for it.
+    hidden: Vec<bool>,
     /// What the UI was last sent (it gets changes only).
     ui: view::UiSync,
     /// What the renderer was last sent of the structure (`structure_update`: changes only).
@@ -204,7 +207,7 @@ impl Game {
     /// ticks while it stays quiet at home).
     pub fn advance(&mut self) {
         self.world.advance();
-        snapshot::write(&self.world, &mut self.snapshot);
+        snapshot::write_with(&self.world, &mut self.snapshot, &mut self.hidden);
     }
 
     /// Starts a real-time step (`World::start_step`): the speed's ticks, or at super speed
@@ -222,7 +225,7 @@ impl Game {
 
     /// Ends a step begun with `start_step`: refreshes the snapshot.
     pub fn end_step(&mut self) {
-        snapshot::write(&self.world, &mut self.snapshot);
+        snapshot::write_with(&self.world, &mut self.snapshot, &mut self.hidden);
     }
 
     /// Pointer into WASM memory; read it as a `Float32Array` of `snapshot_len()` floats.
@@ -239,7 +242,7 @@ impl Game {
     pub fn command(&mut self, json: &str) -> Result<(), JsError> {
         let cmd = Command::from_json(json).map_err(|e| JsError::new(&e.0))?;
         self.world.apply(cmd).map_err(|e| JsError::new(&e.0))?;
-        snapshot::write(&self.world, &mut self.snapshot);
+        snapshot::write_with(&self.world, &mut self.snapshot, &mut self.hidden);
         Ok(())
     }
 
@@ -476,8 +479,9 @@ impl Game {
             chunks: Vec::new(),
             chunks_at: None,
             rooms_sent: None,
+            hidden: Vec::new(),
         };
-        snapshot::write(&game.world, &mut game.snapshot);
+        snapshot::write_with(&game.world, &mut game.snapshot, &mut game.hidden);
         game
     }
 }

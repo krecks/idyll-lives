@@ -272,7 +272,7 @@ mod write;
 pub(crate) use ways::Trails;
 pub use ways::{TRAIL_MOST, TRAIL_POINTS, TRAIL_STEPS, TRAIL_TOLERANCE};
 pub(crate) use write::doing;
-pub use write::write;
+pub use write::{write, write_with};
 
 /// The layout for the web side. `actions` (the content's animation tags) names the values
 /// of `sim.action`.
