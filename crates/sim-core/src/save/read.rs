@@ -232,30 +232,62 @@ impl World {
         }
         world.next_object_id = world.next_object_id.max(save.next_object_id.unwrap_or(0));
         // Genders, traits and perks the content no longer has are dropped (an unknown gender is
-        // the first one's; with no genders in the content any is kept).
+        // the first one's; with no genders in the content any is kept), and so are the later of
+        // two traits that now conflict and the perks past the budget (`character_modifiers`
+        // refuses them).
         let content = &world.content;
         let gender =
             |g: &String| content.genders.is_empty() || content.genders.iter().any(|d| &d.id == g);
-        let known = |ids: &[String], list: &[&String]| -> Vec<String> {
-            ids.iter().filter(|id| list.contains(id)).cloned().collect()
+        let traits = |ids: &[String]| -> Vec<String> {
+            let mut kept: Vec<String> = Vec::new();
+            for id in ids {
+                let Some(d) = content.traits.iter().find(|d| &d.id == id) else {
+                    continue;
+                };
+                let clash = |k: &String| {
+                    k == id
+                        || d.conflicts.contains(k)
+                        || content
+                            .traits
+                            .iter()
+                            .any(|o| &o.id == k && o.conflicts.contains(id))
+                };
+                if !kept.iter().any(clash) {
+                    kept.push(id.clone());
+                }
+            }
+            kept
         };
-        let traits: Vec<&String> = content.traits.iter().map(|d| &d.id).collect();
-        let perks: Vec<&String> = content.perks.iter().map(|d| &d.id).collect();
+        let perks = |ids: &[String]| -> Vec<String> {
+            let (mut kept, mut spent): (Vec<String>, u32) = (Vec::new(), 0);
+            for id in ids {
+                if let Some(d) = content.perks.iter().find(|d| &d.id == id)
+                    && !kept.contains(id)
+                    && spent.saturating_add(d.cost) <= content.rules.perk_points
+                {
+                    spent += d.cost;
+                    kept.push(id.clone());
+                }
+            }
+            kept
+        };
         let spawns: Vec<SimSpawn> = save
             .sims
             .iter()
             .map(|s| SimSpawn {
                 name: s.name.clone(),
                 gender: s.gender.clone().filter(|g| gender(g)),
-                attracted_to: s
-                    .attracted_to
-                    .as_ref()
-                    .map(|a| a.iter().filter(|g| gender(g)).cloned().collect()),
+                // (Everyone it named gone from the content: attracted to all, as with none saved,
+                // not to nobody.)
+                attracted_to: s.attracted_to.as_ref().and_then(|a| {
+                    let kept: Vec<String> = a.iter().filter(|g| gender(g)).cloned().collect();
+                    (!kept.is_empty() || a.is_empty()).then_some(kept)
+                }),
                 household: s.household,
                 job: None,
                 appearance: s.appearance.clone(),
-                traits: known(&s.traits, &traits),
-                perks: known(&s.perks, &perks),
+                traits: traits(&s.traits),
+                perks: perks(&s.perks),
                 age: s.age.filter(|a| a.is_finite()),
                 skills: Default::default(),
                 x: s.pos[0],
