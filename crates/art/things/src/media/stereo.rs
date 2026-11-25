@@ -324,7 +324,7 @@ pub fn stereo() -> Vec<Obj> {
             ],
             at = F.at(px, py_, z),
             material = M.stereo_dark,
-            segments = 32
+            segments = 28
         );
         // the vinyl: a disc with grooved rings, a raised label and the spindle
         revolve!(
@@ -345,7 +345,7 @@ pub fn stereo() -> Vec<Obj> {
             ],
             at = F.at(px, 0.69, z),
             material = M.vinyl,
-            segments = 32
+            segments = 28
         );
         fcyl!(
             F,
@@ -403,7 +403,7 @@ pub fn stereo() -> Vec<Obj> {
                 ],
                 at = F.at(x, 0.685, z + 0.075),
                 material = M.cone,
-                segments = 20,
+                segments = 18,
                 rot = (90, 0, 0)
             );
             fsphere!(
@@ -413,7 +413,7 @@ pub fn stereo() -> Vec<Obj> {
                 (x, 0.685, z + 0.093),
                 M.cone,
                 scale = (1, 0.5, 1),
-                segments = 12,
+                segments = 10,
                 rings = 6
             );
         }
@@ -459,7 +459,7 @@ pub fn boombox() -> Vec<Obj> {
                 );
             }
             for zz in [-0.205, 0.205] {
-                rbox!(
+                let post = rbox!(
                     format!("crate_post{s}{}", float_repr(zz)),
                     0.03,
                     0.42,
@@ -468,6 +468,8 @@ pub fn boombox() -> Vec<Obj> {
                     M.crate_dark,
                     r = 0.003
                 );
+                // (chamfered before its UVs are made, so the chamfers get their own)
+                artkit::bevel::apply(post);
             }
         }
         for x in [-0.15, 0.15] {
