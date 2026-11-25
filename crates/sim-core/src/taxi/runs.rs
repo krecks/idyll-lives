@@ -619,7 +619,7 @@ pub(crate) fn boarded(w: &mut World, i: usize, c: u32) {
     let halt = w.taxis.runs[k].stops[s].halt as usize;
     let left = w.taxis.runs[k].at.len().saturating_sub(halt + 1) as u64;
     let rest = rest_ride.ceil() as u64 + left * DWELL + crate::cars::off_map_ticks(w);
-    crate::life::start_taxi_shift(w, i, rest);
+    crate::life::start_shift(w, i, rest);
     let g = w.taxis.runs[k].group;
     w.taxis.runs[k].stops[s].state = StopState::Aboard;
     let sim = &mut w.sims[i];
