@@ -54,8 +54,7 @@ impl Line {
         self.inner.text.clone()
     }
 
-    /// The model's output (at `rate` Hz) at 24 kHz, trimmed and at the line's pitch, size and
-    /// speed; its mouth shapes are then in `visemes`.
+    /// The model's output (at `rate` Hz) at 24 kHz, trimmed and at the line's pitch and size; its mouth shapes are then in `visemes`.
     pub fn finish(&mut self, samples: &[f32], rate: u32) -> Vec<f32> {
         let (samples, visemes) = self.inner.finish(samples, rate);
         self.visemes = visemes;
@@ -80,13 +79,13 @@ impl Voice {
         }
     }
 
-    /// A line with pitch, size and speed for its output (clamped to what sounds right).
-    pub fn line(&self, text: &str, speed: f32, pitch: f32, depth: f32) -> Line {
+    /// A line with pitch and size for its output (clamped to what sounds right); the model sets the speed.
+    pub fn line(&self, text: &str, pitch: f32, depth: f32) -> Line {
         Line {
             inner: self.engine.line(
                 text,
                 VoiceParams {
-                    speed,
+                    speed: 1.0,
                     pitch,
                     depth,
                 },
