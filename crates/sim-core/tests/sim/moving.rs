@@ -289,3 +289,102 @@ fn a_partner_out_on_a_visit_isnt_moved_from_under_it() {
     days(&mut w, 6);
     assert_eq!(w.sims[1].household, 0, "Cy never moved in with Ada");
 }
+
+/// `CONTENT` with life stages (a baby, a child, a grown-up), names and genders for newcomers.
+fn with_stages() -> String {
+    CONTENT
+        .replace(
+            r#""life":{"daysPerYear":2,"#,
+            r#""life":{"daysPerYear":2,"startAge":[25,30],"stages":[{"id":"baby","label":"Baby","from":0,"baby":true},
+                {"id":"child","label":"Child","from":2,"school":true},{"id":"youngAdult","label":"Young adult","from":18}],"#,
+        )
+        .replace(
+            r#""rules":{"maxHousehold":4},"#,
+            r#""rules":{"maxHousehold":4},"names":{"first":["Ana","Ben","Cleo","Dev"],"last":["Moss","Reed"]},
+               "genders":[{"id":"female","label":"Female"},{"id":"male","label":"Male"}],"#,
+        )
+}
+
+/// Ada (the player's) and Cy next door are partners; Cy lives with his son Kit (5), no other
+/// grown-up at home.
+fn single_parent() -> String {
+    town("", r#",{"a":0,"b":1,"preset":"partners"}"#).replace(
+        r#""name":"Di","x":15.5,"z":5.5,"age":28"#,
+        r#""name":"Kit","x":15.5,"z":5.5,"age":5"#,
+    )
+}
+
+#[test]
+fn a_single_parent_doesnt_move_in_with_a_partner_leaving_a_child_alone() {
+    let mut w = World::from_json(&with_stages(), &single_parent(), 1).unwrap();
+    days(&mut w, 2);
+    assert_eq!(w.sims[1].household, 1, "Cy left Kit on his own");
+}
+
+#[test]
+fn children_whose_last_grown_up_dies_go_to_family_out_of_town() {
+    let mut w = World::from_json(&with_stages(), &single_parent(), 1).unwrap();
+    sim_core::lifecycle::pass_away(&mut w, 1);
+    assert!(!w.sims[2].here(), "Kit was left on his own");
+    assert!(
+        w.events
+            .iter()
+            .any(|e| e.kind == EventKind::MovedAway && e.a == 2)
+    );
+    // The player's household plays on with its children.
+    let town = single_parent().replace(r#""age":5,"household":1"#, r#""age":5,"household":0"#);
+    let mut w = World::from_json(&with_stages(), &town, 1).unwrap();
+    sim_core::lifecycle::pass_away(&mut w, 0);
+    assert!(w.sims[2].here());
+}
+
+#[test]
+fn a_baby_on_the_way_moves_with_its_parents() {
+    // Eve (25, working) and her partner Fin live next door with her mother Di, a baby on the way;
+    // the house for sale has a double bed for them.
+    let eve = r#",{"name":"Eve","x":16.5,"z":5.5,"age":25,"household":1,"job":{"career":"press.print","level":0}},
+                {"name":"Fin","x":17.5,"z":5.5,"age":25,"household":1}"#;
+    let town = town(
+        eve,
+        r#",{"a":3,"b":2,"preset":"parent"},{"a":3,"b":4,"preset":"partners"}"#,
+    )
+    .replace(
+        r#"{"def":"bed","x":22,"z":2}"#,
+        r#"{"def":"double","x":22,"z":2}"#,
+    );
+    let mut w = World::from_json(&with_stages(), &town, 1).unwrap();
+    w.households[1].expecting = Some(sim_core::world::Expecting {
+        parents: [3, 4],
+        due: 1,
+    });
+    days(&mut w, 2);
+    let h = w.sims[3].household;
+    assert_eq!(w.households[h as usize].plot, Some(2), "Eve and Fin moved");
+    let baby = w.sims.get(5).expect("the baby was born");
+    assert_eq!(baby.household, h, "born in Eve and Fin's new home");
+}
+
+#[test]
+fn a_new_family_in_a_house_gets_nothing_of_the_last() {
+    let mut w = World::from_json(&with_stages(), &town("", ""), 1).unwrap();
+    w.events.push(w.tick, EventKind::BecameFriends, 1, 2, None);
+    w.households[1].letters.push(0);
+    w.households[1].free_will = false;
+    w.depart(1, sim_core::world::GoneWhy::MovedAway);
+    w.depart(2, sim_core::world::GoneWhy::MovedAway);
+    assert!(sim_core::lifecycle::arrive(&mut w, 1));
+    let hh = &w.households[1];
+    assert!(
+        hh.letters.is_empty() && hh.free_will,
+        "the Neighbours' post and ways"
+    );
+    assert_ne!(hh.name, "Neighbours");
+    assert!(!w.former.is_empty());
+    for f in &w.former {
+        assert_eq!(
+            f.household, "Neighbours",
+            "{} was a {}",
+            f.name, f.household
+        );
+    }
+}

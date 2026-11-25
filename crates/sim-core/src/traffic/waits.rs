@@ -396,12 +396,3 @@ pub(crate) fn settle(w: &mut World) {
         car.reclaim(&w.travel);
     }
 }
-
-impl World {
-    /// The junctions' traffic lights worked out again (`traffic::settle`), and the cars' claims
-    /// with them: for a test that changes the roads after the world is made.
-    #[doc(hidden)]
-    pub fn settle_lights(&mut self) {
-        settle(self);
-    }
-}

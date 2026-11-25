@@ -234,6 +234,25 @@ fn owners_drive_to_work_together_and_come_home_nose_in() {
     }
 }
 
+/// The driver leaves town while out at work and a newcomer takes their slot at once: the car
+/// still comes home (it waited for the newcomer to be done at work, away for good).
+#[test]
+fn a_car_whose_driver_left_town_comes_home_after_a_newcomer_takes_the_slot() {
+    let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
+    until(&mut w, 2, 10.0);
+    assert_eq!(w.cars[0].state, CarState::Away);
+    let d = w.cars[0].driver.expect("someone drove") as usize;
+    // (As if they'd come by taxi: no taxi home for whoever has the slot next.)
+    w.taxis.rode.push((d as u32, (0, 0)));
+    w.depart(d, crate::world::GoneWhy::MovedAway);
+    let spawn: crate::lot::SimSpawn =
+        serde_json::from_value(serde_json::json!({"name": "Newt", "x": 25.5, "z": 3.5})).unwrap();
+    assert_eq!(w.spawn_at(&spawn, true).unwrap() as usize, d);
+    until(&mut w, 2, 15.0);
+    assert_eq!(w.cars[0].state, CarState::Parked, "home again");
+    assert!(!w.taxis.rode.iter().any(|r| r.0 == d as u32));
+}
+
 #[test]
 fn only_owners_drive() {
     let mut w = World::from_json(CONTENT, TOWN, 1).unwrap();
