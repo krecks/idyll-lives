@@ -5,14 +5,13 @@ pub use crate::common::P;
 use artkit::forms::{self, Extrude, rounded_rect};
 use artkit::kit;
 use artkit::materials::Mat;
-use artkit::math::{Axis, P3, TAU, V3, cos, pow, radians, sin, v3};
-use artkit::motion::{Squash, squash};
+use artkit::math::{P3, TAU, V3, cos, pow, radians, sin, v3};
 use artkit::noise::noise;
-use artkit::parts::{Settle, hinged, join, measure, new_parts, settle_with};
+use artkit::parts::{Settle, join, measure, settle_with};
 use artkit::place::Coord;
 use artkit::py::sum;
 use artkit::scene::{self, Obj, meshes};
-use artkit::{jitter, soft, swing};
+use artkit::{jitter, soft};
 
 /// `_add`: the points summed, a coordinate at a time.
 pub fn add(vs: &[P]) -> P {
@@ -256,77 +255,8 @@ pub fn soft_pillow(
 }
 
 // --- beds: a duvet whose top third turns down (as bedroom.py) -------------------------------------------
-/// The duvet's top above the mattress top.
-pub const DUVET: f64 = 0.05;
-/// The flap's thickness.
-pub const FLAP: f64 = 0.045;
-
-/// The duvet's lower two thirds, from the fold to the foot, draped down the sides and the foot end, puffed on
-/// top (its middle at `DUVET`) and rumpled as a duvet shaken out lies (the soft form's `rumple`, as bedroom.py's:
-/// folds that only go down and in, so it stays under the game's quilt).
-pub fn duvet(
-    top: f64,
-    half: f64,
-    z_fold: f64,
-    z_foot: f64,
-    drape: f64,
-    material: Mat,
-    seed: f64,
-) -> Obj {
-    let (over, puff) = (0.02, 0.01);
-    let (y0, y1) = (top - drape, top + DUVET);
-    soft!(
-        F,
-        "duvet",
-        2.0 * (half + over),
-        y1 - y0 - 2.0 * puff,
-        z_foot + over - z_fold,
-        (0, (y0 + y1) / 2.0, (z_fold + z_foot + over) / 2.0),
-        material,
-        round = 0.05,
-        puff = puff,
-        pinch = 0.0,
-        rumple = 0.025,
-        rumple_size = 0.24,
-        seed = seed + half,
-        resting = true
-    )
-}
-
-/// The duvet's top third with the sheet turned down over its head edge, hinged across its fold.
-pub fn flap(top: f64, half: f64, z_top: f64, z_fold: f64, material: Mat) -> Obj {
-    let parts = new_parts(|| {
-        let y = top + DUVET - FLAP / 2.0;
-        soft!(
-            F,
-            "flap",
-            2.0 * (half + 0.012),
-            FLAP - 0.01,
-            z_fold - z_top,
-            (0, y, (z_top + z_fold) / 2.0),
-            material,
-            round = 0.018,
-            puff = 0.005,
-            flat = 3
-        );
-        soft!(
-            F,
-            "flap_sheet",
-            2.0 * (half + 0.016),
-            FLAP + 0.008,
-            0.12,
-            (0, y, z_top + 0.05),
-            M.sheet,
-            round = 0.02
-        );
-    });
-    hinged(
-        join(&parts, "duvet_flap", None),
-        F.at(0, top + DUVET + 0.003, z_fold),
-    )
-}
-
-/// Builds the duvet (its still two thirds and the flap), joins the bed, settles, keys `turn_down`.
+/// Builds the duvet (its still two thirds and the flap, the kit's), joins the bed, settles, keys `turn_down`
+/// (inside the game's quilt, 0.46 m from the bed's middle, as the bedroom family's one-tile beds do).
 pub fn turn_down(
     top: f64,
     half: f64,
@@ -336,34 +266,36 @@ pub fn turn_down(
     material: Mat,
 ) -> Vec<Obj> {
     let z_fold = z_top + (z_foot - z_top) / 3.0;
-    duvet(top, half, z_fold, z_foot, drape, material, 0.0);
+    kit::duvet!(
+        F,
+        top,
+        half,
+        z_fold,
+        z_foot,
+        drape,
+        material,
+        over = 0.02,
+        puff = 0.01,
+        round = 0.05,
+        rumple = 0.025,
+        folds = 0.24
+    );
     still("bed", None);
-    let flap = flap(top, half, z_top, z_fold, material);
+    let flap = kit::duvet_flap!(
+        F,
+        top,
+        half,
+        z_top,
+        z_fold,
+        material,
+        M.sheet,
+        flat = 3,
+        band = 0.12,
+        band_at = 0.05,
+        band_round = 0.02
+    );
     place(0.0);
-    // As it turns it flattens and narrows to stay under the game's quilt (0.46 m from the bed's middle,
-    // never lower than 8.5 cm over the mattress), as the bedroom family's beds do (bedroom's `_turn_down`).
-    swing!(flap, "turn_down", 180.0, seconds = 1.0, axis = Axis::X);
-    let narrow = (0.46 - 0.08) / (half + 0.016);
-    squash(
-        flap,
-        "turn_down",
-        (if narrow < 1.0 { narrow } else { 1.0 }, 1, 0.4),
-        Squash {
-            seconds: 1.0,
-            ..Squash::default()
-        },
-    );
-    // half way over it's gathered to a fifth of its length, so it rolls over as cloth, not a board standing up
-    squash(
-        flap,
-        "turn_down",
-        (1, 0.2, 1),
-        Squash {
-            seconds: 1.0,
-            back: true,
-            ..Squash::default()
-        },
-    );
+    kit::turn_down!(flap, "turn_down", half, 0.46);
     meshes()
 }
 

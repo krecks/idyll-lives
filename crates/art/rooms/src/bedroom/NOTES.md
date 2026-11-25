@@ -18,7 +18,7 @@ The module builds the nine beds of BR1 into `web/public/assets/models/bedroom/` 
 - **The duvet turns down (`turn_down`).** The game lays its own quilt over each sleeper on `BLANKET_BEDS` (now
   also `bedDouble`, `bedQueenUpholstered`, `bedCanopy`), so the bed's duvet isn't a second cover over them. It is
   two parts: the lower two thirds (`duvet`, one soft, puffed box draped down the sides and the foot, still) and
-  the top third (`duvet_flap`, flat on the mattress with the sheet turned down over its head edge), hinged
+  the top third (`kit::duvet_flap`, flat on the mattress with the sheet turned down over its head edge), hinged
   across the fold on the duvet's top 3 mm up. `turn_down` turns the flap 180° about X in 1 s, laying it over the
   rest toward the foot, and flattens it as it goes (`turn_down`); half way over it is gathered to a fifth of its
   length (`ROLL`, a scale along the bed there and back, 2026-10-21), so it rolls over its fold as cloth, a low

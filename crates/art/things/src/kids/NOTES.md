@@ -31,7 +31,7 @@ creases move its vertices up and down only (`rumple`): `jitter` sideways moved i
   baby, not turning all night; the crib's uses can't tell a sleeping baby from an awake one, and playing is the
   one that means awake). The mobile hangs at the back,
   clear of the arms of a grown-up lifting the baby out over the front rail.
-- **Kids' bed** and **race car bed** (1 × 2): as the bedroom's beds (`crates/art/rooms/src/bedroom`), the duvet's top third (`duvet_flap`) folds back
+- **Kids' bed** and **race car bed** (1 × 2): as the bedroom's beds (`crates/art/rooms/src/bedroom`; both the kit's `duvet!`, `duvet_flap!`, `turn_down!`), the duvet's top third folds back
   toward the foot while a resident sleeps or naps (`turn_down`), gathered to a fifth of its length half way over so
   it rolls as cloth (2026-10-21). Both are in `BLANKET_BEDS`, so the game lays its
   quilt over the sleeper. The car's body, wheels and spoiler are

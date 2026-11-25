@@ -22,6 +22,7 @@
 //! `signs` (the taxi's word and chequers, raised block letters), `tableware`.
 
 pub mod creatures;
+mod duvet;
 mod figure8;
 pub mod hardware;
 mod iron;
@@ -36,6 +37,7 @@ mod turn_round;
 pub mod turned;
 
 pub use creatures::*;
+pub use duvet::*;
 pub use figure8::*;
 pub use hardware::*;
 pub use iron::*;
@@ -49,11 +51,11 @@ pub use turned::*;
 
 // (the macros, exported at the crate's root under `kit_` names, by the names the scripts called: `kit::pull!`)
 pub use crate::{
-    kit_bench_end as bench_end, kit_cabriole as cabriole, kit_chequer as chequer, kit_cut as cut,
+    kit_bench_end as bench_end, kit_cabriole as cabriole, kit_chequer as chequer, kit_cut as cut, kit_duvet as duvet, kit_duvet_flap as duvet_flap,
     kit_fillet as fillet, kit_knob as knob, kit_lathe as lathe, kit_letters as letters,
     kit_moulding as moulding, kit_mug as mug, kit_pull as pull, kit_recessed_box as recessed_box,
     kit_scroll as scroll, kit_shaker as shaker, kit_songbird as songbird,
-    kit_taxi_word as taxi_word, kit_throw as throw, kit_tube as tube, kit_turned as turned,
+    kit_taxi_word as taxi_word, kit_throw as throw, kit_tube as tube, kit_turn_down as turn_down, kit_turned as turned,
 };
 
 /// Python's `min` of floats: the first of the least.
