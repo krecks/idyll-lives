@@ -2703,7 +2703,6 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.applyDimming();
     this.gardenPools?.set([]);
     this.lamps.clear();
-    for (const p of this.decor.values()) for (const d of p.draws) d.enabled = false;
     this.lastWorld = this.builtWorld = null;
     this.cameraPlaced = false;
     this.birdsWaited = false;
@@ -2730,6 +2729,13 @@ export class PlayCanvasRenderer implements Renderer, RendererDebugHooks {
     this.stairwells = [];
     this.lotRooms = null;
     this.walls = this.wallsLow = null;
+    // Every kept garden draw emptied: the next lot places only the kinds it has (`placeDecor`), and `applyStoreys` shows a draw with copies.
+    for (const p of this.decor.values())
+      for (const d of p.draws) {
+        d.setCount(0);
+        d.update();
+        d.enabled = false;
+      }
   }
 
   private lotMaterial(key: string): pc.StandardMaterial {
