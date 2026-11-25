@@ -470,6 +470,13 @@ pub fn write(world: &World, out: &mut [f32]) {
 /// `write`, with the list of cars that aren't drawn (`cars::hidden`) kept by the caller: a frame
 /// that writes the snapshot more than once a tick allocates nothing for it.
 pub fn write_with(world: &World, out: &mut [f32], hidden: &mut Vec<bool>) {
+    // The contract above, said out loud: the writes below index `HEADER_LEN + i * SIM_STRIDE`, so a
+    // short buffer would panic deep in a slice with "range end index ... out of range" and no clue.
+    debug_assert!(
+        out.len() >= CAPACITY,
+        "the snapshot buffer holds CAPACITY floats ({CAPACITY}), not {}",
+        out.len()
+    );
     out[header::TICK] = (world.tick % (1 << 24)) as f32;
     out[header::DAY] = clock::day(world.tick) as f32;
     out[header::MINUTE] = clock::minute_of_day(world.tick);
