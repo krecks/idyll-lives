@@ -24,6 +24,7 @@
 pub mod creatures;
 mod figure8;
 pub mod hardware;
+mod iron;
 pub mod joinery;
 mod macros;
 pub mod metalwork;
@@ -37,6 +38,7 @@ pub mod turned;
 pub use creatures::*;
 pub use figure8::*;
 pub use hardware::*;
+pub use iron::*;
 pub use joinery::*;
 pub use metalwork::*;
 pub use mug::*;
