@@ -78,7 +78,7 @@ pub fn coffee_table_round() -> Vec<Obj> {
 pub fn coffee_table_long() -> Vec<Obj> {
     top(
         "top",
-        1.52,
+        1.66,
         0.72,
         0.02,
         0.04,
@@ -90,7 +90,7 @@ pub fn coffee_table_long() -> Vec<Obj> {
     );
     top(
         "shelf",
-        1.36,
+        1.5,
         0.58,
         0.015,
         0.025,
@@ -101,7 +101,7 @@ pub fn coffee_table_long() -> Vec<Obj> {
         0.006,
     );
     let tube = rounded_rect(0.04, 0.04, 0.008, 1);
-    for x in [-0.69, 0.69] {
+    for x in [-0.76, 0.76] {
         // each end one closed loop of square tube: two legs, a foot rail on the floor, a rail under the top
         let lp: Vec<(f64, f64, f64)> = rounded_rect(0.6, 0.36, 0.03, 2)
             .iter()
@@ -133,7 +133,7 @@ pub fn coffee_table_long() -> Vec<Obj> {
         0.32,
         0.05,
         0.24,
-        (0.36, 0.1775, 0.0),
+        (0.4, 0.1775, 0.0),
         M.box_sand,
         bevel = 0.008,
         bevel_segments = 1
@@ -144,7 +144,7 @@ pub fn coffee_table_long() -> Vec<Obj> {
         0.33,
         0.016,
         0.25,
-        (0.36, 0.2105, 0.0),
+        (0.4, 0.2105, 0.0),
         M.box_sand,
         bevel = 0.005,
         bevel_segments = 1
@@ -155,7 +155,7 @@ pub fn coffee_table_long() -> Vec<Obj> {
         0.26,
         0.035,
         0.19,
-        (0.36, 0.236, 0.0),
+        (0.4, 0.236, 0.0),
         M.magazine_teal,
         rot = (0, 0, -5),
         bevel = 0.004,
@@ -167,7 +167,7 @@ pub fn coffee_table_long() -> Vec<Obj> {
         0.252,
         0.027,
         0.004,
-        (0.36, 0.236, 0.093),
+        (0.4, 0.236, 0.093),
         M.pages,
         rot = (0, 0, -5)
     );
@@ -360,13 +360,13 @@ pub(super) fn basket(name: &str, x: f64, y: f64, z: f64, w: f64, h: f64, d: f64,
 /// black steel frame (legs, a rail under the top each end); two woven baskets on the shelf.
 pub fn console_table() -> Vec<Obj> {
     top(
-        "top", 1.6, 0.44, 0.015, 0.035, 0.7975, M.oak, -0.24, 0.0, 0.008,
+        "top", 1.8, 0.56, 0.015, 0.035, 0.7975, M.oak, -0.18, 0.0, 0.008,
     );
     top(
-        "shelf", 1.5, 0.36, 0.01, 0.025, 0.2325, M.oak, -0.24, 0.0, 0.005,
+        "shelf", 1.7, 0.48, 0.01, 0.025, 0.2325, M.oak, -0.18, 0.0, 0.005,
     );
     let tube = rounded_rect(0.04, 0.04, 0.008, 1);
-    for x in [-0.76, 0.76] {
+    for x in [-0.86, 0.86] {
         fsweep!(
             F,
             format!("frame{}", float_repr(x)),
@@ -374,8 +374,8 @@ pub fn console_table() -> Vec<Obj> {
                 &[
                     (x, 0.0, -0.42),
                     (x, 0.76, -0.42),
-                    (x, 0.76, -0.06),
-                    (x, 0.0, -0.06)
+                    (x, 0.76, 0.06),
+                    (x, 0.0, 0.06)
                 ],
                 0.03,
                 3
@@ -391,18 +391,18 @@ pub fn console_table() -> Vec<Obj> {
             format!("shelf_rail{}", float_repr(x)),
             0.03,
             0.03,
-            0.32,
-            (x * 0.995, 0.205, -0.24),
+            0.44,
+            (x * 0.995, 0.205, -0.18),
             M.black_metal,
             bevel = 0.005,
             bevel_segments = 1
         );
     }
-    for z in [-0.42, -0.06] {
+    for z in [-0.42, 0.06] {
         fbox!(
             F,
             format!("back_rail{}", float_repr(z)),
-            1.48,
+            1.68,
             0.03,
             0.025,
             (0, 0.705, z),
@@ -416,7 +416,7 @@ pub fn console_table() -> Vec<Obj> {
             &format!("basket{}", float_repr(x)),
             x,
             0.2325,
-            -0.24,
+            -0.18,
             0.36,
             0.14,
             0.3,

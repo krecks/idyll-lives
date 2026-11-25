@@ -138,7 +138,7 @@ models' tops now start at the wall's face, 1–4 cm in front of the rectangles' 
 | `model.bookshelf` | 0.90 × 1.92 × 0.38 m | 6,836 | 3 | Frame, Back | `book_out` (read, study, homework) |
 | `model.bookcaseLow` | 0.92 × 1.17 × 0.38 m | 2,820 | 3 | Frame, Back | `book_out` (read) |
 | `model.bookcaseWide` (2 × 1) | 1.86 × 2.00 × 0.47 m | 7,244 | 3 | Frame, Back | `book_out` (read, study, homework) |
-| `model.shelvingIndustrial` (2 × 1) | 1.86 × 1.83 × 0.45 m | 7,540 | 2 | Frame, Shelves | — |
+| `model.shelvingIndustrial` (2 × 1) | 1.86 × 1.83 × 0.53 m | 7,540 | 2 | Frame, Shelves | — |
 | `model.bookcaseTall` | 0.90 × 2.00 × 0.34 m | 4,584 | 3 | Frame, Back | `book_out` (read, study) |
 | `model.bookcaseCorner` | 0.90 × 1.90 × 0.34 m | 4,196 | 2 | Frame, Back | `book_out` (read) |
 | `model.cubeShelf` | 0.80 × 0.80 × 0.36 m | 2,676 | 2 | Frame, Back | — |
@@ -288,9 +288,11 @@ Every living model clear of the gate's warnings but three the gate itself gets w
 - Triangles: book page blocks set in between the boards unbevelled, a plain row's page tops a quad, the shelves'
   oak chamfered in one step, foliage clumps 8 × 5, the box sofas' back cushions crowned in 3 steps, the bergère's seat
   `resting`.
-- Sizes true to their kinds: the console 1.60 × 0.44 (centre 0, −0.21), the long coffee table 1.52, the chaise
-  1.84 deep (its throw and seat cushion with it), the industrial shelving 45 cm deep (centre 0, −0.205), the
-  three-seater 2.82; a bud vase and a low bowl of succulents on the coffee tables (under 55 cm).
+- Sizes true to their kinds: the chaise 1.84 deep (its throw and seat cushion with it), the three-seater 2.82; a bud
+  vase and a low bowl of succulents on the coffee tables (under 55 cm). The console (1.80 × 0.56), the long coffee table
+  (1.66) and the industrial shelving (0.53 deep) keep their sizes: made smaller, what towns and saves keep on their
+  tops hangs over the edge and the town won't load (the sim's travel samples, grid_identity), so their kinds are left
+  to decide.
 - Left to the gate: the sofa bed's bedding and frame read stretched and dense at rest, where the grown mattress is
   scaled to 0.2 of its length, tucked out of sight in the base (out, they are laid 1:1); the three-seaters' mattress
   probe reads `fwd` −0.42 as a depth, where for a bed lain on `across` the renderer moves the sleeper along the sofa
