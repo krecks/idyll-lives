@@ -1,18 +1,18 @@
 //! The things residents carry and cook with: the models of content `items` (`item.*`: a bag of shopping, a
 //! prep bowl, a pot of stew, plates of food, dirty plates and pans, the food bought in town), the props drawn on a
-//! station's top while a resident cooks there (`tool.*`: the chopping board, the pan, food on the grill) and the props
+//! station's top while a resident cooks there (`tool.*`: the chopping board, food on the grill) and the props
 //! in a resident's hands while they use a thing (`tool.*`: a book, a cup, cutlery, a phone, a cue; actions.ts
 //! `PROPS`). Notes: NOTES.md.
 //!
 //! Each is drawn as the old part was (characters.ts `writeCarried`, `writeTool`; items.ts): its origin at
 //! the middle of its base, front +Z in the game, lifted onto the palms, the top it stands on or the station.
 //! So each is built where the game places it, in the game's axes (`F`), and stood on the floor
-//! without moving it sideways (`done`); the few that stand off their middle (the pan's handle, the bag)
+//! without moving it sideways (`done`); the few that stand off their middle (the grill food, the bag)
 //! take their measured `centre`.
 //!
 //! Small and seen several at once: one draw call each (every finish a plain one), two for the wooden boards
 //! (the chopping board, the tasting board, the pizza's board: `wood`); at most 750 triangles (half the
-//! budget of a thing under 35 cm), 2,000 for the few 35-40 cm across (the pot, the pan, the boards, trays and
+//! budget of a thing under 35 cm), 2,000 for the few 35-40 cm across (the pot, the boards, trays and
 //! platters). Turned things are `lathe`s (fluted, lobed or bent where the thing is); crusts, rims, handles,
 //! straws and piped icing are sweeps; boards, leaves, cutlery and smears are outlines extruded.
 //!
@@ -357,16 +357,6 @@ pub fn family() -> Option<Family> {
                 (0.34, 0.055, 0.24),
                 "tool.board",
                 O,
-                false,
-                T,
-            ),
-            // the handle reaches 2 cm further back than the old part's crossbar: the pan stays on its middle
-            i(
-                "pan",
-                pan,
-                (0.28, 0.061, 0.395),
-                "tool.pan",
-                (0.0, 0.0575),
                 false,
                 T,
             ),

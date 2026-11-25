@@ -507,42 +507,6 @@
         }
       }
     },
-    "tool.pan": {
-      "type": "model",
-      "url": "../../models/held/pan.glb",
-      "materials": {
-        "beef": {
-          "finish": "material.finish.satin"
-        },
-        "broccoli": {
-          "finish": "material.finish.satin"
-        },
-        "carrot": {
-          "finish": "material.finish.satin"
-        },
-        "carrot_core": {
-          "finish": "material.finish.satin"
-        },
-        "grip": {
-          "finish": "material.finish.satin"
-        },
-        "iron": {
-          "finish": "material.finish.metal"
-        },
-        "pea": {
-          "finish": "material.finish.satin"
-        },
-        "pepper_red": {
-          "finish": "material.finish.gloss"
-        },
-        "pepper_yellow": {
-          "finish": "material.finish.gloss"
-        },
-        "stew": {
-          "finish": "material.finish.satin"
-        }
-      }
-    },
     "tool.grillFood": {
       "type": "model",
       "url": "../../models/held/grillFood.glb",
