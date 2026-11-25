@@ -5,13 +5,13 @@ use super::common::{P, block, place, star, still, teddy, walls};
 use super::{F, M};
 use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::rounded_rect;
-use artkit::shapes::SHARP;
 use artkit::json::float_repr as r;
 use artkit::kit;
 use artkit::math::{Axis, PI, TAU, cos, sin};
 use artkit::parts::{aside, hinged, join, new_parts};
 use artkit::place::Facing;
 use artkit::scene::{Obj, meshes};
+use artkit::shapes::SHARP;
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, sphere, swing};
 
 /// Toys heaped inside a box, seen with the lid open: a ball, two blocks, a teddy and a toy car's wheels.

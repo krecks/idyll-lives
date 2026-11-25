@@ -7,6 +7,7 @@
 use super::M;
 use super::common::{P, flat_quads};
 use super::workbench_board::tool_board;
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
 use artkit::kit::{self, fillet};
@@ -14,7 +15,6 @@ use artkit::math::{P3, PI, cos, sin};
 use artkit::parts::{Settle, join, new_parts, settle_with};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
-use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::shapes::SHARP;
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, revolve, slide, soft};
 

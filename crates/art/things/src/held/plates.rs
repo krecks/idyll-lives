@@ -625,7 +625,16 @@ pub fn cake_slice() -> Vec<Obj> {
         sides.push(cut);
         // (the sponge's edges soft)
         let bevel = if h > 0.01 { 0.002 } else { 0.0 };
-        prism!(name, &wedge, y, y + h, top, cut, sides = sides, bevel = bevel);
+        prism!(
+            name,
+            &wedge,
+            y,
+            y + h,
+            top,
+            cut,
+            sides = sides,
+            bevel = bevel
+        );
         y += h;
     }
     let mut sides = vec![M.sponge_crumb];

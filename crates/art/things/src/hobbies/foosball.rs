@@ -7,6 +7,7 @@
 //! forth while played (`rods`, a loop); the others stay still.
 
 use super::M;
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
 use artkit::kit::{self};
@@ -15,7 +16,6 @@ use artkit::motion::{Rock, rock};
 use artkit::parts::{Settle, hinged, join, new_parts, settle_with};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
-use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, revolve};
 
 const ROD_Y: f64 = 0.84;

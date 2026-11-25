@@ -672,13 +672,7 @@ fn _platter() {
     );
     let mut mats = vec![M.china; profile.len() - 2];
     mats.push(M.china_well);
-    lathe!(
-        "platter",
-        &profile,
-        mats,
-        segments = 28,
-        scale = (1.0, 0.7)
-    );
+    lathe!("platter", &profile, mats, segments = 28, scale = (1.0, 0.7));
 }
 
 /// A burger off the grill: a thick round patty, its edge rounded and rough, three bar marks across its top.

@@ -6,6 +6,7 @@
 
 use super::M;
 use super::common::{P, flat_quads, sheet_music};
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr as r;
 use artkit::kit::turn_round;
@@ -14,7 +15,6 @@ use artkit::math::{PI, cos, sin};
 use artkit::parts::{Settle, join_all, settle_with};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
-use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::shapes::SHARP;
 use artkit::{fbox, fcyl, fextrude, fsweep, soft};
 

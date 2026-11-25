@@ -3,7 +3,6 @@
 //! and the plate everything is served on.
 
 use artkit::bevel::{EdgeOrder, bevel_edges};
-use artkit::shapes::SHARP;
 use artkit::forms::{self, rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, TAU, V3, asin, atan2, cos, degrees, pow, radians, sin};
@@ -12,6 +11,7 @@ use artkit::palette;
 use artkit::parts::{Settle, join_all, settle_with};
 use artkit::place::{Coord, Facing, GameFrame, Spot};
 use artkit::scene::{self, Obj};
+use artkit::shapes::SHARP;
 use artkit::{boulder, cube, cylinder, fextrude, fsweep, jitter, sphere};
 use std::collections::BTreeMap;
 use std::rc::Rc;

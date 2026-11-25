@@ -347,7 +347,7 @@ pub fn fireplace_electric() -> Vec<Obj> {
         let vase: Vec<Vec<P3>> = lip
             .iter()
             .map(|&(r, h)| ring!(r, r, z = 1.03 + h, verts = 20, at = (at.x, at.y)))
-        .collect();
+            .collect();
         loft!("vase", &vase, material = M.candle);
         fcyl!(
             F,

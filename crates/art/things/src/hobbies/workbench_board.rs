@@ -3,12 +3,12 @@
 use super::M;
 use super::common::{link, up_quad};
 use super::workbench::BOARD_Z;
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr as r;
 use artkit::kit;
 use artkit::math::{V3, cos, radians, sin};
 use artkit::place::{Facing, GameFrame};
-use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::{fbox, fcyl, fextrude, fsweep, revolve, torus};
 
 /// The hardboard pegboard on the back posts, a shelf along its top, and the tools hung on it: a saw, a square, two
