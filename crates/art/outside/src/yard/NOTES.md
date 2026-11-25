@@ -235,3 +235,8 @@ Sizes: the mountain bike's bars are 0.72 m across (a mountain bike's 720-800 mm;
 Left to the owner: the washing line's and the greenhouse's 4 draw calls (each moving part is a draw: the posts and
 three lines let down in turn; the frame, its glass, the door's and the vent's), and the washing line's 9 `texels`
 findings, which measure the washing at rest, squashed to 0.1 % of its height before it is let down.
+
+## Audit (2026-11-25)
+
+The raised bed's tomato canes stand one up each tomato bush (`alt`), at x -0.7, -0.14 and 0.42 (they stood at -0.45,
+0 and 0.45, off the bushes).

@@ -120,3 +120,13 @@ round (a chamfer all round took it past 8,000 triangles), its legs a one-step ch
 grille's back rim is cut across the same way; a book's boards take a 2 mm chamfer (3 mm met in a 6 mm board's
 middle, a ridge). The teacher's globe's turned base lays box UVs on its chamfered mesh (`boxed`): round about its
 axis, the walnut's grain stretched over its slopes.
+
+## Audit (2026-11-25)
+
+- `atm`: the keypad's rows and the shelf under them tilt down to the front (12°, they tilted back), as the rows step,
+  so no row sits in the shelf; its last column of keys is the keys' colour (it was the leaflets').
+- `vaultDoor`: the bolts stand 1.5 cm off the door's face (they were sunk in it).
+- `tellerCounter`: the cash trays moved 3 cm and the monitor and the keyboard 2 cm apart (the trays' front at
+  -0.11, the screen and keys between them and the inner panel), so they no longer go through each other.
+- `dutyDesk`, `hotelReception`, `receptionDesk`, `tellerCounter`: their bevels take their angles from the kernel's
+  Blender arc sine (artkit `bevel`; a hair of shape at most).

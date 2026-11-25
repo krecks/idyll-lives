@@ -121,3 +121,8 @@ Every hard edge the gate found (42) is gone:
 - **Pizza oven:** the sauce bowl's rim chamfered; the prep counter beside it set aside (as a desk's chair): it
   measures 1.57 m wide with the peel on the counter. It keeps 4 draw calls: the door, the peel and the flames move on
   their own.
+
+## Audit (2026-11-25)
+
+`chefsIsland`: its bevels take their angles from the kernel's Blender arc sine (artkit `bevel`; a hair of shape at
+most, towards Blender's build).
