@@ -401,7 +401,8 @@ pub fn nap_pod() -> Vec<Obj> {
     });
     join(&still, "body", Some(P3::from((0, 0, 0))));
     // The hood: a band of a sphere about the egg's upper half, folded back over the egg's top and turning about that
-    // sphere's centre, piped along its front edge; `hood` swings it 60° forward, half over the opening.
+    // sphere's centre, piped along its front edge; `hood` swings it 60° forward, half over the opening. Its back edge
+    // stops 6° below level: lower, the hood's box swings its corner into the wall (the gate's `opened`).
     let hood = new_parts(|| {
         _sphere_band(
             "hood",
@@ -410,7 +411,7 @@ pub fn nap_pod() -> Vec<Obj> {
             HOOD_R,
             HOOD_R + 0.02,
             (-62.0, 62.0),
-            (-108.0, -20.0),
+            (-96.0, -20.0),
             M.hood,
             18,
             12,
