@@ -23,7 +23,6 @@ mod organic;
 use super::grey_detail;
 use super::jpeg::{self, Chroma};
 use super::pil::Img;
-use crate::content;
 use std::f64::consts::FRAC_1_SQRT_2;
 use std::path::Path;
 
@@ -457,7 +456,7 @@ pub fn run(only: &[&str]) -> Result<(), String> {
             return Err(format!("unknown texture set: {name}"));
         }
     }
-    let assets = content::root().join("web/public/assets");
+    let assets = crate::repo_root().join("web/public/assets");
     for set in SETS {
         if !only.is_empty() && !only.contains(&set.name) {
             continue;

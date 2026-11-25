@@ -35,7 +35,7 @@ pub fn main_with(args: &[String]) -> i32 {
         ["leafcards"] => leafcards::run(None),
         ["leafcards", out] => leafcards::run(Some(out)),
         ["materials"] => {
-            finish_faults(&crate::content::root().join("web/public/assets")).and_then(|faults| {
+            finish_faults(&crate::repo_root().join("web/public/assets")).and_then(|faults| {
                 if faults.is_empty() {
                     std::fs::write("materials.json", materials_json())
                         .map_err(|e| format!("materials.json: {e}"))
@@ -344,7 +344,7 @@ mod tests {
     /// their names say.
     #[test]
     fn finishes_are_plausible() {
-        let faults = finish_faults(&crate::content::root().join("web/public/assets")).unwrap();
+        let faults = finish_faults(&crate::repo_root().join("web/public/assets")).unwrap();
         assert!(faults.is_empty(), "{}", faults.join("\n"));
         let entries: serde_json::Value = serde_json::from_str(&materials_json()).unwrap();
         for (finish, metal, class) in [
@@ -394,10 +394,8 @@ mod tests {
         let read = |text: &str| -> serde_json::Value { serde_json::from_str(text).unwrap() };
         let ours = read(&materials_json());
         let manifest = read(
-            &std::fs::read_to_string(
-                crate::content::root().join("web/public/assets/manifest.json"),
-            )
-            .unwrap(),
+            &std::fs::read_to_string(crate::repo_root().join("web/public/assets/manifest.json"))
+                .unwrap(),
         );
         let finishes = |entries: &serde_json::Value| -> Vec<(String, serde_json::Value)> {
             entries
@@ -414,7 +412,7 @@ mod tests {
     /// clouds.py made the committed cloud layer; the port makes the same pixels.
     #[test]
     fn clouds_match_the_committed_layer() {
-        let path = crate::content::root().join("web/public/assets/textures/sky/clouds.png");
+        let path = crate::repo_root().join("web/public/assets/textures/sky/clouds.png");
         let committed = image::open(path).unwrap().to_rgba8();
         assert_eq!(committed.dimensions(), (CW as u32, CH as u32));
         assert!(committed.into_raw() == clouds_rgba());

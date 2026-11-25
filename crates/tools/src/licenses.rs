@@ -15,7 +15,7 @@
 //!
 //! Identical texts (the Apache-2.0 licence of many crates) are printed once and referred to.
 
-use crate::characters::repo_root;
+use crate::repo_root;
 use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;

@@ -18,7 +18,7 @@
 
 use crate::download::sha256_hex;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub const USAGE: &str = "usage: cargo pins [--list]
        cargo pins --update <name> --by <who> --reason <why>
@@ -137,10 +137,6 @@ pub fn pinned_text(
     Err(format!("`export const {name}` never closes"))
 }
 
-fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
-}
-
 fn hash_of(root: &Path, pin: &Pin) -> Result<String, String> {
     let content = std::fs::read_to_string(root.join(&pin.file))
         .map_err(|_| format!("{} is missing", pin.file))?;
@@ -184,7 +180,7 @@ pub fn check(root: &Path, pins: &[Pin], list: bool) -> (Vec<String>, usize) {
 }
 
 fn run(args: &[&str]) -> Result<i32, String> {
-    let root = root();
+    let root = crate::repo_root();
     let path = root.join("tools/pins/pins.json");
     let text = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
     let mut file: File = serde_json::from_str(&text).map_err(|e| format!("pins.json: {e}"))?;
@@ -317,7 +313,7 @@ mod tests {
 
     #[test]
     fn the_repo_s_pins_hold() {
-        let root = root();
+        let root = crate::repo_root();
         let file: File = serde_json::from_str(
             &std::fs::read_to_string(root.join("tools/pins/pins.json")).unwrap(),
         )
@@ -329,7 +325,7 @@ mod tests {
 
     #[test]
     fn the_file_is_written_as_it_is_kept() {
-        let path = root().join("tools/pins/pins.json");
+        let path = crate::repo_root().join("tools/pins/pins.json");
         let text = std::fs::read_to_string(path).unwrap();
         let file: File = serde_json::from_str(&text).unwrap();
         assert_eq!(

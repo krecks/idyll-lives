@@ -494,7 +494,7 @@ pub(super) fn save(picture: &Picture, out: &Path) -> Result<(), String> {
 pub fn run(out: Option<&str>) -> Result<(), String> {
     let dir = match out {
         Some(dir) => Path::new(dir).to_path_buf(),
-        None => crate::content::root().join("web/public/assets/textures/leafcards"),
+        None => crate::repo_root().join("web/public/assets/textures/leafcards"),
     };
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let picture = atlas();

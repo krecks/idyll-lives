@@ -179,10 +179,7 @@ voice styles (F1-F5, M1-M5) are unchanged.
 ";
 
 fn out() -> PathBuf {
-    crate::characters::repo_root()
-        .join("web")
-        .join("public")
-        .join("voice")
+    crate::repo_root().join("web").join("public").join("voice")
 }
 
 /// Where a published file is saved: its last path part, but the licence as a `.txt` so a static

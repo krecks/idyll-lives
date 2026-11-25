@@ -45,7 +45,7 @@ fn flags(names: bool) -> Vec<String> {
 }
 
 fn web() -> PathBuf {
-    crate::characters::repo_root().join("web")
+    crate::repo_root().join("web")
 }
 
 /// binaryen's folder: `web/node_modules/binaryen`, or wherever it was hoisted to.

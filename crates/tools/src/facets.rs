@@ -23,7 +23,7 @@ use crate::checkglb::py::J;
 use crate::checkglb::{applied, node_matrices, override_of, primitives};
 use crate::vec3::{cross, dot, length, sub};
 use std::collections::{BTreeMap, HashMap};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// How far a curve may stand off its chord before its outline shows flat sides, in metres.
 pub const SAGITTA: f64 = 0.0015;
@@ -253,10 +253,6 @@ pub fn of_model(key: &str, family: &str, materials: Option<&J>, g: &Glb) -> R<Fo
     Ok(found)
 }
 
-fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
-}
-
 /// Every model the manifests under `assets` name (not their far versions), measured.
 pub fn survey(assets: &Path) -> Result<Vec<Found>, String> {
     let mut files = Vec::new();
@@ -383,7 +379,7 @@ pub fn main(args: &[String]) -> i32 {
         args.iter().any(|a| a == "--all"),
         args.iter().any(|a| a == "--check"),
     );
-    let found = match survey(&root().join("web/public/assets")) {
+    let found = match survey(&crate::repo_root().join("web/public/assets")) {
         Ok(found) => found,
         Err(e) => {
             eprintln!("review facets: {e}");
@@ -564,7 +560,7 @@ mod tests {
 
     #[test]
     fn the_shipped_models_are_read() {
-        let found = survey(&root().join("web/public/assets")).unwrap();
+        let found = survey(&crate::repo_root().join("web/public/assets")).unwrap();
         assert!(found.len() > 600, "{} models", found.len());
         assert!(found.iter().all(|f| f.triangles > 0));
         // (A report for now: what the kit's rounder defaults and the soft forms bring down.)

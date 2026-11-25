@@ -28,10 +28,6 @@ pub const RANGE: [f64; 2] = [0.02, 0.80];
 /// The least a metal reflects face on.
 pub const METAL_LEAST: f64 = crate::pbr::METAL_LUMINANCE_LEAST;
 
-fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
-}
-
 /// sRGB-encoded 0..1 as the game's materials decode a texture (`pow(c, 2.2)`).
 fn decode(v: f64) -> f64 {
     v.powf(2.2)
@@ -252,7 +248,7 @@ pub fn main(args: &[String]) -> i32 {
         args.iter().any(|a| a == "--all"),
         args.iter().any(|a| a == "--check"),
     );
-    let (models, checked, mut found) = match survey(&root().join("web/public/assets")) {
+    let (models, checked, mut found) = match survey(&crate::repo_root().join("web/public/assets")) {
         Ok(survey) => survey,
         Err(e) => {
             eprintln!("review colours: {e}");
@@ -402,7 +398,8 @@ mod tests {
 
     #[test]
     fn the_shipped_models_are_read() {
-        let (models, checked, found) = survey(&root().join("web/public/assets")).unwrap();
+        let (models, checked, found) =
+            survey(&crate::repo_root().join("web/public/assets")).unwrap();
         assert!(models > 600, "{models} models");
         assert!(checked[0] > 2000 && checked[1] > 300, "{checked:?} colours");
         // (A report for now: how many are out of range is what the palette pass brings down.)

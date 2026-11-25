@@ -42,15 +42,6 @@ turns freely at home gets `"freeRotation": true` when Validate itself doesn't tu
 turning while it's checked; signing off carries an item's own `"freeRotation"` back with it unchanged.
 "#;
 
-/// The repo root (the Python script's `ROOT`).
-pub fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(Path::parent)
-        .expect("crates/tools sits two below the root")
-        .to_path_buf()
-}
-
 /// A path as Python's `Path(s)` spells it: no `.` components, no doubled or trailing slashes.
 pub fn py_path(s: &str) -> PathBuf {
     let out: PathBuf = Path::new(s)

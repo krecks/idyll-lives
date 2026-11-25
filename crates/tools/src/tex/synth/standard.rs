@@ -6,7 +6,6 @@
 
 use super::{LEVEL, SETS, Set, UNIT, normal_stats, set_of_texture};
 use crate::colours;
-use crate::content;
 use crate::tex::pil::Img;
 use serde_json::Value;
 use std::sync::OnceLock;
@@ -91,7 +90,7 @@ struct Loaded {
 fn loaded() -> &'static Loaded {
     static LOADED: OnceLock<Loaded> = OnceLock::new();
     LOADED.get_or_init(|| {
-        let assets = content::root().join("web/public/assets");
+        let assets = crate::repo_root().join("web/public/assets");
         let open = |set: &Set, map: &str| {
             let path = assets.join(set.dir()).join(map);
             Img::open(&path).unwrap_or_else(|e| panic!("{e}"))

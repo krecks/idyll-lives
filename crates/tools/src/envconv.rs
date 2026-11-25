@@ -65,11 +65,11 @@ const MAX_TEXELS: usize = 1 << 28;
 
 /// Where the downloaded HDRI is kept (ignored by git, as `web/.assets/` is).
 pub fn hdri_path() -> PathBuf {
-    crate::characters::repo_root().join("web/.assets/env/belfast_open_field_1k.hdr")
+    crate::repo_root().join("web/.assets/env/belfast_open_field_1k.hdr")
 }
 
 pub fn pcenv_path() -> PathBuf {
-    crate::characters::repo_root().join("web/public/assets/env/belfast_open_field.pcenv")
+    crate::repo_root().join("web/public/assets/env/belfast_open_field.pcenv")
 }
 
 pub fn main_with(args: &[String]) -> i32 {

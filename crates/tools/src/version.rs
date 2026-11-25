@@ -6,7 +6,7 @@
 //!   cargo release-version 0.3.0    set all three to 0.3.0 (then: commit, `git tag v0.3.0`; pushing the tag
 //!                          publishes the game, see .github/workflows/pages.yml)
 
-use crate::characters::repo_root;
+use crate::repo_root;
 use regex::Regex;
 use std::path::Path;
 

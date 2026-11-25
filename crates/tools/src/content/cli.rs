@@ -98,7 +98,7 @@ fn dash(s: &Option<String>) -> String {
 
 /// Runs the tool; stdout goes to `out`.
 pub fn run(a: &Args, out: &mut dyn std::io::Write) -> Result<(), Exit> {
-    let root = root();
+    let root = crate::repo_root();
     let content = a
         .content
         .as_deref()
