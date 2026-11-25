@@ -116,6 +116,13 @@ branch was checked with the CI's own first two steps — `cargo fmt --all --chec
 `cargo clippy --workspace --all-targets --locked -- -D warnings` — both clean; `audit/bugs` and
 `audit/split` each carry one extra style-only commit for the formatting those checks caught.
 
+`audit/all` is the integration branch: `audit/report` plus every code commit of the five area branches
+(bugs, performance, maintainability, split, simplification, in that order). Two cherry-picks collided
+and were resolved by hand — the snapshot's size assert now sits in `write_with`, the function that
+does the writing, and B3's saturating pay keeps S2's single `household` index. Its checks: `cargo fmt
+--all --check` and `cargo clippy --workspace --all-targets --locked -- -D warnings` clean, `sim-core`
+229 + 869 and `ll-tools` 290 tests passing, 0 failed.
+
 ### Measured: `audit/performance` before and after
 
 `cargo run --release --example tickbench` (starter lot, 4 sims, one day, three runs each):
