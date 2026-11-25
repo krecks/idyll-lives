@@ -11,8 +11,8 @@
 
 pub(crate) mod jpeg;
 pub mod leafcards;
-pub mod pil;
 pub mod materials;
+pub mod pil;
 pub mod synth;
 
 pub use materials::*;
