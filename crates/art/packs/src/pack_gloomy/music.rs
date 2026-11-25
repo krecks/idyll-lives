@@ -4,7 +4,7 @@ use super::common::{M, WALL, candle, leg, open_book, vase};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::math::{Axis, P3, PI, TAU, cos, cosd, pow, sin, sind, sqrt};
 use artkit::motion::{Spin, spin};
-use artkit::parts::{hinged, join, new_parts, numbered};
+use artkit::parts::{aside, hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::rand::Random;
 use artkit::scene::Obj;
@@ -130,7 +130,7 @@ pub fn record_cabinet() -> Vec<Obj> {
             (-0.2, 0.33, -0.1),
             M.vinyl,
             rot = (0, 90, 0),
-            verts = 24,
+            verts = 16,
             smooth = false
         );
         fcyl!(
@@ -172,8 +172,8 @@ pub fn record_cabinet() -> Vec<Obj> {
                 numbered("door_slat"),
                 0.03,
                 0.32,
-                0.014,
-                (0.03 + pitch * (k as f64 + 0.5), 0.355, zf + 0.002),
+                0.011, // (under 12 mm: a board's edge, left sharp)
+                (0.03 + pitch * (k as f64 + 0.5), 0.355, zf + 0.0035),
                 M.slat
             );
         }
@@ -282,7 +282,7 @@ pub fn record_cabinet() -> Vec<Obj> {
                 (0.0, 0.027),
             ],
             M.chrome,
-            segments = 10
+            segments = 8
         );
         kit::tube!(
             f,
@@ -307,7 +307,7 @@ pub fn record_cabinet() -> Vec<Obj> {
             (-0.075, 0.624, -0.39),
             M.chrome,
             rot = (90, 0, 0),
-            verts = 12
+            verts = 8
         );
         fbox!(
             f,
@@ -356,7 +356,11 @@ pub fn record_cabinet() -> Vec<Obj> {
             );
         }
         candle(f, 0.34, TOP, -0.12, 0.1, 0.03, true, true, 2, 3);
-        // a floor vase of dried branches at the front right, each branching, with honesty-pod seed heads
+    });
+    join(&still, "body", Some(P3::ZERO));
+    // a floor vase of dried branches at the front right, each branching, with honesty-pod seed heads: drawn, not
+    // the cabinet's size
+    let floor = new_parts(|| {
         let top = vase(f, 0.33, 0.0, 0.3, 1.2);
         for (a, (dx, dz, h)) in [(-0.04, -0.02, 0.4), (0.06, 0.02, 0.33), (0.0, 0.05, 0.36)]
             .into_iter()
@@ -400,7 +404,7 @@ pub fn record_cabinet() -> Vec<Obj> {
                     end,
                     M.dried,
                     rot = (90, 0, 30 * a + 50 * k as i32),
-                    verts = 7,
+                    verts = 5,
                     smooth = false
                 );
             }
@@ -417,13 +421,13 @@ pub fn record_cabinet() -> Vec<Obj> {
                     ),
                     M.dried,
                     rot = (90, 0, 40 * k + 20 * a),
-                    verts = 7,
+                    verts = 5,
                     smooth = false
                 );
             }
         }
     });
-    join(&still, "body", Some(P3::ZERO));
+    aside(&floor, "vase");
     // The platter and its record, origin on the spindle: `platter_spin` turns it (33 rpm) while the record plays.
     let plat = new_parts(|| {
         kit::turned!(
@@ -434,7 +438,7 @@ pub fn record_cabinet() -> Vec<Obj> {
             zc,
             &[(0.0, 0.0), (0.131, 0.0), (0.131, 0.012), (0.0, 0.012)],
             M.platter,
-            segments = 28
+            segments = 20
         );
         kit::turned!(
             f,
@@ -450,7 +454,7 @@ pub fn record_cabinet() -> Vec<Obj> {
                 (0.0, 0.016),
             ],
             M.vinyl,
-            segments = 28
+            segments = 20
         );
         fcyl!(
             f,
@@ -459,7 +463,7 @@ pub fn record_cabinet() -> Vec<Obj> {
             0.002,
             (-0.225, 0.617, zc),
             M.label,
-            verts = 16
+            verts = 12
         );
         fbox!(
             f,
@@ -549,8 +553,10 @@ fn cello_body(f: &GameFrame) {
         (0.35, -0.071),
         (0.72, -0.066),
         (0.93, -0.056),
+        (0.975, -0.052), // (the edges round onto the ribs)
         (1.0, -0.045),
         (1.0, 0.04),
+        (0.975, 0.047),
         (0.93, 0.052),
         (0.72, 0.061),
         (0.35, 0.066),
@@ -672,14 +678,13 @@ fn cello_body(f: &GameFrame) {
         holes = vec![heart]
     );
     // the neck, its fingerboard, the nut, the pegbox with its pegs, the scroll
-    let prof: Vec<(f64, f64)> = (0..9)
-        .map(|i| {
-            (
-                0.0225 * cos(PI * i as f64 / 8.0),
-                0.03 * sin(PI * i as f64 / 8.0),
-            )
-        })
-        .collect();
+    // (its flat face's edges chamfered onto the round)
+    let mut prof = vec![(0.0195, 0.0)];
+    prof.extend((0..9).map(|i| {
+        let a = 0.1 + (PI - 0.2) * i as f64 / 8.0;
+        (0.0225 * cos(a), 0.03 * sin(a))
+    }));
+    prof.push((-0.0195, 0.0));
     fsweep!(
         f,
         "neck",
@@ -747,7 +752,7 @@ fn cello_body(f: &GameFrame) {
         f,
         "scroll",
         (x, 1.335, z + 0.045),
-        (1.385, z + 0.04),
+        (1.383, z + 0.04),
         M.varnish,
         turns = -1.2,
         end = 0.22,
@@ -1097,7 +1102,10 @@ pub fn cello() -> Vec<Obj> {
             (bx, 0.62, bz + 0.022),
             M.page
         );
-        // an open book of music on the floor, and a candle on a dish at the left
+    });
+    join(&still, "body", Some(P3::ZERO));
+    // an open book of music on the floor, and a candle on a dish at the left: drawn, not the set's size
+    let floor = new_parts(|| {
         open_book(
             f,
             "music",
@@ -1113,7 +1121,7 @@ pub fn cello() -> Vec<Obj> {
         );
         candle(f, -0.267, 0.0, -0.2, 0.16, 0.035, true, true, 3, 5);
     });
-    join(&still, "body", Some(P3::ZERO));
+    aside(&floor, "floor");
     // The cello, built upright on its stand with its origin on the end pin's foot: `off_stand` moves it across
     // to between the player's knees and leans it back 14 degrees.
     let body = new_parts(|| cello_body(f));

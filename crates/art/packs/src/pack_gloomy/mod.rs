@@ -24,7 +24,7 @@ pub fn family() -> Family {
         "pack_gloomy",
         M.palette(),
         vec![
-            Model::new("recordCabinet", music::record_cabinet, (0.9, 0.925, 0.814))
+            Model::new("recordCabinet", music::record_cabinet, (0.9, 0.925, 0.482))
                 .key("model.gloomy.recordCabinet")
                 .centre(0.0, -0.025)
                 .motions(
@@ -32,7 +32,7 @@ pub fn family() -> Family {
                                 "loops": {"listen": "platter_spin", "newAlbum": "platter_spin"}}),
                 )
                 .paint(&[("walnut", "Body"), ("ink", "Trim")]),
-            Model::new("cello", music::cello, (0.78, 1.427, 0.741))
+            Model::new("cello", music::cello, (0.651, 1.427, 0.741))
                 .key("model.gloomy.cello")
                 .centre(0.06, 0.091)
                 .motions(json!({"uses": {"practise": "off_stand", "lament": "off_stand"}}))
@@ -42,17 +42,17 @@ pub fn family() -> Family {
                 .centre(0.0, 0.043)
                 .motions(json!({"uses": {"journal": "candle", "poetry": "candle"}}))
                 .paint(&[("rosewood", "Body"), ("plum", "Trim")]),
-            Model::new("rainLamp", rain::rain_lamp, (0.804, 1.498, 0.618))
+            Model::new("rainLamp", rain::rain_lamp, (0.44, 1.498, 0.44))
                 .key("model.gloomy.rainLamp")
                 .centre(0.0, 0.039)
                 .motions(json!({"uses": {"watchRain": "rain"}, "idle": "ripple"}))
                 .paint(&[("slate", "Body"), ("umbrella", "Trim")]),
-            Model::new("windowSeat", seat::window_seat, (1.84, 1.97, 0.706))
+            Model::new("windowSeat", seat::window_seat, (1.84, 0.786, 0.65))
                 .key("model.gloomy.windowSeat")
                 .centre(0.0, -0.077)
                 .motions(json!({"uses": {"brood": "sink_in", "doze": "sink_in"}}))
                 .paint(&[("bench", "Body"), ("cushion", "Cushion"), ("frame", "Trim")]),
-            Model::new("soakingTub", seat::soaking_tub, (1.86, 0.922, 1.85))
+            Model::new("soakingTub", seat::soaking_tub, (1.86, 0.754, 1.85))
                 .key("model.gloomy.soakingTub")
                 .centre(0.0, -0.005)
                 .motions(json!({"uses": {"soak": "fill"}}))

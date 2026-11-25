@@ -17,14 +17,14 @@ fn arch_hole(cx: f64, w: f64, y0: f64, y1: f64) -> Vec<(f64, f64)> {
     let spring = y1 - sqrt(r * r - pow(r - w / 2.0, 2.0));
     let mut pts = vec![(cx - w / 2.0, y0), (cx + w / 2.0, y0)];
     let a0 = artkit::math::acos((r - w / 2.0) / r); // where each arc meets the middle
-    for k in 0..5 {
+    for k in 0..4 {
         // up the right side from the spring to the apex
-        let a = a0 * k as f64 / 5.0;
+        let a = a0 * k as f64 / 4.0;
         pts.push((cx + w / 2.0 - r + r * cos(a), spring + r * sin(a)));
     }
     pts.push((cx, y1));
-    for k in (0..5).rev() {
-        let a = a0 * k as f64 / 5.0;
+    for k in (0..4).rev() {
+        let a = a0 * k as f64 / 4.0;
         pts.push((cx - w / 2.0 + r - r * cos(a), spring + r * sin(a)));
     }
     pts
@@ -108,7 +108,9 @@ pub fn journal_desk() -> Vec<Obj> {
             0.03,
             (0, 0.82, 0.435),
             M.rosewood,
-            holes = holes
+            holes = holes,
+            bevel = 0.004,
+            bevel_segments = 1
         );
         fbox!(
             f,
@@ -175,7 +177,7 @@ pub fn journal_desk() -> Vec<Obj> {
                 (0.009, 0.052),
             ],
             M.inkwell,
-            verts = 16,
+            verts = 12,
             square = 4.0
         );
         torus!(
@@ -296,7 +298,7 @@ pub fn journal_desk() -> Vec<Obj> {
                 (0.0, 0.008),
             ],
             M.brass,
-            segments = 22
+            segments = 16
         );
         candle(
             f,
@@ -390,8 +392,8 @@ pub fn journal_desk() -> Vec<Obj> {
                 0.017,
                 (x, 1.18, -0.356),
                 M.walnut,
-                segments = 10,
-                rings = 6
+                segments = 8,
+                rings = 5
             );
             fsweep!(
                 f,
@@ -463,16 +465,6 @@ pub fn journal_desk() -> Vec<Obj> {
             scale = (1, 1, 2.2),
             segments = 10,
             rings = 6
-        );
-        fsphere!(
-            f,
-            "flame_core",
-            0.008,
-            (wx, wy + 0.018, wz),
-            M.candle_flame,
-            scale = (1, 1, 1.8),
-            segments = 8,
-            rings = 5
         );
     });
     let flame = join(&fl, "flame", Some(f.at(wx, wy, wz)));
