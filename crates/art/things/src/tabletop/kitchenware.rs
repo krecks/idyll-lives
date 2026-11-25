@@ -121,7 +121,7 @@ fn _slice(name: &str, at: (f64, f64, f64), material: Mat, inner: Mat, w: f64, h:
         (-w * 0.47, h * 0.4),
         (-w / 2.0, h * 0.16),
     ];
-    slab!(name, &pts, 0.014, at, material);
+    slab!(name, &pts, 0.014, at, material, bevel = 0.003);
     let crumb: Vec<(f64, f64)> = pts
         .iter()
         .map(|&(u, v)| (u * 0.88, v * 0.88 - h * 0.03))
@@ -573,7 +573,8 @@ fn _mixer_body() {
         &[
             (0.15, 0.085, 0.0),
             (0.15, 0.085, 0.028),
-            (0.142, 0.078, 0.04)
+            (0.146, 0.081, 0.037), // its top edge rounded over
+            (0.138, 0.074, 0.04)
         ],
         M.mixer,
         verts = 16,
@@ -1376,7 +1377,8 @@ pub fn spice_jars() -> Vec<Obj> {
             0.012,
             (s as f64 * 0.144, 0.0, 0.0),
             M.rack,
-            plane = Plane::YZ
+            plane = Plane::YZ,
+            bevel = 0.003
         );
     }
     box_!("back", (0.276, 0.008, 0.052), (0, 0.054, 0.036), M.rack);

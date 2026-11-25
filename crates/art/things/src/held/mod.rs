@@ -458,7 +458,7 @@ pub fn family() -> Family {
             i(
                 "seedBag",
                 seed_bag,
-                (0.086, 0.119, 0.056),
+                (0.084, 0.119, 0.056),
                 "tool.seedBag",
                 O,
                 true,

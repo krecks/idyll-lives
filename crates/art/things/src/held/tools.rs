@@ -293,7 +293,8 @@ pub fn bite_cracker() -> Vec<Obj> {
         0.012,
         M.cheese_cut,
         M.cheese_cut,
-        sides = vec![M.cheese_cut, M.cheese, M.cheese_cut]
+        sides = vec![M.cheese_cut, M.cheese, M.cheese_cut],
+        bevel = 0.002
     );
     done("biteCracker")
 }

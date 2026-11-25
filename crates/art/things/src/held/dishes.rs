@@ -16,7 +16,9 @@ use artkit::{cylinder, fextrude, fsweep, jitter};
 /// A ring of the paper bag at height `y`: its front and back flat, each side folded in by `pinch` at its
 /// middle (the gussets).
 pub fn _bag_ring(y: f64, hw: f64, hd: f64, pinch: f64) -> Vec<(f64, f64, f64)> {
-    let pts = [
+    // from the left gusset round, closed on it; the paper creased round at its four corners
+    let mut pts = vec![
+        (-hw + pinch, 0.0),
         (-hw, hd),
         (-hw / 3.0, hd),
         (hw / 3.0, hd),
@@ -28,6 +30,10 @@ pub fn _bag_ring(y: f64, hw: f64, hd: f64, pinch: f64) -> Vec<(f64, f64, f64)> {
         (-hw, -hd),
         (-hw + pinch, 0.0),
     ];
+    for corner in [9, 6, 4, 1] {
+        pts = crate::common::round_at(&pts, corner, 0.004);
+    }
+    pts.pop();
     pts.iter().rev().map(|&(px, pz)| (px, y, pz)).collect()
 }
 
@@ -543,7 +549,8 @@ pub fn tasting_board() -> Vec<Obj> {
         0.07,
         M.cheese_cut,
         M.cheese_cut,
-        sides = vec![M.cheese_cut, M.cheese, M.cheese_cut]
+        sides = vec![M.cheese_cut, M.cheese, M.cheese_cut],
+        bevel = 0.002
     );
     for (i, (x, z, yaw)) in [(-0.075, 0.0, 20.0), (-0.095, 0.03, 55.0)]
         .into_iter()
@@ -649,10 +656,7 @@ pub fn tasting_board() -> Vec<Obj> {
 
 /// An oval serving platter, 40 by 28 cm, its rim rolled.
 fn _platter() {
-    let mut mats = vec![M.china; 6];
-    mats.push(M.china_well);
-    lathe!(
-        "platter",
+    let profile = crate::common::round_at(
         &[
             (0.0, 0.0),
             (0.15, 0.0),
@@ -661,8 +665,16 @@ fn _platter() {
             (0.196, 0.02),
             (0.188, 0.0192),
             (0.15, 0.01),
-            (0.0, 0.01)
+            (0.0, 0.01),
         ],
+        3,
+        0.0008,
+    );
+    let mut mats = vec![M.china; profile.len() - 2];
+    mats.push(M.china_well);
+    lathe!(
+        "platter",
+        &profile,
         mats,
         segments = 28,
         scale = (1.0, 0.7)
@@ -739,7 +751,7 @@ pub fn _corn(
             .collect();
     }
     let wave = if kernels {
-        Some((7, (2..prof.len() - 2).map(|k| (k, 0.1)).collect()))
+        Some((7, (2..prof.len() - 2).map(|k| (k, 0.06)).collect()))
     } else {
         None
     };
