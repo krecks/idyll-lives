@@ -15,11 +15,12 @@ use artkit::perch::Find;
 use artkit::scene::Obj;
 use artkit::{bough, fruiting, hang, leaves, lump, tube};
 
-const CENTRE: (f64, f64, f64) = (0.0, 0.0, 2.6);
-const RADII: (f64, f64, f64) = (1.5, 1.5, 1.15);
+// (its top 14 cm lower than it was, its underside where it was: a semi-dwarf stands 3-4 m)
+const CENTRE: (f64, f64, f64) = (0.0, 0.0, 2.53);
+const RADII: (f64, f64, f64) = (1.5, 1.5, 1.08);
 
 // The apple tree's low fruit (I-garden-11, I-garden-12): a garden apple (a semi-dwarf) carries its fruit from about
-// 1.1 m up, so its crown's middle stands at 2.6 m (its leaves from 1.6 m up) and laden boughs hang out of it in
+// 1.1 m up, so its crown's middle stands at 2.53 m (its leaves from 1.6 m up) and laden boughs hang out of it in
 // front, under the crown's edge, apples on spurs along them. Each apple is (to the right of a picker facing the
 // tree, out in front of the trunk, its bottom), in metres. `PICKED` is the one a resident picks to eat (its own
 // part: it shrinks away), low enough for every size of picker, a child on tiptoe too (`FRUIT.apple` and
@@ -92,6 +93,8 @@ pub fn species() -> Species {
         },
         leaves: &["#52803A", "#629040", "#74A048", "#86AE52", "#98BC5E"],
         tiles: Tiles::of("apple"),
+        // the fourth apple a paler, streaked red (the trees' yellow, 42°, isn't a red dessert apple's)
+        colours: &[("fruit4", "#D2503A")],
         // a short, crooked trunk opening low into gnarled limbs that spread wide, a round crown on them
         trunk: Stage::Spec(Trunk {
             pts: vec![

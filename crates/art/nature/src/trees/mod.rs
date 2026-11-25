@@ -57,7 +57,7 @@ pub fn family() -> Family {
                     .key("model.tree.blossom"),
             ),
             tree(
-                Model::new("apple", apple::apple, (4.29, 4.106, 4.642))
+                Model::new("apple", apple::apple, (4.29, 3.978, 4.642))
                     .key("model.tree.fruit")
                     .motions(json!({
                         "uses": {
