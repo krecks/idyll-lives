@@ -17,8 +17,7 @@ palette! { M:
     pull = ("#7A5638", wood),        // the dresser's jewellery box
     ebony = ("#2B2C2E", wood),       // the dark gap behind a wood drawer
     brass = ("#B8925A", metal),      // brass handles, knobs and pulls, the bench's frame and the lamp's stem
-    iron = ("#2B2C2E", metal),       // black metal: the modern nightstand's pulls, the chest's straps
-    pull_black = ("#2B2C2E", wood),  // the low dresser's pulls: black-stained wood, so they draw with its oak
+    iron = ("#2B2C2E", metal),       // black metal: the modern nightstand's and low dresser's pulls, the chest's straps
     white = ("#F1F0EC", satin),      // painted white: the modern nightstand and the two wardrobes
     birch = ("#CDB08A", satin),      // the wardrobe's doors
     plinth = ("#2F3236", satin),     // plinths, and the dark gap behind a painted drawer

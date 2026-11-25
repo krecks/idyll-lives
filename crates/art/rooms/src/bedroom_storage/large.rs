@@ -707,7 +707,7 @@ pub fn dresser_low() -> Vec<Obj> {
                     y + 0.032,
                     front_z + 0.02,
                     0.14,
-                    M.pull_black,
+                    M.iron,
                     r = 0.005,
                     out = 0.016
                 );
@@ -733,7 +733,7 @@ pub fn dresser_low() -> Vec<Obj> {
                 0.467,
                 front_z + 0.02,
                 0.14,
-                M.pull_black,
+                M.iron,
                 r = 0.005,
                 out = 0.016
             );

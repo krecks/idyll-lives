@@ -115,7 +115,7 @@ pub fn family() -> Family {
                 .key("model.dresserLow")
                 .centre(0.0, -0.1125)
                 .motions(motions(CHANGE_DRAWER))
-                .paint(&[("oak", "Body"), ("pull_black", "Handles")]),
+                .paint(&[("oak", "Body"), ("iron", "Handles")]),
             Model::new("wardrobeSingle", large::wardrobe_single, (0.6, 2.28, 0.617))
                 .key("model.wardrobeSingle")
                 .centre(0.0, -0.1215)
