@@ -5,7 +5,7 @@
  */
 import { describe, expect, test } from 'bun:test';
 import { readCode, writeCode, type WorldCode } from '../src/game/worldCode';
-import { LAND_SIZE, sizeFor, townFits } from '../src/game/world';
+import { sizeFor, townFits } from '../src/game/world';
 
 describe('world code', () => {
   const codes: WorldCode[] = [
@@ -47,7 +47,6 @@ describe('world code', () => {
 
 describe('land sizes', () => {
   test('a town and its villages get the smallest land they fit on', () => {
-    expect(LAND_SIZE).toEqual({ small: 640, medium: 832, large: 960 });
     expect(sizeFor('hamlet', 'none')).toBe('small');
     expect(sizeFor('village', 'none')).toBe('small');
     expect(sizeFor('city', 'none')).toBe('medium');

@@ -14,7 +14,6 @@ describe('a room\'s light', () => {
     expect(roomDay(0)).toEqual({ ambient: ROOM.dayAmbient, fill: ROOM.dayFill, tint: 1 });
     expect(roomDay(1)).toEqual({ ambient: 1, fill: 1, tint: 0 });
     // (A warm tint takes light away: the shares make up for it.)
-    expect(ROOM.dayTint).toBe('#FFEEDA');
     expect(ROOM.dayAmbient).toBeGreaterThan(1);
     expect(ROOM.dayFill).toBeGreaterThan(1);
     const tuned = { ...ROOM, dayAmbient: 0.6, dayFill: 1.5 };

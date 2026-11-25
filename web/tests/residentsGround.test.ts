@@ -2,63 +2,25 @@
 // on the ground there, not at the flat 0 of what's built (sunk into a hill, floating over a hollow), and with no land
 // given (or flat land) nothing changes. On a land the town follows a step in the ground (onto a lot's pad, over a
 // kerb) is eased over a few frames, not taken at once. `bun test`.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { readFileSync, existsSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { standInView } from './support/residentView';
+import { loadContent, usePublicFetch } from './support/content';
 import { TICK_RATES, TICKS_PER_SECOND } from './snapshotLayout';
 
-const WEB = new URL('../', import.meta.url).pathname;
-
 describe('residents on the land', async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
+  usePublicFetch();
   const { AssetRegistry } = await import('../src/assets/registry');
   const { Characters, MAX_CHARACTERS } = await import('../src/render/shared/characters/residents');
-  const { TemplateCache } = await import('../src/render/shared/templateCache');
   const { Pose, simFields } = await import('../src/core/snapshot');
   type View = import('../src/render/shared/characters/view').ResidentView<object, object, import('../src/render/shared/characters/view').ResidentProp>;
   type SnapshotLayout = import('../src/core/snapshot').SnapshotLayout;
   type FrameState = import('../src/core/bridge').FrameState;
   type SimInfo = import('../src/core/protocol').SimInfo;
 
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json');
 
-  const view: View = {
-    init: () => {},
-    setMorphs: () => {},
-    uploadPoses: () => {},
-    uploadPoseRows: () => {},
-    createPart: () => ({}),
-    partEnabled: () => {},
-    setPartRows: () => {},
-    partRows: () => {},
-    quiltMaterial: () => {},
-    createQuilt: () => ({}),
-    quiltRows: () => {},
-    quiltEnabled: () => {},
-    createRing: () => {},
-    ringMoved: () => {},
-    props: new TemplateCache<import('../src/render/shared/characters/view').ResidentProp | null>({ retell: () => {}, gone: () => false, hide: () => {}, dispose: () => {} }),
-    async buildProp(key) {
-      return { key, matrices: new Float32Array(MAX_CHARACTERS * 16), top: [0, 0, 0] as const };
-    },
-    showProp: () => {},
-    onModelFile: () => () => {},
-    fileColour: async () => undefined,
-    camera: () => false,
-    onDispose: () => {},
-  };
+  const view: View = standInView();
 
   const sims: SimInfo[] = [
     {

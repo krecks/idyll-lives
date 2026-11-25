@@ -335,7 +335,7 @@ describe('the street in chunks', async () => {
   };
   const { blankLand, encodeLand, LAND_CELL } = await import('../src/game/land');
   const { surfaceOf } = await import('../src/render/shared/landSurface');
-  const { ROAD_Y, WALK_Y } = await import('../src/render/shared/roads');
+  const { ROAD_Y } = await import('../src/render/shared/roads');
   /** `world` on a land rising 6 % along x and 3 % along z, its town following it (or drawn, `seeded`). */
   const onLand = (world: WorldStructure, seeded: 'follow' | 'drawn' = 'follow'): WorldStructure => {
     const land = blankLand(world.width, world.depth, seeded);
@@ -396,8 +396,6 @@ describe('the street in chunks', async () => {
     const xs = (c: ChunkPlan) => c.silhouettes.parts.map((q) => q.geo.pos.filter((_, k) => k % 3 !== 1).join(','));
     expect(xs(b)).toEqual(xs(a));
     for (const cid of street.chunkIds()) expect(street.chunk(cid, NO_FOCUS).props.pos.length).toBe(flat.chunk(cid, NO_FOCUS).props.pos.length);
-    // A lamp's post on the sidewalk: its foot at the walk's height over the road there.
-    void WALK_Y;
   });
 
   test('a chunk whose heights moved is planned again (its key has the heights in it)', () => {

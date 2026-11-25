@@ -6,6 +6,7 @@
 // (Why: as a spike the part sat in every body's file, 1.29 MB gzipped of the 5.14 MB a player fetched, and was
 // thrown away at load.)
 import { afterAll, describe, expect, test } from 'bun:test';
+import { standInView } from './support/residentView';
 import { existsSync, readFileSync } from 'node:fs';
 
 const WEB = new URL('../', import.meta.url).pathname;
@@ -30,9 +31,8 @@ describe('the close-up body', async () => {
   });
   const { Content } = await import('../src/content/content');
   const { AssetRegistry } = await import('../src/assets/registry');
-  const { Characters, MAX_CHARACTERS } = await import('../src/render/shared/characters/residents');
+  const { Characters } = await import('../src/render/shared/characters/residents');
   const { CLOSE_UP, loadCharacterSet } = await import('../src/render/shared/characters/data');
-  const { TemplateCache } = await import('../src/render/shared/templateCache');
   type ResidentProp = import('../src/render/shared/characters/view').ResidentProp;
   type View = import('../src/render/shared/characters/view').ResidentView<object, object, ResidentProp>;
   type MorphSet = import('../src/render/shared/characters/data').MorphSet;
@@ -46,34 +46,13 @@ describe('the close-up body', async () => {
   function viewOf(): { view: View; parts: string[]; morphs: MorphSet[] } {
     const parts: string[] = [];
     const morphs: MorphSet[] = [];
-    const view: View = {
-      init: () => {},
+    const view: View = standInView({
       setMorphs: (m) => void morphs.push(m),
-      uploadPoses: () => {},
-      uploadPoseRows: () => {},
       createPart(body, part, shadow) {
         if (!shadow) parts.push(`${body.name}:${part}`);
         return {};
       },
-      partEnabled: () => {},
-      setPartRows: () => {},
-      partRows: () => {},
-      quiltMaterial: () => {},
-      createQuilt: () => ({}),
-      quiltRows: () => {},
-      quiltEnabled: () => {},
-      createRing: () => {},
-      ringMoved: () => {},
-      props: new TemplateCache<ResidentProp | null>({ retell: () => {}, gone: () => false, hide: () => {}, dispose: () => {} }),
-      async buildProp(key) {
-        return { key, matrices: new Float32Array(MAX_CHARACTERS * 16), top: [0, 0, 0] as const };
-      },
-      showProp: () => {},
-      onModelFile: () => () => {},
-      fileColour: async () => undefined,
-      camera: () => false,
-      onDispose: () => {},
-    };
+    });
     return { view, parts, morphs };
   }
   const sim = (id: number, gender: string, stage: string | undefined, closeUp: boolean): SimInfo => ({

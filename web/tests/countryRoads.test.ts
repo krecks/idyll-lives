@@ -147,7 +147,9 @@ describe("a motorway past the world's edge", () => {
 
   test('no bridge height to start from (no surface): a low deck all the way', () => {
     const roads = new CountryRoads(land(null), world, 'Test');
-    for (const r of [...roads.motorways].filter((r) => roads.roads[r][0][0] < 1)) {
+    const west = [...roads.motorways].filter((r) => roads.roads[r][0][0] < 1);
+    expect(west.length).toBe(2);
+    for (const r of west) {
       const road = roads.roads[r];
       expect(road.length).toBeGreaterThan(280 / STEP);
       for (const p of road.slice(1)) expect(p[2]).toBeGreaterThanOrEqual(WATER + DECK_OVER - 1e-6);

@@ -3,29 +3,15 @@
 // its wheels turning forward by the way they've gone; it slides from where it stands to under them as they get on
 // and back as they get off, never jumping; and it's in `ridden` (not drawn where it stands) from getting on, away at
 // work too, until it's back in its place. `bun test`.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { standInView } from './support/residentView';
+import { loadContent, usePublicFetch } from './support/content';
 import { TICK_RATES, TICKS_PER_SECOND } from './snapshotLayout';
 
-const WEB = new URL('../', import.meta.url).pathname;
-
 describe('riding a bike', async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
+  usePublicFetch();
   const { AssetRegistry } = await import('../src/assets/registry');
   const { Characters, MAX_CHARACTERS } = await import('../src/render/shared/characters/residents');
-  const { TemplateCache } = await import('../src/render/shared/templateCache');
   const { Pose, simFields } = await import('../src/core/snapshot');
   const { MOUNTS, MOUNT_SECONDS } = await import('../src/render/shared/characters/vehicles');
   type Prop = import('../src/render/shared/characters/view').ResidentProp;
@@ -35,7 +21,7 @@ describe('riding a bike', async () => {
   type SimInfo = import('../src/core/protocol').SimInfo;
   type ObjectPlacement = import('../src/core/protocol').ObjectPlacement;
 
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json');
   const bike = MOUNTS.bicycle;
 
@@ -49,33 +35,13 @@ describe('riding a bike', async () => {
     if (at) [m[12], m[13]] = [at.x, at.h];
     return m;
   };
-  const view: View = {
-    init: () => {},
-    setMorphs: () => {},
-    uploadPoses: () => {},
-    uploadPoseRows: () => {},
-    createPart: () => ({}),
-    partEnabled: () => {},
-    setPartRows: () => {},
-    partRows: () => {},
-    quiltMaterial: () => {},
-    createQuilt: () => ({}),
-    quiltRows: () => {},
-    quiltEnabled: () => {},
-    createRing: () => {},
-    ringMoved: () => {},
-    props: new TemplateCache<Prop | null>({ retell: () => {}, gone: () => false, hide: () => {}, dispose: () => {} }),
+  const view: View = standInView({
     async buildProp(key) {
       const p = { matrices: new Float32Array(MAX_CHARACTERS * 16), top: [0, 0, 0] as const, pivot: pivotOf(key) };
       built.set(key, p);
       return p;
     },
-    showProp: () => {},
-    onModelFile: () => () => {},
-    fileColour: async () => undefined,
-    camera: () => false,
-    onDispose: () => {},
-  };
+  });
 
   const sims: SimInfo[] = [
     {

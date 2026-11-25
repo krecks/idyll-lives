@@ -2,40 +2,23 @@
 // place; the homes for sale are both, a lived-in flat leaving its building's others for sale; each flat is named as
 // the game names it and knows its storey; the list keeps a building's flats together, and a click on a building
 // chooses the flat chosen already, else the cheapest the household can afford.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
-
-const WEB = new URL('../', import.meta.url).pathname;
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 
 describe("Choose Home's homes", async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
+  usePublicFetch();
   const { AssetRegistry } = await import('../src/assets/registry');
-  const { objectInfos } = await import('../src/game/housegen');
   const { flatsIdOf, generateWorld, useTownContent } = await import('../src/game/town');
   const { flatName, flatsTemplate } = await import('../src/game/flats');
   const { flatPrice } = await import('../src/game/price');
   const { peopleStreams, populate } = await import('../src/game/people');
   const { homeKey, homeOffers, homeOnLot, homeRows, homesForSale, livedIn, sameHome, storeyName } = await import('../src/ui/homes');
-  type Templates = import('../src/game/town').Templates;
   type PlotSlot = import('../src/game/town').PlotSlot;
   type HomeOffer = import('../src/ui/homes').HomeOffer;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json', []);
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
   // (A hamlet whose centre has flats over its shops and a building of flats.)
   const hamlet = generateWorld(content, t, 'country', 4242, undefined, undefined, { town: 'hamlet', villages: 'none' });
   const town = populate(content, assets, t, hamlet, undefined, peopleStreams(2026));

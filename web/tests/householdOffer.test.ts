@@ -3,39 +3,24 @@
 // people seed of its own draws one from the town's seed; "Show others" offers households not shown
 // yet, the same ones for the same presses; and the Neighbours slider ends where `populate` stops.
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
-
-const WEB = new URL('../', import.meta.url).pathname;
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 
 describe("step 3's households from the world code", async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
+  usePublicFetch();
   const realRandom = Math.random;
   afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
     Math.random = realRandom;
   });
-  const { Content } = await import('../src/content/content');
   const { AssetRegistry } = await import('../src/assets/registry');
-  const { objectInfos } = await import('../src/game/housegen');
   const { generateWorld, useTownContent } = await import('../src/game/town');
   const { homesOf, householdsAtMost, offered, peopleStreams, populate } = await import('../src/game/people');
   const { offerPage, peopleKey, peopleSeedOf, startCode, townKey, withSeed } = await import('../src/ui/newGame');
   const { homeKey } = await import('../src/ui/homes');
-  type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json', []);
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
   /** A village-sized world with a few villages: enough households for more than one offer. */
   const world = generateWorld(content, t, 'country', 5150, undefined, undefined, { town: 'village', villages: 'few' });
 
@@ -92,19 +77,23 @@ describe("step 3's households from the world code", async () => {
     const pages = [0, 1, 2, 3, 4, 5].map((p) => offerPage(lived, streams, p));
     expect([0, 1, 2, 3, 4, 5].map((p) => offerPage(lived, streams, p))).toEqual(pages);
     const seen = new Set<string>();
+    let fresh = 0;
     for (const homes of pages) {
       // (A household by its home: a house's lot, or a flat of a building, whose households share its lot.)
       const page = homes.map(homeKey);
       expect(page.length).toBeGreaterThan(0);
       expect(page.length).toBeLessThanOrEqual(30);
       expect(new Set(page).size).toBe(page.length);
-      const fresh = page.filter((s) => !seen.has(s));
       // (Each press shows only households not shown yet, until fewer than ten are left: then all again.)
-      if (seen.size + 10 <= all) expect(fresh).toEqual(page);
-      else seen.clear();
+      if (seen.size + 10 <= all) {
+        expect(page.filter((s) => !seen.has(s))).toEqual(page);
+        fresh++;
+      } else seen.clear();
       for (const s of page) seen.add(s);
       for (const s of page) expect(lived.households.some((h) => homeKey(h) === s)).toBe(true);
     }
+    // (Checked on more than the first page: the town has households enough for that.)
+    expect(fresh).toBeGreaterThan(1);
   });
 
   test('the Neighbours slider ends where the first wave stops', () => {

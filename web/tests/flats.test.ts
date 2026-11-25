@@ -1,39 +1,23 @@
 // Flats (`game/flats.ts`) from the shipped content: buildings of flats round a stair hall, the flats
 // over a shop and the real storeys above an office, each laid out the same whoever lives there, every
 // flat behind its own door off the hall, a shell nobody has moved into, and flats the cheapest homes.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
-
-const WEB = new URL('../', import.meta.url).pathname;
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 
 describe('flats', async () => {
   // --- the page's world in bun: content from web/public (put back for whatever runs next) ---
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
-  const { generateHouse, objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
+  const { generateHouse } = await import('../src/game/housegen');
   const { flatName, flatsFor, flatsId, flatsTemplate, floorsFor, floorsId, overId, placeFloors, placeOfId, storeysOfId } = await import('../src/game/flats');
   const { FLAT_FLOOR, flatPriceParts, priceOf } = await import('../src/game/price');
   const { mulberry32 } = await import('../src/game/noise');
-  type Templates = import('../src/game/town').Templates;
   type Residents = import('../src/game/housegen').Residents;
   type Rect = import('../src/game/town').Rect;
   type Placement = import('../src/game/town').Placement;
 
-  const content = await Content.load('http://localhost/content/base.json');
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
+  const content = await loadContent();
   // As `loadTemplates` puts them together (it fetches by the page's base address, which bun hasn't).
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
   const cfg = t.gen!;
   const len = content.object(cfg.stairs)!.footprint![1];
   const inside = (r: Rect, x: number, z: number) => x >= r.x && z >= r.z && x < r.x + r.w && z < r.z + r.d;

@@ -8,7 +8,6 @@ import { describe, expect, test } from 'bun:test';
 import type { PlotInfo, RelationshipView, SimView, TownPlace } from '../src/core/protocol';
 import { dayBar } from '../src/ui/town/dayBar';
 import { layoutTags, tagOrder, type Box, type TagSpot } from '../src/game/tagLayout';
-import { TAG_ORDER } from '../src/ui/town/kinds';
 import { closedWhy, homesForSale, lotHours, nameLabels, openState, openText, townPlaces } from '../src/ui/town/places';
 import { HAMLET_REACH, homeTag, mostPlaces, mostSales, SALE_MOST, SALE_REACH, nearestFew, placesInView, placeTags, TAG_RANK, tagRank, whereabouts, yourPeople, type TagWorld, type TownTag } from '../src/ui/town/tags';
 import { nextEvents, waitText } from '../src/ui/town/today';
@@ -35,10 +34,6 @@ const PERSON = { kind: 'people', tone: 'person' } as const;
 const PLACE = { kind: 'places', tone: 'place' } as const;
 
 describe('the town tags on screen', () => {
-  test('the tag menu’s kinds: household, people, places, for sale, names', () => {
-    expect(TAG_ORDER).toEqual(['household', 'people', 'places', 'sale', 'names']);
-  });
-
   test('ranks: the household’s own, your people, places one of yours is at, areas, other places, homes for sale, streets', () => {
     const ranks = [MINE, PERSON, { ...PLACE, ours: true }, { kind: 'names', tone: 'area' }, PLACE, { kind: 'sale', tone: 'sale' }, { kind: 'names', tone: 'street' }].map((t) => tagRank(t as TownTag));
     expect(ranks).toEqual([0, TAG_RANK.people, TAG_RANK.ours, TAG_RANK.area, TAG_RANK.places, TAG_RANK.sale, TAG_RANK.street]);

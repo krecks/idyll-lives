@@ -6,32 +6,16 @@
 // its shops among them, a village's street a village's kinds; the homes the same whichever mode; undo
 // gives the draft's bytes back; a civic place offered until the town has it, put down a lot of its own,
 // and a civic place's lot made another; a street built up until it is full, then refused with why; its
-// buildings cleared with their flats and places; on hilly land the settle takes every lot built (those
-// that would break a slope limit left out first); a street drawn with the town's buildings along it in
+// buildings cleared with their flats and places; a street drawn with the town's buildings along it in
 // one edit; and a town built up so has no hard problem it hadn't (`edit/checked.ts` `editedProblems`).
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
-
-const WEB = new URL('../', import.meta.url).pathname;
+// (On hilly land, the settle: `editBuildup.slow.test.ts`.)
+import { describe, expect, test } from 'bun:test';
+import { inWorkerOf, loadContent, templatesOf, usePublicFetch } from './support/content';
 
 describe('build-up', async () => {
   // --- the page's world in bun: content from web/public (put back for whatever runs next) ---
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
   const { plotRect, useTownContent } = await import('../src/game/town');
-  const { runTownJob } = await import('../src/game/townJobs');
   const { inside, lengths, RoadIndex } = await import('../src/game/roads');
   const { CIVIC, civicChoices, civicOf, draftAreaSize } = await import('../src/game/places');
   const { sizeByHomes } = await import('../src/game/world');
@@ -43,18 +27,14 @@ describe('build-up', async () => {
   const { homesOn } = await import('../src/game/town');
   const { flatsTemplate } = await import('../src/game/flats');
   const { drawStreet, removeRoad } = await import('../src/game/edit/streets');
-  type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
-  type TownJob = import('../src/game/townJobs').TownJob;
-  type TownResult = import('../src/game/townJobs').TownResult;
   type WorldOptions = import('../src/game/world').WorldOptions;
   type Edited = import('../src/game/edit/edited').Edited;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
 
-  const inWorker = <K extends TownJob['kind']>(job: Extract<TownJob, { kind: K }>) => structuredClone(runTownJob(content, t, structuredClone(job))) as Extract<TownResult, { kind: K }>;
+  const inWorker = await inWorkerOf(content, t);
   /** A town's plan as step 2 edits it (the land as laid under it). */
   const planOf = (world: string, seed: number, options: Partial<WorldOptions>): NeighbourhoodDraft => {
     const land = inWorker({ kind: 'land', world, seed, options });
@@ -346,22 +326,6 @@ describe('build-up', async () => {
     expect(d.open!.places!.length).toBe(noBank.open!.places!.length);
     expect(civicOffered(d, 0).some((c) => c.civic === police)).toBe(true);
   });
-
-  test('on hilly land the settle takes every lot a street is built up with: those that would break a slope limit are left out first', () => {
-    const settle = (steps: readonly NeighbourhoodDraft[]) => inWorker({ kind: 'edit', plan: steps[steps.length - 1], ops: steps.length - 1, steps, check: false });
-    const hilly = planOf('heath', 5, { town: 'town', villages: 'few', size: 'medium', hills: 'hilly' });
-    let [built, left] = [0, 0];
-    for (const road of streetsOf(hilly, 0).slice(0, 3)) {
-      const b = bare(hilly, road);
-      const e = buildUp(b, t, content, { road, mode: 'both', seed: 1 });
-      if ('refused' in e) continue;
-      built += e.draft.slots.length - b.slots.length;
-      left += e.leftOut ?? 0;
-      expect(settle([b, e.draft]).refused).toEqual([]);
-    }
-    expect(built).toBeGreaterThan(10);
-    console.log(`hilly: ${built} lots, ${left} left out`);
-  }, 120_000);
 
   test('a street drawn with the town buildings along it is one edit: the street, its homes and its buildings', () => {
     // A street of the main town joined to a road at both ends taken up, and drawn again as the Street tool draws one

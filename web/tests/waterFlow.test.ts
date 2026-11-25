@@ -2,13 +2,12 @@
 // one way all along; a drawn river along its drag; a still lake and the sea have no way and no speed; water stepping
 // down runs from the higher level to the lower, fast and foaming at the step; narrow water runs faster than wide and
 // slows at the shore; a rectangle worked out on its own is the same as the whole land's there. `bun test tests/waterFlow.test.ts`.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { describe, expect, test } from 'bun:test';
+import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import { blankLand, LAND_CELL, NONE, SEA_CM, wetAt, type Land } from '../src/game/land';
 import { LandEditor } from '../src/game/landEdit';
 import { flowTexels, riverCourse, waterFlow } from '../src/render/shared/waterFlow';
 
-const WEB = new URL('../', import.meta.url).pathname;
 const FREE = () => 1;
 const at = (land: Land, x: number, z: number) => Math.round(z / LAND_CELL) * land.cols + Math.round(x / LAND_CELL);
 const line = (a: [number, number], b: [number, number], n = 40): [number, number][] => Array.from({ length: n + 1 }, (_, k) => [a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]);
@@ -21,27 +20,12 @@ function flat(size: number, height = 3): Land {
 }
 
 describe('a generated river', async () => {
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
-  const { objectInfos } = await import('../src/game/housegen');
+  usePublicFetch();
   const { useTownContent } = await import('../src/game/town');
   const { landDraft } = await import('../src/game/macro');
-  type Templates = import('../src/game/town').Templates;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
 
   test('runs along its course, one way all along, slowing at the banks', () => {
     for (const seed of [4242, 77]) {

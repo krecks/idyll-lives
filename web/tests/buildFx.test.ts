@@ -7,15 +7,10 @@
 // which needs a Babylon reference checkout to run again). Also: the rings' spread and the pop's spring of
 // `BuildEffectsCore`.
 import { describe, expect, test } from 'bun:test';
+import { numbers } from './support/numbers';
 import { animationRatio, BuildEffectsCore, DUST, PARTICLE, ParticleSim, POP_TIME, RING_TIME, SPARKLES, type ParticleSettings, type PopInstance, type RingState } from '../src/render/shared/buildFx';
 import type { BuildEffect } from '../src/render/types';
 import { fixture, numbers as recorded, type Numbers } from './fixtures/babylon';
-
-/** A fixed sequence of numbers in 0..1 (the same every run). */
-function numbers(seed: number): () => number {
-  let s = seed >>> 0;
-  return () => (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 2 ** 32;
-}
 
 /** Runs `fn` with `Math.random` drawing from `seed`. */
 function seeded<T>(seed: number, fn: () => T): T {

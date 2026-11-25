@@ -6,30 +6,14 @@
 // again from another seed is about as dense as the generator's town, kind by kind (a table printed); a cluster
 // painted far from every town along a street of its own is a village; the brush never paints water or a road; and
 // step 2's summary is within a quarter of what Build makes (exactly it for an untouched layout; an edit that leaves the zones be moves it by what it changes). `SLOW_TESTS=1 bun test tests/buildFromUses.slow.test.ts`.
-import { afterAll, describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
-
-const WEB = new URL('../', import.meta.url).pathname;
+import { describe, expect, test } from 'bun:test';
+import { inWorkerOf, loadContent, templatesOf, usePublicFetch } from './support/content';
 
 describe('build from uses', async () => {
   // --- the page's world in bun: content from web/public (put back for whatever runs next) ---
-  const realLocation = globalThis.location;
-  Object.assign(globalThis, { location: { href: 'http://localhost/', search: '', origin: 'http://localhost', pathname: '/' } });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: string | URL | Request) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost/');
-    const path = `${WEB}public${decodeURIComponent(url.pathname)}`;
-    return existsSync(path) ? new Response(readFileSync(path)) : new Response('missing', { status: 404 });
-  }) as typeof fetch;
-  afterAll(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(globalThis, { location: realLocation });
-  });
-  const { Content } = await import('../src/content/content');
+  usePublicFetch();
   const { AssetRegistry } = await import('../src/assets/registry');
-  const { objectInfos } = await import('../src/game/housegen');
   const { plotRect, populate, useTownContent } = await import('../src/game/town');
-  const { runTownJob } = await import('../src/game/townJobs');
   const { editedProblems } = await import('../src/game/edit/checked');
   const { entriesOf } = await import('../src/game/edit/ground');
   const { lotKey } = await import('../src/game/edit/lots');
@@ -43,22 +27,18 @@ describe('build from uses', async () => {
   const { mulberry32 } = await import('../src/game/noise');
   const { leftOf, lengths, pointAt, RoadIndex } = await import('../src/game/roads');
   const { unpackUses, USE_CELL, usesEmpty, layoutHash } = await import('../src/game/uses');
-  type Templates = import('../src/game/town').Templates;
   type NeighbourhoodDraft = import('../src/game/town').NeighbourhoodDraft;
-  type TownJob = import('../src/game/townJobs').TownJob;
   type TownResult = import('../src/game/townJobs').TownResult;
   type Proposal = import('../src/game/townJobs').Proposal;
   type UseKind = import('../src/game/uses').UseKind;
   type UseStamp = import('../src/game/edit/uses').UseStamp;
   type Pt = import('../src/game/roads').Pt;
-  const content = await Content.load('http://localhost/content/base.json');
+  const content = await loadContent();
   const assets = await AssetRegistry.load('http://localhost/assets/manifest.json', []);
   useTownContent(content);
-  const json = <T>(file: string) => JSON.parse(readFileSync(`${WEB}public/content/${file}`, 'utf8')) as T;
-  const t: Templates = { ...json<Templates>('houses.json'), gen: json('housegen.json'), info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
+  const t = await templatesOf(content);
 
-  /** A job as the worker runs it: sent, run, and its result sent back. */
-  const inWorker = <K extends TownJob['kind']>(job: Extract<TownJob, { kind: K }>) => structuredClone(runTownJob(content, t, structuredClone(job))) as Extract<TownResult, { kind: K }>;
+  const inWorker = await inWorkerOf(content, t);
   /** A draft as bytes: its typed arrays (the land) written out. */
   const bytes = (v: unknown) => JSON.stringify(v, (_, x) => (ArrayBuffer.isView(x) ? Array.from(x as Int16Array).join(',') : x));
   const done = (e: { draft: NeighbourhoodDraft } | { refused: string }): NeighbourhoodDraft => {

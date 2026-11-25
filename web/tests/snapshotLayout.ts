@@ -39,7 +39,8 @@ export function constant(name: string, module?: string, file?: string): number {
   if (module) {
     const from = SNAPSHOT_RS.indexOf(`pub mod ${module} {`);
     if (from < 0) throw new Error(`no module ${module}`);
-    const m = new RegExp(`pub const ${name}: \\w+ = ([0-9._]+);`).exec(SNAPSHOT_RS.slice(from));
+    // Only up to the module's closing brace, so a name gone from it can't be read from the next module.
+    const m = new RegExp(`pub const ${name}: \\w+ = ([0-9._]+);`).exec(SNAPSHOT_RS.slice(from, SNAPSHOT_RS.indexOf('\n}', from)));
     if (!m) throw new Error(`no ${module}::${name}`);
     value = m[1];
   } else value = rustConst(name, file);
