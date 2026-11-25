@@ -155,7 +155,7 @@ fn bowl<X: Coord>(
             rim_y,
             if apron.is_some() { 12 } else { square },
         ),
-        ring(hw + 0.003, hd + 0.003, rim_y, square),
+        ring(hw + 0.006, hd + 0.006, rim_y, square), // 45° down to the wall: the rim eased
     ];
     let inside = vec![
         ring(hw, hd, rim_y - 0.006, square),
@@ -201,7 +201,8 @@ fn herb(fx: &GameFrame, name: &str, x: f64, y: f64, z: f64, r: f64) {
         (0.0, 0.78),
         (0.1, 0.95),
         (0.1, 1.06),
-        (0.13, 1.06),
+        (0.125, 1.06),
+        (0.13, 1.06 - 0.005 / r), // the rim's top edge eased 5 mm
         (0.13, 0.98),
     ]
     .iter()

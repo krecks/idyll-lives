@@ -173,11 +173,35 @@ pub fn recycling_bins() -> Vec<Obj> {
                     at = (bx, by)
                 ),
                 ring!(0.145, 0.21, z = 0.6, verts = 16, square = 6, at = (bx, by)),
-                ring!(0.145, 0.21, z = 0.62, verts = 16, square = 6, at = (bx, by)),
+                // the rim's top eased 4 mm each side
+                ring!(
+                    0.145,
+                    0.21,
+                    z = 0.616,
+                    verts = 16,
+                    square = 6,
+                    at = (bx, by)
+                ),
+                ring!(
+                    0.141,
+                    0.206,
+                    z = 0.62,
+                    verts = 16,
+                    square = 6,
+                    at = (bx, by)
+                ),
+                ring!(
+                    0.136,
+                    0.201,
+                    z = 0.62,
+                    verts = 16,
+                    square = 6,
+                    at = (bx, by)
+                ),
                 ring!(
                     0.132,
                     0.197,
-                    z = 0.62,
+                    z = 0.616,
                     verts = 16,
                     square = 6,
                     at = (bx, by)
