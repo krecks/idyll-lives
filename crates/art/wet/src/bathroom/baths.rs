@@ -10,9 +10,10 @@
 
 use super::M;
 use super::bath_parts::{
-    Section, bath_water, draped_towel, duck, fill, folded_towel, ring, stream, tub, waste,
+    Section, bath_water, draped_towel, duck, fill, folded_towel, ring, tub, waste,
 };
 use super::common::{LATHE, Lathe, bends, lathe, rose, tube};
+use crate::common::stream;
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::math::{cos, radians, sin};
@@ -152,7 +153,16 @@ pub fn bathtub() -> Vec<Obj> {
     });
     let (floor_ring, top) = rings.unwrap();
     join(&still, "body", Some((0, 0, 0).into()));
-    let stream = stream(&f, (-0.68, rim + 0.045, 0), floor_y, "stream");
+    let stream = stream(
+        &f,
+        "stream",
+        (-0.68, rim + 0.045, 0),
+        floor_y,
+        M.water,
+        0.011,
+        10,
+        0.0,
+    );
     let water = bath_water(&f, floor_ring, top, 0.006);
     settle_all();
     fill(stream, water);
@@ -405,7 +415,16 @@ pub fn bathtub_clawfoot() -> Vec<Obj> {
     });
     let (floor_ring, top) = rings.unwrap();
     join(&still, "body", Some((0, 0, 0).into()));
-    let stream = stream(&f, (-0.6, 0.919, 0), floor_y, "stream");
+    let stream = stream(
+        &f,
+        "stream",
+        (-0.6, 0.919, 0),
+        floor_y,
+        M.water,
+        0.011,
+        10,
+        0.0,
+    );
     let water = bath_water(&f, floor_ring, top, 0.006);
     settle_all();
     fill(stream, water);
@@ -541,7 +560,16 @@ pub fn bathtub_freestanding() -> Vec<Obj> {
     });
     let (floor_ring, top) = rings.unwrap();
     join(&still, "body", Some((0, 0, 0).into()));
-    let stream = stream(&f, (0.61, 0.81, 0.0), floor_y, "stream");
+    let stream = stream(
+        &f,
+        "stream",
+        (0.61, 0.81, 0.0),
+        floor_y,
+        M.water,
+        0.011,
+        10,
+        0.0,
+    );
     let water = bath_water(&f, floor_ring, top, 0.006);
     settle_all();
     fill(stream, water);
