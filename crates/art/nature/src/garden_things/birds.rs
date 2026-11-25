@@ -116,7 +116,9 @@ pub fn planterBox() -> Vec<Obj> {
             (0.0, 0.0),
             (0.0, low(0.02, 0.03)),
             (low(0.008, 0.0), 0.03),
-            (0.07, 0.03),
+            // (its inner arris eased too)
+            (low(0.064, 0.07), 0.03),
+            (0.07, low(0.024, 0.03)),
             (0.07, 0.0),
         ],
         m.box_trim,
@@ -257,6 +259,8 @@ pub fn planterBox() -> Vec<Obj> {
             );
         }
     }
+    // (the trim's chamfers laid with their own grain)
+    crate::bevel_first(&["leg", "batten"]);
     let planter = join_all("planterBox");
     // centred on PLANTER_C deep, the far version too (its leaves are coarser)
     let (lo, hi) = measure(&[planter]);
@@ -317,12 +321,7 @@ pub fn birdhouse() -> Vec<Obj> {
             &[(0, 1.36, e * 0.035), (0, 1.49, e * 0.09)],
             0.0,
             m.post,
-            profile = [
-                (-0.012, -0.015),
-                (0.012, -0.015),
-                (0.012, 0.015),
-                (-0.012, 0.015)
-            ],
+            profile = rounded_rect(0.024, 0.03, 0.004, 1),
             up = (1, 0, 0)
         );
     }
@@ -379,7 +378,8 @@ pub fn birdhouse() -> Vec<Obj> {
         0.012,
         (0, 0, 0.114),
         m.body,
-        holes = [hole]
+        holes = [hole],
+        bevel = 0.003
     );
     fcyl!(
         F,
@@ -501,6 +501,9 @@ pub fn birdhouse() -> Vec<Obj> {
             bevel_segments = 1
         );
     }
+    // the gabled box's arrises eased under the roof's overhang; the post's chamfer laid with its own grain
+    crate::chamfer(&["house"]);
+    crate::bevel_first(&["post"]);
     join_all("birdhouse");
     settle_all();
     meshes()
@@ -564,7 +567,8 @@ fn _feeder(x: f64) {
         0.17,
         (x, 1.53, z),
         m.seed,
-        verts = 12
+        verts = 12,
+        bevel = 0.004
     );
     // feeding ports, each with a peg to stand on
     for (y, a) in [(1.6, 0.0), (1.5, 90.0)] {
@@ -599,11 +603,16 @@ fn _feeder(x: f64) {
         &[
             (0.0, 1.433),
             (0.09, 1.433),
+            // (a round lip, and the hub's top eased: no turn of 60°)
             (0.094, 1.447),
-            (0.088, 1.452),
+            (0.0924, 1.4509),
+            (0.0885, 1.4525),
+            (0.0846, 1.4509),
+            (0.083, 1.447),
             (0.083, 1.441),
             (0.06, 1.441),
-            (0.06, 1.465),
+            (0.06, 1.461),
+            (0.056, 1.465),
             (0.0, 1.465)
         ],
         at = (b.x, b.y, 0),

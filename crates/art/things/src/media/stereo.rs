@@ -324,7 +324,7 @@ pub fn stereo() -> Vec<Obj> {
             ],
             at = F.at(px, py_, z),
             material = M.stereo_dark,
-            segments = 32
+            segments = 28
         );
         // the vinyl: a disc with grooved rings, a raised label and the spindle
         revolve!(
@@ -345,7 +345,7 @@ pub fn stereo() -> Vec<Obj> {
             ],
             at = F.at(px, 0.69, z),
             material = M.vinyl,
-            segments = 32
+            segments = 28
         );
         fcyl!(
             F,
@@ -403,7 +403,7 @@ pub fn stereo() -> Vec<Obj> {
                 ],
                 at = F.at(x, 0.685, z + 0.075),
                 material = M.cone,
-                segments = 20,
+                segments = 18,
                 rot = (90, 0, 0)
             );
             fsphere!(
@@ -413,7 +413,7 @@ pub fn stereo() -> Vec<Obj> {
                 (x, 0.685, z + 0.093),
                 M.cone,
                 scale = (1, 0.5, 1),
-                segments = 12,
+                segments = 10,
                 rings = 6
             );
         }
@@ -459,7 +459,7 @@ pub fn boombox() -> Vec<Obj> {
                 );
             }
             for zz in [-0.205, 0.205] {
-                rbox!(
+                let post = rbox!(
                     format!("crate_post{s}{}", float_repr(zz)),
                     0.03,
                     0.42,
@@ -468,6 +468,8 @@ pub fn boombox() -> Vec<Obj> {
                     M.crate_dark,
                     r = 0.003
                 );
+                // (chamfered before its UVs are made, so the chamfers get their own)
+                artkit::bevel::apply(post);
             }
         }
         for x in [-0.15, 0.15] {
@@ -633,10 +635,12 @@ pub fn boombox() -> Vec<Obj> {
         fsweep!(
             F,
             "aerial",
+            // folded down along the top behind the handle, as one is when nobody tunes it (a boombox on its crate
+            // is at most 0.75 m)
             &[
-                (0.22, y0 + 0.275, z - 0.05),
-                (0.25, y0 + 0.4, z - 0.065),
-                (0.28, y0 + 0.52, z - 0.08)
+                (0.22, y0 + 0.28, z - 0.05),
+                (0.08, y0 + 0.288, z - 0.056),
+                (-0.06, y0 + 0.294, z - 0.062)
             ],
             0.005,
             M.boombox_trim,
@@ -657,7 +661,7 @@ pub fn boombox() -> Vec<Obj> {
             F,
             "aerial_tip",
             0.007,
-            (0.28, y0 + 0.52, z - 0.08),
+            (-0.06, y0 + 0.294, z - 0.062),
             M.boombox_trim,
             segments = 8,
             rings = 5

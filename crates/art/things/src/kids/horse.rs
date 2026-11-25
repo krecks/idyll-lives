@@ -266,6 +266,7 @@ pub fn rocking_horse() -> Vec<Obj> {
         scale = [0.7, 1.0, 1.0, 0.8, 0.5]
     );
     jitter!(mane, 0.006, size = 0.04, seed = 4.0);
+    mane.edit(|o| o.uv = artkit::mesh::UvWay::Box); // (along its tapering, curving path it stretched)
     let tail = fsweep!(
         F,
         "tail",
@@ -282,6 +283,7 @@ pub fn rocking_horse() -> Vec<Obj> {
         scale = [0.8, 1.15, 1.0, 0.4]
     );
     jitter!(tail, 0.005, size = 0.04, seed = 5.0);
+    tail.edit(|o| o.uv = artkit::mesh::UvWay::Box);
     // the saddle on a cloth, its flaps, stirrups on leathers; the seat where the game seats the rider (0.56)
     soft!(
         F,

@@ -295,7 +295,9 @@ pub fn bean_bag_kids() -> Vec<Obj> {
             }
         }
     });
-    rumple(bag, 0.014, 0.03, 7.0, 0.08); // up and down only: its bounds (the size and centre checks) stay put
+    rumple(bag, 0.014, 0.03, 7.0, 0.08);
+    // (its cloth laid on from the sides, not round it: the seat pressed in stretches a turned layout)
+    bag.edit(|o| o.uv = artkit::mesh::UvWay::Box); // up and down only: its bounds (the size and centre checks) stay put
     slab(
         "tag",
         &arc(0.045, 0.0, 330.0, 11, 0.0, 0.0),

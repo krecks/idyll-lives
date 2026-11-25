@@ -27,6 +27,8 @@ pub fn veg_patch() -> Vec<Obj> {
     let m = |name: &str| p.get(name);
     let mut rng = Random::new(81);
     let top = raised_bed(&p, 0.92, 0.92, 0.18);
+    // the sawn boards' arrises eased (KIT: botany's `raised_bed` leaves them sharp)
+    crate::chamfer(&["board"]);
     let still = join_all("vegPatch");
     let mut spots = Vec::new();
     for x in [-0.28, 0.0, 0.28] {
@@ -706,7 +708,7 @@ pub fn herbs() -> Vec<Obj> {
             );
         }
     };
-    _fit_with_part("sprigs", "herbs", basil, at, "harvest", (0.84, 1.01, 0.46))
+    _fit_with_part("sprigs", "herbs", basil, at, "harvest", (0.84, 0.98, 0.46))
 }
 
 /// Pumpkin patch: a patch of soil, vines with curling tendrils, big lobed leaves on long stalks and a yellow
@@ -816,6 +818,8 @@ pub fn pumpkins() -> Vec<Obj> {
             tilt = 55,
             segments = low(6, 3)
         );
+        // (turned, then tilted: round its own axis no longer)
+        crate::box_uvs(&["flower"]);
     };
     let crop = || {
         for (i, (x, y, r)) in [(0.18, -0.12, 0.17), (-0.2, 0.05, 0.14), (-0.02, 0.3, 0.11)]

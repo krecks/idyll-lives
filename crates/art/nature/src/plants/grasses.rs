@@ -77,7 +77,8 @@ pub fn lavender() -> Vec<Obj> {
                 cos(lean),
             );
             let base = v3(x * 0.5, y * 0.5, 0.16);
-            let length = rng.uniform(0.4, 0.56);
+            // (English lavender in flower stands 0.3-0.6 m)
+            let length = rng.uniform(0.4, 0.56) * 0.5;
             let tip = base + d * length;
             let along = d.to_track_quat_zy().to_matrix().to_4x4();
             if is_low() {
@@ -128,7 +129,7 @@ pub fn lavender() -> Vec<Obj> {
     spray(&rest, p.get("stem"), false);
     // (built here, so all of it is fitted together)
     let cut = new_parts(|| spray(&front, p.get("stalk"), true));
-    let k = fit_to(&meshes(), 0.607, 0.865, 0.63);
+    let k = fit_to(&meshes(), 0.49, 0.56, 0.55);
     if is_low() {
         return settle(&[join_all("lavender")]);
     }
@@ -387,7 +388,8 @@ pub fn hosta() -> Vec<Obj> {
         let top = v3(
             rng.uniform(-0.08, 0.08),
             rng.uniform(-0.08, 0.08),
-            rng.uniform(0.66, 0.8),
+            // (a medium hosta's scapes just over its leaves: 0.3-0.5 m in all)
+            rng.uniform(0.66, 0.8) * 0.55,
         );
         twig!(
             format!("scape{i}"),
@@ -424,6 +426,6 @@ pub fn hosta() -> Vec<Obj> {
             );
         }
     }
-    fit_to(&meshes(), 0.621, 0.842, 0.675);
+    fit_to(&meshes(), 0.621, 0.395, 0.675);
     settle(&[join_all("hosta")])
 }

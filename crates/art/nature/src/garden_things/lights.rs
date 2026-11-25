@@ -2,6 +2,7 @@
 
 use super::common::{_near_light, _own, F};
 use artkit::far::low;
+use artkit::forms::rounded_rect;
 use artkit::kit::fillet;
 use artkit::math::{P3, PI, TAU, cos, cosd, p3, pow, sin, sind};
 use artkit::motion::{Rock, rock};
@@ -20,11 +21,23 @@ pub fn lampPost() -> Vec<Obj> {
     let m = _own("lampPost");
     let (post, frame) = (m.body, m.lantern);
     let sq = pow(2.0, 0.5);
-    // A square ring of half side `r` at game height `y`, turned to face the front: a loft section.
+    // A square ring of half side `r` at game height `y`, turned to face the front, its corners eased 6 mm (each
+    // corner's 90° turned in two of 45°): a loft section.
     let square = |y: f64, r: f64| -> Vec<P3> {
+        let e = 0.006;
         [(1.0, 1.0), (-1.0, 1.0), (-1.0, -1.0), (1.0, -1.0)]
             .iter()
-            .map(|&(x, z)| F.at(r * x, y, r * z))
+            .enumerate()
+            .flat_map(|(k, &(x, z))| {
+                // (first on the side from the corner before)
+                let (along_z, along_x) =
+                    (F.at(r * x, y, r * z - e * z), F.at(r * x - e * x, y, r * z));
+                if k % 2 == 0 {
+                    [along_z, along_x]
+                } else {
+                    [along_x, along_z]
+                }
+            })
             .collect()
     };
     // the base: a plinth, a torus, a bell and a waisted neck, turned in one piece
@@ -52,11 +65,12 @@ pub fn lampPost() -> Vec<Obj> {
         material = post,
         segments = low(16, 8)
     );
-    // the shaft: fluted, a plain neck and collars over it
-    let flutes: Vec<(f64, f64)> = (0..20)
+    // the shaft: ten round flutes (a wave round it, no turn of 60° in it), a plain neck and collars over it
+    let flutes: Vec<(f64, f64)> = (0..40)
         .map(|k| {
-            let r = if k % 2 == 0 { 0.035 } else { 0.03 };
-            (r * cos(PI * k as f64 / 10.0), r * sin(PI * k as f64 / 10.0))
+            let a = PI * k as f64 / 20.0;
+            let r = 0.0325 + 0.0025 * cos(10.0 * a);
+            (r * cos(a), r * sin(a))
         })
         .collect();
     fsweep!(
@@ -152,6 +166,8 @@ pub fn lampPost() -> Vec<Obj> {
             square(LAMP_Y - 0.19, 0.08),
             square(LAMP_Y - 0.17, 0.112),
             square(LAMP_Y - 0.155, 0.112),
+            // (its rim rounded into its top: no turn of 60°)
+            square(LAMP_Y - 0.1515, 0.109),
             square(LAMP_Y - 0.15, 0.1)
         ],
         material = frame,
@@ -169,12 +185,7 @@ pub fn lampPost() -> Vec<Obj> {
             ],
             0.0,
             frame,
-            profile = [
-                (-0.008, -0.008),
-                (0.008, -0.008),
-                (0.008, 0.008),
-                (-0.008, 0.008)
-            ],
+            profile = rounded_rect(0.016, 0.016, 0.004, 1),
             up = (0, 0, 1)
         );
     }
@@ -255,6 +266,8 @@ pub fn stringLights() -> Vec<Obj> {
                     (0.127, 0.29),
                     (0.121, 0.3),
                     (0.108, 0.3),
+                    // (its rim's inner arris rolled: no turn of 60°)
+                    (0.106, 0.297),
                     (0.104, 0.28),
                     (0.0, 0.28)
                 ],
@@ -372,6 +385,8 @@ pub fn stringLights() -> Vec<Obj> {
             fsweep!(F, format!("hook{i}"), &hook, 0.004, m.wire, verts = 5);
         }
     });
+    // (the chamfers laid with their own grain)
+    crate::bevel_first(&["post", "collar"]);
     join(&still, "posts", Some(p3(0, 0, 0)));
     let string = new_parts(|| {
         let x0 = POST_X - 0.04;

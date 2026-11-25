@@ -74,7 +74,8 @@ fn plant(
             profile = [(0.0, -0.018), (0.003, 0.0), (0.0, 0.018), (-0.0015, 0.0)],
             up = (0, 0, 1),
             resolution = 2,
-            scale = [0.4, 1.0, 0.8, 0.15]
+            scale = [0.4, 1.0, 0.8, 0.15],
+            angle = 180 // a thin blade shaded round its edge, as botany's leaves are: no sharp rim
         );
     }
 }

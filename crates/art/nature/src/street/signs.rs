@@ -46,7 +46,8 @@ pub fn sign() -> Vec<Obj> {
             0.03,
             (0, y, 0),
             M.sign,
-            plane = plane
+            plane = plane,
+            bevel = low(0.004, 0.0)
         );
         fextrude!(
             F,
@@ -162,7 +163,8 @@ pub fn taxi_sign() -> Vec<Obj> {
         0.012,
         (0, 1.5, 0.061),
         M.pole,
-        holes = [rounded_rect(0.264, 0.384, 0.004, 1)]
+        holes = [rounded_rect(0.264, 0.384, 0.004, 1)],
+        bevel = low(0.003, 0.0)
     );
     _box(
         &F,

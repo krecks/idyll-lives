@@ -57,7 +57,7 @@ pub fn family() -> Family {
                     .key("model.tree.blossom"),
             ),
             tree(
-                Model::new("apple", apple::apple, (4.29, 4.106, 4.642))
+                Model::new("apple", apple::apple, (4.29, 3.978, 4.642))
                     .key("model.tree.fruit")
                     .motions(json!({
                         "uses": {
@@ -78,7 +78,8 @@ pub fn family() -> Family {
             ),
             tree(
                 Model::new("magnolia", magnolia::magnolia, (4.1, 5.076, 3.756))
-                    .key("model.tree.magnolia"),
+                    .key("model.tree.magnolia")
+                    .palette(magnolia::petals(&base())),
             ),
             tree(
                 Model::new("willow", willow::willow, (4.947, 6.1, 5.052)).key("model.tree.willow"),
@@ -89,7 +90,7 @@ pub fn family() -> Family {
                 Model::new("cypress", cypress::cypress, (1.012, 7.95, 1.025)).key("model.cypress"),
             ),
             tree(
-                Model::new("lemonTree", lemon_tree::lemon_tree, (1.288, 1.994, 1.344))
+                Model::new("lemonTree", lemon_tree::lemon_tree, (1.221, 1.924, 1.272))
                     .key("model.garden.lemonTree")
                     .paint(&[("body", "Pot")])
                     .motions(json!({"growth": "ripen"})),

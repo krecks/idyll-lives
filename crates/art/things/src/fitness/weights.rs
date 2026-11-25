@@ -3,6 +3,7 @@
 
 use super::M;
 use super::common::{dumbbell, plate};
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::kit;
@@ -55,7 +56,7 @@ pub fn weight_bench() -> Vec<Obj> {
             bevel = 0.005,
             bevel_segments = 1
         );
-        fsweep!(
+        let beam = fsweep!(
             f,
             "beam",
             &[(0, top - 0.14, -0.72), (0, top - 0.14, 0.48)],
@@ -63,6 +64,7 @@ pub fn weight_bench() -> Vec<Obj> {
             M.frame,
             profile = rounded_rect(0.06, 0.12, 0.01, 1)
         );
+        bevel_edges(beam, 0.003, 1, 50.0, &EdgeOrder::Corners); // its ends' edges
         for z in [0.4, -0.62] {
             fsweep!(
                 f,
@@ -275,7 +277,8 @@ pub fn weight_bench() -> Vec<Obj> {
                 (sf * 0.37, BAR.1, BAR.2),
                 M.chrome,
                 rot = (0, 90, 0),
-                verts = 12
+                verts = 12,
+                bevel = 0.003
             );
             fcyl!(
                 f,

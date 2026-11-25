@@ -307,6 +307,7 @@ pub fn pastry_bag() -> Vec<Obj> {
         _bag_ring(0.13, 0.061, 0.031, 0.016),
         _bag_ring(0.155, 0.064, 0.036, 0.008),
         _bag_ring(0.165, 0.06, 0.03, 0.004),
+        _bag_ring(0.1675, 0.057, 0.027, 0.003), // the fold rolled over
     ];
     loft("bag", &rings, M.bag_white, 30.0);
     // the croissant: a crescent of lobes standing up out of the bag, its tips curling down to the front

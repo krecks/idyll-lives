@@ -3887,7 +3887,7 @@
       ]
     },
     "electricFire": {
-      "label": "Electric fire / media fireplace",
+      "label": "Electric fire / media fireplace (with the floor cushion in front, on its tile)",
       "w": [
         0.8,
         1.8
@@ -3898,7 +3898,7 @@
       ],
       "d": [
         0.15,
-        0.45
+        0.85
       ],
       "uses": [
         "switch on the flame effect",
@@ -6641,7 +6641,7 @@
       ]
     },
     "sewingTable": {
-      "label": "Sewing table with machine",
+      "label": "Sewing table with machine (and its chair, on its tile)",
       "w": [
         0.6,
         1.2
@@ -6652,7 +6652,7 @@
       ],
       "d": [
         0.45,
-        0.7
+        0.85
       ],
       "surface": [
         0.72,
@@ -11340,11 +11340,15 @@
           ]
         },
         "blossom": {
-          "colour": "pink/white",
+          "colour": "pink/white with a yellow centre",
           "hue": [
             [
               320,
               355
+            ],
+            [
+              40,
+              65
             ]
           ],
           "months": [

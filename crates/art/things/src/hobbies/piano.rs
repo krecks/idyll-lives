@@ -254,7 +254,8 @@ pub fn piano() -> Vec<Obj> {
                 0.12,
                 (sf * 0.6, 1.42, 0.38),
                 M.candle,
-                verts = 12
+                verts = 12,
+                bevel = 0.003
             );
             fcyl!(
                 f,

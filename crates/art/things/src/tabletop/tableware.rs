@@ -4,7 +4,7 @@ use super::M;
 use super::common::{disc, done, oval};
 use artkit::kit::fillet;
 use artkit::materials::Mat;
-use artkit::math::{PI, V3, atan2, cosd, pow, radians, sin, sind};
+use artkit::math::{PI, V3, atan2, cos, cosd, pow, radians, sin, sind};
 use artkit::parts::new_parts;
 use artkit::scene::{Obj, meshes};
 use artkit::{join, rod, settle, slide, sphere, sweep};
@@ -44,12 +44,19 @@ fn _banana(name: &str, a: (f64, f64, f64), b: (f64, f64, f64), lift: f64, materi
         .into_iter()
         .map(|t| V3::from(a).lerp(V3::from(b), t) + V3::from((0.0, 0.0, lift * sin(PI * t))))
         .collect();
+    // five-sided, its ridges soft: two points round each, all on the circle, so each turns 36 degrees
+    let section: Vec<(f64, f64)> = (0..10)
+        .map(|k| {
+            let a = radians(72.0 * (k / 2) as f64 + if k % 2 == 0 { -12.0 } else { 12.0 });
+            (0.017 * cos(a), 0.017 * sin(a))
+        })
+        .collect();
     sweep!(
         name,
         &pts,
-        0.017,
+        0.0,
         material = material,
-        verts = 5,
+        profile = section,
         scale = [0.25, 0.8, 1.0, 1.0, 0.75, 0.2],
         angle = 50
     );
@@ -290,17 +297,22 @@ fn _drips(obj: Obj, z: f64, depth: f64, n: f64, seed: f64) -> Obj {
 pub fn cake_stand() -> Vec<Obj> {
     turned!(
         "stand",
-        &[
-            (0.078, 0.0),
-            (0.08, 0.008),
-            (0.03, 0.022),
-            (0.02, 0.06),
-            (0.026, 0.072),
-            (0.02, 0.084),
-            (0.13, 0.092),
-            (0.14, 0.1),
-            (0.0, 0.102)
-        ],
+        // (the plate's edge rolled round)
+        &crate::common::round_at(
+            &[
+                (0.078, 0.0),
+                (0.08, 0.008),
+                (0.03, 0.022),
+                (0.02, 0.06),
+                (0.026, 0.072),
+                (0.02, 0.084),
+                (0.13, 0.092),
+                (0.14, 0.1),
+                (0.0, 0.102),
+            ],
+            7,
+            0.001
+        ),
         M.cake_stand,
         verts = 16
     );
@@ -720,9 +732,9 @@ pub fn candlesticks() -> Vec<Obj> {
             turned!(
                 format!("stick{i}"),
                 &[
-                    (0.0346, 0.0),
-                    (0.0346, 0.006),
-                    (0.024, 0.016),
+                    (0.04, 0.0), // a foot 8 cm across, a candlestick's least
+                    (0.04, 0.006),
+                    (0.026, 0.016),
                     (0.009, 0.03),
                     (0.008, h * 0.45),
                     (0.016, h * 0.5),

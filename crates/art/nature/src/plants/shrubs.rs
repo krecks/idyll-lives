@@ -294,6 +294,10 @@ pub fn topiary_cone() -> Vec<Obj> {
             seed = i as f64
         );
     }
+    // the pot's square-cut rims eased (KIT: botany's `vessel` cuts them square)
+    crate::chamfer(&["pot", "saucer"]);
+    // (a box a face: round its axis, the foliage stretched over 2x towards the cone's point)
+    crate::box_uvs(&["cone"]);
     fit_to(&crown, 0.62, None::<f64>, 0.65);
     let still = join_all("topiaryCone");
     perches!(
@@ -411,7 +415,8 @@ pub fn rosebush() -> Vec<Obj> {
     }
     let mut canes = Vec::new();
     for (x, y, a) in spiral!(9, 0.3, &mut rng) {
-        let h = rng.uniform(0.6, 0.84);
+        // (an English shrub rose stands 1-1.5 m)
+        let h = rng.uniform(0.6, 0.84) * 1.2;
         let (foot, tip) = (v3(x * 0.3, y * 0.3, 0.05), v3(x * 1.3, y * 1.3, h));
         let bend = v3(x * 1.05, y * 1.05, h * 0.6);
         canes.push((foot, bend, tip, a, rng.uniform(8.0, 28.0)));

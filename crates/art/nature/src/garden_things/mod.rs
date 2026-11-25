@@ -35,7 +35,7 @@ pub fn family() -> Family {
         "garden_things",
         SPEC.palette(),
         vec![
-            own(Model::new("pond", pond::pond, (1.986, 0.8, 1.823))
+            own(Model::new("pond", pond::pond, (1.999, 0.622, 1.828))
                 .key("model.garden.pond")
                 .motions(json!({
                     "idle": "ripple",

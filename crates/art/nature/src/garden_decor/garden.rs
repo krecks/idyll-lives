@@ -181,6 +181,9 @@ pub fn gnome() -> Vec<Obj> {
     );
     // the beard: a long wedge from the cheeks to a point on his chest, a little wavy; a moustache over it
     let rows = [
+        // (its top rounded in under the moustache: no turn of 60°)
+        (0.35, 0.046, 0.026, -0.024),
+        (0.348, 0.052, 0.03, -0.025),
         (0.345, 0.055, 0.032, -0.026),
         (0.315, 0.062, 0.04, -0.04),
         (0.28, 0.056, 0.038, -0.055),
@@ -190,7 +193,8 @@ pub fn gnome() -> Vec<Obj> {
     ];
     let sections: Vec<Vec<P3>> = rows
         .iter()
-        .map(|&(z, rx, ry, y)| ring!(rx, ry, z = z, verts = 10, at = (0.0, y)))
+        // (14 round: at 10 its flattened sides turned 60° at the cheeks)
+        .map(|&(z, rx, ry, y)| ring!(rx, ry, z = z, verts = 14, at = (0.0, y)))
         .collect();
     let beard = loft!("beard", &sections, material = M.beard);
     jitter!(beard, 0.004, size = 0.03, seed = 2.0);
@@ -732,5 +736,7 @@ pub fn boulder() -> Vec<Obj> {
             subdivisions = 1
         );
     }
+    // (the moss and the grass tufts squashed: their foliage laid on them as they are drawn)
+    crate::bake_scale(&["moss", "lichen", "tuft"]);
     settle(&[join_all("boulder")])
 }

@@ -3,6 +3,7 @@
 use super::common::call::rbox;
 use super::common::{P, WALL};
 use super::{F, M};
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::smooth_outline;
 use artkit::kit;
 use artkit::math::{Axis, P3, TAU, cos, radians, sin};
@@ -48,6 +49,7 @@ fn log(name: &str, a: P, b: P, r: f64, seed: i32) -> Obj {
         verts = 9,
         scale = [0.95, 1.05, 0.9]
     );
+    bevel_edges(log, 0.004, 1, 50.0, &EdgeOrder::Corners); // its sawn ends' edges
     jitter!(log, r * 0.12, size = 0.04, seed = seed)
 }
 
@@ -205,7 +207,8 @@ pub fn fireplace_electric() -> Vec<Obj> {
                 (0.0, 0.0),
                 (0.0, 0.01),
                 (0.006, 0.012),
-                (fw, 0.012),
+                (fw - 0.003, 0.012), // its inner edge chamfered
+                (fw, 0.009),
                 (fw, 0.0),
             ],
             M.firebox,
@@ -326,17 +329,25 @@ pub fn fireplace_electric() -> Vec<Obj> {
             );
         }
         let at = F.at(-0.6, 0, -0.32);
-        let vase: Vec<Vec<P3>> = [
-            (0.0, 0.05),
-            (0.01, 0.058),
-            (0.08, 0.062),
-            (0.18, 0.05),
-            (0.24, 0.04),
-            (0.26, 0.042),
-        ]
-        .iter()
-        .map(|&(h, r)| ring!(r, r, z = 1.03 + h, verts = 20, at = (at.x, at.y)))
-        .collect();
+        // (r, h): its lip rolled round to the top
+        let mut lip = crate::common::round_at(
+            &[
+                (0.05, 0.0),
+                (0.058, 0.01),
+                (0.062, 0.08),
+                (0.05, 0.18),
+                (0.04, 0.24),
+                (0.042, 0.26),
+                (0.0, 0.26),
+            ],
+            5,
+            0.004,
+        );
+        lip.pop();
+        let vase: Vec<Vec<P3>> = lip
+            .iter()
+            .map(|&(r, h)| ring!(r, r, z = 1.03 + h, verts = 20, at = (at.x, at.y)))
+            .collect();
         loft!("vase", &vase, material = M.candle);
         fcyl!(
             F,
@@ -351,12 +362,17 @@ pub fn fireplace_electric() -> Vec<Obj> {
             F,
             "frame_pic",
             &[(0.66, 1.03), (0.66, 1.31), (0.44, 1.31), (0.44, 1.03)],
+            // (rounded over at the front, its back edges chamfered)
             &[
-                (0.0, 0.0),
-                (0.0, 0.02),
+                (0.0, 0.002),
+                (0.0, 0.016),
+                (0.004, 0.022),
                 (0.012, 0.025),
-                (0.03, 0.02),
-                (0.03, 0.0),
+                (0.026, 0.022),
+                (0.03, 0.017),
+                (0.03, 0.002),
+                (0.028, 0.0),
+                (0.002, 0.0),
             ],
             M.picture,
             at = -0.383

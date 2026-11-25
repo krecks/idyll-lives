@@ -3,6 +3,7 @@
 use super::M;
 use super::common::{link, up_quad};
 use super::workbench::BOARD_Z;
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::json::float_repr as r;
 use artkit::kit;
@@ -307,7 +308,7 @@ pub fn tool_board(fr: &GameFrame) {
         up = (1, 0, 0),
         scale = [1.0, 0.85]
     );
-    fsweep!(
+    let head = fsweep!(
         fr,
         "mallet_head",
         &[(0.235, 1.36, z + 0.032), (0.365, 1.36, z + 0.032)],
@@ -315,6 +316,7 @@ pub fn tool_board(fr: &GameFrame) {
         M.plank,
         profile = rounded_rect(0.06, 0.06, 0.012, 2)
     );
+    bevel_edges(head, 0.004, 1, 50.0, &EdgeOrder::Corners); // its faces' edges
     revolve!(
         "tape",
         &[

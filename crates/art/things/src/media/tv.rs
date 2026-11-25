@@ -165,14 +165,19 @@ pub fn tv() -> Vec<Obj> {
     }
     revolve!(
         "bowl",
-        &[
-            (0.0, 0.0),
-            (0.05, 0.0),
-            (0.065, 0.02),
-            (0.06, 0.035),
-            (0.05, 0.02),
-            (0.0, 0.012)
-        ],
+        // (its lip round)
+        &crate::common::round_at(
+            &[
+                (0.0, 0.0),
+                (0.05, 0.0),
+                (0.065, 0.02),
+                (0.06, 0.035),
+                (0.05, 0.02),
+                (0.0, 0.012),
+            ],
+            3,
+            0.003
+        ),
         at = F.at(0.33, 0.51, -0.11),
         material = M.bowl,
         segments = 20
@@ -359,7 +364,7 @@ pub fn tv_wall() -> Vec<Obj> {
 // The set of the reference photo: no cabinet and no legs, the controls and the stub aerial on the top right, the
 // back on the wall face.
 /// The case.
-const PT_W: f64 = 0.86;
+const PT_W: f64 = 0.79;
 const PT_H: f64 = 0.66;
 const PT_D: f64 = 0.40;
 /// Its back, on the wall face.
@@ -379,11 +384,11 @@ const PT_TOP: f64 = PT_BASE_H + PT_H;
 /// The screen's middle height: a chin below it, a narrow brow above.
 const PT_SC_Y: f64 = 0.44;
 /// The glass, and the mask round it.
-const PT_SC_W: f64 = 0.68;
+const PT_SC_W: f64 = 0.62;
 const PT_SC_H: f64 = 0.50;
 const PT_BEZ: f64 = 0.02;
 /// The aerial's foot, on the case's top right.
-const PT_AERIAL: P = (0.33, PT_TOP, PT_BACK + 0.13);
+const PT_AERIAL: P = (0.3, PT_TOP, PT_BACK + 0.13);
 
 pub fn tv_retro() -> Vec<Obj> {
     let still = new_parts(|| {
@@ -418,7 +423,7 @@ pub fn tv_retro() -> Vec<Obj> {
                 0.11,
                 0.045,
                 0.08,
-                (s as f64 * 0.28, 0.0225, PT_FRONT - 0.09),
+                (s as f64 * 0.26, 0.0225, PT_FRONT - 0.09),
                 M.retro_bezel,
                 round = 0.012,
                 round_segments = 2
@@ -427,7 +432,7 @@ pub fn tv_retro() -> Vec<Obj> {
         soft!(
             F,
             "rail",
-            0.66,
+            0.6,
             0.045,
             0.06,
             (0, 0.0225, PT_BACK + 0.09),
@@ -482,7 +487,7 @@ pub fn tv_retro() -> Vec<Obj> {
             0.006,
             0.002,
             0.0015,
-            (0.29, 0.132, PT_FRONT + 0.0005),
+            (0.26, 0.132, PT_FRONT + 0.0005),
             M.led_red
         );
         // the controls on the right side: a turned knob over two buttons, on a pad
@@ -532,7 +537,7 @@ pub fn tv_retro() -> Vec<Obj> {
         soft!(
             F,
             "back",
-            0.70,
+            0.64,
             0.5,
             0.02,
             (0, 0.42, PT_BACK + 0.012),
