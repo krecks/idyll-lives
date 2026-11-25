@@ -922,13 +922,11 @@ fn strict_findings_fail_unless_accepted_with_a_reason() {
     assert_eq!(names.len(), STRICT.len());
 }
 
-/// A held tool (a coin 2 mm thick) is never on a floor, so the floor drawn over thin things isn't held against
-/// it; the same file as a floor model is.
-/// A texture is judged on a part as built: washing a clip grows on the line from flattened (scale y 0.001) is
-/// measured grown, 1 m tall; curtains a clip stretches to three times as built are measured as built; the edges
-/// at rest.
+/// A texture is judged on a part at its largest: washing a clip grows on the line from flattened (scale y 0.001) is
+/// measured grown, 1 m tall; a cloth a clip stretches to three times as built is measured stretched, and found so;
+/// a cushion a clip squashes, at rest; the edges at rest.
 #[test]
-fn texels_are_measured_on_a_part_as_built() {
+fn texels_are_measured_on_a_part_at_its_largest() {
     let tall = |rest: f32, grown: f32, read| {
         let mut bin: Vec<u8> = [[0f32, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
             .iter()
@@ -965,20 +963,36 @@ fn texels_are_measured_on_a_part_as_built() {
             far: false,
         };
         let m = meshes::read(&file, read).unwrap().unwrap();
-        m[0].positions.iter().map(|p| p[1]).fold(0.0, f64::max)
+        let textures = crate::texels::Textures::from([(
+            "fabric".to_string(),
+            crate::texels::Texture {
+                uv_scale: 1.0,
+                px: None,
+            },
+        )]);
+        let stretched = crate::texels::measure(&m, &textures)
+            .first()
+            .is_some_and(|t| !crate::texels::findings(t).is_empty());
+        let top = m[0].positions.iter().map(|p| p[1]).fold(0.0, f64::max);
+        (top, stretched)
     };
-    let near = |a: f64, b: f64| (a - b).abs() < 1e-6;
+    let near = |a: (f64, bool), b: f64| (a.0 - b).abs() < 1e-6;
     assert!(near(tall(0.001, 1.0, meshes::Read::Textured), 1.0), "grown");
     assert!(
         near(tall(0.001, 1.0, meshes::Read::Shape), 0.001),
         "at rest"
     );
+    let cloth = tall(1.0, 3.0, meshes::Read::Textured);
+    assert!(near(cloth, 3.0) && cloth.1, "stretched: {cloth:?}");
+    assert!(!tall(1.0, 1.0, meshes::Read::Textured).1, "as built");
     assert!(
-        near(tall(1.0, 3.0, meshes::Read::Textured), 1.0),
-        "as built"
+        near(tall(1.0, 0.5, meshes::Read::Textured), 1.0),
+        "squashed"
     );
 }
 
+/// A held tool (a coin 2 mm thick) is never on a floor, so the floor drawn over thin things isn't held against
+/// it; the same file as a floor model is.
 #[test]
 fn a_held_tool_is_not_thin_on_the_floor() {
     let fin = Finishes {
