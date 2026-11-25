@@ -188,7 +188,8 @@ The nature lover pack models (`models/pack_natureLover/veggieBed.glb`, `pottingB
 `packs/pack_natureLover/manifest.json`) are built by `crates/art/packs/src/pack_nature_lover` on `artkit` and
 exported as `.glb` (glTF, original, CC0). Each moves while it is used: a lettuce is picked from the
 veggie bed (whose crop follows its growth stage), a seedling comes up, a bird lands, the hammock sways, the shower
-runs, the cloche lifts and the glasshouse's door and roof vent open.
+runs, the cloche lifts and the glasshouse's door opens (its roof vent propped open). Their edges bevelled,
+eased or chamfered to the play camera's pixel (2026-11-25).
 
 Rebuilt in the same families (2026-10-21, original, CC0): the entry console, the baking counter and the spritz
 station with back panels for their mirrors, hooks and shelves; the organizer desk and the love-letter bureau turned
@@ -207,7 +208,8 @@ The cheerful pack models (`models/pack_cheerful/jukebox.glb`, `karaokeMachine.gl
 `rainbowHammock.glb`, `sunriseLamp.glb`, `partyBooth.glb`, override pack `packs/pack_cheerful/manifest.json`) are built
 by `crates/art/packs/src/pack_cheerful` on `artkit` and exported as `.glb` (glTF, original,
 CC0). Each moves one part while it is used: the record swings up, the microphone rises, the shaker tips, the hammock
-sways with its sleeper, the sun rises and the booth's curtain is drawn.
+sways with its sleeper, the sun rises and the booth's curtain is drawn. Their edges bevelled, eased or chamfered
+to the play camera's pixel (2026-11-25).
 
 The couch potato pack models (`models/pack_couchPotato/cinemaWall.glb`, `gameConsole.glb`, `recliner.glb`,
 `snackFridge.glb`, `fitnessGame.glb`, `lavaLamp.glb`, override pack `packs/pack_couchPotato/manifest.json`) are built
