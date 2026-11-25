@@ -109,7 +109,7 @@ pub fn family() -> Family {
                 // sandwich slides the top drawer out
                 .motions(json!({"uses": {"sandwich": "drawer_open"}, "hold": (HOLD)}))
                 .paint(&BASE_PAINT),
-            Model::new("counterCorner", counters::counter_corner, (1.0, 1.26, 0.93))
+            Model::new("counterCorner", counters::counter_corner, (1.0, 0.95, 0.93))
                 .key("model.counterCorner")
                 .centre(0.0, 0.035)
                 // sandwich, as the counter

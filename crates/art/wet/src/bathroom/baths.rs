@@ -18,7 +18,7 @@ use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::kit;
 use artkit::math::{cos, radians, sin};
-use artkit::parts::{join, new_parts, settle_all};
+use artkit::parts::{ASIDE, aside, join, new_parts, settle_all};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, py, soft};
@@ -265,6 +265,27 @@ pub fn bathtub_clawfoot() -> Vec<Obj> {
             }
         }
         waste(&f, -0.45, rim, floor_y, -0.775, M.brass);
+        // a towel over the back rim at the right end
+        draped_towel(
+            &f,
+            "towel",
+            0.5,
+            0.32,
+            &[
+                (rim + 0.008, -0.31),
+                (rim + 0.012, -0.37),
+                (rim, -0.415),
+                (rim - 0.04, -0.425),
+                (rim - 0.24, -0.424),
+            ],
+            M.towel,
+            0.009, // a terry towel's one layer: its cut end too thin to show an edge
+        );
+    });
+    let (floor_ring, top) = rings.unwrap();
+    join(&still, "body", Some((0, 0, 0).into()));
+    // the taps: drawn, not the tub's size
+    let taps = new_parts(|| {
         // a brass filler on the left end: a riser up over the rim and out over the water, two cross handles on a bar
         kit::tube!(
             f,
@@ -395,28 +416,12 @@ pub fn bathtub_clawfoot() -> Vec<Obj> {
             bevel = 0.005,
             bevel_segments = 1
         );
-        // a towel over the back rim at the right end
-        draped_towel(
-            &f,
-            "towel",
-            0.5,
-            0.32,
-            &[
-                (rim + 0.008, -0.31),
-                (rim + 0.012, -0.37),
-                (rim, -0.415),
-                (rim - 0.04, -0.425),
-                (rim - 0.24, -0.424),
-            ],
-            M.towel,
-            0.009, // a terry towel's one layer: its cut end too thin to show an edge
-        );
     });
-    let (floor_ring, top) = rings.unwrap();
-    join(&still, "body", Some((0, 0, 0).into()));
+    aside(&taps, "taps");
     let stream = stream(
         &f,
-        "stream",
+        // the taps' water: drawn with them, not the tub's size
+        &format!("stream{ASIDE}"),
         (-0.6, 0.919, 0),
         floor_y,
         M.water,
@@ -450,6 +455,27 @@ pub fn bathtub_freestanding() -> Vec<Obj> {
     let still = new_parts(|| {
         rings = Some(tub(&sections, rim, floor_y));
         waste(&f, 0.5, rim, floor_y, 0.84, M.chrome);
+        // a towel over the back rim at the left end
+        draped_towel(
+            &f,
+            "towel",
+            -0.5,
+            0.32,
+            &[
+                (rim + 0.008, -0.3),
+                (rim + 0.012, -0.36),
+                (rim, -0.41),
+                (rim - 0.04, -0.415),
+                (rim - 0.22, -0.41),
+            ],
+            M.towel,
+            0.009, // a terry towel's one layer: its cut end too thin to show an edge
+        );
+    });
+    let (floor_ring, top) = rings.unwrap();
+    join(&still, "body", Some((0, 0, 0).into()));
+    // the floor-standing filler: drawn, not the tub's size
+    let filler = new_parts(|| {
         // a floor-standing filler at the right end: a rose on the floor, a column with its mixer and a handset,
         // bent over into a spout above the water
         rose(&f, "filler_base", 0.93, 0.0, 0.12, 0.07, M.chrome, 0.02, 20);
@@ -538,28 +564,12 @@ pub fn bathtub_freestanding() -> Vec<Obj> {
             M.chrome,
             verts = 6
         );
-        // a towel over the back rim at the left end
-        draped_towel(
-            &f,
-            "towel",
-            -0.5,
-            0.32,
-            &[
-                (rim + 0.008, -0.3),
-                (rim + 0.012, -0.36),
-                (rim, -0.41),
-                (rim - 0.04, -0.415),
-                (rim - 0.22, -0.41),
-            ],
-            M.towel,
-            0.009, // a terry towel's one layer: its cut end too thin to show an edge
-        );
     });
-    let (floor_ring, top) = rings.unwrap();
-    join(&still, "body", Some((0, 0, 0).into()));
+    aside(&filler, "filler");
     let stream = stream(
         &f,
-        "stream",
+        // the taps' water: drawn with them, not the tub's size
+        &format!("stream{ASIDE}"),
         (0.61, 0.81, 0.0),
         floor_y,
         M.water,
