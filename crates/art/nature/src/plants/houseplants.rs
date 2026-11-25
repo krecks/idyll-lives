@@ -694,8 +694,9 @@ pub fn boston_fern() -> Vec<Obj> {
         let yaw = i as f64 * 40.0 + rng.uniform(-10.0, 10.0);
         let (tilt, length, droop) = (
             rng.uniform(40.0, 62.0),
-            rng.uniform(0.43, 0.49),
-            rng.uniform(0.92, 1.04),
+            // (a Boston fern's fronds 0.6-0.9 m, arching over and hanging down past its pot)
+            rng.uniform(0.43, 0.49) * 1.35,
+            rng.uniform(0.92, 1.04) * 1.6,
         );
         cut_leaf!(
             format!("frond{i}"),
@@ -717,7 +718,8 @@ pub fn boston_fern() -> Vec<Obj> {
             (0, 0, ys + 0.02),
             yaw,
             68.0,
-            0.28,
+            // (the young fronds upright out of the crown)
+            0.53,
             &pinnate!(6, 0.1, "lance", lean = 0.5, fill = 0.75),
             p.get("leaf_light"),
             droop = 0.5,
@@ -727,7 +729,6 @@ pub fn boston_fern() -> Vec<Obj> {
     }
     // the pot's square-cut rims eased (KIT: botany's `vessel` cuts them square)
     crate::chamfer(&["pot", "saucer"]);
-    fit_to(&meshes(), 0.734, 0.979, 0.792);
     settle(&[join_all("bostonFern")])
 }
 

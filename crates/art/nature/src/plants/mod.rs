@@ -104,7 +104,7 @@ pub fn family() -> Family {
             pot(Model::new(
                 "bostonFern",
                 houseplants::boston_fern,
-                (0.734, 0.979, 0.792),
+                (0.732, 1.128, 0.748),
             )
             .key("model.garden.bostonFern")),
             pot(Model::new("palm", houseplants::palm, (0.770, 0.905, 0.693))
