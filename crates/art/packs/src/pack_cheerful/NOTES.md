@@ -6,7 +6,7 @@ entries in `packs/pack_cheerful/manifest.json`, an override pack listed in the b
 
 Each is built where the game places it (`F`, game axes; `settle!(centre = false)` and `.centre(..)` on its `Model`),
 with one moving part. Flat shapes (the jukebox's arch, the lamp's hills, the booth's pleated curtains, the hammock's
-sling) are meshes made from points in the family (`slab`, `ring!`, `pleats`, `_obj`).
+sling) are meshes made from points in the family (`slab`, `ring!`, `pleats` on the kit's `kit::pleats!`, `_obj`).
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
