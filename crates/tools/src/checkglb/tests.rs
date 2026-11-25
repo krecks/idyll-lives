@@ -503,6 +503,12 @@ fn a_seat_front_is_where_the_seat_ends_in_front() {
 }
 
 fn quads(quads: &[[f32; 5]]) -> Glb {
+    let names: Vec<String> = (0..quads.len()).map(|k| format!("q{k}")).collect();
+    named_quads(&names, quads)
+}
+
+/// `quads` with their nodes named `names`.
+fn named_quads(names: &[String], quads: &[[f32; 5]]) -> Glb {
     let mut bin = Vec::new();
     for [y, x0, x1, z0, z1] in quads {
         for v in [
@@ -518,7 +524,7 @@ fn quads(quads: &[[f32; 5]]) -> Glb {
     bin.extend([0u16, 1, 2, 0, 2, 3].iter().flat_map(|i| i.to_le_bytes()));
     let n = quads.len();
     let nodes: Vec<String> = (0..n)
-        .map(|k| format!(r#"{{"name": "q{k}", "mesh": {k}}}"#))
+        .map(|k| format!(r#"{{"name": "{}", "mesh": {k}}}"#, names[k]))
         .collect();
     let meshes: Vec<String> = (0..n)
         .map(|k| {
@@ -1458,4 +1464,25 @@ fn the_treadmills_belt_scrolls_by_whole_slats() {
     let node = node_index(nodes, key(key(c, "target").unwrap(), "node").unwrap()).unwrap();
     let landed = lands_on_itself(&g, node, &first, &last).unwrap().unwrap();
     assert!(landed > 0.5 && landed < 1.0, "{landed}");
+}
+
+/// `cargo review sizes` measures a model's own body: a desk's top and its height as a table leave out the screen it
+/// carries (`_aside`), which the gate's heights (where residents sit) still see; a bench no content draws has the
+/// seat its kind looks for.
+#[test]
+fn the_review_measures_the_body_not_what_it_carries() {
+    let desk = named_quads(
+        &["top".into(), "screen_aside".into()],
+        &[[0.74, 0.0, 1.0, -0.4, 0.4], [1.2, 0.3, 0.7, -0.1, 0.1]],
+    );
+    let none = J::Obj(Vec::new());
+    let all = Sampler::new(&desk, &none, None).unwrap().unwrap();
+    let own = Sampler::own(&desk, &none).unwrap().unwrap();
+    assert!((all.height_by(0.74).unwrap() - 1.2).abs() < 1e-6, "the screen on it");
+    assert!((own.height_by(0.74).unwrap() - 0.74).abs() < 1e-6, "the desk alone");
+    assert_eq!(top_near(&own, [0.72, 0.76], &[]).map(|(_, h)| (h * 100.0).round()), Some(74.0));
+    // A bench: its seat 0.45 m up, its back's top rail 0.9 m behind it.
+    let bench = quads(&[[0.45, -0.8, 0.8, -0.2, 0.2], [0.9, -0.8, 0.8, -0.25, -0.2]]);
+    let s = Sampler::own(&bench, &none).unwrap().unwrap();
+    assert_eq!(seat_near(&s, [0.42, 0.48]).map(|h| (h * 100.0).round()), Some(45.0));
 }

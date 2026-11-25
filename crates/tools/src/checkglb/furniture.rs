@@ -61,6 +61,17 @@ pub(super) struct Sampler {
 impl Sampler {
     /// None if its positions can't be read here (compressed).
     pub(super) fn new(g: &Glb, entry: &J, pose: Option<&Pose>) -> R<Option<Sampler>> {
+        Self::without(g, entry, pose, &HashSet::new())
+    }
+
+    /// The model's own body at rest (`cargo review sizes`' top and table): what it carries (`aside_nodes`, a moving
+    /// part too) left out.
+    pub(super) fn own(g: &Glb, entry: &J) -> R<Option<Sampler>> {
+        Self::without(g, entry, None, &aside_nodes(&g.gltf))
+    }
+
+    /// `new` with the parts `skip` (their nodes, or the moving parts they are on) left out.
+    fn without(g: &Glb, entry: &J, pose: Option<&Pose>, skip: &HashSet<usize>) -> R<Option<Sampler>> {
         let materials = g.gltf.get("materials").and_then(J::list).unwrap_or(&[]);
         let no_overrides = J::Obj(Vec::new());
         let overrides = entry.get("materials").unwrap_or(&no_overrides);
@@ -78,6 +89,7 @@ impl Sampler {
         // (A part flattened to nothing: one of its axes under a hundredth of its longest, G.grow from 0.001.)
         let placed: Vec<Placed> = node_matrices(&g.gltf, pose, None)?
             .into_iter()
+            .filter(|p| !skip.contains(&p.node) && !p.part.is_some_and(|q| skip.contains(&q)))
             .filter(|p| {
                 let axis =
                     |k: usize| hypot(&[p.m[k * 4].f(), p.m[k * 4 + 1].f(), p.m[k * 4 + 2].f()]);
@@ -295,6 +307,7 @@ pub(super) fn open_pose(g: &Glb, clip: &J) -> R<Pose> {
 
 /// A functional height of a content object (where residents sit or lie on it, where things stand on its top,
 /// where its lamp shines from) and what its model has there (`heights`).
+#[derive(Default)]
 pub struct Height {
     /// `seat`, `surface`, `mattress`, `lower bunk`, `upper bunk` or `light`.
     pub what: &'static str,

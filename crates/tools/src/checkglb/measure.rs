@@ -102,7 +102,8 @@ fn measure(
     if top.is_none() && seats.is_empty() && !f.stairs {
         return Ok(out);
     }
-    let Some(s) = Sampler::new(&m.file, &m.entry, None)? else {
+    // (Its own body's: what it carries isn't its top, nor what a table is measured without its chairs.)
+    let Some(s) = Sampler::own(&m.file, &m.entry)? else {
         return Ok(out);
     };
     out.top = top.and_then(|range| top_near(&s, range, &seats));
@@ -128,6 +129,8 @@ fn measure(
 pub struct Measures {
     pub models: BTreeMap<String, Result<[f64; 3], String>>,
     pub objects: BTreeMap<String, Result<Measure, String>>,
+    /// {model key: its seat (m)}, for the models `measures` was given a seat range for (`seat_near`).
+    pub seats: BTreeMap<String, f64>,
 }
 
 /// The most draw calls a model may take: the pack entry's `draws` for the one model whose moving parts can't fit
@@ -204,9 +207,24 @@ pub(super) fn model(entry: &J, path: &str) -> R<Model> {
     })
 }
 
+/// The seat of a model no content object draws (a street bench the game places by code), its kind's seat `range`
+/// (m): on `top_near`'s lines, the face looking up nearest the range; None: no face looks up there.
+pub(super) fn seat_near(s: &Sampler, range: [f64; 2]) -> Option<f64> {
+    let off = |h: f64| (range[0] - h).max(h - range[1]).max(0.0);
+    top_lines(s, &[])
+        .iter()
+        .filter_map(|p| s.top_in(p[0], p[1], range))
+        .min_by(|a, b| off(*a).total_cmp(&off(*b)))
+}
+
 /// Measures every model and content object (`Measures`), for `cargo review sizes`; `tops`: {object id: its
-/// kind's top range}, for those whose content has no `surface` (`top_near`).
-pub fn measures(paths: &Paths, tops: &BTreeMap<String, [f64; 2]>) -> Result<Measures, String> {
+/// kind's top range}, for those whose content has no `surface` (`top_near`); `seats`: {model key: its kind's seat
+/// range}, for the models no content object draws (`seat_near`).
+pub fn measures(
+    paths: &Paths,
+    tops: &BTreeMap<String, [f64; 2]>,
+    seats: &BTreeMap<String, [f64; 2]>,
+) -> Result<Measures, String> {
     let stack = asset_manifests(paths)?;
     let defs = content(paths)?;
     let facts = content_objects(&defs)?;
@@ -241,9 +259,21 @@ pub fn measures(paths: &Paths, tops: &BTreeMap<String, [f64; 2]>) -> Result<Meas
             objects.insert(str_of(&f.id), measured);
         }
     }
+    let mut found = BTreeMap::new();
+    for (k, range) in seats {
+        if let Some(Ok(m)) = read.get(k)
+            && let Some(h) = Sampler::own(&m.file, &m.entry)?.and_then(|s| seat_near(&s, *range))
+        {
+            found.insert(k.clone(), h);
+        }
+    }
     let models = read
         .into_iter()
         .map(|(k, m)| (k, m.map(|m| m.size)))
         .collect();
-    Ok(Measures { models, objects })
+    Ok(Measures {
+        models,
+        objects,
+        seats: found,
+    })
 }

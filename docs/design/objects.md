@@ -496,6 +496,9 @@ are the examples; `hinged`, `turn`, `swing!` and `slide!` do the work.
 - **`cargo review sizes --check`** (in CI) holds every buyable object's sizes and heights to its kind in
   `docs/review/reference.json` (a tree or plant to its species), what is outside today held by
   `tools/art/gate-baseline.json`'s `reference`; **`cargo review uses --check`** every use the renderer plays.
+  It measures the piece's own body: what it carries (`parts::aside`, a moving part named `<what>_aside` too) is
+  left out of its size, its top and its height as a table, though the seats and mattresses residents use are
+  measured on all of it; a model no content object draws (a street bench) has its seat found as its kind's.
 - **`cargo test -p sim-core --test sim shipped_content::`** (in CI) fails when an object or item has no
   model file, or no `far` file where its entry names one, once the manifests are stacked as the game
   stacks them, and on an empty `model`.
