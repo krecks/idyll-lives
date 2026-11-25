@@ -129,7 +129,7 @@ export async function ensureLlm(device: OrtDevice = llmStatus.device): Promise<v
     llmStatus.progress = 0;
     llmStatus.error = '';
     llmStatus.state = 'loading';
-    post({ type: 'load', base: import.meta.env.BASE_URL, model: MODEL, device });
+    post({ type: 'load', base: import.meta.env.BASE_URL, model: MODEL, device: llmStatus.device });
   }
   return new Promise((resolve, reject) => waiters.push({ resolve, reject }));
 }
