@@ -4,10 +4,9 @@
  * (`WorldMeta.centre`), and how built over it is against the rest of the town (`centreDensity`).
  */
 
-import { inside, leftOf, lengths, nearest, pointAt, roadMask, type Pt, type RoadPlan } from './roads';
+import { dist, inside, leftOf, lengths, nearest, pointAt, roadMask, type Pt, type RoadPlan } from './roads';
 import type { Ground, Rect } from './town';
 import { add, ccw, fillPoly, r2, rectFrom, rectPoly, tilesOf } from './footprints';
-import * as pmath from './pmath';
 
 /** How long a main town's high street is (m, at most), and how far its centre reaches either side of its middle line. */
 const HIGH_STREET = 180;
@@ -42,7 +41,6 @@ export interface Centre {
   at?: { s: number; w: number; d: number; side: 1 | -1; front: number };
 }
 
-const dist = (a: Pt, b: Pt) => pmath.hypot(a[0] - b[0], a[1] - b[1]);
 
 /** Whether a polyline crosses itself (two segments not next to each other meeting). */
 export function selfCrossing(poly: readonly Pt[]): boolean {

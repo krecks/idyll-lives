@@ -15,6 +15,8 @@
  * for everyone, a resident's persona once for them, and each line costs only the moment.
  */
 
+import { mulberry32 } from '../game/noise';
+
 /** The pieces of ONNX Runtime used here (`onnxruntime-web`, CPU or WebGPU build). */
 export interface Tensor {
   readonly dims: readonly number[];
@@ -432,18 +434,6 @@ function firstOf(text: string, stops: readonly string[] | undefined): number {
     if (at >= 0 && (first < 0 || at < first)) first = at;
   }
   return first;
-}
-
-/** A small seeded random number generator (0..1). */
-export function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 /**

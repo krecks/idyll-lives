@@ -23,6 +23,7 @@
 import { tuned } from '../tune';
 import { LENS, RADIUS_LIMITS, TOWN_FROM, TOWN_FULL, TOWN_MAX, townBlend } from './lens';
 import type { OrbitShape } from './orbit';
+import { lerp } from '../../game/noise';
 
 /**
  * The haze from over the town (`?tune=haze.from:2` on the dev server).
@@ -57,7 +58,6 @@ const REACH = 0.6;
 /** The least the target can roam either way in the full town view (m): the pan bounds are never drawn in further. */
 const ROAM_LEAST = 96;
 
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /** The tilt's limits for a camera `radius` m out, into `out`: `limits` (the play camera's) eased into `TOWN_BETA`. */
 export function townBeta(radius: number, limits: readonly [number, number], out: [number, number]): void {

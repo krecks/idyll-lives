@@ -43,7 +43,7 @@ import { APRON, landZones, Protection, wetTiles, type BuiltLand } from './landEd
 import { bridgeSites, dryPieces, type Bounds } from './landPieces';
 import { GENTLE_TILT, seedBare, smoothHeights, type GentlePlane } from './landFollow';
 import { outlines, rasterize, rle, simplify } from './landMasks';
-import { between, fbm, forkable, mulberry32 } from './noise';
+import { between, clamp01, fbm, forkable, mulberry32 } from './noise';
 import type { UseLayer } from './uses';
 import { along, astar, CELL, Cells, clearOfBoxes, COUNTRY_GRADE, COUNTRY_WIDTH, CountryRouter, CTRL_APART, FACING, ROAD_WIDTH, ROUTE_GRADE, SIDE_COST, TRIES, type Port, type Way } from './countryRouter';
 import { centroid, cropRoads, curve, dist, evenly, inside, keepOf, leftOf, lengths, nearest, pointAt, rasterRoads, RoadIndex, roadIndex, roadLengths, roadMeets, round2, straightAround, type Box, type Pt, type RoadPlan } from './roads';
@@ -430,7 +430,6 @@ export function generateFromSpec(content: Content, t: Templates, spec: WorldSpec
   const valley = !!spec.massif;
   const massif = spec.massif ? range(mulberry32((seed ^ MASSIF) >>> 0), ...spec.massif) : 0;
   const valleyZ = (x: number) => D / 2 + (fbm(x / 420, 3.7, nseed + 3, 3) - 0.47) * 260;
-  const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
   for (let i = 0; i < gw * gd && !shaped; i++) {
     const [x, z] = land.centre(i);
     let h = fbm(x / 230, z / 230, nseed, 4) * spec.hills * 2;
@@ -2503,7 +2502,6 @@ function planned(spec: WorldSpec, seed: number): Planned {
   const { gw, gd } = land;
   const nseed = (seed % 100000) + 17;
   const rand = mulberry32((seed ^ PLAN) >>> 0);
-  const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
   const valley = !!spec.massif;
   const massif = spec.massif ? range(mulberry32((seed ^ MASSIF) >>> 0), ...spec.massif) : 0;
   const valleyZ = (x: number) => D / 2 + (fbm(x / 420, 3.7, nseed + 3, 3) - 0.47) * 260;

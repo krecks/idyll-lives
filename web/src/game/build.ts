@@ -62,7 +62,7 @@ import { AREA_APART, BEND, BEND_MOST, BIG_PLACES, cells8, cornersOf, FARM_SHOP_R
 import { mulberry32 } from './noise';
 import { placeOfTemplate, placeUnit } from './placeLots';
 import { fronted, greenSpots, hatched, SPOT_NEAR, SPOT_REACH, stretchesOf, type Stretch } from './proposal';
-import { centroid, inside, lengths, leftOf, pointAt, RoadIndex, straightAround, type Pt } from './roads';
+import { centroid, dist, inside, lengths, leftOf, pointAt, RoadIndex, straightAround, type Pt } from './roads';
 import { boundsOf, frontageOf, generatedHouses, Ground, lotAt, LotPlacer, plotRect, shuffled, slotDims, wantedLots, type Facing, type Frontage, type NeighbourhoodDraft, type PlotSlot, type PublicTemplate, type Rect, type Templates, type Unplaced } from './town';
 import { previewWorld } from './townPreview';
 import type { LaidTown, Proposal } from './townJobs';
@@ -126,7 +126,6 @@ function mix(seed: number, ...words: (string | number)[]): number {
   return h >>> 0;
 }
 
-const dist = (a: Pt, b: Pt) => pmath.hypot(a[0] - b[0], a[1] - b[1]);
 const offRect = (r: Rect, [x, z]: Pt) => pmath.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.z - z, 0, z - r.z - r.d));
 const middle = (a: Rect): Pt => [a.x + a.w / 2, a.z + a.d / 2];
 /** A thing's footprint (tiles) for the driveways' test: the content's (`parking.ts` `driveLines`). */

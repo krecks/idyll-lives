@@ -5,6 +5,8 @@
  * in the row-vector layout of `shared/math.ts`: a vertex times the pose.
  */
 
+import { clamp } from '../../game/noise';
+
 export interface ModelClip {
   /** Seconds. */
   duration: number;
@@ -81,6 +83,3 @@ export function partPose(playing: readonly { clip: ModelClip; time: number; kind
   return true;
 }
 
-function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
-}

@@ -12,6 +12,7 @@
 import { VISEMES } from '../../../voice/visemes';
 import type { MorphSet } from './data';
 import { MORPH_PAIRS } from './layout';
+import { hashInt } from '../../../game/noise';
 
 /**
  * Facial adjustments (all roughly 0..1): smile / frown (lip corners up / down), smirk (one-sided
@@ -210,12 +211,6 @@ const MICRO: readonly (readonly [Unit, number, number])[] = [
   ['eyeSquintRight', 4.7, 0.15],
 ];
 
-function hash01(n: number): number {
-  let h = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
-  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-}
-
 /** Share of a recipe's `eyeSquint` applied (see `FaceMixer.resolve`; the faces' units are at ARKit strength). */
 const SQUINT = 1;
 
@@ -395,7 +390,7 @@ export class FaceMixer {
       const c = this.u[unit];
       if (c < 0) continue;
       const bucket = Math.floor(time / period + seed * 13 + k * 0.37);
-      const r = hash01(bucket * 131 + k * 17 + Math.floor(seed * 1e4));
+      const r = hashInt(bucket * 131 + k * 17 + Math.floor(seed * 1e4));
       // Mostly nothing; sometimes a small movement (the face settles into and out of it).
       if (r > 0.6) this.t[c] += ((r - 0.6) / 0.4) * max * amount;
     }

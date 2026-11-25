@@ -37,6 +37,7 @@ enum Store {
 }
 
 /// Supertonic 3's graphs: as published, and as stored (saved gzipped as `<name>.onnxz`).
+/// The browser checks the stored ones and the other files' (`web/src/voice/tts.worker.ts`): change them there too.
 const GRAPHS: [(&str, &str, &str, Store); 4] = [
     (
         "duration_predictor",
