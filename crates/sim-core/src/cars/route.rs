@@ -306,36 +306,42 @@ impl Route {
         }
     }
 
+    /// The point after the one `t` ticks along lies past, when `points` and the per-point array a
+    /// caller reads (`lens` of them) agree: `Some(i)`, with `i - 1` and `i` the two either side.
+    /// None: too few points to have a span, or the array doesn't match them.
+    fn span(&self, lens: usize, t: f32) -> Option<usize> {
+        let pts = &self.points;
+        if pts.len() < 2 || lens != pts.len() {
+            return None;
+        }
+        Some(pts.partition_point(|p| p.2 <= t).clamp(1, pts.len() - 1))
+    }
+
     /// How far right of its lane a car standing `t` ticks along can pull over (m: the more of the
     /// two points either side: it's on the lane up to the one where its turn off it begins).
     pub(crate) fn room_here(&self, t: f32) -> f32 {
-        let pts = &self.points;
-        if pts.len() < 2 || self.room.len() != pts.len() {
+        let Some(i) = self.span(self.room.len(), t) else {
             return 0.0;
-        }
-        let i = pts.partition_point(|p| p.2 <= t).clamp(1, pts.len() - 1);
+        };
         self.room[i - 1].max(self.room[i])
     }
 
     /// How far right of the road's middle its lane is `t` ticks along (m: the more of the two
     /// points either side). None: nobody comes the other way at either.
     fn lane_at(&self, t: f32) -> Option<f32> {
-        let pts = &self.points;
-        if pts.len() < 2 || self.lane.len() != pts.len() {
+        // (A route whose points and lanes disagree keeps its car in its lane: `Some(LANE)`.)
+        let Some(i) = self.span(self.lane.len(), t) else {
             return Some(LANE);
-        }
-        let i = pts.partition_point(|p| p.2 <= t).clamp(1, pts.len() - 1);
+        };
         Some(self.lane[i - 1]?.max(self.lane[i]?))
     }
 
     /// How far right of its lane a car can pull over `t` ticks along (m: the less of the two
     /// points either side).
     pub(crate) fn room_at(&self, t: f32) -> f32 {
-        let pts = &self.points;
-        if pts.len() < 2 || self.room.len() != pts.len() {
+        let Some(i) = self.span(self.room.len(), t) else {
             return 0.0;
-        }
-        let i = pts.partition_point(|p| p.2 <= t).clamp(1, pts.len() - 1);
+        };
         self.room[i - 1].min(self.room[i])
     }
 
