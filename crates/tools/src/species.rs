@@ -252,21 +252,6 @@ pub struct Plant {
     pub tris: Vec<Tri>,
 }
 
-/// A model file's material's finish: the entry's `materials` map (or its `*`), else its own name
-/// (`leaf@foliage`).
-fn finish_of(materials: Option<&J>, name: &str) -> String {
-    materials
-        .and_then(|m| m.get(name).or_else(|| m.get("*")))
-        .and_then(|o| o.get("finish"))
-        .and_then(J::str)
-        .map(|f| f.trim_start_matches("material.finish.").to_string())
-        .or_else(|| {
-            let tail = name.rsplit_once('@')?.1;
-            Some(tail.split('#').next().unwrap_or(tail).to_string())
-        })
-        .unwrap_or_default()
-}
-
 /// The plant in model file `g`, with its entry's `materials` map and the manifests' finishes (`colours::finishes`).
 pub fn plant(
     g: &Glb,
@@ -276,7 +261,13 @@ pub fn plant(
     let mut out = Plant::default();
     for m in g.gltf.get("materials").and_then(J::list).unwrap_or(&[]) {
         let name = m.get("name").and_then(J::str).unwrap_or("").to_string();
-        let finish = finish_of(materials, &name);
+        // Its finish as the game maps it (`checkglb::override_of`), without the prefix.
+        let finish = checkglb::override_of(materials.unwrap_or(&J::Null), &name)
+            .get("finish")
+            .and_then(J::str)
+            .map_or(String::new(), |f| {
+                f.trim_start_matches("material.finish.").to_string()
+            });
         let base: Vec<f64> = m
             .get("pbrMetallicRoughness")
             .and_then(|p| p.get("baseColorFactor"))

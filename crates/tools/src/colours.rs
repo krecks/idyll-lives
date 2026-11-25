@@ -16,7 +16,10 @@
 //! cargo review colours [--all] [--check]
 //! ```
 
-use serde_json::Value as J;
+use crate::checkglb::glb::parse_glb;
+use crate::checkglb::json::loads_bytes;
+use crate::checkglb::override_of;
+use crate::checkglb::py::{J, Num};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -54,19 +57,20 @@ pub enum Finish {
 /// A manifest's finishes (`material.finish.*`), by key.
 pub fn finishes(manifest: &J, dir: &Path) -> BTreeMap<String, Finish> {
     let mut out = BTreeMap::new();
-    let Some(entries) = manifest.get("entries").and_then(J::as_object) else {
+    let Some(entries) = manifest.get("entries").and_then(J::entries) else {
         return out;
     };
     for (key, e) in entries
         .iter()
         .filter(|(k, _)| k.starts_with("material.finish."))
     {
-        let number = |name: &str, default: f64| e.get(name).and_then(J::as_f64).unwrap_or(default);
+        let number =
+            |name: &str, default: f64| e.get(name).and_then(J::num).map_or(default, Num::f);
         let finish = if number("alpha", 1.0) < 1.0 || e.get("cutout").is_some() {
             Finish::Skipped
         } else if number("metallic", 0.0) >= 0.5 {
             Finish::Metal
-        } else if let Some(texture) = e.get("texture").and_then(J::as_str) {
+        } else if let Some(texture) = e.get("texture").and_then(J::str) {
             match image::open(dir.join(texture)) {
                 Ok(image) => {
                     let image = image.to_rgb8();
@@ -87,25 +91,6 @@ pub fn finishes(manifest: &J, dir: &Path) -> BTreeMap<String, Finish> {
         out.insert(key.clone(), finish);
     }
     out
-}
-
-/// A material named for its finish (`stone@matte`, `tunic@fabric#body`): the finish's key.
-fn named_finish(name: &str) -> Option<String> {
-    let tail = name.split_once('@')?.1;
-    let tail = tail.split('#').next().unwrap_or(tail);
-    (!tail.is_empty() && tail.chars().all(|c| c.is_ascii_lowercase()))
-        .then(|| format!("material.finish.{tail}"))
-}
-
-/// A `.glb`'s JSON chunk.
-fn gltf(file: &Path) -> Result<J, String> {
-    let data = std::fs::read(file).map_err(|e| format!("{}: {e}", file.display()))?;
-    let len = data
-        .get(12..16)
-        .map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize)
-        .ok_or("not a .glb")?;
-    serde_json::from_slice(data.get(20..20 + len).ok_or("its JSON chunk ends early")?)
-        .map_err(|e| format!("{}: {e}", file.display()))
 }
 
 /// One material of one model out of range.
@@ -131,21 +116,18 @@ pub fn of_model(
 ) -> ([usize; 2], Vec<Found>) {
     let mut checked = [0; 2];
     let mut found = Vec::new();
-    let list = gltf
-        .get("materials")
-        .and_then(J::as_array)
-        .map(Vec::as_slice)
-        .unwrap_or_default();
-    for m in list {
-        let name = m.get("name").and_then(J::as_str).unwrap_or("");
-        let mapped = materials.and_then(|map| map.get(name).or_else(|| map.get("*")));
+    for m in gltf.get("materials").and_then(J::list).unwrap_or(&[]) {
+        let name = m.get("name").and_then(J::str).unwrap_or("");
+        // As the game maps it: its own entry, else the finish in its name, else the `*` one.
+        let mapped = override_of(materials.unwrap_or(&J::Null), name);
+        let mapped = Some(&mapped).filter(|o| **o != J::Null);
         let finish_key = mapped
             .and_then(|o| o.get("finish"))
-            .and_then(J::as_str)
-            .map(String::from)
-            .or_else(|| named_finish(name));
+            .and_then(J::str)
+            .map(String::from);
         let pbr = m.get("pbrMetallicRoughness");
-        let number = |o: Option<&J>, name: &str| o.and_then(|o| o.get(name)).and_then(J::as_f64);
+        let number =
+            |o: Option<&J>, name: &str| o.and_then(|o| o.get(name)).and_then(J::num).map(Num::f);
         let finish = match &finish_key {
             Some(k) => finishes.get(k).cloned().unwrap_or(Finish::Plain),
             None => Finish::Plain,
@@ -159,18 +141,18 @@ pub fn of_model(
         }) >= 0.5;
         let glows = mapped.is_some_and(|o| o.get("glow").is_some())
             || m.get("emissiveFactor")
-                .and_then(J::as_array)
-                .is_some_and(|e| e.iter().any(|v| v.as_f64().unwrap_or(0.0) > 0.0));
+                .and_then(J::list)
+                .is_some_and(|e| e.iter().any(|v| v.num().map_or(0.0, Num::f) > 0.0));
         if glows
             || finish == Finish::Skipped
-            || m.get("alphaMode").and_then(J::as_str) == Some("BLEND")
+            || m.get("alphaMode").and_then(J::str) == Some("BLEND")
         {
             continue;
         }
         let base: Vec<f64> = pbr
             .and_then(|p| p.get("baseColorFactor"))
-            .and_then(J::as_array)
-            .map(|a| a.iter().map(|v| v.as_f64().unwrap_or(1.0)).collect())
+            .and_then(J::list)
+            .map(|a| a.iter().map(|v| v.num().map_or(1.0, Num::f)).collect())
             .unwrap_or_else(|| vec![1.0; 4]);
         let tint = match finish {
             Finish::Textured(mean) => mean,
@@ -217,27 +199,27 @@ pub(crate) fn manifests(dir: &Path, out: &mut Vec<PathBuf>) {
 /// Every named model's materials: how many models, how many colours were looked at (those that aren't
 /// metal, then the metals), and those out of range.
 pub fn survey(assets: &Path) -> Result<(usize, [usize; 2], Vec<Found>), String> {
-    let read = |path: &Path| -> Result<J, String> {
-        serde_json::from_slice(
-            &std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?,
-        )
-        .map_err(|e| format!("{}: {e}", path.display()))
+    let read = |path: &Path| -> Result<Vec<u8>, String> {
+        std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))
     };
-    let finishes = finishes(&read(&assets.join("manifest.json"))?, assets);
+    let json = |path: &Path| -> Result<J, String> {
+        loads_bytes(&read(path)?).map_err(|e| format!("{}: {e}", path.display()))
+    };
+    let finishes = finishes(&json(&assets.join("manifest.json"))?, assets);
     let mut files = Vec::new();
     manifests(assets, &mut files);
     let (mut models, mut checked, mut found) = (0, [0; 2], Vec::new());
     for file in files {
-        let manifest = read(&file)?;
+        let manifest = json(&file)?;
         let dir = file.parent().unwrap_or(assets);
-        let Some(entries) = manifest.get("entries").and_then(J::as_object) else {
+        let Some(entries) = manifest.get("entries").and_then(J::entries) else {
             continue;
         };
         for (key, entry) in entries {
             let Some(url) = entry
                 .get("url")
-                .and_then(J::as_str)
-                .filter(|_| entry.get("type").and_then(J::as_str) == Some("model"))
+                .and_then(J::str)
+                .filter(|_| entry.get("type").and_then(J::str) == Some("model"))
             else {
                 continue;
             };
@@ -250,7 +232,9 @@ pub fn survey(assets: &Path) -> Result<(usize, [usize; 2], Vec<Found>), String> 
                 key,
                 &family,
                 entry.get("materials"),
-                &gltf(&glb)?,
+                &parse_glb(&read(&glb)?)
+                    .map_err(|e| format!("{}: {e}", glb.display()))?
+                    .gltf,
                 &finishes,
             );
             models += 1;
@@ -345,6 +329,10 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    fn j(v: serde_json::Value) -> J {
+        loads_bytes(v.to_string().as_bytes()).unwrap()
+    }
+
     #[test]
     fn a_model_s_colours_in_and_out_of_range() {
         let mut finishes = BTreeMap::new();
@@ -366,7 +354,13 @@ mod tests {
             "lamp": { "finish": "material.finish.matte", "glow": "#FFD9A0" },
             "brass": { "finish": "material.finish.matte", "metallic": 1.0 },
         });
-        let (checked, found) = of_model("model.x", "kitchen", Some(&materials), &gltf, &finishes);
+        let (checked, found) = of_model(
+            "model.x",
+            "kitchen",
+            Some(&j(materials)),
+            &j(gltf),
+            &finishes,
+        );
         // (The lamp is left out; steel and brass are metals; the wood's 0.9 is 0.45 under its texture.)
         assert_eq!(checked, [5, 2]);
         let names: Vec<&str> = found.iter().map(|f| f.material.as_str()).collect();
@@ -392,25 +386,18 @@ mod tests {
             "painted": { "finish": "material.finish.metal", "metallic": 0 },
             "grate": { "finish": "material.finish.metal" },
         });
-        let (checked, found) = of_model("model.x", "kitchen", Some(&materials), &gltf, &finishes);
+        let (checked, found) = of_model(
+            "model.x",
+            "kitchen",
+            Some(&j(materials)),
+            &j(gltf),
+            &finishes,
+        );
         // (Painted over, the metal finish's colour is a dielectric's: 5 % is in range.)
         assert_eq!(checked, [1, 4]);
         let names: Vec<&str> = found.iter().map(|f| f.material.as_str()).collect();
         assert_eq!(names, ["iron", "gunmetal", "grate"]);
         assert!(found.iter().all(|f| f.metal));
-    }
-
-    #[test]
-    fn finishes_by_name() {
-        assert_eq!(
-            named_finish("stone@matte").as_deref(),
-            Some("material.finish.matte")
-        );
-        assert_eq!(
-            named_finish("tunic@fabric#body").as_deref(),
-            Some("material.finish.fabric")
-        );
-        assert_eq!(named_finish("plain"), None);
     }
 
     #[test]

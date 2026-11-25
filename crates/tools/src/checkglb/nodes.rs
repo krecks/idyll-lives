@@ -71,7 +71,7 @@ pub(crate) struct Placed {
     pub(crate) mesh: J,
     pub(crate) m: Matrix,
     pub(super) part: Option<usize>,
-    pub(super) node: usize,
+    pub(crate) node: usize,
 }
 
 /// Translations, rotations and scales (by node and path) that put nodes elsewhere than at rest (a part grown,
