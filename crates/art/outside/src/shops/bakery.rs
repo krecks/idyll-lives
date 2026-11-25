@@ -81,7 +81,7 @@ pub fn bakery_case() -> Vec<Obj> {
                 .chain(front_arc.iter().copied())
                 .chain([(-0.45, 1.29)])
                 .collect();
-            fextrude!(
+            crate::eased(fextrude!(
                 f,
                 format!("end{s}"),
                 &outline,
@@ -89,7 +89,7 @@ pub fn bakery_case() -> Vec<Obj> {
                 (x, 0, 0),
                 M.rim,
                 plane = Facing::Side
-            );
+            ));
         }
         let outer = arc(0.37, deck, 0.2, 1.265, 8, 0.0);
         let inner = arc(0.37, deck, 0.2, 1.265, 8, 0.01);

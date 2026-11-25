@@ -187,7 +187,7 @@ pub fn hot_dog_stand() -> Vec<Obj> {
             }
         }
         // the sign on the front: a framed plate, a hot dog in its bun with a mustard zigzag
-        fextrude!(
+        crate::eased(fextrude!(
             f,
             "sign_frame",
             &rounded_rect(0.66, 0.26, 0.02, 2),
@@ -195,7 +195,7 @@ pub fn hot_dog_stand() -> Vec<Obj> {
             (-0.1, 0.72, 0.284),
             M.steel,
             holes = [rounded_rect(0.62, 0.22, 0.012, 2)]
-        );
+        ));
         fbox!(
             f,
             "sign",

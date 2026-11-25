@@ -39,7 +39,7 @@ pub fn shop_counter() -> Vec<Obj> {
             bevel = 0.008
         );
         // the worktop: walnut with a rounded nose along its front, a cove moulding under it
-        fextrude!(
+        crate::eased(fextrude!(
             f,
             "worktop",
             &[
@@ -57,7 +57,7 @@ pub fn shop_counter() -> Vec<Obj> {
             (0, 0, 0),
             M.walnut,
             plane = Facing::Side
-        );
+        ));
         fsweep!(
             f,
             "cove",
@@ -301,7 +301,7 @@ pub fn shop_counter() -> Vec<Obj> {
             rot = (-15, 0, 0)
         );
         for s in [-1, 1] {
-            fextrude!(
+            crate::eased(fextrude!(
                 f,
                 format!("rack_end{s}"),
                 &[
@@ -315,7 +315,7 @@ pub fn shop_counter() -> Vec<Obj> {
                 (rx + s as f64 * 0.254, top, rz),
                 M.walnut,
                 plane = Facing::Side
-            );
+            ));
         }
         for (i, mag) in [M.mag1, M.mag2, M.mag3, M.mag4].into_iter().enumerate() {
             let (x, z) = (

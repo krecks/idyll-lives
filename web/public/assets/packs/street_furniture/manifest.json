@@ -233,6 +233,9 @@
         "glass": {
           "finish": "material.finish.glass"
         },
+        "pane": {
+          "finish": "material.finish.gloss"
+        },
         "paper": {
           "finish": "material.finish.matte"
         },

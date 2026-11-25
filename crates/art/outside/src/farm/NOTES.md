@@ -110,10 +110,10 @@ The table says Paint, Roof. The barn, silo and coop take those with their real m
 |---|---|---|---|---|
 | `model.farm.barn` | 6.04 × 6.00 × 5.94 m | 11,876 | 620 | 1 |
 | `model.farm.silo` | 2.80 × 6.90 × 2.72 m | 10,644 | 568 | 1 |
-| `model.farm.tractor` | 1.62 × 2.51 × 3.30 m | 11,536 | 1,364 | 1 |
+| `model.farm.tractor` | 1.62 × 2.51 × 3.30 m | 11,760 | 1,364 | 1 |
 | `model.farm.hayBale` | 1.23 × 1.23 × 1.23 m | 4,544 | 396 | 2 (hay fabric + plain) |
 | `model.farm.hayStack` | 1.91 × 0.93 × 0.88 m | 3,588 | 108 | 2 |
-| `model.farm.scarecrow` | 1.00 × 2.12 × 0.55 m | 4,570 | 1,134 | 3 (post wood, clothes fabric, plain) |
+| `model.farm.scarecrow` | 1.00 × 2.12 × 0.55 m | 4,542 | 1,134 | 3 (post wood, clothes fabric, plain) |
 | `model.farm.trough` | 1.88 × 0.66 × 0.75 m | 3,376 | 256 | 1 |
 | `model.farm.coop` | 1.74 × 1.88 × 1.97 m | 7,696 | 264 | 3 (walls wood + plain, the hatch) |
 

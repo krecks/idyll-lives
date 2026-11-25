@@ -1,8 +1,7 @@
 //! What the farm is built from: the palette, the frame, and the slabs, shells and bars the buildings are made of,
 //! each drawn as an outline on a plane and thickened across it.
 
-use artkit::bevel::{EdgeOrder, bevel_edges};
-use artkit::far::is_low;
+pub use crate::eased;
 use artkit::forms;
 use artkit::materials::Mat;
 use artkit::math::{V3, cosd, sind};
@@ -10,7 +9,7 @@ use artkit::palette;
 use artkit::place::{Coord, GameFrame, N};
 use artkit::py;
 use artkit::scene::Obj;
-use artkit::shapes::{AUTO_WIDTH, SHARP};
+use artkit::shapes::SHARP;
 
 /// Built in the game's axes (x, height, depth; front +depth).
 pub const F: GameFrame = GameFrame::new(0.0);
@@ -87,26 +86,6 @@ pub fn mesh(name: &str, verts: &[(N, N, N)], faces: &[Vec<u32>], material: Mat) 
         .map(|&(x, y, z)| F.at(x, y, z).into())
         .collect();
     forms::object(name, vs, faces, Some(material), false, SHARP, false)
-}
-
-/// `obj` with its edges turning over 50° chamfered by a pixel at the play camera (what `cube!` gives a box), none
-/// in a far version (each far version is built in `far_of`) nor on a part the gate's `edges` can't find hard: under
-/// 12 mm one way (its edges' faces too narrow) or 10 cm every way (a detail, not a piece).
-pub fn eased(obj: Obj) -> Obj {
-    let points = obj.world_points();
-    let side = |k: fn(&V3) -> f32| {
-        let (lo, hi) = points
-            .iter()
-            .map(k)
-            .fold((f32::MAX, f32::MIN), |(lo, hi), v| (lo.min(v), hi.max(v)));
-        f64::from(hi - lo)
-    };
-    let sides = [side(|p| p.x), side(|p| p.y), side(|p| p.z)];
-    if is_low() || sides.iter().any(|&s| s < 0.0119) || sides.iter().all(|&s| s < 0.1) {
-        return obj;
-    }
-    // (the gate's `edges` finds turns of 60° or more: a rounded corner's 45° steps are left as they are)
-    bevel_edges(obj, AUTO_WIDTH, 1, 50.0, &EdgeOrder::Corners)
 }
 
 /// A bar lying on a surface from game point `a` to `b`, standing `height` off it towards `up` (a game direction

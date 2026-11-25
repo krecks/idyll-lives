@@ -171,7 +171,7 @@ pub fn market_stall() -> Vec<Obj> {
             );
         }
         for z in [-0.38, 0.38] {
-            fbox!(
+            crate::boxed(fbox!(
                 f,
                 format!("shelf_rail{}", float_repr(z)),
                 1.76,
@@ -179,11 +179,11 @@ pub fn market_stall() -> Vec<Obj> {
                 0.04,
                 (0, 0.17, z),
                 M.timber
-            );
+            ));
         }
         for x in [-0.88, 0.88] {
             for (z, h) in [(-0.4, 2.1), (0.4, 1.9)] {
-                fbox!(
+                crate::boxed(fbox!(
                     f,
                     format!("post{}{}", float_repr(x), float_repr(z)),
                     0.06,
@@ -193,12 +193,12 @@ pub fn market_stall() -> Vec<Obj> {
                     M.timber,
                     bevel = 0.006,
                     bevel_segments = 1
-                );
+                ));
             }
             // knee braces under the beams
             let sign = if x > 0.0 { 1 } else { -1 };
             for (z, y) in [(0.4, 1.84), (-0.4, 2.04)] {
-                fbox!(
+                crate::boxed(fbox!(
                     f,
                     format!("brace{}{}", float_repr(x), float_repr(z)),
                     0.04,
@@ -207,7 +207,7 @@ pub fn market_stall() -> Vec<Obj> {
                     (x - 0.08 * sign as f64, y - 0.07, z),
                     M.timber,
                     rot = (0, 45 * sign, 0)
-                );
+                ));
             }
         }
         fbox!(
@@ -265,7 +265,7 @@ pub fn market_stall() -> Vec<Obj> {
             );
         }
         fbox!(f, "board", 0.34, 0.18, 0.016, (0.5, 1.62, 0.4), M.slate);
-        fextrude!(
+        crate::eased(fextrude!(
             f,
             "board_frame",
             &rounded_rect(0.38, 0.22, 0.006, 1),
@@ -273,7 +273,7 @@ pub fn market_stall() -> Vec<Obj> {
             (0.5, 1.62, 0.4),
             M.timber,
             holes = [rounded_rect(0.34, 0.18, 0.004, 1)]
-        );
+        ));
         for (k, (w, dy)) in [(0.18, 0.04), (0.12, 0.0), (0.16, -0.045)]
             .into_iter()
             .enumerate()
@@ -313,19 +313,23 @@ pub fn market_stall() -> Vec<Obj> {
             material = M.steel,
             segments = 10
         );
-        revolve!(
-            "scale_pan",
-            &[
-                (0.0, 0.18),
-                (0.08, 0.18),
-                (0.1, 0.21),
-                (0.092, 0.212),
-                (0.075, 0.192),
-                (0.0, 0.192)
-            ],
-            at = f.at(0.8, 0.825, -0.31),
-            material = M.steel,
-            segments = 12
+        crate::ease(
+            revolve!(
+                "scale_pan",
+                &[
+                    (0.0, 0.18),
+                    (0.08, 0.18),
+                    (0.1, 0.21),
+                    (0.092, 0.212),
+                    (0.075, 0.192),
+                    (0.0, 0.192)
+                ],
+                at = f.at(0.8, 0.825, -0.31),
+                material = M.steel,
+                segments = 12
+            ),
+            50.0,
+            2,
         );
         fcyl!(
             f,
