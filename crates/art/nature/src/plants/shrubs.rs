@@ -294,6 +294,10 @@ pub fn topiary_cone() -> Vec<Obj> {
             seed = i as f64
         );
     }
+    // the pot's square-cut rims eased (KIT: botany's `vessel` cuts them square)
+    crate::chamfer(&["pot", "saucer"]);
+    // (a box a face: round its axis, the foliage stretched over 2x towards the cone's point)
+    crate::box_uvs(&["cone"]);
     fit_to(&crown, 0.62, None::<f64>, 0.65);
     let still = join_all("topiaryCone");
     perches!(

@@ -341,6 +341,8 @@ pub fn snake_plant() -> Vec<Obj> {
             );
         }
     }
+    // the pot's square-cut rims eased (KIT: botany's `vessel` cuts them square)
+    crate::chamfer(&["pot", "saucer"]);
     fit_to(&meshes(), 0.341, 0.905, 0.32);
     settle(&[join_all("snakePlant")])
 }
@@ -473,7 +475,8 @@ pub fn cacti() -> Vec<Obj> {
     ]
     .iter()
     .map(|&(hz, rr)| {
-        ribbed!(rr, m, depth = 0.14)
+        // (six points a rib: rounded ribs, no turn of 60° at their ridges)
+        ribbed!(rr, m, depth = 0.14, verts = m * 6)
             .iter()
             .map(|&(u, v)| P3::from((x + u, y + v, z + hz)))
             .collect()
@@ -515,6 +518,8 @@ pub fn cacti() -> Vec<Obj> {
             rot = (0, r, 0)
         );
     }
+    // the pot's square-cut rims eased (KIT: botany's `vessel` cuts them square)
+    crate::chamfer(&["pot", "saucer"]);
     fit_to(&meshes(), 0.568, 0.521, 0.465);
     settle(&[join_all("cacti")])
 }
@@ -538,6 +543,8 @@ pub fn succulents() -> Vec<Obj> {
             (0.27, 0.085),
             (0.3, 0.11),
             (0.312, 0.122),
+            // (its rim rolled round: no turn of 60°)
+            (0.311, 0.127),
             (0.306, 0.13),
             (0.292, 0.128),
             (0.276, 0.104),
@@ -717,6 +724,8 @@ pub fn boston_fern() -> Vec<Obj> {
             ribs = 3
         );
     }
+    // the pot's square-cut rims eased (KIT: botany's `vessel` cuts them square)
+    crate::chamfer(&["pot", "saucer"]);
     fit_to(&meshes(), 0.734, 0.979, 0.792);
     settle(&[join_all("bostonFern")])
 }
@@ -782,6 +791,8 @@ pub fn palm() -> Vec<Obj> {
             ribs = 5
         );
     }
+    // the pot's square-cut rims eased (KIT: botany's `vessel` cuts them square)
+    crate::chamfer(&["pot", "saucer"]);
     fit_to(&meshes(), 0.770, 0.893, 0.693);
     settle(&[join_all("palm")])
 }
@@ -812,7 +823,9 @@ pub fn orchid() -> Vec<Obj> {
             (0.12, 0.56),
             (0.13, 0.585),
             (0.16, 0.6),
-            (0.16, 0.63),
+            // (its top's arris eased: two turns of 45°)
+            (0.16, 0.626),
+            (0.156, 0.63),
             (0.0, 0.63)
         ],
         material = p.get("wood"),
@@ -921,6 +934,8 @@ pub fn orchid() -> Vec<Obj> {
             );
         }
     }
+    // the pot's square-cut rims eased (KIT: botany's `vessel` cuts them square)
+    crate::chamfer(&["pot", "saucer"]);
     fit_to(&meshes(), 0.431, 1.198, 0.381);
     settle(&[join_all("orchid")])
 }
@@ -931,7 +946,8 @@ pub fn orchid() -> Vec<Obj> {
 /// it.
 pub fn bonsai() -> Vec<Obj> {
     use artkit::json::float_repr as fr;
-    let p = palette(&[
+    // (plain leaves, as the other houseplants': with the stand's wood, three draw calls, not four)
+    let p = super::plain_leaves(palette(&[
         ("body", "#3E5A78"),
         ("wood", "#6A4A32"),
         ("bark", "#6E5A4C"),
@@ -940,7 +956,7 @@ pub fn bonsai() -> Vec<Obj> {
         ("leaf_light", "#467A38"),
         ("stem", "#5E5040"),
         ("moss", "#5E7A34"),
-    ]);
+    ]));
     let (wood, body) = (p.get("wood"), p.get("body"));
     let up = 0.38; // the stand's top over the old knee-high table's
     cube!(
@@ -989,8 +1005,11 @@ pub fn bonsai() -> Vec<Obj> {
         (0.012, 0.2, 0.125),
         (0.02, 0.215, 0.138),
         (0.062, 0.232, 0.152),
-        (0.07, 0.232, 0.152),
-        (0.07, 0.218, 0.138),
+        // (its rim's arrises eased: no turn of 60°)
+        (0.067, 0.232, 0.152),
+        (0.07, 0.228, 0.148),
+        (0.07, 0.222, 0.142),
+        (0.067, 0.218, 0.138),
         (0.055, 0.215, 0.135),
     ]
     .iter()
@@ -1128,7 +1147,7 @@ pub fn bonsai() -> Vec<Obj> {
         }
     }
     let still = join_all("bonsai");
-    // The stray sprig, sticking up out of the top pad: a twig and a tuft, all on foliage (one draw call).
+    // The stray sprig, sticking up out of the top pad: a twig and a tuft, all plain (one draw call).
     let parts = new_parts(|| {
         tube!(
             "sprig_twig",

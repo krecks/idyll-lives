@@ -116,7 +116,8 @@ pub fn family() -> Family {
             ),
             pot(
                 Model::new("bonsai", houseplants::bonsai, (0.62, 1.354, 0.407))
-                    .key("model.garden.bonsai"),
+                    .key("model.garden.bonsai")
+                    .palette(plain_leaves(BASE.palette())),
             )
             .motions(json!({"uses": {"prune": "trim"}})),
             // G2: flowers (with G3 and G4, each with a far version: they stand outside, seen in the town overview)
