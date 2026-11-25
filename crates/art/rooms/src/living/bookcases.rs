@@ -588,7 +588,9 @@ pub fn display_cabinet() -> Vec<Obj> {
             0.1,
             (-0.18, 0.655, z),
             M.cream_gloss,
-            verts = 16
+            verts = 16,
+            bevel = 0.003,
+            bevel_segments = 1
         );
         frame_photo(0.16, 0.605, z - 0.06, M.brass, 0.16, 0.2);
         vase(0.0, 1.055, z, 0.05, 0.2, M.red_gloss);
@@ -609,7 +611,9 @@ pub fn display_cabinet() -> Vec<Obj> {
             (-0.12, 1.615, WALL + 0.05),
             M.porcelain,
             rot = (78, 0, 0),
-            verts = 24
+            verts = 24,
+            bevel = 0.003,
+            bevel_segments = 1
         );
         fbox!(
             F,

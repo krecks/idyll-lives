@@ -1784,10 +1784,10 @@
           "finish": "material.finish.gloss"
         },
         "vitrine": {
-          "finish": "material.finish.wood"
+          "finish": "material.finish.satin"
         },
         "vitrine_back": {
-          "finish": "material.finish.wood"
+          "finish": "material.finish.satin"
         }
       },
       "motions": {
