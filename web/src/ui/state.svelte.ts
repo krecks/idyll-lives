@@ -4,6 +4,7 @@ import type { Catalog, FlatInfo, FormerResident, HouseholdInfo, Lifespan, Object
 import type { ThreadStats } from '../debug/threads';
 import type { RenderStats, WallMode } from '../render/types';
 import { NO_LAND, startBrush, type BrushState, type LandState } from './land/landTools';
+import { townHud } from './town/townHud.svelte';
 
 export interface MenuState {
   objectId: number;
@@ -332,6 +333,9 @@ class GameState {
     this.catalog = null;
     this.home = 0;
     this.creative = false;
+    // (The town card and the away list are of the game left.)
+    townHud.chosen = null;
+    townHud.away = [];
   }
 }
 
