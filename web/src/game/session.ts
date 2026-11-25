@@ -9,7 +9,7 @@ import { SaveRefused, SimBridge, type FrameState } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SimInfo, SocialEvent, WorldStructure } from '../core/protocol';
 import { flatOf, groundDepth, lotOf, lowestStorey, storeyRow } from '../core/protocol';
 import { townMap } from '../ui/townMap.svelte';
-import { gameOnLoading, listSaves, nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
+import { gameOnLoading, listSaves, nextAutosaveId, openedSave, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { BENCH } from '../debug/benchFlags';
 import { DEBUG_HOOKS } from '../debug/hooks';
 import { GAMEPLAY_STATS, installGameplayStats } from '../debug/gameplayStats';
@@ -292,6 +292,7 @@ async function openSession(
     if (err instanceof SaveRefused && saved) throw new UnloadableSave(saved.id, err.problem, await refuseSave(saved, err.problem));
     throw err;
   });
+  if (saved) void openedSave(saved);
   // The first snapshot carries the household's residents (their clothes, hair and skin), so the
   // warm-up draw must wait for it: without it the first live frame compiles their materials.
   const firstFrame = async (): Promise<FrameState> => {

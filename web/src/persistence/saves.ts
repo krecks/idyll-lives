@@ -209,6 +209,18 @@ export async function refuseSave(save: SaveMeta, problem: SaveProblem): Promise<
   return problemNotice(problem, save.name);
 }
 
+/** A save that opened (one set aside earlier tried again from Load game): its details lose the mark, so Continue offers it again. */
+export async function openedSave(save: SaveRecord): Promise<void> {
+  refused.delete(save.id);
+  try {
+    // (The record has no marks: they are only ever put in the details, `refuseSave`.)
+    await run('readwrite', [META], (tx) => tx.objectStore(META).put(metaOf(save)));
+  } catch (err) {
+    console.warn('[saves] could not clear a save\'s failed mark', err);
+  }
+  changed();
+}
+
 /** How an unloadable save is kept (the mark it gets); null: it's removed (too old, or damaged). */
 export function keptAs(problem: SaveProblem): 'tooNewFor' | 'failedIn' | null {
   return problem === 'tooNew' ? 'tooNewFor' : problem === 'failed' ? 'failedIn' : null;
