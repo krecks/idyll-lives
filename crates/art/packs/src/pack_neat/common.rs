@@ -68,7 +68,7 @@ pub const PASTELS: [&str; 6] = [
     "pastel_a", "pastel_b", "pastel_c", "pastel_d", "pastel_e", "pastel_f",
 ];
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 
 pub fn _m(name: &str) -> Mat {
     M.palette().get(name)

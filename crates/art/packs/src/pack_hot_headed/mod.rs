@@ -24,7 +24,7 @@ mod drums;
 pub use common::M;
 
 /// The wall's face in a 1-deep footprint, game depth.
-const WALL: f64 = -0.43;
+use artkit::kit::WALL;
 
 /// The family.
 pub fn family() -> Option<Family> {

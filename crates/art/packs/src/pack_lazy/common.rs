@@ -58,7 +58,7 @@ palette! { M:
 }
 
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 
 /// A closed shell of a sphere about `centre` (game): points at side angle `sides` (from the middle towards ±x) and
 /// pitch `pitch` (from the top, negative towards the back), between radii `r_in` and `r_out`. A pram-hood shape;

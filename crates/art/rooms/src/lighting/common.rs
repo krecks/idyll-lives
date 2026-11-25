@@ -57,7 +57,7 @@ palette! { M:
 }
 
 pub const F: GameFrame = GameFrame::new(0.0);
-pub const WALL: f64 = -0.43; // the wall's face, game depth
+pub use artkit::kit::WALL;
 pub const CEILING: f64 = 2.8;
 
 /// The content files whose objects' `light` the bulbs are placed against, in the script's order.

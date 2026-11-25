@@ -71,7 +71,7 @@ palette! { M:
 }
 
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 
 pub fn _m(name: &str) -> Mat {
     M.palette().get(name)

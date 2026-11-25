@@ -11,7 +11,7 @@ use artkit::shapes::Cube;
 use artkit::{fbox, fsweep, revolve, soft};
 
 /// The wall's face (game depth).
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 
 /// `_axle`: the rot for a cylinder whose axis runs along the game direction (gx, 0, gz).
 pub fn axle(gx: f64, gz: f64) -> P3 {

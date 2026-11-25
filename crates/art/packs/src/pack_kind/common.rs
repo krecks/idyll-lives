@@ -92,7 +92,7 @@ palette! { M:
 }
 
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 
 /// A teapot standing on `y`, spout to the right (+x game), `s` its scale: a round body with a band, a lid with a
 /// knob, a curving spout and a looped handle.

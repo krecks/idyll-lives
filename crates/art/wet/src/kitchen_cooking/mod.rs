@@ -48,8 +48,8 @@ palette! { M:
 }
 
 const SECONDS: f64 = 1.4; // a door drops, a drawer slides or a knob turns in this long
-// catalog2's 0.79-deep counter numbers drawn 0.66 deep against the wall (the counters' COUNTER66)
-const COUNTER66: [(f64, f64); 4] = [(-0.48, -0.43), (-0.46, -0.41), (0.24, 0.19), (0.31, 0.23)];
+// catalog2's 0.79-deep counter numbers drawn 0.66 deep against the wall: the counters'
+use crate::kitchen_counters::COUNTER66;
 const HOLD: f64 = 3.0; // seconds a door stays open once a use starts
 
 /// The microwave's plate turns once its door has shut (`door_open` opens in 1.0 s and plays back from its hold,

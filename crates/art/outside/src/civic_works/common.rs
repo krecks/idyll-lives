@@ -41,7 +41,7 @@ pub(crate) use own_palette;
 own_palette! { S: }
 
 pub const F: GameFrame = GameFrame::new(0.0);
-pub const WALL: f64 = -0.43; // the wall's face, game depth (one tile deep)
+pub use artkit::kit::WALL;
 
 // --- helpers (game coordinates) ------------------------------------------------------------------------------
 /// The points (depth, height) of a wheel arch: the circle of radius `r` round (zc, yc) above the line at height

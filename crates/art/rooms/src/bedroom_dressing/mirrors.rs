@@ -667,7 +667,7 @@ pub fn dressing_table() -> Vec<Obj> {
 // --- the wall mirror: on the wall layer, a black metal frame and a small ledge --------------------------
 // Its back on the wall face (depth -0.43), at the old part's height: the frame from 1.0 to 1.9 m.
 
-const WALL: f64 = -0.43;
+use artkit::kit::WALL;
 const WM_Y: f64 = 1.45;
 const WM_W: f64 = 0.62;
 const WM_H: f64 = 0.9;

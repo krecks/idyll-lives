@@ -11,7 +11,7 @@ use artkit::scene::Obj;
 use artkit::{Arg, fbox, fcyl, fextrude, loft};
 
 /// The wall's face, game depth: the toilets' cisterns and the storage stand on it.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 
 /// A tube in one piece through game points, its bends rounded (the kit's tube).
 #[allow(clippy::too_many_arguments)] // (as the script called it)

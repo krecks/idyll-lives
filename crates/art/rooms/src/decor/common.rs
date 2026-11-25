@@ -109,7 +109,7 @@ palette! { M:
 }
 
 pub const F: GameFrame = GameFrame::new(0.0);
-pub const WALL: f64 = -0.43; // the wall's face, game depth
+pub use artkit::kit::WALL;
 
 // --- flat shapes ------------------------------------------------------------------------------------------
 /// A mesh object from Blender points and faces, its normals made outward; the first `smooth` faces shaded smooth,

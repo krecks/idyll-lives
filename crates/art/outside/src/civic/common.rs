@@ -100,7 +100,7 @@ palette! { M:
 pub use crate::outdoor::common::rod;
 
 pub const F: GameFrame = GameFrame::new(0.0);
-pub const WALL: f64 = -0.43; // the wall's face, game depth (one tile deep)
+pub use artkit::kit::WALL;
 
 // Heights the content names (civic.json): kept here and checked against it.
 pub const SEAT: f64 = 0.45; // pew and waitingBench seat.height (forward 0)

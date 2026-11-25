@@ -103,7 +103,7 @@ pub const STRIPES: [Mat; 6] = [
     M.stripe_violet,
 ];
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 /// In a 2-deep one.
 pub const WALL2: f64 = -0.93;
 /// The mocktail cart's top shelf's top.

@@ -38,7 +38,7 @@ palette! { M:
 }
 
 /// The wall's face in a 1-deep footprint, game depth.
-pub const WALL: f64 = -0.43;
+pub use artkit::kit::WALL;
 
 // (not `kit::cut!`: the kernel's cut numbers the mouth's points, orders its faces and bevels its edges its own way;
 // the same surface and the same row against Blender's build, other bytes; this one keeps Blender's order)
