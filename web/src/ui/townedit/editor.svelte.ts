@@ -442,7 +442,8 @@ export class TownEditorState implements TownEditor {
       const d = Math.hypot(b.x + b.w / 2 - x, b.z + b.d / 2 - z);
       if (d < near) [best, near] = [lot.index, d];
     }
-    if (issue.lot !== undefined) {
+    // (Its lot is a slot of the plan checked: an edit since, a lot removed, numbers the slots again. Till checked, by where it is.)
+    if (issue.lot !== undefined && s.checked) {
       const shown = this.shownPlot(issue.lot);
       if (shown !== null) best = shown;
       this.select({ kind: 'lot', slot: issue.lot });
