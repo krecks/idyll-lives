@@ -109,6 +109,11 @@ impl Road {
 
     /// `project`, and the segment it's on (the first of those as near).
     pub(crate) fn project_on(&self, p: [f32; 2]) -> (usize, (f32, f32)) {
+        // `Road::new` refuses fewer than two points, but the fields are public: `len() - 1` below
+        // would underflow, and there is no segment to be on.
+        if self.pts.len() < 2 {
+            return (0, (0.0, f32::INFINITY));
+        }
         (0..self.pts.len() - 1)
             .map(|i| (i, self.project_segment(i, p)))
             .min_by(|a, b| a.1.1.total_cmp(&b.1.1))
@@ -119,6 +124,9 @@ impl Road {
     /// way on it): from segment `k` to the next while that's nearer `p` (or as near and earlier),
     /// either way. What `project_on` gives where the road doesn't come back by `p` further along.
     pub(crate) fn project_from(&self, k: usize, p: [f32; 2]) -> (usize, (f32, f32)) {
+        if self.pts.len() < 2 {
+            return (0, (0.0, f32::INFINITY));
+        }
         let last = self.pts.len() - 2;
         let mut best = (k.min(last), self.project_segment(k.min(last), p));
         loop {

@@ -433,3 +433,24 @@ fn each_kind_has_its_top_speed() {
         assert_eq!(kind_speed(kind, country), top, "{kind:?}");
     }
 }
+
+#[test]
+fn a_road_with_too_few_points_projects_to_nothing() {
+    // `Road::new` refuses fewer than two points; the fields are public, so the readers still must
+    // not index past them.
+    for pts in [Vec::new(), vec![[0.0, 0.0]]] {
+        let n = pts.len();
+        let road = Road {
+            pts,
+            cum: vec![0.0; n],
+            width: 6.0,
+            kind: RoadKind::Street,
+            area: None,
+            oneway: OneWay::Both,
+            source: 0,
+        };
+        assert_eq!(road.project([1.0, 1.0]).1, f32::INFINITY);
+        assert_eq!(road.project_on([1.0, 1.0]).1.1, f32::INFINITY);
+        assert_eq!(road.project_from(0, [1.0, 1.0]).1.1, f32::INFINITY);
+    }
+}
