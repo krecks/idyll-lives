@@ -324,7 +324,7 @@ pub fn wall_cabinet_glass() -> Vec<Obj> {
                 0.14,
                 None,
                 true,
-                0.026,
+                0.023, // (the wall cabinet stays 0.40 deep, its pull in)
                 0.005,
                 0.0,
             );
@@ -506,7 +506,7 @@ pub fn wall_cabinet_corner() -> Vec<Obj> {
             0.14,
             None,
             true,
-            0.026,
+            0.023, // (the wall cabinet stays 0.40 deep, its pull in)
             0.005,
             0.0,
         );

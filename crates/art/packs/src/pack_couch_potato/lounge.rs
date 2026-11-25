@@ -4,9 +4,10 @@ use super::common::M;
 use artkit::forms::rounded_rect;
 use artkit::math::{Axis, P3, PI, cos, cosd, radians, sin, sind};
 use artkit::motion::{Ease, Spin, spin};
-use artkit::parts::{hinged, join, new_parts, numbered};
+use artkit::parts::{ASIDE, aside, hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
+use artkit::{bevel::ease, forms::eased, shapes::AUTO_WIDTH};
 use artkit::{
     fbox, fcyl, fextrude, fsphere, fsweep, jitter, kit, loft, revolve, ring, settle, slide, soft,
     swing,
@@ -58,7 +59,8 @@ pub fn recliner() -> Vec<Obj> {
         for s in [-1, 1] {
             let s = s as f64;
             // the arm: a panel rising into a fat roll, swept front to back; a plinth-coloured cap on the roll's front
-            let roll: Vec<(f64, f64)> = (-50..231)
+            // (the roll ends tangent to the panel's inside face, not tucked under it into a lip)
+            let roll: Vec<(f64, f64)> = (-50..181)
                 .step_by(28)
                 .map(|a| {
                     (
@@ -73,7 +75,7 @@ pub fn recliner() -> Vec<Obj> {
                 vec![(0.5, s * -0.08)],
             ]
             .concat();
-            fsweep!(
+            let arm = fsweep!(
                 f,
                 numbered("arm"),
                 &[(s * 0.37, 0, -0.43), (s * 0.37, 0, 0.27)],
@@ -82,6 +84,7 @@ pub fn recliner() -> Vec<Obj> {
                 profile = profile,
                 angle = 55
             );
+            ease(arm, 60.0, 1);
             fcyl!(
                 f,
                 numbered("roll_end"),
@@ -114,14 +117,17 @@ pub fn recliner() -> Vec<Obj> {
         );
         revolve!(
             "cup",
-            &[
-                (0.0, 0.0),
-                (0.03, 0.0),
-                (0.037, 0.12),
-                (0.034, 0.12),
-                (0.03, 0.11),
-                (0.0, 0.11)
-            ],
+            &eased(
+                &[
+                    (0.0, 0.0),
+                    (0.03, 0.0),
+                    (0.037, 0.12),
+                    (0.034, 0.12),
+                    (0.03, 0.11),
+                    (0.0, 0.11)
+                ],
+                AUTO_WIDTH
+            ),
             at = f.at(0.37, 0.64, 0.12),
             material = M.teal,
             segments = 12
@@ -164,7 +170,7 @@ pub fn recliner() -> Vec<Obj> {
             &pts,
             0,
             M.throw,
-            profile = rounded_rect(t, 0.4, t / 2.0, 1),
+            profile = rounded_rect(t, 0.4, t / 2.0, 2),
             up = (0, 0, 1)
         );
         jitter!(throw, 0.005, size = 0.1, seed = 3.0, up = 0.5);
@@ -227,7 +233,7 @@ pub fn recliner() -> Vec<Obj> {
             0.5,
             0.22,
             0.08,
-            (0, fy - 0.12, fz + 0.04),
+            (0, fy - 0.12, fz + 0.05),
             M.plush,
             round = 0.035,
             flat = 1
@@ -495,13 +501,15 @@ pub fn snack_fridge() -> Vec<Obj> {
         revolve!(
             "bowl",
             &[
-                (0.0, 0.0),
-                (0.06, 0.0),
-                (0.11, 0.06),
-                (0.105, 0.062),
-                (0.055, 0.008),
-                (0.0, 0.008)
-            ],
+                &[(0.0, 0.0)][..],
+                // (its rim rolled over)
+                &eased(
+                    &[(0.06, 0.0), (0.11, 0.06), (0.105, 0.062), (0.055, 0.008)],
+                    AUTO_WIDTH
+                ),
+                &[(0.0, 0.008)],
+            ]
+            .concat(),
             at = f.at(0.13, 0.45, -0.12),
             material = M.bowl,
             segments = 16
@@ -853,6 +861,8 @@ pub fn fitness_game() -> Vec<Obj> {
             material = M.tv_white,
             segments = 10
         );
+    });
+    let floor = new_parts(|| {
         soft!(
             f,
             "mat",
@@ -974,6 +984,8 @@ pub fn fitness_game() -> Vec<Obj> {
         );
     });
     join(&still, "body", Some(P3::ZERO));
+    // the step mat and the kettlebell on the floor in front of it: drawn with it, not the stand's own size
+    aside(&floor, "floor");
     // The balance board on its rocker, on the mat: `board` tilts it 10° to one side.
     let board = new_parts(|| {
         fextrude!(
@@ -1010,7 +1022,11 @@ pub fn fitness_game() -> Vec<Obj> {
         );
         fbox!(f, "board_mount", 0.08, 0.02, 0.07, (0, 0.082, 0.2), M.grip);
     });
-    let board = hinged(join(&board, "board", None), f.at(0, 0.012, 0.2));
+    // (set aside too: it rocks on the mat in front of the stand)
+    let board = hinged(
+        join(&board, &format!("board{ASIDE}"), None),
+        f.at(0, 0.012, 0.2),
+    );
     let objs = settle!(centre = false);
     swing!(board, "board", 10.0, seconds = 0.8, axis = Axis::Y);
     objs
@@ -1058,7 +1074,8 @@ pub fn lava_lamp() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
     let (tx, tz) = LAMP;
     let (y0, h) = VESSEL;
-    let still = new_parts(|| {
+    // the pouf the lamp is zoned out from and the rug before it: drawn, not the lamp's size (as a desk's chair)
+    let pouf = new_parts(|| {
         let (px, pz) = POUF;
         let (fx, fz) = (sind(TURN), cosd(TURN)); // the way it faces (game x, depth)
         soft!(
@@ -1123,6 +1140,9 @@ pub fn lava_lamp() -> Vec<Obj> {
             bevel = 0.004,
             bevel_segments = 1
         );
+    });
+    aside(&pouf, "pouf");
+    let still = new_parts(|| {
         // the side table: a turned stem on a round foot, a lipped oak top
         fcyl!(
             f,

@@ -6,8 +6,8 @@ use artkit::forms::{Plane, by, rounded_rect, smooth_outline};
 use artkit::json::float_repr;
 use artkit::kit::{Pull, fillet, pull};
 use artkit::materials::Mat;
-use artkit::math::{Axis, PI, TAU, cos, cosd, radians, sin, sind};
-use artkit::parts::{hinged, join, new_parts};
+use artkit::math::{Axis, P3, PI, TAU, V3, cos, cosd, radians, sin, sind};
+use artkit::parts::{aside, hinged, join, new_parts, settle, turn};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
 use artkit::{
@@ -121,7 +121,7 @@ fn _slice(name: &str, at: (f64, f64, f64), material: Mat, inner: Mat, w: f64, h:
         (-w * 0.47, h * 0.4),
         (-w / 2.0, h * 0.16),
     ];
-    slab!(name, &pts, 0.014, at, material);
+    slab!(name, &pts, 0.014, at, material, bevel = 0.003);
     let crumb: Vec<(f64, f64)> = pts
         .iter()
         .map(|&(u, v)| (u * 0.88, v * 0.88 - h * 0.03))
@@ -562,6 +562,12 @@ pub fn stand_mixer() -> Vec<Obj> {
         );
     });
     let beater = join!(&parts, "beater", origin = (-0.07, 0, 0.232)); // about its shaft
+    // built side on, then turned a quarter so its head points to the front over the bowl, as one stands on a
+    // counter: 20 cm across, 30 deep (each part about the middle)
+    for o in meshes() {
+        turn(o, 90.0, Axis::Z);
+        o.edit(|p| p.loc = V3::new(-p.loc.y, p.loc.x, p.loc.z));
+    }
     settle!();
     spin!(beater, "beat", turns = 1, seconds = 0.75, axis = Axis::Z);
     meshes()
@@ -571,9 +577,10 @@ fn _mixer_body() {
     turned!(
         "base",
         &[
-            (0.15, 0.085, 0.0),
-            (0.15, 0.085, 0.028),
-            (0.142, 0.078, 0.04)
+            (0.15, 0.1, 0.0),
+            (0.15, 0.1, 0.028),
+            (0.146, 0.096, 0.037), // its top edge rounded over
+            (0.138, 0.089, 0.04)
         ],
         M.mixer,
         verts = 16,
@@ -1149,109 +1156,114 @@ pub fn cutting_board() -> Vec<Obj> {
         bevel = 0.003,
         holes = vec![hole]
     );
-    let (c, s) = (cosd(15.0), sind(15.0));
-    turned!(
-        "loaf",
-        &[
-            (0.018, 0.024, 0.0),
-            (0.033, 0.043, 0.012),
-            (0.04, 0.05, 0.04),
-            (0.041, 0.052, 0.095),
-            (0.04, 0.05, 0.15),
-            (0.033, 0.043, 0.178),
-            (0.018, 0.024, 0.19)
-        ],
-        M.bread,
-        at = (0.06 - 0.095 * c, 0.02 - 0.095 * s, 0.063),
-        rot = (0, 90, 15),
-        verts = 10,
-        square = 2.4
-    );
-    for (i, d) in [-0.042, 0.0, 0.042].into_iter().enumerate() {
-        box_!(
-            format!("score{i}"),
-            (0.007, 0.046, 0.003),
-            (0.06 + d * c, 0.02 + d * s, 0.1018),
-            M.crumb,
-            rot = (0, 0, 15 + 35)
-        );
-    }
-    for (i, (x, y)) in [(-0.1, 0.05), (-0.125, -0.025)].into_iter().enumerate() {
-        ball!(
-            format!("tomato{i}"),
-            0.03,
-            (x, y, 0.047),
-            M.red,
-            scale = (1, 1, 0.85),
-            seg = 8,
-            rings = 5
-        );
-        star!(
-            format!("calyx{i}"),
-            (x, y, 0.071),
-            0.014,
-            5,
-            M.leaf,
-            inner = 0.35,
-            depth = 0.003,
-            cup = 0.2
-        );
-    }
-    for (i, (x, y)) in [(-0.04, -0.07), (-0.012, -0.082)].into_iter().enumerate() {
-        let z = 0.022 + i as f64 * 0.006;
+    let board = meshes();
+    // the bread, the tomatoes and the knife on it: drawn, not the board's size
+    let food = new_parts(|| {
+        let (c, s) = (cosd(15.0), sind(15.0));
         turned!(
-            format!("slice{i}"),
-            &[(0.027, z), (0.027, z + 0.007)],
-            M.red,
+            "loaf",
+            &[
+                (0.018, 0.024, 0.0),
+                (0.033, 0.043, 0.012),
+                (0.04, 0.05, 0.04),
+                (0.041, 0.052, 0.095),
+                (0.04, 0.05, 0.15),
+                (0.033, 0.043, 0.178),
+                (0.018, 0.024, 0.19)
+            ],
+            M.bread,
+            at = (0.06 - 0.095 * c, 0.02 - 0.095 * s, 0.063),
+            rot = (0, 90, 15),
             verts = 10,
-            at = (x, y, 0)
+            square = 2.4
         );
-        super::common::disc(
-            &format!("flesh{i}"),
-            0.021,
-            (x, y, z + 0.0072),
-            M.tomato_flesh,
-            8,
-            None,
+        for (i, d) in [-0.042, 0.0, 0.042].into_iter().enumerate() {
+            box_!(
+                format!("score{i}"),
+                (0.007, 0.046, 0.003),
+                (0.06 + d * c, 0.02 + d * s, 0.1018),
+                M.crumb,
+                rot = (0, 0, 15 + 35)
+            );
+        }
+        for (i, (x, y)) in [(-0.1, 0.05), (-0.125, -0.025)].into_iter().enumerate() {
+            ball!(
+                format!("tomato{i}"),
+                0.03,
+                (x, y, 0.047),
+                M.red,
+                scale = (1, 1, 0.85),
+                seg = 8,
+                rings = 5
+            );
+            star!(
+                format!("calyx{i}"),
+                (x, y, 0.071),
+                0.014,
+                5,
+                M.leaf,
+                inner = 0.35,
+                depth = 0.003,
+                cup = 0.2
+            );
+        }
+        for (i, (x, y)) in [(-0.04, -0.07), (-0.012, -0.082)].into_iter().enumerate() {
+            let z = 0.022 + i as f64 * 0.006;
+            turned!(
+                format!("slice{i}"),
+                &[(0.027, z), (0.027, z + 0.007)],
+                M.red,
+                verts = 10,
+                at = (x, y, 0)
+            );
+            super::common::disc(
+                &format!("flesh{i}"),
+                0.021,
+                (x, y, z + 0.0072),
+                M.tomato_flesh,
+                8,
+                None,
+            );
+        }
+        // the knife, lying across the front, its handle to the right
+        let a = -8.0;
+        let (ca, sa) = (cosd(a), sind(a));
+        let k = |u: f64, v: f64| (0.085 + u * ca - v * sa, -0.082 + u * sa + v * ca);
+        let blade = [
+            k(0.0, -0.011),
+            k(-0.075, -0.011),
+            k(-0.105, -0.003),
+            k(-0.112, 0.0),
+            k(-0.09, 0.007),
+            k(0.0, 0.012),
+        ];
+        slab!(
+            "blade",
+            &blade,
+            0.002,
+            (0, 0, 0.023),
+            M.steel,
+            plane = Plane::XY
         );
-    }
-    // the knife, lying across the front, its handle to the right
-    let a = -8.0;
-    let (ca, sa) = (cosd(a), sind(a));
-    let k = |u: f64, v: f64| (0.085 + u * ca - v * sa, -0.082 + u * sa + v * ca);
-    let blade = [
-        k(0.0, -0.011),
-        k(-0.075, -0.011),
-        k(-0.105, -0.003),
-        k(-0.112, 0.0),
-        k(-0.09, 0.007),
-        k(0.0, 0.012),
-    ];
-    slab!(
-        "blade",
-        &blade,
-        0.002,
-        (0, 0, 0.023),
-        M.steel,
-        plane = Plane::XY
-    );
-    let (bx, by) = k(0.004, 0.0);
-    box_!(
-        "bolster",
-        (0.008, 0.026, 0.012),
-        (bx, by, 0.028),
-        M.steel,
-        rot = (0.0, 0.0, a)
-    );
-    let at = |(u, v): (f64, f64)| (u, v, 0.029);
-    bar!(
-        "knife_handle",
-        &[at(k(0.008, 0.0)), at(k(0.04, 0.0)), at(k(0.068, 0.0))],
-        rounded_rect(0.013, 0.018, 0.005, 1),
-        M.dark,
-        scale = [1.0, 1.08, 1.0]
-    );
-    done("cuttingBoard", false)
+        let (bx, by) = k(0.004, 0.0);
+        box_!(
+            "bolster",
+            (0.008, 0.026, 0.012),
+            (bx, by, 0.028),
+            M.steel,
+            rot = (0.0, 0.0, a)
+        );
+        let at = |(u, v): (f64, f64)| (u, v, 0.029);
+        bar!(
+            "knife_handle",
+            &[at(k(0.008, 0.0)), at(k(0.04, 0.0)), at(k(0.068, 0.0))],
+            rounded_rect(0.013, 0.018, 0.005, 1),
+            M.dark,
+            scale = [1.0, 1.08, 1.0]
+        );
+    });
+    let food = aside(&food, "food");
+    settle(&[join(&board, "cuttingBoard", Some(P3::ZERO)), food])
 }
 
 /// A roll-top bread bin: a painted body between two D-shaped wooden ends (their edges eased); the roll-top is a
@@ -1376,7 +1388,8 @@ pub fn spice_jars() -> Vec<Obj> {
             0.012,
             (s as f64 * 0.144, 0.0, 0.0),
             M.rack,
-            plane = Plane::YZ
+            plane = Plane::YZ,
+            bevel = 0.003
         );
     }
     box_!("back", (0.276, 0.008, 0.052), (0, 0.054, 0.036), M.rack);

@@ -56,6 +56,11 @@ Draws are unchanged by the detail pass. Before it (2026-10-16 to 10-22) the benc
 Built in Rust since 2026-11-18, proved against the last Blender build (`cargo check-glb --against ref/blender`). The
 clump's flowers are found on what stands when each is made: the clump and the flowers before it.
 
+## The gate's edges (2026-11-25)
+
+The street sign's blades and the taxi rank's fares case are bevelled (4 and 3 mm, none on the far versions): their
+30 and 12 mm sides showed hard edges.
+
 ## Rebuild
 
 ```

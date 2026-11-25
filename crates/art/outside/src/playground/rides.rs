@@ -306,7 +306,7 @@ pub fn spring_rider() -> Vec<Obj> {
                 verts = 6
             );
         }
-        fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "base_plate",
             0.13,
@@ -314,7 +314,7 @@ pub fn spring_rider() -> Vec<Obj> {
             (0, 0.04, 0),
             M.steel,
             verts = 20
-        );
+        ));
         let (turns, r) = (3.5, 0.1);
         let steps = (turns * 12.0) as i64;
         let coil: Vec<(f64, f64, f64)> = (0..=steps)
@@ -330,7 +330,7 @@ pub fn spring_rider() -> Vec<Obj> {
     });
     join(&still, "spring", Some(P3::from((0, 0, 0))));
     let parts = new_parts(|| {
-        fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "top_plate",
             0.12,
@@ -338,7 +338,7 @@ pub fn spring_rider() -> Vec<Obj> {
             (0, HORSE_DRAWN, 0),
             M.steel,
             verts = 20
-        );
+        ));
         fcyl!(
             F,
             "mount",
@@ -746,7 +746,7 @@ pub fn merry_go_round() -> Vec<Obj> {
                 );
             }
         }
-        fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "centre_disc",
             0.2,
@@ -754,7 +754,7 @@ pub fn merry_go_round() -> Vec<Obj> {
             (0, 0.266, 0),
             M.deck,
             verts = 24
-        );
+        ));
         // the column: a turned post, a collar where the rails meet it and a knob on top
         revolve!(
             "column",

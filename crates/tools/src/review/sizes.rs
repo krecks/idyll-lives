@@ -179,8 +179,14 @@ pub fn size_row(
     row
 }
 
-/// A size row for a model key the reference lists in `ids` that no object draws (its size only).
-fn model_row(key: &str, size: &Result<[f64; 3], String>, reference: &Reference) -> SizeRow {
+/// A size row for a model key the reference lists in `ids` that no object draws: its size, and its seat where its
+/// kind has one (`checkglb::Measures::seats`).
+fn model_row(
+    key: &str,
+    size: &Result<[f64; 3], String>,
+    seat: Option<f64>,
+    reference: &Reference,
+) -> SizeRow {
     let object = Object {
         id: key.into(),
         name: String::new(),
@@ -188,9 +194,21 @@ fn model_row(key: &str, size: &Result<[f64; 3], String>, reference: &Reference) 
         model: key.into(),
         ..Object::default()
     };
+    // (No content says where its sitters' hips are: the seat is the model's, as the game's.)
+    let heights = seat
+        .map(|h| {
+            vec![Height {
+                what: "seat",
+                expected: h,
+                mesh: Some(h),
+                ..Height::default()
+            }]
+        })
+        .unwrap_or_default();
     let measure = size.clone().map(|size| Measure {
         model: key.into(),
         size,
+        heights,
         ..Measure::default()
     });
     size_row(&object, Some(&measure), reference)
@@ -288,6 +306,18 @@ pub fn tops(objects: &[Object], reference: &Reference) -> BTreeMap<String, [f64;
         .collect()
 }
 
+/// The model keys in `ids` that no object draws (`model_row`), each with its kind's seat range where it has one:
+/// what `checkglb::measures` measures a seat on.
+pub fn model_seats(objects: &[Object], reference: &Reference) -> BTreeMap<String, [f64; 2]> {
+    let drawn: HashSet<&str> = objects.iter().map(|o| o.model.as_str()).collect();
+    reference
+        .ids
+        .iter()
+        .filter(|(k, _)| k.contains('.') && !drawn.contains(k.as_str()))
+        .filter_map(|(k, kind)| Some((k.clone(), reference.kind(kind)?.seat?)))
+        .collect()
+}
+
 /// Every object's size row (`size_row`), and one for each model key in `ids` that no object draws.
 pub fn size_rows(
     objects: &[Object],
@@ -302,7 +332,12 @@ pub fn size_rows(
     for key in reference.ids.keys().filter(|k| {
         k.contains('.') && measures.models.contains_key(*k) && !drawn.contains(k.as_str())
     }) {
-        rows.push(model_row(key, &measures.models[key], reference));
+        rows.push(model_row(
+            key,
+            &measures.models[key],
+            measures.seats.get(key).copied(),
+            reference,
+        ));
     }
     rows
 }

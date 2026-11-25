@@ -88,3 +88,30 @@ cargo art pack_bookworm --preview  # previews/pack_bookworm/<id>.png, <id>@<clip
 ## The soft forms pass (2026-11-13)
 
 The reading nook's two throw pillows are sewn flat and stuffed: their sides drawn in 1.2 cm between corners that stand out (`waist`), `resting`. Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 3 models changed shape: `firesideLounge`, `readingNook`, `writingBureau`; 26,604 to 27,428 triangles.
+
+## Gate to zero (2026-11-25)
+
+Every hard edge the gate's `edges` found is eased (55 → 0): the nook's and the library's cornices chamfer their top
+arrises 4 mm, the library's plinth moulding its corners; the pendant's crown, the fire basket's rim, the hood's top
+(stepping in under the flue), the embers, the flue's bands, the cups' and saucers' rims, the tin's lid, the cake's cut
+and the wing chairs' arm ends (`bevel_edges`) and scrolls are rounded or bevelled; the chairs' cabriole legs reach 3 cm
+up into their base, so their tops don't show at its rounded edge; the bureau chair's crest rail is eased at its ends.
+
+The books cost what shows of them (`shell_book`): a book standing in a row its spine, top and sides with the edges
+between chamfered 4 mm (20 triangles; its back on the case and its bottom on the shelf left out), one lying in a pile
+the same with its back (30), where a whole chamfered box took 44. With that, and the nook's back and seat cushions
+`resting` (the back ones two flat steps), the globe 16 × 10, the pendant 14 sides, the wing chairs' cushions resting
+(the seat one flat step, one rounding step), their legs 8 sides, the tables' tops one bevel step, the tori's sections 3
+and the scrolls 12, the trolley's frame 6 sides, castors 10, tin 16 and pot lid 12, and the bedside chest's top one
+bevel step, its pulls a flat strap and its glasses' rims 3 sides, every model is under its triangle aim: the nook
+7,858 (was 9,980), the library wall 7,876 (12,304), the lounge 11,922 (14,976), the trolley 3,992 (3,832), the bedside
+stack 3,918 (4,396), the bureau 7,840 (8,168).
+
+The bedside stack's lamp and the pile on the floor in front of it are `aside` (drawn, not the chest's own size; no
+draw call more): it measures 0.60 × 0.66 × 0.45 m, a nightstand. The bureau keeps 4 draw calls (the body plain and
+wood, the flap wood and plain: its brass pull and key and leather lining move with it).
+
+The library wall's rolling ladder is `aside` too, a moving part (`ladder_aside`, still rolled by `ladder`): the wall
+measures 1.88 × 2.34 × 0.43 m, the shelves. The fireside lounge's rug, wing chairs, tripod table, low bookcase and log
+basket are `aside` (`lounge`): its own size is the hearth, the fire basket and the hood on its flue, 0.60 × 2.80 ×
+0.60 m (the chairs are still where residents sit). No draw call more (2026-11-25).

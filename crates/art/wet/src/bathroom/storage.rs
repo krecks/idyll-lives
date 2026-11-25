@@ -9,7 +9,7 @@
 
 use super::M;
 use super::common::{LATHE, Lathe, WALL, bends, bottle, lathe, pull, shaker, wall_rose};
-use artkit::forms::rounded_rect;
+use artkit::forms::{Scale, rounded_rect};
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{TAU, cos, sin};
@@ -356,8 +356,10 @@ pub fn mirror_round() -> Vec<Obj> {
     let still = new_parts(|| {
         // the frame: a moulded section, flat at the back and rounded to the front, swept round the circle
         let moulding = vec![
-            (-0.02, -0.02),
-            (-0.02, 0.02),
+            (-0.016, -0.02), // its back corners (on the wall) eased
+            (-0.02, -0.016),
+            (-0.02, 0.016),
+            (-0.016, 0.02),
             (0.0, 0.02),
             (0.012, 0.016),
             (0.019, 0.007),
@@ -520,11 +522,17 @@ pub fn bath_cabinet_tall() -> Vec<Obj> {
             kit::tube!(
                 f,
                 format!("towel{k}"),
-                &[(x, niche.0 + 0.07, -0.4), (x, niche.0 + 0.07, -0.13)],
+                // its rolled end eased 4 mm round its rim
+                &[
+                    (x, niche.0 + 0.07, -0.4),
+                    (x, niche.0 + 0.07, -0.134),
+                    (x, niche.0 + 0.07, -0.13)
+                ],
                 0.048,
                 m,
                 verts = 12,
-                round = 1
+                round = 1,
+                scale = Scale::List(vec![1.0, 1.0, 0.917])
             );
             fcyl!(
                 f,

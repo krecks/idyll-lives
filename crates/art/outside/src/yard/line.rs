@@ -170,14 +170,14 @@ fn garment(kind: &str, x: f64, z: f64, w: f64, h: f64, m: Mat) {
 pub fn clothesline() -> Vec<Obj> {
     for x in [-1.32, 1.32] {
         // the post, a cap on its top; the arm across, capped; two braces bent up into it; a flange at its foot
-        fsweep!(
+        artkit::bevel::eased(fsweep!(
             F,
             numbered("post"),
             &[(x, 0.0, 0), (x, LINE_Y + 0.045, 0)],
             0.03,
             M.posts,
             verts = low(12, 6)
-        );
+        ));
         fcyl!(
             F,
             numbered("post_cap"),
@@ -189,16 +189,16 @@ pub fn clothesline() -> Vec<Obj> {
             bevel = low(0.004, 0.0),
             bevel_segments = 1
         );
-        fsweep!(
+        artkit::bevel::eased(fsweep!(
             F,
             numbered("arm"),
             &[(x, LINE_Y + 0.02, -0.343), (x, LINE_Y + 0.02, 0.343)],
             0.022,
             M.posts,
             verts = low(10, 5)
-        );
+        ));
         for s in [-1.0, 1.0] {
-            fcyl!(
+            artkit::bevel::eased(fcyl!(
                 F,
                 numbered("arm_cap"),
                 0.025,
@@ -207,7 +207,7 @@ pub fn clothesline() -> Vec<Obj> {
                 M.posts,
                 rot = (90, 0, 0),
                 verts = low(10, 5)
-            );
+            ));
             bent(
                 &numbered("brace"),
                 &[
@@ -223,7 +223,7 @@ pub fn clothesline() -> Vec<Obj> {
                 1.0,
             );
         }
-        revolve!(
+        artkit::bevel::eased(revolve!(
             numbered("foot"),
             &[
                 (0.0, 0.0),
@@ -236,17 +236,17 @@ pub fn clothesline() -> Vec<Obj> {
             at = F.at(x, 0, 0),
             material = M.posts,
             segments = low(12, 6)
-        );
+        ));
     }
     for z in LINES {
-        fsweep!(
+        artkit::bevel::eased(fsweep!(
             F,
             numbered("line"),
             &[(-1.34, LINE_Y, z), (1.34, LINE_Y, z)],
             0.008,
             M.line,
             verts = low(8, 4)
-        );
+        ));
         if !is_low() {
             // a tensioner on each line by the right post
             fbox!(
@@ -271,12 +271,12 @@ pub fn clothesline() -> Vec<Obj> {
         .iter()
         .map(|&(y, rx, rz)| ring!(rx, rz, z = y, verts = low(20, 8), square = 4, at = (px, pz)))
         .collect();
-    loft!("basket", &secs, material = M.basket);
+    artkit::bevel::eased(loft!("basket", &secs, material = M.basket));
     let rim: Vec<(f64, f64, f64)> = rounded_rect(0.52, 0.322, 0.08, low(3, 1))
         .iter()
         .map(|&(u, v)| (bx + u, 0.235, bz + v))
         .collect();
-    fsweep!(
+    artkit::bevel::eased(fsweep!(
         F,
         "basket_rim",
         &rim,
@@ -284,7 +284,7 @@ pub fn clothesline() -> Vec<Obj> {
         M.basket,
         verts = low(6, 4),
         closed = true
-    );
+    ));
     for s in [-1.0, 1.0] {
         if !is_low() {
             torus!(

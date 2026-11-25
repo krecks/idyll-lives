@@ -81,9 +81,9 @@ is never two of it.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.treadmill` | 0.79 × 1.44 × 1.85 m | 4,348 | 2 | Frame, Pads |
-| `model.weightBench` | 0.90 × 1.20 × 1.85 m | 5,000 | 2 | Frame, Pads |
-| `model.exerciseBike` | 0.53 × 1.11 × 0.90 m | 3,152 | 2 | Frame, Pads |
+| `model.treadmill` | 0.79 × 1.44 × 1.85 m | 4,508 | 2 | Frame, Pads |
+| `model.weightBench` | 0.90 × 1.20 × 1.85 m | 5,224 | 2 | Frame, Pads |
+| `model.exerciseBike` | 0.53 × 1.11 × 0.90 m | 3,488 | 2 | Frame, Pads |
 | `model.yogaMat` | 0.92 × 0.23 × 0.27 m (rolled) | 1,952 | 3 | Mat |
 | `model.dumbbells` | 0.77 × 0.72 × 0.93 m | 3,240 | 3 | Rack, Weights |
 | `model.massageTable` | 0.70 × 0.79 × 1.85 m (the table) | 5,388 | 1 | Upholstery, Frame |
@@ -153,3 +153,9 @@ No change to the models' code: their soft boxes take the shared form's new shape
 
 Built in Rust since 2026-11-18 (`cargo art fitness`), proved against the last Blender build (`ref/blender`). The yoga mat's
 nodes come out `roll` before `mat` (the order they are made).
+
+- **No hard edges (2026-11-25, gate zero).** The bike's beam, stabilisers and posts' ends chamfered and its saddle's top rolled over (two more rings), the treadmill's rails and uprights, the bench's beam and the bar's sleeves. The sauna keeps four draws (glass in the cabin and in the swinging door); the treadmill's belt loop moves its slats one on, as it should; the massage table's standing place (slot 1, the masseur) has nothing under it, as it should.
+
+## Measured as the piece (2026-11-25)
+
+`dumbbells`: the rubber floor mat in front of the rack is set aside (`parts::aside`, `mat_aside`): drawn as before, not the rack's size; `cargo review sizes` measures the rack 0.44 m deep (was 0.93 with the mat).

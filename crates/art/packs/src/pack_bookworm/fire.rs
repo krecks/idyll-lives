@@ -1,15 +1,17 @@
 //! The fireside reading lounge and the bedside book stack.
 
 use super::common::{M, WALL, books, lamp, mug, pile};
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, cos, cosd, radians, sin, sind};
 use artkit::motion::{Grow, grow};
-use artkit::parts::{hinged, join, new_parts, numbered, settle_all};
+use artkit::parts::{aside, hinged, join, new_parts, numbered, settle_all};
 use artkit::place::{Facing, GameFrame};
 use artkit::py::norm;
 use artkit::rand::Random;
 use artkit::scene::Obj;
+use artkit::shapes::SHARP;
 use artkit::{
     fbox, fcyl, fextrude, fsweep, jitter, kit, loft, revolve, ring, settle, soft, swing, torus,
 };
@@ -33,7 +35,8 @@ fn wing_chair(f: &GameFrame, x: f64, z: f64) {
         M.velvet,
         round = 0.04,
         flat = 1,
-        round_segments = 1
+        round_segments = 1,
+        resting = true
     );
     soft!(
         f,
@@ -46,7 +49,9 @@ fn wing_chair(f: &GameFrame, x: f64, z: f64) {
         round = 0.03,
         puff = 0.012,
         piping = 0.005,
-        flat = 2
+        flat = 1,
+        round_segments = 1,
+        resting = true
     );
     soft!(
         f,
@@ -59,7 +64,8 @@ fn wing_chair(f: &GameFrame, x: f64, z: f64) {
         rot = (7, 0, 0),
         round = 0.06,
         puff = 0.03,
-        flat = 2
+        flat = 1,
+        resting = true
     );
     for s in [-1.0, 1.0] {
         let ax = x + s * (w / 2.0 - 0.065);
@@ -79,7 +85,7 @@ fn wing_chair(f: &GameFrame, x: f64, z: f64) {
             vec![(0.5, s * -0.05)],
         ]
         .concat();
-        fsweep!(
+        let arm = fsweep!(
             f,
             numbered("chair_arm"),
             &[(ax, 0.0, z0 + 0.1), (ax, 0.0, z + d / 2.0 - 0.035)],
@@ -88,6 +94,7 @@ fn wing_chair(f: &GameFrame, x: f64, z: f64) {
             profile = section,
             angle = 50
         );
+        bevel_edges(arm, 0.004, 1, SHARP, &EdgeOrder::Corners); // its ends' upholstered edges
         fcyl!(
             f,
             numbered("chair_scroll"),
@@ -96,7 +103,9 @@ fn wing_chair(f: &GameFrame, x: f64, z: f64) {
             (ax + s * 0.01, 0.565, z + d / 2.0 - 0.03),
             M.velvet,
             rot = (90, 0, 0),
-            verts = 14
+            verts = 12,
+            bevel = 0.004,
+            bevel_segments = 1
         );
         // the wing: a shaped panel from the back's top curving down to the arm
         let wing = smooth_outline(
@@ -132,11 +141,12 @@ fn wing_chair(f: &GameFrame, x: f64, z: f64) {
                 numbered("chair_leg"),
                 ax,
                 lz,
-                0.16,
+                0.19, // (its top inside the base, not showing at its rounded edge)
                 M.walnut,
                 s * 0.012,
                 dz * 0.012,
-                r = 0.02
+                r = 0.02,
+                verts = 8
             );
         }
     }
@@ -268,6 +278,8 @@ pub fn fireside_lounge() -> Vec<Obj> {
             verts = 24,
             scale = (1, 0.7, 1)
         );
+    });
+    let hearth = new_parts(|| {
         // the hearth stone, the iron fire basket on its legs with logs, the hood on its flue right over them
         fcyl!(
             f,
@@ -285,7 +297,9 @@ pub fn fireside_lounge() -> Vec<Obj> {
             &[
                 (0.0, 0.0),
                 (0.15, 0.0),
-                (0.16, 0.015),
+                (0.159, 0.01), // (its rim rounded over)
+                (0.16, 0.0125),
+                (0.158, 0.015),
                 (0.145, 0.015),
                 (0.0, 0.015)
             ],
@@ -318,7 +332,7 @@ pub fn fireside_lounge() -> Vec<Obj> {
             at = f.at(sx, 0.27, sz),
             material = M.iron,
             major_segments = 20,
-            minor_segments = 4
+            minor_segments = 3
         );
         for k in 0..3 {
             let a = (120 * k + 30) as f64;
@@ -352,7 +366,17 @@ pub fn fireside_lounge() -> Vec<Obj> {
                 None,
             );
         }
-        fcyl!(f, "embers", 0.13, 0.02, (sx, 0.15, sz), M.ember, verts = 14);
+        fcyl!(
+            f,
+            "embers",
+            0.13,
+            0.02,
+            (sx, 0.15, sz),
+            M.ember,
+            verts = 14,
+            bevel = 0.004,
+            bevel_segments = 1
+        );
         let at = f.at(sx, 0, sz);
         let hood: Vec<Vec<P3>> = [
             (0.25, 0.0),
@@ -360,7 +384,8 @@ pub fn fireside_lounge() -> Vec<Obj> {
             (0.2, 0.08),
             (0.12, 0.18),
             (0.075, 0.25),
-            (0.062, 0.28),
+            (0.062, 0.276),
+            (0.058, 0.28), // (its top's edge inside the flue)
         ]
         .iter()
         .map(|&(r, b)| ring!(r, r, z = b + HOOD_Y, verts = 24, at = (at.x, at.y)))
@@ -373,7 +398,7 @@ pub fn fireside_lounge() -> Vec<Obj> {
             at = f.at(sx, HOOD_Y + 0.005, sz),
             material = M.iron,
             major_segments = 24,
-            minor_segments = 4
+            minor_segments = 3
         );
         // the flue up to the ceiling (2.8 m), its joints banded, and its collar there: the hood hangs from it
         fcyl!(
@@ -393,7 +418,9 @@ pub fn fireside_lounge() -> Vec<Obj> {
                 0.025,
                 (sx, y, sz),
                 M.iron,
-                verts = 16
+                verts = 16,
+                bevel = 0.004,
+                bevel_segments = 1
             );
         }
         fcyl!(
@@ -407,6 +434,8 @@ pub fn fireside_lounge() -> Vec<Obj> {
             bevel = 0.005,
             bevel_segments = 1
         );
+    });
+    let lounge = new_parts(|| {
         // the chairs, a tripod table with books and tea between them, a low bookcase behind
         wing_chair(f, -0.5, 0.0);
         wing_chair(f, 0.5, 0.0);
@@ -419,7 +448,7 @@ pub fn fireside_lounge() -> Vec<Obj> {
             M.walnut,
             plane = Facing::Top,
             bevel = 0.008,
-            bevel_segments = 2
+            bevel_segments = 1
         );
         revolve!(
             "table_stem",
@@ -479,7 +508,7 @@ pub fn fireside_lounge() -> Vec<Obj> {
             M.walnut,
             plane = Facing::Top,
             bevel = 0.008,
-            bevel_segments = 2
+            bevel_segments = 1
         );
         fbox!(
             f,
@@ -552,7 +581,7 @@ pub fn fireside_lounge() -> Vec<Obj> {
             at = f.at(0.68, 0.24, 0.62),
             material = M.wicker,
             major_segments = 18,
-            minor_segments = 4
+            minor_segments = 3
         )
         .set_scale((0.165, 0.165 * 0.76, 1.0));
         for k in 0..3 {
@@ -570,7 +599,10 @@ pub fn fireside_lounge() -> Vec<Obj> {
             );
         }
     });
-    join(&still, "body", Some(P3::ZERO));
+    join(&hearth, "body", Some(P3::ZERO));
+    // the rug, the chairs, their table, the bookcase and the log basket: the lounge round the fire, drawn with it
+    // but not the fireplace's own size
+    aside(&[still, lounge].concat(), "lounge");
     // The fire: tongues of flame on the logs, joined with their origin on the grate and built flat, so
     // `flames` grows them up while residents read by it.
     let fire = new_parts(|| {
@@ -615,7 +647,7 @@ pub fn bedside_stack() -> Vec<Obj> {
             M.body,
             plane = Facing::Top,
             bevel = 0.008,
-            bevel_segments = 2
+            bevel_segments = 1
         );
         fbox!(
             f,
@@ -685,7 +717,12 @@ pub fn bedside_stack() -> Vec<Obj> {
                     ],
                     0,
                     M.brass,
-                    profile = rounded_rect(0.012, 0.004, 0.0015, 1),
+                    profile = [
+                        (-0.006, -0.002),
+                        (0.006, -0.002),
+                        (0.006, 0.002),
+                        (-0.006, 0.002)
+                    ],
                     up = (0, 0, 1)
                 );
                 fbox!(
@@ -758,7 +795,6 @@ pub fn bedside_stack() -> Vec<Obj> {
             (0.06, top + 0.031, -0.075),
             M.book_d
         );
-        lamp(f, 0.17, h, -0.3, 0.42, None);
         mug(f, -0.22, h, -0.06, M.mug_a, None);
         // reading glasses folded on the top: two rims, a bridge, the arms folded behind
         let (gx, gy, gz) = (-0.07, h + 0.004, -0.05);
@@ -770,7 +806,7 @@ pub fn bedside_stack() -> Vec<Obj> {
                 at = f.at(gx + s * 0.024, gy, gz),
                 material = M.dark,
                 major_segments = 10,
-                minor_segments = 4
+                minor_segments = 3
             );
         }
         fsweep!(
@@ -802,9 +838,14 @@ pub fn bedside_stack() -> Vec<Obj> {
             M.dark,
             verts = 4
         );
-        pile(f, &mut rnd, 0.2, 0.2, 0.0, 6, 0.24, 0.18); // a pile on the floor in front of the chest
     });
     join(&still, "body", Some(P3::ZERO));
+    // the lamp on it and a pile on the floor in front of it: drawn with it, not the chest's own size
+    let things = new_parts(|| {
+        lamp(f, 0.17, h, -0.3, 0.42, None);
+        pile(f, &mut rnd, 0.2, 0.2, 0.0, 6, 0.24, 0.18);
+    });
+    aside(&things, "things");
     // The top book's cover, hinged on the spine at its right: `book_up` opens it over to the right.
     let cover = new_parts(|| {
         fbox!(

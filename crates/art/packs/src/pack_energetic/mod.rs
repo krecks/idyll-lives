@@ -37,7 +37,7 @@ pub fn family() -> Family {
                 .centre(0.0, 0.022)
                 .motions(json!({"loops": {"bounce": "bounce"}}))
                 .paint(&[("tramp_frame", "Frame"), ("tramp_pad", "Pads"), ("tramp_mat", "Mat")]),
-            Model::new("streetballHoop", play::streetball_hoop, (0.86, 2.833, 0.886))
+            Model::new("streetballHoop", play::streetball_hoop, (0.86, 2.918, 0.886))
                 .key("model.energetic.streetballHoop")
                 .centre(0.0, 0.013)
                 .motions(json!({"uses": {"shoot": [{"clip": "swish", "delay": 1.4, "every": 3.2}, "ball_taken"]}}))

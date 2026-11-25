@@ -1,6 +1,7 @@
 //! The writer's bureau and the book-club tea trolley.
 
 use super::common::{M, books, knob, lamp, mug, pile};
+use artkit::bevel::ease;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, cosd, pow, sin, sind};
@@ -105,7 +106,7 @@ fn bureau_chair(f: &GameFrame, z: f64) {
         round_segments = 1
     );
     // the crest rail, bowed back between the legs' tops, and the splat under it
-    fsweep!(
+    let crest = fsweep!(
         f,
         "chair_crest",
         &[
@@ -121,6 +122,7 @@ fn bureau_chair(f: &GameFrame, z: f64) {
         up = (0, 0, 1),
         resolution = 2
     );
+    ease(crest, 60.0, 1);
     fbox!(
         f,
         "chair_rail",
@@ -517,7 +519,7 @@ fn teapot(f: &GameFrame, x: f64, y: f64, z: f64) {
         ],
         at = (bx, by, bz + 0.104),
         material = M.porcelain,
-        segments = 14
+        segments = 12
     );
     fsweep!(
         f,
@@ -559,8 +561,11 @@ fn cup(f: &GameFrame, x: f64, y: f64, z: f64) {
         &[
             (0.0, 0.0),
             (0.032, 0.0),
-            (0.055, 0.008),
-            (0.052, 0.011),
+            (0.053, 0.0073), // the rim rolled over
+            (0.0552, 0.0085),
+            (0.0553, 0.0101),
+            (0.0538, 0.0112),
+            (0.051, 0.0108),
             (0.03, 0.006),
             (0.0, 0.006)
         ],
@@ -575,8 +580,10 @@ fn cup(f: &GameFrame, x: f64, y: f64, z: f64) {
             (0.022, 0.0),
             (0.03, 0.012),
             (0.04, 0.04),
-            (0.043, 0.05),
-            (0.04, 0.05),
+            (0.0428, 0.0494), // the lip rolled over
+            (0.0424, 0.0503),
+            (0.0405, 0.0504),
+            (0.0393, 0.0497),
             (0.036, 0.04),
             (0.026, 0.014),
             (0.0, 0.014)
@@ -675,7 +682,7 @@ pub fn tea_trolley() -> Vec<Obj> {
                 &kit::fillet!(&path, 0.04),
                 0.012,
                 M.brass,
-                verts = 8,
+                verts = 6,
                 round = 1
             );
             for z in [zb, zf] {
@@ -696,7 +703,7 @@ pub fn tea_trolley() -> Vec<Obj> {
                     (x, 0.034, z),
                     M.dark,
                     rot = (0, 90, 0),
-                    verts = 12
+                    verts = 10
                 );
             }
         }
@@ -784,7 +791,7 @@ pub fn tea_trolley() -> Vec<Obj> {
             &[(0.0, 0.0), (0.008, 0.0), (0.01, 0.008), (0.0, 0.016)],
             at = f.at(0.22, 0.844, -0.1),
             material = M.glaze,
-            segments = 8
+            segments = 6
         );
         // below: the biscuit tin, a cake on its stand and two books
         fcyl!(
@@ -794,7 +801,7 @@ pub fn tea_trolley() -> Vec<Obj> {
             0.12,
             (-0.2, 0.395, -0.22),
             M.glaze,
-            verts = 18
+            verts = 16
         );
         fcyl!(
             f,
@@ -803,7 +810,9 @@ pub fn tea_trolley() -> Vec<Obj> {
             0.02,
             (-0.2, 0.465, -0.22),
             M.brass,
-            verts = 18
+            verts = 16,
+            bevel = 0.004,
+            bevel_segments = 1
         );
         revolve!(
             "cake_stand",
@@ -835,7 +844,9 @@ pub fn tea_trolley() -> Vec<Obj> {
             0.06,
             (0.14, 0.447, -0.2),
             M.cake,
-            plane = Facing::Top
+            plane = Facing::Top,
+            bevel = 0.004,
+            bevel_segments = 1
         );
         let mut icing = vec![(0.0, 0.0)];
         icing.extend(

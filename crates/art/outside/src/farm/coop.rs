@@ -438,7 +438,9 @@ pub fn coop() -> Vec<Obj> {
             0.03,
             (0.3, 0.225, -0.3),
             M.trough,
-            verts = 14
+            verts = 14,
+            bevel = 0.004,
+            bevel_segments = 1
         );
         rod!(
             "feeder_wire",

@@ -23,7 +23,8 @@ pub fn wall_sconce() -> Vec<Obj> {
             WALL,
             &[
                 (0.0, 0.0),
-                (0.06, 0.0),
+                (0.057, 0.0),
+                (0.06, 0.003), // its rim on the wall eased
                 (0.06, 0.006),
                 (0.054, 0.012),
                 (0.03, 0.018),
@@ -110,8 +111,9 @@ pub fn wall_sconce() -> Vec<Obj> {
     check_at("wallSconce")
 }
 
-const ARM_SHADE: [(f64, f64); 9] = [
-    (0.5, -0.5),
+const ARM_SHADE: [(f64, f64); 10] = [
+    (0.485, -0.5),
+    (0.5, -0.481), // the rim's outer corner eased
     (0.5, -0.47),
     (0.478, -0.44),
     (0.2, 0.4),
@@ -134,7 +136,8 @@ pub fn wall_lamp_arm() -> Vec<Obj> {
             WALL,
             &[
                 (0.0, 0.0),
-                (0.055, 0.0),
+                (0.052, 0.0),
+                (0.055, 0.003), // its rim on the wall eased
                 (0.055, 0.006),
                 (0.048, 0.014),
                 (0.022, 0.02),
@@ -310,14 +313,16 @@ pub fn wall_light_outdoor() -> Vec<Obj> {
         // the drip hood: flat on the wall, rounding down over the lens at the front
         let hood = smooth_outline(
             &[
-                (-0.055, 0.0125),
+                (-0.055, 0.009),
+                (-0.051, 0.0125), // its back on the wall eased
                 (0.035, 0.0125),
                 (0.055, -0.004),
                 (0.055, -0.022),
                 (0.046, -0.022),
                 (0.044, -0.006),
                 (0.03, -0.0125),
-                (-0.055, -0.0125),
+                (-0.051, -0.0125),
+                (-0.055, -0.009),
             ],
             1,
             true,
@@ -329,7 +334,9 @@ pub fn wall_light_outdoor() -> Vec<Obj> {
             0.22,
             (0, 2.175, WALL + 0.055),
             M.iron,
-            plane = Facing::Side
+            plane = Facing::Side,
+            bevel = 0.003,
+            bevel_segments = 1
         );
         // the cage: bars from post to post arching forward over the lens
         for y in [1.94, 2.01, 2.08] {
@@ -638,7 +645,17 @@ pub fn floor_lamp_simple() -> Vec<Obj> {
                 F,
                 name,
                 &square,
-                &[(-0.002, 0.0), (0.01, 0.0), (0.01, 0.014), (-0.002, 0.014)],
+                // a band 12 by 14 mm, its corners eased
+                &[
+                    (-0.002, 0.003),
+                    (0.001, 0.0),
+                    (0.007, 0.0),
+                    (0.01, 0.003),
+                    (0.01, 0.011),
+                    (0.007, 0.014),
+                    (0.001, 0.014),
+                    (-0.002, 0.011)
+                ],
                 M.iron,
                 at = y,
                 plane = Facing::Top

@@ -2,6 +2,7 @@
 //! (2026-10-21: 2x1, its sling 1.44 m, grown-ups lying in it with the knees up: M-packs-06, Q-07).
 
 use super::common::M;
+use artkit::bevel::ease;
 use artkit::forms::{rect, rounded_rect};
 use artkit::json::float_repr;
 use artkit::math::{Axis, P3, atan, degrees, pow};
@@ -26,14 +27,18 @@ fn _sag(x: f64) -> f64 {
 pub fn garden_hammock() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
     let still = new_parts(|| {
-        fsweep!(
-            f,
-            "beam",
-            &[(-1.35, 0.05, 0), (1.35, 0.05, 0)],
-            0.0,
-            M.cedar_wood,
-            profile = rounded_rect(0.08, 0.1, 0.015, 2),
-            up = (0, 0, 1)
+        ease(
+            fsweep!(
+                f,
+                "beam",
+                &[(-1.35, 0.05, 0), (1.35, 0.05, 0)],
+                0.0,
+                M.cedar_wood,
+                profile = rounded_rect(0.08, 0.1, 0.015, 2),
+                up = (0, 0, 1)
+            ),
+            60.0,
+            1,
         );
         for s in [-1, 1] {
             let sf = s as f64;
@@ -60,21 +65,25 @@ pub fn garden_hammock() -> Vec<Obj> {
                 );
             }
             // the laminated arm, curving up in one piece from the beam's end to its hook
-            fsweep!(
-                f,
-                format!("arm{s}"),
-                &[
-                    (sf * 1.08, 0.04, 0),
-                    (sf * 1.24, 0.4, 0),
-                    (sf * 1.35, 0.78, 0),
-                    (sf * 1.41, 1.18, 0)
-                ],
-                0.0,
-                M.cedar_wood,
-                profile = rounded_rect(0.07, 0.08, 0.02, 2),
-                up = (0, 0, 1),
-                resolution = 4,
-                scale = [1.15, 1.0, 0.95, 0.85]
+            ease(
+                fsweep!(
+                    f,
+                    format!("arm{s}"),
+                    &[
+                        (sf * 1.08, 0.04, 0),
+                        (sf * 1.24, 0.4, 0),
+                        (sf * 1.35, 0.78, 0),
+                        (sf * 1.41, 1.18, 0)
+                    ],
+                    0.0,
+                    M.cedar_wood,
+                    profile = rounded_rect(0.07, 0.08, 0.02, 2),
+                    up = (0, 0, 1),
+                    resolution = 4,
+                    scale = [1.15, 1.0, 0.95, 0.85]
+                ),
+                60.0,
+                1,
             );
             // (the hook's eye in the stand's dark wood, as the old part's: steel would be a draw of its own)
             fsweep!(

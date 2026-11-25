@@ -144,14 +144,17 @@ pub fn fireplace() -> Vec<Obj> {
                 (0.8, WALL + 0.28),
                 (-0.8, WALL + 0.28)
             ],
-            &[
-                (0.03, 0.0),
-                (0.0, 0.0),
-                (-0.006, 0.01),
-                (-0.014, 0.022),
-                (-0.018, 0.04),
-                (0.03, 0.04)
-            ],
+            &artkit::forms::eased_loop(
+                &[
+                    (0.03, 0.0),
+                    (0.0, 0.0),
+                    (-0.006, 0.01),
+                    (-0.014, 0.022),
+                    (-0.018, 0.04),
+                    (0.03, 0.04)
+                ],
+                0.003
+            ),
             M.surround,
             at = 2.7,
             plane = Facing::Top
@@ -182,7 +185,8 @@ pub fn fireplace() -> Vec<Obj> {
         // the mantel: an oak shelf with a rounded nosing and a cove under it, on two scroll corbels
         let shelf = smooth_outline(
             &[
-                (-0.24, -0.035),
+                (-0.24, -0.031),
+                (-0.236, -0.035), // its back on the wall eased too
                 (0.19, -0.035),
                 (0.205, -0.028),
                 (0.215, -0.012),
@@ -190,7 +194,8 @@ pub fn fireplace() -> Vec<Obj> {
                 (0.24, 0.012),
                 (0.24, 0.028),
                 (0.233, 0.035),
-                (-0.24, 0.035),
+                (-0.236, 0.035),
+                (-0.24, 0.031),
             ],
             1,
             true,
@@ -202,7 +207,9 @@ pub fn fireplace() -> Vec<Obj> {
             1.96,
             (0, 1.285, WALL + 0.24),
             M.oak,
-            plane = Facing::Side
+            plane = Facing::Side,
+            bevel = 0.003,
+            bevel_segments = 1
         );
         for side in [-1, 1] {
             let corbel = smooth_outline(
@@ -265,12 +272,14 @@ pub fn fireplace() -> Vec<Obj> {
         // the surround: moulded jambs and lintel, square corner blocks with rosettes, a keystone
         let jamb = smooth_outline(
             &[
-                (-0.05, 0.0),
-                (0.05, 0.0),
+                (-0.047, 0.0),
+                (0.047, 0.0), // its back on the breast eased
+                (0.05, 0.003),
                 (0.05, 0.02),
                 (0.035, 0.03),
                 (-0.035, 0.03),
                 (-0.05, 0.02),
+                (-0.05, 0.003),
             ],
             1,
             true,
@@ -421,19 +430,22 @@ pub fn fireplace() -> Vec<Obj> {
         let top = 1.32;
         revolve!(
             "vase",
-            &[
-                (0.0, 0.0),
-                (0.036, 0.0),
-                (0.04, 0.006),
-                (0.055, 0.07),
-                (0.05, 0.12),
-                (0.034, 0.18),
-                (0.026, 0.215),
-                (0.03, 0.232),
-                (0.034, 0.24),
-                (0.026, 0.24),
-                (0.0, 0.22)
-            ],
+            &artkit::forms::eased(
+                &[
+                    (0.0, 0.0),
+                    (0.036, 0.0),
+                    (0.04, 0.006),
+                    (0.055, 0.07),
+                    (0.05, 0.12),
+                    (0.034, 0.18),
+                    (0.026, 0.215),
+                    (0.03, 0.232),
+                    (0.034, 0.24),
+                    (0.026, 0.24),
+                    (0.0, 0.22)
+                ],
+                0.002
+            ),
             at = F.at(-0.65, top, MANTEL_Z),
             material = M.pot,
             segments = 20
@@ -488,14 +500,17 @@ pub fn fireplace() -> Vec<Obj> {
                 F,
                 "picture_frame",
                 &rect(0.3, 0.38, top + 0.19, 0.55),
-                &[
-                    (0.0, 0.0),
-                    (0.0, 0.02),
-                    (0.005, 0.025),
-                    (0.03, 0.025),
-                    (0.035, 0.018),
-                    (0.035, 0.0)
-                ],
+                &artkit::forms::eased_loop(
+                    &[
+                        (0.0, 0.0),
+                        (0.0, 0.02),
+                        (0.005, 0.025),
+                        (0.03, 0.025),
+                        (0.035, 0.018),
+                        (0.035, 0.0)
+                    ],
+                    0.003
+                ),
                 M.frame_white,
                 at = WALL + 0.3
             );

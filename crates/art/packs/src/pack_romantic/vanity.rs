@@ -1,16 +1,18 @@
 //! The rose-gold vanity and the moonlight gramophone.
 
 use super::common::{_rose, _rose_leaves, M, WALL};
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{Axis, M4, P3, PI, TAU, V3, cos, cosd, radians, sin, sind};
-use artkit::parts::{hinged, join, new_parts};
+use artkit::parts::{aside, hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{
     fbox, fcyl, fextrude, fsphere, fsweep, loft, revolve, ring, rod, settle, slide, soft, spin,
     sweep, swing, torus,
 };
+use artkit::{forms::eased, shapes::AUTO_WIDTH};
 
 // --- the rose-gold vanity (1x1): a dressing table with an oval mirror, a pouf before it ---------------------
 pub fn vanity() -> Vec<Obj> {
@@ -40,7 +42,9 @@ pub fn vanity() -> Vec<Obj> {
             0.3,
             (0, 0.57, -0.25),
             M.ivory,
-            plane = Facing::Front
+            plane = Facing::Front,
+            bevel = 0.004,
+            bevel_segments = 1
         );
         fbox!(
             f,
@@ -73,7 +77,7 @@ pub fn vanity() -> Vec<Obj> {
                 (0.25 * cos(a), 1.24 + 0.36 * sin(a), -0.405)
             })
             .collect();
-        fsweep!(
+        let frame = fsweep!(
             f,
             "mirror_frame",
             &oval,
@@ -89,6 +93,7 @@ pub fn vanity() -> Vec<Obj> {
             ],
             up = (0, 1, 0)
         );
+        bevel_edges(frame, AUTO_WIDTH, 1, 60.0, &EdgeOrder::Corners); // its moulding's arrises
         fcyl!(
             f,
             "mirror_back",
@@ -98,7 +103,9 @@ pub fn vanity() -> Vec<Obj> {
             M.rosegold,
             rot = (90, 0, 0),
             scale = (1, 1.44, 1),
-            verts = 36
+            verts = 36,
+            bevel = 0.004,
+            bevel_segments = 1
         );
         fcyl!(
             f,
@@ -143,7 +150,7 @@ pub fn vanity() -> Vec<Obj> {
                     0.03 * kk,
                     0.022 * kk,
                     z = b.z + h * t,
-                    verts = 8,
+                    verts = 12,
                     square = sq,
                     at = (b.x, b.y)
                 )
@@ -209,15 +216,18 @@ pub fn vanity() -> Vec<Obj> {
         );
         revolve!(
             "vase",
-            &[
-                (0.0, 0.0),
-                (0.03, 0.0),
-                (0.04, 0.07),
-                (0.025, 0.12),
-                (0.03, 0.14),
-                (0.026, 0.14),
-                (0.0, 0.13)
-            ],
+            &eased(
+                &[
+                    (0.0, 0.0),
+                    (0.03, 0.0),
+                    (0.04, 0.07),
+                    (0.025, 0.12),
+                    (0.03, 0.14),
+                    (0.026, 0.14),
+                    (0.0, 0.13)
+                ],
+                AUTO_WIDTH
+            ),
             at = f.at(0.1, 0.76, -0.36),
             material = M.ivory,
             segments = 12
@@ -252,7 +262,11 @@ pub fn vanity() -> Vec<Obj> {
             );
         }
         _rose_leaves(f, "vase_leaf", 0.1, 0.9, -0.36, 3, 0.045, 0.0, None);
-        // the pouf before it: buttoned, on a rose-gold ring with four little feet
+    });
+    join(&still, "body", Some(P3::from((0, 0, 0))));
+    // the pouf before it: drawn with it, not the dressing table's own size
+    let pouf = new_parts(|| {
+        // buttoned, on a rose-gold ring with four little feet
         revolve!(
             "pouf",
             &[
@@ -317,7 +331,7 @@ pub fn vanity() -> Vec<Obj> {
             rings = 4
         );
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    aside(&pouf, "pouf");
     // The middle drawer, pulled out to the front by `drawer_open`.
     let drawer = new_parts(|| {
         fbox!(
@@ -562,9 +576,9 @@ pub fn gramophone() -> Vec<Obj> {
             "horn_neck",
             &[
                 (0.0, 0.85, -0.3),
-                (0.0, 0.93, -0.36),
-                (0.0, 1.01, -0.35),
-                (0.0, 1.06, -0.32)
+                (0.0, 0.92, -0.36),
+                (0.0, 0.98, -0.35),
+                (0.0, 1.02, -0.32)
             ],
             0.022,
             M.horn,
@@ -587,13 +601,13 @@ pub fn gramophone() -> Vec<Obj> {
         ];
         revolve!(
             "horn",
-            &horn,
-            at = f.at(0.0, 1.05, -0.32),
+            &eased(&horn, AUTO_WIDTH),
+            at = f.at(0.0, 1.01, -0.32), // (2026-11-25: 4 cm lower, a gramophone's height)
             material = M.horn,
             segments = 28,
             rot = (34, 0, 0)
         );
-        let h0 = f.at(0.0, 1.05, -0.32);
+        let h0 = f.at(0.0, 1.01, -0.32);
         let tilt =
             M4::translation(V3::from((h0.x, h0.y, h0.z))) * M4::rotation(radians(34.0), Axis::X);
         for k in 0..8 {
@@ -611,7 +625,37 @@ pub fn gramophone() -> Vec<Obj> {
                 verts = 4
             );
         }
-        // record sleeves leant on the cabinet and a rose on its top
+        // a rose on its top (the record sleeves leant on the cabinet: below)
+        fsweep!(
+            f,
+            "rose_stem",
+            &[
+                (-0.22, 0.745, -0.06),
+                (-0.16, 0.746, -0.03),
+                (-0.1, 0.745, 0.0)
+            ],
+            0.004,
+            M.leaf,
+            verts = 5,
+            resolution = 2
+        );
+        _rose(
+            f,
+            "cabinet_rose",
+            -0.24,
+            0.742,
+            -0.07,
+            0.05,
+            None,
+            7,
+            70.0,
+            240.0,
+        );
+        _rose_leaves(f, "rose_leaf", -0.15, 0.748, -0.025, 2, 0.04, 0.0, None);
+    });
+    join(&still, "body", Some(P3::from((0, 0, 0))));
+    // the record sleeves leant on the cabinet: drawn with it, not the gramophone's own size
+    let sleeves = new_parts(|| {
         fbox!(
             f,
             "sleeve_a",
@@ -642,34 +686,8 @@ pub fn gramophone() -> Vec<Obj> {
             rot = (-12 + 90, 20, 0),
             verts = 14
         );
-        fsweep!(
-            f,
-            "rose_stem",
-            &[
-                (-0.22, 0.745, -0.06),
-                (-0.16, 0.746, -0.03),
-                (-0.1, 0.745, 0.0)
-            ],
-            0.004,
-            M.leaf,
-            verts = 5,
-            resolution = 2
-        );
-        _rose(
-            f,
-            "cabinet_rose",
-            -0.24,
-            0.742,
-            -0.07,
-            0.05,
-            None,
-            7,
-            70.0,
-            240.0,
-        );
-        _rose_leaves(f, "rose_leaf", -0.15, 0.748, -0.025, 2, 0.04, 0.0, None);
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    aside(&sleeves, "sleeves");
     // The platter and record, origin on the spindle: `platter` turns them while the record plays.
     let platter = new_parts(|| {
         fcyl!(

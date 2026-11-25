@@ -124,3 +124,15 @@ cargo art laundry --preview  # previews/laundry/<id>.png, <id>@<clip>.png
 ## The soft forms pass (2026-11-13)
 
 No change to the build: its soft boxes take the shared form's new shape (the kit's soft forms: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 4 models changed shape: `bathMat`, `laundryDryer`, `laundryWasher`, `washingArmful`; the same triangles.
+
+## Gate to zero (2026-11-25)
+
+No hard edge shows unbevelled any more (6 → 0): the porthole ring's back edge is eased and the dryer's basket rim
+rounded (`artkit::forms::eased`). The washer's and the dryer's fourth draw call is their glass door and drum, each a
+moving part: left as it is.
+
+## Audit (2026-11-25)
+
+The ironing board's iron is the kit's `kit::steam_iron`, the one the hand holds (`tool.iron`) too: the same plate,
+body and trim, and the 3.2 cm temperature dial a real iron has under its handle. Its shape is as before, its
+handle's vertices in another order (`cleaning.rs`).

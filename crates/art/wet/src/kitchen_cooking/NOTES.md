@@ -194,3 +194,13 @@ column), so its turntable shows through the window and the open door.
 ## The soft forms pass (2026-11-13)
 
 No change to the build: its soft boxes take the shared form's new shape (the kit's soft forms: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 7 models changed shape: `breakfastCounter`, `coffeeMachine`, `cooktopCounter`, `dishwasher`, `dishwasherCompact`, `microwave`, `wallOven`; the same triangles.
+
+## Gate to zero (2026-11-25)
+
+No hard edge shows unbevelled any more (60 → 0): the pulls shade round, the pan supports are six-sided bars shaded
+round, the range cooker's tea towel folds over its rail in more steps and has round edges, the bowls', saucers' and lids'
+rims are rounded (`artkit::forms::eased`), and the wall oven's cornice has its top edges eased. The gas range's stock pot
+is 16 cm, so the range is 1.09 m high with it; the cooker kind takes a cooker drawn to its 1 m counter tile (0.92 m),
+the dishwasher kind the dishwashers drawn with the cupboard beside them (docs/review/reference.json). The fourth draw
+call of the stoves, the microwave and the breakfast counter is a moving part each (door, knob, flame, turntable, lid):
+left as it is.

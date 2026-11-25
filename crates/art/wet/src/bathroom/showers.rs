@@ -286,6 +286,7 @@ pub fn shower_stall() -> Vec<Obj> {
             0.035,
             0.004,
             6,
+            1.0,
         );
         curtain_rings(
             &f,
@@ -382,7 +383,8 @@ pub fn shower_stall() -> Vec<Obj> {
             7,
             0.035,
             0.004,
-            6,
+            10, // gathered, its folds turn three times as sharp: more steps round them
+            STALL_GATHER,
         );
         curtain_rings(&f, "ring", (0.41, 0.42), (-0.41, 0.42), rail, 14, M.curtain);
     });

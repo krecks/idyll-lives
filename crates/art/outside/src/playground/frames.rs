@@ -163,7 +163,7 @@ pub fn slide() -> Vec<Obj> {
                 )
             })
             .collect();
-        fextrude!(
+        artkit::bevel::eased(fextrude!(
             F,
             format!("panel{}", float_repr(x)),
             &rounded_rect(0.28, 0.21, 0.03, 2),
@@ -172,7 +172,7 @@ pub fn slide() -> Vec<Obj> {
             M.roof,
             plane = Facing::Side,
             holes = [port]
-        );
+        ));
         fbox!(
             F,
             format!("beam_side{}", float_repr(x)),
@@ -357,7 +357,8 @@ pub fn slide() -> Vec<Obj> {
 
 /// A sawn board from game point `a` to `b`, `w` wide (across, as near level as it goes) and `t` thick.
 fn board(name: &str, a: impl Spot, b: impl Spot, w: f64, t: f64, material: Mat) -> Obj {
-    sweep!(
+    // eased, its UVs a box a face (along the sweep, its chamfers had none)
+    let board = artkit::bevel::eased(sweep!(
         name,
         &[a.through(&F), b.through(&F)],
         0.0,
@@ -369,7 +370,9 @@ fn board(name: &str, a: impl Spot, b: impl Spot, w: f64, t: f64, material: Mat) 
             (-w / 2.0, t / 2.0)
         ],
         up = (0, 0, 1)
-    )
+    ));
+    board.edit(|p| p.uv = artkit::mesh::UvWay::Box);
+    board
 }
 
 pub fn climbing_frame() -> Vec<Obj> {

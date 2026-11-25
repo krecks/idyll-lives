@@ -103,3 +103,23 @@ cargo art civic_works --preview    # previews/civic_works/<id>.png, <id>@<clip>.
 
 The Workbench previews draw glass opaque and metal dark: the server rack's servers show only in the game
 (`bun tools/bench/check.mjs gallery --keys model.serverRack`).
+
+## Edges at the play camera (2026-11-25)
+
+The gate's `edges` found 137 (car lift 47, tyre rack 30, printing press 25, fire engine 12, flag pole 7, server
+rack 6, cement mixer 4, the timber stack, hose rack and fire pole 1); none now, none accepted. The press's, yard's
+and the station's revolves, sweeps, lofts and extrusions that named no bevel take `artkit::bevel::eased` (a 4 mm chamfer
+on turns over 50°; not the mixer's tow handle), as do the lift's brakes, springs, pads, pillars, lamps, floor plate,
+exhaust and the wheel's rim, the engine's arches, beacons, wheel caps and head-lamp bezels, the tyre rack's and the
+timber stack's tyres (their open beads); a blank server panel takes the 2 mm chamfer the others have.
+
+Triangles back under the aims: the tyre rack's tyres sixteen round (eased, twenty went to 8,452), its uprights'
+slots one quad each (`mark`: 1,152 triangles as boxes); the fire engine's outer tyres 24 round and its inner 16, its
+rims 16, its arches ten steps, its shutters' slats an open ribbon (`ribbon`: an extrusion's end caps and back, never
+seen, cost as much again); the lift's wheels 24 round, its silencer 12 and its rods 8. Car lift 12,308 → 11,956, fire
+engine 13,532 → 11,972, tyre rack 8,452 → 7,876.
+
+## Audit (2026-11-25)
+
+The fire engine's ladder gantries are 1.0 m long (1.3) and 0.45 m apart (0.6), so they stop short of the suction
+hoses beside them (the nearer at x -0.82) instead of running through them.

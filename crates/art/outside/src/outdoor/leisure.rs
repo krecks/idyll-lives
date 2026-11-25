@@ -774,7 +774,7 @@ pub fn swing_set() -> Vec<Obj> {
                 .iter()
                 .map(|&u| (x + u, 0.48 + 0.035 * pow(u / 0.2, 2.0), 0))
                 .collect();
-            fsweep!(
+            artkit::bevel::eased(fsweep!(
                 F,
                 format!("seat{}", float_repr(x)),
                 &belt,
@@ -783,7 +783,7 @@ pub fn swing_set() -> Vec<Obj> {
                 profile = rounded_rect(0.012, 0.2, 0.005, 1),
                 up = (0, 0, 1),
                 resolution = 2
-            );
+            ));
             for dx in [-0.2, 0.2] {
                 fsweep!(
                     F,

@@ -2,11 +2,12 @@
 
 use super::common::{M, cup, teapot};
 use crate::pack_hot_headed::common::fluted;
+use artkit::bevel::ease;
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, TAU, cos, cosd, pow, radians, sin, sind};
 use artkit::motion::{Rock, Squash, rock, squash};
-use artkit::parts::{hinged, join, new_parts, numbered};
+use artkit::parts::{aside, hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{
@@ -301,14 +302,18 @@ pub fn knitting_rocker() -> Vec<Obj> {
                 )
             })
             .collect();
-        fsweep!(
-            f,
-            "crest",
-            &crest,
-            0,
-            M.rocker,
-            profile = rounded_rect(0.08, 0.035, 0.014, 2),
-            up = (0, 0, 1)
+        ease(
+            fsweep!(
+                f,
+                "crest",
+                &crest,
+                0,
+                M.rocker,
+                profile = rounded_rect(0.08, 0.035, 0.014, 2),
+                up = (0, 0, 1)
+            ),
+            60.0,
+            1,
         );
         kit::tube!(
             f,
@@ -351,9 +356,14 @@ pub fn knitting_rocker() -> Vec<Obj> {
         let pts = [
             (0.02, 0.62, -0.25),
             (0.02, 0.85, -0.305),
-            (0.02, 1.0, -0.335),
+            // (over the crest in a round, 30° a step)
+            (0.02, 1.01, -0.325),
+            (0.02, 1.0275, -0.33),
+            (0.02, 1.04, -0.3425),
             (0.02, 1.045, -0.36),
-            (0.02, 1.0, -0.388),
+            (0.02, 1.04, -0.3775),
+            (0.02, 1.0275, -0.39),
+            (0.02, 1.01, -0.395),
             (0.02, 0.8, -0.4),
         ];
         let throw = fsweep!(
@@ -387,7 +397,8 @@ const POUF_X: f64 = 0.75; // content `places` [±0.75, 0], facing ±90
 
 pub fn welcome_tea_table() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
-    let still = new_parts(|| {
+    // the rug and the two poufs on it, the residents' seats: drawn, not the table's size
+    let seating = new_parts(|| {
         // a braided oval rug: rings of plait in two colours to a border
         fcyl!(
             f,
@@ -423,7 +434,19 @@ pub fn welcome_tea_table() -> Vec<Obj> {
                 &ring,
                 0,
                 m,
-                profile = vec![(-ht, -hw), (ht, -hw), (ht, hw), (-ht, hw)],
+                profile = if k == 0 {
+                    // (the outer one's top edges chamfered: the inner one, under 12 mm, has none to show)
+                    vec![
+                        (-ht, -hw),
+                        (ht - 0.004, -hw),
+                        (ht, 0.004 - hw),
+                        (ht, hw - 0.004),
+                        (ht - 0.004, hw),
+                        (-ht, hw),
+                    ]
+                } else {
+                    vec![(-ht, -hw), (ht, -hw), (ht, hw), (-ht, hw)]
+                },
                 up = (0, 0, 1),
                 closed = true
             );
@@ -481,6 +504,9 @@ pub fn welcome_tea_table() -> Vec<Obj> {
                 rings = 4
             );
         }
+    });
+    aside(&seating, "seating");
+    let still = new_parts(|| {
         // the low table between them (top 0.36, 0.4 across: their knees stop short of its ends, their feet before
         // them), a shelf of books, a tea light
         fbox!(
@@ -636,7 +662,10 @@ pub fn welcome_tea_table() -> Vec<Obj> {
             segments = 6,
             rings = 4
         );
-        // potted ferns at the back, between the poufs and the table: arching fronds in two greens
+    });
+    join(&still, "body", Some(P3::ZERO));
+    // potted ferns at the back, between the poufs and the table: arching fronds in two greens: drawn, not its size
+    let ferns = new_parts(|| {
         for x in [-0.44, 0.44] {
             kit::turned!(
                 f,
@@ -649,7 +678,8 @@ pub fn welcome_tea_table() -> Vec<Obj> {
                     (0.065, 0.0),
                     (0.08, 0.17),
                     (0.09, 0.175),
-                    (0.09, 0.2),
+                    (0.09, 0.196), // (its lip's outer edge eased)
+                    (0.088, 0.2),
                     (0.082, 0.2),
                     (0.078, 0.19),
                     (0.0, 0.19),
@@ -685,7 +715,7 @@ pub fn welcome_tea_table() -> Vec<Obj> {
             }
         }
     });
-    join(&still, "body", Some(P3::ZERO));
+    aside(&ferns, "ferns");
     let pot = new_parts(|| teapot(f, -0.07, 0.36, -0.06, 1.0));
     // `pour` tips it towards its spout about the foot's edge under the spout, over the cups.
     let pot = hinged(join(&pot, "teapot", None), f.at(-0.02, 0.36, -0.06));
@@ -728,14 +758,18 @@ fn rolled_arm(
         vec![(cy - r * 1.4, s * inner)],
     ]
     .concat(); // (height, x out)
-    fsweep!(
-        f,
-        name,
-        &[(ax, 0, z0), (ax, 0, z1)],
-        0,
-        mat,
-        profile = &section,
-        angle = 50
+    ease(
+        fsweep!(
+            f,
+            name,
+            &[(ax, 0, z0), (ax, 0, z1)],
+            0,
+            mat,
+            profile = &section,
+            angle = 50
+        ),
+        60.0,
+        1,
     );
     let mut pts = vec![(ax + s * (lean + r * 0.92) * 0.97, y0 + 0.03, z1 - 0.002)];
     pts.extend(

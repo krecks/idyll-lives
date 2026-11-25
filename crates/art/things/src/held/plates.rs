@@ -502,7 +502,8 @@ pub fn _sandwich_half(
                 M.bread,
                 M.crust,
                 sides = sides,
-                at = off
+                at = off,
+                bevel = 0.003
             );
         } else if m == M.lettuce {
             let outline: Vec<(f64, f64)> = _frill(pts, 0.07, 0.004, 4)
@@ -622,7 +623,18 @@ pub fn cake_slice() -> Vec<Obj> {
         let mut sides = vec![cut];
         sides.extend(vec![M.cake_icing; wedge.len() - 2]);
         sides.push(cut);
-        prism!(name, &wedge, y, y + h, top, cut, sides = sides);
+        // (the sponge's edges soft)
+        let bevel = if h > 0.01 { 0.002 } else { 0.0 };
+        prism!(
+            name,
+            &wedge,
+            y,
+            y + h,
+            top,
+            cut,
+            sides = sides,
+            bevel = bevel
+        );
         y += h;
     }
     let mut sides = vec![M.sponge_crumb];

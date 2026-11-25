@@ -4,11 +4,22 @@ mod common;
 use artkit::forms::{Extrude, Holes, Plane, extrude};
 use artkit::materials::{Finish, Finishes, Mat};
 use artkit::math::{P3, V3};
-use artkit::mesh::Mesh;
+use artkit::mesh::{Mesh, UvWay};
 use artkit::scene;
+use artkit::scene::Obj;
 use artkit::shapes::{Cube, Round, cube, cylinder};
 use common::*;
 use std::collections::BTreeMap;
+
+/// `obj` with its box UVs made now, before its bevel, as Blender's modifier finds them: carried onto the bevel (a part
+/// that makes its own is given them on the bevelled mesh, `bevel::apply`).
+fn uvs_made_first(obj: Obj) -> Obj {
+    obj.edit(|o| {
+        artkit::uv::box_(&mut o.mesh);
+        o.uv = UvWay::Done;
+    });
+    obj
+}
 
 /// A golden's records: each one's name, its `key=value` words and its lines by their first word.
 struct Rec {
@@ -126,7 +137,7 @@ fn a_joined_parts_texture_stays_in_its_own_frame_whichever_part_is_bevelled() {
                 } else {
                     ((0.5, 0.12, 0.2), (1.0, 0.25, 0.5))
                 };
-                cube(
+                uvs_made_first(cube(
                     format!("p{i}"),
                     size,
                     Cube {
@@ -136,7 +147,7 @@ fn a_joined_parts_texture_stays_in_its_own_frame_whichever_part_is_bevelled() {
                         bevel_segments: 1,
                         ..Cube::default()
                     },
-                )
+                ))
             })
             .collect();
         let joined = artkit::parts::join(&parts, "j", None);
@@ -747,7 +758,7 @@ fn a_corner_patchs_texture_is_carried_as_blender_carries_it() {
             .split(',')
             .map(|x| x.parse().unwrap())
             .collect();
-        let deck = cube(
+        let deck = uvs_made_first(cube(
             "deck",
             (s[0], s[1], s[2]),
             Cube {
@@ -757,7 +768,7 @@ fn a_corner_patchs_texture_is_carried_as_blender_carries_it() {
                 bevel_segments: r.kv["seg"].parse().unwrap(),
                 ..Cube::default()
             },
-        );
+        ));
         let joined = artkit::parts::join(&[deck], "j", None);
         assert!(artkit::uv::ensure(&[joined]));
         let mesh = joined.read(|o| o.mesh.clone());

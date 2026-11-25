@@ -22,7 +22,7 @@ const CARDS: &str = "leafcards";
 
 /// What is read of each primitive besides its positions and triangles.
 #[derive(Clone, Copy, PartialEq)]
-enum Read {
+pub(super) enum Read {
     /// Every primitive, with its normals: what the edge rule reads.
     Shape,
     /// The primitives on textured finishes, with their UVs: what the texel rule reads.
@@ -71,7 +71,7 @@ fn numbers(g: &Glb, index: &J, width: usize, whole: bool) -> R<Option<Vec<f64>>>
 }
 
 /// The file's meshes (`Mesh`) as `read` wants them; None where some of it can't be read here (a compressed copy).
-fn read(file: &ModelFile, read: Read) -> R<Option<Vec<Mesh>>> {
+pub(super) fn read(file: &ModelFile, read: Read) -> R<Option<Vec<Mesh>>> {
     let (g, gltf) = (file.glb, &file.glb.gltf);
     let empty = J::Arr(Vec::new());
     let nodes = gltf.get("nodes").unwrap_or(&empty);
@@ -83,8 +83,29 @@ fn read(file: &ModelFile, read: Read) -> R<Option<Vec<Mesh>>> {
     } else {
         file.entry.get("scale").and_then(J::num).map_or(1.0, Num::f)
     };
+    // A texture is judged on a part as built: one shrunk at rest that a clip grows back (washing flattened on the
+    // line, bedding folded into a sofa bed) at its grown size; one a clip stretches past its built size (curtains
+    // drawn) as built. The edges are the model's at rest.
+    let shrunk = |node: usize| {
+        nodes
+            .at(node as i64)
+            .and_then(|n| n.get("scale"))
+            .and_then(J::list)
+            .is_some_and(|s| {
+                s.iter()
+                    .any(|v| v.num().is_some_and(|v| v.f() < 1.0 - 1e-6))
+            })
+    };
+    let pose = match read {
+        Read::Textured => {
+            let mut pose = super::grown(g, &[])?;
+            pose.retain(|(node, _), _| shrunk(*node));
+            Some(pose)
+        }
+        Read::Shape => None,
+    };
     let mut out = Vec::new();
-    for p in node_matrices(gltf, None, None)? {
+    for p in node_matrices(gltf, pose.as_ref(), None)? {
         let m = p.m.map(Num::f);
         // A normal goes through the matrix's cofactors; a mirrored node turns its faces inside out.
         let cofactor = |r: usize, c: usize| {

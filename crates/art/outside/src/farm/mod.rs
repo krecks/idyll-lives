@@ -9,6 +9,7 @@
 //! footprint (`settle`), the sizes the old parts'.
 
 use artkit::family::{Family, Model, motions};
+use artkit::far::far_of;
 
 mod barn;
 mod barn_doors;
@@ -33,7 +34,7 @@ pub fn family() -> Family {
         vec![
             Model::new("barn", barn::barn, (6.04, 6.0, 5.94))
                 .tolerance(TOLERANCE)
-                .far(barn::barn_far)
+                .far(|| far_of(barn::barn_far))
                 .paint(&[
                     ("barn", "Paint"),
                     ("barn_roof", "Roof"),
@@ -41,19 +42,19 @@ pub fn family() -> Family {
                 ]),
             Model::new("silo", silo::silo, (2.77, 6.9, 2.72))
                 .tolerance(TOLERANCE)
-                .far(silo::silo_far)
+                .far(|| far_of(silo::silo_far))
                 .paint(&[("silo", "Paint"), ("silo_cap", "Roof")]),
             Model::new("tractor", tractor::tractor, (1.62, 2.5, 3.28))
                 .tolerance(TOLERANCE)
-                .far(tractor::tractor_far)
+                .far(|| far_of(tractor::tractor_far))
                 .paint(&[("tractor", "Paint"), ("rims", "Wheels")]),
             Model::new("hayBale", hay::hayBale, (1.224, 1.21, 1.21))
                 .tolerance(TOLERANCE)
-                .far(hay::hayBale_far)
+                .far(|| far_of(hay::hayBale_far))
                 .paint(&[("twine", "Twine")]),
             Model::new("hayStack", hay::hayStack, (1.9, 0.915, 0.9))
                 .tolerance(TOLERANCE)
-                .far(hay::hayStack_far)
+                .far(|| far_of(hay::hayStack_far))
                 .paint(&[("twine", "Twine")]),
             Model::new("scarecrow", scarecrow::scarecrow, (0.985, 2.13, 0.54))
                 .tolerance(TOLERANCE)
@@ -62,11 +63,11 @@ pub fn family() -> Family {
                 .paint(&[("shirt", "Shirt"), ("trousers", "Trousers"), ("hat", "Hat")]),
             Model::new("trough", trough::trough, (1.84, 0.655, 0.74))
                 .tolerance(TOLERANCE)
-                .far(trough::trough_far)
+                .far(|| far_of(trough::trough_far))
                 .paint(&[("trough", "Paint")]),
             Model::new("coop", coop::coop, (1.74, 1.88, 1.97))
                 .tolerance(TOLERANCE)
-                .far(coop::coop_far)
+                .far(|| far_of(coop::coop_far))
                 .motions(motions(r#"{"night": "close"}"#))
                 .paint(&[
                     ("coop", "Paint"),

@@ -12,8 +12,8 @@
 //!
 //! Small and seen several at once: one draw call each (every finish a plain one), two for the wooden boards
 //! (the chopping board, the tasting board, the pizza's board: `wood`); at most 750 triangles (half the
-//! budget of a thing under 35 cm), 2,000 for the few 35-40 cm across (the pot, the boards, trays and
-//! platters). Turned things are `lathe`s (fluted, lobed or bent where the thing is); crusts, rims, handles,
+//! budget of a thing under 35 cm; a plate, its rim rolled round, up to about 1,050), 2,000 for the few 35-40 cm
+//! across (the pot, the boards, trays and platters). Turned things are `lathe`s (fluted, lobed or bent where the thing is); crusts, rims, handles,
 //! straws and piped icing are sweeps; boards, leaves, cutlery and smears are outlines extruded.
 
 use artkit::family::{Build, Family, Model};
@@ -130,7 +130,7 @@ pub fn family() -> Family {
             i(
                 "bakingTray",
                 baking_tray,
-                (0.38, 0.07, 0.28),
+                (0.38, 0.025, 0.28),
                 "item.bakingTray",
                 O,
                 false,
@@ -458,7 +458,7 @@ pub fn family() -> Family {
             i(
                 "seedBag",
                 seed_bag,
-                (0.086, 0.119, 0.056),
+                (0.084, 0.119, 0.056),
                 "tool.seedBag",
                 O,
                 true,

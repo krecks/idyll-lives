@@ -5,7 +5,7 @@
 use super::common::{arc, drawer, pull, shaker};
 use super::wall::corbel;
 use super::{M, SECONDS};
-use artkit::forms::rounded_rect;
+use artkit::forms::{Scale, rounded_rect};
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::parts::{join, new_parts, settle_all};
@@ -343,6 +343,7 @@ fn bar(
     prof.extend(arc(0.375, 1.035, 0.025, 0, 90, 3));
     prof.push((-0.468, 1.06));
     prof.extend_from_slice(&arc(-0.468, 1.048, 0.012, 90, 180, 2)[1..]);
+    // its ends eased 1.5 mm: a run's tops meet in a hairline
     fextrude!(
         f,
         "top",
@@ -351,7 +352,9 @@ fn bar(
         (0, 0, 0),
         top,
         plane = Facing::Side,
-        smooth = true
+        smooth = true,
+        bevel = 0.0015,
+        bevel_segments = 1
     );
     fbox!(
         f,
@@ -405,14 +408,21 @@ fn bar(
         bevel_segments = 1
     );
     let x1 = -0.5 + bw + if end { 0.02 } else { 0.0 };
+    // its ends eased 1.5 mm (a run's rails meet in a hairline)
     kit::tube!(
         f,
         "rail",
-        &[(-0.5, 0.2, 0.26), (x1, 0.2, 0.26)],
+        &[
+            (-0.5, 0.2, 0.26),
+            (-0.4985, 0.2, 0.26),
+            (x1 - 0.0015, 0.2, 0.26),
+            (x1, 0.2, 0.26)
+        ],
         0.02,
         rail,
         verts = 12,
-        round = 1
+        round = 1,
+        scale = Scale::List(vec![0.925, 1.0, 1.0, 0.925])
     );
     for x in [-0.38, -0.5 + bw - 0.12] {
         let xs = artkit::json::float_repr(x);
@@ -453,7 +463,9 @@ fn bar(
             (0.47, 0, 0),
             top,
             plane = Facing::Side,
-            smooth = true
+            smooth = true,
+            bevel = 0.003,
+            bevel_segments = 1
         );
     }
 }

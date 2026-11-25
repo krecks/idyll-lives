@@ -6,6 +6,7 @@ use artkit::botany::skeleton::{_along, Branches, ClumpAims, Heart, LimbPoints, M
 use artkit::botany::species::{Aims, Crown, Hearts, Perches, Seeds, Species, Stage, Tree, grow};
 use artkit::far::{is_low, low};
 use artkit::math::{TAU, cos, sin};
+use artkit::mesh::UvWay;
 use artkit::noise::noise_at;
 use artkit::perch::Find;
 use artkit::scene::Obj;
@@ -53,6 +54,8 @@ pub fn species() -> Species {
                 axis: 0.3,
                 limb_r: (0.055, 0.025),
                 bough_r: (0.024, 0.01),
+                // (round enough to read as round: four sides showed four hard edges along each white bough)
+                bough_verts: 6,
                 fork: (0.55, 0.7),
                 lift: 0.3,
                 wander: 0.25,
@@ -127,6 +130,8 @@ fn trunk(tree: &mut Tree) {
         scale = [1.04, 0.94, 0.86],
         caps = false
     );
+    // (round its own axis: along its path, its ragged top stretched the bark over 2x)
+    foot.edit(|part| part.uv = UvWay::Round);
     if full {
         jitter!(foot, 0.018, size = 0.12, seed = 3.0, up = 0.0);
         foot.edit(|part| {
@@ -143,13 +148,17 @@ fn trunk(tree: &mut Tree) {
     for i in 0..22 {
         let z = 0.9 + i as f64 * 0.27 + rng.uniform(-0.1, 0.1);
         let (a, span) = (rng.uniform(0.0, TAU), rng.uniform(0.9, 1.8));
-        let rr = 0.15 * _along(&LINE, &SCALE, z) + 0.004;
+        // a thin dark bar round the stem, its faces under 12 mm across (a lenticel, too narrow to bevel), its
+        // middle a little in from the stem's round so it stands proud of its flat sides and of its corners
+        let rr = 0.97 * 0.15 * _along(&LINE, &SCALE, z);
         if full {
-            let across: Vec<(f64, f64, f64)> = (0..4)
+            // (a short dash, 0.5-1.1 rad round: three points keep it on the stem)
+            let span = span * 0.6;
+            let across: Vec<(f64, f64, f64)> = (0..3)
                 .map(|k| {
                     (
-                        rr * cos(a + span * (k as f64 / 3.0 - 0.5)),
-                        rr * sin(a + span * (k as f64 / 3.0 - 0.5)),
+                        rr * cos(a + span * (k as f64 / 2.0 - 0.5)),
+                        rr * sin(a + span * (k as f64 / 2.0 - 0.5)),
                         z,
                     )
                 })
@@ -157,10 +166,10 @@ fn trunk(tree: &mut Tree) {
             sweep!(
                 format!("mark{i}"),
                 &across,
-                0.024,
+                0.0068,
                 material = p.get("birch_mark"),
                 verts = 3,
-                scale = [0.4, 1.0, 1.0, 0.4]
+                scale = [0.4, 1.0, 0.4]
             );
         }
     }

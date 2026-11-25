@@ -6,7 +6,7 @@ use super::turned::{bowl, can, canister, jug, lathe, plates};
 use super::{COUNTER66, M, SECONDS};
 use artkit::forms::rounded_rect;
 use artkit::math::{cos, radians, sin};
-use artkit::parts::{join, new_parts, settle_all};
+use artkit::parts::{aside, join, new_parts, settle_all};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, revolve, slide};
@@ -197,10 +197,11 @@ pub fn counter_corner() -> Vec<Obj> {
             0.0,
             0.019,
         );
-        // a crock of wooden spoons, a spatula and a whisk on the worktop
-        utensil_crock(f, -0.3, 0.95, -0.3);
     });
     join(&still, "body", Some((0, 0, 0).into()));
+    // a crock of wooden spoons, a spatula and a whisk on the worktop: drawn, not the counter's size
+    let crock = new_parts(|| utensil_crock(f, -0.3, 0.95, -0.3));
+    aside(&crock, "crock");
     let drawer = drawer(
         f, "drawer", 0.974, 0.815, 0.48, M.cab, None, 0.18, true, 0.019, 0.04, 0.17,
     );

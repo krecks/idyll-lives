@@ -48,7 +48,7 @@ pub fn server(
         0.03,
         (0, yc, SR_FACE - 0.015),
         if kind != "blank" { m.unit } else { m.dark },
-        bevel = if kind != "blank" { 0.002 } else { 0.0 },
+        bevel = 0.002,
         bevel_segments = 1
     );
     if kind == "blank" {

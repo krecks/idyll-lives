@@ -49,9 +49,15 @@ fn _flag(
         .iter()
         .map(|&(x, z)| (x * c - z * s, x * s + z * c))
         .collect();
-    // a slab lofted through its outline: a little in at the foot, full at the waist, chamfered in to the top
+    // a slab lofted through its outline: a little in at the foot, full at the waist, its top edge weathered round
+    // into the top (no row turning 60° from the last: no hard edge)
     let (cx, cy, cz) = at;
-    let rows = [(0.9, -h / 2.0), (1.0, -h / 2.0 + h * 0.5), (0.86, h / 2.0)];
+    let rows = [
+        (0.9, -h / 2.0),
+        (1.0, 0.0),
+        (0.95, h * 0.36),
+        (0.84, h / 2.0),
+    ];
     let sections: Vec<Vec<P3>> = rows
         .iter()
         .map(|&(k, y)| {
@@ -247,7 +253,8 @@ pub fn pond() -> Vec<Obj> {
             (0, WATER_Y / 2.0, 0),
             m.water,
             verts = 32,
-            scale = (rx - 0.04, rz - 0.04, 1)
+            scale = (rx - 0.04, rz - 0.04, 1),
+            bevel = 0.004
         );
         fcyl!(
             F,
@@ -383,7 +390,8 @@ pub fn pond() -> Vec<Obj> {
             segments = 8
         );
         _frog(0.0, WATER_Y + 0.006, 0.3, 25.0);
-        // reeds and bulrushes at the back left, rising out of the shallows by the stones
+        // reeds and dwarf reedmace (Typha minima, a garden pond's: under 0.75 m) at the back left, rising out of the
+        // shallows by the stones
         for i in 0..11 {
             let (x, z) = (
                 -0.6 + rng.uniform(-0.12, 0.12),
@@ -392,7 +400,7 @@ pub fn pond() -> Vec<Obj> {
             let (yaw, tilt, length, droop) = (
                 rng.uniform(0.0, 360.0),
                 rng.uniform(70.0, 84.0),
-                rng.uniform(0.45, 0.7),
+                rng.uniform(0.36, 0.56),
                 rng.uniform(0.03, 0.12),
             );
             leaf!(
@@ -413,7 +421,7 @@ pub fn pond() -> Vec<Obj> {
         }
         for i in 0..3 {
             let (x, z) = (-0.62 + i as f64 * 0.07, -0.46 + (i % 2) as f64 * 0.06);
-            let h = 0.6 + i as f64 * 0.06;
+            let h = 0.46 + i as f64 * 0.04;
             fsweep!(
                 F,
                 format!("rush_stem{i}"),

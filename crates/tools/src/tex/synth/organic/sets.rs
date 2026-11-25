@@ -409,7 +409,7 @@ pub(super) fn bark(n: &Noise, r: &mut Rng, size: usize) -> Organic {
     let mut ao = vec![0.0; size * size];
     for i in 0..size * size {
         let o = occ[i].min(1.0);
-        let c = mul(cols[i], 1.14 * (1.0 - 0.3 * o));
+        let c = mul(cols[i], 1.31 * (1.0 - 0.3 * o));
         img[i * 3] = to_u8(c[0]);
         img[i * 3 + 1] = to_u8(c[1]);
         img[i * 3 + 2] = to_u8(c[2]);

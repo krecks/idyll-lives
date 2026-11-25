@@ -1,10 +1,11 @@
 //! The brooding window seat and the moonstone soaking tub.
 
 use super::common::{M, WALL, WALL2, book, candle, vase};
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::rounded_rect;
 use artkit::math::{P3, cosd, sind};
 use artkit::motion::{Grow, Squash, grow, squash};
-use artkit::parts::{hinged, join, new_parts, numbered};
+use artkit::parts::{aside, hinged, join, new_parts, numbered};
 use artkit::place::GameFrame;
 use artkit::rand::Random;
 use artkit::scene::Obj;
@@ -64,7 +65,10 @@ pub fn window_seat() -> Vec<Obj> {
                 out = 0.03
             );
         }
-        // the window wall: a panel, the rainy pane behind a sash of four lights, a moulded casing, a nosed sill
+    });
+    // the window wall: a panel, the rainy pane behind a sash of four lights, a moulded casing, a nosed sill, with
+    // candles and a mug on it: drawn, not the seat's size
+    let window = new_parts(|| {
         fbox!(
             f,
             "wall_panel",
@@ -117,8 +121,11 @@ pub fn window_seat() -> Vec<Obj> {
             &[
                 (-0.045, 0.0),
                 (-0.045, 0.026),
+                (-0.0425, 0.032), // (its edges rounded)
                 (-0.02, 0.04),
-                (0.012, 0.04),
+                (0.006, 0.04),
+                (0.0105, 0.038),
+                (0.012, 0.034),
                 (0.012, 0.0),
             ],
             M.frame,
@@ -214,6 +221,9 @@ pub fn window_seat() -> Vec<Obj> {
             M.mug,
             200.0
         );
+    });
+    aside(&window, "window");
+    let pillows = new_parts(|| {
         // pillows against the window wall
         soft!(
             f,
@@ -246,7 +256,7 @@ pub fn window_seat() -> Vec<Obj> {
             resting = true
         );
     });
-    join(&still, "body", Some(P3::ZERO));
+    join(&[still, pillows].concat(), "body", Some(P3::ZERO));
     // The seat cushion with its throw and a book left on it, joined with their origin on the cushion's underside:
     // `sink_in` presses them 2 cm while a resident broods or dozes on it.
     let zc = FRAME_Z + 0.3;
@@ -265,7 +275,7 @@ pub fn window_seat() -> Vec<Obj> {
             piping = 0.006,
             flat = 3
         );
-        kit::throw!(
+        let throw = kit::throw!(
             f,
             "throw",
             0.32,
@@ -277,6 +287,8 @@ pub fn window_seat() -> Vec<Obj> {
             0.14,
             seed = 2.0
         );
+        // (its cut ends' edges eased)
+        bevel_edges(throw, 0.003, 1, 60.0, &EdgeOrder::Corners);
         book(
             f,
             "book",
@@ -379,14 +391,16 @@ pub fn soaking_tub() -> Vec<Obj> {
                 raised = true
             );
         }
-        fsweep!(
+        fbox!(
             f,
             "ledge_top",
-            &[(-0.93, 0.51, WALL2 + 0.16), (0.93, 0.51, WALL2 + 0.16)],
-            0,
+            1.86,
+            0.04,
+            0.32,
+            (0, 0.51, WALL2 + 0.16),
             M.ledge_top,
-            profile = rounded_rect(0.04, 0.32, 0.014, 2),
-            up = (0, 0, 1)
+            bevel = 0.014,
+            bevel_segments = 2
         );
         for (i, x) in [-0.78, -0.66, -0.56, 0.6, 0.72].into_iter().enumerate() {
             candle(
@@ -440,6 +454,9 @@ pub fn soaking_tub() -> Vec<Obj> {
                 [M.mauve, M.towel][k]
             );
         }
+    });
+    // a vase of fern on the ledge: drawn, not the tub's size
+    let fern = new_parts(|| {
         let top = vase(f, -0.25, 0.53, WALL2 + 0.14, 1.3);
         for k in 0..7 {
             let a = (k * 360) as f64 / 7.0 + 10.0;
@@ -469,6 +486,9 @@ pub fn soaking_tub() -> Vec<Obj> {
                 scale = [0.15, 0.8, 1.0, 0.1]
             );
         }
+    });
+    aside(&fern, "fern");
+    let mat = new_parts(|| {
         // the bath mat in front, a fringe at its ends
         soft!(
             f,
@@ -496,7 +516,7 @@ pub fn soaking_tub() -> Vec<Obj> {
             }
         }
     });
-    join(&still, "body", Some(P3::ZERO));
+    join(&[still, mat].concat(), "body", Some(P3::ZERO));
     // The water: the tub's inside up to 0.52, a little foam on it, its origin under the tub's floor and flat
     // there at rest; `fill` raises it while a resident soaks.
     let water = new_parts(|| {

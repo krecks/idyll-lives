@@ -111,12 +111,13 @@ pub fn pottery_wheel() -> Vec<Obj> {
             .iter()
             .map(|&(r, z)| (r * PAN_R * 2.0, z * 0.12))
             .collect();
+        let prof = artkit::forms::round_at(&prof, 4, 0.003); // the rim's roll round
         revolve!(
             "splash_pan",
             &prof,
             at = f.at(0, 0.42, WHEEL_Z),
             material = M.pan,
-            segments = 32
+            segments = 28
         );
         fbox!(
             f,
@@ -341,6 +342,7 @@ pub fn pottery_wheel() -> Vec<Obj> {
             (0.036, 0.18),
             (0.0, 0.176),
         ];
+        let rings = artkit::forms::round_at(&rings, 9, 0.0015); // its lip round
         let pot = revolve!(
             "pot",
             &rings,

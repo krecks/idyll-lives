@@ -1,7 +1,7 @@
 //! What the couch potato pack is built from: its palette, pleated curtains, speaker drivers, screens and snacks.
 
 use artkit::materials::Mat;
-use artkit::math::{PI, atan2, cosd, sind};
+use artkit::math::{PI, atan2, cosd, sin, sind};
 use artkit::parts::numbered;
 use artkit::place::{Facing, GameFrame};
 use artkit::py::fmod;
@@ -98,16 +98,33 @@ pub fn pleats(
     t: f64,
 ) -> Obj {
     let h = y1 - y0;
+    // (the hem and the heading 11.5 mm thick at most: thinner than a hard edge's 12 mm faces)
     let rows = [
-        (y0, 1.0, 1.5, 0.0),
-        (y0 + 0.012, 1.0, 1.5, 0.02),
+        (y0, 1.0, 1.15, 0.0),
+        (y0 + 0.012, 1.0, 1.15, 0.02),
         (y0 + 0.04, 1.0, 1.0, 0.05),
         (y0 + h * 0.45, 0.9, 1.0, 0.25),
         (y1 - 0.06, 0.7, 1.0, 0.4),
-        (y1 - 0.05, 0.4, 1.3, 0.42),
-        (y1, 0.36, 1.3, 0.42),
+        (y1 - 0.05, 0.4, 1.15, 0.42),
+        (y1, 0.36, 1.15, 0.42),
     ];
     let (verts, faces) = kit::pleats!(f, &rows, x0, x1, z, folds, amp, t);
+    // its side hems: a cord down each end, where the cloth's end is (the folds end where they start)
+    for x in [x0, x1] {
+        let down: Vec<(f64, f64, f64)> = rows
+            .iter()
+            .map(|&(y, af, _, phase)| (x, y, z + amp * af * sin(phase)))
+            .collect();
+        kit::tube!(
+            f,
+            numbered("side_hem"),
+            &down,
+            0.0065,
+            mat,
+            verts = 5,
+            round = 1
+        );
+    }
     object_of!(name, &verts, &faces, &[mat], sharp = 70)
 }
 
@@ -128,7 +145,9 @@ pub fn driver(
         (r + 0.012, -0.008),
         (r + 0.012, 0.002),
         (r + 0.004, 0.004),
-        (r - 0.002, 0.009),
+        // (the surround's crest rolled over in two turns, not one)
+        (r - 0.0005, 0.0085),
+        (r - 0.0035, 0.0085),
         (r - 0.008, 0.004),
         (r * 0.36, -0.02),
         (r * 0.3, -0.016),

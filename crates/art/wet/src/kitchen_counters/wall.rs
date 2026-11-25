@@ -16,10 +16,19 @@ use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, loft, settle, torus};
 
 /// A rectangle in plan at height `y`, game corners (x0, z0) to (x1, z1), as Blender points (for a loft).
 fn rect_ring(f: &GameFrame, x0: f64, x1: f64, z0: f64, z1: f64, y: f64) -> Vec<P3> {
-    [(x0, z0), (x1, z0), (x1, z1), (x0, z1)]
-        .into_iter()
-        .map(|(x, z)| f.at(x, y, z))
-        .collect()
+    // its back (on the wall) 4 mm lower, 4 mm behind the rest: the slope's edge along the wall eased at 45°
+    let c = 0.004;
+    [
+        (x0, y - c, z0),
+        (x1, y - c, z0),
+        (x1, y, z0 + c),
+        (x1, y, z1),
+        (x0, y, z1),
+        (x0, y, z0 + c),
+    ]
+    .into_iter()
+    .map(|(x, y, z)| f.at(x, y, z))
+    .collect()
 }
 
 // --- the cooker hood: 1x1, a canopy and a chimney with a lamp and a filter ------------------------------
@@ -64,6 +73,7 @@ pub fn range_hood() -> Vec<Obj> {
             &[
                 rect_ring(f, -0.45, 0.45, -0.43, 0.07, 1.599),
                 rect_ring(f, -0.45, 0.45, -0.43, 0.07, 1.605),
+                rect_ring(f, -0.447, 0.447, -0.43, 0.067, 1.608), // the rim eased onto the slope
                 rect_ring(f, -0.155, 0.155, -0.43, -0.125, 1.675)
             ],
             material = M.steel,

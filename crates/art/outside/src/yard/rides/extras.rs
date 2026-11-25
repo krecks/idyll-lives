@@ -52,7 +52,7 @@ pub(super) fn city_extras(s: &Bike) {
     let p = F.at(cx, 0, z);
     let (px, pz) = (p.x, p.y);
     let n: usize = low(24, 8);
-    loft!(
+    artkit::bevel::eased(loft!(
         "basket",
         &[
             ring!(
@@ -82,7 +82,7 @@ pub(super) fn city_extras(s: &Bike) {
             )
         ],
         material = M.basket
-    );
+    ));
     let rim: Vec<(f64, f64, f64)> =
         rounded_rect(2.0 * hx + 0.004, 2.0 * hz + 0.004, 0.05, low(3, 1))
             .iter()
@@ -626,7 +626,7 @@ pub(super) fn cargo_extras(s: &Bike) {
 pub(super) fn ebike_extras(s: &Bike) {
     let z = s.z;
     bb_shell(s, 0.08);
-    fcyl!(
+    artkit::bevel::eased(fcyl!(
         F,
         "motor",
         0.06,
@@ -635,7 +635,7 @@ pub(super) fn ebike_extras(s: &Bike) {
         M.motor,
         rot = (90, 0, 0),
         verts = low(14, 7)
-    );
+    ));
     kit::board(
         &F,
         "battery",

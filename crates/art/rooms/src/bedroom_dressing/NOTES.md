@@ -24,10 +24,10 @@ until checked in play.
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
 |---|---|---|---|---|
-| `model.mirror` | 0.80 × 1.86 × 0.56 m | 3,992 | 2 | Frame (wood) |
-| `model.dressingTable` | 0.86 × 1.53 × 0.86 m | 7,692 | 4 | Table (wood), Frame (brass) |
-| `model.mirrorWall` | 0.62 × 0.96 × 0.09 m | 1,312 | 1 | Frame (black metal) |
-| `model.mirrorFloor` | 0.56 × 1.78 × 0.45 m | 2,000 | 1 | Frame (brass) |
+| `model.mirror` | 0.80 × 1.86 × 0.56 m | 4,312 | 2 | Frame (wood) |
+| `model.dressingTable` | 0.86 × 1.53 × 0.86 m | 7,860 | 4 | Table (wood), Frame (brass) |
+| `model.mirrorWall` | 0.62 × 0.96 × 0.09 m | 1,712 | 1 | Frame (black metal) |
+| `model.mirrorFloor` | 0.56 × 1.78 × 0.45 m | 2,272 | 1 | Frame (brass) |
 
 - **`mirror`** — a cheval mirror: two turned posts on feet and a low stretcher, the swing frame between them on
   brass pivots at 0.95 m, a crest with a finial. Centred on its tile (its old part was 5 cm back).
@@ -41,8 +41,8 @@ until checked in play.
   - **The drawer.** The case on the seated resident's right (game +x: the game is left-handed) slides its drawer
     out 18 cm towards the seat in 0.8 s (`drawer_open`, `slide`), its tray hidden in the case at rest, a dark
     `inside` panel behind it. `motions` plays it for `getReady` and holds it 3 s, then shuts it.
-  - **Draw calls: 3.** The still body's wood, its plain finishes (the mirror glass is `gloss`), and the drawer
-    (wood, with a wooden knob so it stays one). The pouf is a plain `satin`, not `fabric`.
+  - **Draw calls: 4.** The still body's wood, its plain finishes (the mirror glass is `gloss`), and the drawer's
+    wood and its brass knob (a wooden knob would make it 3; kept brass, as the frame). The pouf is a plain `satin`, not `fabric`.
 - **`mirrorWall`** — on the wall layer: built in place at the old part's height (frame 1.0–1.9 m, ledge at
   0.97 m), its back on the wall face (depth −0.43); settled with `centre = false, floor = false` and
   its Model `on_wall()`, `centre(0.0, -0.385)`. A black metal frame, the glass, and a ledge with a cup and a
@@ -64,6 +64,13 @@ toothpaste; the standing mirror sled feet turned up at the toe, clamp knobs and 
 
 `check-glb`: 0 failed. Warning: the wall mirror "floats
 93.6 cm above its origin" (it is on the wall, as it should be). Khronos validator: 0 errors, 0 warnings each.
+
+## Edges eased (2026-11-25)
+
+For the gate's `edges`: the frames' moulding (`moulding`) has its square corners eased 3 mm all round (the
+back's and the lip's), the wall mirror's ledge is lofted with its corners eased and its ends chamfered 2 mm, and
+the dressing table's oval ring is 36 points round (was 48), keeping it under 8,000 triangles. The dressing table
+stays at 4 draw calls (its drawer's oak and brass knob, as the body's).
 
 ## In the game
 

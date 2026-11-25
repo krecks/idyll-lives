@@ -1,6 +1,7 @@
 //! The chef's island (2x1): a marble-topped island, a hob on it, drawers on the cook's side, two stools.
 
 use super::common::M;
+use artkit::bevel::ease;
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{Axis, P3, cosd, sind};
@@ -79,19 +80,23 @@ fn _stool(f: &GameFrame, x: f64, z: f64) {
             round = 1
         );
     }
-    fsweep!(
-        f,
-        numbered("stool_back"),
-        &[
-            (x - 0.16, STOOL + 0.21, z - 0.15),
-            (x, STOOL + 0.21, z - 0.183),
-            (x + 0.16, STOOL + 0.21, z - 0.15)
-        ],
-        0.0,
-        M.oak,
-        profile = rounded_rect(0.1, 0.022, 0.008, 1),
-        up = (0, 0, 1),
-        resolution = 3
+    ease(
+        fsweep!(
+            f,
+            numbered("stool_back"),
+            &[
+                (x - 0.16, STOOL + 0.21, z - 0.15),
+                (x, STOOL + 0.21, z - 0.183),
+                (x + 0.16, STOOL + 0.21, z - 0.15)
+            ],
+            0.0,
+            M.oak,
+            profile = rounded_rect(0.1, 0.022, 0.008, 1),
+            up = (0, 0, 1),
+            resolution = 3
+        ),
+        60.0,
+        1,
     );
 }
 
@@ -256,14 +261,15 @@ pub fn chefs_island() -> Vec<Obj> {
                 verts = 12
             );
         }
+        // (a saucepan-high pot, 12 cm: the island stands no higher than an island with it)
         revolve!(
             "stock_pot",
             &[
                 (0.0, 0.0),
                 (0.11, 0.0),
                 (0.12, 0.01),
-                (0.12, 0.18),
-                (0.112, 0.18),
+                (0.12, 0.12),
+                (0.112, 0.12),
                 (0.112, 0.012),
                 (0.0, 0.012)
             ],
@@ -280,7 +286,7 @@ pub fn chefs_island() -> Vec<Obj> {
                 (0.08, 0.02),
                 (0.0, 0.024)
             ],
-            at = f.at(RING, TOP + 0.188, 0.27),
+            at = f.at(RING, TOP + 0.128, 0.27),
             material = M.worktop,
             segments = 18
         );
@@ -294,7 +300,7 @@ pub fn chefs_island() -> Vec<Obj> {
                 (0.012, 0.024),
                 (0.0, 0.025)
             ],
-            at = f.at(RING, TOP + 0.21, 0.27),
+            at = f.at(RING, TOP + 0.15, 0.27),
             material = M.black,
             segments = 8
         );
@@ -305,10 +311,10 @@ pub fn chefs_island() -> Vec<Obj> {
                 numbered("pot_handle"),
                 &kit::fillet!(
                     &[
-                        (RING + sf * 0.118, TOP + 0.16, 0.25),
-                        (RING + sf * 0.15, TOP + 0.16, 0.255),
-                        (RING + sf * 0.15, TOP + 0.16, 0.285),
-                        (RING + sf * 0.118, TOP + 0.16, 0.29)
+                        (RING + sf * 0.118, TOP + 0.1, 0.25),
+                        (RING + sf * 0.15, TOP + 0.1, 0.255),
+                        (RING + sf * 0.15, TOP + 0.1, 0.285),
+                        (RING + sf * 0.118, TOP + 0.1, 0.29)
                     ],
                     0.008
                 ),
@@ -325,7 +331,8 @@ pub fn chefs_island() -> Vec<Obj> {
                     (0.0, 0.0),
                     (0.07, 0.0),
                     (0.11, 0.012),
-                    (0.105, 0.016),
+                    (0.11, 0.0155), // (a 3.5 mm rim band: too narrow to show hard)
+                    (0.105, 0.0165),
                     (0.068, 0.006),
                     (0.0, 0.006)
                 ],

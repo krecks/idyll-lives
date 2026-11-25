@@ -245,7 +245,8 @@ pub fn _toast_half(half: &str, pts: &[(f64, f64)], cut: usize, off: (f64, f64), 
         M.toast,
         M.toast_crust,
         sides = sides,
-        at = off
+        at = off,
+        bevel = 0.003
     );
     let cx = artkit::py::sum(pts.iter().map(|p| p.0)) / pts.len() as f64 + off.0;
     let cz = artkit::py::sum(pts.iter().map(|p| p.1)) / pts.len() as f64 + off.1;
@@ -911,18 +912,23 @@ pub fn cake_stand_dirty() -> Vec<Obj> {
     let top = 0.102;
     lathe!(
         "stand",
-        &[
-            (0.0, 0.0),
-            (0.078, 0.0),
-            (0.08, 0.008),
-            (0.03, 0.022),
-            (0.02, 0.06),
-            (0.026, 0.072),
-            (0.02, 0.084),
-            (0.13, 0.092),
-            (0.14, 0.1),
-            (0.0, top)
-        ],
+        // (the plate's edge rolled round)
+        &artkit::forms::round_at(
+            &[
+                (0.0, 0.0),
+                (0.078, 0.0),
+                (0.08, 0.008),
+                (0.03, 0.022),
+                (0.02, 0.06),
+                (0.026, 0.072),
+                (0.02, 0.084),
+                (0.13, 0.092),
+                (0.14, 0.1),
+                (0.0, top),
+            ],
+            8,
+            0.001
+        ),
         M.china,
         segments = 16
     );

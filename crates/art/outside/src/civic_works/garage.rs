@@ -1,6 +1,6 @@
 //! The garage's tyre rack and tool chest.
 
-use super::common::{F, WALL, own_palette, tyre};
+use super::common::{F, WALL, mark, own_palette, tyre};
 use artkit::forms::Holes;
 use artkit::math::{Axis, TAU, atan2, cos, degrees, pow, radians, sin, sqrt};
 use artkit::parts::{join_all, new_parts};
@@ -53,14 +53,18 @@ pub fn tyre_rack() -> Vec<Obj> {
                     m.iron
                 );
                 for j in 0..24 {
-                    fbox!(
-                        F,
-                        format!("slot{s}{k}{j}"),
-                        0.004,
-                        0.025,
-                        0.012,
-                        (x - s as f64 * 0.031, 0.2 + j as f64 * 0.075, z),
-                        m.dark
+                    // a slot punched in the upright's inner face
+                    let (u, y) = (x - s as f64 * 0.0305, 0.2 + j as f64 * 0.075);
+                    mark(
+                        &format!("slot{s}{k}{j}"),
+                        [
+                            (u, y - 0.0125, z - 0.006),
+                            (u, y - 0.0125, z + 0.006),
+                            (u, y + 0.0125, z + 0.006),
+                            (u, y + 0.0125, z - 0.006),
+                        ],
+                        (-s as f64, 0.0, 0.0),
+                        m.dark,
                     );
                 }
             }
@@ -127,7 +131,8 @@ pub fn tyre_rack() -> Vec<Obj> {
             for t in 0..n {
                 let x = -0.79 + t as f64 * (1.58 / (n - 1) as f64);
                 let ty = y + 0.05 - (r - sqrt(r * r - pow(TR_D / 2.0 - 0.085, 2.0))) + r; // down between the beams
-                tyre(
+                // its open bead eased, sixteen round (eased, twenty went past the triangles' aim)
+                artkit::bevel::eased(tyre(
                     &format!("tyre{lv}{t}"),
                     x,
                     ty,
@@ -136,9 +141,9 @@ pub fn tyre_rack() -> Vec<Obj> {
                     w,
                     m.rubber,
                     None,
-                    Some(20),
+                    Some(16),
                     Axis::X,
-                );
+                ));
                 // the tread's label, on its crown to the front
                 fbox!(
                     F,

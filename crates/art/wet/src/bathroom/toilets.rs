@@ -80,6 +80,8 @@ fn foot(f: &GameFrame, z: f64, top: f64, r: f64, ratio: f64, flare: f64) {
     let rings = [
         (0.0, flare),
         (0.012, flare),
+        (0.0135, flare - 0.012), // its shoulder rolled in
+        (0.016, flare - 0.03),
         (0.03, 0.9 + 0.06 * flare),
         (top * 0.45, 0.8),
         (top * 0.8, 0.88),
@@ -284,7 +286,9 @@ fn roll(f: &GameFrame, x: f64, y: f64, z: f64, side: i32) {
         (x, y, z + 0.065),
         M.paper,
         rot = (0, 90, 0),
-        verts = 18
+        verts = 14,
+        bevel = 0.003,
+        bevel_segments = 1
     );
     fcyl!(
         f,
@@ -464,7 +468,7 @@ pub fn toilet_compact() -> Vec<Obj> {
                 bevel_segments = 1
             );
         }
-        roll(&f, 0.33, 0.62, WALL, 1);
+        roll(&f, 0.30, 0.62, WALL, 1); // (4.5 cm clear of the cistern)
     });
     join(&still, "body", Some((0, 0, 0).into()));
     let lid = lid(&f, zb, rim + 0.024, r, ratio, M.seat, 0.02, false);

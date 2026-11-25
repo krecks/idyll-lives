@@ -127,7 +127,7 @@ pub fn family() -> Family {
                 .centre(0.0, -0.379)
                 .on_wall()
                 .paint(&[("wall_frame", "Body"), ("wall_bar", "Trim")]),
-            Model::new("tvRetro", tv::tv_retro, (0.886, 0.786, 0.426))
+            Model::new("tvRetro", tv::tv_retro, (0.816, 0.786, 0.426))
                 .key("model.tvRetro")
                 .centre(0.013, -0.217)
                 .motions(json!({"uses": {"watch": "antenna"}}))
@@ -150,7 +150,7 @@ pub fn family() -> Family {
                                          "dance": {"clip": "pulse", "every": 0.45}},
                                 "loops": {"listen": "record", "dance": "record"}}))
                 .paint(&[("stereo_wood", "Body"), ("stereo_dark", "Trim")]),
-            Model::new("boombox", stereo::boombox, (0.6, 0.95, 0.44))
+            Model::new("boombox", stereo::boombox, (0.6, 0.765, 0.44))
                 .key("model.boombox")
                 .motions(json!({"uses": {"listen": "cassette"}, "hold": 1.2}))
                 .paint(&[("boombox_body", "Body"), ("boombox_trim", "Trim")]),

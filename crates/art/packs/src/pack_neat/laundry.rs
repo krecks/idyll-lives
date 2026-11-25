@@ -49,7 +49,7 @@ fn _porthole(f: &GameFrame, name: &str, cy: f64, zf: f64) {
         ],
         at = f.at(WX, cy, zf),
         material = M.porthole,
-        segments = 24,
+        segments = 20,
         rot = (90, 0, 0)
     );
     soft!(
@@ -158,7 +158,7 @@ fn _appliance(f: &GameFrame, name: &str, y0: f64, hh: f64, zf: f64, door: bool) 
         ],
         at = f.at(WX, cy, zf - 0.004),
         material = M.drum,
-        segments = 24,
+        segments = 16, // (behind the porthole: seen only with the washer's door open)
         rot = (90, 0, 0)
     );
     if !door {
@@ -209,6 +209,15 @@ fn _basket(
             ring!(
                 w / 2.0 + 0.008,
                 d / 2.0 + 0.008,
+                z = b.z + h + 0.008,
+                verts = 20,
+                square = 5,
+                at = (b.x, b.y)
+            ),
+            // (its top edge chamfered)
+            ring!(
+                w / 2.0 + 0.004,
+                d / 2.0 + 0.004,
                 z = b.z + h + 0.012,
                 verts = 20,
                 square = 5,
@@ -279,7 +288,9 @@ fn _shirt(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, material: Mat) {
         0.022,
         (x, 0, 0),
         material,
-        plane = Facing::Side
+        plane = Facing::Side,
+        bevel = 0.004,
+        bevel_segments = 1
     );
 }
 
@@ -341,7 +352,7 @@ pub fn laundry_center() -> Vec<Obj> {
             M.towel_a,
             profile = rounded_rect(0.008, 0.13, 0.004, 1),
             up = (0, 1, 0),
-            resolution = 2
+            resolution = 4
         );
         // the counter: open cubbies under a top, towels above and baskets below
         fbox!(
@@ -501,7 +512,7 @@ pub fn laundry_center() -> Vec<Obj> {
             bevel_segments = 1
         );
         let b = f.at(CX + 0.12, 0.96, 0.03);
-        let iron: Vec<Vec<P3>> = [(0.0, 1.0), (0.025, 0.98), (0.04, 0.85)]
+        let iron: Vec<Vec<P3>> = [(0.0, 1.0), (0.025, 0.98), (0.036, 0.9), (0.04, 0.8)]
             .iter()
             .map(|&(h, k)| {
                 [

@@ -3,7 +3,7 @@
 use super::common::{M, WALL, lofted};
 use artkit::forms::{by, rounded_rect};
 use artkit::materials::Mat;
-use artkit::math::{P3, PI, cosd, sin, sind};
+use artkit::math::{P3, PI, cos, cosd, sin, sind};
 use artkit::motion::{Ease, Grow, Spin, grow, spin};
 use artkit::parts::{hinged, join, new_parts, numbered, settle_all};
 use artkit::place::{Facing, GameFrame};
@@ -131,25 +131,24 @@ pub fn power_blender() -> Vec<Obj> {
             bevel_segments = 1
         );
         // the worktop, its front rolled (postformed)
-        fsweep!(
+        fextrude!(
             f,
             "worktop",
             &[
-                (-w / 2.0, h - t / 2.0, z0 + d / 2.0),
-                (w / 2.0, h - t / 2.0, z0 + d / 2.0)
+                (-d / 2.0, -t / 2.0),
+                (d / 2.0 - 0.014, -t / 2.0),
+                (d / 2.0 - 0.004, -t / 2.0 + 0.006),
+                (d / 2.0, 0.0),
+                (d / 2.0 - 0.004, t / 2.0 - 0.006),
+                (d / 2.0 - 0.016, t / 2.0),
+                (-d / 2.0, t / 2.0)
             ],
-            0,
+            w,
+            (0.0, h - t / 2.0, z0 + d / 2.0),
             M.worktop,
-            profile = vec![
-                (-t / 2.0, d / 2.0),
-                (t / 2.0, d / 2.0),
-                (t / 2.0, -d / 2.0 + 0.016),
-                (t / 2.0 - 0.006, -d / 2.0 + 0.004),
-                (0.0, -d / 2.0),
-                (-t / 2.0 + 0.006, -d / 2.0 + 0.004),
-                (-t / 2.0, -d / 2.0 + 0.014)
-            ],
-            up = (0, 0, 1)
+            plane = Facing::Side,
+            bevel = 0.004,
+            bevel_segments = 1
         );
         kit::shaker!(
             f,
@@ -252,7 +251,9 @@ pub fn power_blender() -> Vec<Obj> {
             0.02,
             (jx, TOP + 0.11, jz),
             M.dark,
-            verts = 16
+            verts = 16,
+            bevel = 0.004,
+            bevel_segments = 1
         );
         let P3 {
             x: bx,
@@ -294,13 +295,19 @@ pub fn power_blender() -> Vec<Obj> {
             up = (0, 1, 0)
         );
         // a fruit bowl with oranges, an apple, a lime and two bananas; a board with lemon halves and a knife
-        let bowl = [
+        // its rim rolled over (a 4 mm round in 30° steps) into the inside, down to the fruit
+        let mut bowl = vec![
             (0.0, 0.05, 0.05),
             (0.008, 0.06, 0.06),
             (0.05, 0.13, 0.13),
             (0.09, 0.16, 0.16),
-            (0.1, 0.162, 0.162),
         ];
+        for i in 0..=6 {
+            let a = PI * i as f64 / 6.0;
+            let r = 0.158 + 0.004 * cos(a);
+            bowl.push((0.098 + 0.004 * sin(a), r, r));
+        }
+        bowl.push((0.085, 0.146, 0.146));
         lofted(f, "bowl", 0.16, TOP, -0.1, &bowl, M.bowl, 18, 2.0);
         for (x, y, z, r, m) in [
             (0.1, 0.12, -0.08, 0.04, M.orange),
@@ -452,7 +459,7 @@ pub fn power_blender() -> Vec<Obj> {
             y: by_,
             z: bz,
         } = f.at(jx, TOP + 0.13, jz);
-        let secs: Vec<Vec<P3>> = [(0.0, 0.054), (0.02, 0.066), (0.16, 0.066)]
+        let secs: Vec<Vec<P3>> = [(0.0, 0.054), (0.02, 0.066), (0.155, 0.066), (0.16, 0.061)]
             .iter()
             .map(|&(hh, r)| ring!(r, r, z = bz + hh, verts = 14, square = 3.2, at = (bx, by_)))
             .collect();
@@ -818,7 +825,7 @@ pub fn contrast_shower() -> Vec<Obj> {
                     (0.36, 1.12, -0.36)
                 ],
                 0.012,
-                steps = 2
+                steps = 5
             ),
             0,
             M.towel,

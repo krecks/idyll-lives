@@ -33,7 +33,7 @@ pub fn family() -> Family {
                 .centre(0.0, -0.0455)
                 .motions(json!({"uses": {"retreat": "shell", "read": "shell"}}))
                 .paint(&[("shell", "Body"), ("oak", "Wood"), ("cushion", "Cushions")]),
-            Model::new("shortwaveRadio", pod::shortwave_radio, (0.84, 1.325, 0.682))
+            Model::new("shortwaveRadio", pod::shortwave_radio, (0.84, 0.928, 0.678))
                 .key("model.loner.shortwaveRadio")
                 .centre(0.0, 0.113)
                 .motions(json!({"uses": {"tune": "dial", "airwaves": ["antenna", "dial"]}}))
@@ -43,7 +43,7 @@ pub fn family() -> Family {
                 .centre(0.003, 0.091)
                 .motions(json!({"uses": {"piece": "pieces", "newPuzzle": "pieces"}}))
                 .paint(&[("body", "Body"), ("wood", "Wood")]),
-            Model::new("bonsaiBench", puzzle::bonsai_bench, (0.86, 1.31, 0.75))
+            Model::new("bonsaiBench", puzzle::bonsai_bench, (0.86, 1.11, 0.75))
                 .key("model.loner.bonsaiBench")
                 .centre(0.0, -0.055)
                 .motions(json!({"uses": {"shape": "trim"}, "loops": {"tend": "mist"}}))
@@ -54,7 +54,7 @@ pub fn family() -> Family {
                 // the door lets the bather in, shuts behind them and opens again to let them out
                 .motions(json!({"uses": {"sweat": {"clip": "door_open", "hold": 1.5, "out": 1.5}}}))
                 .paint(&[("cedar", "Wood"), ("cedar_dark", "Trim")]),
-            Model::new("deliveryHatch", cabin::delivery_hatch, (0.84, 1.95, 0.84))
+            Model::new("deliveryHatch", cabin::delivery_hatch, (0.84, 1.95, 0.5))
                 .key("model.loner.deliveryHatch")
                 .centre(0.0, -0.01)
                 .motions(json!({"uses": {"order": "hatch", "treat": "hatch"}, "hold": 2}))

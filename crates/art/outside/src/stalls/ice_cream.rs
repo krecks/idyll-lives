@@ -43,12 +43,12 @@ fn parasol(name: &str, r: f64, h: f64, gores: usize, a: Mat, b: Mat) -> Vec<Obj>
         rings.push(ring);
     }
     let canopy = striped(
-        loft!(
+        artkit::bevel::eased(loft!(
             format!("{name}_canopy"),
             &rings,
             material = a,
             smooth = false
-        ),
+        )),
         gores,
         b,
     );
@@ -324,19 +324,23 @@ pub fn ice_cream_cart() -> Vec<Obj> {
             .into_iter()
             .enumerate()
         {
-            revolve!(
-                format!("tub{k}"),
-                &[
-                    (0.0, 0.88),
-                    (0.08, 0.88),
-                    (0.088, 0.952),
-                    (0.09, 0.958),
-                    (0.077, 0.958),
-                    (0.0, 0.93)
-                ],
-                at = f.at(x, 0, 0.08),
-                material = M.steel,
-                segments = 10
+            artkit::bevel::ease(
+                revolve!(
+                    format!("tub{k}"),
+                    &[
+                        (0.0, 0.88),
+                        (0.08, 0.88),
+                        (0.088, 0.952),
+                        (0.09, 0.958),
+                        (0.077, 0.958),
+                        (0.0, 0.93)
+                    ],
+                    at = f.at(x, 0, 0.08),
+                    material = M.steel,
+                    segments = 10
+                ),
+                50.0,
+                2,
             );
             let cream = sphere!(
                 format!("cream{k}"),

@@ -2,17 +2,20 @@
 //! with lemons, two metres tall in all (the ones picked at the front 1.62 m up for a grown-up, 1.42 for a teen and
 //! 1.1 for a child), all picked at once (they shrink away, `ripen`); picked bare, no lemons until it fruits again.
 
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::botany::Tiles;
 use artkit::botany::skeleton::{Branches, ClumpAims, Heart, Mass};
 use artkit::botany::species::{Aims, Crown, Hearts, Perches, Seeds, Species, Stage, Tree, grow};
 use artkit::far::low;
 use artkit::math::{TAU, cos, sin};
 use artkit::perch::Find;
-use artkit::scene::Obj;
+use artkit::scene::{self, Obj};
+use artkit::shapes::SHARP;
 use artkit::{fruiting, hang, lump, pot, sweep, trunk};
 
-const CENTRE: (f64, f64, f64) = (0.0, 0.0, 1.5);
-const RADII: (f64, f64, f64) = (0.4, 0.4, 0.34);
+// (its top 8 cm lower and 4 cm narrower than it was, its underside where it was: a Meyer lemon in a pot stands 1-1.5 m)
+const CENTRE: (f64, f64, f64) = (0.0, 0.0, 1.46);
+const RADII: (f64, f64, f64) = (0.38, 0.38, 0.3);
 
 pub fn species() -> Species {
     Species {
@@ -28,6 +31,9 @@ pub fn species() -> Species {
             ("fruit", "#F2D23C"),
             ("fruit2", "#F5DC50"),
             ("fruit3", "#E8C42E"),
+            // its slim stem and boughs on the plain bark (the birch's, in the bark's tone): with the pot, one draw
+            // call (four were three with the bark's own), and a stem this slim in a pot hardly bends in the wind
+            ("birch_bark", "#5C4C3E"),
         ],
         trunk: Stage::Own(potted),
         crown: Stage::Spec(Crown {
@@ -36,13 +42,16 @@ pub fn species() -> Species {
             tips: 12,
             limbs: 4,
             base_z: (0.95, 1.02),
-            material: None,
+            material: Some("birch_bark"),
             o: Branches {
                 leader_z: Some(1.0),
                 bottom: -0.6,
                 spread: 0.95,
                 limb_r: (0.02, 0.011),
                 bough_r: (0.011, 0.005),
+                // (round, on a plain finish: four and five sides showed as hard edges)
+                verts: 6,
+                bough_verts: 6,
                 fork: (0.4, 0.5),
                 lift: 0.1,
                 wander: 0.2,
@@ -98,17 +107,26 @@ pub fn lemon_tree() -> Vec<Obj> {
 /// The pot with its band, and the stem out of it.
 fn potted(tree: &mut Tree) {
     let p = &tree.palette;
-    let top = pot!(p, 0.3, 0.5, r_bottom = 0.22, rim = 0.016);
+    // (20 round, its band too: the triangles the round boughs took, under the trees' 4,500)
+    let top = pot!(p, 0.3, 0.5, r_bottom = 0.22, rim = 0.016, segments = 20);
+    // its square-cut rim eased, as a thrown pot's is (KIT: botany's `pot` cuts it square)
+    bevel_edges(
+        scene::obj("pot"),
+        low(0.004, 0.0),
+        1,
+        SHARP,
+        &EdgeOrder::Corners,
+    );
     // a raised band round the pot under its rim
     let (zb, rb) = (
         0.36,
         0.22 + 0.004 + (0.3 - 0.226) * (0.36 - 0.012) / (0.47 - 0.012),
     );
-    let band: Vec<(f64, f64, f64)> = (0..24)
+    let band: Vec<(f64, f64, f64)> = (0..20)
         .map(|k| {
             (
-                rb * cos(TAU * k as f64 / 24.0),
-                rb * sin(TAU * k as f64 / 24.0),
+                rb * cos(TAU * k as f64 / 20.0),
+                rb * sin(TAU * k as f64 / 20.0),
                 zb,
             )
         })
@@ -134,7 +152,8 @@ fn potted(tree: &mut Tree) {
         &[1.2, 1.0, 0.9, 0.8],
         14.0,
         verts = 6,
-        wobble = 0.0
+        wobble = 0.0,
+        material = Some(p.get("birch_bark"))
     );
 }
 

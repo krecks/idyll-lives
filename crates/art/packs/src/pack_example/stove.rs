@@ -4,7 +4,7 @@ use super::common::{M, WALL, cut_mouth};
 use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{Axis, P3, TAU, cos, cosd, radians, sin, sind};
-use artkit::parts::{hinged, join, new_parts};
+use artkit::parts::{aside, hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{
@@ -61,7 +61,17 @@ fn _burner(f: &GameFrame, name: &str, x: f64, z: f64) {
 /// feet, a bar across the middle and fingers reaching in towards each burner.
 fn _grate(f: &GameFrame, name: &str, x: f64) {
     let (y, z0, z1, hw) = (HOB + 0.026, -0.4, 0.13, 0.24);
-    let bar = [(0.0, 0.0), (0.016, 0.0), (0.016, 0.016), (0.0, 0.016)]; // (inset, up): a square bar
+    // (inset, up): a square bar, its arrises chamfered 4 mm as cast iron's are
+    let bar = [
+        (0.004, 0.0),
+        (0.012, 0.0),
+        (0.016, 0.004),
+        (0.016, 0.012),
+        (0.012, 0.016),
+        (0.004, 0.016),
+        (0.0, 0.012),
+        (0.0, 0.004),
+    ];
     kit::moulding!(
         f,
         name,
@@ -72,11 +82,15 @@ fn _grate(f: &GameFrame, name: &str, x: f64) {
         plane = Facing::Top
     );
     let prof = vec![
-        (-0.007, -0.008),
-        (0.007, -0.008),
-        (0.007, 0.008),
-        (-0.007, 0.008),
-    ]; // a square bar, as the frame's
+        (-0.004, -0.008),
+        (0.004, -0.008),
+        (0.007, -0.005),
+        (0.007, 0.005),
+        (0.004, 0.008),
+        (-0.004, 0.008),
+        (-0.007, 0.005),
+        (-0.007, -0.005),
+    ]; // a square bar, chamfered as the frame's
     fsweep!(
         f,
         format!("{name}_mid"),
@@ -334,7 +348,8 @@ fn _hood(f: &GameFrame) {
             ring(0.36, 0.28, WALL + 0.14, 2.06),
             ring(0.36, 0.28, WALL + 0.14, 2.26),
             ring(0.37, 0.285, WALL + 0.1425, 2.26),
-            ring(0.37, 0.285, WALL + 0.1425, 2.55)
+            ring(0.37, 0.285, WALL + 0.1425, 2.546),
+            ring(0.362, 0.277, WALL + 0.1425, 2.55)
         ],
         material = M.body,
         smooth = false
@@ -618,8 +633,11 @@ fn _cookware(f: &GameFrame) {
         &[
             (0.0, 0.0),
             (0.13, 0.0),
-            (0.15, 0.04),
-            (0.142, 0.04),
+            (0.15, 0.038), // the lip rounded over, 4 mm round
+            (0.14883, 0.04083),
+            (0.146, 0.042),
+            (0.14317, 0.04083),
+            (0.142, 0.038),
             (0.124, 0.008),
             (0.0, 0.008)
         ],
@@ -776,12 +794,16 @@ pub fn chef_stove() -> Vec<Obj> {
         for x in [-0.5, 0.0, 0.5] {
             _grate(f, &format!("grate{x}"), x);
         }
-        _tiles(f);
-        _rail(f);
-        _hood(f);
         _cookware(f);
     });
     join(&still, "body", Some(P3::from((0, 0, 0))));
+    // the splashback, the utensil rail and the hood on the wall over it: drawn with it, not the range's own size
+    let wall = new_parts(|| {
+        _tiles(f);
+        _rail(f);
+        _hood(f);
+    });
+    aside(&wall, "wall");
     // The left oven door, on its bottom hinge: `oven_open` drops it 85 degrees to the front.
     let door = new_parts(|| _oven_door(f, "oven_door", -0.4, 0.76));
     let door = hinged(

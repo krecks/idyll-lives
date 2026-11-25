@@ -42,10 +42,10 @@ pub fn family() -> Family {
             Model::new(
                 "conversationSectional",
                 bar::conversation_sectional,
-                (1.9, 1.42, 1.86),
+                (1.9, 0.863, 1.563),
             )
             .key("model.outgoing.conversationSectional")
-            .centre(0.0, 0.0)
+            .centre(0.0, 0.0026)
             .motions(json!({"uses": {"hangOut": "sink_in"}}))
             .paint(&[("frame", "Body"), ("upholstery", "Upholstery")]),
             Model::new("karaokeStage", stage::karaoke_stage, (1.9, 1.63, 0.894))
@@ -57,10 +57,10 @@ pub fn family() -> Family {
             Model::new(
                 "videoCallNook",
                 stage::video_call_nook,
-                (0.84, 1.283, 0.788),
+                (0.84, 0.989, 0.768),
             )
             .key("model.outgoing.videoCallNook")
-            .centre(0.0, 0.077)
+            .centre(0.0, 0.081)
             .motions(json!({"uses": {"call": "ring_light"}}))
             .paint(&[
                 ("body", "Body"),

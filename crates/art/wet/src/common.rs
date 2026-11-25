@@ -51,7 +51,8 @@ pub fn pull(
             material,
             up = (uy, 0, ux),
             resolution = 2,
-            angle = 60.0,
+            // shaded round, as a round bar of so few sides is (`round_angle`), its bends too
+            angle = artkit::shapes::round_angle(verts).max(60.0),
             verts = verts
         ),
         Some(r) => fsweep!(

@@ -302,6 +302,8 @@ pub fn snake_plant() -> Vec<Obj> {
             rng.uniform(0.07, 0.09),
             rng.uniform(-50.0, 50.0),
         );
+        // (a grown snake plant's swords stand 1-1.5 m)
+        length *= 1.65;
         if i >= 10 {
             // young ones
             length *= 0.55;
@@ -341,7 +343,6 @@ pub fn snake_plant() -> Vec<Obj> {
             );
         }
     }
-    fit_to(&meshes(), 0.341, 0.905, 0.32);
     settle(&[join_all("snakePlant")])
 }
 
@@ -473,7 +474,8 @@ pub fn cacti() -> Vec<Obj> {
     ]
     .iter()
     .map(|&(hz, rr)| {
-        ribbed!(rr, m, depth = 0.14)
+        // (six points a rib: rounded ribs, no turn of 60° at their ridges)
+        ribbed!(rr, m, depth = 0.14, verts = m * 6)
             .iter()
             .map(|&(u, v)| P3::from((x + u, y + v, z + hz)))
             .collect()
@@ -538,6 +540,8 @@ pub fn succulents() -> Vec<Obj> {
             (0.27, 0.085),
             (0.3, 0.11),
             (0.312, 0.122),
+            // (its rim rolled round: no turn of 60°)
+            (0.311, 0.127),
             (0.306, 0.13),
             (0.292, 0.128),
             (0.276, 0.104),
@@ -686,8 +690,9 @@ pub fn boston_fern() -> Vec<Obj> {
         let yaw = i as f64 * 40.0 + rng.uniform(-10.0, 10.0);
         let (tilt, length, droop) = (
             rng.uniform(40.0, 62.0),
-            rng.uniform(0.43, 0.49),
-            rng.uniform(0.92, 1.04),
+            // (a Boston fern's fronds 0.6-0.9 m, arching over and hanging down past its pot)
+            rng.uniform(0.43, 0.49) * 1.35,
+            rng.uniform(0.92, 1.04) * 1.6,
         );
         cut_leaf!(
             format!("frond{i}"),
@@ -709,7 +714,8 @@ pub fn boston_fern() -> Vec<Obj> {
             (0, 0, ys + 0.02),
             yaw,
             68.0,
-            0.28,
+            // (the young fronds upright out of the crown)
+            0.53,
             &pinnate!(6, 0.1, "lance", lean = 0.5, fill = 0.75),
             p.get("leaf_light"),
             droop = 0.5,
@@ -717,7 +723,6 @@ pub fn boston_fern() -> Vec<Obj> {
             ribs = 3
         );
     }
-    fit_to(&meshes(), 0.734, 0.979, 0.792);
     settle(&[join_all("bostonFern")])
 }
 
@@ -782,7 +787,7 @@ pub fn palm() -> Vec<Obj> {
             ribs = 5
         );
     }
-    fit_to(&meshes(), 0.770, 0.893, 0.693);
+    fit_to(&meshes(), 0.770, 0.905, 0.693);
     settle(&[join_all("palm")])
 }
 
@@ -812,7 +817,9 @@ pub fn orchid() -> Vec<Obj> {
             (0.12, 0.56),
             (0.13, 0.585),
             (0.16, 0.6),
-            (0.16, 0.63),
+            // (its top's arris eased: two turns of 45°)
+            (0.16, 0.626),
+            (0.156, 0.63),
             (0.0, 0.63)
         ],
         material = p.get("wood"),
@@ -871,17 +878,18 @@ pub fn orchid() -> Vec<Obj> {
     cylinder!(
         "stake",
         0.003,
-        0.36,
-        at = (-0.03, 0.01, ys + 0.18),
+        0.39,
+        at = (-0.03, 0.01, ys + 0.195),
         material = p.get("wood"),
         verts = low(5, 3)
     );
     let spike: Vec<V3> = [
         (0.0, 0.0, ys),
         (-0.03, 0.01, ys + 0.18),
-        (-0.06, 0.0, ys + 0.34),
-        (-0.16, -0.01, ys + 0.43),
-        (-0.27, -0.02, ys + 0.4),
+        // (a moth orchid in flower stands 0.46-0.61 m)
+        (-0.06, 0.0, ys + 0.37),
+        (-0.16, -0.01, ys + 0.46),
+        (-0.27, -0.02, ys + 0.43),
     ]
     .into_iter()
     .map(V3::from)
@@ -921,7 +929,7 @@ pub fn orchid() -> Vec<Obj> {
             );
         }
     }
-    fit_to(&meshes(), 0.431, 1.198, 0.381);
+    fit_to(&meshes(), 0.431, 1.228, 0.381);
     settle(&[join_all("orchid")])
 }
 
@@ -931,7 +939,8 @@ pub fn orchid() -> Vec<Obj> {
 /// it.
 pub fn bonsai() -> Vec<Obj> {
     use artkit::json::float_repr as fr;
-    let p = palette(&[
+    // (the stand and the trunk plain, its pads still the foliage's dapple: three draw calls, not four)
+    let p = super::plain_wood(palette(&[
         ("body", "#3E5A78"),
         ("wood", "#6A4A32"),
         ("bark", "#6E5A4C"),
@@ -940,7 +949,7 @@ pub fn bonsai() -> Vec<Obj> {
         ("leaf_light", "#467A38"),
         ("stem", "#5E5040"),
         ("moss", "#5E7A34"),
-    ]);
+    ]));
     let (wood, body) = (p.get("wood"), p.get("body"));
     let up = 0.38; // the stand's top over the old knee-high table's
     cube!(
@@ -989,8 +998,11 @@ pub fn bonsai() -> Vec<Obj> {
         (0.012, 0.2, 0.125),
         (0.02, 0.215, 0.138),
         (0.062, 0.232, 0.152),
-        (0.07, 0.232, 0.152),
-        (0.07, 0.218, 0.138),
+        // (its rim's arrises eased: no turn of 60°)
+        (0.067, 0.232, 0.152),
+        (0.07, 0.228, 0.148),
+        (0.07, 0.222, 0.142),
+        (0.067, 0.218, 0.138),
         (0.055, 0.215, 0.135),
     ]
     .iter()

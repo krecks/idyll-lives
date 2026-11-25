@@ -24,7 +24,7 @@
 import type { BuildingUse } from '../../core/protocol';
 import { EASE, Geo, facing, type V3 } from './geometry';
 import { addRoof, HOUSE_MATERIALS, type HousePart } from './house';
-import { EAVE, MANSARD_BREAK, MANSARD_IN, PARAPET, STOREY, type TownBuilding } from './townBuildings';
+import { churchTower, EAVE, h, MANSARD_BREAK, MANSARD_IN, PARAPET, STOREY, wallFinish, type TownBuilding } from './townBuildings';
 
 /** A building's window glass is in this many sets, each lit at night once the share lit passes its turn (`paneSetLit`). */
 export const PANE_SETS = 4;
@@ -62,14 +62,6 @@ const FLATS_WINDOWS = [2.4, 1.2, 0.9, 2.3] as const;
 
 const SHOPS: ReadonlySet<BuildingUse> = new Set<BuildingUse>(['shop', 'cafe', 'restaurant']);
 
-/** A number from 0 to 1 for `a`, `b`, `c` (stable). */
-function h(a: number, b: number, c = 0): number {
-  let x = Math.imul((a | 0) ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul((b | 0) + 0x632be5ab, 0xc2b2ae35) ^ Math.imul((c | 0) + 0x27d4eb2f, 0x165667b1);
-  x = Math.imul(x ^ (x >>> 15), 0x2c1b3c6d);
-  x ^= x >>> 13;
-  return (x >>> 0) / 4294967296;
-}
-
 const pick = <T>(list: readonly T[], t: number): T => list[Math.min(list.length - 1, Math.floor(t * list.length))];
 
 /** sRGB 0..1 as a hex colour. */
@@ -81,15 +73,6 @@ function hexOf(c: readonly number[]): string {
 function shade(c: string, k: number): string {
   const v = parseInt(c.slice(1), 16);
   return hexOf([(((v >> 16) & 255) / 255) * k, (((v >> 8) & 255) / 255) * k, ((v & 255) / 255) * k]);
-}
-
-/** `c` (sRGB 0..1) mixed `t` of the way to white. */
-const paler = (c: readonly number[], t: number) => hexOf(c.map((v) => v + (1 - v) * t));
-
-/** A wall of the palette that reads as brick: red-brown, darkish. */
-function brickish(c: readonly number[]): boolean {
-  const lum = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
-  return c[0] - c[2] > 0.3 && lum < 0.6;
 }
 
 /**
@@ -300,19 +283,18 @@ export function dressBuilding(t: TownBuilding, use: BuildingUse, to: readonly [n
   const { floor, base, top } = t;
   const storeys = Math.max(1, Math.round((top - floor) / STOREY));
   const front = frontSide(t, to);
-  const wall = t.wall;
+  // (Its colours as painted on its textured walls and roof: `t.wall` and `t.roofColor` are as they show from far off.)
+  const { wall, roof: roofPaint } = t.paint ?? { wall: t.wall, roof: t.roofColor };
   const home = use === 'farm';
   const shop = SHOPS.has(use);
   const boarded = use === 'workshop';
-  // The walls' material and colour: a church's stone, brick where the palette's wall is, boards on a farmhouse and a
-  // workshop, render on the rest.
-  const brick = use !== 'church' && brickish(wall);
-  const walls = use === 'church' ? d.stone : brick ? d.brick : home || boarded ? d.siding : d.render;
-  const colour = use === 'church' ? paler(wall, 0.35) : brick ? paler(wall, 0.82) : hexOf(wall);
+  // The walls' material and colour (`wallFinish`).
+  const { finish, colour } = wallFinish(use, wall);
+  const walls = { stone: d.stone, brick: d.brick, siding: d.siding, plaster: d.render }[finish];
   const accent = pick(ACCENT, h(seed, 7));
   const curtain = pick(CURTAINS, h(seed, 3));
   const shutters = home && h(seed, 6) < 0.6 ? accent : null;
-  const roofHex = hexOf(t.roofColor);
+  const roofHex = hexOf(roofPaint);
   const flat = t.roof === 'flat';
   const wallTop = flat ? top + PARAPET : top;
 
@@ -500,9 +482,8 @@ export function dressBuilding(t: TownBuilding, use: BuildingUse, to: readonly [n
 
   // ---- a church's tower and spire at one end ----
   if (use === 'church') {
-    const tw = Math.min(2 * D * 0.55, 4.2, 2 * W * 0.4);
-    const x0 = door && front === 3 ? -W : door && front === 2 ? W - tw : h(seed, 29) < 0.5 ? -W : W - tw;
-    const towerTop = top + t.rise + 3.5;
+    // (Over its door where that is on an end.)
+    const { x0, tw, top: towerTop, tip } = churchTower(t, door && front === 3 ? -1 : door && front === 2 ? 1 : undefined);
     d.stone.color(colour).box(x0, floor + PLINTH, -tw / 2, x0 + tw, towerTop, tw / 2, 'ny py');
     d.trim.color(TRIM).box(x0 - 0.06, towerTop - 0.25, -tw / 2 - 0.06, x0 + tw + 0.06, towerTop, tw / 2 + 0.06, 'ny');
     // A louvred opening on each face near its top.
@@ -515,7 +496,7 @@ export function dressBuilding(t: TownBuilding, use: BuildingUse, to: readonly [n
       else d.trim.poly([[px, y0, -0.45], [px, y0, 0.45], [px, y0 + 1.6, 0.45], [px, y0 + 1.6, -0.45]], [nx, 0, 0]);
     }
     d.trim.color(TRIM);
-    spire(roof, cx, 0, tw / 2 + 0.1, towerTop, towerTop + tw * 1.6);
+    spire(roof, cx, 0, tw / 2 + 0.1, towerTop, tip);
   }
 
   d.place(t.ux, t.uz, t.cx, t.cz);

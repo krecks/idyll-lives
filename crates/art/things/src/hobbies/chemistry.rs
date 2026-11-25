@@ -38,13 +38,18 @@ fn flask(fr: &GameFrame, name: &str, x: f64, z: f64, liquid: Option<Mat>, fill: 
     if let Some(liquid) = liquid {
         revolve!(
             format!("{name}_liquid"),
-            &[
-                (0.0, 0.003),
-                (0.054, 0.003),
-                (0.056, 0.008),
-                (0.056, fill),
-                (0.0, fill)
-            ],
+            // (its surface curving down into the glass at the edge, no sharp rim)
+            &artkit::forms::round_at(
+                &[
+                    (0.0, 0.003),
+                    (0.054, 0.003),
+                    (0.056, 0.008),
+                    (0.056, fill),
+                    (0.0, fill),
+                ],
+                3,
+                0.002
+            ),
             at = fr.at(x, BENCH_TOP, z),
             material = liquid,
             segments = 16

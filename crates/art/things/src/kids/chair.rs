@@ -83,7 +83,7 @@ pub fn high_chair() -> Vec<Obj> {
         0.38,
         0.05,
         0.36,
-        (0, 0.58, 0.05),
+        (0, 0.574, 0.05), // its top just under the baby's seat (content 0.6): a high chair's is 0.5-0.6 m
         M.chair_white,
         round = 0.02,
         flat = 1
@@ -94,7 +94,7 @@ pub fn high_chair() -> Vec<Obj> {
         0.31,
         0.03,
         0.3,
-        (0, 0.618, 0.06),
+        (0, 0.612, 0.06),
         M.chair_cushion,
         round = 0.012,
         puff = 0.007,

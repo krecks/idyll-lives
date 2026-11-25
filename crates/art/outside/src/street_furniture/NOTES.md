@@ -174,3 +174,13 @@ motorway (render/shared/motorway.ts `signSpots`: before an exit, in its gore, wh
 cargo art street_furniture            # the ten .glb and .far.glb, the pack, check-glb
 cargo art street_furniture --preview  # previews/street_furniture/<id>.png, <id>@<clip>.png, <id>.far.png
 ```
+
+## Edges at the play camera (2026-11-25)
+
+The gate's `edges` found 135 (town fountain 66, litter bin 30, statue 16, street lamp 10, phone box 8, post box and
+traffic light 2, drinking fountain 1); none now, none accepted. Eased (the crate's 4 mm chamfer on turns over 50°):
+the fountain's splash crowns, top bowl and foot, the drinking fountain's capital, the statue's cornice and base
+moulding (at 30°: their mitres), the phone box's pediments, the lamp's collar, lantern floor, roof and vent, the
+traffic light's backboard rim, the bin's label and the post box's times frame. The bin's pressed ribs slope at
+under 60° to its face (their flanks were steep enough to read as cut edges). The phone box door's panes are an
+opaque blue-grey gloss (`pane`): see-through, the door was a fourth draw call.

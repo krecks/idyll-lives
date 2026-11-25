@@ -59,7 +59,7 @@ pub fn press_cylinder(
 ) -> Obj {
     let l = 2.0 * PP_FRAME - 0.02;
     let parts = new_parts(|| {
-        fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             name,
             r,
@@ -68,8 +68,8 @@ pub fn press_cylinder(
             surface,
             rot = (0, 90, 0),
             verts = sides(r, 16, 32)
-        );
-        fcyl!(
+        ));
+        artkit::bevel::eased(fcyl!(
             F,
             format!("{name}_axle"),
             0.035,
@@ -78,10 +78,10 @@ pub fn press_cylinder(
             m.steel,
             rot = (0, 90, 0),
             verts = 10
-        );
+        ));
         for s in [-1, 1] {
             // its bearers: steel rings at its ends
-            fcyl!(
+            artkit::bevel::eased(fcyl!(
                 F,
                 format!("{name}_bearer{s}"),
                 r + 0.004,
@@ -90,7 +90,7 @@ pub fn press_cylinder(
                 m.steel,
                 rot = (0, 90, 0),
                 verts = sides(r, 16, 32)
-            );
+            ));
         }
         fbox!(
             F,
@@ -177,7 +177,7 @@ pub fn printing_press() -> Vec<Obj> {
                     m.dark
                 );
             }
-            fcyl!(
+            artkit::bevel::eased(fcyl!(
                 F,
                 format!("panel_lock{k}"),
                 0.012,
@@ -186,7 +186,7 @@ pub fn printing_press() -> Vec<Obj> {
                 m.chrome,
                 rot = (90, 0, 0),
                 verts = 8
-            );
+            ));
         }
         fbox!(
             F,
@@ -231,7 +231,7 @@ pub fn printing_press() -> Vec<Obj> {
                 .into_iter()
                 .enumerate()
             {
-                fcyl!(
+                artkit::bevel::eased(fcyl!(
                     F,
                     format!("boss{s}{k}"),
                     0.06,
@@ -240,13 +240,13 @@ pub fn printing_press() -> Vec<Obj> {
                     m.iron,
                     rot = (0, 90, 0),
                     verts = 14
-                );
+                ));
             }
         }
         // the impression cylinder (steel, smooth: it shows no turning), the ink rollers in a pyramid under a hood,
         // the ink fountain at the back
         let (y, z, r) = PP_IMPRESSION;
-        fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "impression",
             r,
@@ -255,7 +255,7 @@ pub fn printing_press() -> Vec<Obj> {
             m.steel,
             rot = (0, 90, 0),
             verts = sides(r, 16, 32)
-        );
+        ));
         for (k, (yy, zz, rr)) in [
             (1.36, -0.08, 0.045),
             (1.37, 0.03, 0.04),
@@ -266,7 +266,7 @@ pub fn printing_press() -> Vec<Obj> {
         .into_iter()
         .enumerate()
         {
-            fcyl!(
+            artkit::bevel::eased(fcyl!(
                 F,
                 format!("ink_roller{k}"),
                 rr,
@@ -275,9 +275,9 @@ pub fn printing_press() -> Vec<Obj> {
                 if k % 2 != 0 { m.steel } else { m.roller },
                 rot = (0, 90, 0),
                 verts = 14
-            );
+            ));
         }
-        fextrude!(
+        artkit::bevel::eased(fextrude!(
             F,
             "fountain",
             &[
@@ -291,7 +291,7 @@ pub fn printing_press() -> Vec<Obj> {
             (0, 0, 0),
             m.iron,
             plane = Facing::Side
-        );
+        ));
         fbox!(
             F,
             "fountain_ink",
@@ -318,7 +318,7 @@ pub fn printing_press() -> Vec<Obj> {
                 1.3 + 0.198 * sin(radians(a as f64)),
             )
         }));
-        fextrude!(
+        artkit::bevel::eased(fextrude!(
             F,
             "hood",
             &hood,
@@ -326,7 +326,7 @@ pub fn printing_press() -> Vec<Obj> {
             (0, 0, 0),
             green,
             plane = Facing::Side
-        );
+        ));
         // the reel stand behind it: two A legs, the reel of newsprint on its shaft, a brake disc
         let (ry, rz, rr) = (0.4, -0.7, 0.22);
         for s in [-1, 1] {
@@ -357,7 +357,7 @@ pub fn printing_press() -> Vec<Obj> {
                 m.iron
             );
         }
-        fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "reel",
             rr,
@@ -366,8 +366,8 @@ pub fn printing_press() -> Vec<Obj> {
             m.paper,
             rot = (0, 90, 0),
             verts = sides(rr, 24, 40)
-        );
-        fcyl!(
+        ));
+        artkit::bevel::eased(fcyl!(
             F,
             "reel_core",
             0.05,
@@ -376,8 +376,8 @@ pub fn printing_press() -> Vec<Obj> {
             m.dark,
             rot = (0, 90, 0),
             verts = 12
-        );
-        fcyl!(
+        ));
+        artkit::bevel::eased(fcyl!(
             F,
             "reel_shaft",
             0.025,
@@ -386,8 +386,8 @@ pub fn printing_press() -> Vec<Obj> {
             m.steel,
             rot = (0, 90, 0),
             verts = 10
-        );
-        fcyl!(
+        ));
+        artkit::bevel::eased(fcyl!(
             F,
             "brake",
             0.11,
@@ -396,10 +396,10 @@ pub fn printing_press() -> Vec<Obj> {
             m.iron,
             rot = (0, 90, 0),
             verts = 16
-        );
+        ));
         // the web: up from the reel over the guide roller at the back of the frames, and out of the cylinders'
         // nip to the cutter at the front
-        fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "guide",
             0.04,
@@ -408,7 +408,7 @@ pub fn printing_press() -> Vec<Obj> {
             m.steel,
             rot = (0, 90, 0),
             verts = 12
-        );
+        ));
         let a0 = (rz + rr * 0.15, ry + rr * 0.99);
         let a1 = (-0.56 - 0.03, 1.16 + 0.03);
         let l = py::hypot(a1.0 - a0.0, a1.1 - a0.1);
@@ -555,7 +555,7 @@ pub fn printing_press() -> Vec<Obj> {
             .into_iter()
             .enumerate()
         {
-            fcyl!(
+            artkit::bevel::eased(fcyl!(
                 F,
                 format!("button{k}"),
                 0.016,
@@ -564,9 +564,9 @@ pub fn printing_press() -> Vec<Obj> {
                 mat,
                 rot = (60, 0, 0),
                 verts = 10
-            );
+            ));
         }
-        fcyl!(
+        artkit::bevel::eased(fcyl!(
             F,
             "stop",
             0.028,
@@ -575,7 +575,7 @@ pub fn printing_press() -> Vec<Obj> {
             m.red_lens,
             rot = (60, 0, 0),
             verts = 12
-        );
+        ));
         // the drive's belt guard on the left frame
         fextrude!(
             F,

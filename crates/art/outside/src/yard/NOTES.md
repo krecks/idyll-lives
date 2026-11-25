@@ -220,3 +220,23 @@ cargo art yard --preview  # previews/yard/sandbox.png, sandbox@castle.png, …
 ## The soft forms pass (2026-11-13)
 
 No change to the build: its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `eScooter`; the same triangles.
+
+## Edges at the play camera (2026-11-25)
+
+The gate's `edges` found 72 (greenhouse 24, city bike 10, e-bike 9, cargo bike 7, shed, mountain bike and bike rack 4,
+washing line 3, road bike, rain barrel and kids' bike 2); none now, none accepted. The saddles are twelve round and
+shaded smooth round their rows (eight round, their flattened sides turned past 60°); the greenhouse's rafters and
+vent rafters take a 4 mm chamfer; the city bike's basket, the e-bike's motor, the shed's window box and brackets, the
+rain barrel's and the washing line's revolves, sweeps and lofts are eased (`artkit::bevel::eased`). The compost bin's
+posts lay their wood's UVs on the chamfered post (as the kernel lays any box's: carried, the chamfers smeared the grain).
+
+Sizes: the mountain bike's bars are 0.72 m across (a mountain bike's 720-800 mm; they were 0.60), its depth 0.725.
+
+Left to the owner: the washing line's and the greenhouse's 4 draw calls (each moving part is a draw: the posts and
+three lines let down in turn; the frame, its glass, the door's and the vent's), and the washing line's 9 `texels`
+findings, which measure the washing at rest, squashed to 0.1 % of its height before it is let down.
+
+## Audit (2026-11-25)
+
+The raised bed's tomato canes stand one up each tomato bush (`alt`), at x -0.7, -0.14 and 0.42 (they stood at -0.45,
+0 and 0.45, off the bushes).

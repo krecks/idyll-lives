@@ -12,6 +12,7 @@ use crate::materials::Mat;
 use crate::math::{self, Num, P3, TAU, V3, v3};
 use crate::mesh::{Mesh, UvWay};
 use crate::noise::noise;
+use crate::py;
 use crate::scene::{self, Obj};
 use crate::shapes::{SHARP, options, round_angle, shade, sides};
 use crate::uv;
@@ -108,6 +109,130 @@ pub fn dedupe(pts: &[(f64, f64)], eps: f64) -> Vec<(f64, f64)> {
         out.pop();
     }
     out
+}
+
+// ---- eased profiles (2D): what the gate's `edges` doesn't find hard -------------------------------------
+
+/// How far the corner `p` between legs from `a` and to `c` turns (degrees, 0 to 180).
+fn turn(a: (f64, f64), p: (f64, f64), c: (f64, f64)) -> f64 {
+    let (d1, d2) = ((p.0 - a.0, p.1 - a.1), (c.0 - p.0, c.1 - p.1));
+    math::degrees(math::atan2(
+        d1.0 * d2.1 - d1.1 * d2.0,
+        d1.0 * d2.0 + d1.1 * d2.1,
+    ))
+    .abs()
+}
+
+/// The corner `p` between legs from `a` and to `c` rounded on a circular arc of radius `r` (less where a leg is
+/// under two tangents long), in `steps` chords: the arc's points, from the first leg to the second.
+fn arc(a: (f64, f64), p: (f64, f64), c: (f64, f64), r: f64, steps: usize) -> Vec<(f64, f64)> {
+    use crate::math::{atan2, cos, sin, tan};
+    let (l1, l2) = (
+        py::hypot(a.0 - p.0, a.1 - p.1),
+        py::hypot(c.0 - p.0, c.1 - p.1),
+    );
+    let (u1, u2) = (
+        ((a.0 - p.0) / l1, (a.1 - p.1) / l1),
+        ((c.0 - p.0) / l2, (c.1 - p.1) / l2),
+    );
+    let half = math::radians(180.0 - turn(a, p, c)) / 2.0; // half the angle between the legs
+    let t = (r / tan(half)).min(l1 / 2.0).min(l2 / 2.0);
+    let radius = t * tan(half);
+    let (bx, by) = (u1.0 + u2.0, u1.1 + u2.1);
+    let b = py::hypot(bx, by);
+    let far = t / cos(half);
+    let centre = (p.0 + bx / b * far, p.1 + by / b * far);
+    let (f1, f2) = (
+        atan2(p.1 + u1.1 * t - centre.1, p.0 + u1.0 * t - centre.0),
+        atan2(p.1 + u2.1 * t - centre.1, p.0 + u2.0 * t - centre.0),
+    );
+    let mut sweep = f2 - f1;
+    while sweep > math::PI {
+        sweep -= TAU;
+    }
+    while sweep < -math::PI {
+        sweep += TAU;
+    }
+    (0..=steps)
+        .map(|i| {
+            let f = f1 + sweep * i as f64 / steps as f64;
+            (centre.0 + radius * cos(f), centre.1 + radius * sin(f))
+        })
+        .collect()
+}
+
+/// The corner (a, p, c) as `eased` leaves it: rounded in steps of 50° or less (each well under the 60° the gate
+/// finds) if it turns 60° or more, else as it is.
+fn ease_corner(a: (f64, f64), p: (f64, f64), c: (f64, f64), r: f64) -> Vec<(f64, f64)> {
+    let turn = turn(a, p, c);
+    if turn < 60.0 {
+        return vec![p];
+    }
+    arc(a, p, c, r, (turn / 50.0).ceil() as usize)
+}
+
+/// A lathe's profile (or any open path, (u, v)) with each corner that turns 60° or more rounded on an arc of about
+/// `r`: an eased rim, lip or foot, which the gate's `edges` doesn't find. Its ends are kept.
+pub fn eased(profile: &[(f64, f64)], r: f64) -> Vec<(f64, f64)> {
+    let mut out = vec![profile[0]];
+    for w in profile.windows(3) {
+        out.extend(ease_corner(w[0], w[1], w[2], r));
+    }
+    out.push(profile[profile.len() - 1]);
+    out
+}
+
+/// A closed profile (u, v) with each corner that turns 60° or more rounded as `eased` rounds them.
+pub fn eased_loop(profile: &[(f64, f64)], r: f64) -> Vec<(f64, f64)> {
+    let n = profile.len();
+    (0..n)
+        .flat_map(|i| {
+            ease_corner(
+                profile[(i + n - 1) % n],
+                profile[i],
+                profile[(i + 1) % n],
+                r,
+            )
+        })
+        .collect()
+}
+
+/// `profile` with its corner `i` rounded on an arc of radius `r` in four even steps (each turning a quarter of the
+/// corner, so a lathe shades it round), whatever it turns: a plate's rolled rim, a lip.
+pub fn round_at(profile: &[(f64, f64)], i: usize, r: f64) -> Vec<(f64, f64)> {
+    let mut out = profile[..i].to_vec();
+    out.extend(arc(profile[i - 1], profile[i], profile[i + 1], r, 4));
+    out.extend(&profile[i + 1..]);
+    out
+}
+
+/// A closed outline (u, v) moved `d` in all round (out, for a negative `d`), each corner along its bisector as far
+/// as keeps both its sides `d` in (no more than 2`d`, at a sharp corner): the face of a chamfer at an end of a body
+/// lofted through it, a frame's inside.
+pub fn inset(outline: &[(f64, f64)], d: f64) -> Vec<(f64, f64)> {
+    let n = outline.len();
+    let area: f64 = (0..n)
+        .map(|i| {
+            let (a, b) = (outline[i], outline[(i + 1) % n]);
+            a.0 * b.1 - b.0 * a.1
+        })
+        .sum();
+    let side = if area > 0.0 { 1.0 } else { -1.0 }; // the inside is on the left going round
+    let normal = |a: (f64, f64), b: (f64, f64)| {
+        let (du, dv) = (b.0 - a.0, b.1 - a.1);
+        let l = py::hypot(du, dv);
+        (-dv / l * side, du / l * side)
+    };
+    (0..n)
+        .map(|i| {
+            let (p, prev, next) = (outline[i], outline[(i + n - 1) % n], outline[(i + 1) % n]);
+            let (n1, n2) = (normal(prev, p), normal(p, next));
+            let (mu, mv) = (n1.0 + n2.0, n1.1 + n2.1);
+            let m = py::hypot(mu, mv);
+            let k = (d / (m / 2.0).max(0.5)) / m;
+            (p.0 + mu * k, p.1 + mv * k)
+        })
+        .collect()
 }
 
 // ---- paths --------------------------------------------------------------------------------------------

@@ -236,7 +236,7 @@ pub fn family() -> Family {
                 .centre(0.0, 0.035)
                 .motions(json!({"loops": {"jump": "bounce"}}))
                 .paint(&[("pit", "Pit"), ("pit_rim", "Rim")]),
-            Model::new("trainTable", train::train_table, (1.24, 0.68, 0.84))
+            Model::new("trainTable", train::train_table, (1.24, 0.541, 0.84))
                 .key("model.trainTable")
                 .centre(0.0, 0.0)
                 .motions(json!({"loops": {"trains": "train"}}))

@@ -11,7 +11,7 @@ use artkit::parts::{join, new_parts};
 use artkit::place::GameFrame;
 use artkit::py;
 use artkit::scene::{Obj, meshes};
-use artkit::{fbox, fcyl, fextrude, fsweep, settle, soft};
+use artkit::{fbox, fextrude, fsweep, settle, soft};
 
 pub const FRONT: f64 = 0.29; // the cabinet's front face
 pub const WIN_X: (f64, f64) = (-0.41, 0.16); // the window's sides
@@ -25,20 +25,6 @@ pub fn cabinet(f: &GameFrame, body: Mat) {
     let w = WIN_X.1 - WIN_X.0;
     let cx = (WIN_X.0 + WIN_X.1) / 2.0;
     fbox!(f, "plinth", 0.86, 0.04, 0.68, (0, 0.02, -0.08), M.tray);
-    for sx in [-1, 1] {
-        // levelling feet
-        for z in [-0.38, 0.22] {
-            fcyl!(
-                f,
-                format!("foot{sx}{}", float_repr(z)),
-                0.022,
-                0.03,
-                (sx as f64 * 0.38, 0.015, z),
-                M.tray,
-                verts = 8
-            );
-        }
-    }
     fbox!(
         f,
         "back",
@@ -108,14 +94,14 @@ pub fn cabinet(f: &GameFrame, body: Mat) {
         bevel = 0.008,
         bevel_segments = 1
     );
-    fextrude!(
+    artkit::bevel::eased(fextrude!(
         f,
         "keypad",
         &rounded_rect(0.18, 0.5, 0.015, 2),
         0.02,
         (0.285, 1.2, FRONT + 0.01),
         M.inside
-    );
+    ));
     fbox!(
         f,
         "screen",
@@ -269,7 +255,7 @@ pub fn cabinet(f: &GameFrame, body: Mat) {
         M.tray
     );
     // the window's frame: a rounded bezel round the glass
-    fextrude!(
+    artkit::bevel::eased(fextrude!(
         f,
         "bezel",
         &rounded_rect(w + 0.03, WIN_Y.1 - WIN_Y.0 + 0.03, 0.02, 2),
@@ -277,7 +263,7 @@ pub fn cabinet(f: &GameFrame, body: Mat) {
         (cx, py::sum([WIN_Y.0, WIN_Y.1]) / 2.0, FRONT + 0.002),
         body,
         holes = [rounded_rect(w - 0.01, WIN_Y.1 - WIN_Y.0 - 0.01, 0.012, 2)]
-    );
+    ));
 }
 
 /// A vending machine's spiral, from depth z0 to z1 at (x, y): the wire a snack sits in.

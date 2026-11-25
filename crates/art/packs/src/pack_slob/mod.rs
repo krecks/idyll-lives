@@ -29,7 +29,7 @@ pub fn family() -> Family {
         "pack_slob",
         M.palette(),
         vec![
-            Model::new("microwaveCart", cart::microwave_cart, (0.722, 1.099, 0.783))
+            Model::new("microwaveCart", cart::microwave_cart, (0.735, 1.159, 0.465))
                 .key("model.slob.microwaveCart")
                 .centre(0.011, -0.0386)
                 .motions(json!({"uses": {"nuke": "door_open", "invent": "door_open"}, "hold": 1.5}))
@@ -39,12 +39,12 @@ pub fn family() -> Family {
                 .centre(0.0, 0.007)
                 .motions(json!({"uses": {"flop": "squash", "snooze": "squash"}}))
                 .paint(&[("bag", "Body")]),
-            Model::new("snackNightstand", lounge::snack_nightstand, (0.897, 0.45, 0.728))
+            Model::new("snackNightstand", lounge::snack_nightstand, (0.597, 0.452, 0.468))
                 .key("model.slob.snackNightstand")
-                .centre(0.021, 0.031)
+                .centre(0.0155, 0.031)
                 .motions(json!({"uses": {"midnightSnack": "drawer_open"}}))
                 .paint(&[("stand", "Body"), ("pad", "Top")]),
-            Model::new("spritzStation", play::spritz_station, (0.692, 1.62, 0.798))
+            Model::new("spritzStation", play::spritz_station, (0.6, 1.62, 0.294))
                 .key("model.slob.spritzStation")
                 .centre(0.0325, -0.031)
                 .motions(json!({"uses": {"spritz": "spritz"}}))
@@ -54,7 +54,7 @@ pub fn family() -> Family {
                 .centre(0.031, -0.039)
                 .motions(json!({"loops": {"chaseHighScore": "joystick", "quickRound": "joystick"}}))
                 .paint(&[("cabinet", "Body"), ("side", "Sides")]),
-            Model::new("gamingRecliner", lounge::gaming_recliner, (1.77, 1.103, 0.874))
+            Model::new("gamingRecliner", lounge::gaming_recliner, (0.916, 1.104, 0.873))
                 .key("model.slob.gamingRecliner")
                 .centre(0.005, 0.01)
                 .motions(json!({"uses": {"marathon": "recline", "armrestSoda": "cup_out"}, "ride": "recline"}))

@@ -2,7 +2,8 @@
 
 use super::M;
 use super::common::{frets, guitar_stand, lean, off_stand, strings};
-use super::guitars::{dots, inset, neck};
+use super::guitars::{dots, neck};
+use artkit::forms::inset;
 use artkit::forms::smooth_outline;
 use artkit::kit::figure8;
 use artkit::math::P3;

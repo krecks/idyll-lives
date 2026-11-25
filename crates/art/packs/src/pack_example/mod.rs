@@ -29,7 +29,7 @@ pub fn family() -> Family {
         "pack_example",
         M.palette(),
         vec![
-            Model::new("chefStove", stove::chef_stove, (1.62, 2.55, 0.662))
+            Model::new("chefStove", stove::chef_stove, (1.62, 1.221, 0.662))
                 .key("model.chefStove")
                 .centre(0.0, -0.099)
                 // a meal on the hob lights the burner; a bake (practise, or any `bake` step) drops the oven door
@@ -37,7 +37,7 @@ pub fn family() -> Family {
                 .motions(json!({"uses": {"cook": "burner_on", "stir": "burner_on",
                     "practise": {"clip": "oven_open", "hold": 3.0}, "bake": {"clip": "oven_open", "hold": 3.0}}}))
                 .paint(&[("body", "Body"), ("chrome", "Handles & knobs"), ("tile", "Tiles")]),
-            Model::new("whirlpoolTub", tub::whirlpool_tub, (1.86, 0.929, 1.86))
+            Model::new("whirlpoolTub", tub::whirlpool_tub, (1.86, 0.814, 1.86))
                 .key("model.whirlpoolTub")
                 .motions(json!({"uses": {"soak": "fill"}, "loops": {"soak": "bubbles"}}))
                 .paint(&[("shell", "Tub"), ("wood", "Surround"), ("pillow", "Headrests")]),

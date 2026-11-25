@@ -2,6 +2,7 @@
 
 use super::M;
 use super::common::on;
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr;
 use artkit::kit;
@@ -56,7 +57,7 @@ pub fn treadmill() -> Vec<Obj> {
         );
         for s in [-1, 1] {
             let sf = s as f64;
-            fsweep!(
+            let rail = fsweep!(
                 f,
                 format!("rail{s}"),
                 &[(sf * 0.33, 0.165, -0.65), (sf * 0.33, 0.165, 0.85)],
@@ -72,6 +73,7 @@ pub fn treadmill() -> Vec<Obj> {
                 ],
                 up = (0, 0, 1)
             );
+            bevel_edges(rail, 0.003, 1, 50.0, &EdgeOrder::Corners); // its ends' edges
             fbox!(
                 f,
                 format!("tread{s}"),
@@ -194,7 +196,7 @@ pub fn treadmill() -> Vec<Obj> {
         // with chrome pulse plates
         for s in [-1, 1] {
             let sf = s as f64;
-            fsweep!(
+            let upright = fsweep!(
                 f,
                 format!("upright{s}"),
                 &[(sf * 0.3, 0.2, -0.8), (sf * 0.3, 1.22, -0.62)],
@@ -203,6 +205,7 @@ pub fn treadmill() -> Vec<Obj> {
                 profile = rounded_rect(0.07, 0.045, 0.02, 2),
                 up = (0, 1, 0)
             );
+            bevel_edges(upright, 0.003, 1, 50.0, &EdgeOrder::Corners); // its top's edges
             let bar = kit::fillet(
                 &[
                     (sf * 0.3, 1.18, -0.63),

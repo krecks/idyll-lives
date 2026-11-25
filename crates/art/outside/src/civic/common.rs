@@ -280,7 +280,8 @@ pub fn book(
             d,
             (0, 0, 0),
             cover,
-            bevel = 0.003,
+            // (2 mm: 3 met in the middle of a 6 mm board's edge, a ridge)
+            bevel = 0.002,
             bevel_segments = 1
         );
         fbox!(
@@ -337,7 +338,11 @@ pub fn open_book<X: Coord, Y: Coord, Z: Coord>(
                     .collect()
                 })
                 .collect();
-            loft!(format!("{name}_pages{s}"), &sections, material = M.page);
+            artkit::bevel::eased(loft!(
+                format!("{name}_pages{s}"),
+                &sections,
+                material = M.page
+            ));
             // the top page curving up from the spine
             fsweep!(
                 F,
@@ -369,7 +374,7 @@ pub fn open_book<X: Coord, Y: Coord, Z: Coord>(
 
 /// A small potted plant standing at game (x, y, z).
 pub fn plant(name: &str, x: f64, y: f64, z: f64, r: f64) {
-    revolve!(
+    artkit::bevel::eased(revolve!(
         format!("{name}_pot"),
         &[
             (0.0, 0.0),
@@ -382,7 +387,7 @@ pub fn plant(name: &str, x: f64, y: f64, z: f64, r: f64) {
         at = F.at(x, y, z),
         material = M.pot,
         segments = 16
-    );
+    ));
     for (k, (dx, dy, dz, s)) in [
         (0.0, 1.9, 0.0, 0.9),
         (-0.45, 1.6, 0.2, 0.7),

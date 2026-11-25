@@ -45,7 +45,11 @@ pub fn main(args: &[String]) -> i32 {
                     eprintln!("no {REFERENCE} yet: `cargo review sizes` compares with it");
                     return Ok(2);
                 };
-                let measures = checkglb::measures(&s.paths, &tops(&objects, &reference))?;
+                let measures = checkglb::measures(
+                    &s.paths,
+                    &tops(&objects, &reference),
+                    &model_seats(&objects, &reference),
+                )?;
                 let mut rows = size_rows(&objects, &measures, &reference);
                 measure_plants(&s, &mut rows, &reference)?;
                 let (mut text, files, code) = report(&objects, &rows, &reference);

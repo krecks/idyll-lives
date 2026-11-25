@@ -101,3 +101,23 @@ cargo art pack_cheerful --preview  # previews/pack_cheerful/<id>.png, <id>@<clip
 ## The soft forms pass (2026-11-13)
 
 The hammock's pillow is sewn flat and stuffed (`waist`), `resting`. Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 2 models changed shape: `partyBooth`, `rainbowHammock`; 12,188 to 12,442 triangles.
+
+## Gate to zero (2026-11-25)
+
+Every edge the gate's `edges` found showing unbevelled at the play camera is rounded, chamfered or covered; sizes,
+parts, clips and draws as before.
+- `partyBooth` (59 edges to 0): the backrest channels end in a 4 mm chamfer (the path runs straight into it, so the
+  sweep's frame doesn't twist); the curtains' folds take more points (6 a fold on the fixed one: no crest turns
+  60°), their hem and heading 11.5 mm thick, and a corded side hem down each end; to stay under the 8,000 aim the
+  cushions are `resting`, the bulbs and popcorn 6 × 3, the table 24 sides, its stem 16 (7,764 to 7,970 triangles).
+- `jukebox` (1 edge to 0, 4 draws to 3): the record window's back panel is bevelled 4 mm; the cabinet 6 cm deeper
+  (0.495 to 0.555 m, its front forward; a jukebox is 0.6 to 0.75 m deep); the speaker cloth plain `matte`, not
+  `fabric`, so the spinning label is the third draw (5,792 to 6,056 triangles).
+- `karaokeMachine` (1 to 0): the spotlight's front lip chamfered (4,688 to 4,720).
+- `mocktailCart` (28 to 0): the canopy's stripes and scalloped valance 1 cm thick (were 12 mm, a hard edge's width).
+- `rainbowHammock` (2 to 0): the base beam's flat ends eased 4 mm (`artkit::bevel::ease` at 60°, only the cap rims)
+  (4,710 to 4,742).
+- `sunriseLamp` (2 to 0): the rolled mat's ends bevelled 4 mm. The head (case, scene, sun and its 22 cm rise) is
+  drawn at 0.84 of its build about the scene's middle, 66 cm across (was 78; a mood lamp is at most 60 cm, ±10 %),
+  the `light` still at 1.25 m; the mat and the cork block are what it carries (`aside`), so its size is the lamp's,
+  0.655 × 1.578 × 0.26 m (3,580 to 3,644).

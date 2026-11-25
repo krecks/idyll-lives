@@ -6,7 +6,7 @@ use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, cosd, sind, sqrt};
 use artkit::motion::{Path, keys};
-use artkit::parts::{join, new_parts, numbered};
+use artkit::parts::{aside, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, grow, jitter, loft, revolve, ring, settle};
@@ -299,8 +299,12 @@ pub fn pizza_oven() -> Vec<Obj> {
             material = M.iron,
             segments = 14
         );
+    });
+    join(&still, "body", Some(P3::from((0, 0, 0))));
+    // the prep counter beside it: drawn, not the oven's size (as a desk's chair)
+    let cx = 0.56;
+    let counter = new_parts(|| {
         // the prep counter: a stone cabinet with an oak frame-and-panel door, its pull, a worktop
-        let cx = 0.56;
         fbox!(
             f,
             "counter",
@@ -374,7 +378,8 @@ pub fn pizza_oven() -> Vec<Obj> {
                 (0.0, 0.0),
                 (0.04, 0.0),
                 (0.06, 0.04),
-                (0.062, 0.05),
+                (0.062, 0.047),
+                (0.059, 0.05), // (its rim's outer edge chamfered)
                 (0.056, 0.05),
                 (0.05, 0.044),
                 (0.0, 0.044)
@@ -411,7 +416,7 @@ pub fn pizza_oven() -> Vec<Obj> {
         let top = _pot(f, cx + 0.27, -0.33, 0.89, 0.06, 0.1);
         _basil(f, cx + 0.27, -0.33, top, 0.75);
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    aside(&counter, "counter");
     // The door: an iron grille over the mouth, the fire showing through it; `door_off` lifts it aside.
     let (r, dz) = (0.19, MOUTH_Z + 0.012);
     let door = new_parts(|| {

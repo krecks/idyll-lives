@@ -3,10 +3,11 @@
 use super::common::{M, WALL, bush};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::math::{Axis, P3, PI, TAU, cos, cosd, pow, sin, sind, sqrt};
-use artkit::parts::{hinged, join, new_parts, numbered};
+use artkit::parts::{aside, hinged, join, new_parts, numbered};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, jitter, kit, settle, slide, swing, torus};
+use artkit::{forms::eased, shapes::AUTO_WIDTH};
 
 // --- the neighbourly baking counter (2x1): a cream retro range beside a sage counter laid with bakes --------
 const RANGE: (f64, f64, f64, f64) = (0.6, 0.62, 0.92, 0.6); // x, width, hob height, depth
@@ -95,7 +96,10 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                 M.crust_dark
             );
         }
-        let top = 0.905;
+    });
+    // the bakes on the worktop: drawn, not the counter's size
+    let bakes = new_parts(|| {
+        let top = 0.905; // the worktop's top
         // the bakes: a lattice pie, a wire rack of biscuits with the rolling pin in front, a pink cake on its stand; the
         // worktop's right end, by the range, is left free (a patch of flour on it) for the cook's mixing bowl or board and
         // what they set down behind it (`STATION_SPOTS`, `SET_DOWN_SPOTS`: the pin lay where the bowl goes)
@@ -346,8 +350,12 @@ pub fn neighbourly_oven() -> Vec<Obj> {
             segments = 8,
             rings = 5
         );
-        // a beadboard back rising from the worktop's back (a dresser's), carrying the shelf with three jars: it stands
-        // free or on the wall (2026-10-21: the shelf hung on the air over a free-standing counter)
+    });
+    // a beadboard back rising from the worktop's back (a dresser's), carrying the shelf with three jars: it stands
+    // free or on the wall (2026-10-21: the shelf hung on the air over a free-standing counter); a wall shelf, drawn
+    // with the counter, not its size
+    let shelf = new_parts(|| {
+        let top = 0.905; // the worktop's top
         fbox!(
             f,
             "backboard",
@@ -463,6 +471,9 @@ pub fn neighbourly_oven() -> Vec<Obj> {
                 M.porcelain
             );
         }
+    });
+    aside(&shelf, "shelf");
+    let range = new_parts(|| {
         // the range: an enamel body, a hob with four burners under cast-iron grates, a backguard with a clock, a knob
         // panel, a chrome rail, a stock pot (the gingham tea towel is the door's, over its handle)
         fbox!(
@@ -515,7 +526,7 @@ pub fn neighbourly_oven() -> Vec<Obj> {
             (rx, rh + 0.09, WALL + 0.043),
             M.porcelain,
             rot = (90, 0, 0),
-            verts = 18
+            verts = 16
         );
         torus!(
             "clock_rim",
@@ -524,7 +535,7 @@ pub fn neighbourly_oven() -> Vec<Obj> {
             at = f.at(rx, rh + 0.09, WALL + 0.045),
             material = M.chrome,
             rot = (90, 0, 0),
-            major_segments = 18,
+            major_segments = 16,
             minor_segments = 3
         );
         for (a, l) in [(60.0, 0.025), (-60.0, 0.035)] {
@@ -652,6 +663,9 @@ pub fn neighbourly_oven() -> Vec<Obj> {
             verts = 8,
             round = 1
         );
+    });
+    // the stock pot on the hob: drawn, not the counter's size
+    let pot = new_parts(|| {
         let (sx, sz) = (rx + 0.15, WALL + rd / 2.0 - 0.12);
         kit::turned!(
             f,
@@ -717,7 +731,9 @@ pub fn neighbourly_oven() -> Vec<Obj> {
             );
         }
     });
-    join(&still, "body", Some(P3::ZERO));
+    join(&[still, range].concat(), "body", Some(P3::ZERO));
+    aside(&bakes, "bakes");
+    aside(&pot, "pot");
     // The oven door, hinged on its foot: `oven_open` drops it forward while a pie or treats bake. A window in a raised
     // frame, a chrome bar handle on stand-offs.
     let door = new_parts(|| {
@@ -852,27 +868,30 @@ pub fn giving_jar() -> Vec<Obj> {
             jx,
             0.0,
             jz,
-            &[
-                (0.0, 0.0),
-                (0.22, 0.0),
-                (0.22, 0.03),
-                (0.205, 0.045),
-                (0.15, 0.06),
-                (0.13, 0.09),
-                (0.09, 0.12),
-                (0.07, 0.17),
-                (0.075, 0.2),
-                (0.058, 0.24),
-                (0.053, 0.5),
-                (0.06, 0.66),
-                (0.075, 0.72),
-                (0.1, 0.76),
-                (0.17, 0.8),
-                (0.185, 0.815),
-                (0.185, 0.835),
-                (0.18, 0.86),
-                (0.0, 0.86),
-            ],
+            &eased(
+                &[
+                    (0.0, 0.0),
+                    (0.22, 0.0),
+                    (0.22, 0.03),
+                    (0.205, 0.045),
+                    (0.15, 0.06),
+                    (0.13, 0.09),
+                    (0.09, 0.12),
+                    (0.07, 0.17),
+                    (0.075, 0.2),
+                    (0.058, 0.24),
+                    (0.053, 0.5),
+                    (0.06, 0.66),
+                    (0.075, 0.72),
+                    (0.1, 0.76),
+                    (0.17, 0.8),
+                    (0.185, 0.815),
+                    (0.185, 0.835),
+                    (0.18, 0.86),
+                    (0.0, 0.86),
+                ],
+                AUTO_WIDTH
+            ),
             M.pedestal,
             segments = 28
         );
@@ -927,13 +946,16 @@ pub fn giving_jar() -> Vec<Obj> {
             jx,
             LID_TOP - 0.05,
             jz,
-            &[
-                (0.0, 0.0),
-                (0.1, 0.0),
-                (0.106, 0.04),
-                (0.103, 0.05),
-                (0.0, 0.05),
-            ],
+            &eased(
+                &[
+                    (0.0, 0.0),
+                    (0.1, 0.0),
+                    (0.106, 0.04),
+                    (0.103, 0.05),
+                    (0.0, 0.05),
+                ],
+                AUTO_WIDTH
+            ),
             M.cork,
             segments = 22
         );
@@ -1019,7 +1041,7 @@ pub fn giving_jar() -> Vec<Obj> {
             bevel = 0.003,
             bevel_segments = 1
         );
-        // a chalk sign framed on the pedestal, a chalked heart and lines; a flowering pot plant at its foot
+        // a chalk sign framed on the pedestal, a chalked heart and lines
         fextrude!(
             f,
             "sign_frame",
@@ -1056,26 +1078,6 @@ pub fn giving_jar() -> Vec<Obj> {
             verts = 4,
             closed = true
         );
-        kit::turned!(
-            f,
-            "plant_pot",
-            0.31,
-            0.0,
-            0.291,
-            &[
-                (0.0, 0.0),
-                (0.058, 0.0),
-                (0.075, 0.13),
-                (0.085, 0.135),
-                (0.085, 0.16),
-                (0.075, 0.16),
-                (0.07, 0.148),
-                (0.0, 0.148),
-            ],
-            M.terracotta,
-            segments = 18
-        );
-        bush(f, 0.31, 0.15, 0.291, 0.1, M.mustard, 3);
         // the glass jar over the coins (the glass draw): a thick rim and a lip under the cork
         kit::turned!(
             f,
@@ -1101,6 +1103,33 @@ pub fn giving_jar() -> Vec<Obj> {
         );
     });
     join(&still, "body", Some(P3::ZERO));
+    // the flowering pot plant at its foot: drawn, not the jar's size
+    let plant = new_parts(|| {
+        kit::turned!(
+            f,
+            "plant_pot",
+            0.31,
+            0.0,
+            0.291,
+            &eased(
+                &[
+                    (0.0, 0.0),
+                    (0.058, 0.0),
+                    (0.075, 0.13),
+                    (0.085, 0.135),
+                    (0.085, 0.16),
+                    (0.075, 0.16),
+                    (0.07, 0.148),
+                    (0.0, 0.148),
+                ],
+                AUTO_WIDTH
+            ),
+            M.terracotta,
+            segments = 18
+        );
+        bush(f, 0.31, 0.15, 0.291, 0.1, M.mustard, 3);
+    });
+    aside(&plant, "plant");
     // A coin standing in the slot: `coin` drops it through into the jar.
     let coin = new_parts(|| {
         fcyl!(

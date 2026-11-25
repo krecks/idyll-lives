@@ -7,6 +7,7 @@
 //! forth while played (`rods`, a loop); the others stay still.
 
 use super::M;
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
 use artkit::kit::{self};
@@ -40,7 +41,7 @@ const FOOS_KICKING: [usize; 2] = [1, 5];
 /// A foosball man's outline (game x across the pitch, height from the rod), as seen from the side: a round head,
 /// shoulders, the rod through the chest, legs to two flat kicking feet.
 fn foos_man() -> Vec<(f64, f64)> {
-    let head = (-55..240).step_by(37).map(|a| {
+    let head = (-55..=235).step_by(58).map(|a| {
         (
             0.017 * cos(radians(a as f64)),
             0.054 + 0.017 * sin(radians(a as f64)),
@@ -132,7 +133,7 @@ fn rod_men(fr: &GameFrame, name: &str, x: f64, front: bool, men: &[f64]) {
             .iter()
             .map(|&(u, v)| (x + u, ROD_Y + v))
             .collect();
-        fextrude!(
+        let man = fextrude!(
             fr,
             format!("{name}_man{}", r(z)),
             &outline,
@@ -140,6 +141,8 @@ fn rod_men(fr: &GameFrame, name: &str, x: f64, front: bool, men: &[f64]) {
             (0, 0, z),
             team
         );
+        // its face's edges chamfered, as a moulded man's are (only those: the turns round its outline stay)
+        bevel_edges(man, 0.003, 1, 80.0, &EdgeOrder::Corners);
     }
 }
 

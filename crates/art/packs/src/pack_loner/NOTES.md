@@ -100,3 +100,16 @@ cargo art pack_loner --preview  # previews/pack_loner/<id>.png, <id>@<clip>.png
 ## The soft forms pass (2026-11-13)
 
 The quiet pod's seat and back cushion are `resting`. Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 5 models changed shape: `bonsaiBench`, `deliveryHatch`, `puzzleTable`, `quietPod`, `shortwaveRadio`; 22,914 to 23,074 triangles.
+
+## Gate to zero (2026-11-25)
+
+Every hard edge the gate's `edges` found is eased (13 → 0): the chairs' crest rails' ends and the pod's wing edges'
+ends (`artkit::bevel::ease` at 60°), the bonsai pot's rim (`eased`), the hatch frame's inner arris. The bonsai's leaf pads have their
+scale in their meshes before their UVs are made (a `boulder!` is scaled so), so the foliage is laid at its own size (it was 3,578 px a
+metre and stretched on 18 %: `texels`). The hatch's mat is `aside` (drawn, not the hatch's own size): it measures
+0.84 × 1.95 × 0.50 m. The sauna keeps 4 draw calls (the door's glass is its own). The radio set on the radio
+desk, with its antenna's swivel and tube, the microphone, headphones, logbook and mug, is `aside` (`on_desk`), and so
+are its moving dial and antenna (`dial_aside`, `antenna_aside`, still played by `dial` and `antenna`): it measures 0.84
+× 0.93 × 0.68 m, the desk and chair. The bonsai on the bonsai bench is `aside` (`bonsai`), its trimmed twig too
+(`twig_aside`, still played by `trim` and `mist`): the bench measures 0.86 × 1.11 × 0.75 m, its back board's rail at
+1.11 m. No draw call more (2026-11-25).

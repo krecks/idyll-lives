@@ -53,7 +53,7 @@ import type { ViewRect } from '../types';
 import { EASE, easedBox, encodeFinish, facing, Geo, type V3 } from './geometry';
 import { CARS, CAR_PAINT, carAge, garageAt, garageFor, hash, paintCar, parkCar, pick, type CarAge, type CarBody } from './cars';
 import { chunkAt, chunkCoords, chunkId, distanceToRect, hashNumbers, hashString, RectGrid } from './chunks';
-import { canopyBack, type HousePart, type HousePlanner, type SilhouettePlan, type SilhouetteSpec } from './house';
+import { asDrawn, canopyBack, type FarPlot, type HousePart, type HousePlanner, type SilhouettePlan, type SilhouetteSpec, type WallBox } from './house';
 import { compose, quatYawPitchRoll, type Quat } from './math';
 import { placementVariation, type StandIn } from './modelEntry';
 import { wallCorners, writeFences } from './fences';
@@ -1402,6 +1402,8 @@ export class TownStreet {
       const [x0, z0, x1, z1] = L.info.house;
       for (const { o } of this.openingGrid.near({ x: x0, z: z0, w: x1 - x0, d: z1 - z0 }, 1)) h = mix(mix(mix(h, o.x), o.z * 7 + (o.axis === 'h' ? 1 : 2)), o.kind.length);
       h = mix(h, this.coverOf(L));
+      // (Its storeys' boxes: the silhouette stands them, `boxesOf`.)
+      h = mix(h, hashString(JSON.stringify(this.boxesOf(L))));
     }
     // Its porches and porch pieces.
     for (const p of this.world.porches ?? []) if (p.plot === L.info.id) h = mix(mix(mix(h, p.x), p.z * 7 + (p.axis === 'h' ? 1 : 2)), p.out + 3);
@@ -1458,7 +1460,7 @@ export class TownStreet {
       const g = kind === 'shop' || dress ? null : world.garages ? (this.garages.get(L.info.id) ?? null) : home ? null : this.legacyGarage(L, focus);
       const [x0, z0, x1, z1] = L.info.house ?? [lone!.x0, lone!.z0, lone!.x1, lone!.z1];
       const front: [number, number] = L.turned ? [-L.front, 0] : [0, L.front];
-      spec = { x0, z0, x1, z1, lot: L.info, home, dressingOnly: home && game, front, door: L.door, garage: g, porches, pieces, roof: L.plot.roof, cover: this.coverOf(L), storeys: L.plot.storeys, lived: kind === 'house' && this.options.lived };
+      spec = { x0, z0, x1, z1, lot: L.info, home, dressingOnly: home && game, front, door: L.door, garage: g, porches, pieces, roof: L.plot.roof, cover: this.coverOf(L), storeys: L.plot.storeys, ...(L.info.house ? { boxes: this.boxesOf(L) } : {}), lived: kind === 'house' && this.options.lived };
       // (A canopy against the viewed house's wall goes with it in the cutaway.)
       if (spec.dressingOnly && pieces?.some((p) => p.kind === 'canopy')) spec.walled = this.walled;
       if (dress) return { parts: this.outdoors(L, parts), silhouettes, spec, lot, dressed: this.lotDressed(L, dress) };
@@ -1928,7 +1930,7 @@ export class TownStreet {
     };
     // Sidewalks, kerbs and the road, the junctions' pads, corners and markings, each piece in the
     // chunk its middle is in. (The streets' and lanes' sidewalks, stopped by the country roads too.)
-    const walk = new RoutedGeo((x, z) => at(x, z).parts.walk);
+    const walk = new WalkGeo((x, z) => at(x, z).parts.walk, new RoutedGeo((x, z) => at(x, z).parts.props.geo));
     const shadows = new RoutedGeo((x, z) => at(x, z).parts.shadows).color('#000000');
     // (On a land the town follows, climbing with it: `levels`. Elsewhere a road raised over another climbs to its deck
     // on its own: `deckLevels`.)
@@ -2063,7 +2065,8 @@ export class TownStreet {
   farChunk(id: number, focus: number): { key: string; geo: Geo } | null {
     const houses = (this.plotsByChunk().get(id) ?? []).filter((L) => L.info.house && L.info.id !== focus && (L.base === 'house' || L.base === 'shop'));
     if (!houses.length) return null;
-    const key = `${id}|${houses.map((L) => `${L.info.id}:${L.info.house!.join(',')}:${L.info.roof?.join(',') ?? ''}:${L.info.storeys ?? 1}:${this.coverOf(L)}${this.dresses.has(L.info.id) ? `:${hashString(JSON.stringify(this.dresses.get(L.info.id)))}` : ''}`).join(';')}${this.levels ? `|v${this.levels.surface.version(id)}` : ''}`;
+    const plots = new Map(houses.map((L) => [L, this.farPlot(L)]));
+    const key = `${id}|${houses.map((L) => `${L.info.id}:${JSON.stringify(plots.get(L))}${this.dresses.has(L.info.id) ? `:${hashString(JSON.stringify(this.dresses.get(L.info.id)))}` : ''}`).join(';')}${this.levels ? `|v${this.levels.surface.version(id)}` : ''}`;
     const cached = this.far.get(id);
     if (cached?.key === key) return cached;
     const geo = new Geo();
@@ -2077,7 +2080,7 @@ export class TownStreet {
       // (On a land the town follows, each on its pad.)
       const dy = this.padOf(L);
       const into = dy ? new Geo() : geo;
-      this.planner.farHouse(into, { x: L.info.x, z: L.info.z, house: L.info.house!, roof: L.info.roof, storeys: L.info.storeys, cover: this.coverOf(L) });
+      this.planner.farHouse(into, plots.get(L)!);
       if (dy) geo.merge(into, dy);
     }
     const out = { key, geo };
@@ -2090,16 +2093,30 @@ export class TownStreet {
    * Every lot's house the far LOD draws (`farChunk`'s, the focus lot's left out), with the chunk it is planned in and
    * its pad: the town view draws them all at once (`pc/townView.ts`), those of the chunks not streamed in.
    */
-  townHouses(focus: number): { chunk: number; plot: PlotInfo; pad: number; cover: number; dress?: LotDress }[] {
-    const out: { chunk: number; plot: PlotInfo; pad: number; cover: number; dress?: LotDress }[] = [];
+  townHouses(focus: number): { chunk: number; plot: PlotInfo; pad: number; far: FarPlot; dress?: LotDress }[] {
+    const out: { chunk: number; plot: PlotInfo; pad: number; far: FarPlot; dress?: LotDress }[] = [];
     for (const [chunk, list] of this.plotsByChunk()) {
       for (const L of list) {
         if (!L.info.house || L.info.id === focus || (L.base !== 'house' && L.base !== 'shop')) continue;
         const dress = this.dresses.get(L.info.id);
-        out.push({ chunk, plot: L.info, pad: this.padOf(L), cover: this.coverOf(L), ...(dress ? { dress } : {}) });
+        out.push({ chunk, plot: L.info, pad: this.padOf(L), far: this.farPlot(L), ...(dress ? { dress } : {}) });
       }
     }
     return out;
+  }
+
+  /**
+   * A lot's house as its far versions are asked for (`FarPlot`): its look's place, its box, roof, storeys and covering,
+   * each storey's boxes (`boxesOf`) and its garage (a house's own: a shop's and a lot's with a look have none).
+   */
+  private farPlot(L: PlotLayout): FarPlot {
+    const garage = L.base === 'house' && !this.dresses.has(L.info.id) ? this.garages.get(L.info.id) : null;
+    return { x: L.info.x, z: L.info.z, house: L.info.house!, roof: L.info.roof, storeys: L.info.storeys, cover: this.coverOf(L), boxes: this.boxesOf(L), ...(garage ? { garage } : {}) };
+  }
+
+  /** Each storey's boxes of a lot's house (`HousePlanner.storeyBoxes`), for its far versions. */
+  private boxesOf(L: PlotLayout): WallBox[][] {
+    return this.planner.storeyBoxes(this.world, L.info.house!, L.info.storeys ?? 1);
   }
 
   /** The wall covering most of a lot's house's outside wears (`HousePlanner.exteriorCover`: 0, its own look), for its far versions. */
@@ -2284,6 +2301,33 @@ class RoutedGeo extends Geo {
     g.maskA = this.maskA;
     g.maskB = this.maskB;
     g.poly(points, n, uvs, alphas, tints);
+    return this;
+  }
+}
+
+/** A face of the sidewalks looking up less steeply than this (the y of its normal) stands up: a kerb's face, a walk's edge. */
+const UPRIGHT = 0.5;
+/** The sidewalks' surface (a manifest key), and the plain finish their upright faces are drawn in: as rough, not metal. */
+const SIDEWALK_MATERIAL = 'material.sidewalk';
+const WALK_FINISH = encodeFinish(1, 0);
+
+/**
+ * The sidewalks and kerbs by chunk (`RoutedGeo`), but for what stands up (a kerb's faces, a walk's edge): the
+ * sidewalk's texture is laid from above (its `projection: xz`) and was smeared down such a face, so those go into the
+ * chunk's props (`upright`) in the plain finish, in the colour the sidewalk's texture shows them in (`asDrawn`).
+ * shortcut: a face's own tints (the slabs', all level) aren't carried over; carry them if an upright face gets some.
+ */
+class WalkGeo extends RoutedGeo {
+  constructor(
+    target: (x: number, z: number) => Geo,
+    private readonly upright: Geo,
+  ) {
+    super(target);
+  }
+  override poly(points: readonly V3[], n: V3, uvs?: readonly (readonly [number, number])[], alphas?: readonly number[], tints?: readonly V3[]): this {
+    if (Math.abs(n[1]) >= UPRIGHT) return super.poly(points, n, uvs, alphas, tints);
+    const hex = `#${[this.r, this.g, this.b].map((c) => Math.round(c * 255).toString(16).padStart(2, '0')).join('')}`;
+    this.upright.color(asDrawn(hex, SIDEWALK_MATERIAL), WALK_FINISH).poly(points, n);
     return this;
   }
 }

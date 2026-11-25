@@ -123,3 +123,31 @@ The hammock's pillow is sewn flat and stuffed (`waist`), `resting`. Besides, its
 
 In Rust since 2026-11-18 (`common.rs`: the palette, `_pot`, `_rosette`, `_flower`; a file a model, the glasshouse's
 plants in `ferns.rs`), proved against the last Blender build (`ref/blender`). Left as the Blender script had it: `TOPY` (the terrarium's soil top) was set and never read (not ported).
+
+## Gate to zero (2026-11-25)
+
+Every edge the gate's `edges` found showing unbevelled at the play camera is rounded, chamfered or covered (108 to
+0), the terrarium's texels laid even, the glasshouse under its triangle aim and the potting bench at 3 draws and
+under its.
+- `_pot` (common): a pot 17 cm across or more has its rim's top chamfered 4 mm (each corner cut once); every pot's
+  soil is one cone from its rim (a ring fewer).
+- `glasshouse` (49 to 0; 8,366 to 7,980 triangles): the gutters' outer corner and the bench's back
+  posts chamfered, the posts' ends eased; the trailing stems shaded round; the palm and basket pots 12 sides, the
+  ferns' fronds 4 rows, the palms' 5, the basket leaves 2, the cushions `resting`. Its roof vent opens with `vent_open` again (it
+  was propped open on the still body's glass for a while, to save its draw): the gate now aims a model's draws at 3
+  for its still body and one more for each moving part, so its 4 (body, glass, door, vent) are what it aims for.
+- `birdFeeder` (6 to 0): the bed's stone edge eased; the ridge cap stood upright astride the ridge (it lay on its
+  side), its apex cut; the tube's arm chamfered and its ends eased (5,688 to 6,004).
+- `gardenHammock` (14 to 0): the beam's and the arms' ends eased (3,222 to 3,366).
+- `cedarShower` (2 to 0): its pot's rim (3,772 to 3,800).
+- `mossTerrarium` (1 to 0, texels 2 to 0): the pedestal's bead cut; each fir a lathe a tier, its steep side in
+  three bands, so the foliage is laid at each band's own radius (it was stretched over 2× on a third of it); the
+  mister and the braided rug are what it carries (`aside`): its size is the pedestal and cloche, 0.40 × 1.174 × 0.40 m
+  (3,588 to 3,852).
+- `pottingBench` (28 to 0; 4 to 3 draws): the back boards bevelled 4 mm, the twine spool eased; its plants are the
+  family's satin greens (`green_pale` added), so the body is one draw; the herbs on the top shelf are what it
+  carries (`aside`): its size 1.76 × 1.74 × 0.60 m (7,248 to 7,900).
+- `veggieBed` (8 to 0): the tomato stakes chamfered, their tops eased (7,076 to 7,172). Still 4 draws: the body,
+  the plants (foliage), the fruit and the picked lettuce each move on their own (the growth stages part the fruit
+  from the plants, the harvest presses only the lettuce). Its size kind is a planted vegetable patch (`vegPlot`):
+  it is measured with its ripe crop, the tomatoes on 0.85 m stakes over the 0.45 m box.

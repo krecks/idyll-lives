@@ -145,8 +145,9 @@ pub fn slab(
         (0.0015, 0.88),
         (0.0045, 1.0),
     ]);
+    let edge = eased_edge(edge, t);
     let mut sections: Vec<Vec<P3>> = Vec::new();
-    for &(inset, f) in edge {
+    for &(inset, f) in &edge {
         let y = y_top - t + f * t;
         let outline = rounded_rect(
             w - 2.0 * inset,
@@ -162,6 +163,18 @@ pub fn slab(
         );
     }
     loft!(name, &sections, material = material, angle = 50)
+}
+
+/// A top's moulded `edge` ((inset, share of the thickness `t`), bottom to top) with its turn onto the top (and any
+/// other turning 60° or more but the bottom's) rounded, so it catches the light as an eased arris does.
+fn eased_edge(edge: &[(f64, f64)], t: f64) -> Vec<(f64, f64)> {
+    let mut prof: Vec<(f64, f64)> = edge.iter().map(|&(i, f)| (-i, f * t)).collect();
+    prof.push((-1.0, t)); // the top, running in
+    let eased = artkit::forms::eased(&prof, 0.002);
+    eased[..eased.len() - 1]
+        .iter()
+        .map(|&(o, h)| (-o, h / t))
+        .collect()
 }
 
 /// A round top `rad` across its radius, its top at `y_top`, `t` thick, moulded as `slab`.
@@ -184,7 +197,7 @@ pub fn round_slab(
         (0.0045, 1.0),
     ]);
     let mut prof = vec![(0.0, 0.0)];
-    prof.extend(edge.iter().map(|&(i, f)| (rad - i, f * t)));
+    prof.extend(eased_edge(edge, t).iter().map(|&(i, f)| (rad - i, f * t)));
     prof.push((0.0, t));
     turned(
         name,
@@ -213,24 +226,31 @@ pub fn sq_leg(
     at_top: Option<(f64, f64)>,
 ) -> Obj {
     let (xt, zt) = at_top.unwrap_or((x, z));
-    let mut rings = Vec::new();
+    // swept up from its foot (its grain, the UVs, along it: a splayed leg's box-laid UVs sheared), the profile its
+    // top's, scaled to the foot's
+    let mut points = Vec::new();
+    let mut scales = Vec::new();
     if foot != 0.0 {
-        rings.push((s_foot - 2.0 * foot, y0, x, z));
-        rings.push((s_foot, y0 + foot, x, z));
+        points.push((x, y0, z));
+        scales.push((s_foot - 2.0 * foot) / s_top);
+        points.push((x, y0 + foot, z));
     } else {
-        rings.push((s_foot, y0, x, z));
+        points.push((x, y0, z));
     }
-    rings.push((s_top, y1, xt, zt));
-    let sections: Vec<Vec<P3>> = rings
-        .iter()
-        .map(|&(s, y, cx, cz)| {
-            rounded_rect(s, s, r.min(s * 0.45), 1)
-                .iter()
-                .map(|&(u, v)| F.at(cx + u, y, cz + v))
-                .collect()
-        })
-        .collect();
-    loft!(name, &sections, material = material, angle = 50)
+    scales.push(s_foot / s_top);
+    points.push((xt, y1, zt));
+    scales.push(1.0);
+    fsweep!(
+        F,
+        name,
+        &points,
+        0.0,
+        material,
+        profile = rounded_rect(s_top, s_top, r.min(s_top * 0.45), 1),
+        up = (0, 1, 0),
+        scale = scales,
+        angle = 50
+    )
 }
 
 /// An apron rail `length` long and `h` high (its top at at.1), `t` thick, its lower edge arched up by `arch`
@@ -342,7 +362,7 @@ pub fn finish(name: &str) -> Vec<Obj> {
 }
 
 /// A curved panel `t` thick through a grid of game points (rows of the same length): a moulded shell, a bent back, a
-/// slatted seat. Its faces are shaded smooth.
+/// slatted seat. Its faces are shaded smooth, its rim a round bead.
 pub fn surface(
     name: &str,
     grid: &[Vec<(f64, f64, f64)>],
@@ -377,5 +397,67 @@ pub fn surface(
     solidify!(obj, t, offset = 0.0, use_even_offset = true);
     recalc_normals(obj); // the grid's winding may face either way: outwards
     obj.edit(|o| o.mesh.shade_smooth(angle));
+    // its rim rolled round, as a moulded or carved edge is: a bead the panel's thickness along its edge
+    let mut rim: Vec<(f64, f64, f64)> = grid[0].clone();
+    rim.extend(grid[1..].iter().map(|r| r[cols - 1]));
+    rim.extend(grid[rows - 1][..cols - 1].iter().rev());
+    rim.extend(grid[1..rows - 1].iter().rev().map(|r| r[0]));
+    fsweep!(
+        F,
+        format!("{name}_rim"),
+        &rim,
+        t / 2.0,
+        material,
+        closed = true,
+        verts = if t > 0.02 { 12 } else { 8 }
+    );
     obj
+}
+
+/// A padded board `w` × `h`, `t` thick, its middle at game `at`, bowed back by `bow` at the middle (its ends
+/// forward), leaning back `lean` degrees: a stuffed soft box (its edges and ends round), bent.
+#[allow(clippy::too_many_arguments)]
+pub fn bowed_pad(
+    name: &str,
+    w: f64,
+    h: f64,
+    t: f64,
+    at: (f64, f64, f64),
+    bow: f64,
+    lean: f64,
+    mat: Mat,
+) -> Obj {
+    let pad = artkit::soft!(
+        F,
+        name,
+        w,
+        h,
+        t,
+        at,
+        mat,
+        round = (t * 0.45).min(0.013),
+        flat = 2
+    );
+    let (c, s) = (cos(-lean.to_radians()), sin(-lean.to_radians()));
+    pad.edit(|o| {
+        let n = o.mesh.verts.len() as f64;
+        let mid = o.mesh.verts.iter().fold([0.0; 3], |m, v| {
+            [
+                m[0] + v.x as f64 / n,
+                m[1] + v.y as f64 / n,
+                m[2] + v.z as f64 / n,
+            ]
+        });
+        for v in &mut o.mesh.verts {
+            let x = (v.x as f64 - mid[0]) / (w / 2.0);
+            // bowed back (the kernel's y is the game's depth, backwards), then leant back about its middle
+            let (y, z) = (
+                v.y as f64 - mid[1] + bow * (1.0 - x * x),
+                v.z as f64 - mid[2],
+            );
+            v.y = (mid[1] + y * c - z * s) as f32;
+            v.z = (mid[2] + y * s + z * c) as f32;
+        }
+    });
+    pad
 }

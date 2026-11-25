@@ -7,6 +7,8 @@ import { homeLights, litAt, lotBuilding, lotLookBuilding, MOST_STOREYS, PALETTE,
 
 const flat = () => 0;
 const look = (use: LotLook['use'], roof: LotLook['roof'] = 'gable', n = 3): LotLook => ({ use, storeys: 2, roof, look: n });
+/** A far lot's house's one box (`HousePlanner.farLook`'s part): its walls to `to` m, its roof `rise` m over them. */
+const part = (box: [number, number, number, number], to: number, rise: number) => ({ box, from: 0, to, rise });
 
 describe("a lot's building closed", () => {
   test('its walls\' box exactly, along its longer side, from under the ground to its real storeys', () => {
@@ -38,14 +40,16 @@ describe("a lot's building closed", () => {
     expect(lotLookBuilding([0, 0, 10, 6], look('house', 'gable', 0), 1, 0, flat)).toEqual(a);
     expect(lotLookBuilding([20, 0, 30, 6], look('house', 'gable', 0), 1, 0, flat).wall).not.toEqual(a.wall);
     const palette = parseInt(PALETTE[0][1].slice(1, 3), 16) / 255;
-    expect(a.roofColor[0]).toBeLessThan(palette * 0.85);
-    expect(a.roofColor[0]).toBeGreaterThan(palette * 0.6);
+    expect(a.paint!.roof[0]).toBeLessThan(palette * 0.85);
+    expect(a.paint!.roof[0]).toBeGreaterThan(palette * 0.6);
+    // (Far off, as the roof's texture shows it: darker than painted.)
+    expect(a.roofColor[0]).toBeLessThan(a.paint!.roof[0]);
   });
 });
 
 describe("a far lot's house", () => {
   test('keeps its own look and box', () => {
-    const t = lotBuilding({ id: 3, chunk: 0, box: [10, 20, 18, 30], storeys: 2, wall: '#ECE6D8', roof: '#5C626A', shape: 'hip', rise: 2.4, pad: 0 }, flat);
+    const [t] = lotBuilding({ id: 3, chunk: 0, box: [10, 20, 18, 30], storeys: 2, wall: '#ECE6D8', roof: '#5C626A', shape: 'hip', parts: [part([10, 20, 18, 30], 6, 2.4)], pad: 0 }, flat);
     expect([t.cx, t.cz, t.w, t.d, t.top, t.rise, t.roof]).toEqual([14, 25, 10, 8, 6, 2.4, 'hip']);
     expect(t.uz).toBe(1);
   });
@@ -53,36 +57,39 @@ describe("a far lot's house", () => {
   test('on a hill stands on its pad, its walls from under its lowest corner', () => {
     // (The land rising 0.5 m a metre in x: its corners from 5 to 9 m; the pad at 7.2 m.)
     const slope = (x: number) => x * 0.5;
-    const t = lotBuilding({ id: 3, chunk: 0, box: [10, 20, 18, 30], storeys: 2, wall: '#ECE6D8', roof: '#5C626A', shape: 'hip', rise: 2.4, pad: 7.2 }, slope);
+    const [t] = lotBuilding({ id: 3, chunk: 0, box: [10, 20, 18, 30], storeys: 2, wall: '#ECE6D8', roof: '#5C626A', shape: 'hip', parts: [part([10, 20, 18, 30], 6, 2.4)], pad: 7.2 }, slope);
     expect(t.floor).toBe(7.2);
     expect(t.top).toBeCloseTo(13.2, 6);
     expect(t.base).toBeCloseTo(5 - 0.4, 6);
     // A pad under the lowest corner (cut into the hill): the walls from under the pad.
-    const cut = lotBuilding({ id: 3, chunk: 0, box: [10, 20, 18, 30], storeys: 1, wall: '#ECE6D8', roof: '#5C626A', shape: 'gable', rise: 2, pad: 4 }, slope);
+    const [cut] = lotBuilding({ id: 3, chunk: 0, box: [10, 20, 18, 30], storeys: 1, wall: '#ECE6D8', roof: '#5C626A', shape: 'gable', parts: [part([10, 20, 18, 30], 3, 2)], pad: 4 }, slope);
     expect([cut.floor, cut.top]).toEqual([4, 7]);
     expect(cut.base).toBeCloseTo(4 - 0.4, 6);
   });
 
   test('with a look, drawn from it: as tall as its real storeys, lit by its hours', () => {
-    const h = { id: 2, chunk: 0, box: [42.93, 4.93, 53.07, 14.07] as [number, number, number, number], storeys: 1, wall: '#ffffff', roof: '#000000', shape: 'gable' as const, rise: 2, pad: 0 };
-    const plain = lotBuilding(h, flat);
+    const h = { id: 2, chunk: 0, box: [42.93, 4.93, 53.07, 14.07] as [number, number, number, number], storeys: 1, wall: '#ffffff', roof: '#000000', shape: 'gable' as const, parts: [part([42.93, 4.93, 53.07, 14.07], 3, 2)], pad: 0 };
+    const [plain] = lotBuilding(h, flat);
     expect(plain.top).toBeCloseTo(3, 6);
-    const t = lotBuilding({ ...h, storeys: 2, look: { use: 'church', storeys: 2, roof: 'gable', look: 0 }, hours: { open: 540, close: 1080, days: 127 } }, flat);
+    // (A church: its tower beside it, its spire's top over its roof's.)
+    const [t, tower] = lotBuilding({ ...h, storeys: 2, look: { use: 'church', storeys: 2, roof: 'gable', look: 0 }, hours: { open: 540, close: 1080, days: 127 } }, flat);
     expect(t.top).toBeCloseTo(6, 6);
     expect([t.roof, t.style]).toEqual(['gable', STYLE.church[0]]);
+    expect(tower.roof).toBe('spire');
+    expect(tower.top).toBeGreaterThan(t.top + t.rise);
     expect(litAt(t, 600, 0)).toBe(t.lit);
     expect(litAt(t, 1200, 0)).toBeLessThan(t.lit);
     // (The church's own stone and slate.)
     expect(t.wall).not.toEqual(plain.wall);
     // A flats building: a home's lights, by the hour; a shop with flats over it, its flats' while it is closed.
-    const flats = lotBuilding({ ...h, storeys: 2, look: { use: 'flats', storeys: 2, roof: 'flat', look: 1 } }, flat);
+    const [flats] = lotBuilding({ ...h, storeys: 2, look: { use: 'flats', storeys: 2, roof: 'flat', look: 1 } }, flat);
     expect([flats.home, flats.style]).toEqual([true, STYLE.flats[0]]);
-    const mixed = lotBuilding({ ...h, storeys: 2, look: { use: 'shop', storeys: 2, roof: 'flat', look: 1 }, hours: { open: 540, close: 1080, days: 127 }, flats: true }, flat);
+    const [mixed] = lotBuilding({ ...h, storeys: 2, look: { use: 'shop', storeys: 2, roof: 'flat', look: 1 }, hours: { open: 540, close: 1080, days: 127 }, flats: true }, flat);
     expect(mixed.flats).toBe(true);
     expect(litAt(mixed, 20 * 60, 0)).toBeCloseTo(STYLE.flats[1]);
     expect(litAt(mixed, 3 * 60, 0)).toBeLessThan(STYLE.flats[1] * 0.2);
     // (One storey: no flats over it.)
-    expect(lotBuilding({ ...h, look: { use: 'shop', storeys: 1, roof: 'flat', look: 1 }, flats: true }, flat).flats).toBeUndefined();
+    expect(lotBuilding({ ...h, look: { use: 'shop', storeys: 1, roof: 'flat', look: 1 }, flats: true }, flat)[0].flats).toBeUndefined();
   });
 });
 
@@ -120,9 +127,9 @@ describe('lights', () => {
     const hall = lotLookBuilding([0, 0, 10, 6], look('hall'), 2, 0, flat);
     expect(litAt(hall, 2 * 60, 0)).toBe(hall.lit);
     // A lot's house far off: lit only while someone is up in it.
-    const lot = { id: 3, chunk: 0, box: [10, 20, 18, 30] as const, storeys: 2, wall: '#ECE6D8', roof: '#5C626A', shape: 'hip' as const, rise: 2.4, pad: 0 };
-    expect(lotBuilding(lot, flat, true).lit).toBeGreaterThan(0.3);
-    expect(lotBuilding(lot, flat, false).lit).toBe(0);
+    const lot = { id: 3, chunk: 0, box: [10, 20, 18, 30] as const, storeys: 2, wall: '#ECE6D8', roof: '#5C626A', shape: 'hip' as const, parts: [part([10, 20, 18, 30], 6, 2.4)], pad: 0 };
+    expect(lotBuilding(lot, flat, true)[0].lit).toBeGreaterThan(0.3);
+    expect(lotBuilding(lot, flat, false)[0].lit).toBe(0);
   });
 });
 

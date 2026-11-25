@@ -159,6 +159,8 @@ const SURFACE_TONE: Record<string, V3> = {
   [HOUSE_MATERIALS.interior]: [0.7495, 0.7495, 0.7495],
   [HOUSE_MATERIALS.panelling]: [0.8002, 0.8002, 0.8002],
   [HOUSE_MATERIALS.floorTile]: [0.692, 0.6303, 0.5662],
+  // (The sidewalks' upright faces, drawn plain: `street.ts` `WalkGeo`.)
+  'material.sidewalk': [0.5711, 0.5488, 0.5055],
 };
 
 const toLinear = (v: number) => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
@@ -557,6 +559,8 @@ export interface SilhouetteSpec {
   cover?: number;
   /** Storeys the house has (absent: one). */
   storeys?: number;
+  /** Each storey's boxes of walls (`HousePlanner.storeyBoxes`; absent: the box on every storey). */
+  boxes?: FarPlot['boxes'];
   /** Someone's home: its window glass is kept apart, lit only while someone is up (see `SilhouettePlan.homes`). */
   lived?: boolean;
 }
@@ -715,14 +719,107 @@ export function houseScheme(x: number, z: number): HouseScheme {
   };
 }
 
-/** A house as its far versions are asked for (`HousePlanner.farHouse`, `farLook`): its lot's place (its look's), its box of walls, the roof the player chose, its storeys, and the covering most of its outside wears (`exteriorCover`). */
+/** A box of wall centre lines (grid lines: x0, z0, x1, z1). */
+export type WallBox = readonly [number, number, number, number];
+
+/**
+ * A house as its far versions are asked for (`HousePlanner.farHouse`, `farLook`): its lot's place (its look's), its
+ * box of walls, the roof the player chose, its storeys, the covering most of its outside wears (`exteriorCover`), each
+ * storey's boxes (`storeyBoxes`; absent: the box of walls on every storey) and its garage.
+ */
 export interface FarPlot {
   x: number;
   z: number;
-  house: readonly [number, number, number, number];
+  house: WallBox;
   roof?: [number, number];
   storeys?: number;
   cover?: number;
+  boxes?: readonly (readonly WallBox[])[];
+  garage?: SilhouetteSpec['garage'];
+}
+
+/** A part of a house as the town view stands it (`HousePlanner.farLook`): its outer box (m), from and to (m over its floor), its roof's rise (m), and its own wall colour (a garage's). */
+export interface FarPart {
+  box: [number, number, number, number];
+  from: number;
+  to: number;
+  rise: number;
+  wall?: string;
+}
+
+/** How far a flat roof's fascia reaches past the walls (m), as the far versions draw it; a garage's eaves' overhang (m), as `silhouettes` builds it. */
+const FLAT_FASCIA = 0.1;
+const GARAGE_OVERHANG = 0.3;
+
+/** The top of a roof of `s`'s over `box` (wall centre lines) on walls `h` m high: a flat roof's fascia; a pitched one (`addRoof`) rises over half the shorter span and its eaves, capped. */
+function topOver(s: RoofShape, [x0, z0, x1, z1]: WallBox, h: number): number {
+  if (s.shape === 'flat') return h + 0.2;
+  return h + (Math.min(x1 - x0, z1 - z0) / 2 + T) * s.pitch + ROOF_THICKNESS + 0.07;
+}
+
+/**
+ * A far version's roof of `s`'s over `box` (wall centre lines) on walls `h` m high, into `geo` in the plain finish: a
+ * flat one's fascia, or slopes from eaves where the house's are (as far out as its `overhang` and its `gutter`, as
+ * far under the walls' top as the pitch brings them) to its ridge along the longer side, hipped at its ends where the
+ * house's is (a square plan's meet in a point), else gable ends in `gable`.
+ */
+function farRoof(geo: Geo, s: HouseScheme & RoofShape, box: WallBox, h: number, overhang: number, gutter: number, gable: string): void {
+  const finish = 0.4;
+  const [a0, b0, a1, b1] = [box[0] - T, box[1] - T, box[2] + T, box[3] + T];
+  geo.color(asDrawn(s.roof, HOUSE_MATERIALS.roof), finish);
+  if (s.shape === 'flat') {
+    geo.box(a0 - FLAT_FASCIA, h, b0 - FLAT_FASCIA, a1 + FLAT_FASCIA, h + 0.2, b1 + FLAT_FASCIA, 'ny');
+    return;
+  }
+  const top = topOver(s, box, h);
+  const e = overhang + gutter;
+  const eaves = h - overhang * s.pitch + ROOF_THICKNESS;
+  // Along the ridge (u) and across it (v).
+  const alongX = a1 - a0 >= b1 - b0;
+  const [u0, u1, v0, v1] = alongX ? [a0, a1, b0, b1] : [b0, b1, a0, a1];
+  const P = (u: number, y: number, v: number): V3 => (alongX ? [u, y, v] : [v, y, u]);
+  const N = (u: number, v: number): V3 => (alongX ? [u, 1, v] : [v, 1, u]);
+  const [mu, mv] = [(u0 + u1) / 2, (v0 + v1) / 2];
+  const run = s.hip ? (v1 - v0) / 2 + e : 0;
+  const [r0, r1] = [Math.min(u0 - e + run, mu), Math.max(u1 + e - run, mu)];
+  for (const side of [-1, 1]) {
+    const v = side < 0 ? v0 - e : v1 + e;
+    const pts = [P(u0 - e, eaves, v), P(u1 + e, eaves, v), P(r1, top, mv), ...(r1 > r0 + 1e-6 ? [P(r0, top, mv)] : [])];
+    geo.poly(pts, facing(pts[0], pts[1], pts[2], N(0, side)));
+  }
+  if (s.hip) {
+    for (const side of [-1, 1]) {
+      const u = side < 0 ? u0 - e : u1 + e;
+      const pts = [P(u, eaves, v0 - e), P(u, eaves, v1 + e), P(side < 0 ? r0 : r1, top, mv)];
+      geo.poly(pts, facing(pts[0], pts[1], pts[2], N(side, 0)));
+    }
+    return;
+  }
+  geo.color(gable, finish);
+  for (const side of [-1, 1]) {
+    const u = side < 0 ? u0 : u1;
+    geo.poly([P(u, h, v0), P(u, h, v1), P(u, top, mv)], alongX ? [side, 0, 0] : [0, 0, side]);
+  }
+}
+
+/**
+ * A house's boxes as its far versions stand them (`FarPlot.boxes`): each from the storey it starts on (`from`) to the
+ * storey past the last it stands on unchanged (`to`), its roof on there; absent, the box of walls on every storey.
+ * A plain house is one; an L, or a storey on part of the one under it, more.
+ */
+function stacks(plot: Pick<FarPlot, 'house' | 'storeys' | 'boxes'>): { box: WallBox; from: number; to: number }[] {
+  const boxes = plot.boxes?.some((list) => list.length) ? plot.boxes : Array.from({ length: plot.storeys ?? 1 }, () => [plot.house]);
+  const has = (k: number, box: WallBox) => k >= 0 && k < boxes.length && boxes[k].some((b) => b.every((v, i) => v === box[i]));
+  const out: { box: WallBox; from: number; to: number }[] = [];
+  boxes.forEach((list, k) => {
+    for (const box of list) {
+      if (has(k - 1, box)) continue;
+      let to = k + 1;
+      while (has(to, box)) to++;
+      out.push({ box, from: k, to });
+    }
+  });
+  return out;
 }
 
 /** A Build mode preview laid in a covering's look (`HousePlanner.coverPreview`, `floorPreview`): one part, a hair proud of what it covers. */
@@ -2054,11 +2151,20 @@ export class HousePlanner {
    */
   roofTop(plot: FarPlot): number {
     const s = this.schemeWith(houseScheme(plot.x, plot.z), plot.roof);
-    const [x0, z0, x1, z1] = plot.house;
-    const walls = WALL_HEIGHT * (plot.storeys ?? 1);
-    // A flat roof's fascia; a pitched one (`addRoof`) rises over half the shorter span and its eaves, capped.
-    if (s.shape === 'flat') return walls + 0.2;
-    return walls + (Math.min(x1 - x0, z1 - z0) / 2 + T) * s.pitch + ROOF_THICKNESS + 0.07;
+    return Math.max(...stacks(plot).map(({ box, to }) => topOver(s, box, WALL_HEIGHT * to)));
+  }
+
+  /**
+   * Each storey's boxes of walls (`FarPlot.boxes`): its rooms inside the house's box (`house`) covered with a few
+   * rectangles (`indoorRects`, as the house roofs a storey), for its far versions to stand an L, or a storey on part
+   * of the one under it, as the house does.
+   */
+  storeyBoxes(world: Pick<WorldStructure, 'rooms' | 'width'> & StoreyLayout, house: WallBox, storeys = 1): WallBox[][] {
+    const [x0, z0, x1, z1] = house;
+    return Array.from({ length: storeys }, (_, k) => {
+      const dz = storeyRow(world, k);
+      return indoorRects((x, z) => world.rooms[(z + dz) * world.width + x] ?? 0, x0, z0, x1, z1).map((r): WallBox => [r.x0, r.z0, r.x1, r.z1]);
+    });
   }
 
   /**
@@ -2110,78 +2216,57 @@ export class HousePlanner {
   }
 
   /**
-   * A house far off (the street's far LOD, past the chunks streamed in): its box of walls and its roof as
-   * `silhouettes` tops it (`roofTop`: a ridge along the longer side, hipped at its ends where the house's is, or
-   * flat), into `geo` in the plain finish (rough, not metal), in the colours its textured walls and roof show from
-   * far off (`asDrawn`). 14 triangles a house (a flat one 18).
+   * A house far off (the street's far LOD, past the chunks streamed in): its boxes of walls (`stacks`: an L, a storey on
+   * part of the one under it, as the house stands them) each with its roof as `silhouettes` tops it (`topOver`: a ridge
+   * along the longer side, hipped at its ends where the house's is, or flat), and its garage, into `geo` in the plain
+   * finish (rough, not metal), in the colours its textured walls and roof show from far off (`asDrawn`). 14 triangles
+   * a box (a flat one 18).
    */
   farHouse(geo: Geo, plot: FarPlot): void {
     const s = this.schemeWith(houseScheme(plot.x, plot.z), plot.roof);
-    const [x0, z0, x1, z1] = plot.house;
-    const [a0, b0, a1, b1] = [x0 - T, z0 - T, x1 + T, z1 + T];
-    const h = WALL_HEIGHT * (plot.storeys ?? 1);
     const finish = 0.4;
     const ext = this.exterior(s, plot.cover);
     const wall = asDrawn(ext.color, ext.key);
-    // (A gable end is in the house's own cladding whatever its walls wear: `build`'s `gables`.)
+    // (A gable end is in the house's own cladding whatever its walls wear: `build`'s `gables`; a garage's walls too.)
     const gable = asDrawn(s.wall, s.brick ? HOUSE_MATERIALS.brick : HOUSE_MATERIALS.siding);
-    geo.color(wall, finish).box(a0, 0, b0, a1, h, b1, 'ny py');
-    geo.color(asDrawn(s.roof, HOUSE_MATERIALS.roof), finish);
-    if (s.shape === 'flat') {
-      geo.box(a0 - 0.1, h, b0 - 0.1, a1 + 0.1, h + 0.2, b1 + 0.1, 'ny');
-      return;
+    for (const { box, from, to } of stacks(plot)) {
+      const [x0, z0, x1, z1] = box;
+      geo.color(wall, finish).box(x0 - T, from * WALL_HEIGHT, z0 - T, x1 + T, to * WALL_HEIGHT, z1 + T, 'ny py');
+      farRoof(geo, s, box, to * WALL_HEIGHT, OVERHANG, GUTTER.wide, gable);
     }
-    const top = this.roofTop(plot);
-    // Its eaves where the house's are: as far out as its overhang and its gutters, and as far under the walls' top
-    // as the pitch brings them there.
-    const e = OVERHANG + GUTTER.wide;
-    const eaves = h - OVERHANG * s.pitch + ROOF_THICKNESS;
-    // Along the ridge (u) and across it (v); a hip's ends come in as far as its sides do (a square plan's meet in a point).
-    const alongX = a1 - a0 >= b1 - b0;
-    const [u0, u1, v0, v1] = alongX ? [a0, a1, b0, b1] : [b0, b1, a0, a1];
-    const P = (u: number, y: number, v: number): V3 => (alongX ? [u, y, v] : [v, y, u]);
-    const N = (u: number, v: number): V3 => (alongX ? [u, 1, v] : [v, 1, u]);
-    const [mu, mv] = [(u0 + u1) / 2, (v0 + v1) / 2];
-    const run = s.hip ? (v1 - v0) / 2 + e : 0;
-    const [r0, r1] = [Math.min(u0 - e + run, mu), Math.max(u1 + e - run, mu)];
-    for (const side of [-1, 1]) {
-      const v = side < 0 ? v0 - e : v1 + e;
-      const pts = [P(u0 - e, eaves, v), P(u1 + e, eaves, v), P(r1, top, mv), ...(r1 > r0 + 1e-6 ? [P(r0, top, mv)] : [])];
-      geo.poly(pts, facing(pts[0], pts[1], pts[2], N(0, side)));
-    }
-    if (s.hip) {
-      for (const side of [-1, 1]) {
-        const u = side < 0 ? u0 - e : u1 + e;
-        const pts = [P(u, eaves, v0 - e), P(u, eaves, v1 + e), P(side < 0 ? r0 : r1, top, mv)];
-        geo.poly(pts, facing(pts[0], pts[1], pts[2], N(side, 0)));
-      }
-      return;
-    }
-    geo.color(gable, finish);
-    for (const side of [-1, 1]) {
-      const u = side < 0 ? u0 : u1;
-      geo.poly([P(u, h, v0), P(u, h, v1), P(u, top, mv)], alongX ? [side, 0, 0] : [0, 0, side]);
+    const g = plot.garage;
+    if (g) {
+      geo.color(gable, finish).box(g.x0 - T, 0, g.z0 - T, g.x1 + T, GARAGE_HEIGHT, g.z1 + T, 'ny py');
+      farRoof(geo, s, [g.x0, g.z0, g.x1, g.z1], GARAGE_HEIGHT, GARAGE_OVERHANG, 0, gable);
     }
   }
 
   /**
-   * How a house far off looks (the town view's far lots, `pc/townView.ts`): its walls' outer box (and its gutters'), its wall and
-   * roof colours as they show from far off (`asDrawn`), and its roof's shape and rise over its walls (as `farHouse`
-   * and `roofTop` have them).
+   * How a house far off looks (the town view's far lots, `pc/townView.ts`): its wall and roof colours as they show from
+   * far off (`asDrawn`), its roof's shape, its walls' outer box, and its parts as `farHouse` stands them: each box's
+   * outer box (and its gutters', or a flat roof's fascia's), from and to (m over its floor) and its roof's rise; its
+   * garage's in its own cladding.
    */
-  farLook(plot: FarPlot): { box: [number, number, number, number]; wall: string; roof: string; shape: 'gable' | 'hip' | 'flat'; rise: number } {
+  farLook(plot: FarPlot): { box: [number, number, number, number]; wall: string; roof: string; shape: 'gable' | 'hip' | 'flat'; parts: FarPart[] } {
     const s = this.schemeWith(houseScheme(plot.x, plot.z), plot.roof);
-    const [x0, z0, x1, z1] = plot.house;
-    const walls = WALL_HEIGHT * (plot.storeys ?? 1);
     const ext = this.exterior(s, plot.cover);
-    // (A pitched roof's box a gutter's width wider each side: from the town view its roof covers what the house's does with its gutters on.)
-    const g = s.shape === 'flat' ? 0 : GUTTER.wide;
-    return { box: [x0 - T - g, z0 - T - g, x1 + T + g, z1 + T + g], wall: asDrawn(ext.color, ext.key), roof: asDrawn(s.roof, HOUSE_MATERIALS.roof), shape: s.shape, rise: Math.max(0.2, this.roofTop(plot) - walls) };
+    // (A pitched roof's box a gutter's width wider each side, a flat one's its fascia's: from the town view its roof
+    // covers what the house's does.)
+    const g = s.shape === 'flat' ? FLAT_FASCIA : GUTTER.wide;
+    const outer = ([x0, z0, x1, z1]: WallBox, out = g): [number, number, number, number] => [x0 - T - out, z0 - T - out, x1 + T + out, z1 + T + out];
+    const parts: FarPart[] = stacks(plot).map(({ box, from, to }) => ({ box: outer(box), from: from * WALL_HEIGHT, to: to * WALL_HEIGHT, rise: Math.max(0.2, topOver(s, box, 0)) }));
+    const garage = plot.garage;
+    if (garage) {
+      const box: WallBox = [garage.x0, garage.z0, garage.x1, garage.z1];
+      parts.push({ box: outer(box, s.shape === 'flat' ? FLAT_FASCIA : 0), from: 0, to: GARAGE_HEIGHT, rise: Math.max(0.2, topOver(s, box, 0)), wall: asDrawn(s.wall, s.brick ? HOUSE_MATERIALS.brick : HOUSE_MATERIALS.siding) });
+    }
+    return { box: outer(plot.house), wall: asDrawn(ext.color, ext.key), roof: asDrawn(s.roof, HOUSE_MATERIALS.roof), shape: s.shape, parts };
   }
 
   /**
-   * Neighbouring houses as dressed boxes: the house's own doors and windows where they lie on
-   * the box outline (framed, with muntins, curtains and shutters), corner boards, a porch with a
+   * Neighbouring houses as dressed boxes (each storey's, `SilhouetteSpec.boxes`, as the far versions stand them),
+   * each under its roof: the house's own doors and windows where they lie on a box's outline with the
+   * open air outside (framed, with muntins, curtains and shutters), corner boards, a porch with a
    * gabled canopy over the front door (`porchDoors`), and a garage at the end of the driveway (the
    * viewed lot's house only its garage and porch, `dressingOnly`). No chimney: the house the game
    * draws on a lot in view has none, and one on its roof from across the street went as the player
@@ -2202,15 +2287,16 @@ export class HousePlanner {
     const opened = new Set(openings.map((o) => `${o.axis}:${o.x}:${o.z}`));
     const H = WALL_HEIGHT;
 
-    /** Plinth, siding/brick, frieze and corner boards of a box of wall centre lines. */
-    const shell = (walls: Geo, x0: number, z0: number, x1: number, z1: number, h: number) => {
+    /** Plinth (on the ground), siding/brick, frieze and corner boards of a box of wall centre lines from `y0` up to `h`. */
+    const shell = (walls: Geo, x0: number, z0: number, x1: number, z1: number, h: number, y0 = 0) => {
       const [a0, b0, a1, b1] = [x0 - T, z0 - T, x1 + T, z1 + T];
-      walls.box(a0, PLINTH, b0, a1, h, b1, 'ny py');
-      stone.box(a0 - 0.03, 0, b0 - 0.03, a1 + 0.03, PLINTH, b1 + 0.03, 'ny');
+      const foot = y0 > 0 ? y0 : PLINTH;
+      walls.box(a0, foot, b0, a1, h, b1, 'ny py');
+      if (y0 <= 0) stone.box(a0 - 0.03, 0, b0 - 0.03, a1 + 0.03, PLINTH, b1 + 0.03, 'ny');
       trim.box(a0 - 0.02, h - 0.2, b0 - 0.02, a1 + 0.02, h, b1 + 0.02, 'ny');
       for (const [cx, cz, sx, sz] of [[a0, b0, -1, -1], [a1, b0, 1, -1], [a0, b1, -1, 1], [a1, b1, 1, 1]] as const) {
-        trim.box(Math.min(cx, cx - sx * 0.13), PLINTH, Math.min(cz, cz + sz * 0.025), Math.max(cx, cx - sx * 0.13), h - 0.2, Math.max(cz, cz + sz * 0.025), 'ny');
-        trim.box(Math.min(cx, cx + sx * 0.025), PLINTH, Math.min(cz, cz - sz * 0.13), Math.max(cx, cx + sx * 0.025), h - 0.2, Math.max(cz, cz - sz * 0.13), 'ny');
+        trim.box(Math.min(cx, cx - sx * 0.13), foot, Math.min(cz, cz + sz * 0.025), Math.max(cx, cx - sx * 0.13), h - 0.2, Math.max(cz, cz + sz * 0.025), 'ny');
+        trim.box(Math.min(cx, cx + sx * 0.025), foot, Math.min(cz, cz - sz * 0.13), Math.max(cx, cx + sx * 0.025), h - 0.2, Math.max(cz, cz - sz * 0.13), 'ny');
       }
     };
 
@@ -2219,7 +2305,7 @@ export class HousePlanner {
       walls.color(s.wall);
       shell(walls, g.x0, g.z0, g.x1, g.z1, GARAGE_HEIGHT);
       roof.color(s.roof);
-      addRoofShaped(g, s, roof, trim, walls, GARAGE_HEIGHT, 0.3);
+      addRoofShaped(g, s, roof, trim, walls, GARAGE_HEIGHT, GARAGE_OVERHANG);
       // Sectional door on the street side (whichever wall that is), with a coach lamp beside it.
       const [fx, fz] = g.door ?? b.front;
       const axis = fz ? 'h' : 'v';
@@ -2264,16 +2350,16 @@ export class HousePlanner {
       const panes = b.lived ? new Geo() : glass;
       if (b.lived) homes.push({ spec: b, panes });
       const curtain = pick(CURTAINS, b.x0, b.z0, 7);
-      const tall = H * (b.storeys ?? 1);
+      // Its boxes as the far versions stand them (`stacks`: an L, a storey on part of the one under it).
+      const boxes = stacks({ house: [b.x0, b.z0, b.x1, b.z1], storeys: b.storeys, boxes: b.boxes });
       // Its walls in the covering most of its outside wears (a player's paint or cladding), else its own look. The
       // street has brick and siding to draw in: another finish is drawn on the siding, in the colour that shows there
       // as the covering's does on its own surface.
       const ext = this.exterior(s, b.cover);
       const clad = ext.key === HOUSE_MATERIALS.brick ? brick : siding;
       clad.color(ext.key === HOUSE_MATERIALS.brick || ext.key === HOUSE_MATERIALS.siding ? ext.color : asDrawn(ext.color, ext.key, HOUSE_MATERIALS.siding));
-      shell(clad, b.x0, b.z0, b.x1, b.z1, tall);
+      for (const { box, from, to } of boxes) shell(clad, ...box, to * H, from * H);
       walls.color(s.wall);
-      const [x0, z0, x1, z1] = [b.x0 - T, b.z0 - T, b.x1 + T, b.z1 + T];
       for (const lot of openings) {
         // Openings upstairs: on the same face, a storey higher.
         // (Nothing of the basement shows from the street.)
@@ -2282,17 +2368,17 @@ export class HousePlanner {
         const o = k && layout ? { ...lot, z: lot.z - storeyRow(layout, k) } : lot;
         const SILL = SILL0 + k * H;
         const HEAD = HEAD0 + k * H;
-        // Which face of the box the opening lies on (if any).
-        const side =
-          o.axis === 'h'
-            ? o.x >= b.x0 && o.x < b.x1 && (o.z === b.z0 || o.z === b.z1)
-              ? { plane: o.z === b.z0 ? z0 : z1, n: [0, 0, o.z === b.z0 ? -1 : 1] as V3, a: o.x }
-              : null
-            : o.z >= b.z0 && o.z < b.z1 && (o.x === b.x0 || o.x === b.x1)
-              ? { plane: o.x === b.x0 ? x0 : x1, n: [o.x === b.x0 ? -1 : 1, 0, 0] as V3, a: o.z }
-              : null;
+        // Which face of its storey's boxes the opening lies on (if any), with the open air outside it.
+        const standing = boxes.filter((t) => t.from <= k && k < t.to).map((t) => t.box);
+        const indoors = (tx: number, tz: number) => standing.some(([x0, z0, x1, z1]) => tx >= x0 && tx < x1 && tz >= z0 && tz < z1);
+        let side: { plane: number; n: V3; a: number; box: WallBox } | null = null;
+        for (const box of standing) {
+          const [bx0, bz0, bx1, bz1] = box;
+          if (o.axis === 'h' && o.x >= bx0 && o.x < bx1 && (o.z === bz0 || o.z === bz1) && !indoors(o.x, o.z === bz0 ? o.z - 1 : o.z)) side = { plane: o.z === bz0 ? bz0 - T : bz1 + T, n: [0, 0, o.z === bz0 ? -1 : 1], a: o.x, box };
+          if (o.axis === 'v' && o.z >= bz0 && o.z < bz1 && (o.x === bx0 || o.x === bx1) && !indoors(o.x === bx0 ? o.x - 1 : o.x, o.z)) side = { plane: o.x === bx0 ? bx0 - T : bx1 + T, n: [o.x === bx0 ? -1 : 1, 0, 0], a: o.z, box };
+        }
         if (!side) continue;
-        const { plane, n, a } = side;
+        const { plane, n, a, box } = side;
         const P = (u: number, y: number, d: number): V3 => (o.axis === 'h' ? [u, y, plane + n[2] * d] : [plane + n[0] * d, y, u]);
         // (Its back against the wall isn't drawn.)
         const back = o.axis === 'h' ? (n[2] > 0 ? 'nz' : 'pz') : n[0] > 0 ? 'nx' : 'px';
@@ -2320,8 +2406,8 @@ export class HousePlanner {
           if (s.shutters) {
             const step = (d: number) => (o.axis === 'h' ? `h:${o.x + d}:${o.z}` : `v:${o.x}:${o.z + d}`);
             trim.color(s.accent);
-            if (!opened.has(step(-1)) && a - 1 >= (o.axis === 'h' ? b.x0 : b.z0)) board(g0 - f - 0.36, g0 - f - 0.02, SILL - 0.02, HEAD + 0.04, 0.035);
-            if (!opened.has(step(1)) && a + 1 < (o.axis === 'h' ? b.x1 : b.z1)) board(g1 + f + 0.02, g1 + f + 0.36, SILL - 0.02, HEAD + 0.04, 0.035);
+            if (!opened.has(step(-1)) && a - 1 >= (o.axis === 'h' ? box[0] : box[1])) board(g0 - f - 0.36, g0 - f - 0.02, SILL - 0.02, HEAD + 0.04, 0.035);
+            if (!opened.has(step(1)) && a + 1 < (o.axis === 'h' ? box[2] : box[3])) board(g1 + f + 0.02, g1 + f + 0.36, SILL - 0.02, HEAD + 0.04, 0.035);
             trim.color(TRIM);
           }
         } else {
@@ -2350,7 +2436,8 @@ export class HousePlanner {
         for (let k = 0; k < (b.storeys ?? 1); k++) if (opened.has(`${axis}:${x}:${z + (k && layout ? storeyRow(layout, k) : 0)}`)) return null;
         return 0.1;
       };
-      addRoofShaped({ x0: b.x0, z0: b.z0, x1: b.x1, z1: b.z1 }, s, roof, trim.color(TRIM), walls, tall, OVERHANG, { foot });
+      // (A box a storey up has none: its pipe would come down through the roof under it.)
+      for (const { box, from, to } of boxes) addRoofShaped({ x0: box[0], z0: box[1], x1: box[2], z1: box[3] }, s, roof, trim.color(TRIM), walls, to * H, OVERHANG, { foot: from ? () => null : foot });
       if (b.garage) garage(b, b.garage, s, walls);
     }
     const M = HOUSE_MATERIALS;

@@ -6,7 +6,7 @@ use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::math::{P3, PI, TAU, cos, cosd, degrees, pow, radians, sin, sind};
 use artkit::motion::{PathKey, path};
-use artkit::parts::{hinged, join, new_parts};
+use artkit::parts::{aside, hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{fbox, fextrude, fsphere, fsweep, leaf, loft, revolve, ring, settle, soft, squash};
@@ -141,7 +141,10 @@ pub fn steam_mop_dock() -> Vec<Obj> {
                 None,
             );
         }
-        // a bucket with its bail handle, spare pads stacked on the floor
+    });
+    join(&still, "body", Some(P3::from((0, 0, 0))));
+    // a bucket with its bail handle, spare pads stacked on the floor: drawn, not the dock's size
+    let floor = new_parts(|| {
         revolve!(
             "bucket",
             &[
@@ -200,7 +203,7 @@ pub fn steam_mop_dock() -> Vec<Obj> {
             pinch = 0.0
         ); // (askew: a corner is the model's outermost point)
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    aside(&floor, "floor");
     // The mop: pole, grip, water tank, head and pad, its origin at its head's foot: hidden while it's used (`mop_off`),
     // the game drawing it in the resident's hands (content `held`), pushed over the floor.
     let (x, y, z) = MOP;
@@ -301,11 +304,12 @@ pub fn steam_mop_dock() -> Vec<Obj> {
 }
 
 // --- the robot vacuum and dock (1x1): a self-emptying dock against the wall, the robot docked on a round rug ---
-const ROBOT: (f64, f64) = (0.0, -0.02); // the docked robot's middle (x, depth)
+const ROBOT: (f64, f64) = (0.0, -0.07); // the docked robot's middle (x, depth), against the dock
 
 pub fn robot_vacuum_dock() -> Vec<Obj> {
     let f = &GameFrame::new(0.0);
-    let still = new_parts(|| {
+    // the rug the robot docks on and a plant beside the dock: drawn, not the dock's size
+    let floor = new_parts(|| {
         revolve!(
             "rug",
             &[
@@ -335,8 +339,10 @@ pub fn robot_vacuum_dock() -> Vec<Obj> {
             material = M.rug_inner,
             segments = 32
         );
+    });
+    let still = new_parts(|| {
         // the dock: a rounded tower, its bin window and the bin behind it, a ramp out over the rug
-        let b = f.at(0, 0, WALL + 0.12);
+        let b = f.at(0, 0, WALL + 0.095);
         let sections: Vec<Vec<P3>> = [
             (0.0, 0.98),
             (0.01, 1.0),
@@ -349,7 +355,7 @@ pub fn robot_vacuum_dock() -> Vec<Obj> {
         .map(|&(h, k)| {
             ring!(
                 0.19 * k,
-                0.12 * k,
+                0.095 * k,
                 z = b.z + h,
                 verts = 24,
                 square = 4,
@@ -364,7 +370,7 @@ pub fn robot_vacuum_dock() -> Vec<Obj> {
             0.28,
             0.2,
             0.014,
-            (0, 0.3, WALL + 0.238),
+            (0, 0.3, WALL + 0.188),
             M.porthole,
             round = 0.02,
             round_segments = 2
@@ -375,7 +381,7 @@ pub fn robot_vacuum_dock() -> Vec<Obj> {
             0.2,
             0.12,
             0.006,
-            (0, 0.3, WALL + 0.244),
+            (0, 0.3, WALL + 0.194),
             M.steel,
             round = 0.012,
             round_segments = 1
@@ -386,7 +392,7 @@ pub fn robot_vacuum_dock() -> Vec<Obj> {
             0.06,
             0.015,
             0.008,
-            (0, 0.415, WALL + 0.24),
+            (0, 0.415, WALL + 0.19),
             M.trim,
             bevel = 0.003,
             bevel_segments = 1
@@ -395,10 +401,10 @@ pub fn robot_vacuum_dock() -> Vec<Obj> {
             f,
             "ramp",
             &[
-                (-0.17, WALL + 0.24),
-                (0.17, WALL + 0.24),
-                (0.17, WALL + 0.34),
-                (-0.17, WALL + 0.34)
+                (-0.17, WALL + 0.19),
+                (0.17, WALL + 0.19),
+                (0.17, WALL + 0.29),
+                (-0.17, WALL + 0.29)
             ],
             0.02,
             (0, 0.024, 0),
@@ -411,11 +417,14 @@ pub fn robot_vacuum_dock() -> Vec<Obj> {
             f,
             "led",
             0.01,
-            (0.13, 0.42, WALL + 0.24),
+            (0.13, 0.42, WALL + 0.19),
             M.led,
             segments = 8,
             rings = 4
         );
+    });
+    join(&still, "body", Some(P3::from((0, 0, 0))));
+    let plant = new_parts(|| {
         // a little plant beside the dock
         revolve!(
             "plant_pot",
@@ -423,7 +432,9 @@ pub fn robot_vacuum_dock() -> Vec<Obj> {
                 (0.0, 0.0),
                 (0.07, 0.0),
                 (0.09, 0.19),
-                (0.094, 0.2),
+                (0.0935, 0.1955), // (its lip rounded)
+                (0.0935, 0.1985),
+                (0.091, 0.2005),
                 (0.08, 0.2),
                 (0.07, 0.18),
                 (0.0, 0.18)
@@ -452,7 +463,7 @@ pub fn robot_vacuum_dock() -> Vec<Obj> {
             );
         }
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    aside(&[floor, plant].concat(), "floor");
     // The robot: a disc with a teal bumper, its lid's seam, the lidar turret, a front sensor and a side brush:
     // `vacuum_round` (a loop) drives it out of its dock, round a circle in front of it, turning as it goes, and back in.
     let (x, z) = ROBOT;

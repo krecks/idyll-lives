@@ -26,7 +26,7 @@ pub fn family() -> Family {
             Model::new(
                 "neighbourlyOven",
                 bake::neighbourly_oven,
-                (1.832, 1.717, 0.640),
+                (1.832, 1.08, 0.640),
             )
             .key("model.kind.neighbourlyOven")
             // the door drops while the dish goes in, then shuts for the bake (`hold`). Keyed by the bake step's
@@ -38,7 +38,7 @@ pub fn family() -> Family {
                 ("towel", "Fabric"),
                 ("cabinet", "Cupboards"),
             ]),
-            Model::new("givingJar", bake::giving_jar, (0.641, 1.32, 0.655))
+            Model::new("givingJar", bake::giving_jar, (0.44, 1.32, 0.44))
                 .key("model.kind.givingJar")
                 .centre(0.101, 0.057)
                 .motions(json!({"uses": {"donate": "coin"}}))
@@ -55,7 +55,7 @@ pub fn family() -> Family {
             Model::new(
                 "welcomeTeaTable",
                 home::welcome_tea_table,
-                (1.94, 0.499, 0.864),
+                (0.403, 0.501, 0.56),
             )
             .key("model.kind.welcomeTeaTable")
             .centre(0.0, -0.005)

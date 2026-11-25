@@ -3,35 +3,14 @@
 
 use super::M;
 use super::common::{frets, guitar_stand, lean, off_stand, strings};
-use artkit::forms::{rounded_rect, smooth_outline};
+use artkit::forms::{inset, rounded_rect, smooth_outline};
 use artkit::json::float_repr as r;
 use artkit::materials::Mat;
 use artkit::math::{P3, PI, cos, pow, sin};
 use artkit::parts::{Settle, join, new_parts, settle_with};
 use artkit::place::GameFrame;
-use artkit::py::{hypot, sum};
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcyl, fextrude, fsweep, torus};
-
-/// A closed outline moved `d` in all round (out, for a negative `d`).
-pub fn inset(outline: &[(f64, f64)], d: f64) -> Vec<(f64, f64)> {
-    let n = outline.len();
-    let area = sum((0..n)
-        .map(|i| outline[i].0 * outline[(i + 1) % n].1 - outline[(i + 1) % n].0 * outline[i].1));
-    let turn = if area > 0.0 { 1.0 } else { -1.0 };
-    (0..n)
-        .map(|i| {
-            let ((x0, y0), (x1, y1)) = (outline[(i + n - 1) % n], outline[(i + 1) % n]);
-            let (dx, dy) = (x1 - x0, y1 - y0);
-            let length = hypot(dx, dy);
-            let length = if length == 0.0 { 1.0 } else { length };
-            (
-                outline[i].0 - dy / length * d * turn,
-                outline[i].1 + dx / length * d * turn,
-            )
-        })
-        .collect()
-}
 
 /// A guitar's neck from height `y0` up to `y1`: flat under the fretboard at depth `z`, rounded behind (a D), `w`
 /// across and `d` deep, narrowing by `taper` to the nut.
@@ -56,6 +35,14 @@ pub fn neck(
             )
         })
         .collect();
+    // the fretboard face's two edges rounded over (closed round the flat for it, then opened again)
+    let mut round = vec![prof[verts]];
+    round.extend(&prof);
+    round = artkit::forms::round_at(&round, 1, 0.003);
+    round.push(round[1]);
+    let last = round.len() - 2;
+    round = artkit::forms::round_at(&round, last, 0.003);
+    let prof = round[1..round.len() - 1].to_vec();
     fsweep!(
         fr,
         name,

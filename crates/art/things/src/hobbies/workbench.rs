@@ -7,6 +7,7 @@
 use super::M;
 use super::common::{P, flat_quads};
 use super::workbench_board::tool_board;
+use artkit::bevel::{EdgeOrder, bevel_edges};
 use artkit::forms::rounded_rect;
 use artkit::json::float_repr as r;
 use artkit::kit::{self, fillet};
@@ -14,6 +15,7 @@ use artkit::math::{P3, PI, cos, sin};
 use artkit::parts::{Settle, join, new_parts, settle_with};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::{Obj, meshes};
+use artkit::shapes::SHARP;
 use artkit::{fbox, fcyl, fextrude, fsphere, fsweep, revolve, slide, soft};
 
 /// The top's middle: its back on the wall face.
@@ -343,7 +345,7 @@ pub fn workbench() -> Vec<Obj> {
             round = 1
         );
         // the drill lying on its side: a body, a grip and battery, a chuck and bit
-        fsweep!(
+        let drill = fsweep!(
             f,
             "drill_body",
             &[
@@ -358,6 +360,7 @@ pub fn workbench() -> Vec<Obj> {
             resolution = 2,
             scale = [0.8, 1.0, 1.0, 0.6]
         );
+        bevel_edges(drill, 0.003, 1, SHARP, &EdgeOrder::Corners); // its ends
         fsweep!(
             f,
             "drill_grip",
@@ -479,7 +482,7 @@ pub fn workbench() -> Vec<Obj> {
                 verts = 6
             );
         }
-        fsweep!(
+        let jaw = fsweep!(
             f,
             "vice_jaw",
             &[
@@ -496,6 +499,7 @@ pub fn workbench() -> Vec<Obj> {
                 (-0.035, 0.02)
             ]
         );
+        bevel_edges(jaw, 0.003, 1, SHARP, &EdgeOrder::Corners);
         fbox!(
             f,
             "vice_pad",
@@ -519,7 +523,7 @@ pub fn workbench() -> Vec<Obj> {
     join(&still, "body", Some(P3::ZERO));
     let v = new_parts(|| {
         let z = VICE_Z + 0.044 + VICE_GAP;
-        fsweep!(
+        let jaw = fsweep!(
             f,
             "vice_front",
             &[
@@ -536,6 +540,7 @@ pub fn workbench() -> Vec<Obj> {
                 (-0.035, 0.02)
             ]
         );
+        bevel_edges(jaw, 0.003, 1, SHARP, &EdgeOrder::Corners);
         fbox!(
             f,
             "vice_front_pad",

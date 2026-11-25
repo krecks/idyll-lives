@@ -45,12 +45,12 @@ pub fn family() -> Family {
                 .centre(0.0, 0.0243)
                 .motions(json!({"uses": {"powerNap": "hood", "curlUp": "hood"}}))
                 .paint(&[("shell", "Body"), ("seat", "Upholstery"), ("hood", "Hood")]),
-            Model::new("quiltTable", table::quilt_table, (1.81, 0.77, 0.929))
+            Model::new("quiltTable", table::quilt_table, (1.82, 0.673, 0.56))
                 .key("model.lazy.quiltTable")
                 .centre(0.0, 0.0343)
                 .motions(json!({"uses": {"tuckIn": "quilt", "doze": "quilt"}}))
                 .paint(&[("oak", "Body"), ("quilt", "Upholstery"), ("pouf", "Poufs")]),
-            Model::new("deliveryLocker", home::delivery_locker, (0.86, 1.96, 0.81))
+            Model::new("deliveryLocker", home::delivery_locker, (0.86, 1.96, 0.467))
                 .key("model.lazy.deliveryLocker")
                 .centre(0.0, -0.025)
                 .motions(
@@ -62,7 +62,7 @@ pub fn family() -> Family {
                 .centre(0.02, 0.0193)
                 .motions(json!({"loops": {"shake": "shake"}}))
                 .paint(&[("plate", "Body"), ("lime", "Trim"), ("pad", "Deck")]),
-            Model::new("smartHub", table::smart_hub, (0.6, 0.806, 0.842))
+            Model::new("smartHub", table::smart_hub, (0.6, 0.806, 0.44))
                 .key("model.lazy.smartHub")
                 .centre(0.0, -0.009)
                 .motions(json!({"uses": {"program": "screen_up", "story": "screen_up"}}))

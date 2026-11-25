@@ -4,9 +4,10 @@ use super::common::{M, WALL};
 use artkit::forms::rounded_rect;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, TAU, cos, cosd, sind};
-use artkit::parts::{hinged, join, new_parts, numbered, turn};
+use artkit::parts::{aside, hinged, join, new_parts, numbered, turn};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
+use artkit::{bevel::ease, forms::eased, shapes::AUTO_WIDTH};
 use artkit::{fbox, fcyl, fsphere, fsweep, kit, settle, soft, swing, torus};
 
 // --- the heated quilt table (2x1): a kotatsu in front, two poufs (tops 0.45) at x = ±0.5 behind it ---------
@@ -51,7 +52,11 @@ fn _drape(
         ));
     }
     let prof = rounded_rect(y1 - y0, t, t * 0.45, 1);
-    fsweep!(f, name, &pts, 0.0, material, profile = prof, up = (0, 0, 1))
+    ease(
+        fsweep!(f, name, &pts, 0.0, material, profile = prof, up = (0, 0, 1)),
+        60.0,
+        1,
+    )
 }
 
 pub fn quilt_table() -> Vec<Obj> {
@@ -166,6 +171,8 @@ pub fn quilt_table() -> Vec<Obj> {
             0.012,
             0.026,
         );
+    });
+    let set = new_parts(|| {
         // a bowl of mandarins, two mugs, a plate of biscuits on the quilt's top
         let ty = TOP_Y + 0.067;
         kit::turned!(
@@ -174,16 +181,19 @@ pub fn quilt_table() -> Vec<Obj> {
             0,
             ty,
             0.25,
-            &[
-                (0.0, 0.0),
-                (0.05, 0.0),
-                (0.06, 0.008),
-                (0.12, 0.055),
-                (0.13, 0.065),
-                (0.122, 0.067),
-                (0.055, 0.016),
-                (0.0, 0.016),
-            ],
+            &eased(
+                &[
+                    (0.0, 0.0),
+                    (0.05, 0.0),
+                    (0.06, 0.008),
+                    (0.12, 0.055),
+                    (0.13, 0.065),
+                    (0.122, 0.067),
+                    (0.055, 0.016),
+                    (0.0, 0.016),
+                ],
+                AUTO_WIDTH
+            ),
             M.porcelain,
             segments = 22
         );
@@ -201,8 +211,8 @@ pub fn quilt_table() -> Vec<Obj> {
                 (dx, ty + 0.035 + dy, dz),
                 M.mandarin,
                 scale = (1, 1, 0.85),
-                segments = 12,
-                rings = 8
+                segments = 10,
+                rings = 6
             );
         }
         fsphere!(
@@ -228,7 +238,7 @@ pub fn quilt_table() -> Vec<Obj> {
                 0.09,
                 M.porcelain,
                 (90 - 70 * s) as f64,
-                segments = 14,
+                segments = 12,
                 verts = 5
             );
             // the pouf, its seat cushion (top 0.45) and a back cushion against the wall
@@ -242,7 +252,7 @@ pub fn quilt_table() -> Vec<Obj> {
                 M.pouf,
                 round = 0.12,
                 puff = (0.03, 0.0, 0.008),
-                flat = 3
+                flat = 2
             );
             soft!(
                 f,
@@ -255,7 +265,8 @@ pub fn quilt_table() -> Vec<Obj> {
                 round = 0.022,
                 puff = 0.008,
                 piping = 0.005,
-                flat = 2
+                flat = 2,
+                resting = true
             );
             soft!(
                 f,
@@ -277,14 +288,17 @@ pub fn quilt_table() -> Vec<Obj> {
             0.6,
             ty,
             0.32,
-            &[
-                (0.0, 0.0),
-                (0.06, 0.0),
-                (0.1, 0.01),
-                (0.105, 0.013),
-                (0.06, 0.006),
-                (0.0, 0.006),
-            ],
+            &eased(
+                &[
+                    (0.0, 0.0),
+                    (0.06, 0.0),
+                    (0.1, 0.01),
+                    (0.105, 0.013),
+                    (0.06, 0.006),
+                    (0.0, 0.006),
+                ],
+                AUTO_WIDTH
+            ),
             M.porcelain,
             segments = 18
         );
@@ -302,6 +316,9 @@ pub fn quilt_table() -> Vec<Obj> {
         }
     });
     join(&still, "body", Some(P3::from((0, 0, 0))));
+    // the poufs behind it (where residents sit) and the bowl, mugs and biscuits on its top: drawn with it, not the
+    // table's own size
+    aside(&set, "set");
     // The quilt's back edge, hung from the table top: `quilt` lifts it over the sitters' laps.
     let flap = new_parts(|| {
         soft!(
@@ -503,6 +520,10 @@ pub fn smart_hub() -> Vec<Obj> {
                 rot = (0, 0, r)
             );
         }
+    });
+    join(&still, "body", Some(P3::from((0, 0, 0))));
+    // the robot vacuum on the floor in front: drawn, not the hub's size
+    let robot = new_parts(|| {
         kit::turned!(
             f,
             "robot",
@@ -577,7 +598,7 @@ pub fn smart_hub() -> Vec<Obj> {
             );
         }
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    aside(&robot, "robot");
     // The tablet, built standing up on its hinge in the dock, then laid back to rest: `screen_up` tilts it up.
     let (hy, hz) = (h + 0.02, z + 0.02);
     let tab = new_parts(|| {

@@ -65,7 +65,15 @@ pub fn prism(name: &str, profile: &[(f64, f64)], a0: f64, a1: f64, material: Mat
         faces.push(vec![i, j, n + j, n + i]);
     }
     let verts = a.into_iter().chain(b).collect();
-    forms::object(name, verts, &faces, Some(material), false, SHARP, false)
+    artkit::bevel::eased(forms::object(
+        name,
+        verts,
+        &faces,
+        Some(material),
+        false,
+        SHARP,
+        false,
+    ))
 }
 
 /// A point on a plane through (cx, cy, cz) tilted `deg` back (its back edge higher): `dz` towards the front along

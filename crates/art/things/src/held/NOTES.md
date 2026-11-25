@@ -41,34 +41,34 @@ sideways; the grill food, which stands off its middle, takes its measured `centr
 
 | Key | What it shows | Draws | Tris |
 |---|---|---|---|
-| `item.ingredients` | a kraft bag lofted with its gussets folded in, a turned-over cuff; a slashed baguette, a lettuce, a tapering carrot with three swept fronds, a lobed tomato with a star calyx | 718 | 718 |
+| `item.ingredients` | a kraft bag lofted with its gussets folded in, a turned-over cuff; a slashed baguette, a lettuce, a tapering carrot with three swept fronds, a lobed tomato with a star calyx | 846 | 846 |
 | `item.prepBowl` | a wide glazed bowl, its rim rolled, a heap rising 3.5 cm over the rim thick with two dozen dice of potato, carrot and red pepper, swept green beans and peas | 716 | 716 |
 | `item.mealPot` | the iron stew pot: a rolled rim, swept loop handles riveted on, stew with beef, carrot coins, potato, peas and parsley | 1,376 | 1,376 |
 | `item.potDirty` | the same pot scraped empty: a tidemark, a brown film and burnt bits on the bottom | 940 | 940 |
-| `item.tastingBoard` | a paddle board (one outline, a tab handle with a hole): a cheese wedge and cubes, a fan of salami, crackers, a ramekin of fig jam, grapes on a swept stalk; empties to `item.boardDirty` | 1,496 | 1,496 |
-| `item.grillPlatter` | an oval platter, rim rolled: two bent sausages 2.8 cm thick with grill marks, a rough-edged marked burger, a cob of corn in kernel rows with butter, parsley | 1,348 | 1,348 |
-| `item.platterDirty` | the platter with a smear of grease and sauce, crumbs, a gnawed cob and a crumpled napkin | 976 | 976 |
+| `item.tastingBoard` | a paddle board (one outline, a tab handle with a hole): a cheese wedge and cubes, a fan of salami, crackers, a ramekin of fig jam, grapes on a swept stalk; empties to `item.boardDirty` | 1,568 | 1,568 |
+| `item.grillPlatter` | an oval platter, rim rolled: two bent sausages 2.8 cm thick with grill marks, a rough-edged marked burger, a cob of corn in kernel rows with butter, parsley | 1,572 | 1,572 |
+| `item.platterDirty` | the platter with a smear of grease and sauce, crumbs, a gnawed cob and a crumpled napkin | 1,200 | 1,200 |
 | `item.pizza` | a round board, a puffed crimped crust, tomato inside it, cheese browned in spots, curled pepperoni, basil leaves, eight slices cut; empties to `item.pizzaBoardDirty` | 1,436 | 1,436 |
 | `item.bakingTray` | a pressed steel tray, its edge rolled, what it serves (`treatPlate`): six chocolate-chip cookies and three iced cupcakes with cherries | 1,760 | 1,760 |
 | `item.trayDirty` | the tray with a grease stain, burnt patches, cookie crumbs, smudges of chocolate, a dab of icing and a burnt bit | 856 | 856 |
 | `item.pieDish` | a cherry pie 26 cm across in a fluted dish 4.7 cm deep: a crimped pastry rim and a lattice woven over and under; empties to `item.pieDishDirty` | 716 | 716 |
-| `item.mealPlate` | a plate of stew: beef and carrot coins in gravy, a ridged dollop of mash, bent green beans, parsley (also leftovers) | 708 | 708 |
-| `item.pizzaSlice` | a plate with a slice: base, tomato at the cut sides, cheese browned in a spot, pepperoni, basil, a swept puffed crust | 548 | 548 |
-| `item.treatPlate` | chocolate-chip cookies, one leaning on the others, a cupcake in a pleated case in the well, icing piped in a swirl, a cherry with its stalk (also the snack) | 740 | 740 |
-| `item.pieSlice` | a sixth of the cherry pie (11 cm to its crust) with a crimped swept edge, filling run out at its tip, a piped rosette of cream with mint | 688 | 688 |
-| `item.cakeSlice` | a slice of the café's layer cake on a plate: two sponges, jam and cream between, white icing over the top and round its back, the layers at the cut sides, a strawberry standing on a green calyx, its seeds showing | 472 | 472 |
-| `item.sandwich` | a sandwich cut corner to corner, loaf corners rounded: crumb on top and at the cut, crusts round, lettuce frilled out, cheese, tomato | 500 | 500 |
-| `item.plateDirty` | a plate with a smear of gravy, a streak of sauce, crumbs, a pea, the knife and fork laid side by side (outlines) | 548 | 548 |
-| `item.bbqPlate` | a plate from the barbecue (`grillPlatter`'s `serving`): a sausage marked by the bars, a marked burger, a piece of corn with butter, parsley; eaten with a fork | 780 | 780 |
-| `item.tastingPlate` | a plate from the tasting menu (`tastingBoard`'s `serving`): a wedge and a cube of cheese, folds of salami, two crackers, grapes, a dab of fig jam; eaten with a fork | 704 | 704 |
-| `item.freshPlate` | something fresh from the garden: a salad on the plate, torn leaves in three greens heaped, tomato wedges on their skins, cucumber and radish slices; eaten with a fork | 708 | 708 |
-| `item.plateStackDirty` | three dirty plates stacked, each a little askew, its foot in the well below (the lower two their wells flat, unseen): the top one's leftovers and fork, a drip of gravy down the middle one's rim, a scrap of lettuce over its edge. The sim shows it when two or more dirty plates are carried at once (both hands; content radius 0.156). Over the 750: three plates | 876 | 876 |
+| `item.mealPlate` | a plate of stew: beef and carrot coins in gravy, a ridged dollop of mash, bent green beans, parsley (also leftovers) | 884 | 884 |
+| `item.pizzaSlice` | a plate with a slice: base, tomato at the cut sides, cheese browned in a spot, pepperoni, basil, a swept puffed crust | 724 | 724 |
+| `item.treatPlate` | chocolate-chip cookies, one leaning on the others, a cupcake in a pleated case in the well, icing piped in a swirl, a cherry with its stalk (also the snack) | 916 | 916 |
+| `item.pieSlice` | a sixth of the cherry pie (11 cm to its crust) with a crimped swept edge, filling run out at its tip, a piped rosette of cream with mint | 864 | 864 |
+| `item.cakeSlice` | a slice of the café's layer cake on a plate: two sponges, jam and cream between, white icing over the top and round its back, the layers at the cut sides, a strawberry standing on a green calyx, its seeds showing | 824 | 824 |
+| `item.sandwich` | a sandwich cut corner to corner, loaf corners rounded: crumb on top and at the cut, crusts round, lettuce frilled out, cheese, tomato | 1,028 | 1,028 |
+| `item.plateDirty` | a plate with a smear of gravy, a streak of sauce, crumbs, a pea, the knife and fork laid side by side (outlines) | 724 | 724 |
+| `item.bbqPlate` | a plate from the barbecue (`grillPlatter`'s `serving`): a sausage marked by the bars, a marked burger, a piece of corn with butter, parsley; eaten with a fork | 956 | 956 |
+| `item.tastingPlate` | a plate from the tasting menu (`tastingBoard`'s `serving`): a wedge and a cube of cheese, folds of salami, two crackers, grapes, a dab of fig jam; eaten with a fork | 880 | 880 |
+| `item.freshPlate` | something fresh from the garden: a salad on the plate, torn leaves in three greens heaped, tomato wedges on their skins, cucumber and radish slices; eaten with a fork | 884 | 884 |
+| `item.plateStackDirty` | three dirty plates stacked, each a little askew, its foot in the well below (the lower two their wells flat, unseen): the top one's leftovers and fork, a drip of gravy down the middle one's rim, a scrap of lettuce over its edge. The sim shows it when two or more dirty plates are carried at once (both hands; content radius 0.156). Over the 750: three plates | 1,372 | 1,372 |
 | `tool.board` | the chopping board: rounded, a juice groove, a hanging slot; a tapering carrot, carrot coins, parsley (the knife is in the hand: `tool.knife`) | 600 | 600 |
 | `tool.grillFood` | two bent sausages 2.8 cm thick with grill marks and a rough-edged marked burger | 628 | 628 |
 | `tool.mixingBowl` | a deep glazed bowl, its rim rolled, flat batter with the whisk's swirl on it, a tapering wooden spoon, its bowl in the batter, its handle resting on the far rim (plain satin, one draw) | 616 | 616 |
 | `item.iceCream` | a dessert bowl, rim rolled, three scoops with ragged lips, chocolate sauce trickled over two of them, a fan wafer (no spoon: the hand's) ; empties to `item.bowlDirty` | 644 | 644 |
 | `item.bowlDirty` | the dessert bowl with a film of melted ice cream lying on its sloping inside, a streak of chocolate, a drip of strawberry from the rim, the spoon left in it | 438 | 438 |
-| `item.toast` | toast cut corner to corner, toasted tops, dark crusts, a scorch, a pat of butter melting into a pool on each half | 532 | 532 |
+| `item.toast` | toast cut corner to corner, toasted tops, dark crusts, a scorch, a pat of butter melting into a pool on each half | 884 | 884 |
 | `item.smoothie` | a 14 cm tumbler (thick foot, frothy top) of berry smoothie, a striped bendy straw, a raspberry and mint | 600 | 600 |
 | `item.noodles` | a white card noodle pail with a red band, front and back flaps up, a wire handle, noodles and spring onion (no chopsticks: the hand's) | 592 | 592 |
 | `item.takeout` | an open kraft clamshell, sides flared, its shallow lid up at the back: a sesame burger (patty, cheese, lettuce, tomato) and fries inside | 700 | 700 |
@@ -79,7 +79,7 @@ sideways; the grill food, which stands off its middle, takes its measured `centr
 | `item.hotDog` | a hot dog on a paper boat 9 cm across: a bun 6.3 cm across in two lathed halves side by side, inside the boat, a bent sausage longer than it, a mustard zigzag and a line of ketchup | 624 | 624 |
 | `item.crisps` | a packet of crisps lying on its back, puffed, blue with a yellow band, crimped seals, its top torn open on the silvered inside, five crisps spilt | 616 | 616 |
 | `item.apple` | an apple 7.5 cm across, lobed a little, red with a yellow blush at the stalk and the eye, a stalk and a leaf | 250 | 250 |
-| `item.pastryBag` | a white paper bag 12 cm wide, its top folded open, a croissant of five lobes standing out of it | 176 | 176 |
+| `item.pastryBag` | a white paper bag 12 cm wide, its top folded open, a croissant of five lobes standing out of it | 356 | 356 |
 | `item.cutFlowers` | a bunch of cut flowers 37 cm tall standing out of the hand, the stems gathered at the grip and curving up to six heads (three daisies with an amber eye, two tulip buds, a small daisy) and four leaves, the same heads as the vase of flowers (the tabletop things') | 624 | 624 |
 | `item.daisyChain` | a daisy chain 16 cm across, coiled flat in the hand: a ring of plaited green stems with eleven white daisies round it (an amber eye on each), heads up, and the two stem ends tucked back under where the chain was closed | 1,034 | 1034 |
 | `item.parcel` | a parcel from the shop 42 x 30 x 34 cm (2026-11-03, sim-core `setup.rs`): a corrugated card box, its edges rounded a little, brown tape over the top seam and a hand's width down the front and back, a white address label with three red lines; at the front door, in both hands, and on the floor while what's in it is put together | 140 | 140 |
@@ -93,7 +93,7 @@ sideways; the grill food, which stands off its middle, takes its measured `centr
 | `tool.spoon` | a steel dessert spoon 17 cm long, an oval bowl | 124 | 124 |
 | `tool.chopsticks` | a pair of tapering wooden chopsticks 23 cm long | 24 | 24 |
 | `tool.coin` | a brass coin 2.3 cm across, a milled rim | 140 | 140 |
-| `tool.seedBag` | a small kraft bag of bird seed, its top rolled open over the seed | 116 | 116 |
+| `tool.seedBag` | a small kraft bag of bird seed, its top rolled open over the seed | 244 | 244 |
 | `tool.dart` | a steel dart 15 cm long: a knurled barrel, a black shaft, three blue flights | 180 | 180 |
 | `tool.cue` | a pool cue 1.47 m (the pool table's was on its cloth): a wrapped butt, a joint, a tapering shaft, a ferrule and a chalked tip | 188 | 188 |
 | `tool.bat` | a ping-pong bat: a wooden blade 15 x 16 cm, red rubber over black, a flared handle (the ping-pong table's two were on its top) | 296 | 296 |
@@ -115,13 +115,13 @@ sideways; the grill food, which stands off its middle, takes its measured `centr
 | `tool.woodenSpoon` | a wooden spoon 31 cm, held 10 cm from its end | 144 | 144 |
 | `tool.spatula` | a slotted turner 27 cm: a black grip, a steel shank bent down to a blade 8 x 10 cm with three slots | 280 | 280 |
 | `tool.whisk` | a balloon whisk 33 cm: a steel handle, four loops of wire 6 cm across | 464 | 464 |
-| `tool.biteSandwich` | half the sandwich (`item.sandwich`'s), its point to the front | 140 | 140 |
-| `tool.biteToast` | half a slice of the buttered toast | 156 | 156 |
+| `tool.biteSandwich` | half the sandwich (`item.sandwich`'s), its point to the front | 316 | 316 |
+| `tool.biteToast` | half a slice of the buttered toast | 244 | 244 |
 | `tool.bitePizza` | the pizza slice (`item.pizzaSlice`'s), held by its crust | 328 | 328 |
 | `tool.biteCookie` | a chocolate-chip cookie | 84 | 84 |
 | `tool.biteBurger` | the takeaway's sesame burger | 420 | 420 |
 | `tool.biteHotDog` | the hot dog out of its boat, along the depth | 532 | 532 |
-| `tool.biteCracker` | a cracker with a slice of cheese | 52 | 52 |
+| `tool.biteCracker` | a cracker with a slice of cheese | 124 | 124 |
 | `tool.biteCroissant` | the bakery's croissant, lying | 100 | 100 |
 | `tool.biteCrisps` | three crisps, one on another | 96 | 96 |
 
@@ -173,3 +173,9 @@ sideways; the grill food, which stands off its middle, takes its measured `centr
 ## The soft forms pass (2026-11-13)
 
 No change to the models' code: their soft boxes take the shared form's new shape (rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 1 model changed shape: `crisps`; the same triangles.
+
+- **No hard edges (2026-11-25, gate zero).** The plates', platters' and the cake stand's rims are rolled round (`artkit::forms::round_at`, four even steps a corner), so a plate is 880-1,030 triangles now (over the 750 above; three stacked 1,372): a real plate's rim is round. Toast, bread, cake sponges and cheese wedges are `prism`s with a `bevel`; the paper bags' corners are creased round and the pastry bag's fold rolled over; the corn's kernel ridges are lower (0.06), so they no longer show as edges.
+
+## Measured as the piece (2026-11-25)
+
+`bakingTray`: the cookies and cupcakes on it are set aside (`parts::aside`, `bakes_aside`): drawn as before, not the tray's size; `cargo review sizes` measures the tray 0.025 m high (was 0.07).
