@@ -3,7 +3,8 @@
 //! `tools/pins/pins.json` names a file and, optionally, a part of it:
 //!
 //! - `region`: the lines between `pin:<region> begin` and `pin:<region> end` comments (exclusive);
-//! - `const`: an `export const <NAME>` statement, from its line to where its brackets close.
+//! - `const`: an `export const <NAME>` statement, from its line to where its brackets close (those in comments and
+//!   strings aside).
 //!
 //! ```text
 //! cargo pins                      check every pin (exit 1 on a difference)
@@ -57,11 +58,15 @@ pub fn pinned_text(
         let begin = lines
             .iter()
             .position(|l| l.contains(&format!("pin:{region} begin")));
-        let end = lines
-            .iter()
-            .position(|l| l.contains(&format!("pin:{region} end")));
+        // The end marker is looked for only on the lines after the begin marker.
+        let end = begin.and_then(|begin| {
+            lines[begin + 1..]
+                .iter()
+                .position(|l| l.contains(&format!("pin:{region} end")))
+                .map(|at| begin + 1 + at)
+        });
         return match (begin, end) {
-            (Some(begin), Some(end)) if end >= begin => Ok(lines[begin + 1..end].join("\n")),
+            (Some(begin), Some(end)) => Ok(lines[begin + 1..end].join("\n")),
             _ => Err(format!(
                 "region {region}'s begin and end markers are missing"
             )),
@@ -82,19 +87,43 @@ pub fn pinned_text(
         .ok_or_else(|| format!("no `export const {name}`"))?;
     let mut depth = 0i32;
     let mut opened = false;
+    // Brackets and semicolons in comments and strings don't count: `inside` is `/` in a `//`
+    // comment, `*` in a `/* */` one (its text from `from` on), or the quote of a string.
+    let (mut inside, mut from, mut escaped) = (None, 0, false);
     for (i, c) in content[start..].char_indices() {
         let at = start + i;
         let next = at + c.len_utf8();
-        match c {
-            '(' | '{' | '[' => {
-                depth += 1;
-                opened = true;
+        match inside {
+            Some('/') if c == '\n' => inside = None,
+            Some('*') if c == '/' && at > from && content.as_bytes()[at - 1] == b'*' => {
+                inside = None
             }
-            ')' | '}' | ']' => depth -= 1,
-            ';' if depth == 0 => return Ok(content[start..next].to_string()),
-            _ => {}
+            Some('/' | '*') => {}
+            Some(_) if escaped => escaped = false,
+            Some(_) if c == '\\' => escaped = true,
+            Some(quote) if c == quote => inside = None,
+            Some(_) => {}
+            None => match c {
+                '/' if content[next..].starts_with(['/', '*']) => {
+                    inside = content[next..].chars().next();
+                    from = next + 1;
+                }
+                '\'' | '"' | '`' => inside = Some(c),
+                '(' | '{' | '[' => {
+                    depth += 1;
+                    opened = true;
+                }
+                ')' | '}' | ']' => depth -= 1,
+                ';' if depth == 0 => return Ok(content[start..next].to_string()),
+                _ => {}
+            },
         }
-        if opened && depth == 0 && content[next..].starts_with('\n') && c != ',' {
+        if matches!(inside, None | Some('/'))
+            && opened
+            && depth == 0
+            && content[next..].starts_with('\n')
+            && c != ','
+        {
             // A statement without its semicolon ends where its brackets close at a line's end:
             // unless the next line goes on with it (`.`, `;`, `?`, `)` or `as`).
             let rest = content[next + 1..].trim_start();
@@ -242,6 +271,12 @@ mod tests {
         assert_eq!(pinned_text(text, Some("x"), None).unwrap(), "b\nc");
         assert!(pinned_text(text, Some("y"), None).is_err());
         assert!(pinned_text("// pin:x end\n// pin:x begin", Some("x"), None).is_err());
+        // Both markers on one line: there are no lines between them, and no end after the begin.
+        assert!(pinned_text("a\n// pin:x begin pin:x end\nb", Some("x"), None).is_err());
+        assert_eq!(
+            pinned_text("// pin:x begin pin:x end\nb\n// pin:x end", Some("x"), None).unwrap(),
+            "b"
+        );
     }
 
     #[test]
@@ -267,6 +302,17 @@ mod tests {
             "export const G = [\n  1,\n]\n  .map((x) => x) as const"
         );
         assert!(pinned_text("export const H = (", None, Some("H")).is_err());
+        // Brackets and semicolons in comments and strings don't count.
+        let noted = "export const C = {\n  a: 1, // see 2) and ;\n  b: '}', /* ] */ c: \"\\\"{\",\n  d: `(;`,\n};\nnext";
+        assert_eq!(
+            pinned_text(noted, None, Some("C")).unwrap(),
+            &noted[..noted.len() - "\nnext".len()]
+        );
+        let after = "export const D = f(1) // done\nnext";
+        assert_eq!(
+            pinned_text(after, None, Some("D")).unwrap(),
+            "export const D = f(1) // done"
+        );
     }
 
     #[test]
