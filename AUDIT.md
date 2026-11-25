@@ -14,7 +14,7 @@ the offending line. Statuses: **applied** (fixed on the branch named), **propose
 | Rust tests (core) | `cargo test -p sim-core --locked` | `tools/ci-local.sh sim` | pass |
 | Rust tests (tools + art) | `cargo test -p ll-tools -p sound -p artkit -p ll-art -p art-nature -p art-wet -p art-rooms -p art-packs -p art-outside -p art-things --profile tools --locked` | `tools/ci-local.sh tools` | pass |
 | Web install | `cd web && bun install --frozen-lockfile` | `tools/ci-local.sh web` | ok |
-| Web tests | `cd web && bun run test` (= `bun test --parallel --timeout 30000 --path-ignore-patterns='**/*.slow.test.ts' tests`) | `web/package.json` `scripts.test` | pass |
+| Web tests | `cd web && bun run test` (= `bun test --parallel --timeout 30000 --path-ignore-patterns='**/*.slow.test.ts' tests`) | `web/package.json` `scripts.test` | pass (1,772 tests over 166 files, 0 failed) |
 | Everything, as CI runs it | `tools/ci-local.sh` (`--quick` for the fast subset) | `tools/ci-local.sh` | not run end-to-end (see Open questions) |
 
 Baseline run, taken before any change: `cargo test --workspace --no-fail-fast` → **exit 0**, 92 test
@@ -111,7 +111,10 @@ Filled in as each branch lands; see the git log of each branch for the exact com
 | `audit/split` | `ae27d079d` | SP1 (M5) |
 
 Every branch was cut from `audit/report` and leaves the suite green; the status column above names the
-branch a finding is applied on, so a finding marked `applied` is on that branch, not on this one.
+branch a finding is applied on, so a finding marked `applied` is on that branch, not on this one. Each
+branch was checked with the CI's own first two steps — `cargo fmt --all --check` and
+`cargo clippy --workspace --all-targets --locked -- -D warnings` — both clean; `audit/bugs` and
+`audit/split` each carry one extra style-only commit for the formatting those checks caught.
 
 ## Proposals
 
