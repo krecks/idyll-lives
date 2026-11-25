@@ -85,3 +85,26 @@ pub fn family() -> Option<Family> {
          and a pawn moves on the chess table. Each has a far version for the town overview.",
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use artkit::json::Json;
+
+    /// The seesaw's seats are where the content's places put its riders.
+    #[test]
+    fn content_facts() {
+        let o = crate::content_object("community.json", "seesaw");
+        let Some(Json::Arr(places)) = o.get("places") else {
+            panic!("seesaw: no places")
+        };
+        let xs: Vec<Option<f64>> = places
+            .iter()
+            .map(|p| match p.get("at") {
+                Some(Json::Arr(at)) => at[0].num(),
+                _ => None,
+            })
+            .collect();
+        let x = super::rides::SEAT_X;
+        assert_eq!(xs, [Some(-x), Some(x)], "seesaw: places moved");
+    }
+}

@@ -298,7 +298,7 @@ pub fn silo() -> Vec<Obj> {
     settle(&[join_all("silo")])
 }
 
-/// The silo from afar: pad, plain drum, cap and vent; the ladder a flat strip.
+/// The silo from afar: pad, plain drum, cap and vent; the ladder a flat strip; the hopper.
 pub fn silo_far() -> Vec<Obj> {
     silo_drum(false);
     fbox!(
@@ -310,5 +310,7 @@ pub fn silo_far() -> Vec<Obj> {
         (0, 0.3 + (SILO_TOP - 0.3) / 2.0, SILO_R + 0.15),
         M.steel
     );
+    // the hopper, the farthest part out, so it stands where the silo does
+    fbox!(F, "hopper", 0.26, 0.2, 0.26, (1.32, 0.2, -0.72), M.steel);
     settle(&[join_all("silo_far")])
 }

@@ -13,7 +13,8 @@ things, seen from far: every model has a far version (`.far_ratio(0.25)`; the ch
 ## The moving ones
 
 - **Seesaw** (3 × 1 tiles): a 2.5 m plank on a blue A-frame stand, rubber bumpers under its ends. The content's two
-  slots fall at x = ±0.75 m (3 m wide, 2 slots) at 0.56 m: the seats are there, level at rest. The plank, its seats
+  places are at x = ±0.78 m (`SEAT_X`; a test holds them to it) at 0.56 m: the seats are there, level at rest, the
+  handles 0.28 m in from them (2026-11-25; they were at ±0.75, the slots' spread). The plank, its seats
   and handles are one part (`plank`) turning about the axle (0.46 m up). `seesaw` rocks it ±12° in 1.4 s (`rock`
   about the build axes' y), so the low end just meets its bumper. `motions`: `{"loops": {"seesaw": "seesaw"}, "ride":
   "seesaw"}`.

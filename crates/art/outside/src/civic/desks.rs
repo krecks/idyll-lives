@@ -697,7 +697,7 @@ pub fn teller_counter() -> Vec<Obj> {
                 0.36,
                 0.05,
                 0.28,
-                (sf * 0.5, WORK + 0.025, -0.22),
+                (sf * 0.5, WORK + 0.025, -0.25),
                 M.monitor,
                 bevel = 0.004
             );
@@ -709,7 +709,7 @@ pub fn teller_counter() -> Vec<Obj> {
                     0.06,
                     0.012,
                     0.13,
-                    (sf * 0.5 - 0.12 + kf * 0.08, WORK + 0.054, -0.27),
+                    (sf * 0.5 - 0.12 + kf * 0.08, WORK + 0.054, -0.3),
                     M.note
                 );
                 fcyl!(
@@ -717,14 +717,15 @@ pub fn teller_counter() -> Vec<Obj> {
                     format!("coins{s}{k}"),
                     0.014,
                     0.02,
-                    (sf * 0.5 - 0.12 + kf * 0.08, WORK + 0.06, -0.14),
+                    (sf * 0.5 - 0.12 + kf * 0.08, WORK + 0.06, -0.17),
                     M.coin,
                     verts = 8
                 );
             }
         }
-        monitor("monitor", 0.5, WORK, -0.05, 0.4, 0.26, -1);
-        keyboard("keyboard", -0.35, WORK, -0.05, 0.36);
+        // in front of the cash trays (their front at -0.11), behind the inner panel (0.06)
+        monitor("monitor", 0.5, WORK, -0.03, 0.4, 0.26, -1);
+        keyboard("keyboard", -0.35, WORK, -0.03, 0.36);
         // a pen on a chain for the customers
         rod(
             "pen",

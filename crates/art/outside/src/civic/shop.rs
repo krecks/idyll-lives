@@ -459,7 +459,7 @@ pub fn atm() -> Vec<Obj> {
             (0, 1.0, b + 0.56),
             M.fascia,
             bevel = 0.008,
-            rot = (-12, 0, 0)
+            rot = (12, 0, 0)
         );
         for r in 0..4 {
             for c in 0..3 {
@@ -473,11 +473,11 @@ pub fn atm() -> Vec<Obj> {
                     (
                         -0.12 + c as f64 * 0.05,
                         1.026 - rf * 0.0075,
-                        b + 0.52 + rf * 0.035 - 0.0
+                        b + 0.52 + rf * 0.035
                     ),
-                    if c < 3 { M.keys } else { M.leaflet4 },
+                    M.keys,
                     bevel = 0.003,
-                    rot = (-12, 0, 0)
+                    rot = (12, 0, 0)
                 );
             }
         }
@@ -492,7 +492,7 @@ pub fn atm() -> Vec<Obj> {
                 (0.07, 1.026 - kf * 0.0075, b + 0.52 + kf * 0.035),
                 m,
                 bevel = 0.003,
-                rot = (-12, 0, 0)
+                rot = (12, 0, 0)
             );
         }
         fbox!(

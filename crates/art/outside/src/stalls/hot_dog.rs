@@ -7,7 +7,7 @@ use artkit::json::float_repr;
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3, PI, pow, sin};
 use artkit::motion::{Swing, swing};
-use artkit::parts::{hinged, join, new_parts};
+use artkit::parts::{hinged, join, new_parts, turn};
 use artkit::place::GameFrame;
 use artkit::scene::{Obj, meshes};
 use artkit::{fbox, fcone, fcyl, fextrude, fsweep, kit_pull, loft, ring, settle, soft};
@@ -367,7 +367,8 @@ pub fn hot_dog_stand() -> Vec<Obj> {
         valance(&f, "flap", -0.85, 0.65, 2.25, 0.488, 0.1, &mats, 2);
     });
     join(&still, "body", Some(P3::from((0, 0, 0))));
-    // the hot plate's lid, hinged on its back edge: a rounded steel hood, a bar handle along its front
+    // the hot plate's lid, hinged on its front edge: a rounded steel hood, a bar handle along its back edge, where
+    // the vendor behind the cart lifts it, so it opens away from them (built with the handle at the front, turned)
     let parts = new_parts(|| {
         soft!(
             f,
@@ -393,12 +394,17 @@ pub fn hot_dog_stand() -> Vec<Obj> {
             out = 0.03
         );
     });
-    let lid = hinged(join(&parts, "lid", None), f.at(-0.35, 1.04, -0.3));
+    let lid = turn(
+        hinged(join(&parts, "lid", None), f.at(-0.35, 1.04, -0.1)),
+        180.0,
+        Axis::Z,
+    );
+    let lid = hinged(lid, f.at(-0.35, 1.04, 0.1));
     settle!(centre = false);
     swing(
         lid,
         "lid_open",
-        -75.0,
+        75.0,
         Swing {
             seconds: 0.9,
             axis: Axis::X,
