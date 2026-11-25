@@ -523,8 +523,11 @@ fn build_family(family: &str, out: &Path) -> io::Result<BodyEntry> {
                     v
                 };
                 shapes.push((name, join(&ch.skin.0, dp), join(&ch.skin.1, dn)));
-                // The channel on the close-up body's skin, the same lids, lips and ears after it.
-                shapes.push((HD, join(&ch.skin_hd.0, dp), join(&ch.skin_hd.1, dn)));
+                // The channel on the close-up body's skin, the same lids (shaded by that skin), lips
+                // and ears after it.
+                let mut dn_hd = dn.clone();
+                dn_hd[..ch.lids_hd.len()].copy_from_slice(&ch.lids_hd);
+                shapes.push((HD, join(&ch.skin_hd.0, dp), join(&ch.skin_hd.1, &dn_hd)));
             } else {
                 shapes.push((name, dp.clone(), dn.clone()));
             }

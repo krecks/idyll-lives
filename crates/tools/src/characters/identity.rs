@@ -181,6 +181,8 @@ pub struct Channel {
     pub samples: (Vec<V3>, Vec<V3>),
     /// How many of the `body` part's vertices are the lids' (its first; the lips follow).
     pub lids: usize,
+    /// The lids' normal deltas on the close-up body (`hd.body`), shaded by its level-2 skin.
+    pub lids_hd: Vec<V3>,
 }
 
 static CHANNELS: Cache<String, Vec<Channel>> = Cache::new();
@@ -205,6 +207,8 @@ struct Built {
     /// The lids' vertices (the first of the `body` part's), and their shading normals (build.rs
     /// `lid_shading`: the skin's without its sockets, where they lie).
     lids: Vec<V3>,
+    /// The same shading normals on the close-up body's skin (level 2).
+    lids_hd: Vec<V3>,
 }
 
 impl Built {
@@ -220,19 +224,24 @@ impl Built {
             (Arc::new(srf), Arc::new(head))
         };
         let (parts, n_lids) = rest_parts(family, head.clone(), id);
-        let skin = OnMesh::new(&srf.unsocketed, &body::tris(family), srf.pos.len());
-        let lids = parts[0].1[..n_lids]
-            .iter()
-            .map(|&q| {
-                let (t, w) = skin.at(q);
-                (srf.nor[t[0]] * w[0] + srf.nor[t[1]] * w[1] + srf.nor[t[2]] * w[2]).normalize()
-            })
-            .collect();
+        let shade = |bare: &[V3], tris: &[usize], nor: &[V3]| -> Vec<V3> {
+            let skin = OnMesh::new(bare, tris, bare.len());
+            parts[0].1[..n_lids]
+                .iter()
+                .map(|&q| {
+                    let (t, w) = skin.at(q);
+                    (nor[t[0]] * w[0] + nor[t[1]] * w[1] + nor[t[2]] * w[2]).normalize()
+                })
+                .collect()
+        };
+        let lids = shade(&srf.unsocketed, &body::tris(family), &srf.nor);
+        let lids_hd = shade(&srf.fine_bare, &body::tris_hd(family), &srf.fine_nor);
         Built {
             srf,
             head,
             parts,
             lids,
+            lids_hd,
         }
     }
 }
@@ -353,6 +362,16 @@ fn channel(family: &str, name: &'static str, base: &Built, mask: &Mask) -> Chann
             .map(|i| (hi.srf.head_normals[i] - lo.srf.head_normals[i]) * ws[i])
             .collect(),
     );
+    let lids_hd = (0..base.lids.len())
+        .map(|i| {
+            let n = (hi.lids_hd[i] - lo.lids_hd[i]) * (mask.at(base.parts[0].1[i]) * k);
+            if n.abs().max() < TRIM.1 {
+                V3::zeros()
+            } else {
+                n
+            }
+        })
+        .collect();
     Channel {
         name,
         skin,
@@ -361,5 +380,6 @@ fn channel(family: &str, name: &'static str, base: &Built, mask: &Mask) -> Chann
         eye: [e.x, e.y, e.z, size],
         samples,
         lids: base.lids.len(),
+        lids_hd,
     }
 }
