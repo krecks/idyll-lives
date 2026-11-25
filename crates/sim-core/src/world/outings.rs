@@ -53,7 +53,7 @@ pub(crate) fn trail_step(
     let road = travel
         .trails
         .iter()
-        .map(|&i| (i as usize, g.roads[i as usize].project(at)))
+        .map(|&i| (i as usize, g.roads[i as usize].project_on(at).1))
         .filter(|(_, (_, d))| *d <= TRAIL_REACH)
         .min_by(|a, b| a.1.1.total_cmp(&b.1.1).then(a.0.cmp(&b.0)))
         .map(|(i, (s0, _))| (&g.roads[i], s0))?;

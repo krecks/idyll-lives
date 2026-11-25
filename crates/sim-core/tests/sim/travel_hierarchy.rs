@@ -301,7 +301,7 @@ fn road_of(g: &Graph, source: usize) -> u32 {
 
 /// The place on road `source` nearest `p`.
 fn on(g: &Graph, source: usize, p: [f32; 2]) -> RoadPoint {
-    let (s, _) = g.roads[road_of(g, source) as usize].project(p);
+    let (s, _) = g.roads[road_of(g, source) as usize].project_on(p).1;
     g.at_source(source as u32, s).expect("in the network")
 }
 
@@ -912,7 +912,7 @@ fn motorway_cars_keep_to_the_outer_lane_of_their_carriageway() {
 /// (m: `cars::right_of`, (t.z, -t.x)).
 fn right_of(g: &Graph, source: usize, p: [f32; 2]) -> f32 {
     let road = &g.roads[road_of(g, source) as usize];
-    let (s, _) = road.project(p);
+    let (s, _) = road.project_on(p).1;
     let (q, t) = (road.at(s), road.tangent(s));
     (p[0] - q[0]) * t[1] - (p[1] - q[1]) * t[0]
 }

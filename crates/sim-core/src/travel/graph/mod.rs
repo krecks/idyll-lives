@@ -119,7 +119,7 @@ fn motorway_insides(roads: &[Road]) -> Vec<i8> {
             if j == i {
                 continue;
             }
-            let (s, d) = b.project(p);
+            let (s, d) = b.project_on(p).1;
             if d > (a.width + b.width) / 2.0 + PAIR_APART || best.is_some_and(|x| d >= x.0) {
                 continue;
             }
@@ -345,7 +345,7 @@ impl Graph {
                     }
                     let other = &g.roads[q];
                     let snap = other.width.max(g.roads[r].width) / 2.0 + 1.0;
-                    let (s, d) = other.project(p);
+                    let (s, d) = other.project_on(p).1;
                     if d > snap {
                         continue;
                     }

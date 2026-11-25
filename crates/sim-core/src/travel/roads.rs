@@ -102,13 +102,9 @@ impl Road {
         (self.cum[i] + t * len2.sqrt(), dist(p, q))
     }
 
-    /// The nearest point on it to `p`: how far along it is, and how far from `p`.
-    pub fn project(&self, p: [f32; 2]) -> (f32, f32) {
-        self.project_on(p).1
-    }
-
-    /// `project`, and the segment it's on (the first of those as near).
-    pub(crate) fn project_on(&self, p: [f32; 2]) -> (usize, (f32, f32)) {
+    /// The nearest point on it to `p`: the segment it's on, how far along it is, and how far
+    /// from `p` (the first of those as near).
+    pub fn project_on(&self, p: [f32; 2]) -> (usize, (f32, f32)) {
         // `Road::new` refuses fewer than two points, but the fields are public: `len() - 1` below
         // would underflow, and there is no segment to be on.
         if self.pts.len() < 2 {

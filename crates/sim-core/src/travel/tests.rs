@@ -449,7 +449,7 @@ fn a_road_with_too_few_points_projects_to_nothing() {
             oneway: OneWay::Both,
             source: 0,
         };
-        assert_eq!(road.project([1.0, 1.0]).1, f32::INFINITY);
+        assert_eq!(road.project_on([1.0, 1.0]).1.1, f32::INFINITY);
         assert_eq!(road.project_on([1.0, 1.0]).1.1, f32::INFINITY);
         assert_eq!(road.project_from(0, [1.0, 1.0]).1.1, f32::INFINITY);
     }
