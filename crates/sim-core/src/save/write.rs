@@ -19,7 +19,6 @@ impl World {
                 rot: o.rot,
                 quality: o.quality,
                 colors: crate::world::colors_hex(&o.colors),
-                color: None,
                 value: Some(o.value),
                 turn: o.turn,
                 offset: o.offset,
@@ -167,7 +166,6 @@ impl World {
                         a: a as u32,
                         b: b as u32,
                         rel,
-                        chemistry: None,
                     });
                 }
             }

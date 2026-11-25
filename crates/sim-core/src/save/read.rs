@@ -186,7 +186,7 @@ impl World {
                     let value = o
                         .value
                         .unwrap_or(world.content.objects[def].price.unwrap_or(0));
-                    let colors = crate::world::parse_colors(&o.colors, o.color.as_deref());
+                    let colors = crate::world::parse_colors(&o.colors, None);
                     // A size the content no longer allows goes back to its kind's.
                     let own = crate::world::kind_size(world.content.objects[def].footprint);
                     let (size, tall) = world
@@ -199,7 +199,7 @@ impl World {
                     };
                     world.place(def, o.x, o.z, o.rot, layout, colors, o.quality, value, keep)
                 }
-                None => world.place_object(&o.def, o.x, o.z, o.rot),
+                None => continue,
             };
             // What can't be placed is left out, and the rest of the game loads: a kind the content
             // no longer has, a thing whose top is gone, or one that doesn't fit where it was any
@@ -441,8 +441,6 @@ impl World {
                             routine: false,
                         }
                     }
-                    // Upgrades used to be a Sim task; they are instant purchases now.
-                    TaskSave::Upgrade { .. } => continue,
                     TaskSave::Cook {
                         recipe,
                         step,
@@ -491,9 +489,6 @@ impl World {
                         ..r.rel
                     };
                     world.relationships.set(a, b, rel);
-                    if let Some(c) = r.chemistry {
-                        world.relationships.set_chemistry(a, b, c);
-                    }
                 }
             }
         }

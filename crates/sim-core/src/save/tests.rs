@@ -149,18 +149,6 @@ pub(super) fn drops_objects_missing_from_content() {
 }
 
 #[test]
-pub(super) fn old_upgrade_tasks_are_dropped_on_load() {
-    let w = World::from_json(CONTENT, LOT, 3).unwrap();
-    let json = w.save_json().replacen(
-        r#""tasks":[]"#,
-        r#""tasks":[{"type":"upgrade","object":1},{"type":"moveTo","x":2.5,"z":2.5,"directed":true}]"#,
-        1,
-    );
-    let loaded = World::from_save_json(CONTENT, &json).unwrap();
-    assert_eq!(loaded.sims[0].queue().count(), 1, "only the move is kept");
-}
-
-#[test]
 pub(super) fn the_speed_and_the_one_under_super_speed_load() {
     // A file without the speed super speed drops back to: normal under super speed, else the
     // speed it's at.

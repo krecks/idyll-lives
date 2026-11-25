@@ -437,9 +437,6 @@ pub struct ObjectSave {
     /// The colours the player chose, `#rrggbb` by part (absent: as made).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub colors: BTreeMap<String, String>,
-    /// Before v26: its one colour, on the `body`.
-    #[serde(default, skip_serializing)]
-    pub color: Option<String>,
     /// Money put into it; defaults to the price.
     #[serde(default)]
     pub value: Option<i64>,
@@ -796,11 +793,6 @@ pub enum TaskSave {
         skipped: u8,
         directed: bool,
     },
-    /// Old saves only (upgrades are instant now); dropped on load.
-    Upgrade {
-        #[allow(dead_code)]
-        object: u32,
-    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -872,9 +864,6 @@ pub struct RelationshipSave {
     pub b: u32,
     #[serde(flatten)]
     pub rel: Relationship,
-    /// Before v35 (since: in `SaveFile::chemistry`).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub chemistry: Option<f32>,
 }
 
 #[cfg(test)]
