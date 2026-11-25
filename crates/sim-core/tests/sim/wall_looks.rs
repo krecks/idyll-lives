@@ -299,4 +299,20 @@ fn looks_survive_saving_by_content_id() {
     );
     assert_eq!(loaded.lot.look(EdgeRef::H(2, 2)).style, 0);
     assert_eq!(loaded.lot.look(EdgeRef::H(3, 2)).sides, [1, 0]);
+
+    // A size Build would refuse (a 20 cm door, a sill past any top) is dropped on load.
+    for (sill, head) in [(None, Some(20)), (Some(u16::MAX), None)] {
+        let mut json = json.clone();
+        let door = json["lot"]["looks"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|l| l["x"] == 2)
+            .unwrap();
+        door["sill"] = serde_json::json!(sill);
+        door["head"] = serde_json::json!(head);
+        let loaded = World::from_save_json(CONTENT, &json.to_string()).unwrap();
+        let look = loaded.lot.look(EdgeRef::H(2, 2));
+        assert_eq!((look.sill, look.head), (None, None), "{sill:?} {head:?}");
+    }
 }
