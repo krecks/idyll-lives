@@ -5,7 +5,7 @@ One pack, `packs/ground/manifest.json`. None of them is an object the player buy
 group. The keys are unchanged.
 
 - **Grass tuft** (`model.grassTuft`, **removed 2026-10-25**: the lawn's grass is built on the GPU now,
-  `web/src/render/pc/grass.ts`, `plan/procedural-grass.md`; what follows is the model as it was): drawn by the ten thousand as thin instances on every unpaved tile and round
+  `web/src/render/pc/grass.ts`; what follows is the model as it was): drawn by the ten thousand as thin instances on every unpaved tile and round
   the town (`render/shared/nature.ts` `lawns`, in squares the camera leaves out, half of them on Low). Four bent
   blades leaning out from the middle in the old part's three greens and the fourth, one draw call
   (`foliage`: the nature shader's wind and per-instance tint). Each blade is a flat ribbon with one joint drawn

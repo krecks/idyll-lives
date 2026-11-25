@@ -43,7 +43,7 @@ pub fn main(args: &[String]) -> i32 {
             Some("sizes") => {
                 let Some(reference) = reference else {
                     eprintln!(
-                        "no {REFERENCE} yet: `cargo review sizes` compares with it (plan/authenticity-review.md §3.4)"
+                        "no {REFERENCE} yet: `cargo review sizes` compares with it"
                     );
                     return Ok(2);
                 };

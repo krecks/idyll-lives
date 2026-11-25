@@ -37,7 +37,7 @@
 #          web/tests/fixtures/junctions.ts; web/tests/builtDump.test.ts holds it, so the web job reads it too).
 # ci.yml itself (the jobs, bun-version, SLOW_TESTS), tools/ci-local.sh, tools/ci-runner.sh (the
 # runner's Rust) and this script run every job. Read by no step (checked by grep), so no job:
-# README.md, CHANGELOG.md (pages.yml's version check reads it, on a tag), PLAN.md, plan/, LICENSE, docs/ but review/reference.json, .gitignore,
+# README.md, CHANGELOG.md (pages.yml's version check reads it, on a tag), PLAN.md, LICENSE, docs/ but review/reference.json, .gitignore,
 # .git-blame-ignore-revs, pages.yml, crates/tools/README.md, the models' guides and notes (crates/art's
 # .md files), tools/characters/README.md, tools/art/README.md, and the tools no job runs: tools/bench,
 # llm, voice, audio, and tools/housegen (only `generated`'s, which runs on a tag or by hand, on
@@ -65,7 +65,7 @@ jobs_for() {
     tools/built/*) J="web tools" ;;
     tools/art/README.md) J="" ;;
     tools/pins/* | tools/render/* | tools/art/* | docs/review/reference.json) J="tools" ;;
-    README.md | CHANGELOG.md | PLAN.md | LICENSE | plan/* | docs/* | .gitignore | .git-blame-ignore-revs | \
+    README.md | CHANGELOG.md | PLAN.md | LICENSE | docs/* | .gitignore | .git-blame-ignore-revs | \
       .github/workflows/pages.yml | tools/bench/* | tools/llm/* | \
       tools/voice/* | tools/audio/* | tools/housegen/*)
       J="" ;;

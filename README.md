@@ -44,7 +44,7 @@ Build a home and watch the people who live in it.
 | W | Walls up → cutaway → down |
 | Esc | Step back, then the pause menu (save, load, settings) |
 
-Everything else (jobs, skills, money, building, the garden, every control and the graphics settings) is in [docs/playing.md](docs/playing.md). [PLAN.md](PLAN.md) has the research, architecture, milestones and known issues, and [CHANGELOG.md](CHANGELOG.md) what each release brought.
+Everything else (jobs, skills, money, building, the garden, every control and the graphics settings) is in [docs/playing.md](docs/playing.md). [PLAN.md](PLAN.md) has the status, open points, known issues and architecture, and [CHANGELOG.md](CHANGELOG.md) what each release brought.
 
 ## Run it
 
