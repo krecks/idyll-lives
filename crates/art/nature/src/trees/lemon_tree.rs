@@ -30,6 +30,9 @@ pub fn species() -> Species {
             ("fruit", "#F2D23C"),
             ("fruit2", "#F5DC50"),
             ("fruit3", "#E8C42E"),
+            // its slim stem and boughs plain, the bark's tone: with the pot, one draw call (four were three
+            // with the bark's own), and a stem this slim in a pot hardly bends in the wind
+            ("stalk", "#5C4C3E"),
         ],
         trunk: Stage::Own(potted),
         crown: Stage::Spec(Crown {
@@ -38,13 +41,16 @@ pub fn species() -> Species {
             tips: 12,
             limbs: 4,
             base_z: (0.95, 1.02),
-            material: None,
+            material: Some("stalk"),
             o: Branches {
                 leader_z: Some(1.0),
                 bottom: -0.6,
                 spread: 0.95,
                 limb_r: (0.02, 0.011),
                 bough_r: (0.011, 0.005),
+                // (round, on a plain finish: four and five sides showed as hard edges)
+                verts: 6,
+                bough_verts: 6,
                 fork: (0.4, 0.5),
                 lift: 0.1,
                 wander: 0.2,
@@ -100,7 +106,8 @@ pub fn lemon_tree() -> Vec<Obj> {
 /// The pot with its band, and the stem out of it.
 fn potted(tree: &mut Tree) {
     let p = &tree.palette;
-    let top = pot!(p, 0.3, 0.5, r_bottom = 0.22, rim = 0.016);
+    // (20 round, its band too: the triangles the round boughs took, under the trees' 4,500)
+    let top = pot!(p, 0.3, 0.5, r_bottom = 0.22, rim = 0.016, segments = 20);
     // its square-cut rim eased, as a thrown pot's is (KIT: botany's `pot` cuts it square)
     bevel_edges(
         scene::obj("pot"),
@@ -114,11 +121,11 @@ fn potted(tree: &mut Tree) {
         0.36,
         0.22 + 0.004 + (0.3 - 0.226) * (0.36 - 0.012) / (0.47 - 0.012),
     );
-    let band: Vec<(f64, f64, f64)> = (0..24)
+    let band: Vec<(f64, f64, f64)> = (0..20)
         .map(|k| {
             (
-                rb * cos(TAU * k as f64 / 24.0),
-                rb * sin(TAU * k as f64 / 24.0),
+                rb * cos(TAU * k as f64 / 20.0),
+                rb * sin(TAU * k as f64 / 20.0),
                 zb,
             )
         })
@@ -144,7 +151,8 @@ fn potted(tree: &mut Tree) {
         &[1.2, 1.0, 0.9, 0.8],
         14.0,
         verts = 6,
-        wobble = 0.0
+        wobble = 0.0,
+        material = Some(p.get("stalk"))
     );
 }
 

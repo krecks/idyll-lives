@@ -731,9 +731,6 @@
       "type": "model",
       "url": "../../models/trees/lemonTree.glb",
       "materials": {
-        "bark": {
-          "finish": "material.finish.bark"
-        },
         "body": {
           "finish": "material.finish.satin"
         },
@@ -775,6 +772,9 @@
         },
         "soil": {
           "finish": "material.finish.matte"
+        },
+        "stalk": {
+          "finish": "material.finish.satin"
         }
       },
       "motions": {
