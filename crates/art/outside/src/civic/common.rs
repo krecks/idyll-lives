@@ -4,7 +4,7 @@
 use artkit::materials::Mat;
 use artkit::math::radians;
 use artkit::parts::{join, new_parts, set_origin};
-use artkit::place::{Coord, GameFrame, Spot};
+use artkit::place::{Coord, GameFrame};
 use artkit::scene::Obj;
 use artkit::{fbox, fsphere, fsweep, jitter, kit_fillet, kit_tube, loft, palette, revolve};
 
@@ -97,23 +97,13 @@ palette! { M:
     vault_dark = ("#5C6168", metal),
 }
 
+pub use crate::outdoor::common::rod;
+
 pub const F: GameFrame = GameFrame::new(0.0);
 pub const WALL: f64 = -0.43; // the wall's face, game depth (one tile deep)
 
 // Heights the content names (civic.json): kept here and checked against it.
 pub const SEAT: f64 = 0.45; // pew and waitingBench seat.height (forward 0)
-
-/// A round bar between two game points.
-pub fn rod(name: &str, a: impl Spot, b: impl Spot, r: f64, m: Mat, verts: usize) -> Obj {
-    artkit::rod!(
-        name,
-        a.through(&F),
-        b.through(&F),
-        r,
-        material = m,
-        verts = verts
-    )
-}
 
 /// A bent tube through game points, its corners rounded without overshooting.
 pub fn tube(name: &str, pts: &[(f64, f64, f64)], r: f64, m: Mat, corner: f64, verts: usize) -> Obj {

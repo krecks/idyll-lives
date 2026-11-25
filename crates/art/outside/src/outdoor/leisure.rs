@@ -1,7 +1,7 @@
 //! OU2: the sun lounger, the hammock, the porch swing, the swing set and the cedar hot tub; each moves while it
 //! is used.
 
-use super::common::{F, M, board, end_round, mesh_of, plank, side_slab, tapered_leg};
+use super::common::{F, M, end_round, mesh_of, plank, side_slab, tapered_leg};
 use super::seats::arm_board;
 use artkit::forms::{bisect, rounded_rect};
 use artkit::json::float_repr;
@@ -319,7 +319,8 @@ pub fn hammock() -> Vec<Obj> {
                 M.hammock_frame,
                 0.006,
             );
-            board(
+            kit::board(
+                &F,
                 &format!("brace{s}"),
                 (0, 0.06, sf * 1.0),
                 (0, 0.5, sf * 1.34),
@@ -506,7 +507,8 @@ fn a_frame(prefix: &str, beam_y: f64, material: Mat, round_legs: bool, spread: f
                 );
             }
         }
-        board(
+        kit::board(
+            &F,
             &format!("{prefix}tie{s}"),
             (x, 0.7, -tie - 0.03),
             (x, 0.7, tie + 0.03),

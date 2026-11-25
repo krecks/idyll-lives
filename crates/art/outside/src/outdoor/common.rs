@@ -11,7 +11,7 @@ use artkit::palette;
 use artkit::parts::join_all;
 use artkit::place::{Coord, Facing, GameFrame, Spot};
 use artkit::scene::{Obj, meshes};
-use artkit::{cube, cylinder, extrude, fcyl, fextrude, fsweep, loft, revolve, ring, settle};
+use artkit::{cylinder, extrude, fcyl, fextrude, fsweep, loft, revolve, ring, settle};
 
 palette! { M:
     iron = ("#2A2C30", metal),           // cast and wrought iron frames
@@ -95,33 +95,6 @@ pub const F: GameFrame = GameFrame::new(0.0);
 /// A game position or direction as a Blender vector.
 pub fn v(p: impl Spot) -> V3 {
     V3::from(p.through(&F))
-}
-
-/// A board from game point `a` to `b`, `w` wide and `t` thick, its broad face turned towards game direction
-/// `face` (up for a seat slat, forwards for a back slat): slats, rails and legs at any angle.
-#[allow(clippy::too_many_arguments)] // (as the script called it)
-pub fn board(
-    name: &str,
-    a: impl Spot,
-    b: impl Spot,
-    w: f64,
-    t: f64,
-    material: Mat,
-    face: impl Spot,
-    bevel: f64,
-) -> Obj {
-    let (a, b) = (v(a), v(b));
-    let z = (b - a).normalized();
-    let x = v(face).cross(z).normalized();
-    let y = z.cross(x);
-    let obj = cube!(
-        name,
-        (w, t, (b - a).length()),
-        material = material,
-        bevel = bevel
-    );
-    let rot = M3([x.array(), y.array(), z.array()]);
-    obj.set_matrix_world(M4::translation((a + b) / 2) * rot.to_4x4())
 }
 
 /// A round bar from game point `a` to `b`.

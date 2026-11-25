@@ -21,6 +21,7 @@
 //! a bench's ends, a recess or a hole cut into a body), `metalwork` (tube, scrolls), `creatures` (a songbird),
 //! `signs` (the taxi's word and chequers, raised block letters), `tableware`.
 
+mod board;
 pub mod creatures;
 mod duvet;
 mod figure8;
@@ -38,6 +39,7 @@ mod tiled_walls;
 mod turn_round;
 pub mod turned;
 
+pub use board::*;
 pub use creatures::*;
 pub use duvet::*;
 pub use figure8::*;
