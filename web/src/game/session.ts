@@ -9,7 +9,7 @@ import { SaveRefused, SimBridge, type FrameState } from '../core/bridge';
 import type { Command, GameKind, GameSource, ItemPlacement, Lifespan, Routine, SimInfo, SocialEvent, WorldStructure } from '../core/protocol';
 import { flatOf, groundDepth, lotOf, lowestStorey, storeyRow } from '../core/protocol';
 import { townMap } from '../ui/townMap.svelte';
-import { nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
+import { gameOnLoading, listSaves, nextAutosaveId, readSave, refuseSave, UnloadableSave, writeSave, type SaveRecord } from '../persistence/saves';
 import { BENCH } from '../debug/benchFlags';
 import { DEBUG_HOOKS } from '../debug/hooks';
 import { GAMEPLAY_STATS, installGameplayStats } from '../debug/gameplayStats';
@@ -277,7 +277,7 @@ async function openSession(
     if (!saved) throw new Error('That save no longer exists.');
     source = { save: saved.data };
     household = saved.household;
-    gameId = saved.game ?? saved.id;
+    gameId = gameOnLoading(saved, await listSaves());
   }
 
   progress('Starting the simulation', 0.15);
@@ -1317,7 +1317,7 @@ async function openSession(
     return id;
   };
   /** Saves into the older of the game's two autosaves. */
-  const storeAutosave = async () => store(`${household} · Autosave`, await nextAutosaveId(gameId), true);
+  const storeAutosave = async () => store(`${household} · Autosave`, nextAutosaveId(gameId, await listSaves()), true);
   /** When the game last autosaved (or started). */
   let autosavedAt = -Infinity;
   let autosaveFailed = false;
