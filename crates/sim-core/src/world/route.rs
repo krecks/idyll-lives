@@ -547,7 +547,7 @@ pub(crate) fn progress(
             {
                 return end_activity(sim, content, objects);
             }
-            // Sold at a post: not begun until its server serves them (`staff::hold`).
+            // Sold at a post: not begun (nor paid) until its server serves them (`staff::hold`).
             if let TaskKind::Use {
                 object,
                 interaction,
@@ -564,13 +564,14 @@ pub(crate) fn progress(
                     inter,
                     ticks,
                 ) {
+                    // Paid as they're served (not on arrival: someone called away while they
+                    // wait has paid nothing).
+                    Some(crate::staff::Hold::Serve) if *elapsed == 0.0 => {
+                        sim.pending_spend += ctx.cost_of(object, inter).max(0);
+                    }
                     None | Some(crate::staff::Hold::Serve) => {}
                     Some(crate::staff::Hold::Wait) => return,
-                    // (Not served: the money paid on arrival back.)
-                    Some(crate::staff::Hold::GiveUp) => {
-                        sim.pending_spend -= ctx.cost_of(object, inter).max(0);
-                        return end_activity(sim, content, objects);
-                    }
+                    Some(crate::staff::Hold::GiveUp) => return end_activity(sim, content, objects),
                 }
             }
             // A game for two: not begun until the one they play with is at their place too, and
