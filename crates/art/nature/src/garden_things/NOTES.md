@@ -95,7 +95,7 @@ stones' own random numbers are seeded from a float as Python's `random.seed` see
 
 ## The gate's edges and texels (2026-11-25)
 
-Every edge the gate found is eased: the pond's flags have a weathered round top edge (five loft rows, no turn of 60°,
+Every edge the gate found is eased: the pond's flags have a weathered round top edge (four loft rows, no turn of 60°,
 6,440 triangles) and its water a 4 mm meniscus; the lamp post's flutes are a wave (40 points), its lantern's corner
 bars rounded (`rounded_rect`), its square rings' corners eased 6 mm and its floor's rim rolled; the birdhouse's braces
 rounded, its gabled box chamfered (`crate::chamfer`) and its front bevelled 3 mm; the feeders' trays have a round lip
