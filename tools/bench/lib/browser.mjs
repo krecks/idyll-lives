@@ -138,13 +138,14 @@ export async function answers(url) {
 
 /**
  * The dev server a tool's pages come from: `url` as it is, else the one already answering on `port`, else one
- * started there (`serve`). Resolves `{ url, stop, started }` (`stop` does nothing to a server this didn't start).
+ * started there (`serve`; `mode` 'preview': `vite preview` of web/'s build). Resolves `{ url, stop, started }`
+ * (`stop` does nothing to a server this didn't start).
  */
-export async function devServer({ url = null, port }) {
+export async function devServer({ url = null, port, mode = 'dev' }) {
   if (url) return { url: url.replace(/\/$/, ''), stop: () => {}, started: false };
   const there = `http://localhost:${port}`;
   if (await answers(there)) return { url: there, stop: () => {}, started: false };
-  const { url: started, stop } = await serve({ port });
+  const { url: started, stop } = await serve({ mode, port });
   return { url: started, stop, started: true };
 }
 
@@ -248,6 +249,17 @@ export async function step(page, poses, fn, { limitMs = 60_000, before = null } 
     await page.evaluate((ms) => window.__bench.settle({ limitMs: ms }), limitMs);
     await fn(page, p);
   }
+}
+
+/** The page's Math.random, seeded (mulberry32), before any of its scripts (`context.addInitScript(seeded, n)`). */
+export function seeded(n) {
+  let a = (n ^ 0x9e3779b9) >>> 0;
+  Math.random = () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 /** Two more frames drawn (what was placed a frame after the camera, then the picture). */

@@ -15,7 +15,7 @@
 
 use crate::math::{self, Axis, EulerOrder, M4, P3, PI, Quat, V3};
 use crate::py;
-use crate::scene::{self, FPS, Obj, RotationMode};
+use crate::scene::{FPS, Obj, RotationMode};
 use crate::shapes::options;
 
 mod clips;
@@ -46,6 +46,7 @@ pub use pose::*;
 mod tests {
     use super::*;
     use crate::mesh::Mesh;
+    use crate::scene;
 
     fn part() -> Obj {
         scene::reset();
