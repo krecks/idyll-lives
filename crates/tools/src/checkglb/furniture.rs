@@ -71,7 +71,12 @@ impl Sampler {
     }
 
     /// `new` with the parts `skip` (their nodes, or the moving parts they are on) left out.
-    fn without(g: &Glb, entry: &J, pose: Option<&Pose>, skip: &HashSet<usize>) -> R<Option<Sampler>> {
+    fn without(
+        g: &Glb,
+        entry: &J,
+        pose: Option<&Pose>,
+        skip: &HashSet<usize>,
+    ) -> R<Option<Sampler>> {
         let materials = g.gltf.get("materials").and_then(J::list).unwrap_or(&[]);
         let no_overrides = J::Obj(Vec::new());
         let overrides = entry.get("materials").unwrap_or(&no_overrides);
