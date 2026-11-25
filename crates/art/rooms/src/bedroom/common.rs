@@ -8,9 +8,7 @@ use artkit::math::{P3, PI, cos, radians, sin, sqrt};
 use artkit::parts::{join, measure};
 use artkit::place::{Coord, GameFrame};
 use artkit::scene::{self, Obj, meshes};
-use artkit::{
-    fbox, fcone, fcyl, fextrude, fsphere, fsweep, jitter, loft, ring, soft,
-};
+use artkit::{fbox, fcone, fcyl, fextrude, fsphere, fsweep, jitter, loft, ring, soft};
 use artkit::{kit, palette, settle};
 
 palette! { M:
@@ -179,7 +177,16 @@ pub const FOLDS: f64 = 0.26; // and how far apart
 /// The duvet's top third, flat on the mattress with the sheet turned down over its head edge, hinged across its
 /// fold (`kit::duvet_flap`).
 pub fn flap(top: f64, half: f64, z_top: f64, z_fold: f64, material: Mat) -> Obj {
-    kit::duvet_flap!(F, top, half, z_top, z_fold, material, M.sheet, height = DUVET)
+    kit::duvet_flap!(
+        F,
+        top,
+        half,
+        z_top,
+        z_fold,
+        material,
+        M.sheet,
+        height = DUVET
+    )
 }
 
 /// `bedding`'s options.

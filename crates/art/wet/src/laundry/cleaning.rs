@@ -635,4 +635,3 @@ pub fn ironing_board() -> Vec<Obj> {
     squash!(iron, "iron_off", 0.001, seconds = OFF);
     objs
 }
-

@@ -34,6 +34,7 @@ mod pleats;
 pub mod signs;
 pub mod tableware;
 mod throw;
+mod tiled_walls;
 mod turn_round;
 pub mod turned;
 
@@ -48,6 +49,7 @@ pub use mug::*;
 pub use pleats::*;
 pub use signs::*;
 pub use throw::*;
+pub use tiled_walls::*;
 pub use turn_round::*;
 pub use turned::*;
 
@@ -58,7 +60,8 @@ pub use crate::{
     kit_lathe as lathe, kit_letters as letters, kit_moulding as moulding, kit_mug as mug,
     kit_pleats as pleats, kit_pull as pull, kit_recessed_box as recessed_box, kit_scroll as scroll,
     kit_shaker as shaker, kit_songbird as songbird, kit_taxi_word as taxi_word, kit_throw as throw,
-    kit_tube as tube, kit_turn_down as turn_down, kit_turned as turned,
+    kit_tiled_walls as tiled_walls, kit_tube as tube, kit_turn_down as turn_down,
+    kit_turned as turned,
 };
 
 /// Python's `min` of floats: the first of the least.

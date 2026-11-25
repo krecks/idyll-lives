@@ -8,7 +8,7 @@ Each is built where the game places it (`F`, game axes; `settle!(centre = false)
 The contrast shower stood 2 cm into the wall; it is centred on its `Model` `centre` now (`settle_all()`), its back on
 the wall face at −0.43 and its front 3 cm short of the tile's, as the wall-standing ones' old parts stood, so the
 model and the wall agree within a centimetre.
-The contrast shower fills its tile with its own tiled walls, as the bathroom family's showers do.
+The contrast shower fills its tile with its own tiled walls (`kit::tiled_walls!`, as the bathroom family's showers).
 
 | Model | Moving part and clip | Played by |
 |---|---|---|
