@@ -2163,7 +2163,8 @@ export class HousePlanner {
     const [x0, z0, x1, z1] = house;
     return Array.from({ length: storeys }, (_, k) => {
       const dz = storeyRow(world, k);
-      return indoorRects((x, z) => world.rooms[(z + dz) * world.width + x] ?? 0, x0, z0, x1, z1).map((r): WallBox => [r.x0, r.z0, r.x1, r.z1]);
+      // (Every indoor tile, as the house's own roofs take them: a sliver under 4 tiles left out was a hole in its walls.)
+      return indoorRects((x, z) => world.rooms[(z + dz) * world.width + x] ?? 0, x0, z0, x1, z1, 1).map((r): WallBox => [r.x0, r.z0, r.x1, r.z1]);
     });
   }
 
