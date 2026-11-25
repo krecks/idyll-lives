@@ -763,7 +763,7 @@
         "height": 0.42,
         "kind": "low",
         "size": [
-          1.66,
+          1.52,
           0.72
         ]
       },
@@ -857,12 +857,12 @@
         "height": 0.8,
         "kind": "low",
         "size": [
-          1.8,
-          0.56
+          1.6,
+          0.44
         ],
         "at": [
           0.0,
-          -0.15
+          -0.21
         ]
       },
       "description": "A long oak table on black steel legs for a hall or behind a sofa, baskets underneath.",
