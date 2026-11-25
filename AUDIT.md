@@ -51,10 +51,10 @@ Size: 454,260 lines of Rust over 1,190 files, plus `web/src` ≈ 177,863 lines. 
 
 | # | Sev | Location | What is wrong | Why it matters | Smallest fix | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| P1 | low | `crates/sim-core/src/world/outings.rs:52` | `.filter(\|(_, r)\| r.kind == crate::travel::RoadKind::Trail).map(\|(i, r)\| (i, r.project(at)))` — every road is projected onto (linear in its segments) to find the nearest trail | Called per sim routing a trail walk (`crates/sim-core/src/world/route.rs:635`), so a town with many roads pays O(roads × segments) per walk | Index trailheads in `Travel` when the graph is built (P4) | proposed |
-| P2 | low | `crates/sim-core/src/rooms/score.rs:115` | `let mut by_id = vec![usize::MAX; most + 1];` (and `:116`, `:127` `vec![Things::default(); rooms.len()]`) | Three allocations per rescore; the rescore runs on every object change (`crates/sim-core/src/world/rooms.rs:254`), which a busy lot does constantly | Keep the three as scratch in `RoomTiles` (P5) | proposed |
-| P3 | low | `crates/sim-core/src/world/navigation.rs:9` | `let centres: Vec<[f32; 2]> = self.objects.iter().map(\|o\| o.centre(&self.content)).collect();` | Recomputes every object's centre and reallocates on each `refresh_index` (every object-version change) | Cache the centres beside `objects_version` | proposed |
-| P4 | low | `crates/sim-core/src/cars/bodies.rs:12` | `pub fn hidden(cars: &[Car]) -> Vec<bool>` — two `Vec`s and a sort | Called on every snapshot write (`crates/sim-wasm/src/lib.rs:203`), i.e. per frame; the only per-frame allocation left in `snapshot::write` | Take an `&mut Vec<bool>` scratch, or skip the sort when nothing is out of sight (it already returns early, but still allocates) | proposed |
+| P1 | low | `crates/sim-core/src/world/outings.rs:52` | `.filter(\|(_, r)\| r.kind == crate::travel::RoadKind::Trail).map(\|(i, r)\| (i, r.project(at)))` — every road is projected onto (linear in its segments) to find the nearest trail | Called per sim routing a trail walk (`crates/sim-core/src/world/route.rs:635`), so a town with many roads pays O(roads × segments) per walk | Index trailheads in `Travel` when the graph is built (P4) | applied (`audit/performance`, `5708bfa2d`) |
+| P2 | low | `crates/sim-core/src/rooms/score.rs:115` | `let mut by_id = vec![usize::MAX; most + 1];` (and `:116`, `:127` `vec![Things::default(); rooms.len()]`) | Three allocations per rescore; the rescore runs on every object change (`crates/sim-core/src/world/rooms.rs:254`), which a busy lot does constantly | Keep the three as scratch in `RoomTiles` (P5) | applied (`audit/performance`, `0f9e26069`) |
+| P3 | low | `crates/sim-core/src/world/navigation.rs:9` | `let centres: Vec<[f32; 2]> = self.objects.iter().map(\|o\| o.centre(&self.content)).collect();` | Recomputes every object's centre and reallocates on each `refresh_index` (every object-version change) | Cache the centres beside `objects_version` | applied (`audit/performance`, `dd91ddcf0`) |
+| P4 | low | `crates/sim-core/src/cars/bodies.rs:12` | `pub fn hidden(cars: &[Car]) -> Vec<bool>` — two `Vec`s and a sort | Called on every snapshot write (`crates/sim-wasm/src/lib.rs:203`), i.e. per frame; the only per-frame allocation left in `snapshot::write` | Take an `&mut Vec<bool>` scratch, or skip the sort when nothing is out of sight (it already returns early, but still allocates) | applied (`audit/performance`, `a1fae0b4b`) |
 
 The hot paths are otherwise deliberately allocation-free (`crates/sim-core/src/world/tick/step.rs` has no
 `collect`; the tick's few `Vec`s, `advance.rs:175`/`:218`/`:743`, are on rare events and bounded by
@@ -105,7 +105,7 @@ Filled in as each branch lands; see the git log of each branch for the exact com
 | --- | --- | --- |
 | `audit/report` | `d4d4db99f` | this report; no code change on this branch |
 | `audit/bugs` | `e2156b99e` B2 · `842cdb0b0` B3 · `30cad03bb` B5 · `23dcc0595` B4 · `fd4e0a6b8` B7 · `8ed7cb2f2` B1 · `c97edcc18` B1's test | B1, B2, B3, B4, B5, B7 |
-| `audit/performance` | — | none applied: every performance finding is low severity and needs a new field or an index (P4, P5) |
+| `audit/performance` | `dd91ddcf0` P3 · `0f9e26069` P2 · `5708bfa2d` P1 · `a1fae0b4b` P4 | P1, P2, P3, P4 |
 | `audit/maintainability` | `b8b46ec9f` | M3 |
 | `audit/simplification` | `e07708f7c` S1 · `8cd3676bc` S2 | S1, S2 |
 | `audit/split` | `ae27d079d` | SP1 (M5) |
@@ -138,13 +138,13 @@ branch was checked with the CI's own first two steps — `cargo fmt --all --chec
 - Options: (a) comment + `debug_assert!`; (b) return `None` (behaviour change for a desync only); (c) fold into S1's `span` and document there.
 - Trade-off: (b) makes a broken route's cars drive down the middle; (a)/(c) keep them in lane. Effort: 15 min. Risk: low.
 
-### P4 — a trailhead index (P1)
+### P4 — a trailhead index (P1) — applied (`audit/performance`, `5708bfa2d`)
 
 - Problem: `trail_step` projects onto every road to find the nearest trail, per walk.
 - Options: (a) keep a `Vec<u32>` of trail roads in `Travel`, built with the graph, so only trails are projected; (b) a coarse grid of trails, as `ObjectIndex` does for objects.
 - Trade-off: (a) is ~10 lines and removes the road-kind filter and most projections; (b) is the right answer if trails grow numerous. Effort: 1–2 h. Risk: low (the chosen trail must stay the same — assert it in a test comparing both).
 
-### P5 — scratch for the rescore (P2, P3)
+### P5 — scratch for the rescore (P2, P3) — applied (`audit/performance`, `0f9e26069`, `dd91ddcf0`)
 
 - Problem: `rescore_things` allocates three `Vec`s per call; `refresh_index` rebuilds `centres`.
 - Options: (a) move them into `RoomTiles`/`ObjectIndex` as scratch fields; (b) a thread-local; (c) leave it.
