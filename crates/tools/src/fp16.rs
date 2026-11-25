@@ -31,16 +31,20 @@ pub(crate) struct Field<'a> {
 
 fn varint(buf: &[u8], at: &mut usize) -> Result<u64, String> {
     let mut value: u64 = 0;
-    let mut scale: u64 = 1;
-    loop {
+    for shift in 0..10 {
         let b = *buf.get(*at).ok_or("protobuf: truncated varint")?;
         *at += 1;
-        value = value.wrapping_add((b & 0x7f) as u64 * scale);
+        // Protobuf caps a varint at ten bytes, and the tenth carries only the 64th bit: anything
+        // past that is a value no `u64` holds, and wrapping it silently would accept it.
+        if shift == 9 && b > 1 {
+            return Err("protobuf: varint overflows 64 bits".into());
+        }
+        value |= ((b & 0x7f) as u64) << (shift * 7);
         if b < 0x80 {
             return Ok(value);
         }
-        scale = scale.wrapping_mul(128);
     }
+    Err("protobuf: varint runs past ten bytes".into())
 }
 
 fn encode_varint(value: u64) -> Vec<u8> {
@@ -349,6 +353,18 @@ mod tests {
             assert_eq!(varint(&bytes, &mut at).unwrap(), v);
             assert_eq!(at, bytes.len());
         }
+    }
+
+    #[test]
+    fn a_varint_past_ten_bytes_is_refused() {
+        // Every byte says "one more": the varint never ends.
+        let bytes = [0xffu8; 10];
+        let mut at = 0;
+        assert!(varint(&bytes, &mut at).is_err(), "an error, not a panic");
+        // Ten bytes whose last carries more than the 64th bit name a value no `u64` holds.
+        let bytes = [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f];
+        let mut at = 0;
+        assert!(varint(&bytes, &mut at).is_err(), "an error, not a panic");
     }
 
     /// A graph with one initializer of `n` float32 values called `w`, and one node.
