@@ -16,7 +16,7 @@
 
 use crate::fp16::{
     FLOAT, MIN_VALUES, bytes_field, fields, half_tensor, read_tensor, string_field, to_half,
-    varint_field,
+    varint, varint_field,
 };
 use std::collections::HashMap;
 
@@ -43,17 +43,7 @@ pub(crate) fn dims(buf: &[u8]) -> Result<Vec<u64>, String> {
             (1, 2) => {
                 let mut at = 0;
                 while at < f.payload.len() {
-                    let (mut v, mut shift) = (0u64, 0);
-                    loop {
-                        let b = *f.payload.get(at).ok_or("protobuf: truncated dims")?;
-                        at += 1;
-                        v |= u64::from(b & 0x7f) << shift;
-                        if b < 0x80 {
-                            break;
-                        }
-                        shift += 7;
-                    }
-                    out.push(v);
+                    out.push(varint(f.payload, &mut at)?);
                 }
             }
             _ => {}
@@ -110,7 +100,7 @@ fn quantize(values: &[f32], dims: &[u64], axis: usize) -> (Vec<u8>, Vec<f32>) {
     (bytes, scales)
 }
 
-fn tensor(name: &str, ty: u64, dims: &[u64], raw: &[u8]) -> Vec<u8> {
+pub(crate) fn tensor(name: &str, ty: u64, dims: &[u64], raw: &[u8]) -> Vec<u8> {
     let mut out = Vec::new();
     for &d in dims {
         out.extend_from_slice(&varint_field(1, d));
@@ -297,6 +287,13 @@ mod tests {
         // The largest value of a channel is exactly ±127.
         assert!(q.iter().any(|&b| b as i8 == 127 || b as i8 == -127));
         assert!(!inits.contains_key("w"));
+    }
+
+    #[test]
+    fn packed_dims_refuse_a_varint_past_ten_bytes() {
+        let ok = bytes_field(1, &[0x80, 0x01, 0x05]);
+        assert_eq!(dims(&ok).unwrap(), [128, 5]);
+        assert!(dims(&bytes_field(1, &[0xff; 11])).is_err());
     }
 
     #[test]

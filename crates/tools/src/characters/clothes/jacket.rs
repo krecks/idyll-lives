@@ -184,7 +184,7 @@ pub(super) fn collar(family: &str, stage: &str, gid: &str, cuts: &Cuts) -> Mesh 
         r1.push(bb);
         r2.push(c);
     }
-    let (pos, idx) = strip(&[r0, r1, r2], false);
+    let (pos, idx) = grid(&[r0, r1, r2], false);
     let idx = outward(&pos, idx, (0.0, p[b("neck_01")].z));
     let mut dense = follow(&pos, &s);
     // The collar's back is on the midline, where the nearest body vertices come in mirror pairs:

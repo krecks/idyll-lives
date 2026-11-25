@@ -29,7 +29,7 @@ pub(crate) struct Field<'a> {
     pub(crate) bytes: &'a [u8],
 }
 
-fn varint(buf: &[u8], at: &mut usize) -> Result<u64, String> {
+pub(crate) fn varint(buf: &[u8], at: &mut usize) -> Result<u64, String> {
     let mut value: u64 = 0;
     for shift in 0..10 {
         let b = *buf.get(*at).ok_or("protobuf: truncated varint")?;

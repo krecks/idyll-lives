@@ -46,6 +46,7 @@ use super::meshops::{Src, boundary_edges, clip_by_field, smooth_normals};
 use super::np::{
     PI, clip, linspace, linspace_open, py_mod, py_round, radians, sign, smoothstep, unique,
 };
+use super::prims::grid;
 use super::rig::{BASE_STAGE, NB, b, proportions};
 use super::{Cache, Dense, M3, Mesh, V3, v3};
 

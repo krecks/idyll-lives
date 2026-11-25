@@ -137,7 +137,7 @@ fn sole(
             vec![FLAG_SOLE; 2 * segs],
         )
     };
-    let (mut pos, mut idx) = strip(&rows, true);
+    let (mut pos, mut idx) = grid(&rows, true);
     if st.midsole > 0.0 {
         // The two rows twice (the welt's and the midsole's seam, and the midsole's and the outsole's):
         // no triangles between them, so each band keeps one flag from end to end.

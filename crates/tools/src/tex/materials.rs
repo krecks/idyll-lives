@@ -28,8 +28,8 @@ impl J {
 
     fn write(&self, out: &mut String, depth: usize) {
         match self {
-            J::Str(s) => out.push_str(&crate::content::json_str(s)),
-            J::Owned(s) => out.push_str(&crate::content::json_str(s)),
+            J::Str(s) => out.push_str(&crate::checkglb::py::json_str(s)),
+            J::Owned(s) => out.push_str(&crate::checkglb::py::json_str(s)),
             J::Int(i) => {
                 let _ = write!(out, "{i}");
             }
@@ -40,7 +40,7 @@ impl J {
                 for (i, (k, v)) in m.iter().enumerate() {
                     out.push_str(if i == 0 { "\n" } else { ",\n" });
                     out.push_str(&"  ".repeat(depth + 1));
-                    out.push_str(&crate::content::json_str(k));
+                    out.push_str(&crate::checkglb::py::json_str(k));
                     out.push_str(": ");
                     v.write(out, depth + 1);
                 }

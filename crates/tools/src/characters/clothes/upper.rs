@@ -365,21 +365,11 @@ pub(super) fn upper(family: &str, stage: &str, gid: &str, lod: bool) -> Mesh {
     if !lod {
         // The lining: a band from the collar's edge in to the skin (its hem distance negative: drawn dark).
         let depth = 0.85 * (st.lift + st.pad + st.shaft) * k;
-        let be: Vec<[usize; 2]> = boundary_edges(&out.idx)
-            .into_iter()
-            .filter(|e| !(lay.low[e[0]] && lay.low[e[1]]))
-            .collect();
-        let verts = unique(&be.concat());
-        let mut inner = vec![usize::MAX; n0];
+        let verts;
+        (out.pos, out.idx, verts) = rim(&out.pos, &out.nor, &out.idx, depth, Some(&lay.low));
         for &v in &verts {
-            inner[v] = out.pos.len();
-            let (p, nv) = (out.pos[v], out.nor[v]);
-            out.pos.push(p - nv * depth);
             out.fields.push([-depth, flag, SHOES, 1.0]);
             d.push(d[v]);
-        }
-        for [a, bv] in be {
-            out.idx.extend([bv, a, inner[a], bv, inner[a], inner[bv]]);
         }
         out.nor
             .extend_from_slice(&smooth_normals(&out.pos, &out.idx)[n0..]);
