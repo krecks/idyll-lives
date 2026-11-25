@@ -1,7 +1,7 @@
 //! The label-and-sort organizer desk and the tidy entry console.
 
 use super::common::{_flat, M, PASTELS, WALL};
-use artkit::forms::rounded_rect;
+use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{P3, cosd, sind};
@@ -25,19 +25,26 @@ const BIN: (f64, f64) = (0.0, 0.87); // the bin `drawer_open` pulls out (x, midd
 /// A storage bin: lofted, a little wider at its mouth, a label holder and a grip cut in its front.
 fn _bin(f: &GameFrame, name: &str, x: f64, y: f64, material: Mat) {
     let b = f.at(x, y - 0.095, HZ - 0.005);
-    let sections: Vec<Vec<P3>> = [(0.0, 0.94), (0.005, 0.97), (0.18, 1.0), (0.19, 1.02)]
-        .iter()
-        .map(|&(h, k)| {
-            ring!(
-                0.13 * k,
-                (HD - 0.02) / 2.0 * k,
-                z = b.z + h,
-                verts = 16,
-                square = 6,
-                at = (b.x, b.y)
-            )
-        })
-        .collect();
+    let sections: Vec<Vec<P3>> = [
+        (0.0, 0.94),
+        (0.005, 0.97),
+        (0.18, 1.0),
+        (0.186, 1.02), // (its lip rounded over)
+        (0.19, 1.012),
+        (0.192, 0.995),
+    ]
+    .iter()
+    .map(|&(h, k)| {
+        ring!(
+            0.13 * k,
+            (HD - 0.02) / 2.0 * k,
+            z = b.z + h,
+            verts = 16,
+            square = 6,
+            at = (b.x, b.y)
+        )
+    })
+    .collect();
     loft!(name, &sections, material = material);
     let face = HZ - 0.005 + (HD - 0.02) / 2.0;
     soft!(
@@ -405,22 +412,34 @@ const PANEL_TOP: f64 = 1.78; // the back panel's top, under its cap
 /// A shoe: a lofted upper rising to the heel, its opening dark, on a white sole.
 fn _shoe(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, material: Mat) {
     let b = f.at(x, y + 0.012, z);
-    let upper: Vec<Vec<P3>> = [(0.0, 1.0), (0.035, 1.0), (0.05, 0.85)]
+    let outline = smooth_outline(
+        &[
+            (0.0, -0.11),
+            (0.03, -0.09),
+            (0.038, 0.0),
+            (0.034, 0.09),
+            (0.0, 0.105),
+            (-0.034, 0.09),
+            (-0.038, 0.0),
+            (-0.03, -0.09),
+        ],
+        1,
+        true,
+    );
+    // (h, inset): its top's edge rounded in all round
+    let upper: Vec<Vec<P3>> = [(0.0, 0.0), (0.035, 0.0), (0.044, 0.003), (0.05, 0.008)]
         .iter()
-        .map(|&(h, k)| {
-            [
-                (0.0, -0.11),
-                (0.03, -0.09),
-                (0.038, 0.0),
-                (0.034, 0.09),
-                (0.0, 0.105),
-                (-0.034, 0.09),
-                (-0.038, 0.0),
-                (-0.03, -0.09),
-            ]
-            .iter()
-            .map(|&(px, py)| P3::from((b.x + px * k, b.y + py, b.z + h)))
-            .collect()
+        .map(|&(h, e)| {
+            outline
+                .iter()
+                .map(|&(px, py)| {
+                    P3::from((
+                        b.x + px * (1.0 - e / 0.038),
+                        b.y + py * (1.0 - e / 0.11),
+                        b.z + h,
+                    ))
+                })
+                .collect()
         })
         .collect();
     loft!(name, &upper, material = material);
@@ -574,8 +593,10 @@ pub fn entry_console() -> Vec<Obj> {
                 (0.05, 0.0),
                 (0.06, 0.09),
                 (0.03, 0.19),
-                (0.034, 0.22),
-                (0.03, 0.22),
+                (0.034, 0.214),
+                (0.0335, 0.219),
+                (0.031, 0.221),
+                (0.028, 0.218),
                 (0.0, 0.2)
             ],
             at = f.at(0.28, 0.8175, -0.3),
@@ -755,7 +776,12 @@ pub fn entry_console() -> Vec<Obj> {
                 (-0.3, 1.04, pz + 0.075),
                 (-0.305, 1.25, pz + 0.07),
                 (-0.33, 1.49, pz + 0.075),
-                (-0.335, 1.5, pz + 0.06),
+                // (folded over the hook in a round, 30° a step)
+                (-0.332, 1.4975, pz + 0.073),
+                (-0.334, 1.503, pz + 0.0675),
+                (-0.335, 1.505, pz + 0.06),
+                (-0.334, 1.503, pz + 0.0525),
+                (-0.332, 1.4975, pz + 0.047),
                 (-0.33, 1.49, pz + 0.045),
                 (-0.31, 1.28, pz + 0.04)
             ],
