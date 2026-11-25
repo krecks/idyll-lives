@@ -80,7 +80,6 @@ pub fn bevelled(
                 .collect(),
             picks: Vec::new(),
             segments,
-            offset: 0.0,
             made_at: vec![u32::MAX; mesh.verts.len()],
             centres: BTreeMap::new(),
         });
@@ -436,7 +435,6 @@ pub fn bevelled(
         source,
         picks,
         segments: ns,
-        offset: each,
         made_at,
         centres,
     })

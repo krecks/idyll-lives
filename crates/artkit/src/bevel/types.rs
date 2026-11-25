@@ -72,8 +72,6 @@ pub struct Bevelled {
     pub source: Vec<u32>,
     pub picks: Vec<Pick>,
     pub segments: usize,
-    /// The offset the edges were cut back by: the width, or less where the mesh has no room for it.
-    pub offset: f32,
     /// For each point of the new mesh, the old vertex whose corner it was made at (`u32::MAX`: a point kept).
     pub made_at: Vec<u32>,
     /// For each old vertex with a corner: its bevelled edges in Blender's order of the vertex's edges (each one's

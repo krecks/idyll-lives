@@ -429,3 +429,20 @@ fn soft_boxes_are_gamekits_in_blender() {
         bad.join("\n")
     );
 }
+
+#[test]
+fn resting_on_a_face_no_longer_than_its_rounding_makes_no_plain_face() {
+    for puff in [0.01, 0.02] {
+        let faces = |resting| {
+            scene::reset();
+            let o = SoftBox {
+                round: 0.1,
+                puff: Puff::Faces(puff),
+                resting,
+                ..Default::default()
+            };
+            soft_box("bolster", (0.6, 0.2, 0.2), o).read(|p| p.mesh.faces.len())
+        };
+        assert_eq!(faces(true), faces(false), "puff {puff}");
+    }
+}

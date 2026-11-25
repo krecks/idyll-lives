@@ -423,16 +423,6 @@ fn a_bevel_keeps_flat_faces_flat_and_rounds_between_them() {
     .unwrap();
     assert_eq!((made.mesh.verts.len(), made.mesh.faces.len()), (56, 54));
     assert!(made.mesh.faces.iter().all(|f| f.len == 4));
-    // no room: a bevel wider than half the box is cut back to half
-    let made = bevelled(
-        &artkit::shapes::primitive::cube(),
-        0.8,
-        1,
-        40.0,
-        &EdgeOrder::Faces,
-    )
-    .unwrap();
-    assert!((made.offset - 0.5).abs() < 1e-6, "{}", made.offset);
     // nothing to bevel on a flat sheet; an open edge isn't bevelled
     let sheet = Mesh::from_pydata(
         vec![
