@@ -302,6 +302,8 @@ pub fn snake_plant() -> Vec<Obj> {
             rng.uniform(0.07, 0.09),
             rng.uniform(-50.0, 50.0),
         );
+        // (a grown snake plant's swords stand 1-1.5 m)
+        length *= 1.65;
         if i >= 10 {
             // young ones
             length *= 0.55;
@@ -343,7 +345,6 @@ pub fn snake_plant() -> Vec<Obj> {
     }
     // the pot's square-cut rims eased (KIT: botany's `vessel` cuts them square)
     crate::chamfer(&["pot", "saucer"]);
-    fit_to(&meshes(), 0.341, 0.905, 0.32);
     settle(&[join_all("snakePlant")])
 }
 

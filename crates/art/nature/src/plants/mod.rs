@@ -90,7 +90,7 @@ pub fn family() -> Family {
                     ),
             ),
             pot(
-                Model::new("snakePlant", houseplants::snake_plant, (0.341, 0.905, 0.32))
+                Model::new("snakePlant", houseplants::snake_plant, (0.397, 1.292, 0.407))
                     .key("model.garden.snakePlant"),
             ),
             pot(
