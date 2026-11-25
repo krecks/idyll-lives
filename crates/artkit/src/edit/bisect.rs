@@ -144,9 +144,16 @@ fn bisected(mesh: &Mesh, co: V3, no: V3, o: &Bisect) -> (Mesh, Vec<(u32, u32)>) 
             out.push_face(&corners, face.mat, face.smooth);
         }
     }
+    // a sharp edge the cut splits stays sharp on both sides of its point
+    let mut sharp = mesh.sharp.clone();
+    for (&(a, b), &c) in &crossing {
+        if sharp.remove(&(a, b)) {
+            sharp.insert(edge(a, c));
+            sharp.insert(edge(c, b));
+        }
+    }
     let both = |e: &(u32, u32)| kept[e.0 as usize] != u32::MAX && kept[e.1 as usize] != u32::MAX;
-    out.sharp = mesh
-        .sharp
+    out.sharp = sharp
         .iter()
         .filter(|e| both(e))
         .map(|e| edge(kept[e.0 as usize], kept[e.1 as usize]))
