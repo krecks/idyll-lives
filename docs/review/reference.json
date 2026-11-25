@@ -15649,6 +15649,157 @@
         "dimToilets"
       ],
       "reason": "the pan hangs off a frame boxed in to 0.9-1.25 m and as wide as the boxing (0.5-1.2 m); the pan alone floats, so the piece is pan and boxing together"
+    },
+    "fireplaceHooded": {
+      "label": "Freestanding hearth under a hood on its flue to the ceiling",
+      "w": [
+        0.5,
+        1.0
+      ],
+      "h": [
+        2.3,
+        3.0
+      ],
+      "d": [
+        0.5,
+        1.0
+      ],
+      "seat": [
+        0.38,
+        0.48
+      ],
+      "uses": [
+        "light a fire",
+        "warm up by it",
+        "read by the fire"
+      ],
+      "minutes": {
+        "relax": [
+          15,
+          90
+        ],
+        "lightFire": [
+          5,
+          15
+        ]
+      },
+      "sources": [
+        "neufert"
+      ],
+      "reason": "a hooded hearth stands in the room on its own, its flue up to the ceiling (2.3-3.0 m), the hood 0.5-1.0 m across"
+    },
+    "quiltTableHigh": {
+      "label": "Heated quilt table at a table's height (a kotatsu sat at from poufs)",
+      "w": [
+        1.2,
+        1.9
+      ],
+      "h": [
+        0.6,
+        0.75
+      ],
+      "d": [
+        0.5,
+        0.9
+      ],
+      "seat": [
+        0.42,
+        0.48
+      ],
+      "surface": [
+        0.6,
+        0.7
+      ],
+      "uses": [
+        "share tea on floor cushions",
+        "snack and chat",
+        "warm legs under the quilt"
+      ],
+      "minutes": {
+        "tea": [
+          15,
+          45
+        ],
+        "doze": [
+          20,
+          60
+        ]
+      },
+      "sources": [
+        "neufert"
+      ],
+      "reason": "sat at from poufs at a chair's height, not from floor cushions: its top at a low dining table's 0.6-0.7 m"
+    },
+    "cartCanopy": {
+      "label": "Drinks cart under a striped canopy on its own posts",
+      "w": [
+        0.6,
+        0.95
+      ],
+      "h": [
+        1.5,
+        2.2
+      ],
+      "d": [
+        0.4,
+        0.55
+      ],
+      "surface": [
+        0.75,
+        0.95
+      ],
+      "uses": [
+        "mix a drink",
+        "serve tea",
+        "wheel it to the guests"
+      ],
+      "minutes": {
+        "mix": [
+          3,
+          10
+        ],
+        "brew": [
+          5,
+          15
+        ]
+      },
+      "sources": [
+        "neufert"
+      ],
+      "reason": "the canopy's posts are the cart's legs: a market-style cart stands 1.5-2.2 m to its canopy"
+    },
+    "bonsaiBenchBack": {
+      "label": "Bonsai or potting bench with a back board",
+      "w": [
+        0.6,
+        1
+      ],
+      "h": [
+        1.0,
+        1.5
+      ],
+      "d": [
+        0.45,
+        0.7
+      ],
+      "surface": [
+        0.75,
+        0.95
+      ],
+      "uses": [
+        "prune and wire a bonsai",
+        "repot"
+      ],
+      "minutes": {
+        "shape": [
+          20,
+          90
+        ]
+      },
+      "sources": [
+        "neufert"
+      ],
+      "reason": "its back board with a rail for tools stands over the worktop: 1.0-1.5 m"
     }
   },
   "groups": {
@@ -15731,7 +15882,7 @@
     "picnicTable": "picnicTable",
     "tableBarHigh": "barTable",
     "kind.welcomeTeaTable": "teaTable",
-    "lazy.quiltTable": "lowTable",
+    "lazy.quiltTable": "quiltTableHigh",
     "diningChair": "diningChair",
     "chairWood": "diningChair",
     "chairUpholstered": "diningChair",
@@ -15753,7 +15904,7 @@
     "displayCabinet": "displayCabinet",
     "barCart": "trolley",
     "bookworm.teaTrolley": "trolley",
-    "cheerful.mocktailCart": "trolley",
+    "cheerful.mocktailCart": "cartCanopy",
     "sofa": "sofa2",
     "loveseat": "sofa2",
     "sofaDesign": "sofa2",
@@ -15819,7 +15970,7 @@
     "bookworm.libraryWall": "libraryWall",
     "ladderShelf": "ladderShelf",
     "fireplace": "fireplaceChimney",
-    "bookworm.firesideLounge": "fireplaceChimney",
+    "bookworm.firesideLounge": "fireplaceHooded",
     "fireplaceElectric": "electricFire",
     "bedSingle": "bedSingle",
     "bedDaybed": "bedSingle",
@@ -15948,7 +16099,7 @@
     "potteryWheel": "potteryWheel",
     "craftTable": "craftTable",
     "foodie.cookbookLectern": "cookbookLectern",
-    "loner.bonsaiBench": "bonsaiBench",
+    "loner.bonsaiBench": "bonsaiBenchBack",
     "hotHeaded.smashBin": "smashBin",
     "treadmill": "treadmill",
     "weightBench": "weightBench",
