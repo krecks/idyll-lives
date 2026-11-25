@@ -40,7 +40,7 @@ describe('one-way pairs and avenues in generated worlds', async () => {
             // in town) nor from the world beyond the ways out.
             expect(cutOffRoads(roads, { within: true }), `${tag}: cut off in town`).toEqual([]);
             expect(cutOffRoads(roads), `${tag}: cut off`).toEqual([]);
-            // (The motorway's carriageways and ramps are one-way too: theirs are the motorway's own tests, `motorway.test.ts` and `motorwayFit.slow.test.ts`.)
+            // (The motorway's carriageways and ramps are one-way too: theirs are the motorway's own tests, `motorway.test.ts`, `motorway.slow.test.ts` and `motorwayFit.slow.test.ts`.)
             const ways = roads.flatMap((r, i) => (r.oneway && !isSeparated(r.kind) ? [i] : []));
             if (size === 'village') expect(ways, `${tag}: one-way roads`).toEqual([]);
             expect(ways.length, `${tag}: one-way roads`).toBeLessThanOrEqual(size === 'city' ? 6 : size === 'town' ? 4 : 0);

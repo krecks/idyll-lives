@@ -6,9 +6,9 @@
 // its shops among them, a village's street a village's kinds; the homes the same whichever mode; undo
 // gives the draft's bytes back; a civic place offered until the town has it, put down a lot of its own,
 // and a civic place's lot made another; a street built up until it is full, then refused with why; its
-// buildings cleared with their flats and places; on hilly land the settle takes every lot built (those
-// that would break a slope limit left out first); a street drawn with the town's buildings along it in
+// buildings cleared with their flats and places; a street drawn with the town's buildings along it in
 // one edit; and a town built up so has no hard problem it hadn't (`edit/checked.ts` `editedProblems`).
+// (On hilly land, the settle: `editBuildup.slow.test.ts`.)
 import { describe, expect, test } from 'bun:test';
 import { inWorkerOf, loadContent, templatesOf, usePublicFetch } from './support/content';
 
@@ -326,22 +326,6 @@ describe('build-up', async () => {
     expect(d.open!.places!.length).toBe(noBank.open!.places!.length);
     expect(civicOffered(d, 0).some((c) => c.civic === police)).toBe(true);
   });
-
-  test('on hilly land the settle takes every lot a street is built up with: those that would break a slope limit are left out first', () => {
-    const settle = (steps: readonly NeighbourhoodDraft[]) => inWorker({ kind: 'edit', plan: steps[steps.length - 1], ops: steps.length - 1, steps, check: false });
-    const hilly = planOf('heath', 5, { town: 'town', villages: 'few', size: 'medium', hills: 'hilly' });
-    let [built, left] = [0, 0];
-    for (const road of streetsOf(hilly, 0).slice(0, 3)) {
-      const b = bare(hilly, road);
-      const e = buildUp(b, t, content, { road, mode: 'both', seed: 1 });
-      if ('refused' in e) continue;
-      built += e.draft.slots.length - b.slots.length;
-      left += e.leftOut ?? 0;
-      expect(settle([b, e.draft]).refused).toEqual([]);
-    }
-    expect(built).toBeGreaterThan(10);
-    console.log(`hilly: ${built} lots, ${left} left out`);
-  }, 120_000);
 
   test('a street drawn with the town buildings along it is one edit: the street, its homes and its buildings', () => {
     // A street of the main town joined to a road at both ends taken up, and drawn again as the Street tool draws one

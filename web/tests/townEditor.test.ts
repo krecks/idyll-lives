@@ -3,7 +3,8 @@
 // shown (red for a while, a line, a Problems entry); a settle that fails taking its edits back, so no
 // ghost stays; a town settled but not shown still recorded; the Problems list read
 // from a draft as the checks read a whole town file (`problems.ts` `checkedTown`), sorted into what
-// blocks the way on and what only warns; what is picked found again after an edit; the edits' ghosts.
+// blocks the way on and what only warns; what is picked found again after an edit; the edits' ghosts. (A laid city's
+// checks: `townEditor.slow.test.ts`.)
 import { describe, expect, test } from 'bun:test';
 import { loadContent, templatesOf, usePublicFetch } from './support/content';
 import type { RoadPlan } from '../src/core/protocol';
@@ -547,13 +548,4 @@ describe('the Problems list and picking, on a generated town', async () => {
     expect(made(addLot(hamlet, t, content, at, choice, 11)).slots.at(-1)!.template).toBe(s.template);
     expect(townIssues(town, t, content).blocking).toEqual([]);
   });
-
-  // (A city's checks take seconds, which is why they run in their own worker, `checkJob.ts`: printed here to keep an eye on.)
-  test('a laid city blocks nothing', () => {
-    const city = generateWorld(content, t, 'country', 77, undefined, undefined, { town: 'city', villages: 'many' });
-    const t0 = performance.now();
-    const found = townIssues(city, t, content);
-    console.log(`townIssues on a city with many villages (${city.slots.length} lots, ${city.open?.carParks?.length ?? 0} car parks): ${(performance.now() - t0).toFixed(0)} ms`);
-    expect(found.blocking).toEqual([]);
-  }, 60_000);
 });
