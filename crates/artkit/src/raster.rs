@@ -652,14 +652,16 @@ pub fn render(
         .map(|i| (encode(i as f32 / 4095.0) * 255.0).round() as u8)
         .collect();
     let tris = triangles(meshes, &eye);
-    let mut bands: Vec<Vec<u32>> = vec![Vec::new(); sh.div_ceil(BAND)];
+    // (a band of whole pixels: a pixel's sample rows never run into the next band)
+    let band_rows = BAND / s * s;
+    let mut bands: Vec<Vec<u32>> = vec![Vec::new(); sh.div_ceil(band_rows)];
     for (i, t) in tris.iter().enumerate() {
         let (lo, hi) = range(t.at.map(|a| a[1]));
         if hi < 0.0 || lo > sh as f32 {
             continue;
         }
-        let first = (lo.max(0.0) as usize / BAND).min(bands.len() - 1);
-        let last = (hi.min(sh as f32 - 1.0).max(0.0) as usize / BAND).min(bands.len() - 1);
+        let first = (lo.max(0.0) as usize / band_rows).min(bands.len() - 1);
+        let last = (hi.min(sh as f32 - 1.0).max(0.0) as usize / band_rows).min(bands.len() - 1);
         for band in &mut bands[first..=last] {
             band.push(i as u32);
         }
@@ -667,9 +669,9 @@ pub fn render(
     let contact = look.floor.map(|f| (f, Contact::new(meshes, &f)));
     let texture = |m: &Mesh| m.surface.texture.and_then(|t| textures.get(t));
     let mut out = Picture::filled(width, height, [0, 0, 0, 0]);
-    let mut buffer = vec![EMPTY; sw * BAND];
+    let mut buffer = vec![EMPTY; sw * band_rows];
     for (b, band) in bands.iter().enumerate() {
-        let (y0, y1) = (b * BAND, ((b + 1) * BAND).min(sh));
+        let (y0, y1) = (b * band_rows, ((b + 1) * band_rows).min(sh));
         buffer.fill(EMPTY);
         for &ti in band {
             let t = &tris[ti as usize];
@@ -993,6 +995,17 @@ mod tests {
         };
         let picture = render(&[quad], &[], &above(), &flat([0.0; 4]), 32, 32);
         assert!(picture.rgba.chunks(4).all(|p| p == [255, 255, 255, 255]));
+    }
+
+    #[test]
+    fn samples_that_dont_divide_a_band_still_draw_every_pixel() {
+        // 3 × 64 sample rows: a pixel's three would cross a band of 128
+        let look = Look {
+            samples: 3,
+            ..flat([0.0; 4])
+        };
+        let picture = render(&[triangle(CCW, [1.0; 3])], &[], &above(), &look, 64, 64);
+        assert_eq!(picture.at(32, 40), [255, 255, 255, 255]);
     }
 
     #[test]

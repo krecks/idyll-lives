@@ -4,7 +4,7 @@
 //! as Blender builds and walks it. A ray meets a built mesh where it met the one Blender built, and where it meets
 //! two faces at once it is given Blender's.
 
-use crate::math::{V3, dot_v3, normalize_v3};
+use crate::math::{V3, normalize_v3};
 use crate::mesh::normal_tri;
 use crate::scene::{self, Obj};
 
@@ -572,20 +572,9 @@ impl Polygons {
                 poly.push(index as u32);
                 continue;
             }
-            let mut sum = V3::ZERO;
-            let mut prev = p[p.len() - 1];
-            for &cur in &p {
-                sum.x += (prev.y - cur.y) * (prev.z + cur.z);
-                sum.y += (prev.z - cur.z) * (prev.x + cur.x);
-                sum.z += (prev.x - cur.x) * (prev.y + cur.y);
-                prev = cur;
-            }
-            let normal = normalize_v3(sum).0;
+            let normal = normalize_v3(crate::mesh::newell(&p)).0;
             normals.push(normal);
-            // flattened seen from behind (clockwise), its ears clipped
-            let (n1, n2) = ortho_basis(V3::new(-normal.x, -normal.y, -normal.z));
-            let flat: Vec<[f32; 2]> = p.iter().map(|&c| [dot_v3(n1, c), dot_v3(n2, c)]).collect();
-            for t in crate::botany::polyfill::fill(&flat) {
+            for t in crate::polyfill::ngon(&p, normal) {
                 tris.push(t.map(|i| p[i as usize]));
                 poly.push(index as u32);
             }
@@ -641,22 +630,6 @@ impl Polygons {
             index,
             dist: dive.dist,
         })
-    }
-}
-
-/// Two vectors square to the unit vector `n` and to each other (Blender's `ortho_basis_v3v3_v3`).
-fn ortho_basis(n: V3) -> (V3, V3) {
-    let f = n.x * n.x + n.y * n.y;
-    if f > f32::EPSILON {
-        let d = 1.0 / f.sqrt();
-        let n1 = V3::new(n.y * d, -n.x * d, 0.0);
-        let n2 = V3::new(-n.z * n1.y, n.z * n1.x, n.x * n1.y - n.y * n1.x);
-        (n1, n2)
-    } else {
-        (
-            V3::new(if n.z < 0.0 { -1.0 } else { 1.0 }, 0.0, 0.0),
-            V3::new(0.0, 1.0, 0.0),
-        )
     }
 }
 

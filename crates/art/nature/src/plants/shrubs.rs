@@ -1,7 +1,7 @@
 //! G3, the shrubs: the round shrub and its small and flowering cousins, the street's and the garden's hedges, the
 //! boxwood ball, the topiary cone, the hydrangea, the rose bush and the azalea.
 
-use artkit::botany::{SHRUB, ShrubMass, fit_to, hedge_top, palette};
+use artkit::botany::{_with_part, SHRUB, ShrubMass, fit_to, hedge_top, palette};
 use artkit::far::{is_low, low};
 use artkit::materials::{Mat, Palette};
 use artkit::math::{P3, TAU, V3, asin, atan2, cos, degrees, sin, v3};
@@ -9,8 +9,8 @@ use artkit::parts::{join_all, new_parts, settle};
 use artkit::rand::Random;
 use artkit::scene::Obj;
 use artkit::{
-    _with_part, florets, hedge_block, jitter, leafy_shrub, loft, lump, on_masses, perches, rays,
-    ring, rose_head, rose_leaf, spiral, sprigs, tube, twig, vessel,
+    florets, hedge_block, jitter, leafy_shrub, loft, lump, on_masses, perches, rays, ring,
+    rose_head, rose_leaf, spiral, sprigs, tube, twig, vessel,
 };
 
 /// A shrub's leaf masses' colours, darkest first, by name in the palette.
@@ -23,7 +23,6 @@ fn greens(p: &Palette, names: [&str; 5]) -> Vec<Mat> {
 pub fn bush() -> Vec<Obj> {
     let p = palette(&[]);
     leafy_shrub!(
-        &p,
         31,
         1.043,
         0.91,
@@ -43,7 +42,6 @@ pub fn bush() -> Vec<Obj> {
 pub fn bush_small() -> Vec<Obj> {
     let p = palette(&[]);
     leafy_shrub!(
-        &p,
         32,
         0.832,
         0.707,
@@ -118,7 +116,6 @@ pub fn bush_flowering() -> Vec<Obj> {
         }
     };
     leafy_shrub!(
-        &p,
         33,
         1.208,
         1.016,
@@ -218,12 +215,12 @@ pub fn boxwood() -> Vec<Obj> {
     fit_to(&made, 0.69, 0.71, 0.72);
     let still = join_all("boxwood");
     perches!(4, 135, &[(0.0, 0.0, 0.34)]);
-    _with_part!(
+    _with_part(
         "sprigs",
         still,
         || sprigs!("sprig", &p, (0.02, -0.03, 0.66), 0.12),
         (0.02, -0.03, 0.66),
-        "trim"
+        "trim",
     )
 }
 
@@ -312,12 +309,12 @@ pub fn topiary_cone() -> Vec<Obj> {
     );
     // sprigs reach out of the cone's sides there
     let tip = (0.0, 0.0, top + 1.36);
-    _with_part!(
+    _with_part(
         "sprigs",
         still,
         || sprigs!("sprig", &p, tip, 0.1, n = 5, length = 0.12),
         tip,
-        "trim"
+        "trim",
     )
 }
 
@@ -333,12 +330,12 @@ pub fn garden_hedge() -> Vec<Obj> {
     let still = join_all("hedge");
     perches!(6, 137, &hedge_top(1.12), per = 6, up = (0.6, 1.4));
     let at = (0.1, 0.0, 1.06);
-    _with_part!(
+    _with_part(
         "sprigs",
         still,
         || sprigs!("sprig", &p, at, 0.4, n = 7),
         at,
-        "trim"
+        "trim",
     )
 }
 
@@ -368,7 +365,6 @@ pub fn hydrangea() -> Vec<Obj> {
         }
     };
     leafy_shrub!(
-        &p,
         72,
         1.196,
         0.957,
@@ -476,19 +472,21 @@ pub fn rosebush() -> Vec<Obj> {
         .collect();
     perches!(5, 140, &[(0.0, 0.0, 0.3)], per = 8, bare = bare);
     let (_, _, tip, a, tilt) = canes[front];
-    _with_part!(
+    _with_part(
         "rose",
         join_all("rosebush"),
-        || rose_head!(
-            "cut_rose",
-            tip,
-            0.05,
-            p.get("bloom"),
-            yaw = degrees(a),
-            tilt = tilt
-        ),
+        || {
+            rose_head!(
+                "cut_rose",
+                tip,
+                0.05,
+                p.get("bloom"),
+                yaw = degrees(a),
+                tilt = tilt
+            )
+        },
         tip,
-        "cut"
+        "cut",
     )
 }
 
@@ -531,7 +529,6 @@ pub fn azalea() -> Vec<Obj> {
         }
     };
     leafy_shrub!(
-        &p,
         74,
         1.158,
         1.013,
@@ -549,11 +546,11 @@ pub fn azalea() -> Vec<Obj> {
     let still = join_all("azalea");
     perches!(5, 139, &[(0.0, 0.0, 0.45)]);
     let at = (-0.05, 0.05, 0.94);
-    _with_part!(
+    _with_part(
         "sprigs",
         still,
         || sprigs!("sprig", &p, at, 0.14),
         at,
-        "trim"
+        "trim",
     )
 }

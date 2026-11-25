@@ -1,7 +1,7 @@
 //! Making a surface a shell, and taking vertices out.
 
 use super::*;
-use crate::math::{V3, angle_normalized_v3v3, dot_v3, normalize_v3};
+use crate::math::{V3, angle_normalized, dot_v3, normalize_v3};
 use crate::mesh::{Mesh, edge};
 use crate::normals;
 use crate::scene::Obj;
@@ -11,8 +11,8 @@ use std::collections::BTreeMap;
 options! {
     /// `solidify`'s options, Blender's own defaults: `offset` -1 grows the shell inwards (against the normals), 1
     /// outwards, 0 half each way; `use_even_offset` keeps the shell as thick where the surface bends as where it is
-    /// flat; `use_rim` closes it round the surface's open edges.
-    Solidify { offset: f64 = -1.0, use_even_offset: bool = false, use_rim: bool = true }
+    /// flat.
+    Solidify { offset: f64 = -1.0, use_even_offset: bool = false }
 }
 
 /// Blender's SOLIDIFY modifier (its simple mode), applied: `obj`'s surface made a shell `thickness` thick: the
@@ -67,7 +67,7 @@ fn solidified(mesh: &Mesh, thickness: f32, o: &Solidify) -> Mesh {
             let mut nor_prev = normalize_v3(at(curr - 1) - at(curr)).0;
             for next in 0..c.len() {
                 let nor_next = normalize_v3(at(curr) - at(next)).0;
-                let angle = angle_normalized_v3v3(nor_prev, nor_next).max(f32::EPSILON);
+                let angle = angle_normalized(nor_prev, nor_next).max(f32::EPSILON);
                 let v = c[curr] as usize;
                 accum[v] += angle;
                 // (a shell is as much thicker along the vertex's normal as that leans from the face's)
@@ -112,24 +112,22 @@ fn solidified(mesh: &Mesh, thickness: f32, o: &Solidify) -> Mesh {
         turned.extend(c[1..].iter().rev().map(|&v| v + shift));
         out.push_face(&turned, face.mat, face.smooth);
     }
-    if o.use_rim {
-        // an edge one face runs along is open: a wall from it to its copy, wound against that face
-        let mut users: BTreeMap<(u32, u32), Option<OpenEdge>> = BTreeMap::new();
-        for f in 0..mesh.faces.len() {
-            let c = mesh.corners(f);
-            let mut prev = c[c.len() - 1];
-            for &v in c {
-                users
-                    .entry(edge(prev, v))
-                    .and_modify(|u| *u = None)
-                    .or_insert(Some((f, prev, v)));
-                prev = v;
-            }
+    // an edge one face runs along is open: a wall from it to its copy, wound against that face
+    let mut users: BTreeMap<(u32, u32), Option<OpenEdge>> = BTreeMap::new();
+    for f in 0..mesh.faces.len() {
+        let c = mesh.corners(f);
+        let mut prev = c[c.len() - 1];
+        for &v in c {
+            users
+                .entry(edge(prev, v))
+                .and_modify(|u| *u = None)
+                .or_insert(Some((f, prev, v)));
+            prev = v;
         }
-        for (f, prev, v) in users.into_values().flatten() {
-            let face = mesh.faces[f];
-            out.push_face(&[v, prev, prev + shift, v + shift], face.mat, face.smooth);
-        }
+    }
+    for (f, prev, v) in users.into_values().flatten() {
+        let face = mesh.faces[f];
+        out.push_face(&[v, prev, prev + shift, v + shift], face.mat, face.smooth);
     }
     out.sharp = mesh
         .sharp

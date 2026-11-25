@@ -1,7 +1,8 @@
 //! Cutting faces into triangles, as Blender's polyfill does.
 
-use crate::math::{V3, dot_v3, normalize_v3};
+use crate::math::{V3, dot_v3};
 use crate::mesh::{Mesh, edge};
+use crate::polyfill::{fill, flat, ortho_basis, split_24, turn_gain};
 use crate::scene::Obj;
 
 /// How bmesh.ops.triangulate cuts a quad in two.
@@ -25,117 +26,6 @@ pub enum NgonMethod {
     #[default]
     Beauty,
     EarClip,
-}
-
-/// Two vectors square to the unit vector n and to each other (Blender's ortho_basis_v3v3_v3).
-fn ortho_basis(n: V3) -> (V3, V3) {
-    let f = n.x * n.x + n.y * n.y;
-    if f > f32::EPSILON {
-        let d = 1.0 / f.sqrt();
-        let n1 = V3::new(n.y * d, -n.x * d, 0.0);
-        let n2 = V3::new(-n.z * n1.y, n.z * n1.x, n.x * n1.y - n.y * n1.x);
-        (n1, n2)
-    } else {
-        (
-            V3::new(if n.z < 0.0 { -1.0 } else { 1.0 }, 0.0, 0.0),
-            V3::new(0.0, 1.0, 0.0),
-        )
-    }
-}
-
-/// A point flat on the plane square to n (axis_dominant_v3_to_m3, then mul_v2_m3v3).
-fn flat(p: V3, (n1, n2): (V3, V3)) -> [f32; 2] {
-    [
-        n1.x * p.x + n1.y * p.y + n1.z * p.z,
-        n2.x * p.x + n2.y * p.y + n2.z * p.z,
-    ]
-}
-
-fn cross_tri_v2(v1: [f32; 2], v2: [f32; 2], v3: [f32; 2]) -> f32 {
-    (v1[0] - v2[0]) * (v2[1] - v3[1]) + (v1[1] - v2[1]) * (v3[0] - v2[0])
-}
-
-fn len_v2v2(a: [f32; 2], b: [f32; 2]) -> f32 {
-    let (x, y) = (a[0] - b[0], a[1] - b[1]);
-    (x * x + y * y).sqrt()
-}
-
-/// Blender's BLI_polyfill_beautify_quad_rotate_calc_ex: what turning the cut 2-4 of the flat quad 1, 2, 3, 4 into
-/// 1-3 would gain (under zero: the triangles either side of 1-3 are rounder, area over perimeter), and the quad's
-/// area.
-fn quad_rotate(v1: [f32; 2], v2: [f32; 2], v3: [f32; 2], v4: [f32; 2], lock: bool) -> (f32, f32) {
-    let eps_zero_area = 1e-12_f32;
-    let a234 = cross_tri_v2(v2, v3, v4);
-    let a241 = cross_tri_v2(v2, v4, v1);
-    let a123 = cross_tri_v2(v1, v2, v3);
-    let a134 = cross_tri_v2(v1, v3, v4);
-    let area = (a234.abs() + a241.abs() + a123.abs() + a134.abs()) / 8.0;
-    if (a123 >= 0.0) != (a134 >= 0.0) {
-        return (f32::MAX, area);
-    }
-    if a123.abs() <= eps_zero_area || a134.abs() <= eps_zero_area {
-        return (f32::MAX, area);
-    }
-    if (a234 >= 0.0) != (a241 >= 0.0) {
-        return (if lock { f32::MAX } else { -f32::MAX }, area);
-    }
-    if a234.abs() <= eps_zero_area || a241.abs() <= eps_zero_area {
-        return (-f32::MAX, area);
-    }
-    let (len_12, len_23, len_34, len_41) = (
-        len_v2v2(v1, v2),
-        len_v2v2(v2, v3),
-        len_v2v2(v3, v4),
-        len_v2v2(v4, v1),
-    );
-    let (len_13, len_24) = (len_v2v2(v1, v3), len_v2v2(v2, v4));
-    let fac_24 =
-        (a234.abs() / (len_23 + len_34 + len_24)) + (a241.abs() / (len_41 + len_12 + len_24));
-    let fac_13 =
-        (a123.abs() / (len_12 + len_23 + len_13)) + (a134.abs() / (len_34 + len_41 + len_13));
-    (fac_24 - fac_13, area)
-}
-
-/// Blender's BLI_polyfill_edge_calc_rotate_beauty__area for a quad in space.
-fn quad_rotate_v3(v1: V3, v2: V3, v3: V3, v4: V3) -> f32 {
-    let cross_tri = |a: V3, b: V3, c: V3| (a - b).cross(b - c);
-    let (no, scale) = normalize_v3(cross_tri(v2, v3, v4) + cross_tri(v2, v4, v1));
-    if scale == 0.0 {
-        return f32::MAX;
-    }
-    let basis = ortho_basis(no);
-    let (a, b, c, d) = (
-        flat(v1, basis),
-        flat(v2, basis),
-        flat(v3, basis),
-        flat(v4, basis),
-    );
-    let sign = |x: f32| {
-        if x > 1e-5 {
-            1
-        } else if x < -1e-5 {
-            -1
-        } else {
-            0
-        }
-    };
-    if sign(cross_tri_v2(b, c, d) / scale) + sign(cross_tri_v2(b, d, a) / scale) == 0 {
-        return f32::MAX;
-    }
-    quad_rotate(a, b, c, d, false).0
-}
-
-/// Blender's is_quad_flip_v3: bit 0 where the quad folds over cut 1-3, bit 1 where over 2-4.
-fn quad_flip(v1: V3, v2: V3, v3: V3, v4: V3) -> u8 {
-    let (d_12, d_23, d_34, d_41) = (v1 - v2, v2 - v3, v3 - v4, v4 - v1);
-    let mut ret = 0;
-    if dot_v3(d_12.cross(d_23), d_34.cross(d_41)) < 0.0 {
-        ret |= 1;
-    }
-    if dot_v3(d_23.cross(d_34), d_41.cross(d_12)) < 0.0 {
-        ret |= 2;
-    }
-    ret
 }
 
 /// Blender's BLI_polyfill_beautify: the triangles of a flat polygon (its corners coords, in order) with their
@@ -175,12 +65,11 @@ fn beautify(coords: &[[f32; 2]], tris: &mut [[u32; 3]]) {
         let b = radial[e];
         let a_other = next[next[e]];
         let b_other = next[next[b]];
-        quad_rotate(
+        turn_gain(
             coords[v[a_other] as usize],
             coords[v[e] as usize],
             coords[v[b_other] as usize],
             coords[v[b] as usize],
-            false,
         )
     };
     // the cuts worth turning, each by its edge's number: (gain, the half edge)
@@ -284,16 +173,7 @@ pub fn triangulate(obj: Obj, quad: QuadMethod, ngon: NgonMethod) -> Obj {
                             (d2 - d1) < 0.0
                         }
                     }
-                    QuadMethod::Beauty => {
-                        let flip = quad_flip(p[1], p[2], p[3], p[0]);
-                        if flip & 1 != 0 {
-                            true
-                        } else if flip & 2 != 0 {
-                            false
-                        } else {
-                            quad_rotate_v3(p[1], p[2], p[3], p[0]) > 0.0
-                        }
-                    }
+                    QuadMethod::Beauty => split_24(&p),
                 };
                 if split_24 {
                     vec![[0, 1, 2], [0, 2, 3]]
@@ -304,7 +184,7 @@ pub fn triangulate(obj: Obj, quad: QuadMethod, ngon: NgonMethod) -> Obj {
                 let normal = crate::mesh::normal_of(&p);
                 let basis = ortho_basis(-normal);
                 let coords: Vec<[f32; 2]> = p.iter().map(|&q| flat(q, basis)).collect();
-                let mut tris = crate::botany::polyfill::fill(&coords);
+                let mut tris = fill(&coords);
                 if ngon == NgonMethod::Beauty {
                     beautify(&coords, &mut tris);
                 }

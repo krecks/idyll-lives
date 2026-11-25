@@ -81,6 +81,26 @@ pub fn profile(shape: &str) -> Outline {
     }
 }
 
+/// The point `x` across, `t` along and `z` up off a flat leaf `length` long, bent down its midrib in an arc of
+/// `bend` radians and twisted `twist` degrees about it by the tip.
+pub(super) fn on_midrib(length: f64, bend: f64, twist: f64, x: f64, t: f64, z: f64) -> V3 {
+    let a = -bend * t;
+    let (c, n) = if bend < 1e-4 {
+        (v3(0, length * t, 0), v3(0, 0, 1))
+    } else {
+        (
+            v3(
+                0,
+                length * sin(bend * t) / bend,
+                -length * (1.0 - cos(bend * t)) / bend,
+            ),
+            v3(0, -sin(a), cos(a)),
+        )
+    };
+    let tw = radians(twist * t);
+    c + v3(x * cos(tw) - z * sin(tw), 0, 0) + n * (x * sin(tw) + z * cos(tw))
+}
+
 options! {
     /// `leaf`'s options.
     Leaf { shape: &'static str = "oval", droop: f64 = 0.0, thick: f64 = 0.008, fold: f64 = 0.25, rows: usize = 6, ring: usize = 6, notch: Option<(usize, f64)> = None, twist: f64 = 0.0 }
@@ -109,21 +129,6 @@ pub fn leaf(
     }
     let prof = profile(o.shape);
     let bend = 2.0 * o.droop;
-    // the midrib's point and the normal square to it at `t`: an arc turning down by `bend` radians
-    let along = |t: f64| {
-        let a = -bend * t;
-        if bend < 1e-4 {
-            return (v3(0, length * t, 0), v3(0, 0, 1));
-        }
-        (
-            v3(
-                0,
-                length * sin(bend * t) / bend,
-                -length * (1.0 - cos(bend * t)) / bend,
-            ),
-            v3(0, -sin(a), cos(a)),
-        )
-    };
     let mut verts = vec![v3(0, 0, 0)];
     for i in 1..=rows {
         let t = i as f64 / (rows + 1) as f64;
@@ -134,15 +139,13 @@ pub fn leaf(
             hw *= factor;
         }
         let ht = (o.thick / 2.0 * prof(t)).max(0.0012);
-        let (c, n) = along(t);
-        let tw = radians(o.twist * t);
         for j in 0..ring {
             let a = TAU * j as f64 / ring as f64;
             let (x, z) = (hw * cos(a), ht * sin(a) + o.fold * (hw * cos(a)).abs());
-            verts.push(c + v3(x * cos(tw) - z * sin(tw), 0, 0) + n * (x * sin(tw) + z * cos(tw)));
+            verts.push(on_midrib(length, bend, o.twist, x, t, z));
         }
     }
-    verts.push(along(1.0).0);
+    verts.push(on_midrib(length, bend, o.twist, 0.0, 1.0, 0.0));
     let (mut faces, tip) = (Vec::new(), verts.len() - 1);
     for j in 0..ring {
         let k = (j + 1) % ring;
@@ -259,11 +262,6 @@ pub fn sprigs(name: &str, p: &Palette, centre: impl Into<V3>, spread: f64, o: Sp
     }
 }
 
-options! {
-    /// `_with_part`'s options.
-    WithPart { kind: &'static str = "squash" }
-}
-
 /// Joins what `build` makes into a moving part `name` (origin at `origin`), settles, and shrinks it away
 /// (clip `clip`): the still part and the moving one.
 pub fn _with_part(
@@ -272,9 +270,7 @@ pub fn _with_part(
     build: impl FnOnce(),
     origin: impl Into<P3>,
     clip: &str,
-    o: WithPart,
 ) -> Vec<Obj> {
-    let _ = o.kind;
     if is_low() {
         // a far version: all one still part
         build();

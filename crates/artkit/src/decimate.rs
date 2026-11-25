@@ -68,15 +68,15 @@ const SIDES: f64 = -0.9;
 pub const REACH: [f64; 2] = [0.045, 0.06];
 const FLAT: f64 = 1e-5;
 
-fn sub(a: P, b: P) -> P {
+pub(crate) fn sub(a: P, b: P) -> P {
     [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 }
 
-fn dot(a: P, b: P) -> f64 {
+pub(crate) fn dot(a: P, b: P) -> f64 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
 
-fn cross(a: P, b: P) -> P {
+pub(crate) fn cross(a: P, b: P) -> P {
     [
         a[1] * b[2] - a[2] * b[1],
         a[2] * b[0] - a[0] * b[2],
@@ -822,7 +822,7 @@ fn cut(p: &[V3]) -> Vec<[u32; 3]> {
                 vec![[0, 1, 3], [1, 2, 3]]
             }
         }
-        _ => crate::tri::polygon(p, normal_of(p)),
+        _ => crate::polyfill::ngon(p, normal_of(p)),
     }
 }
 

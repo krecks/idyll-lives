@@ -186,7 +186,7 @@ rewrites the models, the pack and centres.json in the tree.
    - `extrude!` (`fextrude!`): an outline with `holes` into a slab: a carved apron, a headboard, a grille;
      `forms::rounded_rect` and `smooth_outline` draw outlines;
    - `soft_box!` (`soft!`): cushions, pillows, mattresses, duvets (below, "Soft things");
-   - `forms::mirrored`, `forms::bisect` (a cut along a plane), `jitter!` (a hand-made wobble);
+   - `forms::bisect` (a cut along a plane), `jitter!` (a hand-made wobble);
    - `artkit::kit`: whole parts more than one family uses (`kit::tube!`, `fillet!`, `pull!`, `knob!`, `shaker!`,
      `moulding!`, `cabriole!`, `scroll!`, `bench_end!`, `songbird!`, `letters!`, `cut!`, `recessed_box!`:
      [kit/mod.rs](../artkit/src/kit/mod.rs) has an example of each); `artkit::botany` for plants and trees.

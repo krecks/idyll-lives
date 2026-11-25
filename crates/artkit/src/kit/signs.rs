@@ -376,18 +376,7 @@ pub fn letters(
             None => word = Some(letter),
             Some(word) => {
                 let mesh = letter.read(|l| l.mesh.clone());
-                word.edit(|w| {
-                    let base = w.mesh.verts.len() as u32;
-                    w.mesh.verts.extend(mesh.verts.iter().copied());
-                    for f in 0..mesh.faces.len() {
-                        let corners: Vec<u32> = mesh.corners(f).iter().map(|v| v + base).collect();
-                        w.mesh
-                            .push_face(&corners, mesh.faces[f].mat, mesh.faces[f].smooth);
-                    }
-                    w.mesh
-                        .sharp
-                        .extend(mesh.sharp.iter().map(|&(a, b)| (a + base, b + base)));
-                });
+                word.edit(|w| crate::parts::append(&mut w.mesh, &mesh));
                 letter.remove();
             }
         }

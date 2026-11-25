@@ -3,11 +3,6 @@
 use super::*;
 
 impl Model {
-    /// The animation named `clip`.
-    pub fn clip(&self, clip: &str) -> Option<usize> {
-        self.animations.iter().position(|a| a.name == clip)
-    }
-
     /// Node `n`'s translation, rotation and scale in `pose` (its rest where the clip doesn't move it).
     pub fn local(&self, n: usize, pose: Pose) -> ([f32; 3], [f32; 4], [f32; 3]) {
         let node = &self.nodes[n];
