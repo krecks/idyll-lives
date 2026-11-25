@@ -146,7 +146,7 @@ pub fn family() -> Family {
                     ("inlay", "Desk pad"),
                 ]),
             // its own size: the monitor, the things on it and the chair at it are not measured
-            Model::new("computerDesk", desks::computer_desk, (1.54, 0.752, 0.391))
+            Model::new("computerDesk", desks::computer_desk, (1.54, 0.752, 0.5))
                 .key("model.computerDesk")
                 .centre(0.0, 0.0142)
                 .motions(json!({"uses": {"code": "tray_out", "write": "tray_out", "markets": "tray_out", "browse": "tray_out", "homework": "tray_out"}}))
@@ -158,7 +158,7 @@ pub fn family() -> Family {
                     ("chair", "Chair"),
                 ]),
             // its own size: the chair drawn at it and what lies on it are not measured (a desk is 0.75 m tall)
-            Model::new("deskWriting", desks::desk_writing, (1.54, 0.752, 0.433))
+            Model::new("deskWriting", desks::desk_writing, (1.54, 0.752, 0.5))
                 .key("model.deskWriting")
                 .centre(0.0, 0.0142)
                 .motions(json!({"uses": {"write": "drawer_open", "homework": "drawer_open"}, "hold": 2.5}))
