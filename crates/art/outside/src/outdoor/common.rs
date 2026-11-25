@@ -8,7 +8,7 @@ use artkit::math::{M3, M4, P3, PI, V3, cos, radians, sin};
 use artkit::mesh::Mesh;
 use artkit::noise::noise;
 use artkit::palette;
-use artkit::parts::join_all;
+use artkit::parts::{join, own};
 use artkit::place::{Coord, Facing, GameFrame, Spot};
 use artkit::scene::{Obj, meshes};
 use artkit::{cylinder, extrude, fcyl, fextrude, fsweep, loft, revolve, ring, settle};
@@ -109,11 +109,12 @@ pub fn rod(name: &str, a: impl Spot, b: impl Spot, r: f64, material: Mat, verts:
     )
 }
 
-/// Joins the model; `centred`: moves it onto its Model's `centre` (its back onto the wall face), else
+/// Joins the model (but what it carries); `centred`: moves it onto its Model's `centre` (its back onto the wall face), else
 /// leaves it where it was built. Its feet are cut flat on the floor first: a leg swept up from it at a slant dips
 /// a few mm below, and settling would lift the whole model (its seat) by that.
 pub fn finish(name: &str, centred: bool) -> Vec<Obj> {
-    let obj = join_all(name);
+    // (what it carries, `aside`, stays a part of its own)
+    let obj = join(&own(&meshes()), name, Some(P3::ZERO));
     obj.edit(|o| {
         for v in &mut o.mesh.verts {
             if v.z < 0.0 {
@@ -382,10 +383,15 @@ pub fn jug(name: &str, x: f64, y: f64, z: f64, r: f64, h: f64, material: Mat) {
         (0.96, 0.78),
         (1.0, 0.86),
     ];
+    // the lip's top edge rounded over in two rings, where the mouth's disc starts
+    let lip = [
+        (1.0 + 0.003 / h, 0.86 - 0.001 / r),
+        (1.0 + 0.0045 / h, 0.86 - 0.004 / r),
+    ];
     let mut sections = Vec::new();
-    for (t, k) in shape {
+    for (t, k) in shape.into_iter().chain(lip) {
         let mut lp = ring!(r * k, r * k, z = bz + h * t, verts = 14, at = (bx, by));
-        if t == 1.0 {
+        if t >= 1.0 {
             // the spout: the lip pulled out towards -x
             lp = lp
                 .iter()
@@ -457,7 +463,7 @@ pub fn slab(
                 .collect::<Vec<P3>>(),
         );
     }
-    loft!(name, &sections, material = material, angle = 50)
+    crate::eased(loft!(name, &sections, material = material, angle = 50))
 }
 
 /// A bottle standing at game (x, y, z): a body, a rounded shoulder, a neck, a lip; `cap`: its cap's material.

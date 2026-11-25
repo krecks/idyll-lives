@@ -201,7 +201,7 @@ fn frame() {
                 0.04,
                 M.gh_frame,
                 (0, 0, 1),
-                0.0,
+                0.004,
             );
         }
     }
@@ -216,7 +216,7 @@ fn frame() {
     );
     for z in [-hz + 0.01, hz - 0.01] {
         // a finial at each end of the ridge
-        revolve!(
+        crate::eased(revolve!(
             numbered("finial"),
             &[
                 (0.0, 0.0),
@@ -228,7 +228,7 @@ fn frame() {
             at = F.at(0, GH_RIDGE + 0.03, z),
             material = M.gh_frame,
             segments = low(8, 4)
-        );
+        ));
     }
     if !is_low() {
         for z in (0..4).map(|k| -hz + 0.025 + (GHD - 0.05) * k as f64 / 4.0) {
@@ -299,7 +299,7 @@ fn frame() {
             0.04,
             M.gh_frame,
             (0, 0, 1),
-            0.0,
+            0.004,
         );
     }
 }

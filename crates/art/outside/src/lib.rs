@@ -71,6 +71,17 @@ pub fn bevelled(obj: Obj, angle: f64, segments: usize) -> Obj {
     // (the gate's `edges` finds turns of 60° or more: a rounded corner's 45° steps are left as they are)
     // (a profile closed on its first point, a revolve's, leaves a seam the bevel can't cross: welded first)
     obj.edit(|o| o.mesh.remove_doubles(1e-6));
+    // a bevel the kernel can't build (one ending where no other bevelled edge goes) is tried on the turns over 30°
+    // (a mitre's), else left off: the gate's `edges` then says where
+    let builds = |angle: f64| {
+        obj.read(|o| {
+            artkit::bevel::bevelled(&o.mesh, AUTO_WIDTH, segments, angle, &EdgeOrder::Corners)
+                .is_ok()
+        })
+    };
+    let Some(angle) = [angle, 30.0].into_iter().find(|&a| builds(a)) else {
+        return obj;
+    };
     bevel_edges(obj, AUTO_WIDTH, segments, angle, &EdgeOrder::Corners)
 }
 

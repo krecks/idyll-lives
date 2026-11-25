@@ -52,7 +52,7 @@ pub fn family() -> Family {
                 .key("model.bicycle")
                 .far_low()
                 .paint(&[("city", "Frame")]),
-            Model::new("mountainBike", rides::mountain_bike, (1.832, 0.998, 0.605))
+            Model::new("mountainBike", rides::mountain_bike, (1.832, 0.998, 0.725))
                 .tolerance(0.02)
                 .key("model.mountainBike")
                 .far_low()

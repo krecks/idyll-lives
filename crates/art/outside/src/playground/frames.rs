@@ -163,7 +163,7 @@ pub fn slide() -> Vec<Obj> {
                 )
             })
             .collect();
-        fextrude!(
+        crate::eased(fextrude!(
             F,
             format!("panel{}", float_repr(x)),
             &rounded_rect(0.28, 0.21, 0.03, 2),
@@ -172,7 +172,7 @@ pub fn slide() -> Vec<Obj> {
             M.roof,
             plane = Facing::Side,
             holes = [port]
-        );
+        ));
         fbox!(
             F,
             format!("beam_side{}", float_repr(x)),
@@ -357,7 +357,8 @@ pub fn slide() -> Vec<Obj> {
 
 /// A sawn board from game point `a` to `b`, `w` wide (across, as near level as it goes) and `t` thick.
 fn board(name: &str, a: impl Spot, b: impl Spot, w: f64, t: f64, material: Mat) -> Obj {
-    sweep!(
+    // eased, its UVs laid on the eased board (`boxed`)
+    crate::boxed(crate::eased(sweep!(
         name,
         &[a.through(&F), b.through(&F)],
         0.0,
@@ -369,14 +370,14 @@ fn board(name: &str, a: impl Spot, b: impl Spot, w: f64, t: f64, material: Mat) 
             (-w / 2.0, t / 2.0)
         ],
         up = (0, 0, 1)
-    )
+    )))
 }
 
 pub fn climbing_frame() -> Vec<Obj> {
     let deck = 1.1;
     for x in [-0.85, 0.85] {
         for z in [-0.85, 0.85] {
-            fbox!(
+            crate::boxed(fbox!(
                 F,
                 format!("post{}{}", float_repr(x), float_repr(z)),
                 0.1,
@@ -386,7 +387,7 @@ pub fn climbing_frame() -> Vec<Obj> {
                 M.timber,
                 bevel = 0.012,
                 bevel_segments = 1
-            );
+            ));
             fbox!(
                 F,
                 format!("shoe{}{}", float_repr(x), float_repr(z)),
