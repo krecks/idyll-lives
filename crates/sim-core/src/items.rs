@@ -163,14 +163,6 @@ impl Items {
         Some(self.list.remove(i))
     }
 
-    /// Who has promised themselves a serving of this, if anyone (the first of them).
-    pub fn reserved_by(&self, id: u32) -> Option<u32> {
-        self.reserved
-            .iter()
-            .find(|&&(item, _)| item == id)
-            .map(|&(_, sim)| sim)
-    }
-
     /// Whether `sim` may have a serving of `id`: they have promised themselves one, or there are
     /// more servings left than others have promised themselves (a pot feeds the whole table).
     pub fn free_for(&self, id: u32, sim: u32) -> bool {
@@ -326,7 +318,7 @@ mod tests {
         let first = items.add(serving());
         let second = items.add(serving());
         assert!(items.reserve(first, 1));
-        assert_eq!(items.reserved_by(first), Some(1));
+        assert!(items.free_for(first, 1) && !items.free_for(first, 2));
         assert!(items.reserve(first, 1), "the same sim may keep it");
         assert!(!items.reserve(first, 2), "another sim may not take it");
         assert!(!items.free_for(first, 2));
@@ -334,9 +326,9 @@ mod tests {
         items.release(first, 1);
         assert!(items.reserve(first, 2));
         items.remove(second);
-        assert_eq!(items.reserved_by(second), None);
+        assert!(items.reserved.iter().all(|&(item, _)| item != second));
         items.release_stale(|_, _| false);
-        assert_eq!(items.reserved_by(first), None);
+        assert!(items.free_for(first, 1));
     }
 
     #[test]

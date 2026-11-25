@@ -120,16 +120,9 @@ fn prompt(world: &mut World) {
             };
             let at = obj.centre(&world.content);
             let inter = &def.interactions[k];
-            let fetching = |t: &TaskKind| matches!(*t, TaskKind::Use { object, .. } if object == o);
-            let going = |s: &Sim| {
-                s.current().is_some_and(|a| fetching(&a.task.kind))
-                    || s.queue().any(|t| fetching(&t.kind))
-            };
-            if world.sims.iter().any(going) {
-                continue;
-            }
             let far = |s: &Sim| (s.pos[0] - at[0]).hypot(s.pos[1] - at[1]);
-            let who = (0..world.sims.len())
+            let who = world
+                .household_sims(h as u32)
                 .filter(|&j| {
                     let s = &world.sims[j];
                     let (x, z) = s.tile();
@@ -142,7 +135,16 @@ fn prompt(world: &mut World) {
                         && !s.couldnt_reach(o, tick)
                 })
                 .min_by(|&a, &b| far(&world.sims[a]).total_cmp(&far(&world.sims[b])));
-            if let Some(j) = who {
+            // (Unless someone is on their way for it already: looked for only once there is
+            // someone to send.)
+            let fetching = |t: &TaskKind| matches!(*t, TaskKind::Use { object, .. } if object == o);
+            let going = |s: &Sim| {
+                s.current().is_some_and(|a| fetching(&a.task.kind))
+                    || s.queue().any(|t| fetching(&t.kind))
+            };
+            if let Some(j) = who
+                && !world.sims.iter().any(going)
+            {
                 world.sims[j].queue.push_back(Task {
                     kind,
                     directed: false,

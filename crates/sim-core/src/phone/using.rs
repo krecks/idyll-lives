@@ -255,11 +255,16 @@ pub(crate) fn update(w: &mut World) {
             continue;
         };
         // Whoever would set off for the other's home only goes if the way is one to make now
-        // (not a walk of hours, there in visiting hours: `World::visit_fits_now`).
+        // (not a walk of hours, there in visiting hours: `World::visit_fits_now`), and the one
+        // asked over not if it'd leave a baby home alone (`life::no_cover_for`; the caller was
+        // checked as they called).
         let meet = w.content.phone.actions[h.action].meet;
         let home_of = |s: usize| w.households[w.sims[s].household as usize].plot;
         let can_meet = match meet {
-            Some(Meet::Here) => home_of(i).is_some_and(|p| w.visit_fits_now(c, p)),
+            Some(Meet::Here) => {
+                home_of(i).is_some_and(|p| w.visit_fits_now(c, p))
+                    && crate::life::no_cover_for(w, c).is_none()
+            }
             Some(Meet::There) => h.directed || home_of(c).is_some_and(|p| w.visit_fits_now(i, p)),
             None => true,
         };
