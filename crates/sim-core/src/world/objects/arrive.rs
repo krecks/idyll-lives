@@ -60,7 +60,10 @@ pub(crate) fn arrive(
             return;
         }
         // (At a post with someone serving, paid once served: `world::route`.)
-        if inter.served.is_none() || !ctx.served(object) {
+        if inter.served.is_some() && ctx.served(object) {
+            sim.owes = cost.max(0);
+        } else {
+            sim.owes = 0;
             sim.pending_spend += cost.max(0);
         }
         // A load of washing taken up as the use starts (`life::update` settles it); given back if

@@ -61,6 +61,37 @@ fn starter_lot_loads_with_a_household() {
     );
 }
 
+/// A saved resident the content has changed under (traits that now conflict, perks now over the
+/// budget, every gender they were attracted to gone) loads: the later of the two traits and the
+/// perks past the budget are dropped, and they're attracted to all, not to nobody. A new
+/// resident with those traits is still refused.
+#[test]
+fn a_resident_the_content_changed_under_still_loads() {
+    let world = World::from_json(&content(), &starter_with_household(), 1).unwrap();
+    let mut save: serde_json::Value = serde_json::from_str(&world.save_json()).unwrap();
+    let ada = &mut save["sims"][0];
+    ada["traits"] = serde_json::json!(["neat", "cheerful", "slob"]);
+    ada["perks"] = serde_json::json!(["sunnyDisposition", "ironBladder", "charming"]);
+    ada["attractedTo"] = serde_json::json!(["robot"]);
+    let loaded = World::from_save_json(&content(), &save.to_string()).expect("the save loads");
+    let ada = &loaded.sims[0];
+    assert_eq!(ada.traits, ["neat", "cheerful"]);
+    assert_eq!(ada.perks, ["sunnyDisposition", "ironBladder"], "5 points");
+    let all: Vec<String> = loaded
+        .content
+        .genders
+        .iter()
+        .map(|g| g.id.clone())
+        .collect();
+    assert!(!all.is_empty());
+    assert_eq!(ada.attracted_to, all);
+
+    let mut lot: serde_json::Value = serde_json::from_str(&starter_with_household()).unwrap();
+    lot["sims"][0]["traits"] = serde_json::json!(["neat", "slob"]);
+    let err = World::from_json(&content(), &lot.to_string(), 1).err();
+    assert!(err.is_some_and(|e| e.to_string().contains("conflict")));
+}
+
 #[test]
 fn house_templates_and_the_starter_lot_have_windows_in_their_walls() {
     use sim_core::lot::{Edge, Lot, LotFile};

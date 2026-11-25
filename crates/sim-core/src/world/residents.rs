@@ -188,6 +188,7 @@ impl World {
             partner_wait: 0,
             being_served: false,
             serve_wait: 0,
+            owes: 0,
             bound_for_bike: None,
             bike_parked: None,
             bike_spot: None,
