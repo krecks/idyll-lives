@@ -15,18 +15,17 @@ nightstand's padded top at about 0.45, the recliner's seat top at 0.45 in the mi
 | `snackNightstand` | the top side drawer full of chip bags and a cookie: `drawer_open` slides it 16 cm out to the right (0.6 s) | `midnightSnack` |
 | `spritzStation` | the trigger spray bottle, hinged on its foot: `spritz` tips it 35° to the front (0.4 s). The round mirror hangs on a purple back board rising from the top and the green towel on a chrome bar under the top's front, so neither hangs on the air free of a wall (2026-10-21, M-packs-02; Q-06). | `spritz` |
 | `arcadeCabinet` | the joystick, its origin in the deck: `joystick` waggles it 18° each way, side to side, in 0.6 s (a loop). The marquee glows at night (`glow`) and the screen while it is played (`screen`; 2026-10-21, M-packs-07). | `chaseHighScore`, `quickRound` (`loops`) |
-| `gamingRecliner` | the tall back with its stripe and headrest, hinged at the seat's back, and the seat with the footrest: `recline` lays the back 12° back as both ride 14 cm forward (1 s), a wall-hugger, its headrest staying off the wall; the cup holder with a soda on the right armrest: `cup_out` swings it 110° out (0.6 s) | `marathon`; `armrestSoda` |
+| `gamingRecliner` | the tall back with its stripe and headrest and the seat with the footrest, one part hinged at the seat's back: `recline` tilts it 12° back as it rides 14 cm forward (1 s), a wall-hugger, its headrest staying off the wall; the cup holder with a soda on the right armrest: `cup_out` swings it 110° out (0.6 s) | `marathon`; `armrestSoda` |
 
 The arcade's joystick is the loop the table asks for (E1). The recliner's back reclines and the sitter rides
 it (`ride: recline`), tipping back with it.
 
-**Draw calls: 2–3 each, the recliner 4.** Nothing else here needs more:
+**Draw calls: 2–3 each.** Nothing else here needs more:
 - the cart, the beanbag and the arcade cabinet are all plain (2: the body and the moving part); the beanbag's
   vinyl is satin ("wipe-clean");
 - the nightstand's padded top and the spritz station's towels and laundry are `fabric` (3);
-- the recliner is leatherette satin, its three moving parts (back, seat, cup holder) the 2nd to 4th draw (the
-  seat rides forward with the back as it reclines, so it can't be in the body: `check-glb`'s one warning); the mini-fridge's door is plain
-  gloss, no glass;
+- the recliner is leatherette satin, its two moving parts (the back with the seat, the cup holder) the 2nd and 3rd
+  draw; the mini-fridge's door is plain gloss, no glass;
 - the spritz station's round mirror is chrome, as the old part's (no mirror glass: it is not the point here).
 
 | Model | Size (w × h × d) | Triangles | Draws | Colour parts |
@@ -80,3 +79,17 @@ cargo art pack_slob --preview  # previews/pack_slob/<id>.png, <id>@<clip>.png
 ## The soft forms pass (2026-11-13)
 
 The spritz station's laundry heaps are left unpinched (heaps, not cushions). Besides, its soft boxes take the shared form's new shape (the shared `soft_box`: rounded edges turning in equal parts, so the same triangles stand closer to the curve; puffed boxes' corners pinched in; cords following the seams). Same sizes (to 1.2 mm), parts, clips, seat and mattress heights (`cargo review sizes` and `uses` unchanged). 5 models changed shape: `arcadeCabinet`, `beanbag`, `gamingRecliner`, `snackNightstand`, `spritzStation`; 18,618 to 18,522 triangles.
+
+## Gate to zero (2026-11-25)
+
+Every hard edge the gate found (15) is gone, the recliner is down to 3 draw calls and the sizes are the furniture's:
+- **Microwave cart:** the trays' lips roll over (a 4.5 mm round in 30° steps), the cavity's mouth has a rolled front
+  flange lapping its edge; the cart's top is 6 cm higher (0.86, a worktop's height for the microwave on it) and the
+  dropped wrappers are set aside (`aside`), so it measures 0.74 × 1.16 × 0.47 m.
+- **Beanbag:** the rim's crest cut twice (Chaikin) so it rolls over; the controllers' tops eased in.
+- **Snack nightstand:** the alarm clock's back rim chamfered, the sock's ends tapered; the floor clutter (magazine, cans,
+  wrappers, clock, sock) set aside, the pad 2 mm higher (its top 0.45): 0.60 × 0.45 × 0.47 m.
+- **Spritz station:** the hung towel's fold over its bar rolls round (6 steps); the washing heaped on the floor, its
+  sleeve and the can set aside: 0.60 × 1.62 × 0.29 m.
+- **Gaming recliner:** the seat and footrest are one part with the back, tilting with it as it rides forward (3 draw
+  calls, was 4); the side tables (mini fridge, console dock) set aside as a desk's chair is: 0.92 × 1.10 × 0.87 m.

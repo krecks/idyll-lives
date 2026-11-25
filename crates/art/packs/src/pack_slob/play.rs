@@ -4,7 +4,7 @@ use super::common::{_box, _can, _wrapper, M, POP, WALL};
 use artkit::forms::{rounded_rect, smooth_outline};
 use artkit::materials::Mat;
 use artkit::math::{Axis, P3};
-use artkit::parts::{hinged, join, new_parts};
+use artkit::parts::{aside, hinged, join, new_parts};
 use artkit::place::{Facing, GameFrame};
 use artkit::scene::Obj;
 use artkit::{
@@ -234,8 +234,12 @@ pub fn spritz_station() -> Vec<Obj> {
             M.towel_green,
             profile = rounded_rect(0.008, 0.26, 0.004, 1),
             up = (0, 1, 0),
-            resolution = 2
+            resolution = 6 // (enough steps that its fold over the bar rolls round)
         );
+    });
+    join(&still, "body", Some(P3::from((0, 0, 0))));
+    // the washing heaped on the floor in front, a sleeve trailing, a can: drawn, not the station's size
+    let heaped = new_parts(|| {
         for (k, (x, z, r, m)) in [
             (-0.112, 0.14, 0.2, M.laundry),
             (0.08, 0.234, 0.13, M.laundry_red),
@@ -279,7 +283,7 @@ pub fn spritz_station() -> Vec<Obj> {
         );
         _can(f, "can", 0.32, 0.3, 0.0, M.pop_yellow, true, -30.0);
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    aside(&heaped, "heaped");
     // The trigger spray bottle, hinged on its foot: `spritz` tips it 35 degrees towards the front.
     let (sx, sy, sz) = SPRAY;
     let spray = new_parts(|| {

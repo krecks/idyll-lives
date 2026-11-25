@@ -543,7 +543,7 @@
   "model.slob.beanbag": [0.0, 0.007],
   "model.slob.gamingRecliner": [0.005, 0.01],
   "model.slob.microwaveCart": [0.011, -0.0386],
-  "model.slob.snackNightstand": [0.021, 0.031],
+  "model.slob.snackNightstand": [0.0155, 0.031],
   "model.slob.spritzStation": [0.0325, -0.031],
   "model.snowGlobe": [0.0, 0.0],
   "model.soapSet": [0.0, 0.0],

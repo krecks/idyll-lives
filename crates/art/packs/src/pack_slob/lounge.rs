@@ -6,7 +6,7 @@ use artkit::forms::rounded_rect;
 use artkit::kit;
 use artkit::materials::Mat;
 use artkit::math::{Axis, M4, P3, PI, TAU, V3, cos, pow, radians, sin};
-use artkit::parts::{hinged, join, new_parts};
+use artkit::parts::{aside, hinged, join, new_parts};
 use artkit::place::GameFrame;
 use artkit::scene::Obj;
 use artkit::{
@@ -36,15 +36,21 @@ fn _controller(f: &GameFrame, name: &str, x: f64, y: f64, z: f64, material: Mat,
         (0.045, -0.05),
         (0.065, -0.04),
     ];
-    let sections: Vec<Vec<P3>> = [(0.0, 0.92), (0.008, 1.0), (0.026, 1.0), (0.034, 0.9)]
-        .iter()
-        .map(|&(hh, k)| {
-            outline
-                .iter()
-                .map(|&(u, v)| P3::from((bx + u * k, by + v * k, bz + hh)))
-                .collect()
-        })
-        .collect();
+    let sections: Vec<Vec<P3>> = [
+        (0.0, 0.92),
+        (0.008, 1.0),
+        (0.026, 1.0),
+        (0.031, 0.96),
+        (0.034, 0.85),
+    ]
+    .iter()
+    .map(|&(hh, k)| {
+        outline
+            .iter()
+            .map(|&(u, v)| P3::from((bx + u * k, by + v * k, bz + hh)))
+            .collect()
+    })
+    .collect();
     let body = loft!(name, &sections, material = material);
     let mut made = vec![body];
     for dx in [-0.03, 0.03] {
@@ -126,8 +132,11 @@ pub fn beanbag() -> Vec<Obj> {
             ring(0.432, 0.13, 0.0, 0.0),
             ring(0.42, 0.25, 0.04, 0.0),
             ring(0.37, 0.34, 0.12, 0.02),
-            ring(0.3, 0.41, 0.25, 0.04),
-            ring(0.2, 0.43, 0.22, 0.05),
+            // (the rim's crest cut twice, so it rolls over rather than folds)
+            ring(0.3175, 0.3925, 0.2175, 0.035),
+            ring(0.275, 0.415, 0.2425, 0.0425),
+            ring(0.225, 0.425, 0.2275, 0.0475),
+            ring(0.18, 0.4125, 0.1925, 0.0425),
             ring(0.12, 0.36, 0.12, 0.02),
             ring(0.05, 0.315, 0.03, 0.0),
             ring(0.0, 0.31, 0.0, 0.0),
@@ -206,7 +215,7 @@ pub fn snack_nightstand() -> Vec<Obj> {
             0.56,
             0.075,
             0.46,
-            (0, 0.4125 - 0.006, -0.02),
+            (0, 0.4145 - 0.006, -0.02),
             M.pad,
             round = 0.03,
             puff = 0.006,
@@ -219,7 +228,7 @@ pub fn snack_nightstand() -> Vec<Obj> {
                 f,
                 format!("pad_button{k}"),
                 0.01,
-                (k as f64 * 0.12, 0.445, -0.02),
+                (k as f64 * 0.12, 0.447, -0.02),
                 M.stand_front,
                 scale = (1, 1, 0.5),
                 segments = 6,
@@ -271,16 +280,6 @@ pub fn snack_nightstand() -> Vec<Obj> {
             rail = 0.05,
             panel = M.stand
         );
-        fbox!(
-            f,
-            "magazine",
-            0.2,
-            0.012,
-            0.26,
-            (-0.1, 0.006, 0.12),
-            M.pop_purple,
-            rot = (0, 0, 12)
-        ); // under its front edge
         for fx in [-0.25, 0.25] {
             for fz in [-0.22, 0.18] {
                 fcyl!(
@@ -294,7 +293,21 @@ pub fn snack_nightstand() -> Vec<Obj> {
                 );
             }
         }
-        // floor clutter: cans, wrappers, a knocked-over alarm clock with its bells, a sock
+    });
+    join(&still, "body", Some(P3::from((0, 0, 0))));
+    // floor clutter: a magazine, cans, wrappers, a knocked-over alarm clock with its bells, a sock: drawn, not the
+    // nightstand's size
+    let clutter = new_parts(|| {
+        fbox!(
+            f,
+            "magazine",
+            0.2,
+            0.012,
+            0.26,
+            (-0.1, 0.006, 0.12),
+            M.pop_purple,
+            rot = (0, 0, 12)
+        ); // under its front edge
         _can(f, "can_a", -0.36, 0.26, 0.0, M.pop_blue, true, 70.0);
         _can(f, "can_b", -0.38, -0.3, 0.0, M.pop_red, false, 0.0);
         _can(f, "can_c", 0.4, 0.3, 0.0, M.pop_green, true, -20.0);
@@ -305,7 +318,7 @@ pub fn snack_nightstand() -> Vec<Obj> {
                 "clock",
                 &[
                     (0.0, -0.03),
-                    (0.06, -0.03),
+                    (0.056, -0.03),
                     (0.062, -0.022),
                     (0.062, 0.022),
                     (0.056, 0.03),
@@ -348,10 +361,11 @@ pub fn snack_nightstand() -> Vec<Obj> {
             M.white,
             profile = rounded_rect(0.02, 0.07, 0.01, 2),
             up = (0, 0, 1),
-            resolution = 2
+            resolution = 2,
+            scale = [0.5, 1.0, 1.0, 0.5] // (its toe and cuff rounded off, not cut flat)
         );
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
+    aside(&clutter, "clutter");
     // The top side drawer with its snacks, closed into the right side: `drawer_open` slides it out to the right.
     let drawer = new_parts(|| {
         fbox!(
@@ -485,6 +499,13 @@ pub fn gaming_recliner() -> Vec<Obj> {
             );
         }
         fbox!(f, "led_front", 0.8, 0.02, 0.008, (0, 0.04, 0.27), M.cyan);
+        _wrapper(f, "wrapper_a", 0.3, 0.38, M.bag_orange, 8, 0.0);
+        _wrapper(f, "wrapper_b", -0.45, 0.32, M.bag_purple, 9, 0.0);
+        _can(f, "can", -0.3, 0.38, 0.0, M.pop_blue, true, 15.0);
+    });
+    join(&still, "body", Some(P3::from((0, 0, 0))));
+    // the side tables either side: drawn with it, not the recliner's size (as a desk's chair)
+    let tables = new_parts(|| {
         // the right: a mini-fridge side table, cans behind its tinted door, a chip bag on top
         let fx = 0.7;
         _box(
@@ -652,12 +673,10 @@ pub fn gaming_recliner() -> Vec<Obj> {
             );
         }
         _controller(f, "controller", lx + 0.08, 0.437, 0.0, M.gloss_white, 15.0);
-        _wrapper(f, "wrapper_a", 0.3, 0.38, M.bag_orange, 8, 0.0);
-        _wrapper(f, "wrapper_b", -0.45, 0.32, M.bag_purple, 9, 0.0);
-        _can(f, "can", -0.3, 0.38, 0.0, M.pop_blue, true, 15.0);
     });
-    join(&still, "body", Some(P3::from((0, 0, 0))));
-    // The tall back with its stripe and headrest pillow, hinged at the seat's back: `recline` lays it back.
+    aside(&tables, "tables");
+    // The tall back with its stripe and headrest pillow and the seat with its footrest, one part hinged at the
+    // seat's back: `recline` tilts it back and rides it forward.
     let (hy, hz) = HINGE;
     let back = new_parts(|| {
         soft!(
@@ -699,10 +718,7 @@ pub fn gaming_recliner() -> Vec<Obj> {
             puff = 0.02,
             flat = 2
         );
-    });
-    let back = hinged(join(&back, "back", None), f.at(0, hy, hz));
-    // The seat and footrest, which ride forward on the base as the back reclines (a wall-hugger's track).
-    let seat = new_parts(|| {
+        // the seat and footrest, which tilt and ride forward with it on the base (a wall-hugger's track)
         soft!(
             f,
             "seat",
@@ -741,7 +757,7 @@ pub fn gaming_recliner() -> Vec<Obj> {
             flat = 2
         );
     });
-    let seat = join(&seat, "seat", Some(P3::ZERO));
+    let back = hinged(join(&back, "back", None), f.at(0, hy, hz));
     // The cup holder with a soda in it, tucked under the right armrest's front: `cup_out` swings it out.
     let (cx, cy, cz) = CUP;
     let cup = new_parts(|| {
@@ -776,10 +792,9 @@ pub fn gaming_recliner() -> Vec<Obj> {
     });
     let cup = hinged(join(&cup, "cup_holder", None), f.at(cx, cy, cz));
     let objs = settle!(centre = false);
-    // A wall-hugger: the back lies back 12° as it and the seat ride 14 cm forward, its top kept off the wall.
+    // A wall-hugger: the seat and back tilt back 12° as they ride 14 cm forward, the top kept off the wall.
     swing!(back, "recline", -12.0, seconds = 1.0, axis = Axis::X);
     slide!(back, "recline", (0, -RIDE, 0), seconds = 1.0);
-    slide!(seat, "recline", (0, -RIDE, 0), seconds = 1.0);
     swing!(cup, "cup_out", 110.0, seconds = 0.6);
     objs
 }
