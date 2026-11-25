@@ -207,9 +207,9 @@
     {
       "name": "sim-lifecycle-moving",
       "file": "crates/sim-core/src/lifecycle/moving.rs",
-      "sha256": "f41a8a3d9ffa78ff2550fc4a9f47087c8f07654d30768864e32c821b3cd536ab",
+      "sha256": "f71b71cafb9722d9a2b7d882044b6e8cfe95877a4ead2978bead648c92f72e6c",
       "by": "audit",
-      "reason": "audit (PR #132, owner asked to merge): nobody moves out leaving a child alone; a baby on the way moves with its parents; a new family in a home starts afresh; a grown child moving out or leaving town takes their own children (vacant_plot takes stages and pairs)."
+      "reason": "audit follow-up (after PR #132): a baby who moves house gets a crib in the new home (move_to calls cribs_for_babies), as one moving in does; the audit's accepted changes stand."
     },
     {
       "name": "sim-lifecycle-arrival",

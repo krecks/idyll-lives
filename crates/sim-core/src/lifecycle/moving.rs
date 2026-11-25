@@ -281,6 +281,10 @@ pub(super) fn move_to(w: &mut World, i: usize, to: usize) {
     if let Some(pos) = arrive.filter(|_| sim.away_until.is_none()) {
         sim.pos = pos;
     }
+    // A baby gets a crib in the new home, as one moving in does.
+    if w.content.life.baby(w.sims[i].age) {
+        cribs_for_babies(w, to);
+    }
     w.structure_version = w.structure_version.wrapping_add(1);
 }
 
