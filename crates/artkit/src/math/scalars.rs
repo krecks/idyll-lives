@@ -51,6 +51,3 @@ pub fn cosd(a: f64) -> f64 {
 pub fn sind(a: f64) -> f64 {
     sin(radians(a))
 }
-
-// Single-precision functions as Blender's C library (Apple's) works them out, which is not always the nearest
-// single: each is the library's own code, read from it.

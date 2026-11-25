@@ -1,15 +1,15 @@
 //! G2, the flower beds: tulips, daffodils, daisies, sunflowers, poppies, marigolds, pansies, lilies, lupins,
 //! forget-me-nots and cosmos, each on its soil mound.
 
-use artkit::botany::{clumps, fit_to, palette, polar};
+use artkit::botany::{clumps, fit_to, lupin_spike, palette, polar};
 use artkit::far::{is_low, low};
 use artkit::math::{V3, v3};
 use artkit::parts::{join_all, settle};
 use artkit::rand::Random;
 use artkit::scene::{Obj, meshes};
 use artkit::{
-    _put, cupped, cut_leaf, florets, lump, lupin_spike, mound, outline, pinnate, rays, rosettes,
-    sphere, spiral, stalk, tulip_head, twig,
+    _put, cupped, cut_leaf, florets, lump, mound, outline, pinnate, rays, rosettes, sphere, spiral,
+    stalk, tulip_head, twig,
 };
 
 /// Tulips: a soil mound of tulips in five colours, closed cups of petals on straight, slightly bowed stems, broad
@@ -171,7 +171,6 @@ pub fn daisies() -> Vec<Obj> {
     let mut rng = Random::new(53);
     let top = mound!(&p);
     rosettes!(
-        &p,
         &mut rng,
         5,
         0.3,
@@ -356,7 +355,6 @@ pub fn poppies() -> Vec<Obj> {
     let mut rng = Random::new(55);
     let top = mound!(&p);
     rosettes!(
-        &p,
         &mut rng,
         6,
         0.3,
@@ -440,7 +438,6 @@ pub fn marigolds() -> Vec<Obj> {
     let mut rng = Random::new(56);
     let top = mound!(&p);
     clumps(
-        &p,
         &mut rng,
         7,
         0.33,
@@ -502,7 +499,6 @@ pub fn pansies() -> Vec<Obj> {
     let mut rng = Random::new(57);
     let top = mound!(&p);
     rosettes!(
-        &p,
         &mut rng,
         8,
         0.34,
@@ -712,13 +708,12 @@ pub fn lupins() -> Vec<Obj> {
             m("stem"),
             r = 0.007
         );
-        lupin_spike!(
+        lupin_spike(
             format!("spike{i}"),
             (tip.0, tip.1, h - 0.36),
             0.36,
             0.045,
             cols[i % 4],
-            seed = i as f64
         );
     }
     fit_to(&meshes(), 0.84, 0.987, 0.84);
@@ -737,7 +732,6 @@ pub fn forget_me_nots() -> Vec<Obj> {
     let mut rng = Random::new(60);
     let top = mound!(&p);
     clumps(
-        &p,
         &mut rng,
         7,
         0.33,

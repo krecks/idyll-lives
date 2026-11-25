@@ -59,11 +59,7 @@ fn saasin(f: f32) -> f32 {
 }
 
 /// Blender's `angle_normalized_v3v3`: the angle between two unit vectors.
-pub(crate) fn angle_normalized_v3v3(a: V3, b: V3) -> f32 {
-    angle_normalized(a, b)
-}
-
-fn angle_normalized(a: V3, b: V3) -> f32 {
+pub(crate) fn angle_normalized(a: V3, b: V3) -> f32 {
     if dot_v3(a, b) >= 0.0 {
         2.0 * saasin(len_v3(b - a) / 2.0)
     } else {

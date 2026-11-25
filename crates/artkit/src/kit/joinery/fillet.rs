@@ -1,9 +1,9 @@
 //! Bending a path round its corners.
 
 use super::*;
-use crate::kit::{least, most};
 use crate::materials::Mat;
 use crate::math::{V3, pow, tan};
+use crate::py::{self, min_of};
 use crate::shapes::options;
 
 /// The path through `points` (any axes) with each inner corner rounded to about `radius` (`steps` points round
@@ -21,8 +21,8 @@ pub fn fillet<P: Corner>(points: &[P], radius: f64, steps: usize) -> Vec<P::Out>
             out.push(p);
             continue;
         }
-        let t = least(&[
-            radius / most(1e-6, tan(d1.angle(d2) / 2.0)),
+        let t = min_of(&[
+            radius / py::max(1e-6, tan(d1.angle(d2) / 2.0)),
             d1.length() * 0.5,
             d2.length() * 0.5,
         ]);

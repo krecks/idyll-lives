@@ -1,9 +1,10 @@
 //! Hardware on a front: bar pulls and turned knobs.
 
 use crate::forms::Sweep;
-use crate::kit::{fillet, least};
+use crate::kit::fillet;
 use crate::materials::Mat;
 use crate::place::{Coord, GameFrame};
+use crate::py::min_of;
 use crate::scene::Obj;
 use crate::shapes::{self, Revolve, options};
 
@@ -25,7 +26,7 @@ pub fn pull(
     material: Mat,
     o: Pull,
 ) -> Obj {
-    let (h, b) = (length / 2.0, least(&[0.012, o.out * 0.45]));
+    let (h, b) = (length / 2.0, min_of(&[0.012, o.out * 0.45]));
     let ends = [
         (-h, face - 0.003),
         (-h, face + o.out),

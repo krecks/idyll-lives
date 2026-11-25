@@ -1,7 +1,6 @@
 //! Metalwork: tube bent in one piece, and flat iron curled into scrolls.
 
 use crate::forms::{self, Profile, Scale, Sweep, by, rounded_rect};
-use crate::kit::least;
 use crate::materials::Mat;
 use crate::math::{Num, P3, TAU, atan2, cos, sin};
 use crate::place::{Coord, GameFrame, Spot};
@@ -71,7 +70,7 @@ pub fn scroll(
     }
     let prof = match o.profile.0 {
         Some(p) if !p.is_empty() => p,
-        _ => rounded_rect(o.t, o.w, least(&[o.t, o.w]) * 0.3, 1),
+        _ => rounded_rect(o.t, o.w, py::min_of(&[o.t, o.w]) * 0.3, 1),
     };
     forms::sweep(
         name,

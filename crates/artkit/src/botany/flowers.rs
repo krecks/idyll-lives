@@ -214,21 +214,8 @@ pub fn tulip_head(
     )
 }
 
-options! {
-    /// `lupin_spike`'s options.
-    LupinSpike { seed: f64 = 0.0 }
-}
-
 /// A lupin's spike of pea flowers: a tapering column, bumpy with whorls of florets, `h` tall from `at`.
-pub fn lupin_spike(
-    name: impl AsRef<str>,
-    at: impl Into<P3>,
-    h: f64,
-    r: f64,
-    material: Mat,
-    o: LupinSpike,
-) -> Obj {
-    let _ = o.seed;
+pub fn lupin_spike(name: impl AsRef<str>, at: impl Into<P3>, h: f64, r: f64, material: Mat) -> Obj {
     let at: P3 = at.into();
     let rings = low(8, 4);
     let n = low(6, 4);

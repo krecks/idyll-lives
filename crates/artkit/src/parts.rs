@@ -104,7 +104,7 @@ pub(crate) fn join_into(first: Obj, others: &[Obj]) {
 }
 
 /// `b`'s points, faces and materials added to `a`.
-fn append(a: &mut Mesh, b: &Mesh) {
+pub(crate) fn append(a: &mut Mesh, b: &Mesh) {
     let (v0, l0) = (a.verts.len() as u32, a.loops.len());
     let slots: Vec<u16> = b.mats.iter().map(|&m| a.slot(m)).collect();
     a.verts.extend_from_slice(&b.verts);

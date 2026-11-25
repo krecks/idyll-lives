@@ -29,26 +29,6 @@ pub(super) fn madd(a: V3, b: V3, k: f32) -> V3 {
     V3::new(a.x + b.x * k, a.y + b.y * k, a.z + b.z * k)
 }
 
-pub(super) fn saasin(f: f32) -> f32 {
-    if f <= -1.0 {
-        -std::f32::consts::FRAC_PI_2
-    } else if f >= 1.0 {
-        std::f32::consts::FRAC_PI_2
-    } else {
-        // (the single-precision routine: nearer Blender's C library's than the double one rounded)
-        libm::asinf(f)
-    }
-}
-
-/// The angle between two unit vectors, as Blender takes it.
-pub(super) fn angle_normalized(a: V3, b: V3) -> f32 {
-    if dot_v3(a, b) >= 0.0 {
-        2.0 * saasin(len_v3(b - a) / 2.0)
-    } else {
-        std::f32::consts::PI - 2.0 * saasin(len_v3(-b - a) / 2.0)
-    }
-}
-
 pub(super) fn angle(a: V3, b: V3) -> f32 {
     angle_normalized(normalize_v3(a).0, normalize_v3(b).0)
 }

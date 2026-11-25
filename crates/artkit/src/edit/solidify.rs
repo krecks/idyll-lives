@@ -1,7 +1,7 @@
 //! Making a surface a shell, and taking vertices out.
 
 use super::*;
-use crate::math::{V3, angle_normalized_v3v3, dot_v3, normalize_v3};
+use crate::math::{V3, angle_normalized, dot_v3, normalize_v3};
 use crate::mesh::{Mesh, edge};
 use crate::normals;
 use crate::scene::Obj;
@@ -67,7 +67,7 @@ fn solidified(mesh: &Mesh, thickness: f32, o: &Solidify) -> Mesh {
             let mut nor_prev = normalize_v3(at(curr - 1) - at(curr)).0;
             for next in 0..c.len() {
                 let nor_next = normalize_v3(at(curr) - at(next)).0;
-                let angle = angle_normalized_v3v3(nor_prev, nor_next).max(f32::EPSILON);
+                let angle = angle_normalized(nor_prev, nor_next).max(f32::EPSILON);
                 let v = c[curr] as usize;
                 accum[v] += angle;
                 // (a shell is as much thicker along the vertex's normal as that leans from the face's)

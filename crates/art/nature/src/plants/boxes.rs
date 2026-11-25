@@ -472,7 +472,6 @@ pub fn flowerbed() -> Vec<Obj> {
         material = m("soil")
     );
     rosettes!(
-        &p,
         &mut rng,
         8,
         0.3,

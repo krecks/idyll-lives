@@ -31,7 +31,7 @@
 //! What isn't built says so: an edge whose bevel ends at a vertex no other bevelled edge reaches, and a patch of
 //! five segments or more.
 
-use crate::math::{PI, V3, cosf, dot_v3, len_v3, mul_v3_fl, normalize_v3, sinf};
+use crate::math::{PI, V3, angle_normalized, cosf, dot_v3, len_v3, mul_v3_fl, normalize_v3, sinf};
 use crate::mesh::{Mesh, edge, normal_newell, normal_tri};
 use crate::scene::Obj;
 use crate::shapes::{SHARP, shade};

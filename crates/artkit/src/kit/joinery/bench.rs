@@ -3,10 +3,11 @@
 use super::*;
 use crate::forms::{self, Profile, Scale, Sweep, rounded_rect};
 use crate::json::float_repr;
-use crate::kit::{Scroll, least, scroll};
+use crate::kit::{Scroll, scroll};
 use crate::materials::Mat;
 use crate::math::{Num, P3, PI, sin};
 use crate::place::{Coord, GameFrame};
+use crate::py::min_of;
 use crate::scene::Obj;
 use crate::shapes::{Cube, options};
 
@@ -34,7 +35,7 @@ pub fn bench_end<X: Coord>(
         t,
         w,
         if o.corner != 0 {
-            least(&[t, w]) * 0.3
+            min_of(&[t, w]) * 0.3
         } else {
             0.0
         },

@@ -4,7 +4,7 @@
 //! were when the botany was ported, d8038732).
 mod common;
 
-use artkit::botany::{self, CARD_OF, Cards, Tiles, card_of, join_still, stand_in};
+use artkit::botany::{self, _with_part, CARD_OF, Cards, Tiles, card_of, join_still, stand_in};
 use artkit::far::{far_of, is_low, low};
 use artkit::materials::{Finish, Finishes, Mat, Palette};
 use artkit::math::{TAU, V3, cos, degrees, pow, sin, v3};
@@ -12,8 +12,8 @@ use artkit::parts::settle;
 use artkit::rand::Random;
 use artkit::scene::{self, Obj};
 use artkit::{
-    _mesh, _with_part, clad, cupped, find, jitter, leaf, leaves, lump, normals, perch, pot, py,
-    shade, sprigs, sweep, tube,
+    _mesh, clad, cupped, find, jitter, leaf, leaves, lump, normals, perch, pot, py, shade, sprigs,
+    sweep, tube,
 };
 use common::*;
 use std::cell::RefCell;
@@ -371,12 +371,12 @@ fn with_part() -> Vec<Obj> {
         rings = 5
     );
     let at = (0.1, -0.05, 0.7);
-    _with_part!(
+    _with_part(
         "sprigs",
         still,
         || sprigs!("sprig", &p, at, 0.3, n = 4, length = 0.2),
         at,
-        "trim"
+        "trim",
     )
 }
 
