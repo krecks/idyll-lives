@@ -24,6 +24,10 @@ pub fn main(args: &[String]) -> i32 {
         .contains(&a)
     };
     let key = |a: &str| a.starts_with("model.") || a.starts_with("item.") || a.starts_with("tool.");
+    if args.iter().any(|a| a == "-h" || a == "--help") {
+        println!("{USAGE}");
+        return 0;
+    }
     if let Some(a) = args.iter().find(|a| !flag(a) && !key(a)) {
         eprintln!("check-glb: {a}: no such flag or key\n{USAGE}");
         return 2;

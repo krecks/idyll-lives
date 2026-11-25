@@ -6,7 +6,8 @@
 #   - target/ linked to a Rust build kept on the machine between jobs (the checkout empties the
 #     workspace, and it is the Actions cache's place on GitHub's runners). Every job shares it,
 #     and Cargo's lock keeps two builds out of it at once. Past CI_TARGET_MAX_MB (default 40 GB) it
-#     starts over.
+#     starts over. A second runner on the same machine needs a CI_TARGET_DIR of its own (in its .env):
+#     one starting over would delete the build under the other's job.
 # The machine needs git, curl, unzip, a C and C++ compiler and libclang (basisu's bindings):
 # `apt install build-essential clang libclang-dev curl unzip git`.
 set -euo pipefail

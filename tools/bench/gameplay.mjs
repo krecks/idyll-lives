@@ -153,6 +153,7 @@ if (has('help') || args.includes('-h')) {
   --no-dumps               no memory-infra dumps at the boundaries
   --voices                 the residents' voices on (the setting; off by default)
   --prod                   a production build with the benchmark's hooks (VITE_BENCH=1, lib/build.mjs), served by vite preview
+  --assets source|prod     --prod's textures: the sources (default) or what players get
   --headed                 in a window (default headless: the real GPU either way)
   --port 5222 | --url <u>  a dev server on the port (started if none answers), or one already running
   --startup-timeout 120    seconds for startup, --entry-timeout 180 for the entry

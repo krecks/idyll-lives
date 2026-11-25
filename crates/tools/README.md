@@ -24,7 +24,7 @@ Every tool's `src/<name>.rs` opens with what it does and its arguments; this pag
 | `cargo tex` | The texture scripts: `clouds`, `synth` (every surface map, generated in code), `materials` (was `tools/art/*.py`), `leafcards` (the trees' leaf-card atlas, drawn on `artkit`; was a Blender script). |
 | `cargo pins` | Accepted parts of the game held by their SHA-256 (`tools/pins/pins.json`: a file, a marked region or an `export const`), so work on something else can't change them by the way (was `tools/pins/check.ts`). `--list`, `--update`, `--add`. |
 | `cargo shots` | Numbers from the bench's pictures: `stats` (brightness, clipping, saturation, how much is one tone, contrast at four sizes), `steady` (how much a picture changes when the camera moves a quarter of a pixel), `compare` (how many pixels differ between two shot folders, with pictures of where; `render.mjs --compare` runs it) and `sheet` (pictures of the same name from several folders tiled side by side under their names; `looks.mjs` and `play.mjs` run it). Was `tools/bench/stats.mjs`, part of `render.mjs` and `sheet.mjs` on sharp. |
-| `cargo world-map` | Draws the sample worlds (`tools/worlds/sample.ts`'s output) from above, north up as the game shows them, an SVG each and an index page (was `tools/worlds/map.ts`): an avenue with its median, a one-way road with arrows the way cars go. |
+| `cargo world-map` | Draws the sample worlds (`tools/worlds/sample.ts`'s output) from above, north up as the game shows them, an SVG each and an index page: an avenue with its median, a one-way road with arrows the way cars go. (`tools/worlds/map.ts` still gives how often the motorway fits, and `--spots` for `tools/bench/roadShots.mjs`.) |
 | `cargo release-version` | One version for the whole game. Prints it and fails if `web/package.json`, `Cargo.toml` and `Cargo.lock` differ (CI runs this); with an argument, sets all of them. Not `cargo version`: that is cargo's own. |
 | `cargo licenses` | `dist/THIRD-PARTY-LICENSES.txt`, written by production builds (`web/vite.config.ts`). |
 | `cargo wasm-opt` | Optimises the simulation's and the voice's WebAssembly for release, with the pinned binaryen. |
@@ -99,7 +99,7 @@ numbers match a crash stack from the site.
 
 | Tool | Why |
 |---|---|
-| `tools/voice/check.mjs`, `samples.mjs`, `tools/llm/check.mjs`, `devices.mjs` (and the `engine.mjs` they share) | They run the models the way the browser does: ONNX Runtime Web, plus the worker's own `web/src/voice/supertonic.ts` and `voices.ts`. Porting them means an ONNX runtime in Rust (`ort` or `tract`) and `supertonic.ts` in Rust. |
+| `tools/voice/check.mjs`, `tools/llm/check.mjs`, `devices.mjs` (and the `engine.mjs` they share) | They run the models the way the browser does: ONNX Runtime Web, plus the worker's own `web/src/voice/supertonic.ts` and `voices.ts`. Porting them means an ONNX runtime in Rust (`ort` or `tract`) and `supertonic.ts` in Rust. |
 | `tools/characters/check_clips.ts` | Reads the clip data that is generated into `web/src/render/shared/characters/clips/`. |
 | `tools/bench/*.mjs` | Playwright: they drive a real browser and time the render. What they do with the pictures afterwards is `cargo shots`. |
 | `tools/art/validate.ts` | It runs the Khronos glTF validator (`cargo check-glb --validate`), which is a JavaScript package. |

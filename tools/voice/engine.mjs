@@ -3,7 +3,7 @@
  * (`web/src/voice/wasm-pkg`), ONNX Runtime Web (its WASM build: Bun has no WebGPU, so here on
  * the CPU; the arithmetic differs from the GPU's only in rounding) and the files in
  * `web/public/voice/`, with every line made by `web/src/voice/supertonic.ts` (the worker's own
- * code). Used by `check.mjs` and `samples.mjs`. Needs `bun run voice` first.
+ * code). Used by `check.mjs`. Needs `bun run voice` first.
  */
 
 import { readFileSync } from 'node:fs';
@@ -12,17 +12,17 @@ import { gunzipSync } from 'node:zlib';
 
 const web = new URL('../../web/', import.meta.url);
 const require = createRequire(new URL('package.json', web));
-export const ort = require('onnxruntime-web');
+const ort = require('onnxruntime-web');
 const wasm = await import(new URL('src/voice/wasm-pkg/voice_wasm.js', web).href);
 export const { synthesizeLine, parseStyle, STYLE_IDS } = await import(new URL('src/voice/supertonic.ts', web).href);
-export const voices = await import(new URL('src/voice/voices.ts', web).href);
+const voices = await import(new URL('src/voice/voices.ts', web).href);
 export const { PRESETS } = voices;
 
 export const SAMPLE_RATE = 24000;
 /** The model's folder and files, as the worker names them. */
-export const MODEL_DIR = 'supertonic-3/';
+const MODEL_DIR = 'supertonic-3/';
 /** The graphs as the site ships them: 8-bit weights, the matrix ones read by `MatMulNBits` (the duration predictor's 16-bit), gzipped (`cargo fetch-voice`). */
-export const MODELS = { duration: 'duration_predictor.onnxz', text: 'text_encoder.onnxz', vector: 'vector_estimator.onnxz', vocoder: 'vocoder.onnxz' };
+const MODELS = { duration: 'duration_predictor.onnxz', text: 'text_encoder.onnxz', vector: 'vector_estimator.onnxz', vocoder: 'vocoder.onnxz' };
 
 const dir = new URL('public/voice/', web);
 wasm.initSync({ module: readFileSync(new URL('src/voice/wasm-pkg/voice_wasm_bg.wasm', web)) });

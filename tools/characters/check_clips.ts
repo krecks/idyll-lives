@@ -77,6 +77,8 @@ const { KNEEL_TABLE, SIT_LOW } = await import('../../web/src/render/shared/chara
 const { TURN_ANGLES, turnClip, turnDef, turnSeconds, turnShare } = await import('../../web/src/render/shared/characters/clips/locomotion.ts');
 const { turned } = await import('../../web/src/render/shared/characters/clips/ik.ts');
 const { measureTransitions, summarise, TRAVEL_LIMIT } = await import('./transitions.ts');
+/** The runtime's hip roll while walking, per body (rad). */
+const { GAIT_SWAY } = await import('../../web/src/render/shared/characters/actions.ts');
 /**
  * Turning on the spot (clips/locomotion.ts, baked by the runtime as needed: `turnDef`): every size each way, a grown-up's
  * and a child's, with its angle (deg, + to the right).
@@ -182,13 +184,6 @@ const SEAT: Record<string, number> = { child: 0.31 };
 const TURN_OF = new Map(TURNS.map((t) => [t.clip, t]));
 const SEAT_HEIGHT = 0.45;
 const STAGES = ['baby', 'child', 'teen', 'youngAdult', 'adult', 'elder'];
-/** The runtime's hip roll while walking, per body (rad), read from render/shared/characters/actions.ts so the two can't drift apart. */
-const GAIT_SWAY: Record<string, number> = (() => {
-  const src = readFileSync(new URL('../../web/src/render/shared/characters/actions.ts', import.meta.url), 'utf8');
-  const m = /const GAIT_SWAY[^=]*=\s*\{([^}]*)\}/.exec(src);
-  if (!m) throw new Error('check_clips: GAIT_SWAY not found in actions.ts');
-  return Object.fromEntries(m[1].split(',').map((kv) => kv.split(':').map((s) => s.trim())).filter((kv) => kv.length === 2).map(([k, v]) => [k, Number(v)]));
-})();
 const BASELINE = new URL('./clip-baseline.json', import.meta.url).pathname;
 
 // --- arguments --------------------------------------------------------------------------------

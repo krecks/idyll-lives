@@ -109,7 +109,6 @@ for (let run = 0; run < runs; run++) {
     const dt = performance.now() - t0;
     // (The snapshot's tick counts round at 2^24.)
     const now = (tickOf() - start + (1 << 24)) % (1 << 24);
-    const ran = Math.max(1, now - ticks);
     const hour = Math.floor(ticks / TICKS_PER_HOUR);
     if (hour < hours) hourly[hour] += dt;
     ticks = now;

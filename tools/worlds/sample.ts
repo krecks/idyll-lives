@@ -113,7 +113,7 @@ function inACentre(town: TownFile, plot: number): boolean {
 const content = await Content.load(new URL('content/base.json', root).href);
 const assets = await AssetRegistry.load(new URL('assets/manifest.json', root).href);
 const read = (name: string) => JSON.parse(readFileSync(fileURLToPath(new URL(`content/${name}`, root)), 'utf8'));
-const templates: Templates = { ...(read('houses.json') as Templates), gen: read('housegen.json') as HouseGenConfig, info: objectInfos(content), lampTiles: content.lampTiles };
+const templates: Templates = { ...(read('houses.json') as Templates), gen: read('housegen.json') as HouseGenConfig, info: objectInfos(content), lampTiles: content.lampTiles, windowTiles: content.windowTiles };
 
 const flag = (name: string) => {
   const i = process.argv.indexOf(name);
@@ -123,7 +123,7 @@ const flag = (name: string) => {
 const seedBase = Number(flag('--seed-base') ?? process.env.WORLDS_SEED_BASE ?? 0);
 if (!Number.isInteger(seedBase) || seedBase < 0) throw new Error(`no seed base ${seedBase}`);
 const SEED_STEP = 7919;
-/** `--no-timing`: the layout's and the file's time not checked against their budgets (a run beside others, on a slow runner: `web/tests/sampleWorlds.slow.test.ts`). */
+/** `--no-timing`: the layout's and the file's time not checked against their budgets (a run beside others, on a slow runner: `web/tests/sampleWorlds.slow.test.ts`, `tools/ci-local.sh generated`). */
 const timing = !process.argv.includes('--no-timing');
 if (!timing) process.argv.splice(process.argv.indexOf('--no-timing'), 1);
 const tier = (flag('--tier') ?? 'full') as import('../../web/src/game/people.ts').FillTier;

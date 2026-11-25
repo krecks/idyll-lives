@@ -225,3 +225,4 @@ try {
   stop();
 }
 console.log(faults ? `zoneShots: ${faults} fault(s); pictures in ${out}` : `zoneShots: clean; pictures in ${out}`);
+process.exitCode = faults ? 1 : 0;

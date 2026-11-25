@@ -17,7 +17,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { PRESETS, SAMPLE_RATE, STYLE_IDS, engine, medianPitch, phonemizer, synthesizeLine } from './engine.mjs';
+import { PRESETS, SAMPLE_RATE, STYLE_IDS, engine, medianPitch, phonemizer, say } from './engine.mjs';
 
 const LINES = [
   'Hello there!',
@@ -74,7 +74,6 @@ function centroid(x) {
 
 const first = await engine();
 const second = await engine();
-const say = async (e, text, voice) => (await synthesizeLine(e, text, voice)).samples;
 
 /** Same samples twice in one engine and once in a fresh one; prints the time. */
 async function steady(label, line, voice) {
