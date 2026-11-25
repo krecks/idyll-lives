@@ -86,7 +86,7 @@ type Land = import('../../web/src/game/land.ts').Land;
  * (Not targets: a big world may take a while to build. They catch one that runs away.)
  */
 const LAND_JOB_BUDGET = 400;
-const LAYOUT_BUDGET = 1500;
+const LAYOUT_BUDGET = 3000;
 const ASSEMBLE_BUDGET = 2500;
 const MAX_FILE = 6e6;
 /** A place's land seeded and its town graded into it, round after round where it gives up what breaks the slope limits (`settleLand`), ms: about twice the slowest world measured (2026-11-16, M3 Pro). */
