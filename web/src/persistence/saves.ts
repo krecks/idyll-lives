@@ -210,11 +210,19 @@ export async function refuseSave(save: SaveMeta, problem: SaveProblem): Promise<
 }
 
 /** A save that opened (one set aside earlier tried again from Load game): its details lose the mark, so Continue offers it again. */
-export async function openedSave(save: SaveRecord): Promise<void> {
+export async function openedSave(save: SaveMeta): Promise<void> {
   refused.delete(save.id);
   try {
-    // (The record has no marks: they are only ever put in the details, `refuseSave`.)
-    await run('readwrite', [META], (tx) => tx.objectStore(META).put(metaOf(save)));
+    // (Only a marked save's details are written, as they are now: another tab may have saved into the slot since it was read.)
+    await run('readwrite', [META], (tx) => {
+      const store = tx.objectStore(META);
+      const req = store.get(save.id) as IDBRequest<SaveMeta | undefined>;
+      req.onsuccess = () => {
+        if (!req.result || (req.result.tooNewFor === undefined && req.result.failedIn === undefined)) return;
+        const { tooNewFor: _tooNew, failedIn: _failed, ...meta } = req.result;
+        store.put(meta);
+      };
+    });
   } catch (err) {
     console.warn('[saves] could not clear a save\'s failed mark', err);
   }
@@ -226,19 +234,20 @@ export function keptAs(problem: SaveProblem): 'tooNewFor' | 'failedIn' | null {
   return problem === 'tooNew' ? 'tooNewFor' : problem === 'failed' ? 'failedIn' : null;
 }
 
+/** What's wrong with an unloadable save, and whether it was kept or removed. */
 export function problemNotice(problem: SaveProblem, name: string): string {
-  if (problem === 'tooNew') return `“${name}” is from a newer version of Idyll Lives, so this version can't open it. It's been kept.`;
-  if (problem === 'tooOld') return `“${name}” is from a version of Idyll Lives too old to open, so it was removed.`;
-  if (problem === 'failed') return `This version of Idyll Lives couldn't open “${name}”. It's been kept: you can try it again or export it from Load game.`;
-  return `“${name}” is damaged and can't be opened, so it was removed.`;
+  const fate = problem === 'failed' ? "It's been kept: you can try it again or export it from Load game." : keptAs(problem) ? "It's been kept." : 'It was removed.';
+  return `${importProblemText(problem, name)} ${fate}`;
 }
 
-/** What's wrong with a save file someone tried to import. */
-export function importProblemText(problem: SaveProblem): string {
-  if (problem === 'tooNew') return "This save is from a newer version of Idyll Lives, so this version can't open it.";
-  if (problem === 'tooOld') return 'This save is from a version of Idyll Lives too old to open.';
-  if (problem === 'failed') return "This version of Idyll Lives couldn't open this save.";
-  return "This save is damaged and can't be opened.";
+/** What's wrong with a save file someone tried to import (or the save `name`). */
+export function importProblemText(problem: SaveProblem, name?: string): string {
+  const save = name ? `“${name}”` : 'this save';
+  const Save = name ? save : 'This save';
+  if (problem === 'tooNew') return `${Save} is from a newer version of Idyll Lives, so this version can't open it.`;
+  if (problem === 'tooOld') return `${Save} is from a version of Idyll Lives too old to open.`;
+  if (problem === 'failed') return `This version of Idyll Lives couldn't open ${save}.`;
+  return `${Save} is damaged and can't be opened.`;
 }
 
 /** Marks an exported save file (and its format). */

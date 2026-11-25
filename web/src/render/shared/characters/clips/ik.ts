@@ -7,6 +7,7 @@
  */
 
 import { reached, reference, WRITTEN, type BoneKey, type PoseSpec, type Rot, type Vec } from './dsl';
+import { smooth } from '../../../../game/noise';
 
 /** A 3x3 rotation, row-major. */
 export type M3 = readonly number[];
@@ -267,11 +268,7 @@ export function wrist(side: 'l' | 'r', flex: number, dev = 0, roll = 0): Rot {
 
 export type Bones = Partial<Record<BoneKey, Rot>>;
 
-/** Smoothstep, and a clamped ramp from a to b. */
-export function smooth(t: number): number {
-  const c = Math.max(0, Math.min(1, t));
-  return c * c * (3 - 2 * c);
-}
+/** A clamped smoothstep ramp from a to b. */
 export function ramp(t: number, a: number, b: number): number {
   return smooth((t - a) / (b - a));
 }

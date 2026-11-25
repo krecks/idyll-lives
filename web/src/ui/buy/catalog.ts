@@ -98,7 +98,8 @@ export function appeal(content: Content, def: ObjectDef, traits: readonly string
     for (const t of traits) {
       const prefs = likesMap.get(t);
       if (!prefs) continue;
-      for (const tag of it.tags ?? []) pull = Math.max(pull, prefs[tag] ?? 1);
+      // (As sim-core `Modifiers::preference`: the product over its tags, each once, of every trait's preference.)
+      for (const tag of new Set(it.tags)) pull *= prefs[tag] ?? 1;
     }
     best = Math.max(best, pull);
   }

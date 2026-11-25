@@ -303,6 +303,8 @@ export async function runDeviceTest(text: TalkText, device: OrtDevice = llmDevic
         let nanAudio = false;
         const { frames } = await watchFrames(async () => {
           for (const [i, ask] of asks.entries()) {
+            // Stopped after the last line was spoken: before `generateText` loads the model again.
+            check();
             const start = performance.now();
             // As in a game: the writer's limits, and its time (cut short, the finished sentences are said).
             const g = await generateText(ask.messages, { temperature: 0, maxTokens: LINE_TOKENS, stopAt: LINE_STOPS, sentences: i + 1 }, { reply: ask.reply, lead: ask.lead, deadline: Date.now() + WRITE_MS });

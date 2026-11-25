@@ -73,7 +73,7 @@ import { type Hands, palmAt, placeFrame, placeHand, placeProp } from './props';
 import { rimOf } from './clips/shot';
 import { FACE_PARTS, LOD_FAR_PX, LOD_HEIGHT_PX, LOD_NEAR_PX, MORPH_PX, POSE_FAR_PX, POSE_NEAR_PX, type PartMesh, Range, YOUNG_STAGES, detailOf, shellBit, skinChunks, wispsOf } from './parts';
 import { type Additive, type Placement, PoseScratch, addLocal, addRotation, blendInto, makeAdditive, resetAdditive, rotate, sampleClip, skin } from './pose';
-import { BABBLE, type Frame, type Player, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, freezePlayer, gettingIn, lerpAngle, lieBack, lieCentre, player, ramp, rotationOf, setFrame, shoulderDrop, smooth, speaking, splitKey, unit, wrapAngle } from './rig';
+import { BABBLE, type Frame, type Player, HEAD_MARGIN, MAX_CHARACTERS, type SimRig, UNIT, advance, alongWay, clampBuild, clampHeight, copyPlayer, embraceStep, eyesBelowTop, freezePlayer, gettingIn, lerpAngle, lieBack, lieCentre, player, ramp, rotationOf, setFrame, shoulderDrop, speaking, splitKey, unit, wrapAngle } from './rig';
 import { type LegSide, SEAT_FIT, feetDown, legTurn, perch, seatSize } from './seatFit';
 import { BATH_WEAR, BEDS, BENCH_HIP, BENCH_KNEE, BLANKET_BEDS, BLANKET_MEET, BUNKS, type Bed, CLIP_HEIGHT, CURLED_BEDS, DEFAULT_BED, DEFAULT_SEAT, FEET_UP, FOOTSTOOLS, LEGS_OUT_DROP, LIE_CENTRE, LIE_ENTRY, type LegFit, NO_FEET_UP, ON_FLOOR, PEDAL, type PlacedObject, QUILT_COLOUR, QUILT_PART, REST_BACK, RISING, SEATS, SIDE_BEDS, SIDE_IN, SIT_CLIPS, SIT_FLEX, SIT_FROM, SLING, type Seat, type SeatFit, TUCK, floorSit, seatOf, slingTop } from './seats';
 import { AIM, Anim, EMBRACE, KISS_FIT, REFUSED, gesturesOf } from './socials';
@@ -86,7 +86,7 @@ import type { TemplateCache } from '../templateCache';
 import { WALL_HEIGHT } from '../walls';
 import { MOST_CADENCE, MOUNT_SECONDS, MOUNTS, type Mount, mountNodes } from './vehicles';
 import type { ResidentProp, ResidentView } from './view';
-import { clamp, hashInt, lerp } from '../../../game/noise';
+import { clamp, hashInt, lerp, smooth } from '../../../game/noise';
 import { compose, multiply, type Mat4, type Quat } from '../math';
 
 export { PLAYBACK_RATE, SUPER_SPEED } from '../gameSpeed';
@@ -226,7 +226,9 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   /** The drawn part meshes by mesh (`rowsOf`). */
   private readonly parts = new WeakMap<object, PartMesh<M>>();
   private sims: (SimRig | null)[] = [];
-  private objects: PlacedObject[] = [];
+  /** The placed objects Sims sit or lie on (`objectAt`), and those with a use clip (`objectInFront`). */
+  private restful: PlacedObject[] = [];
+  private usable: PlacedObject[] = [];
   /** Rows per storey (0: one storey): residents' rows are mapped back onto the ground's. */
   private storeyDepth = 0;
 
@@ -939,7 +941,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     }
     // Objects Sims sit, lie or stand at (for seat heights and object-use animations).
     this.objectById.clear();
-    this.objects = world.objects.map((o: ObjectPlacement) => {
+    const objects = world.objects.map((o: ObjectPlacement): PlacedObject => {
       const z = this.groundRow(o.z);
       // Its middle where it stands (things that stand anywhere on their tile); the bounds stay on tiles.
       const centre = objectCentre(o);
@@ -959,10 +961,12 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
       const footstool = stool ? { hw: (stool[0] / 2) * (o.size ? o.size[0] / (made[0] * 100) : 1), hd: (stool[1] / 2) * (o.size ? o.size[1] / (made[1] * 100) : 1), yaw: ((o.rot * 90 + (o.turn ?? 0)) * Math.PI) / 180 } : null;
       return { def: o.def, rot: o.rot, yaw: (o.rot * Math.PI) / 2 + ((o.turn ?? 0) * Math.PI) / 180, seat: { ...seat, h: seat.h + lift }, stand, held, lift, restful, builtIn: !!def?.surface && seatsItself(def), quilt: BLANKET_BEDS.has(o.def) ? this.beddingOf(o.def, def?.model, o.colors) : null, footstool, ride, cx: centre.x, cz: z + centre.z - o.z, minX: o.x, minZ: z, maxX: o.x + o.w, maxZ: z + o.d };
     });
-    this.footstools = this.objects.filter((o) => o.footstool);
-    world.objects.forEach((o, j) => this.objectById.set(o.id, this.objects[j]));
+    this.restful = objects.filter((o) => o.restful);
+    this.usable = objects.filter((o) => USE[o.def]);
+    this.footstools = objects.filter((o) => o.footstool);
+    world.objects.forEach((o, j) => this.objectById.set(o.id, objects[j]));
     this.seatIds.clear();
-    world.objects.forEach((o, j) => this.tables.has(o.id) && this.seatIds.set(this.objects[j], o.id));
+    world.objects.forEach((o, j) => this.tables.has(o.id) && this.seatIds.set(objects[j], o.id));
     const beds = world.objects.some((o) => BLANKET_BEDS.has(o.def));
     const bodies = new Set(this.sims.map((r) => r?.body.name));
     const rows = this.sims.length;
@@ -1103,10 +1107,13 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     this.restartClock();
     this.sims = [];
     this.ghosts = [];
-    this.objects = [];
+    this.restful = [];
+    this.usable = [];
+    this.footstools = [];
     this.objectById.clear();
     this.visible.fill(0);
     for (const p of this.meshes.values()) this.enablePart(p, false);
+    for (const p of this.shadowMeshes.values()) this.enablePart(p, false);
     for (const b of this.blankets.values()) this.view.quiltEnabled(b.quilt, false);
     for (let i = 0; i < MAX_CHARACTERS; i++) {
       this.writeProp(this.heldProp, i, null);
@@ -4604,10 +4611,10 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
   private objectAt(x: number, z: number): PlacedObject | null {
     let best: PlacedObject | null = null;
     let bestD = Infinity;
-    for (const o of this.objects) {
+    for (const o of this.restful) {
       if (x < o.minX - 0.05 || x > o.maxX + 0.05 || z < o.minZ - 0.05 || z > o.maxZ + 0.05) continue;
       const d = Math.abs(x - o.cx) + Math.abs(z - o.cz);
-      if (o.restful && d < bestD) {
+      if (d < bestD) {
         best = o;
         bestD = d;
       }
@@ -4621,8 +4628,7 @@ export class Characters<M extends object, Q, P extends ResidentProp> {
     const fz = rig.z + Math.cos(rig.yaw) * 0.55;
     let best: PlacedObject | null = null;
     let bestD = 0.6;
-    for (const o of this.objects) {
-      if (!USE[o.def]) continue;
+    for (const o of this.usable) {
       const qx = clamp(fx, o.minX, o.maxX);
       const qz = clamp(fz, o.minZ, o.maxZ);
       const d = Math.hypot(fx - qx, fz - qz);

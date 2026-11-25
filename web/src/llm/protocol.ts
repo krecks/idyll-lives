@@ -23,5 +23,5 @@ export type FromLlmWorker =
   | { type: 'done'; id: number; result: GenResult }
   /** A reply not written: its deadline passed before it started, or it was aborted. */
   | { type: 'skipped'; id: number }
-  /** A reply that failed (`id`), or the model couldn't load or the worker failed. */
-  | { type: 'error'; id?: number; message: string };
+  /** A reply that failed (`id`), or the model couldn't load or the worker failed. `restart`: the graphics device was lost; a new worker can take over. */
+  | { type: 'error'; id?: number; message: string; restart?: boolean };

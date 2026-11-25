@@ -607,6 +607,24 @@ describe('cost', () => {
     expect(editor.cost(peak, PRICES)).toBeGreaterThan(0);
     expect(editor.cost(peak, PRICES)).toBeLessThan(editor.cost(raised, PRICES));
   });
+
+  test('a reset refunds what the strokes cost, its undo charges it back: the player never comes out ahead', () => {
+    const land = landOf(256);
+    land.cover.fill(COVER.woods);
+    const editor = new LandEditor(land, FREE);
+    let funds = -editor.cost(stroke(editor, { tool: 'clear', radius: 20, strength: 1 }, [[128, 128]])!, PRICES);
+    const paid = -funds;
+    expect(paid).toBeGreaterThan(0);
+    // (As the land mode prices a reset: its patch, undone and redone.)
+    editor.reset();
+    editor.undo();
+    funds -= editor.cost(editor.redo()!, PRICES);
+    expect(funds).toBe(0);
+    funds -= editor.cost(editor.undo()!, PRICES);
+    expect(funds).toBe(-paid);
+    funds -= editor.cost(editor.redo()!, PRICES);
+    expect(funds).toBe(0);
+  });
 });
 
 describe('the point brush', () => {

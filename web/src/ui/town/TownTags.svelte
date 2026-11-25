@@ -43,7 +43,7 @@
   });
 
   /** The homes for sale's tags (a Big town's hundreds): made again when the plots or households change, not each game minute. */
-  const sales = $derived(saleTags(homesForSale(game.plots, game.households, services.content.economy.homePrice, game.flats), game, money));
+  const sales = $derived(saleTags(homesForSale(game.plots, game.households, services.content.economy.homePrice, game.flats), game, game.creative ? null : money));
   const tags = $derived.by((): TownTag[] => {
     if (!world) return [];
     const f = townHud.filters;

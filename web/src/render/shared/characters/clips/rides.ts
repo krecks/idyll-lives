@@ -17,7 +17,8 @@ import { cycle, mix, reference, type ClipDef, type PoseSpec, type Vec } from './
 import { breathe, hangArms, stand, TAU } from './idle';
 import { liePose } from './lie';
 import { SEAT_MOVE, seatedBody } from './seated';
-import { addV, armIK, footIK, lerpV, smooth, sub, turned, wrist } from './ik';
+import { addV, armIK, footIK, lerpV, sub, turned, wrist } from './ik';
+import { smooth } from '../../../../game/noise';
 import { REF_HEIGHT, sizes, type Fit, type Size } from './street';
 import { MOUNTS, type Mount } from '../vehicles';
 

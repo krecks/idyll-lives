@@ -11,8 +11,8 @@
 
 import { cycle, mix, type ClipDef, type PoseSpec, type Vec } from './dsl';
 import { bump, hangArms, stand, TAU, type StandOptions } from './idle';
-import { armIK, lerpV, onBody, smooth, wrist, type ArmOptions } from './ik';
-import { lerp } from '../../../../game/noise';
+import { armIK, lerpV, onBody, wrist, type ArmOptions } from './ik';
+import { lerp, smooth } from '../../../../game/noise';
 
 /** A hand placed by IK (`at`: the palm centre, on the body the numbers were written on: `onBody`), weighted `w` (default 1) against the hanging arm. */
 type Hand = ArmOptions & { at: Vec; w?: number };

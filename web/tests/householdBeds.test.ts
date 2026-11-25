@@ -11,7 +11,7 @@ describe('beds for who lives there', async () => {
   // --- the page's world in bun: content from web/public (put back for whatever runs next) ---
   usePublicFetch();
   const { generateHouse, objectInfos } = await import('../src/game/housegen');
-  const { residentsOf } = await import('../src/game/household');
+  const { householdProblems, residentsOf } = await import('../src/game/household');
   type HouseGenConfig = import('../src/game/housegen').HouseGenConfig;
   type HouseholdDraft = import('../src/game/household').HouseholdDraft;
   type Residents = import('../src/game/housegen').Residents;
@@ -66,6 +66,13 @@ describe('beds for who lives there', async () => {
       for (const d of defs.filter((d) => content.object(d)?.category === 'kids')) expect([d, mayUse(d, 'teen')]).toEqual([d, true]);
       expect(defs.some((d) => (content.object(d)?.slots ?? 1) >= 2 && content.object(d)?.group === 'beds')).toBe(true);
     }
+  });
+
+  test('partners made a child are a problem (they would move in as partners)', () => {
+    const grown = family(12);
+    expect(householdProblems(content, grown).filter((p) => p.includes('partners'))).toEqual([]);
+    grown.members[1].age = 12;
+    expect(householdProblems(content, grown)).toContain('jonah and elif: only grown-ups can be partners');
   });
 
   test("a little one's room may have the race car bed and toys", () => {
