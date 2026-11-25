@@ -49,12 +49,6 @@ impl World {
             .iter()
             .filter(|o| o.may_reach([x0 - 2, z0 - 2, x1 + 2, z1 + 2], m))
             .collect();
-        let object_at = |x: i32, z: i32| {
-            near.iter().any(|o| {
-                let (w, d) = o.size(&self.content);
-                x >= o.x && z >= o.z && x < o.x + w && z < o.z + d
-            })
-        };
         // What hangs on the wall at this grid edge (`horizontal`: an `h` edge).
         let (near, content) = (&near, &self.content);
         let hung_on = move |horizontal: bool, x: i32, z: i32| {
@@ -107,10 +101,10 @@ impl World {
             }
             if e.kind != EdgeKind::Open
                 && let Some(dir) = diagonal
-                && (object_at(a.0, a.1)
-                    || near
-                        .iter()
-                        .any(|o| o.body_crosses(&self.content, e.x, e.z, dir)))
+                && near.iter().any(|o| {
+                    o.tiles(&self.content).any(|t| t == a)
+                        || o.body_crosses(&self.content, e.x, e.z, dir)
+                })
             {
                 return Err(Error::new("a wall can't go through furniture"));
             }
