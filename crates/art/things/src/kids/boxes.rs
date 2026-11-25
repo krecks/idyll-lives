@@ -229,15 +229,16 @@ pub fn toy_box() -> Vec<Obj> {
             "hinge",
             0.006,
             0.7,
-            (0, 0.462, z - 0.252),
+            (0, 0.505, z - 0.218),
             M.handle,
             rot = (0, 90, 0),
             verts = 8
         );
     });
-    let lid = hinged(join(&parts, "lid", None), F.at(0, 0.46, z - 0.26));
+    // hinged 4 cm in from the lid's back, near its top: it swings up to stand on the back rim, clear of the wall
+    let lid = hinged(join(&parts, "lid", None), F.at(0, 0.5, z - 0.218));
     place(0.0);
-    swing!(lid, "lid_open", -100.0, seconds = 1.0, axis = Axis::X);
+    swing!(lid, "lid_open", -90.0, seconds = 1.0, axis = Axis::X);
     meshes()
 }
 
@@ -461,8 +462,9 @@ pub fn toy_chest() -> Vec<Obj> {
             M.eye
         );
     });
-    let lid = hinged(join(&parts, "lid", None), F.at(0, 0.44, z - 0.25));
+    // hinged inside the dome, 5 cm in from its back: it swings up to stand on its back end, clear of the wall
+    let lid = hinged(join(&parts, "lid", None), F.at(0, 0.5, z - 0.196));
     place(0.0);
-    swing!(lid, "lid_open", -100.0, seconds = 1.0, axis = Axis::X);
+    swing!(lid, "lid_open", -90.0, seconds = 1.0, axis = Axis::X);
     meshes()
 }

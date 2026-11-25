@@ -47,7 +47,7 @@ creases move its vertices up and down only (`rumple`): `jitter` sideways moved i
 
 | Model | Clip | Kind |
 |---|---|---|
-| Toy box, toy chest | `lid_open`: the lid swings up 100°, toys heaped inside | `uses.play`, open while the child plays |
+| Toy box, toy chest | `lid_open`: the lid swings up 90° about a hinge set 4–5 cm in from its back, to stand upright on the back rim, clear of the wall behind (at 100° about its back edge it reached 15–18 cm into it); toys heaped inside | `uses.play`, open while the child plays |
 | Doll house | `front_open`: the front wall swings 120° on its side hinge, two furnished rooms behind | `uses.dolls` |
 | Rocking horse | `rock`: ±12° about the rockers' centre, 1 m up, in 1.2 s; the rider rides it | `loops.ride`, `ride` |
 | Play tent | `flap_open`: the door flap rolls up to its top edge (squashed along the canvas) | `uses.play` |
