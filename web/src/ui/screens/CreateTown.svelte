@@ -186,7 +186,11 @@
       }
     }
   }
-  $effect(() => () => job?.abort());
+  // (Let go too: the job's `finally` would attach the disposed editor again.)
+  $effect(() => () => {
+    job?.abort();
+    job = null;
+  });
 
   let confirming = $state<{ text: string; yes: string; go: () => void } | null>(null);
   function answer(yes: boolean) {

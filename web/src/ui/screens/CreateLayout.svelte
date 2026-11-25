@@ -173,9 +173,11 @@
       }
     }
   }
+  // (Let go too: the job's `finally` would attach the disposed editor again.)
   $effect(() => () => {
     clearTimeout(settling);
     job?.abort();
+    job = null;
   });
 
   /** What proposing again asks about (`whatGoes`): the layout's edits, the built town's tweaks. */
