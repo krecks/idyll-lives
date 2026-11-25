@@ -48,20 +48,36 @@ fn word(c: char) -> bool {
 }
 
 /// Whether a `/` after `before` starts a regex literal rather than dividing: at the start, after an operator or
-/// an opening bracket, or after `return`; after `++`/`--` (a value) it divides.
+/// an opening bracket, or after a keyword that takes a value (`return`, `typeof`, `in`, …); after `++`/`--` (a
+/// value) it divides.
 fn regex_may_start(before: &str) -> bool {
     let before = before.trim_end();
     if before.ends_with("++") || before.ends_with("--") {
         return false;
     }
+    const KEYWORDS: [&str; 11] = [
+        "return",
+        "typeof",
+        "instanceof",
+        "in",
+        "of",
+        "case",
+        "void",
+        "delete",
+        "yield",
+        "await",
+        "else",
+    ];
     before.is_empty()
         || before.ends_with([
             '(', ',', '=', ':', '[', '!', '&', '|', '?', '{', '}', ';', '<', '>', '+', '-', '*',
             '%', '~', '^',
         ])
-        || before
-            .strip_suffix("return")
-            .is_some_and(|b| !b.chars().next_back().is_some_and(word))
+        || KEYWORDS.iter().any(|k| {
+            before
+                .strip_suffix(k)
+                .is_some_and(|b| !b.chars().next_back().is_some_and(word))
+        })
 }
 
 /// The pinned text of a file's content, or what is wrong with the pin.
@@ -371,6 +387,10 @@ mod tests {
             whole(&format!("export const W = f({v} / g(2)) / 4;"), "W");
         }
         whole("export const X = (n) => /[(]/.test(n);", "X");
+        // After a keyword that takes a value, a regex; an identifier ending in one divides.
+        whole("export const K = typeof /[(]/;", "K");
+        whole("export const L = (x) => x in /[{]/ ? 1 : 2;", "L");
+        whole("export const O = f(main / 2);", "O");
         whole("export const N = `a ${x ? `(${y})` : '}'} b`;", "N");
         whole("export const M = `${{ a: 1 }.a}`;", "M");
         assert!(
