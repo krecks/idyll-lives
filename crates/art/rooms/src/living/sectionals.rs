@@ -227,8 +227,8 @@ pub fn chaise() -> Vec<Obj> {
             "base",
             0.96,
             0.22,
-            1.9,
-            (0.0, 0.21, 0.0),
+            1.84,
+            (0.0, 0.21, -0.03),
             M.greige,
             0.035,
             0.0,
@@ -251,8 +251,8 @@ pub fn chaise() -> Vec<Obj> {
             "arm",
             0.17,
             0.52,
-            1.9,
-            (0.395, 0.36, 0.0),
+            1.84,
+            (0.395, 0.36, -0.03),
             M.greige,
             0.065,
             0.0,
@@ -273,7 +273,7 @@ pub fn chaise() -> Vec<Obj> {
             },
         );
         for lx in [-0.42, 0.42] {
-            for lz in [-0.88, 0.88] {
+            for lz in [-0.88, 0.82] {
                 taper_leg(
                     &format!("leg{}{}", float_repr(lx), float_repr(lz)),
                     lx,
@@ -292,8 +292,8 @@ pub fn chaise() -> Vec<Obj> {
             "seat",
             0.76,
             0.13,
-            1.66,
-            (-0.08, 0.385, 0.1),
+            1.6,
+            (-0.08, 0.385, 0.07),
             M.greige_cushion,
             Cushion {
                 puff: 0.02,
@@ -307,8 +307,8 @@ pub fn chaise() -> Vec<Obj> {
             -0.06,
             0.52,
             0.469,
-            0.36,
-            0.935,
+            0.3,
+            0.875,
             M.throw_oat,
             0.1,
             turn = -3.0,
@@ -316,5 +316,5 @@ pub fn chaise() -> Vec<Obj> {
         );
         0.45
     };
-    settled(seat(cushions, 0.32, 0.1))
+    settled(seat(cushions, 0.32, 0.07))
 }

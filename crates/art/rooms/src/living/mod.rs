@@ -284,9 +284,9 @@ pub fn family() -> Family {
                 .centre(0.0, 0.015)
                 .motions(sofa_uses())
                 .paint(&[SECTIONAL[0], SECTIONAL[1], SECTIONAL[2], ("pillow_mustard", "Pillow")]),
-            Model::new("chaise", sectionals::chaise, (0.96, 0.823, 1.9))
+            Model::new("chaise", sectionals::chaise, (0.96, 0.823, 1.84))
                 .key("model.chaise")
-                .centre(0.0, 0.02)
+                .centre(0.0, -0.01)
                 .motions(sofa_uses())
                 .paint(&[SECTIONAL[0], SECTIONAL[1], SECTIONAL[2], ("throw_oat", "Throw")]),
             // L2: the armchairs and small seats
@@ -352,10 +352,10 @@ pub fn family() -> Family {
                 .key("model.coffeeTable")
                 .motions(json!({"uses": {"magazine": "drawer_open"}, "hold": 2.5}))
                 .paint(&[("oak", "Wood"), ("brass", "Knob")]),
-            Model::new("coffeeTableGlass", tables::coffee_table_glass, (1.3, 0.6, 0.74))
+            Model::new("coffeeTableGlass", tables::coffee_table_glass, (1.3, 0.525, 0.74))
                 .key("model.coffeeTableGlass")
                 .paint(&[("chrome", "Frame"), ("glass", "Glass")]),
-            Model::new("coffeeTableMarble", tables::coffee_table_marble, (0.88, 0.58, 0.88))
+            Model::new("coffeeTableMarble", tables::coffee_table_marble, (0.88, 0.535, 0.88))
                 .key("model.coffeeTableMarble")
                 .paint(&[("marble", "Top"), ("brass", "Base")]),
             Model::new("sideTable", tables::side_table, (0.55, 0.55, 0.45))
@@ -364,7 +364,7 @@ pub fn family() -> Family {
             Model::new("coffeeTableRound", side_tables::coffee_table_round, (0.84, 0.42, 0.84))
                 .key("model.coffeeTableRound")
                 .paint(&[("cream_gloss", "Top"), ("oak", "Base")]),
-            Model::new("coffeeTableLong", side_tables::coffee_table_long, (1.66, 0.42, 0.72))
+            Model::new("coffeeTableLong", side_tables::coffee_table_long, (1.52, 0.42, 0.72))
                 .key("model.coffeeTableLong")
                 .paint(&[("walnut_warm", "Top"), ("black_metal", "Legs")]),
             Model::new("nestingTables", side_tables::nesting_tables, (0.57, 0.512, 0.55))
@@ -375,9 +375,9 @@ pub fn family() -> Family {
             Model::new("sideTableRound", side_tables::side_table_round, (0.52, 0.56, 0.52))
                 .key("model.sideTableRound")
                 .paint(&[("stone_top", "Top"), ("brass", "Base")]),
-            Model::new("consoleTable", side_tables::console_table, (1.8, 0.7975, 0.56))
+            Model::new("consoleTable", side_tables::console_table, (1.6, 0.7975, 0.44))
                 .key("model.consoleTable")
-                .centre(0.0, -0.15)
+                .centre(0.0, -0.21)
                 .paint(&[("oak", "Top"), ("black_metal", "Legs"), ("basket", "Baskets")]),
             // L5: the shelves; on the bookcases one book tips out while read at
             Model::new("bookshelf", shelves::bookshelf, (0.9, 1.9175, 0.375))
@@ -395,9 +395,9 @@ pub fn family() -> Family {
                 .centre(0.0, -0.195)
                 .motions(book_out)
                 .paint(&[("oak", "Frame"), ("oak_back", "Back")]),
-            Model::new("shelvingIndustrial", bookcases::shelving_industrial, (1.86, 1.83, 0.53))
+            Model::new("shelvingIndustrial", bookcases::shelving_industrial, (1.86, 1.83, 0.45))
                 .key("model.shelvingIndustrial")
-                .centre(0.0, -0.165)
+                .centre(0.0, -0.205)
                 .paint(&[("black_metal", "Frame"), ("oak_shelf", "Shelves")]),
             Model::new("bookcaseTall", bookcases::bookcase_tall, (0.9, 2.0, 0.34))
                 .key("model.bookcaseTall")

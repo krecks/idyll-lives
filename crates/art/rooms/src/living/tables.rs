@@ -336,7 +336,7 @@ pub fn coffee_table_glass() -> Vec<Obj> {
             closed = true
         );
     }
-    plant_bowl(-0.3, 0.42, 0.0, 0.07, 0.08, M.pot_white, 0.1, 3);
+    plant_bowl(-0.3, 0.42, 0.0, 0.065, 0.05, M.pot_white, 0.06, 3); // a low bowl of succulents
     disc(
         "vase",
         &[
@@ -444,13 +444,14 @@ pub fn coffee_table_marble() -> Vec<Obj> {
     disc(
         "vase",
         &[
+            // a bud vase, 12 cm (a coffee table's ornament under 55 cm all told)
             (0.42, 0.032),
-            (0.425, 0.045),
-            (0.47, 0.052),
-            (0.51, 0.038),
-            (0.565, 0.022),
-            (0.575, 0.025),
-            (0.58, 0.02),
+            (0.4236, 0.045),
+            (0.456, 0.052),
+            (0.4848, 0.038),
+            (0.5244, 0.022),
+            (0.5316, 0.025),
+            (0.5352, 0.02),
         ],
         M.vase,
         0.12,

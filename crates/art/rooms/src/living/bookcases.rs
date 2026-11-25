@@ -17,7 +17,7 @@ use artkit::{fbox, fcone, fcyl, fextrude, fsphere, rod, settle, soft, sweep, swi
 /// The industrial shelving (the old part): five oak boards on black steel posts and angles, its top at 1.83 (content
 /// `surface`); a cross brace behind, books, boxes and a plant.
 pub fn shelving_industrial() -> Vec<Obj> {
-    let (zb, zf) = (WALL, 0.10);
+    let (zb, zf) = (WALL, 0.02); // 45 cm deep, as shelving is
     let (zm, d) = ((zb + zf) / 2.0, zf - zb);
     for x in [-0.9125, 0.0, 0.9125] {
         for z in [zb + 0.0175, zf - 0.0175] {
