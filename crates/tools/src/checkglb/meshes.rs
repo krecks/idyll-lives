@@ -83,25 +83,12 @@ pub(super) fn read(file: &ModelFile, read: Read) -> R<Option<Vec<Mesh>>> {
     } else {
         file.entry.get("scale").and_then(J::num).map_or(1.0, Num::f)
     };
-    // A texture is judged on a part as built: one shrunk at rest that a clip grows back (washing flattened on the
-    // line, bedding folded into a sofa bed) at its grown size; one a clip stretches past its built size (curtains
-    // drawn) as built. The edges are the model's at rest.
-    let shrunk = |node: usize| {
-        nodes
-            .at(node as i64)
-            .and_then(|n| n.get("scale"))
-            .and_then(J::list)
-            .is_some_and(|s| {
-                s.iter()
-                    .any(|v| v.num().is_some_and(|v| v.f() < 1.0 - 1e-6))
-            })
-    };
+    // A texture is judged on a part at its largest: at rest, or at the largest key of any clip that scales it up
+    // (`grown`: past 1.5 times its rest). So one shrunk at rest that a clip grows back (washing flattened on the
+    // line, bedding folded into a sofa bed, curtains gathered open) is judged at its grown size, and one a clip
+    // stretches past its built size (a cloth scaled out) as stretched. The edges are the model's at rest.
     let pose = match read {
-        Read::Textured => {
-            let mut pose = super::grown(g, &[])?;
-            pose.retain(|(node, _), _| shrunk(*node));
-            Some(pose)
-        }
+        Read::Textured => Some(super::grown(g, &[])?),
         Read::Shape => None,
     };
     let mut out = Vec::new();
